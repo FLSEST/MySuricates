@@ -144,4 +144,11 @@ describe('FactoryFlowDiagram', () => {
     renderDiagram({ autoFix: false, autoPromote: false, maxRetries: 2, testHealthy: true });
     expect(screen.queryByRole('tablist')).toBeNull();
   });
+
+  it('starts collapsed from a stored "false" of the earlier String(bool) format', () => {
+    localStorage.setItem('mysuricates-factory-flow-open', 'false');
+    renderDiagram({ autoFix: false, autoPromote: false, maxRetries: 2, testHealthy: true });
+    expect(screen.getByRole('button', { name: /How the factory works/ })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('tablist')).toBeNull();
+  });
 });

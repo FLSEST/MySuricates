@@ -77,6 +77,30 @@ class AssistantWorkflowToolsTest {
         assertThat(req.getValue().blocks()).isNull();
     }
 
+    /** TODO 5e2e73a5: like PUT — a named version label is passed on, an absent one keeps the label. */
+    @Test
+    void updateWorkflow_passesTheVersionLabel_evenWrittenAsANumber() {
+        when(workflowService.update(eq("wf-1"), any(), eq(ChangeSource.ASSISTANT))).thenReturn(Workflow.builder().id("wf-1").name("W").build());
+
+        tools.updateWorkflow("{\"workflowId\":\"wf-1\",\"version\":\"4.4.0\"}");
+        tools.updateWorkflow("{\"workflowId\":\"wf-1\",\"version\":2}");
+        tools.updateWorkflow("{\"workflowId\":\"wf-1\",\"name\":\"W\"}");
+
+        ArgumentCaptor<UpdateWorkflowRequest> req = ArgumentCaptor.forClass(UpdateWorkflowRequest.class);
+        verify(workflowService, org.mockito.Mockito.times(3)).update(eq("wf-1"), req.capture(), eq(ChangeSource.ASSISTANT));
+        assertThat(req.getAllValues()).extracting(UpdateWorkflowRequest::version).containsExactly("4.4.0", "2", null);
+    }
+
+    /** A blank label is refused by the service, as on PUT; the tool line names the reason. */
+    @Test
+    void updateWorkflow_refusedVersion_isReportedWithItsReason() {
+        when(workflowService.update(eq("wf-1"), any(), eq(ChangeSource.ASSISTANT))).thenThrow(
+                new IllegalArgumentException("Invalid version: must not be blank (omit it to keep the current one)"));
+
+        assertThat(tools.updateWorkflow("{\"workflowId\":\"wf-1\",\"version\":\" \"}"))
+                .isEqualTo("⚠ Could not update workflow: Invalid version: must not be blank (omit it to keep the current one)");
+    }
+
     @Test
     void updateWorkflow_missingId_errorLine() {
         assertThat(tools.updateWorkflow("{\"name\":\"x\"}"))

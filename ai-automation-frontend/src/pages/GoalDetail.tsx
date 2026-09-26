@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, CalendarDays, ChartGantt, List, Network, Target, Trash2 } from 'lucide-react';
-import { Button, Card, Select, Spinner } from '../components/ui';
+import { Button, Card, ConfirmModal, Select, Spinner } from '../components/ui';
 import { ErrorState } from '../components/shared/ErrorState';
 import { TodoProgressBar } from '../components/todo/TodoProgressBar';
 import { GoalTodoList } from '../components/goal/GoalTodoList';
@@ -77,6 +77,7 @@ export function GoalDetail() {
   const [view, setView] = useState<GoalView>(readView);
   const [filter, setFilter] = useState<CandidateFilter>({ q: '', tag: '' });
   const [editing, setEditing] = useState<string | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState(false);
   const appliedFilter = useDebounced(filter, 300);
   const { data, isLoading, error, refetch } = useGoal(goalId);
   const candidatesPage = useGoalCandidates(appliedFilter, !!data);
@@ -114,10 +115,10 @@ export function GoalDetail() {
   };
   const assignTodo = (todoId: string) => assign.mutate({ id: goal.id, todoIds: [todoId] });
 
-  const remove = () => {
-    if (!window.confirm(t.goals.removeConfirm)) return;
-    deleteGoal.mutate(goal.id, { onSuccess: () => navigate('/goals') });
-  };
+  const remove = () => deleteGoal.mutate(goal.id, {
+    onSuccess: () => navigate('/goals'),
+    onSettled: () => setConfirmRemove(false),
+  });
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -150,7 +151,7 @@ export function GoalDetail() {
             options={GOAL_STATUSES.map((s) => ({ value: s, label: t.goals.statuses[s] }))}
           />
         </div>
-        <Button variant="secondary" size="sm" onClick={remove} aria-label={t.goals.remove}>
+        <Button variant="secondary" size="sm" onClick={() => setConfirmRemove(true)} aria-label={t.goals.remove}>
           <Trash2 className="w-3.5 h-3.5" />
         </Button>
       </div>
@@ -217,6 +218,19 @@ export function GoalDetail() {
       />
 
       {editing && <GoalTodoEditor todoId={editing} onClose={() => setEditing(null)} />}
+
+      {/* 23635ef6: the app's own dialog instead of window.confirm */}
+      <ConfirmModal
+        open={confirmRemove}
+        onClose={() => setConfirmRemove(false)}
+        onConfirm={remove}
+        title={t.goals.remove}
+        message={t.goals.removeConfirm}
+        confirmLabel={t.common.delete}
+        confirmIcon={<Trash2 className="w-4 h-4" />}
+        variant="danger"
+        isPending={deleteGoal.isPending}
+      />
     </div>
   );
 }

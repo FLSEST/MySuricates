@@ -31,14 +31,21 @@ import java.nio.file.Path;
  * startup backup of its throwaway test DB into the developer's real dev backup directory and
  * rotated genuine backups away (retain-count 30).
  *
+ * <p>Root cause (2026-09-24) for the setup directory: {@code SummarizationSetupService} and
+ * {@code FactorySetupService} write their instruction files ({@code CLAUDE.md}, {@code AGENTS.md})
+ * into {@code automation.summarization.base-dir} and {@code automation.factory.base-dir} on every
+ * context start ({@code @PostConstruct}); both default to {@code ${user.home}/.autotrigger/...}, so
+ * every {@code @SpringBootTest} context rewrote them in the developer's real home.
+ *
  * <p>Registered via {@code META-INF/services/org.junit.platform.launcher.LauncherSessionListener},
  * so it runs once per test JVM before any Spring context starts. It publishes per-process
- * unique paths as the {@code integration.db.path}, {@code integration.key.path}, {@code integration.seal.key.path} and
- * {@code integration.backup.dir} system properties, which {@code application-integration.yml}
- * resolves in the datasource/Flyway URLs, the integration-encryption key-file location and the
- * backup directory respectively. On session close it deletes the DB files (including
- * {@code -wal}/{@code -shm}), the key files and the backup directory, so no stale files survive
- * for the next run. Externally provided values for any property are respected and left
+ * unique paths as the {@code integration.db.path}, {@code integration.key.path}, {@code integration.seal.key.path},
+ * {@code integration.backup.dir} and {@code integration.setup.dir} system properties, which
+ * {@code application-integration.yml} resolves in the datasource/Flyway URLs, the
+ * integration-encryption key-file location, the backup directory and the summarization/factory
+ * base directories respectively. On session close it deletes the DB files (including
+ * {@code -wal}/{@code -shm}), the key files, the backup and the setup directory, so no stale files
+ * survive for the next run. Externally provided values for any property are respected and left
  * untouched (each is independent — one being external does not suppress the others).
  */
 public class IntegrationTestDbSessionListener implements LauncherSessionListener {
@@ -47,6 +54,7 @@ public class IntegrationTestDbSessionListener implements LauncherSessionListener
     static final String KEY_PROPERTY = "integration.key.path";
     static final String SEAL_KEY_PROPERTY = "integration.seal.key.path";
     static final String BACKUP_DIR_PROPERTY = "integration.backup.dir";
+    static final String SETUP_DIR_PROPERTY = "integration.setup.dir";
 
     /** Path owned by this listener; null when the property was set externally. */
     private Path ownedDbPath;
@@ -59,6 +67,9 @@ public class IntegrationTestDbSessionListener implements LauncherSessionListener
 
     /** Directory owned by this listener; null when the property was set externally. */
     private Path ownedBackupDir;
+
+    /** Directory owned by this listener; null when the property was set externally. */
+    private Path ownedSetupDir;
 
     @Override
     public void launcherSessionOpened(LauncherSession session) {
@@ -84,6 +95,11 @@ public class IntegrationTestDbSessionListener implements LauncherSessionListener
         if (System.getProperty(BACKUP_DIR_PROPERTY) == null) {
             ownedBackupDir = Path.of(tmpDir, "autotrigger-it-backups-" + pid + "-" + nanos);
             System.setProperty(BACKUP_DIR_PROPERTY, ownedBackupDir.toString());
+        }
+
+        if (System.getProperty(SETUP_DIR_PROPERTY) == null) {
+            ownedSetupDir = Path.of(tmpDir, "autotrigger-it-setup-" + pid + "-" + nanos);
+            System.setProperty(SETUP_DIR_PROPERTY, ownedSetupDir.toString());
         }
     }
 
@@ -111,6 +127,12 @@ public class IntegrationTestDbSessionListener implements LauncherSessionListener
             deleteRecursively(ownedBackupDir);
             System.clearProperty(BACKUP_DIR_PROPERTY);
             ownedBackupDir = null;
+        }
+
+        if (ownedSetupDir != null) {
+            deleteRecursively(ownedSetupDir);
+            System.clearProperty(SETUP_DIR_PROPERTY);
+            ownedSetupDir = null;
         }
     }
 

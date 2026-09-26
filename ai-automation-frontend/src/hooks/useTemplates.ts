@@ -3,6 +3,7 @@ import { api, apiErrorMessage } from '../api/client';
 import { useToast } from './useToast';
 import { useI18nStore, useT } from '../i18n';
 import { downloadJSON } from '../utils/downloadFile';
+import { resolveTemplateName } from '../utils/templateUtils';
 import type { WorkflowTemplate, CreateWorkflowTemplateRequest } from '../types';
 
 /**
@@ -49,8 +50,7 @@ export function useSaveWorkflowAsTemplate() {
   });
 }
 
-export async function exportTemplate(template: WorkflowTemplate, locale: string) {
-  const { resolveTemplateName } = await import('../utils/templateUtils');
+export function exportTemplate(template: WorkflowTemplate, locale: string) {
   const name = resolveTemplateName(template.name, locale).replace(/\s+/g, '_').toLowerCase();
   downloadJSON(template, `template_${name}.json`);
 }

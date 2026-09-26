@@ -46,7 +46,8 @@ class AuditSnapshotApplier {
         List<AuditFinding> touched = new ArrayList<>();
         List<String> collisions = new ArrayList<>();
 
-        for (ParsedFinding item : parsedFindings) {
+        for (ParsedFinding reported : parsedFindings) {
+            ParsedFinding item = unmasked(reported);
             AuditRuleKeyCatalog.Resolution resolution = resolveRuleKey(event, report, item, reportedRuleKeys);
             String ruleKey = resolution.ruleKey();
             String fingerprint = fingerprint(event.getProjectId(), report.getAuditKey(), ruleKey, item.subject());
@@ -136,6 +137,17 @@ class AuditSnapshotApplier {
     }
 
     /**
+     * {@code audit_findings} zeigt ein {@code |} in ruleKey, subject und Titel als {@code ¦}, und ein Modell fuehrt
+     * den Befund genau so weiter. Gespeichert – und im Audit Center gezeigt – wird wieder das {@code |}
+     * (TODO 90c4f7db); die Identitaet ist ohnehin dieselbe ({@link #fingerprint}).
+     */
+    private static ParsedFinding unmasked(ParsedFinding item) {
+        return new ParsedFinding(AuditFindingsContext.unmask(item.ruleKey()), AuditFindingsContext.unmask(item.subject()),
+                item.severity(), AuditFindingsContext.unmask(item.title()), item.description(), item.evidence(),
+                item.tags());
+    }
+
+    /**
      * Zwei Befunde eines Reports mit gleichem ruleKey und gleichem normalisierten subject haben eine
      * Identitaet; nur der erste wird uebernommen. Das geschah frueher still — beim Architektur-Review
      * fehlten so drei Findings, ohne dass es jemand merkte (TODO 94fda6ef).
@@ -172,12 +184,15 @@ class AuditSnapshotApplier {
     /**
      * Identitaet eines Findings: Projekt, Audit, Regel und das <em>normalisierte</em> subject
      * ({@link AuditSubjectNormalizer}) — modellgenerierte Suffix-Drift im subject erzeugt damit
-     * keinen neuen Fingerprint mehr (Audit-TODO 0e19648d).
+     * keinen neuen Fingerprint mehr (Audit-TODO 0e19648d). Ein {@code ¦} in Regel oder subject zaehlt
+     * wie {@code |}: So zeigt {@code audit_findings} ein {@code |} in einem Feld, und ein Modell, das den
+     * Befund von dort weiterfuehrt, gibt es so wieder (TODO 90c4f7db).
      */
     static String fingerprint(String projectId, String auditKey, String ruleKey, String subject) {
         try {
             byte[] hash = MessageDigest.getInstance("SHA-256").digest(
-                    String.join("\n", projectId, auditKey, ruleKey, AuditSubjectNormalizer.normalize(subject))
+                    String.join("\n", projectId, auditKey, AuditFindingsContext.unmask(ruleKey),
+                                    AuditSubjectNormalizer.normalize(AuditFindingsContext.unmask(subject)))
                             .getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(hash);
         } catch (Exception ex) {

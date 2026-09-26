@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Copy, LayoutTemplate, Pencil, Plus, Trash2 } from 'lucide-react';
-import { Button } from '../ui';
+import { Button, ConfirmModal } from '../ui';
 import { useT } from '../../i18n';
 import { selectActiveView, useDashboardLayoutStore } from '../../stores/dashboardLayoutStore';
 import { LAYOUT_LIMITS, type DashboardView } from './dashboardLayout';
@@ -34,6 +34,8 @@ export function DashboardViewTabs({ editMode, disabled }: DashboardViewTabsProps
   const removeView = useDashboardLayoutStore((s) => s.removeView);
   const moveView = useDashboardLayoutStore((s) => s.moveView);
   const [renamingId, setRenamingId] = useState<string | null>(null);
+  // View whose deletion waits for the confirmation (23635ef6)
+  const [removing, setRemoving] = useState<DashboardView | null>(null);
   const numbered = (n: number) => t.dashboard.views.numbered.replace('{n}', () => String(n));
   const labels = viewLabels(views, t.dashboard.views.defaultName, numbered);
 
@@ -51,9 +53,6 @@ export function DashboardViewTabs({ editMode, disabled }: DashboardViewTabsProps
   const addFromTemplate = (templateId: string) => {
     const template = DASHBOARD_TEMPLATES.find((candidate) => candidate.id === templateId);
     if (template) addView(template.name(t), templateWidgets(template.widgetIds, DASHBOARD_WIDGETS));
-  };
-  const confirmRemove = (view: DashboardView) => {
-    if (window.confirm(t.dashboard.views.removeConfirm.replace('{name}', () => labelOf(view)))) removeView(view.id);
   };
 
   return (
@@ -97,7 +96,7 @@ export function DashboardViewTabs({ editMode, disabled }: DashboardViewTabsProps
             size="sm"
             icon={<Trash2 className="h-3.5 w-3.5" />}
             disabled={disabled || views.length < 2}
-            onClick={() => confirmRemove(activeView)}
+            onClick={() => setRemoving(activeView)}
             aria-label={t.dashboard.views.remove}
             title={views.length < 2 ? t.dashboard.views.lastView : t.dashboard.views.remove}
           />
@@ -125,6 +124,19 @@ export function DashboardViewTabs({ editMode, disabled }: DashboardViewTabsProps
           />
         </div>
       )}
+      <ConfirmModal
+        open={removing !== null}
+        onClose={() => setRemoving(null)}
+        onConfirm={() => {
+          if (removing) removeView(removing.id);
+          setRemoving(null);
+        }}
+        title={t.dashboard.views.remove}
+        message={removing ? t.dashboard.views.removeConfirm.replace('{name}', () => labelOf(removing)) : null}
+        confirmLabel={t.common.delete}
+        confirmIcon={<Trash2 className="h-4 w-4" />}
+        variant="danger"
+      />
     </div>
   );
 }

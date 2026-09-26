@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import {
   ArrowLeft, Pause, Play, XCircle, CheckCircle2, AlertCircle, CircleSlash,
 } from 'lucide-react';
@@ -16,6 +16,7 @@ import {
 } from '../hooks/useWorkflows';
 import { useExecutionWebSocket } from '../hooks/useWebSocket';
 import { useRunPendingInput } from '../hooks/useRunPendingInput';
+import { useBackOr } from '../hooks/useBackNavigation';
 import { useI18nStore, useT } from '../i18n';
 import { formatTimestamp } from '../utils/localeFormat';
 import { formatDuration } from '../utils/formatTime';
@@ -84,7 +85,7 @@ const ACTIVE_STATUSES: ReadonlySet<RunStatus> = new Set(['PENDING', 'RUNNING', '
 
 export function SimpleWorkflowExecution() {
   const { id, runId } = useParams<{ id: string; runId: string }>();
-  const navigate = useNavigate();
+  const goBack = useBackOr(`/workflows/${id}`);
   const t = useT();
   const locale = useI18nStore((s) => s.locale);
 
@@ -119,7 +120,7 @@ export function SimpleWorkflowExecution() {
       {/* Header */}
       <div className="flex items-center gap-4">
         <button
-          onClick={() => window.history.length > 1 ? navigate(-1) : navigate(`/workflows/${id}`)}
+          onClick={goBack}
           className="p-2 rounded-lg hover:bg-surface-raised text-text-secondary hover:text-text transition-colors"
           aria-label={t.common.back}
         >
@@ -137,7 +138,7 @@ export function SimpleWorkflowExecution() {
             )}
           </div>
           <p className="text-xs text-text-tertiary mt-0.5">
-            {formatTimestamp(run.startedAt, locale)} · {t.workflows.execution.duration}: {formatDuration(run.durationMs)}
+            {formatTimestamp(run.startedAt, locale)} · {t.workflows.execution.duration}: {formatDuration(run.durationMs, locale)}
           </p>
         </div>
         {/* A failed run offers its rerun in the failure card below — one button, not two. */}

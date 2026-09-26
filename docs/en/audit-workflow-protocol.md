@@ -54,13 +54,15 @@ Title and description may evolve. An empty snapshot is output as
 `"findings": []`.
 
 If the output holds several envelopes, the **last** one with readable JSON counts (TODO `1cf996df`).
-The model's own envelope closes the answer, and an echoed previous run may stand before it:
-`{{ previous_report }}` is the first 3000 characters of the last report, which for a short report
-includes its envelope, often cut off. An envelope starts with `<!--`, the marker and the JSON opening
+The model's own envelope closes the answer, and an echoed previous run may stand before it. Since
+TODO `3bf8c9d8`, `{{ previous_report }}` no longer carries the last report's envelope, not even a
+cut-off one, and `gate_status:`, `todo_item:` and the like lose their colon; the rule remains the
+second safeguard for a previous run a model repeats some other way. An envelope starts with `<!--`, the marker and the JSON opening
 `{`; a quoted marker without JSON does not count, nor does a start inside the text of a finding. If
 another envelope starts after the last readable one, for example because the answer breaks off, the
-report is invalid; ingestion does not fall back to an earlier one. The gate block of the test
-coverage audit counts the same envelope.
+report is invalid; ingestion does not fall back to an earlier one. The gate blocks of the test
+coverage audit and the documentation weight check count the same envelope, with the same awk
+snippet (TODO `d8dae725`).
 
 A prompt that leaves the `subject` to the model gets drift: between two runs `docs/deployment.md`
 became `host-reaching-endpoints`, and the finding came back as a repeat finding without its
@@ -168,7 +170,7 @@ Converted audits in `workflow-pool/`:
 | Health check | block `facts` (Surefire totals, exit codes, lint/tsc, bundle, code and docs sizes) | `scripts/tests/test-audit-facts.sh` |
 | Performance audit | block `facts` (health probe, heap numbers from `/api/v1/system/jvm-memory`, DB and bundle files, log lines, source patterns) | `scripts/tests/test-audit-facts.sh` |
 | Test coverage | block `metrics` with the target size `ERWARTETE FINDINGS`, gate counts the envelope against it | `scripts/tests/test-coverage-snapshot.sh` |
-| Documentation weight check | block `dossier` → `scripts/public-readiness/docs_orphan_scan.py` (reachability, references, maintenance, topic overlap) | `scripts/tests/test_docs_orphan_scan.py` |
+| Documentation weight check | block `dossier` → `scripts/public-readiness/docs_orphan_scan.py` (reachability, references, maintenance, topic overlap) | `scripts/tests/test_docs_orphan_scan.py`, gate: `scripts/tests/test-audit-facts.sh` |
 
 ### When `expectedFindings` does **not** fit
 
@@ -226,6 +228,9 @@ note.
   200, `subject` 300, disposition 200 characters) and stripped of platform markers, the envelope marker
   `mysuricates:audit-result` and block delimiters – also in disguise (full width, invisible characters,
   Unicode whitespace) that a model would echo as ASCII.
+- A `|` in `ruleKey`, `subject`, title or disposition reads `¦` (TODO `90c4f7db`): the separator occurs
+  in no field, so a script may split the line at `|`. For the identity `¦` counts as `|` – a prompt that
+  carries the finding forward as the block shows it hits the same finding.
 - Without known findings it reads `(keine bekannten Befunde)`. If the query fails, it reads
   `NICHT GEMESSEN: audit_findings (nicht verfügbar: <error type>)`, plus a WARN entry in the activity
   log; with the `audit` module off, `… (nicht verfügbar: Modul audit ist aus)`.

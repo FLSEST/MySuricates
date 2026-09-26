@@ -719,6 +719,39 @@ A chain does not belong to any project and can reference workflows from differen
 
 TODOs are automatically created by `AutoTodoService` on RED/YELLOW gate status (RED -> HIGH, YELLOW -> MEDIUM). When a `TodoTrigger` is configured, fix workflows are automatically started (self-improvement loop).
 
+### `goals`
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `id` | TEXT | PK | UUID |
+| `title` | TEXT | NOT NULL | Name of the goal, e.g. "Open-source launch" |
+| `description` | TEXT | | Markdown: what "done" means |
+| `status` | TEXT | NOT NULL, DEFAULT 'ACTIVE' | `ACTIVE`, `DONE`, `ARCHIVED` |
+| `target_date` | TEXT | | Target date |
+| `guard_workflow_id` | TEXT | FK → workflows, ON DELETE SET NULL | Workflow of the goal guard (template `goal-guard`); whether it runs is up to its schedule (V88) |
+| `created_at` | TEXT | NOT NULL | |
+| `updated_at` | TEXT | NOT NULL | |
+
+**Indexes:** `idx_goals_status`
+
+A goal groups TODOs across projects (V85). Membership, rank and assessment live on the TODO (`todos.goal_id` …), not on the goal; `GoalService` computes progress and order from lean projections. Deleting a goal keeps its TODOs, removes its milestones and pauses a goal guard.
+
+### `goal_milestones`
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `id` | TEXT | PK | UUID |
+| `goal_id` | TEXT | NOT NULL, FK → goals, ON DELETE CASCADE | Goal of the milestone |
+| `title` | TEXT | NOT NULL | e.g. "Beta done" |
+| `due_date` | TEXT | NOT NULL | Due date; a bare date counts until 23:59:59 UTC |
+| `reached_at` | TEXT | | First detection of "all assigned TODOs done"; stays even when the milestone opens again |
+| `created_at` | TEXT | NOT NULL | |
+| `updated_at` | TEXT | NOT NULL | |
+
+**Indexes:** `idx_goal_milestones_goal`
+
+Milestones of a goal (V88, TODO 259f4f66). TODOs point to one through `todos.milestone_id`; the state (`OPEN`, `DUE_SOON` ≤ 3 days, `OVERDUE`, `REACHED`) is computed on read, not stored. Deleting a milestone keeps its TODOs in the goal.
+
 ### `activity_log`
 
 | Column | Type | Constraints | Description |
@@ -1083,37 +1116,6 @@ The only persistent system configuration outside of `application.yml`.
 | `Goal.Status` | `ACTIVE`, `DONE`, `ARCHIVED` | Archived goals only show up with an explicit filter |
 | `GoalMilestone.State` (V88) | `OPEN`, `DUE_SOON`, `OVERDUE`, `REACHED` | Not stored, computed on read from the date and the assigned TODOs; `DUE_SOON` = at most 3 days |
 
-### `goals` (V85)
-
-| Column | Type | Constraints | Description |
-|---|---|---|---|
-| `id` | TEXT | PK | UUID |
-| `title` | TEXT | NOT NULL | Name of the goal, e.g. "Open-source launch" |
-| `description` | TEXT | | Markdown: what "done" means |
-| `status` | TEXT | NOT NULL, DEFAULT 'ACTIVE' | `ACTIVE`, `DONE`, `ARCHIVED` |
-| `target_date` | TEXT | | Target date |
-| `guard_workflow_id` | TEXT | FK → workflows, ON DELETE SET NULL | Workflow of the goal guard (template `goal-guard`); whether it runs is up to its schedule (V88) |
-| `created_at` | TEXT | NOT NULL | |
-| `updated_at` | TEXT | NOT NULL | |
-
-A goal groups TODOs across projects. Membership, rank and assessment live on the TODO (`todos.goal_id` …), not on the goal; `GoalService` computes progress and order from lean projections. Deleting a goal keeps its TODOs, removes its milestones and pauses a goal guard.
-
-### `goal_milestones` (V88)
-
-| Column | Type | Constraints | Description |
-|---|---|---|---|
-| `id` | TEXT | PK | UUID |
-| `goal_id` | TEXT | NOT NULL, FK → goals, ON DELETE CASCADE | Goal of the milestone |
-| `title` | TEXT | NOT NULL | e.g. "Beta done" |
-| `due_date` | TEXT | NOT NULL | Due date; a bare date counts until 23:59:59 UTC |
-| `reached_at` | TEXT | | First detection of "all assigned TODOs done"; stays even when the milestone opens again |
-| `created_at` | TEXT | NOT NULL | |
-| `updated_at` | TEXT | NOT NULL | |
-
-**Indexes:** `idx_goal_milestones_goal`
-
-Milestones of a goal (TODO 259f4f66). TODOs point to one through `todos.milestone_id`; the state (`OPEN`, `DUE_SOON` ≤ 3 days, `OVERDUE`, `REACHED`) is computed on read, not stored. Deleting a milestone keeps its TODOs in the goal.
-
 ### LogLevel (ActivityLog)
 
 | Value | Description |
@@ -1189,7 +1191,7 @@ Blocks are stored as a JSON array in the `blocks` column of the `workflows` tabl
   "type": "simple | shell | retry | conditional | foreach | while | switch | agentic | approval | sub-workflow | skill-capability | human-input | integration | document | todo-create | todo-update | todo-close | compress | compress-ai | dashboard-report",
   "name": "Optional display name",
   "config": {
-    "prompt": "Instruction or command",
+    "command": "Instruction or command",
     "timeout_seconds": 300,
     "on_failure": "stop | continue"
   },
@@ -1209,6 +1211,9 @@ Blocks are stored as a JSON array in the `blocks` column of the `workflows` tabl
 **Type-specific config fields:**
 
 The keys the executors read; defaults and examples are in [WORKFLOW-GUIDE.md](WORKFLOW-GUIDE.md).
+`DataModelConfigKeysGateTest` holds the table (here and in the German version) against the code: every key
+must be read where the block type runs, and every block type needs a row. Each entry starts with its key
+in backticks, parentheses behind it give the default or values, free text follows a `;`.
 
 | Type | Key Config Fields |
 |---|---|

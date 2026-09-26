@@ -106,14 +106,17 @@ rm -rf "$TMP/home/.config"; unstub claude
 echo "4c) pi only on request; the downloaded Node in the user's shell (0a078449, 2605ed1f)"
 export NPM_LOG="$TMP/npm.log"; : > "$NPM_LOG"
 OLD_SHELL="${SHELL:-}"; export SHELL=/bin/bash   # Profil: ~/.profile (ohne ~/.bash_profile)
+# Der Befehl aus dem Katalog, in einer festen Version (c3a4cbf6) — die Version steht nur dort
+PI_NPM="$(. "$HERE/../lib/provider-catalog.generated.sh"; printf '%s' "${PROVIDER__pi__install#npm }")"
+check "pi comes in a pinned version"                    'printf "%s" "$PI_NPM" | grep -qE "^install -g @earendil-works/pi-coding-agent@[0-9]+\.[0-9]+\.[0-9]+$"'
 rm -rf "$INST"
 check "default: no pi, also with --yes"                 '[ "$(run --yes --dry-run --runtime host)" = 0 ] && ! out | grep -q "pi-coding-agent" && [ ! -s "$NPM_LOG" ]'
 rm -rf "$INST"
-check "--with-pi: npm -g with sudo where root owns it"  '[ "$(run --yes --dry-run --runtime host --with-pi)" = 0 ] && out | grep -qF "would run: sudo npm install -g @earendil-works/pi-coding-agent"'
+check "--with-pi: npm -g with sudo where root owns it"  '[ "$(run --yes --dry-run --runtime host --with-pi)" = 0 ] && out | grep -qF "would run: sudo npm $PI_NPM"'
 mkdir -p "$TMP/npmprefix"; rm -rf "$INST"
-check "--with-pi: without sudo where npm may write"     '[ "$(NPM_PREFIX="$TMP/npmprefix" run --yes --dry-run --runtime host --with-pi)" = 0 ] && out | grep -qF "would run: npm install -g @earendil-works/pi-coding-agent" && ! out | grep -qF "sudo npm"'
+check "--with-pi: without sudo where npm may write"     '[ "$(NPM_PREFIX="$TMP/npmprefix" run --yes --dry-run --runtime host --with-pi)" = 0 ] && out | grep -qF "would run: npm $PI_NPM" && ! out | grep -qF "sudo npm"'
 rm -rf "$INST"
-check "--with-pi installs pi, nothing started"          '[ "$(NPM_PREFIX="$TMP/npmprefix" NPM_CREATES="$TMP/bin/pi" run --install --runtime host --with-pi)" = 0 ] && grep -qx "install -g @earendil-works/pi-coding-agent" "$NPM_LOG" && out | grep -qE "Install pi \(npm\)" && [ -x "$TMP/bin/pi" ] && [ -f "$INST/main.env" ]'
+check "--with-pi installs pi, nothing started"          '[ "$(NPM_PREFIX="$TMP/npmprefix" NPM_CREATES="$TMP/bin/pi" run --install --runtime host --with-pi)" = 0 ] && grep -qxF "$PI_NPM" "$NPM_LOG" && out | grep -qE "Install pi \(npm\)" && [ -x "$TMP/bin/pi" ] && [ -f "$INST/main.env" ]'
 unstub pi; unstub npm; rm -rf "$INST"
 check "--with-pi without npm: says so, carries on"     '[ "$(run --yes --dry-run --runtime container --with-pi)" = 0 ] && out | grep -q -- "--with-pi needs npm"'
 stub npm "$NPM_STUB"
@@ -183,6 +186,34 @@ check "--bind 0.0.0.0 for access from the network" '[ "$(run --yes --dry-run --r
 check "bound to 127.0.0.1 by default"             'rm -rf "$INST"; [ "$(run --yes --dry-run --runtime host)" = 0 ] && [ "$(val main MYSURICATES_BIND)" = 127.0.0.1 ]'
 check "--bind rejects non-addresses"              '[ "$(run --bind "x;y")" = 2 ]'
 
+echo "6b) --bind on one address: the port choice asks there, not on 127.0.0.1 (065144ee)"
+# Wie instance.sh (3d002903): mit --bind auf eine Adresse lauscht die Instanz nur dort. Die Portwahl
+# fragte 127.0.0.1 — eine Belegung auf der gebundenen Adresse sah sie nicht (up lehnte dann ab), einer
+# auf 127.0.0.1 wich sie ohne Not aus. Eine zweite Loopback-Adresse spielt die gebundene; die Lauscher
+# sind fake_instance.py (nehmen an, sonst haengt die naechste /dev/tcp-Probe).
+BADDR=127.0.0.2
+if command -v python3 >/dev/null 2>&1 && python3 -c "import socket; socket.socket().bind(('$BADDR', 0))" 2>/dev/null; then
+  freeon() { local p="$2"; while (exec 3<>"/dev/tcp/$1/$p") 2>/dev/null; do p=$((p + 1)); done; echo "$p"; }   # ADRESSE BASIS
+  blisten() {  # ADRESSE PORT — losgeloest, gibt die PID aus, sobald er annimmt
+    local pid
+    pid="$( (FAKE_INSTANCE_HOST="$1" FAKE_INSTANCE_TTL=120 python3 "$HERE/fake_instance.py" api "$2" x 0 >/dev/null 2>&1 & echo $!) )"
+    for _ in $(seq 1 100); do (exec 3<>"/dev/tcp/$1/$2") 2>/dev/null && break; sleep 0.05; done
+    echo "$pid"
+  }
+  bgone() { kill "$1" 2>/dev/null; for _ in $(seq 1 100); do kill -0 "$1" 2>/dev/null || break; sleep 0.05; done; }
+  Q="$(freeon "$BADDR" 9090)"; L1=""
+  # Q frei auf der gebundenen Adresse; ist er es auch auf 127.0.0.1, dort belegen
+  (exec 3<>"/dev/tcp/127.0.0.1/$Q") 2>/dev/null || L1="$(blisten 127.0.0.1 "$Q")"
+  rm -rf "$INST"
+  check "taken only on 127.0.0.1: free for --bind $BADDR" '(exec 3<>"/dev/tcp/127.0.0.1/$Q") 2>/dev/null && [ "$(run --yes --dry-run --runtime host --bind $BADDR)" = 0 ] && [ "$(val main MYSURICATES_PORT)" = "$Q" ]'
+  [ -z "$L1" ] || bgone "$L1"
+  L2="$(blisten "$BADDR" "$Q")"; rm -rf "$INST"
+  check "taken on the bound address: the next free one there" '[ "$(run --yes --dry-run --runtime host --bind $BADDR)" = 0 ] && N="$(freeon "$BADDR" $((Q + 1)))" && [ "$(val main MYSURICATES_PORT)" = "$N" ] && out | grep -qF "is in use — taking $N"'
+  bgone "$L2"; rm -rf "$INST"; mkdir -p "$INST"
+else
+  echo "  skip (no python3, or $BADDR is not a loopback address here — macOS)"
+fi
+
 echo "7) an existing setup is kept unless asked"
 printf 'MYSURICATES_RUNTIME=host\nMYSURICATES_PORT=9777\nMYSURICATES_PRESET=full\n' > "$INST/main.env"
 check "kept without --reconfigure"                      '[ "$(run --yes --dry-run --runtime host)" = 0 ] && [ "$(val main MYSURICATES_PORT)" = 9777 ]'
@@ -205,6 +236,9 @@ check "ports: the port of the file, marked"             '[ "$(step Ports)" = "97
 check "AI: the provider of the file, marked"            '[ "$(step AI)" = "pi · from deploy/instances/main.env" ]'
 check "mode and modules: from the file, marked"         '[ "$(step Mode)" = "One instance — on this machine · from deploy/instances/main.env" ] && [ "$(step Modules)" = "full · from deploy/instances/main.env" ]'
 check "the login hint names the provider of the file"   'out | grep -qF "Log in to pi before the first AI workflow"'
+# Nach dem Befehl der Hinweis in der Sprache des Installers: der Katalog nennt nur den Schluessel (eab43a8b)
+check "... pi's note after the command, English"        'out | grep -qF "pi, then /login in pi — or an API key as environment variable (see pi --help)"'
+check "... and German with --lang de"                   '[ "$(run --yes --dry-run --lang de)" = 0 ] && out | grep -qF "Vor dem ersten KI-Workflow bei pi anmelden:" && out | grep -qF "pi, dann /login in pi — oder ein API-Schlüssel als Umgebungsvariable (siehe pi --help)" && ! out | grep -q "then /login"'
 check "flags that do not apply are named"              '[ "$(run --yes --dry-run --port 9555 --provider codex --runtime container)" = 0 ] && out | grep -qF "not used: --runtime container, --port 9555, --provider codex" && cmp -s "$INST/main.env" "$TMP/kept.env" && [ "$(step Ports)" = "9777 · from deploy/instances/main.env" ]'
 check "--preset --force: the preset goes into the file" '[ "$(run --yes --dry-run --preset research --force)" = 0 ] && [ "$(val main MYSURICATES_PRESET)" = research ] && [ "$(step Modules)" = "research · written into deploy/instances/main.env" ] && ! out | grep -q "not used"'
 cp "$TMP/kept.env" "$INST/main.env"
@@ -420,7 +454,7 @@ if command -v python3 >/dev/null 2>&1; then
   printf '#!/bin/sh\nif [ "$3" = main ] && [ -e "%s" ]; then echo "running healthy"; else echo "nicht gestartet"; fi\n' "$TMP/ports/up" > "$TMP/ports/scripts/instance.sh"
   printf 'MYSURICATES_PORT=%s\nMYSURICATES_PORT=%s\n' "$((LP + 7))" "$LP" > "$TMP/ports/inst/main.env"   # doppelt: die letzte Zeile gilt
   # unset -f cut: 8b hat cut in dieser Shell als Funktion ueberschrieben, die Helfer brauchen das echte
-  lib() { ( unset -f cut; SCRIPT_DIR="$TMP/ports/scripts" INSTANCES_DIR="$TMP/ports/inst" RECONF=1; . "$HERE/../lib/setup-kept.sh"; . "$HERE/../lib/setup-ports.sh"; eval "$1" ); }
+  lib() { ( unset -f cut; SCRIPT_DIR="$TMP/ports/scripts" INSTANCES_DIR="$TMP/ports/inst" RECONF=1; . "$HERE/../lib/instance-runs.sh"; . "$HERE/../lib/setup-kept.sh"; . "$HERE/../lib/setup-ports.sh"; eval "$1" ); }
   touch "$TMP/ports/up"
   check "lib: the running own instance's port counts as free" '[ "$(lib "free_port $LP \"\" main")" = "$LP" ] && [ "$(lib "kept_port main $LP \"\"")" = "$LP" ]'
   check "lib: not for another name, not when taken in this run" '[ "$(lib "free_port $LP \"\" dev")" != "$LP" ] && [ "$(lib "free_port $LP \"$LP\" main")" != "$LP" ] && [ "$(lib "free_port $LP")" != "$LP" ]'

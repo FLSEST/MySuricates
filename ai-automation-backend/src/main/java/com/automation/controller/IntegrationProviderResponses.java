@@ -65,7 +65,8 @@ final class IntegrationProviderResponses {
                 provider.getVerification().name(),
                 provider.getVerifiedAgainst(),
                 connections.stream().map(c -> connection(provider, c, configured)).toList(),
-                provider.requiresOAuthFlow()
+                provider.requiresOAuthFlow(),
+                provider.connectionOptional()
         );
     }
 

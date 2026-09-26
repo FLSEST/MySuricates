@@ -1,5 +1,7 @@
 package com.automation.service.integration.providers.telegram;
 
+import com.automation.service.integration.providers.IntegrationParams;
+
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -79,13 +81,7 @@ final class TelegramParams {
     }
 
     static Long optionalLong(Map<String, Object> params, String key) {
-        Object val = params.get(key);
-        if (val == null || val.toString().isBlank()) return null;
-        try {
-            return Long.parseLong(val.toString().trim());
-        } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("Parameter '" + key + "' must be a number");
-        }
+        return IntegrationParams.optionalLong(params.get(key), key);
     }
 
     /** getUpdates limit: 1–100, default 100. */

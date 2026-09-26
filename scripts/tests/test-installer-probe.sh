@@ -28,6 +28,7 @@ probe() { PATH="$TMP/bin:$PATH" bash "$PROBE" "$@" </dev/null >"$TMP/out" 2>&1; 
 echo "1) syntax and help"
 check "bash -n passes"                                  'bash -n "$PROBE"'
 check "--help names the interactive mode"               'bash "$PROBE" --help | grep -- "--interactive" >/dev/null'
+check "--help names --setup-flags (c3a4cbf6)"          'bash "$PROBE" --help | grep -- "--setup-flags" >/dev/null'
 check "--help names --ref and the gate lines"           'bash "$PROBE" --help | grep -- "--ref main" >/dev/null && bash "$PROBE" --help | grep "gate_status" >/dev/null'
 check "the report renderer parses"                      'python3 -m py_compile "$HERE/../lib/installer_probe_report.py"'
 check "the screenshot helper parses"                    '! command -v node >/dev/null || node --check "$HERE/../lib/installer_probe_screens.mjs"'
@@ -41,6 +42,8 @@ check "port below 1024 is refused"                      '[ "$(probe --port 80)" 
 check "--repo must be a git repo"                       '[ "$(probe --repo "$TMP")" = 2 ] && grep -q "Kein Git-Repo" "$TMP/out"'
 check "--interactive without a terminal is refused"     '[ "$(probe --interactive)" = 2 ] && grep -q "braucht ein Terminal" "$TMP/out"'
 check "--port with --interactive is refused"            '[ "$(probe --interactive --port 23000)" = 2 ] && grep -q "nur für den automatischen Lauf" "$TMP/out"'
+check "--setup-flags: quotes and shell syntax refused"  '[ "$(probe --setup-flags "--with-pi'"'"'x")" = 2 ] && grep -q -- "--setup-flags: nur Flags" "$TMP/out" && [ "$(probe --setup-flags "--x;id")" = 2 ] && [ "$(probe --setup-flags "\$(id)")" = 2 ]'
+check "--setup-flags with --interactive is refused"     '[ "$(probe --interactive --setup-flags --with-pi)" = 2 ] && grep -q "nur für den automatischen Lauf" "$TMP/out"'
 check "none of these touched docker"                    '[ ! -s "$DOCKER_CALLS" ]'
 
 echo "3) docker availability"
@@ -81,6 +84,18 @@ MJS
 else
   echo "  skip (no node)"
 fi
+
+echo "6) extra setup flags reach phase 2 only (c3a4cbf6)"
+# Etwa --with-pi: die Probe soll auch den Weg mit pi fahren koennen. docker nimmt hier alles an und tut
+# nichts — die Probe laeuft durch (rot, es gibt keine Instanz), die Phasen stehen in phases.tsv.
+mkdir -p "$TMP/bin3"
+printf '#!/usr/bin/env bash\necho "$*" >> "$DOCKER_CALLS"\nexit 0\n' > "$TMP/bin3/docker"; chmod +x "$TMP/bin3/docker"
+: > "$DOCKER_CALLS"
+PATH="$TMP/bin3:$PATH" INSTALLER_PROBE_PHASE_TIMEOUT=20 timeout 120 bash "$PROBE" --no-screenshots --out "$TMP/p6" \
+  --setup-flags "--with-pi --preset research" </dev/null >"$TMP/out" 2>&1
+phase_cmd() { awk -F'\t' -v n="$1" '$1 == n { print $2 }' "$TMP/p6/phases.tsv" 2>/dev/null; }
+check "phase 2 carries the flags"                       'phase_cmd 2-einrichten | grep -qF -- "--lang de --with-pi --preset research"'
+check "phase 1 (check only) does not"                   'phase_cmd 1-pruefen | grep -qF -- "--lang de" && ! phase_cmd 1-pruefen | grep -qF -- "--with-pi"'
 
 echo
 echo "passed=$PASS failed=$FAIL"

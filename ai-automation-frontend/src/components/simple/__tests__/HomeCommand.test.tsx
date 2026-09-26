@@ -97,7 +97,10 @@ function renderCommand(onAsk?: (text: string) => void) {
   );
 }
 
-const field = () => screen.getByRole('combobox', { name: c.label });
+// By its aria-label, which is also its accessible name: the tests reach for the field after almost
+// every step, and a role query recomputes the whole result list each time (b26bb8ff). Its role is
+// checked once below.
+const field = () => screen.getByLabelText(c.label);
 const type = (value: string) => fireEvent.change(field(), { target: { value } });
 const group = (name: string) => screen.findByRole('group', { name });
 const location = () => screen.getByTestId('location');
@@ -106,6 +109,7 @@ describe('HomeCommand — hits while typing', () => {
   it('shows nothing and fetches nothing extra while the field is empty', async () => {
     serve();
     renderCommand();
+    expect(field()).toHaveAttribute('role', 'combobox');
     await new Promise((r) => setTimeout(r, 300));
     expect(screen.queryByRole('listbox')).toBeNull();
     expect(requests.filter((r) => r !== 'capabilities')).toEqual([]);
@@ -289,7 +293,11 @@ describe('HomeCommand — hits while typing', () => {
     renderCommand();
 
     type('xyzzy');
+    // Not before the debounced sources have searched: "nothing found" flashed for 200 ms, then the
+    // spinner replaced it together with its buttons (a test that clicked in that window failed)
+    expect(screen.queryByText(en.simple.home.noMatch)).toBeNull();
     expect(await screen.findByText(en.simple.home.noMatch)).toBeInTheDocument();
+    expect(requests).toEqual(expect.arrayContaining(['templates', 'pool', 'schedules', 'todos:xyzzy']));
     // Only the generated "add as task" row — never highlighted
     expect(screen.getByRole('option', { name: /xyzzy/ })).toHaveAttribute('aria-selected', 'false');
     fireEvent.click(screen.getByRole('button', { name: en.simple.home.startFromTemplate }));

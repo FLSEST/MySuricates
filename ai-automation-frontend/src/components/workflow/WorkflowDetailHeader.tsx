@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   ArrowLeft, Play, Pencil, Wand2, Wrench, Copy, Download, FileCode2, Trash2, Lock, LockOpen,
 } from 'lucide-react';
@@ -6,6 +7,7 @@ import type { Workflow } from '../../types';
 import { exportWorkflow, useSealWorkflow } from '../../hooks/useWorkflows';
 import { useSealStatus } from '../../hooks/useSealStatus';
 import { SealBadge } from './SealStateIcon';
+import { SealConfirmModal } from './SealConfirmModal';
 import { apiErrorMessage, fetchWorkflowBpmn } from '../../api/client';
 import { downloadBlob } from '../../utils/downloadFile';
 import { useToast } from '../../hooks/useToast';
@@ -49,11 +51,9 @@ export function WorkflowDetailHeader({
   const sealWorkflow = useSealWorkflow();
   const sealed = !!workflow.sealed;
   const sealStatus = useSealStatus(workflow.id);
-  const toggleSeal = () => {
-    if (confirm(sealed ? t.workflows.unsealConfirm : t.workflows.sealConfirm)) {
-      sealWorkflow.mutate({ id: workflow.id, lock: !sealed });
-    }
-  };
+  // What the open confirmation does (seal or unseal), fixed when the button was pressed
+  const [sealIntent, setSealIntent] = useState<boolean | null>(null);
+  const toggleSeal = () => setSealIntent(!sealed);
 
   const handleBpmnExport = async () => {
     try {
@@ -163,6 +163,12 @@ export function WorkflowDetailHeader({
         <Button variant="ghost" size="sm" icon={<Trash2 className="w-4 h-4" />} onClick={onDelete} disabled={sealed}
           title={sealed ? t.workflows.sealedLocked : t.common.delete} aria-label={t.common.delete} />
       </div>
+      <SealConfirmModal
+        lock={sealIntent}
+        pending={sealWorkflow.isPending}
+        onClose={() => setSealIntent(null)}
+        onConfirm={(lock) => sealWorkflow.mutate({ id: workflow.id, lock }, { onSettled: () => setSealIntent(null) })}
+      />
     </div>
   );
 }

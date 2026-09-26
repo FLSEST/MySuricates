@@ -7,7 +7,7 @@ import com.automation.entity.OnboardingProfileType;
 import com.automation.entity.Project;
 import com.automation.entity.Workflow;
 import com.automation.repository.OnboardingProfileRepository;
-import com.automation.service.workflow.WorkflowService;
+import com.automation.repository.WorkflowRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -32,7 +32,7 @@ class ProjectOnboardingLanguageAndFileTest {
     Path dir;
 
     private final OnboardingProfileRepository profileRepository = mock(OnboardingProfileRepository.class);
-    private final WorkflowService workflowService = mock(WorkflowService.class);
+    private final WorkflowRepository workflowRepository = mock(WorkflowRepository.class);
     private final ProjectService projectService = mock(ProjectService.class);
     private final InstanceAddress address = new InstanceAddress("http://localhost:9095", "mysuricates-main", 9090);
     private ProjectOnboardingService service;
@@ -41,7 +41,7 @@ class ProjectOnboardingLanguageAndFileTest {
     void setUp() {
         var modules = com.automation.modules.ModuleRegistry.allEnabled();
         service = new ProjectOnboardingService(
-                new OnboardingRenderer(profileRepository, workflowService, address, modules), modules, projectService);
+                new OnboardingRenderer(profileRepository, workflowRepository, address, modules), modules, projectService);
         OnboardingProfile base = OnboardingProfile.builder().key("base").type(OnboardingProfileType.BASE)
                 .content(Map.of(
                         "de", "Deutsch {{BASE_URL}} $({{API_KEY_COMMAND}}) {{PROJECT_ID}}",
@@ -49,7 +49,7 @@ class ProjectOnboardingLanguageAndFileTest {
                 .build();
         when(profileRepository.findByType(OnboardingProfileType.BASE)).thenReturn(List.of(base));
         Workflow workflow = Workflow.builder().id("wf-1").name("Tests").blocks(List.of()).build();
-        when(workflowService.findByProjectId("p1")).thenReturn(List.of(workflow));
+        when(workflowRepository.findByProjectId("p1")).thenReturn(List.of(workflow));
     }
 
     private Project project(Map<String, Object> onboarding) {

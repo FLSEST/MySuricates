@@ -105,8 +105,13 @@ class TodoDetailsVariable implements PlatformVariableSource {
     }
 
     @Override
+    public List<String> allNames() {
+        return List.of(NAME);
+    }
+
+    @Override
     public List<String> names(Request request) {
-        return Params.requested(request) ? List.of(NAME) : List.of();
+        return Params.requested(request) ? allNames() : List.of();
     }
 
     @Override

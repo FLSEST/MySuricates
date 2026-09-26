@@ -46,6 +46,13 @@ POST /api/v1/workflows
 
 All workflow CRUD and execution operations are under `/api/v1/workflows`. A run is started with `POST /api/v1/workflows/{id}/execute`.
 
+Every call needs the `X-API-Key` header. The backend creates the key on first start; for an instance
+set up by the installer `scripts/instance.sh key --name <name>` shows it, with the source setup it is
+in `~/.autotrigger/api-key`. The `projectId` is the ID of an
+existing project — `GET /api/v1/projects` lists the projects with their `id` field, and in the UI it
+is part of the project page's address (`/projects/<id>`). Full reference:
+[api-referenz.md](api-referenz.md).
+
 ### Context Variables
 
 Pass variables at start:
@@ -86,10 +93,11 @@ In addition to its type-specific config fields, every block also supports these 
 | `model` | string | null | **AI-capable blocks only** (including `compress-ai`): model for this block only (CLI alias `opus`/`sonnet`, concrete id or pi `<backend>/<model>`). Precedence block > workflow > provider default. If a block sets a *different* `provider` than the workflow, the workflow model is not inherited (model ids are provider-specific). |
 | `effort` | string | null | **AI-capable blocks only**: reasoning effort `low`/`medium`/`high`/`xhigh` for this block only. Precedence block > workflow (`workflow.effort`) > provider default; unset emits no flag at all. Claude maps it to `--effort`, pi to `--thinking`, codex ignores it. The value actually used is visible in the run details as step metadata `aiRequest.effort`. |
 
-Additionally, every block supports an optional top-level field (not inside `config`):
+Additionally, every block supports optional top-level fields (next to `type`, not inside `config`):
 
 | Field | Type | Default | Description |
 |---|---|---|---|
+| `name` | string | – | Name under which later blocks read this block's output via `{{ block.<name>.output }}`. Letters, digits, `_` and `-` are recommended, no dots and no whitespace — this is not checked on save; only the reserved name `previous_output` is rejected (`BlockNameRules`) |
 | `skillIds` | string[] | `[]` | Skill IDs that are activated **in addition to** the workflow skills for this block |
 
 **Default behavior**: When a block fails (status `FAILED`), the workflow stops and the run is marked as `FAILED`. With `"on_failure": "continue"`, the workflow proceeds with the next block.
@@ -149,6 +157,12 @@ Executes a shell command on the host or inside a Docker container.
 > `PROJECT_ID={{ project_id }} python3 - <<'PY'` … `os.environ['PROJECT_ID']`, block option
 > `"shell_escape_variables": true`. Shell blocks receive no other environment variables.
 
+> **The term "taint":** A run counts as *tainted* as soon as data from outside — such as a webhook
+> payload — has flowed into it. From then on the platform also puts block outputs into single quotes
+> in shell commands, because a block can pass on foreign bytes. The detailed rules follow below under
+> "Taint propagation", the trust model is in
+> [deployment.md → Three trust classes](deployment.md#three-trust-classes-for-context-values).
+>
 > **Untrusted variables:** Everything a webhook caller supplies (payload fields and the derived
 > `git_*` fields) is single-quoted in shell commands (`shell`, `foreach`, `while`, `retry`, `conditional` and
 > blocks nested in `switch`, each in shell mode) — even without `shell_escape_variables`. Write such placeholders **unquoted**
@@ -530,6 +544,8 @@ Executes another workflow as a nested step.
 
 **Limits**: Maximum nesting depth of 5 levels. Circular references are detected. 30-minute timeout.
 
+**Context**: The child run gets the parent run's variables and its `{{ previous_output }}`, but not its platform data (`previous_report`, `open_todos`, `request_metrics`, `goal_status`/`goal_guard_*`, `audit_findings`): the platform injects those into the child run itself, computed for it. A value under one of these names is not taken from any other input context either. The parent run's taint travels along.
+
 **Markers**: The step merely passes the child run's last output through (step metadata `derivedOutput: true`). Any `gate_status:` and `todo_item:` markers inside it are evaluated in the child run only — the parent run deliberately leaves them out of its gate summary and TODO list.
 
 **When to use**: Composing complex workflows from smaller, reusable ones.
@@ -654,7 +670,7 @@ At most 50 entries. Broken JSON, no list or an unknown key fail the step before 
 ]
 ```
 
-**When to use**: Deterministic single-TODO operations (create a tracking TODO and close it at the end). For **dynamically many** TODOs out of general analysis workflows use `todo_item:` markers instead (see §Auto-TODO/detector format). Structured v4 audit templates use the versioned `mysuricates:audit-result:v1` envelope instead; the Audit Center manages findings and TODO links from it.
+**When to use**: Deterministic single-TODO operations (create a tracking TODO and close it at the end). For **dynamically many** TODOs out of general analysis workflows use `todo_item:` markers instead (see [TODO markers](#todo-markers-todo_item)). Structured v4 audit templates use the versioned `mysuricates:audit-result:v1` envelope instead; the Audit Center manages findings and TODO links from it.
 
 ---
 
@@ -729,9 +745,9 @@ JSON stages need JSON as input and must come before text stages.
 
 ### `dashboard-report` — report the dashboard result without a marker
 
-Fills the **dashboard result** of this run directly from block config — the same fields, the same bounds and the same validation as the marker `dashboard_widget:` (see api-referenz.md), but **without a marker line and without text search**. Deterministic: no AI call, no shell, 0 tokens.
+Fills the **dashboard result** of this run directly from block config — the same fields, the same bounds and the same validation as the marker `dashboard_widget:` (a JSON line in a step's output, see [api-referenz.md](api-referenz.md#the-dashboard_widget-marker-in-a-workflow)), but **without a marker line and without text search**. Deterministic: no AI call, no shell, 0 tokens.
 
-Module: `dashboard-report` (standard on, can be switched off). When off, the block is refused and the type is not offered in the editor.
+Module: `dashboard-report` (standard on, can be switched off). Modules are optional features that the startup configuration switches on or off, here via `automation.modules.dashboard-report: false` ([architektur.md → Module System](architektur.md#module-system-startup-configuration)). When off, the block is refused and the type is not offered in the editor.
 
 | Config Key | Type | Default | Description |
 |---|---|---|---|
@@ -759,7 +775,7 @@ In the example, an earlier block `ampel` prints only `GREEN`, `YELLOW` or `RED` 
 - A placeholder that **could not be resolved** (unknown variable — the resolver leaves it literally) **causes the block to fail** and names the field. Better a red step than `{{ hunt_count }}` as a KPI on the dashboard.
 - Any breach of the contract (too long, unknown field in a KPI, number instead of string, invisible characters) causes the step to be **FAILED**; the message names the field (`kpis[2].value`), never the value.
 - Unknown keys at the top level are ignored (legitimate platform keys like `timeout_seconds` live there); unknown keys **inside** a KPI object are rejected.
-- Step output contains only counts, never contract values.
+- Step output contains only counts, never contract values — in English like every other block, e.g. `✓ Dashboard report GREEN · title · 4 KPIs · 0 items`.
 
 **Precedence over the marker:** Once a `dashboard-report` block has written a result, the marker `dashboard_widget:` is not evaluated in **any** step output. The block is the explicitly configured way; without this rule, a marker line in a later AI step's output could overwrite the report. Two `dashboard-report` blocks in one workflow: the one executed last wins.
 
@@ -809,9 +825,9 @@ The following variables are automatically set by the `WorkflowExecutor` on every
 | `{{ workflow_changed_since_last_run }}` | `"true"` or `"false"` — whether the definition has changed since the last successful run (hash comparison; timestamps when no hash exists) |
 | `{{ workflow_definition_hash }}` | SHA-256 of the executed definition (empty when `automation.hardening.provenance` is off) |
 | `{{ trigger_source }}` | What started the run: `MANUAL`, `RETRY`, `RESUME`, `SCHEDULE`, `WEBHOOK`, `TODO_TRIGGER`, `TODO_RESOLUTION`, `COMPLETION_TRIGGER`, `CHAIN`, `SUB_WORKFLOW`, `ASSISTANT`, `AUTO_REPAIR`, `WISH` |
-| `{{ previous_report }}` | Longest non-shell step output from the last COMPLETED run of the same workflow (max 3000 characters), or `"(no previous report available)"`. Always treated as untrusted → always single-quoted in shell blocks, so write it unquoted |
+| `{{ previous_report }}` | Longest non-shell step output from the last COMPLETED run of the same workflow (max 3000 characters), or `"(no previous report available)"`. An audit envelope is cut off, platform markers lose their colon (`gate_status GREEN` stays readable but is no longer taken as a verdict when a model repeats the line), block boundaries such as `</audit_findings>` read `[audit_findings]`. Always treated as untrusted → always single-quoted in shell blocks, so write it unquoted |
 | `{{ open_todos }}` | Markdown list of open/in-progress TODOs for the project inside an `<open_todos>…</open_todos>` block, or `"(keine offenen TODOs)"`. Titles and tags are flattened to one line, capped at 200/80 chars and stripped of platform markers (`todo_item:`, `gate_*:`, `dashboard_widget:`) — they may originate from imported issues and are data, not instructions. At most 150 entries. Always treated as untrusted → always single-quoted in shell blocks, so write it unquoted |
-| `{{ audit_findings }}` | **Only in audit workflows** (valid `metadata.audit`): the known findings of the workflow's own audit in the project — open, awaiting verification, accepted, dismissed — inside an `<audit_findings>…</audit_findings>` block, one line per finding with status, severity, `ruleKey`, `subject`, title and disposition, at most 250 lines and 60,000 bytes (classified findings first, the rest as a count per status); without findings `"(keine bekannten Befunde)"`. Other workflows do not have the variable, not even through the variable hand-over to a sub-workflow. Format and purpose: [audit-workflow-protocol.md](audit-workflow-protocol.md) → "Known findings in the prompt". Always treated as untrusted → always single-quoted in shell blocks, so write it unquoted |
+| `{{ audit_findings }}` | **Only in audit workflows** (valid `metadata.audit`): the known findings of the workflow's own audit in the project — open, awaiting verification, accepted, dismissed — inside an `<audit_findings>…</audit_findings>` block, one line per finding with status, severity, `ruleKey`, `subject`, title and disposition, at most 250 lines and 60,000 bytes (classified findings first, the rest as a count per status); without findings `"(keine bekannten Befunde)"`. Other workflows do not have the variable, not even through the variable hand-over to a sub-workflow; there the placeholder would stay literally (analyzer rule `audit-only-placeholder`). Format and purpose: [audit-workflow-protocol.md](audit-workflow-protocol.md) → "Known findings in the prompt". Always treated as untrusted → always single-quoted in shell blocks, so write it unquoted |
 | `{{ todo_details }}` | **Only with a filter** (`todo_details_tags` and/or `todo_details_exclude_tags` in the run context, usually `defaultContext`): the TODOs of the run's project **with description** as a JSON list inside a `<todo_details>…</todo_details>` block – per entry `id`, `status`, `priority`, `tags`, `title`, `complexity`, `suggestedEffort`, `openQuestion`, `updatedAt`, `description`. More filters: `todo_details_status` (OPEN/IN_PROGRESS/BACKLOG, default OPEN), `todo_details_first_tags` (moved to the front), `todo_details_limit` (≤ 150, default 40), `todo_details_chars` (per description ≤ 8000, default 1500); the whole list at most 100,000 bytes of UTF-8, so a shell command stays below the 128 KiB per-argument limit. Tags are compared exactly; `batch:*` means "any tag starting like this". Order: `first_tags`, then priority, then age. Titles flattened, descriptions stripped of markers line by line. Always treated as untrusted → always single-quoted in shell blocks, so write it unquoted |
 
 > **Platform data is never silently absent.** `previous_report`, `open_todos` and
@@ -1075,7 +1091,7 @@ else
 fi
 ```
 
-When multiple blocks emit gates, the highest severity wins (RED > YELLOW > GREEN).
+When multiple blocks emit gates, the highest severity wins (RED > YELLOW > GREEN). On a tie, RED and YELLOW keep the first gate – the cause, whose category also names the auto-TODO – while GREEN takes the last one, the closing verdict rather than the `Command exit 0` of a `checked_command` before it – unless it says less: the synthetic `Command exit N` never replaces a description in words of its own, not even after the verdict, and a GREEN without `gate_description` does not replace one that has it. If the later one has no `gate_category`, the current one stays (TODO 2aa9ddd5).
 
 **`run.metadata.gate_summary`** additionally aggregates all parsed gates of the run:
 
@@ -1095,10 +1111,32 @@ When multiple blocks emit gates, the highest severity wins (RED > YELLOW > GREEN
 This allows diffing two runs without re-parsing (e.g. for public readiness trends):
 
 ```bash
-curl -s -H "X-API-Key: $KEY" "$BASE/executions/$RUN1" | jq '.metadata.gate_summary' > a.json
-curl -s -H "X-API-Key: $KEY" "$BASE/executions/$RUN2" | jq '.metadata.gate_summary' > b.json
+curl -s --noproxy '*' -H "X-API-Key: $KEY" "$BASE/executions/$RUN1" | jq '.metadata.gate_summary' > a.json
+curl -s --noproxy '*' -H "X-API-Key: $KEY" "$BASE/executions/$RUN2" | jq '.metadata.gate_summary' > b.json
 diff <(jq -S . a.json) <(jq -S . b.json)
 ```
+
+### TODO markers (`todo_item:`)
+
+Besides the gate, every block can propose any number of TODOs, one line each in its output:
+
+```
+todo_item: <title> | <CRITICAL|HIGH|MEDIUM|LOW> | <tag1,tag2> | <description, optional>
+```
+
+```
+todo_item: Test ChainExecutor | HIGH | backend,testing | Execution loop without a test
+todo_item: Test the useWebSocket hook | MEDIUM | frontend,testing
+```
+
+- The output of **all** steps is read (`TodoOutputParser`); Markdown in front (`#`, `**`, backticks)
+  and the `[<item>]: ` prefix of a `foreach` iteration do no harm.
+- The TODOs are created only when auto-TODO is on for the workflow — workflow metadata
+  `autoTodo.enabled`, otherwise the global setting `auto-todo-default` — and not for audit
+  workflows (`audit.enabled`), whose findings the Audit Center manages (`AutoTodoService`).
+- The title is the identity: the same title in a later run updates the TODO; what a run with markers
+  no longer names, it closes (`GranularTodoService`). An AI similarity search links a new TODO to an
+  identical or related open TODO (`relatedTodoId`); it is created all the same.
 
 ### `checked_command` / `check_category` — Gate Derived Automatically from the Exit Code
 
@@ -1274,7 +1312,9 @@ In addition to the model, a uniform effort level can be set per workflow (`workf
 }
 ```
 
-Rule of thumb: `high`/`xhigh` for analysis/audit blocks, `low` for mechanical transformations. The effort actually used is visible in the step metadata (`aiRequest.effort`) of the run details.
+Rule of thumb: `high`/`xhigh` for analysis/audit blocks, `low` for mechanical transformations. The effort actually used is visible in the step metadata (`aiRequest.effort`) of the run details when the provider applies it (Codex does not). Without a configured effort the CLI's default applies; the CLI does not report it, so `aiRequest.effort` is absent then.
+
+Tokens in the step metadata: for Claude, `inputTokens` is only the part of the input the prompt cache did not serve, often a single digit for a Claude Code call. The rest is in `cacheReadInputTokens` (read from the cache) and `cacheCreationInputTokens` (written to the cache); the run's insights card shows both as "+… cache". Codex and Pi report no real figures (`estimated: true`), so they have no cache keys. The `max_total_tokens` budget of the `agentic` block does not count cache tokens.
 
 ### Provider and Model per Block
 

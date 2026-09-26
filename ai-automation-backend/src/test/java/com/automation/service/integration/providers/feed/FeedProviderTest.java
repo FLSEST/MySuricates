@@ -154,6 +154,15 @@ class FeedProviderTest {
         assertThatThrownBy(() -> provider.executeAction("other", Map.of(), null)).isInstanceOf(IllegalArgumentException.class);
     }
 
+    /** ac639b39: limit 1.5 used to become 1 and 3000000000 wrapped around — read like its text now. */
+    @Test
+    void limit_isReadLikeItsText() {
+        assertThat(FeedProvider.limit(" 3 ")).isEqualTo(3);
+        assertThatThrownBy(() -> FeedProvider.limit(1.5)).hasMessage("Parameter 'limit' must be a number: 1.5");
+        assertThatThrownBy(() -> FeedProvider.limit(3_000_000_000L))
+                .hasMessage("Parameter 'limit' must be a number: 3000000000");
+    }
+
     @Test
     void metadata() {
         assertThat(provider.getProviderId()).isEqualTo("feed");

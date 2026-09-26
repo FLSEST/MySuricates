@@ -5,10 +5,10 @@ import com.automation.dto.request.OnboardingConfigRequest;
 import com.automation.entity.OnboardingProfile;
 import com.automation.entity.OnboardingProfileType;
 import com.automation.entity.Project;
+import com.automation.event.ProjectWorkflowsChangedEvent;
 import com.automation.modules.ModuleRegistry;
 import com.automation.repository.OnboardingProfileRepository;
-import com.automation.service.workflow.ProjectWorkflowsChangedEvent;
-import com.automation.service.workflow.WorkflowService;
+import com.automation.repository.WorkflowRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -29,7 +29,7 @@ class ProjectOnboardingStage2Test {
     Path root;
 
     private final OnboardingProfileRepository profileRepository = mock(OnboardingProfileRepository.class);
-    private final WorkflowService workflowService = mock(WorkflowService.class);
+    private final WorkflowRepository workflowRepository = mock(WorkflowRepository.class);
     private final ProjectService projectService = mock(ProjectService.class);
     private final InstanceAddress address = new InstanceAddress("", "", 9090);
 
@@ -39,7 +39,7 @@ class ProjectOnboardingStage2Test {
                 .build();
         when(profileRepository.findByType(OnboardingProfileType.BASE)).thenReturn(List.of(base));
         return new ProjectOnboardingService(
-                new OnboardingRenderer(profileRepository, workflowService, address, modules), modules, projectService);
+                new OnboardingRenderer(profileRepository, workflowRepository, address, modules), modules, projectService);
     }
 
     private Project project(String id, Map<String, Object> onboarding) throws Exception {

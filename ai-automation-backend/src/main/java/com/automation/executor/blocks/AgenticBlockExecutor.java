@@ -262,7 +262,9 @@ public class AgenticBlockExecutor implements BlockExecutor {
         Map<String, Object> metadata = tokenTracker.buildFinalMetadata(
                 cfg.goal(), cfg.successCriteria(), iteration, goalAchieved, stopReason,
                 model, provider.getId());
-        metadata.put(StepAiMetadata.AI_REQUEST, StepAiMetadata.aiRequest(provider.getId(), model, effort));
+        // Codex ignores an effort (no CLI flag), so its steps do not claim one (TODO 20adda30)
+        metadata.put(StepAiMetadata.AI_REQUEST, StepAiMetadata.aiRequest(provider.getId(), model,
+                provider.getCapabilities().supportsEffort() ? effort : null));
         result.setMetadata(metadata);
 
         context.setVariable("agentic_goal_achieved", goalAchieved);

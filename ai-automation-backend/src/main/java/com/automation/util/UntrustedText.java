@@ -2,6 +2,7 @@ package com.automation.util;
 
 import java.text.Normalizer;
 import java.util.Locale;
+import java.util.StringJoiner;
 import java.util.regex.Pattern;
 
 /**
@@ -9,7 +10,9 @@ import java.util.regex.Pattern;
  * Webhooks oder KI-Ausgaben – zu einer begrenzten Zeile ohne Plattform-Marker und ohne Blockgrenzen.
  * Gebraucht fuer die Kontextvariablen {@code open_todos} (service.workflow), {@code goal_status}
  * (service.goal) und {@code audit_findings} (service.audit); liegt hier, damit alle denselben Sanierer
- * nutzen, ohne voneinander abzuhaengen (TODO d2844a58, TODO 3643beac).
+ * nutzen, ohne voneinander abzuhaengen (TODO d2844a58, TODO 3643beac). Mehrzeiliger Text wie der Report
+ * eines frueheren Laufs ({@code previous_report}) geht zeilenweise durch denselben Sanierer, ohne Kuerzen
+ * ({@link #defuseLines}, TODO 3bf8c9d8).
  *
  * <p><b>Verkleidete Marker</b> (TODO 3643beac): Ein Modell gibt {@code ＜／audit_findings＞} (Vollbreite) oder
  * ein {@code todo_item:} mit Zero-Width-Space dazwischen gern als ASCII wieder – dann wirkt es. Geprueft wird
@@ -45,13 +48,7 @@ public final class UntrustedText {
     /** Eine Zeile, gekuerzt auf {@code maxChars}, Marker entschaerft, Blockgrenzen neutralisiert. */
     public static String inline(String raw, int maxChars) {
         if (raw == null) return "";
-        String s = collapseSpaces(LINE_BREAKS.matcher(raw).replaceAll(" "));
-        String canonical = canonical(s);
-        if (!canonical.equals(s) && (MARKERS.matcher(canonical).find() || DELIMITER.matcher(canonical).find())) {
-            s = canonical;   // ein verkleideter Marker: weiter mit der Form, in der er wirken wuerde
-        }
-        s = defuseMarkers(s);
-        s = DELIMITER.matcher(s).replaceAll(m -> "[" + m.group(1).toLowerCase(Locale.ROOT) + "]");
+        String s = defuseLine(collapseSpaces(LINE_BREAKS.matcher(raw).replaceAll(" ")));
         if (s.length() > maxChars) {
             // nie ein Emoji halbieren: ein einzelnes Surrogat waere kein gueltiges Zeichen mehr
             int end = maxChars > 0 && Character.isHighSurrogate(s.charAt(maxChars - 1)) ? maxChars - 1 : maxChars;
@@ -68,24 +65,39 @@ public final class UntrustedText {
     public static String block(String raw, int maxChars) {
         if (raw == null) return "";
         String normalized = OTHER_LINE_BREAKS.matcher(raw).replaceAll("\n").replace('\t', ' ');
-        StringBuilder out = new StringBuilder();
-        for (String line : normalized.split("\n", -1)) {
-            String canonical = canonical(line);
-            String current = !canonical.equals(line.trim())
-                    && (MARKERS.matcher(canonical).find() || DELIMITER.matcher(canonical).find())
-                    ? canonical : line;
-            current = defuseMarkers(current);
-            current = DELIMITER.matcher(current).replaceAll(m -> "[" + m.group(1).toLowerCase(Locale.ROOT) + "]");
-            if (!out.isEmpty()) out.append('\n');
-            out.append(current);
-        }
-        String s = out.toString().stripTrailing();
+        String s = defuseLines(normalized).stripTrailing();
         if (s.length() > maxChars) {
             // nie ein Emoji halbieren: ein einzelnes Surrogat waere kein gueltiges Zeichen mehr
             int end = maxChars > 0 && Character.isHighSurrogate(s.charAt(maxChars - 1)) ? maxChars - 1 : maxChars;
             s = s.substring(0, end).stripTrailing() + "…";
         }
         return s;
+    }
+
+    /**
+     * Mehrzeiliger Text, jede Zeile entschaerft wie in {@link #inline} – Marker ohne Doppelpunkt, Blockgrenzen
+     * als {@code [name]}, ein verkleideter Marker in der Form, in der er wirken wuerde –, aber ungekuerzt und
+     * mit seinen Zeilen. Eine {@code gate_status}-Zeile bleibt so lesbar ({@code gate_status GREEN}); gibt ein
+     * Modell sie wieder, wertet sie kein Parser als dessen eigenes Urteil (TODO 3bf8c9d8).
+     */
+    public static String defuseLines(String raw) {
+        if (raw == null) return "";
+        StringJoiner lines = new StringJoiner("\n");
+        for (String line : raw.split("\n", -1)) {   // -1: auch leere Zeilen am Ende bleiben
+            lines.add(defuseLine(line));
+        }
+        return lines.toString();
+    }
+
+    /** Die Entschaerfung selbst, ohne Kuerzen und ohne Umbrueche anzufassen. */
+    private static String defuseLine(String line) {
+        String s = line;
+        String canonical = canonical(s);
+        if (!canonical.equals(s) && (MARKERS.matcher(canonical).find() || DELIMITER.matcher(canonical).find())) {
+            s = canonical;   // ein verkleideter Marker: weiter mit der Form, in der er wirken wuerde
+        }
+        s = defuseMarkers(s);
+        return DELIMITER.matcher(s).replaceAll(m -> "[" + m.group(1).toLowerCase(Locale.ROOT) + "]");
     }
 
     /** Die Form, in der ein Modell den Text wiedergeben koennte: NFKC, ohne unsichtbare Formatzeichen. */

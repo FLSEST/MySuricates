@@ -4,7 +4,7 @@ import { Trash2, Plus } from 'lucide-react';
 import { useT, useI18nStore } from '../i18n';
 import { useSchedules, useToggleSchedule, useDeleteSchedule, useCreateSchedule } from '../hooks/useSchedules';
 import { useWorkflows } from '../hooks/useWorkflows';
-import { Spinner, Toggle, Button, Modal, Select, CronPicker } from '../components/ui';
+import { Spinner, Toggle, Button, Modal, Select, CronPicker, ConfirmModal } from '../components/ui';
 import { ErrorState } from '../components/shared/ErrorState';
 import { EmptyState } from '../components/shared/EmptyState';
 import { SimplePage, SimplePageHeader, SimpleRow, StatusDot } from '../components/simple/kit';
@@ -12,6 +12,7 @@ import { ProBadge } from '../components/simple/ProHandoff';
 import { AREA_COLORS } from '../utils/homeTiles';
 import { formatDateTime } from '../utils/formatTime';
 import { describeSchedule } from '../utils/cronSchedule';
+import type { ScheduledWorkflow } from '../types';
 
 // Spring cron has six fields: second minute hour day month weekday.
 const DEFAULT_CRON = '0 0 9 * * *';
@@ -41,6 +42,8 @@ export function SimpleSchedules() {
     }, { replace: true });
   }, [requestedCreate, setSearchParams]);
   const [cron, setCron] = useState(DEFAULT_CRON);
+  // Schedule whose deletion waits for the confirmation (23635ef6)
+  const [deleting, setDeleting] = useState<ScheduledWorkflow | null>(null);
 
   const submitCreate = () => {
     if (!wfId || !cron.trim()) return;
@@ -90,7 +93,7 @@ export function SimpleSchedules() {
                   <button
                     aria-label={t.common.delete}
                     className="text-text-tertiary hover:text-danger transition-colors"
-                    onClick={() => { if (window.confirm(t.common.deleteConfirm)) del.mutate(s.id); }}
+                    onClick={() => setDeleting(s)}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -122,6 +125,17 @@ export function SimpleSchedules() {
           <CronPicker simple label={t.simple.schedules.when} value={cron} onChange={setCron} />
         </div>
       </Modal>
+
+      <ConfirmModal
+        open={deleting !== null}
+        onClose={() => setDeleting(null)}
+        onConfirm={() => deleting && del.mutate(deleting.id, { onSettled: () => setDeleting(null) })}
+        title={t.simple.schedules.deleteTitle}
+        message={deleting ? t.simple.schedules.deleteConfirm.replace('{name}', () => deleting.workflowName ?? deleting.chainName ?? '—') : null}
+        confirmLabel={t.common.delete}
+        variant="danger"
+        isPending={del.isPending}
+      />
     </SimplePage>
   );
 }

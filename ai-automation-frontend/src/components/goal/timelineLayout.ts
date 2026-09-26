@@ -189,6 +189,29 @@ export function dayAtX(axis: TimelineAxis, x: number, width: number): number {
   return axis.startDay + Math.min(axis.days - 1, Math.max(0, index));
 }
 
+/** Wo das Etikett „heute“ steht: mittig über dem Tag, rechts oder links daneben, oder eine Zeile höher. */
+export type TodayLabelPlacement = 'center' | 'right' | 'left' | 'raised';
+
+/** Breite des Etiketts „heute“ (Text 10 px, Rand) und halbe Breite einer Raute oder der Zielfahne, in px. */
+export const TODAY_LABEL_WIDTH = 44;
+const MARK_HALF_WIDTH = 10;
+/** So weit reicht ein seitlich stehendes Etikett noch über die Linie von heute. */
+export const TODAY_LABEL_OVERLAP = 3;
+
+/**
+ * Das Etikett „heute“ weicht den Rauten und der Zielfahne aus (TODO ff6f08fd – bei 768 px lag es auf
+ * der Raute des Nachbartags): mittig, wenn dort frei ist, sonst rechts oder links an der Linie von
+ * heute, sonst eine Zeile höher bei den Tageszahlen. Es bleibt innerhalb der Achse.
+ */
+export function todayLabelPlacement(todayX: number, marks: number[], width: number): TodayLabelPlacement {
+  const free = (from: number, to: number) => from >= 0 && to <= width
+    && marks.every((x) => x + MARK_HALF_WIDTH <= from || x - MARK_HALF_WIDTH >= to);
+  if (free(todayX - TODAY_LABEL_WIDTH / 2, todayX + TODAY_LABEL_WIDTH / 2)) return 'center';
+  if (free(todayX - TODAY_LABEL_OVERLAP, todayX - TODAY_LABEL_OVERLAP + TODAY_LABEL_WIDTH)) return 'right';
+  if (free(todayX + TODAY_LABEL_OVERLAP - TODAY_LABEL_WIDTH, todayX + TODAY_LABEL_OVERLAP)) return 'left';
+  return 'raised';
+}
+
 // ── Zeilen ────────────────────────────────────────────────────────────────────
 
 /**

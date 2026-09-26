@@ -164,6 +164,7 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 - Badge-Anzeige in der Sidebar für offene TODOs
 - Filter-, Ansichts- und Seitenzustand (persistiert, Suche entprellt, `?projectId=` aus dem Cockpit) liefert `hooks/useTodoFilters.ts`; die Quick-Add-Leiste ist `components/todo/TodoQuickAdd.tsx`, ihr Zustand und das Kürzel `n` (fokussiert den Titel außerhalb von Eingabefeldern) liegen in `hooks/useTodoQuickAdd.ts` und damit in der Seite — Eingaben überstehen den Lade-Spinner beim Filterwechsel
 - `hooks/useTodoBoard.ts` liefert die Daten der aktiven Ansicht: in der Liste eine Seite, im Board eine Abfrage je Spalte, die der Statusfilter zeigt (nie eine gemischte Seite auf Spalten verteilt); `hooks/useTodoEditor.ts` den Bearbeiten-Dialog samt Deep-Link `?todoId=` (öffnet das TODO einmal, lockert verbergende Filter, hebt die Zeile bis kurz nach dem Schließen hervor), Speichern und Export. Filterleiste und Tag-Chips sind `components/todo/TodoFilterBar.tsx` und `TodoTagChips.tsx`
+- Der Bearbeiten-Dialog `components/todo/TodoEditModal.tsx` (auch in der Ziel-Ansicht über `GoalTodoEditor`) hält die Formularfelder; „Übertragung / Verknüpfungen“ ist `TodoExportSection.tsx` (Tracker und Ziel aus eigener Wahl, sonst aus der Projekt-Konfiguration, sonst dem ersten verbundenen Tracker: `hooks/useTodoExportTarget.ts`, die eigene Wahl beginnt je TODO leer), die schreibgeschützten Angaben (Quelle, Session, Läufe, Workflow, Daten) sind `TodoMetadata.tsx`
 
 ### ActivityLog (`/activity`)
 
@@ -182,6 +183,7 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 - Vollständige Pipeline: Generieren → Test-Instanz → Verifizieren → Promoten
 - Topic-Kategorien-Auswahl
 - Formularzustand, „Workflow erstellen“ und „Erstellen & Testen“ (Thema und Projekt Pflicht, Testen nur mit laufender Test-Instanz, ungültiges JSON der Test-Eingaben wird gemeldet und als `{}` gesendet) liegen in `hooks/useFactoryForm.ts`; das Formular ist `components/factory/FactoryCreateForm.tsx`, die Ergebnisliste `FactoryResultsList.tsx` (Ergebnisse der Sitzung vor früher erzeugten Workflows, Status-Icons in den Tönen der Status-Badges)
+- Das Ablaufdiagramm `components/factory/FactoryFlowDiagram.tsx` (siehe [Architektur](architektur.md) → Workflow Factory) hält Modus, Schalter und Schrittliste; die Zeichnung ist `FactoryFlowSvg.tsx`, Geometrie und Zeitplan liegen in `factoryFlow.ts`, die Uhr der Animation in `hooks/useTimelineClock.ts` (Schleife, bei `prefers-reduced-motion` erst auf „Abspielen“ und ein Durchlauf; ein geänderter Schalter beginnt von vorn). Ob die Karte eingeklappt ist, merkt sich der Browser
 
 ### DialogImport (`/dialogs`)
 
@@ -209,7 +211,7 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 
 ### WorkflowDetail (`/workflows/:id`) — Erweiterungen
 
-- **Memory-Tab:** Workflow-Memory-Einträge anzeigen, aktivieren, löschen, neu extrahieren
+- **Memory-Tab:** Workflow-Memory-Einträge anzeigen, aktivieren, löschen, neu extrahieren (`WorkflowMemoryPanel.tsx`; ein Eintrag ist `WorkflowMemoryItem.tsx`, der Extraktions-Dialog `MemoryExtractModal.tsx` mit Zustand in `hooks/useMemoryExtraction.ts`: gewählte Läufe, Anbieter, Sekundenzähler, nach Erfolg schließen)
 - **Instructions-Tab:** Workflow-spezifische Agent-Instructions im Monaco-Editor bearbeiten
 - **Gate-Status:** Anzeige des letzten Gate-Status im Run-Verlauf
 - **BPMN-Diagramm:** `BpmnDiagramView.tsx` zeichnet den BPMN-Export als SVG (Zoom, Klick/Hover je Block, Live-Status im Run). Die reine Logik — XML lesen, oben→unten-Layout, Beschriftungen umbrechen, Element-ID → Block-Auswahl — liegt in `bpmnLayout.ts` (Test `bpmnLayout.test.ts`), die Formen und Marker je Element-Typ in `BpmnShapes.tsx`.
@@ -240,6 +242,7 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 - Kontext-sensitiver Chat mit Page Suggestions
 - Persistierte Sessions, WebSocket-Integration
 - Größenänderung an linker und oberer Kante (nur Desktop) über `hooks/usePanelResize.ts`: Ziehen vom Anker unten rechts weg vergrößert, je Kante zwischen Mindestmaß und Fenster minus Rand; das Eingabefeld mit Auto-Grow (Enter sendet, Shift+Enter bricht um, höchstens 240 px) ist `assistant/AssistantComposer.tsx`
+- Eine Nachricht ist `assistant/AssistantMessage.tsx` (`MessageBubble`: Blase, Einklappen langer Antworten, Zeitstempel); daneben liegen `AssistantMarkdown.tsx` (Markdown der Antwort, App-interne Links navigieren im Panel), `ActionButton.tsx` (Aktionen der Antwort, `ask_choice` je Option ein Knopf) und `PendingToolCard.tsx` (vorgeschlagene Änderung bestätigen oder ablehnen; Zustand in `hooks/usePendingToolDecision.ts`). `ActionButton` und `PendingToolCard` nutzt auch `HomeAnswer` auf der Simple-Startseite
 - Siehe [Assistant System](assistant-system.md) für Details
 
 ### `src/components/settings/`
@@ -251,7 +254,7 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 
 ### Shared-Komponenten (`src/components/shared/`)
 
-**Regel:** `shared` importiert keine Fachordner (`workflow`, `goal`, `hints`, `todo`, `settings` …) und nicht `assistantPanelUtils`, sondern nur `ui`, `api`, `hooks`, `utils`, `types`, `stores` und `i18n`. Eine Komponente, die einen Fachordner braucht, gehört in diesen Ordner; fachfreie Helfer liegen in `src/utils/` (z. B. `placeholderContext.ts`, `internalAppPath.ts`). Deshalb liegen `AgenticStepCard`, `ForEachStepCard` und `ApprovalDialog` (Freigabe-Dialog im Run, nutzt `Hint`) in `components/workflow/`, `TodoEditModal` in `components/todo/`.
+**Regel:** `shared` importiert keine Fachordner (`workflow`, `goal`, `hints`, `todo`, `settings` …) und nicht `assistantPanelUtils`, sondern nur `ui`, `api`, `hooks`, `utils`, `types`, `stores` und `i18n`. Eine Komponente, die einen Fachordner braucht, gehört in diesen Ordner; fachfreie Helfer liegen in `src/utils/` (z. B. `placeholderContext.ts`, `internalAppPath.ts`). Deshalb liegen `AgenticStepCard`, `ForEachStepCard` und `ApprovalDialog` (Freigabe-Dialog im Run, nutzt `Hint`) in `components/workflow/`, `TodoEditModal` in `components/todo/`. ESLint prüft die Regel (`no-restricted-imports`, für `import()` `no-restricted-syntax`, in `eslint.config.js`); `npm run lint` scheitert an einem Verstoß.
 
 | Komponente | Beschreibung |
 |---|---|

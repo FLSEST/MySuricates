@@ -118,6 +118,18 @@ class TodoistProviderTest {
         assertThat(stub.requests()).isEmpty();
     }
 
+    /** ac639b39: limit 50.5 used to become 50 and priority 4.5 became 4 — read like their text now. */
+    @Test
+    void limitAndPriority_areReadLikeTheirText() {
+        assertThatThrownBy(() -> provider.executeAction("list_tasks", Map.of("limit", 50.5), CREDENTIAL))
+                .hasMessage("Parameter 'limit' must be a number");
+        assertThatThrownBy(() -> provider.executeAction("create_task", Map.of("content", "x", "priority", 4.5), CREDENTIAL))
+                .hasMessage("Parameter 'priority' must be a number between 1 and 4");
+        assertThatThrownBy(() -> provider.executeAction("create_task", Map.of("content", "x", "priority", 4_294_967_300L), CREDENTIAL))
+                .hasMessage("Parameter 'priority' must be a number between 1 and 4");
+        assertThat(stub.requests()).isEmpty();
+    }
+
     @Test
     void limit_outsideDocumentedRange_isRejected() {
         assertThatThrownBy(() -> provider.executeAction("list_tasks", Map.of("limit", 201), CREDENTIAL))

@@ -1,4 +1,4 @@
-package com.automation.service.cli;
+package com.automation.service.cli.claude;
 
 import com.automation.service.live.LiveLineKind;
 import com.automation.service.live.LiveOutputSink;

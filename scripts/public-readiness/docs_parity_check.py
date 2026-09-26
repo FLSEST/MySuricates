@@ -9,7 +9,9 @@ Drei Dinge, die eine Maschine besser prueft als ein Lesedurchgang:
    nach den Slug-Regeln von GitHub.
 3. **DE/EN-Gleichstand** — jede `docs/*.md` hat ein Gegenstueck unter `docs/en/`, und beide
    fuehren dieselbe Folge von Ueberschriften-Ebenen. Ebenso eine Ebene tiefer fuer die
-   Ordner in `MIRRORED_SUBDIRS` (`docs/konzepte/x.md` <-> `docs/en/konzepte/x.md`).
+   Ordner in `MIRRORED_SUBDIRS` (`docs/konzepte/x.md` <-> `docs/en/konzepte/x.md`). Weicht die
+   Folge ab, paart `align_sections` die Abschnitte ueber ihren Inhalt und nennt genau die ohne
+   Gegenstueck (TODO 2d553479).
 
 Was hier NICHT geprueft wird, weil es Urteil braucht: Aktualitaet gegenueber dem Code
 (dafuer doc-facts-check.sh) und Verstaendlichkeit fuer Fremde (dafuer der Workflow
@@ -28,6 +30,7 @@ from __future__ import annotations
 import argparse
 import difflib
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -35,7 +38,7 @@ from pathlib import Path
 # Das eigene Verzeichnis muss auf den Pfad: Tests laden dieses Skript ueber
 # spec_from_file_location, und dabei liegt sein Verzeichnis nicht auf sys.path.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from md_common import headings, iter_links, slug, tracked_markdown  # noqa: E402
+from md_common import FENCE, headings, iter_links, slug, tracked_markdown  # noqa: E402
 
 # Unterordner von docs/, die wie docs/ selbst eins zu eins unter docs/en/ gespiegelt werden.
 # Bewusst eine Liste statt "was es unter docs/en/ gibt": sonst bliebe ein Ordner, dessen
@@ -48,13 +51,13 @@ MIRRORED_SUBDIRS: tuple[str, ...] = ("onboarding", "konzepte")
 KNOWN_GAPS: dict[str, str] = {}
 
 # Einzelne Abschnitte ohne Gegenstueck. Format: "datei::ueberschrift" -> TODO-Kennung.
-# (Der Eintrag "entwicklung.md::## Bekannte Einschränkungen" ist mit TODO 47bd4d27 entfallen:
-# fehlend war in Wahrheit "## Diagramm-Seiten" — der Ebenenvergleich hatte die Luecke nur
-# dem letzten gleichrangigen Abschnitt zugeschrieben.)
-KNOWN_SECTION_GAPS: dict[str, str] = {
-    "architektur.md::## Scheduler: verpasste Termine (Standby und Kaltstart)": "c58d7402",
-    "architektur.md::## Completion Triggers (V39)": "c58d7402",
-}
+# Der Schluessel ist die Ueberschrift, die WIRKLICH fehlt: Bis TODO 2d553479 verglich die Pruefung
+# nur die Folge der Ebenen und schrieb eine Luecke dem letzten gleichrangigen Abschnitt zu. So
+# standen hier "entwicklung.md::## Bekannte Einschränkungen" (fehlend war "## Diagramm-Seiten")
+# und "architektur.md::## Completion Triggers (V39)" (fehlend war das Audit Center, seit TODO
+# 49f15990 uebersetzt). Zurzeit leer: "## Scheduler: verpasste Termine" ist seit TODO c58d7402
+# uebersetzt.
+KNOWN_SECTION_GAPS: dict[str, str] = {}
 
 
 def check_links(root: Path, files: list[str]) -> tuple[list[str], int]:
@@ -145,23 +148,179 @@ def _check_dir_pair(root: Path, sub: str, new: list[str], known: list[str]) -> N
         new.append(f"nur-englisch docs/en/{prefix}{name}")
 
     for name in sorted(de_names & en_names):
-        de, en = headings(de_dir / name), headings(en_dir / name)
-        if len(de) == len(en):
+        de, en = sections(de_dir / name), sections(en_dir / name)
+        # Gleiche Ebenenfolge: nichts zu paaren. Ob eine Ueberschrift uebersetzt oder durch eine
+        # andere ersetzt ist, laesst sich am Text allein nicht sicher sagen.
+        if [_level(h) for h, _ in de] == [_level(h) for h, _ in en]:
             continue
-        levels_de = [h.split(" ")[0] for h in de]
-        levels_en = [h.split(" ")[0] for h in en]
         label = f"{prefix}{name}"
-        for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(None, levels_de, levels_en).get_opcodes():
-            if tag == "equal":
-                continue
-            for k in range(i1, i2):
-                key = f"{label}::{de[k]}"
-                if key in KNOWN_SECTION_GAPS:
-                    known.append(f"abschnitt-fehlt-en {label} '{de[k]}' (bekannt, TODO {KNOWN_SECTION_GAPS[key]})")
-                else:
-                    new.append(f"abschnitt-fehlt-en {label} '{de[k]}'")
-            for k in range(j1, j2):
-                new.append(f"abschnitt-nur-en {label} '{en[k]}'")
+        only_de, only_en = align_sections(de, en)
+        for k in only_de:
+            heading = de[k][0]
+            key = f"{label}::{heading}"
+            if key in KNOWN_SECTION_GAPS:
+                known.append(f"abschnitt-fehlt-en {label} '{heading}' (bekannt, TODO {KNOWN_SECTION_GAPS[key]})")
+            else:
+                new.append(f"abschnitt-fehlt-en {label} '{heading}'{_position(de, k)}")
+        for k in only_en:
+            new.append(f"abschnitt-nur-en {label} '{en[k][0]}'{_position(en, k)}")
+
+
+# ---------------------------------------------------------------------------
+# Abschnitte paaren (TODO 2d553479)
+#
+# Die Erstfassung verglich nur die Folge der Ebenen (difflib ueber "##", "###" …). Fehlt ein
+# "##"-Abschnitt, ist das mehrdeutig -- jeder gleichrangige Abschnitt koennte fehlen --, und
+# difflib nahm stets den letzten. Zweimal stand deshalb der falsche Abschnitt in
+# KNOWN_SECTION_GAPS (siehe dort).
+#
+# Jetzt werden die Abschnitte ueber ihren Inhalt gepaart: eine Ausrichtung (dynamische
+# Programmierung) ueber beide Folgen, die die Reihenfolge wahrt, nur gleiche Ebenen paart und die
+# Summe der Aehnlichkeiten maximiert. Aehnlich heisst:
+#
+# - die Ueberschrift -- gleiche Woerter ("Workflow Chains", "(V39)", `goals`) oder ein Kognat
+#   ("Architektur"/"Architecture");
+# - oder der Abschnittstext -- sprachneutrale Zeichen darin: Code in Backticks, Linkziele,
+#   Bezeichner mit Ziffer, Unterstrich, Punkt, Schraegstrich oder Binnenmajuskel. Die stehen in
+#   beiden Sprachen gleich da, auch wenn die Ueberschrift ganz uebersetzt ist.
+#
+# Jedes Paar bringt dazu einen kleinen Grundwert (PAIR_BASE), damit zwei Abschnitte ohne jede
+# Aehnlichkeit trotzdem lieber gepaart werden als beide als Luecke zu gelten. Er ist klein genug,
+# dass eine echte Aehnlichkeit eine Verschiebung ueberstimmt. Ohne jedes Signal (reine Prosa, ganz
+# uebersetzte Ueberschriften) bleibt die Wahl eine Vermutung -- dann gilt, wie frueher, der
+# spaetere Abschnitt als fehlend. Probe am Bestand 2026-09-26: je Datei mit gleicher Ebenenfolge
+# jeden englischen Abschnitt einzeln entfernt; richtig benannt wurden 1058 von 1086 Luecken
+# (Ebenenfolge allein: 248). Die verfehlten sind reine Prosa (docs/konzepte: "Wofuer taugt das?"
+# neben "Vorteile") oder fast gleiche Nachbarn (zwei Endpunkte derselben Ressource).
+# ---------------------------------------------------------------------------
+PAIR_BASE = 0.1
+_HEADING_WORD = re.compile(r"[a-z0-9_.]+")
+_CODE_SPAN = re.compile(r"`([^`\n]+)`")
+_LINK_TARGET = re.compile(r"\]\(([^)\s]+)\)")
+_TOKEN = re.compile(r"[A-Za-z0-9_./:-]+")
+_NEUTRAL = re.compile(r"[0-9_/]|[a-z][A-Z]|\.[a-z]")
+
+
+def sections(path: Path) -> list[tuple[str, str]]:
+    """(Ueberschrift, Abschnittstext bis zur naechsten Ueberschrift) -- fence-bewusst wie headings()."""
+    out: list[tuple[str, list[str]]] = []
+    fence = False
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        stripped = line.lstrip()
+        if FENCE.match(line):
+            fence = not fence
+        elif not fence and stripped.startswith("#") and not stripped.startswith("#!"):
+            out.append((stripped, []))
+            continue
+        if out:
+            out[-1][1].append(line)
+    return [(heading, "\n".join(body)) for heading, body in out]
+
+
+def _level(heading: str) -> str:
+    return heading.split(" ")[0]
+
+
+def _heading_text(heading: str) -> str:
+    return heading.lstrip("#").strip().lower()
+
+
+def _jaccard(a: set[str], b: set[str]) -> float:
+    shared = len(a & b)
+    return shared / (len(a) + len(b) - shared) if a and b else 0.0
+
+
+def _neutral_tokens(body: str) -> set[str]:
+    tokens = {code.strip() for code in _CODE_SPAN.findall(body)}
+    tokens.update(target.split("#")[0] for target in _LINK_TARGET.findall(body))
+    for word in _TOKEN.findall(body):
+        word = word.strip(".:-/")
+        if len(word) >= 3 and _NEUTRAL.search(word):
+            tokens.add(word)
+    tokens.discard("")
+    return tokens
+
+
+def _features(section: tuple[str, str]) -> tuple[str, str, set[str], set[str]]:
+    """Ebene, Ueberschriftentext, ihre Woerter und die sprachneutralen Zeichen des Abschnitts."""
+    heading, body = section
+    text = _heading_text(heading)
+    return (_level(heading), text, {w for w in _HEADING_WORD.findall(text) if len(w) >= 2},
+            _neutral_tokens(body))
+
+
+def _similarity(de: tuple, en: tuple, matcher: difflib.SequenceMatcher) -> float:
+    """Aehnlichkeit zweier Abschnitte gleicher Ebene; matcher traegt en[1] schon als zweite Folge."""
+    words = _jaccard(de[2], en[2])
+    # Unter drei Zeichen ist ein Treffer Zufall -- ein einzelnes `true` macht keine Verwandtschaft.
+    body = _jaccard(de[3], en[3]) if len(de[3] | en[3]) >= 3 else 0.0
+    # Buchstaben vergleichen nur, wenn kein Wort passt: fuer Kognate ("Architektur"/"Architecture").
+    # Teilen die Ueberschriften Woerter, sagen die mehr -- und die API-Referenz mit ihren hunderten
+    # aehnlichen Endpunkt-Ueberschriften wuerde sonst zur Rechenaufgabe. Erst ab 0.6, darunter
+    # trifft er Zufallsbuchstaben ("Eins"/"One").
+    letters = 0.0
+    if not words:
+        matcher.set_seq1(de[1])
+        if matcher.real_quick_ratio() >= 0.6 and matcher.quick_ratio() >= 0.6:
+            ratio = matcher.ratio()
+            letters = ratio if ratio >= 0.6 else 0.0
+    return max(words, body, letters)
+
+
+def align_sections(de: list[tuple[str, str]], en: list[tuple[str, str]]) -> tuple[list[int], list[int]]:
+    """Paart die Abschnitte beider Sprachen; liefert (DE ohne Partner, EN ohne Partner) als Indizes."""
+    return align_scores(pair_scores(de, en))
+
+
+def pair_scores(de: list[tuple[str, str]], en: list[tuple[str, str]]) -> list[list[float | None]]:
+    """Wert jedes moeglichen Paares (DE-Index, EN-Index); None, wo die Ebenen verschieden sind."""
+    features_de = [_features(section) for section in de]
+    score: list[list[float | None]] = [[None] * len(en) for _ in de]
+    for j, feature_en in enumerate(_features(section) for section in en):
+        matcher = difflib.SequenceMatcher(None)
+        matcher.set_seq2(feature_en[1])  # zweite Folge einmal je Ueberschrift, difflib cacht sie
+        for i, feature_de in enumerate(features_de):
+            if feature_de[0] == feature_en[0]:
+                score[i][j] = PAIR_BASE + _similarity(feature_de, feature_en, matcher)
+    return score
+
+
+def align_scores(score: list[list[float | None]]) -> tuple[list[int], list[int]]:
+    """Die reihenfolgetreue Paarung mit der hoechsten Summe; (Zeilen ohne Partner, Spalten ohne Partner)."""
+    n = len(score)
+    m = len(score[0]) if score else 0
+    # best[i][j]: hoechste Summe fuer die Restfolgen de[i:] und en[j:].
+    best = [[0.0] * (m + 1) for _ in range(n + 1)]
+    for i in range(n - 1, -1, -1):
+        for j in range(m - 1, -1, -1):
+            value = max(best[i + 1][j], best[i][j + 1])
+            if score[i][j] is not None:
+                value = max(value, score[i][j] + best[i + 1][j + 1])
+            best[i][j] = value
+    # Rueckweg von vorn; bei Gleichstand gilt ein Paar vor einer Luecke, eine deutsche Luecke vor
+    # einer englischen. Damit faellt die Vermutung ohne Signal auf den spaeteren Abschnitt.
+    only_de: list[int] = []
+    only_en: list[int] = []
+    i = j = 0
+    close = 1e-9
+    while i < n and j < m:
+        if score[i][j] is not None and abs(best[i][j] - (score[i][j] + best[i + 1][j + 1])) < close:
+            i, j = i + 1, j + 1
+        elif abs(best[i][j] - best[i + 1][j]) < close:
+            only_de.append(i)
+            i += 1
+        else:
+            only_en.append(j)
+            j += 1
+    only_de.extend(range(i, n))
+    only_en.extend(range(j, m))
+    return only_de, only_en
+
+
+def _position(items: list[tuple[str, str]], k: int) -> str:
+    """Wo der Abschnitt steht: Nummer der Ueberschrift und ihr Vorgaenger in derselben Datei."""
+    after = f", nach '{items[k - 1][0]}'" if k > 0 else ""
+    return f" (Ueberschrift {k + 1} von {len(items)}{after})"
 
 
 def main() -> int:

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { useI18nStore } from '../../../i18n';
 import { en } from '../../../i18n/en';
 import type { UnifiedCalendarEvent } from '../../../types';
@@ -62,15 +62,33 @@ describe('UnifiedCalendarGrid', { timeout: 15_000 }, () => {
   it('lists the events of a selected day and opens the week of that day', () => {
     render(<UnifiedCalendarGrid />);
     fireEvent.click(dayCell(22));
-    expect(screen.getByText('22. September 2026')).toBeInTheDocument();
+    expect(screen.getByText('September 22, 2026')).toBeInTheDocument();
     expect(screen.getByText('Weekly backup')).toBeInTheDocument();
 
     fireEvent.click(screen.getByText('Week'));
-    expect(heading()).toHaveTextContent('21. – 27. September 2026');
+    // ICU puts thin spaces around the dash; toHaveTextContent folds them into plain ones
+    expect(heading()).toHaveTextContent('September 21 – 27, 2026');
     expect(lastRange()).toEqual({
       from: new Date(2026, 8, 21).toISOString(),
       to: new Date(2026, 8, 27, 23, 59, 59).toISOString(),
     });
+  });
+
+  // 6bb7ed36: the week and the selected day read „21. – 27. September“ in the English UI too
+  it('writes the header and the selected day the way the UI language writes dates', () => {
+    useI18nStore.setState({ locale: 'de' });
+    render(<UnifiedCalendarGrid />);
+    expect(heading()).toHaveTextContent('September 2026');
+    fireEvent.click(dayCell(22));
+    expect(screen.getByText('22. September 2026')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Woche'));
+    expect(heading()).toHaveTextContent('21.–27. September 2026');
+    fireEvent.click(navButtons().next);
+    expect(heading()).toHaveTextContent('28. September – 4. Oktober 2026');
+
+    act(() => useI18nStore.setState({ locale: 'en' }));
+    expect(heading()).toHaveTextContent('September 28 – October 4, 2026');
   });
 
   it('opens a day on double click', () => {

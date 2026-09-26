@@ -155,9 +155,12 @@ export interface AiProviderStatus {
   /** The variable name, or the login file as `~/…` / `$VARIABLE/…`. */
   loginSource: string | null;
   install: string;
+  /** The command to log in (older backends: a sentence, e.g. pi's "pi, then /login …"). */
   login: string;
   /** The provider a workflow uses when it names none. */
   defaultProvider: boolean;
+  /** What to do after the login command, as a key into `aiProviderStatus.loginNotes`; missing on older backends. */
+  loginNote?: string | null;
 }
 
 export interface AiProviderStatusReport {

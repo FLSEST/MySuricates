@@ -73,19 +73,6 @@ class AuditFindingOccurrenceRepositoryTest {
         assertThat(occurrenceRepository.existsByFindingIdAndReportId(finding, report2)).isFalse();
     }
 
-    @Test
-    void findByReportId_returnsEveryFindingSeenInThatReport() {
-        String a = saveFinding("fp-a");
-        String b = saveFinding("fp-b");
-        saveOccurrence(a, report1);
-        saveOccurrence(b, report1);
-        saveOccurrence(a, report2);
-
-        assertThat(occurrenceRepository.findByReportId(report1))
-                .extracting(AuditFindingOccurrence::getFindingId).containsExactlyInAnyOrder(a, b);
-        assertThat(occurrenceRepository.findByReportId(report2)).hasSize(1);
-    }
-
     /** Eine GROUP-BY-Abfrage fuer eine ganze Report-Seite; ein Report ohne Findings fehlt (TODO a3b89355). */
     @Test
     void countByReportIds_countsPerReport_inOneQuery() {

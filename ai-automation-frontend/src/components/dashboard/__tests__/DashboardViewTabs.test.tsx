@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { useI18nStore } from '../../../i18n';
 import { useDashboardLayoutStore } from '../../../stores/dashboardLayoutStore';
 import { useDashboardSyncStore } from '../../../stores/dashboardSyncStore';
@@ -123,16 +123,21 @@ describe('DashboardViewTabs', () => {
     expect(useDashboardSyncStore.getState().dirty).toBe(false);
   });
 
+  // 23635ef6: the app's own dialog instead of window.confirm
   it('deletes the active view only after confirmation and never the last view', () => {
     useDashboardLayoutStore.setState({ activeViewId: 'ops', views: [view('default'), view('ops', 'Ops')] });
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true);
     render(<DashboardViewTabs editMode disabled={false} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete view' }));
-    expect(confirm).toHaveBeenCalledWith('Delete the view “Ops”? Its widgets and filter are removed.');
+    const dialog = screen.getByRole('dialog', { name: 'Delete view' });
+    expect(within(dialog).getByText('Delete the view “Ops”? Its widgets and filter are removed.')).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(layout().views).toHaveLength(2);
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete view' }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Delete view' })).getByRole('button', { name: 'Delete' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(layout().views.map((v) => v.id)).toEqual(['default']);
     expect(layout().activeViewId).toBe('default');
     expect(screen.getByRole('button', { name: 'Delete view' })).toBeDisabled();

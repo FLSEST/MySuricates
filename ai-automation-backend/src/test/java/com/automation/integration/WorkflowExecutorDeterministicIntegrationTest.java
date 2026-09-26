@@ -223,6 +223,28 @@ class WorkflowExecutorDeterministicIntegrationTest {
         assertThat(steps.get(1).getOutput()).isEqualTo("child-ctx-parent-start");
     }
 
+    /**
+     * TODO 2a0695ff: The parent's platform data is not stored with the child run — the child gets its own injected
+     * (its shell block sees them) — while the parent's own variables still reach it.
+     */
+    @Test
+    void subWorkflowBlock_childRunStoresNoPlatformDataOfItsParent() {
+        Project project = createProject("sub-workflow-platform");
+        Workflow child = createWorkflow(project, "child platform",
+                shell("echo child-{{ child_value }} {{ open_todos }}"));
+        Workflow parent = createWorkflow(project, "parent platform",
+                block("sub-workflow", Map.of("workflow_id", child.getId())));
+
+        WorkflowRun run = executeAndWait(parent, Map.of("child_value", "ctx"));
+
+        assertThat(run.getStatus()).isEqualTo(RunStatus.COMPLETED);
+        StepResult subStep = stepsFor(run).getFirst();
+        assertThat(subStep.getOutput()).isEqualTo("child-ctx (keine offenen TODOs)");
+        WorkflowRun childRun = workflowRunRepository.findById((String) subStep.getMetadata().get("subRunId")).orElseThrow();
+        assertThat(childRun.getInputContext()).containsEntry("child_value", "ctx")
+                .doesNotContainKeys("previous_report", "open_todos", "request_metrics");
+    }
+
     @Test
     void approvalBlock_autoAnswerStoresVariableForNextStep() {
         Project project = createProject("approval");

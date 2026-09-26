@@ -29,7 +29,8 @@ describe('Schedules', () => {
     cy.contains('button', 'New Schedule').click();
 
     cy.get('[role="dialog"]').within(() => {
-      cy.get('select').select(workflowId);
+      // The dialog has more than one select (workflow and conflict behaviour); pick the workflow one
+      cy.get(`select:has(option[value="${workflowId}"])`).select(workflowId);
       // CronPicker starts in "advanced" mode with empty value; click Daily to set a cron
       cy.contains('button', 'Daily').click();
       cy.get('input[placeholder="Daily code quality check"]').type('Cypress daily schedule');

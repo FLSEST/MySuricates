@@ -1,5 +1,7 @@
 package com.automation.service.integration.providers.ical;
 
+import com.automation.service.integration.providers.IntegrationParams;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ByteArrayOutputStream;
@@ -21,17 +23,9 @@ public final class CalendarParams {
         return val != null && !val.toString().isBlank() ? val.toString() : defaultValue;
     }
 
+    /** Missing or blank → {@code defaultValue}; a number is read like its text ({@link IntegrationParams}). */
     public static int paramInt(Map<String, Object> params, String key, int defaultValue) {
-        Object val = params.get(key);
-        if (val instanceof Number n) return n.intValue();
-        if (val instanceof String s && !s.isBlank()) {
-            try {
-                return Integer.parseInt(s.trim());
-            } catch (NumberFormatException e) {
-                throw new IllegalArgumentException("Parameter '" + key + "' must be a number");
-            }
-        }
-        return defaultValue;
+        return IntegrationParams.intParam(params, key, defaultValue);
     }
 
     public static String requireParam(Map<String, Object> params, String key) {

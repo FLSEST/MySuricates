@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.Map;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -56,15 +58,26 @@ class GoogleGmailProviderTest {
 
     @Test
     void unknownActionThrows() {
-        assertThatThrownBy(() -> provider.executeAction("unknown_action", java.util.Map.of(), "token"))
+        assertThatThrownBy(() -> provider.executeAction("unknown_action", Map.of(), "token"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("unknown_action");
     }
 
     @Test
     void getMessageRequiresMessageId() {
-        assertThatThrownBy(() -> provider.executeAction("get_message", java.util.Map.of(), "token"))
+        assertThatThrownBy(() -> provider.executeAction("get_message", Map.of(), "token"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("messageId");
+    }
+
+    /** ac639b39: maxResults 1.5 used to become 1 and 2^32 + 10 became 10 — read like its text, before any request. */
+    @Test
+    void listMessages_readsMaxResultsLikeItsText() {
+        for (Object bad : new Object[] {1.5, 4_294_967_306L}) {
+            assertThatThrownBy(() -> provider.executeAction("list_messages", Map.of("maxResults", bad), "token"))
+                    .as(String.valueOf(bad))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("Parameter 'maxResults' must be a number");
+        }
     }
 }

@@ -50,9 +50,9 @@ class GitWebhookPayloadParserTest {
         payload.put("before", "aaa");
         payload.put("after", "bbb");
         payload.put("repository", Map.of("full_name", "user/repo"));
-        payload.put("pusher", Map.of("name", "flo"));
+        payload.put("pusher", Map.of("name", "alex"));
         payload.put("commits", List.of(
-                Map.of("message", "fix: something", "author", Map.of("name", "Flo"))
+                Map.of("message", "fix: something", "author", Map.of("name", "Alex"))
         ));
 
         var result = parser.parse(payload, headers);
@@ -65,8 +65,8 @@ class GitWebhookPayloadParserTest {
         assertThat(result).containsEntry("git_after", "bbb");
         assertThat(result).containsEntry("git_commit_sha", "bbb");
         assertThat(result).containsEntry("git_commit_message", "fix: something");
-        assertThat(result).containsEntry("git_author", "Flo");
-        assertThat(result).containsEntry("git_pusher", "flo");
+        assertThat(result).containsEntry("git_author", "Alex");
+        assertThat(result).containsEntry("git_pusher", "alex");
     }
 
     @Test
@@ -111,7 +111,7 @@ class GitWebhookPayloadParserTest {
         Map<String, Object> payload = new HashMap<>();
         payload.put("action", "opened");
         payload.put("repository", Map.of("full_name", "user/repo"));
-        payload.put("sender", Map.of("login", "flo"));
+        payload.put("sender", Map.of("login", "alex"));
         payload.put("pull_request", Map.of(
                 "number", 42,
                 "title", "Add feature",
@@ -126,7 +126,7 @@ class GitWebhookPayloadParserTest {
         assertThat(result).containsEntry("git_pr_title", "Add feature");
         assertThat(result).containsEntry("git_branch", "feature-branch");
         assertThat(result).containsEntry("git_commit_sha", "abc123");
-        assertThat(result).containsEntry("git_author", "flo");
+        assertThat(result).containsEntry("git_author", "alex");
     }
 
     // --- GitHub create/delete ---

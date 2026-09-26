@@ -92,8 +92,8 @@ Done. `b` goes one step back, `q` quits.
   [deployment.md](deployment.md).
   Staged: Dev gets all modules, Test and Prod get Standard with seals ("unattended runs only sealed").
 - **AI:** claude, codex and pi side by side with their login state; you pick the default provider.
-  If pi is missing, the installer offers to install it via npm (default no, without a terminal
-  `--with-pi`); for claude and codex it names the command. Logging in is up to you.
+  If pi is missing, the installer offers to install it via npm — in the tested, fixed version
+  (default no, without a terminal `--with-pi`); for claude and codex it names the command. Logging in is up to you.
   In the container the instance uses the CLI **and** your login from the machine — no second login
   (on macOS only the login; the program lives in the image).
 - **Ports:** default 9090, busy ports are skipped — not the one the running instance itself holds
@@ -155,7 +155,8 @@ The application is running. A first way in, without building anything:
 1. **Create a project** — every workflow belongs to a project; a project points at a directory on
    your machine (in the container: inside the projects folder). To try things out there is the
    **example project**: the dashboard, workflows and projects offer it while no project exists yet.
-   One click, and its example workflows run without AI and without any setup. The dashboard gets
+   One click, and its five example workflows run without AI and without any setup: approval,
+   if-then-else, loop, TODO lifecycle and a report to the dashboard. The dashboard gets
    a view of its own that shows only this project.
 2. **Take a template** — *Templates* holds 55 ready-made workflows. Pick one, copy it into the
    project, run it. The run shows step by step what happens. Templates that need a module switched

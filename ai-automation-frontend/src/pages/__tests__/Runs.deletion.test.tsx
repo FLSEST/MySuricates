@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { Route, Routes } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
 import { renderWithProviders } from '../../test/utils';
@@ -70,6 +71,34 @@ describe('Runs page — run deletion switch (automation.executions.allow-delete)
     // Row rendered first; the button must be gone once the capabilities have arrived
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Delete run' })).not.toBeInTheDocument());
     expect(screen.queryByRole('button', { name: 'Delete run' })).not.toBeInTheDocument();
+  });
+
+  // 23635ef6: the app's own dialog instead of window.confirm; it sits in the table row, so its
+  // clicks must not open the run
+  it('asks in a dialog before deleting and stays on the list while it is answered', async () => {
+    serve(true);
+    const deleted: string[] = [];
+    server.use(http.delete('/api/v1/executions/:id', ({ params }) => {
+      deleted.push(String(params.id));
+      return new HttpResponse(null, { status: 204 });
+    }));
+    renderWithProviders(
+      <Routes>
+        <Route path="/" element={<Runs />} />
+        <Route path="/workflows/:id/run/:runId" element={<p>run page</p>} />
+      </Routes>,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete run' }));
+    const dialog = screen.getByRole('dialog', { name: 'Delete run' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.queryByText('run page')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete run' }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Delete run' })).getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(deleted).toEqual(['run-1']));
+    expect(screen.queryByText('run page')).not.toBeInTheDocument();
   });
 
   it('keeps the button for an older backend that does not report the switch', async () => {

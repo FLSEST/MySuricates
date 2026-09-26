@@ -54,7 +54,7 @@ export function TestingCard({ testing, devVersion, onStart, onStop, onReset, onS
   };
 
   return (
-    <Card>
+    <Card data-testid="testing-card">
       <CardHeader title={t.settings.testing} />
       <SyncSelectModal
         open={syncModalOpen}
@@ -81,7 +81,7 @@ export function TestingCard({ testing, devVersion, onStart, onStop, onReset, onS
           <div className="flex items-center gap-2">
             <StatusBadge
               status={testing?.containerRunning ? (testing.healthy ? 'RUNNING' : 'STARTING') : 'STOPPED'}
-              label={testing?.containerRunning ? t.settings.testingRunning : t.settings.testingStopped}
+              label={testing?.containerRunning ? (testing.healthy ? t.settings.testingRunning : t.settings.testingStarting) : t.settings.testingStopped}
             />
           </div>
         </div>

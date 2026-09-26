@@ -15,6 +15,7 @@ import com.automation.repository.WorkflowRepository;
 import com.automation.repository.WorkflowRunRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Limit;
 import org.springframework.scheduling.support.CronExpression;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +26,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.function.LongSupplier;
 
 /**
  * Schedule CRUD (create/update/enable/disable/delete) and run lookups per schedule.
@@ -72,19 +74,34 @@ public class SchedulerService {
         return scheduledRepository.findByChainId(chainId);
     }
 
-    @Transactional(readOnly = true)
-    public List<WorkflowRun> findWorkflowRunsByScheduleId(String scheduleId) {
-        return workflowRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc(scheduleId);
+    /**
+     * The newest {@code limit} runs of a list and how many there are in all (TODO 86777fb4): a
+     * schedule every 5 minutes gathers ~26 000 runs in 90 days, and the lists had no ceiling.
+     */
+    public record NewestRuns<T>(List<T> runs, long total) {
+        /** Counts only when the limit is reached — below it the list already is the whole set. */
+        static <T> NewestRuns<T> of(List<T> runs, int limit, LongSupplier count) {
+            return new NewestRuns<>(runs, runs.size() < limit ? runs.size() : count.getAsLong());
+        }
     }
 
     @Transactional(readOnly = true)
-    public List<ChainRun> findChainRunsByScheduleId(String scheduleId) {
-        return chainRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc(scheduleId);
+    public NewestRuns<WorkflowRun> findWorkflowRunsByScheduleId(String scheduleId, int limit) {
+        return NewestRuns.of(workflowRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc(scheduleId,
+                Limit.of(limit)), limit, () -> workflowRunRepository.countByTriggeredByScheduleId(scheduleId));
     }
 
     @Transactional(readOnly = true)
-    public List<WorkflowRun> findWorkflowRunsBetween(Instant from, Instant to) {
-        return workflowRunRepository.findByStartedAtBetween(from, to);
+    public NewestRuns<ChainRun> findChainRunsByScheduleId(String scheduleId, int limit) {
+        return NewestRuns.of(chainRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc(scheduleId,
+                Limit.of(limit)), limit, () -> chainRunRepository.countByTriggeredByScheduleId(scheduleId));
+    }
+
+    /** The newest {@code limit} runs started in the period — the calendar's past runs. */
+    @Transactional(readOnly = true)
+    public NewestRuns<WorkflowRun> findWorkflowRunsBetween(Instant from, Instant to, int limit) {
+        return NewestRuns.of(workflowRunRepository.findByStartedAtBetweenOrderByStartedAtDesc(from, to,
+                Limit.of(limit)), limit, () -> workflowRunRepository.countByStartedAtBetween(from, to));
     }
 
     @Transactional
@@ -99,12 +116,11 @@ public class SchedulerService {
 
         ScheduleType type = definitionParser.parseScheduleType(scheduleType);
 
-        ScheduledWorkflow.ConflictBehavior conflictBehavior = ScheduledWorkflow.ConflictBehavior.SKIP;
-        if (conflictBehaviorStr != null && !conflictBehaviorStr.isBlank()) {
-            try {
-                conflictBehavior = ScheduledWorkflow.ConflictBehavior.valueOf(conflictBehaviorStr.toUpperCase());
-            } catch (IllegalArgumentException ignored) {}
-        }
+        // Missing means SKIP; an unknown value fails like on update instead of quietly becoming SKIP
+        // (TODO a9bf13d5).
+        ScheduledWorkflow.ConflictBehavior conflictBehavior = conflictBehaviorStr == null || conflictBehaviorStr.isBlank()
+                ? ScheduledWorkflow.ConflictBehavior.SKIP
+                : definitionParser.parseConflictBehavior(conflictBehaviorStr);
 
         ScheduledWorkflow.ScheduledWorkflowBuilder builder = ScheduledWorkflow.builder()
                 .targetType(targetType)

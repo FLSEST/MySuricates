@@ -7,7 +7,7 @@ import com.automation.entity.OnboardingProfileType;
 import com.automation.entity.Project;
 import com.automation.entity.Workflow;
 import com.automation.repository.OnboardingProfileRepository;
-import com.automation.service.workflow.WorkflowService;
+import com.automation.repository.WorkflowRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -30,7 +30,7 @@ import static org.mockito.Mockito.*;
 class ProjectOnboardingServiceTest {
 
     @Mock private OnboardingProfileRepository profileRepository;
-    @Mock private WorkflowService workflowService;
+    @Mock private WorkflowRepository workflowRepository;
     @Mock private ProjectService projectService;
 
     private ProjectOnboardingService service;
@@ -39,7 +39,7 @@ class ProjectOnboardingServiceTest {
     void setUp() {
         var modules = com.automation.modules.ModuleRegistry.allEnabled();
         service = new ProjectOnboardingService(
-                new OnboardingRenderer(profileRepository, workflowService, new InstanceAddress("", "", 9090), modules),
+                new OnboardingRenderer(profileRepository, workflowRepository, new InstanceAddress("", "", 9090), modules),
                 modules, projectService);
     }
 
@@ -60,7 +60,7 @@ class ProjectOnboardingServiceTest {
             OnboardingProfile base = OnboardingProfile.builder()
                     .key("base").type(OnboardingProfileType.BASE).content(Map.of("de", "Base content {{PROJECT_ID}}")).build();
             when(profileRepository.findByType(OnboardingProfileType.BASE)).thenReturn(List.of(base));
-            when(workflowService.findByProjectId("p1")).thenReturn(List.of());
+            when(workflowRepository.findByProjectId("p1")).thenReturn(List.of());
 
             var config = new OnboardingConfigRequest("CLAUDE_RULES", List.of(), null);
             service.enable(project, config);
@@ -75,7 +75,7 @@ class ProjectOnboardingServiceTest {
         void enable_agentsFormat_writesAgentsMd(@TempDir Path tempDir) {
             Project project = buildProject("p1", tempDir.toString());
             when(profileRepository.findByType(OnboardingProfileType.BASE)).thenReturn(List.of());
-            when(workflowService.findByProjectId("p1")).thenReturn(List.of());
+            when(workflowRepository.findByProjectId("p1")).thenReturn(List.of());
 
             var config = new OnboardingConfigRequest("AGENTS_MD", List.of(), null);
             service.enable(project, config);
@@ -140,7 +140,7 @@ class ProjectOnboardingServiceTest {
             project.setConfig(config);
 
             when(profileRepository.findByType(OnboardingProfileType.BASE)).thenReturn(List.of());
-            when(workflowService.findByProjectId("p1")).thenReturn(List.of());
+            when(workflowRepository.findByProjectId("p1")).thenReturn(List.of());
 
             service.refresh(project);
 
@@ -219,7 +219,7 @@ class ProjectOnboardingServiceTest {
 
             Workflow wf = Workflow.builder().id("wf-1").name("Test WF").description("Does things")
                     .blocks(List.of()).build();
-            when(workflowService.findByProjectId("p1")).thenReturn(List.of(wf));
+            when(workflowRepository.findByProjectId("p1")).thenReturn(List.of(wf));
 
             String result = service.preview(project);
 
@@ -238,7 +238,7 @@ class ProjectOnboardingServiceTest {
             OnboardingProfile devProfile = OnboardingProfile.builder()
                     .id("prof-dev").key("developer").content(Map.of("de", "Developer profile content")).build();
             when(profileRepository.findAllById(List.of("prof-dev"))).thenReturn(List.of(devProfile));
-            when(workflowService.findByProjectId("p1")).thenReturn(List.of());
+            when(workflowRepository.findByProjectId("p1")).thenReturn(List.of());
 
             String result = service.preview(project);
 
@@ -251,7 +251,7 @@ class ProjectOnboardingServiceTest {
             project.setConfig(Map.of());
 
             when(profileRepository.findByType(OnboardingProfileType.BASE)).thenReturn(List.of());
-            when(workflowService.findByProjectId("p1")).thenReturn(List.of());
+            when(workflowRepository.findByProjectId("p1")).thenReturn(List.of());
 
             String result = service.preview(project);
 
@@ -266,7 +266,7 @@ class ProjectOnboardingServiceTest {
             when(profileRepository.findByType(OnboardingProfileType.BASE)).thenReturn(List.of());
             Workflow wf = Workflow.builder().id("wf-1").name("WF")
                     .description("x".repeat(100)).blocks(List.of()).build();
-            when(workflowService.findByProjectId("p1")).thenReturn(List.of(wf));
+            when(workflowRepository.findByProjectId("p1")).thenReturn(List.of(wf));
 
             String result = service.preview(project);
 
@@ -282,7 +282,7 @@ class ProjectOnboardingServiceTest {
             when(profileRepository.findByType(OnboardingProfileType.BASE)).thenReturn(List.of());
             Workflow wf = Workflow.builder().id("wf-1").name("WF")
                     .description("A | B").blocks(List.of()).build();
-            when(workflowService.findByProjectId("p1")).thenReturn(List.of(wf));
+            when(workflowRepository.findByProjectId("p1")).thenReturn(List.of(wf));
 
             String result = service.preview(project);
 

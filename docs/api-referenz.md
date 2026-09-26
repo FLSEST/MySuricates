@@ -7,6 +7,9 @@
 - **Basis-URL:** `http://localhost:9090/api/v1`
 - **Content-Type:** `application/json`
 - **Authentifizierung:** Header `X-API-Key: <key>` (wenn `automation.security.enabled=true`)
+- **Proxy:** Aufrufe mit API-Key per `curl` immer mit `--noproxy '*'` – bei gesetztem `http_proxy`
+  schickt curl auch Anfragen an `localhost` über den Proxy, samt Key. Das Doku-Gate
+  `doc-facts-check.sh` prüft das an jedem Beispiel in `docs/` und `AGENTS.md`.
 
 ### Fehlerformat
 
@@ -141,7 +144,7 @@ Neues Projekt erstellen.
 Das mitgelieferte Beispielprojekt anlegen, gedacht für eine frische Installation. Die Oberfläche bietet es an, solange es kein Projekt gibt.
 
 - **Verzeichnis:** Die Vorlage `classpath:examples/example-project/` wird nach `<automation.examples.directory>/example-project` kopiert. Standard ist `mysuricates-examples` unter dem Workspace-Root, ohne Workspace-Root `./data/examples` neben der Datenbank. Die Umgebungsvariable dafür ist `AUTOMATION_EXAMPLES_DIR`. Ein vorhandenes Verzeichnis wird nie überschrieben.
-- **Workflows:** je ein Workflow pro mitgelieferter Vorlage, die `ExampleProjectService.EXAMPLE_TEMPLATE_IDS` nennt (derzeit die Blaupause `blueprint-approval`), mit `changeSource` `example-project`.
+- **Workflows:** je ein Workflow pro mitgelieferter Vorlage, die `ExampleProjectService.EXAMPLE_TEMPLATE_IDS` nennt (derzeit die Blaupausen `blueprint-approval`, `blueprint-if`, `blueprint-loop`, `blueprint-todo` und `blueprint-report`, alle ohne KI), mit `changeSource` `example-project`.
 - **Idempotent:** Ein aktives Projekt, das schon auf das Verzeichnis zeigt, wird zurückgegeben, und fehlende Beispiel-Workflows werden ergänzt.
 
 | Parameter | Typ | Pflicht | Werte |
@@ -421,8 +424,9 @@ Workflow aus JSON importieren (exportiertes Format + Zielprojekt).
 | `instructions` | String | Nein |
 | `model` | String | Nein |
 | `updateIfExists` | Boolean | Nein (Standard: `false`) |
+| `version` | String | Nein — Versions-Label des Exports (`4.4.0`); fehlt es oder ist es leer, bleibt es beim Standard `1.0.0` bzw. beim bisherigen Label |
 
-Wenn `updateIfExists=true` und ein Workflow gleichen Namens im Zielprojekt existiert, wird dieser aktualisiert statt neu erstellt.
+Wenn `updateIfExists=true` und ein Workflow gleichen Namens im Zielprojekt existiert, wird dieser aktualisiert statt neu erstellt – samt `version`, wie bei `PUT` und der Pool-Neuinstallation.
 
 #### Block-Config: `timeout_seconds`
 
@@ -1120,16 +1124,22 @@ Einzelnen Schedule abrufen.
 
 ### `GET /api/v1/schedules/{id}/runs`
 
-Runs die durch diesen Schedule ausgelöst wurden.
+Die neuesten Runs, die dieser Schedule ausgelöst hat — je Art höchstens `limit` (Query-Parameter,
+Default 50, 1–500), dazu die Gesamtzahl.
 
 **Response:**
 
 ```json
 {
   "workflowRuns": [...],
-  "chainRuns": [...]
+  "chainRuns": [...],
+  "workflowRunsTotal": 26000,
+  "chainRunsTotal": 0
 }
 ```
+
+Ist `workflowRunsTotal` größer als `workflowRuns.length`, hat das Limit gegriffen (bis 2026-09-26 kamen
+alle Runs, ohne Obergrenze).
 
 `workflowRuns` sind `WorkflowRunListItemResponse` — **ohne Steps**, dieselben Listenzeilen wie
 `GET /api/v1/executions` (`stepCount`, `lastStepStatus`, `lastStepPreview`). Bis 2026-09-23 trug diese
@@ -1157,10 +1167,12 @@ Kalender-Daten: geplante Ausführungen und vergangene Runs in einem Zeitraum.
 |---|---|---|
 | `from` | Instant | Ja |
 | `to` | Instant | Ja |
+| `limit` | int | Nein (Default 1000, 1–5000) |
 
 **Response:** `CalendarDataResponse` mit `upcoming` (`ScheduledWorkflowResponse[]`, Zeitpläne, deren
 nächster tatsächlicher Lauf im Zeitraum liegt — während einer `skip-until`-Pause also nach der Pause) und `pastRuns` (`WorkflowRunListItemResponse[]` — **ohne Steps**, dieselben
-Listenzeilen wie `GET /api/v1/executions`; bis 2026-09-23 mit allen Schritten jedes Runs im Zeitraum)
+Listenzeilen wie `GET /api/v1/executions`; bis 2026-09-23 mit allen Schritten jedes Runs im Zeitraum).
+`pastRuns` sind die neuesten `limit` Runs des Zeitraums, `pastRunsTotal` zählt alle (bis 2026-09-26 ohne Obergrenze).
 
 ### `POST /api/v1/schedules/preview`
 
@@ -1207,6 +1219,9 @@ Neuen Schedule erstellen.
 | `maxRuns` | Integer | Nein (max. Starts, 0 = unbegrenzt — siehe unten) |
 | `conflictBehavior` | String | Nein (Standard: `SKIP`, Werte: `SKIP`, `OVERLAP` — siehe unten) |
 | `catchUpOnResume` | boolean | Nein (Standard: `false` — siehe unten) |
+
+`targetType`, `scheduleType` und `conflictBehavior` werden getrimmt und in beliebiger Schreibweise
+angenommen; ein anderer Wert → `400`, die Meldung nennt die erlaubten Werte.
 
 - **`conflictBehavior`:** Bei `SKIP` entfällt ein Termin, solange das Ziel noch einen Lauf in `RUNNING`
   oder `PAUSED` hat: `nextRunAt` springt auf das nächste Vorkommen, ein einmaliger Zeitplan (`ONCE`,
@@ -1793,6 +1808,9 @@ Neuen Todo-Trigger erstellen.
 | `processBacklog` | Nein | Bei Erstellung bestehende passende TODOs abarbeiten (Default: true) |
 | `contextTemplate` | Nein | Statische Context-Variablen, gemerged mit TODO-Daten |
 
+`sourceFilter` und `minPriority` werden in beliebiger Schreibweise angenommen und als Konstante
+gespeichert; ein anderer Wert → `400`, die Meldung nennt die erlaubten Werte.
+
 **Response:** `201` mit `TodoTriggerResponse`
 
 **TodoTriggerResponse-Felder:** `id`, `tagPattern`, `projectId`, `sourceFilter`, `minPriority`, `targetWorkflowId`, `targetWorkflowName`, `contextTemplate`, `enabled`, `maxAttempts`, `autoClose`, `processBacklog`, `description`, `lastTriggeredAt`, `triggerCount`, `createdAt`
@@ -1859,7 +1877,8 @@ Details eines Audits (Zusammenfassung + neuester Report). Pflicht-Parameter: `pr
 
 Alle Reports eines Audits, paginiert (`page`, `size`). Pflicht-Parameter: `projectId`.
 
-**Response:** `PageResponse<AuditReportResponse>`
+**Response:** `PageResponse<AuditReportResponse>` — nur die Köpfe: `markdownContent` ist `null`. Den Text
+liefert `GET /api/v1/audit-reports/{id}` (bis 2026-09-26 trug jede Seite jeden Report im Volltext).
 
 ### `GET /api/v1/audit-reports/{id}`
 
@@ -2152,12 +2171,20 @@ Ob die KI-CLIs auf dem Rechner des Backends bereit sind: je Anbieter das Program
       "id": "CODEX", "cli": "codex", "state": "LOGIN_MISSING",
       "installed": true, "loggedIn": false, "loginVia": null, "loginSource": null,
       "install": "npm install -g @openai/codex", "login": "codex login", "defaultProvider": false
+    },
+    {
+      "id": "PI", "cli": "pi", "state": "LOGIN_MISSING",
+      "installed": true, "loggedIn": false, "loginVia": null, "loginSource": null,
+      "install": "npm install -g @earendil-works/pi-coding-agent@<version>", "login": "pi",
+      "loginNote": "pi_slash_login", "defaultProvider": false
     }
   ]
 }
 ```
 
 `state`: `READY` (Programm und Anmeldung gefunden), `LOGIN_MISSING` (Programm gefunden, keine Anmeldung), `NOT_INSTALLED` (Programm fehlt). `loginSource`: der Variablenname oder die Anmeldedatei als `~/…` — bzw. als `$VARIABLE/…`, wenn eine Container-Instanz das Verzeichnis umlenkt (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `PI_CODING_AGENT_DIR`). `container: true` heißt, das Backend läuft in einem Container: Es zählen Programme und Anmeldungen darin.
+`login` ist nur der Befehl; was danach zu tun ist, steht als Schlüssel in `loginNote` (fehlt, wenn der Befehl alles
+sagt) — die Oberfläche übersetzt ihn (`aiProviderStatus.loginNotes`), der Installer ebenso (`M_login_note_<schlüssel>`).
 
 ### `POST /api/v1/system/ai-providers/status/refresh`
 
@@ -2262,6 +2289,10 @@ Anwendungs-Einstellung setzen.
 ```
 
 **Response:** `200 OK`
+
+`backup-retain-count` nimmt 1–365; ein anderer Wert → `400`, gespeichert wird dann nichts. Der
+gespeicherte Wert gilt ab der nächsten Rotation und nach einem Neustart weiter (sonst
+`automation.backup.retain-count`).
 
 ### `GET /api/v1/system/tray-config`
 

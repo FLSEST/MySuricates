@@ -68,15 +68,16 @@ describe('Projects', () => {
     cy.contains('Start Container').should('be.visible');
   });
 
-  it('deletes a project from the detail page', () => {
-    cy.apiCreateProject('Cypress Delete Project').then((project) => {
+  // Projects are archived (soft delete, ba72c08f), not deleted; the archive filter restores them
+  it('archives a project from the detail page', () => {
+    cy.apiCreateProject('Cypress Archive Project').then((project) => {
       cy.visit(`/projects/${project.id}`);
-      // The page has Edit and Delete buttons; click the danger Delete button
-      cy.contains('button', 'Delete').click();
-      cy.contains('This action cannot be undone').should('be.visible');
-      cy.get('[role="dialog"]').contains('button', 'Delete').click();
-      cy.shouldShowToast('Project deleted successfully');
-      cy.url().should('include', '/projects');
+      cy.contains('button', 'Archive').click();
+      cy.contains('The project will be archived. It can be restored later.').should('be.visible');
+      cy.get('[role="dialog"]').contains('button', 'Archive').click();
+      cy.shouldShowToast('Project archived successfully');
+      cy.location('pathname').should('eq', '/projects');
+      cy.contains('Cypress Archive Project').should('not.exist');
     });
   });
 });

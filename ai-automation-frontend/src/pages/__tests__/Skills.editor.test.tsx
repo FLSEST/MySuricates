@@ -53,7 +53,11 @@ async function openDetail(name: string) {
   return screen.findByTestId('skill-actions');
 }
 
-describe('Skills page — creating and editing', () => {
+// jsdom parses its default stylesheet at the first getComputedStyle of a test file (each file runs in
+// its own process) and runs that cascade for every element a role query checks: the first test pays ~1 s
+// of it on top of the page, the editor dialog and its emoji picker (~50 buttons), beyond the 5 s default
+// under the load of the full suite (b26bb8ff)
+describe('Skills page — creating and editing', { timeout: 15_000 }, () => {
   it('creates a skill and opens it afterwards', async () => {
     const list: Skill[] = [builtin];
     let posted: Record<string, unknown> | undefined;
@@ -189,6 +193,32 @@ describe('Skills page — seal lock', () => {
 
     await openDetail('Reviewer');
     await waitFor(() => expect(screen.getByTestId('skill-sealed-way-out')).toHaveTextContent(/Seals are immutable/));
+  });
+});
+
+// 23635ef6: the app's own dialog instead of window.confirm, above the slide-over
+describe('Skills page — delete', () => {
+  it('deletes a custom skill only after confirmation and closes the slide-over', async () => {
+    const deleted: string[] = [];
+    serveSkills([custom]);
+    server.use(http.delete('/api/v1/skills/:id', ({ params }) => {
+      deleted.push(String(params.id));
+      return new HttpResponse(null, { status: 204 });
+    }));
+    renderWithProviders(<Skills />);
+
+    const actions = await openDetail('Reviewer');
+    fireEvent.click(within(actions).getByRole('button', { name: /Delete/ }));
+    const dialog = screen.getByRole('dialog', { name: 'Delete skill' });
+    expect(within(dialog).getByText(/Delete skill "Reviewer"\?/)).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('dialog', { name: 'Delete skill' })).not.toBeInTheDocument();
+    expect(deleted).toEqual([]);
+
+    fireEvent.click(within(actions).getByRole('button', { name: /Delete/ }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Delete skill' })).getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(deleted).toEqual(['c1']));
+    await waitFor(() => expect(screen.queryByTestId('skill-actions')).not.toBeInTheDocument());
   });
 });
 

@@ -43,5 +43,8 @@ export function useHomeCommand(input: string): { query: ParsedQuery; groups: Hom
   ];
   const active = query.raw.length > 0;
   const groups = active ? arrangeGroups(sources, query.intents) : [];
-  return { query, groups, loading: active && sources.some((s) => s.loading) };
+  // Until the debounce has passed, the fetching sources have not searched this input yet: that counts
+  // as loading too, or "nothing found" flashes before the search has even started
+  const searchPending = input !== debounced;
+  return { query, groups, loading: active && (searchPending || sources.some((s) => s.loading)) };
 }

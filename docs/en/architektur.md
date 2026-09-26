@@ -9,7 +9,9 @@ This page describes its internal structure. For getting started see
 > Short identifiers in parentheses such as `(182bd224)` or `TODO 63ecc124` are
 > provenance markers: commits of this repository, or items in the accompanying
 > MySuricates instance. They record when and why something came about — from the
-> outside, only the commit can be looked up.
+> outside, only the commit can be looked up. Numbers such as `(V39)` in headings, in
+> contrast, name the database migration (Flyway script `V39__….sql`) that brought a
+> feature — list under [Database Migrations](#database-migrations-flyway).
 
 > The flows on this page also exist as diagrams: [docs/en/diagramme.md](diagramme.md)
 > — engine, scheduler, skills, memory, request path, frontend, deployment.
@@ -169,7 +171,7 @@ Chains and sub-workflows pass their starter's origin on in the reserved context 
 | **untrusted external** | webhook payload, restored `__untrusted_keys` (resume, sub-workflow), variables derived from tainted output (`step_N_output`, foreach items, `document` extracts) | always single-quoted | raw | yes, from the moment it is set |
 | **platform data** | `previous_report`, `open_todos` — injected by `WorkflowContextDataService` into **every** run | always single-quoted | raw | on two paths: (1) once the placeholder was really substituted into a shell command line; (2) once the output of an AI block whose prompt contained the placeholder is recorded — from that coloured output on, the run is stickily tainted |
 
-- **Where platform data comes from:** each platform variable has its own `PlatformVariableSource` bean — `PreviousReportVariable`, `OpenTodosVariable`, `RequestMetricsVariable`, `GoalVariables`, `AuditFindingsVariable`, in this `@Order`. `WorkflowContextDataService` only collects them and gives each its own error path: if a source throws, its variables show the `NICHT GEMESSEN` gap and the others stay untouched (TODO 441a4c46). A new variable is a new bean; it still belongs in `ContextDeltaCalculator.SYSTEM_VAR_KEYS`, otherwise it ends up in every step's context delta.
+- **Where platform data comes from:** each platform variable has its own `PlatformVariableSource` bean — `PreviousReportVariable`, `OpenTodosVariable`, `RequestMetricsVariable`, `GoalVariables`, `AuditFindingsVariable`, in this `@Order`. `WorkflowContextDataService` only collects them and gives each its own error path: if a source throws, its variables show the `NICHT GEMESSEN` gap and the others stay untouched (TODO 441a4c46). A new variable is a new bean; it still belongs in `ContextDeltaCalculator.SYSTEM_VAR_KEYS`, otherwise it ends up in every step's context delta. Every source names all the variables it can set in `allNames()`; these names belong to the platform (TODO 2a0695ff): `ExecutionContextFactory` takes none of them from an input context, and a sub-workflow is not handed the parent run's — otherwise they would sit in the child's stored `input_context` and, wherever the child's own source does not apply (`goal_*` without `goal_id`, `audit_findings` without `metadata.audit`), arrive as a trusted variable. Conversely the collector sets only what a source announced for the run (`names()`); any other name from `load()` is dropped and reported in the activity log.
 - **Taint propagation:** in a tainted run `recordOutput` escapes every further block output (`previous_output`, `{{ block.<name>.output }}`) and `setDerivedVariable` marks every variable derived from it as untrusted. The taint turns sticky as soon as one output has been recorded or platform data has reached a command line — from then on even a later `setVariable` on the variable that caused it no longer clears it, because a block can pull foreign bytes into its output without naming any placeholder (reading a file, calling an API). Before that point — external input with no recorded output yet — a `setVariable` on exactly that variable still clears the taint. It is persisted in the three reserved context keys `__untrusted_keys`, `__untrusted_outputs` and `__platform_in_shell` (the last one the platform-data usage flag, `true` once it is raised) so it survives resume and sub-workflow hand-over — even when no output has been recorded since the substitution. A clean run exports nothing and stays byte-identical to the behaviour from before taint tracking.
 - **Why platform data only taints on use:** it is present in every run. Tainting at injection time would taint every run and change the meaning of the output placeholders in the bundled templates. `TemplateResolver.resolveShell`/`resolveShellSafe` therefore report back which placeholders were really substituted into a command line; only that report arms the taint (`ExecutionContextTaint.substitutedIntoShell`). A run that does not use `{{ previous_report }}` at all stays untainted.
 - **AI outputs after a platform-data prompt are coloured:** if platform data was in an AI block's prompt, the output of exactly that block counts as untrusted — a following shell block therefore receives `{{ previous_output }}`/`{{ block.<name>.output }}` single-quoted. Built on the same feedback channel: `TemplateResolver.resolvePrompt` reports the placeholders it resolved, `ExecutionContextTaint.substitutedIntoPrompt` remembers platform data, and the next output recorded via `recordOutput` consumes that flag. The **prompt alone** does not colour the run: as long as no output was recorded, `hasUntrustedInput()` is false and `exportTaint()` is empty. Once the output is recorded the run is tainted, though — sticky as in every other case: from then on `recordOutput` escapes **every** further block output, `setDerivedVariable` marks every variable derived from it (`step_N_output`, foreach items, `document` extracts) untrusted, and `exportTaint()` passes both on to sub-workflows and to a resume. So a later AI block with a clean prompt does not get a clean output back — that only holds while nothing coloured has been recorded before it. The prompt path covers exactly the AI calls: `simple`, `skill-capability`, `agentic` (`goal`/`success_criteria`) and the non-shell branches of `foreach`, `while`, `conditional`, `retry` and `switch`; non-prompt resolutions (mounts, document paths, TODO fields, integration parameters, the `switch` expression) stay on `resolveTemplate` and keep reporting nothing.
@@ -218,7 +220,8 @@ com.automation
 │   ├── learning/        LearningService, AgenticLearningService, ExecutionInsightsService, WorkflowStatsService, WorkflowSimilarityService, BlockTypesBackfillService, MetadataExtractor, PlatformStatsService
 │   ├── system/          ApiKeyService, DatabaseBackupService, ExecutionSettingsService (+ ExecutionSettingKeys; setters per topic in `settings/`: ExecutionCapacitySettings, AccessLimitSettings, HousekeepingSettings, FeatureSettings, RequestMetricsSettings), SystemIdentityService, TailscaleService, FileBrowserService, IntegrationSnippetService, SystemSettingsService (+ AppSettingChangedEvent: services with a cached setting re-read it on this event instead of being called directly)
 │   ├── ai/              HostClaudeService, HostCodexService, HostPiService, AiProviderRegistry, AiProvider, AiProviderCapabilities, AiResponseMetadata, ClaudeAiProvider, CodexAiProvider, PiAiProvider, PiCatalogService
-│   ├── cli/             CommandExecutorService (+ HostRequestAiMetadata), CliSessionManager, CliSession, ClaudeOutputParser, ClaudeJsonResponse, HostExecutionRequest, ShellCommandService, ContainerShellService, TaskCommandService
+│   ├── cli/             CommandExecutorService (+ HostRequestAiMetadata), CliSessionManager, CliSession, HostExecutionRequest, ShellCommandService, ContainerShellService, TaskCommandService
+│   │   └── claude/      ClaudeOutputParser, ClaudeJsonResponse, ClaudeStreamEventFormatter — read the Claude CLI's output (a leaf package for ai/ and cli/, so ai/ does not point back to cli/)
 │   ├── chain/           ChainService, ChainExecutor (+ ChainRunWaiter, ChainZombieRunCleaner), ChainTemplateService, BuiltInChainTemplate
 │   ├── memory/          WorkflowMemoryService, ClaudeSummarizer, CodexSummarizer, KnowledgeSummarizer, ConversationPreprocessor, SummarizationSetupService, AutoMemoryExtractionListener
 │   ├── staging/         StagingService, TestingService, InstanceSyncHelper (+ InstanceHttpClient, SyncPreviewService), DockerContainerManager
@@ -234,7 +237,7 @@ com.automation
 │   ├── health/          HealthAutoTodoService
 │   ├── audit/           AuditResultParser, AuditIngestionService (+ AuditSnapshotApplier), AuditIngestionListener, AuditCenterService (+ AuditFindingTodoLinker)
 │   ├── integration/     IntegrationRegistry, IntegrationOAuthService, IntegrationEncryptionService, IntegrationProvider, OAuthConfig, TaskExportCapable
-│   ├── integration/providers/ 18 Providers in subdirectories (caldav/, confluence/, feed/, gitea/, github/, gitlab/, google/, httpapi/, icalfeed/, jira/, ntfy/, openmeteo/, slack/, taskwarrior/, telegram/, todoist/, trello/; shared: ical/)
+│   ├── integration/providers/ 18 Providers in 17 subdirectories — google/ holds two, Calendar and Gmail (caldav/, confluence/, feed/, gitea/, github/, gitlab/, google/, httpapi/, icalfeed/, jira/, ntfy/, openmeteo/, slack/, taskwarrior/, telegram/, todoist/, trello/; shared: ical/)
 │   ├── assistant/       AssistantContextBuilder (+ PageContextRenderer, ProjectFileListing), AssistantChatCaller, AssistantChatBroadcaster, AssistantFetchService, AssistantToolExecutor (+ AssistantTodoTools, AssistantWorkflowTools, AssistantChainTools, AssistantToolPayloads), AssistantActionSuggestionService, AssistantErrorClassifier, AssistantFetchPolicy, AssistantMutationGate, AssistantActionMerger, AssistantResponseParser, PendingToolRegistry, ToolExecutionResult
 │   ├── assistant/context/ AssistantContextSection, BlockTypesIndexSection, ChainsIndexSection, FailedWorkflowsContextSection, IntegrationsIndexSection, RunsContextSection, SchedulesContextSection, SkillsIndexSection, TodosContextSection, WishesContextSection
 │   ├── assistant/format/  AssistantFormatUtils (formatting helpers for prompt parts; a leaf package of its own, so context/ and fetch/ do not point back to assistant/)
@@ -265,7 +268,7 @@ com.automation
 ├── skills/handlers/     CapabilityHandler, LintHandler, SecurityScanHandler, FactCheckHandler, GrammarCheckHandler, OCRHandler
 ├── exception/           GlobalExceptionHandler, ErrorCode + Exception classes
 ├── websocket/           LogWebSocketHandler, TerminalWebSocketHandler, TerminalSession (+ TerminalStdinStream), Message DTOs
-├── event/               WorkflowRunCompletedEvent, AssistantSessionUpdatedEvent, TodoCreatedEvent
+├── event/               WorkflowRunCompletedEvent, AssistantSessionUpdatedEvent, TodoCreatedEvent, ProjectWorkflowsChangedEvent
 └── util/                JPA Converters (JSON, BlockDefinitions), RuntimeClasspathGuard (refuses a start from `target/classes`)
 ```
 
@@ -432,7 +435,12 @@ The switch block evaluates an expression against multiple cases:
 
 ## Gate Status System
 
-Workflow blocks can write quality gate markers into their output:
+A quality gate is the verdict a checking workflow (audit, test, review) passes on its result:
+GREEN = fine, YELLOW = non-blocking findings, RED = critical. The platform evaluates it: RED (in
+mode `auto` also YELLOW) creates a TODO when auto-TODO is on for the workflow (off by default), and
+after a repair run a GREEN closes the TODO that triggered it
+(`TodoFeedbackListener`, see [Todo Triggers](#todo-triggers--self-improvement-loop-v51v52)).
+To do so, workflow blocks write markers into their output:
 
 ```
 gate_status: GREEN|YELLOW|RED
@@ -442,12 +450,15 @@ gate_description: <description>
 
 **Processing:**
 - `GateStatusOutputParser` — parses markers from block outputs (tolerant of Markdown formatting)
-- `RunCompletionHandler` scans all block outputs — highest severity wins (GREEN < YELLOW < RED)
+- `RunCompletionHandler` scans all block outputs — highest severity wins (GREEN < YELLOW < RED); on a tie RED/YELLOW keep the first gate (the cause, the auto-TODO's category), GREEN the last (the closing verdict; a synthetic `Command exit N` or a GREEN without description does not replace a description, and without a category of its own the current one stays, TODO 2aa9ddd5)
 - Gate status is stored in `WorkflowRun.metadata` (`gate_status`, `gate_category`, `gate_description`)
 
 **A gate does not change the run status.** Neither YELLOW nor RED: the gate is a finding about
-the result, not a failure of the execution. RED creates a todo via `AutoTodoService` plus a
-warning in the activity log, YELLOW only the warning — the run stays `COMPLETED`.
+the result, not a failure of the execution. RED and YELLOW write a warning to the activity log
+(`RunCompletionHandler`). When auto-TODO is on for the workflow (workflow metadata
+`autoTodo.enabled`, otherwise the setting `auto-todo-default`, off by default), `AutoTodoService`
+creates a TODO with priority HIGH on RED and, in mode `auto`, one with MEDIUM on YELLOW — the run
+stays `COMPLETED`.
 
 The run status is decided by something independent: `RunCompletionHandler` sets
 `COMPLETED_WITH_ERRORS` when a step carrying `checkedCommand` metadata has failed, and
@@ -487,6 +498,28 @@ Pre-built chain definitions composed from existing workflow templates. Every ent
 - `ChainTemplateController` — `/api/v1/chain-templates` with list, get, install endpoints
 - Install: Creates a new chain (optionally with associated workflows) in a target project
 
+## Scheduler: missed occurrences (standby and cold start)
+
+The scheduler is a 60-s tick in the backend (`SchedulerTick`); without a running backend nothing starts. For occurrences that fell due during a gap, **one** rule applies since 2026-09-14, regardless of whether the JVM was frozen (standby, detected as a tick gap > `automation.scheduler.resume-grace-minutes`) or the process was not running at all (cold start, detected on the first tick; the reference is the backend's start time, occurrences after it are due normally):
+
+- **Without opt-in** the occurrence is skipped and the schedule is set to its next occurrence (`ScheduleSkipPolicy`, activity log "Schedule skipped (system suspend/resume)" or "(backend was stopped)").
+- **With opt-in** — per schedule `catchUpOnResume` or globally `scheduler-catch-up-on-resume` (settings UI) — the occurrence goes into the `CatchUpQueue`. It starts the entries **one after another** in the order they originally fell due: the next one only once the previous catch-up run has reached a final state (`ScheduledWorkflowExecutor.isFinished`). Waiting entries keep their old `nextRunAt` but are left out by the normal tick. An entry the executor rejects (target already running, schedule disabled in the meantime) does not block the queue.
+- An active `skip-until` pause wins: then nothing is caught up, even with opt-in.
+- The queue is deliberately not persistent: after a restart the same occurrences are due again and the cold-start path queues them again — nothing is lost, nothing runs twice.
+- Visibility: one WARN line in the activity log per event ("Cold start detected … N missed schedule(s): X skipped forward, Y queued for sequential catch-up", on errors "…, Z failed"), `GET /api/v1/schedules/catch-up` (running and waiting entries) and a banner on the schedules page.
+- `resume-grace-minutes: 0` switches both detections off (legacy behaviour: everything due starts at once).
+- The tick only starts once Spring Boot reports `ACCEPTING_TRAFFIC` — that is, after the startup cleanup that sets leftover RUNNING/PAUSED runs to INTERRUPTED (`ApplicationReadyEvent`). Spring fires `@Scheduled` already on `ContextRefreshedEvent`, 0.3–1.4 s earlier: a catch-up run started there was marked INTERRUPTED by the cleanup in mid-run, and a stale run in state RUNNING made the target look busy, so the catch-up occurrence was dropped (TODO aa51d221). Skipped ticks do not count; the first real tick is the cold start and therefore comes about one tick period (60 s) after startup — the immediate tick on `ContextRefreshedEvent` is gone, and catch-up runs start correspondingly later.
+
+Further rules of the tick:
+
+- **An error only affects its own schedule** (TODO 68a3d91e): every schedule of a tick is started, skipped or queued on its own (`SchedulerTick.runIsolated`). If one fails — say, on a cron expression that no longer parses — the activity log shows "Schedule execution failed: …" or "Schedule skip failed: …", and the tick moves on to the next one. Until 2026-09-24 the exception while skipping (`skip-until`) ended the loop: the remaining due schedules of the tick were neither started nor skipped.
+- **Conflict `SKIP`** (default): if the target still has a run in `RUNNING` or `PAUSED` when the occurrence falls due, the occurrence is dropped — `nextRunAt` jumps to the next occurrence, `ONCE`/`DELAYED` expire, `lastRunAt` and `runCount` stay (`ScheduledWorkflowExecutor.skipOccurrence`). Until 2026-09-24 `nextRunAt` stayed in the past, the tick retried every minute and started the occurrence late as soon as the other run ended (TODO ade3fef8). `OVERLAP` starts alongside.
+- **`maxRuns`** counts every start, including failed or rejected ones, but not occurrences dropped by `SKIP`. Re-enabling does not reset `runCount`.
+- **End date** (`endDate`, `CRON` only, TODO 9a3e6c91): an occurrence on or after the end date does not start — measured by the occurrence, not by the time of the tick, so the last occurrence before it does not depend on where the 60-s tick lands. After a run or `SKIP`, `ScheduledWorkflowExecutor.advance` sets no next occurrence past the end date but disables the schedule; an occurrence already stored past it (old data, end date moved forward) ends the schedule without a start when it falls due (activity log "Schedule ended (end date reached)"). Until 2026-09-24 the first occurrence after the end date still ran once.
+- **`skip-until` in the views** (TODO a776fd2a): the tick only winds an occurrence past the window once it falls due. Until then the read paths recalculate — `ScheduleSkipPolicy.effectiveNextRun` (the same rule as `skipScheduleUntil`, without writing): `ScheduleMapper` returns the first occurrence after the pause as `nextRunAt`, plus `pausedUntil`; `UpcomingRunsCalculator` leaves occurrences inside the pause out of the dashboard, calendar, cron preview and assistant context; `GET /schedules/maintenance` names the end of the pause. The read paths parse `skip-until` without an activity log entry; the tick reports an invalid value.
+- **Maintenance mode** (`scheduler.maintenance-mode`, pause switch on the schedules page): the tick keeps running but starts nothing; `nextRunAt` stays put. When it is switched off, every overdue schedule starts once immediately, all at the same time — neither standby/cold-start detection nor the catch-up queue applies, the ticks during the pause have already used up the gap.
+- **Maintenance mode in the views** (TODO 7704b1e9): the same rule as for `skip-until`, not a second one. `ScheduleSkipPolicy.activePause` reads both pauses once per view (`SchedulerPause`); for a schedule held by maintenance mode, `effectiveNextRun` returns no next run — nobody knows when the switch goes off. `ScheduleMapper` then reports `nextRunAt: null` plus `maintenance: true`, `UpcomingRunsCalculator` leaves all occurrences out of the dashboard (`maintenance: true`), and calendar and assistant context show none. The dashboard card and the schedule list say "Maintenance mode – nothing starts".
+
 ## Completion Triggers (V39)
 
 Automatic workflow chaining based on completion events:
@@ -494,6 +527,28 @@ Automatic workflow chaining based on completion events:
 - `CompletionTriggerController` — `/api/v1/completion-triggers`
 - Triggers link a source workflow (trigger) with a target workflow (started after completion)
 - API: List, Get, Create, Enable/Disable, Delete; Filter by source or target workflow ID
+
+## Audit Center — Findings, Acceptance and Expiry (V68/V69)
+
+Audit workflows (metadata `audit.enabled=true`, `key`, `category`, `reportBlock`) emit an envelope `<!-- mysuricates:audit-result:v1 {…} -->` in their report block, which `AuditResultParser` takes apart (with several, the last one counts, so a quoted earlier run does not; TODO 1cf996df). `AuditIngestionService.ingest` (called by `AuditIngestionListener` on `WorkflowRunCompletedEvent`) checks and stores one `AuditReport` per run (VALID/INVALID); `AuditSnapshotApplier` matches the findings of a valid report in the same transaction by fingerprint (SHA-256 over projectId/auditKey/ruleKey/**normalised** subject):
+
+- **Normalisation** (`AuditSubjectNormalizer`): if a lower-case kind word stands before the first `:` (`package:…`, `keyword:…`, `safe-inventory:…`), `<kind>:<value>` stays whole — it is the identity. Otherwise everything from the first `:` and a lower-case method suffix behind a class name are dropped (`ContainerShellService.execute` → `ContainerShellService`, `application.yml:key-store-password` → `application.yml`); paths with `/` and file names without a class prefix stay whole. Otherwise the model-generated `subject` drifts between runs and creates revenants (old finding `RESOLVED`, new one `OPEN`, managed TODO wrongly `DONE`). The stored `subject` is a display attribute only: on a match the newest value wins. `AuditFingerprintMigrationJob` (startup, idempotent) recomputes old rows and merges revenants into the oldest finding through `AuditFindingMerger` (counters added up, TODO links and occurrences move along). A human disposition (`ACCEPTED_RISK`, `DISMISSED`) always wins — whether it sits on the target or on the revenant; status and disposition (`dispositionNote`/`-Evidence`/`-At`, `resolvedAt`) move together, and a finding is only reopened through `AuditAcceptancePolicy` (proven deterioration). Every merge is logged before the delete with both IDs, both raw subjects and the `ruleKey`; a failing scope is logged and blocks neither the others nor the startup. If two findings of the **same** report yield the same identity, only the first is taken; the ingestion reports the others with their subjects in the activity log (they used to vanish silently, TODO 94fda6ef).
+
+- **New** → `OPEN`; **back again** after `RESOLVED` → `OPEN` + `regressionCount`; `AWAITING_VERIFICATION` → `OPEN`; **no longer in the snapshot** → `RESOLVED` (only OPEN/AWAITING_VERIFICATION). The terminal states `ACCEPTED_RISK` and `DISMISSED` are left alone when a finding is absent.
+- **Managed TODOs** (`ManagedTodoWriter`): only for `CRITICAL`/`HIGH` findings in status `OPEN` whose evidence names a measurement of the run (`ensure`, tag `audit`, `auto:workflow`, `TodoCreatedEvent` → TodoTrigger). Accepted/dismissed risks, re-reviews and unverified findings start no fix loop. After every ingest, `ManagedTodoWriter.reconcile` closes the TODO as soon as all linked findings are terminal and reopens it when one comes back; `ManagedTodoReconciler` does the same after a disposition change in the Audit Center and after a merge. A TODO on demand (`POST /api/v1/audit-findings/{id}/todos`, `AuditFindingTodoLinker`) takes the same path (`ManagedTodoWriter.create`). If none of the open linked findings is above the threshold any more (say after changed criteria HIGH → MEDIUM), the TODO is released: link removed, status `ARCHIVED` (not `DONE` — nothing was fixed); an `IN_PROGRESS` TODO stays untouched (TODO ba0dcb3a).
+- **Gate status** comes from the workflow's run metadata (`gate_status`), not from the findings; `AuditSummary.openFindingsBySeverity` counts only non-terminal findings, `findingsByStatus` returns accepted ones separately (Audit Center: "open X · accepted Y"; the findings tab filters on open ones by default).
+
+**Risk acceptance** (`PATCH /api/v1/audit-findings/{id}` with `status=ACCEPTED_RISK`, `dispositionNote`) — rules in `AuditAcceptancePolicy`, number parser `EvidenceMetrics`:
+
+| Rule | Behaviour |
+|---|---|
+| Evidence snapshot | On acceptance, `AuditCenterService.updateFinding` freezes the current `evidence` text as `disposition_evidence` and the time as `disposition_at` (V69). Both stay through later status changes for traceability; accepting again sets both anew. |
+| Deterioration | If the finding shows up again, the ingestion compares measurable values of the new evidence with the snapshot — `EvidenceMetrics.parse` recognises `number + unit` (`LOC`/`lines`/`Zeilen`, `deps`, `KB`/`MB`/`GB`, `ms`, `%`, `files`, `classes`, `methods`, `tests`, `warnings`, `errors`, `issues`, `vulnerabilities`; synonyms are merged, per unit the largest value counts). If a shared key lies > 10 % above the snapshot, the finding goes back to `OPEN` and the note gains `Verschlechtert: 320 LOC → 400 LOC`; the snapshot stays. Without comparable numbers (one-sided or none at all) there is no reopening. |
+| Expiry | If the acceptance is older than 180 days when the finding reappears (`disposition_at`, fallback `resolved_at` for old acceptances), the finding goes to `AWAITING_VERIFICATION` with the note `Wiedervorlage nach 180 Tagen` — without a managed TODO. This happens exactly once: afterwards the normal rules apply (next ingest: present → `OPEN`, gone → `RESOLVED`); only a new acceptance starts a new period. Deterioration takes precedence over expiry. |
+
+Per finding, the Audit Center shows the acceptance date, the re-review date (+180 days), the disposition note and the snapshot (expandable). Tests: `AuditAcceptancePolicyTest`, `EvidenceMetricsTest`, `AuditIngestionServiceTest`, `AuditSnapshotApplierTest`, `AuditControllerTest`, frontend `AuditCenter.test.tsx`.
+
+**Context variable `audit_findings`** (TODO 3643beac): on every run, an audit workflow receives the known findings of its audit (`OPEN`, `AWAITING_VERIFICATION`, `ACCEPTED_RISK`, `DISMISSED`; without `RESOLVED` and without `ruleKey`s the catalogue does not know, marked or not). `WorkflowContextDataService` fetches them through the interface `AuditContextSource`, implemented by `service.audit.AuditFindingsContext` (so that `service.workflow` does not depend on `service.audit`), from a lean projection without TEXT blobs – marked as data and sanitised like `open_todos`, with the same gap path. The block has at most 250 lines and 60,000 bytes (a shell command is a single `bash -c` argument); when space runs short, the triaged findings stay ahead of the open ones. `ExecutionContextFactory` discards a passed-in value (sub-workflows inherit all variables), so the variable always describes the running workflow. That lets a report prompt carry triaged findings forward with the same identity, and deterioration and expiry take effect. Details: [audit-workflow-protocol.md](audit-workflow-protocol.md) → "Known findings in the prompt".
 
 ## Todo Triggers — Self-Improvement Loop (V51/V52)
 
@@ -853,12 +908,13 @@ App.tsx (Router)
 │   ├── Sidebar (Navigation, Collapse)
 │   └── Header (Language, Theme)
 │
-├── Pages (28 Routes)
+├── Pages (one page per route in App.tsx; in Simple Mode — the simplified UI, switchable in
+│   │   the settings — nine routes swap their page for a Simple* variant)
 │   ├── Dashboard, Projects, ProjectDetail, ProjectCockpit
 │   ├── Workflows, WorkflowDetail, WorkflowExecution, WorkflowDebug, WorkflowFactory
 │   ├── Skills, Schedules, Calendar, Webhooks, Integrations, Settings
-│   ├── Runs, ActivityLog, Todos, DeadLetterQueue
-│   ├── Chains, ChainExecution
+│   ├── Runs, Approvals, ActivityLog, Todos, DeadLetterQueue, AuditCenter
+│   ├── Goals, GoalDetail, Chains, ChainExecution
 │   ├── Wishes, Docs, Reports, Insights, OnboardingProfiles, DialogImport
 │   ├── Simple* variants (SimpleHome, SimpleWorkflows, etc.)
 │
@@ -1193,7 +1249,7 @@ autotrigger/
         ├── index.css                  ← Global styles + Tailwind 4 configuration (@theme inline)
         ├── api/client.ts              ← HTTP client (singleton)
         ├── types/index.ts             ← TypeScript types
-        ├── pages/                     ← 37 pages (incl. simple mode variants)
+        ├── pages/                     ← all pages incl. simple mode variants
         ├── components/
         │   ├── ui/                    ← Base UI primitives
         │   ├── layout/                ← App shell, sidebar, navigation

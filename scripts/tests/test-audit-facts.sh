@@ -13,6 +13,8 @@
 #      25ed5f84; die Kurzfassung "Ergebnis erklaeren" gibt es nicht mehr).
 # Abschnitt 10 prueft die Report-Prompts aller fuenf Audits: Sie bekommen die bekannten Befunde
 # ({{ audit_findings }}) und tragen denselben Regelblock, wie sie damit umgehen (1cf996df).
+# Abschnitt 11 prueft das Gate der Doku-Zehrprobe: Es zaehlt wie das der Test-Abdeckung nur den
+# letzten Envelope (d8dae725).
 #
 # Run: bash scripts/tests/test-audit-facts.sh   (exit 0 = alle Checks ok)
 set -uo pipefail
@@ -160,6 +162,10 @@ TXT
 
 head -c 4096 /dev/zero | tr '\0' 'x' > "$FIX/ai-automation-frontend/dist/assets/index-abc.js"
 echo "export const x = 1;" > "$FIX/ai-automation-frontend/src/x.ts"
+# Ein frisches Build: vite schreibt dist/index.html zuletzt, juenger als jede Quelle (df68037b).
+printf '%s\n' '<script type="module" crossorigin src="/assets/index-abc.js"></script>' \
+  > "$FIX/ai-automation-frontend/dist/index.html"
+touch -d '2026-09-20 08:00:00' "$FIX/ai-automation-frontend/src/x.ts"
 head -c 2048 /dev/zero | tr '\0' 'y' > "$FIX/ai-automation-backend/data/automation.db"
 TODAY="$(date +%F)"
 { echo "$TODAY 10:00:00 [main] INFO  com.automation.Boot - Starte Kontext"
@@ -643,6 +649,232 @@ check "Docker-404 nur in der Nachricht, nicht in Zeitstempel oder ID" \
 check "Pflicht-Fakten bleiben im Blatt" \
   '( for F in database_bytes source_files_scanned transactional_slow_call_count repository_loop_count unindexed_findby_columns_count; do grep -q "^FAKT $F: \|^NICHT GEMESSEN: $F (" "$TMP/perf-facts2.out" || exit 1; done )'
 
+echo "6d) Performance-Audit: ein veraltetes dist wird nicht gemessen (df68037b)"
+# Das Faktenblatt misst das vorhandene dist, gebaut wird nicht. Ein dist vom 23.09. meldete am 25.09.
+# noch den vorgeladenen monaco-Chunk, obwohl der Fix laengst in src stand. Ist dist/index.html aelter
+# als eine Datei unter src/ oder vite.config.ts, steht jede Bundle-Zahl als Luecke mit Grund im Blatt;
+# die Gegenprobe zeigt, dass dasselbe dist nach dem Bauen wieder gemessen wird.
+FIX3="$TMP/fixture-dist"
+FE3="$FIX3/ai-automation-frontend"
+mkdir -p "$FE3/src" "$FE3/dist/assets"
+echo "export const app = 1;" > "$FE3/src/app.tsx"
+echo "export default {};" > "$FE3/vite.config.ts"
+head -c 1024 /dev/zero | tr '\0' 'x' > "$FE3/dist/assets/index-abc.js"
+head -c 2048 /dev/zero | tr '\0' 'm' > "$FE3/dist/assets/monaco-def.js"
+printf '%s\n' '<script type="module" crossorigin src="/assets/index-abc.js"></script>' \
+  '<link rel="modulepreload" crossorigin href="/assets/monaco-def.js">' > "$FE3/dist/index.html"
+# Weitere Eingaben des Builds: die Vorlage index.html, public/ und das Lockfile — zunaechst alt.
+mkdir -p "$FE3/public"
+echo '<div id="root"></div>' > "$FE3/index.html"
+echo '<svg/>' > "$FE3/public/logo.svg"
+echo '{}' > "$FE3/package-lock.json"
+touch -d '2026-09-01 12:00:00' "$FE3/index.html" "$FE3/public/logo.svg" "$FE3/package-lock.json"
+printf '%s' "$FIX3" > "$TMP/base3.txt"
+render "$PERF" name:facts "$(json_values project_path="$TMP/base3.txt" request_metrics=)" > "$TMP/perf-facts3.sh"
+run_dist_case() {  # $1 = Fall, $2..$4 = mtime von dist/index.html, src/app.tsx, vite.config.ts
+  touch -d "$2" "$FE3/dist/index.html"; touch -d "$3" "$FE3/src/app.tsx"; touch -d "$4" "$FE3/vite.config.ts"
+  PATH="$TMP/fakebin:$PATH" bash "$TMP/perf-facts3.sh" > "$TMP/perf-dist-$1.out" 2> "$TMP/perf-dist-$1.err"
+}
+bundle_gaps() {  # $1 = Faktenblatt, $2 = Grund: jede Bundle-Zahl genau als Luecke mit diesem Grund
+  for F in frontend_bundle_js_bytes frontend_bundle_js_files frontend_bundle_largest_js frontend_lazy_chunk_preloaded; do
+    grep -qxF "NICHT GEMESSEN: $F ($2)" "$1" || return 1
+  done
+}
+run_dist_case src '2026-09-23 10:00:00' '2026-09-25 09:13:40' '2026-09-01 12:00:00'
+check "src juenger als dist: jede Bundle-Zahl ist Luecke mit beiden Staenden" \
+  'bundle_gaps "$TMP/perf-dist-src.out" "dist veraltet: dist/index.html 2026-09-23T10:00:00 < src/app.tsx 2026-09-25T09:13:40 — vor dem Audit npm run build"'
+check "src juenger als dist: keine Bundle-FAKT-Zeile, auch kein monaco-Preload" \
+  '! grep -qE "^FAKT frontend_(bundle_[a-z_]+|lazy_chunk_preloaded):" "$TMP/perf-dist-src.out"'
+check "src juenger als dist: laeuft ohne stderr" '[ ! -s "$TMP/perf-dist-src.err" ]'
+run_dist_case vite '2026-09-23 10:00:00' '2026-09-22 08:00:00' '2026-09-24 17:05:00'
+check "nur vite.config.ts juenger: ebenfalls veraltet" \
+  'bundle_gaps "$TMP/perf-dist-vite.out" "dist veraltet: dist/index.html 2026-09-23T10:00:00 < vite.config.ts 2026-09-24T17:05:00 — vor dem Audit npm run build"'
+for SOURCE in index.html public/logo.svg package-lock.json; do
+  run_dist_case other '2026-09-23 10:00:00' '2026-09-22 08:00:00' '2026-09-22 08:00:00'
+  touch -d '2026-09-24 12:00:00' "$FE3/$SOURCE"
+  PATH="$TMP/fakebin:$PATH" bash "$TMP/perf-facts3.sh" > "$TMP/perf-dist-other.out" 2>/dev/null
+  check "nur $SOURCE juenger: ebenfalls veraltet" \
+    'bundle_gaps "$TMP/perf-dist-other.out" "dist veraltet: dist/index.html 2026-09-23T10:00:00 < $SOURCE 2026-09-24T12:00:00 — vor dem Audit npm run build"'
+  touch -d '2026-09-01 12:00:00' "$FE3/$SOURCE"
+done
+run_dist_case fresh '2026-09-25 10:00:00' '2026-09-25 09:13:40' '2026-09-24 17:05:00'
+check "Gegenprobe: nach dem Bauen wird das Bundle gemessen" 'grep -qx "FAKT frontend_bundle_js_bytes: 3072" "$TMP/perf-dist-fresh.out"'
+check "Gegenprobe: der monaco-Preload wird gemessen" \
+  'grep -qx "FAKT frontend_lazy_chunk_preloaded: 1 (/assets/monaco-def.js)" "$TMP/perf-dist-fresh.out"'
+check "Gegenprobe: Bauzeit aus dist/index.html" 'grep -qx "FAKT frontend_bundle_built_at: 2026-09-25T10:00:00" "$TMP/perf-dist-fresh.out"'
+check "Gegenprobe: keine Luecke im Bundle" '! grep -q "^NICHT GEMESSEN: frontend_" "$TMP/perf-dist-fresh.out"'
+rm "$FE3/dist/index.html"
+PATH="$TMP/fakebin:$PATH" bash "$TMP/perf-facts3.sh" > "$TMP/perf-dist-noindex.out" 2>/dev/null
+check "dist ohne index.html: Stand nicht pruefbar, nichts gemessen" \
+  'bundle_gaps "$TMP/perf-dist-noindex.out" "$FE3/dist/index.html fehlt — Stand des Build-Artefakts nicht pruefbar"'
+rm -rf "$FE3/dist"
+PATH="$TMP/fakebin:$PATH" bash "$TMP/perf-facts3.sh" > "$TMP/perf-dist-none.out" 2>/dev/null
+check "ohne dist: eine Luecke wie bisher" \
+  '[ "$(grep -c "^NICHT GEMESSEN: frontend_" "$TMP/perf-dist-none.out")" -eq 1 ] \
+     && grep -q "^NICHT GEMESSEN: frontend_bundle_js_bytes (kein Build-Artefakt" "$TMP/perf-dist-none.out"'
+
+echo "6e) Performance-Audit: Klammern in Annotationsargumenten beenden keinen Rumpf (e8226de2)"
+# Wie in @EventListener({ApplicationReadyEvent.class}) oeffnen die Klammern in
+# @Transactional(rollbackFor = {…}) keinen Block. Frueher endete der Rumpf schon in der
+# Annotationszeile, und der langsame Aufruf darunter blieb ungezaehlt; bei Argumenten ueber mehrere
+# Zeilen galt das auch fuer den Startlauf-Listener. Eine { in einem String verlaengert keinen Rumpf.
+FIX4="$TMP/fixture-annotations"
+MAIN4="$FIX4/ai-automation-backend/src/main/java/com/automation"
+mkdir -p "$MAIN4/service"
+cat > "$MAIN4/service/TxService.java" <<'JAVA'
+package com.automation.service;
+
+class TxService {
+    @Transactional(rollbackFor = {java.io.IOException.class, IllegalStateException.class})
+    void syncRemote() {
+        restTemplate.getForObject("http://example.invalid", String.class);
+    }
+
+    @Transactional(rollbackFor = {
+            java.io.IOException.class,
+            IllegalStateException.class})
+    void pushRemote() {
+        webClient.post();
+    }
+
+    @Transactional(rollbackFor = {java.io.IOException.class})
+    void saveOnly() {
+        log("{");
+    }
+
+    void callOutside() {
+        hostClaudeService.execute("x");
+    }
+}
+JAVA
+cat > "$MAIN4/service/BootListener.java" <<'JAVA'
+package com.automation.service;
+
+class BootListener {
+    @EventListener(classes = {
+            ApplicationReadyEvent.class})
+    void onBoot(java.util.List<String> ids) {
+        for (String id : ids) {
+            bootRepository.save(id);
+        }
+    }
+}
+JAVA
+printf '%s' "$FIX4" > "$TMP/base4.txt"
+render "$PERF" name:facts "$(json_values project_path="$TMP/base4.txt" request_metrics=)" > "$TMP/perf-facts4.sh"
+PATH="$TMP/fakebin:$PATH" bash "$TMP/perf-facts4.sh" > "$TMP/perf-facts4.out" 2> "$TMP/perf-facts4.err"
+check "laeuft ohne stderr" '[ ! -s "$TMP/perf-facts4.err" ]'
+check "rollbackFor = {…} in einer Zeile: der Rumpf danach zaehlt" \
+  'grep -qx "TREFFER transactional_slow_call: service/TxService.java:6 restTemplate (@Transactional ab Zeile 4)" "$TMP/perf-facts4.out"'
+check "rollbackFor = {…} ueber drei Zeilen: der Rumpf danach zaehlt" \
+  'grep -qx "TREFFER transactional_slow_call: service/TxService.java:13 webClient (@Transactional ab Zeile 9)" "$TMP/perf-facts4.out"'
+check "Rumpf endet an seiner Klammer, auch mit { im String" '! grep -q "hostClaudeService" "$TMP/perf-facts4.out"'
+check "FAKT transactional_slow_call_count: 2" 'grep -qx "FAKT transactional_slow_call_count: 2" "$TMP/perf-facts4.out"'
+check "@EventListener(classes = {…}) ueber zwei Zeilen: Startlauf, kein N+1" \
+  'grep -qx "FAKT startup_repository_loop_count: 1" "$TMP/perf-facts4.out" \
+     && grep -qx "FAKT repository_loop_count: 0" "$TMP/perf-facts4.out"'
+
+echo "6f) Performance-Audit: Index-Abgleich je Tabelle (a851c42b)"
+# Global nach Spaltenname galt capabilities.skill_id als indiziert, weil skill_versions einen Index auf
+# skill_id hat. Jetzt zaehlt nur ein Index der eigenen Tabelle (Repository -> Entity -> @Table, sonst der
+# Klassenname), und zwar nach allen Migrationen in Flyway-Reihenfolge: V2 baut jobs um, der Index auf
+# status faellt mit der alten Tabelle weg, der auf queue kommt mit jobs_new; V10 (nach V2, nicht davor)
+# loescht den Index auf team. Ein Repository ohne Entity bleibt beim Abgleich ueber alle Tabellen.
+FIX5="$TMP/fixture-index"
+MAIN5="$FIX5/ai-automation-backend/src/main/java/com/automation"
+MIG5="$FIX5/ai-automation-backend/src/main/resources/db/migration"
+mkdir -p "$MAIN5/entity" "$MAIN5/repository" "$MIG5"
+cat > "$MAIN5/entity/Capability.java" <<'JAVA'
+package com.automation.entity;
+
+/** Nur im Kommentar: @Table(name = "skill_versions") */
+@Entity
+@Table(name = "capabilities")
+public class Capability {
+}
+JAVA
+cat > "$MAIN5/entity/SkillVersion.java" <<'JAVA'
+package com.automation.entity;
+
+@Entity
+@Table(uniqueConstraints = @UniqueConstraint(name = "uk_skill_versions", columnNames = {"skill_id", "version"}),
+        name = "skill_versions")
+public class SkillVersion {
+}
+JAVA
+printf '%s\n' 'package com.automation.entity;' '' '@Entity' 'public class WorkItem {' '}' > "$MAIN5/entity/WorkItem.java"
+printf '%s\n' 'package com.automation.entity;' '' '@Entity' '@Table(name = "jobs")' 'public class Job {' '}' \
+  > "$MAIN5/entity/Job.java"
+cat > "$MAIN5/repository/CapabilityRepository.java" <<'JAVA'
+package com.automation.repository;
+
+public interface CapabilityRepository extends JpaRepository<Capability, String> {
+    java.util.List<Capability> findBySkillId(String skillId);
+}
+JAVA
+cat > "$MAIN5/repository/SkillVersionRepository.java" <<'JAVA'
+package com.automation.repository;
+
+public interface SkillVersionRepository extends JpaRepository<SkillVersion, String>,
+        JpaSpecificationExecutor<SkillVersion> {
+    java.util.List<SkillVersion> findBySkillIdOrderByVersionDesc(String skillId);
+}
+JAVA
+cat > "$MAIN5/repository/WorkItemRepository.java" <<'JAVA'
+package com.automation.repository;
+
+public interface WorkItemRepository extends JpaRepository<WorkItem, String> {
+    java.util.List<WorkItem> findByOwner(String owner);
+    java.util.List<WorkItem> findBySkillId(String skillId);
+    java.util.List<WorkItem> findByTeam(String team);
+}
+JAVA
+cat > "$MAIN5/repository/JobRepository.java" <<'JAVA'
+package com.automation.repository;
+
+public interface JobRepository extends JpaRepository<Job, String> {
+    java.util.List<Job> findByStatus(String status);
+    java.util.List<Job> findByQueue(String queue);
+}
+JAVA
+printf '%s\n' 'package com.automation.repository;' '' 'interface LegacyRepository {' \
+  '    java.util.List<Object> findByQueue(String queue);' '}' > "$MAIN5/repository/LegacyRepository.java"
+cat > "$MIG5/V1__init.sql" <<'SQL'
+CREATE TABLE capabilities (id TEXT PRIMARY KEY, skill_id TEXT);
+CREATE TABLE skill_versions (id TEXT PRIMARY KEY, skill_id TEXT, version INTEGER);
+CREATE INDEX idx_skill_versions_skill ON skill_versions(skill_id);
+CREATE TABLE work_item (id TEXT PRIMARY KEY, owner TEXT, skill_id TEXT, team TEXT);
+CREATE INDEX idx_work_item_owner ON work_item(owner);
+CREATE INDEX idx_work_item_team ON work_item(team);
+CREATE TABLE jobs (id TEXT PRIMARY KEY, status TEXT, queue TEXT);
+CREATE INDEX idx_jobs_status ON jobs(status);
+SQL
+cat > "$MIG5/V2__rebuild_jobs.sql" <<'SQL'
+-- CREATE INDEX idx_capabilities_skill ON capabilities(skill_id);
+CREATE TABLE jobs_new (id TEXT PRIMARY KEY, status TEXT, queue TEXT);
+CREATE INDEX idx_jobs_new_queue ON jobs_new(queue);
+INSERT INTO jobs_new SELECT id, status, queue FROM jobs;
+DROP TABLE jobs;
+ALTER TABLE jobs_new RENAME TO jobs;
+SQL
+printf '%s\n' 'DROP INDEX IF EXISTS idx_work_item_team;' > "$MIG5/V10__drop_team_index.sql"
+printf '%s' "$FIX5" > "$TMP/base5.txt"
+render "$PERF" name:facts "$(json_values project_path="$TMP/base5.txt" request_metrics=)" > "$TMP/perf-facts5.sh"
+PATH="$TMP/fakebin:$PATH" bash "$TMP/perf-facts5.sh" > "$TMP/perf-facts5.out" 2> "$TMP/perf-facts5.err"
+check "laeuft ohne stderr" '[ ! -s "$TMP/perf-facts5.err" ]'
+check "Index einer anderen Tabelle zaehlt nicht (capabilities.skill_id), auch nicht mit Default-Tabellenname" \
+  'grep -qx "TREFFER unindexed_findby_column: skill_id (CapabilityRepository.java -> capabilities, WorkItemRepository.java -> work_item)" "$TMP/perf-facts5.out"'
+check "Umbau: der Index der alten Tabelle faellt mit ihr weg" \
+  'grep -qx "TREFFER unindexed_findby_column: status (JobRepository.java -> jobs)" "$TMP/perf-facts5.out"'
+check "DROP INDEX in V10 wirkt nach V2, nicht davor" \
+  'grep -qx "TREFFER unindexed_findby_column: team (WorkItemRepository.java -> work_item)" "$TMP/perf-facts5.out"'
+check "FAKT unindexed_findby_columns_count: 3" 'grep -qx "FAKT unindexed_findby_columns_count: 3" "$TMP/perf-facts5.out"'
+check "eigener Index, umbenannter Index und @Table mit name an zweiter Stelle tragen" \
+  '! grep -qE "^TREFFER unindexed_findby_column: (owner|queue|version) |SkillVersionRepository" "$TMP/perf-facts5.out"'
+check "Repository ohne Entity: gegen alle Tabellen gehalten und genannt" \
+  'grep -qx "# Ohne Tabellen-Zuordnung, gegen alle Tabellen gehalten: LegacyRepository.java" "$TMP/perf-facts5.out"'
+check "FAKT migration_index_statements: 5" 'grep -qx "FAKT migration_index_statements: 5" "$TMP/perf-facts5.out"'
+
 echo "7) Performance-Audit: Gate prueft die Pflicht-Fakten deterministisch"
 run_perf_gate() {  # $1 = faktenblatt-datei
   GATE_VALUES="$(json_values block.report.output="$TMP/report-green.txt" block.facts.output="$1")"
@@ -878,6 +1110,69 @@ check "Gegenprobe: eine fehlende Zaehlregel faellt auf"           '[ "$KP_COUNTI
 check "Gegenprobe: ein Faktenblatt im Regelblock faellt auf"      '[ "$KP_FACTS" -eq 1 ]'
 check "Gegenprobe: eine fehlende Regel fuer Wiedervorlagen ohne Messung faellt auf" '[ "$KP_UNMEASURED" -eq 4 ]'
 check "Gegenprobe: eine andere Schwelle als die der Plattform faellt auf" '[ "$KP_DEGRADED" -eq 4 ]'
+
+echo "11) Doku-Zehrprobe: das Gate zaehlt nur den letzten Envelope (d8dae725)"
+# Wie AuditResultParser und das Gate der Test-Abdeckung zaehlt nur der letzte vollstaendige Envelope. Der
+# sed-Bereich las jeden: Befunde eines wiedergegebenen Vorlaufs hielten das Gate auf YELLOW, obwohl der
+# eigene Envelope leer war, und dessen snapshotComplete=false galt als eigenes.
+ZEHR="$REPO/workflow-pool/mysuricates-doku-zehrprobe.json"
+printf '%s\n' '## FAKTENBLATT' 'FAKT docs_scope_files: 12' 'FAKT docs_candidates: 3' \
+  'PFLICHT-FAKTEN: docs_scope_files docs_candidates' > "$TMP/zehr-dossier.txt"
+zehr_envelope() {  # $1 = Anzahl Befunde, $2 = snapshotComplete (Standard true)
+  local i findings=''
+  for ((i = 0; i < $1; i++)); do
+    findings="$findings{\"ruleKey\":\"docs.orphan\",\"subject\":\"docs/d$i.md\",\"severity\":\"LOW\",\"title\":\"t\"},"
+  done
+  printf '%s\n' '<!-- mysuricates:audit-result:v1' "{\"snapshotComplete\":${2:-true},\"findings\":[${findings%,}]}" '-->'
+}
+run_zehr_gate() {  # $1 = Report
+  printf '%s\n' "$1" > "$TMP/zehr-report.txt"
+  render "$ZEHR" name:gate \
+    "$(json_values block.dossier.output="$TMP/zehr-dossier.txt" block.report.output="$TMP/zehr-report.txt")" \
+    > "$TMP/zehr-gate.sh"
+  bash "$TMP/zehr-gate.sh" > "$TMP/zehr-gate.out" 2> "$TMP/zehr-gate.err"
+}
+run_zehr_gate "$(printf '### Doku-Zehrprobe\n'; zehr_envelope 1)"
+check "ein Envelope mit einem Befund: YELLOW mit der Zahl" \
+  'grep -qx "gate_status: YELLOW" "$TMP/zehr-gate.out" \
+     && grep -q "^gate_description: 3 auffaellige Dokumente gemessen, 1 davon" "$TMP/zehr-gate.out"'
+check "Gate laeuft ohne stderr" '[ ! -s "$TMP/zehr-gate.err" ]'
+run_zehr_gate "$(zehr_envelope 3; printf '### Doku-Zehrprobe\n'; zehr_envelope 0)"
+check "Vorlauf mit drei Befunden, eigener leer: GREEN" \
+  'grep -qx "gate_status: GREEN" "$TMP/zehr-gate.out" && grep -q "gemessen, 0 davon" "$TMP/zehr-gate.out"'
+run_zehr_gate "$(zehr_envelope 0; zehr_envelope 2)"
+check "Vorlauf leer, eigener mit zwei Befunden: zwei gezaehlt" 'grep -q "gemessen, 2 davon" "$TMP/zehr-gate.out"'
+run_zehr_gate "$(zehr_envelope 1 false; zehr_envelope 1)"
+check "snapshotComplete=false im Vorlauf gilt nicht als eigenes" \
+  'grep -qx "gate_category: documentation-weight" "$TMP/zehr-gate.out"'
+run_zehr_gate "$(zehr_envelope 2; printf '%s\n' '<!-- mysuricates:audit-result:v1' '{"snapshotComplete":true,"findings":[')"
+check "eigener abgeschnitten nach vollstaendigem Vorlauf: fehlend, RED" \
+  'grep -qx "gate_status: RED" "$TMP/zehr-gate.out" && grep -qx "gate_category: audit-invalid" "$TMP/zehr-gate.out"'
+# Derselbe awk-Baustein wie im Gate der Test-Abdeckung (wie der VERDICT-Baustein in 7b): eine Kopie, die
+# beim naechsten Fix zurueckbleibt, faellt hier auf. Und kein Audit-Gate liest Envelopes mehr per sed-Bereich.
+read -r ENV_BLOCKS ENV_TEXTS ENV_SED <<< "$(python3 - "$REPO/workflow-pool" <<'PY'
+import glob, json, os, sys
+END = 'END { printf "%s", last }\')'
+found, sed_ranges = [], 0
+for path in sorted(glob.glob(os.path.join(sys.argv[1], '*.json'))):
+    definition = json.load(open(path, encoding='utf-8'))
+    if not definition.get('metadata', {}).get('audit', {}).get('enabled'):
+        continue
+    for block in definition['blocks']:
+        command = block.get('config', {}).get('command', '')
+        if block.get('type') != 'shell':
+            continue
+        sed_ranges += '/mysuricates:audit-result:v1/,/-->/p' in command
+        start = command.find('ENVELOPE=$(')
+        end = command.find(END, start) if start >= 0 else -1
+        if end > start:
+            found.append(command[start:end + len(END)])
+print(len(found), len(set(found)), sed_ranges)
+PY
+)"
+check "Envelope-Baustein in den Gates von Test-Abdeckung und Zehrprobe" '[ "$ENV_BLOCKS" -ge 2 ]'
+check "Envelope-Baustein in allen Gates wortgleich"                     '[ "$ENV_TEXTS" -eq 1 ]'
+check "kein Audit-Gate liest Envelopes per sed-Bereich"                 '[ "$ENV_SED" -eq 0 ]'
 
 echo
 echo "passed=$PASS failed=$FAIL"

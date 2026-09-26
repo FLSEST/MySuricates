@@ -2,7 +2,10 @@ import type { RefObject } from 'react';
 import { Flag } from 'lucide-react';
 import { useI18nStore, useT } from '../../i18n';
 import { formatDate } from '../../utils/localeFormat';
-import { dateOfDay, dayAtX, dayOf, xOfDay, type TimelineAxis } from './timelineLayout';
+import {
+  TODAY_LABEL_OVERLAP, TODAY_LABEL_WIDTH, dateOfDay, dayAtX, dayOf, todayLabelPlacement, xOfDay, type TimelineAxis,
+  type TodayLabelPlacement,
+} from './timelineLayout';
 import { SHORT_DATE } from './planDisplay';
 import { MilestoneDiamond } from './MilestoneDiamond';
 import type { GoalMilestone } from '../../types';
@@ -12,6 +15,13 @@ const MIN_LABEL_PX = 30;
 /** Die Beschriftung am Anfang der Achse entfällt, wenn der nächste Monat (bzw. das nächste Jahr) so nah folgt. */
 const MIN_BAND_PX = 70;
 const TICK_DAYS = { day: 1, week: 7, month: 30.4 } as const;
+/** Lage des Etiketts „heute“ je Ausweichrichtung; seitlich reicht es ein Stück über die Linie von heute. */
+const TODAY_LABEL: Record<TodayLabelPlacement, { className: string; offset: number }> = {
+  center: { className: 'bottom-1 -translate-x-1/2', offset: 0 },
+  right: { className: 'bottom-1', offset: -TODAY_LABEL_OVERLAP },
+  left: { className: 'bottom-1 -translate-x-full', offset: TODAY_LABEL_OVERLAP },
+  raised: { className: 'top-5 z-10 -translate-x-1/2', offset: 0 },
+};
 
 interface TimelineAxisViewProps {
   axis: TimelineAxis;
@@ -51,6 +61,12 @@ export function TimelineAxisView({
   };
   const bandLabel = (day: number) =>
     formatDate(dateOfDay(day), locale, axis.scale === 'month' ? { year: 'numeric' } : { month: 'short', year: 'numeric' });
+  const todayPlacement = todayLabelPlacement(
+    x(axis.today),
+    [...milestones.map((milestone) => x(dayOf(milestone.dueDate))), ...(targetDay !== null ? [x(targetDay)] : [])],
+    width,
+  );
+  const todayLabel = TODAY_LABEL[todayPlacement];
 
   return (
     <div
@@ -81,8 +97,9 @@ export function TimelineAxisView({
           {tickLabel(tick)}
         </span>
       ))}
-      <span className="absolute bottom-1 -translate-x-1/2 rounded border border-info/40 bg-info-subtle px-1 text-[10px] font-medium text-info"
-        style={{ left: x(axis.today) }}>
+      <span data-testid="timeline-today" data-placement={todayPlacement}
+        className={`absolute whitespace-nowrap rounded border border-info/40 bg-info-subtle text-center text-[10px] font-medium text-info ${todayLabel.className}`}
+        style={{ left: x(axis.today) + todayLabel.offset, width: TODAY_LABEL_WIDTH }}>
         {tt.today}
       </span>
       {targetDay !== null && (

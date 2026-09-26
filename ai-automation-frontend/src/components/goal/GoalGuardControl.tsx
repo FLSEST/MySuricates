@@ -1,6 +1,6 @@
 import { useId, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Play, Workflow } from 'lucide-react';
+import { Clock, Play, Workflow } from 'lucide-react';
 import { Button, Input, Modal, Toggle } from '../ui';
 import { Hint } from '../hints/Hint';
 import { useI18nStore, useT } from '../../i18n';
@@ -8,7 +8,10 @@ import { formatTimestamp } from '../../utils/localeFormat';
 import { useModuleEnabled } from '../../hooks/useModules';
 import { useProjects } from '../../hooks/useProjects';
 import { useExecuteWorkflow } from '../../hooks/useWorkflows';
-import { dailyCron, useSetGoalGuard } from '../../hooks/useGoalGuard';
+import { useSchedule } from '../../hooks/useSchedules';
+import {
+  cronWithTime, dailyCron, isDailyCron, timeOfCron, useSetGoalGuard, useSetGuardTime,
+} from '../../hooks/useGoalGuard';
 import type { Goal, GoalProjectProgress } from '../../types';
 
 const DEFAULT_TIME = '08:00';
@@ -25,9 +28,10 @@ function busiestProject(byProject: GoalProjectProgress[]): string | null {
 /**
  * Schalter „Wächter“ im Kopf der Zielseite (TODO e192df18): ein Workflow aus der Vorlage „Ziel-Wächter“
  * prüft das Ziel täglich und meldet eine Ampel als Dashboard-Kachel. Beim ersten Einschalten fragt ein
- * kleiner Dialog nach Projekt und Uhrzeit, danach zeigt die Zeile den nächsten Lauf, den Workflow und
- * „Jetzt prüfen“. Ausschalten pausiert nur den Zeitplan. Ohne das Modul `dashboard-report` gibt es den
- * Schalter nicht – außer ein Wächter besteht schon und soll sich abschalten lassen.
+ * kleiner Dialog nach Projekt und Uhrzeit, danach zeigt die Zeile den nächsten Lauf, den Workflow,
+ * „Uhrzeit ändern“ (TODO ff6f08fd) und „Jetzt prüfen“. Ausschalten pausiert nur den Zeitplan. Ohne das
+ * Modul `dashboard-report` gibt es den Schalter nicht – außer ein Wächter besteht schon und soll sich
+ * abschalten lassen.
  */
 export function GoalGuardControl({ goal, byProject }: { goal: Goal; byProject: GoalProjectProgress[] }) {
   const t = useT();
@@ -35,9 +39,15 @@ export function GoalGuardControl({ goal, byProject }: { goal: Goal; byProject: G
   const locale = useI18nStore((s) => s.locale);
   const reportModule = useModuleEnabled('dashboard-report');
   const setGuard = useSetGoalGuard();
+  const setTime = useSetGuardTime();
   const execute = useExecuteWorkflow();
   const [asking, setAsking] = useState(false);
+  const [editingTime, setEditingTime] = useState(false);
   const { guard } = goal;
+  // Uhrzeit nur, wenn der Zeitplan eine feste hat; wer ihn unter „Zeitpläne“ anders gestellt hat, ändert ihn dort
+  const { data: schedule } = useSchedule(guard.scheduleId);
+  const cron = schedule?.cronExpression ?? null;
+  const canChangeTime = !!guard.scheduleId && !!cron && timeOfCron(cron) !== null;
   if (!reportModule && !guard.workflowId) return null;
 
   const toggle = (on: boolean) => {
@@ -66,6 +76,11 @@ export function GoalGuardControl({ goal, byProject }: { goal: Goal; byProject: G
           {g.workflow}
         </Link>
       )}
+      {canChangeTime && (
+        <Button variant="ghost" size="sm" icon={<Clock className="h-3.5 w-3.5" />} onClick={() => setEditingTime(true)}>
+          {g.changeTime}
+        </Button>
+      )}
       {guard.enabled && guard.workflowId && (
         <Button variant="secondary" size="sm" icon={<Play className="h-3.5 w-3.5" />} loading={execute.isPending}
           onClick={() => execute.mutate({ id: guard.workflowId! })}>
@@ -75,7 +90,40 @@ export function GoalGuardControl({ goal, byProject }: { goal: Goal; byProject: G
       {asking && (
         <GuardDialog byProject={byProject} pending={setGuard.isPending} onCancel={() => setAsking(false)} onConfirm={switchOn} />
       )}
+      {editingTime && canChangeTime && (
+        <GuardTimeDialog cron={cron} pending={setTime.isPending} onCancel={() => setEditingTime(false)}
+          onSave={(next) => setTime.mutate({ scheduleId: guard.scheduleId!, cron: next }, { onSuccess: () => setEditingTime(false) })} />
+      )}
     </div>
+  );
+}
+
+/** Uhrzeit des Wächters ändern: nur die Uhrzeit seines Zeitplans, Tage und Wochentage bleiben. */
+function GuardTimeDialog({ cron, pending, onCancel, onSave }: {
+  cron: string;
+  pending: boolean;
+  onCancel: () => void;
+  onSave: (cron: string) => void;
+}) {
+  const g = useT().goals.guard;
+  const [time, setTime] = useState(() => timeOfCron(cron) ?? DEFAULT_TIME);
+  const next = cronWithTime(cron, time);
+  const daily = isDailyCron(cron);
+
+  return (
+    <Modal open onClose={onCancel} title={g.timeDialogTitle} size="sm" footer={(
+      <>
+        <Button variant="secondary" onClick={onCancel}>{g.cancel}</Button>
+        <Button onClick={() => next && onSave(next)} loading={pending} disabled={!next || next === cron}>
+          {g.timeSave}
+        </Button>
+      </>
+    )}>
+      <div className="space-y-2">
+        <Input label={daily ? g.time : g.timeOfDay} type="time" value={time} onChange={(event) => setTime(event.target.value)} />
+        {!daily && <p className="text-xs text-text-tertiary">{g.timeDaysKept}</p>}
+      </div>
+    </Modal>
   );
 }
 

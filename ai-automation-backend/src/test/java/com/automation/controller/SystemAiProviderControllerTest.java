@@ -259,10 +259,13 @@ class SystemAiProviderControllerTest {
                         new AiProviderStatusReport.ProviderStatus("CLAUDE", "claude",
                                 AiProviderStatusReport.State.READY, true, true,
                                 AiProviderStatusReport.LoginVia.ENVIRONMENT, "CLAUDE_CODE_OAUTH_TOKEN",
-                                "curl -fsSL https://claude.ai/install.sh | bash", "claude auth login", true),
+                                "curl -fsSL https://claude.ai/install.sh | bash", "claude auth login", true, null),
                         new AiProviderStatusReport.ProviderStatus("CODEX", "codex",
                                 AiProviderStatusReport.State.LOGIN_MISSING, true, false, null, null,
-                                "npm install -g @openai/codex", "codex login", false))));
+                                "npm install -g @openai/codex", "codex login", false, null),
+                        new AiProviderStatusReport.ProviderStatus("PI", "pi",
+                                AiProviderStatusReport.State.LOGIN_MISSING, true, false, null, null,
+                                "npm install -g pi", "pi", false, "pi_slash_login"))));
 
         mockMvc.perform(get("/api/v1/system/ai-providers/status"))
                 .andExpect(status().isOk())
@@ -275,7 +278,11 @@ class SystemAiProviderControllerTest {
                 .andExpect(jsonPath("$.providers[0].defaultProvider").value(true))
                 .andExpect(jsonPath("$.providers[1].state").value("LOGIN_MISSING"))
                 .andExpect(jsonPath("$.providers[1].login").value("codex login"))
-                .andExpect(jsonPath("$.providers[1].loginVia").doesNotExist());
+                .andExpect(jsonPath("$.providers[1].loginVia").doesNotExist())
+                .andExpect(jsonPath("$.providers[1].loginNote").doesNotExist())
+                // eab43a8b: what follows the command comes as a key the interface translates
+                .andExpect(jsonPath("$.providers[2].login").value("pi"))
+                .andExpect(jsonPath("$.providers[2].loginNote").value("pi_slash_login"));
     }
 
     @Test

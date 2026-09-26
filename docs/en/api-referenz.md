@@ -5,6 +5,9 @@
 - **Base URL:** `http://localhost:9090/api/v1`
 - **Content-Type:** `application/json`
 - **Authentication:** Header `X-API-Key: <key>` (when `automation.security.enabled=true`)
+- **Proxy:** always call `curl` with an API key as `curl --noproxy '*'` – with `http_proxy` set,
+  curl sends even requests to `localhost` through the proxy, key included. The documentation gate
+  `doc-facts-check.sh` checks every example in `docs/` and `AGENTS.md` for it.
 
 ### Error Format
 
@@ -139,7 +142,7 @@ Create a new project.
 Create the bundled example project, meant for a fresh installation. The UI offers it while there is no project yet.
 
 - **Directory:** The template `classpath:examples/example-project/` is copied to `<automation.examples.directory>/example-project`. The default is `mysuricates-examples` below the workspace root, or `./data/examples` next to the database without a workspace root. The environment variable for it is `AUTOMATION_EXAMPLES_DIR`. An existing directory is never overwritten.
-- **Workflows:** one workflow per shipped template listed in `ExampleProjectService.EXAMPLE_TEMPLATE_IDS` (currently the blueprint `blueprint-approval`), with `changeSource` `example-project`.
+- **Workflows:** one workflow per shipped template listed in `ExampleProjectService.EXAMPLE_TEMPLATE_IDS` (currently the blueprints `blueprint-approval`, `blueprint-if`, `blueprint-loop`, `blueprint-todo` and `blueprint-report`, none of them calls AI), with `changeSource` `example-project`.
 - **Idempotent:** An active project that already points at the directory is returned, and missing example workflows are added.
 
 | Parameter | Type | Required | Values |
@@ -417,8 +420,9 @@ Import a workflow from JSON (exported format + target project).
 | `instructions` | String | No |
 | `model` | String | No |
 | `updateIfExists` | Boolean | No (default: `false`) |
+| `version` | String | No — the export's version label (`4.4.0`); missing or blank keeps the default `1.0.0` or the current label |
 
-When `updateIfExists=true` and a workflow with the same name exists in the target project, it will be updated instead of creating a new one.
+When `updateIfExists=true` and a workflow with the same name exists in the target project, it will be updated instead of creating a new one — `version` included, as with `PUT` and a pool reinstall.
 
 #### Block Config: `timeout_seconds`
 
@@ -1114,16 +1118,22 @@ Retrieve a single schedule.
 
 ### `GET /api/v1/schedules/{id}/runs`
 
-Runs triggered by this schedule.
+The newest runs triggered by this schedule — at most `limit` of each kind (query parameter,
+default 50, 1–500), plus the totals.
 
 **Response:**
 
 ```json
 {
   "workflowRuns": [...],
-  "chainRuns": [...]
+  "chainRuns": [...],
+  "workflowRunsTotal": 26000,
+  "chainRunsTotal": 0
 }
 ```
+
+When `workflowRunsTotal` exceeds `workflowRuns.length`, the limit cut the list (until 2026-09-26 every
+run came, without a ceiling).
 
 `workflowRuns` are `WorkflowRunListItemResponse` — **without steps**, the same list rows as
 `GET /api/v1/executions` (`stepCount`, `lastStepStatus`, `lastStepPreview`). Until 2026-09-23 this
@@ -1151,10 +1161,12 @@ Calendar data: scheduled executions and past runs within a time range.
 |---|---|---|
 | `from` | Instant | Yes |
 | `to` | Instant | Yes |
+| `limit` | int | No (default 1000, 1–5000) |
 
 **Response:** `CalendarDataResponse` with `upcoming` (`ScheduledWorkflowResponse[]`, schedules whose next
 actual run lies in the range — during a `skip-until` pause, that is after the pause) and `pastRuns` (`WorkflowRunListItemResponse[]` — **without steps**, the same list
-rows as `GET /api/v1/executions`; until 2026-09-23 with every step of every run in the range)
+rows as `GET /api/v1/executions`; until 2026-09-23 with every step of every run in the range).
+`pastRuns` are the newest `limit` runs of the range, `pastRunsTotal` counts all of them (until 2026-09-26 without a ceiling).
 
 ### `POST /api/v1/schedules/preview`
 
@@ -1201,6 +1213,9 @@ Create a new schedule.
 | `maxRuns` | Integer | No (max starts, 0 = unlimited — see below) |
 | `conflictBehavior` | String | No (default: `SKIP`, values: `SKIP`, `OVERLAP` — see below) |
 | `catchUpOnResume` | boolean | No (default: `false` — see below) |
+
+`targetType`, `scheduleType` and `conflictBehavior` are trimmed and accepted in any case; any other
+value → `400`, and the message names the allowed values.
 
 - **`conflictBehavior`:** with `SKIP`, an occurrence is dropped while the target still has a run in
   `RUNNING` or `PAUSED`: `nextRunAt` moves on to the next occurrence, a one-off schedule (`ONCE`,
@@ -1787,6 +1802,9 @@ Create a new todo trigger.
 | `processBacklog` | No | Process existing matching TODOs on creation (default: true) |
 | `contextTemplate` | No | Static context variables, merged with TODO data |
 
+`sourceFilter` and `minPriority` are accepted in any case and stored as the constant; any other value
+→ `400`, and the message names the allowed values.
+
 **Response:** `201` with `TodoTriggerResponse`
 
 **TodoTriggerResponse Fields:** `id`, `tagPattern`, `projectId`, `sourceFilter`, `minPriority`, `targetWorkflowId`, `targetWorkflowName`, `contextTemplate`, `enabled`, `maxAttempts`, `autoClose`, `processBacklog`, `description`, `lastTriggeredAt`, `triggerCount`, `createdAt`
@@ -1853,7 +1871,8 @@ Details of an audit (summary + latest report). Required parameter: `projectId`.
 
 All reports of an audit, paginated (`page`, `size`). Required parameter: `projectId`.
 
-**Response:** `PageResponse<AuditReportResponse>`
+**Response:** `PageResponse<AuditReportResponse>` — heads only: `markdownContent` is `null`. The text
+comes from `GET /api/v1/audit-reports/{id}` (until 2026-09-26 every page carried every report in full).
 
 ### `GET /api/v1/audit-reports/{id}`
 
@@ -2145,12 +2164,20 @@ Whether the AI CLIs on the backend's machine are ready: per provider the program
       "id": "CODEX", "cli": "codex", "state": "LOGIN_MISSING",
       "installed": true, "loggedIn": false, "loginVia": null, "loginSource": null,
       "install": "npm install -g @openai/codex", "login": "codex login", "defaultProvider": false
+    },
+    {
+      "id": "PI", "cli": "pi", "state": "LOGIN_MISSING",
+      "installed": true, "loggedIn": false, "loginVia": null, "loginSource": null,
+      "install": "npm install -g @earendil-works/pi-coding-agent@<version>", "login": "pi",
+      "loginNote": "pi_slash_login", "defaultProvider": false
     }
   ]
 }
 ```
 
 `state`: `READY` (program and login found), `LOGIN_MISSING` (program found, no login), `NOT_INSTALLED` (program missing). `loginSource`: the variable name or the login file as `~/…` — or as `$VARIABLE/…` when a container instance moves the directory (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `PI_CODING_AGENT_DIR`). `container: true` means the backend runs in a container: the programs and logins inside it are what counts.
+`login` is only the command; what to do after it comes as a key in `loginNote` (missing when the command says it
+all) — the interface translates it (`aiProviderStatus.loginNotes`), and so does the installer (`M_login_note_<key>`).
 
 ### `POST /api/v1/system/ai-providers/status/refresh`
 
@@ -2255,6 +2282,10 @@ Set an application setting.
 ```
 
 **Response:** `200 OK`
+
+`backup-retain-count` takes 1–365; any other value → `400`, and nothing is stored. The stored value
+applies from the next rotation on and keeps applying after a restart (otherwise
+`automation.backup.retain-count`).
 
 ### `GET /api/v1/system/tray-config`
 

@@ -46,6 +46,13 @@ POST /api/v1/workflows
 
 Alle Workflow-CRUD- und Ausführungsoperationen liegen unter `/api/v1/workflows`. Ein Run wird gestartet mit `POST /api/v1/workflows/{id}/execute`.
 
+Jeder Aufruf braucht den Header `X-API-Key`. Den Schlüssel legt das Backend beim ersten Start an; bei
+einer vom Installer eingerichteten Instanz zeigt ihn `scripts/instance.sh key --name <name>`, beim
+Quellcode-Setup steht er in `~/.autotrigger/api-key`. Die `projectId`
+ist die ID eines vorhandenen Projekts — `GET /api/v1/projects` listet die Projekte mit ihrem Feld `id`,
+in der Oberfläche steht sie in der Adresse der Projektseite (`/projects/<id>`). Vollständige Referenz:
+[api-referenz.md](api-referenz.md).
+
 ### Kontext-Variablen
 
 Variablen beim Start übergeben:
@@ -86,10 +93,11 @@ Jeder Block unterstützt neben seinen typspezifischen Config-Feldern auch diese 
 | `model` | string | null | **Nur KI-fähige Blöcke** (inkl. `compress-ai`): Modell nur für diesen Block (CLI-Alias `opus`/`sonnet`, konkrete ID oder pi `<backend>/<model>`). Präzedenz Block > Workflow > Provider-Default. Setzt ein Block einen *anderen* `provider` als der Workflow, wird das Workflow-Modell nicht vererbt (Modell-IDs sind anbieterspezifisch). |
 | `effort` | string | null | **Nur KI-fähige Blöcke**: Denkaufwand `low`/`medium`/`high`/`xhigh` nur für diesen Block, siehe [Reasoning-Effort](#reasoning-effort-denkaufwand). |
 
-Zusätzlich unterstützt jeder Block ein optionales Top-Level-Feld (nicht in `config`):
+Zusätzlich unterstützt jeder Block optionale Top-Level-Felder (neben `type`, nicht in `config`):
 
 | Feld | Typ | Default | Beschreibung |
 |---|---|---|---|
+| `name` | string | – | Name, unter dem spätere Blöcke die Ausgabe dieses Blocks per `{{ block.<name>.output }}` lesen. Empfohlen sind Buchstaben, Ziffern, `_` und `-`, keine Punkte und kein Leerraum — geprüft wird das beim Speichern nicht; abgelehnt wird nur der reservierte Name `previous_output` (`BlockNameRules`) |
 | `skillIds` | string[] | `[]` | Skill-IDs die **zusätzlich** zu den Workflow-Skills für diesen Block aktiviert werden |
 
 **Standard-Verhalten**: Wenn ein Block fehlschlägt (Status `FAILED`), stoppt der Workflow und der Run wird als `FAILED` markiert. Mit `"on_failure": "continue"` fährt der Workflow mit dem nächsten Block fort.
@@ -149,6 +157,12 @@ Führt einen Shell-Befehl auf dem Host oder innerhalb eines Docker-Containers au
 > `PROJECT_ID={{ project_id }} python3 - <<'PY'` … `os.environ['PROJECT_ID']`, Block-Option
 > `"shell_escape_variables": true`. Shell-Blöcke erhalten sonst keine Umgebungsvariablen.
 
+> **Begriff „Taint“:** Ein Run gilt als *getaintet* (gefärbt), sobald Daten von außen — etwa die
+> Nutzlast eines Webhooks — in ihn geflossen sind. Ab dann setzt die Plattform auch Block-Ausgaben
+> in Shell-Befehlen in Single-Quotes, weil ein Block fremde Bytes weitergeben kann. Die Regeln im
+> Einzelnen stehen unten unter „Taint-Propagation“, das Vertrauensmodell in
+> [deployment.md → Drei Vertrauensklassen](deployment.md#drei-vertrauensklassen-für-kontextwerte).
+>
 > **Nicht vertrauenswürdige Variablen:** Alles, was ein Webhook-Aufrufer liefert (Payload-Felder und
 > die daraus abgeleiteten `git_*`-Felder), landet in Shell-Befehlen (`shell`, `foreach`, `while`, `retry`,
 > `conditional` und in `switch` verschachtelte Blöcke, jeweils im Shell-Modus) grundsätzlich in Single-Quotes — auch ohne `shell_escape_variables`. Solche
@@ -541,6 +555,8 @@ Führt einen anderen Workflow als verschachtelten Schritt aus.
 
 **Limits**: Maximale Verschachtelungstiefe von 5 Ebenen. Zirkuläre Referenzen werden erkannt. 30-Minuten-Timeout.
 
+**Kontext**: Der Child-Run bekommt die Variablen des Parent-Runs und dessen `{{ previous_output }}`, aber nicht dessen Plattform-Daten (`previous_report`, `open_todos`, `request_metrics`, `goal_status`/`goal_guard_*`, `audit_findings`): Die injiziert die Plattform dem Child-Run selbst, für ihn berechnet. Ein Wert unter einem dieser Namen wird auch aus keinem anderen Eingabe-Kontext übernommen. Der Taint des Parent-Runs reist mit.
+
 **Marker**: Der Schritt reicht die letzte Ausgabe des Child-Runs nur durch (Step-Metadatum `derivedOutput: true`). `gate_status:`- und `todo_item:`-Marker darin werden ausschliesslich im Child-Run ausgewertet — der Parent-Run übernimmt sie bewusst nicht in seine Gate-Zusammenfassung oder TODO-Liste.
 
 **Wann verwenden**: Komplexe Workflows aus kleineren, wiederverwendbaren zusammensetzen.
@@ -665,7 +681,7 @@ Höchstens 50 Einträge. Kaputtes JSON, keine Liste oder ein unbekannter Schlüs
 ]
 ```
 
-**Wann verwenden**: Deterministische Einzel-TODO-Operationen (Tracking-TODO anlegen und am Ende schließen). Für **dynamisch viele** TODOs aus allgemeinen Analyse-Workflows `todo_item:`-Marker verwenden (siehe §Auto-TODO/Detector-Format). Strukturierte v4-Audit-Templates verwenden stattdessen das versionierte `mysuricates:audit-result:v1`-Envelope; das Audit Center verwaltet daraus Findings und TODO-Verknüpfungen.
+**Wann verwenden**: Deterministische Einzel-TODO-Operationen (Tracking-TODO anlegen und am Ende schließen). Für **dynamisch viele** TODOs aus allgemeinen Analyse-Workflows `todo_item:`-Marker verwenden (siehe [TODO-Marker](#todo-marker-todo_item)). Strukturierte v4-Audit-Templates verwenden stattdessen das versionierte `mysuricates:audit-result:v1`-Envelope; das Audit Center verwaltet daraus Findings und TODO-Verknüpfungen.
 
 ---
 
@@ -741,9 +757,9 @@ JSON-Stufen brauchen JSON als Eingabe und müssen vor Textstufen stehen.
 
 ### `dashboard-report` — Dashboard-Ergebnis ohne Marker melden
 
-Füllt das **Dashboard-Ergebnis** dieses Runs direkt aus der Block-Config — dieselben Felder, dieselben Grenzen und dieselbe Prüfung wie der Marker `dashboard_widget:` (siehe api-referenz.md), aber **ohne Markerzeile und ohne Textsuche**. Deterministisch: kein KI-Aufruf, keine Shell, 0 Tokens.
+Füllt das **Dashboard-Ergebnis** dieses Runs direkt aus der Block-Config — dieselben Felder, dieselben Grenzen und dieselbe Prüfung wie der Marker `dashboard_widget:` (eine JSON-Zeile in der Ausgabe eines Schritts, siehe [api-referenz.md](api-referenz.md#marker-dashboard_widget-im-workflow)), aber **ohne Markerzeile und ohne Textsuche**. Deterministisch: kein KI-Aufruf, keine Shell, 0 Tokens.
 
-Modul: `dashboard-report` (Standard an, abschaltbar). Ist es aus, verweigert der Block und der Typ wird im Editor nicht angeboten.
+Modul: `dashboard-report` (Standard an, abschaltbar). Module sind optionale Funktionen, die die Startkonfiguration ein- oder ausschaltet, hier per `automation.modules.dashboard-report: false` ([architektur.md → Module-System](architektur.md#module-system-startkonfiguration)). Ist es aus, verweigert der Block und der Typ wird im Editor nicht angeboten.
 
 | Config-Schlüssel | Typ | Default | Beschreibung |
 |---|---|---|---|
@@ -771,7 +787,7 @@ Im Beispiel gibt ein früherer Block `ampel` nur `GREEN`, `YELLOW` oder `RED` au
 - Ein Platzhalter, der **nicht aufgelöst** werden konnte (unbekannte Variable — der Resolver lässt ihn wörtlich stehen), **lässt den Block scheitern** und nennt das Feld. Lieber ein roter Schritt als `{{ hunt_count }}` als Kennzahl auf dem Dashboard.
 - Jeder Verstoß gegen den Vertrag (zu lang, unbekanntes Feld in einem KPI, Zahl statt String, unsichtbare Zeichen) lässt den Schritt **FAILED** werden; die Meldung nennt das Feld (`kpis[2].value`), nie den Wert.
 - Unbekannte Schlüssel auf oberster Ebene werden ignoriert (dort stehen legitim Plattform-Schlüssel wie `timeout_seconds`); unbekannte Schlüssel **innerhalb** eines KPI-Objekts werden abgelehnt.
-- Die Schritt-Ausgabe enthält nur Zählwerte, nie Vertragswerte.
+- Die Schritt-Ausgabe enthält nur Zählwerte, nie Vertragswerte — auf Englisch wie bei den übrigen Blöcken, etwa `✓ Dashboard report GREEN · title · 4 KPIs · 0 items`.
 
 **Vorrang vor dem Marker:** Hat ein `dashboard-report`-Block ein Ergebnis geschrieben, wird der Marker `dashboard_widget:` in **keiner** Schritt-Ausgabe mehr ausgewertet. Der Block ist der bewusst konfigurierte Weg; ohne diese Regel könnte eine Markerzeile in der Ausgabe eines späteren KI-Schritts den Bericht überschreiben. Zwei `dashboard-report`-Blöcke in einem Workflow: der zuletzt ausgeführte gewinnt.
 
@@ -822,9 +838,9 @@ Folgende Variablen werden vom `WorkflowExecutor` automatisch bei jedem Run geset
 | `{{ workflow_changed_since_last_run }}` | `"true"` oder `"false"` — ob sich die Definition seit dem letzten erfolgreichen Run geändert hat (Hash-Vergleich; ohne Hash über Zeitstempel) |
 | `{{ workflow_definition_hash }}` | SHA-256 der ausgeführten Definition (leer, wenn `automation.hardening.provenance` aus ist) |
 | `{{ trigger_source }}` | Auslöser des Runs: `MANUAL`, `RETRY`, `RESUME`, `SCHEDULE`, `WEBHOOK`, `TODO_TRIGGER`, `TODO_RESOLUTION`, `COMPLETION_TRIGGER`, `CHAIN`, `SUB_WORKFLOW`, `ASSISTANT`, `AUTO_REPAIR`, `WISH` |
-| `{{ previous_report }}` | Längster Non-Shell-Step-Output des letzten COMPLETED-Runs desselben Workflows (max. 3000 Zeichen), oder `"(kein vorheriger Report vorhanden)"`. Gilt immer als nicht vertrauenswürdig → in Shell-Blöcken stets single-quoted, deshalb unquoted schreiben |
+| `{{ previous_report }}` | Längster Non-Shell-Step-Output des letzten COMPLETED-Runs desselben Workflows (max. 3000 Zeichen), oder `"(kein vorheriger Report vorhanden)"`. Ein Audit-Envelope ist abgeschnitten, Plattform-Marker verlieren ihren Doppelpunkt (`gate_status GREEN` bleibt lesbar, wird aber nicht mehr als Urteil gewertet, wenn ein Modell die Zeile wiedergibt), Blockgrenzen wie `</audit_findings>` stehen als `[audit_findings]` da. Gilt immer als nicht vertrauenswürdig → in Shell-Blöcken stets single-quoted, deshalb unquoted schreiben |
 | `{{ open_todos }}` | Markdown-Liste offener/in-Bearbeitung-TODOs des Projekts in einem `<open_todos>…</open_todos>`-Block, oder `"(keine offenen TODOs)"`. Titel und Tags sind auf eine Zeile geglättet, auf 200/80 Zeichen gekürzt und von Plattform-Markern (`todo_item:`, `gate_*:`, `dashboard_widget:`) befreit — sie können aus importierten Issues stammen und gelten als Daten, nicht als Anweisung. Maximal 150 Einträge. Gilt immer als nicht vertrauenswürdig → in Shell-Blöcken stets single-quoted, deshalb unquoted schreiben |
-| `{{ audit_findings }}` | **Nur in Audit-Workflows** (gültiges `metadata.audit`): die bekannten Befunde des eigenen Audits im Projekt — offen, Wiedervorlage, akzeptiert, verworfen — in einem `<audit_findings>…</audit_findings>`-Block, je Befund eine Zeile mit Status, Schwere, `ruleKey`, `subject`, Titel und Einordnung, höchstens 250 Zeilen und 60 000 Bytes (eingeordnete zuerst, der Rest als Anzahl je Status); ohne Befunde `"(keine bekannten Befunde)"`. In anderen Workflows gibt es die Variable nicht, auch nicht über die Variablen-Übergabe an einen Sub-Workflow. Format und Zweck: [audit-workflow-protocol.md](audit-workflow-protocol.md) → „Bekannte Befunde im Prompt“. Gilt immer als nicht vertrauenswürdig → in Shell-Blöcken stets single-quoted, deshalb unquoted schreiben |
+| `{{ audit_findings }}` | **Nur in Audit-Workflows** (gültiges `metadata.audit`): die bekannten Befunde des eigenen Audits im Projekt — offen, Wiedervorlage, akzeptiert, verworfen — in einem `<audit_findings>…</audit_findings>`-Block, je Befund eine Zeile mit Status, Schwere, `ruleKey`, `subject`, Titel und Einordnung, höchstens 250 Zeilen und 60 000 Bytes (eingeordnete zuerst, der Rest als Anzahl je Status); ohne Befunde `"(keine bekannten Befunde)"`. In anderen Workflows gibt es die Variable nicht, auch nicht über die Variablen-Übergabe an einen Sub-Workflow; der Platzhalter bliebe dort wörtlich stehen (Analyzer-Regel `audit-only-placeholder`). Format und Zweck: [audit-workflow-protocol.md](audit-workflow-protocol.md) → „Bekannte Befunde im Prompt“. Gilt immer als nicht vertrauenswürdig → in Shell-Blöcken stets single-quoted, deshalb unquoted schreiben |
 | `{{ todo_details }}` | **Nur mit Filter** (`todo_details_tags` und/oder `todo_details_exclude_tags` im Lauf-Kontext, meist `defaultContext`): TODOs des Lauf-Projekts **mit Beschreibung** als JSON-Liste im Block `<todo_details>…</todo_details>` – je Eintrag `id`, `status`, `priority`, `tags`, `title`, `complexity`, `suggestedEffort`, `openQuestion`, `updatedAt`, `description`. Weitere Filter: `todo_details_status` (OPEN/IN_PROGRESS/BACKLOG, Vorgabe OPEN), `todo_details_first_tags` (nach vorn), `todo_details_limit` (≤ 150, Vorgabe 40), `todo_details_chars` (je Beschreibung ≤ 8000, Vorgabe 1500); die ganze Liste höchstens 100 000 Bytes UTF-8, damit ein Shell-Befehl unter der Grenze von 128 KiB je Argument bleibt. Tags vergleicht die Plattform genau; `batch:*` heißt „jedes Tag mit diesem Anfang“. Reihenfolge: `first_tags`, dann Priorität, dann Alter. Titel geglättet, Beschreibungen zeilenweise von Markern befreit. Gilt immer als nicht vertrauenswürdig → in Shell-Blöcken stets single-quoted, deshalb unquoted schreiben |
 
 > **Plattform-Daten fehlen nie stillschweigend.** `previous_report`, `open_todos` und
@@ -1092,7 +1108,7 @@ else
 fi
 ```
 
-Wenn mehrere Blöcke Gates emittieren, gewinnt der höchste Schweregrad (RED > YELLOW > GREEN).
+Wenn mehrere Blöcke Gates emittieren, gewinnt der höchste Schweregrad (RED > YELLOW > GREEN). Bei Gleichstand gilt für RED und YELLOW das erste Gate – die Ursache, nach deren Kategorie auch das Auto-TODO heißt –, für GREEN das letzte, also das abschließende Urteil statt des `Command exit 0` eines `checked_command` davor – es sei denn, es sagt weniger: Das synthetische `Command exit N` verdrängt nie eine Beschreibung mit eigenen Worten, auch nicht hinter dem Urteil, und ein GREEN ohne `gate_description` keines mit. Fehlt dem späteren die `gate_category`, bleibt die bisherige (TODO 2aa9ddd5).
 
 **Gate-Verdict nach KI-Blöcken: Fallback nie GREEN.** Ein Shell-Block, der den `gate_status` aus dem Output eines Simple-/Agentic-Blocks parst, darf im `else`-Zweig nicht GREEN melden — sonst wird ein leerer, abgebrochener oder als `UNKNOWN` markierter KI-Report zum grünen Gate (gesehen 2026-09-13, Security-Audit ohne Codezugriff). Muster: RED → RED, YELLOW → YELLOW, explizites GREEN → GREEN, sonst YELLOW mit `gate_description: Ergebnis unvollständig — kein Gate-Status im Report`. Deterministische Build-Gates (Exit-Code entscheidet) dürfen weiter `else → GREEN` nutzen.
 
@@ -1116,10 +1132,33 @@ Wenn mehrere Blöcke Gates emittieren, gewinnt der höchste Schweregrad (RED > Y
 Damit lassen sich zwei Runs ohne Re-Parsing diffen (z. B. für Public-Readiness-Trends):
 
 ```bash
-curl -s -H "X-API-Key: $KEY" "$BASE/executions/$RUN1" | jq '.metadata.gate_summary' > a.json
-curl -s -H "X-API-Key: $KEY" "$BASE/executions/$RUN2" | jq '.metadata.gate_summary' > b.json
+curl -s --noproxy '*' -H "X-API-Key: $KEY" "$BASE/executions/$RUN1" | jq '.metadata.gate_summary' > a.json
+curl -s --noproxy '*' -H "X-API-Key: $KEY" "$BASE/executions/$RUN2" | jq '.metadata.gate_summary' > b.json
 diff <(jq -S . a.json) <(jq -S . b.json)
 ```
+
+### TODO-Marker (`todo_item:`)
+
+Neben dem Gate kann jeder Block beliebig viele TODOs vorschlagen, je eine Zeile in seiner Ausgabe:
+
+```
+todo_item: <Titel> | <CRITICAL|HIGH|MEDIUM|LOW> | <tag1,tag2> | <Beschreibung, optional>
+```
+
+```
+todo_item: ChainExecutor testen | HIGH | backend,testing | Execution-Loop ohne Test
+todo_item: useWebSocket-Hook testen | MEDIUM | frontend,testing
+```
+
+- Gelesen wird die Ausgabe **aller** Schritte (`TodoOutputParser`); Markdown davor (`#`, `**`,
+  Backticks) und das `[<item>]: `-Präfix einer `foreach`-Iteration stören nicht.
+- Angelegt werden die TODOs nur, wenn Auto-TODO für den Workflow an ist — Workflow-Metadatum
+  `autoTodo.enabled`, sonst die globale Einstellung `auto-todo-default` — und nicht bei
+  Audit-Workflows (`audit.enabled`), deren Befunde das Audit Center verwaltet (`AutoTodoService`).
+- Der Titel ist die Identität: Derselbe Titel in einem späteren Lauf aktualisiert das TODO; was ein
+  Lauf mit Markern nicht mehr nennt, schließt er (`GranularTodoService`). Ein neues TODO verknüpft
+  eine KI-Ähnlichkeitssuche mit einem gleichen oder verwandten offenen TODO (`relatedTodoId`),
+  angelegt wird es trotzdem.
 
 ### `checked_command` / `check_category` — Gate automatisch aus dem Exit-Code
 
@@ -1296,7 +1335,9 @@ Zusätzlich zum Modell kann pro Workflow ein einheitlicher Effort-Level gesetzt 
 }
 ```
 
-Faustregel: `high`/`xhigh` für Analyse-/Audit-Blöcke, `low` für mechanische Transformationen. Der gesetzte Effort ist im Step-Metadata (`aiRequest.effort`) der Run-Details sichtbar.
+Faustregel: `high`/`xhigh` für Analyse-/Audit-Blöcke, `low` für mechanische Transformationen. Der gesetzte Effort ist im Step-Metadata (`aiRequest.effort`) der Run-Details sichtbar, wenn der Anbieter ihn anwendet (bei Codex fehlt er). Ohne gesetzten Effort gilt der Standard der CLI; den meldet die CLI nicht, `aiRequest.effort` fehlt dann.
+
+Tokens im Step-Metadata: `inputTokens` ist bei Claude nur der Teil der Eingabe, den der Prompt-Cache nicht bedient hat, bei einem Claude-Code-Aufruf oft einstellig. Der Rest steht in `cacheReadInputTokens` (aus dem Cache gelesen) und `cacheCreationInputTokens` (in den Cache geschrieben); die Insights-Karte des Laufs zeigt beides als „+… Cache“. Codex und Pi melden keine echten Zahlen (`estimated: true`), dort fehlen die Cache-Schlüssel. Das Budget `max_total_tokens` des `agentic`-Blocks zählt die Cache-Tokens nicht mit.
 
 ### Provider und Modell pro Block
 

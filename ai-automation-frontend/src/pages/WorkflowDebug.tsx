@@ -170,7 +170,7 @@ function BrokenRow({ wf, onRestart }: { wf: BrokenWorkflow; onRestart: () => voi
               {t.workflowDebug.failedAt}: {formatRelativeTime(wf.completedAt ?? wf.startedAt, locale)}
             </span>
             {wf.durationMs != null && (
-              <span>{t.workflowDebug.duration}: {formatDuration(wf.durationMs)}</span>
+              <span>{t.workflowDebug.duration}: {formatDuration(wf.durationMs, locale)}</span>
             )}
             {wf.workflowId && (
               <Link

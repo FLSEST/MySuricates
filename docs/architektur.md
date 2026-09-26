@@ -9,7 +9,9 @@ Einstieg siehe [README.de.md](../README.de.md), zum Bauen von Workflows
 > Kuerzel in Klammern wie `(182bd224)` oder `TODO 63ecc124` sind Herkunftsnachweise:
 > Commits dieses Repositories bzw. Vorgaenge in der begleitenden MySuricates-Instanz.
 > Sie belegen, wann und warum etwas entstanden ist — von aussen nachschlagen laesst
-> sich davon nur der Commit.
+> sich davon nur der Commit. Nummern wie `(V39)` in Überschriften nennen dagegen die
+> Datenbank-Migration (Flyway-Skript `V39__….sql`), mit der ein Feature kam — Liste unter
+> [Datenbankmigrationen](#datenbankmigrationen-flyway).
 
 > Die Abläufe dieser Seite gibt es auch als Diagramme: [docs/diagramme.md](diagramme.md)
 > — Engine, Scheduler, Skills, Memory, Request-Pfad, Frontend, Deployment.
@@ -170,7 +172,7 @@ Chains und Sub-Workflows geben die Herkunft ihres Auslösers im reservierten Kon
 | **untrusted extern** | Webhook-Payload, wiederhergestellte `__untrusted_keys` (Resume, Sub-Workflow), aus getainteten Ausgaben abgeleitete Variablen (`step_N_output`, foreach-Items, `document`-Extrakte) | immer single-quoted | roh | ja, ab dem Setzen |
 | **Plattform-Daten** | `previous_report`, `open_todos` — von `WorkflowContextDataService` in **jeden** Run injiziert | immer single-quoted | roh | auf zwei Wegen: (1) sobald der Platzhalter wirklich in eine Shell-Kommandozeile substituiert wurde; (2) sobald die Ausgabe eines KI-Blocks verbucht wird, in dessen Prompt der Platzhalter stand — ab dieser gefärbten Ausgabe ist der Lauf klebrig getaintet |
 
-- **Woher die Plattform-Daten kommen:** Jede Plattform-Variable liefert eine eigene `PlatformVariableSource`-Bean – `PreviousReportVariable`, `OpenTodosVariable`, `RequestMetricsVariable`, `GoalVariables`, `AuditFindingsVariable`, in dieser `@Order`. `WorkflowContextDataService` sammelt sie nur ein und gibt jeder einen eigenen Fehlerpfad: Wirft eine Quelle, stehen ihre Variablen als `NICHT GEMESSEN`-Lücke da, die anderen bleiben unberührt (TODO 441a4c46). Eine neue Variable ist eine neue Bean; in `ContextDeltaCalculator.SYSTEM_VAR_KEYS` gehört sie trotzdem, sonst landet sie im Context-Delta jedes Steps.
+- **Woher die Plattform-Daten kommen:** Jede Plattform-Variable liefert eine eigene `PlatformVariableSource`-Bean – `PreviousReportVariable`, `OpenTodosVariable`, `RequestMetricsVariable`, `GoalVariables`, `AuditFindingsVariable`, in dieser `@Order`. `WorkflowContextDataService` sammelt sie nur ein und gibt jeder einen eigenen Fehlerpfad: Wirft eine Quelle, stehen ihre Variablen als `NICHT GEMESSEN`-Lücke da, die anderen bleiben unberührt (TODO 441a4c46). Eine neue Variable ist eine neue Bean; in `ContextDeltaCalculator.SYSTEM_VAR_KEYS` gehört sie trotzdem, sonst landet sie im Context-Delta jedes Steps. Jede Quelle nennt mit `allNames()` alle Namen, die sie setzen kann; diese Namen gehören der Plattform (TODO 2a0695ff): `ExecutionContextFactory` übernimmt keinen davon aus einem Eingabe-Kontext, und ein Sub-Workflow bekommt die des Parent-Runs nicht mit – sonst lägen sie im gespeicherten `input_context` des Kindes und kämen dort, wo die eigene Quelle nicht greift (`goal_*` ohne `goal_id`, `audit_findings` ohne `metadata.audit`), als vertrauenswürdige Variable an. Umgekehrt setzt der Einsammler nur, was eine Quelle für den Lauf angemeldet hat (`names()`); einen anderen Namen aus `load()` verwirft er und meldet ihn im Activity-Log.
 - **Taint-Ausbreitung:** Ist ein Run getaintet, escapt `recordOutput` jede weitere Blockausgabe (`previous_output`, `{{ block.<name>.output }}`) und `setDerivedVariable` markiert jede daraus abgeleitete Variable als untrusted. Klebrig wird der Taint, sobald eine Ausgabe verbucht wurde oder Plattform-Daten in eine Kommandozeile gelangt sind — ab dann hebt ihn auch ein späteres `setVariable` auf die auslösende Variable nicht mehr auf, weil ein Block Fremdbytes ohne Platzhalter in seine Ausgabe holen kann (Datei lesen, API aufrufen). Davor, also bei externem Input ohne jede verbuchte Ausgabe, entfernt ein `setVariable` auf genau diese Variable den Taint noch. Persistiert wird er in den drei reservierten Kontextschlüsseln `__untrusted_keys`, `__untrusted_outputs` und `__platform_in_shell` (Letzteres das Nutzungs-Flag der Plattform-Daten, `true` sobald es gesetzt ist), damit er Resume und Sub-Workflow-Übergabe überlebt — auch dann, wenn nach der Substitution noch keine Ausgabe verbucht wurde. Ein sauberer Run exportiert nichts und bleibt byte-identisch zum Verhalten vor der Taint-Einführung.
 - **Warum Plattform-Daten erst bei Nutzung tainten:** Sie stecken in jedem Run. Würden sie beim Injizieren tainten, wäre jeder Run getaintet und die Ausgabe-Platzhalter in den mitgelieferten Templates bekämen eine andere Bedeutung. Deshalb meldet `TemplateResolver.resolveShell`/`resolveShellSafe` zurück, welche Platzhalter tatsächlich in eine Kommandozeile eingesetzt wurden; erst diese Meldung schaltet den Taint scharf (`ExecutionContextTaint.substitutedIntoShell`). Ein Run, der `{{ previous_report }}` gar nicht verwendet, bleibt untainted.
 - **KI-Ausgaben nach Plattform-Daten-Prompt sind gefärbt:** Standen Plattform-Daten im Prompt eines KI-Blocks, gilt die Ausgabe genau dieses Blocks als untrusted — ein folgender Shell-Block bekommt `{{ previous_output }}`/`{{ block.<name>.output }}` also single-quoted. Umgesetzt über denselben Rückmeldekanal: `TemplateResolver.resolvePrompt` meldet die aufgelösten Platzhalter, `ExecutionContextTaint.substitutedIntoPrompt` merkt sich Plattform-Daten, und die nächste über `recordOutput` verbuchte Ausgabe konsumiert dieses Flag. Der **Prompt allein** färbt den Run nicht: Solange keine Ausgabe verbucht wurde, ist `hasUntrustedInput()` false und `exportTaint()` leer. Mit der verbuchten Ausgabe ist der Lauf dann aber getaintet, und zwar klebrig wie in jedem anderen Fall — `recordOutput` escapt ab da **jede** weitere Blockausgabe, `setDerivedVariable` markiert jede daraus abgeleitete Variable (`step_N_output`, foreach-Items, `document`-Extrakte) als untrusted, und `exportTaint()` reicht beides an Sub-Workflows und an ein Resume weiter. Ein späterer KI-Block mit sauberem Prompt bekommt also keine saubere Ausgabe zurück — das gilt nur, wenn vorher nichts Gefärbtes verbucht wurde. Auf dem Prompt-Pfad liegen genau die KI-Aufrufe: `simple`, `skill-capability`, `agentic` (`goal`/`success_criteria`) und die Nicht-Shell-Zweige von `foreach`, `while`, `conditional`, `retry` und `switch`; Nicht-Prompt-Auflösungen (Mounts, Dokumentpfade, TODO-Felder, Integrations-Parameter, `switch`-Ausdruck) bleiben auf `resolveTemplate` und melden weiterhin nichts.
@@ -219,7 +221,8 @@ com.automation
 │   ├── learning/        LearningService, AgenticLearningService, ExecutionInsightsService, WorkflowStatsService, WorkflowSimilarityService, BlockTypesBackfillService, MetadataExtractor, PlatformStatsService
 │   ├── system/          ApiKeyService, DatabaseBackupService, ExecutionSettingsService (+ ExecutionSettingKeys; Setter je Thema in `settings/`: ExecutionCapacitySettings, AccessLimitSettings, HousekeepingSettings, FeatureSettings, RequestMetricsSettings), SystemIdentityService, TailscaleService, FileBrowserService, IntegrationSnippetService, SystemSettingsService (+ AppSettingChangedEvent: Dienste mit gecachter Einstellung lesen sie darauf neu, statt direkt gerufen zu werden)
 │   ├── ai/              HostClaudeService, HostCodexService, HostPiService, AiProviderRegistry, AiProvider, AiProviderCapabilities, AiResponseMetadata, ClaudeAiProvider, CodexAiProvider, PiAiProvider, PiCatalogService
-│   ├── cli/             CommandExecutorService (+ HostRequestAiMetadata), CliSessionManager, CliSession, ClaudeOutputParser, ClaudeJsonResponse, HostExecutionRequest, ShellCommandService, ContainerShellService, TaskCommandService
+│   ├── cli/             CommandExecutorService (+ HostRequestAiMetadata), CliSessionManager, CliSession, HostExecutionRequest, ShellCommandService, ContainerShellService, TaskCommandService
+│   │   └── claude/      ClaudeOutputParser, ClaudeJsonResponse, ClaudeStreamEventFormatter — lesen die Ausgabe der Claude-CLI (Blatt-Paket für ai/ und cli/, damit ai/ nicht auf cli/ zurückzeigt)
 │   ├── chain/           ChainService, ChainExecutor (+ ChainRunWaiter, ChainZombieRunCleaner), ChainTemplateService, BuiltInChainTemplate
 │   ├── memory/          WorkflowMemoryService, ClaudeSummarizer, CodexSummarizer, KnowledgeSummarizer, ConversationPreprocessor, SummarizationSetupService, AutoMemoryExtractionListener
 │   ├── staging/         StagingService, TestingService, InstanceSyncHelper (+ InstanceHttpClient, SyncPreviewService), DockerContainerManager
@@ -235,7 +238,7 @@ com.automation
 │   ├── health/          HealthAutoTodoService
 │   ├── audit/           AuditResultParser, AuditIngestionService (+ AuditSnapshotApplier), AuditIngestionListener, AuditCenterService (+ AuditFindingTodoLinker)
 │   ├── integration/     IntegrationRegistry, IntegrationOAuthService, IntegrationEncryptionService, IntegrationProvider, OAuthConfig, TaskExportCapable
-│   ├── integration/providers/ 18 Provider in Unterverzeichnissen (caldav/, confluence/, feed/, gitea/, github/, gitlab/, google/, httpapi/, icalfeed/, jira/, ntfy/, openmeteo/, slack/, taskwarrior/, telegram/, todoist/, trello/; gemeinsam genutzt: ical/)
+│   ├── integration/providers/ 18 Provider in 17 Unterverzeichnissen — google/ enthält zwei, Calendar und Gmail (caldav/, confluence/, feed/, gitea/, github/, gitlab/, google/, httpapi/, icalfeed/, jira/, ntfy/, openmeteo/, slack/, taskwarrior/, telegram/, todoist/, trello/; gemeinsam genutzt: ical/)
 │   ├── assistant/       AssistantContextBuilder (+ PageContextRenderer, ProjectFileListing), AssistantChatCaller, AssistantChatBroadcaster, AssistantFetchService, AssistantToolExecutor (+ AssistantTodoTools, AssistantWorkflowTools, AssistantChainTools, AssistantToolPayloads), AssistantActionSuggestionService, AssistantErrorClassifier, AssistantFetchPolicy, AssistantMutationGate, AssistantActionMerger, AssistantResponseParser, PendingToolRegistry, ToolExecutionResult
 │   ├── assistant/context/ AssistantContextSection, BlockTypesIndexSection, ChainsIndexSection, FailedWorkflowsContextSection, IntegrationsIndexSection, RunsContextSection, SchedulesContextSection, SkillsIndexSection, TodosContextSection, WishesContextSection
 │   ├── assistant/format/  AssistantFormatUtils (Formatier-Helfer für Prompt-Bausteine; eigenes Blatt-Paket, damit context/ und fetch/ nicht auf assistant/ zurückzeigen)
@@ -266,7 +269,7 @@ com.automation
 ├── skills/handlers/     CapabilityHandler, LintHandler, SecurityScanHandler, FactCheckHandler, GrammarCheckHandler, OCRHandler
 ├── exception/           GlobalExceptionHandler, ErrorCode + Exception-Klassen
 ├── websocket/           LogWebSocketHandler, TerminalWebSocketHandler, TerminalSession (+ TerminalStdinStream), Message-DTOs
-├── event/               WorkflowRunCompletedEvent, AssistantSessionUpdatedEvent, TodoCreatedEvent
+├── event/               WorkflowRunCompletedEvent, AssistantSessionUpdatedEvent, TodoCreatedEvent, ProjectWorkflowsChangedEvent
 └── util/                JPA-Converter (JSON, BlockDefinitions), RuntimeClasspathGuard (Startsperre gegen `target/classes`)
 ```
 
@@ -437,7 +440,12 @@ Der Switch-Block evaluiert einen Ausdruck gegen mehrere Cases:
 
 ## Gate Status System
 
-Workflow-Blöcke können Quality-Gate-Marker in ihre Ausgabe schreiben:
+Ein Quality Gate ist das Urteil, das ein prüfender Workflow (Audit, Test, Review) über sein
+Ergebnis fällt: GREEN = in Ordnung, YELLOW = nicht-blockierende Befunde, RED = kritisch. Die
+Plattform wertet es aus: RED (im Modus `auto` auch YELLOW) erzeugt ein TODO, wenn Auto-TODO für
+den Workflow an ist (Standard aus), und nach einem Reparatur-Lauf schließt ein GREEN
+das auslösende TODO (`TodoFeedbackListener`, siehe [Todo Triggers](#todo-triggers--self-improvement-loop-v51v52)).
+Dazu schreiben Workflow-Blöcke Marker in ihre Ausgabe:
 
 ```
 gate_status: GREEN|YELLOW|RED
@@ -447,7 +455,7 @@ gate_description: <beschreibung>
 
 **Verarbeitung:**
 - `GateStatusOutputParser` — parst Marker aus Block-Ausgaben (tolerant gegenüber Markdown-Formatierung)
-- `RunCompletionHandler` scannt alle Block-Ausgaben — höchste Schwere gewinnt (GREEN < YELLOW < RED)
+- `RunCompletionHandler` scannt alle Block-Ausgaben — höchste Schwere gewinnt (GREEN < YELLOW < RED); bei Gleichstand RED/YELLOW das erste Gate (Ursache, Kategorie des Auto-TODOs), GREEN das letzte (abschließendes Urteil; ein synthetisches `Command exit N` oder ein GREEN ohne Beschreibung verdrängt keine Beschreibung, ohne eigene Kategorie bleibt die bisherige, TODO 2aa9ddd5)
 - Gate-Status wird in `WorkflowRun.metadata` gespeichert (`gate_status`, `gate_category`, `gate_description`)
 
 **Ausbleibendes Urteil ist kein Erfolg** (TODO 63ecc124). Gates bleiben freiwillig — aber ein
@@ -463,8 +471,11 @@ bleibt RED). Hintergrund: Ein Prüf-Workflow, dessen KI-Schritt still fehlschlä
 einem Workflow ohne Gate nicht zu unterscheiden — beide wurden GREEN.
 
 **Ein Gate ändert den Run-Status nicht.** Weder YELLOW noch RED: Das Gate ist ein Befund über
-das Ergebnis, kein Fehlschlag der Ausführung. RED erzeugt über `AutoTodoService` ein TODO und
-eine Warnung im Aktivitätslog, YELLOW nur die Warnung — der Lauf bleibt `COMPLETED`.
+das Ergebnis, kein Fehlschlag der Ausführung. RED und YELLOW schreiben eine Warnung ins
+Aktivitätslog (`RunCompletionHandler`). Ist Auto-TODO für den Workflow an (Workflow-Metadatum
+`autoTodo.enabled`, sonst Einstellung `auto-todo-default`, Standard aus), legt `AutoTodoService`
+bei RED ein TODO mit Priorität HIGH an, im Modus `auto` bei YELLOW eines mit MEDIUM — der Lauf
+bleibt `COMPLETED`.
 
 Den Run-Status bestimmt etwas Unabhängiges: `RunCompletionHandler` setzt
 `COMPLETED_WITH_ERRORS`, wenn ein Schritt mit `checkedCommand`-Metadatum fehlgeschlagen ist,
@@ -515,6 +526,7 @@ Der Scheduler ist ein 60-s-Tick im Backend (`SchedulerTick`); ohne laufendes Bac
 - Die Warteschlange ist bewusst nicht persistent: nach einem Neustart sind dieselben Termine wieder fällig und werden vom Kaltstart-Pfad erneut eingereiht — nichts geht verloren, nichts läuft doppelt.
 - Sichtbarkeit: eine WARN-Zeile im Activity-Log pro Ereignis („Cold start detected … N missed schedule(s): X skipped forward, Y queued for sequential catch-up", bei Fehlern „…, Z failed"), `GET /api/v1/schedules/catch-up` (laufender und wartende Einträge) und ein Banner auf der Schedules-Seite.
 - `resume-grace-minutes: 0` schaltet beide Erkennungen ab (Altverhalten: alles Fällige startet sofort).
+- Der Tick startet erst, wenn Spring Boot `ACCEPTING_TRAFFIC` meldet — also nach der Start-Bereinigung, die liegengebliebene RUNNING/PAUSED-Runs auf INTERRUPTED setzt (`ApplicationReadyEvent`). Spring feuert `@Scheduled` schon bei `ContextRefreshedEvent`, 0,3–1,4 s davor: Ein dort gestarteter Nachhol-Run wurde von der Bereinigung mitten im Lauf als INTERRUPTED markiert, und ein Altlauf im Zustand RUNNING ließ das Ziel belegt aussehen, sodass der Nachhol-Termin verfiel (TODO aa51d221). Übersprungene Ticks zählen nicht; der erste echte Tick ist der Kaltstart und kommt damit etwa eine Tick-Periode (60 s) nach dem Start — der sofortige Tick bei `ContextRefreshedEvent` entfällt, Nachhol-Runs starten entsprechend später.
 
 Weitere Regeln des Ticks:
 
@@ -536,12 +548,12 @@ Automatische Verkettung von Workflows auf Basis von Abschluss-Ereignissen:
 
 ## Audit Center — Findings, Akzeptanz und Verfall (V68/V69)
 
-Audit-Workflows (Metadata `audit.enabled=true`, `key`, `category`, `reportBlock`) liefern im Report-Block einen Envelope `<!-- mysuricates:audit-result:v1 {…} -->`, den `AuditResultParser` zerlegt (bei mehreren den letzten, damit ein wiedergegebener Vorlauf nicht zählt; TODO 1cf996df). `AuditIngestionService.ingest` (auf `WorkflowRunCompletedEvent`) prüft und speichert pro Run einen `AuditReport` (VALID/INVALID); die Findings eines gültigen Reports gleicht `AuditSnapshotApplier` in derselben Transaktion per Fingerprint (SHA-256 über projectId/auditKey/ruleKey/**normalisiertes** subject) ab:
+Audit-Workflows (Metadata `audit.enabled=true`, `key`, `category`, `reportBlock`) liefern im Report-Block einen Envelope `<!-- mysuricates:audit-result:v1 {…} -->`, den `AuditResultParser` zerlegt (bei mehreren den letzten, damit ein wiedergegebener Vorlauf nicht zählt; TODO 1cf996df). `AuditIngestionService.ingest` (vom `AuditIngestionListener` auf `WorkflowRunCompletedEvent` gerufen) prüft und speichert pro Run einen `AuditReport` (VALID/INVALID); die Findings eines gültigen Reports gleicht `AuditSnapshotApplier` in derselben Transaktion per Fingerprint (SHA-256 über projectId/auditKey/ruleKey/**normalisiertes** subject) ab:
 
-- **Normalisierung** (`AuditSubjectNormalizer`): steht vor dem ersten `:` ein klein geschriebenes Art-Wort (`package:…`, `keyword:…`, `safe-inventory:…`), bleibt `<art>:<wert>` ganz — es ist die Identität. Sonst fallen alles ab dem ersten `:` und ein klein geschriebenes Methoden-Suffix hinter einem Klassennamen fallen weg (`ContainerShellService.execute` → `ContainerShellService`, `application.yml:key-store-password` → `application.yml`); Pfade mit `/` und Dateinamen ohne Klassenpräfix bleiben ganz. Das modellgenerierte `subject` driftet sonst zwischen Runs und erzeugt Wiedergänger (altes Finding `RESOLVED`, neues `OPEN`, verwaltetes TODO fälschlich `DONE`). Das gespeicherte `subject` ist reines Anzeigeattribut: bei einem Treffer gewinnt der neueste Wert. `AuditFingerprintMigrationJob` (Startup, idempotent) rechnet Altbestände um und führt Wiedergänger auf das älteste Finding zusammen (Zähler addiert, TODO-Links und Vorkommen ziehen mit). Eine menschliche Disposition (`ACCEPTED_RISK`, `DISMISSED`) schlägt dabei immer — egal ob sie am Ziel oder am Wiedergänger hängt; Status und Disposition (`dispositionNote`/`-Evidence`/`-At`, `resolvedAt`) wandern zusammen, wiedereröffnet wird nur über `AuditAcceptancePolicy` (belegte Verschlechterung). Jede Zusammenführung wird vor dem Löschen mit beiden IDs, beiden Roh-Subjects und dem `ruleKey` protokolliert; ein fehlschlagender Scope wird geloggt und blockiert weder die übrigen noch den Start. Ergeben zwei Befunde **desselben** Reports dieselbe Identität, wird nur der erste übernommen; die übrigen meldet die Ingestion mit ihren Subjects im Activity-Log (früher verschwanden sie still, TODO 94fda6ef).
+- **Normalisierung** (`AuditSubjectNormalizer`): steht vor dem ersten `:` ein klein geschriebenes Art-Wort (`package:…`, `keyword:…`, `safe-inventory:…`), bleibt `<art>:<wert>` ganz — es ist die Identität. Sonst fallen alles ab dem ersten `:` und ein klein geschriebenes Methoden-Suffix hinter einem Klassennamen fallen weg (`ContainerShellService.execute` → `ContainerShellService`, `application.yml:key-store-password` → `application.yml`); Pfade mit `/` und Dateinamen ohne Klassenpräfix bleiben ganz. Das modellgenerierte `subject` driftet sonst zwischen Runs und erzeugt Wiedergänger (altes Finding `RESOLVED`, neues `OPEN`, verwaltetes TODO fälschlich `DONE`). Das gespeicherte `subject` ist reines Anzeigeattribut: bei einem Treffer gewinnt der neueste Wert. `AuditFingerprintMigrationJob` (Startup, idempotent) rechnet Altbestände um und führt Wiedergänger über `AuditFindingMerger` auf das älteste Finding zusammen (Zähler addiert, TODO-Links und Vorkommen ziehen mit). Eine menschliche Disposition (`ACCEPTED_RISK`, `DISMISSED`) schlägt dabei immer — egal ob sie am Ziel oder am Wiedergänger hängt; Status und Disposition (`dispositionNote`/`-Evidence`/`-At`, `resolvedAt`) wandern zusammen, wiedereröffnet wird nur über `AuditAcceptancePolicy` (belegte Verschlechterung). Jede Zusammenführung wird vor dem Löschen mit beiden IDs, beiden Roh-Subjects und dem `ruleKey` protokolliert; ein fehlschlagender Scope wird geloggt und blockiert weder die übrigen noch den Start. Ergeben zwei Befunde **desselben** Reports dieselbe Identität, wird nur der erste übernommen; die übrigen meldet die Ingestion mit ihren Subjects im Activity-Log (früher verschwanden sie still, TODO 94fda6ef).
 
 - **Neu** → `OPEN`; **wieder da** nach `RESOLVED` → `OPEN` + `regressionCount`; `AWAITING_VERIFICATION` → `OPEN`; **nicht mehr im Snapshot** → `RESOLVED` (nur OPEN/AWAITING_VERIFICATION). Terminale Status `ACCEPTED_RISK` und `DISMISSED` werden bei Abwesenheit nicht angefasst.
-- **Verwaltete TODOs**: nur für `CRITICAL`/`HIGH`-Findings im Status `OPEN` (`ensureManagedTodo`, Tag `audit`, `auto:workflow`, `TodoCreatedEvent` → TodoTrigger). Akzeptierte/verworfene Risiken und Wiedervorlagen lösen keinen Fix-Loop aus. `reconcileManagedTodos` schließt das TODO, sobald alle verknüpften Findings terminal sind, und öffnet es beim Wiederauftauchen. Liegt keines der offenen verknüpften Findings mehr über der Schwelle (etwa nach geänderten Kriterien HIGH → MEDIUM), wird das TODO freigegeben: Verknüpfung gelöst, Status `ARCHIVED` (nicht `DONE` — behoben ist nichts); ein `IN_PROGRESS`-TODO bleibt unangetastet (TODO ba0dcb3a).
+- **Verwaltete TODOs** (`ManagedTodoWriter`): nur für `CRITICAL`/`HIGH`-Findings im Status `OPEN`, deren Beleg einen Messwert des Laufs nennt (`ensure`, Tag `audit`, `auto:workflow`, `TodoCreatedEvent` → TodoTrigger). Akzeptierte/verworfene Risiken, Wiedervorlagen und unbelegte Findings lösen keinen Fix-Loop aus. Nach jedem Ingest schließt `ManagedTodoWriter.reconcile` das TODO, sobald alle verknüpften Findings terminal sind, und öffnet es beim Wiederauftauchen; denselben Abgleich nach einem Dispositionswechsel im Audit Center und nach einer Zusammenführung macht `ManagedTodoReconciler`. Ein TODO auf Knopfdruck (`POST /api/v1/audit-findings/{id}/todos`, `AuditFindingTodoLinker`) entsteht auf demselben Weg (`ManagedTodoWriter.create`). Liegt keines der offenen verknüpften Findings mehr über der Schwelle (etwa nach geänderten Kriterien HIGH → MEDIUM), wird das TODO freigegeben: Verknüpfung gelöst, Status `ARCHIVED` (nicht `DONE` — behoben ist nichts); ein `IN_PROGRESS`-TODO bleibt unangetastet (TODO ba0dcb3a).
 - **Gate-Status** kommt aus den Run-Metadaten des Workflows (`gate_status`), nicht aus den Findings; `AuditSummary.openFindingsBySeverity` zählt nur nicht-terminale Findings, `findingsByStatus` liefert Akzeptierte getrennt (Audit Center: „offen X · akzeptiert Y“; der Findings-Reiter filtert standardmäßig auf offene).
 
 **Risiko-Akzeptanz** (`PATCH /api/v1/audit-findings/{id}` mit `status=ACCEPTED_RISK`, `dispositionNote`) — Regeln in `AuditAcceptancePolicy`, Zahlen-Parser `EvidenceMetrics`:
@@ -552,7 +564,7 @@ Audit-Workflows (Metadata `audit.enabled=true`, `key`, `category`, `reportBlock`
 | Verschlechterung | Taucht das Finding erneut auf, vergleicht die Ingestion messbare Werte der neuen Evidence mit dem Snapshot — `EvidenceMetrics.parse` erkennt `Zahl + Einheit` (`LOC`/`lines`/`Zeilen`, `deps`, `KB`/`MB`/`GB`, `ms`, `%`, `files`, `classes`, `methods`, `tests`, `warnings`, `errors`, `issues`, `vulnerabilities`; Synonyme werden zusammengeführt, pro Einheit zählt der größte Wert). Liegt ein gemeinsamer Schlüssel > 10 % über dem Snapshot, wird das Finding wieder `OPEN`, die Notiz um `Verschlechtert: 320 LOC → 400 LOC` ergänzt; der Snapshot bleibt. Ohne vergleichbare Zahlen (einseitig oder gar keine) keine Wiedereröffnung. |
 | Verfall | Ist die Akzeptanz beim Wiederauftauchen älter als 180 Tage (`disposition_at`, Fallback `resolved_at` für Alt-Akzeptanzen), geht das Finding auf `AWAITING_VERIFICATION` mit Notiz `Wiedervorlage nach 180 Tagen` — ohne verwaltetes TODO. Das passiert genau einmal: danach gelten die normalen Regeln (nächster Ingest: da → `OPEN`, weg → `RESOLVED`); erst ein erneutes Akzeptieren startet eine neue Frist. Verschlechterung hat Vorrang vor Verfall. |
 
-Das Audit Center zeigt pro Finding Akzeptanz-Datum, Wiedervorlage-Datum (+180 Tage), Dispositions-Notiz und den Snapshot (aufklappbar). Tests: `AuditAcceptancePolicyTest`, `EvidenceMetricsTest`, `AuditIngestionServiceTest`, `AuditControllerTest`, Frontend `AuditCenter.test.tsx`.
+Das Audit Center zeigt pro Finding Akzeptanz-Datum, Wiedervorlage-Datum (+180 Tage), Dispositions-Notiz und den Snapshot (aufklappbar). Tests: `AuditAcceptancePolicyTest`, `EvidenceMetricsTest`, `AuditIngestionServiceTest`, `AuditSnapshotApplierTest`, `AuditControllerTest`, Frontend `AuditCenter.test.tsx`.
 
 **Kontextvariable `audit_findings`** (TODO 3643beac): Ein Audit-Workflow bekommt bei jedem Lauf die bekannten Befunde seines Audits (`OPEN`, `AWAITING_VERIFICATION`, `ACCEPTED_RISK`, `DISMISSED`; ohne `RESOLVED` und ohne `ruleKey`s, die der Katalog nicht kennt, ob markiert oder nicht). `WorkflowContextDataService` holt sie über die Schnittstelle `AuditContextSource`, umgesetzt von `service.audit.AuditFindingsContext` (damit `service.workflow` nicht von `service.audit` abhängt), aus einer schlanken Projektion ohne TEXT-Blobs – als Daten markiert und saniert wie `open_todos`, mit demselben Lückenpfad. Der Block hat höchstens 250 Zeilen und 60 000 Bytes (ein Shell-Befehl ist ein einziges `bash -c`-Argument); wird es eng, bleiben die eingeordneten Befunde vor den offenen. `ExecutionContextFactory` verwirft einen übergebenen Wert (Sub-Workflows erben alle Variablen), damit die Variable immer den laufenden Workflow beschreibt. So kann ein Report-Prompt eingeordnete Befunde mit derselben Identität weiterführen, und Verschlechterung und Verfall greifen. Details: [audit-workflow-protocol.md](audit-workflow-protocol.md) → „Bekannte Befunde im Prompt“.
 
@@ -916,12 +928,13 @@ App.tsx (Router)
 │   ├── Sidebar (Navigation, Collapse)
 │   └── Header (Sprache, Theme)
 │
-├── Pages (28 Routen)
+├── Pages (je Route in App.tsx eine Seite; im Simple Mode — der vereinfachten, in den
+│   │   Einstellungen umschaltbaren Oberfläche — tauschen neun Routen ihre Seite gegen eine Simple*-Variante)
 │   ├── Dashboard, Projects, ProjectDetail, ProjectCockpit
 │   ├── Workflows, WorkflowDetail, WorkflowExecution, WorkflowDebug, WorkflowFactory
 │   ├── Skills, Schedules, Calendar, Webhooks, Integrations, Settings
-│   ├── Runs, ActivityLog, Todos, DeadLetterQueue
-│   ├── Chains, ChainExecution
+│   ├── Runs, Approvals, ActivityLog, Todos, DeadLetterQueue, AuditCenter
+│   ├── Goals, GoalDetail, Chains, ChainExecution
 │   ├── Wishes, Docs, Reports, Insights, OnboardingProfiles, DialogImport
 │   ├── Simple*-Varianten (SimpleHome, SimpleWorkflows, etc.)
 │
@@ -1259,7 +1272,7 @@ autotrigger/
         ├── index.css                  ← Globale Styles + Tailwind-4-Konfiguration (@theme inline)
         ├── api/client.ts              ← HTTP-Client (Singleton)
         ├── types/index.ts             ← TypeScript-Typen
-        ├── pages/                     ← 37 Seiten (inkl. Simple-Mode-Varianten)
+        ├── pages/                     ← alle Seiten inkl. Simple-Mode-Varianten
         ├── components/
         │   ├── ui/                    ← Basis-UI-Primitives
         │   ├── layout/                ← App-Shell, Sidebar, Navigation

@@ -13,7 +13,8 @@ flowchart LR
     subgraph CORE["Kernseiten"]
         DASH["/ Dashboard<br/>/projects + /projects/:id<br/>/workflows + /workflows/:id"]
         RUN["/workflows/:id/run/:runId<br/>/runs (/runs/:runId leitet weiter)<br/>/approvals"]
-        SCH["/schedules + /calendar<br/>/todos, /cockpit, /goals/:goalId"]
+        SCH["/schedules + /calendar<br/>/todos, /cockpit"]
+        GOAL["/goals Übersicht<br/>/goals/:goalId mit Relationskarte"]
         ACT["/activity + /dlq<br/>/docs<br/>/settings"]
     end
     subgraph MOD["ModuleRoute (optionale Module)"]
@@ -58,6 +59,7 @@ Ein Schlüssel wie `['workflows']` trifft als Präfix alle Queries darunter — 
 | Skill-Aktivierung | `useWorkflow` | activate/deactivate | `workflows` |
 | Schedules | `useSchedules` | create/update/toggle/delete | `schedules` (Liste, Kalender, Vorschau) |
 | Webhooks | `useWebhooks` | create/toggle/delete, Token und Secret | `webhooks` |
+| Ziele | `useGoals`, `useGoal`, `useGoalRelations` | create/update/delete, TODOs zuordnen und ordnen, Einschätzung, Meilensteine, Ziel-Wächter | `goals`; was TODOs berührt, auch `todos`; der Wächter auch `schedules` und `workflows` |
 | System | `useSystemHealth`, `useSystemInfo` | — | keine; Health fragt alle 30 s neu ab |
 
 ## Zustand — *Zustand Stores*

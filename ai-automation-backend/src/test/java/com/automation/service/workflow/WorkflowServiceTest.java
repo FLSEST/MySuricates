@@ -3,6 +3,7 @@ package com.automation.service.workflow;
 import com.automation.dto.request.CreateWorkflowRequest;
 import com.automation.dto.request.UpdateWorkflowRequest;
 import com.automation.entity.*;
+import com.automation.event.ProjectWorkflowsChangedEvent;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.repository.ProjectRepository;
 import com.automation.repository.SkillRepository;

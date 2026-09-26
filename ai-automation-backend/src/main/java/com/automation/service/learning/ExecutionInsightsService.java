@@ -75,6 +75,8 @@ public class ExecutionInsightsService {
         double totalCost = 0.0;
         long totalInputTokens = 0;
         long totalOutputTokens = 0;
+        long totalCacheReadTokens = 0;
+        long totalCacheCreationTokens = 0;
         List<Map<String, Object>> stepInsights = new ArrayList<>();
 
         for (StepResult step : run.getSteps()) {
@@ -94,6 +96,15 @@ public class ExecutionInsightsService {
                 si.put("costUsd", cost);
                 si.put("inputTokens", inTok);
                 si.put("outputTokens", outTok);
+                // Claude reports the cached input apart from inputTokens (TODO 20adda30); other providers do not
+                if (step.getMetadata().get("cacheReadInputTokens") instanceof Number n) {
+                    si.put("cacheReadInputTokens", n.longValue());
+                    totalCacheReadTokens += n.longValue();
+                }
+                if (step.getMetadata().get("cacheCreationInputTokens") instanceof Number n) {
+                    si.put("cacheCreationInputTokens", n.longValue());
+                    totalCacheCreationTokens += n.longValue();
+                }
                 si.put("model", step.getMetadata().get("model"));
                 si.put("provider", step.getMetadata().get("provider"));
                 si.put("numTurns", step.getMetadata().get("numTurns"));
@@ -111,6 +122,8 @@ public class ExecutionInsightsService {
         result.put("totalInputTokens", totalInputTokens);
         result.put("totalOutputTokens", totalOutputTokens);
         result.put("totalTokens", totalInputTokens + totalOutputTokens);
+        result.put("totalCacheReadInputTokens", totalCacheReadTokens);
+        result.put("totalCacheCreationInputTokens", totalCacheCreationTokens);
         result.put("durationMs", run.getDurationMs());
         result.put("steps", stepInsights);
 

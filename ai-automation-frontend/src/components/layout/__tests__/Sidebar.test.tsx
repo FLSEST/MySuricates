@@ -19,15 +19,25 @@ beforeEach(() => {
   useSidebarStore.setState({ collapsed: false });
 });
 
-describe('Sidebar modules', () => {
+// jsdom parses its default stylesheet at the first getComputedStyle of a test file (each file runs in
+// its own process) and runs that cascade for every element a role query checks: the first test pays ~1 s
+// of it on top of rendering the sidebar, beyond the 5 s default under the load of the full suite
+// (b26bb8ff)
+describe('Sidebar modules', { timeout: 15_000 }, () => {
   it('hides pages of modules the backend reports disabled', async () => {
     const modules = modulesFixture('core', ['chains', 'webhooks', 'audit']);
-    server.use(http.get('/api/v1/system/capabilities', () => HttpResponse.json(modules)));
+    let answered = false;
+    server.use(http.get('/api/v1/system/capabilities', () => {
+      answered = true;
+      return HttpResponse.json(modules);
+    }));
 
     renderWithProviders(<Sidebar />);
 
-    await waitFor(() => expect(screen.queryByRole('link', { name: 'Chains' })).not.toBeInTheDocument(),
-      { timeout: 5000 });
+    // Wait for the answer first: polling the role query until then recomputed the accessibility
+    // tree of the whole sidebar every 50 ms, which under load outran the test timeout (b26bb8ff)
+    await waitFor(() => expect(answered).toBe(true));
+    await waitFor(() => expect(screen.queryByRole('link', { name: 'Chains' })).not.toBeInTheDocument());
     expect(screen.queryByRole('link', { name: 'Webhooks' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Audit Center' })).not.toBeInTheDocument();
     // core pages and still-enabled modules stay
@@ -97,7 +107,11 @@ describe('Sidebar modules', () => {
   });
 });
 
-describe('Sidebar dividers', () => {
+// Edit mode renders a drag handle, a hide button and a name field per entry (~60 buttons). After
+// every change jsdom recomputes the styles that getByRole checks for each of them — about 0.5 s per
+// query under load (b26bb8ff). The controls carry an aria-label, so the label query finds them by
+// the same name without that walk; the roles themselves are pinned in "Sidebar edit controls".
+describe('Sidebar dividers', { timeout: 15_000 }, () => {
   const withModules = (disabled: Parameters<typeof modulesFixture>[1]) =>
     localStorage.setItem('mysuricates-modules', JSON.stringify(modulesFixture('full', disabled)));
 
@@ -137,23 +151,23 @@ describe('Sidebar dividers', () => {
   it('adds, names and removes dividers in edit mode', () => {
     withModules([]);
     renderWithProviders(<Sidebar />);
-    fireEvent.click(screen.getByRole('button', { name: 'Edit menu' }));
+    fireEvent.click(screen.getByLabelText('Edit menu'));
 
-    expect(screen.getAllByRole('button', { name: 'Remove divider' })).toHaveLength(4);
-    fireEvent.click(screen.getByRole('button', { name: 'Add divider' }));
-    const inputs = screen.getAllByRole('textbox', { name: 'Name (optional)' });
+    expect(screen.getAllByLabelText('Remove divider')).toHaveLength(4);
+    fireEvent.click(screen.getByText('Add divider'));
+    const inputs = screen.getAllByLabelText('Name (optional)');
     expect(inputs).toHaveLength(5);
 
     // name the first default divider, remove the second
     fireEvent.change(inputs[0]!, { target: { value: 'Planen' } });
-    fireEvent.click(screen.getAllByRole('button', { name: 'Remove divider' })[1]!);
+    fireEvent.click(screen.getAllByLabelText('Remove divider')[1]!);
 
     const { sidebarItemOrder, sidebarDividerLabels } = useSettingsStore.getState();
     expect(sidebarItemOrder.filter((id) => id.startsWith('divider:'))).toHaveLength(4);
     expect(sidebarItemOrder).not.toContain('divider:default-onboarding');
     expect(sidebarDividerLabels).toEqual({ 'divider:default-triggers': 'Planen' });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Finish editing' }));
+    fireEvent.click(screen.getByLabelText('Finish editing'));
     // the new divider sits at the end and separates nothing; the named one is a heading
     expect(screen.getAllByRole('separator')).toHaveLength(3);
     expect(screen.getByRole('separator', { name: 'Planen' })).toHaveTextContent('Planen');
@@ -163,16 +177,17 @@ describe('Sidebar dividers', () => {
     withModules([]);
     useSettingsStore.setState({ sidebarItemOrder: ['/', '/todos'], sidebarDividerLabels: { 'divider:x': 'X' } });
     renderWithProviders(<Sidebar />);
-    fireEvent.click(screen.getByRole('button', { name: 'Edit menu' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Reset menu' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Finish editing' }));
+    fireEvent.click(screen.getByLabelText('Edit menu'));
+    fireEvent.click(screen.getByLabelText('Reset menu'));
+    fireEvent.click(screen.getByLabelText('Finish editing'));
 
     expect(useSettingsStore.getState().sidebarDividerLabels).toEqual({});
     expect(screen.getAllByRole('separator')).toHaveLength(4);
   });
 });
 
-describe('Sidebar edit controls', () => {
+// Checks the roles and names of the edit controls on purpose, with ~60 buttons in edit mode
+describe('Sidebar edit controls', { timeout: 15_000 }, () => {
   beforeEach(() => localStorage.setItem('mysuricates-modules', JSON.stringify(modulesFixture('full', []))));
 
   it('labels the edit controls in English', () => {
@@ -185,6 +200,10 @@ describe('Sidebar edit controls', () => {
       .toHaveAttribute('title', 'Restore the default order, hidden pages and dividers');
     expect(screen.getByRole('button', { name: 'Hide Workflows' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Move Workflows' })).toBeInTheDocument();
+    // The divider controls that "Sidebar dividers" finds by their labels
+    expect(screen.getAllByRole('button', { name: 'Remove divider' })).toHaveLength(4);
+    expect(screen.getByRole('button', { name: 'Add divider' })).toBeInTheDocument();
+    expect(screen.getAllByRole('textbox', { name: 'Name (optional)' })).toHaveLength(4);
   });
 
   it('labels the edit controls in German', () => {
@@ -246,5 +265,36 @@ describe('Sidebar in simple mode', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Pro' }));
     expect(useSettingsStore.getState()).toMatchObject({ simpleMode: false, modeChoiceMade: true });
+  });
+});
+
+// 6c94dc62: the dot of the collapsed sidebar used fixed emerald/amber classes that ignored the theme
+describe('Sidebar environment', () => {
+  const serveEnvironment = (environment: string) =>
+    server.use(http.get('/api/v1/system/info', () => HttpResponse.json({ version: '0.7.8', environment })));
+
+  it('marks production with the success token and every other environment with warning', async () => {
+    useSidebarStore.setState({ collapsed: true });
+    serveEnvironment('Produktiv');
+    const { unmount } = renderWithProviders(<Sidebar />);
+    const dot = await screen.findByTestId('sidebar-environment-dot');
+    expect(dot).toHaveAttribute('title', 'Produktiv');
+    expect(dot).toHaveClass('bg-success');
+    unmount();
+
+    serveEnvironment('Dev');
+    renderWithProviders(<Sidebar />);
+    const devDot = await screen.findByTestId('sidebar-environment-dot');
+    expect(devDot).toHaveClass('bg-warning');
+    // the health dot next to it as well
+    await waitFor(() => expect(screen.getByTitle('Systems OK').querySelector('span')).toHaveClass('bg-success'));
+    expect(document.querySelector('[class*="emerald-"], [class*="amber-"], [class*="gray-"], [class*="red-"]')).toBeNull();
+  });
+
+  it('shows the environment as a labelled pill in the open sidebar', async () => {
+    serveEnvironment('Dev');
+    renderWithProviders(<Sidebar />);
+    expect(await screen.findByText('Dev')).toHaveClass('bg-warning-subtle', 'text-warning');
+    expect(screen.queryByTestId('sidebar-environment-dot')).not.toBeInTheDocument();
   });
 });

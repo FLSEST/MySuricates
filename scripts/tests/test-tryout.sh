@@ -50,6 +50,9 @@ echo "2) build: newest release tag, from git archive"
 : > "$DOCKER_LOG"; OUT="$(bash "$SCRIPT" build 2>&1)"
 check "newest by version, not by name (v0.10.0 > v0.2.0)" 'grep -q -- "-t mysuricates:0.10.0-tryout -t mysuricates:tryout" "$DOCKER_LOG"'
 check "builds the tryout target from stdin"    'grep -q -- "build -f deploy/Dockerfile --target tryout" "$DOCKER_LOG" && grep -q -- " -$" "$DOCKER_LOG"'
+check "APT_REFRESH passed, empty by default (8b7a39b9)" 'grep -q -- "--build-arg APT_REFRESH= -t" "$DOCKER_LOG"'
+: > "$DOCKER_LOG"; MYSURICATES_APT_REFRESH=2026-10 bash "$SCRIPT" build >/dev/null 2>&1
+check "... a new value from the environment"   'grep -q -- "--build-arg APT_REFRESH=2026-10 -t" "$DOCKER_LOG"'
 check "version + revision labels"              'grep -q "image.version=0.10.0" "$DOCKER_LOG" && grep -q "image.revision=$(git -C "$REPO" rev-parse v0.10.0)" "$DOCKER_LOG"'
 check "context is the tag, not the worktree"   'tar -xOf "$DOCKER_CTX" deploy/Dockerfile | grep -q tryout && ! tar -xOf "$DOCKER_CTX" deploy/Dockerfile | grep -q dirty'
 OUT="$(bash "$SCRIPT" build --ref v0.1.0 2>&1)"; RC=$?

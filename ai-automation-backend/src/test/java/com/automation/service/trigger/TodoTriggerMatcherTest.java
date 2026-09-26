@@ -66,6 +66,25 @@ class TodoTriggerMatcherTest {
         assertThat(TodoTriggerMatcher.matches(criteria("backend", null, null, "URGENT"), medium)).isTrue();
     }
 
+    /** a9bf13d5: filter values are read like request parameters — an unknown source still matches nothing. */
+    @Test
+    void filterValues_trimmedAndInAnyCase_unknownSourceMatchesNothing() {
+        var ai = subject(List.of("backend"), null, Todo.Source.AI, Todo.Priority.MEDIUM);
+        assertThat(TodoTriggerMatcher.matches(criteria("backend", null, " ai ", null), ai)).isTrue();
+        assertThat(TodoTriggerMatcher.matches(criteria("backend", null, "user", null), ai)).isFalse();
+        assertThat(TodoTriggerMatcher.matches(criteria("backend", null, "robot", null), ai)).isFalse();
+        assertThat(TodoTriggerMatcher.matches(criteria("backend", null, null, "high"), ai)).isFalse();
+        assertThat(TodoTriggerMatcher.matches(criteria("backend", null, null, " medium "), ai)).isTrue();
+    }
+
+    @Test
+    void sourceFilter_forTheBacklogQuery_isNullWhenUnsetOrUnknown() {
+        assertThat(TodoTriggerMatcher.sourceFilter(" workflow ")).isEqualTo(Todo.Source.WORKFLOW);
+        assertThat(TodoTriggerMatcher.sourceFilter(null)).isNull();
+        assertThat(TodoTriggerMatcher.sourceFilter(" ")).isNull();
+        assertThat(TodoTriggerMatcher.sourceFilter("robot")).isNull();
+    }
+
     @Test
     void entityAdapters_carryTheSameFields() {
         TodoTrigger trigger = TodoTrigger.builder().tagPattern("backend").projectId("p").sourceFilter("AI").minPriority("LOW").build();

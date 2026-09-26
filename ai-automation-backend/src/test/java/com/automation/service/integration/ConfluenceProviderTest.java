@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.Map;
+
 import static org.assertj.core.api.Assertions.*;
 
 class ConfluenceProviderTest {
@@ -62,30 +64,48 @@ class ConfluenceProviderTest {
 
     @Test
     void unknownActionThrows() {
-        assertThatThrownBy(() -> provider.executeAction("unknown_action", java.util.Map.of(), "token"))
+        assertThatThrownBy(() -> provider.executeAction("unknown_action", Map.of(), "token"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("unknown_action");
     }
 
     @Test
     void listPagesRequiresSpaceKey() {
-        assertThatThrownBy(() -> provider.executeAction("list_pages", java.util.Map.of(), "token"))
+        assertThatThrownBy(() -> provider.executeAction("list_pages", Map.of(), "token"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("spaceKey");
     }
 
     @Test
     void getPageRequiresPageId() {
-        assertThatThrownBy(() -> provider.executeAction("get_page", java.util.Map.of(), "token"))
+        assertThatThrownBy(() -> provider.executeAction("get_page", Map.of(), "token"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("pageId");
     }
 
     @Test
     void searchRequiresCql() {
-        assertThatThrownBy(() -> provider.executeAction("search", java.util.Map.of(), "token"))
+        assertThatThrownBy(() -> provider.executeAction("search", Map.of(), "token"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("cql");
     }
 
+
+    /**
+     * ac639b39: limit 1.5 used to become 1 and 2^32 + 5 became 5 — read like its text now, and checked
+     * before the cloud-id lookup, i.e. before any request to Atlassian.
+     */
+    @Test
+    void limit_isReadLikeItsText_beforeAnyRequest() {
+        for (Object bad : new Object[] {1.5, 4_294_967_301L}) {
+            assertThatThrownBy(() -> provider.executeAction("search", Map.of("cql", "type = page", "limit", bad), "token"))
+                    .as(String.valueOf(bad))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("Parameter 'limit' must be a number");
+            assertThatThrownBy(() -> provider.executeAction("list_spaces", Map.of("limit", bad), "token"))
+                    .hasMessage("Parameter 'limit' must be a number");
+            assertThatThrownBy(() -> provider.executeAction("list_pages", Map.of("spaceKey", "DOCS", "limit", bad), "token"))
+                    .hasMessage("Parameter 'limit' must be a number");
+        }
+    }
 }

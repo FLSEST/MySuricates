@@ -144,7 +144,7 @@ cd ai-automation-backend
 mvn clean package -DskipTests
 docker compose build backend
 
-# Alle Agent-Images (ein neuer AGENT_APT_REFRESH holt gh- und Docker-Repo frisch, 97e1529d)
+# Alle Agent-Images (ein neuer AGENT_APT_REFRESH holt gh- und Docker-Repo und die pip-Pakete frisch, 97e1529d, 8b7a39b9)
 AGENT_APT_REFRESH=$(date +%Y-%m) docker compose --profile build-only build
 ```
 
@@ -228,8 +228,37 @@ Text-Report der äußeren Klasse (`target/surefire-reports/<Klasse>.txt`) meldet
 `Tests run: 0` für die äußere Klasse selbst, weil dort keine eigenen `@Test`-Methoden liegen; das
 ist normal, nicht leer. Ein Lauf, dessen `@Nested`-Tests aus irgendeinem Grund wirklich nicht
 mitgelaufen sind, sieht wegen dieser Zeile trotzdem "grün" aus, wenn man nur diese eine Zeile oder
-einen abgeschnittenen `tail` prüft. Maßgeblich ist immer die abschließende
-`Results: Tests run: N`-Zeile des gesamten Maven-Laufs bzw. dessen Exit-Code.
+einen abgeschnittenen `tail` prüft. Maßgeblich ist der Exit-Code des gesamten Maven-Laufs;
+gezählt wird über die `<testcase>`-, `<failure>`- und `<error>`-Elemente in
+`target/surefire-reports/TEST-<Klasse>.xml` (dort landen auch alle `@Nested`-Klassen, eine
+eigene Datei je innerer Klasse gibt es nicht) oder über die Klassenzeilen der Konsole.
+
+**Vorbehalt bei gleichnamigen Methoden in `@Nested`-Klassen:** Die abschließende
+`Results: Tests run: N`-Zeile fasst Ergebnisse unter dem Schlüssel äußere Klasse +
+Methodenname zusammen. Heißen Methoden in zwei `@Nested`-Klassen derselben äußeren Klasse
+gleich, zählen sie dort nur einmal; mehrere Fehlschläge desselben Namens erscheinen unter
+`Failures:` als `Run 1`, `Run 2`, … wie Wiederholungen. Der `<testsuite tests=… failures=…>`-Kopf
+der XML taugt ebenfalls nicht zum Zählen, und was er zeigt, hängt von der Surefire-Version ab —
+die kommt ungepinnt aus dem Spring-Boot-Parent (Stand dieses Repos: 3.5.6). Unter 3.5.4 trägt er
+nur die Zahlen der äußeren Klasse selbst wie deren `.txt`, also meist 0; unter 3.5.6 fasst er wie
+die `Results`-Zeile nach Methodenname zusammen und hat zusätzlich ein `flakes`-Attribut.
+Gezielte Fehlprobe (2026-09-25, dieselbe Testklasse unter beiden Versionen): drei
+`@Nested`-Klassen mit einem roten `sameName()` in jeder, je einer eindeutigen roten Methode in
+zweien und einem grünen `passesEverywhere()` in zweien.
+
+| Quelle (Läufe / Fehlschläge) | Surefire 3.5.4 | Surefire 3.5.6 |
+|---|---|---|
+| Klassenzeilen der Konsole, summiert | 7 / 5 | 7 / 5 |
+| `Results: Tests run:` | 5 / 3 | 5 / 3 |
+| `<testsuite>`-Kopf der XML | 0 / 0 | 4 / 3 |
+| `<testcase>`- / `<failure>`-Elemente der XML | 7 / 5 | 7 / 5 |
+| `.txt` der äußeren Klasse | 0 / 0 | 0 / 0 |
+| Exit-Code | 1 | 1 |
+
+Gefährlich wird es mit `-Dsurefire.rerunFailingTestsCount` > 0 (geprüft unter 3.5.6): Dann gilt
+ein roter Test, dessen Namensvetter in einer Nachbar-`@Nested`-Klasse grün ist, als „Flake“, und
+der Build endet mit `BUILD SUCCESS` und Exit-Code 0, obwohl der Test in beiden Durchgängen
+scheiterte. Die `pom.xml` schaltet keine Wiederholungen ein; dabei soll es bleiben.
 
 **`ERROR`-Zeilen in einem grünen Lauf:** Viele Tests prüfen Fehlerpfade — ein Mock wirft, der
 Code fängt ab und loggt das korrekt auf `ERROR`, samt Stacktrace. Ein grüner Lauf schreibt so
@@ -242,7 +271,7 @@ weil der Workflow `mysuricates-health-check` `target/surefire-reports/*.txt` nac
 
 **Klassengrößen-Ratchet:** `architecture/SourceSizeRatchetTest` zählt die Zeilen aller Dateien unter `src/main/java` und schlägt fehl, sobald eine Datei über 300 Zeilen liegt, die nicht in der Allowlist des Tests steht — oder eine gelistete Datei über ihre eingetragene Obergrenze wächst. Die Liste kennt nur eine Richtung: Wer eine gelistete Klasse verkleinert, senkt ihre Obergrenze; fällt sie auf ≤300 Zeilen, fliegt der Eintrag raus. Neue Dateien über 300 Zeilen werden gesplittet, nicht eingetragen (Audit-TODO 1e248ab9). Keine externe Dependency, reiner JUnit-Test.
 
-**Request-Kosten-Ratchet:** `architecture/RequestCostRatchetTest` misst für die Routen, die die UI bei jedem Seitenaufruf trifft (`/todos`, `/workflows`, `/projects`, `/executions`, `/workflows/{id}/runs`, `/learning/dashboard`, `/search`, `/schedules`, `/schedules/{id}/runs`, `/schedules/calendar`), zwei **deterministische** Kosten und vergleicht sie mit der `BASELINE`-Map im Test: die Zahl der SQL-Statements und die Antwortgröße in Bytes. Keine Millisekunden — Wanduhrzeit hängt auf einem Entwicklerrechner von Hostlast, JIT und davon ab, wer gerade die einzige SQLite-Connection hält, und würde flackern. Die beiden gepinnten Kosten sind dagegen reproduzierbar und genau die, die in der Vergangenheit ausgerissen sind: ein N+1 macht aus 3 Statements 33 (`1e465a9e perf(api)`), ein mitgeladener TEXT-Blob aus einer kleinen Antwort eine riesige (`443fa57e perf(dashboard)`). Gezählt wird über einen Hibernate-`StatementInspector` (`metrics/CountingStatementInspector` → `metrics/SqlStatementCounter`, ThreadLocal, in `config/StatementInspectorConfig` registriert); vor jeder Messung leert der Test den Persistence-Context, sonst fände der Request die geseedeten Entities im First-Level-Cache und ein Lazy-N+1 bliebe unsichtbar. Der Test misst gegen eine eigene, frisch migrierte Datenbankdatei statt gegen die gemeinsame der Test-JVM: Zeilen, die ein anderer Integrationstest ohne Rollback hinterlässt, verschöben sonst jede Obergrenze — in einer `-Dtest`-Auswahl reichten zwei Projekte und drei Workflows für einen roten Lauf (TODO 5695d482); vor jeder Saat prüft er, dass die gesäten Tabellen leer sind. Wie beim Klassengrößen-Ratchet kennt die Liste nur eine Richtung: Obergrenzen sinken, wenn eine Route billiger wird (der Hinweis-Test nennt die neue Zahl). **Eine Obergrenze darf vorübergehend einen bekannten Mangel festschreiben, kein Ziel** — der erste Lauf fand drei N+1-Muster und eine unbegrenzt wachsende Antwort (TODOs 13d1e2a2, 9db34f3b, a05c9504); sie waren gepinnt, damit das Gate grün blieb und nichts *schlimmer* wurde, und sind inzwischen alle behoben. Seit 13d1e2a2 gilt für jede gemessene Route zusätzlich das Wachstums-Kriterium: Ihre Statement-Zahl darf bei doppelter Saat nicht steigen. Wer eine Obergrenze anhebt, begründet das in der Commit-Message.
+**Request-Kosten-Ratchet:** `architecture/RequestCostRatchetTest` misst für die Routen, die die UI bei jedem Seitenaufruf trifft (`/todos`, `/workflows`, `/projects`, `/executions`, `/workflows/{id}/runs`, `/learning/dashboard`, `/search`, `/schedules`, `/schedules/{id}/runs`, `/schedules/calendar`, `/goals` mit Detail, Relationen und Meilensteinen, `/wishes`, `/audits` mit der Report-Historie eines Audits), zwei **deterministische** Kosten und vergleicht sie mit der `BASELINE`-Map im Test: die Zahl der SQL-Statements und die Antwortgröße in Bytes. Keine Millisekunden — Wanduhrzeit hängt auf einem Entwicklerrechner von Hostlast, JIT und davon ab, wer gerade die einzige SQLite-Connection hält, und würde flackern. Die beiden gepinnten Kosten sind dagegen reproduzierbar und genau die, die in der Vergangenheit ausgerissen sind: ein N+1 macht aus 3 Statements 33 (`1e465a9e perf(api)`), ein mitgeladener TEXT-Blob aus einer kleinen Antwort eine riesige (`443fa57e perf(dashboard)`). Gezählt wird über einen Hibernate-`StatementInspector` (`metrics/CountingStatementInspector` → `metrics/SqlStatementCounter`, ThreadLocal, in `config/StatementInspectorConfig` registriert). Gemessen wird ohne umschließende Transaktion, so wie der Betrieb die Route bedient (OSIV ist aus): Die Saat wird committet, jede Anfrage öffnet ihre eigenen Transaktionen oder keine, und nach jedem Test räumt der Test die gesäten Tabellen wieder ab. In der Testtransaktion hatte der Request deren Persistence-Context mitbenutzt — ein Dienst ohne eigene Transaktion sah dort so billig aus wie einer mit, `/learning/dashboard` maß 10 statt 52 Statements (TODO 5c56b3d1). Der Test misst gegen eine eigene, frisch migrierte Datenbankdatei statt gegen die gemeinsame der Test-JVM: Zeilen, die ein anderer Integrationstest ohne Rollback hinterlässt, verschöben sonst jede Obergrenze — in einer `-Dtest`-Auswahl reichten zwei Projekte und drei Workflows für einen roten Lauf (TODO 5695d482); vor jeder Saat prüft er, dass die gesäten Tabellen leer sind. Wie beim Klassengrößen-Ratchet kennt die Liste nur eine Richtung: Obergrenzen sinken, wenn eine Route billiger wird (der Hinweis-Test nennt die neue Zahl). **Eine Obergrenze darf vorübergehend einen bekannten Mangel festschreiben, kein Ziel** — der erste Lauf fand drei N+1-Muster und eine unbegrenzt wachsende Antwort (TODOs 13d1e2a2, 9db34f3b, a05c9504); sie waren gepinnt, damit das Gate grün blieb und nichts *schlimmer* wurde, und sind inzwischen alle behoben. Seit 13d1e2a2 gilt für jede gemessene Route zusätzlich das Wachstums-Kriterium: Ihre Statement-Zahl darf bei doppelter Saat nicht steigen. Wer eine Obergrenze anhebt, begründet das in der Commit-Message.
 
 **Kein KI-Aufruf in einer Transaktion:** `architecture/SlowCallInTransactionRatchetTest` liest den kompilierten Bytecode (mit dem ASM aus spring-core, ohne neue Abhängigkeit) und schlägt fehl, sobald eine Transaktion einen Aufruf umschließt, der einen Prozess startet: jedes `execute*` von `CommandExecutorService` (KI-CLI, Shell, Container), die CLI-Wrapper `HostClaudeService`/`HostCodexService`/`HostPiService`, `ShellCommandService`/`ContainerShellService` sowie `AiProvider.reason`/`executeAction` – auch über eine implementierende Klasse oder einen Provider aus der `AiProviderRegistry`. Ebenso jeder HTTP-Aufruf, der auf einen fremden Server wartet: `HttpClient.send`/`sendAsync` sowie Öffnen, Streams und Lesen der Antwort bei `URLConnection`, `HttpURLConnection` und `HttpsURLConnection` (`connect`, `getInputStream`, `getOutputStream`, `getResponseCode`, `getHeaderField`, `getErrorStream` …; der Scan vergleicht den deklarierten Typ, deshalb steht jeder einzeln in `HTTP_CALLS`) – ein Webhook-Ziel, das in sein Timeout läuft, hielte die Connection genauso lange fest. Als Transaktion zählen `@Transactional`-Methoden (auch über die Klassen-Annotation, nicht bei `NOT_SUPPORTED`/`NEVER`) und die Callbacks von `TransactionTemplate.execute`; verfolgt werden alle Aufrufe am selben Objekt – private Helfer, Lambdas, Methodenreferenzen. Bei pool-size 1 hielte so ein Aufruf die einzige Connection für seine ganze Dauer fest. Aufrufe in andere Beans sieht der Scan nicht: Er hält die direkte Form fest und ist kein Beweis über den ganzen Aufrufgraphen. Die Ausnahmeliste `KNOWN_EXCEPTIONS` ist leer und wird nur kürzer. Die Lösung hat immer dieselbe Form – kurzer Lese-Abschnitt per `TransactionTemplate`, KI-Aufruf ohne Transaktion, kurzer Schreib-Abschnitt (`WorkflowMemoryService#extractKnowledge`, `PageSuggestionService#refreshSuggestions`). Unit-Tests prüfen die Grenze mit `testsupport/FakeTransactions`: ein Transaktionsmanager ohne Datenbank und ein Proxy, der `@Transactional` wie der Anwendungskontext anwendet; im gemockten Aufruf fragt `FakeTransactions.active()`, ob gerade eine Transaktion offen ist.
 
@@ -280,11 +309,13 @@ Welches Werkzeug wann:
 | Alles langsam, CPU niedrig | JFR `jdk.ThreadPark` |
 | Verdacht auf Leck oder GC | JFR `jdk.GCPhasePause`, dazu `/actuator/metrics/jvm.memory.used` (mit API-Key) oder ohne Key die Heap-Zahlen von `/api/v1/system/jvm-memory` |
 
-**Kein Scheduling im Integrationstest-Profil:** `@EnableScheduling` steht in `config/SchedulingConfig` mit `@Profile("!integration")`. Alle `@SpringBootTest`-Klassen laufen mit `@ActiveProfiles("integration")` und damit ohne Hintergrund-Jobs. Grund: Die Jobs schreiben sonst mitten im Testlauf in dieselbe SQLite-Datei — `HealthAutoTodoService` legt z. B. ein TODO an, sobald Stable oder Test nicht erreichbar ist. Solche Zeilen überleben den `@Transactional`-Rollback (eigener Thread, eigene Transaktion) und lassen global zählende Assertions davon abhängen, ob gerade ein Container läuft. Scheduled-Methoden werden in Tests direkt aufgerufen, ihre Logik bleibt abgedeckt. Wer einen neuen `@Scheduled`-Job baut, testet ihn also per direktem Methodenaufruf — nicht, indem er auf den Tick wartet.
+**Kein Scheduling im Integrationstest-Profil:** `@EnableScheduling` steht in `config/SchedulingConfig` mit `@Profile("!integration")`. Alle `@SpringBootTest`-Klassen laufen mit `@ActiveProfiles("integration")` und damit ohne Hintergrund-Jobs. Grund: Die Jobs schreiben sonst mitten im Testlauf in dieselbe SQLite-Datei — `HealthAutoTodoService` legt z. B. ein TODO an, sobald Stable oder Test nicht erreichbar ist (die beiden Container-Umgebungen neben der Dev-Instanz, siehe [deployment.md → Drei-Umgebungs-Setup](deployment.md#drei-umgebungs-setup)). Solche Zeilen überleben den `@Transactional`-Rollback (eigener Thread, eigene Transaktion) und lassen global zählende Assertions davon abhängen, ob gerade ein Container läuft. Scheduled-Methoden werden in Tests direkt aufgerufen, ihre Logik bleibt abgedeckt. Wer einen neuen `@Scheduled`-Job baut, testet ihn also per direktem Methodenaufruf — nicht, indem er auf den Tick wartet.
 
 **Integration-Encryption-Key im Testprofil auf Temp-Pfad gepinnt:** Genau wie `integration.db.path` setzt `IntegrationTestDbSessionListener` seit 2026-09-12 zusätzlich `integration.key.path` (per-JVM-Temp-Datei, im Teardown gelöscht), auf das `application-integration.yml` `automation.integration.key-file` verweist — ohne diesen Pin generiert `IntegrationEncryptionService.init()` bei jedem `@SpringBootTest` mit leeren `app_settings` sonst einen frischen AES-Key ins echte `~/.autotrigger/` des Entwicklers (geschehen 2026-08-06, hat den echten Key monatelang überschattet).
 
 **Backups im Testprofil abgeschaltet und auf Temp-Verzeichnis gepinnt:** Dieselbe Falle ein drittes Mal (2026-09-13): `automation.backup` hat als Default `enabled: true` und `directory: ${user.home}/.autotrigger/backups/dev`, und `application-integration.yml` überschrieb beides nicht — jeder Spring-Kontext eines Integrationstests legte beim Start ein Backup seiner Wegwerf-Test-DB ins echte Dev-Backup-Verzeichnis und rotierte damit (retain-count 30) echte Backups weg. Seitdem setzt das Testprofil `automation.backup.enabled: false` und `directory` auf `integration.backup.dir`, das `IntegrationTestDbSessionListener` pro Test-JVM auf ein Temp-Verzeichnis zeigt und beim Session-Ende rekursiv löscht. Zusätzlich ist die Rotation in `DatabaseBackupService` abgesichert: Sie zählt und löscht nur Dateien im eigenen Namensschema `mysuricates-backup-yyyy-MM-dd_HH-mm-ss.db` (`BackupFileNaming.isOwnBackupFile`); manuelle Kopien oder fremde `.db`-Dateien im selben Verzeichnis bleiben sichtbar, werden aber nie rotiert. Prüfen: `ls ~/.autotrigger/backups/dev | wc -l` vor und nach `mvn test -Dtest=ContainerServiceStaleRowIntegrationTest` muss gleich bleiben.
+
+**Setup-Verzeichnisse von Zusammenfassung und Factory im Testprofil auf Temp-Verzeichnis gepinnt:** Die Falle ein viertes Mal (2026-09-24): `SummarizationSetupService` und `FactorySetupService` schreiben bei jedem Kontextstart (`@PostConstruct`) ihre Anweisungsdateien nach `automation.summarization.base-dir` bzw. `automation.factory.base-dir`, Default `${user.home}/.autotrigger/summarization` bzw. `.../factory` — jeder Spring-Kontext eines Integrationstests schrieb `summarization/claude/CLAUDE.md`, `summarization/codex/AGENTS.md` und `factory/codex/AGENTS.md` ins echte Home. Seitdem zeigen beide auf `integration.setup.dir`, das `IntegrationTestDbSessionListener` pro Test-JVM auf ein Temp-Verzeichnis setzt und beim Session-Ende rekursiv löscht. `config/IntegrationProfileHomeIsolationTest` hält das fest und prüft zusätzlich jeden Schlüssel der `application*.yml`: Zeigt einer im Testprofil aufgelöst ins echte `~/.autotrigger`, schlägt der Test fehl. Das fängt den nächsten Schreiber dieser Art aber nur, wenn sein Pfad als Schlüssel in einer `application*.yml` steht; Pfade, die der Code selbst aus `user.home` baut (etwa die API-Key-Datei über `InstanceAddress.apiKeyFile()`), sieht der Test nicht.
 
 **Szenario-Tests ohne KI-CLI:** `ScenarioIntegrationTest` fährt Workflow-Definitionen aus `src/test/resources/scenarios/*.json` durch den echten Executor. Jeder KI-Aufruf geht dabei an einen `ScriptedAiProvider` (Provider-IDs `SCRIPTED`, `SCRIPTED_B`) mit festen Antworten, der zugleich jeden Aufruf mitschreibt. So lassen sich Prompt, Modell, Timeout und Provider vor dem Aufruf prüfen, und danach Gate, Auto-TODO und Laufstatus, alles ohne `claude`/`codex`/`pi` und ohne Display. Ein Szenario kann statt eines Laufs auch mehrere Läufe desselben Workflows (`runs`, etwa für den Audit-Lebenszyklus) oder eine Kette (`chain`) fahren und auf Freigaben antworten (`answers`). Ein neuer Fall ist eine neue JSON-Datei. Jede Datei nennt ihre Spec-Quelle und den Vorfall, aus dem sie abgeleitet ist. Katalog und Format stehen in `scenarios/README.md`.
 
@@ -330,19 +361,25 @@ npm run cy:run
 npm run test:e2e
 ```
 
-Der Dev-API-Key wird automatisch aus `ai-automation-backend/data/automation.db` gelesen, falls vorhanden.
+Den API-Key sucht `cypress.config.ts` in dieser Reihenfolge: `CYPRESS_API_KEY`, `CYPRESS_DEV_API_KEY`,
+der Eintrag `api-key` in `app_settings` der Dev-Datenbank `ai-automation-backend/data/automation.db`
+(einmal beim Start von Cypress, nur lesend), zuletzt `AUTOMATION_API_KEY`. Unabhängig davon schreibt
+das Backend seinen Schlüssel bei jedem Start nach `~/.autotrigger/api-key` (`ApiKeyService`); für die
+curl-Beispiele dieser Seite also `export DEV_KEY=$(cat ~/.autotrigger/api-key)`. Mit `CYPRESS_TARGET=test`
+gilt eine andere Reihenfolge ohne Datenbank: `CYPRESS_API_KEY`, `CYPRESS_TEST_API_KEY`, `AUTOMATION_API_KEY`.
 
 ### Test-Target (isoliert, keine fachlichen Testdaten in Dev)
 
 **Voraussetzung:** Test-Instanz auf Port `8090` läuft.
 
 ```bash
-# Beispiel: Test-Instanz mit festem API-Key starten
+# Beispiel: Test-Instanz mit festem API-Key starten — <test-api-key> ist ein selbst gewählter Wert,
+# den die Instanz übernimmt; ohne ihn erzeugt sie beim ersten Start einen eigenen
 cd ai-automation-backend
 AUTOMATION_API_KEY=<test-api-key> docker compose -f docker-compose.test.yml up -d
 
 # Optional: aktuelle Definitionen von Dev nach Test synchronisieren
-curl -s -X POST http://localhost:9090/api/v1/testing/sync-definitions \
+curl -s --noproxy '*' -X POST http://localhost:9090/api/v1/testing/sync-definitions \
   -H "Content-Type: application/json" \
   -H "X-API-Key: $DEV_KEY" \
   -d '{}'
@@ -465,6 +502,7 @@ sonst `--ref`), nie der Arbeitsbaum. Braucht Docker.
 ./scripts/installer-probe.sh --ref main             # automatischer Lauf mit Report
 ./scripts/installer-probe.sh --image rockylinux:9   # dasselbe auf einem dnf-System
 ./scripts/installer-probe.sh --ref main --keep      # danach die frische Instanz im Browser ansehen
+./scripts/installer-probe.sh --setup-flags "--with-pi"   # Phase 2 mit Zusatz-Flags, hier pi mitinstallieren
 ```
 
 Die interaktive Maschine teilt das Netz des Rechners (`--network host`): Die Adresse, die
@@ -487,11 +525,30 @@ Die Screenshots macht Playwright aus `ai-automation-frontend/node_modules` auf d
 der Browser zur installierten Playwright-Version (typisch nach einem Update), wird die Login-Prüfung
 rot mit „Browser fehlt — im Frontend `npm run pw:install` ausführen“; die Probe lädt nichts nach.
 
-Vor einem Release läuft er als Workflow **Installer-Probe** (Pool-Eintrag
+Vor einem Release läuft er als Workflow **Installer-Probe** (Eintrag im Workflow-Pool — den
+mitgelieferten, in jede Instanz installierbaren Workflow-Definitionen unter `workflow-pool/`, siehe
+[architektur.md → Workflow Pool](architektur.md#workflow-pool) —, Eintrag
 `mysuricates-installer-probe`, Variable `ref`, Default `main`). Der Workflow holt das Probe-Skript
 aus dem geprüften Stand, nicht aus dem gerade ausgecheckten Branch. Die Skript-Tests laufen ohne
 Docker: `bash scripts/tests/test-installer-probe.sh` und
 `python3 -m unittest discover -s scripts/tests -p 'test_installer_probe_report.py'`.
+
+### pi-Version (Installer und Tryout)
+
+pi kommt in einer festen Version (c3a4cbf6): Eine neue pi-Version kann die Aufrufe von
+`PiAiProvider`/`HostPiService` (`--thinking`, `<backend>/<model>`) brechen, ohne dass es auffällt.
+Die Version steht an einer Stelle, `PiAiProvider.PINNED_VERSION`; daraus entstehen der
+Installationsbefehl im Katalog des Installers (`--with-pi`, Statuskarte) und — per Test abgeglichen —
+`ARG PI_VERSION` der Tryout-Stufe in `deploy/Dockerfile`. Auf eine neue Version heben:
+
+1. Die neue Version auf dem eigenen Rechner installieren (`npm install -g @earendil-works/pi-coding-agent@<version>`)
+   und einen Workflow mit pi laufen lassen — mit Modell `<backend>/<model>` und gesetztem `effort`.
+2. `PINNED_VERSION` in `PiAiProvider` und `ARG PI_VERSION` in `deploy/Dockerfile` setzen.
+3. Den Katalog neu erzeugen:
+   `cd ai-automation-backend && ./mvnw test -Dtest=ProviderCatalogTest -Dprovider.catalog.write=true`
+   (derselbe Test prüft danach den Gleichstand mit dem Dockerfile).
+4. `./scripts/installer-probe.sh --setup-flags "--with-pi"` und, vor dem nächsten Tryout-Image,
+   `scripts/tryout.sh build --ref HEAD`.
 
 ## Versionierung & Releases
 
@@ -534,7 +591,7 @@ Das Script:
 
 ### Zusammenspiel mit Staging
 
-Nach einem Release kann `./scripts/staging.sh promote` ausgeführt werden, um die neue Version in die Stable-Umgebung zu deployen. Die Settings-Seite zeigt dann einen Versionsvergleich (Dev vs. Stable) und empfiehlt ein Promote, wenn die Versionen abweichen.
+Die Stable-Umgebung ist ein Docker-Container auf Port 9091 mit einem eingefrorenen Stand des Codes für den Alltagsbetrieb, neben der Dev-Instanz aus dem Quellcode; `scripts/staging.sh` baut und verwaltet ihn ([deployment.md → Drei-Umgebungs-Setup](deployment.md#drei-umgebungs-setup)). Nach einem Release kann `./scripts/staging.sh promote` ausgeführt werden, um die neue Version in die Stable-Umgebung zu deployen. Die Settings-Seite zeigt dann einen Versionsvergleich (Dev vs. Stable) und empfiehlt ein Promote, wenn die Versionen abweichen.
 
 ### Git-Tags
 
@@ -654,7 +711,7 @@ Das Backend nutzt drei Annotation-Prozessoren, die in der Compiler-Konfiguration
 
 Das Backend umfasst **51 REST-Controller** und **20 Block-Typen**:
 
-**Controller:** ActivityLog, Assistant, Audit, Chain, ChainTemplate, CompletionTrigger, Conversion, DashboardLayout, DashboardReportAssist, DashboardWorkflow, DeadLetter, Dialog, Docs, Execution, Integration, Learning, Notification, OnboardingProfile, PageSuggestion, Project, Reports, Schedule, Search, Skill, Staging, System, SystemAccess, SystemAiProvider, SystemMaintenance, SystemModules, SystemRequestMetrics, SystemSettings, Testing, Todo, TodoTrigger, WebSocketTicket, Webhook, Wish, Workflow, WorkflowAnalyzer, WorkflowDebug, WorkflowFactory, WorkflowImport, WorkflowMemory, WorkflowPool, WorkflowSeal, WorkflowTemplate
+**Controller:** ActivityLog, Assistant, Audit, Chain, ChainTemplate, CompletionTrigger, Conversion, DashboardLayout, DashboardReportAssist, DashboardWorkflow, DeadLetter, Dialog, Docs, Execution, Goal, Integration, Learning, Notification, OnboardingProfile, PageSuggestion, Project, Reports, Schedule, Search, Skill, Staging, System, SystemAccess, SystemAiProvider, SystemMaintenance, SystemModules, SystemRequestMetrics, SystemSettings, Testing, Todo, TodoTrigger, Webhook, WebSocketTicket, Wish, Workflow, WorkflowAnalyzer, WorkflowAssist, WorkflowDebug, WorkflowFactory, WorkflowImport, WorkflowMemory, WorkflowPool, WorkflowSeal, WorkflowSealStatus, WorkflowTemplate, WorkflowVersion
 
 **Block-Typen:** `simple`, `shell`, `retry`, `conditional`, `foreach`, `while`, `switch`, `agentic`, `approval`, `sub-workflow`, `skill-capability`, `human-input`, `document`, `integration`, `todo-create`, `todo-update`, `todo-close`, `compress`, `compress-ai`, `dashboard-report`
 
@@ -685,7 +742,8 @@ Chains verketten mehrere Workflows sequenziell:
 Workflows können Wissen über Runs hinweg akkumulieren:
 - `WorkflowMemoryService.extractKnowledge()` — AI-basierte Extraktion via `KnowledgeSummarizer`
 - Aktive Einträge werden in nachfolgende Runs injiziert
-- Provider: `CLAUDE` (Standard) oder `CODEX`
+- Extraktion nur mit `CLAUDE` (Standard) oder `CODEX` (`WorkflowMemoryService.getSummarizer`) — anders als
+  bei Workflow-Blöcken ist Pi hier nicht angebunden
 
 ### Soft-Delete Pattern
 
@@ -736,7 +794,9 @@ Geprüft wird:
    `scripts/ci/hygiene-allowlist.txt` — nur Pfade, nie Musterliterale, damit die Allowlist selbst
    nichts preisgibt.
 2. **Verbotene Literale** in getrackten Dateien bzw. in hinzugefügten Zeilen.
-3. **Pool-Neutralität** über `scripts/ci/pool-neutrality.sh`. Dasselbe Skript nutzt das
+3. **Pool-Neutralität** über `scripts/ci/pool-neutrality.sh`: Die Definitionen unter `workflow-pool/`
+   werden mitgeliefert und von Lesern installiert, dürfen also nichts Instanz- oder
+   Personenbezogenes enthalten. Dasselbe Skript nutzt das
    Built-in-Template `pool-neutrality-audit` (dort mit `--all`, weil es den Pool einer laufenden
    Instanz prüft und nicht nur den getrackten Release-Bestand).
 4. **Repo-Gewicht**: zwei getrackte Pfade mit identischer Blob-Prüfsumme ab 256 KiB sind ein
@@ -892,6 +952,14 @@ siehe [Cypress-Migrationshinweise](https://www.cypress.io/blog/cypress-15-made-s
 - **Concurrent Writes:** SQLite erlaubt nur einen Schreibzugriff gleichzeitig. HikariCP ist auf Pool-Size=1 konfiguriert, um alle DB-Operationen zu serialisieren und `SQLITE_BUSY`-Fehler unter parallelen Workflow-Runs zu vermeiden.
 - **Keine nativen Typen:** Booleans als INTEGER, Timestamps als TEXT, JSON als TEXT.
 - **Kein ALTER COLUMN:** Schema-Änderungen sind eingeschränkt (nur ADD COLUMN).
+- **Ausdrucksspalten in nativen Abfragen typisieren:** Für eine Ergebnisspalte ohne deklarierten Typ
+  (`json_extract(…)`, `CASE …`) nimmt sqlite-jdbc den Typ des Werts der **ersten** Zeile. Ist der NULL,
+  meldet der Treiber NUMERIC, und Hibernate bricht bei einem späteren Text mit „Bad value for type
+  BigDecimal“ ab – abhängig von der Zeilenreihenfolge, also flackernd. In `nativeQuery = true` deshalb
+  jede solche Spalte fest typisieren, etwa `COALESCE(CAST(… AS TEXT), '')`, und im Test die Reihenfolge
+  so festlegen, dass die erste Zeile NULL liefert. Vorbild: `WorkflowRunProjectionRepository.findOriginColumns`
+  mit `WorkflowRunProjectionRepositoryTest`. Spalten mit deklariertem Typ (`w.name`) und JPQL-Abfragen
+  betrifft das nicht.
 - **NIEMALS direkt in die DB schreiben** (via `sqlite3` CLI oder SQL). Immer REST-API oder Service/Repository-Layer verwenden — direkte Schreibzugriffe umgehen den Hibernate-Cache.
 
 ### Docker-Abhängigkeit

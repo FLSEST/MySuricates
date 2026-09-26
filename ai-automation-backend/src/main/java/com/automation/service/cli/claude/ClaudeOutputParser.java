@@ -1,4 +1,4 @@
-package com.automation.service.cli;
+package com.automation.service.cli.claude;
 
 import com.automation.util.JsonRepairUtil;
 import com.fasterxml.jackson.databind.JsonNode;

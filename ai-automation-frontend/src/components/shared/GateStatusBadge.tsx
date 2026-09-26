@@ -7,10 +7,11 @@ interface GateStatusBadgeProps {
   compact?: boolean;
 }
 
+// Status tokens instead of fixed palette classes, so every theme colours the gate (6c94dc62)
 const gateConfig = {
-  GREEN:  { bg: 'bg-green-100 dark:bg-green-900/30',  text: 'text-green-700 dark:text-green-400',  dot: 'bg-green-500',  label: 'OK' },
-  YELLOW: { bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-700 dark:text-yellow-400', dot: 'bg-yellow-500', label: 'Findings' },
-  RED:    { bg: 'bg-red-100 dark:bg-red-900/30',       text: 'text-red-700 dark:text-red-400',       dot: 'bg-red-500',    label: 'Critical' },
+  GREEN:  { bg: 'bg-success-subtle', text: 'text-success', dot: 'bg-success', label: 'OK' },
+  YELLOW: { bg: 'bg-warning-subtle', text: 'text-warning', dot: 'bg-warning', label: 'Findings' },
+  RED:    { bg: 'bg-danger-subtle',  text: 'text-danger',  dot: 'bg-danger',  label: 'Critical' },
 };
 
 export function GateStatusBadge({ run, className = '', compact = false }: GateStatusBadgeProps) {

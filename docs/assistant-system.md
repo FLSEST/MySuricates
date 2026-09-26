@@ -211,7 +211,7 @@ Der Assistent kann über `<tool type="...">JSON</tool>`-Tags Aktionen vorschlage
 | `create_todo` | `title` | Todo anlegen (optional: description, priority, tags, projectId) |
 | `update_todo_status` | `id`, `status` | Todo-Status ändern (OPEN/IN_PROGRESS/DONE/BACKLOG) |
 | `create_workflow` | `projectId`, `name` | Workflow anlegen (optional: blocks, instructions, model, defaultContext) |
-| `update_workflow` | `workflowId` | Workflow-Felder aktualisieren (nur übergebene Felder werden geändert) |
+| `update_workflow` | `workflowId` | Workflow-Felder aktualisieren (nur übergebene Felder werden geändert, auch das Versions-Label `version` wie bei `PUT`) |
 | `delete_workflow` | `workflowId` | Workflow soft-deleten |
 | `start_workflow` | `workflowId` | Workflow starten (optional: context für Input-Variablen) |
 | `cancel_run` | `runId` | Laufenden Run abbrechen |
@@ -400,7 +400,7 @@ Zwei STOMP-Subscriptions:
 
 ### Weitere Komponenten
 
-- **AssistantMessage** (`components/assistant/AssistantMessage.tsx`): Markdown-Rendering (react-markdown + remark-gfm), Collapse bei >300 Zeichen, ActionButtons für `run_workflow`/`show_workflow`/`show_run`/`start_wish`/`ask_choice`, PendingToolCard mit Confirm/Reject
+- **AssistantMessage** (`components/assistant/AssistantMessage.tsx`): Nachrichtenblase mit Collapse ab 300 px Höhe; Markdown-Rendering (react-markdown + remark-gfm) in `AssistantMarkdown.tsx`, `ActionButton.tsx` für `run_workflow`/`show_workflow`/`show_run`/`start_wish`/`ask_choice`, `PendingToolCard.tsx` mit Confirm/Reject (Zustand in `hooks/usePendingToolDecision.ts`)
 - **StatusIndicator** (`components/assistant/AssistantWelcome.tsx`): WebSocket-Phasen oder rotierende Thinking-Phrases (2,5s Intervall)
 - **assistantPanelUtils** (`components/assistantPanelUtils.ts`): `parsePageContext(pathname)` extrahiert strukturierten Kontext aus URL
 

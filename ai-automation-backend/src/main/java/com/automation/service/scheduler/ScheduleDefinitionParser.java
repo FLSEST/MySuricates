@@ -3,6 +3,7 @@ package com.automation.service.scheduler;
 import com.automation.entity.ScheduledWorkflow.ConflictBehavior;
 import com.automation.entity.ScheduledWorkflow.ScheduleType;
 import com.automation.entity.ScheduledWorkflow.TargetType;
+import com.automation.util.EnumParameter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.support.CronExpression;
 import org.springframework.stereotype.Service;
@@ -12,7 +13,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.Locale;
 
 /**
  * Parses the user-facing schedule definition fields (target type, schedule type, conflict
@@ -26,39 +26,27 @@ public class ScheduleDefinitionParser {
 
     private final Clock clock;
 
+    /**
+     * The three enum fields go through {@link EnumParameter} (TODO a9bf13d5): trimmed, in any case, and
+     * an unknown value names the allowed ones. {@code toUpperCase()} without a locale turned
+     * {@code "chain"} into {@code "CHAİN"} under a Turkish default locale.
+     */
     public TargetType parseTargetType(String targetType) {
-        if (targetType == null || targetType.isBlank()) {
-            return TargetType.WORKFLOW;
-        }
-        try {
-            return TargetType.valueOf(targetType.toUpperCase());
-        } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("Invalid target type: " + targetType);
-        }
+        TargetType parsed = EnumParameter.parseOptional(TargetType.class, "targetType", targetType);
+        return parsed != null ? parsed : TargetType.WORKFLOW;
     }
 
     public ScheduleType parseScheduleType(String scheduleType) {
-        if (scheduleType == null || scheduleType.isBlank()) {
-            return ScheduleType.CRON;
-        }
-        try {
-            return ScheduleType.valueOf(scheduleType.toUpperCase());
-        } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("Invalid schedule type: " + scheduleType);
-        }
+        ScheduleType parsed = EnumParameter.parseOptional(ScheduleType.class, "scheduleType", scheduleType);
+        return parsed != null ? parsed : ScheduleType.CRON;
     }
 
     /**
-     * {@code SKIP} or {@code OVERLAP}, case-insensitive. Strict on purpose — an update that names an
-     * unknown value must fail instead of silently keeping the old behaviour.
+     * {@code SKIP} or {@code OVERLAP}, trimmed, in any case. Strict on purpose — a request that names
+     * an unknown value must fail instead of silently keeping the old (or the default) behaviour.
      */
     public ConflictBehavior parseConflictBehavior(String conflictBehavior) {
-        try {
-            return ConflictBehavior.valueOf(conflictBehavior.trim().toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("Invalid conflict behavior: " + conflictBehavior
-                    + " (expected SKIP or OVERLAP)");
-        }
+        return EnumParameter.parse(ConflictBehavior.class, "conflictBehavior", conflictBehavior);
     }
 
     public Instant calculateNextRun(String cronExpression) {

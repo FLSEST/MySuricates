@@ -4,8 +4,8 @@ Each `*.json` here is a workflow **offer**, not a part of the platform. Nothing 
 directory runs until someone installs it deliberately:
 
 ```bash
-curl -s localhost:9090/api/v1/pool -H "X-API-Key: $KEY"            # list
-curl -X POST localhost:9090/api/v1/pool/<id>/install -H "X-API-Key: $KEY"
+curl -s --noproxy '*' localhost:9090/api/v1/pool -H "X-API-Key: $KEY"            # list
+curl --noproxy '*' -X POST localhost:9090/api/v1/pool/<id>/install -H "X-API-Key: $KEY"
 ```
 
 An installed workflow is a **copy**. It lives on independently — changing the file here does

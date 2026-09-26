@@ -94,6 +94,8 @@ M_ai_choose="Which provider should workflows use by default?"
 M_ai_none="No AI CLI found. MySuricates starts anyway; AI blocks need one of these:"
 M_ai_install="%s — install: %s   log in: %s"
 M_ai_login_hint="Log in to %s before the first AI workflow: %s"
+# What is left to do after the login command — key from the provider catalog (login_note, eab43a8b)
+M_login_note_pi_slash_login="then /login in pi — or an API key as environment variable (see pi --help)"
 M_ai_access_q="What of this machine's AI providers goes into the container?"
 M_ai_access_login="Just the login|programs plus the logins (recommended)"
 M_ai_access_programs="Just the programs|every instance logs in on its own"

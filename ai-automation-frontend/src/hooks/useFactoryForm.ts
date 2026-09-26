@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useFactoryGenerate, useFactoryRun } from './useWorkflowFactory';
 import { useToast } from './useToast';
+import { apiErrorMessage } from '../api/client';
 import { useT } from '../i18n';
 import type { WorkflowFactoryResult } from '../types';
 
@@ -34,7 +35,7 @@ export function useFactoryForm({ testHealthy, onResult }: {
     try {
       return JSON.parse(testInputs);
     } catch {
-      toast.error('Invalid JSON in test inputs');
+      toast.error(t.factory.invalidTestInputs);
       return {};
     }
   };
@@ -48,14 +49,14 @@ export function useFactoryForm({ testHealthy, onResult }: {
       projectId, testInputs: parseTestInputs(), provider: provider || undefined,
     }, {
       onSuccess: (workflow) => {
-        toast.success(`Workflow "${workflow.name}" created`);
+        toast.success(t.factory.created.replace('{name}', () => workflow.name));
         onResult({
           workflowId: workflow.id, workflowName: workflow.name,
           status: 'CREATED', testRunId: null, testStatus: null, testError: null,
           promotedAsTemplate: false, durationMs: 0, retryErrors: [],
         });
       },
-      onError: () => toast.error('Generation failed'),
+      onError: (err) => toast.error(apiErrorMessage(err, t.factory.generateFailed)),
     });
   };
 
@@ -72,12 +73,12 @@ export function useFactoryForm({ testHealthy, onResult }: {
       onSuccess: (result) => {
         onResult(result);
         if (result.status === 'VERIFIED') {
-          toast.success(`Workflow "${result.workflowName}" verified!`);
+          toast.success(t.factory.verifiedNamed.replace('{name}', () => result.workflowName ?? t.factory.unknownWorkflow));
         } else {
-          toast.error(`Workflow failed: ${result.testError ?? 'Unknown error'}`);
+          toast.error(t.factory.runFailed.replace('{error}', () => result.testError ?? t.factory.unknownError));
         }
       },
-      onError: () => toast.error('Factory pipeline failed'),
+      onError: (err) => toast.error(apiErrorMessage(err, t.factory.pipelineFailed)),
     });
   };
 

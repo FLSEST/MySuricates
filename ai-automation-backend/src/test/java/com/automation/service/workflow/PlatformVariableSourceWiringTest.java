@@ -18,11 +18,27 @@ import static org.assertj.core.api.Assertions.assertThat;
 class PlatformVariableSourceWiringTest {
 
     @Autowired private List<PlatformVariableSource> sources;
+    @Autowired private WorkflowContextDataService contextDataService;
 
     @Test
     void everySourceIsWired_inItsOrder() {
         assertThat(sources).extracting(source -> source.getClass().getSimpleName()).containsExactly(
                 "PreviousReportVariable", "OpenTodosVariable", "RequestMetricsVariable", "GoalVariables",
                 "AuditFindingsVariable", "TodoDetailsVariable");
+    }
+
+    /**
+     * Die reservierten Namen (TODO 2a0695ff) – die Tests der Fabrik und des Sub-Workflow-Blocks schreiben sie ab;
+     * waechst hier eine Quelle, muessen sie mitwachsen. Jeder bleibt ausserdem aus dem Step-Delta.
+     */
+    @Test
+    void theCollectorReservesEveryNameOfEverySource() {
+        List<String> expected = new java.util.ArrayList<>(List.of("previous_report", "open_todos", "request_metrics"));
+        expected.addAll(GoalContextSource.VARIABLES);
+        expected.add(AuditContextSource.VARIABLE);
+        expected.add(TodoDetailsVariable.NAME);
+
+        assertThat(contextDataService.platformVariableNames()).containsExactlyElementsOf(expected);
+        assertThat(ContextDeltaCalculator.SYSTEM_VAR_KEYS).containsAll(contextDataService.platformVariableNames());
     }
 }

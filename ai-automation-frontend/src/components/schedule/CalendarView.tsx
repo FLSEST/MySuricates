@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useCalendarData } from '../../hooks/useSchedules';
 import { useT, useI18nStore } from '../../i18n';
-import { formatTimeOfDay } from '../../utils/localeFormat';
+import { formatNumber, formatTimeOfDay } from '../../utils/localeFormat';
 import { Spinner } from '../ui';
 import type { CalendarEvent } from '../../types';
 
@@ -127,6 +127,15 @@ export function CalendarView() {
         <div className="flex justify-center py-4">
           <Spinner text={t.common.loading} />
         </div>
+      )}
+
+      {/* Newer backends cut the month's runs at a limit and name the total (86777fb4); older ones send all. */}
+      {data?.pastRunsTotal != null && data.pastRunsTotal > data.pastRuns.length && (
+        <p className="text-xs text-text-tertiary" data-testid="calendar-runs-limited">
+          {t.schedules.calendarRunsLimited
+            .replace('{shown}', formatNumber(data.pastRuns.length, locale))
+            .replace('{total}', formatNumber(data.pastRunsTotal, locale))}
+        </p>
       )}
 
       {/* Calendar Grid */}

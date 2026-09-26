@@ -9,7 +9,7 @@ import com.automation.service.ai.ClaudeAiProvider;
 import com.automation.service.ai.HostClaudeService;
 import com.automation.service.ai.HostClaudeService.ReasoningResult;
 import com.automation.service.ai.ShellScriptCli;
-import com.automation.service.cli.ClaudeJsonResponse;
+import com.automation.service.cli.claude.ClaudeJsonResponse;
 import com.automation.service.cli.CliSession;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowRun;
@@ -983,5 +983,30 @@ class AgenticBlockExecutorTest {
                 .containsEntry("provider", "CLAUDE")
                 .containsEntry("model", "sonnet")
                 .containsEntry("effort", "high");
+    }
+
+    /** Codex has no effort flag: the block does not claim the workflow effort it could not apply (TODO 20adda30). */
+    @Test
+    @SuppressWarnings("unchecked")
+    void execute_providerWithoutEffortSupport_doesNotClaimTheEffort() throws Exception {
+        com.automation.service.ai.AiProvider codex = mock(com.automation.service.ai.AiProvider.class);
+        when(codex.getId()).thenReturn("CODEX");
+        when(codex.getCapabilities()).thenReturn(com.automation.service.ai.AiProviderCapabilities.codex());
+        when(codex.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
+        when(codex.reason(any())).thenReturn(new com.automation.service.ai.AiProvider.ReasoningResult(
+                "GOAL_STATUS: ACHIEVED\nRATIONALE: done\nACTION:\nSUMMARY: ok",
+                com.automation.service.ai.AiResponseMetadata.estimated(10, 5)));
+        when(aiProviderRegistry.resolve(any())).thenReturn(codex);
+        when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
+
+        ExecutionContext context = buildContext();
+        context.setProvider("CODEX");
+        context.setEffort("high");
+
+        StepResult result = executor.execute(buildBlock("Test goal"), context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        Map<String, Object> aiRequest = (Map<String, Object>) result.getMetadata().get("aiRequest");
+        assertThat(aiRequest).containsEntry("provider", "CODEX").doesNotContainKey("effort");
     }
 }

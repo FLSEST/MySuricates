@@ -139,7 +139,7 @@ cd ai-automation-backend
 mvn clean package -DskipTests
 docker compose build backend
 
-# All agent images (a new AGENT_APT_REFRESH fetches the gh and Docker repos afresh, 97e1529d)
+# All agent images (a new AGENT_APT_REFRESH fetches the gh and Docker repos and the pip packages afresh, 97e1529d, 8b7a39b9)
 AGENT_APT_REFRESH=$(date +%Y-%m) docker compose --profile build-only build
 ```
 
@@ -223,8 +223,35 @@ version/configuration. **Warning:** whichever form you pick, the outer class's o
 (`target/surefire-reports/<Class>.txt`) always reports `Tests run: 0` for the outer class itself,
 because it has no `@Test` methods of its own — that is normal, not empty. A run whose `@Nested`
 tests genuinely did not execute for some other reason can still look "green" from that single line
-if you only check it, or a truncated `tail`. What actually matters is the final
-`Results: Tests run: N` line of the whole Maven run, or its exit code.
+if you only check it, or a truncated `tail`. What actually matters is the exit code of the whole
+Maven run; count tests via the `<testcase>`, `<failure>` and `<error>` elements in
+`target/surefire-reports/TEST-<Class>.xml` (every `@Nested` class ends up there too, there is no
+separate file per inner class) or via the per-class console lines.
+
+**Caveat for same-named methods in `@Nested` classes:** the final `Results: Tests run: N` line
+merges results under the key outer class + method name. When methods in two `@Nested` classes of
+the same outer class share a name, they count only once there; several failures of the same name
+show up under `Failures:` as `Run 1`, `Run 2`, … like reruns. The `<testsuite tests=… failures=…>`
+header of the XML is no good for counting either, and what it shows depends on the Surefire
+version — which comes unpinned from the Spring Boot parent (this repo: 3.5.6). Under 3.5.4 it only
+carries the numbers of the outer class itself, like its `.txt`, so mostly 0; under 3.5.6 it merges
+by method name like the `Results` line and has an additional `flakes` attribute. Targeted failing
+probe (2026-09-25, the same test class under both versions): three `@Nested` classes with a red
+`sameName()` in each, one unique red method in two of them and a green `passesEverywhere()` in two.
+
+| Source (runs / failures) | Surefire 3.5.4 | Surefire 3.5.6 |
+|---|---|---|
+| Per-class console lines, summed | 7 / 5 | 7 / 5 |
+| `Results: Tests run:` | 5 / 3 | 5 / 3 |
+| `<testsuite>` header of the XML | 0 / 0 | 4 / 3 |
+| `<testcase>` / `<failure>` elements of the XML | 7 / 5 | 7 / 5 |
+| `.txt` of the outer class | 0 / 0 | 0 / 0 |
+| Exit code | 1 | 1 |
+
+It turns dangerous with `-Dsurefire.rerunFailingTestsCount` > 0 (checked under 3.5.6): a red test
+whose namesake in a sibling `@Nested` class is green then counts as a "flake", and the build ends
+with `BUILD SUCCESS` and exit code 0 although the test failed in both attempts. The `pom.xml`
+enables no reruns; keep it that way.
 
 **`ERROR` lines in a green run:** Many tests exercise failure paths — a mock throws, the code
 catches it and correctly logs it at `ERROR`, stack trace included. A green run therefore writes
@@ -237,7 +264,7 @@ Locally the same option works; it is deliberately not the default in `pom.xml`, 
 
 **Class-size ratchet:** `architecture/SourceSizeRatchetTest` counts the lines of every file under `src/main/java` and fails as soon as a file exceeds 300 lines without being on the test's allowlist — or a listed file grows past its recorded ceiling. The list only moves one way: whoever shrinks a listed class lowers its ceiling; once it drops to ≤300 lines the entry is removed. New files above 300 lines get split, not listed (audit TODO 1e248ab9). No external dependency, plain JUnit.
 
-**Request cost ratchet:** `architecture/RequestCostRatchetTest` measures two **deterministic** costs for the routes the UI hits on every page load (`/todos`, `/workflows`, `/projects`, `/executions`, `/workflows/{id}/runs`, `/learning/dashboard`, `/search`, `/schedules`, `/schedules/{id}/runs`, `/schedules/calendar`) and compares them against the `BASELINE` map in the test: the number of SQL statements and the response size in bytes. No milliseconds — wall-clock time on a developer machine depends on host load, JIT warm-up and who currently holds the single SQLite connection, so it would flake. The two pinned costs are reproducible and are exactly the ones that went wrong before: an N+1 turns 3 statements into 33 (`1e465a9e perf(api)`), a fetched TEXT blob turns a small response into a huge one (`443fa57e perf(dashboard)`). Counting goes through a Hibernate `StatementInspector` (`metrics/CountingStatementInspector` → `metrics/SqlStatementCounter`, ThreadLocal, registered in `config/StatementInspectorConfig`); the test clears the persistence context before each measurement, otherwise the request would find the seeded entities in the first-level cache and a lazy N+1 would stay invisible. The test measures against a database file of its own, freshly migrated, instead of the one the test JVM shares: rows another integration test leaves behind without a rollback would otherwise shift every ceiling — in one `-Dtest` selection two projects and three workflows were enough for a red run (TODO 5695d482); before every seed it checks that the seeded tables are empty. Like the class-size ratchet the list only moves one way: ceilings drop when a route gets cheaper (the hint test prints the new number). **A ceiling may temporarily pin a known defect, not a target** — the first run found three N+1 patterns and one unbounded response (TODOs 13d1e2a2, 9db34f3b, a05c9504); they were pinned so the gate stayed green and nothing got *worse*, and all of them are fixed by now. Since 13d1e2a2 every measured route is also held to the growth criterion: its statement count must not rise when the seed doubles. Raising a ceiling needs a reason in the commit message.
+**Request cost ratchet:** `architecture/RequestCostRatchetTest` measures two **deterministic** costs for the routes the UI hits on every page load (`/todos`, `/workflows`, `/projects`, `/executions`, `/workflows/{id}/runs`, `/learning/dashboard`, `/search`, `/schedules`, `/schedules/{id}/runs`, `/schedules/calendar`, `/goals` with detail, relations and milestones, `/wishes`, `/audits` with the report history of one audit) and compares them against the `BASELINE` map in the test: the number of SQL statements and the response size in bytes. No milliseconds — wall-clock time on a developer machine depends on host load, JIT warm-up and who currently holds the single SQLite connection, so it would flake. The two pinned costs are reproducible and are exactly the ones that went wrong before: an N+1 turns 3 statements into 33 (`1e465a9e perf(api)`), a fetched TEXT blob turns a small response into a huge one (`443fa57e perf(dashboard)`). Counting goes through a Hibernate `StatementInspector` (`metrics/CountingStatementInspector` → `metrics/SqlStatementCounter`, ThreadLocal, registered in `config/StatementInspectorConfig`). Every route is measured without a surrounding transaction, the way production serves it (OSIV is off): the seed is committed, each request opens its own transactions or none, and the test empties the seeded tables after every test. Inside the test transaction the request had shared its persistence context — a service without a transaction of its own looked as cheap as one with, and `/learning/dashboard` measured 10 statements instead of 52 (TODO 5c56b3d1). The test measures against a database file of its own, freshly migrated, instead of the one the test JVM shares: rows another integration test leaves behind without a rollback would otherwise shift every ceiling — in one `-Dtest` selection two projects and three workflows were enough for a red run (TODO 5695d482); before every seed it checks that the seeded tables are empty. Like the class-size ratchet the list only moves one way: ceilings drop when a route gets cheaper (the hint test prints the new number). **A ceiling may temporarily pin a known defect, not a target** — the first run found three N+1 patterns and one unbounded response (TODOs 13d1e2a2, 9db34f3b, a05c9504); they were pinned so the gate stayed green and nothing got *worse*, and all of them are fixed by now. Since 13d1e2a2 every measured route is also held to the growth criterion: its statement count must not rise when the seed doubles. Raising a ceiling needs a reason in the commit message.
 
 **No AI call inside a transaction:** `architecture/SlowCallInTransactionRatchetTest` reads the compiled bytecode (with the ASM copy inside spring-core, no new dependency) and fails as soon as a transaction encloses a call that starts a process: every `execute*` of `CommandExecutorService` (AI CLI, shell, container), the CLI wrappers `HostClaudeService`/`HostCodexService`/`HostPiService`, `ShellCommandService`/`ContainerShellService`, and `AiProvider.reason`/`executeAction` – also through an implementing class or a provider taken from `AiProviderRegistry`. Likewise every HTTP call that waits on a foreign server: `HttpClient.send`/`sendAsync` and opening, streams and reading the answer of `URLConnection`, `HttpURLConnection` and `HttpsURLConnection` (`connect`, `getInputStream`, `getOutputStream`, `getResponseCode`, `getHeaderField`, `getErrorStream` …; the scan compares the declared type, so each one is listed in `HTTP_CALLS`) – a webhook target that runs into its timeout would hold the connection just as long. Transactions are `@Transactional` methods (also through the class annotation, not with `NOT_SUPPORTED`/`NEVER`) and the callbacks of `TransactionTemplate.execute`; every call on the same object is followed – private helpers, lambdas, method references. With pool-size 1 such a call would hold the only connection for its whole duration. Calls into other beans stay invisible to the scan: it pins the direct shape and is no proof over the whole call graph. The exception list `KNOWN_EXCEPTIONS` is empty and only ever shrinks. The fix always has the same shape – a short read burst through `TransactionTemplate`, the AI call without a transaction, a short write burst (`WorkflowMemoryService#extractKnowledge`, `PageSuggestionService#refreshSuggestions`). Unit tests check the boundary with `testsupport/FakeTransactions`: a transaction manager without a database and a proxy that applies `@Transactional` the way the application context does; inside the mocked call, `FakeTransactions.active()` tells whether a transaction is open right now.
 
@@ -275,11 +302,13 @@ Which tool when:
 | Everything slow, CPU low | JFR `jdk.ThreadPark` |
 | Suspected leak or GC | JFR `jdk.GCPhasePause`, plus `/actuator/metrics/jvm.memory.used` (with the API key) or, without a key, the heap numbers from `/api/v1/system/jvm-memory` |
 
-**No scheduling under the integration test profile:** `@EnableScheduling` lives in `config/SchedulingConfig` with `@Profile("!integration")`. Every `@SpringBootTest` class runs with `@ActiveProfiles("integration")` and therefore without background jobs. Reason: those jobs otherwise write into the same SQLite file while tests run — `HealthAutoTodoService`, for example, creates a TODO as soon as the stable or test instance is unreachable. Such rows survive the `@Transactional` rollback (separate thread, separate transaction) and make globally counting assertions depend on whether a container happens to be running. Scheduled methods are invoked directly in tests, so their logic stays covered. When adding a new `@Scheduled` job, test it by calling the method directly — do not wait for a tick.
+**No scheduling under the integration test profile:** `@EnableScheduling` lives in `config/SchedulingConfig` with `@Profile("!integration")`. Every `@SpringBootTest` class runs with `@ActiveProfiles("integration")` and therefore without background jobs. Reason: those jobs otherwise write into the same SQLite file while tests run — `HealthAutoTodoService`, for example, creates a TODO as soon as the stable or test instance is unreachable (the two container environments next to the dev instance, see [deployment.md → Three-Environment Setup](deployment.md#three-environment-setup)). Such rows survive the `@Transactional` rollback (separate thread, separate transaction) and make globally counting assertions depend on whether a container happens to be running. Scheduled methods are invoked directly in tests, so their logic stays covered. When adding a new `@Scheduled` job, test it by calling the method directly — do not wait for a tick.
 
 **Integration encryption key pinned to a temp path in the test profile:** Since 2026-09-12, just like `integration.db.path`, `IntegrationTestDbSessionListener` also sets `integration.key.path` (a per-JVM temp file, deleted on teardown), which `application-integration.yml`'s `automation.integration.key-file` points to — without this pin, `IntegrationEncryptionService.init()` would generate a fresh AES key into the developer's real `~/.autotrigger/` on every `@SpringBootTest` with empty `app_settings` (happened 2026-08-06, shadowing the real key for months).
 
 **Backups disabled and pinned to a temp directory in the test profile:** The same trap a third time (2026-09-13): `automation.backup` defaults to `enabled: true` and `directory: ${user.home}/.autotrigger/backups/dev`, and `application-integration.yml` did not override either — every Spring context of an integration test backed up its throwaway test DB into the real Dev backup directory on startup, rotating away real backups in the process (retain count 30). Since then the test profile sets `automation.backup.enabled: false` and points `directory` at `integration.backup.dir`, which `IntegrationTestDbSessionListener` points at a temp directory per test JVM and deletes recursively at session end. The rotation in `DatabaseBackupService` is additionally hardened: it only counts and deletes files matching its own naming scheme `mysuricates-backup-yyyy-MM-dd_HH-mm-ss.db` (`BackupFileNaming.isOwnBackupFile`); manual copies or foreign `.db` files in the same directory stay visible but are never rotated. Check: `ls ~/.autotrigger/backups/dev | wc -l` must stay the same before and after `mvn test -Dtest=ContainerServiceStaleRowIntegrationTest`.
+
+**Summarization and factory setup directories pinned to a temp directory in the test profile:** The trap a fourth time (2026-09-24): `SummarizationSetupService` and `FactorySetupService` write their instruction files into `automation.summarization.base-dir` and `automation.factory.base-dir` on every context start (`@PostConstruct`), defaulting to `${user.home}/.autotrigger/summarization` and `.../factory` — every Spring context of an integration test wrote `summarization/claude/CLAUDE.md`, `summarization/codex/AGENTS.md` and `factory/codex/AGENTS.md` into the real home. Since then both point at `integration.setup.dir`, which `IntegrationTestDbSessionListener` sets to a temp directory per test JVM and deletes recursively at session end. `config/IntegrationProfileHomeIsolationTest` pins this and also checks every key of the `application*.yml` files: if one resolves into the real `~/.autotrigger` under the test profile, the test fails. That only catches the next writer of this kind when its path is a key in an `application*.yml`, though; paths the code builds from `user.home` itself (such as the API key file via `InstanceAddress.apiKeyFile()`) stay invisible to the test.
 
 **Scenario tests without an AI CLI:** `ScenarioIntegrationTest` runs workflow definitions from `src/test/resources/scenarios/*.json` through the real executor. Every AI call goes to a `ScriptedAiProvider` (provider ids `SCRIPTED`, `SCRIPTED_B`) with fixed answers, which also records every call. That way prompt, model, timeout and provider can be checked before the call, and gate, auto-TODO and run status after it, all without `claude`/`codex`/`pi` and without a display. Instead of one run, a scenario can also drive several runs of the same workflow (`runs`, e.g. for the audit lifecycle) or a chain (`chain`), and answer approvals (`answers`). A new case is a new JSON file. Every file names its spec source and the incident it was derived from. Catalog and format are in `scenarios/README.md`.
 
@@ -325,19 +354,25 @@ npm run cy:run
 npm run test:e2e
 ```
 
-The dev API key is automatically read from `ai-automation-backend/data/automation.db` if available.
+`cypress.config.ts` looks for the API key in this order: `CYPRESS_API_KEY`, `CYPRESS_DEV_API_KEY`,
+the `api-key` entry in `app_settings` of the dev database `ai-automation-backend/data/automation.db`
+(once at Cypress startup, read-only), finally `AUTOMATION_API_KEY`. Independently of that, the
+backend writes its key to `~/.autotrigger/api-key` on every start (`ApiKeyService`); for the curl
+examples on this page, then, `export DEV_KEY=$(cat ~/.autotrigger/api-key)`. With `CYPRESS_TARGET=test`
+a different order applies, without the database: `CYPRESS_API_KEY`, `CYPRESS_TEST_API_KEY`, `AUTOMATION_API_KEY`.
 
 ### Test Target (isolated, no business test data in Dev)
 
 **Prerequisite:** Test instance running on port `8090`.
 
 ```bash
-# Example: Start test instance with fixed API key
+# Example: Start test instance with fixed API key — <test-api-key> is a value of your choice that
+# the instance adopts; without it the instance creates its own on first start
 cd ai-automation-backend
 AUTOMATION_API_KEY=<test-api-key> docker compose -f docker-compose.test.yml up -d
 
 # Optional: sync current definitions from Dev to Test
-curl -s -X POST http://localhost:9090/api/v1/testing/sync-definitions \
+curl -s --noproxy '*' -X POST http://localhost:9090/api/v1/testing/sync-definitions \
   -H "Content-Type: application/json" \
   -H "X-API-Key: $DEV_KEY" \
   -d '{}'
@@ -460,6 +495,7 @@ the working tree. Requires Docker.
 ./scripts/installer-probe.sh --ref main             # automatic run with report
 ./scripts/installer-probe.sh --image rockylinux:9   # the same on a dnf system
 ./scripts/installer-probe.sh --ref main --keep      # then look at the fresh instance in the browser
+./scripts/installer-probe.sh --setup-flags "--with-pi"   # phase 2 with extra flags, here installing pi too
 ```
 
 The interactive machine shares the host network (`--network host`): open the address `setup.sh`
@@ -483,11 +519,30 @@ the browser for the installed Playwright version is missing (typically after an 
 check turns red with "Browser fehlt — im Frontend `npm run pw:install` ausführen" (browser missing,
 run `npm run pw:install` in the frontend); the probe downloads nothing.
 
-Before a release it runs as the workflow **Installer probe** (pool entry
+Before a release it runs as the workflow **Installer probe** (an entry in the workflow pool — the
+bundled workflow definitions under `workflow-pool/` that any instance can install, see
+[architektur.md → Workflow Pool](architektur.md#workflow-pool) —, entry
 `mysuricates-installer-probe`, variable `ref`, default `main`). The workflow takes the probe script
 from the state under test, not from the branch that happens to be checked out. The script tests run
 without Docker: `bash scripts/tests/test-installer-probe.sh` and
 `python3 -m unittest discover -s scripts/tests -p 'test_installer_probe_report.py'`.
+
+### pi version (installer and tryout)
+
+pi comes in a fixed version (c3a4cbf6): a new pi version can break the calls of
+`PiAiProvider`/`HostPiService` (`--thinking`, `<backend>/<model>`) without anyone noticing. The
+version lives in one place, `PiAiProvider.PINNED_VERSION`; from it come the install command in the
+installer's catalog (`--with-pi`, status card) and — kept equal by a test — `ARG PI_VERSION` of the
+tryout stage in `deploy/Dockerfile`. Moving to a new version:
+
+1. Install the new version on your own machine (`npm install -g @earendil-works/pi-coding-agent@<version>`)
+   and run a workflow with pi — with a `<backend>/<model>` model and `effort` set.
+2. Set `PINNED_VERSION` in `PiAiProvider` and `ARG PI_VERSION` in `deploy/Dockerfile`.
+3. Regenerate the catalog:
+   `cd ai-automation-backend && ./mvnw test -Dtest=ProviderCatalogTest -Dprovider.catalog.write=true`
+   (the same test then checks it matches the Dockerfile).
+4. `./scripts/installer-probe.sh --setup-flags "--with-pi"` and, before the next tryout image,
+   `scripts/tryout.sh build --ref HEAD`.
 
 ## Versioning & Releases
 
@@ -530,7 +585,7 @@ The script:
 
 ### Interaction with Staging
 
-After a release, `./scripts/staging.sh promote` can be run to deploy the new version to the stable environment. The settings page then shows a version comparison (Dev vs. Stable) and recommends a promote if the versions differ.
+The stable environment is a Docker container on port 9091 holding a frozen state of the code for everyday use, next to the dev instance running from source; `scripts/staging.sh` builds and manages it ([deployment.md → Three-Environment Setup](deployment.md#three-environment-setup)). After a release, `./scripts/staging.sh promote` can be run to deploy the new version to the stable environment. The settings page then shows a version comparison (Dev vs. Stable) and recommends a promote if the versions differ.
 
 ### Git Tags
 
@@ -644,7 +699,7 @@ The backend uses three annotation processors that must be correctly ordered in t
 
 The backend comprises **51 REST controllers** and **20 block types**:
 
-**Controllers:** ActivityLog, Assistant, Audit, Chain, ChainTemplate, CompletionTrigger, Conversion, DashboardLayout, DashboardReportAssist, DashboardWorkflow, DeadLetter, Dialog, Docs, Execution, Integration, Learning, Notification, OnboardingProfile, PageSuggestion, Project, Reports, Schedule, Search, Skill, Staging, System, SystemAccess, SystemAiProvider, SystemMaintenance, SystemModules, SystemRequestMetrics, SystemSettings, Testing, Todo, TodoTrigger, WebSocketTicket, Webhook, Wish, Workflow, WorkflowAnalyzer, WorkflowDebug, WorkflowFactory, WorkflowImport, WorkflowMemory, WorkflowPool, WorkflowSeal, WorkflowTemplate
+**Controllers:** ActivityLog, Assistant, Audit, Chain, ChainTemplate, CompletionTrigger, Conversion, DashboardLayout, DashboardReportAssist, DashboardWorkflow, DeadLetter, Dialog, Docs, Execution, Goal, Integration, Learning, Notification, OnboardingProfile, PageSuggestion, Project, Reports, Schedule, Search, Skill, Staging, System, SystemAccess, SystemAiProvider, SystemMaintenance, SystemModules, SystemRequestMetrics, SystemSettings, Testing, Todo, TodoTrigger, Webhook, WebSocketTicket, Wish, Workflow, WorkflowAnalyzer, WorkflowAssist, WorkflowDebug, WorkflowFactory, WorkflowImport, WorkflowMemory, WorkflowPool, WorkflowSeal, WorkflowSealStatus, WorkflowTemplate, WorkflowVersion
 
 **Block types:** `simple`, `shell`, `retry`, `conditional`, `foreach`, `while`, `switch`, `agentic`, `approval`, `sub-workflow`, `skill-capability`, `human-input`, `document`, `integration`, `todo-create`, `todo-update`, `todo-close`, `compress`, `compress-ai`, `dashboard-report`
 
@@ -675,7 +730,8 @@ Chains sequence multiple workflows in order:
 Workflows can accumulate knowledge across runs:
 - `WorkflowMemoryService.extractKnowledge()` — AI-based extraction via `KnowledgeSummarizer`
 - Active entries are injected into subsequent runs
-- Provider: `CLAUDE` (default) or `CODEX`
+- Extraction only with `CLAUDE` (default) or `CODEX` (`WorkflowMemoryService.getSummarizer`) — unlike
+  workflow blocks, Pi is not wired in here
 
 ### Soft-Delete Pattern
 
@@ -727,7 +783,9 @@ What is checked:
    automatically. Deliberate exceptions live with a reason in `scripts/ci/hygiene-allowlist.txt` —
    paths only, never pattern literals, so the allowlist itself gives nothing away.
 2. **Forbidden literals** in tracked files, or in added lines for the staged mode.
-3. **Pool neutrality** via `scripts/ci/pool-neutrality.sh`. The built-in template
+3. **Pool neutrality** via `scripts/ci/pool-neutrality.sh`: the definitions under `workflow-pool/`
+   ship with the repository and readers install them, so they must contain nothing specific to an
+   instance or a person. The built-in template
    `pool-neutrality-audit` runs the same script (with `--all`, because it audits the pool of a
    running instance rather than the tracked release set).
 4. **Repository weight**: two tracked paths with an identical blob checksum from 256 KiB up are an
@@ -876,6 +934,14 @@ see the [Cypress migration notes](https://www.cypress.io/blog/cypress-15-made-si
 - **Concurrent writes:** SQLite only allows one write operation at a time. HikariCP is configured with pool-size=1 to serialize all DB operations and avoid `SQLITE_BUSY` errors under concurrent workflow runs.
 - **No native types:** Booleans as INTEGER, timestamps as TEXT, JSON as TEXT.
 - **No ALTER COLUMN:** Schema changes are limited (ADD COLUMN only).
+- **Type expression columns in native queries:** for a result column without a declared type
+  (`json_extract(…)`, `CASE …`), sqlite-jdbc takes the type of the value in the **first** row. If that is
+  NULL, the driver reports NUMERIC, and Hibernate fails on a later text with "Bad value for type
+  BigDecimal" – depending on the row order, so it flickers. In `nativeQuery = true`, give every such
+  column a fixed type, e.g. `COALESCE(CAST(… AS TEXT), '')`, and have the test fix the order so that the
+  first row yields NULL. Model: `WorkflowRunProjectionRepository.findOriginColumns` with
+  `WorkflowRunProjectionRepositoryTest`. Columns with a declared type (`w.name`) and JPQL queries are not
+  affected.
 - **NEVER write directly to the DB** (via `sqlite3` CLI or SQL). Always use the REST API or service/repository layer — direct writes bypass the Hibernate cache.
 
 ### Docker Dependency

@@ -326,6 +326,73 @@ write_pool api-prefix-as-marker-ok <<'JSON'
  "blocks": [{"type": "shell", "config": {"command": "python3 -c \"MARKERS = ['resttemplate', 'webclient', '/api/v1/', 'wiremock']\""}}]}
 JSON
 
+# --- Im Shell-Code zaehlt jeder Endpunkt ausser den schluesselfreien Sonden, gleich wie weit der
+# Aufruf steht (TODO 28007626): der Pfad in der Schleifenvariable lag mehr als 200 Zeichen vor curl. ---
+PAD="$(printf '%0240d' 0 | tr 0 x)"
+write_pool self-api-loopvar <<JSON
+{"name": {"de": "Schleife", "en": "Loop"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "for E in /api/v1/todos /api/v1/workflows; do\n  # $PAD\n  curl -s http://localhost:9090\$E\ndone"}}]}
+JSON
+
+write_pool self-api-variable <<JSON
+{"name": {"de": "Variable", "en": "Variable"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "ROUTE=/api/v1/executions\n# $PAD\nwget -qO- \"http://localhost:9090\$ROUTE\""}}]}
+JSON
+
+# Shell-Code steckt auch in Bloecken mit execution_mode shell (hier im switch-Case) und im
+# items_command von foreach.
+write_pool self-api-nested-shell <<'JSON'
+{"name": {"de": "Verschachtelt", "en": "Nested"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
+ "blocks": [{"type": "switch", "config": {"expression": "{{ x }}", "execution_mode": "shell",
+   "cases": [{"when": "a", "blocks": [{"type": "simple",
+     "config": {"execution_mode": "shell", "command": "echo /api/v1/schedules"}}]}]}}]}
+JSON
+
+write_pool self-api-items-command <<'JSON'
+{"name": {"de": "Liste", "en": "List"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
+ "blocks": [{"type": "foreach", "config": {"items_source": "command", "items_command": "echo /api/v1/projects",
+   "command": "Fasse {{ item }} zusammen."}}]}
+JSON
+
+# Der Umweg ueber eine Sonde ist kein schluesselfreier Pfad: verglichen wird exakt, wie im ApiKeyAuthFilter.
+write_pool self-api-probe-detour <<'JSON'
+{"name": {"de": "Umweg", "en": "Detour"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "curl -s http://localhost:9090/api/v1/system/jvm-memory/../request-metrics"}}]}
+JSON
+
+# Gegenproben: die schluesselfreien Sonden in einer Schleife (wie im Performance-Audit) und ein Pfad im
+# Prompt ohne Aufruf bleiben erlaubt — die neue Regel gilt dem Shell-Code.
+write_pool api-keyfree-loop-ok <<JSON
+{"name": {"de": "Sonden", "en": "Probes"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "for E in /actuator/health /api/v1/system/jvm-memory; do\n  # $PAD\n  curl -s -m 5 http://localhost:9090\$E\ndone"}}]}
+JSON
+
+# Ein Satzpunkt gehoert nicht zum Pfad: die Sonde am Satzende bleibt erlaubt, der Schluessel-Endpunkt am
+# Satzende wird ohne Punkt gemeldet.
+write_pool api-probe-sentence-ok <<'JSON'
+{"name": {"de": "Satz", "en": "Sentence"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "# Heap aus /api/v1/system/jvm-memory.\ncurl -s -m 5 http://localhost:9090/api/v1/system/jvm-memory"}}]}
+JSON
+
+write_pool self-api-sentence <<'JSON'
+{"name": {"de": "Satz", "en": "Sentence"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "# Die Kosten stehen unter /api/v1/todos.\necho ok"}}]}
+JSON
+
+write_pool api-path-in-prompt-ok <<'JSON'
+{"name": {"de": "Prompt", "en": "Prompt"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
+ "blocks": [{"type": "simple", "config": {"command": "Die Route /api/v1/todos war laut Faktenblatt die langsamste."}}]}
+JSON
+
 OUT=$(bash "$REPO/scripts/ci/pool-neutrality.sh" --all "$POOL" 2>&1); RC=$?
 check "Befunde gemeldet (exit 1)"              '[ "$RC" -eq 1 ]'
 check "ok-portable unbeanstandet"              '! grep -q "ok-portable" <<<"$OUT"'
@@ -359,6 +426,18 @@ check "auth-freie Health-Sonde bleibt erlaubt" '! grep -q "api-health-ok" <<<"$O
 check "Heap-Zahlen ohne Key bleiben erlaubt"   '! grep -q "api-jvm-memory-ok" <<<"$OUT"'
 check "Request-Kosten mit Key erkannt"         'grep -q "self-api-request-metrics.*SELF-API" <<<"$OUT"'
 check "API-Praefix als Suchmuster erlaubt"     '! grep -q "api-prefix-as-marker-ok" <<<"$OUT"'
+check "Pfad in der Schleifenvariable, curl weit weg: erkannt" \
+  'grep -q "self-api-loopvar.*SELF-API.*/api/v1/todos.*im Shell-Code" <<<"$OUT"'
+check "Pfad in einer Variable, wget weit weg: erkannt" \
+  'grep -q "self-api-variable.*SELF-API.*/api/v1/executions" <<<"$OUT"'
+check "Shell-Code im switch-Case erkannt"        'grep -q "self-api-nested-shell.*SELF-API.*/api/v1/schedules" <<<"$OUT"'
+check "items_command von foreach erkannt"        'grep -q "self-api-items-command.*SELF-API.*/api/v1/projects" <<<"$OUT"'
+check "Umweg ueber eine Sonde erkannt"           'grep -q "self-api-probe-detour.*SELF-API" <<<"$OUT"'
+check "Sonden in der Schleife bleiben erlaubt"   '! grep -q "api-keyfree-loop-ok" <<<"$OUT"'
+check "Pfad im Prompt ohne Aufruf bleibt erlaubt" '! grep -q "api-path-in-prompt-ok" <<<"$OUT"'
+check "Sonde mit Satzpunkt bleibt erlaubt"       '! grep -q "api-probe-sentence-ok" <<<"$OUT"'
+check "Endpunkt mit Satzpunkt: gemeldet ohne den Punkt" \
+  'grep -q "self-api-sentence.*SELF-API.*'"'"'/api/v1/todos'"'"' (im Shell-Code)" <<<"$OUT"'
 
 echo "13) Blocktyp-Drift: die erzeugte Gate-Liste deckt sich mit der Registry im Backend"
 # Seit TODO bdc784e1 ist HYGIENE_POOL_BLOCK_TYPES nicht mehr handgepflegt, sondern

@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { Zap, Lock, Download, Pencil, Copy, Trash2 } from 'lucide-react';
-import { Button, Badge, Spinner } from '../ui';
+import { Button, Badge, ConfirmModal, Spinner } from '../ui';
 import { useSkillCapabilities, useDeleteSkill, exportSkill } from '../../hooks/useSkills';
 import { useSkillSealPins } from '../../hooks/useSealStatus';
 import { useModuleEnabled, useModuleInfo } from '../../hooks/useModules';
@@ -26,6 +27,8 @@ export function SkillDetail({ skill, onClose, onEdit, onCopy }: {
   const { data: capabilities, isLoading } = useSkillCapabilities(skill.id);
   const { data: sealPins } = useSkillSealPins();
   const deleteSkill = useDeleteSkill();
+  // Deleting asks first, in a dialog above the slide-over (23635ef6: was window.confirm)
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const sealedBy = sealPins?.[skill.id] ?? [];
   const locked = sealedBy.length > 0;
   // The lock holds regardless of any switch; the switches only decide whether it can be lifted here
@@ -43,10 +46,10 @@ export function SkillDetail({ skill, onClose, onEdit, onCopy }: {
     }
   };
 
-  const handleDelete = () => {
-    if (!window.confirm(t.skills.deleteConfirm.replace('{name}', skill.name))) return;
-    deleteSkill.mutate(skill.id, { onSuccess: onClose });
-  };
+  const handleDelete = () => deleteSkill.mutate(skill.id, {
+    onSuccess: onClose,
+    onSettled: () => setConfirmDelete(false),
+  });
 
   return (
     <div className="fixed inset-0 z-50 flex">
@@ -86,7 +89,7 @@ export function SkillDetail({ skill, onClose, onEdit, onCopy }: {
             </Button>
             {!skill.builtin && (
               <Button size="sm" variant="ghost" icon={<Trash2 className="w-3.5 h-3.5" />}
-                      onClick={handleDelete} disabled={locked || deleteSkill.isPending} loading={deleteSkill.isPending}
+                      onClick={() => setConfirmDelete(true)} disabled={locked || deleteSkill.isPending} loading={deleteSkill.isPending}
                       title={locked ? wayOut : undefined} className="text-danger ml-auto">
                 {t.common.delete}
               </Button>
@@ -149,6 +152,17 @@ export function SkillDetail({ skill, onClose, onEdit, onCopy }: {
           </Button>
         </div>
       </div>
+      <ConfirmModal
+        open={confirmDelete}
+        onClose={() => setConfirmDelete(false)}
+        onConfirm={handleDelete}
+        title={t.skills.deleteTitle}
+        message={t.skills.deleteConfirm.replace('{name}', () => skill.name)}
+        confirmLabel={t.common.delete}
+        confirmIcon={<Trash2 className="w-4 h-4" />}
+        variant="danger"
+        isPending={deleteSkill.isPending}
+      />
     </div>
   );
 }

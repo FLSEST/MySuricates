@@ -94,8 +94,8 @@ Bauen · Fertig. Mit `b` geht es einen Schritt zurück, mit `q` wird abgebrochen
   Beim gestaffelten Betrieb bekommt Dev alle Module, Test und Prod Standard mit Siegeln
   („unbeaufsichtigt nur versiegelte Workflows“).
 - **KI:** claude, codex und pi gleichrangig mit Anmeldestatus; du wählst den Standard-Anbieter.
-  Fehlt pi, bietet der Installer an, es per npm mitzuinstallieren (Vorgabe nein, ohne Terminal
-  `--with-pi`); für claude und codex nennt er den Befehl. Anmelden musst du dich selbst.
+  Fehlt pi, bietet der Installer an, es per npm mitzuinstallieren — in der geprüften, festen Version
+  (Vorgabe nein, ohne Terminal `--with-pi`); für claude und codex nennt er den Befehl. Anmelden musst du dich selbst.
   Im Container nutzt die Instanz die CLI **und** deine Anmeldung vom Rechner — kein zweites Login
   (unter macOS nur die Anmeldung, das Programm liegt im Image).
 - **Ports:** Default 9090, belegte Ports werden übersprungen — nicht der, den die laufende Instanz
@@ -157,7 +157,8 @@ Damit läuft die Anwendung. Ein erster Weg hinein, ohne etwas zu bauen:
 1. **Projekt anlegen** — jeder Workflow gehört zu einem Projekt; ein Projekt zeigt auf ein
    Verzeichnis auf deinem Rechner (beim Container: innerhalb des Projektordners). Zum Ausprobieren
    gibt es das **Beispielprojekt**: Dashboard, Workflows und Projekte bieten es an, solange noch kein
-   Projekt existiert. Ein Klick, und die Beispiel-Workflows laufen ohne KI und ohne Einrichtung.
+   Projekt existiert. Ein Klick, und fünf Beispiel-Workflows laufen ohne KI und ohne Einrichtung:
+   Freigabe, Wenn-dann-sonst, Schleife, TODO-Lebenszyklus und eine Meldung ans Dashboard.
    Das Dashboard bekommt dazu eine eigene Ansicht, die nur dieses Projekt zeigt.
 2. **Eine Vorlage übernehmen** — unter *Templates* liegen 55 fertige Workflows. Eine auswählen,
    ins Projekt kopieren, starten. Der Lauf zeigt Schritt für Schritt, was passiert. Vorlagen, die

@@ -97,6 +97,9 @@ function customizeLocally() {
   useDashboardLayoutStore.setState({ views: [{ id: 'default', name: '', widgets: localWidgets }] });
 }
 
+/** For adoptions that must not ask: declines, so an unexpected question fails the test. */
+const noQuestion = vi.fn(async (_name: string) => false);
+
 describe('useDashboardLayoutSync', () => {
   it('loads a newer server layout when nothing changed locally', async () => {
     serve({ latest: () => summary('v2'), versions: { v2: { ...summary('v2'), layout: remoteLayout } } });
@@ -324,7 +327,7 @@ describe('useDashboardLayoutSync', () => {
     });
     const { result } = renderHook(() => useDashboardLayoutSync(), { wrapper });
 
-    await act(() => result.current.adoptView('v1', 'ops'));
+    await act(() => result.current.adoptView('v1', 'ops', noQuestion));
 
     expect(useDashboardLayoutStore.getState().views.map((v) => v.id)).toEqual(['default', 'ops']);
     expect(calls).toContain('post');
@@ -349,7 +352,7 @@ describe('useDashboardLayoutSync', () => {
     });
     const { result } = renderHook(() => useDashboardLayoutSync(), { wrapper });
 
-    await act(() => result.current.adoptView('v1', 'ops'));
+    await act(() => result.current.adoptView('v1', 'ops', noQuestion));
 
     expect(useDashboardLayoutStore.getState().views.map((v) => v.id)).toEqual(['default', 'ops']);
     expect(calls).toContain('post');
@@ -590,16 +593,17 @@ describe('useDashboardLayoutSync', () => {
       views: [{ id: 'default', name: '', widgets: [] }, { id: 'ops', name: 'Ops', widgets: remoteLayout.views[0]!.widgets }],
     };
     const calls = serve({ latest: () => summary('v2'), versions: { v1: { ...summary('v1', { viewCount: 2 }), layout: oldLayout } } });
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true);
+    // 23635ef6: the page asks in its own dialog; the hook waits for the answer
+    const confirm = vi.fn<(name: string) => Promise<boolean>>().mockResolvedValueOnce(false).mockResolvedValueOnce(true);
     const { result } = renderHook(() => useDashboardLayoutSync(), { wrapper });
 
-    await act(() => result.current.adoptView('v1', 'ops'));
+    await act(() => result.current.adoptView('v1', 'ops', confirm));
 
-    expect(confirm).toHaveBeenCalledWith('This device has unsaved dashboard changes. Replace the view “Ops” with the one from this version?');
+    expect(confirm).toHaveBeenCalledWith('Ops');
     expect(useDashboardLayoutStore.getState().views[1]?.widgets).toEqual(localWidgets);
     expect(calls).not.toContain('post');
 
-    await act(() => result.current.adoptView('v1', 'ops'));
+    await act(() => result.current.adoptView('v1', 'ops', confirm));
 
     expect(useDashboardLayoutStore.getState().views[1]?.widgets).toEqual(remoteLayout.views[0]?.widgets);
     expect(calls).toContain('post');
@@ -615,10 +619,10 @@ describe('useDashboardLayoutSync', () => {
       views: [{ id: 'default', name: '', widgets: [] }, { id: 'ops', name: 'Ops', widgets: remoteLayout.views[0]!.widgets }],
     };
     const calls = serve({ latest: () => summary('v2'), versions: { v1: { ...summary('v1', { viewCount: 2 }), layout: oldLayout } } });
-    const confirm = vi.spyOn(window, 'confirm');
+    const confirm = vi.fn<(name: string) => Promise<boolean>>();
     const { result } = renderHook(() => useDashboardLayoutSync(), { wrapper });
 
-    await act(() => result.current.adoptView('v1', 'ops'));
+    await act(() => result.current.adoptView('v1', 'ops', confirm));
 
     expect(confirm).not.toHaveBeenCalled();
     expect(useDashboardLayoutStore.getState().views[1]?.widgets).toEqual(remoteLayout.views[0]?.widgets);
@@ -634,14 +638,14 @@ describe('useDashboardLayoutSync', () => {
     const calls = serve({ latest: () => summary('v2'), versions: { v1: { ...summary('v1', { viewCount: 2 }), layout: oldLayout } } });
     const { result } = renderHook(() => useDashboardLayoutSync(), { wrapper });
 
-    await act(() => result.current.adoptView('v1', 'plan'));
+    await act(() => result.current.adoptView('v1', 'plan', noQuestion));
     expect(useToastStore.getState().toasts.map((t) => t.message)).toContain('This version does not contain that view.');
 
     useDashboardLayoutStore.setState({
       activeViewId: 'v0',
       views: Array.from({ length: 20 }, (_, i) => ({ id: `v${i}`, name: '', widgets: [] })),
     });
-    await act(() => result.current.adoptView('v1', 'ops'));
+    await act(() => result.current.adoptView('v1', 'ops', noQuestion));
 
     expect(useToastStore.getState().toasts.map((t) => t.message))
       .toContain('The dashboard already has 20 views. Delete one before taking another.');

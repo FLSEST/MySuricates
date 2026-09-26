@@ -1191,7 +1191,7 @@ Blöcke werden als JSON-Array in der `blocks`-Spalte der `workflows`-Tabelle ges
   "type": "simple | shell | retry | conditional | foreach | while | switch | agentic | approval | sub-workflow | skill-capability | human-input | integration | document | todo-create | todo-update | todo-close | compress | compress-ai | dashboard-report",
   "name": "Optionaler Anzeigename",
   "config": {
-    "prompt": "Anweisung oder Befehl",
+    "command": "Anweisung oder Befehl",
     "timeout_seconds": 300,
     "on_failure": "stop | continue"
   },
@@ -1211,6 +1211,10 @@ Blöcke werden als JSON-Array in der `blocks`-Spalte der `workflows`-Tabelle ges
 **Typ-spezifische Config-Felder:**
 
 Die Schlüssel, die die Executoren lesen; Standardwerte und Beispiele stehen in [WORKFLOW-GUIDE.md](WORKFLOW-GUIDE.md).
+`DataModelConfigKeysGateTest` hält die Tabelle (hier und in der englischen Fassung) gegen den Code: Jeder
+Schlüssel muss dort gelesen werden, wo der Block-Typ läuft, und jeder Block-Typ braucht eine Zeile. Je
+Eintrag steht der Schlüssel vorn in Backticks, Klammern dahinter nennen Standard oder Werte, hinter `;`
+folgt freier Text.
 
 | Typ | Wichtigste Config-Felder |
 |---|---|

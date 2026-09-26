@@ -182,4 +182,14 @@ class HttpApiRequestTest {
         assertThat(build(BASE, Map.of("fail_on_error", "false")).failOnError()).isFalse();
         assertThatThrownBy(() -> build(BASE, Map.of("fail_on_error", "maybe"))).isInstanceOf(IllegalArgumentException.class);
     }
+
+    /** ac639b39: timeout_seconds 1.5 used to become 1 and 2^32 + 5 became 5 — read like its text; blank is the default. */
+    @Test
+    void timeoutIsReadLikeItsText() {
+        assertThatThrownBy(() -> build(BASE, Map.of("timeout_seconds", 1.5)))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("timeout_seconds must be a number");
+        assertThatThrownBy(() -> build(BASE, Map.of("timeout_seconds", 4_294_967_301L)))
+                .hasMessage("timeout_seconds must be a number");
+        assertThat(build(BASE, Map.of("timeout_seconds", " ")).timeout().toSeconds()).isEqualTo(30);
+    }
 }

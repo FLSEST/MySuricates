@@ -1,5 +1,17 @@
 # Deployment
 
+MySuricates runs on a machine in one of three ways: as an **instance in a container** via `deploy/`
+(only Docker needed, the backend serves the UI itself — the way for users), as a **slim backend
+container** via `ai-automation-backend/docker-compose.yml` (the API only), or **from source**
+([entwicklung.md](entwicklung.md)). Whoever works on the code often runs two more containers next to
+the source instance ("Dev"): **Stable** (port 9091, a frozen state of the code for everyday use) and
+**Test** (port 8090, for workflow tests) — described in the
+[Three-Environment Setup](#three-environment-setup).
+
+> Short IDs in parentheses such as `(182bd224)` or `TODO 63ecc124` are provenance references:
+> commits of this repository or items in the accompanying MySuricates instance. They record when
+> and why something was introduced — only the commit can be looked up from outside.
+
 ## One instance in a container (`deploy/`)
 
 The machine only needs Docker. `deploy/Dockerfile` (target `runtime`) builds backend and frontend inside Docker
@@ -25,6 +37,7 @@ scripts/instance.sh down --name main     # stop; data stays in the volumes, runn
 | `MYSURICATES_AI_PROVIDERS` | selection from `claude,codex,pi`, default: all present |
 | `MYSURICATES_HARDENING_SEALING`, `MYSURICATES_HARDENING_REQUIRE_SEALED` | hardening, `true`/`false` |
 | `MYSURICATES_ENVIRONMENT` | display name, e.g. `Prod` |
+| `MYSURICATES_APT_REFRESH` | a new value (e.g. the month) makes the next `up` fetch the image's NodeSource and Docker repos afresh instead of taking keys, package lists and packages from the layer cache of the first build; also works as an environment variable (8b7a39b9) |
 
 The image is built from the tracked files of the clone (`git ls-files`) as they are in the working
 tree: changed tracked files go in, whatever exists only locally — such as pool definitions kept out
@@ -51,7 +64,8 @@ What a container gets from the machine is decided in one place: `scripts/lib/hos
 It applies to instances run by `instance.sh`, to Stable and Test run by `staging.sh` — also when they are
 started from the UI — and to the dev container. The switches live outside the app and take effect on the
 next start: neither a workflow nor anyone with the API key can change them. The "Startup configuration"
-card in the settings shows them, read-only.
+card in the settings shows them, read-only — and per provider whether a login is there, by the same rule
+as the installer and the "AI providers" card (7296ad45).
 
 | `…AI_FROM_HOST` | From the machine into the container | Setup | What an AI in the container can do with it |
 |---|---|---|---|
@@ -109,7 +123,8 @@ without Docker: `bash scripts/tests/test-host-mounts.sh`, `bash scripts/tests/te
 
 `deploy/Dockerfile` has two targets. `runtime` is the image of an installed instance (above; tools
 and AI logins come from the machine). `tryout` builds on it and brings everything itself, so
-MySuricates can be tried without installing it: AI CLIs, `python3-pip`/`-venv`, JDK and Maven from
+MySuricates can be tried without installing it: AI CLIs (pi in the same fixed version as the
+installer, [entwicklung.md → pi version](entwicklung.md#pi-version-installer-and-tryout)), `python3-pip`/`-venv`, JDK and Maven from
 the build stage (`JAVA_HOME=/opt/java/jdk`), preset `research`. `HOME` lives on the data volume
 (`/app/data/home`), so logins and the API key survive a rebuild. Deliberately left out: gcc/make,
 Go, Rust, Gradle — if you need more, build `FROM mysuricates:tryout`.
@@ -127,7 +142,8 @@ uncommitted changes and the local `config/` never get in. The Dockerfile itself 
 tags before v0.7.6 do not know the `tryout` stage yet and are refused. Tags are
 `mysuricates:<version>-tryout` and `mysuricates:tryout` (last built), with the labels
 `org.opencontainers.image.version`/`.revision`. For a new version: `build`, then `remove` (data
-stays) and `start`.
+stays) and `start`. `MYSURICATES_APT_REFRESH=$(date +%Y-%m) scripts/tryout.sh build` fetches the
+NodeSource and Docker repos afresh instead of from the layer cache — and with them the AI CLIs.
 
 The container mounts nothing from the machine (no project folder, no Docker socket, no login) — a
 shell block or `--dangerously-skip-permissions` only affects the container. The instance name
@@ -136,7 +152,18 @@ a separate step (4c992a25). Tests without Docker: `bash scripts/tests/test-tryou
 
 ## Docker Compose
 
-The project is deployed via Docker Compose. The configuration is located in `ai-automation-backend/docker-compose.yml`.
+`ai-automation-backend/docker-compose.yml` starts only the backend as a container and builds the
+agent images. For a complete instance with UI and AI providers, use
+[`deploy/`](#one-instance-in-a-container-deploy).
+
+### Prerequisites
+
+- JDK 21 and Maven on the machine — the JAR is built there, `Dockerfile.backend` only copies it
+  (`COPY target/ai-automation-backend-*.jar`).
+- Docker with Compose.
+- The backend image contains no AI CLI (Claude, Codex, Pi) and mounts none from the machine, so AI
+  blocks do not run in this container. `deploy/` and Stable/Test take care of that
+  ([AI providers in the container](#ai-providers-in-the-container)).
 
 ### Starting
 
@@ -153,7 +180,14 @@ docker compose up --build -d
 AGENT_APT_REFRESH=$(date +%Y-%m) docker compose --profile build-only build
 ```
 
-The backend is then accessible at `http://localhost:9090`.
+The backend is then accessible at `http://localhost:9090` — the API only; this container serves no
+UI (`automation.serve-frontend` is switched on only in the `stable` and `test` profiles and in the
+`deploy/` image). The UI then comes from the Vite dev server:
+`cd ai-automation-frontend && npm install && npm run dev`, then `http://localhost:3000`; it forwards
+`/api` and `/ws` to port 9090 ([entwicklung.md](entwicklung.md)). The backend creates the API key for
+the login on first start when `AUTOMATION_API_KEY` is empty. The log shows only its last four
+characters and the file that holds it:
+`docker compose exec backend cat /home/appuser/.autotrigger/api-key`.
 
 ### Services
 
@@ -165,7 +199,17 @@ The backend is then accessible at `http://localhost:9090`.
 | `agent-devops` | `Dockerfile.agent-devops` | - | Ubuntu 24.04 Agent Container (gh, trivy, gitleaks, docker-cli) |
 | `agent-java` | `Dockerfile.agent-java` | - | Temurin 21 Agent Container (maven, LibreOffice) |
 
-The agent images are only built (`profiles: build-only`), not started directly via Compose. The backend creates and manages agent containers dynamically via the Docker API.
+The agent images are only built (`profiles: build-only`, all four with the command from step 3),
+not started directly via Compose. The backend creates and manages agent containers dynamically via
+the Docker API. They are needed as follows:
+
+- `agent-node` and `agent-python` are the base of the project container the platform starts per
+  project — Node for project type `CODE`/`PERSONAL`, Python for `RESEARCH`/`CONTENT`/`BUSINESS`
+  (`DockerContainerGateway.imageFor`).
+- `agent-devops` and `agent-java` are used only when a shell block requests them as
+  `container_image` — `agent-devops`, for instance, by the bundled templates `secret-scanner`,
+  `container-vuln-scan`, `docker-image-build-push` and `github-project-bootstrap`. Without such
+  workflows there is no need to build them.
 
 ## Dockerfiles
 
@@ -189,7 +233,9 @@ The agent images are only built (`profiles: build-only`), not started directly v
 
 - **Base:** `python:3.12-slim`
 - **Tools:** git, curl, jq
-- **Packages:** anthropic, pandas, numpy, requests, beautifulsoup4
+- **Packages:** anthropic, pandas, numpy, requests, beautifulsoup4 — unpinned, behind `ARG PIP_REFRESH`:
+  the same `AGENT_APT_REFRESH` as for agent-devops installs the current ones, otherwise they would stay
+  at the state of the first build (8b7a39b9)
 
 ### Agent DevOps (`docker/Dockerfile.agent-devops`)
 
@@ -234,7 +280,7 @@ Backend + agent images (build-only). Network: `automation` (bridge).
 Stable environment on port 9091:
 - Container: `mysuricates-stable`
 - Profile: `SPRING_PROFILES_ACTIVE=stable`
-- Volumes: `stable-data` (persistent DB), `stable-secrets` (integration and seal keys, kept apart from the DB — 3fb2242c), `stable-frontend/` (read-only), host project directories, backup volume (`~/.autotrigger/backups/stable`); AI providers and the Docker socket come from the override file of `scripts/staging.sh` ([AI providers in the container](#ai-providers-in-the-container))
+- Volumes: `stable-data` (persistent DB), `stable-secrets` (integration and seal keys, kept apart from the DB — 3fb2242c), `stable-frontend/` (read-only; the built UI that `scripts/staging.sh snapshot` copies there from `ai-automation-frontend/dist` — without this folder `staging.sh start` refuses to start), host project directories, backup volume (`~/.autotrigger/backups/stable`); AI providers and the Docker socket come from the override file of `scripts/staging.sh` ([AI providers in the container](#ai-providers-in-the-container))
 - Named Volume: `stable-data`
 
 ### `docker-compose.test.yml`
@@ -243,7 +289,7 @@ Test instance on port 8090 (uses `docker/Dockerfile.stable` as build base):
 - Container: `mysuricates-test`
 - Image: `ai-automation-backend-test`
 - Profile: `SPRING_PROFILES_ACTIVE=test`
-- Volumes: `test-data` (persistent DB), `test-secrets` (keys as for Stable), `stable-frontend/` (read-only), `application-test.yml` (read-only), backup volume (`~/.autotrigger/backups/test`); AI providers and the Docker socket as for Stable
+- Volumes: `test-data` (persistent DB), `test-secrets` (keys as for Stable), `stable-frontend/` (read-only, the same built UI as for Stable), `application-test.yml` (read-only), backup volume (`~/.autotrigger/backups/test`); AI providers and the Docker socket as for Stable
 - Healthcheck: `curl -f http://localhost:8090/api/v1/system/health`
 - Named Volume: `test-data`
 
@@ -268,6 +314,15 @@ Test instance on port 8090 (uses `docker/Dockerfile.stable` as build base):
 | `AUTOMATION_SSL_KEYSTORE` | `./certs/dev.p12` | Path to PKCS12 keystore |
 | `AUTOMATION_SSL_PASSWORD` | `mysuricates` | Keystore password |
 | `DOCKER_HOST` | `unix:///var/run/docker.sock` | Docker socket path |
+| `AUTOMATION_CORS_ORIGINS` | `localhost:3000`/`:5173`, http and https | Allowed browser origins, replaces the default list — see [Where it listens](#where-it-listens) |
+| `AUTOMATION_CLI_SKIP_PERMISSIONS` | `true` | Claude CLI without asking before tool use (`--dangerously-skip-permissions`) — see [What a workflow is allowed to do](#what-a-workflow-is-allowed-to-do) |
+| `AUTOMATION_ALLOW_DOCKER_SOCKET_MOUNT` | `false` | Whether a shell block with `mount_docker_socket: true` gets the Docker socket in its agent container — see [Docker privileges](#docker-privileges--two-separate-layers) |
+| `AUTOMATION_ALLOW_EXTRA_MOUNTS` | `false` | Whether shell blocks may mount additional host folders (`mounts`) into their agent container |
+| `AUTOMATION_ALLOWED_MOUNT_PREFIXES` | (empty) | Comma-separated host path prefixes allowed for these mounts; empty = only the hard-blocked system paths apply |
+| `AUTOMATION_ALLOWED_CONTAINER_IMAGES` | (empty = any image) | Allowlist for `container_image` in shell blocks — see [Container Image Allowlist](#container-image-allowlist) |
+
+The table is a selection. All variables with their actual defaults, grouped by topic, are in
+`ai-automation-backend/.env.example` ([Template and loading path](#template-and-loading-path)).
 
 > **Why some variables do not appear in `application.yml`:** The `automation.*` configuration is bound
 > via `@ConfigurationProperties`. Spring additionally binds every property straight from the matching
@@ -345,7 +400,8 @@ automation.modules.preset: core   # optional modules, see Module System
 ```
 
 - API key authentication active (key is auto-generated on first start if `AUTOMATION_API_KEY`
-  is empty — it is then in the log, in `~/.autotrigger/api-key` and in the `app_settings` table)
+  is empty — it is then in `~/.autotrigger/api-key` and in the `app_settings` table; the log shows
+  only its last four characters)
 - Rate limiting active (120 req/min, configurable in Settings → Execution)
 - SQLite at `./data/automation.db`
 
@@ -452,8 +508,8 @@ networks:
 
 ## Reverse Proxy
 
-Since the switch to one-time tickets for the WebSocket handshake (TODO 05b759f6), the frontend
-enforces `transports: ['websocket']` and deliberately disables the SockJS fallback (HTTP polling):
+The UI signs in its WebSocket connection with a one-time ticket that the backend issues just before
+(`WebSocketTicketService`). That is why the frontend enforces `transports: ['websocket']` and deliberately disables the SockJS fallback (HTTP polling):
 a one-time ticket is only valid for the first connection attempt and does not survive a transport
 switch. A reverse proxy in front of MySuricates therefore **must** pass WebSocket connections
 through via an HTTP upgrade — without upgrade support, the app stops connecting.
@@ -541,7 +597,7 @@ command line raw or wrapped in POSIX single quotes.
 |---|---|---|---|---|
 | **trusted** | workflow defaults, system values (`project_path`, `workflow_run_id`), block-internal values, answers from `approval`/`human-input` | substituted raw | raw | no |
 | **untrusted external** | webhook payload and everything derived from it (block outputs, `step_N_output`, foreach items) — across resume and sub-workflows too | always single-quoted | raw | yes, from the moment it is set |
-| **platform data** | `previous_report` and `open_todos`, injected into **every** run | always single-quoted | raw | only once the placeholder really appears in a shell command |
+| **platform data** | `previous_report` (output of the last successful run of the same workflow) and `open_todos` (open TODOs of the project), injected into **every** run — details in [WORKFLOW-GUIDE.md → System-Injected Variables](WORKFLOW-GUIDE.md#system-injected-variables) | always single-quoted | raw | only once the placeholder really appears in a shell command |
 
 "Taints the run" means: from that moment every further output of the run is quoted too, because a
 block can pull foreign bytes into its output without naming any placeholder. The taint is sticky and
@@ -769,6 +825,10 @@ The test instance is a dedicated Docker container for automated workflow tests:
 ./scripts/staging.sh write-override stable|test   # write the override file (what comes from the machine), print its path
 ./scripts/staging.sh login stable|test claude     # own login inside the container (only *_AI_FROM_HOST=programs)
 ```
+
+`MYSURICATES_APT_REFRESH=$(date +%Y-%m) ./scripts/staging.sh promote` (likewise `test-promote`) fetches
+the image's NodeSource and Docker repos (`Dockerfile.stable`) afresh instead of taking them from the
+layer cache of the first build (8b7a39b9).
 
 ### Definition Sync (Dev → Stable / Dev → Test)
 

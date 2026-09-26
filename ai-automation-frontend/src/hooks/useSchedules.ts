@@ -12,6 +12,15 @@ export function useSchedules({ enabled = true }: { enabled?: boolean } = {}) {
   });
 }
 
+/** One schedule, e.g. the one of a goal guard; off while `id` is null. */
+export function useSchedule(id: string | null) {
+  return useQuery({
+    queryKey: ['schedules', 'one', id],
+    queryFn: () => api.get<ScheduledWorkflow>(`/schedules/${id}`),
+    enabled: !!id,
+  });
+}
+
 /** Schedules that start this workflow (chain schedules are not included). */
 export function useSchedulesForWorkflow(workflowId: string) {
   return useQuery({

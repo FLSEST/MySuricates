@@ -1,4 +1,4 @@
-package com.automation.service.cli;
+package com.automation.service.cli.claude;
 
 import org.junit.jupiter.api.Test;
 
@@ -119,6 +119,49 @@ class ClaudeOutputParserTest {
         ClaudeJsonResponse parsed = ClaudeOutputParser.parseStreamJson(ndjson);
         assertThat(parsed.result()).isEqualTo("final answer");
         assertThat(parsed.toolUses()).isNull();
+    }
+
+    /**
+     * A recorded audit step (run 60fc8d09, step 3, CLI 2.1.x): its step metadata said
+     * {@code inputTokens: 2}, because {@code input_tokens} counts only what the prompt cache did not
+     * serve. The numbers are the step's own ({@code usage} of its session, {@code modelUsage} from the
+     * CLI's cost record); the line layout follows the result schema of the CLI (TODO 20adda30).
+     */
+    private static final String RECORDED_AUDIT_STEP = """
+            {"type":"system","subtype":"init","cwd":"/work/project","session_id":"dbfa497d-127c-41e5-b294-bda24688f2ec","tools":["Bash","Read"],"mcp_servers":[],"model":"claude-opus-5-5","permissionMode":"default","slash_commands":[],"apiKeySource":"none","claude_code_version":"2.1.283","output_style":"default","agents":[],"skills":[],"plugins":[],"uuid":"u-init"}
+            {"type":"assistant","message":{"model":"claude-opus-5-5","id":"msg_1","type":"message","role":"assistant","content":[{"type":"text","text":"gate_status: GREEN"}],"stop_reason":null,"usage":{"input_tokens":2,"cache_creation_input_tokens":48462,"cache_read_input_tokens":13720,"output_tokens":918,"output_tokens_details":{"thinking_tokens":377},"server_tool_use":{"web_search_requests":0,"web_fetch_requests":0},"service_tier":"standard","cache_creation":{"ephemeral_1h_input_tokens":48462,"ephemeral_5m_input_tokens":0}}},"parent_tool_use_id":null,"session_id":"dbfa497d-127c-41e5-b294-bda24688f2ec","uuid":"u-1"}
+            {"type":"result","subtype":"success","is_error":false,"duration_ms":13043,"duration_api_ms":8794,"num_turns":1,"result":"gate_status: GREEN","stop_reason":"end_turn","session_id":"dbfa497d-127c-41e5-b294-bda24688f2ec","total_cost_usd":0.408808,"usage":{"input_tokens":2,"cache_creation_input_tokens":48462,"cache_read_input_tokens":13720,"output_tokens":918,"server_tool_use":{"web_search_requests":0,"web_fetch_requests":0},"service_tier":"standard","cache_creation":{"ephemeral_1h_input_tokens":48462,"ephemeral_5m_input_tokens":0},"output_tokens_details":{"thinking_tokens":377}},"modelUsage":{"claude-opus-5-5":{"inputTokens":2,"outputTokens":918,"thinkingTokens":377,"cacheReadInputTokens":13720,"cacheCreationInputTokens":48462,"webSearchRequests":0,"costUSD":0.408808}},"permission_denials":[],"uuid":"u-result"}
+            """;
+
+    @Test
+    void parseStreamJson_recordedAuditStep_keepsTheCacheTokensBesideTheUncachedInput() {
+        ClaudeJsonResponse parsed = ClaudeOutputParser.parseStreamJson(RECORDED_AUDIT_STEP);
+
+        assertThat(parsed.result()).isEqualTo("gate_status: GREEN");
+        assertThat(parsed.usage().inputTokens()).isEqualTo(2);
+        assertThat(parsed.usage().cacheReadInputTokens()).isEqualTo(13720);
+        assertThat(parsed.usage().cacheCreationInputTokens()).isEqualTo(48462);
+        assertThat(parsed.usage().outputTokens()).isEqualTo(918);
+        assertThat(parsed.toMetadata())
+                .containsEntry("inputTokens", 2)
+                .containsEntry("cacheReadInputTokens", 13720)
+                .containsEntry("cacheCreationInputTokens", 48462)
+                .containsEntry("outputTokens", 918)
+                .containsEntry("costUsd", 0.408808)
+                .containsEntry("model", "claude-opus-5-5");
+    }
+
+    @Test
+    void parseStreamJson_resultWithoutCacheFields_reportsNoCacheTokens() {
+        String ndjson = """
+                {"type":"result","subtype":"success","result":"ok","usage":{"input_tokens":100,"output_tokens":50}}
+                """;
+
+        ClaudeJsonResponse parsed = ClaudeOutputParser.parseStreamJson(ndjson);
+
+        assertThat(parsed.usage().cacheReadInputTokens()).isNull();
+        assertThat(parsed.usage().cacheCreationInputTokens()).isNull();
+        assertThat(parsed.toMetadata()).doesNotContainKeys("cacheReadInputTokens", "cacheCreationInputTokens");
     }
 
     @Test

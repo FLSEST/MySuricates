@@ -1,11 +1,7 @@
 package com.automation.dto.response;
 
-import com.automation.modules.ModuleCatalog;
-import com.automation.modules.ModuleRegistry;
-
 import java.time.Instant;
 import java.util.List;
-import java.util.Locale;
 
 public record SystemCapabilitiesResponse(
         String apiVersion,
@@ -56,7 +52,8 @@ public record SystemCapabilitiesResponse(
     /**
      * @param selected part of the provider selection (always true on the host)
      * @param program  the CLI is on the PATH of this instance
-     * @param login    a login is present; null where this instance cannot tell (host)
+     * @param login    a login is present, by the rule of the AI provider card (7296ad45); null when no
+     *                 provider with this program is registered
      */
     public record ProviderAccessResponse(String id, boolean selected, boolean program, Boolean login) {}
 
@@ -88,28 +85,6 @@ public record SystemCapabilitiesResponse(
                                         List<String> risks, List<String> requires, String property, String envVar,
                                         String description) {
             this(name, kind, enabled, tier, maturity, risks, requires, property, envVar, description, enabled, false);
-        }
-
-        public static ModuleCapabilityResponse from(ModuleRegistry.ModuleStatus status) {
-            ModuleCatalog m = status.module();
-            return new ModuleCapabilityResponse(
-                    m.key(),
-                    apiKey(m.kind()),
-                    status.enabled(),
-                    apiKey(m.tier()),
-                    apiKey(m.maturity()),
-                    m.risks().stream().map(ModuleCapabilityResponse::apiKey).sorted().toList(),
-                    m.requires().stream().map(ModuleCatalog::key).toList(),
-                    m.property(),
-                    m.envVar(),
-                    m.description(),
-                    status.configured(),
-                    status.overridden());
-        }
-
-        /** HOST_ACCESS → host-access */
-        private static String apiKey(Enum<?> value) {
-            return value.name().toLowerCase(Locale.ROOT).replace('_', '-');
         }
     }
 

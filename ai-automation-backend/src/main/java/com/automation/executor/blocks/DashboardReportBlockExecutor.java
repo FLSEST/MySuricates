@@ -75,13 +75,13 @@ public class DashboardReportBlockExecutor implements BlockExecutor {
             String message = DashboardReportCandidate.renumber(e.getMessage(), positions);
             message = message == null || message.isBlank() ? "invalid configuration" : message;
             log.info("dashboard-report block rejected its config: {}", message);
-            result.setOutput("dashboard-report fehlgeschlagen: " + message);
+            result.setOutput("dashboard-report failed: " + message);
             result.setStatus(StepStatus.FAILED);
         } catch (RuntimeException e) {
             // Anything unexpected: a fixed message, never e.getMessage() — an uncontrolled channel
             // into step output, which every marker parser reads again at run end.
             log.warn("dashboard-report block failed unexpectedly", e);
-            result.setOutput("dashboard-report fehlgeschlagen: unerwarteter Fehler");
+            result.setOutput("dashboard-report failed: unexpected error");
             result.setStatus(StepStatus.FAILED);
         }
         result.setCompletedAt(Instant.now());
@@ -89,18 +89,26 @@ public class DashboardReportBlockExecutor implements BlockExecutor {
         return result;
     }
 
-    /** Counts and the status only — no title, no KPI text, no item text, no marker word. */
+    /**
+     * Counts and the status only — no title, no KPI text, no item text, no marker word. In English
+     * like every other block's output (TODO a4e39160): the UI translates, not the server; the
+     * frontend never parses this line, it shows it as the step's (and the run list's) result.
+     */
     private static String summary(Result report) {
-        StringBuilder out = new StringBuilder("✓ Dashboard-Bericht ").append(report.status().name());
+        StringBuilder out = new StringBuilder("✓ Dashboard report ").append(report.status().name());
         if (report.title() != null) {
-            out.append(" · Titel");
+            out.append(" · title");
         }
-        out.append(" · ").append(report.kpis().size()).append(" KPIs");
-        out.append(" · ").append(report.items().size()).append(" Einträge");
+        out.append(" · ").append(count(report.kpis().size(), "KPI"));
+        out.append(" · ").append(count(report.items().size(), "item"));
         if (report.summary() != null) {
-            out.append(" · Zusammenfassung");
+            out.append(" · summary");
         }
         return out.toString();
+    }
+
+    private static String count(int n, String noun) {
+        return n + " " + noun + (n == 1 ? "" : "s");
     }
 
     @Override

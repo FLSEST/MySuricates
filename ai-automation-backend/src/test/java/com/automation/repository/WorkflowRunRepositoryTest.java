@@ -14,6 +14,7 @@ import com.automation.metrics.SqlStatementCounter;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.Limit;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.Page;
@@ -246,15 +247,23 @@ class WorkflowRunRepositoryTest {
         assertThat(top.size()).isLessThanOrEqualTo(5);
     }
 
+    /** Der Kalender: die neuesten Runs des Zeitraums bis zum Limit, dazu ihre Gesamtzahl (TODO 86777fb4). */
     @Test
-    void should_find_runs_started_between_two_instants() {
-        Instant from = Instant.now().minus(1, ChronoUnit.DAYS);
-        Instant to = Instant.now().plus(1, ChronoUnit.DAYS);
-        run(workflowA, RunStatus.COMPLETED, Instant.now());
+    void should_find_the_newest_runs_started_between_two_instants_and_count_them_all() {
+        Instant now = Instant.now();
+        Instant from = now.minus(1, ChronoUnit.DAYS);
+        Instant to = now.plus(1, ChronoUnit.DAYS);
+        long before = runRepository.countByStartedAtBetween(from, to);
+        WorkflowRun older = run(workflowA, RunStatus.COMPLETED, now.minusSeconds(20));
+        WorkflowRun newest = run(workflowA, RunStatus.COMPLETED, now.minusSeconds(10));
+        run(workflowA, RunStatus.COMPLETED, now.minus(2, ChronoUnit.DAYS));
 
-        List<WorkflowRun> result = runRepository.findByStartedAtBetween(from, to);
+        List<WorkflowRun> result = runRepository.findByStartedAtBetweenOrderByStartedAtDesc(from, to, Limit.of(1));
 
-        assertThat(result).isNotEmpty();
+        assertThat(result).extracting(WorkflowRun::getId).containsExactly(newest.getId());
+        assertThat(runRepository.findByStartedAtBetweenOrderByStartedAtDesc(from, to, Limit.of(100)))
+                .extracting(WorkflowRun::getId).containsSubsequence(newest.getId(), older.getId());
+        assertThat(runRepository.countByStartedAtBetween(from, to)).isEqualTo(before + 2);
     }
 
     @Test
@@ -371,6 +380,23 @@ class WorkflowRunRepositoryTest {
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getTriggeredByScheduleId()).isEqualTo("schedule-123");
+    }
+
+    /** Die Run-Liste eines Zeitplans: die neuesten bis zum Limit, dazu ihre Gesamtzahl (TODO 86777fb4). */
+    @Test
+    void should_find_the_newest_runs_of_a_schedule_up_to_the_limit_and_count_them_all() {
+        String scheduleId = "schedule-" + java.util.UUID.randomUUID();
+        Instant now = Instant.now();
+        List<String> ids = new java.util.ArrayList<>();
+        for (int i = 0; i < 3; i++) {
+            WorkflowRun scheduled = run(workflowA, RunStatus.COMPLETED, now.minusSeconds(60L * i));
+            scheduled.setTriggeredByScheduleId(scheduleId);
+            ids.add(runRepository.save(scheduled).getId());
+        }
+
+        assertThat(runRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc(scheduleId, Limit.of(2)))
+                .extracting(WorkflowRun::getId).containsExactly(ids.get(0), ids.get(1));
+        assertThat(runRepository.countByTriggeredByScheduleId(scheduleId)).isEqualTo(3);
     }
 
     @Test

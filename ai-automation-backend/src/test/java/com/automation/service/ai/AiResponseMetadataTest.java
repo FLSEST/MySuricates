@@ -1,6 +1,6 @@
 package com.automation.service.ai;
 
-import com.automation.service.cli.ClaudeJsonResponse;
+import com.automation.service.cli.claude.ClaudeJsonResponse;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -31,6 +31,35 @@ class AiResponseMetadataTest {
         assertThat(meta.numTurns()).isEqualTo(3);
         assertThat(meta.sessionId()).isEqualTo("sess-123");
         assertThat(meta.toolNames()).containsExactly("read_file", "write_file");
+    }
+
+    /** The cached input is reported beside {@code inputTokens}, which stays the CLI's own figure (TODO 20adda30). */
+    @Test
+    void fromClaudeResponse_carriesTheCacheTokens_intoTheStepMetadata() {
+        var usage = new ClaudeJsonResponse.Usage(2, 918, 13720, 48462);
+        var parsed = new ClaudeJsonResponse("ok", "sess", 0.408808, 13043L, 8794L, 1, usage, null, "claude-opus-5-5", List.of());
+
+        AiResponseMetadata meta = AiResponseMetadata.fromClaudeResponse(parsed);
+
+        assertThat(meta.cacheReadInputTokens()).isEqualTo(13720);
+        assertThat(meta.cacheCreationInputTokens()).isEqualTo(48462);
+        assertThat(meta.estimated()).isFalse();
+        assertThat(meta.toMap())
+                .containsEntry("inputTokens", 2)
+                .containsEntry("outputTokens", 918)
+                .containsEntry("cacheReadInputTokens", 13720)
+                .containsEntry("cacheCreationInputTokens", 48462);
+    }
+
+    @Test
+    void withoutCacheFigures_noCacheKeys_insteadOfAMadeUpZero() {
+        var parsed = new ClaudeJsonResponse("ok", null, null, null, null, null,
+                new ClaudeJsonResponse.Usage(100, 50), null, List.of());
+
+        assertThat(AiResponseMetadata.fromClaudeResponse(parsed).toMap())
+                .doesNotContainKeys("cacheReadInputTokens", "cacheCreationInputTokens");
+        assertThat(AiResponseMetadata.estimated("prompt text", "answer").toMap())
+                .doesNotContainKeys("cacheReadInputTokens", "cacheCreationInputTokens");
     }
 
     @Test

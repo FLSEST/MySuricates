@@ -38,11 +38,11 @@ describe('readContextSchema', () => {
     const info = readContextSchema({
       metadata: {
         contextSchema: {
-          name: { description: 'Your full name', placeholder: 'e.g. Flo' },
+          name: { description: 'Your full name', placeholder: 'e.g. Alex' },
         },
       },
     });
     expect(info.descriptions).toEqual({ name: 'Your full name' });
-    expect(info.placeholders).toEqual({ name: 'e.g. Flo' });
+    expect(info.placeholders).toEqual({ name: 'e.g. Alex' });
   });
 });

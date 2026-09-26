@@ -207,7 +207,7 @@ The assistant can suggest actions via `<tool type="...">JSON</tool>` tags. `Assi
 | `create_todo` | `title` | Create a todo (optional: description, priority, tags, projectId) |
 | `update_todo_status` | `id`, `status` | Change todo status (OPEN/IN_PROGRESS/DONE/BACKLOG) |
 | `create_workflow` | `projectId`, `name` | Create a workflow (optional: blocks, instructions, model, defaultContext) |
-| `update_workflow` | `workflowId` | Update workflow fields (only provided fields are changed) |
+| `update_workflow` | `workflowId` | Update workflow fields (only provided fields are changed, the version label `version` too, as with `PUT`) |
 | `delete_workflow` | `workflowId` | Soft-delete a workflow |
 | `start_workflow` | `workflowId` | Start a workflow (optional: context for input variables) |
 | `cancel_run` | `runId` | Cancel a running run |
@@ -396,7 +396,7 @@ Two STOMP subscriptions:
 
 ### Additional Components
 
-- **AssistantMessage** (`components/assistant/AssistantMessage.tsx`): Markdown rendering (react-markdown + remark-gfm), collapse at >300 characters, ActionButtons for `run_workflow`/`show_workflow`/`show_run`/`start_wish`/`ask_choice`, PendingToolCard with Confirm/Reject
+- **AssistantMessage** (`components/assistant/AssistantMessage.tsx`): message bubble that collapses above 300 px height; markdown rendering (react-markdown + remark-gfm) in `AssistantMarkdown.tsx`, `ActionButton.tsx` for `run_workflow`/`show_workflow`/`show_run`/`start_wish`/`ask_choice`, `PendingToolCard.tsx` with Confirm/Reject (state in `hooks/usePendingToolDecision.ts`)
 - **StatusIndicator** (`components/assistant/AssistantWelcome.tsx`): WebSocket phases or rotating thinking phrases (2.5s interval)
 - **assistantPanelUtils** (`components/assistantPanelUtils.ts`): `parsePageContext(pathname)` extracts structured context from URL
 

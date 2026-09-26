@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
-# Teil von scripts/setup.sh: welcher Port frei ist. Belegt heisst, auf 127.0.0.1 nimmt etwas Verbindungen
-# an — ausser es ist die laufende Instanz, die gerade eingerichtet wird (0e5b82b7). Die gibt ihren Port
-# beim Neustart frei; frueher zaehlte sie mit, und --reconfigure ohne --port zog sie auf den naechsten
-# Port (9090 → 9091). Liest INSTANCES_DIR und SCRIPT_DIR des Installers und kept_value aus
-# setup-kept.sh — fuer sich allein nicht nutzbar. bash 3.2 (macOS).
+# Teil von scripts/setup.sh: welcher Port frei ist. Belegt heisst, auf der Adresse, an die die Instanz
+# bindet, nimmt etwas Verbindungen an — ausser es ist die laufende Instanz, die gerade eingerichtet wird
+# (0e5b82b7). Die gibt ihren Port beim Neustart frei; frueher zaehlte sie mit, und --reconfigure ohne
+# --port zog sie auf den naechsten Port (9090 → 9091). Liest INSTANCES_DIR, SCRIPT_DIR und BIND des
+# Installers, kept_value aus setup-kept.sh und instance_connect_addr aus instance-runs.sh — fuer sich
+# allein nicht nutzbar. bash 3.2 (macOS).
 
-port_in_use() { (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null; }
+# Dieselbe Adresse wie port_busy in instance.sh (065144ee): mit --bind auf eine Adresse lauscht die
+# Instanz nur dort — eine Belegung auf 127.0.0.1 hindert sie nicht, eine dort sah die Portwahl nicht
+port_in_use() { (exec 3<>"/dev/tcp/$(instance_connect_addr "${BIND:-}")/$1") 2>/dev/null; }
 
 # own_port NAME — der Port der laufenden Instanz NAME: der aus ihrer Datei, wenn instance.sh sie als
 # laufend meldet (auf dem Rechner ueber die PID, im Container ueber docker); sonst leer

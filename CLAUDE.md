@@ -19,16 +19,19 @@ BEVOR eine Änderung als fertig gilt oder committet wird, MÜSSEN alle relevante
      hinein. Ein am 2026-09-18 auf main aufgefallener Paketzyklus wurde deshalb erst beim
      Integrations-Checkpoint sichtbar, nicht schon im Feature-Branch.
    - **Gezielter Lauf gegen eine Klasse mit `@Nested`-Tests:** `-Dtest='Klasse'` wählt in diesem
-     Repo (Surefire 3.5.4) auch die `@Nested`-Inneren-Klassen aus — verifiziert per gezielter
-     Fehlprobe in einer `@Nested`-Methode, die den Build zuverlässig scheitern ließ. **Trotzdem**
-     als Konvention `-Dtest='Klasse*'` verwenden (auch mit Wildcard, matcht ebenfalls alle
-     `@Nested`-Klassen und bleibt unabhängig von Surefire-Version/-Konfiguration verlässlich) —
-     und sich **nie** an der Summenzeile der äußeren Klasse allein orientieren: Der eigene
-     Report der äußeren Klasse (`target/surefire-reports/<Klasse>.txt`) meldet grundsätzlich
-     `Tests run: 0`, weil die äußere Klasse selbst keine `@Test`-Methoden hat — das ist normal
-     und **kein** Hinweis auf einen leeren Lauf. Maßgeblich ist die abschließende
-     `Results: Tests run: N`-Zeile des gesamten Maven-Laufs bzw. dessen Exit-Code, nicht eine
-     einzelne Klassenzeile oder ein abgeschnittener `tail`.
+     Repo (Surefire 3.5.6 aus dem Spring-Boot-Parent) auch die `@Nested`-Inneren-Klassen aus —
+     verifiziert per gezielter Fehlprobe, die den Build zuverlässig scheitern ließ. **Trotzdem**
+     als Konvention `-Dtest='Klasse*'` verwenden (matcht ebenfalls alle `@Nested`-Klassen und
+     bleibt unabhängig von Surefire-Version/-Konfiguration verlässlich). Maßgeblich sind der
+     Exit-Code des gesamten Maven-Laufs und die `<testcase>`-/`<failure>`-/`<error>`-Elemente in
+     `target/surefire-reports/TEST-<Klasse>.xml` (dort landen auch alle `@Nested`-Klassen). Nicht
+     zum Zählen taugen: die `.txt` der äußeren Klasse (grundsätzlich `Tests run: 0`, weil sie
+     selbst keine `@Test`-Methoden hat — normal, **kein** leerer Lauf), der `<testsuite>`-Kopf der
+     XML (je nach Surefire-Version), eine einzelne Klassenzeile, ein abgeschnittener `tail` — und
+     auch die abschließende `Results: Tests run: N`-Zeile nicht: Sie zählt gleichnamige Methoden
+     verschiedener `@Nested`-Klassen nur einmal. Keine Reruns
+     (`-Dsurefire.rerunFailingTestsCount` > 0): Dann gilt ein roter Test mit grünem Namensvetter
+     nebenan als „Flake“ und der Build als grün. Probe-Zahlen: [docs/entwicklung.md](docs/entwicklung.md).
    - Frontend: `npx tsc --noEmit` + `npm run lint`
    - E2E (falls betroffen): `npm run test:e2e`
    - **Vor dem Push** prüft der `pre-push`-Hook (`scripts/ci/pre-push-checks.sh`) Commit-Nachrichten,
@@ -122,7 +125,7 @@ See [AGENTS.md](AGENTS.md) for a complete REST API reference (workflow/chain CRU
 ## Architecture Overview
 
 - **Dev backend runs from a JAR copy**, never from `target/classes`: `scripts/start-autotrigger-dev.sh restart` builds, copies to `~/.local/state/autotrigger-dev/runtime/` and starts `java -jar`. IDE builds (VS Code Java/m2e) go to `target-ide/` via the pom profile `ide-eclipse-output`. Rationale and the guard: [docs/entwicklung.md](docs/entwicklung.md) → „Builds neben dem laufenden Dev-Backend".
-- **All Claude CLI execution happens on the host** (not inside Docker containers) — `HostClaudeService.executeAction()` runs `claude -p` with `ProcessBuilder.directory(projectPath)`. `CLAUDE_CODE`/`CLAUDECODE` env vars removed to prevent nested-session errors.
+- **Workflow blocks run the Claude CLI on the host** (not inside Docker containers) — `HostClaudeService.executeAction()` runs `claude -p` with `ProcessBuilder.directory(projectPath)`. `CLAUDE_CODE`/`CLAUDECODE` env vars removed to prevent nested-session errors. Exceptions (project container): ad-hoc run commands (`RunControlService` → `CliSession`, `docker exec … claude`) and the terminal (`TerminalSession`, `bash -l`).
 - **Provider routing**: AI-capable block executors (agentic and compress-ai included, not integration) resolve the provider via `context.providerFor(block)` — block > workflow > system default (`BlockAiSettings`). Setting `"provider": "CODEX"` in workflow JSON applies to every AI block without its own `provider`. `AiProviderRegistry.resolve()` falls back to the configured default provider.
 - **Soft-Delete**: Workflows use `@SQLRestriction("deleted_at IS NULL")`. Projects use `archived_at` with repository filter methods (not `@SQLRestriction`, because it would break eager-loaded `Workflow.project`).
 - **ESLint**: Flat config (`eslint.config.js`, ESLint 9+) with `typescript-eslint`, `react-hooks`, `react-refresh`. Test files: `no-explicit-any` disabled.
@@ -142,7 +145,7 @@ For full architecture documentation: [docs/architektur.md](docs/architektur.md)
 
 - **Agent Instructions**: Two-level injection — base instructions (`src/main/resources/agent-instructions.md`, all workflows) + per-workflow instructions (`workflow.instructions` column, editable in UI). Block execution uses `--append-system-prompt`, agentic REASON uses `--system-prompt`.
 - **Model Selection**: `workflow.model` field, passed via `--model` flag. Use the CLI aliases `opus`/`sonnet`/`haiku`/`fable` (always the newest model of that family, never stale) or pin a concrete id like `claude-opus-5`; pi takes `<backend>/<model>`, codex a slug. The UI suggestions come from `GET /api/v1/system/ai-providers/{id}/models` (`ModelCatalogService`: host-discovered via `pi --list-models` / codex cache, Claude = aliases; free text always allowed). Never hard-code dated model ids in code, templates or prompts. Agentic REASON and ACT both use the workflow model (`ReasoningRequest.model`); providers fall back to their default only when no model is configured. **Per-block override**: AI-capable blocks (simple, agentic, skill-capability, nested blocks in foreach/while/conditional/retry/switch) accept config keys `provider` and `model`; precedence Block > Workflow > System default (`executor/BlockAiSettings`). A block `provider` that differs from the workflow's does not inherit the workflow model (model ids are provider-specific). Step metadata `aiRequest.provider/model` show what was actually used — also on wrapper blocks (foreach/while/conditional/switch/retry/skill-capability carry the keys of their first inner AI call; foreach adds `items`+`totalItems`, while `iterations`+`iterationCount`, retry `attempts`+`maxAttempts`). The run detail UI derives the step kind (AI / deterministic / human / unknown, `stepKind` in `frontend/src/components/workflow/stepMetadata.ts`) from exactly these keys — a wrapper without `aiRequest` counts as deterministic only when its result keys are present, so keep writing them.
-- **Reasoning Effort**: `workflow.effort` field (`low`/`medium`/`high`/`xhigh`, nullable), optionally overridden per block via config key `"effort"` (precedence: block > workflow > provider default). Mapping: Claude → `--effort`, Pi → `--thinking` (explicit effort beats the maxTurns heuristic), Codex → ignored (`supportsEffort=false`). Unset ⇒ no flag emitted (byte-identical to pre-effort behavior). Visible in step metadata `aiRequest.effort`.
+- **Reasoning Effort**: `workflow.effort` field (`low`/`medium`/`high`/`xhigh`, nullable), optionally overridden per block via config key `"effort"` (precedence: block > workflow > provider default). Mapping: Claude → `--effort`, Pi → `--thinking` (explicit effort beats the maxTurns heuristic), Codex → ignored (`supportsEffort=false`). Unset ⇒ no flag emitted (byte-identical to pre-effort behavior). Visible in step metadata `aiRequest.effort` only when set and applied (not for Codex). Step tokens: Claude's `inputTokens` is the uncached input only, the cached part is in `cacheReadInputTokens`/`cacheCreationInputTokens` (not counted by the agentic budget).
 - **Per-Call Token Limit**: `HostClaudeConfig.maxTokens` (property `automation.host-claude.max-tokens`) — optional output token limit via `--max-tokens` flag. Distinct from agentic block's `max_total_tokens` budget (cumulative input+output).
 - **Per-Block Timeout**: Optional `timeout_seconds` in block config overrides global `automation.host-claude.timeout-seconds` (default: 300s). Applies to both shell and Claude CLI calls.
 

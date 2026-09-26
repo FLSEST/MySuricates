@@ -169,7 +169,8 @@ flowchart LR
     subgraph CORE["Core pages"]
         DASH["/ Dashboard<br/>/projects + /projects/:id<br/>/workflows + /workflows/:id"]
         RUN["/workflows/:id/run/:runId<br/>/runs (/runs/:runId redirects)<br/>/approvals"]
-        SCH["/schedules + /calendar<br/>/todos, /cockpit, /goals/:goalId"]
+        SCH["/schedules + /calendar<br/>/todos, /cockpit"]
+        GOAL["/goals overview<br/>/goals/:goalId with relation map"]
         ACT["/activity + /dlq<br/>/docs<br/>/settings"]
     end
     subgraph MOD["ModuleRoute (optional modules)"]
@@ -215,6 +216,7 @@ sequenceDiagram
       <tr><td>Skill activation</td><td><code>useWorkflow</code></td><td>activate/deactivate</td><td><code>workflows</code></td></tr>
       <tr><td>Schedules</td><td><code>useSchedules</code></td><td>create/update/toggle/delete</td><td><code>schedules</code> (list, calendar, preview)</td></tr>
       <tr><td>Webhooks</td><td><code>useWebhooks</code></td><td>create/toggle/delete, token and secret</td><td><code>webhooks</code></td></tr>
+      <tr><td>Goals</td><td><code>useGoals</code>, <code>useGoal</code>, <code>useGoalRelations</code></td><td>create/update/delete, assign and order TODOs, assessment, milestones, goal guard</td><td><code>goals</code>; whatever touches TODOs also <code>todos</code>; the guard also <code>schedules</code> and <code>workflows</code></td></tr>
       <tr><td>System</td><td><code>useSystemHealth</code>, <code>useSystemInfo</code></td><td>—</td><td>none; health refetches every 30 s</td></tr>
     </tbody>
   </table>

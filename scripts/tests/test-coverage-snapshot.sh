@@ -262,6 +262,81 @@ check "Nachsatz mit Marker und JSON-Beginn: offener Envelope, RED wie die Ingest
   'grep -qx "gate_status: RED" "$TMP/gate.txt" && grep -qx "gate_category: audit-invalid" "$TMP/gate.txt"'
 check "Gate laeuft auch hier ohne stderr" '[ ! -s "$TMP/gate-err.txt" ]'
 
+echo "8) Records mit eigener Logik bleiben testpflichtig (134e7226)"
+# Seit 59e22c53 nimmt der Messblock Records aus, gedacht fuer reine Datentraeger. Ein Record mit Parser
+# (ICalContentLine, 19 Verzweigungen) fiel damit aus dem Snapshot. Ausgenommen bleibt ein Record nur ohne
+# Methode mit Rumpf, abgesehen von Accessoren und Konstruktoren; ein Methodenkopf im Kommentar zaehlt nicht.
+FIXR="$TMP/fixture-records"
+MAINR="$FIXR/ai-automation-backend/src/main/java/com/automation/service/ical"
+mkdir -p "$MAINR" "$FIXR/ai-automation-backend/src/test/java/com/automation/service/ical" \
+         "$FIXR/ai-automation-frontend/src"
+cat > "$MAINR/ContentLine.java" <<'JAVA'
+package com.automation.service.ical;
+
+public record ContentLine(String name, java.util.Map<String, String> params, String value) {
+
+    public static ContentLine parse(String line) {
+        int colon = line.indexOf(':');
+        if (colon <= 0) return null;
+        return new ContentLine(line.substring(0, colon), java.util.Map.of(), line.substring(colon + 1));
+    }
+}
+JAVA
+cat > "$MAINR/Window.java" <<'JAVA'
+package com.automation.service.ical;
+
+public record Window(java.time.Instant from, java.util.List<String> tags) {
+
+    public Window {
+        tags = java.util.List.copyOf(tags);
+    }
+
+    public Window(java.time.Instant from) {
+        this(from, java.util.List.of());
+    }
+
+    @Override
+    public java.time.Instant from() {
+        return from;
+    }
+}
+JAVA
+cat > "$MAINR/Quoted.java" <<'JAVA'
+package com.automation.service.ical;
+
+public record Quoted(String text) {
+    /*
+    static String format(String s) {
+    */
+    static final String HINT = "void render() {";
+}
+JAVA
+printf '%s\n' 'package com.automation.service.ical;' 'public record Checked(String value) {' \
+  '    boolean isBlank() {' '        return value == null || value.isBlank();' '    }' '}' > "$MAINR/Checked.java"
+printf '%s\n' 'class CheckedTest {' '    @Test void a() {}' '}' \
+  > "$FIXR/ai-automation-backend/src/test/java/com/automation/service/ical/CheckedTest.java"
+echo "export const x = 1;" > "$FIXR/ai-automation-frontend/src/x.ts"
+git init -q "$FIXR" && ( cd "$FIXR" && git -c user.name=t -c user.email=t@example.invalid \
+  add -A && git -c user.name=t -c user.email=t@example.invalid commit -q -m init )
+python3 - "$DEF" "$FIXR" > "$TMP/command-records.sh" <<'PY'
+import json, sys
+definition = json.load(open(sys.argv[1], encoding='utf-8'))
+block = next(b for b in definition['blocks'] if b.get('config', {}).get('label', '').startswith('Coverage-Metriken'))
+print(block['config']['command'].replace('{{ project_path }}', sys.argv[2]))
+PY
+( cd "$FIXR" && bash "$TMP/command-records.sh" ) > "$TMP/out-records.txt" 2> "$TMP/err-records.txt"
+awk '/^UNTESTED gesamt:/{f=1;next} f && /^[[:space:]]*$/{f=0} f' "$TMP/out-records.txt" > "$TMP/untested-records.txt"
+check "Record mit Parser-Methode ist ungetestet gelistet" \
+  'grep -q "^service/ical/ContentLine\.java${TAB}[0-9]\+$" "$TMP/untested-records.txt"'
+check "Accessor, kompakter und zweiter Konstruktor sind keine Logik" '! grep -q "Window" "$TMP/untested-records.txt"'
+check "Methodenkopf in Kommentar oder String ist keine Logik"         '! grep -q "Quoted" "$TMP/untested-records.txt"'
+check "Record mit Logik und Test bleibt ungelistet"                    '! grep -q "Checked" "$TMP/untested-records.txt"'
+check "genau ein ungetesteter Record, Soll-Groesse 1" \
+  'grep -qx "UNTESTED gesamt: 1" "$TMP/out-records.txt" && grep -qx "ERWARTETE FINDINGS: 1" "$TMP/out-records.txt"'
+check "nur die zwei Records ohne Logik ausgenommen" \
+  'grep -qx "Datenklassen ausgenommen (DTO/Entity/Repository/Event/Enum/Record/Interface): 2" "$TMP/out-records.txt"'
+check "Messblock laeuft ohne stderr" '[ ! -s "$TMP/err-records.txt" ]'
+
 echo
 echo "passed=$PASS failed=$FAIL"
 [ "$FAIL" -eq 0 ]

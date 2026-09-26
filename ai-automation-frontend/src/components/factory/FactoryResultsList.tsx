@@ -3,7 +3,7 @@ import {
   Factory, CheckCircle2, XCircle, Clock, ArrowUpRight, RotateCcw, Award, Package,
 } from 'lucide-react';
 import { Card, Button, Spinner, Badge } from '../ui';
-import { useT } from '../../i18n';
+import { useI18nStore, useT } from '../../i18n';
 import { formatDuration } from '../../utils/formatTime';
 import type { Workflow, WorkflowFactoryResult } from '../../types';
 
@@ -27,12 +27,18 @@ function StatusIcon({ status }: { status: string }) {
 }
 
 function ResultStatusBadge({ status }: { status: string }) {
+  const f = useT().factory;
   const variant = status === 'VERIFIED' ? 'success'
     : status === 'PROMOTED' ? 'warning'
     : status === 'FAILED' ? 'danger'
     : status === 'EXPORTED' ? 'accent'
     : 'default';
-  return <Badge variant={variant} dot>{status}</Badge>;
+  const labels: Record<string, string> = {
+    VERIFIED: f.statusVerified, FAILED: f.statusFailed, CREATED: f.statusCreated,
+    PROMOTED: f.statusPromoted, EXPORTED: f.statusExported, UNTESTED: f.statusUntested,
+  };
+  // An unknown status from a newer backend stays readable as it is
+  return <Badge variant={variant} dot>{labels[status] ?? status}</Badge>;
 }
 
 /**
@@ -52,6 +58,7 @@ export function FactoryResultsList({
   onExport: (target: FactoryExportTarget) => void;
 }) {
   const t = useT();
+  const locale = useI18nStore((s) => s.locale);
   const navigate = useNavigate();
 
   return (
@@ -70,7 +77,7 @@ export function FactoryResultsList({
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="font-medium text-text-primary truncate">
-                    {r.workflowName ?? 'Unknown'}
+                    {r.workflowName ?? t.factory.unknownWorkflow}
                   </span>
                   <ResultStatusBadge status={r.status} />
                 </div>
@@ -79,12 +86,12 @@ export function FactoryResultsList({
                 )}
                 {r.retryErrors.length > 0 && (
                   <p className="text-xs text-warning mt-0.5">
-                    {r.retryErrors.length} retry error(s)
+                    {t.factory.retryErrors.replace('{count}', String(r.retryErrors.length))}
                   </p>
                 )}
               </div>
               {r.durationMs > 0 && (
-                <span className="text-xs text-text-secondary">{formatDuration(r.durationMs)}</span>
+                <span className="text-xs text-text-secondary">{formatDuration(r.durationMs, locale)}</span>
               )}
               <div className="flex gap-1">
                 {r.workflowId && (
@@ -124,7 +131,7 @@ export function FactoryResultsList({
                   <Button
                     size="sm" variant="ghost"
                     onClick={() => navigate(`/workflows/${r.workflowId}`)}
-                    title="Open workflow"
+                    title={t.factory.openWorkflow}
                   >
                     <ArrowUpRight className="w-3.5 h-3.5" />
                   </Button>
@@ -171,7 +178,7 @@ export function FactoryResultsList({
                   <Button
                     size="sm" variant="ghost"
                     onClick={() => navigate(`/workflows/${fw.id}`)}
-                    title="Open workflow"
+                    title={t.factory.openWorkflow}
                   >
                     <ArrowUpRight className="w-3.5 h-3.5" />
                   </Button>

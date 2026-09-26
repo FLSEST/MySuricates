@@ -60,6 +60,7 @@ class WorkflowContextDataServiceTest {
     /** Eine Quelle, deren Lader wirft — wie ein Ausfall mitten in der Abfrage. */
     private static PlatformVariableSource failing(String name) {
         return new PlatformVariableSource() {
+            @Override public List<String> allNames() { return List.of(name); }
             @Override public List<String> names(Request request) { return List.of(name); }
             @Override public java.util.Map<String, String> load(Request request) { throw new IllegalStateException("kaputt"); }
         };
@@ -68,9 +69,51 @@ class WorkflowContextDataServiceTest {
     /** Eine Quelle mit festem Wert. */
     private static PlatformVariableSource fixed(String name, String value) {
         return new PlatformVariableSource() {
+            @Override public List<String> allNames() { return List.of(name); }
             @Override public List<String> names(Request request) { return List.of(name); }
             @Override public java.util.Map<String, String> load(Request request) { return java.util.Map.of(name, value); }
         };
+    }
+
+    // --- platformVariableNames (TODO 2a0695ff) ------------------------------------------
+
+    @Test
+    void platformVariableNames_areEveryNameOfEverySource_whetherItAppliesToARunOrNot() {
+        assertThat(service.platformVariableNames()).containsExactlyElementsOf(java.util.stream.Stream.concat(
+                java.util.stream.Stream.of("previous_report", "open_todos", "request_metrics"),
+                java.util.stream.Stream.concat(GoalContextSource.VARIABLES.stream(),
+                        java.util.stream.Stream.of("audit_findings"))).toList());
+        verify(auditContextSource, org.mockito.Mockito.never()).auditKey(any());
+    }
+
+    /**
+     * TODO 2a0695ff: Eine Quelle setzt nur, was sie angemeldet hat. Ein fremder Name – hier ein Systemwert – wird
+     * verworfen und laut gemeldet, statt als Plattform-Daten an den reservierten Namen vorbei gesetzt zu werden.
+     */
+    @Test
+    void injectPlatformData_aValueTheSourceDidNotAnnounce_isDroppedAndReported() {
+        PlatformVariableSource smuggler = new PlatformVariableSource() {
+            @Override public List<String> allNames() { return List.of("smuggler_report"); }
+            @Override public List<String> names(Request request) { return List.of("smuggler_report"); }
+            @Override public java.util.Map<String, String> load(Request request) {
+                return java.util.Map.of("smuggler_report", "angemeldet", "project_path", "/evil");
+            }
+        };
+        ExecutionContext ctx = ExecutionContext.builder().workflowRunId("run-1").build();
+        ctx.setVariable("project_path", "/p");
+
+        new WorkflowContextDataService(List.of(smuggler), activityLogService).injectPlatformData(ctx, "wf-1", "proj-1");
+
+        assertThat(ctx.getVariable("smuggler_report")).isEqualTo("angemeldet");
+        assertThat(ctx.getVariable("project_path")).isEqualTo("/p");
+        assertThat(ctx.isUntrusted("project_path")).as("bleibt der vertrauenswuerdige Systemwert").isFalse();
+        verify(activityLogService).warn(eq(LogCategory.EXECUTION), org.mockito.ArgumentMatchers.contains("'project_path'"),
+                eq("WorkflowContextDataService"), eq("run-1"), eq("wf-1"));
+    }
+
+    @Test
+    void platformVariableNames_areEveryOneOfThemASystemVariable_soNoneLandsInAStepDelta() {
+        assertThat(ContextDeltaCalculator.SYSTEM_VAR_KEYS).containsAll(service.platformVariableNames());
     }
 
     // --- injectPlatformData ------------------------------------------------------------

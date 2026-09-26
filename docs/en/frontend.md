@@ -164,6 +164,7 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 - Badge display in the sidebar for open TODOs
 - Filter, view and page state (persisted, debounced search, `?projectId=` from the cockpit) comes from `hooks/useTodoFilters.ts`; the quick-add bar is `components/todo/TodoQuickAdd.tsx`, its state and the `n` shortcut (focuses the title outside of form fields) live in `hooks/useTodoQuickAdd.ts` and therefore in the page — input survives the loading spinner when a filter changes
 - `hooks/useTodoBoard.ts` provides the data of the active view: one page in the list, one query per column the status filter shows on the board (never a mixed page spread over the columns); `hooks/useTodoEditor.ts` the edit dialog including the deep link `?todoId=` (opens the todo once, releases filters that would hide it, highlights its row until shortly after closing), saving and export. The filter bar and the tag chips are `components/todo/TodoFilterBar.tsx` and `TodoTagChips.tsx`
+- The edit dialog `components/todo/TodoEditModal.tsx` (also used in the goal view via `GoalTodoEditor`) holds the form fields; "Export / Links" is `TodoExportSection.tsx` (tracker and target from the own choice, else from the project configuration, else the first connected tracker: `hooks/useTodoExportTarget.ts`, the own choice starts empty for every todo), the read-only facts (source, session, runs, workflow, dates) are `TodoMetadata.tsx`
 
 ### ActivityLog (`/activity`)
 
@@ -182,6 +183,7 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 - Full pipeline: generate → test instance → verify → promote
 - Topic category selection
 - Form state, "Create Workflow" and "Create & Test" (topic and project required, testing only with the test instance up, invalid JSON in the test inputs is reported and sent as `{}`) live in `hooks/useFactoryForm.ts`; the form is `components/factory/FactoryCreateForm.tsx`, the result list `FactoryResultsList.tsx` (this session's results before earlier generated workflows, status icons in the tones of the status badges)
+- The flow diagram `components/factory/FactoryFlowDiagram.tsx` (see [architecture](architektur.md) → Workflow Factory) holds mode, switches and the step list; the drawing is `FactoryFlowSvg.tsx`, geometry and timeline live in `factoryFlow.ts`, the animation clock in `hooks/useTimelineClock.ts` (loops, under `prefers-reduced-motion` only after "Play" and a single pass; a changed switch starts over). The browser remembers whether the card is collapsed
 
 ### DialogImport (`/dialogs`)
 
@@ -209,7 +211,7 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 
 ### WorkflowDetail (`/workflows/:id`) — Extensions
 
-- **Memory tab:** View, activate, delete, re-extract workflow memory entries
+- **Memory tab:** View, activate, delete, re-extract workflow memory entries (`WorkflowMemoryPanel.tsx`; one entry is `WorkflowMemoryItem.tsx`, the extraction dialog `MemoryExtractModal.tsx` with its state in `hooks/useMemoryExtraction.ts`: chosen runs, provider, seconds counter, closing on success)
 - **Instructions tab:** Edit workflow-specific agent instructions in Monaco Editor
 - **Gate status:** Display of the last gate status in the run history
 - **BPMN diagram:** `BpmnDiagramView.tsx` draws the BPMN export as SVG (zoom, click/hover per block, live status during a run). The pure logic — reading the XML, top-to-bottom layout, wrapping labels, element id → block selection — lives in `bpmnLayout.ts` (test `bpmnLayout.test.ts`), the shapes and markers per element type in `BpmnShapes.tsx`.
@@ -240,6 +242,7 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 - Context-sensitive chat with page suggestions
 - Persisted sessions, WebSocket integration
 - Resizing at the left and top edge (desktop only) via `hooks/usePanelResize.ts`: dragging away from the bottom-right anchor enlarges, each edge between its minimum and the window minus a margin; the auto-growing input (Enter sends, Shift+Enter breaks the line, at most 240 px) is `assistant/AssistantComposer.tsx`
+- A message is `assistant/AssistantMessage.tsx` (`MessageBubble`: bubble, collapsing long answers, timestamp); next to it live `AssistantMarkdown.tsx` (markdown of the answer, app-internal links navigate inside the panel), `ActionButton.tsx` (the answer's actions, one button per option for `ask_choice`) and `PendingToolCard.tsx` (confirm or reject a proposed change; state in `hooks/usePendingToolDecision.ts`). `ActionButton` and `PendingToolCard` are also used by `HomeAnswer` on the Simple home page
 - See [Assistant System](assistant-system.md) for details
 
 ### `src/components/settings/`
@@ -251,7 +254,7 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 
 ### Shared Components (`src/components/shared/`)
 
-**Rule:** `shared` imports no feature folders (`workflow`, `goal`, `hints`, `todo`, `settings` …) and not `assistantPanelUtils`, only `ui`, `api`, `hooks`, `utils`, `types`, `stores` and `i18n`. A component that needs a feature folder belongs in that folder; feature-free helpers live in `src/utils/` (e.g. `placeholderContext.ts`, `internalAppPath.ts`). That is why `AgenticStepCard`, `ForEachStepCard` and `ApprovalDialog` (approval dialog in a run, uses `Hint`) live in `components/workflow/`, and `TodoEditModal` in `components/todo/`.
+**Rule:** `shared` imports no feature folders (`workflow`, `goal`, `hints`, `todo`, `settings` …) and not `assistantPanelUtils`, only `ui`, `api`, `hooks`, `utils`, `types`, `stores` and `i18n`. A component that needs a feature folder belongs in that folder; feature-free helpers live in `src/utils/` (e.g. `placeholderContext.ts`, `internalAppPath.ts`). That is why `AgenticStepCard`, `ForEachStepCard` and `ApprovalDialog` (approval dialog in a run, uses `Hint`) live in `components/workflow/`, and `TodoEditModal` in `components/todo/`. ESLint enforces the rule (`no-restricted-imports`, `no-restricted-syntax` for `import()`, in `eslint.config.js`); `npm run lint` fails on a violation.
 
 | Component | Description |
 |---|---|

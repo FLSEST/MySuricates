@@ -9,6 +9,7 @@ import com.automation.repository.ScheduledWorkflowRepository;
 import com.automation.repository.WorkflowChainRepository;
 import com.automation.repository.WorkflowRepository;
 import org.junit.jupiter.api.BeforeEach;
+import org.springframework.data.domain.Limit;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -302,41 +303,63 @@ class SchedulerServiceTest {
 
     // --- findWorkflowRunsByScheduleId ---
 
+    /** Unter dem Limit ist die Liste schon alles: keine Zaehlabfrage (TODO 86777fb4). */
     @Test
-    void findWorkflowRunsByScheduleId_delegatesToRepository() {
+    void findWorkflowRunsByScheduleId_belowTheLimit_countsNothing() {
         WorkflowRun run = WorkflowRun.builder().id("run-1").build();
-        when(workflowRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc("sched-1"))
+        when(workflowRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc("sched-1", Limit.of(50)))
                 .thenReturn(List.of(run));
 
-        List<WorkflowRun> result = schedulerService.findWorkflowRunsByScheduleId("sched-1");
+        SchedulerService.NewestRuns<WorkflowRun> result = schedulerService.findWorkflowRunsByScheduleId("sched-1", 50);
 
-        assertThat(result).hasSize(1);
+        assertThat(result.runs()).containsExactly(run);
+        assertThat(result.total()).isEqualTo(1);
+        verify(workflowRunRepository, never()).countByTriggeredByScheduleId(any());
+    }
+
+    /** Am Limit zaehlt eine Abfrage alle Runs – die Oberflaeche nennt dann „weitere“ (TODO 86777fb4). */
+    @Test
+    void findWorkflowRunsByScheduleId_atTheLimit_countsAll() {
+        List<WorkflowRun> newest = List.of(WorkflowRun.builder().id("run-2").build(), WorkflowRun.builder().id("run-1").build());
+        when(workflowRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc("sched-1", Limit.of(2)))
+                .thenReturn(newest);
+        when(workflowRunRepository.countByTriggeredByScheduleId("sched-1")).thenReturn(26_000L);
+
+        SchedulerService.NewestRuns<WorkflowRun> result = schedulerService.findWorkflowRunsByScheduleId("sched-1", 2);
+
+        assertThat(result.runs()).isEqualTo(newest);
+        assertThat(result.total()).isEqualTo(26_000L);
     }
 
     // --- findChainRunsByScheduleId ---
 
     @Test
-    void findChainRunsByScheduleId_delegatesToRepository() {
+    void findChainRunsByScheduleId_atTheLimit_countsAll() {
         ChainRun run = ChainRun.builder().id("crun-1").build();
-        when(chainRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc("sched-1"))
+        when(chainRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc("sched-1", Limit.of(1)))
                 .thenReturn(List.of(run));
+        when(chainRunRepository.countByTriggeredByScheduleId("sched-1")).thenReturn(3L);
 
-        List<ChainRun> result = schedulerService.findChainRunsByScheduleId("sched-1");
+        SchedulerService.NewestRuns<ChainRun> result = schedulerService.findChainRunsByScheduleId("sched-1", 1);
 
-        assertThat(result).hasSize(1);
+        assertThat(result.runs()).containsExactly(run);
+        assertThat(result.total()).isEqualTo(3L);
     }
 
     // --- findWorkflowRunsBetween ---
 
     @Test
-    void findWorkflowRunsBetween_delegatesToRepository() {
+    void findWorkflowRunsBetween_returnsTheNewestAndTheirTotal() {
         Instant from = FIXED_NOW.minus(1, ChronoUnit.HOURS);
         WorkflowRun run = WorkflowRun.builder().id("run-2").build();
-        when(workflowRunRepository.findByStartedAtBetween(from, FIXED_NOW)).thenReturn(List.of(run));
+        when(workflowRunRepository.findByStartedAtBetweenOrderByStartedAtDesc(from, FIXED_NOW, Limit.of(1)))
+                .thenReturn(List.of(run));
+        when(workflowRunRepository.countByStartedAtBetween(from, FIXED_NOW)).thenReturn(12L);
 
-        List<WorkflowRun> result = schedulerService.findWorkflowRunsBetween(from, FIXED_NOW);
+        SchedulerService.NewestRuns<WorkflowRun> result = schedulerService.findWorkflowRunsBetween(from, FIXED_NOW, 1);
 
-        assertThat(result).hasSize(1);
+        assertThat(result.runs()).containsExactly(run);
+        assertThat(result.total()).isEqualTo(12L);
     }
 
     // --- update ---
@@ -467,7 +490,7 @@ class SchedulerServiceTest {
 
         assertThatThrownBy(() -> schedulerService.update("sched-1", request))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Invalid conflict behavior");
+                .hasMessageContaining("conflictBehavior muss SKIP oder OVERLAP sein");
         verify(scheduledRepository, never()).save(any());
     }
 
@@ -507,7 +530,7 @@ class SchedulerServiceTest {
         assertThatThrownBy(() -> schedulerService.create(
                 "wf-1", null, "INVALID", "0 0 * * * *", "Test", null, "CRON", null, null, null, null, null, null))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Invalid target type");
+                .hasMessageContaining("targetType muss WORKFLOW oder CHAIN sein");
     }
 
     // --- create: DELAYED schedule type ---
@@ -591,7 +614,7 @@ class SchedulerServiceTest {
         assertThatThrownBy(() -> schedulerService.create(
                 "wf-1", null, null, "0 0 * * * *", "Test", null, "INVALID_TYPE", null, null, null, null, null, null))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Invalid schedule type");
+                .hasMessageContaining("scheduleType muss CRON, ONCE oder DELAYED sein");
     }
 
     @Test
@@ -601,7 +624,7 @@ class SchedulerServiceTest {
         assertThatThrownBy(() -> schedulerService.create(
                 "unknown-wf", null, null, "0 0 * * * *", "Test", null, "INVALID_TYPE", null, null, null, null, null, null))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Invalid schedule type");
+                .hasMessageContaining("scheduleType muss CRON, ONCE oder DELAYED sein");
 
         verify(workflowRepository, never()).findById(any());
     }
@@ -617,6 +640,32 @@ class SchedulerServiceTest {
                 "wf-1", null, null, "0 0 * * * *", "Test", null, "CRON", null, null, null, null, null, true);
 
         assertThat(result.isCatchUpOnResume()).isTrue();
+    }
+
+    // --- create: conflictBehavior (TODO a9bf13d5: parsed like on update) ---
+
+    @Test
+    void create_conflictBehavior_trimmedAndInAnyCase_missingMeansSkip() {
+        when(workflowRepository.findById("wf-1")).thenReturn(Optional.of(testWorkflow));
+        when(scheduledRepository.save(any(ScheduledWorkflow.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ScheduledWorkflow overlap = schedulerService.create(
+                "wf-1", null, null, "0 0 * * * *", "Test", null, "CRON", null, null, null, null, " overlap ", null);
+        ScheduledWorkflow missing = schedulerService.create(
+                "wf-1", null, null, "0 0 * * * *", "Test", null, "CRON", null, null, null, null, " ", null);
+
+        assertThat(overlap.getConflictBehavior()).isEqualTo(ScheduledWorkflow.ConflictBehavior.OVERLAP);
+        assertThat(missing.getConflictBehavior()).isEqualTo(ScheduledWorkflow.ConflictBehavior.SKIP);
+    }
+
+    /** Before, an unknown value quietly became SKIP on create, while update already answered 400. */
+    @Test
+    void create_unknownConflictBehavior_throwsAndSavesNothing() {
+        assertThatThrownBy(() -> schedulerService.create(
+                "wf-1", null, null, "0 0 * * * *", "Test", null, "CRON", null, null, null, null, "sometimes", null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("conflictBehavior muss SKIP oder OVERLAP sein, nicht 'sometimes'");
+        verify(scheduledRepository, never()).save(any());
     }
 
     // --- update: inputContext ---

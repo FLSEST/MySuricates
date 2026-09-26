@@ -20,6 +20,16 @@ export class MonacoValueSync {
    */
   constructor(private readonly limit = 64) {}
 
+  /**
+   * The editor mounted with this text in its model. React re-renders the wrapper with `mounted` a
+   * task later, and a keystroke can come first (a script or an automated browser typing at once).
+   * The first sync must then not take the `value` the model was created from for a change from
+   * outside and write it over what was typed: it counts as reported, like an echo.
+   */
+  mountedWith(text: string): void {
+    this.reported = [text];
+  }
+
   /** The editor reported this text through `onChange`. */
   reportedChange(text: string): void {
     this.reported.push(text);

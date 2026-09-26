@@ -75,16 +75,25 @@ describe('LayoutHistoryDialog', () => {
     await waitFor(() => expect(patched).toEqual({ id: 'v2', body: { name: null } }));
   });
 
+  // 23635ef6: the app's own dialog above the history instead of window.confirm
   it('restores only after confirmation', async () => {
     const { row, onRestore } = await renderDialog();
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true);
+    const restoreButton = () => within(row('v1')).getAllByRole('button', { name: 'Restore' })[0]!;
 
-    fireEvent.click(within(row('v1')).getByRole('button', { name: 'Restore' }));
+    fireEvent.click(restoreButton());
+    const question = screen.getByRole('dialog', { name: 'Restore' });
+    expect(within(question).getByText('Restore this version? It replaces all views on this device and is saved as the newest version.'))
+      .toBeInTheDocument();
+    // Escape answers the question only; the history stays open
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: 'Restore' })).not.toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Dashboard history' })).toBeInTheDocument();
     expect(onRestore).not.toHaveBeenCalled();
-    fireEvent.click(within(row('v1')).getByRole('button', { name: 'Restore' }));
 
-    expect(confirm).toHaveBeenCalledTimes(2);
+    fireEvent.click(restoreButton());
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Restore' })).getByRole('button', { name: 'Restore' }));
     expect(onRestore).toHaveBeenCalledWith('v1');
+    expect(screen.queryByRole('dialog', { name: 'Restore' })).not.toBeInTheDocument();
   });
 
   it('offers the views of a version for adoption', async () => {

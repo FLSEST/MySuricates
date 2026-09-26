@@ -1,13 +1,9 @@
-import { useSyncedState } from '../../hooks/useSyncedState';
-import { Link } from 'react-router-dom';
-import { ExternalLink } from 'lucide-react';
 import { Modal, Button, Input, Select, TagInput } from '../ui';
-import { useI18nStore, useT } from '../../i18n';
-import { formatTimestamp } from '../../utils/localeFormat';
-import { useTaskTargets } from '../../hooks/useIntegrations';
+import { useT } from '../../i18n';
 import { useModuleEnabled } from '../../hooks/useModules';
-import { ProviderIcon } from '../shared/ProviderIcon';
 import { TodoPlanningPanel } from '../goal/TodoPlanningPanel';
+import { TodoExportSection } from './TodoExportSection';
+import { TodoMetadata } from './TodoMetadata';
 import type { Todo, TodoStatus, TodoPriority, UpdateTodoRequest, Project, Workflow, IntegrationProviderInfo } from '../../types';
 
 const STATUSES: TodoStatus[] = ['OPEN', 'IN_PROGRESS', 'DONE', 'BACKLOG', 'ARCHIVED'];
@@ -47,26 +43,7 @@ export function TodoEditModal({
   exportLoading,
 }: TodoEditModalProps) {
   const t = useT();
-  const locale = useI18nStore((s) => s.locale);
   const integrationsModule = useModuleEnabled('integrations');
-  // Export fields start empty for every todo that is opened (reset when the todo id changes)
-  const [exportProvider, setExportProvider] = useSyncedState(editTodo?.id, () => '');
-  const [exportTarget, setExportTarget] = useSyncedState(editTodo?.id, () => '');
-
-  const taskSinks = integrations.filter((p) => p.supportsTaskExport && p.status === 'CONNECTED');
-  const exportProject = projects.find((p) => p.id === (editForm.projectId ?? editTodo?.projectId ?? ''));
-  const exportCfg = (exportProject?.config?.taskExport ?? {}) as { provider?: string; target?: string };
-  const activeProvider = exportProvider || exportCfg.provider || taskSinks[0]?.providerId || '';
-  const activeTarget = (exportTarget.trim() || exportCfg.target || '').trim();
-  const { data: taskTargets } = useTaskTargets(
-    activeProvider,
-    !!editTodo && !editTodo.exportedProvider && taskSinks.length > 0,
-  );
-  const activeProviderName = taskSinks.find((p) => p.providerId === activeProvider)?.displayName ?? activeProvider;
-  const activeProviderIcon = taskSinks.find((p) => p.providerId === activeProvider)?.icon;
-  const exportedProviderName = integrations.find((p) => p.providerId === editTodo?.exportedProvider)?.displayName
-    ?? editTodo?.exportedProvider ?? '';
-  const exportedProviderIcon = integrations.find((p) => p.providerId === editTodo?.exportedProvider)?.icon;
 
   return (
     <Modal
@@ -191,141 +168,18 @@ export function TodoEditModal({
 
         {editTodo && <TodoPlanningPanel todo={editTodo} />}
 
-        {/* Übertragung / Verknüpfungen */}
         {editTodo && integrationsModule && (
-          <div className="pt-3 border-t border-border space-y-2">
-            <label className="block text-sm font-medium text-text-secondary">{t.todos.exportSection}</label>
-            {editTodo.exportedProvider ? (
-              <p className="text-xs text-text-secondary">
-                {t.todos.exportedTo}: <ProviderIcon icon={exportedProviderIcon} className="w-3.5 h-3.5 inline-block align-text-bottom mr-0.5" /><span className="font-medium">{exportedProviderName}</span>{' '}
-                {editTodo.exportedUrl ? (
-                  <a href={editTodo.exportedUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 text-accent hover:underline">
-                    {editTodo.exportedRef}<ExternalLink className="w-3 h-3" />
-                  </a>
-                ) : (
-                  <span>{editTodo.exportedRef}</span>
-                )}
-              </p>
-            ) : taskSinks.length === 0 ? (
-              <Link to="/integrations" className="text-xs text-accent hover:underline">
-                {t.todos.exportNoTarget}
-              </Link>
-            ) : (
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-2">
-                  {taskSinks.length > 1 ? (
-                    <select
-                      className="input-base text-sm"
-                      value={activeProvider}
-                      onChange={(e) => setExportProvider(e.target.value)}
-                    >
-                      {taskSinks.map((s) => (
-                        <option key={s.providerId} value={s.providerId}>{s.displayName}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 text-xs font-medium text-text-secondary shrink-0">
-                      <ProviderIcon icon={activeProviderIcon} className="w-3.5 h-3.5" />
-                      {activeProviderName}
-                    </span>
-                  )}
-                  {taskTargets && taskTargets.length > 0 ? (
-                    <select
-                      className="input-base text-sm flex-1"
-                      value={activeTarget}
-                      onChange={(e) => setExportTarget(e.target.value)}
-                    >
-                      <option value="">{t.todos.exportChooseTarget}</option>
-                      {activeTarget && !taskTargets.some((tt) => tt.id === activeTarget) && (
-                        <option value={activeTarget}>{activeTarget}</option>
-                      )}
-                      {taskTargets.map((tt) => (
-                        <option key={tt.id} value={tt.id}>{tt.label}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      className="input-base text-sm flex-1"
-                      value={exportTarget}
-                      onChange={(e) => setExportTarget(e.target.value)}
-                      placeholder={exportCfg.target || t.todos.exportTargetPlaceholder}
-                    />
-                  )}
-                  <Button size="sm" variant="secondary" loading={exportLoading} disabled={!activeTarget} onClick={() => onExport(activeProvider, activeTarget)}>
-                    {t.todos.exportToTracker}
-                  </Button>
-                </div>
-                {!activeTarget && <p className="text-xs text-text-tertiary">{t.todos.exportTargetHint}</p>}
-              </div>
-            )}
-            {editTodo.referenceType && (
-              <p className="text-xs text-text-tertiary">
-                {t.todos.internalReference}: {editTodo.referenceType}
-                {editTodo.referenceId ? ` / ${editTodo.referenceId}` : ''}
-              </p>
-            )}
-          </div>
+          <TodoExportSection
+            todo={editTodo}
+            projectId={editForm.projectId}
+            projects={projects}
+            integrations={integrations}
+            onExport={onExport}
+            exportLoading={exportLoading}
+          />
         )}
 
-        {/* Read-only metadata */}
-        {editTodo && (
-          <div className="pt-3 border-t border-border space-y-1">
-            <p className="text-xs text-text-tertiary">
-              {t.todos.source}: {t.todos.sources[editTodo.source]}
-              {editTodo.sourceAgent && ` (${editTodo.sourceAgent})`}
-            </p>
-            {editTodo.sessionId && (
-              <p className="text-xs text-text-tertiary">
-                {t.todos.sessionId}: {editTodo.sessionId}
-              </p>
-            )}
-            {editTodo.workflowRunId && (
-              <div className="flex items-center gap-2 text-xs text-text-tertiary">
-                <span>Run:</span>
-                <Link
-                  to={`/runs/${editTodo.workflowRunId}`}
-                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] bg-accent/10 text-accent font-medium hover:bg-accent/20 transition-colors"
-                  title={t.todos.viewRun}
-                >
-                  <ExternalLink className="w-2.5 h-2.5" />
-                  Run
-                </Link>
-              </div>
-            )}
-            {editTodo.lastFixRunId && (
-              <div className="flex items-center gap-2 text-xs text-text-tertiary">
-                <span>{t.todos.viewFixRun}:</span>
-                <Link
-                  to={`/runs/${editTodo.lastFixRunId}`}
-                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] bg-warning/10 text-warning font-medium hover:bg-warning/20 transition-colors"
-                  title={t.todos.viewFixRun}
-                >
-                  <ExternalLink className="w-2.5 h-2.5" />
-                  Fix Run
-                </Link>
-              </div>
-            )}
-            {editTodo.linkedWorkflowId && (
-              <div className="flex items-center gap-2 text-xs text-text-tertiary">
-                <span>{t.todos.linkedWorkflow}:</span>
-                <Link
-                  to={`/workflows/${editTodo.linkedWorkflowId}`}
-                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] bg-accent/10 text-accent font-medium hover:bg-accent/20 transition-colors"
-                  title={editTodo.linkedWorkflowName ?? t.common.workflow}
-                >
-                  <ExternalLink className="w-2.5 h-2.5" />
-                  {editTodo.linkedWorkflowName ?? t.common.workflow}
-                </Link>
-              </div>
-            )}
-            <p className="text-xs text-text-tertiary">
-              {t.common.created}: {formatTimestamp(editTodo.createdAt, locale)}
-            </p>
-            <p className="text-xs text-text-tertiary">
-              {t.common.updated}: {formatTimestamp(editTodo.updatedAt, locale)}
-            </p>
-          </div>
-        )}
+        {editTodo && <TodoMetadata todo={editTodo} />}
       </div>
     </Modal>
   );

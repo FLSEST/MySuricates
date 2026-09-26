@@ -22,6 +22,8 @@ services:
         HOST_UID: ${AUTOTRIGGER_DEV_HOST_UID:-1000}
         HOST_GID: ${AUTOTRIGGER_DEV_HOST_GID:-1000}
         HOST_HOME: ${HOME}
+        # Neuer Wert (etwa der Monat) = NodeSource- und Docker-Repo frisch statt aus dem Layer-Cache (8b7a39b9)
+        APT_REFRESH: ${MYSURICATES_APT_REFRESH:-}
     image: ai-automation-backend-dev-container
     container_name: ${AUTOTRIGGER_DEV_CONTAINER_NAME:-autotrigger-dev-container}
     ports:

@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeAll, afterEach, afterAll } from 'vitest';
-import { screen } from '@testing-library/react';
+import { act, screen } from '@testing-library/react';
 import { server } from '../../../test/server';
 import { renderWithProviders } from '../../../test/utils';
 import { useI18nStore } from '../../../i18n';
-import { PlannedThisWeekStat, PlannedTodayStat } from '../StatWidgets';
+import { PlannedThisWeekStat, PlannedTodayStat, TotalCostStat } from '../StatWidgets';
 import { DashboardDataContext, type DashboardDataValue } from '../dashboardDataContext';
 
 /** The planned tiles read the view's project filter from the dashboard context. */
@@ -29,6 +29,24 @@ describe('stat tiles', () => {
     const title = await screen.findByText('Planned This Week');
     expect(title).toHaveAttribute('title', 'Planned This Week');
     expect(title).not.toHaveClass('truncate');
+  });
+
+  // 6bb7ed36: costs came out of toFixed with a decimal point in the German UI as well
+  it('writes the cost with the separators of the UI language', () => {
+    const withCost = (totalCostUsd30d: number) => (
+      <DashboardDataContext.Provider value={{ ...NO_FILTER, data: { totalCostUsd30d } as DashboardDataValue['data'] }}>
+        <TotalCostStat />
+      </DashboardDataContext.Provider>
+    );
+    useI18nStore.setState({ locale: 'de' });
+    const { rerender } = renderWithProviders(withCost(12.5));
+    expect(screen.getByText(/^12,50\s\$$/)).toBeInTheDocument();
+    rerender(withCost(0.0042));
+    expect(screen.getByText(/^0,0042\s\$$/)).toBeInTheDocument();
+
+    act(() => useI18nStore.setState({ locale: 'en' }));
+    rerender(withCost(0));
+    expect(screen.getByText('$0.00')).toBeInTheDocument();
   });
 
   it('tells today and this week apart in German', async () => {

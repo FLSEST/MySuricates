@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Check, History, Pencil, RotateCcw } from 'lucide-react';
-import { Button } from '../components/ui';
+import { Button, ConfirmModal } from '../components/ui';
 import { DashboardGrid } from '../components/dashboard/DashboardGrid';
 import { DashboardEditBar } from '../components/dashboard/DashboardEditBar';
 import { WidgetCatalogDialog } from '../components/dashboard/WidgetCatalogDialog';
@@ -67,6 +67,13 @@ function DashboardPage() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [catalogOpen, setCatalogOpen] = useState(false);
   const sync = useDashboardLayoutSync();
+  // Taking a view over unsaved changes asks first; `answer` resumes the waiting adoption (23635ef6)
+  const [replaceView, setReplaceView] = useState<{ name: string; answer: (replace: boolean) => void } | null>(null);
+  const confirmReplaceView = (name: string) => new Promise<boolean>((answer) => setReplaceView({ name, answer }));
+  const answerReplaceView = (replace: boolean) => {
+    replaceView?.answer(replace);
+    setReplaceView(null);
+  };
   const { isPlaceholderData } = useDashboardData();
   const activeViewId = useDashboardLayoutStore((s) => selectActiveView(s)?.id);
   const viewCount = useDashboardLayoutStore((s) => s.views.length);
@@ -228,7 +235,17 @@ function DashboardPage() {
         onClose={() => setHistoryOpen(false)}
         busy={sync.busy}
         onRestore={(versionId) => void sync.restoreVersion(versionId)}
-        onAdoptView={(versionId, viewId) => void sync.adoptView(versionId, viewId)}
+        onAdoptView={(versionId, viewId) => void sync.adoptView(versionId, viewId, confirmReplaceView)}
+      />
+
+      <ConfirmModal
+        open={replaceView !== null}
+        onClose={() => answerReplaceView(false)}
+        onConfirm={() => answerReplaceView(true)}
+        title={t.dashboard.history.adoptViewTitle}
+        message={replaceView ? t.dashboard.history.adoptViewConfirm.replace('{name}', () => replaceView.name) : null}
+        confirmLabel={t.dashboard.history.adoptViewReplace}
+        variant="danger"
       />
     </div>
   );

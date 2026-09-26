@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach } from 'vitest';
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../../test/server';
 import { renderWithProviders } from '../../../test/utils';
@@ -12,6 +12,10 @@ import { useDashboardSyncStore } from '../../../stores/dashboardSyncStore';
 import { createDefaultLayout } from '../../dashboard/dashboardLayout';
 import { GoalGuardControl } from '../GoalGuardControl';
 import type { GoalDetail, GoalGuard } from '../../../types';
+// Switching on imports the dashboard registry lazily (useGoalGuard). In Vitest that import transforms the
+// registry with all its widgets and charts, under load longer than a waitFor waits for the tile
+// (b26bb8ff). Loaded here, the lazy import finds it ready and the test measures the flow, not the import.
+import '../../dashboard/workflowResultTile';
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
 afterEach(() => server.resetHandlers());
@@ -63,6 +67,10 @@ function serveGoal(initial: GoalGuard) {
       state.executed.push(String(params.id));
       return HttpResponse.json({ id: 'run-1', workflowId: params.id, status: 'PENDING' });
     }),
+    // The schedule of a guard that exists (its time can be changed at the goal page)
+    http.get('/api/v1/schedules/s1', () => HttpResponse.json({
+      id: 's1', workflowId: 'wf-guard', targetType: 'WORKFLOW', scheduleType: 'CRON', cronExpression: '0 0 8 * * *', enabled: true,
+    })),
   );
   return state;
 }
@@ -82,7 +90,9 @@ const resultTiles = () => (selectActiveView(useDashboardLayoutStore.getState())?
   .map((widget) => widget.config?.workflowId);
 const toasts = () => useToastStore.getState().toasts.map((toast) => toast.message);
 
-describe('GoalGuardControl', () => {
+// The first switch-on loads the dashboard registry on demand (workflowResultTile): under the load of
+// a full parallel suite that import alone passed the 5s default.
+describe('GoalGuardControl', { timeout: 20_000 }, () => {
   it('asks for project and time on the first switch-on, then adds the tile to the dashboard', async () => {
     const state = serveGoal(OFF);
     renderWithProviders(<Harness />);
@@ -154,6 +164,73 @@ describe('GoalGuardControl', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(screen.getByRole('switch', { name: 'Guard' })).toHaveAttribute('aria-checked', 'false');
     expect(state.sent).toEqual([]);
+  });
+
+  // ff6f08fd: the time of the guard changes at the goal page, through the schedule API
+  describe('changing the time', () => {
+    const loaded = { schedule: 0 };
+    function serveSchedule(cronExpression: string) {
+      const puts: unknown[] = [];
+      loaded.schedule = 0;
+      server.use(
+        http.get('/api/v1/schedules/s1', () => {
+          loaded.schedule += 1;
+          return HttpResponse.json({
+            id: 's1', workflowId: 'wf-guard', targetType: 'WORKFLOW', scheduleType: 'CRON', cronExpression, enabled: true,
+          });
+        }),
+        http.put('/api/v1/schedules/s1', async ({ request }) => {
+          puts.push(await request.json());
+          return HttpResponse.json({ id: 's1', cronExpression: (puts.at(-1) as { cronExpression: string }).cronExpression });
+        }),
+      );
+      return puts;
+    }
+
+    it('sets the new time of day on the schedule and keeps the guard as it is', async () => {
+      const state = serveGoal(ON);
+      const puts = serveSchedule('0 0 8 * * *');
+      renderWithProviders(<Harness />);
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Change time' }));
+      const dialog = screen.getByRole('dialog', { name: 'Time of the guard' });
+      const input = within(dialog).getByLabelText('Time (daily)');
+      expect(input).toHaveValue('08:00');
+      expect(within(dialog).getByRole('button', { name: 'Save' })).toBeDisabled();
+      fireEvent.change(input, { target: { value: '06:45' } });
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+      await waitFor(() => expect(puts).toEqual([{ cronExpression: '0 45 6 * * *' }]));
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+      expect(toasts()).toContain('Guard time saved');
+      expect(state.sent).toEqual([]);
+    });
+
+    it('keeps the days of a schedule set to weekdays under "Schedules"', async () => {
+      serveGoal(ON);
+      const puts = serveSchedule('0 30 7 * * MON-FRI');
+      useI18nStore.setState({ locale: 'de' });
+      renderWithProviders(<Harness />);
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Uhrzeit ändern' }));
+      const dialog = screen.getByRole('dialog', { name: 'Uhrzeit des Wächters' });
+      expect(within(dialog).getByText(/die Tage bleiben, wie sie unter „Zeitpläne“ eingestellt sind/)).toBeInTheDocument();
+      fireEvent.change(within(dialog).getByLabelText('Uhrzeit'), { target: { value: '09:05' } });
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+
+      await waitFor(() => expect(puts).toEqual([{ cronExpression: '0 5 9 * * MON-FRI' }]));
+    });
+
+    it('offers no time for a schedule without a fixed time of day', async () => {
+      serveGoal(ON);
+      serveSchedule('0 */15 * * * *');
+      renderWithProviders(<Harness />);
+
+      expect(await screen.findByRole('button', { name: 'Check now' })).toBeInTheDocument();
+      await waitFor(() => expect(loaded.schedule).toBe(1));
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+      expect(screen.queryByRole('button', { name: 'Change time' })).not.toBeInTheDocument();
+    });
   });
 
   it('is not offered while the dashboard-report module is off and no guard exists', async () => {
