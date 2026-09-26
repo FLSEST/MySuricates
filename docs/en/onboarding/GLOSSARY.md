@@ -40,7 +40,7 @@ Interface that every block type must implement. Defines `execute(BlockDefinition
 A single capability of a skill (e.g. "lint", "OCR"). Registered in the `CapabilityRegistry` and referenceable in block definitions via `requiredCapabilities`.
 
 **Claude CLI**
-Anthropic's command-line tool for AI interactions. Runs on the host system (not inside a container). Invoked via `ProcessBuilder` in `HostClaudeService`.
+Anthropic's command-line tool for AI interactions. Workflow blocks run it on the host system (not inside a container), via `ProcessBuilder` in `HostClaudeService`. Only the ad-hoc commands during a run (`claude` via `docker exec`, `RunControlService.executeAdHocCommand`) and the container terminal (`bash -l`) run inside the project container.
 
 **Container**
 Docker container assigned to a project (1:1 relationship). Manages filesystem mounts, resource limits, and lifecycle.
