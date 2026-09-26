@@ -55,10 +55,9 @@ KNOWN_GAPS: dict[str, str] = {}
 # nur die Folge der Ebenen und schrieb eine Luecke dem letzten gleichrangigen Abschnitt zu. So
 # standen hier "entwicklung.md::## Bekannte Einschränkungen" (fehlend war "## Diagramm-Seiten")
 # und "architektur.md::## Completion Triggers (V39)" (fehlend war das Audit Center, seit TODO
-# 49f15990 uebersetzt).
-KNOWN_SECTION_GAPS: dict[str, str] = {
-    "architektur.md::## Scheduler: verpasste Termine (Standby und Kaltstart)": "c58d7402",
-}
+# 49f15990 uebersetzt). Zurzeit leer: "## Scheduler: verpasste Termine" ist seit TODO c58d7402
+# uebersetzt.
+KNOWN_SECTION_GAPS: dict[str, str] = {}
 
 
 def check_links(root: Path, files: list[str]) -> tuple[list[str], int]:
