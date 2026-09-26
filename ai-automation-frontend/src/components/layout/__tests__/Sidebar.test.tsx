@@ -200,6 +200,10 @@ describe('Sidebar edit controls', { timeout: 15_000 }, () => {
       .toHaveAttribute('title', 'Restore the default order, hidden pages and dividers');
     expect(screen.getByRole('button', { name: 'Hide Workflows' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Move Workflows' })).toBeInTheDocument();
+    // The divider controls that "Sidebar dividers" finds by their labels
+    expect(screen.getAllByRole('button', { name: 'Remove divider' })).toHaveLength(4);
+    expect(screen.getByRole('button', { name: 'Add divider' })).toBeInTheDocument();
+    expect(screen.getAllByRole('textbox', { name: 'Name (optional)' })).toHaveLength(4);
   });
 
   it('labels the edit controls in German', () => {
