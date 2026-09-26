@@ -6,6 +6,9 @@ import com.automation.service.ai.ProviderSetup;
 import com.automation.service.ai.status.AiProviderStatusReport.LoginVia;
 import com.automation.service.ai.status.AiProviderStatusReport.ProviderStatus;
 import com.automation.service.ai.status.AiProviderStatusReport.State;
+import com.automation.dto.response.SystemCapabilitiesResponse.ProviderAccessResponse;
+import com.automation.service.project.DockerExpectation;
+import com.automation.service.system.ContainerAccessReport;
 import com.automation.util.HostProcessUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -195,6 +198,72 @@ class AiProviderStatusServiceTest {
 
         assertThat(json).doesNotContain("secret");
         assertThat(json).contains("CLAUDE_CODE_OAUTH_TOKEN", "OPENAI_API_KEY", "GEMINI_API_KEY");
+    }
+
+    /**
+     * 7296ad45: the startup configuration card ({@link ContainerAccessReport}) asks this service for the
+     * logins instead of its own check — which said "unknown" on the host, took any pi auth.json and knew no
+     * API key variable. Both cards must say the same about one machine, case by case.
+     */
+    @Test
+    void theStartupConfigurationCardSaysTheSameAboutEveryLogin() throws IOException {
+        AiProviderStatusService service = service("", 60);
+        ContainerAccessReport access = new ContainerAccessReport(processUtils, mock(DockerExpectation.class), service);
+        Path claudeDir = home.resolve("providers/claude");
+        Path codexDir = home.resolve("providers/codex");
+
+        List<Runnable> steps = List.of(
+                () -> { },                                                             // nothing anywhere
+                () -> env.put("CLAUDE_CODE_OAUTH_TOKEN", "<token>"),                   // placeholder: no login
+                () -> env.put("CLAUDE_CODE_OAUTH_TOKEN", TOKEN),
+                () -> write(home.resolve(".pi/agent/auth.json"), "{}"),                // pi without a backend
+                () -> write(home.resolve(".pi/agent/auth.json"), "{\"anthropic\":{}}"),
+                () -> env.put("OPENAI_API_KEY", "sk-openai"),                          // codex via a variable
+                () -> {                                                               // moved directories (container)
+                    env.clear();
+                    env.put("HOME", home.toString());
+                    env.put("CLAUDE_CONFIG_DIR", claudeDir.toString());
+                    env.put("CODEX_HOME", codexDir.toString());
+                    write(home.resolve(".codex/auth.json"), "{}");                     // not where CODEX_HOME points
+                },
+                () -> {
+                    write(claudeDir.resolve(".credentials.json"), "{}");
+                    write(codexDir.resolve("auth.json"), "{}");
+                });
+        List<String> seen = new java.util.ArrayList<>();
+        for (Runnable step : steps) {
+            step.run();
+            AiProviderStatusReport status = service.report(true);
+            List<ProviderAccessResponse> card = access.report().providers();
+            for (ProviderStatus provider : status.providers()) {
+                ProviderAccessResponse same = card.stream().filter(p -> p.id().equals(provider.cli())).findFirst()
+                        .orElseThrow();
+                assertThat(same.login()).as(provider.cli() + " after step " + seen.size())
+                        .isEqualTo(provider.loggedIn());
+            }
+            seen.add(status.providers().stream().map(p -> p.cli() + "=" + p.loggedIn())
+                    .collect(java.util.stream.Collectors.joining(",")));
+        }
+        // the rule itself, step by step (sorted by id: claude, codex, pi)
+        assertThat(seen).containsExactly(
+                "claude=false,codex=false,pi=false",
+                "claude=false,codex=false,pi=false",
+                "claude=true,codex=false,pi=false",
+                "claude=true,codex=false,pi=false",
+                "claude=true,codex=false,pi=true",
+                "claude=true,codex=true,pi=true",
+                "claude=false,codex=false,pi=true",
+                "claude=true,codex=true,pi=true");
+        assertThat(service.loggedIn("gemini")).as("no provider with this program").isNull();
+    }
+
+    private static void write(Path file, String content) {
+        try {
+            Files.createDirectories(file.getParent());
+            Files.writeString(file, content);
+        } catch (IOException e) {
+            throw new java.io.UncheckedIOException(e);
+        }
     }
 
     @Test

@@ -3,13 +3,10 @@ package com.automation.service.system;
 import com.automation.dto.response.SystemCapabilitiesResponse.ContainerAccessResponse;
 import com.automation.dto.response.SystemCapabilitiesResponse.ProviderAccessResponse;
 import com.automation.service.project.DockerExpectation;
-import com.automation.util.ClaudeOAuthToken;
 import com.automation.util.HostProcessUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
@@ -25,6 +22,11 @@ import java.util.stream.Collectors;
  * what the instance sees. This class only reads the environment the generator left behind and checks
  * what is actually there. Only names and yes/no values leave it — never a token, never the content of
  * a login file.
+ *
+ * <p>Whether a login is there it asks {@link ProviderLoginCheck} — the rule of the installer and of the AI
+ * provider card, on the host as in a container (7296ad45). Its own, hard-wired check here used to say
+ * "unknown" on the host and could disagree with the card next to it (an API key variable, pi's empty
+ * {@code auth.json}).
  */
 @Component
 public class ContainerAccessReport {
@@ -33,20 +35,20 @@ public class ContainerAccessReport {
 
     private final HostProcessUtils processUtils;
     private final DockerExpectation docker;
+    private final ProviderLoginCheck logins;
     private final UnaryOperator<String> env;
-    private final Path userHome;
 
     @Autowired
-    public ContainerAccessReport(HostProcessUtils processUtils, DockerExpectation docker) {
-        this(processUtils, docker, System::getenv, Path.of(System.getProperty("user.home")));
+    public ContainerAccessReport(HostProcessUtils processUtils, DockerExpectation docker, ProviderLoginCheck logins) {
+        this(processUtils, docker, logins, System::getenv);
     }
 
-    ContainerAccessReport(HostProcessUtils processUtils, DockerExpectation docker,
-                          UnaryOperator<String> env, Path userHome) {
+    ContainerAccessReport(HostProcessUtils processUtils, DockerExpectation docker, ProviderLoginCheck logins,
+                          UnaryOperator<String> env) {
         this.processUtils = processUtils;
         this.docker = docker;
+        this.logins = logins;
         this.env = env;
-        this.userHome = userHome;
     }
 
     public ContainerAccessResponse report() {
@@ -54,7 +56,7 @@ public class ContainerAccessReport {
         Set<String> selected = container ? selection(env.apply("MYSURICATES_AI_PROVIDERS")) : Set.copyOf(PROVIDERS);
         List<ProviderAccessResponse> providers = PROVIDERS.stream()
                 .map(id -> new ProviderAccessResponse(id, selected.contains(id), processUtils.isOnPath(id),
-                        container ? loginPresent(id) : null))
+                        logins.loggedIn(id)))
                 .toList();
         return new ContainerAccessResponse(
                 container ? "container" : "host",
@@ -63,22 +65,6 @@ public class ContainerAccessReport {
                 container ? blankToNull(env.apply("MYSURICATES_SWITCH_SOURCE")) : null,
                 container ? blankToNull(env.apply("MYSURICATES_SWITCH_PREFIX")) : null,
                 providers);
-    }
-
-    /** Where each CLI looks for its login — the provider directory the generator set, else its default. */
-    private Boolean loginPresent(String id) {
-        return switch (id) {
-            // A placeholder from a copied instruction is no login (9bef7e8c)
-            case "claude" -> ClaudeOAuthToken.isPlausible(env.apply(ClaudeOAuthToken.VARIABLE))
-                    || Files.isRegularFile(dir("CLAUDE_CONFIG_DIR", ".claude").resolve(".credentials.json"));
-            case "codex" -> Files.isRegularFile(dir("CODEX_HOME", ".codex").resolve("auth.json"));
-            default -> Files.isRegularFile(dir("PI_CODING_AGENT_DIR", ".pi/agent").resolve("auth.json"));
-        };
-    }
-
-    private Path dir(String variable, String underHome) {
-        String value = env.apply(variable);
-        return isBlank(value) ? userHome.resolve(underHome) : Path.of(value);
     }
 
     private static Set<String> selection(String value) {

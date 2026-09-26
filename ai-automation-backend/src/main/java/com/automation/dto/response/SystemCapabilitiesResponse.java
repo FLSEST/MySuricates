@@ -56,7 +56,8 @@ public record SystemCapabilitiesResponse(
     /**
      * @param selected part of the provider selection (always true on the host)
      * @param program  the CLI is on the PATH of this instance
-     * @param login    a login is present; null where this instance cannot tell (host)
+     * @param login    a login is present, by the rule of the AI provider card (7296ad45); null when no
+     *                 provider with this program is registered
      */
     public record ProviderAccessResponse(String id, boolean selected, boolean program, Boolean login) {}
 

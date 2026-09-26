@@ -52,7 +52,8 @@ What a container gets from the machine is decided in one place: `scripts/lib/hos
 It applies to instances run by `instance.sh`, to Stable and Test run by `staging.sh` — also when they are
 started from the UI — and to the dev container. The switches live outside the app and take effect on the
 next start: neither a workflow nor anyone with the API key can change them. The "Startup configuration"
-card in the settings shows them, read-only.
+card in the settings shows them, read-only — and per provider whether a login is there, by the same rule
+as the installer and the "AI providers" card (7296ad45).
 
 | `…AI_FROM_HOST` | From the machine into the container | Setup | What an AI in the container can do with it |
 |---|---|---|---|

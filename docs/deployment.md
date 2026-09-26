@@ -52,7 +52,8 @@ Was ein Container vom Rechner bekommt, entscheidet eine Stelle: `scripts/lib/hos
 Sie gilt für Instanzen über `instance.sh`, für Stable und Test über `staging.sh` — auch wenn sie aus
 der Oberfläche gestartet werden — und für den Dev-Container. Die Schalter stehen außerhalb der App und
 wirken erst beim nächsten Start: Weder ein Workflow noch jemand mit dem API-Key kann sie ändern. Die
-Karte „Startkonfiguration“ in den Einstellungen zeigt sie an, nur lesend.
+Karte „Startkonfiguration“ in den Einstellungen zeigt sie an, nur lesend — und je Anbieter, ob eine
+Anmeldung da ist, nach derselben Regel wie der Installer und die Karte „KI-Anbieter“ (7296ad45).
 
 | `…AI_FROM_HOST` | Vom Rechner im Container | Einrichtung | Was eine KI im Container damit kann |
 |---|---|---|---|
