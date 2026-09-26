@@ -365,7 +365,8 @@ Den API-Key sucht `cypress.config.ts` in dieser Reihenfolge: `CYPRESS_API_KEY`, 
 der Eintrag `api-key` in `app_settings` der Dev-Datenbank `ai-automation-backend/data/automation.db`
 (einmal beim Start von Cypress, nur lesend), zuletzt `AUTOMATION_API_KEY`. Unabhängig davon schreibt
 das Backend seinen Schlüssel bei jedem Start nach `~/.autotrigger/api-key` (`ApiKeyService`); für die
-curl-Beispiele dieser Seite also `export DEV_KEY=$(cat ~/.autotrigger/api-key)`.
+curl-Beispiele dieser Seite also `export DEV_KEY=$(cat ~/.autotrigger/api-key)`. Mit `CYPRESS_TARGET=test`
+gilt eine andere Reihenfolge ohne Datenbank: `CYPRESS_API_KEY`, `CYPRESS_TEST_API_KEY`, `AUTOMATION_API_KEY`.
 
 ### Test-Target (isoliert, keine fachlichen Testdaten in Dev)
 

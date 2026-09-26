@@ -442,7 +442,8 @@ Der Switch-Block evaluiert einen Ausdruck gegen mehrere Cases:
 
 Ein Quality Gate ist das Urteil, das ein prüfender Workflow (Audit, Test, Review) über sein
 Ergebnis fällt: GREEN = in Ordnung, YELLOW = nicht-blockierende Befunde, RED = kritisch. Die
-Plattform wertet es aus: RED erzeugt ein TODO, und nach einem Reparatur-Lauf schließt ein GREEN
+Plattform wertet es aus: RED (im Modus `auto` auch YELLOW) erzeugt ein TODO, wenn Auto-TODO für
+den Workflow an ist (Standard aus), und nach einem Reparatur-Lauf schließt ein GREEN
 das auslösende TODO (`TodoFeedbackListener`, siehe [Todo Triggers](#todo-triggers--self-improvement-loop-v51v52)).
 Dazu schreiben Workflow-Blöcke Marker in ihre Ausgabe:
 
@@ -470,8 +471,11 @@ bleibt RED). Hintergrund: Ein Prüf-Workflow, dessen KI-Schritt still fehlschlä
 einem Workflow ohne Gate nicht zu unterscheiden — beide wurden GREEN.
 
 **Ein Gate ändert den Run-Status nicht.** Weder YELLOW noch RED: Das Gate ist ein Befund über
-das Ergebnis, kein Fehlschlag der Ausführung. RED erzeugt über `AutoTodoService` ein TODO und
-eine Warnung im Aktivitätslog, YELLOW nur die Warnung — der Lauf bleibt `COMPLETED`.
+das Ergebnis, kein Fehlschlag der Ausführung. RED und YELLOW schreiben eine Warnung ins
+Aktivitätslog (`RunCompletionHandler`). Ist Auto-TODO für den Workflow an (Workflow-Metadatum
+`autoTodo.enabled`, sonst Einstellung `auto-todo-default`, Standard aus), legt `AutoTodoService`
+bei RED ein TODO mit Priorität HIGH an, im Modus `auto` bei YELLOW eines mit MEDIUM — der Lauf
+bleibt `COMPLETED`.
 
 Den Run-Status bestimmt etwas Unabhängiges: `RunCompletionHandler` setzt
 `COMPLETED_WITH_ERRORS`, wenn ein Schritt mit `checkedCommand`-Metadatum fehlgeschlagen ist,

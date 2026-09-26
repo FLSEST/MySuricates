@@ -96,7 +96,7 @@ Additionally, every block supports optional top-level fields (next to `type`, no
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `name` | string | – | Name under which later blocks read this block's output via `{{ block.<name>.output }}`; letters, digits, `_` and `-` are allowed, no dots and no whitespace (`BlockDefinition`) |
+| `name` | string | – | Name under which later blocks read this block's output via `{{ block.<name>.output }}`. Letters, digits, `_` and `-` are recommended, no dots and no whitespace — this is not checked on save; only the reserved name `previous_output` is rejected (`BlockNameRules`) |
 | `skillIds` | string[] | `[]` | Skill IDs that are activated **in addition to** the workflow skills for this block |
 
 **Default behavior**: When a block fails (status `FAILED`), the workflow stops and the run is marked as `FAILED`. With `"on_failure": "continue"`, the workflow proceeds with the next block.

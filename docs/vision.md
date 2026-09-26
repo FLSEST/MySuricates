@@ -137,7 +137,7 @@ Workflows sammeln Wissen über Läufe hinweg:
 | Staging (Dev + Stable + Test) | Done |
 | Mehrere KI-Anbieter (Claude + Codex + Pi) | Done |
 | Assistent-System (kontextueller Floating-Chat mit Page-Suggestions) | Done |
-| Gate Status System (Prüf-Workflows melden GREEN/YELLOW/RED, RED erzeugt ein TODO) | Done |
+| Gate Status System (Prüf-Workflows melden GREEN/YELLOW/RED; mit Auto-TODO wird aus RED — im Modus auto auch aus YELLOW — ein TODO) | Done |
 | Agent Instructions System (Base- und Per-Workflow-Instruktionen) | Done |
 | CompletionTrigger-System (automatische Aktionen nach Workflow-Abschluss) | Done |
 | TodoTrigger-System (Self-Improvement-Loop: TODO → Fix-Workflow → Verify → Close) | Done |
@@ -164,7 +164,7 @@ Workflows sammeln Wissen über Läufe hinweg:
 
 - **Kosten-Schätzung vor Ausführung** — der Nutzer sieht die erwarteten Token-Kosten, bevor ein Wish läuft
 - **Modell-Auswahl pro Wish** — automatische oder manuelle Wahl des passenden Modells
-- **Wish-Analytics-Dashboard** — Erfolgsraten, Kosten und Trends der Wishes sichtbar machen
+- **Wish-Analytics-Dashboard** — Kosten und Trends der Wishes ergänzen (Erfolgsquote und Statuszahlen gibt es schon)
 
 ### Später: Ökosystem
 

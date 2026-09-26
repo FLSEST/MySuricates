@@ -358,7 +358,8 @@ npm run test:e2e
 the `api-key` entry in `app_settings` of the dev database `ai-automation-backend/data/automation.db`
 (once at Cypress startup, read-only), finally `AUTOMATION_API_KEY`. Independently of that, the
 backend writes its key to `~/.autotrigger/api-key` on every start (`ApiKeyService`); for the curl
-examples on this page, then, `export DEV_KEY=$(cat ~/.autotrigger/api-key)`.
+examples on this page, then, `export DEV_KEY=$(cat ~/.autotrigger/api-key)`. With `CYPRESS_TARGET=test`
+a different order applies, without the database: `CYPRESS_API_KEY`, `CYPRESS_TEST_API_KEY`, `AUTOMATION_API_KEY`.
 
 ### Test Target (isolated, no business test data in Dev)
 

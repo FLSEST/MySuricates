@@ -436,8 +436,9 @@ The switch block evaluates an expression against multiple cases:
 ## Gate Status System
 
 A quality gate is the verdict a checking workflow (audit, test, review) passes on its result:
-GREEN = fine, YELLOW = non-blocking findings, RED = critical. The platform evaluates it: RED
-creates a TODO, and after a repair run a GREEN closes the TODO that triggered it
+GREEN = fine, YELLOW = non-blocking findings, RED = critical. The platform evaluates it: RED (in
+mode `auto` also YELLOW) creates a TODO when auto-TODO is on for the workflow (off by default), and
+after a repair run a GREEN closes the TODO that triggered it
 (`TodoFeedbackListener`, see [Todo Triggers](#todo-triggers--self-improvement-loop-v51v52)).
 To do so, workflow blocks write markers into their output:
 
@@ -453,8 +454,11 @@ gate_description: <description>
 - Gate status is stored in `WorkflowRun.metadata` (`gate_status`, `gate_category`, `gate_description`)
 
 **A gate does not change the run status.** Neither YELLOW nor RED: the gate is a finding about
-the result, not a failure of the execution. RED creates a todo via `AutoTodoService` plus a
-warning in the activity log, YELLOW only the warning — the run stays `COMPLETED`.
+the result, not a failure of the execution. RED and YELLOW write a warning to the activity log
+(`RunCompletionHandler`). When auto-TODO is on for the workflow (workflow metadata
+`autoTodo.enabled`, otherwise the setting `auto-todo-default`, off by default), `AutoTodoService`
+creates a TODO with priority HIGH on RED and, in mode `auto`, one with MEDIUM on YELLOW — the run
+stays `COMPLETED`.
 
 The run status is decided by something independent: `RunCompletionHandler` sets
 `COMPLETED_WITH_ERRORS` when a step carrying `checkedCommand` metadata has failed, and

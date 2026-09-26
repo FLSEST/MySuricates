@@ -133,7 +133,7 @@ Workflows accumulate knowledge across runs:
 | Staging (Dev + Stable + Test) | Done |
 | Several AI providers (Claude + Codex + Pi) | Done |
 | Assistant System (contextual floating chat with page suggestions) | Done |
-| Gate Status System (checking workflows report GREEN/YELLOW/RED, RED creates a TODO) | Done |
+| Gate Status System (checking workflows report GREEN/YELLOW/RED; with auto-TODO, RED — in mode auto also YELLOW — becomes a TODO) | Done |
 | Agent Instructions System (base and per-workflow instructions) | Done |
 | CompletionTrigger System (automatic actions after workflow completion) | Done |
 | TodoTrigger System (Self-Improvement Loop: TODO → Fix Workflow → Verify → Close) | Done |
@@ -160,7 +160,7 @@ Workflows accumulate knowledge across runs:
 
 - **Cost estimation before execution** — the user sees the expected token costs before a Wish runs
 - **Model selection per Wish** — automatic or manual choice of the appropriate model
-- **Wish analytics dashboard** — make success rates, costs and trends of Wishes visible
+- **Wish analytics dashboard** — add costs and trends of Wishes (success rate and status counts exist already)
 
 ### Later: Ecosystem
 
