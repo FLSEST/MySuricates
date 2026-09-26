@@ -248,8 +248,8 @@ class AuditCenterServiceTest {
     void listReports_mapsThePageIncludingInvalidAttempts() {
         AuditReport invalid = report("r-2", "p-1", "a.health", null, AuditIngestionStatus.INVALID, Instant.now());
         invalid.setIngestionError("Schema kaputt");
-        when(reportRepository.findByProjectIdAndAuditKeyOrderByGeneratedAtDesc("p-1", "a.health", PageRequest.of(1, 1)))
-                .thenReturn(new PageImpl<>(List.of(invalid), PageRequest.of(1, 1), 3));
+        when(reportRepository.findSummaryRows("p-1", "a.health", PageRequest.of(1, 1)))
+                .thenReturn(new PageImpl<>(rows(invalid), PageRequest.of(1, 1), 3));
 
         PageResponse<AuditReportResponse> page = service.listReports("p-1", "a.health", 1, 1);
 
@@ -260,17 +260,29 @@ class AuditCenterServiceTest {
             assertThat(r.ingestionStatus()).isEqualTo(AuditIngestionStatus.INVALID);
             assertThat(r.ingestionError()).isEqualTo("Schema kaputt");
             assertThat(r.findingCount()).isZero();
+            assertThat(r.markdownContent()).as("the history carries heads only (TODO cd50d011)").isNull();
         });
+        verify(reportRepository, never()).findById(any());
     }
 
+    /** Den Text liefert der einzelne Bericht, samt Provider, Modell und Version aus dem Kopf. */
     @Test
-    void getReport_returnsTheReportOr404() {
-        when(reportRepository.findById("r-1")).thenReturn(Optional.of(
-                report("r-1", "p-1", "a.health", GateStatus.GREEN, AuditIngestionStatus.VALID, Instant.now())));
+    void getReport_returnsTheReportWithItsTextOr404() {
+        AuditReport stored = report("r-1", "p-1", "a.health", GateStatus.GREEN, AuditIngestionStatus.VALID, Instant.now());
+        stored.setMarkdownContent("# Health");
+        stored.setProvider("CLAUDE");
+        stored.setModel("opus");
+        stored.setWorkflowVersion("3.0.0");
+        when(reportRepository.findById("r-1")).thenReturn(Optional.of(stored));
         when(occurrenceRepository.countByReportIds(List.of("r-1"))).thenReturn(countRows("r-1", 1));
         when(reportRepository.findById("r-missing")).thenReturn(Optional.empty());
 
-        assertThat(service.getReport("r-1").findingCount()).isEqualTo(1);
+        AuditReportResponse report = service.getReport("r-1");
+        assertThat(report.findingCount()).isEqualTo(1);
+        assertThat(report.markdownContent()).isEqualTo("# Health");
+        assertThat(report.provider()).isEqualTo("CLAUDE");
+        assertThat(report.model()).isEqualTo("opus");
+        assertThat(report.workflowVersion()).isEqualTo("3.0.0");
         assertThatThrownBy(() -> service.getReport("r-missing")).isInstanceOf(ResourceNotFoundException.class);
     }
 
@@ -285,8 +297,8 @@ class AuditCenterServiceTest {
         AuditReport direct = report("r-direct", "p-1", "a.health", GateStatus.YELLOW, AuditIngestionStatus.VALID, now.minusSeconds(60));
         AuditReport oldChain = report("r-old", "p-1", "a.health", GateStatus.GREEN, AuditIngestionStatus.VALID, now.minusSeconds(120));
         AuditReport runGone = report("r-gone", "p-1", "a.health", null, AuditIngestionStatus.INVALID, now.minusSeconds(180));
-        when(reportRepository.findByProjectIdAndAuditKeyOrderByGeneratedAtDesc("p-1", "a.health", PageRequest.of(0, 20)))
-                .thenReturn(new PageImpl<>(List.of(viaChain, direct, oldChain, runGone), PageRequest.of(0, 20), 4));
+        when(reportRepository.findSummaryRows("p-1", "a.health", PageRequest.of(0, 20)))
+                .thenReturn(new PageImpl<>(rows(viaChain, direct, oldChain, runGone), PageRequest.of(0, 20), 4));
         when(occurrenceRepository.countByReportIds(List.of("r-chain", "r-direct", "r-old", "r-gone")))
                 .thenReturn(countRows("r-chain", 3, "r-direct", 1));
         when(runProjections.findOriginRows(List.of("run-r-chain", "run-r-direct", "run-r-old", "run-r-gone"))).thenReturn(List.of(
@@ -383,8 +395,8 @@ class AuditCenterServiceTest {
     @Test
     void listReports_withoutChainsOrVersions_asksNeitherChainRunsNorVersions() {
         AuditReport manual = report("r-1", "p-1", "a.health", GateStatus.GREEN, AuditIngestionStatus.VALID, Instant.now());
-        when(reportRepository.findByProjectIdAndAuditKeyOrderByGeneratedAtDesc("p-1", "a.health", PageRequest.of(0, 20)))
-                .thenReturn(new PageImpl<>(List.of(manual), PageRequest.of(0, 20), 1));
+        when(reportRepository.findSummaryRows("p-1", "a.health", PageRequest.of(0, 20)))
+                .thenReturn(new PageImpl<>(rows(manual), PageRequest.of(0, 20), 1));
         when(runProjections.findOriginRows(List.of("run-r-1"))).thenReturn(List.of(
                 new RunOriginRow("run-r-1", TriggerSource.MANUAL, null, null, null, null)));
 
@@ -397,8 +409,8 @@ class AuditCenterServiceTest {
 
     @Test
     void listReports_emptyPage_asksNothingElse() {
-        when(reportRepository.findByProjectIdAndAuditKeyOrderByGeneratedAtDesc("p-1", "a.none", PageRequest.of(0, 20)))
-                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
+        when(reportRepository.findSummaryRows("p-1", "a.none", PageRequest.of(0, 20)))
+                .thenReturn(new PageImpl<>(rows(), PageRequest.of(0, 20), 0));
 
         assertThat(service.listReports("p-1", "a.none", 0, 20).content()).isEmpty();
         verifyNoInteractions(occurrenceRepository, runProjections, chainRunRepository, versionRepository);
@@ -631,10 +643,7 @@ class AuditCenterServiceTest {
     }
 
     private static List<AuditReportSummaryRow> rows(AuditReport... reports) {
-        return java.util.Arrays.stream(reports).map(r -> new AuditReportSummaryRow(r.getId(), r.getProjectId(),
-                r.getWorkflowId(), r.getWorkflowRunId(), r.getAuditKey(), r.getCategory(), r.getTitle(),
-                r.getGateStatus(), r.getGateDescription(), r.getIngestionStatus(), r.getIngestionError(),
-                r.getGeneratedAt())).toList();
+        return java.util.Arrays.stream(reports).map(AuditReportSummaryRow::of).toList();
     }
 
     private static AuditReport report(String id, String projectId, String auditKey, GateStatus gate,

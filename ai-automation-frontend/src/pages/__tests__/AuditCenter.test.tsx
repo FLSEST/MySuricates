@@ -398,6 +398,49 @@ describe('AuditCenter report head', () => {
     expect(within(head).queryByTestId('trigger-source')).toBeNull();
   });
 
+  // cd50d011: the history list carries heads only; the report on screen loads its text on its own
+  it('loads the text of the shown report when the list carries heads only (new backend)', async () => {
+    const detailRequests: string[] = [];
+    useReports([{ ...report, markdownContent: null }]);
+    server.use(http.get(`${BASE}/audit-reports/:id`, ({ params }) => {
+      detailRequests.push(String(params.id));
+      return HttpResponse.json(report);
+    }));
+    await openAudit();
+
+    expect(await screen.findByText('Body of the shown report')).toBeInTheDocument();
+    expect(detailRequests).toEqual(['rep-1']);
+  });
+
+  it('takes the text from the list while an older backend still sends it there', async () => {
+    let detailRequested = false;
+    useReports([report]);
+    server.use(http.get(`${BASE}/audit-reports/:id`, () => {
+      detailRequested = true;
+      return HttpResponse.json({ ...report, markdownContent: 'Body from the detail route' });
+    }));
+    await openAudit();
+
+    expect(await screen.findByText('Body of the shown report')).toBeInTheDocument();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(detailRequested).toBe(false);
+    expect(screen.queryByText('Body from the detail route')).toBeNull();
+  });
+
+  it('keeps an empty text of an older backend instead of asking again', async () => {
+    let detailRequested = false;
+    useReports([invalid, { ...report, markdownContent: '' }]);
+    server.use(http.get(`${BASE}/audit-reports/:id`, () => {
+      detailRequested = true;
+      return HttpResponse.json(report);
+    }));
+    await openAudit();
+
+    await screen.findByTestId('report-origin');
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(detailRequested).toBe(false);
+  });
+
   it('shows the report the summary names, not the first valid one of the page', async () => {
     const newer: AuditReport = { ...report, id: 'rep-9', markdownContent: 'Body of a newer report', generatedAt: '2026-09-24T07:35:00Z' };
     useReports([newer, report]);

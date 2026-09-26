@@ -160,6 +160,9 @@ class RequestCostRatchetTest {
     /** An audit report's markdown, as big as a step output: in the /audits list it would show in the bytes. */
     private static final String FAT_REPORT_MARKDOWN = "#".repeat(20_000);
 
+    /** The report history of the first seeded audit — the Audit Center's history tab. */
+    private static final String AUDIT_HISTORY = "/api/v1/audits/{audit}/reports?projectId={auditProject}&size=50";
+
     /** Start of every seeded run — a Tuesday. */
     private static final Instant RUN_STARTED = Instant.parse("2026-09-01T10:00:00Z");
 
@@ -285,6 +288,12 @@ class RequestCostRatchetTest {
      *       bytes for six audits, whose markdown alone would add 20 000 bytes each. Their
      *       {@code stale} flag (older than 30 days) turns true for the fixed seed on 2026-10-01: one
      *       byte less per audit, the same queries.</li>
+     *   <li>{@code /audits/{audit}/reports}: added with TODO cd50d011. The history of an audit sent
+     *       every report with its full markdown — about 41 000 bytes for the two seeded reports of
+     *       one audit, 20 000 of them per report. It now reads the same head projection as
+     *       {@code /audits}; the text of the report on screen comes from {@code /audit-reports/{id}}.
+     *       Measured 1 376 bytes; 3 statements: the page, the finding counts in one GROUP BY and the
+     *       run origins (no chain and no version on the seeded runs, so no further lookups).</li>
      * </ul>
      */
     static final Map<String, Cost> BASELINE = new TreeMap<>(Map.ofEntries(
@@ -303,6 +312,7 @@ class RequestCostRatchetTest {
             Map.entry("/api/v1/goals/{goal}/milestones", new Cost(2, 2_000)),
             Map.entry("/api/v1/wishes", new Cost(3, 9_000)),
             Map.entry("/api/v1/audits", new Cost(2, 4_000)),
+            Map.entry(AUDIT_HISTORY, new Cost(3, 2_000)),
             Map.entry(CALENDAR, new Cost(7, 95_000))));
 
     @Autowired private MockMvc mockMvc;
@@ -328,6 +338,9 @@ class RequestCostRatchetTest {
 
     /** Target of {@code {sched}} in a route: that workflow's schedule. */
     private String firstScheduleId;
+    /** Target of {@code {audit}} and {@code {auditProject}}: the first seeded audit and its project. */
+    private String firstAuditKey;
+    private String firstAuditProjectId;
     /** Das Ziel der ersten Charge; jede Charge ordnet ihm ihre Todos zu (TODO dc0566f8). */
     private String firstGoalId;
 
@@ -542,6 +555,10 @@ class RequestCostRatchetTest {
             String projectId = auditWorkflow.getProject().getId();
             for (int a = 0; a < AUDITS_PER_PROJECT; a++) {
                 String auditKey = "cost-audit-" + batch + p + "-" + a;
+                if (firstAuditKey == null) {
+                    firstAuditKey = auditKey;
+                    firstAuditProjectId = projectId;
+                }
                 List<AuditReport> reports = new ArrayList<>();
                 for (int r = 0; r < 2; r++) {
                     reports.add(auditReportRepository.save(AuditReport.builder()
@@ -815,7 +832,8 @@ class RequestCostRatchetTest {
 
     private String resolve(String route) {
         return route.replace("{wf}", firstWorkflowId).replace("{sched}", firstScheduleId)
-                .replace("{goal}", firstGoalId);
+                .replace("{goal}", firstGoalId).replace("{audit}", firstAuditKey)
+                .replace("{auditProject}", firstAuditProjectId);
     }
 
     private Cost measure(String route) throws Exception {

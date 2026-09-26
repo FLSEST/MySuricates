@@ -1863,7 +1863,8 @@ Details of an audit (summary + latest report). Required parameter: `projectId`.
 
 All reports of an audit, paginated (`page`, `size`). Required parameter: `projectId`.
 
-**Response:** `PageResponse<AuditReportResponse>`
+**Response:** `PageResponse<AuditReportResponse>` — heads only: `markdownContent` is `null`. The text
+comes from `GET /api/v1/audit-reports/{id}` (until 2026-09-26 every page carried every report in full).
 
 ### `GET /api/v1/audit-reports/{id}`
 

@@ -36,7 +36,11 @@ export interface AuditReport {
   auditKey: string;
   category: string;
   title: string;
-  markdownContent: string;
+  /**
+   * The report text. The history list leaves it out (null, cd50d011) — `useShownAuditReport` loads it
+   * for the report on screen; older backends still send it in the list.
+   */
+  markdownContent: string | null;
   gateStatus: GateStatus | null;
   gateDescription: string | null;
   provider: string | null;
@@ -115,7 +119,25 @@ export function useShownAuditReport(audit: AuditSummary) {
   const reports = query.data?.content ?? [];
   const shown = reports.find((report) => report.id === audit.latestReportId)
     ?? reports.find((report) => report.ingestionStatus === 'VALID');
-  return { reports, shown, isLoading: query.isLoading };
+  const text = useAuditReportText(shown);
+  return { reports, shown, markdown: text.markdown, markdownLoading: text.isLoading, isLoading: query.isLoading };
+}
+
+/**
+ * The text of one report: from the list entry while an older backend still sends it there, else
+ * from `GET /audit-reports/{id}` (cd50d011 — the history carries heads only).
+ */
+export function useAuditReportText(report: AuditReport | undefined) {
+  const inline = typeof report?.markdownContent === 'string' ? report.markdownContent : null;
+  const query = useQuery({
+    queryKey: ['audit-report', report?.id],
+    queryFn: () => api.get<AuditReport>(`/audit-reports/${encodeURIComponent(report!.id)}`),
+    enabled: !!report && inline === null,
+  });
+  return {
+    markdown: inline ?? query.data?.markdownContent ?? null,
+    isLoading: !!report && inline === null && query.isLoading,
+  };
 }
 
 /** Findings loaded per status; the chip counts come from `AuditSummary.findingsByStatus`, not from here. */

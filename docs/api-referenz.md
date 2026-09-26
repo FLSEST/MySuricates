@@ -1869,7 +1869,8 @@ Details eines Audits (Zusammenfassung + neuester Report). Pflicht-Parameter: `pr
 
 Alle Reports eines Audits, paginiert (`page`, `size`). Pflicht-Parameter: `projectId`.
 
-**Response:** `PageResponse<AuditReportResponse>`
+**Response:** `PageResponse<AuditReportResponse>` — nur die Köpfe: `markdownContent` ist `null`. Den Text
+liefert `GET /api/v1/audit-reports/{id}` (bis 2026-09-26 trug jede Seite jeden Report im Volltext).
 
 ### `GET /api/v1/audit-reports/{id}`
 

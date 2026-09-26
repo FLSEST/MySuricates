@@ -17,7 +17,7 @@ export function AuditDetail({ audit, tab, setTab, locale, projectName, requested
   projectName?: string; requestedFinding: string | null; requestedFindingStatus?: AuditFindingStatus;
 }) {
   const t = useT();
-  const { reports, shown, isLoading } = useShownAuditReport(audit);
+  const { reports, shown, markdown, markdownLoading, isLoading } = useShownAuditReport(audit);
   // Kept here, not in the tab: switching to the report and back keeps the chosen chips.
   const [findingFilter, setFindingFilter] = useState(() => initialFindingFilter(requestedFindingStatus));
   // The header link follows the report on screen, like the run link in its head — not the latest attempt.
@@ -52,7 +52,7 @@ export function AuditDetail({ audit, tab, setTab, locale, projectName, requested
         {tab === 'report' && shown && <div className="max-w-5xl">
           <OlderReportNotice audit={audit} report={shown} locale={locale} />
           <ReportOrigin report={shown} locale={locale} />
-          <AuditMarkdown content={shown.markdownContent} />
+          {markdownLoading ? <CenteredLoading /> : <AuditMarkdown content={markdown ?? ''} />}
         </div>}
         {tab === 'history' && <ReportHistory reports={reports} locale={locale} />}
         {tab === 'findings' && <AuditFindings audit={audit} filter={findingFilter} setFilter={setFindingFilter}
