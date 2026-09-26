@@ -905,6 +905,14 @@ see the [Cypress migration notes](https://www.cypress.io/blog/cypress-15-made-si
 - **Concurrent writes:** SQLite only allows one write operation at a time. HikariCP is configured with pool-size=1 to serialize all DB operations and avoid `SQLITE_BUSY` errors under concurrent workflow runs.
 - **No native types:** Booleans as INTEGER, timestamps as TEXT, JSON as TEXT.
 - **No ALTER COLUMN:** Schema changes are limited (ADD COLUMN only).
+- **Type expression columns in native queries:** for a result column without a declared type
+  (`json_extract(…)`, `CASE …`), sqlite-jdbc takes the type of the value in the **first** row. If that is
+  NULL, the driver reports NUMERIC, and Hibernate fails on a later text with "Bad value for type
+  BigDecimal" – depending on the row order, so it flickers. In `nativeQuery = true`, give every such
+  column a fixed type, e.g. `COALESCE(CAST(… AS TEXT), '')`, and have the test fix the order so that the
+  first row yields NULL. Model: `WorkflowRunProjectionRepository.findOriginColumns` with
+  `WorkflowRunProjectionRepositoryTest`. Columns with a declared type (`w.name`) and JPQL queries are not
+  affected.
 - **NEVER write directly to the DB** (via `sqlite3` CLI or SQL). Always use the REST API or service/repository layer — direct writes bypass the Hibernate cache.
 
 ### Docker Dependency
