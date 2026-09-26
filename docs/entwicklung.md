@@ -124,6 +124,15 @@ assistant-system, vision) ist ein Build-Artefakt — das `maven-resources-plugin
 der Phase `generate-resources` aus dem Repo-Root `docs/`. Das Verzeichnis ist git-ignoriert; Änderungen
 gehören ausschließlich nach `docs/`. Der Assistent liest die Kopie zur Laufzeit per `ClassPathResource`.
 
+**Block-Config-Schema:** `ai-automation-frontend/src/data/blockConfigSchema.json` beschreibt je Blocktyp die
+Config-Schlüssel (Typ, erlaubte Werte, Legacy-Wert, Pflicht, de/en-Text). Der Monaco-Config-Editor importiert
+die Datei direkt, das Backend bekommt beim Build eine Kopie nach `classpath:schema/` (Execution
+`sync-block-config-schema` in `pom.xml`, direkt ins Ausgabeverzeichnis, keine zweite Datei im Repo;
+`deploy/Dockerfile` kopiert sie dafür in die Backend-Stufe). Der Analyzer (`ConfigKeyRules`) prüft damit
+dieselben Schlüssel, die der Editor anbietet. Zwei Wächter: `blockConfigSchema.test.ts` hält das Schema
+gegen die ausgelieferten Definitionen, `ExecutorConfigKeyDriftTest` gegen die Schlüssel, die die Executoren
+im Quelltext lesen. Wer einem Executor einen Config-Schlüssel beibringt, trägt ihn in der JSON-Datei ein.
+
 ### Frontend
 
 ```bash
