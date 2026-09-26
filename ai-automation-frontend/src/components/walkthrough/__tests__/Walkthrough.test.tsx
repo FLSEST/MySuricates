@@ -26,8 +26,10 @@ beforeEach(() => {
 });
 
 let modulesAnswered = false;
+let modulesOff: ModuleName[] = [];
 function serve(disabled: ModuleName[] = []) {
   modulesAnswered = false;
+  modulesOff = disabled;
   server.use(
     http.get('/api/v1/system/capabilities', () => {
       modulesAnswered = true;
@@ -36,11 +38,20 @@ function serve(disabled: ModuleName[] = []) {
   );
 }
 
+/** One progress dot per panel the tour shows. */
+const progressDots = () => document.querySelectorAll('[role="dialog"] div.flex-wrap[aria-hidden="true"] > span').length;
+
 /**
  * Module state is optimistic while unknown, so a walk before the answer can pass a panel the answer
- * then removes. Waits for the request itself instead of polling the dialog with role queries.
+ * then removes. Waits for the request, then for the dialog to show it: as many progress dots as
+ * panels the served modules allow (all modules and panel points come from the same answer). With
+ * every module on the count equals the optimistic one — there the walk itself is the check.
  */
-const moduleAnswer = () => waitFor(() => expect(modulesAnswered).toBe(true));
+async function moduleAnswer() {
+  await waitFor(() => expect(modulesAnswered).toBe(true));
+  const expected = WALKTHROUGH_PANELS.filter((p) => !p.module || !modulesOff.includes(p.module)).length;
+  await waitFor(() => expect(progressDots()).toBe(expected));
+}
 
 const title = (id: string) => walkthroughText(id, 'en').title;
 const point = (id: string, index: number) => walkthroughText(id, 'en').points[index] ?? '';
@@ -77,7 +88,8 @@ describe('Walkthrough', { timeout: 15_000 }, () => {
   it('shows every panel when all modules are on', async () => {
     serve();
     renderWithProviders(<Walkthrough onClose={vi.fn()} />);
-    // Wait for the module answer, otherwise this passes on the optimistic default alone.
+    // The optimistic default shows every panel too; waiting for the answer makes sure the answer
+    // itself removes none
     await moduleAnswer();
 
     expect(await walk()).toEqual(WALKTHROUGH_PANELS.map((p) => title(p.id)));
