@@ -4,7 +4,8 @@ import { useT } from '../../i18n';
 import { useWorkflowAnalysis } from '../../hooks/useWorkflowAnalysis';
 import type { AnalyzerFinding, AnalyzerSeverity, Workflow } from '../../types';
 
-const SEVERITIES: AnalyzerSeverity[] = ['HIGH', 'MEDIUM', 'LOW'];
+/** Only these make the notice appear and count in its header; LOW (hygiene) shows in the list only. */
+const HEADLINE_SEVERITIES: AnalyzerSeverity[] = ['HIGH', 'MEDIUM'];
 
 const SEVERITY_CLASS: Record<AnalyzerSeverity, string> = {
   HIGH: 'bg-danger-subtle text-danger',
@@ -15,7 +16,8 @@ const SEVERITY_CLASS: Record<AnalyzerSeverity, string> = {
 /**
  * The analyzer's findings on the workflow page (TODO f5153c47): until now they were only reachable via
  * REST, so a key no executor reads (`command` instead of `goal`, `on_failure: "fail"`) went unnoticed.
- * Compact — counts per severity, the list on demand — and absent when the definition is clean.
+ * Compact — counts per severity, the list on demand — and absent unless there is at least one MEDIUM or
+ * HIGH finding: nearly every definition has hygiene (LOW) findings, a notice for those alone would be noise.
  */
 export function WorkflowAnalysisNotice({ workflow }: { workflow: Workflow }) {
   const t = useT();
@@ -23,19 +25,19 @@ export function WorkflowAnalysisNotice({ workflow }: { workflow: Workflow }) {
   const [open, setOpen] = useState(false);
   const { data } = useWorkflowAnalysis(workflow.id, workflow.updatedAt);
   const findings = data?.findings ?? [];
-  if (findings.length === 0) return null;
-
-  const counts = SEVERITIES.map((severity) => ({
+  const counts = HEADLINE_SEVERITIES.map((severity) => ({
     severity,
     count: findings.filter((f) => f.severity === severity).length,
   })).filter((c) => c.count > 0);
+  const headline = counts.reduce((sum, c) => sum + c.count, 0);
+  if (headline === 0) return null;
 
   return (
     <div data-testid="workflow-analysis" className="rounded-lg border border-border bg-surface p-3">
       <div className="flex flex-wrap items-center gap-2">
         <ClipboardCheck className="w-4 h-4 text-text-secondary shrink-0" />
         <span className="text-sm font-medium text-text">
-          {a.summary.replace('{count}', String(findings.length))}
+          {a.summary.replace('{count}', String(headline))}
         </span>
         {counts.map(({ severity, count }) => (
           <span key={severity} data-testid={`analysis-count-${severity}`}

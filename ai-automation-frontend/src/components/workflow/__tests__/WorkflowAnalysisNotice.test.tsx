@@ -29,9 +29,11 @@ describe('WorkflowAnalysisNotice', () => {
     renderWithProviders(<WorkflowAnalysisNotice workflow={workflow} />);
 
     const notice = await screen.findByTestId('workflow-analysis');
-    expect(notice).toHaveTextContent('3 finding(s) of the build check');
+    // LOW is hygiene: listed, but not counted in the header
+    expect(notice).toHaveTextContent('2 finding(s) of the build check');
     expect(screen.getByTestId('analysis-count-HIGH')).toHaveTextContent('1 severe');
     expect(screen.getByTestId('analysis-count-MEDIUM')).toHaveTextContent('1 medium');
+    expect(screen.queryByTestId('analysis-count-LOW')).not.toBeInTheDocument();
     expect(screen.queryByText('Pflichtschlüssel goal fehlt')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Show findings' }));
@@ -40,6 +42,8 @@ describe('WorkflowAnalysisNotice', () => {
     expect(screen.getByText('missing-required-config-key')).toBeInTheDocument();
     expect(screen.getAllByText('Block 2 · agent')).toHaveLength(2);
     expect(screen.getByText('Block 1')).toBeInTheDocument();
+    expect(screen.getByText('ohne set -euo pipefail')).toBeInTheDocument();
+    expect(screen.getByText('minor')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Hide findings' })).toHaveAttribute('aria-expanded', 'true');
   });
 
@@ -59,6 +63,19 @@ describe('WorkflowAnalysisNotice', () => {
     server.use(http.get('/api/v1/workflows/wf-1/analyze', () => {
       asked = true;
       return HttpResponse.json({ workflowId: 'wf-1', workflowName: 'Deploy', findingCount: 0, bySeverity: {}, findings: [] });
+    }));
+
+    renderWithProviders(<WorkflowAnalysisNotice workflow={workflow} />);
+
+    await waitFor(() => expect(asked).toBe(true));
+    expect(screen.queryByTestId('workflow-analysis')).not.toBeInTheDocument();
+  });
+
+  it('stays hidden when there are only LOW (hygiene) findings', async () => {
+    let asked = false;
+    server.use(http.get('/api/v1/workflows/wf-1/analyze', () => {
+      asked = true;
+      return HttpResponse.json({ workflowId: 'wf-1', workflowName: 'Deploy', findingCount: 1, bySeverity: { LOW: 1 }, findings: [findings[2]] });
     }));
 
     renderWithProviders(<WorkflowAnalysisNotice workflow={workflow} />);
