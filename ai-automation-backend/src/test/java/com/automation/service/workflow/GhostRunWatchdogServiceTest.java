@@ -12,6 +12,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
@@ -31,13 +32,14 @@ class GhostRunWatchdogServiceTest {
     @Mock private ExecutionBroadcaster broadcaster;
     @Mock private ActivityLogService activityLogService;
     @Mock private SuspendState suspendState;
+    @Mock private ApplicationEventPublisher events;
 
     private GhostRunWatchdogService service;
 
     @BeforeEach
     void setUp() {
         service = new GhostRunWatchdogService(runRepository, executionRegistry,
-                executionSemaphore, broadcaster, activityLogService, suspendState);
+                executionSemaphore, broadcaster, activityLogService, suspendState, events);
         ReflectionTestUtils.setField(service, "staleThresholdMinutes", 10L);
     }
 
@@ -147,6 +149,38 @@ class GhostRunWatchdogServiceTest {
             assertThat(saved.getCompletedAt()).isNotNull();
             verify(broadcaster).broadcastRunStatus("r1", RunStatus.INTERRUPTED);
             verify(activityLogService).warn(any(), contains("INTERRUPTED"), anyString());
+        }
+
+        /** TODO 90d10ba1: the standby branch records its cause and announces the runs for auto-resume. */
+        @Test
+        void suspendRelatedRun_recordsItsCauseAndIsAnnounced() {
+            WorkflowRun run = WorkflowRun.builder().id("r1").status(RunStatus.RUNNING)
+                    .startedAt(Instant.now().minus(25, ChronoUnit.MINUTES)).build();
+            when(runRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of(run));
+            when(executionRegistry.isRunActive("r1")).thenReturn(false);
+            when(suspendState.resumedRecently(any(), any())).thenReturn(true);
+            stubPermitsBalanced();
+
+            service.detectGhostRuns();
+
+            assertThat(run.getMetadata())
+                    .containsEntry(RunInterruption.FROM_KEY, "RUNNING")
+                    .containsEntry(RunInterruption.BY_KEY, "STANDBY");
+            verify(events).publishEvent(new RunInterruption.Event(List.of("r1"), RunInterruption.Cause.STANDBY));
+        }
+
+        @Test
+        void trueGhostRun_isNotAnnouncedForAutoResume() {
+            WorkflowRun run = WorkflowRun.builder().id("r1").status(RunStatus.RUNNING)
+                    .startedAt(Instant.now().minus(25, ChronoUnit.MINUTES)).build();
+            when(runRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of(run));
+            when(executionRegistry.isRunActive("r1")).thenReturn(false);
+            stubPermitsBalanced();
+
+            service.detectGhostRuns();
+
+            assertThat(run.getMetadata()).doesNotContainKey(RunInterruption.FROM_KEY);
+            verifyNoInteractions(events);
         }
 
         @Test

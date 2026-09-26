@@ -9,6 +9,7 @@ import com.automation.service.activitylog.ActivityLogService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -36,6 +37,7 @@ public class GhostRunWatchdogService {
     private final ExecutionBroadcaster broadcaster;
     private final ActivityLogService activityLogService;
     private final SuspendState suspendState;
+    private final ApplicationEventPublisher events;
 
     @Scheduled(fixedRate = 120_000, initialDelay = 60_000)
     public void detectGhostRuns() {
@@ -51,7 +53,7 @@ public class GhostRunWatchdogService {
         // system suspend (which kills the run's CLI/Docker subprocesses) rather than a true ghost.
         boolean suspendRelated = suspendState.resumedRecently(now, Duration.ofMinutes(staleThresholdMinutes * 2));
         int failedCount = 0;
-        int interruptedCount = 0;
+        List<String> interrupted = new java.util.ArrayList<>();
 
         for (WorkflowRun run : runningRuns) {
             if (executionRegistry.isRunActive(run.getId())) {
@@ -74,11 +76,13 @@ public class GhostRunWatchdogService {
             run.setDurationMs(run.getCompletedAt().toEpochMilli() - run.getStartedAt().toEpochMilli());
             if (targetStatus == RunStatus.FAILED) {
                 run.setError(Map.of("message", message));
+            } else {
+                RunInterruption.record(run, RunStatus.RUNNING, RunInterruption.Cause.STANDBY);
             }
             runRepository.save(run);
             broadcaster.broadcastRunStatus(run.getId(), targetStatus);
             if (suspendRelated) {
-                interruptedCount++;
+                interrupted.add(run.getId());
             } else {
                 failedCount++;
             }
@@ -91,10 +95,12 @@ public class GhostRunWatchdogService {
                     "Watchdog: " + failedCount + " ghost run(s) detected and marked as FAILED",
                     "GhostRunWatchdogService");
         }
-        if (interruptedCount > 0) {
+        if (!interrupted.isEmpty()) {
             activityLogService.warn(LogCategory.EXECUTION,
-                    "Watchdog: " + interruptedCount + " run(s) interrupted by system suspend — marked INTERRUPTED (resumable)",
+                    "Watchdog: " + interrupted.size() + " run(s) interrupted by system suspend — marked INTERRUPTED (resumable)",
                     "GhostRunWatchdogService");
+            // After the marking: RunAutoResumer resumes the opted-in ones (TODO 90d10ba1)
+            events.publishEvent(new RunInterruption.Event(interrupted, RunInterruption.Cause.STANDBY));
         }
 
         reconcilePermits();
