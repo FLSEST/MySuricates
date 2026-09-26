@@ -396,7 +396,7 @@ Two STOMP subscriptions:
 
 ### Additional Components
 
-- **AssistantMessage** (`components/assistant/AssistantMessage.tsx`): Markdown rendering (react-markdown + remark-gfm), collapse at >300 characters, ActionButtons for `run_workflow`/`show_workflow`/`show_run`/`start_wish`/`ask_choice`, PendingToolCard with Confirm/Reject
+- **AssistantMessage** (`components/assistant/AssistantMessage.tsx`): message bubble that collapses above 300 px height; markdown rendering (react-markdown + remark-gfm) in `AssistantMarkdown.tsx`, `ActionButton.tsx` for `run_workflow`/`show_workflow`/`show_run`/`start_wish`/`ask_choice`, `PendingToolCard.tsx` with Confirm/Reject (state in `hooks/usePendingToolDecision.ts`)
 - **StatusIndicator** (`components/assistant/AssistantWelcome.tsx`): WebSocket phases or rotating thinking phrases (2.5s interval)
 - **assistantPanelUtils** (`components/assistantPanelUtils.ts`): `parsePageContext(pathname)` extracts structured context from URL
 
