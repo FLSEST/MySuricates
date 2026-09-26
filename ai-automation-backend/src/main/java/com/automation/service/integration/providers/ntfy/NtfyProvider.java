@@ -68,6 +68,12 @@ public class NtfyProvider implements IntegrationProvider {
         return false;
     }
 
+    /** Runs without a stored connection (TODO cdccc1e5) — see {@link IntegrationProvider#connectionOptional()}. */
+    @Override
+    public boolean connectionOptional() {
+        return true;
+    }
+
     /** With a token: {@code GET /v1/account} (validates the token); without: {@code GET /v1/health}. */
     @Override
     public String fetchAccountInfo(String combinedToken) {

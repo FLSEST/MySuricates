@@ -88,4 +88,18 @@ public interface IntegrationProvider {
     default boolean requiresCredentials() {
         return true;
     }
+
+    /**
+     * Whether the integration block and the action endpoint work without any stored connection:
+     * with none, {@code IntegrationOAuthService.getValidAccessToken} hands this provider a
+     * {@code null} token and it runs on its defaults (public API, feed URL per action, host CLI
+     * defaults). Such a provider is usable without setup, and the integrations page says so instead
+     * of "Setup required" (TODO cdccc1e5). Implies {@link #requiresCredentials()} {@code == false};
+     * a provider whose optional credentials still carry something it cannot run without (the base
+     * URL of the HTTP API) stays {@code false}. A stored connection that is not connected still
+     * blocks — the connect check (Taskwarrior: is {@code task} installed?) keeps its say.
+     */
+    default boolean connectionOptional() {
+        return false;
+    }
 }

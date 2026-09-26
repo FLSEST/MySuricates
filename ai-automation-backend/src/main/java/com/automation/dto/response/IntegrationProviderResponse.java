@@ -27,7 +27,12 @@ public record IntegrationProviderResponse(
          */
         List<IntegrationConnectionResponse> connections,
         /** {@code true}: connecting runs the OAuth consent; {@code false}: the credentials are the auth (PAT/API key). */
-        boolean requiresOAuthFlow
+        boolean requiresOAuthFlow,
+        /**
+         * {@code true}: the provider works without a stored connection (TODO cdccc1e5) — without one
+         * it is ready, not "setup required". A stored connection that is not connected still blocks.
+         */
+        boolean connectionOptional
 ) {
     public record ScopeOptionResponse(String scope, String label, boolean granted) {}
 }

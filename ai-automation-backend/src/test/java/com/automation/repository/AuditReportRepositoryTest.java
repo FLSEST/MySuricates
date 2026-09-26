@@ -1,5 +1,6 @@
 package com.automation.repository;
 
+import com.automation.dto.projection.AuditReportSummaryRow;
 import com.automation.entity.AuditIngestionStatus;
 import com.automation.entity.AuditReport;
 import com.automation.entity.GateStatus;
@@ -95,12 +96,32 @@ class AuditReportRepositoryTest {
         AuditReport middle = save(projectId, AUDIT_KEY, T2, AuditIngestionStatus.VALID);
         AuditReport newest = save(projectId, AUDIT_KEY, T3, AuditIngestionStatus.INVALID);
 
-        Page<AuditReport> first = reportRepository.findByProjectIdAndAuditKeyOrderByGeneratedAtDesc(
-                projectId, AUDIT_KEY, PageRequest.of(0, 2));
+        Page<AuditReportSummaryRow> first = reportRepository.findSummaryRows(projectId, AUDIT_KEY, PageRequest.of(0, 2));
 
-        assertThat(first.getContent()).extracting(AuditReport::getId).containsExactly(newest.getId(), middle.getId());
+        assertThat(first.getContent()).extracting(AuditReportSummaryRow::id).containsExactly(newest.getId(), middle.getId());
         assertThat(first.getTotalElements()).isEqualTo(3);
         assertThat(first.getTotalPages()).isEqualTo(2);
+    }
+
+    /** Die Koepfe der Historie tragen Provider, Modell und Version an der richtigen Stelle, aber kein Markdown (TODO cd50d011). */
+    @Test
+    void summaryRows_carryEveryHeadField() {
+        AuditReport stored = save(projectId, AUDIT_KEY, T1, AuditIngestionStatus.VALID);
+        stored.setMarkdownContent("# Body");
+        stored.setGateDescription("6/10");
+        stored.setProvider("CLAUDE");
+        stored.setModel("opus");
+        stored.setWorkflowVersion("3.0.0");
+        reportRepository.save(stored);
+
+        AuditReportSummaryRow row = reportRepository.findSummaryRows(projectId, AUDIT_KEY, PageRequest.of(0, 1))
+                .getContent().getFirst();
+
+        assertThat(row).isEqualTo(AuditReportSummaryRow.of(stored));
+        assertThat(row.provider()).isEqualTo("CLAUDE");
+        assertThat(row.model()).isEqualTo("opus");
+        assertThat(row.workflowVersion()).isEqualTo("3.0.0");
+        assertThat(row.gateDescription()).isEqualTo("6/10");
     }
 
     @Test

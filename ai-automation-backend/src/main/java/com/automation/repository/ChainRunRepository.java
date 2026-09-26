@@ -2,6 +2,7 @@ package com.automation.repository;
 
 import com.automation.entity.ChainRun;
 import com.automation.entity.RunStatus;
+import org.springframework.data.domain.Limit;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -40,6 +41,11 @@ public interface ChainRunRepository extends JpaRepository<ChainRun, String> {
     List<ChainRun> findByStatus(RunStatus status);
 
     List<ChainRun> findByTriggeredByScheduleIdOrderByStartedAtDesc(String scheduleId);
+
+    /** A schedule's newest chain runs, at most {@code limit} — its run list (TODO 86777fb4). */
+    List<ChainRun> findByTriggeredByScheduleIdOrderByStartedAtDesc(String scheduleId, Limit limit);
+
+    long countByTriggeredByScheduleId(String scheduleId);
 
     /**
      * Chain-Runs samt Id und Name ihrer Chain in EINER Abfrage, ohne entry_runs und input_context —

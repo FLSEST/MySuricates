@@ -1118,16 +1118,22 @@ Retrieve a single schedule.
 
 ### `GET /api/v1/schedules/{id}/runs`
 
-Runs triggered by this schedule.
+The newest runs triggered by this schedule — at most `limit` of each kind (query parameter,
+default 50, 1–500), plus the totals.
 
 **Response:**
 
 ```json
 {
   "workflowRuns": [...],
-  "chainRuns": [...]
+  "chainRuns": [...],
+  "workflowRunsTotal": 26000,
+  "chainRunsTotal": 0
 }
 ```
+
+When `workflowRunsTotal` exceeds `workflowRuns.length`, the limit cut the list (until 2026-09-26 every
+run came, without a ceiling).
 
 `workflowRuns` are `WorkflowRunListItemResponse` — **without steps**, the same list rows as
 `GET /api/v1/executions` (`stepCount`, `lastStepStatus`, `lastStepPreview`). Until 2026-09-23 this
@@ -1155,10 +1161,12 @@ Calendar data: scheduled executions and past runs within a time range.
 |---|---|---|
 | `from` | Instant | Yes |
 | `to` | Instant | Yes |
+| `limit` | int | No (default 1000, 1–5000) |
 
 **Response:** `CalendarDataResponse` with `upcoming` (`ScheduledWorkflowResponse[]`, schedules whose next
 actual run lies in the range — during a `skip-until` pause, that is after the pause) and `pastRuns` (`WorkflowRunListItemResponse[]` — **without steps**, the same list
-rows as `GET /api/v1/executions`; until 2026-09-23 with every step of every run in the range)
+rows as `GET /api/v1/executions`; until 2026-09-23 with every step of every run in the range).
+`pastRuns` are the newest `limit` runs of the range, `pastRunsTotal` counts all of them (until 2026-09-26 without a ceiling).
 
 ### `POST /api/v1/schedules/preview`
 
@@ -1863,7 +1871,8 @@ Details of an audit (summary + latest report). Required parameter: `projectId`.
 
 All reports of an audit, paginated (`page`, `size`). Required parameter: `projectId`.
 
-**Response:** `PageResponse<AuditReportResponse>`
+**Response:** `PageResponse<AuditReportResponse>` — heads only: `markdownContent` is `null`. The text
+comes from `GET /api/v1/audit-reports/{id}` (until 2026-09-26 every page carried every report in full).
 
 ### `GET /api/v1/audit-reports/{id}`
 

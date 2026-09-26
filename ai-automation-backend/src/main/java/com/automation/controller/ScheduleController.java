@@ -3,11 +3,10 @@ package com.automation.controller;
 import com.automation.dto.request.CreateScheduleRequest;
 import com.automation.dto.request.UpdateScheduleRequest;
 import com.automation.dto.response.CalendarDataResponse;
-import com.automation.dto.response.ChainRunResponse;
+import com.automation.dto.response.ScheduleRunsResponse;
 import com.automation.dto.response.ScheduledWorkflowResponse;
 import com.automation.dto.response.SchedulerPauseResponse;
 import com.automation.dto.response.UpcomingScheduleResponse;
-import com.automation.dto.response.WorkflowRunListItemResponse;
 import com.automation.mapper.ChainMapper;
 import com.automation.mapper.ScheduleMapper;
 import com.automation.mapper.WorkflowMapper;
@@ -61,18 +60,27 @@ public class ScheduleController {
         return scheduleMapper.toResponse(schedulerService.findById(id));
     }
 
+    /** Default and ceiling of {@code limit} on {@code /{id}/runs} (TODO 86777fb4). */
+    static final int SCHEDULE_RUNS_LIMIT = 50;
+    static final int SCHEDULE_RUNS_MAX_LIMIT = 500;
+    /** Default and ceiling of {@code limit} on {@code /calendar}: a month of an hourly schedule fits. */
+    static final int CALENDAR_RUNS_LIMIT = 1000;
+    static final int CALENDAR_RUNS_MAX_LIMIT = 5000;
+
     /**
-     * Die Runs eines Zeitplans als Listenzeilen: Anzahl und Vorschau des letzten Schritts statt
-     * aller Schritte (TODO 168e3d7f) — die Detail-Route eines Runs liefert den Volltext.
+     * Die neuesten Runs eines Zeitplans als Listenzeilen: Anzahl und Vorschau des letzten Schritts
+     * statt aller Schritte (TODO 168e3d7f) — die Detail-Route eines Runs liefert den Volltext. Je Art
+     * hoechstens {@code limit}, dazu die Gesamtzahl (TODO 86777fb4).
      */
     @GetMapping("/{id}/runs")
     @Transactional(readOnly = true)
-    public Map<String, Object> getScheduleRuns(@PathVariable String id) {
-        List<WorkflowRunListItemResponse> workflowRuns = workflowMapper.toRunListItemsWithOwners(
-                schedulerService.findWorkflowRunsByScheduleId(id));
-        List<ChainRunResponse> chainRuns = chainMapper.toRunResponseList(
-                schedulerService.findChainRunsByScheduleId(id));
-        return Map.of("workflowRuns", workflowRuns, "chainRuns", chainRuns);
+    public ScheduleRunsResponse getScheduleRuns(@PathVariable String id,
+                                                @RequestParam(defaultValue = "" + SCHEDULE_RUNS_LIMIT) int limit) {
+        int capped = Math.clamp(limit, 1, SCHEDULE_RUNS_MAX_LIMIT);
+        var workflowRuns = schedulerService.findWorkflowRunsByScheduleId(id, capped);
+        var chainRuns = schedulerService.findChainRunsByScheduleId(id, capped);
+        return new ScheduleRunsResponse(workflowMapper.toRunListItemsWithOwners(workflowRuns.runs()),
+                chainMapper.toRunResponseList(chainRuns.runs()), workflowRuns.total(), chainRuns.total());
     }
 
     @GetMapping("/workflow/{workflowId}")
@@ -85,15 +93,19 @@ public class ScheduleController {
         return scheduleMapper.toResponseList(schedulerService.findByChainId(chainId));
     }
 
-    /** Upcoming = schedules whose next real run lies in the period (behind a skip-until pause). */
+    /**
+     * Upcoming = schedules whose next real run lies in the period (behind a skip-until pause). Past
+     * runs: the newest {@code limit} of the period plus their total (TODO 86777fb4).
+     */
     @GetMapping("/calendar")
     @Transactional(readOnly = true)
     public CalendarDataResponse getCalendarData(
             @RequestParam Instant from,
-            @RequestParam Instant to) {
+            @RequestParam Instant to,
+            @RequestParam(defaultValue = "" + CALENDAR_RUNS_LIMIT) int limit) {
         var upcoming = scheduleMapper.toResponseList(upcomingRunsCalculator.findWithNextRunBetween(from, to));
-        var pastRuns = workflowMapper.toRunListItemsWithOwners(schedulerService.findWorkflowRunsBetween(from, to));
-        return new CalendarDataResponse(upcoming, pastRuns);
+        var pastRuns = schedulerService.findWorkflowRunsBetween(from, to, Math.clamp(limit, 1, CALENDAR_RUNS_MAX_LIMIT));
+        return new CalendarDataResponse(upcoming, workflowMapper.toRunListItemsWithOwners(pastRuns.runs()), pastRuns.total());
     }
 
     @PostMapping("/preview")

@@ -19,6 +19,7 @@ import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.scheduler.CatchUpQueue;
 import com.automation.service.scheduler.SchedulerMaintenanceMode;
 import com.automation.service.scheduler.SchedulerService;
+import com.automation.service.scheduler.SchedulerService.NewestRuns;
 import com.automation.service.system.ApiKeyService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,6 +37,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -305,8 +307,8 @@ class ScheduleControllerTest {
      */
     @Test
     void getScheduleRuns_returnsBothWorkflowAndChainRuns() throws Exception {
-        when(schedulerService.findWorkflowRunsByScheduleId("sched-1")).thenReturn(List.of());
-        when(schedulerService.findChainRunsByScheduleId("sched-1")).thenReturn(List.of());
+        when(schedulerService.findWorkflowRunsByScheduleId("sched-1", 50)).thenReturn(new NewestRuns<>(List.of(), 1));
+        when(schedulerService.findChainRunsByScheduleId("sched-1", 50)).thenReturn(new NewestRuns<>(List.of(), 0));
         when(workflowMapper.toRunListItemsWithOwners(any())).thenReturn(List.of(listItem("run-1")));
         when(chainMapper.toRunResponseList(any())).thenReturn(List.of());
 
@@ -316,7 +318,28 @@ class ScheduleControllerTest {
                 .andExpect(jsonPath("$.workflowRuns[0].stepCount").value(3))
                 .andExpect(jsonPath("$.workflowRuns[0].lastStepPreview").value("last output"))
                 .andExpect(jsonPath("$.workflowRuns[0].steps").doesNotExist())
-                .andExpect(jsonPath("$.chainRuns").isArray());
+                .andExpect(jsonPath("$.chainRuns").isArray())
+                .andExpect(jsonPath("$.workflowRunsTotal").value(1))
+                .andExpect(jsonPath("$.chainRunsTotal").value(0));
+    }
+
+    /** Hoechstens {@code limit} je Art, begrenzt auf 1..500; die Gesamtzahl nennt, was fehlt (TODO 86777fb4). */
+    @Test
+    void getScheduleRuns_clampsTheLimit_andReportsTheTotals() throws Exception {
+        when(schedulerService.findWorkflowRunsByScheduleId(eq("sched-1"), anyInt())).thenReturn(new NewestRuns<>(List.of(), 26_000));
+        when(schedulerService.findChainRunsByScheduleId(eq("sched-1"), anyInt())).thenReturn(new NewestRuns<>(List.of(), 7));
+        when(workflowMapper.toRunListItemsWithOwners(any())).thenReturn(List.of());
+        when(chainMapper.toRunResponseList(any())).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/v1/schedules/sched-1/runs").param("limit", "100000"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.workflowRunsTotal").value(26_000))
+                .andExpect(jsonPath("$.chainRunsTotal").value(7));
+        mockMvc.perform(get("/api/v1/schedules/sched-1/runs").param("limit", "0")).andExpect(status().isOk());
+
+        verify(schedulerService).findWorkflowRunsByScheduleId("sched-1", 500);
+        verify(schedulerService).findChainRunsByScheduleId("sched-1", 500);
+        verify(schedulerService).findWorkflowRunsByScheduleId("sched-1", 1);
     }
 
     @Test
@@ -403,7 +426,7 @@ class ScheduleControllerTest {
     @Test
     void getCalendarData_returnsUpcomingAndPastRuns() throws Exception {
         when(upcomingRunsCalculator.findWithNextRunBetween(any(), any())).thenReturn(List.of(testScheduled));
-        when(schedulerService.findWorkflowRunsBetween(any(), any())).thenReturn(List.of());
+        when(schedulerService.findWorkflowRunsBetween(any(), any(), eq(1000))).thenReturn(new NewestRuns<>(List.of(), 1));
         when(scheduleMapper.toResponseList(any())).thenReturn(List.of(testResponse));
         when(workflowMapper.toRunListItemsWithOwners(any())).thenReturn(List.of(listItem("run-1")));
 
@@ -414,7 +437,26 @@ class ScheduleControllerTest {
                 .andExpect(jsonPath("$.upcoming").isArray())
                 .andExpect(jsonPath("$.pastRuns[0].id").value("run-1"))
                 .andExpect(jsonPath("$.pastRuns[0].stepCount").value(3))
-                .andExpect(jsonPath("$.pastRuns[0].steps").doesNotExist());
+                .andExpect(jsonPath("$.pastRuns[0].steps").doesNotExist())
+                .andExpect(jsonPath("$.pastRunsTotal").value(1));
+    }
+
+    /** Der Kalender nennt alle Runs des Zeitraums, auch wenn er nur die neuesten schickt (TODO 86777fb4). */
+    @Test
+    void getCalendarData_limitsThePastRuns_andReportsTheirTotal() throws Exception {
+        when(upcomingRunsCalculator.findWithNextRunBetween(any(), any())).thenReturn(List.of());
+        when(schedulerService.findWorkflowRunsBetween(any(), any(), anyInt())).thenReturn(new NewestRuns<>(List.of(), 8_640));
+        when(scheduleMapper.toResponseList(any())).thenReturn(List.of());
+        when(workflowMapper.toRunListItemsWithOwners(any())).thenReturn(List.of(listItem("run-1")));
+
+        mockMvc.perform(get("/api/v1/schedules/calendar")
+                        .param("from", "2026-02-01T00:00:00Z")
+                        .param("to", "2026-03-01T00:00:00Z")
+                        .param("limit", "99999"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.pastRunsTotal").value(8_640));
+
+        verify(schedulerService).findWorkflowRunsBetween(any(), any(), eq(5000));
     }
 
     @Test

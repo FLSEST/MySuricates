@@ -6,6 +6,7 @@ import com.automation.entity.WorkflowChain;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.Limit;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.ActiveProfiles;
@@ -133,6 +134,23 @@ class ChainRunRepositoryTest {
 
         assertThat(result).hasSize(2);
         assertThat(result.get(0).getStartedAt()).isAfterOrEqualTo(result.get(1).getStartedAt());
+    }
+
+    /** Die Chain-Runs eines Zeitplans: die neuesten bis zum Limit, dazu ihre Gesamtzahl (TODO 86777fb4). */
+    @Test
+    void findByTriggeredByScheduleId_withLimit_returnsTheNewest_andTheCountAll() {
+        WorkflowChain chain = saveChain("Scheduled Chain");
+        String scheduleId = "schedule-" + java.util.UUID.randomUUID();
+        Instant now = Instant.now();
+        repository.save(ChainRun.builder().chain(chain).status(RunStatus.COMPLETED)
+                .triggeredByScheduleId(scheduleId).startedAt(now.minusSeconds(20)).build());
+        ChainRun newest = repository.save(ChainRun.builder().chain(chain).status(RunStatus.COMPLETED)
+                .triggeredByScheduleId(scheduleId).startedAt(now).build());
+        repository.save(run(chain, RunStatus.COMPLETED));
+
+        assertThat(repository.findByTriggeredByScheduleIdOrderByStartedAtDesc(scheduleId, Limit.of(1)))
+                .extracting(ChainRun::getId).containsExactly(newest.getId());
+        assertThat(repository.countByTriggeredByScheduleId(scheduleId)).isEqualTo(2);
     }
 
     @Test

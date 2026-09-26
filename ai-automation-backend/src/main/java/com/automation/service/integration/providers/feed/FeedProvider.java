@@ -68,6 +68,12 @@ public class FeedProvider implements IntegrationProvider {
         return false;
     }
 
+    /** Runs without a stored connection (TODO cdccc1e5) — see {@link IntegrationProvider#connectionOptional()}. */
+    @Override
+    public boolean connectionOptional() {
+        return true;
+    }
+
     /** Nothing to validate — a static marker so saving (empty) credentials yields CONNECTED. */
     @Override
     public String fetchAccountInfo(String accessToken) {

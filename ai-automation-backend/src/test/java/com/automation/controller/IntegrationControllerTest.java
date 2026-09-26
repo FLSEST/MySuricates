@@ -84,6 +84,23 @@ class IntegrationControllerTest {
                 .andExpect(jsonPath("$[0].verifiedAgainst").doesNotExist());
     }
 
+    /** Ein Anbieter ohne Pflicht-Verbindung sagt es der Oberflaeche (TODO cdccc1e5); die uebrigen nicht. */
+    @Test
+    void listProviders_saysWhetherAProviderRunsWithoutAConnection() throws Exception {
+        IntegrationProvider feed = provider("feed");
+        when(feed.requiresCredentials()).thenReturn(false);
+        when(feed.connectionOptional()).thenReturn(true);
+        IntegrationProvider calendar = provider("google-calendar");
+        when(registry.getAllProviders()).thenReturn(List.of(feed, calendar));
+        when(oAuthService.listConnections(any())).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/v1/integrations"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].connectionOptional").value(true))
+                .andExpect(jsonPath("$[0].configured").value(false))
+                .andExpect(jsonPath("$[1].connectionOptional").value(false));
+    }
+
     @Test
     void listProviders_namesWhatAVerifiedProviderWasCheckedAgainst() throws Exception {
         IntegrationProvider provider = provider("google-calendar");

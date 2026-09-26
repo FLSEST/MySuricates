@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -77,22 +78,27 @@ public class AuditCenterService {
         AuditReport latestAttempt = reportRepository.findTopByProjectIdAndAuditKeyOrderByGeneratedAtDesc(projectId, auditKey)
                 .orElse(latest);
         List<AuditFinding> findings = findingRepository.findByProjectIdAndAuditKey(projectId, auditKey);
-        return new AuditDetail(toSummary(summaryRow(latest), previous == null ? null : summaryRow(previous),
-                summaryRow(latestAttempt), countsOf(findings)), toReports(List.of(latest)).getFirst());
+        return new AuditDetail(toSummary(AuditReportSummaryRow.of(latest),
+                previous == null ? null : AuditReportSummaryRow.of(previous),
+                AuditReportSummaryRow.of(latestAttempt), countsOf(findings)), withMarkdown(latest));
     }
 
+    /**
+     * Die Historie als Koepfe: {@code markdownContent} bleibt {@code null} (TODO cd50d011). Eine
+     * Seite trug vorher jeden Bericht im Volltext mit, obwohl nur der angezeigte ihn braucht – den
+     * liefert {@link #getReport}.
+     */
     @Transactional(readOnly = true)
     public PageResponse<AuditReportResponse> listReports(String projectId, String auditKey, int page, int size) {
-        Page<AuditReport> result = reportRepository.findByProjectIdAndAuditKeyOrderByGeneratedAtDesc(
-                projectId, auditKey, PageRequest.of(page, size));
-        return new PageResponse<>(toReports(result.getContent()),
+        Page<AuditReportSummaryRow> result = reportRepository.findSummaryRows(projectId, auditKey, PageRequest.of(page, size));
+        return new PageResponse<>(toReports(result.getContent(), id -> null),
                 result.getNumber(), result.getSize(), result.getTotalElements(), result.getTotalPages());
     }
 
     @Transactional(readOnly = true)
     public AuditReportResponse getReport(String id) {
-        return toReports(List.of(reportRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("AuditReport", id)))).getFirst();
+        return withMarkdown(reportRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("AuditReport", id)));
     }
 
     @Transactional(readOnly = true)
@@ -181,13 +187,6 @@ public class AuditCenterService {
                 Duration.between(latest.generatedAt(), Instant.now()).toDays() > 30, byStatus, bySeverity);
     }
 
-    private static AuditReportSummaryRow summaryRow(AuditReport report) {
-        return new AuditReportSummaryRow(report.getId(), report.getProjectId(), report.getWorkflowId(),
-                report.getWorkflowRunId(), report.getAuditKey(), report.getCategory(), report.getTitle(),
-                report.getGateStatus(), report.getGateDescription(), report.getIngestionStatus(),
-                report.getIngestionError(), report.getGeneratedAt());
-    }
-
     private static List<AuditFindingCountRow> countsOf(List<AuditFinding> findings) {
         return findings.stream().map(f -> new AuditFindingCountRow(
                 f.getProjectId(), f.getAuditKey(), f.getStatus(), f.getSeverity(), 1L)).toList();
@@ -197,22 +196,29 @@ public class AuditCenterService {
      * Reports with finding count and origin, for a whole page in a fixed number of queries: one
      * GROUP BY for the counts, the origins in {@link AuditReportOrigins} — not per report (TODO a3b89355).
      */
-    private List<AuditReportResponse> toReports(List<AuditReport> reports) {
+    private List<AuditReportResponse> toReports(List<AuditReportSummaryRow> reports, Function<String, String> markdown) {
         if (reports.isEmpty()) return List.of();
         Map<String, Long> findingCounts = occurrenceRepository
-                .countByReportIds(reports.stream().map(AuditReport::getId).toList()).stream()
+                .countByReportIds(reports.stream().map(AuditReportSummaryRow::id).toList()).stream()
                 .collect(Collectors.toMap(row -> (String) row[0], row -> ((Number) row[1]).longValue()));
         Map<String, AuditReportOrigins.Origin> origins =
-                reportOrigins.byRunId(reports.stream().map(AuditReport::getWorkflowRunId).toList());
-        return reports.stream().map(report -> toReport(report, findingCounts.getOrDefault(report.getId(), 0L).intValue(),
-                origins.getOrDefault(report.getWorkflowRunId(), AuditReportOrigins.Origin.UNKNOWN))).toList();
+                reportOrigins.byRunId(reports.stream().map(AuditReportSummaryRow::workflowRunId).toList());
+        return reports.stream().map(report -> toReport(report, markdown.apply(report.id()),
+                findingCounts.getOrDefault(report.id(), 0L).intValue(),
+                origins.getOrDefault(report.workflowRunId(), AuditReportOrigins.Origin.UNKNOWN))).toList();
     }
 
-    private static AuditReportResponse toReport(AuditReport report, int findingCount, AuditReportOrigins.Origin origin) {
-        return new AuditReportResponse(report.getId(), report.getProjectId(), report.getWorkflowId(), report.getWorkflowRunId(),
-                report.getAuditKey(), report.getCategory(), report.getTitle(), report.getMarkdownContent(), report.getGateStatus(),
-                report.getGateDescription(), report.getProvider(), report.getModel(), report.getWorkflowVersion(),
-                report.getIngestionStatus(), report.getIngestionError(), report.getGeneratedAt(), findingCount,
+    /** One report with its text — the detail of the report on screen. */
+    private AuditReportResponse withMarkdown(AuditReport report) {
+        return toReports(List.of(AuditReportSummaryRow.of(report)), id -> report.getMarkdownContent()).getFirst();
+    }
+
+    private static AuditReportResponse toReport(AuditReportSummaryRow report, String markdown, int findingCount,
+                                                AuditReportOrigins.Origin origin) {
+        return new AuditReportResponse(report.id(), report.projectId(), report.workflowId(), report.workflowRunId(),
+                report.auditKey(), report.category(), report.title(), markdown, report.gateStatus(),
+                report.gateDescription(), report.provider(), report.model(), report.workflowVersion(),
+                report.ingestionStatus(), report.ingestionError(), report.generatedAt(), findingCount,
                 origin.triggerSource(), origin.scheduleId(), origin.chainRunId(), origin.chainId(), origin.chainName(),
                 origin.definitionVersionNumber());
     }
@@ -252,6 +258,7 @@ public class AuditCenterService {
      * A stored audit report. The fields after {@code findingCount} say where its run came from (TODO
      * a3b89355), each {@code null} when unknown; their rules are on {@link AuditReportOrigins.Origin}.
      *
+     * @param markdownContent         the report text; {@code null} in the history list (TODO cd50d011)
      * @param workflowVersion         the workflow's version label when the report was stored (e.g. the pool version)
      * @param triggerSource           effective trigger — for a chain entry the source that started the chain
      * @param scheduleId              schedule that started the run, for a chain entry the chain's schedule

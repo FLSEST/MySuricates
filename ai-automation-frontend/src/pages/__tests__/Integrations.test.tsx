@@ -175,6 +175,94 @@ describe('Integrations — HTTP API provider', () => {
   });
 });
 
+// cdccc1e5: Open-Meteo, feeds, Taskwarrior … run without a stored connection — not "Setup required"
+describe('Integrations — ready without a connection', () => {
+  const credentialFree = (providerId: string, extra: Partial<IntegrationProviderInfo> = {}): IntegrationProviderInfo => ({
+    ...connectedGithub,
+    providerId,
+    displayName: providerId,
+    status: 'DISCONNECTED',
+    configured: false,
+    requiresCredentials: false,
+    requiresOAuthFlow: false,
+    accountName: null,
+    connectedSince: null,
+    scopes: null,
+    optionalScopes: [],
+    connections: [],
+    ...extra,
+  });
+
+  async function card() {
+    renderWithProviders(<Integrations />);
+    const [badge] = await screen.findAllByText(/Ready – no sign-in needed|No sign-in – needs `task`|Setup required|Not connected/);
+    return badge!.closest('.flex.items-start') as HTMLElement;
+  }
+
+  it('shows a provider the new backend marks as connection-optional as ready, with an optional setup', async () => {
+    useProviders([credentialFree('feed', { connectionOptional: true })]);
+    const shown = await card();
+
+    expect(within(shown).getByText('Ready – no sign-in needed')).toBeInTheDocument();
+    expect(within(shown).getByTestId('provider-ready-hint')).toHaveTextContent('Runs in workflows without a stored connection');
+    expect(within(shown).getByRole('button', { name: /Optional setup/ })).toBeInTheDocument();
+    expect(within(shown).queryByText('Setup required')).toBeNull();
+    expect(shown.firstElementChild).not.toHaveClass('bg-warning/10');
+  });
+
+  it.each(['open-meteo', 'feed', 'ical-feed', 'ntfy'])(
+    'derives ready for %s from the fields an older backend already sends',
+    async (providerId) => {
+      useProviders([credentialFree(providerId)]);
+      const shown = await card();
+
+      expect(within(shown).getByText('Ready – no sign-in needed')).toBeInTheDocument();
+    },
+  );
+
+  // Nothing checks the host for `task` until the optional setup — the card must not promise more
+  it.each([undefined, true])('says Taskwarrior needs the task CLI on the host (connectionOptional: %s)', async (connectionOptional) => {
+    useProviders([credentialFree('taskwarrior', { connectionOptional })]);
+    const shown = await card();
+
+    expect(within(shown).getByText('No sign-in – needs `task`')).toBeInTheDocument();
+    expect(within(shown).getByTestId('provider-ready-hint')).toHaveTextContent('Needs the `task` CLI on the backend host');
+    expect(within(shown).queryByText('Ready – no sign-in needed')).toBeNull();
+    expect(within(shown).getByRole('button', { name: /Optional setup/ })).toBeInTheDocument();
+  });
+
+  it.each([undefined, false])('keeps "Setup required" for the HTTP API, which needs its base URL (connectionOptional: %s)',
+    async (connectionOptional) => {
+      useProviders([credentialFree('http-api', { connectionOptional })]);
+      const shown = await card();
+      expect(within(shown).getAllByText('Setup required').length).toBeGreaterThan(0);
+      expect(within(shown).queryByText('Ready – no sign-in needed')).toBeNull();
+    });
+
+  it('believes the new backend when it says a provider needs its connection', async () => {
+    useProviders([credentialFree('ntfy', { connectionOptional: false })]);
+    const shown = await card();
+    expect(within(shown).getAllByText('Setup required').length).toBeGreaterThan(0);
+  });
+
+  // A stored connection that is not connected (Taskwarrior's CLI check failed, or a disconnect) blocks the block
+  it('does not call a provider ready while a stored connection is not connected', async () => {
+    useProviders([credentialFree('taskwarrior', { connectionOptional: true, connectedSince: '2026-09-20T08:00:00Z' })]);
+    const shown = await card();
+
+    expect(within(shown).getAllByText('Setup required').length).toBeGreaterThan(0);
+    expect(within(shown).queryByText('No sign-in – needs `task`')).toBeNull();
+  });
+
+  it('opens the setup guide from the optional setup, so the connection check stays reachable', async () => {
+    useProviders([credentialFree('taskwarrior', { connectionOptional: true })]);
+    const shown = await card();
+    fireEvent.click(within(shown).getByRole('button', { name: /Optional setup/ }));
+
+    expect(await screen.findByRole('button', { name: /Connect/ })).toBeInTheDocument();
+  });
+});
+
 describe('Integrations — cards and action test', () => {
   const connectedSlack: IntegrationProviderInfo = {
     ...connectedGithub,

@@ -131,7 +131,7 @@ Typ Task, Target = Project-Key, Labels ohne Leerzeichen; Browse-URL aus den acce
 Trello Label-IDs erwartet) und Todoist (Aufgabe, Target = Projekt-ID, `listTargets` liefert die Projekte; Tags werden
 Label-Namen, Link `app.todoist.com/app/task/<id>`). Erkennung per `instanceof`, Contract-Test `TaskExportContractTest`.
 
-> **Taskwarrior ist ein Sonderfall:** kein HTTP-Dienst, sondern das lokale `task`-CLI. `executeAction()` ruft `task` per `ProcessBuilder` (Argument-Array, kein `bash -c`) auf dem Backend-Host auf — via `service/cli/TaskCommandService.java` + `util/HostProcessUtils.drain()`. Setzt voraus, dass `task` auf dem Host installiert ist; sonst bleibt die Verbindung „Setup required". Timeout runtime-konfigurierbar über `ExecutionSettingsService` (`task-command-timeout-seconds`). Sicherheit: Filter-Token mit `rc.`-Overrides oder Taskwarrior-Kommandos (z.B. `execute`) werden abgelehnt, IDs validiert, Freitext landet hinter `--`. Intern aufgeteilt: Action-Liste in `TaskwarriorActionCatalog`, Argument-Aufbau und Validierung in `TaskwarriorArgs`.
+> **Taskwarrior ist ein Sonderfall:** kein HTTP-Dienst, sondern das lokale `task`-CLI. `executeAction()` ruft `task` per `ProcessBuilder` (Argument-Array, kein `bash -c`) auf dem Backend-Host auf — via `service/cli/TaskCommandService.java` + `util/HostProcessUtils.drain()`. Setzt voraus, dass `task` auf dem Host installiert ist. Ohne gespeicherte Verbindung läuft er mit den Standardpfaden des Hosts (Seite: „Ohne Anmeldung – braucht `task`“); das optionale Einrichten prüft `task _version` — schlägt das fehl, bleibt die Verbindung getrennt und die Seite zeigt „Einrichtung erforderlich“. Timeout runtime-konfigurierbar über `ExecutionSettingsService` (`task-command-timeout-seconds`). Sicherheit: Filter-Token mit `rc.`-Overrides oder Taskwarrior-Kommandos (z.B. `execute`) werden abgelehnt, IDs validiert, Freitext landet hinter `--`. Intern aufgeteilt: Action-Liste in `TaskwarriorActionCatalog`, Argument-Aufbau und Validierung in `TaskwarriorArgs`.
 
 ### CalDAV und iCal-Feed
 
@@ -369,13 +369,21 @@ Für `requiresOAuthFlow() == false` sind die Credentials selbst die Authentifizi
 `saveCredentials` kombiniert sie zu `clientId|clientSecret`, ruft `fetchAccountInfo()` zur
 Validierung auf und setzt bei Erfolg direkt `CONNECTED`. Es gibt keinen Ablauf und kein
 Refresh — `getValidAccessToken()` gibt das gespeicherte Credential unverändert zurück.
-Für einen Provider mit `requiresCredentials() == false` (Taskwarrior und iCal-Feed) gibt
-Für einen Provider mit `requiresCredentials() == false` (Taskwarrior, ntfy) gibt
-Für einen Provider mit `requiresCredentials() == false` (Taskwarrior, ntfy, RSS/Atom) gibt
-Für einen Provider mit `requiresCredentials() == false` (Taskwarrior, ntfy, RSS/Atom, Open-Meteo) gibt
+Für einen Provider mit `requiresCredentials() == false` (Taskwarrior, iCal-Feed, ntfy, RSS/Atom,
+Open-Meteo, HTTP-API) gibt
 `getValidAccessToken()` `null` statt einer Exception zurück, wenn keine Connection-Zeile
 existiert oder die Entschlüsselung fehlschlägt — Provider ohne Pflicht-Credentials dürfen
 ohne Token laufen.
+
+Welche davon mit `null` tatsächlich **arbeiten**, sagt `connectionOptional()` (TODO cdccc1e5):
+Open-Meteo, RSS/Atom, iCal-Feed, ntfy und Taskwarrior — die HTTP-API nicht, sie braucht ihre
+gespeicherte Basis-URL. `GET /api/v1/integrations` liefert das Feld mit; die Integrationen-Seite
+zeigt einen solchen Provider ohne gespeicherte Verbindung als „Bereit – ohne Anmeldung“ statt
+„Einrichtung erforderlich“ und bietet das Einrichten als optional an. Eine gespeicherte, nicht
+verbundene Verbindung (Taskwarriors CLI-Prüfung schlug fehl, oder getrennt) sperrt den Provider
+weiter — dann bleibt es bei „Einrichtung erforderlich“. Ältere Backends ohne das Feld: das
+Frontend leitet es aus `requiresCredentials` und derselben Liste ab
+(`components/integrations/providerReadiness.ts`, gepinnt durch `ConnectionOptionalGateTest`).
 
 ### Mehrere Verbindungen je Anbieter
 
