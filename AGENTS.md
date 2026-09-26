@@ -408,7 +408,11 @@ GET /api/v1/workflows/{id}/analyze
 #         ohne gueltiges metadata.audit), unwired-output (nur KI-Bloecke),
 #         absolute-home-path, missing-strict-mode, duplicated-instructions, dated-model-id,
 #         on-no-without-reject-option (Approval mit on_no, aber keine Option lehnt ab),
-#         items-command-without-source (foreach mit items_command, aber ohne items_source "command")
+#         items-command-without-source (foreach mit items_command, aber ohne items_source "command"),
+#         unknown-config-key (Schluessel, den der Block nicht liest), missing-required-config-key,
+#         invalid-config-value (on_failure ausser stop/continue = HIGH) — gegen das Block-Config-Schema
+#         des Editors (ai-automation-frontend/src/data/blockConfigSchema.json), auch in verschachtelten
+#         Bloecken; deren detail beginnt mit dem Pfad, z. B. "Block 2 › cases[0] › Block 1: …"
 # Der Analyzer meldet nur — er blockiert keinen Schreibweg und veraendert nichts.
 
 # Bestandslauf ueber alle Definitionen in aktiven Projekten

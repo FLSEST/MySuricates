@@ -22,6 +22,7 @@ check "backend serves the frontend"            'grep -q "AUTOMATION_SERVEFRONTEN
 check "integration key on its own volume path" 'grep -q "AUTOMATION_INTEGRATION_KEYFILE=/app/secrets/" "$DF"'
 check "state paths all under /app/data"        'grep -q "AUTOMATION_DB_PATH=/app/data/" "$DF" && grep -q "AUTOMATION_BACKUP_DIR=/app/data/" "$DF"'
 check "no host-built jar is copied"            '! grep -q "COPY target/" "$DF"'
+check "backend stage gets the block config schema (f5153c47)" 'grep -q "^COPY ai-automation-frontend/src/data/blockConfigSchema.json /src/ai-automation-frontend/src/data/blockConfigSchema.json$" "$DF" && grep -q "ai-automation-frontend/src/data</directory>" "$R/ai-automation-backend/pom.xml" && grep -q "src/main/resources/schema</outputDirectory>" "$R/ai-automation-backend/pom.xml" && grep -qx "ai-automation-backend/src/main/resources/schema/" "$R/.gitignore"'
 
 echo "2b) tryout stage (40c31211)"
 check "compose builds the runtime stage only"  'grep -q "target: runtime" "$R/deploy/compose.yml"'

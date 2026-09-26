@@ -26,8 +26,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Was MySuricates ausliefert, darf die eigenen Baufehler nicht enthalten (TODO 182bd224).
  *
  * <p>Geprüft werden die Definitionen unter {@code workflow-pool/} und die Built-in-Templates mit
- * demselben deterministischen Regelsatz, den der REST-Endpunkt auf Abruf anwendet. Der Analyzer
- * misst, er bewertet nicht — deshalb ist dieser Test ein Gate und keine Empfehlung.
+ * demselben deterministischen Regelsatz, den der REST-Endpunkt auf Abruf anwendet — seit f5153c47
+ * samt den Config-Schlüsseln verschachtelter Blöcke (switch-Cases, {@code default}, {@code blocks}). Der
+ * Analyzer misst, er bewertet nicht — deshalb ist dieser Test ein Gate und keine Empfehlung.
  *
  * <p>Die Schwelle steht bei {@code HIGH}: Ein Verweis auf einen Block, den es nicht gibt, und ein
  * Pfad mit Klarnamen sind Fehler, die auf einem fremden Rechner sofort auffallen. Leichtere
@@ -45,7 +46,11 @@ class PoolAnalyzerGateTest {
     private static final Map<String, String> KNOWN_SEVERE = Map.of(
             "saas-feature-loop.json items-command-without-source",
             "46b9b229 (Built-in-Template saas-feature-loop läuft nicht): foreach kann noch keinen"
-                    + " Unter-Workflow ausführen, items_source allein repariert ihn nicht");
+                    + " Unter-Workflow ausführen, items_source allein repariert ihn nicht",
+            "saas-feature-loop.json missing-required-config-key",
+            "46b9b229 (Built-in-Template saas-feature-loop läuft nicht): der foreach hat kein command, weil"
+                    + " er je Eintrag einen Unter-Workflow starten soll; der verschachtelte sub-workflow-Block"
+                    + " bekommt seine ID erst über workflow_id_lookup, das kein Executor liest");
 
     private final WorkflowAnalyzer analyzer = new WorkflowAnalyzer();
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -70,6 +75,10 @@ class PoolAnalyzerGateTest {
                         ? root.path("instructions").asText() : null;
                 for (AnalyzerFinding finding : analyzer.analyze(blocks, instructions, metadataOf(root))) {
                     byRule.merge(finding.rule(), 1, Integer::sum);
+                    if (finding.rule().endsWith("config-key") || finding.rule().equals("invalid-config-value")) {
+                        System.out.println("  " + variant.label() + " [Block " + finding.blockIndex() + "] "
+                                + finding.severity() + " " + finding.rule() + ": " + finding.detail());
+                    }
                     if (KNOWN_SEVERE.containsKey(variant.label() + " " + finding.rule())) {
                         known.add(variant.label() + " " + finding.rule());
                     } else if (finding.severity() == AnalyzerFinding.Severity.HIGH) {

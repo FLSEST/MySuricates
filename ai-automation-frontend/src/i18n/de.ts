@@ -887,6 +887,15 @@ export const de: TranslationKeys = {
     unsealedToast: 'Workflow entsiegelt',
     sealFailed: 'Siegel konnte nicht geändert werden',
     sealedLocked: 'Versiegelt — zum Bearbeiten entsiegeln',
+    analysis: {
+      summary: '{count} Befund(e) der Baufehler-Prüfung',
+      severity: { HIGH: 'schwer', MEDIUM: 'mittel', LOW: 'leicht' },
+      show: 'Befunde anzeigen',
+      hide: 'Befunde ausblenden',
+      hint: 'Deterministisch geprüft, ohne KI-Aufruf. Die Prüfung meldet nur – Speichern und Starten bleiben möglich.',
+      block: 'Block {n}',
+      definition: 'Definition',
+    },
     sealView: {
       intact: 'Siegel intakt',
       violated: 'Siegel verletzt',

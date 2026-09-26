@@ -1,0 +1,1521 @@
+{
+  "$comment": "Config keys of every block type: key, type, allowed values, legacy value, required, de/en text. Single source for the Monaco config editor (blockConfigSchema.ts) and the backend analyzer (ConfigKeyRules, copied onto the classpath by the backend build). A string value \"#name\" in a field list refers to sharedFields.name. \"legacy\" = old value still accepted, \"legacyFor\" = old key name of another key, \"ignoreCase\" = the executor compares case-insensitively, \"onlyWith\" = the executor reads the key only when these other keys have these values (\"*\" = the key is set). Whoever teaches an executor a new config key adds it here.",
+  "onFailure": {
+    "type": "string",
+    "doc": {
+      "de": "Was passiert, wenn dieser Block fehlschlägt (Status FAILED). Jeder andere Wert als `continue` stoppt wie `stop`.",
+      "en": "What happens when this block fails (status FAILED). Any value other than `continue` stops like `stop`."
+    },
+    "values": [
+      {
+        "value": "stop",
+        "doc": {
+          "de": "Workflow beenden, der Run wird FAILED (Standard).",
+          "en": "Stop the workflow, the run becomes FAILED (default)."
+        }
+      },
+      {
+        "value": "continue",
+        "doc": {
+          "de": "Mit dem nächsten Block weitermachen. Der Block selbst bleibt FAILED.",
+          "en": "Carry on with the next block. The block itself stays FAILED."
+        }
+      }
+    ],
+    "default": "stop"
+  },
+  "commonFields": {
+    "label": {
+      "type": "string",
+      "doc": {
+        "de": "Anzeigename des Schritts, nur zur Beschreibung. Bei der Ausführung ohne Wirkung.",
+        "en": "Display label of the step, description only. No effect on execution."
+      }
+    },
+    "description": {
+      "type": "string",
+      "doc": {
+        "de": "Notiz zum Schritt, nur zur Beschreibung. Bei der Ausführung ohne Wirkung.",
+        "en": "Note on the step, description only. No effect on execution."
+      }
+    },
+    "run_if": {
+      "type": "string",
+      "doc": {
+        "de": "Shell-Test vor dem Block (nur oberste Ebene): Exit 0 → der Block läuft, sonst wird er übersprungen (SKIPPED, ohne KI-Aufruf). Läuft im Arbeitsverzeichnis des Laufs, höchstens 60 s; Platzhalter wie in jedem Shell-Feld.",
+        "en": "Shell test before the block (top level only): exit 0 → the block runs, otherwise it is skipped (SKIPPED, no AI call). Runs in the run working directory, at most 60 s; placeholders as in any shell field."
+      }
+    },
+    "shell_escape_variables": {
+      "type": "boolean",
+      "doc": {
+        "de": "Alle `{{ }}`-Platzhalter der `run_if`-Bedingung POSIX-sicher in Single-Quotes setzen. Bei Blöcken ohne eigene Shell wirkt der Schlüssel nur zusammen mit `run_if`.",
+        "en": "Put every `{{ }}` placeholder of the `run_if` condition in POSIX-safe single quotes. On blocks without a shell of their own the key only takes effect together with `run_if`."
+      },
+      "default": false,
+      "onlyWith": {
+        "run_if": "*"
+      }
+    },
+    "workspace": {
+      "type": "object",
+      "doc": {
+        "de": "Arbeitsverzeichnis des Runs — wirkt nur am **ersten** Block. `{\"mode\": \"isolated\"}` lässt den Run in einem eigenen Git-Klon laufen (weitere Schlüssel: `source`, `source_path`, `branch`, `install_npm`, `additional_sources`).",
+        "en": "Working directory of the run — only honoured on the **first** block. `{\"mode\": \"isolated\"}` runs it in its own Git clone (more keys: `source`, `source_path`, `branch`, `install_npm`, `additional_sources`)."
+      }
+    },
+    "validation": {
+      "type": "object",
+      "doc": {
+        "de": "Prüft die Ausgabe des erfolgreich gelaufenen Blocks: `contains` (Teilstring), `min_length`, `max_length`. Mit `retry_on_fail: true` läuft der Block bei einem Verstoß bis zu `max_retries`-mal erneut (Standard 1), sonst wird der Verstoß nur an die Ausgabe gehängt.",
+        "en": "Checks the output of the block after it succeeded: `contains` (substring), `min_length`, `max_length`. With `retry_on_fail: true` the block runs again up to `max_retries` times on a violation (default 1), otherwise the violation is only appended to the output."
+      }
+    }
+  },
+  "ai": {
+    "blockTypes": [
+      "simple",
+      "agentic",
+      "skill-capability",
+      "retry",
+      "foreach",
+      "while",
+      "conditional",
+      "switch",
+      "compress-ai"
+    ],
+    "fields": {
+      "provider": {
+        "type": "string",
+        "doc": {
+          "de": "KI-Anbieter nur für diesen Block. Vorrang: Block > Workflow > System-Standard.",
+          "en": "AI provider for this block only. Precedence: block > workflow > system default."
+        },
+        "values": [
+          {
+            "value": "CLAUDE",
+            "doc": {
+              "de": "Claude CLI",
+              "en": "Claude CLI"
+            }
+          },
+          {
+            "value": "PI",
+            "doc": {
+              "de": "pi CLI (Modell als `<backend>/<model>`)",
+              "en": "pi CLI (model as `<backend>/<model>`)"
+            }
+          },
+          {
+            "value": "CODEX",
+            "doc": {
+              "de": "Codex CLI (nur lesend)",
+              "en": "Codex CLI (read-only)"
+            }
+          }
+        ],
+        "ignoreCase": true
+      },
+      "model": {
+        "type": "string",
+        "doc": {
+          "de": "Modell nur für diesen Block: Alias `opus`/`sonnet`/`haiku`/`fable`, eine konkrete ID oder bei pi `<backend>/<model>`. Setzt der Block einen anderen `provider` als der Workflow, wird das Workflow-Modell nicht übernommen.",
+          "en": "Model for this block only: alias `opus`/`sonnet`/`haiku`/`fable`, a concrete id, or `<backend>/<model>` for pi. If the block sets a different `provider` than the workflow, the workflow model is not inherited."
+        }
+      },
+      "effort": {
+        "type": "string",
+        "doc": {
+          "de": "Denkaufwand nur für diesen Block. Ohne Angabe gilt der Workflow- bzw. Anbieter-Standard. Codex ignoriert ihn.",
+          "en": "Reasoning effort for this block only. Unset ⇒ workflow or provider default. Codex ignores it."
+        },
+        "values": [
+          {
+            "value": "low",
+            "doc": {
+              "de": "Wenig Denkaufwand, schnell und günstig.",
+              "en": "Little reasoning, fast and cheap."
+            }
+          },
+          {
+            "value": "medium",
+            "doc": {
+              "de": "Mittlerer Denkaufwand.",
+              "en": "Medium reasoning."
+            }
+          },
+          {
+            "value": "high",
+            "doc": {
+              "de": "Hoher Denkaufwand.",
+              "en": "High reasoning."
+            }
+          },
+          {
+            "value": "xhigh",
+            "doc": {
+              "de": "Sehr hoher Denkaufwand, am teuersten.",
+              "en": "Very high reasoning, most expensive."
+            }
+          }
+        ],
+        "ignoreCase": true
+      }
+    }
+  },
+  "sharedFields": {
+    "execution_mode": {
+      "type": "string",
+      "doc": {
+        "de": "Wie Bedingung und Befehl laufen: als KI-Prompt oder als Shell-Befehl.",
+        "en": "How condition and command run: as an AI prompt or as a shell command."
+      },
+      "values": [
+        {
+          "value": "ai",
+          "doc": {
+            "de": "Als KI-Prompt über den Anbieter aus `provider` (Standard).",
+            "en": "As an AI prompt via the provider from `provider` (default)."
+          }
+        },
+        {
+          "value": "shell",
+          "doc": {
+            "de": "Als Shell-Befehl. Kein KI-Aufruf, keine Tokens.",
+            "en": "As a shell command. No AI call, no tokens."
+          }
+        }
+      ],
+      "legacy": "claude",
+      "default": "ai"
+    },
+    "shell_escape_variables": {
+      "type": "boolean",
+      "doc": {
+        "de": "Alle `{{ }}`-Platzhalter POSIX-sicher in Single-Quotes setzen. Platzhalter dann **ohne** eigene Quotes schreiben.",
+        "en": "Put every `{{ }}` placeholder in POSIX-safe single quotes. Then write placeholders **without** your own quotes."
+      },
+      "default": false
+    },
+    "wrapper_container_image": {
+      "type": "string",
+      "doc": {
+        "de": "Docker-Image, in dem der Befehl im Shell-Modus (`execution_mode: shell`) läuft. Ohne Angabe läuft er auf dem Host.",
+        "en": "Docker image the command runs in in shell mode (`execution_mode: shell`). Unset ⇒ runs on the host."
+      },
+      "onlyWith": {
+        "execution_mode": "shell"
+      }
+    },
+    "wrapper_mount_docker_socket": {
+      "type": "boolean",
+      "doc": {
+        "de": "Docker-Socket in den Container mounten (nur im Shell-Modus mit `container_image`).",
+        "en": "Mount the Docker socket into the container (shell mode with `container_image` only)."
+      },
+      "default": false,
+      "onlyWith": {
+        "execution_mode": "shell"
+      }
+    },
+    "wrapper_mounts": {
+      "type": "array",
+      "doc": {
+        "de": "Zusätzliche Volumes `host:container[:ro|rw]` (nur im Shell-Modus mit `container_image`).",
+        "en": "Extra volumes `host:container[:ro|rw]` (shell mode with `container_image` only)."
+      },
+      "items": {
+        "type": "string"
+      },
+      "onlyWith": {
+        "execution_mode": "shell"
+      }
+    }
+  },
+  "blockTypes": {
+    "simple": {
+      "required": [
+        "command"
+      ],
+      "fields": {
+        "command": {
+          "type": "string",
+          "doc": {
+            "de": "Der Prompt, den die KI bekommt. Platzhalter wie `{{ previous_output }}` werden aufgelöst.",
+            "en": "The prompt sent to the AI. Placeholders like `{{ previous_output }}` are resolved."
+          }
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "doc": {
+            "de": "Timeout in Sekunden für den KI-Aufruf. Ohne Angabe gilt `automation.host-claude.timeout-seconds`.",
+            "en": "Timeout in seconds for the AI call. Unset ⇒ `automation.host-claude.timeout-seconds` applies."
+          },
+          "minimum": 1
+        }
+      }
+    },
+    "shell": {
+      "required": [
+        "command"
+      ],
+      "fields": {
+        "command": {
+          "type": "string",
+          "doc": {
+            "de": "Shell-Befehl(e). Tipp: mit `set -euo pipefail` beginnen.",
+            "en": "Shell command(s). Tip: start with `set -euo pipefail`."
+          }
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "doc": {
+            "de": "Timeout in Sekunden (Standard 300).",
+            "en": "Timeout in seconds (default 300)."
+          },
+          "default": 300,
+          "minimum": 1
+        },
+        "shell_escape_variables": "#shell_escape_variables",
+        "container_image": {
+          "type": "string",
+          "doc": {
+            "de": "Docker-Image, in dem der Befehl läuft. Ohne Angabe läuft er auf dem Host.",
+            "en": "Docker image to run the command in. Unset ⇒ runs on the host."
+          }
+        },
+        "mount_docker_socket": {
+          "type": "boolean",
+          "doc": {
+            "de": "Docker-Socket in den Container mounten (nur mit `container_image`).",
+            "en": "Mount the Docker socket into the container (only with `container_image`)."
+          },
+          "default": false
+        },
+        "mounts": {
+          "type": "array",
+          "doc": {
+            "de": "Zusätzliche Volumes `host:container[:ro|rw]` (nur mit `container_image`).",
+            "en": "Extra volumes `host:container[:ro|rw]` (only with `container_image`)."
+          },
+          "items": {
+            "type": "string"
+          }
+        },
+        "checked_command": {
+          "type": "boolean",
+          "doc": {
+            "de": "Leitet aus dem Exit-Code ein Gate ab (`gate_status`) und stellt `set -e -o pipefail` voran.",
+            "en": "Derives a gate (`gate_status`) from the exit code and prepends `set -e -o pipefail`."
+          },
+          "default": false
+        },
+        "check_category": {
+          "type": "string",
+          "doc": {
+            "de": "Gate-Kategorie für `checked_command`, falls das Skript selbst keine `gate_category` ausgibt.",
+            "en": "Gate category for `checked_command` if the script prints no `gate_category` itself."
+          },
+          "default": "build-check"
+        }
+      }
+    },
+    "agentic": {
+      "required": [
+        "goal"
+      ],
+      "fields": {
+        "goal": {
+          "type": "string",
+          "doc": {
+            "de": "Was der Agent erreichen soll.",
+            "en": "What the agent should achieve."
+          }
+        },
+        "success_criteria": {
+          "type": "string",
+          "doc": {
+            "de": "Woran der Agent erkennt, dass er fertig ist.",
+            "en": "How the agent recognises that it is done."
+          }
+        },
+        "max_iterations": {
+          "type": "integer",
+          "doc": {
+            "de": "Harte Obergrenze für Reason/Act-Runden (Standard 10).",
+            "en": "Hard cap on reason/act rounds (default 10)."
+          },
+          "default": 10,
+          "minimum": 1
+        },
+        "iteration_timeout_seconds": {
+          "type": "integer",
+          "doc": {
+            "de": "Timeout pro Runde in Sekunden (Standard 300).",
+            "en": "Timeout per round in seconds (default 300)."
+          },
+          "default": 300,
+          "minimum": 1
+        },
+        "total_timeout_seconds": {
+          "type": "integer",
+          "doc": {
+            "de": "Timeout für den ganzen Block in Sekunden (Standard 1800).",
+            "en": "Timeout for the whole block in seconds (default 1800)."
+          },
+          "default": 1800,
+          "minimum": 1
+        },
+        "max_total_tokens": {
+          "type": "integer",
+          "doc": {
+            "de": "Token-Budget über alle Runden, Input + Output (Standard 200 000).",
+            "en": "Token budget across all rounds, input + output (default 200,000)."
+          },
+          "default": 200000,
+          "minimum": 1
+        },
+        "max_repeated_actions": {
+          "type": "integer",
+          "doc": {
+            "de": "Abbruch, wenn dieselbe Aktion so oft hintereinander kommt.",
+            "en": "Stop when the same action repeats this many times."
+          },
+          "default": 3,
+          "minimum": 1
+        },
+        "require_approval": {
+          "type": "boolean",
+          "doc": {
+            "de": "Vor jeder Aktion eine Freigabe einholen.",
+            "en": "Ask for approval before every action."
+          },
+          "default": false
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "doc": {
+            "de": "Timeout in Sekunden für den KI-Aufruf. Ohne Angabe gilt `automation.host-claude.timeout-seconds`.",
+            "en": "Timeout in seconds for the AI call. Unset ⇒ `automation.host-claude.timeout-seconds` applies."
+          },
+          "minimum": 1
+        }
+      }
+    },
+    "retry": {
+      "required": [
+        "command"
+      ],
+      "fields": {
+        "command": {
+          "type": "string",
+          "doc": {
+            "de": "Befehl, der bei Fehler wiederholt wird (Prompt oder Shell, je nach `execution_mode`).",
+            "en": "Command retried on failure (prompt or shell, depending on `execution_mode`)."
+          }
+        },
+        "max_retries": {
+          "type": "integer",
+          "doc": {
+            "de": "Maximale Zahl der Wiederholungen.",
+            "en": "Maximum number of retries."
+          },
+          "default": 3,
+          "minimum": 0
+        },
+        "delay": {
+          "type": "integer",
+          "doc": {
+            "de": "Pause zwischen den Versuchen in Sekunden.",
+            "en": "Pause between attempts in seconds."
+          },
+          "default": 5,
+          "minimum": 0
+        },
+        "exponential_backoff": {
+          "type": "boolean",
+          "doc": {
+            "de": "Pause bei jedem Versuch verdoppeln.",
+            "en": "Double the pause on every attempt."
+          },
+          "default": false
+        },
+        "execution_mode": "#execution_mode",
+        "shell_escape_variables": "#shell_escape_variables",
+        "timeout_seconds": {
+          "type": "integer",
+          "doc": {
+            "de": "Timeout in Sekunden (Standard 300).",
+            "en": "Timeout in seconds (default 300)."
+          },
+          "default": 300,
+          "minimum": 1
+        },
+        "container_image": "#wrapper_container_image",
+        "mount_docker_socket": "#wrapper_mount_docker_socket",
+        "mounts": "#wrapper_mounts"
+      }
+    },
+    "conditional": {
+      "required": [
+        "condition"
+      ],
+      "fields": {
+        "condition": {
+          "type": "string",
+          "doc": {
+            "de": "Bedingung. Shell: Exit-Code 0 = wahr. KI: Antwort TRUE/FALSE.",
+            "en": "Condition. Shell: exit code 0 = true. AI: answer TRUE/FALSE."
+          }
+        },
+        "then_command": {
+          "type": "string",
+          "doc": {
+            "de": "Befehl, wenn die Bedingung wahr ist.",
+            "en": "Command when the condition is true."
+          }
+        },
+        "else_command": {
+          "type": "string",
+          "doc": {
+            "de": "Befehl, wenn die Bedingung falsch ist.",
+            "en": "Command when the condition is false."
+          }
+        },
+        "execution_mode": "#execution_mode",
+        "shell_escape_variables": "#shell_escape_variables",
+        "timeout_seconds": {
+          "type": "integer",
+          "doc": {
+            "de": "Timeout in Sekunden (Standard 300).",
+            "en": "Timeout in seconds (default 300)."
+          },
+          "default": 300,
+          "minimum": 1
+        },
+        "container_image": "#wrapper_container_image",
+        "mount_docker_socket": "#wrapper_mount_docker_socket",
+        "mounts": "#wrapper_mounts"
+      }
+    },
+    "switch": {
+      "required": [
+        "expression",
+        "cases"
+      ],
+      "fields": {
+        "expression": {
+          "type": "string",
+          "doc": {
+            "de": "Ausdruck, dessen Wert mit den Cases verglichen wird (`${var}` oder `{{ var }}`).",
+            "en": "Expression whose value is matched against the cases (`${var}` or `{{ var }}`)."
+          }
+        },
+        "cases": {
+          "type": "array",
+          "doc": {
+            "de": "Fälle mit `value` (Alternativen mit `|`, z. B. `\"YELLOW|RED\"`) und `blocks`.",
+            "en": "Cases with `value` (alternatives with `|`, e.g. `\"YELLOW|RED\"`) and `blocks`."
+          },
+          "items": {
+            "$ref": "#/definitions/switchCase"
+          }
+        },
+        "default": {
+          "type": "array",
+          "doc": {
+            "de": "Blöcke, wenn kein Case passt.",
+            "en": "Blocks when no case matches."
+          },
+          "items": {
+            "$ref": "#/definitions/nestedBlock"
+          }
+        }
+      }
+    },
+    "foreach": {
+      "required": [
+        "command"
+      ],
+      "fields": {
+        "command": {
+          "type": "string",
+          "doc": {
+            "de": "Befehl pro Item. Das Item steht als `{{ <variable_name> }}` bereit.",
+            "en": "Command per item. The item is available as `{{ <variable_name> }}`."
+          }
+        },
+        "variable_name": {
+          "type": "string",
+          "doc": {
+            "de": "Name der Schleifenvariable (Standard `item`).",
+            "en": "Name of the loop variable (default `item`)."
+          },
+          "default": "item"
+        },
+        "items_source": {
+          "type": "string",
+          "doc": {
+            "de": "Woher die Items kommen.",
+            "en": "Where the items come from."
+          },
+          "values": [
+            {
+              "value": "list",
+              "doc": {
+                "de": "Aus `items` (Standard).",
+                "en": "From `items` (default)."
+              }
+            },
+            {
+              "value": "command",
+              "doc": {
+                "de": "Aus der Ausgabe von `items_command`, ein Item pro Zeile.",
+                "en": "From the output of `items_command`, one item per line."
+              }
+            }
+          ],
+          "default": "list"
+        },
+        "items_command": {
+          "type": "string",
+          "doc": {
+            "de": "Shell-Befehl, der die Items ausgibt (eine Zeile = ein Item). Läuft immer als Shell.",
+            "en": "Shell command printing the items (one line = one item). Always runs as shell."
+          }
+        },
+        "items": {
+          "type": "array",
+          "doc": {
+            "de": "Feste Liste von Items.",
+            "en": "Fixed list of items."
+          }
+        },
+        "execution_mode": "#execution_mode",
+        "shell_escape_variables": "#shell_escape_variables",
+        "timeout_seconds": {
+          "type": "integer",
+          "doc": {
+            "de": "Timeout in Sekunden (Standard 300).",
+            "en": "Timeout in seconds (default 300)."
+          },
+          "default": 300,
+          "minimum": 1
+        },
+        "continue_on_error": {
+          "type": "boolean",
+          "doc": {
+            "de": "Fehlgeschlagene Items lassen den Block nicht scheitern, er endet COMPLETED.",
+            "en": "Failed items do not fail the block, it ends COMPLETED."
+          },
+          "default": false
+        },
+        "container_image": "#wrapper_container_image",
+        "mount_docker_socket": "#wrapper_mount_docker_socket",
+        "mounts": "#wrapper_mounts"
+      }
+    },
+    "while": {
+      "required": [
+        "command"
+      ],
+      "fields": {
+        "command": {
+          "type": "string",
+          "doc": {
+            "de": "Befehl pro Durchlauf.",
+            "en": "Command per iteration."
+          }
+        },
+        "condition_command": {
+          "type": "string",
+          "doc": {
+            "de": "Bedingung vor jedem Durchlauf. Shell: Exit 0 = weiter. KI: \"false\"/\"0\"/leer = stopp.",
+            "en": "Condition before every iteration. Shell: exit 0 = continue. AI: \"false\"/\"0\"/empty = stop."
+          }
+        },
+        "max_iterations": {
+          "type": "integer",
+          "doc": {
+            "de": "Maximale Zahl der Durchläufe.",
+            "en": "Maximum number of iterations."
+          },
+          "default": 100,
+          "minimum": 1
+        },
+        "execution_mode": "#execution_mode",
+        "shell_escape_variables": "#shell_escape_variables",
+        "timeout_seconds": {
+          "type": "integer",
+          "doc": {
+            "de": "Timeout in Sekunden (Standard 300).",
+            "en": "Timeout in seconds (default 300)."
+          },
+          "default": 300,
+          "minimum": 1
+        },
+        "container_image": "#wrapper_container_image",
+        "mount_docker_socket": "#wrapper_mount_docker_socket",
+        "mounts": "#wrapper_mounts"
+      }
+    },
+    "approval": {
+      "fields": {
+        "question": {
+          "type": "string",
+          "doc": {
+            "de": "Freigabe-Frage (Markdown, Platzhalter werden aufgelöst).",
+            "en": "Approval question (Markdown, placeholders are resolved)."
+          },
+          "default": "Approval required"
+        },
+        "options": {
+          "type": "array",
+          "doc": {
+            "de": "Erlaubte Antworten.",
+            "en": "Allowed answers."
+          },
+          "default": [
+            "Yes",
+            "Yes always",
+            "No"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "reject_options": {
+          "type": "array",
+          "doc": {
+            "de": "Antworten, die als Ablehnung gelten und `on_no` auslösen.",
+            "en": "Answers that count as rejection and trigger `on_no`."
+          },
+          "default": [
+            "No",
+            "Nein"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "variable_name": {
+          "type": "string",
+          "doc": {
+            "de": "Kontext-Variable, in die das Ergebnis geschrieben wird (Standard `approval_answer`). Danach als `{{ name }}` nutzbar.",
+            "en": "Context variable that receives the result (default `approval_answer`). Usable afterwards as `{{ name }}`."
+          },
+          "default": "approval_answer"
+        },
+        "timeout_minutes": {
+          "type": "integer",
+          "doc": {
+            "de": "Wartezeit in Minuten.",
+            "en": "Waiting time in minutes."
+          },
+          "default": 30,
+          "minimum": 1
+        },
+        "mode": {
+          "type": "string",
+          "doc": {
+            "de": "Interaktiv fragen oder automatisch antworten.",
+            "en": "Ask interactively or answer automatically."
+          },
+          "values": [
+            {
+              "value": "ask",
+              "doc": {
+                "de": "Wartet auf eine Antwort im UI (Standard).",
+                "en": "Waits for an answer in the UI (default)."
+              }
+            },
+            {
+              "value": "auto",
+              "doc": {
+                "de": "Antwortet sofort mit `auto_answer`.",
+                "en": "Answers immediately with `auto_answer`."
+              }
+            }
+          ],
+          "default": "ask"
+        },
+        "auto_answer": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "doc": {
+            "de": "Antwort im Modus `auto`.",
+            "en": "Answer in mode `auto`."
+          }
+        },
+        "on_no": {
+          "type": "string",
+          "doc": {
+            "de": "Verhalten bei Ablehnung (siehe `reject_options`).",
+            "en": "Behaviour on rejection (see `reject_options`)."
+          },
+          "values": [
+            {
+              "value": "continue",
+              "doc": {
+                "de": "Weiter, Block COMPLETED (Standard).",
+                "en": "Continue, block COMPLETED (default)."
+              }
+            },
+            {
+              "value": "fail",
+              "doc": {
+                "de": "Block FAILED.",
+                "en": "Block FAILED."
+              }
+            },
+            {
+              "value": "skip",
+              "doc": {
+                "de": "Block SKIPPED.",
+                "en": "Block SKIPPED."
+              }
+            }
+          ],
+          "default": "continue"
+        }
+      }
+    },
+    "human-input": {
+      "fields": {
+        "prompt": {
+          "type": "string",
+          "doc": {
+            "de": "Frage an den Benutzer.",
+            "en": "Question to the user."
+          },
+          "default": "Please provide input:"
+        },
+        "input_type": {
+          "type": "string",
+          "doc": {
+            "de": "Art der Eingabe.",
+            "en": "Kind of input."
+          },
+          "values": [
+            {
+              "value": "text",
+              "doc": {
+                "de": "Freitext (Standard).",
+                "en": "Free text (default)."
+              }
+            },
+            {
+              "value": "textarea",
+              "doc": {
+                "de": "Mehrzeiliger Text.",
+                "en": "Multi-line text."
+              }
+            },
+            {
+              "value": "number",
+              "doc": {
+                "de": "Zahlenfeld.",
+                "en": "Number field."
+              }
+            },
+            {
+              "value": "select",
+              "doc": {
+                "de": "Auswahl aus `options`.",
+                "en": "Choice from `options`."
+              }
+            },
+            {
+              "value": "checkbox",
+              "doc": {
+                "de": "Kontrollkästchen, Antwort `\"true\"` oder `\"false\"`.",
+                "en": "Checkbox, answer `\"true\"` or `\"false\"`."
+              }
+            },
+            {
+              "value": "date",
+              "doc": {
+                "de": "Datum, Antwort als `JJJJ-MM-TT`.",
+                "en": "Date, answer as `YYYY-MM-DD`."
+              }
+            }
+          ],
+          "default": "text"
+        },
+        "variable_name": {
+          "type": "string",
+          "doc": {
+            "de": "Kontext-Variable, in die das Ergebnis geschrieben wird (Standard `user_input`). Danach als `{{ name }}` nutzbar.",
+            "en": "Context variable that receives the result (default `user_input`). Usable afterwards as `{{ name }}`."
+          },
+          "default": "user_input"
+        },
+        "options": {
+          "type": "array",
+          "doc": {
+            "de": "Auswahlmöglichkeiten für `select`.",
+            "en": "Choices for `select`."
+          },
+          "items": {
+            "type": "string"
+          }
+        },
+        "default_value": {
+          "type": "string",
+          "doc": {
+            "de": "Standardwert, u. a. bei Timeout.",
+            "en": "Default value, e.g. on timeout."
+          }
+        },
+        "required": {
+          "type": "boolean",
+          "doc": {
+            "de": "Eingabe erforderlich.",
+            "en": "Input required."
+          },
+          "default": true
+        },
+        "validation_pattern": {
+          "type": "string",
+          "doc": {
+            "de": "Regex, gegen den die Eingabe geprüft wird.",
+            "en": "Regex the input is validated against."
+          }
+        },
+        "timeout_minutes": {
+          "type": "integer",
+          "doc": {
+            "de": "Wartezeit in Minuten.",
+            "en": "Waiting time in minutes."
+          },
+          "default": 30,
+          "minimum": 1
+        },
+        "use_default_on_timeout": {
+          "type": "boolean",
+          "doc": {
+            "de": "Bei Timeout `default_value` nehmen statt zu scheitern.",
+            "en": "On timeout use `default_value` instead of failing."
+          },
+          "default": true
+        },
+        "fields": {
+          "type": "array",
+          "doc": {
+            "de": "Formular mit mehreren Feldern (`variable_name`, `label`, `input_type`, `required`, …).",
+            "en": "Form with several fields (`variable_name`, `label`, `input_type`, `required`, …)."
+          }
+        }
+      }
+    },
+    "sub-workflow": {
+      "required": [
+        "workflow_id"
+      ],
+      "fields": {
+        "workflow_id": {
+          "type": "string",
+          "doc": {
+            "de": "ID des Workflows, der als Schritt läuft (max. 5 Ebenen tief).",
+            "en": "ID of the workflow to run as a step (max. 5 levels deep)."
+          }
+        },
+        "workflowId": {
+          "type": "string",
+          "doc": {
+            "de": "Alte Schreibweise von `workflow_id`, wird weiter gelesen.",
+            "en": "Old spelling of `workflow_id`, still read."
+          },
+          "legacyFor": "workflow_id"
+        }
+      }
+    },
+    "skill-capability": {
+      "required": [
+        "capability"
+      ],
+      "fields": {
+        "capability": {
+          "type": "string",
+          "doc": {
+            "de": "Name der Skill-Fähigkeit, z. B. `review_code`. Ihr Skill muss in den `skillIds` des Blocks stehen (neben `config`), Workflow-Skills zählen hier nicht.",
+            "en": "Name of the skill capability, e.g. `review_code`. Its skill must be in the block's `skillIds` (next to `config`); workflow skills do not count here."
+          }
+        },
+        "input": {
+          "type": "string",
+          "doc": {
+            "de": "Eingabe für die Fähigkeit, z. B. `{{ previous_output }}`.",
+            "en": "Input for the capability, e.g. `{{ previous_output }}`."
+          }
+        },
+        "params": {
+          "type": "object",
+          "doc": {
+            "de": "Zusätzliche Parameter.",
+            "en": "Additional parameters."
+          }
+        },
+        "allow_writes": {
+          "type": "boolean",
+          "doc": {
+            "de": "Schreibzugriff aufs Repo erlauben. Pflicht für Fähigkeiten mit `writes: true`.",
+            "en": "Allow writing to the repo. Required for capabilities with `writes: true`."
+          },
+          "default": false
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "doc": {
+            "de": "Timeout in Sekunden für den KI-Aufruf. Ohne Angabe gilt `automation.host-claude.timeout-seconds`.",
+            "en": "Timeout in seconds for the AI call. Unset ⇒ `automation.host-claude.timeout-seconds` applies."
+          },
+          "minimum": 1
+        }
+      }
+    },
+    "integration": {
+      "required": [
+        "provider",
+        "action"
+      ],
+      "fields": {
+        "provider": {
+          "type": "string",
+          "doc": {
+            "de": "Integrations-Anbieter, z. B. `google-calendar` (nicht der KI-Anbieter).",
+            "en": "Integration provider, e.g. `google-calendar` (not the AI provider)."
+          }
+        },
+        "action": {
+          "type": "string",
+          "doc": {
+            "de": "Aktion des Anbieters.",
+            "en": "Action of the provider."
+          }
+        },
+        "params": {
+          "type": "object",
+          "doc": {
+            "de": "Parameter der Aktion.",
+            "en": "Parameters of the action."
+          }
+        },
+        "connection": {
+          "type": "string",
+          "doc": {
+            "de": "Benannte Verbindung des Anbieters, z. B. `arbeit` — wenn mehrere Konten oder Dienste desselben Anbieters eingerichtet sind (Seite Integrationen). Ohne Angabe gilt `default`.",
+            "en": "Named connection of the provider, e.g. `work` — when several accounts or services of the same provider are set up (Integrations page). Without it, `default` is used."
+          },
+          "default": "default"
+        }
+      }
+    },
+    "document": {
+      "required": [
+        "file_path"
+      ],
+      "fields": {
+        "file_path": {
+          "type": "string",
+          "doc": {
+            "de": "Datei (PDF, DOCX, XLSX, HTML, TXT, …), absolut oder relativ zum Projekt.",
+            "en": "File (PDF, DOCX, XLSX, HTML, TXT, …), absolute or relative to the project."
+          }
+        },
+        "variable_name": {
+          "type": "string",
+          "doc": {
+            "de": "Kontext-Variable, in die das Ergebnis geschrieben wird. Danach als `{{ name }}` nutzbar.",
+            "en": "Context variable that receives the result. Usable afterwards as `{{ name }}`."
+          }
+        },
+        "fail_on_empty": {
+          "type": "boolean",
+          "doc": {
+            "de": "Scheitern, wenn weniger als `min_characters` Text herauskommt.",
+            "en": "Fail if less than `min_characters` of text comes out."
+          },
+          "default": false
+        },
+        "min_characters": {
+          "type": "integer",
+          "doc": {
+            "de": "Schwelle für `fail_on_empty`.",
+            "en": "Threshold for `fail_on_empty`."
+          },
+          "default": 1,
+          "minimum": 0
+        }
+      }
+    },
+    "todo-create": {
+      "required": [
+        "title"
+      ],
+      "fields": {
+        "title": {
+          "type": "string",
+          "doc": {
+            "de": "Titel des TODOs.",
+            "en": "Title of the TODO."
+          }
+        },
+        "description": {
+          "type": "string",
+          "doc": {
+            "de": "Beschreibung (Markdown).",
+            "en": "Description (Markdown)."
+          }
+        },
+        "priority": {
+          "type": "string",
+          "doc": {
+            "de": "Priorität.",
+            "en": "Priority."
+          },
+          "values": [
+            {
+              "value": "CRITICAL",
+              "doc": {
+                "de": "Kritisch",
+                "en": "Critical"
+              }
+            },
+            {
+              "value": "HIGH",
+              "doc": {
+                "de": "Hoch, blockierend",
+                "en": "High, blocking"
+              }
+            },
+            {
+              "value": "MEDIUM",
+              "doc": {
+                "de": "Mittel (Standard)",
+                "en": "Medium (default)"
+              }
+            },
+            {
+              "value": "LOW",
+              "doc": {
+                "de": "Niedrig",
+                "en": "Low"
+              }
+            }
+          ],
+          "default": "MEDIUM",
+          "ignoreCase": true
+        },
+        "tags": {
+          "type": [
+            "array",
+            "string"
+          ],
+          "doc": {
+            "de": "Tags als Liste oder kommagetrennt.",
+            "en": "Tags as a list or comma-separated."
+          },
+          "items": {
+            "type": "string"
+          }
+        },
+        "project_id": {
+          "type": "string",
+          "doc": {
+            "de": "Ziel-Projekt. Standard: Projekt des Workflows.",
+            "en": "Target project. Default: the workflow project."
+          }
+        },
+        "source": {
+          "type": "string",
+          "doc": {
+            "de": "Herkunft des TODOs.",
+            "en": "Origin of the TODO."
+          },
+          "values": [
+            {
+              "value": "WORKFLOW",
+              "doc": {
+                "de": "Workflow (Standard)",
+                "en": "Workflow (default)"
+              }
+            },
+            {
+              "value": "AI",
+              "doc": {
+                "de": "KI",
+                "en": "AI"
+              }
+            },
+            {
+              "value": "USER",
+              "doc": {
+                "de": "Benutzer",
+                "en": "User"
+              }
+            }
+          ],
+          "default": "WORKFLOW",
+          "ignoreCase": true
+        },
+        "source_agent": {
+          "type": "string",
+          "doc": {
+            "de": "Bezeichnung des erzeugenden Agenten.",
+            "en": "Label of the creating agent."
+          },
+          "default": "workflow"
+        },
+        "variable_name": {
+          "type": "string",
+          "doc": {
+            "de": "Kontext-Variable, in die das Ergebnis geschrieben wird (Standard `todo_id`). Danach als `{{ name }}` nutzbar.",
+            "en": "Context variable that receives the result (default `todo_id`). Usable afterwards as `{{ name }}`."
+          },
+          "default": "todo_id"
+        }
+      }
+    },
+    "todo-update": {
+      "fields": {
+        "id": {
+          "type": "string",
+          "doc": {
+            "de": "ID des TODOs, z. B. `{{ todo_id }}`. Entweder `id` oder `updates`.",
+            "en": "ID of the TODO, e.g. `{{ todo_id }}`. Either `id` or `updates`."
+          }
+        },
+        "title": {
+          "type": "string",
+          "doc": {
+            "de": "Neuer Titel (nur gesetzte, nicht leere Felder werden geändert).",
+            "en": "New title (only set, non-empty fields are changed)."
+          }
+        },
+        "description": {
+          "type": "string",
+          "doc": {
+            "de": "Neue Beschreibung.",
+            "en": "New description."
+          }
+        },
+        "priority": {
+          "type": "string",
+          "doc": {
+            "de": "Neue Priorität.",
+            "en": "New priority."
+          },
+          "values": [
+            {
+              "value": "CRITICAL",
+              "doc": {
+                "de": "Kritisch",
+                "en": "Critical"
+              }
+            },
+            {
+              "value": "HIGH",
+              "doc": {
+                "de": "Hoch",
+                "en": "High"
+              }
+            },
+            {
+              "value": "MEDIUM",
+              "doc": {
+                "de": "Mittel",
+                "en": "Medium"
+              }
+            },
+            {
+              "value": "LOW",
+              "doc": {
+                "de": "Niedrig",
+                "en": "Low"
+              }
+            }
+          ],
+          "ignoreCase": true
+        },
+        "tags": {
+          "type": [
+            "array",
+            "string"
+          ],
+          "doc": {
+            "de": "Neue Tags.",
+            "en": "New tags."
+          },
+          "items": {
+            "type": "string"
+          }
+        },
+        "updates": {
+          "type": [
+            "array",
+            "string"
+          ],
+          "doc": {
+            "de": "Viele TODOs des Lauf-Projekts auf einmal: JSON-Liste, meist `{{ block.<shell>.output }}` (ist die ganze Ausgabe kein JSON, gilt ihre letzte Zeile). Je Eintrag `id`, optional `status` (OPEN/IN_PROGRESS/DONE/BACKLOG), `add_tags`, `remove_tags`, `note`, `require_tags`, `require_status`. Höchstens 50; ein unpassender Eintrag wird mit Grund übersprungen.",
+            "en": "Many TODOs of the run project at once: a JSON list, usually `{{ block.<shell>.output }}` (if the whole output is no JSON, its last line counts). Per entry `id`, optional `status` (OPEN/IN_PROGRESS/DONE/BACKLOG), `add_tags`, `remove_tags`, `note`, `require_tags`, `require_status`. At most 50; an entry that does not fit is skipped with a reason."
+          }
+        }
+      }
+    },
+    "todo-close": {
+      "required": [
+        "id"
+      ],
+      "fields": {
+        "id": {
+          "type": "string",
+          "doc": {
+            "de": "ID des TODOs, das auf DONE gesetzt wird, z. B. `{{ todo_id }}`.",
+            "en": "ID of the TODO set to DONE, e.g. `{{ todo_id }}`."
+          }
+        }
+      }
+    },
+    "compress": {
+      "required": [
+        "source",
+        "stages"
+      ],
+      "fields": {
+        "source": {
+          "type": "string",
+          "doc": {
+            "de": "Name eines früheren Blocks oder `\"previous\"`.",
+            "en": "Name of an earlier block or `\"previous\"`."
+          }
+        },
+        "stages": {
+          "type": "array",
+          "doc": {
+            "de": "Stufen, die der Reihe nach laufen. JSON-Stufen vor Textstufen.",
+            "en": "Stages run in order. JSON stages before text stages."
+          },
+          "items": {
+            "$ref": "#/definitions/compressStage"
+          }
+        },
+        "max_chars": {
+          "type": "integer",
+          "doc": {
+            "de": "Harte Obergrenze inkl. Kopfzeilen.",
+            "en": "Hard limit including header lines."
+          },
+          "default": 20000,
+          "minimum": 1
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "doc": {
+            "de": "Timeout in Sekunden (Standard 30).",
+            "en": "Timeout in seconds (default 30)."
+          },
+          "default": 30,
+          "minimum": 1
+        }
+      }
+    },
+    "compress-ai": {
+      "required": [
+        "source"
+      ],
+      "fields": {
+        "source": {
+          "type": "string",
+          "doc": {
+            "de": "Name eines früheren Blocks oder `\"previous\"`.",
+            "en": "Name of an earlier block or `\"previous\"`."
+          }
+        },
+        "instruction": {
+          "type": "string",
+          "doc": {
+            "de": "Anweisung zur Verdichtung (Platzhalter werden **nicht** aufgelöst).",
+            "en": "Compression instruction (placeholders are **not** resolved)."
+          }
+        },
+        "max_chars": {
+          "type": "integer",
+          "doc": {
+            "de": "Zielgröße, mindestens 500.",
+            "en": "Target size, at least 500."
+          },
+          "default": 4000,
+          "minimum": 500
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "doc": {
+            "de": "Timeout in Sekunden für den KI-Aufruf. Ohne Angabe gilt `automation.host-claude.timeout-seconds`.",
+            "en": "Timeout in seconds for the AI call. Unset ⇒ `automation.host-claude.timeout-seconds` applies."
+          },
+          "minimum": 1
+        }
+      }
+    },
+    "dashboard-report": {
+      "required": [
+        "status"
+      ],
+      "fields": {
+        "status": {
+          "type": "string",
+          "doc": {
+            "de": "Ampel des Runs (Platzhalter erlaubt, z. B. `{{ block.<name>.output }}` eines Blocks, der GREEN, YELLOW oder RED ausgibt).",
+            "en": "Traffic light of the run (placeholders allowed, e.g. `{{ block.<name>.output }}` of a block printing GREEN, YELLOW or RED)."
+          },
+          "values": [
+            {
+              "value": "GREEN",
+              "doc": {
+                "de": "Grün",
+                "en": "Green"
+              }
+            },
+            {
+              "value": "YELLOW",
+              "doc": {
+                "de": "Gelb",
+                "en": "Yellow"
+              }
+            },
+            {
+              "value": "RED",
+              "doc": {
+                "de": "Rot",
+                "en": "Red"
+              }
+            }
+          ]
+        },
+        "title": {
+          "type": "string",
+          "doc": {
+            "de": "Titel, höchstens 80 Zeichen.",
+            "en": "Title, at most 80 characters."
+          }
+        },
+        "summary": {
+          "type": "string",
+          "doc": {
+            "de": "Zusammenfassung, höchstens 500 Zeichen.",
+            "en": "Summary, at most 500 characters."
+          }
+        },
+        "kpis": {
+          "type": "array",
+          "doc": {
+            "de": "Bis zu 6 Kennzahlen `{ label, value, trend? }`.",
+            "en": "Up to 6 KPIs `{ label, value, trend? }`."
+          },
+          "items": {
+            "$ref": "#/definitions/kpi"
+          }
+        },
+        "items": {
+          "type": "array",
+          "doc": {
+            "de": "Bis zu 10 Einträge, je höchstens 200 Zeichen.",
+            "en": "Up to 10 entries, each at most 200 characters."
+          },
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "compressOps": [
+    {
+      "op": "text.normalize",
+      "doc": {
+        "de": "ANSI, CR, Leerraum am Zeilenende und Leerzeilen-Folgen entfernen.",
+        "en": "Strip ANSI, CR, trailing whitespace and blank-line runs."
+      }
+    },
+    {
+      "op": "text.truncate",
+      "doc": {
+        "de": "Kürzen an Zeilengrenzen: `max_chars`, `keep` (`head`/`tail`/`head_tail`).",
+        "en": "Cut at line boundaries: `max_chars`, `keep` (`head`/`tail`/`head_tail`)."
+      }
+    },
+    {
+      "op": "lines.filter",
+      "doc": {
+        "de": "Zeilen behalten/entfernen: `include`, `exclude` (Regex-Listen), `before`, `after`.",
+        "en": "Keep/remove lines: `include`, `exclude` (regex lists), `before`, `after`."
+      }
+    },
+    {
+      "op": "lines.replace",
+      "doc": {
+        "de": "Regex-Ersetzung je Zeile: `pattern`, `replacement`.",
+        "en": "Regex replacement per line: `pattern`, `replacement`."
+      }
+    },
+    {
+      "op": "lines.dedupe",
+      "doc": {
+        "de": "Wiederholungen entfernen: `count`, `consecutive_only`.",
+        "en": "Remove repeats: `count`, `consecutive_only`."
+      }
+    },
+    {
+      "op": "lines.head",
+      "doc": {
+        "de": "Erste `lines` Zeilen.",
+        "en": "First `lines` lines."
+      }
+    },
+    {
+      "op": "lines.tail",
+      "doc": {
+        "de": "Letzte `lines` Zeilen.",
+        "en": "Last `lines` lines."
+      }
+    },
+    {
+      "op": "markdown.section",
+      "doc": {
+        "de": "Nur passende Abschnitte: `headings` (Regex), `level`.",
+        "en": "Only matching sections: `headings` (regex), `level`."
+      }
+    },
+    {
+      "op": "json.select",
+      "doc": {
+        "de": "Nur diese Felder: `paths`.",
+        "en": "Only these fields: `paths`."
+      }
+    },
+    {
+      "op": "json.limit",
+      "doc": {
+        "de": "Array kürzen: `path`, `count`.",
+        "en": "Shorten an array: `path`, `count`."
+      }
+    },
+    {
+      "op": "json.sort",
+      "doc": {
+        "de": "Array sortieren: `path`, `by`, `order`.",
+        "en": "Sort an array: `path`, `by`, `order`."
+      }
+    },
+    {
+      "op": "json.to_lines",
+      "doc": {
+        "de": "Ein Eintrag pro Zeile: `path`, `template` (`{title} — {url}`).",
+        "en": "One entry per line: `path`, `template` (`{title} — {url}`)."
+      }
+    }
+  ]
+}

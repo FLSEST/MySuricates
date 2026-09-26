@@ -20,8 +20,8 @@ import java.util.Map;
  * über die ausgelieferten Pool-Definitionen. Der Speicherweg bleibt unangetastet — der Analyzer
  * meldet, er blockiert nicht.
  *
- * <p><b>Was er heute prüft</b> — zehn Regeln, jede eindeutig am Text entscheidbar, eine davon am Text samt
- * den Metadaten der Definition:
+ * <p><b>Was er heute prüft</b> — dreizehn Regeln, jede eindeutig am Text entscheidbar, eine davon am Text samt
+ * den Metadaten der Definition, drei am Block-Config-Schema, das auch der Editor nutzt:
  * <ul>
  *   <li>{@code unknown-block-reference} — Verweis auf einen Block, den es nicht gibt</li>
  *   <li>{@code chain-only-placeholder} — Chain-Variable in einem einzeln laufenden Workflow</li>
@@ -37,6 +37,9 @@ import java.util.Map;
  *   <li>{@code on-no-without-reject-option} — Approval mit {@code on_no}, aber ohne Option, die ablehnt</li>
  *   <li>{@code items-command-without-source} — foreach mit {@code items_command}, aber ohne
  *       {@code items_source: "command"}: der Befehl läuft nie</li>
+ *   <li>{@code unknown-config-key} — Config-Schlüssel, den kein Executor liest (auch in verschachtelten Blöcken)</li>
+ *   <li>{@code missing-required-config-key} — Pflichtschlüssel des Blocktyps fehlt</li>
+ *   <li>{@code invalid-config-value} — Wert außerhalb der festen Werte, etwa {@code on_failure: "fail"}</li>
  * </ul>
  *
  * <p><b>Was er bewusst nicht prüft.</b> Drei Regeln des Tickets brauchen mehr als den Text und
@@ -86,6 +89,7 @@ public class WorkflowAnalyzer {
         HygieneRules.apply(blocks, instructions, findings);
         ApprovalRules.apply(blocks, findings);
         ForEachRules.apply(blocks, findings);
+        ConfigKeyRules.apply(blocks, findings);
         findings.sort((a, b) -> a.severity() != b.severity()
                 ? a.severity().compareTo(b.severity())
                 : Integer.compare(a.blockIndex(), b.blockIndex()));

@@ -52,6 +52,8 @@ ai-automation-backend/stable-frontend/
 
 # Build-synced docs (generated from docs/ by maven-resources-plugin at generate-resources)
 ai-automation-backend/src/main/resources/docs/
+# Build-Kopie von ai-automation-frontend/src/data/blockConfigSchema.json (pom: sync-block-config-schema)
+ai-automation-backend/src/main/resources/schema/
 
 # Generated session artifacts (anchored to repo root)
 /explainer/

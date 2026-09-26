@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { BLOCK_TYPES } from '../../../types';
+import { AI_BLOCK_TYPES, BLOCK_TYPES } from '../../../types';
 import {
   BLOCK_DEFAULT_CONFIG,
+  aiOverrideBlockTypes,
   allSchemaTexts,
   allowedConfigValues,
   buildBlockConfigSchema,
@@ -91,6 +92,11 @@ describe('blockConfigSchema', () => {
     }
   });
 
+  // The shared schema file carries its own list for the backend analyzer; it must match the one the UI uses
+  it('lists the same AI block types as the UI (AI_BLOCK_TYPES)', () => {
+    expect([...aiOverrideBlockTypes()].sort()).toEqual([...AI_BLOCK_TYPES].sort());
+  });
+
   it('offers the AI override keys only where the block makes an AI call', () => {
     expect(knownConfigKeys('simple')).toEqual(expect.arrayContaining(['provider', 'model', 'effort']));
     expect(knownConfigKeys('shell')).not.toContain('effort');
@@ -103,6 +109,17 @@ describe('blockConfigSchema', () => {
       expect.objectContaining({ enum: ['ai', 'shell'] }),
       { const: 'claude', doNotSuggest: true },
     ]);
+  });
+
+  // Keys the executors read that the editor used to flag (TODO f5153c47, ExecutorConfigKeyDriftTest on the backend)
+  it('knows the output check, shell-mode container keys of wrappers and the old workflowId spelling', () => {
+    for (const type of BLOCK_TYPES) expect(knownConfigKeys(type), type).toContain('validation');
+    for (const type of ['retry', 'foreach', 'while', 'conditional']) {
+      expect(knownConfigKeys(type), type).toEqual(expect.arrayContaining(['container_image', 'mount_docker_socket', 'mounts']));
+    }
+    const workflowId = (buildBlockConfigSchema('sub-workflow', 'en').properties as Record<string, Record<string, unknown>>).workflowId!;
+    expect(workflowId.doNotSuggest).toBe(true);
+    expect(requiredConfigKeys('sub-workflow')).toEqual(['workflow_id']);
   });
 
   it('lets an unknown (server-only) block type through without key warnings', () => {

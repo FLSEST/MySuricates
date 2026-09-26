@@ -41,6 +41,27 @@ class NestedBlocksTest {
         assertThat(labelsOf(config)).containsExactly("inner", "deep", "after");
     }
 
+    /** Der Pfad nennt die Stelle unter dem äußeren Block — für Meldungen wie „Block 2 › cases[0] › Block 1“. */
+    @Test
+    void namesThePathBelowTheOuterBlockCountingBlocksFromOne() {
+        Map<String, Object> inner = Map.of("type", "switch", "name", "inner",
+                "config", Map.of("default", List.of(Map.of("type", "shell"), Map.of("type", "simple"))));
+        Map<String, Object> config = new HashMap<>(Map.of(
+                "cases", List.of(
+                        Map.of("value", "a", "blocks", List.of(Map.of("type", "shell"))),
+                        Map.of("value", "b", "blocks", List.of(Map.of("type", "shell"), inner)))));
+        List<String> paths = new ArrayList<>();
+
+        NestedBlocks.visit(config, nested -> paths.add(nested.path()));
+
+        assertThat(paths).containsExactly(
+                "cases[0] › Block 1",
+                "cases[1] › Block 1",
+                "cases[1] › Block 2",
+                "cases[1] › Block 2 › default › Block 1",
+                "cases[1] › Block 2 › default › Block 2");
+    }
+
     @Test
     void fallsBackToTheTypeWhenTheNameIsMissingOrBlank() {
         Map<String, Object> config = new HashMap<>(Map.of("blocks", List.of(

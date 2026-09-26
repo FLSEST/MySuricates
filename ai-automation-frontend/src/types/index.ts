@@ -357,6 +357,27 @@ export interface WorkflowRun {
 }
 
 /** Seal state of a workflow, checked without a run (`GET /workflows/seal-status`). */
+/** Severity of a definition finding: HIGH breaks the run or costs money, MEDIUM costs time or context, LOW is hygiene. */
+export type AnalyzerSeverity = 'HIGH' | 'MEDIUM' | 'LOW';
+
+/** One finding of the deterministic definition check (`GET /workflows/{id}/analyze`). */
+export interface AnalyzerFinding {
+  rule: string;
+  severity: AnalyzerSeverity;
+  /** 0-based index of the top-level block, -1 for the definition as a whole */
+  blockIndex: number;
+  blockName: string | null;
+  detail: string;
+}
+
+export interface WorkflowAnalysis {
+  workflowId: string;
+  workflowName: string;
+  findingCount: number;
+  bySeverity?: Partial<Record<AnalyzerSeverity, number>>;
+  findings: AnalyzerFinding[];
+}
+
 export interface WorkflowSealStatus {
   workflowId: string;
   workflowName: string;
