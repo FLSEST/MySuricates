@@ -49,6 +49,10 @@ public class RunAutoResumer {
 
     /** Run metadata key: automatic resume attempts so far. */
     public static final String ATTEMPTS_KEY = "autoResumeAttempts";
+    /** Metadata key of a run a full retry started: the interrupted run it replaces. */
+    public static final String RESUMED_FROM_KEY = "autoResumedFrom";
+    /** Metadata key of an interrupted run a full retry replaced: the new run. */
+    public static final String RESTARTED_AS_KEY = "autoRestartedAs";
     static final int MAX_ATTEMPTS = 1;
     private static final String SOURCE = "RunAutoResumer";
 
@@ -165,7 +169,11 @@ public class RunAutoResumer {
         }
         try {
             WorkflowRun started = tx.execute(status -> workflowExecutor.resumeFromStep(runId, TriggerSource.AUTO_RESUME));
-            String newRun = started != null && !runId.equals(started.getId()) ? " as new run " + started.getId() : "";
+            boolean restarted = started != null && !runId.equals(started.getId());   // no finished block: full retry
+            if (restarted) {
+                tx.executeWithoutResult(status -> markRestarted(runId, started.getId()));
+            }
+            String newRun = restarted ? " as new run " + started.getId() : "";
             activityLog.info(LogCategory.EXECUTION,
                     "Auto-resume: continued interrupted run of " + claim.workflowName() + newRun,
                     SOURCE, runId, claim.workflowId());
@@ -181,6 +189,28 @@ public class RunAutoResumer {
                     SOURCE, runId, claim.workflowId());
         }
         return true;
+    }
+
+    /**
+     * Metadata for the new run of a full retry ({@link WorkflowExecutor#resumeFromStep}, no finished
+     * block): an automatic one carries the attempt count and its origin over, so an interruption of
+     * the new run is not resumed automatically again. {@code null} for any other source.
+     */
+    static Map<String, Object> carryOver(WorkflowRun interrupted, TriggerSource source) {
+        if (source != TriggerSource.AUTO_RESUME) {
+            return null;
+        }
+        return Map.of(ATTEMPTS_KEY, Math.max(attempts(interrupted), MAX_ATTEMPTS), RESUMED_FROM_KEY, interrupted.getId());
+    }
+
+    /** The interrupted run stays INTERRUPTED; its metadata names the run that replaced it. */
+    private void markRestarted(String runId, String newRunId) {
+        runRepository.findById(runId).ifPresent(run -> {
+            Map<String, Object> metadata = new HashMap<>(run.getMetadata() != null ? run.getMetadata() : Map.of());
+            metadata.put(RESTARTED_AS_KEY, newRunId);
+            run.setMetadata(metadata);
+            runRepository.save(run);
+        });
     }
 
     /** Checks the run and counts the attempt (committed before the start); {@code null} = not eligible. */

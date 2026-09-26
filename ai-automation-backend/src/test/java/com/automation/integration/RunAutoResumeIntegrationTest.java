@@ -102,6 +102,41 @@ class RunAutoResumeIntegrationTest {
         assertThat(runRepository.countByWorkflowId(workflow.getId())).as("resumed in place, no new run").isEqualTo(1);
     }
 
+    /**
+     * Review finding: without a finished block the resume is a full retry — a new run. It carries the
+     * attempt over, so its own interruption (e.g. the next standby) is not resumed automatically again.
+     */
+    @Test
+    void fullRetry_newRunCarriesTheAttempt_andIsNotResumedAgain() {
+        Workflow workflow = fixture.workflowWithoutFinishedBlock(project);
+        WorkflowRun run = fixture.inFlight(workflow, RunStatus.RUNNING, r -> { });
+
+        runControlService.cleanupZombieRuns();
+        fixture.awaitResumerIdle();
+
+        WorkflowRun old = fixture.reload(run);
+        assertThat(old.getStatus()).isEqualTo(RunStatus.INTERRUPTED);
+        String newRunId = (String) old.getMetadata().get(RunAutoResumer.RESTARTED_AS_KEY);
+        assertThat(newRunId).isNotNull().isNotEqualTo(run.getId());
+        WorkflowRun retry = fixture.awaitFinished(newRunId);
+        assertThat(retry.getStatus()).isEqualTo(RunStatus.COMPLETED);
+        assertThat(retry.getTriggerSource()).isEqualTo(TriggerSource.AUTO_RESUME);
+        assertThat(retry.getMetadata())
+                .containsEntry(RunAutoResumer.ATTEMPTS_KEY, 1)
+                .containsEntry(RunAutoResumer.RESUMED_FROM_KEY, run.getId());
+
+        // The new run is interrupted as well: it stays for a person, no third run.
+        WorkflowRun again = fixture.reload(retry);
+        again.setStatus(RunStatus.RUNNING);
+        again.setCompletedAt(null);
+        runRepository.saveAndFlush(again);
+        runControlService.cleanupZombieRuns();
+        fixture.awaitResumerIdle();
+
+        assertThat(fixture.reload(retry).getStatus()).isEqualTo(RunStatus.INTERRUPTED);
+        assertThat(runRepository.countByWorkflowId(workflow.getId())).isEqualTo(2);
+    }
+
     @Test
     void runsThatDoNotQualify_stayInterruptedForAPerson() {
         WorkflowRun withoutOptIn = fixture.inFlight(fixture.workflow(project, false), RunStatus.RUNNING, r -> { });

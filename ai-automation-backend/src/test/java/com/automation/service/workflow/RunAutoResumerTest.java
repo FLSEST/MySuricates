@@ -226,6 +226,34 @@ class RunAutoResumerTest {
     }
 
     @Test
+    void fullRetry_marksTheInterruptedRunWithTheNewRun() {
+        Workflow wf = workflow("wf-1", true);
+        WorkflowRun run = interrupted("r1", wf, "RUNNING");
+        stored(run);
+        storedWorkflow(wf);
+        when(workflowExecutor.resumeFromStep("r1", TriggerSource.AUTO_RESUME))
+                .thenReturn(WorkflowRun.builder().id("r2").build());   // no finished block: a new run
+
+        resumer.onRunsInterrupted(new RunInterruption.Event(List.of("r1"), RunInterruption.Cause.STANDBY));
+        runScheduled();
+
+        assertThat(run.getMetadata()).containsEntry(RunAutoResumer.RESTARTED_AS_KEY, "r2")
+                .containsEntry(RunAutoResumer.ATTEMPTS_KEY, 1);
+        verify(activityLog).info(eq(LogCategory.EXECUTION), contains("as new run r2"),
+                eq("RunAutoResumer"), eq("r1"), eq("wf-1"));
+    }
+
+    @Test
+    void carryOver_onlyForAutomaticResumes() {
+        WorkflowRun run = interrupted("r1", workflow("wf-1", true), "RUNNING");
+        run.getMetadata().put(RunAutoResumer.ATTEMPTS_KEY, 1);
+
+        assertThat(RunAutoResumer.carryOver(run, TriggerSource.AUTO_RESUME))
+                .containsEntry(RunAutoResumer.ATTEMPTS_KEY, 1).containsEntry(RunAutoResumer.RESUMED_FROM_KEY, "r1");
+        assertThat(RunAutoResumer.carryOver(run, TriggerSource.RESUME)).isNull();
+    }
+
+    @Test
     void secondAnnouncementOfTheSameRun_isNotQueuedTwice_andASecondAttemptIsRefused() {
         Workflow wf = workflow("wf-1", true);
         WorkflowRun run = interrupted("r1", wf, "RUNNING");

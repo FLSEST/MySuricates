@@ -48,14 +48,22 @@ record InterruptedRunFixture(WorkflowExecutor executor, ProjectRepository projec
 
     /** Block 1 writes a.log; block 2 fails on its first attempt only (flag file), so a resume completes. */
     Workflow workflow(Project project, boolean optIn) {
+        return workflow(project, optIn, true);
+    }
+
+    /** Without the first block: an interruption leaves no finished block, so a resume is a full retry. */
+    Workflow workflowWithoutFinishedBlock(Project project) {
+        return workflow(project, true, false);
+    }
+
+    private Workflow workflow(Project project, boolean optIn, boolean withFirstBlock) {
         Map<String, Object> metadata = new HashMap<>();
         if (optIn) {
             metadata.put("autoResume", Map.of("enabled", true));
         }
         Workflow saved = workflows.saveAndFlush(Workflow.builder()
                 .name("auto-resume-" + System.nanoTime()).project(project)
-                .blocks(new ArrayList<>(List.of(shell("echo a >> a.log"),
-                        shell("if [ -f b.flag ]; then echo b >> b.log; else touch b.flag; exit 1; fi"))))
+                .blocks(new ArrayList<>(withFirstBlock ? List.of(shell("echo a >> a.log"), flagBlock()) : List.of(flagBlock())))
                 .activatedSkills(new ArrayList<>()).defaultContext(Map.of()).metadata(metadata).build());
         entityManager.clear();
         return workflows.findByIdWithSkills(saved.getId()).orElseThrow();
@@ -114,6 +122,10 @@ record InterruptedRunFixture(WorkflowExecutor executor, ProjectRepository projec
     int lines(Project project, String file) throws Exception {
         Path path = Path.of(project.getPath(), file);
         return Files.exists(path) ? Files.readAllLines(path).size() : 0;
+    }
+
+    private static BlockDefinition flagBlock() {
+        return shell("if [ -f b.flag ]; then echo b >> b.log; else touch b.flag; exit 1; fi");
     }
 
     private static BlockDefinition shell(String command) {

@@ -859,6 +859,24 @@ class WorkflowExecutorTest {
         WorkflowRun started = workflowExecutor.resumeFromStep("run-1", TriggerSource.AUTO_RESUME);
 
         assertThat(started.getTriggerSource()).isEqualTo(TriggerSource.AUTO_RESUME);
+        // The new run carries the attempt over — a second interruption must not be resumed again.
+        assertThat(started.getMetadata())
+                .containsEntry(RunAutoResumer.ATTEMPTS_KEY, 1)
+                .containsEntry(RunAutoResumer.RESUMED_FROM_KEY, "run-1");
+    }
+
+    @Test
+    void resumeFromStep_fullRetryByAPerson_startsTheNewRunWithoutAutoResumeMarks() {
+        WorkflowRun interrupted = WorkflowRun.builder().id("run-1").workflow(testWorkflow).workflowName("Test Workflow")
+                .status(RunStatus.INTERRUPTED).startedAt(Instant.now()).build();
+        when(runRepository.findById("run-1")).thenReturn(Optional.of(interrupted));
+        when(stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc("run-1")).thenReturn(List.of());
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenReturn(StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).output("ok").build());
+
+        WorkflowRun started = workflowExecutor.resumeFromStep("run-1", TriggerSource.RESUME);
+
+        assertThat(started.getMetadata()).doesNotContainKeys(RunAutoResumer.ATTEMPTS_KEY, RunAutoResumer.RESUMED_FROM_KEY);
     }
 
     @Test

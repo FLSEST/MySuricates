@@ -374,7 +374,7 @@ public class WorkflowExecutor {
 
         if (completedSteps.isEmpty() && !run.getMetadata().containsKey("workspace")) {
             log.info("Resume requested for run {} but no completed steps found — falling back to full retry", runId);
-            return execute(run.getWorkflow(), run.getInputContext(), source);
+            return execute(run.getWorkflow(), run.getInputContext(), null, RunAutoResumer.carryOver(run, source), source);
         }
 
         ResumePlan plan = ResumePlan.after(persistedSteps);
