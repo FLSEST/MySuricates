@@ -5,6 +5,9 @@
 - **Base URL:** `http://localhost:9090/api/v1`
 - **Content-Type:** `application/json`
 - **Authentication:** Header `X-API-Key: <key>` (when `automation.security.enabled=true`)
+- **Proxy:** always call `curl` with an API key as `curl --noproxy '*'` – with `http_proxy` set,
+  curl sends even requests to `localhost` through the proxy, key included. The documentation gate
+  `doc-facts-check.sh` checks every example in `docs/` and `AGENTS.md` for it.
 
 ### Error Format
 

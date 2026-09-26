@@ -13,7 +13,8 @@
 # Usage:  scripts/public-readiness/doc-facts-check.sh [--root <verzeichnis>] [--facts] [pfad ...]
 #           --root   Repo-Wurzel (Default: git-Toplevel, sonst das Arbeitsverzeichnis)
 #           --facts  nur die erhobenen Zahlen ausgeben, nichts pruefen
-#           pfad     zu pruefende Dateien/Verzeichnisse (Default: docs README.de.md)
+#           pfad     zu pruefende Dateien/Verzeichnisse
+#                    (Default: docs README.de.md workflow-pool/README.md AGENTS.md)
 #
 # Exit:   0 = keine Drift, 1 = Drift gefunden, 2 = Faktenquelle fehlt
 #
@@ -40,8 +41,10 @@ fi
 ROOT="$(cd "$ROOT" 2>/dev/null && pwd)" || { echo "doc-facts-check: Wurzel nicht lesbar" >&2; exit 2; }
 # workflow-pool/README.md nennt die Zahl der Built-in-Templates und gehoert deshalb
 # in die Pruefung -- sonst waere sie eine eingefrorene Zahl ausserhalb der Reichweite
-# des Gates, genau die Sorte, die dieses Skript verhindern soll.
-[ ${#TARGETS[@]} -eq 0 ] && TARGETS=(docs README.de.md workflow-pool/README.md)
+# des Gates, genau die Sorte, die dieses Skript verhindern soll. AGENTS.md ist die
+# Kurzreferenz fuer externe Agents: Ihre curl-Beispiele werden woertlich kopiert und
+# gehoeren deshalb unter die --noproxy-Regel (TODO 2e3cf243).
+[ ${#TARGETS[@]} -eq 0 ] && TARGETS=(docs README.de.md workflow-pool/README.md AGENTS.md)
 
 BACKEND="$ROOT/ai-automation-backend"
 FRONTEND="$ROOT/ai-automation-frontend"
@@ -272,6 +275,6 @@ DOC_FACTS="$(printf '{"block-types":%s,"block-type-names":%s,"controllers":%s,"m
 RC=$?
 
 if [ "$RC" -eq 0 ]; then
-  echo "Doku-Zahlen OK — ${#FILES[@]} Dateien, 7 Groessen (Blocktypen $BLOCK_TYPES, Controller $CONTROLLERS, Migrationen $MIGRATION_COUNT/V$MIGRATION_MAX, Templates $TEMPLATES, Skills $SKILLS, Provider $PROVIDERS)${COMMITS_NOTE}, Migrationstabellen, Blocktyp-Aufzaehlungen, Testzahl-Datierung und Zahlen ueber die ausgelieferten Definitionen."
+  echo "Doku-Zahlen OK — ${#FILES[@]} Dateien, 7 Groessen (Blocktypen $BLOCK_TYPES, Controller $CONTROLLERS, Migrationen $MIGRATION_COUNT/V$MIGRATION_MAX, Templates $TEMPLATES, Skills $SKILLS, Provider $PROVIDERS)${COMMITS_NOTE}, Migrationstabellen, Blocktyp-Aufzaehlungen, Testzahl-Datierung, Zahlen ueber die ausgelieferten Definitionen und --noproxy an API-Key-curls."
 fi
 exit "$RC"

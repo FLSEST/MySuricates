@@ -1104,8 +1104,8 @@ Wenn mehrere Blöcke Gates emittieren, gewinnt der höchste Schweregrad (RED > Y
 Damit lassen sich zwei Runs ohne Re-Parsing diffen (z. B. für Public-Readiness-Trends):
 
 ```bash
-curl -s -H "X-API-Key: $KEY" "$BASE/executions/$RUN1" | jq '.metadata.gate_summary' > a.json
-curl -s -H "X-API-Key: $KEY" "$BASE/executions/$RUN2" | jq '.metadata.gate_summary' > b.json
+curl -s --noproxy '*' -H "X-API-Key: $KEY" "$BASE/executions/$RUN1" | jq '.metadata.gate_summary' > a.json
+curl -s --noproxy '*' -H "X-API-Key: $KEY" "$BASE/executions/$RUN2" | jq '.metadata.gate_summary' > b.json
 diff <(jq -S . a.json) <(jq -S . b.json)
 ```
 

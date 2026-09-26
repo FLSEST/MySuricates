@@ -204,6 +204,96 @@ class MirroredSubdirTest(unittest.TestCase):
             self.assertIn("en_links_to_german: 0", out)
 
 
+class SectionPairingTest(unittest.TestCase):
+    """Ein fehlender Abschnitt wird dem richtigen zugeschrieben, nicht dem letzten gleichrangigen.
+
+    Die Erstfassung verglich nur die Ebenenfolge und meldete bei einem fehlenden mittleren
+    "##"-Abschnitt immer den letzten -- so standen "## Bekannte Einschränkungen" (statt
+    "## Diagramm-Seiten") und "## Completion Triggers (V39)" (statt des Audit Centers) als
+    bekannte Luecken in KNOWN_SECTION_GAPS (TODO 2d553479).
+    """
+
+    def build(self, tmp, de_body, en_body, name="a.md"):
+        root = Path(tmp)
+        (root / "docs" / "en").mkdir(parents=True)
+        (root / "docs" / name).write_text(de_body)
+        (root / "docs" / "en" / name).write_text(en_body)
+        return root
+
+    def test_missing_middle_section_is_named_by_its_heading(self):
+        # Nachbau von docs/architektur.md: Das Audit Center fehlte in der englischen Fassung.
+        de = ("# Architektur\n\n## Workflow Chains\n\n## Completion Triggers (V39)\n\n"
+              "## Audit Center — Findings, Akzeptanz und Verfall (V68/V69)\n\n"
+              "## Todo Triggers — Self-Improvement Loop (V51/V52)\n\n## Notification System (V40)\n")
+        en = ("# Architecture\n\n## Workflow Chains\n\n## Completion Triggers (V39)\n\n"
+              "## Todo Triggers — Self-Improvement Loop (V51/V52)\n\n## Notification System (V40)\n")
+        with tempfile.TemporaryDirectory() as tmp:
+            code, out = run_script(self.build(tmp, de, en))
+            self.assertEqual(code, 1, out)
+            self.assertIn("BEFUND: abschnitt-fehlt-en a.md '## Audit Center — Findings, Akzeptanz und Verfall"
+                          " (V68/V69)' (Ueberschrift 4 von 6, nach '## Completion Triggers (V39)')", out)
+            self.assertEqual(out.count("abschnitt-fehlt-en"), 1, out)
+            self.assertNotIn("Notification System", out)
+
+    def test_translated_headings_are_paired_through_the_section_text(self):
+        # Nachbau von docs/entwicklung.md: "## Diagramm-Seiten" fehlte, gemeldet wurde
+        # "## Bekannte Einschränkungen". Die Ueberschriften teilen kein Wort -- der Abschnittstext
+        # schon: Code, Pfade und Bezeichner stehen in beiden Sprachen gleich da.
+        de = ("# Entwicklung\n\n## Hygiene-Gate\n`scripts/ci/public-hygiene.sh`, `--tracked`\n\n"
+              "## Diagramm-Seiten\nErzeugt von `scripts/docs-diagrams.py` mit `--add-missing` und `--check`.\n\n"
+              "## Abhängigkeits-Meldungen (Frontend)\n`npm audit`, `dep_vuln_check.py`, `package-lock.json`\n\n"
+              "## Bekannte Einschränkungen\n`pool-size=1`, `SQLITE_BUSY`, `HikariCP`\n")
+        en = ("# Development\n\n## Hygiene gate\n`scripts/ci/public-hygiene.sh`, `--tracked`\n\n"
+              "## Dependency advisories (frontend)\n`npm audit`, `dep_vuln_check.py`, `package-lock.json`\n\n"
+              "## Known Limitations\n`pool-size=1`, `SQLITE_BUSY`, `HikariCP`\n")
+        with tempfile.TemporaryDirectory() as tmp:
+            code, out = run_script(self.build(tmp, de, en))
+            self.assertEqual(code, 1, out)
+            self.assertIn("BEFUND: abschnitt-fehlt-en a.md '## Diagramm-Seiten'", out)
+            self.assertNotIn("Bekannte Einschränkungen", out)
+            self.assertNotIn("Abhängigkeits-Meldungen", out)
+
+    def test_moved_section_is_reported_on_both_sides(self):
+        # Nachbau von docs/en/datenmodell.md: gleiche Zahl an Ueberschriften, aber `goals` stand
+        # hinter den Enums statt bei den Tabellen. Frueher blieb das unsichtbar (gleiche Anzahl).
+        de = "# D\n\n## Tabellen\n\n### `todos`\n\n### `goals`\n\n## Enums\n\n### RunStatus\n"
+        en = "# D\n\n## Tables\n\n### `todos`\n\n## Enums\n\n### RunStatus\n\n### `goals`\n"
+        with tempfile.TemporaryDirectory() as tmp:
+            code, out = run_script(self.build(tmp, de, en))
+            self.assertEqual(code, 1, out)
+            self.assertIn("BEFUND: abschnitt-fehlt-en a.md '### `goals`' (Ueberschrift 4 von 6", out)
+            self.assertIn("BEFUND: abschnitt-nur-en a.md '### `goals`' (Ueberschrift 6 von 6", out)
+
+    def test_same_level_sequence_is_not_paired(self):
+        # Gleiche Ebenenfolge: ob eine Ueberschrift uebersetzt oder ersetzt ist, sagt der Text
+        # allein nicht sicher -- die Pruefung bleibt dort stumm, wie bisher.
+        de = "# D\n\n## Eins\n\n## Zwei\n"
+        en = "# D\n\n## One\n\n## Something else\n"
+        with tempfile.TemporaryDirectory() as tmp:
+            code, out = run_script(self.build(tmp, de, en))
+            self.assertEqual(code, 0, out)
+
+    def test_without_any_signal_the_later_section_counts_as_missing(self):
+        # Reine Prosa, ganz uebersetzte Ueberschriften: keine Aehnlichkeit, nur die Ebenen.
+        # Dann bleibt es eine Vermutung, und sie faellt wie frueher auf den spaeteren Abschnitt.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            de_file, en_file = root / "de.md", root / "en.md"
+            de_file.write_text("# D\n\n## Eins\nText.\n\n## Zwei\nMehr Text.\n")
+            en_file.write_text("# D\n\n## One\nText.\n")
+            only_de, only_en = dpc.align_sections(dpc.sections(de_file), dpc.sections(en_file))
+            self.assertEqual((only_de, only_en), ([2], []))
+
+    def test_sections_skip_code_blocks_like_headings(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            f = Path(tmp) / "a.md"
+            f.write_text("# Echt\nvorn\n```bash\n# Kommentar\n```\n## Auch echt\nhinten\n")
+            got = dpc.sections(f)
+            self.assertEqual([h for h, _ in got], dpc.headings(f))
+            self.assertIn("# Kommentar", got[0][1])
+            self.assertEqual(got[1][1], "hinten")
+
+
 class RepoTest(unittest.TestCase):
     def test_this_repository_is_green(self):
         code, out = run_script(REPO)

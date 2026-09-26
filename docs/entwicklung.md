@@ -373,7 +373,7 @@ cd ai-automation-backend
 AUTOMATION_API_KEY=<test-api-key> docker compose -f docker-compose.test.yml up -d
 
 # Optional: aktuelle Definitionen von Dev nach Test synchronisieren
-curl -s -X POST http://localhost:9090/api/v1/testing/sync-definitions \
+curl -s --noproxy '*' -X POST http://localhost:9090/api/v1/testing/sync-definitions \
   -H "Content-Type: application/json" \
   -H "X-API-Key: $DEV_KEY" \
   -d '{}'
@@ -923,6 +923,14 @@ siehe [Cypress-Migrationshinweise](https://www.cypress.io/blog/cypress-15-made-s
 - **Concurrent Writes:** SQLite erlaubt nur einen Schreibzugriff gleichzeitig. HikariCP ist auf Pool-Size=1 konfiguriert, um alle DB-Operationen zu serialisieren und `SQLITE_BUSY`-Fehler unter parallelen Workflow-Runs zu vermeiden.
 - **Keine nativen Typen:** Booleans als INTEGER, Timestamps als TEXT, JSON als TEXT.
 - **Kein ALTER COLUMN:** Schema-Änderungen sind eingeschränkt (nur ADD COLUMN).
+- **Ausdrucksspalten in nativen Abfragen typisieren:** Für eine Ergebnisspalte ohne deklarierten Typ
+  (`json_extract(…)`, `CASE …`) nimmt sqlite-jdbc den Typ des Werts der **ersten** Zeile. Ist der NULL,
+  meldet der Treiber NUMERIC, und Hibernate bricht bei einem späteren Text mit „Bad value for type
+  BigDecimal“ ab – abhängig von der Zeilenreihenfolge, also flackernd. In `nativeQuery = true` deshalb
+  jede solche Spalte fest typisieren, etwa `COALESCE(CAST(… AS TEXT), '')`, und im Test die Reihenfolge
+  so festlegen, dass die erste Zeile NULL liefert. Vorbild: `WorkflowRunProjectionRepository.findOriginColumns`
+  mit `WorkflowRunProjectionRepositoryTest`. Spalten mit deklariertem Typ (`w.name`) und JPQL-Abfragen
+  betrifft das nicht.
 - **NIEMALS direkt in die DB schreiben** (via `sqlite3` CLI oder SQL). Immer REST-API oder Service/Repository-Layer verwenden — direkte Schreibzugriffe umgehen den Hibernate-Cache.
 
 ### Docker-Abhängigkeit

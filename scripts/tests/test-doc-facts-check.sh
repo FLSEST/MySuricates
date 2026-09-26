@@ -677,6 +677,86 @@ check "Projektname im Fliesstext bleibt frei"  '! grep -q "titel-diagrams.md:3" 
 check "Titel mit MySuricates bleibt frei"      '! grep -q "titel-diagrams.md:4" <<<"$OUT"'
 rm "$FAKE/docs/titel-diagrams.md"
 
+echo "17) curl mit API-Key braucht --noproxy (TODO 2e3cf243)"
+# Mit gesetztem http_proxy schickt curl auch localhost-Aufrufe samt X-API-Key ueber den
+# Proxy. Der Header steht oft erst in einer Fortsetzungszeile -- gemeldet wird an der
+# Zeile mit curl, geprueft der ganze Aufruf.
+cat > "$FAKE/docs/curl.md" <<'MD_EOF'
+# curl
+curl -s http://localhost:9090/api/v1/todos -H "X-API-Key: $DEV_KEY"
+curl -s -X POST http://localhost:9090/api/v1/todos \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: $DEV_KEY" -d '{}'
+curl -s -H "X-API-Key: $KEY" "$BASE/executions/$RUN1" | jq .
+curl -s --noproxy '*' localhost:9090/api/v1/pool -H "X-API-Key: $KEY"; curl localhost:9090/api/v1/pool -H "X-API-Key: $KEY"
+MD_EOF
+OUT=$(bash "$SCRIPT" --root "$FAKE" 2>&1); RC=$?
+check "curl-Regel: exit 1"                    '[ "$RC" -eq 1 ]'
+check "einzeiliger Aufruf gemeldet"           'grep -qE "^DRIFT docs/curl.md:2 curl-ohne-noproxy" <<<"$OUT"'
+check "Header in Fortsetzungszeile: an der curl-Zeile gemeldet" \
+  'grep -qE "^DRIFT docs/curl.md:3 curl-ohne-noproxy" <<<"$OUT"'
+check "Fortsetzungszeilen selbst ohne eigenen Befund" \
+  '! grep -qE "^DRIFT docs/curl.md:[45] " <<<"$OUT"'
+check "Ziel als Variable (\$BASE) zaehlt als lokal" \
+  'grep -qE "^DRIFT docs/curl.md:6 curl-ohne-noproxy" <<<"$OUT"'
+check "zweiter Aufruf in derselben Zeile wird nicht vom ersten gedeckt" \
+  'grep -qE "^DRIFT docs/curl.md:7 curl-ohne-noproxy" <<<"$OUT"'
+check "Meldung nennt die Option"              'grep -q "ohne --noproxy" <<<"$OUT"'
+
+# Gegenprobe: dieselben Aufrufe mit --noproxy, Aufrufe ohne Key, eine ausdruecklich
+# entfernte Instanz (dort kann der Proxy gewollt sein), Prosa mit dem Wort curl und die
+# Escape-Hatch.
+cat > "$FAKE/docs/curl.md" <<'MD_EOF'
+# curl
+curl -s --noproxy '*' http://localhost:9090/api/v1/todos -H "X-API-Key: $DEV_KEY"
+curl -s --noproxy '*' -X POST http://localhost:9090/api/v1/todos \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: $DEV_KEY" -d '{}'
+curl -s http://localhost:9090/api/v1/system/health
+curl -s https://mysuricates.example.org/api/v1/todos -H "X-API-Key: $KEY"
+Den Status fragt man per curl mit X-API-Key ab.
+curl -s -H "X-API-Key: $KEY" "$BASE/executions" <!-- doc-facts-check: ignore -->
+MD_EOF
+OUT=$(bash "$SCRIPT" --root "$FAKE" 2>&1); RC=$?
+check "Gegenprobe: kein curl-Befund"          '! grep -q "curl-ohne-noproxy" <<<"$OUT"'
+check "Gegenprobe: exit 0"                    '[ "$RC" -eq 0 ]'
+rm "$FAKE/docs/curl.md"
+
+# Nachbesserung: Der Body ist kein Ziel, "--noproxy ''" wirkt nicht, NO_PROXY='*' vor dem Aufruf
+# wirkt, und ein zweites curl in einer Fortsetzungszeile wird nicht doppelt gemeldet.
+cat > "$FAKE/docs/curl.md" <<'MD_EOF'
+# curl
+curl -s "$BASE/webhooks" -H "X-API-Key: $K" -d '{"url":"https://hooks.example.com"}'
+curl -s --noproxy '' http://localhost:9090/api/v1/todos -H "X-API-Key: $K"
+curl -s http://localhost:9090/api/v1/todos -H "X-API-Key: $K" \
+  | jq . ; curl -s http://localhost:9090/api/v1/goals -H "X-API-Key: $K"
+MD_EOF
+OUT=$(bash "$SCRIPT" --root "$FAKE" 2>&1); RC=$?
+check "URL im Body macht den Aufruf nicht entfernt" \
+  'grep -qE "^DRIFT docs/curl.md:2 curl-ohne-noproxy" <<<"$OUT"'
+check "--noproxy mit leerem Wert zaehlt nicht" \
+  'grep -qE "^DRIFT docs/curl.md:3 curl-ohne-noproxy" <<<"$OUT"'
+check "zwei curl ueber eine Fortsetzung: ein Befund an der Startzeile" \
+  'grep -qE "^DRIFT docs/curl.md:4 curl-ohne-noproxy" <<<"$OUT" && ! grep -q "docs/curl.md:5" <<<"$OUT"'
+cat > "$FAKE/docs/curl.md" <<'MD_EOF'
+# curl
+curl -s https://mysuricates.example.org/api/v1/webhooks -H "X-API-Key: $K" --json '{"target":"http://localhost:9090/x"}'
+NO_PROXY='*' curl -s http://localhost:9090/api/v1/todos -H "X-API-Key: $K"
+no_proxy=* curl -s http://localhost:9090/api/v1/todos -H "X-API-Key: $K"
+MD_EOF
+OUT=$(bash "$SCRIPT" --root "$FAKE" 2>&1); RC=$?
+check "Gegenprobe: localhost im Body macht einen entfernten Aufruf nicht lokal" '! grep -q "docs/curl.md:2" <<<"$OUT"'
+check "Gegenprobe: NO_PROXY='*' / no_proxy=* vor curl gilt als erfuellt" \
+  '! grep -qE "docs/curl.md:[34]" <<<"$OUT"'
+check "Gegenprobe: exit 0"                    '[ "$RC" -eq 0 ]'
+rm "$FAKE/docs/curl.md"
+
+# AGENTS.md steht im Default-Umfang: ihre Beispiele werden woertlich kopiert.
+printf '# Agents\ncurl -s http://localhost:9090/api/v1/todos -H "X-API-Key: $DEV_KEY"\n' > "$FAKE/AGENTS.md"
+OUT=$(bash "$SCRIPT" --root "$FAKE" 2>&1); RC=$?
+check "AGENTS.md wird ohne Pfadangabe geprueft" 'grep -qE "^DRIFT AGENTS.md:2 curl-ohne-noproxy" <<<"$OUT"'
+rm "$FAKE/AGENTS.md"
+
 echo
 echo "passed=$PASS failed=$FAIL"
 [ "$FAIL" -eq 0 ]

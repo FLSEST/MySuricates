@@ -7,6 +7,9 @@
 - **Basis-URL:** `http://localhost:9090/api/v1`
 - **Content-Type:** `application/json`
 - **Authentifizierung:** Header `X-API-Key: <key>` (wenn `automation.security.enabled=true`)
+- **Proxy:** Aufrufe mit API-Key per `curl` immer mit `--noproxy '*'` – bei gesetztem `http_proxy`
+  schickt curl auch Anfragen an `localhost` über den Proxy, samt Key. Das Doku-Gate
+  `doc-facts-check.sh` prüft das an jedem Beispiel in `docs/` und `AGENTS.md`.
 
 ### Fehlerformat
 

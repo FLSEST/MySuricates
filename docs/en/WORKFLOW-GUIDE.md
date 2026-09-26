@@ -1083,8 +1083,8 @@ When multiple blocks emit gates, the highest severity wins (RED > YELLOW > GREEN
 This allows diffing two runs without re-parsing (e.g. for public readiness trends):
 
 ```bash
-curl -s -H "X-API-Key: $KEY" "$BASE/executions/$RUN1" | jq '.metadata.gate_summary' > a.json
-curl -s -H "X-API-Key: $KEY" "$BASE/executions/$RUN2" | jq '.metadata.gate_summary' > b.json
+curl -s --noproxy '*' -H "X-API-Key: $KEY" "$BASE/executions/$RUN1" | jq '.metadata.gate_summary' > a.json
+curl -s --noproxy '*' -H "X-API-Key: $KEY" "$BASE/executions/$RUN2" | jq '.metadata.gate_summary' > b.json
 diff <(jq -S . a.json) <(jq -S . b.json)
 ```
 

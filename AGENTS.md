@@ -17,6 +17,9 @@ export DEV_KEY="<dev-api-key>"
 export TEST_KEY="<test-api-key>"
 ```
 
+Alle Beispiele mit API-Key rufen `curl --noproxy '*'` auf: Bei gesetztem `http_proxy` schickt curl
+sonst auch Anfragen an `localhost` über den Proxy – samt Key. Beim Kopieren die Option behalten.
+
 ## TODO-First Arbeitsweise
 
 - Bei Aufgaben mit Code-, UI-, Config- oder Commit-Bezug zuerst ein MySuricates-TODO ueber die REST API anlegen oder ein vorhandenes TODO als Arbeitsanker referenzieren.
@@ -28,7 +31,7 @@ export TEST_KEY="<test-api-key>"
 ### TODO anlegen
 
 ```bash
-curl -s -X POST http://localhost:9090/api/v1/todos \
+curl -s --noproxy '*' -X POST http://localhost:9090/api/v1/todos \
   -H "Content-Type: application/json" \
   -H "X-API-Key: $DEV_KEY" \
   -d '{
@@ -49,13 +52,13 @@ ueber einen eigenen Endpunkt – `ratedBy: "AI"` markiert die Einschaetzung als 
 kann sie spaeter ueberschreiben:
 
 ```bash
-curl -s -X PATCH http://localhost:9090/api/v1/todos/<todo-id>/planning \
+curl -s --noproxy '*' -X PATCH http://localhost:9090/api/v1/todos/<todo-id>/planning \
   -H "Content-Type: application/json" -H "X-API-Key: $DEV_KEY" \
   -d '{"goalId": "<goal-id>", "complexity": "M", "suggestedEffort": "high",
        "ratingNote": "Viele Dateien, klare Vorlage", "openQuestion": "Welcher Stil?", "ratedBy": "AI"}'
 
 # Reihenfolge im Ziel setzen (Rang 1..n)
-curl -s -X PUT http://localhost:9090/api/v1/goals/<goal-id>/order \
+curl -s --noproxy '*' -X PUT http://localhost:9090/api/v1/goals/<goal-id>/order \
   -H "Content-Type: application/json" -H "X-API-Key: $DEV_KEY" -d '{"todoIds": ["<id-1>", "<id-2>"]}'
 ```
 
@@ -64,8 +67,8 @@ passende TodoTrigger, letzter Fix-Lauf), liefert die Relationskarte; passende TO
 `goalId=none`:
 
 ```bash
-curl -s http://localhost:9090/api/v1/goals/<goal-id>/relations -H "X-API-Key: $DEV_KEY"
-curl -s "http://localhost:9090/api/v1/todos?goalId=none&status=OPEN&tag=release&size=20" -H "X-API-Key: $DEV_KEY"
+curl -s --noproxy '*' http://localhost:9090/api/v1/goals/<goal-id>/relations -H "X-API-Key: $DEV_KEY"
+curl -s --noproxy '*' "http://localhost:9090/api/v1/todos?goalId=none&status=OPEN&tag=release&size=20" -H "X-API-Key: $DEV_KEY"
 ```
 
 Meilensteine (Titel + Datum) legen einen Zeitstrahl ins Ziel; zugeordnet wird ueber `planning`
@@ -74,11 +77,11 @@ wird beim Lesen berechnet. Der Ziel-Waechter legt einmalig einen Workflow aus de
 mit taeglichem Zeitplan an; ausschalten pausiert nur den Zeitplan:
 
 ```bash
-curl -s -X POST http://localhost:9090/api/v1/goals/<goal-id>/milestones \
+curl -s --noproxy '*' -X POST http://localhost:9090/api/v1/goals/<goal-id>/milestones \
   -H "Content-Type: application/json" -H "X-API-Key: $DEV_KEY" -d '{"title": "Beta", "dueDate": "2026-10-01"}'
-curl -s -X PATCH http://localhost:9090/api/v1/todos/<todo-id>/planning \
+curl -s --noproxy '*' -X PATCH http://localhost:9090/api/v1/todos/<todo-id>/planning \
   -H "Content-Type: application/json" -H "X-API-Key: $DEV_KEY" -d '{"milestoneId": "<milestone-id>"}'
-curl -s -X POST http://localhost:9090/api/v1/goals/<goal-id>/guard \
+curl -s --noproxy '*' -X POST http://localhost:9090/api/v1/goals/<goal-id>/guard \
   -H "Content-Type: application/json" -H "X-API-Key: $DEV_KEY" -d '{"enabled": true, "locale": "de"}'
 ```
 
@@ -119,7 +122,7 @@ cd ai-automation-backend
 AUTOMATION_API_KEY=<test-api-key> docker compose -f docker-compose.test.yml up -d
 
 # Optional: Definitionen von Dev nach Test synchronisieren
-curl -s -X POST http://localhost:9090/api/v1/testing/sync-definitions \
+curl -s --noproxy '*' -X POST http://localhost:9090/api/v1/testing/sync-definitions \
   -H "Content-Type: application/json" \
   -H "X-API-Key: $DEV_KEY" \
   -d '{}'
@@ -465,13 +468,13 @@ Feld-Details zu allen Endpunkten: [docs/api-referenz.md](docs/api-referenz.md).
 
 ```bash
 # Todo mit Resolver-Workflow verknuepfen
-curl -s -X PUT http://localhost:9090/api/v1/todos/$TODO_ID \
+curl -s --noproxy '*' -X PUT http://localhost:9090/api/v1/todos/$TODO_ID \
   -H "Content-Type: application/json" \
   -H "X-API-Key: $DEV_KEY" \
   -d "{\"linkedWorkflowId\":\"$WORKFLOW_ID\"}"
 
 # Resolver-Workflow fuer das Todo manuell starten
-curl -s -X POST http://localhost:9090/api/v1/todos/$TODO_ID/resolve \
+curl -s --noproxy '*' -X POST http://localhost:9090/api/v1/todos/$TODO_ID/resolve \
   -H "X-API-Key: $DEV_KEY"
 ```
 
@@ -487,13 +490,13 @@ export DEV_KEY="<dev-api-key>"
 export TEST_KEY="<test-api-key>"
 
 # 2. Test-Status prüfen
-curl -s -H "X-API-Key: $DEV_KEY" http://localhost:9090/api/v1/testing/status
+curl -s --noproxy '*' -H "X-API-Key: $DEV_KEY" http://localhost:9090/api/v1/testing/status
 
 # 3. Projekt-ID finden
-curl -s -H "X-API-Key: $DEV_KEY" http://localhost:9090/api/v1/projects | python3 -c "import sys,json; [print(f'{p[\"id\"]}  {p[\"name\"]}') for p in json.load(sys.stdin)]"
+curl -s --noproxy '*' -H "X-API-Key: $DEV_KEY" http://localhost:9090/api/v1/projects | python3 -c "import sys,json; [print(f'{p[\"id\"]}  {p[\"name\"]}') for p in json.load(sys.stdin)]"
 
 # 4. Workflow erstellen
-WORKFLOW=$(curl -s -X POST http://localhost:9090/api/v1/workflows \
+WORKFLOW=$(curl -s --noproxy '*' -X POST http://localhost:9090/api/v1/workflows \
   -H "Content-Type: application/json" \
   -H "X-API-Key: $DEV_KEY" \
   -d '{
@@ -504,18 +507,18 @@ WORKFLOW=$(curl -s -X POST http://localhost:9090/api/v1/workflows \
 WORKFLOW_ID=$(echo $WORKFLOW | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
 
 # 5. Auf Test synchronisieren
-curl -s -X POST http://localhost:9090/api/v1/testing/sync-definitions \
+curl -s --noproxy '*' -X POST http://localhost:9090/api/v1/testing/sync-definitions \
   -H "Content-Type: application/json" -H "X-API-Key: $DEV_KEY" \
   -d "{\"workflowIds\": [\"$WORKFLOW_ID\"]}"
 
 # 6. Auf Test ausführen (Port 8090!)
-RUN=$(curl -s -X POST http://localhost:8090/api/v1/workflows/$WORKFLOW_ID/execute \
+RUN=$(curl -s --noproxy '*' -X POST http://localhost:8090/api/v1/workflows/$WORKFLOW_ID/execute \
   -H "Content-Type: application/json" -H "X-API-Key: $TEST_KEY" -d '{}')
 RUN_ID=$(echo $RUN | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
 
 # 7. Ergebnis pollen
 while true; do
-  STATUS=$(curl -s -H "X-API-Key: $TEST_KEY" \
+  STATUS=$(curl -s --noproxy '*' -H "X-API-Key: $TEST_KEY" \
     http://localhost:8090/api/v1/executions/$RUN_ID | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])")
   echo "Status: $STATUS"
   case $STATUS in COMPLETED|FAILED|CANCELLED|INTERRUPTED|COMPLETED_WITH_ERRORS) break;; esac
@@ -523,7 +526,7 @@ while true; do
 done
 
 # 8. Ergebnis melden
-curl -s -X POST http://localhost:9090/api/v1/testing/report-result \
+curl -s --noproxy '*' -X POST http://localhost:9090/api/v1/testing/report-result \
   -H "Content-Type: application/json" -H "X-API-Key: $DEV_KEY" \
   -d '{"workflowName": "Test-Workflow", "status": "PASSED"}'
 ```
