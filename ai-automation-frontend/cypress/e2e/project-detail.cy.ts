@@ -1,6 +1,9 @@
 describe('Project Detail', () => {
   let projectId: string;
 
+  // The sidebar has its own "Edit menu" button (4a31d456); the project's Edit button is the one in the page
+  const editButton = () => cy.get('main').contains('button', /^Edit$/);
+
   before(() => {
     cy.apiCleanup();
     cy.apiCreateProject('Cypress Detail Project').then((project) => {
@@ -38,12 +41,12 @@ describe('Project Detail', () => {
 
   // Projects are archived, not deleted, since the archive (soft delete) came in
   it('shows edit and archive buttons', () => {
-    cy.contains('button', 'Edit').should('be.visible');
+    editButton().should('be.visible');
     cy.contains('button', 'Archive').should('be.visible');
   });
 
   it('opens edit modal with pre-filled data', () => {
-    cy.contains('button', 'Edit').click();
+    editButton().click();
     cy.get('[role="dialog"]').should('be.visible');
     cy.get('[role="dialog"]').within(() => {
       cy.get('input').first().should('have.value', 'Cypress Detail Project');
@@ -51,7 +54,7 @@ describe('Project Detail', () => {
   });
 
   it('edits project name', () => {
-    cy.contains('button', 'Edit').click();
+    editButton().click();
     cy.get('[role="dialog"]').within(() => {
       cy.get('input').first().clear().type('Cypress Renamed Project');
       cy.contains('button', 'Save').click();
@@ -60,7 +63,7 @@ describe('Project Detail', () => {
     cy.contains('Cypress Renamed Project').should('be.visible');
 
     // Rename back for other tests
-    cy.contains('button', 'Edit').click();
+    editButton().click();
     cy.get('[role="dialog"]').within(() => {
       cy.get('input').first().clear().type('Cypress Detail Project');
       cy.contains('button', 'Save').click();
@@ -69,7 +72,7 @@ describe('Project Detail', () => {
   });
 
   it('edits project subtitle and description', () => {
-    cy.contains('button', 'Edit').click();
+    editButton().click();
     cy.get('[role="dialog"]').within(() => {
       // Subtitle is the second input field
       cy.get('input').eq(1).clear().type('v1.0 Beta');
@@ -80,7 +83,7 @@ describe('Project Detail', () => {
   });
 
   it('changes project type', () => {
-    cy.contains('button', 'Edit').click();
+    editButton().click();
     cy.get('[role="dialog"]').within(() => {
       cy.get('select').select('RESEARCH');
       cy.contains('button', 'Save').click();
@@ -89,7 +92,7 @@ describe('Project Detail', () => {
     cy.contains('Research').should('be.visible');
 
     // Change back
-    cy.contains('button', 'Edit').click();
+    editButton().click();
     cy.get('[role="dialog"]').within(() => {
       cy.get('select').select('CODE');
       cy.contains('button', 'Save').click();
@@ -97,7 +100,7 @@ describe('Project Detail', () => {
   });
 
   it('cancels edit modal without saving', () => {
-    cy.contains('button', 'Edit').click();
+    editButton().click();
     cy.get('[role="dialog"]').within(() => {
       cy.get('input').first().clear().type('Should Not Save');
       cy.contains('button', 'Cancel').click();
