@@ -89,9 +89,10 @@ describe('useTodoExportTarget', () => {
     const asked = serveTargets([]);
     const { result } = renderHook(() => useTodoExportTarget({
       todo: todo({ exportedProvider: 'jira', exportedRef: 'JIRA-1' }), projects: [],
-      integrations: [sink('jira', { status: 'DISCONNECTED' })],
+      integrations: [sink('jira')],
     }), { wrapper });
 
+    expect(result.current.taskSinks).toHaveLength(1);
     expect(result.current.exportedProviderName).toBe('JIRA');
     expect(result.current.exportedProviderIcon).toBe('jira-icon');
     await new Promise((r) => setTimeout(r, 20));
