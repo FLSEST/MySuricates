@@ -240,6 +240,7 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 - Context-sensitive chat with page suggestions
 - Persisted sessions, WebSocket integration
 - Resizing at the left and top edge (desktop only) via `hooks/usePanelResize.ts`: dragging away from the bottom-right anchor enlarges, each edge between its minimum and the window minus a margin; the auto-growing input (Enter sends, Shift+Enter breaks the line, at most 240 px) is `assistant/AssistantComposer.tsx`
+- A message is `assistant/AssistantMessage.tsx` (`MessageBubble`: bubble, collapsing long answers, timestamp); next to it live `AssistantMarkdown.tsx` (markdown of the answer, app-internal links navigate inside the panel), `ActionButton.tsx` (the answer's actions, one button per option for `ask_choice`) and `PendingToolCard.tsx` (confirm or reject a proposed change; state in `hooks/usePendingToolDecision.ts`). `ActionButton` and `PendingToolCard` are also used by `HomeAnswer` on the Simple home page
 - See [Assistant System](assistant-system.md) for details
 
 ### `src/components/settings/`

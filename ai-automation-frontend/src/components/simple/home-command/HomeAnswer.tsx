@@ -4,7 +4,8 @@ import { useT } from '../../../i18n';
 import { useModuleEnabled } from '../../../hooks/useModules';
 import { useAssistantWebSocket } from '../../../hooks/useAssistantWebSocket';
 import { MarkdownBlock } from '../../shared/MarkdownBlock';
-import { ActionButton, PendingToolCard } from '../../assistant/AssistantMessage';
+import { ActionButton } from '../../assistant/ActionButton';
+import { PendingToolCard } from '../../assistant/PendingToolCard';
 import { assistantPhaseLabel, visibleActions } from '../../assistantPanelUtils';
 import type { HomeAnswerTurn } from './useHomeAssistant';
 

@@ -4,7 +4,7 @@ import { renderWithProviders } from '../../test/utils';
 import { useI18nStore } from '../../i18n';
 import { de } from '../../i18n/de';
 import { en } from '../../i18n/en';
-import { PendingToolCard } from '../assistant/AssistantMessage';
+import { PendingToolCard } from '../assistant/PendingToolCard';
 import { pendingToolText } from '../assistant/pendingToolText';
 import type { PendingTool } from '../../hooks/useAssistant';
 
