@@ -837,7 +837,7 @@ Folgende Variablen werden vom `WorkflowExecutor` automatisch bei jedem Run geset
 | `{{ workflow_version }}` | Aktuelle Versionsnummer des Workflows |
 | `{{ workflow_changed_since_last_run }}` | `"true"` oder `"false"` — ob sich die Definition seit dem letzten erfolgreichen Run geändert hat (Hash-Vergleich; ohne Hash über Zeitstempel) |
 | `{{ workflow_definition_hash }}` | SHA-256 der ausgeführten Definition (leer, wenn `automation.hardening.provenance` aus ist) |
-| `{{ trigger_source }}` | Auslöser des Runs: `MANUAL`, `RETRY`, `RESUME`, `SCHEDULE`, `WEBHOOK`, `TODO_TRIGGER`, `TODO_RESOLUTION`, `COMPLETION_TRIGGER`, `CHAIN`, `SUB_WORKFLOW`, `ASSISTANT`, `AUTO_REPAIR`, `WISH` |
+| `{{ trigger_source }}` | Auslöser des Runs: `MANUAL`, `RETRY`, `RESUME`, `SCHEDULE`, `WEBHOOK`, `TODO_TRIGGER`, `TODO_RESOLUTION`, `COMPLETION_TRIGGER`, `CHAIN`, `SUB_WORKFLOW`, `ASSISTANT`, `AUTO_REPAIR`, `AUTO_RESUME`, `WISH` |
 | `{{ previous_report }}` | Längster Non-Shell-Step-Output des letzten COMPLETED-Runs desselben Workflows (max. 3000 Zeichen), oder `"(kein vorheriger Report vorhanden)"`. Ein Audit-Envelope ist abgeschnitten, Plattform-Marker verlieren ihren Doppelpunkt (`gate_status GREEN` bleibt lesbar, wird aber nicht mehr als Urteil gewertet, wenn ein Modell die Zeile wiedergibt), Blockgrenzen wie `</audit_findings>` stehen als `[audit_findings]` da. Gilt immer als nicht vertrauenswürdig → in Shell-Blöcken stets single-quoted, deshalb unquoted schreiben |
 | `{{ open_todos }}` | Markdown-Liste offener/in-Bearbeitung-TODOs des Projekts in einem `<open_todos>…</open_todos>`-Block, oder `"(keine offenen TODOs)"`. Titel und Tags sind auf eine Zeile geglättet, auf 200/80 Zeichen gekürzt und von Plattform-Markern (`todo_item:`, `gate_*:`, `dashboard_widget:`) befreit — sie können aus importierten Issues stammen und gelten als Daten, nicht als Anweisung. Maximal 150 Einträge. Gilt immer als nicht vertrauenswürdig → in Shell-Blöcken stets single-quoted, deshalb unquoted schreiben |
 | `{{ audit_findings }}` | **Nur in Audit-Workflows** (gültiges `metadata.audit`): die bekannten Befunde des eigenen Audits im Projekt — offen, Wiedervorlage, akzeptiert, verworfen — in einem `<audit_findings>…</audit_findings>`-Block, je Befund eine Zeile mit Status, Schwere, `ruleKey`, `subject`, Titel und Einordnung, höchstens 250 Zeilen und 60 000 Bytes (eingeordnete zuerst, der Rest als Anzahl je Status); ohne Befunde `"(keine bekannten Befunde)"`. In anderen Workflows gibt es die Variable nicht, auch nicht über die Variablen-Übergabe an einen Sub-Workflow; der Platzhalter bliebe dort wörtlich stehen (Analyzer-Regel `audit-only-placeholder`). Format und Zweck: [audit-workflow-protocol.md](audit-workflow-protocol.md) → „Bekannte Befunde im Prompt“. Gilt immer als nicht vertrauenswürdig → in Shell-Blöcken stets single-quoted, deshalb unquoted schreiben |
@@ -1835,6 +1835,24 @@ Neben **Vorlagen** (fertige Aufgaben) und dem **Pool** gibt es **Blaupausen**: l
 - **Erklärtext je Schritt:** `config.description` (zweisprachig) sagt, was der Schritt im Muster tut und was man ersetzt. Der Editor zeigt ihn unter dem Block, die Run-Ansicht unter dem Step-Kopf (`metadata.blockDescription`). Das gilt für jeden Workflow, denn `description` ist ein gemeinsamer Schlüssel ohne Wirkung auf die Ausführung. Ausgenommen sind `todo-create` und `todo-update`, dort ist `description` der Text des TODOs.
 
 ---
+
+## Automatisch fortsetzen nach Neustart oder Standby
+
+Ein Backend-Neustart oder ein System-Standby unterbricht laufende Runs; sie stehen danach auf `INTERRUPTED`. Ohne Opt-in geht es nur per Knopf „Resume from Step“ weiter. Mit dem Opt-in setzt die Plattform den Run selbst fort (TODO 90d10ba1):
+
+```json
+{ "metadata": { "autoResume": { "enabled": true } } }
+```
+
+In der Oberfläche: Workflow-Detailseite → „Nach Neustart automatisch fortsetzen“. Der Schlüssel gehört zur Definition — er ändert den Definitions-Hash (eine neue Version), ist bei einem versiegelten Workflow gesperrt, und ein Workflow ohne ihn behält seinen bisherigen Hash.
+
+**Was fortgesetzt wird** — nur Runs, die in diesem Lebenslauf des Backends vom Neustart-Cleanup oder vom Standby-Watchdog auf `INTERRUPTED` gesetzt wurden **und vorher `RUNNING` waren**. Nicht fortgesetzt werden: pausierte Runs (Pause setzt eine Person), Ketten-Einträge und Sub-Workflows (ihr Eltern-Run entscheidet — setzt er fort, läuft der Sub-Workflow-Block neu), Runs gelöschter Workflows und ältere `INTERRUPTED`-Runs. Jeder Run bekommt **höchstens einen** automatischen Versuch (`autoResumeAttempts` in den Run-Metadaten, vor dem Start gezählt); wird er erneut unterbrochen, bleibt er für eine Person liegen.
+
+**Nebenwirkungen** — Fortgesetzt wird hinter dem letzten fertigen Block; **der unterbrochene Block läuft von vorn**. Blöcke mit Wirkung nach außen (Dateien anhängen, Nachrichten senden, deployen) müssen eine Wiederholung vertragen. Wartete der Run auf eine Freigabe (`approval`) oder Eingabe (`human-input`), war dieser Block nicht fertig: Die Frage wird neu gestellt und der Run wartet wieder — die Regeln für unbeaufsichtigte Runs beantworten sie nicht (ein `auto_answer` des Blocks greift wie immer). Ohne fertigen Block startet — wie beim Knopf — ein neuer Run desselben Workflows.
+
+**Unbeaufsichtigt** — Der Run trägt danach `trigger_source = AUTO_RESUME`. Mit `automation.hardening.require-sealed-for-unattended` braucht der Workflow ein Siegel; sonst lehnt `RunAdmission` ab, der Run bleibt `INTERRUPTED`, im Activity-Log steht ein `SECURITY`-Eintrag, und es gibt keinen zweiten Versuch.
+
+**Global** — Einstellungen → Ausführung: „Unterbrochene Runs automatisch fortsetzen“ (`run-auto-resume-enabled`, Default an) und „Wartezeit vor jeder Fortsetzung“ (`run-auto-resume-delay-seconds`, Default 30 s, 0–3600). Die Runs werden nacheinander mit dieser Wartezeit fortgesetzt, auch vor dem ersten. Startwerte: `automation.execution.auto-resume.enabled` / `.delay-seconds`.
 
 ## Auto-Repair
 
