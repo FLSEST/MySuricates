@@ -183,6 +183,7 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 - Full pipeline: generate → test instance → verify → promote
 - Topic category selection
 - Form state, "Create Workflow" and "Create & Test" (topic and project required, testing only with the test instance up, invalid JSON in the test inputs is reported and sent as `{}`) live in `hooks/useFactoryForm.ts`; the form is `components/factory/FactoryCreateForm.tsx`, the result list `FactoryResultsList.tsx` (this session's results before earlier generated workflows, status icons in the tones of the status badges)
+- The flow diagram `components/factory/FactoryFlowDiagram.tsx` (see [architecture](architektur.md) → Workflow Factory) holds mode, switches and the step list; the drawing is `FactoryFlowSvg.tsx`, geometry and timeline live in `factoryFlow.ts`, the animation clock in `hooks/useTimelineClock.ts` (loops, under `prefers-reduced-motion` only after "Play" and a single pass; a changed switch starts over). The browser remembers whether the card is collapsed
 
 ### DialogImport (`/dialogs`)
 
