@@ -134,6 +134,10 @@ class RequestCostRatchetTest {
     @DynamicPropertySource
     static void useOwnDatabase(DynamicPropertyRegistry registry) {
         registry.add("integration.db.path", () -> ownDatabase.resolve("request-cost.db").toString());
+        // The class sends well over 120 requests a minute — every route several times per test. The
+        // rate limit is not what it measures; with it on, the routes added for TODO 86777fb4 tipped
+        // the measurements into 429 answers.
+        registry.add("automation.security.rate-limit.enabled", () -> "false");
     }
 
     /**
@@ -172,6 +176,17 @@ class RequestCostRatchetTest {
     /** The calendar week holding both: every seeded run and every seeded schedule's next date. */
     private static final String CALENDAR =
             "/api/v1/schedules/calendar?from=2026-09-01T00:00:00Z&to=2026-09-08T00:00:00Z";
+
+    /**
+     * A schedule that fires every five minutes, seeded once with more runs than either of its lists
+     * sends — {@code /schedules/{busy}/runs} (limit 50) and the calendar (limit 1 000) — so both have
+     * to cut and count (TODO 86777fb4). Nearly four days from {@link #BUSY_FROM}, a month before the
+     * other runs and outside {@link #CALENDAR}.
+     */
+    private static final int BUSY_SCHEDULE_RUNS = 1_100;
+    private static final Instant BUSY_FROM = Instant.parse("2026-08-03T00:00:00Z");
+    private static final String BUSY_CALENDAR =
+            "/api/v1/schedules/calendar?from=2026-08-03T00:00:00Z&to=2026-08-10T00:00:00Z";
 
     /**
      * The dashboard over a window that reaches back past {@link #RUN_STARTED}. Its default window
@@ -288,6 +303,13 @@ class RequestCostRatchetTest {
      *       bytes for six audits, whose markdown alone would add 20 000 bytes each. Their
      *       {@code stale} flag (older than 30 days) turns true for the fixed seed on 2026-10-01: one
      *       byte less per audit, the same queries.</li>
+     *   <li>{@code /schedules/{busy}/runs} and the busy calendar week: added with TODO 86777fb4. Both
+     *       lists had no ceiling — a schedule every five minutes gathers ~26 000 runs in 90 days, and
+     *       both would have sent all of them (for the 1 100 seeded busy runs about 630 000 bytes
+     *       each). Now they send the newest 50 and 1 000 runs, and count the rest in one more
+     *       statement only when the limit is reached: measured 6 statements and 28 727 bytes for the
+     *       runs, 6 statements and 573 049 bytes for the week. {@code /schedules} went 20 → 21 kB
+     *       only because the busy schedule is one more seeded row (measured 20 395 bytes).</li>
      *   <li>{@code /audits/{audit}/reports}: added with TODO cd50d011. The history of an audit sent
      *       every report with its full markdown — about 41 000 bytes for the two seeded reports of
      *       one audit, 20 000 of them per report. It now reads the same head projection as
@@ -304,8 +326,9 @@ class RequestCostRatchetTest {
             Map.entry("/api/v1/workflows/{wf}/runs", new Cost(4, 5_000)),
             Map.entry(DASHBOARD, new Cost(10, 650_000)),
             Map.entry("/api/v1/search?q=Workflow", new Cost(2, 18_000)),
-            Map.entry("/api/v1/schedules", new Cost(3, 20_000)),
+            Map.entry("/api/v1/schedules", new Cost(3, 21_000)),
             Map.entry("/api/v1/schedules/{sched}/runs", new Cost(5, 5_000)),
+            Map.entry("/api/v1/schedules/{busy}/runs", new Cost(6, 32_000)),
             Map.entry("/api/v1/goals", new Cost(2, 2_000)),
             Map.entry("/api/v1/goals/{goal}", new Cost(2, 40_000)),
             Map.entry("/api/v1/goals/{goal}/relations", new Cost(6, 35_000)),
@@ -313,7 +336,8 @@ class RequestCostRatchetTest {
             Map.entry("/api/v1/wishes", new Cost(3, 9_000)),
             Map.entry("/api/v1/audits", new Cost(2, 4_000)),
             Map.entry(AUDIT_HISTORY, new Cost(3, 2_000)),
-            Map.entry(CALENDAR, new Cost(7, 95_000))));
+            Map.entry(CALENDAR, new Cost(7, 95_000)),
+            Map.entry(BUSY_CALENDAR, new Cost(6, 600_000))));
 
     @Autowired private MockMvc mockMvc;
     @Autowired private ProjectRepository projectRepository;
@@ -338,6 +362,10 @@ class RequestCostRatchetTest {
 
     /** Target of {@code {sched}} in a route: that workflow's schedule. */
     private String firstScheduleId;
+
+    /** Target of {@code {busy}} in a route: the schedule of {@link #seedBusySchedule}, on the last workflow of the first batch. */
+    private String busyScheduleId;
+    private String busyWorkflowId;
     /** Target of {@code {audit}} and {@code {auditProject}}: the first seeded audit and its project. */
     private String firstAuditKey;
     private String firstAuditProjectId;
@@ -348,6 +376,43 @@ class RequestCostRatchetTest {
     void seed() {
         nothingButTheSeedIsMeasured();
         seedBatch("a");
+        seedBusySchedule();
+    }
+
+    /**
+     * {@link #BUSY_SCHEDULE_RUNS} runs of one schedule, five minutes apart and without steps – seeded
+     * once, not per batch: the growth criterion doubles the batches, and the busy routes have to stay
+     * flat while it does. The runs belong to the last workflow of the first batch, so that
+     * {@code /workflows/{wf}/runs} keeps measuring the first one.
+     */
+    private void seedBusySchedule() {
+        transactions.executeWithoutResult(status -> {
+            Workflow workflow = workflowRepository.getReferenceById(busyWorkflowId);
+            busyScheduleId = scheduledWorkflowRepository.save(ScheduledWorkflow.builder()
+                    .workflow(workflow)
+                    .targetType(ScheduledWorkflow.TargetType.WORKFLOW)
+                    .cronExpression("0 */5 * * * *")
+                    .scheduleType(ScheduledWorkflow.ScheduleType.CRON)
+                    .enabled(true)
+                    .description("Seeded busy schedule for the request cost ratchet")
+                    .inputContext(Map.of())
+                    .build()).getId();
+            List<WorkflowRun> runs = new ArrayList<>();
+            for (int r = 0; r < BUSY_SCHEDULE_RUNS; r++) {
+                Instant started = BUSY_FROM.plusSeconds(300L * r);
+                runs.add(WorkflowRun.builder()
+                        .workflow(workflow)
+                        .triggeredByScheduleId(busyScheduleId)
+                        .status(RunStatus.COMPLETED)
+                        .startedAt(started)
+                        .completedAt(started.plusSeconds(5))
+                        .durationMs(5_000L)
+                        .inputContext(Map.of())
+                        .metadata(Map.of())
+                        .build());
+            }
+            runRepository.saveAll(runs);
+        });
     }
 
     /**
@@ -423,6 +488,7 @@ class RequestCostRatchetTest {
 
         if (firstWorkflowId == null) {
             firstWorkflowId = workflows.get(0).getId();
+            busyWorkflowId = workflows.getLast().getId();
         }
         // Ein Zeitplan je Workflow, wie im Betrieb mit naechstem Termin, und die Runs des Workflows
         // tragen seine Id: So misst /schedules/{sched}/runs echte Zeitplan-Runs, und der Kalender
@@ -758,7 +824,7 @@ class RequestCostRatchetTest {
         for (JsonNode day : dashboard.path("timeSeries")) {
             runsInWindow += day.path("count").asInt();
         }
-        assertThat(runsInWindow).as("seeded runs in the dashboard window").isEqualTo(seededRuns);
+        assertThat(runsInWindow).as("seeded runs in the dashboard window").isEqualTo(seededRuns + BUSY_SCHEDULE_RUNS);
         assertThat(dashboard.path("recentRuns").size()).as("recent runs on the dashboard").isPositive();
 
         JsonNode calendar = json(CALENDAR);
@@ -766,6 +832,25 @@ class RequestCostRatchetTest {
                 .isEqualTo(seededRuns);
         assertThat(calendar.path("upcoming").size()).as("seeded schedules due in the calendar week")
                 .isEqualTo(PROJECTS * WORKFLOWS_PER_PROJECT);
+        assertThat(calendar.path("pastRunsTotal").asInt()).isEqualTo(seededRuns);
+    }
+
+    /**
+     * The busy schedule has more runs than its lists send (TODO 86777fb4): each list sends the newest
+     * up to its limit and says how many there are — otherwise its ceiling would measure a list the
+     * limit never cut.
+     */
+    @Test
+    void busyListsSendTheNewestAndCountTheRest() throws Exception {
+        JsonNode busyWeek = json(BUSY_CALENDAR);
+        assertThat(busyWeek.path("pastRuns").size()).as("runs the calendar sends").isEqualTo(1_000);
+        assertThat(busyWeek.path("pastRunsTotal").asInt()).as("runs of the busy week").isEqualTo(BUSY_SCHEDULE_RUNS);
+        assertThat(busyWeek.path("pastRuns").get(0).path("startedAt").asText())
+                .as("newest first").isEqualTo(BUSY_FROM.plusSeconds(300L * (BUSY_SCHEDULE_RUNS - 1)).toString());
+
+        JsonNode busyRuns = json("/api/v1/schedules/{busy}/runs");
+        assertThat(busyRuns.path("workflowRuns").size()).as("runs the schedule list sends").isEqualTo(50);
+        assertThat(busyRuns.path("workflowRunsTotal").asInt()).isEqualTo(BUSY_SCHEDULE_RUNS);
     }
 
     private JsonNode json(String route) throws Exception {
@@ -831,7 +916,7 @@ class RequestCostRatchetTest {
     }
 
     private String resolve(String route) {
-        return route.replace("{wf}", firstWorkflowId).replace("{sched}", firstScheduleId)
+        return route.replace("{wf}", firstWorkflowId).replace("{sched}", firstScheduleId).replace("{busy}", busyScheduleId)
                 .replace("{goal}", firstGoalId).replace("{audit}", firstAuditKey)
                 .replace("{auditProject}", firstAuditProjectId);
     }

@@ -2,6 +2,7 @@ package com.automation.repository;
 
 import com.automation.entity.RunStatus;
 import com.automation.entity.WorkflowRun;
+import org.springframework.data.domain.Limit;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -130,7 +131,10 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, String
     @Query("SELECT COUNT(wr) FROM WorkflowRun wr WHERE wr.workflow.project.id = :projectId AND wr.startedAt > :since")
     long countByProjectAndStartedAtAfter(@Param("projectId") String projectId, @Param("since") Instant since);
 
-    List<WorkflowRun> findByStartedAtBetween(Instant from, Instant to);
+    /** The calendar's past runs: newest first, at most {@code limit} (TODO 86777fb4). */
+    List<WorkflowRun> findByStartedAtBetweenOrderByStartedAtDesc(Instant from, Instant to, Limit limit);
+
+    long countByStartedAtBetween(Instant from, Instant to);
 
     long countByStatusAndStartedAtAfter(RunStatus status, Instant since);
 
@@ -185,6 +189,11 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, String
     List<WorkflowRun> findTop5ByWorkflowIdOrderByStartedAtDesc(String workflowId);
 
     List<WorkflowRun> findByTriggeredByScheduleIdOrderByStartedAtDesc(String scheduleId);
+
+    /** A schedule's newest runs, at most {@code limit} — its run list (TODO 86777fb4). */
+    List<WorkflowRun> findByTriggeredByScheduleIdOrderByStartedAtDesc(String scheduleId, Limit limit);
+
+    long countByTriggeredByScheduleId(String scheduleId);
 
     /**
      * Status und Startzeit aller Runs, die von einem der genannten Zeitplaene ausgeloest wurden —

@@ -580,6 +580,11 @@ export interface CalendarDataResponse {
   upcoming: ScheduledWorkflow[];
   /** Listenzeilen ohne Schritte (MySuricates-TODO 168e3d7f). */
   pastRuns: WorkflowRunListItem[];
+  /**
+   * Alle Runs des Zeitraums; `pastRuns` sind die neuesten bis zum Limit (86777fb4). Fehlt bei älteren
+   * Backends, die alle schicken.
+   */
+  pastRunsTotal?: number;
 }
 
 // ── Upcoming Schedule ────────────────────────────────────
@@ -1589,6 +1594,9 @@ export interface ScheduleRunsResponse {
   /** Listenzeilen ohne Schritte (MySuricates-TODO 168e3d7f). */
   workflowRuns: WorkflowRunListItem[];
   chainRuns: ChainRun[];
+  /** Alle Runs des Zeitplans; die Listen sind die neuesten bis zum Limit (86777fb4). Fehlen bei älteren Backends. */
+  workflowRunsTotal?: number;
+  chainRunsTotal?: number;
 }
 
 export interface ChainRunEntry {

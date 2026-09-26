@@ -1124,16 +1124,22 @@ Einzelnen Schedule abrufen.
 
 ### `GET /api/v1/schedules/{id}/runs`
 
-Runs die durch diesen Schedule ausgelöst wurden.
+Die neuesten Runs, die dieser Schedule ausgelöst hat — je Art höchstens `limit` (Query-Parameter,
+Default 50, 1–500), dazu die Gesamtzahl.
 
 **Response:**
 
 ```json
 {
   "workflowRuns": [...],
-  "chainRuns": [...]
+  "chainRuns": [...],
+  "workflowRunsTotal": 26000,
+  "chainRunsTotal": 0
 }
 ```
+
+Ist `workflowRunsTotal` größer als `workflowRuns.length`, hat das Limit gegriffen (bis 2026-09-26 kamen
+alle Runs, ohne Obergrenze).
 
 `workflowRuns` sind `WorkflowRunListItemResponse` — **ohne Steps**, dieselben Listenzeilen wie
 `GET /api/v1/executions` (`stepCount`, `lastStepStatus`, `lastStepPreview`). Bis 2026-09-23 trug diese
@@ -1161,10 +1167,12 @@ Kalender-Daten: geplante Ausführungen und vergangene Runs in einem Zeitraum.
 |---|---|---|
 | `from` | Instant | Ja |
 | `to` | Instant | Ja |
+| `limit` | int | Nein (Default 1000, 1–5000) |
 
 **Response:** `CalendarDataResponse` mit `upcoming` (`ScheduledWorkflowResponse[]`, Zeitpläne, deren
 nächster tatsächlicher Lauf im Zeitraum liegt — während einer `skip-until`-Pause also nach der Pause) und `pastRuns` (`WorkflowRunListItemResponse[]` — **ohne Steps**, dieselben
-Listenzeilen wie `GET /api/v1/executions`; bis 2026-09-23 mit allen Schritten jedes Runs im Zeitraum)
+Listenzeilen wie `GET /api/v1/executions`; bis 2026-09-23 mit allen Schritten jedes Runs im Zeitraum).
+`pastRuns` sind die neuesten `limit` Runs des Zeitraums, `pastRunsTotal` zählt alle (bis 2026-09-26 ohne Obergrenze).
 
 ### `POST /api/v1/schedules/preview`
 

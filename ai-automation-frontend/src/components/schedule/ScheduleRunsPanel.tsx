@@ -1,7 +1,7 @@
 import { History } from 'lucide-react';
 import { useScheduleRuns } from '../../hooks/useSchedules';
 import { useI18nStore, useT } from '../../i18n';
-import { formatTimestamp } from '../../utils/localeFormat';
+import { formatNumber, formatTimestamp } from '../../utils/localeFormat';
 import { formatDuration } from '../../utils/formatTime';
 import { statusDot } from './statusDot';
 
@@ -16,7 +16,9 @@ export function ScheduleRunsPanel({ scheduleId }: { scheduleId: string }) {
 
   const workflowRuns = data?.workflowRuns ?? [];
   const chainRuns = data?.chainRuns ?? [];
-  const totalRuns = workflowRuns.length + chainRuns.length;
+  const shownRuns = workflowRuns.length + chainRuns.length;
+  // Newer backends send the newest runs up to a limit plus the totals (86777fb4); older ones send all.
+  const totalRuns = (data?.workflowRunsTotal ?? workflowRuns.length) + (data?.chainRunsTotal ?? chainRuns.length);
 
   if (totalRuns === 0) {
     return (
@@ -31,8 +33,13 @@ export function ScheduleRunsPanel({ scheduleId }: { scheduleId: string }) {
     <div className="space-y-2">
       <div className="flex items-center gap-1.5 text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">
         <History className="w-3.5 h-3.5" />
-        {t.schedules.runHistory} ({totalRuns})
+        {t.schedules.runHistory} ({formatNumber(totalRuns, locale)})
       </div>
+      {totalRuns > shownRuns && (
+        <p className="text-xs text-text-tertiary" data-testid="schedule-runs-limited">
+          {t.schedules.runsLimited.replace('{shown}', formatNumber(shownRuns, locale)).replace('{total}', formatNumber(totalRuns, locale))}
+        </p>
+      )}
       <div className="space-y-1">
         {workflowRuns.map((run) => (
           <div key={run.id} className="flex items-center gap-3 text-xs py-1 px-2 rounded bg-surface/60">

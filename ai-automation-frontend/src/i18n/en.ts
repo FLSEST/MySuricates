@@ -1186,6 +1186,8 @@ export const en = {
     edit: 'Edit Schedule',
     runHistory: 'Run History',
     noRuns: 'No runs triggered by this schedule yet.',
+    runsLimited: 'Showing the newest {shown} of {total} runs.',
+    calendarRunsLimited: 'The calendar shows the newest {shown} of {total} runs this month – earlier days are missing some.',
     workflowRun: 'Workflow Run',
     chainRun: 'Chain Run',
     maintenanceMode: 'Maintenance Mode',

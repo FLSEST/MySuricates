@@ -1188,6 +1188,8 @@ export const de: TranslationKeys = {
     edit: 'Zeitplan bearbeiten',
     runHistory: 'Ausführungshistorie',
     noRuns: 'Noch keine Ausführungen durch diesen Zeitplan.',
+    runsLimited: 'Gezeigt: die neuesten {shown} von {total} Ausführungen.',
+    calendarRunsLimited: 'Der Kalender zeigt die neuesten {shown} von {total} Ausführungen dieses Monats – an früheren Tagen fehlen welche.',
     workflowRun: 'Workflow-Ausführung',
     chainRun: 'Ketten-Ausführung',
     maintenanceMode: 'Wartungsmodus',
