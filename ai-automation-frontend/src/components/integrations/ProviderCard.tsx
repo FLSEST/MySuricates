@@ -3,6 +3,7 @@ import { Card, Button, Badge } from '../ui';
 import { useT } from '../../i18n';
 import { useProviderCopy } from '../../hooks/useProviderCopy';
 import { VerificationBadge } from './IntegrationVerification';
+import { isReadyWithoutConnection } from './providerReadiness';
 import type { IntegrationProviderInfo } from '../../types';
 
 const ICON_MAP: Record<string, typeof Calendar> = {
@@ -46,6 +47,15 @@ function ProviderStatusBadge({ provider }: { provider: IntegrationProviderInfo }
       </Badge>
     );
   }
+  // Open-Meteo, feeds, Taskwarrior …: they run without a stored connection (cdccc1e5).
+  if (isReadyWithoutConnection(provider)) {
+    return (
+      <Badge variant="info">
+        <CheckCircle2 className="w-3 h-3 mr-1" />
+        {t.integrations.statusReady}
+      </Badge>
+    );
+  }
   if (!provider.configured) {
     return (
       <Badge variant="warning">
@@ -86,6 +96,7 @@ export function ProviderCard({
 }: ProviderCardProps) {
   const t = useT();
   const copy = useProviderCopy();
+  const ready = isReadyWithoutConnection(provider);
   return (
     <Card
       className={`cursor-pointer transition-all hover:border-primary/50 ${
@@ -97,7 +108,7 @@ export function ProviderCard({
         <div className={`p-3 rounded-lg ${
           provider.status === 'CONNECTED'
             ? 'bg-success/10 text-success'
-            : !provider.configured
+            : !provider.configured && !ready
               ? 'bg-warning/10 text-warning'
               : 'bg-surface-secondary text-text-secondary'
         }`}>
@@ -110,6 +121,7 @@ export function ProviderCard({
             <VerificationBadge provider={provider} />
           </div>
           <p className="text-sm text-text-secondary mb-3">{copy.description(provider)}</p>
+          {ready && <p className="text-xs text-text-tertiary mb-3" data-testid="provider-ready-hint">{t.integrations.readyHint}</p>}
 
           {provider.status === 'CONNECTED' && provider.accountEmail && (
             <p className="text-xs text-text-tertiary mb-3">
@@ -172,7 +184,7 @@ export function ProviderCard({
                 onClick={(e) => { e.stopPropagation(); onSetup(); }}
               >
                 <Settings2 className="w-3 h-3 mr-1" />
-                {t.integrations.setupRequired}
+                {ready ? t.integrations.setupOptional : t.integrations.setupRequired}
               </Button>
             )}
           </div>

@@ -66,6 +66,12 @@ public class ICalFeedProvider implements IntegrationProvider {
         return false;
     }
 
+    /** Runs without a stored connection (TODO cdccc1e5) — see {@link IntegrationProvider#connectionOptional()}. */
+    @Override
+    public boolean connectionOptional() {
+        return true;
+    }
+
     /** Nothing to validate — connecting only enables the provider in the UI. */
     @Override
     public String fetchAccountInfo(String combinedToken) {

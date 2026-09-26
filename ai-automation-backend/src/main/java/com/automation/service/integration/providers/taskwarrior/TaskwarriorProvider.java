@@ -69,6 +69,12 @@ public class TaskwarriorProvider implements IntegrationProvider {
         return false;
     }
 
+    /** Runs without a stored connection (TODO cdccc1e5) — see {@link IntegrationProvider#connectionOptional()}. */
+    @Override
+    public boolean connectionOptional() {
+        return true;
+    }
+
     @Override
     public OAuthConfig getOAuthConfig() {
         // URLs/scopes are unused for non-OAuth providers; the env-var slots map to the

@@ -679,6 +679,11 @@ export interface IntegrationProviderInfo {
   connections?: IntegrationConnectionInfo[];
   /** true: connecting runs the OAuth consent; false: the saved credentials are the auth (PAT/API key). */
   requiresOAuthFlow?: boolean;
+  /**
+   * true: works in workflows without a stored connection (cdccc1e5). Missing on older backends —
+   * read it via `isConnectionOptional`.
+   */
+  connectionOptional?: boolean;
 }
 
 /** One named connection of an integration provider. */

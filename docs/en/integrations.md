@@ -139,7 +139,7 @@ list ID, `listTargets` returns "Board / List"; tags are not sent as labels becau
 Todoist (task, target = project ID, `listTargets` returns the projects; tags become label names, link
 `app.todoist.com/app/task/<id>`). Detected via `instanceof`, contract test `TaskExportContractTest`.
 
-> **Taskwarrior is a special case:** not an HTTP service, but the local `task` CLI. `executeAction()` calls `task` via `ProcessBuilder` (argument array, no `bash -c`) on the backend host — via `service/cli/TaskCommandService.java` + `util/HostProcessUtils.drain()`. Requires `task` to be installed on the host; otherwise the connection remains "Setup required". Timeout is runtime-configurable via `ExecutionSettingsService` (`task-command-timeout-seconds`). Security: filter tokens with `rc.` overrides or Taskwarrior commands (e.g. `execute`) are rejected, IDs are validated, free text is placed after `--`. Split internally: action list in `TaskwarriorActionCatalog`, argument building and validation in `TaskwarriorArgs`.
+> **Taskwarrior is a special case:** not an HTTP service, but the local `task` CLI. `executeAction()` calls `task` via `ProcessBuilder` (argument array, no `bash -c`) on the backend host — via `service/cli/TaskCommandService.java` + `util/HostProcessUtils.drain()`. Requires `task` to be installed on the host. Without a stored connection it runs on the host's default paths (page: "Ready – no sign-in needed"); the optional setup checks `task _version` — if that fails, the connection stays disconnected and the page shows "Setup required". Timeout is runtime-configurable via `ExecutionSettingsService` (`task-command-timeout-seconds`). Security: filter tokens with `rc.` overrides or Taskwarrior commands (e.g. `execute`) are rejected, IDs are validated, free text is placed after `--`. Split internally: action list in `TaskwarriorActionCatalog`, argument building and validation in `TaskwarriorArgs`.
 
 ### CalDAV and iCal feed
 
@@ -372,12 +372,19 @@ For `requiresOAuthFlow() == false` the credentials themselves are the authentica
 `saveCredentials` combines them as `clientId|clientSecret`, calls `fetchAccountInfo()` for
 validation, and on success sets the status directly to `CONNECTED`. There is no expiry and no
 refresh — `getValidAccessToken()` returns the stored credential unchanged.
-For a provider with `requiresCredentials() == false` (Taskwarrior and the iCal feed),
-For a provider with `requiresCredentials() == false` (Taskwarrior, ntfy),
-For a provider with `requiresCredentials() == false` (Taskwarrior, ntfy, RSS/Atom),
-For a provider with `requiresCredentials() == false` (Taskwarrior, ntfy, RSS/Atom, Open-Meteo),
+For a provider with `requiresCredentials() == false` (Taskwarrior, the iCal feed, ntfy, RSS/Atom,
+Open-Meteo, the HTTP API),
 `getValidAccessToken()` returns `null` instead of throwing when no connection row exists or
 decryption fails — providers that need no credentials are allowed to run without a token.
+
+Which of them actually **work** with `null` is what `connectionOptional()` says (TODO cdccc1e5):
+Open-Meteo, RSS/Atom, the iCal feed, ntfy and Taskwarrior — not the HTTP API, which needs its
+stored base URL. `GET /api/v1/integrations` carries the field; the integrations page shows such a
+provider without a stored connection as "Ready – no sign-in needed" instead of "Setup required"
+and offers the setup as optional. A stored connection that is not connected (Taskwarrior's CLI
+check failed, or it was disconnected) still blocks the provider — then it stays "Setup required".
+Older backends without the field: the frontend derives it from `requiresCredentials` and the same
+list (`components/integrations/providerReadiness.ts`, pinned by `ConnectionOptionalGateTest`).
 
 ### Several Connections per Provider
 
