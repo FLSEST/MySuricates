@@ -40,9 +40,9 @@ export function useAddGoalProject(goalId: string) {
 }
 
 /**
- * Löst ein Projekt vom Ziel. Hängen noch Teilziele oder TODOs daran, antwortet der Server mit 409 –
+ * Löst ein Projekt vom Ziel. Hängen noch Arbeitspakete oder TODOs daran, antwortet der Server mit 409 –
  * das meldet der Aufrufer selbst (er bietet dann die Kaskade an), deshalb hier kein Fehler-Toast.
- * `cascade` löscht die Teilziele des Projekts in diesem Ziel und löst seine TODOs vom Ziel.
+ * `cascade` löscht die Arbeitspakete des Projekts in diesem Ziel und löst seine TODOs vom Ziel.
  */
 export function useRemoveGoalProject(goalId: string) {
   const qc = useQueryClient();

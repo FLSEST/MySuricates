@@ -5,8 +5,8 @@ import { useToast } from './useToast';
 import { useT } from '../i18n';
 import { useTodos } from './useTodos';
 import type {
-  CreateGoalRequest, Goal, GoalDetail, GoalGuard, GoalMilestone, GoalProject, GoalRelations, GoalStatus, GoalTodoItem, Todo,
-  UpdateGoalRequest, UpdateTodoPlanningRequest,
+  CreateGoalRequest, Goal, GoalDetail, GoalGuard, GoalMilestone, GoalProject, GoalRelations, GoalStatus, GoalTodoItem,
+  GoalWorkPackage, MilestoneState, Todo, UpdateGoalRequest, UpdateTodoPlanningRequest,
 } from '../types';
 
 /** Ziele (TODO dc0566f8): TODOs projektübergreifend sammeln, ordnen und einschätzen. */
@@ -39,21 +39,51 @@ export function useGoals(statuses?: GoalStatus[], projectId?: string) {
 
 const NO_GUARD: GoalGuard = { enabled: false, workflowId: null, scheduleId: null, nextRunAt: null };
 
-const counted = (todo: GoalTodoItem) => todo.status !== 'ARCHIVED';
-const asksQuestion = (todo: GoalTodoItem) => counted(todo) && todo.status !== 'DONE' && !!todo.openQuestion;
+const asksQuestion = (todo: GoalTodoItem) => todo.status !== 'ARCHIVED' && todo.status !== 'DONE' && !!todo.openQuestion;
 
-/** Die Antwort eines Backends vor c60bf914: ohne `projects`, Teilziele ohne `projectId`/`position`/`openQuestions`. */
-type OlderGoalDetail = Omit<GoalDetail, 'projects' | 'milestones'> & {
+/** Ein TODO, wie es auch ein älteres Backend liefert: das Arbeitspaket noch als `milestoneId`, Fälligkeit fehlt vor 259f4f66. */
+type RawTodo = Omit<GoalTodoItem, 'workPackageId' | 'dueDate'> & {
+  workPackageId?: string | null;
+  milestoneId?: string | null;
+  dueDate?: string | null;
+};
+
+/**
+ * Ein Arbeitspaket, wie es ein Backend vor c60bf914 als „milestone“ liefert: nur eine Fälligkeit,
+ * Projekt, Position und offene Fragen erst ab Stufe 1.
+ */
+interface LegacyPackage {
+  id: string;
+  goalId: string;
+  title: string;
+  dueDate?: string | null;
+  state: MilestoneState;
+  total: number;
+  done: number;
+  reachedAt?: string | null;
+  reopened?: boolean;
+  projectId?: string | null;
+  position?: number;
+  openQuestions?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Die Antwort von `GET /goals/{id}` – aktuell oder von einem älteren Backend. */
+type RawGoalDetail = Omit<GoalDetail, 'todos' | 'projects' | 'workPackages' | 'milestones' | 'legacyBackend' | 'goal'> & {
+  goal: Omit<Goal, 'guard'> & { guard?: GoalGuard };
+  todos: RawTodo[];
   projects?: GoalProject[];
-  milestones?: (Omit<GoalMilestone, 'projectId' | 'position' | 'openQuestions'>
-    & Partial<Pick<GoalMilestone, 'projectId' | 'position' | 'openQuestions'>>)[];
+  workPackages?: (Omit<GoalWorkPackage, 'startDate' | 'endDate' | 'completedAt' | 'reopened' | 'openQuestions'>
+    & Partial<Pick<GoalWorkPackage, 'startDate' | 'endDate' | 'completedAt' | 'reopened' | 'openQuestions'>>)[];
+  milestones?: unknown[];
 };
 
 /**
  * Projekte eines älteren Backends: die aus `byProject` (die Projekte der TODOs), in dessen Reihenfolge.
  * „Ohne Projekt“ ist kein Projekt des Ziels.
  */
-function projectsFromByProject(detail: OlderGoalDetail, todos: GoalTodoItem[]): GoalProject[] {
+function projectsFromByProject(detail: RawGoalDetail, todos: GoalTodoItem[]): GoalProject[] {
   return detail.byProject.flatMap((entry, position) => (entry.projectId === null ? [] : [{
     projectId: entry.projectId,
     name: entry.projectName ?? entry.projectId,
@@ -65,34 +95,77 @@ function projectsFromByProject(detail: OlderGoalDetail, todos: GoalTodoItem[]): 
   }]));
 }
 
-/** Projekt eines Teilziels ohne `projectId`: das mit den meisten seiner TODOs, sonst das einzige des Ziels – wie V92. */
-function inferredProject(milestoneId: string, todos: GoalTodoItem[], projects: GoalProject[]): string | null {
+/** Projekt eines Pakets ohne `projectId`: das mit den meisten seiner TODOs, sonst das einzige des Ziels – wie V92. */
+function inferredProject(packageId: string, todos: GoalTodoItem[], projects: GoalProject[]): string | null {
   const counts = new Map<string, number>();
-  todos.filter((todo) => todo.milestoneId === milestoneId && todo.projectId)
+  todos.filter((todo) => todo.workPackageId === packageId && todo.projectId)
     .forEach((todo) => counts.set(todo.projectId!, (counts.get(todo.projectId!) ?? 0) + 1));
   const [busiest] = [...counts.entries()].sort((a, b) => b[1] - a[1]);
   return busiest?.[0] ?? (projects.length === 1 ? projects[0]!.projectId : null);
 }
 
-/**
- * Ein Backend vor TODO 259f4f66 kennt Wächter, Teilziele und Fälligkeiten im Ziel noch nicht, eins
- * vor c60bf914 weder die Projekte des Ziels noch Projekt, Position und offene Fragen der Teilziele –
- * bis zu seinem Neustart leitet die Zielseite ab, was sich ableiten lässt, statt an einem fehlenden
- * Feld zu scheitern.
- */
-export function normalizeGoalDetail(raw: GoalDetail | OlderGoalDetail): GoalDetail {
-  const detail = raw as OlderGoalDetail;
-  const todos = detail.todos.map((todo) => ({ ...todo, dueDate: todo.dueDate ?? null, milestoneId: todo.milestoneId ?? null }));
-  const projects = detail.projects ?? projectsFromByProject(detail, todos);
-  const milestones = (detail.milestones ?? []).map((milestone, index): GoalMilestone => ({
-    ...milestone,
-    dueDate: milestone.dueDate ?? null,
-    projectId: milestone.projectId !== undefined ? milestone.projectId : inferredProject(milestone.id, todos, projects),
-    position: milestone.position ?? index,
-    openQuestions: milestone.openQuestions
-      ?? todos.filter((todo) => todo.milestoneId === milestone.id && asksQuestion(todo)).length,
+/** Die „milestones“ eines älteren Backends sind Arbeitspakete mit nur einer Fälligkeit: ein Ein-Tages-Paket. */
+function packagesFromLegacy(legacy: LegacyPackage[], todos: GoalTodoItem[], projects: GoalProject[]): GoalWorkPackage[] {
+  return legacy.map((item, index) => ({
+    id: item.id,
+    goalId: item.goalId,
+    title: item.title,
+    projectId: item.projectId !== undefined ? item.projectId : inferredProject(item.id, todos, projects),
+    startDate: item.dueDate ?? null,
+    endDate: item.dueDate ?? null,
+    position: item.position ?? index,
+    state: item.state,
+    total: item.total,
+    done: item.done,
+    openQuestions: item.openQuestions ?? todos.filter((todo) => todo.workPackageId === item.id && asksQuestion(todo)).length,
+    completedAt: item.reachedAt ?? null,
+    reopened: item.reopened ?? false,
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt,
   }));
-  return { ...detail, goal: { ...detail.goal, guard: detail.goal.guard ?? NO_GUARD }, todos, projects, milestones };
+}
+
+/**
+ * Die Zielseite kommt mit jedem Backend-Stand zurecht (c60bf914 geht mit dem Merge live, das Backend
+ * erst nach einem Neustart). Fehlt `workPackages`, ist das Backend älter: Seine „milestones“ sind
+ * Arbeitspakete (nur `dueDate` → Beginn = Ende), die TODOs zeigen per `milestoneId` darauf, echte
+ * Meilensteine gibt es noch nicht (`legacyBackend`). Vor TODO 259f4f66 fehlen außerdem Wächter,
+ * Pakete und Fälligkeiten, vor Stufe 1 die Projekte des Ziels – abgeleitet wird, was sich ableiten
+ * lässt, statt an einem fehlenden Feld zu scheitern.
+ */
+export function normalizeGoalDetail(raw: GoalDetail | RawGoalDetail): GoalDetail {
+  const detail = raw as RawGoalDetail;
+  const legacyBackend = detail.workPackages === undefined;
+  const todos = detail.todos.map(({ milestoneId, workPackageId, ...todo }): GoalTodoItem => ({
+    ...todo,
+    dueDate: todo.dueDate ?? null,
+    workPackageId: workPackageId !== undefined ? workPackageId : (milestoneId ?? null),
+  }));
+  const projects = detail.projects ?? projectsFromByProject(detail, todos);
+  const workPackages = legacyBackend
+    ? packagesFromLegacy((detail.milestones ?? []) as LegacyPackage[], todos, projects)
+    : detail.workPackages!.map((item): GoalWorkPackage => ({
+      ...item,
+      projectId: item.projectId ?? null,
+      startDate: item.startDate ?? null,
+      endDate: item.endDate ?? null,
+      openQuestions: item.openQuestions ?? 0,
+      completedAt: item.completedAt ?? null,
+      reopened: item.reopened ?? false,
+    }));
+  const milestones = legacyBackend ? [] : ((detail.milestones ?? []) as GoalMilestone[]).map((milestone): GoalMilestone => ({
+    ...milestone,
+    workPackageIds: milestone.workPackageIds ?? [],
+    packagesTotal: milestone.packagesTotal ?? milestone.workPackageIds?.length ?? 0,
+    packagesDone: milestone.packagesDone ?? 0,
+    reachedAt: milestone.reachedAt ?? null,
+    reopened: milestone.reopened ?? false,
+  }));
+  return {
+    ...detail,
+    goal: { ...detail.goal, guard: detail.goal.guard ?? NO_GUARD },
+    todos, projects, workPackages, milestones, legacyBackend,
+  };
 }
 
 export function useGoal(id: string | undefined) {
@@ -155,7 +228,7 @@ export function useAssignGoalTodos() {
     qc.invalidateQueries({ queryKey: ['todos'] });
   };
   const undo = (todoIds: string[]) => {
-    // `goalId: ''` löst die Zuordnung (mit Rang und Meilenstein); null hieße „unverändert“
+    // `goalId: ''` löst die Zuordnung (mit Rang und Arbeitspaket); null hieße „unverändert“
     void Promise.all(todoIds.map((todoId) => api.patch<Todo>(`/todos/${todoId}/planning`, { goalId: '' })))
       .then(() => toast.success(t.goals.assignUndone))
       .catch((err) => toast.error(apiErrorMessage(err, t.goals.saveFailed)))

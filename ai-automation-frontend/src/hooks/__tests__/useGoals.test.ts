@@ -18,19 +18,20 @@ describe('normalizeGoalDetail', () => {
   const todo = (id: string, extra: Record<string, unknown> = {}) => ({
     id, title: id, status: 'OPEN', priority: 'MEDIUM', projectId: 'p1', projectName: 'AutoPilot', tags: [], goalRank: null,
     complexity: null, suggestedEffort: null, ratingNote: null, ratedBy: null, ratedAt: null, openQuestion: null,
-    updatedAt: '2026-09-23T00:00:00Z', dueDate: null, milestoneId: null, ...extra,
+    updatedAt: '2026-09-23T00:00:00Z', dueDate: null, ...extra,
   });
   const goal = {
     id: 'g1', title: 'Release', description: null, status: 'ACTIVE', targetDate: null, createdAt: '', updatedAt: '',
     progress: { total: 3, open: 3, inProgress: 0, backlog: 0, done: 0, openQuestions: 1, percentDone: 0 },
     guard: { enabled: false, workflowId: null, scheduleId: null, nextRunAt: null },
   };
-  const oldMilestone = {
+  /** Was ein Backend vor c60bf914 „milestone“ nannte, ist ein Arbeitspaket mit nur einer Fälligkeit. */
+  const oldPackage = {
     id: 'm1', goalId: 'g1', title: 'Promo', dueDate: '2026-12-31T22:59:59Z', state: 'OPEN', total: 3, done: 0,
-    reachedAt: null, reopened: false, createdAt: '', updatedAt: '',
+    reachedAt: '2026-09-01T00:00:00Z', reopened: false, createdAt: '', updatedAt: '',
   };
 
-  it('derives the projects of an older backend from byProject and places its sub-goals in the busiest project', () => {
+  it('reads an older backend: its milestones are work packages of one day, the TODOs point at them by milestoneId', () => {
     const older = {
       goal,
       todos: [
@@ -44,43 +45,72 @@ describe('normalizeGoalDetail', () => {
         { projectId: 'p1', projectName: 'AutoPilot', total: 1, done: 0 },
         { projectId: null, projectName: null, total: 1, done: 0 },
       ],
-      milestones: [oldMilestone],
+      milestones: [oldPackage],
     };
     const detail = normalizeGoalDetail(older as never);
 
+    expect(detail.legacyBackend).toBe(true);
+    expect(detail.milestones).toEqual([]);
     expect(detail.projects).toEqual([
       { projectId: 'p2', name: 'Site', archived: false, position: 0, total: 2, done: 0, openQuestions: 1 },
       { projectId: 'p1', name: 'AutoPilot', archived: false, position: 1, total: 1, done: 0, openQuestions: 0 },
     ]);
-    expect(detail.milestones[0]).toMatchObject({ id: 'm1', projectId: 'p2', position: 0, openQuestions: 1, dueDate: oldMilestone.dueDate });
+    expect(detail.workPackages).toEqual([{
+      id: 'm1', goalId: 'g1', title: 'Promo', projectId: 'p2', startDate: oldPackage.dueDate, endDate: oldPackage.dueDate,
+      position: 0, state: 'OPEN', total: 3, done: 0, openQuestions: 1, completedAt: '2026-09-01T00:00:00Z', reopened: false,
+      createdAt: '', updatedAt: '',
+    }]);
+    expect(detail.todos.map((item) => item.workPackageId)).toEqual(['m1', 'm1', 'm1', null]);
+    expect(detail.todos[0]).not.toHaveProperty('milestoneId');
   });
 
-  it('takes the only project of the goal for a sub-goal without TODOs, and copes without milestones and due dates', () => {
+  it('takes the only project of the goal for an old package without TODOs, and copes without milestones and due dates', () => {
     const older = {
       goal,
-      todos: [{ ...todo('a'), dueDate: undefined, milestoneId: undefined }],
+      todos: [{ ...todo('a'), dueDate: undefined }],
       byProject: [{ projectId: 'p1', projectName: 'AutoPilot', total: 1, done: 0 }],
-      milestones: [{ ...oldMilestone, total: 0 }],
+      milestones: [{ ...oldPackage, total: 0, dueDate: undefined }],
     };
     const detail = normalizeGoalDetail(older as never);
-    expect(detail.milestones[0]!.projectId).toBe('p1');
-    expect(detail.todos[0]).toMatchObject({ dueDate: null, milestoneId: null });
+    expect(detail.workPackages[0]).toMatchObject({ projectId: 'p1', startDate: null, endDate: null });
+    expect(detail.todos[0]).toMatchObject({ dueDate: null, workPackageId: null });
 
     const { milestones: _m, ...withoutMilestones } = older;
-    expect(normalizeGoalDetail(withoutMilestones as never).milestones).toEqual([]);
+    const bare = normalizeGoalDetail(withoutMilestones as never);
+    expect(bare.workPackages).toEqual([]);
+    expect(bare.milestones).toEqual([]);
+    expect(bare.legacyBackend).toBe(true);
   });
 
-  it('keeps the answer of a current backend as it is: projects, null dates, positions and question counts', () => {
+  it('keeps the answer of a current backend: work packages with their span, milestones with their links', () => {
     const current = {
       goal,
-      todos: [todo('a', { milestoneId: 'm1' })],
+      todos: [todo('a', { workPackageId: 'w1' })],
       byProject: [{ projectId: 'p1', projectName: 'AutoPilot', total: 1, done: 0 }],
       projects: [{ projectId: 'p1', name: 'AutoPilot', archived: true, position: 0, total: 1, done: 0, openQuestions: 4 }],
-      milestones: [{ ...oldMilestone, dueDate: null, projectId: null, position: 7, openQuestions: 2 }],
+      workPackages: [{
+        id: 'w1', goalId: 'g1', projectId: null, title: 'Repo sauber', startDate: '2026-10-11T22:00:00Z', endDate: '2026-10-18T21:59:59Z',
+        position: 7, state: 'OPEN', total: 1, done: 0, openQuestions: 2, completedAt: null, reopened: false, createdAt: '', updatedAt: '',
+      }],
+      milestones: [{
+        id: 'ms1', goalId: 'g1', title: 'Code-Freeze', dueDate: '2026-10-15T21:59:59Z', state: 'DUE_SOON', workPackageIds: ['w1'],
+        packagesTotal: 1, packagesDone: 0, reachedAt: null, reopened: false, createdAt: '', updatedAt: '',
+      }],
     };
     const detail = normalizeGoalDetail(current as never);
+    expect(detail.legacyBackend).toBe(false);
     expect(detail.projects).toEqual(current.projects);
-    // null stays null – a sub-goal whose project was deleted is not re-guessed
-    expect(detail.milestones[0]).toMatchObject({ dueDate: null, projectId: null, position: 7, openQuestions: 2 });
+    // null stays null – a package whose project was deleted is not re-guessed
+    expect(detail.workPackages).toEqual(current.workPackages);
+    expect(detail.milestones).toEqual(current.milestones);
+    expect(detail.todos[0]!.workPackageId).toBe('w1');
+  });
+
+  it('fills in what a current answer may leave out: empty links and counts of a milestone', () => {
+    const detail = normalizeGoalDetail({
+      goal, todos: [], byProject: [], projects: [], workPackages: [],
+      milestones: [{ id: 'ms1', goalId: 'g1', title: 'Launch', dueDate: '2026-10-31T22:59:59Z', state: 'OPEN', createdAt: '', updatedAt: '' }],
+    } as never);
+    expect(detail.milestones[0]).toMatchObject({ workPackageIds: [], packagesTotal: 0, packagesDone: 0, reachedAt: null, reopened: false });
   });
 });

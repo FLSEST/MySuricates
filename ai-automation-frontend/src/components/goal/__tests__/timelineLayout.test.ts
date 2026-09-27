@@ -1,30 +1,41 @@
 import { describe, it, expect } from 'vitest';
 import {
-  CHIP_WIDTH, FALLBACK_WIDTH, NO_MILESTONE, NO_PROJECT_BAND,
-  applyPlan, axisFor, buildAxis, buildBands, dateOfDay, dayAtX, dayOf, dayOfIsoDate, dropTargetOf, dueDateOfDay,
-  isOverdue, isoDateOfDay, milestoneAccepts, milestoneDateChange, pillDropId, planChanges, rowDropId, stackChips,
-  stripDropId, todayLabelPlacement, todoAccepts, trayDropId, undatedDropId, xOfDay,
+  BAR_ZONE, CHIP_WIDTH, FALLBACK_WIDTH, LANE_HEIGHT, MILESTONES_DROP_ID, NO_PACKAGE, NO_PROJECT_BAND, WEEK_DAYS,
+  applyPlan, axisFor, barBox, barLabelFit, buildAxis, buildBands, dateOfDay, dayAtX, dayOf, dayOfIsoDate, dayShift,
+  dropTargetOf, dueDateOfDay, hasDays, isOverdue, isoDateOfDay, milestoneAccepts, milestoneMarks, movedRange,
+  packageAccepts, packageRange, pillDropId, planChanges, rangeRequest, resizedRange, rowDropId, sameRange, stackChips,
+  startDateOfDay, stripDropId, todayLabelPlacement, todoAccepts, trayDropId, undatedDropId, weekFrom, xOfDay,
 } from '../timelineLayout';
-import type { GoalMilestone, GoalTodoItem } from '../../../types';
+import type { GoalMilestone, GoalTodoItem, GoalWorkPackage } from '../../../types';
 
 const day = (iso: string) => dayOfIsoDate(iso)!;
-/** Ende des lokalen Tages – so speichert der TODO-Dialog eine Fälligkeit. */
+/** Ende des lokalen Tages – so speichert der TODO-Dialog eine Fälligkeit, so endet ein Paket. */
 const endOf = (iso: string) => new Date(`${iso}T23:59:59`).toISOString();
+/** Anfang des lokalen Tages – so beginnt ein Paket. */
+const startOf = (iso: string) => new Date(`${iso}T00:00:00`).toISOString();
 const W = FALLBACK_WIDTH;
 
 function todo(id: string, overrides: Partial<GoalTodoItem> = {}): GoalTodoItem {
   return {
     id, title: `Todo ${id}`, status: 'OPEN', priority: 'MEDIUM', projectId: 'p1', projectName: 'AutoPilot', tags: [],
     goalRank: null, complexity: null, suggestedEffort: null, ratingNote: null, ratedBy: null, ratedAt: null,
-    openQuestion: null, updatedAt: '2026-09-23T00:00:00Z', dueDate: null, milestoneId: null, ...overrides,
+    openQuestion: null, updatedAt: '2026-09-23T00:00:00Z', dueDate: null, workPackageId: null, ...overrides,
   };
 }
 
-function milestone(id: string, title: string, iso: string | null, overrides: Partial<GoalMilestone> = {}): GoalMilestone {
+/** Ein Arbeitspaket; `from`/`to` als `YYYY-MM-DD`, ohne = ohne Zeitraum. */
+function wp(id: string, title: string, from: string | null, to: string | null, overrides: Partial<GoalWorkPackage> = {}): GoalWorkPackage {
   return {
-    id, goalId: 'g1', title, dueDate: iso ? endOf(iso) : null, projectId: 'p1', position: 0, openQuestions: 0,
-    state: 'OPEN', total: 0, done: 0, reachedAt: null, reopened: false,
+    id, goalId: 'g1', projectId: 'p1', title, startDate: from ? startOf(from) : null, endDate: to ? endOf(to) : null,
+    position: 0, state: 'OPEN', total: 0, done: 0, openQuestions: 0, completedAt: null, reopened: false,
     createdAt: '2026-09-23T00:00:00Z', updatedAt: '2026-09-23T00:00:00Z', ...overrides,
+  };
+}
+
+function milestone(id: string, title: string, iso: string, overrides: Partial<GoalMilestone> = {}): GoalMilestone {
+  return {
+    id, goalId: 'g1', title, dueDate: endOf(iso), state: 'OPEN', workPackageIds: [], packagesTotal: 0, packagesDone: 0,
+    reachedAt: null, reopened: false, createdAt: '2026-09-23T00:00:00Z', updatedAt: '2026-09-23T00:00:00Z', ...overrides,
   };
 }
 
@@ -49,6 +60,7 @@ describe('days', () => {
   });
 });
 
+
 describe('buildAxis', () => {
   const today = day('2026-09-24');
 
@@ -66,11 +78,15 @@ describe('buildAxis', () => {
     expect(axis.endDay).toBeGreaterThan(day('2026-11-30'));
   });
 
-  it('spans at least two weeks from today when nothing is dated yet', () => {
-    const axis = buildAxis({ today, days: [], target: null }, W);
-    expect(axis.days).toBeGreaterThanOrEqual(14);
-    expect(axis.startDay).toBeLessThan(today);
-    expect(axis.endDay).toBeGreaterThanOrEqual(today + 13);
+  // c60bf914: with nothing dated the timeline shows today and the four weeks after
+  it('spans today to four weeks ahead when nothing is dated, at least two weeks otherwise', () => {
+    const empty = buildAxis({ today, days: [], target: null }, W);
+    expect(empty.startDay).toBeLessThan(today);
+    expect(empty.endDay).toBeGreaterThanOrEqual(today + 27);
+    expect(empty.endDay).toBeLessThan(today + 35);
+    const short = buildAxis({ today, days: [today + 2], target: null }, W);
+    expect(short.endDay).toBeGreaterThanOrEqual(today + 13);
+    expect(short.endDay).toBeLessThan(today + 20);
   });
 
   it('draws a grid by day, week or month depending on the span', () => {
@@ -105,21 +121,22 @@ describe('buildAxis', () => {
     for (const band of monthly.bands.slice(1)) expect(isoDateOfDay(band).slice(5)).toBe('01-01');
   });
 
-  it('axisFor takes today, the due dates, the milestones and the target date', () => {
+  it('axisFor takes today, start and end of the packages, the milestones, the due dates and the target date', () => {
     const axis = axisFor({
       todos: [todo('a', { dueDate: endOf('2026-11-10') }), todo('b', { dueDate: endOf('2027-02-01'), status: 'ARCHIVED' })],
-      milestones: [milestone('m1', 'Beta', '2026-09-10')],
+      workPackages: [wp('w1', 'Repo', '2026-09-05', '2026-09-12'), wp('w2', 'Someday', null, null)],
+      milestones: [milestone('m1', 'Freeze', '2026-11-20')],
       targetDate: endOf('2026-10-15'),
       today,
     }, W);
-    expect(axis.startDay).toBeLessThan(day('2026-09-10'));
-    expect(axis.endDay).toBeGreaterThan(day('2026-11-10'));
+    expect(axis.startDay).toBeLessThan(day('2026-09-05'));
+    expect(axis.endDay).toBeGreaterThan(day('2026-11-20'));
     // archivierte TODOs stehen nicht auf dem Zeitstrahl und ziehen ihn nicht in die Länge
     expect(axis.endDay).toBeLessThan(day('2027-02-01'));
   });
 
-  it('axisFor leaves sub-goals without a date out', () => {
-    const axis = axisFor({ todos: [], milestones: [milestone('m1', 'Someday', null)], targetDate: null, today }, W);
+  it('axisFor leaves packages without a time span out', () => {
+    const axis = axisFor({ todos: [], workPackages: [wp('w1', 'Someday', null, null)], milestones: [], targetDate: null, today }, W);
     expect(axis).toEqual(buildAxis({ today, days: [], target: null }, W));
   });
 });
@@ -176,194 +193,275 @@ describe('stackChips', () => {
   });
 });
 
+describe('time spans (c60bf914)', () => {
+  const axis = buildAxis({ today: day('2026-09-24'), days: [], target: day('2026-10-15') }, W);
+  const perDay = W / axis.days;
+
+  it('reads a package\'s span in local days – only with start and end, turned round if the two are swapped', () => {
+    expect(packageRange(wp('w', 'Repo', '2026-10-12', '2026-10-18'))).toEqual({ start: day('2026-10-12'), end: day('2026-10-18') });
+    expect(packageRange(wp('w', 'One day', '2026-10-12', '2026-10-12'))).toEqual({ start: day('2026-10-12'), end: day('2026-10-12') });
+    expect(packageRange(wp('w', 'Swapped', '2026-10-18', '2026-10-12'))).toEqual({ start: day('2026-10-12'), end: day('2026-10-18') });
+    expect(packageRange(wp('w', 'Open', null, null))).toBeNull();
+    expect(packageRange({ startDate: startOf('2026-10-12'), endDate: null })).toBeNull();
+  });
+
+  it('sends start at 00:00 and end at 23:59:59 local time, or both empty to clear the span', () => {
+    expect(startDateOfDay(day('2026-10-12'))).toBe(startOf('2026-10-12'));
+    expect(rangeRequest({ start: day('2026-10-12'), end: day('2026-10-18') }))
+      .toEqual({ startDate: startOf('2026-10-12'), endDate: endOf('2026-10-18') });
+    expect(rangeRequest(null)).toEqual({ startDate: '', endDate: '' });
+  });
+
+  it('moves a span keeping its length, stretches either end but never past the other one', () => {
+    const range = { start: day('2026-10-12'), end: day('2026-10-18') };
+    expect(movedRange(range, 3)).toEqual({ start: day('2026-10-15'), end: day('2026-10-21') });
+    expect(movedRange(range, -2)).toEqual({ start: day('2026-10-10'), end: day('2026-10-16') });
+    expect(resizedRange(range, 'end', 2)).toEqual({ start: day('2026-10-12'), end: day('2026-10-20') });
+    expect(resizedRange(range, 'start', -1)).toEqual({ start: day('2026-10-11'), end: day('2026-10-18') });
+    // at least one day: the ends do not cross
+    expect(resizedRange(range, 'end', -30)).toEqual({ start: day('2026-10-12'), end: day('2026-10-12') });
+    expect(resizedRange(range, 'start', 30)).toEqual({ start: day('2026-10-18'), end: day('2026-10-18') });
+    expect(sameRange(range, { ...range })).toBe(true);
+    expect(sameRange(range, null)).toBe(false);
+    expect(sameRange(null, null)).toBe(true);
+  });
+
+  it('gives a package dropped from the tray one week from the day it lands on', () => {
+    expect(WEEK_DAYS).toBe(7);
+    expect(weekFrom(day('2026-10-12'))).toEqual({ start: day('2026-10-12'), end: day('2026-10-18') });
+  });
+
+  it('turns a pointer movement into whole days', () => {
+    expect(dayShift(axis, perDay * 2.4, W)).toBe(2);
+    expect(dayShift(axis, perDay * 2.6, W)).toBe(3);
+    expect(dayShift(axis, -perDay * 1.2, W)).toBe(-1);
+    expect(dayShift(axis, perDay * 0.3, W)).toBe(0);
+  });
+
+  it('draws a bar from the start of its first day to the end of its last one', () => {
+    const range = { start: day('2026-10-01'), end: day('2026-10-07') };
+    const box = barBox(axis, range, W);
+    expect(box.left).toBeCloseTo((day('2026-10-01') - axis.startDay) * perDay);
+    expect(box.width).toBeCloseTo(7 * perDay);
+    expect(box.left).toBeLessThan(xOfDay(axis, range.start, W));
+    expect(box.left + box.width).toBeGreaterThan(xOfDay(axis, range.end, W));
+  });
+
+  it('puts title and progress into a wide bar, only the title into a narrower one and the title beside a short bar', () => {
+    expect(barLabelFit('Repo sauber', 200)).toBe('full');
+    expect(barLabelFit('Repo sauber', 90)).toBe('title');
+    expect(barLabelFit('Repo sauber', 40)).toBe('none');
+  });
+});
+
+describe('milestoneMarks (c60bf914)', () => {
+  const axis = buildAxis({ today: day('2026-09-24'), days: [], target: day('2026-10-31') }, W);
+
+  it('sets each diamond on its day, by date, and moves a title that would cover the next one to a second lane', () => {
+    const { marks, lanes } = milestoneMarks([
+      milestone('m3', 'Repo öffentlich', '2026-10-26'),
+      milestone('m1', 'Code-Freeze', '2026-10-10'),
+      milestone('m2', 'Werbematerial fertig und abgenommen', '2026-10-13'),
+    ], axis, W);
+    expect(marks.map((mark) => mark.milestone.id)).toEqual(['m1', 'm2', 'm3']);
+    expect(marks[0]!.x).toBeCloseTo(xOfDay(axis, day('2026-10-10'), W));
+    expect(marks.map((mark) => mark.lane)).toEqual([0, 1, 0]);
+    expect(lanes).toBe(2);
+  });
+
+  it('keeps a title inside the axis at the right edge and has one lane without milestones', () => {
+    const { marks } = milestoneMarks([milestone('m1', 'Launch day with a long name', '2026-10-31')], axis, W);
+    expect(marks[0]!.x + 10 + marks[0]!.labelWidth).toBeLessThanOrEqual(W);
+    expect(milestoneMarks([], axis, W)).toEqual({ marks: [], lanes: 1 });
+  });
+});
+
 describe('buildBands (c60bf914)', () => {
   const axis = buildAxis({ today: day('2026-09-24'), days: [], target: day('2026-10-15') }, W);
   const projects = [{ projectId: 'p1', name: 'AutoPilot' }, { projectId: 'p2', name: 'Site' }];
-  const beta = milestone('m-beta', 'Beta', '2026-10-01');
-  const rc = milestone('m-rc', 'RC', '2026-10-08');
-  const docs = milestone('m-docs', 'Docs', null, { position: 1 });
-  const wording = milestone('m-wording', 'Wording', null, { position: 0 });
-  const promo = milestone('m-promo', 'Promo', '2026-10-03', { projectId: 'p2' });
+  const umbau = wp('w-umbau', 'Umbau', '2026-09-20', '2026-10-01', { position: 0 });
+  const repo = wp('w-repo', 'Repo sauber', '2026-10-01', '2026-10-09', { position: 1 });
+  const github = wp('w-github', 'GitHub-Mechanik', null, null, { position: 2 });
+  const halt = wp('w-halt', 'Haltepunkte', null, null, { position: 3 });
+  const site = wp('w-site', 'Werbematerial', '2026-10-05', '2026-10-12', { projectId: 'p2' });
 
   it('has a band per project in the goal\'s order, even an empty one', () => {
     const bands = buildBands([], [], projects, axis, W);
     expect(bands.map((band) => [band.key, band.name, band.linked])).toEqual([['p1', 'AutoPilot', true], ['p2', 'Site', true]]);
-    // every band has its row "no sub-goal" to drop into
-    expect(bands.map((band) => band.rows.map((row) => row.key))).toEqual([[NO_MILESTONE], [NO_MILESTONE]]);
+    expect(bands.every((band) => band.rows.length === 0 && band.unscheduled.length === 0)).toBe(true);
+    expect(bands[0]!.noPackage.key).toBe(NO_PACKAGE);
   });
 
-  it('gives dated sub-goals a row by date, puts undated ones into the tray by position, each in its project\'s band', () => {
-    const bands = buildBands([], [rc, docs, beta, promo, wording], projects, axis, W);
-    const [autopilot, site] = bands;
-    expect(autopilot!.dated.map((m) => m.id)).toEqual(['m-beta', 'm-rc']);
-    expect(autopilot!.undated.map((m) => m.id)).toEqual(['m-wording', 'm-docs']);
-    expect(autopilot!.rows.map((row) => row.key)).toEqual(['m-beta', 'm-rc', NO_MILESTONE]);
-    expect(site!.rows.map((row) => row.key)).toEqual(['m-promo', NO_MILESTONE]);
-    expect(site!.rows.every((row) => row.band === 'p2')).toBe(true);
+  it('gives every package with a span one row in package order and puts the others into the tray', () => {
+    const bands = buildBands([], [halt, repo, site, github, umbau], projects, axis, W);
+    const [autopilot, siteBand] = bands;
+    expect(autopilot!.rows.map((row) => row.key)).toEqual(['w-umbau', 'w-repo']);
+    expect(autopilot!.rows[0]!.range).toEqual({ start: day('2026-09-20'), end: day('2026-10-01') });
+    expect(autopilot!.unscheduled.map((entry) => entry.workPackage.id)).toEqual(['w-github', 'w-halt']);
+    expect(siteBand!.rows.map((row) => [row.key, row.band])).toEqual([['w-site', 'p2']]);
   });
 
-  it('places TODOs in the row of their sub-goal, else in "no sub-goal" of their project – dated on the axis, undated beside it', () => {
+  it('places due TODOs under the bar of their package and keeps undated ones as a count at its label – nothing lost', () => {
     const bands = buildBands([
-      todo('a', { dueDate: endOf('2026-09-30'), milestoneId: 'm-beta' }),
-      todo('b', { dueDate: endOf('2026-10-05') }),
-      todo('c', { milestoneId: 'm-rc' }),
-      todo('d', { dueDate: endOf('2026-10-02'), milestoneId: 'deleted-meanwhile' }),
-      todo('e', { dueDate: endOf('2026-10-02'), status: 'ARCHIVED' }),
-      todo('f', { status: 'ARCHIVED' }),
-      todo('g', { dueDate: endOf('2026-10-04'), projectId: 'p2', projectName: 'Site' }),
-    ], [rc, beta, promo], projects, axis, W);
-
-    const [autopilot, site] = bands;
-    expect(autopilot!.rows.map((row) => [row.key, row.items.map((item) => item.todo.id)]))
-      .toEqual([['m-beta', ['a']], ['m-rc', []], [NO_MILESTONE, ['d', 'b']]]);
-    // the undated TODO keeps its sub-goal: it stands beside the axis in the row of "RC"
-    expect(autopilot!.rows.map((row) => [row.key, row.undated.map((item) => item.id)]))
-      .toEqual([['m-beta', []], ['m-rc', ['c']], [NO_MILESTONE, []]]);
-    expect(site!.rows.map((row) => [row.key, row.items.map((item) => item.todo.id)]))
-      .toEqual([['m-promo', []], [NO_MILESTONE, ['g']]]);
-    const a = autopilot!.rows[0]!.items[0]!;
+      todo('a', { dueDate: endOf('2026-09-30'), workPackageId: 'w-umbau' }),
+      todo('b', { workPackageId: 'w-umbau' }),
+      todo('c', { workPackageId: 'w-umbau' }),
+      todo('d', { workPackageId: 'w-github' }),
+      todo('e', { dueDate: endOf('2026-10-02') }),
+      todo('f', { status: 'ARCHIVED', workPackageId: 'w-umbau' }),
+      todo('g', { dueDate: endOf('2026-10-04'), workPackageId: 'deleted-meanwhile' }),
+    ], [umbau, repo, github], projects, axis, W);
+    const [autopilot] = bands;
+    const [umbauRow, repoRow] = autopilot!.rows;
+    expect(umbauRow!.items.map((item) => item.todo.id)).toEqual(['a']);
+    expect(umbauRow!.undated.map((item) => item.id)).toEqual(['b', 'c']);
+    expect(umbauRow!.lanes).toBe(1);
+    // no chips, a flat row
+    expect(repoRow!.lanes).toBe(0);
+    expect(autopilot!.unscheduled).toEqual([{ workPackage: github, undated: [todo('d', { workPackageId: 'w-github' })] }]);
+    expect(autopilot!.noPackage.items.map((item) => item.todo.id)).toEqual(['e', 'g']);
+    const a = umbauRow!.items[0]!;
     expect(a.day).toBe(day('2026-09-30'));
     expect(a.left + a.anchor).toBeCloseTo(xOfDay(axis, day('2026-09-30'), W));
   });
 
-  it('gives an undated sub-goal a row as soon as it has TODOs, dated or not; without TODOs it only waits in the tray', () => {
+  it('gives a package without a span a row only once one of its TODOs is due – its undated ones then stay there, not in the tray', () => {
     const bands = buildBands([
-      todo('a', { dueDate: endOf('2026-10-02'), milestoneId: 'm-docs' }),
-      todo('b', { milestoneId: 'm-wording' }),
-      todo('c', { milestoneId: 'm-wording', status: 'ARCHIVED' }),
-    ], [docs, wording, milestone('m-empty', 'Empty', null, { position: 3 })], projects, axis, W);
-    expect(bands[0]!.rows.map((row) => row.key)).toEqual(['m-wording', 'm-docs', NO_MILESTONE]);
-    expect(bands[0]!.rows[0]!.undated.map((item) => item.id)).toEqual(['b']);
-    expect(bands[0]!.undated.map((m) => m.id)).toEqual(['m-wording', 'm-docs', 'm-empty']);
-  });
-
-  it('keeps undated TODOs without sub-goal in "no sub-goal" of their band – there is no global pile any more', () => {
-    const bands = buildBands([
-      todo('a'), todo('b', { projectId: 'p2', projectName: 'Site' }), todo('c', { projectId: null, projectName: null }),
-    ], [], projects, axis, W);
-    expect(bands.map((band) => [band.key, band.rows.at(-1)!.undated.map((item) => item.id)]))
-      .toEqual([['p1', ['a']], ['p2', ['b']], [NO_PROJECT_BAND, ['c']]]);
+      todo('a', { dueDate: endOf('2026-10-02'), workPackageId: 'w-github' }),
+      todo('b', { workPackageId: 'w-github' }),
+    ], [github], projects, axis, W);
+    expect(bands[0]!.rows.map((row) => [row.key, row.range, row.undated.map((item) => item.id)])).toEqual([['w-github', null, ['b']]]);
+    expect(bands[0]!.unscheduled).toEqual([{ workPackage: github, undated: [] }]);
   });
 
   it('adds a band for old data from a project outside the goal and one "without project" when something is there', () => {
     const bands = buildBands([
       todo('a', { dueDate: endOf('2026-10-02'), projectId: 'p9', projectName: 'Elsewhere' }),
-      todo('b', { dueDate: endOf('2026-10-03'), projectId: null, projectName: null }),
-    ], [milestone('m-lost', 'Lost', null, { projectId: null })], projects, axis, W);
+      todo('b', { projectId: null, projectName: null }),
+    ], [wp('w-lost', 'Lost', null, null, { projectId: null })], projects, axis, W);
     expect(bands.map((band) => [band.key, band.name, band.linked])).toEqual([
       ['p1', 'AutoPilot', true], ['p2', 'Site', true], ['p9', 'Elsewhere', false], [NO_PROJECT_BAND, null, false],
     ]);
-    expect(bands[3]!.undated.map((m) => m.id)).toEqual(['m-lost']);
-    expect(bands[3]!.rows.at(-1)!.items.map((item) => item.todo.id)).toEqual(['b']);
+    expect(bands[3]!.unscheduled.map((entry) => entry.workPackage.id)).toEqual(['w-lost']);
+    expect(bands[3]!.noPackage.undated.map((item) => item.id)).toEqual(['b']);
   });
 
-  it('counts the lanes of every row', () => {
+  it('stacks due TODOs of one day into lanes below the bar', () => {
     const bands = buildBands([
-      todo('a', { dueDate: endOf('2026-10-05') }),
-      todo('b', { dueDate: endOf('2026-10-05') }),
-      todo('c', { dueDate: endOf('2026-10-05') }),
-    ], [], projects.slice(0, 1), axis, W);
-    expect(bands[0]!.rows).toHaveLength(1);
+      todo('a', { dueDate: endOf('2026-10-05'), workPackageId: 'w-repo' }),
+      todo('b', { dueDate: endOf('2026-10-05'), workPackageId: 'w-repo' }),
+      todo('c', { dueDate: endOf('2026-10-05'), workPackageId: 'w-repo' }),
+    ], [repo], projects.slice(0, 1), axis, W);
     expect(bands[0]!.rows[0]!.lanes).toBe(3);
+    expect(BAR_ZONE + 3 * LANE_HEIGHT).toBeGreaterThan(3 * LANE_HEIGHT);
   });
 });
 
 describe('drop targets', () => {
   it('reads the drop target from the droppable id', () => {
-    expect(dropTargetOf(undatedDropId('p1', NO_MILESTONE))).toEqual({ kind: 'undated', band: 'p1', milestoneId: null });
-    expect(dropTargetOf(undatedDropId('p1', 'm-beta'))).toEqual({ kind: 'undated', band: 'p1', milestoneId: 'm-beta' });
-    expect(dropTargetOf('unplanned')).toBeNull();
-    expect(dropTargetOf(rowDropId('p1', NO_MILESTONE))).toEqual({ kind: 'row', band: 'p1', milestoneId: null });
-    expect(dropTargetOf(rowDropId('p1', 'm-beta'))).toEqual({ kind: 'row', band: 'p1', milestoneId: 'm-beta' });
+    expect(dropTargetOf(rowDropId('p1', NO_PACKAGE))).toEqual({ kind: 'row', band: 'p1', workPackageId: null });
+    expect(dropTargetOf(rowDropId('p1', 'w-repo'))).toEqual({ kind: 'row', band: 'p1', workPackageId: 'w-repo' });
+    expect(dropTargetOf(undatedDropId('p1', NO_PACKAGE))).toEqual({ kind: 'undated', band: 'p1', workPackageId: null });
+    expect(dropTargetOf(undatedDropId('p1', 'w-repo'))).toEqual({ kind: 'undated', band: 'p1', workPackageId: 'w-repo' });
     expect(dropTargetOf(stripDropId('p2'))).toEqual({ kind: 'strip', band: 'p2' });
     expect(dropTargetOf(trayDropId('p2'))).toEqual({ kind: 'tray', band: 'p2' });
-    expect(dropTargetOf(pillDropId('p2', 'm-docs'))).toEqual({ kind: 'pill', band: 'p2', milestoneId: 'm-docs' });
+    expect(dropTargetOf(pillDropId('p2', 'w-site'))).toEqual({ kind: 'pill', band: 'p2', workPackageId: 'w-site' });
+    expect(dropTargetOf(MILESTONES_DROP_ID)).toEqual({ kind: 'milestones' });
     expect(dropTargetOf('todo:a')).toBeNull();
-    expect(dropTargetOf('row:m-beta')).toBeNull();
+    expect(dropTargetOf('unplanned')).toBeNull();
     expect(dropTargetOf('strip:p1:x')).toBeNull();
+    expect(hasDays({ kind: 'row', band: 'p1', workPackageId: null })).toBe(true);
+    expect(hasDays({ kind: 'milestones' })).toBe(true);
+    expect(hasDays({ kind: 'undated', band: 'p1', workPackageId: null })).toBe(false);
+    expect(hasDays(null)).toBe(false);
   });
 
-  it('offers a TODO only the rows, undated areas and sub-goals of its own project', () => {
-    const own = { projectId: 'p1', milestoneId: null };
-    expect(todoAccepts(own, { kind: 'row', band: 'p1', milestoneId: 'm-beta' })).toBe(true);
-    expect(todoAccepts(own, { kind: 'row', band: 'p1', milestoneId: null })).toBe(true);
-    expect(todoAccepts(own, { kind: 'pill', band: 'p1', milestoneId: 'm-docs' })).toBe(true);
-    expect(todoAccepts(own, { kind: 'undated', band: 'p1', milestoneId: 'm-beta' })).toBe(true);
-    expect(todoAccepts(own, { kind: 'undated', band: 'p2', milestoneId: null })).toBe(false);
-    expect(todoAccepts(own, { kind: 'row', band: 'p2', milestoneId: 'm-promo' })).toBe(false);
-    expect(todoAccepts(own, { kind: 'row', band: 'p2', milestoneId: null })).toBe(false);
+  it('offers a TODO only the rows, labels and packages of its own project', () => {
+    const own = { projectId: 'p1', workPackageId: null };
+    expect(todoAccepts(own, { kind: 'row', band: 'p1', workPackageId: 'w-repo' })).toBe(true);
+    expect(todoAccepts(own, { kind: 'row', band: 'p1', workPackageId: null })).toBe(true);
+    expect(todoAccepts(own, { kind: 'undated', band: 'p1', workPackageId: 'w-repo' })).toBe(true);
+    expect(todoAccepts(own, { kind: 'pill', band: 'p1', workPackageId: 'w-github' })).toBe(true);
+    expect(todoAccepts(own, { kind: 'row', band: 'p2', workPackageId: 'w-site' })).toBe(false);
+    expect(todoAccepts(own, { kind: 'undated', band: 'p2', workPackageId: null })).toBe(false);
     expect(todoAccepts(own, { kind: 'strip', band: 'p1' })).toBe(false);
     expect(todoAccepts(own, { kind: 'tray', band: 'p1' })).toBe(false);
+    expect(todoAccepts(own, { kind: 'milestones' })).toBe(false);
     // TODOs without a project only go into the band "without project"
-    expect(todoAccepts({ projectId: null, milestoneId: null }, { kind: 'row', band: NO_PROJECT_BAND, milestoneId: null })).toBe(true);
-    expect(todoAccepts({ projectId: null, milestoneId: null }, { kind: 'row', band: 'p1', milestoneId: null })).toBe(false);
+    expect(todoAccepts({ projectId: null, workPackageId: null }, { kind: 'row', band: NO_PROJECT_BAND, workPackageId: null })).toBe(true);
+    expect(todoAccepts({ projectId: null, workPackageId: null }, { kind: 'row', band: 'p1', workPackageId: null })).toBe(false);
   });
 
-  it('lets an old TODO stay in its sub-goal of another project and move its day there', () => {
-    const legacy = { projectId: 'p2', milestoneId: 'm-beta' };
-    expect(todoAccepts(legacy, { kind: 'row', band: 'p1', milestoneId: 'm-beta' })).toBe(true);
-    expect(todoAccepts(legacy, { kind: 'row', band: 'p1', milestoneId: 'm-rc' })).toBe(false);
-    expect(todoAccepts(legacy, { kind: 'row', band: 'p2', milestoneId: null })).toBe(true);
+  it('lets an old TODO stay in its package of another project and move its day there', () => {
+    const legacy = { projectId: 'p2', workPackageId: 'w-repo' };
+    expect(todoAccepts(legacy, { kind: 'row', band: 'p1', workPackageId: 'w-repo' })).toBe(true);
+    expect(todoAccepts(legacy, { kind: 'row', band: 'p1', workPackageId: 'w-umbau' })).toBe(false);
+    expect(todoAccepts(legacy, { kind: 'row', band: 'p2', workPackageId: null })).toBe(true);
   });
 
-  it('keeps a sub-goal in its band: strip and rows set the date, the tray takes it away', () => {
+  it('keeps a bar in its band: rows and the head strip take it on a day, the tray takes its span away', () => {
     const own = { projectId: 'p1' };
-    expect(milestoneAccepts(own, { kind: 'strip', band: 'p1' })).toBe(true);
-    expect(milestoneAccepts(own, { kind: 'row', band: 'p1', milestoneId: 'm-rc' })).toBe(true);
-    expect(milestoneAccepts(own, { kind: 'tray', band: 'p1' })).toBe(true);
-    expect(milestoneAccepts(own, { kind: 'strip', band: 'p2' })).toBe(false);
-    expect(milestoneAccepts(own, { kind: 'pill', band: 'p1', milestoneId: 'm-docs' })).toBe(false);
-    expect(milestoneAccepts(own, { kind: 'undated', band: 'p1', milestoneId: null })).toBe(false);
+    expect(packageAccepts(own, { kind: 'row', band: 'p1', workPackageId: 'w-umbau' })).toBe(true);
+    expect(packageAccepts(own, { kind: 'strip', band: 'p1' })).toBe(true);
+    expect(packageAccepts(own, { kind: 'tray', band: 'p1' })).toBe(true);
+    expect(packageAccepts(own, { kind: 'row', band: 'p2', workPackageId: null })).toBe(false);
+    expect(packageAccepts(own, { kind: 'undated', band: 'p1', workPackageId: null })).toBe(false);
+    expect(packageAccepts(own, { kind: 'pill', band: 'p1', workPackageId: 'w-github' })).toBe(false);
+    expect(packageAccepts(own, { kind: 'milestones' })).toBe(false);
   });
 
-  it('dates a sub-goal where it lands, clears the date in the tray and changes nothing on the same day', () => {
-    const undated = { dueDate: null };
-    const dated = { dueDate: endOf('2026-10-01') };
-    expect(milestoneDateChange(undated, { kind: 'strip', band: 'p1' }, day('2026-10-06'))).toBe(endOf('2026-10-06'));
-    expect(milestoneDateChange(dated, { kind: 'row', band: 'p1', milestoneId: null }, day('2026-10-03'))).toBe(endOf('2026-10-03'));
-    expect(milestoneDateChange(dated, { kind: 'strip', band: 'p1' }, day('2026-10-01'))).toBeUndefined();
-    expect(milestoneDateChange(dated, { kind: 'tray', band: 'p1' }, null)).toBe('');
-    expect(milestoneDateChange(undated, { kind: 'tray', band: 'p1' }, null)).toBeUndefined();
+  it('lets a milestone land on any day – it belongs to the whole goal', () => {
+    expect(milestoneAccepts({ kind: 'milestones' })).toBe(true);
+    expect(milestoneAccepts({ kind: 'row', band: 'p2', workPackageId: null })).toBe(true);
+    expect(milestoneAccepts({ kind: 'strip', band: 'p1' })).toBe(true);
+    expect(milestoneAccepts({ kind: 'tray', band: 'p1' })).toBe(false);
+    expect(milestoneAccepts({ kind: 'undated', band: 'p1', workPackageId: null })).toBe(false);
   });
 });
 
 describe('dropping a TODO', () => {
-  const dated = { dueDate: endOf('2026-10-01'), milestoneId: 'm-beta' as string | null };
-  const row = (milestoneId: string | null) => ({ kind: 'row' as const, band: 'p1', milestoneId });
+  const dated = { dueDate: endOf('2026-10-01'), workPackageId: 'w-repo' as string | null };
+  const row = (workPackageId: string | null) => ({ kind: 'row' as const, band: 'p1', workPackageId });
 
   it('another day in the same row only moves the date', () => {
-    expect(planChanges(dated, row('m-beta'), day('2026-10-03'))).toEqual({ dueDate: endOf('2026-10-03') });
+    expect(planChanges(dated, row('w-repo'), day('2026-10-03'))).toEqual({ dueDate: endOf('2026-10-03') });
   });
 
-  it('another row on the same day only changes the sub-goal', () => {
-    expect(planChanges(dated, row('m-rc'), day('2026-10-01'))).toEqual({ milestoneId: 'm-rc' });
-    expect(planChanges(dated, row(null), day('2026-10-01'))).toEqual({ milestoneId: '' });
+  it('another row on the same day only changes the package', () => {
+    expect(planChanges(dated, row('w-umbau'), day('2026-10-01'))).toEqual({ workPackageId: 'w-umbau' });
+    expect(planChanges(dated, row(null), day('2026-10-01'))).toEqual({ workPackageId: '' });
   });
 
-  it('an unplanned TODO dropped into a row gets the day and the row', () => {
-    expect(planChanges({ dueDate: null, milestoneId: null }, row('m-rc'), day('2026-10-06')))
-      .toEqual({ dueDate: endOf('2026-10-06'), milestoneId: 'm-rc' });
+  it('a TODO without a date dropped onto a row gets the day and the package', () => {
+    expect(planChanges({ dueDate: null, workPackageId: null }, row('w-umbau'), day('2026-10-06')))
+      .toEqual({ dueDate: endOf('2026-10-06'), workPackageId: 'w-umbau' });
   });
 
-  it('on a sub-goal of the tray it only changes the sub-goal, the day stays', () => {
-    expect(planChanges(dated, { kind: 'pill', band: 'p1', milestoneId: 'm-docs' }, null)).toEqual({ milestoneId: 'm-docs' });
-    expect(planChanges(dated, { kind: 'pill', band: 'p1', milestoneId: 'm-beta' }, null)).toEqual({});
+  it('on a package of the tray it only changes the package, the day stays', () => {
+    expect(planChanges(dated, { kind: 'pill', band: 'p1', workPackageId: 'w-github' }, null)).toEqual({ workPackageId: 'w-github' });
+    expect(planChanges(dated, { kind: 'pill', band: 'p1', workPackageId: 'w-repo' }, null)).toEqual({});
   });
 
-  it('into the undated area of a row it clears the date and takes that row\'s sub-goal', () => {
-    const undated = (milestoneId: string | null) => ({ kind: 'undated' as const, band: 'p1', milestoneId });
-    expect(planChanges(dated, undated('m-beta'), null)).toEqual({ dueDate: '' });
-    expect(planChanges(dated, undated('m-rc'), null)).toEqual({ dueDate: '', milestoneId: 'm-rc' });
-    expect(planChanges({ dueDate: null, milestoneId: 'm-beta' }, undated('m-beta'), null)).toEqual({});
-    expect(planChanges({ dueDate: null, milestoneId: 'm-beta' }, undated(null), null)).toEqual({ milestoneId: '' });
+  it('onto the label of a row it clears the date and takes that row\'s package', () => {
+    const undated = (workPackageId: string | null) => ({ kind: 'undated' as const, band: 'p1', workPackageId });
+    expect(planChanges(dated, undated('w-repo'), null)).toEqual({ dueDate: '' });
+    expect(planChanges(dated, undated('w-umbau'), null)).toEqual({ dueDate: '', workPackageId: 'w-umbau' });
+    expect(planChanges({ dueDate: null, workPackageId: 'w-repo' }, undated('w-repo'), null)).toEqual({});
+    expect(planChanges({ dueDate: null, workPackageId: 'w-repo' }, undated(null), null)).toEqual({ workPackageId: '' });
+  });
+
+  it('changes nothing on the head strip, the tray or the milestone row', () => {
+    expect(planChanges(dated, { kind: 'strip', band: 'p1' }, day('2026-10-05'))).toEqual({});
+    expect(planChanges(dated, { kind: 'tray', band: 'p1' }, null)).toEqual({});
+    expect(planChanges(dated, { kind: 'milestones' }, day('2026-10-05'))).toEqual({});
   });
 
   it('writes the changes into the TODO rows for the optimistic update', () => {
     const rows = [todo('a', dated), todo('b')];
-    const next = applyPlan(rows, 'a', { dueDate: '', milestoneId: 'm-rc' });
-    expect(next[0]).toMatchObject({ dueDate: null, milestoneId: 'm-rc' });
+    const next = applyPlan(rows, 'a', { dueDate: '', workPackageId: 'w-umbau' });
+    expect(next[0]).toMatchObject({ dueDate: null, workPackageId: 'w-umbau' });
     expect(next[1]).toBe(rows[1]);
-    expect(applyPlan(rows, 'a', { milestoneId: '' })[0]).toMatchObject({ dueDate: dated.dueDate, milestoneId: null });
+    expect(applyPlan(rows, 'a', { workPackageId: '' })[0]).toMatchObject({ dueDate: dated.dueDate, workPackageId: null });
   });
 });
 

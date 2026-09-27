@@ -69,7 +69,7 @@ export function OutlineBar({ counts, className = '' }: { counts: OutlineCounts; 
 
 /**
  * Eine Projektkarte der Gliederung: Kopf mit Name, Zählern und Aktionen, darunter der Balken über
- * die ganze Breite, aufgeklappt die Teilziele.
+ * die ganze Breite, aufgeklappt die Arbeitspakete.
  */
 export function OutlineGroup({ nodeKey, bodyId, title, badge, counts, expanded, onToggle, actions, children, testId }: {
   nodeKey: string;
@@ -91,7 +91,7 @@ export function OutlineGroup({ nodeKey, bodyId, title, badge, counts, expanded, 
           {badge}
         </OutlineToggle>
         <OutlineCountColumns counts={counts} />
-        {/* Feste Breite wie die drei Knöpfe der Teilziel-Zeilen – so fluchten die Zähler mit denen darunter */}
+        {/* Feste Breite wie die drei Knöpfe der Paket-Zeilen – so fluchten die Zähler mit denen darunter */}
         <div className="flex w-[66px] shrink-0 items-center justify-end">{actions}</div>
       </div>
       <OutlineBar counts={counts} className="mx-3 mb-2.5 mt-1.5 h-1.5 sm:mx-4" />

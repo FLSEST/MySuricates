@@ -32,6 +32,22 @@ describe('GoalsSection', () => {
     expect(screen.getByText('Open questions: 3')).toBeInTheDocument();
   });
 
+  // c60bf914: the card names the next milestone of the goal
+  it('shows the next milestone on the card, and nothing for an older backend without it', async () => {
+    server.use(http.get('/api/v1/goals', () => HttpResponse.json([
+      { ...goal, nextMilestone: { id: 'm1', title: 'Code-Freeze', dueDate: new Date(2026, 9, 15, 23, 59, 59).toISOString(), state: 'DUE_SOON' } },
+      { ...goal, id: 'g2', title: 'Docs' },
+    ])));
+    renderWithProviders(<GoalsSection />);
+
+    const card = await screen.findByRole('button', { name: 'Open-Source-Launch' });
+    const next = within(card).getByTestId('goal-card-milestone');
+    expect(next).toHaveTextContent('Code-Freeze');
+    expect(next).toHaveTextContent('10/15');
+    expect(next).toHaveAttribute('title', 'Next milestone: Code-Freeze, 10/15/2026');
+    expect(within(screen.getByRole('button', { name: 'Docs' })).queryByTestId('goal-card-milestone')).not.toBeInTheDocument();
+  });
+
   it('explains what a goal is while there is none, and creates one with title and date', async () => {
     let body: unknown = null;
     server.use(

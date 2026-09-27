@@ -3,18 +3,22 @@ import { AlertTriangle, ArrowDown, ArrowUp, HelpCircle, Pencil, Plus, Trash2 } f
 import { Card, ConfirmModal } from '../ui';
 import { Hint } from '../hints/Hint';
 import { useI18nStore, useT } from '../../i18n';
-import { formatDate } from '../../utils/localeFormat';
-import { useDeleteMilestone, useReorderMilestones } from '../../hooks/useGoalTimeline';
+import { useDeleteWorkPackage, useReorderWorkPackages } from '../../hooks/useGoalWorkPackages';
+import { useDeleteMilestone } from '../../hooks/useGoalMilestones';
 import { useAddGoalProject, useReorderGoalProjects } from '../../hooks/useGoalProjects';
 import { ComplexityChip, EffortChip, RatedByMark } from './GoalBadges';
 import { DueChip } from './TodoPlanChips';
-import { MilestoneDiamond } from './MilestoneDiamond';
+import { WorkPackageMark } from './WorkPackageMark';
 import { OutlineBar, OutlineCountColumns, OutlineGroup, OutlineToggle } from './OutlineGroup';
-import { SubgoalEditor } from './SubgoalEditor';
+import { OutlineMilestones } from './OutlineMilestones';
+import { WorkPackageEditor } from './WorkPackageEditor';
+import { MilestoneEditor } from './MilestoneEditor';
 import { AddProjectPicker } from './GoalProjectsBar';
 import { STATUS_DOT } from './planDisplay';
-import { buildOutline, countTodos, moved, type OutlineProject, type OutlineSubgoal, type OutlineTodo } from './goalOutline';
-import type { GoalDetail, GoalMilestone } from '../../types';
+import { rangeText } from './dragLabel';
+import { packageRange } from './timelineLayout';
+import { buildOutline, countTodos, moved, type OutlinePackage, type OutlineProject, type OutlineTodo } from './goalOutline';
+import type { GoalDetail, GoalMilestone, GoalWorkPackage } from '../../types';
 
 const COLLAPSE_KEY = 'mysuricates-goal-outline';
 
@@ -39,14 +43,21 @@ function storeExpanded(goalId: string, state: Record<string, boolean>) {
 
 const ICON_BUTTON = 'rounded p-1 text-text-tertiary hover:bg-surface-hover hover:text-text focus-ring disabled:opacity-30 disabled:pointer-events-none';
 
-type EditorState = { milestone?: GoalMilestone; projectId?: string | null } | null;
+/** Welcher Dialog offen ist: ein Arbeitspaket (neu oder bestehend) oder ein Meilenstein. */
+type EditorState =
+  | { kind: 'package'; workPackage?: GoalWorkPackage; projectId?: string | null }
+  | { kind: 'milestone'; milestone?: GoalMilestone }
+  | null;
+
+/** Was nach der Rückfrage gelöscht wird. */
+type Removing = { kind: 'package'; item: GoalWorkPackage } | { kind: 'milestone'; item: GoalMilestone } | null;
 
 /**
- * Gliederung eines Ziels (c60bf914), die Standardansicht der Zielseite: je Projekt eine Karte mit
- * Balken und Zählern, darin die Teilziele an einem Faden in ihrer Reihenfolge, darunter „Ohne
- * Teilziel“; am Ende „Ohne Projekt“. Aufgeklappt stehen die TODOs mit Status, Fälligkeit und
- * Einschätzung. Erreichte Teilziele sind zugeklappt. Tastatur: ↑ ↓ wechseln die Zeile, → klappt
- * auf, ← zu; Enter und Leertaste schalten um.
+ * Gliederung eines Ziels (c60bf914), die Standardansicht der Zielseite: oben die Meilensteine, dann
+ * je Projekt eine Karte mit Balken und Zählern, darin die Arbeitspakete an einem Faden in ihrer
+ * Reihenfolge – jedes mit Zeitraum –, darunter „Ohne Arbeitspaket“; am Ende „Ohne Projekt“.
+ * Aufgeklappt stehen die TODOs mit Status, Fälligkeit und Einschätzung. Abgeschlossene Pakete sind
+ * zugeklappt. Tastatur: ↑ ↓ wechseln die Zeile, → klappt auf, ← zu; Enter und Leertaste schalten um.
  */
 export function GoalOutline({ detail, today, onOpenTodo }: {
   detail: GoalDetail;
@@ -61,10 +72,11 @@ export function GoalOutline({ detail, today, onOpenTodo }: {
   const outline = useMemo(() => buildOutline(detail), [detail]);
   const [expanded, setExpanded] = useState(() => readExpanded(goalId));
   const [editor, setEditor] = useState<EditorState>(null);
-  const [removing, setRemoving] = useState<GoalMilestone | null>(null);
-  const reorderMilestones = useReorderMilestones(goalId);
+  const [removing, setRemoving] = useState<Removing>(null);
+  const reorderPackages = useReorderWorkPackages(goalId);
   const reorderProjects = useReorderGoalProjects(goalId);
   const addProject = useAddGoalProject(goalId);
+  const removePackage = useDeleteWorkPackage(goalId);
   const removeMilestone = useDeleteMilestone(goalId);
 
   const isOpen = useCallback((key: string, byDefault: boolean) => expanded[key] ?? byDefault, [expanded]);
@@ -101,9 +113,9 @@ export function GoalOutline({ detail, today, onOpenTodo }: {
     const ids = moved(outline.projects.filter((group) => group.linked).map((group) => group.key), index, delta);
     if (ids) reorderProjects.mutate(ids);
   };
-  const moveSubgoal = (group: OutlineProject, index: number, delta: -1 | 1) => {
-    const ids = moved(group.subgoals.map((subgoal) => subgoal.milestone.id), index, delta);
-    if (ids) reorderMilestones.mutate(ids);
+  const movePackage = (group: OutlineProject, index: number, delta: -1 | 1) => {
+    const ids = moved(group.packages.map((entry) => entry.workPackage.id), index, delta);
+    if (ids) reorderPackages.mutate(ids);
   };
 
   const linkedCount = outline.projects.filter((group) => group.linked).length;
@@ -139,10 +151,10 @@ export function GoalOutline({ detail, today, onOpenTodo }: {
           </>
         )}>
         <ProjectBody group={group} today={today} isOpen={isOpen} toggle={toggle} onOpenTodo={onOpenTodo}
-          reordering={reorderMilestones.isPending}
-          onMove={(subgoalIndex, delta) => moveSubgoal(group, subgoalIndex, delta)}
-          onEdit={(milestone) => setEditor({ milestone })}
-          onAdd={group.project && group.linked ? () => setEditor({ projectId: group.key }) : undefined}
+          reordering={reorderPackages.isPending}
+          onMove={(packageIndex, delta) => movePackage(group, packageIndex, delta)}
+          onEdit={(workPackage) => setEditor({ kind: 'package', workPackage })}
+          onAdd={group.project && group.linked ? () => setEditor({ kind: 'package', projectId: group.key }) : undefined}
           onLink={group.project && !group.linked ? () => addProject.mutate(group.key) : undefined}
           linking={addProject.isPending} />
       </OutlineGroup>
@@ -153,6 +165,8 @@ export function GoalOutline({ detail, today, onOpenTodo }: {
     <section aria-label={to.label} data-testid="goal-outline" className="space-y-3">
       <Hint id="goal-outline" />
       <p id={helpId} className="sr-only">{to.keyboardHelp}</p>
+      <OutlineMilestones detail={detail} onAdd={() => setEditor({ kind: 'milestone' })}
+        onEdit={(milestone) => setEditor({ kind: 'milestone', milestone })} />
       {detail.projects.length === 0 && (
         <Card className="flex flex-wrap items-center gap-3" data-testid="outline-no-projects">
           <p className="min-w-0 flex-1 basis-60 text-sm text-text-secondary">{to.emptyProjects}</p>
@@ -164,25 +178,30 @@ export function GoalOutline({ detail, today, onOpenTodo }: {
         {outline.noProject && renderProject(outline.noProject, -1)}
       </div>
 
-      {editor && (
-        <SubgoalEditor goalId={goalId} projects={detail.projects} milestone={editor.milestone} projectId={editor.projectId}
+      {editor?.kind === 'package' && (
+        <WorkPackageEditor goalId={goalId} projects={detail.projects} workPackage={editor.workPackage} projectId={editor.projectId}
           onClose={() => setEditor(null)}
-          onDelete={(milestone) => {
+          onDelete={(item) => {
             setEditor(null);
-            setRemoving(milestone);
+            setRemoving({ kind: 'package', item });
           }} />
       )}
-      <ConfirmModal
-        open={removing !== null}
-        onClose={() => setRemoving(null)}
-        onConfirm={() => removing && removeMilestone.mutate(removing.id, { onSettled: () => setRemoving(null) })}
-        title={t.goals.milestones.deleteTitle}
-        message={removing ? t.goals.milestones.deleteConfirm.replace('{title}', () => removing.title) : null}
-        confirmLabel={t.goals.milestones.delete}
-        confirmIcon={<Trash2 className="h-4 w-4" />}
-        variant="danger"
-        isPending={removeMilestone.isPending}
-      />
+      {editor?.kind === 'milestone' && (
+        <MilestoneEditor goalId={goalId} milestone={editor.milestone} workPackages={detail.workPackages} projects={detail.projects}
+          onClose={() => setEditor(null)}
+          onDelete={(item) => {
+            setEditor(null);
+            setRemoving({ kind: 'milestone', item });
+          }} />
+      )}
+      <RemoveDialog removing={removing} onClose={() => setRemoving(null)}
+        pending={removePackage.isPending || removeMilestone.isPending}
+        onConfirm={() => {
+          if (!removing) return;
+          const done = { onSettled: () => setRemoving(null) };
+          if (removing.kind === 'package') removePackage.mutate(removing.item.id, done);
+          else removeMilestone.mutate(removing.item.id, done);
+        }} />
     </section>
   );
 }
@@ -195,21 +214,21 @@ interface BodyProps {
   onOpenTodo: (todoId: string) => void;
   reordering: boolean;
   onMove: (index: number, delta: -1 | 1) => void;
-  onEdit: (milestone: GoalMilestone) => void;
-  /** Fehlt bei „Ohne Projekt“ und bei Projekten, die nicht zum Ziel gehören – dort lässt sich kein Teilziel anlegen. */
+  onEdit: (workPackage: GoalWorkPackage) => void;
+  /** Fehlt bei „Ohne Projekt“ und bei Projekten, die nicht zum Ziel gehören – dort lässt sich kein Paket anlegen. */
   onAdd?: () => void;
   /** Nur bei einem Projekt, das bloß über TODOs hereinkommt: es dem Ziel zuordnen. */
   onLink?: () => void;
   linking?: boolean;
 }
 
-/** Inhalt einer Projektkarte: die Teilziele am Faden, „Ohne Teilziel“, dann „+ Teilziel“. */
+/** Inhalt einer Projektkarte: die Arbeitspakete am Faden, „Ohne Arbeitspaket“, dann „+ Arbeitspaket“. */
 function ProjectBody({ group, today, isOpen, toggle, onOpenTodo, reordering, onMove, onEdit, onAdd, onLink, linking }: BodyProps) {
   const t = useT();
   const to = t.goals.outline;
   const name = group.project?.name ?? to.noProject;
   const looseKey = `loose:${group.key}`;
-  const empty = group.subgoals.length === 0 && group.loose.length === 0;
+  const empty = group.packages.length === 0 && group.loose.length === 0;
   return (
     <div className="space-y-2">
       {!group.project && <p className="text-xs text-text-tertiary">{to.noProjectHint}</p>}
@@ -222,17 +241,17 @@ function ProjectBody({ group, today, isOpen, toggle, onOpenTodo, reordering, onM
           </button>
         </div>
       )}
-      {empty && group.project && <p className="text-sm text-text-secondary">{to.noSubgoals}</p>}
-      {(group.subgoals.length > 0 || group.loose.length > 0) && (
-        // Der Faden: eine senkrechte Linie, auf der die Rauten der Teilziele sitzen – wie am Zeitstrahl
-        <ol className="relative space-y-0.5 before:absolute before:bottom-3 before:left-[5px] before:top-3 before:w-0.5 before:rounded-full before:bg-border">
-          {group.subgoals.map((subgoal, index) => (
-            <SubgoalRow key={subgoal.milestone.id} subgoal={subgoal} today={today}
-              expanded={isOpen(`ms:${subgoal.milestone.id}`, subgoal.milestone.state !== 'REACHED')}
-              onToggle={() => toggle(`ms:${subgoal.milestone.id}`, subgoal.milestone.state !== 'REACHED')}
-              onOpenTodo={onOpenTodo} onEdit={() => onEdit(subgoal.milestone)}
+      {empty && group.project && <p className="text-sm text-text-secondary">{to.noWorkPackages}</p>}
+      {(group.packages.length > 0 || group.loose.length > 0) && (
+        // Der Faden: eine senkrechte Linie, auf der die Pakete der Reihe nach sitzen
+        <ol className="relative space-y-0.5 before:absolute before:bottom-3 before:left-[7px] before:top-3 before:w-0.5 before:rounded-full before:bg-border">
+          {group.packages.map((entry, index) => (
+            <PackageRow key={entry.workPackage.id} entry={entry} today={today}
+              expanded={isOpen(`wp:${entry.workPackage.id}`, entry.workPackage.state !== 'REACHED')}
+              onToggle={() => toggle(`wp:${entry.workPackage.id}`, entry.workPackage.state !== 'REACHED')}
+              onOpenTodo={onOpenTodo} onEdit={() => onEdit(entry.workPackage)}
               onUp={index > 0 && !reordering ? () => onMove(index, -1) : undefined}
-              onDown={index < group.subgoals.length - 1 && !reordering ? () => onMove(index, 1) : undefined} />
+              onDown={index < group.packages.length - 1 && !reordering ? () => onMove(index, 1) : undefined} />
           ))}
           {group.loose.length > 0 && (
             <LooseRow nodeKey={looseKey} todos={group.loose} today={today} expanded={isOpen(looseKey, true)}
@@ -241,18 +260,18 @@ function ProjectBody({ group, today, isOpen, toggle, onOpenTodo, reordering, onM
         </ol>
       )}
       {onAdd && (
-        <button type="button" onClick={onAdd} aria-label={to.addSubgoalIn.replace('{project}', name)}
-          className="ml-4 inline-flex items-center gap-1 rounded-md border border-dashed border-border-strong px-2.5 py-1 text-xs font-medium text-text-secondary hover:border-accent hover:text-accent focus-ring">
+        <button type="button" onClick={onAdd} aria-label={to.addWorkPackageIn.replace('{project}', name)}
+          className="ml-5 inline-flex items-center gap-1 rounded-md border border-dashed border-border-strong px-2.5 py-1 text-xs font-medium text-text-secondary hover:border-accent hover:text-accent focus-ring">
           <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-          {to.addSubgoal}
+          {to.addWorkPackage}
         </button>
       )}
     </div>
   );
 }
 
-function SubgoalRow({ subgoal, today, expanded, onToggle, onOpenTodo, onEdit, onUp, onDown }: {
-  subgoal: OutlineSubgoal;
+function PackageRow({ entry, today, expanded, onToggle, onOpenTodo, onEdit, onUp, onDown }: {
+  entry: OutlinePackage;
   today: number;
   expanded: boolean;
   onToggle: () => void;
@@ -262,25 +281,26 @@ function SubgoalRow({ subgoal, today, expanded, onToggle, onOpenTodo, onEdit, on
   onDown?: () => void;
 }) {
   const t = useT();
-  const tm = t.goals.milestones;
+  const tw = t.goals.workPackages;
   const locale = useI18nStore((s) => s.locale);
   const bodyId = useId();
-  const { milestone, todos, counts } = subgoal;
-  const reached = milestone.state === 'REACHED';
-  const when = milestone.dueDate ? formatDate(milestone.dueDate, locale) : tm.noDate;
-  const state = milestone.state !== 'OPEN' ? ` · ${tm.states[milestone.state]}` : '';
+  const { workPackage, todos, counts } = entry;
+  const done = workPackage.state === 'REACHED';
+  const range = packageRange(workPackage);
   return (
-    <li data-testid={`outline-subgoal-${milestone.id}`}>
+    <li data-testid={`outline-package-${workPackage.id}`}>
       <div className="flex items-center gap-2 rounded-md hover:bg-surface-hover/60">
-        <span className="relative z-10 flex w-3 shrink-0 justify-center"><MilestoneDiamond state={milestone.state} /></span>
-        <OutlineToggle nodeKey={`ms:${milestone.id}`} expanded={expanded} controls={bodyId} onToggle={onToggle}>
+        <span className="relative z-10 flex w-4 shrink-0 justify-center bg-surface-raised py-0.5"><WorkPackageMark state={workPackage.state} /></span>
+        <OutlineToggle nodeKey={`wp:${workPackage.id}`} expanded={expanded} controls={bodyId} onToggle={onToggle}>
           <span className="min-w-0">
-            <span title={milestone.title}
-              className={`line-clamp-2 break-words text-sm font-medium ${reached ? 'text-text-secondary' : 'text-text'}`}>
-              {milestone.title}
+            <span title={workPackage.title}
+              className={`line-clamp-2 break-words text-sm font-medium ${done ? 'text-text-secondary' : 'text-text'}`}>
+              {workPackage.title}
             </span>
-            <span className={`block text-[11px] ${milestone.state === 'OVERDUE' ? 'text-danger' : 'text-text-tertiary'}`}>
-              {when}{state}{milestone.reopened && ` · ${tm.reopened}`}
+            <span className={`flex flex-wrap gap-x-2 text-[11px] ${workPackage.state === 'OVERDUE' ? 'text-danger' : 'text-text-tertiary'}`}>
+              <span className="tabular-nums">{range ? rangeText(range, locale) : tw.noRange}</span>
+              {workPackage.state !== 'OPEN' && <span>{tw.states[workPackage.state]}</span>}
+              {workPackage.reopened && <span>{tw.reopened}</span>}
             </span>
           </span>
         </OutlineToggle>
@@ -288,20 +308,20 @@ function SubgoalRow({ subgoal, today, expanded, onToggle, onOpenTodo, onEdit, on
         <OutlineCountColumns counts={counts} />
         <div className="flex shrink-0 items-center">
           <button type="button" className={ICON_BUTTON} disabled={!onUp} onClick={onUp}
-            aria-label={`${tm.moveUp}: ${milestone.title}`} title={tm.moveUp}>
+            aria-label={`${tw.moveUp}: ${workPackage.title}`} title={tw.moveUp}>
             <ArrowUp className="h-3.5 w-3.5" aria-hidden="true" />
           </button>
           <button type="button" className={ICON_BUTTON} disabled={!onDown} onClick={onDown}
-            aria-label={`${tm.moveDown}: ${milestone.title}`} title={tm.moveDown}>
+            aria-label={`${tw.moveDown}: ${workPackage.title}`} title={tw.moveDown}>
             <ArrowDown className="h-3.5 w-3.5" aria-hidden="true" />
           </button>
           <button type="button" className={ICON_BUTTON} onClick={onEdit}
-            aria-label={t.goals.outline.edit.replace('{title}', milestone.title)} title={tm.editAction}>
+            aria-label={t.goals.outline.edit.replace('{title}', workPackage.title)} title={tw.edit}>
             <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
           </button>
         </div>
       </div>
-      <div id={bodyId} hidden={!expanded} className="pb-1 pl-5">
+      <div id={bodyId} hidden={!expanded} className="pb-1 pl-6">
         {todos.length === 0
           ? <p className="px-1.5 py-1 text-xs text-text-tertiary">{t.goals.outline.noTodos}</p>
           : <TodoRows todos={todos} today={today} onOpenTodo={onOpenTodo} />}
@@ -310,7 +330,7 @@ function SubgoalRow({ subgoal, today, expanded, onToggle, onOpenTodo, onEdit, on
   );
 }
 
-/** „Ohne Teilziel“: die TODOs des Projekts, die noch in keinem Teilziel stehen. */
+/** „Ohne Arbeitspaket“: die TODOs des Projekts, die noch in keinem Paket stehen. */
 function LooseRow({ nodeKey, todos, today, expanded, onToggle, onOpenTodo }: {
   nodeKey: string;
   todos: OutlineTodo[];
@@ -325,18 +345,18 @@ function LooseRow({ nodeKey, todos, today, expanded, onToggle, onOpenTodo }: {
   return (
     <li data-testid={`outline-${nodeKey.replace(':', '-')}`}>
       <div className="flex items-center gap-2 rounded-md hover:bg-surface-hover/60">
-        <span className="relative z-10 flex w-3 shrink-0 justify-center">
+        <span className="relative z-10 flex w-4 shrink-0 justify-center">
           <span aria-hidden="true" className="h-2 w-2 rounded-full border-2 border-border-strong bg-surface-raised" />
         </span>
         <OutlineToggle nodeKey={nodeKey} expanded={expanded} controls={bodyId} onToggle={onToggle}>
-          <span className="truncate text-sm italic text-text-secondary">{to.noSubgoal}</span>
+          <span className="truncate text-sm italic text-text-secondary">{to.noWorkPackage}</span>
         </OutlineToggle>
         <OutlineBar counts={counts} className="hidden h-1 w-14 shrink-0 sm:block" />
         <OutlineCountColumns counts={counts} />
-        {/* Platz der drei Knöpfe der Teilziel-Zeilen, damit die Zähler fluchten */}
+        {/* Platz der drei Knöpfe der Paket-Zeilen, damit die Zähler fluchten */}
         <span aria-hidden="true" className="w-[66px] shrink-0" />
       </div>
-      <div id={bodyId} hidden={!expanded} className="pb-1 pl-5">
+      <div id={bodyId} hidden={!expanded} className="pb-1 pl-6">
         <TodoRows todos={todos} today={today} onOpenTodo={onOpenTodo} />
       </div>
     </li>
@@ -382,5 +402,29 @@ function TodoRows({ todos, today, onOpenTodo }: { todos: OutlineTodo[]; today: n
         );
       })}
     </ul>
+  );
+}
+
+/** Rückfrage vor dem Löschen eines Pakets oder Meilensteins. */
+function RemoveDialog({ removing, pending, onClose, onConfirm }: {
+  removing: Removing;
+  pending: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  const t = useT();
+  const words = removing?.kind === 'milestone' ? t.goals.milestones : t.goals.workPackages;
+  return (
+    <ConfirmModal
+      open={removing !== null}
+      onClose={onClose}
+      onConfirm={onConfirm}
+      title={words.deleteTitle}
+      message={removing ? words.deleteConfirm.replace('{title}', () => removing.item.title) : null}
+      confirmLabel={words.delete}
+      confirmIcon={<Trash2 className="h-4 w-4" />}
+      variant="danger"
+      isPending={pending}
+    />
   );
 }

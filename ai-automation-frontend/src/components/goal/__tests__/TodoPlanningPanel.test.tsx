@@ -5,7 +5,7 @@ import { server } from '../../../test/server';
 import { renderWithProviders } from '../../../test/utils';
 import { useI18nStore } from '../../../i18n';
 import { TodoPlanningPanel } from '../TodoPlanningPanel';
-import type { GoalMilestone, Todo } from '../../../types';
+import type { GoalWorkPackage, Todo } from '../../../types';
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
 afterEach(() => server.resetHandlers());
@@ -17,19 +17,27 @@ const goals = [
   { id: 'g2', title: 'Docs' },
 ];
 
-const ms = (id: string, title: string, projectId: string | null, dueDate: string | null = null): Partial<GoalMilestone> => ({
-  id, goalId: 'g1', title, projectId, dueDate, position: 0, openQuestions: 0, state: 'OPEN', total: 0, done: 0,
+const startOf = (iso: string) => new Date(`${iso}T00:00:00`).toISOString();
+const endOf = (iso: string) => new Date(`${iso}T23:59:59`).toISOString();
+
+const wp = (id: string, title: string, projectId: string | null, span?: [string, string]): Partial<GoalWorkPackage> => ({
+  id, goalId: 'g1', title, projectId, startDate: span ? startOf(span[0]) : null, endDate: span ? endOf(span[1]) : null,
+  position: 0, openQuestions: 0, state: 'OPEN', total: 0, done: 0,
 });
 
-const todo = {
-  id: 't1', title: 'Privacy findings', projectId: 'p1', projectName: 'AutoPilot', status: 'OPEN',
-  planning: {
-    goalId: 'g1', goalTitle: 'Release', goalRank: null, complexity: null, suggestedEffort: null, ratingNote: null,
-    ratedBy: null, ratedAt: null, openQuestion: null, milestoneId: 'm-legal',
-  },
-} as unknown as Todo;
+function todoWith(planning: Record<string, unknown>): Todo {
+  return {
+    id: 't1', title: 'Privacy findings', projectId: 'p1', projectName: 'AutoPilot', status: 'OPEN',
+    planning: {
+      goalId: 'g1', goalTitle: 'Release', goalRank: null, complexity: null, suggestedEffort: null, ratingNote: null,
+      ratedBy: null, ratedAt: null, openQuestion: null, ...planning,
+    },
+  } as unknown as Todo;
+}
 
-function serve(sent: unknown[]) {
+/** `legacy`: das Ziel antwortet wie ein Backend vor c60bf914 – ohne `workPackages`, die Pakete heißen „milestones“. */
+function serve(sent: unknown[], legacy = false) {
+  const packages = [wp('w-legal', 'Legal', 'p1', ['2026-10-12', '2026-10-15']), wp('w-promo', 'Promotion', 'p2'), wp('w-docs', 'Handbook', 'p1')];
   server.use(
     http.get('/api/v1/goals', () => HttpResponse.json(goals)),
     http.get('/api/v1/goals/:id', ({ params }) => HttpResponse.json({
@@ -37,47 +45,60 @@ function serve(sent: unknown[]) {
       todos: [],
       byProject: [],
       projects: [],
-      milestones: params.id === 'g1'
-        ? [ms('m-legal', 'Legal', 'p1', '2026-10-15T21:59:59Z'), ms('m-promo', 'Promotion', 'p2'), ms('m-docs', 'Handbook', 'p1')]
-        : [ms('m-other', 'Other goal', 'p1')],
+      ...(legacy
+        ? { milestones: packages.map(({ startDate: _s, endDate, ...rest }) => ({ ...rest, dueDate: endDate })) }
+        : { workPackages: params.id === 'g1' ? packages : [wp('w-other', 'Other goal', 'p1')], milestones: [] }),
     })),
     http.patch('/api/v1/todos/t1/planning', async ({ request }) => {
       sent.push(await request.json());
-      return HttpResponse.json(todo);
+      return HttpResponse.json(todoWith({}));
     }),
   );
 }
 
-// c60bf914: the planning field picks the sub-goal, filtered to the TODO's project
-describe('TodoPlanningPanel – sub-goal', () => {
-  it('offers only sub-goals of the TODO\'s project and saves a new one', async () => {
+// c60bf914: the planning field picks the work package, filtered to the TODO's project
+describe('TodoPlanningPanel – work package', () => {
+  it('offers only packages of the TODO\'s project with their span and saves a new one as workPackageId', async () => {
     const sent: unknown[] = [];
     serve(sent);
-    renderWithProviders(<TodoPlanningPanel todo={todo} />);
+    renderWithProviders(<TodoPlanningPanel todo={todoWith({ workPackageId: 'w-legal' })} />);
 
-    const select = await screen.findByRole('combobox', { name: 'Sub-goal' });
-    await waitFor(() => expect(within(select).getAllByRole('option').map((option) => option.textContent))
-      .toEqual(['No sub-goal', 'Legal · Oct 15', 'Handbook · no date']));
-    expect(select).toHaveValue('m-legal');
+    const select = await screen.findByRole('combobox', { name: 'Work package' });
+    await waitFor(() => expect(within(select).getAllByRole('option').map((option) => option.textContent?.replace(/\s/g, ' ')))
+      .toEqual(['No work package', 'Legal · 10/12 – 10/15', 'Handbook · no time span']));
+    expect(select).toHaveValue('w-legal');
 
-    fireEvent.change(select, { target: { value: 'm-docs' } });
+    fireEvent.change(select, { target: { value: 'w-docs' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save planning' }));
-    await waitFor(() => expect(sent).toEqual([{ milestoneId: 'm-docs' }]));
+    await waitFor(() => expect(sent).toEqual([{ workPackageId: 'w-docs' }]));
   });
 
-  it('resets the sub-goal when the goal changes and lists the sub-goals of the new goal', async () => {
+  it('resets the package when the goal changes and lists the packages of the new goal', async () => {
     const sent: unknown[] = [];
     serve(sent);
-    renderWithProviders(<TodoPlanningPanel todo={todo} />);
+    renderWithProviders(<TodoPlanningPanel todo={todoWith({ workPackageId: 'w-legal' })} />);
 
     await screen.findByRole('option', { name: 'Docs' });
     fireEvent.change(screen.getByRole('combobox', { name: 'Goal' }), { target: { value: 'g2' } });
-    const select = screen.getByRole('combobox', { name: 'Sub-goal' });
+    const select = screen.getByRole('combobox', { name: 'Work package' });
     expect(select).toHaveValue('');
     await waitFor(() => expect(within(select).getAllByRole('option').map((option) => option.textContent))
-      .toEqual(['No sub-goal', 'Other goal · no date']));
+      .toEqual(['No work package', 'Other goal · no time span']));
 
     fireEvent.click(screen.getByRole('button', { name: 'Save planning' }));
-    await waitFor(() => expect(sent).toEqual([{ goalId: 'g2', milestoneId: '' }]));
+    await waitFor(() => expect(sent).toEqual([{ goalId: 'g2', workPackageId: '' }]));
+  });
+
+  it('reads the package an older backend still calls milestoneId, and sends it under that name', async () => {
+    const sent: unknown[] = [];
+    serve(sent, true);
+    renderWithProviders(<TodoPlanningPanel todo={todoWith({ milestoneId: 'w-legal' })} />);
+
+    const select = await screen.findByRole('combobox', { name: 'Work package' });
+    await waitFor(() => expect(within(select).getAllByRole('option')).toHaveLength(3));
+    expect(select).toHaveValue('w-legal');
+    fireEvent.change(select, { target: { value: 'w-docs' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save planning' }));
+    await waitFor(() => expect(sent).toEqual([{ milestoneId: 'w-docs' }]));
   });
 });

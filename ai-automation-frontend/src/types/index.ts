@@ -1268,7 +1268,9 @@ export interface TodoPlanning {
   ratedBy: RatedBy | null;
   ratedAt: string | null;
   openQuestion: string | null;
-  /** Teilziel (im Code `milestone`) im Ziel (TODO 259f4f66); null = keins. Fehlt bei einem älteren Backend. */
+  /** Arbeitspaket im Ziel (c60bf914); null = keins. Fehlt bei einem älteren Backend. */
+  workPackageId?: string | null;
+  /** Dasselbe unter dem Namen eines älteren Backends (vor c60bf914 hieß das Arbeitspaket „milestone“). */
   milestoneId?: string | null;
 }
 
@@ -1281,7 +1283,9 @@ export interface UpdateTodoPlanningRequest {
   ratingNote?: string;
   openQuestion?: string;
   ratedBy?: RatedBy;
-  /** Meilenstein desselben Ziels; `''` nimmt ihn weg. */
+  /** Arbeitspaket desselben Ziels; `''` nimmt es weg. */
+  workPackageId?: string;
+  /** Nur für ein älteres Backend (vor c60bf914): dort heißt das Feld noch so. */
   milestoneId?: string;
 }
 
@@ -1319,6 +1323,16 @@ export interface Goal {
   guard: GoalGuard;
   /** Ausdrücklich zugeordnete Projekte, nach Position (c60bf914). Fehlt bei einem älteren Backend. */
   projects?: GoalProjectRef[];
+  /** Nächster nicht erreichter Meilenstein – für die Zielkarte. Fehlt bei einem älteren Backend. */
+  nextMilestone?: GoalMilestoneRef | null;
+}
+
+/** Ein Meilenstein in der Zielliste: das Nötigste für die Karte. */
+export interface GoalMilestoneRef {
+  id: string;
+  title: string;
+  dueDate: string;
+  state: MilestoneState;
 }
 
 /** Projekt eines Ziels in der Zielliste: nur Name und ID. */
@@ -1339,58 +1353,96 @@ export interface GoalProject {
 }
 
 /**
- * Zustand eines Teilziels (im Code `milestone`), beim Lesen berechnet: bald fällig = in höchstens
- * 3 Tagen. Ohne Datum nur OPEN oder REACHED.
+ * Zustand eines Arbeitspakets bzw. Meilensteins, beim Lesen berechnet: bald fällig = in höchstens
+ * 3 Tagen. Ein Arbeitspaket ohne Zeitraum ist nur OPEN oder REACHED (Oberfläche: „abgeschlossen“).
  */
 export type MilestoneState = 'OPEN' | 'DUE_SOON' | 'OVERDUE' | 'REACHED';
+export type WorkPackageState = MilestoneState;
 
 /**
- * Teilziel eines Ziels (c60bf914; im Code `milestone`): gehört genau einem Projekt des Ziels, das
- * Datum ist optional, die Reihenfolge im Projekt steht in `position`. Erreicht, wenn alle
- * zugeordneten TODOs erledigt sind.
+ * Arbeitspaket eines Ziels (c60bf914): gehört genau einem Projekt des Ziels und bündelt dessen
+ * TODOs; Reihenfolge im Projekt über `position`. Mit Zeitraum (`startDate` und `endDate`, beide oder
+ * keins) steht es als Balken auf dem Zeitstrahl. Abgeschlossen, wenn alle seine TODOs erledigt sind.
  */
-export interface GoalMilestone {
+export interface GoalWorkPackage {
   id: string;
   goalId: string;
-  title: string;
-  /** null = ohne Datum. */
-  dueDate: string | null;
-  /** Projekt des Teilziels; null nur bei Altdaten oder wenn das Projekt gelöscht wurde. */
+  /** null nur bei Altdaten oder wenn das Projekt gelöscht wurde. */
   projectId: string | null;
+  title: string;
+  /** Beginn (lokaler Tagesbeginn); null = ohne Zeitraum. */
+  startDate: string | null;
+  /** Ende (lokales Tagesende); null = ohne Zeitraum. */
+  endDate: string | null;
   /** Reihenfolge innerhalb des Projekts. */
   position: number;
-  /** Nicht erledigte TODOs mit offener Frage. */
-  openQuestions: number;
-  state: MilestoneState;
+  /** Basis ist das Ende: bald fällig, überfällig, abgeschlossen. */
+  state: WorkPackageState;
   /** Zugeordnete TODOs ohne ARCHIVED. */
   total: number;
   done: number;
-  /** Erstes Erreichen; bleibt stehen. */
-  reachedAt: string | null;
-  /** War schon erreicht, ist es wegen eines neuen TODOs nicht mehr („wieder offen“). */
+  /** Nicht erledigte TODOs mit offener Frage. */
+  openQuestions: number;
+  /** Erster Abschluss; bleibt stehen. */
+  completedAt: string | null;
+  /** War schon abgeschlossen, ist es wegen eines neuen TODOs nicht mehr. */
   reopened: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
-/** Ein Teilziel mit Datum – nur solche stehen als Raute auf dem Zeitstrahl. */
-export type DatedMilestone = GoalMilestone & { dueDate: string };
+/** Ein Arbeitspaket mit Zeitraum – nur solche stehen als Balken auf dem Zeitstrahl. */
+export type ScheduledWorkPackage = GoalWorkPackage & { startDate: string; endDate: string };
 
 /**
- * `dueDate`: ISO-Zeitpunkt oder `YYYY-MM-DD` (= bis 23:59:59 UTC), fehlt = ohne Datum. `projectId`
- * ist Pflicht, außer das Ziel hat genau ein Projekt.
+ * Meilenstein eines Ziels (c60bf914): ein Termin fürs ganze Ziel (kein Projekt), als Raute oben im
+ * Zeitstrahl. Mit verknüpften Arbeitspaketen erreicht, wenn alle abgeschlossen sind; ohne von Hand.
  */
-export interface CreateGoalMilestoneRequest {
+export interface GoalMilestone {
+  id: string;
+  goalId: string;
   title: string;
-  dueDate?: string;
-  projectId?: string;
+  /** Fälligkeit (lokales Tagesende). */
+  dueDate: string;
+  state: MilestoneState;
+  workPackageIds: string[];
+  packagesTotal: number;
+  packagesDone: number;
+  /** Erstes Erreichen; bleibt stehen. */
+  reachedAt: string | null;
+  reopened: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
-/** Fehlendes Feld = unverändert; `dueDate: ''` entfernt das Datum; `projectId` nur, solange keine TODOs daran hängen. */
+/** Zeitraum `startDate`/`endDate` als ISO-Zeitpunkt; ohne beide = ohne Zeitraum. `projectId` Pflicht, außer das Ziel hat genau ein Projekt. */
+export interface CreateGoalWorkPackageRequest {
+  title: string;
+  projectId?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+/** Fehlendes Feld = unverändert, `''` leert (Beginn und Ende nur zusammen); `projectId` nur ohne TODOs. */
+export interface UpdateGoalWorkPackageRequest {
+  title?: string;
+  projectId?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface CreateGoalMilestoneRequest {
+  title: string;
+  dueDate: string;
+  workPackageIds?: string[];
+}
+
+/** Fehlendes Feld = unverändert; `workPackageIds` ersetzt die Menge; `reached` nur ohne verknüpfte Pakete. */
 export interface UpdateGoalMilestoneRequest {
   title?: string;
   dueDate?: string;
-  projectId?: string;
+  workPackageIds?: string[];
+  reached?: boolean;
 }
 
 /** `POST /goals/{id}/guard`; Projekt, Zeitplan und Sprache zählen nur beim ersten Einschalten. */
@@ -1420,8 +1472,8 @@ export interface GoalTodoItem {
   updatedAt: string;
   /** Fälligkeit (TODO 259f4f66); null = ungeplant. */
   dueDate: string | null;
-  /** Meilenstein des Ziels; null = keiner. */
-  milestoneId: string | null;
+  /** Arbeitspaket des Ziels (c60bf914); null = keins. */
+  workPackageId: string | null;
 }
 
 export interface GoalProjectProgress {
@@ -1438,8 +1490,15 @@ export interface GoalDetail {
   byProject: GoalProjectProgress[];
   /** Ausdrücklich zugeordnete Projekte nach Position; `normalizeGoalDetail` leitet sie bei einem älteren Backend aus `byProject` ab. */
   projects: GoalProject[];
-  /** Nach Projekt-Position, dann Teilziel-Position. */
+  /** Nach Projekt-Position, dann Paket-Position. */
+  workPackages: GoalWorkPackage[];
+  /** Nach Fälligkeit, dann Titel. */
   milestones: GoalMilestone[];
+  /**
+   * Gesetzt von `normalizeGoalDetail`: Die Antwort kam von einem Backend vor c60bf914 (ohne
+   * `workPackages`). Meilensteine gibt es dort noch nicht, die Oberfläche blendet sie aus.
+   */
+  legacyBackend?: boolean;
 }
 
 /** Relationskarte eines Ziels (TODO c6ea8f5c): Herkunft → TODO → Bearbeitung → Ergebnis. */
@@ -1578,9 +1637,14 @@ export interface ProjectRollup {
   needsYouCount: number;
 }
 
-/** Ein Meilenstein in „Braucht dich“: bald fällig oder überfällig, mit dem Ziel für den Link. */
+/**
+ * Ein Termin in „Braucht dich“ (Feldname `milestonesDue` bleibt): ein Meilenstein, bald fällig oder
+ * überfällig, oder ein Arbeitspaket, dessen Ende vorbei ist – mit dem Ziel für den Link. `kind`
+ * fehlt bei einem älteren Backend; dessen Einträge sind Arbeitspakete.
+ */
 export interface MilestoneAttentionItem {
   id: string;
+  kind?: 'MILESTONE' | 'WORK_PACKAGE';
   title: string;
   goalId: string;
   goalTitle: string;

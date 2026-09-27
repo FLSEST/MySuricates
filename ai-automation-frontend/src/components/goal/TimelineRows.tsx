@@ -1,41 +1,43 @@
 import { useId, useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
-import { useI18nStore, useT } from '../../i18n';
-import { formatDate } from '../../utils/localeFormat';
+import { ChevronRight, HelpCircle } from 'lucide-react';
+import { useT } from '../../i18n';
 import {
-  LANE_HEIGHT, dayOf, rowDropId, undatedDropId, xOfDay, type PlanChanges, type TimelineAxis, type TimelineRow,
+  BAR_HEIGHT, BAR_TOP, BAR_ZONE, LANE_HEIGHT, barBox, rowDropId, undatedDropId, xOfDay,
+  type DayRange, type MilestoneMark, type PackageRow, type PlanChanges, type TimelineAxis,
 } from './timelineLayout';
-import { acceptsDrop, dropTone, useDragged } from './timelineDrag';
-import { SHORT_DATE } from './planDisplay';
-import { MilestoneDiamond } from './MilestoneDiamond';
+import { acceptsDrop, dropTone, useDragState } from './timelineDrag';
 import { TimelineChip } from './TimelineChip';
-import type { GoalMilestone, GoalTodoItem, MilestoneState } from '../../types';
+import { WorkPackageBar } from './WorkPackageBar';
+import { WorkPackageMark } from './WorkPackageMark';
+import type { GoalWorkPackage, MilestoneState } from '../../types';
 
-/** Abstand der Chips zum oberen und unteren Rand einer Zeile. */
+/** Abstand der Chips zum oberen Rand einer Zeile ohne Balken. */
 const ROW_PADDING = 8;
-/** So viele TODOs ohne Datum zeigt eine Zeile, der Rest klappt hinter „+n“ auf. */
-const UNDATED_SHOWN = 3;
 
 /** Breite der Beschriftungsspalte – Zeilen, Achse und Linien müssen dieselbe nehmen. */
-export const LABEL_COLUMN = 'w-28 shrink-0 sm:w-44';
-const LINES_LEFT = 'left-28 sm:left-44';
+export const LABEL_COLUMN = 'w-28 shrink-0 sm:w-44 lg:w-52 xl:w-56';
+const LINES_LEFT = 'left-28 sm:left-44 lg:left-52 xl:left-56';
 
-const MILESTONE_LINE: Record<MilestoneState, string> = {
-  OPEN: 'border-border-strong',
-  DUE_SOON: 'border-warning/70',
-  OVERDUE: 'border-danger/70',
+/** Führungslinien der Meilensteine: gestrichelt durch alle Bänder, Farbe nach Zustand. */
+const GUIDE: Record<MilestoneState, string> = {
+  OPEN: 'border-text-tertiary/60',
+  DUE_SOON: 'border-warning/80',
+  OVERDUE: 'border-danger/80',
   REACHED: 'border-success/70',
 };
 
 /**
- * Senkrechte Linien über Achse und Zeilen: Raster, heute, das Zieldatum und beim Ziehen der Tag,
- * auf dem das TODO landen würde. Liegt unter den Chips und nimmt keine Klicks an.
+ * Senkrechte Linien über Achse und Zeilen: Raster, heute, das Zieldatum, die Meilensteine (von ihrer
+ * Raute durch alle Bänder – so sieht man, welche Balken vor dem Termin enden) und beim Ziehen die
+ * Tage, auf denen es landen würde. Liegt unter Balken und Chips und nimmt keine Klicks an.
  */
-export function TimelineLines({ axis, width, targetDay, preview }: {
+export function TimelineLines({ axis, width, targetDay, marks, preview }: {
   axis: TimelineAxis;
   width: number;
   targetDay: number | null;
-  preview: number | null;
+  marks: MilestoneMark[];
+  preview: number[];
 }) {
   const perDay = width / axis.days;
   const x = (day: number) => xOfDay(axis, day, width);
@@ -48,61 +50,123 @@ export function TimelineLines({ axis, width, targetDay, preview }: {
       {targetDay !== null && (
         <span className="absolute bottom-0 top-12 border-l-2 border-dashed border-accent" style={{ left: x(targetDay) - 1 }} />
       )}
-      {preview !== null && <span className="absolute bottom-0 top-5 w-0.5 -translate-x-1/2 bg-accent" style={{ left: x(preview) }} />}
+      {marks.map((mark) => (
+        <span key={mark.milestone.id} data-testid="timeline-guide"
+          className={`absolute bottom-0 top-16 border-l border-dashed ${GUIDE[mark.milestone.state]}`} style={{ left: mark.x }} />
+      ))}
+      {preview.map((day) => (
+        <span key={day} className="absolute bottom-0 top-5 w-0.5 -translate-x-1/2 bg-accent" style={{ left: x(day) }} />
+      ))}
     </div>
   );
 }
 
 interface RowProps {
-  row: TimelineRow;
+  row: PackageRow;
   axis: TimelineAxis;
   width: number;
   today: number;
-  milestones: GoalMilestone[];
+  workPackages: GoalWorkPackage[];
+  barHelpId: string;
   onPlan: (todoId: string, changes: PlanChanges) => void;
   onOpenTodo: (todoId: string) => void;
   /** `trigger`: was geklickt wurde – die Karte steht dort und gibt ihm danach den Fokus zurück. */
-  onOpenMilestone: (id: string, trigger: HTMLElement) => void;
+  onOpenPackage: (id: string, trigger: HTMLElement) => void;
+  onReschedule: (workPackage: GoalWorkPackage, range: DayRange | null) => void;
+  announce: (text: string) => void;
 }
 
 /**
- * Eine Zeile: ein Teilziel (oder „ohne Teilziel“) mit seinen TODOs – die fälligen auf der Achse, die
- * ohne Datum links unter dem Namen, damit sie ihre Zuordnung behalten. Ablegen auf der Achse setzt
- * Tag und Teilziel, links nimmt es das Datum weg. Beim Ziehen nimmt sie nur an, was zu ihrem Projekt
- * passt (c60bf914).
+ * Eine Zeile im Band (c60bf914): links Name, Zeitraum, Stand und – eingeklappt – die TODOs ohne
+ * Datum; rechts der Balken des Pakets, darunter nur bei Bedarf seine fälligen TODOs. Auf der Achse
+ * abgelegt setzt ein TODO Tag und Paket, links abgelegt verliert es das Datum. Beim Ziehen nimmt die
+ * Zeile nur an, was zu ihrem Projekt passt; die übrigen werden blass.
  */
-export function TimelineRowView({ row, axis, width, today, milestones, onPlan, onOpenTodo, onOpenMilestone }: RowProps) {
+export function PackageRowView({
+  row, axis, width, today, workPackages, barHelpId, onPlan, onOpenTodo, onOpenPackage, onReschedule, announce,
+}: RowProps) {
   const t = useT();
-  const dragged = useDragged();
+  const tt = t.goals.timeline;
+  const tw = t.goals.workPackages;
+  const { dragged, preview } = useDragState();
+  const listId = useId();
+  const [showUndated, setShowUndated] = useState(false);
   const id = rowDropId(row.band, row.key);
   const accepts = acceptsDrop(dragged, id);
-  const { setNodeRef, isOver } = useDroppable({ id, disabled: accepts === false });
+  const { setNodeRef, isOver } = useDroppable({ id });
   const undatedId = undatedDropId(row.band, row.key);
   const undatedAccepts = acceptsDrop(dragged, undatedId);
-  const { setNodeRef: setUndatedRef, isOver: undatedOver } = useDroppable({ id: undatedId, disabled: undatedAccepts === false });
-  const { milestone } = row;
+  const { setNodeRef: setUndatedRef, isOver: undatedOver } = useDroppable({ id: undatedId });
+  const { workPackage, range } = row;
+  const chipsTop = range ? BAR_ZONE : ROW_PADDING;
+  // Wohin ein gezogener Balken dieses Pakets käme: gestrichelt an seinem neuen Platz
+  const ghost = workPackage && dragged?.kind === 'package' && dragged.workPackage.id === workPackage.id
+    && (dragged.mode === 'move' || dragged.mode === 'schedule') && preview?.workPackageId === workPackage.id ? preview.range : null;
+  const ghostBox = ghost ? barBox(axis, ghost, width) : null;
+
   return (
     <div className="flex border-t border-border" data-testid={`timeline-row-${row.band}-${row.key}`}>
       <div ref={setUndatedRef} data-testid={`timeline-undated-${row.band}-${row.key}`}
         data-accepts={undatedAccepts === null ? undefined : String(undatedAccepts)}
-        className={`${LABEL_COLUMN} space-y-1.5 py-2 pl-3 pr-2 transition-colors ${dropTone(undatedAccepts, undatedOver)}`}>
-        {milestone
-          ? <MilestoneRowLabel milestone={milestone} onOpen={(trigger) => onOpenMilestone(milestone.id, trigger)} />
-          : <span className="block text-xs italic text-text-tertiary">{t.goals.timeline.noMilestone}</span>}
+        className={`${LABEL_COLUMN} py-1 pl-3 pr-2 transition-colors ${dropTone(undatedAccepts, undatedOver)}`}>
+        {workPackage ? (
+          <>
+            <button type="button" onClick={(event) => onOpenPackage(workPackage.id, event.currentTarget)} title={workPackage.title}
+              aria-label={tw.card.replace('{title}', workPackage.title)}
+              className="-mx-1 flex w-[calc(100%+0.5rem)] min-w-0 items-center gap-1.5 rounded px-1 text-left hover:bg-surface-hover focus-ring">
+              <WorkPackageMark state={workPackage.state} />
+              <span className="min-w-0 truncate text-[13px] font-medium leading-[18px] text-text">{workPackage.title}</span>
+            </button>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] leading-[14px] text-text-tertiary">
+              <span className="tabular-nums" title={tw.progress.replace('{done}', String(workPackage.done))
+                .replace('{total}', String(workPackage.total))}>
+                {workPackage.done}/{workPackage.total}
+              </span>
+              {workPackage.openQuestions > 0 && (
+                <span className="inline-flex items-center gap-0.5 text-human">
+                  <HelpCircle className="h-3 w-3" aria-hidden="true" />
+                  <span aria-hidden="true">{workPackage.openQuestions}</span>
+                  <span className="sr-only">{t.goals.openQuestions.replace('{n}', String(workPackage.openQuestions))}</span>
+                </span>
+              )}
+              {row.undated.length > 0 && <UndatedToggle count={row.undated.length} open={showUndated} controls={listId} onToggle={setShowUndated} />}
+            </div>
+          </>
+        ) : (
+          <div className="flex flex-wrap items-center gap-x-2 text-[11px] leading-[18px] text-text-tertiary">
+            <span className="min-w-0 truncate text-xs italic" title={tt.noPackage}>{tt.noPackage}</span>
+            {row.undated.length > 0 && <UndatedToggle count={row.undated.length} open={showUndated} controls={listId} onToggle={setShowUndated} />}
+          </div>
+        )}
         {row.undated.length > 0 && (
-          <UndatedTodos todos={row.undated} milestones={milestones} today={today} onPlan={onPlan} onOpenTodo={onOpenTodo} />
+          <ul id={listId} hidden={!showUndated} className="mb-1 mt-1 space-y-1">
+            {showUndated && row.undated.map((todo) => (
+              <li key={todo.id}>
+                <TimelineChip todo={todo} workPackages={workPackages} today={today} compact onPlan={onPlan} onOpenTodo={onOpenTodo} />
+              </li>
+            ))}
+          </ul>
         )}
       </div>
       <div ref={setNodeRef} data-accepts={accepts === null ? undefined : String(accepts)}
         className={`relative min-w-0 flex-1 transition-colors ${dropTone(accepts, isOver)}`}
-        style={{ minHeight: row.lanes * LANE_HEIGHT + 2 * ROW_PADDING }}>
-        {milestone?.dueDate && (
-          <span aria-hidden="true" className={`absolute inset-y-0 border-l-2 border-dashed ${MILESTONE_LINE[milestone.state]}`}
-            style={{ left: xOfDay(axis, dayOf(milestone.dueDate), width) - 1 }} />
+        style={{ minHeight: chipsTop + row.lanes * LANE_HEIGHT + (row.lanes > 0 ? 3 : 0) }}>
+        {workPackage && range && (
+          <WorkPackageBar workPackage={workPackage} range={range} axis={axis} width={width} helpId={barHelpId}
+            onOpen={(trigger) => onOpenPackage(workPackage.id, trigger)}
+            onReschedule={(next) => onReschedule(workPackage, next)} announce={announce} />
+        )}
+        {workPackage && !range && (
+          <span className="pointer-events-none absolute left-2 top-2 text-[11px] italic text-text-tertiary">{tw.noRange}</span>
+        )}
+        {ghostBox && (
+          <span aria-hidden="true" data-testid="timeline-ghost"
+            className="pointer-events-none absolute rounded-md border-2 border-dashed border-accent bg-accent/10"
+            style={{ left: ghostBox.left, width: ghostBox.width, top: BAR_TOP, height: BAR_HEIGHT }} />
         )}
         {row.items.map((item) => (
-          <TimelineChip key={item.todo.id} todo={item.todo} milestones={milestones} today={today}
-            placement={{ left: item.left, top: ROW_PADDING + item.lane * LANE_HEIGHT, flipped: item.flipped, anchor: item.anchor }}
+          <TimelineChip key={item.todo.id} todo={item.todo} workPackages={workPackages} today={today} compact
+            placement={{ left: item.left, top: chipsTop + item.lane * LANE_HEIGHT, flipped: item.flipped, anchor: item.anchor }}
             onPlan={onPlan} onOpenTodo={onOpenTodo} />
         ))}
       </div>
@@ -110,55 +174,19 @@ export function TimelineRowView({ row, axis, width, today, milestones, onPlan, o
   );
 }
 
-function MilestoneRowLabel({ milestone, onOpen }: { milestone: GoalMilestone; onOpen: (trigger: HTMLElement) => void }) {
-  const tm = useT().goals.milestones;
-  const locale = useI18nStore((s) => s.locale);
-  return (
-    <button type="button" onClick={(event) => onOpen(event.currentTarget)} className="-mx-1 block w-full rounded px-1 text-left hover:bg-surface-hover focus-ring">
-      <span className="flex min-w-0 items-center gap-1.5">
-        <MilestoneDiamond state={milestone.state} />
-        <span className="truncate text-sm font-medium text-text" title={milestone.title}>{milestone.title}</span>
-      </span>
-      <span className="block truncate text-[11px] text-text-tertiary">
-        {milestone.dueDate ? formatDate(milestone.dueDate, locale, SHORT_DATE) : tm.noDate} · {milestone.done}/{milestone.total} · {tm.states[milestone.state]}
-        {milestone.reopened && ` · ${tm.reopened}`}
-      </span>
-    </button>
-  );
-}
-
-/**
- * TODOs ohne Datum einer Zeile (c60bf914): die ersten drei als schmale Chips, der Rest hinter „+n“
- * aufklappbar. Ein Chip von hier auf die Achse gezogen bekommt ein Datum, wie jeder andere.
- */
-function UndatedTodos({ todos, milestones, today, onPlan, onOpenTodo }: {
-  todos: GoalTodoItem[];
-  milestones: GoalMilestone[];
-  today: number;
-  onPlan: (todoId: string, changes: PlanChanges) => void;
-  onOpenTodo: (todoId: string) => void;
+/** Zähler der TODOs ohne Datum an der Beschriftung – eingeklappt, bis jemand sie sehen will. */
+export function UndatedToggle({ count, open, controls, onToggle }: {
+  count: number;
+  open: boolean;
+  controls: string;
+  onToggle: (open: boolean) => void;
 }) {
   const tt = useT().goals.timeline;
-  const listId = useId();
-  const [all, setAll] = useState(false);
-  const hidden = todos.length - UNDATED_SHOWN;
-  const shown = all || hidden <= 0 ? todos : todos.slice(0, UNDATED_SHOWN);
   return (
-    <div className="space-y-1">
-      <p className="text-[10px] font-medium text-text-tertiary">{tt.undatedTodos.replace('{n}', String(todos.length))}</p>
-      <ul id={listId} className="space-y-1">
-        {shown.map((todo) => (
-          <li key={todo.id}>
-            <TimelineChip todo={todo} milestones={milestones} today={today} compact onPlan={onPlan} onOpenTodo={onOpenTodo} />
-          </li>
-        ))}
-      </ul>
-      {hidden > 0 && (
-        <button type="button" aria-expanded={all} aria-controls={listId} onClick={() => setAll((value) => !value)}
-          className="rounded px-1 text-[11px] font-medium text-text-secondary hover:text-accent focus-ring">
-          {all ? tt.fewerTodos : tt.moreTodos.replace('{n}', String(hidden))}
-        </button>
-      )}
-    </div>
+    <button type="button" aria-expanded={open} aria-controls={controls} onClick={() => onToggle(!open)}
+      className="inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap rounded hover:text-accent focus-ring">
+      {tt.undatedTodos.replace('{n}', String(count))}
+      <ChevronRight className={`h-3 w-3 transition-transform motion-reduce:transition-none ${open ? 'rotate-90' : ''}`} aria-hidden="true" />
+    </button>
   );
 }

@@ -4,13 +4,13 @@ import { RatedByMark } from './GoalBadges';
 import { useSyncedState } from '../../hooks/useSyncedState';
 import { useGoal, useGoals, useUpdateTodoPlanning } from '../../hooks/useGoals';
 import { useI18nStore, useT } from '../../i18n';
-import { formatDate } from '../../utils/localeFormat';
 import type { Todo } from '../../types';
-import { SHORT_DATE } from './planDisplay';
-import { COMPLEXITIES, EFFORTS, formOf, planningChanges, subgoalOptions, withGoal } from './planning';
+import { rangeText } from './dragLabel';
+import { packageRange } from './timelineLayout';
+import { COMPLEXITIES, EFFORTS, forBackend, formOf, packageOptions, planningChanges, withGoal } from './planning';
 
 /**
- * Einordnung eines TODOs im Bearbeiten-Dialog (TODO dc0566f8): Ziel, Teilziel (nur solche des
+ * Einordnung eines TODOs im Bearbeiten-Dialog (TODO dc0566f8): Ziel, Arbeitspaket (nur solche des
  * TODO-Projekts, c60bf914), Komplexität, empfohlener Effort, Begründung und offene Frage. Speichert
  * für sich, getrennt vom übrigen Formular.
  */
@@ -23,7 +23,12 @@ export function TodoPlanningPanel({ todo }: { todo: Todo }) {
   const changes = planningChanges(formOf(todo), form);
   const dirty = Object.keys(changes).length > 0;
   const { data: goal } = useGoal(form.goalId || undefined);
-  const subgoals = goal && goal.goal.id === form.goalId ? subgoalOptions(goal.milestones, todo.projectId, form.milestoneId) : [];
+  const loaded = goal && goal.goal.id === form.goalId ? goal : undefined;
+  const packages = loaded ? packageOptions(loaded.workPackages, todo.projectId, form.workPackageId) : [];
+  const packageLabel = (item: (typeof packages)[number]) => {
+    const range = packageRange(item);
+    return `${item.title} · ${range ? rangeText(range, locale) : t.goals.workPackages.noRange}`;
+  };
 
   return (
     <fieldset className="pt-3 border-t border-border space-y-3" data-testid="todo-planning">
@@ -41,19 +46,16 @@ export function TodoPlanningPanel({ todo }: { todo: Todo }) {
       />
       {form.goalId && (
         <Select
-          label={t.goals.subgoal}
-          aria-label={t.goals.subgoal}
-          value={form.milestoneId}
-          onChange={(e) => setForm({ ...form, milestoneId: e.target.value })}
+          label={t.goals.workPackage}
+          aria-label={t.goals.workPackage}
+          value={form.workPackageId}
+          onChange={(e) => setForm({ ...form, workPackageId: e.target.value })}
           options={[
-            { value: '', label: t.goals.timeline.noMilestoneOption },
-            ...subgoals.map((m) => ({
-              value: m.id,
-              label: `${m.title} · ${m.dueDate ? formatDate(m.dueDate, locale, SHORT_DATE) : t.goals.milestones.noDate}`,
-            })),
-            // Solange das Ziel lädt, bleibt das bisherige Teilziel gewählt statt scheinbar „keins“
-            ...(form.milestoneId && !subgoals.some((m) => m.id === form.milestoneId)
-              ? [{ value: form.milestoneId, label: t.common.loading }] : []),
+            { value: '', label: t.goals.timeline.noWorkPackageOption },
+            ...packages.map((item) => ({ value: item.id, label: packageLabel(item) })),
+            // Solange das Ziel lädt, bleibt das bisherige Paket gewählt statt scheinbar „keins“
+            ...(form.workPackageId && !packages.some((item) => item.id === form.workPackageId)
+              ? [{ value: form.workPackageId, label: t.common.loading }] : []),
           ]}
         />
       )}
@@ -84,7 +86,7 @@ export function TodoPlanningPanel({ todo }: { todo: Todo }) {
       />
       <div className="flex justify-end">
         <Button size="sm" variant="secondary" disabled={!dirty || update.isPending}
-          onClick={() => update.mutate({ id: todo.id, data: changes })}>
+          onClick={() => update.mutate({ id: todo.id, data: forBackend(changes, loaded?.legacyBackend) })}>
           {t.goals.savePlanning}
         </Button>
       </div>

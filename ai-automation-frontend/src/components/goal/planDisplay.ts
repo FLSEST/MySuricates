@@ -1,7 +1,7 @@
 import type { Locale, TranslationKeys } from '../../i18n';
 import { formatDate } from '../../utils/localeFormat';
 import { isOverdue } from './timelineLayout';
-import type { GoalMilestone, GoalTodoItem, TodoStatus } from '../../types';
+import type { GoalTodoItem, GoalWorkPackage, TodoStatus } from '../../types';
 
 /** Statuspunkt eines TODOs – am Zeitstrahl und in der Gliederung. */
 export const STATUS_DOT: Record<TodoStatus, string> = {
@@ -27,14 +27,14 @@ export interface PlanBadge {
 }
 
 /**
- * Fälligkeit und Meilenstein eines TODOs als ein Stück Text („3. Okt. · Beta“) – für die Knoten der
+ * Fälligkeit und Arbeitspaket eines TODOs als ein Stück Text („3. Okt. · Beta“) – für die Knoten der
  * Relationskarte, die keine HTML-Chips tragen können. Null, wenn beides fehlt.
  */
 export function planBadge(
-  todo: Pick<GoalTodoItem, 'dueDate' | 'status'>, milestone: GoalMilestone | undefined, today: number,
+  todo: Pick<GoalTodoItem, 'dueDate' | 'status'>, workPackage: GoalWorkPackage | undefined, today: number,
   locale: Locale, t: TranslationKeys,
 ): PlanBadge | null {
-  if (!todo.dueDate && !milestone) return null;
+  if (!todo.dueDate && !workPackage) return null;
   const overdue = isOverdue(todo, today);
   const text: string[] = [];
   const title: string[] = [];
@@ -42,9 +42,9 @@ export function planBadge(
     text.push(formatDate(todo.dueDate, locale, SHORT_DATE));
     title.push(dueTitle(todo.dueDate, overdue, locale, t));
   }
-  if (milestone) {
-    text.push(milestone.title);
-    title.push(t.goals.milestones.chip.replace('{title}', milestone.title));
+  if (workPackage) {
+    text.push(workPackage.title);
+    title.push(t.goals.workPackages.chip.replace('{title}', workPackage.title));
   }
   return { text: text.join(' · '), title: title.join(' · '), overdue };
 }

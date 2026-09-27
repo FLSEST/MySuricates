@@ -23,7 +23,7 @@ function item(overrides: Partial<GoalTodoItem>): GoalTodoItem {
   return {
     id: 'x', title: 'X', status: 'OPEN', priority: 'MEDIUM', projectId: 'p1', projectName: 'AutoPilot', tags: [],
     goalRank: null, complexity: null, suggestedEffort: null, ratingNote: null, ratedBy: null, ratedAt: null,
-    openQuestion: null, updatedAt: '2026-09-23T00:00:00Z', dueDate: null, milestoneId: null, ...overrides,
+    openQuestion: null, updatedAt: '2026-09-23T00:00:00Z', dueDate: null, workPackageId: null, ...overrides,
   };
 }
 
@@ -40,7 +40,7 @@ const detail: GoalDetailData = {
   todos: [
     item({
       id: 'a', title: 'Privacy findings', goalRank: 1, complexity: 'M', suggestedEffort: 'medium', ratedBy: 'AI',
-      dueDate: endOf('2030-10-03'), milestoneId: 'm1',
+      dueDate: endOf('2030-10-03'), workPackageId: 'w1',
     }),
     item({ id: 'b', title: 'Style probe', goalRank: 2, status: 'IN_PROGRESS', openQuestion: 'Which look?' }),
     item({ id: 'c', title: 'Examples page', projectId: 'p2', projectName: 'Site' }),
@@ -54,19 +54,29 @@ const detail: GoalDetailData = {
     { projectId: 'p1', name: 'AutoPilot', archived: false, position: 0, total: 3, done: 1, openQuestions: 1 },
     { projectId: 'p2', name: 'Site', archived: false, position: 1, total: 1, done: 0, openQuestions: 0 },
   ],
+  workPackages: [{
+    id: 'w1', goalId: 'g1', title: 'Beta', startDate: new Date('2030-09-28T00:00:00').toISOString(), endDate: endOf('2030-10-05'),
+    projectId: 'p1', position: 0, openQuestions: 0, state: 'OPEN', total: 1, done: 0, completedAt: null, reopened: false,
+    createdAt: '2026-09-23T00:00:00Z', updatedAt: '2026-09-23T00:00:00Z',
+  }],
   milestones: [{
-    id: 'm1', goalId: 'g1', title: 'Beta', dueDate: endOf('2030-10-05'), projectId: 'p1', position: 0, openQuestions: 0,
-    state: 'OPEN', total: 1, done: 0,
-    reachedAt: null, reopened: false, createdAt: '2026-09-23T00:00:00Z', updatedAt: '2026-09-23T00:00:00Z',
+    id: 'ms1', goalId: 'g1', title: 'Launch', dueDate: endOf('2030-10-10'), state: 'OPEN', workPackageIds: ['w1'],
+    packagesTotal: 1, packagesDone: 0, reachedAt: null, reopened: false, createdAt: '2026-09-23T00:00:00Z', updatedAt: '2026-09-23T00:00:00Z',
   }],
 };
 
-/** Die Antwort eines Backends vor c60bf914: ohne `projects`, Teilziele ohne Projekt, Position und offene Fragen. */
+/**
+ * Die Antwort eines Backends vor c60bf914: ohne `projects` und `workPackages`; seine „milestones“ sind
+ * Arbeitspakete mit nur einer Fälligkeit, die TODOs zeigen per `milestoneId` darauf.
+ */
 function olderDetail(): Record<string, unknown> {
-  const { projects: _projects, ...rest } = detail;
+  const { projects: _projects, workPackages: _packages, milestones: _milestones, ...rest } = detail;
   return {
     ...rest,
-    milestones: detail.milestones.map(({ projectId: _p, position: _pos, openQuestions: _q, ...milestone }) => milestone),
+    todos: detail.todos.map(({ workPackageId, ...todo }) => ({ ...todo, milestoneId: workPackageId })),
+    milestones: detail.workPackages.map(({ id, goalId, title, endDate, state, total, done, createdAt, updatedAt }) => ({
+      id, goalId, title, dueDate: endDate, state, total, done, reachedAt: null, reopened: false, createdAt, updatedAt,
+    })),
   };
 }
 
@@ -136,7 +146,7 @@ describe('GoalDetail', () => {
     expect(screen.getByRole('img', { name: 'assessed by AI' })).toBeInTheDocument();
   });
 
-  it('shows the due date and the milestone of a TODO as chips in the list', async () => {
+  it('shows the due date and the work package of a TODO as chips in the list', async () => {
     chooseList();
     server.use(http.get('/api/v1/goals/g1', () => HttpResponse.json(detail)));
     renderGoal();
@@ -144,19 +154,19 @@ describe('GoalDetail', () => {
     await screen.findByRole('heading', { name: 'Open-Source-Launch' });
     const [first, second] = screen.getAllByTestId('goal-next-item');
     expect(within(first!).getByTitle('Due 10/3/2030')).toHaveTextContent('Oct 3');
-    expect(within(first!).getByTitle('Sub-goal: Beta')).toHaveTextContent('Beta');
+    expect(within(first!).getByTitle('Work package: Beta')).toHaveTextContent('Beta');
     expect(within(second!).queryByTitle(/^Due/)).not.toBeInTheDocument();
-    expect(within(second!).queryByTitle(/^Sub-goal/)).not.toBeInTheDocument();
+    expect(within(second!).queryByTitle(/^Work package/)).not.toBeInTheDocument();
   });
 
   it('copes with an older backend without milestones, guard and due dates', async () => {
     chooseList();
     const { guard: _guard, ...goalWithoutGuard } = detail.goal;
-    const { milestones: _milestones, projects: _projects, ...older } = detail;
+    const { milestones: _milestones, projects: _projects, workPackages: _packages, ...older } = detail;
     server.use(http.get('/api/v1/goals/g1', () => HttpResponse.json({
       ...older,
       goal: goalWithoutGuard,
-      todos: detail.todos.map(({ dueDate: _due, milestoneId: _ms, ...rest }) => rest),
+      todos: detail.todos.map(({ dueDate: _due, workPackageId: _wp, ...rest }) => rest),
     })));
     renderGoal();
 
@@ -184,7 +194,7 @@ describe('GoalDetail', () => {
     const [questions] = within(autopilot).getAllByTestId('outline-questions');
     expect(done).toHaveTextContent('1/31 of 3 done');
     expect(questions).toHaveTextContent('1Open questions: 1');
-    const beta = within(autopilot).getByTestId('outline-subgoal-m1');
+    const beta = within(autopilot).getByTestId('outline-package-w1');
     expect(within(beta).getByRole('button', { name: /^Open TODO: Privacy findings/ })).toBeInTheDocument();
     const loose = within(autopilot).getByTestId('outline-loose-p1');
     expect(within(loose).getAllByTestId('outline-todo').map((row) => within(row).getAllByRole('button')[0]!.textContent))
@@ -195,14 +205,26 @@ describe('GoalDetail', () => {
     expect(within(site).getByRole('button', { name: /^Open TODO: Examples page/ })).toBeInTheDocument();
   });
 
-  it('builds the outline from an older backend: projects from byProject, the sub-goal in its TODOs\' project', async () => {
+  it('builds the outline from an older backend: its milestones as packages in their TODOs\' project, milestones later', async () => {
     server.use(http.get('/api/v1/goals/g1', () => HttpResponse.json(olderDetail())));
     renderGoal();
 
     const autopilot = await screen.findByTestId('outline-project-p1');
-    expect(within(autopilot).getByTestId('outline-subgoal-m1')).toHaveTextContent('Beta');
+    const beta = within(autopilot).getByTestId('outline-package-w1');
+    expect(beta).toHaveTextContent('Beta');
+    expect(within(beta).getByRole('button', { name: /^Open TODO: Privacy findings/ })).toBeInTheDocument();
     expect(screen.getByTestId('outline-project-p2')).toBeInTheDocument();
     expect(screen.queryByTestId('outline-project-none')).not.toBeInTheDocument();
+    expect(screen.getByTestId('outline-milestones-legacy')).toHaveTextContent('Milestones become available after the backend restart.');
+  });
+
+  it('shows the milestones above the projects in the outline', async () => {
+    server.use(http.get('/api/v1/goals/g1', () => HttpResponse.json(detail)));
+    renderGoal();
+
+    const block = await screen.findByTestId('outline-milestones');
+    expect(within(block).getByTestId('outline-milestone-ms1')).toHaveTextContent('Launch');
+    expect(within(block).getByTestId('outline-milestone-ms1')).toHaveTextContent('0/1 packages');
   });
 
   it('removes a project from the goal after asking, and offers the cascade when the server refuses with 409', async () => {
@@ -214,19 +236,19 @@ describe('GoalDetail', () => {
         deleted.push(`${params.pid}?cascade=${cascade}`);
         return cascade === 'true'
           ? new HttpResponse(null, { status: 204 })
-          : HttpResponse.json({ error: '1 sub-goal and 3 TODOs are still attached', timestamp: '' }, { status: 409 });
+          : HttpResponse.json({ error: '1 work package and 3 TODOs are still attached', timestamp: '' }, { status: 409 });
       }),
     );
     renderGoal();
 
     fireEvent.click(await screen.findByRole('button', { name: 'Remove project AutoPilot from the goal' }));
     const dialog = screen.getByRole('dialog', { name: 'Remove project from the goal' });
-    expect(within(dialog).getByText('1 sub-goals and 3 TODOs are attached to it.')).toBeInTheDocument();
+    expect(within(dialog).getByText('1 work packages and 3 TODOs are attached to it.')).toBeInTheDocument();
     fireEvent.click(within(dialog).getByRole('button', { name: 'Remove' }));
 
-    expect(await within(dialog).findByText('1 sub-goal and 3 TODOs are still attached')).toBeInTheDocument();
+    expect(await within(dialog).findByText('1 work package and 3 TODOs are still attached')).toBeInTheDocument();
     expect(deleted).toEqual(['p1?cascade=false']);
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Delete sub-goals, release TODOs' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Delete work packages, release TODOs' }));
     await waitFor(() => expect(deleted).toEqual(['p1?cascade=false', 'p1?cascade=true']));
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Remove project from the goal' })).not.toBeInTheDocument());
   });
@@ -259,7 +281,8 @@ describe('GoalDetail', () => {
     fireEvent.click(await screen.findByRole('tab', { name: 'Timeline' }));
 
     const timeline = await screen.findByTestId('goal-timeline');
-    expect(within(timeline).getByTestId('timeline-row-p1-m1')).toBeInTheDocument();
+    expect(within(timeline).getByTestId('timeline-row-p1-w1')).toBeInTheDocument();
+    expect(within(timeline).getByRole('button', { name: /^Milestone Launch/ })).toBeInTheDocument();
     expect(within(timeline).getByRole('button', { name: /^Privacy findings/ })).toBeInTheDocument();
     expect(localStorage.getItem('mysuricates-goal-view-v2')).toBe('timeline');
     expect(screen.getByRole('tab', { name: 'Timeline' })).toHaveAttribute('aria-selected', 'true');
@@ -298,7 +321,7 @@ describe('GoalDetail', () => {
     await waitFor(() => expect(asked.include).toContain('c1'));
     // once in the map (dashed), once in the list below
     await waitFor(() => expect(screen.getAllByRole('button', { name: 'Add: Release notes' })).toHaveLength(2));
-    // due date and milestone of a TODO also sit on its node
+    // due date and work package of a TODO also sit on its node
     const node = document.querySelector('[data-node="todo:a"]')!;
     expect(node).toHaveTextContent('Oct 3 · Beta');
     const todoQuery = asked.todos[0]!;

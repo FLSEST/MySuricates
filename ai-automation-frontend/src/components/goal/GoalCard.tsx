@@ -3,12 +3,16 @@ import { Card } from '../ui';
 import { TodoProgressBar } from '../todo/TodoProgressBar';
 import { useI18nStore, useT } from '../../i18n';
 import { formatDate } from '../../utils/localeFormat';
+import { MilestoneDiamond } from './MilestoneDiamond';
 import type { Goal } from '../../types';
 
 /** So viele Projekt-Chips trägt eine Karte, der Rest steht als „+n“. */
 const PROJECT_CHIPS = 3;
 
-/** Ein Ziel als Karte: Projekte, Fortschritt, Zieldatum, offene Fragen; ein Klick öffnet die Zielansicht. */
+/**
+ * Ein Ziel als Karte: Projekte, der nächste Meilenstein (c60bf914), Fortschritt, Zieldatum, offene
+ * Fragen; ein Klick öffnet die Zielansicht.
+ */
 export function GoalCard({ goal, onOpen }: { goal: Goal; onOpen: () => void }) {
   const t = useT();
   const locale = useI18nStore((s) => s.locale);
@@ -39,6 +43,17 @@ export function GoalCard({ goal, onOpen }: { goal: Goal; onOpen: () => void }) {
               </span>
             )}
           </div>
+        )}
+        {goal.nextMilestone && (
+          <span className="flex min-w-0 items-center gap-1.5 text-xs text-text-secondary" data-testid="goal-card-milestone"
+            title={t.goals.nextMilestone.replace('{title}', goal.nextMilestone.title)
+              .replace('{date}', formatDate(goal.nextMilestone.dueDate, locale))}>
+            <MilestoneDiamond state={goal.nextMilestone.state} size="sm" />
+            <span className="min-w-0 truncate">{goal.nextMilestone.title}</span>
+            <span className="shrink-0 tabular-nums text-text-tertiary">
+              {formatDate(goal.nextMilestone.dueDate, locale, { day: 'numeric', month: 'numeric' })}
+            </span>
+          </span>
         )}
         <TodoProgressBar open={progress.open} inProgress={progress.inProgress} done={progress.done} backlog={progress.backlog} />
         <div className="flex flex-wrap items-center gap-3 text-xs text-text-secondary">

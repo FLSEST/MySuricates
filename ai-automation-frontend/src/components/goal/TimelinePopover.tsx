@@ -7,13 +7,13 @@ const FOCUSABLE = 'input, select, textarea, button';
 const AUTOFOCUS = '[data-autofocus]';
 
 /**
- * Kleine, nicht modale Karte am Zeitstrahl – das Menü eines Chips, die Karte oder das Formular eines
- * Teilziels. Sie schwebt per Portal über der Seite (`floating.ts`), damit der in sich scrollende
+ * Kleine, nicht modale Karte am Zeitstrahl – das Menü eines Chips, die Karte eines Arbeitspakets
+ * oder Meilensteins. Sie schwebt per Portal über der Seite (`floating.ts`), damit der in sich scrollende
  * Zeitstrahl sie nicht abschneidet. Beim Öffnen steht der Fokus auf ihrem ersten Feld (oder dem mit
  * `data-autofocus`); Escape und ein Klick daneben schließen sie. Danach geht der Fokus an den
  * Auslöser zurück – nach Speichern wie nach Abbrechen.
  */
-export function TimelinePopover({ label, onClose, anchor, align = 'start', triggerRef, children }: {
+export function TimelinePopover({ label, onClose, anchor, align = 'start', triggerRef, wide = false, children }: {
   label: string;
   onClose: () => void;
   /** Wo die Karte steht; ohne eigenen Anker am Auslöser. */
@@ -21,6 +21,8 @@ export function TimelinePopover({ label, onClose, anchor, align = 'start', trigg
   align?: FloatingAlign;
   /** Klicks auf den Auslöser schalten selbst um – sie zählen nicht als „daneben“. Er bekommt danach den Fokus zurück. */
   triggerRef?: RefObject<HTMLElement | null>;
+  /** Breiter für Formulare mit zwei Datumsfeldern oder einer Auswahlliste. */
+  wide?: boolean;
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -60,7 +62,7 @@ export function TimelinePopover({ label, onClose, anchor, align = 'start', trigg
         onClose();
       }}
       style={FLOATING_STYLE}
-      className="z-50 w-64 max-w-[calc(100vw-1rem)] rounded-lg border border-border bg-surface-overlay p-3 text-left shadow-lg"
+      className={`z-50 ${wide ? 'w-80' : 'w-64'} max-w-[calc(100vw-1rem)] rounded-lg border border-border bg-surface-overlay p-3 text-left shadow-lg`}
     >
       {children}
     </div>,

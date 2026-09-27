@@ -3,8 +3,8 @@ import { useI18nStore, useT } from '../../i18n';
 import { formatDate } from '../../utils/localeFormat';
 import { isOverdue } from './timelineLayout';
 import { SHORT_DATE, dueTitle } from './planDisplay';
-import { MilestoneDiamond } from './MilestoneDiamond';
-import type { GoalMilestone, GoalTodoItem } from '../../types';
+import { WorkPackageMark } from './WorkPackageMark';
+import type { GoalTodoItem, GoalWorkPackage } from '../../types';
 
 /** Fälligkeit eines TODOs; überfällig in der Fehlerfarbe. */
 export function DueChip({ todo, today }: { todo: Pick<GoalTodoItem, 'dueDate' | 'status'>; today: number }) {
@@ -22,15 +22,15 @@ export function DueChip({ todo, today }: { todo: Pick<GoalTodoItem, 'dueDate' | 
   );
 }
 
-/** Meilenstein eines TODOs, mit der Raute in seiner Zustandsfarbe. */
-export function MilestoneChip({ milestone }: { milestone: GoalMilestone | undefined }) {
+/** Arbeitspaket eines TODOs, mit dem Balken-Zeichen in seiner Zustandsfarbe. */
+export function WorkPackageChip({ workPackage }: { workPackage: GoalWorkPackage | undefined }) {
   const t = useT();
-  if (!milestone) return null;
+  if (!workPackage) return null;
   return (
-    <span title={t.goals.milestones.chip.replace('{title}', milestone.title)}
+    <span title={t.goals.workPackages.chip.replace('{title}', workPackage.title)}
       className="inline-flex max-w-[10rem] shrink-0 items-center gap-1.5 rounded border border-border px-1.5 py-0.5 text-[11px] text-text-secondary">
-      <MilestoneDiamond state={milestone.state} size="sm" />
-      <span className="truncate">{milestone.title}</span>
+      <WorkPackageMark state={workPackage.state} />
+      <span className="truncate">{workPackage.title}</span>
     </span>
   );
 }

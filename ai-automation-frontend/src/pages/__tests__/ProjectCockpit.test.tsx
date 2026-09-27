@@ -38,25 +38,36 @@ function serveOverview(overview: Partial<TodoOverviewResponse>) {
 }
 
 describe('ProjectCockpit – "Needs you"', () => {
-  it('lists milestones that are overdue or due soon, each linking to its goal', async () => {
+  // c60bf914: milestones (diamond) and work packages past their end (bar) – an older backend sends no kind: packages
+  it('lists milestones and work packages that are overdue or due soon, each linking to its goal', async () => {
     serveOverview({
       needsYou: [overdueTodo],
-      milestonesDue: [milestoneDue({}), milestoneDue({ id: 'm2', title: 'RC', goalId: 'g2', goalTitle: 'Website', state: 'DUE_SOON', done: 0 })],
+      milestonesDue: [
+        milestoneDue({ kind: 'WORK_PACKAGE' }),
+        milestoneDue({ id: 'm2', kind: 'MILESTONE', title: 'RC', goalId: 'g2', goalTitle: 'Website', state: 'DUE_SOON', done: 0, total: 2 }),
+        milestoneDue({ id: 'm3', title: 'Old stage', state: 'OVERDUE' }),
+      ],
     });
     renderWithProviders(<ProjectCockpit />);
 
     const beta = await screen.findByRole('link', { name: /Beta/ });
     expect(beta).toHaveAttribute('href', '/goals/g1');
+    expect(beta).toHaveAttribute('data-kind', 'work-package');
     expect(beta).toHaveTextContent('Open-Source-Launch');
     expect(beta).toHaveTextContent('overdue');
     expect(beta).toHaveTextContent('1/3');
+    expect(within(beta).getByTitle('1 of 3 done')).toBeInTheDocument();
     const rc = screen.getByRole('link', { name: /RC/ });
     expect(rc).toHaveAttribute('href', '/goals/g2');
+    expect(rc).toHaveAttribute('data-kind', 'milestone');
     expect(rc).toHaveTextContent('due soon');
+    // a milestone counts its linked packages
+    expect(within(rc).getByTitle('0 of 2 linked packages complete')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Old stage/ })).toHaveAttribute('data-kind', 'work-package');
 
     const lane = screen.getByRole('region', { name: /Needs you/ });
     expect(within(lane).getByText('Remove private data')).toBeInTheDocument();
-    expect(within(lane).getByText('3')).toBeInTheDocument();
+    expect(within(lane).getByText('4')).toBeInTheDocument();
   });
 
   it('counts as nothing urgent only when neither TODOs nor milestones need attention', async () => {

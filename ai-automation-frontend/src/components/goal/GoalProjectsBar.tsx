@@ -5,7 +5,7 @@ import { useT } from '../../i18n';
 import { apiErrorStatus } from '../../api/client';
 import { useProjects } from '../../hooks/useProjects';
 import { useAddGoalProject, useRemoveGoalProject } from '../../hooks/useGoalProjects';
-import type { GoalMilestone, GoalProject } from '../../types';
+import type { GoalProject, GoalWorkPackage } from '../../types';
 
 /** Der Text des Servers zu einem Fehler – bei 409 nennt er, was noch am Projekt hängt. */
 function serverText(err: unknown): string | null {
@@ -39,12 +39,12 @@ export const AddProjectPicker = forwardRef<HTMLSelectElement, { goalId: string; 
 /**
  * Projekte eines Ziels (c60bf914) als Chips mit Stand, dazu „Projekt hinzufügen“. Entfernen fragt
  * nach und nennt vorher, was daran hängt (aus dem Detail). Antwortet der Server trotzdem mit 409,
- * bietet derselbe Dialog die Kaskade an: Teilziele löschen, TODOs vom Ziel lösen.
+ * bietet derselbe Dialog die Kaskade an: Arbeitspakete löschen, TODOs vom Ziel lösen.
  */
-export function GoalProjectsBar({ goalId, projects, milestones }: {
+export function GoalProjectsBar({ goalId, projects, workPackages }: {
   goalId: string;
   projects: GoalProject[];
-  milestones: GoalMilestone[];
+  workPackages: GoalWorkPackage[];
 }) {
   const t = useT();
   const tp = t.goals.projects;
@@ -67,7 +67,7 @@ export function GoalProjectsBar({ goalId, projects, milestones }: {
       },
     });
   };
-  const subgoalCount = (project: GoalProject) => milestones.filter((m) => m.projectId === project.projectId).length;
+  const packageCount = (project: GoalProject) => workPackages.filter((item) => item.projectId === project.projectId).length;
 
   return (
     <div role="group" aria-labelledby={labelId} className="flex flex-wrap items-center gap-2" data-testid="goal-projects">
@@ -106,9 +106,9 @@ export function GoalProjectsBar({ goalId, projects, milestones }: {
           <div className="space-y-2 text-sm text-text-secondary">
             <p className="text-text">{tp.removeConfirm.replace('{name}', () => removing.name)}</p>
             <p>
-              {subgoalCount(removing) === 0 && removing.total === 0
+              {packageCount(removing) === 0 && removing.total === 0
                 ? tp.removeEmpty
-                : tp.removeCounts.replace('{subgoals}', String(subgoalCount(removing))).replace('{todos}', String(removing.total))}
+                : tp.removeCounts.replace('{packages}', String(packageCount(removing))).replace('{todos}', String(removing.total))}
             </p>
             {conflict !== null && (
               <div role="alert" className="space-y-1 rounded-lg border border-warning/40 bg-warning-subtle p-3">

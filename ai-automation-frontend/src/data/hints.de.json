@@ -254,17 +254,17 @@
   "goal-outline": {
     "title": "Das Ziel gegliedert",
     "points": [
-      "Jedes Projekt des Ziels ist eine Karte; darin stehen seine Teilziele in der festgelegten Reihenfolge, jedes mit seinen TODOs",
-      "Ein Teilziel ist erreicht, wenn alle seine TODOs erledigt sind – ein Datum braucht es nicht, die Reihenfolge sagt, was zuerst kommt",
+      "Oben stehen die Meilensteine: Termine fürs ganze Ziel, erreicht, wenn ihre verknüpften Arbeitspakete abgeschlossen sind",
+      "Darunter hat jedes Projekt eine Karte mit seinen Arbeitspaketen in der festgelegten Reihenfolge, jedes mit Zeitraum und seinen TODOs",
       "Die Zähler zeigen erledigt von gesamt und offene Fragen; eine Frage muss geklärt sein, bevor jemand anfängt"
     ]
   },
   "goal-timeline": {
     "title": "Das Ziel auf dem Zeitstrahl",
     "points": [
-      "Jedes Projekt hat ein Band; ein Klick in das Band legt dort an diesem Tag ein Teilziel an, nur der Titel fehlt noch",
-      "Teilziele ohne Datum warten in der Leiste „Ohne Datum“ ihres Bands – auf das Band gezogen bekommen sie eines; Rauten lassen sich verschieben",
-      "TODOs landen nur in Teilzielen ihres eigenen Projekts; ohne Fälligkeit stehen sie links in der Zeile ihres Teilziels, auf die Achse gezogen bekommen sie ein Datum; überfällige werden rot"
+      "Oben die Meilensteine als Rauten, darunter je Projekt ein Band mit den Arbeitspaketen als Balken von Beginn bis Ende",
+      "Ein Klick in die Meilenstein-Zeile oder in ein Band legt dort an; Balken und Rauten lassen sich ziehen, ein Balken auch an seinen Enden",
+      "Beim Ziehen steht unter dem Eintrag, wo er landet; TODOs gehen nur in Arbeitspakete ihres eigenen Projekts"
     ]
   },
   "goal-guard": {

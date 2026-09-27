@@ -1,8 +1,9 @@
-import type { GoalDetail, GoalMilestone, GoalProject, GoalTodoItem } from '../../types';
+import type { GoalDetail, GoalProject, GoalTodoItem, GoalWorkPackage } from '../../types';
 
 /**
- * Gliederung eines Ziels (c60bf914), rein und testbar: Projekt → Teilziel → TODOs, je Projekt dazu
- * „Ohne Teilziel“, am Ende „Ohne Projekt“. Jeder Knoten zählt seine TODOs.
+ * Gliederung eines Ziels (c60bf914), rein und testbar: Projekt → Arbeitspaket → TODOs, je Projekt
+ * dazu „Ohne Arbeitspaket“, am Ende „Ohne Projekt“. Jeder Knoten zählt seine TODOs. Die Meilensteine
+ * stehen darüber für sich (sie gehören dem ganzen Ziel, keinem Projekt).
  *
  * Gezählt werden nicht archivierte TODOs; offene Fragen nur an TODOs, die noch nicht erledigt sind.
  * Archivierte TODOs stehen auch nicht in der Gliederung.
@@ -19,12 +20,12 @@ export interface OutlineCounts {
 
 export interface OutlineTodo {
   todo: GoalTodoItem;
-  /** Altfall (⚠): Das TODO hat ein anderes Projekt als sein Teilziel. Wird gelesen, nicht abgewiesen. */
+  /** Altfall (⚠): Das TODO hat ein anderes Projekt als sein Arbeitspaket. Wird gelesen, nicht abgewiesen. */
   mismatch: boolean;
 }
 
-export interface OutlineSubgoal {
-  milestone: GoalMilestone;
+export interface OutlinePackage {
+  workPackage: GoalWorkPackage;
   todos: OutlineTodo[];
   counts: OutlineCounts;
 }
@@ -37,8 +38,8 @@ export interface OutlineProject {
   /** Das Projekt eines TODOs gehört (noch) nicht zum Ziel – nur Altdaten, sonst hängt der Server es an. */
   linked: boolean;
   /** In Reihenfolge ihrer Position. */
-  subgoals: OutlineSubgoal[];
-  /** TODOs des Projekts ohne Teilziel. */
+  packages: OutlinePackage[];
+  /** TODOs des Projekts ohne Arbeitspaket. */
   loose: OutlineTodo[];
   counts: OutlineCounts;
 }
@@ -46,7 +47,7 @@ export interface OutlineProject {
 export interface GoalOutline {
   /** Die Projekte des Ziels nach Position, danach Projekte, die nur über ein TODO hereinkommen. */
   projects: OutlineProject[];
-  /** „Ohne Projekt“ – nur, wenn es dort TODOs oder Teilziele gibt. */
+  /** „Ohne Projekt“ – nur, wenn es dort TODOs oder Arbeitspakete gibt. */
   noProject: OutlineProject | null;
 }
 
@@ -71,29 +72,27 @@ export function percentDone(counts: OutlineCounts): number {
   return counts.total === 0 ? 0 : Math.round((counts.done / counts.total) * 100);
 }
 
-/**
- * Teilziele nach `position`; bei gleicher Position bleibt die Reihenfolge des Servers.
- */
-function byPosition(milestones: GoalMilestone[]): GoalMilestone[] {
-  return milestones.map((milestone, index) => ({ milestone, index }))
-    .sort((a, b) => a.milestone.position - b.milestone.position || a.index - b.index)
-    .map(({ milestone }) => milestone);
+/** Pakete nach `position`; bei gleicher Position bleibt die Reihenfolge des Servers. */
+function byPosition(workPackages: GoalWorkPackage[]): GoalWorkPackage[] {
+  return workPackages.map((item, index) => ({ item, index }))
+    .sort((a, b) => a.item.position - b.item.position || a.index - b.index)
+    .map(({ item }) => item);
 }
 
-export function buildOutline(detail: Pick<GoalDetail, 'projects' | 'milestones' | 'todos'>): GoalOutline {
+export function buildOutline(detail: Pick<GoalDetail, 'projects' | 'workPackages' | 'todos'>): GoalOutline {
   const projectKeys = new Set(detail.projects.map((project) => project.projectId));
-  const milestoneById = new Map(detail.milestones.map((milestone) => [milestone.id, milestone]));
-  /** Gruppe eines Teilziels: sein Projekt, sonst (Projekt gelöscht, Altdaten) „Ohne Projekt“. */
-  const groupOfMilestone = (milestone: GoalMilestone) => milestone.projectId ?? NO_PROJECT;
+  const packageById = new Map(detail.workPackages.map((item) => [item.id, item]));
+  /** Gruppe eines Pakets: sein Projekt, sonst (Projekt gelöscht, Altdaten) „Ohne Projekt“. */
+  const groupOfPackage = (item: GoalWorkPackage) => item.projectId ?? NO_PROJECT;
 
   const todosBy = new Map<string, OutlineTodo[]>();
   const push = (key: string, entry: OutlineTodo) => todosBy.set(key, [...(todosBy.get(key) ?? []), entry]);
   const strays = new Map<string, string>();
 
   for (const todo of detail.todos.filter(shown)) {
-    const milestone = todo.milestoneId ? milestoneById.get(todo.milestoneId) : undefined;
-    if (milestone) {
-      push(`ms:${milestone.id}`, { todo, mismatch: (todo.projectId ?? null) !== (milestone.projectId ?? null) });
+    const item = todo.workPackageId ? packageById.get(todo.workPackageId) : undefined;
+    if (item) {
+      push(`wp:${item.id}`, { todo, mismatch: (todo.projectId ?? null) !== (item.projectId ?? null) });
       continue;
     }
     const key = todo.projectId ?? NO_PROJECT;
@@ -102,21 +101,21 @@ export function buildOutline(detail: Pick<GoalDetail, 'projects' | 'milestones' 
   }
 
   const group = (key: string, project: GoalProject | null, linked: boolean): OutlineProject => {
-    const subgoals = byPosition(detail.milestones.filter((milestone) => groupOfMilestone(milestone) === key))
-      .map((milestone): OutlineSubgoal => {
-        const todos = todosBy.get(`ms:${milestone.id}`) ?? [];
-        return { milestone, todos, counts: countTodos(todos.map((entry) => entry.todo)) };
+    const packages = byPosition(detail.workPackages.filter((item) => groupOfPackage(item) === key))
+      .map((workPackage): OutlinePackage => {
+        const todos = todosBy.get(`wp:${workPackage.id}`) ?? [];
+        return { workPackage, todos, counts: countTodos(todos.map((entry) => entry.todo)) };
       });
     const loose = todosBy.get(`loose:${key}`) ?? [];
-    const counts = sumCounts([...subgoals.map((subgoal) => subgoal.counts), countTodos(loose.map((entry) => entry.todo))]);
-    return { key, project, linked, subgoals, loose, counts };
+    const counts = sumCounts([...packages.map((entry) => entry.counts), countTodos(loose.map((entry) => entry.todo))]);
+    return { key, project, linked, packages, loose, counts };
   };
 
-  // Teilziele, deren Projekt nicht (mehr) zum Ziel gehört, bekommen ihr Projekt als eigene Gruppe
-  for (const milestone of detail.milestones) {
-    if (milestone.projectId && !projectKeys.has(milestone.projectId) && !strays.has(milestone.projectId)) {
-      const named = detail.todos.find((todo) => todo.projectId === milestone.projectId)?.projectName;
-      strays.set(milestone.projectId, named ?? milestone.projectId);
+  // Pakete, deren Projekt nicht (mehr) zum Ziel gehört, bekommen ihr Projekt als eigene Gruppe
+  for (const item of detail.workPackages) {
+    if (item.projectId && !projectKeys.has(item.projectId) && !strays.has(item.projectId)) {
+      const named = detail.todos.find((todo) => todo.projectId === item.projectId)?.projectName;
+      strays.set(item.projectId, named ?? item.projectId);
     }
   }
 
@@ -128,7 +127,7 @@ export function buildOutline(detail: Pick<GoalDetail, 'projects' | 'milestones' 
     }, false)),
   ];
   const rest = group(NO_PROJECT, null, true);
-  const noProject = rest.subgoals.length > 0 || rest.loose.length > 0 ? rest : null;
+  const noProject = rest.packages.length > 0 || rest.loose.length > 0 ? rest : null;
   return { projects, noProject };
 }
 

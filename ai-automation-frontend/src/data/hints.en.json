@@ -254,17 +254,17 @@
   "goal-outline": {
     "title": "The goal in outline",
     "points": [
-      "Every project of the goal is a card; it holds the project's sub-goals in their set order, each with its TODOs",
-      "A sub-goal is reached once all its TODOs are done – it needs no date, the order says what comes first",
+      "At the top are the milestones: dates for the whole goal, reached once their linked work packages are complete",
+      "Below, every project has a card with its work packages in their set order, each with its time span and its TODOs",
       "The counters show done out of total and the open questions; a question has to be settled before anyone starts"
     ]
   },
   "goal-timeline": {
     "title": "The goal on a timeline",
     "points": [
-      "Every project has a band; a click into the band adds a sub-goal on that day – only the title is missing",
-      "Sub-goals without a date wait in the band's “No date” tray – dragged onto the band they get one; diamonds can be moved",
-      "TODOs only go into sub-goals of their own project; without a due date they stand at the left of their sub-goal's row, dragged onto the axis they get a date; overdue ones turn red"
+      "Milestones sit at the top as diamonds, below every project has a band with its work packages as bars from start to end",
+      "A click into the milestone row or into a band adds one there; bars and diamonds can be dragged, a bar also by its ends",
+      "While dragging, the item shows where it will land; TODOs only go into work packages of their own project"
     ]
   },
   "goal-guard": {
