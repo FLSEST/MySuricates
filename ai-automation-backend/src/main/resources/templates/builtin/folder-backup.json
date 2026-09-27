@@ -10,7 +10,7 @@
     "de" : "Mehrere Ordner per Shell in komprimierte Archive sichern, inklusive Checksummen"
   },
   "category" : "DATA",
-  "sortOrder" : 27,
+  "sortOrder" : 26,
   "version" : "1.0.0",
   "model" : null,
   "instructions" : "Sichere alle Unterordner des aktuellen Projektverzeichnisses (ausser backup) in komprimierte Tar-Archive mit Zeitstempel nach backup/. Keine KI-Beteiligung, reine Shell-Ausfuehrung.",

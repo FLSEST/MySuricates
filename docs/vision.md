@@ -132,7 +132,7 @@ Workflows sammeln Wissen über Läufe hinweg:
 | Pre-flight Verification + Auto-Fix + AutoRepair-Config | Done |
 | Learning-Feedback in Prompts | Done |
 | Cross-Project Workflow-Erkennung | Done |
-| 55 Built-in Templates (Dev + Büro + Alltag) | Done |
+| 54 Built-in Templates (Dev + Büro + Alltag) | Done |
 | 19 Built-in Skills (Code-Review, Test-Generator, Security-Analyzer u.a.) | Done |
 | Staging (Dev + Stable + Test) | Done |
 | Mehrere KI-Anbieter (Claude + Codex + Pi) | Done |

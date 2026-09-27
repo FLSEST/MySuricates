@@ -765,7 +765,7 @@ Workflows können Wissen über Runs hinweg akkumulieren:
 
 - **SkillSeeder:** Legt 19 Built-in-Skills beim Start an (idempotent, Update bei Version-Bump) und registriert sie im `SkillRegistry`
 - Skill-Definitionen als JSON + Prompt-`.md` unter `src/main/resources/skills/builtin/`
-- **WorkflowTemplateSeeder:** Legt 55 Built-in-Templates beim Start an (idempotent, Update bei Version-Bump) und entfernt Built-in-Zeilen, deren Datei nicht mehr ausgeliefert wird
+- **WorkflowTemplateSeeder:** Legt 54 Built-in-Templates beim Start an (idempotent, Update bei Version-Bump) und entfernt Built-in-Zeilen, deren Datei nicht mehr ausgeliefert wird
 - Template-Definitionen als JSON unter `src/main/resources/templates/builtin/`
 
 ### Modul-Katalog

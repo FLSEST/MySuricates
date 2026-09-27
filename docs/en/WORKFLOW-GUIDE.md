@@ -1751,7 +1751,6 @@ All built-in templates with their primary pattern. The SaaS factory workflows (`
 | `auto-fix-java` | Multi-Stage + Approval | CODE |
 | `auto-fix-python` | Multi-Stage + Approval | CODE |
 | `auto-fix-typescript` | Multi-Stage + Approval | CODE |
-| `hunt-quality-pipeline` | Multi-Stage Pipeline | CODE |
 | `folder-backup` | Shell Chain | UTILITY |
 | `github-project-bootstrap` | Shell Chain | CODE |
 | `dependency-update-check` | Shell + Conditional | CODE |

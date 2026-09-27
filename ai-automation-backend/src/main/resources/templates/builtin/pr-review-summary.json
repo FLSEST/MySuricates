@@ -10,7 +10,7 @@
     "de" : "Pull-Request-Diff analysieren und strukturiertes Review mit Risikobewertung erstellen"
   },
   "category" : "TEAM",
-  "sortOrder" : 52,
+  "sortOrder" : 51,
   "version" : "1.0.0",
   "model" : null,
   "instructions" : "Analysiere Pull Requests. Variablen: base_branch (default 'main'), feature_branch (Name des Feature-Branch), max_diff_lines (default 500).",

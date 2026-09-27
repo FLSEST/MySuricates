@@ -10,7 +10,7 @@
     "de" : "Rsync-basierte Synchronisation mit Dry-Run und Report"
   },
   "category" : "DATA",
-  "sortOrder" : 34,
+  "sortOrder" : 33,
   "version" : "1.0.0",
   "model" : null,
   "instructions" : "Synchronisiere Verzeichnisse mit rsync. Variablen: source, target, exclude_patterns (kommasepariert), delete_removed (true/false).",

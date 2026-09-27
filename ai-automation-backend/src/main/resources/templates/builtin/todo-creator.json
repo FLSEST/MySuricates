@@ -10,7 +10,7 @@
     "de": "Aufgabenbeschreibung in atomare TODOs zerlegen und via API anlegen"
   },
   "category": "TRANSFORM",
-  "sortOrder": 43,
+  "sortOrder": 42,
   "version": "1.0.0",
   "model": null,
   "instructions": "Zerlege Aufgabenbeschreibungen in atomare TODOs und lege sie automatisch via API an. Variablen: task_description (Aufgabe), project_context (Kontext), project_id (Ziel-Projekt-ID).",

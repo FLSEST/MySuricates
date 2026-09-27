@@ -10,7 +10,7 @@
     "de": "Ungetestete Klassen und Services identifizieren, Coverage-Ratio berechnen, Prioritäten setzen"
   },
   "category": "CODE",
-  "sortOrder": 41,
+  "sortOrder": 40,
   "version": "1.0.0",
   "model": "sonnet",
   "instructions": "Identifiziert ungetestete Klassen, berechnet Coverage-Ratio und priorisiert Test-Luecken nach Kritikalitaet.",

@@ -14,7 +14,7 @@
     "en": "Checks a goal every day: overdue and soon-due TODOs and milestones, progress, target date. Reports a traffic light with key figures and items to the dashboard (no AI, 0 tokens). Created per goal by the “Guard” switch on the goal page; the data arrives as the context variables goal_status and goal_guard_* via goal_id."
   },
   "category": "MONITORING",
-  "sortOrder": 54,
+  "sortOrder": 53,
   "version": "1.0.0",
   "model": null,
   "instructions": null,

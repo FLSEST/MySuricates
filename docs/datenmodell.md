@@ -587,7 +587,7 @@ M:N-Beziehung zwischen Workflows und Skills.
 | `created_at` | TEXT | | |
 | `updated_at` | TEXT | | |
 
-55 Built-in-Templates werden durch `WorkflowTemplateSeeder` beim Start angelegt. Template-Definitionen liegen als JSON unter `src/main/resources/templates/builtin/`.
+54 Built-in-Templates werden durch `WorkflowTemplateSeeder` beim Start angelegt. Template-Definitionen liegen als JSON unter `src/main/resources/templates/builtin/`.
 
 ### `template_verifications`
 

@@ -10,7 +10,7 @@
     "de" : "Commits, Contributors, Churn und Aktivitäts-Trends analysieren"
   },
   "category" : "CODE",
-  "sortOrder" : 33,
+  "sortOrder" : 32,
   "version" : "1.0.1",
   "model" : null,
   "instructions" : "Erstelle einen Git-Statistik-Report. Variablen: project_path, since (z.B. '3 months ago').",

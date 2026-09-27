@@ -10,7 +10,7 @@
     "de" : "Veraltete Pakete und Sicherheitslücken prüfen"
   },
   "category" : "CODE",
-  "sortOrder" : 29,
+  "sortOrder" : 28,
   "version" : "1.0.0",
   "model" : null,
   "instructions" : "Pruefe Abhaengigkeiten auf Updates und Sicherheitsluecken. Variablen: project_path, package_manager (npm/mvn/gradle).",
