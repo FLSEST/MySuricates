@@ -26,7 +26,7 @@ export function PendingToolCard({ tool, sessionId, existingResult }: {
           : 'bg-danger/10 border-danger/30 text-danger'
       }`}>
         {decision.result.success ? <Check className="w-3.5 h-3.5 mt-0.5 shrink-0" /> : <X className="w-3.5 h-3.5 mt-0.5 shrink-0" />}
-        <span className="leading-snug">{decision.result.message}</span>
+        <span className="leading-snug whitespace-pre-line break-words min-w-0">{decision.result.message}</span>
       </div>
     );
   }

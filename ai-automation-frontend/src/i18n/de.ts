@@ -2071,6 +2071,10 @@ export const de: TranslationKeys = {
     chainRuns: 'Chain-Ausführungen',
     successfulRuns: 'Erfolgreich',
   },
+  buildCheck: {
+    title: 'Baufehler-Prüfung',
+    hint: 'Der Analyzer meldet diese Befunde nur; sie verhindern das Speichern nicht.',
+  },
   conversion: {
     banner: 'Dieser agentische Lauf war erfolgreich. In einen deterministischen Workflow umwandeln?',
     preview: 'Vorschau',
