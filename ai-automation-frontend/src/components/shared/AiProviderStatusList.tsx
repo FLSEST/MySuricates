@@ -21,7 +21,10 @@ interface AiProviderStatusListProps {
 /**
  * Per AI provider: program found, login found, and otherwise the command that helps (f5a273ae).
  * The commands are the ones the installer shows (`ProviderSetup` in the backend). In a container they
- * would point to the wrong machine, so there the list names the state only and says how logins get in.
+ * would point to the wrong machine, so there the list names the state only — plus, when the start path
+ * that launched this container has a fixed login command of its own (`report.loginCommand`), that
+ * command, copyable like any other. An older backend or a start path without one (e.g. the default
+ * login mode, where the login happens on the machine around the container): the generic note stays.
  */
 export function AiProviderStatusList({ report, onRefresh, refreshing }: AiProviderStatusListProps) {
   const t = useT().aiProviderStatus;
@@ -36,10 +39,17 @@ export function AiProviderStatusList({ report, onRefresh, refreshing }: AiProvid
         ))}
       </ul>
       {report.container && (
-        <p className="flex items-start gap-2 text-xs text-text-tertiary" data-testid="ai-provider-status-container">
-          <Info className="w-3.5 h-3.5 mt-0.5 shrink-0" aria-hidden="true" />
-          {t.containerNote}
-        </p>
+        <div className="space-y-1.5" data-testid="ai-provider-status-container">
+          <p className="flex items-start gap-2 text-xs text-text-tertiary">
+            <Info className="w-3.5 h-3.5 mt-0.5 shrink-0" aria-hidden="true" />
+            {t.containerNote}
+          </p>
+          {report.loginCommand && (
+            <div className="ml-6">
+              <CommandLine label={t.login} text={report.loginCommand} />
+            </div>
+          )}
+        </div>
       )}
       <div className="flex flex-wrap items-center gap-2 text-xs text-text-tertiary">
         <span>{t.checkedAt.replace('{time}', checkedAt)}</span>

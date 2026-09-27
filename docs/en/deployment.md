@@ -77,6 +77,15 @@ nor login. With `login` and `programs` every provider has its own directory on t
 (`/app/data/providers/<provider>`, via `CLAUDE_CONFIG_DIR`, `CODEX_HOME` and `PI_CODING_AGENT_DIR`):
 whatever the programs write there — sessions, caches — never reaches the machine.
 
+**Login command in the "AI providers" card.** In `programs` mode the starter knows the command that logs
+in inside the container — the container itself has no idea how it was started, so the starter passes it
+along as `MYSURICATES_LOGIN_COMMAND` (fixed text it already has anyway, never built from any input). The
+backend only shows it, never runs it. Tryout: `scripts/tryout.sh login [claude|codex|pi]`. `instance.sh`
+in `programs`: `scripts/instance.sh login`. `staging.sh` in `programs`: `scripts/staging.sh login stable`
+or `scripts/staging.sh login test`. In the default `login` mode (the login comes from the machine, see
+below) and for the dev container, which has no `login` subcommand of its own, it stays at the general
+hint, as before this command existed.
+
 **Why Claude needs a token.** Claude replaces `~/.claude/.credentials.json` every time it refreshes the
 login (new file, then rename). A file mounted on its own would keep pointing at the old one inside the
 container, and after the next refresh on the machine the container would be logged out. Codex and Pi

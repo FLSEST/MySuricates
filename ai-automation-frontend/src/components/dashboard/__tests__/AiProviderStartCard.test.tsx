@@ -42,8 +42,8 @@ function provider(id: string, state: AiProviderStatus['state'], extra: Partial<A
   };
 }
 
-function report(providers: AiProviderStatus[], container = false): AiProviderStatusReport {
-  return { container, checkedAt: '2026-09-24T10:00:00Z', providers };
+function report(providers: AiProviderStatus[], container = false, loginCommand: string | null = null): AiProviderStatusReport {
+  return { container, loginCommand, checkedAt: '2026-09-24T10:00:00Z', providers };
 }
 
 function serve(status: AiProviderStatusReport, projects: unknown[] = []) {
@@ -134,7 +134,32 @@ describe('AiProviderStartCard', () => {
 
     const card = await screen.findByTestId('ai-provider-start');
     expect(within(card).queryByText('claude login')).not.toBeInTheDocument();
-    expect(within(card).getByTestId('ai-provider-status-container')).toHaveTextContent('scripts/tryout.sh login');
+    expect(within(card).getByTestId('ai-provider-status-container')).toHaveTextContent(en.aiProviderStatus.containerNote);
+  });
+
+  // Whether a login command is known depends on the start path (tryout, instance.sh in programs
+  // mode, staging.sh in programs mode) — the backend sends it, the card shows it copyable.
+  it('shows the login command of the start path that launched this container, copyable', async () => {
+    serve(report([provider('CLAUDE', 'LOGIN_MISSING', { defaultProvider: true })], true,
+      'scripts/tryout.sh login [claude|codex|pi]'));
+    renderWithProviders(<AiProviderStartCard />);
+
+    const card = await screen.findByTestId('ai-provider-start');
+    const note = within(card).getByTestId('ai-provider-status-container');
+    expect(within(note).getByText('scripts/tryout.sh login [claude|codex|pi]', { selector: 'code' })).toBeInTheDocument();
+  });
+
+  it('an older backend without loginCommand: the generic hint only, as before', async () => {
+    const { loginCommand: _drop, ...legacyReport } = report(
+      [provider('CLAUDE', 'LOGIN_MISSING', { defaultProvider: true })], true,
+    );
+    serve(legacyReport as AiProviderStatusReport);
+    renderWithProviders(<AiProviderStartCard />);
+
+    const card = await screen.findByTestId('ai-provider-start');
+    const note = within(card).getByTestId('ai-provider-status-container');
+    expect(note).toHaveTextContent(en.aiProviderStatus.containerNote);
+    expect(within(note).queryByRole('button', { name: /copy/i })).not.toBeInTheDocument();
   });
 
   it('stays hidden for the status it was hidden at, and returns when the status changes', async () => {
