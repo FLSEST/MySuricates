@@ -215,8 +215,12 @@ cleanup() {
   [ "$WAY" = host ] || remove_probe_docker
   rm -rf "$WORK" 2>/dev/null || echo "installer-probe: $WORK ließ sich nicht ganz löschen" >&2
 }
+PHASE_PID=""
 trap cleanup EXIT
-trap 'exit 130' INT TERM
+# Eine Phase laeuft im Hintergrund, die Probe wartet mit wait darauf: nur so greift ein TERM sofort
+# (auf einen Vordergrund-Prozess wartete bash bis zu dessen Ende, bis zu PHASE_TIMEOUT) und das
+# Aufraeumen kommt, bevor ein halb eingerichteter Container stehen bleibt
+trap '[ -z "$PHASE_PID" ] || kill "$PHASE_PID" 2>/dev/null; exit 130' INT TERM
 
 # --- Frische Maschine ------------------------------------------------------------------------------
 # Ein Bundle trägt den Stand in den Container, unabhängig davon, ob $REPO ein Worktree, ein Klon mit
@@ -329,11 +333,16 @@ check() {  # label, ok|fail|skip, detail
 # vorab gepufferte Antwort nicht als Zeile am Anfang des Mitschnitts steht.
 run_phase() {  # name, command, input
   local name="$1" cmd="$2" input="$3" t0=$SECONDS rc
-  printf '%b' "$input" | timeout "$PHASE_TIMEOUT" docker exec -i -u probe -w "$CLONE" \
-    -e TERM=xterm-256color -e LANG=C.UTF-8 ${EXEC_ENV[@]+"${EXEC_ENV[@]}"} "$NAME" \
-    script -qefc "stty cols 120 rows 40 -echo 2>/dev/null; rm -f /tmp/phase.rc; bash -c '$cmd'; echo \$? > /tmp/phase.rc" /dev/null \
-    > "$OUT/logs/${name}.log" 2>&1
-  rc="${PIPESTATUS[1]}"
+  (
+    printf '%b' "$input" | timeout "$PHASE_TIMEOUT" docker exec -i -u probe -w "$CLONE" \
+      -e TERM=xterm-256color -e LANG=C.UTF-8 ${EXEC_ENV[@]+"${EXEC_ENV[@]}"} "$NAME" \
+      script -qefc "stty cols 120 rows 40 -echo 2>/dev/null; rm -f /tmp/phase.rc; bash -c '$cmd'; echo \$? > /tmp/phase.rc" /dev/null \
+      > "$OUT/logs/${name}.log" 2>&1
+    exit "${PIPESTATUS[1]}"
+  ) &
+  PHASE_PID=$!
+  wait "$PHASE_PID"; rc=$?
+  PHASE_PID=""
   # Der Exit-Code der Phase selbst — über script/docker exec ging ein Abbruch schon als 0 durch
   local inner
   inner="$(docker exec "$NAME" cat /tmp/phase.rc 2>/dev/null)" && [ -n "$inner" ] && rc="$inner"
@@ -349,7 +358,8 @@ case "$WAY" in
   container)
     # Die Vorgaben eines Nutzers (im Container, 127.0.0.1, kein Socket); nur der Port ist gesetzt —
     # 9090 und die folgenden gehören auf diesem Rechner oft schon echten Instanzen
-    CMD1="./scripts/setup.sh --check --lang de"
+    # --runtime container auch im Prüflauf: ohne Weg fragt setup.sh im Terminal danach
+    CMD1="./scripts/setup.sh --check --runtime container --lang de"
     CMD2="./scripts/setup.sh --yes --port ${BASE_PORT} --lang de" ;;
   staged)
     CMD1="./scripts/setup.sh --check --mode staged --lang de"

@@ -136,6 +136,7 @@ STUB
   check "the clone folder under the same path"          'grep -E "^run .* -v ([^ :]+/machine):\1 " "$DOCKER_CALLS" >/dev/null'
   check "the probe user gets this machine's IDs"        'grep -F -- "-e PROBE_UID=$(id -u) -e PROBE_SOCK_GID=$(stat -c %g "$TMP/d.sock" 2>/dev/null || stat -f %g "$TMP/d.sock") $N bash -c" "$DOCKER_CALLS" >/dev/null'
   check "setup.sh with the defaults, only the port set" 'awk -F"\t" "\$1==\"2-einrichten\" {print \$2}" "$TMP/p7/phases.tsv" | grep -qx -- "./scripts/setup.sh --yes --port 19871 --lang de"'
+  check "check phase names the way (no mode question)" 'awk -F"\t" "\$1==\"1-pruefen\" {print \$2}" "$TMP/p7/phases.tsv" | grep -qx -- "./scripts/setup.sh --check --runtime container --lang de"'
   check "setup.sh sees the run's prefix"                'grep -E "^exec -i -u probe .* -e MYSURICATES_PREFIX=$N " "$DOCKER_CALLS" >/dev/null'
   check "cleanup: the machine and its instance"         'grep -qx "rm -f $N" "$DOCKER_CALLS" && grep -qx "rm -f $N-main" "$DOCKER_CALLS"'
   check "cleanup: its volumes, network and image"       'grep -qx "volume rm $N-main-data" "$DOCKER_CALLS" && grep -qx "volume rm $N-main-secrets" "$DOCKER_CALLS" && grep -qx "network rm $N-main_default" "$DOCKER_CALLS" && grep -qx "image rm $N:local" "$DOCKER_CALLS"'
@@ -149,6 +150,24 @@ STUB
   N="mysuricates-installer-probe-20260927-120000"; echo "$N" > "$PROBE_NAME_FILE"
   check "--cleanup removes a kept run"                   '[ "$(PATH="$TMP/bin4:$PATH" bash "$PROBE" --cleanup "$N" </dev/null >"$TMP/out" 2>&1; echo $?)" = 0 ] && grep -qx "rm -f $N" "$DOCKER_CALLS" && grep -qx "volume rm $N-main-data" "$DOCKER_CALLS" && ! grep -E "^(rm|volume rm) .*(stable|mysuricates-main)" "$DOCKER_CALLS" >/dev/null'
 fi
+
+echo "8) TERM during a phase: cleanup right away, not after the phase"
+# docker exec der Phase haengt (wie setup.sh an einer Rueckfrage); ein TERM an die Probe muss trotzdem
+# sofort aufraeumen — auf einen Vordergrund-Prozess wartete bash bis zum Ende der Phase
+mkdir -p "$TMP/bin5"
+cat > "$TMP/bin5/docker" <<'STUB'
+#!/usr/bin/env bash
+echo "$*" >> "$DOCKER_CALLS"
+case "$1 $2" in "exec -i") sleep 20 ;; esac   # endet von selbst, der Test beendet nichts per Name
+exit 0
+STUB
+chmod +x "$TMP/bin5/docker"; : > "$DOCKER_CALLS"
+PATH="$TMP/bin5:$PATH" bash "$PROBE" --no-screenshots --out "$TMP/p9" </dev/null >"$TMP/out" 2>&1 &
+PPID9=$!
+for _ in $(seq 1 100); do grep -q "^exec -i " "$DOCKER_CALLS" 2>/dev/null && break; sleep 0.1; done
+T0=$SECONDS; kill -TERM "$PPID9"; wait "$PPID9"; RC9=$?
+check "TERM ends the probe within seconds (exit 130)"  '[ "$RC9" = 130 ] && [ $((SECONDS - T0)) -lt 15 ]'
+check "... and removes the machine"                    'grep -qE "^rm -f mysuricates-installer-probe-[0-9]{8}-[0-9]{6}$" "$DOCKER_CALLS"'
 
 echo
 echo "passed=$PASS failed=$FAIL"
