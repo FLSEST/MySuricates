@@ -1244,7 +1244,6 @@ autotrigger/
 │   ├── docker-compose.stable.yml      ← Stable-Container
 │   ├── docker-compose.test.yml        ← Test-Container
 │   ├── docker/
-│   │   ├── Dockerfile.backend
 │   │   ├── Dockerfile.stable          ← Ubuntu-basiert (glibc für Claude CLI)
 │   │   ├── Dockerfile.agent-node
 │   │   ├── Dockerfile.agent-python

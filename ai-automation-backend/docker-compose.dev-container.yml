@@ -6,9 +6,9 @@
 # fest verdrahtet.
 #
 # Warum nicht docker-compose.yml? Die baut keinen Backend-Service mehr, nur noch die Agent-Images.
-# docker/Dockerfile.backend ist ein reines JRE-Alpine-Image **ohne Node**. Claude ist ein natives
-# glibc-Programm (Alpine hat musl), Codex und Pi sind Node-Programme; in diesem Image kann keines
-# davon laufen. docker/Dockerfile.stable ist Ubuntu-basiert und bringt Node mit — deshalb baut diese
+# Ein reines JRE-Alpine-Image ohne Node reicht hier nicht: Claude ist ein natives glibc-Programm
+# (Alpine hat musl), Codex und Pi sind Node-Programme; in einem solchen Image kann keines davon
+# laufen. docker/Dockerfile.stable ist Ubuntu-basiert und bringt Node mit — deshalb baut diese
 # Datei daraus, wie es Test und Stable auch tun.
 services:
   backend:

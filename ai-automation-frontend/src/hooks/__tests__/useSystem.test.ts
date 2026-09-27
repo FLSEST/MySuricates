@@ -246,6 +246,32 @@ describe('useRemoteAccessStatus', () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data!.enabled).toBe(true);
   });
+
+  // The frontend goes live with the merge before the backend restarts — an OLD backend answers
+  // without `inContainer` at all, and the hook must pass that through unchanged rather than fail.
+  it('passes through a response without inContainer (old backend)', async () => {
+    server.use(
+      http.get(`${apiBase}/system/remote-access/status`, () =>
+        HttpResponse.json({ enabled: false, ip: null, hostname: null }),
+      ),
+    );
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useRemoteAccessStatus(), { wrapper: Wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data!.inContainer).toBeUndefined();
+  });
+
+  it('passes through inContainer on a NEW backend', async () => {
+    server.use(
+      http.get(`${apiBase}/system/remote-access/status`, () =>
+        HttpResponse.json({ enabled: false, ip: null, hostname: null, inContainer: true }),
+      ),
+    );
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useRemoteAccessStatus(), { wrapper: Wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data!.inContainer).toBe(true);
+  });
 });
 
 describe('useEnableRemoteAccess', () => {

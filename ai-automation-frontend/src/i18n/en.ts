@@ -1624,6 +1624,7 @@ export const en = {
     tailscaleStatus: 'Status',
     tailscaleIp: 'Tailscale IP',
     tailscaleNotConnected: 'Not connected',
+    tailscaleContainerHint: 'This instance runs in a container — remote access only works on the machine: install Tailscale there and run "tailscale serve --bg --https=443 http://127.0.0.1:<port>".',
     simpleMode: 'Simple Mode',
     simpleModeHint: 'Streamlined interface — ideal for users who just run workflows',
     simpleModeShort: 'Simple',

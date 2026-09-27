@@ -1574,6 +1574,7 @@ export const de: TranslationKeys = {
     tailscaleStatus: 'Status',
     tailscaleIp: 'Tailscale-IP',
     tailscaleNotConnected: 'Nicht verbunden',
+    tailscaleContainerHint: 'Diese Instanz läuft in einem Container — Fernzugriff geht nur auf dem Rechner: Tailscale dort installieren und "tailscale serve --bg --https=443 http://127.0.0.1:<Port>" ausführen.',
     simpleMode: 'Einfacher Modus',
     simpleModeHint: 'Vereinfachte Oberfläche — ideal für Nutzer, die nur Workflows ausführen',
     simpleModeShort: 'Einfach',
