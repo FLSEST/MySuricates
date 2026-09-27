@@ -166,8 +166,9 @@ public class WorkflowController {
                         request.instructions(),
                         request.model(),
                         null,
-                        null,
-                        null,
+                        // Like on create; metadata merges as on PUT (TODO 3e405c14)
+                        request.metadata(),
+                        request.defaultContext(),
                         "Imported workflow update",
                         null,
                         null,
