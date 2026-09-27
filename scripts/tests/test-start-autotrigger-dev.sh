@@ -149,10 +149,14 @@ OVR='export HOST_MOUNTS_ASSUME_SOCKET=1 AUTOTRIGGER_DEV_NODE_MODULES="'"$TMP"'/n
 OUT="$(run_in_script "$OVR"'; write_compose_override >/dev/null 2>&1; cat "$COMPOSE_OVERRIDE"')"
 check "override names the backend service"  'grep -q "^  backend:" <<<"$OUT"'
 check "default login: no login directory"   '! grep -q "/.claude:" <<<"$OUT" && grep -q "MYSURICATES_AI_FROM_HOST=login" <<<"$OUT"'
-check "socket on by default, as before"     'grep -q "/var/run/docker.sock:/var/run/docker.sock" <<<"$OUT"'
+check "socket off by default"               '! grep -q "docker.sock" <<<"$OUT" && grep -q "MYSURICATES_DOCKER_SOCKET=0" <<<"$OUT"'
 check "switches named for the settings"     'grep -q "MYSURICATES_SWITCH_PREFIX=AUTOTRIGGER_DEV_" <<<"$OUT"'
-OUT="$(run_in_script "$OVR"'; AUTOTRIGGER_DEV_DOCKER_SOCKET=0 AUTOTRIGGER_DEV_AI_FROM_HOST=all write_compose_override >/dev/null 2>&1; cat "$COMPOSE_OVERRIDE"')"
-check "all + socket off are honored"        'grep -q "/.claude:" <<<"$OUT" && ! grep -q "docker.sock" <<<"$OUT"'
+OUT="$(run_in_script "$OVR"'; AUTOTRIGGER_DEV_DOCKER_SOCKET=1 AUTOTRIGGER_DEV_AI_FROM_HOST=all write_compose_override >/dev/null 2>&1; cat "$COMPOSE_OVERRIDE"')"
+check "all + socket on purpose are honored" 'grep -q "/.claude:" <<<"$OUT" && grep -q "/var/run/docker.sock:/var/run/docker.sock" <<<"$OUT"'
+RC="$(run_in_script "$OVR"'; AUTOTRIGGER_DEV_CONTAINER_BIND="0.0.0.0 x" write_compose_override >/dev/null 2>&1; echo $?')"
+check "a bind that is no address refuses the start" '[ "$RC" = 2 ]'
+DCY="$HERE/../../ai-automation-backend/docker-compose.dev-container.yml"
+check "compose file publishes on 127.0.0.1 unless switched" 'grep -qF "host_ip: \"\${AUTOTRIGGER_DEV_CONTAINER_BIND:-127.0.0.1}\"" "$DCY" && [ "$(grep -c "host_ip:" "$DCY")" = 1 ]'
 RC="$(run_in_script "$OVR"'; AUTOTRIGGER_DEV_AI_FROM_HOST=everything write_compose_override >/dev/null 2>&1; echo $?')"
 check "invalid mode refuses the start"      '[ "$RC" = 2 ]'
 check "compose file no longer hard-wires the socket" '! grep -q "docker.sock:/var/run/docker.sock" "$HERE/../../ai-automation-backend/docker-compose.dev-container.yml"'

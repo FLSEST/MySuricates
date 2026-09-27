@@ -55,7 +55,10 @@ with `--rebuild` or when there is none yet, and `build --container` builds just 
 What of the machine's AI providers goes into the container is set by `AUTOTRIGGER_DEV_AI_FROM_HOST`
 (`login` = the programs and just the login of each provider, the default; `programs`; `all` = whole
 provider directories as before), plus `AUTOTRIGGER_DEV_AI_PROVIDERS` (selection from
-`claude,codex,pi`) and `AUTOTRIGGER_DEV_DOCKER_SOCKET` (default `1`). Claude needs a one-time
+`claude,codex,pi`) and `AUTOTRIGGER_DEV_DOCKER_SOCKET` (default `0`; `1` gives the container full control
+over Docker on the machine and is needed for project containers, the terminal and `container_image` blocks).
+The port is published on `127.0.0.1` only by default, `AUTOTRIGGER_DEV_CONTAINER_BIND=0.0.0.0` opens it to the
+local network on purpose. Claude needs a one-time
 `claude setup-token` for it — background in
 [deployment.md → AI providers in the container](deployment.md#ai-providers-in-the-container). The
 "Startup configuration" card in the settings shows what the container runs with.

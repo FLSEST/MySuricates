@@ -27,13 +27,17 @@ services:
         APT_REFRESH: ${MYSURICATES_APT_REFRESH:-}
     image: ai-automation-backend-dev-container
     container_name: ${AUTOTRIGGER_DEV_CONTAINER_NAME:-autotrigger-dev-container}
+    # Standardmaessig nur auf 127.0.0.1, wie deploy/ und Stable/Test; AUTOTRIGGER_DEV_CONTAINER_BIND=0.0.0.0
+    # oeffnet den Port bewusst auch fuers lokale Netz.
     ports:
-      - "${AUTOTRIGGER_DEV_CONTAINER_PORT:-9090}:9090"
+      - target: 9090
+        published: "${AUTOTRIGGER_DEV_CONTAINER_PORT:-9090}"
+        host_ip: "${AUTOTRIGGER_DEV_CONTAINER_BIND:-127.0.0.1}"
     volumes:
       - dev-container-data:/app/data
       - dev-container-secrets:/app/secrets
       # Docker-Socket und KI-Anbieter kommen aus der Override-Datei des Starters
-      # (scripts/lib/host-mounts.sh): AUTOTRIGGER_DEV_DOCKER_SOCKET (Default 1),
+      # (scripts/lib/host-mounts.sh): AUTOTRIGGER_DEV_DOCKER_SOCKET (Default 0, 1 bewusst setzen),
       # AUTOTRIGGER_DEV_AI_FROM_HOST (Default login), AUTOTRIGGER_DEV_AI_PROVIDERS (262948a4).
       # Projektverzeichnisse: ohne sie sieht ein Workflow die Projekte nicht, auf die er
       # laut Projektpfad zugreifen soll.

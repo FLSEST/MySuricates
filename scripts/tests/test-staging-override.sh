@@ -31,7 +31,7 @@ for t in curl mvn npm git; do printf '#!/bin/sh\nexit 0\n' > "$TMP/bin/$t"; done
 chmod +x "$TMP/bin/"*
 export HOME="$TMP/home" XDG_CONFIG_HOME="$TMP/config" XDG_STATE_HOME="$TMP/state" PATH="$TMP/bin:$PATH" \
        DOCKER_LOG="$TMP/docker.log" HOST_MOUNTS_ASSUME_SOCKET=1 HOST_MOUNTS_NODE_MODULES="$TMP/nm"
-unset STABLE_AI_FROM_HOST STABLE_AI_PROVIDERS STABLE_DOCKER_SOCKET TEST_AI_FROM_HOST TEST_AI_PROVIDERS TEST_DOCKER_SOCKET MYSURICATES_STAGING_ENV
+unset STABLE_AI_FROM_HOST STABLE_AI_PROVIDERS STABLE_DOCKER_SOCKET STABLE_BIND TEST_AI_FROM_HOST TEST_AI_PROVIDERS TEST_DOCKER_SOCKET TEST_BIND MYSURICATES_STAGING_ENV
 S="$REPO/scripts/staging.sh"; OV="$TMP/state/mysuricates/staging"; ENVF="$TMP/config/mysuricates/staging.env"
 STABLE_YML="$REPO/ai-automation-backend/docker-compose.stable.yml"; TEST_YML="$REPO/ai-automation-backend/docker-compose.test.yml"
 
@@ -39,19 +39,26 @@ echo "1) write-override"
 OUT="$(bash "$S" write-override stable 2>/dev/null)"
 check "prints only the path (the backend reads it)" '[ "$OUT" = "$OV/stable.override.yml" ]'
 check "service stable, default login"               'grep -q "^  stable:" "$OUT" && grep -q "MYSURICATES_AI_FROM_HOST=login" "$OUT"'
-check "socket on by default, as before"             'grep -q "/var/run/docker.sock:/var/run/docker.sock" "$OUT"'
+check "socket off by default"                       '! grep -q "docker.sock" "$OUT" && grep -q "MYSURICATES_DOCKER_SOCKET=0" "$OUT"'
+check "port only on 127.0.0.1 by default"           '[ "$(grep -c "host_ip:" "$OUT")" = 1 ] && grep -q "host_ip: \"127.0.0.1\"" "$OUT" && grep -q "published: \"9091\"" "$OUT"'
 check "switches named for the settings page"        'grep -q "MYSURICATES_SWITCH_PREFIX=STABLE_" "$OUT" && grep -q "MYSURICATES_SWITCH_SOURCE=$ENVF" "$OUT"'
 OUT="$(bash "$S" write-override test 2>/dev/null)"
 check "service test, prefix TEST_"                  'grep -q "^  test:" "$OUT" && grep -q "MYSURICATES_SWITCH_PREFIX=TEST_" "$OUT"'
+check "test: own port, 127.0.0.1, no socket"        'grep -q "published: \"8090\"" "$OUT" && grep -q "host_ip: \"127.0.0.1\"" "$OUT" && ! grep -q docker.sock "$OUT"'
 check "unknown environment is refused"              'bash "$S" write-override prod >/dev/null 2>&1; [ $? -eq 2 ]'
 
 echo "2) switches from staging.env, environment wins"
-printf 'STABLE_AI_FROM_HOST=programs\nSTABLE_DOCKER_SOCKET=0\nTEST_AI_PROVIDERS=claude\n' > "$ENVF"
+printf 'STABLE_AI_FROM_HOST=programs\nSTABLE_DOCKER_SOCKET=0\nTEST_AI_PROVIDERS=claude\nTEST_DOCKER_SOCKET=1\nTEST_BIND=0.0.0.0\n' > "$ENVF"
 bash "$S" write-override stable >/dev/null 2>&1; bash "$S" write-override test >/dev/null 2>&1
-check "stable: programs, no socket"                 'grep -q "MYSURICATES_AI_FROM_HOST=programs" "$OV/stable.override.yml" && ! grep -q docker.sock "$OV/stable.override.yml"'
-check "test keeps its own values"                   'grep -q "MYSURICATES_AI_FROM_HOST=login" "$OV/test.override.yml" && grep -q "MYSURICATES_AI_PROVIDERS=claude" "$OV/test.override.yml" && grep -q docker.sock "$OV/test.override.yml"'
-STABLE_DOCKER_SOCKET=1 bash "$S" write-override stable >/dev/null 2>&1
+check "stable: programs, no socket, 127.0.0.1"      'grep -q "MYSURICATES_AI_FROM_HOST=programs" "$OV/stable.override.yml" && ! grep -q docker.sock "$OV/stable.override.yml" && grep -q "host_ip: \"127.0.0.1\"" "$OV/stable.override.yml"'
+check "test keeps its own values"                   'grep -q "MYSURICATES_AI_FROM_HOST=login" "$OV/test.override.yml" && grep -q "MYSURICATES_AI_PROVIDERS=claude" "$OV/test.override.yml"'
+check "test: socket switched on on purpose"         'grep -q "/var/run/docker.sock:/var/run/docker.sock" "$OV/test.override.yml" && grep -q "MYSURICATES_DOCKER_SOCKET=1" "$OV/test.override.yml"'
+check "test: 0.0.0.0 alone (includes loopback)"     '[ "$(grep -c "host_ip:" "$OV/test.override.yml")" = 1 ] && grep -q "host_ip: \"0.0.0.0\"" "$OV/test.override.yml"'
+STABLE_DOCKER_SOCKET=1 STABLE_BIND=192.168.178.20 bash "$S" write-override stable >/dev/null 2>&1
 check "an environment variable wins over the file"  'grep -q docker.sock "$OV/stable.override.yml"'
+check "a single address keeps 127.0.0.1 for health" 'grep -q "host_ip: \"192.168.178.20\"" "$OV/stable.override.yml" && grep -q "host_ip: \"127.0.0.1\"" "$OV/stable.override.yml"'
+STABLE_BIND='0.0.0.0:1:1 #' bash "$S" write-override stable >/dev/null 2>&1; RC=$?
+check "a bind that is no address is refused"       '[ "$RC" = 2 ] && grep -q "host_ip: \"192.168.178.20\"" "$OV/stable.override.yml"'
 printf 'STABLE_AI_FROM_HOST=$(touch %s/pwned)\n' "$TMP" > "$ENVF"
 bash "$S" write-override stable >/dev/null 2>&1; RC=$?
 check "the file is never executed"                  '[ ! -e "$TMP/pwned" ] && [ "$RC" = 2 ]'
@@ -71,6 +78,9 @@ check "no call without it"     '! grep -E "^compose " "$DOCKER_LOG" | grep -v --
 printf 'STABLE_AI_FROM_HOST=everything\n' > "$ENVF"; : > "$DOCKER_LOG"
 bash "$S" start >/dev/null 2>&1; RC=$?
 check "invalid switch: start refuses before compose" '[ "$RC" = 2 ] && ! grep -q "^compose " "$DOCKER_LOG"'
+printf 'STABLE_BIND=all\n' > "$ENVF"; : > "$DOCKER_LOG"
+bash "$S" start >/dev/null 2>&1; RC=$?
+check "invalid bind: start refuses before compose"   '[ "$RC" = 2 ] && ! grep -q "^compose " "$DOCKER_LOG"'
 rm -f "$ENVF"
 
 echo "4) own login only with programs"
@@ -82,9 +92,10 @@ check "mode programs: as the app user" 'grep -q -- "exec -it -u flo mysuricates-
 check "not running: refused"           'bash "$S" login test codex >/dev/null 2>&1; [ $? -eq 2 ]'
 check "unknown provider: refused"      'RUNNING=1 MODE=programs bash "$S" login stable gemini >/dev/null 2>&1; [ $? -eq 2 ]'
 
-echo "5) compose files no longer hard-wire the host"
+echo "5) compose files no longer hard-wire the host or the port"
 for f in "$R/ai-automation-backend/docker-compose.stable.yml" "$R/ai-automation-backend/docker-compose.test.yml"; do
   check "$(basename "$f"): no provider mounts, no socket" '! grep -E "^\s+- " "$f" | grep -qE "/seed/|\.claude|\.codex|\.pi[:/]|\.local/(bin|share)[^ ]*:|docker\.sock:"'
+  check "$(basename "$f"): publishes no port itself (the override does)" '! grep -qE "^\s+ports:" "$f"'
 done
 check "staging.sh parses"               'bash -n "$R/scripts/staging.sh"'
 

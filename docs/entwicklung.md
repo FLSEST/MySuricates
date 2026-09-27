@@ -60,7 +60,10 @@ nur mit `--rebuild` oder wenn noch keins liegt, und `build --container` baut nur
 Was von den KI-Anbietern des Rechners in den Container kommt, entscheidet
 `AUTOTRIGGER_DEV_AI_FROM_HOST` (`login` = Programme und je Anbieter nur die Anmeldung, der Standard;
 `programs`; `all` = ganze Anbieter-Verzeichnisse wie früher), dazu `AUTOTRIGGER_DEV_AI_PROVIDERS`
-(Auswahl aus `claude,codex,pi`) und `AUTOTRIGGER_DEV_DOCKER_SOCKET` (Standard `1`). Claude braucht
+(Auswahl aus `claude,codex,pi`) und `AUTOTRIGGER_DEV_DOCKER_SOCKET` (Standard `0`; `1` gibt dem Container volle
+Kontrolle über Docker auf dem Rechner und ist nötig für Projekt-Container, Terminal und `container_image`-Blöcke).
+Der Port ist standardmäßig nur auf `127.0.0.1` veröffentlicht, `AUTOTRIGGER_DEV_CONTAINER_BIND=0.0.0.0` öffnet ihn
+bewusst fürs lokale Netz. Claude braucht
 dafür einmal `claude setup-token` — Hintergrund in
 [deployment.md → KI-Anbieter im Container](deployment.md#ki-anbieter-im-container). Die Karte
 „Startkonfiguration“ in den Einstellungen zeigt, womit der Container läuft.

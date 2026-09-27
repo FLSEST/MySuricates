@@ -186,11 +186,16 @@ Nach Code-Änderungen immer `test-promote` (oder `test-snapshot`) verwenden, son
 der Test-Container mit einem veralteten Backend-JAR (aktuelles Frontend + altes Backend
 → neue Endpoints liefern 404 → UI hängt auf „loading").
 
-**KI-Anbieter und Docker-Socket in Stable/Test** kommen aus `scripts/lib/host-mounts.sh` — derselben Stelle wie bei
-`instance.sh` und dem Dev-Container, auch beim Start aus der Oberfläche (`StagingComposeCommand`). Schalter in
-`~/.config/mysuricates/staging.env`: `STABLE_`/`TEST_` + `AI_FROM_HOST` (`login` = Programme + je Anbieter nur die
-Anmeldung, Standard; Claude per Token aus `~/.config/mysuricates/ai.env`), `AI_PROVIDERS`, `DOCKER_SOCKET` (Standard 1).
-Nie wieder ganze Provider-Verzeichnisse fest in eine Compose-Datei schreiben. Details: [docs/deployment.md](docs/deployment.md) → „KI-Anbieter im Container“.
+**KI-Anbieter, Docker-Socket und Port in Stable/Test** kommen aus der Override-Datei von `scripts/staging.sh`
+(`scripts/lib/host-mounts.sh` — derselben Stelle wie bei `instance.sh` und dem Dev-Container), auch beim Start aus
+der Oberfläche (`StagingComposeCommand`). Schalter in `~/.config/mysuricates/staging.env`: `STABLE_`/`TEST_` +
+`AI_FROM_HOST` (`login` = Programme + je Anbieter nur die Anmeldung, Standard; Claude per Token aus
+`~/.config/mysuricates/ai.env`), `AI_PROVIDERS`, `DOCKER_SOCKET` (Standard 0), `BIND` (Standard `127.0.0.1`).
+**Sicher per Standard, überall:** jeder Docker-Weg (deploy/, tryout, Stable, Test, Dev-Container) veröffentlicht den
+Port nur auf `127.0.0.1` und bindet keinen Docker-Socket ein; nach außen (`…BIND=0.0.0.0`) oder mit Socket
+(`…DOCKER_SOCKET=1`, nötig für Projekt-Container, Terminal, `container_image`-Blöcke, `docker` in Shell-Blöcken)
+nur per bewusstem Schalter. Nie wieder ganze Provider-Verzeichnisse oder ein Portmapping ohne Adresse fest in eine
+Compose-Datei schreiben (`test-deploy-files.sh` prüft das). Details: [docs/deployment.md](docs/deployment.md) → „KI-Anbieter im Container“.
 
 Vollständige Dokumentation (Auto-Start, Definition-Sync, Key-Files): [docs/deployment.md](docs/deployment.md)
 
