@@ -266,5 +266,21 @@
       "The result appears as a traffic-light tile on the dashboard; the workflow needs no model and costs no tokens",
       "Switching it off only pauses the schedule – workflow and tile stay, and switching it on again carries on from there"
     ]
+  },
+  "dialogs-sessions": {
+    "title": "Turn a Claude Code session into a workflow",
+    "points": [
+      "Reads the Claude Code sessions on this machine, grouped by project",
+      "An analysis looks for repeatable steps and suggests blocks; the confidence says how sure it is about the pattern",
+      "Check the suggestions before creating the workflow, especially at low confidence"
+    ]
+  },
+  "docs-reading": {
+    "title": "This installation's manuals",
+    "points": [
+      "The documentation from the docs folder: building workflows, architecture, API, operations and development",
+      "English where a translation exists, otherwise the German version",
+      "The assistant draws on parts of it when you ask about building workflows"
+    ]
   }
 }

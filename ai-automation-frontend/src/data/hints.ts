@@ -47,6 +47,8 @@ export const HINTS = {
   'audit-findings': { version: 1 },
   'insights-numbers': { version: 1 },
   'onboarding-profiles': { version: 1 },
+  'dialogs-sessions': { version: 1 },
+  'docs-reading': { version: 1 },
   'simple-home': { version: 1 },
   'simple-result': { version: 1 },
   'simple-create': { version: 1 },
