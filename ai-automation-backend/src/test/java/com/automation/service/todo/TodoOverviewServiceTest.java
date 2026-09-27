@@ -146,6 +146,23 @@ class TodoOverviewServiceTest {
         assertThat(result.milestonesDue().get(1).state()).isEqualTo(com.automation.entity.GoalMilestone.State.DUE_SOON);
     }
 
+    /** TODO c60bf914: ein Teilziel ohne Datum ist nie faellig, selbst wenn es als Kandidat auftaucht. */
+    @Test
+    void getOverview_neverListsAnUndatedMilestone() {
+        when(hygieneConfig.getStaleDays()).thenReturn(30);
+        when(todoRepository.aggregateByProject()).thenReturn(List.of());
+        when(todoRepository.staleCountByProject(any())).thenReturn(List.of());
+        when(todoRepository.findNeedsYou(any(), any())).thenReturn(List.of());
+        var undated = com.automation.entity.GoalMilestone.builder().id("m1").goalId("g1").title("Irgendwann").build();
+        when(milestoneRepository.findDueForActiveGoals(any(), any())).thenReturn(List.of(undated));
+        when(todoRepository.countByMilestone(any())).thenReturn(List.of(
+                new com.automation.dto.projection.MilestoneTodoCounts("m1", 3, 1)));
+        when(goalRepository.findAllById(any())).thenReturn(List.of(
+                com.automation.entity.Goal.builder().id("g1").title("Launch").build()));
+
+        assertThat(service.getOverview().milestonesDue()).isEmpty();
+    }
+
     @Test
     void getOverview_withoutDueMilestones_asksNothingMore() {
         when(hygieneConfig.getStaleDays()).thenReturn(30);

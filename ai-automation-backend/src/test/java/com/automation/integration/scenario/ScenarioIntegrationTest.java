@@ -115,6 +115,7 @@ class ScenarioIntegrationTest {
     @Autowired private AuditFindingTodoRepository auditFindingTodoRepository;
     @Autowired private com.automation.repository.GoalRepository goalRepository;
     @Autowired private com.automation.repository.GoalMilestoneRepository goalMilestoneRepository;
+    @Autowired private com.automation.repository.GoalProjectRepository goalProjectRepository;
     @Autowired private EntityManager entityManager;
     @Autowired private List<ScriptedAiProvider> scriptedProviders;
 
@@ -137,7 +138,7 @@ class ScenarioIntegrationTest {
         fixtures = new ScenarioFixtures(entityManager, projectRepository, workflowRepository, chainRepository,
                 auditReportRepository, auditFindingRepository, auditOccurrenceRepository, auditFindingTodoRepository);
         approvals = new ScenarioApprovals(runControlService, workflowRunRepository, entityManager);
-        goals = new ScenarioGoals(goalRepository, goalMilestoneRepository, todoRepository);
+        goals = new ScenarioGoals(goalRepository, goalMilestoneRepository, goalProjectRepository, todoRepository);
     }
 
     @AfterEach

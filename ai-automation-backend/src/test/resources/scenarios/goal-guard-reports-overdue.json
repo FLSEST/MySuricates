@@ -5,7 +5,8 @@
     "spec": "docs/WORKFLOW-GUIDE.md → Ziel-Kontext (goal_status, goal_guard_*): nur mit goal_id injiziert, als Daten markiert; Vorlage goal-guard schreibt goal_status ins Protokoll und füllt die Kachel ohne Modell; Rot bei Überfälligem, Gelb bei bald Fälligem",
     "incidents": [
       "259f4f66 (Ziele: Meilensteine, Fälligkeit im Ziel, Kontextvariable goal_status, Ziel-Wächter)",
-      "f4231dc9 (dashboard-report: die Kachel aus Block-Config statt aus einem Marker in KI-Ausgabe – der Marker war die Hürde)"
+      "f4231dc9 (dashboard-report: die Kachel aus Block-Config statt aus einem Marker in KI-Ausgabe – der Marker war die Hürde)",
+      "c60bf914 (Ziele Stufe 1: Ziel → Projekte → Teilziele → TODOs – ein Teilziel ohne Datum steht als „ohne Datum“ im Block und ist nie fällig)"
     ]
   },
   "goal": {
@@ -13,7 +14,8 @@
     "targetInDays": 20,
     "milestones": [
       { "title": "Beta", "dueInDays": -1 },
-      { "title": "Release", "dueInDays": 15 }
+      { "title": "Release", "dueInDays": 15 },
+      { "title": "Werbematerial" }
     ],
     "todos": [
       { "title": "Privatdaten entfernen", "status": "OPEN", "dueInDays": -2, "milestone": 0 },
@@ -36,7 +38,7 @@
       {
         "index": 0,
         "status": "COMPLETED",
-        "outputContains": ["<goal_status>", "Open-Source-Launch", "Beta", "OVERDUE", "Privatdaten entfernen", "</goal_status>"],
+        "outputContains": ["<goal_status>", "Open-Source-Launch", "Beta", "OVERDUE", "Privatdaten entfernen", "- ohne Datum [OPEN] Werbematerial", "</goal_status>"],
         "outputNotContains": ["{{"]
       },
       { "index": 1, "status": "COMPLETED" }

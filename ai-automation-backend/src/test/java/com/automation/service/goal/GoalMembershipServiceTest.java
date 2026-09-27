@@ -3,6 +3,7 @@ package com.automation.service.goal;
 import com.automation.dto.projection.GoalTodoRow;
 import com.automation.entity.Goal;
 import com.automation.entity.Todo;
+import com.automation.repository.GoalProjectRepository;
 import com.automation.repository.TodoRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,13 +29,14 @@ class GoalMembershipServiceTest {
 
     @Mock private GoalService goalService;
     @Mock private TodoRepository todoRepository;
+    @Mock private GoalProjectRepository goalProjectRepository;
 
     private GoalMembershipService service;
     private Goal goal;
 
     @BeforeEach
     void setUp() {
-        service = new GoalMembershipService(goalService, todoRepository);
+        service = new GoalMembershipService(goalService, todoRepository, goalProjectRepository);
         goal = Goal.builder().id(GOAL_ID).title("Open-Source-Launch").build();
         when(goalService.find(GOAL_ID)).thenReturn(goal);
     }
@@ -94,6 +96,27 @@ class GoalMembershipServiceTest {
         assertThatThrownBy(() -> service.reorder(GOAL_ID, List.of("t-9")))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("t-9");
         verify(todoRepository, never()).save(any());
+    }
+
+    /** Ein TODO aus einem neuen Projekt bringt sein Projekt mit, einmal je Projekt (TODO c60bf914). */
+    @Test
+    void assign_linksTheProjectsOfTheTodos_onceEach_andClearsAForeignMilestone() {
+        Todo fromA = Todo.builder().id("t-1").title("A").projectId("pA").goalId("g-other").milestoneId("m-old").build();
+        Todo alsoA = Todo.builder().id("t-2").title("A2").projectId("pA").build();
+        Todo fromB = Todo.builder().id("t-3").title("B").projectId("pB").goalId(GOAL_ID).build();
+        Todo withoutProject = Todo.builder().id("t-4").title("ohne").build();
+        when(todoRepository.findAllById(List.of("t-1", "t-2", "t-3", "t-4")))
+                .thenReturn(List.of(fromA, alsoA, fromB, withoutProject));
+
+        service.assign(GOAL_ID, List.of("t-1", "t-2", "t-3", "t-4"));
+
+        verify(goalProjectRepository, times(1)).linkIfAbsent(GOAL_ID, "pA");
+        verify(goalProjectRepository, times(1)).linkIfAbsent(GOAL_ID, "pB");
+        verify(goalProjectRepository, times(2)).linkIfAbsent(any(), any());
+        assertThat(fromA.getGoalId()).isEqualTo(GOAL_ID);
+        assertThat(fromA.getMilestoneId()).isNull();
+        verify(todoRepository, never()).save(fromB);
+        verify(goalService).detailOf(goal);
     }
 
     private static Todo todo(String id, Integer rank) {

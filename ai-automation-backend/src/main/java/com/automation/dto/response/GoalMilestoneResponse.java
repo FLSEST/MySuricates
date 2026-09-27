@@ -5,9 +5,15 @@ import com.automation.entity.GoalMilestone;
 import java.time.Instant;
 
 /**
- * Ein Meilenstein mit berechnetem Zustand (TODO 259f4f66). {@code total}/{@code done} zaehlen die
- * zugeordneten TODOs ohne ARCHIVED. {@code reopened}: war schon einmal erreicht
- * ({@code reachedAt} gesetzt), ist es jetzt aber nicht mehr – etwa weil ein neues TODO dazukam.
+ * Ein Meilenstein – in der Oberflaeche „Teilziel“ – mit berechnetem Zustand (TODO 259f4f66).
+ * {@code total}/{@code done} zaehlen die zugeordneten TODOs ohne ARCHIVED. {@code reopened}: war
+ * schon einmal erreicht ({@code reachedAt} gesetzt), ist es jetzt aber nicht mehr – etwa weil ein
+ * neues TODO dazukam.
+ *
+ * <p>Seit TODO c60bf914: {@code dueDate} kann null sein (dann ist {@code state} nur OPEN oder
+ * REACHED), {@code projectId} ist das Projekt des Teilziels (null nur bei Altdaten),
+ * {@code position} die Reihenfolge innerhalb dieses Projekts und {@code openQuestions} die Zahl der
+ * aktiven TODOs darin mit offener Frage.
  */
 public record GoalMilestoneResponse(
         String id,
@@ -20,5 +26,8 @@ public record GoalMilestoneResponse(
         Instant reachedAt,
         boolean reopened,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        String projectId,
+        int position,
+        long openQuestions
 ) {}

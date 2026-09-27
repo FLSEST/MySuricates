@@ -9,6 +9,7 @@ import com.automation.entity.AuditSeverity;
 import com.automation.entity.GateStatus;
 import com.automation.entity.Goal;
 import com.automation.entity.GoalMilestone;
+import com.automation.entity.GoalProject;
 import com.automation.entity.Project;
 import com.automation.entity.ProjectStatus;
 import com.automation.entity.ProjectType;
@@ -26,6 +27,7 @@ import com.automation.metrics.SqlStatementCounter;
 import com.automation.repository.AuditFindingRepository;
 import com.automation.repository.AuditReportRepository;
 import com.automation.repository.GoalMilestoneRepository;
+import com.automation.repository.GoalProjectRepository;
 import com.automation.repository.GoalRepository;
 import com.automation.repository.ProjectRepository;
 import com.automation.repository.StepResultRepository;
@@ -147,7 +149,7 @@ class RequestCostRatchetTest {
      */
     private static final List<String> SEEDED_TABLES = List.of(
             "projects", "workflows", "workflow_runs", "step_results", "scheduled_workflows", "goals",
-            "goal_milestones", "todos", "todo_triggers", "wishes", "audit_reports", "audit_findings");
+            "goal_projects", "goal_milestones", "todos", "todo_triggers", "wishes", "audit_reports", "audit_findings");
 
     /** Seed size — large enough that a per-row query shows up as a multiple, small enough to stay fast. */
     private static final int PROJECTS = 3;
@@ -275,7 +277,18 @@ class RequestCostRatchetTest {
      *   <li>{@code /goals} and {@code /goals/{goal}}: added with TODO dc0566f8. Both read lean
      *       projections ({@code GoalStatusCounts}, {@code GoalTodoRow}) — no todo description ever
      *       reaches the goal view. The detail is the goal plus one row query (the project names
-     *       are only looked up when a todo has a project; the seeded ones have none).</li>
+     *       are only looked up when a todo has a project; the seeded ones have none).
+     *       2 → 3 statements on purpose with TODO c60bf914 (Ziele Stufe 1): both now carry the goal's
+     *       explicitly assigned projects ({@code goal_projects}, seeded one per batch on the first
+     *       goal) — ONE {@code GoalProjectRow} query for the whole list, one for the detail, which
+     *       also supplies the project names of the todos, so a todo with a project costs no lookup
+     *       as long as its project belongs to the goal. Measured 2026-09-27: {@code /goals} 481 bytes,
+     *       the detail 19 444 bytes. {@code /goals/{goal}/milestones} stays at 2 (797 bytes): the
+     *       project positions it sorts by come from the same join as the milestones.</li>
+     *   <li>{@code /goals?status=ACTIVE&projectId=}: added with TODO c60bf914 – the cockpit's project
+     *       filter. The same three queries as the list, the filter is an {@code EXISTS} on
+     *       {@code goal_projects} (measured 481 bytes). {@code {goalProject}} is the first project of
+     *       the first batch.</li>
      *   <li>{@code /goals/{goal}/relations}: added with TODO c6ea8f5c. Every fifth seeded todo
      *       points at a run of its batch (origin) and at another one as its last fix run (result),
      *       and each batch adds one active TodoTrigger that matches every seeded todo (worker). The
@@ -329,8 +342,9 @@ class RequestCostRatchetTest {
             Map.entry("/api/v1/schedules", new Cost(3, 21_000)),
             Map.entry("/api/v1/schedules/{sched}/runs", new Cost(5, 5_000)),
             Map.entry("/api/v1/schedules/{busy}/runs", new Cost(6, 32_000)),
-            Map.entry("/api/v1/goals", new Cost(2, 2_000)),
-            Map.entry("/api/v1/goals/{goal}", new Cost(2, 40_000)),
+            Map.entry("/api/v1/goals", new Cost(3, 2_000)),
+            Map.entry("/api/v1/goals?status=ACTIVE&projectId={goalProject}", new Cost(3, 2_000)),
+            Map.entry("/api/v1/goals/{goal}", new Cost(3, 40_000)),
             Map.entry("/api/v1/goals/{goal}/relations", new Cost(6, 35_000)),
             Map.entry("/api/v1/goals/{goal}/milestones", new Cost(2, 2_000)),
             Map.entry("/api/v1/wishes", new Cost(3, 9_000)),
@@ -348,6 +362,7 @@ class RequestCostRatchetTest {
     @Autowired private ScheduledWorkflowRepository scheduledWorkflowRepository;
     @Autowired private GoalRepository goalRepository;
     @Autowired private GoalMilestoneRepository milestoneRepository;
+    @Autowired private GoalProjectRepository goalProjectRepository;
     @Autowired private TodoTriggerRepository todoTriggerRepository;
     @Autowired private WishRepository wishRepository;
     @Autowired private AuditReportRepository auditReportRepository;
@@ -371,6 +386,8 @@ class RequestCostRatchetTest {
     private String firstAuditProjectId;
     /** Das Ziel der ersten Charge; jede Charge ordnet ihm ihre Todos zu (TODO dc0566f8). */
     private String firstGoalId;
+    /** Target of {@code {goalProject}}: the first project of the first batch, assigned to the first goal (TODO c60bf914). */
+    private String firstGoalProjectId;
 
     @BeforeEach
     void seed() {
@@ -469,6 +486,7 @@ class RequestCostRatchetTest {
 
     private void writeBatch(String batch) {
         List<Workflow> workflows = new ArrayList<>();
+        List<String> projectIds = new ArrayList<>();
         for (int p = 0; p < PROJECTS; p++) {
             Project project = projectRepository.save(Project.builder()
                     .name("Cost Project " + batch + p)
@@ -476,6 +494,7 @@ class RequestCostRatchetTest {
                     .path("/tmp/cost-" + batch + p)
                     .status(ProjectStatus.STOPPED)
                     .build());
+            projectIds.add(project.getId());
 
             for (int w = 0; w < WORKFLOWS_PER_PROJECT; w++) {
                 workflows.add(workflowRepository.save(Workflow.builder()
@@ -548,6 +567,16 @@ class RequestCostRatchetTest {
         String goalId = goalRepository.save(Goal.builder().title("Cost Goal " + batch).build()).getId();
         if (firstGoalId == null) {
             firstGoalId = goalId;
+            firstGoalProjectId = projectIds.get(0);
+        }
+        // Zielprojekte (TODO c60bf914): jede Charge haengt ihr erstes Projekt an ihr eigenes Ziel und
+        // an das erste – so waechst die Projektliste des ersten Ziels mit der zweiten Charge, und
+        // /goals liest die Projekte beider Ziele. Beide Routen holen sie in EINER Abfrage
+        // (GoalProjectRow); ein Nachschlagen je Ziel oder Projekt faellt als Wachstum auf.
+        goalProjectRepository.save(new GoalProject(goalId, projectIds.get(0), 0));
+        if (!goalId.equals(firstGoalId)) {
+            goalProjectRepository.save(new GoalProject(firstGoalId, projectIds.get(0),
+                    goalProjectRepository.findRows(firstGoalId).size()));
         }
         // Relationskarte (TODO c6ea8f5c): jedes fuenfte Todo stammt aus einem Lauf und hat einen
         // Fix-Lauf, und ein aktiver Trigger je Charge passt auf alle – so muss /relations Laeufe,
@@ -561,8 +590,9 @@ class RequestCostRatchetTest {
         // Todo einem zu – Detail und Meilenstein-Liste muessen sie mit dem Ziel in einer Abfrage holen.
         List<String> milestoneIds = new ArrayList<>();
         for (int m = 0; m < 2; m++) {
-            milestoneIds.add(milestoneRepository.save(GoalMilestone.builder().goalId(firstGoalId)
-                    .title("Cost Milestone " + batch + m).dueDate(RUN_STARTED.plusSeconds(86_400L * (m + 1))).build()).getId());
+            milestoneIds.add(milestoneRepository.save(GoalMilestone.builder().goalId(firstGoalId).projectId(projectIds.get(0))
+                    .position(m).title("Cost Milestone " + batch + m).dueDate(RUN_STARTED.plusSeconds(86_400L * (m + 1)))
+                    .build()).getId());
         }
         for (int t = 0; t < TODOS; t++) {
             boolean fromRun = t % 5 == 0;
@@ -917,7 +947,7 @@ class RequestCostRatchetTest {
 
     private String resolve(String route) {
         return route.replace("{wf}", firstWorkflowId).replace("{sched}", firstScheduleId).replace("{busy}", busyScheduleId)
-                .replace("{goal}", firstGoalId).replace("{audit}", firstAuditKey)
+                .replace("{goal}", firstGoalId).replace("{goalProject}", firstGoalProjectId).replace("{audit}", firstAuditKey)
                 .replace("{auditProject}", firstAuditProjectId);
     }
 

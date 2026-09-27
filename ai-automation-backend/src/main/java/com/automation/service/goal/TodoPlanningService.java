@@ -6,6 +6,7 @@ import com.automation.entity.Todo;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.entity.GoalMilestone;
 import com.automation.repository.GoalMilestoneRepository;
+import com.automation.repository.GoalProjectRepository;
 import com.automation.repository.GoalRepository;
 import com.automation.repository.TodoRepository;
 import com.automation.service.ai.ReasoningEffort;
@@ -32,6 +33,7 @@ public class TodoPlanningService {
     private final GoalRepository goalRepository;
     private final GoalMilestoneRepository milestoneRepository;
     private final TodoResponseAssembler responseAssembler;
+    private final GoalProjectRepository goalProjectRepository;
 
     @Transactional
     public TodoResponse update(String todoId, UpdateTodoPlanningRequest request) {
@@ -73,12 +75,18 @@ public class TodoPlanningService {
         return responseAssembler.toResponse(todoRepository.save(todo));
     }
 
+    /**
+     * Ziel setzen oder loesen. Ist das Projekt des TODOs dem Ziel noch nicht zugeordnet, kommt es dazu
+     * (TODO c60bf914) – Kandidatenliste, Plugin-Triage und Planungsfeld arbeiten projektuebergreifend.
+     */
     private void applyGoal(Todo todo, String goalId) {
         if (goalId.isEmpty()) {
             todo.setGoalId(null);
             todo.setGoalRank(null);
             todo.setMilestoneId(null);
-        } else if (!goalId.equals(todo.getGoalId())) {
+            return;
+        }
+        if (!goalId.equals(todo.getGoalId())) {
             if (!goalRepository.existsById(goalId)) {
                 throw new ResourceNotFoundException("Goal", goalId);
             }
@@ -86,11 +94,16 @@ public class TodoPlanningService {
             todo.setGoalRank(null);
             todo.setMilestoneId(null);
         }
+        if (todo.getProjectId() != null) {
+            goalProjectRepository.linkIfAbsent(goalId, todo.getProjectId());
+        }
     }
 
     /**
      * Meilenstein zuordnen (TODO 259f4f66): nur einer des eigenen Ziels – sonst 400, damit ein TODO
-     * nie auf einen Meilenstein zeigt, dessen Ziel es nicht zaehlt. {@code ""} loest die Zuordnung.
+     * nie auf einen Meilenstein zeigt, dessen Ziel es nicht zaehlt. Seit TODO c60bf914 auch nur einer
+     * des eigenen Projekts; ein TODO ohne Projekt passt in kein Teilziel mit Projekt. Altdaten mit
+     * Abweichung bleiben lesbar – geprueft wird nur beim Schreiben. {@code ""} loest die Zuordnung.
      */
     private void applyMilestone(Todo todo, String milestoneId) {
         if (milestoneId.isEmpty()) {
@@ -102,6 +115,10 @@ public class TodoPlanningService {
         if (todo.getGoalId() == null || !todo.getGoalId().equals(milestone.getGoalId())) {
             throw new IllegalArgumentException("Meilenstein " + milestoneId
                     + " gehoert nicht zum Ziel des TODOs – erst goalId setzen");
+        }
+        if (milestone.getProjectId() != null && !milestone.getProjectId().equals(todo.getProjectId())) {
+            throw new IllegalArgumentException("Teilziel " + milestoneId + " gehoert zum Projekt " + milestone.getProjectId()
+                    + ", das TODO " + (todo.getProjectId() == null ? "hat kein Projekt" : "zum Projekt " + todo.getProjectId()));
         }
         todo.setMilestoneId(milestoneId);
     }

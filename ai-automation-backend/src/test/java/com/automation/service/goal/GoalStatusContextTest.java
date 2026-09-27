@@ -46,6 +46,22 @@ class GoalStatusContextTest {
         assertThat(block).doesNotContain("Ohne Datum");
     }
 
+    /** Ein Teilziel ohne Datum (TODO c60bf914): „ohne Datum“ statt einer leeren Stelle, nie faellig. */
+    @Test
+    void undatedMilestone_isListedAsWithoutDate_andKeepsTheGuardGreen() {
+        GoalSnapshot snapshot = snapshot("Launch", null,
+                List.of(milestone("m1", "Werbematerial", null, State.OPEN, 2, 0)),
+                row("t-1", "Flyer", Todo.Status.OPEN, null));
+
+        Map<String, String> de = render(snapshot, "de");
+        Map<String, String> en = render(snapshot, "en");
+
+        assertThat(de.get("goal_status")).contains("- ohne Datum [OPEN] Werbematerial — 0/2 erledigt");
+        assertThat(en.get("goal_status")).contains("- no date [OPEN] Werbematerial");
+        assertThat(de.get("goal_guard_status")).isEqualTo("GREEN");
+        assertThat(de.get("goal_guard_summary")).doesNotContain("Werbematerial");
+    }
+
     @Test
     void guard_isRed_whenATodoIsOverdue() {
         Map<String, String> vars = render(snapshot("Launch", null, List.of(),
@@ -182,7 +198,7 @@ class GoalStatusContextTest {
 
     private static GoalMilestoneResponse milestone(String id, String title, Instant due, State state, long total, long done) {
         return new GoalMilestoneResponse(id, "g1", title, due, state, total, done,
-                state == State.REACHED ? due : null, false, NOW, NOW);
+                state == State.REACHED ? due : null, false, NOW, NOW, "p1", 0, 0);
     }
 
     private static GoalTodoRow row(String id, String title, Todo.Status status, Instant due) {

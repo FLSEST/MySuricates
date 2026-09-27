@@ -85,7 +85,60 @@ class MilestoneProgressTest {
         GoalMilestoneResponse response = MilestoneProgress.toResponse(m, 3, 1, NOW);
 
         assertThat(response).isEqualTo(
-                new GoalMilestoneResponse("m", "g1", "Beta", due, State.OPEN, 3, 1, null, false, OLD, NEW));
+                new GoalMilestoneResponse("m", "g1", "Beta", due, State.OPEN, 3, 1, null, false, OLD, NEW, null, 0, 0));
+    }
+
+    @Test
+    void evaluate_sortsByProjectPosition_thenPositionInTheProject_unassignedProjectsLast() {
+        List<GoalMilestone> scrambled = List.of(
+                inProject("b-1", "pB", 1, NOW.plus(Duration.ofDays(1))),
+                inProject("legacy", null, 0, NOW.plus(Duration.ofDays(1))),
+                inProject("a-1", "pA", 1, NOW.plus(Duration.ofDays(2))),
+                inProject("foreign", "pX", 0, NOW),
+                inProject("b-0", "pB", 0, null),
+                inProject("a-0", "pA", 0, NOW.plus(Duration.ofDays(30))));
+
+        List<String> order = MilestoneProgress.evaluate(scrambled, List.of(), Map.of("pB", 0, "pA", 1), NOW).stream()
+                .map(GoalMilestoneResponse::id).toList();
+
+        assertThat(order).as("Projekt-Position schlaegt Datum, Position im Projekt schlaegt Datum")
+                .containsExactly("b-0", "b-1", "a-0", "a-1", "foreign", "legacy");
+    }
+
+    @Test
+    void evaluate_countsOpenQuestionsOfActiveTodosPerMilestone() {
+        GoalMilestone m = milestone("m1", null, null, OLD);
+        List<GoalTodoRow> rows = List.of(
+                question("t1", Todo.Status.OPEN, "m1", "Welcher Stil?"),
+                question("t2", Todo.Status.BACKLOG, "m1", "Wer?"),
+                question("t3", Todo.Status.DONE, "m1", "geklaert, Text blieb"),
+                question("t4", Todo.Status.ARCHIVED, "m1", "verworfen"),
+                question("t5", Todo.Status.OPEN, "m1", null),
+                question("t6", Todo.Status.OPEN, null, "ohne Teilziel"));
+
+        GoalMilestoneResponse response = MilestoneProgress.evaluate(List.of(m), rows, NOW).get(0);
+
+        assertThat(response.openQuestions()).isEqualTo(2);
+        assertThat(response.total()).isEqualTo(4);
+    }
+
+    @Test
+    void undatedMilestone_isNeverDueSoonOrOverdue_onlyOpenOrReached() {
+        GoalMilestone undated = milestone("u", null, null, OLD);
+
+        assertThat(MilestoneProgress.toResponse(undated, 3, 1, NOW).state()).isEqualTo(State.OPEN);
+        assertThat(MilestoneProgress.toResponse(undated, 0, 0, NOW.plus(Duration.ofDays(3650))).state()).isEqualTo(State.OPEN);
+        assertThat(MilestoneProgress.toResponse(undated, 2, 2, NOW).state()).isEqualTo(State.REACHED);
+        assertThat(MilestoneProgress.toResponse(undated, 2, 2, NOW).dueDate()).isNull();
+    }
+
+    @Test
+    void toResponse_carriesProjectAndPosition() {
+        GoalMilestoneResponse response = MilestoneProgress.toResponse(inProject("m", "pA", 4, null), 0, 0, 1, NOW);
+
+        assertThat(response.projectId()).isEqualTo("pA");
+        assertThat(response.position()).isEqualTo(4);
+        assertThat(response.openQuestions()).isEqualTo(1);
     }
 
     @Test
@@ -121,6 +174,16 @@ class MilestoneProgressTest {
     private static GoalMilestone milestone(String id, Instant due, Instant reachedAt, Instant createdAt) {
         return GoalMilestone.builder().id(id).goalId("g1").title(id).dueDate(due).reachedAt(reachedAt)
                 .createdAt(createdAt).build();
+    }
+
+    private static GoalMilestone inProject(String id, String projectId, int position, Instant due) {
+        return GoalMilestone.builder().id(id).goalId("g1").title(id).projectId(projectId).position(position)
+                .dueDate(due).createdAt(OLD).build();
+    }
+
+    private static GoalTodoRow question(String id, Todo.Status status, String milestoneId, String openQuestion) {
+        return new GoalTodoRow(id, id, status, Todo.Priority.MEDIUM, null, null, null, null, null, null, null, null,
+                openQuestion, NOW, NOW, null, milestoneId);
     }
 
     private static GoalTodoRow row(String id, Todo.Status status, String milestoneId) {

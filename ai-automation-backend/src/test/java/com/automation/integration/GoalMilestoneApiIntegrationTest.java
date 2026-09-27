@@ -30,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -74,18 +75,26 @@ class GoalMilestoneApiIntegrationTest {
         String goalId = createGoal("Launch");
         Instant soon = Instant.now().plus(2, ChronoUnit.DAYS);
 
+        // ein Ziel ohne Projekte: das Teilziel braucht eine projectId (TODO c60bf914)
+        perform(post("/api/v1/goals/" + goalId + "/milestones"), Map.of("title", "Ohne Projekt", "dueDate", "2026-10-01"))
+                .andExpect(status().isBadRequest());
         JsonNode beta = json(perform(post("/api/v1/goals/" + goalId + "/milestones"),
-                Map.of("title", "Beta", "dueDate", soon.toString())).andExpect(status().isCreated()));
+                Map.of("title", "Beta", "dueDate", soon.toString(), "projectId", projectA.getId())).andExpect(status().isCreated()));
         assertThat(beta.get("state").asText()).isEqualTo("DUE_SOON");
         assertThat(beta.get("total").asInt()).isZero();
         assertThat(beta.get("reopened").asBoolean()).isFalse();
+        assertThat(beta.get("projectId").asText()).isEqualTo(projectA.getId());
+        assertThat(beta.get("position").asInt()).isZero();
+        assertThat(beta.get("openQuestions").asInt()).isZero();
         JsonNode alpha = json(perform(post("/api/v1/goals/" + goalId + "/milestones"),
                 Map.of("title", "Alpha", "dueDate", "2020-01-01")).andExpect(status().isCreated()));
         assertThat(alpha.get("dueDate").asText()).isEqualTo("2020-01-01T23:59:59Z");
         assertThat(alpha.get("state").asText()).isEqualTo("OVERDUE");
+        assertThat(alpha.get("projectId").asText()).as("das einzige Projekt des Ziels").isEqualTo(projectA.getId());
+        assertThat(alpha.get("position").asInt()).isEqualTo(1);
 
         JsonNode list = json(mockMvc.perform(get("/api/v1/goals/" + goalId + "/milestones")).andExpect(status().isOk()));
-        assertThat(list.findValuesAsText("title")).containsExactly("Alpha", "Beta");
+        assertThat(list.findValuesAsText("title")).as("nach Position, nicht nach Datum").containsExactly("Beta", "Alpha");
 
         perform(put("/api/v1/goals/" + goalId + "/milestones/" + alpha.get("id").asText()),
                 Map.of("title", "Alpha 2")).andExpect(status().isOk())
@@ -94,8 +103,10 @@ class GoalMilestoneApiIntegrationTest {
 
         perform(post("/api/v1/goals/" + goalId + "/milestones"), Map.of("title", " ", "dueDate", "2026-10-01"))
                 .andExpect(status().isBadRequest());
-        perform(post("/api/v1/goals/" + goalId + "/milestones"), Map.of("title", "Ohne Datum"))
-                .andExpect(status().isBadRequest());
+        JsonNode undated = json(perform(post("/api/v1/goals/" + goalId + "/milestones"), Map.of("title", "Ohne Datum"))
+                .andExpect(status().isCreated()));
+        assertThat(undated.get("dueDate").isNull()).isTrue();
+        assertThat(undated.get("state").asText()).isEqualTo("OPEN");
         perform(post("/api/v1/goals/missing/milestones"), Map.of("title", "X", "dueDate", "2026-10-01"))
                 .andExpect(status().isNotFound());
         String other = createGoal("Anderes Ziel");
@@ -105,7 +116,7 @@ class GoalMilestoneApiIntegrationTest {
         mockMvc.perform(delete("/api/v1/goals/" + goalId + "/milestones/" + beta.get("id").asText()))
                 .andExpect(status().isNoContent());
         assertThat(json(mockMvc.perform(get("/api/v1/goals/" + goalId + "/milestones"))).findValuesAsText("title"))
-                .containsExactly("Alpha 2");
+                .containsExactly("Alpha 2", "Ohne Datum");
     }
 
     @Test
@@ -160,7 +171,8 @@ class GoalMilestoneApiIntegrationTest {
         String goalId = createGoal("Launch");
         String otherGoal = createGoal("Anderes");
         String mine = createMilestone(goalId, "Meiner", Instant.now().plus(5, ChronoUnit.DAYS));
-        String foreign = createMilestone(otherGoal, "Fremder", Instant.now().plus(5, ChronoUnit.DAYS));
+        String foreign = createMilestone(otherGoal, "Fremder", Instant.now().plus(5, ChronoUnit.DAYS), projectB);
+        String mineForB = createMilestone(goalId, "Meiner fuer B", null, projectB);
         Todo todo = todo("Aufgabe", projectA, null);
         Todo loose = todo("Ohne Ziel", projectB, null);
         assign(goalId, todo);
@@ -187,7 +199,9 @@ class GoalMilestoneApiIntegrationTest {
         assertThat(item(json(mockMvc.perform(get("/api/v1/goals/" + goalId))), loose.getId()).get("milestoneId").isNull())
                 .as("Zuordnen zu einem anderen Ziel loest den Meilenstein").isTrue();
 
-        perform(patch("/api/v1/todos/" + loose.getId() + "/planning"), Map.of("milestoneId", mine)).andExpect(status().isOk());
+        // Teilziel eines anderen Projekts (TODO c60bf914)
+        perform(patch("/api/v1/todos/" + loose.getId() + "/planning"), Map.of("milestoneId", mine)).andExpect(status().isBadRequest());
+        perform(patch("/api/v1/todos/" + loose.getId() + "/planning"), Map.of("milestoneId", mineForB)).andExpect(status().isOk());
         perform(patch("/api/v1/todos/" + loose.getId() + "/planning"), Map.of("goalId", ""))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.planning").doesNotExist());
@@ -224,12 +238,13 @@ class GoalMilestoneApiIntegrationTest {
         String overdue = createMilestone(goalId, "Ueberfaellig", Instant.now().minus(1, ChronoUnit.DAYS));
         String soon = createMilestone(goalId, "Bald", Instant.now().plus(1, ChronoUnit.DAYS));
         String later = createMilestone(goalId, "Spaeter", Instant.now().plus(20, ChronoUnit.DAYS));
+        String undated = createMilestone(goalId, "Irgendwann", null);
 
         JsonNode overview = json(mockMvc.perform(get("/api/v1/todos/overview")).andExpect(status().isOk()));
         Map<String, JsonNode> byId = new HashMap<>();
         overview.get("milestonesDue").forEach(node -> byId.put(node.get("id").asText(), node));
 
-        assertThat(byId).containsKeys(overdue, soon).doesNotContainKey(later);
+        assertThat(byId).containsKeys(overdue, soon).doesNotContainKeys(later, undated);
         assertThat(byId.get(overdue).get("state").asText()).isEqualTo("OVERDUE");
         assertThat(byId.get(overdue).get("goalId").asText()).isEqualTo(goalId);
         assertThat(byId.get(overdue).get("goalTitle").asText()).startsWith("Launch");
@@ -289,6 +304,50 @@ class GoalMilestoneApiIntegrationTest {
         perform(post("/api/v1/goals/missing/guard"), Map.of("enabled", true)).andExpect(status().isNotFound());
     }
 
+    // ── TODO c60bf914 (Ziele Stufe 1: Ziel → Projekte → Teilziele → TODOs) ──────────────────
+
+    @Test
+    void milestones_areOrderedPerProject_datesCanBeRemoved_andAProjectChangeNeedsAnEmptyMilestone() throws Exception {
+        String goalId = createGoal("Release");
+        perform(post("/api/v1/goals/" + goalId + "/projects"), Map.of("projectId", projectB.getId())).andExpect(status().isOk());
+        String a1 = createMilestone(goalId, "A1", Instant.now().plus(9, ChronoUnit.DAYS), projectA);
+        String a2 = createMilestone(goalId, "A2", null, projectA);
+        String a3 = createMilestone(goalId, "A3", Instant.now().plus(1, ChronoUnit.DAYS), projectA);
+        String b1 = createMilestone(goalId, "B1", null, projectB);
+        // zwei Zielprojekte: projectId ist Pflicht
+        perform(post("/api/v1/goals/" + goalId + "/milestones"), Map.of("title", "Welches Projekt?"))
+                .andExpect(status().isBadRequest());
+
+        JsonNode detail = json(mockMvc.perform(get("/api/v1/goals/" + goalId)));
+        assertThat(detail.get("projects").findValuesAsText("projectId"))
+                .as("B kam zuerst ans Ziel, A mit dem ersten Teilziel").containsExactly(projectB.getId(), projectA.getId());
+        assertThat(detail.get("milestones").findValuesAsText("title")).containsExactly("B1", "A1", "A2", "A3");
+
+        JsonNode reordered = json(perform(put("/api/v1/goals/" + goalId + "/milestones/order"), Map.of("ids", List.of(a3, a1)))
+                .andExpect(status().isOk()));
+        assertThat(reordered.findValuesAsText("title")).containsExactly("B1", "A3", "A1", "A2");
+        assertThat(reordered.findValuesAsText("position")).containsExactly("0", "0", "1", "2");
+        perform(put("/api/v1/goals/" + goalId + "/milestones/order"), Map.of("ids", List.of(a1, b1)))
+                .andExpect(status().isBadRequest());
+        perform(put("/api/v1/goals/" + goalId + "/milestones/order"), Map.of("ids", List.of("missing")))
+                .andExpect(status().isNotFound());
+
+        perform(put("/api/v1/goals/" + goalId + "/milestones/" + a1), Map.of("dueDate", ""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.dueDate").doesNotExist())
+                .andExpect(jsonPath("$.state").value("OPEN"));
+
+        Todo todo = todo("Aufgabe", projectA, null);
+        perform(patch("/api/v1/todos/" + todo.getId() + "/planning"), Map.of("goalId", goalId, "milestoneId", a1))
+                .andExpect(status().isOk());
+        perform(put("/api/v1/goals/" + goalId + "/milestones/" + a1), Map.of("projectId", projectB.getId()))
+                .andExpect(status().isBadRequest());
+        perform(put("/api/v1/goals/" + goalId + "/milestones/" + a2), Map.of("projectId", projectB.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.projectId").value(projectB.getId()))
+                .andExpect(jsonPath("$.position").value(1));
+    }
+
     @Test
     void guard_neverSwitchedOn_isReportedAsOff() throws Exception {
         String goalId = createGoal("Ohne Waechter");
@@ -303,7 +362,14 @@ class GoalMilestoneApiIntegrationTest {
     }
 
     private String createMilestone(String goalId, String title, Instant due) throws Exception {
-        return json(perform(post("/api/v1/goals/" + goalId + "/milestones"), Map.of("title", title, "dueDate", due.toString()))
+        return createMilestone(goalId, title, due, projectA);
+    }
+
+    /** Teilziel im Projekt; ein Projekt, das dem Ziel noch fehlt, kommt dabei dazu. {@code due} null = ohne Datum. */
+    private String createMilestone(String goalId, String title, Instant due, Project project) throws Exception {
+        Map<String, Object> body = new HashMap<>(Map.of("title", title, "projectId", project.getId()));
+        if (due != null) body.put("dueDate", due.toString());
+        return json(perform(post("/api/v1/goals/" + goalId + "/milestones"), body)
                 .andExpect(status().isCreated())).get("id").asText();
     }
 

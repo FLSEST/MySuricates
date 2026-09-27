@@ -112,6 +112,8 @@ public class TodoOverviewService {
      * Meilensteine aktiver Ziele, die in hoechstens drei Tagen faellig oder schon ueberfaellig sind
      * (TODO 259f4f66). Erreichte fallen heraus; der Zustand kommt aus derselben Regel wie in der
      * Zielansicht ({@link GoalMilestone#stateOf}). Ohne Kandidaten bleibt es bei einer Abfrage.
+     * Ein Teilziel ohne Datum ist nie „faellig“ (TODO c60bf914): Die Abfrage laesst es weg, und
+     * {@code stateOf} gibt ihm hoechstens OPEN.
      */
     private List<MilestoneAttentionItem> milestonesDue(Instant now) {
         List<GoalMilestone> due = milestoneRepository.findDueForActiveGoals(

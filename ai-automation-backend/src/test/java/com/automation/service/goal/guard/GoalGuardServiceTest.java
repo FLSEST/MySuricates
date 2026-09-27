@@ -1,5 +1,6 @@
 package com.automation.service.goal.guard;
 
+import com.automation.dto.projection.GoalProjectRow;
 import com.automation.dto.projection.GoalTodoRow;
 import com.automation.dto.request.CreateWorkflowRequest;
 import com.automation.dto.request.GoalGuardRequest;
@@ -15,6 +16,7 @@ import com.automation.entity.WorkflowTemplate;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.modules.ModuleCatalog;
 import com.automation.modules.ModuleRegistry;
+import com.automation.repository.GoalProjectRepository;
 import com.automation.repository.GoalRepository;
 import com.automation.repository.ProjectRepository;
 import com.automation.repository.TodoRepository;
@@ -56,6 +58,7 @@ import static org.mockito.Mockito.when;
 class GoalGuardServiceTest {
 
     @Mock private GoalRepository goalRepository;
+    @Mock private GoalProjectRepository goalProjectRepository;
     @Mock private TodoRepository todoRepository;
     @Mock private ProjectRepository projectRepository;
     @Mock private WorkflowRepository workflowRepository;
@@ -122,6 +125,22 @@ class GoalGuardServiceTest {
         assertThat(created.getValue().blocks()).extracting(BlockDefinition::getName).containsExactly("log_status", "report");
         verify(schedulerService).create(eq("wf-new"), isNull(), eq("WORKFLOW"), eq("0 30 7 * * MON-FRI"), anyString(),
                 anyMap(), eq("CRON"), isNull(), isNull(), isNull(), isNull(), eq("SKIP"), eq(false));
+    }
+
+    /** TODO c60bf914: das erste nicht archivierte Zielprojekt schlaegt das Projekt mit den meisten TODOs. */
+    @Test
+    void firstSwitchOn_prefersTheFirstActiveGoalProject() {
+        when(goalProjectRepository.findRows("g1")).thenReturn(List.of(
+                new GoalProjectRow("g1", "archived", "Alt", Instant.parse("2026-01-01T00:00:00Z"), 0),
+                new GoalProjectRow("g1", "pa", "A", null, 1),
+                new GoalProjectRow("g1", "pb", "B", null, 2)));
+        when(projectRepository.findById("pa")).thenReturn(Optional.of(projectA));
+
+        service.setGuard("g1", new GoalGuardRequest(true, null, null, "de"));
+
+        ArgumentCaptor<CreateWorkflowRequest> created = ArgumentCaptor.forClass(CreateWorkflowRequest.class);
+        verify(workflowService).create(created.capture(), eq(ChangeSource.GOAL_GUARD));
+        assertThat(created.getValue().projectId()).isEqualTo("pa");
     }
 
     @Test

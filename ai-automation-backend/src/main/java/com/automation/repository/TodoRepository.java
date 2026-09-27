@@ -231,7 +231,8 @@ public interface TodoRepository extends JpaRepository<Todo, String>, JpaSpecific
      * verworfenes TODO haelt keinen Meilenstein auf. Meilensteine ohne TODOs fehlen in der Liste.
      */
     @Query("SELECT new com.automation.dto.projection.MilestoneTodoCounts(t.milestoneId, COUNT(t), "
-         + "SUM(CASE WHEN t.status = 'DONE' THEN 1 ELSE 0 END)) FROM Todo t "
+         + "SUM(CASE WHEN t.status = 'DONE' THEN 1 ELSE 0 END), SUM(CASE WHEN t.openQuestion IS NOT NULL "
+         + "AND t.status IN ('OPEN','IN_PROGRESS','BACKLOG') THEN 1 ELSE 0 END)) FROM Todo t "
          + "WHERE t.milestoneId IN :milestoneIds AND t.status <> 'ARCHIVED' GROUP BY t.milestoneId")
     List<MilestoneTodoCounts> countByMilestone(@Param("milestoneIds") Collection<String> milestoneIds);
 
@@ -239,6 +240,16 @@ public interface TodoRepository extends JpaRepository<Todo, String>, JpaSpecific
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("UPDATE Todo t SET t.milestoneId = NULL, t.updatedAt = :now WHERE t.milestoneId = :milestoneId")
     int detachFromMilestone(@Param("milestoneId") String milestoneId, @Param("now") Instant now);
+
+    long countByMilestoneId(String milestoneId);
+
+    long countByGoalIdAndProjectId(String goalId, String projectId);
+
+    /** Loest die TODOs eines Projekts vom Ziel (TODO c60bf914). Aufrufer muss @Transactional sein. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("UPDATE Todo t SET t.goalId = NULL, t.goalRank = NULL, t.milestoneId = NULL, t.updatedAt = :now "
+         + "WHERE t.goalId = :goalId AND t.projectId = :projectId")
+    int detachProjectFromGoal(@Param("goalId") String goalId, @Param("projectId") String projectId, @Param("now") Instant now);
 
     // ── Hygiene ────────────────────────────────────────────────────────────────
 

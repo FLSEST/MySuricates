@@ -3,6 +3,8 @@ package com.automation.controller;
 import com.automation.dto.request.CreateGoalMilestoneRequest;
 import com.automation.dto.request.CreateGoalRequest;
 import com.automation.dto.request.GoalGuardRequest;
+import com.automation.dto.request.GoalIdsRequest;
+import com.automation.dto.request.GoalProjectRequest;
 import com.automation.dto.request.GoalTodoIdsRequest;
 import com.automation.dto.request.UpdateGoalMilestoneRequest;
 import com.automation.dto.request.UpdateGoalRequest;
@@ -13,6 +15,7 @@ import com.automation.dto.response.GoalResponse;
 import com.automation.entity.Goal;
 import com.automation.service.goal.GoalMembershipService;
 import com.automation.service.goal.GoalMilestoneService;
+import com.automation.service.goal.GoalProjectService;
 import com.automation.service.goal.GoalRelationsService;
 import com.automation.service.goal.GoalService;
 import com.automation.service.goal.guard.GoalGuardService;
@@ -28,7 +31,8 @@ import java.util.List;
  * Ziele: TODOs projektuebergreifend auf ein Ergebnis hin sammeln, ordnen und den Fortschritt
  * zeigen (TODO dc0566f8). Die Einschaetzung eines einzelnen TODOs laeuft ueber
  * {@code PATCH /api/v1/todos/{id}/planning} – dort auch die Zuordnung zu einem Meilenstein.
- * Meilensteine und Ziel-Waechter: TODO 259f4f66.
+ * Meilensteine und Ziel-Waechter: TODO 259f4f66. Projekte des Ziels, Teilziele mit Projekt und
+ * Reihenfolge: TODO c60bf914 (im Code heissen Teilziele weiter {@code milestones}).
  */
 @RestController
 @RequestMapping("/api/v1/goals")
@@ -39,12 +43,17 @@ public class GoalController {
     private final GoalMembershipService membershipService;
     private final GoalRelationsService relationsService;
     private final GoalMilestoneService milestoneService;
+    private final GoalProjectService projectService;
     private final GoalGuardService guardService;
 
-    /** Ohne {@code status}: aktive und erledigte Ziele, neueste zuerst. */
+    /**
+     * Ohne {@code status}: aktive und erledigte Ziele, neueste zuerst. Mit {@code projectId} nur die
+     * Ziele, denen dieses Projekt zugeordnet ist.
+     */
     @GetMapping
-    public List<GoalResponse> listGoals(@RequestParam(required = false) List<Goal.Status> status) {
-        return goalService.list(status);
+    public List<GoalResponse> listGoals(@RequestParam(required = false) List<Goal.Status> status,
+                                        @RequestParam(required = false) String projectId) {
+        return goalService.list(status, projectId);
     }
 
     @PostMapping
@@ -93,7 +102,33 @@ public class GoalController {
         return membershipService.reorder(id, request.todoIds());
     }
 
-    /** Meilensteine des Ziels nach Datum, mit Zustand (OPEN/DUE_SOON/OVERDUE/REACHED) und Zaehlern. */
+    /** Projekt ans Ende der Zielprojekte haengen; schon zugeordnet = unveraendert (idempotent). */
+    @PostMapping("/{id}/projects")
+    public GoalDetailResponse addProject(@PathVariable String id, @Valid @RequestBody GoalProjectRequest request) {
+        return projectService.add(id, request.projectId());
+    }
+
+    /** Zielprojekte neu ordnen: die genannten vorn, die uebrigen in bisheriger Folge dahinter. */
+    @PutMapping("/{id}/projects/order")
+    public GoalDetailResponse reorderProjects(@PathVariable String id, @Valid @RequestBody GoalIdsRequest request) {
+        return projectService.reorder(id, request.ids());
+    }
+
+    /**
+     * Projekt vom Ziel loesen. Haengen daran im Ziel noch Teilziele oder TODOs: 409 – mit
+     * {@code cascade=true} werden die Teilziele geloescht und die TODOs vom Ziel geloest.
+     */
+    @DeleteMapping("/{id}/projects/{projectId}")
+    public ResponseEntity<Void> removeProject(@PathVariable String id, @PathVariable String projectId,
+                                              @RequestParam(defaultValue = "false") boolean cascade) {
+        projectService.remove(id, projectId, cascade);
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Meilensteine (Teilziele) des Ziels nach Projekt-Position und Position im Projekt, mit Zustand
+     * (OPEN/DUE_SOON/OVERDUE/REACHED; ohne Datum nur OPEN/REACHED) und Zaehlern.
+     */
     @GetMapping("/{id}/milestones")
     public List<GoalMilestoneResponse> listMilestones(@PathVariable String id) {
         return milestoneService.list(id);
@@ -103,6 +138,12 @@ public class GoalController {
     public ResponseEntity<GoalMilestoneResponse> createMilestone(@PathVariable String id,
                                                                  @Valid @RequestBody CreateGoalMilestoneRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(milestoneService.create(id, request));
+    }
+
+    /** Teilziele EINES Projekts neu ordnen; Antwort: alle Teilziele des Ziels. */
+    @PutMapping("/{id}/milestones/order")
+    public List<GoalMilestoneResponse> reorderMilestones(@PathVariable String id, @Valid @RequestBody GoalIdsRequest request) {
+        return milestoneService.reorder(id, request.ids());
     }
 
     @PutMapping("/{id}/milestones/{milestoneId}")

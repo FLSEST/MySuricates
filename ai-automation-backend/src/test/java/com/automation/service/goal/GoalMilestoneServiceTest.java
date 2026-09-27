@@ -1,5 +1,6 @@
 package com.automation.service.goal;
 
+import com.automation.dto.projection.GoalProjectRow;
 import com.automation.dto.projection.GoalTodoRow;
 import com.automation.dto.projection.GoalWithMilestones;
 import com.automation.dto.request.CreateGoalMilestoneRequest;
@@ -11,7 +12,9 @@ import com.automation.entity.GoalMilestone.State;
 import com.automation.entity.Todo;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.repository.GoalMilestoneRepository;
+import com.automation.repository.GoalProjectRepository;
 import com.automation.repository.GoalRepository;
+import com.automation.repository.ProjectRepository;
 import com.automation.repository.TodoRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -48,13 +51,15 @@ class GoalMilestoneServiceTest {
     @Mock private GoalRepository goalRepository;
     @Mock private GoalMilestoneRepository milestoneRepository;
     @Mock private TodoRepository todoRepository;
+    @Mock private GoalProjectRepository goalProjectRepository;
+    @Mock private ProjectRepository projectRepository;
 
     private GoalMilestoneService service;
 
     @BeforeEach
     void setUp() {
         service = new GoalMilestoneService(goalRepository, milestoneRepository, todoRepository,
-                Clock.fixed(NOW, ZoneOffset.UTC));
+                goalProjectRepository, projectRepository, Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     @Test
@@ -144,6 +149,8 @@ class GoalMilestoneServiceTest {
     @Test
     void create_trimsTitle_andReadsADateAsTheEndOfThatDay() {
         when(goalRepository.existsById("g1")).thenReturn(true);
+        when(goalProjectRepository.findRows("g1")).thenReturn(List.of(project("pA", 0)));
+        when(milestoneRepository.maxPosition("g1", "pA")).thenReturn(null);
         when(milestoneRepository.save(any())).thenAnswer(inv -> {
             GoalMilestone m = inv.getArgument(0);
             m.setId("new");
@@ -158,6 +165,106 @@ class GoalMilestoneServiceTest {
         assertThat(created.dueDate()).isEqualTo(Instant.parse("2026-10-01T23:59:59Z"));
         assertThat(created.state()).isEqualTo(State.OPEN);
         assertThat(created.total()).isZero();
+        assertThat(created.projectId()).as("das einzige Projekt des Ziels").isEqualTo("pA");
+        assertThat(created.position()).isZero();
+    }
+
+    /** TODO c60bf914: Datum optional, Projekt Pflicht ausser bei genau einem Zielprojekt. */
+    @Test
+    void create_withoutProject_needsExactlyOneGoalProject() {
+        when(goalRepository.existsById("g1")).thenReturn(true);
+        when(goalProjectRepository.findRows("g1")).thenReturn(List.of(), List.of(project("pA", 0), project("pB", 1)));
+
+        assertThatThrownBy(() -> service.create("g1", new CreateGoalMilestoneRequest("Beta", null)))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("0 Projekte");
+        assertThatThrownBy(() -> service.create("g1", new CreateGoalMilestoneRequest("Beta", null)))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("2 Projekte");
+        verify(milestoneRepository, never()).save(any());
+    }
+
+    @Test
+    void create_withProject_undated_linksTheProject_andAppendsToItsMilestones() {
+        when(goalRepository.existsById("g1")).thenReturn(true);
+        when(projectRepository.existsById("pB")).thenReturn(true);
+        when(milestoneRepository.maxPosition("g1", "pB")).thenReturn(2);
+        when(milestoneRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        GoalMilestoneResponse created = service.create("g1", new CreateGoalMilestoneRequest("Werbematerial", "", "pB"));
+
+        verify(goalProjectRepository).linkIfAbsent("g1", "pB");
+        assertThat(created.dueDate()).isNull();
+        assertThat(created.state()).isEqualTo(State.OPEN);
+        assertThat(created.projectId()).isEqualTo("pB");
+        assertThat(created.position()).isEqualTo(3);
+    }
+
+    @Test
+    void create_withUnknownProject_is404() {
+        when(goalRepository.existsById("g1")).thenReturn(true);
+        when(projectRepository.existsById("nope")).thenReturn(false);
+
+        assertThatThrownBy(() -> service.create("g1", new CreateGoalMilestoneRequest("Beta", null, "nope")))
+                .isInstanceOf(ResourceNotFoundException.class);
+        verify(goalProjectRepository, never()).linkIfAbsent(any(), any());
+    }
+
+    @Test
+    void update_emptyDateRemovesIt_andProjectChangeMovesAnEmptyMilestoneToTheEnd() {
+        GoalMilestone m = milestone("m", NOW.plus(Duration.ofDays(9)), null);
+        m.setProjectId("pA");
+        m.setPosition(0);
+        when(milestoneRepository.findById("m")).thenReturn(Optional.of(m));
+        when(milestoneRepository.save(m)).thenReturn(m);
+        when(todoRepository.countByMilestone(List.of("m"))).thenReturn(List.of());
+        when(todoRepository.countByMilestoneId("m")).thenReturn(0L);
+        when(projectRepository.existsById("pB")).thenReturn(true);
+        when(milestoneRepository.maxPosition("g1", "pB")).thenReturn(null);
+
+        GoalMilestoneResponse updated = service.update("g1", "m", new UpdateGoalMilestoneRequest(null, "", "pB"));
+
+        assertThat(updated.dueDate()).isNull();
+        assertThat(updated.projectId()).isEqualTo("pB");
+        assertThat(updated.position()).isZero();
+        verify(goalProjectRepository).linkIfAbsent("g1", "pB");
+    }
+
+    @Test
+    void update_projectChangeOfAMilestoneWithTodos_is400() {
+        GoalMilestone m = milestone("m", null, null);
+        m.setProjectId("pA");
+        when(milestoneRepository.findById("m")).thenReturn(Optional.of(m));
+        when(todoRepository.countByMilestoneId("m")).thenReturn(2L);
+
+        assertThatThrownBy(() -> service.update("g1", "m", new UpdateGoalMilestoneRequest(null, null, "pB")))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("2 TODO");
+        assertThatThrownBy(() -> service.update("g1", "m", new UpdateGoalMilestoneRequest(null, null, " ")))
+                .isInstanceOf(IllegalArgumentException.class);
+        verify(milestoneRepository, never()).save(any());
+        assertThat(m.getProjectId()).isEqualTo("pA");
+    }
+
+    @Test
+    void reorder_setsPositionsWithinOneProject_appendsTheUnnamed_andRefusesMixedProjects() {
+        GoalMilestone a0 = inProject("a0", "pA", 0);
+        GoalMilestone a1 = inProject("a1", "pA", 1);
+        GoalMilestone a2 = inProject("a2", "pA", 2);
+        GoalMilestone b0 = inProject("b0", "pB", 0);
+        when(goalRepository.existsById("g1")).thenReturn(true);
+        when(milestoneRepository.findByGoalId("g1")).thenReturn(List.of(a0, a1, a2, b0));
+        goalWith(a0, a1, a2, b0);
+        when(todoRepository.findGoalRows("g1")).thenReturn(List.of());
+
+        service.reorder("g1", List.of("a2", "a0"));
+
+        assertThat(a2.getPosition()).isZero();
+        assertThat(a0.getPosition()).isEqualTo(1);
+        assertThat(a1.getPosition()).as("nicht genannt: dahinter").isEqualTo(2);
+        assertThat(b0.getPosition()).as("anderes Projekt bleibt").isZero();
+
+        assertThatThrownBy(() -> service.reorder("g1", List.of("a0", "b0")))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("innerhalb eines Projekts");
+        assertThatThrownBy(() -> service.reorder("g1", List.of("fremd")))
+                .isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test
@@ -184,6 +291,7 @@ class GoalMilestoneServiceTest {
 
         GoalMilestoneResponse updated = service.update("g1", "m",
                 new UpdateGoalMilestoneRequest(null, "2026-11-02T12:00:00Z"));
+        verify(todoRepository, never()).countByMilestoneId(any());
 
         assertThat(updated.title()).isEqualTo("m");
         assertThat(updated.dueDate()).isEqualTo(Instant.parse("2026-11-02T12:00:00Z"));
@@ -223,6 +331,14 @@ class GoalMilestoneServiceTest {
         Goal goal = Goal.builder().id("g1").title("Launch").build();
         when(goalRepository.findWithMilestones("g1"))
                 .thenReturn(Optional.of(new GoalWithMilestones(goal, new ArrayList<>(List.of(milestones)))));
+    }
+
+    private static GoalMilestone inProject(String id, String projectId, int position) {
+        return GoalMilestone.builder().id(id).goalId("g1").title(id).projectId(projectId).position(position).build();
+    }
+
+    private static GoalProjectRow project(String projectId, int position) {
+        return new GoalProjectRow("g1", projectId, projectId, null, position);
     }
 
     private static GoalMilestone milestone(String id, Instant due, Instant reachedAt) {

@@ -10,8 +10,12 @@ import java.time.Duration;
 import java.time.Instant;
 
 /**
- * Ein Zwischenpunkt auf dem Weg zu einem Ziel: Titel und Datum (TODO 259f4f66). TODOs des Ziels
- * werden ihm ueber {@code Todo.milestoneId} zugeordnet.
+ * Ein Zwischenpunkt auf dem Weg zu einem Ziel – in der Oberflaeche „Teilziel“ (TODO 259f4f66).
+ * TODOs des Ziels werden ihm ueber {@code Todo.milestoneId} zugeordnet.
+ *
+ * <p>Seit V92 (TODO c60bf914) gehoert ein Teilziel genau einem Projekt des Ziels ({@link #projectId});
+ * die TODOs darin muessen aus diesem Projekt sein. Das Datum ist optional, die Reihenfolge innerhalb
+ * des Projekts steht ausdruecklich in {@link #position}. {@code projectId} ist nur bei Altdaten null.
  *
  * <p>Der Zustand wird nicht gespeichert, sondern beim Lesen berechnet ({@link #stateOf}); nur
  * {@link #reachedAt} haelt fest, wann er zum ersten Mal erreicht war. Der Zeitpunkt bleibt, auch
@@ -39,11 +43,20 @@ public class GoalMilestone {
     @Column(name = "goal_id", nullable = false)
     private String goalId;
 
+    /** Projekt des Teilziels; null nur bei Altdaten eines Ziels ohne Projekte (V92). */
+    @Column(name = "project_id")
+    private String projectId;
+
     @Column(nullable = false)
     private String title;
 
-    @Column(name = "due_date", nullable = false)
+    /** Faelligkeit; null = ohne Datum – dann nie „bald faellig“ oder „ueberfaellig“. */
+    @Column(name = "due_date")
     private Instant dueDate;
+
+    /** Reihenfolge innerhalb seines Projekts im Ziel, ab 0. */
+    @Column(nullable = false)
+    private int position;
 
     /** Erstes Erkennen „alle zugeordneten TODOs erledigt“; null = noch nie erreicht. */
     @Column(name = "reached_at")

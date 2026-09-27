@@ -13,6 +13,7 @@ import com.automation.entity.WorkflowTemplate;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.modules.ModuleCatalog;
 import com.automation.modules.ModuleRegistry;
+import com.automation.repository.GoalProjectRepository;
 import com.automation.repository.GoalRepository;
 import com.automation.repository.ProjectRepository;
 import com.automation.repository.TodoRepository;
@@ -61,6 +62,7 @@ public class GoalGuardService {
     private static final int MAX_NAME = 200;
 
     private final GoalRepository goalRepository;
+    private final GoalProjectRepository goalProjectRepository;
     private final TodoRepository todoRepository;
     private final ProjectRepository projectRepository;
     private final WorkflowRepository workflowRepository;
@@ -153,13 +155,21 @@ public class GoalGuardService {
     }
 
     /**
-     * Das genannte Projekt; sonst das mit den meisten (nicht archivierten) TODOs des Ziels, sonst das
-     * aelteste aktive Projekt. Jeder Workflow gehoert zu einem Projekt.
+     * Das genannte Projekt; sonst das erste nicht archivierte Zielprojekt (TODO c60bf914); sonst das
+     * mit den meisten (nicht archivierten) TODOs des Ziels, sonst das aelteste aktive Projekt. Jeder
+     * Workflow gehoert zu einem Projekt.
      */
     private Project project(Goal goal, String projectId) {
         if (projectId != null) {
             return projectRepository.findById(projectId).filter(p -> p.getArchivedAt() == null)
                     .orElseThrow(() -> new ResourceNotFoundException("Project", projectId));
+        }
+        Optional<Project> first = goalProjectRepository.findRows(goal.getId()).stream()
+                .filter(row -> !row.archived())
+                .findFirst()
+                .flatMap(row -> projectRepository.findById(row.projectId()));
+        if (first.isPresent()) {
+            return first.get();
         }
         Map<String, Long> counts = todoRepository.findGoalRows(goal.getId()).stream()
                 .map(row -> row.projectId())
