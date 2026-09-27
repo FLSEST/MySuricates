@@ -596,11 +596,16 @@ Das Script:
 1. Liest die letzte veröffentlichte Version aus dem jüngsten Git-Tag (ohne Tags: aus `pom.xml`)
 2. Berechnet die neue Version (Segment hochzählen) und bricht ab, wenn es den Tag schon gibt
 3. Schreibt sie **ohne Suffix** in `pom.xml` sowie in `package.json` und `package-lock.json` (über `npm version`) — ein Lockfile auf der alten Version macht jeden frischen Klon nach dem ersten `npm install` dirty; `packageLock.guard.test.ts` hält beide synchron
-4. Erstellt Git-Commit `Release vX.Y.Z` und setzt Git-Tag `vX.Y.Z`
+4. Erstellt Git-Commit `Release vX.Y.Z` und setzt ein **annotiertes** Git-Tag `vX.Y.Z` (`git tag -a`, trägt Datum/Autor/Nachricht) — Grundlage für das GitHub-Release, das bei jedem `v*`-Tag automatisch entsteht ([„GitHub-Release bei jedem Tag"](#github-release-bei-jedem-tag) unten)
 5. Setzt `pom.xml` **und** `package.json` auf die nächste Entwicklungsversion `X.Y.(Z+1)-SNAPSHOT` und committet `Weiter an vX.Y.(Z+1)` — sonst trüge jeder Commit nach dem Tag dieselbe Release-Nummer, und die Versions-Kachel meldete dauerhaft Drift
 
 **Voraussetzung:** Sauberer Working Tree (keine uncommitteten Änderungen).
 **Test:** `bash scripts/tests/test-release.sh` fährt den Ablauf in einem Wegwerf-Repo durch.
+
+**Push:** `git push origin main "vX.Y.Z"` (oder `git push --follow-tags`, das nimmt nur annotierte
+Tags mit) — **nicht** `git push --tags`: `staging.sh promote` legt bei jedem Promote ein
+leichtgewichtiges `stable-*`-Tag an (Deployment-Zeitstempel, siehe unten), und `--tags` schöbe alle
+davon mit auf GitHub, wo sie sich unter die Releases mischen würden.
 
 ### Zusammenspiel mit Staging
 
@@ -610,10 +615,45 @@ Die Stable-Umgebung ist ein Docker-Container auf Port 9091 mit einem eingefroren
 
 Es gibt zwei Arten von Git-Tags:
 
-| Tag-Format | Erstellt durch | Zweck |
-|---|---|---|
-| `v0.1.1` | `release.sh` | Semver-Release-Markierung |
-| `stable-20250225-143022` | `staging.sh promote` | Deployment-Zeitstempel |
+| Tag-Format | Erstellt durch | Art | Zweck |
+|---|---|---|---|
+| `v0.1.1` | `release.sh` | annotiert (`git tag -a`) | Semver-Release-Markierung, löst `release.yml` aus |
+| `stable-20250225-143022` | `staging.sh promote` | leichtgewichtig | Deployment-Zeitstempel, bleibt lokal |
+
+Deshalb `git push --follow-tags` statt `git push --tags`: `--follow-tags` nimmt nur annotierte
+Tags mit, `--tags` schöbe auch jedes lokale `stable-*` nach GitHub.
+
+### GitHub-Release bei jedem Tag
+
+`.github/workflows/release.yml` läuft bei jedem Push eines `v*`-Tags und legt automatisch ein
+GitHub-Release an (`gh release create "$TAG" --verify-tag --title "$TAG" --notes-file notes.md`).
+Die Notizen entstehen **deterministisch, ohne KI** über `scripts/release-notes.sh <prev-tag> <tag>`:
+
+- **Überblick**: Betreffzeilen der Merge-Commits zwischen den beiden Tags
+  (`git log --first-parent --merges`). Interne TODO-Kürzel-Klammern werden für die öffentlichen
+  Notizen entfernt (`scripts/lib/strip-todo-brackets.py`): eine abschließende Klammer, deren Inhalt
+  mit einem 8-Hex-Kürzel beginnt (Titel, Kommalisten und verschachtelte Klammern danach egal, z. B.
+  `(<8-hex> Titel (mit Klammer))` oder `(<8-hex>, <8-hex>, <8-hex>)`), eine abschließende Klammer,
+  deren letztes Komma-Element ein reines Kürzel ist (`(Stand 2026-09-22, <8-hex>)`), sowie eine
+  Klammer mitten im Betreff, die nur aus Kürzeln besteht (`(TODO <8-hex>)`). Eine normale Klammer
+  ohne Kürzel bleibt stehen.
+- **Änderungen nach Typ**: Nicht-Merge-Commits, gruppiert nach Conventional-Präfix
+  (`feat`/`fix`/`perf`/`refactor`/`docs`/`test`/…).
+- **Verhaltensänderungen**: Einträge aus [„Verhaltensänderungen"](#verhaltensänderungen) unten,
+  die nach dem Datum des vorigen Tags liegen — ohne solche Einträge entfällt der Abschnitt.
+- **Vergleich**: Link auf den Compare-View `prev...tag` (entfällt beim allerersten Release, das
+  keinen Vorgänger-Tag hat).
+
+Das Skript läuft ohne Vorgänger-Tag (`scripts/release-notes.sh "" v0.1.0`) und auch dann, wenn im
+aktuellen Repo keine passenden Merge-Commits existieren (z. B. im kuratierten öffentlichen Repo, das
+die Merge-Historie des Arbeits-Repos nicht mitbekommt) — die betroffenen Abschnitte entfallen dann
+einfach, statt einen Fehler zu werfen. Die Action nimmt eine mitgelieferte Notizdatei
+(`release-notes/<tag>.md`), falls eine vorhanden ist — etwa aus dem Übergabe-Workflow, der einen
+geprüften Commit samt Tag ins öffentliche Repo bringt — und erzeugt die Notizen sonst selbst aus der
+Historie des Repos, in dem der Workflow läuft.
+
+**Test:** `bash scripts/tests/test-release-notes.sh` fährt `release-notes.sh` in einem Wegwerf-Repo
+durch (Merges, Typ-Abschnitte, TODO-Klammer wird entfernt, erstes Release ohne Vorgänger-Tag).
 
 ### Verhaltensänderungen
 
