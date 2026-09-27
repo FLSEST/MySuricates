@@ -27,6 +27,9 @@ REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 # Backend und Vite fragen: nie ueber einen Proxy aus der Umgebung, der Key nur ueber stdin (bb4f60a5).
 # shellcheck source=lib/local-curl.sh
 . "${SCRIPT_DIR}/lib/local-curl.sh"
+# api_key(): Env -> Key-Datei, nie die DB (ausgelagert fuer setup-audit-workflows.sh, fff23a6c).
+# shellcheck source=lib/api-key.sh
+. "${SCRIPT_DIR}/lib/api-key.sh"
 
 COMMAND="start"
 # Betriebsart des Backends: host (Default, java -jar) oder container (docker compose).
@@ -219,16 +222,6 @@ wait_for_frontend() {
 # ---------------------------------------------------------------------------
 # Run-Waechter: laufende Workflow-Runs vor einem Neustart erkennen.
 # ---------------------------------------------------------------------------
-
-api_key() {
-  if [[ -n "${MYSURICATES_API_KEY:-}" ]]; then
-    echo "${MYSURICATES_API_KEY}"
-  elif [[ -f "${HOME}/.mysuricates/api-key" ]]; then
-    cat "${HOME}/.mysuricates/api-key"
-  elif [[ -f "${HOME}/.autotrigger/api-key" ]]; then
-    cat "${HOME}/.autotrigger/api-key"
-  fi
-}
 
 # Anzahl laufender Runs; leer, wenn nicht ermittelbar (Backend down, kein Key).
 running_runs_count() {

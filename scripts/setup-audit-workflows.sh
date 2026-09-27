@@ -18,6 +18,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # No proxy from the environment, the key via stdin instead of curl's arguments (bb4f60a5)
 # shellcheck source=lib/local-curl.sh
 . "${SCRIPT_DIR}/lib/local-curl.sh"
+# api_key(): MYSURICATES_API_KEY (env) -> key file, never the DB (fff23a6c)
+# shellcheck source=lib/api-key.sh
+. "${SCRIPT_DIR}/lib/api-key.sh"
 
 # Colors for output (all logs go to stderr)
 info()  { echo -e "\033[0;34m[INFO]\033[0m  $*" >&2; }
@@ -37,27 +40,13 @@ check_api() {
   fi
   ok "API reachable at ${BASE_URL}"
 
-  # Auto-detect API key from database if not provided
+  # Resolve API key: AUTOPILOT_API_KEY (explicit override) -> api_key() (MYSURICATES_API_KEY env,
+  # then the key file the backend writes on every start) — never the SQLite DB (CLAUDE.md).
   if [[ -z "$API_KEY" ]]; then
-    for db in \
-      "${SCRIPT_DIR}/../ai-automation-backend/data/automation.db" \
-      "./ai-automation-backend/data/automation.db" \
-      "./data/automation.db"; do
-      if [[ -f "$db" ]]; then
-        API_KEY=$(python3 -c "
-import sqlite3
-conn = sqlite3.connect('$db')
-c = conn.execute(\"SELECT value FROM app_settings WHERE key='api-key'\")
-r = c.fetchone()
-if r: print(r[0])
-conn.close()
-" 2>/dev/null || true)
-        if [[ -n "$API_KEY" ]]; then
-          ok "Auto-detected API key from ${db}"
-          break
-        fi
-      fi
-    done
+    API_KEY="$(api_key)"
+    if [[ -n "$API_KEY" ]]; then
+      ok "Auto-detected API key (env or key file)"
+    fi
   fi
 
   # Verify API key works
@@ -68,7 +57,8 @@ conn.close()
     fi
     ok "API key authenticated"
   else
-    warn "No API key found — requests may fail if security is enabled"
+    warn "No API key found (AUTOPILOT_API_KEY / MYSURICATES_API_KEY / ~/.mysuricates/api-key / ~/.autotrigger/api-key)"
+    warn "Requests may fail unless security is disabled on the target instance."
   fi
 }
 

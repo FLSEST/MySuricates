@@ -7,25 +7,15 @@ import { execSync } from 'child_process';
 import { existsSync, mkdirSync, cpSync, writeFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { readApiKeyFile } from './api-key';
 
 const API = 'http://localhost:9090/api/v1';
 export const TEST_PREFIX = 'PW-Template';
 
-// Auto-detect API key
-let apiKey = '';
-try {
-  const __dir = dirname(fileURLToPath(import.meta.url));
-  const dbPath = resolve(__dir, '../../../ai-automation-backend/data/automation.db');
-  if (existsSync(dbPath)) {
-    const script = `import sqlite3,sys;c=sqlite3.connect(sys.argv[1]);print(c.execute("SELECT value FROM app_settings WHERE key=?",("api-key",)).fetchone()[0])`;
-    apiKey = execSync(`python3 -c '${script}' '${dbPath}'`, {
-      encoding: 'utf-8',
-      timeout: 5000,
-    }).trim();
-  }
-} catch {
-  // no key
-}
+// Never read the SQLite DB directly (CLAUDE.md: no direct DB access, pool-size=1 lock
+// contention). Read the plaintext key file the backend writes on every start instead —
+// see playwright/fixtures/api-key.ts.
+const apiKey = readApiKeyFile();
 
 export function getApiKey(): string {
   return apiKey;
