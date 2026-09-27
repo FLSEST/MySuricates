@@ -224,15 +224,25 @@ geprüft, ein Umschalten zur Laufzeit wirkt sofort.
 - *Auth-Header nie ausgeben:* verschlüsselt gespeichert, nicht in Logs (geloggt werden nur
   Methode, Host und Pfad), und sein Wert wird aus Antwort, `location` und Fehlermeldungen durch
   `***` ersetzt — ein Dienst, der Request-Header zurückspiegelt, verrät ihn nicht.
-- *Nur öffentliche Ziele:* Dienste im eigenen Netz (localhost, private Adressen) lehnt jeder Aufruf
-  ab, solange der Härtungsschalter `private-network-guard` an ist (Default) — siehe
-  [Abrufe ins lokale Netz](#abrufe-ins-lokale-netz). Wer einen Dienst im LAN ansprechen will,
-  schaltet ihn in der Startkonfiguration aus. Geprüft wird beim Aufruf, nicht beim Speichern.
+- *Eigenes Netz standardmäßig offen:* Ziele im eigenen Netz (localhost, private Adressen) sind
+  erreichbar — die Basis-URL trägt der Betreiber selbst ein, und genau solche Dienste sind oft das
+  Ziel. Wer das nicht will, schaltet `private-network-guard-http-api` ein (siehe
+  [Abrufe ins lokale Netz](#abrufe-ins-lokale-netz)); geprüft wird dann bei jedem Aufruf, nicht beim
+  Speichern.
 
 ### Abrufe ins lokale Netz
 
-iCal-Feed, RSS/Atom und HTTP-API rufen URLs ab, die im Workflow stehen. Damit sie nicht zum Sprungbrett
-in das Netz der Instanz werden, geht jeder Abruf durch `OutboundTargetGuard` (`service/integration/`):
+iCal-Feed, RSS/Atom und HTTP-API rufen URLs ab, die im Workflow oder in der Verbindung stehen. Damit sie
+nicht zum Sprungbrett in das Netz der Instanz werden, geht jeder Abruf durch `OutboundTargetGuard`
+(`service/integration/`). Ob geprüft wird, entscheidet je Provider ein Härtungsschalter:
+
+| Schalter | Umgebungsvariable | Default | Gilt für |
+|---|---|---|---|
+| `automation.hardening.private-network-guard` | `AUTOMATION_HARDENING_PRIVATE_NETWORK_GUARD` | `true` | iCal-Feed, RSS/Atom |
+| `automation.hardening.private-network-guard-http-api` | `AUTOMATION_HARDENING_PRIVATE_NETWORK_GUARD_HTTP_API` | `false` | HTTP-API |
+
+Die HTTP-API ist standardmäßig offen, weil Dienste im eigenen Netz ihr häufigstes Ziel sind. Ist ein
+Schalter an, gilt:
 
 - Der Host wird aufgelöst, und **jede** gelieferte Adresse muss öffentlich sein. Abgelehnt werden
   Loopback (`127.0.0.0/8`, `::1`, also auch `localhost`), `0.0.0.0/8` und `::`, private Netze
@@ -247,10 +257,14 @@ in das Netz der Instanz werden, geht jeder Abruf durch `OutboundTargetGuard` (`s
 - **Grenze:** Zwischen dieser Auflösung und der des HTTP-Clients liegt ein kurzes Fenster — ein Name, dessen
   DNS-Antwort genau dazwischen wechselt (DNS-Rebinding mit sehr kurzer TTL), wird nicht erkannt.
 
-**Bewusste Freigabe:** Härtungsschalter `automation.hardening.private-network-guard` (Default `true`,
-Env `AUTOMATION_HARDENING_PRIVATE_NETWORK_GUARD`). Wie alle Härtungsschalter nur in der Startkonfiguration
-änderbar, nie per REST — ein abgeflossener API-Key kann die Sperre nicht lösen. `false` gibt lokale Quellen für
-alle drei Provider frei (etwa einen Kalender oder Dienst im Heimnetz); wirksam nach Neustart.
+Beide Schalter sind wie alle Härtungsschalter nur in der Startkonfiguration änderbar, nie per REST — ein
+abgeflossener API-Key kann eine Sperre weder lösen noch setzen. Wirksam nach Neustart; `false` gibt lokale
+Quellen bewusst frei (etwa einen Kalender im Heimnetz).
+
+**Zusätzlich auf Container-Ebene:** Die Prüfung gilt nur für diese drei Provider. Wer mehr will, kann die
+ausgehenden Verbindungen des MySuricates-Containers selbst einschränken, etwa über ein eigenes
+Docker-Netzwerk oder Firewall-Regeln auf dem Host. Das trifft dann aber alles im Container — auch die
+KI-CLIs, Shell-Blöcke und die übrigen Integrationen —, also vorher klären, welche Ziele diese brauchen.
 
 ### OAuth-Endpunkte & Scopes je Provider
 

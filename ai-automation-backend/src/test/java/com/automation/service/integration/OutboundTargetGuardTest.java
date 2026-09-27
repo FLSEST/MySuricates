@@ -1,5 +1,6 @@
 package com.automation.service.integration;
 
+import com.automation.modules.ModuleCatalog;
 import com.automation.testsupport.TestTargetGuards;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -28,6 +29,8 @@ class OutboundTargetGuardTest {
         });
     }
 
+    private static final ModuleCatalog FEEDS = ModuleCatalog.PRIVATE_NETWORK_GUARD;
+    private static final ModuleCatalog HTTP_API = ModuleCatalog.PRIVATE_NETWORK_GUARD_HTTP_API;
     private static final OutboundTargetGuard LITERALS = guard(true, Map.of());
 
     @ParameterizedTest
@@ -40,7 +43,7 @@ class OutboundTargetGuardTest {
             "[ff02::1]", "[::ffff:127.0.0.1]", "[::ffff:169.254.169.254]", "[::ffff:10.0.0.1]",
             "[::127.0.0.1]", "[64:ff9b::a9fe:a9fe]"})
     void refusesInternalAddresses(String host) {
-        assertThatThrownBy(() -> LITERALS.check(URI.create("http://" + host + "/x")))
+        assertThatThrownBy(() -> LITERALS.check(URI.create("http://" + host + "/x"), FEEDS))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("local or private network address")
                 .hasMessageContaining("automation.hardening.private-network-guard=false");
@@ -51,7 +54,7 @@ class OutboundTargetGuardTest {
             "100.63.255.255", "192.169.0.1", "169.255.0.1", "203.0.113.10",
             "[2606:4700::1111]", "[2001:4860:4860::8888]", "[::ffff:8.8.8.8]", "[64:ff9b::808:808]"})
     void allowsPublicAddresses(String host) {
-        assertThatCode(() -> LITERALS.check(URI.create("https://" + host + "/feed.ics"))).doesNotThrowAnyException();
+        assertThatCode(() -> LITERALS.check(URI.create("https://" + host + "/feed.ics"), FEEDS)).doesNotThrowAnyException();
     }
 
     @Test
@@ -63,20 +66,20 @@ class OutboundTargetGuardTest {
                 "mixed.example", new String[]{"93.184.216.34", "192.168.0.5"},
                 "public.example", new String[]{"93.184.216.34", "2606:4700::1111"}));
 
-        assertThatThrownBy(() -> guard.check(URI.create("https://rebind.example/cal.ics")))
+        assertThatThrownBy(() -> guard.check(URI.create("https://rebind.example/cal.ics"), FEEDS))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("rebind.example (127.0.0.1)");
-        assertThatThrownBy(() -> guard.check(URI.create("http://metadata.example/latest/meta-data")))
+        assertThatThrownBy(() -> guard.check(URI.create("http://metadata.example/latest/meta-data"), FEEDS))
                 .hasMessageContaining("169.254.169.254");
-        assertThatThrownBy(() -> guard.check(URI.create("http://lan.example/"))).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> guard.check(URI.create("http://lan.example/"), FEEDS)).isInstanceOf(IllegalArgumentException.class);
         // one internal address among several is enough — the client may pick any of them
-        assertThatThrownBy(() -> guard.check(URI.create("http://mixed.example/"))).hasMessageContaining("192.168.0.5");
-        assertThatCode(() -> guard.check(URI.create("https://public.example/feed"))).doesNotThrowAnyException();
+        assertThatThrownBy(() -> guard.check(URI.create("http://mixed.example/"), FEEDS)).hasMessageContaining("192.168.0.5");
+        assertThatCode(() -> guard.check(URI.create("https://public.example/feed"), FEEDS)).doesNotThrowAnyException();
     }
 
     @Test
     void localhostByNameIsRefused() {
-        assertThatThrownBy(() -> TestTargetGuards.on().check(URI.create("http://localhost:9090/api")))
+        assertThatThrownBy(() -> TestTargetGuards.on().check(URI.create("http://localhost:9090/api"), FEEDS))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("localhost");
     }
@@ -86,11 +89,11 @@ class OutboundTargetGuardTest {
         OutboundTargetGuard guard = new OutboundTargetGuard(TestTargetGuards.registry(true), host -> {
             throw new UnknownHostException(host);
         });
-        assertThatThrownBy(() -> guard.check(URI.create("https://nowhere.invalid/x")))
+        assertThatThrownBy(() -> guard.check(URI.create("https://nowhere.invalid/x"), FEEDS))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("Host nowhere.invalid could not be resolved");
         OutboundTargetGuard empty = new OutboundTargetGuard(TestTargetGuards.registry(true), host -> new InetAddress[0]);
-        assertThatThrownBy(() -> empty.check(URI.create("https://nowhere.invalid/x"))).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> empty.check(URI.create("https://nowhere.invalid/x"), FEEDS)).isInstanceOf(IllegalStateException.class);
     }
 
     @Test
@@ -101,19 +104,32 @@ class OutboundTargetGuardTest {
             return new InetAddress[]{InetAddress.getByName("127.0.0.1")};
         });
 
-        assertThat(off.enabled()).isFalse();
-        assertThatCode(() -> off.check(URI.create("http://127.0.0.1:8080/x"))).doesNotThrowAnyException();
-        assertThatCode(() -> off.check(URI.create("http://169.254.169.254/"))).doesNotThrowAnyException();
+        assertThat(off.enabled(FEEDS)).isFalse();
+        assertThat(off.enabled(HTTP_API)).isFalse();
+        assertThatCode(() -> off.check(URI.create("http://127.0.0.1:8080/x"), FEEDS)).doesNotThrowAnyException();
+        assertThatCode(() -> off.check(URI.create("http://169.254.169.254/"), FEEDS)).doesNotThrowAnyException();
         assertThat(lookups).hasValue(0);
     }
 
     @Test
-    void isOnByDefault() {
-        assertThat(new OutboundTargetGuard(com.automation.modules.ModuleRegistry.of(Map.of(), Map.of())).enabled()).isTrue();
+    void feedsAreGuardedByDefault_httpApiIsNot() {
+        OutboundTargetGuard defaults = TestTargetGuards.defaults();
+        assertThat(defaults.enabled(FEEDS)).isTrue();
+        assertThat(defaults.enabled(HTTP_API)).isFalse();
+
+        assertThatThrownBy(() -> defaults.check(URI.create("http://10.0.0.5/feed.xml"), FEEDS))
+                .hasMessageContaining("automation.hardening.private-network-guard=false");
+        assertThatCode(() -> defaults.check(URI.create("http://10.0.0.5/api"), HTTP_API)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void theRefusalNamesTheSwitchThatDecided() {
+        assertThatThrownBy(() -> LITERALS.check(URI.create("http://192.168.1.2/api"), HTTP_API))
+                .hasMessageContaining("automation.hardening.private-network-guard-http-api=false");
     }
 
     @Test
     void urlWithoutHostIsRefused() {
-        assertThatThrownBy(() -> LITERALS.check(URI.create("file:///etc/passwd"))).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> LITERALS.check(URI.create("file:///etc/passwd"), FEEDS)).isInstanceOf(IllegalArgumentException.class);
     }
 }

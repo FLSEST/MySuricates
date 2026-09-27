@@ -30,6 +30,7 @@ const HARDENING: Array<Pick<ModuleInfo, 'name' | 'requires'>> = [
   { name: 'seal-immutable', requires: ['sealing'] },
   { name: 'webhook-signatures', requires: ['webhooks'] },
   { name: 'private-network-guard', requires: [] },
+  { name: 'private-network-guard-http-api', requires: [] },
 ];
 
 function envName(prefix: string, name: string) {

@@ -175,14 +175,19 @@ class HttpApiClientTest {
     }
 
     @Test
-    void localTargetsAreRefusedBeforeAnyRequest_whileTheGuardIsOn() {
-        HttpApiClient guarded = new HttpApiClient(JSON, TestTargetGuards.on());
+    void localTargetsAreReachableByDefault_andRefusedBeforeAnyRequestWithTheSwitchOn() {
         HttpApiTarget target = target("");
+        HttpApiClient byDefault = new HttpApiClient(JSON, TestTargetGuards.defaults());
+        assertThat(byDefault.send(target, HttpApiRequest.from(target, Map.of("path", "echo"), JSON)).get("status")).isEqualTo(200);
+        assertThat(requests).hasSize(1);
+        requests.clear();
+
+        HttpApiClient guarded = new HttpApiClient(JSON, TestTargetGuards.on());
 
         assertThatThrownBy(() -> guarded.send(target, HttpApiRequest.from(target, Map.of("path", "echo"), JSON)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("local or private network address")
-                .hasMessageContaining("automation.hardening.private-network-guard=false");
+                .hasMessageContaining("automation.hardening.private-network-guard-http-api=false");
         assertThat(requests).isEmpty();
 
         HttpApiClient open = new HttpApiClient(JSON, TestTargetGuards.off());

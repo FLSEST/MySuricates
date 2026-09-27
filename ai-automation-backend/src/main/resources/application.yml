@@ -96,7 +96,8 @@ automation:
     ui-editable: ${AUTOMATION_MODULES_UI_EDITABLE:false}
   # Optionale Workflow-Härtung — unabhängig vom Preset, gleiche Regeln (nur Startkonfig).
   # provenance (Default true) · sealing · require-sealed-for-unattended · require-signed-seal · webhook-signatures
-  # · private-network-guard (Default true: iCal/RSS-Feed und http-api rufen keine lokalen/privaten Adressen ab)
+  # · private-network-guard (Default true: iCal/RSS-Feed rufen keine lokalen/privaten Adressen ab)
+  # · private-network-guard-http-api (Default false: dieselbe Sperre für http-api, das eigene Netz bleibt sonst erreichbar)
   # hardening:
   #   sealing: true
   #   require-signed-seal: true    # Siegel ohne gültige Signatur lehnen ihre Runs ab

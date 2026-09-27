@@ -225,16 +225,25 @@ effect at once.
 - *Never hand out the auth header:* stored encrypted, not in logs (only method, host and path are
   logged), and its value is replaced by `***` in the answer, `location` and error messages — a
   service that mirrors request headers does not reveal it.
-- *Public targets only:* services in your own network (localhost, private addresses) are refused on
-  every call while the hardening switch `private-network-guard` is on (default) — see
-  [Fetches into the local network](#fetches-into-the-local-network). To reach a service in the LAN,
-  turn it off in the startup configuration. The check runs on each call, not when saving.
+- *Own network open by default:* targets in your own network (localhost, private addresses) are
+  reachable — the operator enters the base URL, and such services are often exactly the target.
+  Whoever does not want that turns on `private-network-guard-http-api` (see
+  [Fetches into the local network](#fetches-into-the-local-network)); the check then runs on every
+  call, not when saving.
 
 ### Fetches into the local network
 
-iCal feed, RSS/Atom and HTTP API fetch URLs that are written in the workflow. So that they cannot be used as
-a stepping stone into the instance's network, every fetch goes through `OutboundTargetGuard`
-(`service/integration/`):
+iCal feed, RSS/Atom and HTTP API fetch URLs that are written in the workflow or the connection. So that they
+cannot be used as a stepping stone into the instance's network, every fetch goes through `OutboundTargetGuard`
+(`service/integration/`). Whether it checks is decided per provider by a hardening switch:
+
+| Switch | Environment variable | Default | Applies to |
+|---|---|---|---|
+| `automation.hardening.private-network-guard` | `AUTOMATION_HARDENING_PRIVATE_NETWORK_GUARD` | `true` | iCal feed, RSS/Atom |
+| `automation.hardening.private-network-guard-http-api` | `AUTOMATION_HARDENING_PRIVATE_NETWORK_GUARD_HTTP_API` | `false` | HTTP API |
+
+The HTTP API is open by default because services in your own network are its most common target. While a
+switch is on:
 
 - The host is resolved, and **every** address it returns must be public. Refused are loopback
   (`127.0.0.0/8`, `::1`, so `localhost` too), `0.0.0.0/8` and `::`, private networks (`10/8`, `172.16/12`,
@@ -248,11 +257,14 @@ a stepping stone into the instance's network, every fetch goes through `Outbound
 - **Limit:** there is a short window between this lookup and the HTTP client's own — a name whose DNS answer
   changes exactly in between (DNS rebinding with a very short TTL) is not caught.
 
-**Allowing local sources on purpose:** hardening switch `automation.hardening.private-network-guard`
-(default `true`, env `AUTOMATION_HARDENING_PRIVATE_NETWORK_GUARD`). Like every hardening switch it can only
-be changed in the startup configuration, never over REST — a leaked API key cannot lift the block. `false`
-allows local sources for all three providers (a calendar or service in the home network, say); effective
-after a restart.
+Like every hardening switch, both can only be changed in the startup configuration, never over REST — a
+leaked API key can neither lift nor set a block. Effective after a restart; `false` allows local sources on
+purpose (a calendar in the home network, say).
+
+**Additionally at container level:** the check covers these three providers only. Whoever wants more can
+restrict the outbound connections of the MySuricates container themselves, for instance with a dedicated
+Docker network or firewall rules on the host. That then affects everything in the container — the AI CLIs,
+shell blocks and the other integrations too — so first work out which targets they need.
 
 ### OAuth Endpoints & Scopes per Provider
 

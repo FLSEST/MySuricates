@@ -95,7 +95,7 @@ Env-Form: `AUTOMATION_MODULES_PRESET`, `AUTOMATION_MODULES_<NAME>`, `AUTOMATION_
 | `research` | `chains`, `assistant`, `learning` (Analyse-Endpunkte; Dashboard-Daten bleiben Kern), `memory`, `audit`, `bpmn` | chains stabil, Rest experimentell |
 | `advanced` (nach außen) | `integrations` (inkl. TODO-Tracker-Export, Kalender-Adapter), `http-api` (allgemeine HTTP-API-Verbindung, braucht `integrations`), `webhooks`, `remote-access` (Tailscale), `terminal` (Run-Terminal per WebSocket), `staging` | stabil / staging experimentell |
 | `advanced` (wenig genutzt) | `conversion`, `dialog-import` (benötigt conversion), `onboarding-profiles`, `skills`, `debug`, `factory` (inkl. Auto-Repair), `wishes` (benötigt chains) | Altlast / experimentell |
-| `hardening` | `provenance` (Default an), `sealing`, `require-sealed-for-unattended`, `webhook-signatures`, `private-network-guard` (Default an) | experimentell |
+| `hardening` | `provenance` (Default an), `sealing`, `require-sealed-for-unattended`, `webhook-signatures`, `private-network-guard` (Default an), `private-network-guard-http-api` | experimentell |
 
 Der Katalog wird zusätzlich als reine Bash-Arrays nach `scripts/lib/module-catalog.generated.sh`
 exportiert — eingelesen von `scripts/lib/module-preset.sh`, das vor jedem Build läuft und deshalb
@@ -139,7 +139,8 @@ Schalter unter `automation.hardening.*` — derselbe Mechanismus wie bei den Mod
 | `require-signed-seal` | aus | `sealing` | Versiegelte Workflows brauchen eine gültige Signatur |
 | `seal-immutable` | aus | `sealing` | Entsiegeln nicht mehr über REST — nur über die Startkonfiguration |
 | `webhook-signatures` | aus | Modul `webhooks` | Signatur-Secret pro Webhook (HMAC-SHA256) |
-| `private-network-guard` | an | — | iCal-Feed, RSS/Atom-Feed und http-api rufen nur öffentliche Adressen ab (siehe [Integrationen](integrations.md#abrufe-ins-lokale-netz)) |
+| `private-network-guard` | an | — | iCal-Feed und RSS/Atom-Feed rufen nur öffentliche Adressen ab (siehe [Integrationen](integrations.md#abrufe-ins-lokale-netz)) |
+| `private-network-guard-http-api` | aus | — | Dieselbe Sperre für http-api (eigenes Netz sonst erreichbar) |
 
 **Definitions-Hash** — `WorkflowDefinitionHasher` hasht den `WorkflowSnapshot` (blocks, instructions, model, provider, effort, metadata, defaultContext, sortierte Skill-IDs) als kanonisches JSON (sortierte Schlüssel, leere Werte weggelassen) mit einem eigenen `ObjectMapper`, damit Jackson-Customizing den Hash nie verändert. Name, Beschreibung, Icon und Tags sind Etiketten und fließen nicht ein. Alte Versionszeilen bekommen ihren Hash beim Start (`WorkflowVersionHashBackfillService`). Kontextvariablen: `{{ workflow_definition_hash }}`, `{{ trigger_source }}`.
 

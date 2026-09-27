@@ -15,18 +15,23 @@ public final class TestTargetGuards {
     private TestTargetGuards() {
     }
 
-    /** Hardening flag off: local targets allowed, as on an instance that opts out. */
+    /** Both hardening flags off: local targets allowed for feeds and http-api. */
     public static OutboundTargetGuard off() {
         return new OutboundTargetGuard(registry(false));
     }
 
-    /** Hardening flag on (the default), real DNS. */
+    /** Both hardening flags on (feeds and http-api), real DNS. */
     public static OutboundTargetGuard on() {
         return new OutboundTargetGuard(registry(true));
     }
 
+    /** Catalog defaults: feeds guarded, http-api not. Real DNS. */
+    public static OutboundTargetGuard defaults() {
+        return new OutboundTargetGuard(ModuleRegistry.of(Map.of(), Map.of()));
+    }
+
     /**
-     * Flag on, but the literal {@code 127.0.0.1} counts as a public host — lets a test reach its
+     * Both flags on, but the literal {@code 127.0.0.1} counts as a public host — lets a test reach its
      * loopback server while every other target (e.g. a redirect hop) gets the real check.
      */
     public static OutboundTargetGuard onWithLoopbackServerAsPublic() {
@@ -35,7 +40,9 @@ public final class TestTargetGuards {
                 : InetAddress.getAllByName(host));
     }
 
+    /** Both address-check flags ({@code private-network-guard}, {@code private-network-guard-http-api}) set to {@code guardOn}. */
     public static ModuleRegistry registry(boolean guardOn) {
-        return ModuleRegistry.of(Map.of(), Map.of("private-network-guard", Boolean.toString(guardOn)));
+        return ModuleRegistry.of(Map.of(), Map.of("private-network-guard", Boolean.toString(guardOn),
+                "private-network-guard-http-api", Boolean.toString(guardOn)));
     }
 }

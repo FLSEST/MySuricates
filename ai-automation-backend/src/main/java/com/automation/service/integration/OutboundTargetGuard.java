@@ -26,8 +26,10 @@ import java.util.Arrays;
  * is the gap between this lookup and the HTTP client's own: a name whose DNS answer changes within
  * that window (DNS rebinding with a very short TTL) is not caught.
  *
- * <p>Switched by the hardening flag {@code automation.hardening.private-network-guard} (default on,
- * startup configuration only, read per call). Turned off, local sources are reachable on purpose.
+ * <p>Each caller names the hardening flag that switches its check (startup configuration only, read
+ * per call): {@link ModuleCatalog#PRIVATE_NETWORK_GUARD} for the feeds (default on) and
+ * {@link ModuleCatalog#PRIVATE_NETWORK_GUARD_HTTP_API} for http-api (default off — services in the
+ * own network are a common http-api target). Turned off, local targets are reachable on purpose.
  */
 @Component
 public class OutboundTargetGuard {
@@ -51,17 +53,17 @@ public class OutboundTargetGuard {
         this.resolver = resolver;
     }
 
-    public boolean enabled() {
-        return modules.isEnabled(ModuleCatalog.PRIVATE_NETWORK_GUARD);
+    public boolean enabled(ModuleCatalog flag) {
+        return modules.isEnabled(flag);
     }
 
     /**
      * Throws {@link IllegalArgumentException} if {@code uri}'s host is, or resolves to, a local or
-     * private address; {@link IllegalStateException} if it cannot be resolved. No-op when the guard
-     * is switched off.
+     * private address; {@link IllegalStateException} if it cannot be resolved. No-op while
+     * {@code flag} is off.
      */
-    public void check(URI uri) {
-        if (!enabled()) return;
+    public void check(URI uri, ModuleCatalog flag) {
+        if (!enabled(flag)) return;
         String host = uri == null ? null : uri.getHost();
         if (host == null || host.isBlank()) throw new IllegalArgumentException("URL has no host");
         if (host.startsWith("[") && host.endsWith("]")) host = host.substring(1, host.length() - 1);
@@ -79,8 +81,7 @@ public class OutboundTargetGuard {
                 String ip = address.getHostAddress();
                 throw new IllegalArgumentException("Target " + host + (ip.equals(host) ? "" : " (" + ip + ")")
                         + " is a local or private network address — integrations only fetch from public "
-                        + "addresses. To allow local sources, set "
-                        + ModuleCatalog.PRIVATE_NETWORK_GUARD.property() + "=false and restart.");
+                        + "addresses. To allow local sources, set " + flag.property() + "=false and restart.");
             }
         }
     }

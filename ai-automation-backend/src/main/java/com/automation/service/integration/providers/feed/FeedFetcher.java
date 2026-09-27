@@ -1,5 +1,6 @@
 package com.automation.service.integration.providers.feed;
 
+import com.automation.modules.ModuleCatalog;
 import com.automation.service.integration.OutboundTargetGuard;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -49,7 +50,7 @@ public class FeedFetcher {
         URI uri = requireHttpUri(url);
         try {
             for (int hop = 0; hop <= MAX_REDIRECTS; hop++) {
-                guard.check(uri);
+                guard.check(uri, ModuleCatalog.PRIVATE_NETWORK_GUARD);
                 HttpResponse<InputStream> response = httpClient.send(request(uri), HttpResponse.BodyHandlers.ofInputStream());
                 try (InputStream body = response.body()) {
                     int status = response.statusCode();

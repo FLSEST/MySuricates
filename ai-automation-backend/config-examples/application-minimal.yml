@@ -27,5 +27,7 @@ automation:
     require-sealed-for-unattended: false
     # Webhook signing secrets cannot be set. Secrets set earlier stay in force.
     webhook-signatures: false
-    # Integration fetches (iCal/RSS feed, http-api) may also reach localhost and private networks.
+    # iCal/RSS feeds may also be fetched from localhost and private networks.
     private-network-guard: false
+    # http-api may reach localhost and private networks (the default).
+    private-network-guard-http-api: false

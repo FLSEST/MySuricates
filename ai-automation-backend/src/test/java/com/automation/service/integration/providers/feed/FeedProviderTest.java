@@ -121,7 +121,7 @@ class FeedProviderTest {
     }
 
     @Test
-    void fetchFeed_refusesLocalTargetsWhileTheGuardIsOn_andReachesThemWhenOff() {
+    void fetchFeed_refusesLocalTargetsByDefault_andReachesThemWithTheSwitchOff() {
         AtomicInteger hits = new AtomicInteger();
         server.createContext("/local", ex -> {
             hits.incrementAndGet();
@@ -131,7 +131,7 @@ class FeedProviderTest {
             ex.close();
         });
 
-        assertThatThrownBy(() -> new FeedFetcher(TestTargetGuards.on()).fetch(base + "/local"))
+        assertThatThrownBy(() -> new FeedFetcher(TestTargetGuards.defaults()).fetch(base + "/local"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("local or private network address");
         assertThat(hits).hasValue(0);

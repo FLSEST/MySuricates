@@ -1,5 +1,6 @@
 package com.automation.service.integration.providers.icalfeed;
 
+import com.automation.modules.ModuleCatalog;
 import com.automation.service.integration.OutboundTargetGuard;
 import com.automation.service.integration.providers.ical.CalendarParams;
 import org.springframework.stereotype.Component;
@@ -44,7 +45,7 @@ public class ICalFeedFetcher {
     public String fetch(URI url) {
         URI uri = url;
         for (int hop = 0; hop <= MAX_REDIRECTS; hop++) {
-            guard.check(uri);
+            guard.check(uri, ModuleCatalog.PRIVATE_NETWORK_GUARD);
             HttpResponse<InputStream> response = send(uri);
             int status = response.statusCode();
             if (REDIRECTS.contains(status)) {
