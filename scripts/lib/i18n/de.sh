@@ -172,7 +172,8 @@ M_help="MySuricates-Einrichtung — von der nackten Maschine bis zum Login in ei
   --runtime container|host     im Container (Default, nur Docker nötig) oder auf diesem Rechner
   --preset core|research|full  Module (Default core); --modules a,b nimmt einzelne Module dazu
   --provider claude|codex|pi   Standard-KI-Anbieter (Default: der erste angemeldete)
-  --port N                     Port der Instanz (Default 9090, belegte werden übersprungen)
+  --port N                     Port der Instanz (Default 9090, belegte werden übersprungen);
+                               Dev · Test · Prod: Dev ab N, Test ab N+1, Prod ab N+2
   --bind ADDR                  Adresse (Default 127.0.0.1; 0.0.0.0 = aus dem Netz, VPN davor)
   --projects DIR               Projektordner für den Container (Default: Ordner über dem Klon)
   --docker-socket              Container: Shell-Blöcke mit container_image erlauben (volle Docker-Kontrolle)

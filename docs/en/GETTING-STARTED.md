@@ -107,6 +107,7 @@ hardening, ui-editable and other settings go into the instance file (section 4).
 ./scripts/setup.sh --yes                                   # defaults: container, Standard, port 9090
 ./scripts/setup.sh --yes --runtime host --port 9190        # on this machine, another port
 ./scripts/setup.sh --yes --mode staged                     # Dev · Test · Prod
+./scripts/setup.sh --yes --mode staged --port 19090        # the same from port 19090 (Test 19091, Prod 19092)
 ./scripts/setup.sh --check                                 # only check and show the plan
 ./scripts/setup.sh --help                                  # all flags
 ```

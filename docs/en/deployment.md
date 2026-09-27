@@ -37,6 +37,7 @@ scripts/instance.sh down --name main     # stop; data stays in the volumes, runn
 | `MYSURICATES_HARDENING_SEALING`, `MYSURICATES_HARDENING_REQUIRE_SEALED` | hardening, `true`/`false` |
 | `MYSURICATES_ENVIRONMENT` | display name, e.g. `Prod` |
 | `MYSURICATES_APT_REFRESH` | a new value (e.g. the month) makes the next `up` fetch the image's NodeSource and Docker repos afresh instead of taking keys, package lists and packages from the layer cache of the first build; also works as an environment variable (8b7a39b9) |
+| `MYSURICATES_PREFIX` | prefix of the Docker names, default `mysuricates`: container and compose project `<prefix>-<name>`, volumes `<prefix>-<name>-data`/`-secrets`, image `<prefix>:local`; also works as an environment variable. The installer probe uses it to keep its instances apart from real ones on the same machine |
 
 The image is built from the tracked files of the clone (`git ls-files`) as they are in the working
 tree: changed tracked files go in, whatever exists only locally — such as pool definitions kept out
