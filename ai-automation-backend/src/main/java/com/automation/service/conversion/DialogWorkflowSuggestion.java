@@ -19,8 +19,22 @@ public record DialogWorkflowSuggestion(
         String patternType,      // "scripting" | "file_editing" | "research" | "mixed"
         String notAvailableReason,
         int toolCallsAnalyzed,
-        boolean available
+        boolean available,
+        List<String> buildFindings  // Baufehler-Prüfung ab MEDIUM, HIGH zuerst (TODO 326d5987); leer = sauber
 ) {
+    public DialogWorkflowSuggestion {
+        if (buildFindings == null) buildFindings = List.of();
+    }
+
+    /** Ohne Befunde der Baufehler-Prüfung. */
+    public DialogWorkflowSuggestion(String suggestedName, String suggestedDescription, List<BlockDefinition> blocks,
+                                    String sessionId, String sourceFilePath, String projectPath, double confidence,
+                                    String patternType, String notAvailableReason, int toolCallsAnalyzed,
+                                    boolean available) {
+        this(suggestedName, suggestedDescription, blocks, sessionId, sourceFilePath, projectPath, confidence,
+                patternType, notAvailableReason, toolCallsAnalyzed, available, List.of());
+    }
+
     public static DialogWorkflowSuggestion notAvailable(String reason) {
         return new DialogWorkflowSuggestion(
                 null, null, List.of(),

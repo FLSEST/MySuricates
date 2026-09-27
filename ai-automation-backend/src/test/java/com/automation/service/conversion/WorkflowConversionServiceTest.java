@@ -5,12 +5,17 @@ import com.automation.entity.*;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.mapper.WorkflowMapper;
 import com.automation.repository.WorkflowRunRepository;
+import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.ai.AiProvider;
 import com.automation.service.ai.AiProviderRegistry;
 import com.automation.service.workflow.AgentInstructionsService;
 import com.automation.service.workflow.WorkflowService;
+import com.automation.service.workflow.analyzer.GeneratedWorkflowCheck;
+import com.automation.service.workflow.analyzer.WorkflowAnalyzer;
 import com.automation.testsupport.FakeTransactions;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -48,12 +53,19 @@ class WorkflowConversionServiceTest {
     @Mock
     private AiProvider aiProvider;
 
+    @Mock
+    private ActivityLogService activityLogService;
+
     private WorkflowConversionService conversionService;
+
+    private GeneratedWorkflowCheck buildCheck() {
+        return new GeneratedWorkflowCheck(new WorkflowAnalyzer(), new ObjectMapper(), activityLogService);
+    }
 
     @BeforeEach
     void setUp() throws Exception {
         conversionService = new WorkflowConversionService(runRepository, workflowService, workflowMapper,
-                aiProviderRegistry, agentInstructionsService, FakeTransactions.manager());
+                aiProviderRegistry, agentInstructionsService, FakeTransactions.manager(), buildCheck());
         lenient().when(agentInstructionsService.buildInstructionPrefix(null)).thenReturn("");
         lenient().when(aiProviderRegistry.getDefault()).thenReturn(aiProvider);
     }
@@ -265,7 +277,7 @@ class WorkflowConversionServiceTest {
     private WorkflowConversionService proxiedWithFakeTransactions() {
         PlatformTransactionManager transactions = FakeTransactions.manager();
         return FakeTransactions.proxy(new WorkflowConversionService(runRepository, workflowService,
-                workflowMapper, aiProviderRegistry, agentInstructionsService, transactions), transactions);
+                workflowMapper, aiProviderRegistry, agentInstructionsService, transactions, buildCheck()), transactions);
     }
 
     @Test
@@ -319,5 +331,80 @@ class WorkflowConversionServiceTest {
         assertThat(txDuringCreate.get()).as("the workflow is created in a transaction").isTrue();
         assertThat(txDuringMapping.get()).as("the response is mapped in the same transaction").isTrue();
         assertThat(result).isSameAs(response);
+    }
+
+    // ── build check after the AI suggestion (TODO 326d5987) ──
+
+    @Nested
+    class BuildCheck {
+
+        private static final String BAD = """
+                {"suggestedName": "Bericht", "blocks": [{"type": "simple", "config": {"prompt": "Fasse zusammen"}}]}
+                """;
+
+        @BeforeEach
+        void run() {
+            lenient().when(agentInstructionsService.buildInstructionPrefix(null)).thenReturn("system");
+            when(runRepository.findById("run-1")).thenReturn(Optional.of(buildCompletedRunWithAgenticSteps()));
+        }
+
+        @Test
+        void highFinding_exactlyOneCorrectionWithSameSystemPrompt_correctedVersionIsSuggested() throws Exception {
+            when(aiProvider.reason(any())).thenReturn(
+                    new AiProvider.ReasoningResult(BAD, null),
+                    new AiProvider.ReasoningResult("[{\"type\":\"simple\",\"config\":{\"command\":\"Fasse zusammen\"}}]", null));
+
+            WorkflowSuggestion suggestion = conversionService.suggestWorkflow("run-1");
+
+            ArgumentCaptor<AiProvider.ReasoningRequest> calls = ArgumentCaptor.forClass(AiProvider.ReasoningRequest.class);
+            verify(aiProvider, times(2)).reason(calls.capture());
+            assertThat(calls.getAllValues().get(1).prompt()).contains("HIGH missing-required-config-key");
+            assertThat(calls.getAllValues().get(1).systemPrompt()).isEqualTo("system");
+            assertThat(suggestion.blocks()).singleElement()
+                    .satisfies(b -> assertThat(b.getConfig()).containsEntry("command", "Fasse zusammen"));
+            assertThat(suggestion.buildFindings()).isEmpty();
+        }
+
+        @Test
+        void unusableCorrection_originalIsSuggested_withTheRemainingFindings() throws Exception {
+            when(aiProvider.reason(any())).thenReturn(
+                    new AiProvider.ReasoningResult(BAD, null), new AiProvider.ReasoningResult("nein", null));
+
+            WorkflowSuggestion suggestion = conversionService.suggestWorkflow("run-1");
+
+            verify(aiProvider, times(2)).reason(any());
+            assertThat(suggestion.blocks()).singleElement()
+                    .satisfies(b -> assertThat(b.getConfig()).containsEntry("prompt", "Fasse zusammen"));
+            assertThat(suggestion.buildFindings()).first().asString().startsWith("HIGH missing-required-config-key");
+        }
+
+        @Test
+        void noHighFinding_noExtraCall() throws Exception {
+            when(aiProvider.reason(any())).thenReturn(new AiProvider.ReasoningResult("""
+                    {"blocks": [{"type": "shell", "config": {"command": "set -euo pipefail; echo ok"}}]}
+                    """, null));
+
+            WorkflowSuggestion suggestion = conversionService.suggestWorkflow("run-1");
+
+            verify(aiProvider, times(1)).reason(any());
+            assertThat(suggestion.buildFindings()).isEmpty();
+        }
+
+        @Test
+        void createWorkflowFromSuggestion_logsRemainingFindingsAfterTheTransaction() throws Exception {
+            when(aiProvider.reason(any())).thenReturn(
+                    new AiProvider.ReasoningResult(BAD, null), new AiProvider.ReasoningResult("nein", null));
+            Workflow created = Workflow.builder().id("new-wf").name("Bericht").build();
+            when(workflowService.create(any(), eq(ChangeSource.CONVERSION))).thenReturn(created);
+            when(workflowMapper.toResponse(created)).thenReturn(new WorkflowResponse(
+                    "new-wf", "proj-1", "Project", null, null, "Bericht",
+                    null, null, List.of(), null, Map.of(), List.of(), List.of(), 0, null, null, null, null, Map.of(),
+                    null, null, null, null, null));
+
+            conversionService.createWorkflowFromSuggestion("run-1", "proj-1", null);
+
+            verify(activityLogService).warn(any(), contains("Baufehler-Prüfung (Konvertierung)"), anyString(),
+                    isNull(), eq("new-wf"));
+        }
     }
 }

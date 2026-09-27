@@ -13,6 +13,7 @@ import com.automation.service.chain.ChainService;
 import com.automation.service.factory.FactoryTestResult;
 import com.automation.service.factory.FactoryVerificationService;
 import com.automation.service.workflow.WorkflowService;
+import com.automation.service.workflow.analyzer.GeneratedWorkflowCheck;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -34,6 +35,7 @@ public class WishDecomposeService {
     private final FactoryVerificationService factoryVerificationService;
     private final WishPromptBuilder promptBuilder;
     private final SimpMessagingTemplate messagingTemplate;
+    private final GeneratedWorkflowCheck buildCheck;
 
     public WishDecomposeService(
             WishConfig wishConfig,
@@ -44,7 +46,8 @@ public class WishDecomposeService {
             ChainService chainService,
             @Lazy FactoryVerificationService factoryVerificationService,
             WishPromptBuilder promptBuilder,
-            SimpMessagingTemplate messagingTemplate
+            SimpMessagingTemplate messagingTemplate,
+            GeneratedWorkflowCheck buildCheck
     ) {
         this.wishConfig = wishConfig;
         this.wishRepository = wishRepository;
@@ -55,6 +58,7 @@ public class WishDecomposeService {
         this.factoryVerificationService = factoryVerificationService;
         this.promptBuilder = promptBuilder;
         this.messagingTemplate = messagingTemplate;
+        this.buildCheck = buildCheck;
     }
 
     @SuppressWarnings("unchecked")
@@ -112,6 +116,7 @@ public class WishDecomposeService {
 
         // Create workflows from decomposition
         List<String> workflowIds = new ArrayList<>();
+        final String dir = workingDir;
         Object workflowsObj = parsed.get("workflows");
         if (workflowsObj instanceof List<?> workflowList) {
             for (Object wfObj : workflowList) {
@@ -122,6 +127,16 @@ public class WishDecomposeService {
                 String description = (String) wf.getOrDefault("description", "");
 
                 List<BlockDefinition> blocks = parseBlocks(wf.get("blocks"));
+
+                // Build check (TODO 326d5987): HIGH findings get exactly one correction round with the
+                // decompose call's provider and system prompt; the default timeouts apply to the answer too.
+                GeneratedWorkflowCheck.Correction check = buildCheck.correctOnce(blocks, null,
+                        correctionPrompt -> defaultProvider.reason(new AiProvider.ReasoningRequest(
+                                correctionPrompt, systemPrompt, dir, 3, null)).text());
+                blocks = check.blocks();
+                if (check.applied()) {
+                    blocks.forEach(b -> applyDefaultTimeouts(b.getType(), b.getConfig()));
+                }
 
                 String model = (String) wf.getOrDefault("model", null);
                 if (model == null) {
@@ -147,6 +162,7 @@ public class WishDecomposeService {
                 Workflow created = workflowService.create(req, ChangeSource.WISH);
                 workflowIds.add(created.getId());
                 log.info("Wish {}: Created workflow '{}' ({})", wish.getId(), name, created.getId());
+                buildCheck.reportRemaining(created.getId(), name, "Wunsch", check.remaining());
             }
         }
 

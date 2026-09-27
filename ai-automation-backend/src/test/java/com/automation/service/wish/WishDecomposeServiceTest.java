@@ -1,15 +1,20 @@
 package com.automation.service.wish;
 
 import com.automation.config.WishConfig;
+import com.automation.dto.request.CreateWorkflowRequest;
 import com.automation.entity.*;
 import com.automation.repository.ProjectRepository;
 import com.automation.repository.WishRepository;
+import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.ai.AiProvider;
 import com.automation.service.ai.AiProviderRegistry;
 import com.automation.service.chain.ChainService;
 import com.automation.service.factory.FactoryTestResult;
 import com.automation.service.factory.FactoryVerificationService;
 import com.automation.service.workflow.WorkflowService;
+import com.automation.service.workflow.analyzer.GeneratedWorkflowCheck;
+import com.automation.service.workflow.analyzer.WorkflowAnalyzer;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -24,6 +29,8 @@ import java.util.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -38,6 +45,7 @@ class WishDecomposeServiceTest {
     @Mock private WishPromptBuilder promptBuilder;
     @Mock private SimpMessagingTemplate messagingTemplate;
     @Mock private AiProvider aiProvider;
+    @Mock private ActivityLogService activityLogService;
 
     private WishConfig wishConfig;
     private WishDecomposeService service;
@@ -48,7 +56,8 @@ class WishDecomposeServiceTest {
         service = new WishDecomposeService(
                 wishConfig, wishRepository, aiProviderRegistry, projectRepository,
                 workflowService, chainService, factoryVerificationService,
-                promptBuilder, messagingTemplate
+                promptBuilder, messagingTemplate,
+                new GeneratedWorkflowCheck(new WorkflowAnalyzer(), new ObjectMapper(), activityLogService)
         );
         lenient().when(aiProviderRegistry.getDefault()).thenReturn(aiProvider);
         lenient().when(promptBuilder.buildDecomposePrompt(any())).thenReturn("prompt");
@@ -269,6 +278,77 @@ class WishDecomposeServiceTest {
             verify(workflowService).create(captor.capture(), eq(ChangeSource.WISH));
             assertThat(captor.getValue().blocks().get(0).getConfig())
                     .containsEntry("timeout_seconds", 1200);
+        }
+    }
+
+    /** Build check after the decomposition (TODO 326d5987). */
+    @Nested
+    class BuildCheckTests {
+
+        private static final String BAD = """
+                {"workflows":[{"name":"Bericht","blocks":[
+                  {"type":"simple","config":{"prompt":"Fasse zusammen"}}
+                ]}],"needsClarification":false}""";
+
+        private CreateWorkflowRequest savedRequest() {
+            ArgumentCaptor<CreateWorkflowRequest> captor = ArgumentCaptor.forClass(CreateWorkflowRequest.class);
+            verify(workflowService).create(captor.capture(), eq(ChangeSource.WISH));
+            return captor.getValue();
+        }
+
+        @BeforeEach
+        void stubs() {
+            lenient().when(workflowService.create(any(), eq(ChangeSource.WISH)))
+                    .thenReturn(Workflow.builder().id("wf-1").name("Bericht").build());
+            lenient().when(factoryVerificationService.verifyAndFix(anyString(), anyInt()))
+                    .thenReturn(new FactoryTestResult("OK", null, null));
+        }
+
+        @Test
+        void highFinding_exactlyOneCorrectionWithSameSystemPrompt_correctedVersionIsSaved() throws Exception {
+            when(aiProvider.reason(any())).thenReturn(
+                    new AiProvider.ReasoningResult(BAD, null),
+                    new AiProvider.ReasoningResult("[{\"type\":\"simple\",\"config\":{\"command\":\"Fasse zusammen\"}}]", null));
+
+            service.decompose(createWish("w-1"));
+
+            ArgumentCaptor<AiProvider.ReasoningRequest> calls = ArgumentCaptor.forClass(AiProvider.ReasoningRequest.class);
+            verify(aiProvider, times(2)).reason(calls.capture());
+            AiProvider.ReasoningRequest correction = calls.getAllValues().get(1);
+            assertThat(correction.prompt()).contains("HIGH missing-required-config-key");
+            assertThat(correction.systemPrompt()).isEqualTo("system");
+            assertThat(savedRequest().blocks()).singleElement().satisfies(b -> {
+                assertThat(b.getConfig()).containsEntry("command", "Fasse zusammen");
+                // the default timeouts apply to the corrected answer too
+                assertThat(b.getConfig()).containsKey("timeout_seconds");
+            });
+            verifyNoInteractions(activityLogService);
+        }
+
+        @Test
+        void unusableCorrection_originalIsSaved_andFindingsAreLogged() throws Exception {
+            when(aiProvider.reason(any())).thenReturn(
+                    new AiProvider.ReasoningResult(BAD, null),
+                    new AiProvider.ReasoningResult("keine Ahnung", null));
+
+            service.decompose(createWish("w-1"));
+
+            verify(aiProvider, times(2)).reason(any());
+            assertThat(savedRequest().blocks()).singleElement()
+                    .satisfies(b -> assertThat(b.getConfig()).containsEntry("prompt", "Fasse zusammen"));
+            verify(activityLogService).warn(any(), contains("Baufehler-Prüfung (Wunsch)"), anyString(), isNull(), eq("wf-1"));
+        }
+
+        @Test
+        void noHighFinding_noExtraCall() throws Exception {
+            when(aiProvider.reason(any())).thenReturn(new AiProvider.ReasoningResult("""
+                    {"workflows":[{"name":"Bericht","blocks":[
+                      {"type":"shell","config":{"command":"set -euo pipefail; echo ok"}}
+                    ]}],"needsClarification":false}""", null));
+
+            service.decompose(createWish("w-1"));
+
+            verify(aiProvider, times(1)).reason(any());
         }
     }
 
