@@ -1,9 +1,8 @@
 # Deployment
 
-MySuricates läuft auf einem Rechner auf einem von drei Wegen: als **Instanz im Container** über
-`deploy/` (nur Docker nötig, Backend liefert die Oberfläche mit — der Weg für Nutzer), als
-**schlanker Backend-Container** über `ai-automation-backend/docker-compose.yml` (nur die API) oder
-**aus dem Quellcode** ([entwicklung.md](entwicklung.md)). Wer am Code arbeitet, betreibt neben der
+MySuricates läuft auf einem Rechner auf einem von zwei Wegen: als **Instanz im Container** über
+`deploy/` (nur Docker nötig, Backend liefert die Oberfläche mit — der Weg für Nutzer, auch der
+einzige Docker-Weg) oder **aus dem Quellcode** ([entwicklung.md](entwicklung.md)). Wer am Code arbeitet, betreibt neben der
 Quellcode-Instanz („Dev“) oft zwei weitere Container: **Stable** (Port 9091, ein eingefrorener Stand
 des Codes für den Alltagsbetrieb) und **Test** (Port 8090, für Workflow-Tests) — beschrieben im
 [Drei-Umgebungs-Setup](#drei-umgebungs-setup).
@@ -155,54 +154,31 @@ Instanzname `tryout` ist für `instance.sh` reserviert, damit sich Container und
 
 ## Docker Compose
 
-`ai-automation-backend/docker-compose.yml` startet nur das Backend als Container und baut die
-Agent-Images. Für eine vollständige Instanz mit Oberfläche und KI-Anbietern ist der Weg über
-[`deploy/`](#eine-instanz-im-container-deploy) gedacht.
+`ai-automation-backend/docker-compose.yml` baut nur die Agent-Images (Profil `build-only`) — keine
+Instanz. Der einzige Docker-Weg für eine laufende Instanz mit Oberfläche und KI-Anbietern ist
+[`deploy/`](#eine-instanz-im-container-deploy); einen eigenständigen Backend-Container gibt es nicht
+mehr. Bis TODO 1e6f8f9f war er neben `deploy/` ein zweiter, halber Betriebsweg — ohne Oberfläche und
+KI-CLI, dafür mit offen gebundenem Port und fest gemountetem Docker-Socket.
 
-### Voraussetzungen
-
-- JDK 21 und Maven auf dem Rechner — das JAR wird dort gebaut, `Dockerfile.backend` kopiert es nur
-  (`COPY target/ai-automation-backend-*.jar`).
-- Docker mit Compose.
-- Das Backend-Image enthält keine KI-CLI (Claude, Codex, Pi) und bindet keine vom Rechner ein;
-  KI-Blöcke laufen in diesem Container also nicht. Dafür sorgen erst `deploy/` und Stable/Test
-  ([KI-Anbieter im Container](#ki-anbieter-im-container)).
-
-### Starten
+### Agent-Images bauen
 
 ```bash
 cd ai-automation-backend
 
-# 1. JAR bauen
-mvn clean package -DskipTests
-
-# 2. Backend starten
-docker compose up --build -d
-
-# 3. Agent-Images bauen — der Monat im Wert frischt die Fremd-Repos von agent-devops auf
+# der Monat im Wert frischt die Fremd-Repos von agent-devops auf
 AGENT_APT_REFRESH=$(date +%Y-%m) docker compose --profile build-only build
 ```
 
-Das Backend ist dann unter `http://localhost:9090` erreichbar — nur die API, eine Oberfläche liefert
-dieser Container nicht aus (`automation.serve-frontend` ist nur in den Profilen `stable` und `test`
-und im `deploy/`-Image eingeschaltet). Die Oberfläche kommt dann vom Vite-Dev-Server:
-`cd ai-automation-frontend && npm install && npm run dev`, danach `http://localhost:3000`; er leitet
-`/api` und `/ws` an Port 9090 weiter ([entwicklung.md](entwicklung.md)). Den API-Key für den Login
-erzeugt das Backend beim ersten Start, wenn `AUTOMATION_API_KEY` leer ist. Das Log zeigt davon nur die
-letzten vier Zeichen und die Datei, in der er steht:
-`docker compose exec backend cat /home/appuser/.autotrigger/api-key`.
-
 ### Services
 
-| Service | Image | Port | Beschreibung |
-|---|---|---|---|
-| `backend` | `Dockerfile.backend` | 9090 | Spring Boot Backend |
-| `agent-node` | `Dockerfile.agent-node` | - | Node.js 22 Agent-Container |
-| `agent-python` | `Dockerfile.agent-python` | - | Python 3.12 Agent-Container |
-| `agent-devops` | `Dockerfile.agent-devops` | - | Ubuntu 24.04 Agent-Container (gh, trivy, gitleaks, docker-cli) |
-| `agent-java` | `Dockerfile.agent-java` | - | Temurin 21 Agent-Container (maven, LibreOffice) |
+| Service | Image | Beschreibung |
+|---|---|---|
+| `agent-node` | `Dockerfile.agent-node` | Node.js 22 Agent-Container |
+| `agent-python` | `Dockerfile.agent-python` | Python 3.12 Agent-Container |
+| `agent-devops` | `Dockerfile.agent-devops` | Ubuntu 24.04 Agent-Container (gh, trivy, gitleaks, docker-cli) |
+| `agent-java` | `Dockerfile.agent-java` | Temurin 21 Agent-Container (maven, LibreOffice) |
 
-Die Agent-Images werden nur gebaut (`profiles: build-only`, alle vier mit dem Befehl aus Schritt 3),
+Die Agent-Images werden nur gebaut (`profiles: build-only`, alle vier mit dem Befehl oben),
 nicht direkt über Compose gestartet. Das Backend erstellt und verwaltet Agent-Container dynamisch über
 die Docker API. Gebraucht werden sie so:
 
@@ -215,14 +191,6 @@ die Docker API. Gebraucht werden sie so:
   Workflows hat, braucht sie nicht zu bauen.
 
 ## Dockerfiles
-
-### Backend (`docker/Dockerfile.backend`)
-
-- **Base:** `eclipse-temurin:21-jre-alpine`
-- **User:** `appuser` (UID 1000, nicht-root)
-- **JVM:** ZGC (Generational), 256MB–1GB Heap
-- **Extras:** Tailscale CLI (pinned Version + SHA256-Verifizierung, multi-arch amd64/arm64), sudo
-- **Healthcheck:** `curl -f http://localhost:9090/api/v1/system/health`
 
 ### Agent Node (`docker/Dockerfile.agent-node`)
 
@@ -276,7 +244,7 @@ die Docker API. Gebraucht werden sie so:
 
 ### `docker-compose.yml` (Haupt)
 
-Backend + Agent-Images (build-only). Netzwerk: `automation` (Bridge).
+Baut nur die Agent-Images (`profiles: build-only`), startet keinen Service.
 
 ### `docker-compose.stable.yml`
 
@@ -412,26 +380,16 @@ automation.modules.preset: core   # optionale Module, siehe Module-System
 ### Produktion
 
 ```bash
-# docker-compose.yml Umgebung
+# deploy/instances/<name>.env, siehe Tabelle oben
 AUTOMATION_SECURITY_ENABLED=true
-AUTOMATION_API_KEY=<sicherer-key>   # Pflicht: die Compose-Datei liefert keinen Default mit
+AUTOMATION_API_KEY=<sicherer-key>   # Pflicht: die Env-Datei liefert keinen Default mit
 AUTOMATION_MODULES_PRESET=core       # optional: research | full; Fernzugriff: AUTOMATION_MODULES_REMOTE_ACCESS=true
 AUTOMATION_RATE_LIMIT_ENABLED=true   # optional
 ```
 
 - API-Key-Authentifizierung aktiv
 - Rate Limiting empfohlen
-- Docker Socket gemountet (`/var/run/docker.sock`)
-
-## Volumes
-
-```yaml
-volumes:
-  - ./data:/app/data                    # SQLite-Datenbank
-  - /var/run/docker.sock:/var/run/docker.sock  # Docker Socket
-```
-
-**Wichtig:** Der Docker-Socket-Mount gibt dem Backend volle Kontrolle über den Host-Docker. In Produktionsumgebungen sollte API-Key-Auth aktiviert sein.
+- Docker Socket nur bei Bedarf (`MYSURICATES_DOCKER_SOCKET=1`, siehe oben) — gibt der Instanz volle Kontrolle über Docker auf dem Rechner
 
 **Hinweis:** HikariCP Pool-Size ist auf 1 gesetzt. SQLite erlaubt nur einen gleichzeitigen Schreibzugriff. Pool-Size=1 serialisiert alle DB-Operationen — kein Lock-Contention. Pool-Size erhöhen erst sinnvoll beim Wechsel auf PostgreSQL.
 
@@ -441,7 +399,10 @@ Das Backend kann über Tailscale von außerhalb des lokalen Netzwerks erreichbar
 
 ### Voraussetzungen
 
-- Tailscale CLI im Container installiert (Dockerfile.backend enthält dies)
+- Tailscale CLI im Container installiert — aktuell bringt kein mitgeliefertes Image (`deploy/Dockerfile`,
+  `docker/Dockerfile.stable`) sie mit; der bisher einzige Container mit Tailscale CLI war das jetzt
+  gestrichene `docker/Dockerfile.backend` (TODO 1e6f8f9f, Folgefrage offen). Aus dem Quellcode
+  (Dev-Instanz auf dem Host) genügt eine lokale Tailscale-Installation
 - Modul `remote-access` eingeschaltet (`AUTOMATION_MODULES_REMOTE_ACCESS=true` oder Preset `full`) — im öffentlichen Default `core` ist es aus; ohne Modul antworten die `/system/remote-access/*`-Endpunkte mit 404 `MODULE_DISABLED`
 
 ### Aktivierung
@@ -457,15 +418,15 @@ Das Backend kann über Tailscale von außerhalb des lokalen Netzwerks erreichbar
 
 ## Healthcheck
 
-Docker Compose und das Dockerfile definieren einen Healthcheck:
+`deploy/Dockerfile` definiert einen Healthcheck (Compose übernimmt ihn unverändert):
 
 ```
 GET http://localhost:9090/api/v1/system/health
 
-Interval: 30s
+Interval: 15s
 Timeout: 5s
 Retries: 3
-Start Period: 15s
+Start Period: 90s
 ```
 
 Response bei Erfolg:
@@ -499,16 +460,6 @@ sqlite3 data/automation.db ".backup 'data/automation.db.backup'"
 **Speicherort:** `ai-automation-backend/data/automation.db` (lokal) bzw. `/app/data/automation.db` (Docker)
 
 Die Datei enthält alle Projekte, Workflows, Runs, Skills, Schedules, Webhooks, Chains, Todos, Integrations, Templates und weitere Entitäten. Ein Backup dieser Datei sichert den gesamten Zustand der Plattform.
-
-## Netzwerk
-
-Docker Compose erstellt ein `automation`-Bridge-Netzwerk. Der Backend-Container und die dynamisch erstellten Agent-Container können darüber kommunizieren.
-
-```yaml
-networks:
-  automation:
-    driver: bridge
-```
 
 ## Reverse-Proxy
 
@@ -641,10 +592,12 @@ Technische Fassung mit Klassennamen und reservierten Kontextschlüsseln:
 
 ### Wo gelauscht wird
 
-Weder Backend noch Frontend binden auf Loopback. `server.address` ist nirgends gesetzt, das Backend
-lauscht also auf allen Interfaces; Vite läuft mit `host: true`. Der Compose-Dienst veröffentlicht
-`9090:9090` ohne Host-IP-Präfix, also auf allen Adressen — und Dockers Portfreigabe umgeht dabei
-die üblichen Host-Firewall-Regeln.
+Weder Backend noch Frontend binden separat auf Loopback: `server.address` ist nirgends gesetzt, das
+Backend lauscht also auf allen Interfaces; Vite läuft mit `host: true`. Aus dem Quellcode gestartet
+(Dev) ist die Instanz damit im lokalen Netz erreichbar, nicht nur auf dem eigenen Rechner. Über
+`deploy/` veröffentlicht `instance.sh` den Port dagegen per Default nur auf `127.0.0.1`
+(`MYSURICATES_BIND`, siehe [Eine Instanz im Container](#eine-instanz-im-container-deploy)) — wer das
+ändert, umgeht damit auch die üblichen Host-Firewall-Regeln (Dockers Portfreigabe).
 
 **CORS** betrifft eine installierte Instanz nicht: Das Backend liefert die Oberfläche selbst aus,
 Seite und API haben denselben Ursprung. Eine Rolle spielt die Liste nur, wo beide verschiedene
@@ -730,8 +683,7 @@ Die beiden werden leicht verwechselt:
    bekommt. Wird es verweigert, landet ein SECURITY-Eintrag im Activity-Log.
 2. **Der Socket im Backend-Container** (`/var/run/docker.sock`) ist unabhängig von Punkt 1 und gibt der
    Anwendung volle Kontrolle über Docker auf dem Host. Bei `instance.sh`, Stable, Test und dem
-   Dev-Container entscheidet das ein Schalter ([KI-Anbieter im Container](#ki-anbieter-im-container)); die
-   schlanke `docker-compose.yml` mountet ihn weiterhin fest.
+   Dev-Container entscheidet das ein Schalter ([KI-Anbieter im Container](#ki-anbieter-im-container)).
 
 ### Container-Image-Allowlist
 

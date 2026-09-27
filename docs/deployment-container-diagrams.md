@@ -11,40 +11,34 @@ Instanz im Container, Compose-Setup, Agent-Images, Projekt-Container und Ressour
 - Daten liegen in benannten Volumes und bleiben bei `scripts/instance.sh down` erhalten
 - `MYSURICATES_RUNTIME=host` startet dieselbe Instanz statt im Container direkt auf dem Rechner
 
-## Docker Compose — *Services*
+## Docker Compose — *Agent-Images*
 
-`ai-automation-backend/docker-compose.yml` baut und startet das Backend; die Agent-Images baut es nur (Profil `build-only`). Container aus diesen Images startet das Backend selbst über die Docker-API.
+`ai-automation-backend/docker-compose.yml` startet kein Backend mehr — der einzige Docker-Weg für eine Instanz ist `deploy/` (oben). Die Datei baut nur noch die Agent-Images (Profil `build-only`); Container aus diesen Images startet das Backend über die Docker-API.
 
 ```mermaid
 flowchart LR
     subgraph Compose
-        BE["backend (:9090)"]
         N["agent-node (Node 22)"]
         PY["agent-python (Python 3.12)"]
         DO["agent-devops (Ubuntu 24.04)"]
         JV["agent-java (Temurin 21)"]
     end
-    BE -->|"docker.sock"| Engine["Docker Engine"]
+    Backend["Backend (deploy/)"] -->|"docker.sock"| Engine["Docker Engine"]
+    Engine -.->|"startet"| N
+    Engine -.->|"startet"| PY
+    Engine -.->|"startet"| DO
+    Engine -.->|"startet"| JV
     style Compose fill:#1a1f2e,stroke:#30363d,color:#e6edf3
 ```
 
 ### Build
 
-`mvn clean package -DskipTests` (das JAR, das `docker/Dockerfile.backend` kopiert)
-
-`docker compose --profile build-only build` (Agent-Images)
-
-### Start
-
-`docker compose up --build` im Verzeichnis `ai-automation-backend/`
-
-Backend Port: 9090; Daten unter `./data`
+`AGENT_APT_REFRESH=$(date +%Y-%m) docker compose --profile build-only build` im Verzeichnis `ai-automation-backend/`
 
 ## Agent-Images — *Dockerfiles*
 
 | Image | Basis | Pfad |
 |---|---|---|
-| backend | `eclipse-temurin:21-jre-alpine` + Spring-Boot-JAR | `docker/Dockerfile.backend` |
 | agent-node | `node:22-slim` | `docker/Dockerfile.agent-node` |
 | agent-python | `python:3.12-slim` | `docker/Dockerfile.agent-python` |
 | agent-devops | `ubuntu:24.04` | `docker/Dockerfile.agent-devops` |
@@ -99,7 +93,7 @@ Projektpfad → `/workspace` (lesen und schreiben)
 
 Claude vom Host nach `MYSURICATES_AI_FROM_HOST`; Standard `login`: das Programm schreibgeschützt, die Anmeldung als Token
 
-Docker-Socket: nur für das Backend (`/var/run/docker.sock` in `docker-compose.yml`), nicht im Projekt-Container
+Docker-Socket: nur für das Backend, per Schalter (`MYSURICATES_DOCKER_SOCKET`, siehe *deploy/*), nicht im Projekt-Container
 
 ## Ausführung auf dem Host — *Sicherheit & Reproduzierbarkeit*
 

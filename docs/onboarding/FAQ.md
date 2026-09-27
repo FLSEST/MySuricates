@@ -235,20 +235,14 @@ logging:
 
 ## Deployment
 
-### Wie baue ich ein Docker-Image fuer das Backend?
+### Wie baue und starte ich eine Instanz im Container?
 
 ```bash
-cd ai-automation-backend
-mvn clean package -DskipTests
-docker build -f docker/Dockerfile.backend -t autopilot-backend:latest .
+printf 'MYSURICATES_PORT=9090\n' > deploy/instances/main.env
+scripts/instance.sh up --name main
 ```
 
-Das Image nutzt:
-- Eclipse Temurin Java 21 (Alpine)
-- ZGC (Generational) mit 256MB-1GB Heap
-- Non-Root User (`appuser`)
-- Health-Check auf `/api/v1/system/health`
-
-### Gibt es ein Frontend-Docker-Image?
-
-Aktuell nicht. Das Frontend wird als statisches Build (`npm run build`) ausgeliefert. Die `dist/`-Dateien koennen ueber einen beliebigen Webserver (nginx, Caddy, etc.) gehostet werden. Der Vite-Proxy entfaellt dann -- das Frontend muss direkt auf das Backend zeigen.
+`deploy/Dockerfile` baut Backend und Frontend in ein Image — eine Instanz ist ein Container und ein
+Port, die Oberfläche liefert das Backend selbst mit. Details:
+[deployment.md](../deployment.md#eine-instanz-im-container-deploy). Ein eigenständiges
+Backend-Image ohne Oberfläche gibt es nicht (TODO 1e6f8f9f).

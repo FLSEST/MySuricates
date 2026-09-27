@@ -1,9 +1,8 @@
 # Deployment
 
-MySuricates runs on a machine in one of three ways: as an **instance in a container** via `deploy/`
-(only Docker needed, the backend serves the UI itself — the way for users), as a **slim backend
-container** via `ai-automation-backend/docker-compose.yml` (the API only), or **from source**
-([entwicklung.md](entwicklung.md)). Whoever works on the code often runs two more containers next to
+MySuricates runs on a machine in one of two ways: as an **instance in a container** via `deploy/`
+(only Docker needed, the backend serves the UI itself — the way for users, also the only Docker way)
+or **from source** ([entwicklung.md](entwicklung.md)). Whoever works on the code often runs two more containers next to
 the source instance ("Dev"): **Stable** (port 9091, a frozen state of the code for everyday use) and
 **Test** (port 8090, for workflow tests) — described in the
 [Three-Environment Setup](#three-environment-setup).
@@ -152,54 +151,31 @@ a separate step (4c992a25). Tests without Docker: `bash scripts/tests/test-tryou
 
 ## Docker Compose
 
-`ai-automation-backend/docker-compose.yml` starts only the backend as a container and builds the
-agent images. For a complete instance with UI and AI providers, use
-[`deploy/`](#one-instance-in-a-container-deploy).
+`ai-automation-backend/docker-compose.yml` only builds the agent images (profile `build-only`) — no
+instance. The only Docker way to run an instance with UI and AI providers is
+[`deploy/`](#one-instance-in-a-container-deploy); there is no standalone backend container any more.
+Until TODO 1e6f8f9f it was a second, half operating path next to `deploy/` — no UI, no AI CLI, but with
+an openly bound port and the Docker socket mounted unconditionally.
 
-### Prerequisites
-
-- JDK 21 and Maven on the machine — the JAR is built there, `Dockerfile.backend` only copies it
-  (`COPY target/ai-automation-backend-*.jar`).
-- Docker with Compose.
-- The backend image contains no AI CLI (Claude, Codex, Pi) and mounts none from the machine, so AI
-  blocks do not run in this container. `deploy/` and Stable/Test take care of that
-  ([AI providers in the container](#ai-providers-in-the-container)).
-
-### Starting
+### Building the agent images
 
 ```bash
 cd ai-automation-backend
 
-# 1. Build JAR
-mvn clean package -DskipTests
-
-# 2. Start backend
-docker compose up --build -d
-
-# 3. Build agent images — the month in the value refreshes the third-party repos of agent-devops
+# the month in the value refreshes the third-party repos of agent-devops
 AGENT_APT_REFRESH=$(date +%Y-%m) docker compose --profile build-only build
 ```
 
-The backend is then accessible at `http://localhost:9090` — the API only; this container serves no
-UI (`automation.serve-frontend` is switched on only in the `stable` and `test` profiles and in the
-`deploy/` image). The UI then comes from the Vite dev server:
-`cd ai-automation-frontend && npm install && npm run dev`, then `http://localhost:3000`; it forwards
-`/api` and `/ws` to port 9090 ([entwicklung.md](entwicklung.md)). The backend creates the API key for
-the login on first start when `AUTOMATION_API_KEY` is empty. The log shows only its last four
-characters and the file that holds it:
-`docker compose exec backend cat /home/appuser/.autotrigger/api-key`.
-
 ### Services
 
-| Service | Image | Port | Description |
-|---|---|---|---|
-| `backend` | `Dockerfile.backend` | 9090 | Spring Boot Backend |
-| `agent-node` | `Dockerfile.agent-node` | - | Node.js 22 Agent Container |
-| `agent-python` | `Dockerfile.agent-python` | - | Python 3.12 Agent Container |
-| `agent-devops` | `Dockerfile.agent-devops` | - | Ubuntu 24.04 Agent Container (gh, trivy, gitleaks, docker-cli) |
-| `agent-java` | `Dockerfile.agent-java` | - | Temurin 21 Agent Container (maven, LibreOffice) |
+| Service | Image | Description |
+|---|---|---|
+| `agent-node` | `Dockerfile.agent-node` | Node.js 22 Agent Container |
+| `agent-python` | `Dockerfile.agent-python` | Python 3.12 Agent Container |
+| `agent-devops` | `Dockerfile.agent-devops` | Ubuntu 24.04 Agent Container (gh, trivy, gitleaks, docker-cli) |
+| `agent-java` | `Dockerfile.agent-java` | Temurin 21 Agent Container (maven, LibreOffice) |
 
-The agent images are only built (`profiles: build-only`, all four with the command from step 3),
+The agent images are only built (`profiles: build-only`, all four with the command above),
 not started directly via Compose. The backend creates and manages agent containers dynamically via
 the Docker API. They are needed as follows:
 
@@ -212,14 +188,6 @@ the Docker API. They are needed as follows:
   workflows there is no need to build them.
 
 ## Dockerfiles
-
-### Backend (`docker/Dockerfile.backend`)
-
-- **Base:** `eclipse-temurin:21-jre-alpine`
-- **User:** `appuser` (UID 1000, non-root)
-- **JVM:** ZGC (Generational), 256MB–1GB Heap
-- **Extras:** Tailscale CLI (pinned version + SHA256 verification, multi-arch amd64/arm64), sudo
-- **Healthcheck:** `curl -f http://localhost:9090/api/v1/system/health`
 
 ### Agent Node (`docker/Dockerfile.agent-node`)
 
@@ -273,7 +241,7 @@ the Docker API. They are needed as follows:
 
 ### `docker-compose.yml` (Main)
 
-Backend + agent images (build-only). Network: `automation` (bridge).
+Only builds the agent images (`profiles: build-only`), starts no service.
 
 ### `docker-compose.stable.yml`
 
@@ -408,26 +376,16 @@ automation.modules.preset: core   # optional modules, see Module System
 ### Production
 
 ```bash
-# docker-compose.yml environment
+# deploy/instances/<name>.env, see table above
 AUTOMATION_SECURITY_ENABLED=true
-AUTOMATION_API_KEY=<secure-key>   # required: the compose file ships no default
+AUTOMATION_API_KEY=<secure-key>   # required: the env file ships no default
 AUTOMATION_MODULES_PRESET=core       # optional: research | full; remote access: AUTOMATION_MODULES_REMOTE_ACCESS=true
 AUTOMATION_RATE_LIMIT_ENABLED=true   # optional
 ```
 
 - API key authentication active
 - Rate limiting recommended
-- Docker socket mounted (`/var/run/docker.sock`)
-
-## Volumes
-
-```yaml
-volumes:
-  - ./data:/app/data                    # SQLite database
-  - /var/run/docker.sock:/var/run/docker.sock  # Docker socket
-```
-
-**Important:** The Docker socket mount gives the backend full control over host Docker. In production environments, API key auth should be enabled.
+- Docker socket only when needed (`MYSURICATES_DOCKER_SOCKET=1`, see above) — gives the instance full control over Docker on the machine
 
 **Note:** HikariCP pool size is set to 1. SQLite only allows one concurrent writer. Pool size=1 serializes all DB operations — no lock contention. Increasing pool size only makes sense when switching to PostgreSQL.
 
@@ -437,7 +395,10 @@ The backend can be made accessible from outside the local network via Tailscale.
 
 ### Prerequisites
 
-- Tailscale CLI installed in the container (Dockerfile.backend includes this)
+- Tailscale CLI installed in the container — no shipped image (`deploy/Dockerfile`,
+  `docker/Dockerfile.stable`) currently includes it; the only container that ever had it was the now
+  removed `docker/Dockerfile.backend` (TODO 1e6f8f9f, follow-up question open). From source (a Dev
+  instance on the host), a local Tailscale install is enough
 - Module `remote-access` enabled (`AUTOMATION_MODULES_REMOTE_ACCESS=true` or preset `full`) — off in the public default `core`; without it the `/system/remote-access/*` endpoints answer 404 `MODULE_DISABLED`
 
 ### Activation
@@ -453,15 +414,15 @@ The backend can be made accessible from outside the local network via Tailscale.
 
 ## Healthcheck
 
-Docker Compose and the Dockerfile define a healthcheck:
+`deploy/Dockerfile` defines a healthcheck (Compose keeps it unchanged):
 
 ```
 GET http://localhost:9090/api/v1/system/health
 
-Interval: 30s
+Interval: 15s
 Timeout: 5s
 Retries: 3
-Start Period: 15s
+Start Period: 90s
 ```
 
 Response on success:
@@ -495,16 +456,6 @@ sqlite3 data/automation.db ".backup 'data/automation.db.backup'"
 **Location:** `ai-automation-backend/data/automation.db` (local) or `/app/data/automation.db` (Docker)
 
 The file contains all projects, workflows, runs, skills, schedules, webhooks, chains, todos, integrations, templates, and other entities. A backup of this file preserves the entire platform state.
-
-## Network
-
-Docker Compose creates an `automation` bridge network. The backend container and dynamically created agent containers can communicate through it.
-
-```yaml
-networks:
-  automation:
-    driver: bridge
-```
 
 ## Reverse Proxy
 
@@ -635,10 +586,12 @@ Technical version with class names and reserved context keys:
 
 ### Where it listens
 
-Neither backend nor frontend binds to loopback. `server.address` is set nowhere, so the backend
-listens on all interfaces; Vite runs with `host: true`. The compose service publishes `9090:9090`
-without a host-IP prefix, i.e. on every address — and Docker's port publishing bypasses most host
-firewall rules while doing so.
+Neither backend nor frontend binds to loopback on its own: `server.address` is set nowhere, so the
+backend listens on all interfaces; Vite runs with `host: true`. Started from source (Dev), the
+instance is therefore reachable on the local network, not just on the machine itself. Via `deploy/`,
+`instance.sh` instead publishes the port on `127.0.0.1` only by default (`MYSURICATES_BIND`, see
+[One instance in a container](#one-instance-in-a-container-deploy)) — changing that also bypasses the
+usual host firewall rules (Docker's port publishing).
 
 **CORS** does not affect an installed instance: the backend serves the UI itself, so page and API
 share one origin. The list only matters where the two have different origins — with the Vite dev
@@ -723,8 +676,7 @@ These two are easily confused:
    A denial is written to the activity log as a SECURITY entry.
 2. **The socket in the backend container** (`/var/run/docker.sock`) is independent of point 1 and gives
    the application full control over Docker on the host. For `instance.sh`, Stable, Test and the dev
-   container a switch decides it ([AI providers in the container](#ai-providers-in-the-container)); the
-   lean `docker-compose.yml` still mounts it unconditionally.
+   container a switch decides it ([AI providers in the container](#ai-providers-in-the-container)).
 
 ### Container Image Allowlist
 

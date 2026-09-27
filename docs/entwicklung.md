@@ -42,8 +42,9 @@ AUTOTRIGGER_DEV_RUNTIME=container scripts/start-autotrigger-dev.sh   # dauerhaft
 
 **Host oder Container?** Der Host-Weg ist der Default und unverändert. `--container` startet das
 Backend stattdessen per `docker compose` aus `ai-automation-backend/docker-compose.dev-container.yml`
-(Image `Dockerfile.stable`, also mit Node — die Dev-`docker-compose.yml` baut aus einem
-JRE-Alpine-Image **ohne** Node, dort läuft keine KI-CLI). Die Provider-Zugänge mountet der Starter
+(Image `Dockerfile.stable`, also mit Node — `docker/Dockerfile.backend` baut ein reines
+JRE-Alpine-Image **ohne** Node, dort liefe keine KI-CLI; die Datei wird seit TODO 1e6f8f9f von
+keinem Compose-Service mehr benutzt). Die Provider-Zugänge mountet der Starter
 zur Laufzeit, und zwar nur die, die es auf diesem Rechner gibt; findet er keinen, sagt er das.
 Der Vite-Dev-Server bleibt in beiden Fällen auf dem Host. Parametrierbar über
 `AUTOTRIGGER_DEV_CONTAINER_PORT`, `AUTOTRIGGER_DEV_CONTAINER_NAME`,
@@ -149,13 +150,12 @@ npm run build
 ```bash
 cd ai-automation-backend
 
-# Backend-Image
-mvn clean package -DskipTests
-docker compose build backend
-
-# Alle Agent-Images (ein neuer AGENT_APT_REFRESH holt gh- und Docker-Repo und die pip-Pakete frisch, 97e1529d, 8b7a39b9)
+# Agent-Images (ein neuer AGENT_APT_REFRESH holt gh- und Docker-Repo und die pip-Pakete frisch, 97e1529d, 8b7a39b9)
 AGENT_APT_REFRESH=$(date +%Y-%m) docker compose --profile build-only build
 ```
+
+Ein eigenständiges Backend-Image über diese Compose-Datei gibt es nicht mehr — für eine Instanz im
+Container siehe [deployment.md → deploy/](deployment.md#eine-instanz-im-container-deploy).
 
 ## Builds neben dem laufenden Dev-Backend
 

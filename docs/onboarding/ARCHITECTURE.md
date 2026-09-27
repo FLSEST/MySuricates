@@ -371,6 +371,5 @@ CREATED → RUNNING → STOPPED
 | `Dockerfile.agent-node` | `automation-agent-node:latest` | Node.js-basierte Skills |
 | `Dockerfile.agent-devops` | `automation-agent-devops:latest` | gh, trivy, gitleaks, docker-cli |
 | `Dockerfile.agent-java` | `automation-agent-java:latest` | maven, LibreOffice (DOCX->PDF) |
-| `Dockerfile.backend` | Backend-Image | Fuer Docker-basiertes Deployment |
 
-Agent-Container werden NICHT ueber Docker Compose gestartet, sondern vom Backend dynamisch ueber die Docker API verwaltet.
+Agent-Container werden NICHT ueber Docker Compose gestartet, sondern vom Backend dynamisch ueber die Docker API verwaltet. Fuer eine laufende Instanz im Container gibt es nur `deploy/` (`deploy/Dockerfile`, `scripts/instance.sh`) — kein eigenstaendiges Backend-Image mehr (TODO 1e6f8f9f).
