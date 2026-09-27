@@ -100,8 +100,8 @@ class GoalMembershipServiceTest {
 
     /** Ein TODO aus einem neuen Projekt bringt sein Projekt mit, einmal je Projekt (TODO c60bf914). */
     @Test
-    void assign_linksTheProjectsOfTheTodos_onceEach_andClearsAForeignMilestone() {
-        Todo fromA = Todo.builder().id("t-1").title("A").projectId("pA").goalId("g-other").milestoneId("m-old").build();
+    void assign_linksTheProjectsOfTheTodos_onceEach_andClearsAForeignWorkPackage() {
+        Todo fromA = Todo.builder().id("t-1").title("A").projectId("pA").goalId("g-other").workPackageId("m-old").build();
         Todo alsoA = Todo.builder().id("t-2").title("A2").projectId("pA").build();
         Todo fromB = Todo.builder().id("t-3").title("B").projectId("pB").goalId(GOAL_ID).build();
         Todo withoutProject = Todo.builder().id("t-4").title("ohne").build();
@@ -114,7 +114,7 @@ class GoalMembershipServiceTest {
         verify(goalProjectRepository, times(1)).linkIfAbsent(GOAL_ID, "pB");
         verify(goalProjectRepository, times(2)).linkIfAbsent(any(), any());
         assertThat(fromA.getGoalId()).isEqualTo(GOAL_ID);
-        assertThat(fromA.getMilestoneId()).isNull();
+        assertThat(fromA.getWorkPackageId()).isNull();
         verify(todoRepository, never()).save(fromB);
         verify(goalService).detailOf(goal);
     }

@@ -38,7 +38,7 @@ public class GoalProject {
     @Column(name = "project_id")
     private String projectId;
 
-    /** Reihenfolge im Ziel, ab 0; die Gliederung und die Teilziele folgen ihr. */
+    /** Reihenfolge im Ziel, ab 0; die Gliederung und die Arbeitspakete folgen ihr. */
     @Column(nullable = false)
     private int position;
 

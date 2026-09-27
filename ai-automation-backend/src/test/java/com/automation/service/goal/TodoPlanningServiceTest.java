@@ -1,10 +1,10 @@
 package com.automation.service.goal;
 
 import com.automation.dto.request.UpdateTodoPlanningRequest;
-import com.automation.entity.GoalMilestone;
+import com.automation.entity.GoalWorkPackage;
 import com.automation.entity.Todo;
 import com.automation.exception.ResourceNotFoundException;
-import com.automation.repository.GoalMilestoneRepository;
+import com.automation.repository.GoalWorkPackageRepository;
 import com.automation.repository.GoalProjectRepository;
 import com.automation.repository.GoalRepository;
 import com.automation.repository.TodoRepository;
@@ -28,8 +28,9 @@ import static org.mockito.Mockito.when;
 
 /**
  * Einordnung eines TODOs ueber {@code PATCH /todos/{id}/planning} (TODO dc0566f8, 259f4f66) – mit
- * den Regeln von TODO c60bf914 (Ziele Stufe 1: Ziel → Projekte → Teilziele → TODOs): Das Projekt des
- * TODOs kommt ans Ziel, ein Teilziel muss zum Projekt des TODOs passen.
+ * den Regeln von TODO c60bf914 (Ziele Stufe 1: Ziel → Projekte → Arbeitspakete → TODOs, Meilensteine,
+ * Gliederung und Zeitstrahl): Das Projekt des TODOs kommt ans Ziel, ein Arbeitspaket muss zum Projekt
+ * des TODOs passen.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -37,7 +38,7 @@ class TodoPlanningServiceTest {
 
     @Mock private TodoRepository todoRepository;
     @Mock private GoalRepository goalRepository;
-    @Mock private GoalMilestoneRepository milestoneRepository;
+    @Mock private GoalWorkPackageRepository workPackageRepository;
     @Mock private TodoResponseAssembler responseAssembler;
     @Mock private GoalProjectRepository goalProjectRepository;
 
@@ -45,7 +46,7 @@ class TodoPlanningServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new TodoPlanningService(todoRepository, goalRepository, milestoneRepository, responseAssembler,
+        service = new TodoPlanningService(todoRepository, goalRepository, workPackageRepository, responseAssembler,
                 goalProjectRepository);
         when(todoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(goalRepository.existsById("g1")).thenReturn(true);
@@ -83,63 +84,74 @@ class TodoPlanningServiceTest {
     }
 
     @Test
-    void milestoneOfTheSameProject_isAssigned() {
+    void workPackageOfTheSameProject_isAssigned() {
         Todo todo = todo("pA", "g1", null);
-        milestone("mA", "pA");
+        workPackage("mA", "pA");
 
         service.update("t", planning(null, "mA"));
 
-        assertThat(todo.getMilestoneId()).isEqualTo("mA");
+        assertThat(todo.getWorkPackageId()).isEqualTo("mA");
     }
 
     @Test
-    void milestoneOfAnotherProject_is400() {
+    void workPackageOfAnotherProject_is400() {
         Todo todo = todo("pB", "g1", null);
-        milestone("mA", "pA");
+        workPackage("mA", "pA");
 
         assertThatThrownBy(() -> service.update("t", planning(null, "mA")))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("pA").hasMessageContaining("pB");
-        assertThat(todo.getMilestoneId()).isNull();
+        assertThat(todo.getWorkPackageId()).isNull();
         verify(todoRepository, never()).save(any());
     }
 
     @Test
-    void todoWithoutProject_fitsNoMilestoneWithProject_butALegacyOneWithout() {
+    void todoWithoutProject_fitsNoWorkPackageWithProject_butALegacyOneWithout() {
         Todo todo = todo(null, "g1", null);
-        milestone("mA", "pA");
-        milestone("legacy", null);
+        workPackage("mA", "pA");
+        workPackage("legacy", null);
 
         assertThatThrownBy(() -> service.update("t", planning(null, "mA")))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("kein Projekt");
         service.update("t", planning(null, "legacy"));
 
-        assertThat(todo.getMilestoneId()).isEqualTo("legacy");
+        assertThat(todo.getWorkPackageId()).isEqualTo("legacy");
     }
 
     @Test
-    void goalAndMilestoneInOneStep_goalFirst() {
+    void goalAndWorkPackageInOneStep_goalFirst() {
         Todo todo = todo("pA", null, null);
-        milestone("mA", "pA");
+        workPackage("mA", "pA");
 
         service.update("t", planning("g1", "mA"));
 
         assertThat(todo.getGoalId()).isEqualTo("g1");
-        assertThat(todo.getMilestoneId()).isEqualTo("mA");
+        assertThat(todo.getWorkPackageId()).isEqualTo("mA");
         verify(goalProjectRepository).linkIfAbsent("g1", "pA");
     }
 
-    private Todo todo(String projectId, String goalId, String milestoneId) {
-        Todo todo = Todo.builder().id("t").title("T").projectId(projectId).goalId(goalId).milestoneId(milestoneId).build();
+    /** Bis V92 hiess das Feld {@code milestoneId}; Aufrufer von vorher (Plugin, Skripte) schicken es weiter. */
+    @Test
+    void request_acceptsTheOldFieldNameAsAlias() throws Exception {
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+
+        assertThat(mapper.readValue("{\"milestoneId\":\"wp1\"}", UpdateTodoPlanningRequest.class).workPackageId())
+                .isEqualTo("wp1");
+        assertThat(mapper.readValue("{\"workPackageId\":\"wp2\"}", UpdateTodoPlanningRequest.class).workPackageId())
+                .isEqualTo("wp2");
+    }
+
+    private Todo todo(String projectId, String goalId, String workPackageId) {
+        Todo todo = Todo.builder().id("t").title("T").projectId(projectId).goalId(goalId).workPackageId(workPackageId).build();
         when(todoRepository.findById("t")).thenReturn(Optional.of(todo));
         return todo;
     }
 
-    private void milestone(String id, String projectId) {
-        when(milestoneRepository.findById(id))
-                .thenReturn(Optional.of(GoalMilestone.builder().id(id).goalId("g1").projectId(projectId).title(id).build()));
+    private void workPackage(String id, String projectId) {
+        when(workPackageRepository.findById(id))
+                .thenReturn(Optional.of(GoalWorkPackage.builder().id(id).goalId("g1").projectId(projectId).title(id).build()));
     }
 
-    private static UpdateTodoPlanningRequest planning(String goalId, String milestoneId) {
-        return new UpdateTodoPlanningRequest(goalId, null, null, null, null, null, null, milestoneId);
+    private static UpdateTodoPlanningRequest planning(String goalId, String workPackageId) {
+        return new UpdateTodoPlanningRequest(goalId, null, null, null, null, null, null, workPackageId);
     }
 }

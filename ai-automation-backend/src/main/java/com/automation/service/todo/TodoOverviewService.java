@@ -4,15 +4,18 @@ import com.automation.config.TodoHygieneConfig;
 import com.automation.dto.projection.NeedsYouRow;
 import com.automation.dto.projection.ProjectCount;
 import com.automation.dto.projection.ProjectStatusCounts;
-import com.automation.dto.projection.MilestoneTodoCounts;
+import com.automation.dto.projection.GoalMilestoneSummaryRow;
+import com.automation.dto.projection.WorkPackageTodoCounts;
 import com.automation.dto.response.MilestoneAttentionItem;
 import com.automation.dto.response.NeedsYouItem;
 import com.automation.dto.response.ProjectRollup;
 import com.automation.dto.response.TodoOverviewResponse;
 import com.automation.entity.Goal;
-import com.automation.entity.GoalMilestone;
+import com.automation.entity.GoalDueState;
+import com.automation.entity.GoalWorkPackage;
 import com.automation.repository.GoalMilestoneRepository;
 import com.automation.repository.GoalRepository;
+import com.automation.repository.GoalWorkPackageRepository;
 import com.automation.repository.ProjectRepository;
 import com.automation.repository.TodoRepository;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -49,6 +53,7 @@ public class TodoOverviewService {
     private final ProjectRepository projectRepository;
     private final TodoHygieneConfig hygieneConfig;
     private final GoalMilestoneRepository milestoneRepository;
+    private final GoalWorkPackageRepository workPackageRepository;
     private final GoalRepository goalRepository;
 
     @Transactional(readOnly = true)
@@ -109,30 +114,43 @@ public class TodoOverviewService {
     }
 
     /**
-     * Meilensteine aktiver Ziele, die in hoechstens drei Tagen faellig oder schon ueberfaellig sind
-     * (TODO 259f4f66). Erreichte fallen heraus; der Zustand kommt aus derselben Regel wie in der
-     * Zielansicht ({@link GoalMilestone#stateOf}). Ohne Kandidaten bleibt es bei einer Abfrage.
-     * Ein Teilziel ohne Datum ist nie „faellig“ (TODO c60bf914): Die Abfrage laesst es weg, und
-     * {@code stateOf} gibt ihm hoechstens OPEN.
+     * Termine aktiver Ziele, die Aufmerksamkeit brauchen (TODO 259f4f66, c60bf914): Meilensteine, die in
+     * hoechstens drei Tagen faellig oder schon ueberfaellig und nicht erreicht sind, und ueberfaellige
+     * Arbeitspakete mit noch offenen TODOs ({@code kind}). Der Zustand kommt aus derselben Regel wie in
+     * der Zielansicht ({@link GoalDueState}); ein Paket ohne Zeitraum ist nie faellig. Ohne Kandidaten
+     * bleibt es bei zwei Abfragen; nach Datum, bei Gleichstand der Meilenstein zuerst.
      */
     private List<MilestoneAttentionItem> milestonesDue(Instant now) {
-        List<GoalMilestone> due = milestoneRepository.findDueForActiveGoals(
-                now.plus(GoalMilestone.DUE_SOON), PageRequest.of(0, NEEDS_YOU_LIMIT));
-        if (due.isEmpty()) {
+        PageRequest page = PageRequest.of(0, NEEDS_YOU_LIMIT);
+        List<GoalMilestoneSummaryRow> milestones = milestoneRepository.findDueForActiveGoals(
+                now.plus(GoalDueState.DUE_SOON_WINDOW), page).stream().filter(m -> !m.reached()).toList();
+        List<GoalWorkPackage> workPackages = workPackageRepository.findOverdueForActiveGoals(now, page);
+        if (milestones.isEmpty() && workPackages.isEmpty()) {
             return List.of();
         }
-        Map<String, MilestoneTodoCounts> counts = todoRepository.countByMilestone(
-                due.stream().map(GoalMilestone::getId).toList()).stream()
-                .collect(Collectors.toMap(MilestoneTodoCounts::milestoneId, c -> c));
-        Map<String, String> goalTitles = goalRepository.findAllById(
-                due.stream().map(GoalMilestone::getGoalId).collect(Collectors.toSet())).stream()
+        Map<String, WorkPackageTodoCounts> counts = workPackages.isEmpty() ? Map.of()
+                : todoRepository.countByWorkPackage(workPackages.stream().map(GoalWorkPackage::getId).toList()).stream()
+                        .collect(Collectors.toMap(WorkPackageTodoCounts::workPackageId, c -> c));
+        Set<String> goalIds = new HashSet<>();
+        milestones.forEach(m -> goalIds.add(m.goalId()));
+        workPackages.forEach(p -> goalIds.add(p.getGoalId()));
+        Map<String, String> goalTitles = goalRepository.findAllById(goalIds).stream()
                 .collect(Collectors.toMap(Goal::getId, Goal::getTitle));
-        return due.stream().map(m -> {
-            MilestoneTodoCounts c = counts.getOrDefault(m.getId(), new MilestoneTodoCounts(m.getId(), 0, 0));
-            GoalMilestone.State state = GoalMilestone.stateOf(m.getDueDate(), c.total(), c.done(), now);
-            return new MilestoneAttentionItem(m.getId(), m.getTitle(), m.getGoalId(), goalTitles.get(m.getGoalId()),
-                    m.getDueDate(), state, c.total(), c.done());
-        }).filter(item -> item.state() == GoalMilestone.State.DUE_SOON || item.state() == GoalMilestone.State.OVERDUE)
+        List<MilestoneAttentionItem> items = new ArrayList<>();
+        for (GoalMilestoneSummaryRow m : milestones) {
+            items.add(new MilestoneAttentionItem(m.id(), m.title(), m.goalId(), goalTitles.get(m.goalId()), m.dueDate(),
+                    m.state(now), m.packagesTotal(), m.packagesDone(), MilestoneAttentionItem.Kind.MILESTONE));
+        }
+        for (GoalWorkPackage p : workPackages) {
+            WorkPackageTodoCounts c = counts.getOrDefault(p.getId(), new WorkPackageTodoCounts(p.getId(), 0, 0));
+            items.add(new MilestoneAttentionItem(p.getId(), p.getTitle(), p.getGoalId(), goalTitles.get(p.getGoalId()),
+                    p.getEndDate(), GoalWorkPackage.stateOf(p.getEndDate(), c.total(), c.done(), now), c.total(), c.done(),
+                    MilestoneAttentionItem.Kind.WORK_PACKAGE));
+        }
+        return items.stream()
+                .filter(item -> item.state() == GoalDueState.DUE_SOON || item.state() == GoalDueState.OVERDUE)
+                .sorted(Comparator.comparing(MilestoneAttentionItem::dueDate).thenComparing(MilestoneAttentionItem::kind))
+                .limit(NEEDS_YOU_LIMIT)
                 .toList();
     }
 

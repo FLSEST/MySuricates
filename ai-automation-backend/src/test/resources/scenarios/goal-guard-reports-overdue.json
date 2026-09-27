@@ -1,26 +1,29 @@
 {
   "id": "goal-guard-reports-overdue",
-  "title": "Ziel-Wächter: ein Lauf mit goal_id meldet über dashboard-report Rot mit dem überfälligen Meilenstein und TODO, ohne KI",
+  "title": "Ziel-Wächter: ein Lauf mit goal_id meldet über dashboard-report Rot mit dem überfälligen Arbeitspaket und TODO und dem bald fälligen Meilenstein, ohne KI",
   "derivedFrom": {
     "spec": "docs/WORKFLOW-GUIDE.md → Ziel-Kontext (goal_status, goal_guard_*): nur mit goal_id injiziert, als Daten markiert; Vorlage goal-guard schreibt goal_status ins Protokoll und füllt die Kachel ohne Modell; Rot bei Überfälligem, Gelb bei bald Fälligem",
     "incidents": [
       "259f4f66 (Ziele: Meilensteine, Fälligkeit im Ziel, Kontextvariable goal_status, Ziel-Wächter)",
       "f4231dc9 (dashboard-report: die Kachel aus Block-Config statt aus einem Marker in KI-Ausgabe – der Marker war die Hürde)",
-      "c60bf914 (Ziele Stufe 1: Ziel → Projekte → Teilziele → TODOs – ein Teilziel ohne Datum steht als „ohne Datum“ im Block und ist nie fällig)"
+      "c60bf914 (Ziele Stufe 1: Ziel → Projekte → Arbeitspakete → TODOs, Meilensteine – der Wächter meldet Meilensteine und Arbeitspakete getrennt, ein Paket ohne Zeitraum ist nie fällig)"
     ]
   },
   "goal": {
     "title": "Open-Source-Launch",
     "targetInDays": 20,
-    "milestones": [
-      { "title": "Beta", "dueInDays": -1 },
-      { "title": "Release", "dueInDays": 15 },
+    "workPackages": [
+      { "title": "Beta", "startInDays": -6, "endInDays": -1 },
+      { "title": "Release-Vorbereitung", "startInDays": 3, "endInDays": 15 },
       { "title": "Werbematerial" }
     ],
+    "milestones": [
+      { "title": "Launch", "dueInDays": 2, "workPackages": [1] }
+    ],
     "todos": [
-      { "title": "Privatdaten entfernen", "status": "OPEN", "dueInDays": -2, "milestone": 0 },
-      { "title": "Videos schneiden", "status": "DONE", "milestone": 0 },
-      { "title": "Doku glätten", "status": "OPEN", "dueInDays": 2, "milestone": 1 }
+      { "title": "Privatdaten entfernen", "status": "OPEN", "dueInDays": -2, "workPackage": 0 },
+      { "title": "Videos schneiden", "status": "DONE", "workPackage": 0 },
+      { "title": "Doku glätten", "status": "OPEN", "dueInDays": 2, "workPackage": 1 }
     ]
   },
   "workflow": {
@@ -38,7 +41,8 @@
       {
         "index": 0,
         "status": "COMPLETED",
-        "outputContains": ["<goal_status>", "Open-Source-Launch", "Beta", "OVERDUE", "Privatdaten entfernen", "- ohne Datum [OPEN] Werbematerial", "</goal_status>"],
+        "outputContains": ["<goal_status>", "Open-Source-Launch", "Meilensteine:", "[DUE_SOON] Launch — 0/1 Arbeitspakete abgeschlossen",
+          "Arbeitspakete:", "[OVERDUE] Beta — 1/2 erledigt", "Privatdaten entfernen", "- ohne Zeitraum [OPEN] Werbematerial", "</goal_status>"],
         "outputNotContains": ["{{"]
       },
       { "index": 1, "status": "COMPLETED" }
@@ -46,9 +50,9 @@
     "dashboard": {
       "status": "RED",
       "title": "Ziel: Open-Source-Launch",
-      "summaryContains": ["1/3", "2 überfällig"],
-      "kpis": { "Fortschritt": "1/3 (33 %)", "Überfällig": "2", "Bald fällig": "1" },
-      "itemsContain": ["Beta", "Privatdaten entfernen", "Doku glätten"]
+      "summaryContains": ["1/3", "2 überfällig", "2 bald fällig", "nächster Meilenstein „Launch“"],
+      "kpis": { "Fortschritt": "1/3 (33 %)", "Überfällig": "2", "Bald fällig": "2" },
+      "itemsContain": ["Arbeitspaket überfällig: Beta", "Privatdaten entfernen", "Meilenstein bald fällig: Launch", "Doku glätten"]
     },
     "gate": "none"
   }

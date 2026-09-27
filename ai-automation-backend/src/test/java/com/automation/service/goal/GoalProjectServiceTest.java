@@ -3,7 +3,7 @@ package com.automation.service.goal;
 import com.automation.entity.Goal;
 import com.automation.entity.GoalProject;
 import com.automation.exception.ResourceNotFoundException;
-import com.automation.repository.GoalMilestoneRepository;
+import com.automation.repository.GoalWorkPackageRepository;
 import com.automation.repository.GoalProjectRepository;
 import com.automation.repository.ProjectRepository;
 import com.automation.repository.TodoRepository;
@@ -32,7 +32,7 @@ import static org.mockito.Mockito.when;
 
 /**
  * Projekte eines Ziels zuordnen, entfernen und ordnen (TODO c60bf914 Ziele Stufe 1: Ziel → Projekte →
- * Teilziele → TODOs, Gliederungsansicht und Zeitstrahl mit Projektbaendern).
+ * Arbeitspakete → TODOs, Meilensteine, Gliederung und Zeitstrahl).
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -42,7 +42,7 @@ class GoalProjectServiceTest {
 
     @Mock private GoalService goalService;
     @Mock private GoalProjectRepository goalProjectRepository;
-    @Mock private GoalMilestoneRepository milestoneRepository;
+    @Mock private GoalWorkPackageRepository workPackageRepository;
     @Mock private TodoRepository todoRepository;
     @Mock private ProjectRepository projectRepository;
 
@@ -51,7 +51,7 @@ class GoalProjectServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new GoalProjectService(goalService, goalProjectRepository, milestoneRepository, todoRepository,
+        service = new GoalProjectService(goalService, goalProjectRepository, workPackageRepository, todoRepository,
                 projectRepository, Clock.fixed(NOW, ZoneOffset.UTC));
         goal = Goal.builder().id("g1").title("Release").build();
         when(goalService.find("g1")).thenReturn(goal);
@@ -76,13 +76,13 @@ class GoalProjectServiceTest {
     }
 
     @Test
-    void remove_withMilestonesOrTodos_isAConflictNamingTheCounts() {
-        when(milestoneRepository.countByGoalIdAndProjectId("g1", "pA")).thenReturn(2L);
+    void remove_withWorkPackagesOrTodos_isAConflictNamingTheCounts() {
+        when(workPackageRepository.countByGoalIdAndProjectId("g1", "pA")).thenReturn(2L);
         when(todoRepository.countByGoalIdAndProjectId("g1", "pA")).thenReturn(5L);
 
         assertThatThrownBy(() -> service.remove("g1", "pA", false))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("2 Teilziel").hasMessageContaining("5 TODO");
+                .hasMessageContaining("2 Arbeitspaket").hasMessageContaining("5 TODO");
         verify(goalProjectRepository, never()).unlink(anyString(), anyString());
     }
 
@@ -91,22 +91,22 @@ class GoalProjectServiceTest {
         service.remove("g1", "pA", false);
 
         verify(goalProjectRepository).unlink("g1", "pA");
-        verify(milestoneRepository, never()).deleteByGoalAndProject(any(), any());
+        verify(workPackageRepository, never()).deleteByGoalAndProject(any(), any());
         verify(todoRepository, never()).detachProjectFromGoal(any(), any(), any());
     }
 
     @Test
-    void remove_cascade_detachesMilestoneTodos_deletesTheMilestones_releasesTheTodos_thenUnlinks() {
-        when(milestoneRepository.countByGoalIdAndProjectId("g1", "pA")).thenReturn(2L);
+    void remove_cascade_detachesPackageTodos_deletesThePackages_releasesTheTodos_thenUnlinks() {
+        when(workPackageRepository.countByGoalIdAndProjectId("g1", "pA")).thenReturn(2L);
         when(todoRepository.countByGoalIdAndProjectId("g1", "pA")).thenReturn(3L);
-        when(milestoneRepository.findIdsByGoalAndProject("g1", "pA")).thenReturn(List.of("m1", "m2"));
+        when(workPackageRepository.findIdsByGoalAndProject("g1", "pA")).thenReturn(List.of("m1", "m2"));
 
         service.remove("g1", "pA", true);
 
-        InOrder order = inOrder(todoRepository, milestoneRepository, goalProjectRepository);
-        order.verify(todoRepository).detachFromMilestone("m1", NOW);
-        order.verify(todoRepository).detachFromMilestone("m2", NOW);
-        order.verify(milestoneRepository).deleteByGoalAndProject("g1", "pA");
+        InOrder order = inOrder(todoRepository, workPackageRepository, goalProjectRepository);
+        order.verify(todoRepository).detachFromWorkPackage("m1", NOW);
+        order.verify(todoRepository).detachFromWorkPackage("m2", NOW);
+        order.verify(workPackageRepository).deleteByGoalAndProject("g1", "pA");
         order.verify(todoRepository).detachProjectFromGoal("g1", "pA", NOW);
         order.verify(goalProjectRepository).unlink("g1", "pA");
     }

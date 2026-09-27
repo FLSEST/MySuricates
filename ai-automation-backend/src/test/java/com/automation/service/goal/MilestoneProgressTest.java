@@ -1,197 +1,118 @@
 package com.automation.service.goal;
 
-import com.automation.dto.projection.GoalTodoRow;
+import com.automation.dto.projection.GoalMilestoneLinks;
+import com.automation.dto.projection.GoalMilestoneSummaryRow;
 import com.automation.dto.response.GoalMilestoneResponse;
+import com.automation.dto.response.GoalResponse;
+import com.automation.entity.GoalDueState;
 import com.automation.entity.GoalMilestone;
-import com.automation.entity.GoalMilestone.State;
-import com.automation.entity.Todo;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Meilenstein-Zustand direkt aus den TODO-Zeilen, ohne Service drumherum (TODO c8a11b7a): Zaehlung,
- * Reihenfolge, Feldabbildung und die reachedAt-/reopened-Regel. Die Zustandsgrenzen selbst prueft
- * {@code GoalMilestoneServiceTest} ueber {@code list}.
+ * Zustand der Meilensteine aus ihren verknuepften Arbeitspaketen (TODO c60bf914 Ziele Stufe 1: Ziel →
+ * Projekte → Arbeitspakete → TODOs, Meilensteine, Gliederung und Zeitstrahl): mit Paketen automatisch,
+ * ohne Pakete von Hand, sonst nach Datum; reachedAt/reopened, Reihenfolge und der naechste Meilenstein.
  */
 class MilestoneProgressTest {
 
-    private static final Instant NOW = Instant.parse("2026-09-25T10:00:00Z");
+    private static final Instant NOW = Instant.parse("2026-09-27T10:00:00Z");
     private static final Instant OLD = Instant.parse("2026-09-01T08:00:00Z");
-    private static final Instant NEW = Instant.parse("2026-09-20T08:00:00Z");
 
     @Test
-    void evaluate_withoutMilestones_isEmpty_whateverTheRows() {
-        List<GoalTodoRow> rows = List.of(row("t1", Todo.Status.DONE, "m1"));
+    void withPackages_reachedWhenAllAreCompleted_andTheFirstDetectionIsStamped() {
+        GoalMilestone m = milestone("m", NOW.plus(Duration.ofDays(10)), null);
 
-        assertThat(MilestoneProgress.evaluate(null, rows, NOW)).isEmpty();
-        assertThat(MilestoneProgress.evaluate(List.of(), rows, NOW)).isEmpty();
-    }
+        GoalMilestoneResponse half = MilestoneProgress.toResponse(m, List.of("wp1", "wp2"), Set.of("wp1"), NOW);
+        assertThat(half.state()).isEqualTo(GoalDueState.OPEN);
+        assertThat(half.packagesTotal()).isEqualTo(2);
+        assertThat(half.packagesDone()).isEqualTo(1);
+        assertThat(m.getReachedAt()).isNull();
 
-    @Test
-    void evaluate_countsPerMilestone_skipsArchivedUnassignedAndForeignRows() {
-        GoalMilestone m1 = milestone("m1", NOW.plus(Duration.ofDays(10)), null, null);
-        GoalMilestone m2 = milestone("m2", NOW.plus(Duration.ofDays(20)), null, null);
-        List<GoalTodoRow> rows = List.of(
-                row("t1", Todo.Status.DONE, "m1"),
-                row("t2", Todo.Status.IN_PROGRESS, "m1"),
-                row("t3", Todo.Status.OPEN, "m1"),
-                row("t4", Todo.Status.BACKLOG, "m1"),
-                row("t5", Todo.Status.ARCHIVED, "m1"),
-                row("t6", Todo.Status.DONE, null),
-                row("t7", Todo.Status.DONE, "other-milestone"));
-
-        Map<String, GoalMilestoneResponse> byId = byId(MilestoneProgress.evaluate(List.of(m1, m2), rows, NOW));
-
-        assertThat(byId.get("m1").total()).as("alles ausser ARCHIVED zaehlt, BACKLOG eingeschlossen").isEqualTo(4);
-        assertThat(byId.get("m1").done()).isEqualTo(1);
-        assertThat(byId.get("m2").total()).as("TODOs ohne oder mit fremdem Meilenstein zaehlen nirgends").isZero();
-        assertThat(byId.get("m2").done()).isZero();
-        assertThat(byId.get("m2").state()).isEqualTo(State.OPEN);
-    }
-
-    @Test
-    void evaluate_sortsByDueDate_undatedLast_tiesByCreation_uncreatedLast() {
-        Instant tie = NOW.plus(Duration.ofDays(10));
-        List<GoalMilestone> scrambled = List.of(
-                milestone("undated-new", null, null, NEW),
-                milestone("tie-uncreated", tie, null, null),
-                milestone("late", NOW.plus(Duration.ofDays(20)), null, OLD),
-                milestone("tie-new", tie, null, NEW),
-                milestone("undated-old", null, null, OLD),
-                milestone("early", NOW.plus(Duration.ofDays(5)), null, NEW),
-                milestone("tie-old", tie, null, OLD));
-
-        List<String> order = MilestoneProgress.evaluate(scrambled, List.of(), NOW).stream()
-                .map(GoalMilestoneResponse::id).toList();
-
-        assertThat(order).containsExactly(
-                "early", "tie-old", "tie-new", "tie-uncreated", "late", "undated-old", "undated-new");
-    }
-
-    @Test
-    void toResponse_carriesTheMilestoneFieldsAndCounts() {
-        Instant due = NOW.plus(Duration.ofDays(10));
-        GoalMilestone m = GoalMilestone.builder().id("m").goalId("g1").title("Beta")
-                .dueDate(due).createdAt(OLD).updatedAt(NEW).build();
-
-        GoalMilestoneResponse response = MilestoneProgress.toResponse(m, 3, 1, NOW);
-
-        assertThat(response).isEqualTo(
-                new GoalMilestoneResponse("m", "g1", "Beta", due, State.OPEN, 3, 1, null, false, OLD, NEW, null, 0, 0));
-    }
-
-    @Test
-    void evaluate_sortsByProjectPosition_thenPositionInTheProject_unassignedProjectsLast() {
-        List<GoalMilestone> scrambled = List.of(
-                inProject("b-1", "pB", 1, NOW.plus(Duration.ofDays(1))),
-                inProject("legacy", null, 0, NOW.plus(Duration.ofDays(1))),
-                inProject("a-1", "pA", 1, NOW.plus(Duration.ofDays(2))),
-                inProject("foreign", "pX", 0, NOW),
-                inProject("b-0", "pB", 0, null),
-                inProject("a-0", "pA", 0, NOW.plus(Duration.ofDays(30))));
-
-        List<String> order = MilestoneProgress.evaluate(scrambled, List.of(), Map.of("pB", 0, "pA", 1), NOW).stream()
-                .map(GoalMilestoneResponse::id).toList();
-
-        assertThat(order).as("Projekt-Position schlaegt Datum, Position im Projekt schlaegt Datum")
-                .containsExactly("b-0", "b-1", "a-0", "a-1", "foreign", "legacy");
-    }
-
-    @Test
-    void evaluate_countsOpenQuestionsOfActiveTodosPerMilestone() {
-        GoalMilestone m = milestone("m1", null, null, OLD);
-        List<GoalTodoRow> rows = List.of(
-                question("t1", Todo.Status.OPEN, "m1", "Welcher Stil?"),
-                question("t2", Todo.Status.BACKLOG, "m1", "Wer?"),
-                question("t3", Todo.Status.DONE, "m1", "geklaert, Text blieb"),
-                question("t4", Todo.Status.ARCHIVED, "m1", "verworfen"),
-                question("t5", Todo.Status.OPEN, "m1", null),
-                question("t6", Todo.Status.OPEN, null, "ohne Teilziel"));
-
-        GoalMilestoneResponse response = MilestoneProgress.evaluate(List.of(m), rows, NOW).get(0);
-
-        assertThat(response.openQuestions()).isEqualTo(2);
-        assertThat(response.total()).isEqualTo(4);
-    }
-
-    @Test
-    void undatedMilestone_isNeverDueSoonOrOverdue_onlyOpenOrReached() {
-        GoalMilestone undated = milestone("u", null, null, OLD);
-
-        assertThat(MilestoneProgress.toResponse(undated, 3, 1, NOW).state()).isEqualTo(State.OPEN);
-        assertThat(MilestoneProgress.toResponse(undated, 0, 0, NOW.plus(Duration.ofDays(3650))).state()).isEqualTo(State.OPEN);
-        assertThat(MilestoneProgress.toResponse(undated, 2, 2, NOW).state()).isEqualTo(State.REACHED);
-        assertThat(MilestoneProgress.toResponse(undated, 2, 2, NOW).dueDate()).isNull();
-    }
-
-    @Test
-    void toResponse_carriesProjectAndPosition() {
-        GoalMilestoneResponse response = MilestoneProgress.toResponse(inProject("m", "pA", 4, null), 0, 0, 1, NOW);
-
-        assertThat(response.projectId()).isEqualTo("pA");
-        assertThat(response.position()).isEqualTo(4);
-        assertThat(response.openQuestions()).isEqualTo(1);
-    }
-
-    @Test
-    void toResponse_firstReachStampsNow_onTheEntity_andKeepsIt() {
-        GoalMilestone m = milestone("m", NOW.plus(Duration.ofDays(1)), null, OLD);
-
-        GoalMilestoneResponse first = MilestoneProgress.toResponse(m, 2, 2, NOW);
-        GoalMilestoneResponse later = MilestoneProgress.toResponse(m, 2, 2, NOW.plus(Duration.ofHours(5)));
-
-        assertThat(first.state()).isEqualTo(State.REACHED);
+        GoalMilestoneResponse all = MilestoneProgress.toResponse(m, List.of("wp1", "wp2"), Set.of("wp1", "wp2", "other"), NOW);
+        assertThat(all.state()).as("erreicht schlaegt jedes Datum").isEqualTo(GoalDueState.REACHED);
+        assertThat(all.reachedAt()).isEqualTo(NOW);
         assertThat(m.getReachedAt()).as("an der Entity, die Schreib-Transaktion speichert es").isEqualTo(NOW);
-        assertThat(first.reachedAt()).isEqualTo(NOW);
-        assertThat(later.reachedAt()).as("der erste Zeitpunkt bleibt").isEqualTo(NOW);
-        assertThat(first.reopened()).isFalse();
-        assertThat(later.reopened()).isFalse();
+        assertThat(all.workPackageIds()).containsExactly("wp1", "wp2");
+
+        GoalMilestoneResponse again = MilestoneProgress.toResponse(m, List.of("wp1", "wp2"), Set.of("wp1"),
+                NOW.plus(Duration.ofDays(20)));
+        assertThat(again.state()).as("wieder offen: der Zustand folgt dem Datum").isEqualTo(GoalDueState.OVERDUE);
+        assertThat(again.reopened()).isTrue();
+        assertThat(again.reachedAt()).as("der erste Zeitpunkt bleibt").isEqualTo(NOW);
     }
 
     @Test
-    void toResponse_reopenedOnlyWhenReachedBefore() {
-        GoalMilestone never = milestone("never", NOW.plus(Duration.ofDays(10)), null, OLD);
-        GoalMilestone before = milestone("before", NOW.plus(Duration.ofDays(10)), NOW.minus(Duration.ofDays(1)), OLD);
+    void withoutPackages_onlyReachedByHand_andNeverReopened() {
+        GoalMilestone open = milestone("open", NOW.minus(Duration.ofDays(1)), null);
+        GoalMilestone manual = milestone("manual", NOW.minus(Duration.ofDays(1)), OLD);
 
-        GoalMilestoneResponse open = MilestoneProgress.toResponse(never, 2, 1, NOW);
-        GoalMilestoneResponse reopened = MilestoneProgress.toResponse(before, 3, 2, NOW);
+        GoalMilestoneResponse overdue = MilestoneProgress.toResponse(open, List.of(), Set.of("wp1"), NOW);
+        GoalMilestoneResponse reached = MilestoneProgress.toResponse(manual, List.of(), Set.of(), NOW);
 
-        assertThat(open.reopened()).isFalse();
-        assertThat(never.getReachedAt()).as("nicht erreicht: nichts gestempelt").isNull();
-        assertThat(reopened.state()).isEqualTo(State.OPEN);
-        assertThat(reopened.reopened()).isTrue();
-        assertThat(reopened.reachedAt()).isEqualTo(NOW.minus(Duration.ofDays(1)));
+        assertThat(overdue.state()).isEqualTo(GoalDueState.OVERDUE);
+        assertThat(overdue.packagesTotal()).isZero();
+        assertThat(open.getReachedAt()).as("ohne Pakete stempelt das Lesen nichts").isNull();
+        assertThat(reached.state()).isEqualTo(GoalDueState.REACHED);
+        assertThat(reached.reachedAt()).isEqualTo(OLD);
+        assertThat(reached.reopened()).isFalse();
     }
 
-    private static GoalMilestone milestone(String id, Instant due, Instant reachedAt, Instant createdAt) {
-        return GoalMilestone.builder().id(id).goalId("g1").title(id).dueDate(due).reachedAt(reachedAt)
-                .createdAt(createdAt).build();
+    @Test
+    void stateByDate_dueSoonWithinThreeDays() {
+        assertThat(MilestoneProgress.toResponse(milestone("soon", NOW.plus(Duration.ofDays(3)), null), List.of(), Set.of(), NOW)
+                .state()).isEqualTo(GoalDueState.DUE_SOON);
+        assertThat(MilestoneProgress.toResponse(milestone("later", NOW.plus(Duration.ofDays(4)), null), List.of(), Set.of(), NOW)
+                .state()).isEqualTo(GoalDueState.OPEN);
     }
 
-    private static GoalMilestone inProject(String id, String projectId, int position, Instant due) {
-        return GoalMilestone.builder().id(id).goalId("g1").title(id).projectId(projectId).position(position)
-                .dueDate(due).createdAt(OLD).build();
+    @Test
+    void evaluate_sortsByDate_thenTitle_andNextSkipsReached() {
+        List<GoalMilestoneLinks> milestones = List.of(
+                new GoalMilestoneLinks(milestone("b", NOW.plus(Duration.ofDays(5)), null, "Beta"), List.of()),
+                new GoalMilestoneLinks(milestone("r", NOW.plus(Duration.ofDays(1)), OLD, "Release-Check"), List.of()),
+                new GoalMilestoneLinks(milestone("a", NOW.plus(Duration.ofDays(5)), null, "Alpha"), List.of("wp1")));
+
+        List<GoalMilestoneResponse> evaluated = MilestoneProgress.evaluate(milestones, Set.of(), NOW);
+
+        assertThat(evaluated).extracting(GoalMilestoneResponse::id).containsExactly("r", "a", "b");
+        GoalResponse.NextMilestone next = MilestoneProgress.next(evaluated);
+        assertThat(next).isEqualTo(new GoalResponse.NextMilestone("a", "Alpha", NOW.plus(Duration.ofDays(5)), GoalDueState.OPEN));
+        assertThat(MilestoneProgress.evaluate(List.of(), Set.of(), NOW)).isEmpty();
+        assertThat(MilestoneProgress.next(List.of())).isNull();
     }
 
-    private static GoalTodoRow question(String id, Todo.Status status, String milestoneId, String openQuestion) {
-        return new GoalTodoRow(id, id, status, Todo.Priority.MEDIUM, null, null, null, null, null, null, null, null,
-                openQuestion, NOW, NOW, null, milestoneId);
+    /** Die Zielliste rechnet aus Zusammenfassungen dasselbe aus wie die Detailansicht. */
+    @Test
+    void nextOf_summaries_sameRules_withoutLoadingPackages() {
+        Instant soon = NOW.plus(Duration.ofDays(2));
+        List<GoalMilestoneSummaryRow> rows = List.of(
+                new GoalMilestoneSummaryRow("done", "g1", "Alles fertig", NOW.minus(Duration.ofDays(3)), null, 2, 2),
+                new GoalMilestoneSummaryRow("manual", "g1", "Von Hand", NOW.minus(Duration.ofDays(2)), OLD, 0, 0),
+                new GoalMilestoneSummaryRow("late", "g1", "Spaet", NOW.plus(Duration.ofDays(9)), null, 0, 0),
+                new GoalMilestoneSummaryRow("reopened", "g1", "Wieder offen", soon, OLD, 2, 1));
+
+        GoalResponse.NextMilestone next = MilestoneProgress.nextOf(rows, NOW);
+
+        assertThat(next).isEqualTo(new GoalResponse.NextMilestone("reopened", "Wieder offen", soon, GoalDueState.DUE_SOON));
+        assertThat(MilestoneProgress.nextOf(rows.subList(0, 2), NOW)).as("alles erreicht").isNull();
+        assertThat(rows.get(0).reached()).isTrue();
+        assertThat(rows.get(1).reached()).isTrue();
+        assertThat(rows.get(3).reached()).as("mit Paketen zaehlen die Pakete, nicht reachedAt").isFalse();
     }
 
-    private static GoalTodoRow row(String id, Todo.Status status, String milestoneId) {
-        return new GoalTodoRow(id, id, status, Todo.Priority.MEDIUM, null, null, null, null, null, null, null, null,
-                null, NOW, NOW, null, milestoneId);
+    private static GoalMilestone milestone(String id, Instant due, Instant reachedAt) {
+        return milestone(id, due, reachedAt, id);
     }
 
-    private static Map<String, GoalMilestoneResponse> byId(List<GoalMilestoneResponse> list) {
-        return list.stream().collect(Collectors.toMap(GoalMilestoneResponse::id, Function.identity()));
+    private static GoalMilestone milestone(String id, Instant due, Instant reachedAt, String title) {
+        return GoalMilestone.builder().id(id).goalId("g1").title(title).dueDate(due).reachedAt(reachedAt)
+                .createdAt(OLD).updatedAt(OLD).build();
     }
 }

@@ -46,7 +46,7 @@ public class GoalMembershipService {
             if (!goal.getId().equals(todo.getGoalId())) {
                 todo.setGoalId(goal.getId());
                 todo.setGoalRank(null);
-                todo.setMilestoneId(null); // ein Meilenstein gilt nur im alten Ziel (TODO 259f4f66)
+                todo.setWorkPackageId(null); // ein Arbeitspaket gilt nur im alten Ziel (TODO 259f4f66, c60bf914)
                 todoRepository.save(todo);
             }
             if (todo.getProjectId() != null) {

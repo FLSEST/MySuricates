@@ -2,20 +2,20 @@ package com.automation.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 
+import java.util.List;
+
 /**
- * Neuer Meilenstein – in der Oberflaeche „Teilziel“ (TODO 259f4f66, c60bf914).
+ * Neuer Meilenstein – ein Termin fuers ganze Ziel (TODO c60bf914).
  *
- * @param dueDate   optional, ISO-Zeitpunkt ({@code 2026-10-15T21:59:59Z}) oder ISO-Datum
- *                  ({@code 2026-10-15} = Ende dieses Tages in UTC); fehlt/leer = ohne Datum
- * @param projectId Projekt des Teilziels; Pflicht, ausser das Ziel hat genau ein Projekt – dann dieses.
- *                  Ein Projekt, das dem Ziel noch nicht zugeordnet ist, kommt dazu.
+ * @param dueDate        Pflicht, ISO-Zeitpunkt ({@code 2026-10-15T21:59:59Z}) oder ISO-Datum
+ *                       ({@code 2026-10-15} = Ende dieses Tages in UTC)
+ * @param workPackageIds optional, Arbeitspakete desselben Ziels, von denen er abhaengt; ein fremdes = 400
  */
 public record CreateGoalMilestoneRequest(
         @NotBlank String title,
-        String dueDate,
-        String projectId
+        @NotBlank String dueDate,
+        List<String> workPackageIds
 ) {
-    /** Form ohne Projekt – fuer Aufrufer von vorher. */
     public CreateGoalMilestoneRequest(String title, String dueDate) {
         this(title, dueDate, null);
     }

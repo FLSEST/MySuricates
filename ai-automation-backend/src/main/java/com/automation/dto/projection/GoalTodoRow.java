@@ -25,5 +25,5 @@ public record GoalTodoRow(
         Instant createdAt,
         Instant updatedAt,
         Instant dueDate,
-        String milestoneId
+        String workPackageId
 ) {}

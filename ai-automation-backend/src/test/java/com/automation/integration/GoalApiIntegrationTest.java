@@ -307,7 +307,7 @@ class GoalApiIntegrationTest {
         throw new AssertionError("TODO " + id + " fehlt in der Relationskarte");
     }
 
-    // ── TODO c60bf914 (Ziele Stufe 1: Ziel → Projekte → Teilziele → TODOs) ──────────────────
+    // ── TODO c60bf914 (Ziele Stufe 1: Ziel → Projekte → Arbeitspakete → TODOs, Meilensteine) ────
 
     @Test
     void goalWithProjects_isListedPerProject_andCarriesItsProjectsInOrder() throws Exception {
@@ -330,6 +330,7 @@ class GoalApiIntegrationTest {
         assertThat(find(forC, goalId)).isNull();
         JsonNode all = json(mockMvc.perform(get("/api/v1/goals")));
         assertThat(find(all, other).get("projects")).isEmpty();
+        assertThat(find(all, other).get("nextMilestone").isNull()).as("ohne Meilensteine keiner").isTrue();
 
         perform(post("/api/v1/goals"), Map.of("title", "Kaputt", "projectIds", List.of("missing")))
                 .andExpect(status().isNotFound());
@@ -366,45 +367,50 @@ class GoalApiIntegrationTest {
                 .andExpect(status().isBadRequest());
 
         mockMvc.perform(delete("/api/v1/goals/" + goalId + "/projects/" + projectB.getId())).andExpect(status().isNoContent());
-        String milestone = json(perform(post("/api/v1/goals/" + goalId + "/milestones"), Map.of("title", "Werbematerial"))
+        String workPackage = json(perform(post("/api/v1/goals/" + goalId + "/work-packages"), Map.of("title", "Werbematerial"))
                 .andExpect(status().isCreated())).get("id").asText();
-        perform(patch("/api/v1/todos/" + question.getId() + "/planning"), Map.of("milestoneId", milestone))
+        perform(patch("/api/v1/todos/" + question.getId() + "/planning"), Map.of("workPackageId", workPackage))
                 .andExpect(status().isOk());
+        String milestone = json(perform(post("/api/v1/goals/" + goalId + "/milestones"),
+                Map.of("title", "Launch", "dueDate", "2026-12-01", "workPackageIds", List.of(workPackage)))
+                .andExpect(status().isCreated())).get("id").asText();
 
         mockMvc.perform(delete("/api/v1/goals/" + goalId + "/projects/" + projectA.getId()))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("STATE_CONFLICT"))
-                .andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.containsString("1 Teilziel")))
+                .andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.containsString("1 Arbeitspaket")))
                 .andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.containsString("2 TODO")));
         mockMvc.perform(delete("/api/v1/goals/" + goalId + "/projects/" + projectA.getId()).param("cascade", "true"))
                 .andExpect(status().isNoContent());
 
         JsonNode detail = json(mockMvc.perform(get("/api/v1/goals/" + goalId)).andExpect(status().isOk()));
         assertThat(detail.get("projects")).isEmpty();
-        assertThat(detail.get("milestones")).isEmpty();
+        assertThat(detail.get("workPackages")).isEmpty();
         assertThat(detail.get("todos")).isEmpty();
+        assertThat(detail.at("/milestones/0/id").asText()).as("der Meilenstein gilt fuers ganze Ziel und bleibt").isEqualTo(milestone);
+        assertThat(detail.at("/milestones/0/workPackageIds")).as("nur die Verknuepfung faellt weg").isEmpty();
         entityManager.clear();
         Todo released = todoRepository.findById(question.getId()).orElseThrow();
         assertThat(released.getGoalId()).isNull();
-        assertThat(released.getMilestoneId()).isNull();
+        assertThat(released.getWorkPackageId()).isNull();
         assertThat(released.getOpenQuestion()).as("das TODO selbst bleibt").isEqualTo("Welcher Stil?");
     }
 
     @Test
-    void todoMovingToAnotherProject_bringsItsProjectToTheGoal_andLeavesAMilestoneOfTheOldOne() throws Exception {
+    void todoMovingToAnotherProject_bringsItsProjectToTheGoal_andLeavesAWorkPackageOfTheOldOne() throws Exception {
         String goalId = json(perform(post("/api/v1/goals"), Map.of("title", "Release", "projectIds", List.of(projectA.getId())))
                 .andExpect(status().isCreated())).get("id").asText();
-        String milestone = json(perform(post("/api/v1/goals/" + goalId + "/milestones"), Map.of("title", "Beta"))
+        String workPackage = json(perform(post("/api/v1/goals/" + goalId + "/work-packages"), Map.of("title", "Beta"))
                 .andExpect(status().isCreated())).get("id").asText();
         Todo todo = todo("Wandert", Todo.Priority.MEDIUM, projectA);
-        perform(patch("/api/v1/todos/" + todo.getId() + "/planning"), Map.of("goalId", goalId, "milestoneId", milestone))
+        perform(patch("/api/v1/todos/" + todo.getId() + "/planning"), Map.of("goalId", goalId, "workPackageId", workPackage))
                 .andExpect(status().isOk());
 
         perform(put("/api/v1/todos/" + todo.getId()), Map.of("projectId", projectB.getId())).andExpect(status().isOk());
 
         JsonNode detail = json(mockMvc.perform(get("/api/v1/goals/" + goalId)));
         assertThat(detail.get("projects").findValuesAsText("projectId")).containsExactly(projectA.getId(), projectB.getId());
-        assertThat(detail.at("/todos/0/milestoneId").isNull()).as("Teilziel des alten Projekts faellt weg").isTrue();
+        assertThat(detail.at("/todos/0/workPackageId").isNull()).as("Arbeitspaket des alten Projekts faellt weg").isTrue();
         assertThat(detail.at("/todos/0/projectId").asText()).isEqualTo(projectB.getId());
     }
 

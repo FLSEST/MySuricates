@@ -13,7 +13,10 @@ public record TodoOverviewResponse(
         List<NeedsYouItem> needsYou,
         Instant generatedAt,
         int staleThresholdDays,
-        /** Meilensteine aktiver Ziele, die bald faellig oder ueberfaellig sind (TODO 259f4f66). */
+        /**
+         * Termine aktiver Ziele, die Aufmerksamkeit brauchen (TODO 259f4f66, c60bf914): bald faellige oder
+         * ueberfaellige Meilensteine und ueberfaellige Arbeitspakete mit offenen TODOs, je mit {@code kind}.
+         */
         List<MilestoneAttentionItem> milestonesDue
 ) {
     /** Form ohne {@code milestonesDue} – fuer Aufrufer und Test-Fixturen von vorher. */

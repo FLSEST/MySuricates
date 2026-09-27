@@ -15,6 +15,6 @@ public record TodoPlanningResponse(
         Todo.RatedBy ratedBy,
         Instant ratedAt,
         String openQuestion,
-        /** Meilenstein im Ziel (TODO 259f4f66); null = keiner. */
-        String milestoneId
+        /** Arbeitspaket im Ziel (TODO c60bf914, bis V92 {@code milestoneId}); null = keins. */
+        String workPackageId
 ) {}

@@ -149,8 +149,10 @@ Statt eines Laufs sind auch mehrere Läufe desselben Workflows oder eine Kette m
   Lauf gemacht hat: den Status des Reports (`VALID`/`INVALID`), die Zahl der Findings im Projekt
   (eines je Identität) und einzelne Findings, gefunden über ihr `subject`.
 - **`goal`:** legt vor dem Lauf ein Ziel im Projekt des Szenarios an – `title`, `targetInDays`,
-  `milestones` (`title`, `dueInDays`) und `todos` (`title`, `status`, `priority`, `dueInDays`,
-  `milestone` als Index). Tage relativ zu jetzt, auch negativ. `"@goal"` in `context` wird zur ID.
+  `workPackages` (Arbeitspakete: `title`, `startInDays`, `endInDays`; nur `endInDays` = Ein-Tages-Paket,
+  keins von beiden = ohne Zeitraum), `milestones` (`title`, `dueInDays`, `workPackages` als Indizes) und
+  `todos` (`title`, `status`, `priority`, `dueInDays`, `workPackage` als Index). Tage relativ zu jetzt,
+  auch negativ. `"@goal"` in `context` wird zur ID.
 - **`workflow.builtinTemplate`:** statt eigener Blöcke die Blöcke einer mitgelieferten Vorlage, in
   `locale` aufgelöst (Standard `de`) – das Szenario fährt, was ausgeliefert wird.
 - **`dashboard`:** was der Lauf an seine Dashboard-Kachel gemeldet hat (`dashboard_widget` in den

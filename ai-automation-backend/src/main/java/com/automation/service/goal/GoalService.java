@@ -1,26 +1,23 @@
 package com.automation.service.goal;
 
-import com.automation.dto.projection.GoalProjectRow;
+import com.automation.dto.projection.GoalMilestoneSummaryRow;
 import com.automation.dto.projection.GoalStatusCounts;
 import com.automation.dto.projection.GoalTodoRow;
-import com.automation.dto.projection.GoalWithMilestones;
+import com.automation.dto.projection.GoalWithWorkPackages;
 import com.automation.dto.request.CreateGoalRequest;
 import com.automation.dto.request.UpdateGoalRequest;
 import com.automation.dto.response.GoalDetailResponse;
 import com.automation.dto.response.GoalGuardResponse;
 import com.automation.dto.response.GoalProgressResponse;
 import com.automation.dto.response.GoalResponse;
-import com.automation.dto.response.GoalTodoItem;
 import com.automation.entity.Goal;
-import com.automation.entity.GoalMilestone;
 import com.automation.entity.GoalProject;
-import com.automation.entity.Project;
 import com.automation.entity.Todo;
 import com.automation.exception.ResourceNotFoundException;
-import com.automation.mapper.TodoMapper;
 import com.automation.repository.GoalMilestoneRepository;
 import com.automation.repository.GoalProjectRepository;
 import com.automation.repository.GoalRepository;
+import com.automation.repository.GoalWorkPackageRepository;
 import com.automation.repository.ProjectRepository;
 import com.automation.repository.TodoRepository;
 import lombok.RequiredArgsConstructor;
@@ -73,13 +70,16 @@ public class GoalService {
     private final TodoRepository todoRepository;
     private final ProjectRepository projectRepository;
     private final GoalGuardLookup guardLookup;
+    private final GoalWorkPackageRepository workPackageRepository;
     private final GoalMilestoneRepository milestoneRepository;
     private final GoalProjectRepository goalProjectRepository;
+    private final GoalDetailAssembler detailAssembler;
     private final Clock clock;
 
     /**
      * Ohne Statusfilter: aktive und erledigte Ziele, archivierte nur auf Nachfrage. Mit
-     * {@code projectId} nur die Ziele, denen dieses Projekt zugeordnet ist (TODO c60bf914).
+     * {@code projectId} nur die Ziele, denen dieses Projekt zugeordnet ist (TODO c60bf914). Je Ziel der
+     * naechste nicht erreichte Meilenstein – fuer alle Ziele aus einer Abfrage mit Paket-Zaehlern.
      */
     @Transactional(readOnly = true)
     public List<GoalResponse> list(List<Goal.Status> statuses, String projectId) {
@@ -96,10 +96,14 @@ public class GoalService {
                 .stream().collect(Collectors.toMap(GoalStatusCounts::goalId, Function.identity()));
         Map<String, List<GoalResponse.ProjectRef>> projects =
                 GoalProjectSummaries.refsByGoal(goalProjectRepository.findRowsForGoals(ids));
+        Map<String, List<GoalMilestoneSummaryRow>> milestones = milestoneRepository.findSummaries(ids).stream()
+                .collect(Collectors.groupingBy(GoalMilestoneSummaryRow::goalId));
         Map<String, GoalGuardResponse> guards = guardLookup.byGoal(goals);
+        Instant now = clock.instant();
         return goals.stream()
                 .map(goal -> toResponse(goal, progressOf(counts.get(goal.getId())), guards.get(goal.getId()),
-                        projects.getOrDefault(goal.getId(), List.of())))
+                        projects.getOrDefault(goal.getId(), List.of()),
+                        MilestoneProgress.nextOf(milestones.getOrDefault(goal.getId(), List.of()), now)))
                 .toList();
     }
 
@@ -110,14 +114,16 @@ public class GoalService {
     }
 
     /**
-     * Schreibend, weil das Lesen einen Meilenstein zum ersten Mal als erreicht erkennen kann – dann
-     * wird {@code reachedAt} gespeichert (TODO 259f4f66). Sonst schreibt es nichts.
+     * Schreibend, weil das Lesen ein Arbeitspaket oder einen Meilenstein zum ersten Mal als
+     * abgeschlossen bzw. erreicht erkennen kann – dann wird {@code completedAt}/{@code reachedAt}
+     * gespeichert (TODO 259f4f66, c60bf914). Sonst schreibt es nichts. Ziel samt Paketen in einer
+     * Abfrage, der Rest in {@link GoalDetailAssembler}.
      */
     @Transactional
     public GoalDetailResponse detail(String id) {
-        GoalWithMilestones loaded = goalRepository.findWithMilestones(id)
+        GoalWithWorkPackages loaded = goalRepository.findWithWorkPackages(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Goal", id));
-        return detailOf(loaded.goal(), loaded.milestones());
+        return detailAssembler.detailOf(loaded.goal(), loaded.workPackages());
     }
 
     /** Mit {@code projectIds} gleich samt Projekten in dieser Reihenfolge; ein unbekanntes Projekt ist ein 404. */
@@ -143,7 +149,7 @@ public class GoalService {
             }
             projects = GoalProjectSummaries.refs(goalProjectRepository.findRows(goal.getId()));
         }
-        return toResponse(goal, GoalProgressResponse.of(0, 0, 0, 0, 0), GoalGuardResponse.NONE, projects);
+        return toResponse(goal, GoalProgressResponse.of(0, 0, 0, 0, 0), GoalGuardResponse.NONE, projects, null);
     }
 
     @Transactional
@@ -174,25 +180,9 @@ public class GoalService {
         return goalRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Goal", id));
     }
 
+    /** Zielansicht nach einer Aenderung; die Pakete werden dafuer nachgeladen. */
     GoalDetailResponse detailOf(Goal goal) {
-        return detailOf(goal, milestoneRepository.findByGoalId(goal.getId()));
-    }
-
-    /**
-     * Ziel, TODO-Zeilen und Zielprojekte – drei Statements; Projektnamen nur fuer TODOs aus Projekten,
-     * die dem Ziel nicht zugeordnet sind (Altdaten), in einer weiteren Abfrage.
-     */
-    GoalDetailResponse detailOf(Goal goal, List<GoalMilestone> milestones) {
-        List<GoalTodoRow> rows = todoRepository.findGoalRows(goal.getId()).stream().sorted(WORK_ORDER).toList();
-        List<GoalProjectRow> projects = goalProjectRepository.findRows(goal.getId());
-        Map<String, String> projectNames = projectNames(rows, projects);
-        Map<String, Integer> positions = new HashMap<>();
-        projects.forEach(p -> positions.put(p.projectId(), p.position()));
-        List<GoalTodoItem> items = rows.stream().map(row -> toItem(row, projectNames.get(row.projectId()))).toList();
-        GoalResponse response = toResponse(goal, progressOf(rows), guardLookup.of(goal), GoalProjectSummaries.refs(projects));
-        return new GoalDetailResponse(response, items, GoalProjectSummaries.byProject(rows, projectNames),
-                MilestoneProgress.evaluate(milestones, rows, positions, clock.instant()),
-                GoalProjectSummaries.projects(projects, rows));
+        return detailAssembler.detailOf(goal, workPackageRepository.findByGoalId(goal.getId()));
     }
 
     static GoalProgressResponse progressOf(GoalStatusCounts counts) {
@@ -218,30 +208,11 @@ public class GoalService {
                 || row.status() == Todo.Status.BACKLOG;
     }
 
-    /** Projekt-ID → Name; eine HashMap, weil TODOs ohne Projekt mit {@code null} nachschlagen. */
-    private Map<String, String> projectNames(List<GoalTodoRow> rows, List<GoalProjectRow> projects) {
-        Map<String, String> names = new HashMap<>();
-        projects.forEach(p -> names.put(p.projectId(), p.projectName()));
-        Set<String> ids = rows.stream().map(GoalTodoRow::projectId).filter(Objects::nonNull)
-                .filter(id -> !names.containsKey(id)).collect(Collectors.toSet());
-        if (!ids.isEmpty()) {
-            projectRepository.findAllById(ids).forEach(project -> names.put(project.getId(), project.getName()));
-        }
-        return names;
-    }
-
-    private static GoalTodoItem toItem(GoalTodoRow row, String projectName) {
-        return new GoalTodoItem(row.id(), row.title(), row.status(), row.priority(), row.projectId(), projectName,
-                TodoMapper.jsonToList(row.tags()), row.goalRank(), row.complexity(), row.suggestedEffort(),
-                row.ratingNote(), row.ratedBy(), row.ratedAt(), row.openQuestion(), row.updatedAt(),
-                row.dueDate(), row.milestoneId());
-    }
-
     static GoalResponse toResponse(Goal goal, GoalProgressResponse progress, GoalGuardResponse guard,
-                                   List<GoalResponse.ProjectRef> projects) {
+                                   List<GoalResponse.ProjectRef> projects, GoalResponse.NextMilestone nextMilestone) {
         return new GoalResponse(goal.getId(), goal.getTitle(), goal.getDescription(), goal.getStatus(),
                 goal.getTargetDate(), goal.getCreatedAt(), goal.getUpdatedAt(), progress,
-                guard != null ? guard : GoalGuardResponse.NONE, projects != null ? projects : List.of());
+                guard != null ? guard : GoalGuardResponse.NONE, projects != null ? projects : List.of(), nextMilestone);
     }
 
     /** {@code 2026-10-15} oder ein ISO-Zeitpunkt; leer = kein Datum. */

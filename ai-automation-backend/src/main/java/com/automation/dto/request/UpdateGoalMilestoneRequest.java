@@ -1,17 +1,17 @@
 package com.automation.dto.request;
 
+import java.util.List;
+
 /**
- * Teilaenderung eines Meilensteins (TODO 259f4f66): {@code null} laesst ein Feld stehen.
- * {@code dueDate = ""} entfernt das Datum (TODO c60bf914). {@code projectId} wechselt das Projekt –
- * nur solange dem Teilziel keine TODOs zugeordnet sind, sonst 400.
+ * Teilaenderung eines Meilensteins (TODO c60bf914): {@code null} laesst ein Feld stehen.
+ * {@code workPackageIds} ersetzt die Menge der verknuepften Pakete ({@code []} loest alle).
+ * {@code reached} markiert einen Meilenstein OHNE verknuepfte Pakete von Hand als erreicht
+ * ({@code true}) oder nicht ({@code false}); mit Paketen ergibt sich das aus ihnen – dann ist
+ * {@code reached} ein 400.
  */
 public record UpdateGoalMilestoneRequest(
         String title,
         String dueDate,
-        String projectId
-) {
-    /** Form ohne Projekt – fuer Aufrufer von vorher. */
-    public UpdateGoalMilestoneRequest(String title, String dueDate) {
-        this(title, dueDate, null);
-    }
-}
+        List<String> workPackageIds,
+        Boolean reached
+) {}

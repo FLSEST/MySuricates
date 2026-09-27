@@ -9,6 +9,8 @@ import com.automation.entity.AuditSeverity;
 import com.automation.entity.GateStatus;
 import com.automation.entity.Goal;
 import com.automation.entity.GoalMilestone;
+import com.automation.entity.GoalMilestoneWorkPackage;
+import com.automation.entity.GoalWorkPackage;
 import com.automation.entity.GoalProject;
 import com.automation.entity.Project;
 import com.automation.entity.ProjectStatus;
@@ -27,6 +29,8 @@ import com.automation.metrics.SqlStatementCounter;
 import com.automation.repository.AuditFindingRepository;
 import com.automation.repository.AuditReportRepository;
 import com.automation.repository.GoalMilestoneRepository;
+import com.automation.repository.GoalMilestoneWorkPackageRepository;
+import com.automation.repository.GoalWorkPackageRepository;
 import com.automation.repository.GoalProjectRepository;
 import com.automation.repository.GoalRepository;
 import com.automation.repository.ProjectRepository;
@@ -149,7 +153,7 @@ class RequestCostRatchetTest {
      */
     private static final List<String> SEEDED_TABLES = List.of(
             "projects", "workflows", "workflow_runs", "step_results", "scheduled_workflows", "goals",
-            "goal_projects", "goal_milestones", "todos", "todo_triggers", "wishes", "audit_reports", "audit_findings");
+            "goal_projects", "goal_work_packages", "goal_milestones", "goal_milestone_work_packages", "todos", "todo_triggers", "wishes", "audit_reports", "audit_findings");
 
     /** Seed size — large enough that a per-row query shows up as a multiple, small enough to stay fast. */
     private static final int PROJECTS = 3;
@@ -269,11 +273,17 @@ class RequestCostRatchetTest {
      *       {@link #statementCountMustNotGrowWithTheNumberOfRows} keeps constant. 42 → 43 kB with
      *       TODO c6ea8f5c, and only because the seed changed, not the route: every fifth seeded todo
      *       now carries a {@code workflowRunId} and a {@code lastFixRunId} (measured 42 081 bytes).
-     *       43 → 44 kB with TODO 259f4f66: {@code planning} carries {@code milestoneId}, and every tenth
-     *       seeded todo now sits in a milestone (measured 43 201 bytes); the statement count stays 3.</li>
-     *   <li>{@code /goals/{goal}/milestones}: added with TODO 259f4f66. Goal and milestones come from
-     *       one entity join, the counts from the same lean {@code GoalTodoRow} query as the detail –
-     *       2 statements, and the detail itself stays at 2 although it now carries the milestones.</li>
+     *       43 → 44 kB with TODO 259f4f66: {@code planning} carries {@code milestoneId} (since TODO
+     *       c60bf914 {@code workPackageId}), and every tenth seeded todo now sits in one (measured
+     *       43 201 bytes, 43 301 with the longer field name); the statement count stays 3.</li>
+     *   <li>{@code /goals/{goal}/work-packages}: added with TODO 259f4f66 as {@code /milestones}, renamed
+     *       with TODO c60bf914 (the old milestones became work packages). Goal and packages come from one
+     *       entity join that also carries the project positions they are sorted by, the counts from the
+     *       same lean {@code GoalTodoRow} query as the detail – 2 statements (measured 877 bytes).</li>
+     *   <li>{@code /goals/{goal}/milestones}: the NEW milestones of TODO c60bf914 – dates of the whole
+     *       goal, each linked to work packages of its batch in the seed. Their state follows the linked
+     *       packages, so the route reads what the package list reads plus ONE query for the milestones
+     *       and their links together – 3 statements (measured 429 bytes).</li>
      *   <li>{@code /goals} and {@code /goals/{goal}}: added with TODO dc0566f8. Both read lean
      *       projections ({@code GoalStatusCounts}, {@code GoalTodoRow}) — no todo description ever
      *       reaches the goal view. The detail is the goal plus one row query (the project names
@@ -282,12 +292,14 @@ class RequestCostRatchetTest {
      *       explicitly assigned projects ({@code goal_projects}, seeded one per batch on the first
      *       goal) — ONE {@code GoalProjectRow} query for the whole list, one for the detail, which
      *       also supplies the project names of the todos, so a todo with a project costs no lookup
-     *       as long as its project belongs to the goal. Measured 2026-09-27: {@code /goals} 481 bytes,
-     *       the detail 19 444 bytes. {@code /goals/{goal}/milestones} stays at 2 (797 bytes): the
-     *       project positions it sorts by come from the same join as the milestones.</li>
+     *       as long as its project belongs to the goal. 3 → 4 statements on purpose, same TODO: the
+     *       detail carries the work packages and the milestones with their links (one join for the
+     *       milestones and links), and every list row its next open milestone – for all goals from ONE
+     *       query that counts the linked and completed packages in sub-queries instead of loading
+     *       packages or todos. Measured 2026-09-27: {@code /goals} 621 bytes, the detail 20 209 bytes.</li>
      *   <li>{@code /goals?status=ACTIVE&projectId=}: added with TODO c60bf914 – the cockpit's project
-     *       filter. The same three queries as the list, the filter is an {@code EXISTS} on
-     *       {@code goal_projects} (measured 481 bytes). {@code {goalProject}} is the first project of
+     *       filter. The same four queries as the list, the filter is an {@code EXISTS} on
+     *       {@code goal_projects} (measured 621 bytes). {@code {goalProject}} is the first project of
      *       the first batch.</li>
      *   <li>{@code /goals/{goal}/relations}: added with TODO c6ea8f5c. Every fifth seeded todo
      *       points at a run of its batch (origin) and at another one as its last fix run (result),
@@ -342,11 +354,12 @@ class RequestCostRatchetTest {
             Map.entry("/api/v1/schedules", new Cost(3, 21_000)),
             Map.entry("/api/v1/schedules/{sched}/runs", new Cost(5, 5_000)),
             Map.entry("/api/v1/schedules/{busy}/runs", new Cost(6, 32_000)),
-            Map.entry("/api/v1/goals", new Cost(3, 2_000)),
-            Map.entry("/api/v1/goals?status=ACTIVE&projectId={goalProject}", new Cost(3, 2_000)),
-            Map.entry("/api/v1/goals/{goal}", new Cost(3, 40_000)),
+            Map.entry("/api/v1/goals", new Cost(4, 2_000)),
+            Map.entry("/api/v1/goals?status=ACTIVE&projectId={goalProject}", new Cost(4, 2_000)),
+            Map.entry("/api/v1/goals/{goal}", new Cost(4, 40_000)),
             Map.entry("/api/v1/goals/{goal}/relations", new Cost(6, 35_000)),
-            Map.entry("/api/v1/goals/{goal}/milestones", new Cost(2, 2_000)),
+            Map.entry("/api/v1/goals/{goal}/work-packages", new Cost(2, 2_000)),
+            Map.entry("/api/v1/goals/{goal}/milestones", new Cost(3, 2_000)),
             Map.entry("/api/v1/wishes", new Cost(3, 9_000)),
             Map.entry("/api/v1/audits", new Cost(2, 4_000)),
             Map.entry(AUDIT_HISTORY, new Cost(3, 2_000)),
@@ -361,7 +374,9 @@ class RequestCostRatchetTest {
     @Autowired private TodoRepository todoRepository;
     @Autowired private ScheduledWorkflowRepository scheduledWorkflowRepository;
     @Autowired private GoalRepository goalRepository;
+    @Autowired private GoalWorkPackageRepository workPackageRepository;
     @Autowired private GoalMilestoneRepository milestoneRepository;
+    @Autowired private GoalMilestoneWorkPackageRepository milestoneLinkRepository;
     @Autowired private GoalProjectRepository goalProjectRepository;
     @Autowired private TodoTriggerRepository todoTriggerRepository;
     @Autowired private WishRepository wishRepository;
@@ -586,18 +601,25 @@ class RequestCostRatchetTest {
                 .targetWorkflow(workflows.get(0))
                 .description("Cost Trigger " + batch)
                 .build());
-        // Meilensteine (TODO 259f4f66): jede Charge legt zwei am ersten Ziel an und ordnet jedes zehnte
-        // Todo einem zu – Detail und Meilenstein-Liste muessen sie mit dem Ziel in einer Abfrage holen.
-        List<String> milestoneIds = new ArrayList<>();
-        for (int m = 0; m < 2; m++) {
-            milestoneIds.add(milestoneRepository.save(GoalMilestone.builder().goalId(firstGoalId).projectId(projectIds.get(0))
-                    .position(m).title("Cost Milestone " + batch + m).dueDate(RUN_STARTED.plusSeconds(86_400L * (m + 1)))
-                    .build()).getId());
+        // Arbeitspakete (TODO 259f4f66, c60bf914): jede Charge legt zwei am ersten Ziel an und ordnet jedes
+        // zehnte Todo einem zu – Detail und Paket-Liste muessen sie mit dem Ziel in einer Abfrage holen.
+        // Dazu je Charge ein Meilenstein, der an beiden Paketen haengt: Detail und Meilenstein-Liste holen
+        // Meilensteine samt Verknuepfungen in EINER Abfrage, die Zielliste den naechsten Meilenstein
+        // aller Ziele in einer mit Paket-Zaehlern als Unterabfragen.
+        List<String> workPackageIds = new ArrayList<>();
+        for (int w = 0; w < 2; w++) {
+            Instant end = RUN_STARTED.plusSeconds(86_400L * (w + 1));
+            workPackageIds.add(workPackageRepository.save(GoalWorkPackage.builder().goalId(firstGoalId)
+                    .projectId(projectIds.get(0)).position(w).title("Cost Work Package " + batch + w)
+                    .startDate(end.minusSeconds(86_400L)).endDate(end).build()).getId());
         }
+        String milestoneId = milestoneRepository.save(GoalMilestone.builder().goalId(firstGoalId)
+                .title("Cost Milestone " + batch).dueDate(RUN_STARTED.plusSeconds(86_400L * 3)).build()).getId();
+        workPackageIds.forEach(id -> milestoneLinkRepository.save(new GoalMilestoneWorkPackage(milestoneId, id)));
         for (int t = 0; t < TODOS; t++) {
             boolean fromRun = t % 5 == 0;
             todoRepository.save(Todo.builder()
-                    .milestoneId(t % 10 == 0 ? milestoneIds.get(t / 10 % 2) : null)
+                    .workPackageId(t % 10 == 0 ? workPackageIds.get(t / 10 % 2) : null)
                     .goalId(firstGoalId)
                     .goalRank(t % 2 == 0 ? t + 1 : null)
                     .title("Cost Todo " + batch + t)

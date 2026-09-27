@@ -1,6 +1,7 @@
 package com.automation.dto.request;
 
 import com.automation.entity.Todo;
+import com.fasterxml.jackson.annotation.JsonAlias;
 
 /**
  * Einordnung eines TODOs in ein Ziel und seine Einschaetzung ({@code PATCH /todos/{id}/planning},
@@ -11,9 +12,10 @@ import com.automation.entity.Todo;
  * nimmt den Rang zurueck. {@code complexity} ist {@code S|M|L|XL}, {@code suggestedEffort}
  * {@code low|medium|high|xhigh}. {@code ratedBy} fehlt = {@code USER}; das Plugin schickt {@code AI}.
  *
- * <p>{@code milestoneId} (TODO 259f4f66) ordnet das TODO einem Meilenstein seines Ziels zu,
- * {@code ""} loest es davon. Ein Meilenstein eines anderen Ziels ist ein 400. Wechselt oder verlaesst
- * das TODO sein Ziel, verliert es den Meilenstein.
+ * <p>{@code workPackageId} (TODO c60bf914; bis V92 hiess das Feld {@code milestoneId}, der alte Name
+ * wird weiter angenommen) ordnet das TODO einem Arbeitspaket seines Ziels UND seines Projekts zu,
+ * {@code ""} loest es davon. Ein Paket eines anderen Ziels oder Projekts ist ein 400. Wechselt oder
+ * verlaesst das TODO sein Ziel, verliert es das Paket.
  */
 public record UpdateTodoPlanningRequest(
         String goalId,
@@ -23,9 +25,9 @@ public record UpdateTodoPlanningRequest(
         String ratingNote,
         String openQuestion,
         Todo.RatedBy ratedBy,
-        String milestoneId
+        @JsonAlias("milestoneId") String workPackageId
 ) {
-    /** Form ohne {@code milestoneId} – fuer Aufrufer von vorher. */
+    /** Form ohne {@code workPackageId} – fuer Aufrufer von vorher. */
     public UpdateTodoPlanningRequest(String goalId, Integer goalRank, String complexity, String suggestedEffort,
                                      String ratingNote, String openQuestion, Todo.RatedBy ratedBy) {
         this(goalId, goalRank, complexity, suggestedEffort, ratingNote, openQuestion, ratedBy, null);
