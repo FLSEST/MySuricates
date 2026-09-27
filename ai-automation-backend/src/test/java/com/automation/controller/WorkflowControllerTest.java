@@ -272,6 +272,25 @@ class WorkflowControllerTest {
     }
 
     @Test
+    void importWorkflow_updateIfExists_takesOverMetadataAndDefaultContext() throws Exception {
+        when(workflowService.findByNameAndProjectId("Test Workflow", "proj-1")).thenReturn(java.util.Optional.of(testWorkflow));
+        when(workflowService.update(eq("wf-1"), any(), eq(ChangeSource.IMPORT))).thenReturn(testWorkflow);
+        when(workflowMapper.toResponse(testWorkflow)).thenReturn(testResponse);
+
+        mockMvc.perform(post("/api/v1/workflows/import")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"projectId\": \"proj-1\", \"name\": \"Test Workflow\", \"updateIfExists\": true,"
+                                + " \"metadata\": {\"audit\": {\"scope\": \"backend\"}},"
+                                + " \"defaultContext\": {\"target\": \"main\"}}"))
+                .andExpect(status().isOk());
+
+        verify(workflowService).update(eq("wf-1"),
+                argThat(req -> Map.of("audit", Map.of("scope", "backend")).equals(req.metadata())
+                        && Map.of("target", "main").equals(req.defaultContext())),
+                eq(ChangeSource.IMPORT));
+    }
+
+    @Test
     void importWorkflow_asNewWorkflow_takesOverTheVersionLabel() throws Exception {
         when(workflowService.create(any(), eq(ChangeSource.IMPORT))).thenReturn(testWorkflow);
         when(workflowMapper.toResponse(testWorkflow)).thenReturn(testResponse);
