@@ -18,7 +18,8 @@ import java.util.Map;
  *
  * <p><b>Wirkungsort</b> (Entscheidung vom 2026-09-19): auf Abruf über die REST-API und als Test
  * über die ausgelieferten Pool-Definitionen. Der Speicherweg bleibt unangetastet — der Analyzer
- * meldet, er blockiert nicht.
+ * meldet, er blockiert nicht. Seit TODO 326d5987 läuft er außerdem nach jeder KI-Erzeugung einer Definition
+ * ({@link GeneratedWorkflowCheck}): Befunde gehen an die KI zurück oder in das Ergebnis, nie in den Speicherweg.
  *
  * <p><b>Was er heute prüft</b> — fünfzehn Regeln, jede am Text entscheidbar, eine davon am Text samt
  * den Metadaten der Definition, drei am Block-Config-Schema, das auch der Editor nutzt:
