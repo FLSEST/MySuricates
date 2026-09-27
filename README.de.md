@@ -57,6 +57,14 @@ oder Schritt fuer Schritt in [Getting Started](docs/GETTING-STARTED.md).
 
 Fuer Agenten, die die REST-API direkt ansprechen, ist [AGENTS.md](AGENTS.md) der Einstieg.
 
+## Leitideen
+
+1. **Deterministisch, wo es geht**, auch wegen der Kosten: Ein Shell-Schritt kostet keine Tokens, KI nur dort, wo sie nötig ist. Frontier-Modelle helfen beim Bauen. Was gebaut ist, läuft deterministisch, und die verbleibenden, eng gefassten KI-Stellen können anders gefüttert werden (kleineres Modell, anderer Anbieter).
+2. **Wiederverwenden und nachhalten:** Vorlagen, Pool, Sub-Workflows, Chains und Skills zum Wiederverwenden. Das TODO-System hält nach.
+3. **Einfacher Zugang und Übersicht** über eine Oberfläche.
+4. **Alles lässt sich zusammenstöpseln:** diverse Konzepte, weitere Quellen anbinden.
+5. **Unabhängig vom Anbieter, so weit wie möglich:** Anbieter und Modell je Block wählbar. Die Kapselung der KI im Container ist noch nicht erreicht.
+
 ## Die Fragen dahinter
 
 Vier Mechanismen sind gebaut, um jeweils eine Frage zu untersuchen. Gebaut heisst hier: sie laufen.

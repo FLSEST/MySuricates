@@ -20,6 +20,16 @@ Not just for developers. For anyone who wants to solve real problems.
 
 ---
 
+## Guiding ideas
+
+1. **Deterministic where possible**, also because of cost: a shell step costs no tokens, AI only where it is needed. Frontier models help with building. What is built runs deterministically, and the remaining, narrowly scoped AI steps can be fed differently (a smaller model, another provider).
+2. **Reuse and follow up:** templates, pool, sub-workflows, chains and skills for reuse. The TODO system follows up.
+3. **Easy access and overview** through a user interface.
+4. **Everything plugs together:** various concepts, connecting further sources.
+5. **Independent of the provider, as far as possible:** provider and model can be chosen per block. Encapsulating the AI in a container has not been achieved yet.
+
+---
+
 ## The Principle of Continuous Approximation
 
 Perfection is not a state — it is a direction. A system that considers perfection achievable will eventually stop learning. This one won't.
