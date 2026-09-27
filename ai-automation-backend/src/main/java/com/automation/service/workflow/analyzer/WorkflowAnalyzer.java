@@ -20,7 +20,7 @@ import java.util.Map;
  * über die ausgelieferten Pool-Definitionen. Der Speicherweg bleibt unangetastet — der Analyzer
  * meldet, er blockiert nicht.
  *
- * <p><b>Was er heute prüft</b> — dreizehn Regeln, jede eindeutig am Text entscheidbar, eine davon am Text samt
+ * <p><b>Was er heute prüft</b> — fünfzehn Regeln, jede am Text entscheidbar, eine davon am Text samt
  * den Metadaten der Definition, drei am Block-Config-Schema, das auch der Editor nutzt:
  * <ul>
  *   <li>{@code unknown-block-reference} — Verweis auf einen Block, den es nicht gibt</li>
@@ -40,6 +40,10 @@ import java.util.Map;
  *   <li>{@code unknown-config-key} — Config-Schlüssel, den kein Executor liest (auch in verschachtelten Blöcken)</li>
  *   <li>{@code missing-required-config-key} — Pflichtschlüssel des Blocktyps fehlt</li>
  *   <li>{@code invalid-config-value} — Wert außerhalb der festen Werte, etwa {@code on_failure: "fail"}</li>
+ *   <li>{@code self-api-call} — Block ruft die REST-API der eigenen Instanz auf (außer den schlüsselfreien
+ *       Sonden); im Shell-Code HIGH, im KI-Auftrag MEDIUM zum Prüfen ({@link SelfAccessRules})</li>
+ *   <li>{@code direct-db-access} — Block liest die Plattform-Datenbank ({@code app_settings},
+ *       {@code automation.db} mit Lesezugriff) — HIGH; {@code sqlite3} allein MEDIUM zum Prüfen</li>
  * </ul>
  *
  * <p><b>Was er bewusst nicht prüft.</b> Drei Regeln des Tickets brauchen mehr als den Text und
@@ -90,6 +94,7 @@ public class WorkflowAnalyzer {
         ApprovalRules.apply(blocks, findings);
         ForEachRules.apply(blocks, findings);
         ConfigKeyRules.apply(blocks, findings);
+        SelfAccessRules.apply(blocks, findings);
         findings.sort((a, b) -> a.severity() != b.severity()
                 ? a.severity().compareTo(b.severity())
                 : Integer.compare(a.blockIndex(), b.blockIndex()));

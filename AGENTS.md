@@ -412,7 +412,10 @@ GET /api/v1/workflows/{id}/analyze
 #         unknown-config-key (Schluessel, den der Block nicht liest), missing-required-config-key,
 #         invalid-config-value (on_failure ausser stop/continue = HIGH) — gegen das Block-Config-Schema
 #         des Editors (ai-automation-frontend/src/data/blockConfigSchema.json), auch in verschachtelten
-#         Bloecken; deren detail beginnt mit dem Pfad, z. B. "Block 2 › cases[0] › Block 1: …"
+#         Bloecken; deren detail beginnt mit dem Pfad, z. B. "Block 2 › cases[0] › Block 1: …",
+#         self-api-call (Shell-Code ruft die eigene REST-API, ausser den schluesselfreien Sonden = HIGH;
+#         KI-Auftrag nennt einen lokalen Aufruf = MEDIUM "pruefen"), direct-db-access (app_settings oder
+#         automation.db mit Lesezugriff = HIGH; sqlite3 allein = MEDIUM "pruefen")
 # Der Analyzer meldet nur — er blockiert keinen Schreibweg und veraendert nichts.
 
 # Bestandslauf ueber alle Definitionen in aktiven Projekten
