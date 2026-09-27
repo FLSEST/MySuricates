@@ -219,6 +219,8 @@ Der Assistent kann über `<tool type="...">JSON</tool>`-Tags Aktionen vorschlage
 
 Alle 8 Tool-Typen sind in `MUTATING_TOOL_TYPES` definiert und erfordern User-Bestätigung.
 
+Nach `create_workflow`/`update_workflow` läuft die Baufehler-Prüfung (`GeneratedWorkflowCheck`) über die gespeicherte Definition. Befunde ab MEDIUM hängen an der Ergebniszeile (`Baufehler-Prüfung: N Befund(e) ab MEDIUM`, HIGH zuerst, höchstens zehn Zeilen plus „… und N weitere“) samt dem Hinweis, dass `update_workflow` sie beheben kann; ohne solche Befunde bleibt die Zeile unverändert. Es gibt keine zusätzliche KI-Runde, und das Speichern wird nicht blockiert. Die Ergebniskarte im Chat zeigt die Zeilen umbrochen.
+
 ### PendingTool-Lebenszyklus
 
 1. Claude generiert `<tool type="...">JSON</tool>` in seiner Antwort

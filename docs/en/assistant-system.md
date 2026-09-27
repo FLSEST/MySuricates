@@ -215,6 +215,8 @@ The assistant can suggest actions via `<tool type="...">JSON</tool>` tags. `Assi
 
 All 8 tool types are defined in `MUTATING_TOOL_TYPES` and require user confirmation.
 
+After `create_workflow`/`update_workflow` the build check (`GeneratedWorkflowCheck`) runs over the saved definition. Findings from MEDIUM up are appended to the result line (`Baufehler-Prüfung: N Befund(e) ab MEDIUM`, HIGH first, at most ten lines plus "… und N weitere") together with the note that `update_workflow` can fix them; without such findings the line stays unchanged. There is no extra AI round, and saving is never blocked. The result card in the chat shows the lines wrapped.
+
 ### PendingTool Lifecycle
 
 1. Claude generates `<tool type="...">JSON</tool>` in its response
