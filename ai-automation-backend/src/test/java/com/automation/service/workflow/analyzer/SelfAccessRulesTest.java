@@ -76,6 +76,39 @@ class SelfAccessRulesTest {
         assertThat(shell("API=https://api.example.com/api/v1; curl $API/items")).isEmpty();
     }
 
+    /** Folge-TODO 54c698f6: Basis-URL ohne /v1 in der Variable, der Endpunkt entsteht erst am Aufruf. */
+    @Test
+    void basisUrlOhneApiV1PfadMitSpaeteremSuffixIstHigh() {
+        assertThat(shell("API=http://localhost:9090/api; curl $API/v1/todos")).singleElement().satisfies(f -> {
+            assertThat(f.rule()).isEqualTo("self-api-call");
+            assertThat(f.severity()).isEqualTo(Severity.HIGH);
+            assertThat(f.detail()).contains("/api/v1/todos");
+        });
+        assertThat(shell("HOST=http://127.0.0.1:9090; curl \"$HOST/api/v1/executions\"")).singleElement()
+                .satisfies(f -> assertThat(f.detail()).contains("/api/v1/executions"));
+        assertThat(shell("python3 - <<'PY'\nbase = 'http://localhost:9090'\n"
+                + "requests.get(f'{base}/api/v1/todos')\nPY")).singleElement()
+                .satisfies(f -> assertThat(f.detail()).contains("/api/v1/todos"));
+    }
+
+    @Test
+    void basisUrlOhneApiV1PfadOhneSpaeterenAufrufIstKeinBefund() {
+        // Zuweisung allein: eine lokale URL ohne API-Pfad ist oft legitim (Health, Vite, fremder Dienst)
+        assertThat(shell("API=http://localhost:9090/api\necho \"$API\"")).isEmpty();
+        assertThat(shell("HOST=http://127.0.0.1:9090\ncurl -sf \"$HOST/health\"")).isEmpty();
+    }
+
+    @Test
+    void basisUrlOhneApiV1PfadAlsSondeUeberVariableIstKeinBefund() {
+        assertThat(shell("HOST=http://localhost:9090\ncurl -sf \"$HOST/api/v1/system/health\"")).isEmpty();
+    }
+
+    @Test
+    void basisUrlOhneApiV1PfadAufFremdemHostIstKeinBefund() {
+        // Fremder Host: die Variablenzuweisung selbst matcht keine der lokalen Host-Formen, also kein Fund
+        assertThat(shell("API=https://api.example.com/api\ncurl \"$API/v1/todos\"")).isEmpty();
+    }
+
     @Test
     void schluesselfreieSondenSindErlaubt() {
         assertThat(shell("curl -sf http://localhost:9090/actuator/health\n"
