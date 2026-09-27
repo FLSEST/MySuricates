@@ -31,7 +31,7 @@
 | `/calendar` | CalendarPage | Aggregierter Kalender (Schedules, Runs, Integrationen) |
 | `/cockpit` | ProjectCockpit | Projekt-Cockpit mit Todo-Übersicht |
 | `/goals` | Goals | Ziele nach Status (Aktiv · Erledigt · Archiviert), Anlegen; im Menü eingerückt als Untereintrag direkt unter „Todos“ |
-| `/goals/:goalId` | GoalDetail | Ein Ziel: Liste, Relationskarte (Herkunft → TODOs → Bearbeitung → Ergebnis) oder Zeitstrahl (Fälligkeiten und Meilensteine per Ziehen), Schalter „Wächter“, Kandidaten zuordnen |
+| `/goals/:goalId` | GoalDetail | Ein Ziel: Gliederung (Standard: Meilensteine, dann je Projekt Arbeitspakete und TODOs), Liste, Relationskarte (Herkunft → TODOs → Bearbeitung → Ergebnis) oder Zeitstrahl (Meilensteine als Rauten, Arbeitspakete als Balken in Projektbändern, alles per Ziehen – eine zweite Zeile zeigt dabei Paket und Datum), Schalter „Wächter“, Kandidaten zuordnen |
 | `/onboarding-profiles` | OnboardingProfiles | Onboarding-Profile verwalten |
 | `/settings` | Settings | Sprache, Theme, API-Key, Tailscale, Staging, Testing |
 

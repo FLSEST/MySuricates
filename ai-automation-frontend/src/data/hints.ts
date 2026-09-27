@@ -33,7 +33,9 @@ export const HINTS = {
   'cockpit-overview': { version: 1 },
   'goals-overview': { version: 1 },
   'goal-relation-map': { version: 1 },
-  'goal-timeline': { version: 1 },
+  'goal-outline': { version: 1 },
+  // v2: milestones and work packages as bars in project bands, adding them with a click (c60bf914).
+  'goal-timeline': { version: 2 },
   'goal-guard': { version: 1 },
   'activity-events': { version: 1 },
   'dlq-retry': { version: 1 },

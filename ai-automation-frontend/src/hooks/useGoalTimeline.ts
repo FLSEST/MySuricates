@@ -4,16 +4,36 @@ import { useToast } from './useToast';
 import { useT } from '../i18n';
 import { goalKeys } from './useGoals';
 import { applyPlan, type PlanChanges } from '../components/goal/timelineLayout';
-import type { CreateGoalMilestoneRequest, GoalDetail, GoalMilestone, UpdateGoalMilestoneRequest } from '../types';
+import type { GoalDetail, UpdateTodoPlanningRequest } from '../types';
 
 /**
- * Zeitstrahl eines Ziels (TODO e192df18): TODOs einplanen und Meilensteine pflegen. Danach ist
- * neu zu laden, was davon abhängt – Ziele (Fortschritt, Meilenstein-Zustand) und TODO-Listen samt
- * Cockpit („Braucht dich“).
+ * Planung an einem Ziel (TODO e192df18, c60bf914): TODOs einplanen, Arbeitspakete und Meilensteine
+ * pflegen. Danach ist neu zu laden, was davon abhängt – Ziele (Fortschritt, Zustände) und TODO-Listen
+ * samt Cockpit („Braucht dich“).
  */
-function invalidatePlanning(qc: QueryClient) {
+export function invalidatePlanning(qc: QueryClient) {
   qc.invalidateQueries({ queryKey: goalKeys.all });
   qc.invalidateQueries({ queryKey: ['todos'] });
+}
+
+/**
+ * Ändert das gespeicherte Detail eines Ziels sofort (optimistisch) und gibt den alten Stand zum
+ * Zurücksetzen zurück, falls der Aufruf scheitert.
+ */
+export async function patchGoalDetail(qc: QueryClient, goalId: string, patch: (detail: GoalDetail) => GoalDetail) {
+  const key = goalKeys.detail(goalId);
+  await qc.cancelQueries({ queryKey: key });
+  const previous = qc.getQueryData<GoalDetail>(key);
+  if (previous) qc.setQueryData<GoalDetail>(key, patch(previous));
+  return { previous };
+}
+
+/**
+ * Das Arbeitspaket im Planungsaufruf: `workPackageId`, bei einem Backend vor c60bf914 (`legacyBackend`)
+ * noch unter seinem alten Namen `milestoneId` – das neue Feld würde es stillschweigend übergehen.
+ */
+export function workPackageField(workPackageId: string, legacyBackend: boolean | undefined): UpdateTodoPlanningRequest {
+  return legacyBackend ? { milestoneId: workPackageId } : { workPackageId };
 }
 
 export interface PlanGoalTodo {
@@ -24,7 +44,7 @@ export interface PlanGoalTodo {
 }
 
 /**
- * Fälligkeit (`PUT /todos/{id}`) und Meilenstein (`PATCH …/planning`) eines TODOs. Der Chip springt
+ * Fälligkeit (`PUT /todos/{id}`) und Arbeitspaket (`PATCH …/planning`) eines TODOs. Der Chip springt
  * sofort an die neue Stelle; scheitert ein Aufruf, geht er zurück.
  */
 export function usePlanGoalTodo(goalId: string) {
@@ -33,16 +53,14 @@ export function usePlanGoalTodo(goalId: string) {
   const t = useT();
   return useMutation({
     mutationFn: async ({ todoId, changes }: PlanGoalTodo) => {
+      const legacy = qc.getQueryData<GoalDetail>(goalKeys.detail(goalId))?.legacyBackend;
       if (changes.dueDate !== undefined) await api.put(`/todos/${todoId}`, { dueDate: changes.dueDate });
-      if (changes.milestoneId !== undefined) await api.patch(`/todos/${todoId}/planning`, { milestoneId: changes.milestoneId });
+      if (changes.workPackageId !== undefined) {
+        await api.patch(`/todos/${todoId}/planning`, workPackageField(changes.workPackageId, legacy));
+      }
     },
-    onMutate: async ({ todoId, changes }) => {
-      const key = goalKeys.detail(goalId);
-      await qc.cancelQueries({ queryKey: key });
-      const previous = qc.getQueryData<GoalDetail>(key);
-      if (previous) qc.setQueryData<GoalDetail>(key, { ...previous, todos: applyPlan(previous.todos, todoId, changes) });
-      return { previous };
-    },
+    onMutate: ({ todoId, changes }) =>
+      patchGoalDetail(qc, goalId, (detail) => ({ ...detail, todos: applyPlan(detail.todos, todoId, changes) })),
     onError: (err, _plan, context) => {
       if (context?.previous) qc.setQueryData(goalKeys.detail(goalId), context.previous);
       toast.error(apiErrorMessage(err, t.goals.timeline.saveFailed));
@@ -51,49 +69,5 @@ export function usePlanGoalTodo(goalId: string) {
       if (announce) toast.success(t.goals.timeline.planned);
     },
     onSettled: () => invalidatePlanning(qc),
-  });
-}
-
-export function useCreateMilestone(goalId: string) {
-  const qc = useQueryClient();
-  const toast = useToast();
-  const t = useT();
-  return useMutation({
-    mutationFn: (data: CreateGoalMilestoneRequest) => api.post<GoalMilestone>(`/goals/${goalId}/milestones`, data),
-    onSuccess: () => {
-      invalidatePlanning(qc);
-      toast.success(t.goals.milestones.saved);
-    },
-    onError: (err) => toast.error(apiErrorMessage(err, t.goals.milestones.saveFailed)),
-  });
-}
-
-export function useUpdateMilestone(goalId: string) {
-  const qc = useQueryClient();
-  const toast = useToast();
-  const t = useT();
-  return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: UpdateGoalMilestoneRequest }) =>
-      api.put<GoalMilestone>(`/goals/${goalId}/milestones/${id}`, data),
-    onSuccess: () => {
-      invalidatePlanning(qc);
-      toast.success(t.goals.milestones.saved);
-    },
-    onError: (err) => toast.error(apiErrorMessage(err, t.goals.milestones.saveFailed)),
-  });
-}
-
-/** Die TODOs bleiben im Ziel, nur ohne Meilenstein. */
-export function useDeleteMilestone(goalId: string) {
-  const qc = useQueryClient();
-  const toast = useToast();
-  const t = useT();
-  return useMutation({
-    mutationFn: (id: string) => api.delete<void>(`/goals/${goalId}/milestones/${id}`),
-    onSuccess: () => {
-      invalidatePlanning(qc);
-      toast.success(t.goals.milestones.deleted);
-    },
-    onError: (err) => toast.error(apiErrorMessage(err, t.goals.milestones.saveFailed)),
   });
 }

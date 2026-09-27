@@ -23,7 +23,7 @@ function item(overrides: Partial<GoalTodoItem>): GoalTodoItem {
   return {
     id: 'x', title: 'X', status: 'OPEN', priority: 'MEDIUM', projectId: 'p1', projectName: 'AutoPilot', tags: [],
     goalRank: null, complexity: null, suggestedEffort: null, ratingNote: null, ratedBy: null, ratedAt: null,
-    openQuestion: null, updatedAt: '2026-09-23T00:00:00Z', dueDate: null, milestoneId: null, ...overrides,
+    openQuestion: null, updatedAt: '2026-09-23T00:00:00Z', dueDate: null, workPackageId: null, ...overrides,
   };
 }
 
@@ -40,21 +40,48 @@ const detail: GoalDetailData = {
   todos: [
     item({
       id: 'a', title: 'Privacy findings', goalRank: 1, complexity: 'M', suggestedEffort: 'medium', ratedBy: 'AI',
-      dueDate: endOf('2030-10-03'), milestoneId: 'm1',
+      dueDate: endOf('2030-10-03'), workPackageId: 'w1',
     }),
     item({ id: 'b', title: 'Style probe', goalRank: 2, status: 'IN_PROGRESS', openQuestion: 'Which look?' }),
-    item({ id: 'c', title: 'Examples page', projectName: 'Site' }),
+    item({ id: 'c', title: 'Examples page', projectId: 'p2', projectName: 'Site' }),
     item({ id: 'd', title: 'Banner', status: 'DONE' }),
   ],
   byProject: [
     { projectId: 'p1', projectName: 'AutoPilot', total: 3, done: 1 },
     { projectId: 'p2', projectName: 'Site', total: 1, done: 0 },
   ],
+  projects: [
+    { projectId: 'p1', name: 'AutoPilot', archived: false, position: 0, total: 3, done: 1, openQuestions: 1 },
+    { projectId: 'p2', name: 'Site', archived: false, position: 1, total: 1, done: 0, openQuestions: 0 },
+  ],
+  workPackages: [{
+    id: 'w1', goalId: 'g1', title: 'Beta', startDate: new Date('2030-09-28T00:00:00').toISOString(), endDate: endOf('2030-10-05'),
+    projectId: 'p1', position: 0, openQuestions: 0, state: 'OPEN', total: 1, done: 0, completedAt: null, reopened: false,
+    createdAt: '2026-09-23T00:00:00Z', updatedAt: '2026-09-23T00:00:00Z',
+  }],
   milestones: [{
-    id: 'm1', goalId: 'g1', title: 'Beta', dueDate: endOf('2030-10-05'), state: 'OPEN', total: 1, done: 0,
-    reachedAt: null, reopened: false, createdAt: '2026-09-23T00:00:00Z', updatedAt: '2026-09-23T00:00:00Z',
+    id: 'ms1', goalId: 'g1', title: 'Launch', dueDate: endOf('2030-10-10'), state: 'OPEN', workPackageIds: ['w1'],
+    packagesTotal: 1, packagesDone: 0, reachedAt: null, reopened: false, createdAt: '2026-09-23T00:00:00Z', updatedAt: '2026-09-23T00:00:00Z',
   }],
 };
+
+/**
+ * Die Antwort eines Backends vor c60bf914: ohne `projects` und `workPackages`; seine „milestones“ sind
+ * Arbeitspakete mit nur einer Fälligkeit, die TODOs zeigen per `milestoneId` darauf.
+ */
+function olderDetail(): Record<string, unknown> {
+  const { projects: _projects, workPackages: _packages, milestones: _milestones, ...rest } = detail;
+  return {
+    ...rest,
+    todos: detail.todos.map(({ workPackageId, ...todo }) => ({ ...todo, milestoneId: workPackageId })),
+    milestones: detail.workPackages.map(({ id, goalId, title, endDate, state, total, done, createdAt, updatedAt }) => ({
+      id, goalId, title, dueDate: endDate, state, total, done, reachedAt: null, reopened: false, createdAt, updatedAt,
+    })),
+  };
+}
+
+/** Die Liste als gewählte Ansicht – die Standardansicht ist seit c60bf914 die Gliederung. */
+const chooseList = () => localStorage.setItem('mysuricates-goal-view-v2', 'list');
 
 function candidate(id: string, title: string, tags: string[] = []): Todo {
   return {
@@ -104,6 +131,7 @@ function renderGoal() {
 
 describe('GoalDetail', () => {
   it('lists what comes next in work order, the open questions and the progress', async () => {
+    chooseList();
     server.use(http.get('/api/v1/goals/g1', () => HttpResponse.json(detail)));
     renderGoal();
 
@@ -112,29 +140,33 @@ describe('GoalDetail', () => {
     expect(next).toEqual(['Privacy findings', 'Style probe', 'Examples page']);
     expect(screen.getByTestId('goal-question')).toHaveTextContent('Which look?');
     expect(screen.getByTestId('goal-progress')).toHaveTextContent('1 of 4 done');
-    expect(screen.getByText('Site: 0/1')).toBeInTheDocument();
+    const projects = screen.getByRole('group', { name: 'Projects of the goal' });
+    expect(within(projects).getByText('Site')).toBeInTheDocument();
+    expect(within(projects).getByText('0 of 1 done')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'assessed by AI' })).toBeInTheDocument();
   });
 
-  it('shows the due date and the milestone of a TODO as chips in the list', async () => {
+  it('shows the due date and the work package of a TODO as chips in the list', async () => {
+    chooseList();
     server.use(http.get('/api/v1/goals/g1', () => HttpResponse.json(detail)));
     renderGoal();
 
     await screen.findByRole('heading', { name: 'Open-Source-Launch' });
     const [first, second] = screen.getAllByTestId('goal-next-item');
     expect(within(first!).getByTitle('Due 10/3/2030')).toHaveTextContent('Oct 3');
-    expect(within(first!).getByTitle('Milestone: Beta')).toHaveTextContent('Beta');
+    expect(within(first!).getByTitle('Work package: Beta')).toHaveTextContent('Beta');
     expect(within(second!).queryByTitle(/^Due/)).not.toBeInTheDocument();
-    expect(within(second!).queryByTitle(/^Milestone/)).not.toBeInTheDocument();
+    expect(within(second!).queryByTitle(/^Work package/)).not.toBeInTheDocument();
   });
 
   it('copes with an older backend without milestones, guard and due dates', async () => {
+    chooseList();
     const { guard: _guard, ...goalWithoutGuard } = detail.goal;
-    const { milestones: _milestones, ...older } = detail;
+    const { milestones: _milestones, projects: _projects, workPackages: _packages, ...older } = detail;
     server.use(http.get('/api/v1/goals/g1', () => HttpResponse.json({
       ...older,
       goal: goalWithoutGuard,
-      todos: detail.todos.map(({ dueDate: _due, milestoneId: _ms, ...rest }) => rest),
+      todos: detail.todos.map(({ dueDate: _due, workPackageId: _wp, ...rest }) => rest),
     })));
     renderGoal();
 
@@ -142,6 +174,104 @@ describe('GoalDetail', () => {
     expect(screen.getAllByTestId('goal-next-item')).toHaveLength(3);
     fireEvent.click(screen.getByRole('tab', { name: 'Timeline' }));
     expect(await screen.findByTestId('goal-timeline')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: 'Outline' }));
+    expect(await screen.findByTestId('outline-project-p1')).toBeInTheDocument();
+  });
+
+  // c60bf914: the outline is the new default – a view chosen under the old key does not hide it
+  it('opens on the outline by default, even with a view stored under the old key', async () => {
+    localStorage.setItem('mysuricates-goal-view', 'list');
+    server.use(http.get('/api/v1/goals/g1', () => HttpResponse.json(detail)));
+    renderGoal();
+
+    const outline = await screen.findByTestId('goal-outline');
+    expect(screen.getByRole('tab', { name: 'Outline' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByTestId('goal-next-item')).not.toBeInTheDocument();
+    const autopilot = within(outline).getByTestId('outline-project-p1');
+    expect(within(autopilot).getByRole('button', { name: 'AutoPilot', expanded: true })).toBeInTheDocument();
+    // the header counts the whole project: done/total and the open questions, read out in full
+    const [done] = within(autopilot).getAllByTestId('outline-done');
+    const [questions] = within(autopilot).getAllByTestId('outline-questions');
+    expect(done).toHaveTextContent('1/31 of 3 done');
+    expect(questions).toHaveTextContent('1Open questions: 1');
+    const beta = within(autopilot).getByTestId('outline-package-w1');
+    expect(within(beta).getByRole('button', { name: /^Open TODO: Privacy findings/ })).toBeInTheDocument();
+    const loose = within(autopilot).getByTestId('outline-loose-p1');
+    expect(within(loose).getAllByTestId('outline-todo').map((row) => within(row).getAllByRole('button')[0]!.textContent))
+      .toEqual(['Style probe', 'Banner']);
+    // the open question sits on its TODO in the human colour, readable as text
+    expect(within(loose).getByRole('img', { name: 'Open question: Which look?' })).toHaveClass('text-human');
+    const site = within(outline).getByTestId('outline-project-p2');
+    expect(within(site).getByRole('button', { name: /^Open TODO: Examples page/ })).toBeInTheDocument();
+  });
+
+  it('builds the outline from an older backend: its milestones as packages in their TODOs\' project, milestones later', async () => {
+    server.use(http.get('/api/v1/goals/g1', () => HttpResponse.json(olderDetail())));
+    renderGoal();
+
+    const autopilot = await screen.findByTestId('outline-project-p1');
+    const beta = within(autopilot).getByTestId('outline-package-w1');
+    expect(beta).toHaveTextContent('Beta');
+    expect(within(beta).getByRole('button', { name: /^Open TODO: Privacy findings/ })).toBeInTheDocument();
+    expect(screen.getByTestId('outline-project-p2')).toBeInTheDocument();
+    expect(screen.queryByTestId('outline-project-none')).not.toBeInTheDocument();
+    expect(screen.getByTestId('outline-milestones-legacy')).toHaveTextContent('Milestones become available after the backend restart.');
+  });
+
+  it('shows the milestones above the projects in the outline', async () => {
+    server.use(http.get('/api/v1/goals/g1', () => HttpResponse.json(detail)));
+    renderGoal();
+
+    const block = await screen.findByTestId('outline-milestones');
+    expect(within(block).getByTestId('outline-milestone-ms1')).toHaveTextContent('Launch');
+    expect(within(block).getByTestId('outline-milestone-ms1')).toHaveTextContent('0/1 packages');
+  });
+
+  it('removes a project from the goal after asking, and offers the cascade when the server refuses with 409', async () => {
+    const deleted: string[] = [];
+    server.use(
+      http.get('/api/v1/goals/g1', () => HttpResponse.json(detail)),
+      http.delete('/api/v1/goals/g1/projects/:pid', ({ request, params }) => {
+        const cascade = new URL(request.url).searchParams.get('cascade');
+        deleted.push(`${params.pid}?cascade=${cascade}`);
+        return cascade === 'true'
+          ? new HttpResponse(null, { status: 204 })
+          : HttpResponse.json({ error: '1 work package and 3 TODOs are still attached', timestamp: '' }, { status: 409 });
+      }),
+    );
+    renderGoal();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Remove project AutoPilot from the goal' }));
+    const dialog = screen.getByRole('dialog', { name: 'Remove project from the goal' });
+    expect(within(dialog).getByText('1 work packages and 3 TODOs are attached to it.')).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Remove' }));
+
+    expect(await within(dialog).findByText('1 work package and 3 TODOs are still attached')).toBeInTheDocument();
+    expect(deleted).toEqual(['p1?cascade=false']);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Delete work packages, release TODOs' }));
+    await waitFor(() => expect(deleted).toEqual(['p1?cascade=false', 'p1?cascade=true']));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Remove project from the goal' })).not.toBeInTheDocument());
+  });
+
+  it('adds a project from the picker and offers only projects the goal does not have yet', async () => {
+    const added: unknown[] = [];
+    server.use(
+      http.get('/api/v1/goals/g1', () => HttpResponse.json(detail)),
+      http.get('/api/v1/projects', () => HttpResponse.json([
+        { id: 'p1', name: 'AutoPilot' }, { id: 'p3', name: 'Docs' }, { id: 'p4', name: 'Old', archivedAt: '2026-01-01T00:00:00Z' },
+      ])),
+      http.post('/api/v1/goals/g1/projects', async ({ request }) => {
+        added.push(await request.json());
+        return HttpResponse.json(detail);
+      }),
+    );
+    renderGoal();
+
+    const projects = await screen.findByRole('group', { name: 'Projects of the goal' });
+    const picker = await within(projects).findByRole('combobox', { name: 'Add project' });
+    expect(within(picker).getAllByRole('option').map((option) => option.textContent)).toEqual(['+ Add project', 'Docs']);
+    fireEvent.change(picker, { target: { value: 'p3' } });
+    await waitFor(() => expect(added).toEqual([{ projectId: 'p3' }]));
   });
 
   it('switches to the timeline and remembers the choice', async () => {
@@ -151,13 +281,15 @@ describe('GoalDetail', () => {
     fireEvent.click(await screen.findByRole('tab', { name: 'Timeline' }));
 
     const timeline = await screen.findByTestId('goal-timeline');
-    expect(within(timeline).getByTestId('timeline-row-m1')).toBeInTheDocument();
+    expect(within(timeline).getByTestId('timeline-row-p1-w1')).toBeInTheDocument();
+    expect(within(timeline).getByRole('button', { name: /^Milestone Launch/ })).toBeInTheDocument();
     expect(within(timeline).getByRole('button', { name: /^Privacy findings/ })).toBeInTheDocument();
-    expect(localStorage.getItem('mysuricates-goal-view')).toBe('timeline');
+    expect(localStorage.getItem('mysuricates-goal-view-v2')).toBe('timeline');
     expect(screen.getByRole('tab', { name: 'Timeline' })).toHaveAttribute('aria-selected', 'true');
   });
 
   it('moving an item down sends the whole active order to the server', async () => {
+    chooseList();
     let sent: unknown = null;
     server.use(
       http.get('/api/v1/goals/g1', () => HttpResponse.json(detail)),
@@ -184,12 +316,12 @@ describe('GoalDetail', () => {
 
     expect(await screen.findByTestId('goal-relation-map')).toBeInTheDocument();
     expect(screen.getByTestId('goal-map-no-workers')).toBeInTheDocument();
-    expect(localStorage.getItem('mysuricates-goal-view')).toBe('map');
+    expect(localStorage.getItem('mysuricates-goal-view-v2')).toBe('map');
     // The shown candidates go into the map as `include` and appear there dashed
     await waitFor(() => expect(asked.include).toContain('c1'));
     // once in the map (dashed), once in the list below
     await waitFor(() => expect(screen.getAllByRole('button', { name: 'Add: Release notes' })).toHaveLength(2));
-    // due date and milestone of a TODO also sit on its node
+    // due date and work package of a TODO also sit on its node
     const node = document.querySelector('[data-node="todo:a"]')!;
     expect(node).toHaveTextContent('Oct 3 · Beta');
     const todoQuery = asked.todos[0]!;
@@ -256,7 +388,7 @@ describe('GoalDetail', () => {
   });
 
   it('opens the edit dialog of a todo from the map', async () => {
-    localStorage.setItem('mysuricates-goal-view', 'map');
+    localStorage.setItem('mysuricates-goal-view-v2', 'map');
     server.use(
       http.get('/api/v1/goals/g1', () => HttpResponse.json(detail)),
       http.get('/api/v1/todos/a', () => HttpResponse.json({ ...candidate('a', 'Privacy findings'), description: 'Full text' })),
@@ -270,7 +402,7 @@ describe('GoalDetail', () => {
     expect(await screen.findByDisplayValue('Full text')).toBeInTheDocument();
   });
   it('explains an older backend (404 on the map) with a hint and a way back to the list, no error card', async () => {
-    localStorage.setItem('mysuricates-goal-view', 'map');
+    localStorage.setItem('mysuricates-goal-view-v2', 'map');
     let hits = 0;
     server.use(
       http.get('/api/v1/goals/g1', () => HttpResponse.json(detail)),
@@ -290,11 +422,11 @@ describe('GoalDetail', () => {
     fireEvent.click(within(hint).getByRole('button', { name: 'To the list' }));
     expect(await screen.findAllByTestId('goal-next-item')).toHaveLength(3);
     expect(screen.getByRole('tab', { name: 'List' })).toHaveAttribute('aria-selected', 'true');
-    expect(localStorage.getItem('mysuricates-goal-view')).toBe('list');
+    expect(localStorage.getItem('mysuricates-goal-view-v2')).toBe('list');
   });
 
   it('shows the empty state in the map for a goal without todos and without candidates', async () => {
-    localStorage.setItem('mysuricates-goal-view', 'map');
+    localStorage.setItem('mysuricates-goal-view-v2', 'map');
     const empty: GoalDetailData = {
       ...detail,
       goal: { ...detail.goal, progress: { total: 0, open: 0, inProgress: 0, backlog: 0, done: 0, openQuestions: 0, percentDone: 0 } },
@@ -345,7 +477,7 @@ describe('GoalDetail', () => {
   });
 
   it('keeps the error card with retry for other errors of the map', async () => {
-    localStorage.setItem('mysuricates-goal-view', 'map');
+    localStorage.setItem('mysuricates-goal-view-v2', 'map');
     server.use(
       http.get('/api/v1/goals/g1', () => HttpResponse.json(detail)),
       http.get('/api/v1/todos', () => HttpResponse.json({ content: [], page: 0, size: 20, totalElements: 0, totalPages: 1 })),

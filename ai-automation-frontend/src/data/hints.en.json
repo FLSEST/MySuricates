@@ -251,12 +251,20 @@
       "A dotted stub shows where no workflow docks on yet; dashed rows are suggestions that might belong to the goal"
     ]
   },
+  "goal-outline": {
+    "title": "The goal in outline",
+    "points": [
+      "At the top are the milestones: dates for the whole goal, reached once their linked work packages are complete",
+      "Below, every project has a card with its work packages in their set order, each with its time span and its TODOs",
+      "The counters show done out of total and the open questions; a question has to be settled before anyone starts"
+    ]
+  },
   "goal-timeline": {
     "title": "The goal on a timeline",
     "points": [
-      "Every row is a milestone, below them the TODOs without a milestone – each on its due day",
-      "A milestone is reached once all TODOs assigned to it are done; its diamond shows where it stands: green reached, yellow due soon, red overdue",
-      "Whatever has no date yet waits under “Unplanned”; overdue TODOs turn red and also show up under “Needs you” in the cockpit"
+      "Milestones sit at the top as diamonds, below every project has a band with its work packages as bars from start to end",
+      "A click into the milestone row or into a band adds one there; bars and diamonds can be dragged, a bar also by its ends",
+      "While dragging, the item shows where it will land; TODOs only go into work packages of their own project"
     ]
   },
   "goal-guard": {

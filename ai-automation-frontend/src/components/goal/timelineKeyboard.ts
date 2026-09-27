@@ -5,9 +5,10 @@ import {
 import { CHIP_ANCHOR, xOfDay, type TimelineAxis } from './timelineLayout';
 
 /**
- * Ziehen per Tastatur am Zeitstrahl (TODO ff6f08fd). Leertaste hebt ein TODO an – Enter bleibt beim
- * Menü des Chips –, ← → schieben es um einen Tag, ↑ ↓ in die Zeile darüber oder darunter (die Leiste
- * „ungeplant“ ist die unterste), Leertaste oder Enter legt es ab, Escape und Tab brechen ab.
+ * Ziehen per Tastatur am Zeitstrahl (TODO ff6f08fd): Leertaste hebt ein TODO an – Enter bleibt beim
+ * Menü –, ← → schieben um einen Tag, ↑ ↓ in die Zeile darüber oder darunter, Leertaste oder Enter
+ * legt ab, Escape und Tab brechen ab. Flächen fremder Projekte nehmen es nicht an; die Live-Zeile
+ * sagt das. Balken und Rauten (c60bf914) verschieben die Pfeiltasten direkt, ohne Anheben.
  */
 export const TIMELINE_KEYBOARD_CODES: KeyboardCodes = {
   start: ['Space'],
@@ -15,18 +16,29 @@ export const TIMELINE_KEYBOARD_CODES: KeyboardCodes = {
   end: ['Space', 'Enter'],
 };
 
-/** Was ein Chip beim Anheben mitgibt: wo sein Statuspunkt sitzt (px vom linken Rand) und ob er gespiegelt steht. */
+/**
+ * Was ein Chip oder eine Raute beim Anheben mitgibt: wo der Punkt sitzt, der das Datum trägt (px vom
+ * linken Rand), ob der Chip gespiegelt steht und was gezogen wird.
+ */
 export interface ChipDragData {
   anchor: number;
   flipped: boolean;
+  kind: 'todo' | 'milestone' | 'package';
+  /** Ein schmaler Chip aus der Beschriftung einer Zeile – das Bild beim Ziehen bleibt so schmal. */
+  compact?: boolean;
 }
 
 export function chipDragData(active: Pick<Active, 'data'> | null | undefined): ChipDragData {
   const data = active?.data.current as Partial<ChipDragData> | undefined;
-  return { anchor: data?.anchor ?? CHIP_ANCHOR, flipped: data?.flipped ?? false };
+  return {
+    anchor: data?.anchor ?? CHIP_ANCHOR, flipped: data?.flipped ?? false, kind: data?.kind ?? 'todo',
+    ...(data?.compact ? { compact: true } : {}),
+  };
 }
 
-const isRow = (id: UniqueIdentifier) => String(id).startsWith('row:');
+/** Flächen mit Tagen: Paket-Zeilen, die Kopfzeilen der Bänder und die Meilenstein-Zeile. */
+const isRow = (id: UniqueIdentifier) =>
+  String(id).startsWith('row:') || String(id).startsWith('strip:') || String(id) === 'milestones';
 const middleOf = (rect: ClientRect) => rect.top + rect.height / 2;
 
 /**
@@ -42,8 +54,8 @@ export const timelineCollision: CollisionDetection = (args) => {
 
 /**
  * Wohin die Pfeiltasten den angehobenen Chip schieben: ← → genau einen Tag, nicht über die Achse
- * hinaus und nur in einer Zeile; ↑ ↓ mitten in die nächste Zeile. Wer aus „ungeplant“ in eine Zeile
- * wechselt, landet auf heute – vorher hatte das TODO keinen Tag.
+ * hinaus und nur in einer Zeile; ↑ ↓ mitten in die nächste Fläche. Wer aus einer Fläche ohne Tage
+ * (etwa der Beschriftung einer Zeile) in eine Zeile wechselt, landet auf heute.
  */
 export function timelineKeyboardCoordinates(axis: TimelineAxis, width: number): KeyboardCoordinateGetter {
   return (event, { context }) => {

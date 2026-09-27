@@ -44,6 +44,8 @@ function detail(guard: GoalGuard): GoalDetail {
       { projectId: 'p1', projectName: 'AutoPilot', total: 1, done: 0 },
       { projectId: 'p2', projectName: 'Site', total: 3, done: 0 },
     ],
+    projects: [],
+    workPackages: [],
     milestones: [],
   };
 }

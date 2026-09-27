@@ -3,30 +3,30 @@ import { ArrowDown, ArrowUp, HelpCircle } from 'lucide-react';
 import { Card } from '../ui';
 import { priorityColor } from '../todo/todoConstants';
 import { ComplexityChip, EffortChip, RatedByMark } from './GoalBadges';
-import { DueChip, MilestoneChip } from './TodoPlanChips';
+import { DueChip, WorkPackageChip } from './TodoPlanChips';
 import { useReorderGoal } from '../../hooks/useGoals';
 import { todoDeepLink } from '../../utils/todoLinks';
 import { useT } from '../../i18n';
-import type { GoalMilestone, GoalTodoItem } from '../../types';
+import type { GoalTodoItem, GoalWorkPackage } from '../../types';
 
 const isActive = (todo: GoalTodoItem) =>
   todo.status === 'OPEN' || todo.status === 'IN_PROGRESS' || todo.status === 'BACKLOG';
 
 /**
  * Die TODOs eines Ziels als Liste (TODO dc0566f8): was als Nächstes drankommt (verschiebbar),
- * welche Fragen vorher zu klären sind, was schon erledigt ist. Fälligkeit und Meilenstein stehen
+ * welche Fragen vorher zu klären sind, was schon erledigt ist. Fälligkeit und Arbeitspaket stehen
  * als Chips an jedem TODO (TODO e192df18).
  */
-export function GoalTodoList({ goalId, todos, milestones, today }: {
+export function GoalTodoList({ goalId, todos, workPackages, today }: {
   goalId: string;
   todos: GoalTodoItem[];
-  milestones: GoalMilestone[];
+  workPackages: GoalWorkPackage[];
   /** Tag (`timelineLayout.dayOf`), gegen den „überfällig“ gilt. */
   today: number;
 }) {
   const t = useT();
   const reorder = useReorderGoal();
-  const milestoneOf = (todo: GoalTodoItem) => milestones.find((milestone) => milestone.id === todo.milestoneId);
+  const packageOf = (todo: GoalTodoItem) => workPackages.find((item) => item.id === todo.workPackageId);
   const next = todos.filter(isActive);
   const questions = next.filter((todo) => todo.openQuestion);
   const done = todos.filter((todo) => todo.status === 'DONE');
@@ -66,7 +66,7 @@ export function GoalTodoList({ goalId, todos, milestones, today }: {
                     {todo.projectName && <span className="text-xs text-text-tertiary">{todo.projectName}</span>}
                   </div>
                   <DueChip todo={todo} today={today} />
-                  <MilestoneChip milestone={milestoneOf(todo)} />
+                  <WorkPackageChip workPackage={packageOf(todo)} />
                   <ComplexityChip value={todo.complexity} />
                   <EffortChip value={todo.suggestedEffort} />
                   <RatedByMark ratedBy={todo.ratedBy} />

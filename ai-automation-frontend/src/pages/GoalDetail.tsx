@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, CalendarDays, ChartGantt, List, Network, Target, Trash2 } from 'lucide-react';
+import { ArrowLeft, CalendarDays, ChartGantt, List, ListTree, Network, Target, Trash2 } from 'lucide-react';
 import { Button, Card, ConfirmModal, Select, Spinner } from '../components/ui';
 import { ErrorState } from '../components/shared/ErrorState';
 import { TodoProgressBar } from '../components/todo/TodoProgressBar';
@@ -10,6 +10,8 @@ import { GoalCandidates, type CandidateFilter } from '../components/goal/GoalCan
 import { GoalTodoEditor } from '../components/goal/GoalTodoEditor';
 import { GoalTimeline } from '../components/goal/GoalTimeline';
 import { GoalGuardControl } from '../components/goal/GoalGuardControl';
+import { GoalOutline } from '../components/goal/GoalOutline';
+import { GoalProjectsBar } from '../components/goal/GoalProjectsBar';
 import { planBadge } from '../components/goal/planDisplay';
 import { dayOf } from '../components/goal/timelineLayout';
 import {
@@ -22,18 +24,22 @@ import type { GoalStatus, GoalTodoItem } from '../types';
 
 const GOAL_STATUSES: GoalStatus[] = ['ACTIVE', 'DONE', 'ARCHIVED'];
 
-type GoalView = 'list' | 'map' | 'timeline';
-const VIEW_KEY = 'mysuricates-goal-view';
-const VIEWS: readonly GoalView[] = ['list', 'map', 'timeline'];
+type GoalView = 'outline' | 'list' | 'map' | 'timeline';
+/**
+ * Neuer Schlüssel mit der Gliederung als Standard (c60bf914) – unter dem alten stünde bei allen, die
+ * schon eine Ansicht gewählt hatten, weiter die alte, und die Gliederung bliebe unentdeckt.
+ */
+const VIEW_KEY = 'mysuricates-goal-view-v2';
+const VIEWS: readonly GoalView[] = ['outline', 'list', 'map', 'timeline'];
 /** Immer als Tag-Vorschlag dabei: Ziele sind oft Releases. */
 const DEFAULT_TAG_SUGGESTION = 'release';
 
 function readView(): GoalView {
   try {
     const stored = localStorage.getItem(VIEW_KEY);
-    return VIEWS.find((view) => view === stored) ?? 'list';
+    return VIEWS.find((view) => view === stored) ?? 'outline';
   } catch {
-    return 'list';
+    return 'outline';
   }
 }
 
@@ -64,9 +70,10 @@ function useDebounced<T>(value: T, ms: number): T {
 }
 
 /**
- * Ein Ziel mit seinen TODOs (TODO dc0566f8): als Liste – was als Nächstes drankommt, offene Fragen,
- * Erledigtes –, als Relationskarte, woher die TODOs kommen und welche Workflows sie abarbeiten
- * (TODO c6ea8f5c), oder als Zeitstrahl mit Fälligkeiten und Meilensteinen (TODO e192df18). Im Kopf
+ * Ein Ziel mit seinen TODOs (TODO dc0566f8): gegliedert in Meilensteine, Projekte und Arbeitspakete
+ * (Standard, c60bf914), als Liste – was als Nächstes drankommt, offene Fragen, Erledigtes –, als
+ * Relationskarte, woher die TODOs kommen und welche Workflows sie abarbeiten (TODO c6ea8f5c), oder als
+ * Zeitstrahl mit Meilensteinen, Arbeitspaketen als Balken und Fälligkeiten (TODO e192df18). Im Kopf
  * der Schalter für den Ziel-Wächter, darunter Vorschläge, die zum Ziel passen könnten.
  */
 export function GoalDetail() {
@@ -86,13 +93,13 @@ export function GoalDetail() {
   const suggestions = useMemo(() => tagSuggestions(data?.todos ?? []), [data?.todos]);
   const [today] = useState(() => dayOf(new Date()));
   const badges = useMemo(() => {
-    const milestones = new Map((data?.milestones ?? []).map((milestone) => [milestone.id, milestone]));
+    const packages = new Map((data?.workPackages ?? []).map((item) => [item.id, item]));
     const entries = (data?.todos ?? []).flatMap((todo) => {
-      const badge = planBadge(todo, todo.milestoneId ? milestones.get(todo.milestoneId) : undefined, today, locale, t);
+      const badge = planBadge(todo, todo.workPackageId ? packages.get(todo.workPackageId) : undefined, today, locale, t);
       return badge ? [[todo.id, badge] as const] : [];
     });
     return new Map(entries);
-  }, [data?.todos, data?.milestones, today, locale, t]);
+  }, [data?.todos, data?.workPackages, today, locale, t]);
   const updateGoal = useUpdateGoal();
   const deleteGoal = useDeleteGoal();
   const assign = useAssignGoalTodos();
@@ -108,7 +115,7 @@ export function GoalDetail() {
     return <ErrorState message={error?.message ?? t.goals.notFound} onRetry={() => refetch()} />;
   }
 
-  const { goal, todos, byProject, milestones } = data;
+  const { goal, todos, byProject, workPackages, milestones, projects } = data;
   const chooseView = (next: GoalView) => {
     setView(next);
     storeView(next);
@@ -168,35 +175,30 @@ export function GoalDetail() {
         <p className="text-sm text-text-secondary" data-testid="goal-progress">
           {t.goals.progress.replace('{done}', String(goal.progress.done)).replace('{total}', String(goal.progress.total))}
         </p>
-        {byProject.length > 1 && (
-          <div className="text-xs text-text-secondary space-y-1">
-            <p className="font-medium">{t.goals.byProject}</p>
-            {byProject.map((p) => (
-              <p key={p.projectId ?? 'none'}>
-                {p.projectName ?? t.goals.noProject}: {p.done}/{p.total}
-              </p>
-            ))}
-          </div>
-        )}
+        <GoalProjectsBar goalId={goal.id} projects={projects} workPackages={workPackages} />
       </Card>
 
-      <div role="tablist" aria-label={t.goals.views.label} className="inline-flex gap-1 p-1 rounded-lg bg-surface-secondary">
+      <div role="tablist" aria-label={t.goals.views.label} className="inline-flex max-w-full gap-1 overflow-x-auto p-1 rounded-lg bg-surface-secondary">
         {([
-          ['list', List, t.goals.views.list], ['map', Network, t.goals.views.map], ['timeline', ChartGantt, t.goals.views.timeline],
+          ['outline', ListTree, t.goals.views.outline], ['list', List, t.goals.views.list],
+          ['map', Network, t.goals.views.map], ['timeline', ChartGantt, t.goals.views.timeline],
         ] as const).map(([key, Icon, label]) => (
           <button key={key} type="button" role="tab" aria-selected={view === key} onClick={() => chooseView(key)}
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md transition-colors ${
               view === key ? 'bg-surface text-text shadow-sm font-medium' : 'text-text-secondary hover:text-text'}`}>
-            <Icon className="w-3.5 h-3.5" />
+            <Icon className="w-3.5 h-3.5 max-sm:hidden" aria-hidden="true" />
             {label}
           </button>
         ))}
       </div>
 
-      {view === 'list' ? (
-        <GoalTodoList goalId={goal.id} todos={todos} milestones={milestones} today={today} />
+      {view === 'outline' ? (
+        <GoalOutline detail={data} today={today} onOpenTodo={setEditing} />
+      ) : view === 'list' ? (
+        <GoalTodoList goalId={goal.id} todos={todos} workPackages={workPackages} today={today} />
       ) : view === 'timeline' ? (
-        <GoalTimeline goal={goal} todos={todos} milestones={milestones} onOpenTodo={setEditing} />
+        <GoalTimeline goal={goal} todos={todos} workPackages={workPackages} milestones={milestones} projects={projects}
+          legacyBackend={data.legacyBackend} onOpenTodo={setEditing} />
       ) : relations.isLoading || !relations.data ? (
         relations.error
           ? apiErrorStatus(relations.error) === 404

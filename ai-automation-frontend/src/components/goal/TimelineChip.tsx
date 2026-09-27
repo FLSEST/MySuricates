@@ -2,36 +2,33 @@ import { useCallback, useId, useRef, useState, type CSSProperties, type FormEven
 import { useDraggable } from '@dnd-kit/core';
 import { Button } from '../ui';
 import { useI18nStore, useT } from '../../i18n';
-import { formatDate } from '../../utils/localeFormat';
-import { CHIP_ANCHOR, CHIP_WIDTH, dayOf, dayOfIsoDate, dueDateOfDay, isOverdue, isoDateOfDay, type PlanChanges } from './timelineLayout';
+import {
+  CHIP_ANCHOR, CHIP_WIDTH, dayOf, dayOfIsoDate, dueDateOfDay, isOverdue, isoDateOfDay, packageRange, type PlanChanges,
+} from './timelineLayout';
 import type { ChipDragData } from './timelineKeyboard';
-import { SHORT_DATE, dueTitle } from './planDisplay';
+import { STATUS_DOT, dueTitle } from './planDisplay';
+import { packageOptions } from './planning';
+import { rangeText } from './dragLabel';
 import { TimelinePopover } from './TimelinePopover';
-import type { GoalMilestone, GoalTodoItem, TodoStatus } from '../../types';
-
-const STATUS_DOT: Record<TodoStatus, string> = {
-  OPEN: 'bg-text-tertiary',
-  BACKLOG: 'bg-border-strong',
-  IN_PROGRESS: 'bg-info',
-  DONE: 'bg-success',
-  ARCHIVED: 'bg-border',
-};
+import type { GoalTodoItem, GoalWorkPackage } from '../../types';
 
 /**
  * So sieht ein TODO auf dem Zeitstrahl aus: Statuspunkt und Titel, überfällig rot, erledigt
  * durchgestrichen. Der Punkt sitzt `CHIP_ANCHOR` px vom Rand – genau auf dem Fälligkeitstag.
  */
-export function ChipFace({ todo, overdue, flipped = false, lifted = false }: {
+export function ChipFace({ todo, overdue, flipped = false, lifted = false, compact = false }: {
   todo: GoalTodoItem;
   overdue: boolean;
   flipped?: boolean;
   /** Das Bild unter dem Mauszeiger beim Ziehen. */
   lifted?: boolean;
+  /** Schmal im Bereich „ohne Datum“ einer Zeile. */
+  compact?: boolean;
 }) {
   const done = todo.status === 'DONE';
   const text = done ? 'text-text-tertiary line-through' : overdue ? 'text-danger' : 'text-text';
   return (
-    <span className={`flex h-7 w-full items-center gap-1.5 rounded-md border bg-surface-raised px-[7px] text-xs ${
+    <span className={`flex w-full items-center gap-1.5 rounded-md border bg-surface-raised px-[7px] ${compact ? 'h-6 text-[11px]' : 'h-7 text-xs'} ${
       flipped ? 'flex-row-reverse' : ''} ${overdue ? 'border-danger/60' : 'border-border'} ${lifted ? 'shadow-lg ring-1 ring-accent' : 'shadow-sm'}`}>
       <span className={`h-2 w-2 shrink-0 rounded-full ${overdue ? 'bg-danger' : STATUS_DOT[todo.status]}`} />
       <span className={`min-w-0 flex-1 truncate ${flipped ? 'text-right' : 'text-left'} ${text}`}>{todo.title}</span>
@@ -41,13 +38,16 @@ export function ChipFace({ todo, overdue, flipped = false, lifted = false }: {
 
 interface TimelineChipProps {
   todo: GoalTodoItem;
-  milestones: GoalMilestone[];
+  /** Alle Pakete des Ziels – das Menü bietet die des eigenen Projekts an. */
+  workPackages: GoalWorkPackage[];
   today: number;
   /**
-   * Platz im Zeitstrahl; ohne steht der Chip im Fluss (Leiste „ungeplant“). `anchor`: Abstand vom
-   * linken Rand zum Tag, auf dem der Statuspunkt sitzt.
+   * Platz im Zeitstrahl; ohne steht der Chip im Fluss (Bereich „ohne Datum“ einer Zeile). `anchor`:
+   * Abstand vom linken Rand zum Tag, auf dem der Statuspunkt sitzt.
    */
   placement?: { left: number; top: number; flipped: boolean; anchor: number };
+  /** Schmal und so breit wie sein Platz – im Bereich „ohne Datum“. */
+  compact?: boolean;
   /** Aus dem Menü des Chips – dem Weg ohne Ziehen. */
   onPlan: (todoId: string, changes: PlanChanges) => void;
   onOpenTodo: (todoId: string) => void;
@@ -56,24 +56,26 @@ interface TimelineChipProps {
 /**
  * Ein TODO auf dem Zeitstrahl (TODO e192df18): mit der Maus oder per Tastatur (Leertaste, dann
  * Pfeiltasten – TODO ff6f08fd) ziehbar, ein Klick (oder Enter) öffnet sein Menü mit „Datum setzen“
- * und „Meilenstein“.
+ * und „Arbeitspaket“ (c60bf914).
  */
-export function TimelineChip({ todo, milestones, today, placement, onPlan, onOpenTodo }: TimelineChipProps) {
+export function TimelineChip({ todo, workPackages, today, placement, compact = false, onPlan, onOpenTodo }: TimelineChipProps) {
   const t = useT();
   const locale = useI18nStore((s) => s.locale);
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const dragData: ChipDragData = { anchor: placement?.anchor ?? CHIP_ANCHOR, flipped: placement?.flipped ?? false };
+  const dragData: ChipDragData = {
+    anchor: placement?.anchor ?? CHIP_ANCHOR, flipped: placement?.flipped ?? false, kind: 'todo', ...(compact ? { compact } : {}),
+  };
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `todo:${todo.id}`, data: dragData });
   const close = useCallback(() => setOpen(false), []);
   const overdue = isOverdue(todo, today);
-  const milestone = milestones.find((m) => m.id === todo.milestoneId);
-  const due = todo.dueDate ? dueTitle(todo.dueDate, overdue, locale, t) : t.goals.timeline.unscheduled;
-  const tooltip = [todo.title, due, milestone && t.goals.milestones.chip.replace('{title}', milestone.title)]
+  const workPackage = workPackages.find((item) => item.id === todo.workPackageId);
+  const due = todo.dueDate ? dueTitle(todo.dueDate, overdue, locale, t) : t.goals.timeline.unscheduledTodo;
+  const tooltip = [todo.title, due, workPackage && t.goals.workPackages.chip.replace('{title}', workPackage.title)]
     .filter(Boolean).join('\n');
   const style: CSSProperties = placement
     ? { position: 'absolute', left: placement.left, top: placement.top, width: CHIP_WIDTH }
-    : { width: CHIP_WIDTH };
+    : { width: compact ? '100%' : CHIP_WIDTH };
 
   return (
     <div ref={setNodeRef} style={style} className={`${placement ? '' : 'relative'} ${isDragging ? 'opacity-40' : ''}`}>
@@ -92,12 +94,12 @@ export function TimelineChip({ todo, milestones, today, placement, onPlan, onOpe
         className="block w-full cursor-grab rounded-md focus-ring active:cursor-grabbing"
         style={{ touchAction: 'none' }}
       >
-        <ChipFace todo={todo} overdue={overdue} flipped={placement?.flipped} />
+        <ChipFace todo={todo} overdue={overdue} flipped={placement?.flipped} compact={compact} />
       </button>
       {open && (
         <ChipMenu
           todo={todo}
-          milestones={milestones}
+          workPackages={workPackages}
           alignRight={placement?.flipped ?? false}
           triggerRef={triggerRef}
           onClose={close}
@@ -115,9 +117,9 @@ export function TimelineChip({ todo, milestones, today, placement, onPlan, onOpe
   );
 }
 
-function ChipMenu({ todo, milestones, alignRight, triggerRef, onClose, onPlan, onOpenTodo }: {
+function ChipMenu({ todo, workPackages, alignRight, triggerRef, onClose, onPlan, onOpenTodo }: {
   todo: GoalTodoItem;
-  milestones: GoalMilestone[];
+  workPackages: GoalWorkPackage[];
   alignRight: boolean;
   triggerRef: RefObject<HTMLButtonElement | null>;
   onClose: () => void;
@@ -128,7 +130,7 @@ function ChipMenu({ todo, milestones, alignRight, triggerRef, onClose, onPlan, o
   const tt = t.goals.timeline;
   const locale = useI18nStore((s) => s.locale);
   const dateId = useId();
-  const milestoneId = useId();
+  const packageId = useId();
   const [date, setDate] = useState(todo.dueDate ? isoDateOfDay(dayOf(todo.dueDate)) : '');
   const day = dayOfIsoDate(date);
 
@@ -141,7 +143,7 @@ function ChipMenu({ todo, milestones, alignRight, triggerRef, onClose, onPlan, o
 
   return (
     <TimelinePopover label={tt.planMenu.replace('{title}', todo.title)} onClose={onClose} triggerRef={triggerRef}
-      className={`top-full mt-1 ${alignRight ? 'right-0' : 'left-0'}`}>
+      align={alignRight ? 'end' : 'start'}>
       <form onSubmit={applyDate} className="space-y-1.5">
         <label htmlFor={dateId} className="block text-xs font-medium text-text-secondary">{tt.setDate}</label>
         <div className="flex gap-2">
@@ -156,13 +158,19 @@ function ChipMenu({ todo, milestones, alignRight, triggerRef, onClose, onPlan, o
         )}
       </form>
       <div className="mt-3 space-y-1.5">
-        <label htmlFor={milestoneId} className="block text-xs font-medium text-text-secondary">{tt.milestone}</label>
-        <select id={milestoneId} value={todo.milestoneId ?? ''} onChange={(event) => onPlan({ milestoneId: event.target.value })}
+        <label htmlFor={packageId} className="block text-xs font-medium text-text-secondary">{tt.workPackage}</label>
+        <select id={packageId} value={todo.workPackageId ?? ''} onChange={(event) => onPlan({ workPackageId: event.target.value })}
           className="input-base w-full py-1 text-sm">
-          <option value="">{tt.noMilestoneOption}</option>
-          {milestones.map((m) => (
-            <option key={m.id} value={m.id}>{`${m.title} · ${formatDate(m.dueDate, locale, SHORT_DATE)}`}</option>
-          ))}
+          <option value="">{tt.noWorkPackageOption}</option>
+          {/* Nur Pakete des eigenen Projekts (c60bf914) – und das bisherige, auch wenn es nicht passt */}
+          {packageOptions(workPackages, todo.projectId, todo.workPackageId ?? '').map((item) => {
+            const range = packageRange(item);
+            return (
+              <option key={item.id} value={item.id}>
+                {`${item.title} · ${range ? rangeText(range, locale) : t.goals.workPackages.noRange}`}
+              </option>
+            );
+          })}
         </select>
       </div>
       <div className="mt-3 flex justify-end border-t border-border pt-2">
