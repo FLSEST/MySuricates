@@ -1,3 +1,4 @@
+import { Hint } from '../components/hints/Hint';
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -56,6 +57,8 @@ export function Docs() {
           </div>
         )}
       </div>
+
+      <Hint id="docs-reading" />
 
       <div className="flex gap-6 flex-1 min-h-0">
         {/* Sidebar */}

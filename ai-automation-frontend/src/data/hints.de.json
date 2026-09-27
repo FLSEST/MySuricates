@@ -266,5 +266,21 @@
       "Das Ergebnis erscheint als Ampel-Kachel auf dem Dashboard; der Workflow braucht kein Modell und kostet keine Tokens",
       "Ausschalten pausiert nur den Zeitplan – Workflow und Kachel bleiben, beim nächsten Einschalten geht es dort weiter"
     ]
+  },
+  "dialogs-sessions": {
+    "title": "Aus einer Claude-Code-Sitzung einen Workflow machen",
+    "points": [
+      "Liest die Claude-Code-Sitzungen auf diesem Rechner, nach Projekt geordnet",
+      "Eine Analyse sucht darin wiederholbare Schritte und schlägt Blöcke vor; die Konfidenz sagt, wie sicher sie das Muster erkannt hat",
+      "Vorschläge vor dem Anlegen prüfen, besonders bei niedriger Konfidenz"
+    ]
+  },
+  "docs-reading": {
+    "title": "Die Handbücher dieser Installation",
+    "points": [
+      "Die Doku aus dem docs-Ordner: Workflow-Bau, Architektur, API, Betrieb und Entwicklung",
+      "Englisch, wo es eine Übersetzung gibt, sonst die deutsche Fassung",
+      "Der Assistent greift auf Teile davon zurück, wenn du ihn zum Workflow-Bau fragst"
+    ]
   }
 }

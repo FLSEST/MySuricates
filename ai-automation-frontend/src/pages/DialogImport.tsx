@@ -1,3 +1,4 @@
+import { Hint } from '../components/hints/Hint';
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -494,6 +495,8 @@ export function DialogImport() {
           <p className="text-sm text-text-secondary">{t.dialog.subtitle}</p>
         </div>
       </div>
+
+      <Hint id="dialogs-sessions" />
 
       {/* 3-Panel-Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-start">

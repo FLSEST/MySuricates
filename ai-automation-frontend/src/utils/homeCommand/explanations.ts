@@ -2,20 +2,15 @@ import { countHits } from './query';
 import type { ParsedQuery } from './types';
 import type { HintId } from '../../data/hints';
 import type { FeatureModuleName } from '../../types';
+import { navItems } from '../navItems';
 
-/** Hints that explain a module's page — they never appear while the module is off. */
-export const HINT_MODULES: Partial<Record<HintId, FeatureModuleName>> = {
-  'wishes-loop': 'wishes',
-  'factory-create': 'factory',
-  'chains-sequence': 'chains',
-  'skills-packages': 'skills',
-  'webhooks-trigger': 'webhooks',
-  'integrations-connect': 'integrations',
-  'debug-failing': 'debug',
-  'audit-findings': 'audit',
-  'insights-numbers': 'learning',
-  'onboarding-profiles': 'onboarding-profiles',
-};
+/**
+ * Hints that explain a module's page — they never appear while the module is off. Taken from the
+ * sidebar: each entry names its page's hint and module (TODO 1df94028).
+ */
+export const HINT_MODULES: Partial<Record<HintId, FeatureModuleName>> = Object.fromEntries(
+  navItems.filter((item) => item.module).map((item) => [item.hint, item.module]),
+);
 
 export interface HintEntry {
   id: HintId;
