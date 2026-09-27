@@ -1,0 +1,32 @@
+name: Idea / suggestion
+description: Propose a feature, workflow pattern, or direction for MySuricates
+title: "idea: "
+labels: ["idea"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Short and to the point is fine. Please check
+        [docs/en/vision.md](docs/en/vision.md) first — if the idea is already
+        the stated direction, say so and skip re-explaining it; if it goes
+        against it, explain why it should change.
+
+        Per [CONTRIBUTING.md](CONTRIBUTING.md), this is the place to discuss an
+        idea before opening a pull request — a PR without a prior issue is
+        likely to sit unread.
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: What
+      description: The idea, in a few sentences.
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: What problem it solves, or why it fits where the project is headed.
+    validations:
+      required: false
