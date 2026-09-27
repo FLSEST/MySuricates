@@ -137,4 +137,13 @@ check "Kuerzel am Ende mit Fliesstext davor entfernt"     'grep -qF -- "- Sync n
 check "kein 8-Hex-Kuerzel mehr ausserhalb Vergleichslink/Verhaltensaenderungen" \
   '[ -z "$(grep -E "[0-9a-f]{8}" <<< "$OUT8" | grep -v "compare/" | grep -v "^- \*\*Seit ")" ]'
 
+echo "9) Slug fuer die Links: von aussen gesetzt, leer, lokaler origin"
+OUT9="$( (cd "$TMP" && RELEASE_NOTES_REPO_SLUG=public/repo bash scripts/release-notes.sh v0.1.0 v0.2.0) )"
+check "gesetzter Slug ersetzt origin im Vergleichslink"   'grep -qF "https://github.com/public/repo/compare/v0.1.0...v0.2.0" <<< "$OUT9" && ! grep -qF "example/mini-repo" <<< "$OUT9"'
+OUT10="$( (cd "$TMP" && RELEASE_NOTES_REPO_SLUG= bash scripts/release-notes.sh v0.1.0 v0.2.0) )"
+check "leerer Slug: kein Vergleichs-Abschnitt"           '! grep -q "## Vergleich" <<< "$OUT10"'
+git -C "$TMP" remote set-url origin "$TMP/elsewhere.git"
+OUT11="$( (cd "$TMP" && bash scripts/release-notes.sh v0.1.0 v0.2.0) )"
+check "lokaler origin: kein kaputter GitHub-Link"        '! grep -q "github.com" <<< "$OUT11"'
+
 echo; echo "passed=$PASS failed=$FAIL"; [ "$FAIL" -eq 0 ]

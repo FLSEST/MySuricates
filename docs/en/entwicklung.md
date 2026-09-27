@@ -643,11 +643,89 @@ The script runs without a previous tag (`scripts/release-notes.sh "" v0.1.0`) an
 current repo has no matching merge commits (e.g. in the curated public repo, which does not inherit
 the working repo's merge history) — the affected sections are simply left out instead of raising an
 error. The action uses a supplied notes file (`release-notes/<tag>.md`) if one exists — for example
-from the handover workflow that brings a verified commit plus tag into the public repo — and
-otherwise generates the notes itself from the history of the repo the workflow runs in.
+from the [handover to the public repo](#handover-to-the-public-repo), which brings a verified
+commit plus tag there — and otherwise generates the notes itself from the history of the repo the
+workflow runs in. The links (comparison, behavior changes) point to the GitHub repo from `origin`;
+`RELEASE_NOTES_REPO_SLUG=<owner>/<repo>` sets it from outside, set to empty the links are left out,
+and an `origin` that is not a GitHub address yields none either.
 
 **Test:** `bash scripts/tests/test-release-notes.sh` runs `release-notes.sh` in a throwaway repo
 (merges, type sections, TODO bracket gets stripped, first release without a previous tag).
+
+### Handover to the public repo
+
+The working repo stays private; the public repository gets **one** squashed, verified commit plus
+an annotated tag per release. The logic lives deterministically in `scripts/release-handover.sh`,
+a MySuricates workflow runs the sequence with an approval.
+
+```bash
+scripts/release-handover.sh v0.8.0 ~/path/to/public-clone               # gates without build
+scripts/release-handover.sh --with-build v0.8.0 ~/path/to/public-clone  # + mvn test, tsc, lint
+scripts/release-handover.sh --discard v0.8.0 ~/path/to/public-clone     # take back, if not pushed
+```
+
+The script:
+1. Checks the preconditions: tag in the working repo, target is the root of a clean clone on a
+   branch, not behind its upstream, the tag does not exist there yet and neither does a newer one,
+   author and committer in the target use the GitHub noreply form, the private hygiene lists can be
+   found (`$HYGIENE_PRIVATE_LIST`/`$HYGIENE_PRIVATE_TERMS`, `~/.config/mysuricates/` or the
+   untracked copies in the working repo, which it passes on).
+2. Exports the tag's tree via `git archive` without the patterns from
+   `scripts/release-handover.exclude` (read from the tag itself; older tags without a list use the
+   one from the working tree) and replaces the target's tracked content with it. `.git`,
+   `release-notes/` (the notes of earlier releases) and ignored files such as build caches stay.
+   Exactly the archive's file list is staged, with `-f` (tracked files under an ignore rule, like
+   the tray icons, belong to it) and without line-ending conversion.
+3. Stops with exit 3 if the result equals the target — nothing is left behind then.
+4. Writes the notes from `scripts/release-notes.sh` to `release-notes/<tag>.md` (the previous tag is
+   the last handed-over release, the links point to the public repo) and commits `Release <tag>`.
+5. Checks exactly this commit: fidelity (every file has the same blob and mode as in the tag,
+   nothing else apart from `release-notes/`), `public-hygiene.sh --tracked`,
+   `pool-neutrality.sh`, gitleaks (if installed), the docs gates (`pre-push-checks.sh --tree`),
+   with `--with-build` also `mvn test` plus `npm ci` (only without `node_modules`),
+   `tsc --noEmit` and `npm run lint`. Any finding takes the commit back; the target is as before.
+6. Sets the annotated tag and ends with the diff statistics, the gate summary, the lines
+   `handover_status:`/`handover_commit:`/`handover_branch:` and the push command. **It never
+   pushes.**
+
+Exit codes: 0 ready (or discarded), 1 stopped (finding or precondition), 2 usage error, 3 nothing to
+hand over.
+
+**Exclusion list** (`scripts/release-handover.exclude`): git pathspecs with glob magic, each entry
+with a reason. It goes out itself and therefore names nothing private — such files are covered by a
+pattern. Excluded today: the one-off workflow migration of one particular instance
+(`scripts/workspace-isolation/prepare-*.py`, `pool-overrides/`) plus its test, and as a safety net
+the private, untracked paths from `.gitignore`. Excluding a file that a test, the build or the docs
+refer to shows up at the latest in a run with `--with-build`.
+
+**The workflow** lives only in the maintainer's instance (not in the pool: it presumes a public repo
+of one's own) and consists of four blocks without AI:
+
+| Block | Type | Task |
+|---|---|---|
+| `vorbereiten` | `shell` | `release-handover.sh` with the context variables `{{ tag }}`, `{{ public_clone }}` and `{{ with_build }}` (`1` = `--with-build`), read via `set -- {{ tag }}; TAG="$*"` with `shell_escape_variables`; exit 3 becomes 0, `timeout_seconds` covers the test suite |
+| `freigabe` | `approval` | only with `handover_status: READY` in the output of `vorbereiten` (`run_if`); the question shows that output — diff statistics and gates; answers `Pushen`/`Verwerfen` in `handover_decision` |
+| `push` | `shell` | only on `Pushen`: checks that HEAD and tag in the clone are still the approved commit, then `git push --atomic origin refs/heads/<branch> refs/tags/<tag>` |
+| `verwerfen` | `shell` | only on `Verwerfen`: `release-handover.sh --discard` takes commit and tag back, so a new run for the same tag is possible |
+
+In the public repo, `.github/workflows/release.yml` then creates the GitHub release from the
+supplied notes file.
+
+**Way back** (contributions from the public repo, per `CONTRIBUTING.md` only after agreement):
+since every handed-over file has the same blob as in the tag, a patch from the public clone applies
+in the working repo with a three-way merge:
+
+```bash
+git -C ~/path/to/public-clone fetch origin pull/<nr>/head:pr-<nr>
+git -C ~/path/to/public-clone format-patch --stdout origin/main..pr-<nr> | git am -3
+```
+
+`git am` keeps the contributor as author; the change then goes out again with the next release tag.
+
+**Test:** `bash scripts/tests/test-release-handover.sh` runs the script between a throwaway working
+repo and a local throwaway "public" repo (bare + clone): exclusion, replaced content, fidelity even
+for CRLF files, commit, annotated tag, notes file, stop and complete reset on a gate finding, stop
+without a change, preconditions, `--discard` and that nothing gets pushed.
 
 ### Behavior Changes
 
