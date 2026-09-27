@@ -78,6 +78,15 @@ Programm noch Anmeldung. Mit `login` und `programs` hat jeder Anbieter ein eigen
 Daten-Volume (`/app/data/providers/<anbieter>`, über `CLAUDE_CONFIG_DIR`, `CODEX_HOME` und
 `PI_CODING_AGENT_DIR`): Was die Programme dort schreiben — Sitzungen, Caches —, erreicht den Rechner nicht.
 
+**Anmelde-Befehl in der Karte „KI-Anbieter“.** In `programs` kennt der Starter den Befehl, der im
+Container anmeldet — der Container weiß selbst nicht, wie er gestartet wurde, also gibt der Starter ihn
+als `MYSURICATES_LOGIN_COMMAND` mit (fester Text, den er ohnehin schon kennt, nie aus einer Eingabe
+zusammengesetzt). Das Backend zeigt ihn nur an und führt ihn nie aus. Tryout: `scripts/tryout.sh login
+[claude|codex|pi]`. `instance.sh` in `programs`: `scripts/instance.sh login`. `staging.sh` in `programs`:
+`scripts/staging.sh login stable` bzw. `scripts/staging.sh login test`. Im Standardmodus `login` (die
+Anmeldung kommt vom Rechner, siehe unten) und beim Dev-Container, der keinen eigenen `login`-Befehl kennt,
+bleibt es beim allgemeinen Hinweis, wie schon vor diesem Befehl.
+
 **Warum Claude einen Token braucht.** Claude ersetzt `~/.claude/.credentials.json` bei jedem Erneuern der
 Anmeldung (neue Datei, dann Umbenennen). Eine einzeln eingebundene Datei zeigte im Container danach
 weiter auf die alte, und nach der nächsten Erneuerung auf dem Rechner wäre der Container abgemeldet.

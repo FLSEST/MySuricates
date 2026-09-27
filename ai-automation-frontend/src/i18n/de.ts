@@ -3102,7 +3102,7 @@ export const de: TranslationKeys = {
     loginNotes: {
       pi_slash_login: 'dann /login in pi — oder ein API-Schlüssel als Umgebungsvariable (siehe pi --help)',
     },
-    containerNote: 'Diese Instanz läuft in einem Container. Es zählen die Programme und Anmeldungen darin, nicht die auf dem Rechner davor. Wie eine Anmeldung hineinkommt, hängt vom Startweg ab: im Tryout mit scripts/tryout.sh login, bei Installer- und Staging-Instanzen vom Rechner (siehe Startkonfiguration).',
+    containerNote: 'Diese Instanz läuft in einem Container. Es zählen die Programme und Anmeldungen darin, nicht die auf dem Rechner davor. Wie eine Anmeldung hineinkommt, hängt vom Startweg ab (siehe Startkonfiguration).',
     heuristic: 'Geprüft wird, ob das Programm auf dem PATH liegt und eine Anmeldung vorhanden ist — nicht, ob sie noch gilt.',
     checkedAt: 'Geprüft um {time}',
     recheck: 'Neu prüfen',

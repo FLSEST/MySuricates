@@ -150,7 +150,7 @@ tracked_files_tar() {
 is_git_clone() { [ "$(git -C "$REPO_ROOT" rev-parse --show-toplevel 2>/dev/null)" = "$(cd "$REPO_ROOT" && pwd -P)" ]; }
 
 container_cmd() {
-  local override="$INSTANCES_DIR/$NAME.override.yml" owner missing
+  local override="$INSTANCES_DIR/$NAME.override.yml" owner missing login_command
   compose() { docker compose -p "mysuricates-$NAME" -f "$COMPOSE_FILE" -f "$override" "$@"; }
   build_image() {
     if is_git_clone; then
@@ -174,8 +174,12 @@ container_cmd() {
   case "$CMD" in
     up)
       # Was vom Host in den Container kommt, entscheiden die Schalter der Instanzdatei (262948a4)
+      # Nur im Modus programs meldet sich der Container selbst an — die Statuskarte zeigt dann den
+      # Befehl, der das tut (fester Text, nie ausgefuehrt).
+      login_command=""
+      [ "${MYSURICATES_AI_FROM_HOST:-login}" = programs ] && login_command="scripts/instance.sh login"
       host_mounts_yaml app "${MYSURICATES_PROJECTS:-$(cd "$REPO_ROOT/.." && pwd)}" "${MYSURICATES_DOCKER_SOCKET:-0}" \
-        "${MYSURICATES_AI_FROM_HOST:-login}" "${MYSURICATES_AI_PROVIDERS:-}" "$ENV_FILE" MYSURICATES_ > "$override" \
+        "${MYSURICATES_AI_FROM_HOST:-login}" "${MYSURICATES_AI_PROVIDERS:-}" "$ENV_FILE" MYSURICATES_ "$login_command" > "$override" \
         || die "Ungültige KI-Schalter in $ENV_FILE (MYSURICATES_AI_FROM_HOST=programs|login|all, MYSURICATES_AI_PROVIDERS=claude,codex,pi)"
       missing="$(host_mounts_missing_text)"
       [ -z "$missing" ] || printf 'KI-Anbieter, die dieser Container nicht nutzen kann:\n%s\n' "$missing" >&2

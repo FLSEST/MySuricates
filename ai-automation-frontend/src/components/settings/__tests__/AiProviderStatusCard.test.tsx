@@ -84,6 +84,42 @@ describe('AiProviderStatusCard', () => {
     expect(within(pi).queryByTestId('ai-provider-login-note')).not.toBeInTheDocument();
   });
 
+  it('in a container, shows the login command of the start path that launched it, copyable', async () => {
+    server.use(http.get('/api/v1/system/ai-providers/status', () => HttpResponse.json({
+      container: true,
+      loginCommand: 'scripts/instance.sh login',
+      checkedAt: '2026-09-24T10:00:00Z',
+      providers: [
+        { id: 'CLAUDE', cli: 'claude', state: 'LOGIN_MISSING', installed: true, loggedIn: false, loginVia: null,
+          loginSource: null, install: 'curl claude', login: 'claude auth login', defaultProvider: true },
+      ],
+    })));
+    renderWithProviders(<AiProviderStatusCard />);
+
+    const card = await screen.findByTestId('ai-provider-status-card');
+    const note = await within(card).findByTestId('ai-provider-status-container');
+    expect(within(note).getByText('scripts/instance.sh login', { selector: 'code' })).toBeInTheDocument();
+    // The per-provider command never shows in a container — it would point to the wrong machine
+    expect(within(card).queryByText('claude auth login')).not.toBeInTheDocument();
+  });
+
+  it('in a container without a known login command (older backend, or the default login mode): the hint only', async () => {
+    server.use(http.get('/api/v1/system/ai-providers/status', () => HttpResponse.json({
+      container: true,
+      checkedAt: '2026-09-24T10:00:00Z',
+      providers: [
+        { id: 'CLAUDE', cli: 'claude', state: 'LOGIN_MISSING', installed: true, loggedIn: false, loginVia: null,
+          loginSource: null, install: 'curl claude', login: 'claude auth login', defaultProvider: true },
+      ],
+    })));
+    renderWithProviders(<AiProviderStatusCard />);
+
+    const card = await screen.findByTestId('ai-provider-status-card');
+    const note = await within(card).findByTestId('ai-provider-status-container');
+    expect(note).toHaveTextContent(en.aiProviderStatus.containerNote);
+    expect(within(note).queryByRole('button', { name: /copy/i })).not.toBeInTheDocument();
+  });
+
   it('shows nothing when the instance cannot answer (older backend)', async () => {
     let asked = false;
     server.use(http.get('/api/v1/system/ai-providers/status', () => {
