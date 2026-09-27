@@ -47,6 +47,10 @@ export function ModelStatsCard({ data }: ModelStatsCardProps) {
             <YAxis
               type="category"
               dataKey="name"
+              // Recharts otherwise hides every second category label when the
+              // compact card contains several models. Model names are the
+              // meaning of this chart, so keep one label for every bar.
+              interval={0}
               tick={{ fill: 'var(--color-text-secondary)', fontSize: 11 }}
               axisLine={false}
               tickLine={false}
