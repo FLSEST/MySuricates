@@ -50,7 +50,7 @@ class GitLabParamsTest {
     void ids_acceptsNumericUserIdsOnly() {
         assertThat(GitLabParams.ids("3, 12", "assigneeIds")).containsExactly(3L, 12L);
         assertThat(GitLabParams.ids(List.of(5), "assigneeIds")).containsExactly(5L);
-        assertThatThrownBy(() -> GitLabParams.ids("flo", "assigneeIds"))
+        assertThatThrownBy(() -> GitLabParams.ids("alex", "assigneeIds"))
                 .hasMessage("Parameter 'assigneeIds' expects numeric user IDs");
     }
 

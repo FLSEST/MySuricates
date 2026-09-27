@@ -23,7 +23,7 @@ class ExportWorkflowResponseTest {
         BlockDefinition block = sampleBlock();
         List<BlockDefinition> blocks = List.of(block);
         Map<String, Object> defaultContext = Map.of("env", "prod", "retries", 3);
-        Map<String, Object> metadata = Map.of("author", "flo", "tags", List.of("etl"));
+        Map<String, Object> metadata = Map.of("author", "alex", "tags", List.of("etl"));
 
         ExportWorkflowResponse response = new ExportWorkflowResponse(
                 "My Workflow",
@@ -46,7 +46,7 @@ class ExportWorkflowResponseTest {
         assertThat(response.model()).isEqualTo("claude-sonnet-4-6");
         assertThat(response.version()).isEqualTo("1.2.3");
         assertThat(response.defaultContext()).containsEntry("env", "prod").containsEntry("retries", 3);
-        assertThat(response.metadata()).containsEntry("author", "flo");
+        assertThat(response.metadata()).containsEntry("author", "alex");
         assertThat(response.exportedAt()).isEqualTo(exportedAt);
     }
 

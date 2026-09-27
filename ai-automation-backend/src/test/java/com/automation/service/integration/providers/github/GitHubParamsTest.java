@@ -12,7 +12,7 @@ class GitHubParamsTest {
 
     @Test
     void extractToken_takesPartAfterPipe_orWholeValue() {
-        assertThat(GitHubParams.extractToken("flo|ghp_x")).isEqualTo("ghp_x");
+        assertThat(GitHubParams.extractToken("alex|ghp_x")).isEqualTo("ghp_x");
         assertThat(GitHubParams.extractToken("ghp_x")).isEqualTo("ghp_x");
         assertThat(GitHubParams.extractToken(null)).isNull();
     }

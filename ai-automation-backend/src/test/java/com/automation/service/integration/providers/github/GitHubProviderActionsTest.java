@@ -41,7 +41,7 @@ class GitHubProviderActionsTest {
                 .thenReturn(Map.of("number", 5));
 
         Object result = provider.executeAction("create_issue",
-                Map.of("repo", "FLSEST/MySuricates", "title", "Bug", "labels", "a, b"), "flo|ghp_x");
+                Map.of("repo", "FLSEST/MySuricates", "title", "Bug", "labels", "a, b"), "alex|ghp_x");
 
         assertThat(((Map<?, ?>) result).get("number")).isEqualTo(5);
         verify(http).post(any(), eq(Map.of("title", "Bug", "labels", List.of("a", "b"))), eq("ghp_x"), eq(Object.class));
@@ -76,7 +76,7 @@ class GitHubProviderActionsTest {
                 .thenReturn(Map.of("number", 42, "html_url", "https://github.com/FLSEST/MySuricates/issues/42"));
 
         TaskExportCapable.TaskRef ref = provider.createTask(
-                new TaskExportCapable.TaskExportInput("Titel", "Body", List.of("bug"), "FLSEST/MySuricates"), "flo|ghp_x");
+                new TaskExportCapable.TaskExportInput("Titel", "Body", List.of("bug"), "FLSEST/MySuricates"), "alex|ghp_x");
 
         assertThat(ref.referenceType()).isEqualTo("github");
         assertThat(ref.referenceId()).isEqualTo("FLSEST/MySuricates#42");
@@ -87,6 +87,6 @@ class GitHubProviderActionsTest {
     void fetchAccountInfo_onHttpFailure_returnsNull() {
         when(http.get(any(), any(), eq(Object.class))).thenThrow(new IllegalStateException("GitHub API error 500: x"));
 
-        assertThat(provider.fetchAccountInfo("flo|ghp_x")).isNull();
+        assertThat(provider.fetchAccountInfo("alex|ghp_x")).isNull();
     }
 }

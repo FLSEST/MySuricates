@@ -49,11 +49,11 @@ class TrelloHttpClientTest {
     @Test
     void get_noAuthorizationHeader() {
         AtomicReference<String> auth = new AtomicReference<>();
-        respond("/members/me", 200, "{\"username\":\"flo\"}", auth, null, null);
+        respond("/members/me", 200, "{\"username\":\"alex\"}", auth, null, null);
 
         Object member = client.get(base + "/members/me?key=k&token=t", Object.class);
 
-        assertThat(((Map<?, ?>) member).get("username")).isEqualTo("flo");
+        assertThat(((Map<?, ?>) member).get("username")).isEqualTo("alex");
         assertThat(auth.get()).isNull();
     }
 

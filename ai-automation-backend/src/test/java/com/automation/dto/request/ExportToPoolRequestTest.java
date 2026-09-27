@@ -22,7 +22,7 @@ class ExportToPoolRequestTest {
                     "Verifiziert Builds",
                     "ci",
                     tags,
-                    "flo"
+                    "alex"
             );
 
             assertThat(request.nameEn()).isEqualTo("Build Gate");
@@ -31,7 +31,7 @@ class ExportToPoolRequestTest {
             assertThat(request.descriptionDe()).isEqualTo("Verifiziert Builds");
             assertThat(request.category()).isEqualTo("ci");
             assertThat(request.tags()).containsExactly("automation", "build");
-            assertThat(request.author()).isEqualTo("flo");
+            assertThat(request.author()).isEqualTo("alex");
         }
 
         @Test

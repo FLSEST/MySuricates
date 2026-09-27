@@ -102,14 +102,14 @@ class IntegrationOAuthConnectFlowTest {
     @Test
     void saveCredentials_patAccepted_recordsGrantedScopes() {
         when(provider.requiresOAuthFlow()).thenReturn(false);
-        when(provider.fetchAccountInfo("key|token")).thenReturn("flo");
+        when(provider.fetchAccountInfo("key|token")).thenReturn("alex");
         when(provider.fetchGrantedScopes("key|token")).thenReturn("repo");
         when(connectionRepository.findByProviderIdAndConnectionName("acme", "default")).thenReturn(Optional.empty());
 
         IntegrationConnection saved = flow.saveCredentials("acme", "default", "key", "token");
 
         assertThat(saved.getStatus()).isEqualTo(ConnectionStatus.CONNECTED);
-        assertThat(saved.getAccountInfo()).isEqualTo("flo");
+        assertThat(saved.getAccountInfo()).isEqualTo("alex");
         assertThat(saved.getScopes()).isEqualTo("repo");
     }
 
@@ -123,7 +123,7 @@ class IntegrationOAuthConnectFlowTest {
         when(connectionRepository.findByProviderIdAndConnectionName("acme", "default")).thenReturn(Optional.of(row));
         when(tokenClient.exchangeCodeForTokens("acme", CONFIG, "code-1", "cid", "sec", "https://app/cb"))
                 .thenReturn(json("{\"access_token\":\"at\",\"refresh_token\":\"rt\",\"expires_in\":120,\"scope\":\"read write\"}"));
-        when(provider.fetchAccountInfo("at")).thenReturn("flo@acme");
+        when(provider.fetchAccountInfo("at")).thenReturn("alex@acme");
 
         Instant before = Instant.now();
         IntegrationConnection saved = flow.handleCallback("acme", "default", "code-1", "https://app/cb");
@@ -132,7 +132,7 @@ class IntegrationOAuthConnectFlowTest {
         assertThat(saved.getAccessTokenEncrypted()).isEqualTo("enc(at)");
         assertThat(saved.getRefreshTokenEncrypted()).isEqualTo("enc(rt)");
         assertThat(saved.getScopes()).isEqualTo("read write");
-        assertThat(saved.getAccountInfo()).isEqualTo("flo@acme");
+        assertThat(saved.getAccountInfo()).isEqualTo("alex@acme");
         assertThat(saved.getTokenExpiry()).isBetween(before.plusSeconds(120), Instant.now().plusSeconds(120));
 
         // read burst committed → HTTP → write burst: the provider call never holds the connection

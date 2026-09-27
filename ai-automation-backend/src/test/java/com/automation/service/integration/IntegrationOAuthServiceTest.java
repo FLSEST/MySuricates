@@ -911,7 +911,7 @@ class IntegrationOAuthServiceTest {
         IntegrationOAuthService service = newService();
         when(registry.getProvider("github")).thenReturn(provider);
         when(provider.requiresOAuthFlow()).thenReturn(false);
-        when(provider.fetchAccountInfo("x|ghp_token")).thenReturn("{\"login\":\"flo\"}");
+        when(provider.fetchAccountInfo("x|ghp_token")).thenReturn("{\"login\":\"alex\"}");
         when(provider.fetchGrantedScopes("x|ghp_token")).thenReturn(scopesFromProvider);
         when(connectionRepository.findByProviderIdAndConnectionName("github", "default")).thenReturn(Optional.empty());
         when(encryptionService.encrypt(any())).thenReturn("enc");

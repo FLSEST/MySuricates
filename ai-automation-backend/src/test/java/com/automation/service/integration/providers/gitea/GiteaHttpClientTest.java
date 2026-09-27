@@ -51,11 +51,11 @@ class GiteaHttpClientTest {
 
     @Test
     void get_sendsTokenHeaderAndParsesJson() {
-        respond("/api/v1/user", 200, "{\"login\":\"flo\"}");
+        respond("/api/v1/user", 200, "{\"login\":\"alex\"}");
 
         Object user = client.get(base + "/api/v1/user?x=1", "tok", Object.class);
 
-        assertThat(((Map<?, ?>) user).get("login")).isEqualTo("flo");
+        assertThat(((Map<?, ?>) user).get("login")).isEqualTo("alex");
         assertThat(auth.get()).isEqualTo("token tok");
         assertThat(method.get()).isEqualTo("GET");
         assertThat(query.get()).isEqualTo("x=1");

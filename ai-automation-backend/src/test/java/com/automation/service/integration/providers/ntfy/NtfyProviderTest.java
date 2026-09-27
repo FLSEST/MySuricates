@@ -118,14 +118,14 @@ class NtfyProviderTest {
 
     @Test
     void fetchAccountInfo_withTokenReadsAccount() throws Exception {
-        respond("/v1/account", 200, "{\"username\":\"flo\",\"role\":\"user\"}");
+        respond("/v1/account", 200, "{\"username\":\"alex\",\"role\":\"user\"}");
 
         String info = provider.fetchAccountInfo(base + "|tk_secret");
 
         assertThat(auth.get()).isEqualTo("Bearer tk_secret");
         Map<?, ?> parsed = objectMapper.readValue(info, Map.class);
-        assertThat(parsed.get("username")).isEqualTo("flo");
-        assertThat(parsed.get("name")).isEqualTo("flo @ 127.0.0.1");
+        assertThat(parsed.get("username")).isEqualTo("alex");
+        assertThat(parsed.get("name")).isEqualTo("alex @ 127.0.0.1");
         assertThat(parsed.get("server")).isEqualTo(base);
     }
 
