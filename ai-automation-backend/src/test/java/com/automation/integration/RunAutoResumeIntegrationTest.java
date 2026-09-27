@@ -128,6 +128,7 @@ class RunAutoResumeIntegrationTest {
         // The new run is interrupted as well: it stays for a person, no third run.
         WorkflowRun again = fixture.reload(retry);
         again.setStatus(RunStatus.RUNNING);
+        again.setStartedAt(InterruptedRunFixture.beforeJvmStart());
         again.setCompletedAt(null);
         runRepository.saveAndFlush(again);
         runControlService.cleanupZombieRuns();
@@ -187,6 +188,7 @@ class RunAutoResumeIntegrationTest {
         // The resumed run is caught by the next restart as well.
         WorkflowRun again = fixture.reload(run);
         again.setStatus(RunStatus.RUNNING);
+        again.setStartedAt(InterruptedRunFixture.beforeJvmStart());
         again.setCompletedAt(null);
         runRepository.saveAndFlush(again);
         runControlService.cleanupZombieRuns();
