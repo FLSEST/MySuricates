@@ -111,6 +111,98 @@ class PublicationGateTest(unittest.TestCase):
         self.gate('en', target)
 
 
+class OnlyFilterTest(unittest.TestCase):
+    """--only regenerates single pages without touching the others or rewriting index rows."""
+
+    def setUp(self):
+        base = PublicationGateTest()
+        base.setUp()
+        self.addCleanup(base.temp.cleanup)
+        self.root, self.facts, self.catalog = base.root, base.facts, base.catalog
+        self.items = pages.select('zusammenstoepseln,anbieter-unabhaengig')
+        self.work = self.root / 'only-run'
+        (self.work / 'drafts').mkdir(parents=True)
+        (self.work / 'manifest.json').write_text((base.work / 'manifest.json').read_text())
+        for item in self.items:
+            (self.work / 'drafts' / (item['slug'] + '.md')).write_text(
+                (base.work / 'drafts' / (item['slug'] + '.md')).read_text())
+        self.index = self.root / 'docs/konzepte/README.md'
+        self.index.parent.mkdir(parents=True, exist_ok=True)
+        self.index.write_text('# Konzepte\n\n| Mechanismus | Leitfrage |\n|---|---|\n'
+                              '| [Gates](gates.md) | Handgeschriebene Frage? |\n\n## Weiter\n')
+
+    def run_quietly(self, function, *args):
+        with contextlib.redirect_stdout(io.StringIO()) as out:
+            function(*args)
+        return out.getvalue()
+
+    def test_selection_keeps_catalog_order_and_rejects_unknown_slugs(self):
+        self.assertEqual([i['slug'] for i in pages.select(' anbieter-unabhaengig, gates ')],
+                         ['gates', 'anbieter-unabhaengig'])
+        self.assertEqual(len(pages.select('')), len(self.catalog))
+        with self.assertRaisesRegex(ValueError, 'nope'):
+            pages.select('gates,nope')
+
+    def test_filtered_prepare_writes_only_selected_packets(self):
+        with patch.object(pages.subprocess, 'check_output', return_value='a' * 40):
+            self.run_quietly(pages.prepare, self.root, self.root / 'prep', self.facts, self.items)
+        self.assertEqual(sorted(p.name for p in (self.root / 'prep/packets').iterdir()),
+                         ['anbieter-unabhaengig.txt', 'zusammenstoepseln.txt'])
+
+    def test_missing_metric_named_before_ai_call(self):
+        data = pages.read_json(self.facts)
+        del data['metrics']['steps_integration']
+        self.facts.write_text(json.dumps(data))
+        with self.assertRaisesRegex(ValueError, 'steps_integration'):
+            pages.prepare(self.root, self.root / 'prep', self.facts, self.items)
+
+    def test_filtered_assembly_adds_index_rows_and_checks_only_selection(self):
+        self.run_quietly(pages.assemble, self.root, self.work, self.facts, self.items)
+        target = self.work / 'de'
+        self.assertEqual(sorted(p.name for p in target.iterdir()),
+                         ['README.md', 'anbieter-unabhaengig.md', 'zusammenstoepseln.md'])
+        index = (target / 'README.md').read_text()
+        self.assertIn('| [Gates](gates.md) | Handgeschriebene Frage? |', index)
+        self.assertEqual(index.count('](zusammenstoepseln.md)'), 1)
+        self.assertLess(index.index('](anbieter-unabhaengig.md)'), index.index('## Weiter'))
+        self.run_quietly(pages.check, self.root, target, self.facts, 'de', self.items)
+        with self.assertRaisesRegex(ValueError, 'gates'):
+            self.run_quietly(pages.check, self.root, target, self.facts, 'de')
+
+    def test_index_untouched_when_rows_exist(self):
+        self.index.write_text(pages.add_index_rows(self.index.read_text(), self.items, 'de'))
+        self.run_quietly(pages.assemble, self.root, self.work, self.facts, self.items)
+        self.assertFalse((self.work / 'de/README.md').exists())
+
+    def test_filtered_english_finish_adds_rows_to_existing_translation(self):
+        self.run_quietly(pages.assemble, self.root, self.work, self.facts, self.items)
+        target = self.root / 'docs/en/konzepte'
+        target.mkdir(parents=True)
+        for item in self.items:
+            text = (self.work / 'de' / (item['slug'] + '.md')).read_text()
+            for german, english in zip(pages.HEADINGS['de'], pages.HEADINGS['en']):
+                text = text.replace('## ' + german, '## ' + english)
+            (target / (item['slug'] + '.md')).write_text('<!-- last-sync: fixture -->\n\n' + text)
+        (target / 'README.md').write_text('| Mechanism | Guiding question |\n|---|---|\n'
+                                          '| [Gates](gates.md) | Hand-written question? |\n')
+        self.run_quietly(pages.finish_english, self.root, target, self.facts, self.items)
+        index = (target / 'README.md').read_text()
+        self.assertIn('| [Gates](gates.md) | Hand-written question? |', index)
+        self.assertIn('[Provider independence](anbieter-unabhaengig.md)', index)
+        self.assertIn('Next workflow in the chain', (target / 'zusammenstoepseln.md').read_text())
+
+    def test_list_prints_items_for_the_workflow(self):
+        full = io.StringIO()
+        with contextlib.redirect_stdout(full):
+            pages.list_items(pages.select(''), True, False)
+        self.assertEqual(full.getvalue().split()[-1], 'konzepte/README.md')
+        only = io.StringIO()
+        with contextlib.redirect_stdout(only):
+            pages.list_items(self.items, True, True)
+        self.assertEqual(only.getvalue().split(),
+                         ['konzepte/zusammenstoepseln.md', 'konzepte/anbieter-unabhaengig.md'])
+
+
 class CollectorTest(unittest.TestCase):
     def test_pagination_and_data_minimization(self):
         responses = iter([
@@ -130,6 +222,9 @@ class CollectorTest(unittest.TestCase):
         self.assertEqual(result['metrics']['todos_without_resolution_state']['value'], 1)
         self.assertNotIn('PRIVATE', json.dumps(result))
         self.assertNotIn('secret-fixture', json.dumps(result))
+        # A step count the catalog needs is measured as zero, not left out (prepare would stop).
+        self.assertEqual(result['metrics']['steps_integration']['value'], 0)
+        self.assertEqual(result['metrics']['steps_shell']['value'], 2)
 
 
 if __name__ == '__main__':

@@ -4,8 +4,8 @@
     "en": "MySuricates concept pages by mechanism"
   },
   "description": {
-    "de": "Erzeugt acht kurze Konzeptseiten aus aktuellen anonymen Betriebszahlen und Codebelegen. Ein KI-Aufruf je Mechanismus, feste Mermaid-Diagramme und deterministisches Gate. Benötigt dieses Repository und einen vorher erhobenen Fakten-Snapshot.",
-    "en": "Generates eight concise concept pages from current anonymous operational counts and code evidence. One AI call per mechanism, fixed Mermaid diagrams and a deterministic gate. Requires this repository and a previously collected facts snapshot."
+    "de": "Erzeugt kurze Konzeptseiten je Mechanismus aus aktuellen anonymen Betriebszahlen und Codebelegen. Ein KI-Aufruf je Mechanismus, feste Mermaid-Diagramme und deterministisches Gate; concept_only begrenzt den Lauf auf einzelne Seiten. Benötigt dieses Repository und einen vorher erhobenen Fakten-Snapshot.",
+    "en": "Generates concise concept pages per mechanism from current anonymous operational counts and code evidence. One AI call per mechanism, fixed Mermaid diagrams and a deterministic gate; concept_only limits the run to single pages. Requires this repository and a previously collected facts snapshot."
   },
   "icon": "📖",
   "category": "DOCUMENTATION",
@@ -19,20 +19,22 @@
   "provider": "PI",
   "model": "openai-codex/gpt-5.5",
   "effort": "medium",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "MySuricates",
   "instructions": "Erzeuge belegte Dokumentation im ausdrücklich angegebenen Arbeitsverzeichnis. Dies ist ein kontrollierter Dokumentationsauftrag; keine Commits oder Plattformänderungen. Jeder Aufruf schreibt ausschließlich seinen angegebenen Entwurf. Betriebsdaten werden vor dem Run über REST erhoben; Workflow-Blöcke greifen weder auf REST noch auf die DB zu.",
   "defaultContext": {
     "concept_root": ".",
     "concept_facts": "docs/konzepte/betriebsdaten.json",
-    "concept_output": "/tmp/mysuricates-concept-pages"
+    "concept_output": "/tmp/mysuricates-concept-pages",
+    "concept_only": ""
   },
   "blocks": [
     {
       "type": "shell",
       "name": "faktenpakete",
       "config": {
-        "command": "set -euo pipefail\npython3 \"{{ concept_root }}/scripts/concepts/pages.py\" prepare --root \"{{ concept_root }}\" --facts \"{{ concept_facts }}\" --work \"{{ concept_output }}/{{ workflow_run_id }}\"",
+        "command": "set -euo pipefail\npython3 {{ concept_root }}/scripts/concepts/pages.py prepare --root {{ concept_root }} --facts {{ concept_facts }} --work {{ concept_output }}/{{ workflow_run_id }} --only {{ concept_only }}",
+        "shell_escape_variables": true,
         "timeout_seconds": 120
       }
     },
@@ -40,17 +42,9 @@
       "type": "foreach",
       "name": "konzepttexte",
       "config": {
-        "items_source": "list",
-        "items": [
-          "gates",
-          "selbstverbesserung",
-          "persistenz-herkunft",
-          "agentische-budgets",
-          "zugaenge",
-          "messen-vor-bewerten",
-          "workflow-memory",
-          "haertung"
-        ],
+        "items_source": "command",
+        "items_command": "python3 {{ concept_root }}/scripts/concepts/pages.py list --only {{ concept_only }}",
+        "shell_escape_variables": true,
         "variable_name": "concept",
         "execution_mode": "ai",
         "continue_on_error": false,
@@ -64,7 +58,8 @@
       "type": "shell",
       "name": "seiten-zusammensetzen",
       "config": {
-        "command": "set -euo pipefail\npython3 \"{{ concept_root }}/scripts/concepts/pages.py\" assemble --root \"{{ concept_root }}\" --facts \"{{ concept_facts }}\" --work \"{{ concept_output }}/{{ workflow_run_id }}\"",
+        "command": "set -euo pipefail\npython3 {{ concept_root }}/scripts/concepts/pages.py assemble --root {{ concept_root }} --facts {{ concept_facts }} --work {{ concept_output }}/{{ workflow_run_id }} --only {{ concept_only }}",
+        "shell_escape_variables": true,
         "timeout_seconds": 120
       }
     },
@@ -72,7 +67,8 @@
       "type": "shell",
       "name": "gate",
       "config": {
-        "command": "set -euo pipefail\npython3 \"{{ concept_root }}/scripts/concepts/pages.py\" check --root \"{{ concept_root }}\" --facts \"{{ concept_facts }}\" --work \"{{ concept_output }}/{{ workflow_run_id }}/de\"",
+        "command": "set -euo pipefail\npython3 {{ concept_root }}/scripts/concepts/pages.py check --root {{ concept_root }} --facts {{ concept_facts }} --work {{ concept_output }}/{{ workflow_run_id }}/de --only {{ concept_only }}",
+        "shell_escape_variables": true,
         "timeout_seconds": 120
       }
     }

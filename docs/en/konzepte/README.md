@@ -2,7 +2,7 @@
 
 # Concepts to adopt
 
-These pages explain eight mechanisms of MySuricates: when they help, what they
+These pages explain mechanisms of MySuricates: when they help, what they
 cost, and where their limits are. Each page combines a flow diagram with code
 evidence and a dated operational measurement. The numbers describe a single
 development installation; they do not prove any general benefit.
@@ -75,20 +75,34 @@ preserved even after installation from the pool.
    check deterministically at the end. The snapshot may be at most 24 hours old
    at startup. Each run has its own output directory.
 
-3. Read the eight pages under `<concept_output>/<run-id>/de/` for subject-matter
+   `concept_only` limits the run to single pages: a comma-separated list of slugs
+   from the catalog, for example `zusammenstoepseln,anbieter-unabhaengig`. Empty
+   (the default) means all pages. The loop takes its entries from `pages.py list`;
+   an unknown slug stops the run in the first step.
+
+3. Read the generated pages under `<concept_output>/<run-id>/de/` for subject-matter
    correctness. The gate checks completeness, sections, source links,
    measurements, snapshot hash, unchanged diagrams, and obvious private markers.
    It does not replace a content review and does not guarantee complete
    anonymization. Only after a successful check, copy the pages to
-   `docs/konzepte/`.
+   `docs/konzepte/`. If a page has no row in the overview above yet, a `README.md`
+   with the additional rows (label and guiding question from the catalog) lies next
+   to the pages; existing rows stay unchanged. Copy it along.
+
+   With `concept_only` the gate checks only the selected pages. The other pages keep
+   the hash and measurements of their snapshot. If a new snapshot for the filtered
+   run is copied to `docs/konzepte/`, the other pages no longer match it; the check
+   without a filter reports this until all pages have been regenerated.
 
 4. Start the [limited variant of the Docs DE→EN sync](../../../workflow-pool/mysuricates-concept-pages-en.json).
    `translation_root` denotes the same absolute checkout path. It uses the
-   translation task from the existing delta sync for these eight pages plus the
+   translation task from the existing delta sync for all pages plus the
    index. Each file is translated individually; afterward the script sets the
    English diagram labels and corrects the source links changed by the additional
    directory level. Target: `docs/en/konzepte/`. Existing translations in this
-   directory are replaced.
+   directory are replaced. With the same `concept_only` as in the German run, only
+   these pages are translated; the AI then leaves the index alone, and the script
+   only adds the missing rows from the catalog there.
 
 The workflow definitions depend on this repository and are therefore marked as
 `scope: repo` in the pool. They do not create commits or pushes. The German
@@ -101,9 +115,12 @@ path.
 python3 -m unittest discover -s scripts/tests -p 'test_concept_pages.py'
 python3 scripts/concepts/pages.py check --root . --work docs/konzepte --facts docs/konzepte/betriebsdaten.json
 python3 scripts/concepts/pages.py check --root . --work docs/en/konzepte --facts docs/konzepte/betriebsdaten.json --language en
+# single pages only:
+python3 scripts/concepts/pages.py check --root . --work docs/konzepte --facts docs/konzepte/betriebsdaten.json --only gates,haertung
 ```
 
 The [catalog](../../../scripts/concepts/catalog.json) is the shared source for
-topics, code evidence, and both language versions of the Mermaid diagrams. The
+topics, code evidence, both language versions of the Mermaid diagrams, and the
+rows of the overview. The
 comments on each page contain the checked source commit and the SHA-256 of the
 facts snapshot.
