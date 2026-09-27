@@ -67,6 +67,19 @@ final class SelfAccessRules {
     /** Wie im Skript: gut eine Befehlszeile um die Fundstelle. */
     private static final int WINDOW = 200;
 
+    /**
+     * Zuweisung einer Basis-URL der eigenen Instanz an eine Variable — Shell ({@code API=…},
+     * {@code export BASE=…}) wie Python ({@code base = '…'}): {@code API=http://127.0.0.1:9090/api/v1;
+     * curl $API/todos} nennt den Endpunkt nie am Stück. Die Zuweisung ist selbst der Befund, egal wo
+     * die Variable später aufgerufen wird. Gruppe 1 ist der Pfad ab {@code /api/v1}.
+     */
+    private static final Pattern BASE_URL_ASSIGNMENT = Pattern.compile(
+            "(?m)(?:^|[\\s;&(])(?:export\\s+)?[A-Za-z_][A-Za-z0-9_]*\\s*=\\s*[\"']?"
+                    + "(?:[a-zA-Z][a-zA-Z0-9+.-]*://)?"
+                    + "(?:localhost|127\\.0\\.0\\.1|0\\.0\\.0\\.0|\\[::1]|host\\.docker\\.internal"
+                    + "|\\{\\{[^}]*}}|\\$\\{?[A-Za-z_][A-Za-z0-9_]*}?)(?::\\d+)?"
+                    + "(/api/v1(?:/[^\\s\"';]*)?)(?=[\"';\\s]|$)");
+
     private static final Pattern SQLITE = Pattern.compile("\\bsqlite3\\b");
     private static final Pattern PLATFORM_DB = Pattern.compile("\\bautomation(-[a-z]+)?\\.db\\b");
     private static final Pattern APP_SETTINGS = Pattern.compile("\\bapp_settings\\b");
@@ -96,7 +109,9 @@ final class SelfAccessRules {
     private static void selfApiCall(List<String> shell, List<String> all, int i, String name,
                                     List<AnalyzerFinding> out) {
         for (String code : shell) {
-            String hit = firstSelfEndpoint(withoutCommentLines(code), false);
+            String stripped = withoutCommentLines(code);
+            String hit = firstSelfEndpoint(stripped, false);
+            if (hit == null) hit = firstBaseUrlAssignment(stripped);
             if (hit != null) {
                 out.add(AnalyzerFinding.of("self-api-call", Severity.HIGH, i, name,
                         "ruft im Shell-Code die eigene REST-API auf ('" + hit + "') — braucht einen API-Key"
@@ -121,6 +136,15 @@ final class SelfAccessRules {
      * ausdrücklich fremder Host zählt nie. Mit {@code needsCaller} (Text außerhalb der Shell) nur ein
      * Endpunkt mit lokalem oder variablem Host und einem Aufrufer in der Nähe.
      */
+    private static String firstBaseUrlAssignment(String code) {
+        Matcher assignment = BASE_URL_ASSIGNMENT.matcher(code);
+        while (assignment.find()) {
+            String path = assignment.group(1).replaceAll("[./]+$", "");
+            if (!KEY_FREE_PROBES.contains(path)) return path;
+        }
+        return null;
+    }
+
     private static String firstSelfEndpoint(String text, boolean needsCaller) {
         Matcher endpoint = ENDPOINT.matcher(text);
         while (endpoint.find()) {

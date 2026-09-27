@@ -57,6 +57,25 @@ class SelfAccessRulesTest {
         assertThat(shell("curl http://127.0.0.1:8090/api/v1/executions/{{ workflow_run_id }}")).hasSize(1);
     }
 
+    /** Review m2: die Basis-URL steht in einer Variable, der Endpunkt nie am Stück. */
+    @Test
+    void basisUrlInEinerVariableIstHigh() {
+        assertThat(shell("API=http://127.0.0.1:9090/api/v1; curl $API/todos")).singleElement().satisfies(f -> {
+            assertThat(f.rule()).isEqualTo("self-api-call");
+            assertThat(f.severity()).isEqualTo(Severity.HIGH);
+            assertThat(f.detail()).contains("/api/v1");
+        });
+        assertThat(shell("BASE=http://localhost:9090/api/v1\ncurl \"$BASE/executions\"")).hasSize(1);
+        assertThat(shell("export BASE=\"http://{{ api_host }}:9090/api/v1/\"\ncurl \"$BASE\"todos")).hasSize(1);
+        assertThat(shell("python3 - <<'PY'\nbase = 'http://localhost:9090/api/v1'\nPY")).hasSize(1);
+    }
+
+    @Test
+    void basisUrlAufSondeOderFremdenHostIstKeinBefund() {
+        assertThat(shell("HEALTH=http://localhost:9090/api/v1/system/health\ncurl -sf \"$HEALTH\"")).isEmpty();
+        assertThat(shell("API=https://api.example.com/api/v1; curl $API/items")).isEmpty();
+    }
+
     @Test
     void schluesselfreieSondenSindErlaubt() {
         assertThat(shell("curl -sf http://localhost:9090/actuator/health\n"
