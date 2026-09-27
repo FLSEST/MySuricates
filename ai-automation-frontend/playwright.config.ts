@@ -1,23 +1,19 @@
 import { defineConfig } from '@playwright/test';
-import { resolve, dirname } from 'path';
-import { existsSync } from 'fs';
-import { execSync } from 'child_process';
-import { fileURLToPath } from 'url';
+import { readApiKeyFile } from './playwright/fixtures/api-key';
 
-// Auto-detect API key from SQLite DB (same pattern as cypress.config.ts)
-let detectedApiKey = '';
-try {
-  const __dir = dirname(fileURLToPath(import.meta.url));
-  const dbPath = resolve(__dir, '../ai-automation-backend/data/automation.db');
-  if (existsSync(dbPath)) {
-    const script = `import sqlite3,sys;c=sqlite3.connect(sys.argv[1]);print(c.execute("SELECT value FROM app_settings WHERE key=?",("api-key",)).fetchone()[0])`;
-    detectedApiKey = execSync(`python3 -c '${script}' '${dbPath}'`, {
-      encoding: 'utf-8',
-      timeout: 5000,
-    }).trim();
-  }
-} catch {
-  // DB not available — tests will run without API key
+// Never read the SQLite DB directly (CLAUDE.md: no direct DB access, pool-size=1 lock
+// contention). The backend writes the effective key to a plaintext file on the host at every
+// start (ApiKeyService/InstanceAddress) — read that instead (same order as cypress.config.ts).
+const detectedApiKey = readApiKeyFile();
+
+if (!detectedApiKey) {
+  // No API key detected: tests can still run if auth is disabled on the target instance
+  // (AUTOMATION_SECURITY_ENABLED=false). Otherwise every authenticated request fails.
+  console.warn(
+    '[playwright.config] No API key found (~/.mysuricates/api-key / ~/.autotrigger/api-key). ' +
+      'Start the dev backend first so it writes the key file, or run against an instance with ' +
+      'AUTOMATION_SECURITY_ENABLED=false.',
+  );
 }
 
 export default defineConfig({
