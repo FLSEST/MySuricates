@@ -469,6 +469,24 @@ printf 'MYSURICATES_RUNTIME=host\nMYSURICATES_PORT=19761\nMYSURICATES_PORT=19762
 LE="$( unset -f cut; INSTANCES_DIR="$TMP" RECONF=0; RUNTIME="" PORT="" PRESET="" PROVIDER="" PROJECTS=""; . "$HERE/../lib/setup-kept.sh"; load_existing dup; printf '%s|%s|%s|%s|%s' "$RUNTIME" "$PORT" "$PRESET" "$PROVIDER" "$NAME" )"
 check "load_existing: one value per key, the last line wins" '[ "$LE" = "host|19762|full|codex|dup" ]'
 
+echo "9e) load_existing also keeps bind, ai-from-host, ai-providers, docker-socket and hardening (fbb1c61e)"
+printf 'MYSURICATES_RUNTIME=container\nMYSURICATES_PORT=19770\nMYSURICATES_PRESET=full\nAUTOMATION_AI_DEFAULT_PROVIDER=CODEX\nMYSURICATES_BIND=127.0.0.2\nMYSURICATES_AI_FROM_HOST=all\nMYSURICATES_AI_PROVIDERS=codex,pi\nMYSURICATES_DOCKER_SOCKET=1\nAUTOMATION_HARDENING_SEALING=true\n' > "$TMP/harden.env"
+LEH() {  # BIND AI_FROM_HOST AI_PROVIDERS SOCKET_FLAG SOCKET → BIND|AI_FROM_HOST|AI_PROVIDERS|SOCKET|CUSTOM_LINES nach load_existing
+  ( unset -f cut; INSTANCES_DIR="$TMP" RECONF=0
+    RUNTIME=""; PORT=""; PRESET=""; PROVIDER=""; PROJECTS=""
+    BIND="$1"; AI_FROM_HOST="$2"; AI_PROVIDERS="$3"; SOCKET_FLAG="$4"; SOCKET="$5"
+    . "$HERE/../lib/module-preset.sh"; . "$HERE/../lib/setup-kept.sh"; load_existing harden
+    printf '%s|%s|%s|%s|%s' "$BIND" "$AI_FROM_HOST" "$AI_PROVIDERS" "$SOCKET" "$CUSTOM_LINES" )
+}
+LE2="$(LEH 127.0.0.1 "" "" 0 0)"
+check "no flags: bind/ai-from-host/ai-providers/docker-socket from the file" \
+  '[ "$(unset -f cut; printf "%s" "$LE2" | cut -d"|" -f1-4)" = "127.0.0.2|all|codex,pi|1" ]'
+check "no flags: the hardening switch of the file is carried into CUSTOM_LINES" \
+  'printf "%s" "$LE2" | grep -q "AUTOMATION_HARDENING_SEALING=true"'
+LE3="$(LEH 0.0.0.0 programs "" 1 1)"
+check "a flag wins over the file (bind, ai-from-host, docker-socket)" \
+  '[ "$(unset -f cut; printf "%s" "$LE3" | cut -d"|" -f1-4)" = "0.0.0.0|programs|codex,pi|1" ]'
+
 echo "10) bash 3.2 hygiene"
 check "no bash-4-only syntax (code)"                    '! grep -v "^[[:space:]]*#" "$SETUP" | grep -nE "declare -g?A|mapfile|readarray|\\$\\{[A-Za-z_]+(,,|\\^\\^)\\}" >/dev/null'
 

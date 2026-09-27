@@ -52,6 +52,11 @@ module_catalog_get() {
   printf '%s' "${!name-}"
 }
 
+# Application-Property in ihren Umgebungsvariablennamen: automation.modules.remote-access →
+# AUTOMATION_MODULES_REMOTEACCESS. Von setup.sh (Modulwahl) und setup-kept.sh (load_existing,
+# Haertungs-Schalter) genutzt.
+prop_env() { printf '%s' "$1" | tr 'a-z.' 'A-Z_' | tr -d '-'; }
+
 # Display text of a module. $1 = field (NAME, DESC), $2 = language, $3 = key.
 module_text_get() {
   local name="MODULE_TEXT_${1:-}__$(_module_var_key "${2:-}")__$(_module_var_key "${3:-}")"

@@ -88,7 +88,10 @@ kept_mark() {
 kept_port() { if is_kept "$1"; then kept_value "$1" MYSURICATES_PORT; else free_port "$2" "${3:-}" "$1"; fi; }
 
 # load_existing NAME — die Werte einer vorhandenen Instanz als Vorbelegung fuer „Einstellungen aendern“;
-# Flags gehen vor. Wie kept_value: je Schluessel ein Wert, die letzte Zeile gewinnt (0e5b82b7)
+# Flags gehen vor. Wie kept_value: je Schluessel ein Wert, die letzte Zeile gewinnt (0e5b82b7).
+# Nimmt auch BIND, AI_FROM_HOST, AI_PROVIDERS, den Docker-Socket und die Haertungs-Schalter mit
+# (fbb1c61e) — sonst schreibt ein Reconfigure ohne die passenden Flags stillschweigend die Vorgaben
+# (127.0.0.1, kein Socket, keine Haertung) in die Datei.
 load_existing() {
   NAME="$1"; MODE=one
   RUNTIME="${RUNTIME:-$(kept_or "$1" MYSURICATES_RUNTIME container)}"
@@ -96,4 +99,19 @@ load_existing() {
   PRESET="${PRESET:-$(kept_value "$1" MYSURICATES_PRESET)}"
   PROVIDER="${PROVIDER:-$(kept_value "$1" AUTOMATION_AI_DEFAULT_PROVIDER | tr 'A-Z' 'a-z')}"
   PROJECTS="${PROJECTS:-$(kept_value "$1" MYSURICATES_PROJECTS)}"
+  # BIND traegt "127.0.0.1" schon als Vorgabe (kein leerer String) — wie kept_load erkennen wir ein
+  # gegebenes --bind daran, dass es davon abweicht.
+  [ "${BIND:-127.0.0.1}" != 127.0.0.1 ] || BIND="$(kept_or "$1" MYSURICATES_BIND 127.0.0.1)"
+  AI_FROM_HOST="${AI_FROM_HOST:-$(kept_value "$1" MYSURICATES_AI_FROM_HOST)}"
+  AI_PROVIDERS="${AI_PROVIDERS:-$(kept_value "$1" MYSURICATES_AI_PROVIDERS)}"
+  # SOCKET traegt zu diesem Zeitpunkt schon SOCKET_FLAG (0 ohne --docker-socket) — wie bei kept_load
+  # zaehlt nur ein gegebenes --docker-socket als Flag, kein "aus".
+  [ "${SOCKET_FLAG:-0}" = 1 ] || SOCKET="$(kept_or "$1" MYSURICATES_DOCKER_SOCKET 0)"
+  local key prop val
+  for key in "${MODULE_CATALOG_HARDENING_KEYS[@]}"; do
+    prop="$(prop_env "$(module_catalog_get PROPERTY "$key")")"
+    val="$(kept_value "$1" "$prop")"
+    [ -z "$val" ] || CUSTOM_LINES="${CUSTOM_LINES:-}$prop=$val
+"
+  done
 }
