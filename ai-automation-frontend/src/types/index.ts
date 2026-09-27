@@ -902,6 +902,8 @@ export interface RemoteAccessStatus {
   enabled: boolean;
   ip: string | null;
   hostname: string | null;
+  /** Missing on an older backend (frontend deploys ahead of it) — treat as absent/false, never required. */
+  inContainer?: boolean;
 }
 
 export interface BackupInfo {

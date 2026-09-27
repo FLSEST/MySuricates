@@ -96,4 +96,57 @@ class TailscaleServiceTest {
         RemoteAccessResponse response = service.getStatus();
         assertThat(response).isNotNull();
     }
+
+    // --- Container instances: no supported Tailscale path there ---
+
+    @Test
+    void enable_whenInContainer_throwsClearErrorInsteadOfRunningCli() {
+        TailscaleService service = new TailscaleService(() -> true, env("container"), "");
+
+        assertThatThrownBy(service::enable)
+                .isInstanceOf(TailscaleException.class)
+                .hasMessageContaining("container")
+                .hasMessageContaining("tailscale serve");
+    }
+
+    @Test
+    void disable_whenInContainer_throwsClearErrorInsteadOfRunningCli() {
+        TailscaleService service = new TailscaleService(() -> true, env("container"), "");
+
+        assertThatThrownBy(service::disable)
+                .isInstanceOf(TailscaleException.class)
+                .hasMessageContaining("container");
+    }
+
+    @Test
+    void getStatus_whenInContainerAndModuleEnabled_reportsInContainerWithoutCallingCli() {
+        TailscaleService service = new TailscaleService(() -> true, env("container"), "");
+
+        RemoteAccessResponse response = service.getStatus();
+
+        assertThat(response.enabled()).isFalse();
+        assertThat(response.inContainer()).isTrue();
+    }
+
+    @Test
+    void getStatus_whenOnHost_reportsNotInContainer() {
+        TailscaleService service = new TailscaleService(true);
+
+        RemoteAccessResponse response = service.getStatus();
+
+        assertThat(response.inContainer()).isFalse();
+    }
+
+    @Test
+    void inContainer_whenAutomationInstanceContainerSet_detectsContainerLikeAiProviderStatusService() {
+        TailscaleService service = new TailscaleService(() -> true, env(null), "autotrigger-dev-container");
+
+        RemoteAccessResponse response = service.getStatus();
+
+        assertThat(response.inContainer()).isTrue();
+    }
+
+    private static java.util.function.UnaryOperator<String> env(String runtime) {
+        return key -> "MYSURICATES_RUNTIME".equals(key) ? runtime : null;
+    }
 }

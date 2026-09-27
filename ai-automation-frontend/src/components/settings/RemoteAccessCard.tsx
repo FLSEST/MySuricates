@@ -2,13 +2,17 @@ import { Card, CardHeader, Button } from '../ui';
 import { StatusBadge } from '../shared/StatusBadge';
 import { useT } from '../../i18n';
 import { useRemoteAccessStatus, useEnableRemoteAccess, useDisableRemoteAccess } from '../../hooks/useSystem';
-import { Wifi } from 'lucide-react';
+import { Wifi, Info } from 'lucide-react';
 
 export function RemoteAccessCard() {
   const t = useT();
   const { data: remoteAccess } = useRemoteAccessStatus();
   const enableRemote = useEnableRemoteAccess();
   const disableRemote = useDisableRemoteAccess();
+
+  // Missing on an older backend (frontend deploys ahead of it) — treat as absent/false, so the card
+  // keeps showing the normal host controls instead of breaking.
+  const inContainer = remoteAccess?.inContainer === true;
 
   return (
     <Card>
@@ -26,7 +30,7 @@ export function RemoteAccessCard() {
           </div>
           <div className="flex items-center gap-3">
             <StatusBadge status={remoteAccess?.enabled ? 'RUNNING' : 'STOPPED'} />
-            {remoteAccess?.enabled ? (
+            {inContainer ? null : remoteAccess?.enabled ? (
               <Button
                 variant="danger"
                 size="sm"
@@ -46,6 +50,12 @@ export function RemoteAccessCard() {
             )}
           </div>
         </div>
+        {inContainer && (
+          <div className="flex items-start gap-2 pl-8 text-xs text-info">
+            <Info className="w-4 h-4 shrink-0 mt-0.5" />
+            <p>{t.settings.tailscaleContainerHint}</p>
+          </div>
+        )}
         {remoteAccess?.hostname && (
           <p className="text-xs text-text-tertiary font-mono pl-8">
             Hostname: {remoteAccess.hostname}

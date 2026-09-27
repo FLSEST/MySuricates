@@ -389,26 +389,39 @@ AUTOMATION_RATE_LIMIT_ENABLED=true   # optional
 
 ## Tailscale Remote Access
 
-The backend can be made accessible from outside the local network via Tailscale.
+The `remote-access` module makes the backend reachable from outside the local network via
+Tailscale — **for instances running from source on the host only.** None of the shipped images
+(`deploy/Dockerfile`, `docker/Dockerfile.stable`) carries the Tailscale CLI, and a container is the
+wrong place for it anyway: Tailscale would need its own privileges and its own secret inside the
+container, gone again on every `compose down`. An earlier attempt at this
+(`docker/Dockerfile.backend`) was removed for that reason.
 
-### Prerequisites
+### Host path
 
-- Tailscale CLI installed in the container — no shipped image (`deploy/Dockerfile`,
-  `docker/Dockerfile.stable`) currently includes it; only `docker/Dockerfile.backend` has it, but no
-  Compose service builds it any more. From source (a Dev instance on the host), a local Tailscale
-  install is enough
-- Module `remote-access` enabled (`AUTOMATION_MODULES_REMOTE_ACCESS=true` or preset `full`) — off in the public default `core`; without it the `/system/remote-access/*` endpoints answer 404 `MODULE_DISABLED`
+1. A local Tailscale install on the machine the instance runs on
+2. Module `remote-access` enabled (`AUTOMATION_MODULES_REMOTE_ACCESS=true` or preset `full`) — off in
+   the public default `core`; without it the `/system/remote-access/*` endpoints answer 404
+   `MODULE_DISABLED`
+3. Call the API endpoint: `POST /api/v1/system/remote-access/enable` — the backend starts Tailscale
+   on the host
+4. IP and hostname come back in the response; status afterwards via
+   `GET /api/v1/system/remote-access/status` → `{ enabled, ip, hostname, inContainer }`. Visible in
+   the frontend under Settings → Remote Access
 
-### Activation
+### Container path
 
-1. Call the API endpoint: `POST /api/v1/system/remote-access/enable`
-2. Backend starts Tailscale in the container
-3. IP and hostname are returned in the response
+When the instance runs in a container (`MYSURICATES_RUNTIME=container`, or a set
+`automation.instance.container` id — the same detection as the startup container report and the AI
+provider status, no new heuristic), the status reports `inContainer: true` and the UI shows a hint
+instead of the button: `POST .../remote-access/enable` fails with a clear error message in that case
+instead of attempting a CLI call. Remote access works differently there:
 
-### Status
-
-- `GET /api/v1/system/remote-access/status` → `{ enabled, ip, hostname }`
-- Visible in the frontend under Settings → Remote Access
+1. Install Tailscale on the machine and log in (not in the container)
+2. Expose whatever the container should publish from there, e.g. with
+   `tailscale serve --bg --https=443 http://127.0.0.1:<port>` (port = the published container port,
+   see `AUTOTRIGGER_DEV_CONTAINER_PORT`/`docker-compose.*.yml`)
+3. No Tailscale state, no login and no token inside the container — just an ordinary local port that
+   the machine forwards itself
 
 ## Healthcheck
 

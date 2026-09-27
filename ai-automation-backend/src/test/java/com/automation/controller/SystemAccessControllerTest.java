@@ -50,7 +50,7 @@ class SystemAccessControllerTest {
     @Test
     void enableRemoteAccess_success() throws Exception {
         when(tailscaleService.enable())
-                .thenReturn(new RemoteAccessResponse(true, "100.64.1.2", "my-host"));
+                .thenReturn(new RemoteAccessResponse(true, "100.64.1.2", "my-host", false));
 
         mockMvc.perform(post("/api/v1/system/remote-access/enable"))
                 .andExpect(status().isOk())
@@ -92,7 +92,7 @@ class SystemAccessControllerTest {
     @Test
     void remoteAccessStatus_enabled() throws Exception {
         when(tailscaleService.getStatus())
-                .thenReturn(new RemoteAccessResponse(true, "100.64.1.2", "my-host"));
+                .thenReturn(new RemoteAccessResponse(true, "100.64.1.2", "my-host", false));
 
         mockMvc.perform(get("/api/v1/system/remote-access/status"))
                 .andExpect(status().isOk())
@@ -103,12 +103,35 @@ class SystemAccessControllerTest {
     @Test
     void remoteAccessStatus_disabled() throws Exception {
         when(tailscaleService.getStatus())
-                .thenReturn(new RemoteAccessResponse(false, null, null));
+                .thenReturn(new RemoteAccessResponse(false, null, null, false));
 
         mockMvc.perform(get("/api/v1/system/remote-access/status"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.enabled").value(false))
                 .andExpect(jsonPath("$.ip").doesNotExist());
+    }
+
+    @Test
+    void remoteAccessStatus_inContainer_reportsInContainerField() throws Exception {
+        when(tailscaleService.getStatus())
+                .thenReturn(new RemoteAccessResponse(false, null, null, true));
+
+        mockMvc.perform(get("/api/v1/system/remote-access/status"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.enabled").value(false))
+                .andExpect(jsonPath("$.inContainer").value(true));
+    }
+
+    @Test
+    void enableRemoteAccess_inContainer_returns503WithClearMessage() throws Exception {
+        when(tailscaleService.enable())
+                .thenThrow(new TailscaleException(
+                        "Remote access has no supported path in a container — install Tailscale on the "
+                        + "host machine instead and run `tailscale serve --bg --https=443 http://127.0.0.1:<port>`"));
+
+        mockMvc.perform(post("/api/v1/system/remote-access/enable"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.error", org.hamcrest.Matchers.containsString("container")));
     }
 
     @Test
