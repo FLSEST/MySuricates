@@ -11,6 +11,7 @@ import com.automation.exception.ResourceNotFoundException;
 import com.automation.repository.ProjectRepository;
 import com.automation.service.workflow.WorkflowService;
 import com.automation.service.workflow.WorkflowTemplateService;
+import com.automation.service.workflow.analyzer.GeneratedWorkflowCheck;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -42,6 +43,7 @@ public class WorkflowFactoryService {
     private final ObjectMapper objectMapper;
     private final FactoryPromptBuilder promptBuilder;
     private final FactoryResponseParser responseParser;
+    private final GeneratedWorkflowCheck buildCheck;
 
     /**
      * Generates a workflow definition from a topic/description using Claude CLI.
@@ -72,6 +74,12 @@ public class WorkflowFactoryService {
 
         List<BlockDefinition> blocks = responseParser.parseBlocks(workflowJson);
 
+        // Build check before any test run (TODO 326d5987): HIGH findings get exactly one correction round
+        // with the same generator — the cheap check runs before the expensive verify/fix loop.
+        GeneratedWorkflowCheck.Correction check = buildCheck.correctOnce(blocks, instructions,
+                correctionPrompt -> generator.generate(correctionPrompt, systemPrompt, factoryConfig.getTimeoutSeconds()));
+        blocks = check.blocks();
+
         Map<String, Object> defaultContext = workflowJson.has("defaultContext")
                 ? objectMapper.convertValue(workflowJson.get("defaultContext"), new TypeReference<>() {})
                 : new HashMap<>();
@@ -95,6 +103,7 @@ public class WorkflowFactoryService {
 
         Workflow workflow = workflowService.create(createRequest, com.automation.entity.ChangeSource.FACTORY);
         log.info("Factory: created workflow '{}' ({})", workflow.getName(), workflow.getId());
+        buildCheck.reportRemaining(workflow.getId(), workflow.getName(), "Factory", check.remaining());
         return workflow;
     }
 
@@ -150,7 +159,8 @@ public class WorkflowFactoryService {
             return new WorkflowFactoryResult(
                     workflow.getId(), workflow.getName(), overallStatus,
                     testResult.runId(), testResult.status(), testResult.error(),
-                    promoted, System.currentTimeMillis() - start, retryErrors
+                    promoted, System.currentTimeMillis() - start, retryErrors,
+                    GeneratedWorkflowCheck.summaryLines(buildCheck.findings(workflow))
             );
         } catch (Exception e) {
             log.error("Factory pipeline failed: {}", e.getMessage(), e);

@@ -10,6 +10,7 @@ import com.automation.service.ai.AiProvider;
 import com.automation.service.ai.AiProviderRegistry;
 import com.automation.service.workflow.AgentInstructionsService;
 import com.automation.service.workflow.WorkflowService;
+import com.automation.service.workflow.analyzer.GeneratedWorkflowCheck;
 import com.automation.util.JsonRepairUtil;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -31,6 +32,7 @@ public class WorkflowConversionService {
     private final AgentInstructionsService agentInstructionsService;
     private final TransactionTemplate transactionTemplate;
     private final TransactionTemplate readOnlyTransactionTemplate;
+    private final GeneratedWorkflowCheck buildCheck;
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     public WorkflowConversionService(WorkflowRunRepository runRepository,
@@ -38,7 +40,8 @@ public class WorkflowConversionService {
                                      WorkflowMapper workflowMapper,
                                      AiProviderRegistry aiProviderRegistry,
                                      AgentInstructionsService agentInstructionsService,
-                                     PlatformTransactionManager transactionManager) {
+                                     PlatformTransactionManager transactionManager,
+                                     GeneratedWorkflowCheck buildCheck) {
         this.runRepository = runRepository;
         this.workflowService = workflowService;
         this.workflowMapper = workflowMapper;
@@ -47,6 +50,7 @@ public class WorkflowConversionService {
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.readOnlyTransactionTemplate = new TransactionTemplate(transactionManager);
         this.readOnlyTransactionTemplate.setReadOnly(true);
+        this.buildCheck = buildCheck;
     }
 
     /**
@@ -71,7 +75,11 @@ public class WorkflowConversionService {
             log.debug("AI-assisted conversion failed, falling back to rule-based: {}", e.getMessage());
         }
 
-        return suggestWorkflowRuleBased(agenticSteps);
+        // Regelbasiert gibt es keine KI, die korrigieren könnte: nur melden.
+        WorkflowSuggestion ruleBased = suggestWorkflowRuleBased(agenticSteps);
+        return ruleBased.available()
+                ? ruleBased.withBuildFindings(GeneratedWorkflowCheck.summaryLines(buildCheck.findings(ruleBased.blocks(), null)))
+                : ruleBased;
     }
 
     /**
@@ -173,7 +181,8 @@ public class WorkflowConversionService {
         String prompt = WorkflowConversionPrompt.build(actionDesc.toString());
 
         String systemPrompt = agentInstructionsService.buildInstructionPrefix(null);
-        AiProvider.ReasoningResult aiResult = aiProviderRegistry.getDefault().reason(
+        AiProvider provider = aiProviderRegistry.getDefault();
+        AiProvider.ReasoningResult aiResult = provider.reason(
                 new AiProvider.ReasoningRequest(prompt, systemPrompt));
         String response = aiResult.text();
 
@@ -203,7 +212,13 @@ public class WorkflowConversionService {
             return WorkflowSuggestion.notAvailable();
         }
 
-        return new WorkflowSuggestion(sugName, sugDesc, blocks, goal, blocks.size(), true);
+        // Baufehler-Prüfung (TODO 326d5987): bei HIGH genau eine Korrekturrunde mit demselben Provider und
+        // System-Prompt; verbliebene Befunde stehen im Vorschlag.
+        GeneratedWorkflowCheck.Correction check = buildCheck.correctOnce(blocks, null,
+                correctionPrompt -> provider.reason(new AiProvider.ReasoningRequest(correctionPrompt, systemPrompt)).text());
+
+        return new WorkflowSuggestion(sugName, sugDesc, check.blocks(), goal, check.blocks().size(), true,
+                GeneratedWorkflowCheck.summaryLines(check.remaining()));
     }
 
     /**
@@ -235,8 +250,14 @@ public class WorkflowConversionService {
                 null
         );
 
-        return transactionTemplate.execute(status ->
+        WorkflowResponse created = transactionTemplate.execute(status ->
                 workflowMapper.toResponse(workflowService.create(request, ChangeSource.CONVERSION)));
+        // Nach der Transaktion: das Activity-Log gehört nicht in den Speicher-Burst.
+        if (created != null) {
+            buildCheck.reportRemaining(created.id(), created.name(), "Konvertierung",
+                    buildCheck.findings(suggestion.blocks(), null));
+        }
+        return created;
     }
 
     private String extractJson(String text) {

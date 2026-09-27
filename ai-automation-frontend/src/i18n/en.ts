@@ -2075,6 +2075,10 @@ export const en = {
     chainRuns: 'Chain Runs',
     successfulRuns: 'Successful',
   },
+  buildCheck: {
+    title: 'Build check',
+    hint: 'The analyzer only reports these findings; they do not prevent saving.',
+  },
   conversion: {
     banner: 'This agentic run was successful. Convert to a deterministic workflow?',
     preview: 'Preview',

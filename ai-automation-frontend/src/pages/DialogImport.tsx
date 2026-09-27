@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { Card, Button, Input, Select, Spinner, Badge, Toggle, Modal, ModalFooter } from '../components/ui';
 import { MonacoEditor } from '../components/shared/MonacoEditor';
+import { BuildFindingsNote } from '../components/shared/BuildFindingsNote';
 import { useProjects } from '../hooks/useProjects';
 import {
   useDialogSessionCounts, useDialogSessions,
@@ -258,6 +259,8 @@ function SuggestionPanel({
           {t.dialog.lowConfidenceWarning}
         </div>
       )}
+
+      <BuildFindingsNote findings={suggestion.buildFindings} />
 
       {suggestion.suggestedDescription && (
         <p className="text-xs text-text-secondary leading-relaxed">{suggestion.suggestedDescription}</p>

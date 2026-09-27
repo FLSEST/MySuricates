@@ -10,6 +10,7 @@ import com.automation.entity.WorkflowRun;
 import com.automation.service.workflow.RunControlService;
 import com.automation.service.workflow.WorkflowExecutor;
 import com.automation.service.workflow.WorkflowService;
+import com.automation.service.workflow.analyzer.GeneratedWorkflowCheck;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +38,7 @@ public class AssistantWorkflowTools {
     private final WorkflowExecutor workflowExecutor;
     private final RunControlService runControlService;
     private final ObjectMapper objectMapper;
+    private final GeneratedWorkflowCheck buildCheck;
 
     public String createWorkflow(String json) {
         try {
@@ -71,7 +73,8 @@ public class AssistantWorkflowTools {
                     null  // version
             );
             Workflow created = workflowService.create(request, ChangeSource.ASSISTANT);
-            return "✓ Workflow created: \"" + created.getName() + "\" (ID: " + created.getId() + ")";
+            return "✓ Workflow created: \"" + created.getName() + "\" (ID: " + created.getId() + ")"
+                    + buildCheckNote(created);
         } catch (Exception e) {
             log.warn("Assistant create_workflow tool failed. Payload: {}", json, e);
             return "⚠ Could not create workflow: " + e.getMessage();
@@ -108,10 +111,31 @@ public class AssistantWorkflowTools {
                     version(params)
             );
             Workflow updated = workflowService.update(workflowId, request, ChangeSource.ASSISTANT);
-            return "✓ Workflow updated: \"" + updated.getName() + "\" (ID: " + workflowId + ")";
+            return "✓ Workflow updated: \"" + updated.getName() + "\" (ID: " + workflowId + ")"
+                    + buildCheckNote(updated);
         } catch (Exception e) {
             log.warn("Assistant update_workflow tool failed. Payload: {}", json, e);
             return "⚠ Could not update workflow: " + e.getMessage();
+        }
+    }
+
+    /**
+     * Build check of the saved definition (TODO 326d5987): findings from MEDIUM up, HIGH first, appended to
+     * the result line so the chat can fix them with {@code update_workflow}. Empty without such findings —
+     * the line then stays exactly as before. No extra model call; a failing check never fails the tool.
+     */
+    private String buildCheckNote(Workflow workflow) {
+        try {
+            var findings = buildCheck.findings(workflow);
+            if (findings.isEmpty()) {
+                return "";
+            }
+            return "\n\nBaufehler-Prüfung: " + findings.size() + " Befund(e) ab MEDIUM\n"
+                    + GeneratedWorkflowCheck.format(findings)
+                    + "\nMit update_workflow lassen sie sich beheben.";
+        } catch (Exception e) {
+            log.warn("Build check after assistant tool failed for workflow {}: {}", workflow.getId(), e.getMessage());
+            return "";
         }
     }
 

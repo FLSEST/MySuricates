@@ -1,6 +1,7 @@
 package com.automation.service.factory;
 
 import com.automation.config.FactoryConfig;
+import com.automation.dto.request.CreateWorkflowRequest;
 import com.automation.dto.request.WorkflowFactoryRequest;
 import com.automation.dto.response.WorkflowFactoryResult;
 import com.automation.entity.ChangeSource;
@@ -8,15 +9,20 @@ import com.automation.entity.Project;
 import com.automation.entity.Workflow;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.repository.ProjectRepository;
+import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.staging.TestingService;
 import com.automation.service.workflow.AgentInstructionsService;
 import com.automation.service.workflow.WorkflowService;
 import com.automation.service.workflow.WorkflowTemplateService;
+import com.automation.service.workflow.analyzer.GeneratedWorkflowCheck;
+import com.automation.service.workflow.analyzer.WorkflowAnalyzer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -53,6 +59,9 @@ class WorkflowFactoryServiceTest {
     @Mock
     private AgentInstructionsService agentInstructionsService;
 
+    @Mock
+    private ActivityLogService activityLogService;
+
     private ObjectMapper objectMapper = new ObjectMapper();
     private FactoryConfig factoryConfig;
     private WorkflowFactoryService factoryService;
@@ -74,7 +83,8 @@ class WorkflowFactoryServiceTest {
         factoryService = new WorkflowFactoryService(
                 generatorResolver, factoryConfig,
                 workflowService, templateService, verificationService,
-                projectRepository, objectMapper, promptBuilder, responseParser
+                projectRepository, objectMapper, promptBuilder, responseParser,
+                new GeneratedWorkflowCheck(new WorkflowAnalyzer(), objectMapper, activityLogService)
         );
 
         testProject = Project.builder()
@@ -387,5 +397,91 @@ class WorkflowFactoryServiceTest {
         assertThat(result.status()).isEqualTo("PROMOTED");
         assertThat(result.promotedAsTemplate()).isTrue();
         verify(templateService).createFromWorkflow("wf-1");
+    }
+
+    // ── build check after generation (TODO 326d5987) ──
+
+    @Nested
+    class BuildCheck {
+
+        /** simple block with {@code prompt} instead of {@code command}: one HIGH finding. */
+        private static final String BAD = """
+                { "name": "Bericht", "blocks": [{ "type": "simple", "config": { "prompt": "Fasse zusammen" } }] }
+                """;
+        private static final String GOOD_BLOCKS = "[{ \"type\": \"simple\", \"config\": { \"command\": \"Fasse zusammen\" } }]";
+
+        private final WorkflowFactoryRequest request = new WorkflowFactoryRequest(
+                "Bericht", null, null, "proj-1", null, false, false, 2, null);
+
+        private CreateWorkflowRequest savedRequest() {
+            ArgumentCaptor<CreateWorkflowRequest> captor = ArgumentCaptor.forClass(CreateWorkflowRequest.class);
+            verify(workflowService).create(captor.capture(), eq(ChangeSource.FACTORY));
+            return captor.getValue();
+        }
+
+        @BeforeEach
+        void created() {
+            lenient().when(workflowService.create(any(), eq(ChangeSource.FACTORY)))
+                    .thenReturn(Workflow.builder().id("wf-1").name("Bericht").project(testProject).build());
+        }
+
+        @Test
+        void highFinding_exactlyOneCorrectionWithTheFindings_correctedVersionIsSaved() throws IOException {
+            when(claudeGenerator.generate(anyString(), anyString(), eq(600))).thenReturn(BAD, GOOD_BLOCKS);
+
+            factoryService.generateWorkflow(request);
+
+            ArgumentCaptor<String> prompts = ArgumentCaptor.forClass(String.class);
+            verify(claudeGenerator, times(2)).generate(prompts.capture(), anyString(), eq(600));
+            assertThat(prompts.getAllValues().get(1))
+                    .contains("HIGH missing-required-config-key")
+                    .contains("\"prompt\":\"Fasse zusammen\"");
+            assertThat(savedRequest().blocks()).singleElement()
+                    .satisfies(b -> assertThat(b.getConfig()).containsEntry("command", "Fasse zusammen"));
+            verifyNoInteractions(activityLogService);
+        }
+
+        @Test
+        void unusableCorrection_originalIsSaved_andRemainingFindingsAreLogged() throws IOException {
+            when(claudeGenerator.generate(anyString(), anyString(), eq(600))).thenReturn(BAD, "Das geht nicht.");
+
+            factoryService.generateWorkflow(request);
+
+            verify(claudeGenerator, times(2)).generate(anyString(), anyString(), eq(600));
+            assertThat(savedRequest().blocks()).singleElement()
+                    .satisfies(b -> assertThat(b.getConfig()).containsEntry("prompt", "Fasse zusammen"));
+            verify(activityLogService).warn(eq(com.automation.entity.ActivityLog.LogCategory.SYSTEM),
+                    contains("missing-required-config-key"), eq("GeneratedWorkflowCheck"), isNull(), eq("wf-1"));
+        }
+
+        @Test
+        void noHighFinding_noExtraCall() throws IOException {
+            when(claudeGenerator.generate(anyString(), anyString(), eq(600))).thenReturn("""
+                    { "name": "Bericht", "blocks": [{ "type": "simple", "config": { "command": "Fasse zusammen" } }] }
+                    """);
+
+            factoryService.generateWorkflow(request);
+
+            verify(claudeGenerator, times(1)).generate(anyString(), anyString(), eq(600));
+            verifyNoInteractions(activityLogService);
+        }
+
+        @Test
+        void runFactory_reportsRemainingFindingsInTheResult() throws IOException {
+            when(claudeGenerator.generate(anyString(), anyString(), eq(600))).thenReturn(BAD, "kaputt");
+            Workflow saved = Workflow.builder().id("wf-1").name("Bericht").project(testProject)
+                    .blocks(new java.util.ArrayList<>(java.util.List.of(com.automation.entity.BlockDefinition.builder()
+                            .type("simple").config(new java.util.HashMap<>(Map.of("prompt", "Fasse zusammen"))).build())))
+                    .build();
+            when(workflowService.create(any(), eq(ChangeSource.FACTORY))).thenReturn(saved);
+            when(testingService.executeWorkflowOnTest(any(), any(), any())).thenReturn("test-run-1");
+            when(testingService.pollTestRun("test-run-1"))
+                    .thenReturn(objectMapper.createObjectNode().put("status", "COMPLETED"));
+
+            WorkflowFactoryResult result = factoryService.runFactory(request);
+
+            assertThat(result.buildFindings()).isNotEmpty()
+                    .first().asString().startsWith("HIGH missing-required-config-key");
+        }
     }
 }

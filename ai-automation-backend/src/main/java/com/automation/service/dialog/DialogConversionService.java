@@ -10,6 +10,7 @@ import com.automation.service.conversion.DialogWorkflowSuggestion;
 import com.automation.service.memory.ConversationPreprocessor;
 import com.automation.service.workflow.AgentInstructionsService;
 import com.automation.service.workflow.WorkflowService;
+import com.automation.service.workflow.analyzer.GeneratedWorkflowCheck;
 import com.automation.util.JsonRepairUtil;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -20,6 +21,12 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.*;
+
+import static com.automation.service.dialog.DialogTextRules.deduplicate;
+import static com.automation.service.dialog.DialogTextRules.extractJson;
+import static com.automation.service.dialog.DialogTextRules.isInternalCommand;
+import static com.automation.service.dialog.DialogTextRules.isMetaCommentary;
+import static com.automation.service.dialog.DialogTextRules.truncate;
 
 /**
  * Analysiert Claude-Code-JSONL-Sessions und wandelt sie in Workflow-Suggestions um.
@@ -40,6 +47,7 @@ public class DialogConversionService {
 
     // ConversationPreprocessor ist StepResult-basiert, wir brauchen nur processOutput
     private final ConversationPreprocessor conversationPreprocessor;
+    private final GeneratedWorkflowCheck buildCheck;
 
     /**
      * Analysiert eine JSONL-Session und liefert eine Workflow-Suggestion.
@@ -93,6 +101,8 @@ public class DialogConversionService {
         );
 
         var created = workflowService.create(request, com.automation.entity.ChangeSource.DIALOG);
+        // Der Vorschlag kommt vom Client zurück und kann bearbeitet sein: die gespeicherte Fassung prüfen.
+        buildCheck.reportRemaining(created.getId(), created.getName(), "Dialog-Import", buildCheck.findings(created));
         return workflowMapper.toResponse(created);
     }
 
@@ -104,7 +114,8 @@ public class DialogConversionService {
 
         String prompt = DialogConversionPrompt.build(session.projectPath(), session.turns().size(), compressed);
 
-        AiProvider.ReasoningResult aiResult = aiProviderRegistry.getDefault().reason(
+        AiProvider provider = aiProviderRegistry.getDefault();
+        AiProvider.ReasoningResult aiResult = provider.reason(
                 new AiProvider.ReasoningRequest(prompt, systemPrompt));
         String response = aiResult.text();
 
@@ -121,11 +132,17 @@ public class DialogConversionService {
             return suggestRuleBased(session, filePath);
         }
 
+        // Baufehler-Prüfung (TODO 326d5987): bei HIGH genau eine Korrekturrunde mit demselben Provider und
+        // System-Prompt; verbliebene Befunde stehen im Vorschlag, den der Nutzer vor dem Anlegen sieht.
+        GeneratedWorkflowCheck.Correction check = buildCheck.correctOnce(blocks, null,
+                correctionPrompt -> provider.reason(new AiProvider.ReasoningRequest(correctionPrompt, systemPrompt)).text());
+
         long toolCallCount = countToolCalls(session);
         return new DialogWorkflowSuggestion(
-                sugName, sugDesc, blocks,
+                sugName, sugDesc, check.blocks(),
                 session.sessionId(), filePath, session.projectPath(),
-                confidence, patternType, null, (int) toolCallCount, true
+                confidence, patternType, null, (int) toolCallCount, true,
+                GeneratedWorkflowCheck.summaryLines(check.remaining())
         );
     }
 
@@ -175,10 +192,12 @@ public class DialogConversionService {
         blocks = deduplicate(blocks);
 
         String name = "Dialog: " + truncate(session.projectPath(), 50);
+        // Regelbasiert gibt es keine KI, die korrigieren könnte: nur melden.
         return new DialogWorkflowSuggestion(
                 name, "Aus Claude-Code-Session generiert (rule-based)", blocks,
                 session.sessionId(), filePath, session.projectPath(),
-                0.5, "mixed", null, toolCallsAnalyzed, true
+                0.5, "mixed", null, toolCallsAnalyzed, true,
+                GeneratedWorkflowCheck.summaryLines(buildCheck.findings(blocks, null))
         );
     }
 
@@ -249,46 +268,5 @@ public class DialogConversionService {
                 .flatMap(t -> t.messages().stream())
                 .filter(m -> "tool_use".equals(m.type()))
                 .count();
-    }
-
-    private List<BlockDefinition> deduplicate(List<BlockDefinition> blocks) {
-        List<BlockDefinition> result = new ArrayList<>();
-        BlockDefinition prev = null;
-        for (BlockDefinition b : blocks) {
-            if (prev == null || !b.getType().equals(prev.getType())
-                    || !Objects.equals(b.getConfig(), prev.getConfig())) {
-                result.add(b);
-            }
-            prev = b;
-        }
-        return result;
-    }
-
-    private boolean isInternalCommand(String cmd) {
-        if (cmd == null || cmd.isBlank()) return true;
-        // Typische interne/explorative Commands die keinen Wert als Workflow-Block haben
-        return cmd.startsWith("ls ") || cmd.equals("ls") || cmd.startsWith("cat ")
-                || cmd.startsWith("echo ") || cmd.startsWith("pwd")
-                || cmd.contains("| head ") || cmd.contains("| tail ");
-    }
-
-    private boolean isMetaCommentary(String text) {
-        if (text == null) return true;
-        String lower = text.toLowerCase();
-        return lower.startsWith("let me") || lower.startsWith("i'll now")
-                || lower.startsWith("i'm going to") || lower.startsWith("i can see")
-                || lower.startsWith("i notice") || lower.startsWith("looking at");
-    }
-
-    private String extractJson(String text) {
-        int start = text.indexOf('{');
-        int end = text.lastIndexOf('}');
-        if (start >= 0 && end > start) return text.substring(start, end + 1);
-        return text;
-    }
-
-    private String truncate(String s, int max) {
-        if (s == null) return "";
-        return s.length() > max ? s.substring(0, max) + "..." : s;
     }
 }

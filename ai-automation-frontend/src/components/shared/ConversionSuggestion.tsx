@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Sparkles, ChevronDown, ChevronUp, Plus } from 'lucide-react';
 import { Card, Button, Badge, Input } from '../ui';
+import { BuildFindingsNote } from './BuildFindingsNote';
 import { useConversionSuggestion, useCreateWorkflowFromSuggestion } from '../../hooks/useConversion';
 import { useProjects } from '../../hooks/useProjects';
 import { useT } from '../../i18n';
@@ -68,6 +69,8 @@ export function ConversionSuggestion({ runId }: { runId: string }) {
               <p className="text-sm text-text-secondary">{suggestion.originalGoal}</p>
             </div>
           )}
+
+          <BuildFindingsNote findings={suggestion.buildFindings} />
 
           {/* Suggested blocks */}
           <div>

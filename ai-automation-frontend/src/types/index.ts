@@ -1165,6 +1165,8 @@ export interface WorkflowSuggestion {
   originalGoal: string;
   agenticStepsAnalyzed: number;
   available: boolean;
+  /** Build-check findings from MEDIUM up, HIGH first (TODO 326d5987); absent on older backends. */
+  buildFindings?: string[];
 }
 
 // ── Pagination ───────────────────────────────────────────
@@ -1741,6 +1743,8 @@ export interface WorkflowFactoryResult {
   promotedAsTemplate: boolean;
   durationMs: number;
   retryErrors: string[];
+  /** Build-check findings from MEDIUM up, HIGH first (TODO 326d5987); absent on older backends. */
+  buildFindings?: string[];
 }
 
 export interface FactoryTopicCategory {
@@ -1817,6 +1821,8 @@ export interface DialogWorkflowSuggestion {
   notAvailableReason: string | null;
   toolCallsAnalyzed: number;
   available: boolean;
+  /** Build-check findings from MEDIUM up, HIGH first (TODO 326d5987); absent on older backends. */
+  buildFindings?: string[];
 }
 
 // ── Modules (startup configuration, read-only) ──────────

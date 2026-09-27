@@ -3,6 +3,7 @@ import {
   Factory, CheckCircle2, XCircle, Clock, ArrowUpRight, RotateCcw, Award, Package,
 } from 'lucide-react';
 import { Card, Button, Spinner, Badge } from '../ui';
+import { BuildFindingsNote } from '../shared/BuildFindingsNote';
 import { useI18nStore, useT } from '../../i18n';
 import { formatDuration } from '../../utils/formatTime';
 import type { Workflow, WorkflowFactoryResult } from '../../types';
@@ -88,6 +89,9 @@ export function FactoryResultsList({
                   <p className="text-xs text-warning mt-0.5">
                     {t.factory.retryErrors.replace('{count}', String(r.retryErrors.length))}
                   </p>
+                )}
+                {r.buildFindings && r.buildFindings.length > 0 && (
+                  <div className="mt-1.5"><BuildFindingsNote findings={r.buildFindings} /></div>
                 )}
               </div>
               {r.durationMs > 0 && (

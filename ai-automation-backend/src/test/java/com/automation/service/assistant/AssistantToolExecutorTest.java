@@ -19,6 +19,8 @@ import com.automation.service.todo.TodoService;
 import com.automation.service.workflow.RunControlService;
 import com.automation.service.workflow.WorkflowExecutor;
 import com.automation.service.workflow.WorkflowService;
+import com.automation.service.workflow.analyzer.GeneratedWorkflowCheck;
+import com.automation.service.workflow.analyzer.WorkflowAnalyzer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -54,7 +56,8 @@ class AssistantToolExecutorTest {
         ObjectMapper mapper = new ObjectMapper();
         executor = new AssistantToolExecutor(
                 new AssistantTodoTools(todoService, mapper),
-                new AssistantWorkflowTools(workflowService, workflowExecutor, runControlService, mapper),
+                new AssistantWorkflowTools(workflowService, workflowExecutor, runControlService, mapper,
+                        new GeneratedWorkflowCheck(new WorkflowAnalyzer(), mapper, activityLogService)),
                 new AssistantChainTools(chainService, mapper),
                 registry,
                 new AssistantToolValidator(mapper), guardrailsConfig, activityLogService, ModuleRegistry.allEnabled(),
@@ -231,7 +234,8 @@ class AssistantToolExecutorTest {
         ObjectMapper mapper = new ObjectMapper();
         executor = new AssistantToolExecutor(
                 new AssistantTodoTools(todoService, mapper),
-                new AssistantWorkflowTools(workflowService, workflowExecutor, runControlService, mapper),
+                new AssistantWorkflowTools(workflowService, workflowExecutor, runControlService, mapper,
+                        new GeneratedWorkflowCheck(new WorkflowAnalyzer(), mapper, activityLogService)),
                 new AssistantChainTools(chainService, mapper),
                 registry,
                 new AssistantToolValidator(mapper), guardrailsConfig, activityLogService,
