@@ -1,5 +1,6 @@
 package com.automation.service.integration.providers.feed;
 
+import com.automation.testsupport.TestTargetGuards;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,7 +22,7 @@ class FeedProviderTest {
 
     private HttpServer server;
     private String base;
-    private final FeedProvider provider = new FeedProvider(new FeedFetcher());
+    private final FeedProvider provider = new FeedProvider(new FeedFetcher(TestTargetGuards.onWithLoopbackServerAsPublic()));
 
     @BeforeEach
     void start() throws Exception {
@@ -110,6 +111,36 @@ class FeedProviderTest {
     }
 
     @Test
+    void fetchFeed_refusesRedirectToAnInternalAddress_beforeConnecting() {
+        serve("/meta", 302, "", "http://169.254.169.254/latest/meta-data/");
+
+        assertThatThrownBy(() -> fetch(Map.of("url", base + "/meta")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("169.254.169.254")
+                .hasMessageContaining("private-network-guard");
+    }
+
+    @Test
+    void fetchFeed_refusesLocalTargetsWhileTheGuardIsOn_andReachesThemWhenOff() {
+        AtomicInteger hits = new AtomicInteger();
+        server.createContext("/local", ex -> {
+            hits.incrementAndGet();
+            byte[] bytes = FeedParserTest.RSS.getBytes(StandardCharsets.UTF_8);
+            ex.sendResponseHeaders(200, bytes.length);
+            ex.getResponseBody().write(bytes);
+            ex.close();
+        });
+
+        assertThatThrownBy(() -> new FeedFetcher(TestTargetGuards.on()).fetch(base + "/local"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("local or private network address");
+        assertThat(hits).hasValue(0);
+
+        assertThat(new FeedFetcher(TestTargetGuards.off()).fetch(base + "/local")).isNotEmpty();
+        assertThat(hits).hasValue(1);
+    }
+
+    @Test
     void fetchFeed_rejectsRedirectToFileScheme() {
         serve("/evil", 302, "", "file:///etc/passwd");
 
@@ -130,7 +161,7 @@ class FeedProviderTest {
     @Test
     void fetcher_enforcesSizeLimit() {
         serve("/big", 200, FeedParserTest.RSS, null);
-        FeedFetcher small = new FeedFetcher(100);
+        FeedFetcher small = new FeedFetcher(TestTargetGuards.off(), 100);
 
         assertThatThrownBy(() -> small.fetch(base + "/big"))
                 .isInstanceOf(IllegalStateException.class)

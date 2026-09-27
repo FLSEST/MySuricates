@@ -1,6 +1,7 @@
 package com.automation.service.integration.providers.icalfeed;
 
 import com.automation.service.integration.IntegrationAction;
+import com.automation.testsupport.TestTargetGuards;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,7 +36,7 @@ class ICalFeedProviderTest {
     private HttpServer server;
     private String base;
     private final AtomicReference<String> userAgent = new AtomicReference<>();
-    private final ICalFeedProvider provider = new ICalFeedProvider(new ICalFeedFetcher());
+    private final ICalFeedProvider provider = new ICalFeedProvider(new ICalFeedFetcher(TestTargetGuards.onWithLoopbackServerAsPublic()));
 
     @BeforeEach
     void start() throws Exception {

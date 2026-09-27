@@ -102,5 +102,9 @@
   "webhook-signatures": {
     "name": "Webhook-Signaturen (HMAC)",
     "description": "Signatur-Secret je Webhook (HMAC-SHA256 im Header X-Signature); ein gespeichertes Secret gilt immer, der Schalter regelt nur Setzen und Entfernen."
+  },
+  "private-network-guard": {
+    "name": "Keine Abrufe ins lokale Netz",
+    "description": "iCal-Feed, RSS/Atom-Feed und HTTP-API rufen nur öffentliche Adressen ab: Ziele auf localhost, in privaten Netzen, Link-Local (samt Cloud-Metadaten 169.254.169.254), 0.0.0.0/:: oder Multicast werden abgelehnt – geprüft werden die aufgelösten IP-Adressen, auch bei jeder Weiterleitung. Ausschalten gibt lokale Quellen bewusst frei."
   }
 }
