@@ -57,6 +57,14 @@ Docker volume. Permanent setup: [Installation](#installation) below or step by s
 
 For agents that call the REST API directly, [AGENTS.md](AGENTS.md) is the starting point.
 
+## Guiding ideas
+
+1. **Deterministic wherever possible**, also because of cost: a shell step costs no tokens; AI is used only where it is needed. Frontier models help with building. What has been built runs deterministically, and the remaining, narrowly scoped AI points can be fed differently (smaller model, different provider).
+2. **Reuse and follow up:** templates, pool, sub-workflows, chains, and skills for reuse. The TODO system follows up.
+3. **Simple access and overview** through one interface.
+4. **Everything can be wired together:** diverse concepts, connect additional sources.
+5. **Provider-independent as far as possible:** provider and model can be selected per block. Encapsulating AI in the container has not yet been achieved.
+
 ## The questions behind it
 
 Four mechanisms were built to investigate one question each. Built here means: they run.
