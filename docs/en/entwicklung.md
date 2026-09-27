@@ -622,8 +622,13 @@ notes are generated **deterministically, without AI** by `scripts/release-notes.
 <tag>`:
 
 - **Overview**: subject lines of the merge commits between the two tags
-  (`git log --first-parent --merges`). An internal TODO bracket at the end of the subject
-  (`… (<8-hex> title)`) is stripped for the public notes.
+  (`git log --first-parent --merges`). Internal TODO-shorthand brackets are stripped for the public
+  notes (`scripts/lib/strip-todo-brackets.py`): a trailing bracket whose content starts with an
+  8-hex code (title, comma lists and nested brackets afterward don't matter, e.g.
+  `(<8-hex> title (with bracket))` or `(<8-hex>, <8-hex>, <8-hex>)`), a trailing bracket whose last
+  comma-separated element is a bare code (`(as of 2026-09-22, <8-hex>)`), and a bracket anywhere in
+  the subject that consists only of codes (`(TODO <8-hex>)`). An ordinary bracket without a code is
+  left alone.
 - **Changes by type**: non-merge commits, grouped by conventional prefix
   (`feat`/`fix`/`perf`/`refactor`/`docs`/`test`/…).
 - **Behavior changes**: entries from [„Behavior Changes"](#behavior-changes) below that are dated

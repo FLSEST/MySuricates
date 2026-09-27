@@ -627,8 +627,13 @@ GitHub-Release an (`gh release create "$TAG" --verify-tag --title "$TAG" --notes
 Die Notizen entstehen **deterministisch, ohne KI** über `scripts/release-notes.sh <prev-tag> <tag>`:
 
 - **Überblick**: Betreffzeilen der Merge-Commits zwischen den beiden Tags
-  (`git log --first-parent --merges`). Eine interne TODO-Klammer am Ende des Betreffs
-  (`… (<8-hex> Titel)`) wird für die öffentlichen Notizen entfernt.
+  (`git log --first-parent --merges`). Interne TODO-Kürzel-Klammern werden für die öffentlichen
+  Notizen entfernt (`scripts/lib/strip-todo-brackets.py`): eine abschließende Klammer, deren Inhalt
+  mit einem 8-Hex-Kürzel beginnt (Titel, Kommalisten und verschachtelte Klammern danach egal, z. B.
+  `(<8-hex> Titel (mit Klammer))` oder `(<8-hex>, <8-hex>, <8-hex>)`), eine abschließende Klammer,
+  deren letztes Komma-Element ein reines Kürzel ist (`(Stand 2026-09-22, <8-hex>)`), sowie eine
+  Klammer mitten im Betreff, die nur aus Kürzeln besteht (`(TODO <8-hex>)`). Eine normale Klammer
+  ohne Kürzel bleibt stehen.
 - **Änderungen nach Typ**: Nicht-Merge-Commits, gruppiert nach Conventional-Präfix
   (`feat`/`fix`/`perf`/`refactor`/`docs`/`test`/…).
 - **Verhaltensänderungen**: Einträge aus [„Verhaltensänderungen"](#verhaltensänderungen) unten,

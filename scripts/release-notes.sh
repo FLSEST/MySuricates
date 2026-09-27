@@ -44,28 +44,32 @@ RANGE="${TAG}"
 REMOTE_URL="$(git config --get remote.origin.url 2>/dev/null || true)"
 REPO_SLUG="$(sed -E 's#^git@github\.com:##; s#^https://github\.com/##; s#\.git$##' <<< "$REMOTE_URL")"
 
-# ── TODO-Klammer am Ende eines Betreffs entfernen: "… (<8-hex> Titel)" ist ein internes Kuerzel ──
-strip_todo_bracket() {
-    sed -E 's/[[:space:]]*\([0-9a-f]{6,8}([[:space:]]+[^()]*)?\)[[:space:]]*$//'
+# ── TODO-Kuerzel-Klammern entfernen: intern (repo-lokale Kurz-IDs), nichts fuer oeffentliche Notizen.
+# Zwei Formen (scripts/lib/strip-todo-brackets.py): eine abschliessende Klammer, deren Inhalt mit
+# einem 8-Hex-Kuerzel beginnt (Titel/Kommas/verschachtelte Klammern danach egal), und eine Klammer
+# irgendwo im Betreff, die nur aus Kuerzeln besteht ("(TODO 2738fda0)", "(a4644103, e8a4ebb4)").
+# Batch-Verarbeitung (ein Python-Aufruf je Abschnitt statt einer pro Zeile).
+strip_todo_brackets() {
+    python3 "$SCRIPT_DIR/lib/strip-todo-brackets.py"
 }
 
 echo "# ${TAG}"
 echo
 
 # ── Ueberblick: Betreffzeilen der Merge-Commits im First-Parent-Verlauf ─────────────────────────
-MERGE_SUBJECTS="$(git log --first-parent --merges --format='%s' "$RANGE" -- 2>/dev/null)"
+MERGE_SUBJECTS="$(git log --first-parent --merges --format='%s' "$RANGE" -- 2>/dev/null | strip_todo_brackets)"
 if [ -n "$MERGE_SUBJECTS" ]; then
     echo "## Überblick"
     echo
     while IFS= read -r subject; do
         [ -n "$subject" ] || continue
-        echo "- $(printf '%s' "$subject" | strip_todo_bracket)"
+        echo "- ${subject}"
     done <<< "$MERGE_SUBJECTS"
     echo
 fi
 
 # ── Änderungen nach Typ: Nicht-Merge-Commits, gruppiert nach Conventional-Praefix ───────────────
-NONMERGE_SUBJECTS="$(git log --no-merges --format='%s' "$RANGE" -- 2>/dev/null)"
+NONMERGE_SUBJECTS="$(git log --no-merges --format='%s' "$RANGE" -- 2>/dev/null | strip_todo_brackets)"
 
 declare -A TYPE_LABEL=(
     [feat]="Features"
@@ -94,7 +98,7 @@ if [ -n "$NONMERGE_SUBJECTS" ]; then
             echo
             while IFS= read -r subject; do
                 [ -n "$subject" ] || continue
-                stripped="$(printf '%s' "$subject" | strip_todo_bracket | sed -E 's/^[a-z]+(\(.*\))?!?:[[:space:]]*//')"
+                stripped="$(sed -E 's/^[a-z]+(\(.*\))?!?:[[:space:]]*//' <<< "$subject")"
                 echo "- ${stripped}"
             done <<< "$MATCHES"
             echo

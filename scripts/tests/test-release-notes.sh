@@ -13,8 +13,9 @@ check() { if eval "$2"; then echo "  ok   $1"; PASS=$((PASS + 1)); else echo "  
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
-mkdir -p "$TMP/scripts" "$TMP/docs"
+mkdir -p "$TMP/scripts/lib" "$TMP/docs"
 cp "$REPO/scripts/release-notes.sh" "$TMP/scripts/release-notes.sh"
+cp "$REPO/scripts/lib/strip-todo-brackets.py" "$TMP/scripts/lib/strip-todo-brackets.py"
 
 git -C "$TMP" init -q -b main
 git -C "$TMP" config user.email test@example.com
@@ -100,5 +101,40 @@ check "Skript laeuft durch"                            '[ "$RC7" -eq 0 ]'
 check "Verhaltensaenderungen-Abschnitt vorhanden"       'grep -q "^## Verhaltensänderungen" <<< "$OUT7"'
 check "alter Eintrag (vor v0.2.0) fehlt"                '! grep -q "Alter Eintrag" <<< "$OUT7"'
 check "neuer Eintrag (nach v0.2.0) gelistet"            'grep -q "Neuer Eintrag nach v0.2.0" <<< "$OUT7"'
+
+echo "8) Mehrere Kuerzel, verschachtelte Klammer im Titel, normale Klammer bleibt"
+# Reine Kuerzelliste ohne Titel (Serien-Merge-Format, z.B. "series/w3-…: … (id, id, id, id)")
+git -C "$TMP" checkout -q -b feat/series
+echo "series" >> "$TMP/README.md"
+git -C "$TMP" commit -qam "feat(series): Themenbuendel A, B, C, D"
+git -C "$TMP" checkout -q main
+git -C "$TMP" merge --no-ff -q -m "Merge series/w3-x: Themenbuendel A, B, C (66666666, 77777777, 88888888)" feat/series
+
+# Titel, der selbst eine Klammer enthaelt (z.B. "(448 statt hoechstens 435 Zeilen)")
+echo "nested" >> "$TMP/README.md"
+git -C "$TMP" commit -qam "refactor(x): Modellstatistik verschoben (99999999 Titel mit (Klammer) drin)"
+
+# Normale Klammer ohne Kuerzel bleibt stehen (Typ muss in TYPE_ORDER liegen, sonst faellt der
+# Commit komplett aus den Typ-Abschnitten heraus statt nur ungestrippt zu bleiben)
+echo "normal" >> "$TMP/README.md"
+git -C "$TMP" commit -qam "fix(x): Abhaengigkeit aktualisiert (kein Kuerzel)"
+
+# Kuerzel am Ende einer Klammer mit Fliesstext davor (z.B. "(Stand 2026-09-22, 8f28fad0)")
+echo "trailing" >> "$TMP/README.md"
+git -C "$TMP" commit -qam "docs(readme): Sync nachgezogen (Stand 2026-09-22, aaaaaaaa)"
+
+git -C "$TMP" tag -a v0.4.0 -m "Release v0.4.0"
+
+OUT8="$( (cd "$TMP" && bash scripts/release-notes.sh v0.3.0 v0.4.0) )"; RC8=$?
+check "Skript laeuft durch"                              '[ "$RC8" -eq 0 ]'
+check "Serien-Merge-Betreff ohne Kuerzelliste"            'grep -qF -- "Merge series/w3-x: Themenbuendel A, B, C" <<< "$OUT8" && ! grep -qE "66666666|77777777|88888888" <<< "$OUT8"'
+check "verschachtelte Klammer im Titel komplett entfernt" 'grep -qF -- "- Modellstatistik verschoben" <<< "$OUT8" && ! grep -qF -- "99999999" <<< "$OUT8" && ! grep -qF -- "Klammer" <<< "$OUT8"'
+check "normale Klammer ohne Kuerzel bleibt stehen"        'grep -qF -- "- Abhaengigkeit aktualisiert (kein Kuerzel)" <<< "$OUT8"'
+check "Kuerzel am Ende mit Fliesstext davor entfernt"     'grep -qF -- "- Sync nachgezogen" <<< "$OUT8" && ! grep -qF -- "aaaaaaaa" <<< "$OUT8" && ! grep -qF -- "Stand 2026-09-22" <<< "$OUT8"'
+# Verhaltensaenderungen-Eintraege stammen aus docs/entwicklung.md und zitieren ihren Commit-/
+# TODO-Hash bewusst (siehe dortige Konvention) — die einzigen erlaubten Fundstellen ausserhalb
+# davon sind der Compare-Link (Tag-Namen ohne Hex) selbst.
+check "kein 8-Hex-Kuerzel mehr ausserhalb Vergleichslink/Verhaltensaenderungen" \
+  '[ -z "$(grep -E "[0-9a-f]{8}" <<< "$OUT8" | grep -v "compare/" | grep -v "^- \*\*Seit ")" ]'
 
 echo; echo "passed=$PASS failed=$FAIL"; [ "$FAIL" -eq 0 ]
