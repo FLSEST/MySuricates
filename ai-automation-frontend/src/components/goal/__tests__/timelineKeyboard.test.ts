@@ -50,6 +50,17 @@ describe('timelineKeyboardCoordinates (ff6f08fd)', () => {
     expect(move('ArrowLeft', context(dayX(axis.startDay), 124, 'row:none'))).toBeUndefined();
   });
 
+  // c60bf914: a diamond moves by days in the head strip of its band just like a chip in a row
+  it('moves a lifted diamond by one day in the head strip of its band', () => {
+    const start = dayX(today + 5);
+    const strip = rect(180, 64, W, 36);
+    const ctx = {
+      ...context(start, 82, null, 10),
+      over: { id: 'strip:p1', rect: strip, disabled: false, data: { current: undefined } },
+    } as unknown as SensorContext;
+    expect(move('ArrowRight', ctx)).toEqual({ x: start + DAY - 10, y: 82 - 14 });
+  });
+
   it('moves days only in a row, not in "unplanned"', () => {
     expect(move('ArrowRight', context(100, 260, 'unplanned'))).toBeUndefined();
   });
@@ -92,8 +103,10 @@ describe('timelineCollision (ff6f08fd)', () => {
     expect(hit(timelineCollision(args(100, 260, null)))).toEqual(['unplanned']);
   });
 
-  it('reads anchor and orientation of the lifted chip, with the plain chip as fallback', () => {
-    expect(chipDragData({ data: { current: { anchor: 140, flipped: true } } })).toEqual({ anchor: 140, flipped: true });
-    expect(chipDragData(null)).toEqual({ anchor: CHIP_ANCHOR, flipped: false });
+  it('reads anchor, orientation and kind of the lifted item, with the plain TODO chip as fallback', () => {
+    expect(chipDragData({ data: { current: { anchor: 140, flipped: true } } })).toEqual({ anchor: 140, flipped: true, kind: 'todo' });
+    expect(chipDragData({ data: { current: { anchor: 10, flipped: false, kind: 'milestone' } } }))
+      .toEqual({ anchor: 10, flipped: false, kind: 'milestone' });
+    expect(chipDragData(null)).toEqual({ anchor: CHIP_ANCHOR, flipped: false, kind: 'todo' });
   });
 });

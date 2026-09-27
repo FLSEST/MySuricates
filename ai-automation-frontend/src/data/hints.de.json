@@ -251,12 +251,20 @@
       "Ein gepunkteter Stummel zeigt, wo noch kein Workflow andockt; gestrichelte Zeilen sind Vorschläge, die zum Ziel passen könnten"
     ]
   },
+  "goal-outline": {
+    "title": "Das Ziel gegliedert",
+    "points": [
+      "Jedes Projekt des Ziels ist eine Karte; darin stehen seine Teilziele in der festgelegten Reihenfolge, jedes mit seinen TODOs",
+      "Ein Teilziel ist erreicht, wenn alle seine TODOs erledigt sind – ein Datum braucht es nicht, die Reihenfolge sagt, was zuerst kommt",
+      "Die Zähler zeigen erledigt von gesamt und offene Fragen; eine Frage muss geklärt sein, bevor jemand anfängt"
+    ]
+  },
   "goal-timeline": {
     "title": "Das Ziel auf dem Zeitstrahl",
     "points": [
-      "Jede Zeile ist ein Meilenstein, darunter stehen die TODOs ohne Meilenstein – jedes an seinem Fälligkeitstag",
-      "Ein Meilenstein ist erreicht, wenn alle ihm zugeordneten TODOs erledigt sind; seine Raute zeigt den Stand: grün erreicht, gelb bald fällig, rot überfällig",
-      "Was noch kein Datum hat, wartet unter „Ungeplant“; überfällige TODOs werden rot und erscheinen zusätzlich unter „Braucht dich“ im Cockpit"
+      "Jedes Projekt hat ein Band; ein Klick in das Band legt dort an diesem Tag ein Teilziel an, nur der Titel fehlt noch",
+      "Teilziele ohne Datum warten in der Leiste „Ohne Datum“ ihres Bands – auf das Band gezogen bekommen sie eines; Rauten lassen sich verschieben",
+      "TODOs landen nur in Teilzielen ihres eigenen Projekts; was noch keine Fälligkeit hat, steht unter „Ungeplant“, überfällige werden rot"
     ]
   },
   "goal-guard": {

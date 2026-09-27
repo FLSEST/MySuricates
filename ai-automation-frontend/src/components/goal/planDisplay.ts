@@ -1,7 +1,16 @@
 import type { Locale, TranslationKeys } from '../../i18n';
 import { formatDate } from '../../utils/localeFormat';
 import { isOverdue } from './timelineLayout';
-import type { GoalMilestone, GoalTodoItem } from '../../types';
+import type { GoalMilestone, GoalTodoItem, TodoStatus } from '../../types';
+
+/** Statuspunkt eines TODOs – am Zeitstrahl und in der Gliederung. */
+export const STATUS_DOT: Record<TodoStatus, string> = {
+  OPEN: 'bg-text-tertiary',
+  BACKLOG: 'bg-border-strong',
+  IN_PROGRESS: 'bg-info',
+  DONE: 'bg-success',
+  ARCHIVED: 'bg-border',
+};
 
 /** Kurzes Datum für Chips und Achse: „3. Okt.“ / „Oct 3“. */
 export const SHORT_DATE = { month: 'short', day: 'numeric' } as const;

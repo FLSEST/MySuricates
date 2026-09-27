@@ -2,7 +2,10 @@ import { useId } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { useI18nStore, useT } from '../../i18n';
 import { formatDate } from '../../utils/localeFormat';
-import { LANE_HEIGHT, dayOf, rowDropId, xOfDay, type PlanChanges, type TimelineAxis, type TimelineRow } from './timelineLayout';
+import {
+  LANE_HEIGHT, UNPLANNED_DROP_ID, dayOf, rowDropId, xOfDay, type PlanChanges, type TimelineAxis, type TimelineRow,
+} from './timelineLayout';
+import { acceptsDrop, dropTone, useDragged } from './timelineDrag';
 import { SHORT_DATE } from './planDisplay';
 import { MilestoneDiamond } from './MilestoneDiamond';
 import { TimelineChip } from './TimelineChip';
@@ -59,21 +62,27 @@ interface RowProps {
   onOpenMilestone: (id: string) => void;
 }
 
-/** Eine Zeile: ein Meilenstein (oder „ohne Meilenstein“) mit seinen fälligen TODOs; Ablegen setzt Tag und Zeile. */
+/**
+ * Eine Zeile: ein Teilziel (oder „ohne Teilziel“) mit seinen fälligen TODOs; Ablegen setzt Tag und
+ * Zeile. Beim Ziehen nimmt sie nur an, was zu ihrem Projekt passt (c60bf914).
+ */
 export function TimelineRowView({ row, axis, width, today, milestones, onPlan, onOpenTodo, onOpenMilestone }: RowProps) {
   const t = useT();
-  const { setNodeRef, isOver } = useDroppable({ id: rowDropId(row.key) });
+  const id = rowDropId(row.band, row.key);
+  const accepts = acceptsDrop(useDragged(), id);
+  const { setNodeRef, isOver } = useDroppable({ id, disabled: accepts === false });
   const { milestone } = row;
   return (
-    <div className="flex border-t border-border" data-testid={`timeline-row-${row.key}`}>
-      <div className={`${LABEL_COLUMN} py-2 pr-2`}>
+    <div className="flex border-t border-border" data-testid={`timeline-row-${row.band}-${row.key}`}>
+      <div className={`${LABEL_COLUMN} py-2 pl-3 pr-2`}>
         {milestone
           ? <MilestoneRowLabel milestone={milestone} onOpen={() => onOpenMilestone(milestone.id)} />
-          : <span className="text-xs text-text-tertiary">{t.goals.timeline.noMilestone}</span>}
+          : <span className="text-xs italic text-text-tertiary">{t.goals.timeline.noMilestone}</span>}
       </div>
-      <div ref={setNodeRef} className={`relative min-w-0 flex-1 transition-colors ${isOver ? 'bg-accent/10' : ''}`}
+      <div ref={setNodeRef} data-accepts={accepts === null ? undefined : String(accepts)}
+        className={`relative min-w-0 flex-1 transition-colors ${dropTone(accepts, isOver)}`}
         style={{ height: row.lanes * LANE_HEIGHT + 2 * ROW_PADDING }}>
-        {milestone && (
+        {milestone?.dueDate && (
           <span aria-hidden="true" className={`absolute inset-y-0 border-l-2 border-dashed ${MILESTONE_LINE[milestone.state]}`}
             style={{ left: xOfDay(axis, dayOf(milestone.dueDate), width) - 1 }} />
         )}
@@ -94,10 +103,10 @@ function MilestoneRowLabel({ milestone, onOpen }: { milestone: GoalMilestone; on
     <button type="button" onClick={onOpen} className="-mx-1 block w-full rounded px-1 text-left hover:bg-surface-hover focus-ring">
       <span className="flex min-w-0 items-center gap-1.5">
         <MilestoneDiamond state={milestone.state} />
-        <span className="truncate text-sm font-medium text-text">{milestone.title}</span>
+        <span className="truncate text-sm font-medium text-text" title={milestone.title}>{milestone.title}</span>
       </span>
       <span className="block truncate text-[11px] text-text-tertiary">
-        {formatDate(milestone.dueDate, locale, SHORT_DATE)} · {milestone.done}/{milestone.total} · {tm.states[milestone.state]}
+        {milestone.dueDate ? formatDate(milestone.dueDate, locale, SHORT_DATE) : tm.noDate} · {milestone.done}/{milestone.total} · {tm.states[milestone.state]}
         {milestone.reopened && ` · ${tm.reopened}`}
       </span>
     </button>
@@ -114,10 +123,11 @@ export function UnplannedBar({ todos, milestones, today, onPlan, onOpenTodo }: {
 }) {
   const tt = useT().goals.timeline;
   const headingId = useId();
-  const { setNodeRef, isOver } = useDroppable({ id: 'unplanned' });
+  const accepts = acceptsDrop(useDragged(), UNPLANNED_DROP_ID);
+  const { setNodeRef, isOver } = useDroppable({ id: UNPLANNED_DROP_ID, disabled: accepts === false });
   return (
     <section ref={setNodeRef} aria-labelledby={headingId}
-      className={`rounded-xl border border-dashed p-3 transition-colors ${isOver ? 'border-accent bg-accent/5' : 'border-border-strong'}`}>
+      className={`rounded-xl border border-dashed p-3 transition-colors ${isOver ? 'border-accent' : 'border-border-strong'} ${dropTone(accepts, isOver)}`}>
       <div className="mb-2 flex flex-wrap items-baseline gap-x-2">
         <h3 id={headingId} className="text-xs font-semibold uppercase tracking-wide text-text-secondary">{tt.unplanned}</h3>
         <span className="text-xs tabular-nums text-text-tertiary">{todos.length}</span>

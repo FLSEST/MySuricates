@@ -1268,7 +1268,7 @@ export interface TodoPlanning {
   ratedBy: RatedBy | null;
   ratedAt: string | null;
   openQuestion: string | null;
-  /** Meilenstein im Ziel (TODO 259f4f66); null = keiner. Fehlt bei einem älteren Backend. */
+  /** Teilziel (im Code `milestone`) im Ziel (TODO 259f4f66); null = keins. Fehlt bei einem älteren Backend. */
   milestoneId?: string | null;
 }
 
@@ -1317,17 +1317,50 @@ export interface Goal {
   progress: GoalProgress;
   /** Nie null; `useGoal` ergänzt ihn für ein älteres Backend. */
   guard: GoalGuard;
+  /** Ausdrücklich zugeordnete Projekte, nach Position (c60bf914). Fehlt bei einem älteren Backend. */
+  projects?: GoalProjectRef[];
 }
 
-/** Zustand eines Meilensteins, beim Lesen berechnet: bald fällig = in höchstens 3 Tagen. */
+/** Projekt eines Ziels in der Zielliste: nur Name und ID. */
+export interface GoalProjectRef {
+  id: string;
+  name: string;
+}
+
+/** Projekt eines Ziels im Detail (c60bf914), mit Zählern aus den nicht archivierten TODOs des Ziels darin. */
+export interface GoalProject {
+  projectId: string;
+  name: string;
+  archived: boolean;
+  position: number;
+  total: number;
+  done: number;
+  openQuestions: number;
+}
+
+/**
+ * Zustand eines Teilziels (im Code `milestone`), beim Lesen berechnet: bald fällig = in höchstens
+ * 3 Tagen. Ohne Datum nur OPEN oder REACHED.
+ */
 export type MilestoneState = 'OPEN' | 'DUE_SOON' | 'OVERDUE' | 'REACHED';
 
-/** Meilenstein eines Ziels: erreicht, wenn alle zugeordneten TODOs erledigt sind. */
+/**
+ * Teilziel eines Ziels (c60bf914; im Code `milestone`): gehört genau einem Projekt des Ziels, das
+ * Datum ist optional, die Reihenfolge im Projekt steht in `position`. Erreicht, wenn alle
+ * zugeordneten TODOs erledigt sind.
+ */
 export interface GoalMilestone {
   id: string;
   goalId: string;
   title: string;
-  dueDate: string;
+  /** null = ohne Datum. */
+  dueDate: string | null;
+  /** Projekt des Teilziels; null nur bei Altdaten oder wenn das Projekt gelöscht wurde. */
+  projectId: string | null;
+  /** Reihenfolge innerhalb des Projekts. */
+  position: number;
+  /** Nicht erledigte TODOs mit offener Frage. */
+  openQuestions: number;
   state: MilestoneState;
   /** Zugeordnete TODOs ohne ARCHIVED. */
   total: number;
@@ -1340,16 +1373,24 @@ export interface GoalMilestone {
   updatedAt: string;
 }
 
-/** `dueDate`: ISO-Zeitpunkt oder `YYYY-MM-DD` (= bis 23:59:59 UTC). */
+/** Ein Teilziel mit Datum – nur solche stehen als Raute auf dem Zeitstrahl. */
+export type DatedMilestone = GoalMilestone & { dueDate: string };
+
+/**
+ * `dueDate`: ISO-Zeitpunkt oder `YYYY-MM-DD` (= bis 23:59:59 UTC), fehlt = ohne Datum. `projectId`
+ * ist Pflicht, außer das Ziel hat genau ein Projekt.
+ */
 export interface CreateGoalMilestoneRequest {
   title: string;
-  dueDate: string;
+  dueDate?: string;
+  projectId?: string;
 }
 
-/** Fehlendes Feld = unverändert. */
+/** Fehlendes Feld = unverändert; `dueDate: ''` entfernt das Datum; `projectId` nur, solange keine TODOs daran hängen. */
 export interface UpdateGoalMilestoneRequest {
   title?: string;
   dueDate?: string;
+  projectId?: string;
 }
 
 /** `POST /goals/{id}/guard`; Projekt, Zeitplan und Sprache zählen nur beim ersten Einschalten. */
@@ -1395,7 +1436,9 @@ export interface GoalDetail {
   /** Arbeitsreihenfolge: Rang, dann Priorität, dann Alter. */
   todos: GoalTodoItem[];
   byProject: GoalProjectProgress[];
-  /** Nach Datum sortiert. */
+  /** Ausdrücklich zugeordnete Projekte nach Position; `normalizeGoalDetail` leitet sie bei einem älteren Backend aus `byProject` ab. */
+  projects: GoalProject[];
+  /** Nach Projekt-Position, dann Teilziel-Position. */
   milestones: GoalMilestone[];
 }
 
@@ -1461,6 +1504,8 @@ export interface CreateGoalRequest {
   description?: string;
   /** `YYYY-MM-DD` oder ISO-Zeitpunkt. */
   targetDate?: string;
+  /** Projekte, denen das Ziel gleich zugeordnet wird. */
+  projectIds?: string[];
 }
 
 export interface UpdateGoalRequest {

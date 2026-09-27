@@ -8,7 +8,7 @@ import {
 } from './timelineLayout';
 import { SHORT_DATE } from './planDisplay';
 import { MilestoneDiamond } from './MilestoneDiamond';
-import type { GoalMilestone } from '../../types';
+import type { DatedMilestone } from '../../types';
 
 /** Mindestabstand zweier beschrifteter Rasterlinien in px; dazwischen bleiben Linien unbeschriftet. */
 const MIN_LABEL_PX = 30;
@@ -26,27 +26,26 @@ const TODAY_LABEL: Record<TodayLabelPlacement, { className: string; offset: numb
 interface TimelineAxisViewProps {
   axis: TimelineAxis;
   width: number;
-  milestones: GoalMilestone[];
+  /** Datierte Teilziele – als stille Marken, damit man sie über alle Bänder hinweg sieht. */
+  milestones: DatedMilestone[];
   targetDay: number | null;
   /** Tag, auf dem ein gezogenes TODO landen würde. */
   preview: number | null;
   /** Die Achse wird gemessen – ihre Breite ist die aller Zeilen. */
   measureRef: RefObject<HTMLDivElement | null>;
   onCreateAt: (day: number, x: number) => void;
-  onOpenMilestone: (id: string) => void;
 }
 
 /**
- * Die Achse des Zeitstrahls (TODO e192df18): Monate bzw. Jahre, darunter das Raster, unten die
- * Rauten der Meilensteine (Farbe nach Zustand), die Fahne des Zieldatums und „heute“. Ein Klick
- * daneben legt an diesem Tag einen Meilenstein an.
+ * Die Achse des Zeitstrahls (TODO e192df18): Monate bzw. Jahre, darunter das Raster, unten kleine
+ * Marken der datierten Teilziele (Farbe nach Zustand – ziehen und öffnen geht in ihrem Projektband,
+ * c60bf914), die Fahne des Zieldatums und „heute“. Ein Klick legt an diesem Tag ein Teilziel an.
  */
 export function TimelineAxisView({
-  axis, width, milestones, targetDay, preview, measureRef, onCreateAt, onOpenMilestone,
+  axis, width, milestones, targetDay, preview, measureRef, onCreateAt,
 }: TimelineAxisViewProps) {
   const t = useT();
   const tt = t.goals.timeline;
-  const tm = t.goals.milestones;
   const locale = useI18nStore((s) => s.locale);
   const perDay = width / axis.days;
   const labelEvery = Math.max(1, Math.ceil(MIN_LABEL_PX / (perDay * TICK_DAYS[axis.scale])));
@@ -108,21 +107,12 @@ export function TimelineAxisView({
           <Flag className="h-4 w-4" aria-hidden="true" />
         </span>
       )}
-      {milestones.map((milestone) => {
-        const label = tm.diamond.replace('{title}', milestone.title).replace('{state}', tm.states[milestone.state])
-          .replace('{date}', formatDate(milestone.dueDate, locale));
-        return (
-          <button key={milestone.id} type="button" aria-label={label} title={label}
-            onClick={(event) => {
-              event.stopPropagation();
-              onOpenMilestone(milestone.id);
-            }}
-            className="absolute bottom-0.5 z-10 -translate-x-1/2 rounded p-1 hover:bg-surface-hover focus-ring"
-            style={{ left: x(dayOf(milestone.dueDate)) }}>
-            <MilestoneDiamond state={milestone.state} size="lg" />
-          </button>
-        );
-      })}
+      {milestones.map((milestone) => (
+        <span key={milestone.id} aria-hidden="true" data-testid="timeline-axis-mark"
+          className="pointer-events-none absolute bottom-1.5 -translate-x-1/2" style={{ left: x(dayOf(milestone.dueDate)) }}>
+          <MilestoneDiamond state={milestone.state} size="sm" />
+        </span>
+      ))}
       {preview !== null && (
         <span className="absolute top-0 z-20 -translate-x-1/2 whitespace-nowrap rounded bg-accent px-1.5 py-0.5 text-[11px] font-medium text-text-inverse shadow"
           style={{ left: x(preview) }}>

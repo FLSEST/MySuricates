@@ -1,15 +1,17 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach, vi } from 'vitest';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
-import type { DndContextProps, DragEndEvent } from '@dnd-kit/core';
+import type { DndContextProps, DragEndEvent, DragStartEvent } from '@dnd-kit/core';
 import { server } from '../../../test/server';
 import { renderWithProviders } from '../../../test/utils';
 import { useI18nStore } from '../../../i18n';
 import { createRef } from 'react';
 import { GoalTimeline } from '../GoalTimeline';
 import { TimelineAxisView } from '../TimelineAxisView';
-import { CHIP_ANCHOR, CHIP_WIDTH, FALLBACK_WIDTH, NO_MILESTONE, axisFor, dayOf, dayOfIsoDate, xOfDay } from '../timelineLayout';
-import type { Goal, GoalMilestone, GoalTodoItem } from '../../../types';
+import {
+  CHIP_ANCHOR, CHIP_WIDTH, DIAMOND_ANCHOR, FALLBACK_WIDTH, NO_MILESTONE, axisFor, dayOf, dayOfIsoDate, isDated, xOfDay,
+} from '../timelineLayout';
+import type { Goal, GoalMilestone, GoalProject, GoalTodoItem } from '../../../types';
 
 // Ziehen lässt sich in jsdom nicht echt ausführen (keine Layout-Maße). Der Test greift deshalb die
 // Handler des DndContext ab und löst das Ende eines Zugs so aus, wie dnd-kit es melden würde.
@@ -53,9 +55,18 @@ const goal: Goal = {
 };
 
 const beta: GoalMilestone = {
-  id: 'm-beta', goalId: 'g1', title: 'Beta', dueDate: endOf('2026-10-01'), state: 'OPEN', total: 1, done: 0,
+  id: 'm-beta', goalId: 'g1', title: 'Beta', dueDate: endOf('2026-10-01'), projectId: 'p1', position: 0, openQuestions: 0,
+  state: 'OPEN', total: 1, done: 0,
   reachedAt: null, reopened: false, createdAt: '2026-09-23T00:00:00Z', updatedAt: '2026-09-23T00:00:00Z',
 };
+/** Ein Teilziel ohne Datum (c60bf914) – es wartet in der Leiste „ohne Datum“ seines Bands. */
+const docs: GoalMilestone = { ...beta, id: 'm-docs', title: 'Docs', dueDate: null, position: 1, total: 0 };
+const milestones = [beta, docs];
+
+const projects: GoalProject[] = [
+  { projectId: 'p1', name: 'AutoPilot', archived: false, position: 0, total: 5, done: 1, openQuestions: 0 },
+  { projectId: 'p2', name: 'Site', archived: false, position: 1, total: 1, done: 0, openQuestions: 0 },
+];
 
 const todos: GoalTodoItem[] = [
   item({ id: 'a', title: 'Privacy findings', dueDate: endOf('2026-09-30'), milestoneId: 'm-beta' }),
@@ -63,6 +74,7 @@ const todos: GoalTodoItem[] = [
   item({ id: 'c', title: 'Examples page' }),
   item({ id: 'd', title: 'Old banner', dueDate: endOf('2026-09-20') }),
   item({ id: 'e', title: 'Release notes', status: 'DONE', dueDate: endOf('2026-09-22') }),
+  item({ id: 's', title: 'Site copy', projectId: 'p2', projectName: 'Site', dueDate: endOf('2026-10-03') }),
 ];
 
 interface Sent { method: string; path: string; body: unknown }
@@ -87,21 +99,26 @@ function recordWrites(): Sent[] {
 }
 
 function renderTimeline(onOpenTodo = vi.fn()) {
-  renderWithProviders(<GoalTimeline goal={goal} todos={todos} milestones={[beta]} onOpenTodo={onOpenTodo} now={NOW} />);
+  renderWithProviders(
+    <GoalTimeline goal={goal} todos={todos} milestones={milestones} projects={projects} onOpenTodo={onOpenTodo} now={NOW} />,
+  );
   return onOpenTodo;
 }
 
 /** Wo der Tag im Zeitstrahl liegt – dieselbe Achse, die der Zeitstrahl ohne gemessene Breite zeichnet. */
 function xFor(iso: string): number {
-  const axis = axisFor({ todos, milestones: [beta], targetDate: goal.targetDate, today: dayOf(NOW) }, FALLBACK_WIDTH);
+  const axis = axisFor({ todos, milestones, targetDate: goal.targetDate, today: dayOf(NOW) }, FALLBACK_WIDTH);
   return xOfDay(axis, dayOfIsoDate(iso)!, FALLBACK_WIDTH);
 }
 
-/** Das Ende eines Zugs: TODO `todoId` losgelassen über `overId`, Zeiger `x` Pixel rechts vom Anfang der Zeile. */
-function dropOn(todoId: string, overId: string | null, x = 0) {
+/**
+ * Das Ende eines Zugs: `activeId` (`todo:…` oder `ms:…`) losgelassen über `overId`, Zeiger `x` Pixel
+ * rechts vom Anfang der Fläche.
+ */
+function dropOn(activeId: string, overId: string | null, x = 0) {
   const rowLeft = 180;
   const event = {
-    active: { id: `todo:${todoId}`, data: { current: undefined }, rect: { current: { initial: null, translated: null } } },
+    active: { id: activeId.includes(':') ? activeId : `todo:${activeId}`, data: { current: undefined }, rect: { current: { initial: null, translated: null } } },
     over: overId === null ? null : {
       id: overId, data: { current: undefined }, disabled: false,
       rect: { left: rowLeft, top: 300, width: FALLBACK_WIDTH, height: 48, right: rowLeft + FALLBACK_WIDTH, bottom: 348 },
@@ -117,12 +134,13 @@ function dropOn(todoId: string, overId: string | null, x = 0) {
  * Das Ende eines Zugs per Tastatur: kein Zeiger, der Tag steht unter dem Statuspunkt des angehobenen
  * Chips – `dotX` Pixel rechts vom Anfang der Zeile (ff6f08fd).
  */
-function keyboardDropOn(todoId: string, overId: string, dotX: number) {
+function keyboardDropOn(activeId: string, overId: string, dotX: number, anchor = CHIP_ANCHOR) {
   const rowLeft = 180;
-  const left = rowLeft + dotX - CHIP_ANCHOR;
+  const left = rowLeft + dotX - anchor;
   const event = {
     active: {
-      id: `todo:${todoId}`, data: { current: { anchor: CHIP_ANCHOR, flipped: false } },
+      id: activeId.includes(':') ? activeId : `todo:${activeId}`,
+      data: { current: { anchor, flipped: false, kind: activeId.startsWith('ms:') ? 'milestone' : 'todo' } },
       rect: { current: { initial: null, translated: { left, top: 310, width: CHIP_WIDTH, height: 28, right: left + CHIP_WIDTH, bottom: 338 } } },
     },
     over: {
@@ -137,12 +155,18 @@ function keyboardDropOn(todoId: string, overId: string, dotX: number) {
 }
 
 describe('GoalTimeline', () => {
-  it('shows a row per milestone and one without, the dated TODOs in them and the undated ones as unplanned', () => {
+  it('shows a band per project with a row per sub-goal and one without, the dated TODOs in them and the undated ones as unplanned', () => {
     renderTimeline();
 
-    const betaRow = screen.getByTestId('timeline-row-m-beta');
+    const autopilot = screen.getByRole('region', { name: 'Project band AutoPilot' });
+    const site = screen.getByRole('region', { name: 'Project band Site' });
+    const betaRow = within(autopilot).getByTestId('timeline-row-p1-m-beta');
     expect(within(betaRow).getByRole('button', { name: /^Privacy findings/ })).toBeInTheDocument();
-    const noneRow = screen.getByTestId(`timeline-row-${NO_MILESTONE}`);
+    expect(within(site).getByRole('button', { name: /^Site copy/ })).toBeInTheDocument();
+    // the undated sub-goal waits in the tray of its band
+    expect(within(screen.getByTestId('timeline-tray-p1')).getByRole('button', { name: 'Sub-goal Docs – open, no date' }))
+      .toBeInTheDocument();
+    const noneRow = screen.getByTestId(`timeline-row-p1-${NO_MILESTONE}`);
     expect(within(noneRow).getByRole('button', { name: /^Style probe/ })).toBeInTheDocument();
     expect(within(noneRow).queryByRole('button', { name: /^Examples page/ })).not.toBeInTheDocument();
 
@@ -155,8 +179,8 @@ describe('GoalTimeline', () => {
     expect(screen.getByRole('button', { name: /^Release notes/ })).toHaveAttribute('data-done', 'true');
     expect(screen.getByRole('button', { name: /^Release notes/ })).not.toHaveAttribute('data-overdue', 'true');
 
-    // Achse: Raute je Meilenstein, Fahne für das Zieldatum, heute
-    expect(screen.getByRole('button', { name: /^Milestone Beta/ })).toBeInTheDocument();
+    // Raute je datiertes Teilziel in seinem Band, auf der Achse Fahne für das Zieldatum und heute
+    expect(within(autopilot).getByRole('button', { name: /^Sub-goal Beta – open, due/ })).toBeInTheDocument();
     expect(within(screen.getByTestId('timeline-axis')).getByText('Today')).toBeInTheDocument();
     expect(screen.getByTestId('timeline-target')).toBeInTheDocument();
   });
@@ -165,29 +189,29 @@ describe('GoalTimeline', () => {
     const sent = recordWrites();
     renderTimeline();
 
-    dropOn('b', `row:${NO_MILESTONE}`, xFor('2026-10-07'));
+    dropOn('b', `row:p1:${NO_MILESTONE}`, xFor('2026-10-07'));
 
     await waitFor(() => expect(sent).toEqual([
       { method: 'PUT', path: '/api/v1/todos/b', body: { dueDate: endOf('2026-10-07') } },
     ]));
   });
 
-  it('a drop into a milestone row sets the milestone, keeping the date', async () => {
+  it('a drop into a sub-goal row sets the sub-goal, keeping the date', async () => {
     const sent = recordWrites();
     renderTimeline();
 
-    dropOn('b', 'row:m-beta', xFor('2026-10-05'));
+    dropOn('b', 'row:p1:m-beta', xFor('2026-10-05'));
 
     await waitFor(() => expect(sent).toEqual([
       { method: 'PATCH', path: '/api/v1/todos/b/planning', body: { milestoneId: 'm-beta' } },
     ]));
   });
 
-  it('an unplanned TODO dropped into a milestone row gets date and milestone', async () => {
+  it('an unplanned TODO dropped into a sub-goal row gets date and sub-goal', async () => {
     const sent = recordWrites();
     renderTimeline();
 
-    dropOn('c', 'row:m-beta', xFor('2026-09-29'));
+    dropOn('c', 'row:p1:m-beta', xFor('2026-09-29'));
 
     await waitFor(() => expect(sent).toHaveLength(2));
     expect(sent).toContainEqual({ method: 'PUT', path: '/api/v1/todos/c', body: { dueDate: endOf('2026-09-29') } });
@@ -199,7 +223,7 @@ describe('GoalTimeline', () => {
     renderTimeline();
 
     dropOn('a', null);
-    dropOn('b', `row:${NO_MILESTONE}`, xFor('2026-10-05'));
+    dropOn('b', `row:p1:${NO_MILESTONE}`, xFor('2026-10-05'));
     dropOn('a', 'unplanned');
 
     await waitFor(() => expect(sent).toEqual([
@@ -212,7 +236,7 @@ describe('GoalTimeline', () => {
     const sent = recordWrites();
     renderTimeline();
 
-    keyboardDropOn('b', `row:${NO_MILESTONE}`, xFor('2026-10-08'));
+    keyboardDropOn('b', `row:p1:${NO_MILESTONE}`, xFor('2026-10-08'));
 
     await waitFor(() => expect(sent).toEqual([
       { method: 'PUT', path: '/api/v1/todos/b', body: { dueDate: endOf('2026-10-08') } },
@@ -255,8 +279,11 @@ describe('GoalTimeline', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Privacy findings/ }));
     const second = screen.getByRole('dialog', { name: 'Plan: Privacy findings' });
     expect(within(second).getByLabelText('Set date')).toHaveValue('2026-09-30');
-    expect(within(second).getByLabelText('Milestone')).toHaveValue('m-beta');
-    fireEvent.change(within(second).getByLabelText('Milestone'), { target: { value: '' } });
+    expect(within(second).getByLabelText('Sub-goal')).toHaveValue('m-beta');
+    // only sub-goals of the TODO's own project are offered
+    expect(within(within(second).getByLabelText('Sub-goal')).getAllByRole('option').map((option) => option.textContent))
+      .toEqual(['No sub-goal', 'Beta · Oct 1', 'Docs · no date']);
+    fireEvent.change(within(second).getByLabelText('Sub-goal'), { target: { value: '' } });
     await waitFor(() => expect(sent).toContainEqual(
       { method: 'PATCH', path: '/api/v1/todos/a/planning', body: { milestoneId: '' } },
     ));
@@ -280,36 +307,50 @@ describe('GoalTimeline', () => {
     expect(screen.queryByRole('dialog', { name: 'Plan: Examples page' })).not.toBeInTheDocument();
   });
 
-  it('adds a milestone from the button and by a click on the axis', async () => {
+  it('adds a sub-goal from the button, with a project and an optional date, and by a click on the axis', async () => {
     const sent = recordWrites();
     renderTimeline();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Milestone' }));
-    const form = screen.getByRole('dialog', { name: 'New milestone' });
+    fireEvent.click(screen.getByRole('button', { name: 'Sub-goal' }));
+    const form = screen.getByRole('dialog', { name: 'New sub-goal' });
     fireEvent.change(within(form).getByLabelText('Title'), { target: { value: 'RC' } });
-    fireEvent.change(within(form).getByLabelText('Date'), { target: { value: '2026-10-08' } });
+    expect(within(form).getByLabelText('Project')).toHaveValue('p1');
+    fireEvent.change(within(form).getByLabelText('Project'), { target: { value: 'p2' } });
+    fireEvent.change(within(form).getByLabelText('Date (optional)'), { target: { value: '2026-10-08' } });
     fireEvent.click(within(form).getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(sent).toEqual([
-      { method: 'POST', path: '/api/v1/goals/g1/milestones', body: { title: 'RC', dueDate: endOf('2026-10-08') } },
+      { method: 'POST', path: '/api/v1/goals/g1/milestones', body: { title: 'RC', projectId: 'p2', dueDate: endOf('2026-10-08') } },
     ]));
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New milestone' })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New sub-goal' })).not.toBeInTheDocument());
+
+    // without a date the request carries none
+    fireEvent.click(screen.getByRole('button', { name: 'Sub-goal' }));
+    const undated = screen.getByRole('dialog', { name: 'New sub-goal' });
+    fireEvent.change(within(undated).getByLabelText('Title'), { target: { value: 'Someday' } });
+    fireEvent.click(within(undated).getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(sent).toContainEqual(
+      { method: 'POST', path: '/api/v1/goals/g1/milestones', body: { title: 'Someday', projectId: 'p1' } },
+    ));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New sub-goal' })).not.toBeInTheDocument());
 
     fireEvent.click(screen.getByTestId('timeline-axis'), { clientX: xFor('2026-10-12') });
-    expect(within(screen.getByRole('dialog', { name: 'New milestone' })).getByLabelText('Date')).toHaveValue('2026-10-12');
+    expect(within(screen.getByRole('dialog', { name: 'New sub-goal' })).getByLabelText('Date (optional)')).toHaveValue('2026-10-12');
   });
 
-  it('a diamond opens the milestone card with its TODOs, to edit or delete it', async () => {
+  it('a diamond opens the sub-goal card with its TODOs, to edit or delete it', async () => {
     const sent = recordWrites();
     renderTimeline();
 
-    fireEvent.click(screen.getByRole('button', { name: /^Milestone Beta/ }));
-    const card = screen.getByRole('dialog', { name: 'Milestone Beta' });
+    fireEvent.click(screen.getByRole('button', { name: /^Sub-goal Beta/ }));
+    const card = screen.getByRole('dialog', { name: 'Sub-goal Beta' });
     expect(within(card).getByText('Privacy findings')).toBeInTheDocument();
     expect(within(card).getByText('0 of 1 done')).toBeInTheDocument();
 
     fireEvent.click(within(card).getByRole('button', { name: 'Edit' }));
-    const form = screen.getByRole('dialog', { name: 'Edit milestone' });
-    expect(within(form).getByLabelText('Date')).toHaveValue('2026-10-01');
+    const form = screen.getByRole('dialog', { name: 'Edit sub-goal' });
+    expect(within(form).getByLabelText('Date (optional)')).toHaveValue('2026-10-01');
+    // a sub-goal with TODOs keeps its project
+    expect(within(form).getByLabelText('Project')).toBeDisabled();
     fireEvent.change(within(form).getByLabelText('Title'), { target: { value: 'Public beta' } });
     fireEvent.click(within(form).getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(sent).toEqual([
@@ -317,19 +358,143 @@ describe('GoalTimeline', () => {
     ]));
 
     // 23635ef6: the timeline asks in its own dialog; the card closes, a click in the dialog must not matter to it
-    fireEvent.click(screen.getByRole('button', { name: /^Milestone Beta/ }));
-    fireEvent.click(within(screen.getByRole('dialog', { name: 'Milestone Beta' })).getByRole('button', { name: 'Delete' }));
-    expect(screen.queryByRole('dialog', { name: 'Milestone Beta' })).not.toBeInTheDocument();
-    const question = screen.getByRole('dialog', { name: 'Delete milestone' });
-    expect(within(question).getByText('Delete the milestone “Beta”? Its TODOs stay in the goal.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^Sub-goal Beta/ }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Sub-goal Beta' })).getByRole('button', { name: 'Delete' }));
+    expect(screen.queryByRole('dialog', { name: 'Sub-goal Beta' })).not.toBeInTheDocument();
+    const question = screen.getByRole('dialog', { name: 'Delete sub-goal' });
+    expect(within(question).getByText('Delete the sub-goal “Beta”? Its TODOs stay in the goal.')).toBeInTheDocument();
     fireEvent.click(within(question).getByRole('button', { name: 'Cancel' }));
     expect(sent.filter((call) => call.method === 'DELETE')).toEqual([]);
 
-    fireEvent.click(screen.getByRole('button', { name: /^Milestone Beta/ }));
-    fireEvent.click(within(screen.getByRole('dialog', { name: 'Milestone Beta' })).getByRole('button', { name: 'Delete' }));
-    fireEvent.click(within(screen.getByRole('dialog', { name: 'Delete milestone' })).getByRole('button', { name: 'Delete' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Sub-goal Beta/ }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Sub-goal Beta' })).getByRole('button', { name: 'Delete' }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Delete sub-goal' })).getByRole('button', { name: 'Delete' }));
     await waitFor(() => expect(sent).toContainEqual({ method: 'DELETE', path: '/api/v1/goals/g1/milestones/m-beta', body: null }));
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Delete milestone' })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Delete sub-goal' })).not.toBeInTheDocument());
+  });
+});
+
+// c60bf914: sub-goals are added right in their project band – with a click, by keyboard or without a date
+describe('GoalTimeline — adding sub-goals in the bands', () => {
+  it('a click into a band opens a field with project and day set; the title and Enter add the sub-goal', async () => {
+    const sent = recordWrites();
+    renderTimeline();
+
+    fireEvent.click(screen.getByTestId('timeline-strip-picker-p1'), { clientX: xFor('2026-10-12') });
+    const field = screen.getByRole('textbox', { name: 'New sub-goal in AutoPilot on 10/12/2026' });
+    expect(field).toHaveFocus();
+    fireEvent.change(field, { target: { value: '  Release candidate ' } });
+    fireEvent.submit(field.closest('form')!);
+
+    await waitFor(() => expect(sent).toEqual([{
+      method: 'POST', path: '/api/v1/goals/g1/milestones',
+      body: { title: 'Release candidate', projectId: 'p1', dueDate: endOf('2026-10-12') },
+    }]));
+    await waitFor(() => expect(screen.queryByTestId('inline-subgoal')).not.toBeInTheDocument());
+  });
+
+  it('by keyboard: focus the band, pick the day with the arrow keys, Enter opens the field', async () => {
+    const sent = recordWrites();
+    renderTimeline();
+
+    const picker = screen.getByRole('slider', { name: 'New sub-goal in Site' });
+    act(() => picker.focus());
+    expect(picker).toHaveAttribute('aria-valuetext', '9/24/2026');
+    fireEvent.keyDown(picker, { key: 'ArrowRight' });
+    fireEvent.keyDown(picker, { key: 'ArrowRight' });
+    fireEvent.keyDown(picker, { key: 'ArrowLeft' });
+    fireEvent.keyDown(picker, { key: 'PageDown' });
+    expect(picker).toHaveAttribute('aria-valuetext', '10/2/2026');
+    fireEvent.keyDown(picker, { key: 'Enter' });
+
+    const field = screen.getByRole('textbox', { name: 'New sub-goal in Site on 10/2/2026' });
+    fireEvent.change(field, { target: { value: 'Launch page' } });
+    fireEvent.submit(field.closest('form')!);
+    await waitFor(() => expect(sent).toEqual([{
+      method: 'POST', path: '/api/v1/goals/g1/milestones',
+      body: { title: 'Launch page', projectId: 'p2', dueDate: endOf('2026-10-02') },
+    }]));
+  });
+
+  it('"+ sub-goal" of a band adds one without a date in its tray; Escape cancels', async () => {
+    const sent = recordWrites();
+    renderTimeline();
+
+    fireEvent.click(screen.getByRole('button', { name: 'New sub-goal in Site' }));
+    const tray = screen.getByTestId('timeline-tray-p2');
+    const field = within(tray).getByRole('textbox', { name: 'New sub-goal in Site without a date' });
+    fireEvent.keyDown(field, { key: 'Escape' });
+    expect(screen.queryByTestId('inline-subgoal')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'New sub-goal in Site' }));
+    const again = within(screen.getByTestId('timeline-tray-p2')).getByRole('textbox');
+    fireEvent.change(again, { target: { value: 'Press kit' } });
+    fireEvent.submit(again.closest('form')!);
+    await waitFor(() => expect(sent).toEqual([
+      { method: 'POST', path: '/api/v1/goals/g1/milestones', body: { title: 'Press kit', projectId: 'p2' } },
+    ]));
+  });
+});
+
+describe('GoalTimeline — dragging sub-goals and TODOs between bands', () => {
+  it('moves a diamond to another day by mouse and by keyboard', async () => {
+    const sent = recordWrites();
+    renderTimeline();
+
+    dropOn('ms:m-beta', 'strip:p1', xFor('2026-10-06'));
+    await waitFor(() => expect(sent).toEqual([
+      { method: 'PUT', path: '/api/v1/goals/g1/milestones/m-beta', body: { dueDate: endOf('2026-10-06') } },
+    ]));
+
+    keyboardDropOn('ms:m-beta', 'strip:p1', xFor('2026-10-09'), DIAMOND_ANCHOR);
+    await waitFor(() => expect(sent).toContainEqual(
+      { method: 'PUT', path: '/api/v1/goals/g1/milestones/m-beta', body: { dueDate: endOf('2026-10-09') } },
+    ));
+  });
+
+  it('dates an undated sub-goal dragged from the tray onto its band, and takes the date away back in the tray', async () => {
+    const sent = recordWrites();
+    renderTimeline();
+
+    dropOn('ms:m-docs', `row:p1:${NO_MILESTONE}`, xFor('2026-10-04'));
+    await waitFor(() => expect(sent).toEqual([
+      { method: 'PUT', path: '/api/v1/goals/g1/milestones/m-docs', body: { dueDate: endOf('2026-10-04') } },
+    ]));
+
+    dropOn('ms:m-beta', 'tray:p1');
+    await waitFor(() => expect(sent).toContainEqual(
+      { method: 'PUT', path: '/api/v1/goals/g1/milestones/m-beta', body: { dueDate: '' } },
+    ));
+  });
+
+  it('keeps a diamond in its own band', async () => {
+    const sent = recordWrites();
+    renderTimeline();
+
+    dropOn('ms:m-beta', 'strip:p2', xFor('2026-10-06'));
+    dropOn('ms:m-beta', 'unplanned');
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
+    expect(sent).toEqual([]);
+  });
+
+  it('lights up only the sub-goals of the TODO\'s own project while dragging, and refuses the others', async () => {
+    const sent = recordWrites();
+    renderTimeline();
+
+    act(() => dnd.props!.onDragStart!({
+      active: { id: 'todo:b', data: { current: { anchor: CHIP_ANCHOR, flipped: false, kind: 'todo' } }, rect: { current: { initial: null, translated: null } } },
+    } as unknown as DragStartEvent));
+    expect(screen.getByTestId('timeline-row-p1-m-beta').lastElementChild).toHaveAttribute('data-accepts', 'true');
+    expect(screen.getByTestId('timeline-pill-m-docs')).toHaveClass('bg-accent/5');
+    expect(screen.getByTestId(`timeline-row-p2-${NO_MILESTONE}`).lastElementChild).toHaveAttribute('data-accepts', 'false');
+    expect(screen.getByTestId('timeline-strip-p1')).toHaveAttribute('data-accepts', 'false');
+
+    dropOn('b', `row:p2:${NO_MILESTONE}`, xFor('2026-10-05'));
+    dropOn('b', 'pill:p1:m-docs');
+    await waitFor(() => expect(sent).toEqual([
+      { method: 'PATCH', path: '/api/v1/todos/b/planning', body: { milestoneId: 'm-docs' } },
+    ]));
+    expect(screen.getByTestId('timeline-row-p1-m-beta').lastElementChild).not.toHaveAttribute('data-accepts');
   });
 });
 
@@ -337,11 +502,11 @@ describe('GoalTimeline', () => {
 describe('TimelineAxisView — the label "Today"', () => {
   const nextDay: GoalMilestone = { ...beta, id: 'm-next', title: 'Kick-off', dueDate: endOf('2026-09-25') };
 
-  function renderAxis(width: number, milestones: GoalMilestone[]) {
-    const axis = axisFor({ todos, milestones, targetDate: goal.targetDate, today: dayOf(NOW) }, width);
+  function renderAxis(width: number, marks: GoalMilestone[]) {
+    const axis = axisFor({ todos, milestones: marks, targetDate: goal.targetDate, today: dayOf(NOW) }, width);
     renderWithProviders(
-      <TimelineAxisView axis={axis} width={width} milestones={milestones} targetDay={dayOf(goal.targetDate!)}
-        preview={null} measureRef={createRef()} onCreateAt={vi.fn()} onOpenMilestone={vi.fn()} />,
+      <TimelineAxisView axis={axis} width={width} milestones={marks.filter(isDated)} targetDay={dayOf(goal.targetDate!)}
+        preview={null} measureRef={createRef()} onCreateAt={vi.fn()} />,
     );
     return screen.getByTestId('timeline-today');
   }

@@ -5,9 +5,11 @@ import {
 import { CHIP_ANCHOR, xOfDay, type TimelineAxis } from './timelineLayout';
 
 /**
- * Ziehen per Tastatur am Zeitstrahl (TODO ff6f08fd). Leertaste hebt ein TODO an – Enter bleibt beim
- * Menü des Chips –, ← → schieben es um einen Tag, ↑ ↓ in die Zeile darüber oder darunter (die Leiste
- * „ungeplant“ ist die unterste), Leertaste oder Enter legt es ab, Escape und Tab brechen ab.
+ * Ziehen per Tastatur am Zeitstrahl (TODO ff6f08fd). Leertaste hebt ein TODO oder eine Raute an –
+ * Enter bleibt beim Menü bzw. der Karte –, ← → schieben um einen Tag, ↑ ↓ in die Zeile darüber oder
+ * darunter (die Leiste „ungeplant“ ist die unterste), Leertaste oder Enter legt ab, Escape und Tab
+ * brechen ab. Flächen, die das Gezogene nicht annehmen (fremde Bänder), sind abgeschaltet und
+ * werden übersprungen.
  */
 export const TIMELINE_KEYBOARD_CODES: KeyboardCodes = {
   start: ['Space'],
@@ -15,18 +17,23 @@ export const TIMELINE_KEYBOARD_CODES: KeyboardCodes = {
   end: ['Space', 'Enter'],
 };
 
-/** Was ein Chip beim Anheben mitgibt: wo sein Statuspunkt sitzt (px vom linken Rand) und ob er gespiegelt steht. */
+/**
+ * Was ein Chip oder eine Raute beim Anheben mitgibt: wo der Punkt sitzt, der das Datum trägt (px vom
+ * linken Rand), ob der Chip gespiegelt steht und was gezogen wird.
+ */
 export interface ChipDragData {
   anchor: number;
   flipped: boolean;
+  kind: 'todo' | 'milestone';
 }
 
 export function chipDragData(active: Pick<Active, 'data'> | null | undefined): ChipDragData {
   const data = active?.data.current as Partial<ChipDragData> | undefined;
-  return { anchor: data?.anchor ?? CHIP_ANCHOR, flipped: data?.flipped ?? false };
+  return { anchor: data?.anchor ?? CHIP_ANCHOR, flipped: data?.flipped ?? false, kind: data?.kind ?? 'todo' };
 }
 
-const isRow = (id: UniqueIdentifier) => String(id).startsWith('row:');
+/** Flächen mit Tagen: Zeilen und die Kopfzeilen der Bänder. */
+const isRow = (id: UniqueIdentifier) => String(id).startsWith('row:') || String(id).startsWith('strip:');
 const middleOf = (rect: ClientRect) => rect.top + rect.height / 2;
 
 /**

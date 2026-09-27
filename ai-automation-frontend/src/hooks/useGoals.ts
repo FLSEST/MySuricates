@@ -5,41 +5,94 @@ import { useToast } from './useToast';
 import { useT } from '../i18n';
 import { useTodos } from './useTodos';
 import type {
-  CreateGoalRequest, Goal, GoalDetail, GoalGuard, GoalRelations, GoalStatus, Todo, UpdateGoalRequest,
-  UpdateTodoPlanningRequest,
+  CreateGoalRequest, Goal, GoalDetail, GoalGuard, GoalMilestone, GoalProject, GoalRelations, GoalStatus, GoalTodoItem, Todo,
+  UpdateGoalRequest, UpdateTodoPlanningRequest,
 } from '../types';
 
 /** Ziele (TODO dc0566f8): TODOs projektübergreifend sammeln, ordnen und einschätzen. */
 export const goalKeys = {
   all: ['goals'] as const,
-  list: (statuses?: GoalStatus[]) => ['goals', 'list', statuses?.join(',') ?? 'default'] as const,
+  list: (statuses?: GoalStatus[], projectId?: string) =>
+    ['goals', 'list', statuses?.join(',') ?? 'default', projectId ?? 'all'] as const,
   detail: (id: string) => ['goals', 'detail', id] as const,
   relations: (id: string, include: string[]) => ['goals', 'relations', id, include.join(',')] as const,
 };
 
-/** Ohne Filter liefert der Server aktive und erledigte Ziele, neueste zuerst. */
-export function useGoals(statuses?: GoalStatus[]) {
-  const query = statuses?.length ? `?${statuses.map((s) => `status=${s}`).join('&')}` : '';
+/**
+ * Ohne Filter liefert der Server aktive und erledigte Ziele, neueste zuerst. `projectId` lässt nur
+ * Ziele übrig, denen dieses Projekt zugeordnet ist (c60bf914); ein älteres Backend kennt den Filter
+ * nicht und liefert alle – die kennen dann auch ihre Projekte nicht und bleiben stehen.
+ */
+export function useGoals(statuses?: GoalStatus[], projectId?: string) {
+  const params = [
+    ...(statuses ?? []).map((s) => `status=${s}`),
+    ...(projectId ? [`projectId=${encodeURIComponent(projectId)}`] : []),
+  ];
+  const query = params.length ? `?${params.join('&')}` : '';
   return useQuery({
-    queryKey: goalKeys.list(statuses),
-    queryFn: () => api.get<Goal[]>(`/goals${query}`),
+    queryKey: goalKeys.list(statuses, projectId),
+    queryFn: () => api.get<Goal[]>(`/goals${query}`)
+      .then((goals) => (projectId ? goals.filter((goal) => !goal.projects || goal.projects.some((p) => p.id === projectId)) : goals)),
     staleTime: 30_000,
   });
 }
 
 const NO_GUARD: GoalGuard = { enabled: false, workflowId: null, scheduleId: null, nextRunAt: null };
 
+const counted = (todo: GoalTodoItem) => todo.status !== 'ARCHIVED';
+const asksQuestion = (todo: GoalTodoItem) => counted(todo) && todo.status !== 'DONE' && !!todo.openQuestion;
+
+/** Die Antwort eines Backends vor c60bf914: ohne `projects`, Teilziele ohne `projectId`/`position`/`openQuestions`. */
+type OlderGoalDetail = Omit<GoalDetail, 'projects' | 'milestones'> & {
+  projects?: GoalProject[];
+  milestones?: (Omit<GoalMilestone, 'projectId' | 'position' | 'openQuestions'>
+    & Partial<Pick<GoalMilestone, 'projectId' | 'position' | 'openQuestions'>>)[];
+};
+
 /**
- * Ein Backend vor TODO 259f4f66 kennt Wächter, Meilensteine und Fälligkeiten im Ziel noch nicht –
- * bis zu seinem Neustart zeigt die Zielseite sie dann leer, statt an einem fehlenden Feld zu scheitern.
+ * Projekte eines älteren Backends: die aus `byProject` (die Projekte der TODOs), in dessen Reihenfolge.
+ * „Ohne Projekt“ ist kein Projekt des Ziels.
  */
-export function normalizeGoalDetail(detail: GoalDetail): GoalDetail {
-  return {
-    ...detail,
-    goal: { ...detail.goal, guard: detail.goal.guard ?? NO_GUARD },
-    milestones: detail.milestones ?? [],
-    todos: detail.todos.map((todo) => ({ ...todo, dueDate: todo.dueDate ?? null, milestoneId: todo.milestoneId ?? null })),
-  };
+function projectsFromByProject(detail: OlderGoalDetail, todos: GoalTodoItem[]): GoalProject[] {
+  return detail.byProject.flatMap((entry, position) => (entry.projectId === null ? [] : [{
+    projectId: entry.projectId,
+    name: entry.projectName ?? entry.projectId,
+    archived: false,
+    position,
+    total: entry.total,
+    done: entry.done,
+    openQuestions: todos.filter((todo) => todo.projectId === entry.projectId && asksQuestion(todo)).length,
+  }]));
+}
+
+/** Projekt eines Teilziels ohne `projectId`: das mit den meisten seiner TODOs, sonst das einzige des Ziels – wie V92. */
+function inferredProject(milestoneId: string, todos: GoalTodoItem[], projects: GoalProject[]): string | null {
+  const counts = new Map<string, number>();
+  todos.filter((todo) => todo.milestoneId === milestoneId && todo.projectId)
+    .forEach((todo) => counts.set(todo.projectId!, (counts.get(todo.projectId!) ?? 0) + 1));
+  const [busiest] = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+  return busiest?.[0] ?? (projects.length === 1 ? projects[0]!.projectId : null);
+}
+
+/**
+ * Ein Backend vor TODO 259f4f66 kennt Wächter, Teilziele und Fälligkeiten im Ziel noch nicht, eins
+ * vor c60bf914 weder die Projekte des Ziels noch Projekt, Position und offene Fragen der Teilziele –
+ * bis zu seinem Neustart leitet die Zielseite ab, was sich ableiten lässt, statt an einem fehlenden
+ * Feld zu scheitern.
+ */
+export function normalizeGoalDetail(raw: GoalDetail | OlderGoalDetail): GoalDetail {
+  const detail = raw as OlderGoalDetail;
+  const todos = detail.todos.map((todo) => ({ ...todo, dueDate: todo.dueDate ?? null, milestoneId: todo.milestoneId ?? null }));
+  const projects = detail.projects ?? projectsFromByProject(detail, todos);
+  const milestones = (detail.milestones ?? []).map((milestone, index): GoalMilestone => ({
+    ...milestone,
+    dueDate: milestone.dueDate ?? null,
+    projectId: milestone.projectId !== undefined ? milestone.projectId : inferredProject(milestone.id, todos, projects),
+    position: milestone.position ?? index,
+    openQuestions: milestone.openQuestions
+      ?? todos.filter((todo) => todo.milestoneId === milestone.id && asksQuestion(todo)).length,
+  }));
+  return { ...detail, goal: { ...detail.goal, guard: detail.goal.guard ?? NO_GUARD }, todos, projects, milestones };
 }
 
 export function useGoal(id: string | undefined) {

@@ -1,8 +1,9 @@
-import type { GoalMilestone, GoalTodoItem, TodoStatus } from '../../types';
+import type { DatedMilestone, GoalMilestone, GoalTodoItem, TodoStatus } from '../../types';
 
 /**
  * Layout des Zeitstrahls eines Ziels (TODO e192df18), rein und testbar: Achse, Raster, x ↔ Datum,
- * Zeilen je Meilenstein und gestapelte TODO-Chips.
+ * je Projekt ein Band (c60bf914) mit einer Zeile je Teilziel, gestapelte TODO-Chips und was wohin
+ * abgelegt werden darf.
  *
  * Gerechnet wird in ganzen **Tagen** des lokalen Kalenders (`dayOf`), nicht in Millisekunden – so
  * verschiebt der Wechsel auf Sommer- oder Winterzeit nichts. Eine Fälligkeit gilt wie im TODO-Dialog
@@ -18,8 +19,12 @@ export const CHIP_ANCHOR = 12;
 export const LANE_HEIGHT = 32;
 /** Breite, solange keine gemessen ist (erster Render, Tests). */
 export const FALLBACK_WIDTH = 960;
-/** Schlüssel der Zeile „ohne Meilenstein“. */
+/** Schlüssel der Zeile „ohne Teilziel“ in einem Band. */
 export const NO_MILESTONE = 'none';
+/** Schlüssel des Bands „ohne Projekt“ – Projekt-IDs sind UUIDs, das kollidiert nicht. */
+export const NO_PROJECT_BAND = 'none';
+/** Halbe Breite einer ziehbaren Raute im Band: so weit liegt ihre Mitte (das Datum) vom linken Rand. */
+export const DIAMOND_ANCHOR = 10;
 
 const CHIP_GAP = 6;
 const MIN_SPAN_DAYS = 14;
@@ -58,14 +63,42 @@ export interface PlacedTodo extends ChipSlot {
 }
 
 export interface TimelineRow {
-  /** ID des Meilensteins oder {@link NO_MILESTONE}. */
+  /** ID des Teilziels oder {@link NO_MILESTONE}. */
   key: string;
+  /** Band (Projekt), zu dem die Zeile gehört. */
+  band: string;
   milestone: GoalMilestone | null;
   items: PlacedTodo[];
   lanes: number;
 }
 
-export type DropTarget = { kind: 'row'; milestoneId: string | null } | { kind: 'unplanned' };
+/** Ein Projektband: Kopfzeile mit den Rauten, eine Zeile je Teilziel, „ohne Teilziel“, die Leiste „ohne Datum“. */
+export interface TimelineBand {
+  /** Projekt-ID oder {@link NO_PROJECT_BAND}. */
+  key: string;
+  /** Projektname; null = ohne Projekt. */
+  name: string | null;
+  /** Gehört zu den Projekten des Ziels – nur dann lassen sich darin Teilziele anlegen. */
+  linked: boolean;
+  /** Teilziele mit Datum, nach Datum: ihre Rauten stehen in der Kopfzeile. */
+  dated: DatedMilestone[];
+  /** Teilziele ohne Datum, nach Position: die Leiste „ohne Datum“. */
+  undated: GoalMilestone[];
+  /** Je datiertes Teilziel eine Zeile, je undatiertes mit fälligen TODOs auch, zuletzt „ohne Teilziel“. */
+  rows: TimelineRow[];
+}
+
+/**
+ * Wohin etwas fallen kann: in eine Zeile (Tag und Teilziel), in die Kopfzeile eines Bands (nur
+ * Rauten: ein Datum), in die Leiste „ohne Datum“ (nur Rauten: Datum weg), auf ein Teilziel dieser
+ * Leiste (nur TODOs: das Teilziel, der Tag bleibt) oder nach „ungeplant“ (nur TODOs: Datum weg).
+ */
+export type DropTarget =
+  | { kind: 'row'; band: string; milestoneId: string | null }
+  | { kind: 'strip'; band: string }
+  | { kind: 'tray'; band: string }
+  | { kind: 'pill'; band: string; milestoneId: string }
+  | { kind: 'unplanned' };
 
 /** Was ein Ablegen ändert: `dueDate` als ISO-Zeitpunkt (`''` leert), `milestoneId` (`''` nimmt ihn weg). */
 export interface PlanChanges {
@@ -164,7 +197,12 @@ export function buildAxis(input: { today: number; days: number[]; target: number
 
 const shownOnTimeline = (todo: GoalTodoItem) => todo.status !== 'ARCHIVED';
 
-/** Die Achse für ein Ziel: heute, die Fälligkeiten seiner TODOs, seine Meilensteine und das Zieldatum. */
+/** Nur Teilziele mit Datum stehen als Raute auf dem Zeitstrahl. */
+export function isDated(milestone: GoalMilestone): milestone is DatedMilestone {
+  return milestone.dueDate !== null;
+}
+
+/** Die Achse für ein Ziel: heute, die Fälligkeiten seiner TODOs, seine datierten Teilziele und das Zieldatum. */
 export function axisFor(input: {
   todos: GoalTodoItem[];
   milestones: GoalMilestone[];
@@ -173,7 +211,7 @@ export function axisFor(input: {
 }, width: number): TimelineAxis {
   const days = [
     ...input.todos.filter((todo) => shownOnTimeline(todo) && todo.dueDate).map((todo) => dayOf(todo.dueDate!)),
-    ...input.milestones.map((milestone) => dayOf(milestone.dueDate)),
+    ...input.milestones.filter(isDated).map((milestone) => dayOf(milestone.dueDate)),
   ];
   return buildAxis({ today: input.today, days, target: input.targetDate ? dayOf(input.targetDate) : null }, width);
 }
@@ -235,59 +273,138 @@ export function stackChips(items: { id: string; x: number }[], width: number): {
   return { slots, lanes: Math.max(1, laneEnds.length) };
 }
 
-/**
- * Eine Zeile je Meilenstein (nach Datum), dann „ohne Meilenstein“, jeweils mit den fälligen TODOs.
- * TODOs ohne Fälligkeit sind ungeplant; archivierte stehen nicht auf dem Zeitstrahl. Ein TODO, dessen
- * Meilenstein es nicht (mehr) gibt, landet in „ohne Meilenstein“.
- */
-export function buildRows(todos: GoalTodoItem[], milestones: GoalMilestone[], axis: TimelineAxis, width: number):
-  { rows: TimelineRow[]; unplanned: GoalTodoItem[] } {
-  const shown = todos.filter(shownOnTimeline);
-  const known = new Set(milestones.map((milestone) => milestone.id));
-  const rowOf = (todo: GoalTodoItem) => (todo.milestoneId && known.has(todo.milestoneId) ? todo.milestoneId : NO_MILESTONE);
-  const ordered = [...milestones].sort((a, b) =>
-    Date.parse(a.dueDate) - Date.parse(b.dueDate) || a.title.localeCompare(b.title));
+/** Band eines TODOs bzw. Teilziels: sein Projekt, sonst „ohne Projekt“. */
+export const bandOfTodo = (todo: Pick<GoalTodoItem, 'projectId'>) => todo.projectId ?? NO_PROJECT_BAND;
+export const bandOfMilestone = (milestone: Pick<GoalMilestone, 'projectId'>) => milestone.projectId ?? NO_PROJECT_BAND;
 
-  const rows = [...ordered.map((milestone) => ({ key: milestone.id, milestone })), { key: NO_MILESTONE, milestone: null }]
-    .map(({ key, milestone }): TimelineRow => {
-      const dated = shown.filter((todo) => todo.dueDate && rowOf(todo) === key);
-      const byId = new Map(dated.map((todo) => [todo.id, todo]));
-      const { slots, lanes } = stackChips(dated.map((todo) => ({ id: todo.id, x: xOfDay(axis, dayOf(todo.dueDate!), width) })), width);
-      const items = slots.map((slot): PlacedTodo => {
-        const todo = byId.get(slot.id)!;
-        return { ...slot, todo, day: dayOf(todo.dueDate!) };
-      });
-      return { key, milestone, items, lanes };
+function placeRow(key: string, band: string, milestone: GoalMilestone | null, dated: GoalTodoItem[], axis: TimelineAxis, width: number): TimelineRow {
+  const byId = new Map(dated.map((todo) => [todo.id, todo]));
+  const { slots, lanes } = stackChips(dated.map((todo) => ({ id: todo.id, x: xOfDay(axis, dayOf(todo.dueDate!), width) })), width);
+  const items = slots.map((slot): PlacedTodo => {
+    const todo = byId.get(slot.id)!;
+    return { ...slot, todo, day: dayOf(todo.dueDate!) };
+  });
+  return { key, band, milestone, items, lanes };
+}
+
+/**
+ * Die Bänder des Zeitstrahls (c60bf914): je Projekt des Ziels eins in dessen Reihenfolge, dahinter
+ * Projekte, die nur über ein TODO oder Teilziel hereinkommen (Altdaten), zuletzt „ohne Projekt“, wenn
+ * dort etwas steht. Ein fälliges TODO steht in der Zeile seines Teilziels, sonst in „ohne Teilziel“
+ * seines Projekts; ein TODO, dessen Teilziel es nicht (mehr) gibt, ebenso. TODOs ohne Fälligkeit
+ * sind ungeplant, archivierte stehen nicht auf dem Zeitstrahl.
+ */
+export function buildBands(
+  todos: GoalTodoItem[], milestones: GoalMilestone[], projects: { projectId: string; name: string }[],
+  axis: TimelineAxis, width: number,
+): { bands: TimelineBand[]; unplanned: GoalTodoItem[] } {
+  const shown = todos.filter(shownOnTimeline);
+  const milestoneById = new Map(milestones.map((milestone) => [milestone.id, milestone]));
+  const rowOf = (todo: GoalTodoItem) => {
+    const milestone = todo.milestoneId ? milestoneById.get(todo.milestoneId) : undefined;
+    return milestone ? { band: bandOfMilestone(milestone), key: milestone.id } : { band: bandOfTodo(todo), key: NO_MILESTONE };
+  };
+  const dated = shown.filter((todo) => todo.dueDate);
+
+  const names = new Map(projects.map((project) => [project.projectId, project.name]));
+  const keys = [...projects.map((project) => project.projectId)];
+  const addStray = (band: string, name: string | null) => {
+    if (band === NO_PROJECT_BAND || keys.includes(band)) return;
+    keys.push(band);
+    names.set(band, name ?? band);
+  };
+  dated.forEach((todo) => addStray(rowOf(todo).band, todo.projectName));
+  milestones.forEach((milestone) => addStray(bandOfMilestone(milestone), null));
+  const hasNoProject = dated.some((todo) => rowOf(todo).band === NO_PROJECT_BAND)
+    || milestones.some((milestone) => bandOfMilestone(milestone) === NO_PROJECT_BAND);
+  if (hasNoProject) keys.push(NO_PROJECT_BAND);
+  const linked = new Set(projects.map((project) => project.projectId));
+
+  const bands = keys.map((band): TimelineBand => {
+    const own = milestones.filter((milestone) => bandOfMilestone(milestone) === band);
+    const bandDated = own.filter(isDated).sort((a, b) =>
+      Date.parse(a.dueDate) - Date.parse(b.dueDate) || a.position - b.position || a.title.localeCompare(b.title));
+    const undated = own.filter((milestone) => !isDated(milestone)).sort((a, b) => a.position - b.position);
+    const inRow = (key: string) => dated.filter((todo) => {
+      const row = rowOf(todo);
+      return row.band === band && row.key === key;
     });
-  return { rows, unplanned: shown.filter((todo) => !todo.dueDate) };
+    const rows = [
+      ...bandDated.map((milestone) => placeRow(milestone.id, band, milestone, inRow(milestone.id), axis, width)),
+      ...undated.filter((milestone) => inRow(milestone.id).length > 0)
+        .map((milestone) => placeRow(milestone.id, band, milestone, inRow(milestone.id), axis, width)),
+      placeRow(NO_MILESTONE, band, null, inRow(NO_MILESTONE), axis, width),
+    ];
+    return { key: band, name: band === NO_PROJECT_BAND ? null : names.get(band) ?? band, linked: linked.has(band), dated: bandDated, undated, rows };
+  });
+  return { bands, unplanned: shown.filter((todo) => !todo.dueDate) };
 }
 
 // ── Ablegen ───────────────────────────────────────────────────────────────────
 
-/** Ziel eines Ablegens aus der ID der Drop-Fläche: `row:<Meilenstein|none>` oder `unplanned`. */
+export const rowDropId = (band: string, key: string) => `row:${band}:${key}`;
+export const stripDropId = (band: string) => `strip:${band}`;
+export const trayDropId = (band: string) => `tray:${band}`;
+export const pillDropId = (band: string, milestoneId: string) => `pill:${band}:${milestoneId}`;
+export const UNPLANNED_DROP_ID = 'unplanned';
+
+/**
+ * Ziel eines Ablegens aus der ID der Drop-Fläche: `row:<Band>:<Teilziel|none>`, `strip:<Band>`,
+ * `tray:<Band>`, `pill:<Band>:<Teilziel>` oder `unplanned`.
+ */
 export function dropTargetOf(id: string): DropTarget | null {
-  if (id === 'unplanned') return { kind: 'unplanned' };
-  if (!id.startsWith('row:')) return null;
-  const key = id.slice('row:'.length);
-  return { kind: 'row', milestoneId: key === NO_MILESTONE ? null : key };
+  if (id === UNPLANNED_DROP_ID) return { kind: 'unplanned' };
+  const [kind, band, key, ...rest] = id.split(':');
+  if (!band || rest.length > 0) return null;
+  if (kind === 'strip' && key === undefined) return { kind: 'strip', band };
+  if (kind === 'tray' && key === undefined) return { kind: 'tray', band };
+  if (kind === 'row' && key) return { kind: 'row', band, milestoneId: key === NO_MILESTONE ? null : key };
+  if (kind === 'pill' && key) return { kind: 'pill', band, milestoneId: key };
+  return null;
 }
 
-export function rowDropId(key: string): string {
-  return `row:${key}`;
+/**
+ * Darf ein TODO hier landen? In Zeilen und auf Teilziele nur seines eigenen Projekts – der Server
+ * wiese alles andere ab. Ein Altfall (TODO in einem Teilziel eines anderen Projekts) darf in seinem
+ * Teilziel bleiben und dort den Tag wechseln. „Ungeplant“ nimmt jedes TODO.
+ */
+export function todoAccepts(todo: Pick<GoalTodoItem, 'projectId' | 'milestoneId'>, target: DropTarget): boolean {
+  if (target.kind === 'unplanned') return true;
+  if (target.kind !== 'row' && target.kind !== 'pill') return false;
+  return target.band === bandOfTodo(todo) || (target.milestoneId !== null && target.milestoneId === todo.milestoneId);
+}
+
+/** Eine Raute bleibt in ihrem Band: Kopfzeile oder Zeile setzt das Datum, die Leiste „ohne Datum“ nimmt es weg. */
+export function milestoneAccepts(milestone: Pick<GoalMilestone, 'projectId'>, target: DropTarget): boolean {
+  if (target.kind !== 'row' && target.kind !== 'strip' && target.kind !== 'tray') return false;
+  return target.band === bandOfMilestone(milestone);
 }
 
 /**
  * Was sich ändert, wenn ein TODO an `day` in `target` landet: ein anderer Tag setzt die Fälligkeit,
- * eine andere Zeile den Meilenstein; „ungeplant“ leert nur das Datum.
+ * eine andere Zeile das Teilziel; ein Teilziel der Leiste nur das Teilziel; „ungeplant“ leert nur
+ * das Datum.
  */
 export function planChanges(
   todo: { dueDate: string | null; milestoneId: string | null }, target: DropTarget, day: number | null,
 ): PlanChanges {
   if (target.kind === 'unplanned') return todo.dueDate ? { dueDate: '' } : {};
+  if (target.kind === 'pill') return (todo.milestoneId ?? null) === target.milestoneId ? {} : { milestoneId: target.milestoneId };
+  if (target.kind !== 'row') return {};
   const changes: PlanChanges = {};
   if (day !== null && (!todo.dueDate || dayOf(todo.dueDate) !== day)) changes.dueDate = dueDateOfDay(day);
   if ((todo.milestoneId ?? null) !== target.milestoneId) changes.milestoneId = target.milestoneId ?? '';
   return changes;
+}
+
+/**
+ * Das neue Datum einer abgelegten Raute als ISO-Zeitpunkt, `''` entfernt es; undefined, wenn sich
+ * nichts ändert.
+ */
+export function milestoneDateChange(milestone: Pick<GoalMilestone, 'dueDate'>, target: DropTarget, day: number | null): string | undefined {
+  if (target.kind === 'tray') return milestone.dueDate ? '' : undefined;
+  if ((target.kind !== 'row' && target.kind !== 'strip') || day === null) return undefined;
+  return milestone.dueDate && dayOf(milestone.dueDate) === day ? undefined : dueDateOfDay(day);
 }
 
 /** Die Änderungen in den TODO-Zeilen eines Ziels – für die optimistische Anzeige nach dem Ablegen. */

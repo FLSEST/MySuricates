@@ -5,17 +5,9 @@ import { useI18nStore, useT } from '../../i18n';
 import { formatDate } from '../../utils/localeFormat';
 import { CHIP_ANCHOR, CHIP_WIDTH, dayOf, dayOfIsoDate, dueDateOfDay, isOverdue, isoDateOfDay, type PlanChanges } from './timelineLayout';
 import type { ChipDragData } from './timelineKeyboard';
-import { SHORT_DATE, dueTitle } from './planDisplay';
+import { SHORT_DATE, STATUS_DOT, dueTitle } from './planDisplay';
 import { TimelinePopover } from './TimelinePopover';
-import type { GoalMilestone, GoalTodoItem, TodoStatus } from '../../types';
-
-const STATUS_DOT: Record<TodoStatus, string> = {
-  OPEN: 'bg-text-tertiary',
-  BACKLOG: 'bg-border-strong',
-  IN_PROGRESS: 'bg-info',
-  DONE: 'bg-success',
-  ARCHIVED: 'bg-border',
-};
+import type { GoalMilestone, GoalTodoItem } from '../../types';
 
 /**
  * So sieht ein TODO auf dem Zeitstrahl aus: Statuspunkt und Titel, überfällig rot, erledigt
@@ -63,7 +55,7 @@ export function TimelineChip({ todo, milestones, today, placement, onPlan, onOpe
   const locale = useI18nStore((s) => s.locale);
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const dragData: ChipDragData = { anchor: placement?.anchor ?? CHIP_ANCHOR, flipped: placement?.flipped ?? false };
+  const dragData: ChipDragData = { anchor: placement?.anchor ?? CHIP_ANCHOR, flipped: placement?.flipped ?? false, kind: 'todo' };
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `todo:${todo.id}`, data: dragData });
   const close = useCallback(() => setOpen(false), []);
   const overdue = isOverdue(todo, today);
@@ -160,8 +152,11 @@ function ChipMenu({ todo, milestones, alignRight, triggerRef, onClose, onPlan, o
         <select id={milestoneId} value={todo.milestoneId ?? ''} onChange={(event) => onPlan({ milestoneId: event.target.value })}
           className="input-base w-full py-1 text-sm">
           <option value="">{tt.noMilestoneOption}</option>
-          {milestones.map((m) => (
-            <option key={m.id} value={m.id}>{`${m.title} · ${formatDate(m.dueDate, locale, SHORT_DATE)}`}</option>
+          {/* Nur Teilziele des eigenen Projekts (c60bf914) – und das bisherige, auch wenn es nicht passt */}
+          {milestones.filter((m) => (m.projectId ?? null) === (todo.projectId ?? null) || m.id === todo.milestoneId).map((m) => (
+            <option key={m.id} value={m.id}>
+              {`${m.title} · ${m.dueDate ? formatDate(m.dueDate, locale, SHORT_DATE) : t.goals.milestones.noDate}`}
+            </option>
           ))}
         </select>
       </div>

@@ -1,12 +1,12 @@
 import { useState, type CSSProperties, type FormEvent, type RefObject } from 'react';
-import { Button, Input } from '../ui';
+import { Button, Input, Select } from '../ui';
 import { useI18nStore, useT } from '../../i18n';
 import { formatDate } from '../../utils/localeFormat';
 import { useCreateMilestone, useUpdateMilestone } from '../../hooks/useGoalTimeline';
-import { dayOf, dayOfIsoDate, dueDateOfDay, isoDateOfDay } from './timelineLayout';
+import { MAX_SUBGOAL_TITLE, createRequest, draftOf, isDraftValid, projectLocked, updateRequest } from './subgoalForm';
 import { MilestoneDiamond } from './MilestoneDiamond';
 import { TimelinePopover } from './TimelinePopover';
-import type { GoalMilestone, GoalTodoItem, UpdateGoalMilestoneRequest } from '../../types';
+import type { GoalMilestone, GoalProject, GoalTodoItem } from '../../types';
 
 interface Placement {
   className?: string;
@@ -14,39 +14,38 @@ interface Placement {
   triggerRef?: RefObject<HTMLElement | null>;
 }
 
-/** Titel höchstens so lang, wie das Backend annimmt. */
-const MAX_TITLE = 200;
-
 /**
- * Meilenstein anlegen oder bearbeiten (TODO e192df18). Das Datum gilt wie eine Fälligkeit bis
- * 23:59:59 Ortszeit; beim Bearbeiten geht nur, was sich geändert hat, an den Server.
+ * Teilziel anlegen oder bearbeiten (TODO e192df18, c60bf914): Titel, Projekt (vorbelegt aus dem
+ * Band), Datum optional. Beim Bearbeiten geht nur, was sich geändert hat, an den Server.
  */
-export function MilestoneForm({ goalId, milestone, initialDay, onClose, ...placement }: {
+export function MilestoneForm({ goalId, projects, milestone, initialDay, initialProjectId, onClose, ...placement }: {
   goalId: string;
+  projects: GoalProject[];
   milestone?: GoalMilestone;
   initialDay: number | null;
+  initialProjectId?: string | null;
   onClose: () => void;
 } & Placement) {
   const tm = useT().goals.milestones;
-  const [title, setTitle] = useState(milestone?.title ?? '');
-  const [date, setDate] = useState(
-    milestone ? isoDateOfDay(dayOf(milestone.dueDate)) : initialDay !== null ? isoDateOfDay(initialDay) : '',
-  );
+  const [draft, setDraft] = useState(() => draftOf(milestone, {
+    projectId: initialProjectId ?? projects[0]?.projectId ?? '', day: initialDay,
+  }));
   const create = useCreateMilestone(goalId);
   const update = useUpdateMilestone(goalId);
-  const day = dayOfIsoDate(date);
-  const trimmed = title.trim();
+  const options = projects.map((project) => ({ value: project.projectId, label: project.name }));
+  if (draft.projectId && !options.some((option) => option.value === draft.projectId)) {
+    options.push({ value: draft.projectId, label: draft.projectId });
+  }
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    if (!trimmed || day === null) return;
     if (!milestone) {
-      create.mutate({ title: trimmed, dueDate: dueDateOfDay(day) }, { onSuccess: onClose });
+      const request = createRequest(draft);
+      if (request) create.mutate(request, { onSuccess: onClose });
       return;
     }
-    const data: UpdateGoalMilestoneRequest = {};
-    if (trimmed !== milestone.title) data.title = trimmed;
-    if (day !== dayOf(milestone.dueDate)) data.dueDate = dueDateOfDay(day);
+    const data = updateRequest(milestone, draft);
+    if (!data) return;
     if (Object.keys(data).length === 0) onClose();
     else update.mutate({ id: milestone.id, data }, { onSuccess: onClose });
   };
@@ -55,11 +54,19 @@ export function MilestoneForm({ goalId, milestone, initialDay, onClose, ...place
     <TimelinePopover label={milestone ? tm.edit : tm.create} onClose={onClose} {...placement}>
       <form onSubmit={submit} className="space-y-3">
         <p className="text-sm font-semibold text-text">{milestone ? tm.edit : tm.create}</p>
-        <Input label={tm.titleLabel} value={title} maxLength={MAX_TITLE} onChange={(event) => setTitle(event.target.value)} />
-        <Input label={tm.dateLabel} type="date" value={date} onChange={(event) => setDate(event.target.value)} />
+        <Input label={tm.titleLabel} value={draft.title} maxLength={MAX_SUBGOAL_TITLE}
+          onChange={(event) => setDraft({ ...draft, title: event.target.value })} />
+        {options.length === 0
+          ? <p className="text-xs text-text-secondary">{tm.noProjects}</p>
+          : (
+            <Select label={tm.project} aria-label={tm.project} value={draft.projectId} options={options}
+              disabled={projectLocked(milestone)} title={projectLocked(milestone) ? tm.projectLocked : undefined}
+              onChange={(event) => setDraft({ ...draft, projectId: event.target.value })} />
+          )}
+        <Input label={tm.dateOptional} type="date" value={draft.date} onChange={(event) => setDraft({ ...draft, date: event.target.value })} />
         <div className="flex justify-end gap-2">
           <Button type="button" variant="ghost" size="sm" onClick={onClose}>{tm.cancel}</Button>
-          <Button type="submit" size="sm" loading={create.isPending || update.isPending} disabled={!trimmed || day === null}>
+          <Button type="submit" size="sm" loading={create.isPending || update.isPending} disabled={!isDraftValid(draft)}>
             {tm.save}
           </Button>
         </div>
@@ -92,7 +99,7 @@ export function MilestoneCard({ milestone, todos, onEdit, onDelete, onClose, ...
         <div className="min-w-0">
           <p className="break-words text-sm font-semibold text-text">{milestone.title}</p>
           <p className="text-xs text-text-secondary">
-            {formatDate(milestone.dueDate, locale)} · {tm.states[milestone.state]}
+            {milestone.dueDate ? formatDate(milestone.dueDate, locale) : tm.noDate} · {tm.states[milestone.state]}
             {milestone.reopened && <span className="text-warning"> · {tm.reopened}</span>}
           </p>
         </div>
@@ -106,7 +113,7 @@ export function MilestoneCard({ milestone, todos, onEdit, onDelete, onClose, ...
       ) : (
         <ul className="mt-1 max-h-40 space-y-0.5 overflow-y-auto text-xs">
           {assigned.map((todo) => (
-            <li key={todo.id} className={`truncate ${todo.status === 'DONE' ? 'text-text-tertiary line-through' : 'text-text'}`}>
+            <li key={todo.id} title={todo.title} className={`truncate ${todo.status === 'DONE' ? 'text-text-tertiary line-through' : 'text-text'}`}>
               {todo.title}
             </li>
           ))}

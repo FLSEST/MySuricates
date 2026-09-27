@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, CalendarDays, ChartGantt, List, Network, Target, Trash2 } from 'lucide-react';
+import { ArrowLeft, CalendarDays, ChartGantt, List, ListTree, Network, Target, Trash2 } from 'lucide-react';
 import { Button, Card, ConfirmModal, Select, Spinner } from '../components/ui';
 import { ErrorState } from '../components/shared/ErrorState';
 import { TodoProgressBar } from '../components/todo/TodoProgressBar';
@@ -10,6 +10,8 @@ import { GoalCandidates, type CandidateFilter } from '../components/goal/GoalCan
 import { GoalTodoEditor } from '../components/goal/GoalTodoEditor';
 import { GoalTimeline } from '../components/goal/GoalTimeline';
 import { GoalGuardControl } from '../components/goal/GoalGuardControl';
+import { GoalOutline } from '../components/goal/GoalOutline';
+import { GoalProjectsBar } from '../components/goal/GoalProjectsBar';
 import { planBadge } from '../components/goal/planDisplay';
 import { dayOf } from '../components/goal/timelineLayout';
 import {
@@ -22,18 +24,22 @@ import type { GoalStatus, GoalTodoItem } from '../types';
 
 const GOAL_STATUSES: GoalStatus[] = ['ACTIVE', 'DONE', 'ARCHIVED'];
 
-type GoalView = 'list' | 'map' | 'timeline';
-const VIEW_KEY = 'mysuricates-goal-view';
-const VIEWS: readonly GoalView[] = ['list', 'map', 'timeline'];
+type GoalView = 'outline' | 'list' | 'map' | 'timeline';
+/**
+ * Neuer Schlüssel mit der Gliederung als Standard (c60bf914) – unter dem alten stünde bei allen, die
+ * schon eine Ansicht gewählt hatten, weiter die alte, und die Gliederung bliebe unentdeckt.
+ */
+const VIEW_KEY = 'mysuricates-goal-view-v2';
+const VIEWS: readonly GoalView[] = ['outline', 'list', 'map', 'timeline'];
 /** Immer als Tag-Vorschlag dabei: Ziele sind oft Releases. */
 const DEFAULT_TAG_SUGGESTION = 'release';
 
 function readView(): GoalView {
   try {
     const stored = localStorage.getItem(VIEW_KEY);
-    return VIEWS.find((view) => view === stored) ?? 'list';
+    return VIEWS.find((view) => view === stored) ?? 'outline';
   } catch {
-    return 'list';
+    return 'outline';
   }
 }
 
@@ -64,7 +70,8 @@ function useDebounced<T>(value: T, ms: number): T {
 }
 
 /**
- * Ein Ziel mit seinen TODOs (TODO dc0566f8): als Liste – was als Nächstes drankommt, offene Fragen,
+ * Ein Ziel mit seinen TODOs (TODO dc0566f8): gegliedert nach Projekt und Teilziel (Standard,
+ * c60bf914), als Liste – was als Nächstes drankommt, offene Fragen,
  * Erledigtes –, als Relationskarte, woher die TODOs kommen und welche Workflows sie abarbeiten
  * (TODO c6ea8f5c), oder als Zeitstrahl mit Fälligkeiten und Meilensteinen (TODO e192df18). Im Kopf
  * der Schalter für den Ziel-Wächter, darunter Vorschläge, die zum Ziel passen könnten.
@@ -108,7 +115,7 @@ export function GoalDetail() {
     return <ErrorState message={error?.message ?? t.goals.notFound} onRetry={() => refetch()} />;
   }
 
-  const { goal, todos, byProject, milestones } = data;
+  const { goal, todos, byProject, milestones, projects } = data;
   const chooseView = (next: GoalView) => {
     setView(next);
     storeView(next);
@@ -168,21 +175,13 @@ export function GoalDetail() {
         <p className="text-sm text-text-secondary" data-testid="goal-progress">
           {t.goals.progress.replace('{done}', String(goal.progress.done)).replace('{total}', String(goal.progress.total))}
         </p>
-        {byProject.length > 1 && (
-          <div className="text-xs text-text-secondary space-y-1">
-            <p className="font-medium">{t.goals.byProject}</p>
-            {byProject.map((p) => (
-              <p key={p.projectId ?? 'none'}>
-                {p.projectName ?? t.goals.noProject}: {p.done}/{p.total}
-              </p>
-            ))}
-          </div>
-        )}
+        <GoalProjectsBar goalId={goal.id} projects={projects} milestones={milestones} />
       </Card>
 
-      <div role="tablist" aria-label={t.goals.views.label} className="inline-flex gap-1 p-1 rounded-lg bg-surface-secondary">
+      <div role="tablist" aria-label={t.goals.views.label} className="inline-flex max-w-full gap-1 overflow-x-auto p-1 rounded-lg bg-surface-secondary">
         {([
-          ['list', List, t.goals.views.list], ['map', Network, t.goals.views.map], ['timeline', ChartGantt, t.goals.views.timeline],
+          ['outline', ListTree, t.goals.views.outline], ['list', List, t.goals.views.list],
+          ['map', Network, t.goals.views.map], ['timeline', ChartGantt, t.goals.views.timeline],
         ] as const).map(([key, Icon, label]) => (
           <button key={key} type="button" role="tab" aria-selected={view === key} onClick={() => chooseView(key)}
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md transition-colors ${
@@ -193,10 +192,12 @@ export function GoalDetail() {
         ))}
       </div>
 
-      {view === 'list' ? (
+      {view === 'outline' ? (
+        <GoalOutline detail={data} today={today} onOpenTodo={setEditing} />
+      ) : view === 'list' ? (
         <GoalTodoList goalId={goal.id} todos={todos} milestones={milestones} today={today} />
       ) : view === 'timeline' ? (
-        <GoalTimeline goal={goal} todos={todos} milestones={milestones} onOpenTodo={setEditing} />
+        <GoalTimeline goal={goal} todos={todos} milestones={milestones} projects={projects} onOpenTodo={setEditing} />
       ) : relations.isLoading || !relations.data ? (
         relations.error
           ? apiErrorStatus(relations.error) === 404
