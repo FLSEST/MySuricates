@@ -587,11 +587,16 @@ The script:
 1. Reads the last released version from the newest git tag (without tags: from `pom.xml`)
 2. Calculates the new version (increments the segment) and stops if that tag exists already
 3. Writes it **without a suffix** into `pom.xml` plus `package.json` and `package-lock.json` (via `npm version`) — a lockfile left at the old version makes every fresh clone dirty after its first `npm install`; `packageLock.guard.test.ts` keeps both in sync
-4. Creates the git commit `Release vX.Y.Z` and sets the git tag `vX.Y.Z`
+4. Creates the git commit `Release vX.Y.Z` and sets an **annotated** git tag `vX.Y.Z` (`git tag -a`, carries date/author/message) — the basis for the GitHub release that gets created automatically for every `v*` tag ([„GitHub release on every tag"](#github-release-on-every-tag) below)
 5. Sets `pom.xml` **and** `package.json` to the next development version `X.Y.(Z+1)-SNAPSHOT` and commits `Weiter an vX.Y.(Z+1)` — otherwise every commit after the tag would carry the release number and the version tile would report drift permanently
 
 **Prerequisite:** Clean working tree (no uncommitted changes).
 **Test:** `bash scripts/tests/test-release.sh` runs the flow in a throwaway repository.
+
+**Push:** `git push origin main "vX.Y.Z"` (or `git push --follow-tags`, which only takes annotated
+tags along) — **not** `git push --tags`: every `staging.sh promote` creates a lightweight `stable-*`
+tag (deployment timestamp, see below), and `--tags` would push all of those to GitHub too, mixing
+them into the release list.
 
 ### Interaction with Staging
 
@@ -601,10 +606,40 @@ The stable environment is a Docker container on port 9091 holding a frozen state
 
 There are two types of git tags:
 
-| Tag Format | Created by | Purpose |
-|---|---|---|
-| `v0.1.1` | `release.sh` | Semver release marker |
-| `stable-20250225-143022` | `staging.sh promote` | Deployment timestamp |
+| Tag Format | Created by | Kind | Purpose |
+|---|---|---|---|
+| `v0.1.1` | `release.sh` | annotated (`git tag -a`) | Semver release marker, triggers `release.yml` |
+| `stable-20250225-143022` | `staging.sh promote` | lightweight | Deployment timestamp, stays local |
+
+That's why it's `git push --follow-tags` rather than `git push --tags`: `--follow-tags` only takes
+annotated tags along, `--tags` would push every local `stable-*` tag to GitHub too.
+
+### GitHub release on every tag
+
+`.github/workflows/release.yml` runs on every push of a `v*` tag and automatically creates a
+GitHub release (`gh release create "$TAG" --verify-tag --title "$TAG" --notes-file notes.md`). The
+notes are generated **deterministically, without AI** by `scripts/release-notes.sh <prev-tag>
+<tag>`:
+
+- **Overview**: subject lines of the merge commits between the two tags
+  (`git log --first-parent --merges`). An internal TODO bracket at the end of the subject
+  (`… (<8-hex> title)`) is stripped for the public notes.
+- **Changes by type**: non-merge commits, grouped by conventional prefix
+  (`feat`/`fix`/`perf`/`refactor`/`docs`/`test`/…).
+- **Behavior changes**: entries from [„Behavior Changes"](#behavior-changes) below that are dated
+  after the previous tag — without such entries, the section is left out.
+- **Comparison**: link to the compare view `prev...tag` (left out for the very first release, which
+  has no previous tag).
+
+The script runs without a previous tag (`scripts/release-notes.sh "" v0.1.0`) and also when the
+current repo has no matching merge commits (e.g. in the curated public repo, which does not inherit
+the working repo's merge history) — the affected sections are simply left out instead of raising an
+error. The action uses a supplied notes file (`release-notes/<tag>.md`) if one exists — for example
+from the handover workflow that brings a verified commit plus tag into the public repo — and
+otherwise generates the notes itself from the history of the repo the workflow runs in.
+
+**Test:** `bash scripts/tests/test-release-notes.sh` runs `release-notes.sh` in a throwaway repo
+(merges, type sections, TODO bracket gets stripped, first release without a previous tag).
 
 ### Behavior Changes
 

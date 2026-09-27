@@ -128,7 +128,10 @@ git add "$POM_FILE" "$PACKAGE_JSON" "$PACKAGE_LOCK"
 git commit -m "Release v${NEXT}"
 
 log "Tagging v${NEXT}..."
-git tag "v${NEXT}"
+# Annotated, not lightweight: carries date/author/message and is what --follow-tags pushes.
+# staging.sh promote's stable-* tags are lightweight on purpose (deploy timestamps, never meant
+# to leave this machine) — --follow-tags skips those, so they never reach GitHub by accident.
+git tag -a "v${NEXT}" -m "Release v${NEXT}"
 
 # Back to development: without this, every later commit would carry the release number.
 # Backend and frontend move together — the dashboard tile compares both numbers and would warn
@@ -144,4 +147,4 @@ log "Done! Released ${NEXT}"
 log "  Git tag v${NEXT}:  pom ${NEXT}, package.json ${NEXT} (package-lock.json mitgezogen)"
 log "  danach:            pom + package.json ${DEV}-SNAPSHOT"
 echo ""
-log "To push: git push && git push --tags"
+log "To push: git push origin main \"v${NEXT}\"  (or: git push --follow-tags)"
