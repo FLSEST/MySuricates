@@ -296,4 +296,32 @@ class WorkflowAnalyzerTest {
 
         assertThat(rules(blocks, null)).doesNotContain("items-command-without-source");
     }
+
+    // --- TODO d0348479: Live-Definitionen rufen die eigene API/DB nicht auf ---
+
+    @Test
+    void eigeneApiUndPlattformDbSindSchwereBefunde() {
+        var blocks = List.of(
+                block("shell", "todos", Map.of("command",
+                        "set -euo pipefail\ncurl -s http://localhost:9090/api/v1/todos > todos.json")),
+                block("shell", "key", Map.of("command",
+                        "set -euo pipefail\nsqlite3 data/automation.db 'select value from app_settings'")));
+
+        assertThat(analyzer.analyze(blocks, null))
+                .filteredOn(f -> f.rule().equals("self-api-call") || f.rule().equals("direct-db-access"))
+                .extracting(AnalyzerFinding::rule, AnalyzerFinding::blockIndex, AnalyzerFinding::severity)
+                .containsExactly(tuple("self-api-call", 0, AnalyzerFinding.Severity.HIGH),
+                        tuple("direct-db-access", 1, AnalyzerFinding.Severity.HIGH));
+    }
+
+    @Test
+    void healthSondeUndKontextvariableSindKeinZugriffAufDieEigenePlattform() {
+        var blocks = List.of(
+                block("shell", "probe", Map.of("command",
+                        "set -euo pipefail\ncurl -sf http://localhost:9090/actuator/health\n"
+                                + "curl -s http://localhost:9090/api/v1/system/jvm-memory")),
+                block("simple", "report", Map.of("command", "Offene TODOs: {{ open_todos }}")));
+
+        assertThat(rules(blocks, null)).doesNotContain("self-api-call", "direct-db-access");
+    }
 }

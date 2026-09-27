@@ -164,6 +164,8 @@ HYGIENE_POOL_API_CALLERS=("curl" "wget" "requests." "urllib" "fetch(" "http.clie
 # /api/v1/system/jvm-memory die drei Heap-Zahlen (c2cda5ed; /actuator/metrics braucht den Key).
 # Im Shell-Code eines Pool-Blocks ist jeder andere konkrete /api/v1/-Pfad ein Befund, auch ohne
 # Aufruf in der Naehe; verglichen wird exakt wie im Filter (28007626).
+# Dieselbe Liste fuehrt der Workflow-Analyzer fuer Live-Definitionen (SelfAccessRules.KEY_FREE_PROBES,
+# Regel self-api-call, d0348479); SelfAccessRulesTest haelt beide gleich.
 HYGIENE_POOL_API_ALLOWED=(
   "/api/v1/system/health" "/api/v1/system/info" "/api/v1/system/auth-status"
   "/api/v1/system/jvm-memory"
