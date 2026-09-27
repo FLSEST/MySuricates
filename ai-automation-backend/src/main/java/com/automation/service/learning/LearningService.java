@@ -82,18 +82,6 @@ public class LearningService {
         return insightsService.getRunInsights(runId);
     }
 
-    /** Strips trailing date version suffixes like {@code -20251001} from model IDs. */
-    static String normalizeModelId(String model) {
-        return model.replaceAll("-\\d{8,}$", "");
-    }
-
-    private record ModelKey(String requestedModel, String provider, String model) {}
-
-    private static String modelMetadata(Map<String, Object> metadata, String key) {
-        String value = extractString(metadata, key);
-        return value == null || value.isBlank() ? null : value;
-    }
-
     /** Safely resolve workflow from run, returning null if the workflow was soft-deleted. */
     private Workflow safeGetWorkflow(WorkflowRun run) {
         try {
@@ -189,10 +177,7 @@ public class LearningService {
         Map<String, long[]> integrationSuccessCount = new LinkedHashMap<>();
         Map<String, long[]> integrationTokens = new LinkedHashMap<>();
 
-        // Model aggregation
-        Map<ModelKey, long[]> modelStepCount = new LinkedHashMap<>();
-        Map<ModelKey, long[]> modelTokens = new LinkedHashMap<>();
-        Map<ModelKey, double[]> modelCost = new LinkedHashMap<>();
+        ModelUsageStats modelUsage = new ModelUsageStats();
 
         // Gate status
         Map<String, long[]> gateStatusCounts = new LinkedHashMap<>();
@@ -279,18 +264,7 @@ public class LearningService {
                     integrationTokens.computeIfAbsent(integrationId, k -> new long[1])[0] += stepTokens;
                 }
 
-                String model = modelMetadata(meta, "model");
-                String requestedModel = modelMetadata(meta, "requestedModel");
-                String provider = modelMetadata(meta, "provider");
-                // Keep request and response distinct, including calls without a reported model.
-                // Integration providers describe connectors, not AI model usage.
-                if (!isIntegrationStep && (model != null || requestedModel != null || provider != null)) {
-                    ModelKey key = new ModelKey(requestedModel, provider,
-                            model != null ? normalizeModelId(model) : null);
-                    modelStepCount.computeIfAbsent(key, k -> new long[1])[0]++;
-                    modelTokens.computeIfAbsent(key, k -> new long[1])[0] += stepTokens;
-                    modelCost.computeIfAbsent(key, k -> new double[1])[0] += stepCost;
-                }
+                modelUsage.record(meta, isIntegrationStep, stepTokens, stepCost);
 
                 // Block type usage
                 String blockType = extractString(meta, "blockType");
@@ -371,16 +345,7 @@ public class LearningService {
                 .sorted(Comparator.comparingLong(DashboardResponse.IntegrationStats::runCount).reversed())
                 .toList();
 
-        List<DashboardResponse.ModelStats> modelStats = modelStepCount.entrySet().stream()
-                .map(e -> {
-                    ModelKey m = e.getKey();
-                    long steps = e.getValue()[0];
-                    long tokens = modelTokens.getOrDefault(m, new long[]{0})[0];
-                    double cost = modelCost.getOrDefault(m, new double[]{0.0})[0];
-                    return new DashboardResponse.ModelStats(m.model(), m.requestedModel(), m.provider(), steps, tokens, cost);
-                })
-                .sorted(Comparator.comparingLong(DashboardResponse.ModelStats::totalTokens).reversed())
-                .toList();
+        List<DashboardResponse.ModelStats> modelStats = modelUsage.stats();
 
         List<DashboardResponse.GateStatusEntry> gateStatusSummary = gateStatusCounts.entrySet().stream()
                 .map(e -> new DashboardResponse.GateStatusEntry(e.getKey(), e.getValue()[0]))
