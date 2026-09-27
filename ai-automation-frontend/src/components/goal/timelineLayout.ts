@@ -68,8 +68,11 @@ export interface TimelineRow {
   /** Band (Projekt), zu dem die Zeile gehört. */
   band: string;
   milestone: GoalMilestone | null;
+  /** Fällige TODOs auf der Achse. */
   items: PlacedTodo[];
   lanes: number;
+  /** TODOs ohne Fälligkeit – sie stehen links in der Zeile, im Bereich „ohne Datum“ ihres Teilziels. */
+  undated: GoalTodoItem[];
 }
 
 /** Ein Projektband: Kopfzeile mit den Rauten, eine Zeile je Teilziel, „ohne Teilziel“, die Leiste „ohne Datum“. */
@@ -84,21 +87,22 @@ export interface TimelineBand {
   dated: DatedMilestone[];
   /** Teilziele ohne Datum, nach Position: die Leiste „ohne Datum“. */
   undated: GoalMilestone[];
-  /** Je datiertes Teilziel eine Zeile, je undatiertes mit fälligen TODOs auch, zuletzt „ohne Teilziel“. */
+  /** Je datiertes Teilziel eine Zeile, je undatiertes mit TODOs auch, zuletzt „ohne Teilziel“. */
   rows: TimelineRow[];
 }
 
 /**
- * Wohin etwas fallen kann: in eine Zeile (Tag und Teilziel), in die Kopfzeile eines Bands (nur
- * Rauten: ein Datum), in die Leiste „ohne Datum“ (nur Rauten: Datum weg), auf ein Teilziel dieser
- * Leiste (nur TODOs: das Teilziel, der Tag bleibt) oder nach „ungeplant“ (nur TODOs: Datum weg).
+ * Wohin etwas fallen kann: auf die Achse einer Zeile (Tag und Teilziel), in den Bereich „ohne Datum“
+ * einer Zeile (nur TODOs: Teilziel, Datum weg), in die Kopfzeile eines Bands (nur Rauten: ein
+ * Datum), in die Leiste „ohne Datum“ (nur Rauten: Datum weg) oder auf ein Teilziel dieser Leiste
+ * (nur TODOs: das Teilziel, der Tag bleibt).
  */
 export type DropTarget =
   | { kind: 'row'; band: string; milestoneId: string | null }
+  | { kind: 'undated'; band: string; milestoneId: string | null }
   | { kind: 'strip'; band: string }
   | { kind: 'tray'; band: string }
-  | { kind: 'pill'; band: string; milestoneId: string }
-  | { kind: 'unplanned' };
+  | { kind: 'pill'; band: string; milestoneId: string };
 
 /** Was ein Ablegen ändert: `dueDate` als ISO-Zeitpunkt (`''` leert), `milestoneId` (`''` nimmt ihn weg). */
 export interface PlanChanges {
@@ -277,34 +281,37 @@ export function stackChips(items: { id: string; x: number }[], width: number): {
 export const bandOfTodo = (todo: Pick<GoalTodoItem, 'projectId'>) => todo.projectId ?? NO_PROJECT_BAND;
 export const bandOfMilestone = (milestone: Pick<GoalMilestone, 'projectId'>) => milestone.projectId ?? NO_PROJECT_BAND;
 
-function placeRow(key: string, band: string, milestone: GoalMilestone | null, dated: GoalTodoItem[], axis: TimelineAxis, width: number): TimelineRow {
+function placeRow(
+  key: string, band: string, milestone: GoalMilestone | null, todos: GoalTodoItem[], axis: TimelineAxis, width: number,
+): TimelineRow {
+  const dated = todos.filter((todo) => todo.dueDate);
   const byId = new Map(dated.map((todo) => [todo.id, todo]));
   const { slots, lanes } = stackChips(dated.map((todo) => ({ id: todo.id, x: xOfDay(axis, dayOf(todo.dueDate!), width) })), width);
   const items = slots.map((slot): PlacedTodo => {
     const todo = byId.get(slot.id)!;
     return { ...slot, todo, day: dayOf(todo.dueDate!) };
   });
-  return { key, band, milestone, items, lanes };
+  return { key, band, milestone, items, lanes, undated: todos.filter((todo) => !todo.dueDate) };
 }
 
 /**
  * Die Bänder des Zeitstrahls (c60bf914): je Projekt des Ziels eins in dessen Reihenfolge, dahinter
  * Projekte, die nur über ein TODO oder Teilziel hereinkommen (Altdaten), zuletzt „ohne Projekt“, wenn
- * dort etwas steht. Ein fälliges TODO steht in der Zeile seines Teilziels, sonst in „ohne Teilziel“
- * seines Projekts; ein TODO, dessen Teilziel es nicht (mehr) gibt, ebenso. TODOs ohne Fälligkeit
- * sind ungeplant, archivierte stehen nicht auf dem Zeitstrahl.
+ * dort etwas steht. Ein TODO steht in der Zeile seines Teilziels, sonst in „ohne Teilziel“ seines
+ * Projekts; ein TODO, dessen Teilziel es nicht (mehr) gibt, ebenso. Fällige TODOs stehen auf der
+ * Achse, TODOs ohne Fälligkeit links in derselben Zeile – so behalten sie ihre Zuordnung, auch wenn
+ * (wie meist) niemand Daten vergibt. Archivierte stehen nicht auf dem Zeitstrahl.
  */
 export function buildBands(
   todos: GoalTodoItem[], milestones: GoalMilestone[], projects: { projectId: string; name: string }[],
   axis: TimelineAxis, width: number,
-): { bands: TimelineBand[]; unplanned: GoalTodoItem[] } {
+): TimelineBand[] {
   const shown = todos.filter(shownOnTimeline);
   const milestoneById = new Map(milestones.map((milestone) => [milestone.id, milestone]));
   const rowOf = (todo: GoalTodoItem) => {
     const milestone = todo.milestoneId ? milestoneById.get(todo.milestoneId) : undefined;
     return milestone ? { band: bandOfMilestone(milestone), key: milestone.id } : { band: bandOfTodo(todo), key: NO_MILESTONE };
   };
-  const dated = shown.filter((todo) => todo.dueDate);
 
   const names = new Map(projects.map((project) => [project.projectId, project.name]));
   const keys = [...projects.map((project) => project.projectId)];
@@ -313,9 +320,9 @@ export function buildBands(
     keys.push(band);
     names.set(band, name ?? band);
   };
-  dated.forEach((todo) => addStray(rowOf(todo).band, todo.projectName));
+  shown.forEach((todo) => addStray(rowOf(todo).band, todo.projectName));
   milestones.forEach((milestone) => addStray(bandOfMilestone(milestone), null));
-  const hasNoProject = dated.some((todo) => rowOf(todo).band === NO_PROJECT_BAND)
+  const hasNoProject = shown.some((todo) => rowOf(todo).band === NO_PROJECT_BAND)
     || milestones.some((milestone) => bandOfMilestone(milestone) === NO_PROJECT_BAND);
   if (hasNoProject) keys.push(NO_PROJECT_BAND);
   const linked = new Set(projects.map((project) => project.projectId));
@@ -325,7 +332,7 @@ export function buildBands(
     const bandDated = own.filter(isDated).sort((a, b) =>
       Date.parse(a.dueDate) - Date.parse(b.dueDate) || a.position - b.position || a.title.localeCompare(b.title));
     const undated = own.filter((milestone) => !isDated(milestone)).sort((a, b) => a.position - b.position);
-    const inRow = (key: string) => dated.filter((todo) => {
+    const inRow = (key: string) => shown.filter((todo) => {
       const row = rowOf(todo);
       return row.band === band && row.key === key;
     });
@@ -337,7 +344,7 @@ export function buildBands(
     ];
     return { key: band, name: band === NO_PROJECT_BAND ? null : names.get(band) ?? band, linked: linked.has(band), dated: bandDated, undated, rows };
   });
-  return { bands, unplanned: shown.filter((todo) => !todo.dueDate) };
+  return bands;
 }
 
 // ── Ablegen ───────────────────────────────────────────────────────────────────
@@ -346,19 +353,19 @@ export const rowDropId = (band: string, key: string) => `row:${band}:${key}`;
 export const stripDropId = (band: string) => `strip:${band}`;
 export const trayDropId = (band: string) => `tray:${band}`;
 export const pillDropId = (band: string, milestoneId: string) => `pill:${band}:${milestoneId}`;
-export const UNPLANNED_DROP_ID = 'unplanned';
+export const undatedDropId = (band: string, key: string) => `undated:${band}:${key}`;
 
 /**
- * Ziel eines Ablegens aus der ID der Drop-Fläche: `row:<Band>:<Teilziel|none>`, `strip:<Band>`,
- * `tray:<Band>`, `pill:<Band>:<Teilziel>` oder `unplanned`.
+ * Ziel eines Ablegens aus der ID der Drop-Fläche: `row:<Band>:<Teilziel|none>`,
+ * `undated:<Band>:<Teilziel|none>`, `strip:<Band>`, `tray:<Band>` oder `pill:<Band>:<Teilziel>`.
  */
 export function dropTargetOf(id: string): DropTarget | null {
-  if (id === UNPLANNED_DROP_ID) return { kind: 'unplanned' };
   const [kind, band, key, ...rest] = id.split(':');
   if (!band || rest.length > 0) return null;
   if (kind === 'strip' && key === undefined) return { kind: 'strip', band };
   if (kind === 'tray' && key === undefined) return { kind: 'tray', band };
   if (kind === 'row' && key) return { kind: 'row', band, milestoneId: key === NO_MILESTONE ? null : key };
+  if (kind === 'undated' && key) return { kind: 'undated', band, milestoneId: key === NO_MILESTONE ? null : key };
   if (kind === 'pill' && key) return { kind: 'pill', band, milestoneId: key };
   return null;
 }
@@ -366,11 +373,10 @@ export function dropTargetOf(id: string): DropTarget | null {
 /**
  * Darf ein TODO hier landen? In Zeilen und auf Teilziele nur seines eigenen Projekts – der Server
  * wiese alles andere ab. Ein Altfall (TODO in einem Teilziel eines anderen Projekts) darf in seinem
- * Teilziel bleiben und dort den Tag wechseln. „Ungeplant“ nimmt jedes TODO.
+ * Teilziel bleiben und dort den Tag wechseln oder das Datum abgeben.
  */
 export function todoAccepts(todo: Pick<GoalTodoItem, 'projectId' | 'milestoneId'>, target: DropTarget): boolean {
-  if (target.kind === 'unplanned') return true;
-  if (target.kind !== 'row' && target.kind !== 'pill') return false;
+  if (target.kind !== 'row' && target.kind !== 'pill' && target.kind !== 'undated') return false;
   return target.band === bandOfTodo(todo) || (target.milestoneId !== null && target.milestoneId === todo.milestoneId);
 }
 
@@ -382,17 +388,20 @@ export function milestoneAccepts(milestone: Pick<GoalMilestone, 'projectId'>, ta
 
 /**
  * Was sich ändert, wenn ein TODO an `day` in `target` landet: ein anderer Tag setzt die Fälligkeit,
- * eine andere Zeile das Teilziel; ein Teilziel der Leiste nur das Teilziel; „ungeplant“ leert nur
- * das Datum.
+ * eine andere Zeile das Teilziel; ein Teilziel der Leiste nur das Teilziel; der Bereich „ohne Datum“
+ * einer Zeile nimmt das Datum weg und setzt das Teilziel der Zeile.
  */
 export function planChanges(
   todo: { dueDate: string | null; milestoneId: string | null }, target: DropTarget, day: number | null,
 ): PlanChanges {
-  if (target.kind === 'unplanned') return todo.dueDate ? { dueDate: '' } : {};
   if (target.kind === 'pill') return (todo.milestoneId ?? null) === target.milestoneId ? {} : { milestoneId: target.milestoneId };
-  if (target.kind !== 'row') return {};
+  if (target.kind !== 'row' && target.kind !== 'undated') return {};
   const changes: PlanChanges = {};
-  if (day !== null && (!todo.dueDate || dayOf(todo.dueDate) !== day)) changes.dueDate = dueDateOfDay(day);
+  if (target.kind === 'undated') {
+    if (todo.dueDate) changes.dueDate = '';
+  } else if (day !== null && (!todo.dueDate || dayOf(todo.dueDate) !== day)) {
+    changes.dueDate = dueDateOfDay(day);
+  }
   if ((todo.milestoneId ?? null) !== target.milestoneId) changes.milestoneId = target.milestoneId ?? '';
   return changes;
 }

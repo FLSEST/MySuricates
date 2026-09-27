@@ -209,3 +209,22 @@ describe('GoalOutline (c60bf914)', () => {
     expect(onOpenTodo).toHaveBeenCalledWith('e');
   });
 });
+
+// c60bf914 (review): a project that only comes in through TODOs is marked and can be added – no sub-goals before
+describe('GoalOutline — project not assigned to the goal', () => {
+  it('marks it, offers "Add the project" instead of "+ sub-goal", and adds it', async () => {
+    const added: unknown[] = [];
+    server.use(http.post('/api/v1/goals/g1/projects', async ({ request }) => {
+      added.push(await request.json());
+      return HttpResponse.json(detail);
+    }));
+    renderOutline({ ...detail, todos: [...detail.todos, item({ id: 'z', title: 'Stray', projectId: 'p9', projectName: 'Elsewhere' })] });
+
+    const stray = screen.getByTestId('outline-project-p9');
+    expect(within(stray).getByText('not assigned')).toHaveClass('text-warning');
+    expect(within(stray).queryByRole('button', { name: 'New sub-goal in Elsewhere' })).not.toBeInTheDocument();
+    expect(within(stray).queryByRole('button', { name: /^Move project/ })).not.toBeInTheDocument();
+    fireEvent.click(within(stray).getByRole('button', { name: 'Add the project' }));
+    await waitFor(() => expect(added).toEqual([{ projectId: 'p9' }]));
+  });
+});

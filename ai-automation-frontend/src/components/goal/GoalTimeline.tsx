@@ -16,12 +16,13 @@ import {
 } from './timelineLayout';
 import { ChipFace } from './TimelineChip';
 import { TimelineAxisView } from './TimelineAxisView';
-import { LABEL_COLUMN, TimelineLines, UnplannedBar } from './TimelineRows';
-import { TimelineBandView, type InlineAt, type PanelSlot } from './TimelineBand';
+import { LABEL_COLUMN, TimelineLines } from './TimelineRows';
+import { TimelineBandView, type InlineAt } from './TimelineBand';
 import { MilestoneCard, MilestoneForm } from './MilestonePopovers';
 import { MilestoneDiamond } from './MilestoneDiamond';
 import { TIMELINE_KEYBOARD_CODES, chipDragData, timelineCollision, timelineKeyboardCoordinates } from './timelineKeyboard';
 import { TimelineDragContext, type Dragged } from './timelineDrag';
+import type { FloatingAnchor } from './floating';
 import type { Goal, GoalMilestone, GoalProject, GoalTodoItem } from '../../types';
 
 /** Was gerade am Zeitstrahl offen ist: ein neues Teilziel (an einem Tag der Achse oder vom Knopf) oder eins. */
@@ -29,12 +30,6 @@ type MilestonePanel =
   | { kind: 'create'; day: number | null; x: number | null }
   | { kind: 'view' | 'edit'; id: string };
 
-/** Breite der Teilziel-Karten (`w-64`) – so weit dürfen sie nach links und rechts reichen. */
-const PANEL_WIDTH = 256;
-/** Höhe der Achse (`h-16`): Karten der Achse öffnen sich darunter. */
-const AXIS_HEIGHT = 64;
-/** Höhe der Kopfzeile eines Bands (`h-9`): Karten einer Raute öffnen sich darunter. */
-const STRIP_HEIGHT = 36;
 
 /**
  * Beim Ziehen mit der Maus sitzt der Punkt, der das Datum trägt, unter dem Mauszeiger – bei einem
@@ -84,7 +79,7 @@ export function GoalTimeline({ goal, todos, milestones, projects, onOpenTodo, no
     () => axisFor({ todos, milestones, targetDate: goal.targetDate, today }, width),
     [todos, milestones, goal.targetDate, today, width],
   );
-  const { bands, unplanned } = useMemo(
+  const bands = useMemo(
     () => buildBands(todos, milestones, projects.map(({ projectId, name }) => ({ projectId, name })), axis, width),
     [todos, milestones, projects, axis, width],
   );
@@ -99,6 +94,8 @@ export function GoalTimeline({ goal, todos, milestones, projects, onOpenTodo, no
   const [draggingFlipped, setDraggingFlipped] = useState(false);
   const [preview, setPreview] = useState<{ over: string; day: number } | null>(null);
   const [panel, setPanel] = useState<MilestonePanel | null>(null);
+  // Was die offene Karte eines Teilziels geöffnet hat: dort steht sie, dorthin geht danach der Fokus
+  const panelTrigger = useRef<HTMLElement | null>(null);
   const [inline, setInline] = useState<(InlineAt & { band: string }) | null>(null);
   // Sub-goal whose deletion waits for the confirmation (23635ef6)
   const [removing, setRemoving] = useState<GoalMilestone | null>(null);
@@ -147,9 +144,10 @@ export function GoalTimeline({ goal, todos, milestones, projects, onOpenTodo, no
     const target = dropTargetOf(String(id));
     if (!target) return '';
     switch (target.kind) {
-      case 'unplanned': return tt.unplanned;
       case 'strip': return tt.band.replace('{project}', bandName(target.band));
       case 'tray': return `${tt.undated} · ${bandName(target.band)}`;
+      case 'undated': return `${tt.undated} · ${target.milestoneId
+        ? milestoneById.get(target.milestoneId)?.title ?? tt.noMilestone : `${tt.noMilestone} · ${bandName(target.band)}`}`;
       default: return target.milestoneId
         ? milestoneById.get(target.milestoneId)?.title ?? tt.noMilestone
         : `${tt.noMilestone} · ${bandName(target.band)}`;
@@ -189,28 +187,19 @@ export function GoalTimeline({ goal, todos, milestones, projects, onOpenTodo, no
     onDragCancel: () => tt.announce.cancel,
   };
 
-  const clampPanel = (x: number) => Math.max(0, Math.min(x - PANEL_WIDTH / 2, width - PANEL_WIDTH));
-  const openPanel = (id: string) => {
+  const openPanel = (id: string, trigger: HTMLElement) => {
     setInline(null);
+    panelTrigger.current = trigger;
     setPanel({ kind: 'view', id });
   };
-  const panelFor = (milestone: GoalMilestone, slot: PanelSlot) => {
-    if (!panel || panel.kind === 'create' || panel.id !== milestone.id) return null;
-    const placement = slot.where === 'strip'
-      ? { style: { left: clampPanel(slot.x), top: STRIP_HEIGHT } }
-      : { className: 'left-0 top-full mt-1' };
-    if (panel.kind === 'edit') {
-      return <MilestoneForm goalId={goal.id} projects={projects} milestone={milestone} initialDay={null} onClose={closePanel} {...placement} />;
-    }
-    return (
-      <MilestoneCard milestone={milestone} todos={todos} onClose={closePanel} {...placement}
-        onEdit={() => setPanel({ kind: 'edit', id: milestone.id })}
-        onDelete={() => {
-          setPanel(null);
-          setRemoving(milestone);
-        }} />
-    );
-  };
+  const openMilestone = panel && panel.kind !== 'create' ? milestoneById.get(panel.id) : undefined;
+  const panelAnchor = useCallback<FloatingAnchor>(() => panelTrigger.current?.getBoundingClientRect() ?? null, []);
+  /** Ein Klick auf die Achse: die Karte steht unter der Achse an diesem Tag. */
+  const createX = panel?.kind === 'create' ? panel.x : null;
+  const axisAnchor = useCallback<FloatingAnchor>(() => {
+    const rect = measureRef.current?.getBoundingClientRect();
+    return rect && createX !== null ? new DOMRect(rect.left + createX, rect.top, 0, rect.height) : null;
+  }, [createX]);
   const createInline = (band: string, title: string, day: number | null) => create.mutate(
     { title, projectId: band, ...(day !== null ? { dueDate: dueDateOfDay(day) } : {}) },
     { onSuccess: () => setInline(null) },
@@ -227,7 +216,7 @@ export function GoalTimeline({ goal, todos, milestones, projects, onOpenTodo, no
           </Button>
           {panel?.kind === 'create' && panel.x === null && (
             <MilestoneForm goalId={goal.id} projects={projects} initialDay={null} onClose={closePanel} triggerRef={addButtonRef}
-              className="right-0 top-full mt-1" />
+              align="end" />
           )}
         </div>
       </div>
@@ -266,7 +255,7 @@ export function GoalTimeline({ goal, todos, milestones, projects, onOpenTodo, no
                       }} />
                     {panel?.kind === 'create' && panel.x !== null && (
                       <MilestoneForm goalId={goal.id} projects={projects} initialDay={panel.day} onClose={closePanel}
-                        style={{ left: clampPanel(panel.x), top: AXIS_HEIGHT }} />
+                        anchor={axisAnchor} align="center" />
                     )}
                   </div>
                 </div>
@@ -283,13 +272,24 @@ export function GoalTimeline({ goal, todos, milestones, projects, onOpenTodo, no
                       setInline(at ? { ...at, band: band.key } : null);
                     }}
                     onCreate={(title, day) => createInline(band.key, title, day)}
-                    onPlan={planFromMenu} onOpenTodo={onOpenTodo} onOpenMilestone={openPanel} panelFor={panelFor} />
+                    onPlan={planFromMenu} onOpenTodo={onOpenTodo} onOpenMilestone={openPanel} />
                 ))}
               </div>
             </div>
           </Card>
-          <UnplannedBar todos={unplanned} milestones={milestones} today={today} onPlan={planFromMenu} onOpenTodo={onOpenTodo} />
         </TimelineDragContext.Provider>
+        {openMilestone && panel?.kind === 'view' && (
+          <MilestoneCard milestone={openMilestone} todos={todos} onClose={closePanel} anchor={panelAnchor} triggerRef={panelTrigger}
+            onEdit={() => setPanel({ kind: 'edit', id: openMilestone.id })}
+            onDelete={() => {
+              setPanel(null);
+              setRemoving(openMilestone);
+            }} />
+        )}
+        {openMilestone && panel?.kind === 'edit' && (
+          <MilestoneForm goalId={goal.id} projects={projects} milestone={openMilestone} initialDay={null} onClose={closePanel}
+            anchor={panelAnchor} triggerRef={panelTrigger} />
+        )}
         <DragOverlay modifiers={[dotToCursor]} dropAnimation={null}>
           {dragged?.kind === 'todo' && (
             <div style={{ width: CHIP_WIDTH }}>

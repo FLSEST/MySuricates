@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type FormEvent, type RefObject } from 'react';
+import { useState, type FormEvent, type RefObject } from 'react';
 import { Button, Input, Select } from '../ui';
 import { useI18nStore, useT } from '../../i18n';
 import { formatDate } from '../../utils/localeFormat';
@@ -6,11 +6,13 @@ import { useCreateMilestone, useUpdateMilestone } from '../../hooks/useGoalTimel
 import { MAX_SUBGOAL_TITLE, createRequest, draftOf, isDraftValid, projectLocked, updateRequest } from './subgoalForm';
 import { MilestoneDiamond } from './MilestoneDiamond';
 import { TimelinePopover } from './TimelinePopover';
+import type { FloatingAlign, FloatingAnchor } from './floating';
 import type { GoalMilestone, GoalProject, GoalTodoItem } from '../../types';
 
+/** Wo die Karte schwebt (`floating.ts`) und wer sie geöffnet hat – er bekommt danach den Fokus zurück. */
 interface Placement {
-  className?: string;
-  style?: CSSProperties;
+  anchor?: FloatingAnchor;
+  align?: FloatingAlign;
   triggerRef?: RefObject<HTMLElement | null>;
 }
 

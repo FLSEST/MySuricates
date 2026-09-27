@@ -3,7 +3,7 @@ import {
   CHIP_WIDTH, FALLBACK_WIDTH, NO_MILESTONE, NO_PROJECT_BAND,
   applyPlan, axisFor, buildAxis, buildBands, dateOfDay, dayAtX, dayOf, dayOfIsoDate, dropTargetOf, dueDateOfDay,
   isOverdue, isoDateOfDay, milestoneAccepts, milestoneDateChange, pillDropId, planChanges, rowDropId, stackChips,
-  stripDropId, todayLabelPlacement, todoAccepts, trayDropId, xOfDay,
+  stripDropId, todayLabelPlacement, todoAccepts, trayDropId, undatedDropId, xOfDay,
 } from '../timelineLayout';
 import type { GoalMilestone, GoalTodoItem } from '../../../types';
 
@@ -186,14 +186,14 @@ describe('buildBands (c60bf914)', () => {
   const promo = milestone('m-promo', 'Promo', '2026-10-03', { projectId: 'p2' });
 
   it('has a band per project in the goal\'s order, even an empty one', () => {
-    const { bands } = buildBands([], [], projects, axis, W);
+    const bands = buildBands([], [], projects, axis, W);
     expect(bands.map((band) => [band.key, band.name, band.linked])).toEqual([['p1', 'AutoPilot', true], ['p2', 'Site', true]]);
     // every band has its row "no sub-goal" to drop into
     expect(bands.map((band) => band.rows.map((row) => row.key))).toEqual([[NO_MILESTONE], [NO_MILESTONE]]);
   });
 
   it('gives dated sub-goals a row by date, puts undated ones into the tray by position, each in its project\'s band', () => {
-    const { bands } = buildBands([], [rc, docs, beta, promo, wording], projects, axis, W);
+    const bands = buildBands([], [rc, docs, beta, promo, wording], projects, axis, W);
     const [autopilot, site] = bands;
     expect(autopilot!.dated.map((m) => m.id)).toEqual(['m-beta', 'm-rc']);
     expect(autopilot!.undated.map((m) => m.id)).toEqual(['m-wording', 'm-docs']);
@@ -202,8 +202,8 @@ describe('buildBands (c60bf914)', () => {
     expect(site!.rows.every((row) => row.band === 'p2')).toBe(true);
   });
 
-  it('places due TODOs in the row of their sub-goal, else in "no sub-goal" of their project; undated ones are unplanned', () => {
-    const { bands, unplanned } = buildBands([
+  it('places TODOs in the row of their sub-goal, else in "no sub-goal" of their project – dated on the axis, undated beside it', () => {
+    const bands = buildBands([
       todo('a', { dueDate: endOf('2026-09-30'), milestoneId: 'm-beta' }),
       todo('b', { dueDate: endOf('2026-10-05') }),
       todo('c', { milestoneId: 'm-rc' }),
@@ -216,22 +216,37 @@ describe('buildBands (c60bf914)', () => {
     const [autopilot, site] = bands;
     expect(autopilot!.rows.map((row) => [row.key, row.items.map((item) => item.todo.id)]))
       .toEqual([['m-beta', ['a']], ['m-rc', []], [NO_MILESTONE, ['d', 'b']]]);
+    // the undated TODO keeps its sub-goal: it stands beside the axis in the row of "RC"
+    expect(autopilot!.rows.map((row) => [row.key, row.undated.map((item) => item.id)]))
+      .toEqual([['m-beta', []], ['m-rc', ['c']], [NO_MILESTONE, []]]);
     expect(site!.rows.map((row) => [row.key, row.items.map((item) => item.todo.id)]))
       .toEqual([['m-promo', []], [NO_MILESTONE, ['g']]]);
-    expect(unplanned.map((item) => item.id)).toEqual(['c']);
     const a = autopilot!.rows[0]!.items[0]!;
     expect(a.day).toBe(day('2026-09-30'));
     expect(a.left + a.anchor).toBeCloseTo(xOfDay(axis, day('2026-09-30'), W));
   });
 
-  it('gives an undated sub-goal a row as soon as one of its TODOs is due', () => {
-    const { bands } = buildBands([todo('a', { dueDate: endOf('2026-10-02'), milestoneId: 'm-docs' })], [docs], projects, axis, W);
-    expect(bands[0]!.rows.map((row) => row.key)).toEqual(['m-docs', NO_MILESTONE]);
-    expect(bands[0]!.undated.map((m) => m.id)).toEqual(['m-docs']);
+  it('gives an undated sub-goal a row as soon as it has TODOs, dated or not; without TODOs it only waits in the tray', () => {
+    const bands = buildBands([
+      todo('a', { dueDate: endOf('2026-10-02'), milestoneId: 'm-docs' }),
+      todo('b', { milestoneId: 'm-wording' }),
+      todo('c', { milestoneId: 'm-wording', status: 'ARCHIVED' }),
+    ], [docs, wording, milestone('m-empty', 'Empty', null, { position: 3 })], projects, axis, W);
+    expect(bands[0]!.rows.map((row) => row.key)).toEqual(['m-wording', 'm-docs', NO_MILESTONE]);
+    expect(bands[0]!.rows[0]!.undated.map((item) => item.id)).toEqual(['b']);
+    expect(bands[0]!.undated.map((m) => m.id)).toEqual(['m-wording', 'm-docs', 'm-empty']);
+  });
+
+  it('keeps undated TODOs without sub-goal in "no sub-goal" of their band – there is no global pile any more', () => {
+    const bands = buildBands([
+      todo('a'), todo('b', { projectId: 'p2', projectName: 'Site' }), todo('c', { projectId: null, projectName: null }),
+    ], [], projects, axis, W);
+    expect(bands.map((band) => [band.key, band.rows.at(-1)!.undated.map((item) => item.id)]))
+      .toEqual([['p1', ['a']], ['p2', ['b']], [NO_PROJECT_BAND, ['c']]]);
   });
 
   it('adds a band for old data from a project outside the goal and one "without project" when something is there', () => {
-    const { bands } = buildBands([
+    const bands = buildBands([
       todo('a', { dueDate: endOf('2026-10-02'), projectId: 'p9', projectName: 'Elsewhere' }),
       todo('b', { dueDate: endOf('2026-10-03'), projectId: null, projectName: null }),
     ], [milestone('m-lost', 'Lost', null, { projectId: null })], projects, axis, W);
@@ -243,7 +258,7 @@ describe('buildBands (c60bf914)', () => {
   });
 
   it('counts the lanes of every row', () => {
-    const { bands } = buildBands([
+    const bands = buildBands([
       todo('a', { dueDate: endOf('2026-10-05') }),
       todo('b', { dueDate: endOf('2026-10-05') }),
       todo('c', { dueDate: endOf('2026-10-05') }),
@@ -255,7 +270,9 @@ describe('buildBands (c60bf914)', () => {
 
 describe('drop targets', () => {
   it('reads the drop target from the droppable id', () => {
-    expect(dropTargetOf('unplanned')).toEqual({ kind: 'unplanned' });
+    expect(dropTargetOf(undatedDropId('p1', NO_MILESTONE))).toEqual({ kind: 'undated', band: 'p1', milestoneId: null });
+    expect(dropTargetOf(undatedDropId('p1', 'm-beta'))).toEqual({ kind: 'undated', band: 'p1', milestoneId: 'm-beta' });
+    expect(dropTargetOf('unplanned')).toBeNull();
     expect(dropTargetOf(rowDropId('p1', NO_MILESTONE))).toEqual({ kind: 'row', band: 'p1', milestoneId: null });
     expect(dropTargetOf(rowDropId('p1', 'm-beta'))).toEqual({ kind: 'row', band: 'p1', milestoneId: 'm-beta' });
     expect(dropTargetOf(stripDropId('p2'))).toEqual({ kind: 'strip', band: 'p2' });
@@ -266,12 +283,13 @@ describe('drop targets', () => {
     expect(dropTargetOf('strip:p1:x')).toBeNull();
   });
 
-  it('offers a TODO only the rows and sub-goals of its own project, and "unplanned"', () => {
+  it('offers a TODO only the rows, undated areas and sub-goals of its own project', () => {
     const own = { projectId: 'p1', milestoneId: null };
     expect(todoAccepts(own, { kind: 'row', band: 'p1', milestoneId: 'm-beta' })).toBe(true);
     expect(todoAccepts(own, { kind: 'row', band: 'p1', milestoneId: null })).toBe(true);
     expect(todoAccepts(own, { kind: 'pill', band: 'p1', milestoneId: 'm-docs' })).toBe(true);
-    expect(todoAccepts(own, { kind: 'unplanned' })).toBe(true);
+    expect(todoAccepts(own, { kind: 'undated', band: 'p1', milestoneId: 'm-beta' })).toBe(true);
+    expect(todoAccepts(own, { kind: 'undated', band: 'p2', milestoneId: null })).toBe(false);
     expect(todoAccepts(own, { kind: 'row', band: 'p2', milestoneId: 'm-promo' })).toBe(false);
     expect(todoAccepts(own, { kind: 'row', band: 'p2', milestoneId: null })).toBe(false);
     expect(todoAccepts(own, { kind: 'strip', band: 'p1' })).toBe(false);
@@ -295,7 +313,7 @@ describe('drop targets', () => {
     expect(milestoneAccepts(own, { kind: 'tray', band: 'p1' })).toBe(true);
     expect(milestoneAccepts(own, { kind: 'strip', band: 'p2' })).toBe(false);
     expect(milestoneAccepts(own, { kind: 'pill', band: 'p1', milestoneId: 'm-docs' })).toBe(false);
-    expect(milestoneAccepts(own, { kind: 'unplanned' })).toBe(false);
+    expect(milestoneAccepts(own, { kind: 'undated', band: 'p1', milestoneId: null })).toBe(false);
   });
 
   it('dates a sub-goal where it lands, clears the date in the tray and changes nothing on the same day', () => {
@@ -332,9 +350,12 @@ describe('dropping a TODO', () => {
     expect(planChanges(dated, { kind: 'pill', band: 'p1', milestoneId: 'm-beta' }, null)).toEqual({});
   });
 
-  it('back into "unplanned" clears the date and keeps the sub-goal', () => {
-    expect(planChanges(dated, { kind: 'unplanned' }, null)).toEqual({ dueDate: '' });
-    expect(planChanges({ dueDate: null, milestoneId: 'm-beta' }, { kind: 'unplanned' }, null)).toEqual({});
+  it('into the undated area of a row it clears the date and takes that row\'s sub-goal', () => {
+    const undated = (milestoneId: string | null) => ({ kind: 'undated' as const, band: 'p1', milestoneId });
+    expect(planChanges(dated, undated('m-beta'), null)).toEqual({ dueDate: '' });
+    expect(planChanges(dated, undated('m-rc'), null)).toEqual({ dueDate: '', milestoneId: 'm-rc' });
+    expect(planChanges({ dueDate: null, milestoneId: 'm-beta' }, undated('m-beta'), null)).toEqual({});
+    expect(planChanges({ dueDate: null, milestoneId: 'm-beta' }, undated(null), null)).toEqual({ milestoneId: '' });
   });
 
   it('writes the changes into the TODO rows for the optimistic update', () => {

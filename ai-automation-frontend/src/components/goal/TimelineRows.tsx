@@ -1,9 +1,9 @@
-import { useId } from 'react';
+import { useId, useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { useI18nStore, useT } from '../../i18n';
 import { formatDate } from '../../utils/localeFormat';
 import {
-  LANE_HEIGHT, UNPLANNED_DROP_ID, dayOf, rowDropId, xOfDay, type PlanChanges, type TimelineAxis, type TimelineRow,
+  LANE_HEIGHT, dayOf, rowDropId, undatedDropId, xOfDay, type PlanChanges, type TimelineAxis, type TimelineRow,
 } from './timelineLayout';
 import { acceptsDrop, dropTone, useDragged } from './timelineDrag';
 import { SHORT_DATE } from './planDisplay';
@@ -13,6 +13,8 @@ import type { GoalMilestone, GoalTodoItem, MilestoneState } from '../../types';
 
 /** Abstand der Chips zum oberen und unteren Rand einer Zeile. */
 const ROW_PADDING = 8;
+/** So viele TODOs ohne Datum zeigt eine Zeile, der Rest klappt hinter „+n“ auf. */
+const UNDATED_SHOWN = 3;
 
 /** Breite der Beschriftungsspalte – Zeilen, Achse und Linien müssen dieselbe nehmen. */
 export const LABEL_COLUMN = 'w-28 shrink-0 sm:w-44';
@@ -59,29 +61,41 @@ interface RowProps {
   milestones: GoalMilestone[];
   onPlan: (todoId: string, changes: PlanChanges) => void;
   onOpenTodo: (todoId: string) => void;
-  onOpenMilestone: (id: string) => void;
+  /** `trigger`: was geklickt wurde – die Karte steht dort und gibt ihm danach den Fokus zurück. */
+  onOpenMilestone: (id: string, trigger: HTMLElement) => void;
 }
 
 /**
- * Eine Zeile: ein Teilziel (oder „ohne Teilziel“) mit seinen fälligen TODOs; Ablegen setzt Tag und
- * Zeile. Beim Ziehen nimmt sie nur an, was zu ihrem Projekt passt (c60bf914).
+ * Eine Zeile: ein Teilziel (oder „ohne Teilziel“) mit seinen TODOs – die fälligen auf der Achse, die
+ * ohne Datum links unter dem Namen, damit sie ihre Zuordnung behalten. Ablegen auf der Achse setzt
+ * Tag und Teilziel, links nimmt es das Datum weg. Beim Ziehen nimmt sie nur an, was zu ihrem Projekt
+ * passt (c60bf914).
  */
 export function TimelineRowView({ row, axis, width, today, milestones, onPlan, onOpenTodo, onOpenMilestone }: RowProps) {
   const t = useT();
+  const dragged = useDragged();
   const id = rowDropId(row.band, row.key);
-  const accepts = acceptsDrop(useDragged(), id);
+  const accepts = acceptsDrop(dragged, id);
   const { setNodeRef, isOver } = useDroppable({ id, disabled: accepts === false });
+  const undatedId = undatedDropId(row.band, row.key);
+  const undatedAccepts = acceptsDrop(dragged, undatedId);
+  const { setNodeRef: setUndatedRef, isOver: undatedOver } = useDroppable({ id: undatedId, disabled: undatedAccepts === false });
   const { milestone } = row;
   return (
     <div className="flex border-t border-border" data-testid={`timeline-row-${row.band}-${row.key}`}>
-      <div className={`${LABEL_COLUMN} py-2 pl-3 pr-2`}>
+      <div ref={setUndatedRef} data-testid={`timeline-undated-${row.band}-${row.key}`}
+        data-accepts={undatedAccepts === null ? undefined : String(undatedAccepts)}
+        className={`${LABEL_COLUMN} space-y-1.5 py-2 pl-3 pr-2 transition-colors ${dropTone(undatedAccepts, undatedOver)}`}>
         {milestone
-          ? <MilestoneRowLabel milestone={milestone} onOpen={() => onOpenMilestone(milestone.id)} />
-          : <span className="text-xs italic text-text-tertiary">{t.goals.timeline.noMilestone}</span>}
+          ? <MilestoneRowLabel milestone={milestone} onOpen={(trigger) => onOpenMilestone(milestone.id, trigger)} />
+          : <span className="block text-xs italic text-text-tertiary">{t.goals.timeline.noMilestone}</span>}
+        {row.undated.length > 0 && (
+          <UndatedTodos todos={row.undated} milestones={milestones} today={today} onPlan={onPlan} onOpenTodo={onOpenTodo} />
+        )}
       </div>
       <div ref={setNodeRef} data-accepts={accepts === null ? undefined : String(accepts)}
         className={`relative min-w-0 flex-1 transition-colors ${dropTone(accepts, isOver)}`}
-        style={{ height: row.lanes * LANE_HEIGHT + 2 * ROW_PADDING }}>
+        style={{ minHeight: row.lanes * LANE_HEIGHT + 2 * ROW_PADDING }}>
         {milestone?.dueDate && (
           <span aria-hidden="true" className={`absolute inset-y-0 border-l-2 border-dashed ${MILESTONE_LINE[milestone.state]}`}
             style={{ left: xOfDay(axis, dayOf(milestone.dueDate), width) - 1 }} />
@@ -96,11 +110,11 @@ export function TimelineRowView({ row, axis, width, today, milestones, onPlan, o
   );
 }
 
-function MilestoneRowLabel({ milestone, onOpen }: { milestone: GoalMilestone; onOpen: () => void }) {
+function MilestoneRowLabel({ milestone, onOpen }: { milestone: GoalMilestone; onOpen: (trigger: HTMLElement) => void }) {
   const tm = useT().goals.milestones;
   const locale = useI18nStore((s) => s.locale);
   return (
-    <button type="button" onClick={onOpen} className="-mx-1 block w-full rounded px-1 text-left hover:bg-surface-hover focus-ring">
+    <button type="button" onClick={(event) => onOpen(event.currentTarget)} className="-mx-1 block w-full rounded px-1 text-left hover:bg-surface-hover focus-ring">
       <span className="flex min-w-0 items-center gap-1.5">
         <MilestoneDiamond state={milestone.state} />
         <span className="truncate text-sm font-medium text-text" title={milestone.title}>{milestone.title}</span>
@@ -113,8 +127,11 @@ function MilestoneRowLabel({ milestone, onOpen }: { milestone: GoalMilestone; on
   );
 }
 
-/** Leiste „ungeplant“: alle TODOs ohne Fälligkeit; hierher gezogen verliert ein TODO sein Datum. */
-export function UnplannedBar({ todos, milestones, today, onPlan, onOpenTodo }: {
+/**
+ * TODOs ohne Datum einer Zeile (c60bf914): die ersten drei als schmale Chips, der Rest hinter „+n“
+ * aufklappbar. Ein Chip von hier auf die Achse gezogen bekommt ein Datum, wie jeder andere.
+ */
+function UndatedTodos({ todos, milestones, today, onPlan, onOpenTodo }: {
   todos: GoalTodoItem[];
   milestones: GoalMilestone[];
   today: number;
@@ -122,26 +139,26 @@ export function UnplannedBar({ todos, milestones, today, onPlan, onOpenTodo }: {
   onOpenTodo: (todoId: string) => void;
 }) {
   const tt = useT().goals.timeline;
-  const headingId = useId();
-  const accepts = acceptsDrop(useDragged(), UNPLANNED_DROP_ID);
-  const { setNodeRef, isOver } = useDroppable({ id: UNPLANNED_DROP_ID, disabled: accepts === false });
+  const listId = useId();
+  const [all, setAll] = useState(false);
+  const hidden = todos.length - UNDATED_SHOWN;
+  const shown = all || hidden <= 0 ? todos : todos.slice(0, UNDATED_SHOWN);
   return (
-    <section ref={setNodeRef} aria-labelledby={headingId}
-      className={`rounded-xl border border-dashed p-3 transition-colors ${isOver ? 'border-accent' : 'border-border-strong'} ${dropTone(accepts, isOver)}`}>
-      <div className="mb-2 flex flex-wrap items-baseline gap-x-2">
-        <h3 id={headingId} className="text-xs font-semibold uppercase tracking-wide text-text-secondary">{tt.unplanned}</h3>
-        <span className="text-xs tabular-nums text-text-tertiary">{todos.length}</span>
-        <span className="text-xs text-text-tertiary">{tt.unplannedHint}</span>
-      </div>
-      {todos.length === 0 ? (
-        <p className="text-xs text-text-tertiary">{tt.unplannedEmpty}</p>
-      ) : (
-        <div className="flex flex-wrap gap-2">
-          {todos.map((todo) => (
-            <TimelineChip key={todo.id} todo={todo} milestones={milestones} today={today} onPlan={onPlan} onOpenTodo={onOpenTodo} />
-          ))}
-        </div>
+    <div className="space-y-1">
+      <p className="text-[10px] font-medium text-text-tertiary">{tt.undatedTodos.replace('{n}', String(todos.length))}</p>
+      <ul id={listId} className="space-y-1">
+        {shown.map((todo) => (
+          <li key={todo.id}>
+            <TimelineChip todo={todo} milestones={milestones} today={today} compact onPlan={onPlan} onOpenTodo={onOpenTodo} />
+          </li>
+        ))}
+      </ul>
+      {hidden > 0 && (
+        <button type="button" aria-expanded={all} aria-controls={listId} onClick={() => setAll((value) => !value)}
+          className="rounded px-1 text-[11px] font-medium text-text-secondary hover:text-accent focus-ring">
+          {all ? tt.fewerTodos : tt.moreTodos.replace('{n}', String(hidden))}
+        </button>
       )}
-    </section>
+    </div>
   );
 }

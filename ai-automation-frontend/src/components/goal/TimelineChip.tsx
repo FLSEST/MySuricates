@@ -13,17 +13,19 @@ import type { GoalMilestone, GoalTodoItem } from '../../types';
  * So sieht ein TODO auf dem Zeitstrahl aus: Statuspunkt und Titel, überfällig rot, erledigt
  * durchgestrichen. Der Punkt sitzt `CHIP_ANCHOR` px vom Rand – genau auf dem Fälligkeitstag.
  */
-export function ChipFace({ todo, overdue, flipped = false, lifted = false }: {
+export function ChipFace({ todo, overdue, flipped = false, lifted = false, compact = false }: {
   todo: GoalTodoItem;
   overdue: boolean;
   flipped?: boolean;
   /** Das Bild unter dem Mauszeiger beim Ziehen. */
   lifted?: boolean;
+  /** Schmal im Bereich „ohne Datum“ einer Zeile. */
+  compact?: boolean;
 }) {
   const done = todo.status === 'DONE';
   const text = done ? 'text-text-tertiary line-through' : overdue ? 'text-danger' : 'text-text';
   return (
-    <span className={`flex h-7 w-full items-center gap-1.5 rounded-md border bg-surface-raised px-[7px] text-xs ${
+    <span className={`flex w-full items-center gap-1.5 rounded-md border bg-surface-raised px-[7px] ${compact ? 'h-6 text-[11px]' : 'h-7 text-xs'} ${
       flipped ? 'flex-row-reverse' : ''} ${overdue ? 'border-danger/60' : 'border-border'} ${lifted ? 'shadow-lg ring-1 ring-accent' : 'shadow-sm'}`}>
       <span className={`h-2 w-2 shrink-0 rounded-full ${overdue ? 'bg-danger' : STATUS_DOT[todo.status]}`} />
       <span className={`min-w-0 flex-1 truncate ${flipped ? 'text-right' : 'text-left'} ${text}`}>{todo.title}</span>
@@ -36,10 +38,12 @@ interface TimelineChipProps {
   milestones: GoalMilestone[];
   today: number;
   /**
-   * Platz im Zeitstrahl; ohne steht der Chip im Fluss (Leiste „ungeplant“). `anchor`: Abstand vom
-   * linken Rand zum Tag, auf dem der Statuspunkt sitzt.
+   * Platz im Zeitstrahl; ohne steht der Chip im Fluss (Bereich „ohne Datum“ einer Zeile). `anchor`:
+   * Abstand vom linken Rand zum Tag, auf dem der Statuspunkt sitzt.
    */
   placement?: { left: number; top: number; flipped: boolean; anchor: number };
+  /** Schmal und so breit wie sein Platz – im Bereich „ohne Datum“. */
+  compact?: boolean;
   /** Aus dem Menü des Chips – dem Weg ohne Ziehen. */
   onPlan: (todoId: string, changes: PlanChanges) => void;
   onOpenTodo: (todoId: string) => void;
@@ -50,7 +54,7 @@ interface TimelineChipProps {
  * Pfeiltasten – TODO ff6f08fd) ziehbar, ein Klick (oder Enter) öffnet sein Menü mit „Datum setzen“
  * und „Meilenstein“.
  */
-export function TimelineChip({ todo, milestones, today, placement, onPlan, onOpenTodo }: TimelineChipProps) {
+export function TimelineChip({ todo, milestones, today, placement, compact = false, onPlan, onOpenTodo }: TimelineChipProps) {
   const t = useT();
   const locale = useI18nStore((s) => s.locale);
   const [open, setOpen] = useState(false);
@@ -65,7 +69,7 @@ export function TimelineChip({ todo, milestones, today, placement, onPlan, onOpe
     .filter(Boolean).join('\n');
   const style: CSSProperties = placement
     ? { position: 'absolute', left: placement.left, top: placement.top, width: CHIP_WIDTH }
-    : { width: CHIP_WIDTH };
+    : { width: compact ? '100%' : CHIP_WIDTH };
 
   return (
     <div ref={setNodeRef} style={style} className={`${placement ? '' : 'relative'} ${isDragging ? 'opacity-40' : ''}`}>
@@ -84,7 +88,7 @@ export function TimelineChip({ todo, milestones, today, placement, onPlan, onOpe
         className="block w-full cursor-grab rounded-md focus-ring active:cursor-grabbing"
         style={{ touchAction: 'none' }}
       >
-        <ChipFace todo={todo} overdue={overdue} flipped={placement?.flipped} />
+        <ChipFace todo={todo} overdue={overdue} flipped={placement?.flipped} compact={compact} />
       </button>
       {open && (
         <ChipMenu
@@ -133,7 +137,7 @@ function ChipMenu({ todo, milestones, alignRight, triggerRef, onClose, onPlan, o
 
   return (
     <TimelinePopover label={tt.planMenu.replace('{title}', todo.title)} onClose={onClose} triggerRef={triggerRef}
-      className={`top-full mt-1 ${alignRight ? 'right-0' : 'left-0'}`}>
+      align={alignRight ? 'end' : 'start'}>
       <form onSubmit={applyDate} className="space-y-1.5">
         <label htmlFor={dateId} className="block text-xs font-medium text-text-secondary">{tt.setDate}</label>
         <div className="flex gap-2">

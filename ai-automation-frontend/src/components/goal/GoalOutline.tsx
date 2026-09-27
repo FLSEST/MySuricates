@@ -5,7 +5,7 @@ import { Hint } from '../hints/Hint';
 import { useI18nStore, useT } from '../../i18n';
 import { formatDate } from '../../utils/localeFormat';
 import { useDeleteMilestone, useReorderMilestones } from '../../hooks/useGoalTimeline';
-import { useReorderGoalProjects } from '../../hooks/useGoalProjects';
+import { useAddGoalProject, useReorderGoalProjects } from '../../hooks/useGoalProjects';
 import { ComplexityChip, EffortChip, RatedByMark } from './GoalBadges';
 import { DueChip } from './TodoPlanChips';
 import { MilestoneDiamond } from './MilestoneDiamond';
@@ -64,6 +64,7 @@ export function GoalOutline({ detail, today, onOpenTodo }: {
   const [removing, setRemoving] = useState<GoalMilestone | null>(null);
   const reorderMilestones = useReorderMilestones(goalId);
   const reorderProjects = useReorderGoalProjects(goalId);
+  const addProject = useAddGoalProject(goalId);
   const removeMilestone = useDeleteMilestone(goalId);
 
   const isOpen = useCallback((key: string, byDefault: boolean) => expanded[key] ?? byDefault, [expanded]);
@@ -113,7 +114,16 @@ export function GoalOutline({ detail, today, onOpenTodo }: {
       <OutlineGroup key={group.key} nodeKey={key} bodyId={`${helpId}-${group.key}`} title={name} counts={group.counts}
         testId={`outline-project-${group.key}`}
         expanded={isOpen(key, true)} onToggle={() => toggle(key, true)}
-        badge={group.project?.archived && <span className="shrink-0 text-xs text-text-tertiary">({t.goals.projects.archived})</span>}
+        badge={(
+          <>
+            {group.project?.archived && <span className="shrink-0 text-xs text-text-tertiary">({t.goals.projects.archived})</span>}
+            {group.project && !group.linked && (
+              <span className="shrink-0 rounded-full border border-warning/40 bg-warning-subtle px-1.5 text-[11px] font-medium text-warning">
+                {to.notLinked}
+              </span>
+            )}
+          </>
+        )}
         actions={group.project && group.linked && linkedCount > 1 && (
           <>
             <button type="button" className={ICON_BUTTON} disabled={index === 0 || reorderProjects.isPending}
@@ -132,7 +142,9 @@ export function GoalOutline({ detail, today, onOpenTodo }: {
           reordering={reorderMilestones.isPending}
           onMove={(subgoalIndex, delta) => moveSubgoal(group, subgoalIndex, delta)}
           onEdit={(milestone) => setEditor({ milestone })}
-          onAdd={group.project ? () => setEditor({ projectId: group.key }) : undefined} />
+          onAdd={group.project && group.linked ? () => setEditor({ projectId: group.key }) : undefined}
+          onLink={group.project && !group.linked ? () => addProject.mutate(group.key) : undefined}
+          linking={addProject.isPending} />
       </OutlineGroup>
     );
   };
@@ -184,12 +196,15 @@ interface BodyProps {
   reordering: boolean;
   onMove: (index: number, delta: -1 | 1) => void;
   onEdit: (milestone: GoalMilestone) => void;
-  /** Fehlt bei „Ohne Projekt“ – dort lässt sich kein Teilziel anlegen. */
+  /** Fehlt bei „Ohne Projekt“ und bei Projekten, die nicht zum Ziel gehören – dort lässt sich kein Teilziel anlegen. */
   onAdd?: () => void;
+  /** Nur bei einem Projekt, das bloß über TODOs hereinkommt: es dem Ziel zuordnen. */
+  onLink?: () => void;
+  linking?: boolean;
 }
 
 /** Inhalt einer Projektkarte: die Teilziele am Faden, „Ohne Teilziel“, dann „+ Teilziel“. */
-function ProjectBody({ group, today, isOpen, toggle, onOpenTodo, reordering, onMove, onEdit, onAdd }: BodyProps) {
+function ProjectBody({ group, today, isOpen, toggle, onOpenTodo, reordering, onMove, onEdit, onAdd, onLink, linking }: BodyProps) {
   const t = useT();
   const to = t.goals.outline;
   const name = group.project?.name ?? to.noProject;
@@ -198,6 +213,15 @@ function ProjectBody({ group, today, isOpen, toggle, onOpenTodo, reordering, onM
   return (
     <div className="space-y-2">
       {!group.project && <p className="text-xs text-text-tertiary">{to.noProjectHint}</p>}
+      {onLink && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-warning/40 bg-warning-subtle px-3 py-2">
+          <p className="min-w-0 flex-1 basis-56 text-xs text-text-secondary">{to.notLinkedHint}</p>
+          <button type="button" onClick={onLink} disabled={linking}
+            className="btn-base shrink-0 border border-border bg-surface-raised px-2.5 py-1 text-xs text-text hover:border-accent hover:text-accent focus-ring">
+            {to.assignProject}
+          </button>
+        </div>
+      )}
       {empty && group.project && <p className="text-sm text-text-secondary">{to.noSubgoals}</p>}
       {(group.subgoals.length > 0 || group.loose.length > 0) && (
         // Der Faden: eine senkrechte Linie, auf der die Rauten der Teilziele sitzen – wie am Zeitstrahl

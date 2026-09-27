@@ -155,7 +155,7 @@ function keyboardDropOn(activeId: string, overId: string, dotX: number, anchor =
 }
 
 describe('GoalTimeline', () => {
-  it('shows a band per project with a row per sub-goal and one without, the dated TODOs in them and the undated ones as unplanned', () => {
+  it('shows a band per project with a row per sub-goal and one without, dated TODOs on the axis, undated ones beside it in their row', () => {
     renderTimeline();
 
     const autopilot = screen.getByRole('region', { name: 'Project band AutoPilot' });
@@ -168,10 +168,14 @@ describe('GoalTimeline', () => {
       .toBeInTheDocument();
     const noneRow = screen.getByTestId(`timeline-row-p1-${NO_MILESTONE}`);
     expect(within(noneRow).getByRole('button', { name: /^Style probe/ })).toBeInTheDocument();
-    expect(within(noneRow).queryByRole('button', { name: /^Examples page/ })).not.toBeInTheDocument();
+    // not on the axis part of the row …
+    expect(within(noneRow.lastElementChild as HTMLElement).queryByRole('button', { name: /^Examples page/ })).not.toBeInTheDocument();
 
-    const unplanned = screen.getByRole('region', { name: 'Unplanned' });
-    expect(within(unplanned).getByRole('button', { name: /^Examples page/ })).toBeInTheDocument();
+    // c60bf914: without a due date a TODO stays in the row of its sub-goal (here: none) instead of a global pile
+    const undated = screen.getByTestId(`timeline-undated-p1-${NO_MILESTONE}`);
+    expect(within(undated).getByText('1 without a date')).toBeInTheDocument();
+    expect(within(undated).getByRole('button', { name: /^Examples page – no due date/ })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Unplanned' })).not.toBeInTheDocument();
 
     // überfällig rot, erledigt durchgestrichen
     expect(screen.getByRole('button', { name: /^Old banner/ })).toHaveAccessibleName(/overdue/i);
@@ -218,13 +222,13 @@ describe('GoalTimeline', () => {
     expect(sent).toContainEqual({ method: 'PATCH', path: '/api/v1/todos/c/planning', body: { milestoneId: 'm-beta' } });
   });
 
-  it('back into "unplanned" clears the date; a drop outside or on the same spot changes nothing', async () => {
+  it('back beside the axis clears the date; a drop outside or on the same spot changes nothing', async () => {
     const sent = recordWrites();
     renderTimeline();
 
     dropOn('a', null);
     dropOn('b', `row:p1:${NO_MILESTONE}`, xFor('2026-10-05'));
-    dropOn('a', 'unplanned');
+    dropOn('a', 'undated:p1:m-beta');
 
     await waitFor(() => expect(sent).toEqual([
       { method: 'PUT', path: '/api/v1/todos/a', body: { dueDate: '' } },
@@ -495,6 +499,96 @@ describe('GoalTimeline — dragging sub-goals and TODOs between bands', () => {
       { method: 'PATCH', path: '/api/v1/todos/b/planning', body: { milestoneId: 'm-docs' } },
     ]));
     expect(screen.getByTestId('timeline-row-p1-m-beta').lastElementChild).not.toHaveAttribute('data-accepts');
+  });
+});
+
+// c60bf914 (review): TODOs without a due date keep their sub-goal – they stand beside the axis in its row
+describe('GoalTimeline — TODOs without a date in their row', () => {
+  const pending = ['p', 'q', 'r', 's2', 't'].map((id) => item({ id, title: `Handbook ${id}`, milestoneId: 'm-docs' }));
+
+  function renderWithUndated() {
+    renderWithProviders(
+      <GoalTimeline goal={goal} todos={[...todos, ...pending]} milestones={milestones} projects={projects} onOpenTodo={vi.fn()} now={NOW} />,
+    );
+  }
+
+  it('gives an undated sub-goal with TODOs a row, shows three of them and the rest behind "+n"', () => {
+    renderWithUndated();
+
+    const undated = screen.getByTestId('timeline-undated-p1-m-docs');
+    expect(within(undated).getByRole('button', { name: /^Docs/ })).toHaveTextContent('no date');
+    expect(within(undated).getByText('5 without a date')).toBeInTheDocument();
+    expect(within(undated).getAllByRole('button', { name: /^Handbook/ })).toHaveLength(3);
+    const more = within(undated).getByRole('button', { name: '+2 more' });
+    expect(more).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(more);
+    expect(within(undated).getAllByRole('button', { name: /^Handbook/ })).toHaveLength(5);
+    expect(within(undated).getByRole('button', { name: 'show fewer' })).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('dates a TODO dragged from beside the axis onto the axis of its row, keeping its sub-goal', async () => {
+    const sent = recordWrites();
+    renderWithUndated();
+
+    dropOn('p', 'row:p1:m-docs', xFor('2026-10-06'));
+    await waitFor(() => expect(sent).toEqual([
+      { method: 'PUT', path: '/api/v1/todos/p', body: { dueDate: endOf('2026-10-06') } },
+    ]));
+  });
+});
+
+// c60bf914 (review): menus and cards float above the page, so the self-scrolling timeline cannot cut them off
+describe('GoalTimeline — floating cards and focus', () => {
+  it('renders menus and cards into the page body, not into the scrolling timeline', () => {
+    renderTimeline();
+
+    fireEvent.click(screen.getByRole('button', { name: /^Style probe/ }));
+    const menu = screen.getByRole('dialog', { name: 'Plan: Style probe' });
+    expect(menu.parentElement).toBe(document.body);
+    expect(menu).toHaveStyle({ position: 'fixed' });
+    expect(within(screen.getByTestId('goal-timeline')).queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('gives the focus back to the diamond after the card closes, and after editing', async () => {
+    recordWrites();
+    renderTimeline();
+
+    const diamond = screen.getByRole('button', { name: /^Sub-goal Beta – open, due/ });
+    act(() => diamond.focus());
+    fireEvent.click(diamond);
+    const card = screen.getByRole('dialog', { name: 'Sub-goal Beta' });
+    expect(card).toContainElement(document.activeElement as HTMLElement);
+    fireEvent.keyDown(card, { key: 'Escape' });
+    expect(diamond).toHaveFocus();
+
+    fireEvent.click(diamond);
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Sub-goal Beta' })).getByRole('button', { name: 'Edit' }));
+    const form = screen.getByRole('dialog', { name: 'Edit sub-goal' });
+    fireEvent.change(within(form).getByLabelText('Title'), { target: { value: 'Public beta' } });
+    fireEvent.click(within(form).getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Edit sub-goal' })).not.toBeInTheDocument());
+    expect(diamond).toHaveFocus();
+  });
+
+  it('gives the focus back to the day picker and to "+ sub-goal" after the field closes', async () => {
+    recordWrites();
+    renderTimeline();
+
+    const picker = screen.getByRole('slider', { name: 'New sub-goal in AutoPilot' });
+    act(() => picker.focus());
+    fireEvent.keyDown(picker, { key: 'Enter' });
+    const field = screen.getByRole('textbox', { name: /^New sub-goal in AutoPilot on/ });
+    expect(field.closest('form')!.parentElement).toBe(document.body);
+    fireEvent.keyDown(field, { key: 'Escape' });
+    expect(picker).toHaveFocus();
+
+    const add = screen.getByRole('button', { name: 'New sub-goal in Site' });
+    fireEvent.click(add);
+    const undatedField = screen.getByRole('textbox', { name: 'New sub-goal in Site without a date' });
+    fireEvent.change(undatedField, { target: { value: 'Press kit' } });
+    fireEvent.submit(undatedField.closest('form')!);
+    await waitFor(() => expect(screen.queryByTestId('inline-subgoal')).not.toBeInTheDocument());
+    expect(add).toHaveFocus();
   });
 });
 

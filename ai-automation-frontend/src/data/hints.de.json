@@ -264,7 +264,7 @@
     "points": [
       "Jedes Projekt hat ein Band; ein Klick in das Band legt dort an diesem Tag ein Teilziel an, nur der Titel fehlt noch",
       "Teilziele ohne Datum warten in der Leiste „Ohne Datum“ ihres Bands – auf das Band gezogen bekommen sie eines; Rauten lassen sich verschieben",
-      "TODOs landen nur in Teilzielen ihres eigenen Projekts; was noch keine Fälligkeit hat, steht unter „Ungeplant“, überfällige werden rot"
+      "TODOs landen nur in Teilzielen ihres eigenen Projekts; ohne Fälligkeit stehen sie links in der Zeile ihres Teilziels, auf die Achse gezogen bekommen sie ein Datum; überfällige werden rot"
     ]
   },
   "goal-guard": {

@@ -1,29 +1,42 @@
-import { useEffect, useRef, type CSSProperties, type ReactNode, type RefObject } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, type ReactNode, type RefObject } from 'react';
+import { createPortal } from 'react-dom';
+import { FLOATING_STYLE, returnFocus, useFloating, type FloatingAlign, type FloatingAnchor } from './floating';
 
 const FOCUSABLE = 'input, select, textarea, button';
 /** Ein Element mit diesem Attribut bekommt beim Öffnen den Fokus statt des ersten Felds. */
 const AUTOFOCUS = '[data-autofocus]';
 
 /**
- * Kleine, nicht modale Karte am Zeitstrahl – das Menü eines Chips, die Karte eines Meilensteins.
- * Beim Öffnen steht der Fokus auf ihrem ersten Feld (oder dem mit `data-autofocus`); Escape schließt
- * sie und gibt den Fokus an den Auslöser zurück, ein Klick daneben schließt sie ebenfalls.
+ * Kleine, nicht modale Karte am Zeitstrahl – das Menü eines Chips, die Karte oder das Formular eines
+ * Teilziels. Sie schwebt per Portal über der Seite (`floating.ts`), damit der in sich scrollende
+ * Zeitstrahl sie nicht abschneidet. Beim Öffnen steht der Fokus auf ihrem ersten Feld (oder dem mit
+ * `data-autofocus`); Escape und ein Klick daneben schließen sie. Danach geht der Fokus an den
+ * Auslöser zurück – nach Speichern wie nach Abbrechen.
  */
-export function TimelinePopover({ label, onClose, triggerRef, className = '', style, children }: {
+export function TimelinePopover({ label, onClose, anchor, align = 'start', triggerRef, children }: {
   label: string;
   onClose: () => void;
-  /** Klicks auf den Auslöser schalten selbst um – sie zählen nicht als „daneben“. */
+  /** Wo die Karte steht; ohne eigenen Anker am Auslöser. */
+  anchor?: FloatingAnchor;
+  align?: FloatingAlign;
+  /** Klicks auf den Auslöser schalten selbst um – sie zählen nicht als „daneben“. Er bekommt danach den Fokus zurück. */
   triggerRef?: RefObject<HTMLElement | null>;
-  className?: string;
-  /** Lage am Zeitstrahl, etwa unter einer Raute. */
-  style?: CSSProperties;
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const atTrigger = useCallback<FloatingAnchor>(() => triggerRef?.current?.getBoundingClientRect() ?? null, [triggerRef]);
+  useFloating(anchor ?? atTrigger, ref, align);
 
   useEffect(() => {
     (ref.current?.querySelector<HTMLElement>(AUTOFOCUS) ?? ref.current?.querySelector<HTMLElement>(FOCUSABLE))?.focus();
   }, []);
+
+  // Beim Schließen – gleich wodurch – den Fokus an den Auslöser zurückgeben
+  useLayoutEffect(() => {
+    const node = ref.current;
+    const trigger = triggerRef?.current;
+    return () => returnFocus(trigger, node);
+  }, [triggerRef]);
 
   useEffect(() => {
     const closeOnOutsideClick = (event: MouseEvent) => {
@@ -35,7 +48,7 @@ export function TimelinePopover({ label, onClose, triggerRef, className = '', st
     return () => document.removeEventListener('mousedown', closeOnOutsideClick);
   }, [onClose, triggerRef]);
 
-  return (
+  return createPortal(
     <div
       ref={ref}
       role="dialog"
@@ -45,12 +58,12 @@ export function TimelinePopover({ label, onClose, triggerRef, className = '', st
         event.preventDefault();
         event.stopPropagation();
         onClose();
-        triggerRef?.current?.focus();
       }}
-      style={style}
-      className={`absolute z-30 w-64 max-w-[calc(100vw-2rem)] rounded-lg border border-border bg-surface-overlay p-3 text-left shadow-lg ${className}`}
+      style={FLOATING_STYLE}
+      className="z-50 w-64 max-w-[calc(100vw-1rem)] rounded-lg border border-border bg-surface-overlay p-3 text-left shadow-lg"
     >
       {children}
-    </div>
+    </div>,
+    document.body,
   );
 }

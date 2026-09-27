@@ -264,7 +264,7 @@
     "points": [
       "Every project has a band; a click into the band adds a sub-goal on that day – only the title is missing",
       "Sub-goals without a date wait in the band's “No date” tray – dragged onto the band they get one; diamonds can be moved",
-      "TODOs only go into sub-goals of their own project; whatever has no due date waits under “Unplanned”, overdue ones turn red"
+      "TODOs only go into sub-goals of their own project; without a due date they stand at the left of their sub-goal's row, dragged onto the axis they get a date; overdue ones turn red"
     ]
   },
   "goal-guard": {
