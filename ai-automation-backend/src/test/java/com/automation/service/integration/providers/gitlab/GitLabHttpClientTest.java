@@ -53,11 +53,11 @@ class GitLabHttpClientTest {
 
     @Test
     void get_sendsPrivateTokenHeaderOnly() {
-        respond("/api/v4/user", 200, "{\"username\":\"flo\"}");
+        respond("/api/v4/user", 200, "{\"username\":\"alex\"}");
 
         Object user = client.get(base + "/api/v4/user", "glpat-x", Object.class);
 
-        assertThat(((Map<?, ?>) user).get("username")).isEqualTo("flo");
+        assertThat(((Map<?, ?>) user).get("username")).isEqualTo("alex");
         assertThat(privateToken.get()).isEqualTo("glpat-x");
         assertThat(authorization.get()).isNull();
     }

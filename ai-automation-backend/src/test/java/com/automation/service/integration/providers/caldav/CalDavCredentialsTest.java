@@ -13,12 +13,12 @@ class CalDavCredentialsTest {
 
     @Test
     void parse_splitsUrlUserAndPassword_passwordMayContainSeparators() {
-        CalDavCredentials c = CalDavCredentials.parse("https://cloud.example/remote.php/dav|flo:pa|ss:w0rd");
+        CalDavCredentials c = CalDavCredentials.parse("https://cloud.example/remote.php/dav|alex:pa|ss:w0rd");
         assertThat(c.baseUrl()).isEqualTo(URI.create("https://cloud.example/remote.php/dav/"));
-        assertThat(c.username()).isEqualTo("flo");
+        assertThat(c.username()).isEqualTo("alex");
         assertThat(c.password()).isEqualTo("pa|ss:w0rd");
         String decoded = new String(Base64.getDecoder().decode(c.basicAuthHeader().substring(6)), StandardCharsets.UTF_8);
-        assertThat(decoded).isEqualTo("flo:pa|ss:w0rd");
+        assertThat(decoded).isEqualTo("alex:pa|ss:w0rd");
     }
 
     @Test
@@ -58,12 +58,12 @@ class CalDavCredentialsTest {
     @Test
     void resolveCollection_addsTheTrailingSlash() {
         CalDavCredentials c = CalDavCredentials.parse("http://127.0.0.1:5232|u:p");
-        assertThat(c.resolveCollection("/flo/work")).hasToString("http://127.0.0.1:5232/flo/work/");
-        assertThat(c.resolveCollection("/flo/work/")).hasToString("http://127.0.0.1:5232/flo/work/");
+        assertThat(c.resolveCollection("/alex/work")).hasToString("http://127.0.0.1:5232/alex/work/");
+        assertThat(c.resolveCollection("/alex/work/")).hasToString("http://127.0.0.1:5232/alex/work/");
     }
 
     @Test
     void toString_neverShowsThePassword() {
-        assertThat(CalDavCredentials.parse("https://x/dav|flo:s3cret").toString()).doesNotContain("s3cret").contains("***");
+        assertThat(CalDavCredentials.parse("https://x/dav|alex:s3cret").toString()).doesNotContain("s3cret").contains("***");
     }
 }

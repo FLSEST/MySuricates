@@ -18,12 +18,12 @@ class CalDavXmlTest {
             <d:multistatus xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav" xmlns:cs="http://calendarserver.org/ns/"
                            xmlns:x="http://apple.com/ns/ical/">
               <d:response>
-                <d:href>/dav/calendars/flo/</d:href>
+                <d:href>/dav/calendars/alex/</d:href>
                 <d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop>
                   <d:status>HTTP/1.1 200 OK</d:status></d:propstat>
               </d:response>
               <d:response>
-                <d:href>/dav/calendars/flo/personal/</d:href>
+                <d:href>/dav/calendars/alex/personal/</d:href>
                 <d:propstat>
                   <d:prop>
                     <d:resourcetype><d:collection/><c:calendar/></d:resourcetype>
@@ -44,7 +44,7 @@ class CalDavXmlTest {
     void parseMultistatus_readsHrefsAndOnlySuccessfulPropstats() {
         List<DavResponse> responses = CalDavXml.parseMultistatus(CALENDARS);
         assertThat(responses).extracting(DavResponse::href)
-                .containsExactly("/dav/calendars/flo/", "/dav/calendars/flo/personal/");
+                .containsExactly("/dav/calendars/alex/", "/dav/calendars/alex/personal/");
 
         DavResponse personal = responses.get(1);
         assertThat(personal.hasChild(CalDavXml.DAV, "resourcetype", CalDavXml.CALDAV, "calendar")).isTrue();
@@ -60,10 +60,10 @@ class CalDavXmlTest {
     void parseMultistatus_nestedHrefsAndDefaultNamespace() {
         String xml = """
                 <multistatus xmlns="DAV:"><response><href>/</href><propstat><prop>
-                <current-user-principal><href>/flo/</href></current-user-principal></prop>
+                <current-user-principal><href>/alex/</href></current-user-principal></prop>
                 <status>HTTP/1.1 200 OK</status></propstat></response></multistatus>""";
         DavResponse r = CalDavXml.parseMultistatus(xml).get(0);
-        assertThat(r.hrefIn(CalDavXml.DAV, "current-user-principal")).isEqualTo("/flo/");
+        assertThat(r.hrefIn(CalDavXml.DAV, "current-user-principal")).isEqualTo("/alex/");
         assertThat(r.hrefIn(CalDavXml.CALDAV, "calendar-home-set")).isNull();
     }
 

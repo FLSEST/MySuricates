@@ -48,20 +48,20 @@ class GitLabProviderTest {
 
     @Test
     void emptyServerUrl_defaultsToGitlabCom() {
-        when(http.get("https://gitlab.com/api/v4/user", "glpat", Object.class)).thenReturn(Map.of("username", "flo"));
+        when(http.get("https://gitlab.com/api/v4/user", "glpat", Object.class)).thenReturn(Map.of("username", "alex"));
 
         assertThat(provider.fetchAccountInfo("|glpat")).contains("\"server\":\"https://gitlab.com\"");
-        assertThat(provider.fetchAccountInfo("glpat")).contains("\"login\":\"flo\"");
+        assertThat(provider.fetchAccountInfo("glpat")).contains("\"login\":\"alex\"");
     }
 
     @Test
     void fetchAccountInfo_readsUsernameNameAndEmail() {
         when(http.get(API + "/user", "glpat", Object.class))
-                .thenReturn(Map.of("username", "flo", "name", "Flo S", "email", "flo@example.org"));
+                .thenReturn(Map.of("username", "alex", "name", "Alex S", "email", "alex@example.org"));
 
         String info = provider.fetchAccountInfo(CRED);
 
-        assertThat(info).contains("\"login\":\"flo\"", "\"name\":\"Flo S\"", "\"email\":\"flo@example.org\"",
+        assertThat(info).contains("\"login\":\"alex\"", "\"name\":\"Alex S\"", "\"email\":\"alex@example.org\"",
                 "\"server\":\"https://gitlab.example.org\"");
     }
 

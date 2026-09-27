@@ -599,7 +599,7 @@ class AssistantFetchServiceTest {
         ));
         IntegrationConnection conn = IntegrationConnection.builder()
                 .providerId("github").status(IntegrationConnection.ConnectionStatus.CONNECTED)
-                .accountInfo("flo@github").build();
+                .accountInfo("alex@github").build();
         when(integrationRegistry.hasProvider("github")).thenReturn(true);
         when(integrationRegistry.getProvider("github")).thenReturn(provider);
         when(integrationConnectionRepository.findAllByProviderId("github")).thenReturn(List.of(conn));
@@ -608,7 +608,7 @@ class AssistantFetchServiceTest {
 
         assertThat(result)
                 .contains("**Integration: GitHub** (id: github)")
-                .contains("Status: CONNECTED (flo@github)")
+                .contains("Status: CONNECTED (alex@github)")
                 .contains("OAuth flow required: yes")
                 .contains("Available actions (1)")
                 .contains("create_issue")

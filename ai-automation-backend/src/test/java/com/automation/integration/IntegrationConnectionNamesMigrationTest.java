@@ -33,7 +33,7 @@ class IntegrationConnectionNamesMigrationTest {
         try (Connection c = dataSource.getConnection(); Statement st = c.createStatement()) {
             st.execute("INSERT INTO integration_connections (id, provider_id, status, access_token_encrypted, "
                     + "account_info, client_id_encrypted, client_secret_encrypted) "
-                    + "VALUES ('c1', 'github', 'CONNECTED', 'tok', '{\"name\":\"flo\"}', 'cid', 'csec')");
+                    + "VALUES ('c1', 'github', 'CONNECTED', 'tok', '{\"name\":\"alex\"}', 'cid', 'csec')");
         }
 
         flyway(dataSource, "86").migrate();
@@ -46,7 +46,7 @@ class IntegrationConnectionNamesMigrationTest {
                 assertThat(rs.getString("connection_name")).isEqualTo("default");
                 assertThat(rs.getString("status")).isEqualTo("CONNECTED");
                 assertThat(rs.getString("access_token_encrypted")).isEqualTo("tok");
-                assertThat(rs.getString("account_info")).isEqualTo("{\"name\":\"flo\"}");
+                assertThat(rs.getString("account_info")).isEqualTo("{\"name\":\"alex\"}");
                 assertThat(rs.getString("client_id_encrypted")).isEqualTo("cid");
                 assertThat(rs.getString("client_secret_encrypted")).isEqualTo("csec");
                 assertThat(rs.next()).isFalse();

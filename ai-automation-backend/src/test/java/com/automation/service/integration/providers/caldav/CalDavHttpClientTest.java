@@ -20,7 +20,7 @@ class CalDavHttpClientTest {
     @BeforeEach
     void start() throws Exception {
         server = new FakeDavServer();
-        cred = CalDavCredentials.parse(server.base() + "/dav|flo:geheim");
+        cred = CalDavCredentials.parse(server.base() + "/dav|alex:geheim");
     }
 
     @AfterEach
@@ -42,7 +42,7 @@ class CalDavHttpClientTest {
         FakeDavServer.Recorded r = server.requests.get(0);
         assertThat(r.method()).isEqualTo("PROPFIND");
         assertThat(r.headers()).containsEntry("Depth", "0")
-                .containsEntry("Authorization", "Basic ZmxvOmdlaGVpbQ==")
+                .containsEntry("Authorization", "Basic YWxleDpnZWhlaW0=")
                 .containsEntry("Content-Type", "application/xml; charset=utf-8");
         assertThat(r.body()).isEqualTo("<propfind/>");
     }
@@ -119,7 +119,7 @@ class CalDavHttpClientTest {
 
     @Test
     void transportFailure_isWrappedWithHostOnly() {
-        CalDavCredentials dead = CalDavCredentials.parse("http://127.0.0.1:1/dav|flo:geheim");
+        CalDavCredentials dead = CalDavCredentials.parse("http://127.0.0.1:1/dav|alex:geheim");
         assertThatThrownBy(() -> client.get(dead, URI.create("http://127.0.0.1:1/dav/x.ics")))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageStartingWith("CalDAV request failed (GET 127.0.0.1)")

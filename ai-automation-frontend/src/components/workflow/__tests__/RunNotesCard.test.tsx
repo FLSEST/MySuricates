@@ -44,8 +44,8 @@ function recordNotes(saved: unknown[]) {
 
 describe('RunNotesCard', () => {
   it('shows the saved notes of the run and offers no saving while nobody typed', () => {
-    renderWithProviders(<Notes saved="checked by Flo" />);
-    expect(screen.getByPlaceholderText(/notes/i)).toHaveValue('checked by Flo');
+    renderWithProviders(<Notes saved="checked by Alex" />);
+    expect(screen.getByPlaceholderText(/notes/i)).toHaveValue('checked by Alex');
     // Saving here would send the untouched (empty) draft and wipe the notes
     expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
   });

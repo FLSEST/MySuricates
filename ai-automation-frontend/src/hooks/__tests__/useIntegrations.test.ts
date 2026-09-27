@@ -294,11 +294,11 @@ describe('useTestIntegrationAction', () => {
       await result.current.mutateAsync({
         providerId: 'github',
         action: 'listRepos',
-        params: { user: 'flo' },
+        params: { user: 'alex' },
       });
     });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(receivedBody).toEqual({ user: 'flo' });
+    expect(receivedBody).toEqual({ user: 'alex' });
     expect(result.current.data).toEqual({ repos: ['a', 'b'] });
   });
 

@@ -55,12 +55,12 @@ class GitHubHttpClientTest {
     @Test
     void get_sendsBearerTokenAndParsesJson() {
         AtomicReference<String> auth = new AtomicReference<>();
-        respond("/user", 200, "{\"login\":\"flo\"}", auth, null);
+        respond("/user", 200, "{\"login\":\"alex\"}", auth, null);
 
         Object user = client.get(base + "/user", "ghp_x", Object.class);
 
         assertThat(user).isInstanceOf(Map.class);
-        assertThat(((Map<?, ?>) user).get("login")).isEqualTo("flo");
+        assertThat(((Map<?, ?>) user).get("login")).isEqualTo("alex");
         assertThat(auth.get()).isEqualTo("Bearer ghp_x");
     }
 

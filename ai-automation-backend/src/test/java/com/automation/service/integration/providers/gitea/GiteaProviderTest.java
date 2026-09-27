@@ -49,11 +49,11 @@ class GiteaProviderTest {
     @Test
     void fetchAccountInfo_readsUserFromTheConfiguredServer() {
         when(http.get("https://git.example.org/api/v1/user", "tok", Object.class))
-                .thenReturn(Map.of("login", "flo", "full_name", "Flo S"));
+                .thenReturn(Map.of("login", "alex", "full_name", "Alex S"));
 
         String info = provider.fetchAccountInfo(CRED);
 
-        assertThat(info).contains("\"login\":\"flo\"", "\"name\":\"Flo S\"", "\"server\":\"https://git.example.org\"");
+        assertThat(info).contains("\"login\":\"alex\"", "\"name\":\"Alex S\"", "\"server\":\"https://git.example.org\"");
     }
 
     @Test
