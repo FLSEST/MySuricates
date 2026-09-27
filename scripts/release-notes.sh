@@ -41,8 +41,22 @@ fi
 RANGE="${TAG}"
 [ -n "$PREV" ] && RANGE="${PREV}..${TAG}"
 
-REMOTE_URL="$(git config --get remote.origin.url 2>/dev/null || true)"
-REPO_SLUG="$(sed -E 's#^git@github\.com:##; s#^https://github\.com/##; s#\.git$##' <<< "$REMOTE_URL")"
+# GitHub-Slug fuer die Links (Vergleich, Verhaltensaenderungen). RELEASE_NOTES_REPO_SLUG setzt ihn
+# von aussen — die Uebergabe (scripts/release-handover.sh) erzeugt die Notizen im Arbeits-Repo, die
+# Links muessen aber ins oeffentliche Repo zeigen. Gesetzt und leer: keine Links. Ohne Variable gilt
+# origin, aber nur eine GitHub-Adresse: ein lokaler Pfad als origin ergaebe sonst
+# "https://github.com//pfad/…".
+if [ -n "${RELEASE_NOTES_REPO_SLUG+x}" ]; then
+    REPO_SLUG="$RELEASE_NOTES_REPO_SLUG"
+else
+    REMOTE_URL="$(git config --get remote.origin.url 2>/dev/null || true)"
+    REPO_SLUG=""
+    case "$REMOTE_URL" in
+        git@github.com:*|https://github.com/*|ssh://git@github.com/*)
+            REPO_SLUG="$(sed -E 's#^git@github\.com:##; s#^ssh://git@github\.com/##; s#^https://github\.com/##; s#\.git$##; s#/$##' <<< "$REMOTE_URL")"
+            ;;
+    esac
+fi
 
 # ── TODO-Kuerzel-Klammern entfernen: intern (repo-lokale Kurz-IDs), nichts fuer oeffentliche Notizen.
 # Zwei Formen (scripts/lib/strip-todo-brackets.py): eine abschliessende Klammer, deren Inhalt mit
