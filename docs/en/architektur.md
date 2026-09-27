@@ -141,6 +141,8 @@ Switches under `automation.hardening.*` — the same mechanism as modules (start
 | `private-network-guard` | on | — | iCal feed and RSS/Atom feed fetch public addresses only (see [Integrations](integrations.md#fetches-into-the-local-network)) |
 | `private-network-guard-http-api` | off | — | The same block for http-api (own network reachable otherwise) |
 
+The two `private-network-guard` switches control the **outbound guard** (`OutboundTargetGuard`): where the instance itself connects to. Which provider uses which switch follows from its target kind — see [Integrations → Target kind of a provider](integrations.md#target-kind-of-a-provider-outbound-guard).
+
 **Definition hash** — `WorkflowDefinitionHasher` hashes the `WorkflowSnapshot` (blocks, instructions, model, provider, effort, metadata, defaultContext, sorted skill IDs) as canonical JSON (sorted keys, empty values omitted) with its own `ObjectMapper`, so Jackson customizing never changes the hash. Name, description, icon and tags are labels and are not hashed. Old version rows get their hash at startup (`WorkflowVersionHashBackfillService`). Context variables: `{{ workflow_definition_hash }}`, `{{ trigger_source }}`.
 
 **Run admission** — Every run trigger calls `WorkflowExecutor.execute(…, TriggerSource)` and therefore passes `RunAdmission` before a run row exists. Rules in this order: (1) a sealed workflow must match its seal — definition and the content of its skills —, (2) with `require-sealed-for-unattended` an unattended run needs a sealed workflow. A refused run leaves **no run row and no DLQ entry**, only a `SECURITY` entry in the activity log; REST callers get the error code.

@@ -266,6 +266,26 @@ ausgehenden Verbindungen des MySuricates-Containers selbst einschränken, etwa �
 Docker-Netzwerk oder Firewall-Regeln auf dem Host. Das trifft dann aber alles im Container — auch die
 KI-CLIs, Shell-Blöcke und die übrigen Integrationen —, also vorher klären, welche Ziele diese brauchen.
 
+#### Zielart eines Providers (Outbound-Guard)
+
+`OutboundTargetGuard` ist der **Outbound-Guard**: die Prüfung, wohin die Instanz selbst Verbindungen aufbaut.
+Er schützt nicht die Instanz vor Zugriffen von außen (dafür sind Bindung auf `127.0.0.1` und API-Key da),
+sondern das Netz der Instanz davor, dass eine eingegebene URL die Instanz als Sprungbrett benutzt. Welche
+Rolle er für einen Provider spielt, folgt aus dessen **Zielart**:
+
+| Zielart | Woher die URL kommt | Outbound-Guard | Provider heute |
+|---|---|---|---|
+| fester Host | steht im Code | nicht nötig | GitHub, Google, Slack, Telegram, Todoist, Trello, Open-Meteo, OAuth-Token-Endpunkte |
+| öffentliche Quelle | frei eingegeben, soll aus dem Internet kommen | an (`private-network-guard`) | iCal-Feed, RSS/Atom |
+| eigener Dienst | frei eingegebene Basis-URL eines selbst betriebenen Dienstes | per Schalter, Standard aus (Heimnetz ist legitim) | HTTP-API (`private-network-guard-http-api`); CalDAV, Gitea, GitLab, Jira/Confluence mit eigener URL und ntfy mit eigenem Server prüfen noch nicht |
+
+**Neuer Provider:** zuerst die Zielart festlegen. Kommt eine URL aus Verbindung, Parametern oder
+Workflow, geht jeder Abruf — auch jeder Hop einer Weiterleitung — durch `OutboundTargetGuard.check`, mit
+dem Schalter, der zur Zielart passt. Noch baut jeder Provider seinen HTTP-Client selbst; geplant ist eine
+gemeinsame Stelle für ausgehende Clients, an der die Zielart deklariert wird und ein Architektur-Test
+eigene Clients verbietet. Nicht vom Outbound-Guard erfasst sind Shell-Blöcke (Code des Besitzers, bewusst
+frei) und die KI-CLIs (eigene Werkzeuge und Rechte).
+
 ### OAuth-Endpunkte & Scopes je Provider
 
 Die Tabelle gilt für die Provider mit OAuth2-Flow (und Trello, das dessen Felder für Key und Token

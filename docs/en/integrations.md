@@ -266,6 +266,26 @@ restrict the outbound connections of the MySuricates container themselves, for i
 Docker network or firewall rules on the host. That then affects everything in the container — the AI CLIs,
 shell blocks and the other integrations too — so first work out which targets they need.
 
+#### Target kind of a provider (outbound guard)
+
+`OutboundTargetGuard` is the **outbound guard**: the check on where the instance itself connects to. It does
+not protect the instance from access from outside (binding to `127.0.0.1` and the API key do that), but the
+instance's network from an entered URL that uses the instance as a stepping stone. Its role for a provider
+follows from the provider's **target kind**:
+
+| Target kind | Where the URL comes from | Outbound guard | Providers today |
+|---|---|---|---|
+| fixed host | written in the code | not needed | GitHub, Google, Slack, Telegram, Todoist, Trello, Open-Meteo, OAuth token endpoints |
+| public source | entered freely, meant to come from the internet | on (`private-network-guard`) | iCal feed, RSS/Atom |
+| own service | freely entered base URL of a self-hosted service | by switch, off by default (the home network is legitimate) | HTTP API (`private-network-guard-http-api`); CalDAV, Gitea, GitLab, Jira/Confluence with their own URL and ntfy with its own server do not check yet |
+
+**New provider:** decide the target kind first. If a URL comes from the connection, the parameters or the
+workflow, every fetch — including every hop of a redirect — goes through `OutboundTargetGuard.check`, with
+the switch that matches the target kind. For now every provider builds its own HTTP client; a shared place
+for outbound clients is planned, where the target kind is declared and an architecture test forbids
+clients of their own. Not covered by the outbound guard: shell blocks (the owner's code, deliberately
+unrestricted) and the AI CLIs (their own tools and permissions).
+
 ### OAuth Endpoints & Scopes per Provider
 
 The table covers the providers with an OAuth2 flow (and Trello, which uses its fields for key and
