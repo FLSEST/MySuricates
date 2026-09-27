@@ -118,7 +118,6 @@ section() {  # Schrittleiste vor jedem Schritt (nur im Terminal; sonst eine schl
   if [ "$TUI_TTY" = 1 ]; then printf '\n'; tui_rail "$1" "${STEPS[@]}"; printf '\n'
   else printf '\n== %s ==\n' "${STEPS[$1]}"; fi
 }
-prop_env() { printf '%s' "$1" | tr 'a-z.' 'A-Z_' | tr -d '-'; }   # automation.modules.remote-access → AUTOMATION_MODULES_REMOTEACCESS
 existing_instances() { local f; for f in "$INSTANCES_DIR"/*.env; do [ -f "$f" ] && basename "$f" .env; done; }
 
 # --- Schritt 1: Willkommen --------------------------------------------------------------------------
