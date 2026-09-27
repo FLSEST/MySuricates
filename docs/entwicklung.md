@@ -43,8 +43,8 @@ AUTOTRIGGER_DEV_RUNTIME=container scripts/start-autotrigger-dev.sh   # dauerhaft
 **Host oder Container?** Der Host-Weg ist der Default und unverändert. `--container` startet das
 Backend stattdessen per `docker compose` aus `ai-automation-backend/docker-compose.dev-container.yml`
 (Image `Dockerfile.stable`, also mit Node — `docker/Dockerfile.backend` baut ein reines
-JRE-Alpine-Image **ohne** Node, dort liefe keine KI-CLI; die Datei wird seit TODO 1e6f8f9f von
-keinem Compose-Service mehr benutzt). Die Provider-Zugänge mountet der Starter
+JRE-Alpine-Image **ohne** Node, dort liefe keine KI-CLI; die Datei wird von keinem Compose-Service
+mehr benutzt). Die Provider-Zugänge mountet der Starter
 zur Laufzeit, und zwar nur die, die es auf diesem Rechner gibt; findet er keinen, sagt er das.
 Der Vite-Dev-Server bleibt in beiden Fällen auf dem Host. Parametrierbar über
 `AUTOTRIGGER_DEV_CONTAINER_PORT`, `AUTOTRIGGER_DEV_CONTAINER_NAME`,

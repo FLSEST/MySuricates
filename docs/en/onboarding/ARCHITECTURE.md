@@ -374,4 +374,4 @@ CREATED → RUNNING → STOPPED
 | `Dockerfile.agent-devops` | `automation-agent-devops:latest` | gh, trivy, gitleaks, docker-cli |
 | `Dockerfile.agent-java` | `automation-agent-java:latest` | maven, LibreOffice (DOCX->PDF) |
 
-Agent containers are NOT started via Docker Compose — they are managed dynamically by the backend via the Docker API. For a running instance in a container there is only `deploy/` (`deploy/Dockerfile`, `scripts/instance.sh`) — no standalone backend image any more (TODO 1e6f8f9f).
+Agent containers are NOT started via Docker Compose — they are managed dynamically by the backend via the Docker API. For a running instance in a container there is only `deploy/` (`deploy/Dockerfile`, `scripts/instance.sh`) — no standalone backend image.

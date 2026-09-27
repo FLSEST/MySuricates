@@ -245,4 +245,4 @@ scripts/instance.sh up --name main
 `deploy/Dockerfile` baut Backend und Frontend in ein Image — eine Instanz ist ein Container und ein
 Port, die Oberfläche liefert das Backend selbst mit. Details:
 [deployment.md](../deployment.md#eine-instanz-im-container-deploy). Ein eigenständiges
-Backend-Image ohne Oberfläche gibt es nicht (TODO 1e6f8f9f).
+Backend-Image ohne Oberfläche gibt es nicht.

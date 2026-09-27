@@ -40,8 +40,8 @@ AUTOTRIGGER_DEV_RUNTIME=container scripts/start-autotrigger-dev.sh   # permanent
 **Host or container?** The host way is the default and unchanged. `--container` starts the backend
 through `docker compose` from `ai-automation-backend/docker-compose.dev-container.yml` instead (image
 `Dockerfile.stable`, so with Node — `docker/Dockerfile.backend` builds a plain JRE Alpine image
-**without** Node, where no AI CLI would run; no Compose service uses that file any more since
-TODO 1e6f8f9f). The Vite dev server stays on the host either way. Tunable via
+**without** Node, where no AI CLI would run; no Compose service uses that file any more). The Vite
+dev server stays on the host either way. Tunable via
 `AUTOTRIGGER_DEV_CONTAINER_PORT`, `AUTOTRIGGER_DEV_CONTAINER_NAME`, `AUTOTRIGGER_DEV_COMPOSE_PROJECT`,
 `AUTOTRIGGER_DEV_PROJECT_ROOT`, `AUTOTRIGGER_DEV_PRESET` — so a probe instance can run next to the real
 one. In container mode the starter's checks (is a backend already running?, readiness, run check

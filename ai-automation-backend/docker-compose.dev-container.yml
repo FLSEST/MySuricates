@@ -5,11 +5,11 @@
 # KI-Anbieter nach AUTOTRIGGER_DEV_AI_FROM_HOST, Docker-Socket) — deshalb steht hier nichts davon
 # fest verdrahtet.
 #
-# Warum nicht docker-compose.yml? Die baut keinen Backend-Service mehr (TODO 1e6f8f9f), nur noch die
-# Agent-Images. Ihr fruehere Backend-Service baute aus docker/Dockerfile.backend, einem reinen
-# JRE-Alpine-Image **ohne Node**. Claude ist ein natives glibc-Programm (Alpine hat musl), Codex und
-# Pi sind Node-Programme; in diesem Image kann keines davon laufen. docker/Dockerfile.stable ist
-# Ubuntu-basiert und bringt Node mit — deshalb baut diese Datei daraus, wie es Test und Stable auch tun.
+# Warum nicht docker-compose.yml? Die baut keinen Backend-Service mehr, nur noch die Agent-Images.
+# docker/Dockerfile.backend ist ein reines JRE-Alpine-Image **ohne Node**. Claude ist ein natives
+# glibc-Programm (Alpine hat musl), Codex und Pi sind Node-Programme; in diesem Image kann keines
+# davon laufen. docker/Dockerfile.stable ist Ubuntu-basiert und bringt Node mit — deshalb baut diese
+# Datei daraus, wie es Test und Stable auch tun.
 services:
   backend:
     build:

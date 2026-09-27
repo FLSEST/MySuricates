@@ -156,9 +156,7 @@ Instanzname `tryout` ist für `instance.sh` reserviert, damit sich Container und
 
 `ai-automation-backend/docker-compose.yml` baut nur die Agent-Images (Profil `build-only`) — keine
 Instanz. Der einzige Docker-Weg für eine laufende Instanz mit Oberfläche und KI-Anbietern ist
-[`deploy/`](#eine-instanz-im-container-deploy); einen eigenständigen Backend-Container gibt es nicht
-mehr. Bis TODO 1e6f8f9f war er neben `deploy/` ein zweiter, halber Betriebsweg — ohne Oberfläche und
-KI-CLI, dafür mit offen gebundenem Port und fest gemountetem Docker-Socket.
+[`deploy/`](#eine-instanz-im-container-deploy); einen eigenständigen Backend-Container gibt es nicht.
 
 ### Agent-Images bauen
 
@@ -400,9 +398,9 @@ Das Backend kann über Tailscale von außerhalb des lokalen Netzwerks erreichbar
 ### Voraussetzungen
 
 - Tailscale CLI im Container installiert — aktuell bringt kein mitgeliefertes Image (`deploy/Dockerfile`,
-  `docker/Dockerfile.stable`) sie mit; der bisher einzige Container mit Tailscale CLI war das jetzt
-  gestrichene `docker/Dockerfile.backend` (TODO 1e6f8f9f, Folgefrage offen). Aus dem Quellcode
-  (Dev-Instanz auf dem Host) genügt eine lokale Tailscale-Installation
+  `docker/Dockerfile.stable`) sie mit; nur `docker/Dockerfile.backend` enthält sie, wird aber von
+  keinem Compose-Service mehr gebaut. Aus dem Quellcode (Dev-Instanz auf dem Host) genügt eine
+  lokale Tailscale-Installation
 - Modul `remote-access` eingeschaltet (`AUTOMATION_MODULES_REMOTE_ACCESS=true` oder Preset `full`) — im öffentlichen Default `core` ist es aus; ohne Modul antworten die `/system/remote-access/*`-Endpunkte mit 404 `MODULE_DISABLED`
 
 ### Aktivierung

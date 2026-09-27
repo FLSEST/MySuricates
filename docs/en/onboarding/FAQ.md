@@ -247,4 +247,4 @@ scripts/instance.sh up --name main
 `deploy/Dockerfile` builds backend and frontend into one image — an instance is one container and
 one port, the backend serves the UI itself. Details:
 [deployment.md](../deployment.md#one-instance-in-a-container-deploy). There is no standalone
-backend image without a UI (TODO 1e6f8f9f).
+backend image without a UI.

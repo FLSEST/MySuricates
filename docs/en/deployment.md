@@ -153,9 +153,7 @@ a separate step (4c992a25). Tests without Docker: `bash scripts/tests/test-tryou
 
 `ai-automation-backend/docker-compose.yml` only builds the agent images (profile `build-only`) — no
 instance. The only Docker way to run an instance with UI and AI providers is
-[`deploy/`](#one-instance-in-a-container-deploy); there is no standalone backend container any more.
-Until TODO 1e6f8f9f it was a second, half operating path next to `deploy/` — no UI, no AI CLI, but with
-an openly bound port and the Docker socket mounted unconditionally.
+[`deploy/`](#one-instance-in-a-container-deploy); there is no standalone backend container.
 
 ### Building the agent images
 
@@ -396,9 +394,9 @@ The backend can be made accessible from outside the local network via Tailscale.
 ### Prerequisites
 
 - Tailscale CLI installed in the container — no shipped image (`deploy/Dockerfile`,
-  `docker/Dockerfile.stable`) currently includes it; the only container that ever had it was the now
-  removed `docker/Dockerfile.backend` (TODO 1e6f8f9f, follow-up question open). From source (a Dev
-  instance on the host), a local Tailscale install is enough
+  `docker/Dockerfile.stable`) currently includes it; only `docker/Dockerfile.backend` has it, but no
+  Compose service builds it any more. From source (a Dev instance on the host), a local Tailscale
+  install is enough
 - Module `remote-access` enabled (`AUTOMATION_MODULES_REMOTE_ACCESS=true` or preset `full`) — off in the public default `core`; without it the `/system/remote-access/*` endpoints answer 404 `MODULE_DISABLED`
 
 ### Activation

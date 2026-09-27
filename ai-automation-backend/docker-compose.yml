@@ -5,10 +5,8 @@ services:
   # (a new value rebuilds the third-party APT layers of agent-devops instead of reusing old keyrings,
   # and the unpinned pip packages of agent-python instead of keeping those of the first build)
   #
-  # There is no `backend` service here (TODO 1e6f8f9f): the only supported way to run MySuricates in
-  # a container is deploy/ (instance.sh/setup.sh) — see docs/deployment.md. A standalone backend-only
-  # container built from docker/Dockerfile.backend had no UI, no AI CLI and published 9090 on all
-  # addresses with the Docker socket mounted unconditionally.
+  # There is no `backend` service here: the only supported way to run MySuricates in a container is
+  # deploy/ (instance.sh/setup.sh) — see docs/deployment.md.
   agent-node:
     build:
       context: .
