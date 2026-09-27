@@ -71,7 +71,7 @@ staging_ports_yaml() {
 # write_override stable|test — schreibt die Override-Datei und gibt ihren Pfad aus (nur den: das
 # Backend liest ihn). Hinweise zu fehlenden Anbietern gehen nach stderr.
 write_override() {
-    local env="$1" service prefix port bind file missing
+    local env="$1" service prefix port bind file missing login_command=""
     case "$env" in
         stable) service=stable; prefix=STABLE_; port=9091 ;;
         test)   service=test; prefix=TEST_; port=8090 ;;
@@ -84,9 +84,12 @@ write_override() {
     esac
     mkdir -p "$OVERRIDE_DIR"
     file="$OVERRIDE_DIR/$env.override.yml"
+    # Nur im Modus programs meldet sich der Container selbst an (cmd_login) — die Statuskarte zeigt
+    # dann den Befehl, der das tut (fester Text, nie ausgefuehrt).
+    [ "$(staging_setting "$env" AI_FROM_HOST login)" = programs ] && login_command="scripts/staging.sh login $env"
     if ! host_mounts_yaml "$service" "" "$(staging_setting "$env" DOCKER_SOCKET 0)" \
             "$(staging_setting "$env" AI_FROM_HOST login)" "$(staging_setting "$env" AI_PROVIDERS "")" \
-            "$STAGING_ENV" "$prefix" > "$file.tmp"; then
+            "$STAGING_ENV" "$prefix" "$login_command" > "$file.tmp"; then
         rm -f "$file.tmp"
         err "Ungueltige ${prefix}AI_*-Werte (programs|login|all, claude,codex,pi) — $STAGING_ENV"
         return 2

@@ -254,7 +254,7 @@ class SystemAiProviderControllerTest {
     /** f5a273ae: the start page asks whether the AI CLIs are ready — names and commands, never a value. */
     @Test
     void aiProviderStatus_reportsStateAndCommandsPerProvider() throws Exception {
-        when(aiProviderStatusService.report(false)).thenReturn(new AiProviderStatusReport(false,
+        when(aiProviderStatusService.report(false)).thenReturn(new AiProviderStatusReport(false, null,
                 Instant.parse("2026-09-24T10:00:00Z"), List.of(
                         new AiProviderStatusReport.ProviderStatus("CLAUDE", "claude",
                                 AiProviderStatusReport.State.READY, true, true,
@@ -288,10 +288,11 @@ class SystemAiProviderControllerTest {
     @Test
     void aiProviderStatus_refreshLooksAgain() throws Exception {
         when(aiProviderStatusService.report(true)).thenReturn(new AiProviderStatusReport(true,
-                Instant.parse("2026-09-24T10:01:00Z"), List.of()));
+                "scripts/tryout.sh login [claude|codex|pi]", Instant.parse("2026-09-24T10:01:00Z"), List.of()));
 
         mockMvc.perform(post("/api/v1/system/ai-providers/status/refresh"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.container").value(true));
+                .andExpect(jsonPath("$.container").value(true))
+                .andExpect(jsonPath("$.loginCommand").value("scripts/tryout.sh login [claude|codex|pi]"));
     }
 }

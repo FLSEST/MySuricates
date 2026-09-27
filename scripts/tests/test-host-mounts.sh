@@ -142,8 +142,11 @@ check "projects mounted at same path"   'line "      - \"$TMP/projects:$TMP/proj
 check "socket when asked, and shown"    'line "      - \"/var/run/docker.sock:/var/run/docker.sock\"" && has "\"MYSURICATES_DOCKER_SOCKET=1\""'
 check "switch source shown, quoted"     'line "      - \"MYSURICATES_SWITCH_SOURCE=/etc/demo \\\"x\\\".env\""'
 check "switch prefix shown"             'line "      - \"MYSURICATES_SWITCH_PREFIX=STABLE_\""'
+check "no login command: param left empty" '! has "MYSURICATES_LOGIN_COMMAND"'
+OUT="$(run Linux svc "$TMP/projects" 1 login "" "/etc/demo \"x\".env" STABLE_ "scripts/staging.sh login stable")"
+check "login command shown"             'line "      - \"MYSURICATES_LOGIN_COMMAND=scripts/staging.sh login stable\""'
 OUT="$(run Linux svc "$TMP/projects" 0)"
-check "no socket by default"            '! has "docker.sock" && has "\"MYSURICATES_DOCKER_SOCKET=0\"" && ! has "MYSURICATES_SWITCH_"'
+check "no socket by default"            '! has "docker.sock" && has "\"MYSURICATES_DOCKER_SOCKET=0\"" && ! has "MYSURICATES_SWITCH_" && ! has "MYSURICATES_LOGIN_COMMAND"'
 check "missing projects dir is skipped" '! grep -q "/nope" <<<"$(run Linux svc "$TMP/nope" 0)"'
 check "whole HOME is refused"           '! grep -qF -- "\"$TMP/home:$TMP/home\"" <<<"$(run Linux svc "$TMP/home" 0)"'
 

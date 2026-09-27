@@ -42,6 +42,7 @@ check "service stable, default login"               'grep -q "^  stable:" "$OUT"
 check "socket off by default"                       '! grep -q "docker.sock" "$OUT" && grep -q "MYSURICATES_DOCKER_SOCKET=0" "$OUT"'
 check "port only on 127.0.0.1 by default"           '[ "$(grep -c "host_ip:" "$OUT")" = 1 ] && grep -q "host_ip: \"127.0.0.1\"" "$OUT" && grep -q "published: \"9091\"" "$OUT"'
 check "switches named for the settings page"        'grep -q "MYSURICATES_SWITCH_PREFIX=STABLE_" "$OUT" && grep -q "MYSURICATES_SWITCH_SOURCE=$ENVF" "$OUT"'
+check "login mode: no fixed login command"          '! grep -q "MYSURICATES_LOGIN_COMMAND" "$OUT"'
 OUT="$(bash "$S" write-override test 2>/dev/null)"
 check "service test, prefix TEST_"                  'grep -q "^  test:" "$OUT" && grep -q "MYSURICATES_SWITCH_PREFIX=TEST_" "$OUT"'
 check "test: own port, 127.0.0.1, no socket"        'grep -q "published: \"8090\"" "$OUT" && grep -q "host_ip: \"127.0.0.1\"" "$OUT" && ! grep -q docker.sock "$OUT"'
@@ -51,7 +52,9 @@ echo "2) switches from staging.env, environment wins"
 printf 'STABLE_AI_FROM_HOST=programs\nSTABLE_DOCKER_SOCKET=0\nTEST_AI_PROVIDERS=claude\nTEST_DOCKER_SOCKET=1\nTEST_BIND=0.0.0.0\n' > "$ENVF"
 bash "$S" write-override stable >/dev/null 2>&1; bash "$S" write-override test >/dev/null 2>&1
 check "stable: programs, no socket, 127.0.0.1"      'grep -q "MYSURICATES_AI_FROM_HOST=programs" "$OV/stable.override.yml" && ! grep -q docker.sock "$OV/stable.override.yml" && grep -q "host_ip: \"127.0.0.1\"" "$OV/stable.override.yml"'
+check "programs mode: login command for the card"   'grep -q "MYSURICATES_LOGIN_COMMAND=scripts/staging.sh login stable" "$OV/stable.override.yml"'
 check "test keeps its own values"                   'grep -q "MYSURICATES_AI_FROM_HOST=login" "$OV/test.override.yml" && grep -q "MYSURICATES_AI_PROVIDERS=claude" "$OV/test.override.yml"'
+check "test stays in login mode: no login command"  '! grep -q "MYSURICATES_LOGIN_COMMAND" "$OV/test.override.yml"'
 check "test: socket switched on on purpose"         'grep -q "/var/run/docker.sock:/var/run/docker.sock" "$OV/test.override.yml" && grep -q "MYSURICATES_DOCKER_SOCKET=1" "$OV/test.override.yml"'
 check "test: 0.0.0.0 alone (includes loopback)"     '[ "$(grep -c "host_ip:" "$OV/test.override.yml")" = 1 ] && grep -q "host_ip: \"0.0.0.0\"" "$OV/test.override.yml"'
 STABLE_DOCKER_SOCKET=1 STABLE_BIND=192.168.178.20 bash "$S" write-override stable >/dev/null 2>&1

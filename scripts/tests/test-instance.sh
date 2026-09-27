@@ -34,9 +34,11 @@ check "compose project named after instance"  'grep -q -- "-p mysuricates-demo" 
 check "uses deploy/compose.yml + override"    'grep -q "deploy/compose.yml" "$DOCKER_LOG" && grep -q "demo.override.yml" "$DOCKER_LOG"'
 check "override was written"                  '[ -f "$TMP/inst/demo.override.yml" ] && grep -q "^  app:" "$TMP/inst/demo.override.yml"'
 check "default: login, switches named"        'grep -q "MYSURICATES_AI_FROM_HOST=login" "$TMP/inst/demo.override.yml" && grep -q "MYSURICATES_SWITCH_PREFIX=MYSURICATES_" "$TMP/inst/demo.override.yml" && grep -q "MYSURICATES_SWITCH_SOURCE=$TMP/inst/demo.env" "$TMP/inst/demo.override.yml"'
+check "login mode: no fixed login command"    '! grep -q "MYSURICATES_LOGIN_COMMAND" "$TMP/inst/demo.override.yml"'
 printf 'MYSURICATES_PORT=19403\nMYSURICATES_AI_FROM_HOST=programs\nMYSURICATES_AI_PROVIDERS=codex\n' > "$TMP/inst/prog.env"
 INSTANCE_HEALTH_TIMEOUT=0 bash "$SCRIPT" up --name prog --no-wait >/dev/null 2>&1
 check "switches come from the instance file"  'grep -q "MYSURICATES_AI_FROM_HOST=programs" "$TMP/inst/prog.override.yml" && grep -q "MYSURICATES_AI_PROVIDERS=codex" "$TMP/inst/prog.override.yml"'
+check "programs mode: login command for the card" 'grep -q "MYSURICATES_LOGIN_COMMAND=scripts/instance.sh login" "$TMP/inst/prog.override.yml"'
 printf 'MYSURICATES_PORT=19404\nMYSURICATES_AI_FROM_HOST=everything\n' > "$TMP/inst/bad.env"
 : > "$DOCKER_LOG"
 OUT="$(bash "$SCRIPT" up --name bad --no-wait 2>&1)"; RC=$?

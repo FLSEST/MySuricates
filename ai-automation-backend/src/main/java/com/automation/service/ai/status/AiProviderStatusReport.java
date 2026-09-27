@@ -14,10 +14,19 @@ import java.util.List;
  * @param container the backend runs in a container: the programs and logins that count are the ones
  *                  in there, so the plain commands below do not simply belong into the terminal of the
  *                  person reading this (the start path decides how a login gets in)
+ * @param loginCommand the fixed command that logs in inside this very container — set by the start
+ *                     path that launched it (scripts/tryout.sh, scripts/instance.sh, scripts/staging.sh,
+ *                     each in {@code AI_FROM_HOST=programs}) and passed through unchanged; null on the
+ *                     host and whenever the start path has none (e.g. the default {@code login} mode,
+ *                     where the login happens on the machine around the container, not in it — an older
+ *                     backend also has no such field). Only ever the start path's own fixed text, never
+ *                     anything a user typed, and checked against a small allow-list of characters before
+ *                     it leaves this record; shown, never run.
  * @param checkedAt when the machine was looked at — the answer is cached ({@link AiProviderStatusService})
  * @param providers one entry per registered provider, ordered by id
  */
-public record AiProviderStatusReport(boolean container, Instant checkedAt, List<ProviderStatus> providers) {
+public record AiProviderStatusReport(boolean container, String loginCommand, Instant checkedAt,
+                                     List<ProviderStatus> providers) {
 
     public AiProviderStatusReport {
         providers = List.copyOf(providers);

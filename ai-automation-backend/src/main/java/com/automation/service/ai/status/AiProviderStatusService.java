@@ -17,6 +17,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.function.LongSupplier;
 import java.util.function.UnaryOperator;
+import java.util.regex.Pattern;
 
 /**
  * Per registered AI provider: is its program on the PATH, is a login there, and if not, which command
@@ -31,6 +32,12 @@ import java.util.function.UnaryOperator;
  *
  * <p>As {@link ProviderLoginCheck} it answers the startup configuration card with the same rule, the
  * same environment and the same home directory (7296ad45) — freshly, like that card, not from the cache.
+ *
+ * <p>In a container, the fixed login command of the start path that launched it (if it has one) comes
+ * along as {@code MYSURICATES_LOGIN_COMMAND} — the same environment {@code scripts/lib/host-mounts.sh}
+ * (or {@code scripts/tryout.sh}, which sets it directly) leaves behind, next to {@code MYSURICATES_RUNTIME}.
+ * Read once at construction, like every other environment variable here, and checked against a small
+ * allow-list of characters before it ever reaches a response.
  */
 @Service
 public class AiProviderStatusService implements ProviderLoginCheck {
@@ -41,6 +48,7 @@ public class AiProviderStatusService implements ProviderLoginCheck {
     private final UnaryOperator<String> env;
     private final Path home;
     private final boolean container;
+    private final String loginCommand;
     private final long ttlMs;
     private final LongSupplier clock;
     private final Object lock = new Object();
@@ -78,6 +86,7 @@ public class AiProviderStatusService implements ProviderLoginCheck {
         // scripts/lib/host-mounts.sh marks its containers; compose files and tryout.sh name the container
         this.container = "container".equals(env.apply("MYSURICATES_RUNTIME"))
                 || (instanceContainer != null && !instanceContainer.isBlank());
+        this.loginCommand = this.container ? sanitizeLoginCommand(env.apply("MYSURICATES_LOGIN_COMMAND")) : null;
         this.ttlMs = Math.max(0, ttlSeconds) * 1000L;
         this.clock = clock;
     }
@@ -95,7 +104,7 @@ public class AiProviderStatusService implements ProviderLoginCheck {
             }
         }
         String defaultProviderId = registry.getDefaultProviderId();
-        return new AiProviderStatusReport(container, Instant.ofEpochMilli(current.takenAt()),
+        return new AiProviderStatusReport(container, loginCommand, Instant.ofEpochMilli(current.takenAt()),
                 current.probes().stream().map(p -> p.status(defaultProviderId)).toList());
     }
 
@@ -104,6 +113,20 @@ public class AiProviderStatusService implements ProviderLoginCheck {
         return providers.stream().map(AiProvider::setup).filter(setup -> setup.cli().equals(cli)).findFirst()
                 .map(setup -> ProviderLoginProbe.find(setup, env, home).isPresent())
                 .orElse(null);
+    }
+
+    // Letters, digits, spaces and the punctuation a start path's own login command actually needs
+    // (a path, "login", a provider list in brackets separated by "|"): scripts/tryout.sh login
+    // [claude|codex|pi], scripts/instance.sh login, scripts/staging.sh login stable. Nothing here is
+    // ever run — only checked before it leaves this service, in case the variable was ever tampered with.
+    private static final Pattern LOGIN_COMMAND_ALLOWED = Pattern.compile("[A-Za-z0-9 ./_\\-\\[\\]|]+");
+
+    private static String sanitizeLoginCommand(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.strip();
+        return !trimmed.isEmpty() && LOGIN_COMMAND_ALLOWED.matcher(trimmed).matches() ? trimmed : null;
     }
 
     private boolean isStale(Snapshot current) {
