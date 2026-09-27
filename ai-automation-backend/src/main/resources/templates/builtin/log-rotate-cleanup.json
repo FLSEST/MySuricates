@@ -10,7 +10,7 @@
     "de" : "Alte Logs komprimieren, abgelaufene Dateien entfernen und freigegebenen Speicher melden"
   },
   "category" : "INFRA",
-  "sortOrder" : 49,
+  "sortOrder" : 48,
   "version" : "1.0.0",
   "model" : null,
   "instructions" : "Bereinige Log-Dateien. Variablen: log_dir (Verzeichnis), compress_days (ältere Logs komprimieren, default 7), delete_days (ältere Logs löschen, default 30), pattern (Datei-Muster, default '*.log').",

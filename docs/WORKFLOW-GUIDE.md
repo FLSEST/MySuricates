@@ -1776,7 +1776,6 @@ Alle eingebauten Templates mit ihrem primären Pattern. Die SaaS-Factory-Workflo
 | `auto-fix-java` | Mehrstufig + Freigabe | CODE |
 | `auto-fix-python` | Mehrstufig + Freigabe | CODE |
 | `auto-fix-typescript` | Mehrstufig + Freigabe | CODE |
-| `hunt-quality-pipeline` | Mehrstufige Pipeline | CODE |
 | `folder-backup` | Shell-Kette | UTILITY |
 | `github-project-bootstrap` | Shell-Kette | CODE |
 | `dependency-update-check` | Shell + Conditional | CODE |

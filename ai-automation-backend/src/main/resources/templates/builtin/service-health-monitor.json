@@ -10,7 +10,7 @@
     "de" : "Health, Antwortzeit und Disk/Memory-Nutzung über mehrere Services prüfen"
   },
   "category" : "INFRA",
-  "sortOrder" : 48,
+  "sortOrder" : 47,
   "version" : "1.0.0",
   "model" : null,
   "instructions" : "Prüfe Service-Health. Variablen: service_urls (zeilengetrennte HTTP/HTTPS URLs), timeout_seconds (default 10).",

@@ -10,7 +10,7 @@
     "de": "Ganzheitliche Bewertung: Tests, Komplexität, Fehlerbehandlung, Security, Tech Debt, Architektur"
   },
   "category": "CODE",
-  "sortOrder": 39,
+  "sortOrder": 38,
   "version": "1.1.0",
   "model": "sonnet",
   "instructions": "Ganzheitliche Codebase-Bewertung in 6 Dimensionen: Testabdeckung, Komplexitaet, Fehlerbehandlung, Security, Tech Debt, Architektur.",

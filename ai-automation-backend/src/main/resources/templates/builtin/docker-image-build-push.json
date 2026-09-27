@@ -10,7 +10,7 @@
     "de" : "Docker Build, Tag und Push in Registry"
   },
   "category" : "CODE",
-  "sortOrder" : 35,
+  "sortOrder" : 34,
   "version" : "1.1.0",
   "model" : null,
   "instructions" : "Baue und pushe ein Docker Image. Variablen: dockerfile, image_name, tag, registry.",

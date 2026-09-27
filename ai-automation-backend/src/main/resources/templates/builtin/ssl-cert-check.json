@@ -10,7 +10,7 @@
     "de" : "Ablaufdaten für mehrere Domains prüfen und anstehende Verlängerungen melden"
   },
   "category" : "INFRA",
-  "sortOrder" : 47,
+  "sortOrder" : 46,
   "version" : "1.0.0",
   "model" : null,
   "instructions" : "Prüfe SSL-Zertifikate. Variablen: domains (zeilengetrennte Liste von Hostnamen), warn_days (Warnung wenn Ablauf innerhalb N Tage, default 30).",

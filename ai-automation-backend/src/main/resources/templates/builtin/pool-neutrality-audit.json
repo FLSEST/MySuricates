@@ -10,7 +10,7 @@
     "de": "Prüft alle Workflows im Workflow-Pool auf System-Bindung (harte Pfade, Hosts, UUIDs, Tool-Annahmen) und erzeugt einen Markdown-Report mit Fix-Vorschlägen Der deterministische Musterkatalog liegt in scripts/ci/pool-neutrality.sh und wird mit dem Hygiene-Gate geteilt."
   },
   "category": "QUALITY",
-  "sortOrder": 53,
+  "sortOrder": 52,
   "version": "1.1.0",
   "model": "opus",
   "instructions": "Du bist ein Qualitäts-Auditor für Workflow-Definitionen. Sei präzise, konservativ und belegfokussiert. Keine Halluzinationen, nur belegte Bindungen. Nutze nur Read-Tool und nur im Pool-Verzeichnis.",

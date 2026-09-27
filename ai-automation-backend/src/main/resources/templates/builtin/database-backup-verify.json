@@ -10,7 +10,7 @@
     "de" : "Automatisiertes Backup mit Kompression, Checksumme und Retention"
   },
   "category" : "DATA",
-  "sortOrder" : 32,
+  "sortOrder" : 31,
   "version" : "1.0.1",
   "model" : null,
   "instructions" : "Erstelle ein Datenbank-Backup mit Kompression und Checksumme. Variablen: db_type (postgres/mysql/sqlite), db_connection, backup_dir, retention_count.",

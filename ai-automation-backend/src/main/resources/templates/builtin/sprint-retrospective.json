@@ -10,7 +10,7 @@
     "de" : "KI-gestützte Sprint-Retrospektive: Daten sammeln, Muster erkennen, Maßnahmen ableiten"
   },
   "category" : "TEAM",
-  "sortOrder" : 51,
+  "sortOrder" : 50,
   "version" : "1.0.0",
   "model" : null,
   "instructions" : "Führe eine Sprint-Retrospektive durch. Variablen: sprint_name, sprint_duration_days (default 14), team_size (default 3), sprint_goal (beschreibt was erreicht werden sollte), sprint_notes (optionale Notizen/Beobachtungen).",

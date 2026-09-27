@@ -16,7 +16,7 @@ Two mechanisms exist side by side, and they answer different questions.
 
 | | Built-in templates | Workflow pool |
 |---|---|---|
-| Location | `ai-automation-backend/src/main/resources/templates/builtin/*.json` (55) | `workflow-pool/*.json` |
+| Location | `ai-automation-backend/src/main/resources/templates/builtin/*.json` (54) | `workflow-pool/*.json` |
 | Way into an instance | `WorkflowTemplateSeeder` seeds them into the database at startup, comparing semver | manual: `GET /api/v1/pool` → `POST /api/v1/pool/{id}/install` |
 | Visible as | a template in the catalogue, present in every instance | an entry in the pool browser, a workflow only after a deliberate install |
 | Updates | the seeder pulls in a higher version and removes what no longer ships | none; an installed workflow is a copy and lives on by itself |

@@ -587,7 +587,7 @@ M:N relationship between workflows and skills.
 | `created_at` | TEXT | | |
 | `updated_at` | TEXT | | |
 
-55 built-in templates are created by `WorkflowTemplateSeeder` at startup. Template definitions are stored as JSON under `src/main/resources/templates/builtin/`.
+54 built-in templates are created by `WorkflowTemplateSeeder` at startup. Template definitions are stored as JSON under `src/main/resources/templates/builtin/`.
 
 ### `template_verifications`
 

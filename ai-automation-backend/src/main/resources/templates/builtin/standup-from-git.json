@@ -10,7 +10,7 @@
     "de" : "Tägliches Standup-Summary aus den letzten Git-Commits je Autor erstellen"
   },
   "category" : "TEAM",
-  "sortOrder" : 50,
+  "sortOrder" : 49,
   "version" : "1.0.0",
   "model" : null,
   "instructions" : "Erstelle Standup-Reports. Variablen: since (Zeitraum, default '24 hours ago'), branch (default 'HEAD'), max_commits (default 50).",

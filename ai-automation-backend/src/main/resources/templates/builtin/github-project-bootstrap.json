@@ -10,7 +10,7 @@
     "de" : "Neues GitHub-Repository erstellen mit Labels, Branch-Protection und initialen Issues"
   },
   "category" : "CODE",
-  "sortOrder" : 28,
+  "sortOrder" : 27,
   "version" : "1.1.2",
   "model" : null,
   "instructions" : "Erstelle ein neues GitHub-Repository mit Standardkonfiguration. Variablen: repo_name, visibility (public/private), org (Organisation oder 'none').",
