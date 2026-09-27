@@ -118,6 +118,10 @@ jobs:
       # Version ohne -SNAPSHOT tragen (TODO dd82775b), sonst meldet jede Installation SNAPSHOT.
       - name: Release-Skript Selbsttest
         run: bash scripts/tests/test-release.sh
+      # release-notes.sh erzeugt die GitHub-Release-Notizen deterministisch, ohne KI-Aufruf —
+      # der Selbsttest laeuft in einem Wegwerf-Repo mit echten Merge-Commits (release.yml).
+      - name: Release-Notizen Selbsttest
+        run: bash scripts/tests/test-release-notes.sh
 
   gitleaks:
     name: Gitleaks Secret Scan
