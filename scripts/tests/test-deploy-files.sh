@@ -110,7 +110,7 @@ hc_lines() {
   done
 }
 HC="$(hc_lines)"; T="$(printf '\t')"
-check "found: HEALTHCHECK and compose healthcheck"   'printf "%s\n" "$HC" | grep -q "^deploy/Dockerfile${T}curl " && printf "%s\n" "$HC" | grep -q "^ai-automation-backend/docker-compose.yml${T}\[\"CMD\", \"curl\""'
+check "found: HEALTHCHECK and compose healthcheck"   'printf "%s\n" "$HC" | grep -q "^deploy/Dockerfile${T}curl " && printf "%s\n" "$HC" | grep -q "^ai-automation-backend/docker-compose.test.yml${T}\[\"CMD\", \"curl\""'
 NAKED_HC="$(printf '%s\n' "$HC" | grep curl | grep -vF -e "${T}curl --noproxy '*' " -e '["CMD", "curl", "--noproxy", "*", ')"
 check "every health check curl carries --noproxy '*'" '[ -z "$NAKED_HC" ] || { printf "%s\n" "$NAKED_HC" | sed "s/^/         /"; false; }'
 # Und so, wie Docker sie ausfuehrt — Shell-Form ueber sh -c, im Verzeichnis mit Dateien (ein ungequotetes *

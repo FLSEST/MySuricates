@@ -79,7 +79,7 @@ autotrigger/
 │   ├── src/main/resources/      # Konfiguration & Migrationen
 │   ├── src/test/                # Unit- & Integrationstests
 │   ├── docker/                  # Dockerfiles fuer Agent-Container
-│   ├── docker-compose.yml       # Entwicklungsumgebung (+ .stable.yml, .test.yml)
+│   ├── docker-compose.yml       # Baut nur die Agent-Images (+ .stable.yml, .test.yml, .dev-container.yml)
 │   └── pom.xml                  # Maven Build-Konfiguration
 │
 ├── ai-automation-frontend/      # React SPA (Port 3000)

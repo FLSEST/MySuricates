@@ -172,32 +172,25 @@
 </section>
 
 <section id="docker-compose">
-  <h2>Docker Compose <span>Services</span></h2>
-  <p><code>ai-automation-backend/docker-compose.yml</code> baut und startet das Backend; die Agent-Images baut es nur (Profil <code>build-only</code>). Container aus diesen Images startet das Backend selbst über die Docker-API.</p>
+  <h2>Docker Compose <span>Agent-Images</span></h2>
+  <p><code>ai-automation-backend/docker-compose.yml</code> startet kein Backend mehr — der einzige Docker-Weg für eine Instanz ist <code>deploy/</code> (oben). Die Datei baut nur noch die Agent-Images (Profil <code>build-only</code>); Container aus diesen Images startet das Backend über die Docker-API.</p>
   <pre class="mermaid">
 flowchart LR
     subgraph Compose
-        BE["backend (:9090)"]
         N["agent-node (Node 22)"]
         PY["agent-python (Python 3.12)"]
         DO["agent-devops (Ubuntu 24.04)"]
         JV["agent-java (Temurin 21)"]
     end
-    BE --&gt;|"docker.sock"| Engine["Docker Engine"]
+    Backend["Backend (deploy/)"] --&gt;|"docker.sock"| Engine["Docker Engine"]
+    Engine -.-&gt;|"startet"| N
+    Engine -.-&gt;|"startet"| PY
+    Engine -.-&gt;|"startet"| DO
+    Engine -.-&gt;|"startet"| JV
     style Compose fill:#1a1f2e,stroke:#30363d,color:#e6edf3
   </pre>
-  <div class="grid">
-    <div class="card">
-      <h3>Build</h3>
-      <p><code>mvn clean package -DskipTests</code> (das JAR, das <code>docker/Dockerfile.backend</code> kopiert)</p>
-      <p><code>docker compose --profile build-only build</code> (Agent-Images)</p>
-    </div>
-    <div class="card">
-      <h3>Start</h3>
-      <p><code>docker compose up --build</code> im Verzeichnis <code>ai-automation-backend/</code></p>
-      <p>Backend Port: 9090; Daten unter <code>./data</code></p>
-    </div>
-  </div>
+  <h3>Build</h3>
+  <p><code>AGENT_APT_REFRESH=$(date +%Y-%m) docker compose --profile build-only build</code> im Verzeichnis <code>ai-automation-backend/</code></p>
 </section>
 
 <section id="agent-images">
@@ -205,7 +198,6 @@ flowchart LR
   <table>
     <thead><tr><th>Image</th><th>Basis</th><th>Pfad</th></tr></thead>
     <tbody>
-      <tr><td>backend</td><td><code>eclipse-temurin:21-jre-alpine</code> + Spring-Boot-JAR</td><td><code>docker/Dockerfile.backend</code></td></tr>
       <tr><td>agent-node</td><td><code>node:22-slim</code></td><td><code>docker/Dockerfile.agent-node</code></td></tr>
       <tr><td>agent-python</td><td><code>python:3.12-slim</code></td><td><code>docker/Dockerfile.agent-python</code></td></tr>
       <tr><td>agent-devops</td><td><code>ubuntu:24.04</code></td><td><code>docker/Dockerfile.agent-devops</code></td></tr>
@@ -257,7 +249,7 @@ sequenceDiagram
       <h3>Mounts</h3>
       <p>Projektpfad → <code>/workspace</code> (lesen und schreiben)</p>
       <p>Claude vom Host nach <code>MYSURICATES_AI_FROM_HOST</code>; Standard <code>login</code>: das Programm schreibgeschützt, die Anmeldung als Token</p>
-      <p>Docker-Socket: nur für das Backend (<code>/var/run/docker.sock</code> in <code>docker-compose.yml</code>), nicht im Projekt-Container</p>
+      <p>Docker-Socket: nur für das Backend, per Schalter (<code>MYSURICATES_DOCKER_SOCKET</code>, siehe <em>deploy/</em>), nicht im Projekt-Container</p>
     </div>
   </div>
 </section>

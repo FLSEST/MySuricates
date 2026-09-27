@@ -237,20 +237,14 @@ logging:
 
 ## Deployment
 
-### How do I build a Docker image for the backend?
+### How do I build and start an instance in a container?
 
 ```bash
-cd ai-automation-backend
-mvn clean package -DskipTests
-docker build -f docker/Dockerfile.backend -t autopilot-backend:latest .
+printf 'MYSURICATES_PORT=9090\n' > deploy/instances/main.env
+scripts/instance.sh up --name main
 ```
 
-The image uses:
-- Eclipse Temurin Java 21 (Alpine)
-- ZGC (Generational) with 256MB–1GB heap
-- Non-root user (`appuser`)
-- Health check on `/api/v1/system/health`
-
-### Is there a frontend Docker image?
-
-Not currently. The frontend is served as a static build (`npm run build`). The `dist/` files can be hosted via any web server (nginx, Caddy, etc.). The Vite proxy is no longer needed in that case — the frontend must point directly to the backend.
+`deploy/Dockerfile` builds backend and frontend into one image — an instance is one container and
+one port, the backend serves the UI itself. Details:
+[deployment.md](../deployment.md#one-instance-in-a-container-deploy). There is no standalone
+backend image without a UI.

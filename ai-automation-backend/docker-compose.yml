@@ -1,43 +1,12 @@
 services:
-  backend:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.backend
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./data:/app/data
-      # WARNING: Docker socket gives the app full host Docker control.
-      # Enable API key auth (AUTOMATION_SECURITY_ENABLED=true) in production.
-      - /var/run/docker.sock:/var/run/docker.sock
-    environment:
-      - AUTOMATION_DB_PATH=/app/data/automation.db
-      - DOCKER_HOST=unix:///var/run/docker.sock
-      - AUTOMATION_SECURITY_ENABLED=true
-      # Leer lassen -> das Backend erzeugt beim ersten Start einen Schluessel; das Log zeigt nur
-      # die letzten vier Zeichen, voll steht er in der Datei:
-      # docker compose exec backend cat /home/appuser/.autotrigger/api-key. Eigenen Wert setzen:
-      # AUTOMATION_API_KEY=... exportieren oder in eine .env neben dieser Datei schreiben.
-      - AUTOMATION_API_KEY=${AUTOMATION_API_KEY:-}
-      # Optionale Module: core (Default) | research | full; einzelne Module per AUTOMATION_MODULES_<NAME>=true
-      - AUTOMATION_MODULES_PRESET=${AUTOMATION_MODULES_PRESET:-core}
-    restart: unless-stopped
-    healthcheck:
-      # --noproxy: Docker reicht Proxy-Variablen in den Container, curl schickt auch localhost
-      # ueber sie — der Container wurde nie gesund (cf662c01)
-      test: ["CMD", "curl", "--noproxy", "*", "-f", "http://localhost:9090/api/v1/system/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
-    networks:
-      - automation
-
-  # Agent images - build only, not run via compose.
-  # The backend creates/manages agent containers via Docker API.
+  # Agent images - build only, not run via compose. Used by the deploy/ instance (backend creates
+  # and manages agent containers via the Docker API) and by the source-based dev instance.
   # Build all: AGENT_APT_REFRESH=$(date +%Y-%m) docker compose --profile build-only build
   # (a new value rebuilds the third-party APT layers of agent-devops instead of reusing old keyrings,
   # and the unpinned pip packages of agent-python instead of keeping those of the first build)
+  #
+  # There is no `backend` service here: the only supported way to run MySuricates in a container is
+  # deploy/ (instance.sh/setup.sh) — see docs/deployment.md.
   agent-node:
     build:
       context: .
@@ -73,7 +42,3 @@ services:
     image: automation-agent-java:latest
     profiles:
       - build-only
-
-networks:
-  automation:
-    driver: bridge

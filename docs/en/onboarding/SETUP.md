@@ -167,17 +167,9 @@ docker build -f docker/Dockerfile.agent-devops -t automation-agent-devops:latest
 docker build -f docker/Dockerfile.agent-java -t automation-agent-java:latest .
 ```
 
-### Docker-based Start (alternative)
-
-```bash
-cd ai-automation-backend
-
-# Backend via Docker only
-docker compose up
-
-# Backend + build agent images
-docker compose --profile build-only up --build
-```
+There is no standalone backend container via this compose file — the only Docker way to run an
+instance is `deploy/` (`scripts/instance.sh`, see
+[deployment.md](../deployment.md#one-instance-in-a-container-deploy)).
 
 ---
 
