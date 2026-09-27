@@ -2993,7 +2993,7 @@ Anzahl TODOs nach Status. Optionaler Query-Parameter `projectId` zählt nur die 
 
 TODO-Übersicht mit Projekt-Rollups und "Needs You"-Items.
 
-**Response:** `TodoOverviewResponse` mit `projects` (List), `needsYou` (List), `generatedAt`, `staleThresholdDays`, `milestonesDue` (V88: Meilensteine aktiver Ziele mit `DUE_SOON`/`OVERDUE` – `id`, `title`, `goalId`, `goalTitle`, `dueDate`, `state`, `total`, `done`)
+**Response:** `TodoOverviewResponse` mit `projects` (List), `needsYou` (List), `generatedAt`, `staleThresholdDays`, `milestonesDue` (Termine aktiver Ziele, die Aufmerksamkeit brauchen – `kind` `MILESTONE`: Meilensteine mit `DUE_SOON`/`OVERDUE`, nicht erreicht, `total`/`done` = verknüpfte Arbeitspakete; `kind` `WORK_PACKAGE` (V92): Arbeitspakete, deren Ende vorbei ist und die noch offene TODOs haben, `dueDate` = Ende, `total`/`done` = TODOs; je `id`, `title`, `goalId`, `goalTitle`, `dueDate`, `state`, `total`, `done`, `kind`, nach Datum)
 
 ### `POST /api/v1/todos/bulk-status`
 
@@ -3028,7 +3028,7 @@ Veraltete TODOs archivieren.
 
 ### `PATCH /api/v1/todos/{id}/planning`
 
-Ziel, Rang, Meilenstein und Einschätzung eines TODOs setzen (V85, `milestoneId` V88). `null` lässt ein Feld stehen, ein leerer Text leert es: `goalId: ""` löst das TODO vom Ziel, `milestoneId: ""` vom Meilenstein, `openQuestion: ""` markiert die Frage als geklärt. `milestoneId` muss ein Meilenstein des eigenen Ziels sein (sonst 400, unbekannt 404; `goalId` im selben Request zählt zuerst); wechselt oder verlässt das TODO sein Ziel, wird `milestoneId` geleert. `planning` in der Antwort trägt `milestoneId`. `goalRank <= 0` nimmt den Rang zurück. Ohne `ratedBy` gilt die Einschätzung als menschlich (`USER`); `ratedAt` setzt der Server, sobald `complexity`, `suggestedEffort` oder `ratingNote` mitkommt.
+Ziel, Rang, Arbeitspaket und Einschätzung eines TODOs setzen (V85; `workPackageId` seit V92, vorher `milestoneId` – der alte Name wird weiter angenommen). `null` lässt ein Feld stehen, ein leerer Text leert es: `goalId: ""` löst das TODO vom Ziel, `workPackageId: ""` vom Arbeitspaket, `openQuestion: ""` markiert die Frage als geklärt. `workPackageId` muss ein Arbeitspaket des eigenen Ziels und des eigenen Projekts sein (sonst 400, unbekannt 404; `goalId` im selben Request zählt zuerst); wechselt oder verlässt das TODO sein Ziel, wird `workPackageId` geleert. Ist das Projekt des TODOs dem Ziel noch nicht zugeordnet, kommt es dazu. `planning` in der Antwort trägt `workPackageId`. `goalRank <= 0` nimmt den Rang zurück. Ohne `ratedBy` gilt die Einschätzung als menschlich (`USER`); `ratedAt` setzt der Server, sobald `complexity`, `suggestedEffort` oder `ratingNote` mitkommt.
 
 ```json
 {
@@ -3039,7 +3039,7 @@ Ziel, Rang, Meilenstein und Einschätzung eines TODOs setzen (V85, `milestoneId`
   "ratingNote": "Viele Dateien, aber klare Vorlage",
   "openQuestion": "Welcher Video-Stil?",
   "ratedBy": "AI",
-  "milestoneId": "uuid"
+  "workPackageId": "uuid"
 }
 ```
 
@@ -3057,7 +3057,7 @@ Ein Ziel sammelt TODOs projektübergreifend und zeigt den Fortschritt (V85). Sie
 
 Ziele mit Fortschritt, neueste zuerst. **Query:** `status` (mehrfach; ohne Angabe `ACTIVE` und `DONE`, archivierte nur ausdrücklich), `projectId` (optional, V92: nur Ziele, denen dieses Projekt zugeordnet ist).
 
-**Response:** `GoalResponse[]` – `id`, `title`, `description`, `status`, `targetDate`, `createdAt`, `updatedAt`, `progress` (`total`, `open`, `inProgress`, `backlog`, `done`, `openQuestions`, `percentDone`; `total` ohne ARCHIVED), `guard` (`enabled`, `workflowId`, `scheduleId`, `nextRunAt`; nie eingeschaltet = `enabled: false`, Rest `null`), `projects[]` (V92: `id`, `name` der zugeordneten Projekte in ihrer Reihenfolge; nie `null`).
+**Response:** `GoalResponse[]` – `id`, `title`, `description`, `status`, `targetDate`, `createdAt`, `updatedAt`, `progress` (`total`, `open`, `inProgress`, `backlog`, `done`, `openQuestions`, `percentDone`; `total` ohne ARCHIVED), `guard` (`enabled`, `workflowId`, `scheduleId`, `nextRunAt`; nie eingeschaltet = `enabled: false`, Rest `null`), `projects[]` (V92: `id`, `name` der zugeordneten Projekte in ihrer Reihenfolge; nie `null`), `nextMilestone` (V92: der nächste nicht erreichte Meilenstein nach Datum – `id`, `title`, `dueDate`, `state`; `null` = keiner; für alle Ziele der Liste aus einer Abfrage).
 
 ### `POST /api/v1/goals`
 
@@ -3072,7 +3072,7 @@ Ziele mit Fortschritt, neueste zuerst. **Query:** `status` (mehrfach; ohne Angab
 
 Ziel mit seinen TODOs in Arbeitsreihenfolge (Rang, dann Priorität, dann Alter) – ohne Beschreibungen – und Fortschritt je Projekt.
 
-**Response:** `GoalDetailResponse` – `goal`, `todos[]` (`id`, `title`, `status`, `priority`, `projectId`, `projectName`, `tags`, `goalRank`, `complexity`, `suggestedEffort`, `ratingNote`, `ratedBy`, `ratedAt`, `openQuestion`, `updatedAt`, `dueDate`, `milestoneId`), `byProject[]` (`projectId`, `projectName`, `total`, `done`; aus den TODOs abgeleitet, bleibt für bestehende Aufrufer), `milestones[]` (`GoalMilestoneResponse`, nach Projekt-Position, dann `position`), `projects[]` (V92: die zugeordneten Projekte nach `position` – `projectId`, `name`, `archived`, `position`, `total`, `done`, `openQuestions`, gezählt aus den nicht archivierten TODOs des Ziels in diesem Projekt). Erkennt das Lesen einen Meilenstein zum ersten Mal als erreicht, speichert es `reachedAt`.
+**Response:** `GoalDetailResponse` – `goal`, `todos[]` (`id`, `title`, `status`, `priority`, `projectId`, `projectName`, `tags`, `goalRank`, `complexity`, `suggestedEffort`, `ratingNote`, `ratedBy`, `ratedAt`, `openQuestion`, `updatedAt`, `dueDate`, `workPackageId`), `byProject[]` (`projectId`, `projectName`, `total`, `done`; aus den TODOs abgeleitet, bleibt für bestehende Aufrufer), `projects[]` (V92: die zugeordneten Projekte nach `position` – `projectId`, `name`, `archived`, `position`, `total`, `done`, `openQuestions`, gezählt aus den nicht archivierten TODOs des Ziels in diesem Projekt), `workPackages[]` (V92: `GoalWorkPackageResponse`, nach Projekt-Position, dann `position`), `milestones[]` (V92: `GoalMilestoneResponse`, nach Datum, dann Titel). Erkennt das Lesen ein Arbeitspaket oder einen Meilenstein zum ersten Mal als abgeschlossen bzw. erreicht, speichert es `completedAt`/`reachedAt`.
 
 ### `GET /api/v1/goals/{id}/relations`
 
@@ -3092,11 +3092,11 @@ Teiländerung: `title`, `description`, `status`, `targetDate` (`null` = unverän
 
 ### `DELETE /api/v1/goals/{id}`
 
-Löscht das Ziel; seine TODOs bleiben und verlieren nur die Zuordnung (samt Meilenstein), seine Meilensteine fallen weg, ein Ziel-Wächter pausiert (sein Workflow bleibt). **Response:** `204`
+Löscht das Ziel; seine TODOs bleiben und verlieren nur die Zuordnung (samt Arbeitspaket), seine Arbeitspakete und Meilensteine fallen weg, ein Ziel-Wächter pausiert (sein Workflow bleibt). **Response:** `204`
 
 ### `POST /api/v1/goals/{id}/todos`
 
-TODOs zuordnen: `{ "todoIds": ["…"] }`. Ein TODO aus einem anderen Ziel wechselt hierher und verliert seinen Meilenstein; neu Zugeordnete bekommen keinen Rang. Ist ihr Projekt dem Ziel noch nicht zugeordnet, kommt es ans Ende dazu (V92) – ebenso über `PATCH /todos/{id}/planning` (`goalId`) und beim Projektwechsel eines TODOs (`PUT /todos/{id}`, dort fällt zusätzlich ein Teilziel des alten Projekts weg). **Response:** `GoalDetailResponse`
+TODOs zuordnen: `{ "todoIds": ["…"] }`. Ein TODO aus einem anderen Ziel wechselt hierher und verliert sein Arbeitspaket; neu Zugeordnete bekommen keinen Rang. Ist ihr Projekt dem Ziel noch nicht zugeordnet, kommt es ans Ende dazu (V92) – ebenso über `PATCH /todos/{id}/planning` (`goalId`) und beim Projektwechsel eines TODOs (`PUT /todos/{id}`, dort fällt zusätzlich ein Arbeitspaket des alten Projekts weg). **Response:** `GoalDetailResponse`
 
 ### `PUT /api/v1/goals/{id}/order`
 
@@ -3108,29 +3108,51 @@ Ein Ziel ist ausdrücklich einem oder mehreren Projekten zugeordnet, in einer Re
 
 - `POST /api/v1/goals/{id}/projects` – `{ "projectId": "…" }` hängt das Projekt ans Ende; schon zugeordnet = unverändert (idempotent). Unbekanntes Ziel/Projekt → `404`. **Response:** `GoalDetailResponse`
 - `PUT /api/v1/goals/{id}/projects/order` – `{ "ids": ["<projectId>", …] }`: die genannten vorn in dieser Folge, die übrigen Zielprojekte in bisheriger Folge dahinter; ein nicht zugeordnetes Projekt → `400`. **Response:** `GoalDetailResponse`
-- `DELETE /api/v1/goals/{id}/projects/{projectId}?cascade=false` – hängen im Ziel noch Teilziele oder TODOs an dem Projekt → `409` (`STATE_CONFLICT`, die Meldung nennt die Anzahlen). `cascade=true` löscht die Teilziele des Projekts in diesem Ziel und löst seine TODOs vom Ziel (die TODOs bleiben). **Response:** `204`
+- `DELETE /api/v1/goals/{id}/projects/{projectId}?cascade=false` – hängen im Ziel noch Arbeitspakete oder TODOs an dem Projekt → `409` (`STATE_CONFLICT`, die Meldung nennt die Anzahlen). `cascade=true` löscht die Arbeitspakete des Projekts in diesem Ziel (Meilensteine verlieren die Verknüpfung) und löst seine TODOs vom Ziel (die TODOs bleiben). **Response:** `204`
 
-### Meilensteine (V88)
+### Arbeitspakete (V92)
 
-Ein Meilenstein – in der Oberfläche „Teilziel“ – ist ein eigener Eintrag mit Titel und optionalem Datum (seit V92); TODOs des Ziels werden ihm über `PATCH /todos/{id}/planning` (`milestoneId`) zugeordnet. Seit V92 gehört ein Teilziel genau einem Projekt des Ziels (`projectId`), und ein TODO passt nur in ein Teilziel seines eigenen Projekts (sonst `400`; ein TODO ohne Projekt in keins mit Projekt). Der Zustand wird beim Lesen berechnet: `REACHED` (alle zugeordneten TODOs ohne ARCHIVED erledigt, mindestens eins), sonst `OVERDUE`, `DUE_SOON` (≤ 3 Tage) oder `OPEN` – ohne Datum nur `OPEN` oder `REACHED`. `reachedAt` hält das erste Erkennen fest und bleibt; ist der Meilenstein danach wieder offen, steht `reopened: true`. `openQuestions` zählt die aktiven TODOs darin mit offener Frage.
+Ein Arbeitspaket gehört genau einem Projekt des Ziels (`projectId`) und bündelt TODOs dieses Projekts; bis V92 hießen sie Meilensteine (V88). TODOs werden ihm über `PATCH /todos/{id}/planning` (`workPackageId`) zugeordnet – nur TODOs desselben Ziels und Projekts (sonst `400`; ein TODO ohne Projekt passt in kein Paket mit Projekt). Der Zeitraum ist optional: `startDate` und `endDate` gibt es nur zusammen, der Start liegt nie nach dem Ende (sonst `400`). Der Zustand wird beim Lesen aus dem Ende berechnet: `REACHED` (abgeschlossen: alle zugeordneten TODOs ohne ARCHIVED erledigt, mindestens eins), sonst `OVERDUE`, `DUE_SOON` (≤ 3 Tage) oder `OPEN` – ohne Zeitraum nur `OPEN` oder `REACHED`. `completedAt` hält das erste Erkennen fest und bleibt; ist das Paket danach wieder offen, steht `reopened: true`. `openQuestions` zählt die aktiven TODOs darin mit offener Frage.
+
+**`GoalWorkPackageResponse`:**
+
+```json
+{
+  "id": "b1f0…", "goalId": "6c2e…", "projectId": "3a9d…", "title": "Werbematerial",
+  "startDate": "2026-09-28T00:00:00Z", "endDate": "2026-10-01T23:59:59Z", "position": 0,
+  "state": "DUE_SOON", "total": 4, "done": 2, "openQuestions": 1,
+  "completedAt": null, "reopened": false,
+  "createdAt": "2026-09-24T08:00:00Z", "updatedAt": "2026-09-24T08:00:00Z"
+}
+```
+
+- `GET /api/v1/goals/{id}/work-packages` – nach Projekt-Position, dann `position`. **Response:** `GoalWorkPackageResponse[]`
+- `POST /api/v1/goals/{id}/work-packages` – `{ "title": "Werbematerial", "projectId": "…", "startDate": "2026-09-28", "endDate": "2026-10-01" }`; Zeitraum optional, ISO-Zeitpunkt oder Datum (Start `2026-09-28` = ab 00:00:00 UTC, Ende `2026-10-01` = bis 23:59:59 UTC); `projectId` Pflicht, außer das Ziel hat genau ein Projekt (sonst `400`), ein dem Ziel noch fehlendes Projekt kommt dazu; das Paket rückt ans Ende seines Projekts; Titel höchstens 200 Zeichen. **Response:** `201` + `GoalWorkPackageResponse`
+- `PUT /api/v1/goals/{id}/work-packages/{workPackageId}` – Teiländerung `{ "title"?, "projectId"?, "startDate"?, "endDate"? }` (`null` = unverändert, `""` leert ein Datum). Das Ergebnis muss den Zeitraum vollständig haben oder gar nicht (sonst `400`). Ein Projektwechsel geht nur, solange dem Paket keine TODOs zugeordnet sind (sonst `400`); es rückt ans Ende des neuen Projekts. **Response:** `GoalWorkPackageResponse`
+- `PUT /api/v1/goals/{id}/work-packages/order` – `{ "ids": ["<workPackageId>", …] }`: Pakete EINES Projekts in neuer Folge, nicht genannte desselben Projekts dahinter; Pakete verschiedener Projekte → `400`, ein fremdes → `404`. **Response:** alle `GoalWorkPackageResponse` des Ziels
+- `DELETE /api/v1/goals/{id}/work-packages/{workPackageId}` – die TODOs bleiben im Ziel und verlieren nur die Zuordnung, Meilensteine verlieren die Verknüpfung. **Response:** `204`
+
+Unbekanntes Ziel oder ein Paket eines anderen Ziels → `404`.
+
+### Meilensteine (V92)
+
+Ein Meilenstein ist ein Termin fürs ganze Ziel – kein Projekt, das Datum ist Pflicht. Optional hängt er an Arbeitspaketen desselben Ziels (`workPackageIds`): dann ist er `REACHED`, sobald alle verknüpften Pakete abgeschlossen sind; `reachedAt` hält den ersten Zeitpunkt fest, sind die Pakete später nicht mehr alle abgeschlossen, steht `reopened: true`. Ohne Pakete markiert ihn ein Mensch (`reached`). Sonst entscheidet das Datum: `OVERDUE`, `DUE_SOON` (≤ 3 Tage) oder `OPEN`. Nicht zu verwechseln mit den Meilensteinen bis V92 – die heißen jetzt Arbeitspakete.
 
 **`GoalMilestoneResponse`:**
 
 ```json
 {
-  "id": "b1f0…", "goalId": "6c2e…", "title": "Beta fertig",
-  "dueDate": "2026-10-01T21:59:59Z", "state": "DUE_SOON",
-  "total": 4, "done": 2, "reachedAt": null, "reopened": false,
-  "createdAt": "2026-09-24T08:00:00Z", "updatedAt": "2026-09-24T08:00:00Z",
-  "projectId": "3a9d…", "position": 0, "openQuestions": 1
+  "id": "7d21…", "goalId": "6c2e…", "title": "Launch", "dueDate": "2026-10-15T23:59:59Z",
+  "state": "OPEN", "workPackageIds": ["b1f0…", "c4e2…"], "packagesTotal": 2, "packagesDone": 1,
+  "reachedAt": null, "reopened": false,
+  "createdAt": "2026-09-24T08:00:00Z", "updatedAt": "2026-09-24T08:00:00Z"
 }
 ```
 
-- `GET /api/v1/goals/{id}/milestones` – nach Projekt-Position, dann `position`. **Response:** `GoalMilestoneResponse[]`
-- `POST /api/v1/goals/{id}/milestones` – `{ "title": "Beta fertig", "dueDate": "2026-10-01T21:59:59Z", "projectId": "…" }`; `dueDate` optional, ISO-Zeitpunkt oder Datum (`2026-10-01` = bis 23:59:59 UTC); `projectId` Pflicht, außer das Ziel hat genau ein Projekt (sonst `400`), ein dem Ziel noch fehlendes Projekt kommt dazu; das Teilziel rückt ans Ende seines Projekts; Titel höchstens 200 Zeichen. **Response:** `201` + `GoalMilestoneResponse`
-- `PUT /api/v1/goals/{id}/milestones/{milestoneId}` – Teiländerung `{ "title"?, "dueDate"?, "projectId"? }` (`null` = unverändert, `dueDate: ""` entfernt das Datum). Ein Projektwechsel geht nur, solange dem Teilziel keine TODOs zugeordnet sind (sonst `400`); es rückt ans Ende des neuen Projekts. **Response:** `GoalMilestoneResponse`
-- `PUT /api/v1/goals/{id}/milestones/order` – `{ "ids": ["<milestoneId>", …] }`: Teilziele EINES Projekts in neuer Folge, nicht genannte desselben Projekts dahinter; Teilziele verschiedener Projekte → `400`, ein fremdes → `404`. **Response:** alle `GoalMilestoneResponse` des Ziels
-- `DELETE /api/v1/goals/{id}/milestones/{milestoneId}` – die TODOs bleiben im Ziel und verlieren nur die Zuordnung. **Response:** `204`
+- `GET /api/v1/goals/{id}/milestones` – nach Datum, dann Titel. **Response:** `GoalMilestoneResponse[]`
+- `POST /api/v1/goals/{id}/milestones` – `{ "title": "Launch", "dueDate": "2026-10-15", "workPackageIds": ["…"] }`; `dueDate` Pflicht (Datum = bis 23:59:59 UTC); jedes Paket muss zum Ziel gehören (sonst `400`). **Response:** `201` + `GoalMilestoneResponse`
+- `PUT /api/v1/goals/{id}/milestones/{milestoneId}` – Teiländerung `{ "title"?, "dueDate"?, "workPackageIds"?, "reached"? }`; `workPackageIds` ersetzt die Verknüpfungen (`[]` löst alle), `reached: true` markiert von Hand als erreicht, `false` nimmt es zurück – nur ohne verknüpfte Pakete (nach dieser Änderung), sonst `400`. **Response:** `GoalMilestoneResponse`
+- `DELETE /api/v1/goals/{id}/milestones/{milestoneId}` – die Arbeitspakete bleiben. **Response:** `204`
 
 Unbekanntes Ziel oder ein Meilenstein eines anderen Ziels → `404`.
 

@@ -711,11 +711,11 @@ Eine Chain gehört zu keinem Projekt und kann Workflows aus verschiedenen Projek
 | `rated_by` | TEXT | | `USER` oder `AI` – wer zuletzt eingeschätzt hat (V85) |
 | `rated_at` | TEXT | | Zeitpunkt der Einschätzung (V85) |
 | `open_question` | TEXT | | Frage, die vor der Arbeit geklärt sein muss (V85) |
-| `milestone_id` | TEXT | FK → goal_milestones, ON DELETE SET NULL | Meilenstein (Teilziel) des eigenen Ziels und – seit V92 beim Schreiben geprüft – des eigenen Projekts (V88) |
+| `work_package_id` | TEXT | FK → goal_work_packages, ON DELETE SET NULL | Arbeitspaket des eigenen Ziels und – beim Schreiben geprüft – des eigenen Projekts (V88 als `milestone_id`, seit V92 umbenannt) |
 | `created_at` | TEXT | NOT NULL | |
 | `updated_at` | TEXT | NOT NULL | |
 
-**Indizes:** `idx_todos_status`, `idx_todos_project`, `idx_todos_source`, `idx_todos_created`, `idx_todos_status_priority_created` (V54), `idx_todos_project_status` (V54), `idx_todos_linked_workflow_id` (V59), `idx_todos_agent_session_ref` (V76), `idx_todos_goal` (V85), `idx_todos_last_fix_run_id` (V87), `idx_todos_workflow_run_id` (V87), `idx_todos_milestone` (V88)
+**Indizes:** `idx_todos_status`, `idx_todos_project`, `idx_todos_source`, `idx_todos_created`, `idx_todos_status_priority_created` (V54), `idx_todos_project_status` (V54), `idx_todos_linked_workflow_id` (V59), `idx_todos_agent_session_ref` (V76), `idx_todos_goal` (V85), `idx_todos_last_fix_run_id` (V87), `idx_todos_workflow_run_id` (V87), `idx_todos_work_package` (V92, vorher `idx_todos_milestone`)
 
 TODOs werden von `AutoTodoService` automatisch bei RED/YELLOW Gate-Status erstellt (RED → HIGH, YELLOW → MEDIUM). Bei konfiguriertem `TodoTrigger` werden Fix-Workflows automatisch gestartet (Self-Improvement-Loop).
 
@@ -734,7 +734,7 @@ TODOs werden von `AutoTodoService` automatisch bei RED/YELLOW Gate-Status erstel
 
 **Indizes:** `idx_goals_status`
 
-Ein Ziel bündelt TODOs projektübergreifend (V85). Die Zugehörigkeit, der Rang und die Einschätzung stehen am TODO (`todos.goal_id` …), nicht am Ziel; Fortschritt und Reihenfolge rechnet `GoalService` aus schlanken Projektionen zusammen. Seit V92 ist ein Ziel ausdrücklich einem oder mehreren Projekten zugeordnet (`goal_projects`). Beim Löschen eines Ziels bleiben die TODOs erhalten, seine Meilensteine und Projektzuordnungen fallen mit, ein Ziel-Wächter pausiert.
+Ein Ziel bündelt TODOs projektübergreifend (V85). Die Zugehörigkeit, der Rang und die Einschätzung stehen am TODO (`todos.goal_id` …), nicht am Ziel; Fortschritt und Reihenfolge rechnet `GoalService` aus schlanken Projektionen zusammen. Seit V92 ist ein Ziel ausdrücklich einem oder mehreren Projekten zugeordnet (`goal_projects`), gegliedert in Arbeitspakete (`goal_work_packages`) mit TODOs darunter, dazu Meilensteine als Termine des ganzen Ziels (`goal_milestones`). Beim Löschen eines Ziels bleiben die TODOs erhalten, seine Arbeitspakete, Meilensteine und Projektzuordnungen fallen mit, ein Ziel-Wächter pausiert.
 
 ### `goal_projects`
 
@@ -746,7 +746,26 @@ Ein Ziel bündelt TODOs projektübergreifend (V85). Die Zugehörigkeit, der Rang
 
 **Indizes:** `idx_goal_projects_project`
 
-Die Projekte eines Ziels (V92, TODO c60bf914), n:m. Befüllt aus den TODOs der Ziele (auch archivierten); Position 0 bekam das Projekt mit den meisten nicht archivierten TODOs. Wird ein TODO aus einem noch nicht zugeordneten Projekt ins Ziel geholt (Zuordnen, `planning`, Projektwechsel des TODOs), kommt das Projekt automatisch ans Ende dazu. Entfernen lässt sich ein Projekt nur, wenn im Ziel keine Teilziele oder TODOs mehr daran hängen – sonst mit `cascade=true` (Teilziele gelöscht, TODOs vom Ziel gelöst).
+Die Projekte eines Ziels (V92, TODO c60bf914), n:m. Befüllt aus den TODOs der Ziele (auch archivierten); Position 0 bekam das Projekt mit den meisten nicht archivierten TODOs. Wird ein TODO aus einem noch nicht zugeordneten Projekt ins Ziel geholt (Zuordnen, `planning`, Projektwechsel des TODOs), kommt das Projekt automatisch ans Ende dazu. Entfernen lässt sich ein Projekt nur, wenn im Ziel keine Arbeitspakete oder TODOs mehr daran hängen – sonst mit `cascade=true` (Arbeitspakete samt Meilenstein-Verknüpfungen gelöscht, TODOs vom Ziel gelöst).
+
+### `goal_work_packages`
+
+| Spalte | Typ | Constraints | Beschreibung |
+|---|---|---|---|
+| `id` | TEXT | PK | UUID |
+| `goal_id` | TEXT | NOT NULL, FK → goals, ON DELETE CASCADE | Ziel des Arbeitspakets |
+| `project_id` | TEXT | FK → projects, ON DELETE SET NULL | Projekt des Pakets; NULL nur bei Altdaten eines Ziels ohne Projekte |
+| `title` | TEXT | NOT NULL | z. B. „Werbematerial“ |
+| `start_date` | TEXT | | Beginn des Zeitraums; nur zusammen mit `end_date`, nie danach; ein reines Datum gilt ab 00:00:00 UTC |
+| `end_date` | TEXT | | Ende des Zeitraums, Basis für „bald fällig“/„überfällig“; ein reines Datum gilt bis 23:59:59 UTC |
+| `position` | INTEGER | NOT NULL, DEFAULT 0 | Reihenfolge innerhalb seines Projekts im Ziel, ab 0 |
+| `completed_at` | TEXT | | Erstes Erkennen „alle zugeordneten TODOs erledigt“; bleibt, auch wenn das Paket wieder offen ist |
+| `created_at` | TEXT | NOT NULL | |
+| `updated_at` | TEXT | NOT NULL | |
+
+**Indizes:** `idx_goal_work_packages_goal`, `idx_goal_work_packages_goal_project` (`goal_id, project_id, position`)
+
+Arbeitspakete eines Ziels (V92, TODO c60bf914; bis V92 hießen sie Meilensteine, V88/TODO 259f4f66). Ein Paket gehört genau einem Projekt des Ziels, TODOs zeigen über `todos.work_package_id` darauf und müssen aus demselben Projekt sein (geprüft beim Schreiben, Altdaten werden gelesen). Der Zeitraum ist optional, aber nur vollständig (Start und Ende, Start ≤ Ende). Der Zustand (`OPEN`, `DUE_SOON` ≤ 3 Tage, `OVERDUE`, `REACHED` = abgeschlossen) wird beim Lesen aus dem Ende und den TODOs berechnet – ohne Zeitraum nur `OPEN` oder `REACHED`. Beim Löschen eines Pakets bleiben die TODOs im Ziel, Meilensteine verlieren die Verknüpfung. V92 hat die Meilensteine aus V88 übernommen: Datum → `end_date` und `start_date` (Ein-Tages-Paket), `reached_at` → `completed_at`; gemischte Pakete wurden aufgeteilt – je Minderheitsprojekt eine Kopie (gleicher Titel und Zeitraum, `completed_at` NULL), an der die TODOs dieses Projekts jetzt hängen. Gelesen wird nach Projekt-Position, dann `position`.
 
 ### `goal_milestones`
 
@@ -754,17 +773,26 @@ Die Projekte eines Ziels (V92, TODO c60bf914), n:m. Befüllt aus den TODOs der Z
 |---|---|---|---|
 | `id` | TEXT | PK | UUID |
 | `goal_id` | TEXT | NOT NULL, FK → goals, ON DELETE CASCADE | Ziel des Meilensteins |
-| `project_id` | TEXT | FK → projects, ON DELETE SET NULL | Projekt des Teilziels; NULL nur bei Altdaten eines Ziels ohne Projekte (V92) |
-| `title` | TEXT | NOT NULL | z. B. „Beta fertig“ |
-| `due_date` | TEXT | | Fälligkeit, optional (seit V92); ein reines Datum gilt bis 23:59:59 UTC |
-| `position` | INTEGER | NOT NULL, DEFAULT 0 | Reihenfolge innerhalb seines Projekts im Ziel, ab 0 (V92) |
-| `reached_at` | TEXT | | Erstes Erkennen „alle zugeordneten TODOs erledigt“; bleibt, auch wenn er wieder offen ist |
+| `title` | TEXT | NOT NULL | z. B. „Launch“ |
+| `due_date` | TEXT | NOT NULL | Termin; ein reines Datum gilt bis 23:59:59 UTC |
+| `reached_at` | TEXT | | Erreicht seit – mit Paketen das erste Erkennen, ohne Pakete von Hand gesetzt |
 | `created_at` | TEXT | NOT NULL | |
 | `updated_at` | TEXT | NOT NULL | |
 
-**Indizes:** `idx_goal_milestones_goal`, `idx_goal_milestones_goal_project` (`goal_id, project_id, position`, V92)
+**Indizes:** `idx_goal_milestones_goal`
 
-Meilensteine eines Ziels (V88, TODO 259f4f66) – in der Oberfläche seit V92 „Teilziele“. TODOs zeigen über `todos.milestone_id` darauf; der Zustand (`OPEN`, `DUE_SOON` ≤ 3 Tage, `OVERDUE`, `REACHED`) wird beim Lesen berechnet, nicht gespeichert – ohne Datum nur `OPEN` oder `REACHED`. Beim Löschen eines Meilensteins bleiben die TODOs im Ziel. Seit V92 (TODO c60bf914) gehört ein Teilziel genau einem Projekt des Ziels; TODOs darin müssen aus diesem Projekt sein (geprüft beim Schreiben, Altdaten werden gelesen). V92 hat gemischte Teilziele aufgeteilt: je Minderheitsprojekt eine Kopie (gleicher Titel und Datum, `reached_at` NULL), an der die TODOs dieses Projekts jetzt hängen. Gelesen wird nach Projekt-Position, dann `position`.
+Meilensteine eines Ziels (V92, TODO c60bf914): Termine des ganzen Ziels, kein Projekt, immer mit Datum. Mit verknüpften Arbeitspaketen ist ein Meilenstein erreicht, wenn alle abgeschlossen sind; `reached_at` hält den ersten Zeitpunkt fest, sind die Pakete später nicht mehr alle abgeschlossen, heißt er „wieder offen“. Ohne Pakete wird er von Hand als erreicht markiert. Sonst entscheidet das Datum (`OPEN`, `DUE_SOON`, `OVERDUE`). Nicht zu verwechseln mit den Meilensteinen aus V88 – die sind seit V92 Arbeitspakete.
+
+### `goal_milestone_work_packages`
+
+| Spalte | Typ | Constraints | Beschreibung |
+|---|---|---|---|
+| `milestone_id` | TEXT | PK (mit `work_package_id`), FK → goal_milestones, ON DELETE CASCADE | Meilenstein |
+| `work_package_id` | TEXT | PK (mit `milestone_id`), FK → goal_work_packages, ON DELETE CASCADE | Arbeitspaket desselben Ziels, von dem der Meilenstein abhängt |
+
+**Indizes:** `idx_goal_milestone_work_packages_package`
+
+Welche Arbeitspakete ein Meilenstein braucht (V92, TODO c60bf914). Beide Seiten gehören zum selben Ziel (geprüft beim Schreiben); gelöscht wird eine Verknüpfung mit dem Meilenstein oder dem Paket.
 
 ### `activity_log`
 
@@ -1128,7 +1156,7 @@ Einzige persistente Systemkonfiguration außerhalb der `application.yml`.
 | `Todo.Complexity` | `S`, `M`, `L`, `XL` | Umfang und Unsicherheit, grob – dieselbe Skala für Mensch und KI |
 | `Todo.RatedBy` | `USER`, `AI` | Wer die Einschätzung zuletzt gesetzt hat; ein Mensch überschreibt die KI |
 | `Goal.Status` | `ACTIVE`, `DONE`, `ARCHIVED` | Archivierte Ziele erscheinen nur mit ausdrücklichem Filter |
-| `GoalMilestone.State` (V88) | `OPEN`, `DUE_SOON`, `OVERDUE`, `REACHED` | Nicht gespeichert, beim Lesen aus Datum und zugeordneten TODOs berechnet; `DUE_SOON` = höchstens 3 Tage; ohne Datum nur `OPEN`/`REACHED` (V92) |
+| `GoalDueState` (V88, seit V92 für Arbeitspakete und Meilensteine) | `OPEN`, `DUE_SOON`, `OVERDUE`, `REACHED` | Nicht gespeichert, beim Lesen berechnet; `DUE_SOON` = höchstens 3 Tage. Arbeitspaket: Basis ist das Ende, `REACHED` (abgeschlossen) = alle TODOs erledigt, ohne Zeitraum nur `OPEN`/`REACHED`. Meilenstein: Basis ist sein Datum, `REACHED` = alle verknüpften Pakete abgeschlossen oder – ohne Pakete – von Hand markiert |
 
 ### LogLevel (ActivityLog)
 
@@ -1350,7 +1378,7 @@ folgt freier Text.
 | V89 | `V89__workflow_run_chain_run_id.sql` | `chain_run_id` in workflow_runs (Chain-Run eines Ketteneintrags, ohne Nachtrag für Altbestand) + Index `idx_workflow_runs_chain_run_id` |
 | V90 | `V90__keyless_integration_account_names.sql` | Kontonamen ohne Sprache für RSS/Atom und Open-Meteo in `integration_connections.account_info` (Bestand nachgezogen) |
 | V91 | `V91__page_suggestions_per_locale.sql` | `locale` in page_suggestions (Tabellenneubau: `UNIQUE(page)` → `UNIQUE(page, locale)`, Bestand gilt als deutsch) |
-| V92 | `V92__goal_projects_and_subgoals.sql` | neue Tabelle `goal_projects` (aus den TODOs befüllt); `goal_milestones` neu gebaut mit `project_id`, `position`, `due_date` optional – gemischte Teilziele je Minderheitsprojekt aufgeteilt, `todos.milestone_id` vor dem Neubau gesichert und zurückgeschrieben |
+| V92 | `V92__goal_projects_work_packages_milestones.sql` | neue Tabelle `goal_projects` (aus den TODOs befüllt); die bisherigen Meilensteine werden `goal_work_packages` (Neubau mit `project_id`, `position`, `start_date`/`end_date`, `completed_at`; gemischte Pakete je Minderheitsprojekt aufgeteilt), `todos.milestone_id` → `work_package_id` (vor dem Neubau gesichert und zurückgeschrieben); neue Tabellen `goal_milestones` (Termine des Ziels) und `goal_milestone_work_packages` |
 
 ## SQLite-Besonderheiten
 
