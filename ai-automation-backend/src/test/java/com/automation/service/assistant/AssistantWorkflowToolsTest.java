@@ -6,9 +6,12 @@ import com.automation.entity.ChangeSource;
 import com.automation.entity.TriggerSource;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowRun;
+import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.workflow.RunControlService;
 import com.automation.service.workflow.WorkflowExecutor;
 import com.automation.service.workflow.WorkflowService;
+import com.automation.service.workflow.analyzer.GeneratedWorkflowCheck;
+import com.automation.service.workflow.analyzer.WorkflowAnalyzer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,11 +36,14 @@ class AssistantWorkflowToolsTest {
     @Mock private WorkflowService workflowService;
     @Mock private WorkflowExecutor workflowExecutor;
     @Mock private RunControlService runControlService;
+    @Mock private ActivityLogService activityLogService;
     private AssistantWorkflowTools tools;
 
     @BeforeEach
     void setUp() {
-        tools = new AssistantWorkflowTools(workflowService, workflowExecutor, runControlService, new ObjectMapper());
+        ObjectMapper mapper = new ObjectMapper();
+        tools = new AssistantWorkflowTools(workflowService, workflowExecutor, runControlService, mapper,
+                new GeneratedWorkflowCheck(new WorkflowAnalyzer(), mapper, activityLogService));
     }
 
     @Test
@@ -177,5 +183,47 @@ class AssistantWorkflowToolsTest {
         assertThat(tools.cancelRun("{}")).isEqualTo("⚠ cancel_run: runId is a required field.");
         doThrow(new RuntimeException("gone")).when(runControlService).cancelExecution("r");
         assertThat(tools.cancelRun("{\"runId\":\"r\"}")).isEqualTo("⚠ Could not cancel run: gone");
+    }
+
+    // ── build check after create/update (TODO 326d5987) ──
+
+    /** simple block with {@code prompt} instead of {@code command}: one HIGH and one MEDIUM finding. */
+    private static Workflow withPromptInsteadOfCommand(String id, String name) {
+        return Workflow.builder().id(id).name(name).blocks(new java.util.ArrayList<>(java.util.List.of(
+                com.automation.entity.BlockDefinition.builder().type("simple")
+                        .config(new java.util.HashMap<>(Map.of("prompt", "Fasse zusammen"))).build()))).build();
+    }
+
+    @Test
+    void createWorkflow_withFindings_appendsTheBuildCheckHighFirst() {
+        when(workflowService.create(any(), eq(ChangeSource.ASSISTANT))).thenReturn(withPromptInsteadOfCommand("wf-1", "Daily"));
+
+        String r = tools.createWorkflow("{\"projectId\":\"p\",\"name\":\"Daily\",\"blocks\":[{\"type\":\"simple\",\"config\":{\"prompt\":\"Fasse zusammen\"}}]}");
+
+        assertThat(r).startsWith("✓ Workflow created: \"Daily\" (ID: wf-1)\n\nBaufehler-Prüfung: 2 Befund(e) ab MEDIUM\n")
+                .endsWith("\nMit update_workflow lassen sie sich beheben.");
+        assertThat(r.indexOf("- HIGH missing-required-config-key")).isPositive()
+                .isLessThan(r.indexOf("- MEDIUM unknown-config-key"));
+    }
+
+    @Test
+    void updateWorkflow_withFindings_appendsTheBuildCheck() {
+        when(workflowService.update(eq("wf-1"), any(), eq(ChangeSource.ASSISTANT))).thenReturn(withPromptInsteadOfCommand("wf-1", "Daily"));
+
+        String r = tools.updateWorkflow("{\"workflowId\":\"wf-1\",\"name\":\"Daily\"}");
+
+        assertThat(r).startsWith("✓ Workflow updated: \"Daily\" (ID: wf-1)\n\nBaufehler-Prüfung:")
+                .contains("HIGH missing-required-config-key");
+    }
+
+    @Test
+    void createWorkflow_cleanDefinition_lineStaysExactlyAsBefore() {
+        Workflow clean = Workflow.builder().id("wf-1").name("Daily").blocks(new java.util.ArrayList<>(java.util.List.of(
+                com.automation.entity.BlockDefinition.builder().type("simple")
+                        .config(new java.util.HashMap<>(Map.of("command", "Fasse zusammen"))).build()))).build();
+        when(workflowService.create(any(), eq(ChangeSource.ASSISTANT))).thenReturn(clean);
+
+        assertThat(tools.createWorkflow("{\"projectId\":\"p\",\"name\":\"Daily\"}"))
+                .isEqualTo("✓ Workflow created: \"Daily\" (ID: wf-1)");
     }
 }
