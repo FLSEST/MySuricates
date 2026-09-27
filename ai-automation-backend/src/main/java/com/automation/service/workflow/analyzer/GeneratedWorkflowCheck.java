@@ -4,9 +4,6 @@ import com.automation.entity.ActivityLog.LogCategory;
 import com.automation.entity.BlockDefinition;
 import com.automation.entity.Workflow;
 import com.automation.service.activitylog.ActivityLogService;
-import com.automation.util.JsonRepairUtil;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,7 +11,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
 
 /**
@@ -28,8 +24,10 @@ import java.util.List;
  *   <li>{@link #format} macht daraus einen kompakten Text: je Zeile Schwere, Regel, Block, Detail — höchstens
  *       {@value #MAX_LINES} Zeilen und ein „… und N weitere“.</li>
  *   <li>{@link #correctOnce} gibt der KI bei {@code HIGH}-Befunden <b>genau eine</b> Korrekturrunde; nie bei
- *       {@code MEDIUM}/{@code LOW} (Kostenregel). Ist die Antwort unbrauchbar oder hat die korrigierte Fassung
- *       mehr {@code HIGH}-Befunde, gilt die ursprüngliche.</li>
+ *       {@code MEDIUM}/{@code LOW} (Kostenregel). Ist die Antwort unbrauchbar, hat sie eine andere Struktur
+ *       (Blockzahl, Blocktyp je Position, Zahl der verschachtelten Blöcke je Container) oder hat die korrigierte
+ *       Fassung mehr {@code HIGH}-Befunde, gilt die ursprüngliche. Lässt die Korrektur {@code name},
+ *       {@code skillIds} oder {@code requiredCapabilities} eines Blocks weg, kommen sie aus dem Original.</li>
  * </ul>
  *
  * <p>Die Prüfung ändert nie selbst etwas und blockiert kein Speichern. Der KI-Aufruf kommt vom Aufrufer
@@ -129,7 +127,7 @@ public class GeneratedWorkflowCheck {
         }
         List<BlockDefinition> corrected;
         try {
-            corrected = parseBlocks(model.ask(correctionPrompt(blocks, before)));
+            corrected = CorrectionAnswer.parse(model.ask(correctionPrompt(blocks, before)), objectMapper);
         } catch (Exception e) {
             log.warn("Baufehler-Korrektur: KI-Aufruf fehlgeschlagen, ursprüngliche Fassung bleibt: {}", e.getMessage());
             corrected = List.of();
@@ -138,6 +136,14 @@ public class GeneratedWorkflowCheck {
             log.info("Baufehler-Korrektur: Antwort unbrauchbar, ursprüngliche Fassung bleibt ({} HIGH)", highBefore);
             return new Correction(blocks, before, true, false);
         }
+        String shapeChange = CorrectionAnswer.shapeChange(blocks, corrected);
+        if (shapeChange != null) {
+            // Typischer Fehler: das Modell liefert nur den reparierten Block zurück — die übrigen fielen still weg.
+            log.warn("Baufehler-Korrektur verworfen, Struktur geändert: {} (Blöcke vorher {}, nachher {}); "
+                    + "ursprüngliche Fassung bleibt", shapeChange, blocks.size(), corrected.size());
+            return new Correction(blocks, before, true, false);
+        }
+        CorrectionAnswer.keepOmittedFields(blocks, corrected);
         List<AnalyzerFinding> after = findings(corrected, instructions);
         if (highCount(after) > highBefore) {
             log.info("Baufehler-Korrektur: korrigierte Fassung hat mehr HIGH-Befunde ({} > {}), ursprüngliche bleibt",
@@ -157,8 +163,9 @@ public class GeneratedWorkflowCheck {
         }
         return """
                 The workflow blocks you produced fail the platform's deterministic build check.
-                Fix every finding marked HIGH. Keep everything else as it is: same purpose, same block order,
-                no additional blocks unless a finding requires one. Block numbers count from 1 in array order.
+                Fix every finding marked HIGH. Return ALL blocks, not only the fixed ones: same number of blocks,
+                same order, same type at every position, same block names. Keep everything else as it is.
+                Block numbers count from 1 in array order.
 
                 CURRENT BLOCKS (JSON):
                 %s
@@ -168,72 +175,6 @@ public class GeneratedWorkflowCheck {
 
                 Output ONLY the corrected blocks array as JSON. Do not wrap it in markdown code fences.
                 """.formatted(blocksJson, format(findings));
-    }
-
-    /**
-     * Liest eine Blockliste aus einer Modellantwort: ein JSON-Array oder ein Objekt mit {@code blocks},
-     * gern in Code-Fences. Leer, wenn nichts Brauchbares darin steht.
-     */
-    List<BlockDefinition> parseBlocks(String response) {
-        if (response == null || response.isBlank()) {
-            return List.of();
-        }
-        try {
-            String text = stripFences(response.trim());
-            int arr = text.indexOf('[');
-            int obj = text.indexOf('{');
-            JsonNode node;
-            if (arr >= 0 && (obj < 0 || arr < obj)) {
-                node = JsonRepairUtil.readTreeWithRepair(text.substring(arr, text.lastIndexOf(']') + 1));
-            } else if (obj >= 0) {
-                node = JsonRepairUtil.readTreeWithRepair(text.substring(obj, text.lastIndexOf('}') + 1)).path("blocks");
-            } else {
-                return List.of();
-            }
-            if (!node.isArray()) {
-                return List.of();
-            }
-            List<BlockDefinition> blocks = new ArrayList<>();
-            for (JsonNode b : node) {
-                if (!b.isObject()) {
-                    return List.of();
-                }
-                blocks.add(toBlock(b));
-            }
-            return blocks;
-        } catch (Exception e) {
-            log.debug("Baufehler-Korrektur: Antwort nicht lesbar: {}", e.getMessage());
-            return List.of();
-        }
-    }
-
-    private BlockDefinition toBlock(JsonNode b) {
-        BlockDefinition block = new BlockDefinition();
-        block.setType(b.path("type").asText("simple"));
-        if (b.hasNonNull("name")) {
-            block.setName(b.get("name").asText());
-        }
-        if (b.path("config").isObject()) {
-            block.setConfig(objectMapper.convertValue(b.get("config"), new TypeReference<LinkedHashMap<String, Object>>() {}));
-        }
-        if (b.path("requiredCapabilities").isArray()) {
-            block.setRequiredCapabilities(objectMapper.convertValue(b.get("requiredCapabilities"), new TypeReference<>() {}));
-        }
-        if (b.path("skillIds").isArray()) {
-            block.setSkillIds(objectMapper.convertValue(b.get("skillIds"), new TypeReference<>() {}));
-        }
-        return block;
-    }
-
-    private static String stripFences(String text) {
-        if (text.startsWith("```")) {
-            int firstNewline = text.indexOf('\n');
-            int lastFence = text.lastIndexOf("```");
-            if (firstNewline > 0 && lastFence > firstNewline) {
-                return text.substring(firstNewline + 1, lastFence).trim();
-            }
-        }
-        return text;
     }
 
     /**

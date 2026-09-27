@@ -184,6 +184,70 @@ class GeneratedWorkflowCheckTest {
         assertThat(result.blocks()).isSameAs(original);
     }
 
+    /** Kaputter Block plus gesunder Block danach. */
+    private static List<BlockDefinition> badAndHealthy() {
+        return new ArrayList<>(List.of(
+                block("simple", "zusammenfassung", Map.of("prompt", "Fasse zusammen")),
+                block("shell", "ablage", Map.of("command", "set -euo pipefail\necho ok"))));
+    }
+
+    @Test
+    void korrekturOhneDenGesundenBlockLaesstDasOriginal() {
+        var original = badAndHealthy();
+
+        // typischer Fehler: nur der reparierte Block kommt zurück — weniger HIGH, aber ein Block fehlt
+        var result = check.correctOnce(original, null, p -> GOOD_BLOCKS);
+
+        assertThat(result.attempted()).isTrue();
+        assertThat(result.applied()).isFalse();
+        assertThat(result.blocks()).isSameAs(original);
+        assertThat(GeneratedWorkflowCheck.highCount(result.remaining())).isEqualTo(1);
+    }
+
+    @Test
+    void korrekturMitGeaendertemBlocktypLaesstDasOriginal() {
+        var original = badBlocks();
+
+        var result = check.correctOnce(original, null,
+                p -> "[{\"type\":\"shell\",\"config\":{\"command\":\"set -euo pipefail\\necho ok\"}}]");
+
+        assertThat(result.applied()).isFalse();
+        assertThat(result.blocks()).isSameAs(original);
+    }
+
+    @Test
+    void korrekturOhneNameUebernimmtNameSkillsUndCapabilitiesAusDemOriginal() {
+        var original = badAndHealthy();
+        original.get(0).setSkillIds(new ArrayList<>(List.of("skill-1")));
+        original.get(0).setRequiredCapabilities(new ArrayList<>(List.of("web")));
+
+        var result = check.correctOnce(original, null, p -> "[{\"type\":\"simple\",\"config\":{\"command\":\"Fasse zusammen\"}},"
+                + "{\"type\":\"shell\",\"config\":{\"command\":\"set -euo pipefail\\necho ok\"}}]");
+
+        assertThat(result.applied()).isTrue();
+        assertThat(result.blocks()).extracting(BlockDefinition::getName).containsExactly("zusammenfassung", "ablage");
+        assertThat(result.blocks().get(0).getSkillIds()).containsExactly("skill-1");
+        assertThat(result.blocks().get(0).getRequiredCapabilities()).containsExactly("web");
+        assertThat(result.blocks().get(0).getConfig()).containsEntry("command", "Fasse zusammen");
+    }
+
+    @Test
+    void shapeChangeErkenntFehlendeVerschachtelteBloecke() {
+        var switchBlock = block("switch", "weiche", Map.of("cases", List.of(Map.of("blocks", List.of(
+                Map.of("type", "simple", "config", Map.of("command", "a")),
+                Map.of("type", "simple", "config", Map.of("command", "b")))))));
+        var ohneZweiten = block("switch", "weiche", Map.of("cases", List.of(Map.of("blocks", List.of(
+                Map.of("type", "shell", "config", Map.of("command", "a")))))));
+        var gleichGeformt = block("switch", "weiche", Map.of("cases", List.of(Map.of("blocks", List.of(
+                Map.of("type", "shell", "config", Map.of("command", "a")),
+                Map.of("type", "simple", "config", Map.of("command", "b")))))));
+
+        assertThat(CorrectionAnswer.shapeChange(List.of(switchBlock), List.of(ohneZweiten)))
+                .isEqualTo("Block 1: verschachtelte Blöcke 2 → 1");
+        assertThat(CorrectionAnswer.shapeChange(List.of(switchBlock), List.of(gleichGeformt))).isNull();
+        assertThat(CorrectionAnswer.shapeChange(badAndHealthy(), badBlocks())).isEqualTo("Blockzahl 2 → 1");
+    }
+
     @Test
     void reportRemainingSchreibtWarnAmWorkflow() {
         var findings = check.findings(badBlocks(), null);
