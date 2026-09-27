@@ -516,24 +516,45 @@ sonst `--ref`), nie der Arbeitsbaum. Braucht Docker.
 ./scripts/installer-probe.sh --image rockylinux:9   # dasselbe auf einem dnf-System
 ./scripts/installer-probe.sh --ref main --keep      # danach die frische Instanz im Browser ansehen
 ./scripts/installer-probe.sh --setup-flags "--with-pi"   # Phase 2 mit Zusatz-Flags, hier pi mitinstallieren
+./scripts/installer-probe.sh --way container        # Standardweg: die Instanz im Container
+./scripts/installer-probe.sh --way staged           # Dev · Test · Prod, drei Container
+./scripts/installer-probe.sh --cleanup <lauf>       # Reste eines Laufs mit --keep wegräumen
 ```
 
 Die interaktive Maschine teilt das Netz des Rechners (`--network host`): Die Adresse, die
 `setup.sh` am Ende nennt, öffnet man direkt im Browser, belegte Ports des Rechners umgeht der
 Installer selbst. Im Modus-Schritt „auf diesem Rechner“ wählen — Docker gibt es in der Probe nicht.
 
-Der automatische Lauf nimmt den Weg „eine Instanz auf diesem Rechner“ aus
-[GETTING-STARTED.md](GETTING-STARTED.md) in zwei Phasen, jede unter einem Pseudo-Terminal:
-`setup.sh --check` (nur prüfen) und `setup.sh --yes --runtime host --bind 0.0.0.0` (ein Durchgang
-bis zur laufenden Instanz). Den Exit-Code schreibt jede Phase selbst in eine Datei im Container —
+Der automatische Lauf nimmt einen Weg aus [GETTING-STARTED.md](GETTING-STARTED.md) (`--way`,
+Default `host` = „eine Instanz auf diesem Rechner“) in zwei Phasen, jede unter einem Pseudo-Terminal:
+`setup.sh --check` (nur prüfen) und `setup.sh --yes …` (ein Durchgang bis zur laufenden Instanz) —
+auf dem Rechner mit `--runtime host --bind 0.0.0.0`, im Container (`--way container`) mit den
+Vorgaben und nur `--port`, gestuft (`--way staged`) mit `--mode staged --port`. Den Exit-Code schreibt jede Phase selbst in eine Datei im Container —
 über `script` und `docker exec` ging ein Abbruch schon als 0 durch. Rot wird der Lauf, wenn Phase 1
 fehlende Tools nicht nennt, Phase 2 nicht mit Exit 0 endet, Health oder Oberfläche auf dem einen
 Port nicht antworten, der Login mit dem erzeugten Key scheitert, der Key in einem Log steht, das
-Backend nicht genau einmal gebaut wird oder der Klon danach nicht mehr sauber ist (`git status`).
+Backend nicht genau einmal gebaut wird (nur auf dem Rechner) oder der Klon danach nicht mehr sauber ist
+(`git status`). Die Container-Wege prüfen dazu je Instanz, dass sie nur auf `127.0.0.1` veröffentlicht
+ist und keinen Docker-Socket hat (die Vorgaben); gestuft außerdem drei gesunde Instanzen auf
+verschiedenen Ports und Prod mit Siegelpflicht (`environment` Prod, `sealing` und
+`require-sealed-for-unattended` an — aus `/api/v1/system/capabilities` der Instanz selbst).
 Das Ergebnis ist eine einzelne HTML-Seite mit Terminal-Mitschnitt und Screenshots unter
 `~/.local/state/mysuricates/installer-probe/<zeit>-<sha>/report.html` (`latest` zeigt auf den letzten
-Lauf). Ein Lauf lädt JDK, Node, npm-Pakete und Maven-Abhängigkeiten jedes Mal frisch. Der
-Container-Weg (Docker im Container) ist noch nicht Teil der Probe.
+Lauf). Ein Lauf lädt JDK, Node, npm-Pakete und Maven-Abhängigkeiten jedes Mal frisch.
+
+Für die Container-Wege bekommt die Probe-Maschine den Docker des Rechners: den Socket (die Gruppe
+`docker` darin hat dessen Gruppen-ID, Docker selbst installiert `setup.sh` wie bei jedem Nutzer, der
+Dienst ist der des Rechners), das Netz des Rechners und einen Ordner des Rechners unter demselben Pfad
+für Klon und Projektordner — die Bind-Mounts des inneren Compose löst der Docker-Dienst des Rechners
+auf. Das Netz des Rechners statt einer Sonderbindung: `setup.sh` sieht so die dort belegten Ports
+selbst, die Instanzen bleiben auf der Vorgabe `127.0.0.1`, und die Probe prüft sie von außen genau
+dort. Die Ports wählt die Probe ab 19190 und nie 8090, 9090, 9091 oder 9095 (Dev, Test, Stable,
+Tryout — auch wenn die gerade nicht laufen). Alle Docker-Namen des Laufs tragen seine Vorsilbe
+`mysuricates-installer-probe-<zeit>` (`MYSURICATES_PREFIX` an `instance.sh`: Container, Compose-Projekt,
+Volumes `…-data`/`-secrets`, Image); am Ende — auch nach Abbruch — räumt die Probe genau diese weg,
+jeder Name vorher gegen die Vorsilbe geprüft. Laufende Instanzen des Rechners bleiben unberührt. Wer
+den Socket hat, steuert den Docker des Rechners: nur mit Ständen starten, deren `setup.sh` man traut.
+Nicht geprüft wird dabei, ob `setup.sh` einen Docker-Dienst startet — den gibt es im Container nicht.
 Die Screenshots macht Playwright aus `ai-automation-frontend/node_modules` auf dem Rechner. Fehlt
 der Browser zur installierten Playwright-Version (typisch nach einem Update), wird die Login-Prüfung
 rot mit „Browser fehlt — im Frontend `npm run pw:install` ausführen“; die Probe lädt nichts nach.

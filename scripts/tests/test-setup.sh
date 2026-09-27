@@ -172,6 +172,9 @@ check "test is like prod"                               '[ "$(val test MYSURICAT
 check "display names Dev / Test / Prod"                 '[ "$(val prod MYSURICATES_ENVIRONMENT)" = Prod ] && [ "$(val dev MYSURICATES_ENVIRONMENT)" = Dev ]'
 check "staged runs in containers"                       '[ "$(val test MYSURICATES_RUNTIME)" = container ]'
 check "staged: only the login in all three"             '[ "$(val dev MYSURICATES_AI_FROM_HOST)" = login ] && [ "$(val prod MYSURICATES_AI_FROM_HOST)" = login ]'
+rm -rf "$INST"
+D="$(firstfree 19750)"; T="$(firstfree 19751 "$D")"; P="$(firstfree 19752 "$D $T")"
+check "staged --port N: Dev from N, Test N+1, Prod N+2"  '[ "$(run --yes --dry-run --mode staged --port 19750)" = 0 ] && [ "$(val dev MYSURICATES_PORT)" = "$D" ] && [ "$(val test MYSURICATES_PORT)" = "$T" ] && [ "$(val prod MYSURICATES_PORT)" = "$P" ]'
 
 echo "6) choices as flags"
 rm -rf "$INST"

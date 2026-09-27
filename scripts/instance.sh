@@ -20,7 +20,8 @@
 # programs|login|all (was von den KI-Anbietern des Rechners in den Container kommt; Default login =
 # Programme + je Anbieter nur die Anmeldung), AI_PROVIDERS (Auswahl aus claude,codex,pi), HARDENING_SEALING,
 # HARDENING_REQUIRE_SEALED (true|false), ENVIRONMENT (Anzeigename), APT_REFRESH (Container: ein neuer
-# Wert, etwa der Monat, holt NodeSource- und Docker-Repo des Images frisch). Jede AUTOMATION_*-Zeile geht
+# Wert, etwa der Monat, holt NodeSource- und Docker-Repo des Images frisch), PREFIX (Container: Vorsilbe
+# der Docker-Namen PREFIX-NAME und des Images PREFIX:local, Default mysuricates). Jede AUTOMATION_*-Zeile geht
 # unveraendert an die Instanz (Einzelmodule, Haertung, AUTOMATION_AI_DEFAULT_PROVIDER …).
 #
 # Host: gebaut wird in eine Kopie unter ${XDG_STATE_HOME:-~/.local/state}/mysuricates/NAME/ (JAR +
@@ -98,16 +99,22 @@ done < "$ENV_FILE"
 RUNTIME="${MYSURICATES_RUNTIME:-container}"
 PORT="$MYSURICATES_PORT"
 BIND="${MYSURICATES_BIND:-127.0.0.1}"
-export MYSURICATES_NAME="$NAME" MYSURICATES_ENV_FILE="$ENV_FILE"
+# Namen im Docker: Container und Compose-Projekt PREFIX-NAME, Volumes PREFIX-NAME-data/-secrets, Image
+# PREFIX:local. Die Vorsilbe (Default mysuricates) haelt etwa die Installer-Probe mit ihrem Docker im
+# Container von echten Instanzen desselben Rechners fern — gleiche Namen hiessen gleiche Volumes.
+PREFIX="${MYSURICATES_PREFIX:-mysuricates}"
+case "$PREFIX" in *[!a-z0-9-]*|-*) die "MYSURICATES_PREFIX nur aus a-z, 0-9 und - (nicht am Anfang)" ;; esac
+CONTAINER="$PREFIX-$NAME"; IMAGE="$PREFIX:local"
+export MYSURICATES_NAME="$NAME" MYSURICATES_ENV_FILE="$ENV_FILE" MYSURICATES_CONTAINER="$CONTAINER" MYSURICATES_IMAGE="$IMAGE"
 HOST_UID="$(id -u)"; HOST_GID="$(id -g)"; HOST_USER="$(id -un)"; HOST_HOME="$HOME"
 export HOST_UID HOST_GID HOST_USER HOST_HOME
 
 # "läuft"-Meldung: lokal eine Zeile wie bisher; bindet die Instanz ins Netz (--bind 0.0.0.0), dazu
 # die Netzadresse(n) dieses Rechners und der VPN-Hinweis (b8aa3866, scripts/lib/netaddr.sh)
 say_running() {  # WORT
-  if netaddr_is_local "$BIND"; then echo "mysuricates-$NAME $1: $(netaddr_local_url "$BIND" "$PORT")"; return 0; fi
+  if netaddr_is_local "$BIND"; then echo "$CONTAINER $1: $(netaddr_local_url "$BIND" "$PORT")"; return 0; fi
   i18n_load "${MYSURICATES_LANG:-de}"
-  echo "mysuricates-$NAME $1:"
+  echo "$CONTAINER $1:"
   netaddr_lines "$BIND" "$PORT" | sed 's/^/  /'
 }
 
@@ -120,7 +127,7 @@ warn_running_runs() {  # KEY
   local n
   n="$(instance_running_runs "$(instance_api_base "$BIND" "$PORT")" "${1:-}")"
   [ -n "$n" ] && [ "$n" -gt 0 ] || return 0
-  echo "mysuricates-$NAME: $n Workflow-Run(s) laufen noch — sie brechen jetzt ab." >&2
+  echo "$CONTAINER: $n Workflow-Run(s) laufen noch — sie brechen jetzt ab." >&2
 }
 # Belegt = irgendetwas nimmt auf der Adresse der Instanz Verbindungen an (nicht: antwortet wie MySuricates)
 port_busy() { (exec 3<>"/dev/tcp/$(instance_connect_addr "$BIND")/$PORT") 2>/dev/null; }
@@ -151,13 +158,13 @@ is_git_clone() { [ "$(git -C "$REPO_ROOT" rev-parse --show-toplevel 2>/dev/null)
 
 container_cmd() {
   local override="$INSTANCES_DIR/$NAME.override.yml" owner missing login_command
-  compose() { docker compose -p "mysuricates-$NAME" -f "$COMPOSE_FILE" -f "$override" "$@"; }
+  compose() { docker compose -p "$CONTAINER" -f "$COMPOSE_FILE" -f "$override" "$@"; }
   build_image() {
     if is_git_clone; then
-      echo "Baue Image mysuricates:local aus den getrackten Dateien des Klons ..."
+      echo "Baue Image $IMAGE aus den getrackten Dateien des Klons ..."
       # APT_REFRESH wie in deploy/compose.yml: ein neuer Wert holt die Fremd-Repos frisch (8b7a39b9)
       tracked_files_tar | docker build -f deploy/Dockerfile --target runtime \
-        --build-arg "APT_REFRESH=${MYSURICATES_APT_REFRESH:-}" -t mysuricates:local -
+        --build-arg "APT_REFRESH=${MYSURICATES_APT_REFRESH:-}" -t "$IMAGE" -
     else
       # Ohne git (etwa ein entpacktes Release-Archiv, das ohnehin nur Getracktes enthaelt): der Ordner
       compose build
@@ -166,9 +173,9 @@ container_cmd() {
   # Ein gleichnamiger Container aus einer anderen Einrichtung (z. B. docker-compose.test.yml →
   # mysuricates-test) wird nie angefasst; down/logs bleiben ohnehin im eigenen Compose-Projekt.
   case "$CMD" in down|logs) ;; *)
-    if owner="$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' "mysuricates-$NAME" 2>/dev/null)" \
-       && [ "$owner" != "mysuricates-$NAME" ]; then
-      die "Es gibt schon einen Container mysuricates-$NAME aus einer anderen Einrichtung (Compose-Projekt: ${owner:-keins}) — bitte einen anderen Namen wählen (--name)"
+    if owner="$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' "$CONTAINER" 2>/dev/null)" \
+       && [ "$owner" != "$CONTAINER" ]; then
+      die "Es gibt schon einen Container $CONTAINER aus einer anderen Einrichtung (Compose-Projekt: ${owner:-keins}) — bitte einen anderen Namen wählen (--name)"
     fi ;;
   esac
   case "$CMD" in
@@ -187,28 +194,28 @@ container_cmd() {
       compose up -d --no-build || exit 1
       [ "$WAIT" = 1 ] || exit 0
       if wait_health container_healthy; then say_running läuft; exit 0; fi
-      echo "mysuricates-$NAME wurde nicht rechtzeitig gesund — scripts/instance.sh logs --name $NAME" >&2; exit 1 ;;
+      echo "$CONTAINER wurde nicht rechtzeitig gesund — scripts/instance.sh logs --name $NAME" >&2; exit 1 ;;
     down)
       # Key nur aus dem eigenen Container — einen gleichnamigen aus einer anderen Einrichtung fasst down nicht an
-      if [ "$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' "mysuricates-$NAME" 2>/dev/null)" = "mysuricates-$NAME" ]; then
-        warn_running_runs "$(docker exec -u "$HOST_UID" "mysuricates-$NAME" cat "$HOST_HOME/.autotrigger/api-key" 2>/dev/null)"
+      if [ "$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' "$CONTAINER" 2>/dev/null)" = "$CONTAINER" ]; then
+        warn_running_runs "$(docker exec -u "$HOST_UID" "$CONTAINER" cat "$HOST_HOME/.autotrigger/api-key" 2>/dev/null)"
       fi
       compose down ;;
-    status) docker inspect -f '{{.State.Status}} {{.State.Health.Status}}' "mysuricates-$NAME" 2>/dev/null || echo "nicht gestartet" ;;
+    status) docker inspect -f '{{.State.Status}} {{.State.Health.Status}}' "$CONTAINER" 2>/dev/null || echo "nicht gestartet" ;;
     logs)   compose logs --tail 200 ;;
-    key)    docker exec -u "$HOST_UID" "mysuricates-$NAME" cat "$HOST_HOME/.autotrigger/api-key" ;;
+    key)    docker exec -u "$HOST_UID" "$CONTAINER" cat "$HOST_HOME/.autotrigger/api-key" ;;
     login)
       # Im Modus login kommt die Anmeldung vom Rechner; eine zweite im Container ueberschriebe dort die
       # eingebundene auth.json (Codex, Pi) oder liefe am Token vorbei (Claude).
       [ "${MYSURICATES_AI_FROM_HOST:-login}" = programs ] \
-        || die "mysuricates-$NAME nutzt die Anmeldung dieses Rechners (MYSURICATES_AI_FROM_HOST=${MYSURICATES_AI_FROM_HOST:-login}). Eigene Anmeldung nur mit MYSURICATES_AI_FROM_HOST=programs in $ENV_FILE"
+        || die "$CONTAINER nutzt die Anmeldung dieses Rechners (MYSURICATES_AI_FROM_HOST=${MYSURICATES_AI_FROM_HOST:-login}). Eigene Anmeldung nur mit MYSURICATES_AI_FROM_HOST=programs in $ENV_FILE"
       provider_login_argv "${TOOL:-claude}" || die "login kennt claude, codex, pi"
-      docker exec -it -u "$HOST_UID" "mysuricates-$NAME" "${PROVIDER_LOGIN_ARGV[@]}" ;;
+      docker exec -it -u "$HOST_UID" "$CONTAINER" "${PROVIDER_LOGIN_ARGV[@]}" ;;
     built)  die "built gibt es nur für Host-Instanzen — im Container baut docker compose das Image bei jedem up" ;;
     *)      die "Unbekannter Befehl: $CMD (up|down|status|logs|key|list|login|built)" ;;
   esac
 }
-container_healthy() { [ "$(docker inspect -f '{{.State.Health.Status}}' "mysuricates-$NAME" 2>/dev/null)" = healthy ]; }
+container_healthy() { [ "$(docker inspect -f '{{.State.Health.Status}}' "$CONTAINER" 2>/dev/null)" = healthy ]; }
 
 # ---------------------------------------------------------------------------------------------------
 # Host — ein java-Prozess, gebautes Frontend, Zustand je Instanz
@@ -278,7 +285,7 @@ EOF
         # Nie still auf dem alten Stand weiterlaufen (1c016162) — aber auch nicht ungefragt anhalten:
         # das beendete laufende Workflow-Runs. Uebernommen wird der neue Stand mit down und up.
         if [ "$st" = outdated ]; then
-          echo "mysuricates-$NAME läuft mit Stand $(short_sha "$built"), der Klon steht auf $(short_sha "$head") — nicht übernommen." >&2
+          echo "$CONTAINER läuft mit Stand $(short_sha "$built"), der Klon steht auf $(short_sha "$head") — nicht übernommen." >&2
           echo "  Übernehmen (baut neu): scripts/instance.sh down --name $NAME && scripts/instance.sh up --name $NAME" >&2
         elif [ "$REBUILD" = 1 ]; then
           echo "--rebuild wirkt erst auf eine gestoppte Instanz: scripts/instance.sh down --name $NAME, dann up --rebuild" >&2
@@ -324,15 +331,15 @@ EOF
       ) || exit 1
       [ "$WAIT" = 1 ] || exit 0
       if wait_health health_ok; then say_running läuft; exit 0; fi
-      echo "mysuricates-$NAME wurde nicht rechtzeitig gesund — scripts/instance.sh logs --name $NAME" >&2; exit 1 ;;
+      echo "$CONTAINER wurde nicht rechtzeitig gesund — scripts/instance.sh logs --name $NAME" >&2; exit 1 ;;
     down)
-      if ! host_running; then echo "mysuricates-$NAME läuft nicht"; rm -f "$PID_FILE"; exit 0; fi
+      if ! host_running; then echo "$CONTAINER läuft nicht"; rm -f "$PID_FILE"; exit 0; fi
       warn_running_runs "$(cat "$STATE/home/.autotrigger/api-key" 2>/dev/null)"
       pid="$(cat "$PID_FILE")"
       kill "$pid" 2>/dev/null
       i=0; while kill -0 "$pid" 2>/dev/null && [ "$i" -lt 30 ]; do sleep 1; i=$((i + 1)); done
       kill -0 "$pid" 2>/dev/null && kill -9 "$pid" 2>/dev/null
-      rm -f "$PID_FILE"; echo "mysuricates-$NAME gestoppt" ;;
+      rm -f "$PID_FILE"; echo "$CONTAINER gestoppt" ;;
     status)
       if host_running; then
         if health_ok; then echo "running healthy"; else echo "running starting"; fi

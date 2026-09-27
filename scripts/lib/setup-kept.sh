@@ -31,6 +31,7 @@ kept_load() {
     # Alle drei bleiben: die Fragen nach Anbieter und KI-Zugang entfallen, gezeigt wird, was drinsteht
     KEPT=1
     for n in dev test prod; do provs="$provs${provs:+ · }$n $(kept_provider "$n")"; done
+    _kept_flag --port "$PORT" "$(kept_value dev MYSURICATES_PORT)"
     _kept_flag --provider "$PROVIDER" "$(kept_provider dev)"
     _kept_flag --ai-from-host "$AI_FROM_HOST" "$(kept_or dev MYSURICATES_AI_FROM_HOST login)"
     _kept_flag --ai-providers "$AI_PROVIDERS" "$(kept_value dev MYSURICATES_AI_PROVIDERS)"

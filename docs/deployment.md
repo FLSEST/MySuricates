@@ -38,6 +38,7 @@ scripts/instance.sh down --name main     # stoppen; Daten bleiben in den Volumes
 | `MYSURICATES_HARDENING_SEALING`, `MYSURICATES_HARDENING_REQUIRE_SEALED` | Härtung, `true`/`false` |
 | `MYSURICATES_ENVIRONMENT` | Anzeigename, z. B. `Prod` |
 | `MYSURICATES_APT_REFRESH` | ein neuer Wert (etwa der Monat) holt beim nächsten `up` NodeSource- und Docker-Repo des Images frisch, statt Schlüssel, Paketlisten und Pakete aus dem Schichten-Cache des ersten Baus zu nehmen; geht auch als Umgebungsvariable (8b7a39b9) |
+| `MYSURICATES_PREFIX` | Vorsilbe der Docker-Namen, Default `mysuricates`: Container und Compose-Projekt `<vorsilbe>-<name>`, Volumes `<vorsilbe>-<name>-data`/`-secrets`, Image `<vorsilbe>:local`; geht auch als Umgebungsvariable. Die Installer-Probe hält damit ihre Instanzen von echten desselben Rechners getrennt |
 
 Das Image entsteht aus den getrackten Dateien des Klons (`git ls-files`), wie sie im Arbeitsbaum
 liegen: Geänderte getrackte Dateien kommen mit, was nur lokal liegt — etwa per `.git/info/exclude`

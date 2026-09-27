@@ -520,9 +520,13 @@ step_ports() {
   local p
   section 5
   if [ "$MODE" = staged ]; then
-    # Ports behaltener Dateien stehen fest — die uebrigen weichen ihnen aus (fd4eb89f)
+    # Ports behaltener Dateien stehen fest — die uebrigen weichen ihnen aus (fd4eb89f). Mit --port N
+    # beginnt Dev bei N, Test und Prod bei N+1 und N+2 — fuer einen Rechner, auf dem 9090, 8090 und
+    # 9091 schon anderen gehoeren (etwa die Installer-Probe neben laufenden Instanzen)
+    local bd=9090 bt=8090 bp=9091
+    [ -z "$PORT" ] || { bd="$PORT"; bt=$((PORT + 1)); bp=$((PORT + 2)); }
     p="$(for n in dev test prod; do is_kept "$n" && kept_value "$n" MYSURICATES_PORT; done | tr '\n' ' ')"
-    P_DEV="$(kept_port dev 9090 "$p")"; P_TEST="$(kept_port test 8090 "$p $P_DEV")"; P_PROD="$(kept_port prod 9091 "$p $P_DEV $P_TEST")"
+    P_DEV="$(kept_port dev "$bd" "$p")"; P_TEST="$(kept_port test "$bt" "$p $P_DEV")"; P_PROD="$(kept_port prod "$bp" "$p $P_DEV $P_TEST")"
     tui_done "$(msg step_ports)" "Dev $P_DEV · Test $P_TEST · Prod $P_PROD$(kept_mark)"
     return 0
   fi

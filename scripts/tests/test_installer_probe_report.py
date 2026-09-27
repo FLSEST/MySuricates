@@ -94,6 +94,19 @@ class RenderTest(unittest.TestCase):
         self.assertIn("data:image/png;base64," + base64.b64encode(png).decode(), page)
         self.assertNotIn("Nach dem Login", page)
 
+    def test_way_is_named_and_host_is_the_default(self):
+        self.write([], [["x", "ok", ""]])
+        page = report.render(self.dir, {})
+        self.assertIn("<dt>Weg</dt><dd>eine Instanz auf dem Rechner</dd>", page)
+        self.assertNotIn("Docker-Dienst", page)
+
+    def test_container_ways_say_whose_docker_it_is(self):
+        self.write([], [["x", "ok", ""]])
+        page = report.render(self.dir, {"way": "staged"})
+        self.assertIn("<dt>Weg</dt><dd>Dev · Test · Prod im Container</dd>", page)
+        self.assertIn("Docker-Dienst ist der des Rechners", page)
+        self.assertIn("eine Instanz im Container", report.render(self.dir, {"way": "container"}))
+
     def test_durations_are_human_readable(self):
         self.assertEqual(report._duration("410"), "6 min 50 s")
         self.assertEqual(report._duration("9"), "9 s")
