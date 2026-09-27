@@ -363,12 +363,14 @@ npm run cy:run
 npm run test:e2e
 ```
 
-`cypress.config.ts` looks for the API key in this order: `CYPRESS_API_KEY`, `CYPRESS_DEV_API_KEY`,
-the `api-key` entry in `app_settings` of the dev database `ai-automation-backend/data/automation.db`
-(once at Cypress startup, read-only), finally `AUTOMATION_API_KEY`. Independently of that, the
-backend writes its key to `~/.autotrigger/api-key` on every start (`ApiKeyService`); for the curl
-examples on this page, then, `export DEV_KEY=$(cat ~/.autotrigger/api-key)`. With `CYPRESS_TARGET=test`
-a different order applies, without the database: `CYPRESS_API_KEY`, `CYPRESS_TEST_API_KEY`, `AUTOMATION_API_KEY`.
+`cypress.config.ts` looks for the API key in this order, never touching the DB: `CYPRESS_API_KEY`,
+`CYPRESS_DEV_API_KEY`, the file `~/.mysuricates/api-key` or `~/.autotrigger/api-key` (read-only; the
+backend writes its key there on every start, `ApiKeyService`/`InstanceAddress`), finally
+`AUTOMATION_API_KEY`. For the curl examples on this page, then, `export DEV_KEY=$(cat ~/.autotrigger/api-key)`.
+With `CYPRESS_TARGET=test` a different order applies (the test instance runs in a container, so the
+file isn't reachable without `docker exec`): `CYPRESS_API_KEY`, `CYPRESS_TEST_API_KEY`, `AUTOMATION_API_KEY`.
+If Cypress finds no key at all, it logs a console warning instead of running silently — runs against
+an instance with security enabled then fail on every authenticated request.
 
 ### Test Target (isolated, no business test data in Dev)
 
