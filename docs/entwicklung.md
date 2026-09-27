@@ -648,12 +648,92 @@ Das Skript läuft ohne Vorgänger-Tag (`scripts/release-notes.sh "" v0.1.0`) und
 aktuellen Repo keine passenden Merge-Commits existieren (z. B. im kuratierten öffentlichen Repo, das
 die Merge-Historie des Arbeits-Repos nicht mitbekommt) — die betroffenen Abschnitte entfallen dann
 einfach, statt einen Fehler zu werfen. Die Action nimmt eine mitgelieferte Notizdatei
-(`release-notes/<tag>.md`), falls eine vorhanden ist — etwa aus dem Übergabe-Workflow, der einen
-geprüften Commit samt Tag ins öffentliche Repo bringt — und erzeugt die Notizen sonst selbst aus der
-Historie des Repos, in dem der Workflow läuft.
+(`release-notes/<tag>.md`), falls eine vorhanden ist — etwa aus der
+[Übergabe ins öffentliche Repo](#übergabe-ins-öffentliche-repo), die einen geprüften Commit samt Tag
+dorthin bringt — und erzeugt die Notizen sonst selbst aus der Historie des Repos, in dem der
+Workflow läuft. Die Links (Vergleich, Verhaltensänderungen) zeigen auf das GitHub-Repo aus `origin`;
+`RELEASE_NOTES_REPO_SLUG=<owner>/<repo>` setzt es von außen, leer gesetzt entfallen die Links, und
+ein `origin`, das keine GitHub-Adresse ist, ergibt ebenfalls keine.
 
 **Test:** `bash scripts/tests/test-release-notes.sh` fährt `release-notes.sh` in einem Wegwerf-Repo
 durch (Merges, Typ-Abschnitte, TODO-Klammer wird entfernt, erstes Release ohne Vorgänger-Tag).
+
+### Übergabe ins öffentliche Repo
+
+Das Arbeits-Repo bleibt privat; das öffentliche Repository bekommt je Release **einen**
+zusammengefassten, geprüften Commit samt annotiertem Tag. Die Logik steht deterministisch in
+`scripts/release-handover.sh`, den Ablauf mit Freigabe fährt ein MySuricates-Workflow.
+
+```bash
+scripts/release-handover.sh v0.8.0 ~/pfad/zum/oeffentlichen-klon               # Gates ohne Build
+scripts/release-handover.sh --with-build v0.8.0 ~/pfad/zum/oeffentlichen-klon  # + mvn test, tsc, lint
+scripts/release-handover.sh --discard v0.8.0 ~/pfad/zum/oeffentlichen-klon     # nicht gepusht zurücknehmen
+```
+
+Das Skript:
+1. Prüft die Vorbedingungen: Tag im Arbeits-Repo, Ziel ist die Wurzel eines sauberen Klons auf
+   einem Branch, nicht hinter seinem Upstream, das Tag gibt es dort noch nicht und kein neueres,
+   Autor und Committer im Ziel haben die GitHub-noreply-Form, die privaten Hygiene-Listen sind
+   auffindbar (`$HYGIENE_PRIVATE_LIST`/`$HYGIENE_PRIVATE_TERMS`, `~/.config/mysuricates/` oder die
+   untrackten Kopien im Arbeits-Repo, die es durchreicht).
+2. Exportiert den Baum des Tags per `git archive` ohne die Muster aus
+   `scripts/release-handover.exclude` (gelesen aus dem Tag selbst; ältere Tags ohne Liste nehmen die
+   aus dem Arbeitsbaum) und ersetzt damit den getrackten Inhalt des Ziels. `.git`, `release-notes/`
+   (die Notizen früherer Releases) und ignorierte Dateien wie Build-Caches bleiben. Gestaged wird
+   genau die Dateiliste des Archivs, mit `-f` (getrackte Dateien unter einer Ignore-Regel wie die
+   Tray-Icons gehören dazu) und ohne Zeilenende-Umwandlung.
+3. Bricht mit Exit 3 ab, wenn der Stand dem Ziel gleicht — dann bleibt nichts zurück.
+4. Schreibt die Notizen aus `scripts/release-notes.sh` nach `release-notes/<tag>.md` (Vorgänger ist
+   das zuletzt übergebene Release, die Links zeigen ins öffentliche Repo) und committet
+   `Release <tag>`.
+5. Prüft genau diesen Commit: Treue (jede Datei hat Blob und Modus wie im Tag, nichts sonst außer
+   `release-notes/`), `public-hygiene.sh --tracked`, `pool-neutrality.sh`, gitleaks (falls
+   installiert), die Doku-Gates (`pre-push-checks.sh --tree`), mit `--with-build` außerdem
+   `mvn test` sowie `npm ci` (nur ohne `node_modules`), `tsc --noEmit` und `npm run lint`. Jeder
+   Befund nimmt den Commit zurück; das Ziel steht danach wie vorher.
+6. Setzt das annotierte Tag und endet mit Diff-Statistik, Gate-Übersicht, den Zeilen
+   `handover_status:`/`handover_commit:`/`handover_branch:` und dem Push-Befehl. **Es pusht nie.**
+
+Exit-Codes: 0 bereit (bzw. verworfen), 1 abgebrochen (Befund oder Vorbedingung), 2 Aufruffehler,
+3 nichts zu übergeben.
+
+**Ausschlussliste** (`scripts/release-handover.exclude`): Git-Pfadangaben mit glob-Magie, je Eintrag
+eine Begründung. Sie geht selbst mit hinaus und nennt deshalb keine privaten Namen — solche Dateien
+fasst ein Muster. Heute draußen: die Einmal-Migration der Workflows einer bestimmten Instanz
+(`scripts/workspace-isolation/prepare-*.py`, `pool-overrides/`) samt ihrem Test sowie als
+Sicherheitsnetz die privaten, ungetrackten Pfade aus `.gitignore`. Wer eine Datei ausschließt, auf
+die ein Test, der Build oder die Doku verweist, sieht das spätestens am Lauf mit `--with-build`.
+
+**Der Workflow** liegt nur in der Instanz des Maintainers (nicht im Pool: er setzt ein eigenes
+öffentliches Repo voraus) und besteht aus vier Blöcken ohne KI:
+
+| Block | Typ | Aufgabe |
+|---|---|---|
+| `vorbereiten` | `shell` | `release-handover.sh` mit den Kontextvariablen `{{ tag }}`, `{{ public_clone }}` und `{{ with_build }}` (`1` = `--with-build`), gelesen über `set -- {{ tag }}; TAG="$*"` mit `shell_escape_variables`; Exit 3 wird zu 0, `timeout_seconds` reicht für die Testsuite |
+| `freigabe` | `approval` | nur bei `handover_status: READY` in der Ausgabe von `vorbereiten` (`run_if`); die Frage zeigt diese Ausgabe — Diff-Statistik und Gates; Antworten `Pushen`/`Verwerfen` in `handover_decision` |
+| `push` | `shell` | nur bei `Pushen`: prüft, dass HEAD und Tag im Klon noch der freigegebene Commit sind, dann `git push --atomic origin refs/heads/<branch> refs/tags/<tag>` |
+| `verwerfen` | `shell` | nur bei `Verwerfen`: `release-handover.sh --discard` nimmt Commit und Tag zurück, damit ein neuer Lauf für dasselbe Tag möglich ist |
+
+Im öffentlichen Repo legt danach `.github/workflows/release.yml` das GitHub-Release aus der
+mitgelieferten Notizdatei an.
+
+**Rückweg** (Beiträge aus dem öffentlichen Repo, laut `CONTRIBUTING.md` nur nach Absprache): Weil
+jede übertragene Datei denselben Blob hat wie im Tag, lässt sich ein Patch aus dem öffentlichen
+Klon im Arbeits-Repo mit Drei-Wege-Abgleich anwenden:
+
+```bash
+git -C ~/pfad/zum/oeffentlichen-klon fetch origin pull/<nr>/head:pr-<nr>
+git -C ~/pfad/zum/oeffentlichen-klon format-patch --stdout origin/main..pr-<nr> | git am -3
+```
+
+`git am` behält den Autor des Beitrags; danach geht die Änderung mit dem nächsten Release-Tag
+wieder hinaus.
+
+**Test:** `bash scripts/tests/test-release-handover.sh` fährt das Skript zwischen einem
+Wegwerf-Arbeits-Repo und einem lokalen Wegwerf-„öffentlichen“ Repo (bare + Klon) durch: Ausschluss,
+ersetzter Inhalt, Treue auch bei CRLF-Dateien, Commit, annotiertes Tag, Notizdatei, Abbruch und
+vollständiges Zurücksetzen bei einem Gate-Befund, Abbruch ohne Änderung, Vorbedingungen,
+`--discard` und dass nichts gepusht wird.
 
 ### Verhaltensänderungen
 

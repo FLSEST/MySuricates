@@ -122,6 +122,10 @@ jobs:
       # der Selbsttest laeuft in einem Wegwerf-Repo mit echten Merge-Commits (release.yml).
       - name: Release-Notizen Selbsttest
         run: bash scripts/tests/test-release-notes.sh
+      # release-handover.sh zwischen zwei Wegwerf-Repos (Arbeits-Repo + lokales bare/Klon): Ausschluss,
+      # Treue zum Tag, Gates mit Zuruecksetzen, annotiertes Tag — und dass nie gepusht wird.
+      - name: Release-Uebergabe Selbsttest
+        run: bash scripts/tests/test-release-handover.sh
 
   gitleaks:
     name: Gitleaks Secret Scan
