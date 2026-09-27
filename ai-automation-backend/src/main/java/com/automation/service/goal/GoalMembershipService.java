@@ -5,6 +5,7 @@ import com.automation.dto.response.GoalDetailResponse;
 import com.automation.entity.Goal;
 import com.automation.entity.Todo;
 import com.automation.exception.ResourceNotFoundException;
+import com.automation.repository.GoalProjectRepository;
 import com.automation.repository.TodoRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -16,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -28,23 +30,30 @@ public class GoalMembershipService {
 
     private final GoalService goalService;
     private final TodoRepository todoRepository;
+    private final GoalProjectRepository goalProjectRepository;
 
     /**
      * Ordnet TODOs dem Ziel zu. Ein TODO aus einem anderen Ziel wechselt hierher (ein TODO gehoert
      * hoechstens einem Ziel). Neu zugeordnete TODOs bekommen keinen Rang – sie stehen hinter den
-     * eingeordneten, bis jemand die Reihenfolge setzt.
+     * eingeordneten, bis jemand die Reihenfolge setzt. Ist ihr Projekt dem Ziel noch nicht
+     * zugeordnet, kommt es dazu (TODO c60bf914).
      */
     @Transactional
     public GoalDetailResponse assign(String goalId, List<String> todoIds) {
         Goal goal = goalService.find(goalId);
+        Set<String> projects = new LinkedHashSet<>();
         for (Todo todo : load(todoIds)) {
             if (!goal.getId().equals(todo.getGoalId())) {
                 todo.setGoalId(goal.getId());
                 todo.setGoalRank(null);
-                todo.setMilestoneId(null); // ein Meilenstein gilt nur im alten Ziel (TODO 259f4f66)
+                todo.setWorkPackageId(null); // ein Arbeitspaket gilt nur im alten Ziel (TODO 259f4f66, c60bf914)
                 todoRepository.save(todo);
             }
+            if (todo.getProjectId() != null) {
+                projects.add(todo.getProjectId());
+            }
         }
+        projects.forEach(projectId -> goalProjectRepository.linkIfAbsent(goal.getId(), projectId));
         return goalService.detailOf(goal);
     }
 

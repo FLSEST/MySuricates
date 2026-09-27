@@ -4,8 +4,9 @@ import com.automation.dto.request.UpdateTodoPlanningRequest;
 import com.automation.dto.response.TodoResponse;
 import com.automation.entity.Todo;
 import com.automation.exception.ResourceNotFoundException;
-import com.automation.entity.GoalMilestone;
-import com.automation.repository.GoalMilestoneRepository;
+import com.automation.entity.GoalWorkPackage;
+import com.automation.repository.GoalWorkPackageRepository;
+import com.automation.repository.GoalProjectRepository;
 import com.automation.repository.GoalRepository;
 import com.automation.repository.TodoRepository;
 import com.automation.service.ai.ReasoningEffort;
@@ -30,8 +31,9 @@ public class TodoPlanningService {
 
     private final TodoRepository todoRepository;
     private final GoalRepository goalRepository;
-    private final GoalMilestoneRepository milestoneRepository;
+    private final GoalWorkPackageRepository workPackageRepository;
     private final TodoResponseAssembler responseAssembler;
+    private final GoalProjectRepository goalProjectRepository;
 
     @Transactional
     public TodoResponse update(String todoId, UpdateTodoPlanningRequest request) {
@@ -40,8 +42,8 @@ public class TodoPlanningService {
         if (request.goalId() != null) {
             applyGoal(todo, request.goalId().trim());
         }
-        if (request.milestoneId() != null) {
-            applyMilestone(todo, request.milestoneId().trim());
+        if (request.workPackageId() != null) {
+            applyWorkPackage(todo, request.workPackageId().trim());
         }
         if (request.goalRank() != null) {
             if (todo.getGoalId() == null && request.goalRank() > 0) {
@@ -73,37 +75,53 @@ public class TodoPlanningService {
         return responseAssembler.toResponse(todoRepository.save(todo));
     }
 
+    /**
+     * Ziel setzen oder loesen. Ist das Projekt des TODOs dem Ziel noch nicht zugeordnet, kommt es dazu
+     * (TODO c60bf914) – Kandidatenliste, Plugin-Triage und Planungsfeld arbeiten projektuebergreifend.
+     */
     private void applyGoal(Todo todo, String goalId) {
         if (goalId.isEmpty()) {
             todo.setGoalId(null);
             todo.setGoalRank(null);
-            todo.setMilestoneId(null);
-        } else if (!goalId.equals(todo.getGoalId())) {
+            todo.setWorkPackageId(null);
+            return;
+        }
+        if (!goalId.equals(todo.getGoalId())) {
             if (!goalRepository.existsById(goalId)) {
                 throw new ResourceNotFoundException("Goal", goalId);
             }
             todo.setGoalId(goalId);
             todo.setGoalRank(null);
-            todo.setMilestoneId(null);
+            todo.setWorkPackageId(null);
+        }
+        if (todo.getProjectId() != null) {
+            goalProjectRepository.linkIfAbsent(goalId, todo.getProjectId());
         }
     }
 
     /**
-     * Meilenstein zuordnen (TODO 259f4f66): nur einer des eigenen Ziels – sonst 400, damit ein TODO
-     * nie auf einen Meilenstein zeigt, dessen Ziel es nicht zaehlt. {@code ""} loest die Zuordnung.
+     * Arbeitspaket zuordnen (TODO c60bf914, bis V92 „Meilenstein“): nur eins des eigenen Ziels – sonst
+     * 400, damit ein TODO nie auf ein Paket zeigt, dessen Ziel es nicht zaehlt – und des eigenen
+     * Projekts; ein TODO ohne Projekt passt in kein Paket mit Projekt. Altdaten mit Abweichung bleiben
+     * lesbar – geprueft wird nur beim Schreiben. {@code ""} loest die Zuordnung.
      */
-    private void applyMilestone(Todo todo, String milestoneId) {
-        if (milestoneId.isEmpty()) {
-            todo.setMilestoneId(null);
+    private void applyWorkPackage(Todo todo, String workPackageId) {
+        if (workPackageId.isEmpty()) {
+            todo.setWorkPackageId(null);
             return;
         }
-        GoalMilestone milestone = milestoneRepository.findById(milestoneId)
-                .orElseThrow(() -> new ResourceNotFoundException("GoalMilestone", milestoneId));
-        if (todo.getGoalId() == null || !todo.getGoalId().equals(milestone.getGoalId())) {
-            throw new IllegalArgumentException("Meilenstein " + milestoneId
+        GoalWorkPackage workPackage = workPackageRepository.findById(workPackageId)
+                .orElseThrow(() -> new ResourceNotFoundException("GoalWorkPackage", workPackageId));
+        if (todo.getGoalId() == null || !todo.getGoalId().equals(workPackage.getGoalId())) {
+            throw new IllegalArgumentException("Arbeitspaket " + workPackageId
                     + " gehoert nicht zum Ziel des TODOs – erst goalId setzen");
         }
-        todo.setMilestoneId(milestoneId);
+        if (workPackage.getProjectId() != null && !workPackage.getProjectId().equals(todo.getProjectId())) {
+            throw new IllegalArgumentException("Arbeitspaket " + workPackageId + " gehoert zum Projekt "
+                    + workPackage.getProjectId() + ", das TODO "
+                    + (todo.getProjectId() == null ? "hat kein Projekt" : "zum Projekt " + todo.getProjectId()));
+        }
+        todo.setWorkPackageId(workPackageId);
     }
 
     /** {@code ""} clears the rating; an unknown value names S, M, L and XL (EnumParameter, TODO a9bf13d5). */

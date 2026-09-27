@@ -2,10 +2,16 @@ package com.automation.integration.scenario;
 
 import com.automation.entity.Goal;
 import com.automation.entity.GoalMilestone;
+import com.automation.entity.GoalMilestoneWorkPackage;
+import com.automation.entity.GoalProject;
+import com.automation.entity.GoalWorkPackage;
 import com.automation.entity.Project;
 import com.automation.entity.Todo;
-import com.automation.repository.GoalRepository;
 import com.automation.repository.GoalMilestoneRepository;
+import com.automation.repository.GoalMilestoneWorkPackageRepository;
+import com.automation.repository.GoalProjectRepository;
+import com.automation.repository.GoalRepository;
+import com.automation.repository.GoalWorkPackageRepository;
 import com.automation.repository.TodoRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 
@@ -15,21 +21,32 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * {@code goal} of a scenario (TODO 259f4f66): a goal with milestones and TODOs in the scenario's
- * project, dates relative to now ({@code targetInDays}, {@code dueInDays}), so a run with
- * {@code "goal_id": "@goal"} sees a fixed picture. A TODO names its milestone by index
- * ({@code "milestone": 0}).
+ * {@code goal} of a scenario (TODO 259f4f66, c60bf914): a goal assigned to the scenario's project,
+ * with work packages, milestones and TODOs, dates relative to now ({@code targetInDays},
+ * {@code startInDays}/{@code endInDays}, {@code dueInDays}), so a run with {@code "goal_id": "@goal"}
+ * sees a fixed picture. Work packages belong to the scenario's project in the order given; one with
+ * only {@code endInDays} starts on its end day, one with neither has no period. A milestone names its
+ * work packages by index ({@code "workPackages": [0, 1]}), a TODO its work package
+ * ({@code "workPackage": 0}).
  */
 final class ScenarioGoals {
 
     private final GoalRepository goalRepository;
+    private final GoalWorkPackageRepository workPackageRepository;
     private final GoalMilestoneRepository milestoneRepository;
+    private final GoalMilestoneWorkPackageRepository linkRepository;
+    private final GoalProjectRepository goalProjectRepository;
     private final TodoRepository todoRepository;
     private final List<String> goalIds = new ArrayList<>();
 
-    ScenarioGoals(GoalRepository goalRepository, GoalMilestoneRepository milestoneRepository, TodoRepository todoRepository) {
+    ScenarioGoals(GoalRepository goalRepository, GoalWorkPackageRepository workPackageRepository,
+                  GoalMilestoneRepository milestoneRepository, GoalMilestoneWorkPackageRepository linkRepository,
+                  GoalProjectRepository goalProjectRepository, TodoRepository todoRepository) {
         this.goalRepository = goalRepository;
+        this.workPackageRepository = workPackageRepository;
         this.milestoneRepository = milestoneRepository;
+        this.linkRepository = linkRepository;
+        this.goalProjectRepository = goalProjectRepository;
         this.todoRepository = todoRepository;
     }
 
@@ -41,13 +58,29 @@ final class ScenarioGoals {
                 .targetDate(spec.has("targetInDays") ? days(now, spec.path("targetInDays")) : null)
                 .build());
         goalIds.add(goal.getId());
-        List<String> milestoneIds = new ArrayList<>();
+        goalProjectRepository.saveAndFlush(new GoalProject(goal.getId(), project.getId(), 0));
+        List<String> workPackageIds = new ArrayList<>();
+        for (JsonNode workPackage : spec.path("workPackages")) {
+            Instant end = workPackage.has("endInDays") ? days(now, workPackage.path("endInDays")) : null;
+            Instant start = workPackage.has("startInDays") ? days(now, workPackage.path("startInDays")) : end;
+            workPackageIds.add(workPackageRepository.saveAndFlush(GoalWorkPackage.builder()
+                    .goalId(goal.getId())
+                    .projectId(project.getId())
+                    .position(workPackageIds.size())
+                    .title(workPackage.path("title").asText())
+                    .startDate(start)
+                    .endDate(end)
+                    .build()).getId());
+        }
         for (JsonNode milestone : spec.path("milestones")) {
-            milestoneIds.add(milestoneRepository.saveAndFlush(GoalMilestone.builder()
+            String milestoneId = milestoneRepository.saveAndFlush(GoalMilestone.builder()
                     .goalId(goal.getId())
                     .title(milestone.path("title").asText())
                     .dueDate(days(now, milestone.path("dueInDays")))
-                    .build()).getId());
+                    .build()).getId();
+            for (JsonNode index : milestone.path("workPackages")) {
+                linkRepository.saveAndFlush(new GoalMilestoneWorkPackage(milestoneId, workPackageIds.get(index.asInt())));
+            }
         }
         for (JsonNode todo : spec.path("todos")) {
             todoRepository.saveAndFlush(Todo.builder()
@@ -56,14 +89,17 @@ final class ScenarioGoals {
                     .priority(Todo.Priority.valueOf(todo.path("priority").asText("MEDIUM")))
                     .projectId(project.getId())
                     .goalId(goal.getId())
-                    .milestoneId(todo.has("milestone") ? milestoneIds.get(todo.path("milestone").asInt()) : null)
+                    .workPackageId(todo.has("workPackage") ? workPackageIds.get(todo.path("workPackage").asInt()) : null)
                     .dueDate(todo.has("dueInDays") ? days(now, todo.path("dueInDays")) : null)
                     .build());
         }
         return goal.getId();
     }
 
-    /** Goals of this scenario; their milestones go with them ({@code ON DELETE CASCADE}), TODOs are the runner's. */
+    /**
+     * Goals of this scenario; work packages, milestones, their links and goal projects go with them
+     * ({@code ON DELETE CASCADE}), TODOs are the runner's.
+     */
     void deleteAll() {
         goalIds.forEach(goalRepository::deleteById);
         goalIds.clear();

@@ -711,11 +711,11 @@ A chain does not belong to any project and can reference workflows from differen
 | `rated_by` | TEXT | | `USER` or `AI` – who assessed last (V85) |
 | `rated_at` | TEXT | | Time of the assessment (V85) |
 | `open_question` | TEXT | | Question that has to be settled before work starts (V85) |
-| `milestone_id` | TEXT | FK → goal_milestones, ON DELETE SET NULL | Milestone of the TODO's own goal (V88) |
+| `work_package_id` | TEXT | FK → goal_work_packages, ON DELETE SET NULL | Work package of the TODO's own goal and – checked on write – of its own project (V88 as `milestone_id`, renamed in V92) |
 | `created_at` | TEXT | NOT NULL | |
 | `updated_at` | TEXT | NOT NULL | |
 
-**Indexes:** `idx_todos_status`, `idx_todos_project`, `idx_todos_source`, `idx_todos_created`, `idx_todos_status_priority_created` (V54), `idx_todos_project_status` (V54), `idx_todos_linked_workflow_id` (V59), `idx_todos_agent_session_ref` (V76), `idx_todos_goal` (V85), `idx_todos_last_fix_run_id` (V87), `idx_todos_workflow_run_id` (V87), `idx_todos_milestone` (V88)
+**Indexes:** `idx_todos_status`, `idx_todos_project`, `idx_todos_source`, `idx_todos_created`, `idx_todos_status_priority_created` (V54), `idx_todos_project_status` (V54), `idx_todos_linked_workflow_id` (V59), `idx_todos_agent_session_ref` (V76), `idx_todos_goal` (V85), `idx_todos_last_fix_run_id` (V87), `idx_todos_workflow_run_id` (V87), `idx_todos_work_package` (V92, formerly `idx_todos_milestone`)
 
 TODOs are automatically created by `AutoTodoService` on RED/YELLOW gate status (RED -> HIGH, YELLOW -> MEDIUM). When a `TodoTrigger` is configured, fix workflows are automatically started (self-improvement loop).
 
@@ -734,7 +734,38 @@ TODOs are automatically created by `AutoTodoService` on RED/YELLOW gate status (
 
 **Indexes:** `idx_goals_status`
 
-A goal groups TODOs across projects (V85). Membership, rank and assessment live on the TODO (`todos.goal_id` …), not on the goal; `GoalService` computes progress and order from lean projections. Deleting a goal keeps its TODOs, removes its milestones and pauses a goal guard.
+A goal groups TODOs across projects (V85). Membership, rank and assessment live on the TODO (`todos.goal_id` …), not on the goal; `GoalService` computes progress and order from lean projections. Since V92 a goal is explicitly assigned to one or more projects (`goal_projects`), structured into work packages (`goal_work_packages`) with TODOs below, plus milestones as dates of the whole goal (`goal_milestones`). Deleting a goal keeps its TODOs, removes its work packages, milestones and project assignments and pauses a goal guard.
+
+### `goal_projects`
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `goal_id` | TEXT | PK (with `project_id`), FK → goals, ON DELETE CASCADE | Goal |
+| `project_id` | TEXT | PK (with `goal_id`), FK → projects, ON DELETE CASCADE | Project of the goal |
+| `position` | INTEGER | NOT NULL, DEFAULT 0 | Order of the projects within the goal, from 0 |
+
+**Indexes:** `idx_goal_projects_project`
+
+The projects of a goal (V92, TODO c60bf914), n:m. Backfilled from the goals' TODOs (archived ones included); position 0 went to the project with the most non-archived TODOs. When a TODO from a project the goal does not have yet joins the goal (assign, `planning`, the TODO changing its project), the project is appended automatically. A project can only be removed while no work packages or TODOs of the goal hang on it – otherwise with `cascade=true` (work packages deleted along with their milestone links, TODOs released from the goal).
+
+### `goal_work_packages`
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `id` | TEXT | PK | UUID |
+| `goal_id` | TEXT | NOT NULL, FK → goals, ON DELETE CASCADE | Goal of the work package |
+| `project_id` | TEXT | FK → projects, ON DELETE SET NULL | Project of the package; NULL only for legacy data of a goal without projects |
+| `title` | TEXT | NOT NULL | e.g. "Promo material" |
+| `start_date` | TEXT | | Start of the period; only together with `end_date`, never after it; a bare date counts from 00:00:00 UTC |
+| `end_date` | TEXT | | End of the period, the basis for "due soon"/"overdue"; a bare date counts until 23:59:59 UTC |
+| `position` | INTEGER | NOT NULL, DEFAULT 0 | Order within its project in the goal, from 0 |
+| `completed_at` | TEXT | | First detection of "all assigned TODOs done"; stays even when the package opens again |
+| `created_at` | TEXT | NOT NULL | |
+| `updated_at` | TEXT | NOT NULL | |
+
+**Indexes:** `idx_goal_work_packages_goal`, `idx_goal_work_packages_goal_project` (`goal_id, project_id, position`)
+
+Work packages of a goal (V92, TODO c60bf914; until V92 they were called milestones, V88/TODO 259f4f66). A package belongs to exactly one project of the goal; TODOs point to it through `todos.work_package_id` and must come from the same project (checked on write, legacy data is still read). The period is optional but only complete (start and end, start ≤ end). The state (`OPEN`, `DUE_SOON` ≤ 3 days, `OVERDUE`, `REACHED` = completed) is computed on read from the end and the TODOs – without a period only `OPEN` or `REACHED`. Deleting a package keeps its TODOs in the goal; milestones lose the link. V92 took over the milestones of V88: date → `end_date` and `start_date` (a one-day package), `reached_at` → `completed_at`; mixed packages were split – one copy per minority project (same title and period, `completed_at` NULL) that the TODOs of that project now point to. Reads are ordered by project position, then `position`.
 
 ### `goal_milestones`
 
@@ -742,15 +773,26 @@ A goal groups TODOs across projects (V85). Membership, rank and assessment live 
 |---|---|---|---|
 | `id` | TEXT | PK | UUID |
 | `goal_id` | TEXT | NOT NULL, FK → goals, ON DELETE CASCADE | Goal of the milestone |
-| `title` | TEXT | NOT NULL | e.g. "Beta done" |
-| `due_date` | TEXT | NOT NULL | Due date; a bare date counts until 23:59:59 UTC |
-| `reached_at` | TEXT | | First detection of "all assigned TODOs done"; stays even when the milestone opens again |
+| `title` | TEXT | NOT NULL | e.g. "Launch" |
+| `due_date` | TEXT | NOT NULL | Date; a bare date counts until 23:59:59 UTC |
+| `reached_at` | TEXT | | Reached since – with packages the first detection, without packages set by hand |
 | `created_at` | TEXT | NOT NULL | |
 | `updated_at` | TEXT | NOT NULL | |
 
 **Indexes:** `idx_goal_milestones_goal`
 
-Milestones of a goal (V88, TODO 259f4f66). TODOs point to one through `todos.milestone_id`; the state (`OPEN`, `DUE_SOON` ≤ 3 days, `OVERDUE`, `REACHED`) is computed on read, not stored. Deleting a milestone keeps its TODOs in the goal.
+Milestones of a goal (V92, TODO c60bf914): dates of the whole goal, no project, always with a date. With linked work packages a milestone is reached once all of them are completed; `reached_at` keeps the first detection, and if the packages are later no longer all completed it reads "open again". Without packages it is marked as reached by hand. Otherwise the date decides (`OPEN`, `DUE_SOON`, `OVERDUE`). Not to be confused with the milestones of V88 – those are work packages since V92.
+
+### `goal_milestone_work_packages`
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `milestone_id` | TEXT | PK (with `work_package_id`), FK → goal_milestones, ON DELETE CASCADE | Milestone |
+| `work_package_id` | TEXT | PK (with `milestone_id`), FK → goal_work_packages, ON DELETE CASCADE | Work package of the same goal the milestone depends on |
+
+**Indexes:** `idx_goal_milestone_work_packages_package`
+
+Which work packages a milestone needs (V92, TODO c60bf914). Both sides belong to the same goal (checked on write); a link goes with its milestone or its package.
 
 ### `activity_log`
 
@@ -1114,7 +1156,7 @@ The only persistent system configuration outside of `application.yml`.
 | `Todo.Complexity` | `S`, `M`, `L`, `XL` | Size and uncertainty, coarse – the same scale for people and AI |
 | `Todo.RatedBy` | `USER`, `AI` | Who set the assessment last; a person overrides the AI |
 | `Goal.Status` | `ACTIVE`, `DONE`, `ARCHIVED` | Archived goals only show up with an explicit filter |
-| `GoalMilestone.State` (V88) | `OPEN`, `DUE_SOON`, `OVERDUE`, `REACHED` | Not stored, computed on read from the date and the assigned TODOs; `DUE_SOON` = at most 3 days |
+| `GoalDueState` (V88, since V92 for work packages and milestones) | `OPEN`, `DUE_SOON`, `OVERDUE`, `REACHED` | Not stored, computed on read; `DUE_SOON` = at most 3 days. Work package: based on its end, `REACHED` (completed) = all TODOs done, without a period only `OPEN`/`REACHED`. Milestone: based on its date, `REACHED` = all linked packages completed or – without packages – marked by hand |
 
 ### LogLevel (ActivityLog)
 
@@ -1335,6 +1377,7 @@ in backticks, parentheses behind it give the default or values, free text follow
 | V89 | `V89__workflow_run_chain_run_id.sql` | `chain_run_id` in workflow_runs (chain run of a chain entry, no backfill for existing runs) + index `idx_workflow_runs_chain_run_id` |
 | V90 | `V90__keyless_integration_account_names.sql` | Language-neutral account names for RSS/Atom and Open-Meteo in `integration_connections.account_info` (existing rows updated) |
 | V91 | `V91__page_suggestions_per_locale.sql` | `locale` in page_suggestions (table rebuild: `UNIQUE(page)` → `UNIQUE(page, locale)`, existing rows count as German) |
+| V92 | `V92__goal_projects_work_packages_milestones.sql` | new table `goal_projects` (backfilled from the TODOs); the former milestones become `goal_work_packages` (rebuilt with `project_id`, `position`, `start_date`/`end_date`, `completed_at`; mixed packages split per minority project), `todos.milestone_id` → `work_package_id` (saved before the rebuild and written back); new tables `goal_milestones` (dates of the goal) and `goal_milestone_work_packages` |
 
 ## SQLite Specifics
 

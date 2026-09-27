@@ -3,7 +3,7 @@ package com.automation.repository;
 import com.automation.dto.projection.GoalRelationRow;
 import com.automation.dto.projection.GoalStatusCounts;
 import com.automation.dto.projection.GoalTodoRow;
-import com.automation.dto.projection.MilestoneTodoCounts;
+import com.automation.dto.projection.WorkPackageTodoCounts;
 import com.automation.dto.projection.NeedsYouRow;
 import com.automation.dto.projection.ProjectCount;
 import com.automation.dto.projection.ProjectStatusCounts;
@@ -198,7 +198,7 @@ public interface TodoRepository extends JpaRepository<Todo, String>, JpaSpecific
     @Query("SELECT new com.automation.dto.projection.GoalTodoRow("
          + "t.id, t.title, t.status, t.priority, t.projectId, t.tags, t.goalRank, t.complexity, "
          + "t.suggestedEffort, t.ratingNote, t.ratedBy, t.ratedAt, t.openQuestion, t.createdAt, t.updatedAt, "
-         + "t.dueDate, t.milestoneId"
+         + "t.dueDate, t.workPackageId"
          + ") FROM Todo t WHERE t.goalId = :goalId")
     List<GoalTodoRow> findGoalRows(@Param("goalId") String goalId);
 
@@ -222,23 +222,34 @@ public interface TodoRepository extends JpaRepository<Todo, String>, JpaSpecific
 
     /** Loest alle TODOs vom Ziel; die TODOs selbst bleiben. Aufrufer muss @Transactional sein. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query("UPDATE Todo t SET t.goalId = NULL, t.goalRank = NULL, t.milestoneId = NULL, t.updatedAt = :now "
+    @Query("UPDATE Todo t SET t.goalId = NULL, t.goalRank = NULL, t.workPackageId = NULL, t.updatedAt = :now "
          + "WHERE t.goalId = :goalId")
     int detachFromGoal(@Param("goalId") String goalId, @Param("now") Instant now);
 
     /**
-     * Zugeordnete und erledigte TODOs je Meilenstein (TODO 259f4f66), ohne ARCHIVED – ein
-     * verworfenes TODO haelt keinen Meilenstein auf. Meilensteine ohne TODOs fehlen in der Liste.
+     * Zugeordnete und erledigte TODOs je Arbeitspaket (TODO 259f4f66, c60bf914), ohne ARCHIVED – ein
+     * verworfenes TODO haelt kein Paket auf. Pakete ohne TODOs fehlen in der Liste.
      */
-    @Query("SELECT new com.automation.dto.projection.MilestoneTodoCounts(t.milestoneId, COUNT(t), "
-         + "SUM(CASE WHEN t.status = 'DONE' THEN 1 ELSE 0 END)) FROM Todo t "
-         + "WHERE t.milestoneId IN :milestoneIds AND t.status <> 'ARCHIVED' GROUP BY t.milestoneId")
-    List<MilestoneTodoCounts> countByMilestone(@Param("milestoneIds") Collection<String> milestoneIds);
+    @Query("SELECT new com.automation.dto.projection.WorkPackageTodoCounts(t.workPackageId, COUNT(t), "
+         + "SUM(CASE WHEN t.status = 'DONE' THEN 1 ELSE 0 END), SUM(CASE WHEN t.openQuestion IS NOT NULL "
+         + "AND t.status IN ('OPEN','IN_PROGRESS','BACKLOG') THEN 1 ELSE 0 END)) FROM Todo t "
+         + "WHERE t.workPackageId IN :workPackageIds AND t.status <> 'ARCHIVED' GROUP BY t.workPackageId")
+    List<WorkPackageTodoCounts> countByWorkPackage(@Param("workPackageIds") Collection<String> workPackageIds);
 
-    /** Loest alle TODOs von einem Meilenstein; sie bleiben im Ziel. Aufrufer muss @Transactional sein. */
+    /** Loest alle TODOs von einem Arbeitspaket; sie bleiben im Ziel. Aufrufer muss @Transactional sein. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query("UPDATE Todo t SET t.milestoneId = NULL, t.updatedAt = :now WHERE t.milestoneId = :milestoneId")
-    int detachFromMilestone(@Param("milestoneId") String milestoneId, @Param("now") Instant now);
+    @Query("UPDATE Todo t SET t.workPackageId = NULL, t.updatedAt = :now WHERE t.workPackageId = :workPackageId")
+    int detachFromWorkPackage(@Param("workPackageId") String workPackageId, @Param("now") Instant now);
+
+    long countByWorkPackageId(String workPackageId);
+
+    long countByGoalIdAndProjectId(String goalId, String projectId);
+
+    /** Loest die TODOs eines Projekts vom Ziel (TODO c60bf914). Aufrufer muss @Transactional sein. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("UPDATE Todo t SET t.goalId = NULL, t.goalRank = NULL, t.workPackageId = NULL, t.updatedAt = :now "
+         + "WHERE t.goalId = :goalId AND t.projectId = :projectId")
+    int detachProjectFromGoal(@Param("goalId") String goalId, @Param("projectId") String projectId, @Param("now") Instant now);
 
     // ── Hygiene ────────────────────────────────────────────────────────────────
 

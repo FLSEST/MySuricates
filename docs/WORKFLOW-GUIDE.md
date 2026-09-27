@@ -862,13 +862,13 @@ ohne Angabe Deutsch). Kein REST-Aufruf nötig – und keiner erlaubt.
 
 | Variable | Inhalt |
 |----------|--------|
-| `{{ goal_status }}` | Block `<goal_status>…</goal_status>` mit Ziel, Zieldatum, Fortschritt, Meilensteinen samt Zustand (`OPEN`/`DUE_SOON`/`OVERDUE`/`REACHED`, `REOPENED`), überfälligen und bald fälligen (≤ 3 Tage) aktiven TODOs. Titel geglättet, gekürzt und von Plattform-Markern (`todo_item:`, `gate_*:`, `dashboard_widget:`) und Blockgrenzen befreit; je Liste höchstens 20 Zeilen |
+| `{{ goal_status }}` | Block `<goal_status>…</goal_status>` mit Ziel, Zieldatum, Fortschritt, Meilensteinen (Termine des Ziels, mit abgeschlossenen/verknüpften Arbeitspaketen) und Arbeitspaketen (Zeitraum oder „ohne Zeitraum“ – dann nie fällig –, erledigte/zugeordnete TODOs), je samt Zustand (`OPEN`/`DUE_SOON`/`OVERDUE`/`REACHED`, `REOPENED`), überfälligen und bald fälligen (≤ 3 Tage) aktiven TODOs. Titel geglättet, gekürzt und von Plattform-Markern (`todo_item:`, `gate_*:`, `dashboard_widget:`) und Blockgrenzen befreit; je Liste höchstens 20 Zeilen |
 | `{{ goal_guard_status }}` | `RED` (etwas überfällig oder Zieldatum mit offener Arbeit vorbei), `YELLOW` (etwas in ≤ 3 Tagen fällig), sonst `GREEN` |
 | `{{ goal_guard_title }}` | `Ziel: <Titel>`, höchstens 80 Zeichen |
 | `{{ goal_guard_summary }}` | Eine Zeile: `7/12 erledigt (58 %) · 2 überfällig · 1 bald fällig · nächster Meilenstein „Beta“ am 2026-10-01`, höchstens 500 Zeichen |
 | `{{ goal_guard_progress }}` | `7/12 (58 %)` |
-| `{{ goal_guard_overdue }}` / `{{ goal_guard_due_soon }}` | Anzahl überfälliger bzw. bald fälliger TODOs plus Meilensteine |
-| `{{ goal_guard_item_1 }}` … `{{ goal_guard_item_5 }}` | Die dringendsten Punkte (überfällige Meilensteine, überfällige TODOs, Zieldatum, bald Fälliges), je höchstens 200 Zeichen; freie Plätze sind leer und fallen in `dashboard-report` weg |
+| `{{ goal_guard_overdue }}` / `{{ goal_guard_due_soon }}` | Anzahl überfälliger bzw. bald fälliger TODOs, Meilensteine und Arbeitspakete (Basis: ihr Ende) |
+| `{{ goal_guard_item_1 }}` … `{{ goal_guard_item_5 }}` | Die dringendsten Punkte (überfällige Meilensteine, überfällige Arbeitspakete, überfällige TODOs, Zieldatum, bald Fälliges in derselben Folge – „Meilenstein …“, „Arbeitspaket …“), je höchstens 200 Zeichen; freie Plätze sind leer und fallen in `dashboard-report` weg |
 | `{{ goal_guard_items }}` | Alle Punkte, eine Zeile je Punkt |
 
 Die Kachelwerte sind frei von Steuer- und Formatzeichen und halten die Längen des Dashboard-Vertrags

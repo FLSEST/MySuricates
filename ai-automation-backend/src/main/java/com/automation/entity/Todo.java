@@ -127,9 +127,12 @@ public class Todo {
     @Column(name = "goal_rank")
     private Integer goalRank;
 
-    /** Meilenstein des Ziels, auf den dieses TODO einzahlt (TODO 259f4f66); nur innerhalb von {@link #goalId}. */
-    @Column(name = "milestone_id")
-    private String milestoneId;
+    /**
+     * Arbeitspaket des Ziels, in dem dieses TODO steht (TODO c60bf914, bis V92 „Meilenstein“); nur
+     * innerhalb von {@link #goalId} und – beim Schreiben geprueft – desselben Projekts.
+     */
+    @Column(name = "work_package_id")
+    private String workPackageId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "complexity")

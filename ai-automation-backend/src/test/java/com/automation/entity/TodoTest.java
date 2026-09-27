@@ -144,11 +144,11 @@ class TodoTest {
                     "run", "rt", "rid", "ep", "er", "eu", "rel",
                     now, 5, "lastFix",
                     Todo.ResolutionState.SUCCEEDED,
-                    "goal-1", 3, "milestone-1", Todo.Complexity.L, "high", "note", Todo.RatedBy.AI, now, "Frage?",
+                    "goal-1", 3, "package-1", Todo.Complexity.L, "high", "note", Todo.RatedBy.AI, now, "Frage?",
                     now, now
             );
             assertThat(todo.getGoalId()).isEqualTo("goal-1");
-            assertThat(todo.getMilestoneId()).isEqualTo("milestone-1");
+            assertThat(todo.getWorkPackageId()).isEqualTo("package-1");
             assertThat(todo.getGoalRank()).isEqualTo(3);
             assertThat(todo.getComplexity()).isEqualTo(Todo.Complexity.L);
             assertThat(todo.getSuggestedEffort()).isEqualTo("high");

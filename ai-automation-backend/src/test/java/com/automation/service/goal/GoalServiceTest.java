@@ -1,7 +1,10 @@
 package com.automation.service.goal;
 
+import com.automation.dto.projection.GoalProjectRow;
 import com.automation.dto.projection.GoalTodoRow;
+import com.automation.dto.response.GoalDetailResponse;
 import com.automation.dto.response.GoalProgressResponse;
+import com.automation.dto.response.GoalResponse;
 import com.automation.entity.Todo;
 import org.junit.jupiter.api.Test;
 
@@ -74,6 +77,46 @@ class GoalServiceTest {
         assertThat(TodoPlanningService.text("  ", "openQuestion")).isNull();
         assertThatThrownBy(() -> TodoPlanningService.text("x".repeat(TodoPlanningService.MAX_TEXT + 1), "ratingNote"))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    /** TODO c60bf914: Zielprojekte mit Zaehlern aus den nicht archivierten TODOs in diesem Projekt. */
+    @Test
+    void projects_countPerAssignedProject_inTheirOrder_withoutArchived() {
+        List<GoalProjectRow> projects = List.of(
+                new GoalProjectRow("g1", "pB", "Site", null, 0),
+                new GoalProjectRow("g1", "pA", "AutoPilot", Instant.parse("2026-09-01T00:00:00Z"), 1),
+                new GoalProjectRow("g1", "pEmpty", "Leer", null, 2));
+        List<GoalTodoRow> rows = List.of(
+                inProject("a1", "pA", Todo.Status.DONE, null), inProject("a2", "pA", Todo.Status.OPEN, "Wer?"),
+                inProject("a3", "pA", Todo.Status.ARCHIVED, "verworfen"), inProject("a4", "pA", Todo.Status.DONE, "alt"),
+                inProject("b1", "pB", Todo.Status.BACKLOG, "Welcher Stil?"),
+                inProject("x1", "pOther", Todo.Status.OPEN, null), inProject("n1", null, Todo.Status.OPEN, null));
+
+        List<GoalDetailResponse.ProjectSummary> summaries = GoalProjectSummaries.projects(projects, rows);
+
+        assertThat(summaries).containsExactly(
+                new GoalDetailResponse.ProjectSummary("pB", "Site", false, 0, 1, 0, 1),
+                new GoalDetailResponse.ProjectSummary("pA", "AutoPilot", true, 1, 3, 2, 1),
+                new GoalDetailResponse.ProjectSummary("pEmpty", "Leer", false, 2, 0, 0, 0));
+        assertThat(GoalProjectSummaries.refs(projects)).extracting(GoalResponse.ProjectRef::id)
+                .containsExactly("pB", "pA", "pEmpty");
+    }
+
+    @Test
+    void refsByGoal_groupsTheRowsOfSeveralGoals_keepingTheirOrder() {
+        var byGoal = GoalProjectSummaries.refsByGoal(List.of(
+                new GoalProjectRow("g1", "pB", "Site", null, 0), new GoalProjectRow("g1", "pA", "AutoPilot", null, 1),
+                new GoalProjectRow("g2", "pA", "AutoPilot", null, 0)));
+
+        assertThat(byGoal.get("g1")).containsExactly(new GoalResponse.ProjectRef("pB", "Site"),
+                new GoalResponse.ProjectRef("pA", "AutoPilot"));
+        assertThat(byGoal.get("g2")).containsExactly(new GoalResponse.ProjectRef("pA", "AutoPilot"));
+    }
+
+    private static GoalTodoRow inProject(String id, String projectId, Todo.Status status, String openQuestion) {
+        Instant created = Instant.parse("2026-09-01T00:00:00Z");
+        return new GoalTodoRow(id, id, status, Todo.Priority.MEDIUM, projectId, null, null, null, null, null, null, null,
+                openQuestion, created, created, null, null);
     }
 
     private static GoalTodoRow row(String id, Integer rank, Todo.Priority priority, Todo.Status status, int ageSeconds) {

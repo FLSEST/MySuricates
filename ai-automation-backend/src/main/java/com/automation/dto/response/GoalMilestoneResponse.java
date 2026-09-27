@@ -1,22 +1,26 @@
 package com.automation.dto.response;
 
-import com.automation.entity.GoalMilestone;
+import com.automation.entity.GoalDueState;
 
 import java.time.Instant;
+import java.util.List;
 
 /**
- * Ein Meilenstein mit berechnetem Zustand (TODO 259f4f66). {@code total}/{@code done} zaehlen die
- * zugeordneten TODOs ohne ARCHIVED. {@code reopened}: war schon einmal erreicht
- * ({@code reachedAt} gesetzt), ist es jetzt aber nicht mehr – etwa weil ein neues TODO dazukam.
+ * Ein Meilenstein – ein Termin fuers ganze Ziel – mit berechnetem Zustand (TODO c60bf914).
+ * Mit verknuepften Arbeitspaketen ({@code workPackageIds}) ist er REACHED, sobald alle abgeschlossen
+ * sind ({@code packagesDone == packagesTotal}); ohne Pakete, wenn er von Hand markiert wurde.
+ * {@code reopened}: war schon einmal erreicht ({@code reachedAt} gesetzt), die Pakete sind es jetzt
+ * aber nicht mehr.
  */
 public record GoalMilestoneResponse(
         String id,
         String goalId,
         String title,
         Instant dueDate,
-        GoalMilestone.State state,
-        long total,
-        long done,
+        GoalDueState state,
+        List<String> workPackageIds,
+        long packagesTotal,
+        long packagesDone,
         Instant reachedAt,
         boolean reopened,
         Instant createdAt,

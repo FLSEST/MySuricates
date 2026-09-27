@@ -2,19 +2,26 @@ package com.automation.controller;
 
 import com.automation.dto.request.CreateGoalMilestoneRequest;
 import com.automation.dto.request.CreateGoalRequest;
+import com.automation.dto.request.CreateGoalWorkPackageRequest;
 import com.automation.dto.request.GoalGuardRequest;
+import com.automation.dto.request.GoalIdsRequest;
+import com.automation.dto.request.GoalProjectRequest;
 import com.automation.dto.request.GoalTodoIdsRequest;
 import com.automation.dto.request.UpdateGoalMilestoneRequest;
 import com.automation.dto.request.UpdateGoalRequest;
+import com.automation.dto.request.UpdateGoalWorkPackageRequest;
 import com.automation.dto.response.GoalDetailResponse;
 import com.automation.dto.response.GoalMilestoneResponse;
 import com.automation.dto.response.GoalRelationsResponse;
 import com.automation.dto.response.GoalResponse;
+import com.automation.dto.response.GoalWorkPackageResponse;
 import com.automation.entity.Goal;
 import com.automation.service.goal.GoalMembershipService;
 import com.automation.service.goal.GoalMilestoneService;
+import com.automation.service.goal.GoalProjectService;
 import com.automation.service.goal.GoalRelationsService;
 import com.automation.service.goal.GoalService;
+import com.automation.service.goal.GoalWorkPackageService;
 import com.automation.service.goal.guard.GoalGuardService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -27,8 +34,9 @@ import java.util.List;
 /**
  * Ziele: TODOs projektuebergreifend auf ein Ergebnis hin sammeln, ordnen und den Fortschritt
  * zeigen (TODO dc0566f8). Die Einschaetzung eines einzelnen TODOs laeuft ueber
- * {@code PATCH /api/v1/todos/{id}/planning} – dort auch die Zuordnung zu einem Meilenstein.
- * Meilensteine und Ziel-Waechter: TODO 259f4f66.
+ * {@code PATCH /api/v1/todos/{id}/planning} – dort auch die Zuordnung zu einem Arbeitspaket.
+ * Ziel-Waechter: TODO 259f4f66. Projekte des Ziels, Arbeitspakete (je Projekt, mit Zeitraum und
+ * Reihenfolge) und Meilensteine (Termine des Ziels, optional an Pakete geknuepft): TODO c60bf914.
  */
 @RestController
 @RequestMapping("/api/v1/goals")
@@ -38,13 +46,19 @@ public class GoalController {
     private final GoalService goalService;
     private final GoalMembershipService membershipService;
     private final GoalRelationsService relationsService;
+    private final GoalWorkPackageService workPackageService;
     private final GoalMilestoneService milestoneService;
+    private final GoalProjectService projectService;
     private final GoalGuardService guardService;
 
-    /** Ohne {@code status}: aktive und erledigte Ziele, neueste zuerst. */
+    /**
+     * Ohne {@code status}: aktive und erledigte Ziele, neueste zuerst. Mit {@code projectId} nur die
+     * Ziele, denen dieses Projekt zugeordnet ist.
+     */
     @GetMapping
-    public List<GoalResponse> listGoals(@RequestParam(required = false) List<Goal.Status> status) {
-        return goalService.list(status);
+    public List<GoalResponse> listGoals(@RequestParam(required = false) List<Goal.Status> status,
+                                        @RequestParam(required = false) String projectId) {
+        return goalService.list(status, projectId);
     }
 
     @PostMapping
@@ -93,7 +107,64 @@ public class GoalController {
         return membershipService.reorder(id, request.todoIds());
     }
 
-    /** Meilensteine des Ziels nach Datum, mit Zustand (OPEN/DUE_SOON/OVERDUE/REACHED) und Zaehlern. */
+    /** Projekt ans Ende der Zielprojekte haengen; schon zugeordnet = unveraendert (idempotent). */
+    @PostMapping("/{id}/projects")
+    public GoalDetailResponse addProject(@PathVariable String id, @Valid @RequestBody GoalProjectRequest request) {
+        return projectService.add(id, request.projectId());
+    }
+
+    /** Zielprojekte neu ordnen: die genannten vorn, die uebrigen in bisheriger Folge dahinter. */
+    @PutMapping("/{id}/projects/order")
+    public GoalDetailResponse reorderProjects(@PathVariable String id, @Valid @RequestBody GoalIdsRequest request) {
+        return projectService.reorder(id, request.ids());
+    }
+
+    /**
+     * Projekt vom Ziel loesen. Haengen daran im Ziel noch Arbeitspakete oder TODOs: 409 – mit
+     * {@code cascade=true} werden die Arbeitspakete geloescht und die TODOs vom Ziel geloest.
+     */
+    @DeleteMapping("/{id}/projects/{projectId}")
+    public ResponseEntity<Void> removeProject(@PathVariable String id, @PathVariable String projectId,
+                                              @RequestParam(defaultValue = "false") boolean cascade) {
+        projectService.remove(id, projectId, cascade);
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Arbeitspakete des Ziels nach Projekt-Position und Position im Projekt, mit Zustand
+     * (OPEN/DUE_SOON/OVERDUE/REACHED auf Basis des Endes; ohne Zeitraum nur OPEN/REACHED) und Zaehlern.
+     */
+    @GetMapping("/{id}/work-packages")
+    public List<GoalWorkPackageResponse> listWorkPackages(@PathVariable String id) {
+        return workPackageService.list(id);
+    }
+
+    @PostMapping("/{id}/work-packages")
+    public ResponseEntity<GoalWorkPackageResponse> createWorkPackage(@PathVariable String id,
+                                                                     @Valid @RequestBody CreateGoalWorkPackageRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(workPackageService.create(id, request));
+    }
+
+    /** Arbeitspakete EINES Projekts neu ordnen; Antwort: alle Arbeitspakete des Ziels. */
+    @PutMapping("/{id}/work-packages/order")
+    public List<GoalWorkPackageResponse> reorderWorkPackages(@PathVariable String id, @Valid @RequestBody GoalIdsRequest request) {
+        return workPackageService.reorder(id, request.ids());
+    }
+
+    @PutMapping("/{id}/work-packages/{workPackageId}")
+    public GoalWorkPackageResponse updateWorkPackage(@PathVariable String id, @PathVariable String workPackageId,
+                                                     @RequestBody UpdateGoalWorkPackageRequest request) {
+        return workPackageService.update(id, workPackageId, request);
+    }
+
+    /** Loescht das Arbeitspaket; seine TODOs bleiben im Ziel, Meilensteine verlieren die Verknuepfung. */
+    @DeleteMapping("/{id}/work-packages/{workPackageId}")
+    public ResponseEntity<Void> deleteWorkPackage(@PathVariable String id, @PathVariable String workPackageId) {
+        workPackageService.delete(id, workPackageId);
+        return ResponseEntity.noContent().build();
+    }
+
+    /** Meilensteine des Ziels nach Datum, dann Titel, mit Zustand und Paket-Zaehlern. */
     @GetMapping("/{id}/milestones")
     public List<GoalMilestoneResponse> listMilestones(@PathVariable String id) {
         return milestoneService.list(id);
@@ -105,13 +176,14 @@ public class GoalController {
         return ResponseEntity.status(HttpStatus.CREATED).body(milestoneService.create(id, request));
     }
 
+    /** {@code workPackageIds} ersetzt die Verknuepfungen; {@code reached} nur ohne verknuepfte Pakete. */
     @PutMapping("/{id}/milestones/{milestoneId}")
     public GoalMilestoneResponse updateMilestone(@PathVariable String id, @PathVariable String milestoneId,
                                                  @RequestBody UpdateGoalMilestoneRequest request) {
         return milestoneService.update(id, milestoneId, request);
     }
 
-    /** Loescht den Meilenstein; seine TODOs bleiben im Ziel und verlieren nur die Zuordnung. */
+    /** Loescht den Meilenstein; die verknuepften Arbeitspakete bleiben. */
     @DeleteMapping("/{id}/milestones/{milestoneId}")
     public ResponseEntity<Void> deleteMilestone(@PathVariable String id, @PathVariable String milestoneId) {
         milestoneService.delete(id, milestoneId);

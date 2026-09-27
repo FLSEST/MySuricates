@@ -24,6 +24,6 @@ public record GoalTodoItem(
         Instant updatedAt,
         /** Faelligkeit des TODOs (TODO 259f4f66); null = ungeplant. */
         Instant dueDate,
-        /** Meilenstein des Ziels, dem das TODO zugeordnet ist; null = keiner. */
-        String milestoneId
+        /** Arbeitspaket des Ziels, dem das TODO zugeordnet ist (TODO c60bf914); null = keins. */
+        String workPackageId
 ) {}

@@ -45,6 +45,7 @@ public class TodoService {
     private final TodoResponseAssembler responseAssembler;
     private final ApplicationEventPublisher eventPublisher;
     private final AuditCenterService auditCenterService;
+    private final TodoGoalConsistency goalConsistency;
 
     @Transactional(readOnly = true)
     public PageResponse<TodoResponse> findAll(int page, int size, String projectId, List<String> status, String priority, String source, String tag, String q) {
@@ -116,7 +117,11 @@ public class TodoService {
         if (request.status() != null) todo.setStatus(request.status());
         if (request.priority() != null) todo.setPriority(request.priority());
         if (request.tags() != null) todo.setTags(TodoMapper.listToJson(request.tags()));
-        if (request.projectId() != null) todo.setProjectId(resolveProjectId(request.projectId()));
+        if (request.projectId() != null) {
+            String before = todo.getProjectId();
+            todo.setProjectId(resolveProjectId(request.projectId()));
+            if (!java.util.Objects.equals(before, todo.getProjectId())) goalConsistency.afterProjectChange(todo);
+        }
         if (request.linkedWorkflowId() != null) {
             todo.setLinkedWorkflowId(validateLinkedWorkflowId(request.linkedWorkflowId()));
             todo.setResolutionState(todo.getLinkedWorkflowId() != null ? Todo.ResolutionState.IDLE : null);

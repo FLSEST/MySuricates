@@ -52,6 +52,9 @@ class TodoServiceTest {
     @Mock
     private AuditCenterService auditCenterService;
 
+    @Mock
+    private TodoGoalConsistency goalConsistency;
+
     @InjectMocks
     private TodoService todoService;
 
@@ -308,6 +311,22 @@ class TodoServiceTest {
         Todo result = todoService.update("t-1", request);
 
         assertThat(result.getProjectId()).isNull();
+    }
+
+    /** TODO c60bf914: ein Projektwechsel haelt das TODO mit seinem Ziel stimmig – nur bei echtem Wechsel. */
+    @Test
+    void update_projectChange_keepsTheGoalConsistent_sameProjectDoesNot() {
+        Todo existing = Todo.builder().id("t-1").title("Test").projectId("proj-1").goalId("g1").build();
+        when(todoRepository.findById("t-1")).thenReturn(Optional.of(existing));
+        when(todoRepository.save(any(Todo.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(projectRepository.existsById(any())).thenReturn(true);
+
+        todoService.update("t-1", new UpdateTodoRequest(null, null, null, null, null, "proj-1", null, null, null, null));
+        verify(goalConsistency, never()).afterProjectChange(any());
+
+        todoService.update("t-1", new UpdateTodoRequest(null, null, null, null, null, "proj-2", null, null, null, null));
+        verify(goalConsistency).afterProjectChange(existing);
+        assertThat(existing.getProjectId()).isEqualTo("proj-2");
     }
 
     // --- updateStatus ---

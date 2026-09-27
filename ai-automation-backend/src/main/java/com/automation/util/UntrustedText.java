@@ -6,7 +6,7 @@ import java.util.StringJoiner;
 import java.util.regex.Pattern;
 
 /**
- * Macht nicht vertrauenswuerdigen Text – Titel von TODOs, Zielen und Meilensteinen aus Importen,
+ * Macht nicht vertrauenswuerdigen Text – Titel von TODOs, Zielen, Arbeitspaketen und Meilensteinen aus Importen,
  * Webhooks oder KI-Ausgaben – zu einer begrenzten Zeile ohne Plattform-Marker und ohne Blockgrenzen.
  * Gebraucht fuer die Kontextvariablen {@code open_todos} (service.workflow), {@code goal_status}
  * (service.goal) und {@code audit_findings} (service.audit); liegt hier, damit alle denselben Sanierer

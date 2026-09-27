@@ -2971,7 +2971,7 @@ Count TODOs by status. Optional query parameter `projectId` counts only that pro
 
 TODO overview with project rollups and "Needs You" items.
 
-**Response:** `TodoOverviewResponse` with `projects` (List), `needsYou` (List), `generatedAt`, `staleThresholdDays`, `milestonesDue` (V88: milestones of active goals that are `DUE_SOON`/`OVERDUE` – `id`, `title`, `goalId`, `goalTitle`, `dueDate`, `state`, `total`, `done`)
+**Response:** `TodoOverviewResponse` with `projects` (List), `needsYou` (List), `generatedAt`, `staleThresholdDays`, `milestonesDue` (dates of active goals that need attention – `kind` `MILESTONE`: milestones that are `DUE_SOON`/`OVERDUE` and not reached, `total`/`done` = linked work packages; `kind` `WORK_PACKAGE` (V92): work packages whose end has passed while they still have open TODOs, `dueDate` = end, `total`/`done` = TODOs; each with `id`, `title`, `goalId`, `goalTitle`, `dueDate`, `state`, `total`, `done`, `kind`, by date)
 
 ### `POST /api/v1/todos/bulk-status`
 
@@ -3006,7 +3006,7 @@ Search for similar TODOs (for duplicate detection).
 
 ### `PATCH /api/v1/todos/{id}/planning`
 
-Set a TODO's goal, rank, milestone and assessment (V85, `milestoneId` V88). `null` leaves a field alone, an empty string clears it: `goalId: ""` detaches the TODO from its goal, `milestoneId: ""` from its milestone, `openQuestion: ""` marks the question as settled. `milestoneId` must be a milestone of the TODO's own goal (else 400, unknown 404; a `goalId` in the same request applies first); when the TODO changes or leaves its goal, `milestoneId` is cleared. `planning` in the response carries `milestoneId`. `goalRank <= 0` removes the rank. Without `ratedBy` the assessment counts as human (`USER`); the server sets `ratedAt` whenever `complexity`, `suggestedEffort` or `ratingNote` is sent.
+Set a TODO's goal, rank, work package and assessment (V85; `workPackageId` since V92, formerly `milestoneId` – the old name is still accepted). `null` leaves a field alone, an empty string clears it: `goalId: ""` detaches the TODO from its goal, `workPackageId: ""` from its work package, `openQuestion: ""` marks the question as settled. `workPackageId` must be a work package of the TODO's own goal and own project (else 400, unknown 404; a `goalId` in the same request applies first); when the TODO changes or leaves its goal, `workPackageId` is cleared. If the TODO's project is not assigned to the goal yet, it is added. `planning` in the response carries `workPackageId`. `goalRank <= 0` removes the rank. Without `ratedBy` the assessment counts as human (`USER`); the server sets `ratedAt` whenever `complexity`, `suggestedEffort` or `ratingNote` is sent.
 
 ```json
 {
@@ -3017,7 +3017,7 @@ Set a TODO's goal, rank, milestone and assessment (V85, `milestoneId` V88). `nul
   "ratingNote": "Many files, but a clear template",
   "openQuestion": "Which video style?",
   "ratedBy": "AI",
-  "milestoneId": "uuid"
+  "workPackageId": "uuid"
 }
 ```
 
@@ -3033,23 +3033,24 @@ A goal collects TODOs across projects and shows progress (V85). See [architektur
 
 ### `GET /api/v1/goals`
 
-Goals with progress, newest first. **Query:** `status` (repeatable; default `ACTIVE` and `DONE`, archived ones only when asked for).
+Goals with progress, newest first. **Query:** `status` (repeatable; default `ACTIVE` and `DONE`, archived ones only when asked for), `projectId` (optional, V92: only goals this project is assigned to).
 
-**Response:** `GoalResponse[]` – `id`, `title`, `description`, `status`, `targetDate`, `createdAt`, `updatedAt`, `progress` (`total`, `open`, `inProgress`, `backlog`, `done`, `openQuestions`, `percentDone`; `total` excludes ARCHIVED), `guard` (`enabled`, `workflowId`, `scheduleId`, `nextRunAt`; never switched on = `enabled: false`, the rest `null`).
+**Response:** `GoalResponse[]` – `id`, `title`, `description`, `status`, `targetDate`, `createdAt`, `updatedAt`, `progress` (`total`, `open`, `inProgress`, `backlog`, `done`, `openQuestions`, `percentDone`; `total` excludes ARCHIVED), `guard` (`enabled`, `workflowId`, `scheduleId`, `nextRunAt`; never switched on = `enabled: false`, the rest `null`), `projects[]` (V92: `id`, `name` of the assigned projects in their order; never `null`), `nextMilestone` (V92: the next milestone not yet reached, by date – `id`, `title`, `dueDate`, `state`; `null` = none; for all goals of the list from one query).
 
 ### `POST /api/v1/goals`
 
 ```json
-{ "title": "Open-source launch", "description": "Repo public, README with video", "targetDate": "2026-10-15" }
+{ "title": "Open-source launch", "description": "Repo public, README with video", "targetDate": "2026-10-15",
+  "projectIds": ["<project-id>", "…"] }
 ```
 
-`targetDate` as a date or ISO instant. **Response:** `201` + `GoalResponse`
+`targetDate` as a date or ISO instant. `projectIds` optional (V92): the goal's projects in this order, an unknown one → `404`. **Response:** `201` + `GoalResponse`
 
 ### `GET /api/v1/goals/{id}`
 
 The goal with its TODOs in work order (rank, then priority, then age) – without descriptions – and progress per project.
 
-**Response:** `GoalDetailResponse` – `goal`, `todos[]` (`id`, `title`, `status`, `priority`, `projectId`, `projectName`, `tags`, `goalRank`, `complexity`, `suggestedEffort`, `ratingNote`, `ratedBy`, `ratedAt`, `openQuestion`, `updatedAt`, `dueDate`, `milestoneId`), `byProject[]` (`projectId`, `projectName`, `total`, `done`), `milestones[]` (`GoalMilestoneResponse`, by date). If reading detects a milestone as reached for the first time, it stores `reachedAt`.
+**Response:** `GoalDetailResponse` – `goal`, `todos[]` (`id`, `title`, `status`, `priority`, `projectId`, `projectName`, `tags`, `goalRank`, `complexity`, `suggestedEffort`, `ratingNote`, `ratedBy`, `ratedAt`, `openQuestion`, `updatedAt`, `dueDate`, `workPackageId`), `byProject[]` (`projectId`, `projectName`, `total`, `done`; derived from the TODOs, kept for existing callers), `projects[]` (V92: the assigned projects by `position` – `projectId`, `name`, `archived`, `position`, `total`, `done`, `openQuestions`, counted from the goal's non-archived TODOs in that project), `workPackages[]` (V92: `GoalWorkPackageResponse`, by project position, then `position`), `milestones[]` (V92: `GoalMilestoneResponse`, by date, then title). If reading detects a work package or milestone as completed or reached for the first time, it stores `completedAt`/`reachedAt`.
 
 ### `GET /api/v1/goals/{id}/relations`
 
@@ -3069,35 +3070,67 @@ Partial update: `title`, `description`, `status`, `targetDate` (`null` = unchang
 
 ### `DELETE /api/v1/goals/{id}`
 
-Deletes the goal; its TODOs stay and only lose the assignment (milestone included), its milestones go, a goal guard pauses (its workflow stays). **Response:** `204`
+Deletes the goal; its TODOs stay and only lose the assignment (work package included), its work packages and milestones go, a goal guard pauses (its workflow stays). **Response:** `204`
 
 ### `POST /api/v1/goals/{id}/todos`
 
-Assign TODOs: `{ "todoIds": ["…"] }`. A TODO from another goal moves here and loses its milestone; newly assigned TODOs get no rank. **Response:** `GoalDetailResponse`
+Assign TODOs: `{ "todoIds": ["…"] }`. A TODO from another goal moves here and loses its work package; newly assigned TODOs get no rank. If their project is not assigned to the goal yet, it is appended (V92) – likewise via `PATCH /todos/{id}/planning` (`goalId`) and when a TODO changes its project (`PUT /todos/{id}`, which also drops a work package of the old project). **Response:** `GoalDetailResponse`
 
 ### `PUT /api/v1/goals/{id}/order`
 
 Set the order: `{ "todoIds": ["…"] }` → rank 1..n in this sequence; all other TODOs of the goal lose their rank. Every ID must already belong to the goal, else 400. **Response:** `GoalDetailResponse`
 
-### Milestones (V88)
+### Projects of a goal (V92)
 
-A milestone is an entry of its own with title and date; TODOs of the goal are assigned to it via `PATCH /todos/{id}/planning` (`milestoneId`). The state is computed on read: `REACHED` (all assigned TODOs without ARCHIVED done, at least one), else `OVERDUE`, `DUE_SOON` (≤ 3 days) or `OPEN`. `reachedAt` keeps the first detection and stays; if the milestone opens again afterwards, `reopened: true`.
+A goal is explicitly assigned to one or more projects, in an order (`goal_projects`).
+
+- `POST /api/v1/goals/{id}/projects` – `{ "projectId": "…" }` appends the project; already assigned = unchanged (idempotent). Unknown goal/project → `404`. **Response:** `GoalDetailResponse`
+- `PUT /api/v1/goals/{id}/projects/order` – `{ "ids": ["<projectId>", …] }`: the named ones first in this order, the other goal projects behind them in their previous order; a project not assigned to the goal → `400`. **Response:** `GoalDetailResponse`
+- `DELETE /api/v1/goals/{id}/projects/{projectId}?cascade=false` – if work packages or TODOs of the goal still hang on the project → `409` (`STATE_CONFLICT`, the message names the counts). `cascade=true` deletes the project's work packages in this goal (milestones lose the link) and releases its TODOs from the goal (the TODOs stay). **Response:** `204`
+
+### Work packages (V92)
+
+A work package belongs to exactly one project of the goal (`projectId`) and bundles TODOs of that project; until V92 they were called milestones (V88). TODOs are assigned via `PATCH /todos/{id}/planning` (`workPackageId`) – only TODOs of the same goal and project (else `400`; a TODO without a project fits no package with a project). The period is optional: `startDate` and `endDate` only come together, and the start never lies after the end (else `400`). The state is computed on read from the end: `REACHED` (completed: all assigned TODOs without ARCHIVED done, at least one), else `OVERDUE`, `DUE_SOON` (≤ 3 days) or `OPEN` – without a period only `OPEN` or `REACHED`. `completedAt` keeps the first detection and stays; if the package opens again afterwards, `reopened: true`. `openQuestions` counts the active TODOs in it with an open question.
+
+**`GoalWorkPackageResponse`:**
+
+```json
+{
+  "id": "b1f0…", "goalId": "6c2e…", "projectId": "3a9d…", "title": "Promo material",
+  "startDate": "2026-09-28T00:00:00Z", "endDate": "2026-10-01T23:59:59Z", "position": 0,
+  "state": "DUE_SOON", "total": 4, "done": 2, "openQuestions": 1,
+  "completedAt": null, "reopened": false,
+  "createdAt": "2026-09-24T08:00:00Z", "updatedAt": "2026-09-24T08:00:00Z"
+}
+```
+
+- `GET /api/v1/goals/{id}/work-packages` – by project position, then `position`. **Response:** `GoalWorkPackageResponse[]`
+- `POST /api/v1/goals/{id}/work-packages` – `{ "title": "Promo material", "projectId": "…", "startDate": "2026-09-28", "endDate": "2026-10-01" }`; period optional, ISO instant or date (start `2026-09-28` = from 00:00:00 UTC, end `2026-10-01` = until 23:59:59 UTC); `projectId` required unless the goal has exactly one project (else `400`), a project the goal does not have yet is added; the package goes to the end of its project; title at most 200 characters. **Response:** `201` + `GoalWorkPackageResponse`
+- `PUT /api/v1/goals/{id}/work-packages/{workPackageId}` – partial update `{ "title"?, "projectId"?, "startDate"?, "endDate"? }` (`null` = unchanged, `""` clears a date). The result must have the full period or none (else `400`). Changing the project only works while no TODOs are assigned to the package (else `400`); it goes to the end of the new project. **Response:** `GoalWorkPackageResponse`
+- `PUT /api/v1/goals/{id}/work-packages/order` – `{ "ids": ["<workPackageId>", …] }`: packages of ONE project in a new order, unnamed ones of the same project behind them; packages of different projects → `400`, a foreign one → `404`. **Response:** all `GoalWorkPackageResponse` of the goal
+- `DELETE /api/v1/goals/{id}/work-packages/{workPackageId}` – the TODOs stay in the goal and only lose the assignment, milestones lose the link. **Response:** `204`
+
+Unknown goal, or a package of another goal → `404`.
+
+### Milestones (V92)
+
+A milestone is a date of the whole goal – no project, the date is required. Optionally it hangs on work packages of the same goal (`workPackageIds`): then it is `REACHED` once all linked packages are completed; `reachedAt` keeps the first detection, and if the packages are later no longer all completed, `reopened: true`. Without packages a person marks it (`reached`). Otherwise the date decides: `OVERDUE`, `DUE_SOON` (≤ 3 days) or `OPEN`. Not to be confused with the milestones before V92 – those are work packages now.
 
 **`GoalMilestoneResponse`:**
 
 ```json
 {
-  "id": "b1f0…", "goalId": "6c2e…", "title": "Beta done",
-  "dueDate": "2026-10-01T21:59:59Z", "state": "DUE_SOON",
-  "total": 4, "done": 2, "reachedAt": null, "reopened": false,
+  "id": "7d21…", "goalId": "6c2e…", "title": "Launch", "dueDate": "2026-10-15T23:59:59Z",
+  "state": "OPEN", "workPackageIds": ["b1f0…", "c4e2…"], "packagesTotal": 2, "packagesDone": 1,
+  "reachedAt": null, "reopened": false,
   "createdAt": "2026-09-24T08:00:00Z", "updatedAt": "2026-09-24T08:00:00Z"
 }
 ```
 
-- `GET /api/v1/goals/{id}/milestones` – by date. **Response:** `GoalMilestoneResponse[]`
-- `POST /api/v1/goals/{id}/milestones` – `{ "title": "Beta done", "dueDate": "2026-10-01T21:59:59Z" }`; `dueDate` required, ISO instant or date (`2026-10-01` = until 23:59:59 UTC); title at most 200 characters. **Response:** `201` + `GoalMilestoneResponse`
-- `PUT /api/v1/goals/{id}/milestones/{milestoneId}` – partial update `{ "title"?, "dueDate"? }` (`null` = unchanged). **Response:** `GoalMilestoneResponse`
-- `DELETE /api/v1/goals/{id}/milestones/{milestoneId}` – the TODOs stay in the goal and only lose the assignment. **Response:** `204`
+- `GET /api/v1/goals/{id}/milestones` – by date, then title. **Response:** `GoalMilestoneResponse[]`
+- `POST /api/v1/goals/{id}/milestones` – `{ "title": "Launch", "dueDate": "2026-10-15", "workPackageIds": ["…"] }`; `dueDate` required (a date = until 23:59:59 UTC); every package must belong to the goal (else `400`). **Response:** `201` + `GoalMilestoneResponse`
+- `PUT /api/v1/goals/{id}/milestones/{milestoneId}` – partial update `{ "title"?, "dueDate"?, "workPackageIds"?, "reached"? }`; `workPackageIds` replaces the links (`[]` removes all), `reached: true` marks it as reached by hand, `false` takes that back – only without linked packages (after this change), else `400`. **Response:** `GoalMilestoneResponse`
+- `DELETE /api/v1/goals/{id}/milestones/{milestoneId}` – the work packages stay. **Response:** `204`
 
 Unknown goal, or a milestone of another goal → `404`.
 
@@ -3105,7 +3138,7 @@ Unknown goal, or a milestone of another goal → `404`.
 
 Switch the goal guard on or off (V88): `{ "enabled": true, "projectId": "…"?, "cron": "0 0 8 * * *"?, "locale": "en"? }`.
 
-- **First switch-on:** creates a workflow "Goal guard: <title>" (`locale` `de`: "Ziel-Wächter: …") from the shipped template `goal-guard` with `defaultContext` `{goal_id, goal_locale}` (`changeSource` `goal-guard`), plus a CRON schedule (default daily 08:00, `inputContext.goal_id`, conflict `SKIP`). Project: `projectId`, else the one with most of the goal's TODOs, else the oldest active one; no project at all → 400.
+- **First switch-on:** creates a workflow "Goal guard: <title>" (`locale` `de`: "Ziel-Wächter: …") from the shipped template `goal-guard` with `defaultContext` `{goal_id, goal_locale}` (`changeSource` `goal-guard`), plus a CRON schedule (default daily 08:00, `inputContext.goal_id`, conflict `SKIP`). Project: `projectId`, else the first non-archived goal project (V92), else the one with most of the goal's TODOs, else the oldest active one; no project at all → 400.
 - **Switching on again:** re-enables the existing schedule; a given `cron` replaces the old one. If the workflow was deleted, a new one is created.
 - **Switching off** (`enabled: false`): pauses the schedule, the workflow stays. Deleting the goal pauses it as well.
 

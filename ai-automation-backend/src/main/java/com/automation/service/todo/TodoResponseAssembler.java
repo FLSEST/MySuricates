@@ -92,11 +92,11 @@ public class TodoResponseAssembler {
     /** Null, solange weder Ziel noch Einschaetzung noch offene Frage gesetzt sind (TODO dc0566f8). */
     static TodoPlanningResponse planningOf(Todo todo, String goalTitle) {
         if (todo.getGoalId() == null && todo.getComplexity() == null && todo.getSuggestedEffort() == null
-                && todo.getRatingNote() == null && todo.getOpenQuestion() == null && todo.getMilestoneId() == null) {
+                && todo.getRatingNote() == null && todo.getOpenQuestion() == null && todo.getWorkPackageId() == null) {
             return null;
         }
         return new TodoPlanningResponse(todo.getGoalId(), goalTitle, todo.getGoalRank(),
                 todo.getComplexity(), todo.getSuggestedEffort(), todo.getRatingNote(),
-                todo.getRatedBy(), todo.getRatedAt(), todo.getOpenQuestion(), todo.getMilestoneId());
+                todo.getRatedBy(), todo.getRatedAt(), todo.getOpenQuestion(), todo.getWorkPackageId());
     }
 }

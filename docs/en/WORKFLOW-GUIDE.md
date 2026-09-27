@@ -848,13 +848,13 @@ language follows `goal_locale` (`de`/`en`, German when absent). No REST call nee
 
 | Variable | Content |
 |----------|---------|
-| `{{ goal_status }}` | Block `<goal_status>…</goal_status>` with goal, target date, progress, milestones with state (`OPEN`/`DUE_SOON`/`OVERDUE`/`REACHED`, `REOPENED`), overdue and soon-due (≤ 3 days) active TODOs. Titles flattened, capped and stripped of platform markers (`todo_item:`, `gate_*:`, `dashboard_widget:`) and block delimiters; at most 20 lines per list |
+| `{{ goal_status }}` | Block `<goal_status>…</goal_status>` with goal, target date, progress, milestones (dates of the goal, with completed/linked work packages) and work packages (period or “no period” – then never due –, done/assigned TODOs), each with state (`OPEN`/`DUE_SOON`/`OVERDUE`/`REACHED`, `REOPENED`), overdue and soon-due (≤ 3 days) active TODOs. Titles flattened, capped and stripped of platform markers (`todo_item:`, `gate_*:`, `dashboard_widget:`) and block delimiters; at most 20 lines per list |
 | `{{ goal_guard_status }}` | `RED` (something overdue or the target date passed with work left), `YELLOW` (something due within ≤ 3 days), else `GREEN` |
 | `{{ goal_guard_title }}` | `Goal: <title>`, at most 80 characters |
 | `{{ goal_guard_summary }}` | One line: `7/12 done (58 %) · 2 overdue · 1 due soon · next milestone “Beta” on 2026-10-01`, at most 500 characters |
 | `{{ goal_guard_progress }}` | `7/12 (58 %)` |
-| `{{ goal_guard_overdue }}` / `{{ goal_guard_due_soon }}` | Number of overdue / soon-due TODOs plus milestones |
-| `{{ goal_guard_item_1 }}` … `{{ goal_guard_item_5 }}` | The most urgent items (overdue milestones, overdue TODOs, target date, soon-due items), at most 200 characters each; free slots are empty and drop out in `dashboard-report` |
+| `{{ goal_guard_overdue }}` / `{{ goal_guard_due_soon }}` | Number of overdue / soon-due TODOs, milestones and work packages (based on their end) |
+| `{{ goal_guard_item_1 }}` … `{{ goal_guard_item_5 }}` | The most urgent items (overdue milestones, overdue work packages, overdue TODOs, target date, soon-due items in the same order – “Milestone …”, “Work package …”), at most 200 characters each; free slots are empty and drop out in `dashboard-report` |
 | `{{ goal_guard_items }}` | All items, one line each |
 
 The tile values carry no control or format characters and keep the dashboard contract's lengths – they
