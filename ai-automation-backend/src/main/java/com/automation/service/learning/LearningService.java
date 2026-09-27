@@ -87,6 +87,13 @@ public class LearningService {
         return model.replaceAll("-\\d{8,}$", "");
     }
 
+    private record ModelKey(String requestedModel, String provider, String model) {}
+
+    private static String modelMetadata(Map<String, Object> metadata, String key) {
+        String value = extractString(metadata, key);
+        return value == null || value.isBlank() ? null : value;
+    }
+
     /** Safely resolve workflow from run, returning null if the workflow was soft-deleted. */
     private Workflow safeGetWorkflow(WorkflowRun run) {
         try {
@@ -183,9 +190,9 @@ public class LearningService {
         Map<String, long[]> integrationTokens = new LinkedHashMap<>();
 
         // Model aggregation
-        Map<String, long[]> modelStepCount = new LinkedHashMap<>();
-        Map<String, long[]> modelTokens = new LinkedHashMap<>();
-        Map<String, double[]> modelCost = new LinkedHashMap<>();
+        Map<ModelKey, long[]> modelStepCount = new LinkedHashMap<>();
+        Map<ModelKey, long[]> modelTokens = new LinkedHashMap<>();
+        Map<ModelKey, double[]> modelCost = new LinkedHashMap<>();
 
         // Gate status
         Map<String, long[]> gateStatusCounts = new LinkedHashMap<>();
@@ -272,11 +279,17 @@ public class LearningService {
                     integrationTokens.computeIfAbsent(integrationId, k -> new long[1])[0] += stepTokens;
                 }
 
-                if (meta.get("model") instanceof String m && !m.isBlank()) {
-                    String nm = normalizeModelId(m);
-                    modelStepCount.computeIfAbsent(nm, k -> new long[1])[0]++;
-                    modelTokens.computeIfAbsent(nm, k -> new long[1])[0] += stepTokens;
-                    modelCost.computeIfAbsent(nm, k -> new double[1])[0] += stepCost;
+                String model = modelMetadata(meta, "model");
+                String requestedModel = modelMetadata(meta, "requestedModel");
+                String provider = modelMetadata(meta, "provider");
+                // Keep request and response distinct, including calls without a reported model.
+                // Integration providers describe connectors, not AI model usage.
+                if (!isIntegrationStep && (model != null || requestedModel != null || provider != null)) {
+                    ModelKey key = new ModelKey(requestedModel, provider,
+                            model != null ? normalizeModelId(model) : null);
+                    modelStepCount.computeIfAbsent(key, k -> new long[1])[0]++;
+                    modelTokens.computeIfAbsent(key, k -> new long[1])[0] += stepTokens;
+                    modelCost.computeIfAbsent(key, k -> new double[1])[0] += stepCost;
                 }
 
                 // Block type usage
@@ -360,11 +373,11 @@ public class LearningService {
 
         List<DashboardResponse.ModelStats> modelStats = modelStepCount.entrySet().stream()
                 .map(e -> {
-                    String m = e.getKey();
+                    ModelKey m = e.getKey();
                     long steps = e.getValue()[0];
                     long tokens = modelTokens.getOrDefault(m, new long[]{0})[0];
                     double cost = modelCost.getOrDefault(m, new double[]{0.0})[0];
-                    return new DashboardResponse.ModelStats(m, steps, tokens, cost);
+                    return new DashboardResponse.ModelStats(m.model(), m.requestedModel(), m.provider(), steps, tokens, cost);
                 })
                 .sorted(Comparator.comparingLong(DashboardResponse.ModelStats::totalTokens).reversed())
                 .toList();

@@ -22,7 +22,7 @@ class DashboardResponseTest {
     }
 
     private static DashboardResponse.ModelStats sampleModelStats() {
-        return new DashboardResponse.ModelStats("claude-sonnet-4-6", 200L, 80_000L, 18.75);
+        return new DashboardResponse.ModelStats("claude-sonnet-4-6", "sonnet", "CLAUDE", 200L, 80_000L, 18.75);
     }
 
     private static DashboardResponse.GateStatusEntry sampleGateStatusEntry() {
@@ -235,6 +235,8 @@ class DashboardResponseTest {
             DashboardResponse.ModelStats stats = sampleModelStats();
 
             assertThat(stats.model()).isEqualTo("claude-sonnet-4-6");
+            assertThat(stats.requestedModel()).isEqualTo("sonnet");
+            assertThat(stats.provider()).isEqualTo("CLAUDE");
             assertThat(stats.stepCount()).isEqualTo(200L);
             assertThat(stats.totalTokens()).isEqualTo(80_000L);
             assertThat(stats.totalCostUsd()).isEqualTo(18.75);

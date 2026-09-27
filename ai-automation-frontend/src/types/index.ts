@@ -1009,7 +1009,9 @@ export interface IntegrationStats {
 }
 
 export interface ModelStats {
-  model: string;
+  model: string | null;
+  requestedModel?: string | null;
+  provider?: string | null;
   stepCount: number;
   totalTokens: number;
   totalCostUsd: number;

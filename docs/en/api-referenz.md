@@ -2438,7 +2438,7 @@ project's workflows and runs — including the overall numbers (`totalWorkflows`
     { "provider": "CLAUDE", "runCount": 150, "totalTokens": 240000, "totalCostUsd": 11.0, "successRate": 90.0 }
   ],
   "modelStats": [
-    { "model": "sonnet", "stepCount": 200, "totalTokens": 180000, "totalCostUsd": 8.5 }
+    { "requestedModel": "sonnet", "provider": "CLAUDE", "model": "claude-sonnet", "stepCount": 200, "totalTokens": 180000, "totalCostUsd": 8.5 }
   ],
   "gateStatusSummary": [
     { "status": "GREEN", "count": 10 }
@@ -2457,6 +2457,12 @@ project's workflows and runs — including the overall numbers (`totalWorkflows`
   }
 }
 ```
+
+`modelStats` groups steps by the combination of `requestedModel` (requested),
+`provider` (AI provider), and `model` (reported; date suffixes are removed as before).
+Missing or blank values remain `null`; the requested model never replaces the reported one.
+Calls without a reported model and values such as `<synthetic>` remain visible.
+Integration steps do not contribute to these AI statistics.
 
 ### `GET /api/v1/learning/platform-stats`
 

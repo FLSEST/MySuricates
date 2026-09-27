@@ -59,6 +59,8 @@ public record DashboardResponse(
 
     public record ModelStats(
             String model,
+            String requestedModel,
+            String provider,
             long stepCount,
             long totalTokens,
             double totalCostUsd

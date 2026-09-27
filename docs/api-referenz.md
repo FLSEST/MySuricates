@@ -2466,7 +2466,7 @@ Workflows und Läufe dieses Projekts ein — auch die Gesamtzahlen (`totalWorkfl
     { "provider": "CLAUDE", "runCount": 150, "totalTokens": 240000, "totalCostUsd": 11.0, "successRate": 90.0 }
   ],
   "modelStats": [
-    { "model": "sonnet", "stepCount": 200, "totalTokens": 180000, "totalCostUsd": 8.5 }
+    { "requestedModel": "sonnet", "provider": "CLAUDE", "model": "claude-sonnet", "stepCount": 200, "totalTokens": 180000, "totalCostUsd": 8.5 }
   ],
   "gateStatusSummary": [
     { "status": "GREEN", "count": 10 }
@@ -2485,6 +2485,12 @@ Workflows und Läufe dieses Projekts ein — auch die Gesamtzahlen (`totalWorkfl
   }
 }
 ```
+
+`modelStats` gruppiert Schritte nach der Kombination aus `requestedModel` (angefordert),
+`provider` (KI-Anbieter) und `model` (gemeldet; wie bisher ohne Datums-Suffix).
+Fehlende oder leere Angaben bleiben `null`; das angeforderte Modell ersetzt nie das gemeldete.
+Auch Aufrufe ohne gemeldetes Modell und Werte wie `<synthetic>` bleiben sichtbar.
+Integrationsschritte zählen nicht zu dieser KI-Statistik.
 
 ### `GET /api/v1/learning/platform-stats`
 

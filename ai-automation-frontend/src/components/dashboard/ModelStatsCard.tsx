@@ -1,83 +1,60 @@
-import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
-} from 'recharts';
 import { ChartCard } from './ChartCard';
-import { useT } from '../../i18n';
+import { ModelStatsChart } from './ModelStatsChart';
+import { usePersistedState } from '../../hooks/usePersistedState';
+import { useI18nStore, useT } from '../../i18n';
+import { formatNumber, formatUsd } from '../../utils/localeFormat';
 import type { ModelStats } from '../../types';
 
 interface ModelStatsCardProps {
   data?: ModelStats[];
 }
 
-const BAR_COLORS = [
-  'var(--color-accent)',
-  'var(--color-chart-1)',
-  'var(--color-chart-2)',
-  'var(--color-chart-3)',
-  'var(--color-chart-4)',
-];
-
-function shortModelName(model: string): string {
-  // Strip "claude-" prefix, then strip trailing date suffix like "-20251001"
-  return model.replace(/^claude-/, '').replace(/-\d{8,}$/, '');
-}
-
-export function ModelStatsCard({ data }: ModelStatsCardProps) {
+export function ModelStatsCard({ data = [] }: ModelStatsCardProps) {
   const t = useT();
-
-  const chartData = data?.map((m) => ({
-    name: shortModelName(m.model),
-    tokens: Math.round(m.totalTokens / 1000),
-    cost: m.totalCostUsd,
-    steps: m.stepCount,
-  })) ?? [];
+  const locale = useI18nStore((s) => s.locale);
+  const [view, setView] = usePersistedState<'simple' | 'details'>('model-stats-view', 'simple');
+  const showDetails = view === 'details';
+  const maxTokens = Math.max(1, ...data.map((entry) => entry.totalTokens));
+  const display = (value: string | null | undefined) => value?.trim() || t.charts.modelNotReported;
 
   return (
-    <ChartCard title={t.charts.modelStats} isEmpty={!chartData.length}>
-      <div className="h-40">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={chartData} layout="vertical" margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
-            <XAxis
-              type="number"
-              tick={{ fill: 'var(--color-text-tertiary)', fontSize: 11 }}
-              axisLine={false}
-              tickLine={false}
-              tickFormatter={(v) => `${v}k`}
-            />
-            <YAxis
-              type="category"
-              dataKey="name"
-              // Recharts otherwise hides every second category label when the
-              // compact card contains several models. Model names are the
-              // meaning of this chart, so keep one label for every bar.
-              interval={0}
-              tick={{ fill: 'var(--color-text-secondary)', fontSize: 11 }}
-              axisLine={false}
-              tickLine={false}
-              width={72}
-            />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: 'var(--color-surface-overlay)',
-                border: '1px solid var(--color-border)',
-                borderRadius: '8px',
-                color: 'var(--color-text)',
-                fontSize: 12,
-              }}
-              formatter={(value, name) => {
-                if (name === 'tokens') return [`${Number(value ?? 0)}k`, t.charts.tokens];
-                return [Number(value ?? 0), name];
-              }}
-              labelStyle={{ color: 'var(--color-text-secondary)' }}
-            />
-            <Bar dataKey="tokens" radius={[0, 4, 4, 0]} maxBarSize={16}>
-              {chartData.map((_, i) => (
-                <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]} />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
+    <ChartCard title={t.charts.modelStats} isEmpty={!data.length}>
+      <div role="group" aria-label={t.charts.modelView} className="inline-flex rounded-lg bg-surface p-1 gap-1 mb-3">
+        {(['simple', 'details'] as const).map((mode) => (
+          <button key={mode} type="button" aria-pressed={mode === (showDetails ? 'details' : 'simple')}
+            onClick={() => setView(mode)}
+            className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${mode === (showDetails ? 'details' : 'simple') ? 'bg-accent/15 text-accent' : 'text-text-tertiary hover:text-text'}`}>
+            {mode === 'simple' ? t.charts.modelSimple : t.charts.modelDetails}
+          </button>
+        ))}
       </div>
+      {showDetails ? <ul aria-label={t.charts.modelStats} className="max-h-80 overflow-y-auto space-y-4">
+        {data.map((entry) => (
+          <li key={JSON.stringify([entry.requestedModel, entry.provider, entry.model])}>
+            <dl className="grid grid-cols-3 gap-2 text-xs">
+              <div className="min-w-0">
+                <dt className="text-text-tertiary">{t.charts.modelRequested}</dt>
+                <dd className="mt-1 font-medium text-text break-all">{display(entry.requestedModel)}</dd>
+              </div>
+              <div className="min-w-0">
+                <dt className="text-text-tertiary">{t.charts.modelProvider}</dt>
+                <dd className="mt-1 font-medium text-text break-all">{display(entry.provider)}</dd>
+              </div>
+              <div className="min-w-0">
+                <dt className="text-text-tertiary">{t.charts.modelReported}</dt>
+                <dd className="mt-1 font-medium text-text break-all">{display(entry.model)}</dd>
+              </div>
+            </dl>
+            <div aria-hidden="true" className="h-1.5 rounded-full bg-surface overflow-hidden my-2">
+              <div className="h-full rounded-full bg-accent" style={{ width: `${entry.totalTokens / maxTokens * 100}%` }} />
+            </div>
+            <div className="flex flex-wrap justify-between gap-x-2 text-[11px] text-text-tertiary">
+              <span>{formatNumber(entry.stepCount, locale)} {entry.stepCount === 1 ? t.charts.modelStep : t.charts.modelSteps}</span>
+              <span>{formatNumber(entry.totalTokens, locale)} {t.charts.tokens} · {formatUsd(entry.totalCostUsd, locale)}</span>
+            </div>
+          </li>
+        ))}
+      </ul> : <ModelStatsChart data={data} />}
     </ChartCard>
   );
 }
