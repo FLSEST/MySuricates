@@ -1,5 +1,8 @@
 package com.automation.service.integration.providers.feed;
 
+import com.automation.modules.ModuleCatalog;
+import com.automation.service.integration.OutboundTargetGuard;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -13,8 +16,9 @@ import java.util.Locale;
 import java.util.Set;
 
 /**
- * Downloads a feed with hard limits: http/https only (also for every redirect hop), at most
- * {@value #MAX_REDIRECTS} redirects followed by hand, a response-size cap and timeouts.
+ * Downloads a feed with hard limits: http/https only and a public target ({@link OutboundTargetGuard}),
+ * both checked for every redirect hop, at most {@value #MAX_REDIRECTS} redirects followed by hand,
+ * a response-size cap and timeouts.
  */
 @Component
 public class FeedFetcher {
@@ -26,16 +30,19 @@ public class FeedFetcher {
             + "application/xml;q=0.9, text/xml;q=0.9, */*;q=0.5";
 
     private final int maxBytes;
+    private final OutboundTargetGuard guard;
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
             .followRedirects(HttpClient.Redirect.NEVER)
             .build();
 
-    public FeedFetcher() {
-        this(DEFAULT_MAX_BYTES);
+    @Autowired
+    public FeedFetcher(OutboundTargetGuard guard) {
+        this(guard, DEFAULT_MAX_BYTES);
     }
 
-    FeedFetcher(int maxBytes) {
+    FeedFetcher(OutboundTargetGuard guard, int maxBytes) {
+        this.guard = guard;
         this.maxBytes = maxBytes;
     }
 
@@ -43,6 +50,7 @@ public class FeedFetcher {
         URI uri = requireHttpUri(url);
         try {
             for (int hop = 0; hop <= MAX_REDIRECTS; hop++) {
+                guard.check(uri, ModuleCatalog.PRIVATE_NETWORK_GUARD);
                 HttpResponse<InputStream> response = httpClient.send(request(uri), HttpResponse.BodyHandlers.ofInputStream());
                 try (InputStream body = response.body()) {
                     int status = response.statusCode();

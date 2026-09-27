@@ -1,5 +1,7 @@
 package com.automation.service.integration.providers.httpapi;
 
+import com.automation.modules.ModuleCatalog;
+import com.automation.service.integration.OutboundTargetGuard;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,7 +20,9 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Sends one {@link HttpApiRequest} and turns the answer into the action result. Redirects are
+ * Sends one {@link HttpApiRequest} and turns the answer into the action result. With the hardening
+ * flag {@code private-network-guard-http-api} on, the target must be a public address
+ * ({@link OutboundTargetGuard}, checked on every request). Redirects are
  * never followed (a 3xx comes back with its {@code location}), the response is read up to
  * {@link #MAX_RESPONSE_BYTES}, and the connection's auth value is scrubbed from everything that
  * goes back — a service that echoes request headers must not leak it into a step output.
@@ -34,21 +38,24 @@ class HttpApiClient {
 
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
+    private final OutboundTargetGuard guard;
 
     @Autowired
-    HttpApiClient(ObjectMapper objectMapper) {
+    HttpApiClient(ObjectMapper objectMapper, OutboundTargetGuard guard) {
         this(objectMapper, HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
                 .followRedirects(HttpClient.Redirect.NEVER)
-                .build());
+                .build(), guard);
     }
 
-    HttpApiClient(ObjectMapper objectMapper, HttpClient httpClient) {
+    HttpApiClient(ObjectMapper objectMapper, HttpClient httpClient, OutboundTargetGuard guard) {
         this.objectMapper = objectMapper;
         this.httpClient = httpClient;
+        this.guard = guard;
     }
 
     Map<String, Object> send(HttpApiTarget target, HttpApiRequest request) {
+        guard.check(request.uri(), ModuleCatalog.PRIVATE_NETWORK_GUARD_HTTP_API);
         HttpRequest.Builder builder = HttpRequest.newBuilder(request.uri()).timeout(request.timeout());
         request.headers().forEach(builder::header);
         if (target.hasAuth()) builder.header(target.authName(), target.authValue());

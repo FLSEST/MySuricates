@@ -32,3 +32,7 @@ automation:
     seal-immutable: true
     # HMAC-SHA256 signing secret per webhook (header X-Signature). Requires the webhooks module.
     webhook-signatures: true
+    # iCal/RSS feeds only fetch public addresses (resolved IPs, every redirect hop).
+    private-network-guard: true
+    # The same check for http-api: services in your own network are refused as well.
+    private-network-guard-http-api: true

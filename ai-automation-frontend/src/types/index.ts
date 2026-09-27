@@ -1835,7 +1835,7 @@ export type FeatureModuleName =
 
 export type HardeningModuleName =
   | 'provenance' | 'sealing' | 'require-sealed-for-unattended' | 'require-signed-seal' | 'seal-immutable'
-  | 'webhook-signatures';
+  | 'webhook-signatures' | 'private-network-guard' | 'private-network-guard-http-api';
 
 export type ModuleName = FeatureModuleName | HardeningModuleName;
 

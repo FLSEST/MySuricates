@@ -177,7 +177,9 @@ read both calendar sources the same way.
   origin rule — enter that address there.
 - **iCal feed** (`ical-feed`): no credentials (`requiresCredentials() == false`), the feed URL is a parameter
   of `list_events` (`url`, `from`, `to`, `limit`, `timeZone`); `webcal://` is read as https. Download with a
-  10 s connect / 20 s total timeout, at most 5 MB, only responses containing `BEGIN:VCALENDAR`. It returns single
+  10 s connect / 20 s total timeout, at most 5 MB, only responses containing `BEGIN:VCALENDAR`; the provider
+  follows redirects itself (at most 5, never from https to http) and checks each like the start URL, public
+  targets only ([Fetches into the local network](#fetches-into-the-local-network)). It returns single
   events overlapping the window and series masters with `rrule` and `recurring: true` (first occurrence as
   `start`; an `UNTIL` in the past hides the series, `EXDATE` is ignored) plus a `note`. Errors name the host
   only, never path or query — private feed links often contain a secret.
@@ -223,9 +225,46 @@ effect at once.
 - *Never hand out the auth header:* stored encrypted, not in logs (only method, host and path are
   logged), and its value is replaced by `***` in the answer, `location` and error messages — a
   service that mirrors request headers does not reveal it.
-- *Deliberately open:* targets in your own network (localhost, private addresses) are not blocked —
-  the operator enters the base URL, and such services are often exactly the target. Whoever does
-  not want that keeps the module off.
+- *Own network open by default:* targets in your own network (localhost, private addresses) are
+  reachable — the operator enters the base URL, and such services are often exactly the target.
+  Whoever does not want that turns on `private-network-guard-http-api` (see
+  [Fetches into the local network](#fetches-into-the-local-network)); the check then runs on every
+  call, not when saving.
+
+### Fetches into the local network
+
+iCal feed, RSS/Atom and HTTP API fetch URLs that are written in the workflow or the connection. So that they
+cannot be used as a stepping stone into the instance's network, every fetch goes through `OutboundTargetGuard`
+(`service/integration/`). Whether it checks is decided per provider by a hardening switch:
+
+| Switch | Environment variable | Default | Applies to |
+|---|---|---|---|
+| `automation.hardening.private-network-guard` | `AUTOMATION_HARDENING_PRIVATE_NETWORK_GUARD` | `true` | iCal feed, RSS/Atom |
+| `automation.hardening.private-network-guard-http-api` | `AUTOMATION_HARDENING_PRIVATE_NETWORK_GUARD_HTTP_API` | `false` | HTTP API |
+
+The HTTP API is open by default because services in your own network are its most common target. While a
+switch is on:
+
+- The host is resolved, and **every** address it returns must be public. Refused are loopback
+  (`127.0.0.0/8`, `::1`, so `localhost` too), `0.0.0.0/8` and `::`, private networks (`10/8`, `172.16/12`,
+  `192.168/16`, `fc00::/7`, `fec0::/10`), `100.64.0.0/10` (carrier-grade NAT, Tailscale), link-local
+  (`169.254/16` including the cloud metadata endpoint `169.254.169.254`, `fe80::/10`), multicast and
+  broadcast — also IPv4 wrapped in IPv6 (`::ffff:…`, `::a.b.c.d`, NAT64 `64:ff9b::/96`). A public name that
+  points at an internal address is caught just like an IP in the URL.
+- **Redirects:** iCal feed and RSS/Atom follow them themselves and check every hop before connecting; the
+  HTTP API follows none.
+- The error names host, address and the switch; a host that does not resolve is an error, not a pass.
+- **Limit:** there is a short window between this lookup and the HTTP client's own — a name whose DNS answer
+  changes exactly in between (DNS rebinding with a very short TTL) is not caught.
+
+Like every hardening switch, both can only be changed in the startup configuration, never over REST — a
+leaked API key can neither lift nor set a block. Effective after a restart; `false` allows local sources on
+purpose (a calendar in the home network, say).
+
+**Additionally at container level:** the check covers these three providers only. Whoever wants more can
+restrict the outbound connections of the MySuricates container themselves, for instance with a dedicated
+Docker network or firewall rules on the host. That then affects everything in the container — the AI CLIs,
+shell blocks and the other integrations too — so first work out which targets they need.
 
 ### OAuth Endpoints & Scopes per Provider
 
@@ -305,8 +344,9 @@ Notes:
 - **RSS/Atom** (`feed`) reads RSS 2.0, Atom 1.0 and RSS 1.0 (RDF). `fetch_feed` returns per entry
   title, link, date (ISO 8601, UTC; RFC 822 and ISO values are normalised), summary (HTML removed,
   cut to 500 characters), author and id/guid — newest first, `limit` default 20 (at most 200); with
-  `since`, older and undated entries are dropped. Fetching uses http/https only, on every redirect
-  too (at most 5), responses of at most 5 MB, timeouts 10 s/20 s. The XML parser rejects any DOCTYPE
+  `since`, older and undated entries are dropped. Fetching uses http/https and public addresses only
+  ([Fetches into the local network](#fetches-into-the-local-network)), both on every redirect too (at
+  most 5), responses of at most 5 MB, timeouts 10 s/20 s. The XML parser rejects any DOCTYPE
   declaration (no XXE, no entity expansion). Internally: `FeedFetcher` (HTTP limits), `FeedParser`,
   `FeedDates`, `FeedText` (HTML → text).
 - **Open-Meteo** (`open-meteo`): `forecast` against `api.open-meteo.com/v1/forecast` (latitude
