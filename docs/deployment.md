@@ -104,15 +104,40 @@ Instanz oder aus `~/.config/mysuricates/ai.env`), dazu ein eigenes Konfiguration
 bekommt er wie früher `~/.claude` und `~/.claude.json` mit Schreibrecht. Ohne `claude` in `…AI_PROVIDERS`
 bekommt er nichts von Claude.
 
-| Weg | Schalter | Docker-Socket ohne Schalter |
-|---|---|---|
-| `scripts/instance.sh`, auch der Installer-Modus „Dev · Test · Prod“ | `MYSURICATES_AI_FROM_HOST`, `MYSURICATES_AI_PROVIDERS`, `MYSURICATES_DOCKER_SOCKET` in `deploy/instances/<name>.env` | aus |
-| Stable und Test (`scripts/staging.sh`, Start aus der Oberfläche) | `STABLE_…` bzw. `TEST_…` mit `AI_FROM_HOST`, `AI_PROVIDERS`, `DOCKER_SOCKET` in `~/.config/mysuricates/staging.env` — zeilenweise gelesen, nie ausgeführt; eine gleichnamige Umgebungsvariable gewinnt | an |
-| Dev-Container (`scripts/start-autotrigger-dev.sh --container`) | `AUTOTRIGGER_DEV_AI_FROM_HOST`, `AUTOTRIGGER_DEV_AI_PROVIDERS`, `AUTOTRIGGER_DEV_DOCKER_SOCKET` | an |
+| Weg | Schalter | Port ohne Schalter | Docker-Socket ohne Schalter |
+|---|---|---|---|
+| `scripts/instance.sh`, auch der Installer-Modus „Dev · Test · Prod“ | `MYSURICATES_AI_FROM_HOST`, `MYSURICATES_AI_PROVIDERS`, `MYSURICATES_DOCKER_SOCKET`, `MYSURICATES_BIND` in `deploy/instances/<name>.env` | `127.0.0.1` | aus |
+| Stable und Test (`scripts/staging.sh`, Start aus der Oberfläche) | `STABLE_…` bzw. `TEST_…` mit `AI_FROM_HOST`, `AI_PROVIDERS`, `DOCKER_SOCKET`, `BIND` in `~/.config/mysuricates/staging.env` — zeilenweise gelesen, nie ausgeführt; eine gleichnamige Umgebungsvariable gewinnt | `127.0.0.1` | aus |
+| Dev-Container (`scripts/start-autotrigger-dev.sh --container`) | `AUTOTRIGGER_DEV_AI_FROM_HOST`, `AUTOTRIGGER_DEV_AI_PROVIDERS`, `AUTOTRIGGER_DEV_DOCKER_SOCKET`, `AUTOTRIGGER_DEV_CONTAINER_BIND` | `127.0.0.1` | aus |
+| Tryout (`scripts/tryout.sh`) | keine | `127.0.0.1` | aus |
 
-Mit dem Socket kann ein Workflow per `docker run -v /:/host …` den ganzen Rechner erreichen; die Grenze
-oben schützt dann nur vor Versehen. Stable, Test und der Dev-Container behalten ihn, damit
-Container-Blöcke dort weiterlaufen — wer die Grenze ernst nimmt, schaltet ihn dort aus.
+**Sicher per Standard, auf jedem Docker-Weg:** Der Port ist nur von diesem Rechner aus erreichbar, und
+die Instanz bekommt keinen Docker-Socket. Anders wird es nur durch einen ausdrücklichen Schalter.
+
+**Port öffnen.** `…BIND=0.0.0.0` macht die Instanz im lokalen Netz erreichbar (Handy, PWA, andere
+Rechner) — an der Host-Firewall vorbei, denn Docker trägt seine Portfreigaben selbst ein. Eine einzelne
+Adresse, etwa die LAN-IP, geht auch; Stable und Test bleiben dann zusätzlich auf `127.0.0.1`
+erreichbar, damit Health-Prüfung und Oberfläche sie weiter finden. Bei Stable und Test schreibt
+`staging.sh` den Port in die Override-Datei; `docker-compose.stable.yml` und `docker-compose.test.yml`
+veröffentlichen selbst keinen. Für Fernzugriff besser ein VPN davorsetzen (Tailscale, siehe
+[Container-Weg](#container-weg)), statt den Port zu öffnen.
+
+**Was ohne Socket fehlt.** Die Instanz meldet Docker dann als „nicht eingerichtet“; Workflows mit
+gewöhnlichen Shell- und KI-Blöcken laufen weiter. Es fehlen:
+
+- Projekt-Container: Ein Run startet keinen `automation-<projekt-id>`-Container, Befehle mitten im Lauf
+  und das Terminal gehen nicht.
+- Shell-Blöcke mit `container_image` (Agent-Container) scheitern.
+- Shell-Blöcke, die selbst `docker` aufrufen — etwa ein Workflow, der Images baut oder
+  `scripts/staging.sh` startet —, scheitern.
+- Stable/Test aus der Oberfläche einer Container-Instanz starten: Das ruft `docker compose` auf.
+
+Wer das braucht, setzt `STABLE_DOCKER_SOCKET=1` (bzw. `TEST_…`, `AUTOTRIGGER_DEV_DOCKER_SOCKET=1`,
+`MYSURICATES_DOCKER_SOCKET=1`) und startet die Instanz neu. Mit dem Socket kann ein Workflow per
+`docker run -v /:/host …` den ganzen Rechner erreichen; die Grenze oben schützt dann nur vor Versehen.
+Bis zu dieser Umstellung hatten Stable, Test und der Dev-Container den Socket standardmäßig und
+veröffentlichten ihren Port auf allen Adressen: Wer das weiter braucht, trägt die Schalter vor dem
+nächsten `promote` bzw. `test-promote` ein.
 
 Grenzen: Ein per npm installiertes Claude (statt des nativen Installers) wird mit `login` und `programs`
 nicht eingebunden. Unter macOS kommen keine Programme (3dd32594). Codex' eigene Sandbox
@@ -249,7 +274,7 @@ Baut nur die Agent-Images (`profiles: build-only`), startet keinen Service.
 Stable-Umgebung auf Port 9091:
 - Container: `mysuricates-stable`
 - Profil: `SPRING_PROFILES_ACTIVE=stable`
-- Volumes: `stable-data` (persistente DB), `stable-secrets` (Integrations- und Siegel-Schlüssel, getrennt von der DB — 3fb2242c), `stable-frontend/` (read-only; die gebaute Oberfläche, die `scripts/staging.sh snapshot` aus `ai-automation-frontend/dist` dorthin kopiert — ohne diesen Ordner verweigert `staging.sh start` den Start), Host-Projektverzeichnisse, Backup-Volume (`~/.autotrigger/backups/stable`); KI-Anbieter und Docker-Socket kommen aus der Override-Datei von `scripts/staging.sh` ([KI-Anbieter im Container](#ki-anbieter-im-container))
+- Volumes: `stable-data` (persistente DB), `stable-secrets` (Integrations- und Siegel-Schlüssel, getrennt von der DB — 3fb2242c), `stable-frontend/` (read-only; die gebaute Oberfläche, die `scripts/staging.sh snapshot` aus `ai-automation-frontend/dist` dorthin kopiert — ohne diesen Ordner verweigert `staging.sh start` den Start), Host-Projektverzeichnisse, Backup-Volume (`~/.autotrigger/backups/stable`); KI-Anbieter Docker-Socket (Standard aus) und Port (Standard nur `127.0.0.1:9091`) kommen aus der Override-Datei von `scripts/staging.sh` ([KI-Anbieter im Container](#ki-anbieter-im-container))
 - Named Volume: `stable-data`
 
 ### `docker-compose.test.yml`
@@ -258,7 +283,7 @@ Test-Instanz auf Port 8090 (nutzt `docker/Dockerfile.stable` als Build-Basis):
 - Container: `mysuricates-test`
 - Image: `ai-automation-backend-test`
 - Profil: `SPRING_PROFILES_ACTIVE=test`
-- Volumes: `test-data` (persistente DB), `test-secrets` (Schlüssel wie bei Stable), `stable-frontend/` (read-only, dieselbe gebaute Oberfläche wie bei Stable), `application-test.yml` (read-only), Backup-Volume (`~/.autotrigger/backups/test`); KI-Anbieter und Docker-Socket wie bei Stable
+- Volumes: `test-data` (persistente DB), `test-secrets` (Schlüssel wie bei Stable), `stable-frontend/` (read-only, dieselbe gebaute Oberfläche wie bei Stable), `application-test.yml` (read-only), Backup-Volume (`~/.autotrigger/backups/test`); KI-Anbieter, Docker-Socket und Port (`127.0.0.1:8090`) wie bei Stable
 - Healthcheck: `curl -f http://localhost:8090/api/v1/system/health`
 - Named Volume: `test-data`
 
@@ -606,10 +631,12 @@ Technische Fassung mit Klassennamen und reservierten Kontextschlüsseln:
 
 Weder Backend noch Frontend binden separat auf Loopback: `server.address` ist nirgends gesetzt, das
 Backend lauscht also auf allen Interfaces; Vite läuft mit `host: true`. Aus dem Quellcode gestartet
-(Dev) ist die Instanz damit im lokalen Netz erreichbar, nicht nur auf dem eigenen Rechner. Über
-`deploy/` veröffentlicht `instance.sh` den Port dagegen per Default nur auf `127.0.0.1`
-(`MYSURICATES_BIND`, siehe [Eine Instanz im Container](#eine-instanz-im-container-deploy)) — wer das
-ändert, umgeht damit auch die üblichen Host-Firewall-Regeln (Dockers Portfreigabe).
+(Dev) ist die Instanz damit im lokalen Netz erreichbar, nicht nur auf dem eigenen Rechner. Jeder
+Docker-Weg veröffentlicht den Port dagegen per Default nur auf `127.0.0.1` — `instance.sh`
+(`MYSURICATES_BIND`, siehe [Eine Instanz im Container](#eine-instanz-im-container-deploy)), Stable und
+Test (`STABLE_BIND`/`TEST_BIND`), der Dev-Container (`AUTOTRIGGER_DEV_CONTAINER_BIND`) und das
+Tryout-Image ([Tabelle](#ki-anbieter-im-container)) — wer das ändert, umgeht damit auch die üblichen
+Host-Firewall-Regeln (Dockers Portfreigabe).
 
 **CORS** betrifft eine installierte Instanz nicht: Das Backend liefert die Oberfläche selbst aus,
 Seite und API haben denselben Ursprung. Eine Rolle spielt die Liste nur, wo beide verschiedene
@@ -695,7 +722,7 @@ Die beiden werden leicht verwechselt:
    bekommt. Wird es verweigert, landet ein SECURITY-Eintrag im Activity-Log.
 2. **Der Socket im Backend-Container** (`/var/run/docker.sock`) ist unabhängig von Punkt 1 und gibt der
    Anwendung volle Kontrolle über Docker auf dem Host. Bei `instance.sh`, Stable, Test und dem
-   Dev-Container entscheidet das ein Schalter ([KI-Anbieter im Container](#ki-anbieter-im-container)).
+   Dev-Container entscheidet das ein Schalter, Standard aus ([KI-Anbieter im Container](#ki-anbieter-im-container)).
 
 ### Container-Image-Allowlist
 
@@ -713,7 +740,8 @@ Allowlist) — `docker run` würde es sonst als Flag lesen. Analoges Muster zu
 
 - Nur in einem Netz betreiben, dem du vertraust; für Fernzugriff ein VPN davorsetzen statt den Port zu öffnen.
 - Einen eigenen API-Key setzen und prüfen, dass er nicht leer ist.
-- Den Docker-Socket ausschalten (`…DOCKER_SOCKET=0`), wenn keine Container-Blöcke gebraucht werden.
+- Den Docker-Socket aus lassen (Standard auf jedem Docker-Weg) und `…DOCKER_SOCKET=1` nur setzen, wenn
+  Projekt-Container, Terminal oder Container-Blöcke gebraucht werden.
 - In Produktivumgebungen `AUTOMATION_ALLOWED_CONTAINER_IMAGES` auf die tatsächlich benötigten
   Images setzen, statt auf dem leeren Default (= alle Images erlaubt) zu bleiben.
 - Keine Workflows aus fremder Quelle ungelesen ausführen — sie laufen mit deinen Rechten.

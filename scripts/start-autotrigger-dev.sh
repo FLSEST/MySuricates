@@ -339,12 +339,19 @@ compose_cmd() {
 # Override mit dem, was vom Host in den Container kommt (scripts/lib/host-mounts.sh, 262948a4):
 #   AUTOTRIGGER_DEV_AI_FROM_HOST  programs | login (Default) | all
 #   AUTOTRIGGER_DEV_AI_PROVIDERS  Auswahl aus claude,codex,pi (Default: alle)
-#   AUTOTRIGGER_DEV_DOCKER_SOCKET 1 (Default, wie bisher) | 0
+#   AUTOTRIGGER_DEV_DOCKER_SOCKET 0 (Default) | 1 = volle Kontrolle ueber Docker auf dem Rechner
+#                                 (Projekt-Container, Terminal, container_image) — bewusst setzen
+#   AUTOTRIGGER_DEV_CONTAINER_BIND Adresse fuer den Port, Default 127.0.0.1; 0.0.0.0 = auch lokales Netz
+#                                 (liest docker-compose.dev-container.yml selbst, hier nur geprueft)
 # Die Projektwurzel bindet docker-compose.dev-container.yml selbst ein.
 write_compose_override() {
   local HOST_MOUNTS_NODE_MODULES="${AUTOTRIGGER_DEV_NODE_MODULES:-}"   # leer: npm root -g
   local missing
-  host_mounts_yaml backend "" "${AUTOTRIGGER_DEV_DOCKER_SOCKET:-1}" "${AUTOTRIGGER_DEV_AI_FROM_HOST:-login}" \
+  case "${AUTOTRIGGER_DEV_CONTAINER_BIND:-127.0.0.1}" in
+    *[!0-9a-fA-F.:]*) echo "Ungueltiges AUTOTRIGGER_DEV_CONTAINER_BIND '${AUTOTRIGGER_DEV_CONTAINER_BIND}' (eine IP-Adresse, z. B. 127.0.0.1 oder 0.0.0.0)." >&2
+                      return 2 ;;
+  esac
+  host_mounts_yaml backend "" "${AUTOTRIGGER_DEV_DOCKER_SOCKET:-0}" "${AUTOTRIGGER_DEV_AI_FROM_HOST:-login}" \
     "${AUTOTRIGGER_DEV_AI_PROVIDERS:-}" "scripts/start-autotrigger-dev.sh --container" AUTOTRIGGER_DEV_ \
     > "${COMPOSE_OVERRIDE}" || { echo "Ungueltige AUTOTRIGGER_DEV_AI_*-Werte (siehe oben)." >&2; return 2; }
   echo "KI-Anbieter im Container: ${HOST_MOUNTS_READY:-keiner} (${AUTOTRIGGER_DEV_AI_FROM_HOST:-login}, ${COMPOSE_OVERRIDE})"
@@ -377,14 +384,14 @@ start_backend_container() {  # $1 = always|missing|built, siehe ensure_container
     return 1
   fi
   ensure_container_jar "${1:-missing}" || return 1
-  write_compose_override
+  write_compose_override || return 1
   echo "Starte Backend im Container (docker compose up -d) ..."
   compose_cmd up -d --build
 }
 
 stop_backend_container() {
   require_command docker
-  [[ -f "${COMPOSE_OVERRIDE}" ]] || write_compose_override
+  [[ -f "${COMPOSE_OVERRIDE}" ]] || write_compose_override || return 1
   echo "Stoppe Backend-Container (docker compose down) ..."
   compose_cmd down
 }
