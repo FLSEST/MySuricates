@@ -29,6 +29,7 @@ echo "1) syntax and help"
 check "bash -n passes"                                  'bash -n "$PROBE"'
 check "--help names the interactive mode"               'bash "$PROBE" --help | grep -- "--interactive" >/dev/null'
 check "--help names --setup-flags (c3a4cbf6)"          'bash "$PROBE" --help | grep -- "--setup-flags" >/dev/null'
+check "--help names the container ways and --cleanup"   'bash "$PROBE" --help | grep -- "--way container" >/dev/null && bash "$PROBE" --help | grep -- "--way staged" >/dev/null && bash "$PROBE" --help | grep -- "--cleanup" >/dev/null'
 check "--help names --ref and the gate lines"           'bash "$PROBE" --help | grep -- "--ref main" >/dev/null && bash "$PROBE" --help | grep "gate_status" >/dev/null'
 check "the report renderer parses"                      'python3 -m py_compile "$HERE/../lib/installer_probe_report.py"'
 check "the screenshot helper parses"                    '! command -v node >/dev/null || node --check "$HERE/../lib/installer_probe_screens.mjs"'
@@ -44,6 +45,9 @@ check "--interactive without a terminal is refused"     '[ "$(probe --interactiv
 check "--port with --interactive is refused"            '[ "$(probe --interactive --port 23000)" = 2 ] && grep -q "nur für den automatischen Lauf" "$TMP/out"'
 check "--setup-flags: quotes and shell syntax refused"  '[ "$(probe --setup-flags "--with-pi'"'"'x")" = 2 ] && grep -q -- "--setup-flags: nur Flags" "$TMP/out" && [ "$(probe --setup-flags "--x;id")" = 2 ] && [ "$(probe --setup-flags "\$(id)")" = 2 ]'
 check "--setup-flags with --interactive is refused"     '[ "$(probe --interactive --setup-flags --with-pi)" = 2 ] && grep -q "nur für den automatischen Lauf" "$TMP/out"'
+check "unknown --way"                                   '[ "$(probe --way vm)" = 2 ] && grep -q -- "--way host|container|staged" "$TMP/out"'
+check "--interactive only for --way host"               '[ "$(probe --interactive --way container)" = 2 ] && grep -q "nur für --way host" "$TMP/out"'
+check "--cleanup refuses names that are not a probe run" '[ "$(probe --cleanup mysuricates-stable)" = 2 ] && [ "$(probe --cleanup mysuricates-installer-probe-x)" = 2 ] && [ "$(probe --cleanup "mysuricates-installer-probe-20260927-120000-main")" = 2 ] && grep -q "nur den Namen eines Probe-Laufs" "$TMP/out"'
 check "none of these touched docker"                    '[ ! -s "$DOCKER_CALLS" ]'
 
 echo "3) docker availability"
@@ -96,6 +100,55 @@ PATH="$TMP/bin3:$PATH" INSTALLER_PROBE_PHASE_TIMEOUT=20 timeout 120 bash "$PROBE
 phase_cmd() { awk -F'\t' -v n="$1" '$1 == n { print $2 }' "$TMP/p6/phases.tsv" 2>/dev/null; }
 check "phase 2 carries the flags"                       'phase_cmd 2-einrichten | grep -qF -- "--lang de --with-pi --preset research"'
 check "phase 1 (check only) does not"                   'phase_cmd 1-pruefen | grep -qF -- "--lang de" && ! phase_cmd 1-pruefen | grep -qF -- "--with-pi"'
+
+echo "7) container ways: host socket, same path, own names — and only those cleaned up"
+# docker nimmt alles an; ps/volume/network ls listen Namen dieses Laufs (Vorsilbe aus `run --name`)
+# neben fremden. Aufgeraeumt werden duerfen nur die mit der Vorsilbe.
+if [ "$(id -u)" = 0 ]; then
+  echo "  skip (running as root — the container ways refuse root)"
+else
+  mkdir -p "$TMP/bin4"
+  cat > "$TMP/bin4/docker" <<'STUB'
+#!/usr/bin/env bash
+echo "$*" >> "$DOCKER_CALLS"
+n="$(cat "$PROBE_NAME_FILE" 2>/dev/null)"
+case "$1" in
+  run) prev=""; for a in "$@"; do [ "$prev" = --name ] && echo "$a" > "$PROBE_NAME_FILE"; prev="$a"; done ;;
+  ps) printf '%s\n' "$n" "$n-main" mysuricates-stable mysuricates-main "${n}x-main" ;;
+  volume) [ "$2" = ls ] && printf '%s\n' "$n-main-data" "$n-main-secrets" mysuricates-main-data ai-automation-backend_stable-data ;;
+  network) [ "$2" = ls ] && printf '%s\n' "$n-main_default" bridge ;;
+esac
+exit 0
+STUB
+  chmod +x "$TMP/bin4/docker"
+  python3 -c "import socket,sys; socket.socket(socket.AF_UNIX).bind(sys.argv[1])" "$TMP/d.sock"
+  export PROBE_NAME_FILE="$TMP/probe-name"
+  way() { PATH="$TMP/bin4:$PATH" DOCKER_HOST="unix://$TMP/d.sock" INSTALLER_PROBE_PHASE_TIMEOUT=20 timeout 120 bash "$PROBE" --no-screenshots "$@" </dev/null >"$TMP/out" 2>&1; echo $?; }
+  : > "$DOCKER_CALLS"
+  check "a missing socket exits 2"                      '[ "$(PATH="$TMP/bin4:$PATH" DOCKER_HOST="unix://$TMP/none.sock" bash "$PROBE" --way container </dev/null >"$TMP/out" 2>&1; echo $?)" = 2 ] && grep -q "Docker-Socket .* nicht gefunden" "$TMP/out"'
+  check "a remote DOCKER_HOST exits 2"                  '[ "$(PATH="$TMP/bin4:$PATH" DOCKER_HOST=tcp://10.0.0.1:2375 bash "$PROBE" --way staged </dev/null >"$TMP/out" 2>&1; echo $?)" = 2 ] && grep -q "lokalen Docker-Socket" "$TMP/out"'
+  check "ports of Dev/Test/Stable/Tryout are refused"   '[ "$(way --way container --port 9090)" = 2 ] && grep -q "vergeben" "$TMP/out" && [ "$(way --way staged --port 9089)" = 2 ]'
+  check "no machine was started for these"              '! grep -q "^run " "$DOCKER_CALLS"'
+  : > "$DOCKER_CALLS"
+  way --way container --port 19871 --out "$TMP/p7" >/dev/null
+  N="$(cat "$PROBE_NAME_FILE")"
+  check "the machine: host network, host socket"        'grep -E "^run -d --name $N --network host -v $TMP/d.sock:/var/run/docker.sock " "$DOCKER_CALLS" >/dev/null'
+  check "the clone folder under the same path"          'grep -E "^run .* -v ([^ :]+/machine):\1 " "$DOCKER_CALLS" >/dev/null'
+  check "the probe user gets this machine's IDs"        'grep -F -- "-e PROBE_UID=$(id -u) -e PROBE_SOCK_GID=$(stat -c %g "$TMP/d.sock" 2>/dev/null || stat -f %g "$TMP/d.sock") $N bash -c" "$DOCKER_CALLS" >/dev/null'
+  check "setup.sh with the defaults, only the port set" 'awk -F"\t" "\$1==\"2-einrichten\" {print \$2}" "$TMP/p7/phases.tsv" | grep -qx -- "./scripts/setup.sh --yes --port 19871 --lang de"'
+  check "setup.sh sees the run's prefix"                'grep -E "^exec -i -u probe .* -e MYSURICATES_PREFIX=$N " "$DOCKER_CALLS" >/dev/null'
+  check "cleanup: the machine and its instance"         'grep -qx "rm -f $N" "$DOCKER_CALLS" && grep -qx "rm -f $N-main" "$DOCKER_CALLS"'
+  check "cleanup: its volumes, network and image"       'grep -qx "volume rm $N-main-data" "$DOCKER_CALLS" && grep -qx "volume rm $N-main-secrets" "$DOCKER_CALLS" && grep -qx "network rm $N-main_default" "$DOCKER_CALLS" && grep -qx "image rm $N:local" "$DOCKER_CALLS"'
+  check "cleanup: nothing else"                         '! grep -E "^(rm|volume rm|network rm|image rm) " "$DOCKER_CALLS" | grep -vE " $N(-main(-data|-secrets|_default)?|:local)?$" | grep . >/dev/null'
+  : > "$DOCKER_CALLS"
+  way --way staged --port 19874 --out "$TMP/p8" >/dev/null
+  check "staged: Dev · Test · Prod from the port on"     'awk -F"\t" "\$1==\"2-einrichten\" {print \$2}" "$TMP/p8/phases.tsv" | grep -qx -- "./scripts/setup.sh --yes --mode staged --port 19874 --lang de" && awk -F"\t" "\$1==\"1-pruefen\" {print \$2}" "$TMP/p8/phases.tsv" | grep -q -- "--mode staged"'
+  check "staged: its own checks are in the report"       'grep -q "^Drei Instanzen gesund" "$TMP/p8/checks.tsv" && grep -q "^Prod mit Siegelpflicht" "$TMP/p8/checks.tsv"'
+  check "staged: red without instances"                  'grep -q "gate_status: RED" "$TMP/out"'
+  : > "$DOCKER_CALLS"
+  N="mysuricates-installer-probe-20260927-120000"; echo "$N" > "$PROBE_NAME_FILE"
+  check "--cleanup removes a kept run"                   '[ "$(PATH="$TMP/bin4:$PATH" bash "$PROBE" --cleanup "$N" </dev/null >"$TMP/out" 2>&1; echo $?)" = 0 ] && grep -qx "rm -f $N" "$DOCKER_CALLS" && grep -qx "volume rm $N-main-data" "$DOCKER_CALLS" && ! grep -E "^(rm|volume rm) .*(stable|mysuricates-main)" "$DOCKER_CALLS" >/dev/null'
+fi
 
 echo
 echo "passed=$PASS failed=$FAIL"

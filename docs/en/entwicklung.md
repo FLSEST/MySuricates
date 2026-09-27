@@ -509,24 +509,46 @@ the working tree. Requires Docker.
 ./scripts/installer-probe.sh --image rockylinux:9   # the same on a dnf system
 ./scripts/installer-probe.sh --ref main --keep      # then look at the fresh instance in the browser
 ./scripts/installer-probe.sh --setup-flags "--with-pi"   # phase 2 with extra flags, here installing pi too
+./scripts/installer-probe.sh --way container        # the default way: the instance in a container
+./scripts/installer-probe.sh --way staged           # Dev · Test · Prod, three containers
+./scripts/installer-probe.sh --cleanup <run>        # remove what a run with --keep left behind
 ```
 
 The interactive machine shares the host network (`--network host`): open the address `setup.sh`
 names at the end directly in the browser; the installer skips ports that are busy on the host. Pick
 "on this machine" in the mode step — there is no Docker inside the probe.
 
-The automatic run takes the "one instance on this machine" way from
-[GETTING-STARTED.md](GETTING-STARTED.md) in two phases, each under a pseudo terminal:
-`setup.sh --check` (check only) and `setup.sh --yes --runtime host --bind 0.0.0.0` (one pass up to
-the running instance). Each phase writes its own exit code to a file inside the container — through
+The automatic run takes one way from [GETTING-STARTED.md](GETTING-STARTED.md) (`--way`, default
+`host` = "one instance on this machine") in two phases, each under a pseudo terminal:
+`setup.sh --check` (check only) and `setup.sh --yes …` (one pass up to the running instance) — on the
+machine with `--runtime host --bind 0.0.0.0`, in a container (`--way container`) with the defaults and
+only `--port`, staged (`--way staged`) with `--mode staged --port`. Each phase writes its own exit code to a file inside the container — through
 `script` and `docker exec` an abort once came back as 0. The run turns red when phase 1 does not name
 the missing tools, phase 2 does not end with exit 0, health or the interface on the one port do not
 answer, the login with the generated key fails, the key shows up in a log, the backend is not built
-exactly once, or the clone is no longer clean afterwards (`git status`). The result is a single HTML
+exactly once (on the machine only), or the clone is no longer clean afterwards (`git status`). The
+container ways additionally check per instance that it is published on `127.0.0.1` only and has no
+Docker socket (the defaults); staged also three healthy instances on different ports and Prod with
+mandatory seals (`environment` Prod, `sealing` and `require-sealed-for-unattended` on — from the
+instance's own `/api/v1/system/capabilities`). The result is a single HTML
 page with terminal transcript and screenshots under
 `~/.local/state/mysuricates/installer-probe/<time>-<sha>/report.html` (`latest` points to the last
-run). A run downloads JDK, Node, npm packages and Maven dependencies fresh every time. The container
-way (Docker inside the container) is not part of the probe yet.
+run). A run downloads JDK, Node, npm packages and Maven dependencies fresh every time.
+
+For the container ways the probe machine gets the host's Docker: the socket (the `docker` group in it
+has the socket's group ID; `setup.sh` installs Docker itself as for any user, the daemon is the
+host's), the host network, and a host folder under the same path for the clone and the projects
+folder — the bind mounts of the inner compose are resolved by the host's Docker daemon. The host
+network rather than a special binding: `setup.sh` then sees the ports that are busy on the host by
+itself, the instances stay on the default `127.0.0.1`, and the probe checks them from outside right
+there. The probe picks ports from 19190 on and never 8090, 9090, 9091 or 9095 (Dev, Test, Stable,
+Tryout — even when they are not running). Every Docker name of a run carries its prefix
+`mysuricates-installer-probe-<time>` (`MYSURICATES_PREFIX` for `instance.sh`: container, compose
+project, volumes `…-data`/`-secrets`, image); at the end — also after an abort — the probe removes
+exactly those, checking each name against the prefix first. Running instances on the host stay
+untouched. Whoever holds the socket controls the host's Docker: only run it on states whose
+`setup.sh` you trust. What it does not check is whether `setup.sh` starts a Docker daemon — there is
+none inside the container.
 The screenshots are taken by Playwright from `ai-automation-frontend/node_modules` on the host. If
 the browser for the installed Playwright version is missing (typically after an update), the login
 check turns red with "Browser fehlt — im Frontend `npm run pw:install` ausführen" (browser missing,
