@@ -848,7 +848,7 @@ language follows `goal_locale` (`de`/`en`, German when absent). No REST call nee
 
 | Variable | Content |
 |----------|---------|
-| `{{ goal_status }}` | Block `<goal_status>…</goal_status>` with goal, target date, progress, milestones with state (`OPEN`/`DUE_SOON`/`OVERDUE`/`REACHED`, `REOPENED`), overdue and soon-due (≤ 3 days) active TODOs. Titles flattened, capped and stripped of platform markers (`todo_item:`, `gate_*:`, `dashboard_widget:`) and block delimiters; at most 20 lines per list |
+| `{{ goal_status }}` | Block `<goal_status>…</goal_status>` with goal, target date, progress, milestones (sub-goals) with state (`OPEN`/`DUE_SOON`/`OVERDUE`/`REACHED`, `REOPENED`; an undated one reads “no date” and is never due), overdue and soon-due (≤ 3 days) active TODOs. Titles flattened, capped and stripped of platform markers (`todo_item:`, `gate_*:`, `dashboard_widget:`) and block delimiters; at most 20 lines per list |
 | `{{ goal_guard_status }}` | `RED` (something overdue or the target date passed with work left), `YELLOW` (something due within ≤ 3 days), else `GREEN` |
 | `{{ goal_guard_title }}` | `Goal: <title>`, at most 80 characters |
 | `{{ goal_guard_summary }}` | One line: `7/12 done (58 %) · 2 overdue · 1 due soon · next milestone “Beta” on 2026-10-01`, at most 500 characters |

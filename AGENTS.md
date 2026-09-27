@@ -71,14 +71,37 @@ curl -s --noproxy '*' http://localhost:9090/api/v1/goals/<goal-id>/relations -H 
 curl -s --noproxy '*' "http://localhost:9090/api/v1/todos?goalId=none&status=OPEN&tag=release&size=20" -H "X-API-Key: $DEV_KEY"
 ```
 
-Meilensteine (Titel + Datum) legen einen Zeitstrahl ins Ziel; zugeordnet wird ueber `planning`
-(`milestoneId`, nur Meilensteine des eigenen Ziels). Der Zustand (`OPEN`/`DUE_SOON`/`OVERDUE`/`REACHED`)
-wird beim Lesen berechnet. Der Ziel-Waechter legt einmalig einen Workflow aus der Vorlage `goal-guard`
-mit taeglichem Zeitplan an; ausschalten pausiert nur den Zeitplan:
+Ein Ziel ist ausdruecklich einem oder mehreren Projekten zugeordnet (Reihenfolge = Gliederung). Ein
+TODO aus einem neuen Projekt bringt sein Projekt beim Zuordnen automatisch mit; entfernen geht nur,
+solange im Ziel nichts mehr daran haengt (sonst 409, `?cascade=true` loescht dessen Teilziele und loest
+die TODOs):
 
 ```bash
+curl -s --noproxy '*' "http://localhost:9090/api/v1/goals?status=ACTIVE&projectId=<project-id>" -H "X-API-Key: $DEV_KEY"
+curl -s --noproxy '*' -X POST http://localhost:9090/api/v1/goals/<goal-id>/projects \
+  -H "Content-Type: application/json" -H "X-API-Key: $DEV_KEY" -d '{"projectId": "<project-id>"}'
+curl -s --noproxy '*' -X PUT http://localhost:9090/api/v1/goals/<goal-id>/projects/order \
+  -H "Content-Type: application/json" -H "X-API-Key: $DEV_KEY" -d '{"ids": ["<project-id-1>", "<project-id-2>"]}'
+curl -s --noproxy '*' -X DELETE "http://localhost:9090/api/v1/goals/<goal-id>/projects/<project-id>?cascade=false" \
+  -H "X-API-Key: $DEV_KEY"
+```
+
+Teilziele (im Code `milestones`) gehoeren genau einem Projekt des Ziels; das Datum ist optional,
+die Reihenfolge je Projekt explizit. Zugeordnet wird ueber `planning` (`milestoneId`, nur Teilziele des
+eigenen Ziels UND des eigenen Projekts – sonst 400). Der Zustand (`OPEN`/`DUE_SOON`/`OVERDUE`/`REACHED`,
+ohne Datum nur `OPEN`/`REACHED`) wird beim Lesen berechnet. Der Ziel-Waechter legt einmalig einen
+Workflow aus der Vorlage `goal-guard` mit taeglichem Zeitplan an; ausschalten pausiert nur den Zeitplan:
+
+```bash
+# projectId Pflicht, ausser das Ziel hat genau ein Projekt; dueDate optional
 curl -s --noproxy '*' -X POST http://localhost:9090/api/v1/goals/<goal-id>/milestones \
-  -H "Content-Type: application/json" -H "X-API-Key: $DEV_KEY" -d '{"title": "Beta", "dueDate": "2026-10-01"}'
+  -H "Content-Type: application/json" -H "X-API-Key: $DEV_KEY" -d '{"title": "Beta", "dueDate": "2026-10-01", "projectId": "<project-id>"}'
+# Datum entfernen ("" = leeren); Projekt wechseln nur, solange das Teilziel leer ist
+curl -s --noproxy '*' -X PUT http://localhost:9090/api/v1/goals/<goal-id>/milestones/<milestone-id> \
+  -H "Content-Type: application/json" -H "X-API-Key: $DEV_KEY" -d '{"dueDate": ""}'
+# Reihenfolge der Teilziele EINES Projekts
+curl -s --noproxy '*' -X PUT http://localhost:9090/api/v1/goals/<goal-id>/milestones/order \
+  -H "Content-Type: application/json" -H "X-API-Key: $DEV_KEY" -d '{"ids": ["<milestone-id-1>", "<milestone-id-2>"]}'
 curl -s --noproxy '*' -X PATCH http://localhost:9090/api/v1/todos/<todo-id>/planning \
   -H "Content-Type: application/json" -H "X-API-Key: $DEV_KEY" -d '{"milestoneId": "<milestone-id>"}'
 curl -s --noproxy '*' -X POST http://localhost:9090/api/v1/goals/<goal-id>/guard \

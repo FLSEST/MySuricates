@@ -862,7 +862,7 @@ ohne Angabe Deutsch). Kein REST-Aufruf nötig – und keiner erlaubt.
 
 | Variable | Inhalt |
 |----------|--------|
-| `{{ goal_status }}` | Block `<goal_status>…</goal_status>` mit Ziel, Zieldatum, Fortschritt, Meilensteinen samt Zustand (`OPEN`/`DUE_SOON`/`OVERDUE`/`REACHED`, `REOPENED`), überfälligen und bald fälligen (≤ 3 Tage) aktiven TODOs. Titel geglättet, gekürzt und von Plattform-Markern (`todo_item:`, `gate_*:`, `dashboard_widget:`) und Blockgrenzen befreit; je Liste höchstens 20 Zeilen |
+| `{{ goal_status }}` | Block `<goal_status>…</goal_status>` mit Ziel, Zieldatum, Fortschritt, Meilensteinen (Teilzielen) samt Zustand (`OPEN`/`DUE_SOON`/`OVERDUE`/`REACHED`, `REOPENED`; ohne Datum steht „ohne Datum“, nie fällig), überfälligen und bald fälligen (≤ 3 Tage) aktiven TODOs. Titel geglättet, gekürzt und von Plattform-Markern (`todo_item:`, `gate_*:`, `dashboard_widget:`) und Blockgrenzen befreit; je Liste höchstens 20 Zeilen |
 | `{{ goal_guard_status }}` | `RED` (etwas überfällig oder Zieldatum mit offener Arbeit vorbei), `YELLOW` (etwas in ≤ 3 Tagen fällig), sonst `GREEN` |
 | `{{ goal_guard_title }}` | `Ziel: <Titel>`, höchstens 80 Zeichen |
 | `{{ goal_guard_summary }}` | Eine Zeile: `7/12 erledigt (58 %) · 2 überfällig · 1 bald fällig · nächster Meilenstein „Beta“ am 2026-10-01`, höchstens 500 Zeichen |

@@ -3027,23 +3027,24 @@ A goal collects TODOs across projects and shows progress (V85). See [architektur
 
 ### `GET /api/v1/goals`
 
-Goals with progress, newest first. **Query:** `status` (repeatable; default `ACTIVE` and `DONE`, archived ones only when asked for).
+Goals with progress, newest first. **Query:** `status` (repeatable; default `ACTIVE` and `DONE`, archived ones only when asked for), `projectId` (optional, V92: only goals this project is assigned to).
 
-**Response:** `GoalResponse[]` – `id`, `title`, `description`, `status`, `targetDate`, `createdAt`, `updatedAt`, `progress` (`total`, `open`, `inProgress`, `backlog`, `done`, `openQuestions`, `percentDone`; `total` excludes ARCHIVED), `guard` (`enabled`, `workflowId`, `scheduleId`, `nextRunAt`; never switched on = `enabled: false`, the rest `null`).
+**Response:** `GoalResponse[]` – `id`, `title`, `description`, `status`, `targetDate`, `createdAt`, `updatedAt`, `progress` (`total`, `open`, `inProgress`, `backlog`, `done`, `openQuestions`, `percentDone`; `total` excludes ARCHIVED), `guard` (`enabled`, `workflowId`, `scheduleId`, `nextRunAt`; never switched on = `enabled: false`, the rest `null`), `projects[]` (V92: `id`, `name` of the assigned projects in their order; never `null`).
 
 ### `POST /api/v1/goals`
 
 ```json
-{ "title": "Open-source launch", "description": "Repo public, README with video", "targetDate": "2026-10-15" }
+{ "title": "Open-source launch", "description": "Repo public, README with video", "targetDate": "2026-10-15",
+  "projectIds": ["<project-id>", "…"] }
 ```
 
-`targetDate` as a date or ISO instant. **Response:** `201` + `GoalResponse`
+`targetDate` as a date or ISO instant. `projectIds` optional (V92): the goal's projects in this order, an unknown one → `404`. **Response:** `201` + `GoalResponse`
 
 ### `GET /api/v1/goals/{id}`
 
 The goal with its TODOs in work order (rank, then priority, then age) – without descriptions – and progress per project.
 
-**Response:** `GoalDetailResponse` – `goal`, `todos[]` (`id`, `title`, `status`, `priority`, `projectId`, `projectName`, `tags`, `goalRank`, `complexity`, `suggestedEffort`, `ratingNote`, `ratedBy`, `ratedAt`, `openQuestion`, `updatedAt`, `dueDate`, `milestoneId`), `byProject[]` (`projectId`, `projectName`, `total`, `done`), `milestones[]` (`GoalMilestoneResponse`, by date). If reading detects a milestone as reached for the first time, it stores `reachedAt`.
+**Response:** `GoalDetailResponse` – `goal`, `todos[]` (`id`, `title`, `status`, `priority`, `projectId`, `projectName`, `tags`, `goalRank`, `complexity`, `suggestedEffort`, `ratingNote`, `ratedBy`, `ratedAt`, `openQuestion`, `updatedAt`, `dueDate`, `milestoneId`), `byProject[]` (`projectId`, `projectName`, `total`, `done`; derived from the TODOs, kept for existing callers), `milestones[]` (`GoalMilestoneResponse`, by project position, then `position`), `projects[]` (V92: the assigned projects by `position` – `projectId`, `name`, `archived`, `position`, `total`, `done`, `openQuestions`, counted from the goal's non-archived TODOs in that project). If reading detects a milestone as reached for the first time, it stores `reachedAt`.
 
 ### `GET /api/v1/goals/{id}/relations`
 
@@ -3067,15 +3068,23 @@ Deletes the goal; its TODOs stay and only lose the assignment (milestone include
 
 ### `POST /api/v1/goals/{id}/todos`
 
-Assign TODOs: `{ "todoIds": ["…"] }`. A TODO from another goal moves here and loses its milestone; newly assigned TODOs get no rank. **Response:** `GoalDetailResponse`
+Assign TODOs: `{ "todoIds": ["…"] }`. A TODO from another goal moves here and loses its milestone; newly assigned TODOs get no rank. If their project is not assigned to the goal yet, it is appended (V92) – likewise via `PATCH /todos/{id}/planning` (`goalId`) and when a TODO changes its project (`PUT /todos/{id}`, which also drops a sub-goal of the old project). **Response:** `GoalDetailResponse`
 
 ### `PUT /api/v1/goals/{id}/order`
 
 Set the order: `{ "todoIds": ["…"] }` → rank 1..n in this sequence; all other TODOs of the goal lose their rank. Every ID must already belong to the goal, else 400. **Response:** `GoalDetailResponse`
 
+### Projects of a goal (V92)
+
+A goal is explicitly assigned to one or more projects, in an order (`goal_projects`).
+
+- `POST /api/v1/goals/{id}/projects` – `{ "projectId": "…" }` appends the project; already assigned = unchanged (idempotent). Unknown goal/project → `404`. **Response:** `GoalDetailResponse`
+- `PUT /api/v1/goals/{id}/projects/order` – `{ "ids": ["<projectId>", …] }`: the named ones first in this order, the other goal projects behind them in their previous order; a project not assigned to the goal → `400`. **Response:** `GoalDetailResponse`
+- `DELETE /api/v1/goals/{id}/projects/{projectId}?cascade=false` – if sub-goals or TODOs of the goal still hang on the project → `409` (`STATE_CONFLICT`, the message names the counts). `cascade=true` deletes the project's sub-goals in this goal and releases its TODOs from the goal (the TODOs stay). **Response:** `204`
+
 ### Milestones (V88)
 
-A milestone is an entry of its own with title and date; TODOs of the goal are assigned to it via `PATCH /todos/{id}/planning` (`milestoneId`). The state is computed on read: `REACHED` (all assigned TODOs without ARCHIVED done, at least one), else `OVERDUE`, `DUE_SOON` (≤ 3 days) or `OPEN`. `reachedAt` keeps the first detection and stays; if the milestone opens again afterwards, `reopened: true`.
+A milestone – "sub-goal" in the UI – is an entry of its own with a title and an optional date (since V92); TODOs of the goal are assigned to it via `PATCH /todos/{id}/planning` (`milestoneId`). Since V92 a sub-goal belongs to exactly one project of the goal (`projectId`), and a TODO only fits a sub-goal of its own project (else `400`; a TODO without a project fits none with a project). The state is computed on read: `REACHED` (all assigned TODOs without ARCHIVED done, at least one), else `OVERDUE`, `DUE_SOON` (≤ 3 days) or `OPEN` – without a date only `OPEN` or `REACHED`. `reachedAt` keeps the first detection and stays; if the milestone opens again afterwards, `reopened: true`. `openQuestions` counts the active TODOs in it with an open question.
 
 **`GoalMilestoneResponse`:**
 
@@ -3084,13 +3093,15 @@ A milestone is an entry of its own with title and date; TODOs of the goal are as
   "id": "b1f0…", "goalId": "6c2e…", "title": "Beta done",
   "dueDate": "2026-10-01T21:59:59Z", "state": "DUE_SOON",
   "total": 4, "done": 2, "reachedAt": null, "reopened": false,
-  "createdAt": "2026-09-24T08:00:00Z", "updatedAt": "2026-09-24T08:00:00Z"
+  "createdAt": "2026-09-24T08:00:00Z", "updatedAt": "2026-09-24T08:00:00Z",
+  "projectId": "3a9d…", "position": 0, "openQuestions": 1
 }
 ```
 
-- `GET /api/v1/goals/{id}/milestones` – by date. **Response:** `GoalMilestoneResponse[]`
-- `POST /api/v1/goals/{id}/milestones` – `{ "title": "Beta done", "dueDate": "2026-10-01T21:59:59Z" }`; `dueDate` required, ISO instant or date (`2026-10-01` = until 23:59:59 UTC); title at most 200 characters. **Response:** `201` + `GoalMilestoneResponse`
-- `PUT /api/v1/goals/{id}/milestones/{milestoneId}` – partial update `{ "title"?, "dueDate"? }` (`null` = unchanged). **Response:** `GoalMilestoneResponse`
+- `GET /api/v1/goals/{id}/milestones` – by project position, then `position`. **Response:** `GoalMilestoneResponse[]`
+- `POST /api/v1/goals/{id}/milestones` – `{ "title": "Beta done", "dueDate": "2026-10-01T21:59:59Z", "projectId": "…" }`; `dueDate` optional, ISO instant or date (`2026-10-01` = until 23:59:59 UTC); `projectId` required unless the goal has exactly one project (else `400`), a project the goal does not have yet is added; the sub-goal goes to the end of its project; title at most 200 characters. **Response:** `201` + `GoalMilestoneResponse`
+- `PUT /api/v1/goals/{id}/milestones/{milestoneId}` – partial update `{ "title"?, "dueDate"?, "projectId"? }` (`null` = unchanged, `dueDate: ""` removes the date). Changing the project only works while no TODOs are assigned to the sub-goal (else `400`); it goes to the end of the new project. **Response:** `GoalMilestoneResponse`
+- `PUT /api/v1/goals/{id}/milestones/order` – `{ "ids": ["<milestoneId>", …] }`: sub-goals of ONE project in a new order, unnamed ones of the same project behind them; sub-goals of different projects → `400`, a foreign one → `404`. **Response:** all `GoalMilestoneResponse` of the goal
 - `DELETE /api/v1/goals/{id}/milestones/{milestoneId}` – the TODOs stay in the goal and only lose the assignment. **Response:** `204`
 
 Unknown goal, or a milestone of another goal → `404`.
@@ -3099,7 +3110,7 @@ Unknown goal, or a milestone of another goal → `404`.
 
 Switch the goal guard on or off (V88): `{ "enabled": true, "projectId": "…"?, "cron": "0 0 8 * * *"?, "locale": "en"? }`.
 
-- **First switch-on:** creates a workflow "Goal guard: <title>" (`locale` `de`: "Ziel-Wächter: …") from the shipped template `goal-guard` with `defaultContext` `{goal_id, goal_locale}` (`changeSource` `goal-guard`), plus a CRON schedule (default daily 08:00, `inputContext.goal_id`, conflict `SKIP`). Project: `projectId`, else the one with most of the goal's TODOs, else the oldest active one; no project at all → 400.
+- **First switch-on:** creates a workflow "Goal guard: <title>" (`locale` `de`: "Ziel-Wächter: …") from the shipped template `goal-guard` with `defaultContext` `{goal_id, goal_locale}` (`changeSource` `goal-guard`), plus a CRON schedule (default daily 08:00, `inputContext.goal_id`, conflict `SKIP`). Project: `projectId`, else the first non-archived goal project (V92), else the one with most of the goal's TODOs, else the oldest active one; no project at all → 400.
 - **Switching on again:** re-enables the existing schedule; a given `cron` replaces the old one. If the workflow was deleted, a new one is created.
 - **Switching off** (`enabled: false`): pauses the schedule, the workflow stays. Deleting the goal pauses it as well.
 

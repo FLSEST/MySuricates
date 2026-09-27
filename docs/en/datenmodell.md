@@ -711,7 +711,7 @@ A chain does not belong to any project and can reference workflows from differen
 | `rated_by` | TEXT | | `USER` or `AI` – who assessed last (V85) |
 | `rated_at` | TEXT | | Time of the assessment (V85) |
 | `open_question` | TEXT | | Question that has to be settled before work starts (V85) |
-| `milestone_id` | TEXT | FK → goal_milestones, ON DELETE SET NULL | Milestone of the TODO's own goal (V88) |
+| `milestone_id` | TEXT | FK → goal_milestones, ON DELETE SET NULL | Milestone (sub-goal) of the TODO's own goal and – checked on write since V92 – of its own project (V88) |
 | `created_at` | TEXT | NOT NULL | |
 | `updated_at` | TEXT | NOT NULL | |
 
@@ -734,7 +734,19 @@ TODOs are automatically created by `AutoTodoService` on RED/YELLOW gate status (
 
 **Indexes:** `idx_goals_status`
 
-A goal groups TODOs across projects (V85). Membership, rank and assessment live on the TODO (`todos.goal_id` …), not on the goal; `GoalService` computes progress and order from lean projections. Deleting a goal keeps its TODOs, removes its milestones and pauses a goal guard.
+A goal groups TODOs across projects (V85). Membership, rank and assessment live on the TODO (`todos.goal_id` …), not on the goal; `GoalService` computes progress and order from lean projections. Since V92 a goal is explicitly assigned to one or more projects (`goal_projects`). Deleting a goal keeps its TODOs, removes its milestones and project assignments and pauses a goal guard.
+
+### `goal_projects`
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `goal_id` | TEXT | PK (with `project_id`), FK → goals, ON DELETE CASCADE | Goal |
+| `project_id` | TEXT | PK (with `goal_id`), FK → projects, ON DELETE CASCADE | Project of the goal |
+| `position` | INTEGER | NOT NULL, DEFAULT 0 | Order of the projects within the goal, from 0 |
+
+**Indexes:** `idx_goal_projects_project`
+
+The projects of a goal (V92, TODO c60bf914), n:m. Backfilled from the goals' TODOs (archived ones included); position 0 went to the project with the most non-archived TODOs. When a TODO from a project the goal does not have yet joins the goal (assign, `planning`, the TODO changing its project), the project is appended automatically. A project can only be removed while no sub-goals or TODOs of the goal hang on it – otherwise with `cascade=true` (sub-goals deleted, TODOs released from the goal).
 
 ### `goal_milestones`
 
@@ -742,15 +754,17 @@ A goal groups TODOs across projects (V85). Membership, rank and assessment live 
 |---|---|---|---|
 | `id` | TEXT | PK | UUID |
 | `goal_id` | TEXT | NOT NULL, FK → goals, ON DELETE CASCADE | Goal of the milestone |
+| `project_id` | TEXT | FK → projects, ON DELETE SET NULL | Project of the sub-goal; NULL only for legacy data of a goal without projects (V92) |
 | `title` | TEXT | NOT NULL | e.g. "Beta done" |
-| `due_date` | TEXT | NOT NULL | Due date; a bare date counts until 23:59:59 UTC |
+| `due_date` | TEXT | | Due date, optional (since V92); a bare date counts until 23:59:59 UTC |
+| `position` | INTEGER | NOT NULL, DEFAULT 0 | Order within its project in the goal, from 0 (V92) |
 | `reached_at` | TEXT | | First detection of "all assigned TODOs done"; stays even when the milestone opens again |
 | `created_at` | TEXT | NOT NULL | |
 | `updated_at` | TEXT | NOT NULL | |
 
-**Indexes:** `idx_goal_milestones_goal`
+**Indexes:** `idx_goal_milestones_goal`, `idx_goal_milestones_goal_project` (`goal_id, project_id, position`, V92)
 
-Milestones of a goal (V88, TODO 259f4f66). TODOs point to one through `todos.milestone_id`; the state (`OPEN`, `DUE_SOON` ≤ 3 days, `OVERDUE`, `REACHED`) is computed on read, not stored. Deleting a milestone keeps its TODOs in the goal.
+Milestones of a goal (V88, TODO 259f4f66) – called "sub-goals" in the UI since V92. TODOs point to one through `todos.milestone_id`; the state (`OPEN`, `DUE_SOON` ≤ 3 days, `OVERDUE`, `REACHED`) is computed on read, not stored – without a date only `OPEN` or `REACHED`. Deleting a milestone keeps its TODOs in the goal. Since V92 (TODO c60bf914) a sub-goal belongs to exactly one project of the goal; its TODOs must come from that project (checked on write, legacy data is still read). V92 split mixed sub-goals: one copy per minority project (same title and date, `reached_at` NULL) that the TODOs of that project now point to. Reads are ordered by project position, then `position`.
 
 ### `activity_log`
 
@@ -1114,7 +1128,7 @@ The only persistent system configuration outside of `application.yml`.
 | `Todo.Complexity` | `S`, `M`, `L`, `XL` | Size and uncertainty, coarse – the same scale for people and AI |
 | `Todo.RatedBy` | `USER`, `AI` | Who set the assessment last; a person overrides the AI |
 | `Goal.Status` | `ACTIVE`, `DONE`, `ARCHIVED` | Archived goals only show up with an explicit filter |
-| `GoalMilestone.State` (V88) | `OPEN`, `DUE_SOON`, `OVERDUE`, `REACHED` | Not stored, computed on read from the date and the assigned TODOs; `DUE_SOON` = at most 3 days |
+| `GoalMilestone.State` (V88) | `OPEN`, `DUE_SOON`, `OVERDUE`, `REACHED` | Not stored, computed on read from the date and the assigned TODOs; `DUE_SOON` = at most 3 days; without a date only `OPEN`/`REACHED` (V92) |
 
 ### LogLevel (ActivityLog)
 
@@ -1335,6 +1349,7 @@ in backticks, parentheses behind it give the default or values, free text follow
 | V89 | `V89__workflow_run_chain_run_id.sql` | `chain_run_id` in workflow_runs (chain run of a chain entry, no backfill for existing runs) + index `idx_workflow_runs_chain_run_id` |
 | V90 | `V90__keyless_integration_account_names.sql` | Language-neutral account names for RSS/Atom and Open-Meteo in `integration_connections.account_info` (existing rows updated) |
 | V91 | `V91__page_suggestions_per_locale.sql` | `locale` in page_suggestions (table rebuild: `UNIQUE(page)` → `UNIQUE(page, locale)`, existing rows count as German) |
+| V92 | `V92__goal_projects_and_subgoals.sql` | new table `goal_projects` (backfilled from the TODOs); `goal_milestones` rebuilt with `project_id`, `position`, optional `due_date` – mixed sub-goals split per minority project, `todos.milestone_id` saved before the rebuild and written back |
 
 ## SQLite Specifics
 
