@@ -20,6 +20,10 @@ Good first contributions are the small, verifiable kind: a broken link, a
 documentation passage that no longer matches the code, a test that pins down
 behaviour which is currently untested.
 
+Use the bug report or idea issue form to start that conversation — they ask
+for the details needed up front (version, installation method, reproduction
+steps) instead of a second round of questions.
+
 ## Pull requests currently need prior agreement
 
 Right now every pull request is discussed in an issue before it is opened. The
@@ -101,7 +105,8 @@ betreutes Produkt — kein Support, keine zugesagten Reaktionszeiten, auch nicht
 auf Pull Requests.
 
 - **Erst ein Issue, dann Code.** Ein Pull Request ohne vorheriges Gespräch
-  bleibt wahrscheinlich liegen.
+  bleibt wahrscheinlich liegen. Die Bug- oder Ideen-Vorlage beim Issue-Anlegen
+  fragt die nötigen Angaben gleich ab.
 - **Pull Requests brauchen derzeit vorherige Absprache.** Grund: Solange es nur
   einen Urheber gibt, bleibt eine spätere Umlizenzierung möglich. Mit fremdem
   Code im Bestand ginge das nur noch mit Zustimmung aller Beteiligten. Das soll
