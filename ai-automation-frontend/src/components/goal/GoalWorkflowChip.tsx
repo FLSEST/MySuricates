@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { ExternalLink, Gauge, Hammer, Play } from 'lucide-react';
 import { Button } from '../ui';
 import { useI18nStore, useT } from '../../i18n';
-import { useDetachGoalWorkflow, useStartGoalWorkflow, useUpdateGoalWorkflowRole } from '../../hooks/useGoalWorkflows';
+import { useDetachGoalWorkflow, useGoalWorkflowStart, useUpdateGoalWorkflowRole } from '../../hooks/useGoalWorkflows';
 import { WorkflowResultContent } from '../dashboard/WorkflowResultContent';
 import type { WorkflowWidgetEntry } from '../dashboard/workflowWidgetContract';
 import { TimelinePopover } from './TimelinePopover';
@@ -45,8 +45,8 @@ export function GoalWorkflowChip({ attachment, entry, compact = false }: {
   const [open, setOpen] = useState(false);
   const [now] = useState(() => new Date());
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const start = useStartGoalWorkflow(attachment.goalId);
   const name = useShownName(attachment);
+  const start = useGoalWorkflowStart(attachment.goalId, attachment.workflowId, attachment.workPackageId, name, entry);
   const status = useStatusText(attachment, entry);
   const at = lastRunAt(entry);
   const RoleIcon = ROLE_ICON[attachment.role];
@@ -71,29 +71,29 @@ export function GoalWorkflowChip({ attachment, entry, compact = false }: {
         )}
         {summary && <span className="hidden max-w-[12rem] truncate text-text-secondary lg:inline" aria-hidden="true">– {summary}</span>}
       </button>
-      <button type="button" aria-label={tw.start.replace('{name}', name)} title={tw.start.replace('{name}', name)}
-        disabled={start.isPending}
-        onClick={() => start.mutate({ workflowId: attachment.workflowId, workPackageId: attachment.workPackageId, name })}
+      <button type="button" aria-label={tw.start.replace('{name}', name)} title={start.running ? tw.running : tw.start.replace('{name}', name)}
+        disabled={start.busy} onClick={start.start}
         className="flex items-center rounded-r-md border-l border-border px-1.5 text-text-secondary hover:bg-surface-hover hover:text-accent focus-ring disabled:opacity-50">
         <Play className={compact ? 'h-3 w-3' : 'h-3.5 w-3.5'} aria-hidden="true" />
       </button>
       {open && (
         <WorkflowCard attachment={attachment} entry={entry} triggerRef={triggerRef} onClose={() => setOpen(false)}
-          onStart={() => start.mutate({ workflowId: attachment.workflowId, workPackageId: attachment.workPackageId, name })}
-          starting={start.isPending} />
+          onStart={start.start} starting={start.starting} blocked={start.busy} />
       )}
     </span>
   );
 }
 
 /** Die Karte eines Workflows am Ziel: letzter Lauf, bei „liefert den Stand“ das Ergebnis, Rolle, Starten und Lösen. */
-function WorkflowCard({ attachment, entry, triggerRef, onClose, onStart, starting }: {
+function WorkflowCard({ attachment, entry, triggerRef, onClose, onStart, starting, blocked }: {
   attachment: GoalWorkflow;
   entry: WorkflowWidgetEntry | undefined;
   triggerRef: RefObject<HTMLElement | null>;
   onClose: () => void;
   onStart: () => void;
   starting: boolean;
+  /** Startet gerade oder läuft noch – dann kein zweiter Start. */
+  blocked: boolean;
 }) {
   const t = useT();
   const tw = t.goals.workflows;
@@ -170,7 +170,7 @@ function WorkflowCard({ attachment, entry, triggerRef, onClose, onStart, startin
               {tw.detach}
             </button>
           )}
-          <Button size="sm" icon={<Play className="h-3.5 w-3.5" />} loading={starting} onClick={onStart}>
+          <Button size="sm" icon={<Play className="h-3.5 w-3.5" />} loading={starting} disabled={blocked} onClick={onStart}>
             {tw.startLabel}
           </Button>
         </div>

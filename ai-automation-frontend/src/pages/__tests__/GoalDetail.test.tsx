@@ -513,6 +513,42 @@ describe('GoalDetail', () => {
       await waitFor(() => expect(sent).toContainEqual({ id: 'c', body: { decision: '' } }));
     });
 
+    // Review 68a5e24e: shown at once, taken back when the server refuses – with the server's message
+    it('takes an optimistic decision back when the server refuses it, and says why', async () => {
+      chooseList();
+      let refuse = () => {};
+      server.use(
+        http.get('/api/v1/goals/g1', () => HttpResponse.json(deciding)),
+        http.patch('/api/v1/todos/:id/planning', async () => {
+          await new Promise<void>((resolve) => { refuse = resolve; });
+          return HttpResponse.json({ error: 'openQuestion and decision at once' }, { status: 400 });
+        }),
+      );
+      renderWithProviders(
+        <>
+          <Routes><Route path="/goals/:goalId" element={<GoalDetail />} /></Routes>
+          <ToastContainer />
+        </>,
+        { route: '/goals/g1' },
+      );
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Decide: Style probe' }));
+      const card = screen.getByRole('dialog', { name: 'Decision on Style probe' });
+      fireEvent.change(within(card).getByLabelText('Decision'), { target: { value: 'Dark theme' } });
+      fireEvent.click(within(card).getByRole('button', { name: 'Decide' }));
+
+      // at once: the question has left, two are decided
+      await waitFor(() => expect(screen.queryAllByTestId('goal-question')).toHaveLength(0));
+      expect(screen.getByText('Decided (2)')).toBeInTheDocument();
+
+      refuse();
+      expect(await screen.findByText('Could not save the decision: openQuestion and decision at once')).toBeInTheDocument();
+      await waitFor(() => expect(screen.getAllByTestId('goal-question')).toHaveLength(1));
+      expect(screen.getByTestId('goal-question')).toHaveTextContent('Which look?');
+      expect(screen.getByText('Decided (1)')).toBeInTheDocument();
+      expect(screen.getByTestId('goal-progress').parentElement).toHaveTextContent('1 open·1 decided');
+    });
+
     it('offers no deciding against an older backend – the marks stay a plain display', async () => {
       chooseList();
       server.use(http.get('/api/v1/goals/g1', () => HttpResponse.json(detail)));

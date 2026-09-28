@@ -2648,6 +2648,7 @@ export const en = {
       saveFailed: 'Could not save the assignment',
       start: 'Start: {name}',
       startLabel: 'Start',
+      running: 'Running – can be started again once it ends',
       started: '{name} started',
       startFailed: 'Could not start the workflow',
       openRun: 'Open run',

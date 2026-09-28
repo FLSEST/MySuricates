@@ -1,8 +1,10 @@
 import { Play, Plus, Workflow } from 'lucide-react';
 import { useT } from '../../i18n';
-import { useStartGoalWorkflow } from '../../hooks/useGoalWorkflows';
+import { useGoalWorkflowStart } from '../../hooks/useGoalWorkflows';
 import { GoalWorkflowChip } from './GoalWorkflowChip';
 import { TONE_DOT, shownTone } from './goalWorkflowStatus';
+import type { WorkflowWidgetEntry } from '../dashboard/workflowWidgetContract';
+import type { GoalWorkflow } from '../../types';
 import { attachmentsAt, useGoalWorkflowsScope } from './goalWorkflowsContext';
 
 /**
@@ -61,10 +63,8 @@ export function PackageWorkflows({ workPackageId, className = '' }: { workPackag
  * der Karte), mit ▶ und „Workflow zuordnen“ – das schließt die Karte und öffnet den Dialog.
  */
 export function PackageWorkflowList({ workPackageId, onAssign }: { workPackageId: string; onAssign: () => void }) {
-  const t = useT();
-  const tw = t.goals.workflows;
+  const tw = useT().goals.workflows;
   const scope = useGoalWorkflowsScope();
-  const start = useStartGoalWorkflow(scope?.goalId ?? '');
   if (!scope) return null;
   const items = attachmentsAt(scope.attachments, workPackageId);
   if (items.length === 0 && !scope.supported) return null;
@@ -73,21 +73,9 @@ export function PackageWorkflowList({ workPackageId, onAssign }: { workPackageId
       <p className="text-xs font-medium text-text-secondary">{tw.title}</p>
       {items.length === 0 ? <p className="text-xs text-text-tertiary">{tw.packageEmpty}</p> : (
         <ul className="mt-1 space-y-0.5 text-xs">
-          {items.map((item) => {
-            const entry = scope.results.get(item.workflowId);
-            return (
-              <li key={item.id} className="flex items-center gap-1.5">
-                <span className={`h-2 w-2 shrink-0 rounded-full ${TONE_DOT[shownTone(entry, item.role === 'STATUS')]}`} aria-hidden="true" />
-                <span className="min-w-0 flex-1 truncate text-text" title={item.workflowName}>{item.workflowName}</span>
-                <span className="shrink-0 text-text-tertiary">{tw.roles[item.role]}</span>
-                <button type="button" aria-label={tw.start.replace('{name}', item.workflowName)} disabled={start.isPending}
-                  onClick={() => start.mutate({ workflowId: item.workflowId, workPackageId, name: item.workflowName })}
-                  className="rounded p-0.5 text-text-secondary hover:text-accent focus-ring disabled:opacity-50">
-                  <Play className="h-3 w-3" aria-hidden="true" />
-                </button>
-              </li>
-            );
-          })}
+          {items.map((item) => (
+            <PackageWorkflowItem key={item.id} attachment={item} entry={scope.results.get(item.workflowId)} />
+          ))}
         </ul>
       )}
       {scope.supported && (
@@ -98,5 +86,23 @@ export function PackageWorkflowList({ workPackageId, onAssign }: { workPackageId
         </button>
       )}
     </div>
+  );
+}
+
+/** Eine Zeile der Paket-Karte: Punkt, Name, Rolle und ▶ – ▶ teilt sich die Sperre mit allen anderen Knöpfen. */
+function PackageWorkflowItem({ attachment, entry }: { attachment: GoalWorkflow; entry: WorkflowWidgetEntry | undefined }) {
+  const tw = useT().goals.workflows;
+  const start = useGoalWorkflowStart(attachment.goalId, attachment.workflowId, attachment.workPackageId, attachment.workflowName, entry);
+  return (
+    <li className="flex items-center gap-1.5">
+      <span className={`h-2 w-2 shrink-0 rounded-full ${TONE_DOT[shownTone(entry, attachment.role === 'STATUS')]}`} aria-hidden="true" />
+      <span className="min-w-0 flex-1 truncate text-text" title={attachment.workflowName}>{attachment.workflowName}</span>
+      <span className="shrink-0 text-text-tertiary">{tw.roles[attachment.role]}</span>
+      <button type="button" aria-label={tw.start.replace('{name}', attachment.workflowName)} disabled={start.busy}
+        title={start.running ? tw.running : undefined} onClick={start.start}
+        className="rounded p-0.5 text-text-secondary hover:text-accent focus-ring disabled:opacity-50">
+        <Play className="h-3 w-3" aria-hidden="true" />
+      </button>
+    </li>
   );
 }

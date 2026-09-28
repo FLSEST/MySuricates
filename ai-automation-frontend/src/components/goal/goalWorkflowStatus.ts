@@ -68,3 +68,8 @@ export function ago(iso: string, now: Date, locale: Locale): string {
 
 /** Link zum Lauf – die Seite des Laufs im Workflow. */
 export const runPath = (workflowId: string, runId: string) => `/workflows/${workflowId}/run/${runId}`;
+
+/** Läuft der letzte Lauf noch (oder wartet er)? Dann startet ▶ keinen zweiten daneben. */
+export function runActive(entry: WorkflowWidgetEntry | null | undefined): boolean {
+  return runTone(entry) === 'info';
+}

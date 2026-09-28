@@ -875,3 +875,53 @@ describe('GoalTimeline — workflows', () => {
     expect(screen.queryByRole('dialog', { name: 'Work package Repo sauber' })).not.toBeInTheDocument();
   });
 });
+
+// Review 52bc1e8c: two ▶ for the same workflow (row chip and package card) must not start it twice
+describe('GoalTimeline — starting a workflow once', () => {
+  const attachment = {
+    id: 'a2', goalId: 'g1', workPackageId: 'w-repo', workflowId: 'wf-fix', workflowName: 'Fix bot', workflowProjectId: 'p1',
+    role: 'WORKER' as const, guard: false,
+  };
+  const renderWith = (results: Map<string, never>) => renderWithProviders(
+    <GoalWorkflowsContext.Provider value={{ goalId: 'g1', supported: true, attachments: [attachment], results, openAssign: vi.fn() }}>
+      <GoalTimeline goal={goal} todos={todos} workPackages={workPackages} milestones={milestones} projects={projects}
+        onOpenTodo={vi.fn()} now={NOW} />
+    </GoalWorkflowsContext.Provider>,
+  );
+
+  it('sends one call when the chip and the card are clicked right after each other, and locks both while it starts', async () => {
+    const calls: string[] = [];
+    let release = () => {};
+    server.use(http.post('/api/v1/workflows/:id/execute', async ({ params }) => {
+      calls.push(String(params.id));
+      await new Promise<void>((resolve) => { release = resolve; });
+      return HttpResponse.json({ id: 'run-1', status: 'PENDING' });
+    }));
+    renderWith(new Map());
+
+    fireEvent.click(within(screen.getByTestId('timeline-bar-w-repo')).getByRole('button'));
+    const card = screen.getByRole('dialog', { name: 'Work package Repo sauber' });
+    const inCard = within(card).getByRole('button', { name: 'Start: Fix bot' });
+    const inRow = within(screen.getByTestId('timeline-row-p1-w-repo')).getByRole('button', { name: 'Start: Fix bot' });
+    fireEvent.click(inRow);
+    fireEvent.click(inCard);
+    fireEvent.click(inRow);
+    await waitFor(() => expect(calls).toEqual(['wf-fix']));
+    await waitFor(() => expect(inCard).toBeDisabled());
+    expect(inRow).toBeDisabled();
+    act(() => release());
+    await waitFor(() => expect(inRow).toBeEnabled());
+    expect(calls).toEqual(['wf-fix']);
+  });
+
+  it('locks ▶ while the last run of the workflow is still running', () => {
+    const running = {
+      workflowId: 'wf-fix', workflowName: 'Fix bot', available: true, resultState: 'MISSING', result: null,
+      run: { runId: 'r1', status: 'RUNNING', startedAt: new Date().toISOString(), completedAt: null, durationMs: null, gateStatus: null },
+    };
+    renderWith(new Map([['wf-fix', running as never]]));
+    const button = within(screen.getByTestId('timeline-row-p1-w-repo')).getByRole('button', { name: 'Start: Fix bot' });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute('title', 'Running – can be started again once it ends');
+  });
+});
