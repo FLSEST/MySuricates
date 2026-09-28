@@ -33,7 +33,8 @@ export const HINTS = {
   'cockpit-overview': { version: 1 },
   'goals-overview': { version: 1 },
   'goal-relation-map': { version: 1 },
-  'goal-outline': { version: 1 },
+  // v2: open questions are decided in place, ✔ counts what is decided (68a5e24e).
+  'goal-outline': { version: 2 },
   // v2: milestones and work packages as bars in project bands, adding them with a click (c60bf914).
   'goal-timeline': { version: 2 },
   'goal-guard': { version: 1 },

@@ -12,6 +12,8 @@ import { GoalTimeline } from '../components/goal/GoalTimeline';
 import { GoalGuardControl } from '../components/goal/GoalGuardControl';
 import { GoalOutline } from '../components/goal/GoalOutline';
 import { GoalProjectsBar } from '../components/goal/GoalProjectsBar';
+import { DecisionCounts } from '../components/goal/DecisionCounts';
+import { DecisionContext } from '../components/goal/decisionContext';
 import { planBadge } from '../components/goal/planDisplay';
 import { dayOf } from '../components/goal/timelineLayout';
 import {
@@ -104,6 +106,7 @@ export function GoalDetail() {
   const updateGoal = useUpdateGoal();
   const deleteGoal = useDeleteGoal();
   const assign = useAssignGoalTodos();
+  const decisionScope = useMemo(() => (goalId ? { goalId, enabled: !!data?.decisionsSupported } : null), [goalId, data?.decisionsSupported]);
 
   if (isLoading) {
     return (
@@ -173,9 +176,13 @@ export function GoalDetail() {
       <Card className="space-y-3">
         <TodoProgressBar open={goal.progress.open} inProgress={goal.progress.inProgress}
           done={goal.progress.done} backlog={goal.progress.backlog} />
-        <p className="text-sm text-text-secondary" data-testid="goal-progress">
-          {t.goals.progress.replace('{done}', String(goal.progress.done)).replace('{total}', String(goal.progress.total))}
-        </p>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <p className="text-sm text-text-secondary" data-testid="goal-progress">
+            {t.goals.progress.replace('{done}', String(goal.progress.done)).replace('{total}', String(goal.progress.total))}
+          </p>
+          <DecisionCounts openQuestions={goal.progress.openQuestions} decided={goal.progress.decided ?? 0} variant="words"
+            className="text-sm" />
+        </div>
         <GoalProjectsBar goalId={goal.id} projects={projects} workPackages={workPackages} />
       </Card>
 
@@ -193,22 +200,24 @@ export function GoalDetail() {
         ))}
       </div>
 
-      {view === 'outline' ? (
-        <GoalOutline detail={data} today={today} onOpenTodo={setEditing} />
-      ) : view === 'list' ? (
-        <GoalTodoList goalId={goal.id} todos={todos} workPackages={workPackages} today={today} />
-      ) : view === 'timeline' ? (
-        <GoalTimeline goal={goal} todos={todos} workPackages={workPackages} milestones={milestones} projects={projects}
-          legacyBackend={data.legacyBackend} onOpenTodo={setEditing} />
-      ) : relations.isLoading || !relations.data ? (
-        relations.error
-          ? apiErrorStatus(relations.error) === 404
-            ? <GoalMapOutdatedBackend onShowList={() => chooseView('list')} />
-            : <ErrorState message={relations.error.message} onRetry={() => relations.refetch()} />
-          : <div className="flex justify-center py-8"><Spinner text={t.common.loading} /></div>
-      ) : (
-        <GoalRelationMap relations={relations.data} onOpenTodo={setEditing} onAssign={assignTodo} badges={badges} />
-      )}
+      <DecisionContext.Provider value={decisionScope}>
+        {view === 'outline' ? (
+          <GoalOutline detail={data} today={today} onOpenTodo={setEditing} />
+        ) : view === 'list' ? (
+          <GoalTodoList goalId={goal.id} todos={todos} workPackages={workPackages} today={today} />
+        ) : view === 'timeline' ? (
+          <GoalTimeline goal={goal} todos={todos} workPackages={workPackages} milestones={milestones} projects={projects}
+            legacyBackend={data.legacyBackend} onOpenTodo={setEditing} />
+        ) : relations.isLoading || !relations.data ? (
+          relations.error
+            ? apiErrorStatus(relations.error) === 404
+              ? <GoalMapOutdatedBackend onShowList={() => chooseView('list')} />
+              : <ErrorState message={relations.error.message} onRetry={() => relations.refetch()} />
+            : <div className="flex justify-center py-8"><Spinner text={t.common.loading} /></div>
+        ) : (
+          <GoalRelationMap relations={relations.data} onOpenTodo={setEditing} onAssign={assignTodo} badges={badges} />
+        )}
+      </DecisionContext.Provider>
 
       <GoalCandidates
         filter={filter}

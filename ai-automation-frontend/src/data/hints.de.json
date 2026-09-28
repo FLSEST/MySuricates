@@ -256,7 +256,7 @@
     "points": [
       "Oben stehen die Meilensteine: Termine fürs ganze Ziel, erreicht, wenn ihre verknüpften Arbeitspakete abgeschlossen sind",
       "Darunter hat jedes Projekt eine Karte mit seinen Arbeitspaketen in der festgelegten Reihenfolge, jedes mit Zeitraum und seinen TODOs",
-      "Die Zähler zeigen erledigt von gesamt und offene Fragen; eine Frage muss geklärt sein, bevor jemand anfängt"
+      "Die Zähler zeigen erledigt von gesamt, offene Fragen (❓) und Entschiedenes (✔); ein Klick auf ❓ entscheidet die Frage, bevor jemand anfängt"
     ]
   },
   "goal-timeline": {

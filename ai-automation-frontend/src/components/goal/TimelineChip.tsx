@@ -10,6 +10,8 @@ import { STATUS_DOT, dueTitle } from './planDisplay';
 import { packageOptions } from './planning';
 import { rangeText } from './dragLabel';
 import { TimelinePopover } from './TimelinePopover';
+import { DecisionCard, DecisionMark } from './DecisionMark';
+import { useDecisionScope } from './decisionContext';
 import type { GoalTodoItem, GoalWorkPackage } from '../../types';
 
 /**
@@ -32,6 +34,7 @@ export function ChipFace({ todo, overdue, flipped = false, lifted = false, compa
       flipped ? 'flex-row-reverse' : ''} ${overdue ? 'border-danger/60' : 'border-border'} ${lifted ? 'shadow-lg ring-1 ring-accent' : 'shadow-sm'}`}>
       <span className={`h-2 w-2 shrink-0 rounded-full ${overdue ? 'bg-danger' : STATUS_DOT[todo.status]}`} />
       <span className={`min-w-0 flex-1 truncate ${flipped ? 'text-right' : 'text-left'} ${text}`}>{todo.title}</span>
+      <DecisionMark todo={todo} size="sm" interactive={false} />
     </span>
   );
 }
@@ -62,6 +65,8 @@ export function TimelineChip({ todo, workPackages, today, placement, compact = f
   const t = useT();
   const locale = useI18nStore((s) => s.locale);
   const [open, setOpen] = useState(false);
+  const [deciding, setDeciding] = useState(false);
+  const scope = useDecisionScope();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dragData: ChipDragData = {
     anchor: placement?.anchor ?? CHIP_ANCHOR, flipped: placement?.flipped ?? false, kind: 'todo', ...(compact ? { compact } : {}),
@@ -111,13 +116,20 @@ export function TimelineChip({ todo, workPackages, today, placement, compact = f
             close();
             onOpenTodo(todo.id);
           }}
+          onDecide={scope?.enabled && (todo.decisionState === 'DECIDED' || (todo.openQuestion && todo.status !== 'DONE')) ? () => {
+            close();
+            setDeciding(true);
+          } : undefined}
         />
+      )}
+      {deciding && scope && (
+        <DecisionCard todo={todo} goalId={scope.goalId} triggerRef={triggerRef} onClose={() => setDeciding(false)} />
       )}
     </div>
   );
 }
 
-function ChipMenu({ todo, workPackages, alignRight, triggerRef, onClose, onPlan, onOpenTodo }: {
+function ChipMenu({ todo, workPackages, alignRight, triggerRef, onClose, onPlan, onOpenTodo, onDecide }: {
   todo: GoalTodoItem;
   workPackages: GoalWorkPackage[];
   alignRight: boolean;
@@ -125,6 +137,8 @@ function ChipMenu({ todo, workPackages, alignRight, triggerRef, onClose, onPlan,
   onClose: () => void;
   onPlan: (changes: PlanChanges) => void;
   onOpenTodo: () => void;
+  /** Offene Frage entscheiden bzw. die Entscheidung ändern (68a5e24e); fehlt ohne Frage und Entscheidung. */
+  onDecide?: () => void;
 }) {
   const t = useT();
   const tt = t.goals.timeline;
@@ -173,7 +187,12 @@ function ChipMenu({ todo, workPackages, alignRight, triggerRef, onClose, onPlan,
           })}
         </select>
       </div>
-      <div className="mt-3 flex justify-end border-t border-border pt-2">
+      <div className="mt-3 flex justify-end gap-1 border-t border-border pt-2">
+        {onDecide && (
+          <Button type="button" variant="ghost" size="sm" onClick={onDecide}>
+            {todo.decisionState === 'DECIDED' ? t.goals.decision.change : t.goals.decision.decide}
+          </Button>
+        )}
         <Button type="button" variant="ghost" size="sm" onClick={onOpenTodo}>{tt.edit}</Button>
       </div>
     </TimelinePopover>

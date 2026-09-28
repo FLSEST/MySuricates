@@ -4,7 +4,7 @@ import { defaultQueryRetry } from '../api/queryDefaults';
 import { useToast } from './useToast';
 import { useT } from '../i18n';
 import type {
-  CreateGoalRequest, Goal, GoalDetail, GoalGuard, GoalMilestone, GoalProject, GoalRelations, GoalStatus, GoalTodoItem,
+  CreateGoalRequest, DecisionState, Goal, GoalDetail, GoalGuard, GoalMilestone, GoalProject, GoalRelations, GoalStatus, GoalTodoItem,
   GoalWorkPackage, MilestoneState, PageResponse, Todo, UpdateGoalRequest, UpdateTodoPlanningRequest,
 } from '../types';
 
@@ -39,13 +39,27 @@ export function useGoals(statuses?: GoalStatus[], projectId?: string) {
 const NO_GUARD: GoalGuard = { enabled: false, workflowId: null, scheduleId: null, nextRunAt: null };
 
 const asksQuestion = (todo: GoalTodoItem) => todo.status !== 'ARCHIVED' && todo.status !== 'DONE' && !!todo.openQuestion;
+/** Entschieden zählt wie beim Backend: nicht archiviert, Zustand DECIDED (68a5e24e). */
+const isDecided = (todo: GoalTodoItem) => todo.status !== 'ARCHIVED' && todo.decisionState === 'DECIDED';
 
-/** Ein TODO, wie es auch ein älteres Backend liefert: das Arbeitspaket noch als `milestoneId`, Fälligkeit fehlt vor 259f4f66. */
-type RawTodo = Omit<GoalTodoItem, 'workPackageId' | 'dueDate'> & {
+type DecisionFields = 'decision' | 'decidedAt' | 'decidedBy' | 'decisionState';
+
+/**
+ * Ein TODO, wie es auch ein älteres Backend liefert: das Arbeitspaket noch als `milestoneId`,
+ * Fälligkeit fehlt vor 259f4f66, Entscheidungen vor 68a5e24e.
+ */
+type RawTodo = Omit<GoalTodoItem, 'workPackageId' | 'dueDate' | DecisionFields> & Partial<Pick<GoalTodoItem, DecisionFields>> & {
   workPackageId?: string | null;
   milestoneId?: string | null;
   dueDate?: string | null;
 };
+
+/** Zustand der Klärung, wenn das Backend ihn nicht mitschickt: eine offene Frage ist QUESTION. */
+function decisionStateOf(todo: RawTodo): DecisionState {
+  if (todo.decisionState) return todo.decisionState;
+  if (todo.openQuestion) return 'QUESTION';
+  return todo.decision ? 'DECIDED' : 'NONE';
+}
 
 /**
  * Ein Arbeitspaket, wie es ein Backend vor c60bf914 als „milestone“ liefert: nur eine Fälligkeit,
@@ -72,9 +86,9 @@ interface LegacyPackage {
 type RawGoalDetail = Omit<GoalDetail, 'todos' | 'projects' | 'workPackages' | 'milestones' | 'legacyBackend' | 'goal'> & {
   goal: Omit<Goal, 'guard'> & { guard?: GoalGuard };
   todos: RawTodo[];
-  projects?: GoalProject[];
-  workPackages?: (Omit<GoalWorkPackage, 'startDate' | 'endDate' | 'completedAt' | 'reopened' | 'openQuestions'>
-    & Partial<Pick<GoalWorkPackage, 'startDate' | 'endDate' | 'completedAt' | 'reopened' | 'openQuestions'>>)[];
+  projects?: (Omit<GoalProject, 'decided'> & { decided?: number })[];
+  workPackages?: (Omit<GoalWorkPackage, 'startDate' | 'endDate' | 'completedAt' | 'reopened' | 'openQuestions' | 'decided'>
+    & Partial<Pick<GoalWorkPackage, 'startDate' | 'endDate' | 'completedAt' | 'reopened' | 'openQuestions' | 'decided'>>)[];
   milestones?: unknown[];
 };
 
@@ -91,6 +105,7 @@ function projectsFromByProject(detail: RawGoalDetail, todos: GoalTodoItem[]): Go
     total: entry.total,
     done: entry.done,
     openQuestions: todos.filter((todo) => todo.projectId === entry.projectId && asksQuestion(todo)).length,
+    decided: todos.filter((todo) => todo.projectId === entry.projectId && isDecided(todo)).length,
   }]));
 }
 
@@ -117,6 +132,7 @@ function packagesFromLegacy(legacy: LegacyPackage[], todos: GoalTodoItem[], proj
     total: item.total,
     done: item.done,
     openQuestions: item.openQuestions ?? todos.filter((todo) => todo.workPackageId === item.id && asksQuestion(todo)).length,
+    decided: todos.filter((todo) => todo.workPackageId === item.id && isDecided(todo)).length,
     completedAt: item.reachedAt ?? null,
     reopened: item.reopened ?? false,
     createdAt: item.createdAt,
@@ -135,12 +151,22 @@ function packagesFromLegacy(legacy: LegacyPackage[], todos: GoalTodoItem[], proj
 export function normalizeGoalDetail(raw: GoalDetail | RawGoalDetail): GoalDetail {
   const detail = raw as RawGoalDetail;
   const legacyBackend = detail.workPackages === undefined;
+  const decisionsSupported = detail.goal.progress.decided !== undefined;
   const todos = detail.todos.map(({ milestoneId, workPackageId, ...todo }): GoalTodoItem => ({
     ...todo,
     dueDate: todo.dueDate ?? null,
     workPackageId: workPackageId !== undefined ? workPackageId : (milestoneId ?? null),
+    decision: todo.decision ?? null,
+    decidedAt: todo.decidedAt ?? null,
+    decidedBy: todo.decidedBy ?? null,
+    decisionState: decisionStateOf(todo),
   }));
-  const projects = detail.projects ?? projectsFromByProject(detail, todos);
+  const projects = detail.projects
+    ? detail.projects.map((project): GoalProject => ({
+      ...project,
+      decided: project.decided ?? todos.filter((todo) => todo.projectId === project.projectId && isDecided(todo)).length,
+    }))
+    : projectsFromByProject(detail, todos);
   const workPackages = legacyBackend
     ? packagesFromLegacy((detail.milestones ?? []) as LegacyPackage[], todos, projects)
     : detail.workPackages!.map((item): GoalWorkPackage => ({
@@ -149,6 +175,7 @@ export function normalizeGoalDetail(raw: GoalDetail | RawGoalDetail): GoalDetail
       startDate: item.startDate ?? null,
       endDate: item.endDate ?? null,
       openQuestions: item.openQuestions ?? 0,
+      decided: item.decided ?? todos.filter((todo) => todo.workPackageId === item.id && isDecided(todo)).length,
       completedAt: item.completedAt ?? null,
       reopened: item.reopened ?? false,
     }));
@@ -162,8 +189,12 @@ export function normalizeGoalDetail(raw: GoalDetail | RawGoalDetail): GoalDetail
   }));
   return {
     ...detail,
-    goal: { ...detail.goal, guard: detail.goal.guard ?? NO_GUARD },
-    todos, projects, workPackages, milestones, legacyBackend,
+    goal: {
+      ...detail.goal,
+      guard: detail.goal.guard ?? NO_GUARD,
+      progress: { ...detail.goal.progress, decided: detail.goal.progress.decided ?? todos.filter(isDecided).length },
+    },
+    todos, projects, workPackages, milestones, legacyBackend, decisionsSupported,
   };
 }
 

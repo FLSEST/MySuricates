@@ -23,13 +23,18 @@ const goal: Goal = {
 };
 
 describe('GoalsSection', () => {
-  it('shows each goal with its progress and open questions', async () => {
-    server.use(http.get('/api/v1/goals', () => HttpResponse.json([goal])));
+  it('shows each goal with its progress, open questions and – 68a5e24e – what is decided', async () => {
+    server.use(http.get('/api/v1/goals', () => HttpResponse.json([goal, { ...goal, id: 'g2', title: 'Docs', progress: { ...goal.progress, decided: 2 } }])));
     renderWithProviders(<GoalsSection />);
 
-    expect(await screen.findByRole('button', { name: 'Open-Source-Launch' })).toBeInTheDocument();
-    expect(screen.getByText('2 of 5 done')).toBeInTheDocument();
-    expect(screen.getByText('Open questions: 3')).toBeInTheDocument();
+    const card = await screen.findByRole('button', { name: 'Open-Source-Launch' });
+    expect(within(card).getByText('2 of 5 done')).toBeInTheDocument();
+    // an older backend sends no `decided` – only the questions show
+    expect(within(card).getByTestId('decision-counts')).toHaveTextContent('3 open');
+    expect(within(card).getByTestId('decision-counts')).toHaveAttribute('title', '3 open questions');
+    const docs = within(screen.getByRole('button', { name: 'Docs' })).getByTestId('decision-counts');
+    expect(docs).toHaveAttribute('title', '3 open questions, 2 decided');
+    expect(docs).toHaveTextContent('2 decided');
   });
 
   // c60bf914: the card names the next milestone of the goal

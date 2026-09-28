@@ -1,6 +1,6 @@
 import { useId, useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
-import { ChevronRight, HelpCircle } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { useT } from '../../i18n';
 import {
   BAR_HEIGHT, BAR_TOP, BAR_ZONE, LANE_HEIGHT, barBox, rowDropId, undatedDropId, xOfDay,
@@ -10,6 +10,7 @@ import { acceptsDrop, dropTone, useDragState } from './timelineDrag';
 import { TimelineChip } from './TimelineChip';
 import { WorkPackageBar } from './WorkPackageBar';
 import { WorkPackageMark } from './WorkPackageMark';
+import { DecisionCounts } from './DecisionCounts';
 import type { GoalWorkPackage, MilestoneState } from '../../types';
 
 /** Abstand der Chips zum oberen Rand einer Zeile ohne Balken. */
@@ -122,13 +123,7 @@ export function PackageRowView({
                 .replace('{total}', String(workPackage.total))}>
                 {workPackage.done}/{workPackage.total}
               </span>
-              {workPackage.openQuestions > 0 && (
-                <span className="inline-flex items-center gap-0.5 text-human">
-                  <HelpCircle className="h-3 w-3" aria-hidden="true" />
-                  <span aria-hidden="true">{workPackage.openQuestions}</span>
-                  <span className="sr-only">{t.goals.openQuestions.replace('{n}', String(workPackage.openQuestions))}</span>
-                </span>
-              )}
+              <DecisionCounts openQuestions={workPackage.openQuestions} decided={workPackage.decided} />
               {row.undated.length > 0 && <UndatedToggle count={row.undated.length} open={showUndated} controls={listId} onToggle={setShowUndated} />}
             </div>
           </>

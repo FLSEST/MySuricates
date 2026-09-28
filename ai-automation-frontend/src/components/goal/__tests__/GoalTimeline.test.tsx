@@ -8,6 +8,7 @@ import { server } from '../../../test/server';
 import { renderWithProviders } from '../../../test/utils';
 import { useI18nStore } from '../../../i18n';
 import { GoalTimeline } from '../GoalTimeline';
+import { DecisionContext } from '../decisionContext';
 import { TimelineAxisView } from '../TimelineAxisView';
 import { NUDGE_DELAY } from '../useKeyboardNudge';
 import {
@@ -134,11 +135,14 @@ function recordWrites(): Sent[] {
   return sent;
 }
 
-function renderTimeline(extra: { todos?: GoalTodoItem[]; legacy?: boolean; strict?: boolean } = {}, onOpenTodo = vi.fn()) {
-  const timeline = (
+function renderTimeline(
+  extra: { todos?: GoalTodoItem[]; legacy?: boolean; strict?: boolean; decisions?: boolean } = {}, onOpenTodo = vi.fn(),
+) {
+  let timeline = (
     <GoalTimeline goal={goal} todos={extra.todos ?? todos} workPackages={workPackages} milestones={extra.legacy ? [] : milestones}
       projects={projects} legacyBackend={extra.legacy} onOpenTodo={onOpenTodo} now={NOW} />
   );
+  if (extra.decisions) timeline = <DecisionContext.Provider value={{ goalId: 'g1', enabled: true }}>{timeline}</DecisionContext.Provider>;
   renderWithProviders(extra.strict ? <StrictMode>{timeline}</StrictMode> : timeline);
   return onOpenTodo;
 }
@@ -803,5 +807,42 @@ describe('TimelineAxisView — labels at the right end', () => {
     expect(screen.getByText('Nov 2026')).toBeInTheDocument();
     expect(screen.getByText('11/2')).toBeInTheDocument();
     expect(screen.getByText('11/9')).toBeInTheDocument();
+  });
+});
+
+// 68a5e24e: the chips carry ❓/✔ and their menu decides
+describe('GoalTimeline — decisions', () => {
+  const asking = todos.map((todo) => (todo.id === 'a'
+    ? { ...todo, openQuestion: 'Which licence?', decisionState: 'QUESTION' as const }
+    : todo.id === 'c' ? { ...todo, decision: 'Plain HTML', decidedAt: '2026-09-26T08:00:00Z', decidedBy: 'USER' as const, decisionState: 'DECIDED' as const }
+      : todo));
+
+  it('marks a chip with ❓ or ✔ and decides from its menu', async () => {
+    const sent: unknown[] = [];
+    server.use(http.patch('/api/v1/todos/:id/planning', async ({ request }) => {
+      sent.push(await request.json());
+      return HttpResponse.json({});
+    }));
+    renderTimeline({ todos: asking, decisions: true });
+
+    const chip = screen.getByRole('button', { name: /^Privacy findings – / });
+    expect(within(chip).getByTestId('decision-mark')).toHaveAttribute('data-state', 'QUESTION');
+    expect(within(screen.getByRole('button', { name: /^Examples page – / })).getByTestId('decision-mark'))
+      .toHaveAttribute('aria-label', 'Decided: Plain HTML (9/26/2026, by a person)');
+
+    fireEvent.click(chip);
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Plan: Privacy findings' })).getByRole('button', { name: 'Decide' }));
+    const card = screen.getByRole('dialog', { name: 'Decision on Privacy findings' });
+    fireEvent.change(within(card).getByLabelText('Decision'), { target: { value: 'MIT' } });
+    fireEvent.click(within(card).getByRole('button', { name: 'Decide' }));
+    await waitFor(() => expect(sent).toEqual([{ decision: 'MIT' }]));
+  });
+
+  it('offers no deciding in the menu of a chip without question and decision', () => {
+    renderTimeline({ todos: asking, decisions: true });
+    fireEvent.click(screen.getByRole('button', { name: /^Old banner – / }));
+    const menu = screen.getByRole('dialog', { name: 'Plan: Old banner' });
+    expect(within(menu).queryByRole('button', { name: 'Decide' })).not.toBeInTheDocument();
+    expect(within(menu).queryByRole('button', { name: 'Change' })).not.toBeInTheDocument();
   });
 });

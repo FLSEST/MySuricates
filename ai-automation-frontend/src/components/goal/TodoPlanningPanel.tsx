@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { Target } from 'lucide-react';
 import { Button, Input, Select } from '../ui';
 import { RatedByMark } from './GoalBadges';
@@ -7,12 +8,12 @@ import { useI18nStore, useT } from '../../i18n';
 import type { Todo } from '../../types';
 import { rangeText } from './dragLabel';
 import { packageRange } from './timelineLayout';
-import { COMPLEXITIES, EFFORTS, forBackend, formOf, packageOptions, planningChanges, withGoal } from './planning';
+import { COMPLEXITIES, EFFORTS, forBackend, formOf, packageOptions, planningChanges, planningConflict, withGoal } from './planning';
 
 /**
  * Einordnung eines TODOs im Bearbeiten-Dialog (TODO dc0566f8): Ziel, Arbeitspaket (nur solche des
- * TODO-Projekts, c60bf914), Komplexität, empfohlener Effort, Begründung und offene Frage. Speichert
- * für sich, getrennt vom übrigen Formular.
+ * TODO-Projekts, c60bf914), Komplexität, empfohlener Effort, Begründung, offene Frage und
+ * Entscheidung (68a5e24e). Speichert für sich, getrennt vom übrigen Formular.
  */
 export function TodoPlanningPanel({ todo }: { todo: Todo }) {
   const t = useT();
@@ -20,8 +21,12 @@ export function TodoPlanningPanel({ todo }: { todo: Todo }) {
   const { data: goals = [] } = useGoals();
   const update = useUpdateTodoPlanning();
   const [form, setForm] = useSyncedState(todo, formOf);
+  const decisionId = useId();
   const changes = planningChanges(formOf(todo), form);
   const dirty = Object.keys(changes).length > 0;
+  const conflict = planningConflict(changes);
+  // Entscheidungen kennt erst ein Backend ab 68a5e24e – ein älteres ließe das Feld stillschweigend fallen
+  const decisions = todo.planning?.decisionState !== undefined;
   const { data: goal } = useGoal(form.goalId || undefined);
   const loaded = goal && goal.goal.id === form.goalId ? goal : undefined;
   const packages = loaded ? packageOptions(loaded.workPackages, todo.projectId, form.workPackageId) : [];
@@ -84,8 +89,18 @@ export function TodoPlanningPanel({ todo }: { todo: Todo }) {
         value={form.openQuestion}
         onChange={(e) => setForm({ ...form, openQuestion: e.target.value })}
       />
+      {decisions && (
+        <div className="space-y-1.5">
+          <label htmlFor={decisionId} className="block text-sm font-medium text-text-secondary">{t.goals.decision.field}</label>
+          <textarea id={decisionId} rows={2} value={form.decision} aria-describedby={`${decisionId}-hint`}
+            onChange={(e) => setForm({ ...form, decision: e.target.value })} className="input-base w-full resize-y" />
+          <p id={`${decisionId}-hint`} className={`text-xs ${conflict ? 'text-danger' : 'text-text-tertiary'}`} role={conflict ? 'alert' : undefined}>
+            {conflict ? t.goals.decision.conflict : t.goals.decision.fieldHint}
+          </p>
+        </div>
+      )}
       <div className="flex justify-end">
-        <Button size="sm" variant="secondary" disabled={!dirty || update.isPending}
+        <Button size="sm" variant="secondary" disabled={!dirty || conflict || update.isPending}
           onClick={() => update.mutate({ id: todo.id, data: forBackend(changes, loaded?.legacyBackend) })}>
           {t.goals.savePlanning}
         </Button>

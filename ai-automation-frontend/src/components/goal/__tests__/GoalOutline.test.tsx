@@ -5,6 +5,7 @@ import { server } from '../../../test/server';
 import { renderWithProviders } from '../../../test/utils';
 import { useI18nStore } from '../../../i18n';
 import { GoalOutline } from '../GoalOutline';
+import { DecisionContext } from '../decisionContext';
 import { dayOfIsoDate } from '../timelineLayout';
 import type { GoalDetail, GoalMilestone, GoalTodoItem, GoalWorkPackage } from '../../../types';
 
@@ -328,5 +329,51 @@ describe('GoalOutline — project not assigned to the goal', () => {
     expect(within(stray).queryByRole('button', { name: /^Move project/ })).not.toBeInTheDocument();
     fireEvent.click(within(stray).getByRole('button', { name: 'Add the project' }));
     await waitFor(() => expect(added).toEqual([{ projectId: 'p9' }]));
+  });
+});
+
+// 68a5e24e: ❓/✔ in the outline, counters per package and project, deciding from a ❓ row
+describe('GoalOutline — decisions', () => {
+  const withDecisions: GoalDetail = {
+    ...detail,
+    todos: detail.todos.map((todo) => ({
+      ...todo, decision: null, decidedAt: null, decidedBy: null,
+      decisionState: todo.openQuestion ? 'QUESTION' as const : 'NONE' as const,
+      ...(todo.id === 'e' ? { decision: 'Keep it', decidedAt: '2026-09-26T08:00:00Z', decidedBy: 'AI' as const, decisionState: 'DECIDED' as const } : {}),
+    })),
+  };
+
+  it('counts open and decided per package and project, and decides a question from its ❓', async () => {
+    const sent: unknown[] = [];
+    server.use(http.patch('/api/v1/todos/:id/planning', async ({ request }) => {
+      sent.push(await request.json());
+      return HttpResponse.json({});
+    }));
+    renderWithProviders(
+      <DecisionContext.Provider value={{ goalId: 'g1', enabled: true }}>
+        <GoalOutline detail={withDecisions} today={TODAY} onOpenTodo={vi.fn()} />
+      </DecisionContext.Provider>,
+    );
+
+    const autopilot = screen.getByRole('region', { name: 'AutoPilot' });
+    // the project head: 1 open question (Legal), 1 decided (the loose end)
+    const head = within(autopilot).getAllByTestId('outline-decided')[0]!;
+    expect(head).toHaveTextContent('1');
+    expect(head).toHaveTextContent('1 decided');
+    const decided = within(autopilot).getByRole('button', { name: /^Decided: Keep it \(9\/26\/2026, by the AI\)/ });
+    expect(decided).toHaveAttribute('data-state', 'DECIDED');
+
+    fireEvent.click(within(autopilot).getByRole('button', { name: 'Open question: Which licence? – Decide: Privacy findings' }));
+    const card = screen.getByRole('dialog', { name: 'Decision on Privacy findings' });
+    fireEvent.change(within(card).getByLabelText('Decision'), { target: { value: 'MIT' } });
+    fireEvent.submit(within(card).getByLabelText('Decision').closest('form')!);
+    await waitFor(() => expect(sent).toEqual([{ decision: 'MIT' }]));
+  });
+
+  it('shows the marks without a way to decide outside the goal page', () => {
+    renderOutline(withDecisions);
+    const marks = screen.getAllByTestId('decision-mark');
+    expect(marks.map((mark) => mark.getAttribute('data-state'))).toEqual(expect.arrayContaining(['QUESTION', 'DECIDED']));
+    expect(marks.every((mark) => mark.tagName.toLowerCase() === 'svg')).toBe(true);
   });
 });

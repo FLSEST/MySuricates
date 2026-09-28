@@ -52,16 +52,21 @@ describe('normalizeGoalDetail', () => {
     expect(detail.legacyBackend).toBe(true);
     expect(detail.milestones).toEqual([]);
     expect(detail.projects).toEqual([
-      { projectId: 'p2', name: 'Site', archived: false, position: 0, total: 2, done: 0, openQuestions: 1 },
-      { projectId: 'p1', name: 'AutoPilot', archived: false, position: 1, total: 1, done: 0, openQuestions: 0 },
+      { projectId: 'p2', name: 'Site', archived: false, position: 0, total: 2, done: 0, openQuestions: 1, decided: 0 },
+      { projectId: 'p1', name: 'AutoPilot', archived: false, position: 1, total: 1, done: 0, openQuestions: 0, decided: 0 },
     ]);
     expect(detail.workPackages).toEqual([{
       id: 'm1', goalId: 'g1', title: 'Promo', projectId: 'p2', startDate: oldPackage.dueDate, endDate: oldPackage.dueDate,
-      position: 0, state: 'OPEN', total: 3, done: 0, openQuestions: 1, completedAt: '2026-09-01T00:00:00Z', reopened: false,
+      position: 0, state: 'OPEN', total: 3, done: 0, openQuestions: 1, decided: 0, completedAt: '2026-09-01T00:00:00Z', reopened: false,
       createdAt: '', updatedAt: '',
     }]);
     expect(detail.todos.map((item) => item.workPackageId)).toEqual(['m1', 'm1', 'm1', null]);
     expect(detail.todos[0]).not.toHaveProperty('milestoneId');
+    // 68a5e24e: an older backend knows no decisions – a question is QUESTION, nothing is decided, no deciding
+    expect(detail.todos.map((item) => item.decisionState)).toEqual(['QUESTION', 'NONE', 'NONE', 'NONE']);
+    expect(detail.todos[0]).toMatchObject({ decision: null, decidedAt: null, decidedBy: null });
+    expect(detail.goal.progress.decided).toBe(0);
+    expect(detail.decisionsSupported).toBe(false);
   });
 
   it('takes the only project of the goal for an old package without TODOs, and copes without milestones and due dates', () => {
@@ -84,13 +89,15 @@ describe('normalizeGoalDetail', () => {
 
   it('keeps the answer of a current backend: work packages with their span, milestones with their links', () => {
     const current = {
-      goal,
-      todos: [todo('a', { workPackageId: 'w1' })],
+      goal: { ...goal, progress: { ...goal.progress, decided: 1 } },
+      todos: [todo('a', {
+        workPackageId: 'w1', decision: 'MIT', decidedAt: '2026-09-27T10:00:00Z', decidedBy: 'USER', decisionState: 'DECIDED',
+      })],
       byProject: [{ projectId: 'p1', projectName: 'AutoPilot', total: 1, done: 0 }],
-      projects: [{ projectId: 'p1', name: 'AutoPilot', archived: true, position: 0, total: 1, done: 0, openQuestions: 4 }],
+      projects: [{ projectId: 'p1', name: 'AutoPilot', archived: true, position: 0, total: 1, done: 0, openQuestions: 4, decided: 3 }],
       workPackages: [{
         id: 'w1', goalId: 'g1', projectId: null, title: 'Repo sauber', startDate: '2026-10-11T22:00:00Z', endDate: '2026-10-18T21:59:59Z',
-        position: 7, state: 'OPEN', total: 1, done: 0, openQuestions: 2, completedAt: null, reopened: false, createdAt: '', updatedAt: '',
+        position: 7, state: 'OPEN', total: 1, done: 0, openQuestions: 2, decided: 1, completedAt: null, reopened: false, createdAt: '', updatedAt: '',
       }],
       milestones: [{
         id: 'ms1', goalId: 'g1', title: 'Code-Freeze', dueDate: '2026-10-15T21:59:59Z', state: 'DUE_SOON', workPackageIds: ['w1'],
@@ -104,6 +111,10 @@ describe('normalizeGoalDetail', () => {
     expect(detail.workPackages).toEqual(current.workPackages);
     expect(detail.milestones).toEqual(current.milestones);
     expect(detail.todos[0]!.workPackageId).toBe('w1');
+    // 68a5e24e: decisions and their counters pass through unchanged
+    expect(detail.todos[0]).toMatchObject({ decision: 'MIT', decidedAt: '2026-09-27T10:00:00Z', decidedBy: 'USER', decisionState: 'DECIDED' });
+    expect(detail.goal.progress.decided).toBe(1);
+    expect(detail.decisionsSupported).toBe(true);
   });
 
   it('fills in what a current answer may leave out: empty links and counts of a milestone', () => {

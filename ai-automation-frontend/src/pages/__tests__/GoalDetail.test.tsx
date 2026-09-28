@@ -8,6 +8,7 @@ import { useI18nStore } from '../../i18n';
 import { useToastStore } from '../../stores/toastStore';
 import { ToastContainer } from '../../components/ui/ToastContainer';
 import { GoalDetail } from '../GoalDetail';
+import { applyDecisionToDetail } from '../../components/goal/decision';
 import type { GoalDetail as GoalDetailData, GoalRelations, GoalTodoItem, Todo } from '../../types';
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
@@ -436,6 +437,92 @@ describe('GoalDetail', () => {
     renderGoal();
 
     expect(await screen.findByText('No project is assigned to this goal yet. “Show all projects” searches everywhere.')).toBeInTheDocument();
+  });
+
+  // 68a5e24e: „Entschieden“ als sichtbarer Zustand – entscheiden aus der Liste, ändern und entfernen
+  describe('decisions', () => {
+    const decidedAt = '2026-09-27T10:00:00Z';
+    const deciding: GoalDetailData = {
+      ...detail,
+      goal: { ...detail.goal, progress: { ...detail.goal.progress, decided: 1 } },
+      todos: detail.todos.map((todo) => ({
+        ...todo, decision: null, decidedAt: null, decidedBy: null,
+        decisionState: todo.openQuestion ? 'QUESTION' as const : 'NONE' as const,
+        ...(todo.id === 'c' ? { decision: 'Plain HTML', decidedAt, decidedBy: 'USER' as const, decisionState: 'DECIDED' as const } : {}),
+      })),
+    };
+    /** Das Ziel antwortet mit dem jeweils aktuellen Stand – wie der Server nach dem Entscheiden. */
+    function serveDecisions() {
+      const sent: { id: string; body: unknown }[] = [];
+      let state = deciding;
+      server.use(
+        http.get('/api/v1/goals/g1', () => HttpResponse.json(state)),
+        http.patch('/api/v1/todos/:id/planning', async ({ params, request }) => {
+          const body = (await request.json()) as { decision: string };
+          sent.push({ id: String(params.id), body });
+          state = applyDecisionToDetail(state, String(params.id), body.decision, decidedAt);
+          return HttpResponse.json(candidate(String(params.id), 'x'));
+        }),
+      );
+      return sent;
+    }
+
+    it('decides an open question from the list; it moves to "Decided" and the progress counts it', async () => {
+      chooseList();
+      const sent = serveDecisions();
+      renderGoal();
+
+      const progress = within((await screen.findByTestId('goal-progress')).parentElement!).getByTestId('decision-counts');
+      expect(progress).toHaveTextContent('1 open·1 decided');
+      fireEvent.click(screen.getByRole('button', { name: 'Decide: Style probe' }));
+      const card = screen.getByRole('dialog', { name: 'Decision on Style probe' });
+      expect(within(card).getByText('Which look?')).toBeInTheDocument();
+      expect(within(card).getByText('Saving closes the open question.')).toBeInTheDocument();
+      fireEvent.change(within(card).getByLabelText('Decision'), { target: { value: ' Dark theme ' } });
+      fireEvent.click(within(card).getByRole('button', { name: 'Decide' }));
+
+      await waitFor(() => expect(sent).toEqual([{ id: 'b', body: { decision: 'Dark theme' } }]));
+      // shown at once: no open question left, two decided
+      await waitFor(() => expect(screen.queryAllByTestId('goal-question')).toHaveLength(0));
+      expect(screen.getByText('No open questions.', { exact: false })).toBeInTheDocument();
+      expect(screen.getByText('Decided (2)')).toBeInTheDocument();
+    });
+
+    it('shows a decision with its wording, date and who, and changes or removes it', async () => {
+      chooseList();
+      const sent = serveDecisions();
+      renderGoal();
+
+      fireEvent.click(await screen.findByText('Decided (1)'));
+      const row = screen.getByTestId('goal-decided-item');
+      expect(row).toHaveTextContent('Examples page');
+      expect(row).toHaveTextContent('Plain HTML');
+      expect(row).toHaveTextContent('9/27/2026, by a person');
+      const mark = within(row).getByRole('button', { name: /^Decided: Plain HTML \(9\/27\/2026, by a person\) – Change decision: Examples page$/ });
+      fireEvent.click(mark);
+      let card = screen.getByRole('dialog', { name: 'Decision on Examples page' });
+      fireEvent.click(within(card).getByRole('button', { name: 'Change' }));
+      fireEvent.change(within(card).getByLabelText('Decision'), { target: { value: 'Astro' } });
+      fireEvent.click(within(card).getByRole('button', { name: 'Save' }));
+      await waitFor(() => expect(sent).toEqual([{ id: 'c', body: { decision: 'Astro' } }]));
+
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Decision on Examples page' })).not.toBeInTheDocument());
+      fireEvent.click(within(screen.getByTestId('goal-decided-item')).getByRole('button', { name: /Change decision: Examples page$/ }));
+      card = screen.getByRole('dialog', { name: 'Decision on Examples page' });
+      fireEvent.click(within(card).getByRole('button', { name: 'Remove' }));
+      await waitFor(() => expect(sent).toContainEqual({ id: 'c', body: { decision: '' } }));
+    });
+
+    it('offers no deciding against an older backend – the marks stay a plain display', async () => {
+      chooseList();
+      server.use(http.get('/api/v1/goals/g1', () => HttpResponse.json(detail)));
+      renderGoal();
+
+      expect(await screen.findByTestId('goal-question')).toHaveTextContent('Which look?');
+      expect(screen.queryByRole('button', { name: 'Decide: Style probe' })).not.toBeInTheDocument();
+      expect(screen.getAllByTestId('decision-mark').every((mark) => mark.tagName.toLowerCase() === 'svg')).toBe(true);
+      expect(screen.queryByTestId('goal-decided')).not.toBeInTheDocument();
+    });
   });
 
   it('opens the edit dialog of a todo from the map', async () => {

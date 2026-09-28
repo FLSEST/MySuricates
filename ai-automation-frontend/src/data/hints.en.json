@@ -256,7 +256,7 @@
     "points": [
       "At the top are the milestones: dates for the whole goal, reached once their linked work packages are complete",
       "Below, every project has a card with its work packages in their set order, each with its time span and its TODOs",
-      "The counters show done out of total and the open questions; a question has to be settled before anyone starts"
+      "The counters show done out of total, open questions (❓) and what is decided (✔); a click on ❓ decides the question before anyone starts"
     ]
   },
   "goal-timeline": {
