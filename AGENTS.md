@@ -62,13 +62,22 @@ curl -s --noproxy '*' -X PUT http://localhost:9090/api/v1/goals/<goal-id>/order 
   -H "Content-Type: application/json" -H "X-API-Key: $DEV_KEY" -d '{"todoIds": ["<id-1>", "<id-2>"]}'
 ```
 
+Ist eine offene Frage entschieden, haelt `decision` das fest (leert die Frage; `decisionState` wird
+`DECIDED`, eine spaetere neue Frage laesst die Entscheidung stehen; `""` nimmt sie zurueck; neue Frage
+und Entscheidung zugleich = 400):
+
+```bash
+curl -s --noproxy '*' -X PATCH http://localhost:9090/api/v1/todos/<todo-id>/planning \
+  -H "Content-Type: application/json" -H "X-API-Key: $DEV_KEY" -d '{"decision": "Handgezeichneter Stil", "ratedBy": "AI"}'
+```
+
 Woher die TODOs eines Ziels kommen und welche Workflows sie abarbeiten (Herkunft, Fix-Workflow und
-passende TodoTrigger, letzter Fix-Lauf), liefert die Relationskarte; passende TODOs ohne Ziel findet
-`goalId=none`:
+passende TodoTrigger, letzter Fix-Lauf), liefert die Relationskarte; passende offene TODOs ohne Ziel aus
+den Projekten des Ziels liefern die Kandidaten (`allProjects=true`: aus allen Projekten):
 
 ```bash
 curl -s --noproxy '*' http://localhost:9090/api/v1/goals/<goal-id>/relations -H "X-API-Key: $DEV_KEY"
-curl -s --noproxy '*' "http://localhost:9090/api/v1/todos?goalId=none&status=OPEN&tag=release&size=20" -H "X-API-Key: $DEV_KEY"
+curl -s --noproxy '*' "http://localhost:9090/api/v1/goals/<goal-id>/candidates?tag=release&size=20" -H "X-API-Key: $DEV_KEY"
 ```
 
 Ein Ziel ist ausdruecklich einem oder mehreren Projekten zugeordnet (Reihenfolge = Gliederung). Ein
@@ -111,6 +120,19 @@ curl -s --noproxy '*' -X POST http://localhost:9090/api/v1/goals/<goal-id>/miles
   -d '{"title": "Launch", "dueDate": "2026-10-15", "workPackageIds": ["<work-package-id>"]}'
 curl -s --noproxy '*' -X POST http://localhost:9090/api/v1/goals/<goal-id>/guard \
   -H "Content-Type: application/json" -H "X-API-Key: $DEV_KEY" -d '{"enabled": true, "locale": "de"}'
+```
+
+Workflows haengen am Ziel oder an einem Arbeitspaket (Rolle `WORKER` oder `STATUS`); gestartet wird
+ueber den normalen Execute-Endpunkt mit `goal_id` im Kontext. Die Liste zeigt einen eingeschalteten
+Waechter als ersten Eintrag `guard` (nicht loesbar); doppelt anhaengen = 409, fremdes Paket = 400:
+
+```bash
+curl -s --noproxy '*' http://localhost:9090/api/v1/goals/<goal-id>/workflows -H "X-API-Key: $DEV_KEY"
+curl -s --noproxy '*' -X POST http://localhost:9090/api/v1/goals/<goal-id>/workflows \
+  -H "Content-Type: application/json" -H "X-API-Key: $DEV_KEY" -d '{"workflowId": "<workflow-id>", "workPackageId": "<work-package-id>", "role": "STATUS"}'
+curl -s --noproxy '*' -X DELETE http://localhost:9090/api/v1/goals/<goal-id>/workflows/<attachment-id> -H "X-API-Key: $DEV_KEY"
+curl -s --noproxy '*' -X POST http://localhost:9090/api/v1/workflows/<workflow-id>/execute \
+  -H "Content-Type: application/json" -H "X-API-Key: $DEV_KEY" -d '{"context": {"goal_id": "<goal-id>", "goal_locale": "de"}}'
 ```
 
 Im Workflow selbst kommen Ziel-Daten nie per REST, sondern als Kontextvariablen `{{ goal_status }}`
