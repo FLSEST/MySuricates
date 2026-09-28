@@ -20,7 +20,13 @@ public class TodoGoalConsistency {
     private final GoalProjectRepository goalProjectRepository;
     private final GoalWorkPackageRepository workPackageRepository;
 
-    /** Nach dem Setzen des neuen Projekts, vor dem Speichern; aendert hoechstens {@code workPackageId}. */
+    /**
+     * Nach dem Setzen des neuen Projekts, vor dem Speichern; aendert hoechstens {@code workPackageId}.
+     *
+     * <p>Laeuft bewusst auch bei ausgeschaltetem Modul {@code goals}: Die Ziel-Daten bleiben erhalten und
+     * sollen nach dem Wiedereinschalten stimmen – ein TODO, das inzwischen das Projekt gewechselt hat, darf
+     * dann nicht in einem Arbeitspaket des alten Projekts haengen.
+     */
     public void afterProjectChange(Todo todo) {
         if (todo.getGoalId() == null) {
             return;

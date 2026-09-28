@@ -11,6 +11,8 @@ import com.automation.dto.response.NeedsYouItem;
 import com.automation.dto.response.ProjectRollup;
 import com.automation.dto.response.TodoOverviewResponse;
 import com.automation.entity.Goal;
+import com.automation.modules.ModuleCatalog;
+import com.automation.modules.ModuleRegistry;
 import com.automation.entity.GoalDueState;
 import com.automation.entity.GoalWorkPackage;
 import com.automation.repository.GoalMilestoneRepository;
@@ -55,6 +57,7 @@ public class TodoOverviewService {
     private final GoalMilestoneRepository milestoneRepository;
     private final GoalWorkPackageRepository workPackageRepository;
     private final GoalRepository goalRepository;
+    private final ModuleRegistry modules;
 
     @Transactional(readOnly = true)
     public TodoOverviewResponse getOverview() {
@@ -121,6 +124,9 @@ public class TodoOverviewService {
      * bleibt es bei zwei Abfragen; nach Datum, bei Gleichstand der Meilenstein zuerst.
      */
     private List<MilestoneAttentionItem> milestonesDue(Instant now) {
+        if (!modules.isEnabled(ModuleCatalog.GOALS)) {
+            return List.of(); // Termine gehoeren zum Modul goals (TODO c60bf914): aus = keine Abfrage, keine Eintraege
+        }
         PageRequest page = PageRequest.of(0, NEEDS_YOU_LIMIT);
         List<GoalMilestoneSummaryRow> milestones = milestoneRepository.findDueForActiveGoals(
                 now.plus(GoalDueState.DUE_SOON_WINDOW), page).stream().filter(m -> !m.reached()).toList();

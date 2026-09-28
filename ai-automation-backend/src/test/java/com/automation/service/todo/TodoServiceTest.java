@@ -55,6 +55,9 @@ class TodoServiceTest {
     @Mock
     private TodoGoalConsistency goalConsistency;
 
+    /** Modul goals an; einzelne Tests schalten es aus (TODO c60bf914). */
+    @org.mockito.Spy private com.automation.modules.ModuleRegistry modules = com.automation.modules.ModuleRegistry.allEnabled();
+
     @InjectMocks
     private TodoService todoService;
 
@@ -415,5 +418,18 @@ class TodoServiceTest {
         assertThat(todoService.bulkUpdateStatus(List.of(), Todo.Status.ARCHIVED)).isZero();
         assertThat(todoService.bulkUpdateStatus(null, Todo.Status.ARCHIVED)).isZero();
         verify(todoRepository, never()).bulkSetStatus(any(), any(), any());
+    }
+
+    /** Modul goals aus (TODO c60bf914): der goalId-Filter ist ein 400 statt stillschweigend die ganze Liste. */
+    @Test
+    void findAll_goalFilterWhileGoalsIsOff_isRefused_withoutFilterItWorks() {
+        org.mockito.Mockito.doReturn(false).when(modules).isEnabled(com.automation.modules.ModuleCatalog.GOALS);
+
+        assertThatThrownBy(() -> todoService.findAll(0, 20, null, null, null, null, null, null, "g-1"))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("goals");
+        verify(todoRepository, never()).findAll(ArgumentMatchers.<Specification<Todo>>any(), any(Pageable.class));
+
+        when(todoRepository.findAll(ArgumentMatchers.<Specification<Todo>>any(), any(Pageable.class))).thenReturn(Page.<Todo>empty());
+        assertThat(todoService.findAll(0, 20, null, null, null, null, null, null, " ").content()).isEmpty();
     }
 }

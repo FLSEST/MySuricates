@@ -53,7 +53,7 @@ class WorkflowContextDataServiceTest {
     /** Der Einsammler mit allen fuenf Quellen in ihrer Reihenfolge; die ersten beiden austauschbar. */
     private WorkflowContextDataService service(PlatformVariableSource previousReport, PlatformVariableSource openTodos) {
         return new WorkflowContextDataService(List.of(previousReport, openTodos,
-                new RequestMetricsVariable(requestMetricsFactSheet), new GoalVariables(goalContextSource),
+                new RequestMetricsVariable(requestMetricsFactSheet), new GoalVariables(goalContextSource, com.automation.modules.ModuleRegistry.allEnabled()),
                 new AuditFindingsVariable(auditContextSource)), activityLogService);
     }
 

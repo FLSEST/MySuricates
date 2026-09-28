@@ -7,8 +7,9 @@
 # Core (always on): workflows, runs, projects, TODOs with TodoTrigger, schedules, activity log/DLQ,
 # gates, workflow pool, templates, docs, settings.
 #
-# Difference to the public default: the two things the default leaves on are off here — the standard
-# module dashboard-report and provenance (definition hash on every run). The preset is the same one.
+# Difference to the public default: the things the default leaves on are off here — the standard
+# modules dashboard-report and goals, and provenance (definition hash on every run). The preset is the
+# same one.
 
 automation:
   modules:
@@ -18,6 +19,9 @@ automation:
     ui-editable: false
     # Standard module (on by default). Off here, because "minimal" means nothing optional at all.
     dashboard-report: false
+    # Standard module (on by default): goals, work packages, milestones, TODO planning. Off here too; the
+    # goal data stays in the database and is back when the module is switched on again.
+    goals: false
   hardening:
     # No definition hash or version id on runs (the trigger source is still recorded).
     provenance: false

@@ -114,6 +114,14 @@ public class ScheduledWorkflowExecutor {
                         ModuleCatalog.CHAINS.disabledMessage("Chain schedule '" + scheduled.getTargetName() + "'"));
                 return Optional.empty();
             }
+            if (scheduled.getInputContext() != null && scheduled.getInputContext().get("goal_id") != null
+                    && !modules.isEnabled(ModuleCatalog.GOALS)) {
+                // Zielgebundener Zeitplan (z. B. der Ziel-Waechter) bei Modul goals aus: ueberspringen statt
+                // ohne Zieldaten scheitern (TODO c60bf914); der finally-Block rueckt nextRunAt weiter.
+                log.info("Schedule {} skipped — {}", scheduleId,
+                        ModuleCatalog.GOALS.disabledMessage("Goal schedule '" + scheduled.getTargetName() + "'"));
+                return Optional.empty();
+            }
             if (scheduled.getTargetType() == TargetType.CHAIN && scheduled.getChain() != null) {
                 ChainRun run = chainExecutor.execute(scheduled.getChain(), scheduled.getInputContext(), scheduleId);
                 return Optional.ofNullable(run).map(r -> new ScheduledRunRef(r.getId(), TargetType.CHAIN));

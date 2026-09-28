@@ -32,8 +32,6 @@ class ControllerModuleGateTest {
             "DashboardWorkflowController",
             "DeadLetterController",
             "DocsController",
-            "GoalController",
-            "GoalWorkflowController",
             "ExecutionController",
             "LearningController",
             "NotificationController",
@@ -69,6 +67,8 @@ class ControllerModuleGateTest {
     /** Method-level assignments inside core controllers — pinned so they cannot be dropped unnoticed. */
     private static final Map<String, ModuleCatalog> METHOD_MODULES = Map.ofEntries(
             Map.entry("TodoController#exportTodo", ModuleCatalog.INTEGRATIONS),
+            // Einordnung und Einschaetzung eines TODOs gehoeren zum Modul goals (TODO c60bf914).
+            Map.entry("TodoController#updateTodoPlanning", ModuleCatalog.GOALS),
             Map.entry("WorkflowController#exportWorkflowAsBpmn", ModuleCatalog.BPMN),
             Map.entry("WorkflowAssistController#repairWorkflow", ModuleCatalog.FACTORY),
             Map.entry("WorkflowController#activateSkills", ModuleCatalog.SKILLS),

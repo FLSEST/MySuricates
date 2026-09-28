@@ -189,7 +189,7 @@ class WorkflowExecutorTest {
                         new WorkflowContextDataService(java.util.List.of(
                                 new PreviousReportVariable(runRepository, stepResultRepository),
                                 new OpenTodosVariable(todoRepository), new RequestMetricsVariable(requestMetricsFactSheet),
-                                new GoalVariables(org.mockito.Mockito.mock(GoalContextSource.class)),
+                                new GoalVariables(org.mockito.Mockito.mock(GoalContextSource.class), com.automation.modules.ModuleRegistry.allEnabled()),
                                 new AuditFindingsVariable(org.mockito.Mockito.mock(AuditContextSource.class))),
                                 activityLogService),
                         agentInstructionsService, commandExecutorService, workflowMemoryService, projectContextService),
@@ -1334,7 +1334,7 @@ class WorkflowExecutorTest {
                         new WorkflowContextDataService(java.util.List.of(
                                 new PreviousReportVariable(runRepository, stepResultRepository),
                                 new OpenTodosVariable(todoRepository), new RequestMetricsVariable(requestMetricsFactSheet),
-                                new GoalVariables(org.mockito.Mockito.mock(GoalContextSource.class)),
+                                new GoalVariables(org.mockito.Mockito.mock(GoalContextSource.class), com.automation.modules.ModuleRegistry.allEnabled()),
                                 new AuditFindingsVariable(org.mockito.Mockito.mock(AuditContextSource.class))),
                                 activityLogService),
                         agentInstructionsService, commandExecutorService, workflowMemoryService, projectContextService),

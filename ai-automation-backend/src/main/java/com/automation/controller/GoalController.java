@@ -18,6 +18,8 @@ import com.automation.dto.response.GoalWorkPackageResponse;
 import com.automation.dto.response.PageResponse;
 import com.automation.dto.response.TodoResponse;
 import com.automation.entity.Goal;
+import com.automation.modules.ModuleCatalog;
+import com.automation.modules.RequiresModule;
 import com.automation.service.goal.GoalCandidateService;
 import com.automation.service.goal.GoalMembershipService;
 import com.automation.service.goal.GoalMilestoneService;
@@ -42,6 +44,7 @@ import java.util.List;
  * Reihenfolge) und Meilensteine (Termine des Ziels, optional an Pakete geknuepft): TODO c60bf914.
  */
 @RestController
+@RequiresModule(ModuleCatalog.GOALS)
 @RequestMapping("/api/v1/goals")
 @RequiredArgsConstructor
 public class GoalController {

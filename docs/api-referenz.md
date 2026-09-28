@@ -2881,7 +2881,7 @@ TODOs auflisten (paginiert, filterbar).
 | `source` | String | Filter nach Quelle: `USER`, `AI`, `WORKFLOW` |
 | `tag` | String | Filter nach Tag |
 | `q` | String | Volltextsuche |
-| `goalId` | String | Nur TODOs dieses Ziels (V85); `none` = nur TODOs ohne Ziel (Kandidaten der Relationskarte) |
+| `goalId` | String | Nur TODOs dieses Ziels (V85); `none` = nur TODOs ohne Ziel (Kandidaten der Relationskarte). Bei ausgeschaltetem Modul `goals` → 400 |
 
 Bei `status`, `priority` und `source` zählt die Groß- und Kleinschreibung nicht. Ein unbekannter Wert ergibt `400` (`INVALID_ARGUMENT`) mit den erlaubten Werten, etwa `status muss OPEN, IN_PROGRESS, DONE, BACKLOG oder ARCHIVED sein, nicht 'BLOCKED'`.
 
@@ -3059,7 +3059,7 @@ Ziel, Rang, Arbeitspaket und Einschätzung eines TODOs setzen (V85; `workPackage
 
 ## Ziele
 
-Ein Ziel sammelt TODOs projektübergreifend und zeigt den Fortschritt (V85). Siehe [architektur.md](architektur.md#ziele--todos-projektübergreifend-einordnen-v85).
+Ein Ziel sammelt TODOs projektübergreifend und zeigt den Fortschritt (V85). Alle Endpunkte dieses Abschnitts und `PATCH /todos/{id}/planning` gehören zum Standardmodul `goals`; ist es ausgeschaltet (`automation.modules.goals=false`), antworten sie mit 404 `MODULE_DISABLED`, TODO-Antworten tragen dann kein `planning` und `milestonesDue` ist leer – die Daten bleiben erhalten. Siehe [architektur.md](architektur.md#ziele--todos-projektübergreifend-einordnen-v85).
 
 ### `GET /api/v1/goals`
 

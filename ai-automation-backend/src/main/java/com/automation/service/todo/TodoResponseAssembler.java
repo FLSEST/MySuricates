@@ -7,6 +7,8 @@ import com.automation.entity.Project;
 import com.automation.entity.Todo;
 import com.automation.entity.Workflow;
 import com.automation.mapper.TodoMapper;
+import com.automation.modules.ModuleCatalog;
+import com.automation.modules.ModuleRegistry;
 import com.automation.repository.GoalRepository;
 import com.automation.repository.ProjectRepository;
 import com.automation.repository.WorkflowRepository;
@@ -33,13 +35,14 @@ public class TodoResponseAssembler {
     private final WorkflowRepository workflowRepository;
     private final GoalRepository goalRepository;
     private final TodoMapper todoMapper;
+    private final ModuleRegistry modules;
 
     public TodoResponse toResponse(Todo todo) {
         String projectName = todo.getProjectId() == null ? null
                 : projectRepository.findById(todo.getProjectId()).map(Project::getName).orElse(null);
         String workflowName = todo.getLinkedWorkflowId() == null ? null
                 : workflowRepository.findById(todo.getLinkedWorkflowId()).map(Workflow::getName).orElse(null);
-        String goalTitle = todo.getGoalId() == null ? null
+        String goalTitle = todo.getGoalId() == null || !goalsEnabled() ? null
                 : goalRepository.findById(todo.getGoalId()).map(Goal::getTitle).orElse(null);
         return withNames(todo, projectName, workflowName, goalTitle);
     }
@@ -53,7 +56,7 @@ public class TodoResponseAssembler {
                         .collect(Collectors.toMap(row -> (String) row[0], row -> (String) row[1])));
         Map<String, String> workflowNames = namesFor(todos, Todo::getLinkedWorkflowId,
                 ids -> workflowRepository.findAllById(ids).stream().collect(Collectors.toMap(Workflow::getId, Workflow::getName)));
-        Map<String, String> goalTitles = namesFor(todos, Todo::getGoalId,
+        Map<String, String> goalTitles = !goalsEnabled() ? Map.of() : namesFor(todos, Todo::getGoalId,
                 ids -> goalRepository.findAllById(ids).stream().collect(Collectors.toMap(Goal::getId, Goal::getTitle)));
         return todos.stream()
                 .map(todo -> withNames(todo, nameOf(projectNames, todo.getProjectId()),
@@ -89,8 +92,17 @@ public class TodoResponseAssembler {
                 base.resolutionState(),
                 base.dueDate(),
                 base.createdAt(), base.updatedAt(),
-                planningOf(todo, goalTitle)
+                goalsEnabled() ? planningOf(todo, goalTitle) : null
         );
+    }
+
+    /**
+     * Ziel und Einschaetzung gehoeren zum Modul {@code goals}: ist es aus, bleibt {@code planning} leer
+     * und kein Zieltitel wird nachgeschlagen – die Daten bleiben erhalten und sind nach dem
+     * Wiedereinschalten wieder da (TODO c60bf914). Je Aufruf geprueft, kein Start-Snapshot.
+     */
+    private boolean goalsEnabled() {
+        return modules.isEnabled(ModuleCatalog.GOALS);
     }
 
     /** Null, solange weder Ziel noch Einschaetzung noch offene Frage gesetzt sind (TODO dc0566f8). */

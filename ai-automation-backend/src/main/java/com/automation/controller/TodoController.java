@@ -78,6 +78,7 @@ public class TodoController {
 
     /** Ziel, Rang und Einschaetzung (Komplexitaet, Effort, Begruendung, offene Frage) – TODO dc0566f8. */
     @PatchMapping("/{id}/planning")
+    @RequiresModule(ModuleCatalog.GOALS)
     public TodoResponse updateTodoPlanning(@PathVariable String id, @RequestBody UpdateTodoPlanningRequest request) {
         return planningService.update(id, request);
     }

@@ -30,6 +30,9 @@ public enum ModuleCatalog {
     DASHBOARD_REPORT("dashboard-report", STANDARD, STABLE, true, Set.of(), List.of(),
             "Dashboard report block: a workflow fills the dashboard result contract from block "
                     + "config instead of emitting a marker, plus the editor's AI proposal for those fields."),
+    GOALS("goals", STANDARD, STABLE, true, Set.of(), List.of(),
+            "Goals: projects, work packages, milestones, TODO planning (size, effort, question/decision), "
+                    + "goal workflows and the goal guard."),
 
     // ── Research ─────────────────────────────────────────────────────────────
     CHAINS("chains", RESEARCH, STABLE, false, Set.of(), List.of(),

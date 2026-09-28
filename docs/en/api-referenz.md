@@ -2853,7 +2853,7 @@ List TODOs (paginated, filterable).
 | `source` | String | Filter by source: `USER`, `AI`, `WORKFLOW` |
 | `tag` | String | Filter by tag |
 | `q` | String | Full-text search |
-| `goalId` | String | Only TODOs of this goal (V85); `none` = only TODOs without a goal (candidates for the relation map) |
+| `goalId` | String | Only TODOs of this goal (V85); `none` = only TODOs without a goal (candidates for the relation map). With the module `goals` switched off → 400 |
 
 `status`, `priority` and `source` ignore upper and lower case. An unknown value returns `400` (`INVALID_ARGUMENT`), and the message lists the allowed values.
 
@@ -3031,7 +3031,7 @@ Set a TODO's goal, rank, work package and assessment (V85; `workPackageId` since
 
 ## Goals
 
-A goal collects TODOs across projects and shows progress (V85). See [architektur.md](architektur.md#goals--ordering-todos-across-projects-v85).
+A goal collects TODOs across projects and shows progress (V85). Every endpoint in this section and `PATCH /todos/{id}/planning` belongs to the standard module `goals`; switched off (`automation.modules.goals=false`) they answer 404 `MODULE_DISABLED`, TODO responses then carry no `planning` and `milestonesDue` is empty – the data is kept. See [architektur.md](architektur.md#goals--ordering-todos-across-projects-v85).
 
 ### `GET /api/v1/goals`
 

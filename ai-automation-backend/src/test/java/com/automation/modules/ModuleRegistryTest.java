@@ -23,7 +23,8 @@ class ModuleRegistryTest {
 
         assertThat(registry.preset()).isEqualTo(ModulePreset.CORE);
         assertThat(Arrays.stream(ModuleCatalog.values()).filter(registry::isEnabled))
-                .containsExactly(ModuleCatalog.DASHBOARD_REPORT, ModuleCatalog.PROVENANCE, ModuleCatalog.PRIVATE_NETWORK_GUARD);
+                .containsExactly(ModuleCatalog.DASHBOARD_REPORT, ModuleCatalog.GOALS, ModuleCatalog.PROVENANCE,
+                        ModuleCatalog.PRIVATE_NETWORK_GUARD);
     }
 
     /** "Only" as in: of the tiers the preset adds — the STANDARD tier is on here as in every preset. */
@@ -163,7 +164,7 @@ class ModuleRegistryTest {
     void summaryListsPresetAndEnabledModules() {
         ModuleRegistry registry = ModuleRegistry.of(Map.of("chains", "true"), Map.of());
 
-        assertThat(registry.summary()).isEqualTo("preset=core, enabled=[dashboard-report, chains, provenance, private-network-guard]");
+        assertThat(registry.summary()).isEqualTo("preset=core, enabled=[dashboard-report, goals, chains, provenance, private-network-guard]");
     }
 
     // --- automation.modules.ui-editable ---------------------------------------------
@@ -248,7 +249,7 @@ class ModuleRegistryTest {
         ModuleRegistry registry = editable(Map.of());
         registry.applyUiOverrides(Map.of(ModuleCatalog.CHAINS, true));
 
-        assertThat(registry.summary()).isEqualTo("preset=core, ui-editable=true, ui-overrides=[chains=true], enabled=[dashboard-report, chains, provenance, private-network-guard]");
+        assertThat(registry.summary()).isEqualTo("preset=core, ui-editable=true, ui-overrides=[chains=true], enabled=[dashboard-report, goals, chains, provenance, private-network-guard]");
     }
 
     @Test
@@ -308,5 +309,19 @@ class ModuleRegistryTest {
         assertThat(ModuleCatalog.DASHBOARD_REPORT.risks()).isEmpty();
         assertThat(ModuleCatalog.DASHBOARD_REPORT.requires()).isEmpty();
         assertThat(ModuleCatalog.DASHBOARD_REPORT.property()).isEqualTo("automation.modules.dashboard-report");
+    }
+
+    /** TODO c60bf914: Ziele sind ein Standardmodul – in jedem Preset an, beim Start abschaltbar. */
+    @Test
+    void goalsIsAStandardFeatureModule_onInEveryPreset_switchableOffAtStartup() {
+        assertThat(ModuleCatalog.GOALS.kind()).isEqualTo(ModuleKind.FEATURE);
+        assertThat(ModuleCatalog.GOALS.tier()).isEqualTo(ModuleTier.STANDARD);
+        assertThat(ModuleCatalog.GOALS.risks()).isEmpty();
+        assertThat(ModuleCatalog.GOALS.requires()).isEmpty();
+        assertThat(ModuleCatalog.GOALS.property()).isEqualTo("automation.modules.goals");
+        for (String preset : java.util.List.of("core", "research", "full")) {
+            assertThat(ModuleRegistry.of(Map.of("preset", preset), Map.of()).isEnabled(ModuleCatalog.GOALS)).as(preset).isTrue();
+        }
+        assertThat(ModuleRegistry.of(Map.of("preset", "full", "goals", "false"), Map.of()).isEnabled(ModuleCatalog.GOALS)).isFalse();
     }
 }

@@ -24,6 +24,9 @@ class GoalVariablesTest {
 
     @Mock private GoalContextSource goalContextSource;
 
+    /** Modul goals an; einzelne Tests schalten es aus (TODO c60bf914). */
+    @org.mockito.Spy private com.automation.modules.ModuleRegistry modules = com.automation.modules.ModuleRegistry.allEnabled();
+
     @InjectMocks private GoalVariables goalVariables;
 
     private static PlatformVariableSource.Request run(Object goalId, Object locale) {
@@ -57,5 +60,14 @@ class GoalVariablesTest {
         when(goalContextSource.variables("missing", null)).thenThrow(new ResourceNotFoundException("Goal", "missing"));
 
         assertThatThrownBy(() -> goalVariables.load(run("missing", null))).isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    /** Modul goals aus (TODO c60bf914): keine Zielvariablen, keine Abfrage, keine Luecken-Warnung. */
+    @Test
+    void names_whileGoalsIsOff_areNone() {
+        org.mockito.Mockito.doReturn(false).when(modules).isEnabled(com.automation.modules.ModuleCatalog.GOALS);
+
+        assertThat(goalVariables.names(run("g-1", "de"))).isEmpty();
+        verifyNoInteractions(goalContextSource);
     }
 }

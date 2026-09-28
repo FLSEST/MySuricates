@@ -3,6 +3,10 @@
     "name": "Dashboard-Bericht",
     "description": "Block-Typ, mit dem ein Workflow das Dashboard-Ergebnis aus Config-Feldern füllt, plus der KI-Vorschlag für diese Felder im Editor."
   },
+  "goals": {
+    "name": "Ziele",
+    "description": "Ziele mit Projekten, Arbeitspaketen und Meilensteinen, die Einordnung von TODOs (Größe, Aufwand, Frage/Entscheidung), Workflows am Ziel und der Ziel-Wächter. Aus: Ziel-Seiten und Planung verschwinden, die Daten bleiben erhalten."
+  },
   "chains": {
     "name": "Chains",
     "description": "Verkettet mehrere Workflows zu einer Pipeline, die nacheinander läuft."
