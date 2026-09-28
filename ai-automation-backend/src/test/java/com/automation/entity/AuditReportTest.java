@@ -24,7 +24,7 @@ class AuditReportTest {
         assertThat(report.getIngestionStatus()).isEqualTo(AuditIngestionStatus.INVALID);
         assertThat(report.getIngestionError()).isEqualTo("kein Envelope");
         assertThat(report.getGeneratedAt()).isEqualTo(at);
-        assertThat(report.getCreatedAt()).as("setzt erst der AuditingEntityListener").isNull();
+        assertThat(report.getCreatedAt()).as("setzt erst der AuditTimestampListener").isNull();
     }
 
     @Test

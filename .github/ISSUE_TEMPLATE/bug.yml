@@ -1,0 +1,92 @@
+name: Bug report
+description: Something in MySuricates does not work as expected
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please read
+        [CONTRIBUTING.md](CONTRIBUTING.md) first: MySuricates is a research
+        project maintained by a single person, not a supported product — there is
+        no response-time guarantee for issues or pull requests.
+
+        The more of the fields below you can fill in, the more likely the report
+        is reproducible without back-and-forth.
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Shown in the version tile in the UI (Settings / footer).
+      placeholder: e.g. 0.7.7
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install-method
+    attributes:
+      label: Installation method
+      description: How did you get MySuricates running?
+      options:
+        - setup.sh (guided installer)
+        - instance.sh (container instance)
+        - tryout.sh (tryout image)
+        - Dev setup from source (git clone + mvn/npm)
+        - Other / not sure
+    validations:
+      required: true
+
+  - type: input
+    id: ai-provider
+    attributes:
+      label: AI provider(s) in use
+      description: e.g. Claude, Codex, Pi — and roughly which model/alias, if relevant.
+      placeholder: e.g. Claude (sonnet)
+    validations:
+      required: false
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: What did you do, in order?
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log excerpt
+      description: >-
+        Relevant lines only, not the whole file. Please remove secrets
+        (API keys, tokens) before pasting.
+      render: shell
+    validations:
+      required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        This is a research project, not a maintained product — there is no
+        response-time commitment on bug reports. See
+        [SECURITY.md](SECURITY.md) instead if this is a security issue,
+        rather than filing it here.

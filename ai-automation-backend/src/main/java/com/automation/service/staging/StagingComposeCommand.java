@@ -15,14 +15,15 @@ import java.util.List;
 
 /**
  * Builds the {@code docker compose} command line for Stable and Test together with the override file
- * that decides what comes from the host: the AI providers (how much of their setup, which ones) and
- * the Docker socket. The override is written by {@code scripts/staging.sh write-override stable|test},
+ * that decides what comes from the host: the AI providers (how much of their setup, which ones), the
+ * Docker socket (off unless {@code STABLE_/TEST_DOCKER_SOCKET=1}) and the published port (only on
+ * {@code 127.0.0.1} unless {@code STABLE_/TEST_BIND} opens it). The override is written by {@code scripts/staging.sh write-override stable|test},
  * i.e. by the same generator ({@code scripts/lib/host-mounts.sh}) that the script itself,
  * {@code instance.sh} and the dev container use — a start from the UI gets exactly the mounts of a
  * start from the shell (262948a4).
  *
- * <p>Without an override the container would start without any AI provider and without the socket,
- * which looks like a broken instance. So a missing script or a failed write is an error, not a
+ * <p>Without an override the container would start without any AI provider and without a published
+ * port, which looks like a broken instance. So a missing script or a failed write is an error, not a
  * silent fallback.
  */
 @Component

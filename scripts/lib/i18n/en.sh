@@ -173,7 +173,8 @@ M_help="MySuricates setup — from a bare machine to the login in one pass.
   --runtime container|host     in a container (default, needs only Docker) or on this machine
   --preset core|research|full  modules (default core); --modules a,b adds single modules
   --provider claude|codex|pi   default AI provider (default: the first one logged in)
-  --port N                     port of the instance (default 9090, busy ports are skipped)
+  --port N                     port of the instance (default 9090, busy ports are skipped);
+                               Dev · Test · Prod: Dev from N, Test from N+1, Prod from N+2
   --bind ADDR                  address (default 127.0.0.1; 0.0.0.0 = from the network, VPN in front)
   --projects DIR               projects folder for the container (default: the folder above the clone)
   --docker-socket              container: allow shell blocks with container_image (full Docker control)

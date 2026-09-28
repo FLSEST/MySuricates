@@ -34,9 +34,11 @@ check "compose project named after instance"  'grep -q -- "-p mysuricates-demo" 
 check "uses deploy/compose.yml + override"    'grep -q "deploy/compose.yml" "$DOCKER_LOG" && grep -q "demo.override.yml" "$DOCKER_LOG"'
 check "override was written"                  '[ -f "$TMP/inst/demo.override.yml" ] && grep -q "^  app:" "$TMP/inst/demo.override.yml"'
 check "default: login, switches named"        'grep -q "MYSURICATES_AI_FROM_HOST=login" "$TMP/inst/demo.override.yml" && grep -q "MYSURICATES_SWITCH_PREFIX=MYSURICATES_" "$TMP/inst/demo.override.yml" && grep -q "MYSURICATES_SWITCH_SOURCE=$TMP/inst/demo.env" "$TMP/inst/demo.override.yml"'
+check "login mode: no fixed login command"    '! grep -q "MYSURICATES_LOGIN_COMMAND" "$TMP/inst/demo.override.yml"'
 printf 'MYSURICATES_PORT=19403\nMYSURICATES_AI_FROM_HOST=programs\nMYSURICATES_AI_PROVIDERS=codex\n' > "$TMP/inst/prog.env"
 INSTANCE_HEALTH_TIMEOUT=0 bash "$SCRIPT" up --name prog --no-wait >/dev/null 2>&1
 check "switches come from the instance file"  'grep -q "MYSURICATES_AI_FROM_HOST=programs" "$TMP/inst/prog.override.yml" && grep -q "MYSURICATES_AI_PROVIDERS=codex" "$TMP/inst/prog.override.yml"'
+check "programs mode: login command for the card" 'grep -q "MYSURICATES_LOGIN_COMMAND=scripts/instance.sh login" "$TMP/inst/prog.override.yml"'
 printf 'MYSURICATES_PORT=19404\nMYSURICATES_AI_FROM_HOST=everything\n' > "$TMP/inst/bad.env"
 : > "$DOCKER_LOG"
 OUT="$(bash "$SCRIPT" up --name bad --no-wait 2>&1)"; RC=$?
@@ -52,6 +54,13 @@ OUT="$(OWNER= bash "$SCRIPT" key --name demo 2>&1)"; RC=$?
 check "container without compose label counts as foreign" '[ "$RC" = 2 ]'
 check "own container is fine"                   'OWNER=mysuricates-demo INSTANCE_HEALTH_TIMEOUT=0 bash "$SCRIPT" up --name demo --no-wait >/dev/null 2>&1'
 check "down stays inside its compose project"   'OWNER=ai-automation-backend bash "$SCRIPT" down --name demo >/dev/null 2>&1; tail -1 "$DOCKER_LOG" | grep -- "-p mysuricates-demo" >/dev/null'
+
+echo "1b2) MYSURICATES_PREFIX: own docker names, e.g. for the installer probe"
+: > "$DOCKER_LOG"
+check "prefix: up builds its own image and project" 'MYSURICATES_PREFIX=probe-x OWNER=probe-x-demo INSTANCE_HEALTH_TIMEOUT=0 bash "$SCRIPT" up --name demo --no-wait >/dev/null 2>&1 && grep -q -- "-t probe-x:local -$" "$DOCKER_LOG" && grep -q -- "-p probe-x-demo " "$DOCKER_LOG" && ! grep -q "mysuricates" "$DOCKER_LOG"'
+check "prefix: key reads from its own container" 'MYSURICATES_PREFIX=probe-x OWNER=probe-x-demo CONTAINER_KEY=k bash "$SCRIPT" key --name demo >/dev/null 2>&1; tail -1 "$DOCKER_LOG" | grep -q " probe-x-demo cat "'
+check "prefix: invalid characters refused (exit 2)" 'MYSURICATES_PREFIX="Probe x" bash "$SCRIPT" status --name demo >/dev/null 2>&1; [ $? -eq 2 ]'
+check "compose derives every name from the prefix" '[ "$(grep -c "MYSURICATES_CONTAINER:?" "$HERE/../../deploy/compose.yml")" = 5 ] && grep -q "image: \${MYSURICATES_IMAGE:?}" "$HERE/../../deploy/compose.yml" && ! grep -q "mysuricates-\\\${MYSURICATES_NAME" "$HERE/../../deploy/compose.yml"'
 
 echo "1c) bound to the network: the address of this machine is named (b8aa3866)"
 printf '#!/bin/sh\n[ "$1" = -I ] && echo "192.168.7.7 127.0.0.1"\n' > "$TMP/bin/hostname"; chmod +x "$TMP/bin/hostname"

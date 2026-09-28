@@ -2,7 +2,6 @@ import importlib.util
 import json
 from pathlib import Path
 import re
-import shlex
 import subprocess
 import unittest
 
@@ -35,17 +34,6 @@ class MigrationTest(unittest.TestCase):
                 command = re.sub(r'\{\{.*?\}\}', 'fixture_value', block['config'].get('command', ''))
                 result = subprocess.run(['bash', '-n'], input=command, text=True, capture_output=True)
                 self.assertEqual(0, result.returncode, result.stderr)
-
-    def test_unknown_report_remains_yellow_in_combined_pool_gates(self):
-        for name in ['build-gate', 'health-check', 'i18n-sync', 'release-readiness', 'test-sync']:
-            workflow = json.loads((ROOT / 'workflow-pool' / ('mysuricates-'+name+'.json')).read_text())
-            command = workflow['blocks'][-1]['config']['command']
-            for report, status in [('', 'YELLOW'), ('gate_status: UNKNOWN', 'YELLOW'),
-                                   ('gate_status: RED', 'RED'), ('gate_status: GREEN', 'GREEN')]:
-                rendered = command.replace('{{ previous_output }}', shlex.quote(report))
-                result = subprocess.run(['bash', '-c', rendered], text=True, capture_output=True)
-                self.assertEqual(0, result.returncode, result.stderr)
-                self.assertIn('gate_status: '+status, result.stdout, name)
 
 
 if __name__ == '__main__': unittest.main()

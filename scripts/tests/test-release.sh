@@ -55,6 +55,7 @@ echo "1) Patch-Release nach v0.1.0"
 OUT="$( (cd "$TMP" && bash scripts/release.sh patch) 2>&1 )"; RC=$?
 check "Skript laeuft durch"                     '[ "$RC" -eq 0 ]'
 check "Tag v0.1.1 angelegt"                     'git -C "$TMP" rev-parse -q --verify refs/tags/v0.1.1 >/dev/null'
+check "Tag v0.1.1 ist annotiert"                '[ "$(git -C "$TMP" cat-file -t v0.1.1)" = "tag" ]'
 check "im Tag ohne -SNAPSHOT"                   '[ "$(at_tag v0.1.1)" = "0.1.1" ]'
 check "package.json im Tag auf 0.1.1"           '[ "$(git -C "$TMP" show v0.1.1:ai-automation-frontend/package.json | json_version)" = "0.1.1" ]'
 check "danach 0.1.2-SNAPSHOT in der pom.xml"    '[ "$(pom_version)" = "0.1.2-SNAPSHOT" ]'
@@ -66,6 +67,7 @@ echo "2) Minor-Release zaehlt vom letzten Tag, nicht von der Entwicklungsversion
 OUT3="$( (cd "$TMP" && bash scripts/release.sh minor) 2>&1 )"; RC3=$?
 check "Skript laeuft durch"                     '[ "$RC3" -eq 0 ]'
 check "v0.2.0 statt v0.2.1"                     'git -C "$TMP" rev-parse -q --verify refs/tags/v0.2.0 >/dev/null'
+check "Tag v0.2.0 ist annotiert"                '[ "$(git -C "$TMP" cat-file -t v0.2.0)" = "tag" ]'
 check "im Tag ohne -SNAPSHOT"                   '[ "$(at_tag v0.2.0)" = "0.2.0" ]'
 check "danach 0.2.1-SNAPSHOT"                   '[ "$(pom_version)" = "0.2.1-SNAPSHOT" ]'
 check "package.json ebenso 0.2.1-SNAPSHOT"      '[ "$(pkg_version)" = "0.2.1-SNAPSHOT" ]'

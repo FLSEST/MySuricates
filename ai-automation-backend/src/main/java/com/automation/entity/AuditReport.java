@@ -3,13 +3,12 @@ package com.automation.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
-import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.Instant;
 
 @Entity
 @Table(name = "audit_reports")
-@EntityListeners(AuditingEntityListener.class)
+@EntityListeners(AuditTimestampListener.class)
 @Getter
 @Setter
 @NoArgsConstructor

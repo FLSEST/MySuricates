@@ -160,6 +160,17 @@ def _read_tsv(path: Path, columns: int) -> list[list[str]]:
     return rows
 
 
+# The ways the probe takes (installer-probe.sh --way): label and what the fresh machine brings along.
+_WAYS = {
+    "host": ("eine Instanz auf dem Rechner", "nichts installiert außer git, sudo und tzdata."),
+    "container": ("eine Instanz im Container",
+                  "nichts installiert außer git, sudo und tzdata. Docker installiert der Installer; der "
+                  "Docker-Dienst ist der des Rechners (Socket), die Instanz bleibt auf 127.0.0.1."),
+    "staged": ("Dev · Test · Prod im Container",
+               "nichts installiert außer git, sudo und tzdata. Docker installiert der Installer; der "
+               "Docker-Dienst ist der des Rechners (Socket), die drei Instanzen bleiben auf 127.0.0.1."),
+}
+
 _STATUS = {"ok": ("✓", "ok"), "fail": ("✗", "fail"), "skip": ("–", "skip")}
 
 _CSS = """
@@ -216,6 +227,7 @@ def render(directory: Path, meta: dict) -> str:
     checks = _read_tsv(directory / "checks.tsv", 3)
     green = bool(checks) and all(status != "fail" for _, status, _ in checks)
     esc = lambda s: html.escape(str(s))  # noqa: E731
+    way_label, machine = _WAYS.get(meta.get("way") or "host", _WAYS["host"])
 
     parts = [
         "<!doctype html><html lang=\"de\"><head><meta charset=\"utf-8\">",
@@ -225,13 +237,15 @@ def render(directory: Path, meta: dict) -> str:
         "<h1>Installer-Probe"
         f"<span class=\"verdict {'green' if green else 'red'}\">{'GRÜN' if green else 'ROT'}</span></h1>",
         "<p class=\"sub\">So erlebt ein neuer Nutzer <code>scripts/setup.sh</code> auf einer frischen "
-        "Maschine: nichts installiert außer git, sudo und tzdata.</p>",
+        f"Maschine: {esc(machine)}</p>",
         "<dl class=\"meta\">",
     ]
-    for label, key in (("Stand", "ref"), ("Commit", "sha"), ("Image", "image"),
-                       ("Gestartet", "started"), ("Dauer gesamt", "duration")):
-        if meta.get(key):
-            parts.append(f"<dt>{label}</dt><dd>{esc(meta[key])}</dd>")
+    rows = (("Weg", way_label), ("Stand", meta.get("ref")), ("Commit", meta.get("sha")),
+            ("Image", meta.get("image")), ("Gestartet", meta.get("started")),
+            ("Dauer gesamt", meta.get("duration")))
+    for label, value in rows:
+        if value:
+            parts.append(f"<dt>{label}</dt><dd>{esc(value)}</dd>")
     parts.append("</dl>")
 
     parts.append("<h2>Prüfungen</h2><ul class=\"checks\">")
@@ -284,10 +298,11 @@ def _duration(seconds: str) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--dir", required=True, type=Path)
-    for key in ("ref", "sha", "short", "image", "started", "duration"):
+    keys = ("ref", "sha", "short", "image", "way", "started", "duration")
+    for key in keys:
         parser.add_argument(f"--{key}", default="")
     args = parser.parse_args()
-    meta = {k: getattr(args, k) for k in ("ref", "sha", "short", "image", "started", "duration")}
+    meta = {k: getattr(args, k) for k in keys}
     (args.dir / "report.html").write_text(render(args.dir, meta), encoding="utf-8")
     return 0
 

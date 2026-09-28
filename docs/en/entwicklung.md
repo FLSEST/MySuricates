@@ -55,7 +55,10 @@ with `--rebuild` or when there is none yet, and `build --container` builds just 
 What of the machine's AI providers goes into the container is set by `AUTOTRIGGER_DEV_AI_FROM_HOST`
 (`login` = the programs and just the login of each provider, the default; `programs`; `all` = whole
 provider directories as before), plus `AUTOTRIGGER_DEV_AI_PROVIDERS` (selection from
-`claude,codex,pi`) and `AUTOTRIGGER_DEV_DOCKER_SOCKET` (default `1`). Claude needs a one-time
+`claude,codex,pi`) and `AUTOTRIGGER_DEV_DOCKER_SOCKET` (default `0`; `1` gives the container full control
+over Docker on the machine and is needed for project containers, the terminal and `container_image` blocks).
+The port is published on `127.0.0.1` only by default, `AUTOTRIGGER_DEV_CONTAINER_BIND=0.0.0.0` opens it to the
+local network on purpose. Claude needs a one-time
 `claude setup-token` for it — background in
 [deployment.md → AI providers in the container](deployment.md#ai-providers-in-the-container). The
 "Startup configuration" card in the settings shows what the container runs with.
@@ -506,24 +509,46 @@ the working tree. Requires Docker.
 ./scripts/installer-probe.sh --image rockylinux:9   # the same on a dnf system
 ./scripts/installer-probe.sh --ref main --keep      # then look at the fresh instance in the browser
 ./scripts/installer-probe.sh --setup-flags "--with-pi"   # phase 2 with extra flags, here installing pi too
+./scripts/installer-probe.sh --way container        # the default way: the instance in a container
+./scripts/installer-probe.sh --way staged           # Dev · Test · Prod, three containers
+./scripts/installer-probe.sh --cleanup <run>        # remove what a run with --keep left behind
 ```
 
 The interactive machine shares the host network (`--network host`): open the address `setup.sh`
 names at the end directly in the browser; the installer skips ports that are busy on the host. Pick
 "on this machine" in the mode step — there is no Docker inside the probe.
 
-The automatic run takes the "one instance on this machine" way from
-[GETTING-STARTED.md](GETTING-STARTED.md) in two phases, each under a pseudo terminal:
-`setup.sh --check` (check only) and `setup.sh --yes --runtime host --bind 0.0.0.0` (one pass up to
-the running instance). Each phase writes its own exit code to a file inside the container — through
+The automatic run takes one way from [GETTING-STARTED.md](GETTING-STARTED.md) (`--way`, default
+`host` = "one instance on this machine") in two phases, each under a pseudo terminal:
+`setup.sh --check` (check only) and `setup.sh --yes …` (one pass up to the running instance) — on the
+machine with `--runtime host --bind 0.0.0.0`, in a container (`--way container`) with the defaults and
+only `--port`, staged (`--way staged`) with `--mode staged --port`. Each phase writes its own exit code to a file inside the container — through
 `script` and `docker exec` an abort once came back as 0. The run turns red when phase 1 does not name
 the missing tools, phase 2 does not end with exit 0, health or the interface on the one port do not
 answer, the login with the generated key fails, the key shows up in a log, the backend is not built
-exactly once, or the clone is no longer clean afterwards (`git status`). The result is a single HTML
+exactly once (on the machine only), or the clone is no longer clean afterwards (`git status`). The
+container ways additionally check per instance that it is published on `127.0.0.1` only and has no
+Docker socket (the defaults); staged also three healthy instances on different ports and Prod with
+mandatory seals (`environment` Prod, `sealing` and `require-sealed-for-unattended` on — from the
+instance's own `/api/v1/system/capabilities`). The result is a single HTML
 page with terminal transcript and screenshots under
 `~/.local/state/mysuricates/installer-probe/<time>-<sha>/report.html` (`latest` points to the last
-run). A run downloads JDK, Node, npm packages and Maven dependencies fresh every time. The container
-way (Docker inside the container) is not part of the probe yet.
+run). A run downloads JDK, Node, npm packages and Maven dependencies fresh every time.
+
+For the container ways the probe machine gets the host's Docker: the socket (the `docker` group in it
+has the socket's group ID; `setup.sh` installs Docker itself as for any user, the daemon is the
+host's), the host network, and a host folder under the same path for the clone and the projects
+folder — the bind mounts of the inner compose are resolved by the host's Docker daemon. The host
+network rather than a special binding: `setup.sh` then sees the ports that are busy on the host by
+itself, the instances stay on the default `127.0.0.1`, and the probe checks them from outside right
+there. The probe picks ports from 19190 on and never 8090, 9090, 9091 or 9095 (Dev, Test, Stable,
+Tryout — even when they are not running). Every Docker name of a run carries its prefix
+`mysuricates-installer-probe-<time>` (`MYSURICATES_PREFIX` for `instance.sh`: container, compose
+project, volumes `…-data`/`-secrets`, image); at the end — also after an abort — the probe removes
+exactly those, checking each name against the prefix first. Running instances on the host stay
+untouched. Whoever holds the socket controls the host's Docker: only run it on states whose
+`setup.sh` you trust. What it does not check is whether `setup.sh` starts a Docker daemon — there is
+none inside the container.
 The screenshots are taken by Playwright from `ai-automation-frontend/node_modules` on the host. If
 the browser for the installed Playwright version is missing (typically after an update), the login
 check turns red with "Browser fehlt — im Frontend `npm run pw:install` ausführen" (browser missing,
@@ -587,11 +612,16 @@ The script:
 1. Reads the last released version from the newest git tag (without tags: from `pom.xml`)
 2. Calculates the new version (increments the segment) and stops if that tag exists already
 3. Writes it **without a suffix** into `pom.xml` plus `package.json` and `package-lock.json` (via `npm version`) — a lockfile left at the old version makes every fresh clone dirty after its first `npm install`; `packageLock.guard.test.ts` keeps both in sync
-4. Creates the git commit `Release vX.Y.Z` and sets the git tag `vX.Y.Z`
+4. Creates the git commit `Release vX.Y.Z` and sets an **annotated** git tag `vX.Y.Z` (`git tag -a`, carries date/author/message) — the basis for the GitHub release that gets created automatically for every `v*` tag ([„GitHub release on every tag"](#github-release-on-every-tag) below)
 5. Sets `pom.xml` **and** `package.json` to the next development version `X.Y.(Z+1)-SNAPSHOT` and commits `Weiter an vX.Y.(Z+1)` — otherwise every commit after the tag would carry the release number and the version tile would report drift permanently
 
 **Prerequisite:** Clean working tree (no uncommitted changes).
 **Test:** `bash scripts/tests/test-release.sh` runs the flow in a throwaway repository.
+
+**Push:** `git push origin main "vX.Y.Z"` (or `git push --follow-tags`, which only takes annotated
+tags along) — **not** `git push --tags`: every `staging.sh promote` creates a lightweight `stable-*`
+tag (deployment timestamp, see below), and `--tags` would push all of those to GitHub too, mixing
+them into the release list.
 
 ### Interaction with Staging
 
@@ -601,10 +631,123 @@ The stable environment is a Docker container on port 9091 holding a frozen state
 
 There are two types of git tags:
 
-| Tag Format | Created by | Purpose |
+| Tag Format | Created by | Kind | Purpose |
+|---|---|---|---|
+| `v0.1.1` | `release.sh` | annotated (`git tag -a`) | Semver release marker, triggers `release.yml` |
+| `stable-20250225-143022` | `staging.sh promote` | lightweight | Deployment timestamp, stays local |
+
+That's why it's `git push --follow-tags` rather than `git push --tags`: `--follow-tags` only takes
+annotated tags along, `--tags` would push every local `stable-*` tag to GitHub too.
+
+### GitHub release on every tag
+
+`.github/workflows/release.yml` runs on every push of a `v*` tag and automatically creates a
+GitHub release (`gh release create "$TAG" --verify-tag --title "$TAG" --notes-file notes.md`). The
+notes are generated **deterministically, without AI** by `scripts/release-notes.sh <prev-tag>
+<tag>`:
+
+- **Overview**: subject lines of the merge commits between the two tags
+  (`git log --first-parent --merges`). Internal TODO-shorthand brackets are stripped for the public
+  notes (`scripts/lib/strip-todo-brackets.py`): a trailing bracket whose content starts with an
+  8-hex code (title, comma lists and nested brackets afterward don't matter, e.g.
+  `(<8-hex> title (with bracket))` or `(<8-hex>, <8-hex>, <8-hex>)`), a trailing bracket whose last
+  comma-separated element is a bare code (`(as of 2026-09-22, <8-hex>)`), and a bracket anywhere in
+  the subject that consists only of codes (`(TODO <8-hex>)`). An ordinary bracket without a code is
+  left alone.
+- **Changes by type**: non-merge commits, grouped by conventional prefix
+  (`feat`/`fix`/`perf`/`refactor`/`docs`/`test`/…).
+- **Behavior changes**: entries from [„Behavior Changes"](#behavior-changes) below that are dated
+  after the previous tag — without such entries, the section is left out.
+- **Comparison**: link to the compare view `prev...tag` (left out for the very first release, which
+  has no previous tag).
+
+The script runs without a previous tag (`scripts/release-notes.sh "" v0.1.0`) and also when the
+current repo has no matching merge commits (e.g. in the curated public repo, which does not inherit
+the working repo's merge history) — the affected sections are simply left out instead of raising an
+error. The action uses a supplied notes file (`release-notes/<tag>.md`) if one exists — for example
+from the [handover to the public repo](#handover-to-the-public-repo), which brings a verified
+commit plus tag there — and otherwise generates the notes itself from the history of the repo the
+workflow runs in. The links (comparison, behavior changes) point to the GitHub repo from `origin`;
+`RELEASE_NOTES_REPO_SLUG=<owner>/<repo>` sets it from outside, set to empty the links are left out,
+and an `origin` that is not a GitHub address yields none either.
+
+**Test:** `bash scripts/tests/test-release-notes.sh` runs `release-notes.sh` in a throwaway repo
+(merges, type sections, TODO bracket gets stripped, first release without a previous tag).
+
+### Handover to the public repo
+
+The working repo stays private; the public repository gets **one** squashed, verified commit plus
+an annotated tag per release. The logic lives deterministically in `scripts/release-handover.sh`,
+a MySuricates workflow runs the sequence with an approval.
+
+```bash
+scripts/release-handover.sh v0.8.0 ~/path/to/public-clone               # gates without build
+scripts/release-handover.sh --with-build v0.8.0 ~/path/to/public-clone  # + mvn test, tsc, lint
+scripts/release-handover.sh --discard v0.8.0 ~/path/to/public-clone     # take back, if not pushed
+```
+
+The script:
+1. Checks the preconditions: tag in the working repo, target is the root of a clean clone on a
+   branch, not behind its upstream, the tag does not exist there yet and neither does a newer one,
+   author and committer in the target use the GitHub noreply form, the private hygiene lists can be
+   found (`$HYGIENE_PRIVATE_LIST`/`$HYGIENE_PRIVATE_TERMS`, `~/.config/mysuricates/` or the
+   untracked copies in the working repo, which it passes on).
+2. Exports the tag's tree via `git archive` without the patterns from
+   `scripts/release-handover.exclude` (read from the tag itself; older tags without a list use the
+   one from the working tree) and replaces the target's tracked content with it. `.git`,
+   `release-notes/` (the notes of earlier releases) and ignored files such as build caches stay.
+   Exactly the archive's file list is staged, with `-f` (tracked files under an ignore rule, like
+   the tray icons, belong to it) and without line-ending conversion.
+3. Stops with exit 3 if the result equals the target — nothing is left behind then.
+4. Writes the notes from `scripts/release-notes.sh` to `release-notes/<tag>.md` (the previous tag is
+   the last handed-over release, the links point to the public repo) and commits `Release <tag>`.
+5. Checks exactly this commit: fidelity (every file has the same blob and mode as in the tag,
+   nothing else apart from `release-notes/`), `public-hygiene.sh --tracked`,
+   `pool-neutrality.sh`, gitleaks (if installed), the docs gates (`pre-push-checks.sh --tree`),
+   with `--with-build` also `mvn test` plus `npm ci` (only without `node_modules`),
+   `tsc --noEmit` and `npm run lint`. Any finding takes the commit back; the target is as before.
+6. Sets the annotated tag and ends with the diff statistics, the gate summary, the lines
+   `handover_status:`/`handover_commit:`/`handover_branch:` and the push command. **It never
+   pushes.**
+
+Exit codes: 0 ready (or discarded), 1 stopped (finding or precondition), 2 usage error, 3 nothing to
+hand over.
+
+**Exclusion list** (`scripts/release-handover.exclude`): git pathspecs with glob magic, each entry
+with a reason. It goes out itself and therefore names nothing private — such files are covered by a
+pattern. Excluded today: the one-off workflow migration of one particular instance
+(`scripts/workspace-isolation/prepare-*.py`, `pool-overrides/`) plus its test, and as a safety net
+the private, untracked paths from `.gitignore`. Excluding a file that a test, the build or the docs
+refer to shows up at the latest in a run with `--with-build`.
+
+**The workflow** lives only in the maintainer's instance (not in the pool: it presumes a public repo
+of one's own) and consists of four blocks without AI:
+
+| Block | Type | Task |
 |---|---|---|
-| `v0.1.1` | `release.sh` | Semver release marker |
-| `stable-20250225-143022` | `staging.sh promote` | Deployment timestamp |
+| `vorbereiten` | `shell` | `release-handover.sh` with the context variables `{{ tag }}`, `{{ public_clone }}` and `{{ with_build }}` (`1` = `--with-build`), read via `set -- {{ tag }}; TAG="$*"` with `shell_escape_variables`; exit 3 becomes 0, `timeout_seconds` covers the test suite |
+| `freigabe` | `approval` | only with `handover_status: READY` in the output of `vorbereiten` (`run_if`); the question shows that output — diff statistics and gates; answers `Pushen`/`Verwerfen` in `handover_decision` |
+| `push` | `shell` | only on `Pushen`: checks that HEAD and tag in the clone are still the approved commit, then `git push --atomic origin refs/heads/<branch> refs/tags/<tag>` |
+| `verwerfen` | `shell` | only on `Verwerfen`: `release-handover.sh --discard` takes commit and tag back, so a new run for the same tag is possible |
+
+In the public repo, `.github/workflows/release.yml` then creates the GitHub release from the
+supplied notes file.
+
+**Way back** (contributions from the public repo, per `CONTRIBUTING.md` only after agreement):
+since every handed-over file has the same blob as in the tag, a patch from the public clone applies
+in the working repo with a three-way merge:
+
+```bash
+git -C ~/path/to/public-clone fetch origin pull/<nr>/head:pr-<nr>
+git -C ~/path/to/public-clone format-patch --stdout origin/main..pr-<nr> | git am -3
+```
+
+`git am` keeps the contributor as author; the change then goes out again with the next release tag.
+
+**Test:** `bash scripts/tests/test-release-handover.sh` runs the script between a throwaway working
+repo and a local throwaway "public" repo (bare + clone): exclusion, replaced content, fidelity even
+for CRLF files, commit, annotated tag, notes file, stop and complete reset on a gate finding, stop
+without a change, preconditions, `--discard` and that nothing gets pushed.
 
 ### Behavior Changes
 
@@ -675,7 +818,7 @@ Details on the three trust classes and taint propagation:
 | **Mapper** | MapStruct for entity ↔ DTO conversion (automatic code generation) |
 | **IDs** | UUID as string (`@GeneratedValue(strategy = GenerationType.UUID)`) |
 | **JSON fields** | `@Convert(converter = JsonMapConverter.class)` for `Map<String, Object>` in TEXT columns |
-| **Auditing** | `@CreatedDate`, `@LastModifiedDate` via Spring Data JPA Auditing |
+| **Auditing** | `@CreatedDate`, `@LastModifiedDate` via the own `@EntityListeners(AuditTimestampListener.class)` — not via Spring Data auditing (`@EnableJpaAuditing` would need `spring-aspects` and with it `aspectjweaver`, EPL-2.0, not AGPL-compatible) and not via Hibernate's `@CreationTimestamp` (set only at flush, truncated to whole seconds in SQLite). `AgplDependencyGuardTest` pins this |
 | **Validation** | Jakarta Validation (`@NotBlank`, `@NotNull`, `@NotEmpty`) on DTOs |
 | **Exceptions** | `GlobalExceptionHandler` with `@RestControllerAdvice`, unified error format |
 | **Logging** | SLF4J with `@Slf4j` (Lombok) |

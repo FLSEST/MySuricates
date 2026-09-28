@@ -109,6 +109,7 @@ sie); Härtung, ui-editable und weitere Einstellungen stehen in der Instanz-Date
 ./scripts/setup.sh --yes                                   # Defaults: Container, Standard, Port 9090
 ./scripts/setup.sh --yes --runtime host --port 9190        # auf diesem Rechner, anderer Port
 ./scripts/setup.sh --yes --mode staged                     # Dev · Test · Prod
+./scripts/setup.sh --yes --mode staged --port 19090        # dasselbe ab Port 19090 (Test 19091, Prod 19092)
 ./scripts/setup.sh --check                                 # nur prüfen und den Plan zeigen
 ./scripts/setup.sh --help                                  # alle Flags
 ```

@@ -186,6 +186,35 @@ class AiProviderStatusServiceTest {
         assertThat(service("", 60).report(false).container()).isTrue();
     }
 
+    /** The starter that launched this container passes the command that logs in there. */
+    @Test
+    void theLoginCommandOfTheStartPathPassesThrough() {
+        env.put("MYSURICATES_RUNTIME", "container");
+        env.put("MYSURICATES_LOGIN_COMMAND", "scripts/tryout.sh login [claude|codex|pi]");
+
+        assertThat(service("", 60).report(false).loginCommand()).isEqualTo("scripts/tryout.sh login [claude|codex|pi]");
+    }
+
+    @Test
+    void noLoginCommandMeansTheStartPathHasNoneOrIsHostMode() {
+        env.put("MYSURICATES_RUNTIME", "container");
+
+        assertThat(service("", 60).report(false).loginCommand()).as("no fixed command from this start path").isNull();
+
+        env.remove("MYSURICATES_RUNTIME");
+        env.put("MYSURICATES_LOGIN_COMMAND", "scripts/instance.sh login");
+        assertThat(service("", 60).report(false).loginCommand()).as("not a container: never shown").isNull();
+    }
+
+    /** Never built from user input, but checked anyway in case the variable was ever tampered with. */
+    @Test
+    void aLoginCommandOutsideTheAllowListIsDropped() {
+        env.put("MYSURICATES_RUNTIME", "container");
+        env.put("MYSURICATES_LOGIN_COMMAND", "scripts/instance.sh login; rm -rf /");
+
+        assertThat(service("", 60).report(false).loginCommand()).isNull();
+    }
+
     @Test
     void noValueEverLeavesTheService() throws Exception {
         env.put("CLAUDE_CODE_OAUTH_TOKEN", TOKEN);

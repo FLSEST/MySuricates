@@ -4,8 +4,8 @@
     "en": "MySuricates concept pages DE→EN sync"
   },
   "description": {
-    "de": "Auf Konzeptseiten begrenzte Variante des bestehenden Docs-DE→EN-Delta-Syncs: ein Übersetzungsaufruf je Datei, getrennte Arbeitsdateien je Run, englische Diagrammlabels und ein deterministisches Gate.",
-    "en": "Concept-page scope of the existing docs DE→EN delta sync: one translation call per file, separate work files per run, English diagram labels and a deterministic gate."
+    "de": "Auf Konzeptseiten begrenzte Variante des bestehenden Docs-DE→EN-Delta-Syncs: ein Übersetzungsaufruf je Datei, getrennte Arbeitsdateien je Run, englische Diagrammlabels und ein deterministisches Gate; concept_only übersetzt nur einzelne Seiten.",
+    "en": "Concept-page scope of the existing docs DE→EN delta sync: one translation call per file, separate work files per run, English diagram labels and a deterministic gate; concept_only translates single pages only."
   },
   "icon": "🌐",
   "category": "DOCUMENTATION",
@@ -20,19 +20,21 @@
   "provider": "PI",
   "model": "openai-codex/gpt-5.5",
   "effort": "medium",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "MySuricates",
   "instructions": "Faithful German-to-English documentation sync, derived from Docs DE→EN Sync (delta). Work only in the explicit translation_root. No commits, pushes, API calls or TODO changes.",
   "defaultContext": {
     "translation_root": ".",
-    "translation_output": "/tmp/mysuricates-concept-translation"
+    "translation_output": "/tmp/mysuricates-concept-translation",
+    "concept_only": ""
   },
   "blocks": [
     {
       "type": "shell",
       "name": "quellen-pruefen",
       "config": {
-        "command": "set -euo pipefail\npython3 \"{{ translation_root }}/scripts/concepts/pages.py\" check --root \"{{ translation_root }}\" --work \"{{ translation_root }}/docs/konzepte\" --facts \"{{ translation_root }}/docs/konzepte/betriebsdaten.json\"\nmkdir -p \"{{ translation_output }}/{{ workflow_run_id }}\" \"{{ translation_root }}/docs/en/konzepte\"\ndate -u +%F > \"{{ translation_output }}/{{ workflow_run_id }}/date.txt\"",
+        "command": "set -euo pipefail\npython3 {{ translation_root }}/scripts/concepts/pages.py check --root {{ translation_root }} --work {{ translation_root }}/docs/konzepte --facts {{ translation_root }}/docs/konzepte/betriebsdaten.json --only {{ concept_only }}\nmkdir -p {{ translation_output }}/{{ workflow_run_id }} {{ translation_root }}/docs/en/konzepte\ndate -u +%F > {{ translation_output }}/{{ workflow_run_id }}/date.txt",
+        "shell_escape_variables": true,
         "timeout_seconds": 120
       }
     },
@@ -40,18 +42,9 @@
       "type": "foreach",
       "name": "docs-sync",
       "config": {
-        "items_source": "list",
-        "items": [
-          "konzepte/gates.md",
-          "konzepte/selbstverbesserung.md",
-          "konzepte/persistenz-herkunft.md",
-          "konzepte/agentische-budgets.md",
-          "konzepte/zugaenge.md",
-          "konzepte/messen-vor-bewerten.md",
-          "konzepte/workflow-memory.md",
-          "konzepte/haertung.md",
-          "konzepte/README.md"
-        ],
+        "items_source": "command",
+        "items_command": "python3 {{ translation_root }}/scripts/concepts/pages.py list --paths --only {{ concept_only }}",
+        "shell_escape_variables": true,
         "variable_name": "relpath",
         "execution_mode": "ai",
         "continue_on_error": false,
@@ -65,7 +58,8 @@
       "type": "shell",
       "name": "gate",
       "config": {
-        "command": "set -euo pipefail\npython3 \"{{ translation_root }}/scripts/concepts/pages.py\" finish-english --root \"{{ translation_root }}\" --work \"{{ translation_root }}/docs/en/konzepte\" --facts \"{{ translation_root }}/docs/konzepte/betriebsdaten.json\"\ntest -s \"{{ translation_root }}/docs/en/konzepte/README.md\"",
+        "command": "set -euo pipefail\npython3 {{ translation_root }}/scripts/concepts/pages.py finish-english --root {{ translation_root }} --work {{ translation_root }}/docs/en/konzepte --facts {{ translation_root }}/docs/konzepte/betriebsdaten.json --only {{ concept_only }}\ntest -s {{ translation_root }}/docs/en/konzepte/README.md",
+        "shell_escape_variables": true,
         "timeout_seconds": 120
       }
     }

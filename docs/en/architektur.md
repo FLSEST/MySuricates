@@ -95,7 +95,7 @@ Environment form: `AUTOMATION_MODULES_PRESET`, `AUTOMATION_MODULES_<NAME>`, `AUT
 | `research` | `chains`, `assistant`, `learning` (analytics endpoints; dashboard data stays core), `memory`, `audit`, `bpmn` | chains stable, others experimental |
 | `advanced` (outward-facing) | `integrations` (incl. TODO tracker export, calendar adapters), `http-api` (general HTTP API connection, requires `integrations`), `webhooks`, `remote-access` (Tailscale), `terminal` (run terminal over WebSocket), `staging` | stable / staging experimental |
 | `advanced` (low use) | `conversion`, `dialog-import` (requires conversion), `onboarding-profiles`, `skills`, `debug`, `factory` (incl. auto-repair), `wishes` (requires chains) | legacy / experimental |
-| `hardening` | `provenance` (on by default), `sealing`, `require-sealed-for-unattended`, `webhook-signatures` | experimental |
+| `hardening` | `provenance` (on by default), `sealing`, `require-sealed-for-unattended`, `webhook-signatures`, `private-network-guard` (on by default), `private-network-guard-http-api` | experimental |
 
 The catalog is additionally exported as plain bash arrays to `scripts/lib/module-catalog.generated.sh`
 — read by `scripts/lib/module-preset.sh`, which runs before every build and therefore must not
@@ -128,7 +128,7 @@ matches the catalog — whoever adds a module finds out at the latest there.
 
 ## Workflow Hardening (optional)
 
-Four switches under `automation.hardening.*` — the same mechanism as modules (startup configuration only, independent of the preset, shown read-only in **Settings → Modules & hardening**). Change provenance is not a switch; it is always on.
+Switches under `automation.hardening.*` — the same mechanism as modules (startup configuration only, independent of the preset, shown read-only in **Settings → Modules & hardening**). Change provenance is not a switch; it is always on.
 
 | Switch | Default | Requires | Effect |
 |---|---|---|---|
@@ -138,6 +138,10 @@ Four switches under `automation.hardening.*` — the same mechanism as modules (
 | `require-signed-seal` | off | `sealing` | Sealed workflows need a valid signature |
 | `seal-immutable` | off | `sealing` | Unsealing no longer over REST — only via the startup configuration |
 | `webhook-signatures` | off | module `webhooks` | Per-webhook signing secret (HMAC-SHA256) |
+| `private-network-guard` | on | — | iCal feed and RSS/Atom feed fetch public addresses only (see [Integrations](integrations.md#fetches-into-the-local-network)) |
+| `private-network-guard-http-api` | off | — | The same block for http-api (own network reachable otherwise) |
+
+The two `private-network-guard` switches control the **outbound guard** (`OutboundTargetGuard`): where the instance itself connects to. Which provider uses which switch follows from its target kind — see [Integrations → Target kind of a provider](integrations.md#target-kind-of-a-provider-outbound-guard).
 
 **Definition hash** — `WorkflowDefinitionHasher` hashes the `WorkflowSnapshot` (blocks, instructions, model, provider, effort, metadata, defaultContext, sorted skill IDs) as canonical JSON (sorted keys, empty values omitted) with its own `ObjectMapper`, so Jackson customizing never changes the hash. Name, description, icon and tags are labels and are not hashed. Old version rows get their hash at startup (`WorkflowVersionHashBackfillService`). Context variables: `{{ workflow_definition_hash }}`, `{{ trigger_source }}`.
 

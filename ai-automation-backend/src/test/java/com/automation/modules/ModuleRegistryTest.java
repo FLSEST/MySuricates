@@ -18,12 +18,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class ModuleRegistryTest {
 
     @Test
-    void defaultPresetIsCoreWithStandardModulesAndProvenanceOn() {
+    void defaultPresetIsCoreWithStandardModulesAndDefaultOnHardening() {
         ModuleRegistry registry = ModuleRegistry.of(Map.of(), Map.of());
 
         assertThat(registry.preset()).isEqualTo(ModulePreset.CORE);
         assertThat(Arrays.stream(ModuleCatalog.values()).filter(registry::isEnabled))
-                .containsExactly(ModuleCatalog.DASHBOARD_REPORT, ModuleCatalog.PROVENANCE);
+                .containsExactly(ModuleCatalog.DASHBOARD_REPORT, ModuleCatalog.PROVENANCE, ModuleCatalog.PRIVATE_NETWORK_GUARD);
     }
 
     /** "Only" as in: of the tiers the preset adds — the STANDARD tier is on here as in every preset. */
@@ -163,7 +163,7 @@ class ModuleRegistryTest {
     void summaryListsPresetAndEnabledModules() {
         ModuleRegistry registry = ModuleRegistry.of(Map.of("chains", "true"), Map.of());
 
-        assertThat(registry.summary()).isEqualTo("preset=core, enabled=[dashboard-report, chains, provenance]");
+        assertThat(registry.summary()).isEqualTo("preset=core, enabled=[dashboard-report, chains, provenance, private-network-guard]");
     }
 
     // --- automation.modules.ui-editable ---------------------------------------------
@@ -248,7 +248,7 @@ class ModuleRegistryTest {
         ModuleRegistry registry = editable(Map.of());
         registry.applyUiOverrides(Map.of(ModuleCatalog.CHAINS, true));
 
-        assertThat(registry.summary()).isEqualTo("preset=core, ui-editable=true, ui-overrides=[chains=true], enabled=[dashboard-report, chains, provenance]");
+        assertThat(registry.summary()).isEqualTo("preset=core, ui-editable=true, ui-overrides=[chains=true], enabled=[dashboard-report, chains, provenance, private-network-guard]");
     }
 
     @Test

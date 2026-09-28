@@ -29,11 +29,53 @@ LABELS = {
     'activeMemoryEntries': 'Aktive Memory-Einträge',
     'workflows': 'Sichtbare Workflows in aktiven Projekten',
     'workflows_sealed': 'Versiegelte sichtbare Workflows',
+    'workflows_explicit_provider': 'Sichtbare Workflows mit eigenem KI-Anbieter',
+    'workflows_explicit_effort': 'Sichtbare Workflows mit eigenem Effort',
+    'steps_integration': 'Integrations-Schritte im 30-Tage-Fenster',
+    'steps_skill_capability': 'Skill-Schritte im 30-Tage-Fenster',
 }
+INDEX_DE = Path('docs/konzepte/README.md')
 
 
 def read_json(path):
     return json.loads(path.read_text())
+
+
+def slugs(only):
+    return [slug for slug in re.split(r'[,\s]+', only or '') if slug]
+
+
+def select(only=None):
+    """Catalog entries named in ``only`` (comma or whitespace separated), in catalog order.
+
+    Empty or missing ``only`` selects the whole catalog. Unknown slugs fail instead of
+    silently shrinking the run.
+    """
+    catalog = read_json(CATALOG)
+    wanted = slugs(only)
+    if not wanted:
+        return catalog
+    unknown = sorted(set(wanted) - {item['slug'] for item in catalog})
+    if unknown:
+        raise ValueError('Unknown concept slug(s): ' + ', '.join(unknown))
+    return [item for item in catalog if item['slug'] in wanted]
+
+
+def add_index_rows(text, items, language):
+    """Append overview-table rows for pages the index does not link yet; existing rows stay as they are."""
+    lines = text.split('\n')
+    for start in range(len(lines) - 1):
+        if lines[start].startswith('|') and lines[start + 1].startswith('|---'):
+            break
+    else:
+        raise ValueError('Concept index has no overview table')
+    end = start + 2
+    while end < len(lines) and lines[end].startswith('|'):
+        end += 1
+    rows = [f'| [{item["label_" + language]}]({item["slug"]}.md) | {item["question_" + language]} |'
+            for item in items if f']({item["slug"]}.md)' not in text]
+    lines[end:end] = rows
+    return '\n'.join(lines)
 
 
 def digest(path):
@@ -46,7 +88,8 @@ def private_markers(text):
                      r'[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}', text)
 
 
-def prepare(root, work, facts_path):
+def prepare(root, work, facts_path, items=None):
+    items = select() if items is None else items
     facts = read_json(facts_path)
     if facts.get('schema') != 1 or not facts.get('metrics'):
         raise ValueError('Missing/unsupported measurement snapshot')
@@ -56,6 +99,9 @@ def prepare(root, work, facts_path):
         raise ValueError('Collect measurements again: snapshot must be at most 24 hours old')
     if private_markers(json.dumps(facts)):
         raise ValueError('Private markers in measurement snapshot')
+    missing = sorted({key for item in items for key in item['metrics']} - set(facts['metrics']))
+    if missing:
+        raise ValueError('Measurement snapshot lacks metrics: ' + ', '.join(missing))
     work.mkdir(parents=True, exist_ok=False)
     (work / 'drafts').mkdir()
     (work / 'packets').mkdir()
@@ -63,7 +109,7 @@ def prepare(root, work, facts_path):
     commit = subprocess.check_output(['git', '-C', str(root), 'rev-parse', 'HEAD'], text=True).strip()
     (work / 'manifest.json').write_text(json.dumps({'source_commit': commit,
         'facts_sha256': digest(facts_path)}, indent=2) + '\n')
-    for item in read_json(CATALOG):
+    for item in items:
         selected = {key: facts['metrics'][key] for key in item['metrics']}
         packet = [f'# {item["title_de"]}', item['notes'],
                   '## Aktuelle Betriebsdaten', facts['collected_at'],
@@ -75,7 +121,7 @@ def prepare(root, work, facts_path):
             if len(content) > 18000:
                 packet.append('[Auszug; restliche Datei bei Bedarf gezielt im Repository lesen.]')
         (work / 'packets' / (item['slug'] + '.txt')).write_text('\n\n'.join(packet) + '\n')
-    print('Prepared 8 evidence packets; measurement snapshot verified')
+    print(f'Prepared {len(items)} evidence packets; measurement snapshot verified')
 
 
 def check_body(text, language='de'):
@@ -90,20 +136,20 @@ def check_body(text, language='de'):
         raise ValueError('Private data or unresolved placeholder')
 
 
-def assemble(root, work, facts_path):
-    catalog = read_json(CATALOG)
+def assemble(root, work, facts_path, items=None):
+    items = select() if items is None else items
     manifest = read_json(work / 'manifest.json')
     if digest(facts_path) != manifest['facts_sha256']:
         raise ValueError('Measurement snapshot changed during generation')
     facts = read_json(facts_path)
     bodies = {}
-    for item in catalog:
+    for item in items:
         body = (work / 'drafts' / (item['slug'] + '.md')).read_text().strip()
         check_body(body)
         bodies[item['slug']] = body
     target = work / 'de'
     target.mkdir(exist_ok=True)
-    for item in catalog:
+    for item in items:
         measurements = []
         for key in item['metrics']:
             metric = facts['metrics'][key]
@@ -124,12 +170,21 @@ def assemble(root, work, facts_path):
                 '\n\n[Definitionen, Messgrenzen und Rohzähler](betriebsdaten.json) · '
                 '[Messmethode und Wiederholung](README.md)\n\n## Im Code\n\n' + sources + '\n')
         (target / (item['slug'] + '.md')).write_text(text)
-    print('Assembled 8 German pages with fixed diagrams, measurements and source links')
+    # New pages need a row in the overview; the copy goes next to the pages for the same review.
+    index = root / INDEX_DE
+    if index.is_file():
+        current = index.read_text()
+        updated = add_index_rows(current, items, 'de')
+        if updated != current:
+            (target / 'README.md').write_text(updated)
+            print('Wrote README.md with overview rows for the new pages')
+    print(f'Assembled {len(items)} German pages with fixed diagrams, measurements and source links')
 
 
-def finish_english(root, directory, facts_path):
+def finish_english(root, directory, facts_path, items=None):
     """Repair language-dependent assembly parts after the existing docs translator."""
-    for item in read_json(CATALOG):
+    items = select() if items is None else items
+    for item in items:
         path = directory / (item['slug'] + '.md')
         text = path.read_text()
         diagrams = re.findall(r'```mermaid\n(.*?)\n```', text, re.S)
@@ -142,17 +197,19 @@ def finish_english(root, directory, facts_path):
         path.write_text(text)
     index = directory / 'README.md'
     if index.exists():
-        text = index.read_text().replace('(betriebsdaten.json)', '(../../konzepte/betriebsdaten.json)')
+        text = add_index_rows(index.read_text(), items, 'en')
+        text = text.replace('(betriebsdaten.json)', '(../../konzepte/betriebsdaten.json)')
         for folder in ('scripts', 'workflow-pool'):
             text = text.replace('(../../' + folder + '/', '(../../../' + folder + '/')
         index.write_text(text)
-    check(root, directory, facts_path, 'en')
+    check(root, directory, facts_path, 'en', items)
 
 
-def check(root, directory, facts_path, language):
+def check(root, directory, facts_path, language, items=None):
+    items = select() if items is None else items
     facts = read_json(facts_path)
     failures = []
-    for item in read_json(CATALOG):
+    for item in items:
         path = directory / (item['slug'] + '.md')
         try:
             text = path.read_text()
@@ -168,6 +225,8 @@ def check(root, directory, facts_path, language):
             rows = re.findall(r'^\| [^|]+ \| ([\d /]+) \|$', text, re.M)
             expected_rows = []
             for key in item['metrics']:
+                if key not in facts['metrics']:
+                    raise ValueError('Measurement snapshot lacks metric ' + key)
                 value = str(facts['metrics'][key]['value'])
                 denominator = facts['metrics'][key]['denominator']
                 if denominator is not None:
@@ -189,22 +248,44 @@ def check(root, directory, facts_path, language):
     if failures:
         print('gate_status: RED\ngate_category: concept-pages')
         raise ValueError('\n'.join(failures))
-    print(f'gate_status: GREEN\ngate_category: concept-pages\ngate_description: 8 {language} pages verified')
+    print(f'gate_status: GREEN\ngate_category: concept-pages\ngate_description: {len(items)} {language} pages verified')
+
+
+def list_items(items, paths, filtered):
+    """One line per selected page: its slug, or with ``paths`` its path below docs/.
+
+    ``paths`` adds the overview only for a full run; a filtered run leaves the translated
+    overview alone and ``finish-english`` adds the rows for the selected pages.
+    """
+    lines = [('konzepte/' + item['slug'] + '.md') if paths else item['slug'] for item in items]
+    if paths and not filtered:
+        lines.append('konzepte/README.md')
+    print('\n'.join(lines))
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=['prepare', 'assemble', 'check', 'finish-english'])
+    parser.add_argument('action', choices=['prepare', 'assemble', 'check', 'finish-english', 'list'])
     parser.add_argument('--root', type=Path, default=Path.cwd())
-    parser.add_argument('--work', type=Path, required=True)
-    parser.add_argument('--facts', type=Path, required=True)
+    parser.add_argument('--work', type=Path)
+    parser.add_argument('--facts', type=Path)
     parser.add_argument('--language', choices=['de', 'en'], default='de')
+    parser.add_argument('--only', default='',
+                        help='Comma-separated catalog slugs; empty = all pages')
+    parser.add_argument('--paths', action='store_true',
+                        help='list: print docs-relative paths instead of slugs')
     args = parser.parse_args()
+    items = select(args.only)
+    if args.action == 'list':
+        list_items(items, args.paths, bool(slugs(args.only)))
+        return
+    if args.work is None or args.facts is None:
+        parser.error('--work and --facts are required for ' + args.action)
     actions = {'prepare': prepare, 'assemble': assemble, 'finish-english': finish_english}
     if args.action == 'check':
-        check(args.root, args.work, args.facts, args.language)
+        check(args.root, args.work, args.facts, args.language, items)
     else:
-        actions[args.action](args.root, args.work, args.facts)
+        actions[args.action](args.root, args.work, args.facts, items)
 
 
 if __name__ == '__main__':

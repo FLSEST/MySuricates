@@ -1,6 +1,6 @@
 # Konzepte zum Übernehmen
 
-Diese Seiten erklären acht Mechanismen von MySuricates: wann sie helfen, was sie
+Diese Seiten erklären Mechanismen von MySuricates: wann sie helfen, was sie
 kosten und wo ihre Grenzen liegen. Jede Seite verbindet ein Ablaufdiagramm mit
 Codebelegen und einer datierten Betriebsmessung. Die Zahlen beschreiben eine
 einzelne Entwicklungsinstallation; sie belegen keinen allgemeinen Nutzen.
@@ -74,19 +74,35 @@ damit er auch nach einer Pool-Installation erhalten bleibt.
    abschließend deterministisch prüfen. Der Snapshot darf beim Start höchstens
    24 Stunden alt sein. Jeder Run hat ein eigenes Ausgabeverzeichnis.
 
-3. Unter `<concept_output>/<run-id>/de/` die acht Seiten fachlich lesen. Das Gate
+   `concept_only` begrenzt den Lauf auf einzelne Seiten: eine Kommaliste von Slugs
+   aus dem Katalog, etwa `zusammenstoepseln,anbieter-unabhaengig`. Leer (Standard)
+   heißt alle Seiten. Die Schleife holt ihre Einträge mit `pages.py list`; ein
+   unbekannter Slug bricht schon beim ersten Schritt ab.
+
+3. Unter `<concept_output>/<run-id>/de/` die erzeugten Seiten fachlich lesen. Das Gate
    prüft Vollständigkeit, Abschnitte, Quellenlinks, Messwerte, Snapshot-Hash,
    unveränderte Diagramme und offensichtliche private Marker. Es ersetzt keine
    inhaltliche Prüfung und garantiert keine vollständige Anonymisierung.
    Erst nach erfolgreicher Prüfung die Seiten nach `docs/konzepte/` übernehmen.
+   Fehlt einer Seite die Zeile in der Übersicht oben, liegt daneben eine `README.md`
+   mit den zusätzlichen Zeilen (Bezeichnung und Leitfrage aus dem Katalog);
+   bestehende Zeilen bleiben unverändert. Sie wird mit übernommen.
+
+   Mit `concept_only` prüft das Gate nur die gewählten Seiten. Die übrigen behalten
+   Hash und Messwerte ihres Snapshots. Wird für den gefilterten Lauf ein neuer
+   Snapshot nach `docs/konzepte/` übernommen, passen die übrigen Seiten nicht mehr
+   dazu; die Prüfung ohne Filter meldet das, bis alle Seiten neu erzeugt sind.
 
 4. Die [begrenzte Variante des Docs-DE→EN-Sync](../../workflow-pool/mysuricates-concept-pages-en.json)
    starten. `translation_root` bezeichnet denselben absoluten Checkout-Pfad.
-   Sie verwendet den Übersetzungsauftrag des bestehenden Delta-Syncs für diese
-   acht Seiten plus den Index. Jede Datei wird einzeln übersetzt; anschließend
+   Sie verwendet den Übersetzungsauftrag des bestehenden Delta-Syncs für alle
+   Seiten plus den Index. Jede Datei wird einzeln übersetzt; anschließend
    setzt das Skript die englischen Diagrammlabels und korrigiert die durch die
    zusätzliche Verzeichnisebene geänderten Quellenlinks. Ziel: `docs/en/konzepte/`.
-   Vorhandene Übersetzungen in diesem Verzeichnis werden ersetzt.
+   Vorhandene Übersetzungen in diesem Verzeichnis werden ersetzt. Mit demselben
+   `concept_only` wie im deutschen Lauf werden nur diese Seiten übersetzt; den Index
+   übersetzt die KI dann nicht, das Skript ergänzt dort nur die fehlenden Zeilen
+   aus dem Katalog.
 
 Die Workflow-Definitionen sind auf dieses Repository angewiesen und deshalb im
 Pool als `scope: repo` gekennzeichnet. Sie führen keine Commits oder Pushes aus.
@@ -99,8 +115,11 @@ Die deutsche Fassung bleibt die Quelle; englische Korrekturen laufen über dense
 python3 -m unittest discover -s scripts/tests -p 'test_concept_pages.py'
 python3 scripts/concepts/pages.py check --root . --work docs/konzepte --facts docs/konzepte/betriebsdaten.json
 python3 scripts/concepts/pages.py check --root . --work docs/en/konzepte --facts docs/konzepte/betriebsdaten.json --language en
+# nur einzelne Seiten:
+python3 scripts/concepts/pages.py check --root . --work docs/konzepte --facts docs/konzepte/betriebsdaten.json --only gates,haertung
 ```
 
 Der [Katalog](../../scripts/concepts/catalog.json) ist die gemeinsame Quelle für
-Themen, Codebelege und beide Sprachfassungen der Mermaid-Diagramme. Die Kommentare
+Themen, Codebelege, beide Sprachfassungen der Mermaid-Diagramme und die Zeilen der
+Übersicht. Die Kommentare
 je Seite enthalten den geprüften Quell-Commit und den SHA-256 des Fakten-Snapshots.

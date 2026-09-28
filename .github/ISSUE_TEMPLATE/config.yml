@@ -1,0 +1,12 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/FLSEST/MySuricates/security/advisories/new
+    about: >-
+      Please do not report a suspected vulnerability as a public issue.
+      Use GitHub's private vulnerability reporting instead — see SECURITY.md.
+  - name: Getting Started guide
+    url: https://github.com/FLSEST/MySuricates/blob/main/docs/en/GETTING-STARTED.md
+    about: >-
+      Installation and first run (tryout image, guided installer). Many
+      "how do I..." questions are answered there before an issue is needed.

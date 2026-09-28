@@ -1,0 +1,43 @@
+# Ausschlussliste der Release-Übergabe (scripts/release-handover.sh)
+#
+# Was hier steht, bleibt beim Übertragen eines Release-Tags ins öffentliche Repository draußen.
+# Gelesen wird die Fassung aus dem Tag selbst — ein Release trägt seine eigene Liste.
+#
+# Format: ein Muster je Zeile, relativ zur Repo-Wurzel, Kommentare mit #.
+# Git-Pathspec mit glob-Magie: "*" bleibt innerhalb eines Verzeichnisses, "**" geht über
+# Verzeichnisgrenzen; ein Verzeichnisname (mit oder ohne "/" am Ende) nimmt alles darunter.
+# Keine privaten Namen hier eintragen — die Liste geht selbst mit ins öffentliche Repository.
+# Solche Dateien über ein Muster fassen (wie unten prepare-*.py) oder gar nicht erst tracken.
+#
+# Jeder Eintrag bekommt eine Begründung. Wer eine Datei ausschließt, auf die ein Test, ein Build
+# oder die Doku verweist, bricht das öffentliche Repository — deshalb baut `--with-build` genau
+# den übertragenen Stand.
+
+# --- Einmal-Migration der Workflows einer bestimmten Instanz ----------------------------------------
+# Die prepare-Skripte tragen Workflow-IDs und Quellpfade der Instanz des Maintainers und
+# Projektnamen, die nicht öffentlich sind. apply-migration.py und prune-workspaces.py sind
+# allgemein (und durch scripts/tests/test_local_api_proxy.py in der CI geprüft) und bleiben drin.
+scripts/workspace-isolation/prepare-*.py
+# Pool-Overrides für private Projekte derselben Migration.
+scripts/workspace-isolation/pool-overrides/
+# Testet prepare-*.py (lädt die Skripte direkt) und fiele ohne sie um. Der zweite Test darin
+# (Pool-Gates bleiben bei unbekanntem Bericht YELLOW) ist allgemein; er geht mit, bis er in eine
+# eigene Datei umzieht.
+ai-automation-backend/src/test/python/test_workspace_migrations.py
+
+# --- Sicherheitsnetz: privat und ungetrackt, darf auch versehentlich getrackt nicht hinaus ------------
+# Ein Tag enthält nur getrackte Dateien; diese Einträge greifen erst, wenn eine davon doch einmal
+# mit einem pauschalen "git add" in den Bestand gerät. Die Pfade stehen auch in .gitignore.
+.claude/
+.superpowers/
+.playwright-mcp/
+docs/plans/
+docs/specs/
+docs/superpowers/
+docs/analysis.md
+docs/en/analysis.md
+scripts/seed-workflows.sh
+scripts/readme-banner.py
+# Private Listen des Hygiene-Gates (Pool-Namen, Begriffe) — liegen sonst in .git/info/exclude.
+scripts/ci/hygiene-private.txt
+scripts/ci/hygiene-private-terms.txt

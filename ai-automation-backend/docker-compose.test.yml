@@ -12,8 +12,9 @@ services:
         APT_REFRESH: ${MYSURICATES_APT_REFRESH:-}
     image: ai-automation-backend-test
     container_name: mysuricates-test
-    ports:
-      - "8090:8090"
+    # Kein ports-Eintrag hier: Den Port veroeffentlicht die Override-Datei von scripts/staging.sh,
+    # standardmaessig nur auf 127.0.0.1 (TEST_BIND in ~/.config/mysuricates/staging.env oeffnet ihn
+    # bewusst, etwa 0.0.0.0 fuers lokale Netz). Ohne Override veroeffentlicht er keinen Port.
     environment:
       - SPRING_PROFILES_ACTIVE=test
       # Onboarding-Texte: API-Key liegt nur im Container (Port innen = außen, Adresse stimmt ohne URL)
@@ -33,11 +34,11 @@ services:
       - ./stable-frontend:/app/frontend:ro
       - ./src/main/resources/application-test.yml:/app/config/application-test.yml:ro
       - ./docker/entrypoint.sh:/app/entrypoint.sh:ro
-      # KI-Anbieter und Docker-Socket kommen aus der Override-Datei, die scripts/staging.sh (und das
-      # Backend beim Start aus der Oberflaeche) ueber scripts/lib/host-mounts.sh schreibt. Schalter:
-      # TEST_AI_FROM_HOST, TEST_AI_PROVIDERS, TEST_DOCKER_SOCKET in
+      # KI-Anbieter, Docker-Socket und Port kommen aus der Override-Datei, die scripts/staging.sh (und
+      # das Backend beim Start aus der Oberflaeche) schreibt. Schalter: TEST_AI_FROM_HOST,
+      # TEST_AI_PROVIDERS, TEST_DOCKER_SOCKET (Standard 0), TEST_BIND (Standard 127.0.0.1) in
       # ~/.config/mysuricates/staging.env (262948a4). Ohne die Override-Datei startet der Container
-      # ohne KI-Anbieter und ohne Socket.
+      # ohne KI-Anbieter, ohne Socket und ohne veroeffentlichten Port.
       - ${HOME}/Entwicklung:${HOME}/Entwicklung
       - ${HOME}/.autotrigger/backups/test:/host-backups/test
     healthcheck:

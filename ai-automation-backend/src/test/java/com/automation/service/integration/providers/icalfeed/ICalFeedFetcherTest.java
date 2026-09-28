@@ -1,5 +1,6 @@
 package com.automation.service.integration.providers.icalfeed;
 
+import com.automation.testsupport.TestTargetGuards;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -8,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -16,7 +18,7 @@ class ICalFeedFetcherTest {
 
     private HttpServer server;
     private String base;
-    private final ICalFeedFetcher fetcher = new ICalFeedFetcher();
+    private final ICalFeedFetcher fetcher = new ICalFeedFetcher(TestTargetGuards.onWithLoopbackServerAsPublic());
 
     @BeforeEach
     void start() throws Exception {
@@ -65,6 +67,57 @@ class ICalFeedFetcherTest {
         serve("/big-chunked", 200, big, true);
         assertThatThrownBy(() -> fetcher.fetch(URI.create(base + "/big"))).hasMessageContaining("size limit of 5 MB");
         assertThatThrownBy(() -> fetcher.fetch(URI.create(base + "/big-chunked"))).hasMessageContaining("size limit of 5 MB");
+    }
+
+    private void redirect(String path, String location) {
+        server.createContext(path, ex -> {
+            ex.getResponseHeaders().add("Location", location);
+            ex.sendResponseHeaders(302, -1);
+            ex.close();
+        });
+    }
+
+    @Test
+    void fetch_followsRedirectsByHand() {
+        serve("/new.ics", 200, "BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n".getBytes(StandardCharsets.UTF_8), false);
+        redirect("/old.ics", "/new.ics");
+        assertThat(fetcher.fetch(URI.create(base + "/old.ics"))).startsWith("BEGIN:VCALENDAR");
+    }
+
+    @Test
+    void fetch_refusesARedirectHopToAnInternalAddress() {
+        redirect("/meta", "http://169.254.169.254/latest/meta-data/");
+        assertThatThrownBy(() -> fetcher.fetch(URI.create(base + "/meta")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("169.254.169.254")
+                .hasMessageContaining("private-network-guard");
+    }
+
+    @Test
+    void fetch_refusesRedirectsToOtherSchemesAndStopsLoops() {
+        redirect("/file", "file:///etc/passwd");
+        assertThatThrownBy(() -> fetcher.fetch(URI.create(base + "/file")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("invalid URL");
+
+        AtomicInteger hits = new AtomicInteger();
+        server.createContext("/loop", ex -> {
+            hits.incrementAndGet();
+            ex.getResponseHeaders().add("Location", "/loop");
+            ex.sendResponseHeaders(302, -1);
+            ex.close();
+        });
+        assertThatThrownBy(() -> fetcher.fetch(URI.create(base + "/loop"))).hasMessageContaining("redirected more than");
+        assertThat(hits).hasValue(ICalFeedFetcher.MAX_REDIRECTS + 1);
+    }
+
+    @Test
+    void fetch_refusesLocalTargetsByDefault_andReachesThemWithTheSwitchOff() {
+        serve("/cal.ics", 200, "BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n".getBytes(StandardCharsets.UTF_8), false);
+        assertThatThrownBy(() -> new ICalFeedFetcher(TestTargetGuards.defaults()).fetch(URI.create(base + "/cal.ics")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("local or private network address");
+        assertThat(new ICalFeedFetcher(TestTargetGuards.off()).fetch(URI.create(base + "/cal.ics"))).startsWith("BEGIN:VCALENDAR");
     }
 
     @Test

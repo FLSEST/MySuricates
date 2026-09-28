@@ -90,6 +90,19 @@ done
 check "agent-python: pip packages behind PIP_REFRESH" '[ -n "$(lof "$PDF" "^ARG PIP_REFRESH=")" ] && [ "$(lof "$PDF" "^ARG PIP_REFRESH=")" -lt "$(lof "$PDF" "pip install")" ] && grep -q "RUN echo \"PIP_REFRESH=\${PIP_REFRESH" "$PDF"'
 check "compose: the same AGENT_APT_REFRESH for agent-python" 'grep -q "PIP_REFRESH: \${AGENT_APT_REFRESH:-}" "$DC"'
 
+echo "5c) instance ports only on 127.0.0.1 unless switched on purpose"
+# Ein Portmapping ohne Adresse ("9091:9091") oeffnet Docker auf allen Schnittstellen, an der
+# Host-Firewall vorbei. Jede Instanz-Compose-Datei nennt deshalb eine Adresse mit Standard 127.0.0.1
+# oder veroeffentlicht selbst gar nichts (Stable/Test: das tut die Override-Datei von staging.sh).
+# docker-compose.yml (Agent-Images, Altlast) ist davon ausgenommen.
+for c in deploy/compose.yml ai-automation-backend/docker-compose.stable.yml ai-automation-backend/docker-compose.test.yml ai-automation-backend/docker-compose.dev-container.yml; do
+  check "$c: no port on all addresses"   '! grep -qE "^[[:space:]]+- \"?(\\\$\{[A-Za-z_]+(:-[0-9]+)?\}|[0-9]+):[0-9]+\"?[[:space:]]*$" "$R/$c"'
+  check "$c: an address, default 127.0.0.1, or no port" '! grep -qE "^[[:space:]]+ports:" "$R/$c" || grep -qE "(_BIND:-127\.0\.0\.1\}:|host_ip: \"\\\$\{[A-Z_]+_BIND:-127\.0\.0\.1\}\")" "$R/$c"'
+done
+check "staging.sh: port on 127.0.0.1 unless STABLE_/TEST_BIND" 'grep -q "staging_setting \"\$env\" BIND 127.0.0.1" "$R/scripts/staging.sh"'
+check "staging.sh: socket off unless switched on"             'grep -q "staging_setting \"\$env\" DOCKER_SOCKET 0" "$R/scripts/staging.sh"'
+check "dev starter: socket off unless switched on"            'grep -q "AUTOTRIGGER_DEV_DOCKER_SOCKET:-0" "$R/scripts/start-autotrigger-dev.sh"'
+
 echo "6) health checks ask the own instance directly, never through a proxy (cf662c01)"
 # Docker reicht Proxy-Variablen in den Container (~/.docker/config.json, „proxies“), und curl 8.5 schickt
 # auch localhost ueber sie: die Pruefung scheiterte am Proxy, der Container wurde nie gesund, up wartete

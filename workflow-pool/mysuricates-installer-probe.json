@@ -4,8 +4,8 @@
     "en": "Installer probe"
   },
   "description": {
-    "de": "Prüft scripts/setup.sh auf einer frischen Linux-Maschine im Container — von nackt über --install bis zum Login — und schreibt einen Report mit Terminal-Mitschnitt und Screenshots. Kein KI-Aufruf.",
-    "en": "Checks scripts/setup.sh on a fresh Linux machine in a container — from bare over --install to the login — and writes a report with terminal transcript and screenshots. No AI call."
+    "de": "Prüft scripts/setup.sh auf einer frischen Linux-Maschine im Container — von nackt über --install bis zum Login — und schreibt einen Report mit Terminal-Mitschnitt und Screenshots. Kein KI-Aufruf. Variable way (host, container, staged) wählt den Weg wie Schritt 2 von setup.sh; container und staged brauchen den Docker dieses Rechners.",
+    "en": "Checks scripts/setup.sh on a fresh Linux machine in a container — from bare over --install to the login — and writes a report with terminal transcript and screenshots. No AI call. Variable way (host, container, staged) picks the path like step 2 of setup.sh; container and staged need this machine's Docker."
   },
   "icon": "📦",
   "category": "CUSTOM",
@@ -16,10 +16,11 @@
     "installer",
     "release"
   ],
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "MySuricates",
   "defaultContext": {
-    "ref": "main"
+    "ref": "main",
+    "way": "host"
   },
   "instructions": "Deterministischer Lauf ohne KI: das Probe-Skript entscheidet GREEN/RED selbst. Braucht Docker auf dem Host; der Pfad des Reports steht am Ende der Ausgabe.",
   "blocks": [
@@ -27,7 +28,7 @@
       "type": "shell",
       "config": {
         "label": "Installer auf frischer Maschine prüfen",
-        "command": "set -euo pipefail\n# Stand, der geprüft wird: Variable ref (Default main). Das Probe-Skript kommt aus genau diesem Stand,\n# nicht aus dem gerade ausgecheckten Branch — so prüft der Lauf, was ein Klon von ref bekommt.\nset -- {{ ref }}; REF=\"${1:-main}\"\nREPO={{ project_path }}\nTMP=\"$(mktemp -d)\"; trap 'rm -rf \"$TMP\"' EXIT\nred() { echo \"gate_status: RED\"; echo \"gate_category: installer\"; echo \"gate_description: $1\"; exit 1; }\ngit -C \"$REPO\" rev-parse --verify --quiet \"${REF}^{commit}\" >/dev/null || red \"Unbekannter Stand: ${REF}\"\ngit -C \"$REPO\" archive \"$REF\" scripts | tar -x -C \"$TMP\"\n[ -f \"$TMP/scripts/installer-probe.sh\" ] || red \"Stand ${REF} enthält noch kein scripts/installer-probe.sh\"\nset +e\nbash \"$TMP/scripts/installer-probe.sh\" --repo \"$REPO\" --ref \"$REF\" 2>&1 | tee \"$TMP/probe.out\"\nRC=\"${PIPESTATUS[0]}\"\nset -e\n# Ohne eigene Gate-Zeilen (Abbruch vor den Prüfungen) wäre das Verdict sonst stillschweigend grün.\ngrep -q '^gate_status:' \"$TMP/probe.out\" || red \"Installer-Probe brach ab (Exit ${RC}), bevor sie prüfen konnte\"\nexit \"$RC\"",
+        "command": "set -euo pipefail\n# Stand, der geprüft wird: Variable ref (Default main). Das Probe-Skript kommt aus genau diesem Stand,\n# nicht aus dem gerade ausgecheckten Branch — so prüft der Lauf, was ein Klon von ref bekommt.\nset -- {{ ref }}; REF=\"${1:-main}\"\n# Weg, den die Probe prüft (Variable way, Default host): host | container | staged – wie Schritt 2 von setup.sh.\n# container und staged brauchen den Docker dieses Rechners.\nset -- {{ way }}; WAY=\"${1:-host}\"\nREPO={{ project_path }}\nTMP=\"$(mktemp -d)\"; trap 'rm -rf \"$TMP\"' EXIT\nred() { echo \"gate_status: RED\"; echo \"gate_category: installer\"; echo \"gate_description: $1\"; exit 1; }\ngit -C \"$REPO\" rev-parse --verify --quiet \"${REF}^{commit}\" >/dev/null || red \"Unbekannter Stand: ${REF}\"\ngit -C \"$REPO\" archive \"$REF\" scripts | tar -x -C \"$TMP\"\n[ -f \"$TMP/scripts/installer-probe.sh\" ] || red \"Stand ${REF} enthält noch kein scripts/installer-probe.sh\"\ncase \"$WAY\" in host|container|staged) ;; *) red \"Unbekannter Weg: ${WAY} (erlaubt: host, container, staged)\" ;; esac\n# Ältere Stände kennen --way nicht; für den Host-Weg deshalb ohne die Option aufrufen.\nWAY_ARGS=(); [ \"$WAY\" = host ] || WAY_ARGS=(--way \"$WAY\")\nset +e\nbash \"$TMP/scripts/installer-probe.sh\" --repo \"$REPO\" --ref \"$REF\" \"${WAY_ARGS[@]}\" 2>&1 | tee \"$TMP/probe.out\"\nRC=\"${PIPESTATUS[0]}\"\nset -e\n# Ohne eigene Gate-Zeilen (Abbruch vor den Prüfungen) wäre das Verdict sonst stillschweigend grün.\ngrep -q '^gate_status:' \"$TMP/probe.out\" || red \"Installer-Probe brach ab (Exit ${RC}), bevor sie prüfen konnte\"\nexit \"$RC\"",
         "shell_escape_variables": true,
         "timeout_seconds": 3600
       }

@@ -20,13 +20,17 @@ Good first contributions are the small, verifiable kind: a broken link, a
 documentation passage that no longer matches the code, a test that pins down
 behaviour which is currently untested.
 
+Use the bug report or idea issue form to start that conversation — they ask
+for the details needed up front (version, installation method, reproduction
+steps) instead of a second round of questions.
+
 ## Pull requests currently need prior agreement
 
 Right now every pull request is discussed in an issue before it is opened. The
 reason is deliberate and worth stating plainly: the project has exactly one
 copyright holder today, and that keeps the option of relicensing open. Once
 code by other people is merged, that option is gone without their consent. The
-project may well stay on Apache-2.0 forever — but that should be a decision,
+project may well stay on the AGPL-3.0 forever — but that should be a decision,
 not something that happens by accident.
 
 If this restriction is ever lifted, it will be lifted here.
@@ -48,8 +52,8 @@ which appends a line to the commit message:
 
     Signed-off-by: Your Name <your.email@example.com>
 
-There is no CLA and no bot. With one maintainer, a CLA would be ceremony
-without benefit.
+There is no separate CLA to sign and no bot. The sign-off also confirms the
+licensing terms below.
 
 ## What a change has to satisfy
 
@@ -90,7 +94,15 @@ GitHub's private vulnerability reporting — the channel is described in
 ## Licensing of contributions
 
 By contributing you agree that your contribution is licensed under the
-[Apache License 2.0](LICENSE), the same license that covers the project.
+[GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0-only), the same
+license that covers the project.
+
+In addition, you grant the copyright holder of MySuricates (Florian Stampe) a
+perpetual, worldwide, non-exclusive, royalty-free and irrevocable license to
+use, reproduce, modify and distribute your contribution, and to license it to
+others under different terms, including proprietary ones. You keep the
+copyright in your contribution. This keeps the project's licensing in one hand,
+the same reason pull requests currently need prior agreement.
 
 ---
 
@@ -101,13 +113,14 @@ betreutes Produkt — kein Support, keine zugesagten Reaktionszeiten, auch nicht
 auf Pull Requests.
 
 - **Erst ein Issue, dann Code.** Ein Pull Request ohne vorheriges Gespräch
-  bleibt wahrscheinlich liegen.
+  bleibt wahrscheinlich liegen. Die Bug- oder Ideen-Vorlage beim Issue-Anlegen
+  fragt die nötigen Angaben gleich ab.
 - **Pull Requests brauchen derzeit vorherige Absprache.** Grund: Solange es nur
   einen Urheber gibt, bleibt eine spätere Umlizenzierung möglich. Mit fremdem
   Code im Bestand ginge das nur noch mit Zustimmung aller Beteiligten. Das soll
   eine Entscheidung sein, kein Versehen.
 - **Commits signieren** nach dem [Developer Certificate of
-  Origin](https://developercertificate.org/): `git commit -s`. Kein CLA, kein Bot.
+  Origin](https://developercertificate.org/): `git commit -s`. Kein eigener CLA, kein Bot.
 - **Tests müssen grün sein:** `mvn test` (bei neuen oder verschobenen Klassen
   zusätzlich `bash scripts/tests/arch-guard.sh`), `npx tsc --noEmit`,
   `npm run lint`, `bash scripts/ci/public-hygiene.sh --tracked`. Tests werden
@@ -116,6 +129,9 @@ auf Pull Requests.
   `README.de.md` erzeugt — die deutsche Quelle bearbeiten, nie die erzeugte Datei.
 - **Sicherheitslücken** nicht als öffentliches Issue, sondern über den Meldeweg
   in [SECURITY.md](SECURITY.md).
-- Beiträge stehen unter der [Apache-Lizenz 2.0](LICENSE).
+- Beiträge stehen unter der [GNU AGPL v3.0](LICENSE). Zusätzlich räumst du dem
+  Urheber (Florian Stampe) ein unbefristetes, nicht ausschließliches Recht ein,
+  deinen Beitrag auch unter anderen Lizenzen weiterzugeben, einschließlich
+  proprietärer. Dein Urheberrecht behältst du.
 - **Achtstellige Kennungen** wie `TODO 1b84ecab` in Commits, Kommentaren und Doku
   verweisen auf den Aufgaben-Tracker des Maintainers, nicht auf Issues.

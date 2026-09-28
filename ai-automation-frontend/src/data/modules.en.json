@@ -102,5 +102,13 @@
   "webhook-signatures": {
     "name": "Webhook signatures (HMAC)",
     "description": "Per-webhook signing secret (HMAC-SHA256 in the X-Signature header); a stored secret is always enforced, the switch only gates setting and removing it."
+  },
+  "private-network-guard": {
+    "name": "Feeds: no fetches into the local network",
+    "description": "iCal feed and RSS/Atom feed fetch public addresses only: targets on localhost, in private networks, link-local (including cloud metadata 169.254.169.254), 0.0.0.0/:: or multicast are refused — the resolved IP addresses are checked, on every redirect too. Turning it off allows local feeds on purpose."
+  },
+  "private-network-guard-http-api": {
+    "name": "HTTP API: no fetches into the local network",
+    "description": "The same address check for the HTTP API connection. Off by default, because services in your own network are a common HTTP API target; turned on, it refuses them as well."
   }
 }

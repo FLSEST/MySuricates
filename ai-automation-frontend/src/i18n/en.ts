@@ -3208,7 +3208,7 @@ export const en = {
     loginNotes: {
       pi_slash_login: 'then /login in pi — or an API key as environment variable (see pi --help)',
     },
-    containerNote: 'This instance runs in a container. What counts are the programs and logins inside it, not the ones on the machine around it. How a login gets in depends on how the instance was started: in the tryout with scripts/tryout.sh login, for installer and staging instances from the machine (see startup configuration).',
+    containerNote: 'This instance runs in a container. What counts are the programs and logins inside it, not the ones on the machine around it. How a login gets in depends on how the instance was started (see the startup configuration).',
     heuristic: 'The check looks for the program on the PATH and for a login — not whether the login is still valid.',
     checkedAt: 'Checked at {time}',
     recheck: 'Check again',

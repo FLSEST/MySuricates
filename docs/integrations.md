@@ -175,7 +175,9 @@ Serien expandiert MySuricates **nicht** selbst. Zeitangaben kommen im Google-For
   selbst ansteuert — dort diese Adresse eintragen.
 - **iCal-Feed** (`ical-feed`): keine Zugangsdaten (`requiresCredentials() == false`), die Feed-URL ist
   Parameter von `list_events` (`url`, `from`, `to`, `limit`, `timeZone`); `webcal://` wird als https gelesen.
-  Download mit 10 s Verbindungs-/20 s Gesamt-Timeout, höchstens 5 MB, nur Antworten mit `BEGIN:VCALENDAR`.
+  Download mit 10 s Verbindungs-/20 s Gesamt-Timeout, höchstens 5 MB, nur Antworten mit `BEGIN:VCALENDAR`;
+  Weiterleitungen folgt der Provider selbst (höchstens 5, nie von https auf http) und prüft jede wie die
+  Start-URL, nur öffentliche Ziele ([Abrufe ins lokale Netz](#abrufe-ins-lokale-netz)).
   Geliefert werden Einzeltermine, die den Zeitraum überschneiden, und Serien-Master mit `rrule` und
   `recurring: true` (erstes Vorkommen als `start`; `UNTIL` in der Vergangenheit blendet die Serie aus,
   `EXDATE` bleibt unberücksichtigt) plus ein `note`-Hinweis. Fehler nennen nur den Host, nie Pfad oder Query —
@@ -222,9 +224,67 @@ geprüft, ein Umschalten zur Laufzeit wirkt sofort.
 - *Auth-Header nie ausgeben:* verschlüsselt gespeichert, nicht in Logs (geloggt werden nur
   Methode, Host und Pfad), und sein Wert wird aus Antwort, `location` und Fehlermeldungen durch
   `***` ersetzt — ein Dienst, der Request-Header zurückspiegelt, verrät ihn nicht.
-- *Bewusst offen:* Ziele im eigenen Netz (localhost, private Adressen) werden nicht gesperrt — die
-  Basis-URL trägt der Betreiber selbst ein, und genau solche Dienste sind oft das Ziel. Wer das
-  nicht will, lässt das Modul aus.
+- *Eigenes Netz standardmäßig offen:* Ziele im eigenen Netz (localhost, private Adressen) sind
+  erreichbar — die Basis-URL trägt der Betreiber selbst ein, und genau solche Dienste sind oft das
+  Ziel. Wer das nicht will, schaltet `private-network-guard-http-api` ein (siehe
+  [Abrufe ins lokale Netz](#abrufe-ins-lokale-netz)); geprüft wird dann bei jedem Aufruf, nicht beim
+  Speichern.
+
+### Abrufe ins lokale Netz
+
+iCal-Feed, RSS/Atom und HTTP-API rufen URLs ab, die im Workflow oder in der Verbindung stehen. Damit sie
+nicht zum Sprungbrett in das Netz der Instanz werden, geht jeder Abruf durch `OutboundTargetGuard`
+(`service/integration/`). Ob geprüft wird, entscheidet je Provider ein Härtungsschalter:
+
+| Schalter | Umgebungsvariable | Default | Gilt für |
+|---|---|---|---|
+| `automation.hardening.private-network-guard` | `AUTOMATION_HARDENING_PRIVATE_NETWORK_GUARD` | `true` | iCal-Feed, RSS/Atom |
+| `automation.hardening.private-network-guard-http-api` | `AUTOMATION_HARDENING_PRIVATE_NETWORK_GUARD_HTTP_API` | `false` | HTTP-API |
+
+Die HTTP-API ist standardmäßig offen, weil Dienste im eigenen Netz ihr häufigstes Ziel sind. Ist ein
+Schalter an, gilt:
+
+- Der Host wird aufgelöst, und **jede** gelieferte Adresse muss öffentlich sein. Abgelehnt werden
+  Loopback (`127.0.0.0/8`, `::1`, also auch `localhost`), `0.0.0.0/8` und `::`, private Netze
+  (`10/8`, `172.16/12`, `192.168/16`, `fc00::/7`, `fec0::/10`), `100.64.0.0/10` (Carrier-NAT, Tailscale),
+  Link-Local (`169.254/16` samt Cloud-Metadaten `169.254.169.254`, `fe80::/10`), Multicast und Broadcast —
+  auch als IPv4 in IPv6 verpackt (`::ffff:…`, `::a.b.c.d`, NAT64 `64:ff9b::/96`). Ein öffentlicher Name,
+  der auf eine interne Adresse zeigt, fällt damit ebenso auf wie eine IP in der URL.
+- **Weiterleitungen:** iCal-Feed und RSS/Atom folgen ihnen selbst und prüfen jeden Hop vor dem Verbinden;
+  die HTTP-API folgt keinen.
+- Die Fehlermeldung nennt Host und Adresse und den Schalter; ein nicht auflösbarer Host ist ein Fehler,
+  kein Durchlass.
+- **Grenze:** Zwischen dieser Auflösung und der des HTTP-Clients liegt ein kurzes Fenster — ein Name, dessen
+  DNS-Antwort genau dazwischen wechselt (DNS-Rebinding mit sehr kurzer TTL), wird nicht erkannt.
+
+Beide Schalter sind wie alle Härtungsschalter nur in der Startkonfiguration änderbar, nie per REST — ein
+abgeflossener API-Key kann eine Sperre weder lösen noch setzen. Wirksam nach Neustart; `false` gibt lokale
+Quellen bewusst frei (etwa einen Kalender im Heimnetz).
+
+**Zusätzlich auf Container-Ebene:** Die Prüfung gilt nur für diese drei Provider. Wer mehr will, kann die
+ausgehenden Verbindungen des MySuricates-Containers selbst einschränken, etwa über ein eigenes
+Docker-Netzwerk oder Firewall-Regeln auf dem Host. Das trifft dann aber alles im Container — auch die
+KI-CLIs, Shell-Blöcke und die übrigen Integrationen —, also vorher klären, welche Ziele diese brauchen.
+
+#### Zielart eines Providers (Outbound-Guard)
+
+`OutboundTargetGuard` ist der **Outbound-Guard**: die Prüfung, wohin die Instanz selbst Verbindungen aufbaut.
+Er schützt nicht die Instanz vor Zugriffen von außen (dafür sind Bindung auf `127.0.0.1` und API-Key da),
+sondern das Netz der Instanz davor, dass eine eingegebene URL die Instanz als Sprungbrett benutzt. Welche
+Rolle er für einen Provider spielt, folgt aus dessen **Zielart**:
+
+| Zielart | Woher die URL kommt | Outbound-Guard | Provider heute |
+|---|---|---|---|
+| fester Host | steht im Code | nicht nötig | GitHub, Google, Slack, Telegram, Todoist, Trello, Open-Meteo, OAuth-Token-Endpunkte |
+| öffentliche Quelle | frei eingegeben, soll aus dem Internet kommen | an (`private-network-guard`) | iCal-Feed, RSS/Atom |
+| eigener Dienst | frei eingegebene Basis-URL eines selbst betriebenen Dienstes | per Schalter, Standard aus (Heimnetz ist legitim) | HTTP-API (`private-network-guard-http-api`); CalDAV, Gitea, GitLab, Jira/Confluence mit eigener URL und ntfy mit eigenem Server prüfen noch nicht |
+
+**Neuer Provider:** zuerst die Zielart festlegen. Kommt eine URL aus Verbindung, Parametern oder
+Workflow, geht jeder Abruf — auch jeder Hop einer Weiterleitung — durch `OutboundTargetGuard.check`, mit
+dem Schalter, der zur Zielart passt. Noch baut jeder Provider seinen HTTP-Client selbst; geplant ist eine
+gemeinsame Stelle für ausgehende Clients, an der die Zielart deklariert wird und ein Architektur-Test
+eigene Clients verbietet. Nicht vom Outbound-Guard erfasst sind Shell-Blöcke (Code des Besitzers, bewusst
+frei) und die KI-CLIs (eigene Werkzeuge und Rechte).
 
 ### OAuth-Endpunkte & Scopes je Provider
 
@@ -304,8 +364,9 @@ Hinweise:
 - **RSS/Atom** (`feed`) liest RSS 2.0, Atom 1.0 und RSS 1.0 (RDF). `fetch_feed` liefert je Eintrag
   Titel, Link, Datum (ISO 8601, UTC; RFC-822- und ISO-Angaben werden normalisiert), Zusammenfassung
   (HTML entfernt, auf 500 Zeichen gekürzt), Autor und id/guid — neueste zuerst, `limit` Standard 20
-  (höchstens 200); mit `since` fallen ältere und undatierte Einträge weg. Abruf nur über http/https,
-  auch bei jeder Weiterleitung (höchstens 5), Antwort höchstens 5 MB, Timeouts 10 s/20 s. Der
+  (höchstens 200); mit `since` fallen ältere und undatierte Einträge weg. Abruf nur über http/https und
+  nur an öffentliche Adressen ([Abrufe ins lokale Netz](#abrufe-ins-lokale-netz)), beides auch bei jeder
+  Weiterleitung (höchstens 5), Antwort höchstens 5 MB, Timeouts 10 s/20 s. Der
   XML-Parser lehnt jede DOCTYPE-Deklaration ab (kein XXE, keine Entity-Expansion). Intern:
   `FeedFetcher` (HTTP-Grenzen), `FeedParser`, `FeedDates`, `FeedText` (HTML → Text).
 - **Open-Meteo** (`open-meteo`): `forecast` gegen `api.open-meteo.com/v1/forecast` (latitude −90…90,

@@ -1,7 +1,7 @@
-# Genau eine MySuricates-Instanz. Nicht direkt benutzen: scripts/instance.sh setzt Name, Port und
-# Benutzer-ID und erzeugt daneben das Override mit den Mounts dieses Rechners
+# Genau eine MySuricates-Instanz. Nicht direkt benutzen: scripts/instance.sh setzt Namen (Container,
+# Volumes, Image aus MYSURICATES_PREFIX und dem Instanznamen), Port und Benutzer-ID und erzeugt daneben das Override mit den Mounts dieses Rechners
 # (scripts/lib/host-mounts.sh). Mehrere Instanzen (z. B. Dev · Test · Prod) = mehrere Namen.
-name: mysuricates-${MYSURICATES_NAME:?}
+name: ${MYSURICATES_CONTAINER:?}
 services:
   app:
     build:
@@ -11,8 +11,8 @@ services:
       args:
         # Neuer Wert (etwa der Monat) = NodeSource- und Docker-Repo frisch statt aus dem Layer-Cache (8b7a39b9)
         APT_REFRESH: ${MYSURICATES_APT_REFRESH:-}
-    image: mysuricates:local
-    container_name: mysuricates-${MYSURICATES_NAME:?}
+    image: ${MYSURICATES_IMAGE:?}
+    container_name: ${MYSURICATES_CONTAINER:?}
     ports:
       - "${MYSURICATES_BIND:-127.0.0.1}:${MYSURICATES_PORT:?}:9090"
     # Alle AUTOMATION_*-Zeilen der Instanz-Datei (Einzelmodule, Haertung, Standard-Anbieter …)
@@ -30,7 +30,7 @@ services:
       - AUTOMATION_CORS_ORIGINS=http://localhost:${MYSURICATES_PORT:?},http://127.0.0.1:${MYSURICATES_PORT:?}
       # Innen lauscht das Backend auf 9090; den veröffentlichten Port kennt es nur hierüber (Onboarding-Texte).
       - AUTOMATION_INSTANCE_URL=http://localhost:${MYSURICATES_PORT:?}
-      - AUTOMATION_INSTANCE_CONTAINER=mysuricates-${MYSURICATES_NAME:?}
+      - AUTOMATION_INSTANCE_CONTAINER=${MYSURICATES_CONTAINER:?}
       - AUTOMATION_HARDENING_SEALING=${MYSURICATES_HARDENING_SEALING:-false}
       - AUTOMATION_HARDENING_REQUIRESEALEDFORUNATTENDED=${MYSURICATES_HARDENING_REQUIRE_SEALED:-false}
     volumes:
@@ -40,6 +40,6 @@ services:
     restart: unless-stopped
 volumes:
   data:
-    name: mysuricates-${MYSURICATES_NAME:?}-data
+    name: ${MYSURICATES_CONTAINER:?}-data
   secrets:
-    name: mysuricates-${MYSURICATES_NAME:?}-secrets
+    name: ${MYSURICATES_CONTAINER:?}-secrets

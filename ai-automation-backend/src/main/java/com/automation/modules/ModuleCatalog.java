@@ -94,7 +94,15 @@ public enum ModuleCatalog {
                     + "(including an agent) who holds the API key."),
     WEBHOOK_SIGNATURES("webhook-signatures", HARDENING, EXPERIMENTAL, false, Set.of(), List.of("webhooks"),
             "Per-webhook HMAC-SHA256 signing secret (X-Signature). A stored secret is always enforced; "
-                    + "the switch gates setting and removing it.");
+                    + "the switch gates setting and removing it."),
+    PRIVATE_NETWORK_GUARD("private-network-guard", HARDENING, EXPERIMENTAL, true, Set.of(), List.of(),
+            "The iCal feed and RSS/Atom feed integrations refuse targets that resolve to localhost, private "
+                    + "networks, link-local (incl. cloud metadata), unspecified or multicast addresses — also "
+                    + "on every redirect hop. Turn it off in the startup configuration to fetch local feeds on purpose."),
+    PRIVATE_NETWORK_GUARD_HTTP_API("private-network-guard-http-api", HARDENING, EXPERIMENTAL, false, Set.of(),
+            List.of(),
+            "The same address check for the http-api integration. Off by default, because services in your "
+                    + "own network are a common http-api target; turn it on to refuse them as well.");
 
     private final String key;
     private final ModuleTier tier;

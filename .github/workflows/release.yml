@@ -1,0 +1,69 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Vorhandenes v*-Tag, für das nachträglich ein Release entstehen soll"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: GitHub-Release anlegen
+    runs-on: ubuntu-26.04
+    steps:
+      # fetch-depth: 0 — release-notes.sh braucht die volle Historie (Merge-Commits zwischen
+      # den Tags, das vorige Tag selbst).
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - name: Tag bestimmen
+        id: tag
+        run: |
+          TAG="${{ github.event.inputs.tag }}"
+          if [ -z "$TAG" ]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+          fi
+          if ! git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
+            echo "Tag ${TAG} existiert nicht." >&2
+            exit 1
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+      - name: Vorgänger-Tag bestimmen
+        id: prev
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          # Nach Semver sortiert: die Zeile direkt vor dem eigenen Tag ist der Vorgaenger — robuster
+          # als --merged, weil es nicht von der First-Parent-Topologie abhaengt.
+          PREV="$(git tag --list 'v[0-9]*' --sort=v:refname | grep -B1 -x "$TAG" | head -1)"
+          [ "$PREV" = "$TAG" ] && PREV=""
+          echo "prev=${PREV}" >> "$GITHUB_OUTPUT"
+      # Eine mitgelieferte Notizdatei (aus dem Übergabe-Workflow, der einen geprüften Commit samt
+      # Tag ins öffentliche Repo bringt) hat Vorrang — release-notes.sh setzt dort an, wo die
+      # eigene Historie dieses Repos aufhört (siehe docs/entwicklung.md → „GitHub-Release bei
+      # jedem Tag").
+      - name: Notizen bereitstellen
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          PREV="${{ steps.prev.outputs.prev }}"
+          SUPPLIED="release-notes/${TAG}.md"
+          if [ -f "$SUPPLIED" ]; then
+            echo "Verwende mitgelieferte Notizdatei ${SUPPLIED}"
+            cp "$SUPPLIED" notes.md
+          else
+            echo "Erzeuge Notizen aus der Historie dieses Repos (Vorgänger: ${PREV:-keiner})"
+            bash scripts/release-notes.sh "$PREV" "$TAG" > notes.md
+          fi
+      - name: GitHub-Release anlegen
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.tag.outputs.tag }}" \
+            --verify-tag \
+            --title "${{ steps.tag.outputs.tag }}" \
+            --notes-file notes.md

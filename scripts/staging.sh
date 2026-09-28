@@ -7,7 +7,10 @@
 # Umgebungsvariable gewinnt:
 #   STABLE_AI_FROM_HOST / TEST_AI_FROM_HOST    programs | login (Default) | all
 #   STABLE_AI_PROVIDERS / TEST_AI_PROVIDERS    Auswahl aus claude,codex,pi (Default: alle)
-#   STABLE_DOCKER_SOCKET / TEST_DOCKER_SOCKET  1 (Default, wie bisher) | 0
+#   STABLE_DOCKER_SOCKET / TEST_DOCKER_SOCKET  0 (Default) | 1 = volle Kontrolle ueber Docker auf dem
+#                                              Rechner (Projekt-Container, Terminal, container_image) — bewusst setzen
+#   STABLE_BIND / TEST_BIND                    Adresse fuer den Port, Default 127.0.0.1 (nur dieser Rechner);
+#                                              0.0.0.0 = auch aus dem lokalen Netz — bewusst setzen
 # Jeder Compose-Aufruf nimmt die daraus erzeugte Override-Datei mit — auch die aus dem Backend
 # (StagingService/TestingService holen sie ueber `staging.sh write-override`).
 set -euo pipefail
@@ -52,24 +55,46 @@ staging_setting() {
     printf '%s' "${v:-$3}"
 }
 
+# staging_ports_yaml PORT BIND — der ports-Block der Override-Datei (Service-Ebene). Standard ist
+# 127.0.0.1: nur dieser Rechner erreicht die Instanz, wie bei deploy/ (MYSURICATES_BIND). Bei jeder
+# anderen Adresse ausser 0.0.0.0 (schliesst 127.0.0.1 ein) kommt 127.0.0.1 dazu, damit Health-Pruefung
+# und Oberflaeche die Instanz weiter ueber localhost erreichen.
+staging_ports_yaml() {
+    local port="$1" addrs="$2" a
+    case "$2" in 127.0.0.1|0.0.0.0) ;; *) addrs="$2 127.0.0.1" ;; esac
+    echo "    ports:"
+    for a in $addrs; do
+        printf '      - target: %s\n        published: "%s"\n        host_ip: "%s"\n' "$port" "$port" "$a"
+    done
+}
+
 # write_override stable|test — schreibt die Override-Datei und gibt ihren Pfad aus (nur den: das
 # Backend liest ihn). Hinweise zu fehlenden Anbietern gehen nach stderr.
 write_override() {
-    local env="$1" service prefix file missing
+    local env="$1" service prefix port bind file missing login_command=""
     case "$env" in
-        stable) service=stable; prefix=STABLE_ ;;
-        test)   service=test; prefix=TEST_ ;;
+        stable) service=stable; prefix=STABLE_; port=9091 ;;
+        test)   service=test; prefix=TEST_; port=8090 ;;
         *) err "write-override: stable|test"; return 2 ;;
+    esac
+    bind="$(staging_setting "$env" BIND 127.0.0.1)"
+    case "$bind" in
+        *[!0-9a-fA-F.:]*) err "Ungueltiges ${prefix}BIND '$bind' (eine IP-Adresse, z. B. 127.0.0.1 oder 0.0.0.0) — $STAGING_ENV"
+                          return 2 ;;
     esac
     mkdir -p "$OVERRIDE_DIR"
     file="$OVERRIDE_DIR/$env.override.yml"
-    if ! host_mounts_yaml "$service" "" "$(staging_setting "$env" DOCKER_SOCKET 1)" \
+    # Nur im Modus programs meldet sich der Container selbst an (cmd_login) — die Statuskarte zeigt
+    # dann den Befehl, der das tut (fester Text, nie ausgefuehrt).
+    [ "$(staging_setting "$env" AI_FROM_HOST login)" = programs ] && login_command="scripts/staging.sh login $env"
+    if ! host_mounts_yaml "$service" "" "$(staging_setting "$env" DOCKER_SOCKET 0)" \
             "$(staging_setting "$env" AI_FROM_HOST login)" "$(staging_setting "$env" AI_PROVIDERS "")" \
-            "$STAGING_ENV" "$prefix" > "$file.tmp"; then
+            "$STAGING_ENV" "$prefix" "$login_command" > "$file.tmp"; then
         rm -f "$file.tmp"
         err "Ungueltige ${prefix}AI_*-Werte (programs|login|all, claude,codex,pi) — $STAGING_ENV"
         return 2
     fi
+    staging_ports_yaml "$port" "$bind" >> "$file.tmp"
     mv "$file.tmp" "$file"
     missing="$(host_mounts_missing_text)"
     [ -z "$missing" ] || printf 'KI-Anbieter, die %s nicht nutzen kann:\n%s\n' "$env" "$missing" >&2
@@ -443,7 +468,7 @@ usage() {
     echo "  write-override stable|test    Write the compose override (what comes from the host), print its path"
     echo "  login stable|test [provider]  Own login inside the container (only with *_AI_FROM_HOST=programs)"
     echo ""
-    echo "Switches: $STAGING_ENV (STABLE_/TEST_ + AI_FROM_HOST, AI_PROVIDERS, DOCKER_SOCKET)"
+    echo "Switches: $STAGING_ENV (STABLE_/TEST_ + AI_FROM_HOST, AI_PROVIDERS, DOCKER_SOCKET=0|1, BIND=127.0.0.1)"
 }
 
 case "${1:-}" in

@@ -18,6 +18,7 @@ import com.automation.service.workflow.RunAutoResumer;
 import com.automation.service.workflow.WorkflowExecutor;
 import jakarta.persistence.EntityManager;
 
+import java.lang.management.ManagementFactory;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -81,12 +82,18 @@ record InterruptedRunFixture(WorkflowExecutor executor, ProjectRepository projec
 
         WorkflowRun run = runs.findById(finished.getId()).orElseThrow();
         run.setStatus(status);
+        run.setStartedAt(beforeJvmStart());
         run.setCompletedAt(null);
         run.setError(null);
         tweak.accept(run);
         runs.saveAndFlush(run);
         entityManager.clear();
         return run;
+    }
+
+    /** A start time of a previous lifecycle: the startup cleanup skips runs started in this JVM. */
+    static Instant beforeJvmStart() {
+        return Instant.ofEpochMilli(ManagementFactory.getRuntimeMXBean().getStartTime()).minusSeconds(60);
     }
 
     WorkflowRun reload(WorkflowRun run) {

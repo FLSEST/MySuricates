@@ -37,6 +37,7 @@ scripts/instance.sh down --name main     # stop; data stays in the volumes, runn
 | `MYSURICATES_HARDENING_SEALING`, `MYSURICATES_HARDENING_REQUIRE_SEALED` | hardening, `true`/`false` |
 | `MYSURICATES_ENVIRONMENT` | display name, e.g. `Prod` |
 | `MYSURICATES_APT_REFRESH` | a new value (e.g. the month) makes the next `up` fetch the image's NodeSource and Docker repos afresh instead of taking keys, package lists and packages from the layer cache of the first build; also works as an environment variable (8b7a39b9) |
+| `MYSURICATES_PREFIX` | prefix of the Docker names, default `mysuricates`: container and compose project `<prefix>-<name>`, volumes `<prefix>-<name>-data`/`-secrets`, image `<prefix>:local`; also works as an environment variable. The installer probe uses it to keep its instances apart from real ones on the same machine |
 
 The image is built from the tracked files of the clone (`git ls-files`) as they are in the working
 tree: changed tracked files go in, whatever exists only locally — such as pool definitions kept out
@@ -77,6 +78,15 @@ nor login. With `login` and `programs` every provider has its own directory on t
 (`/app/data/providers/<provider>`, via `CLAUDE_CONFIG_DIR`, `CODEX_HOME` and `PI_CODING_AGENT_DIR`):
 whatever the programs write there — sessions, caches — never reaches the machine.
 
+**Login command in the "AI providers" card.** In `programs` mode the starter knows the command that logs
+in inside the container — the container itself has no idea how it was started, so the starter passes it
+along as `MYSURICATES_LOGIN_COMMAND` (fixed text it already has anyway, never built from any input). The
+backend only shows it, never runs it. Tryout: `scripts/tryout.sh login [claude|codex|pi]`. `instance.sh`
+in `programs`: `scripts/instance.sh login`. `staging.sh` in `programs`: `scripts/staging.sh login stable`
+or `scripts/staging.sh login test`. In the default `login` mode (the login comes from the machine, see
+below) and for the dev container, which has no `login` subcommand of its own, it stays at the general
+hint, as before this command existed.
+
 **Why Claude needs a token.** Claude replaces `~/.claude/.credentials.json` every time it refreshes the
 login (new file, then rename). A file mounted on its own would keep pointing at the old one inside the
 container, and after the next refresh on the machine the container would be logged out. Codex and Pi
@@ -103,15 +113,39 @@ disappears with the container. With `programs` it gets no token. Only with `all`
 `~/.claude` and `~/.claude.json` read-write, as before. Without `claude` in `…AI_PROVIDERS` it gets
 nothing of Claude.
 
-| Way | Switches | Docker socket without a switch |
-|---|---|---|
-| `scripts/instance.sh`, including the installer mode "Dev · Test · Prod" | `MYSURICATES_AI_FROM_HOST`, `MYSURICATES_AI_PROVIDERS`, `MYSURICATES_DOCKER_SOCKET` in `deploy/instances/<name>.env` | off |
-| Stable and Test (`scripts/staging.sh`, start from the UI) | `STABLE_…` or `TEST_…` with `AI_FROM_HOST`, `AI_PROVIDERS`, `DOCKER_SOCKET` in `~/.config/mysuricates/staging.env` — read line by line, never executed; an environment variable of the same name wins | on |
-| Dev container (`scripts/start-autotrigger-dev.sh --container`) | `AUTOTRIGGER_DEV_AI_FROM_HOST`, `AUTOTRIGGER_DEV_AI_PROVIDERS`, `AUTOTRIGGER_DEV_DOCKER_SOCKET` | on |
+| Way | Switches | Port without a switch | Docker socket without a switch |
+|---|---|---|---|
+| `scripts/instance.sh`, including the installer mode "Dev · Test · Prod" | `MYSURICATES_AI_FROM_HOST`, `MYSURICATES_AI_PROVIDERS`, `MYSURICATES_DOCKER_SOCKET`, `MYSURICATES_BIND` in `deploy/instances/<name>.env` | `127.0.0.1` | off |
+| Stable and Test (`scripts/staging.sh`, start from the UI) | `STABLE_…` or `TEST_…` with `AI_FROM_HOST`, `AI_PROVIDERS`, `DOCKER_SOCKET`, `BIND` in `~/.config/mysuricates/staging.env` — read line by line, never executed; an environment variable of the same name wins | `127.0.0.1` | off |
+| Dev container (`scripts/start-autotrigger-dev.sh --container`) | `AUTOTRIGGER_DEV_AI_FROM_HOST`, `AUTOTRIGGER_DEV_AI_PROVIDERS`, `AUTOTRIGGER_DEV_DOCKER_SOCKET`, `AUTOTRIGGER_DEV_CONTAINER_BIND` | `127.0.0.1` | off |
+| Tryout (`scripts/tryout.sh`) | none | `127.0.0.1` | off |
 
-With the socket a workflow can reach the whole machine via `docker run -v /:/host …`; the boundary above
-then only guards against mistakes. Stable, Test and the dev container keep it so container blocks keep
-running there — if you take the boundary seriously, switch it off there.
+**Secure by default, on every Docker way:** the port is reachable from this machine only, and the
+instance gets no Docker socket. Only an explicit switch changes that.
+
+**Opening the port.** `…BIND=0.0.0.0` makes the instance reachable from the local network (phone, PWA,
+other machines) — bypassing the host firewall, because Docker adds its port forwards itself. A single
+address, such as the LAN IP, works too; Stable and Test then stay reachable on `127.0.0.1` as well, so
+the health check and the UI still find them. For Stable and Test `staging.sh` writes the port into the
+override file; `docker-compose.stable.yml` and `docker-compose.test.yml` publish none themselves. For
+remote access, put a VPN in front (Tailscale, see [Container path](#container-path)) rather than opening
+the port.
+
+**What is missing without the socket.** The instance then reports Docker as "not set up"; workflows
+with ordinary shell and AI blocks keep running. Missing are:
+
+- Project containers: a run starts no `automation-<project-id>` container, commands in the middle of a
+  run and the terminal do not work.
+- Shell blocks with `container_image` (agent containers) fail.
+- Shell blocks that call `docker` themselves — say a workflow that builds images or starts
+  `scripts/staging.sh` — fail.
+- Starting Stable/Test from the UI of a container instance: that calls `docker compose`.
+
+If you need that, set `STABLE_DOCKER_SOCKET=1` (or `TEST_…`, `AUTOTRIGGER_DEV_DOCKER_SOCKET=1`,
+`MYSURICATES_DOCKER_SOCKET=1`) and restart the instance. With the socket a workflow can reach the whole
+machine via `docker run -v /:/host …`; the boundary above then only guards against mistakes. Until this
+change Stable, Test and the dev container had the socket by default and published their port on all
+addresses: if you still need that, add the switches before the next `promote` or `test-promote`.
 
 Limits: a Claude installed via npm (instead of the native installer) is not mounted with `login` and
 `programs`. On macOS no programs are mounted (3dd32594). Codex's own sandbox (`--sandbox read-only`)
@@ -246,7 +280,7 @@ Only builds the agent images (`profiles: build-only`), starts no service.
 Stable environment on port 9091:
 - Container: `mysuricates-stable`
 - Profile: `SPRING_PROFILES_ACTIVE=stable`
-- Volumes: `stable-data` (persistent DB), `stable-secrets` (integration and seal keys, kept apart from the DB — 3fb2242c), `stable-frontend/` (read-only; the built UI that `scripts/staging.sh snapshot` copies there from `ai-automation-frontend/dist` — without this folder `staging.sh start` refuses to start), host project directories, backup volume (`~/.autotrigger/backups/stable`); AI providers and the Docker socket come from the override file of `scripts/staging.sh` ([AI providers in the container](#ai-providers-in-the-container))
+- Volumes: `stable-data` (persistent DB), `stable-secrets` (integration and seal keys, kept apart from the DB — 3fb2242c), `stable-frontend/` (read-only; the built UI that `scripts/staging.sh snapshot` copies there from `ai-automation-frontend/dist` — without this folder `staging.sh start` refuses to start), host project directories, backup volume (`~/.autotrigger/backups/stable`); AI providers, Docker socket (off by default) and port (only `127.0.0.1:9091` by default) come from the override file of `scripts/staging.sh` ([AI providers in the container](#ai-providers-in-the-container))
 - Named Volume: `stable-data`
 
 ### `docker-compose.test.yml`
@@ -255,7 +289,7 @@ Test instance on port 8090 (uses `docker/Dockerfile.stable` as build base):
 - Container: `mysuricates-test`
 - Image: `ai-automation-backend-test`
 - Profile: `SPRING_PROFILES_ACTIVE=test`
-- Volumes: `test-data` (persistent DB), `test-secrets` (keys as for Stable), `stable-frontend/` (read-only, the same built UI as for Stable), `application-test.yml` (read-only), backup volume (`~/.autotrigger/backups/test`); AI providers and the Docker socket as for Stable
+- Volumes: `test-data` (persistent DB), `test-secrets` (keys as for Stable), `stable-frontend/` (read-only, the same built UI as for Stable), `application-test.yml` (read-only), backup volume (`~/.autotrigger/backups/test`); AI providers, Docker socket and port (`127.0.0.1:8090`) as for Stable
 - Healthcheck: `curl -f http://localhost:8090/api/v1/system/health`
 - Named Volume: `test-data`
 
@@ -272,7 +306,7 @@ Test instance on port 8090 (uses `docker/Dockerfile.stable` as build base):
 | `AUTOMATION_MODULES_PRESET` | `core` | Optional modules at startup: `core`, `research` or `full` (see [Module System](architektur.md#module-system-startup-configuration)) |
 | `AUTOMATION_MODULES_<NAME>` | (preset) | Switch a single module, e.g. `AUTOMATION_MODULES_REMOTE_ACCESS=true` — wins over the preset |
 | `AUTOMATION_MODULES_UI_EDITABLE` | `false` | `true` = feature modules can also be switched in the settings (applies immediately). Anyone with the API key can then turn on e.g. webhooks or the terminal — keep it off on publicly reachable instances |
-| `AUTOMATION_HARDENING_<NAME>` | `provenance`: `true`, others `false` | Hardening flags `PROVENANCE`, `SEALING` (requires provenance), `REQUIRE_SEALED_FOR_UNATTENDED` (requires sealing), `WEBHOOK_SIGNATURES` (requires module webhooks) — see [Workflow Hardening](architektur.md#workflow-hardening-optional) |
+| `AUTOMATION_HARDENING_<NAME>` | `provenance`, `private-network-guard`: `true`, others `false` | Hardening flags `PROVENANCE`, `SEALING` (requires provenance), `REQUIRE_SEALED_FOR_UNATTENDED` (requires sealing), `WEBHOOK_SIGNATURES` (requires module webhooks), `PRIVATE_NETWORK_GUARD` (iCal/RSS feeds only to public addresses), `PRIVATE_NETWORK_GUARD_HTTP_API` (the same for http-api, default `false`) — see [Workflow Hardening](architektur.md#workflow-hardening-optional) |
 | `AUTOMATION_HOST_CLAUDE_TIMEOUT` | `300` | Global Claude CLI timeout in seconds (declared in `application.yml`) |
 | `AUTOMATION_HOST_CLAUDE_MAX_TOKENS` | (empty) | Optional per-call token limit for Claude CLI |
 | `AUTOMATION_DISCOVERY_AUTO_TAGGING_ENABLED` | `true` | Tags and category of a workflow via AI (`suggestions-model`), after every create/change and at startup for untagged workflows — `false` saves these background calls (test and side instances) |
@@ -319,6 +353,8 @@ AUTOMATION_HARDENING_PROVENANCE=false
 AUTOMATION_HARDENING_SEALING=false
 AUTOMATION_HARDENING_REQUIRE_SEALED_FOR_UNATTENDED=false
 AUTOMATION_HARDENING_WEBHOOK_SIGNATURES=false
+AUTOMATION_HARDENING_PRIVATE_NETWORK_GUARD=false
+AUTOMATION_HARDENING_PRIVATE_NETWORK_GUARD_HTTP_API=false
 ```
 
 ```bash
@@ -329,6 +365,8 @@ AUTOMATION_HARDENING_PROVENANCE=true
 AUTOMATION_HARDENING_SEALING=true
 AUTOMATION_HARDENING_REQUIRE_SEALED_FOR_UNATTENDED=true   # seal workflows first, see below
 AUTOMATION_HARDENING_WEBHOOK_SIGNATURES=true
+AUTOMATION_HARDENING_PRIVATE_NETWORK_GUARD=true
+AUTOMATION_HARDENING_PRIVATE_NETWORK_GUARD_HTTP_API=true
 ```
 
 > **Before "maximal":** `require-sealed-for-unattended` refuses every unattended run of an unsealed workflow (schedules, webhooks, TODO/completion triggers, auto-repair, wishes — also through chains and sub-workflows). Seal the affected workflows first, or keep this one switch `false`. With `full` and `ui-editable`, anyone holding the API key can also turn on modules with network, credential and host access — only on instances that are not publicly reachable.
@@ -599,10 +637,12 @@ Technical version with class names and reserved context keys:
 
 Neither backend nor frontend binds to loopback on its own: `server.address` is set nowhere, so the
 backend listens on all interfaces; Vite runs with `host: true`. Started from source (Dev), the
-instance is therefore reachable on the local network, not just on the machine itself. Via `deploy/`,
-`instance.sh` instead publishes the port on `127.0.0.1` only by default (`MYSURICATES_BIND`, see
-[One instance in a container](#one-instance-in-a-container-deploy)) — changing that also bypasses the
-usual host firewall rules (Docker's port publishing).
+instance is therefore reachable on the local network, not just on the machine itself. Every Docker
+way instead publishes the port on `127.0.0.1` only by default — `instance.sh` (`MYSURICATES_BIND`, see
+[One instance in a container](#one-instance-in-a-container-deploy)), Stable and Test
+(`STABLE_BIND`/`TEST_BIND`), the dev container (`AUTOTRIGGER_DEV_CONTAINER_BIND`) and the tryout image
+([table](#ai-providers-in-the-container)) — changing that also bypasses the usual host firewall rules
+(Docker's port publishing).
 
 **CORS** does not affect an installed instance: the backend serves the UI itself, so page and API
 share one origin. The list only matters where the two have different origins — with the Vite dev
@@ -687,7 +727,7 @@ These two are easily confused:
    A denial is written to the activity log as a SECURITY entry.
 2. **The socket in the backend container** (`/var/run/docker.sock`) is independent of point 1 and gives
    the application full control over Docker on the host. For `instance.sh`, Stable, Test and the dev
-   container a switch decides it ([AI providers in the container](#ai-providers-in-the-container)).
+   container a switch decides it, off by default ([AI providers in the container](#ai-providers-in-the-container)).
 
 ### Container Image Allowlist
 
@@ -704,7 +744,8 @@ of the image. An image starting with `-` is always rejected (regardless of the a
 
 - Only run it on a network you trust; for remote access put a VPN in front instead of opening the port.
 - Set your own API key and verify it is not empty.
-- Switch the Docker socket off (`…DOCKER_SOCKET=0`) if you do not need container blocks.
+- Leave the Docker socket off (the default on every Docker way) and set `…DOCKER_SOCKET=1` only when
+  project containers, the terminal or container blocks are needed.
 - In production, set `AUTOMATION_ALLOWED_CONTAINER_IMAGES` to the images you actually need instead
   of staying on the empty default (= all images allowed).
 - Do not run workflows from an untrusted source unread — they run with your privileges.

@@ -166,6 +166,13 @@ export interface AiProviderStatus {
 export interface AiProviderStatusReport {
   /** The backend runs in a container: logins count in there, the start path decides how they get in. */
   container: boolean;
+  /**
+   * The fixed command that logs in inside this container, from the start path that launched it
+   * (e.g. `scripts/tryout.sh login [claude|codex|pi]`) — only shown, never run. Null on the host and
+   * whenever the start path has none (e.g. the default login mode, where the login happens on the
+   * machine around the container); missing entirely on an older backend.
+   */
+  loginCommand?: string | null;
   checkedAt: string;
   providers: AiProviderStatus[];
 }
