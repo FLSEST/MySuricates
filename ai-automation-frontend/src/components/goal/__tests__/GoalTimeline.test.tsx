@@ -9,6 +9,7 @@ import { renderWithProviders } from '../../../test/utils';
 import { useI18nStore } from '../../../i18n';
 import { GoalTimeline } from '../GoalTimeline';
 import { DecisionContext } from '../decisionContext';
+import { GoalWorkflowsContext } from '../goalWorkflowsContext';
 import { TimelineAxisView } from '../TimelineAxisView';
 import { NUDGE_DELAY } from '../useKeyboardNudge';
 import {
@@ -844,5 +845,33 @@ describe('GoalTimeline — decisions', () => {
     const menu = screen.getByRole('dialog', { name: 'Plan: Old banner' });
     expect(within(menu).queryByRole('button', { name: 'Decide' })).not.toBeInTheDocument();
     expect(within(menu).queryByRole('button', { name: 'Change' })).not.toBeInTheDocument();
+  });
+});
+
+// 52bc1e8c: the workflows of a package stand at its row and in its card
+describe('GoalTimeline — workflows', () => {
+  it('shows a package\'s workflows in its row label and its card, where "Assign workflow" opens the dialog', () => {
+    const openAssign = vi.fn();
+    const attachment = {
+      id: 'a2', goalId: 'g1', workPackageId: 'w-repo', workflowId: 'wf-fix', workflowName: 'Fix bot', workflowProjectId: 'p1',
+      role: 'WORKER' as const, guard: false,
+    };
+    renderWithProviders(
+      <GoalWorkflowsContext.Provider value={{ goalId: 'g1', supported: true, attachments: [attachment], results: new Map(), openAssign }}>
+        <GoalTimeline goal={goal} todos={todos} workPackages={workPackages} milestones={milestones} projects={projects}
+          onOpenTodo={vi.fn()} now={NOW} />
+      </GoalWorkflowsContext.Provider>,
+    );
+
+    const row = screen.getByTestId('timeline-row-p1-w-repo');
+    expect(within(row).getByTestId('goal-workflow-a2')).toHaveAttribute('data-tone', 'neutral');
+    expect(within(row).getByRole('button', { name: 'Start: Fix bot' })).toBeInTheDocument();
+
+    fireEvent.click(within(screen.getByTestId('timeline-bar-w-repo')).getByRole('button'));
+    const card = screen.getByRole('dialog', { name: 'Work package Repo sauber' });
+    expect(within(card).getByTestId('package-workflow-list-w-repo')).toHaveTextContent('Fix bot');
+    fireEvent.click(within(card).getByRole('button', { name: 'Assign workflow' }));
+    expect(openAssign).toHaveBeenCalledWith('w-repo');
+    expect(screen.queryByRole('dialog', { name: 'Work package Repo sauber' })).not.toBeInTheDocument();
   });
 });

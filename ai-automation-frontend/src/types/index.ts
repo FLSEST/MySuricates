@@ -1536,6 +1536,30 @@ export interface GoalDetail {
   decisionsSupported?: boolean;
 }
 
+/**
+ * Rolle eines Workflows am Ziel (52bc1e8c): WORKER „arbeitet daran“, STATUS „liefert den Stand“
+ * (sein Ergebnis ist eine Ampel mit Kennzahlen). Anzeigen und Starten gehen bei beiden.
+ */
+export type GoalWorkflowRole = 'WORKER' | 'STATUS';
+
+/**
+ * Ein Workflow am Ziel oder an einem Arbeitspaket (52bc1e8c, `GET /goals/{id}/workflows`). Der
+ * Wächter steht als erster Eintrag mit `id: "guard"` und `guard: true` darin – lösen lässt er sich
+ * nur über seinen Schalter.
+ */
+export interface GoalWorkflow {
+  id: string;
+  goalId: string;
+  /** null = am ganzen Ziel. */
+  workPackageId: string | null;
+  workflowId: string;
+  workflowName: string;
+  workflowProjectId: string | null;
+  role: GoalWorkflowRole;
+  guard: boolean;
+  createdAt?: string;
+}
+
 /** Relationskarte eines Ziels (TODO c6ea8f5c): Herkunft → TODO → Bearbeitung → Ergebnis. */
 export type GoalOriginKind = 'AUDIT' | 'HEALTH' | 'WORKFLOW_RUN' | 'AGENT' | 'USER';
 

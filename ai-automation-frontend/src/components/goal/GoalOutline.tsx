@@ -9,6 +9,7 @@ import { useAddGoalProject, useReorderGoalProjects } from '../../hooks/useGoalPr
 import { ComplexityChip, EffortChip, RatedByMark } from './GoalBadges';
 import { DueChip } from './TodoPlanChips';
 import { DecisionMark } from './DecisionMark';
+import { PackageWorkflows } from './GoalWorkflowsPanel';
 import { WorkPackageMark } from './WorkPackageMark';
 import { OutlineBar, OutlineCountColumns, OutlineGroup, OutlineToggle } from './OutlineGroup';
 import { OutlineMilestones } from './OutlineMilestones';
@@ -322,6 +323,8 @@ function PackageRow({ entry, today, expanded, onToggle, onOpenTodo, onEdit, onUp
           </button>
         </div>
       </div>
+      {/* Workflows am Paket (52bc1e8c): immer sichtbar, „+ Workflow“ nur aufgeklappt */}
+      <PackageWorkflows workPackageId={workPackage.id} title={workPackage.title} withAdd={expanded} className="pb-1 pl-6" />
       <div id={bodyId} hidden={!expanded} className="pb-1 pl-6">
         {todos.length === 0
           ? <p className="px-1.5 py-1 text-xs text-text-tertiary">{t.goals.outline.noTodos}</p>

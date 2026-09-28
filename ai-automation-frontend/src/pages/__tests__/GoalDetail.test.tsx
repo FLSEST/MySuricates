@@ -525,6 +525,143 @@ describe('GoalDetail', () => {
     });
   });
 
+  // 52bc1e8c: Workflows am Ziel oder Arbeitspaket anzeigen, starten und als Stand nutzen
+  describe('workflows', () => {
+    const guardOn = { ...detail, goal: { ...detail.goal, guard: { enabled: true, workflowId: 'wf-guard', scheduleId: 's1', nextRunAt: null } } };
+    const attachments = [
+      { id: 'guard', goalId: 'g1', workPackageId: null, workflowId: 'wf-guard', workflowName: 'Goal guard: Open-Source-Launch', workflowProjectId: 'p1', role: 'STATUS', guard: true },
+      { id: 'a1', goalId: 'g1', workPackageId: null, workflowId: 'wf-check', workflowName: 'Release check', workflowProjectId: 'p1', role: 'STATUS', guard: false },
+      { id: 'a2', goalId: 'g1', workPackageId: 'w1', workflowId: 'wf-fix', workflowName: 'Fix bot', workflowProjectId: 'p1', role: 'WORKER', guard: false },
+    ];
+    const hoursAgo = (n: number) => new Date(Date.now() - n * 3_600_000).toISOString();
+    const results = [
+      { workflowId: 'wf-check', workflowName: 'Release check', available: true,
+        run: { runId: 'run-7', status: 'COMPLETED', startedAt: hoursAgo(2), completedAt: hoursAgo(2), durationMs: 5, gateStatus: 'YELLOW' },
+        resultState: 'VALID', result: { title: '2 overdue', status: 'YELLOW', kpis: [{ label: 'Overdue', value: '2' }], items: [] } },
+      { workflowId: 'wf-fix', workflowName: 'Fix bot', available: true,
+        run: { runId: 'run-8', status: 'FAILED', startedAt: hoursAgo(1), completedAt: hoursAgo(1), durationMs: 5, gateStatus: null },
+        resultState: 'MISSING', result: null },
+    ];
+    function serveWorkflows() {
+      const sent: { method: string; path: string; body: unknown }[] = [];
+      const record = async ({ request }: { request: Request }) => {
+        const body = request.method === 'DELETE' ? null : await request.json();
+        sent.push({ method: request.method, path: new URL(request.url).pathname, body });
+        if (request.method === 'DELETE') return new HttpResponse(null, { status: 204 });
+        if (request.url.includes('/execute')) return HttpResponse.json({ id: 'run-42', status: 'PENDING' });
+        return HttpResponse.json({ ...attachments[1], ...(body as object) }, { status: request.method === 'POST' ? 201 : 200 });
+      };
+      server.use(
+        http.get('/api/v1/goals/g1', () => HttpResponse.json(guardOn)),
+        http.get('/api/v1/goals/g1/workflows', () => HttpResponse.json(attachments)),
+        http.get('/api/v1/dashboard/workflow-results', () => HttpResponse.json(results)),
+        http.get('/api/v1/workflows', () => HttpResponse.json([
+          { id: 'wf-check', projectId: 'p1', projectName: 'AutoPilot', name: 'Release check', blocks: [], createdAt: '', updatedAt: '' },
+          { id: 'wf-docs', projectId: 'p2', projectName: 'Site', name: 'Docs build', blocks: [], createdAt: '', updatedAt: '' },
+          { id: 'wf-other', projectId: 'p9', projectName: 'Elsewhere', name: 'Backup', blocks: [], createdAt: '', updatedAt: '' },
+        ])),
+        http.post('/api/v1/goals/g1/workflows', record),
+        http.patch('/api/v1/goals/g1/workflows/:id', record),
+        http.delete('/api/v1/goals/g1/workflows/:id', record),
+        http.post('/api/v1/workflows/:id/execute', record),
+      );
+      return sent;
+    }
+
+    it('lists the guard and the goal\'s workflows with their state, and starts one with the goal as context', async () => {
+      const sent = serveWorkflows();
+      renderWithProviders(
+        <>
+          <Routes><Route path="/goals/:goalId" element={<GoalDetail />} /></Routes>
+          <ToastContainer />
+        </>,
+        { route: '/goals/g1' },
+      );
+
+      const panel = await screen.findByTestId('goal-workflows');
+      const check = await within(panel).findByRole('button', { name: /^Release check, Reports the state, yellow, 2 hours ago$/ });
+      expect(within(panel).getByTestId('goal-workflow-guard')).toHaveTextContent('Guard');
+      expect(within(panel).getByTestId('goal-workflow-a1')).toHaveAttribute('data-tone', 'warning');
+      // the package workflow sits at its package, not at the goal
+      expect(within(panel).queryByTestId('goal-workflow-a2')).not.toBeInTheDocument();
+      expect(within(screen.getByTestId('package-workflows-w1')).getByTestId('goal-workflow-a2')).toHaveAttribute('data-tone', 'danger');
+
+      fireEvent.click(within(panel).getByRole('button', { name: 'Start: Release check' }));
+      await waitFor(() => expect(sent).toEqual([{
+        method: 'POST', path: '/api/v1/workflows/wf-check/execute', body: { context: { goal_id: 'g1', goal_locale: 'en' } },
+      }]));
+      const toast = await screen.findByText('Release check started');
+      expect(within(toast.closest('[data-testid="toast"]') as HTMLElement).getByRole('button', { name: 'Open run' })).toBeInTheDocument();
+
+      fireEvent.click(within(screen.getByTestId('package-workflows-w1')).getByRole('button', { name: 'Start: Fix bot' }));
+      await waitFor(() => expect(sent).toContainEqual({
+        method: 'POST', path: '/api/v1/workflows/wf-fix/execute', body: { context: { goal_id: 'g1', work_package_id: 'w1', goal_locale: 'en' } },
+      }));
+
+      // the card of a status workflow shows its result, lets change the role and remove it
+      fireEvent.click(check);
+      const card = screen.getByRole('dialog', { name: 'Workflow Release check' });
+      expect(within(card).getByTestId('goal-workflow-result')).toHaveTextContent('yellow – 2 overdue');
+      expect(within(card).getByText('Overdue')).toBeInTheDocument();
+      fireEvent.click(within(card).getByRole('radio', { name: 'Works on it' }));
+      await waitFor(() => expect(sent).toContainEqual({ method: 'PATCH', path: '/api/v1/goals/g1/workflows/a1', body: { role: 'WORKER' } }));
+      fireEvent.click(within(card).getByRole('button', { name: 'Remove' }));
+      await waitFor(() => expect(sent).toContainEqual({ method: 'DELETE', path: '/api/v1/goals/g1/workflows/a1', body: null }));
+    });
+
+    it('offers no removing for the guard – it points to its switch', async () => {
+      serveWorkflows();
+      renderGoal();
+
+      fireEvent.click(await screen.findByRole('button', { name: /^Guard, Reports the state/ }));
+      const card = screen.getByRole('dialog', { name: 'Workflow Goal guard: Open-Source-Launch' });
+      expect(card).toHaveTextContent('The guard is switched on and off with its switch above.');
+      expect(within(card).queryByRole('button', { name: 'Remove' })).not.toBeInTheDocument();
+      expect(within(card).queryByRole('radio')).not.toBeInTheDocument();
+    });
+
+    it('assigns a workflow of the goal\'s projects to a work package with a role; others only with "show all"', async () => {
+      const sent = serveWorkflows();
+      renderGoal();
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Assign workflow' }));
+      const dialog = screen.getByRole('dialog', { name: 'Assign a workflow' });
+      await within(dialog).findByRole('radio', { name: /Docs build/ });
+      // on the whole goal Release check hangs already
+      expect(within(dialog).getByRole('radio', { name: /Release check/ })).toBeDisabled();
+      expect(within(dialog).queryByRole('radio', { name: /Backup/ })).not.toBeInTheDocument();
+      fireEvent.click(within(dialog).getByRole('switch', { name: 'Show all workflows' }));
+      expect(within(dialog).getByRole('radio', { name: /Backup/ })).toBeInTheDocument();
+
+      fireEvent.change(within(dialog).getByLabelText('For'), { target: { value: 'w1' } });
+      // at the package it is free again
+      fireEvent.click(within(dialog).getByRole('radio', { name: /Release check/ }));
+      fireEvent.click(within(dialog).getByRole('radio', { name: /Reports the state/ }));
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Assign' }));
+      await waitFor(() => expect(sent).toEqual([{
+        method: 'POST', path: '/api/v1/goals/g1/workflows', body: { workflowId: 'wf-check', role: 'STATUS', workPackageId: 'w1' },
+      }]));
+    });
+
+    it('shows only the switched-on guard for a backend without goal workflows, and says when assigning comes', async () => {
+      server.use(http.get('/api/v1/goals/g1', () => HttpResponse.json(guardOn)));
+      renderGoal();
+
+      const panel = await screen.findByTestId('goal-workflows');
+      expect(within(panel).getByTestId('goal-workflow-guard')).toBeInTheDocument();
+      expect(panel).toHaveTextContent('Assigning workflows becomes available after the backend restart.');
+      expect(within(panel).queryByRole('button', { name: 'Assign workflow' })).not.toBeInTheDocument();
+    });
+
+    it('shows no panel for an older backend while the guard is off', async () => {
+      server.use(http.get('/api/v1/goals/g1', () => HttpResponse.json(detail)));
+      renderGoal();
+
+      await screen.findByRole('heading', { name: 'Open-Source-Launch' });
+      await waitFor(() => expect(screen.queryByTestId('goal-workflows')).not.toBeInTheDocument());
+    });
+  });
+
   it('opens the edit dialog of a todo from the map', async () => {
     localStorage.setItem('mysuricates-goal-view-v2', 'map');
     server.use(

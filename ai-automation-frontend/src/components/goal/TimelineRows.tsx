@@ -11,6 +11,7 @@ import { TimelineChip } from './TimelineChip';
 import { WorkPackageBar } from './WorkPackageBar';
 import { WorkPackageMark } from './WorkPackageMark';
 import { DecisionCounts } from './DecisionCounts';
+import { PackageWorkflows } from './GoalWorkflowsPanel';
 import type { GoalWorkPackage, MilestoneState } from '../../types';
 
 /** Abstand der Chips zum oberen Rand einer Zeile ohne Balken. */
@@ -126,6 +127,7 @@ export function PackageRowView({
               <DecisionCounts openQuestions={workPackage.openQuestions} decided={workPackage.decided} />
               {row.undated.length > 0 && <UndatedToggle count={row.undated.length} open={showUndated} controls={listId} onToggle={setShowUndated} />}
             </div>
+            <PackageWorkflows workPackageId={workPackage.id} title={workPackage.title} className="mt-0.5" />
           </>
         ) : (
           <div className="flex flex-wrap items-center gap-x-2 text-[11px] leading-[18px] text-text-tertiary">
