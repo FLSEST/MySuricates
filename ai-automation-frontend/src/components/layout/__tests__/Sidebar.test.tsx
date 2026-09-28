@@ -55,7 +55,7 @@ describe('Sidebar modules', { timeout: 15_000 }, () => {
     expect(screen.getByRole('link', { name: 'Workflows' })).toBeInTheDocument();
   });
 
-  it('lists the goals overview right under the todos, indented as a sub-entry (core page, no module)', async () => {
+  it('lists the goals overview right under the todos, indented as a sub-entry (module goals, on in every preset)', async () => {
     const modules = modulesFixture('core', ['chains', 'webhooks', 'audit']);
     server.use(http.get('/api/v1/system/capabilities', () => HttpResponse.json(modules)));
     renderWithProviders(<Sidebar />);

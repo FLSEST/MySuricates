@@ -43,6 +43,7 @@ export function TodoEditModal({
   exportLoading,
 }: TodoEditModalProps) {
   const t = useT();
+  const goalsModule = useModuleEnabled('goals');
   const integrationsModule = useModuleEnabled('integrations');
 
   return (
@@ -166,7 +167,8 @@ export function TodoEditModal({
           placeholder="bug, performance, ux"
         />
 
-        {editTodo && <TodoPlanningPanel todo={editTodo} />}
+        {/* Einordnung gehört zum Modul „Ziele“ (c60bf914) – aus, gibt es sie nicht */}
+        {editTodo && goalsModule && <TodoPlanningPanel todo={editTodo} />}
 
         {editTodo && integrationsModule && (
           <TodoExportSection

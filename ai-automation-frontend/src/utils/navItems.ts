@@ -27,7 +27,7 @@ export const navItems: NavItemDef[] = [
   { to: '/', icon: LayoutDashboard, labelKey: 'dashboard', hint: 'dashboard-views' },
   { to: '/projects', icon: FolderKanban, labelKey: 'projects', hint: 'projects-directory' },
   { to: '/todos', icon: CheckSquare, labelKey: 'todos', hint: 'todos-sources' },
-  { to: '/goals', icon: Target, labelKey: 'goals', parent: '/todos', hint: 'goals-overview' },
+  { to: '/goals', icon: Target, labelKey: 'goals', parent: '/todos', hint: 'goals-overview', module: 'goals' },
   { to: '/workflows', icon: GitBranch, labelKey: 'workflows', hint: 'workflows-start' },
   { to: '/runs', icon: History, labelKey: 'runs', hint: 'runs-list' },
   { to: '/debug', icon: Bug, labelKey: 'debug', module: 'debug', hint: 'debug-failing' },

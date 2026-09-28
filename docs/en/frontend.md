@@ -30,7 +30,7 @@
 | `/runs/:runId` | RunRedirect | Redirect → `/workflows/:workflowId/run/:runId` (API lookup) |
 | `/calendar` | CalendarPage | Aggregated calendar (schedules, runs, integrations) |
 | `/cockpit` | ProjectCockpit | Project cockpit with todo overview |
-| `/goals` | Goals | Goals by status (active · done · archived), create; in the menu indented as a sub-entry right under “Todos” |
+| `/goals` | Goals | Goals by status (active · done · archived), create; in the menu indented as a sub-entry right under “Todos” – module `goals` |
 | `/goals/:goalId` | GoalDetail | One goal: outline (default: milestones, then work packages and TODOs per project), list, relation map (origin → TODOs → processing → result) or timeline (milestones as diamonds, work packages as bars in project bands, everything by drag and drop – a second line shows package and date meanwhile), "Guard" switch with an explanation, workflows on the goal and its work packages (start, state, assign), ❓/✔ and deciding, assign candidates from the goal's projects; side panel on the right for a milestone or work package (`?item=…`, docked or detached as a window), every TODO opens its dialog |
 | `/onboarding-profiles` | OnboardingProfiles | Manage onboarding profiles |
 | `/settings` | Settings | Language, theme, API key, Tailscale, staging, testing |

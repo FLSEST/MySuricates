@@ -30,7 +30,7 @@
 | `/runs/:runId` | RunRedirect | Redirect → `/workflows/:workflowId/run/:runId` (API-Lookup) |
 | `/calendar` | CalendarPage | Aggregierter Kalender (Schedules, Runs, Integrationen) |
 | `/cockpit` | ProjectCockpit | Projekt-Cockpit mit Todo-Übersicht |
-| `/goals` | Goals | Ziele nach Status (Aktiv · Erledigt · Archiviert), Anlegen; im Menü eingerückt als Untereintrag direkt unter „Todos“ |
+| `/goals` | Goals | Ziele nach Status (Aktiv · Erledigt · Archiviert), Anlegen; im Menü eingerückt als Untereintrag direkt unter „Todos“ – Modul `goals` |
 | `/goals/:goalId` | GoalDetail | Ein Ziel: Gliederung (Standard: Meilensteine, dann je Projekt Arbeitspakete und TODOs), Liste, Relationskarte (Herkunft → TODOs → Bearbeitung → Ergebnis) oder Zeitstrahl (Meilensteine als Rauten, Arbeitspakete als Balken in Projektbändern, alles per Ziehen – eine zweite Zeile zeigt dabei Paket und Datum), Schalter „Wächter“ mit Erklärung, Workflows am Ziel und an Arbeitspaketen (starten, Stand, zuordnen), ❓/✔ und Entscheiden, Kandidaten aus den Zielprojekten zuordnen; Seitenleiste rechts für Meilenstein bzw. Arbeitspaket (`?item=…`, andockbar, als Fenster lösbar), jedes TODO öffnet seinen Dialog |
 | `/onboarding-profiles` | OnboardingProfiles | Onboarding-Profile verwalten |
 | `/settings` | Settings | Sprache, Theme, API-Key, Tailscale, Staging, Testing |

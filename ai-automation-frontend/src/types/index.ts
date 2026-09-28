@@ -1990,7 +1990,7 @@ export interface DialogWorkflowSuggestion {
 // ── Modules (startup configuration, read-only) ──────────
 
 export type FeatureModuleName =
-  | 'dashboard-report'
+  | 'dashboard-report' | 'goals'
   | 'chains' | 'assistant' | 'learning' | 'memory' | 'audit' | 'bpmn'
   | 'integrations' | 'webhooks' | 'remote-access' | 'terminal' | 'staging'
   | 'conversion' | 'dialog-import' | 'onboarding-profiles' | 'skills' | 'debug' | 'factory' | 'wishes';

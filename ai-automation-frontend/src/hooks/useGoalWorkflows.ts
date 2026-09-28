@@ -2,6 +2,7 @@ import { useMutation, useMutationState, useQuery, useQueryClient } from '@tansta
 import { useNavigate } from 'react-router-dom';
 import { api, apiErrorMessage, apiErrorStatus } from '../api/client';
 import { useToast } from './useToast';
+import { useModuleEnabled } from './useModules';
 import { useI18nStore, useT } from '../i18n';
 import { WORKFLOW_RESULTS_QUERY_KEY, fetchWorkflowResults } from './useWorkflowWidgets';
 import { runActive, runPath } from '../components/goal/goalWorkflowStatus';
@@ -38,6 +39,7 @@ function guardEntry(goalId: string, guard: GoalGuard, name: string): GoalWorkflo
  * bei dem Wächter aus `goal.guard`, Zuordnen ist erst nach dem Neustart möglich.
  */
 export function useGoalWorkflows(goalId: string | undefined, guard: GoalGuard | undefined, guardName: string) {
+  const goalsModule = useModuleEnabled('goals');
   return useQuery({
     queryKey: [...goalWorkflowKeys.list(goalId ?? ''), guard?.enabled && guard.workflowId ? guard.workflowId : ''],
     queryFn: async (): Promise<GoalWorkflowList> => {
@@ -48,7 +50,7 @@ export function useGoalWorkflows(goalId: string | undefined, guard: GoalGuard | 
         return { attachments: guard ? guardEntry(goalId!, guard, guardName) : [], supported: false };
       }
     },
-    enabled: !!goalId,
+    enabled: goalsModule && !!goalId,
     staleTime: 30_000,
   });
 }
