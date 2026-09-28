@@ -269,6 +269,21 @@ describe('GoalGuardControl', { timeout: 20_000 }, () => {
       expect(tip()).not.toBeInTheDocument();
     });
 
+    // Review c60bf914: Safari does not focus a clicked button, so no blur comes – a click elsewhere closes
+    it('closes a pinned explanation on a click elsewhere, but not on a click into it', async () => {
+      serveGoal(OFF);
+      renderWithProviders(<Harness />);
+
+      const info = await screen.findByRole('button', { name: 'What does the guard do?' });
+      fireEvent.click(info);
+      fireEvent.mouseLeave(info);
+      fireEvent.mouseDown(info);
+      fireEvent.mouseDown(within(tip()!).getByText('What does the guard do?'));
+      expect(tip()).toBeInTheDocument();
+      fireEvent.mouseDown(screen.getByText('goal loaded'));
+      expect(tip()).not.toBeInTheDocument();
+    });
+
     it('links the last result of a switched-on guard with its light and when it ran', async () => {
       serveGoal(ON);
       server.use(http.get('/api/v1/dashboard/workflow-results', () => HttpResponse.json([{
