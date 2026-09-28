@@ -831,7 +831,7 @@ Details zu den drei Vertrauensklassen und zur Taint-Propagation:
 | **Mapper** | MapStruct für Entity ↔ DTO Konvertierung (automatische Codegenerierung) |
 | **IDs** | UUID als String (`@GeneratedValue(strategy = GenerationType.UUID)`) |
 | **JSON-Felder** | `@Convert(converter = JsonMapConverter.class)` für `Map<String, Object>` in TEXT-Spalten |
-| **Auditing** | `@CreatedDate`, `@LastModifiedDate` über Spring Data JPA Auditing |
+| **Auditing** | `@CreatedDate`, `@LastModifiedDate` über den eigenen `@EntityListeners(AuditTimestampListener.class)` — nicht über Spring-Data-Auditing (`@EnableJpaAuditing` bräuchte `spring-aspects` und damit `aspectjweaver`, EPL-2.0, nicht AGPL-verträglich) und nicht über Hibernates `@CreationTimestamp` (erst beim Flush, in SQLite auf ganze Sekunden gekürzt). `AgplDependencyGuardTest` hält das fest |
 | **Validierung** | Jakarta Validation (`@NotBlank`, `@NotNull`, `@NotEmpty`) auf DTOs |
 | **Exceptions** | `GlobalExceptionHandler` mit `@RestControllerAdvice`, einheitliches Fehlerformat |
 | **Logging** | SLF4J mit `@Slf4j` (Lombok) |

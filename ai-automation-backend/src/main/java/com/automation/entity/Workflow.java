@@ -8,7 +8,6 @@ import lombok.*;
 import org.hibernate.annotations.SQLRestriction;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
-import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -19,7 +18,7 @@ import java.util.Map;
 @Entity
 @Table(name = "workflows")
 @SQLRestriction("deleted_at IS NULL")
-@EntityListeners(AuditingEntityListener.class)
+@EntityListeners(AuditTimestampListener.class)
 @NamedEntityGraph(
         name = "Workflow.forExecution",
         attributeNodes = @NamedAttributeNode("activatedSkills")

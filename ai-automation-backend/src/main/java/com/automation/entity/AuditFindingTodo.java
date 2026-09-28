@@ -3,14 +3,13 @@ package com.automation.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
-import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.Instant;
 
 @Entity
 @Table(name = "audit_finding_todos", uniqueConstraints =
         @UniqueConstraint(name = "uq_audit_finding_todo", columnNames = {"finding_id", "todo_id"}))
-@EntityListeners(AuditingEntityListener.class)
+@EntityListeners(AuditTimestampListener.class)
 @Getter
 @Setter
 @NoArgsConstructor
