@@ -16,6 +16,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
+import java.lang.management.ManagementFactory;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -53,10 +54,20 @@ public class RunControlService {
      */
     @EventListener(ApplicationReadyEvent.class)
     public void cleanupZombieRuns() {
+        cleanupZombieRuns(Instant.ofEpochMilli(ManagementFactory.getRuntimeMXBean().getStartTime()));
+    }
+
+    /**
+     * Only runs started before {@code jvmStart} belong to a previous lifecycle: backlog polls, REST
+     * and webhook starts may already run before ApplicationReadyEvent. A run without
+     * {@code startedAt} cannot be dated and counts as left over.
+     */
+    void cleanupZombieRuns(Instant jvmStart) {
         // Collect all runs that were in-flight when the application was last shut down
         List<WorkflowRun> zombies = new java.util.ArrayList<>();
         zombies.addAll(runRepository.findByStatus(RunStatus.RUNNING));
         zombies.addAll(runRepository.findByStatus(RunStatus.PAUSED));
+        zombies.removeIf(run -> run.getStartedAt() != null && !run.getStartedAt().isBefore(jvmStart));
         if (zombies.isEmpty()) return;
         log.warn("Found {} run(s) stuck in RUNNING/PAUSED status — marking as INTERRUPTED", zombies.size());
         List<String> marked = new java.util.ArrayList<>();
@@ -64,7 +75,9 @@ public class RunControlService {
             RunInterruption.record(zombie, zombie.getStatus(), RunInterruption.Cause.RESTART);
             zombie.setStatus(RunStatus.INTERRUPTED);
             zombie.setCompletedAt(Instant.now());
-            zombie.setDurationMs(zombie.getCompletedAt().toEpochMilli() - zombie.getStartedAt().toEpochMilli());
+            if (zombie.getStartedAt() != null) {
+                zombie.setDurationMs(zombie.getCompletedAt().toEpochMilli() - zombie.getStartedAt().toEpochMilli());
+            }
             zombie.setError(Map.of("message", "Workflow was interrupted by an application restart"));
             runRepository.save(zombie);
             marked.add(zombie.getId());

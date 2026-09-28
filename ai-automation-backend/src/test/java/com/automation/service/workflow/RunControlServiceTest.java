@@ -69,8 +69,11 @@ class RunControlServiceTest {
         return context;
     }
 
+    private static final Instant JVM_START = Instant.parse("2026-09-27T08:00:00Z");
+
+    /** A run a previous application lifecycle left behind. */
     private static WorkflowRun persistedRun(String runId, RunStatus status) {
-        return WorkflowRun.builder().id(runId).status(status).startedAt(Instant.now()).build();
+        return WorkflowRun.builder().id(runId).status(status).startedAt(JVM_START.minusSeconds(60)).build();
     }
 
     // ── pause / resume ────────────────────────────────────────────────────────
@@ -253,12 +256,12 @@ class RunControlServiceTest {
 
     @Test
     void cleanupZombieRuns_marksRunningRunsAsInterrupted() {
-        WorkflowRun orphan1 = WorkflowRun.builder().id("orphan-1").status(RunStatus.RUNNING).startedAt(Instant.now()).build();
-        WorkflowRun orphan2 = WorkflowRun.builder().id("orphan-2").status(RunStatus.RUNNING).startedAt(Instant.now()).build();
+        WorkflowRun orphan1 = persistedRun("orphan-1", RunStatus.RUNNING);
+        WorkflowRun orphan2 = persistedRun("orphan-2", RunStatus.RUNNING);
         when(runRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of(orphan1, orphan2));
         when(runRepository.findByStatus(RunStatus.PAUSED)).thenReturn(List.of());
 
-        runControl.cleanupZombieRuns();
+        runControl.cleanupZombieRuns(JVM_START);
 
         assertThat(orphan1.getStatus()).isEqualTo(RunStatus.INTERRUPTED);
         assertThat(orphan1.getCompletedAt()).isNotNull();
@@ -274,7 +277,7 @@ class RunControlServiceTest {
         when(runRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of(running));
         when(runRepository.findByStatus(RunStatus.PAUSED)).thenReturn(List.of(paused));
 
-        runControl.cleanupZombieRuns();
+        runControl.cleanupZombieRuns(JVM_START);
 
         assertThat(paused.getStatus()).isEqualTo(RunStatus.INTERRUPTED);
         assertThat(paused.getDurationMs()).isNotNull();
@@ -291,7 +294,7 @@ class RunControlServiceTest {
         when(runRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of(running));
         when(runRepository.findByStatus(RunStatus.PAUSED)).thenReturn(List.of(paused));
 
-        runControl.cleanupZombieRuns();
+        runControl.cleanupZombieRuns(JVM_START);
 
         assertThat(running.getMetadata())
                 .containsEntry(RunInterruption.FROM_KEY, "RUNNING")
@@ -310,9 +313,54 @@ class RunControlServiceTest {
         when(runRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of());
         when(runRepository.findByStatus(RunStatus.PAUSED)).thenReturn(List.of());
 
-        runControl.cleanupZombieRuns();
+        runControl.cleanupZombieRuns(JVM_START);
 
         verify(runRepository, never()).save(any(WorkflowRun.class));
+        verifyNoInteractions(activityLogService, events);
+    }
+
+    /** TODO 13cf8a15: backlog polls, REST and webhook starts may run before ApplicationReadyEvent. */
+    @Test
+    void cleanupZombieRuns_leavesRunsStartedInThisLifecycle() {
+        WorkflowRun orphan = persistedRun("orphan-1", RunStatus.RUNNING);
+        WorkflowRun fresh = WorkflowRun.builder().id("fresh-1").status(RunStatus.RUNNING)
+                .startedAt(JVM_START.plusSeconds(5)).build();
+        when(runRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of(orphan, fresh));
+        when(runRepository.findByStatus(RunStatus.PAUSED)).thenReturn(List.of());
+
+        runControl.cleanupZombieRuns(JVM_START);
+
+        assertThat(orphan.getStatus()).isEqualTo(RunStatus.INTERRUPTED);
+        assertThat(fresh.getStatus()).isEqualTo(RunStatus.RUNNING);
+        verify(runRepository, never()).save(fresh);
+        verify(events).publishEvent(new RunInterruption.Event(List.of("orphan-1"), RunInterruption.Cause.RESTART));
+    }
+
+    @Test
+    void cleanupZombieRuns_runWithoutStartedAt_isMarkedWithoutDuration_andTheOthersToo() {
+        WorkflowRun undated = WorkflowRun.builder().id("undated").status(RunStatus.RUNNING).build();
+        WorkflowRun orphan = persistedRun("orphan-1", RunStatus.RUNNING);
+        when(runRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of(undated, orphan));
+        when(runRepository.findByStatus(RunStatus.PAUSED)).thenReturn(List.of());
+
+        runControl.cleanupZombieRuns(JVM_START);
+
+        assertThat(undated.getStatus()).isEqualTo(RunStatus.INTERRUPTED);
+        assertThat(undated.getDurationMs()).isNull();
+        assertThat(orphan.getStatus()).isEqualTo(RunStatus.INTERRUPTED);
+        assertThat(orphan.getDurationMs()).isNotNull();
+        verify(runRepository, times(2)).save(any(WorkflowRun.class));
+    }
+
+    @Test
+    void cleanupZombieRuns_onApplicationReady_usesTheJvmStartTime() {
+        WorkflowRun fresh = WorkflowRun.builder().id("fresh-1").status(RunStatus.RUNNING).startedAt(Instant.now()).build();
+        when(runRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of(fresh));
+        when(runRepository.findByStatus(RunStatus.PAUSED)).thenReturn(List.of());
+
+        runControl.cleanupZombieRuns();
+
+        assertThat(fresh.getStatus()).isEqualTo(RunStatus.RUNNING);
         verifyNoInteractions(activityLogService, events);
     }
 }
