@@ -15,6 +15,7 @@ import { LABEL_COLUMN, PackageRowView, UndatedToggle } from './TimelineRows';
 import { TimelineChip } from './TimelineChip';
 import { WorkPackageMark } from './WorkPackageMark';
 import { DecisionCounts } from './DecisionCounts';
+import { useIsSelected } from './goalSelection';
 import type { FloatingAnchor } from './floating';
 import type { GoalWorkPackage } from '../../types';
 
@@ -213,6 +214,7 @@ function UnscheduledPill({ band, entry, listId, open, onToggle, onOpen }: {
   const accepts = acceptsDrop(dragged, dropId);
   const { setNodeRef: setDropRef, isOver } = useDroppable({ id: dropId });
   const { listeners, setNodeRef: setDragRef, isDragging } = useDraggable({ id: `wp:${workPackage.id}`, data: PILL_DATA });
+  const selected = useIsSelected('workpackage', workPackage.id);
   const label = tw.pill.replace('{title}', workPackage.title)
     .replace('{done}', String(workPackage.done)).replace('{total}', String(workPackage.total));
   return (
@@ -220,8 +222,9 @@ function UnscheduledPill({ band, entry, listId, open, onToggle, onOpen }: {
       className={`relative flex items-center gap-1 rounded-md ${dropTone(accepts, isOver)} ${isOver && accepts ? 'ring-2 ring-accent' : ''}`}>
       <button ref={setDragRef} type="button" {...pointerOnly(listeners)} aria-label={label} title={label}
         onClick={(event) => onOpen(event.currentTarget)}
+        aria-current={selected || undefined}
         className={`flex h-7 max-w-[15rem] cursor-grab items-center gap-1.5 rounded-md border border-dashed border-border-strong bg-surface-raised px-2 text-xs shadow-sm focus-ring active:cursor-grabbing ${
-          isDragging ? 'opacity-40' : ''}`}
+          isDragging ? 'opacity-40' : ''} ${selected ? 'ring-2 ring-accent' : ''}`}
         style={{ touchAction: 'none' }}>
         <WorkPackageMark state={workPackage.state} />
         <span className="min-w-0 truncate text-text">{workPackage.title}</span>

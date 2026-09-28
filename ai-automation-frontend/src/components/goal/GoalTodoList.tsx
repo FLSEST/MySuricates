@@ -22,14 +22,25 @@ const isActive = (todo: GoalTodoItem) =>
  * Bereich „Entschieden“ –, was schon erledigt ist. Fälligkeit und Arbeitspaket stehen als Chips an
  * jedem TODO (TODO e192df18).
  */
-export function GoalTodoList({ goalId, todos, workPackages, today }: {
+export function GoalTodoList({ goalId, todos, workPackages, today, onOpenTodo }: {
   goalId: string;
   todos: GoalTodoItem[];
   workPackages: GoalWorkPackage[];
   /** Tag (`timelineLayout.dayOf`), gegen den „überfällig“ gilt. */
   today: number;
+  /** Öffnet den TODO-Dialog (c60bf914); ohne führt der Titel auf die TODO-Seite. */
+  onOpenTodo?: (todoId: string) => void;
 }) {
   const t = useT();
+  const scope = useDecisionScope();
+  // Die Karte „Entscheiden“ hängt an der Liste, nicht an der Zeile: Die Zeile verschwindet beim
+  // Entscheiden sofort, scheitert es, soll der eingetippte Text noch da sein (c60bf914)
+  const [deciding, setDeciding] = useState<GoalTodoItem | null>(null);
+  const decidingTrigger = useRef<HTMLElement | null>(null);
+  const decide = (todo: GoalTodoItem, trigger: HTMLElement) => {
+    decidingTrigger.current = trigger;
+    setDeciding((current) => (current?.id === todo.id ? null : todo));
+  };
   const reorder = useReorderGoal();
   const packageOf = (todo: GoalTodoItem) => workPackages.find((item) => item.id === todo.workPackageId);
   const next = todos.filter(isActive);
@@ -65,10 +76,7 @@ export function GoalTodoList({ goalId, todos, workPackages, today }: {
                   </span>
                   <span className={`w-2 h-2 rounded-full shrink-0 ${priorityColor[todo.priority]}`} />
                   <div className="flex-1 min-w-0">
-                    <Link to={todoDeepLink(todo)} className="text-sm text-text hover:text-accent truncate block"
-                      title={todo.ratingNote ?? undefined}>
-                      {todo.title}
-                    </Link>
+                    <TodoTitle todo={todo} onOpenTodo={onOpenTodo} className="block truncate" title={todo.ratingNote ?? undefined} />
                     {todo.projectName && <span className="text-xs text-text-tertiary">{todo.projectName}</span>}
                   </div>
                   <DueChip todo={todo} today={today} />
@@ -102,7 +110,9 @@ export function GoalTodoList({ goalId, todos, workPackages, today }: {
         ) : (
           <Card padding={false}>
             <ul className="divide-y divide-border">
-              {questions.map((todo) => <QuestionRow key={todo.id} todo={todo} />)}
+              {questions.map((todo) => (
+                <QuestionRow key={todo.id} todo={todo} onOpenTodo={onOpenTodo} open={deciding?.id === todo.id} onDecide={decide} />
+              ))}
             </ul>
           </Card>
         )}
@@ -113,7 +123,7 @@ export function GoalTodoList({ goalId, todos, workPackages, today }: {
             </summary>
             <Card padding={false} className="mt-2">
               <ul className="divide-y divide-border">
-                {decided.map((todo) => <DecidedRow key={todo.id} todo={todo} />)}
+                {decided.map((todo) => <DecidedRow key={todo.id} todo={todo} onOpenTodo={onOpenTodo} />)}
               </ul>
             </Card>
           </details>
@@ -129,44 +139,72 @@ export function GoalTodoList({ goalId, todos, workPackages, today }: {
             <ul className="divide-y divide-border">
               {done.map((todo) => (
                 <li key={todo.id} className="px-4 py-2 text-sm text-text-secondary line-through">
-                  <Link to={todoDeepLink(todo)}>{todo.title}</Link>
+                  <TodoTitle todo={todo} onOpenTodo={onOpenTodo} className="line-through" />
                 </li>
               ))}
             </ul>
           </Card>
         </details>
       )}
+      {deciding && scope && (
+        <DecisionCard todo={deciding} goalId={scope.goalId} triggerRef={decidingTrigger} onClose={() => setDeciding(null)} />
+      )}
     </>
   );
 }
 
-/** Eine offene Frage: TODO, Wortlaut, „Entscheiden“ öffnet die Karte (68a5e24e). */
-function QuestionRow({ todo }: { todo: GoalTodoItem }) {
+/**
+ * Titel eines TODOs: öffnet den TODO-Dialog der Zielseite (c60bf914, Flo: „besser zu den TODOs
+ * kommen … anklickbar“), per Maus und mit Enter; ohne Dialog ein Link auf die TODO-Seite.
+ */
+function TodoTitle({ todo, onOpenTodo, className = '', title }: {
+  todo: GoalTodoItem;
+  onOpenTodo?: (todoId: string) => void;
+  className?: string;
+  title?: string;
+}) {
+  const t = useT();
+  if (!onOpenTodo) {
+    return <Link to={todoDeepLink(todo)} className={`text-sm text-text hover:text-accent ${className}`} title={title}>{todo.title}</Link>;
+  }
+  return (
+    <button type="button" onClick={() => onOpenTodo(todo.id)} title={title ?? todo.title}
+      aria-label={t.goals.outline.openTodo.replace('{title}', todo.title)}
+      className={`max-w-full rounded text-left text-sm text-text hover:text-accent focus-ring ${className}`}>
+      {todo.title}
+    </button>
+  );
+}
+
+/** Eine offene Frage: TODO, Wortlaut, „Entscheiden“ öffnet die Karte (68a5e24e) – die Karte hält die Liste. */
+function QuestionRow({ todo, onOpenTodo, open, onDecide }: {
+  todo: GoalTodoItem;
+  onOpenTodo?: (todoId: string) => void;
+  open: boolean;
+  onDecide: (todo: GoalTodoItem, trigger: HTMLElement) => void;
+}) {
   const t = useT();
   const scope = useDecisionScope();
-  const [open, setOpen] = useState(false);
-  const buttonRef = useRef<HTMLButtonElement>(null);
   return (
     <li className="flex items-start gap-3 px-4 py-2.5" data-testid="goal-question">
       <div className="min-w-0 flex-1">
-        <Link to={todoDeepLink(todo)} className="text-sm text-text hover:text-accent">{todo.title}</Link>
+        <TodoTitle todo={todo} onOpenTodo={onOpenTodo} />
         <p className="text-sm text-human mt-0.5">{todo.openQuestion}</p>
         {todo.decision && <p className="mt-0.5 text-xs text-text-tertiary">{t.goals.decision.earlier.replace('{text}', todo.decision)}</p>}
       </div>
       {scope?.enabled && (
-        <button ref={buttonRef} type="button" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen((was) => !was)}
+        <button type="button" aria-haspopup="dialog" aria-expanded={open} onClick={(event) => onDecide(todo, event.currentTarget)}
           aria-label={t.goals.decision.decideFor.replace('{title}', todo.title)}
           className="shrink-0 rounded-md border border-human/40 bg-human-subtle px-2.5 py-1 text-xs font-medium text-human hover:border-human focus-ring">
           {t.goals.decision.decide}
         </button>
       )}
-      {open && scope && <DecisionCard todo={todo} goalId={scope.goalId} triggerRef={buttonRef} onClose={() => setOpen(false)} />}
     </li>
   );
 }
 
 /** Ein entschiedenes TODO: Wortlaut der Entscheidung, wann und wer; ✔ öffnet „Ändern/Entfernen“. */
-function DecidedRow({ todo }: { todo: GoalTodoItem }) {
+function DecidedRow({ todo, onOpenTodo }: { todo: GoalTodoItem; onOpenTodo?: (todoId: string) => void }) {
   const t = useT();
   const td = t.goals.decision;
   const locale = useI18nStore((s) => s.locale);
@@ -174,7 +212,7 @@ function DecidedRow({ todo }: { todo: GoalTodoItem }) {
     <li className="flex items-start gap-3 px-4 py-2.5" data-testid="goal-decided-item">
       <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-success" aria-hidden="true" />
       <div className="min-w-0 flex-1">
-        <Link to={todoDeepLink(todo)} className="text-sm text-text hover:text-accent">{todo.title}</Link>
+        <TodoTitle todo={todo} onOpenTodo={onOpenTodo} />
         <p className="mt-0.5 text-sm text-text-secondary">{todo.decision}</p>
         {todo.decidedAt && (
           <p className="mt-0.5 text-xs text-text-tertiary">

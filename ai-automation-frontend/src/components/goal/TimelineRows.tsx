@@ -11,6 +11,7 @@ import { TimelineChip } from './TimelineChip';
 import { WorkPackageBar } from './WorkPackageBar';
 import { WorkPackageMark } from './WorkPackageMark';
 import { DecisionCounts } from './DecisionCounts';
+import { useIsSelected } from './goalSelection';
 import { PackageWorkflows } from './GoalWorkflowsPanel';
 import type { GoalWorkPackage, MilestoneState } from '../../types';
 
@@ -100,6 +101,7 @@ export function PackageRowView({
   const undatedAccepts = acceptsDrop(dragged, undatedId);
   const { setNodeRef: setUndatedRef, isOver: undatedOver } = useDroppable({ id: undatedId });
   const { workPackage, range } = row;
+  const selected = useIsSelected('workpackage', workPackage?.id ?? '');
   const chipsTop = range ? BAR_ZONE : ROW_PADDING;
   // Wohin ein gezogener Balken dieses Pakets käme: gestrichelt an seinem neuen Platz
   const ghost = workPackage && dragged?.kind === 'package' && dragged.workPackage.id === workPackage.id
@@ -115,7 +117,9 @@ export function PackageRowView({
           <>
             <button type="button" onClick={(event) => onOpenPackage(workPackage.id, event.currentTarget)} title={workPackage.title}
               aria-label={tw.card.replace('{title}', workPackage.title)}
-              className="-mx-1 flex w-[calc(100%+0.5rem)] min-w-0 items-center gap-1.5 rounded px-1 text-left hover:bg-surface-hover focus-ring">
+              aria-current={selected || undefined}
+              className={`-mx-1 flex w-[calc(100%+0.5rem)] min-w-0 items-center gap-1.5 rounded px-1 text-left hover:bg-surface-hover focus-ring ${
+                selected ? 'bg-accent-subtle' : ''}`}>
               <WorkPackageMark state={workPackage.state} />
               <span className="min-w-0 truncate text-[13px] font-medium leading-[18px] text-text">{workPackage.title}</span>
             </button>

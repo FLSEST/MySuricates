@@ -10,12 +10,14 @@ import { useI18nStore } from '../../../i18n';
 import { GoalTimeline } from '../GoalTimeline';
 import { DecisionContext } from '../decisionContext';
 import { GoalWorkflowsContext } from '../goalWorkflowsContext';
+import { GoalSelectionContext, type GoalSelection } from '../goalSelection';
+import { GoalSidePanel } from '../GoalSidePanel';
 import { TimelineAxisView } from '../TimelineAxisView';
 import { NUDGE_DELAY } from '../useKeyboardNudge';
 import {
   CHIP_ANCHOR, CHIP_WIDTH, FALLBACK_WIDTH, NO_PACKAGE, axisFor, dayOf, dayOfIsoDate, xOfDay, type TimelineAxis,
 } from '../timelineLayout';
-import type { Goal, GoalMilestone, GoalProject, GoalTodoItem, GoalWorkPackage } from '../../../types';
+import type { Goal, GoalDetail, GoalMilestone, GoalProject, GoalTodoItem, GoalWorkPackage } from '../../../types';
 
 // Ziehen lässt sich in jsdom nicht echt ausführen (keine Layout-Maße). Der Test greift deshalb die
 // Handler des DndContext ab und löst Beginn, Bewegung und Ende eines Zugs so aus, wie dnd-kit sie
@@ -136,12 +138,19 @@ function recordWrites(): Sent[] {
   return sent;
 }
 
+/** Die Seitenleiste der Zielseite (c60bf914): der Zeitstrahl meldet, was geöffnet werden soll. */
+const selection = { select: vi.fn(), close: vi.fn() };
+
 function renderTimeline(
-  extra: { todos?: GoalTodoItem[]; legacy?: boolean; strict?: boolean; decisions?: boolean } = {}, onOpenTodo = vi.fn(),
+  extra: { todos?: GoalTodoItem[]; legacy?: boolean; strict?: boolean; decisions?: boolean; selected?: GoalSelection | null } = {},
+  onOpenTodo = vi.fn(),
 ) {
+  selection.select = vi.fn();
   let timeline = (
-    <GoalTimeline goal={goal} todos={extra.todos ?? todos} workPackages={workPackages} milestones={extra.legacy ? [] : milestones}
-      projects={projects} legacyBackend={extra.legacy} onOpenTodo={onOpenTodo} now={NOW} />
+    <GoalSelectionContext.Provider value={{ selected: extra.selected ?? null, select: selection.select, close: selection.close }}>
+      <GoalTimeline goal={goal} todos={extra.todos ?? todos} workPackages={workPackages} milestones={extra.legacy ? [] : milestones}
+        projects={projects} legacyBackend={extra.legacy} onOpenTodo={onOpenTodo} now={NOW} />
+    </GoalSelectionContext.Provider>
   );
   if (extra.decisions) timeline = <DecisionContext.Provider value={{ goalId: 'g1', enabled: true }}>{timeline}</DecisionContext.Provider>;
   renderWithProviders(extra.strict ? <StrictMode>{timeline}</StrictMode> : timeline);
@@ -323,11 +332,16 @@ describe('GoalTimeline — TODOs', () => {
     await waitFor(() => expect(document.querySelector('.ring-accent')).toBeNull());
   });
 
-  it('plans a TODO from its menu – date and package of its own project', async () => {
+  // c60bf914 (Flo: „anklickbar“): a click opens the TODO, the menu sits behind ⋯ or a right click
+  it('opens the TODO on a click and plans it from its menu – date and package of its own project', async () => {
     const sent = recordWrites();
     const onOpenTodo = renderTimeline();
 
-    fireEvent.click(screen.getByRole('button', { name: /^Examples page/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Examples page – / }));
+    expect(onOpenTodo).toHaveBeenCalledWith('c');
+    expect(screen.queryByRole('dialog', { name: 'Plan: Examples page' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Plan: Examples page' }));
     const menu = screen.getByRole('dialog', { name: 'Plan: Examples page' });
     // the menu floats above the page, so the scrolling timeline cannot cut it off
     expect(menu.parentElement).toBe(document.body);
@@ -339,8 +353,24 @@ describe('GoalTimeline — TODOs', () => {
       { method: 'PATCH', path: '/api/v1/todos/c/planning', body: { workPackageId: 'w-repo' } },
     ]));
 
-    fireEvent.click(screen.getByRole('button', { name: /^Examples page/ }));
+    fireEvent.contextMenu(screen.getByRole('button', { name: /^Examples page – / }));
     fireEvent.click(within(screen.getByRole('dialog', { name: 'Plan: Examples page' })).getByRole('button', { name: 'Edit' }));
+    expect(onOpenTodo).toHaveBeenCalledTimes(2);
+  });
+
+  // c60bf914: dragging a chip is not a click on it
+  it('does not open the TODO for the click that ends a drag, only for a later one', async () => {
+    const onOpenTodo = renderTimeline();
+    const chip = screen.getByRole('button', { name: /^Examples page – / });
+
+    startDrag('todo:c');
+    fireEvent.click(chip);
+    act(() => dnd.props!.onDragEnd!(dragEvent('todo:c', null) as unknown as DragEndEvent));
+    fireEvent.click(chip);
+    expect(onOpenTodo).not.toHaveBeenCalled();
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 350)); });
+    fireEvent.keyDown(chip, { key: 'Enter' });
+    fireEvent.click(chip);
     expect(onOpenTodo).toHaveBeenCalledWith('c');
   });
 });
@@ -445,7 +475,7 @@ describe('GoalTimeline — bars', () => {
     }]));
   });
 
-  it('by keyboard: leaving the bar saves at once, Escape throws the draft away, Enter opens the card', async () => {
+  it('by keyboard: leaving the bar saves at once, Escape throws the draft away, Enter opens the side panel', async () => {
     const sent = recordWrites();
     renderTimeline();
 
@@ -461,38 +491,28 @@ describe('GoalTimeline — bars', () => {
       body: { startDate: startOf('2026-09-30'), endDate: endOf('2026-10-06') },
     }]));
 
+    // Enter opens the package in the side panel of the goal page (c60bf914)
     fireEvent.keyDown(bar, { key: 'Enter' });
-    const card = screen.getByRole('dialog', { name: 'Work package Repo sauber' });
-    expect(within(card).getByLabelText('Start')).toHaveValue('2026-10-01');
-    expect(within(card).getByLabelText('End')).toHaveValue('2026-10-07');
+    expect(selection.select).toHaveBeenCalledWith({ kind: 'workpackage', id: 'w-repo' }, bar);
   });
 
-  it('edits and deletes a package from its card, and gives the focus back to the bar', async () => {
-    const sent = recordWrites();
-    renderTimeline();
+  // c60bf914 (Flo): a package opens in the side panel – from its bar, its row label or its tray entry; the open one is marked
+  it('opens a package in the side panel from its bar, its row label and its tray entry, and marks the open one', () => {
+    renderTimeline({ selected: { kind: 'workpackage', id: 'w-repo' } });
 
     const bar = within(screen.getByTestId('timeline-bar-w-repo')).getByRole('button');
-    act(() => bar.focus());
+    expect(bar).toHaveAttribute('aria-current', 'true');
+    expect(within(screen.getByTestId('timeline-bar-w-umbau')).getByRole('button')).not.toHaveAttribute('aria-current');
     fireEvent.click(bar);
-    let card = screen.getByRole('dialog', { name: 'Work package Repo sauber' });
-    expect(card.parentElement).toBe(document.body);
-    expect(within(card).getByText('Old banner')).toBeInTheDocument();
-    fireEvent.change(within(card).getByLabelText('End'), { target: { value: '2026-10-09' } });
-    fireEvent.click(within(card).getByRole('button', { name: 'Save' }));
-    await waitFor(() => expect(sent).toEqual([{
-      method: 'PUT', path: '/api/v1/goals/g1/work-packages/w-repo',
-      body: { startDate: startOf('2026-10-01'), endDate: endOf('2026-10-09') },
-    }]));
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Work package Repo sauber' })).not.toBeInTheDocument());
-    expect(bar).toHaveFocus();
-
-    fireEvent.click(bar);
-    card = screen.getByRole('dialog', { name: 'Work package Repo sauber' });
-    fireEvent.click(within(card).getByRole('button', { name: 'Delete' }));
-    const question = screen.getByRole('dialog', { name: 'Delete work package' });
-    expect(within(question).getByText('Delete the work package “Repo sauber”? Its TODOs stay in the goal.')).toBeInTheDocument();
-    fireEvent.click(within(question).getByRole('button', { name: 'Delete' }));
-    await waitFor(() => expect(sent).toContainEqual({ method: 'DELETE', path: '/api/v1/goals/g1/work-packages/w-repo', body: null }));
+    expect(selection.select).toHaveBeenLastCalledWith({ kind: 'workpackage', id: 'w-repo' }, bar);
+    const label = within(screen.getByTestId('timeline-row-p1-w-umbau')).getByRole('button', { name: 'Work package Umbau' });
+    fireEvent.click(label);
+    expect(selection.select).toHaveBeenLastCalledWith({ kind: 'workpackage', id: 'w-umbau' }, label);
+    const pill = within(screen.getByTestId('timeline-pill-w-docs')).getAllByRole('button')[0]!;
+    fireEvent.click(pill);
+    expect(selection.select).toHaveBeenLastCalledWith({ kind: 'workpackage', id: 'w-docs' }, pill);
+    // no small card any more
+    expect(screen.queryByRole('dialog', { name: /^Work package/ })).not.toBeInTheDocument();
   });
 });
 
@@ -629,38 +649,19 @@ describe('GoalTimeline — milestones', () => {
     ]));
   });
 
-  it('opens the card of a milestone: links by project, packages progress, save and delete; focus back to the diamond', async () => {
-    const sent = recordWrites();
-    renderTimeline();
+  // c60bf914: a diamond opens its milestone in the side panel – by click or Enter
+  it('opens a milestone in the side panel by click or Enter, and marks the open one', () => {
+    renderTimeline({ selected: { kind: 'milestone', id: 'm-freeze' } });
 
     const diamond = screen.getByRole('button', { name: /^Milestone Code freeze/ });
-    act(() => diamond.focus());
+    expect(diamond).toHaveAttribute('aria-current', 'true');
     fireEvent.click(diamond);
-    let card = screen.getByRole('dialog', { name: 'Milestone Code freeze' });
-    expect(within(card).getByRole('group', { name: 'AutoPilot' })).toBeInTheDocument();
-    expect(within(within(card).getByRole('group', { name: 'Site' })).getByRole('checkbox', { name: /Werbematerial/ })).not.toBeChecked();
-    expect(within(card).getByRole('checkbox', { name: /Umbau/ })).toBeChecked();
-    expect(within(card).getByTestId('milestone-packages-progress')).toHaveTextContent('0 of 2 linked packages complete');
-    expect(within(card).queryByRole('switch', { name: 'Reached' })).not.toBeInTheDocument();
-    fireEvent.keyDown(card, { key: 'Escape' });
-    expect(diamond).toHaveFocus();
-
-    fireEvent.click(diamond);
-    card = screen.getByRole('dialog', { name: 'Milestone Code freeze' });
-    fireEvent.click(within(card).getByRole('checkbox', { name: /Werbematerial/ }));
-    fireEvent.click(within(card).getByRole('button', { name: 'Save' }));
-    await waitFor(() => expect(sent).toEqual([{
-      method: 'PUT', path: '/api/v1/goals/g1/milestones/m-freeze', body: { workPackageIds: ['w-umbau', 'w-repo', 'w-site'] },
-    }]));
-
-    fireEvent.click(screen.getByRole('button', { name: /^Milestone Launch/ }));
-    card = screen.getByRole('dialog', { name: 'Milestone Launch' });
-    fireEvent.click(within(card).getByRole('switch', { name: 'Reached' }));
-    await waitFor(() => expect(sent).toContainEqual({ method: 'PUT', path: '/api/v1/goals/g1/milestones/m-launch', body: { reached: true } }));
-
-    fireEvent.click(within(screen.getByRole('dialog', { name: 'Milestone Launch' })).getByRole('button', { name: 'Delete' }));
-    fireEvent.click(within(screen.getByRole('dialog', { name: 'Delete milestone' })).getByRole('button', { name: 'Delete' }));
-    await waitFor(() => expect(sent).toContainEqual({ method: 'DELETE', path: '/api/v1/goals/g1/milestones/m-launch', body: null }));
+    expect(selection.select).toHaveBeenLastCalledWith({ kind: 'milestone', id: 'm-freeze' }, diamond);
+    const launch = screen.getByRole('button', { name: /^Milestone Launch/ });
+    expect(launch).not.toHaveAttribute('aria-current');
+    fireEvent.keyDown(launch, { key: 'Enter' });
+    expect(selection.select).toHaveBeenLastCalledWith({ kind: 'milestone', id: 'm-launch' }, launch);
+    expect(screen.queryByRole('dialog', { name: /^Milestone/ })).not.toBeInTheDocument();
   });
 
   it('hides the milestone controls behind an older backend and says why', () => {
@@ -831,7 +832,7 @@ describe('GoalTimeline — decisions', () => {
     expect(within(screen.getByRole('button', { name: /^Examples page – / })).getByTestId('decision-mark'))
       .toHaveAttribute('aria-label', 'Decided: Plain HTML (9/26/2026, by a person)');
 
-    fireEvent.click(chip);
+    fireEvent.click(screen.getByRole('button', { name: 'Plan: Privacy findings' }));
     fireEvent.click(within(screen.getByRole('dialog', { name: 'Plan: Privacy findings' })).getByRole('button', { name: 'Decide' }));
     const card = screen.getByRole('dialog', { name: 'Decision on Privacy findings' });
     fireEvent.change(within(card).getByLabelText('Decision'), { target: { value: 'MIT' } });
@@ -841,55 +842,55 @@ describe('GoalTimeline — decisions', () => {
 
   it('offers no deciding in the menu of a chip without question and decision', () => {
     renderTimeline({ todos: asking, decisions: true });
-    fireEvent.click(screen.getByRole('button', { name: /^Old banner – / }));
+    fireEvent.click(screen.getByRole('button', { name: 'Plan: Old banner' }));
     const menu = screen.getByRole('dialog', { name: 'Plan: Old banner' });
     expect(within(menu).queryByRole('button', { name: 'Decide' })).not.toBeInTheDocument();
     expect(within(menu).queryByRole('button', { name: 'Change' })).not.toBeInTheDocument();
   });
 });
 
-// 52bc1e8c: the workflows of a package stand at its row and in its card
-describe('GoalTimeline — workflows', () => {
-  it('shows a package\'s workflows in its row label and its card, where "Assign workflow" opens the dialog', () => {
-    const openAssign = vi.fn();
-    const attachment = {
-      id: 'a2', goalId: 'g1', workPackageId: 'w-repo', workflowId: 'wf-fix', workflowName: 'Fix bot', workflowProjectId: 'p1',
-      role: 'WORKER' as const, guard: false,
-    };
-    renderWithProviders(
-      <GoalWorkflowsContext.Provider value={{ goalId: 'g1', supported: true, attachments: [attachment], results: new Map(), openAssign }}>
+// 52bc1e8c: the workflows of a package stand at its row label; the side panel lists them too (c60bf914)
+const attachment = {
+  id: 'a2', goalId: 'g1', workPackageId: 'w-repo', workflowId: 'wf-fix', workflowName: 'Fix bot', workflowProjectId: 'p1',
+  role: 'WORKER' as const, guard: false,
+};
+const detailOfFixtures = {
+  goal, todos, workPackages, milestones, projects, byProject: [], decisionsSupported: true,
+} as unknown as GoalDetail;
+
+/** Zeitstrahl und Seitenleiste des Pakets „Repo sauber“ nebeneinander, wie auf der Zielseite. */
+function renderWithPanel(results: Map<string, never>, openAssign = vi.fn()) {
+  renderWithProviders(
+    <GoalWorkflowsContext.Provider value={{ goalId: 'g1', supported: true, attachments: [attachment], results, openAssign }}>
+      <GoalSelectionContext.Provider value={{ selected: { kind: 'workpackage', id: 'w-repo' }, select: vi.fn(), close: vi.fn() }}>
         <GoalTimeline goal={goal} todos={todos} workPackages={workPackages} milestones={milestones} projects={projects}
           onOpenTodo={vi.fn()} now={NOW} />
-      </GoalWorkflowsContext.Provider>,
-    );
+        <GoalSidePanel detail={detailOfFixtures} selection={{ kind: 'workpackage', id: 'w-repo' }} today={dayOf(NOW)}
+          onClose={vi.fn()} onSelect={vi.fn()} onOpenTodo={vi.fn()} />
+      </GoalSelectionContext.Provider>
+    </GoalWorkflowsContext.Provider>,
+  );
+}
+
+describe('GoalTimeline — workflows', () => {
+  it('shows a package\'s workflows in its row label and in its side panel, where "Assign workflow" opens the dialog', () => {
+    const openAssign = vi.fn();
+    renderWithPanel(new Map(), openAssign);
 
     const row = screen.getByTestId('timeline-row-p1-w-repo');
     expect(within(row).getByTestId('goal-workflow-a2')).toHaveAttribute('data-tone', 'neutral');
     expect(within(row).getByRole('button', { name: 'Start: Fix bot' })).toBeInTheDocument();
 
-    fireEvent.click(within(screen.getByTestId('timeline-bar-w-repo')).getByRole('button'));
-    const card = screen.getByRole('dialog', { name: 'Work package Repo sauber' });
-    expect(within(card).getByTestId('package-workflow-list-w-repo')).toHaveTextContent('Fix bot');
-    fireEvent.click(within(card).getByRole('button', { name: 'Assign workflow' }));
+    const panel = screen.getByTestId('panel-workflows');
+    expect(within(panel).getByTestId('goal-workflow-a2')).toBeInTheDocument();
+    fireEvent.click(within(panel).getByRole('button', { name: 'Assign workflow' }));
     expect(openAssign).toHaveBeenCalledWith('w-repo');
-    expect(screen.queryByRole('dialog', { name: 'Work package Repo sauber' })).not.toBeInTheDocument();
   });
 });
 
-// Review 52bc1e8c: two ▶ for the same workflow (row chip and package card) must not start it twice
+// Review 52bc1e8c: two ▶ for the same workflow (row chip and side panel) must not start it twice
 describe('GoalTimeline — starting a workflow once', () => {
-  const attachment = {
-    id: 'a2', goalId: 'g1', workPackageId: 'w-repo', workflowId: 'wf-fix', workflowName: 'Fix bot', workflowProjectId: 'p1',
-    role: 'WORKER' as const, guard: false,
-  };
-  const renderWith = (results: Map<string, never>) => renderWithProviders(
-    <GoalWorkflowsContext.Provider value={{ goalId: 'g1', supported: true, attachments: [attachment], results, openAssign: vi.fn() }}>
-      <GoalTimeline goal={goal} todos={todos} workPackages={workPackages} milestones={milestones} projects={projects}
-        onOpenTodo={vi.fn()} now={NOW} />
-    </GoalWorkflowsContext.Provider>,
-  );
-
-  it('sends one call when the chip and the card are clicked right after each other, and locks both while it starts', async () => {
+  it('sends one call when the row and the side panel are clicked right after each other, and locks both while it starts', async () => {
     const calls: string[] = [];
     let release = () => {};
     server.use(http.post('/api/v1/workflows/:id/execute', async ({ params }) => {
@@ -897,17 +898,15 @@ describe('GoalTimeline — starting a workflow once', () => {
       await new Promise<void>((resolve) => { release = resolve; });
       return HttpResponse.json({ id: 'run-1', status: 'PENDING' });
     }));
-    renderWith(new Map());
+    renderWithPanel(new Map());
 
-    fireEvent.click(within(screen.getByTestId('timeline-bar-w-repo')).getByRole('button'));
-    const card = screen.getByRole('dialog', { name: 'Work package Repo sauber' });
-    const inCard = within(card).getByRole('button', { name: 'Start: Fix bot' });
+    const inPanel = within(screen.getByTestId('panel-workflows')).getByRole('button', { name: 'Start: Fix bot' });
     const inRow = within(screen.getByTestId('timeline-row-p1-w-repo')).getByRole('button', { name: 'Start: Fix bot' });
     fireEvent.click(inRow);
-    fireEvent.click(inCard);
+    fireEvent.click(inPanel);
     fireEvent.click(inRow);
     await waitFor(() => expect(calls).toEqual(['wf-fix']));
-    await waitFor(() => expect(inCard).toBeDisabled());
+    await waitFor(() => expect(inPanel).toBeDisabled());
     expect(inRow).toBeDisabled();
     act(() => release());
     await waitFor(() => expect(inRow).toBeEnabled());
@@ -919,7 +918,7 @@ describe('GoalTimeline — starting a workflow once', () => {
       workflowId: 'wf-fix', workflowName: 'Fix bot', available: true, resultState: 'MISSING', result: null,
       run: { runId: 'r1', status: 'RUNNING', startedAt: new Date().toISOString(), completedAt: null, durationMs: null, gateStatus: null },
     };
-    renderWith(new Map([['wf-fix', running as never]]));
+    renderWithPanel(new Map([['wf-fix', running as never]]));
     const button = within(screen.getByTestId('timeline-row-p1-w-repo')).getByRole('button', { name: 'Start: Fix bot' });
     expect(button).toBeDisabled();
     expect(button).toHaveAttribute('title', 'Running – can be started again once it ends');

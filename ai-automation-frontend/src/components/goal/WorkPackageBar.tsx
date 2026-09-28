@@ -1,4 +1,5 @@
 import type { KeyboardEvent } from 'react';
+import { useIsSelected } from './goalSelection';
 import { useDraggable } from '@dnd-kit/core';
 import { Check } from 'lucide-react';
 import { useI18nStore, useT } from '../../i18n';
@@ -62,6 +63,8 @@ export function WorkPackageBar({ workPackage, range, axis, width, helpId, onOpen
   const label = tw.bar.replace('{title}', workPackage.title).replace('{range}', rangeText(shown, locale))
     .replace('{done}', String(workPackage.done)).replace('{total}', String(workPackage.total));
 
+  // In der Seitenleiste offen (c60bf914): hervorgehoben
+  const selected = useIsSelected('workpackage', id);
   const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
       const step = event.key === 'ArrowRight' ? 1 : -1;
@@ -92,7 +95,8 @@ export function WorkPackageBar({ workPackage, range, axis, width, helpId, onOpen
         aria-label={label} aria-describedby={helpId} title={label}
         onKeyDown={onKeyDown} onBlur={nudge.flush} onClick={(event) => onOpen(event.currentTarget)}
         className={`relative flex h-full w-full cursor-grab items-center overflow-hidden rounded-md text-left text-[11px] focus-ring active:cursor-grabbing ${
-          FRAME[workPackage.state]} ${mine === 'move' || mine === 'schedule' ? 'opacity-40' : ''}`}
+          FRAME[workPackage.state]} ${mine === 'move' || mine === 'schedule' ? 'opacity-40' : ''} ${selected ? 'ring-2 ring-accent' : ''}`}
+        aria-current={selected || undefined} data-selected={selected || undefined}
         style={{ touchAction: 'none' }}>
         <span aria-hidden="true" className="absolute inset-y-0 left-0 bg-success/30" style={{ width: `${percent}%` }} />
         {fits && (

@@ -10,6 +10,7 @@ import { ComplexityChip, EffortChip, RatedByMark } from './GoalBadges';
 import { DueChip } from './TodoPlanChips';
 import { DecisionMark } from './DecisionMark';
 import { PackageWorkflows } from './GoalWorkflowsPanel';
+import { useGoalSelection, useIsSelected } from './goalSelection';
 import { WorkPackageMark } from './WorkPackageMark';
 import { OutlineBar, OutlineCountColumns, OutlineGroup, OutlineToggle } from './OutlineGroup';
 import { OutlineMilestones } from './OutlineMilestones';
@@ -288,24 +289,29 @@ function PackageRow({ entry, today, expanded, onToggle, onOpenTodo, onEdit, onUp
   const bodyId = useId();
   const { workPackage, todos, counts } = entry;
   const done = workPackage.state === 'REACHED';
+  const selection = useGoalSelection();
+  const selected = useIsSelected('workpackage', workPackage.id);
   const range = packageRange(workPackage);
   return (
     <li data-testid={`outline-package-${workPackage.id}`}>
       <div className="flex items-center gap-2 rounded-md hover:bg-surface-hover/60">
         <span className="relative z-10 flex w-4 shrink-0 justify-center bg-surface-raised py-0.5"><WorkPackageMark state={workPackage.state} /></span>
-        <OutlineToggle nodeKey={`wp:${workPackage.id}`} expanded={expanded} controls={bodyId} onToggle={onToggle}>
-          <span className="min-w-0">
-            <span title={workPackage.title}
-              className={`line-clamp-2 break-words text-sm font-medium ${done ? 'text-text-secondary' : 'text-text'}`}>
-              {workPackage.title}
-            </span>
-            <span className={`flex flex-wrap gap-x-2 text-[11px] ${workPackage.state === 'OVERDUE' ? 'text-danger' : 'text-text-tertiary'}`}>
-              <span className="tabular-nums">{range ? rangeText(range, locale) : tw.noRange}</span>
-              {workPackage.state !== 'OPEN' && <span>{tw.states[workPackage.state]}</span>}
-              {workPackage.reopened && <span>{tw.reopened}</span>}
-            </span>
+        <OutlineToggle nodeKey={`wp:${workPackage.id}`} expanded={expanded} controls={bodyId} onToggle={onToggle} className="shrink-0"
+          label={t.goals.outline.toggle.replace('{title}', workPackage.title)} />
+        {/* Der Titel öffnet die Seitenleiste mit TODOs und Workflows des Pakets (c60bf914) */}
+        <button type="button" onClick={(event) => selection?.select({ kind: 'workpackage', id: workPackage.id }, event.currentTarget)}
+          aria-label={t.goals.panel.openPackage.replace('{title}', workPackage.title)} aria-current={selected || undefined}
+          className={`min-w-0 flex-1 rounded-md px-1 py-0.5 text-left focus-ring hover:text-accent ${selected ? 'bg-accent-subtle' : ''}`}>
+          <span title={workPackage.title}
+            className={`line-clamp-2 break-words text-sm font-medium ${done ? 'text-text-secondary' : 'text-text'}`}>
+            {workPackage.title}
           </span>
-        </OutlineToggle>
+          <span className={`flex flex-wrap gap-x-2 text-[11px] ${workPackage.state === 'OVERDUE' ? 'text-danger' : 'text-text-tertiary'}`}>
+            <span className="tabular-nums">{range ? rangeText(range, locale) : tw.noRange}</span>
+            {workPackage.state !== 'OPEN' && <span>{tw.states[workPackage.state]}</span>}
+            {workPackage.reopened && <span>{tw.reopened}</span>}
+          </span>
+        </button>
         <OutlineBar counts={counts} className="hidden h-1 w-14 shrink-0 sm:block" />
         <OutlineCountColumns counts={counts} />
         <div className="flex shrink-0 items-center">

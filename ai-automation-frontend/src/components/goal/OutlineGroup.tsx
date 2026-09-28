@@ -9,19 +9,22 @@ import { percentDone, type OutlineCounts } from './goalOutline';
  * Pfeiltasten von Knopf zu Knopf (`data-outline-toggle`, siehe `GoalOutline`).
  */
 
-export function OutlineToggle({ nodeKey, expanded, controls, onToggle, className = '', children }: {
+export function OutlineToggle({ nodeKey, expanded, controls, onToggle, className = 'flex-1', label, children }: {
   nodeKey: string;
   expanded: boolean;
   /** ID des Bereichs, den der Knopf auf- und zuklappt. */
   controls: string;
   onToggle: () => void;
   className?: string;
-  children: ReactNode;
+  /** Name, wenn der Knopf nur den Pfeil zeigt (Paketzeile: der Titel daneben öffnet die Seitenleiste). */
+  label?: string;
+  children?: ReactNode;
 }) {
   const Chevron = expanded ? ChevronDown : ChevronRight;
   return (
     <button type="button" data-outline-toggle={nodeKey} aria-expanded={expanded} aria-controls={controls} onClick={onToggle}
-      className={`flex min-w-0 flex-1 items-center gap-1.5 rounded-md py-1 text-left focus-ring ${className}`}>
+      aria-label={label} title={label}
+      className={`flex min-w-0 items-center gap-1.5 rounded-md py-1 text-left focus-ring ${className}`}>
       <Chevron className="h-4 w-4 shrink-0 text-text-tertiary" aria-hidden="true" />
       {children}
     </button>

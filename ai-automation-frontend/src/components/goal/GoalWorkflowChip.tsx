@@ -63,13 +63,14 @@ export function GoalWorkflowChip({ attachment, entry, compact = false }: {
         className="flex min-w-0 items-center gap-1.5 rounded-l-md px-2 hover:bg-surface-hover focus-ring">
         <RoleIcon className={`${compact ? 'h-3 w-3' : 'h-3.5 w-3.5'} shrink-0 text-text-tertiary`} aria-hidden="true" />
         <span className={`h-2 w-2 shrink-0 rounded-full ${TONE_DOT[status.tone]}`} aria-hidden="true" />
-        <span className={`min-w-0 truncate text-text ${compact ? 'max-w-[8rem]' : 'max-w-[14rem]'}`}>{name}</span>
+        {/* Der Name bleibt lesbar; wird es eng, kürzen sich zuerst Stand und Kurzfassung dahinter */}
+        <span className={`truncate text-text ${compact ? 'min-w-0 max-w-[8rem]' : 'max-w-[14rem] shrink-0'}`}>{name}</span>
         {!compact && (
-          <span className="shrink-0 text-text-tertiary" aria-hidden="true">
+          <span className="min-w-0 truncate text-text-tertiary" aria-hidden="true">
             {[status.text, at ? ago(at, now, locale) : null].filter(Boolean).join(' · ')}
           </span>
         )}
-        {summary && <span className="hidden max-w-[12rem] truncate text-text-secondary lg:inline" aria-hidden="true">– {summary}</span>}
+        {summary && <span className="hidden min-w-0 max-w-[12rem] truncate text-text-secondary lg:inline" aria-hidden="true">– {summary}</span>}
       </button>
       <button type="button" aria-label={tw.start.replace('{name}', name)} title={start.running ? tw.running : tw.start.replace('{name}', name)}
         disabled={start.busy} onClick={start.start}
