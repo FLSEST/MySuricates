@@ -4,14 +4,13 @@ import {
   type Announcements, type DragEndEvent, type DragMoveEvent, type DragStartEvent, type Modifier, type UniqueIdentifier,
 } from '@dnd-kit/core';
 import { getEventCoordinates } from '@dnd-kit/utilities';
-import { Trash2 } from 'lucide-react';
-import { Card, ConfirmModal } from '../ui';
+import { Card } from '../ui';
 import { Hint } from '../hints/Hint';
 import { useI18nStore, useT } from '../../i18n';
 import { useElementWidth } from '../../hooks/useElementWidth';
 import { usePlanGoalTodo } from '../../hooks/useGoalTimeline';
-import { useCreateWorkPackage, useDeleteWorkPackage, useUpdateWorkPackage } from '../../hooks/useGoalWorkPackages';
-import { useCreateMilestone, useDeleteMilestone, useUpdateMilestone } from '../../hooks/useGoalMilestones';
+import { useCreateWorkPackage, useUpdateWorkPackage } from '../../hooks/useGoalWorkPackages';
+import { useCreateMilestone, useUpdateMilestone } from '../../hooks/useGoalMilestones';
 import {
   CHIP_ANCHOR, DIAMOND_ANCHOR, FALLBACK_WIDTH, axisFor, buildBands, dayAtX, dayOf, dayShift, dropTargetOf,
   dueDateOfDay, hasDays, milestoneAccepts, milestoneMarks, movedRange, packageAccepts, packageRange, planChanges,
@@ -21,7 +20,8 @@ import { TimelineAxisView } from './TimelineAxisView';
 import { LABEL_COLUMN, TimelineLines } from './TimelineRows';
 import { TimelineBandView, type InlineAt } from './TimelineBand';
 import { TimelineMilestoneRow } from './TimelineMilestoneRow';
-import { MilestoneCard, WorkPackageCard } from './TimelineCards';
+import { MilestoneCard } from './TimelineCards';
+import { useGoalSelection } from './goalSelection';
 import { TimelineOverlay, type DragFace } from './TimelineOverlay';
 import { TIMELINE_KEYBOARD_CODES, chipDragData, timelineCollision, timelineKeyboardCoordinates } from './timelineKeyboard';
 import { IDLE, TimelineDragContext, type DragState, type Dragged } from './timelineDrag';
@@ -30,17 +30,14 @@ import type { FloatingAnchor } from './floating';
 import type { Goal, GoalMilestone, GoalProject, GoalTodoItem, GoalWorkPackage } from '../../types';
 
 /** Was gerade als Karte offen ist: ein Paket, ein Meilenstein oder ein neuer Meilenstein. */
-type Panel =
-  | { kind: 'package'; id: string }
-  | { kind: 'milestone'; id: string }
-  | { kind: 'newMilestone' };
+/** Die kleine Karte am Zeitstrahl gibt es nur noch für einen neuen Meilenstein; bestehende öffnen die Seitenleiste. */
+type Panel = { kind: 'newMilestone' };
 
 /** Wo gerade ein Titel eingetippt wird: ein neues Paket in einem Band oder ein neuer Meilenstein an einem Tag. */
 type Inline =
   | ({ scope: 'band'; band: string } & InlineAt)
   | { scope: 'milestones'; day: number; x: number };
 
-type Removing = { kind: 'package'; item: GoalWorkPackage } | { kind: 'milestone'; item: GoalMilestone } | null;
 
 /** Wo das Gezogene gerade stünde: Fläche, Tag darunter und – bei einem Paket – der neue Zeitraum. */
 interface Hover {
@@ -120,10 +117,8 @@ export function GoalTimeline({ goal, todos, workPackages, milestones, projects, 
   const { mutate: plan } = usePlanGoalTodo(goal.id);
   const createPackage = useCreateWorkPackage(goal.id);
   const { mutate: updatePackage } = useUpdateWorkPackage(goal.id);
-  const removePackage = useDeleteWorkPackage(goal.id);
   const createMilestone = useCreateMilestone(goal.id);
   const { mutate: updateMilestone } = useUpdateMilestone(goal.id);
-  const removeMilestone = useDeleteMilestone(goal.id);
   const [dragged, setDragged] = useState<Dragged>(null);
   const [face, setFace] = useState<DragFace>(NO_FACE);
   const [hover, setHover] = useState<Hover | null>(null);
@@ -131,7 +126,6 @@ export function GoalTimeline({ goal, todos, workPackages, milestones, projects, 
   // Was die offene Karte geöffnet hat: dort steht sie, dorthin geht danach der Fokus
   const panelTrigger = useRef<HTMLElement | null>(null);
   const [inline, setInline] = useState<Inline | null>(null);
-  const [removing, setRemoving] = useState<Removing>(null);
   const [spoken, setSpoken] = useState('');
   const keyboardOptions = useMemo(
     () => ({ keyboardCodes: TIMELINE_KEYBOARD_CODES, coordinateGetter: timelineKeyboardCoordinates(axis, width) }),
@@ -281,8 +275,13 @@ export function GoalTimeline({ goal, todos, workPackages, milestones, projects, 
     setPanel(next);
   };
   const panelAnchor = useCallback<FloatingAnchor>(() => panelTrigger.current?.getBoundingClientRect() ?? null, []);
-  const openPackage = panel?.kind === 'package' ? packageById.get(panel.id) : undefined;
-  const openMilestone = panel?.kind === 'milestone' ? milestoneById.get(panel.id) : undefined;
+  // Meilensteine und Arbeitspakete öffnen die Seitenleiste der Zielseite (c60bf914)
+  const selection = useGoalSelection();
+  const openDetails = (kind: 'milestone' | 'workpackage', id: string, trigger: HTMLElement) => {
+    setInline(null);
+    setPanel(null);
+    selection?.select({ kind, id }, trigger);
+  };
 
   const addPackage = (band: string, title: string, day: number | null) => createPackage.mutate(
     { title, projectId: band, ...(day !== null ? rangeRequest(weekFrom(day)) : {}) },
@@ -339,7 +338,7 @@ export function GoalTimeline({ goal, todos, workPackages, milestones, projects, 
                     onCreate={addMilestone}
                     onCancel={() => setInline(null)}
                     onAdd={(trigger) => openPanel({ kind: 'newMilestone' }, trigger)}
-                    onOpen={(item, trigger) => openPanel({ kind: 'milestone', id: item.id }, trigger)}
+                    onOpen={(item, trigger) => openDetails('milestone', item.id, trigger)}
                     onMove={moveMilestone} announce={setSpoken} />
                 )}
                 {bands.length === 0 && (
@@ -357,29 +356,13 @@ export function GoalTimeline({ goal, todos, workPackages, milestones, projects, 
                     }}
                     onCreate={(title, day) => addPackage(band.key, title, day)}
                     onPlan={planFromMenu} onOpenTodo={onOpenTodo}
-                    onOpenPackage={(id, trigger) => openPanel({ kind: 'package', id }, trigger)}
+                    onOpenPackage={(id, trigger) => openDetails('workpackage', id, trigger)}
                     onReschedule={reschedule} announce={setSpoken} />
                 ))}
               </div>
             </div>
           </Card>
         </TimelineDragContext.Provider>
-        {openPackage && (
-          <WorkPackageCard goalId={goal.id} workPackage={openPackage} projects={projects} todos={todos}
-            onClose={closePanel} anchor={panelAnchor} triggerRef={panelTrigger}
-            onDelete={() => {
-              setPanel(null);
-              setRemoving({ kind: 'package', item: openPackage });
-            }} />
-        )}
-        {openMilestone && (
-          <MilestoneCard goalId={goal.id} milestone={openMilestone} workPackages={workPackages} projects={projects}
-            onClose={closePanel} anchor={panelAnchor} triggerRef={panelTrigger}
-            onDelete={() => {
-              setPanel(null);
-              setRemoving({ kind: 'milestone', item: openMilestone });
-            }} />
-        )}
         {panel?.kind === 'newMilestone' && (
           <MilestoneCard goalId={goal.id} day={Math.min(axis.endDay, Math.max(axis.startDay, today))} workPackages={workPackages}
             projects={projects} onClose={closePanel} anchor={panelAnchor} triggerRef={panelTrigger} align="start" />
@@ -390,25 +373,6 @@ export function GoalTimeline({ goal, todos, workPackages, milestones, projects, 
           )}
         </DragOverlay>
       </DndContext>
-
-      <ConfirmModal
-        open={removing !== null}
-        onClose={() => setRemoving(null)}
-        onConfirm={() => {
-          if (!removing) return;
-          const done = { onSettled: () => setRemoving(null) };
-          if (removing.kind === 'package') removePackage.mutate(removing.item.id, done);
-          else removeMilestone.mutate(removing.item.id, done);
-        }}
-        title={removing?.kind === 'milestone' ? t.goals.milestones.deleteTitle : t.goals.workPackages.deleteTitle}
-        message={removing
-          ? (removing.kind === 'milestone' ? t.goals.milestones : t.goals.workPackages).deleteConfirm.replace('{title}', () => removing.item.title)
-          : null}
-        confirmLabel={t.goals.milestones.delete}
-        confirmIcon={<Trash2 className="h-4 w-4" />}
-        variant="danger"
-        isPending={removePackage.isPending || removeMilestone.isPending}
-      />
     </section>
   );
 }

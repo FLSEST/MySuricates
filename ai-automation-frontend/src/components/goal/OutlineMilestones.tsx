@@ -3,11 +3,12 @@ import { Check, Pencil, Plus } from 'lucide-react';
 import { useI18nStore, useT } from '../../i18n';
 import { formatDate } from '../../utils/localeFormat';
 import { MilestoneDiamond } from './MilestoneDiamond';
+import { useGoalSelection, useIsSelected } from './goalSelection';
 import type { GoalDetail, GoalMilestone } from '../../types';
 
 /**
  * Die Meilensteine oben in der Gliederung (c60bf914): Termine fürs ganze Ziel, nach Datum – Raute,
- * Titel, Datum, Zustand und „2/3 Pakete“; ein Klick bearbeitet, „+ Meilenstein“ legt an. Bei einem
+ * Titel, Datum, Zustand und „2/3 Pakete“; ein Klick öffnet die Seitenleiste, ✎ bearbeitet, „+ Meilenstein“ legt an. Bei einem
  * Backend vor c60bf914 steht hier nur, dass es sie nach dem Neustart gibt.
  */
 export function OutlineMilestones({ detail, onAdd, onEdit }: {
@@ -49,13 +50,19 @@ function MilestoneLine({ milestone, onEdit }: { milestone: GoalMilestone; onEdit
   const t = useT();
   const tm = t.goals.milestones;
   const locale = useI18nStore((s) => s.locale);
+  const selection = useGoalSelection();
+  const selected = useIsSelected('milestone', milestone.id);
   const reached = milestone.state === 'REACHED';
-  const label = t.goals.outline.editMilestone.replace('{title}', milestone.title);
+  const editLabel = t.goals.outline.editMilestone.replace('{title}', milestone.title);
+  // Auf der Zielseite öffnet der Titel die Seitenleiste (c60bf914), ✎ bearbeitet; ohne Seitenleiste bearbeitet der Titel
+  const label = selection ? t.goals.panel.openMilestone.replace('{title}', milestone.title) : editLabel;
   return (
-    <li className="flex items-center gap-2.5 py-1.5" data-testid={`outline-milestone-${milestone.id}`}>
+    <li className={`-mx-1.5 flex items-center gap-2.5 rounded-md px-1.5 py-1.5 ${selected ? 'bg-accent-subtle' : ''}`}
+      data-testid={`outline-milestone-${milestone.id}`}>
       <MilestoneDiamond state={milestone.state} />
-      <button type="button" onClick={onEdit} aria-label={label} title={milestone.title}
-        className="min-w-0 flex-1 rounded text-left focus-ring">
+      <button type="button" aria-label={label} title={milestone.title} aria-current={selected || undefined}
+        onClick={(event) => (selection ? selection.select({ kind: 'milestone', id: milestone.id }, event.currentTarget) : onEdit())}
+        className="min-w-0 flex-1 rounded text-left focus-ring hover:text-accent">
         <span className={`block truncate text-sm font-medium ${reached ? 'text-text-secondary' : 'text-text'}`}>{milestone.title}</span>
         <span className={`flex flex-wrap gap-x-2 text-[11px] ${milestone.state === 'OVERDUE' ? 'text-danger' : 'text-text-tertiary'}`}>
           <span className="tabular-nums">{formatDate(milestone.dueDate, locale)}</span>
@@ -73,9 +80,10 @@ function MilestoneLine({ milestone, onEdit }: { milestone: GoalMilestone; onEdit
           </>
         ) : reached && <Check className="ml-auto h-3.5 w-3.5 text-success" role="img" aria-label={tm.states.REACHED} />}
       </span>
-      {/* Nur für die Maus: der Titel davor ist schon der Knopf zum Bearbeiten */}
-      <button type="button" onClick={onEdit} aria-hidden="true" title={tm.edit} tabIndex={-1}
-        className="rounded p-1 text-text-tertiary hover:bg-surface-hover hover:text-text">
+      {/* Mit Seitenleiste ein eigener Knopf zum Bearbeiten; ohne ist der Titel davor schon dieser Knopf */}
+      <button type="button" onClick={onEdit} aria-label={selection ? editLabel : undefined} aria-hidden={selection ? undefined : true}
+        tabIndex={selection ? undefined : -1} title={tm.edit}
+        className="rounded p-1 text-text-tertiary hover:bg-surface-hover hover:text-text focus-ring">
         <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
       </button>
     </li>

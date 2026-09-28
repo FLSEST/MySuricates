@@ -263,7 +263,7 @@
     "title": "Das Ziel auf dem Zeitstrahl",
     "points": [
       "Oben die Meilensteine als Rauten, darunter je Projekt ein Band mit den Arbeitspaketen als Balken von Beginn bis Ende",
-      "Ein Klick in die Meilenstein-Zeile oder in ein Band legt dort an; Balken und Rauten lassen sich ziehen, ein Balken auch an seinen Enden",
+      "Ein Klick in die Meilenstein-Zeile oder in ein Band legt dort an; ein Klick auf Balken oder Raute öffnet rechts TODOs und Workflows, gezogen verschieben sie sich",
       "Beim Ziehen steht unter dem Eintrag, wo er landet; TODOs gehen nur in Arbeitspakete ihres eigenen Projekts"
     ]
   },

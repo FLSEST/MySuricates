@@ -1,4 +1,5 @@
-import { useCallback, useId, useRef, useState, type CSSProperties, type FormEvent, type RefObject } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type CSSProperties, type FormEvent, type RefObject } from 'react';
+import { MoreHorizontal } from 'lucide-react';
 import { useDraggable } from '@dnd-kit/core';
 import { Button } from '../ui';
 import { useI18nStore, useT } from '../../i18n';
@@ -10,6 +11,7 @@ import { STATUS_DOT, dueTitle } from './planDisplay';
 import { packageOptions } from './planning';
 import { rangeText } from './dragLabel';
 import { TimelinePopover } from './TimelinePopover';
+import { useDragState } from './timelineDrag';
 import { DecisionCard, DecisionMark } from './DecisionMark';
 import { useDecisionScope } from './decisionContext';
 import type { GoalTodoItem, GoalWorkPackage } from '../../types';
@@ -56,10 +58,14 @@ interface TimelineChipProps {
   onOpenTodo: (todoId: string) => void;
 }
 
+/** So lange nach dem Loslassen gilt ein Klick noch als Ende des Ziehens, nicht als Klick. */
+const CLICK_AFTER_DRAG_MS = 300;
+
 /**
  * Ein TODO auf dem Zeitstrahl (TODO e192df18): mit der Maus oder per Tastatur (Leertaste, dann
- * Pfeiltasten – TODO ff6f08fd) ziehbar, ein Klick (oder Enter) öffnet sein Menü mit „Datum setzen“
- * und „Arbeitspaket“ (c60bf914).
+ * Pfeiltasten – TODO ff6f08fd) ziehbar. Ein Klick (oder Enter) öffnet den TODO-Dialog (c60bf914, Flo:
+ * „anklickbar“); das Menü mit „Datum setzen“, „Arbeitspaket“ und „Entscheiden“ öffnet ⋯ daneben oder
+ * die rechte Maustaste. Ein Klick direkt nach dem Ziehen zählt nicht.
  */
 export function TimelineChip({ todo, workPackages, today, placement, compact = false, onPlan, onOpenTodo }: TimelineChipProps) {
   const t = useT();
@@ -72,6 +78,15 @@ export function TimelineChip({ todo, workPackages, today, placement, compact = f
     anchor: placement?.anchor ?? CHIP_ANCHOR, flipped: placement?.flipped ?? false, kind: 'todo', ...(compact ? { compact } : {}),
   };
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `todo:${todo.id}`, data: dragData });
+  const { dragged } = useDragState();
+  const draggingMe = isDragging || (dragged?.kind === 'todo' && dragged.todo.id === todo.id);
+  const dragEndedAt = useRef(0);
+  const wasDragging = useRef(false);
+  useEffect(() => {
+    if (wasDragging.current && !draggingMe) dragEndedAt.current = Date.now();
+    wasDragging.current = draggingMe;
+  }, [draggingMe]);
+  const menuRef = useRef<HTMLButtonElement>(null);
   const close = useCallback(() => setOpen(false), []);
   const overdue = isOverdue(todo, today);
   const workPackage = workPackages.find((item) => item.id === todo.workPackageId);
@@ -83,7 +98,7 @@ export function TimelineChip({ todo, workPackages, today, placement, compact = f
     : { width: compact ? '100%' : CHIP_WIDTH };
 
   return (
-    <div ref={setNodeRef} style={style} className={`${placement ? '' : 'relative'} ${isDragging ? 'opacity-40' : ''}`}>
+    <div ref={setNodeRef} style={style} className={`group ${placement ? '' : 'relative'} ${isDragging ? 'opacity-40' : ''}`}>
       <button
         ref={triggerRef}
         type="button"
@@ -91,22 +106,35 @@ export function TimelineChip({ todo, workPackages, today, placement, compact = f
         {...listeners}
         aria-label={`${todo.title} – ${due}`}
         aria-haspopup="dialog"
-        aria-expanded={open}
         data-overdue={overdue ? 'true' : undefined}
         data-done={todo.status === 'DONE' ? 'true' : undefined}
         title={tooltip}
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => {
+          if (draggingMe || Date.now() - dragEndedAt.current < CLICK_AFTER_DRAG_MS) return;
+          onOpenTodo(todo.id);
+        }}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          setOpen(true);
+        }}
         className="block w-full cursor-grab rounded-md focus-ring active:cursor-grabbing"
         style={{ touchAction: 'none' }}
       >
         <ChipFace todo={todo} overdue={overdue} flipped={placement?.flipped} compact={compact} />
+      </button>
+      <button ref={menuRef} type="button" aria-haspopup="dialog" aria-expanded={open}
+        aria-label={t.goals.timeline.planMenu.replace('{title}', todo.title)} title={t.goals.timeline.planMenu.replace('{title}', todo.title)}
+        onClick={() => setOpen((value) => !value)} data-testid={`timeline-chip-menu-${todo.id}`}
+        className={`absolute top-1/2 -translate-y-1/2 ${placement?.flipped ? 'left-0.5' : 'right-0.5'} rounded bg-surface-raised p-0.5 text-text-tertiary opacity-0 hover:text-accent focus:opacity-100 focus-ring group-hover:opacity-100 max-sm:opacity-100 ${
+          open ? 'opacity-100' : ''}`}>
+        <MoreHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
       </button>
       {open && (
         <ChipMenu
           todo={todo}
           workPackages={workPackages}
           alignRight={placement?.flipped ?? false}
-          triggerRef={triggerRef}
+          triggerRef={menuRef}
           onClose={close}
           onPlan={(changes) => {
             close();

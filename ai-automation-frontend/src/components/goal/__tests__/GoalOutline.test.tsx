@@ -114,10 +114,13 @@ describe('GoalOutline (c60bf914)', () => {
     const autopilot = screen.getByTestId('outline-project-p1');
     const rows = within(autopilot).getAllByTestId(/^outline-package-/).map((row) => row.getAttribute('data-testid'));
     expect(rows).toEqual(['outline-package-w-done', 'outline-package-w-legal', 'outline-package-w-docs']);
-    expect(within(autopilot).getByRole('button', { name: /^Kick-off/, expanded: false })).toHaveTextContent('complete');
+    expect(within(autopilot).getByRole('button', { name: 'Expand or collapse: Kick-off', expanded: false })).toBeInTheDocument();
+    // c60bf914: the title beside the arrow opens the side panel
+    expect(within(autopilot).getByRole('button', { name: 'Open work package: Kick-off' })).toHaveTextContent('complete');
     expect(within(autopilot).queryByRole('button', { name: /^Open TODO: Old notes/ })).not.toBeInTheDocument();
     const legal = within(autopilot).getByTestId('outline-package-w-legal');
-    expect(within(legal).getByRole('button', { name: /^Legal/, expanded: true }).textContent).toMatch(/10\/12\s–\s10\/15/);
+    expect(within(legal).getByRole('button', { name: 'Expand or collapse: Legal', expanded: true })).toBeInTheDocument();
+    expect(within(legal).getByRole('button', { name: 'Open work package: Legal' }).textContent).toMatch(/10\/12\s–\s10\/15/);
     expect(within(legal).getByRole('button', { name: 'Open TODO: Privacy findings (Open)' })).toBeInTheDocument();
     expect(within(legal).getByRole('button', { name: 'Open TODO: Imprint (Done)' })).toHaveClass('line-through');
     // counters: aligned short form, full sentence for screen readers; questions in the human colour
@@ -151,12 +154,12 @@ describe('GoalOutline (c60bf914)', () => {
   it('folds and unfolds by click and remembers it per goal', () => {
     renderOutline();
 
-    const toggle = screen.getByRole('button', { name: /^Legal/ });
+    const toggle = screen.getByRole('button', { name: 'Expand or collapse: Legal' });
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByRole('button', { name: /^Open TODO: Privacy findings/ })).not.toBeInTheDocument();
     expect(JSON.parse(localStorage.getItem('mysuricates-goal-outline')!)).toEqual({ g1: { 'wp:w-legal': false } });
-    fireEvent.click(screen.getByRole('button', { name: /^Kick-off/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Expand or collapse: Kick-off' }));
     expect(screen.getByRole('button', { name: /^Open TODO: Old notes/ })).toBeInTheDocument();
   });
 
@@ -166,7 +169,7 @@ describe('GoalOutline (c60bf914)', () => {
     const project = screen.getByRole('button', { name: /^AutoPilot/ });
     act(() => project.focus());
     fireEvent.keyDown(project, { key: 'ArrowDown' });
-    const kickoff = screen.getByRole('button', { name: /^Kick-off/ });
+    const kickoff = screen.getByRole('button', { name: 'Expand or collapse: Kick-off' });
     expect(kickoff).toHaveFocus();
     fireEvent.keyDown(kickoff, { key: 'ArrowRight' });
     expect(kickoff).toHaveAttribute('aria-expanded', 'true');

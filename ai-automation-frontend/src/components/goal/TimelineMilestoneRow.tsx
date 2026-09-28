@@ -12,6 +12,7 @@ import { InlineTitleField } from './InlineTitleField';
 import { MilestoneDiamond } from './MilestoneDiamond';
 import { LABEL_COLUMN } from './TimelineRows';
 import { useKeyboardNudge } from './useKeyboardNudge';
+import { useIsSelected } from './goalSelection';
 import type { FloatingAnchor } from './floating';
 import type { GoalMilestone } from '../../types';
 
@@ -106,6 +107,7 @@ function MilestoneMarkButton({ mark, axis, width, helpId, onOpen, onMove, onNudg
   const locale = useI18nStore((s) => s.locale);
   const { milestone } = mark;
   const nudge = useKeyboardNudge(mark.day, (a, b) => a === b, onMove);
+  const selected = useIsSelected('milestone', milestone.id);
   const { listeners, setNodeRef, isDragging } = useDraggable({ id: `ms:${milestone.id}`, data: DRAG_DATA });
   const x = nudge.active ? xOfDay(axis, nudge.value, width) : mark.x;
   const label = tm.diamond.replace('{title}', milestone.title).replace('{state}', tm.states[milestone.state])
@@ -134,7 +136,8 @@ function MilestoneMarkButton({ mark, axis, width, helpId, onOpen, onMove, onNudg
       <button ref={setNodeRef} type="button" {...pointerOnly(listeners)} aria-label={label} aria-describedby={helpId} title={label}
         onKeyDown={onKeyDown} onBlur={nudge.flush} onClick={(event) => onOpen(event.currentTarget)}
         className={`flex h-5 cursor-grab items-center rounded hover:bg-surface-hover focus-ring active:cursor-grabbing ${
-          mark.flipped ? 'flex-row-reverse pl-1' : 'pr-1'} ${isDragging ? 'opacity-40' : ''}`}
+          mark.flipped ? 'flex-row-reverse pl-1' : 'pr-1'} ${isDragging ? 'opacity-40' : ''} ${selected ? 'bg-accent-subtle ring-2 ring-accent' : ''}`}
+        aria-current={selected || undefined} data-selected={selected || undefined}
         style={{ touchAction: 'none', maxWidth: 2 * DIAMOND_ANCHOR + mark.labelWidth }}>
         <span className="flex h-5 w-5 shrink-0 items-center justify-center"><MilestoneDiamond state={milestone.state} size="lg" /></span>
         {mark.labelWidth > 20 && (

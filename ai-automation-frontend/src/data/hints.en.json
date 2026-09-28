@@ -263,7 +263,7 @@
     "title": "The goal on a timeline",
     "points": [
       "Milestones sit at the top as diamonds, below every project has a band with its work packages as bars from start to end",
-      "A click into the milestone row or into a band adds one there; bars and diamonds can be dragged, a bar also by its ends",
+      "A click into the milestone row or into a band adds one there; a click on a bar or diamond opens its TODOs and workflows on the right, dragging moves them",
       "While dragging, the item shows where it will land; TODOs only go into work packages of their own project"
     ]
   },

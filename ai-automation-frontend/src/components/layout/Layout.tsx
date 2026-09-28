@@ -40,7 +40,7 @@ export function Layout() {
 
   return (
     <ApiKeyGuard>
-      <div className="min-h-screen overflow-x-hidden bg-surface">
+      <div className="min-h-screen overflow-x-clip bg-surface">
         <Sidebar />
 
         {/* Mobile backdrop */}

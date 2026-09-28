@@ -137,7 +137,7 @@ describe('GoalDetail', () => {
     renderGoal();
 
     await screen.findByRole('heading', { name: 'Open-Source-Launch' });
-    const next = screen.getAllByTestId('goal-next-item').map((li) => within(li).getByRole('link').textContent);
+    const next = screen.getAllByTestId('goal-next-item').map((li) => within(li).getByRole('button', { name: /^Open TODO: / }).textContent);
     expect(next).toEqual(['Privacy findings', 'Style probe', 'Examples page']);
     expect(screen.getByTestId('goal-question')).toHaveTextContent('Which look?');
     expect(screen.getByTestId('goal-progress')).toHaveTextContent('1 of 4 done');
@@ -547,6 +547,8 @@ describe('GoalDetail', () => {
       expect(screen.getByTestId('goal-question')).toHaveTextContent('Which look?');
       expect(screen.getByText('Decided (1)')).toBeInTheDocument();
       expect(screen.getByTestId('goal-progress').parentElement).toHaveTextContent('1 open·1 decided');
+      // c60bf914: the card hangs on the list, not on the row – the typed answer survives the refusal
+      expect(within(screen.getByRole('dialog', { name: 'Decision on Style probe' })).getByLabelText('Decision')).toHaveValue('Dark theme');
     });
 
     it('offers no deciding against an older backend – the marks stay a plain display', async () => {
