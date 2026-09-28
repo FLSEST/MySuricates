@@ -10,6 +10,8 @@ import com.automation.entity.Project;
 import com.automation.entity.Todo;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.mapper.TodoMapper;
+import com.automation.modules.ModuleCatalog;
+import com.automation.modules.ModuleRegistry;
 import com.automation.repository.ProjectRepository;
 import com.automation.repository.TodoRepository;
 import com.automation.repository.WorkflowRepository;
@@ -46,6 +48,7 @@ public class TodoService {
     private final ApplicationEventPublisher eventPublisher;
     private final AuditCenterService auditCenterService;
     private final TodoGoalConsistency goalConsistency;
+    private final ModuleRegistry modules;
 
     @Transactional(readOnly = true)
     public PageResponse<TodoResponse> findAll(int page, int size, String projectId, List<String> status, String priority, String source, String tag, String q) {
@@ -56,6 +59,10 @@ public class TodoService {
     @Transactional(readOnly = true)
     public PageResponse<TodoResponse> findAll(int page, int size, String projectId, List<String> status, String priority,
                                               String source, String tag, String q, String goalId) {
+        if (goalId != null && !goalId.isBlank() && !modules.isEnabled(ModuleCatalog.GOALS)) {
+            // Ein stilles Ignorieren gaebe einem Aufrufer, der „die TODOs dieses Ziels“ will, die ganze Liste.
+            throw new IllegalArgumentException(ModuleCatalog.GOALS.disabledMessage("Filter goalId"));
+        }
         // The order (priority rank, then newest) sits in the specification — an unsorted
         // PageRequest is required, a Sort would overwrite that order-by (aa434aee).
         Specification<Todo> spec = TodoSpecifications.listSpec(projectId, status, priority, source, tag, q)

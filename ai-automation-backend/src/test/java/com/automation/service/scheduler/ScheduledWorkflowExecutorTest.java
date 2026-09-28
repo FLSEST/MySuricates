@@ -648,4 +648,56 @@ class ScheduledWorkflowExecutorTest {
         assertThat(executor.isFinished(null)).isTrue();
     }
 
+
+    /**
+     * Modul goals aus (TODO c60bf914): ein zielgebundener Zeitplan – der Ziel-Waechter traegt goal_id in
+     * seinem Eingabekontext – startet keinen Lauf, der ohne Zieldaten scheitern wuerde, und rueckt weiter.
+     */
+    @Test
+    void executeSingleSchedule_goalScheduleWhileGoalsIsOff_isSkippedAndMovesOn() {
+        org.mockito.Mockito.doReturn(false).when(modules).isEnabled(com.automation.modules.ModuleCatalog.GOALS);
+        Instant due = Instant.now().minusSeconds(60);
+        ScheduledWorkflow scheduled = ScheduledWorkflow.builder()
+                .id("sched-guard")
+                .workflow(testWorkflow)
+                .cronExpression("0 0 8 * * *")
+                .scheduleType(ScheduleType.CRON)
+                .enabled(true)
+                .nextRunAt(due)
+                .inputContext(Map.of("goal_id", "g1"))
+                .build();
+        when(scheduledRepository.findByIdWithWorkflowSkills("sched-guard")).thenReturn(Optional.of(scheduled));
+        when(scheduledRepository.findById("sched-guard")).thenReturn(Optional.of(scheduled));
+        when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(workflowRunRepository.existsByWorkflowIdAndStatusIn(eq("wf-1"), eq(ScheduledWorkflowExecutor.BUSY_STATES))).thenReturn(false);
+
+        assertThat(executor.executeSingleSchedule("sched-guard")).isEmpty();
+
+        verify(workflowExecutor, org.mockito.Mockito.never()).execute(any(), any(), any(String.class), any(), any());
+        assertThat(scheduled.getNextRunAt()).as("naechster Termin statt Wiederholung jeden Tick").isAfter(due);
+        assertThat(scheduled.isEnabled()).as("der Zeitplan bleibt, nach dem Wiedereinschalten laeuft er wieder").isTrue();
+        verify(activityLogService, org.mockito.Mockito.never()).error(any(), any(), any(), any());
+    }
+
+    @Test
+    void executeSingleSchedule_goalScheduleWhileGoalsIsOn_runs() {
+        ScheduledWorkflow scheduled = ScheduledWorkflow.builder()
+                .id("sched-guard-on")
+                .workflow(testWorkflow)
+                .cronExpression("0 0 8 * * *")
+                .scheduleType(ScheduleType.CRON)
+                .enabled(true)
+                .nextRunAt(Instant.now().minusSeconds(60))
+                .inputContext(Map.of("goal_id", "g1"))
+                .build();
+        when(scheduledRepository.findByIdWithWorkflowSkills("sched-guard-on")).thenReturn(Optional.of(scheduled));
+        when(scheduledRepository.findById("sched-guard-on")).thenReturn(Optional.of(scheduled));
+        when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(workflowRunRepository.existsByWorkflowIdAndStatusIn(eq("wf-1"), eq(ScheduledWorkflowExecutor.BUSY_STATES))).thenReturn(false);
+
+        executor.executeSingleSchedule("sched-guard-on");
+
+        verify(workflowExecutor).execute(eq(testWorkflow), eq(Map.of("goal_id", "g1")), any(String.class), isNull(),
+                eq(TriggerSource.SCHEDULE));
+    }
 }

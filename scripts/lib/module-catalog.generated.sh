@@ -16,6 +16,7 @@ MODULE_CATALOG_LANGS=(
 
 MODULE_CATALOG_KEYS=(
   dashboard-report
+  goals
   chains
   assistant
   learning
@@ -47,6 +48,7 @@ MODULE_CATALOG_KEYS=(
 
 MODULE_CATALOG_FEATURE_KEYS=(
   dashboard-report
+  goals
   chains
   assistant
   learning
@@ -81,6 +83,7 @@ MODULE_CATALOG_HARDENING_KEYS=(
 
 # MODULE_CATALOG_TIER
 MODULE_CATALOG_TIER__dashboard_report="standard"
+MODULE_CATALOG_TIER__goals="standard"
 MODULE_CATALOG_TIER__chains="research"
 MODULE_CATALOG_TIER__assistant="research"
 MODULE_CATALOG_TIER__learning="research"
@@ -111,6 +114,7 @@ MODULE_CATALOG_TIER__private_network_guard_http_api="hardening"
 
 # MODULE_CATALOG_MATURITY
 MODULE_CATALOG_MATURITY__dashboard_report="stable"
+MODULE_CATALOG_MATURITY__goals="stable"
 MODULE_CATALOG_MATURITY__chains="stable"
 MODULE_CATALOG_MATURITY__assistant="experimental"
 MODULE_CATALOG_MATURITY__learning="experimental"
@@ -141,6 +145,7 @@ MODULE_CATALOG_MATURITY__private_network_guard_http_api="experimental"
 
 # MODULE_CATALOG_DEFAULT
 MODULE_CATALOG_DEFAULT__dashboard_report="true"
+MODULE_CATALOG_DEFAULT__goals="true"
 MODULE_CATALOG_DEFAULT__chains="false"
 MODULE_CATALOG_DEFAULT__assistant="false"
 MODULE_CATALOG_DEFAULT__learning="false"
@@ -171,6 +176,7 @@ MODULE_CATALOG_DEFAULT__private_network_guard_http_api="false"
 
 # MODULE_CATALOG_PROPERTY
 MODULE_CATALOG_PROPERTY__dashboard_report="automation.modules.dashboard-report"
+MODULE_CATALOG_PROPERTY__goals="automation.modules.goals"
 MODULE_CATALOG_PROPERTY__chains="automation.modules.chains"
 MODULE_CATALOG_PROPERTY__assistant="automation.modules.assistant"
 MODULE_CATALOG_PROPERTY__learning="automation.modules.learning"
@@ -201,6 +207,7 @@ MODULE_CATALOG_PROPERTY__private_network_guard_http_api="automation.hardening.pr
 
 # MODULE_CATALOG_RISKS
 MODULE_CATALOG_RISKS__dashboard_report=""
+MODULE_CATALOG_RISKS__goals=""
 MODULE_CATALOG_RISKS__chains=""
 MODULE_CATALOG_RISKS__assistant=""
 MODULE_CATALOG_RISKS__learning=""
@@ -231,6 +238,7 @@ MODULE_CATALOG_RISKS__private_network_guard_http_api=""
 
 # MODULE_CATALOG_REQUIRES
 MODULE_CATALOG_REQUIRES__dashboard_report=""
+MODULE_CATALOG_REQUIRES__goals=""
 MODULE_CATALOG_REQUIRES__chains=""
 MODULE_CATALOG_REQUIRES__assistant=""
 MODULE_CATALOG_REQUIRES__learning=""
@@ -261,6 +269,7 @@ MODULE_CATALOG_REQUIRES__private_network_guard_http_api=""
 
 # MODULE_TEXT_NAME
 MODULE_TEXT_NAME__de__dashboard_report="Dashboard-Bericht"
+MODULE_TEXT_NAME__de__goals="Ziele"
 MODULE_TEXT_NAME__de__chains="Chains"
 MODULE_TEXT_NAME__de__assistant="Assistent"
 MODULE_TEXT_NAME__de__learning="Insights & Learning"
@@ -289,6 +298,7 @@ MODULE_TEXT_NAME__de__webhook_signatures="Webhook-Signaturen (HMAC)"
 MODULE_TEXT_NAME__de__private_network_guard="Feeds: keine Abrufe ins lokale Netz"
 MODULE_TEXT_NAME__de__private_network_guard_http_api="HTTP-API: keine Abrufe ins lokale Netz"
 MODULE_TEXT_NAME__en__dashboard_report="Dashboard report"
+MODULE_TEXT_NAME__en__goals="Goals"
 MODULE_TEXT_NAME__en__chains="Chains"
 MODULE_TEXT_NAME__en__assistant="Assistant"
 MODULE_TEXT_NAME__en__learning="Insights & learning"
@@ -319,6 +329,7 @@ MODULE_TEXT_NAME__en__private_network_guard_http_api="HTTP API: no fetches into 
 
 # MODULE_TEXT_DESC
 MODULE_TEXT_DESC__de__dashboard_report="Block-Typ, mit dem ein Workflow das Dashboard-Ergebnis aus Config-Feldern füllt, plus der KI-Vorschlag für diese Felder im Editor."
+MODULE_TEXT_DESC__de__goals="Ziele mit Projekten, Arbeitspaketen und Meilensteinen, die Einordnung von TODOs (Größe, Aufwand, Frage/Entscheidung), Workflows am Ziel und der Ziel-Wächter. Aus: Ziel-Seiten und Planung verschwinden, die Daten bleiben erhalten."
 MODULE_TEXT_DESC__de__chains="Verkettet mehrere Workflows zu einer Pipeline, die nacheinander läuft."
 MODULE_TEXT_DESC__de__assistant="Chat-Assistent und Seitenvorschläge, die Plattform-Objekte lesen und ändern können."
 MODULE_TEXT_DESC__de__learning="Auswertungen zu Runs, Empfehlungen und Statistiken je Block-Typ."
@@ -347,6 +358,7 @@ MODULE_TEXT_DESC__de__webhook_signatures="Signatur-Secret je Webhook (HMAC-SHA25
 MODULE_TEXT_DESC__de__private_network_guard="iCal-Feed und RSS/Atom-Feed rufen nur öffentliche Adressen ab: Ziele auf localhost, in privaten Netzen, Link-Local (samt Cloud-Metadaten 169.254.169.254), 0.0.0.0/:: oder Multicast werden abgelehnt – geprüft werden die aufgelösten IP-Adressen, auch bei jeder Weiterleitung. Ausschalten gibt lokale Feeds bewusst frei."
 MODULE_TEXT_DESC__de__private_network_guard_http_api="Dieselbe Adressprüfung für die HTTP-API-Verbindung. Standardmäßig aus, weil Dienste im eigenen Netz ein häufiges Ziel der HTTP-API sind; eingeschaltet lehnt sie auch diese ab."
 MODULE_TEXT_DESC__en__dashboard_report="Block type that lets a workflow fill the dashboard result from config fields, plus the editor's AI proposal for those fields."
+MODULE_TEXT_DESC__en__goals="Goals with projects, work packages and milestones, TODO planning (size, effort, question/decision), workflows on a goal and the goal guard. Off: goal pages and planning disappear, the data is kept."
 MODULE_TEXT_DESC__en__chains="Chains several workflows into a pipeline that runs one after another."
 MODULE_TEXT_DESC__en__assistant="Chat assistant and page suggestions that can read and edit platform objects."
 MODULE_TEXT_DESC__en__learning="Run insights, recommendations and statistics per block type."

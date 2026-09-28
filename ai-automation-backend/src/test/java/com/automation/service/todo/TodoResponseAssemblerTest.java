@@ -29,6 +29,10 @@ class TodoResponseAssemblerTest {
     @Mock private ProjectRepository projectRepository;
     @Mock private WorkflowRepository workflowRepository;
     @Mock private TodoMapper todoMapper;
+    @Mock private com.automation.repository.GoalRepository goalRepository;
+    /** Modul goals an; einzelne Tests schalten es aus (TODO c60bf914). */
+    @org.mockito.Spy private com.automation.modules.ModuleRegistry modules = com.automation.modules.ModuleRegistry.allEnabled();
+
     @InjectMocks private TodoResponseAssembler assembler;
 
     private static TodoResponse base(String id) {
@@ -77,5 +81,27 @@ class TodoResponseAssemblerTest {
 
         verify(projectRepository, never()).findIdAndNameByIdIn(any());
         verify(workflowRepository, never()).findAllById(any());
+    }
+
+    /** Modul goals aus (TODO c60bf914): kein planning, kein Zieltitel-Nachschlagen – die Daten bleiben am TODO. */
+    @Test
+    void goalsOff_leavesPlanningOut_andLooksUpNoGoal() {
+        org.mockito.Mockito.doReturn(false).when(modules).isEnabled(com.automation.modules.ModuleCatalog.GOALS);
+        Todo todo = Todo.builder().id("t-1").goalId("g-1").openQuestion("Welcher Stil?").build();
+        when(todoMapper.toResponse(todo)).thenReturn(base("t-1"));
+
+        assertThat(assembler.toResponse(todo).planning()).isNull();
+        assertThat(assembler.toResponses(List.of(todo))).singleElement().extracting(TodoResponse::planning).isNull();
+        org.mockito.Mockito.verifyNoInteractions(goalRepository);
+        assertThat(todo.getGoalId()).isEqualTo("g-1");
+    }
+
+    @Test
+    void goalsOn_carriesPlanningWithTheGoalTitle() {
+        Todo todo = Todo.builder().id("t-1").goalId("g-1").build();
+        when(todoMapper.toResponse(todo)).thenReturn(base("t-1"));
+        when(goalRepository.findById("g-1")).thenReturn(Optional.of(com.automation.entity.Goal.builder().id("g-1").title("Release").build()));
+
+        assertThat(assembler.toResponse(todo).planning().goalTitle()).isEqualTo("Release");
     }
 }

@@ -3,6 +3,8 @@ package com.automation.controller;
 import com.automation.dto.request.AttachGoalWorkflowRequest;
 import com.automation.dto.request.UpdateGoalWorkflowRequest;
 import com.automation.dto.response.GoalWorkflowResponse;
+import com.automation.modules.ModuleCatalog;
+import com.automation.modules.RequiresModule;
 import com.automation.service.goal.GoalWorkflowService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +22,7 @@ import java.util.List;
  * Eintrag {@code "guard"} zuerst in der Liste.
  */
 @RestController
+@RequiresModule(ModuleCatalog.GOALS)
 @RequestMapping("/api/v1/goals/{goalId}/workflows")
 @RequiredArgsConstructor
 public class GoalWorkflowController {

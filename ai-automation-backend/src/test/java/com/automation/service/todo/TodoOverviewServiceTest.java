@@ -39,6 +39,9 @@ class TodoOverviewServiceTest {
     @Mock private com.automation.repository.GoalWorkPackageRepository workPackageRepository;
     @Mock private com.automation.repository.GoalRepository goalRepository;
 
+    /** Modul goals an; einzelne Tests schalten es aus (TODO c60bf914). */
+    @org.mockito.Spy private com.automation.modules.ModuleRegistry modules = com.automation.modules.ModuleRegistry.allEnabled();
+
     @InjectMocks private TodoOverviewService service;
 
     @Test
@@ -191,5 +194,15 @@ class TodoOverviewServiceTest {
         when(todoRepository.aggregateByProject()).thenReturn(List.of());
         when(todoRepository.staleCountByProject(any())).thenReturn(List.of());
         when(todoRepository.findNeedsYou(any(), any())).thenReturn(List.of());
+    }
+
+    /** Modul goals aus (TODO c60bf914): milestonesDue leer, ohne eine einzige Ziel-Abfrage. */
+    @Test
+    void getOverview_whileGoalsIsOff_hasNoMilestonesDue_andAsksNothing() {
+        org.mockito.Mockito.doReturn(false).when(modules).isEnabled(com.automation.modules.ModuleCatalog.GOALS);
+        emptyTodoOverview();
+
+        assertThat(service.getOverview().milestonesDue()).isEmpty();
+        org.mockito.Mockito.verifyNoInteractions(milestoneRepository, workPackageRepository, goalRepository);
     }
 }

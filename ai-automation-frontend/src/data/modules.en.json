@@ -3,6 +3,10 @@
     "name": "Dashboard report",
     "description": "Block type that lets a workflow fill the dashboard result from config fields, plus the editor's AI proposal for those fields."
   },
+  "goals": {
+    "name": "Goals",
+    "description": "Goals with projects, work packages and milestones, TODO planning (size, effort, question/decision), workflows on a goal and the goal guard. Off: goal pages and planning disappear, the data is kept."
+  },
   "chains": {
     "name": "Chains",
     "description": "Chains several workflows into a pipeline that runs one after another."
