@@ -63,7 +63,7 @@ Controller → Service → Repository → Entity (JPA/SQLite)
 | `exception/` | Custom Exceptions + globaler Error-Handler |
 | `util/` | JSON-Converter, Hilfsfunktionen |
 
-### Controller-Uebersicht (Auswahl aus 51 REST-Controllern)
+### Controller-Uebersicht (Auswahl aus 52 REST-Controllern)
 
 Die folgende Tabelle zeigt die zentralen Controller. Die vollstaendige Liste steht in [../api-referenz.md](../api-referenz.md); die Zahl frisch erheben mit `find ai-automation-backend/src/main/java -name '*Controller.java' | wc -l`.
 
@@ -173,9 +173,9 @@ Todo (unabhaengig)
 ActivityLog (unabhaengig)
 ```
 
-### Datenbank-Migrationen (Flyway, aktuell V1-V92)
+### Datenbank-Migrationen (Flyway, aktuell V1-V94)
 
-Die folgende Tabelle beschreibt das Grundschema (V1-V19). V20-V92 ergaenzen ueberwiegend Spalten und Indizes an diesen Tabellen sowie einzelne neue Tabellen; die vollstaendige Liste steht unter `src/main/resources/db/migration/`.
+Die folgende Tabelle beschreibt das Grundschema (V1-V19). V20-V94 ergaenzen ueberwiegend Spalten und Indizes an diesen Tabellen sowie einzelne neue Tabellen; die vollstaendige Liste steht unter `src/main/resources/db/migration/`.
 
 | Migration | Tabelle | Beschreibung |
 |---|---|---|

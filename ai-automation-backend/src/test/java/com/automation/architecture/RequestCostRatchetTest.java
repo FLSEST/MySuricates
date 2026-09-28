@@ -11,6 +11,7 @@ import com.automation.entity.Goal;
 import com.automation.entity.GoalMilestone;
 import com.automation.entity.GoalMilestoneWorkPackage;
 import com.automation.entity.GoalWorkPackage;
+import com.automation.entity.GoalWorkflow;
 import com.automation.entity.GoalProject;
 import com.automation.entity.Project;
 import com.automation.entity.ProjectStatus;
@@ -31,6 +32,7 @@ import com.automation.repository.AuditReportRepository;
 import com.automation.repository.GoalMilestoneRepository;
 import com.automation.repository.GoalMilestoneWorkPackageRepository;
 import com.automation.repository.GoalWorkPackageRepository;
+import com.automation.repository.GoalWorkflowRepository;
 import com.automation.repository.GoalProjectRepository;
 import com.automation.repository.GoalRepository;
 import com.automation.repository.ProjectRepository;
@@ -153,7 +155,7 @@ class RequestCostRatchetTest {
      */
     private static final List<String> SEEDED_TABLES = List.of(
             "projects", "workflows", "workflow_runs", "step_results", "scheduled_workflows", "goals",
-            "goal_projects", "goal_work_packages", "goal_milestones", "goal_milestone_work_packages", "todos", "todo_triggers", "wishes", "audit_reports", "audit_findings");
+            "goal_projects", "goal_work_packages", "goal_milestones", "goal_milestone_work_packages", "goal_workflows", "todos", "todo_triggers", "wishes", "audit_reports", "audit_findings");
 
     /** Seed size — large enough that a per-row query shows up as a multiple, small enough to stay fast. */
     private static final int PROJECTS = 3;
@@ -161,6 +163,8 @@ class RequestCostRatchetTest {
     private static final int RUNS_PER_WORKFLOW = 2;
     private static final int STEPS_PER_RUN = 3;
     private static final int TODOS = 50;
+    /** Offene TODOs ohne Ziel je Charge – die Kandidaten fuer „Könnte dazugehören“ (TODO c60bf914). */
+    private static final int CANDIDATES = 5;
     private static final int WISHES = 10;
     private static final int AUDITS_PER_PROJECT = 2;
 
@@ -275,7 +279,20 @@ class RequestCostRatchetTest {
      *       now carries a {@code workflowRunId} and a {@code lastFixRunId} (measured 42 081 bytes).
      *       43 → 44 kB with TODO 259f4f66: {@code planning} carries {@code milestoneId} (since TODO
      *       c60bf914 {@code workPackageId}), and every tenth seeded todo now sits in one (measured
-     *       43 201 bytes, 43 301 with the longer field name); the statement count stays 3.</li>
+     *       43 201 bytes, 43 301 with the longer field name); the statement count stays 3.
+     *       44 → 48 kB on purpose with TODO 68a5e24e (Ziele Stufe 2): {@code planning} carries the
+     *       decision ({@code decision}, {@code decidedAt}, {@code decidedBy}, {@code decisionState}),
+     *       and every seventh seeded todo has one (measured 47 073 bytes); still 3 statements. The
+     *       seed's five LOW candidates per batch sit behind the first page and change nothing here.</li>
+     *   <li>{@code /goals/{goal}/workflows}: added with TODO 52bc1e8c (Ziele Stufe 3) – goal check plus
+     *       ONE query for the attachments with workflow name, project and package order (2 statements,
+     *       709 bytes; no guard in the seed, an enabled one adds its schedule and workflow).</li>
+     *   <li>{@code /goals/{goal}/candidates}: added with TODO c60bf914 – open todos without a goal from
+     *       the goal's projects (a sub-query on {@code goal_projects}): goal check, the page, one batched
+     *       project-name lookup (3 statements, 3 370 bytes). The route first showed 4 → 5 statements with
+     *       the second batch: {@code TodoResponseAssembler} loaded whole projects via {@code findAllById},
+     *       and each project's nullable container re-selected itself – it reads only id and name now,
+     *       which also keeps {@code /todos} flat once its todos have projects.</li>
      *   <li>{@code /goals/{goal}/work-packages}: added with TODO 259f4f66 as {@code /milestones}, renamed
      *       with TODO c60bf914 (the old milestones became work packages). Goal and packages come from one
      *       entity join that also carries the project positions they are sorted by, the counts from the
@@ -344,7 +361,7 @@ class RequestCostRatchetTest {
      * </ul>
      */
     static final Map<String, Cost> BASELINE = new TreeMap<>(Map.ofEntries(
-            Map.entry("/api/v1/todos", new Cost(3, 44_000)),
+            Map.entry("/api/v1/todos", new Cost(3, 48_000)),
             Map.entry("/api/v1/projects", new Cost(2, 1_200)),
             Map.entry("/api/v1/workflows", new Cost(2, 26_000)),
             Map.entry("/api/v1/executions", new Cost(5, 60_000)),
@@ -360,6 +377,8 @@ class RequestCostRatchetTest {
             Map.entry("/api/v1/goals/{goal}/relations", new Cost(6, 35_000)),
             Map.entry("/api/v1/goals/{goal}/work-packages", new Cost(2, 2_000)),
             Map.entry("/api/v1/goals/{goal}/milestones", new Cost(3, 2_000)),
+            Map.entry("/api/v1/goals/{goal}/workflows", new Cost(2, 2_000)),
+            Map.entry("/api/v1/goals/{goal}/candidates", new Cost(3, 5_000)),
             Map.entry("/api/v1/wishes", new Cost(3, 9_000)),
             Map.entry("/api/v1/audits", new Cost(2, 4_000)),
             Map.entry(AUDIT_HISTORY, new Cost(3, 2_000)),
@@ -375,6 +394,7 @@ class RequestCostRatchetTest {
     @Autowired private ScheduledWorkflowRepository scheduledWorkflowRepository;
     @Autowired private GoalRepository goalRepository;
     @Autowired private GoalWorkPackageRepository workPackageRepository;
+    @Autowired private GoalWorkflowRepository goalWorkflowRepository;
     @Autowired private GoalMilestoneRepository milestoneRepository;
     @Autowired private GoalMilestoneWorkPackageRepository milestoneLinkRepository;
     @Autowired private GoalProjectRepository goalProjectRepository;
@@ -616,6 +636,19 @@ class RequestCostRatchetTest {
         String milestoneId = milestoneRepository.save(GoalMilestone.builder().goalId(firstGoalId)
                 .title("Cost Milestone " + batch).dueDate(RUN_STARTED.plusSeconds(86_400L * 3)).build()).getId();
         workPackageIds.forEach(id -> milestoneLinkRepository.save(new GoalMilestoneWorkPackage(milestoneId, id)));
+        // Workflows am Ziel (TODO 52bc1e8c): je Charge einer am ersten Ziel und einer an ihrem ersten Paket –
+        // die Liste liest sie samt Workflow-Namen und Paket-Reihenfolge in EINER Abfrage.
+        goalWorkflowRepository.save(GoalWorkflow.builder().goalId(firstGoalId).workflowId(workflows.get(0).getId())
+                .role(GoalWorkflow.Role.STATUS).build());
+        goalWorkflowRepository.save(GoalWorkflow.builder().goalId(firstGoalId).workPackageId(workPackageIds.get(0))
+                .workflowId(workflows.get(1).getId()).build());
+        // Kandidaten (TODO c60bf914): offene TODOs ohne Ziel im ersten Projekt der Charge, das am ersten Ziel
+        // haengt; LOW, damit die erste Seite von /todos dieselbe bleibt.
+        for (int c = 0; c < CANDIDATES; c++) {
+            todoRepository.save(Todo.builder().title("Cost Candidate " + batch + c).description("Seeded candidate")
+                    .status(Todo.Status.OPEN).priority(Todo.Priority.LOW).projectId(projectIds.get(0))
+                    .tags("performance,testing").build());
+        }
         for (int t = 0; t < TODOS; t++) {
             boolean fromRun = t % 5 == 0;
             todoRepository.save(Todo.builder()
@@ -630,6 +663,7 @@ class RequestCostRatchetTest {
                     .workflowRunId(fromRun ? runIds.get(t % runIds.size()) : null)
                     .lastFixRunId(fromRun ? runIds.get((t + 1) % runIds.size()) : null)
                     .fixAttempts(fromRun ? 1 : 0)
+                    .decision(t % 7 == 0 ? "Seeded decision" : null)
                     .build());
         }
         seedWishes(batch, workflows);

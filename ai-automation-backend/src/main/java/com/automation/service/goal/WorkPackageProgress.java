@@ -45,16 +45,17 @@ final class WorkPackageProgress {
             if (row.workPackageId() == null || row.status() == Todo.Status.ARCHIVED) {
                 continue;
             }
-            long[] c = counts.computeIfAbsent(row.workPackageId(), id -> new long[3]);
+            long[] c = counts.computeIfAbsent(row.workPackageId(), id -> new long[4]);
             c[0]++;
             if (row.status() == Todo.Status.DONE) c[1]++;
             if (ACTIVE.contains(row.status()) && row.openQuestion() != null) c[2]++;
+            if (row.decisionState() == Todo.DecisionState.DECIDED) c[3]++;
         }
         return workPackages.stream()
                 .sorted(order(projectPositions))
                 .map(p -> {
-                    long[] c = counts.getOrDefault(p.getId(), new long[3]);
-                    return toResponse(p, c[0], c[1], c[2], now);
+                    long[] c = counts.getOrDefault(p.getId(), new long[4]);
+                    return toResponse(p, c[0], c[1], c[2], c[3], now);
                 })
                 .toList();
     }
@@ -65,6 +66,12 @@ final class WorkPackageProgress {
      * OPEN oder REACHED.
      */
     static GoalWorkPackageResponse toResponse(GoalWorkPackage p, long total, long done, long openQuestions, Instant now) {
+        return toResponse(p, total, done, openQuestions, 0, now);
+    }
+
+    /** @param decided nicht archivierte TODOs mit Entscheidung und ohne offene Frage (TODO 68a5e24e) */
+    static GoalWorkPackageResponse toResponse(GoalWorkPackage p, long total, long done, long openQuestions, long decided,
+                                              Instant now) {
         GoalDueState state = GoalWorkPackage.stateOf(p.getEndDate(), total, done, now);
         if (state == GoalDueState.REACHED && p.getCompletedAt() == null) {
             p.setCompletedAt(now);
@@ -72,7 +79,7 @@ final class WorkPackageProgress {
         boolean reopened = p.getCompletedAt() != null && state != GoalDueState.REACHED;
         return new GoalWorkPackageResponse(p.getId(), p.getGoalId(), p.getProjectId(), p.getTitle(), p.getStartDate(),
                 p.getEndDate(), p.getPosition(), state, total, done, openQuestions, p.getCompletedAt(), reopened,
-                p.getCreatedAt(), p.getUpdatedAt());
+                p.getCreatedAt(), p.getUpdatedAt(), decided);
     }
 
     static Comparator<GoalWorkPackage> order(Map<String, Integer> projectPositions) {

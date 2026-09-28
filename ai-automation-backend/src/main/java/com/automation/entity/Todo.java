@@ -26,6 +26,21 @@ public class Todo {
     /** Wer die Einschaetzung zuletzt gesetzt hat; ein Mensch ueberschreibt die KI. */
     public enum RatedBy { USER, AI }
 
+    /**
+     * Stand einer Frage am TODO (TODO 68a5e24e): QUESTION, solange eine Frage offen ist – auch wenn
+     * es schon eine fruehere Entscheidung gibt –, DECIDED mit Entscheidung und ohne offene Frage, sonst NONE.
+     */
+    public enum DecisionState {
+        QUESTION, DECIDED, NONE;
+
+        public static DecisionState of(String openQuestion, String decision) {
+            if (openQuestion != null) {
+                return QUESTION;
+            }
+            return decision != null ? DECIDED : NONE;
+        }
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
@@ -159,6 +174,25 @@ public class Todo {
     /** Frage, die vor der Arbeit geklaert sein muss; null = nichts offen. */
     @Column(name = "open_question", columnDefinition = "text")
     private String openQuestion;
+
+    /**
+     * Entscheidung, die eine offene Frage beantwortet hat (TODO 68a5e24e); null = keine. Eine
+     * Entscheidung leert die offene Frage, eine spaetere neue Frage laesst sie stehen.
+     */
+    @Column(name = "decision", columnDefinition = "text")
+    private String decision;
+
+    @Column(name = "decided_at")
+    private Instant decidedAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "decided_by")
+    private RatedBy decidedBy;
+
+    /** Zustand aus offener Frage und Entscheidung – nie gespeichert (TODO 68a5e24e). */
+    public DecisionState getDecisionState() {
+        return DecisionState.of(openQuestion, decision);
+    }
 
     @CreatedDate
     @Column(updatable = false)

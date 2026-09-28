@@ -3051,6 +3051,8 @@ Ziel, Rang, Arbeitspaket und Einschätzung eines TODOs setzen (V85; `workPackage
 
 `complexity`: `S`, `M`, `L`, `XL` · `suggestedEffort`: `low`, `medium`, `high`, `xhigh` · andere Werte → 400.
 
+**Entscheidung** (V93): `decision` hält fest, wie eine offene Frage entschieden wurde – nicht leer speichert den Text, `decidedAt = jetzt`, `decidedBy = ratedBy` (sonst `USER`) und leert `openQuestion`; `""` nimmt die Entscheidung zurück (Text, Zeit, wer). Eine nicht leere neue Frage und eine nicht leere Entscheidung im selben Request → 400. Eine spätere neue Frage lässt die Entscheidung stehen. `planning` in der Antwort trägt `decision`, `decidedAt`, `decidedBy` und `decisionState` (`QUESTION` = offene Frage, `DECIDED` = Entscheidung ohne offene Frage, sonst `NONE`).
+
 **Response:** `TodoResponse`
 
 ---
@@ -3063,7 +3065,7 @@ Ein Ziel sammelt TODOs projektübergreifend und zeigt den Fortschritt (V85). Sie
 
 Ziele mit Fortschritt, neueste zuerst. **Query:** `status` (mehrfach; ohne Angabe `ACTIVE` und `DONE`, archivierte nur ausdrücklich), `projectId` (optional, V92: nur Ziele, denen dieses Projekt zugeordnet ist).
 
-**Response:** `GoalResponse[]` – `id`, `title`, `description`, `status`, `targetDate`, `createdAt`, `updatedAt`, `progress` (`total`, `open`, `inProgress`, `backlog`, `done`, `openQuestions`, `percentDone`; `total` ohne ARCHIVED), `guard` (`enabled`, `workflowId`, `scheduleId`, `nextRunAt`; nie eingeschaltet = `enabled: false`, Rest `null`), `projects[]` (V92: `id`, `name` der zugeordneten Projekte in ihrer Reihenfolge; nie `null`), `nextMilestone` (V92: der nächste nicht erreichte Meilenstein nach Datum – `id`, `title`, `dueDate`, `state`; `null` = keiner; für alle Ziele der Liste aus einer Abfrage).
+**Response:** `GoalResponse[]` – `id`, `title`, `description`, `status`, `targetDate`, `createdAt`, `updatedAt`, `progress` (`total`, `open`, `inProgress`, `backlog`, `done`, `openQuestions`, `percentDone`, `decided`; `total` ohne ARCHIVED), `guard` (`enabled`, `workflowId`, `scheduleId`, `nextRunAt`; nie eingeschaltet = `enabled: false`, Rest `null`), `projects[]` (V92: `id`, `name` der zugeordneten Projekte in ihrer Reihenfolge; nie `null`), `nextMilestone` (V92: der nächste nicht erreichte Meilenstein nach Datum – `id`, `title`, `dueDate`, `state`; `null` = keiner; für alle Ziele der Liste aus einer Abfrage).
 
 ### `POST /api/v1/goals`
 
@@ -3078,7 +3080,7 @@ Ziele mit Fortschritt, neueste zuerst. **Query:** `status` (mehrfach; ohne Angab
 
 Ziel mit seinen TODOs in Arbeitsreihenfolge (Rang, dann Priorität, dann Alter) – ohne Beschreibungen – und Fortschritt je Projekt.
 
-**Response:** `GoalDetailResponse` – `goal`, `todos[]` (`id`, `title`, `status`, `priority`, `projectId`, `projectName`, `tags`, `goalRank`, `complexity`, `suggestedEffort`, `ratingNote`, `ratedBy`, `ratedAt`, `openQuestion`, `updatedAt`, `dueDate`, `workPackageId`), `byProject[]` (`projectId`, `projectName`, `total`, `done`; aus den TODOs abgeleitet, bleibt für bestehende Aufrufer), `projects[]` (V92: die zugeordneten Projekte nach `position` – `projectId`, `name`, `archived`, `position`, `total`, `done`, `openQuestions`, gezählt aus den nicht archivierten TODOs des Ziels in diesem Projekt), `workPackages[]` (V92: `GoalWorkPackageResponse`, nach Projekt-Position, dann `position`), `milestones[]` (V92: `GoalMilestoneResponse`, nach Datum, dann Titel). Erkennt das Lesen ein Arbeitspaket oder einen Meilenstein zum ersten Mal als abgeschlossen bzw. erreicht, speichert es `completedAt`/`reachedAt`.
+**Response:** `GoalDetailResponse` – `goal`, `todos[]` (`id`, `title`, `status`, `priority`, `projectId`, `projectName`, `tags`, `goalRank`, `complexity`, `suggestedEffort`, `ratingNote`, `ratedBy`, `ratedAt`, `openQuestion`, `updatedAt`, `dueDate`, `workPackageId`, `decision`, `decidedAt`, `decidedBy`, `decisionState`), `byProject[]` (`projectId`, `projectName`, `total`, `done`; aus den TODOs abgeleitet, bleibt für bestehende Aufrufer), `projects[]` (V92: die zugeordneten Projekte nach `position` – `projectId`, `name`, `archived`, `position`, `total`, `done`, `openQuestions`, `decided` (V93), gezählt aus den nicht archivierten TODOs des Ziels in diesem Projekt), `workPackages[]` (V92: `GoalWorkPackageResponse`, nach Projekt-Position, dann `position`), `milestones[]` (V92: `GoalMilestoneResponse`, nach Datum, dann Titel). Erkennt das Lesen ein Arbeitspaket oder einen Meilenstein zum ersten Mal als abgeschlossen bzw. erreicht, speichert es `completedAt`/`reachedAt`.
 
 ### `GET /api/v1/goals/{id}/relations`
 
@@ -3126,7 +3128,7 @@ Ein Arbeitspaket gehört genau einem Projekt des Ziels (`projectId`) und bündel
 {
   "id": "b1f0…", "goalId": "6c2e…", "projectId": "3a9d…", "title": "Werbematerial",
   "startDate": "2026-09-28T00:00:00Z", "endDate": "2026-10-01T23:59:59Z", "position": 0,
-  "state": "DUE_SOON", "total": 4, "done": 2, "openQuestions": 1,
+  "state": "DUE_SOON", "total": 4, "done": 2, "openQuestions": 1, "decided": 1,
   "completedAt": null, "reopened": false,
   "createdAt": "2026-09-24T08:00:00Z", "updatedAt": "2026-09-24T08:00:00Z"
 }
@@ -3161,6 +3163,23 @@ Ein Meilenstein ist ein Termin fürs ganze Ziel – kein Projekt, das Datum ist 
 - `DELETE /api/v1/goals/{id}/milestones/{milestoneId}` – die Arbeitspakete bleiben. **Response:** `204`
 
 Unbekanntes Ziel oder ein Meilenstein eines anderen Ziels → `404`.
+
+### Workflows am Ziel (V94)
+
+Ein Workflow hängt am ganzen Ziel oder an einem seiner Arbeitspakete, mit Rolle `WORKER` („arbeitet daran“) oder `STATUS` („liefert den Stand“). Gestartet wird über `POST /api/v1/workflows/{workflowId}/execute` mit `{ "context": { "goal_id": "…", "work_package_id": "…"?, "goal_locale": "de" } }` (TriggerSource `MANUAL`; `goal_id` liefert `goal_status`/`goal_guard_*`), den letzten Stand liefert `GET /api/v1/dashboard/workflow-results?workflowIds=…`.
+
+**`GoalWorkflowResponse`:** `{ "id", "goalId", "workPackageId": "…"|null, "workflowId", "workflowName", "workflowProjectId": "…"|null, "role": "WORKER"|"STATUS", "guard": false, "createdAt" }`
+
+- `GET /api/v1/goals/{id}/workflows` – Ziel-Ebene zuerst, dann nach Paket-Reihenfolge, dann Name; weich gelöschte Workflows fehlen. Ist der Ziel-Wächter eingeschaltet, steht er als erster Eintrag `{ "id": "guard", "guard": true, "role": "STATUS", "workPackageId": null, … }` darin. **Response:** `GoalWorkflowResponse[]`
+- `POST /api/v1/goals/{id}/workflows` – `{ "workflowId": "…", "workPackageId": "…"?, "role": "WORKER"? }`; Paket nicht aus diesem Ziel → `400`, Workflow unbekannt oder gelöscht → `404`, dieselbe Zuordnung schon da → `409`. **Response:** `201` + `GoalWorkflowResponse`
+- `PATCH /api/v1/goals/{id}/workflows/{attachmentId}` – `{ "role": "STATUS" }`. **Response:** `GoalWorkflowResponse`
+- `DELETE /api/v1/goals/{id}/workflows/{attachmentId}` – löst die Zuordnung, der Workflow bleibt; `guard` → `400` (der Wächter hat seinen Schalter). **Response:** `204`
+
+Ein Arbeitspaket oder Ziel löschen nimmt seine Zuordnungen mit.
+
+### `GET /api/v1/goals/{id}/candidates`
+
+„Könnte dazugehören“: offene TODOs (OPEN, IN_PROGRESS, BACKLOG) ohne Ziel. **Query:** `q`, `tag`, `allProjects` (Standard `false`: nur TODOs aus den Projekten des Ziels; ein Ziel ohne Projekte liefert dann eine leere Seite; `true`: aus allen), `page` (0), `size` (20). **Response:** Seite wie `GET /api/v1/todos` (`content` = `TodoResponse[]`, `totalElements`, …). Unbekanntes Ziel → `404`.
 
 ### `POST /api/v1/goals/{id}/guard`
 

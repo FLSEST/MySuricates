@@ -25,5 +25,11 @@ public record GoalTodoItem(
         /** Faelligkeit des TODOs (TODO 259f4f66); null = ungeplant. */
         Instant dueDate,
         /** Arbeitspaket des Ziels, dem das TODO zugeordnet ist (TODO c60bf914); null = keins. */
-        String workPackageId
+        String workPackageId,
+        /** Entscheidung, wann und von wem (TODO 68a5e24e); null = keine. */
+        String decision,
+        Instant decidedAt,
+        Todo.RatedBy decidedBy,
+        /** QUESTION (offene Frage), DECIDED (Entscheidung, keine offene Frage) oder NONE. */
+        Todo.DecisionState decisionState
 ) {}

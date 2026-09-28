@@ -252,7 +252,7 @@ class GoalStatusContextTest {
     private static GoalWorkPackageResponse workPackage(String id, String title, Instant start, Instant end,
                                                        GoalDueState state, long total, long done) {
         return new GoalWorkPackageResponse(id, "g1", "p1", title, start, end, 0, state, total, done, 0,
-                state == GoalDueState.REACHED ? end : null, false, NOW, NOW);
+                state == GoalDueState.REACHED ? end : null, false, NOW, NOW, 0);
     }
 
     private static GoalTodoRow row(String id, String title, Todo.Status status, Instant due) {

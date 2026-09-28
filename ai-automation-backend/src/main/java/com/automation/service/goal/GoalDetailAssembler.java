@@ -80,6 +80,6 @@ class GoalDetailAssembler {
         return new GoalTodoItem(row.id(), row.title(), row.status(), row.priority(), row.projectId(), projectName,
                 TodoMapper.jsonToList(row.tags()), row.goalRank(), row.complexity(), row.suggestedEffort(),
                 row.ratingNote(), row.ratedBy(), row.ratedAt(), row.openQuestion(), row.updatedAt(),
-                row.dueDate(), row.workPackageId());
+                row.dueDate(), row.workPackageId(), row.decision(), row.decidedAt(), row.decidedBy(), row.decisionState());
     }
 }

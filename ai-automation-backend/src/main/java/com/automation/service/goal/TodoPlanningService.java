@@ -38,6 +38,9 @@ public class TodoPlanningService {
     @Transactional
     public TodoResponse update(String todoId, UpdateTodoPlanningRequest request) {
         Todo todo = todoRepository.findById(todoId).orElseThrow(() -> new ResourceNotFoundException("Todo", todoId));
+        if (notBlank(request.openQuestion()) && notBlank(request.decision())) {
+            throw new IllegalArgumentException("Eine neue Frage und eine Entscheidung zugleich – erst fragen, dann entscheiden");
+        }
 
         if (request.goalId() != null) {
             applyGoal(todo, request.goalId().trim());
@@ -72,7 +75,32 @@ public class TodoPlanningService {
         if (request.openQuestion() != null) {
             todo.setOpenQuestion(text(request.openQuestion(), "openQuestion"));
         }
+        if (request.decision() != null) {
+            applyDecision(todo, text(request.decision(), "decision"), request.ratedBy());
+        }
         return responseAssembler.toResponse(todoRepository.save(todo));
+    }
+
+    /**
+     * Entscheidung festhalten (TODO 68a5e24e): Text, Zeitpunkt, wer ({@code ratedBy}, sonst USER) – und
+     * die offene Frage ist damit beantwortet. {@code ""} ({@code null} nach {@link #text}) nimmt die
+     * Entscheidung zurueck. Eine spaetere neue Frage laesst sie stehen; der Zustand ist dann QUESTION.
+     */
+    private static void applyDecision(Todo todo, String decision, Todo.RatedBy ratedBy) {
+        if (decision == null) {
+            todo.setDecision(null);
+            todo.setDecidedAt(null);
+            todo.setDecidedBy(null);
+            return;
+        }
+        todo.setDecision(decision);
+        todo.setDecidedAt(Instant.now());
+        todo.setDecidedBy(ratedBy != null ? ratedBy : Todo.RatedBy.USER);
+        todo.setOpenQuestion(null);
+    }
+
+    private static boolean notBlank(String value) {
+        return value != null && !value.isBlank();
     }
 
     /**

@@ -183,6 +183,9 @@ public interface TodoRepository extends JpaRepository<Todo, String>, JpaSpecific
 
     // ── Ziele (TODO dc0566f8): schlanke Projektionen, keine Beschreibungen ─────────
 
+    /** Zustand DECIDED (TODO 68a5e24e): Entscheidung, keine offene Frage, nicht archiviert. */
+    String DECIDED = "t.decision IS NOT NULL AND t.openQuestion IS NULL AND t.status <> 'ARCHIVED'";
+
     /** Status-Zaehler je Ziel in einem GROUP BY; Ziele ohne TODOs fehlen in der Liste. */
     @Query("SELECT new com.automation.dto.projection.GoalStatusCounts("
          + "t.goalId, "
@@ -191,14 +194,15 @@ public interface TodoRepository extends JpaRepository<Todo, String>, JpaSpecific
          + "SUM(CASE WHEN t.status = 'DONE' THEN 1 ELSE 0 END), "
          + "SUM(CASE WHEN t.status = 'BACKLOG' THEN 1 ELSE 0 END), "
          + "SUM(CASE WHEN t.status = 'ARCHIVED' THEN 1 ELSE 0 END), "
-         + "SUM(CASE WHEN t.openQuestion IS NOT NULL AND t.status IN ('OPEN','IN_PROGRESS','BACKLOG') THEN 1 ELSE 0 END)"
+         + "SUM(CASE WHEN t.openQuestion IS NOT NULL AND t.status IN ('OPEN','IN_PROGRESS','BACKLOG') THEN 1 ELSE 0 END), "
+         + "SUM(CASE WHEN " + DECIDED + " THEN 1 ELSE 0 END)"
          + ") FROM Todo t WHERE t.goalId IN :goalIds GROUP BY t.goalId")
     List<GoalStatusCounts> countByGoal(@Param("goalIds") Collection<String> goalIds);
 
     @Query("SELECT new com.automation.dto.projection.GoalTodoRow("
          + "t.id, t.title, t.status, t.priority, t.projectId, t.tags, t.goalRank, t.complexity, "
          + "t.suggestedEffort, t.ratingNote, t.ratedBy, t.ratedAt, t.openQuestion, t.createdAt, t.updatedAt, "
-         + "t.dueDate, t.workPackageId"
+         + "t.dueDate, t.workPackageId, t.decision, t.decidedAt, t.decidedBy"
          + ") FROM Todo t WHERE t.goalId = :goalId")
     List<GoalTodoRow> findGoalRows(@Param("goalId") String goalId);
 
@@ -232,8 +236,8 @@ public interface TodoRepository extends JpaRepository<Todo, String>, JpaSpecific
      */
     @Query("SELECT new com.automation.dto.projection.WorkPackageTodoCounts(t.workPackageId, COUNT(t), "
          + "SUM(CASE WHEN t.status = 'DONE' THEN 1 ELSE 0 END), SUM(CASE WHEN t.openQuestion IS NOT NULL "
-         + "AND t.status IN ('OPEN','IN_PROGRESS','BACKLOG') THEN 1 ELSE 0 END)) FROM Todo t "
-         + "WHERE t.workPackageId IN :workPackageIds AND t.status <> 'ARCHIVED' GROUP BY t.workPackageId")
+         + "AND t.status IN ('OPEN','IN_PROGRESS','BACKLOG') THEN 1 ELSE 0 END), SUM(CASE WHEN " + DECIDED
+         + " THEN 1 ELSE 0 END)) FROM Todo t WHERE t.workPackageId IN :workPackageIds AND t.status <> 'ARCHIVED' GROUP BY t.workPackageId")
     List<WorkPackageTodoCounts> countByWorkPackage(@Param("workPackageIds") Collection<String> workPackageIds);
 
     /** Loest alle TODOs von einem Arbeitspaket; sie bleiben im Ziel. Aufrufer muss @Transactional sein. */

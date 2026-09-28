@@ -45,8 +45,12 @@ public class TodoResponseAssembler {
     }
 
     public List<TodoResponse> toResponses(List<Todo> todos) {
+        // Nur ID und Name: findAllById laedt ganze Projekte, und deren Container-Beziehung (nullable
+        // one-to-one, nicht als Proxy moeglich) kostet je Projekt ohne Container eine Abfrage mehr –
+        // sichtbar geworden an den Kandidaten eines Ziels mit zwei Projekten (TODO c60bf914).
         Map<String, String> projectNames = namesFor(todos, Todo::getProjectId,
-                ids -> projectRepository.findAllById(ids).stream().collect(Collectors.toMap(Project::getId, Project::getName)));
+                ids -> projectRepository.findIdAndNameByIdIn(ids).stream()
+                        .collect(Collectors.toMap(row -> (String) row[0], row -> (String) row[1])));
         Map<String, String> workflowNames = namesFor(todos, Todo::getLinkedWorkflowId,
                 ids -> workflowRepository.findAllById(ids).stream().collect(Collectors.toMap(Workflow::getId, Workflow::getName)));
         Map<String, String> goalTitles = namesFor(todos, Todo::getGoalId,
@@ -92,11 +96,13 @@ public class TodoResponseAssembler {
     /** Null, solange weder Ziel noch Einschaetzung noch offene Frage gesetzt sind (TODO dc0566f8). */
     static TodoPlanningResponse planningOf(Todo todo, String goalTitle) {
         if (todo.getGoalId() == null && todo.getComplexity() == null && todo.getSuggestedEffort() == null
-                && todo.getRatingNote() == null && todo.getOpenQuestion() == null && todo.getWorkPackageId() == null) {
+                && todo.getRatingNote() == null && todo.getOpenQuestion() == null && todo.getWorkPackageId() == null
+                && todo.getDecision() == null) {
             return null;
         }
         return new TodoPlanningResponse(todo.getGoalId(), goalTitle, todo.getGoalRank(),
                 todo.getComplexity(), todo.getSuggestedEffort(), todo.getRatingNote(),
-                todo.getRatedBy(), todo.getRatedAt(), todo.getOpenQuestion(), todo.getWorkPackageId());
+                todo.getRatedBy(), todo.getRatedAt(), todo.getOpenQuestion(), todo.getWorkPackageId(),
+                todo.getDecision(), todo.getDecidedAt(), todo.getDecidedBy(), todo.getDecisionState());
     }
 }

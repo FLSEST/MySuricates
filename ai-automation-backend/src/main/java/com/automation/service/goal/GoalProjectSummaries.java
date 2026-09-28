@@ -33,15 +33,16 @@ final class GoalProjectSummaries {
             if (row.projectId() == null || row.status() == Todo.Status.ARCHIVED) {
                 continue;
             }
-            long[] c = counts.computeIfAbsent(row.projectId(), id -> new long[3]);
+            long[] c = counts.computeIfAbsent(row.projectId(), id -> new long[4]);
             c[0]++;
             if (row.status() == Todo.Status.DONE) c[1]++;
             if (ACTIVE.contains(row.status()) && row.openQuestion() != null) c[2]++;
+            if (row.decisionState() == Todo.DecisionState.DECIDED) c[3]++;
         }
         return projects.stream().map(p -> {
-            long[] c = counts.getOrDefault(p.projectId(), new long[3]);
+            long[] c = counts.getOrDefault(p.projectId(), new long[4]);
             return new GoalDetailResponse.ProjectSummary(p.projectId(), p.projectName(), p.archived(), p.position(),
-                    c[0], c[1], c[2]);
+                    c[0], c[1], c[2], c[3]);
         }).toList();
     }
 

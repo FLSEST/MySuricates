@@ -33,6 +33,7 @@ class ControllerModuleGateTest {
             "DeadLetterController",
             "DocsController",
             "GoalController",
+            "GoalWorkflowController",
             "ExecutionController",
             "LearningController",
             "NotificationController",

@@ -26,5 +26,7 @@ public record GoalWorkPackageResponse(
         Instant completedAt,
         boolean reopened,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        /** Nicht archivierte TODOs darin mit Entscheidung und ohne offene Frage (TODO 68a5e24e). */
+        long decided
 ) {}

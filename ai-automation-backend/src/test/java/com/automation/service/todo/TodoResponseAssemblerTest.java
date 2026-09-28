@@ -56,7 +56,8 @@ class TodoResponseAssemblerTest {
         Todo b = Todo.builder().id("b").projectId("p-1").linkedWorkflowId("wf-1").build();
         when(todoMapper.toResponse(a)).thenReturn(base("a"));
         when(todoMapper.toResponse(b)).thenReturn(base("b"));
-        when(projectRepository.findAllById(Set.of("p-1"))).thenReturn(List.of(Project.builder().id("p-1").name("Proj").build()));
+        List<Object[]> names = List.<Object[]>of(new Object[]{"p-1", "Proj"});
+        when(projectRepository.findIdAndNameByIdIn(Set.of("p-1"))).thenReturn(names);
         when(workflowRepository.findAllById(Set.of("wf-1"))).thenReturn(List.of(Workflow.builder().id("wf-1").name("Fix").build()));
 
         List<TodoResponse> responses = assembler.toResponses(List.of(a, b));
@@ -64,6 +65,7 @@ class TodoResponseAssemblerTest {
         assertThat(responses).extracting(TodoResponse::projectName).containsExactly("Proj", "Proj");
         assertThat(responses.get(1).linkedWorkflowName()).isEqualTo("Fix");
         verify(projectRepository, never()).findById(any());
+        verify(projectRepository, never()).findAllById(any());
     }
 
     @Test
@@ -73,7 +75,7 @@ class TodoResponseAssemblerTest {
 
         assembler.toResponses(List.of(a));
 
-        verify(projectRepository, never()).findAllById(any());
+        verify(projectRepository, never()).findIdAndNameByIdIn(any());
         verify(workflowRepository, never()).findAllById(any());
     }
 }

@@ -711,6 +711,9 @@ Eine Chain gehört zu keinem Projekt und kann Workflows aus verschiedenen Projek
 | `rated_by` | TEXT | | `USER` oder `AI` – wer zuletzt eingeschätzt hat (V85) |
 | `rated_at` | TEXT | | Zeitpunkt der Einschätzung (V85) |
 | `open_question` | TEXT | | Frage, die vor der Arbeit geklärt sein muss (V85) |
+| `decision` | TEXT | | Entscheidung, die eine offene Frage beantwortet hat; leert `open_question`, eine spätere neue Frage lässt sie stehen (V93) |
+| `decided_at` | TEXT | | Zeitpunkt der Entscheidung (V93) |
+| `decided_by` | TEXT | | `USER` oder `AI` (V93) |
 | `work_package_id` | TEXT | FK → goal_work_packages, ON DELETE SET NULL | Arbeitspaket des eigenen Ziels und – beim Schreiben geprüft – des eigenen Projekts (V88 als `milestone_id`, seit V92 umbenannt) |
 | `created_at` | TEXT | NOT NULL | |
 | `updated_at` | TEXT | NOT NULL | |
@@ -793,6 +796,22 @@ Meilensteine eines Ziels (V92, TODO c60bf914): Termine des ganzen Ziels, kein Pr
 **Indizes:** `idx_goal_milestone_work_packages_package`
 
 Welche Arbeitspakete ein Meilenstein braucht (V92, TODO c60bf914). Beide Seiten gehören zum selben Ziel (geprüft beim Schreiben); gelöscht wird eine Verknüpfung mit dem Meilenstein oder dem Paket.
+
+### `goal_workflows`
+
+| Spalte | Typ | Constraints | Beschreibung |
+|---|---|---|---|
+| `id` | TEXT | PK | UUID |
+| `goal_id` | TEXT | NOT NULL, FK → goals, ON DELETE CASCADE | Ziel |
+| `work_package_id` | TEXT | FK → goal_work_packages, ON DELETE CASCADE | Arbeitspaket des Ziels; NULL = am ganzen Ziel |
+| `workflow_id` | TEXT | NOT NULL, FK → workflows, ON DELETE CASCADE | Workflow |
+| `role` | TEXT | NOT NULL, DEFAULT 'WORKER' | `WORKER` („arbeitet daran“) oder `STATUS` („liefert den Stand“) |
+| `created_at` | TEXT | NOT NULL | |
+| `updated_at` | TEXT | NOT NULL | |
+
+**Indizes:** `idx_goal_workflows_unique` (UNIQUE über `goal_id`, `IFNULL(work_package_id, '')`, `workflow_id`), `idx_goal_workflows_workflow`, `idx_goal_workflows_work_package`
+
+Workflows am Ziel oder an einem Arbeitspaket (V94, TODO 52bc1e8c). Dieselbe Zuordnung gibt es nur einmal; „am Ziel“ (NULL) zählt dabei als eigener Wert. Workflows werden weich gelöscht: die Zuordnung bleibt stehen und wird beim Lesen ausgeblendet. Der Ziel-Wächter steht nicht hier, er hängt über `goals.guard_workflow_id` am Ziel.
 
 ### `activity_log`
 
@@ -1157,6 +1176,8 @@ Einzige persistente Systemkonfiguration außerhalb der `application.yml`.
 | `Todo.RatedBy` | `USER`, `AI` | Wer die Einschätzung zuletzt gesetzt hat; ein Mensch überschreibt die KI |
 | `Goal.Status` | `ACTIVE`, `DONE`, `ARCHIVED` | Archivierte Ziele erscheinen nur mit ausdrücklichem Filter |
 | `GoalDueState` (V88, seit V92 für Arbeitspakete und Meilensteine) | `OPEN`, `DUE_SOON`, `OVERDUE`, `REACHED` | Nicht gespeichert, beim Lesen berechnet; `DUE_SOON` = höchstens 3 Tage. Arbeitspaket: Basis ist das Ende, `REACHED` (abgeschlossen) = alle TODOs erledigt, ohne Zeitraum nur `OPEN`/`REACHED`. Meilenstein: Basis ist sein Datum, `REACHED` = alle verknüpften Pakete abgeschlossen oder – ohne Pakete – von Hand markiert |
+| `Todo.DecisionState` (V93) | `QUESTION`, `DECIDED`, `NONE` | Nicht gespeichert: `QUESTION`, solange eine Frage offen ist (auch mit früherer Entscheidung), `DECIDED` mit Entscheidung und ohne offene Frage |
+| `GoalWorkflow.Role` (V94) | `WORKER`, `STATUS` | Rolle eines Workflows am Ziel oder Arbeitspaket |
 
 ### LogLevel (ActivityLog)
 
@@ -1379,6 +1400,8 @@ folgt freier Text.
 | V90 | `V90__keyless_integration_account_names.sql` | Kontonamen ohne Sprache für RSS/Atom und Open-Meteo in `integration_connections.account_info` (Bestand nachgezogen) |
 | V91 | `V91__page_suggestions_per_locale.sql` | `locale` in page_suggestions (Tabellenneubau: `UNIQUE(page)` → `UNIQUE(page, locale)`, Bestand gilt als deutsch) |
 | V92 | `V92__goal_projects_work_packages_milestones.sql` | neue Tabelle `goal_projects` (aus den TODOs befüllt); die bisherigen Meilensteine werden `goal_work_packages` (Neubau mit `project_id`, `position`, `start_date`/`end_date`, `completed_at`; gemischte Pakete je Minderheitsprojekt aufgeteilt), `todos.milestone_id` → `work_package_id` (vor dem Neubau gesichert und zurückgeschrieben); neue Tabellen `goal_milestones` (Termine des Ziels) und `goal_milestone_work_packages` |
+| V93 | `V93__todo_decisions.sql` | `decision`, `decided_at`, `decided_by` in todos (Entscheidung zur offenen Frage) |
+| V94 | `V94__goal_workflows.sql` | neue Tabelle `goal_workflows` (Workflows am Ziel oder Arbeitspaket, Rolle WORKER/STATUS) |
 
 ## SQLite-Besonderheiten
 

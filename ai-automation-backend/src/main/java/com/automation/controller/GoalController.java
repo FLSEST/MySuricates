@@ -15,7 +15,10 @@ import com.automation.dto.response.GoalMilestoneResponse;
 import com.automation.dto.response.GoalRelationsResponse;
 import com.automation.dto.response.GoalResponse;
 import com.automation.dto.response.GoalWorkPackageResponse;
+import com.automation.dto.response.PageResponse;
+import com.automation.dto.response.TodoResponse;
 import com.automation.entity.Goal;
+import com.automation.service.goal.GoalCandidateService;
 import com.automation.service.goal.GoalMembershipService;
 import com.automation.service.goal.GoalMilestoneService;
 import com.automation.service.goal.GoalProjectService;
@@ -49,6 +52,7 @@ public class GoalController {
     private final GoalWorkPackageService workPackageService;
     private final GoalMilestoneService milestoneService;
     private final GoalProjectService projectService;
+    private final GoalCandidateService candidateService;
     private final GoalGuardService guardService;
 
     /**
@@ -93,6 +97,20 @@ public class GoalController {
         guardService.pauseForDeletedGoal(id); // sein Waechter-Workflow bleibt, laeuft aber nicht mehr
         goalService.delete(id);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * „Könnte dazugehören“: offene TODOs ohne Ziel, standardmaessig nur aus den Projekten des Ziels
+     * ({@code allProjects=true}: aus allen). Seite wie {@code GET /todos}.
+     */
+    @GetMapping("/{id}/candidates")
+    public PageResponse<TodoResponse> candidates(@PathVariable String id,
+                                                 @RequestParam(required = false) String q,
+                                                 @RequestParam(required = false) String tag,
+                                                 @RequestParam(defaultValue = "false") boolean allProjects,
+                                                 @RequestParam(defaultValue = "0") int page,
+                                                 @RequestParam(defaultValue = "20") int size) {
+        return candidateService.candidates(id, q, tag, allProjects, page, size);
     }
 
     /** Ordnet TODOs dem Ziel zu (ohne Rang – sie stehen hinter den eingeordneten). */

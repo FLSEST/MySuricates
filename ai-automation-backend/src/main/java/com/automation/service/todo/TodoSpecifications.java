@@ -1,10 +1,13 @@
 package com.automation.service.todo;
 
+import com.automation.entity.GoalProject;
 import com.automation.entity.Todo;
 import com.automation.util.EnumParameter;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
+import jakarta.persistence.criteria.Subquery;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.util.ArrayList;
@@ -127,6 +130,19 @@ public final class TodoSpecifications {
                 return null;
             }
             return NO_GOAL.equals(goalId.trim()) ? cb.isNull(root.get("goalId")) : cb.equal(root.get("goalId"), goalId);
+        };
+    }
+
+    /**
+     * Nur TODOs aus Projekten, die dem Ziel zugeordnet sind (TODO c60bf914) – als Unterabfrage auf
+     * {@code goal_projects}, ohne die Projekte vorher zu laden. Ein Ziel ohne Projekte waehlt nichts.
+     */
+    public static Specification<Todo> inProjectsOfGoal(String goalId) {
+        return (root, query, cb) -> {
+            Subquery<String> projects = query.subquery(String.class);
+            Root<GoalProject> link = projects.from(GoalProject.class);
+            projects.select(link.get("projectId")).where(cb.equal(link.get("goalId"), goalId));
+            return root.get("projectId").in(projects);
         };
     }
 
