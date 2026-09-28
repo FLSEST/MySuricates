@@ -875,6 +875,41 @@ check "Repository ohne Entity: gegen alle Tabellen gehalten und genannt" \
   'grep -qx "# Ohne Tabellen-Zuordnung, gegen alle Tabellen gehalten: LegacyRepository.java" "$TMP/perf-facts5.out"'
 check "FAKT migration_index_statements: 5" 'grep -qx "FAKT migration_index_statements: 5" "$TMP/perf-facts5.out"'
 
+echo "6g) Performance-Audit: zusammengesetzter Index und erste Spalte einer Abfrage (2d233599)"
+# (workflow_id, active) traegt findByWorkflowIdAndActiveTrue, aber nicht die Suche nach active allein:
+# active bleibt Kandidat. findByOwnerAndFlagTrue hat keinen Index: gemeldet wird nur owner, wo der
+# fehlende Index begaenne, nicht zusaetzlich flag.
+FIX6="$TMP/fixture-composite"
+MAIN6="$FIX6/ai-automation-backend/src/main/java/com/automation"
+MIG6="$FIX6/ai-automation-backend/src/main/resources/db/migration"
+mkdir -p "$MAIN6/entity" "$MAIN6/repository" "$MIG6"
+printf '%s\n' 'package com.automation.entity;' '' '@Entity' '@Table(name = "memo")' 'public class Memo {' '}' \
+  > "$MAIN6/entity/Memo.java"
+cat > "$MAIN6/repository/MemoRepository.java" <<'JAVA'
+package com.automation.repository;
+
+public interface MemoRepository extends JpaRepository<Memo, String> {
+    java.util.Optional<Memo> findByWorkflowIdAndActiveTrue(String workflowId);
+    java.util.List<Memo> findTop8ByActiveTrueOrderByCreatedAtDesc();
+    java.util.List<Memo> findByOwnerAndFlagTrue(String owner);
+}
+JAVA
+cat > "$MIG6/V1__init.sql" <<'SQL'
+CREATE TABLE memo (id TEXT PRIMARY KEY, workflow_id TEXT, active INTEGER, owner TEXT, flag INTEGER, created_at TEXT);
+CREATE INDEX idx_memo_active ON memo(workflow_id, active);
+SQL
+printf '%s' "$FIX6" > "$TMP/base6.txt"
+render "$PERF" name:facts "$(json_values project_path="$TMP/base6.txt" request_metrics=)" > "$TMP/perf-facts6.sh"
+PATH="$TMP/fakebin:$PATH" bash "$TMP/perf-facts6.sh" > "$TMP/perf-facts6.out" 2> "$TMP/perf-facts6.err"
+check "laeuft ohne stderr" '[ ! -s "$TMP/perf-facts6.err" ]'
+check "zweite Spalte eines zusammengesetzten Index traegt die Suche nach ihr allein nicht" \
+  'grep -qx "TREFFER unindexed_findby_column: active (MemoRepository.java -> memo)" "$TMP/perf-facts6.out"'
+check "Abfrage ohne Index: nur ihre erste Spalte" \
+  'grep -qx "TREFFER unindexed_findby_column: owner (MemoRepository.java -> memo)" "$TMP/perf-facts6.out"'
+check "weitere And-Spalten und fuehrende Indexspalte nicht gemeldet" \
+  '! grep -qE "^TREFFER unindexed_findby_column: (flag|workflow_id|created_at) " "$TMP/perf-facts6.out"'
+check "FAKT unindexed_findby_columns_count: 2" 'grep -qx "FAKT unindexed_findby_columns_count: 2" "$TMP/perf-facts6.out"'
+
 echo "7) Performance-Audit: Gate prueft die Pflicht-Fakten deterministisch"
 run_perf_gate() {  # $1 = faktenblatt-datei
   GATE_VALUES="$(json_values block.report.output="$TMP/report-green.txt" block.facts.output="$1")"
