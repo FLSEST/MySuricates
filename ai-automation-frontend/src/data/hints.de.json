@@ -270,7 +270,7 @@
   "goal-guard": {
     "title": "Ein Wächter je Ziel",
     "points": [
-      "Ein Workflow aus der Vorlage „Ziel-Wächter“ prüft das Ziel jeden Tag: überfällige und bald fällige TODOs und Meilensteine, Fortschritt und Zieldatum",
+      "Ein Workflow aus der Vorlage „Ziel-Wächter“ prüft das Ziel jeden Tag: überfällige und bald fällige TODOs, Arbeitspakete und Meilensteine, Fortschritt und Zieldatum",
       "Das Ergebnis erscheint als Ampel-Kachel auf dem Dashboard; der Workflow braucht kein Modell und kostet keine Tokens",
       "Ausschalten pausiert nur den Zeitplan – Workflow und Kachel bleiben, beim nächsten Einschalten geht es dort weiter"
     ]

@@ -9,6 +9,9 @@ import { useModuleEnabled } from '../../hooks/useModules';
 import { useProjects } from '../../hooks/useProjects';
 import { useExecuteWorkflow } from '../../hooks/useWorkflows';
 import { useSchedule } from '../../hooks/useSchedules';
+import { useWorkflowWidgetResults } from '../../hooks/useWorkflowWidgets';
+import { InfoTip } from './InfoTip';
+import { GuardLastResult } from './GuardLastResult';
 import {
   cronWithTime, dailyCron, isDailyCron, timeOfCron, useSetGoalGuard, useSetGuardTime,
 } from '../../hooks/useGoalGuard';
@@ -46,6 +49,8 @@ export function GoalGuardControl({ goal, byProject }: { goal: Goal; byProject: G
   const { guard } = goal;
   // Uhrzeit nur, wenn der Zeitplan eine feste hat; wer ihn unter „Zeitpläne“ anders gestellt hat, ändert ihn dort
   const { data: schedule } = useSchedule(guard.scheduleId);
+  const { data: results } = useWorkflowWidgetResults(guard.workflowId ? [guard.workflowId] : [], { polling: false });
+  const last = results?.find((entry) => entry.workflowId === guard.workflowId) ?? null;
   const cron = schedule?.cronExpression ?? null;
   const canChangeTime = !!guard.scheduleId && !!cron && timeOfCron(cron) !== null;
   if (!reportModule && !guard.workflowId) return null;
@@ -60,8 +65,16 @@ export function GoalGuardControl({ goal, byProject }: { goal: Goal; byProject: G
 
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-text-secondary" data-testid="goal-guard">
-      <Toggle enabled={guard.enabled || asking} onChange={toggle} label={g.label} ariaLabel={g.label}
-        disabled={setGuard.isPending || asking} />
+      <span className="inline-flex items-center gap-1">
+        <Toggle enabled={guard.enabled || asking} onChange={toggle} label={g.label} ariaLabel={g.label}
+          disabled={setGuard.isPending || asking} />
+        <InfoTip label={g.infoLabel} testId="goal-guard-info">
+          <p className="font-semibold text-text">{g.infoTitle}</p>
+          <p>{g.infoChecks}</p>
+          <p>{g.infoReport}</p>
+          <p>{guard.workflowId ? g.infoExisting : g.infoSetup}</p>
+        </InfoTip>
+      </span>
       {guard.enabled && guard.nextRunAt && (
         <span>
           {g.nextRun.replace('{date}', formatTimestamp(guard.nextRunAt, locale, {
@@ -70,6 +83,7 @@ export function GoalGuardControl({ goal, byProject }: { goal: Goal; byProject: G
         </span>
       )}
       {!guard.enabled && guard.workflowId && <span className="rounded bg-surface px-1.5 py-0.5">{g.paused}</span>}
+      {guard.workflowId && last?.run && <GuardLastResult workflowId={guard.workflowId} entry={last} />}
       {guard.workflowId && (
         <Link to={`/workflows/${guard.workflowId}`} className="inline-flex items-center gap-1 hover:text-accent">
           <Workflow className="h-3.5 w-3.5" aria-hidden="true" />

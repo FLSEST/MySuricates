@@ -416,6 +416,30 @@ describe('GoalTimeline — bars', () => {
     }]));
   });
 
+  // c60bf914 review: the start of a bar could only be changed with the mouse
+  it('by keyboard: Alt with an arrow changes the start of a bar, never past its end, and the help says so', async () => {
+    const sent = recordWrites();
+    renderTimeline();
+
+    const bar = within(screen.getByTestId('timeline-bar-w-umbau')).getByRole('button');
+    expect(document.getElementById(bar.getAttribute('aria-describedby')!)).toHaveTextContent('Alt with an arrow key changes the start');
+    act(() => bar.focus());
+    fireEvent.keyDown(bar, { key: 'ArrowRight', altKey: true });
+    fireEvent.keyDown(bar, { key: 'ArrowRight', altKey: true });
+    expect(screen.getByTestId('timeline-bar-w-umbau')).toHaveAttribute('data-start', String(dayOfIsoDate('2026-09-23')));
+    expect(screen.getByTestId('timeline-bar-w-umbau')).toHaveAttribute('data-end', String(dayOfIsoDate('2026-09-30')));
+    expect(plain(screen.getByTestId('timeline-announcer').textContent)).toBe('Umbau: 9/23 – 9/30');
+    // the start never passes the end: eight more steps stop on the last day
+    for (let step = 0; step < 8; step++) fireEvent.keyDown(bar, { key: 'ArrowRight', altKey: true });
+    expect(screen.getByTestId('timeline-bar-w-umbau')).toHaveAttribute('data-start', String(dayOfIsoDate('2026-09-30')));
+    for (let step = 0; step < 7; step++) fireEvent.keyDown(bar, { key: 'ArrowLeft', altKey: true });
+    fireEvent.blur(bar);
+    await waitFor(() => expect(sent).toEqual([{
+      method: 'PUT', path: '/api/v1/goals/g1/work-packages/w-umbau',
+      body: { startDate: startOf('2026-09-23'), endDate: endOf('2026-09-30') },
+    }]));
+  });
+
   it('by keyboard: leaving the bar saves at once, Escape throws the draft away, Enter opens the card', async () => {
     const sent = recordWrites();
     renderTimeline();
@@ -714,6 +738,12 @@ describe('GoalTimeline — live line while dragging', () => {
     startDrag('ms:m-freeze');
     moveDrag('ms:m-freeze', 'milestones', xFor('2026-10-09'));
     expect(live()).toBe('Fri, 10/9');
+    // c60bf914 review: every row where the diamond may land lights up – of every project – the tray stays calm
+    expect(screen.getByTestId('timeline-row-p1-w-repo').lastElementChild).toHaveAttribute('data-accepts', 'true');
+    expect(screen.getByTestId('timeline-row-p2-w-site').lastElementChild).toHaveAttribute('data-accepts', 'true');
+    expect(screen.getByTestId('timeline-strip-p2')).toHaveAttribute('data-accepts', 'true');
+    expect(screen.getByTestId('timeline-milestones').lastElementChild).toHaveAttribute('data-accepts', 'true');
+    expect(screen.getByTestId('timeline-tray-p1')).not.toHaveAttribute('data-accepts');
     act(() => dnd.props!.onDragCancel!({} as never));
 
     // Site has no TODO without a package – the row appears only while one of its TODOs is dragged

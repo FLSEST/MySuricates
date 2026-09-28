@@ -121,8 +121,10 @@ export interface MilestoneMark {
   day: number;
   x: number;
   lane: number;
-  /** Platz für den Titel rechts der Raute. */
+  /** Platz für den Titel neben der Raute. */
   labelWidth: number;
+  /** Der Titel steht links der Raute – rechts am Rand wäre er abgeschnitten. */
+  flipped: boolean;
 }
 
 /**
@@ -334,7 +336,8 @@ const MILESTONE_LABEL_MAX = 150;
 
 /**
  * Rauten der Meilensteine mit ihrem Titel rechts daneben, von links nach rechts in die erste Spur
- * gelegt, in der sie nichts überdecken. Rechts am Rand steht der Titel so weit, wie Platz ist.
+ * gelegt, in der sie nichts überdecken. Passt der Titel rechts am Rand nicht und ist links mehr
+ * Platz, klappt er nach links (`flipped`, c60bf914) – statt abgeschnitten zu werden.
  */
 export function milestoneMarks(milestones: GoalMilestone[], axis: TimelineAxis, width: number): { marks: MilestoneMark[]; lanes: number } {
   const laneEnds: number[] = [];
@@ -344,16 +347,19 @@ export function milestoneMarks(milestones: GoalMilestone[], axis: TimelineAxis, 
       const day = dayOf(milestone.dueDate);
       const x = xOfDay(axis, day, width);
       const wanted = Math.min(MILESTONE_LABEL_MAX, milestone.title.length * 6.2 + 8);
-      const labelWidth = Math.max(0, Math.min(wanted, width - x - DIAMOND_ANCHOR - 4));
-      const from = x - DIAMOND_ANCHOR;
-      const to = x + DIAMOND_ANCHOR + labelWidth;
+      const right = width - x - DIAMOND_ANCHOR - 4;
+      const left = x - DIAMOND_ANCHOR - 4;
+      const flipped = wanted > right && left > right;
+      const labelWidth = Math.max(0, Math.min(wanted, flipped ? left : right));
+      const from = flipped ? x - DIAMOND_ANCHOR - labelWidth : x - DIAMOND_ANCHOR;
+      const to = flipped ? x + DIAMOND_ANCHOR : x + DIAMOND_ANCHOR + labelWidth;
       let lane = laneEnds.findIndex((end) => end + 4 <= from);
       if (lane < 0) {
         lane = laneEnds.length;
         laneEnds.push(0);
       }
       laneEnds[lane] = to;
-      return { milestone, day, x, lane, labelWidth };
+      return { milestone, day, x, lane, labelWidth, flipped };
     });
   return { marks, lanes: Math.max(1, laneEnds.length) };
 }

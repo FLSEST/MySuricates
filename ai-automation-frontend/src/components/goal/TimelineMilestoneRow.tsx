@@ -128,16 +128,18 @@ function MilestoneMarkButton({ mark, axis, width, helpId, onOpen, onMove, onNudg
   };
 
   return (
-    <div className="absolute z-10" style={{ left: x - DIAMOND_ANCHOR, top: 4 + mark.lane * MILESTONE_LANE }}
-      data-testid={`timeline-milestone-${milestone.id}`} data-day={nudge.value}>
+    <div className="absolute z-10"
+      style={{ left: x - DIAMOND_ANCHOR - (mark.flipped ? mark.labelWidth : 0), top: 4 + mark.lane * MILESTONE_LANE }}
+      data-testid={`timeline-milestone-${milestone.id}`} data-day={nudge.value} data-flipped={mark.flipped || undefined}>
       <button ref={setNodeRef} type="button" {...pointerOnly(listeners)} aria-label={label} aria-describedby={helpId} title={label}
         onKeyDown={onKeyDown} onBlur={nudge.flush} onClick={(event) => onOpen(event.currentTarget)}
-        className={`flex h-5 cursor-grab items-center rounded pr-1 hover:bg-surface-hover focus-ring active:cursor-grabbing ${
-          isDragging ? 'opacity-40' : ''}`}
+        className={`flex h-5 cursor-grab items-center rounded hover:bg-surface-hover focus-ring active:cursor-grabbing ${
+          mark.flipped ? 'flex-row-reverse pl-1' : 'pr-1'} ${isDragging ? 'opacity-40' : ''}`}
         style={{ touchAction: 'none', maxWidth: 2 * DIAMOND_ANCHOR + mark.labelWidth }}>
         <span className="flex h-5 w-5 shrink-0 items-center justify-center"><MilestoneDiamond state={milestone.state} size="lg" /></span>
         {mark.labelWidth > 20 && (
-          <span className={`min-w-0 truncate text-[11px] font-medium ${milestone.state === 'REACHED' ? 'text-text-secondary' : 'text-text'}`}>
+          <span className={`min-w-0 truncate text-[11px] font-medium ${mark.flipped ? 'text-right' : ''} ${
+            milestone.state === 'REACHED' ? 'text-text-secondary' : 'text-text'}`}>
             {milestone.title}
           </span>
         )}

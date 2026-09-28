@@ -54,7 +54,8 @@ export function acceptsTarget(dragged: NonNullable<Dragged>, target: DropTarget)
 const RELEVANT: Record<'todo' | 'package' | 'milestone', DropTarget['kind'][]> = {
   todo: ['row', 'undated', 'pill'],
   package: ['row', 'strip', 'tray'],
-  milestone: ['milestones'],
+  // Eine Raute darf auf jeden Tag – in ihrer Zeile, in jeder Paket-Zeile und in jeder Kopfzeile (c60bf914)
+  milestone: ['milestones', 'row', 'strip'],
 };
 
 /**
