@@ -187,7 +187,8 @@ public class GoalService {
 
     static GoalProgressResponse progressOf(GoalStatusCounts counts) {
         return counts == null ? GoalProgressResponse.of(0, 0, 0, 0, 0)
-                : GoalProgressResponse.of(counts.open(), counts.inProgress(), counts.backlog(), counts.done(), counts.openQuestions());
+                : GoalProgressResponse.of(counts.open(), counts.inProgress(), counts.backlog(), counts.done(), counts.openQuestions(),
+                        counts.decided());
     }
 
     static GoalProgressResponse progressOf(List<GoalTodoRow> rows) {
@@ -196,7 +197,9 @@ public class GoalService {
         long backlog = count(rows, Todo.Status.BACKLOG);
         long done = count(rows, Todo.Status.DONE);
         long questions = rows.stream().filter(GoalService::isActive).filter(row -> row.openQuestion() != null).count();
-        return GoalProgressResponse.of(open, inProgress, backlog, done, questions);
+        long decided = rows.stream().filter(row -> row.status() != Todo.Status.ARCHIVED)
+                .filter(row -> row.decisionState() == Todo.DecisionState.DECIDED).count();
+        return GoalProgressResponse.of(open, inProgress, backlog, done, questions, decided);
     }
 
     private static long count(List<GoalTodoRow> rows, Todo.Status status) {

@@ -16,5 +16,11 @@ public record TodoPlanningResponse(
         Instant ratedAt,
         String openQuestion,
         /** Arbeitspaket im Ziel (TODO c60bf914, bis V92 {@code milestoneId}); null = keins. */
-        String workPackageId
+        String workPackageId,
+        /** Entscheidung, wann und von wem (TODO 68a5e24e); null = keine. */
+        String decision,
+        Instant decidedAt,
+        Todo.RatedBy decidedBy,
+        /** QUESTION (offene Frage), DECIDED (Entscheidung, keine offene Frage) oder NONE. */
+        Todo.DecisionState decisionState
 ) {}

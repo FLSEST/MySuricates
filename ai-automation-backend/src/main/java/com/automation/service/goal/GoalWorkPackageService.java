@@ -130,7 +130,8 @@ public class GoalWorkPackageService {
         GoalWorkPackage saved = workPackageRepository.save(workPackage);
         WorkPackageTodoCounts counts = todoRepository.countByWorkPackage(List.of(saved.getId())).stream()
                 .findFirst().orElse(new WorkPackageTodoCounts(saved.getId(), 0, 0));
-        return WorkPackageProgress.toResponse(saved, counts.total(), counts.done(), counts.openQuestions(), clock.instant());
+        return WorkPackageProgress.toResponse(saved, counts.total(), counts.done(), counts.openQuestions(), counts.decided(),
+                clock.instant());
     }
 
     /**

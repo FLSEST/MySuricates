@@ -414,6 +414,106 @@ class GoalApiIntegrationTest {
         assertThat(detail.at("/todos/0/projectId").asText()).isEqualTo(projectB.getId());
     }
 
+    // ── „Könnte dazugehören“ nur aus den Zielprojekten (TODO c60bf914) ─────────────────────
+
+    @Test
+    void candidates_comeFromTheGoalProjects_orFromAllProjectsOnRequest() throws Exception {
+        String tag = "cand-" + System.nanoTime();
+        String goalId = json(perform(post("/api/v1/goals"), Map.of("title", "Release", "projectIds", List.of(projectA.getId())))
+                .andExpect(status().isCreated())).get("id").asText();
+        String empty = createGoal("Ohne Projekte", null);
+        Todo inA = todoRepository.save(Todo.builder().title("In A").priority(Todo.Priority.HIGH).projectId(projectA.getId())
+                .tags(tag).build());
+        Todo backlogA = todoRepository.save(Todo.builder().title("Backlog A").status(Todo.Status.BACKLOG)
+                .priority(Todo.Priority.LOW).projectId(projectA.getId()).tags(tag).build());
+        Todo inB = todoRepository.save(Todo.builder().title("In B").priority(Todo.Priority.MEDIUM).projectId(projectB.getId())
+                .tags(tag).build());
+        todoRepository.save(Todo.builder().title("Erledigt A").status(Todo.Status.DONE).priority(Todo.Priority.HIGH)
+                .projectId(projectA.getId()).tags(tag).build());
+        Todo assigned = todoRepository.save(Todo.builder().title("Schon im Ziel").priority(Todo.Priority.HIGH)
+                .projectId(projectA.getId()).tags(tag).goalId(empty).build());
+
+        JsonNode page = json(mockMvc.perform(get("/api/v1/goals/" + goalId + "/candidates").param("tag", tag))
+                .andExpect(status().isOk()));
+        assertThat(page.get("content").findValuesAsText("id")).as("offen, ohne Ziel, aus Projekt A; nach Prioritaet")
+                .containsExactly(inA.getId(), backlogA.getId());
+        assertThat(page.get("totalElements").asInt()).isEqualTo(2);
+        assertThat(page.at("/content/0/projectName").asText()).isEqualTo(projectA.getName());
+
+        JsonNode all = json(mockMvc.perform(get("/api/v1/goals/" + goalId + "/candidates").param("tag", tag)
+                .param("allProjects", "true")));
+        assertThat(all.get("content").findValuesAsText("id")).containsExactly(inA.getId(), inB.getId(), backlogA.getId())
+                .doesNotContain(assigned.getId());
+        JsonNode searched = json(mockMvc.perform(get("/api/v1/goals/" + goalId + "/candidates").param("tag", tag)
+                .param("q", "backlog")));
+        assertThat(searched.get("content").findValuesAsText("id")).containsExactly(backlogA.getId());
+        JsonNode paged = json(mockMvc.perform(get("/api/v1/goals/" + goalId + "/candidates").param("tag", tag)
+                .param("allProjects", "true").param("size", "1").param("page", "1")));
+        assertThat(paged.get("content").findValuesAsText("id")).containsExactly(inB.getId());
+        assertThat(paged.get("totalElements").asInt()).isEqualTo(3);
+
+        JsonNode none = json(mockMvc.perform(get("/api/v1/goals/" + empty + "/candidates").param("tag", tag)));
+        assertThat(none.get("content")).as("ein Ziel ohne Projekte hat ohne allProjects keine Kandidaten").isEmpty();
+        assertThat(json(mockMvc.perform(get("/api/v1/goals/" + empty + "/candidates").param("tag", tag)
+                .param("allProjects", "true"))).get("content")).hasSize(3);
+        mockMvc.perform(get("/api/v1/goals/missing/candidates")).andExpect(status().isNotFound());
+    }
+
+    // ── „Entschieden“ (TODO 68a5e24e) ──────────────────────────────────────────────────────
+
+    @Test
+    void decisions_answerTheQuestion_andAreCountedPerGoalProjectAndWorkPackage() throws Exception {
+        String goalId = json(perform(post("/api/v1/goals"), Map.of("title", "Release", "projectIds", List.of(projectA.getId())))
+                .andExpect(status().isCreated())).get("id").asText();
+        String workPackage = json(perform(post("/api/v1/goals/" + goalId + "/work-packages"), Map.of("title", "Video"))
+                .andExpect(status().isCreated())).get("id").asText();
+        Todo style = todo("Stil", Todo.Priority.MEDIUM, projectA);
+        Todo music = todo("Musik", Todo.Priority.MEDIUM, projectA);
+        perform(post("/api/v1/goals/" + goalId + "/todos"), Map.of("todoIds", List.of(style.getId(), music.getId())))
+                .andExpect(status().isOk());
+        perform(patch("/api/v1/todos/" + style.getId() + "/planning"),
+                Map.of("workPackageId", workPackage, "openQuestion", "Welcher Stil?")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.planning.decisionState").value("QUESTION"));
+        perform(patch("/api/v1/todos/" + music.getId() + "/planning"), Map.of("openQuestion", "Welche Musik?"))
+                .andExpect(status().isOk());
+
+        perform(patch("/api/v1/todos/" + style.getId() + "/planning"), Map.of("decision", "Handgezeichnet", "ratedBy", "AI"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.planning.decision").value("Handgezeichnet"))
+                .andExpect(jsonPath("$.planning.decidedBy").value("AI"))
+                .andExpect(jsonPath("$.planning.decidedAt").isNotEmpty())
+                .andExpect(jsonPath("$.planning.openQuestion").doesNotExist())
+                .andExpect(jsonPath("$.planning.decisionState").value("DECIDED"));
+        perform(patch("/api/v1/todos/" + music.getId() + "/planning"), Map.of("openQuestion", "Andere?", "decision", "Jazz"))
+                .andExpect(status().isBadRequest());
+
+        JsonNode detail = json(mockMvc.perform(get("/api/v1/goals/" + goalId)).andExpect(status().isOk()));
+        assertThat(detail.at("/goal/progress/decided").asInt()).isEqualTo(1);
+        assertThat(detail.at("/goal/progress/openQuestions").asInt()).isEqualTo(1);
+        assertThat(detail.at("/projects/0/decided").asInt()).isEqualTo(1);
+        assertThat(detail.at("/workPackages/0/decided").asInt()).isEqualTo(1);
+        JsonNode styleItem = null;
+        for (JsonNode item : detail.get("todos")) {
+            if (style.getId().equals(item.get("id").asText())) styleItem = item;
+        }
+        assertThat(styleItem).isNotNull();
+        assertThat(styleItem.get("decision").asText()).isEqualTo("Handgezeichnet");
+        assertThat(styleItem.get("decisionState").asText()).isEqualTo("DECIDED");
+        JsonNode listed = find(json(mockMvc.perform(get("/api/v1/goals"))), goalId);
+        assertThat(listed.at("/progress/decided").asInt()).as("auch in der Liste, aus dem GROUP BY").isEqualTo(1);
+
+        // Eine neue Frage laesst die Entscheidung stehen; "" nimmt sie zurueck
+        perform(patch("/api/v1/todos/" + style.getId() + "/planning"), Map.of("openQuestion", "Farbig oder nicht?"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.planning.decision").value("Handgezeichnet"))
+                .andExpect(jsonPath("$.planning.decisionState").value("QUESTION"));
+        perform(patch("/api/v1/todos/" + style.getId() + "/planning"), Map.of("decision", ""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.planning.decision").doesNotExist())
+                .andExpect(jsonPath("$.planning.decidedBy").doesNotExist());
+        assertThat(json(mockMvc.perform(get("/api/v1/goals/" + goalId))).at("/goal/progress/decided").asInt()).isZero();
+    }
+
     private String createGoal(String title, String targetDate) throws Exception {
         Map<String, Object> body = targetDate == null ? Map.of("title", title) : Map.of("title", title, "targetDate", targetDate);
         return json(perform(post("/api/v1/goals"), body).andExpect(status().isCreated())).get("id").asText();

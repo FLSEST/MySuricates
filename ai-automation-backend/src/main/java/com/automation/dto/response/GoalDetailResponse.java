@@ -23,8 +23,9 @@ public record GoalDetailResponse(
 
     /**
      * Ein Zielprojekt: {@code total}/{@code done} ohne ARCHIVED, {@code openQuestions} zaehlt aktive
-     * TODOs (OPEN/IN_PROGRESS/BACKLOG) mit offener Frage.
+     * TODOs (OPEN/IN_PROGRESS/BACKLOG) mit offener Frage, {@code decided} die nicht archivierten mit
+     * Entscheidung und ohne offene Frage (TODO 68a5e24e).
      */
     public record ProjectSummary(String projectId, String name, boolean archived, int position,
-                                 long total, long done, long openQuestions) {}
+                                 long total, long done, long openQuestions, long decided) {}
 }

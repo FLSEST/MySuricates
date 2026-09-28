@@ -12,5 +12,12 @@ public record GoalStatusCounts(
         long done,
         long backlog,
         long archived,
-        long openQuestions
-) {}
+        long openQuestions,
+        /** Nicht archivierte TODOs mit Entscheidung und ohne offene Frage (TODO 68a5e24e). */
+        long decided
+) {
+    public GoalStatusCounts(String goalId, long open, long inProgress, long done, long backlog, long archived,
+                            long openQuestions) {
+        this(goalId, open, inProgress, done, backlog, archived, openQuestions, 0);
+    }
+}

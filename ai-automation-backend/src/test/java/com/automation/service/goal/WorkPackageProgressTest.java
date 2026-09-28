@@ -85,7 +85,7 @@ class WorkPackageProgressTest {
         GoalWorkPackageResponse response = WorkPackageProgress.toResponse(m, 3, 1, 0, NOW);
 
         assertThat(response).isEqualTo(
-                new GoalWorkPackageResponse("m", "g1", null, "Beta", due, due, 0, GoalDueState.OPEN, 3, 1, 0, null, false, OLD, NEW));
+                new GoalWorkPackageResponse("m", "g1", null, "Beta", due, due, 0, GoalDueState.OPEN, 3, 1, 0, null, false, OLD, NEW, 0));
     }
 
     @Test
@@ -180,6 +180,24 @@ class WorkPackageProgressTest {
     private static GoalWorkPackage inProject(String id, String projectId, int position, Instant end) {
         return GoalWorkPackage.builder().id(id).goalId("g1").title(id).projectId(projectId).position(position)
                 .startDate(end).endDate(end).createdAt(OLD).build();
+    }
+
+    /** TODO 68a5e24e: entschiedene TODOs je Paket, ohne ARCHIVED und ohne solche mit neuer Frage. */
+    @Test
+    void evaluate_countsDecidedTodosPerWorkPackage() {
+        GoalWorkPackage p = workPackage("p1", null, null, OLD);
+        List<GoalTodoRow> rows = List.of(
+                withDecision("t1", Todo.Status.DONE, null, "Ja"),
+                withDecision("t2", Todo.Status.OPEN, "Neu?", "Alt"),
+                withDecision("t3", Todo.Status.ARCHIVED, null, "Weg"),
+                withDecision("t4", Todo.Status.OPEN, null, null));
+
+        assertThat(WorkPackageProgress.evaluate(List.of(p), rows, NOW).get(0).decided()).isEqualTo(1);
+    }
+
+    private static GoalTodoRow withDecision(String id, Todo.Status status, String openQuestion, String decision) {
+        return new GoalTodoRow(id, id, status, Todo.Priority.MEDIUM, null, null, null, null, null, null, null, null,
+                openQuestion, NOW, NOW, null, "p1", decision, null, null);
     }
 
     private static GoalTodoRow question(String id, Todo.Status status, String workPackageId, String openQuestion) {

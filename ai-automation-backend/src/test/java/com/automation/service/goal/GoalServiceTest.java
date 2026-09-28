@@ -95,9 +95,9 @@ class GoalServiceTest {
         List<GoalDetailResponse.ProjectSummary> summaries = GoalProjectSummaries.projects(projects, rows);
 
         assertThat(summaries).containsExactly(
-                new GoalDetailResponse.ProjectSummary("pB", "Site", false, 0, 1, 0, 1),
-                new GoalDetailResponse.ProjectSummary("pA", "AutoPilot", true, 1, 3, 2, 1),
-                new GoalDetailResponse.ProjectSummary("pEmpty", "Leer", false, 2, 0, 0, 0));
+                new GoalDetailResponse.ProjectSummary("pB", "Site", false, 0, 1, 0, 1, 0),
+                new GoalDetailResponse.ProjectSummary("pA", "AutoPilot", true, 1, 3, 2, 1, 0),
+                new GoalDetailResponse.ProjectSummary("pEmpty", "Leer", false, 2, 0, 0, 0, 0));
         assertThat(GoalProjectSummaries.refs(projects)).extracting(GoalResponse.ProjectRef::id)
                 .containsExactly("pB", "pA", "pEmpty");
     }
@@ -111,6 +111,30 @@ class GoalServiceTest {
         assertThat(byGoal.get("g1")).containsExactly(new GoalResponse.ProjectRef("pB", "Site"),
                 new GoalResponse.ProjectRef("pA", "AutoPilot"));
         assertThat(byGoal.get("g2")).containsExactly(new GoalResponse.ProjectRef("pA", "AutoPilot"));
+    }
+
+    /** TODO 68a5e24e: entschieden = Entscheidung ohne offene Frage, nicht archiviert – im Fortschritt und je Projekt. */
+    @Test
+    void decided_countsDecisionsWithoutOpenQuestion_withoutArchived() {
+        List<GoalTodoRow> rows = List.of(
+                decided("d1", "pA", Todo.Status.DONE, null, "Ja"),
+                decided("d2", "pA", Todo.Status.OPEN, null, "Nein"),
+                decided("q1", "pA", Todo.Status.OPEN, "Wieder offen?", "Frueher: ja"),
+                decided("a1", "pA", Todo.Status.ARCHIVED, null, "Verworfen"),
+                decided("n1", "pA", Todo.Status.OPEN, null, null));
+
+        assertThat(GoalService.progressOf(rows).decided()).isEqualTo(2);
+        assertThat(GoalProjectSummaries.projects(List.of(new GoalProjectRow("g1", "pA", "A", null, 0)), rows))
+                .singleElement().extracting(GoalDetailResponse.ProjectSummary::decided).isEqualTo(2L);
+        assertThat(rows.get(2).decisionState()).isEqualTo(Todo.DecisionState.QUESTION);
+        assertThat(rows.get(4).decisionState()).isEqualTo(Todo.DecisionState.NONE);
+    }
+
+    private static GoalTodoRow decided(String id, String projectId, Todo.Status status, String openQuestion, String decision) {
+        Instant created = Instant.parse("2026-09-01T00:00:00Z");
+        return new GoalTodoRow(id, id, status, Todo.Priority.MEDIUM, projectId, null, null, null, null, null, null, null,
+                openQuestion, created, created, null, "wp1", decision, decision != null ? created : null,
+                decision != null ? Todo.RatedBy.USER : null);
     }
 
     private static GoalTodoRow inProject(String id, String projectId, Todo.Status status, String openQuestion) {

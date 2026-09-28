@@ -145,9 +145,13 @@ class TodoTest {
                     now, 5, "lastFix",
                     Todo.ResolutionState.SUCCEEDED,
                     "goal-1", 3, "package-1", Todo.Complexity.L, "high", "note", Todo.RatedBy.AI, now, "Frage?",
+                    "Stil A", now, Todo.RatedBy.USER,
                     now, now
             );
             assertThat(todo.getGoalId()).isEqualTo("goal-1");
+            assertThat(todo.getDecision()).isEqualTo("Stil A");
+            assertThat(todo.getDecidedBy()).isEqualTo(Todo.RatedBy.USER);
+            assertThat(todo.getDecisionState()).as("die offene Frage schlaegt die Entscheidung").isEqualTo(Todo.DecisionState.QUESTION);
             assertThat(todo.getWorkPackageId()).isEqualTo("package-1");
             assertThat(todo.getGoalRank()).isEqualTo(3);
             assertThat(todo.getComplexity()).isEqualTo(Todo.Complexity.L);

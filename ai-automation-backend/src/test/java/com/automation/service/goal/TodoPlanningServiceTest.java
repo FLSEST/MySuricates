@@ -140,6 +140,63 @@ class TodoPlanningServiceTest {
                 .isEqualTo("wp2");
     }
 
+    // ── Entscheidungen (TODO 68a5e24e Ziele Stufe 2: „Entschieden“ als sichtbarer Zustand am TODO) ──
+
+    @Test
+    void decision_answersTheOpenQuestion_withTimeAndAuthor() {
+        Todo todo = todo("pA", "g1", null);
+        todo.setOpenQuestion("Welcher Stil?");
+
+        service.update("t", decision(null, "Handgezeichnet", null));
+
+        assertThat(todo.getDecision()).isEqualTo("Handgezeichnet");
+        assertThat(todo.getDecidedAt()).isNotNull();
+        assertThat(todo.getDecidedBy()).as("ohne ratedBy ein Mensch").isEqualTo(Todo.RatedBy.USER);
+        assertThat(todo.getOpenQuestion()).as("die Frage ist damit beantwortet").isNull();
+        assertThat(todo.getDecisionState()).isEqualTo(Todo.DecisionState.DECIDED);
+
+        service.update("t", decision(null, "  KI-Vorschlag  ", Todo.RatedBy.AI));
+        assertThat(todo.getDecision()).isEqualTo("KI-Vorschlag");
+        assertThat(todo.getDecidedBy()).isEqualTo(Todo.RatedBy.AI);
+    }
+
+    @Test
+    void emptyDecision_removesTextTimeAndAuthor_andANewQuestionKeepsTheDecision() {
+        Todo todo = todo("pA", "g1", null);
+        service.update("t", decision(null, "Jazz", null));
+
+        service.update("t", decision("Oder doch Klassik?", null, null));
+        assertThat(todo.getDecision()).as("eine neue Frage laesst die Entscheidung stehen").isEqualTo("Jazz");
+        assertThat(todo.getDecisionState()).isEqualTo(Todo.DecisionState.QUESTION);
+
+        service.update("t", decision(null, "", null));
+        assertThat(todo.getDecision()).isNull();
+        assertThat(todo.getDecidedAt()).isNull();
+        assertThat(todo.getDecidedBy()).isNull();
+        assertThat(todo.getOpenQuestion()).isEqualTo("Oder doch Klassik?");
+
+        service.update("t", decision("", null, null));
+        assertThat(todo.getDecisionState()).isEqualTo(Todo.DecisionState.NONE);
+    }
+
+    @Test
+    void newQuestionAndDecisionInOneRequest_is400_andChangesNothing() {
+        Todo todo = todo("pA", "g1", null);
+
+        assertThatThrownBy(() -> service.update("t", decision("Welche Farbe?", "Blau", null)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(todo.getOpenQuestion()).isNull();
+        assertThat(todo.getDecision()).isNull();
+        verify(todoRepository, never()).save(any());
+
+        service.update("t", decision("", "Blau", null));
+        assertThat(todo.getDecision()).as("eine leere Frage und eine Entscheidung vertragen sich").isEqualTo("Blau");
+    }
+
+    private static UpdateTodoPlanningRequest decision(String openQuestion, String decision, Todo.RatedBy ratedBy) {
+        return new UpdateTodoPlanningRequest(null, null, null, null, null, openQuestion, ratedBy, null, decision);
+    }
+
     private Todo todo(String projectId, String goalId, String workPackageId) {
         Todo todo = Todo.builder().id("t").title("T").projectId(projectId).goalId(goalId).workPackageId(workPackageId).build();
         when(todoRepository.findById("t")).thenReturn(Optional.of(todo));
