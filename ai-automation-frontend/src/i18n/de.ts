@@ -2614,7 +2614,12 @@ export const de: TranslationKeys = {
     },
     candidates: {
       title: 'Könnte dazugehören',
-      subtitle: 'Offene TODOs ohne Ziel; die gezeigten erscheinen gestrichelt in der Karte.',
+      subtitle: 'Offene TODOs ohne Ziel aus allen Projekten; die gezeigten erscheinen gestrichelt in der Karte.',
+      subtitleScoped: 'Offene TODOs ohne Ziel aus den Projekten dieses Ziels; die gezeigten erscheinen gestrichelt in der Karte.',
+      allProjects: 'Alle Projekte zeigen',
+      otherProject: 'anderes Projekt',
+      otherProjectHint: 'Das Projekt gehört noch nicht zum Ziel – beim Zuordnen kommt es dazu.',
+      noProjects: 'Diesem Ziel ist noch kein Projekt zugeordnet. „Alle Projekte zeigen“ sucht überall.',
       search: 'Suche',
       tag: 'Tag',
       suggestions: 'Vorschläge',

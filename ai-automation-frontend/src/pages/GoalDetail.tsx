@@ -83,11 +83,12 @@ export function GoalDetail() {
   const navigate = useNavigate();
   const [view, setView] = useState<GoalView>(readView);
   const [filter, setFilter] = useState<CandidateFilter>({ q: '', tag: '' });
+  const [allProjects, setAllProjects] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const appliedFilter = useDebounced(filter, 300);
   const { data, isLoading, error, refetch } = useGoal(goalId);
-  const candidatesPage = useGoalCandidates(appliedFilter, !!data);
+  const candidatesPage = useGoalCandidates(goalId, appliedFilter, allProjects, !!data);
   const candidates = useMemo(() => candidatesPage.data?.content ?? [], [candidatesPage.data]);
   const relations = useGoalRelations(goalId, candidates.map((todo) => todo.id), view === 'map');
   const suggestions = useMemo(() => tagSuggestions(data?.todos ?? []), [data?.todos]);
@@ -217,6 +218,10 @@ export function GoalDetail() {
         suggestions={suggestions}
         onAssign={assignTodo}
         assigning={assign.isPending}
+        scoped={candidatesPage.data?.scoped ?? false}
+        allProjects={allProjects}
+        onAllProjectsChange={setAllProjects}
+        goalProjectIds={projects.map((project) => project.projectId)}
       />
 
       {editing && <GoalTodoEditor todoId={editing} onClose={() => setEditing(null)} />}

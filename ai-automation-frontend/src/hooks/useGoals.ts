@@ -3,10 +3,9 @@ import { api, apiErrorMessage, apiErrorStatus } from '../api/client';
 import { defaultQueryRetry } from '../api/queryDefaults';
 import { useToast } from './useToast';
 import { useT } from '../i18n';
-import { useTodos } from './useTodos';
 import type {
   CreateGoalRequest, Goal, GoalDetail, GoalGuard, GoalMilestone, GoalProject, GoalRelations, GoalStatus, GoalTodoItem,
-  GoalWorkPackage, MilestoneState, Todo, UpdateGoalRequest, UpdateTodoPlanningRequest,
+  GoalWorkPackage, MilestoneState, PageResponse, Todo, UpdateGoalRequest, UpdateTodoPlanningRequest,
 } from '../types';
 
 /** Ziele (TODO dc0566f8): TODOs projektübergreifend sammeln, ordnen und einschätzen. */
@@ -206,12 +205,39 @@ const CANDIDATE_STATUSES = ['OPEN', 'IN_PROGRESS', 'BACKLOG'];
 /** Höchstens so viele Kandidaten – genau so viele nimmt die Relationskarte mit. */
 export const CANDIDATE_LIMIT = 20;
 
-/** Kandidaten (TODO c6ea8f5c): offene TODOs ohne Ziel (`goalId=none`), gefiltert nach Tag und Suche. */
-export function useGoalCandidates(filter: { q: string; tag: string }, enabled = true) {
-  return useTodos(
-    { status: CANDIDATE_STATUSES, goalId: 'none', tag: filter.tag.trim(), q: filter.q.trim() },
-    0, CANDIDATE_LIMIT, enabled,
-  );
+/** Eine Seite Kandidaten; `scoped` sagt, ob der Server nach den Projekten des Ziels filtern kann. */
+export type CandidatePage = PageResponse<Todo> & { scoped: boolean };
+
+/**
+ * Kandidaten (TODO c6ea8f5c): offene TODOs ohne Ziel, gefiltert nach Tag und Suche. Seit c60bf914
+ * nur aus den Projekten des Ziels (`/goals/{id}/candidates`), `allProjects` sucht überall. Ein
+ * älteres Backend kennt den Endpunkt nicht (404) – dann wie früher über `/todos?goalId=none`, und
+ * die Seite sagt `scoped: false`, damit der Schalter nicht etwas verspricht, das keiner einlöst.
+ */
+export function useGoalCandidates(goalId: string | undefined, filter: { q: string; tag: string }, allProjects: boolean, enabled = true) {
+  const q = filter.q.trim();
+  const tag = filter.tag.trim();
+  return useQuery({
+    queryKey: ['todos', 'goal-candidates', goalId ?? '', q, tag, allProjects],
+    queryFn: async (): Promise<CandidatePage> => {
+      const scoped = new URLSearchParams({ page: '0', size: String(CANDIDATE_LIMIT), allProjects: String(allProjects) });
+      if (q) scoped.set('q', q);
+      if (tag) scoped.set('tag', tag);
+      try {
+        return { ...(await api.get<PageResponse<Todo>>(`/goals/${goalId}/candidates?${scoped.toString()}`)), scoped: true };
+      } catch (err) {
+        if (apiErrorStatus(err) !== 404) throw err;
+      }
+      const legacy = new URLSearchParams({ page: '0', size: String(CANDIDATE_LIMIT), goalId: 'none' });
+      CANDIDATE_STATUSES.forEach((status) => legacy.append('status', status));
+      if (tag) legacy.set('tag', tag);
+      if (q) legacy.set('q', q);
+      return { ...(await api.get<PageResponse<Todo>>(`/todos?${legacy.toString()}`)), scoped: false };
+    },
+    enabled: !!goalId && enabled,
+    placeholderData: keepPreviousData,
+    staleTime: 60_000,
+  });
 }
 
 /**

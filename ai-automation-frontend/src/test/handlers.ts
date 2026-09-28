@@ -39,6 +39,11 @@ export const handlers = [
     ]),
   ),
 
+  // Goals (68a5e24e/52bc1e8c): by default the backend of the tests predates the goal's candidates and
+  // workflows – candidates then come from /todos, the workflow panel shows the guard only
+  http.get(`${BASE}/goals/:id/candidates`, () => HttpResponse.json({ error: 'No static resource' }, { status: 404 })),
+  http.get(`${BASE}/goals/:id/workflows`, () => HttpResponse.json({ error: 'No static resource' }, { status: 404 })),
+
   // Todos
   http.get(`${BASE}/todos`, () =>
     HttpResponse.json({ content: [{ id: 't1', title: 'Test Todo', description: null, status: 'OPEN', priority: 'MEDIUM', tags: [], projectId: null, projectName: null, linkedWorkflowId: 'w1', linkedWorkflowName: 'Test Workflow', source: 'USER', sourceAgent: null, workflowRunId: null, referenceType: null, referenceId: null, fixAttempts: 0, lastFixRunId: null, resolutionState: 'IDLE', dueDate: null, createdAt: '2025-01-01T00:00:00Z', updatedAt: '2025-01-01T00:00:00Z' }], page: 0, size: 50, totalElements: 1, totalPages: 1 }),

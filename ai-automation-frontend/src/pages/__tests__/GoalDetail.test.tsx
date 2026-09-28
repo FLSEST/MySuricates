@@ -387,6 +387,57 @@ describe('GoalDetail', () => {
     expect(await screen.findByText('Removed from the goal again')).toBeInTheDocument();
   });
 
+  // c60bf914 (Flo): "Might belong here also shows TODOs from other projects that are not assigned"
+  it('takes candidates from the goal\'s projects only, and from all projects with the switch', async () => {
+    const asked: URLSearchParams[] = [];
+    const foreign = { ...candidate('c2', 'Other project chore'), projectId: 'p9', projectName: 'Elsewhere' } as Todo;
+    server.use(
+      http.get('/api/v1/goals/g1', () => HttpResponse.json(detail)),
+      http.get('/api/v1/goals/g1/candidates', ({ request }) => {
+        const params = new URL(request.url).searchParams;
+        asked.push(params);
+        const content = params.get('allProjects') === 'true' ? [candidate('c1', 'Release notes'), foreign] : [candidate('c1', 'Release notes')];
+        return HttpResponse.json({ content, page: 0, size: 20, totalElements: content.length, totalPages: 1 });
+      }),
+    );
+    renderGoal();
+
+    expect(await screen.findByText('Release notes')).toBeInTheDocument();
+    expect(screen.queryByText('Other project chore')).not.toBeInTheDocument();
+    expect(screen.getByText("Open TODOs without a goal from this goal's projects; the ones shown appear dashed in the map.")).toBeInTheDocument();
+    expect(asked[0]!.get('allProjects')).toBe('false');
+    expect(asked[0]!.get('size')).toBe('20');
+
+    fireEvent.click(screen.getByRole('switch', { name: 'Show all projects' }));
+    const row = (await screen.findByText('Other project chore')).closest('li')!;
+    expect(within(row).getByText('other project')).toHaveAttribute('title', 'The project does not belong to the goal yet – adding the TODO adds it.');
+    expect(asked.at(-1)!.get('allProjects')).toBe('true');
+    // TODOs of the goal's own projects carry no mark
+    expect(within(screen.getByText('Release notes').closest('li')!).queryByText('other project')).not.toBeInTheDocument();
+  });
+
+  it('keeps the old way over /todos for a backend without the candidates endpoint, without the switch', async () => {
+    const asked = { todos: [] as URLSearchParams[], include: [] as (string | null)[] };
+    server.use(http.get('/api/v1/goals/g1', () => HttpResponse.json(detail)));
+    serveMapAndCandidates([candidate('c1', 'Release notes')], asked);
+    renderGoal();
+
+    expect(await screen.findByText('Release notes')).toBeInTheDocument();
+    expect(asked.todos[0]!.get('goalId')).toBe('none');
+    expect(screen.queryByRole('switch', { name: 'Show all projects' })).not.toBeInTheDocument();
+    expect(screen.getByText('Open TODOs without a goal from all projects; the ones shown appear dashed in the map.')).toBeInTheDocument();
+  });
+
+  it('says why the list is empty when the goal has no project yet', async () => {
+    server.use(
+      http.get('/api/v1/goals/g1', () => HttpResponse.json({ ...detail, projects: [] })),
+      http.get('/api/v1/goals/g1/candidates', () => HttpResponse.json({ content: [], page: 0, size: 20, totalElements: 0, totalPages: 0 })),
+    );
+    renderGoal();
+
+    expect(await screen.findByText('No project is assigned to this goal yet. “Show all projects” searches everywhere.')).toBeInTheDocument();
+  });
+
   it('opens the edit dialog of a todo from the map', async () => {
     localStorage.setItem('mysuricates-goal-view-v2', 'map');
     server.use(

@@ -2617,7 +2617,12 @@ export const en = {
     },
     candidates: {
       title: 'Might belong here',
-      subtitle: 'Open TODOs without a goal; the ones shown appear dashed in the map.',
+      subtitle: 'Open TODOs without a goal from all projects; the ones shown appear dashed in the map.',
+      subtitleScoped: 'Open TODOs without a goal from this goal\'s projects; the ones shown appear dashed in the map.',
+      allProjects: 'Show all projects',
+      otherProject: 'other project',
+      otherProjectHint: 'The project does not belong to the goal yet – adding the TODO adds it.',
+      noProjects: 'No project is assigned to this goal yet. “Show all projects” searches everywhere.',
       search: 'Search',
       tag: 'Tag',
       suggestions: 'Suggestions',
