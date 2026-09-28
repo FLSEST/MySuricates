@@ -2627,8 +2627,6 @@ export const en = {
       title: 'Workflows',
       hint: 'Workflows that work on this goal or report its state',
       assign: 'Assign workflow',
-      addShort: 'Workflow',
-      assignTo: 'Assign workflow: {target}',
       dialogTitle: 'Assign a workflow',
       search: 'Search workflows',
       showAll: 'Show all workflows',

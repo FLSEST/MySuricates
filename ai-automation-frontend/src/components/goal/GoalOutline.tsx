@@ -323,8 +323,8 @@ function PackageRow({ entry, today, expanded, onToggle, onOpenTodo, onEdit, onUp
           </button>
         </div>
       </div>
-      {/* Workflows am Paket (52bc1e8c): immer sichtbar, „+ Workflow“ nur aufgeklappt */}
-      <PackageWorkflows workPackageId={workPackage.id} title={workPackage.title} withAdd={expanded} className="pb-1 pl-6" />
+      {/* Workflows am Paket (52bc1e8c); zugeordnet wird im Kopf („Workflow zuordnen“, Wofür) oder in der Paket-Karte am Zeitstrahl */}
+      <PackageWorkflows workPackageId={workPackage.id} className="pb-1 pl-6" />
       <div id={bodyId} hidden={!expanded} className="pb-1 pl-6">
         {todos.length === 0
           ? <p className="px-1.5 py-1 text-xs text-text-tertiary">{t.goals.outline.noTodos}</p>

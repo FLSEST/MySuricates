@@ -39,33 +39,19 @@ export function GoalWorkflowsPanel() {
 }
 
 /**
- * Workflows an einem Arbeitspaket (52bc1e8c), klein – in der Gliederung und am Zeitstrahl. `withAdd`
- * zeigt „+ Workflow“ (in der aufgeklappten Gliederung); ohne Workflows und ohne Knopf bleibt es leer.
+ * Workflows an einem Arbeitspaket (52bc1e8c), klein – in der Gliederung und in der Zeilenbeschriftung
+ * des Zeitstrahls. Ohne Workflows bleibt es leer; zugeordnet wird im Kopf oder in der Paket-Karte.
  */
-export function PackageWorkflows({ workPackageId, title, withAdd = false, className = '' }: {
-  workPackageId: string;
-  title: string;
-  withAdd?: boolean;
-  className?: string;
-}) {
-  const tw = useT().goals.workflows;
+export function PackageWorkflows({ workPackageId, className = '' }: { workPackageId: string; className?: string }) {
   const scope = useGoalWorkflowsScope();
   if (!scope) return null;
   const items = attachmentsAt(scope.attachments, workPackageId);
-  const add = withAdd && scope.supported;
-  if (items.length === 0 && !add) return null;
+  if (items.length === 0) return null;
   return (
     <div className={`flex flex-wrap items-center gap-1 ${className}`} data-testid={`package-workflows-${workPackageId}`}>
       {items.map((attachment) => (
         <GoalWorkflowChip key={attachment.id} attachment={attachment} entry={scope.results.get(attachment.workflowId)} compact />
       ))}
-      {add && (
-        <button type="button" onClick={() => scope.openAssign(workPackageId)} aria-label={tw.assignTo.replace('{target}', title)}
-          className="inline-flex h-6 items-center gap-0.5 rounded-md px-1.5 text-[11px] text-text-tertiary hover:bg-surface-hover hover:text-accent focus-ring">
-          <Plus className="h-3 w-3" aria-hidden="true" />
-          {tw.addShort}
-        </button>
-      )}
     </div>
   );
 }

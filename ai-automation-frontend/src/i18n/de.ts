@@ -2624,8 +2624,6 @@ export const de: TranslationKeys = {
       title: 'Workflows',
       hint: 'Workflows, die an diesem Ziel arbeiten oder seinen Stand liefern',
       assign: 'Workflow zuordnen',
-      addShort: 'Workflow',
-      assignTo: 'Workflow zuordnen: {target}',
       dialogTitle: 'Workflow zuordnen',
       search: 'Workflow suchen',
       showAll: 'Alle Workflows zeigen',
