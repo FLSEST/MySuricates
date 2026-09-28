@@ -2645,6 +2645,7 @@ export const de: TranslationKeys = {
       saveFailed: 'Die Zuordnung konnte nicht gespeichert werden',
       start: 'Starten: {name}',
       startLabel: 'Starten',
+      running: 'Läuft gerade – erst nach dem Ende wieder startbar',
       started: '{name} gestartet',
       startFailed: 'Der Workflow konnte nicht gestartet werden',
       openRun: 'Lauf öffnen',

@@ -1,10 +1,10 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useMutationState, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { api, apiErrorMessage, apiErrorStatus } from '../api/client';
 import { useToast } from './useToast';
 import { useI18nStore, useT } from '../i18n';
 import { WORKFLOW_RESULTS_QUERY_KEY, fetchWorkflowResults } from './useWorkflowWidgets';
-import { runPath } from '../components/goal/goalWorkflowStatus';
+import { runActive, runPath } from '../components/goal/goalWorkflowStatus';
 import type { WorkflowWidgetEntry } from '../components/dashboard/workflowWidgetContract';
 import type { GoalGuard, GoalWorkflow, GoalWorkflowRole, WorkflowRun } from '../types';
 
@@ -117,10 +117,23 @@ export function useDetachGoalWorkflow(goalId: string) {
   });
 }
 
+/** Schlüssel aller Starts an einem Ziel – daran erkennt jeder ▶, dass derselbe Workflow schon startet. */
+const startKey = (goalId: string) => ['goals', goalId, 'start-workflow'] as const;
+
+interface StartVariables {
+  workflowId: string;
+  workPackageId: string | null;
+  name: string;
+}
+
 /**
  * Startet einen Workflow des Ziels über den vorhandenen Weg `POST /workflows/{id}/execute` – mit
  * `goal_id` (daraus kommen `goal_status` und `goal_guard_*`), am Paket auch `work_package_id`, und
  * der Sprache der Oberfläche. Der Toast führt zum Lauf.
+ *
+ * Gegen Doppelstarts (Review 52bc1e8c): Alle ▶ eines Ziels teilen sich über `mutationKey` einen Stand.
+ * Solange ein Start desselben Workflows unterwegs ist, startet `start` nichts – geprüft im Cache der
+ * Mutationen, der den neuen Start sofort kennt, also auch beim schnellen Doppelklick auf zwei Knöpfe.
  */
 export function useStartGoalWorkflow(goalId: string) {
   const qc = useQueryClient();
@@ -128,8 +141,9 @@ export function useStartGoalWorkflow(goalId: string) {
   const t = useT();
   const locale = useI18nStore((s) => s.locale);
   const navigate = useNavigate();
-  return useMutation({
-    mutationFn: ({ workflowId, workPackageId }: { workflowId: string; workPackageId: string | null; name: string }) =>
+  const mutation = useMutation({
+    mutationKey: startKey(goalId),
+    mutationFn: ({ workflowId, workPackageId }: StartVariables) =>
       api.post<WorkflowRun>(`/workflows/${workflowId}/execute`, {
         context: { goal_id: goalId, ...(workPackageId ? { work_package_id: workPackageId } : {}), goal_locale: locale },
       }),
@@ -142,4 +156,38 @@ export function useStartGoalWorkflow(goalId: string) {
     },
     onError: (err) => toast.error(apiErrorMessage(err, t.goals.workflows.startFailed)),
   });
+  const start = (variables: StartVariables) => {
+    const running = qc.getMutationCache().findAll({ mutationKey: startKey(goalId), status: 'pending' })
+      .some((pending) => (pending.state.variables as StartVariables | undefined)?.workflowId === variables.workflowId);
+    if (!running) mutation.mutate(variables);
+  };
+  return { start };
+}
+
+/** Startet dieser Workflow gerade (irgendein ▶ des Ziels)? */
+export function useWorkflowStarting(goalId: string, workflowId: string): boolean {
+  const starting = useMutationState({
+    filters: { mutationKey: startKey(goalId), status: 'pending' },
+    select: (mutation) => (mutation.state.variables as StartVariables | undefined)?.workflowId,
+  });
+  return starting.includes(workflowId);
+}
+
+/**
+ * Ein ▶ für einen Workflow des Ziels: gesperrt, solange derselbe Workflow gerade gestartet wird oder
+ * sein letzter Lauf noch läuft – so entsteht aus zwei Knöpfen (Chip und Paket-Karte) nie ein zweiter Lauf.
+ */
+export function useGoalWorkflowStart(goalId: string, workflowId: string, workPackageId: string | null, name: string,
+  entry: WorkflowWidgetEntry | null | undefined) {
+  const { start } = useStartGoalWorkflow(goalId);
+  const starting = useWorkflowStarting(goalId, workflowId);
+  const running = runActive(entry);
+  return {
+    starting,
+    running,
+    busy: starting || running,
+    start: () => {
+      if (!running) start({ workflowId, workPackageId, name });
+    },
+  };
 }
