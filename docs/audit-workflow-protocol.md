@@ -279,8 +279,9 @@ fünf wortgleich der Regelblock `UMGANG MIT BEKANNTEN BEFUNDEN (VERBINDLICH)`:
 - **Markdown:** Die Findings-Tabelle zeigt nur `OPEN`, `AWAITING_VERIFICATION` und neue Befunde.
   Eingeordnete stehen gesammelt in einer Zeile `Bewusst eingeordnet: <N> (akzeptiert <x>,
   verworfen <y>) - siehe Audit Center`, außer einer hat sich messbar verschlechtert. Verschlechtert
-  heißt: Eine belegende Kennzahl liegt um mehr als 10 % über ihrem letzten Wert. Ab dieser Schwelle
-  öffnet auch `AuditAcceptancePolicy` eine Akzeptanz wieder; kleinere Schwankungen zählen nicht.
+  heißt: Eine belegende Kennzahl liegt um mehr als 10 % über ihrem letzten Wert, oder die
+  Änderungsrate erreicht die Hotspot-Schwelle neu. Ab dieser Schwelle öffnet auch
+  `AuditAcceptancePolicy` eine Akzeptanz wieder; kleinere Schwankungen zählen nicht.
 - **Zählung:** `gate_status` und die Zahlen im Markdown zählen nur `OPEN`,
   `AWAITING_VERIFICATION` und neue Befunde, eingeordnete nur, wenn sie sich laut Messung dieses
   Laufs verschlechtert haben. Der Envelope und die Messwerte selbst bleiben unberührt. Sonst bliebe
@@ -310,7 +311,8 @@ dasselbe unter „verschlechtert“ verstehen.
 - `ACCEPTED_RISK` und `DISMISSED` bleiben unverändert, wenn sie im Snapshot fehlen. Nur `OPEN`
   und `AWAITING_VERIFICATION` werden `RESOLVED`.
 - Taucht ein `ACCEPTED_RISK`-Finding wieder auf, prüft `AuditAcceptancePolicy` es gegen den
-  Beleg zum Zeitpunkt der Akzeptanz: Liegt ein Messwert um mehr als 10 % darüber, wird es wieder
+  Beleg zum Zeitpunkt der Akzeptanz: Liegt ein Messwert um mehr als 10 % darüber oder hat die
+  Änderungsrate die Hotspot-Schwelle neu erreicht, wird es wieder
   `OPEN` (die Einordnung bekommt `Verschlechtert: alt → neu`); ist die Akzeptanz 180 Tage alt,
   geht es auf `AWAITING_VERIFICATION` (`Wiedervorlage nach 180 Tagen`). Ein `DISMISSED`-Finding
   bleibt auch beim Wiederauftauchen `DISMISSED`.

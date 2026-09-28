@@ -74,6 +74,77 @@ class AuditAcceptancePolicyTest {
     }
 
     @Test
+    void reassess_nclocIsComparedAsItsOwnUnit() {
+        assertThat(policy.reassess(accepted("500 NCLOC (600 Zeilen)", ACCEPTED_AT), "555 NCLOC (600 Zeilen)",
+                ACCEPTED_AT.plus(Duration.ofDays(7)))).isEqualTo(Outcome.REOPENED);
+        assertThat(policy.reassess(accepted("500 NCLOC (600 Zeilen)", ACCEPTED_AT), "545 NCLOC (600 Zeilen)",
+                ACCEPTED_AT.plus(Duration.ofDays(7)))).isEqualTo(Outcome.UNCHANGED);
+
+        AuditFinding finding = accepted("500 NCLOC (600 Zeilen)", ACCEPTED_AT);
+        policy.reassess(finding, "555 NCLOC (600 Zeilen)", ACCEPTED_AT.plus(Duration.ofDays(7)));
+        assertThat(finding.getDispositionNote()).isEqualTo("Split geplant\nVerschlechtert: 500 NCLOC → 555 NCLOC");
+    }
+
+    @Test
+    void reassess_switchFromLocToNcloc_comparesOnlyCommonUnits() {
+        // Snapshot vor der NCLOC-Messung: 629 LOC; heute 531 NCLOC bei 635 Zeilen -> LOC +1 %, NCLOC ohne Vergleich.
+        assertThat(policy.reassess(accepted("Struktur-Scan FRONTEND: 629 LOC | pages/DialogImport.tsx", ACCEPTED_AT),
+                "531 NCLOC (635 Zeilen)", ACCEPTED_AT.plus(Duration.ofDays(7)))).isEqualTo(Outcome.UNCHANGED);
+        assertThat(policy.reassess(accepted("Big.java: 300 LOC", ACCEPTED_AT), "Big.java: 900 NCLOC",
+                ACCEPTED_AT.plus(Duration.ofDays(7)))).as("NCLOC never counts as LOC").isEqualTo(Outcome.UNCHANGED);
+    }
+
+    @Test
+    void reassess_namedCountFromFactLine_usesTheTenPercentRule() {
+        AuditFinding finding = accepted("FAKT unindexed_findby_columns_count: 9; TREFFER active (A.java)", ACCEPTED_AT);
+
+        assertThat(policy.reassess(finding, "FAKT unindexed_findby_columns_count: 18; TREFFER x (B.java)",
+                ACCEPTED_AT.plus(Duration.ofDays(7)))).isEqualTo(Outcome.REOPENED);
+        assertThat(finding.getDispositionNote()).isEqualTo(
+                "Split geplant\nVerschlechtert: 9 unindexed_findby_columns_count → 18 unindexed_findby_columns_count");
+        assertThat(policy.reassess(accepted("FAKT unindexed_findby_columns_count: 9", ACCEPTED_AT),
+                "FAKT unindexed_findby_columns_count: 9", ACCEPTED_AT.plus(Duration.ofDays(7)))).isEqualTo(Outcome.UNCHANGED);
+        assertThat(policy.reassess(accepted("FAKT a_count: 9", ACCEPTED_AT), "FAKT b_count: 90",
+                ACCEPTED_AT.plus(Duration.ofDays(7)))).as("counts are compared per name").isEqualTo(Outcome.UNCHANGED);
+    }
+
+    @Test
+    void reassess_churnReachingTheHotspotThreshold_reopens() {
+        AuditFinding finding = accepted("Backend churn: 0", ACCEPTED_AT);
+
+        assertThat(policy.reassess(finding, "531 NCLOC (635 Zeilen), 6 Aenderungen in 90 Tagen (Hotspot ab 5)",
+                ACCEPTED_AT.plus(Duration.ofDays(7)))).isEqualTo(Outcome.REOPENED);
+        assertThat(finding.getStatus()).isEqualTo(AuditFindingStatus.OPEN);
+        assertThat(finding.getDispositionNote())
+                .isEqualTo("Split geplant\nVerschlechtert: 0 Änderungen → 6 Änderungen (Hotspot ab 5)");
+        assertThat(policy.reassess(accepted("Backend churn: 3", ACCEPTED_AT), "8 Aenderungen in 90 Tagen (Hotspot ab 8)",
+                ACCEPTED_AT.plus(Duration.ofDays(7)))).as("threshold from the current evidence").isEqualTo(Outcome.REOPENED);
+        assertThat(policy.reassess(accepted("Backend churn: 3", ACCEPTED_AT), "7 Aenderungen in 90 Tagen (Hotspot ab 8)",
+                ACCEPTED_AT.plus(Duration.ofDays(7)))).isEqualTo(Outcome.UNCHANGED);
+        assertThat(policy.reassess(accepted("Backend churn: 2", ACCEPTED_AT), "Backend churn: 5",
+                ACCEPTED_AT.plus(Duration.ofDays(7)))).as("default threshold " + AuditAcceptancePolicy.HOTSPOT_MIN_CHANGES)
+                .isEqualTo(Outcome.REOPENED);
+        assertThat(policy.reassess(accepted("Backend churn: 2", ACCEPTED_AT), "Backend churn: 4",
+                ACCEPTED_AT.plus(Duration.ofDays(7)))).isEqualTo(Outcome.UNCHANGED);
+    }
+
+    @Test
+    void reassess_churnAlreadyAtHotspot_isNoDegradationEvenAboveTenPercent() {
+        assertThat(policy.reassess(accepted("Backend churn: 30; Struktur-Scan: 16 deps", ACCEPTED_AT),
+                "320 NCLOC (441 Zeilen), 16 deps, 34 Aenderungen in 90 Tagen (Hotspot ab 5)",
+                ACCEPTED_AT.plus(Duration.ofDays(7)))).isEqualTo(Outcome.UNCHANGED);
+        assertThat(policy.reassess(accepted("Backend churn: 3", ACCEPTED_AT), "Backend churn: 4",
+                ACCEPTED_AT.plus(Duration.ofDays(7)))).as("+33 % below the threshold").isEqualTo(Outcome.UNCHANGED);
+    }
+
+    @Test
+    void reassess_snapshotWithoutChurn_neverReopensOnChurn() {
+        assertThat(policy.reassess(accepted("Struktur-Scan FRONTEND: 616 LOC | pages/Workflows.tsx", ACCEPTED_AT),
+                "511 NCLOC (602 Zeilen), 7 Aenderungen in 90 Tagen (Hotspot ab 5)",
+                ACCEPTED_AT.plus(Duration.ofDays(7)))).isEqualTo(Outcome.UNCHANGED);
+    }
+
+    @Test
     void reassess_olderThan180Days_movesToAwaitingVerificationOnce() {
         AuditFinding finding = accepted("Big.java: 320 LOC", ACCEPTED_AT);
 
