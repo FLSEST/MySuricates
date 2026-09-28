@@ -1278,7 +1278,18 @@ export interface TodoPlanning {
   workPackageId?: string | null;
   /** Dasselbe unter dem Namen eines älteren Backends (vor c60bf914 hieß das Arbeitspaket „milestone“). */
   milestoneId?: string | null;
+  /** Entscheidung zur offenen Frage (68a5e24e). Fehlen die Felder, ist das Backend älter. */
+  decision?: string | null;
+  decidedAt?: string | null;
+  decidedBy?: RatedBy | null;
+  decisionState?: DecisionState;
 }
+
+/**
+ * Zustand der Klärung eines TODOs (68a5e24e): QUESTION = eine offene Frage steht an (auch, wenn es
+ * schon eine frühere Entscheidung gibt), DECIDED = entschieden und keine neue Frage, NONE = nichts.
+ */
+export type DecisionState = 'QUESTION' | 'DECIDED' | 'NONE';
 
 /** `null`/fehlt = unverändert, leerer Text = leeren (`goalId: ''` löst das TODO vom Ziel). */
 export interface UpdateTodoPlanningRequest {
@@ -1293,6 +1304,8 @@ export interface UpdateTodoPlanningRequest {
   workPackageId?: string;
   /** Nur für ein älteres Backend (vor c60bf914): dort heißt das Feld noch so. */
   milestoneId?: string;
+  /** Entscheidung (68a5e24e): Text leert die offene Frage, `''` nimmt die Entscheidung weg. */
+  decision?: string;
 }
 
 export interface GoalProgress {
@@ -1302,6 +1315,8 @@ export interface GoalProgress {
   backlog: number;
   done: number;
   openQuestions: number;
+  /** Entschiedene TODOs ohne neue Frage (68a5e24e). Fehlt bei einem älteren Backend. */
+  decided?: number;
   percentDone: number;
 }
 
@@ -1356,6 +1371,8 @@ export interface GoalProject {
   total: number;
   done: number;
   openQuestions: number;
+  /** Entschiedene TODOs (68a5e24e); `useGoal` ergänzt 0 bei einem älteren Backend. */
+  decided: number;
 }
 
 /**
@@ -1389,6 +1406,8 @@ export interface GoalWorkPackage {
   done: number;
   /** Nicht erledigte TODOs mit offener Frage. */
   openQuestions: number;
+  /** Entschiedene TODOs (68a5e24e). */
+  decided: number;
   /** Erster Abschluss; bleibt stehen. */
   completedAt: string | null;
   /** War schon abgeschlossen, ist es wegen eines neuen TODOs nicht mehr. */
@@ -1480,6 +1499,11 @@ export interface GoalTodoItem {
   dueDate: string | null;
   /** Arbeitspaket des Ziels (c60bf914); null = keins. */
   workPackageId: string | null;
+  /** Entscheidung zur (früheren) offenen Frage (68a5e24e). */
+  decision: string | null;
+  decidedAt: string | null;
+  decidedBy: RatedBy | null;
+  decisionState: DecisionState;
 }
 
 export interface GoalProjectProgress {
@@ -1505,6 +1529,35 @@ export interface GoalDetail {
    * `workPackages`). Meilensteine gibt es dort noch nicht, die Oberfläche blendet sie aus.
    */
   legacyBackend?: boolean;
+  /**
+   * Gesetzt von `normalizeGoalDetail`: Das Backend kennt Entscheidungen (68a5e24e). Ohne sie gibt es
+   * kein „Entscheiden“ – ein älteres Backend ließe das Feld stillschweigend fallen.
+   */
+  decisionsSupported?: boolean;
+}
+
+/**
+ * Rolle eines Workflows am Ziel (52bc1e8c): WORKER „arbeitet daran“, STATUS „liefert den Stand“
+ * (sein Ergebnis ist eine Ampel mit Kennzahlen). Anzeigen und Starten gehen bei beiden.
+ */
+export type GoalWorkflowRole = 'WORKER' | 'STATUS';
+
+/**
+ * Ein Workflow am Ziel oder an einem Arbeitspaket (52bc1e8c, `GET /goals/{id}/workflows`). Der
+ * Wächter steht als erster Eintrag mit `id: "guard"` und `guard: true` darin – lösen lässt er sich
+ * nur über seinen Schalter.
+ */
+export interface GoalWorkflow {
+  id: string;
+  goalId: string;
+  /** null = am ganzen Ziel. */
+  workPackageId: string | null;
+  workflowId: string;
+  workflowName: string;
+  workflowProjectId: string | null;
+  role: GoalWorkflowRole;
+  guard: boolean;
+  createdAt?: string;
 }
 
 /** Relationskarte eines Ziels (TODO c6ea8f5c): Herkunft → TODO → Bearbeitung → Ergebnis. */

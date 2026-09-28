@@ -65,7 +65,9 @@ export function WorkPackageBar({ workPackage, range, axis, width, helpId, onOpen
   const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
       const step = event.key === 'ArrowRight' ? 1 : -1;
-      const next = event.shiftKey ? resizedRange(nudge.value, 'end', step) : movedRange(nudge.value, step);
+      // Umschalt ändert das Ende, Alt den Beginn (c60bf914) – ohne beides wandert der ganze Balken
+      const next = event.shiftKey ? resizedRange(nudge.value, 'end', step)
+        : event.altKey ? resizedRange(nudge.value, 'start', step) : movedRange(nudge.value, step);
       nudge.nudge(next);
       announce(t.goals.timeline.announce.moved.replace('{title}', workPackage.title).replace('{when}', rangeText(next, locale)));
     } else if (event.key === 'Enter') {

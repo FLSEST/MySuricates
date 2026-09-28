@@ -256,7 +256,7 @@
     "points": [
       "At the top are the milestones: dates for the whole goal, reached once their linked work packages are complete",
       "Below, every project has a card with its work packages in their set order, each with its time span and its TODOs",
-      "The counters show done out of total and the open questions; a question has to be settled before anyone starts"
+      "The counters show done out of total, open questions (❓) and what is decided (✔); a click on ❓ decides the question before anyone starts"
     ]
   },
   "goal-timeline": {
@@ -270,7 +270,7 @@
   "goal-guard": {
     "title": "One guard per goal",
     "points": [
-      "A workflow from the “Goal guard” template checks the goal every day: overdue and soon-due TODOs and milestones, progress and target date",
+      "A workflow from the “Goal guard” template checks the goal every day: overdue and soon-due TODOs, work packages and milestones, progress and target date",
       "The result appears as a traffic-light tile on the dashboard; the workflow needs no model and costs no tokens",
       "Switching it off only pauses the schedule – workflow and tile stay, and switching it on again carries on from there"
     ]

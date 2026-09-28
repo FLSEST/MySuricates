@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { forBackend, formOf, packageOptions, planningChanges, withGoal, type PlanningForm } from '../planning';
+import { forBackend, formOf, packageOptions, planningChanges, planningConflict, withGoal, type PlanningForm } from '../planning';
 import type { GoalWorkPackage, Todo } from '../../../types';
 
 const base: PlanningForm = {
   goalId: 'g1', workPackageId: 'w1', complexity: 'M', suggestedEffort: 'high', ratingNote: 'Klar umrissen', openQuestion: '',
+  decision: '',
 };
 
 describe('planningChanges', () => {
@@ -52,5 +53,27 @@ describe('work package in the planning field', () => {
     expect(forBackend({ goalId: 'g1', workPackageId: 'w1' }, false)).toEqual({ goalId: 'g1', workPackageId: 'w1' });
     expect(forBackend({ goalId: 'g1', workPackageId: 'w1' }, true)).toEqual({ goalId: 'g1', milestoneId: 'w1' });
     expect(forBackend({ goalId: 'g1' }, true)).toEqual({ goalId: 'g1' });
+  });
+});
+
+// 68a5e24e: the decision is part of the planning field
+describe('decision in the planning field', () => {
+  it('reads the decision, sends a changed one trimmed and empty text as "remove"', () => {
+    const todo = { planning: { goalId: 'g1', decision: 'MIT', decisionState: 'DECIDED' } } as unknown as Todo;
+    expect(formOf(todo).decision).toBe('MIT');
+    const decided = { ...base, decision: 'MIT' };
+    expect(planningChanges(decided, { ...decided, decision: ' Apache ' })).toEqual({ decision: 'Apache' });
+    expect(planningChanges(decided, { ...decided, decision: '' })).toEqual({ decision: '' });
+    expect(planningChanges(decided, { ...decided })).toEqual({});
+  });
+
+  it('refuses a new question and a decision in one go – the server would answer 400', () => {
+    expect(planningConflict(planningChanges(base, { ...base, openQuestion: 'Which?', decision: 'This' }))).toBe(true);
+    expect(planningConflict(planningChanges(base, { ...base, decision: 'This' }))).toBe(false);
+    const asking = { ...base, openQuestion: 'Which?' };
+    // answering the question and clearing it in the same step is fine
+    expect(planningConflict(planningChanges(asking, { ...asking, openQuestion: '', decision: 'This' }))).toBe(false);
+    // the unchanged question is not sent – the decision closes it on the server
+    expect(planningChanges(asking, { ...asking, decision: 'This' })).toEqual({ decision: 'This' });
   });
 });

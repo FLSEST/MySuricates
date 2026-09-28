@@ -7,6 +7,8 @@ import { TimelinePopover } from './TimelinePopover';
 import { WorkPackageFields } from './WorkPackageFields';
 import { MilestoneFields } from './MilestoneFields';
 import { ReachedSwitch } from './ReachedSwitch';
+import { PackageWorkflowList } from './GoalWorkflowsPanel';
+import { useGoalWorkflowsScope } from './goalWorkflowsContext';
 import { WorkPackageMark } from './WorkPackageMark';
 import { MilestoneDiamond } from './MilestoneDiamond';
 import { isPackageDraftValid, packageDraftOf, projectLocked, updatePackageRequest } from './workPackageForm';
@@ -43,6 +45,7 @@ export function WorkPackageCard({ goalId, workPackage, projects, todos, onClose,
   const [draft, setDraft] = useState(() => packageDraftOf(workPackage));
   const update = useUpdateWorkPackage(goalId);
   const assigned = todos.filter((todo) => todo.workPackageId === workPackage.id && todo.status !== 'ARCHIVED');
+  const workflows = useGoalWorkflowsScope();
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -79,6 +82,10 @@ export function WorkPackageCard({ goalId, workPackage, projects, todos, onClose,
             </ul>
           )}
         </div>
+        <PackageWorkflowList workPackageId={workPackage.id} onAssign={() => {
+          onClose();
+          workflows?.openAssign(workPackage.id);
+        }} />
         <div className="flex items-center gap-2 border-t border-border pt-2">
           <button type="button" onClick={onDelete} className={DELETE_BUTTON}>{tw.delete}</button>
           <Button type="button" variant="ghost" size="sm" onClick={onClose}>{tw.cancel}</Button>

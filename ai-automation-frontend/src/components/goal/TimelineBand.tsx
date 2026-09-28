@@ -1,6 +1,6 @@
 import { useId, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
-import { HelpCircle, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useI18nStore, useT } from '../../i18n';
 import { formatDate } from '../../utils/localeFormat';
 import {
@@ -14,6 +14,7 @@ import { InlineTitleField } from './InlineTitleField';
 import { LABEL_COLUMN, PackageRowView, UndatedToggle } from './TimelineRows';
 import { TimelineChip } from './TimelineChip';
 import { WorkPackageMark } from './WorkPackageMark';
+import { DecisionCounts } from './DecisionCounts';
 import type { FloatingAnchor } from './floating';
 import type { GoalWorkPackage } from '../../types';
 
@@ -225,11 +226,7 @@ function UnscheduledPill({ band, entry, listId, open, onToggle, onOpen }: {
         <WorkPackageMark state={workPackage.state} />
         <span className="min-w-0 truncate text-text">{workPackage.title}</span>
         <span className="shrink-0 tabular-nums text-text-tertiary" aria-hidden="true">{workPackage.done}/{workPackage.total}</span>
-        {workPackage.openQuestions > 0 && (
-          <span className="inline-flex shrink-0 items-center gap-0.5 text-human" aria-hidden="true">
-            <HelpCircle className="h-3 w-3" />{workPackage.openQuestions}
-          </span>
-        )}
+        <DecisionCounts openQuestions={workPackage.openQuestions} decided={workPackage.decided} />
       </button>
       {undated.length > 0 && (
         <span className="text-[11px] text-text-tertiary">

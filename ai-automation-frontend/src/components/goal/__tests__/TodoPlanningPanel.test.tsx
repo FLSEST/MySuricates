@@ -102,3 +102,30 @@ describe('TodoPlanningPanel – work package', () => {
     await waitFor(() => expect(sent).toEqual([{ milestoneId: 'w-docs' }]));
   });
 });
+
+// 68a5e24e: the decision is edited in the planning field of the TODO dialog
+describe('TodoPlanningPanel – decision', () => {
+  it('saves a decision, refuses it together with a new question, and hides the field for an older backend', async () => {
+    const sent: unknown[] = [];
+    serve(sent);
+    const { unmount } = renderWithProviders(
+      <TodoPlanningPanel todo={todoWith({ openQuestion: 'Which licence?', decisionState: 'QUESTION', decision: null })} />,
+    );
+
+    const field = await screen.findByLabelText('Decision');
+    expect(screen.getByText('Answers the open question – saving clears it. Leave empty for no decision.')).toBeInTheDocument();
+    fireEvent.change(field, { target: { value: 'MIT' } });
+    fireEvent.change(screen.getByLabelText('Open question'), { target: { value: 'And GPL?' } });
+    expect(screen.getByRole('alert')).toHaveTextContent('A new question and a decision at once do not go together');
+    expect(screen.getByRole('button', { name: 'Save planning' })).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText('Open question'), { target: { value: 'Which licence?' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save planning' }));
+    await waitFor(() => expect(sent).toEqual([{ decision: 'MIT' }]));
+    unmount();
+
+    renderWithProviders(<TodoPlanningPanel todo={todoWith({ openQuestion: 'Which licence?' })} />);
+    await screen.findByRole('combobox', { name: 'Goal' });
+    expect(screen.queryByLabelText('Decision')).not.toBeInTheDocument();
+  });
+});

@@ -11,6 +11,8 @@ export interface PlanningForm {
   suggestedEffort: string;
   ratingNote: string;
   openQuestion: string;
+  /** Entscheidung zur offenen Frage (68a5e24e); leer = keine. */
+  decision: string;
 }
 
 export function formOf(todo: Todo): PlanningForm {
@@ -23,6 +25,7 @@ export function formOf(todo: Todo): PlanningForm {
     suggestedEffort: p?.suggestedEffort ?? '',
     ratingNote: p?.ratingNote ?? '',
     openQuestion: p?.openQuestion ?? '',
+    decision: p?.decision ?? '',
   };
 }
 
@@ -37,7 +40,16 @@ export function planningChanges(before: PlanningForm, after: PlanningForm): Upda
   }
   if (after.ratingNote.trim() !== before.ratingNote) data.ratingNote = after.ratingNote.trim();
   if (after.openQuestion.trim() !== before.openQuestion) data.openQuestion = after.openQuestion.trim();
+  if (after.decision.trim() !== before.decision) data.decision = after.decision.trim();
   return data;
+}
+
+/**
+ * Eine neue Frage und eine Entscheidung im selben Aufruf weist der Server ab (68a5e24e): Die
+ * Entscheidung schließt die Frage. Erst entscheiden, dann neu fragen.
+ */
+export function planningConflict(changes: UpdateTodoPlanningRequest): boolean {
+  return !!changes.openQuestion && !!changes.decision;
 }
 
 

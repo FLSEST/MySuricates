@@ -1,5 +1,5 @@
 import { useCallback, useId, useMemo, useState, type KeyboardEvent } from 'react';
-import { AlertTriangle, ArrowDown, ArrowUp, HelpCircle, Pencil, Plus, Trash2 } from 'lucide-react';
+import { AlertTriangle, ArrowDown, ArrowUp, Pencil, Plus, Trash2 } from 'lucide-react';
 import { Card, ConfirmModal } from '../ui';
 import { Hint } from '../hints/Hint';
 import { useI18nStore, useT } from '../../i18n';
@@ -8,6 +8,8 @@ import { useDeleteMilestone } from '../../hooks/useGoalMilestones';
 import { useAddGoalProject, useReorderGoalProjects } from '../../hooks/useGoalProjects';
 import { ComplexityChip, EffortChip, RatedByMark } from './GoalBadges';
 import { DueChip } from './TodoPlanChips';
+import { DecisionMark } from './DecisionMark';
+import { PackageWorkflows } from './GoalWorkflowsPanel';
 import { WorkPackageMark } from './WorkPackageMark';
 import { OutlineBar, OutlineCountColumns, OutlineGroup, OutlineToggle } from './OutlineGroup';
 import { OutlineMilestones } from './OutlineMilestones';
@@ -321,6 +323,8 @@ function PackageRow({ entry, today, expanded, onToggle, onOpenTodo, onEdit, onUp
           </button>
         </div>
       </div>
+      {/* Workflows am Paket (52bc1e8c); zugeordnet wird im Kopf („Workflow zuordnen“, Wofür) oder in der Paket-Karte am Zeitstrahl */}
+      <PackageWorkflows workPackageId={workPackage.id} className="pb-1 pl-6" />
       <div id={bodyId} hidden={!expanded} className="pb-1 pl-6">
         {todos.length === 0
           ? <p className="px-1.5 py-1 text-xs text-text-tertiary">{t.goals.outline.noTodos}</p>
@@ -363,7 +367,7 @@ function LooseRow({ nodeKey, todos, today, expanded, onToggle, onOpenTodo }: {
   );
 }
 
-/** TODO-Zeilen: Statuspunkt, Titel (öffnet den Dialog), Fälligkeit, Einschätzung, ❓ und ⚠ bei Altfällen. */
+/** TODO-Zeilen: Statuspunkt, Titel (öffnet den Dialog), Fälligkeit, Einschätzung, ❓/✔ (entscheiden, 68a5e24e) und ⚠ bei Altfällen. */
 function TodoRows({ todos, today, onOpenTodo }: { todos: OutlineTodo[]; today: number; onOpenTodo: (todoId: string) => void }) {
   const t = useT();
   const to = t.goals.outline;
@@ -391,11 +395,7 @@ function TodoRows({ todos, today, onOpenTodo }: { todos: OutlineTodo[]; today: n
                 <ComplexityChip value={todo.complexity} />
                 <EffortChip value={todo.suggestedEffort} />
                 <RatedByMark ratedBy={todo.ratedBy} />
-                {todo.openQuestion && !done && (
-                  <HelpCircle className="h-3.5 w-3.5 text-human" role="img" aria-label={`${t.goals.openQuestion}: ${todo.openQuestion}`}>
-                    <title>{todo.openQuestion}</title>
-                  </HelpCircle>
-                )}
+                <DecisionMark todo={todo} />
               </span>
             </div>
           </li>

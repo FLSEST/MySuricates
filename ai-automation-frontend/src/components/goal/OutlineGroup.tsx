@@ -1,5 +1,5 @@
 import { type ReactNode } from 'react';
-import { ChevronDown, ChevronRight, HelpCircle } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ChevronRight, HelpCircle } from 'lucide-react';
 import { useT } from '../../i18n';
 import { percentDone, type OutlineCounts } from './goalOutline';
 
@@ -29,9 +29,9 @@ export function OutlineToggle({ nodeKey, expanded, controls, onToggle, className
 }
 
 /**
- * Zähler mit fester Breite, damit „erledigt/gesamt“ und „❓ n“ über alle Zeilen fluchten. Sichtbar
- * steht die Kurzform, der Screenreader liest den ganzen Satz. Eine leere Fragenspalte hält trotzdem
- * ihren Platz.
+ * Zähler mit fester Breite, damit „erledigt/gesamt“, „❓ n“ (offen) und „✔ m“ (entschieden,
+ * 68a5e24e) über alle Zeilen fluchten. Sichtbar steht die Kurzform, der Screenreader liest den ganzen
+ * Satz. Eine leere Spalte hält trotzdem ihren Platz.
  */
 export function OutlineCountColumns({ counts }: { counts: OutlineCounts }) {
   const t = useT();
@@ -50,6 +50,16 @@ export function OutlineCountColumns({ counts }: { counts: OutlineCounts }) {
             <HelpCircle className="h-3.5 w-3.5" aria-hidden="true" />
             <span aria-hidden="true">{counts.openQuestions}</span>
             <span className="sr-only">{t.goals.openQuestions.replace('{n}', String(counts.openQuestions))}</span>
+          </>
+        )}
+      </span>
+      <span className="inline-flex w-10 shrink-0 items-center justify-end gap-0.5 text-xs tabular-nums text-success"
+        data-testid="outline-decided">
+        {counts.decided > 0 && (
+          <>
+            <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+            <span aria-hidden="true">{counts.decided}</span>
+            <span className="sr-only">{t.goals.decision.decidedCount.replace('{n}', String(counts.decided))}</span>
           </>
         )}
       </span>

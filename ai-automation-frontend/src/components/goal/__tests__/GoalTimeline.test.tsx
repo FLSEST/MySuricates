@@ -8,6 +8,8 @@ import { server } from '../../../test/server';
 import { renderWithProviders } from '../../../test/utils';
 import { useI18nStore } from '../../../i18n';
 import { GoalTimeline } from '../GoalTimeline';
+import { DecisionContext } from '../decisionContext';
+import { GoalWorkflowsContext } from '../goalWorkflowsContext';
 import { TimelineAxisView } from '../TimelineAxisView';
 import { NUDGE_DELAY } from '../useKeyboardNudge';
 import {
@@ -134,11 +136,14 @@ function recordWrites(): Sent[] {
   return sent;
 }
 
-function renderTimeline(extra: { todos?: GoalTodoItem[]; legacy?: boolean; strict?: boolean } = {}, onOpenTodo = vi.fn()) {
-  const timeline = (
+function renderTimeline(
+  extra: { todos?: GoalTodoItem[]; legacy?: boolean; strict?: boolean; decisions?: boolean } = {}, onOpenTodo = vi.fn(),
+) {
+  let timeline = (
     <GoalTimeline goal={goal} todos={extra.todos ?? todos} workPackages={workPackages} milestones={extra.legacy ? [] : milestones}
       projects={projects} legacyBackend={extra.legacy} onOpenTodo={onOpenTodo} now={NOW} />
   );
+  if (extra.decisions) timeline = <DecisionContext.Provider value={{ goalId: 'g1', enabled: true }}>{timeline}</DecisionContext.Provider>;
   renderWithProviders(extra.strict ? <StrictMode>{timeline}</StrictMode> : timeline);
   return onOpenTodo;
 }
@@ -413,6 +418,30 @@ describe('GoalTimeline — bars', () => {
     await waitFor(() => expect(sent).toEqual([{
       method: 'PUT', path: '/api/v1/goals/g1/work-packages/w-umbau',
       body: { startDate: startOf('2026-09-23'), endDate: endOf('2026-10-03') },
+    }]));
+  });
+
+  // c60bf914 review: the start of a bar could only be changed with the mouse
+  it('by keyboard: Alt with an arrow changes the start of a bar, never past its end, and the help says so', async () => {
+    const sent = recordWrites();
+    renderTimeline();
+
+    const bar = within(screen.getByTestId('timeline-bar-w-umbau')).getByRole('button');
+    expect(document.getElementById(bar.getAttribute('aria-describedby')!)).toHaveTextContent('Alt with an arrow key changes the start');
+    act(() => bar.focus());
+    fireEvent.keyDown(bar, { key: 'ArrowRight', altKey: true });
+    fireEvent.keyDown(bar, { key: 'ArrowRight', altKey: true });
+    expect(screen.getByTestId('timeline-bar-w-umbau')).toHaveAttribute('data-start', String(dayOfIsoDate('2026-09-23')));
+    expect(screen.getByTestId('timeline-bar-w-umbau')).toHaveAttribute('data-end', String(dayOfIsoDate('2026-09-30')));
+    expect(plain(screen.getByTestId('timeline-announcer').textContent)).toBe('Umbau: 9/23 – 9/30');
+    // the start never passes the end: eight more steps stop on the last day
+    for (let step = 0; step < 8; step++) fireEvent.keyDown(bar, { key: 'ArrowRight', altKey: true });
+    expect(screen.getByTestId('timeline-bar-w-umbau')).toHaveAttribute('data-start', String(dayOfIsoDate('2026-09-30')));
+    for (let step = 0; step < 7; step++) fireEvent.keyDown(bar, { key: 'ArrowLeft', altKey: true });
+    fireEvent.blur(bar);
+    await waitFor(() => expect(sent).toEqual([{
+      method: 'PUT', path: '/api/v1/goals/g1/work-packages/w-umbau',
+      body: { startDate: startOf('2026-09-23'), endDate: endOf('2026-09-30') },
     }]));
   });
 
@@ -714,6 +743,12 @@ describe('GoalTimeline — live line while dragging', () => {
     startDrag('ms:m-freeze');
     moveDrag('ms:m-freeze', 'milestones', xFor('2026-10-09'));
     expect(live()).toBe('Fri, 10/9');
+    // c60bf914 review: every row where the diamond may land lights up – of every project – the tray stays calm
+    expect(screen.getByTestId('timeline-row-p1-w-repo').lastElementChild).toHaveAttribute('data-accepts', 'true');
+    expect(screen.getByTestId('timeline-row-p2-w-site').lastElementChild).toHaveAttribute('data-accepts', 'true');
+    expect(screen.getByTestId('timeline-strip-p2')).toHaveAttribute('data-accepts', 'true');
+    expect(screen.getByTestId('timeline-milestones').lastElementChild).toHaveAttribute('data-accepts', 'true');
+    expect(screen.getByTestId('timeline-tray-p1')).not.toHaveAttribute('data-accepts');
     act(() => dnd.props!.onDragCancel!({} as never));
 
     // Site has no TODO without a package – the row appears only while one of its TODOs is dragged
@@ -773,5 +808,70 @@ describe('TimelineAxisView — labels at the right end', () => {
     expect(screen.getByText('Nov 2026')).toBeInTheDocument();
     expect(screen.getByText('11/2')).toBeInTheDocument();
     expect(screen.getByText('11/9')).toBeInTheDocument();
+  });
+});
+
+// 68a5e24e: the chips carry ❓/✔ and their menu decides
+describe('GoalTimeline — decisions', () => {
+  const asking = todos.map((todo) => (todo.id === 'a'
+    ? { ...todo, openQuestion: 'Which licence?', decisionState: 'QUESTION' as const }
+    : todo.id === 'c' ? { ...todo, decision: 'Plain HTML', decidedAt: '2026-09-26T08:00:00Z', decidedBy: 'USER' as const, decisionState: 'DECIDED' as const }
+      : todo));
+
+  it('marks a chip with ❓ or ✔ and decides from its menu', async () => {
+    const sent: unknown[] = [];
+    server.use(http.patch('/api/v1/todos/:id/planning', async ({ request }) => {
+      sent.push(await request.json());
+      return HttpResponse.json({});
+    }));
+    renderTimeline({ todos: asking, decisions: true });
+
+    const chip = screen.getByRole('button', { name: /^Privacy findings – / });
+    expect(within(chip).getByTestId('decision-mark')).toHaveAttribute('data-state', 'QUESTION');
+    expect(within(screen.getByRole('button', { name: /^Examples page – / })).getByTestId('decision-mark'))
+      .toHaveAttribute('aria-label', 'Decided: Plain HTML (9/26/2026, by a person)');
+
+    fireEvent.click(chip);
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Plan: Privacy findings' })).getByRole('button', { name: 'Decide' }));
+    const card = screen.getByRole('dialog', { name: 'Decision on Privacy findings' });
+    fireEvent.change(within(card).getByLabelText('Decision'), { target: { value: 'MIT' } });
+    fireEvent.click(within(card).getByRole('button', { name: 'Decide' }));
+    await waitFor(() => expect(sent).toEqual([{ decision: 'MIT' }]));
+  });
+
+  it('offers no deciding in the menu of a chip without question and decision', () => {
+    renderTimeline({ todos: asking, decisions: true });
+    fireEvent.click(screen.getByRole('button', { name: /^Old banner – / }));
+    const menu = screen.getByRole('dialog', { name: 'Plan: Old banner' });
+    expect(within(menu).queryByRole('button', { name: 'Decide' })).not.toBeInTheDocument();
+    expect(within(menu).queryByRole('button', { name: 'Change' })).not.toBeInTheDocument();
+  });
+});
+
+// 52bc1e8c: the workflows of a package stand at its row and in its card
+describe('GoalTimeline — workflows', () => {
+  it('shows a package\'s workflows in its row label and its card, where "Assign workflow" opens the dialog', () => {
+    const openAssign = vi.fn();
+    const attachment = {
+      id: 'a2', goalId: 'g1', workPackageId: 'w-repo', workflowId: 'wf-fix', workflowName: 'Fix bot', workflowProjectId: 'p1',
+      role: 'WORKER' as const, guard: false,
+    };
+    renderWithProviders(
+      <GoalWorkflowsContext.Provider value={{ goalId: 'g1', supported: true, attachments: [attachment], results: new Map(), openAssign }}>
+        <GoalTimeline goal={goal} todos={todos} workPackages={workPackages} milestones={milestones} projects={projects}
+          onOpenTodo={vi.fn()} now={NOW} />
+      </GoalWorkflowsContext.Provider>,
+    );
+
+    const row = screen.getByTestId('timeline-row-p1-w-repo');
+    expect(within(row).getByTestId('goal-workflow-a2')).toHaveAttribute('data-tone', 'neutral');
+    expect(within(row).getByRole('button', { name: 'Start: Fix bot' })).toBeInTheDocument();
+
+    fireEvent.click(within(screen.getByTestId('timeline-bar-w-repo')).getByRole('button'));
+    const card = screen.getByRole('dialog', { name: 'Work package Repo sauber' });
+    expect(within(card).getByTestId('package-workflow-list-w-repo')).toHaveTextContent('Fix bot');
+    fireEvent.click(within(card).getByRole('button', { name: 'Assign workflow' }));
+    expect(openAssign).toHaveBeenCalledWith('w-repo');
+    expect(screen.queryByRole('dialog', { name: 'Work package Repo sauber' })).not.toBeInTheDocument();
   });
 });

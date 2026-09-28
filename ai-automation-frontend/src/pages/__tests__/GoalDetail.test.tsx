@@ -8,6 +8,7 @@ import { useI18nStore } from '../../i18n';
 import { useToastStore } from '../../stores/toastStore';
 import { ToastContainer } from '../../components/ui/ToastContainer';
 import { GoalDetail } from '../GoalDetail';
+import { applyDecisionToDetail } from '../../components/goal/decision';
 import type { GoalDetail as GoalDetailData, GoalRelations, GoalTodoItem, Todo } from '../../types';
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
@@ -385,6 +386,280 @@ describe('GoalDetail', () => {
     // goalId '' releases the todo; null would mean "unchanged" to the planning endpoint
     await waitFor(() => expect(planned).toEqual([{ id: 'c1', body: { goalId: '' } }]));
     expect(await screen.findByText('Removed from the goal again')).toBeInTheDocument();
+  });
+
+  // c60bf914 (Flo): "Might belong here also shows TODOs from other projects that are not assigned"
+  it('takes candidates from the goal\'s projects only, and from all projects with the switch', async () => {
+    const asked: URLSearchParams[] = [];
+    const foreign = { ...candidate('c2', 'Other project chore'), projectId: 'p9', projectName: 'Elsewhere' } as Todo;
+    server.use(
+      http.get('/api/v1/goals/g1', () => HttpResponse.json(detail)),
+      http.get('/api/v1/goals/g1/candidates', ({ request }) => {
+        const params = new URL(request.url).searchParams;
+        asked.push(params);
+        const content = params.get('allProjects') === 'true' ? [candidate('c1', 'Release notes'), foreign] : [candidate('c1', 'Release notes')];
+        return HttpResponse.json({ content, page: 0, size: 20, totalElements: content.length, totalPages: 1 });
+      }),
+    );
+    renderGoal();
+
+    expect(await screen.findByText('Release notes')).toBeInTheDocument();
+    expect(screen.queryByText('Other project chore')).not.toBeInTheDocument();
+    expect(screen.getByText("Open TODOs without a goal from this goal's projects; the ones shown appear dashed in the map.")).toBeInTheDocument();
+    expect(asked[0]!.get('allProjects')).toBe('false');
+    expect(asked[0]!.get('size')).toBe('20');
+
+    fireEvent.click(screen.getByRole('switch', { name: 'Show all projects' }));
+    const row = (await screen.findByText('Other project chore')).closest('li')!;
+    expect(within(row).getByText('other project')).toHaveAttribute('title', 'The project does not belong to the goal yet – adding the TODO adds it.');
+    expect(asked.at(-1)!.get('allProjects')).toBe('true');
+    // TODOs of the goal's own projects carry no mark
+    expect(within(screen.getByText('Release notes').closest('li')!).queryByText('other project')).not.toBeInTheDocument();
+  });
+
+  it('keeps the old way over /todos for a backend without the candidates endpoint, without the switch', async () => {
+    const asked = { todos: [] as URLSearchParams[], include: [] as (string | null)[] };
+    server.use(http.get('/api/v1/goals/g1', () => HttpResponse.json(detail)));
+    serveMapAndCandidates([candidate('c1', 'Release notes')], asked);
+    renderGoal();
+
+    expect(await screen.findByText('Release notes')).toBeInTheDocument();
+    expect(asked.todos[0]!.get('goalId')).toBe('none');
+    expect(screen.queryByRole('switch', { name: 'Show all projects' })).not.toBeInTheDocument();
+    expect(screen.getByText('Open TODOs without a goal from all projects; the ones shown appear dashed in the map.')).toBeInTheDocument();
+  });
+
+  it('says why the list is empty when the goal has no project yet', async () => {
+    server.use(
+      http.get('/api/v1/goals/g1', () => HttpResponse.json({ ...detail, projects: [] })),
+      http.get('/api/v1/goals/g1/candidates', () => HttpResponse.json({ content: [], page: 0, size: 20, totalElements: 0, totalPages: 0 })),
+    );
+    renderGoal();
+
+    expect(await screen.findByText('No project is assigned to this goal yet. “Show all projects” searches everywhere.')).toBeInTheDocument();
+  });
+
+  // 68a5e24e: „Entschieden“ als sichtbarer Zustand – entscheiden aus der Liste, ändern und entfernen
+  describe('decisions', () => {
+    const decidedAt = '2026-09-27T10:00:00Z';
+    const deciding: GoalDetailData = {
+      ...detail,
+      goal: { ...detail.goal, progress: { ...detail.goal.progress, decided: 1 } },
+      todos: detail.todos.map((todo) => ({
+        ...todo, decision: null, decidedAt: null, decidedBy: null,
+        decisionState: todo.openQuestion ? 'QUESTION' as const : 'NONE' as const,
+        ...(todo.id === 'c' ? { decision: 'Plain HTML', decidedAt, decidedBy: 'USER' as const, decisionState: 'DECIDED' as const } : {}),
+      })),
+    };
+    /** Das Ziel antwortet mit dem jeweils aktuellen Stand – wie der Server nach dem Entscheiden. */
+    function serveDecisions() {
+      const sent: { id: string; body: unknown }[] = [];
+      let state = deciding;
+      server.use(
+        http.get('/api/v1/goals/g1', () => HttpResponse.json(state)),
+        http.patch('/api/v1/todos/:id/planning', async ({ params, request }) => {
+          const body = (await request.json()) as { decision: string };
+          sent.push({ id: String(params.id), body });
+          state = applyDecisionToDetail(state, String(params.id), body.decision, decidedAt);
+          return HttpResponse.json(candidate(String(params.id), 'x'));
+        }),
+      );
+      return sent;
+    }
+
+    it('decides an open question from the list; it moves to "Decided" and the progress counts it', async () => {
+      chooseList();
+      const sent = serveDecisions();
+      renderGoal();
+
+      const progress = within((await screen.findByTestId('goal-progress')).parentElement!).getByTestId('decision-counts');
+      expect(progress).toHaveTextContent('1 open·1 decided');
+      fireEvent.click(screen.getByRole('button', { name: 'Decide: Style probe' }));
+      const card = screen.getByRole('dialog', { name: 'Decision on Style probe' });
+      expect(within(card).getByText('Which look?')).toBeInTheDocument();
+      expect(within(card).getByText('Saving closes the open question.')).toBeInTheDocument();
+      fireEvent.change(within(card).getByLabelText('Decision'), { target: { value: ' Dark theme ' } });
+      fireEvent.click(within(card).getByRole('button', { name: 'Decide' }));
+
+      await waitFor(() => expect(sent).toEqual([{ id: 'b', body: { decision: 'Dark theme' } }]));
+      // shown at once: no open question left, two decided
+      await waitFor(() => expect(screen.queryAllByTestId('goal-question')).toHaveLength(0));
+      expect(screen.getByText('No open questions.', { exact: false })).toBeInTheDocument();
+      expect(screen.getByText('Decided (2)')).toBeInTheDocument();
+    });
+
+    it('shows a decision with its wording, date and who, and changes or removes it', async () => {
+      chooseList();
+      const sent = serveDecisions();
+      renderGoal();
+
+      fireEvent.click(await screen.findByText('Decided (1)'));
+      const row = screen.getByTestId('goal-decided-item');
+      expect(row).toHaveTextContent('Examples page');
+      expect(row).toHaveTextContent('Plain HTML');
+      expect(row).toHaveTextContent('9/27/2026, by a person');
+      const mark = within(row).getByRole('button', { name: /^Decided: Plain HTML \(9\/27\/2026, by a person\) – Change decision: Examples page$/ });
+      fireEvent.click(mark);
+      let card = screen.getByRole('dialog', { name: 'Decision on Examples page' });
+      fireEvent.click(within(card).getByRole('button', { name: 'Change' }));
+      fireEvent.change(within(card).getByLabelText('Decision'), { target: { value: 'Astro' } });
+      fireEvent.click(within(card).getByRole('button', { name: 'Save' }));
+      await waitFor(() => expect(sent).toEqual([{ id: 'c', body: { decision: 'Astro' } }]));
+
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Decision on Examples page' })).not.toBeInTheDocument());
+      fireEvent.click(within(screen.getByTestId('goal-decided-item')).getByRole('button', { name: /Change decision: Examples page$/ }));
+      card = screen.getByRole('dialog', { name: 'Decision on Examples page' });
+      fireEvent.click(within(card).getByRole('button', { name: 'Remove' }));
+      await waitFor(() => expect(sent).toContainEqual({ id: 'c', body: { decision: '' } }));
+    });
+
+    it('offers no deciding against an older backend – the marks stay a plain display', async () => {
+      chooseList();
+      server.use(http.get('/api/v1/goals/g1', () => HttpResponse.json(detail)));
+      renderGoal();
+
+      expect(await screen.findByTestId('goal-question')).toHaveTextContent('Which look?');
+      expect(screen.queryByRole('button', { name: 'Decide: Style probe' })).not.toBeInTheDocument();
+      expect(screen.getAllByTestId('decision-mark').every((mark) => mark.tagName.toLowerCase() === 'svg')).toBe(true);
+      expect(screen.queryByTestId('goal-decided')).not.toBeInTheDocument();
+    });
+  });
+
+  // 52bc1e8c: Workflows am Ziel oder Arbeitspaket anzeigen, starten und als Stand nutzen
+  describe('workflows', () => {
+    const guardOn = { ...detail, goal: { ...detail.goal, guard: { enabled: true, workflowId: 'wf-guard', scheduleId: 's1', nextRunAt: null } } };
+    const attachments = [
+      { id: 'guard', goalId: 'g1', workPackageId: null, workflowId: 'wf-guard', workflowName: 'Goal guard: Open-Source-Launch', workflowProjectId: 'p1', role: 'STATUS', guard: true },
+      { id: 'a1', goalId: 'g1', workPackageId: null, workflowId: 'wf-check', workflowName: 'Release check', workflowProjectId: 'p1', role: 'STATUS', guard: false },
+      { id: 'a2', goalId: 'g1', workPackageId: 'w1', workflowId: 'wf-fix', workflowName: 'Fix bot', workflowProjectId: 'p1', role: 'WORKER', guard: false },
+    ];
+    const hoursAgo = (n: number) => new Date(Date.now() - n * 3_600_000).toISOString();
+    const results = [
+      { workflowId: 'wf-check', workflowName: 'Release check', available: true,
+        run: { runId: 'run-7', status: 'COMPLETED', startedAt: hoursAgo(2), completedAt: hoursAgo(2), durationMs: 5, gateStatus: 'YELLOW' },
+        resultState: 'VALID', result: { title: '2 overdue', status: 'YELLOW', kpis: [{ label: 'Overdue', value: '2' }], items: [] } },
+      { workflowId: 'wf-fix', workflowName: 'Fix bot', available: true,
+        run: { runId: 'run-8', status: 'FAILED', startedAt: hoursAgo(1), completedAt: hoursAgo(1), durationMs: 5, gateStatus: null },
+        resultState: 'MISSING', result: null },
+    ];
+    function serveWorkflows() {
+      const sent: { method: string; path: string; body: unknown }[] = [];
+      const record = async ({ request }: { request: Request }) => {
+        const body = request.method === 'DELETE' ? null : await request.json();
+        sent.push({ method: request.method, path: new URL(request.url).pathname, body });
+        if (request.method === 'DELETE') return new HttpResponse(null, { status: 204 });
+        if (request.url.includes('/execute')) return HttpResponse.json({ id: 'run-42', status: 'PENDING' });
+        return HttpResponse.json({ ...attachments[1], ...(body as object) }, { status: request.method === 'POST' ? 201 : 200 });
+      };
+      server.use(
+        http.get('/api/v1/goals/g1', () => HttpResponse.json(guardOn)),
+        http.get('/api/v1/goals/g1/workflows', () => HttpResponse.json(attachments)),
+        http.get('/api/v1/dashboard/workflow-results', () => HttpResponse.json(results)),
+        http.get('/api/v1/workflows', () => HttpResponse.json([
+          { id: 'wf-check', projectId: 'p1', projectName: 'AutoPilot', name: 'Release check', blocks: [], createdAt: '', updatedAt: '' },
+          { id: 'wf-docs', projectId: 'p2', projectName: 'Site', name: 'Docs build', blocks: [], createdAt: '', updatedAt: '' },
+          { id: 'wf-other', projectId: 'p9', projectName: 'Elsewhere', name: 'Backup', blocks: [], createdAt: '', updatedAt: '' },
+        ])),
+        http.post('/api/v1/goals/g1/workflows', record),
+        http.patch('/api/v1/goals/g1/workflows/:id', record),
+        http.delete('/api/v1/goals/g1/workflows/:id', record),
+        http.post('/api/v1/workflows/:id/execute', record),
+      );
+      return sent;
+    }
+
+    it('lists the guard and the goal\'s workflows with their state, and starts one with the goal as context', async () => {
+      const sent = serveWorkflows();
+      renderWithProviders(
+        <>
+          <Routes><Route path="/goals/:goalId" element={<GoalDetail />} /></Routes>
+          <ToastContainer />
+        </>,
+        { route: '/goals/g1' },
+      );
+
+      const panel = await screen.findByTestId('goal-workflows');
+      const check = await within(panel).findByRole('button', { name: /^Release check, Reports the state, yellow, 2 hours ago$/ });
+      expect(within(panel).getByTestId('goal-workflow-guard')).toHaveTextContent('Guard');
+      expect(within(panel).getByTestId('goal-workflow-a1')).toHaveAttribute('data-tone', 'warning');
+      // the package workflow sits at its package, not at the goal
+      expect(within(panel).queryByTestId('goal-workflow-a2')).not.toBeInTheDocument();
+      expect(within(screen.getByTestId('package-workflows-w1')).getByTestId('goal-workflow-a2')).toHaveAttribute('data-tone', 'danger');
+
+      fireEvent.click(within(panel).getByRole('button', { name: 'Start: Release check' }));
+      await waitFor(() => expect(sent).toEqual([{
+        method: 'POST', path: '/api/v1/workflows/wf-check/execute', body: { context: { goal_id: 'g1', goal_locale: 'en' } },
+      }]));
+      const toast = await screen.findByText('Release check started');
+      expect(within(toast.closest('[data-testid="toast"]') as HTMLElement).getByRole('button', { name: 'Open run' })).toBeInTheDocument();
+
+      fireEvent.click(within(screen.getByTestId('package-workflows-w1')).getByRole('button', { name: 'Start: Fix bot' }));
+      await waitFor(() => expect(sent).toContainEqual({
+        method: 'POST', path: '/api/v1/workflows/wf-fix/execute', body: { context: { goal_id: 'g1', work_package_id: 'w1', goal_locale: 'en' } },
+      }));
+
+      // the card of a status workflow shows its result, lets change the role and remove it
+      fireEvent.click(check);
+      const card = screen.getByRole('dialog', { name: 'Workflow Release check' });
+      expect(within(card).getByTestId('goal-workflow-result')).toHaveTextContent('yellow – 2 overdue');
+      expect(within(card).getByText('Overdue')).toBeInTheDocument();
+      fireEvent.click(within(card).getByRole('radio', { name: 'Works on it' }));
+      await waitFor(() => expect(sent).toContainEqual({ method: 'PATCH', path: '/api/v1/goals/g1/workflows/a1', body: { role: 'WORKER' } }));
+      fireEvent.click(within(card).getByRole('button', { name: 'Remove' }));
+      await waitFor(() => expect(sent).toContainEqual({ method: 'DELETE', path: '/api/v1/goals/g1/workflows/a1', body: null }));
+    });
+
+    it('offers no removing for the guard – it points to its switch', async () => {
+      serveWorkflows();
+      renderGoal();
+
+      fireEvent.click(await screen.findByRole('button', { name: /^Guard, Reports the state/ }));
+      const card = screen.getByRole('dialog', { name: 'Workflow Goal guard: Open-Source-Launch' });
+      expect(card).toHaveTextContent('The guard is switched on and off with its switch above.');
+      expect(within(card).queryByRole('button', { name: 'Remove' })).not.toBeInTheDocument();
+      expect(within(card).queryByRole('radio')).not.toBeInTheDocument();
+    });
+
+    it('assigns a workflow of the goal\'s projects to a work package with a role; others only with "show all"', async () => {
+      const sent = serveWorkflows();
+      renderGoal();
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Assign workflow' }));
+      const dialog = screen.getByRole('dialog', { name: 'Assign a workflow' });
+      await within(dialog).findByRole('radio', { name: /Docs build/ });
+      // on the whole goal Release check hangs already
+      expect(within(dialog).getByRole('radio', { name: /Release check/ })).toBeDisabled();
+      expect(within(dialog).queryByRole('radio', { name: /Backup/ })).not.toBeInTheDocument();
+      fireEvent.click(within(dialog).getByRole('switch', { name: 'Show all workflows' }));
+      expect(within(dialog).getByRole('radio', { name: /Backup/ })).toBeInTheDocument();
+
+      fireEvent.change(within(dialog).getByLabelText('For'), { target: { value: 'w1' } });
+      // at the package it is free again
+      fireEvent.click(within(dialog).getByRole('radio', { name: /Release check/ }));
+      fireEvent.click(within(dialog).getByRole('radio', { name: /Reports the state/ }));
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Assign' }));
+      await waitFor(() => expect(sent).toEqual([{
+        method: 'POST', path: '/api/v1/goals/g1/workflows', body: { workflowId: 'wf-check', role: 'STATUS', workPackageId: 'w1' },
+      }]));
+    });
+
+    it('shows only the switched-on guard for a backend without goal workflows, and says when assigning comes', async () => {
+      server.use(http.get('/api/v1/goals/g1', () => HttpResponse.json(guardOn)));
+      renderGoal();
+
+      const panel = await screen.findByTestId('goal-workflows');
+      expect(within(panel).getByTestId('goal-workflow-guard')).toBeInTheDocument();
+      expect(panel).toHaveTextContent('Assigning workflows becomes available after the backend restart.');
+      expect(within(panel).queryByRole('button', { name: 'Assign workflow' })).not.toBeInTheDocument();
+    });
+
+    it('shows no panel for an older backend while the guard is off', async () => {
+      server.use(http.get('/api/v1/goals/g1', () => HttpResponse.json(detail)));
+      renderGoal();
+
+      await screen.findByRole('heading', { name: 'Open-Source-Launch' });
+      await waitFor(() => expect(screen.queryByTestId('goal-workflows')).not.toBeInTheDocument());
+    });
   });
 
   it('opens the edit dialog of a todo from the map', async () => {

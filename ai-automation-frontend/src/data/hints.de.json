@@ -256,7 +256,7 @@
     "points": [
       "Oben stehen die Meilensteine: Termine fürs ganze Ziel, erreicht, wenn ihre verknüpften Arbeitspakete abgeschlossen sind",
       "Darunter hat jedes Projekt eine Karte mit seinen Arbeitspaketen in der festgelegten Reihenfolge, jedes mit Zeitraum und seinen TODOs",
-      "Die Zähler zeigen erledigt von gesamt und offene Fragen; eine Frage muss geklärt sein, bevor jemand anfängt"
+      "Die Zähler zeigen erledigt von gesamt, offene Fragen (❓) und Entschiedenes (✔); ein Klick auf ❓ entscheidet die Frage, bevor jemand anfängt"
     ]
   },
   "goal-timeline": {
@@ -270,7 +270,7 @@
   "goal-guard": {
     "title": "Ein Wächter je Ziel",
     "points": [
-      "Ein Workflow aus der Vorlage „Ziel-Wächter“ prüft das Ziel jeden Tag: überfällige und bald fällige TODOs und Meilensteine, Fortschritt und Zieldatum",
+      "Ein Workflow aus der Vorlage „Ziel-Wächter“ prüft das Ziel jeden Tag: überfällige und bald fällige TODOs, Arbeitspakete und Meilensteine, Fortschritt und Zieldatum",
       "Das Ergebnis erscheint als Ampel-Kachel auf dem Dashboard; der Workflow braucht kein Modell und kostet keine Tokens",
       "Ausschalten pausiert nur den Zeitplan – Workflow und Kachel bleiben, beim nächsten Einschalten geht es dort weiter"
     ]

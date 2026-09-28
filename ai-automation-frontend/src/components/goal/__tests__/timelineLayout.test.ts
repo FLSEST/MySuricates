@@ -269,10 +269,26 @@ describe('milestoneMarks (c60bf914)', () => {
     expect(lanes).toBe(2);
   });
 
-  it('keeps a title inside the axis at the right edge and has one lane without milestones', () => {
-    const { marks } = milestoneMarks([milestone('m1', 'Launch day with a long name', '2026-10-31')], axis, W);
-    expect(marks[0]!.x + 10 + marks[0]!.labelWidth).toBeLessThanOrEqual(W);
+  // c60bf914 review: at the right edge the title was cut – it folds to the left of its diamond instead
+  it('folds a title to the left of its diamond at the right edge, in full, and has one lane without milestones', () => {
+    const { marks } = milestoneMarks([milestone('m1', 'Launch day', '2026-10-31')], axis, W);
+    const mark = marks[0]!;
+    expect(mark.flipped).toBe(true);
+    expect(mark.labelWidth).toBeCloseTo('Launch day'.length * 6.2 + 8);
+    expect(mark.x - 10 - mark.labelWidth).toBeGreaterThanOrEqual(0);
     expect(milestoneMarks([], axis, W)).toEqual({ marks: [], lanes: 1 });
+  });
+
+  it('keeps a title on the right where it fits, and lanes count the folded side', () => {
+    const { marks, lanes } = milestoneMarks([
+      milestone('m1', 'Code-Freeze', '2026-10-10'),
+      milestone('m2', 'Repo public and announced', '2026-10-30'),
+      milestone('m3', 'Beta', '2026-10-28'),
+    ], axis, W);
+    expect(marks.map((mark) => [mark.milestone.id, mark.flipped])).toEqual([['m1', false], ['m3', false], ['m2', true]]);
+    // the folded title of m2 would cover Beta's diamond two days earlier – so it takes the next lane
+    expect(marks.find((mark) => mark.milestone.id === 'm2')!.lane).toBe(1);
+    expect(lanes).toBe(2);
   });
 });
 

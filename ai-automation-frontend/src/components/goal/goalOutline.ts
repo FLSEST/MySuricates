@@ -5,7 +5,8 @@ import type { GoalDetail, GoalProject, GoalTodoItem, GoalWorkPackage } from '../
  * dazu „Ohne Arbeitspaket“, am Ende „Ohne Projekt“. Jeder Knoten zählt seine TODOs. Die Meilensteine
  * stehen darüber für sich (sie gehören dem ganzen Ziel, keinem Projekt).
  *
- * Gezählt werden nicht archivierte TODOs; offene Fragen nur an TODOs, die noch nicht erledigt sind.
+ * Gezählt werden nicht archivierte TODOs; offene Fragen nur an TODOs, die noch nicht erledigt sind,
+ * Entscheidungen an allen (68a5e24e, wie der Server).
  * Archivierte TODOs stehen auch nicht in der Gliederung.
  */
 
@@ -16,6 +17,8 @@ export interface OutlineCounts {
   total: number;
   done: number;
   openQuestions: number;
+  /** Entschiedene TODOs (68a5e24e). */
+  decided: number;
 }
 
 export interface OutlineTodo {
@@ -59,12 +62,18 @@ export function countTodos(todos: GoalTodoItem[]): OutlineCounts {
     total: counted.length,
     done: counted.filter((todo) => todo.status === 'DONE').length,
     openQuestions: counted.filter((todo) => todo.status !== 'DONE' && !!todo.openQuestion).length,
+    decided: counted.filter((todo) => todo.decisionState === 'DECIDED').length,
   };
 }
 
 const sumCounts = (parts: OutlineCounts[]): OutlineCounts => parts.reduce(
-  (sum, part) => ({ total: sum.total + part.total, done: sum.done + part.done, openQuestions: sum.openQuestions + part.openQuestions }),
-  { total: 0, done: 0, openQuestions: 0 },
+  (sum, part) => ({
+    total: sum.total + part.total,
+    done: sum.done + part.done,
+    openQuestions: sum.openQuestions + part.openQuestions,
+    decided: sum.decided + part.decided,
+  }),
+  { total: 0, done: 0, openQuestions: 0, decided: 0 },
 );
 
 /** Anteil erledigt in Prozent, 0 ohne TODOs. */
@@ -123,7 +132,7 @@ export function buildOutline(detail: Pick<GoalDetail, 'projects' | 'workPackages
   const projects = [
     ...ordered.map((project) => group(project.projectId, project, true)),
     ...[...strays.entries()].map(([projectId, name], index) => group(projectId, {
-      projectId, name, archived: false, position: ordered.length + index, total: 0, done: 0, openQuestions: 0,
+      projectId, name, archived: false, position: ordered.length + index, total: 0, done: 0, openQuestions: 0, decided: 0,
     }, false)),
   ];
   const rest = group(NO_PROJECT, null, true);

@@ -1,8 +1,9 @@
-import { CalendarDays, FolderOpen, HelpCircle } from 'lucide-react';
+import { CalendarDays, FolderOpen } from 'lucide-react';
 import { Card } from '../ui';
 import { TodoProgressBar } from '../todo/TodoProgressBar';
 import { useI18nStore, useT } from '../../i18n';
 import { formatDate } from '../../utils/localeFormat';
+import { DecisionCounts } from './DecisionCounts';
 import { MilestoneDiamond } from './MilestoneDiamond';
 import type { Goal } from '../../types';
 
@@ -64,12 +65,7 @@ export function GoalCard({ goal, onOpen }: { goal: Goal; onOpen: () => void }) {
               {t.goals.targetDate.replace('{date}', formatDate(goal.targetDate, locale))}
             </span>
           )}
-          {progress.openQuestions > 0 && (
-            <span className="flex items-center gap-1 text-human">
-              <HelpCircle className="w-3 h-3" />
-              {t.goals.openQuestions.replace('{n}', String(progress.openQuestions))}
-            </span>
-          )}
+          <DecisionCounts openQuestions={progress.openQuestions} decided={progress.decided ?? 0} variant="words" />
         </div>
       </Card>
     </button>

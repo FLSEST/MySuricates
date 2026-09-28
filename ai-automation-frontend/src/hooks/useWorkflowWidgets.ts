@@ -11,6 +11,18 @@ interface WorkflowWidgetOptions {
 }
 
 /**
+ * The latest run and validated result contract of the given workflows, parsed like every widget sees
+ * them. Shared with the goal page (52bc1e8c), which shows the same data for the goal's workflows.
+ */
+export async function fetchWorkflowResults(ids: readonly string[]): Promise<WorkflowWidgetEntry[]> {
+  const params = new URLSearchParams();
+  for (const workflowId of ids) params.append('workflowIds', workflowId);
+  const raw = await api.get<unknown>(`/dashboard/workflow-results?${params.toString()}`);
+  if (!Array.isArray(raw)) return [];
+  return raw.map(parseWorkflowEntry).filter((entry): entry is WorkflowWidgetEntry => entry !== null);
+}
+
+/**
  * The latest run and the validated contract of every workflow shown in the current view — one
  * request per dashboard, not one per widget (spec E3). Updates arrive through the run-completed
  * broadcast; the 60 s interval is the fallback for a missing WebSocket connection.
@@ -26,13 +38,7 @@ export function useWorkflowWidgetResults(workflowIds: readonly string[], options
   return useQuery({
     queryKey: [...WORKFLOW_RESULTS_QUERY_KEY, ids.join(',')],
     enabled: ids.length > 0,
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      for (const workflowId of ids) params.append('workflowIds', workflowId);
-      const raw = await api.get<unknown>(`/dashboard/workflow-results?${params.toString()}`);
-      if (!Array.isArray(raw)) return [];
-      return raw.map(parseWorkflowEntry).filter((entry): entry is WorkflowWidgetEntry => entry !== null);
-    },
+    queryFn: () => fetchWorkflowResults(ids),
     refetchInterval: options.polling ? 60_000 : false,
     refetchOnWindowFocus: true,
     staleTime: 10_000,

@@ -19,7 +19,7 @@ function wp(id: string, overrides: Partial<GoalWorkPackage> = {}): GoalWorkPacka
 }
 
 function project(projectId: string, name: string, position: number): GoalProject {
-  return { projectId, name, archived: false, position, total: 0, done: 0, openQuestions: 0 };
+  return { projectId, name, archived: false, position, total: 0, done: 0, openQuestions: 0, decided: 0 };
 }
 
 const projects = [project('p2', 'Site', 1), project('p1', 'AutoPilot', 0)];
@@ -68,9 +68,9 @@ describe('buildOutline (c60bf914)', () => {
       ],
     });
     const [autopilot] = outline.projects;
-    expect(autopilot!.packages[0]!.counts).toEqual({ total: 2, done: 1, openQuestions: 1 });
+    expect(autopilot!.packages[0]!.counts).toEqual({ total: 2, done: 1, openQuestions: 1, decided: 0 });
     expect(autopilot!.packages[0]!.todos.map((entry) => entry.todo.id)).toEqual(['a', 'b']);
-    expect(autopilot!.counts).toEqual({ total: 4, done: 2, openQuestions: 2 });
+    expect(autopilot!.counts).toEqual({ total: 4, done: 2, openQuestions: 2, decided: 0 });
     expect(percentDone(autopilot!.counts)).toBe(50);
     expect(percentDone(countTodos([]))).toBe(0);
   });

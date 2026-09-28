@@ -235,6 +235,59 @@ describe('GoalGuardControl', { timeout: 20_000 }, () => {
     });
   });
 
+  // c60bf914 (Flo): „Wächter muss erklärt werden, vielleicht ein Info zum Drüberfahren“
+  describe('explanation', () => {
+    const tip = () => screen.queryByRole('tooltip');
+
+    it('explains the guard on hover, on keyboard focus and on a tap, and closes on Escape and when leaving', async () => {
+      serveGoal(OFF);
+      renderWithProviders(<Harness />);
+
+      const info = await screen.findByRole('button', { name: 'What does the guard do?' });
+      expect(tip()).not.toBeInTheDocument();
+      fireEvent.mouseEnter(info);
+      expect(tip()).toHaveTextContent('It checks this goal once a day: overdue and soon-due TODOs, work packages and milestones');
+      expect(tip()).toHaveTextContent('No AI, 0 tokens – it changes nothing about the goal.');
+      expect(tip()).toHaveTextContent('Switching it on creates a workflow with a daily schedule');
+      expect(info).toHaveAttribute('aria-describedby', tip()!.id);
+      fireEvent.mouseLeave(info);
+      expect(tip()).not.toBeInTheDocument();
+
+      act(() => info.focus());
+      expect(tip()).toBeInTheDocument();
+      fireEvent.keyDown(info, { key: 'Escape' });
+      expect(tip()).not.toBeInTheDocument();
+
+      // a tap (focus + click) pins it: leaving with the pointer keeps it, a second tap closes it
+      fireEvent.click(info);
+      fireEvent.mouseLeave(info);
+      expect(tip()).toBeInTheDocument();
+      fireEvent.click(info);
+      expect(tip()).not.toBeInTheDocument();
+      fireEvent.click(info);
+      fireEvent.blur(info);
+      expect(tip()).not.toBeInTheDocument();
+    });
+
+    it('links the last result of a switched-on guard with its light and when it ran', async () => {
+      serveGoal(ON);
+      server.use(http.get('/api/v1/dashboard/workflow-results', () => HttpResponse.json([{
+        workflowId: 'wf-guard', workflowName: 'Goal guard: Open-Source-Launch', available: true,
+        run: { runId: 'run-9', status: 'COMPLETED', startedAt: new Date(Date.now() - 3 * 3_600_000).toISOString(),
+          completedAt: new Date(Date.now() - 3 * 3_600_000).toISOString(), durationMs: 900, gateStatus: 'YELLOW' },
+        resultState: 'VALID',
+        result: { status: 'YELLOW', kpis: [], items: [] },
+      }])));
+      renderWithProviders(<Harness />);
+
+      const link = await screen.findByTestId('goal-guard-last-result');
+      expect(link).toHaveTextContent('Last result: yellow · 3 hours ago');
+      expect(link).toHaveAttribute('href', '/workflows/wf-guard/run/run-9');
+      fireEvent.mouseEnter(screen.getByRole('button', { name: 'What does the guard do?' }));
+      expect(tip()).toHaveTextContent('A workflow of its own with a daily schedule does this');
+    });
+  });
+
   it('is not offered while the dashboard-report module is off and no guard exists', async () => {
     serveGoal(OFF);
     server.use(http.get('/api/v1/system/capabilities', () =>
