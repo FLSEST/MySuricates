@@ -9,6 +9,8 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.OptionalInt;
 
 /**
  * Regeln fuer akzeptierte Audit-Risiken (ACCEPTED_RISK).
@@ -16,8 +18,12 @@ import java.util.Map;
  *   <li><b>Beweis-Snapshot:</b> Beim Akzeptieren wird der aktuelle Evidence-Text samt Zeitpunkt am
  *       Finding eingefroren ({@link #accept}).</li>
  *   <li><b>Verschlechterung:</b> Taucht das Finding erneut auf und liegt ein messbarer Wert der neuen
- *       Evidence mehr als {@value #DEGRADATION_THRESHOLD_PERCENT} % ueber dem Snapshot, wird es wieder
- *       OPEN; die Notiz bekommt einen "Verschlechtert"-Hinweis, der Snapshot bleibt erhalten.</li>
+ *       Evidence mehr als {@value #DEGRADATION_THRESHOLD_PERCENT} % ueber dem Snapshot (je gemeinsamer Einheit
+ *       oder benannter Zaehlung, siehe {@link EvidenceMetrics#parse}), wird es wieder OPEN; die Notiz bekommt
+ *       einen "Verschlechtert"-Hinweis, der Snapshot bleibt erhalten. Die Aenderungsrate (Churn) schwankt und
+ *       zaehlt deshalb nicht prozentual: Sie verschlechtert nur, wenn sie im Snapshot unter der Hotspot-Schwelle
+ *       lag und sie jetzt erreicht (Schwelle aus "Hotspot ab N" der aktuellen Evidence, sonst
+ *       {@value #HOTSPOT_MIN_CHANGES} wie HOTSPOT_MIN_CHANGES in scripts/public-readiness/arch-findings.py).</li>
  *   <li><b>Verfall:</b> Ist die Akzeptanz aelter als {@link #REVIEW_INTERVAL}, geht das Finding beim
  *       naechsten Auftauchen auf AWAITING_VERIFICATION ("Wiedervorlage"). Danach gelten die normalen
  *       Ingestion-Regeln; ein erneutes Akzeptieren setzt Snapshot und Frist neu.</li>
@@ -27,6 +33,7 @@ import java.util.Map;
 @Component
 public class AuditAcceptancePolicy {
     public static final int DEGRADATION_THRESHOLD_PERCENT = 10;
+    public static final int HOTSPOT_MIN_CHANGES = 5;
     public static final Duration REVIEW_INTERVAL = Duration.ofDays(180);
     static final String REVIEW_NOTE = "Wiedervorlage nach 180 Tagen";
     static final String DEGRADED_PREFIX = "Verschlechtert: ";
@@ -65,7 +72,10 @@ public class AuditAcceptancePolicy {
         return Outcome.UNCHANGED;
     }
 
-    /** @return "alt → neu" je gemeinsamer Einheit, deren Wert um mehr als den Schwellwert gestiegen ist. */
+    /**
+     * @return "alt → neu" je gemeinsamer Einheit bzw. Zaehlung, deren Wert um mehr als den Schwellwert gestiegen
+     *         ist, dazu die Aenderungsrate, wenn sie die Hotspot-Schwelle neu erreicht hat.
+     */
     static List<String> degradations(String snapshotEvidence, String currentEvidence) {
         Map<String, Double> before = EvidenceMetrics.parse(snapshotEvidence);
         Map<String, Double> after = EvidenceMetrics.parse(currentEvidence);
@@ -79,7 +89,21 @@ public class AuditAcceptancePolicy {
                 result.add(EvidenceMetrics.format(old, entry.getKey()) + " → " + EvidenceMetrics.format(current, entry.getKey()));
             }
         }
+        churnDegradation(snapshotEvidence, currentEvidence).ifPresent(result::add);
         return result;
+    }
+
+    private static Optional<String> churnDegradation(String snapshotEvidence, String currentEvidence) {
+        OptionalInt before = EvidenceMetrics.churn(snapshotEvidence);
+        OptionalInt after = EvidenceMetrics.churn(currentEvidence);
+        if (before.isEmpty() || after.isEmpty()) return Optional.empty();
+        int threshold = EvidenceMetrics.hotspotThreshold(currentEvidence).orElse(HOTSPOT_MIN_CHANGES);
+        if (before.getAsInt() >= threshold || after.getAsInt() < threshold) return Optional.empty();
+        return Optional.of(changes(before.getAsInt()) + " → " + changes(after.getAsInt()) + " (Hotspot ab " + threshold + ")");
+    }
+
+    private static String changes(int count) {
+        return count + (count == 1 ? " Änderung" : " Änderungen");
     }
 
     private static String appendNote(String existing, String hint) {

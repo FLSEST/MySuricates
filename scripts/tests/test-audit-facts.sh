@@ -1047,7 +1047,8 @@ policy = open(os.path.join(repo, 'ai-automation-backend/src/main/java/com/automa
                                  'AuditAcceptancePolicy.java'), encoding='utf-8').read()
 threshold = re.search(r'DEGRADATION_THRESHOLD_PERCENT = (\d+);', policy).group(1)
 DEGRADED = ('Als verschlechtert gilt ein eingeordneter Befund nur, wenn eine belegende Kennzahl um mehr als '
-            + threshold + ' % ueber ihrem letzten Wert liegt; ab dieser Schwelle oeffnet auch die Plattform '
+            + threshold + ' % ueber ihrem letzten Wert liegt oder seine Aenderungsrate die Hotspot-Schwelle neu '
+            'erreicht; ab dieser Schwelle oeffnet auch die Plattform '
             'eine Einordnung wieder.')
 section = rules = old = counting = fact_sheet = unmeasured = degraded = 0
 texts = set()
