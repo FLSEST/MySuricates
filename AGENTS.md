@@ -47,7 +47,9 @@ curl -s --noproxy '*' -X POST http://localhost:9090/api/v1/todos \
 
 ### TODO in ein Ziel einordnen und einschaetzen
 
-Ziele buendeln TODOs projektuebergreifend (`/api/v1/goals`). Wer ein TODO einschaetzt, schreibt das
+Ziele buendeln TODOs projektuebergreifend (`/api/v1/goals`). Alles rund um Ziele (auch `PATCH /todos/{id}/planning`) ist das
+Standardmodul `goals`; mit `automation.modules.goals=false` antworten diese Endpunkte 404 `MODULE_DISABLED`
+(`GET /todos?goalId=` dann 400), die Daten bleiben erhalten. Wer ein TODO einschaetzt, schreibt das
 ueber einen eigenen Endpunkt – `ratedBy: "AI"` markiert die Einschaetzung als maschinell, ein Mensch
 kann sie spaeter ueberschreiben:
 

@@ -87,11 +87,11 @@ automation:
 
 Env-Form: `AUTOMATION_MODULES_PRESET`, `AUTOMATION_MODULES_<NAME>`, `AUTOMATION_HARDENING_<NAME>` (Bindestriche als `_`, z. B. `AUTOMATION_MODULES_REMOTE_ACCESS=true`). Stable- und Test-Profil setzen `full`; `scripts/setup.sh` schreibt das gewählte Preset nach `ai-automation-backend/config/application.yml`. Vorlagen „minimal“ und „maximal“: `ai-automation-backend/config-examples/`, erklärt in [deployment.md](deployment.md#konfigurationen-minimal-und-maximal). `scripts/setup.sh --lang de|en` wählt nur die Anzeigesprache der Modultexte im Terminal (Default: `$LANG`-Präfix, sonst `en`) — das Ergebnis (welche Module aktiv sind) ändert sich dadurch nicht.
 
-**Katalog** (einzige Quelle: `modules/ModuleCatalog`, 19 Feature-Module + 4 Härtungsschalter = 23 Schlüssel):
+**Katalog** (einzige Quelle: `modules/ModuleCatalog`, 21 Feature-Module + 8 Härtungsschalter = 29 Schlüssel):
 
 | Stufe | Module | Reifegrad |
 |---|---|---|
-| `standard` (alle Presets) | `dashboard-report` | stabil |
+| `standard` (alle Presets) | `dashboard-report`, `goals` (Ziele mit Projekten, Arbeitspaketen, Meilensteinen, TODO-Planung, Workflows am Ziel, Ziel-Wächter) | stabil |
 | `research` | `chains`, `assistant`, `learning` (Analyse-Endpunkte; Dashboard-Daten bleiben Kern), `memory`, `audit`, `bpmn` | chains stabil, Rest experimentell |
 | `advanced` (nach außen) | `integrations` (inkl. TODO-Tracker-Export, Kalender-Adapter), `http-api` (allgemeine HTTP-API-Verbindung, braucht `integrations`), `webhooks`, `remote-access` (Tailscale), `terminal` (Run-Terminal per WebSocket), `staging` | stabil / staging experimentell |
 | `advanced` (wenig genutzt) | `conversion`, `dialog-import` (benötigt conversion), `onboarding-profiles`, `skills`, `debug`, `factory` (inkl. Auto-Repair), `wishes` (benötigt chains) | Altlast / experimentell |
@@ -619,7 +619,7 @@ Da TODOs zu ~96 % maschinell erzeugt und über viele Projekte verstreut sind, gi
 
 ## Ziele — TODOs projektübergreifend einordnen (V85)
 
-Ein **Ziel** (`entity/Goal`, `/api/v1/goals`, TODO dc0566f8) sammelt TODOs aus mehreren Projekten, die auf ein Ergebnis einzahlen – etwa den Open-Source-Launch, der AutoPilot und die Website zugleich betrifft. Es ist bewusst schlank: keine Abhängigkeitsgraphen, Sprints oder Zeiterfassung.
+Ein **Ziel** (`entity/Goal`, `/api/v1/goals`, TODO dc0566f8) sammelt TODOs aus mehreren Projekten, die auf ein Ergebnis einzahlen – etwa den Open-Source-Launch, der AutoPilot und die Website zugleich betrifft. Es ist bewusst schlank: keine Abhängigkeitsgraphen, Sprints oder Zeiterfassung. Alles rund um Ziele ist das Standardmodul `goals` (in jedem Preset an, `automation.modules.goals=false` schaltet es ab, TODO c60bf914): dann antworten `/goals/**` und `PATCH /todos/{id}/planning` mit 404 `MODULE_DISABLED`, TODO-Antworten tragen kein `planning`, `GET /todos?goalId=` ist ein 400 (ein stilles Ignorieren gäbe die ganze Liste), `milestonesDue` im Cockpit ist leer, zielgebundene Zeitpläne (Eingabekontext mit `goal_id`, etwa der Ziel-Wächter) werden übersprungen und rücken weiter, und ein Lauf mit `goal_id` bekommt keine `goal_*`-Variablen. Die Daten bleiben erhalten; nach dem Wiedereinschalten ist alles da.
 
 - **Einordnung am TODO:** `goal_id` (höchstens ein Ziel), `goal_rank` (1 = zuerst, NULL = noch nicht eingeordnet), `complexity` (S/M/L/XL), `suggested_effort` (`low`…`xhigh`, dieselben Stufen wie `workflow.effort` und `claude --effort`), `rating_note`, `rated_by` (USER/AI), `rated_at` und `open_question`. Geschrieben über `PATCH /api/v1/todos/{id}/planning` (`TodoPlanningService`); `null` lässt ein Feld stehen, ein leerer Text leert es.
 - **Reihenfolge:** Rang, dann Priorität, dann Alter (`GoalService.WORK_ORDER`). `PUT /goals/{id}/order` setzt Rang 1..n für die genannten TODOs, alle übrigen verlieren den Rang. Zuordnen ist `POST /goals/{id}/todos` (neu Zugeordnete stehen ohne Rang hinten).
