@@ -102,14 +102,20 @@ class WorkflowRunProjectionRepositoryTest {
      * Vom Kontext liest {@code findOriginColumns} nur den Eltern-Ausloeser, als Text (TODO a3b89355) — auch
      * wenn die erste Zeile keinen hat. Fuer einen Ausdruck ohne deklarierten Typ nimmt sqlite-jdbc den Typ
      * des Werts der aktuellen Zeile; ein NULL dort meldet NUMERIC. Die Zeilen kommen nach Id sortiert.
+     *
+     * <p>Die Ids erzeugt Hibernate zufaellig. Deshalb bekommt erst nach dem Anlegen der Lauf mit der
+     * groesseren Id den Eltern-Ausloeser — ohne Suchschleife, die bei einer sehr kleinen Eltern-Id
+     * aufgab (TODO 923e53d8).
      */
     @Test
     void findOriginColumns_readsTheParentSourceAsText_evenWhenTheFirstRowHasNone() {
-        WorkflowRun withParent = originRun(Map.of(TriggerSource.PARENT_CONTEXT_KEY, "SCHEDULE"));
-        WorkflowRun withoutParent = originRun(Map.of());
-        for (int i = 0; i < 64 && withoutParent.getId().compareTo(withParent.getId()) > 0; i++) {
-            withoutParent = originRun(Map.of());
-        }
+        WorkflowRun first = originRun(Map.of());
+        WorkflowRun second = originRun(Map.of());
+        boolean firstSortsFirst = first.getId().compareTo(second.getId()) < 0;
+        WorkflowRun withoutParent = firstSortsFirst ? first : second;
+        WorkflowRun withParent = firstSortsFirst ? second : first;
+        withParent.setInputContext(new HashMap<>(Map.of(TriggerSource.PARENT_CONTEXT_KEY, "SCHEDULE")));
+        runRepository.save(withParent);
         assertThat(withoutParent.getId()).as("a run without parent sorts first").isLessThan(withParent.getId());
         entityManager.flush();
         entityManager.clear();
