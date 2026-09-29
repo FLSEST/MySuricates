@@ -19,6 +19,7 @@ Die Auswertung macht report.py. Der Treiber misst nur, er urteilt nicht.
 import argparse
 import http.client
 import json
+import os
 import random
 import re
 import sys
@@ -196,7 +197,7 @@ def start_and_wait(client, wf, poll_ms, deadline_s=300):
 def load(client_factory, scenario, seeded, recorder, log):
     cfg = scenario["load"]
     stop = threading.Event()
-    runs, heap = [], []
+    runs, heap, host_load = [], [], []
     runs_lock = threading.Lock()
     pages = [(name, weight, paths) for name, (weight, paths) in PAGES.items()]
     weights = [w for _, w, _ in pages]
@@ -245,6 +246,8 @@ def load(client_factory, scenario, seeded, recorder, log):
             if recorder.phase == "load" and status == 200 and isinstance(body, dict):
                 value = body.get("jvm_heap_used_percent")
                 heap.append(float(value) if value is not None else None)
+            if recorder.phase == "load":
+                host_load.append(sample_host_load())
             stop.wait(cfg["heap_sample_s"])
 
     threads = [threading.Thread(target=reader, args=(i,)) for i in range(cfg["readers"])]
@@ -267,7 +270,16 @@ def load(client_factory, scenario, seeded, recorder, log):
     # Lauf-Starter pollen ihren letzten Lauf zu Ende; laenger als das Lauf-Limit wartet niemand.
     for t in threads:
         t.join(timeout=330)
-    return load_start, load_end, runs, heap
+    return load_start, load_end, runs, heap, host_load
+
+
+def sample_host_load():
+    """1-Minuten-Load des Rechners. Mit Instanz und Treiber, denn die laufen hier mit — gesucht ist,
+    ob ausserdem etwas anderes (ein Build, ein zweiter Test) den Rechner belegt hat."""
+    try:
+        return round(os.getloadavg()[0], 2)
+    except (AttributeError, OSError):
+        return None
 
 
 def main(argv=None):
@@ -290,7 +302,7 @@ def main(argv=None):
     factory = lambda: Client(args.base, args.key, recorder)  # noqa: E731
     started_at = now_iso()
     seeded = seed(factory(), scenario, args.project_dir, log)
-    load_start, load_end, runs, heap = load(factory, scenario, seeded, recorder, log)
+    load_start, load_end, runs, heap, host_load = load(factory, scenario, seeded, recorder, log)
     ai_calls = 0
     if args.ai_log:
         try:
@@ -300,7 +312,8 @@ def main(argv=None):
             ai_calls = 0
     raw = {"commit": args.commit, "scenario": scenario, "seed": seeded["counts"],
            "started_at": started_at, "finished_at": now_iso(), "load_start": load_start, "load_end": load_end,
-           "requests": recorder.requests, "runs": runs, "heap": heap, "ai_cli_calls": ai_calls}
+           "requests": recorder.requests, "runs": runs, "heap": heap, "ai_cli_calls": ai_calls,
+           "host_load": host_load, "cpus": os.cpu_count()}
     with open(args.out, "w") as f:
         json.dump(raw, f)
     measured = sum(1 for r in recorder.requests if r["phase"] == "load")

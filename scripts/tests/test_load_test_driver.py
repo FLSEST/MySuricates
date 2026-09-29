@@ -44,6 +44,22 @@ class RecorderTest(unittest.TestCase):
         self.assertIsNone(rec.requests[0]["sql"])
 
 
+class HostLoadSampleTest(unittest.TestCase):
+
+    def test_load_average_or_none(self):
+        value = driver.sample_host_load()
+        self.assertTrue(value is None or isinstance(value, float))
+        original = driver.os.getloadavg
+
+        def broken():
+            raise OSError("nicht verfuegbar")
+        driver.os.getloadavg = broken
+        try:
+            self.assertIsNone(driver.sample_host_load())
+        finally:
+            driver.os.getloadavg = original
+
+
 class FakeApi(http.server.BaseHTTPRequestHandler):
     """execute liefert RUNNING, der zweite Abruf des Laufs COMPLETED; ohne Key 401."""
     polls = 0
