@@ -15,7 +15,7 @@ const variantStyles: Record<Variant, string> = {
   primary: 'bg-accent text-text-inverse hover:bg-accent-hover',
   secondary: 'bg-surface-raised border border-border text-text hover:bg-surface-overlay hover:border-border-strong',
   ghost: 'text-text-secondary hover:text-text hover:bg-surface-raised',
-  danger: 'bg-danger text-text-inverse hover:bg-danger/90',
+  danger: 'bg-danger text-text-inverse hover:brightness-90',
 };
 
 const sizeStyles: Record<Size, string> = {

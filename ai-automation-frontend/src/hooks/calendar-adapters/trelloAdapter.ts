@@ -59,7 +59,7 @@ export const trelloAdapter: CalendarSourceAdapter = {
         allDay: !card.due!.includes('T'),
         source: 'trello',
         sourceLabel: 'Trello',
-        color: card.dueComplete ? 'bg-success' : 'bg-chart-7',
+        color: card.dueComplete ? 'bg-chart-7/50' : 'bg-chart-7',
         status: card.dueComplete ? 'DONE' : 'DUE',
         link: card.url,
       }));
