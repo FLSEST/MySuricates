@@ -2044,6 +2044,7 @@ export const de: TranslationKeys = {
     integrations: 'Integrationen',
     chains: 'Chains',
     triggers: 'Trigger',
+    triggersSplit: '{todo} Todo / {completion} Abschluss',
     memoryEntries: 'Wissenseinträge',
     active: 'aktiv',
     archived: 'archiviert',
