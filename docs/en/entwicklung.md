@@ -337,6 +337,13 @@ npx tsc --noEmit
 npm run lint
 ```
 
+### CI on GitHub
+
+`.github/workflows/ci.yml` runs on every push to `main`, on every `v*` tag, on every pull request
+(no branch filter, so external PRs too) and by hand (`workflow_dispatch`). Working branches from
+worktrees are not pushed; `origin` only has `main`. A new run for the same ref cancels the running
+one (`concurrency: ci-<ref>`) — except on `main`, where every commit gets its own result.
+
 ### E2E Tests (Cypress)
 
 The E2E tests run with [Cypress](https://www.cypress.io/) against the **real backend** (no mocking). Test data is created and deleted directly via the API using `cy.request()`.
@@ -987,7 +994,8 @@ deterministically, in seconds to a minute. Two hooks call it: `commit-msg` (mess
 address only, while writing — a hit is cheap there) and `pre-push` (the whole push range, the last
 net: it also catches commits from worktrees without hooks, from run workspaces and with
 `--no-verify`). CI runs the same tree gates (`--tree`) and the same range check on the commits of
-every push event; the rules live in `scripts/lib/hygiene-rules.sh`.
+every push event and every pull request (there merge base..PR head); the rules live in
+`scripts/lib/hygiene-rules.sh`.
 
 Checked per push range (remote state..local; for a new branch everything no remote ref knows yet):
 
