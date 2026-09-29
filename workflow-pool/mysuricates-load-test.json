@@ -1,0 +1,56 @@
+{
+  "name": {
+    "de": "Lasttest vor dem Release",
+    "en": "Load test before a release"
+  },
+  "description": {
+    "de": "Misst den Stand ref (Default main) auf einer Wegwerf-Instanz mit synthetischem Seed und Last wie echte Benutzer (scripts/load-test.sh) und wertet das Faktenblatt aus: Engpässe, Vergleich mit dem letzten Release, Empfehlungen. Das Verdict ist gemessen, nicht von der KI. release.sh fragt nach, wenn für den Stand kein Lasttest vorliegt. Ein KI-Aufruf (Auswertung); der Lasttest selbst ruft keine KI.",
+    "en": "Measures ref (default main) on a throwaway instance with a synthetic seed and load like real users (scripts/load-test.sh) and evaluates the fact sheet: bottlenecks, comparison with the last release, recommendations. The verdict is measured, not decided by the AI. release.sh asks when a commit has no load test. One AI call (the evaluation); the load test itself calls no AI."
+  },
+  "icon": "🏋️",
+  "category": "CUSTOM",
+  "scope": "repo",
+  "tags": [
+    "quality-gate",
+    "mysuricates",
+    "performance",
+    "release"
+  ],
+  "model": "opus",
+  "version": "1.0.0",
+  "author": "MySuricates",
+  "defaultContext": {
+    "ref": "main"
+  },
+  "instructions": "Der Lasttest misst, die KI erklärt nur. Das Gate folgt FAKT load_verdict. Ergebnisse liegen unter ~/.local/state/mysuricates/load-test/<zeit>-<sha>/ (Pfad am Ende des Faktenblatts).",
+  "blocks": [
+    {
+      "type": "shell",
+      "name": "facts",
+      "config": {
+        "label": "Lasttest auf Wegwerf-Instanz (Skript misst)",
+        "command": "set -euo pipefail\n# Stand, der geprüft wird: Variable ref (Default main). Die Lasttest-Skripte kommen aus genau diesem\n# Stand, nicht aus dem gerade ausgecheckten Branch — gemessen wird, was getaggt werden soll.\nset -- {{ ref }}; REF=\"${1:-main}\"\nREPO={{ project_path }}\nTMP=\"$(mktemp -d)\"; trap 'rm -rf \"$TMP\"' EXIT\nred() { echo \"gate_status: RED\"; echo \"gate_category: load-test\"; echo \"gate_description: $1\"; exit 1; }\ngit -C \"$REPO\" rev-parse --verify --quiet \"${REF}^{commit}\" >/dev/null || red \"Unbekannter Stand: ${REF}\"\ngit -C \"$REPO\" archive \"$REF\" scripts | tar -x -C \"$TMP\"\n[ -f \"$TMP/scripts/load-test.sh\" ] || red \"Stand ${REF} enthält noch kein scripts/load-test.sh\"\nset +e\nbash \"$TMP/scripts/load-test.sh\" --repo \"$REPO\" --ref \"$REF\" > \"$TMP/load.out\" 2>&1\nRC=$?\nset -e\n# Exit 2: Lauf nicht möglich (Build, Start, Seed) — dann gibt es kein Faktenblatt zum Auswerten.\nif [ \"$RC\" -eq 2 ] || ! grep -q '^FAKT load_verdict: ' \"$TMP/load.out\"; then\n  tail -40 \"$TMP/load.out\"\n  red \"Lasttest brach ab (Exit ${RC}), bevor er messen konnte\"\nfi\n# RED ist ein Ergebnis, kein Abbruch: die Auswertung soll es erklären. Die gate_*-Zeilen des Skripts\n# setzt am Ende der Gate-Block aus FAKT load_verdict, deshalb fallen sie hier weg.\ngrep -v '^gate_' \"$TMP/load.out\"",
+        "timeout_seconds": 3600,
+        "shell_escape_variables": true
+      }
+    },
+    {
+      "type": "simple",
+      "name": "report",
+      "config": {
+        "label": "Auswertung (Opus)",
+        "command": "Du wertest einen Lasttest von MySuricates aus. Die Zahlen hat scripts/load-test.sh gemessen: eine Wegwerf-Instanz des Stands, der als Nächstes getaggt werden soll, mit synthetischem Seed und Last wie echte Benutzer (Leser, Lauf-Starter, TODO-Schreiber).\n\nLASTTEST-FAKTENBLATT:\n{{ block.facts.output }}\n\nLETZTE AUSWERTUNG:\n{{ previous_report }}\n\n---\n\nMESSREGEL (VERBINDLICH):\n- Bewerte ausschließlich das Faktenblatt; miss, zähle und schätze nichts selbst. Jede Zahl im Report stammt aus einer FAKT-Zeile.\n- \"NICHT GEMESSEN: <name> (<grund>)\" weist du als nicht gemessen aus.\n- Das Verdict steht fest (FAKT load_verdict); du erklärst es, du änderst es nicht.\n- Schreibe keine Dateien und führe keine Befehle aus. Deine Antwort ist der Report.\n\nHINTERGRUND:\n- SQLite mit genau einer DB-Connection (pool-size 1): Unter Last wartet fast jede Anfrage auf diese Connection. Ein hoher Wartezeit-Anteil ist deshalb normal; auffällig wird er erst zusammen mit einem hohen p95. Die Ursache liegt dann meist bei dem, was die Connection lange hält (große Antworten, viele SQL-Statements, Schreiblast der Läufe), nicht bei der wartenden Route.\n- load_route-Zeilen: Route | read/write | n | Fehler | p50 | p95 | p99 | max | Wartezeit-Anteil | SQL je Aufruf | mittlere Antwortgröße.\n- load_regression_*: p95 gegen den letzten Lauf auf einem früheren Stand (load_baseline).\n\nREPORT:\n### Lasttest — {{ workflow_name }}\n**Stand**: <load_commit> · **Verdict**: <load_verdict>\n\n1. **Ergebnis in zwei Sätzen** — trägt der Stand die Last?\n2. **Engpässe** — die drei teuersten Routen nach p95 mit Wartezeit-Anteil, SQL und Antwortgröße; welche davon hält die Connection vermutlich selbst lange (große Antwort, viele Statements), welche wartet nur.\n3. **Vergleich** — gegen load_baseline und die letzte Auswertung; ohne Baseline sagst du das.\n4. **Läufe und Speicher** — load_runs, load_run_duration_s, load_heap_max_percent.\n5. **Empfehlungen** — höchstens drei, konkret an Routen aus dem Faktenblatt, mit der FAKT-Zeile als Beleg.\n\nSchließe mit genau einer Zeile ab:\ngate_status: <der Wert aus FAKT load_verdict>",
+        "timeout_seconds": 600
+      }
+    },
+    {
+      "type": "shell",
+      "config": {
+        "label": "Gate-Verdict",
+        "command": "set -- {{ block.facts.output }}\nFACTS=${1:-}\nPH='{'\"{\"\ncase \"$FACTS\" in \"$PH\"*) FACTS='' ;; esac\n# Das Gate folgt dem gemessenen Verdict (FAKT load_verdict), nie der Auswertung der KI.\nVERDICT=$(printf '%s\\n' \"$FACTS\" | grep -E '^FAKT load_verdict: (GREEN|YELLOW|RED)$' | tail -1 | sed 's/^FAKT load_verdict: //')\nREASON=$(printf '%s\\n' \"$FACTS\" | sed -n 's/^FAKT load_reason_1: //p' | head -1)\ncase \"$VERDICT\" in\n  GREEN)\n    echo 'gate_status: GREEN'; echo 'gate_category: load-test'\n    echo 'gate_description: Lasttest unauffällig' ;;\n  YELLOW)\n    echo 'gate_status: YELLOW'; echo 'gate_category: load-test'\n    echo \"gate_description: Lasttest auffällig — ${REASON}\" ;;\n  RED)\n    echo 'gate_status: RED'; echo 'gate_category: load-test'\n    echo \"gate_description: Lasttest RED — ${REASON}\" ;;\n  *)\n    echo 'gate_status: RED'; echo 'gate_category: audit-invalid'\n    echo 'gate_description: Kein FAKT load_verdict — der Lasttest hat nichts gemessen' ;;\nesac",
+        "timeout_seconds": 10,
+        "shell_escape_variables": true
+      }
+    }
+  ]
+}

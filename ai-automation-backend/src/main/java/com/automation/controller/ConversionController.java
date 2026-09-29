@@ -29,7 +29,7 @@ public class ConversionController {
             @PathVariable String runId,
             @Valid @RequestBody ConvertRunToWorkflowRequest request) {
         WorkflowResponse created = conversionService.createWorkflowFromSuggestion(
-                runId, request.projectId(), request.name());
+                runId, request.projectId(), request.name(), request.description(), request.blocks());
         return ResponseEntity.ok(created);
     }
 }

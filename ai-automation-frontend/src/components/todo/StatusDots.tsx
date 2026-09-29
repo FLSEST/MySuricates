@@ -1,3 +1,4 @@
+import { useT } from '../../i18n';
 import type { TodoStatus } from '../../types';
 
 interface StatusDotsProps {
@@ -6,6 +7,7 @@ interface StatusDotsProps {
 }
 
 export function StatusDots({ current, onChange }: StatusDotsProps) {
+  const t = useT();
   return (
     <div className="flex items-center gap-1 shrink-0">
       {/* OPEN */}
@@ -16,7 +18,7 @@ export function StatusDots({ current, onChange }: StatusDotsProps) {
             ? 'border-text-tertiary bg-surface-raised'
             : 'border-border hover:border-text-tertiary'
         }`}
-        title="Open"
+        title={t.todos.statuses.OPEN}
       />
       {/* IN_PROGRESS */}
       <button
@@ -26,7 +28,7 @@ export function StatusDots({ current, onChange }: StatusDotsProps) {
             ? 'border-warning bg-warning/20'
             : 'border-border hover:border-warning'
         }`}
-        title="In Progress"
+        title={t.todos.statuses.IN_PROGRESS}
       >
         {current === 'IN_PROGRESS' && (
           <div className="w-2.5 h-2.5 rounded-full bg-warning" style={{ clipPath: 'inset(0 50% 0 0)' }}>
@@ -42,7 +44,7 @@ export function StatusDots({ current, onChange }: StatusDotsProps) {
             ? 'border-success bg-success text-white'
             : 'border-border hover:border-success'
         }`}
-        title="Done"
+        title={t.todos.statuses.DONE}
       >
         {current === 'DONE' && (
           <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
@@ -58,7 +60,7 @@ export function StatusDots({ current, onChange }: StatusDotsProps) {
             ? 'border-text-tertiary/60 bg-text-tertiary/20'
             : 'border-border hover:border-text-tertiary/60'
         }`}
-        title="Backlog"
+        title={t.todos.statuses.BACKLOG}
       >
         {current === 'BACKLOG' && (
           <div className="w-2 h-2 rounded-full bg-text-tertiary/60" />

@@ -155,7 +155,8 @@ class WorkflowMutationGatewayTest {
         assertThatThrownBy(() -> gateway.record(workflow, before, ChangeSource.ASSISTANT, null))
                 .isInstanceOf(HardeningException.class)
                 .hasMessageContaining("sealed").hasMessageContaining("instructions")
-                .satisfies(e -> assertThat(((HardeningException) e).getCode()).isEqualTo(ErrorCode.WORKFLOW_SEALED));
+                .satisfies(e -> assertThat(((HardeningException) e).getCode()).isEqualTo(ErrorCode.WORKFLOW_SEALED))
+                .satisfies(e -> assertThat(((HardeningException) e).getParams()).containsOnlyKeys("name"));
         verifyNoInteractions(versions);
     }
 

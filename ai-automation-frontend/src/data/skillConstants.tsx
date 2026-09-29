@@ -11,13 +11,14 @@ export const CATEGORY_ICONS: Record<SkillCategory, React.ReactNode> = {
   PRODUCTIVITY: <ListChecks className="w-5 h-5" />,
 };
 
+// Categories without a meaning of their own take chart colors: distinguishable in every theme
 export const CATEGORY_COLORS: Record<SkillCategory, string> = {
   CODE: 'text-accent',
   DOCUMENT: 'text-warning',
   DATA: 'text-success',
-  CONTENT: 'text-purple-400',
-  RESEARCH: 'text-blue-400',
-  BUSINESS: 'text-orange-400',
+  CONTENT: 'text-chart-3',
+  RESEARCH: 'text-chart-1',
+  BUSINESS: 'text-chart-8',
   PRODUCTIVITY: 'text-info',
 };
 

@@ -200,6 +200,7 @@ class ModuleRegistryTest {
         assertThatThrownBy(() -> registry.applyUiOverrides(Map.of(ModuleCatalog.WEBHOOKS, true)))
                 .isInstanceOf(ModuleChangeException.class)
                 .satisfies(e -> assertThat(((ModuleChangeException) e).getCode()).isEqualTo(ErrorCode.MODULES_NOT_EDITABLE))
+                .satisfies(e -> assertThat(((ModuleChangeException) e).getParams()).containsEntry("property", "automation.modules.ui-editable"))
                 .hasMessageContaining("automation.modules.ui-editable=true");
         assertThat(registry.isEnabled(ModuleCatalog.WEBHOOKS)).isFalse();
     }

@@ -192,7 +192,7 @@ export function ExecutionSettingsCard() {
             </div>
             <div className="h-1.5 bg-surface-hover rounded-full overflow-hidden">
               <div
-                className={`h-full rounded-full transition-all ${usagePercent > 80 ? 'bg-red-500' : usagePercent > 50 ? 'bg-yellow-500' : 'bg-accent'}`}
+                className={`h-full rounded-full transition-all ${usagePercent > 80 ? 'bg-danger' : usagePercent > 50 ? 'bg-warning' : 'bg-accent'}`}
                 style={{ width: `${usagePercent}%` }}
               />
             </div>

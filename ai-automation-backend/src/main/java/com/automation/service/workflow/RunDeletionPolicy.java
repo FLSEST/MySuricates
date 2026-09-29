@@ -5,6 +5,8 @@ import com.automation.exception.HardeningException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.util.Map;
+
 /**
  * Whether runs may be deleted through the API ({@code DELETE /api/v1/executions/{id}}).
  *
@@ -55,7 +57,8 @@ public class RunDeletionPolicy {
     public void requireAllowed() {
         if (!allowDelete) {
             throw new HardeningException(ErrorCode.RUN_DELETION_DISABLED,
-                    "Deleting runs is disabled on this instance (automation.executions.allow-delete=false)");
+                    "Deleting runs is disabled on this instance (automation.executions.allow-delete=false)",
+                    Map.of());
         }
     }
 }

@@ -115,10 +115,10 @@ export function PlannedTodayStat() {
   if (isLoading) return <WidgetSkeleton size="stat" />;
   return (
     <StatCard
-      icon={<CalendarClock className="w-4 h-4 text-blue-500" />}
+      icon={<CalendarClock className="w-4 h-4 text-info" />}
       label={t.dashboard.plannedToday}
       value={remainingToday?.count ?? '-'}
-      accent="bg-blue-500/10"
+      accent="bg-info-subtle"
     />
   );
 }
@@ -129,10 +129,10 @@ export function PlannedThisWeekStat() {
   if (isLoading) return <WidgetSkeleton size="stat" />;
   return (
     <StatCard
-      icon={<CalendarRange className="w-4 h-4 text-violet-500" />}
+      icon={<CalendarRange className="w-4 h-4 text-info" />}
       label={t.dashboard.plannedThisWeek}
       value={remainingThisWeek?.count ?? '-'}
-      accent="bg-violet-500/10"
+      accent="bg-info-subtle"
     />
   );
 }
@@ -161,8 +161,8 @@ export function BuildInfoStat() {
 
   return (
     <Card className="flex items-center gap-3 py-3! px-4!">
-      <div className="p-2 rounded-lg bg-teal-500/10">
-        <Info className="w-4 h-4 text-teal-500" />
+      <div className="p-2 rounded-lg bg-surface-hover">
+        <Info className="w-4 h-4 text-text-secondary" />
       </div>
       <div className="min-w-0">
         <p className="text-xs text-text-secondary">{t.dashboard.version}</p>

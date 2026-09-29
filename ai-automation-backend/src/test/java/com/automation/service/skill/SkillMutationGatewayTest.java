@@ -102,6 +102,7 @@ class SkillMutationGatewayTest {
         assertThatThrownBy(() -> gateway.save(skill("changed"), SkillChangeSource.USER))
                 .isInstanceOf(HardeningException.class)
                 .satisfies(e -> assertThat(((HardeningException) e).getCode()).isEqualTo(ErrorCode.SKILL_PINNED_BY_SEAL))
+                .satisfies(e -> assertThat(((HardeningException) e).getParams()).containsEntry("workflows", "Deploy").containsKey("name"))
                 .hasMessageContaining("Deploy");
         verify(skillRepository, never()).save(any());
         verify(versionRepository, never()).save(any());

@@ -71,7 +71,8 @@ class GoalDetailAssembler {
         Set<String> ids = rows.stream().map(GoalTodoRow::projectId).filter(Objects::nonNull)
                 .filter(id -> !names.containsKey(id)).collect(Collectors.toSet());
         if (!ids.isEmpty()) {
-            projectRepository.findAllById(ids).forEach(project -> names.put(project.getId(), project.getName()));
+            // Nur ID und Name – findAllById kostete je Projekt ein select containers (TODO 08224ed6)
+            projectRepository.findIdAndNameByIdIn(ids).forEach(row -> names.put((String) row[0], (String) row[1]));
         }
         return names;
     }

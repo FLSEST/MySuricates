@@ -623,13 +623,16 @@ render "$PERF" name:facts "$(json_values project_path="$TMP/base2.txt" request_m
 PATH="$TMP/fakebin:$PATH" bash "$TMP/perf-facts2.sh" > "$TMP/perf-facts2.out" 2> "$TMP/perf-facts2.err"
 check "laeuft ohne stderr"                      '[ ! -s "$TMP/perf-facts2.err" ]'
 check "einzeiliges forEach endet in der Zeile"  '! grep -q "^TREFFER repository_in_loop: service/ScanService.java:6 " "$TMP/perf-facts2.out"'
-check "einzeiliges for mit Aufruf ist Treffer"  'grep -q "^TREFFER repository_in_loop: service/ScanService.java:7 " "$TMP/perf-facts2.out"'
+# Zeile 7 speichert nur: seit d8af1b06 ein Schreib-Schleifen-Treffer, kein Lese-N+1.
+check "einzeiliges for mit Aufruf ist Treffer"  'grep -q "^TREFFER repository_write_in_loop: service/ScanService.java:7 " "$TMP/perf-facts2.out"'
 check "verschachtelte Schleife: ein Treffer" \
   '[ "$(grep -c "^TREFFER repository_in_loop: service/ScanService.java:10 " "$TMP/perf-facts2.out")" -eq 1 ]'
-# Warten kann nur eine while-Schleife: das for-each mit Fristpruefung je Element ist ein N+1.
-check "for-each mit Fristpruefung bleibt N+1" \
-  'grep -q "^TREFFER repository_in_loop: service/ScanService.java:[0-9]* sessionRepository.delete " "$TMP/perf-facts2.out"'
-check "FAKT repository_loop_count: 3"           'grep -qx "FAKT repository_loop_count: 3" "$TMP/perf-facts2.out"'
+# Warten kann nur eine while-Schleife: das for-each mit Fristpruefung je Element ist keine
+# Warteschleife, sondern ein Schleifentreffer — da es nur loescht, als Schreib-Schleife (d8af1b06).
+check "for-each mit Fristpruefung bleibt Schleifentreffer" \
+  'grep -q "^TREFFER repository_write_in_loop: service/ScanService.java:[0-9]* sessionRepository.delete " "$TMP/perf-facts2.out"'
+check "FAKT repository_loop_count: 1"           'grep -qx "FAKT repository_loop_count: 1" "$TMP/perf-facts2.out"'
+check "FAKT repository_write_loop_count: 2"     'grep -qx "FAKT repository_write_loop_count: 2" "$TMP/perf-facts2.out"'
 check "FAKT polling_loop_count: 1"              'grep -qx "FAKT polling_loop_count: 1" "$TMP/perf-facts2.out"'
 # onStart, onReady (@EventListener({ApplicationReadyEvent.class})) und der Seeder.
 check "FAKT startup_repository_loop_count: 3"   'grep -qx "FAKT startup_repository_loop_count: 3" "$TMP/perf-facts2.out"'
@@ -875,6 +878,242 @@ check "Repository ohne Entity: gegen alle Tabellen gehalten und genannt" \
   'grep -qx "# Ohne Tabellen-Zuordnung, gegen alle Tabellen gehalten: LegacyRepository.java" "$TMP/perf-facts5.out"'
 check "FAKT migration_index_statements: 5" 'grep -qx "FAKT migration_index_statements: 5" "$TMP/perf-facts5.out"'
 
+echo "6g) Performance-Audit: zusammengesetzter Index und erste Spalte einer Abfrage (2d233599)"
+# (workflow_id, active) traegt findByWorkflowIdAndActiveTrue, aber nicht die Suche nach active allein:
+# active bleibt Kandidat. findByOwnerAndFlagTrue hat keinen Index: gemeldet wird nur owner, wo der
+# fehlende Index begaenne, nicht zusaetzlich flag.
+FIX6="$TMP/fixture-composite"
+MAIN6="$FIX6/ai-automation-backend/src/main/java/com/automation"
+MIG6="$FIX6/ai-automation-backend/src/main/resources/db/migration"
+mkdir -p "$MAIN6/entity" "$MAIN6/repository" "$MIG6"
+printf '%s\n' 'package com.automation.entity;' '' '@Entity' '@Table(name = "memo")' 'public class Memo {' '}' \
+  > "$MAIN6/entity/Memo.java"
+cat > "$MAIN6/repository/MemoRepository.java" <<'JAVA'
+package com.automation.repository;
+
+public interface MemoRepository extends JpaRepository<Memo, String> {
+    java.util.Optional<Memo> findByWorkflowIdAndActiveTrue(String workflowId);
+    java.util.List<Memo> findTop8ByActiveTrueOrderByCreatedAtDesc();
+    java.util.List<Memo> findByOwnerAndFlagTrue(String owner);
+}
+JAVA
+cat > "$MIG6/V1__init.sql" <<'SQL'
+CREATE TABLE memo (id TEXT PRIMARY KEY, workflow_id TEXT, active INTEGER, owner TEXT, flag INTEGER, created_at TEXT);
+CREATE INDEX idx_memo_active ON memo(workflow_id, active);
+SQL
+printf '%s' "$FIX6" > "$TMP/base6.txt"
+render "$PERF" name:facts "$(json_values project_path="$TMP/base6.txt" request_metrics=)" > "$TMP/perf-facts6.sh"
+PATH="$TMP/fakebin:$PATH" bash "$TMP/perf-facts6.sh" > "$TMP/perf-facts6.out" 2> "$TMP/perf-facts6.err"
+check "laeuft ohne stderr" '[ ! -s "$TMP/perf-facts6.err" ]'
+check "zweite Spalte eines zusammengesetzten Index traegt die Suche nach ihr allein nicht" \
+  'grep -qx "TREFFER unindexed_findby_column: active (MemoRepository.java -> memo)" "$TMP/perf-facts6.out"'
+check "Abfrage ohne Index: nur ihre erste Spalte" \
+  'grep -qx "TREFFER unindexed_findby_column: owner (MemoRepository.java -> memo)" "$TMP/perf-facts6.out"'
+check "weitere And-Spalten und fuehrende Indexspalte nicht gemeldet" \
+  '! grep -qE "^TREFFER unindexed_findby_column: (flag|workflow_id|created_at) " "$TMP/perf-facts6.out"'
+check "FAKT unindexed_findby_columns_count: 2" 'grep -qx "FAKT unindexed_findby_columns_count: 2" "$TMP/perf-facts6.out"'
+
+echo "6h) Performance-Audit: LIKE-Bedingungen sind keine Index-Kandidaten (a1f124c3)"
+# Containing, EndingWith, Like und IgnoreCase nutzen keinen B-Tree-Index: name aus
+# findByNameContainingIgnoreCase ist kein Kandidat, in findByNameContainingAndProjectId tritt
+# project_id an die Stelle der ersten Spalte. StartingWith ohne IgnoreCase bleibt index-faehig
+# (tag.name). Die Gegenprobe laeuft auf einer Kopie ohne NOT_INDEXABLE, also mit der alten Regel.
+FIX7="$TMP/fixture-like"
+MAIN7="$FIX7/ai-automation-backend/src/main/java/com/automation"
+MIG7="$FIX7/ai-automation-backend/src/main/resources/db/migration"
+mkdir -p "$MAIN7/entity" "$MAIN7/repository" "$MIG7"
+printf '%s\n' 'package com.automation.entity;' '' '@Entity' '@Table(name = "note")' 'public class Note {' '}' \
+  > "$MAIN7/entity/Note.java"
+printf '%s\n' 'package com.automation.entity;' '' '@Entity' '@Table(name = "tag")' 'public class Tag {' '}' \
+  > "$MAIN7/entity/Tag.java"
+cat > "$MAIN7/repository/NoteRepository.java" <<'JAVA'
+package com.automation.repository;
+
+public interface NoteRepository extends JpaRepository<Note, String> {
+    java.util.List<Note> findByNameContainingIgnoreCase(String name);
+    java.util.List<Note> findByNameContainingAndProjectId(String name, String projectId);
+    java.util.List<Note> findByNameStartingWithIgnoreCase(String prefix);
+    java.util.List<Note> findByTitleNotLike(String pattern);
+    java.util.List<Note> findByTitleEndsWith(String suffix);
+    java.util.List<Note> findByOwnerAndTitleAllIgnoreCase(String owner, String title);
+}
+JAVA
+cat > "$MAIN7/repository/TagRepository.java" <<'JAVA'
+package com.automation.repository;
+
+public interface TagRepository extends JpaRepository<Tag, String> {
+    java.util.List<Tag> findByNameStartingWith(String prefix);
+}
+JAVA
+cat > "$MIG7/V1__init.sql" <<'SQL'
+CREATE TABLE note (id TEXT PRIMARY KEY, name TEXT, project_id TEXT, title TEXT, owner TEXT);
+CREATE TABLE tag (id TEXT PRIMARY KEY, name TEXT);
+SQL
+printf '%s' "$FIX7" > "$TMP/base7.txt"
+VALUES7="$(json_values project_path="$TMP/base7.txt" request_metrics=)"
+render "$PERF" name:facts "$VALUES7" > "$TMP/perf-facts7.sh"
+PATH="$TMP/fakebin:$PATH" bash "$TMP/perf-facts7.sh" > "$TMP/perf-facts7.out" 2> "$TMP/perf-facts7.err"
+check "laeuft ohne stderr" '[ ! -s "$TMP/perf-facts7.err" ]'
+check "StartingWith ohne IgnoreCase bleibt Kandidat, Containing/IgnoreCase nicht" \
+  'grep -qx "TREFFER unindexed_findby_column: name (TagRepository.java -> tag)" "$TMP/perf-facts7.out"'
+check "hinter einer LIKE-Bedingung meldet die naechste index-faehige Spalte" \
+  'grep -qx "TREFFER unindexed_findby_column: project_id (NoteRepository.java -> note)" "$TMP/perf-facts7.out"'
+check "NotLike, EndsWith und AllIgnoreCase nicht gemeldet, keine Restwoerter als Spalte" \
+  '! grep -qE "^TREFFER unindexed_findby_column: (title|owner|title_all|title_ends_with) " "$TMP/perf-facts7.out"'
+check "FAKT unindexed_findby_columns_count: 2" 'grep -qx "FAKT unindexed_findby_columns_count: 2" "$TMP/perf-facts7.out"'
+check "Hinweiszeile nennt die LIKE-Regel" 'grep -q "^# TREFFER-Zeilen .*LIKE-Bedingungen" "$TMP/perf-facts7.out"'
+python3 - "$PERF" "$TMP/perf-old-like.json" <<'PY'
+import json, sys
+definition = json.load(open(sys.argv[1], encoding='utf-8'))
+block = next(b for b in definition['blocks'] if b.get('name') == 'facts')
+old = block['config']['command'].replace("NOT_INDEXABLE = {", "NOT_INDEXABLE = set() and {", 1)
+assert old != block['config']['command'], 'NOT_INDEXABLE nicht gefunden'
+block['config']['command'] = old
+json.dump(definition, open(sys.argv[2], 'w', encoding='utf-8'), ensure_ascii=False)
+PY
+render "$TMP/perf-old-like.json" name:facts "$VALUES7" > "$TMP/perf-facts7-old.sh"
+PATH="$TMP/fakebin:$PATH" bash "$TMP/perf-facts7-old.sh" > "$TMP/perf-facts7-old.out" 2> /dev/null
+check "Gegenprobe: ohne NOT_INDEXABLE ist name aus Containing wieder Kandidat" \
+  'grep -qx "TREFFER unindexed_findby_column: name (NoteRepository.java -> note, TagRepository.java -> tag)" "$TMP/perf-facts7-old.out"'
+check "Gegenprobe: ohne NOT_INDEXABLE fehlt project_id" \
+  '! grep -q "^TREFFER unindexed_findby_column: project_id " "$TMP/perf-facts7-old.out"'
+
+echo "6i) Performance-Audit: nur die Annotation @Transactional oeffnet einen Rumpf (a0e335c4)"
+# '@Transactional' als Teilzeichenkette traf auch @TransactionalEventListener (AFTER_COMMIT, laeuft
+# nach der Transaktion) und Javadoc-Zeilen, die mit /** beginnen. Gezaehlt wird jetzt nur die
+# Annotation selbst, mit oder ohne Argumente und auch voll qualifiziert; Kommentarzeilen (//, /*, /**, *)
+# und Text in Literalen oder hinter // zaehlen nicht.
+FIX8="$TMP/fixture-transactional"
+MAIN8="$FIX8/ai-automation-backend/src/main/java/com/automation"
+mkdir -p "$MAIN8/service"
+cat > "$MAIN8/service/CommitService.java" <<'JAVA'
+package com.automation.service;
+
+class CommitService {
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    void onCommit(Object event) {
+        restTemplate.getForObject("http://example.invalid", String.class);
+    }
+
+    /** Laeuft bewusst ohne @Transactional: der Aufruf haelt keine Connection. */
+    void outside() {
+        webClient.post();
+    }
+
+    /*
+     * @Transactional fehlt hier absichtlich.
+     */
+    void outsideToo() {
+        hostClaudeService.execute("x");
+    }
+
+    // @Transactional
+    void commented() {
+        dockerClient.ping();
+    }
+
+    private static final String NOTE = "@Transactional"; // @Transactional
+    void afterMention() {
+        HttpClient.newHttpClient();
+    }
+
+    @Transactional(readOnly = true)
+    void inside() {
+        restTemplate.getForObject("http://example.invalid", String.class);
+    }
+
+    @org.springframework.transaction.annotation.Transactional
+    void qualified() {
+        webClient.get();
+    }
+}
+JAVA
+printf '%s' "$FIX8" > "$TMP/base8.txt"
+render "$PERF" name:facts "$(json_values project_path="$TMP/base8.txt" request_metrics=)" > "$TMP/perf-facts8.sh"
+PATH="$TMP/fakebin:$PATH" bash "$TMP/perf-facts8.sh" > "$TMP/perf-facts8.out" 2> "$TMP/perf-facts8.err"
+check "laeuft ohne stderr" '[ ! -s "$TMP/perf-facts8.err" ]'
+check "@TransactionalEventListener oeffnet keinen @Transactional-Rumpf" '! grep -q "Zeile 4)" "$TMP/perf-facts8.out"'
+check "Javadoc- und Blockkommentarzeilen zaehlen nicht" '! grep -qE "(webClient|hostClaudeService) \(@Transactional ab Zeile (9|14|15)\)" "$TMP/perf-facts8.out"'
+check "Zeilenkommentar und Literal zaehlen nicht" '! grep -qE "(dockerClient|HttpClient) " "$TMP/perf-facts8.out"'
+check "@Transactional(readOnly = true) zaehlt" \
+  'grep -qx "TREFFER transactional_slow_call: service/CommitService.java:33 restTemplate (@Transactional ab Zeile 31)" "$TMP/perf-facts8.out"'
+check "voll qualifiziertes @Transactional zaehlt" \
+  'grep -qx "TREFFER transactional_slow_call: service/CommitService.java:38 webClient (@Transactional ab Zeile 36)" "$TMP/perf-facts8.out"'
+check "FAKT transactional_slow_call_count: 2" 'grep -qx "FAKT transactional_slow_call_count: 2" "$TMP/perf-facts8.out"'
+
+echo "6j) Performance-Audit: Schreib-Schleifen getrennt von Lese-N+1 (d8af1b06)"
+# save() einer schon geladenen Entity je Durchlauf (GoalMembershipService.reorder) ist kein Lese-N+1:
+# Schleifen, die nur schreiben (save*/delete*), stehen als repository_write_in_loop mit eigener
+# Zaehlung. Liest die Schleife auch (find/get/count/exists), bleibt sie N+1-Kandidat und nennt die
+# Lesezeile, auch wenn ein save davor steht. Mehrere Aufrufe in einer Zeile: der Lesezugriff zaehlt.
+FIX9="$TMP/fixture-write-loop"
+MAIN9="$FIX9/ai-automation-backend/src/main/java/com/automation"
+mkdir -p "$MAIN9/service"
+cat > "$MAIN9/service/ReorderService.java" <<'JAVA'
+package com.automation.service;
+
+class ReorderService {
+    void reorder(java.util.List<Goal> goals) {
+        for (Goal goal : goals) {
+            goal.setRank(1);
+            goalRepository.save(goal);
+        }
+    }
+
+    void purge(java.util.List<String> ids) {
+        ids.forEach(id -> goalRepository.deleteById(id));
+    }
+
+    void readThenWrite(java.util.List<String> ids) {
+        for (String id : ids) {
+            Goal goal = goalRepository.findById(id).orElseThrow();
+            goalRepository.save(goal);
+        }
+    }
+
+    void writeThenRead(java.util.List<String> ids) {
+        for (String id : ids) {
+            goalRepository.saveAndFlush(new Goal(id));
+            goalRepository.existsById(id);
+        }
+    }
+
+    void sameLine(java.util.List<Goal> goals) {
+        for (Goal goal : goals) {
+            goalRepository.save(goalRepository.getReferenceById(goal.getId()));
+        }
+    }
+
+    void batch(java.util.List<java.util.List<Goal>> chunks) {
+        for (java.util.List<Goal> chunk : chunks) {
+            goalRepository.saveAll(chunk);
+        }
+    }
+}
+JAVA
+printf '%s' "$FIX9" > "$TMP/base9.txt"
+render "$PERF" name:facts "$(json_values project_path="$TMP/base9.txt" request_metrics=)" > "$TMP/perf-facts9.sh"
+PATH="$TMP/fakebin:$PATH" bash "$TMP/perf-facts9.sh" > "$TMP/perf-facts9.out" 2> "$TMP/perf-facts9.err"
+check "laeuft ohne stderr" '[ ! -s "$TMP/perf-facts9.err" ]'
+check "save einer geladenen Entity ist kein Lese-N+1" '! grep -q "^TREFFER repository_in_loop: .*\.save" "$TMP/perf-facts9.out"'
+check "save in der Schleife als Schreib-Schleife gelistet" \
+  'grep -qx "TREFFER repository_write_in_loop: service/ReorderService.java:7 goalRepository.save (Schleife ab Zeile 5)" "$TMP/perf-facts9.out"'
+check "deleteById im forEach als Schreib-Schleife gelistet" \
+  'grep -qx "TREFFER repository_write_in_loop: service/ReorderService.java:12 goalRepository.deleteById (Schleife ab Zeile 12)" "$TMP/perf-facts9.out"'
+check "saveAll je Durchlauf als Schreib-Schleife gelistet" \
+  'grep -qx "TREFFER repository_write_in_loop: service/ReorderService.java:37 goalRepository.saveAll (Schleife ab Zeile 36)" "$TMP/perf-facts9.out"'
+check "Lesen vor dem save bleibt N+1-Kandidat" \
+  'grep -qx "TREFFER repository_in_loop: service/ReorderService.java:17 goalRepository.findById (Schleife ab Zeile 16)" "$TMP/perf-facts9.out"'
+check "Lesen nach dem save bleibt N+1-Kandidat und nennt die Lesezeile" \
+  'grep -qx "TREFFER repository_in_loop: service/ReorderService.java:25 goalRepository.existsById (Schleife ab Zeile 23)" "$TMP/perf-facts9.out"'
+check "save und Lesen in einer Zeile: der Lesezugriff zaehlt" \
+  'grep -qx "TREFFER repository_in_loop: service/ReorderService.java:31 goalRepository.getReferenceById (Schleife ab Zeile 30)" "$TMP/perf-facts9.out"'
+check "FAKT repository_loop_count: 3" 'grep -qx "FAKT repository_loop_count: 3" "$TMP/perf-facts9.out"'
+check "FAKT repository_write_loop_count: 3" 'grep -qx "FAKT repository_write_loop_count: 3" "$TMP/perf-facts9.out"'
+check "Hinweiszeile: Schreib-Schleife ist kein Lese-N+1" 'grep -q "^# repository_write_loop_count: .*kein Lese-N+1" "$TMP/perf-facts9.out"'
+check "Report-Prompt: Schreib-Schleife ist nie ein Finding" \
+  'grep -q "repository_write_loop_count.*nie ein Finding" "$TMP/perf-prompt.txt"'
+
 echo "7) Performance-Audit: Gate prueft die Pflicht-Fakten deterministisch"
 run_perf_gate() {  # $1 = faktenblatt-datei
   GATE_VALUES="$(json_values block.report.output="$TMP/report-green.txt" block.facts.output="$1")"
@@ -1047,7 +1286,8 @@ policy = open(os.path.join(repo, 'ai-automation-backend/src/main/java/com/automa
                                  'AuditAcceptancePolicy.java'), encoding='utf-8').read()
 threshold = re.search(r'DEGRADATION_THRESHOLD_PERCENT = (\d+);', policy).group(1)
 DEGRADED = ('Als verschlechtert gilt ein eingeordneter Befund nur, wenn eine belegende Kennzahl um mehr als '
-            + threshold + ' % ueber ihrem letzten Wert liegt; ab dieser Schwelle oeffnet auch die Plattform '
+            + threshold + ' % ueber ihrem letzten Wert liegt oder seine Aenderungsrate die Hotspot-Schwelle neu '
+            'erreicht; ab dieser Schwelle oeffnet auch die Plattform '
             'eine Einordnung wieder.')
 section = rules = old = counting = fact_sheet = unmeasured = degraded = 0
 texts = set()

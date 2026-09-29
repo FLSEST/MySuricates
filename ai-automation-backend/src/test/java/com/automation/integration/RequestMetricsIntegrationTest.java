@@ -41,7 +41,7 @@ class RequestMetricsIntegrationTest {
 
     @BeforeEach
     void resetWindow() {
-        collector.snapshotAndReset();
+        collector.drainWindows();
         config.setEnabled(true);
         config.setServerTimingEnabled(false);
     }
@@ -168,7 +168,7 @@ class RequestMetricsIntegrationTest {
     void snapshotWritesOneRowPerRouteAndClearsTheWindow() throws Exception {
         mockMvc.perform(get("/api/v1/todos")).andExpect(status().isOk());
 
-        int written = snapshotService.snapshotToday();
+        int written = snapshotService.persistWindows();
 
         assertThat(written).isPositive();
         assertThat(collector.snapshot()).isEmpty();
@@ -177,18 +177,24 @@ class RequestMetricsIntegrationTest {
         repository.deleteAll(rows);
     }
 
-    /** Running the job twice in a day must update the row, not add a second one. */
+    /**
+     * Running the job twice in a day must fold the second window into the row, not add a second
+     * row and not overwrite the first window's calls (a restart persists mid-day, TODO cab7d1d9).
+     */
     @Test
     void snapshotIsRepeatableWithinADay() throws Exception {
+        // A context closed earlier in this JVM persists its window on shutdown into the same file.
+        repository.deleteAll(repository.findByDayOrderByP95MsDesc(LocalDate.now()));
         mockMvc.perform(get("/api/v1/todos")).andExpect(status().isOk());
-        snapshotService.snapshotToday();
+        snapshotService.persistWindows();
         mockMvc.perform(get("/api/v1/todos")).andExpect(status().isOk());
-        snapshotService.snapshotToday();
+        snapshotService.persistWindows();
 
         List<RequestMetricDaily> rows = repository.findByDayOrderByP95MsDesc(LocalDate.now()).stream()
                 .filter(row -> row.getRoute().equals("GET /api/v1/todos"))
                 .toList();
         assertThat(rows).hasSize(1);
+        assertThat(rows.get(0).getCalls()).isEqualTo(2);
         repository.deleteAll(repository.findByDayOrderByP95MsDesc(LocalDate.now()));
     }
 

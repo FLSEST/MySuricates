@@ -92,8 +92,8 @@ export function ApiKeyGuard({ children }: { children: React.ReactNode }) {
         </div>
 
         <div className="bg-surface-raised rounded-xl border border-border p-6">
-          <div className="flex items-start gap-3 mb-5 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
-            <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+          <div className="flex items-start gap-3 mb-5 p-3 rounded-lg bg-warning/10 border border-warning/20">
+            <AlertTriangle className="w-5 h-5 text-warning shrink-0 mt-0.5" />
             <p className="text-sm text-text-secondary">{t.security.authHint}</p>
           </div>
 

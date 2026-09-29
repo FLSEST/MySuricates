@@ -22,7 +22,7 @@ export function SecurityBanner() {
   if (!securityDisabled) return null;
 
   return (
-    <div className="bg-amber-500/90 text-white px-4 py-2 text-sm font-medium text-center">
+    <div className="bg-warning-subtle text-warning border-b border-warning/30 px-4 py-2 text-sm font-medium text-center">
       {t.security.warning}
     </div>
   );

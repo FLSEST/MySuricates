@@ -280,7 +280,8 @@ rule block word for word, `UMGANG MIT BEKANNTEN BEFUNDEN (VERBINDLICH)` (the pro
 - **Markdown:** the findings table shows only `OPEN`, `AWAITING_VERIFICATION` and new findings.
   Classified ones are summed up in one line, `Bewusst eingeordnet: <N> (akzeptiert <x>, verworfen
   <y>) - siehe Audit Center`, unless one has measurably degraded. Degraded means: a supporting
-  metric lies more than 10 % above its last value. That is the threshold at which
+  metric lies more than 10 % above its last value, or the change rate newly reaches the hotspot
+  threshold. That is the threshold at which
   `AuditAcceptancePolicy` reopens an acceptance, too; smaller fluctuations do not count.
 - **Counting:** `gate_status` and the numbers in the Markdown count only `OPEN`,
   `AWAITING_VERIFICATION` and new findings, classified ones only if this run's measurement shows they
@@ -312,7 +313,8 @@ reads the threshold from `AuditAcceptancePolicy`, so that prompt and platform me
 - `ACCEPTED_RISK` and `DISMISSED` stay unchanged when they are absent from the snapshot. Only `OPEN`
   and `AWAITING_VERIFICATION` become `RESOLVED`.
 - If an `ACCEPTED_RISK` finding re-appears, `AuditAcceptancePolicy` checks it against the evidence
-  frozen at acceptance: if a measured value lies more than 10 % above it, the finding becomes `OPEN`
+  frozen at acceptance: if a measured value lies more than 10 % above it or the change rate has newly
+  reached the hotspot threshold, the finding becomes `OPEN`
   again (the disposition note gets `Verschlechtert: old → new`); if the acceptance is 180 days old, it
   moves to `AWAITING_VERIFICATION` (`Wiedervorlage nach 180 Tagen`). A `DISMISSED` finding stays
   `DISMISSED` even when it re-appears.

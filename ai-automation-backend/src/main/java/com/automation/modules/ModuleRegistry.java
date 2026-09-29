@@ -136,7 +136,8 @@ public final class ModuleRegistry {
         if (!uiEditable) {
             throw new ModuleChangeException(ErrorCode.MODULES_NOT_EDITABLE,
                     "Modules cannot be switched at runtime on this instance — set " + UI_EDITABLE_PROPERTY
-                            + "=true in the startup configuration, or change automation.modules.* and restart");
+                            + "=true in the startup configuration, or change automation.modules.* and restart",
+                    Map.of("property", UI_EDITABLE_PROPERTY));
         }
         Map<ModuleCatalog, Boolean> normalized = new EnumMap<>(ModuleCatalog.class);
         for (Map.Entry<ModuleCatalog, Boolean> entry : requested.entrySet()) {

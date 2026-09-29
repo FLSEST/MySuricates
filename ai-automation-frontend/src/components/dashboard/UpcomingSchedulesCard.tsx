@@ -80,7 +80,7 @@ export function UpcomingSchedulesCard() {
                   {schedule.projectName ? (
                     <span className="text-[10px] text-accent/70 truncate block">{schedule.projectName}</span>
                   ) : schedule.targetType === 'CHAIN' ? (
-                    <span className="text-[10px] text-accent/70 truncate block">Chain</span>
+                    <span className="text-[10px] text-accent/70 truncate block">{t.common.chain}</span>
                   ) : null}
                 </div>
               </div>

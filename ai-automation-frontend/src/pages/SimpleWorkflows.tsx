@@ -235,7 +235,7 @@ export function SimpleWorkflows() {
               <div className="flex items-center gap-2 shrink-0">
                 <StatusDot status={latestStatus.get(workflow.id)} />
                 <button
-                  aria-label="pin"
+                  aria-label={pinnedWorkflowIds.includes(workflow.id) ? t.simple.unpinWorkflow : t.simple.pinWorkflow}
                   className={pinnedWorkflowIds.includes(workflow.id) ? 'text-accent' : 'text-text-tertiary hover:text-text'}
                   onClick={() => togglePinnedWorkflow(workflow.id)}
                 >

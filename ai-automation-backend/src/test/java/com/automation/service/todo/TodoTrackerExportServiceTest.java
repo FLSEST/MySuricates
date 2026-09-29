@@ -116,6 +116,8 @@ class TodoTrackerExportServiceTest {
 
         assertThatThrownBy(() -> service.exportToTracker("t-1", null, null))
                 .isInstanceOf(TaskExportException.class)
+                .satisfies(e -> assertThat(((TaskExportException) e).getParams())
+                        .containsEntry("setting", "project.config.taskExport.provider"))
                 .extracting("code").isEqualTo(ErrorCode.NO_TASK_TARGET);
     }
 
@@ -160,6 +162,8 @@ class TodoTrackerExportServiceTest {
 
         assertThatThrownBy(() -> service.exportToTracker("t-1", "GITHUB", null))
                 .isInstanceOf(TaskExportException.class)
+                .satisfies(e -> assertThat(((TaskExportException) e).getParams())
+                        .containsEntry("setting", "project.config.taskExport.target"))
                 .extracting("code").isEqualTo(ErrorCode.NO_TASK_TARGET);
         verify(integrationOAuthService, never()).getValidAccessToken(anyString());
     }

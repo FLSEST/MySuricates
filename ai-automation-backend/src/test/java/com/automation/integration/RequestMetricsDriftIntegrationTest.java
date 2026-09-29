@@ -52,7 +52,7 @@ class RequestMetricsDriftIntegrationTest {
     @BeforeEach
     void setUp(TestInfo testInfo) {
         route = ROUTE_PREFIX + testInfo.getTestMethod().orElseThrow().getName();
-        collector.snapshotAndReset();
+        collector.drainWindows();
         config.setEnabled(true);
         config.setDriftDetectionEnabled(true);
         config.setDriftFactor(2.0);
@@ -63,7 +63,7 @@ class RequestMetricsDriftIntegrationTest {
 
     @AfterEach
     void tearDown() {
-        collector.snapshotAndReset();
+        collector.drainWindows();
         cleanUp();
     }
 

@@ -6,6 +6,7 @@ import {
   Square,
 } from 'lucide-react';
 import { WorkflowRow } from './WorkflowRow';
+import { useT } from '../../i18n';
 import type { useNavigate } from 'react-router-dom';
 import type { Workflow } from '../../types';
 
@@ -43,6 +44,7 @@ export function ProjectGroup({
   onToggleProjectSelect,
   showDetails = false,
 }: ProjectGroupProps) {
+  const t = useT();
   const allSelected = workflows.every((w) => selectedIds.has(w.id));
   const someSelected = !allSelected && workflows.some((w) => selectedIds.has(w.id));
 
@@ -53,7 +55,7 @@ export function ProjectGroup({
           <button
             onClick={(e) => { e.stopPropagation(); onToggleProjectSelect(workflows); }}
             className="p-0.5 shrink-0 text-text-tertiary hover:text-accent transition-colors"
-            title={allSelected ? 'Alle abwählen' : 'Alle auswählen'}
+            title={allSelected ? t.workflows.deselectAllInProject : t.workflows.selectAllInProject}
           >
             {allSelected ? (
               <CheckSquare className="w-3.5 h-3.5 text-accent" />

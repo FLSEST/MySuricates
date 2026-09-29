@@ -42,7 +42,7 @@ export function TodoMetadata({ todo }: { todo: Todo }) {
             title={t.todos.viewFixRun}
           >
             <ExternalLink className="w-2.5 h-2.5" />
-            Fix Run
+            {t.todos.fixRun}
           </Link>
         </div>
       )}

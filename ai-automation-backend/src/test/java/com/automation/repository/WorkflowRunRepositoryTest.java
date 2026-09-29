@@ -371,15 +371,42 @@ class WorkflowRunRepositoryTest {
 
     @Test
     void should_find_runs_by_triggered_by_schedule_id() {
+        String scheduleId = "schedule-" + java.util.UUID.randomUUID();
         WorkflowRun scheduled = run(workflowA, RunStatus.COMPLETED, Instant.now());
-        scheduled.setTriggeredByScheduleId("schedule-123");
+        scheduled.setTriggeredByScheduleId(scheduleId);
         runRepository.save(scheduled);
         run(workflowA, RunStatus.COMPLETED, Instant.now());
 
-        List<WorkflowRun> result = runRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc("schedule-123");
+        List<WorkflowRun> result = runRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc(scheduleId, Limit.unlimited());
 
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).getTriggeredByScheduleId()).isEqualTo("schedule-123");
+        assertThat(result.get(0).getTriggeredByScheduleId()).isEqualTo(scheduleId);
+    }
+
+    /**
+     * Der letzte Status eines Zeitplans fuer die Einzelansicht: nur die Status-Spalte, neuester
+     * zuerst, bei {@code PageRequest.of(0, 1)} genau eine Zeile (TODO 86286572).
+     */
+    @Test
+    void should_find_only_the_newest_status_of_a_schedule() {
+        String scheduleId = "schedule-" + java.util.UUID.randomUUID();
+        Instant now = Instant.now();
+        scheduledRun(scheduleId, RunStatus.COMPLETED, now.minusSeconds(120));
+        scheduledRun(scheduleId, RunStatus.FAILED, now);
+        scheduledRun(scheduleId, RunStatus.CANCELLED, now.minusSeconds(60));
+        run(workflowA, RunStatus.RUNNING, now.plusSeconds(60)); // anderer bzw. kein Zeitplan
+
+        assertThat(runRepository.findStatusesByScheduleIdNewestFirst(scheduleId, PageRequest.of(0, 10)))
+                .containsExactly(RunStatus.FAILED, RunStatus.CANCELLED, RunStatus.COMPLETED);
+        assertThat(runRepository.findStatusesByScheduleIdNewestFirst(scheduleId, PageRequest.of(0, 1)))
+                .containsExactly(RunStatus.FAILED);
+        assertThat(runRepository.findStatusesByScheduleIdNewestFirst("no-such-schedule", PageRequest.of(0, 1))).isEmpty();
+    }
+
+    private void scheduledRun(String scheduleId, RunStatus status, Instant startedAt) {
+        WorkflowRun scheduled = run(workflowA, status, startedAt);
+        scheduled.setTriggeredByScheduleId(scheduleId);
+        runRepository.save(scheduled);
     }
 
     /** Die Run-Liste eines Zeitplans: die neuesten bis zum Limit, dazu ihre Gesamtzahl (TODO 86777fb4). */

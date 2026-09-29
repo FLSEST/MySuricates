@@ -69,4 +69,22 @@ class ErrorResponseTest {
         // Instant.toString() produces ISO-8601 format
         assertThat(response.getTimestamp()).matches("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z");
     }
+
+    @Test
+    void should_leaveParamsOutOfTheJson_when_theMessageIsFreeText() throws Exception {
+        var json = new com.fasterxml.jackson.databind.ObjectMapper()
+                .writeValueAsString(ErrorResponse.of(ErrorCode.INVALID_ARGUMENT, "Invalid cron expression: x"));
+
+        assertThat(json).doesNotContain("params");
+    }
+
+    @Test
+    void should_writeParams_evenWhenEmpty_because_emptyStillMeansTranslatable() throws Exception {
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+
+        assertThat(mapper.writeValueAsString(ErrorResponse.of(ErrorCode.INTERNAL_ERROR, "Internal server error", Map.of())))
+                .contains("\"params\":{}");
+        assertThat(mapper.writeValueAsString(ErrorResponse.of(ErrorCode.WORKFLOW_SEALED, "m", Map.of("name", "Nightly"))))
+                .contains("\"params\":{\"name\":\"Nightly\"}");
+    }
 }

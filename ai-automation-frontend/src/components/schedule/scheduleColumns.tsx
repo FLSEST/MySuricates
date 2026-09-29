@@ -50,12 +50,13 @@ export function useScheduleColumns({ onEdit, onDelete, onToggle }: ScheduleColum
       key: 'type',
       header: t.schedules.scheduleType,
       render: (s: ScheduledWorkflow) => (
+        // Recurring is the normal case and stays neutral; once/delayed stand out (19ebb8a5)
         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
           s.scheduleType === 'ONCE'
-            ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
+            ? 'bg-info-subtle text-info'
             : s.scheduleType === 'DELAYED'
-            ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
-            : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+            ? 'bg-accent-subtle text-accent'
+            : 'bg-surface-hover text-text-secondary'
         }`}>
           {s.scheduleType === 'ONCE' ? t.schedules.once
             : s.scheduleType === 'DELAYED' ? t.schedules.delayed
@@ -73,7 +74,7 @@ export function useScheduleColumns({ onEdit, onDelete, onToggle }: ScheduleColum
             ? (s.scheduledAt ? formatTimestamp(s.scheduledAt, locale) : '-')
             : s.cronExpression}
           {s.scheduleType === 'DELAYED' && s.delayExpression && (
-            <span className="ml-1 text-orange-500">({s.delayExpression})</span>
+            <span className="ml-1 text-accent">({s.delayExpression})</span>
           )}
         </span>
       ),
@@ -84,7 +85,7 @@ export function useScheduleColumns({ onEdit, onDelete, onToggle }: ScheduleColum
       render: (s: ScheduledWorkflow) => (
         <span className="text-text-secondary">
           {(s.scheduleType === 'ONCE' || s.scheduleType === 'DELAYED') && !s.enabled
-            ? (<span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">{t.schedules.completed}</span>)
+            ? (<span className="text-xs px-2 py-0.5 rounded-full bg-surface-hover text-text-secondary">{t.schedules.completed}</span>)
             : s.nextRunAt ? formatTimestamp(s.nextRunAt, locale) : s.maintenance ? null : '-'}
           {/* The maintenance switch holds the schedule: no next run until it is switched off */}
           {s.maintenance && (

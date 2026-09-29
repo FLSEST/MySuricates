@@ -6,6 +6,9 @@ import com.automation.entity.AuditFindingStatus;
 import com.automation.entity.AuditIngestionStatus;
 import com.automation.entity.AuditReport;
 import com.automation.entity.AuditSeverity;
+import com.automation.entity.ChainEntry;
+import com.automation.entity.ChainRun;
+import com.automation.entity.ChainRunEntry;
 import com.automation.entity.GateStatus;
 import com.automation.entity.Goal;
 import com.automation.entity.GoalMilestone;
@@ -25,10 +28,12 @@ import com.automation.entity.TodoTrigger;
 import com.automation.entity.Wish;
 import com.automation.entity.WishStatus;
 import com.automation.entity.Workflow;
+import com.automation.entity.WorkflowChain;
 import com.automation.entity.WorkflowRun;
 import com.automation.metrics.SqlStatementCounter;
 import com.automation.repository.AuditFindingRepository;
 import com.automation.repository.AuditReportRepository;
+import com.automation.repository.ChainRunRepository;
 import com.automation.repository.GoalMilestoneRepository;
 import com.automation.repository.GoalMilestoneWorkPackageRepository;
 import com.automation.repository.GoalWorkPackageRepository;
@@ -41,6 +46,7 @@ import com.automation.repository.ScheduledWorkflowRepository;
 import com.automation.repository.TodoRepository;
 import com.automation.repository.TodoTriggerRepository;
 import com.automation.repository.WishRepository;
+import com.automation.repository.WorkflowChainRepository;
 import com.automation.repository.WorkflowRepository;
 import com.automation.repository.WorkflowRunRepository;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -154,7 +160,7 @@ class RequestCostRatchetTest {
      * reverse order after every test ({@link #removeTheSeed()}).
      */
     private static final List<String> SEEDED_TABLES = List.of(
-            "projects", "workflows", "workflow_runs", "step_results", "scheduled_workflows", "goals",
+            "projects", "workflows", "workflow_chains", "chain_runs", "workflow_runs", "step_results", "scheduled_workflows", "goals",
             "goal_projects", "goal_work_packages", "goal_milestones", "goal_milestone_work_packages", "goal_workflows", "todos", "todo_triggers", "wishes", "audit_reports", "audit_findings");
 
     /** Seed size — large enough that a per-row query shows up as a multiple, small enough to stay fast. */
@@ -167,6 +173,8 @@ class RequestCostRatchetTest {
     private static final int CANDIDATES = 5;
     private static final int WISHES = 10;
     private static final int AUDITS_PER_PROJECT = 2;
+    private static final int CHAINS = 3;
+    private static final int RUNS_PER_CHAIN = 2;
 
     /** A step output big enough that fetching it by accident is visible in the response size. */
     private static final String FAT_STEP_OUTPUT = "x".repeat(20_000);
@@ -280,6 +288,12 @@ class RequestCostRatchetTest {
      *       43 → 44 kB with TODO 259f4f66: {@code planning} carries {@code milestoneId} (since TODO
      *       c60bf914 {@code workPackageId}), and every tenth seeded todo now sits in one (measured
      *       43 201 bytes, 43 301 with the longer field name); the statement count stays 3.
+     *       3 → 5 statements and 44 → 46 kB with TODO 08224ed6, because the seed changed: every third
+     *       seeded todo now links a workflow of its batch and that workflow's project, so the page
+     *       looks up one project-name and one workflow-name list (measured 44 850 bytes). The dev
+     *       database had shown 30 statements for one big page — both lookups went through
+     *       {@code findAllById}, and every loaded project re-selected its nullable container. They
+     *       read id/name rows now; the seed makes a relapse visible here.</li>
      *       44 → 48 kB on purpose with TODO 68a5e24e (Ziele Stufe 2): {@code planning} carries the
      *       decision ({@code decision}, {@code decidedAt}, {@code decidedBy}, {@code decisionState}),
      *       and every seventh seeded todo has one (measured 47 073 bytes); still 3 statements. The
@@ -305,6 +319,9 @@ class RequestCostRatchetTest {
      *       projections ({@code GoalStatusCounts}, {@code GoalTodoRow}) — no todo description ever
      *       reaches the goal view. The detail is the goal plus one row query (the project names
      *       are only looked up when a todo has a project; the seeded ones have none).
+     *       2 → 3 statements with TODO 08224ed6: every third seeded todo now has a project, and the
+     *       names come from ONE id/name query. With {@code findAllById} the detail grew from 6 to 9
+     *       statements with the second batch – a container select per project.
      *       2 → 3 statements on purpose with TODO c60bf914 (Ziele Stufe 1): both now carry the goal's
      *       explicitly assigned projects ({@code goal_projects}, seeded one per batch on the first
      *       goal) — ONE {@code GoalProjectRow} query for the whole list, one for the detail, which
@@ -313,7 +330,11 @@ class RequestCostRatchetTest {
      *       detail carries the work packages and the milestones with their links (one join for the
      *       milestones and links), and every list row its next open milestone – for all goals from ONE
      *       query that counts the linked and completed packages in sub-queries instead of loading
-     *       packages or todos. Measured 2026-09-27: {@code /goals} 621 bytes, the detail 20 209 bytes.</li>
+     *       packages or todos. Measured 2026-09-27: {@code /goals} 621 bytes, the detail 20 209 bytes.
+     *       4 → 5 on the detail when TODO 08224ed6 met c60bf914 (2026-09-29): the 08224ed6 seed gives every
+     *       third todo the project of its linked workflow, which is not always a goal project – those
+     *       names come from ONE id/name query ({@code findIdAndNameByIdIn}, no {@code findAllById}), a
+     *       fixed extra statement that does not grow with the second batch (measured 25 146 bytes).</li>
      *   <li>{@code /goals?status=ACTIVE&projectId=}: added with TODO c60bf914 – the cockpit's project
      *       filter. The same four queries as the list, the filter is an {@code EXISTS} on
      *       {@code goal_projects} (measured 621 bytes). {@code {goalProject}} is the first project of
@@ -322,8 +343,8 @@ class RequestCostRatchetTest {
      *       points at a run of its batch (origin) and at another one as its last fix run (result),
      *       and each batch adds one active TodoTrigger that matches every seeded todo (worker). The
      *       route reads a lean projection and then one query per kind — goal check, rows, active
-     *       triggers, run states, workflow names, audit links (6 statements; no project lookup,
-     *       the seeded todos have none) — so the count stays flat when the second batch doubles
+     *       triggers, run states, workflow names, audit links (6 statements; 7 since TODO 08224ed6
+     *       gave every third seeded todo a project, which adds the one project-name lookup) — so the count stays flat when the second batch doubles
      *       runs, triggers and todos.</li>
      *   <li>{@code /schedules/{sched}/runs} and the calendar week: added with TODO 168e3d7f, both
      *       answered with every step of every run — 122 651 bytes for the two runs of one schedule,
@@ -358,10 +379,16 @@ class RequestCostRatchetTest {
      *       {@code /audits}; the text of the report on screen comes from {@code /audit-reports/{id}}.
      *       Measured 1 376 bytes; 3 statements: the page, the finding counts in one GROUP BY and the
      *       run origins (no chain and no version on the seeded runs, so no further lookups).</li>
+     *   <li>{@code /chains/runs}: added with TODO 44db05fd. {@code ChainRun.chain} is EAGER and the
+     *       filter query only joined it, so Hibernate loaded every chain of the page on its own – 4
+     *       statements for one seed batch (three chains), 7 for two. The query now fetches the chain
+     *       along and counts in a separate count query: 1 statement while the page is not full
+     *       (Spring skips the count then), measured 3 815 bytes for six runs.</li>
      * </ul>
      */
     static final Map<String, Cost> BASELINE = new TreeMap<>(Map.ofEntries(
-            Map.entry("/api/v1/todos", new Cost(3, 48_000)),
+            Map.entry("/api/v1/todos", new Cost(5, 50_000)),
+            Map.entry("/api/v1/chains/runs", new Cost(1, 5_000)),
             Map.entry("/api/v1/projects", new Cost(2, 1_200)),
             Map.entry("/api/v1/workflows", new Cost(2, 26_000)),
             Map.entry("/api/v1/executions", new Cost(5, 60_000)),
@@ -373,8 +400,8 @@ class RequestCostRatchetTest {
             Map.entry("/api/v1/schedules/{busy}/runs", new Cost(6, 32_000)),
             Map.entry("/api/v1/goals", new Cost(4, 2_000)),
             Map.entry("/api/v1/goals?status=ACTIVE&projectId={goalProject}", new Cost(4, 2_000)),
-            Map.entry("/api/v1/goals/{goal}", new Cost(4, 40_000)),
-            Map.entry("/api/v1/goals/{goal}/relations", new Cost(6, 35_000)),
+            Map.entry("/api/v1/goals/{goal}", new Cost(5, 40_000)),
+            Map.entry("/api/v1/goals/{goal}/relations", new Cost(7, 35_000)),
             Map.entry("/api/v1/goals/{goal}/work-packages", new Cost(2, 2_000)),
             Map.entry("/api/v1/goals/{goal}/milestones", new Cost(3, 2_000)),
             Map.entry("/api/v1/goals/{goal}/workflows", new Cost(2, 2_000)),
@@ -402,6 +429,8 @@ class RequestCostRatchetTest {
     @Autowired private WishRepository wishRepository;
     @Autowired private AuditReportRepository auditReportRepository;
     @Autowired private AuditFindingRepository auditFindingRepository;
+    @Autowired private WorkflowChainRepository chainRepository;
+    @Autowired private ChainRunRepository chainRunRepository;
     @Autowired private TransactionTemplate transactions;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private EntityManagerFactory entityManagerFactory;
@@ -649,9 +678,15 @@ class RequestCostRatchetTest {
                     .status(Todo.Status.OPEN).priority(Todo.Priority.LOW).projectId(projectIds.get(0))
                     .tags("performance,testing").build());
         }
+        // Jedes dritte Todo haengt an einem Workflow der Charge und dessen Projekt (TODO 08224ed6): Die
+        // Liste loest beide Namen auf. Ueber findAllById kam je Workflow und je Projekt ein eigenes
+        // select containers dazu – mit der zweiten Charge verdoppelt sich das und faellt als Wachstum auf.
         for (int t = 0; t < TODOS; t++) {
             boolean fromRun = t % 5 == 0;
+            Workflow linked = t % 3 == 0 ? workflows.get(t % workflows.size()) : null;
             todoRepository.save(Todo.builder()
+                    .linkedWorkflowId(linked != null ? linked.getId() : null)
+                    .projectId(linked != null ? linked.getProject().getId() : null)
                     .workPackageId(t % 10 == 0 ? workPackageIds.get(t / 10 % 2) : null)
                     .goalId(firstGoalId)
                     .goalRank(t % 2 == 0 ? t + 1 : null)
@@ -668,6 +703,43 @@ class RequestCostRatchetTest {
         }
         seedWishes(batch, workflows);
         seedAudits(batch, workflows, runIds);
+        seedChains(batch, workflows, runIds);
+    }
+
+    /**
+     * Ketten (TODO 44db05fd): {@link #CHAINS} je Charge mit je {@link #RUNS_PER_CHAIN} Laeufen.
+     * {@code ChainRun.chain} ist EAGER; laedt die Laufliste die Kette nicht in derselben Abfrage mit,
+     * holt Hibernate jede Kette der Seite einzeln nach – mit der zweiten Charge doppelt so oft.
+     */
+    private void seedChains(String batch, List<Workflow> workflows, List<String> runIds) {
+        for (int c = 0; c < CHAINS; c++) {
+            Workflow first = workflows.get(c);
+            WorkflowChain chain = chainRepository.save(WorkflowChain.builder()
+                    .name("Cost Chain " + batch + c)
+                    .description("Seeded for the request cost ratchet")
+                    .entries(new ArrayList<>(List.of(ChainEntry.builder().workflowId(first.getId()).build())))
+                    .build());
+            for (int r = 0; r < RUNS_PER_CHAIN; r++) {
+                chainRunRepository.save(ChainRun.builder()
+                        .chain(chain)
+                        .status(RunStatus.COMPLETED)
+                        .entryRuns(new ArrayList<>(List.of(ChainRunEntry.builder()
+                                .entryIndex(0)
+                                .workflowId(first.getId())
+                                .workflowName(first.getName())
+                                .projectName(first.getProject().getName())
+                                .workflowRunId(runIds.get(c * RUNS_PER_CHAIN + r))
+                                .status(RunStatus.COMPLETED)
+                                .startedAt(RUN_STARTED)
+                                .completedAt(RUN_STARTED.plusSeconds(5))
+                                .durationMs(5_000L)
+                                .build())))
+                        .startedAt(RUN_STARTED.plusSeconds(60L * r))
+                        .completedAt(RUN_STARTED.plusSeconds(60L * r + 5))
+                        .durationMs(5_000L)
+                        .build());
+            }
+        }
     }
 
     /**

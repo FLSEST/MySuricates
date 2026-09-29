@@ -50,6 +50,10 @@
     "perf.frontend.lazy-chunk-preloaded",
     "perf.request.slow-route",
     "perf.request.sql-statements",
+    "perf.request.connection-wait",
+    "perf.request.trend-slower",
+    "perf.request.response-growth",
+    "perf.request.drift",
     "perf.jvm.metrics-unavailable"
   ],
   "mysuricates.security": [

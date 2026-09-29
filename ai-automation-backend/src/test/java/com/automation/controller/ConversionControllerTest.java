@@ -9,6 +9,7 @@ import com.automation.service.system.ApiKeyService;
 import com.automation.service.conversion.WorkflowSuggestion;
 import com.automation.entity.BlockDefinition;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -20,6 +21,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.List;
 import java.util.Map;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -82,7 +85,8 @@ class ConversionControllerTest {
                 "wf-new", "proj-1", "Project", null, null, "My Workflow",
                 "desc", null, List.of(), null, Map.of(), List.of(), List.of(), 0, null, null, null, null, Map.of(), null, null, null, null, null);
 
-        when(conversionService.createWorkflowFromSuggestion("run-1", "proj-1", "My Workflow"))
+        // Alte Clients schicken nur Projekt und Name: ohne Blöcke erzeugt der Server den Vorschlag neu.
+        when(conversionService.createWorkflowFromSuggestion("run-1", "proj-1", "My Workflow", null, null))
                 .thenReturn(response);
 
         mockMvc.perform(post("/api/v1/conversions/runs/run-1/create-workflow")
@@ -91,6 +95,31 @@ class ConversionControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value("wf-new"))
                 .andExpect(jsonPath("$.name").value("My Workflow"));
+    }
+
+    /** Der geprüfte Vorschlag aus der Vorschau wird unverändert an den Service durchgereicht (TODO 935af6d3). */
+    @Test
+    void createWorkflow_withReviewedBlocks_passesThemThrough() throws Exception {
+        WorkflowResponse response = new WorkflowResponse(
+                "wf-new", "proj-1", "Project", null, null, "Geprüft",
+                "Aus der Vorschau", null, List.of(), null, Map.of(), List.of(), List.of(), 0, null, null, null, null, Map.of(), null, null, null, null, null);
+        ArgumentCaptor<List<BlockDefinition>> blocks = ArgumentCaptor.captor();
+        when(conversionService.createWorkflowFromSuggestion(eq("run-1"), eq("proj-1"), eq("Geprüft"),
+                eq("Aus der Vorschau"), blocks.capture())).thenReturn(response);
+
+        mockMvc.perform(post("/api/v1/conversions/runs/run-1/create-workflow")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"projectId":"proj-1","name":"Geprüft","description":"Aus der Vorschau",
+                                 "blocks":[{"type":"shell","config":{"command":"npm test"}}]}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("wf-new"));
+
+        assertThat(blocks.getValue()).singleElement().satisfies(b -> {
+            assertThat(b.getType()).isEqualTo("shell");
+            assertThat(b.getConfig()).containsEntry("command", "npm test");
+        });
     }
 
     @Test

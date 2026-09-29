@@ -25,7 +25,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleNotFound(ResourceNotFoundException ex) {
-        return respond(ErrorCode.RESOURCE_NOT_FOUND, ex.getMessage());
+        return respond(ErrorCode.RESOURCE_NOT_FOUND, ex.getMessage(), ex.getParams());
     }
 
     @ExceptionHandler(NoSuchElementException.class)
@@ -36,7 +36,8 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(TokenBudgetExceededException.class)
     public ResponseEntity<ErrorResponse> handleTokenBudgetExceeded(TokenBudgetExceededException ex) {
         log.warn("Token budget exceeded: {}", ex.getMessage());
-        return respond(ErrorCode.TOKEN_BUDGET_EXCEEDED, ex.getMessage());
+        return respond(ErrorCode.TOKEN_BUDGET_EXCEEDED, ex.getMessage(), Map.of(
+                "used", String.valueOf(ex.getUsedTokens()), "budget", String.valueOf(ex.getBudgetTokens())));
     }
 
     @ExceptionHandler(WorkflowExecutionException.class)
@@ -66,19 +67,19 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(TaskExportException.class)
     public ResponseEntity<ErrorResponse> handleTaskExport(TaskExportException ex) {
         log.warn("Task export error [{}]: {}", ex.getCode(), ex.getMessage());
-        return respond(ex.getCode(), ex.getMessage());
+        return respond(ex.getCode(), ex.getMessage(), ex.getParams());
     }
 
     @ExceptionHandler(HardeningException.class)
     public ResponseEntity<ErrorResponse> handleHardening(HardeningException ex) {
         log.warn("Hardening rule [{}]: {}", ex.getCode(), ex.getMessage());
-        return respond(ex.getCode(), ex.getMessage());
+        return respond(ex.getCode(), ex.getMessage(), ex.getParams());
     }
 
     @ExceptionHandler(ModuleChangeException.class)
     public ResponseEntity<ErrorResponse> handleModuleChange(ModuleChangeException ex) {
         log.warn("Module switch refused [{}]: {}", ex.getCode(), ex.getMessage());
-        return respond(ex.getCode(), ex.getMessage());
+        return respond(ex.getCode(), ex.getMessage(), ex.getParams());
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
@@ -159,7 +160,8 @@ public class GlobalExceptionHandler {
         if (supported != null && supported.length > 0) {
             builder.header(HttpHeaders.ALLOW, String.join(", ", supported));
         }
-        return builder.body(ErrorResponse.of(ErrorCode.METHOD_NOT_ALLOWED, message));
+        return builder.body(ErrorResponse.of(ErrorCode.METHOD_NOT_ALLOWED, message,
+                Map.of("method", String.valueOf(ex.getMethod()), "path", String.valueOf(request.getRequestURI()))));
     }
 
     // Repositories/services that look up by id with EntityNotFoundException (e.g. an unknown run id
@@ -173,10 +175,15 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGeneral(Exception ex) {
         log.error("Unhandled exception", ex);
-        return respond(ErrorCode.INTERNAL_ERROR, "Internal server error");
+        return respond(ErrorCode.INTERNAL_ERROR, "Internal server error", Map.of());
     }
 
     private ResponseEntity<ErrorResponse> respond(ErrorCode code, String message) {
-        return ResponseEntity.status(code.getHttpStatus()).body(ErrorResponse.of(code, message));
+        return respond(code, message, null);
+    }
+
+    /** @param params non-null when code and params describe the message completely (see {@link CodedException}) */
+    private ResponseEntity<ErrorResponse> respond(ErrorCode code, String message, Map<String, String> params) {
+        return ResponseEntity.status(code.getHttpStatus()).body(ErrorResponse.of(code, message, params));
     }
 }

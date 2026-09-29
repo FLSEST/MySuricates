@@ -121,7 +121,7 @@ function ModalFrame({ onClose, title, children, footer, size, resizable }: Omit<
             <button
               onClick={onClose}
               className="p-2 rounded-lg text-text-tertiary hover:text-text hover:bg-surface-raised transition-colors"
-              aria-label="Close"
+              aria-label={t.common.close}
             >
               <X className="w-4 h-4" />
             </button>

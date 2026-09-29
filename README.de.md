@@ -110,7 +110,9 @@ datiert in der Tabelle:
 
 Die Testzahlen stammen aus dem CI-Lauf zu genau diesem Commit und sind damit nachpruefbar. Die
 CI-Definition (`.github/workflows/ci.yml`) faehrt seit dem 2026-09-12 beide Suiten bei jedem Push,
-zusaetzlich zu Hygiene-Gate und Secret-Scan; seit dem 2026-09-21 auf Ubuntu 26.04.
+zusaetzlich zu Hygiene-Gate und Secret-Scan; seit dem 2026-09-21 auf Ubuntu 26.04. Seit dem
+2026-09-29 entfaellt eine Suite, wenn die Aenderung sie nachweislich nicht beruehrt (etwa reine
+Doku); einmal pro Woche laufen beide ohne Filter.
 
 ## Reifegrad und bekannte Schulden
 

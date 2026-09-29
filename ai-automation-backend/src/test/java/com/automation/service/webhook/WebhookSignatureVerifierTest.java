@@ -84,7 +84,8 @@ class WebhookSignatureVerifierTest {
 
         assertThatThrownBy(() -> verifier.verify(webhook, BODY, HttpHeaders.EMPTY))
                 .isInstanceOf(HardeningException.class)
-                .satisfies(e -> assertThat(((HardeningException) e).getCode()).isEqualTo(ErrorCode.WEBHOOK_SIGNATURE_INVALID));
+                .satisfies(e -> assertThat(((HardeningException) e).getCode()).isEqualTo(ErrorCode.WEBHOOK_SIGNATURE_INVALID))
+                .satisfies(e -> assertThat(((HardeningException) e).getParams()).containsEntry("header", "X-Signature"));
         verify(activityLog).warn(eq(LogCategory.SECURITY), contains("missing signature"), eq("WebhookSignatureVerifier"), eq("wh-1"));
     }
 

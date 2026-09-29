@@ -50,7 +50,7 @@ export const PROJECT_ACTIVE_TODOS_STALE_MS = 30_000;
 export type ViewMode = 'list' | 'board';
 
 export const priorityColor: Record<TodoPriority, string> = {
-  CRITICAL: 'bg-red-700 dark:bg-red-600',
+  CRITICAL: 'bg-danger ring-2 ring-danger/40',
   HIGH: 'bg-danger',
   MEDIUM: 'bg-warning',
   LOW: 'bg-text-tertiary',

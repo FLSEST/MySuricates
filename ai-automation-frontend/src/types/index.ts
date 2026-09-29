@@ -2060,5 +2060,9 @@ export interface RequestMetricRoute {
 export interface ApiError {
   error: string;
   timestamp: string;
+  /** Stable error code of the backend (`ErrorCode`), e.g. `WORKFLOW_SEALED`. */
+  code?: string;
+  /** Present when code + params describe the error completely — the UI then translates the code. */
+  params?: Record<string, string>;
   fieldErrors?: Record<string, string>;
 }

@@ -49,7 +49,7 @@ export function SetupGuidePanel({ providerId, displayName, requiresCredentials =
       {!connected && (
         <>
           <div className="flex items-center gap-2 mb-1">
-            <Settings2 className="w-5 h-5 text-amber-500" />
+            <Settings2 className="w-5 h-5 text-warning" />
             <h3 className="font-semibold text-text">
               {t.integrations.setupTitle.replace('{provider}', displayName)}
             </h3>
@@ -91,9 +91,9 @@ export function SetupGuidePanel({ providerId, displayName, requiresCredentials =
                           <button
                             onClick={() => copyToClipboard(step.code!, i)}
                             className="absolute top-1 right-1 p-1 rounded hover:bg-surface-secondary text-text-tertiary hover:text-text transition-colors"
-                            title="Copy"
+                            title={t.common.copy}
                           >
-                            {copied === i ? <CheckCircle2 className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+                            {copied === i ? <CheckCircle2 className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5" />}
                           </button>
                         </div>
                       )}

@@ -24,7 +24,7 @@ final class TrayMenuBuilder {
 
         String browserBaseUrl = traySettings.browserBaseUrl();
         if (state.pendingApprovals() > 0) {
-            MenuItem approvals = new MenuItem(state.pendingApprovals() + " Freigabe(n) wartend");
+            MenuItem approvals = new MenuItem(approvalsText(state));
             approvals.addActionListener(e -> TrayLinks.open(TrayLinks.approvals(browserBaseUrl)));
             menu.add(approvals);
             menu.addSeparator();
@@ -68,27 +68,47 @@ final class TrayMenuBuilder {
                                   SystemTrayService.TrayState state,
                                   String version,
                                   DockerExpectation dockerExpectation) {
-        MenuItem header = new MenuItem("MySuricates v" + version);
+        MenuItem header = new MenuItem(headerText(version));
         header.setEnabled(false);
         menu.add(header);
         menu.addSeparator();
 
         state.instances().forEach(light -> {
-            MenuItem status = new MenuItem(light.kind().label() + ": "
-                    + SystemTrayService.statusText(light.color()));
+            MenuItem status = new MenuItem(instanceText(light));
             status.setEnabled(false);
             menu.add(status);
         });
 
-        MenuItem runs = new MenuItem(String.format("%d aktiv | %d%% Erfolg",
-                state.activeRuns(), state.successPercent()));
+        MenuItem runs = new MenuItem(runsText(state));
         runs.setEnabled(false);
         menu.add(runs);
 
-        MenuItem docker = new MenuItem("Docker: " + (!state.dockerOk()
-                ? "Offline" : dockerExpectation.isConfigured() ? "OK" : "nicht eingerichtet"));
+        MenuItem docker = new MenuItem(dockerText(state, dockerExpectation));
         docker.setEnabled(false);
         menu.add(docker);
         menu.addSeparator();
+    }
+
+    // Beschriftungen ohne AWT-Objekte, damit sie auch headless prüfbar sind.
+
+    static String headerText(String version) {
+        return "MySuricates v" + version;
+    }
+
+    static String approvalsText(SystemTrayService.TrayState state) {
+        return state.pendingApprovals() + " Freigabe(n) wartend";
+    }
+
+    static String instanceText(TrayInstanceMonitor.InstanceLight light) {
+        return light.kind().label() + ": " + SystemTrayService.statusText(light.color());
+    }
+
+    static String runsText(SystemTrayService.TrayState state) {
+        return String.format("%d aktiv | %d%% Erfolg", state.activeRuns(), state.successPercent());
+    }
+
+    static String dockerText(SystemTrayService.TrayState state, DockerExpectation dockerExpectation) {
+        return "Docker: " + (!state.dockerOk()
+                ? "Offline" : dockerExpectation.isConfigured() ? "OK" : "nicht eingerichtet");
     }
 }

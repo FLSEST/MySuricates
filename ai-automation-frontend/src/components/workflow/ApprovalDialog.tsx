@@ -44,7 +44,7 @@ export function ApprovalDialog({ approval, onSubmit, onDismiss, loading }: Appro
 
         <div className="mb-6 min-h-0 flex flex-col">
           <ApprovalQuestion question={approval.question} maxHeightClass="max-h-[60vh]" />
-          <p className="text-xs text-text-tertiary mt-1">Step {approval.stepIndex + 1}</p>
+          <p className="text-xs text-text-tertiary mt-1">{t.common.stepNumber.replace('{n}', String(approval.stepIndex + 1))}</p>
         </div>
 
         <div className="flex flex-wrap gap-2">

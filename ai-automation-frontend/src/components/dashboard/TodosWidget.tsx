@@ -11,7 +11,7 @@ import { WidgetSkeleton } from './WidgetSkeleton';
 import { useDashboardData } from './dashboardDataContext';
 
 const priorityColor: Record<TodoPriority, string> = {
-  CRITICAL: 'bg-red-700 dark:bg-red-600',
+  CRITICAL: 'bg-danger ring-2 ring-danger/40',
   HIGH: 'bg-danger',
   MEDIUM: 'bg-accent',
   LOW: 'bg-text-tertiary',
@@ -159,7 +159,7 @@ export function TodosWidget() {
             {backlog > 0 && (
               <span className="flex items-center gap-1 text-text-tertiary/60">
                 <Circle className="w-2 h-2 fill-text-tertiary/30 text-text-tertiary/30" />
-                {backlog} Backlog
+                {backlog} {t.todos.statuses.BACKLOG}
               </span>
             )}
           </div>

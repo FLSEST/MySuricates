@@ -15,7 +15,7 @@ import type { CalendarSourceAdapter } from './types';
 export const schedulesAdapter: CalendarSourceAdapter = {
   sourceId: 'schedules',
   label: 'Zeitpläne',
-  color: 'bg-violet-500',
+  color: 'bg-chart-3',
 
   isAvailable: () => true,
 
@@ -36,7 +36,7 @@ export const schedulesAdapter: CalendarSourceAdapter = {
         allDay: false,
         source: 'schedules',
         sourceLabel: 'Zeitpläne',
-        color: 'bg-violet-500',
+        color: 'bg-chart-3',
         status: s.scheduleType === 'ONCE' ? 'ONCE' : 'CRON',
         link: s.workflowId ? `/workflows/${s.workflowId}` : undefined,
       }));

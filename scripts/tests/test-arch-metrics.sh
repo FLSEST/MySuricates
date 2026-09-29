@@ -197,7 +197,7 @@ assert "Paketkopplung" in prompt and "KEIN Befund mehr" in prompt, "Paketkopplun
 assert "Regelwechsel 4.6.0:" in prompt, "einmalige Erklaerung des Regelwechsels fehlt"
 assert "NCLOC" in prompt and "Hotspot" in prompt, "NCLOC-Baender und Hotspot-Regel fehlen"
 assert "nur Kollaborateure" in prompt, "Zahl meint Kollaborateure"
-assert wf["version"] == "4.6.0", wf["version"]
+assert wf["version"] == "4.6.1", wf["version"]
 delta = next(b for b in blocks if b.get("name") == "delta_scan")
 assert delta["config"].get("timeout_seconds", 0) >= 180, "Struktur-Scan braucht Luft fuer Last"
 # Die Kollaborateur-Zaehlung und die Ratchet-Listen leben seit 4.6.0 in arch-metrics.sh.

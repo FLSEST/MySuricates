@@ -25,6 +25,12 @@ Alle Fehler folgen diesem Format:
 
 Das Feld `details` wird nur bei Bedarf mitgeliefert (`@JsonInclude(NON_NULL)`).
 
+`params` (Objekt aus Zeichenketten) kommt nur mit, wenn Code und Parameter die Meldung vollständig
+beschreiben – etwa `{"code":"WORKFLOW_SEALED","params":{"name":"Nightly"}}` oder
+`{"code":"RESOURCE_NOT_FOUND","params":{"resource":"Workflow","id":"…"}}`, auch leer (`{}`) bei festem
+Text. Die Oberfläche zeigt dann ihre eigene Übersetzung des Codes; `error` bleibt der englische Text für
+Logs und API-Clients. Ohne `params` ist `error` Freitext der Wurfstelle und wird so angezeigt.
+
 **Error-Codes:**
 
 | Code | HTTP-Status |
@@ -2365,6 +2371,7 @@ Aktuelle Execution-Konfiguration abrufen (Timeouts, Token-Limits etc.). Enthält
 | `request-metrics-drift-factor` | 1.1–100.0 |
 | `request-metrics-drift-min-calls` | 1–100000 |
 | `request-metrics-baseline-days` | 1–365 |
+| `request-metrics-trend-min-daily-calls` | 1–100000 |
 
 Die Liste ist der Stand von `ExecutionSettingKeys.BOUNDS`. Ein Schlüssel ohne Grenzen dort ist
 über diesen Endpunkt **nicht** erreichbar, auch wenn ein Applier existiert — zwei Wächter-Tests
@@ -3616,9 +3623,17 @@ Workflow aus einem Agentic-Run erstellen.
 ```json
 {
   "projectId": "uuid",
-  "name": "Konvertierter Workflow"
+  "name": "Konvertierter Workflow",
+  "description": "Beschreibung aus der Vorschau",
+  "blocks": [{ "type": "shell", "config": { "command": "npm test" } }]
 }
 ```
+
+`description` und `blocks` sind optional: der geprüfte Vorschlag aus `GET …/suggest`. Mit `blocks`
+werden genau diese Blöcke gespeichert, ohne den Vorschlag neu zu erzeugen (kein KI-Aufruf); `name`
+ist dann Pflicht (sonst `400`), der Lauf muss existieren (`404`) und abgeschlossen sein. Ohne
+`blocks` erzeugt der Server den Vorschlag neu (bisheriges Verhalten). Die Baufehler-Prüfung meldet
+Befunde des gespeicherten Workflows in beiden Fällen im Activity-Log.
 
 **Response:** `WorkflowResponse`
 

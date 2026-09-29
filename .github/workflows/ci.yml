@@ -1,15 +1,53 @@
 name: CI
 
+# Push nur auf main und auf Release-Tags: Auf origin gibt es allein main, Arbeits-Branches aus
+# Worktrees werden nicht gepusht. Ein PR-Branch im selben Repo lief vorher doppelt (push und
+# pull_request); jetzt deckt ihn allein pull_request ab, ohne Branch-Filter, damit auch fremde
+# PRs voll durchlaufen.
 on:
   push:
-    branches: ["**"]
+    branches: [main]
+    tags: ["v*"]
   pull_request:
-    branches: ["**"]
+  workflow_dispatch:
+  # Einmal pro Woche alles, unabhaengig vom Pfadfilter: Wechselwirkungen und Drift
+  # (npm-Stand, OSV-Daten) fallen so auch ohne passende Aenderung auf.
+  schedule:
+    - cron: "0 4 * * 1"
+
+# Ein neuer Lauf desselben Refs bricht den alten ab — ausser auf main: Dort soll jeder Commit
+# ein eigenes Ergebnis bekommen.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
   contents: read
 
 jobs:
+  # Welche Suiten braucht diese Aenderung? Die Einordnung steht in scripts/ci/changed-scopes.sh
+  # (samt der Liste, was Backend-Tests ausserhalb von ai-automation-backend/ lesen) und hat einen
+  # eigenen Selbsttest. Ohne Fremd-Action: nur git diff. Tags, schedule, workflow_dispatch und
+  # jede fehlende Basis ergeben fuer beide Suiten true.
+  changes:
+    name: Geaenderte Bereiche
+    runs-on: ubuntu-26.04
+    outputs:
+      backend: ${{ steps.scopes.outputs.backend }}
+      frontend: ${{ steps.scopes.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      # PR: Basis und Kopf des PRs (nicht der Merge-Commit), push: before..sha. GITHUB_EVENT_NAME
+      # und GITHUB_REF_TYPE setzt GitHub selbst; das Skript liest sie.
+      - name: Geaenderte Pfade einordnen
+        id: scopes
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: bash scripts/ci/changed-scopes.sh | tee -a "$GITHUB_OUTPUT"
+
   hygiene:
     name: Public Hygiene
     runs-on: ubuntu-26.04
@@ -26,8 +64,9 @@ jobs:
         run: bash scripts/tests/test-public-hygiene.sh
       # Dieselbe Pruefung wie der pre-push-Hook, hier auf die Commits dieses Push-Ereignisses:
       # faengt, was an einem Klon ohne installierte Hooks vorbeikam (Autor-Adresse, Nachricht,
-      # neu hinzugekommene Inhalte). Beim ersten Push eines Branches ist `before` die Null-Referenz,
-      # nach einem Force-Push liegt er nicht im Checkout — beides wird hoerbar uebersprungen.
+      # neu hinzugekommene Inhalte). Beim ersten Push eines Refs (auch eines Tags) ist `before`
+      # die Null-Referenz, nach einem Force-Push liegt er nicht im Checkout — beides wird hoerbar
+      # uebersprungen.
       - name: Pre-Push-Gate auf die Commits dieses Pushes
         if: github.event_name == 'push'
         env:
@@ -38,8 +77,29 @@ jobs:
           else
             bash scripts/ci/pre-push-checks.sh --range "${BEFORE}..${GITHUB_SHA}" --skip-tree --skip-build
           fi
+      # Dasselbe fuer einen Pull Request, damit auch fremde PRs die Commit-Pruefung bekommen.
+      # Geprueft wird der PR-Kopf, nicht der Merge-Commit, den GitHub fuer den Checkout baut —
+      # dessen Committer ist GitHub selbst. Untere Grenze ist die Merge-Basis von Basis und Kopf:
+      # Liegt der PR hinter main, saehe `git diff base..head` die neueren main-Zeilen sonst als
+      # entfernt und die alten als neu hinzugekommen. Fehlt einer der Commits im Checkout
+      # (fetch-depth 0 holt alle Branches, der Kopf haengt am Merge-Commit), wird hoerbar
+      # uebersprungen.
+      - name: Pre-Push-Gate auf die Commits dieses Pull Requests
+        if: github.event_name == 'pull_request'
+        env:
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if ! git cat-file -e "${PR_BASE}^{commit}" 2>/dev/null || ! git cat-file -e "${PR_HEAD}^{commit}" 2>/dev/null \
+             || ! MERGE_BASE="$(git merge-base "$PR_BASE" "$PR_HEAD")"; then
+            echo "Kein Bereich (Basis oder Kopf des PRs nicht im Checkout) — Commit-Pruefung uebersprungen"
+          else
+            bash scripts/ci/pre-push-checks.sh --range "${MERGE_BASE}..${PR_HEAD}" --skip-tree --skip-build
+          fi
       - name: Pre-Push-Gate Selbsttest (Hooks, Nachrichten, Autor-Adresse, Scope)
         run: bash scripts/tests/test-pre-push-checks.sh
+      - name: Pfadfilter der CI Selbsttest (changed-scopes)
+        run: bash scripts/tests/test-changed-scopes.sh
       - name: Setup-Modul-Preset Selbsttest
         run: bash scripts/tests/test-module-preset.sh
       # Der Probelauf selbst braucht Docker und zehn Minuten — hier nur Aufruf, Vorab-Pruefungen
@@ -48,6 +108,11 @@ jobs:
         run: |
           bash scripts/tests/test-installer-probe.sh
           python3 -m unittest discover -s scripts/tests -p 'test_installer_probe_report.py'
+      # Der Lasttest selbst baut ein JAR und faehrt eine Wegwerf-Instanz (Workflow "Lasttest vor dem
+      # Release", release.sh fragt danach) — hier nur Auswertung, Verdict, Baseline und Treiber gegen
+      # einen HTTP-Server aus der Standardbibliothek.
+      - name: Lasttest Selbsttest (ohne Instanz)
+        run: python3 -m unittest discover -s scripts/tests -p 'test_load_test_*.py'
       - name: Container-Instanz Selbsttest (deploy/, ohne Docker)
         run: |
           bash scripts/tests/test-host-mounts.sh
@@ -138,8 +203,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  # Uebersprungen nur bei ausdruecklichem "false" aus changes: Scheitert die Einordnung selbst,
+  # laeuft die Suite trotzdem (!cancelled() statt des impliziten success()), statt als
+  # uebersprungen und damit bestanden durchzugehen.
   backend:
     name: Backend Tests
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.backend != 'false' }}
     runs-on: ubuntu-26.04
     defaults:
       run:
@@ -184,6 +254,8 @@ jobs:
 
   frontend:
     name: Frontend Lint + Test + Build
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.frontend != 'false' }}
     runs-on: ubuntu-26.04
     defaults:
       run:

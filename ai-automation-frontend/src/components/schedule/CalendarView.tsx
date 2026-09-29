@@ -181,13 +181,13 @@ export function CalendarView() {
                     {dayEvents.length > 0 && (
                       <div className="flex gap-1 mt-1 flex-wrap">
                         {scheduledCount > 0 && (
-                          <span className="inline-block w-2 h-2 rounded-full bg-info" title={`${scheduledCount} scheduled`} />
+                          <span className="inline-block w-2 h-2 rounded-full bg-info" title={t.schedules.calendarDotScheduled.replace('{count}', String(scheduledCount))} />
                         )}
                         {successCount > 0 && (
-                          <span className="inline-block w-2 h-2 rounded-full bg-success" title={`${successCount} successful`} />
+                          <span className="inline-block w-2 h-2 rounded-full bg-success" title={t.schedules.calendarDotSuccessful.replace('{count}', String(successCount))} />
                         )}
                         {failedCount > 0 && (
-                          <span className="inline-block w-2 h-2 rounded-full bg-danger" title={`${failedCount} failed`} />
+                          <span className="inline-block w-2 h-2 rounded-full bg-danger" title={t.schedules.calendarDotFailed.replace('{count}', String(failedCount))} />
                         )}
                       </div>
                     )}

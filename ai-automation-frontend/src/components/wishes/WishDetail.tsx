@@ -102,7 +102,7 @@ export function WishDetail({ wishId, onCancel, onDelete }: {
                 onClick={() => navigate(`/chains`)}
               >
                 <span className="text-sm text-accent flex items-center gap-1">
-                  Chain <ChevronRight className="w-3.5 h-3.5" />
+                  {t.common.chain} <ChevronRight className="w-3.5 h-3.5" />
                 </span>
               </div>
             )}

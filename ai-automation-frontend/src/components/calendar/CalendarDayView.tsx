@@ -109,8 +109,8 @@ function DayEventItem({ event, showTime }: { event: UnifiedCalendarEvent; showTi
             <>
               <span className="text-xs text-text-tertiary">·</span>
               <span className={`text-xs ${
-                event.status === 'COMPLETED' || event.status === 'DONE' ? 'text-green-500'
-                : event.status === 'FAILED' ? 'text-red-500'
+                event.status === 'COMPLETED' || event.status === 'DONE' ? 'text-success'
+                : event.status === 'FAILED' ? 'text-danger'
                 : 'text-text-tertiary'
               }`}>
                 {event.status}

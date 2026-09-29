@@ -14,8 +14,8 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -85,7 +85,8 @@ class WorkflowMemoryContextSectionTest {
 
         assertThat(sb.toString()).contains("Memory 0").contains("Memory 7");
         verify(workflowMemoryRepository).findTop8ByActiveTrueOrderByCreatedAtDesc();
-        verify(workflowMemoryRepository, never()).findByActiveTrueOrderByCreatedAtDesc();
+        // Keine weitere Memory-Abfrage — insbesondere keine, die alle aktiven Memories laedt (7a8481e2).
+        verifyNoMoreInteractions(workflowMemoryRepository);
     }
 
     @Test

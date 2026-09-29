@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { CheckCircle2, XCircle, Info, AlertTriangle, X } from 'lucide-react';
 import { useToastStore, type Toast, type ToastType } from '../../stores/toastStore';
+import { useT } from '../../i18n';
 
 const AUTO_DISMISS_MS = 4000;
 /**
@@ -25,6 +26,7 @@ const progressColors: Record<ToastType, string> = {
 };
 
 function ToastItem({ toast }: { toast: Toast }) {
+  const t = useT();
   const removeToast = useToastStore((s) => s.removeToast);
   const [exiting, setExiting] = useState(false);
   const [now, setNow] = useState(toast.createdAt);
@@ -101,7 +103,7 @@ function ToastItem({ toast }: { toast: Toast }) {
       <button
         onClick={handleClose}
         className="shrink-0 p-0.5 rounded-md text-text-tertiary hover:text-text transition-colors"
-        aria-label="Close"
+        aria-label={t.common.close}
       >
         <X className="w-4 h-4" />
       </button>

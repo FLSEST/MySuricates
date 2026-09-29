@@ -99,7 +99,7 @@ export function TagEditor({ t, tags, category, userEdited, onSave, disabled = fa
               onClick={() => removeTag(tag)}
               disabled={disabled}
               className="hover:text-danger transition-colors disabled:opacity-50"
-              aria-label={`remove ${tag}`}
+              aria-label={t.common.removeItem.replace('{name}', tag)}
             >
               <X className="w-3 h-3" />
             </button>

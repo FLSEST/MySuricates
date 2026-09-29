@@ -60,16 +60,17 @@ class TodoResponseAssemblerTest {
         Todo b = Todo.builder().id("b").projectId("p-1").linkedWorkflowId("wf-1").build();
         when(todoMapper.toResponse(a)).thenReturn(base("a"));
         when(todoMapper.toResponse(b)).thenReturn(base("b"));
-        List<Object[]> names = List.<Object[]>of(new Object[]{"p-1", "Proj"});
-        when(projectRepository.findIdAndNameByIdIn(Set.of("p-1"))).thenReturn(names);
-        when(workflowRepository.findAllById(Set.of("wf-1"))).thenReturn(List.of(Workflow.builder().id("wf-1").name("Fix").build()));
+        when(projectRepository.findIdAndNameByIdIn(Set.of("p-1"))).thenReturn(List.<Object[]>of(new Object[]{"p-1", "Proj"}));
+        when(workflowRepository.findIdAndNameByIdIn(Set.of("wf-1"))).thenReturn(List.<Object[]>of(new Object[]{"wf-1", "Fix"}));
 
         List<TodoResponse> responses = assembler.toResponses(List.of(a, b));
 
         assertThat(responses).extracting(TodoResponse::projectName).containsExactly("Proj", "Proj");
         assertThat(responses.get(1).linkedWorkflowName()).isEqualTo("Fix");
         verify(projectRepository, never()).findById(any());
+        // Keine ganzen Entities: findAllById kostete je Projekt ein select containers (TODO 08224ed6)
         verify(projectRepository, never()).findAllById(any());
+        verify(workflowRepository, never()).findAllById(any());
     }
 
     @Test
@@ -80,7 +81,7 @@ class TodoResponseAssemblerTest {
         assembler.toResponses(List.of(a));
 
         verify(projectRepository, never()).findIdAndNameByIdIn(any());
-        verify(workflowRepository, never()).findAllById(any());
+        verify(workflowRepository, never()).findIdAndNameByIdIn(any());
     }
 
     /** Modul goals aus (TODO c60bf914): kein planning, kein Zieltitel-Nachschlagen – die Daten bleiben am TODO. */

@@ -25,7 +25,8 @@ import java.util.stream.Collectors;
 /**
  * Turns {@link Todo} entities into {@link TodoResponse}s including the display names of the
  * linked project, workflow and goal. {@link #toResponses(List)} batch-loads the names (one query
- * per table) instead of N+1 lookups; {@link #toResponse(Todo)} is the single-entity variant.
+ * per table, project and workflow as id/name rows) instead of N+1 lookups;
+ * {@link #toResponse(Todo)} is the single-entity variant.
  */
 @Component
 @RequiredArgsConstructor
@@ -48,14 +49,13 @@ public class TodoResponseAssembler {
     }
 
     public List<TodoResponse> toResponses(List<Todo> todos) {
-        // Nur ID und Name: findAllById laedt ganze Projekte, und deren Container-Beziehung (nullable
-        // one-to-one, nicht als Proxy moeglich) kostet je Projekt ohne Container eine Abfrage mehr –
-        // sichtbar geworden an den Kandidaten eines Ziels mit zwei Projekten (TODO c60bf914).
+        // Nur ID und Name: findAllById laedt ganze Projekte bzw. Workflows samt Projekt, und die
+        // Container-Beziehung des Projekts (nullable one-to-one, nicht als Proxy moeglich) kostet je
+        // Projekt eine Abfrage mehr – 30 Statements fuer eine grosse Seite (TODO 08224ed6).
         Map<String, String> projectNames = namesFor(todos, Todo::getProjectId,
-                ids -> projectRepository.findIdAndNameByIdIn(ids).stream()
-                        .collect(Collectors.toMap(row -> (String) row[0], row -> (String) row[1])));
+                ids -> idToName(projectRepository.findIdAndNameByIdIn(ids)));
         Map<String, String> workflowNames = namesFor(todos, Todo::getLinkedWorkflowId,
-                ids -> workflowRepository.findAllById(ids).stream().collect(Collectors.toMap(Workflow::getId, Workflow::getName)));
+                ids -> idToName(workflowRepository.findIdAndNameByIdIn(ids)));
         Map<String, String> goalTitles = !goalsEnabled() ? Map.of() : namesFor(todos, Todo::getGoalId,
                 ids -> goalRepository.findAllById(ids).stream().collect(Collectors.toMap(Goal::getId, Goal::getTitle)));
         return todos.stream()
@@ -68,6 +68,12 @@ public class TodoResponseAssembler {
                                                 Function<Set<String>, Map<String, String>> loader) {
         Set<String> ids = todos.stream().map(idOf).filter(id -> id != null && !id.isBlank()).collect(Collectors.toSet());
         return ids.isEmpty() ? new HashMap<>() : loader.apply(ids);
+    }
+
+    private static Map<String, String> idToName(List<Object[]> rows) {
+        Map<String, String> names = new HashMap<>();
+        rows.forEach(row -> names.put((String) row[0], (String) row[1]));
+        return names;
     }
 
     // Null-safe lookup: todos without a projectId/linkedWorkflowId must not trigger a map lookup

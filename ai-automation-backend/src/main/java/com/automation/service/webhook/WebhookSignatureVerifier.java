@@ -16,6 +16,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.util.HexFormat;
+import java.util.Map;
 
 /**
  * Checks the HMAC-SHA256 signature of a webhook call over the raw request bytes. Applies to every
@@ -47,7 +48,8 @@ public class WebhookSignatureVerifier {
                         + " signature (workflow: " + webhook.getWorkflow().getName() + ")",
                 "WebhookSignatureVerifier", webhook.getId());
         throw new HardeningException(ErrorCode.WEBHOOK_SIGNATURE_INVALID,
-                "Missing or invalid " + HEADER + " header (expected sha256=<hex HMAC-SHA256 of the request body>)");
+                "Missing or invalid " + HEADER + " header (expected sha256=<hex HMAC-SHA256 of the request body>)",
+                Map.of("header", HEADER));
     }
 
     static boolean matches(String secret, byte[] body, String signature) {

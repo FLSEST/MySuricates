@@ -32,7 +32,7 @@ interface TrelloSearchResponse {
 export const trelloAdapter: CalendarSourceAdapter = {
   sourceId: 'trello',
   label: 'Trello',
-  color: 'bg-sky-500',
+  color: 'bg-chart-7',
 
   isAvailable: (integrations) =>
     integrations.some((p) => p.providerId === 'trello' && p.status === 'CONNECTED'),
@@ -59,7 +59,7 @@ export const trelloAdapter: CalendarSourceAdapter = {
         allDay: !card.due!.includes('T'),
         source: 'trello',
         sourceLabel: 'Trello',
-        color: card.dueComplete ? 'bg-sky-300' : 'bg-sky-500',
+        color: card.dueComplete ? 'bg-chart-7/50' : 'bg-chart-7',
         status: card.dueComplete ? 'DONE' : 'DUE',
         link: card.url,
       }));

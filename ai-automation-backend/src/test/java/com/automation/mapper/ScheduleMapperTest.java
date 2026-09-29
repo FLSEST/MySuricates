@@ -15,6 +15,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -23,10 +25,12 @@ import java.time.ZoneId;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -37,6 +41,9 @@ class ScheduleMapperTest {
     @Mock private ScheduledWorkflowRepository scheduledWorkflowRepository;
     @Mock private ActivityLogService activityLogService;
     @Mock private SchedulerMaintenanceMode maintenanceMode;
+
+    /** Die Einzelauflösung fragt nur die neueste Zeile ab (TODO 86286572). */
+    private static final Pageable NEWEST = PageRequest.of(0, 1);
 
     private static final Instant NOW = LocalDateTime.of(2026, 9, 24, 10, 0).atZone(ZoneId.systemDefault()).toInstant();
 
@@ -109,8 +116,8 @@ class ScheduleMapperTest {
         void pauseThatAlreadyEnded_changesNothing() {
             schedulerConfig.setSkipUntil(local(20, 12).toString());
             ScheduledWorkflow stale = daily("s-4", local(24, 8));
-            when(workflowRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc("s-4")).thenReturn(List.of());
-            when(chainRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc("s-4")).thenReturn(List.of());
+            when(workflowRunRepository.findStatusesByScheduleIdNewestFirst("s-4", NEWEST)).thenReturn(List.of());
+            when(chainRunRepository.findStatusesByScheduleIdNewestFirst("s-4", NEWEST)).thenReturn(List.of());
 
             ScheduledWorkflowResponse response = mapper.toResponse(stale);
 
@@ -176,9 +183,9 @@ class ScheduleMapperTest {
                     .id("s-1").workflow(wf).targetType(ScheduledWorkflow.TargetType.WORKFLOW)
                     .cronExpression("0 0 * * *").scheduleType(ScheduledWorkflow.ScheduleType.CRON)
                     .enabled(true).runCount(5).build();
-            when(workflowRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc("s-1"))
+            when(workflowRunRepository.findStatusesByScheduleIdNewestFirst("s-1", NEWEST))
                     .thenReturn(List.of());
-            when(chainRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc("s-1"))
+            when(chainRunRepository.findStatusesByScheduleIdNewestFirst("s-1", NEWEST))
                     .thenReturn(List.of());
 
             ScheduledWorkflowResponse response = mapper.toResponse(schedule);
@@ -199,9 +206,8 @@ class ScheduleMapperTest {
                     .cronExpression("0 0 * * *").scheduleType(ScheduledWorkflow.ScheduleType.CRON)
                     .build();
 
-            WorkflowRun run = WorkflowRun.builder().id("r-1").status(RunStatus.FAILED).build();
-            when(workflowRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc("s-1"))
-                    .thenReturn(List.of(run));
+            when(workflowRunRepository.findStatusesByScheduleIdNewestFirst("s-1", NEWEST))
+                    .thenReturn(List.of(RunStatus.FAILED));
 
             ScheduledWorkflowResponse response = mapper.toResponse(schedule);
 
@@ -215,9 +221,9 @@ class ScheduleMapperTest {
                     .id("s-1").workflow(wf).targetType(ScheduledWorkflow.TargetType.WORKFLOW)
                     .cronExpression("0 0 * * *").scheduleType(ScheduledWorkflow.ScheduleType.CRON)
                     .build();
-            when(workflowRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc("s-1"))
+            when(workflowRunRepository.findStatusesByScheduleIdNewestFirst("s-1", NEWEST))
                     .thenReturn(List.of());
-            when(chainRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc("s-1"))
+            when(chainRunRepository.findStatusesByScheduleIdNewestFirst("s-1", NEWEST))
                     .thenReturn(List.of());
 
             ScheduledWorkflowResponse response = mapper.toResponse(schedule);
@@ -236,9 +242,9 @@ class ScheduleMapperTest {
                     .id("s-2").chain(chain).targetType(ScheduledWorkflow.TargetType.CHAIN)
                     .cronExpression("0 0 * * *").scheduleType(ScheduledWorkflow.ScheduleType.CRON)
                     .build();
-            when(workflowRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc("s-2"))
+            when(workflowRunRepository.findStatusesByScheduleIdNewestFirst("s-2", NEWEST))
                     .thenReturn(List.of());
-            when(chainRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc("s-2"))
+            when(chainRunRepository.findStatusesByScheduleIdNewestFirst("s-2", NEWEST))
                     .thenReturn(List.of());
 
             ScheduledWorkflowResponse response = mapper.toResponse(schedule);
@@ -256,11 +262,10 @@ class ScheduleMapperTest {
                     .id("s-2").chain(chain).targetType(ScheduledWorkflow.TargetType.CHAIN)
                     .cronExpression("0 0 * * *").scheduleType(ScheduledWorkflow.ScheduleType.CRON)
                     .build();
-            when(workflowRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc("s-2"))
+            when(workflowRunRepository.findStatusesByScheduleIdNewestFirst("s-2", NEWEST))
                     .thenReturn(List.of());
-            ChainRun chainRun = ChainRun.builder().id("cr-1").status(RunStatus.COMPLETED).build();
-            when(chainRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc("s-2"))
-                    .thenReturn(List.of(chainRun));
+            when(chainRunRepository.findStatusesByScheduleIdNewestFirst("s-2", NEWEST))
+                    .thenReturn(List.of(RunStatus.COMPLETED));
 
             ScheduledWorkflowResponse response = mapper.toResponse(schedule);
 
@@ -294,8 +299,8 @@ class ScheduleMapperTest {
                 .id("s-1").workflow(wf).targetType(ScheduledWorkflow.TargetType.WORKFLOW)
                 .cronExpression("0 0 * * *").scheduleType(ScheduledWorkflow.ScheduleType.CRON)
                 .conflictBehavior(null).build();
-        when(workflowRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc("s-1")).thenReturn(List.of());
-        when(chainRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc("s-1")).thenReturn(List.of());
+        when(workflowRunRepository.findStatusesByScheduleIdNewestFirst("s-1", NEWEST)).thenReturn(List.of());
+        when(chainRunRepository.findStatusesByScheduleIdNewestFirst("s-1", NEWEST)).thenReturn(List.of());
 
         ScheduledWorkflowResponse response = mapper.toResponse(schedule);
 
@@ -337,8 +342,8 @@ class ScheduleMapperTest {
             assertThat(responses).extracting(ScheduledWorkflowResponse::lastRunStatus)
                     .containsExactly(RunStatus.COMPLETED, RunStatus.FAILED, null);
             // Die Einzelauflösung darf in der Liste nicht mehr vorkommen.
-            verify(workflowRunRepository, never()).findByTriggeredByScheduleIdOrderByStartedAtDesc(anyString());
-            verify(chainRunRepository, never()).findByTriggeredByScheduleIdOrderByStartedAtDesc(anyString());
+            verify(workflowRunRepository, never()).findStatusesByScheduleIdNewestFirst(anyString(), any());
+            verify(chainRunRepository, never()).findStatusesByScheduleIdNewestFirst(anyString(), any());
         }
 
         /** Die Abfrage liefert absteigend nach Startzeit — der erste Treffer je Zeitplan gewinnt. */
@@ -393,14 +398,21 @@ class ScheduleMapperTest {
             verifyNoInteractions(workflowRunRepository, chainRunRepository);
         }
 
-        /** Die Detail-Route behaelt die Einzelauflösung — dort sind zwei Abfragen zwei Abfragen. */
+        /**
+         * Die Detail-Route behaelt die Einzelauflösung — liest aber nur noch den neuesten Status
+         * (eine Zeile, {@code PageRequest.of(0, 1)}), keine Run-Liste als Entitaeten (TODO 86286572).
+         * Hat der Zeitplan einen Workflow-Run, wird nach Ketten-Runs gar nicht erst gefragt.
+         */
         @Test
-        void einzelneAntwortLoestWeiterEinzelnAuf() {
-            when(workflowRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc("s1"))
-                    .thenReturn(List.of(WorkflowRun.builder().status(RunStatus.COMPLETED).build()));
+        void einzelneAntwortLiestNurDenNeuestenStatus() {
+            when(workflowRunRepository.findStatusesByScheduleIdNewestFirst("s1", NEWEST))
+                    .thenReturn(List.of(RunStatus.COMPLETED));
 
             assertThat(mapper.toResponse(schedule("s1")).lastRunStatus())
                     .isEqualTo(RunStatus.COMPLETED);
+            verify(workflowRunRepository).findStatusesByScheduleIdNewestFirst("s1", PageRequest.of(0, 1));
+            verifyNoMoreInteractions(workflowRunRepository);
+            verifyNoInteractions(chainRunRepository);
         }
     }
 

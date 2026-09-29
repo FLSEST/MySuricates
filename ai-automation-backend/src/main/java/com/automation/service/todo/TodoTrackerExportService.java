@@ -98,26 +98,31 @@ public class TodoTrackerExportService {
 
         if (providerId == null) {
             throw new TaskExportException(ErrorCode.NO_TASK_TARGET,
-                    "Kein Ziel-Tracker konfiguriert (project.config.taskExport.provider)");
+                    "Kein Ziel-Tracker konfiguriert (project.config.taskExport.provider)",
+                    Map.of("setting", "project.config.taskExport.provider"));
         }
         if (!integrationRegistry.hasProvider(providerId)) {
-            throw new TaskExportException(ErrorCode.PROVIDER_NOT_TASK_CAPABLE, "Unbekannte Integration: " + providerId);
+            throw new TaskExportException(ErrorCode.PROVIDER_NOT_TASK_CAPABLE, "Unbekannte Integration: " + providerId,
+                    Map.of("provider", providerId));
         }
         IntegrationProvider provider = integrationRegistry.getProvider(providerId);
         if (!(provider instanceof TaskExportCapable taskProvider)) {
             throw new TaskExportException(ErrorCode.PROVIDER_NOT_TASK_CAPABLE,
-                    "Integration '" + providerId + "' kann keine Tasks aufnehmen");
+                    "Integration '" + providerId + "' kann keine Tasks aufnehmen",
+                    Map.of("provider", providerId));
         }
         boolean connected = integrationOAuthService.getConnection(providerId)
                 .map(c -> c.getStatus() == IntegrationConnection.ConnectionStatus.CONNECTED)
                 .orElse(false);
         if (!connected) {
             throw new TaskExportException(ErrorCode.PROVIDER_NOT_CONNECTED,
-                    "Integration '" + providerId + "' ist nicht verbunden");
+                    "Integration '" + providerId + "' ist nicht verbunden",
+                    Map.of("provider", providerId));
         }
         if (target == null) {
             throw new TaskExportException(ErrorCode.NO_TASK_TARGET,
-                    "Kein Ziel für '" + providerId + "' konfiguriert (project.config.taskExport.target)");
+                    "Kein Ziel für '" + providerId + "' konfiguriert (project.config.taskExport.target)",
+                    Map.of("setting", "project.config.taskExport.target"));
         }
 
         var input = new TaskExportCapable.TaskExportInput(

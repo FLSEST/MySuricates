@@ -9,6 +9,7 @@ interface GateStatusBannerProps {
 
 type GateKey = 'GREEN' | 'YELLOW' | 'RED';
 
+// Status tokens instead of fixed palette classes, so every theme colours the banner (19ebb8a5)
 const gateConfig: Record<GateKey, {
   container: string;
   iconWrap: string;
@@ -17,24 +18,24 @@ const gateConfig: Record<GateKey, {
   Icon: typeof AlertTriangle;
 }> = {
   GREEN: {
-    container: 'border-green-300/60 bg-green-50 dark:border-green-700/60 dark:bg-green-900/20',
-    iconWrap: 'bg-green-100 dark:bg-green-900/40',
-    iconColor: 'text-green-700 dark:text-green-300',
-    title: 'text-green-900 dark:text-green-100',
+    container: 'border-success/30 bg-success-subtle',
+    iconWrap: 'bg-success/15',
+    iconColor: 'text-success',
+    title: 'text-success',
     Icon: CheckCircle2,
   },
   YELLOW: {
-    container: 'border-yellow-300/60 bg-yellow-50 dark:border-yellow-700/60 dark:bg-yellow-900/20',
-    iconWrap: 'bg-yellow-100 dark:bg-yellow-900/40',
-    iconColor: 'text-yellow-700 dark:text-yellow-300',
-    title: 'text-yellow-900 dark:text-yellow-100',
+    container: 'border-warning/30 bg-warning-subtle',
+    iconWrap: 'bg-warning/15',
+    iconColor: 'text-warning',
+    title: 'text-warning',
     Icon: AlertTriangle,
   },
   RED: {
-    container: 'border-red-300/60 bg-red-50 dark:border-red-700/60 dark:bg-red-900/20',
-    iconWrap: 'bg-red-100 dark:bg-red-900/40',
-    iconColor: 'text-red-700 dark:text-red-300',
-    title: 'text-red-900 dark:text-red-100',
+    container: 'border-danger/30 bg-danger-subtle',
+    iconWrap: 'bg-danger/10',
+    iconColor: 'text-danger',
+    title: 'text-danger',
     Icon: XOctagon,
   },
 };
