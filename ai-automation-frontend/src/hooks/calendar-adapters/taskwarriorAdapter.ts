@@ -42,7 +42,7 @@ function parseTaskwarriorDate(value: string | undefined): Date | null {
 export const taskwarriorAdapter: CalendarSourceAdapter = {
   sourceId: 'taskwarrior',
   label: 'Taskwarrior',
-  color: 'bg-amber-500',
+  color: 'bg-chart-8',
 
   isAvailable: (integrations) =>
     integrations.some((p) => p.providerId === 'taskwarrior' && p.status === 'CONNECTED'),
@@ -67,7 +67,7 @@ export const taskwarriorAdapter: CalendarSourceAdapter = {
         allDay: true,
         source: 'taskwarrior',
         sourceLabel: 'Taskwarrior',
-        color: 'bg-amber-500',
+        color: 'bg-chart-8',
         status: 'DUE',
       }));
   },

@@ -67,6 +67,19 @@ describe('GateStatusBanner', () => {
     expect(screen.queryByText(/Category/)).toBeNull();
   });
 
+  // 19ebb8a5: status tokens instead of fixed palette classes
+  it.each([
+    ['GREEN', 'status', 'success'],
+    ['YELLOW', 'alert', 'warning'],
+    ['RED', 'alert', 'danger'],
+  ] as const)('colours the %s banner with the %s token', (gate, role, token) => {
+    render(<GateStatusBanner run={buildRun({ gate_status: gate })} />);
+    const banner = screen.getByRole(role);
+    expect(banner).toHaveClass(`bg-${token}-subtle`, `border-${token}/30`);
+    expect(banner.querySelector('.text-sm.font-semibold')).toHaveClass(`text-${token}`);
+    expect(banner.className).not.toMatch(/-(green|yellow|red)-\d/);
+  });
+
   it('uses German labels when locale is de', () => {
     useI18nStore.setState({ locale: 'de' });
     render(<GateStatusBanner run={buildRun({ gate_status: 'RED' })} />);

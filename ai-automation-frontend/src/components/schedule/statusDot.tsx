@@ -7,7 +7,7 @@ export function statusDot(status: RunStatus) {
     FAILED: 'bg-danger',
     INTERRUPTED: 'bg-danger',
     RUNNING: 'bg-accent',
-    CANCELLED: 'bg-gray-400',
+    CANCELLED: 'bg-text-tertiary',
   };
-  return <span className={`inline-block w-2 h-2 rounded-full ${colors[status] ?? 'bg-gray-400'}`} />;
+  return <span className={`inline-block w-2 h-2 rounded-full ${colors[status] ?? 'bg-text-tertiary'}`} />;
 }

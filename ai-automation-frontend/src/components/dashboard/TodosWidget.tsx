@@ -11,7 +11,7 @@ import { WidgetSkeleton } from './WidgetSkeleton';
 import { useDashboardData } from './dashboardDataContext';
 
 const priorityColor: Record<TodoPriority, string> = {
-  CRITICAL: 'bg-red-700 dark:bg-red-600',
+  CRITICAL: 'bg-danger ring-2 ring-danger/40',
   HIGH: 'bg-danger',
   MEDIUM: 'bg-accent',
   LOW: 'bg-text-tertiary',

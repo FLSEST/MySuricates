@@ -2046,6 +2046,7 @@ export const en = {
     integrations: 'Integrations',
     chains: 'Chains',
     triggers: 'Triggers',
+    triggersSplit: '{todo} Todo / {completion} Completion',
     memoryEntries: 'Memory Entries',
     active: 'active',
     archived: 'archived',

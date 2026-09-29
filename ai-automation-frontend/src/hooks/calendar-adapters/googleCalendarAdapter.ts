@@ -21,7 +21,7 @@ function parseGoogleDateTime(dt: { dateTime?: string; date?: string }): { date: 
 export const googleCalendarAdapter: CalendarSourceAdapter = {
   sourceId: 'google-calendar',
   label: 'Google Calendar',
-  color: 'bg-blue-500',
+  color: 'bg-chart-1',
 
   isAvailable: (integrations) =>
     integrations.some((p) => p.providerId === 'google-calendar' && p.status === 'CONNECTED'),
@@ -44,7 +44,7 @@ export const googleCalendarAdapter: CalendarSourceAdapter = {
         allDay,
         source: 'google-calendar',
         sourceLabel: 'Google Calendar',
-        color: 'bg-blue-500',
+        color: 'bg-chart-1',
         location: item.location,
         link: item.htmlLink,
       };

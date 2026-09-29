@@ -202,7 +202,7 @@ export function Projects() {
                             e.stopPropagation();
                             stopContainer.mutate(project.id);
                           }}
-                          className="text-danger hover:text-red-400 transition-colors font-medium"
+                          className="text-danger hover:text-danger/80 transition-colors font-medium"
                         >
                           {t.projects.stopContainer}
                         </button>

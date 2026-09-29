@@ -25,8 +25,8 @@ export function RouteErrorFallback() {
     <div className="min-h-screen flex items-center justify-center bg-bg-primary p-4">
       <div className="max-w-md w-full text-center space-y-6">
         <div className="flex justify-center">
-          <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center">
-            <AlertTriangle className="w-8 h-8 text-red-500" />
+          <div className="w-16 h-16 rounded-full bg-danger/10 flex items-center justify-center">
+            <AlertTriangle className="w-8 h-8 text-danger" />
           </div>
         </div>
         <div className="space-y-2">

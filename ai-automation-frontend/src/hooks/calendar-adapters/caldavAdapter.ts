@@ -36,7 +36,7 @@ export interface CalDavEventList {
   events?: CalDavEvent[];
 }
 
-const COLOR = 'bg-teal-500';
+const COLOR = 'bg-chart-6';
 
 /** All-day dates are local calendar days; date-times carry their offset (or are floating local time). */
 function toDate(dt: CalDavDateTime): Date {
