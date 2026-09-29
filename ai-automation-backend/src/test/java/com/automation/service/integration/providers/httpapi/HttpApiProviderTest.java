@@ -103,4 +103,48 @@ class HttpApiProviderTest {
         assertThat(provider.requiredModule()).isEqualTo(ModuleCatalog.HTTP_API);
         assertThat(provider.getAvailableActions()).extracting(a -> a.name()).containsExactly("request");
     }
+
+    @Test
+    void metadata_identifiesTheProvider() {
+        HttpApiProvider provider = provider(true);
+        assertThat(provider.getProviderId()).isEqualTo("http-api");
+        assertThat(provider.getDisplayName()).isEqualTo("HTTP API");
+        assertThat(provider.getIcon()).isNotBlank();
+        assertThat(provider.getDescription()).isNotBlank();
+    }
+
+    @Test
+    void oauthConfig_isEmptyAndUsesNoRealEnvVariables() {
+        var config = provider(true).getOAuthConfig();
+        assertThat(config.authorizationUrl()).isEmpty();
+        assertThat(config.tokenUrl()).isEmpty();
+        assertThat(config.defaultScopes()).isEmpty();
+        assertThat(config.clientIdEnvVar()).contains("NO_ENV");
+        assertThat(config.clientSecretEnvVar()).contains("NO_ENV");
+    }
+
+    @Test
+    void requestAction_declaresMethodsAndOptionalParameters() {
+        var action = provider(true).getAvailableActions().get(0);
+        assertThat(action.name()).isEqualTo("request");
+        assertThat(action.description()).isNotBlank();
+        assertThat(action.inputSchema().keySet())
+                .containsExactlyInAnyOrder("method", "path", "query", "headers", "body", "timeout_seconds", "fail_on_error");
+        assertThat(((Map<?, ?>) action.inputSchema().get("method")).get("enum"))
+                .isEqualTo(List.copyOf(HttpApiRequest.METHODS));
+    }
+
+    @Test
+    void fetchAccountInfo_withoutConnectionFails_andSendsNothing() {
+        assertThatThrownBy(() -> provider(true).fetchAccountInfo(null))
+                .isInstanceOf(IllegalStateException.class);
+        verify(client, never()).send(any(), any());
+    }
+
+    @Test
+    void validateCredentialInput_acceptsEmptyAuthHeader() {
+        provider(true).validateCredentialInput("https://api.example.com", "");
+        assertThatThrownBy(() -> provider(true).validateCredentialInput("", ""))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
 }
