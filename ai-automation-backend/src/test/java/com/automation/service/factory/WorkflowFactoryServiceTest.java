@@ -78,13 +78,15 @@ class WorkflowFactoryServiceTest {
                 new FactoryGeneratorResolver(claudeGenerator, codexGenerator, factoryConfig);
         FactoryPromptBuilder promptBuilder = new FactoryPromptBuilder(agentInstructionsService);
         FactoryResponseParser responseParser = new FactoryResponseParser(objectMapper);
+        GeneratedWorkflowCheck buildCheck = new GeneratedWorkflowCheck(new WorkflowAnalyzer(), objectMapper, activityLogService);
         FactoryVerificationService verificationService = new FactoryVerificationService(
-                workflowService, testingService, objectMapper, promptBuilder, responseParser, generatorResolver);
+                workflowService, testingService, objectMapper, promptBuilder, responseParser, generatorResolver,
+                buildCheck);
         factoryService = new WorkflowFactoryService(
                 generatorResolver, factoryConfig,
                 workflowService, templateService, verificationService,
                 projectRepository, objectMapper, promptBuilder, responseParser,
-                new GeneratedWorkflowCheck(new WorkflowAnalyzer(), objectMapper, activityLogService)
+                buildCheck
         );
 
         testProject = Project.builder()
@@ -363,6 +365,43 @@ class WorkflowFactoryServiceTest {
 
         assertThat(result.status()).isEqualTo("FAILED");
         assertThat(result.testStatus()).isEqualTo("FAILED");
+    }
+
+    @Test
+    void runFactory_autoFixRepairLosesABlock_isDiscarded_noRetestOfTheUnchangedWorkflow() throws IOException {
+        // TODO 99a9dfb0: the auto-fix repair goes through the build check before it is saved.
+        String generated = """
+                { "name": "Two WF", "blocks": [
+                  { "type": "shell", "name": "fetch", "config": { "command": "exit 1" } },
+                  { "type": "simple", "name": "summarize", "config": { "command": "Fasse zusammen: {{ block.fetch.output }}" } }
+                ] }
+                """;
+        when(claudeGenerator.generate(anyString(), anyString(), eq(600))).thenReturn(generated);
+        when(claudeGenerator.generate(anyString(), anyString(), eq(120)))
+                .thenReturn("[{ \"type\": \"shell\", \"name\": \"fetch\", \"config\": { \"command\": \"echo ok\" } }]");
+        Workflow workflow = Workflow.builder().id("wf-1").name("Two WF").project(testProject)
+                .blocks(new java.util.ArrayList<>(java.util.List.of(
+                        com.automation.entity.BlockDefinition.builder().type("shell").name("fetch")
+                                .config(new java.util.HashMap<>(Map.of("command", "exit 1")))
+                                .build(),
+                        com.automation.entity.BlockDefinition.builder().type("simple").name("summarize")
+                                .config(new java.util.HashMap<>(Map.of("command", "Fasse zusammen: {{ block.fetch.output }}")))
+                                .build())))
+                .build();
+        when(workflowService.create(any(), eq(ChangeSource.FACTORY))).thenReturn(workflow);
+        when(testingService.executeWorkflowOnTest(anyString(), anyString(), any())).thenReturn("run-1");
+        when(testingService.pollTestRun("run-1"))
+                .thenReturn(objectMapper.createObjectNode().put("status", "FAILED").put("error", "exit 1"));
+
+        WorkflowFactoryResult result = factoryService.runFactory(new WorkflowFactoryRequest(
+                "Two", null, null, "proj-1", null, false, true, 2, null));
+
+        assertThat(result.status()).isEqualTo("FAILED");
+        assertThat(result.retryErrors()).hasSize(2)
+                .allSatisfy(e -> assertThat(e).contains("Reparatur verworfen").contains("Blockzahl 2 → 1"));
+        verify(claudeGenerator, times(2)).generate(anyString(), anyString(), eq(120));
+        verify(testingService, times(1)).executeWorkflowOnTest(anyString(), anyString(), any());
+        verify(workflowService, never()).update(anyString(), any(), any());
     }
 
     @Test
