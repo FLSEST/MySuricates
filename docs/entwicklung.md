@@ -344,6 +344,28 @@ npx tsc --noEmit
 npm run lint
 ```
 
+### CI auf GitHub
+
+`.github/workflows/ci.yml` läuft bei jedem Push auf `main`, bei jedem `v*`-Tag, bei jedem Pull
+Request (ohne Branch-Filter, also auch für fremde PRs) und von Hand (`workflow_dispatch`).
+Arbeits-Branches aus Worktrees werden nicht gepusht; auf `origin` gibt es nur `main`. Ein neuer
+Lauf desselben Refs bricht den laufenden ab (`concurrency: ci-<ref>`) — außer auf `main`, dort
+bekommt jeder Commit ein eigenes Ergebnis.
+
+Backend- und Frontend-Suite laufen nur, wenn die Änderung sie braucht. Der Job `changes` ordnet die
+geänderten Pfade mit `scripts/ci/changed-scopes.sh` ein (nur `git diff`, keine Fremd-Action;
+Selbsttest `scripts/tests/test-changed-scopes.sh`). Das Backend wird **umgekehrt** gefiltert: Es
+entfällt nur, wenn *jede* geänderte Datei unter `ai-automation-frontend/` außerhalb von `src/data/`
+und `src/i18n/` liegt oder eine `.md` außerhalb von `docs/`, `ai-automation-backend/` und
+`workflow-pool/` ist (nicht `CLAUDE.md`) — Backend-Tests lesen auch `docs/`, `workflow-pool/`,
+`scripts/lib/`, `deploy/Dockerfile` und Teile des Frontends; die Liste steht im Skriptkopf. Das
+Frontend läuft bei Änderungen unter `ai-automation-frontend/`, an den Backend-Vorlagen
+(`src/main/resources/templates/`) und am `workflow-pool/`. Tags, `workflow_dispatch`, eine fehlende
+Vergleichsbasis (neuer Ref, Force-Push) und jede Änderung an `ci.yml` oder am Skript lassen beide
+laufen, ebenso der wöchentliche Lauf montags um 04:00 UTC — so fallen Wechselwirkungen und Drift
+(npm, OSV-Daten) auch ohne passende Änderung auf. Übersprungen wird nur bei ausdrücklichem `false`;
+scheitert die Einordnung, laufen beide Suiten. Hygiene-Gate und Secret-Scan laufen immer.
+
 ### E2E-Tests (Cypress)
 
 Die E2E-Tests laufen mit [Cypress](https://www.cypress.io/) gegen das **echte Backend** (kein Mocking). Testdaten werden per `cy.request()` direkt über die API angelegt und gelöscht.
@@ -1019,7 +1041,8 @@ in Sekunden bis zu einer Minute. Zwei Hooks rufen es auf: `commit-msg` (nur Nach
 Autor-Adresse, beim Schreiben — dort ist der Befund billig) und `pre-push` (der ganze Push-Bereich,
 das letzte Netz: fängt auch Commits aus Worktrees ohne Hooks, aus Run-Workspaces und mit
 `--no-verify`). Die CI fährt dieselben Bestands-Gates (`--tree`) und dieselbe Bereichsprüfung auf
-die Commits jedes Push-Ereignisses; die Regeln stehen in `scripts/lib/hygiene-rules.sh`.
+die Commits jedes Push-Ereignisses und jedes Pull Requests (dort Merge-Basis..PR-Kopf); die Regeln
+stehen in `scripts/lib/hygiene-rules.sh`.
 
 Geprüft wird je Push-Bereich (Remote-Stand..lokal; bei einem neuen Branch alles, was noch kein
 Remote-Ref kennt):

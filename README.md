@@ -109,7 +109,9 @@ dated in the table:
 
 The test numbers come from the CI run for exactly this commit and are therefore verifiable. The
 CI definition (`.github/workflows/ci.yml`) has run both suites on every push since 2026-09-12,
-in addition to the hygiene gate and secret scan; since 2026-09-21 on Ubuntu 26.04.
+in addition to the hygiene gate and secret scan; since 2026-09-21 on Ubuntu 26.04. Since
+2026-09-29 a suite is skipped when the change demonstrably does not touch it (pure documentation,
+for example); once a week both run without the filter.
 
 ## Maturity level and known debt
 
