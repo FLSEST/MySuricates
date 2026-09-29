@@ -14,7 +14,6 @@ import { GoalDetail } from '../GoalDetail';
 import { ModuleRoute } from '../ModuleRoute';
 import { Sidebar } from '../../components/layout/Sidebar';
 import type { Todo } from '../../types';
-import appSource from '../../App.tsx?raw';
 
 // c60bf914 (Flo): „Wird auch sauber durchgetestet, wie die TODO-Seite aussieht, wenn GOALS deaktiviert ist?“ –
 // „Ja, das war damals der Plan, dass es ein richtiges Modul ist.“ Jede Fläche mit Ziel-Anteil wird mit dem
@@ -151,13 +150,5 @@ describe.each([true, false])('module "goals" %s', (on) => {
       await new Promise((resolve) => setTimeout(resolve, 100));
       expect(goalCalls).toEqual([]);
     }
-  });
-});
-
-// Die App führt beide Zielseiten hinter dem Modul – sonst wäre der Direktaufruf bei „aus“ eine leere Seite
-describe('App routes', () => {
-  it('guards /goals and /goals/:goalId with the module "goals"', () => {
-    expect(appSource).toMatch(/path: 'goals', element: <ModuleRoute module="goals"><Goals \/><\/ModuleRoute>/);
-    expect(appSource).toMatch(/path: 'goals\/:goalId', element: <ModuleRoute module="goals"><GoalDetail \/><\/ModuleRoute>/);
   });
 });

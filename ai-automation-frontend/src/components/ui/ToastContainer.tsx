@@ -120,7 +120,8 @@ export function ToastContainer() {
   const toasts = useToastStore((s) => s.toasts);
 
   return createPortal(
-    <div className="fixed top-4 right-4 z-50 flex flex-col gap-2" aria-live="polite">
+    // Immer bedienbar – auch unter einem modalen Blatt, das den Rest der Seite inert macht (SidePanelFrame)
+    <div className="fixed top-4 right-4 z-50 flex flex-col gap-2" aria-live="polite" data-always-interactive="">
       {toasts.map((toast) => (
         <ToastItem key={toast.id} toast={toast} />
       ))}

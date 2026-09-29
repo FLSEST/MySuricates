@@ -248,13 +248,15 @@ function SheetPanel({ labelledBy, testId, kind, onClose, children }: {
   const [host] = useState(() => document.createElement('div'));
   useLayoutEffect(() => {
     document.body.appendChild(host);
-    // Alles außer dem Blatt tritt zurück. Öffnet das Blatt selbst einen modalen Dialog (TODO,
+    // Alles außer dem Blatt und den immer bedienbaren Portalen (`data-always-interactive`: Toasts)
+    // tritt zurück. Öffnet das Blatt selbst einen modalen Dialog (TODO,
     // Bearbeiten, Löschen – sie stehen im Seitenbaum), gilt solange dieser: dann ist nichts inert.
     const marked = new Set<Element>();
     const apply = () => {
       const otherModal = [...document.querySelectorAll('[aria-modal="true"]')].some((element) => !host.contains(element));
       for (const element of [...document.body.children]) {
-        if (element === host) continue;
+        // Toasts („Rückgängig“) bleiben bedienbar – Review c60bf914
+        if (element === host || element.hasAttribute('data-always-interactive')) continue;
         if (!otherModal && !element.hasAttribute('inert')) {
           element.setAttribute('inert', '');
           marked.add(element);
