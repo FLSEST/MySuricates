@@ -82,6 +82,23 @@ class GeneratedWorkflowCheckTest {
         assertThat(GeneratedWorkflowCheck.format(List.of())).isEmpty();
     }
 
+    /** TODO 81773d7b: dieselben Zeilen auf Englisch — Detail aus detailEn, englische Anführungszeichen und Schlusszeile. */
+    @Test
+    void formatAufEnglischNimmtDetailEn_undFaelltSonstAufDeutschZurueck() {
+        var f = new AnalyzerFinding("missing-required-config-key", AnalyzerFinding.Severity.HIGH, 1, "report",
+                "Pflichtschlüssel command fehlt", "required key command is missing");
+        List<AnalyzerFinding> many = new ArrayList<>();
+        for (int i = 0; i < 12; i++) {
+            many.add(finding(AnalyzerFinding.Severity.MEDIUM, i));
+        }
+
+        assertThat(GeneratedWorkflowCheck.format(List.of(f), "en"))
+                .isEqualTo("- HIGH missing-required-config-key — Block 2 \"report\": required key command is missing");
+        assertThat(GeneratedWorkflowCheck.format(List.of(f), "de")).isEqualTo(GeneratedWorkflowCheck.format(List.of(f)));
+        assertThat(GeneratedWorkflowCheck.summaryLines(many, "en")).last().isEqualTo("… and 2 more");
+        assertThat(GeneratedWorkflowCheck.summaryLines(many, "en").get(0)).endsWith(": Detail 0");   // ohne detailEn
+    }
+
     @Test
     void formatBegrenztAufZehnZeilenUndZaehltDenRest() {
         List<AnalyzerFinding> many = new ArrayList<>();

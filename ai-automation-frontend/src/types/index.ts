@@ -367,7 +367,10 @@ export interface AnalyzerFinding {
   /** 0-based index of the top-level block, -1 for the definition as a whole */
   blockIndex: number;
   blockName: string | null;
+  /** What was found, in German (the field older backends send). */
   detail: string;
+  /** The same sentence in English (TODO 81773d7b); absent on older backends — then `detail`. */
+  detailEn?: string | null;
 }
 
 export interface WorkflowAnalysis {
@@ -1165,8 +1168,10 @@ export interface WorkflowSuggestion {
   originalGoal: string;
   agenticStepsAnalyzed: number;
   available: boolean;
-  /** Build-check findings from MEDIUM up, HIGH first (TODO 326d5987); absent on older backends. */
+  /** Build-check findings from MEDIUM up, HIGH first (TODO 326d5987); German, absent on older backends. */
   buildFindings?: string[];
+  /** The same lines in English (TODO 81773d7b); absent or empty on older backends — then `buildFindings`. */
+  buildFindingsEn?: string[];
 }
 
 // ── Pagination ───────────────────────────────────────────
@@ -1743,8 +1748,10 @@ export interface WorkflowFactoryResult {
   promotedAsTemplate: boolean;
   durationMs: number;
   retryErrors: string[];
-  /** Build-check findings from MEDIUM up, HIGH first (TODO 326d5987); absent on older backends. */
+  /** Build-check findings from MEDIUM up, HIGH first (TODO 326d5987); German, absent on older backends. */
   buildFindings?: string[];
+  /** The same lines in English (TODO 81773d7b); absent or empty on older backends — then `buildFindings`. */
+  buildFindingsEn?: string[];
 }
 
 export interface FactoryTopicCategory {
@@ -1821,8 +1828,10 @@ export interface DialogWorkflowSuggestion {
   notAvailableReason: string | null;
   toolCallsAnalyzed: number;
   available: boolean;
-  /** Build-check findings from MEDIUM up, HIGH first (TODO 326d5987); absent on older backends. */
+  /** Build-check findings from MEDIUM up, HIGH first (TODO 326d5987); German, absent on older backends. */
   buildFindings?: string[];
+  /** The same lines in English (TODO 81773d7b); absent or empty on older backends — then `buildFindings`. */
+  buildFindingsEn?: string[];
 }
 
 // ── Modules (startup configuration, read-only) ──────────

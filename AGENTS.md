@@ -403,7 +403,8 @@ GET /api/v1/projects/<uuid>/workflows
 # Definition auf bekannte Baufehler pruefen (deterministisch, kein KI-Aufruf)
 GET /api/v1/workflows/{id}/analyze
 # → {"workflowId","workflowName","findingCount","bySeverity",
-#     "findings":[{"rule","severity","blockIndex","blockName","detail"}]}
+#     "findings":[{"rule","severity","blockIndex","blockName","detail","detailEn"}]}
+# detail = deutscher Satz (wie bisher), detailEn = derselbe Satz auf Englisch (jede Regel liefert beide)
 # Regeln: unknown-block-reference, chain-only-placeholder, audit-only-placeholder ({{ audit_findings }}
 #         ohne gueltiges metadata.audit), unwired-output (nur KI-Bloecke),
 #         absolute-home-path, missing-strict-mode, duplicated-instructions, dated-model-id,

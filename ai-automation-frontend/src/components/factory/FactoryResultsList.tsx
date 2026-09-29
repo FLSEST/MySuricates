@@ -91,7 +91,7 @@ export function FactoryResultsList({
                   </p>
                 )}
                 {r.buildFindings && r.buildFindings.length > 0 && (
-                  <div className="mt-1.5"><BuildFindingsNote findings={r.buildFindings} /></div>
+                  <div className="mt-1.5"><BuildFindingsNote findings={r.buildFindings} findingsEn={r.buildFindingsEn} /></div>
                 )}
               </div>
               {r.durationMs > 0 && (

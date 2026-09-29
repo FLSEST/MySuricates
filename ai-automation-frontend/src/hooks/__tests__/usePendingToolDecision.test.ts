@@ -25,7 +25,8 @@ function tool(expiresAt = ''): PendingTool {
 const inTenMinutes = () => new Date(Date.now() + 600_000).toISOString();
 
 describe('usePendingToolDecision', () => {
-  it('keeps the answer of the confirm call as result and sends the session', async () => {
+  it('keeps the answer of the confirm call as result and sends the session and UI language', async () => {
+    useI18nStore.setState({ locale: 'de' });
     let body: unknown;
     server.use(http.post('/api/v1/assistant/pending-tools/:id/confirm', async ({ request }) => {
       body = await request.json();
@@ -39,7 +40,8 @@ describe('usePendingToolDecision', () => {
 
     expect(result.current.result).toEqual({ toolId: 'pt-1', type: 'start_workflow', success: true, message: 'Gestartet' });
     expect(result.current.error).toBeNull();
-    expect(body).toEqual({ sessionId: 's-1' });
+    // language: the build check after a workflow tool answers in it (TODO 81773d7b)
+    expect(body).toEqual({ sessionId: 's-1', language: 'de' });
   });
 
   it('keeps the answer of the reject call as result', async () => {

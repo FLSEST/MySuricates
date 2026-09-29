@@ -100,7 +100,7 @@ export function SuggestionPanel({
         </div>
       )}
 
-      <BuildFindingsNote findings={suggestion.buildFindings} />
+      <BuildFindingsNote findings={suggestion.buildFindings} findingsEn={suggestion.buildFindingsEn} />
 
       {suggestion.suggestedDescription && (
         <p className="text-xs text-text-secondary leading-relaxed">{suggestion.suggestedDescription}</p>

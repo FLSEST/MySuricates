@@ -111,6 +111,9 @@ final class SelfAccessRules {
     private static final String ALTERNATIVE = " — Plattformdaten kommen als Kontextvariable (etwa {{ open_todos }},"
             + " {{ previous_report }}), TODOs über die Blöcke todo-create/todo-update/todo-close,"
             + " externe Dienste über den Integrations-Block";
+    private static final String ALTERNATIVE_EN = " — platform data comes as a context variable (such as {{ open_todos }},"
+            + " {{ previous_report }}), TODOs via the todo-create/todo-update/todo-close blocks,"
+            + " external services via the integration block";
 
     static void apply(List<BlockDefinition> blocks, List<AnalyzerFinding> out) {
         for (int i = 0; i < blocks.size(); i++) {
@@ -131,7 +134,9 @@ final class SelfAccessRules {
             if (hit != null) {
                 out.add(AnalyzerFinding.of("self-api-call", Severity.HIGH, i, name,
                         "ruft im Shell-Code die eigene REST-API auf ('" + hit + "') — braucht einen API-Key"
-                                + " im Klartext und umgeht die Kontextinjektion" + ALTERNATIVE));
+                                + " im Klartext und umgeht die Kontextinjektion" + ALTERNATIVE,
+                        "calls the instance's own REST API in shell code ('" + hit + "') — needs an API key"
+                                + " in plain text and bypasses the context injection" + ALTERNATIVE_EN));
                 return;
             }
         }
@@ -141,7 +146,9 @@ final class SelfAccessRules {
             if (hit != null) {
                 out.add(AnalyzerFinding.of("self-api-call", Severity.MEDIUM, i, name,
                         "der Auftrag nennt einen Aufruf der eigenen REST-API ('" + hit + "') — prüfen, ob die"
-                                + " KI ihn ausführen soll" + ALTERNATIVE));
+                                + " KI ihn ausführen soll" + ALTERNATIVE,
+                        "the prompt mentions a call to the instance's own REST API ('" + hit + "') — check whether"
+                                + " the AI is meant to make it" + ALTERNATIVE_EN));
                 return;
             }
         }
@@ -213,7 +220,9 @@ final class SelfAccessRules {
         if (settings.find()) {
             out.add(AnalyzerFinding.of("direct-db-access", Severity.HIGH, i, name,
                     "nennt die Tabelle app_settings — dort liegen API-Key und Zugangsdaten; der direkte"
-                            + " Zugriff umgeht Hibernate und die einzige Connection (pool-size=1)" + ALTERNATIVE));
+                            + " Zugriff umgeht Hibernate und die einzige Connection (pool-size=1)" + ALTERNATIVE,
+                    "names the table app_settings — it holds the API key and credentials; direct"
+                            + " access bypasses Hibernate and the single connection (pool-size=1)" + ALTERNATIVE_EN));
             return;
         }
         Matcher db = PLATFORM_DB.matcher(all);
@@ -223,14 +232,19 @@ final class SelfAccessRules {
                 out.add(AnalyzerFinding.of("direct-db-access", Severity.HIGH, i, name,
                         "liest die Plattform-Datenbank '" + db.group() + "' direkt — erlaubt ist nur, die"
                                 + " Dateigröße anzusehen (stat, du); der Zugriff umgeht Hibernate und die"
-                                + " einzige Connection (pool-size=1)" + ALTERNATIVE));
+                                + " einzige Connection (pool-size=1)" + ALTERNATIVE,
+                        "reads the platform database '" + db.group() + "' directly — only looking at the"
+                                + " file size is allowed (stat, du); the access bypasses Hibernate and the"
+                                + " single connection (pool-size=1)" + ALTERNATIVE_EN));
                 return;
             }
         }
         if (shell.stream().map(SelfAccessRules::withoutCommentLines).anyMatch(code -> SQLITE.matcher(code).find())) {
             out.add(AnalyzerFinding.of("direct-db-access", Severity.MEDIUM, i, name,
                     "ruft sqlite3 auf — prüfen, ob die Plattform-Datenbank gemeint ist; die Datei eines"
-                            + " Projekts ist in Ordnung, die der Instanz nie" + ALTERNATIVE));
+                            + " Projekts ist in Ordnung, die der Instanz nie" + ALTERNATIVE,
+                    "calls sqlite3 — check whether the platform database is meant; a project's own"
+                            + " file is fine, the instance's never" + ALTERNATIVE_EN));
         }
     }
 

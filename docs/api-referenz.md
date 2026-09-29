@@ -3336,9 +3336,13 @@ Pending Tool-Call bestätigen (z.B. Workflow-Start durch Assistenten).
 
 ```json
 {
-  "sessionId": "session-uuid"
+  "sessionId": "session-uuid",
+  "language": "en"
 }
 ```
+
+`language` (`de` | `en`, optional, Vorgabe deutsch): Sprache der Baufehler-Prüfung, die `create_workflow`/`update_workflow`
+an ihr Ergebnis hängen.
 
 **Response:** `ToolExecutionResult` (oder `410 Gone` wenn bereits verarbeitet/abgelaufen)
 
@@ -3350,7 +3354,8 @@ Pending Tool-Call ablehnen.
 
 ```json
 {
-  "sessionId": "session-uuid"
+  "sessionId": "session-uuid",
+  "language": "en"
 }
 ```
 

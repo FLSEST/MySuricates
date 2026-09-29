@@ -149,12 +149,13 @@ POST /api/v1/assistant/pending-tools/{id}/confirm
 POST /api/v1/assistant/pending-tools/{id}/reject
 ```
 
-Request-Body (optional): `{"sessionId": "uuid"}`
+Request-Body (optional): `{"sessionId": "uuid", "language": "en"}`
 
 - `confirm` führt das Tool aus und gibt `ToolExecutionResult` zurück (`{toolId, type, success, message}`)
 - `reject` markiert das Tool als abgelehnt (Message: `"✗ Abgelehnt"`)
 - Abgelaufene Tools (TTL 30 Min.) liefern HTTP **410 Gone** (Message: `"✗ Vorschlag abgelaufen"`)
 - Bei Angabe von `sessionId` wird das Ergebnis via `AssistantSessionService.appendToolResult()` in die Session geschrieben
+- `language` (`de` | `en`, Vorgabe deutsch) ist die Sprache der Oberfläche: Die Baufehler-Prüfung nach `create_workflow`/`update_workflow` antwortet darin
 
 ## Datenbankschema
 
@@ -219,7 +220,7 @@ Der Assistent kann über `<tool type="...">JSON</tool>`-Tags Aktionen vorschlage
 
 Alle 8 Tool-Typen sind in `MUTATING_TOOL_TYPES` definiert und erfordern User-Bestätigung.
 
-Nach `create_workflow`/`update_workflow` läuft die Baufehler-Prüfung (`GeneratedWorkflowCheck`) über die gespeicherte Definition. Befunde ab MEDIUM hängen an der Ergebniszeile (`Baufehler-Prüfung: N Befund(e) ab MEDIUM`, HIGH zuerst, höchstens zehn Zeilen plus „… und N weitere“) samt dem Hinweis, dass `update_workflow` sie beheben kann; ohne solche Befunde bleibt die Zeile unverändert. Es gibt keine zusätzliche KI-Runde, und das Speichern wird nicht blockiert. Die Ergebniskarte im Chat zeigt die Zeilen umbrochen.
+Nach `create_workflow`/`update_workflow` läuft die Baufehler-Prüfung (`GeneratedWorkflowCheck`) über die gespeicherte Definition. Befunde ab MEDIUM hängen an der Ergebniszeile (`Baufehler-Prüfung: N Befund(e) ab MEDIUM`, HIGH zuerst, höchstens zehn Zeilen plus „… und N weitere“) samt dem Hinweis, dass `update_workflow` sie beheben kann; ohne solche Befunde bleibt die Zeile unverändert. In der englischen Oberfläche (`language: "en"` beim Bestätigen) lautet der Block `Build check: N finding(s) from MEDIUM up` mit den englischen Befundtexten. Es gibt keine zusätzliche KI-Runde, und das Speichern wird nicht blockiert. Die Ergebniskarte im Chat zeigt die Zeilen umbrochen.
 
 ### PendingTool-Lebenszyklus
 

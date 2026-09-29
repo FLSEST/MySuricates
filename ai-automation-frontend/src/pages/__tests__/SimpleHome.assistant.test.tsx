@@ -237,7 +237,8 @@ describe('SimpleHome — the assistant answers in place', { timeout: 15_000 }, (
     fireEvent.click(within(card).getByRole('button', { name: en.assistant.pendingToolConfirm }));
 
     expect(await within(card).findByText('Task created')).toBeInTheDocument();
-    expect(confirmed).toEqual({ id: 'tool-1', body: { sessionId: chats[0]!.sessionId } });
+    // language: the UI locale, for the build check of workflow tools (TODO 81773d7b)
+    expect(confirmed).toEqual({ id: 'tool-1', body: { sessionId: chats[0]!.sessionId, language: 'en' } });
   });
 
   it('continues in the chat panel with the same conversation', async () => {

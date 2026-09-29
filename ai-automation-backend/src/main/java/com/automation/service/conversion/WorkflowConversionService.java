@@ -77,9 +77,10 @@ public class WorkflowConversionService {
 
         // Regelbasiert gibt es keine KI, die korrigieren könnte: nur melden.
         WorkflowSuggestion ruleBased = RuleBasedConversion.suggest(agenticSteps);
-        return ruleBased.available()
-                ? ruleBased.withBuildFindings(GeneratedWorkflowCheck.summaryLines(buildCheck.findings(ruleBased.blocks(), null)))
-                : ruleBased;
+        if (!ruleBased.available()) return ruleBased;
+        var findings = buildCheck.findings(ruleBased.blocks(), null);
+        return ruleBased.withBuildFindings(GeneratedWorkflowCheck.summaryLines(findings),
+                GeneratedWorkflowCheck.summaryLines(findings, "en"));
     }
 
     /**
@@ -170,7 +171,8 @@ public class WorkflowConversionService {
                 correctionPrompt -> provider.reason(new AiProvider.ReasoningRequest(correctionPrompt, systemPrompt)).text());
 
         return new WorkflowSuggestion(sugName, sugDesc, check.blocks(), goal, check.blocks().size(), true,
-                GeneratedWorkflowCheck.summaryLines(check.remaining()));
+                GeneratedWorkflowCheck.summaryLines(check.remaining()),
+                GeneratedWorkflowCheck.summaryLines(check.remaining(), "en"));
     }
 
     /**

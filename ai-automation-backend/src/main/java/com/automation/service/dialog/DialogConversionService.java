@@ -142,7 +142,8 @@ public class DialogConversionService {
                 sugName, sugDesc, check.blocks(),
                 session.sessionId(), filePath, session.projectPath(),
                 confidence, patternType, null, (int) toolCallCount, true,
-                GeneratedWorkflowCheck.summaryLines(check.remaining())
+                GeneratedWorkflowCheck.summaryLines(check.remaining()),
+                GeneratedWorkflowCheck.summaryLines(check.remaining(), "en")
         );
     }
 
@@ -193,11 +194,13 @@ public class DialogConversionService {
 
         String name = "Dialog: " + truncate(session.projectPath(), 50);
         // Regelbasiert gibt es keine KI, die korrigieren könnte: nur melden.
+        var findings = buildCheck.findings(blocks, null);
         return new DialogWorkflowSuggestion(
                 name, "Aus Claude-Code-Session generiert (rule-based)", blocks,
                 session.sessionId(), filePath, session.projectPath(),
                 0.5, "mixed", null, toolCallsAnalyzed, true,
-                GeneratedWorkflowCheck.summaryLines(buildCheck.findings(blocks, null))
+                GeneratedWorkflowCheck.summaryLines(findings),
+                GeneratedWorkflowCheck.summaryLines(findings, "en")
         );
     }
 

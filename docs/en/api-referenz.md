@@ -3307,9 +3307,13 @@ Confirm a pending tool call (e.g. workflow start by the assistant).
 
 ```json
 {
-  "sessionId": "session-uuid"
+  "sessionId": "session-uuid",
+  "language": "en"
 }
 ```
+
+`language` (`de` | `en`, optional, default German): language of the build check that `create_workflow`/`update_workflow`
+append to their result.
 
 **Response:** `ToolExecutionResult` (or `410 Gone` if already processed/expired)
 
@@ -3321,7 +3325,8 @@ Reject a pending tool call.
 
 ```json
 {
-  "sessionId": "session-uuid"
+  "sessionId": "session-uuid",
+  "language": "en"
 }
 ```
 

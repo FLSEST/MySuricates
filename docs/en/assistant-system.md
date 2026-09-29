@@ -145,12 +145,13 @@ POST /api/v1/assistant/pending-tools/{id}/confirm
 POST /api/v1/assistant/pending-tools/{id}/reject
 ```
 
-Request body (optional): `{"sessionId": "uuid"}`
+Request body (optional): `{"sessionId": "uuid", "language": "en"}`
 
 - `confirm` executes the tool and returns a `ToolExecutionResult` (`{toolId, type, success, message}`)
 - `reject` marks the tool as rejected (message: `"✗ Rejected"`)
 - Expired tools (TTL 30 min.) return HTTP **410 Gone** (message: `"✗ Suggestion expired"`)
 - When `sessionId` is provided, the result is written to the session via `AssistantSessionService.appendToolResult()`
+- `language` (`de` | `en`, default German) is the UI language: the build check after `create_workflow`/`update_workflow` answers in it
 
 ## Database Schema
 
@@ -215,7 +216,7 @@ The assistant can suggest actions via `<tool type="...">JSON</tool>` tags. `Assi
 
 All 8 tool types are defined in `MUTATING_TOOL_TYPES` and require user confirmation.
 
-After `create_workflow`/`update_workflow` the build check (`GeneratedWorkflowCheck`) runs over the saved definition. Findings from MEDIUM up are appended to the result line (`Baufehler-Prüfung: N Befund(e) ab MEDIUM`, HIGH first, at most ten lines plus "… und N weitere") together with the note that `update_workflow` can fix them; without such findings the line stays unchanged. There is no extra AI round, and saving is never blocked. The result card in the chat shows the lines wrapped.
+After `create_workflow`/`update_workflow` the build check (`GeneratedWorkflowCheck`) runs over the saved definition. Findings from MEDIUM up are appended to the result line (`Baufehler-Prüfung: N Befund(e) ab MEDIUM`, HIGH first, at most ten lines plus "… und N weitere") together with the note that `update_workflow` can fix them; without such findings the line stays unchanged. In the English UI (`language: "en"` on confirm) the block reads `Build check: N finding(s) from MEDIUM up` with the English finding texts. There is no extra AI round, and saving is never blocked. The result card in the chat shows the lines wrapped.
 
 ### PendingTool Lifecycle
 

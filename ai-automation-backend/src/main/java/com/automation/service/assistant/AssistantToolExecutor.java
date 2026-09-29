@@ -122,6 +122,14 @@ public class AssistantToolExecutor {
      * {@link PendingToolRegistry#take(String)} has returned the entry.
      */
     public ToolExecutionResult executeConfirmed(PendingTool tool) {
+        return executeConfirmed(tool, null);
+    }
+
+    /**
+     * Like {@link #executeConfirmed(PendingTool)}, with the UI language of the confirming user ({@code "en"},
+     * otherwise German) — the build check after {@code create_workflow}/{@code update_workflow} answers in it.
+     */
+    public ToolExecutionResult executeConfirmed(PendingTool tool, String language) {
         String payload = sanitizeJson(tool.payloadJson());
 
         String rawResult = checkGuardrails(tool.type(), payload);
@@ -129,8 +137,8 @@ public class AssistantToolExecutor {
             rawResult = switch (tool.type()) {
                 case "create_todo"        -> todoTools.createTodo(payload);
                 case "update_todo_status" -> todoTools.updateTodoStatus(payload);
-                case "create_workflow"    -> workflowTools.createWorkflow(payload);
-                case "update_workflow"    -> workflowTools.updateWorkflow(payload);
+                case "create_workflow"    -> workflowTools.createWorkflow(payload, language);
+                case "update_workflow"    -> workflowTools.updateWorkflow(payload, language);
                 case "delete_workflow"    -> workflowTools.deleteWorkflow(payload);
                 case "start_workflow"     -> workflowTools.startWorkflow(payload);
                 case "cancel_run"         -> workflowTools.cancelRun(payload);

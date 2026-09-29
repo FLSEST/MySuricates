@@ -96,18 +96,21 @@ export function useAssistantChat() {
 /**
  * Confirms a previously-proposed tool action. The backend only executes the tool after this
  * call fires — the assistant itself cannot bypass this gate regardless of model behavior.
+ * `language` is the UI locale: the build check after a workflow tool answers in it (TODO 81773d7b).
  */
 export function useConfirmPendingTool() {
   return useMutation({
     mutationFn: ({ id, sessionId }: { id: string; sessionId?: string }) =>
-      api.post<ToolExecutionResult>(`/assistant/pending-tools/${id}/confirm`, { sessionId }),
+      api.post<ToolExecutionResult>(`/assistant/pending-tools/${id}/confirm`,
+        { sessionId, language: useI18nStore.getState().locale }),
   });
 }
 
 export function useRejectPendingTool() {
   return useMutation({
     mutationFn: ({ id, sessionId }: { id: string; sessionId?: string }) =>
-      api.post<ToolExecutionResult>(`/assistant/pending-tools/${id}/reject`, { sessionId }),
+      api.post<ToolExecutionResult>(`/assistant/pending-tools/${id}/reject`,
+        { sessionId, language: useI18nStore.getState().locale }),
   });
 }
 

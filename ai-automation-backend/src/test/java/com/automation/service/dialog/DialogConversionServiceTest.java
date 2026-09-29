@@ -302,6 +302,8 @@ class DialogConversionServiceTest {
             assertThat(result.blocks()).singleElement()
                     .satisfies(b -> assertThat(b.getConfig()).containsEntry("prompt", "Fasse zusammen"));
             assertThat(result.buildFindings()).first().asString().startsWith("HIGH missing-required-config-key");
+            assertThat(result.buildFindingsEn()).hasSameSizeAs(result.buildFindings())
+                    .first().asString().startsWith("HIGH missing-required-config-key").contains("required key command is missing");
         }
 
         @Test

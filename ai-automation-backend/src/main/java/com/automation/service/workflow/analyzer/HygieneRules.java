@@ -44,14 +44,18 @@ final class HygieneRules {
         if (matcher.find()) {
             out.add(AnalyzerFinding.of("absolute-home-path", Severity.HIGH, i, name,
                     "enthält einen Pfad unter /home/" + matcher.group(1)
-                            + " — trägt den Klarnamen und bricht auf jedem anderen Rechner"));
+                            + " — trägt den Klarnamen und bricht auf jedem anderen Rechner",
+                    "contains a path under /home/" + matcher.group(1)
+                            + " — carries the user's real name and breaks on every other machine"));
         }
         if (!"shell".equals(block.getType())) return;
         String command = BlockText.directValue(block, "command");
         if (command != null && !command.isBlank() && !command.contains("set -e") && !command.contains("set -o errexit")) {
             out.add(AnalyzerFinding.of("missing-strict-mode", Severity.LOW, i, name,
                     "Shell-Block ohne 'set -euo pipefail' — ein Fehler in der Mitte bleibt unbemerkt, "
-                            + "der Block endet trotzdem mit 0"));
+                            + "der Block endet trotzdem mit 0",
+                    "shell block without 'set -euo pipefail' — an error halfway through goes unnoticed, "
+                            + "the block still exits with 0"));
         }
     }
 
@@ -73,9 +77,12 @@ final class HygieneRules {
             for (Map.Entry<String, List<String>> source : prompts.entrySet()) {
                 if (source.getValue().stream().anyMatch(prompt -> prompt.contains(trimmed))) {
                     String where = source.getKey().isEmpty() ? "" : " im verschachtelten Block '" + source.getKey() + "'";
+                    String whereEn = source.getKey().isEmpty() ? "" : " in the nested block '" + source.getKey() + "'";
                     out.add(AnalyzerFinding.of("duplicated-instructions", Severity.MEDIUM, i, name,
                             "wiederholt" + where + " wörtlich einen Absatz aus workflow.instructions ("
-                                    + trimmed.length() + " Zeichen) — die Regeln gehen zweimal in den Kontext"));
+                                    + trimmed.length() + " Zeichen) — die Regeln gehen zweimal in den Kontext",
+                            "repeats" + whereEn + " a paragraph of workflow.instructions word for word ("
+                                    + trimmed.length() + " characters) — the rules go into the context twice"));
                     return;
                 }
             }
@@ -87,7 +94,9 @@ final class HygieneRules {
         if (model != null && DATED_MODEL.matcher(model).find()) {
             out.add(AnalyzerFinding.of("dated-model-id", Severity.LOW, i, name,
                     "nennt die datierte Modell-ID \"" + model
-                            + "\" statt eines Alias (opus/sonnet/haiku/fable) — datierte IDs veralten still"));
+                            + "\" statt eines Alias (opus/sonnet/haiku/fable) — datierte IDs veralten still",
+                    "names the dated model id \"" + model
+                            + "\" instead of an alias (opus/sonnet/haiku/fable) — dated ids go stale silently"));
         }
     }
 }
