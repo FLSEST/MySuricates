@@ -69,7 +69,23 @@ public class ProjectService {
     @Transactional
     public Project create(CreateProjectRequest request) {
         validatePath(request.path());
+        return save(request);
+    }
 
+    /**
+     * Like {@link #create}, but the folder may still be unknown — a project imported from a bundle.
+     * An empty path is stored as {@code ""}; any other path is validated as usual.
+     */
+    @Transactional
+    public Project createWithOptionalPath(CreateProjectRequest request) {
+        if (request.path() == null || request.path().isBlank()) {
+            return save(new CreateProjectRequest(request.name(), request.subtitle(), request.description(),
+                    request.type(), "", request.config(), request.aiContext()));
+        }
+        return create(request);
+    }
+
+    private Project save(CreateProjectRequest request) {
         Project project = Project.builder()
                 .name(request.name())
                 .subtitle(request.subtitle())

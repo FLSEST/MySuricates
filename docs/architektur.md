@@ -195,7 +195,7 @@ Chains und Sub-Workflows geben die Herkunft ihres Auslösers im reservierten Kon
 ### Schichtenmodell
 
 ```
-Controller (REST API, 51 Controller)
+Controller (REST API, 52 Controller)
     ↓ DTO (Request/Response Records)
 Service (Geschäftslogik)
     ↓ Entity (JPA)
@@ -215,7 +215,7 @@ SQLite (Datei: data/automation.db)
 
 ```
 com.automation
-├── controller/          51 REST-Controller
+├── controller/          52 REST-Controller
 ├── service/
 │   ├── project/         ProjectService, ProjectStatusReconciler, ContainerService (+ DockerContainerGateway, DockerOrphanReconciler), ProjectContextService, PathValidator, OnboardingProfileService (+ OnboardingProfileSeeder), ProjectOnboardingService
 │   ├── workflow/        WorkflowExecutor (+ ExecutionContextFactory, BlockSkillContext, BlockStepRunner, RunCompletionHandler, RunFinalizer, WorkflowContextDataService + PlatformVariableSource-Beans), RunControlService, WorkflowService (+ WorkflowRequestFields), ExecutionBroadcaster, TemplateVerificationService, WorkflowOptimizationService (+ WorkflowOptimizationPrompt), GhostRunWatchdogService, RunCleanupService, AgentInstructionsService, WorkflowTemplateService, BlockOutputValidator, WorkflowExecutionRegistry, IdleContainerReaper, WorkflowTaggingService, WorkflowVersionService, WorkflowContentChangedEvent
@@ -277,11 +277,12 @@ com.automation
 └── util/                JPA-Converter (JSON, BlockDefinitions), RuntimeClasspathGuard (Startsperre gegen `target/classes`)
 ```
 
-### Alle 51 REST-Controller
+### Alle 52 REST-Controller
 
 | Controller | Base-Path | Beschreibung |
 |---|---|---|
 | `ProjectController` | `/api/v1/projects` | CRUD, Archivierung, Container-Lifecycle, Kontext-Generierung |
+| `ProjectBundleController` | `/api/v1/projects` | Projekt-Bündel: `/{id}/export` (Datei-Download), `/import/preview`, `/import` — siehe „Projekt-Bündel“ (Kern; Chains darin nur mit Modul `chains`) |
 | `WorkflowController` | `/api/v1/workflows` | CRUD, Ausführung, Runs, Export/Import, Skills |
 | `WorkflowVersionController` | `/api/v1/workflows` | `/{id}/versions` — Versionsliste, einzelne Version, Restore |
 | `WorkflowAssistController` | `/api/v1/workflows` | `/{id}/optimize`, `/{id}/similar`, `/{id}/repair` (Repair nur mit Modul `factory`) |
@@ -614,6 +615,58 @@ Da TODOs zu ~96 % maschinell erzeugt und über viele Projekte verstreut sind, gi
 - **Hygiene** (`TodoHygieneService`): `archiveStaleNow(projectId)` verschiebt verstaubte Auto-Todos (OPEN/BACKLOG, Source AI/WORKFLOW, Tag `auto:workflow`, `updatedAt` älter als Schwelle) nach ARCHIVED — per Bulk-UPDATE in kurzer Transaktion. Cockpit-Knopf „Verstaubtes archivieren" (`POST /todos/archive-stale?projectId=`) ist der primäre, human-in-the-loop Weg. Der `@Scheduled`-Job (täglich 03:30) ruft denselben Pfad, ist aber per Default **AUS** (`todo-hygiene-enabled`). Schwellen runtime-konfigurierbar via `ExecutionSettingsService`: `todo-hygiene-enabled` [0,1], `todo-stale-days` [7,365], `todo-hygiene-max-per-run` [10,2000].
 - **Ghost-Watchdog** (`TodoGhostWatchdogService`): setzt verwaiste IN_PROGRESS-TODOs mit Maschinen-Source (AI/WORKFLOW) zurück auf OPEN, wenn die zugehörige CLI-Session ohne abschließenden Status-PATCH gestorben ist (`updatedAt` älter als Schwelle). Poll alle 5 min (`automation.todo-watchdog.poll-ms`), per Default **AN**; Human-TODOs (Source USER) werden nie angefasst. ActivityLog-WARNING pro Lauf. Runtime-Settings: `todo-watchdog-enabled` [0,1], `todo-watchdog-stale-hours` [1,720] (Default 24h).
 - **Bulk-Status** (`POST /todos/bulk-status`): generischer Bulk-UPDATE für viele TODO-IDs auf einen Status.
+
+## Projekt-Bündel
+
+Ein Projekt lässt sich als **eine JSON-Datei** weitergeben und auf einem anderen Rechner — auch mit anderen
+Ordnern — wieder anlegen (`ProjectBundleController`, Kern; Services in `service/project/bundle/`).
+Endpunkte: [api-referenz.md](api-referenz.md) → `GET /projects/{id}/export`, `POST /projects/import/preview`,
+`POST /projects/import`.
+
+**Format** (`format: mysuricates-project-bundle`, `formatVersion: 1`, Datei `<projekt-slug>.mysuricates-bundle.json`):
+Projekt-Stammdaten ohne Pfad, Container, Status und IDs; die Workflows des Projekts (ohne gelöschte) mit ihrer
+Definition wie beim Einzel-Export, aber ohne ID, Projekt, Siegelfelder und Hash; die Chains, deren Einträge nur
+Workflows dieses Projekts nennen; die Zeitpläne auf diese Workflows und Chains — ohne `enabled`.
+
+**Referenzen ohne UUIDs.** Workflows und Chains tragen einen `key` (Slug des Namens, eindeutig mit `-2`, `-3` …).
+Chain-Einträge und Zeitpläne nennen `workflowKey`/`chainKey`. `sub-workflow`-Blöcke — auch verschachtelt, überall
+wo `NestedBlocks` hinsieht, Schlüssel `workflow_id` und der Altschlüssel `workflowId` — zeigen auf
+`@@workflow:<key>@@`; ein Verweis auf einen Workflow außerhalb des Projekts bleibt als UUID stehen und erscheint
+unter `warnings`. Skills reisen per Name (`activatedSkillNames`, in Blöcken `@@skill:<name>@@`); fehlt ein Skill
+auf dem Zielrechner, wird der Workflow ohne ihn angelegt (Warnung).
+
+**Pfad-Anpassung.** Beim Export werden die Strings der Blöcke (auch verschachtelter), `instructions`,
+`metadata`, `defaultContext` sowie der `inputContext` von Chain-Einträgen und Zeitplänen durchsucht:
+
+- Der Projektpfad wird in Blöcken und `instructions` zu `{{ project_path }}` — dort löst der Executor Platzhalter
+  auf. Kontextwerte und Metadaten werden nicht noch einmal aufgelöst; dort wird er wie jeder andere Pfad ein Token.
+  Ein Projektpfad mit nur einem Segment (`/tmp`) wird nie Platzhalter.
+- Jeder andere absolute Pfad unter `/home/ /Users/ /tmp/ /opt/ /srv/ /mnt/ /var/ /data/ ~/` wird `@@path:N@@`;
+  `metadata.workspace.source_path` gilt als Ganzes als Pfad. Ein Pfad endet an Leerzeichen, Anführungszeichen,
+  `; | ( ) { } < > , :` und am Zeilenende. Beginnt ein Pfad mit einem erfassten Pfad plus `/`, wird er als
+  Unterpfad dieses Tokens geschrieben (`@@path:1@@/tests/.`); der kürzeste gewinnt, die Grenze ist das `/`
+  (`/tmp/app-venv` ist kein Unterpfad von `/tmp/app`).
+- `paths[]` nennt je Token `original`, die Zahl der Fundstellen und die erste als Hinweis. Der Home-Pfad des
+  Exportierenden bleibt in `original` stehen — er ist der Vorschlag beim Import; ein Bündel ist deshalb kein
+  Pool-Artefakt.
+
+**Import.** Die Vorschau validiert (Format, Version, Pflichtfelder, eindeutige Keys, jede Referenz löst im Bündel
+auf — sonst 400 mit allen Problemen) und zeigt Blocktypen, Anbieter, Modelle, die Shell-Befehle (je Feld die ersten
+200 Zeichen), Namenskonflikte und Warnungen. Der Import verlangt für jedes Token eine Zuordnung und schreibt in
+**einer** Transaktion — nur Datenbankarbeit, nichts Langsames: Projekt → Workflows über `WorkflowService` mit
+`ChangeSource.IMPORT` (Versionszeile, ungesiegelt) → Verweise auf die neuen IDs (zweiter Schritt über denselben
+Weg) → Chains → Zeitpläne, **immer deaktiviert**. Gleichnamige Workflows im Zielprojekt werden übersprungen
+(Verweise zeigen dann auf den vorhandenen) oder umbenannt (`Name (Import)`, `Name (Import 2)` …). Scheitert ein
+Schritt, bleibt nichts zurück; der Aktivitätseintrag folgt erst nach dem Commit. Ist das Modul `chains` aus,
+exportiert der Export keine Chains und der Import überspringt sie — beides mit Warnung.
+
+**Sicherheit.** Ein Bündel bringt ausführbare Shell-Befehle mit. Die Oberfläche zeigt sie in der Vorschau und
+bietet den Import erst danach an; die API verlangt die Vorschau nicht zusätzlich — sie ist per API-Key geschützt
+wie jeder Schreibweg. Siegel werden nie übernommen, Zeitpläne nie aktiv angelegt; Webhooks und
+Integrations-Zugangsdaten sind nicht Teil des Bündels.
+
+**Grenzen v1.** Nicht enthalten: TODO- und Completion-Trigger, Webhooks, Memory, Läufe, TODOs, Skills selbst.
+Kein `replace` beim Konflikt. Anfrage höchstens 5 MB.
 
 ## Ziele — TODOs projektübergreifend einordnen (V85)
 

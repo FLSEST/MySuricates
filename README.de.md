@@ -103,7 +103,7 @@ datiert in der Tabelle:
 | | |
 |---|---|
 | Entstanden seit | 2026-02-15, rund 1 800 Commits, ein Autor |
-| Backend | Java 21 / Spring Boot 3.5, rund 73 000 Zeilen, 51 REST-Controller, 91 Flyway-Migrationen |
+| Backend | Java 21 / Spring Boot 3.5, rund 73 000 Zeilen, 52 REST-Controller, 91 Flyway-Migrationen |
 | Frontend | React 19 / TypeScript, rund 77 000 Zeilen |
 | Tests | Backend 10 476, Frontend 1 580 (192 Dateien) — 0 Fehler, 0 uebersprungen, CI-Lauf 35777382298 vom 2026-09-22 |
 | Bausteine | 20 Block-Typen, 54 Workflow-Templates, 20 Blaupausen (Grundgerueste zum Ausfuellen), 19 Built-in Skills, 18 Integrations-Provider |

@@ -119,6 +119,23 @@ class ProjectServiceTest {
         verify(projectRepository).save(any(Project.class));
     }
 
+    /** A bundle import may not know the folder yet: blank is stored as "" and not validated. */
+    @Test
+    void createWithOptionalPath_blankPathSkipsValidation_otherPathsAreValidated() {
+        when(projectRepository.save(any(Project.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Project blank = projectService.createWithOptionalPath(new CreateProjectRequest(
+                "Imported", null, null, ProjectType.CODE, "  ", null, null));
+        assertThat(blank.getPath()).isEmpty();
+        verify(pathValidator, never()).validate(any());
+
+        doThrow(new IllegalArgumentException("Path must be an existing directory: /nope"))
+                .when(pathValidator).validate("/nope");
+        assertThatThrownBy(() -> projectService.createWithOptionalPath(new CreateProjectRequest(
+                "Imported", null, null, ProjectType.CODE, "/nope", null, null)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
     @Test
     void create_withConfig_preservesConfig() {
         Map<String, Object> config = Map.of("key", "value");
