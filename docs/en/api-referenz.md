@@ -3248,6 +3248,12 @@ Send a chat message to the AI assistant.
 | `sessionId` | String | No |
 | `requestId` | String | No |
 
+`MessageEntry` = `{role, content, toolResults?}`. `toolResults` (optional, assistant entries only) are the results of
+the tools confirmed on that turn: `[{"type": "create_workflow", "success": true, "message": "✓ …"}]`. The server takes
+only executed ones (no leading `✗`), from the last 3 assistant turns, at most 5 per turn and 600 characters each, and
+marks them as data in the prompt ([assistant-system.md](assistant-system.md) → "Tool results in the history"). Without
+the field everything stays as before.
+
 **Response:** `AssistantChatResponse`
 
 ```json

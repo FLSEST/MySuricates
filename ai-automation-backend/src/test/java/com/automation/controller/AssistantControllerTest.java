@@ -120,6 +120,41 @@ class AssistantControllerTest {
         verify(assistantService).chat(any(AssistantChatRequest.class));
     }
 
+    /** TODO 2f7766e7: the old history form (role/content only) still arrives, with no tool results. */
+    @Test
+    void chat_legacyHistoryWithoutToolResults_arrivesWithNullToolResults() throws Exception {
+        when(assistantService.chat(any())).thenReturn(new AssistantChatResponse("OK", List.of()));
+
+        mockMvc.perform(post("/api/v1/assistant/chat")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"message\":\"Weiter\",\"history\":[{\"role\":\"user\",\"content\":\"Leg an\"},"
+                                + "{\"role\":\"assistant\",\"content\":\"Erledigt\"}]}"))
+                .andExpect(status().isOk());
+
+        var captor = org.mockito.ArgumentCaptor.forClass(AssistantChatRequest.class);
+        verify(assistantService).chat(captor.capture());
+        assertThat(captor.getValue().history()).extracting(AssistantChatRequest.MessageEntry::toolResults)
+                .containsOnlyNulls();
+    }
+
+    /** TODO 2f7766e7: the new form carries the results of confirmed tools on the assistant entry. */
+    @Test
+    void chat_historyWithToolResults_passesThemToService() throws Exception {
+        when(assistantService.chat(any())).thenReturn(new AssistantChatResponse("OK", List.of()));
+
+        mockMvc.perform(post("/api/v1/assistant/chat")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"message\":\"Behebe das\",\"history\":[{\"role\":\"assistant\",\"content\":\"Lege an\","
+                                + "\"toolResults\":[{\"type\":\"create_workflow\",\"success\":true,"
+                                + "\"message\":\"✓ Workflow created\"}]}]}"))
+                .andExpect(status().isOk());
+
+        var captor = org.mockito.ArgumentCaptor.forClass(AssistantChatRequest.class);
+        verify(assistantService).chat(captor.capture());
+        assertThat(captor.getValue().history().get(0).toolResults()).containsExactly(
+                new AssistantChatRequest.ToolResultEntry("create_workflow", true, "✓ Workflow created"));
+    }
+
     @Test
     void chat_withPageContext_passesContextToService() throws Exception {
         when(assistantService.chat(any()))

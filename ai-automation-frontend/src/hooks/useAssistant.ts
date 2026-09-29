@@ -6,6 +6,28 @@ import { useI18nStore } from '../i18n';
 export interface AssistantHistoryEntry {
   role: 'user' | 'assistant';
   content: string;
+  /**
+   * On an assistant turn: results of the tools the user confirmed (TODO 2f7766e7), so the model sees e.g. the
+   * build-check findings after `create_workflow`. Left out when there are none — the request then has the
+   * old form. The backend filters, cuts and marks them as data itself.
+   */
+  toolResults?: AssistantHistoryToolResult[];
+}
+
+export interface AssistantHistoryToolResult {
+  type: string;
+  success: boolean;
+  message: string;
+}
+
+/** Start of the result line of a proposal that never ran (rejected or expired) — `ToolExecutionResult.DECLINED_PREFIX`. */
+export const DECLINED_TOOL_PREFIX = '✗';
+
+/** Results of tools that ran — rejected or expired proposals stay out of the model's history. */
+export function executedToolResults(results: ToolExecutionResult[] | undefined): AssistantHistoryToolResult[] {
+  return (results ?? [])
+    .filter((r) => r.message && !r.message.trim().startsWith(DECLINED_TOOL_PREFIX))
+    .map((r) => ({ type: r.type, success: r.success, message: r.message }));
 }
 
 export interface AssistantPageContext {
@@ -148,6 +170,8 @@ export interface AssistantSessionDetail {
     responseTimeMs?: number;
     provider?: string;
     model?: string;
+    /** Results of the tools confirmed on this turn (rejected ones included); absent on older backends. */
+    toolResults?: ToolExecutionResult[];
   }>;
   messageCount: number;
   startedAt: string;

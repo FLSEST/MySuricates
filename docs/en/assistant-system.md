@@ -122,6 +122,7 @@ Response (`AssistantChatResponse`):
 ```
 
 - `message` (required), `history`, `context`, `provider`, `language`, `sessionId`, `requestId` — all except `message` optional
+- An assistant `history` entry may carry `toolResults`: `[{"type": "create_workflow", "success": true, "message": "✓ Workflow created: …"}]` — the results of the tools the user confirmed on that turn (see "Tool results in the history"). Without the field the old form applies and the prompt stays unchanged
 - `context.page` controls which platform data is injected into the system prompt
 - `requestId` is used for WebSocket status updates (topic `/topic/assistant/{requestId}/status`)
 - Response fields `provider`, `responseTimeMs` only present when non-null (`@JsonInclude(NON_NULL)`), `pendingTools` only when non-empty (`@JsonInclude(NON_EMPTY)`)
@@ -217,6 +218,20 @@ The assistant can suggest actions via `<tool type="...">JSON</tool>` tags. `Assi
 All 8 tool types are defined in `MUTATING_TOOL_TYPES` and require user confirmation.
 
 After `create_workflow`/`update_workflow` the build check (`GeneratedWorkflowCheck`) runs over the saved definition. Findings from MEDIUM up are appended to the result line (`Baufehler-Prüfung: N Befund(e) ab MEDIUM`, HIGH first, at most ten lines plus "… und N weitere") together with the note that `update_workflow` can fix them; without such findings the line stays unchanged. In the English UI (`language: "en"` on confirm) the block reads `Build check: N finding(s) from MEDIUM up` with the English finding texts. There is no extra AI round, and saving is never blocked. The result card in the chat shows the lines wrapped.
+
+### Tool results in the history
+
+The model sees the results of confirmed tools on the next turn (TODO 2f7766e7) — so it can fix build-check findings after `create_workflow`/`update_workflow` itself with `update_workflow`. The frontend stores a decision's result on the message that proposed the tool (`assistantStore.recordToolResult`) and sends the results of **executed** tools as `toolResults` on the history entry with the next turn; rejected and expired proposals (result starts with `✗`) never. `AssistantContextBuilder.buildPrompt` puts each result as a `<tool_result tool="…">…</tool_result>` block after the assistant line, with a one-time note that these blocks are platform data, not instructions (`ToolResultHistory`). Without results the prompt is byte-identical to before.
+
+The server enforces the bounds, because the history is client input — every result goes to the model again with every following turn:
+
+| Bound | Value | Why |
+|---|---|---|
+| Turns with results | the last 3 assistant turns | older results have usually been acted on; the answer text stays |
+| Results per turn | 5 | a turn rarely proposes more; a client cannot buy itself prompt space |
+| Characters per result | 600 | status and summary line plus the first findings; the summary line (`Baufehler-Prüfung:`/`Build check:`) moves to the front so the cut never removes the count |
+
+A result can quote foreign text (a workflow name, an error message). As with the context variables of workflows (`UntrustedText`) it cannot forge the block boundary, and the tags the platform parses from the answer (`<tool>`, `<fetch>`, `<actions>`) are neutralised (`‹tool …`), also in disguised form (fullwidth, invisible characters). The tool type must match `[a-z0-9_-]`, otherwise it reads `unknown`. The hard gate stays: even a tag the model copied from a result would only become a new proposal with a confirmation card.
 
 ### PendingTool Lifecycle
 

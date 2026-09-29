@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { ChatMessage, AssistantPageContext } from '../hooks/useAssistant';
+import type { ChatMessage, AssistantPageContext, ToolExecutionResult } from '../hooks/useAssistant';
 import { generateId } from '../utils/uuid';
 
 export interface ChatSession {
@@ -47,6 +47,11 @@ interface AssistantState {
   startNewSession: () => string;
   appendMessage: (sessionId: string, msg: ChatMessage) => void;
   updateMessageStatus: (sessionId: string, msgId: string, status: ChatMessage['status']) => void;
+  /**
+   * Keeps a tool decision's result on the message that proposed the tool (the one whose `pendingTools`
+   * contain `result.toolId`) — so the card shows it again and the next turn sends it along (TODO 2f7766e7).
+   */
+  recordToolResult: (sessionId: string, result: ToolExecutionResult) => void;
   deleteSession: (id: string) => void;
   loadSession: (id: string) => void;
   hydrateSession: (session: ChatSession) => void;
@@ -116,6 +121,22 @@ export const useAssistantStore = create<AssistantState>()(
               messages: sess.messages.map((m) =>
                 m.id === msgId ? { ...m, status } : m
               ),
+            };
+          }),
+        }));
+      },
+
+      recordToolResult: (sessionId, result) => {
+        set((s) => ({
+          sessions: s.sessions.map((sess) => {
+            if (sess.id !== sessionId) return sess;
+            return {
+              ...sess,
+              messages: sess.messages.map((m) => {
+                if (!m.pendingTools?.some((p) => p.id === result.toolId)) return m;
+                const others = (m.toolResults ?? []).filter((r) => r.toolId !== result.toolId);
+                return { ...m, toolResults: [...others, result] };
+              }),
             };
           }),
         }));

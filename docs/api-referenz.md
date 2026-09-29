@@ -3277,6 +3277,12 @@ Chat-Nachricht an den KI-Assistenten senden.
 | `sessionId` | String | Nein |
 | `requestId` | String | Nein |
 
+`MessageEntry` = `{role, content, toolResults?}`. `toolResults` (optional, nur an Assistenten-Einträgen) sind die
+Ergebnisse der in diesem Zug bestätigten Werkzeuge: `[{"type": "create_workflow", "success": true, "message": "✓ …"}]`.
+Der Server nimmt nur ausgeführte (kein `✗` am Anfang), aus den letzten 3 Assistenten-Zügen, höchstens 5 je Zug und
+je 600 Zeichen, und kennzeichnet sie im Prompt als Daten ([assistant-system.md](assistant-system.md) → „Werkzeug-Ergebnisse
+im Verlauf“). Ohne das Feld bleibt alles wie bisher.
+
 **Response:** `AssistantChatResponse`
 
 ```json
