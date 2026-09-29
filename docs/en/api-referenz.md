@@ -1226,6 +1226,8 @@ value → `400`, and the message names the allowed values.
 - **`conflictBehavior`:** with `SKIP`, an occurrence is dropped while the target still has a run in
   `RUNNING` or `PAUSED`: `nextRunAt` moves on to the next occurrence, a one-off schedule (`ONCE`,
   `DELAYED`) expires, and the activity log notes “Schedule skipped (previous run still in progress)”.
+  Likewise while an interrupted run of the workflow waits for its automatic resume (“Schedule skipped
+  (interrupted run is being resumed automatically)”, `reason: auto-resume-pending`).
   `OVERLAP` starts a second run next to it anyway.
 - **`maxRuns`:** counts every start of the schedule, a failed or refused one too; an occurrence dropped by
   `SKIP` does not count. Once the number is reached, the schedule is disabled. Re-enabling does not reset

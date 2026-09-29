@@ -1232,6 +1232,8 @@ angenommen; ein anderer Wert → `400`, die Meldung nennt die erlaubten Werte.
 - **`conflictBehavior`:** Bei `SKIP` entfällt ein Termin, solange das Ziel noch einen Lauf in `RUNNING`
   oder `PAUSED` hat: `nextRunAt` springt auf das nächste Vorkommen, ein einmaliger Zeitplan (`ONCE`,
   `DELAYED`) verfällt, das Activity-Log vermerkt „Schedule skipped (previous run still in progress)“.
+  Ebenso, solange ein unterbrochener Lauf des Workflows auf seine automatische Fortsetzung wartet
+  („Schedule skipped (interrupted run is being resumed automatically)“, `reason: auto-resume-pending`).
   `OVERLAP` startet trotzdem einen zweiten Lauf daneben.
 - **`maxRuns`:** zählt jeden Start des Zeitplans, auch einen fehlgeschlagenen oder abgewiesenen; ein per
   `SKIP` entfallener Termin zählt nicht. Ist die Zahl erreicht, wird der Zeitplan deaktiviert.
