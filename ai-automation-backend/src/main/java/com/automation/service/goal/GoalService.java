@@ -12,7 +12,6 @@ import com.automation.dto.response.GoalResponse;
 import com.automation.dto.response.GoalTodoItem;
 import com.automation.entity.Goal;
 import com.automation.entity.GoalMilestone;
-import com.automation.entity.Project;
 import com.automation.entity.Todo;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.mapper.TodoMapper;
@@ -202,7 +201,8 @@ public class GoalService {
         Set<String> ids = rows.stream().map(GoalTodoRow::projectId).filter(Objects::nonNull).collect(Collectors.toSet());
         Map<String, String> names = new HashMap<>();
         if (!ids.isEmpty()) {
-            projectRepository.findAllById(ids).forEach(project -> names.put(project.getId(), project.getName()));
+            // Nur ID und Name – findAllById kostete je Projekt ein select containers (TODO 08224ed6)
+            projectRepository.findIdAndNameByIdIn(ids).forEach(row -> names.put((String) row[0], (String) row[1]));
         }
         return names;
     }
