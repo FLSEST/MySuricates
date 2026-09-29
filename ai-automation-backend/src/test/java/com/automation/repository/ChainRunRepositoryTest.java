@@ -240,30 +240,30 @@ class ChainRunRepositoryTest {
         assertThat(repository.existsByChainIdAndStatusIn(other.getId(), busy)).isFalse();
     }
 
-    // --- findByTriggeredByScheduleIdOrderByStartedAtDesc ---
+    // --- findStatusesByScheduleIdNewestFirst ---
 
+    /** Nur die Status-Spalte, neuester zuerst, nur der eigene Zeitplan (TODO 86286572). */
     @Test
-    void findByTriggeredByScheduleIdOrderByStartedAtDesc_returnsOnlyMatchingSchedule() {
+    void findStatusesByScheduleIdNewestFirst_returnsTheNewestStatusOfTheSchedule() {
         WorkflowChain chain = saveChain("Chain");
-        String scheduleId = "sched-123";
+        String scheduleId = "sched-" + java.util.UUID.randomUUID();
+        Instant now = Instant.now();
         repository.save(ChainRun.builder().chain(chain).status(RunStatus.COMPLETED)
-                .startedAt(Instant.now()).triggeredByScheduleId(scheduleId).build());
+                .startedAt(now.minusSeconds(60)).triggeredByScheduleId(scheduleId).build());
         repository.save(ChainRun.builder().chain(chain).status(RunStatus.FAILED)
-                .startedAt(Instant.now()).triggeredByScheduleId(scheduleId).build());
-        repository.save(ChainRun.builder().chain(chain).status(RunStatus.COMPLETED)
-                .startedAt(Instant.now()).triggeredByScheduleId("other-sched").build());
+                .startedAt(now).triggeredByScheduleId(scheduleId).build());
+        repository.save(ChainRun.builder().chain(chain).status(RunStatus.RUNNING)
+                .startedAt(now.plusSeconds(60)).triggeredByScheduleId("other-sched").build());
 
-        List<ChainRun> result = repository.findByTriggeredByScheduleIdOrderByStartedAtDesc(scheduleId);
-
-        assertThat(result).hasSize(2);
-        assertThat(result).allMatch(r -> scheduleId.equals(r.getTriggeredByScheduleId()));
+        assertThat(repository.findStatusesByScheduleIdNewestFirst(scheduleId, PageRequest.of(0, 10)))
+                .containsExactly(RunStatus.FAILED, RunStatus.COMPLETED);
+        assertThat(repository.findStatusesByScheduleIdNewestFirst(scheduleId, PageRequest.of(0, 1)))
+                .containsExactly(RunStatus.FAILED);
     }
 
     @Test
-    void findByTriggeredByScheduleIdOrderByStartedAtDesc_emptyForUnknownSchedule() {
-        List<ChainRun> result = repository.findByTriggeredByScheduleIdOrderByStartedAtDesc("no-such-sched");
-
-        assertThat(result).isEmpty();
+    void findStatusesByScheduleIdNewestFirst_emptyForUnknownSchedule() {
+        assertThat(repository.findStatusesByScheduleIdNewestFirst("no-such-sched", PageRequest.of(0, 1))).isEmpty();
     }
 
     // --- findFiltered ---

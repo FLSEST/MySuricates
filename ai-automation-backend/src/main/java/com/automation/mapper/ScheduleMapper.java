@@ -8,6 +8,8 @@ import com.automation.repository.ChainRunRepository;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.scheduler.ScheduleSkipPolicy;
 import com.automation.service.scheduler.SchedulerPause;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 
 import java.time.Clock;
@@ -113,16 +115,20 @@ public class ScheduleMapper {
         );
     }
 
+    /** Nur der neueste Status — eine Zeile, eine Spalte (TODO 86286572). */
+    private static final Pageable NEWEST_ONLY = PageRequest.of(0, 1);
+
+    /**
+     * Letzter Run-Status eines einzelnen Zeitplans. Liest je Run-Art hoechstens eine Status-Zeile,
+     * statt die komplette Run-Liste des Zeitplans als Entitaeten zu laden (TODO 86286572).
+     */
     private RunStatus resolveLastRunStatus(ScheduledWorkflow s) {
-        var workflowRuns = workflowRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc(s.getId());
-        if (!workflowRuns.isEmpty()) {
-            return workflowRuns.get(0).getStatus();
+        List<RunStatus> workflowStatus = workflowRunRepository.findStatusesByScheduleIdNewestFirst(s.getId(), NEWEST_ONLY);
+        if (!workflowStatus.isEmpty()) {
+            return workflowStatus.get(0);
         }
-        var chainRuns = chainRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc(s.getId());
-        if (!chainRuns.isEmpty()) {
-            return chainRuns.get(0).getStatus();
-        }
-        return null;
+        List<RunStatus> chainStatus = chainRunRepository.findStatusesByScheduleIdNewestFirst(s.getId(), NEWEST_ONLY);
+        return chainStatus.isEmpty() ? null : chainStatus.get(0);
     }
 
     /**

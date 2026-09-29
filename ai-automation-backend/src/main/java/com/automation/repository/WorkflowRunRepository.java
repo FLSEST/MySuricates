@@ -188,8 +188,6 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, String
 
     List<WorkflowRun> findTop5ByWorkflowIdOrderByStartedAtDesc(String workflowId);
 
-    List<WorkflowRun> findByTriggeredByScheduleIdOrderByStartedAtDesc(String scheduleId);
-
     /** A schedule's newest runs, at most {@code limit} — its run list (TODO 86777fb4). */
     List<WorkflowRun> findByTriggeredByScheduleIdOrderByStartedAtDesc(String scheduleId, Limit limit);
 
@@ -210,6 +208,17 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, String
            + "WHERE r.triggeredByScheduleId IN :scheduleIds "
            + "ORDER BY r.startedAt DESC")
     List<Object[]> findStatusesByScheduleIds(@Param("scheduleIds") Collection<String> scheduleIds);
+
+    /**
+     * Status der Runs eines Zeitplans, neuester zuerst — mit {@code PageRequest.of(0, 1)} der
+     * letzte Status fuer die Einzelansicht im {@code ScheduleMapper} (TODO 86286572).
+     *
+     * <p>Projektion auf die Status-Spalte: Vorher lud der Mapper dafuer jede Run-Entitaet des
+     * Zeitplans samt Eingabe-Kontext und verwarf alles ausser dem ersten Status.
+     */
+    @Query("SELECT r.status FROM WorkflowRun r WHERE r.triggeredByScheduleId = :scheduleId "
+           + "ORDER BY r.startedAt DESC")
+    List<RunStatus> findStatusesByScheduleIdNewestFirst(@Param("scheduleId") String scheduleId, Pageable pageable);
 
     @Query("SELECT wr FROM WorkflowRun wr LEFT JOIN wr.workflow w " +
            "WHERE (:status IS NULL OR wr.status = :status) " +
