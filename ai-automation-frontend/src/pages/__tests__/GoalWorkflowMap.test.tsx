@@ -88,7 +88,11 @@ const relations: GoalRelations = {
 
 interface Sent { method: string; path: string; body: unknown }
 
-function serve({ workflowsEndpoint = true, attachments = [] as unknown[], hold = null as Promise<void> | null } = {}) {
+/** Schranken, die der Test zur Laufzeit setzt: hält das Nachladen der Karte bzw. das PUT des Rückgängig an. */
+interface Gates { relations: Promise<void> | null; undo: Promise<void> | null }
+
+function serve({ workflowsEndpoint = true, attachments = [] as unknown[], hold = null as Promise<void> | null,
+  gates = { relations: null, undo: null } as Gates } = {}) {
   const sent: Sent[] = [];
   // der Server merkt sich die Verknüpfung, damit das Nachladen nach dem Ablegen sie auch zeigt
   const linked = new Map<string, string>();
@@ -107,6 +111,7 @@ function serve({ workflowsEndpoint = true, attachments = [] as unknown[], hold =
     const path = new URL(request.url).pathname;
     sent.push({ method: request.method, path, body });
     if (hold) await hold;
+    if (gates.undo && request.method === 'PUT' && (body as { linkedWorkflowId?: string }).linkedWorkflowId === '') await gates.undo;
     if (request.method === 'PUT') linked.set(path.split('/').pop()!, (body as { linkedWorkflowId: string }).linkedWorkflowId);
     if (request.method === 'DELETE') return new HttpResponse(null, { status: 204 });
     if (request.url.includes('/goals/g1/workflows')) return HttpResponse.json({ id: 'att-new', ...(body as object) }, { status: 201 });
@@ -114,7 +119,12 @@ function serve({ workflowsEndpoint = true, attachments = [] as unknown[], hold =
   };
   server.use(
     http.get('/api/v1/goals/g1', () => HttpResponse.json(detail)),
-    http.get('/api/v1/goals/g1/relations', () => HttpResponse.json(current())),
+    http.get('/api/v1/goals/g1/relations', async () => {
+      // Stand zum Zeitpunkt der Anfrage – kommt die Antwort spät, ist er womöglich schon überholt
+      const state = current();
+      if (gates.relations) await gates.relations;
+      return HttpResponse.json(state);
+    }),
     http.get('/api/v1/goals/g1/workflows', () => (workflowsEndpoint
       ? HttpResponse.json(attachments) : HttpResponse.json({ error: 'No static resource' }, { status: 404 }))),
     http.get('/api/v1/workflows', () => HttpResponse.json([
@@ -234,6 +244,37 @@ describe('Workflow map', () => {
     expect(await screen.findByText('Fix bot now works on “Changelog”')).toBeInTheDocument();
   });
 
+  it('Undo is not overturned by the refetch of the link that is still under way', async () => {
+    const gates: Gates = { relations: null, undo: null };
+    let openRelations = () => {};
+    let openUndo = () => {};
+    serve({ gates });
+    renderGoal();
+    await screen.findByRole('button', { name: 'Drag workflow Fix bot' });
+    const worker = () => document.querySelector('[data-node="worker:wf-fix"]');
+
+    // das Nachladen nach dem Verknüpfen bleibt hängen und liefert später den Stand „verknüpft“
+    gates.relations = new Promise<void>((resolve) => { openRelations = resolve; });
+    gates.undo = new Promise<void>((resolve) => { openUndo = resolve; });
+    startDrag('wf-fix');
+    drop('wf-fix', 'wm-todo:c');
+    const toast = await screen.findByText('Fix bot now works on “Changelog”');
+    expect(worker()).toBeInTheDocument();
+
+    fireEvent.click(within(toast.closest('[data-testid="toast"]') as HTMLElement).getByRole('button', { name: 'Undo' }));
+    await waitFor(() => expect(worker()).not.toBeInTheDocument());
+    // die überholte Antwort trifft ein, während das Rückgängig noch unterwegs ist: die Karte bleibt ohne Verknüpfung
+    gates.relations = null;
+    await act(async () => {
+      openRelations();
+      await new Promise((resolve) => setTimeout(resolve, 60));
+    });
+    expect(worker()).not.toBeInTheDocument();
+    openUndo();
+    expect(await screen.findByText('Assignment taken back')).toBeInTheDocument();
+    expect(worker()).not.toBeInTheDocument();
+  });
+
   it('asks before replacing a workflow a TODO already has, and names the project of a foreign workflow', async () => {
     const sent = serve();
     renderGoal();
@@ -255,9 +296,11 @@ describe('Workflow map', () => {
     renderGoal();
     await screen.findByRole('button', { name: 'Drag workflow Fix bot' });
     await screen.findByText('Whole goal: Release');
+    expect(document.querySelector('[data-drop-target="wm-pkg:w1"]')).toBeInTheDocument();
 
     startDrag('wf-fix');
     moveOver('wf-fix', 'wm-pkg:w1');
+    expect(document.querySelector('[data-drop-target="wm-pkg:w1"]')).toHaveAttribute('data-accepts', 'true');
     expect(live()).toBe('→ work package Repo clean');
     drop('wf-fix', 'wm-pkg:w1');
     await waitFor(() => expect(sent).toEqual([
@@ -283,15 +326,19 @@ describe('Workflow map', () => {
     expect(sent).toHaveLength(before);
   });
 
-  it('with an older backend (404 on /workflows) only links TODOs – no goal band, packages say why', async () => {
+  it('with an older backend (404 on /workflows) only links TODOs – no goal band, no package targets', async () => {
     const sent = serve({ workflowsEndpoint: false });
     renderGoal();
     await screen.findByRole('button', { name: 'Drag workflow Fix bot' });
+    await waitFor(() => expect(document.querySelector('[data-drop-target="wm-todo:c"]')).toBeInTheDocument());
 
     expect(screen.queryByText('Whole goal: Release')).not.toBeInTheDocument();
+    expect(document.querySelector('[data-drop-target^="wm-pkg:"]')).not.toBeInTheDocument();
     startDrag('wf-fix');
+    expect(document.querySelector('[data-drop-target^="wm-pkg:"]')).not.toBeInTheDocument();
+    expect(document.querySelector('[data-drop-target="wm-todo:c"]')).toHaveAttribute('data-accepts', 'true');
+    // käme ein Ablegen auf einem Paket doch an (etwa per Tastatur-Altstand), sendet es nichts
     moveOver('wf-fix', 'wm-pkg:w1');
-    expect(live()).toBe('Assigning becomes available after the backend restart');
     expect(screen.getByTestId('workflow-map-live')).toHaveAttribute('data-refused', 'true');
     drop('wf-fix', 'wm-pkg:w1');
     startDrag('wf-fix');
