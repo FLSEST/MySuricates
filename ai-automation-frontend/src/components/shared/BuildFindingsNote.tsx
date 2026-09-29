@@ -1,13 +1,20 @@
 import { AlertTriangle } from 'lucide-react';
-import { useT } from '../../i18n';
+import { useI18nStore, useT } from '../../i18n';
 
 /**
  * Findings of the build check (analyzer, from MEDIUM up, HIGH first) that an AI-generated definition still
  * has — one line each, as the backend formats them (TODO 326d5987). Renders nothing without findings, also
- * for answers of an older backend that has no `buildFindings` field.
+ * for answers of an older backend that has no `buildFindings` field. The backend sends the lines in German
+ * (`buildFindings`) and English (`findingsEn`, TODO 81773d7b); the English UI takes the English ones when there
+ * are any, an older backend without them keeps showing the German lines.
  */
-export function BuildFindingsNote({ findings }: { findings?: string[] | null }) {
+export function BuildFindingsNote({ findings: findingsDe, findingsEn }: {
+  findings?: string[] | null;
+  findingsEn?: string[] | null;
+}) {
   const t = useT();
+  const locale = useI18nStore((s) => s.locale);
+  const findings = locale === 'en' && findingsEn && findingsEn.length > 0 ? findingsEn : findingsDe;
   if (!findings || findings.length === 0) return null;
   return (
     <div className="p-2 rounded-lg text-xs border bg-warning/10 border-warning/30 text-warning" role="note">

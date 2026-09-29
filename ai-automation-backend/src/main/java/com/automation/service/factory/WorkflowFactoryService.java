@@ -156,11 +156,13 @@ public class WorkflowFactoryService {
             verificationService.reportTestResult(workflow, testResult.status());
 
             String overallStatus = "PASSED".equals(testResult.status()) ? "VERIFIED" : "FAILED";
+            var findings = buildCheck.findings(workflow);
             return new WorkflowFactoryResult(
                     workflow.getId(), workflow.getName(), overallStatus,
                     testResult.runId(), testResult.status(), testResult.error(),
                     promoted, System.currentTimeMillis() - start, retryErrors,
-                    GeneratedWorkflowCheck.summaryLines(buildCheck.findings(workflow))
+                    GeneratedWorkflowCheck.summaryLines(findings),
+                    GeneratedWorkflowCheck.summaryLines(findings, "en")
             );
         } catch (Exception e) {
             log.error("Factory pipeline failed: {}", e.getMessage(), e);

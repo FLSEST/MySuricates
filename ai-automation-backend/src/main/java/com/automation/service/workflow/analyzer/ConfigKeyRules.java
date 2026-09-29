@@ -43,18 +43,25 @@ final class ConfigKeyRules {
             if (block == null) continue;
             int index = i;
             String outer = block.getName();
-            check(schema, block.getType(), block.getConfig(), new Where(index, outer, null), out);
-            NestedBlocks.visit(block.getConfig(), nested -> check(schema, nested.type(), nested.config(),
-                    new Where(index, outer, "Block " + (index + 1) + " › " + nested.path()
-                            + (nested.name() != null && !nested.name().isBlank() ? " „" + nested.name() + "“" : "")),
-                    out));
+            check(schema, block.getType(), block.getConfig(), new Where(index, outer, null, null), out);
+            NestedBlocks.visit(block.getConfig(), nested -> {
+                String path = "Block " + (index + 1) + " › " + nested.path();
+                boolean named = nested.name() != null && !nested.name().isBlank();
+                check(schema, nested.type(), nested.config(), new Where(index, outer,
+                        path + (named ? " „" + nested.name() + "“" : ""),
+                        path + (named ? " \"" + nested.name() + "\"" : "")), out);
+            });
         }
     }
 
-    /** Wo ein Befund hängt: Index und Name des äußeren Blocks, bei verschachtelten der Pfad dazu. */
-    private record Where(int index, String name, String path) {
+    /** Wo ein Befund hängt: Index und Name des äußeren Blocks, bei verschachtelten der Pfad dazu (de/en). */
+    private record Where(int index, String name, String path, String pathEn) {
         String prefix() {
             return path == null ? "" : path + ": ";
+        }
+
+        String prefixEn() {
+            return pathEn == null ? "" : pathEn + ": ";
         }
     }
 
@@ -70,11 +77,15 @@ final class ConfigKeyRules {
             if (field == null) {
                 out.add(AnalyzerFinding.of("unknown-config-key", Severity.MEDIUM, where.index(), where.name(),
                         where.prefix() + "unbekannter Config-Schlüssel " + key + " — der " + type
-                                + "-Block liest ihn nicht, die Einstellung wirkt nicht" + hint(key, suggestable(fields))));
+                                + "-Block liest ihn nicht, die Einstellung wirkt nicht" + hint(key, suggestable(fields), false),
+                        where.prefixEn() + "unknown config key " + key + " — the " + type
+                                + " block does not read it, the setting has no effect" + hint(key, suggestable(fields), true)));
             } else if (!onlyWithMet(field, cfg)) {
                 out.add(AnalyzerFinding.of("unknown-config-key", Severity.MEDIUM, where.index(), where.name(),
                         where.prefix() + key + " wirkt nur mit " + condition(field) + " — so liest der " + type
-                                + "-Block ihn nicht, die Einstellung wirkt nicht"));
+                                + "-Block ihn nicht, die Einstellung wirkt nicht",
+                        where.prefixEn() + key + " only takes effect with " + condition(field) + " — as it is, the "
+                                + type + " block does not read it, the setting has no effect"));
             } else if (!skipValueCheck(type, key, cfg)) {
                 checkValue(field, entry.getValue(), where, out);
             }
@@ -82,9 +93,12 @@ final class ConfigKeyRules {
 
         for (String required : schema.requiredKeys(type)) {
             if (cfg.get(required) != null || legacyKeyPresent(fields, required, cfg)) continue;
+            String instead = presentInstead(cfg, fields, required);
             out.add(AnalyzerFinding.of("missing-required-config-key", Severity.HIGH, where.index(), where.name(),
                     where.prefix() + "Pflichtschlüssel " + required + " fehlt — ohne ihn kann der " + type
-                            + "-Block nicht laufen" + presentInstead(cfg, fields, required)));
+                            + "-Block nicht laufen" + (instead == null ? "" : " (gesetzt ist " + instead + ")"),
+                    where.prefixEn() + "required key " + required + " is missing — without it the " + type
+                            + " block cannot run" + (instead == null ? "" : " (" + instead + " is set instead)")));
         }
     }
 
@@ -95,6 +109,8 @@ final class ConfigKeyRules {
         Severity severity = "on_failure".equals(field.key()) ? Severity.HIGH : Severity.MEDIUM;
         out.add(AnalyzerFinding.of("invalid-config-value", severity, where.index(), where.name(),
                 where.prefix() + field.key() + ": " + shown + " ist kein gültiger Wert, erlaubt: "
+                        + String.join(", ", field.values()),
+                where.prefixEn() + field.key() + ": " + shown + " is not a valid value, allowed: "
                         + String.join(", ", field.values())));
     }
 
@@ -125,15 +141,15 @@ final class ConfigKeyRules {
                 .anyMatch(f -> required.equals(f.legacyFor()) && cfg.get(f.key()) != null);
     }
 
-    /** Steht statt des Pflichtschlüssels ein unbekannter, der ihm ähnelt, sagt die Meldung das gleich mit. */
+    /** Steht statt des Pflichtschlüssels ein unbekannter, der ihm ähnelt, nennt die Meldung ihn gleich mit; sonst {@code null}. */
     private static String presentInstead(Map<String, Object> cfg, Map<String, BlockConfigSchema.Field> fields,
                                          String required) {
         for (String key : cfg.keySet()) {
             if (!fields.containsKey(key) && required.equals(suggestion(key, suggestable(fields)))) {
-                return " (gesetzt ist " + key + ")";
+                return key;
             }
         }
-        return "";
+        return null;
     }
 
     /** Vorgeschlagen werden nur aktuelle Namen, nie die alte Schreibweise eines Schlüssels. */
@@ -145,12 +161,14 @@ final class ConfigKeyRules {
         return keys;
     }
 
-    private static String hint(String key, Set<String> known) {
+    private static String hint(String key, Set<String> known, boolean en) {
         if (BLOCK_LEVEL_KEYS.contains(key)) {
-            return "; " + key + " gehört neben config auf die Blockebene";
+            return en ? "; " + key + " belongs on the block level, next to config"
+                    : "; " + key + " gehört neben config auf die Blockebene";
         }
         String suggestion = suggestion(key, known);
-        return suggestion != null ? "; meintest du " + suggestion + "?" : "";
+        if (suggestion == null) return "";
+        return en ? "; did you mean " + suggestion + "?" : "; meintest du " + suggestion + "?";
     }
 
     /**

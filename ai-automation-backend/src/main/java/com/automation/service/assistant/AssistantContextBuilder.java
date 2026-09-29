@@ -169,16 +169,30 @@ public class AssistantContextBuilder {
         return sb.toString();
     }
 
+    /**
+     * The conversation so far plus the current message. Results of tools the user confirmed follow their
+     * assistant turn as {@code <tool_result>} blocks, bounded and marked as data ({@link ToolResultHistory},
+     * TODO 2f7766e7); without such results the prompt is exactly what it was before.
+     */
     public String buildPrompt(List<AssistantChatRequest.MessageEntry> history, String currentMessage) {
         if (history == null || history.isEmpty()) {
             return currentMessage;
         }
+        var conversation = new StringBuilder();
+        int firstWithResults = ToolResultHistory.firstRenderedIndex(history);
+        boolean anyResult = false;
+        for (int i = 0; i < history.size(); i++) {
+            var entry = history.get(i);
+            String speaker = "user".equals(entry.role()) ? "User" : "MySuricates";
+            conversation.append(speaker).append(": ").append(entry.content()).append("\n");
+            String results = i >= firstWithResults ? ToolResultHistory.render(entry) : "";
+            conversation.append(results);
+            anyResult |= !results.isEmpty();
+        }
         var sb = new StringBuilder();
         sb.append("Previous conversation:\n");
-        history.forEach(entry -> {
-            String speaker = "user".equals(entry.role()) ? "User" : "MySuricates";
-            sb.append(speaker).append(": ").append(entry.content()).append("\n");
-        });
+        if (anyResult) sb.append(ToolResultHistory.DATA_NOTE).append("\n");
+        sb.append(conversation);
         sb.append("\nCurrent message:\n").append(currentMessage);
         return sb.toString();
     }

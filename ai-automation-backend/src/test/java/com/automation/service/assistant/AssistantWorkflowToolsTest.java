@@ -216,6 +216,29 @@ class AssistantWorkflowToolsTest {
                 .contains("HIGH missing-required-config-key");
     }
 
+    /** TODO 81773d7b: in the English UI the build check answers in English, detail texts included. */
+    @Test
+    void createWorkflow_withFindings_inEnglish_whenTheUiIsEnglish() {
+        when(workflowService.create(any(), eq(ChangeSource.ASSISTANT))).thenReturn(withPromptInsteadOfCommand("wf-1", "Daily"));
+
+        String r = tools.createWorkflow("{\"projectId\":\"p\",\"name\":\"Daily\"}", "en");
+
+        assertThat(r).startsWith("✓ Workflow created: \"Daily\" (ID: wf-1)\n\nBuild check: 2 finding(s) from MEDIUM up\n")
+                .contains("- HIGH missing-required-config-key — Block 1: required key command is missing")
+                .contains("unknown config key prompt")
+                .endsWith("\nupdate_workflow can fix them.")
+                .doesNotContain("Pflichtschlüssel").doesNotContain("Baufehler");
+    }
+
+    @Test
+    void updateWorkflow_withFindings_germanWithoutLanguage_asBefore() {
+        when(workflowService.update(eq("wf-1"), any(), eq(ChangeSource.ASSISTANT))).thenReturn(withPromptInsteadOfCommand("wf-1", "Daily"));
+
+        assertThat(tools.updateWorkflow("{\"workflowId\":\"wf-1\"}", null))
+                .isEqualTo(tools.updateWorkflow("{\"workflowId\":\"wf-1\"}"))
+                .contains("Baufehler-Prüfung: 2 Befund(e) ab MEDIUM");
+    }
+
     @Test
     void createWorkflow_cleanDefinition_lineStaysExactlyAsBefore() {
         Workflow clean = Workflow.builder().id("wf-1").name("Daily").blocks(new java.util.ArrayList<>(java.util.List.of(

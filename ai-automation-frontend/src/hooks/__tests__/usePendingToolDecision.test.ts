@@ -8,6 +8,7 @@ import { createTestQueryClient } from '../../test/utils';
 import { useI18nStore } from '../../i18n';
 import { en } from '../../i18n/en';
 import { usePendingToolDecision } from '../usePendingToolDecision';
+import { useAssistantStore } from '../../stores/assistantStore';
 import type { PendingTool } from '../useAssistant';
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
@@ -25,7 +26,8 @@ function tool(expiresAt = ''): PendingTool {
 const inTenMinutes = () => new Date(Date.now() + 600_000).toISOString();
 
 describe('usePendingToolDecision', () => {
-  it('keeps the answer of the confirm call as result and sends the session', async () => {
+  it('keeps the answer of the confirm call as result and sends the session and UI language', async () => {
+    useI18nStore.setState({ locale: 'de' });
     let body: unknown;
     server.use(http.post('/api/v1/assistant/pending-tools/:id/confirm', async ({ request }) => {
       body = await request.json();
@@ -39,7 +41,24 @@ describe('usePendingToolDecision', () => {
 
     expect(result.current.result).toEqual({ toolId: 'pt-1', type: 'start_workflow', success: true, message: 'Gestartet' });
     expect(result.current.error).toBeNull();
-    expect(body).toEqual({ sessionId: 's-1' });
+    // language: the build check after a workflow tool answers in it (TODO 81773d7b)
+    expect(body).toEqual({ sessionId: 's-1', language: 'de' });
+  });
+
+  // TODO 2f7766e7: the result lands on the proposing message, from where the next turn sends it to the model
+  it('records the result on the message that proposed the tool', async () => {
+    server.use(http.post('/api/v1/assistant/pending-tools/:id/confirm', () =>
+      HttpResponse.json({ toolId: 'pt-1', type: 'start_workflow', success: true, message: '✓ Workflow started' })));
+    const sessionId = useAssistantStore.getState().startNewSession();
+    useAssistantStore.getState().appendMessage(sessionId, {
+      id: 'a1', role: 'assistant', content: 'Starting.', pendingTools: [tool(inTenMinutes())],
+    });
+    const { result } = renderHook(() => usePendingToolDecision(tool(inTenMinutes()), sessionId), { wrapper });
+
+    await act(() => result.current.confirm());
+
+    const stored = useAssistantStore.getState().sessions.find((s) => s.id === sessionId)!.messages[0]!;
+    expect(stored.toolResults).toEqual([{ toolId: 'pt-1', type: 'start_workflow', success: true, message: '✓ Workflow started' }]);
   });
 
   it('keeps the answer of the reject call as result', async () => {

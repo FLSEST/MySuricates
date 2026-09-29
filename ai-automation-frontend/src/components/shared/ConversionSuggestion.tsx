@@ -79,7 +79,7 @@ export function ConversionSuggestion({ runId }: { runId: string }) {
             </div>
           )}
 
-          <BuildFindingsNote findings={suggestion.buildFindings} />
+          <BuildFindingsNote findings={suggestion.buildFindings} findingsEn={suggestion.buildFindingsEn} />
 
           {/* Suggested blocks */}
           <div>

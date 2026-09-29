@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronRight, ClipboardCheck } from 'lucide-react';
-import { useT } from '../../i18n';
+import { useI18nStore, useT } from '../../i18n';
 import { useWorkflowAnalysis } from '../../hooks/useWorkflowAnalysis';
 import type { AnalyzerFinding, AnalyzerSeverity, Workflow } from '../../types';
 
@@ -70,8 +70,14 @@ export function WorkflowAnalysisNotice({ workflow }: { workflow: Workflow }) {
   );
 }
 
+/** The finding's text in the UI language: `detailEn` in English when the backend sends it (TODO 81773d7b). */
+function findingDetail(finding: AnalyzerFinding, locale: string): string {
+  return locale === 'en' && finding.detailEn ? finding.detailEn : finding.detail;
+}
+
 function FindingRow({ finding }: { finding: AnalyzerFinding }) {
   const t = useT();
+  const locale = useI18nStore((s) => s.locale);
   const a = t.workflows.analysis;
   const where = finding.blockIndex < 0
     ? a.definition
@@ -83,7 +89,7 @@ function FindingRow({ finding }: { finding: AnalyzerFinding }) {
       </span>
       <code className="text-xs text-text-secondary">{finding.rule}</code>
       <span className="text-xs text-text-secondary">{where}</span>
-      <span className="basis-full text-text break-words">{finding.detail}</span>
+      <span className="basis-full text-text break-words">{findingDetail(finding, locale)}</span>
     </li>
   );
 }

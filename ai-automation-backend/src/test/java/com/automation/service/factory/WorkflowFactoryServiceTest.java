@@ -482,6 +482,8 @@ class WorkflowFactoryServiceTest {
 
             assertThat(result.buildFindings()).isNotEmpty()
                     .first().asString().startsWith("HIGH missing-required-config-key");
+            assertThat(result.buildFindingsEn()).hasSameSizeAs(result.buildFindings())
+                    .first().asString().contains("required key command is missing");
         }
     }
 }

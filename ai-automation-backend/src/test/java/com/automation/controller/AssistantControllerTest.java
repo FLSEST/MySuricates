@@ -23,6 +23,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.time.Instant;
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -119,6 +120,41 @@ class AssistantControllerTest {
         verify(assistantService).chat(any(AssistantChatRequest.class));
     }
 
+    /** TODO 2f7766e7: the old history form (role/content only) still arrives, with no tool results. */
+    @Test
+    void chat_legacyHistoryWithoutToolResults_arrivesWithNullToolResults() throws Exception {
+        when(assistantService.chat(any())).thenReturn(new AssistantChatResponse("OK", List.of()));
+
+        mockMvc.perform(post("/api/v1/assistant/chat")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"message\":\"Weiter\",\"history\":[{\"role\":\"user\",\"content\":\"Leg an\"},"
+                                + "{\"role\":\"assistant\",\"content\":\"Erledigt\"}]}"))
+                .andExpect(status().isOk());
+
+        var captor = org.mockito.ArgumentCaptor.forClass(AssistantChatRequest.class);
+        verify(assistantService).chat(captor.capture());
+        assertThat(captor.getValue().history()).extracting(AssistantChatRequest.MessageEntry::toolResults)
+                .containsOnlyNulls();
+    }
+
+    /** TODO 2f7766e7: the new form carries the results of confirmed tools on the assistant entry. */
+    @Test
+    void chat_historyWithToolResults_passesThemToService() throws Exception {
+        when(assistantService.chat(any())).thenReturn(new AssistantChatResponse("OK", List.of()));
+
+        mockMvc.perform(post("/api/v1/assistant/chat")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"message\":\"Behebe das\",\"history\":[{\"role\":\"assistant\",\"content\":\"Lege an\","
+                                + "\"toolResults\":[{\"type\":\"create_workflow\",\"success\":true,"
+                                + "\"message\":\"✓ Workflow created\"}]}]}"))
+                .andExpect(status().isOk());
+
+        var captor = org.mockito.ArgumentCaptor.forClass(AssistantChatRequest.class);
+        verify(assistantService).chat(captor.capture());
+        assertThat(captor.getValue().history().get(0).toolResults()).containsExactly(
+                new AssistantChatRequest.ToolResultEntry("create_workflow", true, "✓ Workflow created"));
+    }
+
     @Test
     void chat_withPageContext_passesContextToService() throws Exception {
         when(assistantService.chat(any()))
@@ -172,7 +208,7 @@ class AssistantControllerTest {
                 "tool-1", "create_todo", "TODO anlegen: X", "{\"title\":\"X\"}",
                 java.time.Instant.now().plusSeconds(60));
         when(pendingToolRegistry.take("tool-1")).thenReturn(java.util.Optional.of(tool));
-        when(toolExecutor.executeConfirmed(tool))
+        when(toolExecutor.executeConfirmed(tool, null))
                 .thenReturn(new com.automation.service.assistant.ToolExecutionResult(
                         "tool-1", "create_todo", true, "✓ Todo created"));
 
@@ -184,10 +220,29 @@ class AssistantControllerTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").value("✓ Todo created"));
 
-        verify(toolExecutor).executeConfirmed(tool);
+        verify(toolExecutor).executeConfirmed(tool, null);
         verify(assistantSessionService).appendToolResult(
                 org.mockito.ArgumentMatchers.eq("s1"),
                 org.mockito.ArgumentMatchers.argThat(r -> r.success() && "tool-1".equals(r.toolId())));
+    }
+
+    /** TODO 81773d7b: the UI language from the confirm body reaches the tool (build check in English). */
+    @Test
+    void confirmPendingTool_passesUiLanguageToExecutor() throws Exception {
+        var tool = new com.automation.dto.PendingTool(
+                "tool-3", "create_workflow", "Workflow anlegen", "{}", java.time.Instant.now().plusSeconds(60));
+        when(pendingToolRegistry.take("tool-3")).thenReturn(java.util.Optional.of(tool));
+        when(toolExecutor.executeConfirmed(tool, "en"))
+                .thenReturn(new com.automation.service.assistant.ToolExecutionResult(
+                        "tool-3", "create_workflow", true, "✓ Workflow created"));
+
+        mockMvc.perform(post("/api/v1/assistant/pending-tools/tool-3/confirm")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sessionId\":\"s1\",\"language\":\"en\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        verify(toolExecutor).executeConfirmed(tool, "en");
     }
 
     @Test
@@ -199,7 +254,7 @@ class AssistantControllerTest {
                         .content("{}"))
                 .andExpect(status().isGone());
 
-        verify(toolExecutor, org.mockito.Mockito.never()).executeConfirmed(any());
+        verify(toolExecutor, org.mockito.Mockito.never()).executeConfirmed(any(), any());
     }
 
     @Test
@@ -217,7 +272,7 @@ class AssistantControllerTest {
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").value("✗ Abgelehnt"));
 
-        verify(toolExecutor, org.mockito.Mockito.never()).executeConfirmed(any());
+        verify(toolExecutor, org.mockito.Mockito.never()).executeConfirmed(any(), any());
         verify(assistantSessionService).appendToolResult(
                 org.mockito.ArgumentMatchers.eq("s2"),
                 org.mockito.ArgumentMatchers.argThat(r -> !r.success() && "tool-2".equals(r.toolId())));
@@ -324,7 +379,7 @@ class AssistantControllerTest {
                         .content("{}"))
                 .andExpect(status().isGone());
 
-        verify(toolExecutor, never()).executeConfirmed(any());
+        verify(toolExecutor, never()).executeConfirmed(any(), any());
     }
 
     // ── Error propagation ─────────────────────────────────────────────────────

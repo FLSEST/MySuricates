@@ -496,6 +496,8 @@ class WorkflowConversionServiceTest {
             assertThat(suggestion.blocks()).singleElement()
                     .satisfies(b -> assertThat(b.getConfig()).containsEntry("prompt", "Fasse zusammen"));
             assertThat(suggestion.buildFindings()).first().asString().startsWith("HIGH missing-required-config-key");
+            assertThat(suggestion.buildFindingsEn()).hasSameSizeAs(suggestion.buildFindings())
+                    .first().asString().contains("required key command is missing");
         }
 
         @Test

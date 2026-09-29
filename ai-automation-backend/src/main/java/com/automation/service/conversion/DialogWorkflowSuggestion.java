@@ -20,10 +20,21 @@ public record DialogWorkflowSuggestion(
         String notAvailableReason,
         int toolCallsAnalyzed,
         boolean available,
-        List<String> buildFindings  // Baufehler-Prüfung ab MEDIUM, HIGH zuerst (TODO 326d5987); leer = sauber
+        List<String> buildFindings,  // Baufehler-Prüfung ab MEDIUM, HIGH zuerst (TODO 326d5987); leer = sauber; deutsch
+        List<String> buildFindingsEn // dieselben Zeilen auf Englisch (TODO 81773d7b)
 ) {
     public DialogWorkflowSuggestion {
         if (buildFindings == null) buildFindings = List.of();
+        if (buildFindingsEn == null) buildFindingsEn = List.of();
+    }
+
+    /** Nur mit den deutschen Befundzeilen. */
+    public DialogWorkflowSuggestion(String suggestedName, String suggestedDescription, List<BlockDefinition> blocks,
+                                    String sessionId, String sourceFilePath, String projectPath, double confidence,
+                                    String patternType, String notAvailableReason, int toolCallsAnalyzed,
+                                    boolean available, List<String> buildFindings) {
+        this(suggestedName, suggestedDescription, blocks, sessionId, sourceFilePath, projectPath, confidence,
+                patternType, notAvailableReason, toolCallsAnalyzed, available, buildFindings, List.of());
     }
 
     /** Ohne Befunde der Baufehler-Prüfung. */
@@ -32,7 +43,7 @@ public record DialogWorkflowSuggestion(
                                     String patternType, String notAvailableReason, int toolCallsAnalyzed,
                                     boolean available) {
         this(suggestedName, suggestedDescription, blocks, sessionId, sourceFilePath, projectPath, confidence,
-                patternType, notAvailableReason, toolCallsAnalyzed, available, List.of());
+                patternType, notAvailableReason, toolCallsAnalyzed, available, List.of(), List.of());
     }
 
     public static DialogWorkflowSuggestion notAvailable(String reason) {

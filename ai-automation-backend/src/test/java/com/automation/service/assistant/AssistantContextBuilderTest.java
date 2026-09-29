@@ -171,6 +171,50 @@ class AssistantContextBuilderTest {
         assertThat(result).contains("Was geht?");
     }
 
+    /** TODO 2f7766e7: without tool results the prompt is exactly the pre-feature format. */
+    @Test
+    void buildPrompt_withoutToolResults_isByteIdenticalToTheOldFormat() {
+        List<AssistantChatRequest.MessageEntry> history = List.of(
+                new AssistantChatRequest.MessageEntry("user", "Leg einen Workflow an"),
+                new AssistantChatRequest.MessageEntry("assistant", "Mache ich.", List.of()),
+                new AssistantChatRequest.MessageEntry("user", "Danke"));
+
+        assertThat(builder.buildPrompt(history, "Und jetzt?")).isEqualTo("""
+                Previous conversation:
+                User: Leg einen Workflow an
+                MySuricates: Mache ich.
+                User: Danke
+
+                Current message:
+                Und jetzt?""");
+    }
+
+    /** TODO 2f7766e7: a confirmed tool's result follows its assistant turn, marked as data. */
+    @Test
+    void buildPrompt_withExecutedToolResult_rendersItAfterTheAssistantTurn() {
+        List<AssistantChatRequest.MessageEntry> history = List.of(
+                new AssistantChatRequest.MessageEntry("user", "Leg an"),
+                new AssistantChatRequest.MessageEntry("assistant", "Lege an.", List.of(
+                        new AssistantChatRequest.ToolResultEntry("create_workflow", true,
+                                "✓ Workflow created: \"W\" (ID: w1)\n\nBaufehler-Prüfung: 1 Befund(e) ab MEDIUM\n"
+                                        + "- HIGH missing-required-config-key — Block 1: Pflichtschlüssel command fehlt"),
+                        new AssistantChatRequest.ToolResultEntry("delete_workflow", false, "✗ Abgelehnt"))));
+
+        assertThat(builder.buildPrompt(history, "Behebe das")).isEqualTo("""
+                Previous conversation:
+                %s
+                User: Leg an
+                MySuricates: Lege an.
+                <tool_result tool="create_workflow">
+                Baufehler-Prüfung: 1 Befund(e) ab MEDIUM
+                ✓ Workflow created: "W" (ID: w1)
+                - HIGH missing-required-config-key — Block 1: Pflichtschlüssel command fehlt
+                </tool_result>
+
+                Current message:
+                Behebe das""".formatted(ToolResultHistory.DATA_NOTE));
+    }
+
     @Test
     void buildPrompt_emptyHistory_onlyCurrentMessage() {
         String result = builder.buildPrompt(List.of(), "Frage");
