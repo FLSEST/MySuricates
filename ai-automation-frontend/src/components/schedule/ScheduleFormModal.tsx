@@ -307,7 +307,7 @@ export function ScheduleFormModal({
           label={t.common.description}
           value={form.description ?? ''}
           onChange={(e) => onFormChange({ ...form, description: e.target.value })}
-          placeholder="Daily code quality check"
+          placeholder={t.schedules.descriptionPlaceholder}
         />
 
         <Select

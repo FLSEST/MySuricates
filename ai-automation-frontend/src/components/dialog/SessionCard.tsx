@@ -1,6 +1,6 @@
 import { ChevronRight } from 'lucide-react';
 import { Badge } from '../ui';
-import { useI18nStore } from '../../i18n';
+import { useI18nStore, useT } from '../../i18n';
 import type { DialogSessionInfo } from '../../types';
 import { formatDuration, formatSessionStart } from './dialogSessionFormat';
 
@@ -13,6 +13,7 @@ export function SessionCard({
   onClick: () => void;
 }) {
   const locale = useI18nStore((s) => s.locale);
+  const t = useT();
   return (
     <button
       onClick={onClick}
@@ -35,7 +36,7 @@ export function SessionCard({
                 {tool}
               </span>
             ))}
-            {!session.substantial && <Badge variant="default">small</Badge>}
+            {!session.substantial && <Badge variant="default">{t.dialog.smallSession}</Badge>}
           </div>
         </div>
         <div className="flex flex-col items-end gap-1 shrink-0 text-xs text-text-secondary">

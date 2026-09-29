@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { CheckCircle2, AlertCircle, ChevronDown, ChevronRight, List } from 'lucide-react';
 import { Badge } from '../ui';
+import { useT } from '../../i18n';
 import { PathLinkedOutput } from '../shared/PathLinkedOutput';
 import type { StepResult } from '../../types';
 import type { ForEachState, ForEachItemState } from '../../hooks/useWebSocket';
@@ -50,6 +51,7 @@ interface ForEachStepCardProps {
 }
 
 export function ForEachStepCard({ step, forEachState }: ForEachStepCardProps) {
+  const t = useT();
   const [expanded, setExpanded] = useState(false);
 
   // Live WebSocket state while running; the persisted step metadata after a reload
@@ -107,7 +109,7 @@ export function ForEachStepCard({ step, forEachState }: ForEachStepCardProps) {
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs text-text-secondary flex items-center gap-1">
                 <List className="w-3 h-3" />
-                {completedItems}/{totalItems > 0 ? totalItems : '?'} items
+                {t.workflows.foreachItems.replace('{done}', String(completedItems)).replace('{total}', totalItems > 0 ? String(totalItems) : '?')}
               </span>
               {progress !== null && (
                 <span className="text-xs font-medium text-accent">{progress}%</span>

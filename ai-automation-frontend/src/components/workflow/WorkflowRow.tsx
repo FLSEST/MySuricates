@@ -134,14 +134,14 @@ export function WorkflowRow({
           <button
             onClick={(e) => { e.stopPropagation(); onExecute(); }}
             className="sm:opacity-0 sm:group-hover:opacity-100 p-0.5 rounded-sm hover:bg-accent/20 text-accent transition-all shrink-0"
-            title="Ausführen"
+            title={t.workflows.execute}
           >
             <Play className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); onDelete(); }}
             className="sm:opacity-0 sm:group-hover:opacity-100 p-0.5 rounded-sm hover:bg-danger/20 text-text-tertiary hover:text-danger transition-all shrink-0"
-            title="Löschen"
+            title={t.common.delete}
           >
             <Trash2 className="w-3.5 h-3.5" />
           </button>

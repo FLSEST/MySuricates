@@ -85,7 +85,7 @@ export function SortableBlock({ id, index, block, onEdit, onRemove, allBlocks = 
         {...attributes}
         {...listeners}
         className="pt-1 text-text-tertiary hover:text-text cursor-grab active:cursor-grabbing touch-none"
-        aria-label="Drag to reorder"
+        aria-label={t.workflows.dragToReorder}
         onClick={(e) => e.stopPropagation()}
       >
         <GripVertical className="w-4 h-4" />

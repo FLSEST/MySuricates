@@ -110,7 +110,7 @@ export function HumanInputDialog({ humanInput, onSubmit, loading }: HumanInputDi
 
         <div className="mb-4">
           <ApprovalQuestion question={humanInput.prompt} maxHeightClass="max-h-[40vh]" />
-          <p className="text-xs text-text-tertiary mt-1">Step {humanInput.stepIndex + 1}</p>
+          <p className="text-xs text-text-tertiary mt-1">{t.common.stepNumber.replace('{n}', String(humanInput.stepIndex + 1))}</p>
         </div>
 
         {isMulti ? (

@@ -83,7 +83,7 @@ export function MessageBubble({ msg, sessionId, onClose, onSend, onExecute, onRe
                     className="flex items-center gap-1 text-[11px] text-accent hover:text-accent-hover font-medium"
                   >
                     <ChevronDown className="w-3.5 h-3.5" />
-                    Mehr anzeigen
+                    {t.common.showMore}
                   </button>
                 </div>
               )}
@@ -93,7 +93,7 @@ export function MessageBubble({ msg, sessionId, onClose, onSend, onExecute, onRe
                   className="flex items-center gap-1 text-[11px] text-accent hover:text-accent-hover font-medium mt-1"
                 >
                   <ChevronUp className="w-3.5 h-3.5" />
-                  Weniger anzeigen
+                  {t.common.showLess}
                 </button>
               )}
             </div>

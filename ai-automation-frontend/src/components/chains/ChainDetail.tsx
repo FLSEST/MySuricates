@@ -81,7 +81,7 @@ export function ChainDetail({ chain, onExecute, onEdit, onDelete }: {
                         )}
                       </div>
                       {entry.stopOnFailure && (
-                        <Badge variant="warning" dot>Stop</Badge>
+                        <Badge variant="warning" dot>{t.chains.stopBadge}</Badge>
                       )}
                     </div>
                   </div>

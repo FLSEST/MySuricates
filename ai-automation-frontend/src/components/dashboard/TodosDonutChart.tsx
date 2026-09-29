@@ -65,7 +65,7 @@ export function TodosDonutChart() {
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="text-center">
             <p className="text-2xl font-bold text-text">{total}</p>
-            <p className="text-[10px] text-text-tertiary uppercase tracking-wide">Total</p>
+            <p className="text-[10px] text-text-tertiary uppercase tracking-wide">{t.common.total}</p>
           </div>
         </div>
       </div>

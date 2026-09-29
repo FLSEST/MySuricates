@@ -159,7 +159,7 @@ export function TodosWidget() {
             {backlog > 0 && (
               <span className="flex items-center gap-1 text-text-tertiary/60">
                 <Circle className="w-2 h-2 fill-text-tertiary/30 text-text-tertiary/30" />
-                {backlog} Backlog
+                {backlog} {t.todos.statuses.BACKLOG}
               </span>
             )}
           </div>

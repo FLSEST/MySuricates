@@ -2,53 +2,35 @@ import { describe, expect, it } from 'vitest';
 import { de } from '../de';
 import { en } from '../en';
 
-// Ratchet against keys copied into de.ts without being translated (TODO 99ceb2b5). The type check
+// Guard against keys copied into de.ts without being translated (TODO 99ceb2b5). The type check
 // only asks that de.ts has every key of en.ts; `cancel: 'Cancel'` in de.ts passes it and shows
 // English in the German UI.
 //
 // A value that is the same in both files is fine when it consists only of SHARED_TERMS — words the
 // German UI keeps on purpose (product terms, names, loanwords). Paths, file names and {placeholders}
 // are ignored. Anything else is either translated, or its word goes into SHARED_TERMS if German
-// really keeps it. KNOWN_UNTRANSLATED holds the keys that were already like this; it only shrinks.
+// really keeps it.
 
 const SHARED_TERMS = new Set([
   // Product terms
-  'agent', 'audit', 'auto-memory', 'auto-repair', 'auto-todo', 'backlog', 'block', 'chains', 'cockpit',
+  'agent', 'audit', 'auto-memory', 'auto-repair', 'auto-todo', 'backlog', 'block', 'board', 'chains', 'cockpit',
   'dashboard', 'dead-letter queue', 'factory', 'findings', 'gate', 'insights', 'live', 'pool', 'preset', 'pro',
   'provider', 'quality gates', 'retry', 'run', 'runs', 'session', 'session2workflow', 'sessions', 'shell',
   'simple', 'skill', 'skills', 'sub-workflow', 'tag', 'tags', 'todo', 'todo-trigger', 'todos', 'todotrigger',
-  'tokens', 'webhook', 'webhooks', 'workflow', 'workflows',
+  'tokens', 'tracking', 'webhook', 'webhooks', 'workflow', 'workflows',
   // Names
   'caldav', 'discord', 'docker', 'forgejo', 'gitea', 'github', 'gitlab', 'google calendar', 'java',
   'mysuricates', 'ntfy', 'open-meteo', 'slack', 'tailscale', 'telegram', 'todoist',
   // A language named in itself
   'deutsch', 'english',
+  // Values shown as they stand in a definition (pool scope badge, see PoolBrowser.test.tsx)
+  'external', 'portable',
   // Words German uses as they are
   'api', 'business', 'code', 'container', 'definition', 'deployment', 'details', 'dev', 'devops', 'diagnose',
   'emoji', 'format', 'horizontal', 'icon', 'id', 'import', 'info', 'integration', 'iteration', 'name',
   'offline', 'optional', 'pause', 'person', 'phase', 'plugin', 'repo', 'stable', 'standard', 'start',
   'status', 'step', 'sync', 'system', 'team', 'teams', 'template', 'terminal', 'test', 'trend', 'update',
   'version',
-]);
-
-/** Keys whose German text is still the English one. Translate them and drop them from the list. */
-const KNOWN_UNTRANSLATED = new Set([
-  'activityLog.level',
-  'auditCenter.navLegacy',
-  'charts.rate',
-  'dashboard.topWorkflows',
-  'dlq.retryCount',
-  'insights.skillsAndAutomation',
-  'pool.scopeExternal',
-  'pool.scopePortable',
-  'settings.syncDiffDescription',
-  'settings.syncDiffInstructions',
-  'settings.syncSkills',
-  'todos.viewBoard',
-  'workflows.autoTodoModeTrack',
-  'workflows.dashboardReport.titlePlaceholder',
-  'workflows.piCustom',
-  'workflows.viewModeDiscovery',
 ]);
 
 /** Words of a value that need a translation; empty when only paths, placeholders or symbols remain. */
@@ -78,13 +60,8 @@ function untranslatedKeys(english: unknown, german: unknown, prefix = ''): strin
 }
 
 describe('untranslated German text', () => {
-  it('adds no key whose German text is the English one, and lists exactly the old ones', () => {
-    const found = untranslatedKeys(en, de);
-    const added = found.filter((key) => !KNOWN_UNTRANSLATED.has(key));
-    const fixed = [...KNOWN_UNTRANSLATED].filter((key) => !found.includes(key));
-
-    expect(added, 'translate these in de.ts (or add the word to SHARED_TERMS if German keeps it)').toEqual([]);
-    expect(fixed, 'translated or gone — remove from KNOWN_UNTRANSLATED').toEqual([]);
+  it('has no key whose German text is the English one', () => {
+    expect(untranslatedKeys(en, de), 'translate these in de.ts (or add the word to SHARED_TERMS if German keeps it)').toEqual([]);
   });
 
   it('flags copied English, also in arrays, and accepts shared terms, names, paths and placeholders', () => {

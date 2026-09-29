@@ -205,7 +205,7 @@ export function ActivityLog() {
       {data && data.totalPages > 1 && (
         <div className="flex items-center justify-between">
           <span className="text-sm text-text-secondary">
-            {data.totalElements} entries
+            {t.activityLog.entryCount.replace('{count}', String(data.totalElements))}
           </span>
           <div className="flex items-center gap-2">
             <button

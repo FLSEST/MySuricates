@@ -65,7 +65,7 @@ export function WebhookCreateModal({ open, workflows, onClose, onCreated }: {
           label={t.common.description}
           value={form.description ?? ''}
           onChange={(e) => setForm({ ...form, description: e.target.value })}
-          placeholder="GitHub push event handler"
+          placeholder={t.webhooks.descriptionPlaceholder}
         />
       </div>
     </Modal>

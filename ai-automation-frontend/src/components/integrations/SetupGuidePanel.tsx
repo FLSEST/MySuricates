@@ -91,7 +91,7 @@ export function SetupGuidePanel({ providerId, displayName, requiresCredentials =
                           <button
                             onClick={() => copyToClipboard(step.code!, i)}
                             className="absolute top-1 right-1 p-1 rounded hover:bg-surface-secondary text-text-tertiary hover:text-text transition-colors"
-                            title="Copy"
+                            title={t.common.copy}
                           >
                             {copied === i ? <CheckCircle2 className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5" />}
                           </button>

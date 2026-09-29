@@ -49,7 +49,7 @@ export function AuditCenter() {
       <header className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-text flex items-center gap-2">
-            <ShieldCheck className="w-6 h-6 text-accent" /> Audit Center
+            <ShieldCheck className="w-6 h-6 text-accent" /> {t.nav.reports}
           </h1>
           <p className="text-sm text-text-secondary mt-1">{t.auditCenter.subtitle}</p>
         </div>

@@ -1,5 +1,11 @@
 export const en = {
   common: {
+    showMore: 'Show more',
+    showLess: 'Show less',
+    total: 'Total',
+    chain: 'Chain',
+    stepNumber: 'Step {n}',
+    removeItem: 'Remove {name}',
     maximize: 'Maximize',
     restore: 'Restore size',
     save: 'Save',
@@ -89,6 +95,8 @@ export const en = {
     hidePage: 'Hide {name}',
   },
   simple: {
+    pinWorkflow: 'Pin',
+    unpinWorkflow: 'Unpin',
     home: {
       question: 'What do you want to do?',
       noMatch: 'None of your workflows matches that.',
@@ -571,6 +579,8 @@ export const en = {
     },
   },
   workflows: {
+    dragToReorder: 'Drag to reorder',
+    foreachItems: '{done}/{total} items',
     title: 'Workflows',
     subtitle: 'Build and manage automation workflows',
     create: 'New Workflow',
@@ -1056,6 +1066,7 @@ export const en = {
         requiredError: 'This field is required.',
       },
       agentic: {
+        approvalBadge: 'Approval',
         title: 'Agentic Loop',
         reasoning: 'Reasoning',
         acting: 'Executing',
@@ -1142,6 +1153,10 @@ export const en = {
     },
   },
   schedules: {
+    calendarDotScheduled: '{count} scheduled',
+    calendarDotSuccessful: '{count} successful',
+    calendarDotFailed: '{count} failed',
+    descriptionPlaceholder: 'Daily code quality check',
     title: 'Schedules',
     subtitle: 'Automated workflow and chain scheduling',
     subtitleWorkflowsOnly: 'Automated workflow scheduling',
@@ -1231,6 +1246,7 @@ export const en = {
     maxRunsHint: 'Schedule is disabled after this many starts. Every start counts, a failed one too; an occurrence skipped because the previous run was still going does not. Re-enabling does not reset the counter.',
   },
   webhooks: {
+    descriptionPlaceholder: 'GitHub push event handler',
     title: 'Webhooks',
     subtitle: 'Trigger workflows via HTTP',
     create: 'New Webhook',
@@ -2143,6 +2159,7 @@ export const en = {
     chainFailedCount: '({count} failed)',
   },
   activityLog: {
+    entryCount: '{count} entries',
     title: 'Activity Log',
     subtitle: 'Server events and system activity',
     noLogs: 'No log entries found.',
@@ -2526,6 +2543,8 @@ export const en = {
     },
   },
   todos: {
+    fixRun: 'Fix run',
+    statusShort: { OPEN: 'Open', IN_PROGRESS: 'WIP', DONE: 'Done', BACKLOG: 'Backlog' },
     resumeSession: 'Resume the agent session — copy the command',
     resumeCopied: 'Command copied',
     title: 'Todos',
@@ -2717,6 +2736,8 @@ export const en = {
     takeOver: 'Take over',
   },
   chains: {
+    stopBadge: 'Stop',
+    namePlaceholder: 'My chain',
     title: 'Workflow Chains',
     subtitle: 'Group and execute workflows sequentially',
     create: 'New Chain',
@@ -2916,6 +2937,7 @@ export const en = {
     tryAgain: 'Try Again',
   },
   dialog: {
+    smallSession: 'small',
     title: 'Session2Workflow',
     subtitle: 'Convert Claude Code sessions to reusable workflows',
     experimental: 'Experimental · Claude only',

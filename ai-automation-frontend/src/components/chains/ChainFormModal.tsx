@@ -78,7 +78,7 @@ export function ChainFormModal({ title, chain, workflows, onSave, onClose, savin
             label={t.common.name}
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="My Chain"
+            placeholder={t.chains.namePlaceholder}
           />
           <Input
             label={t.workflows.iconLabel}

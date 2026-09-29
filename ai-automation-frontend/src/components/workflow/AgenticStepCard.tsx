@@ -30,7 +30,7 @@ function IterationCard({ iter }: { iter: AgenticIteration }) {
     acted: iter.exitCode === 0
       ? <Badge variant="success">{t.workflows.execution.agentic.result}</Badge>
       : <Badge variant="danger">{t.workflows.execution.agentic.result}</Badge>,
-    approval: <Badge variant="warning">Approval</Badge>,
+    approval: <Badge variant="warning">{t.workflows.execution.agentic.approvalBadge}</Badge>,
     completed: <Badge variant="success">{t.workflows.execution.agentic.goalAchieved}</Badge>,
     error: <Badge variant="danger">{t.common.error}</Badge>,
   };

@@ -143,7 +143,7 @@ const KanbanCard = memo(function KanbanCard({ todo, onEdit, onStatusChange, onRe
               onClick={(e) => { e.stopPropagation(); onStatusChange(todo, 'OPEN'); }}
               className="px-1.5 py-0.5 rounded text-[10px] text-text-tertiary hover:bg-surface-raised transition-colors"
             >
-              Open
+              {t.todos.statusShort.OPEN}
             </button>
           )}
           {todo.status !== 'IN_PROGRESS' && (
@@ -151,7 +151,7 @@ const KanbanCard = memo(function KanbanCard({ todo, onEdit, onStatusChange, onRe
               onClick={(e) => { e.stopPropagation(); onStatusChange(todo, 'IN_PROGRESS'); }}
               className="px-1.5 py-0.5 rounded text-[10px] text-warning hover:bg-warning/10 transition-colors"
             >
-              WIP
+              {t.todos.statusShort.IN_PROGRESS}
             </button>
           )}
           {todo.status !== 'DONE' && (
@@ -159,7 +159,7 @@ const KanbanCard = memo(function KanbanCard({ todo, onEdit, onStatusChange, onRe
               onClick={(e) => { e.stopPropagation(); onStatusChange(todo, 'DONE'); }}
               className="px-1.5 py-0.5 rounded text-[10px] text-success hover:bg-success/10 transition-colors"
             >
-              Done
+              {t.todos.statusShort.DONE}
             </button>
           )}
           {todo.status !== 'BACKLOG' && (
@@ -167,7 +167,7 @@ const KanbanCard = memo(function KanbanCard({ todo, onEdit, onStatusChange, onRe
               onClick={(e) => { e.stopPropagation(); onStatusChange(todo, 'BACKLOG'); }}
               className="px-1.5 py-0.5 rounded text-[10px] text-text-tertiary/60 hover:bg-text-tertiary/10 transition-colors"
             >
-              Backlog
+              {t.todos.statusShort.BACKLOG}
             </button>
           )}
         </div>

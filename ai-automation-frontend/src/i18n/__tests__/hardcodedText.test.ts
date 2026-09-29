@@ -1,16 +1,13 @@
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
-// Ratchet against UI text written straight into components instead of de.ts/en.ts (TODO 99ceb2b5).
+// Guard against UI text written straight into components instead of de.ts/en.ts (TODO 99ceb2b5).
 // Such text shows in one language only, whatever the user picked — no type check notices.
 //
 // Scanned: JSX text, the visible attributes below, toast.*() / confirm() / alert() / prompt() and the
 // fallback of apiErrorMessage(). Text without a word of two letters (symbols, entities, {placeholders})
-// is ignored, and so is the language-neutral text in LANGUAGE_NEUTRAL.
-//
-// CEILINGS holds the files that still carry such text, with their current count. It only shrinks:
-// a file must not gain text, a file that loses some gets its ceiling lowered, a file at zero leaves
-// the list, and a new file never joins it — put the text into de.ts and en.ts instead.
+// is ignored, and so is the language-neutral text in LANGUAGE_NEUTRAL. Everything else fails: put it
+// into de.ts and en.ts, or — only if it really reads the same in both languages — into LANGUAGE_NEUTRAL.
 
 const SOURCES = import.meta.glob<string>(
   ['../../**/*.{ts,tsx}', '!../../**/__tests__/**', '!../../**/*.test.*', '!../../**/*.d.ts', '!../../i18n/**', '!../../test/**'],
@@ -29,7 +26,23 @@ const LANGUAGE_NEUTRAL = new Set([
   'English',
   'DE',
   'EN',
-  // Units, keys, code
+  // Terms the German UI keeps as they are
+  'Run',
+  'Run:',
+  'Run →',
+  'Runs',
+  'Snapshot',
+  'Stable',
+  'Test',
+  'global',
+  'Hostname:',
+  'Cron:',
+  // Abbreviations, units, keys, code
+  'BE',
+  'FE',
+  'vs',
+  'max',
+  'tok',
   'ms',
   'ESC',
   '(Alt+ )',
@@ -53,52 +66,6 @@ const LANGUAGE_NEUTRAL = new Set([
   'tag1, tag2, tag3',
   'bug, performance, ux',
 ]);
-
-/** Relative to src/, value = number of findings the file may still carry. */
-const CEILINGS: Record<string, number> = {
-  'components/assistant/AssistantMessage.tsx': 2,
-  'components/chains/ChainDetail.tsx': 1,
-  'components/chains/ChainFormModal.tsx': 1,
-  'components/dashboard/StatWidgets.tsx': 2,
-  'components/dashboard/TodosDonutChart.tsx': 1,
-  'components/dashboard/TodosWidget.tsx': 1,
-  'components/dashboard/UpcomingSchedulesCard.tsx': 1,
-  'components/dialog/SessionCard.tsx': 1,
-  'components/integrations/SetupGuidePanel.tsx': 1,
-  'components/schedule/CalendarView.tsx': 3,
-  'components/schedule/ScheduleFormModal.tsx': 1,
-  'components/settings/NotificationsCard.tsx': 1,
-  'components/settings/RemoteAccessCard.tsx': 1,
-  'components/settings/StagingCard.tsx': 2,
-  'components/settings/TestingCard.tsx': 2,
-  'components/shared/CopyButton.tsx': 2,
-  'components/shared/HumanInputDialog.tsx': 1,
-  'components/shared/InsightsPanel.tsx': 1,
-  'components/todo/StatusDots.tsx': 4,
-  'components/todo/TodoKanbanView.tsx': 5,
-  'components/todo/TodoListView.tsx': 1,
-  'components/todo/TodoMetadata.tsx': 3,
-  'components/todo/TodoTriggerSection.tsx': 1,
-  'components/ui/CronPicker.tsx': 1,
-  'components/ui/Modal.tsx': 1,
-  'components/ui/ToastContainer.tsx': 1,
-  'components/webhooks/WebhookCreateModal.tsx': 1,
-  'components/wishes/ExecutionLogsPanel.tsx': 1,
-  'components/wishes/WishDetail.tsx': 1,
-  'components/wishes/WishIterationHistory.tsx': 1,
-  'components/workflow/AgenticStepCard.tsx': 1,
-  'components/workflow/ApprovalDialog.tsx': 1,
-  'components/workflow/ForEachStepCard.tsx': 1,
-  'components/workflow/SortableBlock.tsx': 1,
-  'components/workflow/TagEditor.tsx': 1,
-  'components/workflow/WorkflowMemoryItem.tsx': 1,
-  'components/workflow/WorkflowRow.tsx': 2,
-  'components/workflow/WorkflowVersionsTab.tsx': 1,
-  'pages/ActivityLog.tsx': 1,
-  'pages/AuditCenter.tsx': 1,
-  'pages/DeadLetterQueue.tsx': 1,
-  'pages/SimpleWorkflows.tsx': 1,
-};
 
 interface Finding {
   file: string;
@@ -171,24 +138,10 @@ function findingsByFile(): Map<string, Finding[]> {
 const describeFinding = (f: Finding) => `  ${f.file}:${f.line} ${f.kind}: "${f.text}"`;
 
 describe('hardcoded UI text', () => {
-  it('grows in no file, and each file that carries some is listed with its exact count', () => {
-    const byFile = findingsByFile();
-    const problems: string[] = [];
-    for (const [file, findings] of byFile) {
-      const ceiling = CEILINGS[file];
-      const listing = findings.map(describeFinding).join('\n');
-      if (ceiling === undefined) {
-        problems.push(`${file}: new hardcoded text — move it into de.ts and en.ts:\n${listing}`);
-      } else if (findings.length > ceiling) {
-        problems.push(`${file}: ${findings.length} hardcoded texts (ceiling ${ceiling}) — move the new one into de.ts and en.ts:\n${listing}`);
-      } else if (findings.length < ceiling) {
-        problems.push(`${file}: down to ${findings.length} (ceiling ${ceiling}) — lower its ceiling in CEILINGS.`);
-      }
-    }
-    for (const file of Object.keys(CEILINGS)) {
-      if (!byFile.has(file)) problems.push(`${file}: no hardcoded text left (or file gone) — remove it from CEILINGS.`);
-    }
-    expect(problems.join('\n\n')).toBe('');
+  it('is found in no component', () => {
+    const listing = [...findingsByFile().values()].flat().map(describeFinding);
+
+    expect(listing, 'move this text into de.ts and en.ts').toEqual([]);
   });
 
   it('finds text in every place it scans, and skips what reads the same in every language', () => {
