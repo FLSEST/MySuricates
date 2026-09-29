@@ -29,6 +29,7 @@ public class RequestMetricsSettings implements RuntimeSettingsGroup {
         m.put("request-metrics-drift-factor", v -> requestMetricsConfig.setDriftFactor(Double.parseDouble(v)));
         m.put("request-metrics-drift-min-calls", v -> requestMetricsConfig.setDriftMinCalls(Integer.parseInt(v)));
         m.put("request-metrics-baseline-days", v -> requestMetricsConfig.setBaselineDays(Integer.parseInt(v)));
+        m.put("request-metrics-trend-min-daily-calls", v -> requestMetricsConfig.setTrendMinDailyCalls(Integer.parseInt(v)));
         return m;
     }
 

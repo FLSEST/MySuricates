@@ -1,9 +1,16 @@
 package com.automation.metrics;
 
+import com.automation.metrics.RequestMetricsCollector.DayWindow;
 import com.automation.metrics.RequestMetricsCollector.RouteSnapshot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -97,11 +104,98 @@ class RequestMetricsCollectorTest {
     }
 
     @Test
-    void snapshotAndResetStartsTheNextWindowEmpty() {
+    void drainStartsTheNextWindowEmpty() {
         collector.record("GET /api/v1/todos", 10, 0, 2, 100);
 
-        assertThat(collector.snapshotAndReset()).hasSize(1);
+        assertThat(collector.drainWindows()).singleElement()
+                .satisfies(window -> assertThat(window.routes()).hasSize(1));
         assertThat(collector.snapshot()).isEmpty();
+        assertThat(collector.drainWindows()).isEmpty();
+    }
+
+    /**
+     * A window belongs to the day it measured. The job that should have run at 23:55 caught up at
+     * 01:04 after a standby and filed the 26th under the 27th (2026-09-27) — a day change closes
+     * the running window under its own day instead.
+     */
+    @Test
+    void dayChangeClosesTheWindowUnderTheDayItMeasured() {
+        MutableClock clock = new MutableClock(Instant.parse("2026-09-26T21:00:00Z"));
+        collector = new RequestMetricsCollector(clock);
+        collector.record("GET /api/v1/todos", 10, 0, 1, 100);
+        collector.record("GET /api/v1/todos", 20, 0, 1, 100);
+
+        clock.set(Instant.parse("2026-09-27T01:04:00Z"));
+        collector.record("GET /api/v1/todos", 30, 0, 1, 100);
+
+        assertThat(collector.snapshot()).singleElement()
+                .satisfies(route -> assertThat(route.calls()).isEqualTo(1));
+        assertThat(collector.windowOpenedAt()).isEqualTo(Instant.parse("2026-09-27T00:00:00Z"));
+
+        List<DayWindow> windows = collector.drainWindows();
+        assertThat(windows).extracting(DayWindow::day)
+                .containsExactly(LocalDate.of(2026, 9, 26), LocalDate.of(2026, 9, 27));
+        assertThat(windows.get(0).routes().get(0).calls()).isEqualTo(2);
+        assertThat(windows.get(1).routes().get(0).calls()).isEqualTo(1);
+    }
+
+    /** No request after midnight: the late job still files the window under the day it measured. */
+    @Test
+    void lateDrainWithoutNewRequestsKeepsTheMeasuredDay() {
+        MutableClock clock = new MutableClock(Instant.parse("2026-09-26T21:00:00Z"));
+        collector = new RequestMetricsCollector(clock);
+        collector.record("GET /api/v1/todos", 10, 0, 1, 100);
+
+        clock.set(Instant.parse("2026-09-27T01:04:00Z"));
+
+        assertThat(collector.drainWindows()).extracting(DayWindow::day)
+                .containsExactly(LocalDate.of(2026, 9, 26));
+        assertThat(collector.windowOpenedAt()).isEqualTo(Instant.parse("2026-09-27T01:04:00Z"));
+    }
+
+    /** Days without a drain must not pile up: only the most recent closed windows are kept. */
+    @Test
+    void closedWindowsAreBounded() {
+        MutableClock clock = new MutableClock(Instant.parse("2026-09-01T12:00:00Z"));
+        collector = new RequestMetricsCollector(clock);
+        for (int day = 0; day < RequestMetricsCollector.MAX_CLOSED_WINDOWS + 3; day++) {
+            clock.set(Instant.parse("2026-09-01T12:00:00Z").plus(Duration.ofDays(day)));
+            collector.record("GET /api/v1/todos", 10, 0, 1, 100);
+        }
+
+        List<DayWindow> windows = collector.drainWindows();
+        // The kept closed windows plus the running one; the oldest days are gone.
+        assertThat(windows).hasSize(RequestMetricsCollector.MAX_CLOSED_WINDOWS + 1);
+        assertThat(windows.get(windows.size() - 1).day()).isEqualTo(LocalDate.of(2026, 9, 10));
+        assertThat(windows.get(0).day()).isEqualTo(LocalDate.of(2026, 9, 3));
+    }
+
+    /** Settable clock: the day change is what these tests are about. */
+    private static final class MutableClock extends Clock {
+        private Instant now;
+
+        MutableClock(Instant now) {
+            this.now = now;
+        }
+
+        void set(Instant now) {
+            this.now = now;
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return ZoneOffset.UTC;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return this;
+        }
+
+        @Override
+        public Instant instant() {
+            return now;
+        }
     }
 
     /** An unparameterised path must not be able to grow the map without bound. */

@@ -21,9 +21,9 @@ class RequestMetricsQueryServiceTest {
     private static final String ROUTE = "GET /api/v1/todos";
     private static final LocalDate TODAY = LocalDate.of(2026, 9, 21);
 
-    private final RequestMetricsCollector collector = new RequestMetricsCollector();
-    private final RequestMetricDailyRepository repository = mock(RequestMetricDailyRepository.class);
     private final Clock clock = Clock.fixed(Instant.parse("2026-09-21T10:00:00Z"), ZoneOffset.UTC);
+    private final RequestMetricsCollector collector = new RequestMetricsCollector(clock);
+    private final RequestMetricDailyRepository repository = mock(RequestMetricDailyRepository.class);
     private final RequestMetricsQueryService service = new RequestMetricsQueryService(collector, repository, clock);
 
     @Test
@@ -64,5 +64,27 @@ class RequestMetricsQueryServiceTest {
 
         verify(repository, org.mockito.Mockito.times(2))
                 .findByRouteAndDayBetweenOrderByDayAsc(ROUTE, TODAY.minusDays(1), TODAY);
+    }
+
+    /** One query for all routes of the window, today included — never a loop on the single connection. */
+    @Test
+    void recentDaysReadsAllRoutesUpToTodayInOneQuery() {
+        RequestMetricDaily row = RequestMetricDaily.builder().route(ROUTE).day(TODAY).build();
+        when(repository.findByDayBetweenOrderByDayAsc(TODAY.minusDays(30), TODAY)).thenReturn(List.of(row));
+
+        assertThat(service.recentDays(30)).containsExactly(row);
+    }
+
+    @Test
+    void recentDaysIsCappedAtTheMaximum() {
+        service.recentDays(10_000);
+
+        verify(repository).findByDayBetweenOrderByDayAsc(
+                TODAY.minusDays(RequestMetricsQueryService.MAX_HISTORY_DAYS), TODAY);
+    }
+
+    @Test
+    void liveWindowStartComesFromTheCollector() {
+        assertThat(service.liveWindowOpenedAt()).isEqualTo(Instant.parse("2026-09-21T10:00:00Z"));
     }
 }
