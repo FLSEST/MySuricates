@@ -437,6 +437,32 @@ Content-Type: application/xml   # Body = BPMN-XML (max. 2 MiB)
 # schreibbare Attribute, und `blockConfig` wird als Definition übernommen. Ein Import ist so
 # vertrauenswürdig wie seine Quelle — wie ein JSON-Import. Prüfsumme/Signatur: TODO b18939a6.
 
+# Ganzes Projekt als Bündel exportieren (Workflows, Chains, Zeitpläne — ohne IDs, Siegel, Läufe, TODOs)
+GET /api/v1/projects/{id}/export
+# → 200, Datei <slug>.mysuricates-bundle.json (Content-Disposition: attachment); 404 bei unbekanntem/archiviertem Projekt
+# Verweise im Bündel: Workflows/Chains per "key", sub-workflow → "@@workflow:<key>@@", Skills per Name,
+# Projektpfad in Blöcken → "{{ project_path }}", jeder andere absolute Pfad → "@@path:N@@" (Liste in "paths")
+
+# Bündel prüfen, ohne etwas anzulegen (max. 5 MB)
+POST /api/v1/projects/import/preview
+Body: {"bundle": {...}, "targetProjectId": "<uuid, optional>"}
+# → {"project":{"name","nameTaken"},"workflows":[{"key","name","blockCount","blockTypes","providers","models",
+#     "shellCommands","nameTakenInTarget"}],"chains":[…],"schedules":[{"target","cronExpression","willBeDisabled"}],
+#     "paths":[{"token","original","occurrences","hint"}],"warnings":[…]}
+# → 400 mit allen Problemen (format/formatVersion, Pflichtfelder, doppelte Keys, unaufgelöste Referenzen)
+
+# Bündel importieren — eine Transaktion; Zeitpläne kommen deaktiviert an, Workflows ungesiegelt (changeSource import)
+POST /api/v1/projects/import
+Body: {"bundle": {...},
+       "project": {"mode": "new", "name": "…", "path": "/pfad/oder/leer"},   # oder {"mode":"existing","projectId":"<uuid>"}
+       "pathMappings": {"@@path:1@@": "/neuer/pfad"},                     # Pflicht für JEDES Token aus paths
+       "onConflict": "skip"}                                             # skip (Default) | rename → "Name (Import)"
+# → 201 {"projectId","created":{"workflows","chains","schedules"},"skipped":[{"kind","key","reason"}],
+#        "renamed":[{"kind","key","from","to"}],"warnings":[…]}
+# → 400 bei fehlender Pfad-Zuordnung (mit Liste), ungültigem Bündel oder Fehler mitten im Import (nichts angelegt)
+# Das Bündel bringt ausführbare Shell-Befehle mit: Die Oberfläche zeigt sie in der Vorschau, bevor sie den
+# Import anbietet; die API verlangt die Vorschau nicht (sie ist per API-Key geschützt wie jeder Schreibweg).
+
 # System-Backup erstellen
 GET /api/v1/system/backup
 # → File-Download
@@ -465,6 +491,7 @@ DELETE /api/v1/assistant/sessions/<session-uuid>
 | TODO lesen / ändern / löschen | `GET`/`PUT`/`DELETE /api/v1/todos/{id}` |
 | TODO-Status setzen | `PATCH /api/v1/todos/{id}/status` — Body: `{"status": "IN_PROGRESS", "sessionId": "..."}` |
 | Projekt anlegen / lesen / ändern | `POST /api/v1/projects`, `GET`/`PUT /api/v1/projects/{id}` |
+| Projekt als Bündel exportieren / prüfen / importieren | `GET /api/v1/projects/{id}/export`, `POST /api/v1/projects/import/preview`, `POST /api/v1/projects/import` (Details oben unter „Hilfreich“) |
 | Beispielprojekt anlegen (idempotent) | `POST /api/v1/projects/example?locale=de` — 201 beim ersten Aufruf, danach 200 mit demselben Projekt |
 | App-Setting lesen / setzen | `GET`/`PUT /api/v1/system/settings/{key}` — PUT-Body: `{"value": "..."}` |
 | Execution-Config (Timeouts, Concurrency) | `GET`/`PUT /api/v1/system/execution-config` |

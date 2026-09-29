@@ -65,7 +65,7 @@ Controller → Service → Repository → Entity (JPA/SQLite)
 | `exception/` | Custom exceptions + global error handler |
 | `util/` | JSON converters, helper functions |
 
-### Controller Overview (selection from 51 REST controllers)
+### Controller Overview (selection from 52 REST controllers)
 
 The table below lists the central controllers. The full list is in [../api-referenz.md](../api-referenz.md); re-measure the count with `find ai-automation-backend/src/main/java -name '*Controller.java' | wc -l`.
 
