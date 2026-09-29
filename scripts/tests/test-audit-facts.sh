@@ -623,13 +623,16 @@ render "$PERF" name:facts "$(json_values project_path="$TMP/base2.txt" request_m
 PATH="$TMP/fakebin:$PATH" bash "$TMP/perf-facts2.sh" > "$TMP/perf-facts2.out" 2> "$TMP/perf-facts2.err"
 check "laeuft ohne stderr"                      '[ ! -s "$TMP/perf-facts2.err" ]'
 check "einzeiliges forEach endet in der Zeile"  '! grep -q "^TREFFER repository_in_loop: service/ScanService.java:6 " "$TMP/perf-facts2.out"'
-check "einzeiliges for mit Aufruf ist Treffer"  'grep -q "^TREFFER repository_in_loop: service/ScanService.java:7 " "$TMP/perf-facts2.out"'
+# Zeile 7 speichert nur: seit d8af1b06 ein Schreib-Schleifen-Treffer, kein Lese-N+1.
+check "einzeiliges for mit Aufruf ist Treffer"  'grep -q "^TREFFER repository_write_in_loop: service/ScanService.java:7 " "$TMP/perf-facts2.out"'
 check "verschachtelte Schleife: ein Treffer" \
   '[ "$(grep -c "^TREFFER repository_in_loop: service/ScanService.java:10 " "$TMP/perf-facts2.out")" -eq 1 ]'
-# Warten kann nur eine while-Schleife: das for-each mit Fristpruefung je Element ist ein N+1.
-check "for-each mit Fristpruefung bleibt N+1" \
-  'grep -q "^TREFFER repository_in_loop: service/ScanService.java:[0-9]* sessionRepository.delete " "$TMP/perf-facts2.out"'
-check "FAKT repository_loop_count: 3"           'grep -qx "FAKT repository_loop_count: 3" "$TMP/perf-facts2.out"'
+# Warten kann nur eine while-Schleife: das for-each mit Fristpruefung je Element ist keine
+# Warteschleife, sondern ein Schleifentreffer — da es nur loescht, als Schreib-Schleife (d8af1b06).
+check "for-each mit Fristpruefung bleibt Schleifentreffer" \
+  'grep -q "^TREFFER repository_write_in_loop: service/ScanService.java:[0-9]* sessionRepository.delete " "$TMP/perf-facts2.out"'
+check "FAKT repository_loop_count: 1"           'grep -qx "FAKT repository_loop_count: 1" "$TMP/perf-facts2.out"'
+check "FAKT repository_write_loop_count: 2"     'grep -qx "FAKT repository_write_loop_count: 2" "$TMP/perf-facts2.out"'
 check "FAKT polling_loop_count: 1"              'grep -qx "FAKT polling_loop_count: 1" "$TMP/perf-facts2.out"'
 # onStart, onReady (@EventListener({ApplicationReadyEvent.class})) und der Seeder.
 check "FAKT startup_repository_loop_count: 3"   'grep -qx "FAKT startup_repository_loop_count: 3" "$TMP/perf-facts2.out"'
@@ -1037,6 +1040,79 @@ check "@Transactional(readOnly = true) zaehlt" \
 check "voll qualifiziertes @Transactional zaehlt" \
   'grep -qx "TREFFER transactional_slow_call: service/CommitService.java:38 webClient (@Transactional ab Zeile 36)" "$TMP/perf-facts8.out"'
 check "FAKT transactional_slow_call_count: 2" 'grep -qx "FAKT transactional_slow_call_count: 2" "$TMP/perf-facts8.out"'
+
+echo "6j) Performance-Audit: Schreib-Schleifen getrennt von Lese-N+1 (d8af1b06)"
+# save() einer schon geladenen Entity je Durchlauf (GoalMembershipService.reorder) ist kein Lese-N+1:
+# Schleifen, die nur schreiben (save*/delete*), stehen als repository_write_in_loop mit eigener
+# Zaehlung. Liest die Schleife auch (find/get/count/exists), bleibt sie N+1-Kandidat und nennt die
+# Lesezeile, auch wenn ein save davor steht. Mehrere Aufrufe in einer Zeile: der Lesezugriff zaehlt.
+FIX9="$TMP/fixture-write-loop"
+MAIN9="$FIX9/ai-automation-backend/src/main/java/com/automation"
+mkdir -p "$MAIN9/service"
+cat > "$MAIN9/service/ReorderService.java" <<'JAVA'
+package com.automation.service;
+
+class ReorderService {
+    void reorder(java.util.List<Goal> goals) {
+        for (Goal goal : goals) {
+            goal.setRank(1);
+            goalRepository.save(goal);
+        }
+    }
+
+    void purge(java.util.List<String> ids) {
+        ids.forEach(id -> goalRepository.deleteById(id));
+    }
+
+    void readThenWrite(java.util.List<String> ids) {
+        for (String id : ids) {
+            Goal goal = goalRepository.findById(id).orElseThrow();
+            goalRepository.save(goal);
+        }
+    }
+
+    void writeThenRead(java.util.List<String> ids) {
+        for (String id : ids) {
+            goalRepository.saveAndFlush(new Goal(id));
+            goalRepository.existsById(id);
+        }
+    }
+
+    void sameLine(java.util.List<Goal> goals) {
+        for (Goal goal : goals) {
+            goalRepository.save(goalRepository.getReferenceById(goal.getId()));
+        }
+    }
+
+    void batch(java.util.List<java.util.List<Goal>> chunks) {
+        for (java.util.List<Goal> chunk : chunks) {
+            goalRepository.saveAll(chunk);
+        }
+    }
+}
+JAVA
+printf '%s' "$FIX9" > "$TMP/base9.txt"
+render "$PERF" name:facts "$(json_values project_path="$TMP/base9.txt" request_metrics=)" > "$TMP/perf-facts9.sh"
+PATH="$TMP/fakebin:$PATH" bash "$TMP/perf-facts9.sh" > "$TMP/perf-facts9.out" 2> "$TMP/perf-facts9.err"
+check "laeuft ohne stderr" '[ ! -s "$TMP/perf-facts9.err" ]'
+check "save einer geladenen Entity ist kein Lese-N+1" '! grep -q "^TREFFER repository_in_loop: .*\.save" "$TMP/perf-facts9.out"'
+check "save in der Schleife als Schreib-Schleife gelistet" \
+  'grep -qx "TREFFER repository_write_in_loop: service/ReorderService.java:7 goalRepository.save (Schleife ab Zeile 5)" "$TMP/perf-facts9.out"'
+check "deleteById im forEach als Schreib-Schleife gelistet" \
+  'grep -qx "TREFFER repository_write_in_loop: service/ReorderService.java:12 goalRepository.deleteById (Schleife ab Zeile 12)" "$TMP/perf-facts9.out"'
+check "saveAll je Durchlauf als Schreib-Schleife gelistet" \
+  'grep -qx "TREFFER repository_write_in_loop: service/ReorderService.java:37 goalRepository.saveAll (Schleife ab Zeile 36)" "$TMP/perf-facts9.out"'
+check "Lesen vor dem save bleibt N+1-Kandidat" \
+  'grep -qx "TREFFER repository_in_loop: service/ReorderService.java:17 goalRepository.findById (Schleife ab Zeile 16)" "$TMP/perf-facts9.out"'
+check "Lesen nach dem save bleibt N+1-Kandidat und nennt die Lesezeile" \
+  'grep -qx "TREFFER repository_in_loop: service/ReorderService.java:25 goalRepository.existsById (Schleife ab Zeile 23)" "$TMP/perf-facts9.out"'
+check "save und Lesen in einer Zeile: der Lesezugriff zaehlt" \
+  'grep -qx "TREFFER repository_in_loop: service/ReorderService.java:31 goalRepository.getReferenceById (Schleife ab Zeile 30)" "$TMP/perf-facts9.out"'
+check "FAKT repository_loop_count: 3" 'grep -qx "FAKT repository_loop_count: 3" "$TMP/perf-facts9.out"'
+check "FAKT repository_write_loop_count: 3" 'grep -qx "FAKT repository_write_loop_count: 3" "$TMP/perf-facts9.out"'
+check "Hinweiszeile: Schreib-Schleife ist kein Lese-N+1" 'grep -q "^# repository_write_loop_count: .*kein Lese-N+1" "$TMP/perf-facts9.out"'
+check "Report-Prompt: Schreib-Schleife ist nie ein Finding" \
+  'grep -q "repository_write_loop_count.*nie ein Finding" "$TMP/perf-prompt.txt"'
 
 echo "7) Performance-Audit: Gate prueft die Pflicht-Fakten deterministisch"
 run_perf_gate() {  # $1 = faktenblatt-datei
