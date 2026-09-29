@@ -42,6 +42,9 @@ import java.util.concurrent.TimeUnit;
  * through {@link WorkflowExecutor#resumeFromStep(String, TriggerSource)} with
  * {@link TriggerSource#AUTO_RESUME}, i.e. through {@link RunAdmission}; a refusal leaves the run
  * INTERRUPTED (the SECURITY entry is RunAdmission's) and is not retried.
+ *
+ * <p>What it is done with, and which attempt is under way, it reports to {@link PendingAutoResumes}:
+ * the scheduler skips a workflow's due occurrence while a resume of it is ahead (TODO 070ccc3d).
  */
 @Service
 @Slf4j
@@ -63,6 +66,7 @@ public class RunAutoResumer {
     private final AutoResumeConfig config;
     private final TransactionTemplate tx;
     private final ScheduledExecutorService scheduler;
+    private final PendingAutoResumes pending;
 
     private final Deque<String> queue = new ArrayDeque<>();
     private boolean draining;
@@ -70,15 +74,18 @@ public class RunAutoResumer {
     @Autowired
     public RunAutoResumer(WorkflowRunRepository runRepository, WorkflowRepository workflowRepository,
                           WorkflowExecutor workflowExecutor, ActivityLogService activityLog,
-                          AutoResumeConfig config, PlatformTransactionManager transactionManager) {
+                          AutoResumeConfig config, PlatformTransactionManager transactionManager,
+                          PendingAutoResumes pending) {
         this(runRepository, workflowRepository, workflowExecutor, activityLog, config, transactionManager,
-                Executors.newSingleThreadScheduledExecutor(Thread.ofPlatform().daemon().name("auto-resume").factory()));
+                Executors.newSingleThreadScheduledExecutor(Thread.ofPlatform().daemon().name("auto-resume").factory()),
+                pending);
     }
 
     /** Test constructor: the caller owns the scheduler. */
     RunAutoResumer(WorkflowRunRepository runRepository, WorkflowRepository workflowRepository,
                    WorkflowExecutor workflowExecutor, ActivityLogService activityLog, AutoResumeConfig config,
-                   PlatformTransactionManager transactionManager, ScheduledExecutorService scheduler) {
+                   PlatformTransactionManager transactionManager, ScheduledExecutorService scheduler,
+                   PendingAutoResumes pending) {
         this.runRepository = runRepository;
         this.workflowRepository = workflowRepository;
         this.workflowExecutor = workflowExecutor;
@@ -86,6 +93,7 @@ public class RunAutoResumer {
         this.config = config;
         this.tx = new TransactionTemplate(transactionManager);
         this.scheduler = scheduler;
+        this.pending = pending;
     }
 
     @PreDestroy
@@ -103,6 +111,7 @@ public class RunAutoResumer {
     public void onRunsInterrupted(RunInterruption.Event event) {
         if (!config.isEnabled()) {
             log.debug("Auto-resume is switched off — {} interrupted run(s) stay for a person", event.runIds().size());
+            pending.dropped(event.runIds());
             return;
         }
         enqueue(event.runIds());
@@ -114,6 +123,7 @@ public class RunAutoResumer {
     }
 
     synchronized void enqueue(Collection<String> runIds) {
+        pending.reopen(runIds);
         runIds.stream().filter(id -> !queue.contains(id)).forEach(queue::add);
         if (!draining && !queue.isEmpty()) {
             draining = true;
@@ -126,6 +136,7 @@ public class RunAutoResumer {
             scheduler.schedule(this::resumeNext, Math.max(0, config.getDelaySeconds()), TimeUnit.SECONDS);
         } catch (RuntimeException e) {   // shutting down: the runs stay INTERRUPTED for a person
             log.warn("Auto-resume could not be scheduled: {}", e.getMessage());
+            pending.dropped(queue);
             queue.clear();
             draining = false;
         }
@@ -163,6 +174,15 @@ public class RunAutoResumer {
 
     /** @return whether an attempt was made (started, refused or failed) */
     private boolean attempt(String runId) {
+        pending.attemptStarted(runId);
+        try {
+            return attemptClaimed(runId);
+        } finally {
+            pending.attemptEnded(runId);
+        }
+    }
+
+    private boolean attemptClaimed(String runId) {
         Claim claim = tx.execute(status -> claim(runId));
         if (claim == null) {
             return false;

@@ -1853,6 +1853,8 @@ In der Oberfläche: Workflow-Detailseite → „Nach Neustart automatisch fortse
 
 **Global** — Einstellungen → Ausführung: „Unterbrochene Runs automatisch fortsetzen“ (`run-auto-resume-enabled`, Default an) und „Wartezeit vor jeder Fortsetzung“ (`run-auto-resume-delay-seconds`, Default 30 s, 0–3600). Die Runs werden nacheinander mit dieser Wartezeit fortgesetzt, auch vor dem ersten. Startwerte: `automation.execution.auto-resume.enabled` / `.delay-seconds`.
 
+**Zusammen mit einem Zeitplan** — Hat der Workflow einen Zeitplan mit Konfliktverhalten `SKIP` (Standard), gewinnt die Fortsetzung: Solange eine automatische Fortsetzung für den Workflow ansteht oder läuft, entfällt ein fälliger Termin — auch ein Nachhol-Run (`catchUpOnResume`) nach Neustart oder Standby. Das Activity-Log vermerkt „Schedule skipped (interrupted run is being resumed automatically)“ mit `reason: auto-resume-pending`. Mit `OVERLAP` startet der Termin wie gewohnt daneben (TODO 070ccc3d).
+
 ## Auto-Repair
 
 Auto-Repair ist der Self-Healing-Mechanismus der Plattform: Wenn ein Workflow fehlschlägt, analysiert die KI den Fehler, korrigiert die Workflow-Blocks und verifiziert die Reparatur automatisch.

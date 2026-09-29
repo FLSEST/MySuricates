@@ -56,6 +56,7 @@ class RunAutoResumerTest {
     private final List<Runnable> scheduled = new ArrayList<>();
     private final List<Long> delays = new ArrayList<>();
     private RunAutoResumer resumer;
+    private PendingAutoResumes pending;
 
     @BeforeEach
     void setUp() {
@@ -65,8 +66,9 @@ class RunAutoResumerTest {
             delays.add(inv.getArgument(1));
             return null;
         });
+        pending = new PendingAutoResumes(runRepository, workflowRepository);
         resumer = new RunAutoResumer(runRepository, workflowRepository, workflowExecutor, activityLog, config,
-                FakeTransactions.manager(), scheduler);
+                FakeTransactions.manager(), scheduler, pending);
     }
 
     private static Workflow workflow(String id, boolean optIn) {
@@ -272,5 +274,81 @@ class RunAutoResumerTest {
         runScheduled();
 
         verify(workflowExecutor).resumeFromStep(anyString(), any());   // still exactly once
+    }
+
+    // ── PendingAutoResumes: the scheduler's view (TODO 070ccc3d) ───────────
+
+    /** The query of {@link PendingAutoResumes#forWorkflow}: the INTERRUPTED ones among these runs. */
+    private void interruptedRunsOf(String workflowId, WorkflowRun... runs) {
+        when(runRepository.findByWorkflowIdAndStatusAndCompletedAtGreaterThanEqual(eq(workflowId),
+                eq(RunStatus.INTERRUPTED), any(Instant.class)))
+                .thenAnswer(inv -> List.of(runs).stream().filter(r -> r.getStatus() == RunStatus.INTERRUPTED).toList());
+    }
+
+    @Test
+    void pending_fromTheMarking_throughTheAttempt_untilTheRunIsRunning() {
+        Workflow wf = workflow("wf-1", true);
+        WorkflowRun run = interrupted("r1", wf, "RUNNING");
+        stored(run);
+        storedWorkflow(wf);
+        interruptedRunsOf("wf-1", run);
+        List<Boolean> duringAttempt = new ArrayList<>();
+        when(workflowExecutor.resumeFromStep("r1", TriggerSource.AUTO_RESUME)).thenAnswer(inv -> {
+            duringAttempt.add(pending.forWorkflow("wf-1"));   // attempt already counted, not RUNNING yet
+            run.setStatus(RunStatus.RUNNING);
+            return run;
+        });
+
+        assertThat(pending.forWorkflow("wf-1")).as("marked, event not there yet").isTrue();
+        resumer.onRunsInterrupted(new RunInterruption.Event(List.of("r1"), RunInterruption.Cause.RESTART));
+        assertThat(pending.forWorkflow("wf-1")).as("waiting for the delay").isTrue();
+
+        runScheduled();
+
+        assertThat(duringAttempt).containsExactly(true);
+        assertThat(pending.forWorkflow("wf-1")).as("RUNNING now — the busy check takes over").isFalse();
+    }
+
+    @Test
+    void pending_endsWithARefusedAttempt_althoughTheRunStaysInterrupted() {
+        Workflow wf = workflow("wf-1", true);
+        WorkflowRun run = interrupted("r1", wf, "RUNNING");
+        stored(run);
+        storedWorkflow(wf);
+        interruptedRunsOf("wf-1", run);
+        when(workflowExecutor.resumeFromStep("r1", TriggerSource.AUTO_RESUME))
+                .thenThrow(new HardeningException(ErrorCode.UNATTENDED_REQUIRES_SEAL, "needs a seal"));
+
+        resumer.onRunsInterrupted(new RunInterruption.Event(List.of("r1"), RunInterruption.Cause.RESTART));
+        runScheduled();
+
+        assertThat(run.getStatus()).isEqualTo(RunStatus.INTERRUPTED);
+        assertThat(pending.forWorkflow("wf-1")).isFalse();
+    }
+
+    @Test
+    void pending_notForRunsTheResumerWillNotTouch() {
+        Workflow plain = workflow("wf-plain", false);
+        interruptedRunsOf("wf-plain", interrupted("r1", plain, "RUNNING"));
+        storedWorkflow(plain);
+        assertThat(pending.forWorkflow("wf-plain")).as("no opt-in").isFalse();
+
+        Workflow optedIn = workflow("wf-paused", true);
+        interruptedRunsOf("wf-paused", interrupted("r2", optedIn, "PAUSED"));
+        assertThat(pending.forWorkflow("wf-paused")).as("a person paused it").isFalse();
+
+        interruptedRunsOf("wf-none");
+        assertThat(pending.forWorkflow("wf-none")).as("nothing interrupted").isFalse();
+    }
+
+    @Test
+    void pending_notWhenAutoResumeWasSwitchedOffAtTheInterruption() {
+        config.setEnabled(false);
+        Workflow wf = workflow("wf-1", true);
+        interruptedRunsOf("wf-1", interrupted("r1", wf, "RUNNING"));
+
+        resumer.onRunsInterrupted(new RunInterruption.Event(List.of("r1"), RunInterruption.Cause.RESTART));
+
+        assertThat(pending.forWorkflow("wf-1")).isFalse();
     }
 }

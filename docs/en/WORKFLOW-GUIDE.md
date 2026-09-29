@@ -1828,6 +1828,8 @@ In the UI: workflow detail page → "Resume automatically after a restart". The 
 
 **Global** — Settings → Execution: "Resume interrupted runs automatically" (`run-auto-resume-enabled`, default on) and "Wait before each resume" (`run-auto-resume-delay-seconds`, default 30 s, 0–3600). Runs are resumed one after another with this wait, also before the first. Startup values: `automation.execution.auto-resume.enabled` / `.delay-seconds`.
 
+**Together with a schedule** — If the workflow has a schedule with conflict behaviour `SKIP` (the default), the resume wins: while an automatic resume of the workflow is pending or running, a due occurrence is dropped — a catch-up run (`catchUpOnResume`) after a restart or standby as well. The activity log notes "Schedule skipped (interrupted run is being resumed automatically)" with `reason: auto-resume-pending`. With `OVERLAP` the occurrence starts next to it as usual (TODO 070ccc3d).
+
 ## Auto-Repair
 
 Auto-Repair is the platform's self-healing mechanism: When a workflow fails, the AI analyzes the error, corrects the workflow blocks, and automatically verifies the repair.
