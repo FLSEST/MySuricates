@@ -222,4 +222,78 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody().getCode()).isEqualTo("INVALID_ARGUMENT");
         assertThat(response.getBody().getError()).isEqualTo("Invalid value for parameter 'severity'");
     }
+
+    // Params tell the UI that code + params describe the message completely, so it may show its own
+    // translation (TODO 325cc733). Free-text errors must not carry them, or the UI would hide the text.
+
+    @Test
+    void handleNotFound_sendsResourceAndIdAsParams() {
+        ResponseEntity<ErrorResponse> response = handler.handleNotFound(new ResourceNotFoundException("Workflow", "abc-123"));
+
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getParams()).containsExactlyInAnyOrderEntriesOf(
+                java.util.Map.of("resource", "Workflow", "id", "abc-123"));
+    }
+
+    @Test
+    void handleHardening_passesTheParamsOfTheException() {
+        var ex = new HardeningException(ErrorCode.WORKFLOW_SEALED, "Workflow 'Nightly' is sealed — unseal it before deleting it",
+                java.util.Map.of("name", "Nightly"));
+
+        ResponseEntity<ErrorResponse> response = handler.handleHardening(ex);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getCode()).isEqualTo("WORKFLOW_SEALED");
+        assertThat(response.getBody().getError()).isEqualTo("Workflow 'Nightly' is sealed — unseal it before deleting it");
+        assertThat(response.getBody().getParams()).containsExactlyEntriesOf(java.util.Map.of("name", "Nightly"));
+    }
+
+    @Test
+    void handleHardening_sendsNoParamsForFreeText() {
+        ResponseEntity<ErrorResponse> response = handler.handleHardening(
+                new HardeningException(ErrorCode.WORKFLOW_TAMPERED, "Sealed workflow 'x' was not started: skill changed"));
+
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getParams()).isNull();
+    }
+
+    @Test
+    void handleIllegalArgument_sendsNoParams() {
+        ResponseEntity<ErrorResponse> response = handler.handleIllegalArgument(new IllegalArgumentException("Invalid cron expression: x"));
+
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getParams()).isNull();
+    }
+
+    @Test
+    void handleGeneral_marksItsFixedTextAsTranslatable() {
+        ResponseEntity<ErrorResponse> response = handler.handleGeneral(new RuntimeException("secret detail"));
+
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getParams()).isEmpty();
+    }
+
+    @Test
+    void handleMethodNotSupported_sendsMethodAndPathAsParams() {
+        var ex = new HttpRequestMethodNotSupportedException("GET", java.util.List.of("POST"));
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        when(request.getRequestURI()).thenReturn("/api/v1/workflows/abc-123/execute");
+
+        ResponseEntity<ErrorResponse> response = handler.handleMethodNotSupported(ex, request);
+
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getParams()).containsExactlyInAnyOrderEntriesOf(
+                java.util.Map.of("method", "GET", "path", "/api/v1/workflows/abc-123/execute"));
+    }
+
+    @Test
+    void handleTokenBudgetExceeded_sendsUsedAndBudgetAsParams() {
+        ResponseEntity<ErrorResponse> response = handler.handleTokenBudgetExceeded(new TokenBudgetExceededException(1000, 1500));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getParams()).containsExactlyInAnyOrderEntriesOf(
+                java.util.Map.of("used", "1500", "budget", "1000"));
+    }
 }

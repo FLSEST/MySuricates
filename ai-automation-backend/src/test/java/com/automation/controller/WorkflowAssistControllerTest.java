@@ -83,6 +83,7 @@ class WorkflowAssistControllerTest {
         mockMvc.perform(post("/api/v1/workflows/wf-1/repair"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("WORKFLOW_SEALED"))
+                .andExpect(jsonPath("$.params.name").value(testWorkflow.getName()))
                 .andExpect(jsonPath("$.error").value(containsString("unseal it before repairing")));
 
         verifyNoInteractions(autoRepairService);

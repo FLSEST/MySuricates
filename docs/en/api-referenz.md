@@ -23,6 +23,12 @@ All errors follow this format:
 
 The `details` field is only included when needed (`@JsonInclude(NON_NULL)`).
 
+`params` (an object of strings) is only included when code and params describe the message completely —
+e.g. `{"code":"WORKFLOW_SEALED","params":{"name":"Nightly"}}` or
+`{"code":"RESOURCE_NOT_FOUND","params":{"resource":"Workflow","id":"…"}}`, empty (`{}`) for a fixed
+text. The UI then shows its own translation of the code; `error` stays the English text for logs and API
+clients. Without `params`, `error` is free text from the throw site and is shown as it is.
+
 **Error Codes:**
 
 | Code | HTTP Status |

@@ -52,7 +52,8 @@ public class WorkflowSealService {
         if (legacySeal && !hash.equals(workflow.getSealedHash())) {
             // Pinning skills re-baselines nothing else: a definition that no longer matches stays refused.
             throw new HardeningException(ErrorCode.WORKFLOW_TAMPERED, "Sealed workflow '" + workflow.getName()
-                    + "' no longer matches its seal — unseal it, review the definition and seal it again");
+                    + "' no longer matches its seal — unseal it, review the definition and seal it again",
+                    Map.of("name", String.valueOf(workflow.getName())));
         }
         if (!legacySeal) {
             workflow.setSealed(true);
@@ -90,7 +91,8 @@ public class WorkflowSealService {
                     "Unseal refused — sealing is immutable: " + workflow.getName(),
                     "WorkflowSealService", workflow.getId(), Map.of(), workflow.getId());
             throw new HardeningException(ErrorCode.SEAL_IMMUTABLE, "Workflow '" + workflow.getName()
-                    + "' cannot be unsealed: automation.hardening.seal-immutable is on (startup configuration)");
+                    + "' cannot be unsealed: automation.hardening.seal-immutable is on (startup configuration)",
+                    Map.of("name", String.valueOf(workflow.getName())));
         }
         String previousHash = workflow.getSealedHash();
         workflow.setSealed(false);

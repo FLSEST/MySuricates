@@ -82,7 +82,8 @@ public class SkillMutationGateway {
         List<String> sealed = workflowRepository.findSealedWorkflowNamesUsingSkill(skill.getId());
         if (!sealed.isEmpty()) {
             throw new HardeningException(ErrorCode.SKILL_PINNED_BY_SEAL, "Skill '" + skill.getName()
-                    + "' is used by sealed workflow(s) " + String.join(", ", sealed) + " — unseal them before " + operation);
+                    + "' is used by sealed workflow(s) " + String.join(", ", sealed) + " — unseal them before " + operation,
+                    Map.of("name", String.valueOf(skill.getName()), "workflows", String.join(", ", sealed)));
         }
     }
 

@@ -61,7 +61,8 @@ public class WorkflowAssistController {
         if (workflow.isSealed()) {
             // Refuse before the async repair starts: it would call the AI and only then fail on saving
             throw new HardeningException(ErrorCode.WORKFLOW_SEALED,
-                    "Workflow '" + workflow.getName() + "' is sealed — unseal it before repairing it");
+                    "Workflow '" + workflow.getName() + "' is sealed — unseal it before repairing it",
+                    Map.of("name", String.valueOf(workflow.getName())));
         }
 
         // Check for FAILED runs

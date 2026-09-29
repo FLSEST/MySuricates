@@ -86,7 +86,8 @@ public class RunAdmission {
                 "RunAdmission", workflow.getId(), metadata, workflow.getId());
         throw new HardeningException(ErrorCode.UNATTENDED_REQUIRES_SEAL,
                 "Workflow '" + workflow.getName() + "' was not started: unattended runs (" + origin
-                        + ") require a sealed workflow (automation.hardening.require-sealed-for-unattended)");
+                        + ") require a sealed workflow (automation.hardening.require-sealed-for-unattended)",
+                Map.of("name", String.valueOf(workflow.getName()), "origin", origin));
     }
 
     /** Returns the verdict of an intact seal or refuses the run (fail closed: an unverifiable seal is a broken seal). */

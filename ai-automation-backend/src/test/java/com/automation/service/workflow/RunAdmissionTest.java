@@ -135,6 +135,7 @@ class RunAdmissionTest {
         assertThatThrownBy(() -> policyOn().admit(workflow(), TriggerSource.SCHEDULE, Map.of()))
                 .isInstanceOf(HardeningException.class)
                 .satisfies(e -> assertThat(((HardeningException) e).getCode()).isEqualTo(ErrorCode.UNATTENDED_REQUIRES_SEAL))
+                .satisfies(e -> assertThat(((HardeningException) e).getParams()).containsEntry("origin", "SCHEDULE").containsKey("name"))
                 .hasMessageContaining("SCHEDULE");
         verify(activityLog).logRefusal(eq(LogLevel.WARN), eq(LogCategory.SECURITY), anyString(), eq("RunAdmission"), eq("wf-1"),
                 argThat(meta -> "SCHEDULE".equals(meta.get("effectiveSource"))), eq("wf-1"));

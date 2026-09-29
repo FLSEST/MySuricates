@@ -51,7 +51,8 @@ public class WorkflowMutationGateway {
             // Runs inside the caller's transaction: throwing rolls the change back. Holds even when the
             // sealing switch is off later — turning the switch off must not silently unseal anything.
             throw new HardeningException(ErrorCode.WORKFLOW_SEALED, "Workflow '" + saved.getName()
-                    + "' is sealed — unseal it before changing " + String.join(", ", changedFields));
+                    + "' is sealed — unseal it before changing " + String.join(", ", changedFields),
+                    Map.of("name", String.valueOf(saved.getName())));
         }
         // Runs inside the caller's transaction like the seal check: an unknown type rolls the save
         // back, so no definition the executor cannot run is ever stored (TODO 89dd9e34).
@@ -81,7 +82,8 @@ public class WorkflowMutationGateway {
     public void requireUnsealed(Workflow workflow, String operation) {
         if (workflow.isSealed()) {
             throw new HardeningException(ErrorCode.WORKFLOW_SEALED,
-                    "Workflow '" + workflow.getName() + "' is sealed — unseal it before " + operation);
+                    "Workflow '" + workflow.getName() + "' is sealed — unseal it before " + operation,
+                    Map.of("name", String.valueOf(workflow.getName())));
         }
     }
 

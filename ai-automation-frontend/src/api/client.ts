@@ -1,6 +1,7 @@
 import type { ApiError } from '../types';
 import { useSettingsStore } from '../stores/settingsStore';
 import { getTranslations } from '../i18n';
+import { localizedErrorText } from './errorText';
 
 const BASE_URL = '/api/v1';
 
@@ -252,7 +253,8 @@ class ApiClient {
           lockAfterRateLimit(path, seconds);
           throw rateLimitError(seconds, body.error);
         }
-        throw { ...body, status: response.status, message: body.error };
+        const text = localizedErrorText(body);
+        throw { ...body, error: text, status: response.status, message: text };
       }
 
       if (response.status === 204) return undefined as T;

@@ -31,7 +31,8 @@ class RunDeletionPolicyTest {
             assertThatThrownBy(policy::requireAllowed)
                     .isInstanceOf(HardeningException.class)
                     .satisfies(e -> assertThat(((HardeningException) e).getCode())
-                            .isEqualTo(ErrorCode.RUN_DELETION_DISABLED));
+                            .isEqualTo(ErrorCode.RUN_DELETION_DISABLED))
+                    .satisfies(e -> assertThat(((HardeningException) e).getParams()).isEmpty());
             assertThat(ErrorCode.RUN_DELETION_DISABLED.getHttpStatus().value()).isEqualTo(403);
         });
     }
@@ -49,7 +50,9 @@ class RunDeletionPolicyTest {
                 .isInstanceOf(HardeningException.class)
                 .extracting(e -> ((HardeningException) e).getCode())
                 .isEqualTo(ErrorCode.RUN_DELETION_DISABLED);
-        assertThatThrownBy(() -> locked.requireRetentionChangeAllowed(0, 730)).isInstanceOf(HardeningException.class);
+        assertThatThrownBy(() -> locked.requireRetentionChangeAllowed(0, 730)).isInstanceOf(HardeningException.class)
+                // Same code, other text: without params the UI keeps the server text instead of the code's translation
+                .satisfies(e -> assertThat(((HardeningException) e).getParams()).isNull());
     }
 
     @Test

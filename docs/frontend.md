@@ -914,7 +914,7 @@ class ApiClient {
 }
 ```
 
-Fehler werden als `ApiError` geworfen mit `{ error, timestamp, fieldErrors? }`. Requests haben ein 300-Sekunden-Timeout via `AbortController`.
+Fehler werden als `ApiError` geworfen mit `{ error, timestamp, code?, params?, fieldErrors? }`; `error` und `message` tragen den Text in der Sprache der Oberfläche, sobald der Server `params` mitschickt (`api/errorText.ts`, Übersetzungen unter `errors.codes` in `de.ts`/`en.ts`). Requests haben ein 300-Sekunden-Timeout via `AbortController`.
 
 Standalone-Exports: `openPath(path)` öffnet einen Dateipfad via Backend, `apiErrorMessage(err, fallback)` extrahiert Fehlermeldungen aus API-Responses.
 

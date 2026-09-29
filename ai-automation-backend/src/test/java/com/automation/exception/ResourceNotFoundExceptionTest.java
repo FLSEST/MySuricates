@@ -27,4 +27,18 @@ class ResourceNotFoundExceptionTest {
 
         assertThat(ex.getMessage()).isEqualTo(" not found with id: ");
     }
+
+    @Test
+    void should_carryResourceAndId_asParamsForTheUi() {
+        var ex = new ResourceNotFoundException("Workflow", "abc-123");
+
+        assertThat(ex.getParams()).containsExactlyInAnyOrderEntriesOf(java.util.Map.of("resource", "Workflow", "id", "abc-123"));
+    }
+
+    @Test
+    void should_writeNullIdAsText_insteadOfFailing() {
+        var ex = new ResourceNotFoundException("Workflow", null);
+
+        assertThat(ex.getParams()).containsEntry("id", "null");
+    }
 }

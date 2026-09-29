@@ -25,6 +25,12 @@ Alle Fehler folgen diesem Format:
 
 Das Feld `details` wird nur bei Bedarf mitgeliefert (`@JsonInclude(NON_NULL)`).
 
+`params` (Objekt aus Zeichenketten) kommt nur mit, wenn Code und Parameter die Meldung vollständig
+beschreiben – etwa `{"code":"WORKFLOW_SEALED","params":{"name":"Nightly"}}` oder
+`{"code":"RESOURCE_NOT_FOUND","params":{"resource":"Workflow","id":"…"}}`, auch leer (`{}`) bei festem
+Text. Die Oberfläche zeigt dann ihre eigene Übersetzung des Codes; `error` bleibt der englische Text für
+Logs und API-Clients. Ohne `params` ist `error` Freitext der Wurfstelle und wird so angezeigt.
+
 **Error-Codes:**
 
 | Code | HTTP-Status |
