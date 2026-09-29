@@ -33,7 +33,9 @@ export const WINDOW_MIN = { width: 300, height: 240 };
 /** So viel Abstand hält ein Fenster zum Rand des Sichtbereichs. */
 export const EDGE = 8;
 export const DEFAULT_WIDTH = 384;
-const STORAGE_KEY = 'mysuricates-goal-panel';
+/** Speicher der Seitenleiste; die Workflow-Leiste der Zuordnung (52bc1e8c) merkt sich ihre Lage getrennt. */
+export const PANEL_STORAGE_KEY = 'mysuricates-goal-panel';
+export const WORKFLOW_PANEL_KEY = 'mysuricates-goal-workflow-panel';
 
 export function clampWidth(width: number, viewport: Viewport): number {
   const max = Math.max(DOCK_MIN, Math.min(DOCK_MAX, Math.floor(viewport.width * 0.6)));
@@ -72,10 +74,10 @@ export function defaultRect(width: number, viewport: Viewport): PanelRect {
   return clampRect({ x: viewport.width - w - 24, y: 72, width: w, height: viewport.height - 96 }, viewport);
 }
 
-export function readPanelPrefs(viewport: Viewport): PanelPrefs {
+export function readPanelPrefs(viewport: Viewport, key: string = PANEL_STORAGE_KEY): PanelPrefs {
   const fallback: PanelPrefs = { mode: 'docked', width: DEFAULT_WIDTH, rect: defaultRect(DEFAULT_WIDTH, viewport) };
   try {
-    const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null') as Partial<PanelPrefs> | null;
+    const raw = JSON.parse(localStorage.getItem(key) ?? 'null') as Partial<PanelPrefs> | null;
     if (!raw || typeof raw !== 'object') return fallback;
     const width = typeof raw.width === 'number' ? clampWidth(raw.width, viewport) : fallback.width;
     const rect = raw.rect && ['x', 'y', 'width', 'height'].every((key) => typeof (raw.rect as unknown as Record<string, unknown>)[key] === 'number')
@@ -86,9 +88,9 @@ export function readPanelPrefs(viewport: Viewport): PanelPrefs {
   }
 }
 
-export function storePanelPrefs(prefs: PanelPrefs) {
+export function storePanelPrefs(prefs: PanelPrefs, key: string = PANEL_STORAGE_KEY) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
+    localStorage.setItem(key, JSON.stringify(prefs));
   } catch {
     // privates Fenster oder gesperrter Speicher: gilt dann bis zum Neuladen
   }

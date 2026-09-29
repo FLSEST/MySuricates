@@ -313,7 +313,7 @@ describe('GoalDetail', () => {
     serveMapAndCandidates([candidate('c1', 'Release notes', ['release'])], asked);
     renderGoal();
 
-    fireEvent.click(await screen.findByRole('tab', { name: 'Map' }));
+    fireEvent.click(await screen.findByRole('tab', { name: 'Workflow map' }));
 
     expect(await screen.findByTestId('goal-relation-map')).toBeInTheDocument();
     expect(screen.getByTestId('goal-map-no-workers')).toBeInTheDocument();

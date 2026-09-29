@@ -4,8 +4,9 @@ import type { GoalOriginKind, GoalTodoRelation, RunStatus, TodoResolutionState }
  * Layout der Relationskarte eines Ziels (TODO c6ea8f5c), rein und testbar: vier Spalten
  * Herkunft · TODOs · Bearbeitung · Ergebnis.
  *
- * - TODO-Zeilen in Arbeitsreihenfolge (so liefert sie der Server), nach Projekt gruppiert; die
- *   Kandidaten stehen zuletzt in einer eigenen Gruppe.
+ * - TODO-Zeilen in Arbeitsreihenfolge (so liefert sie der Server), nach Projekt gruppiert – mit
+ *   `MapStructure` nach Projekt → Arbeitspaket (52bc1e8c); die Kandidaten stehen zuletzt in einer
+ *   eigenen Gruppe.
  * - Herkunft und Bearbeitung sind zusammengefasst: derselbe Workflow (oder „Mensch“, „Health-Check“ …)
  *   ist ein Knoten, auf Höhe des Mittels seiner TODOs; die Linien laufen fächerförmig zusammen.
  * - Ein TODO ohne Bearbeitung bekommt einen gepunkteten Stummel („kein Workflow“) – so sieht man,
@@ -80,7 +81,30 @@ export interface MapGroup {
   /** Projektname; `null` = ohne Projekt; bei `candidate` die Kandidaten-Gruppe. */
   label: string | null;
   y: number;
+  /** Höhe der Gruppe samt ihrer Zeilen – Ablagefläche der Workflow-Zuordnung. */
+  h?: number;
   candidate: boolean;
+  /**
+   * Gliederung nach Arbeitspaketen (52bc1e8c): das Paket der Gruppe; `null` = „Ohne Arbeitspaket“;
+   * fehlt, wenn nur nach Projekt gegliedert ist.
+   */
+  workPackageId?: string | null;
+  /** Titel des Pakets (oder `null` für „Ohne Arbeitspaket“) – steht hinter dem Projektnamen. */
+  packageTitle?: string | null;
+}
+
+/**
+ * Wie die Zeilen gegliedert werden (52bc1e8c): Projekt → Arbeitspaket, in der Reihenfolge der
+ * Projekte und Pakete des Ziels, je Projekt zuletzt „Ohne Arbeitspaket“. Die Relationen kennen
+ * das Paket eines TODOs nicht – es kommt aus dem Ziel (`GoalDetail.todos[].workPackageId`).
+ */
+export interface MapStructure {
+  /** Projekte des Ziels in ihrer Reihenfolge. */
+  projectOrder: string[];
+  /** Pakete des Ziels in ihrer Reihenfolge (je Projekt nach Position). */
+  packages: { id: string; title: string; projectId: string | null }[];
+  /** Paket je TODO; fehlt ein TODO, gilt es als ohne Paket. */
+  packageOf: ReadonlyMap<string, string | null>;
 }
 
 export interface RelationLayout {
@@ -164,7 +188,47 @@ function place(items: Pending[]): number {
   return bottom;
 }
 
-export function layoutRelations(todos: GoalTodoRelation[]): RelationLayout {
+/** Gruppen der Zeilen: nach Projekt (ohne Struktur) oder nach Projekt → Arbeitspaket. */
+function rowGroupsOf(members: GoalTodoRelation[], structure?: MapStructure) {
+  type RowGroup = { label: string | null; candidate: boolean; todos: GoalTodoRelation[]; workPackageId?: string | null; packageTitle?: string | null };
+  const byProject = new Map<string, GoalTodoRelation[]>();
+  for (const todo of members) {
+    const key = todo.projectId ?? '';
+    byProject.set(key, [...(byProject.get(key) ?? []), todo]);
+  }
+  if (!structure) {
+    return [...byProject.values()].map((list): RowGroup => ({ label: list[0]!.projectName, candidate: false, todos: list }));
+  }
+  const rank = (projectId: string) => {
+    const index = structure.projectOrder.indexOf(projectId);
+    return index < 0 ? Number.MAX_SAFE_INTEGER : index;
+  };
+  const projects = [...byProject.keys()].map((key, index) => ({ key, index }))
+    .sort((a, b) => rank(a.key) - rank(b.key) || a.index - b.index).map(({ key }) => key);
+  const groups: RowGroup[] = [];
+  for (const projectId of projects) {
+    const list = byProject.get(projectId)!;
+    const label = list[0]!.projectName;
+    const packageOf = (todo: GoalTodoRelation) => {
+      const id = structure.packageOf.get(todo.id) ?? null;
+      return id && structure.packages.some((item) => item.id === id) ? id : null;
+    };
+    // Pakete in der Reihenfolge des Ziels; auch ein Paket eines anderen Projekts (Altfall) steht unter dem TODO-Projekt
+    const packageIds = [...new Set(list.map(packageOf).filter((id): id is string => id !== null))]
+      .sort((a, b) => structure.packages.findIndex((item) => item.id === a) - structure.packages.findIndex((item) => item.id === b));
+    for (const id of packageIds) {
+      groups.push({
+        label, candidate: false, todos: list.filter((todo) => packageOf(todo) === id), workPackageId: id,
+        packageTitle: structure.packages.find((item) => item.id === id)!.title,
+      });
+    }
+    const loose = list.filter((todo) => packageOf(todo) === null);
+    if (loose.length) groups.push({ label, candidate: false, todos: loose, workPackageId: null, packageTitle: null });
+  }
+  return groups;
+}
+
+export function layoutRelations(todos: GoalTodoRelation[], structure?: MapStructure): RelationLayout {
   const nodes: MapNode[] = [];
   const edges: MapEdge[] = [];
   const groups: MapGroup[] = [];
@@ -172,19 +236,16 @@ export function layoutRelations(todos: GoalTodoRelation[]): RelationLayout {
   // ── TODO-Zeilen: nach Projekt gruppiert, Gruppen in der Reihenfolge ihres ersten TODOs ──
   const members = todos.filter((t) => !t.candidate);
   const candidates = todos.filter((t) => t.candidate);
-  const byProject = new Map<string, GoalTodoRelation[]>();
-  for (const todo of members) {
-    const key = todo.projectId ?? '';
-    byProject.set(key, [...(byProject.get(key) ?? []), todo]);
-  }
-  const rowGroups: { label: string | null; candidate: boolean; todos: GoalTodoRelation[] }[] =
-    [...byProject.values()].map((list) => ({ label: list[0]!.projectName, candidate: false, todos: list }));
+  const rowGroups = rowGroupsOf(members, structure);
   if (candidates.length) rowGroups.push({ label: null, candidate: true, todos: candidates });
 
   const todoNodes = new Map<string, MapNode>();
   let cursor = HEADER_HEIGHT;
   for (const group of rowGroups) {
-    groups.push({ label: group.label, y: cursor, candidate: group.candidate });
+    groups.push({
+      label: group.label, y: cursor, candidate: group.candidate,
+      ...(group.workPackageId !== undefined ? { workPackageId: group.workPackageId, packageTitle: group.packageTitle ?? null } : {}),
+    });
     cursor += GROUP_LABEL_HEIGHT;
     for (const todo of group.todos) {
       const node: MapNode = {
@@ -198,6 +259,7 @@ export function layoutRelations(todos: GoalTodoRelation[]): RelationLayout {
     }
   }
   const rowsBottom = cursor;
+  groups.forEach((group, index) => { group.h = (groups[index + 1]?.y ?? rowsBottom) - group.y; });
 
   // ── Herkunft: ein Knoten je Workflow bzw. Art ──
   const origins = new Map<string, Pending>();

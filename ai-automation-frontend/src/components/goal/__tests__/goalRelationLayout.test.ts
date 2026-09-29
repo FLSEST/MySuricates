@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { COLUMNS, highlightFor, layoutRelations, resultTone, type MapNode } from '../goalRelationLayout';
+import { COLUMNS, GROUP_LABEL_HEIGHT, ROW_HEIGHT, highlightFor, layoutRelations, resultTone, type MapNode } from '../goalRelationLayout';
 import type { GoalTodoRelation } from '../../../types';
 
 function relation(id: string, overrides: Partial<GoalTodoRelation> = {}): GoalTodoRelation {
@@ -114,7 +114,7 @@ describe('layoutRelations', () => {
       relation('c2', { candidate: true }),
     ]);
 
-    expect(layout.groups).toEqual([{ label: null, y: expect.any(Number), candidate: true }]);
+    expect(layout.groups).toEqual([{ label: null, y: expect.any(Number), h: 2 * ROW_HEIGHT + GROUP_LABEL_HEIGHT, candidate: true }]);
     expect(byKind(layout.nodes, 'todo').map((n) => n.candidate)).toEqual([true, true]);
     expect(layout.edges.length).toBeGreaterThan(0);
     expect(layout.edges.filter((e) => e.style !== 'dotted').every((e) => e.style === 'dashed')).toBe(true);

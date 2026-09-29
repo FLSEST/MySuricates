@@ -1,11 +1,13 @@
 import { useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowDown, Info, List } from 'lucide-react';
+import { ArrowDown, Info, List, Workflow } from 'lucide-react';
 import { Button, Card } from '../ui';
 import { Hint } from '../hints/Hint';
 import { FIT_MIN_WIDTH_RATIO, useDiagramZoom } from '../workflow/useDiagramZoom';
 import { useT } from '../../i18n';
-import { COLUMNS, highlightFor, layoutRelations, type MapNode, type NodeTarget } from './goalRelationLayout';
+import { COLUMNS, highlightFor, layoutRelations, type MapNode, type MapStructure, type NodeTarget } from './goalRelationLayout';
+import { GoalDropTarget, PackageDropTarget, TodoDropTarget } from './WorkflowMapTargets';
+import { useWorkflowMapDrag } from './workflowMapDrag';
 import { RelationMapNode } from './RelationMapNode';
 import { RelationMapLegend } from './RelationMapLegend';
 import type { PlanBadge } from './planDisplay';
@@ -63,17 +65,24 @@ function EmptyGoalMap() {
  * mit Zoom. Hover hebt den ganzen Pfad eines TODOs hervor; Workflows, Läufe und Befunde sind
  * Links, ein TODO öffnet den Bearbeiten-Dialog, ein Kandidat lässt sich zuordnen.
  */
-export function GoalRelationMap({ relations, onOpenTodo, onAssign, badges }: {
+export function GoalRelationMap({ relations, onOpenTodo, onAssign, badges, structure, goalTitle, onOpenWorkflows }: {
   relations: GoalRelations;
   onOpenTodo: (todoId: string) => void;
   onAssign: (todoId: string) => void;
   /** Fälligkeit und Meilenstein je TODO des Ziels (TODO e192df18); Kandidaten haben keine. */
   badges?: ReadonlyMap<string, PlanBadge>;
+  /** Gliederung nach Projekt → Arbeitspaket (52bc1e8c); ohne nur nach Projekt. */
+  structure?: MapStructure;
+  goalTitle?: string;
+  /** Öffnet die Workflow-Leiste, wenn sie zu ist. */
+  onOpenWorkflows?: () => void;
 }) {
   const t = useT();
   const m = t.goals.map;
+  const tm = t.goals.workflowMap;
   const navigate = useNavigate();
-  const layout = useMemo(() => layoutRelations(relations.todos), [relations.todos]);
+  const drag = useWorkflowMapDrag();
+  const layout = useMemo(() => layoutRelations(relations.todos, structure), [relations.todos, structure]);
   const [hovered, setHovered] = useState<string | null>(null);
   const highlight = highlightFor(layout, hovered);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -109,6 +118,17 @@ export function GoalRelationMap({ relations, onOpenTodo, onAssign, badges }: {
         </div>
       )}
       <Card padding={false} className="relative">
+        {onOpenWorkflows && (
+          <button type="button" onClick={onOpenWorkflows} data-testid="workflow-map-open"
+            className="absolute left-2 top-1.5 z-10 inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-2 py-1 text-xs text-text-secondary shadow-sm hover:border-accent hover:text-accent focus-ring">
+            <Workflow className="h-3.5 w-3.5" aria-hidden="true" />{tm.open}
+          </button>
+        )}
+        {goalTitle && drag && (
+          <div className="px-3 pt-10">
+            <GoalDropTarget label={tm.goalBand.replace('{title}', goalTitle)} hint={tm.goalBandHint} />
+          </div>
+        )}
         <div role="group" aria-label={t.workflows.zoomHint} title={t.workflows.zoomHint}
           className="absolute top-1 right-1 z-10 flex items-center gap-0.5 rounded-md border border-border bg-surface/85 p-0.5 text-text-secondary shadow-sm">
           <button type="button" onClick={zoom.zoomOut} disabled={!zoom.canZoomOut} aria-label={t.workflows.zoomOut}
@@ -120,7 +140,7 @@ export function GoalRelationMap({ relations, onOpenTodo, onAssign, badges }: {
           <button type="button" onClick={zoom.zoomIn} disabled={!zoom.canZoomIn} aria-label={t.workflows.zoomIn}
             className="h-6 w-6 rounded text-base leading-none hover:bg-surface-raised hover:text-text disabled:opacity-40">+</button>
         </div>
-        <div ref={scrollRef} className={`px-3 pb-3 pt-10 ${fixedSize ? 'overflow-auto max-h-[75vh]' : 'overflow-x-auto'}`}>
+        <div ref={scrollRef} className={`px-3 pb-3 ${goalTitle && drag?.context.attachSupported ? 'pt-3' : 'pt-10'} ${fixedSize ? 'overflow-auto max-h-[75vh]' : 'overflow-x-auto'}`}>
           <svg
             viewBox={`-8 0 ${layout.width + 16} ${layout.height}`}
             {...(fixedSize ?? {})}
@@ -134,9 +154,17 @@ export function GoalRelationMap({ relations, onOpenTodo, onAssign, badges }: {
                 {label}
               </text>
             ))}
+            {drag && layout.groups.map((group) => (typeof group.workPackageId === 'string'
+              ? <PackageDropTarget key={`drop-${group.y}`} group={group} workPackageId={group.workPackageId} /> : null))}
             {layout.groups.map((group) => (
-              <text key={`${group.y}`} x={COLUMNS[1].x} y={group.y + 16} className="fill-text-tertiary text-[11px] font-medium">
+              <text key={`${group.y}`} x={COLUMNS[1].x} y={group.y + 16} className="fill-text-tertiary text-[11px] font-medium"
+                data-testid="map-group-label">
                 {group.candidate ? m.candidates : group.label ?? t.goals.noProject}
+                {group.workPackageId !== undefined && !group.candidate && (
+                  <tspan className={group.workPackageId ? 'fill-text-secondary' : 'fill-text-tertiary italic'}>
+                    {` · ${group.packageTitle ?? tm.noPackage}`}
+                  </tspan>
+                )}
               </text>
             ))}
             {layout.edges.map((edge) => {
@@ -150,7 +178,8 @@ export function GoalRelationMap({ relations, onOpenTodo, onAssign, badges }: {
                   opacity={lit([edge.todoId]) ? 1 : 0.2} />
               );
             })}
-            {layout.nodes.map((node) => (
+            {layout.nodes.map((node) => {
+              const view = (
               <RelationMapNode
                 key={node.id}
                 node={node}
@@ -161,7 +190,11 @@ export function GoalRelationMap({ relations, onOpenTodo, onAssign, badges }: {
                 assignLabel={m.assign}
                 badge={node.kind === 'todo' && !node.candidate ? badges?.get(node.todoIds[0]!) : undefined}
               />
-            ))}
+              );
+              // In der Workflow-Zuordnung ist jedes TODO des Ziels eine Ablagefläche (52bc1e8c)
+              return drag && node.kind === 'todo' && !node.candidate
+                ? <TodoDropTarget key={node.id} node={node}>{view}</TodoDropTarget> : view;
+            })}
           </svg>
         </div>
       </Card>

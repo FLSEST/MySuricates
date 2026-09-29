@@ -55,7 +55,7 @@ function useDrag() {
  * der Größe änderbar, immer ganz im Sichtbereich. Breite, Lage, Größe und Art bleiben gemerkt. Darunter
  * ein Blatt über dem Inhalt.
  */
-export function SidePanelFrame({ labelledBy, header, children, footer, onClose, testId, kind }: {
+export function SidePanelFrame({ labelledBy, header, children, footer, onClose, testId, kind, storageKey, closeLabel }: {
   labelledBy: string;
   header: ReactNode;
   children: ReactNode;
@@ -63,13 +63,17 @@ export function SidePanelFrame({ labelledBy, header, children, footer, onClose, 
   onClose: () => void;
   testId: string;
   kind: string;
+  /** Wo Breite, Art und Fensterlage gemerkt werden – je Leiste eigener Schlüssel. */
+  storageKey?: string;
+  /** Name des ×; ohne der der Seitenleiste. */
+  closeLabel?: string;
 }) {
   const t = useT();
   const tp = t.goals.panel;
   const mobile = useIsMobile();
   const drag = useDrag();
-  const [prefs, setPrefs] = useState<PanelPrefs>(() => readPanelPrefs(viewport()));
-  useEffect(() => storePanelPrefs(prefs), [prefs]);
+  const [prefs, setPrefs] = useState<PanelPrefs>(() => readPanelPrefs(viewport(), storageKey));
+  useEffect(() => storePanelPrefs(prefs, storageKey), [prefs, storageKey]);
 
   // Wird das Browserfenster kleiner, kommt das Fenster zurück in den Sichtbereich
   useEffect(() => {
@@ -130,7 +134,7 @@ export function SidePanelFrame({ labelledBy, header, children, footer, onClose, 
           {floating ? <PanelRight className="h-4 w-4" aria-hidden="true" /> : <PictureInPicture2 className="h-4 w-4" aria-hidden="true" />}
         </button>
       )}
-      <button type="button" onClick={onClose} aria-label={tp.close} title={tp.close}
+      <button type="button" onClick={onClose} aria-label={closeLabel ?? tp.close} title={closeLabel ?? tp.close}
         className="rounded-md p-1.5 text-text-secondary hover:bg-surface-hover hover:text-text focus-ring">
         <X className="h-4 w-4" aria-hidden="true" />
       </button>

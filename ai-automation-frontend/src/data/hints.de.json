@@ -248,7 +248,8 @@
     "points": [
       "Links steht die Herkunft: ein Workflow-Lauf, ein Audit-Befund, ein Health-Check, ein Agent oder ein Mensch",
       "Rechts davon, welcher Workflow ein TODO bearbeitet: als Fix-Workflow am TODO oder über einen passenden TodoTrigger, und was der letzte Lauf ergab",
-      "Ein gepunkteter Stummel zeigt, wo noch kein Workflow andockt; gestrichelte Zeilen sind Vorschläge, die zum Ziel passen könnten"
+      "Ein gepunkteter Stummel zeigt, wo noch kein Workflow andockt; gestrichelte Zeilen sind Vorschläge, die zum Ziel passen könnten",
+      "Die Zeilen stehen nach Projekt und Arbeitspaket; ein Workflow aus der Leiste, auf ein TODO gezogen, wird dessen Fix-Workflow, auf ein Paket oder das Ziel gezogen, arbeitet er dort mit – jede Zuordnung lässt sich gleich zurücknehmen"
     ]
   },
   "goal-outline": {
