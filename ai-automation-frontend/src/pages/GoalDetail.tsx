@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, CalendarDays, ChartGantt, List, ListTree, Network, Target, Trash2 } from 'lucide-react';
 import { Button, Card, ConfirmModal, Select, Spinner } from '../components/ui';
@@ -17,6 +17,10 @@ import { DecisionContext } from '../components/goal/decisionContext';
 import { GoalWorkflowsProvider } from '../components/goal/GoalWorkflowsProvider';
 import { GoalWorkflowsPanel } from '../components/goal/GoalWorkflowsPanel';
 import { GoalSidePanel } from '../components/goal/GoalSidePanel';
+import { WorkflowMapDnd } from '../components/goal/WorkflowMapDnd';
+import { WorkflowMapPanel } from '../components/goal/WorkflowMapPanel';
+import { structureOf } from '../components/goal/workflowMap';
+import { useIsMobile } from '../hooks/useIsMobile';
 import {
   GoalSelectionContext, SELECTION_PARAM, parseSelection, selectionValue, type GoalSelection, type GoalSelectionValue,
 } from '../components/goal/goalSelection';
@@ -38,7 +42,8 @@ type GoalView = 'outline' | 'list' | 'map' | 'timeline';
  * schon eine Ansicht gewählt hatten, weiter die alte, und die Gliederung bliebe unentdeckt.
  */
 const VIEW_KEY = 'mysuricates-goal-view-v2';
-const VIEWS: readonly GoalView[] = ['outline', 'list', 'map', 'timeline'];
+// Die Workflow-Zuordnung (Wert `map`) steht ganz rechts (52bc1e8c) – gespeichert bleibt `map` gültig
+const VIEWS: readonly GoalView[] = ['outline', 'list', 'timeline', 'map'];
 /** Immer als Tag-Vorschlag dabei: Ziele sind oft Releases. */
 const DEFAULT_TAG_SUGGESTION = 'release';
 
@@ -57,6 +62,29 @@ function storeView(view: GoalView) {
   } catch {
     // privates Fenster oder gesperrter Speicher: die Wahl gilt dann nur bis zum Neuladen
   }
+}
+
+const WORKFLOW_PANEL_OPEN_KEY = 'mysuricates-goal-workflow-panel-open';
+
+function readWorkflowPanel(): boolean {
+  try {
+    return localStorage.getItem(WORKFLOW_PANEL_OPEN_KEY) !== 'false';
+  } catch {
+    return true;
+  }
+}
+
+function storeWorkflowPanel(open: boolean) {
+  try {
+    localStorage.setItem(WORKFLOW_PANEL_OPEN_KEY, String(open));
+  } catch {
+    // privates Fenster: gilt bis zum Neuladen
+  }
+}
+
+/** Nur in der Workflow-Zuordnung umschließt das Ziehen Karte und Leiste; sonst bleibt alles, wie es ist. */
+function WorkflowMapFrame({ on, children, ...props }: Omit<ComponentProps<typeof WorkflowMapDnd>, 'children'> & { on: boolean; children: ReactNode }) {
+  return on ? <WorkflowMapDnd {...props}>{children}</WorkflowMapDnd> : <>{children}</>;
 }
 
 /** `release` und die häufigsten Tags der TODOs des Ziels. */
@@ -90,6 +118,13 @@ export function GoalDetail() {
   const locale = useI18nStore((s) => s.locale);
   const navigate = useNavigate();
   const [view, setView] = useState<GoalView>(readView);
+  // Workflow-Leiste der Workflow-Zuordnung (52bc1e8c): gemerkt, ob sie offen ist; auf dem Handy gibt es kein Ziehen
+  const [workflowPanel, setWorkflowPanelState] = useState(readWorkflowPanel);
+  const setWorkflowPanel = (open: boolean) => {
+    setWorkflowPanelState(open);
+    storeWorkflowPanel(open);
+  };
+  const mobile = useIsMobile();
   const [filter, setFilter] = useState<CandidateFilter>({ q: '', tag: '' });
   const [allProjects, setAllProjects] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
@@ -112,6 +147,7 @@ export function GoalDetail() {
   const updateGoal = useUpdateGoal();
   const deleteGoal = useDeleteGoal();
   const assign = useAssignGoalTodos();
+  const structure = useMemo(() => (data ? structureOf(data) : undefined), [data]);
   const decisionScope = useMemo(() => (goalId ? { goalId, enabled: !!data?.decisionsSupported } : null), [goalId, data?.decisionsSupported]);
   // Seitenleiste (c60bf914): Auswahl in der URL, damit Zurück und Neuladen sie behalten
   const location = useLocation();
@@ -153,6 +189,7 @@ export function GoalDetail() {
   }
 
   const { goal, todos, byProject, workPackages, milestones, projects } = data;
+  const workflowPanelShown = view === 'map' && workflowPanel && !mobile;
   const chooseView = (next: GoalView) => {
     setView(next);
     storeView(next);
@@ -167,6 +204,8 @@ export function GoalDetail() {
   return (
     <GoalWorkflowsProvider detail={data}>
       <GoalSelectionContext.Provider value={selection}>
+        <WorkflowMapFrame on={view === 'map'} goalId={goal.id} goalTitle={goal.title} relations={relations.data}
+          workPackages={workPackages}>
         <div className="lg:flex lg:items-start lg:gap-6">
           <div className="min-w-0 flex-1 space-y-6 animate-fade-in">
             <Link to="/goals" className="inline-flex items-center gap-1 text-sm text-text-secondary hover:text-text">
@@ -226,7 +265,7 @@ export function GoalDetail() {
             <div role="tablist" aria-label={t.goals.views.label} className="inline-flex max-w-full gap-1 overflow-x-auto p-1 rounded-lg bg-surface-secondary">
               {([
                 ['outline', ListTree, t.goals.views.outline], ['list', List, t.goals.views.list],
-                ['map', Network, t.goals.views.map], ['timeline', ChartGantt, t.goals.views.timeline],
+                ['timeline', ChartGantt, t.goals.views.timeline], ['map', Network, t.goals.views.map],
               ] as const).map(([key, Icon, label]) => (
                 <button key={key} type="button" role="tab" aria-selected={view === key} onClick={() => chooseView(key)}
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md transition-colors ${
@@ -252,7 +291,9 @@ export function GoalDetail() {
                     : <ErrorState message={relations.error.message} onRetry={() => relations.refetch()} />
                   : <div className="flex justify-center py-8"><Spinner text={t.common.loading} /></div>
               ) : (
-                <GoalRelationMap relations={relations.data} onOpenTodo={setEditing} onAssign={assignTodo} badges={badges} />
+                <GoalRelationMap relations={relations.data} onOpenTodo={setEditing} onAssign={assignTodo} badges={badges}
+                  structure={structure} goalTitle={goal.title}
+                  onOpenWorkflows={workflowPanelShown || mobile ? undefined : () => setWorkflowPanel(true)} />
               )}
             </DecisionContext.Provider>
 
@@ -291,7 +332,9 @@ export function GoalDetail() {
                 onOpenTodo={setEditing} />
             </DecisionContext.Provider>
           )}
+          {workflowPanelShown && <WorkflowMapPanel projects={projects} onClose={() => setWorkflowPanel(false)} />}
         </div>
+        </WorkflowMapFrame>
       </GoalSelectionContext.Provider>
     </GoalWorkflowsProvider>
   );

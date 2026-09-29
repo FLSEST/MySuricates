@@ -8,6 +8,8 @@ import { server } from '../../test/server';
 import { renderWithProviders } from '../../test/utils';
 import { useI18nStore } from '../../i18n';
 import { GoalDetail } from '../GoalDetail';
+import { ToastContainer } from '../../components/ui/ToastContainer';
+import { useToastStore } from '../../stores/toastStore';
 import type { GoalDetail as GoalDetailData, GoalTodoItem } from '../../types';
 
 // c60bf914 (Flo): „Beim Anklicken eines Milestones sollten die TODOs und Workflows in der Ansicht rechts
@@ -324,6 +326,35 @@ describe('GoalSidePanel – history, modal sheet, clean-up', () => {
       await waitFor(() => expect(container).toHaveAttribute('inert'));
       fireEvent.click(within(screen.getByTestId('goal-side-panel')).getByRole('button', { name: 'Close the side panel' }));
       expect(container).not.toHaveAttribute('inert');
+    } finally {
+      window.matchMedia = original;
+    }
+  });
+
+  // Review c60bf914: toasts are a portal of their own – under the modal sheet their buttons stay usable
+  it('keeps toasts clickable while the sheet is open', async () => {
+    const original = window.matchMedia;
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: query.includes('max-width: 1023px'), media: query, onchange: null,
+      addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn(),
+    }));
+    const undo = vi.fn();
+    try {
+      serveGoal();
+      const { container } = renderWithProviders(
+        <>
+          <Routes><Route path="/goals/:goalId" element={<GoalDetail />} /></Routes>
+          <ToastContainer />
+        </>,
+        { route: '/goals/g1?item=workpackage:w1' },
+      );
+      await screen.findByTestId('goal-side-panel');
+      act(() => { useToastStore.getState().addToast('success', 'Assigned', { label: 'Undo', onClick: undo }); });
+      const toast = await screen.findByTestId('toast');
+      expect(container).toHaveAttribute('inert');
+      expect(toast.closest('[inert]')).toBeNull();
+      fireEvent.click(within(toast).getByRole('button', { name: 'Undo' }));
+      expect(undo).toHaveBeenCalled();
     } finally {
       window.matchMedia = original;
     }

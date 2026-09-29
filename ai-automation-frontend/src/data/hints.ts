@@ -32,7 +32,8 @@ export const HINTS = {
   'calendar-overview': { version: 1 },
   'cockpit-overview': { version: 1 },
   'goals-overview': { version: 1 },
-  'goal-relation-map': { version: 1 },
+  // v2: grouped by work package, workflows are dragged onto TODOs, packages or the goal (52bc1e8c).
+  'goal-relation-map': { version: 2 },
   // v2: open questions are decided in place, ✔ counts what is decided (68a5e24e).
   'goal-outline': { version: 2 },
   // v2: milestones and work packages as bars in project bands, adding them with a click (c60bf914).
