@@ -1,5 +1,6 @@
 package com.automation.service.repair;
 
+import com.automation.entity.ActivityLog.LogCategory;
 import com.automation.entity.RunStatus;
 import com.automation.entity.TriggerSource;
 import com.automation.entity.Workflow;
@@ -46,6 +47,13 @@ class AutoRepairServiceTest {
                 factoryVerificationService, workflowService, testingService,
                 activityLogService, appSettingsRepository, workflowRunRepository,
                 workflowExecutor);
+        // Default: the AI repair was saved (99a9dfb0); the discarded case stubs its own outcome.
+        try {
+            lenient().when(factoryVerificationService.autoFixWorkflow(any(), anyString()))
+                    .thenReturn(new FactoryVerificationService.AutoFixOutcome(true, null));
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     // ── Event listener tests ──────────────────────────────
@@ -351,6 +359,40 @@ class AutoRepairServiceTest {
         assertThat(result.status()).isEqualTo("FAILED");
         assertThat(result.error()).isEqualTo("still broken");
         verify(factoryVerificationService, times(2)).autoFixWorkflow(any(), anyString());
+    }
+
+    @Test
+    void repairLocally_discardedRepair_doesNotRunTheUnchangedWorkflow_andReportsTheReason() throws Exception {
+        // TODO 99a9dfb0: a repair the build check discards leaves the workflow unchanged — running it again
+        // would only repeat the failure (and its AI calls).
+        var workflow = createWorkflow(Map.of());
+        when(workflowService.findById("wf-1")).thenReturn(workflow);
+        when(factoryVerificationService.autoFixWorkflow(any(), anyString())).thenReturn(
+                new FactoryVerificationService.AutoFixOutcome(false, "Reparatur verworfen, Struktur geändert: Blockzahl 2 → 1"));
+
+        FactoryTestResult result = service.repairLocally("wf-1", "original error", 2, 600);
+
+        assertThat(result.status()).isEqualTo("FAILED");
+        assertThat(result.runId()).isNull();
+        assertThat(result.error()).contains("original error").contains("Reparatur verworfen, Struktur geändert: Blockzahl 2 → 1");
+        verify(factoryVerificationService, times(2)).autoFixWorkflow(any(), eq("original error"));
+        verifyNoInteractions(workflowExecutor);
+    }
+
+    @Test
+    void onWorkflowRunCompleted_discardedLocalRepair_reasonLandsInTheActivityLog() throws Exception {
+        var workflow = createWorkflow(Map.of("autoRepair", Map.of("enabled", true, "mode", "local", "maxRetries", 1)));
+        when(workflowService.findById("wf-1")).thenReturn(workflow);
+        when(factoryVerificationService.autoFixWorkflow(any(), anyString())).thenReturn(
+                new FactoryVerificationService.AutoFixOutcome(false, "Reparatur verworfen, mehr HIGH-Befunde (0 → 1)"));
+        var event = createEvent(RunStatus.FAILED, Map.of(),
+                Map.of("autoRepair", Map.of("enabled", true, "mode", "local", "maxRetries", 1)));
+
+        service.onWorkflowRunCompleted(event);
+
+        verifyNoInteractions(workflowExecutor);
+        verify(activityLogService).warn(eq(LogCategory.EXECUTION),
+                contains("Reparatur verworfen, mehr HIGH-Befunde (0 → 1)"), eq("AutoRepairService"), any(), eq("wf-1"));
     }
 
     @Test

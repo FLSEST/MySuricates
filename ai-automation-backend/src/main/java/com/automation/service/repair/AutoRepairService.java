@@ -191,17 +191,10 @@ public class AutoRepairService {
      * Resolves the effective repair mode for a workflow.
      * Priority: workflow metadata > global setting > default "auto".
      */
-    @SuppressWarnings("unchecked")
     String resolveRepairMode(Workflow workflow) {
-        Map<String, Object> metadata = workflow.getMetadata();
-        if (metadata != null) {
-            Object autoRepair = metadata.get("autoRepair");
-            if (autoRepair instanceof Map<?, ?> map) {
-                Object mode = map.get("mode");
-                if (mode instanceof String m && List.of("test", "local", "auto").contains(m)) {
-                    return m;
-                }
-            }
+        if (autoRepairSetting(workflow.getMetadata(), "mode") instanceof String m
+                && List.of("test", "local", "auto").contains(m)) {
+            return m;
         }
         return appSettingsRepository.get(SETTING_AUTO_REPAIR_MODE)
                 .filter(m -> List.of("test", "local", "auto").contains(m))
@@ -212,17 +205,10 @@ public class AutoRepairService {
      * Resolves max retries for a workflow.
      * Priority: workflow metadata > global setting > default 2.
      */
-    @SuppressWarnings("unchecked")
     int resolveMaxRetries(Workflow workflow) {
-        Map<String, Object> metadata = workflow.getMetadata();
-        if (metadata != null) {
-            Object autoRepair = metadata.get("autoRepair");
-            if (autoRepair instanceof Map<?, ?> map) {
-                Object retries = map.get("maxRetries");
-                if (retries instanceof Number n && n.intValue() >= 1 && n.intValue() <= 5) {
-                    return n.intValue();
-                }
-            }
+        if (autoRepairSetting(workflow.getMetadata(), "maxRetries") instanceof Number n
+                && n.intValue() >= 1 && n.intValue() <= 5) {
+            return n.intValue();
         }
         return appSettingsRepository.get(SETTING_MAX_RETRIES)
                 .map(s -> { try { return Math.max(1, Math.min(5, Integer.parseInt(s))); } catch (NumberFormatException e) { return DEFAULT_MAX_RETRIES; } })
@@ -233,17 +219,10 @@ public class AutoRepairService {
      * Resolves timeout in seconds for a workflow.
      * Priority: workflow metadata > global setting > default 600.
      */
-    @SuppressWarnings("unchecked")
     long resolveTimeoutSeconds(Workflow workflow) {
-        Map<String, Object> metadata = workflow.getMetadata();
-        if (metadata != null) {
-            Object autoRepair = metadata.get("autoRepair");
-            if (autoRepair instanceof Map<?, ?> map) {
-                Object timeout = map.get("timeoutSeconds");
-                if (timeout instanceof Number n && n.longValue() >= 60 && n.longValue() <= 3600) {
-                    return n.longValue();
-                }
-            }
+        if (autoRepairSetting(workflow.getMetadata(), "timeoutSeconds") instanceof Number n
+                && n.longValue() >= 60 && n.longValue() <= 3600) {
+            return n.longValue();
         }
         return appSettingsRepository.get(SETTING_TIMEOUT_SECONDS)
                 .map(s -> { try { return Math.max(60, Math.min(3600, Long.parseLong(s))); } catch (NumberFormatException e) { return DEFAULT_TIMEOUT_SECONDS; } })
@@ -253,17 +232,28 @@ public class AutoRepairService {
     // ── Local repair pipeline ──────────────────────────────
 
     /**
-     * Repairs a workflow locally: AI-fix the blocks, then re-execute on this instance.
+     * Repairs a workflow locally: AI-fix the blocks, then re-execute on this instance. A repair the build check
+     * discards (TODO 99a9dfb0) leaves the workflow unchanged, so it is not run again — that would only repeat the
+     * failure; the next attempt asks for a repair of the same error, and the reason ends up in the result's error.
      */
     FactoryTestResult repairLocally(String workflowId, String errorMessage, int maxRetries, long timeoutSeconds) {
         Workflow workflow = workflowService.findById(workflowId);
         String lastError = errorMessage;
+        String discarded = null;
 
         for (int i = 0; i < maxRetries; i++) {
             log.info("Local repair: attempt {}/{} for workflow '{}'", i + 1, maxRetries, workflow.getName());
 
             try {
-                factoryVerificationService.autoFixWorkflow(workflow, lastError);
+                FactoryVerificationService.AutoFixOutcome fix =
+                        factoryVerificationService.autoFixWorkflow(workflow, lastError);
+                if (!fix.applied()) {
+                    log.warn("Local repair: attempt {} not applied ({}), workflow '{}' not run again",
+                            i + 1, fix.reason(), workflow.getName());
+                    discarded = fix.reason();
+                    continue;
+                }
+                discarded = null;
                 workflow = workflowService.findById(workflowId);
 
                 Map<String, Object> context = workflow.getDefaultContext() != null
@@ -286,10 +276,13 @@ public class AutoRepairService {
             } catch (Exception e) {
                 log.warn("Local repair: attempt {} failed: {}", i + 1, e.getMessage());
                 lastError = e.getMessage();
+                discarded = null;
             }
         }
 
-        return new FactoryTestResult(null, "FAILED", lastError);
+        String error = discarded == null ? lastError
+                : (lastError == null ? discarded : lastError + " — " + discarded);
+        return new FactoryTestResult(null, "FAILED", error);
     }
 
     /**
@@ -317,6 +310,11 @@ public class AutoRepairService {
     }
 
     // ── Helpers ──────────────────────────────
+
+    /** One key of the {@code autoRepair} map in workflow metadata, or {@code null} if there is none. */
+    private static Object autoRepairSetting(Map<String, Object> metadata, String key) {
+        return metadata != null && metadata.get("autoRepair") instanceof Map<?, ?> map ? map.get(key) : null;
+    }
 
     private boolean shouldUseTestInstance(String mode) {
         return switch (mode) {
@@ -358,17 +356,10 @@ public class AutoRepairService {
         }
     }
 
-    @SuppressWarnings("unchecked")
     private boolean isAutoRepairEnabledForWorkflow(Workflow workflow) {
-        Map<String, Object> metadata = workflow.getMetadata();
-        if (metadata == null) return false;
-
-        Object autoRepair = metadata.get("autoRepair");
-        if (autoRepair instanceof Map<?, ?> map) {
-            Object enabled = map.get("enabled");
-            if (enabled instanceof Boolean b) {
-                return b;
-            }
+        if (workflow.getMetadata() == null) return false;
+        if (autoRepairSetting(workflow.getMetadata(), "enabled") instanceof Boolean b) {
+            return b;
         }
         // Fall back to global default
         return appSettingsRepository.get(SETTING_AUTO_REPAIR_DEFAULT)
@@ -376,15 +367,10 @@ public class AutoRepairService {
                 .orElse(false);
     }
 
-    @SuppressWarnings("unchecked")
     boolean isAutoRepairEnabled(WorkflowRunCompletedEvent event) {
         // Priority 1: explicit workflow metadata
-        Object autoRepair = event.getWorkflowMetadata().get("autoRepair");
-        if (autoRepair instanceof Map<?, ?> map) {
-            Object enabled = map.get("enabled");
-            if (enabled instanceof Boolean b) {
-                return b;
-            }
+        if (autoRepairSetting(event.getWorkflowMetadata(), "enabled") instanceof Boolean b) {
+            return b;
         }
         // Priority 2: global default setting
         return appSettingsRepository.get(SETTING_AUTO_REPAIR_DEFAULT)
