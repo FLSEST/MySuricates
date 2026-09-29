@@ -975,6 +975,69 @@ check "Gegenprobe: ohne NOT_INDEXABLE ist name aus Containing wieder Kandidat" \
 check "Gegenprobe: ohne NOT_INDEXABLE fehlt project_id" \
   '! grep -q "^TREFFER unindexed_findby_column: project_id " "$TMP/perf-facts7-old.out"'
 
+echo "6i) Performance-Audit: nur die Annotation @Transactional oeffnet einen Rumpf (a0e335c4)"
+# '@Transactional' als Teilzeichenkette traf auch @TransactionalEventListener (AFTER_COMMIT, laeuft
+# nach der Transaktion) und Javadoc-Zeilen, die mit /** beginnen. Gezaehlt wird jetzt nur die
+# Annotation selbst, mit oder ohne Argumente und auch voll qualifiziert; Kommentarzeilen (//, /*, /**, *)
+# und Text in Literalen oder hinter // zaehlen nicht.
+FIX8="$TMP/fixture-transactional"
+MAIN8="$FIX8/ai-automation-backend/src/main/java/com/automation"
+mkdir -p "$MAIN8/service"
+cat > "$MAIN8/service/CommitService.java" <<'JAVA'
+package com.automation.service;
+
+class CommitService {
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    void onCommit(Object event) {
+        restTemplate.getForObject("http://example.invalid", String.class);
+    }
+
+    /** Laeuft bewusst ohne @Transactional: der Aufruf haelt keine Connection. */
+    void outside() {
+        webClient.post();
+    }
+
+    /*
+     * @Transactional fehlt hier absichtlich.
+     */
+    void outsideToo() {
+        hostClaudeService.execute("x");
+    }
+
+    // @Transactional
+    void commented() {
+        dockerClient.ping();
+    }
+
+    private static final String NOTE = "@Transactional"; // @Transactional
+    void afterMention() {
+        HttpClient.newHttpClient();
+    }
+
+    @Transactional(readOnly = true)
+    void inside() {
+        restTemplate.getForObject("http://example.invalid", String.class);
+    }
+
+    @org.springframework.transaction.annotation.Transactional
+    void qualified() {
+        webClient.get();
+    }
+}
+JAVA
+printf '%s' "$FIX8" > "$TMP/base8.txt"
+render "$PERF" name:facts "$(json_values project_path="$TMP/base8.txt" request_metrics=)" > "$TMP/perf-facts8.sh"
+PATH="$TMP/fakebin:$PATH" bash "$TMP/perf-facts8.sh" > "$TMP/perf-facts8.out" 2> "$TMP/perf-facts8.err"
+check "laeuft ohne stderr" '[ ! -s "$TMP/perf-facts8.err" ]'
+check "@TransactionalEventListener oeffnet keinen @Transactional-Rumpf" '! grep -q "Zeile 4)" "$TMP/perf-facts8.out"'
+check "Javadoc- und Blockkommentarzeilen zaehlen nicht" '! grep -qE "(webClient|hostClaudeService) \(@Transactional ab Zeile (9|14|15)\)" "$TMP/perf-facts8.out"'
+check "Zeilenkommentar und Literal zaehlen nicht" '! grep -qE "(dockerClient|HttpClient) " "$TMP/perf-facts8.out"'
+check "@Transactional(readOnly = true) zaehlt" \
+  'grep -qx "TREFFER transactional_slow_call: service/CommitService.java:33 restTemplate (@Transactional ab Zeile 31)" "$TMP/perf-facts8.out"'
+check "voll qualifiziertes @Transactional zaehlt" \
+  'grep -qx "TREFFER transactional_slow_call: service/CommitService.java:38 webClient (@Transactional ab Zeile 36)" "$TMP/perf-facts8.out"'
+check "FAKT transactional_slow_call_count: 2" 'grep -qx "FAKT transactional_slow_call_count: 2" "$TMP/perf-facts8.out"'
+
 echo "7) Performance-Audit: Gate prueft die Pflicht-Fakten deterministisch"
 run_perf_gate() {  # $1 = faktenblatt-datei
   GATE_VALUES="$(json_values block.report.output="$TMP/report-green.txt" block.facts.output="$1")"
