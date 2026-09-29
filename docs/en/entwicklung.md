@@ -620,6 +620,23 @@ The script:
 **Prerequisite:** Clean working tree (no uncommitted changes).
 **Test:** `bash scripts/tests/test-release.sh` runs the flow in a throwaway repository.
 
+### Load test before a release
+
+Every tag is measured under load first (TODO 1a6058dc). `release.sh` looks for a result of `scripts/load-test.sh` for exactly the commit being tagged (HEAD before the bump). **GREEN** passes, **YELLOW** passes with a note. **Missing** or **RED** makes `release.sh` ask; without a terminal it stops. `--skip-load-test` or `RELEASE_SKIP_LOAD_TEST=1` releases without one and says so.
+
+```bash
+scripts/load-test.sh                 # measure HEAD (builds the JAR from the commit, ~5 min)
+scripts/load-test.sh --ref v0.7.8    # another commit; --jar PATH skips the build
+```
+
+- **Throwaway instance** from exactly that commit (`git archive` + `mvn package`, JAR cached per commit under `~/.cache/mysuricates/load-test/jars/`): own port, `-Duser.home`/`HOME`/`XDG_CONFIG_HOME` in the work directory, own DB and API key, `env -i` (no `AUTOMATION_*` from the dev shell), no Docker, no backup, no tray, no rate limit, no auto-tagging. `claude`/`codex`/`pi` are stand-ins on the PATH: an AI call costs no tokens but turns the run RED.
+- **Synthetic seed** from `scripts/load-test/scenario.json` (workflows, some with 200 KB of step output, finished runs, TODOs) — reproducible and shareable, no copy of the dev DB. Any change to amounts, mix or pace bumps `version`; comparisons only use runs of the same version.
+- **Load like real users** (`driver.py`): readers open the UI pages with exactly their API calls, run starters start shell workflows and poll the run page until done, a TODO writer creates and switches status. Warm-up first, then the measured phase. Every request with client time and the instance's `Server-Timing` (connection wait, work, SQL).
+- **Evaluation** (`report.py`): p50/p95/p99 per route, wait share, SQL, response size, runs, heap; RED above 1 % errors, on a failed run, p95 over 5 s or an AI call, YELLOW for a read route over 1 s p95, heap over 85 % or p95 ×1.5 against the baseline. The wait share alone is no finding — under load with pool-size 1 nearly every request waits (50–79 % at p95 below 450 ms in the first run); it only explains a route that is slow anyway. The **baseline** is the newest run of the same scenario on an ancestor commit, tagged commits first.
+- **Result** under `~/.local/state/mysuricates/load-test/<time>-<sha12>/` (`MYSURICATES_LOAD_TEST_DIR`): `facts.txt` (FAKT lines), `result.json`, `summary.txt` (for `release.sh`), `raw.json`, `instance.log`.
+
+From the UI it runs as the pool workflow **Load test before a release** (`workflow-pool/mysuricates-load-test.json`, variable `ref`): the script comes from the commit under test, Opus explains the fact sheet (bottlenecks, comparison, recommendations), the gate follows `FAKT load_verdict`, never the AI. **Test:** `python3 -m unittest discover -s scripts/tests -p 'test_load_test_*.py'` (evaluation, verdict, baseline, driver against a test server); `test-release.sh` covers the prompt.
+
 **Push:** `git push origin main "vX.Y.Z"` (or `git push --follow-tags`, which only takes annotated
 tags along) — **not** `git push --tags`: every `staging.sh promote` creates a lightweight `stable-*`
 tag (deployment timestamp, see below), and `--tags` would push all of those to GitHub too, mixing
