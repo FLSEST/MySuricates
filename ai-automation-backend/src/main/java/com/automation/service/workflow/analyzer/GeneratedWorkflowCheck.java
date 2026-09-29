@@ -28,6 +28,8 @@ import java.util.List;
  *       (Blockzahl, Blocktyp je Position, Zahl der verschachtelten Blöcke je Container) oder hat die korrigierte
  *       Fassung mehr {@code HIGH}-Befunde, gilt die ursprüngliche. Lässt die Korrektur {@code name},
  *       {@code skillIds} oder {@code requiredCapabilities} eines Blocks weg, kommen sie aus dem Original.</li>
+ *   <li>{@link #reviewRepair} legt dieselben Regeln an eine Reparatur an, die der Aufrufer selbst bei der KI
+ *       geholt hat (Factory-Auto-Fix, TODO 99a9dfb0) — ohne eigenen KI-Aufruf.</li>
  * </ul>
  *
  * <p>Die Prüfung ändert nie selbst etwas und blockiert kein Speichern. Der KI-Aufruf kommt vom Aufrufer
@@ -59,6 +61,22 @@ public class GeneratedWorkflowCheck {
     /** Ergebnis von {@link #correctOnce}: die Blöcke, die gespeichert werden, und ihre Befunde ab MEDIUM. */
     public record Correction(List<BlockDefinition> blocks, List<AnalyzerFinding> remaining,
                              boolean attempted, boolean applied) {
+    }
+
+    /**
+     * Ergebnis von {@link #reviewRepair}: übernommen ({@code rejection == null}; {@code blocks} ist die ergänzte
+     * Reparatur) oder verworfen mit Grund ({@code blocks} ist das Original). {@code findings} sind die Befunde ab
+     * MEDIUM der Fassung in {@code blocks}.
+     */
+    public record RepairReview(List<BlockDefinition> blocks, List<AnalyzerFinding> findings, String rejection) {
+
+        static RepairReview rejected(List<BlockDefinition> original, List<AnalyzerFinding> findings, String reason) {
+            return new RepairReview(original, findings, reason);
+        }
+
+        public boolean accepted() {
+            return rejection == null;
+        }
     }
 
     /** Befunde ab MEDIUM einer gespeicherten Definition (samt Metadaten), HIGH zuerst. */
@@ -159,22 +177,41 @@ public class GeneratedWorkflowCheck {
             log.info("Baufehler-Korrektur: Antwort unbrauchbar, ursprüngliche Fassung bleibt ({} HIGH)", highBefore);
             return new Correction(blocks, before, true, false);
         }
-        String shapeChange = CorrectionAnswer.shapeChange(blocks, corrected);
+        RepairReview review = review(blocks, before, corrected, instructions);
+        if (!review.accepted()) {
+            log.warn("Baufehler-Korrektur verworfen, {}; ursprüngliche Fassung bleibt", review.rejection());
+            return new Correction(blocks, before, true, false);
+        }
+        log.info("Baufehler-Korrektur übernommen: HIGH {} → {}", highBefore, highCount(review.findings()));
+        return new Correction(review.blocks(), review.findings(), true, true);
+    }
+
+    /**
+     * Prüft eine Blockliste, die eine KI aus {@code original} gemacht hat — etwa die Auto-Fix-Reparatur der Factory
+     * (TODO 99a9dfb0) —, nach denselben Regeln wie die Korrekturrunde von {@link #correctOnce}, ohne selbst die KI zu
+     * fragen: Verwerfen, wenn die Struktur nicht gleich geblieben ist ({@link CorrectionAnswer#shapeChange}) oder die
+     * Reparatur mehr {@code HIGH}-Befunde hat als das Original. Weggelassene {@code name}, {@code skillIds} und
+     * {@code requiredCapabilities} kommen aus dem Original ({@code repaired} wird dafür ergänzt).
+     */
+    public RepairReview reviewRepair(List<BlockDefinition> original, List<BlockDefinition> repaired, String instructions) {
+        return review(original, findings(original, instructions), repaired, instructions);
+    }
+
+    private RepairReview review(List<BlockDefinition> original, List<AnalyzerFinding> before,
+                                List<BlockDefinition> repaired, String instructions) {
+        String shapeChange = CorrectionAnswer.shapeChange(original, repaired);
         if (shapeChange != null) {
             // Typischer Fehler: das Modell liefert nur den reparierten Block zurück — die übrigen fielen still weg.
-            log.warn("Baufehler-Korrektur verworfen, Struktur geändert: {} (Blöcke vorher {}, nachher {}); "
-                    + "ursprüngliche Fassung bleibt", shapeChange, blocks.size(), corrected.size());
-            return new Correction(blocks, before, true, false);
+            return RepairReview.rejected(original, before, "Struktur geändert: " + shapeChange);
         }
-        CorrectionAnswer.keepOmittedFields(blocks, corrected);
-        List<AnalyzerFinding> after = findings(corrected, instructions);
-        if (highCount(after) > highBefore) {
-            log.info("Baufehler-Korrektur: korrigierte Fassung hat mehr HIGH-Befunde ({} > {}), ursprüngliche bleibt",
-                    highCount(after), highBefore);
-            return new Correction(blocks, before, true, false);
+        CorrectionAnswer.keepOmittedFields(original, repaired);
+        List<AnalyzerFinding> after = findings(repaired, instructions);
+        long highBefore = highCount(before);
+        long highAfter = highCount(after);
+        if (highAfter > highBefore) {
+            return RepairReview.rejected(original, before, "mehr HIGH-Befunde (" + highBefore + " → " + highAfter + ")");
         }
-        log.info("Baufehler-Korrektur übernommen: HIGH {} → {}", highBefore, highCount(after));
-        return new Correction(corrected, after, true, true);
+        return new RepairReview(repaired, after, null);
     }
 
     String correctionPrompt(List<BlockDefinition> blocks, List<AnalyzerFinding> findings) {

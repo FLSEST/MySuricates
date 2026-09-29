@@ -9,6 +9,9 @@ import com.automation.entity.Workflow;
 import com.automation.service.staging.TestingService;
 import com.automation.service.workflow.AgentInstructionsService;
 import com.automation.service.workflow.WorkflowService;
+import com.automation.service.workflow.analyzer.GeneratedWorkflowCheck;
+import com.automation.service.workflow.analyzer.WorkflowAnalyzer;
+import com.automation.service.activitylog.ActivityLogService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,6 +47,9 @@ class FactoryVerificationServiceTest {
     @Mock
     private AgentInstructionsService agentInstructionsService;
 
+    @Mock
+    private ActivityLogService activityLogService;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
     private FactoryVerificationService verificationService;
 
@@ -59,7 +65,8 @@ class FactoryVerificationServiceTest {
                 workflowService, testingService, objectMapper,
                 new FactoryPromptBuilder(agentInstructionsService),
                 new FactoryResponseParser(objectMapper),
-                new FactoryGeneratorResolver(claudeGenerator, codexGenerator, factoryConfig));
+                new FactoryGeneratorResolver(claudeGenerator, codexGenerator, factoryConfig),
+                new GeneratedWorkflowCheck(new WorkflowAnalyzer(), objectMapper, activityLogService));
 
         testProject = Project.builder()
                 .id("proj-1")
@@ -174,7 +181,7 @@ class FactoryVerificationServiceTest {
     void autoFixWorkflow_arrayResponse_keepsRequiredCapabilities() throws IOException {
         // TODO ba5df025: auto-fix replaces the block list wholesale, so capabilities must survive the round-trip.
         when(claudeGenerator.generate(anyString(), anyString(), eq(120)))
-                .thenReturn("[{\"type\":\"agentic\",\"config\":{\"goal\":\"fix\"},\"requiredCapabilities\":[\"docker\",\"web\"]}]");
+                .thenReturn("[{\"type\":\"shell\",\"config\":{\"command\":\"echo fixed\"},\"requiredCapabilities\":[\"docker\",\"web\"]}]");
         Workflow workflow = brokenWorkflow();
 
         verificationService.autoFixWorkflow(workflow, "exit code 1");
@@ -217,5 +224,104 @@ class FactoryVerificationServiceTest {
 
         verify(codexGenerator).generate(anyString(), anyString(), eq(120));
         verify(claudeGenerator, never()).generate(anyString(), anyString(), anyInt());
+    }
+
+    // ── build check after every repair (TODO 99a9dfb0) ────
+
+    private Workflow namedWorkflow() {
+        List<BlockDefinition> blocks = new java.util.ArrayList<>();
+        blocks.add(BlockDefinition.builder().type("shell").name("fetch")
+                .config(new HashMap<>(Map.of("command", "exit 1")))
+                .skillIds(new java.util.ArrayList<>(List.of("skill-1"))).build());
+        blocks.add(BlockDefinition.builder().type("simple").name("summarize")
+                .config(new HashMap<>(Map.of("command", "Fasse zusammen: {{ block.fetch.output }}"))).build());
+        return Workflow.builder().id("wf-1").name("Named").description("desc").project(testProject)
+                .blocks(blocks).build();
+    }
+
+    @Test
+    void autoFixWorkflow_repairLosesABlock_isDiscarded() throws IOException {
+        // Typical failure: the model returns only the block it repaired.
+        when(claudeGenerator.generate(anyString(), anyString(), eq(120)))
+                .thenReturn("[{\"type\":\"shell\",\"name\":\"fetch\",\"config\":{\"command\":\"echo ok\"}}]");
+        Workflow workflow = namedWorkflow();
+
+        FactoryVerificationService.AutoFixOutcome outcome = verificationService.autoFixWorkflow(workflow, "exit code 1");
+
+        assertThat(outcome.applied()).isFalse();
+        assertThat(outcome.reason()).contains("Blockzahl 2 → 1");
+        assertThat(workflow.getBlocks()).hasSize(2);
+        assertThat(workflow.getBlocks().get(0).getConfig()).containsEntry("command", "exit 1");
+        verify(workflowService, never()).update(anyString(), any(), any());
+    }
+
+    @Test
+    void autoFixWorkflow_repairChangesATopLevelType_isDiscarded() throws IOException {
+        when(claudeGenerator.generate(anyString(), anyString(), eq(120))).thenReturn("""
+                [{"type":"agentic","name":"fetch","config":{"goal":"fetch"}},
+                 {"type":"simple","name":"summarize","config":{"command":"Fasse zusammen: {{ block.fetch.output }}"}}]""");
+
+        FactoryVerificationService.AutoFixOutcome outcome = verificationService.autoFixWorkflow(namedWorkflow(), "err");
+
+        assertThat(outcome.applied()).isFalse();
+        assertThat(outcome.reason()).contains("Typ shell → agentic");
+        verify(workflowService, never()).update(anyString(), any(), any());
+    }
+
+    @Test
+    void autoFixWorkflow_repairWithANewHighFinding_isDiscarded() throws IOException {
+        // Same shape, but the second block now points at a block that does not exist: unknown-block-reference (HIGH).
+        when(claudeGenerator.generate(anyString(), anyString(), eq(120))).thenReturn("""
+                [{"type":"shell","name":"fetch","config":{"command":"echo ok"}},
+                 {"type":"simple","name":"summarize","config":{"command":"Fasse zusammen: {{ block.gone.output }}"}}]""");
+        Workflow workflow = namedWorkflow();
+
+        FactoryVerificationService.AutoFixOutcome outcome = verificationService.autoFixWorkflow(workflow, "exit code 1");
+
+        assertThat(outcome.applied()).isFalse();
+        assertThat(outcome.reason()).contains("mehr HIGH-Befunde (0 → 1)");
+        assertThat(workflow.getBlocks().get(0).getConfig()).containsEntry("command", "exit 1");
+        verify(workflowService, never()).update(anyString(), any(), any());
+    }
+
+    @Test
+    void autoFixWorkflow_goodRepair_isSaved_andKeepsOmittedNamesAndSkillIds() throws IOException {
+        // The repair drops name and skillIds — they come back from the current version, so the reference still resolves.
+        when(claudeGenerator.generate(anyString(), anyString(), eq(120))).thenReturn("""
+                [{"type":"shell","config":{"command":"echo ok"}},
+                 {"type":"simple","config":{"command":"Fasse zusammen: {{ block.fetch.output }}"}}]""");
+        Workflow workflow = namedWorkflow();
+
+        FactoryVerificationService.AutoFixOutcome outcome = verificationService.autoFixWorkflow(workflow, "exit code 1");
+
+        assertThat(outcome.applied()).isTrue();
+        verify(workflowService).update(eq("wf-1"), argThat(req -> req.blocks() != null
+                && req.blocks().size() == 2
+                && "echo ok".equals(req.blocks().get(0).getConfig().get("command"))
+                && "fetch".equals(req.blocks().get(0).getName())
+                && List.of("skill-1").equals(req.blocks().get(0).getSkillIds())
+                && "summarize".equals(req.blocks().get(1).getName())), eq(ChangeSource.FACTORY));
+    }
+
+    @Test
+    void verifyAndFix_discardedRepair_noExtraTestRunOnTheUnchangedWorkflow() {
+        Workflow workflow = namedWorkflow();
+        when(workflowService.findById("wf-1")).thenReturn(workflow);
+        when(testingService.executeWorkflowOnTest(anyString(), anyString(), any())).thenReturn("run-1");
+        when(testingService.pollTestRun("run-1"))
+                .thenReturn(objectMapper.createObjectNode().put("status", "FAILED").put("error", "exit 1"));
+        try {
+            when(claudeGenerator.generate(anyString(), anyString(), eq(120)))
+                    .thenReturn("[{\"type\":\"shell\",\"config\":{\"command\":\"echo ok\"}}]");
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        }
+
+        FactoryTestResult result = verificationService.verifyAndFix("wf-1", 2);
+
+        assertThat(result.status()).isEqualTo("FAILED");
+        verify(testingService, times(1)).executeWorkflowOnTest(anyString(), anyString(), any());
+        verify(workflowService, never()).update(anyString(), any(), any());
+        verify(testingService).reportTestResult("Named", "Test Project", "FAILED");
     }
 }

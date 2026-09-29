@@ -235,6 +235,32 @@ class DialogConversionServiceTest {
         assertThat(result.blocks()).hasSize(2);
     }
 
+    @Test
+    void suggestFromSession_aiBlocksKeepNameSkillIdsAndCapabilities() throws Exception {
+        // TODO d6be36f3: parseBlocks took only type and config — {{ block.fetch.output }} pointed nowhere.
+        var msg1 = new ClaudeJsonlParser.DialogMessage("tool_use", null, "Bash", "cat data.txt", null, null);
+        var msg2 = new ClaudeJsonlParser.DialogMessage("tool_use", null, "Bash", "npm build", null, null);
+        var turn = new ClaudeJsonlParser.DialogTurn("t1", null, "assistant", Instant.now(), List.of(msg1, msg2));
+        when(parser.parse(any())).thenReturn(
+                new ClaudeJsonlParser.ParsedSession("s1", "/project", Instant.now(), Instant.now(), List.of(turn)));
+        lenient().when(conversationPreprocessor.processOutput(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(aiProvider.reason(any())).thenReturn(new AiProvider.ReasoningResult("""
+                {"suggestedName": "Report", "confidence": 0.9, "patternType": "scripting", "blocks": [
+                    {"type": "shell", "name": "fetch", "config": {"command": "cat data.txt"},
+                     "skillIds": ["skill-1"], "requiredCapabilities": ["docker"]},
+                    {"type": "simple", "name": "summarize", "config": {"command": "Fasse zusammen: {{ block.fetch.output }}"}}
+                ]}
+                """, null));
+
+        var result = service.suggestFromSession("/path/to/session.jsonl");
+
+        assertThat(result.blocks()).extracting(com.automation.entity.BlockDefinition::getName).containsExactly("fetch", "summarize");
+        assertThat(result.blocks().get(0).getSkillIds()).containsExactly("skill-1");
+        assertThat(result.blocks().get(0).getRequiredCapabilities()).containsExactly("docker");
+        // the reference resolves, so the build check needs no correction round
+        verify(aiProvider, times(1)).reason(any());
+    }
+
     /** The prompt names the block types as the executors do — it said "forEach" (TODO cf8db6f8). */
     @Test
     void suggestFromSession_promptCarriesTheBlockSpecifications() throws IOException {

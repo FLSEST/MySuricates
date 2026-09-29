@@ -129,7 +129,13 @@ public class WorkflowFactoryService {
                     log.info("Factory: auto-fix attempt {}/{} for workflow '{}'",
                             retries, request.maxRetries(), workflow.getName());
                     try {
-                        verificationService.autoFixWorkflow(workflow, testResult.error(), request.provider());
+                        FactoryVerificationService.AutoFixOutcome fix =
+                                verificationService.autoFixWorkflow(workflow, testResult.error(), request.provider());
+                        if (!fix.applied()) {
+                            // Workflow unchanged — another test run would only repeat the failure.
+                            retryErrors.add("Retry " + retries + ": " + fix.reason());
+                            continue;
+                        }
                         // Re-fetch after update
                         workflow = workflowService.findById(workflow.getId());
                         testResult = verificationService.deployAndVerify(workflow);
