@@ -875,6 +875,106 @@ check "Repository ohne Entity: gegen alle Tabellen gehalten und genannt" \
   'grep -qx "# Ohne Tabellen-Zuordnung, gegen alle Tabellen gehalten: LegacyRepository.java" "$TMP/perf-facts5.out"'
 check "FAKT migration_index_statements: 5" 'grep -qx "FAKT migration_index_statements: 5" "$TMP/perf-facts5.out"'
 
+echo "6g) Performance-Audit: zusammengesetzter Index und erste Spalte einer Abfrage (2d233599)"
+# (workflow_id, active) traegt findByWorkflowIdAndActiveTrue, aber nicht die Suche nach active allein:
+# active bleibt Kandidat. findByOwnerAndFlagTrue hat keinen Index: gemeldet wird nur owner, wo der
+# fehlende Index begaenne, nicht zusaetzlich flag.
+FIX6="$TMP/fixture-composite"
+MAIN6="$FIX6/ai-automation-backend/src/main/java/com/automation"
+MIG6="$FIX6/ai-automation-backend/src/main/resources/db/migration"
+mkdir -p "$MAIN6/entity" "$MAIN6/repository" "$MIG6"
+printf '%s\n' 'package com.automation.entity;' '' '@Entity' '@Table(name = "memo")' 'public class Memo {' '}' \
+  > "$MAIN6/entity/Memo.java"
+cat > "$MAIN6/repository/MemoRepository.java" <<'JAVA'
+package com.automation.repository;
+
+public interface MemoRepository extends JpaRepository<Memo, String> {
+    java.util.Optional<Memo> findByWorkflowIdAndActiveTrue(String workflowId);
+    java.util.List<Memo> findTop8ByActiveTrueOrderByCreatedAtDesc();
+    java.util.List<Memo> findByOwnerAndFlagTrue(String owner);
+}
+JAVA
+cat > "$MIG6/V1__init.sql" <<'SQL'
+CREATE TABLE memo (id TEXT PRIMARY KEY, workflow_id TEXT, active INTEGER, owner TEXT, flag INTEGER, created_at TEXT);
+CREATE INDEX idx_memo_active ON memo(workflow_id, active);
+SQL
+printf '%s' "$FIX6" > "$TMP/base6.txt"
+render "$PERF" name:facts "$(json_values project_path="$TMP/base6.txt" request_metrics=)" > "$TMP/perf-facts6.sh"
+PATH="$TMP/fakebin:$PATH" bash "$TMP/perf-facts6.sh" > "$TMP/perf-facts6.out" 2> "$TMP/perf-facts6.err"
+check "laeuft ohne stderr" '[ ! -s "$TMP/perf-facts6.err" ]'
+check "zweite Spalte eines zusammengesetzten Index traegt die Suche nach ihr allein nicht" \
+  'grep -qx "TREFFER unindexed_findby_column: active (MemoRepository.java -> memo)" "$TMP/perf-facts6.out"'
+check "Abfrage ohne Index: nur ihre erste Spalte" \
+  'grep -qx "TREFFER unindexed_findby_column: owner (MemoRepository.java -> memo)" "$TMP/perf-facts6.out"'
+check "weitere And-Spalten und fuehrende Indexspalte nicht gemeldet" \
+  '! grep -qE "^TREFFER unindexed_findby_column: (flag|workflow_id|created_at) " "$TMP/perf-facts6.out"'
+check "FAKT unindexed_findby_columns_count: 2" 'grep -qx "FAKT unindexed_findby_columns_count: 2" "$TMP/perf-facts6.out"'
+
+echo "6h) Performance-Audit: LIKE-Bedingungen sind keine Index-Kandidaten (a1f124c3)"
+# Containing, EndingWith, Like und IgnoreCase nutzen keinen B-Tree-Index: name aus
+# findByNameContainingIgnoreCase ist kein Kandidat, in findByNameContainingAndProjectId tritt
+# project_id an die Stelle der ersten Spalte. StartingWith ohne IgnoreCase bleibt index-faehig
+# (tag.name). Die Gegenprobe laeuft auf einer Kopie ohne NOT_INDEXABLE, also mit der alten Regel.
+FIX7="$TMP/fixture-like"
+MAIN7="$FIX7/ai-automation-backend/src/main/java/com/automation"
+MIG7="$FIX7/ai-automation-backend/src/main/resources/db/migration"
+mkdir -p "$MAIN7/entity" "$MAIN7/repository" "$MIG7"
+printf '%s\n' 'package com.automation.entity;' '' '@Entity' '@Table(name = "note")' 'public class Note {' '}' \
+  > "$MAIN7/entity/Note.java"
+printf '%s\n' 'package com.automation.entity;' '' '@Entity' '@Table(name = "tag")' 'public class Tag {' '}' \
+  > "$MAIN7/entity/Tag.java"
+cat > "$MAIN7/repository/NoteRepository.java" <<'JAVA'
+package com.automation.repository;
+
+public interface NoteRepository extends JpaRepository<Note, String> {
+    java.util.List<Note> findByNameContainingIgnoreCase(String name);
+    java.util.List<Note> findByNameContainingAndProjectId(String name, String projectId);
+    java.util.List<Note> findByNameStartingWithIgnoreCase(String prefix);
+    java.util.List<Note> findByTitleNotLike(String pattern);
+    java.util.List<Note> findByTitleEndsWith(String suffix);
+    java.util.List<Note> findByOwnerAndTitleAllIgnoreCase(String owner, String title);
+}
+JAVA
+cat > "$MAIN7/repository/TagRepository.java" <<'JAVA'
+package com.automation.repository;
+
+public interface TagRepository extends JpaRepository<Tag, String> {
+    java.util.List<Tag> findByNameStartingWith(String prefix);
+}
+JAVA
+cat > "$MIG7/V1__init.sql" <<'SQL'
+CREATE TABLE note (id TEXT PRIMARY KEY, name TEXT, project_id TEXT, title TEXT, owner TEXT);
+CREATE TABLE tag (id TEXT PRIMARY KEY, name TEXT);
+SQL
+printf '%s' "$FIX7" > "$TMP/base7.txt"
+VALUES7="$(json_values project_path="$TMP/base7.txt" request_metrics=)"
+render "$PERF" name:facts "$VALUES7" > "$TMP/perf-facts7.sh"
+PATH="$TMP/fakebin:$PATH" bash "$TMP/perf-facts7.sh" > "$TMP/perf-facts7.out" 2> "$TMP/perf-facts7.err"
+check "laeuft ohne stderr" '[ ! -s "$TMP/perf-facts7.err" ]'
+check "StartingWith ohne IgnoreCase bleibt Kandidat, Containing/IgnoreCase nicht" \
+  'grep -qx "TREFFER unindexed_findby_column: name (TagRepository.java -> tag)" "$TMP/perf-facts7.out"'
+check "hinter einer LIKE-Bedingung meldet die naechste index-faehige Spalte" \
+  'grep -qx "TREFFER unindexed_findby_column: project_id (NoteRepository.java -> note)" "$TMP/perf-facts7.out"'
+check "NotLike, EndsWith und AllIgnoreCase nicht gemeldet, keine Restwoerter als Spalte" \
+  '! grep -qE "^TREFFER unindexed_findby_column: (title|owner|title_all|title_ends_with) " "$TMP/perf-facts7.out"'
+check "FAKT unindexed_findby_columns_count: 2" 'grep -qx "FAKT unindexed_findby_columns_count: 2" "$TMP/perf-facts7.out"'
+check "Hinweiszeile nennt die LIKE-Regel" 'grep -q "^# TREFFER-Zeilen .*LIKE-Bedingungen" "$TMP/perf-facts7.out"'
+python3 - "$PERF" "$TMP/perf-old-like.json" <<'PY'
+import json, sys
+definition = json.load(open(sys.argv[1], encoding='utf-8'))
+block = next(b for b in definition['blocks'] if b.get('name') == 'facts')
+old = block['config']['command'].replace("NOT_INDEXABLE = {", "NOT_INDEXABLE = set() and {", 1)
+assert old != block['config']['command'], 'NOT_INDEXABLE nicht gefunden'
+block['config']['command'] = old
+json.dump(definition, open(sys.argv[2], 'w', encoding='utf-8'), ensure_ascii=False)
+PY
+render "$TMP/perf-old-like.json" name:facts "$VALUES7" > "$TMP/perf-facts7-old.sh"
+PATH="$TMP/fakebin:$PATH" bash "$TMP/perf-facts7-old.sh" > "$TMP/perf-facts7-old.out" 2> /dev/null
+check "Gegenprobe: ohne NOT_INDEXABLE ist name aus Containing wieder Kandidat" \
+  'grep -qx "TREFFER unindexed_findby_column: name (NoteRepository.java -> note, TagRepository.java -> tag)" "$TMP/perf-facts7-old.out"'
+check "Gegenprobe: ohne NOT_INDEXABLE fehlt project_id" \
+  '! grep -q "^TREFFER unindexed_findby_column: project_id " "$TMP/perf-facts7-old.out"'
+
 echo "7) Performance-Audit: Gate prueft die Pflicht-Fakten deterministisch"
 run_perf_gate() {  # $1 = faktenblatt-datei
   GATE_VALUES="$(json_values block.report.output="$TMP/report-green.txt" block.facts.output="$1")"
