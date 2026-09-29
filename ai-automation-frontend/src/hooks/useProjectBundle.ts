@@ -5,7 +5,7 @@ import { downloadFromResponse } from '../utils/downloadFile';
 import { useToast } from './useToast';
 import { useT } from '../i18n';
 import type {
-  ProjectBundle, ProjectBundlePreview, ProjectBundleImportRequest, ProjectBundleImportResult,
+  ProjectBundlePreview, ProjectBundlePreviewRequest, ProjectBundleImportRequest, ProjectBundleImportResult,
 } from '../types';
 
 /** Fallback filename when the response carries no `Content-Disposition` (spec: `<slug>.mysuricates-bundle.json`). */
@@ -41,11 +41,15 @@ export function useExportProjectBundle() {
   });
 }
 
-/** Preview of a bundle import (`POST /projects/import/preview`) — required before the import button unlocks. */
+/**
+ * Preview of a bundle import (`POST /projects/import/preview`) — required before the import button
+ * unlocks. Called again with `targetProjectId` once the dialog's target switches to an existing
+ * project, so `nameTakenInTarget` reflects real conflicts instead of always being `false`.
+ */
 export function usePreviewProjectBundleImport() {
   return useMutation({
-    mutationFn: (bundle: ProjectBundle) =>
-      api.post<ProjectBundlePreview>('/projects/import/preview', { bundle }),
+    mutationFn: (request: ProjectBundlePreviewRequest) =>
+      api.post<ProjectBundlePreview>('/projects/import/preview', request),
   });
 }
 

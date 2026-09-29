@@ -78,7 +78,7 @@ describe('useExportProjectBundle', () => {
 });
 
 describe('usePreviewProjectBundleImport', () => {
-  it('posts the bundle and returns the preview', async () => {
+  it('posts the bundle without a targetProjectId and returns the preview', async () => {
     let body: unknown;
     const preview: ProjectBundlePreview = {
       project: { name: 'widgetco', nameTaken: false },
@@ -90,11 +90,25 @@ describe('usePreviewProjectBundleImport', () => {
     }));
     const { result } = renderHook(() => usePreviewProjectBundleImport(), { wrapper: createWrapper() });
 
-    result.current.mutate(bundle);
+    result.current.mutate({ bundle });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(body).toEqual({ bundle });
     expect(result.current.data).toEqual(preview);
+  });
+
+  it('posts targetProjectId once an existing target project is known', async () => {
+    let body: unknown;
+    server.use(http.post('/api/v1/projects/import/preview', async ({ request }) => {
+      body = await request.json();
+      return HttpResponse.json({ project: { name: 'widgetco', nameTaken: false }, workflows: [], chains: [], schedules: [], paths: [], warnings: [] });
+    }));
+    const { result } = renderHook(() => usePreviewProjectBundleImport(), { wrapper: createWrapper() });
+
+    result.current.mutate({ bundle, targetProjectId: 'p1' });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(body).toEqual({ bundle, targetProjectId: 'p1' });
   });
 });
 

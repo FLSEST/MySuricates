@@ -14,7 +14,8 @@ import { BundleImportResult } from './BundleImportResult';
  * "Import project" on the project list: file → preview (workflows with collapsible shell
  * commands, chains, schedules, warnings) → target + path tokens → result with a link to the
  * project. The Import button only appears once the preview came back (spec: it must not be
- * possible to skip the preview).
+ * possible to skip the preview). Switching the target to an existing project re-fetches the
+ * preview with that project's id, so `nameTakenInTarget` reflects real conflicts.
  */
 export function ProjectImportButton() {
   const t = useT();
@@ -66,24 +67,32 @@ export function ProjectImportButton() {
               variant="secondary"
               icon={<Upload className="w-4 h-4" />}
               onClick={() => fileRef.current?.click()}
-              disabled={flow.preview.isPending}
+              disabled={flow.previewPending}
             >
               {t.projects.bundle.selectFile}
             </Button>
             <p className="text-xs text-text-tertiary">{t.projects.bundle.fileHint}</p>
-            {flow.preview.isPending && <Spinner text={t.common.loading} />}
+            {flow.previewPending && <Spinner text={t.common.loading} />}
             {flow.fileError && <p className="text-xs text-danger">{flow.fileError}</p>}
-            {flow.preview.isError && (
+            {flow.previewError && (
               <p className="text-xs text-danger">
-                {apiErrorMessage(flow.preview.error, t.projects.bundle.previewFailed)}
+                {apiErrorMessage(flow.previewError, t.projects.bundle.previewFailed)}
               </p>
             )}
           </div>
         )}
 
-        {flow.step === 'form' && flow.preview.data && flow.bundle && (
+        {flow.step === 'form' && flow.previewData && flow.bundle && (
           <div className="space-y-5">
-            <BundleImportPreview preview={flow.preview.data} />
+            <BundleImportPreview preview={flow.previewData} />
+            {flow.previewPending && (
+              <p className="text-xs text-text-tertiary">{t.projects.bundle.refreshingPreview}</p>
+            )}
+            {flow.previewError && (
+              <p className="text-xs text-danger">
+                {apiErrorMessage(flow.previewError, t.projects.bundle.previewFailed)}
+              </p>
+            )}
             <BundleImportTargetFields
               target={flow.target}
               onTargetChange={flow.setTarget}
@@ -91,12 +100,14 @@ export function ProjectImportButton() {
               onConflictChange={flow.setOnConflict}
               projects={activeProjects}
               defaultName={flow.bundle.project.name}
-              nameTaken={flow.preview.data.project.nameTaken}
+              nameTaken={flow.previewData.project.nameTaken}
             />
             <BundleImportPathFields
-              paths={flow.preview.data.paths}
+              paths={flow.previewData.paths}
               pathMappings={flow.pathMappings}
               onChange={flow.setPathMapping}
+              canApplyProjectPath={flow.canApplyProjectPath}
+              onApplyProjectPath={flow.applyProjectPath}
             />
           </div>
         )}

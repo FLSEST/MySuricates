@@ -1,16 +1,31 @@
 import { Link } from 'react-router-dom';
 import { ExternalLink } from 'lucide-react';
-import { useT } from '../../i18n';
-import type { ProjectBundleImportResult } from '../../types';
+import { useT, type TranslationKeys } from '../../i18n';
+import type { ProjectBundleImportResult, ProjectBundleItemKind } from '../../types';
 
 interface BundleImportResultProps {
   result: ProjectBundleImportResult;
   onOpenProject: () => void;
 }
 
+const KIND_ORDER: ProjectBundleItemKind[] = ['workflow', 'chain', 'schedule'];
+
+function kindLabel(kind: ProjectBundleItemKind, t: TranslationKeys): string {
+  return kind === 'workflow' ? t.nav.workflows : kind === 'chain' ? t.nav.chains : t.nav.schedules;
+}
+
+/** Groups a skipped/renamed list by `kind`, in a fixed workflow/chain/schedule order. */
+function groupByKind<T extends { kind: ProjectBundleItemKind }>(items: T[]): Array<[ProjectBundleItemKind, T[]]> {
+  return KIND_ORDER
+    .map((kind): [ProjectBundleItemKind, T[]] => [kind, items.filter((item) => item.kind === kind)])
+    .filter(([, group]) => group.length > 0);
+}
+
 /** Success screen: link to the project plus what was created, skipped, renamed or warned about. */
 export function BundleImportResult({ result, onOpenProject }: BundleImportResultProps) {
   const t = useT();
+  const skippedByKind = groupByKind(result.skipped);
+  const renamedByKind = groupByKind(result.renamed);
 
   return (
     <div className="space-y-4">
@@ -31,25 +46,31 @@ export function BundleImportResult({ result, onOpenProject }: BundleImportResult
         {t.projects.bundle.openProject}
       </Link>
 
-      {result.skipped.length > 0 && (
-        <div className="space-y-1">
+      {skippedByKind.length > 0 && (
+        <div className="space-y-1.5">
           <p className="text-xs font-medium text-text-secondary">{t.projects.bundle.resultSkipped}</p>
-          <ul className="text-xs text-text-tertiary space-y-0.5 list-disc list-inside">
-            {result.skipped.map((item, i) => (
-              <li key={i}>{item.key}{item.reason ? ` — ${item.reason}` : ''}</li>
-            ))}
-          </ul>
+          {skippedByKind.map(([kind, items]) => (
+            <div key={kind}>
+              <p className="text-xs text-text-tertiary font-medium">{kindLabel(kind, t)}</p>
+              <ul className="text-xs text-text-tertiary space-y-0.5 list-disc list-inside">
+                {items.map((item, i) => <li key={i}>{item.key} — {item.reason}</li>)}
+              </ul>
+            </div>
+          ))}
         </div>
       )}
 
-      {result.renamed.length > 0 && (
-        <div className="space-y-1">
+      {renamedByKind.length > 0 && (
+        <div className="space-y-1.5">
           <p className="text-xs font-medium text-text-secondary">{t.projects.bundle.resultRenamed}</p>
-          <ul className="text-xs text-text-tertiary space-y-0.5 list-disc list-inside">
-            {result.renamed.map((item, i) => (
-              <li key={i}>{item.key}{item.newName ? ` → ${item.newName}` : ''}</li>
-            ))}
-          </ul>
+          {renamedByKind.map(([kind, items]) => (
+            <div key={kind}>
+              <p className="text-xs text-text-tertiary font-medium">{kindLabel(kind, t)}</p>
+              <ul className="text-xs text-text-tertiary space-y-0.5 list-disc list-inside">
+                {items.map((item, i) => <li key={i}>{item.from} &rarr; {item.to}</li>)}
+              </ul>
+            </div>
+          ))}
         </div>
       )}
 

@@ -64,6 +64,7 @@ export interface BundleWorkflowDefinition {
   model?: string;
   provider?: string;
   effort?: string;
+  version?: string;
   defaultContext?: Record<string, unknown>;
   metadata?: Record<string, unknown>;
   /** Skills referenced by name (`activatedSkillIds` don't survive the move); missing on import → warning. */
@@ -80,19 +81,25 @@ export interface BundleChainEntryStep {
   workflowKey: string;
   label?: string | null;
   sortOrder: number;
-  stopOnFailure: boolean;
+  stopOnFailure?: boolean | null;
   inputContext?: Record<string, unknown>;
   timeoutMinutes?: number | null;
 }
 
-export interface BundleChainEntry {
+export interface BundleChain {
   key: string;
   name: string;
   description?: string | null;
+  icon?: string | null;
+  stopOnFailure?: boolean | null;
   entries: BundleChainEntryStep[];
 }
 
-export type BundleScheduleTarget = { workflowKey: string } | { chainKey: string };
+/** Exactly one of both is set (backend's `BundleTarget`); the preview turns it into `workflow:<key>`/`chain:<key>`. */
+export interface BundleScheduleTarget {
+  workflowKey: string | null;
+  chainKey: string | null;
+}
 
 export interface BundleScheduleEntry {
   target: BundleScheduleTarget;
@@ -125,7 +132,7 @@ export interface ProjectBundle {
   appVersion: string;
   project: BundleProject;
   workflows: BundleWorkflowEntry[];
-  chains: BundleChainEntry[];
+  chains: BundleChain[];
   schedules: BundleScheduleEntry[];
   paths: BundlePathToken[];
   skillNames: string[];
@@ -169,6 +176,16 @@ export interface ProjectBundlePreview {
   warnings: string[];
 }
 
+/**
+ * `POST /projects/import/preview` body. `targetProjectId` is optional: without it every
+ * workflow's `nameTakenInTarget` reports `false` — once an existing target project is chosen in
+ * the dialog, the preview is re-requested with it to get real per-workflow conflicts.
+ */
+export interface ProjectBundlePreviewRequest {
+  bundle: ProjectBundle;
+  targetProjectId?: string;
+}
+
 // ── Project Bundle: Import ───────────────────────────────
 
 export type ProjectBundleImportTarget =
@@ -184,18 +201,27 @@ export interface ProjectBundleImportRequest {
   onConflict: ProjectBundleConflictBehavior;
 }
 
-export interface ProjectBundleImportItem {
-  kind: 'workflow' | 'chain' | 'schedule';
+export type ProjectBundleItemKind = 'workflow' | 'chain' | 'schedule';
+
+export interface ProjectBundleSkippedItem {
+  kind: ProjectBundleItemKind;
   key: string;
-  reason?: string;
-  newName?: string;
+  reason: string;
+}
+
+export interface ProjectBundleRenamedItem {
+  kind: ProjectBundleItemKind;
+  key: string;
+  from: string;
+  to: string;
 }
 
 export interface ProjectBundleImportResult {
   projectId: string;
+  /** Counts only what was newly created — not skipped or renamed items. */
   created: { workflows: number; chains: number; schedules: number };
-  skipped: ProjectBundleImportItem[];
-  renamed: ProjectBundleImportItem[];
+  skipped: ProjectBundleSkippedItem[];
+  renamed: ProjectBundleRenamedItem[];
   warnings: string[];
 }
 
