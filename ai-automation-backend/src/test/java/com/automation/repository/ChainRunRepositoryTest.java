@@ -327,6 +327,28 @@ class ChainRunRepositoryTest {
         assertThat(result.getContent().get(0).getStatus()).isEqualTo(RunStatus.COMPLETED);
     }
 
+    /**
+     * Der JOIN FETCH der Laufliste braucht eine eigene Zaehlabfrage (TODO 44db05fd). Sie greift erst,
+     * wenn die Seite voll ist – und muss dann dieselben Filter anwenden wie die Liste.
+     */
+    @Test
+    void findFiltered_fullPage_countsWithTheSameFilters() {
+        WorkflowChain theta = saveChain("Theta Chain");
+        WorkflowChain other = saveChain("Iota Chain");
+        for (int i = 0; i < 3; i++) {
+            repository.save(run(theta, RunStatus.COMPLETED));
+        }
+        repository.save(run(theta, RunStatus.FAILED));
+        repository.save(run(other, RunStatus.COMPLETED));
+
+        Page<ChainRun> result = repository.findFiltered(RunStatus.COMPLETED, "theta", PageRequest.of(0, 2));
+
+        assertThat(result.getContent()).hasSize(2);
+        assertThat(result.getTotalElements()).isEqualTo(3);
+        assertThat(result.getTotalPages()).isEqualTo(2);
+        assertThat(result.getContent()).allMatch(r -> r.getChain().getName().equals("Theta Chain"));
+    }
+
     @Test
     void findFiltered_emptyWhenNoChainNameMatch() {
         WorkflowChain chain = saveChain("Eta Chain");

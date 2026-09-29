@@ -61,10 +61,18 @@ public interface ChainRunRepository extends JpaRepository<ChainRun, String> {
            + "ORDER BY r.startedAt DESC")
     List<Object[]> findStatusesByScheduleIds(@Param("scheduleIds") Collection<String> scheduleIds);
 
-    @Query("SELECT cr FROM ChainRun cr LEFT JOIN cr.chain c " +
+    /**
+     * Die Laufliste holt die Kette in derselben Abfrage mit: {@code ChainRun.chain} ist EAGER, ein
+     * blosser JOIN laedt sie danach je Kette der Seite einzeln nach (TODO 44db05fd). Der JOIN FETCH
+     * braucht eine eigene Zaehlabfrage.
+     */
+    @Query(value = "SELECT cr FROM ChainRun cr LEFT JOIN FETCH cr.chain c " +
            "WHERE (:status IS NULL OR cr.status = :status) " +
            "AND (:search IS NULL OR LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%'))) " +
-           "ORDER BY cr.startedAt DESC")
+           "ORDER BY cr.startedAt DESC",
+           countQuery = "SELECT COUNT(cr) FROM ChainRun cr LEFT JOIN cr.chain c " +
+           "WHERE (:status IS NULL OR cr.status = :status) " +
+           "AND (:search IS NULL OR LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%')))")
     Page<ChainRun> findFiltered(@Param("status") RunStatus status,
                                  @Param("search") String search,
                                  Pageable pageable);
