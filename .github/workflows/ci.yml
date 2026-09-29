@@ -10,6 +10,10 @@ on:
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
+  # Einmal pro Woche alles, unabhaengig vom Pfadfilter: Wechselwirkungen und Drift
+  # (npm-Stand, OSV-Daten) fallen so auch ohne passende Aenderung auf.
+  schedule:
+    - cron: "0 4 * * 1"
 
 # Ein neuer Lauf desselben Refs bricht den alten ab — ausser auf main: Dort soll jeder Commit
 # ein eigenes Ergebnis bekommen.
@@ -21,6 +25,29 @@ permissions:
   contents: read
 
 jobs:
+  # Welche Suiten braucht diese Aenderung? Die Einordnung steht in scripts/ci/changed-scopes.sh
+  # (samt der Liste, was Backend-Tests ausserhalb von ai-automation-backend/ lesen) und hat einen
+  # eigenen Selbsttest. Ohne Fremd-Action: nur git diff. Tags, schedule, workflow_dispatch und
+  # jede fehlende Basis ergeben fuer beide Suiten true.
+  changes:
+    name: Geaenderte Bereiche
+    runs-on: ubuntu-26.04
+    outputs:
+      backend: ${{ steps.scopes.outputs.backend }}
+      frontend: ${{ steps.scopes.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      # PR: Basis und Kopf des PRs (nicht der Merge-Commit), push: before..sha. GITHUB_EVENT_NAME
+      # und GITHUB_REF_TYPE setzt GitHub selbst; das Skript liest sie.
+      - name: Geaenderte Pfade einordnen
+        id: scopes
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: bash scripts/ci/changed-scopes.sh | tee -a "$GITHUB_OUTPUT"
+
   hygiene:
     name: Public Hygiene
     runs-on: ubuntu-26.04
@@ -71,6 +98,8 @@ jobs:
           fi
       - name: Pre-Push-Gate Selbsttest (Hooks, Nachrichten, Autor-Adresse, Scope)
         run: bash scripts/tests/test-pre-push-checks.sh
+      - name: Pfadfilter der CI Selbsttest (changed-scopes)
+        run: bash scripts/tests/test-changed-scopes.sh
       - name: Setup-Modul-Preset Selbsttest
         run: bash scripts/tests/test-module-preset.sh
       # Der Probelauf selbst braucht Docker und zehn Minuten — hier nur Aufruf, Vorab-Pruefungen
@@ -169,8 +198,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  # Uebersprungen nur bei ausdruecklichem "false" aus changes: Scheitert die Einordnung selbst,
+  # laeuft die Suite trotzdem (!cancelled() statt des impliziten success()), statt als
+  # uebersprungen und damit bestanden durchzugehen.
   backend:
     name: Backend Tests
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.backend != 'false' }}
     runs-on: ubuntu-26.04
     defaults:
       run:
@@ -215,6 +249,8 @@ jobs:
 
   frontend:
     name: Frontend Lint + Test + Build
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.frontend != 'false' }}
     runs-on: ubuntu-26.04
     defaults:
       run:

@@ -344,6 +344,20 @@ npm run lint
 worktrees are not pushed; `origin` only has `main`. A new run for the same ref cancels the running
 one (`concurrency: ci-<ref>`) — except on `main`, where every commit gets its own result.
 
+The backend and frontend suites only run when the change needs them. The `changes` job classifies
+the changed paths with `scripts/ci/changed-scopes.sh` (plain `git diff`, no third-party action;
+self-test `scripts/tests/test-changed-scopes.sh`). The backend is filtered **inversely**: it is
+skipped only when *every* changed file is under `ai-automation-frontend/` outside `src/data/` and
+`src/i18n/`, or a `.md` outside `docs/`, `ai-automation-backend/` and `workflow-pool/` (not
+`CLAUDE.md`) — backend tests also read `docs/`, `workflow-pool/`, `scripts/lib/`,
+`deploy/Dockerfile` and parts of the frontend; the list is in the script header. The frontend runs
+on changes under `ai-automation-frontend/`, to the backend templates (`src/main/resources/templates/`)
+and to `workflow-pool/`. Tags, `workflow_dispatch`, a missing comparison base (new ref, force push)
+and any change to `ci.yml` or the script run both, as does the weekly run on Mondays at 04:00 UTC —
+so interactions and drift (npm, OSV data) surface even without a matching change. A suite is skipped
+only on an explicit `false`; if the classification fails, both run. The hygiene gate and the secret
+scan always run.
+
 ### E2E Tests (Cypress)
 
 The E2E tests run with [Cypress](https://www.cypress.io/) against the **real backend** (no mocking). Test data is created and deleted directly via the API using `cy.request()`.

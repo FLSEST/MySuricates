@@ -352,6 +352,20 @@ Arbeits-Branches aus Worktrees werden nicht gepusht; auf `origin` gibt es nur `m
 Lauf desselben Refs bricht den laufenden ab (`concurrency: ci-<ref>`) — außer auf `main`, dort
 bekommt jeder Commit ein eigenes Ergebnis.
 
+Backend- und Frontend-Suite laufen nur, wenn die Änderung sie braucht. Der Job `changes` ordnet die
+geänderten Pfade mit `scripts/ci/changed-scopes.sh` ein (nur `git diff`, keine Fremd-Action;
+Selbsttest `scripts/tests/test-changed-scopes.sh`). Das Backend wird **umgekehrt** gefiltert: Es
+entfällt nur, wenn *jede* geänderte Datei unter `ai-automation-frontend/` außerhalb von `src/data/`
+und `src/i18n/` liegt oder eine `.md` außerhalb von `docs/`, `ai-automation-backend/` und
+`workflow-pool/` ist (nicht `CLAUDE.md`) — Backend-Tests lesen auch `docs/`, `workflow-pool/`,
+`scripts/lib/`, `deploy/Dockerfile` und Teile des Frontends; die Liste steht im Skriptkopf. Das
+Frontend läuft bei Änderungen unter `ai-automation-frontend/`, an den Backend-Vorlagen
+(`src/main/resources/templates/`) und am `workflow-pool/`. Tags, `workflow_dispatch`, eine fehlende
+Vergleichsbasis (neuer Ref, Force-Push) und jede Änderung an `ci.yml` oder am Skript lassen beide
+laufen, ebenso der wöchentliche Lauf montags um 04:00 UTC — so fallen Wechselwirkungen und Drift
+(npm, OSV-Daten) auch ohne passende Änderung auf. Übersprungen wird nur bei ausdrücklichem `false`;
+scheitert die Einordnung, laufen beide Suiten. Hygiene-Gate und Secret-Scan laufen immer.
+
 ### E2E-Tests (Cypress)
 
 Die E2E-Tests laufen mit [Cypress](https://www.cypress.io/) gegen das **echte Backend** (kein Mocking). Testdaten werden per `cy.request()` direkt über die API angelegt und gelöscht.
