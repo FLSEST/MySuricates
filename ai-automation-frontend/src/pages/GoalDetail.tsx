@@ -129,10 +129,12 @@ export function GoalDetail() {
   const select = useCallback((next: GoalSelection, trigger?: HTMLElement | null) => {
     // Aus der Leiste heraus (verknüpftes Paket, Meilenstein) bleibt der ursprüngliche Auslöser das Ziel des Fokus
     if (trigger && !trigger.closest('[data-testid="goal-side-panel"]')) selectionTrigger.current = trigger;
-    navigate({ search: withSelection(selectionValue(next)) });
+    // Ersetzen statt anhängen (Review c60bf914): Jedes Öffnen, Wechseln und Schließen neu im Verlauf
+    // hieße, sich mit Zurück durch die Auswahl zu klicken, statt die Seite zu verlassen
+    navigate({ search: withSelection(selectionValue(next)) }, { replace: true });
   }, [navigate, withSelection]);
   const closeSelection = useCallback(() => {
-    navigate({ search: withSelection(null) });
+    navigate({ search: withSelection(null) }, { replace: true });
     const trigger = selectionTrigger.current;
     selectionTrigger.current = null;
     if (trigger?.isConnected) trigger.focus();

@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { GripVertical, PanelRight, PictureInPicture2, X } from 'lucide-react';
+import { createPortal } from 'react-dom';
 import { useT } from '../../i18n';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import {
@@ -13,19 +14,38 @@ const STICKY_TOP = 16;
 const BIG_STEP = 64;
 const viewport = (): Viewport => ({ width: window.innerWidth, height: window.innerHeight });
 
-/** Zieht mit der Maus (Zeiger): `onMove` bekommt den Weg seit dem Drücken, bis losgelassen wird. */
-function dragFrom(event: ReactPointerEvent, onMove: (dx: number, dy: number) => void) {
-  if (event.button !== 0) return;
+/**
+ * Zieht mit der Maus (Zeiger): `onMove` bekommt den Weg seit dem Drücken, bis losgelassen wird. Gibt
+ * die Aufräumfunktion zurück – schließt die Leiste mitten im Ziehen, hängen keine Listener nach.
+ */
+function dragFrom(event: ReactPointerEvent, onMove: (dx: number, dy: number) => void): (() => void) | null {
+  if (event.button !== 0) return null;
   event.preventDefault();
   const startX = event.clientX;
   const startY = event.clientY;
   const move = (e: PointerEvent) => onMove(e.clientX - startX, e.clientY - startY);
-  const up = () => {
+  const stop = () => {
     window.removeEventListener('pointermove', move);
-    window.removeEventListener('pointerup', up);
+    window.removeEventListener('pointerup', stop);
+    window.removeEventListener('pointercancel', stop);
   };
   window.addEventListener('pointermove', move);
-  window.addEventListener('pointerup', up);
+  window.addEventListener('pointerup', stop);
+  window.addEventListener('pointercancel', stop);
+  return stop;
+}
+
+/**
+ * Hält den gerade laufenden Zug: ein neuer beendet den alten, das Aushängen der Leiste beendet ihn
+ * auch (Review c60bf914).
+ */
+function useDrag() {
+  const stop = useRef<(() => void) | null>(null);
+  useEffect(() => () => stop.current?.(), []);
+  return (event: ReactPointerEvent, onMove: (dx: number, dy: number) => void) => {
+    stop.current?.();
+    stop.current = dragFrom(event, onMove);
+  };
 }
 
 /**
@@ -47,6 +67,7 @@ export function SidePanelFrame({ labelledBy, header, children, footer, onClose, 
   const t = useT();
   const tp = t.goals.panel;
   const mobile = useIsMobile();
+  const drag = useDrag();
   const [prefs, setPrefs] = useState<PanelPrefs>(() => readPanelPrefs(viewport()));
   useEffect(() => storePanelPrefs(prefs), [prefs]);
 
@@ -66,7 +87,7 @@ export function SidePanelFrame({ labelledBy, header, children, footer, onClose, 
 
   const resizeWidth = (event: ReactPointerEvent) => {
     const start = prefs.width;
-    dragFrom(event, (dx) => setPrefs((current) => ({ ...current, width: clampWidth(start - dx, viewport()) })));
+    drag(event, (dx) => setPrefs((current) => ({ ...current, width: clampWidth(start - dx, viewport()) })));
   };
   const widthKeys = (event: KeyboardEvent) => {
     const step = event.shiftKey ? BIG_STEP : STEP;
@@ -78,7 +99,7 @@ export function SidePanelFrame({ labelledBy, header, children, footer, onClose, 
   const move = (event: ReactPointerEvent) => {
     if ((event.target as HTMLElement).closest('button')) return;
     const start = prefs.rect;
-    dragFrom(event, (dx, dy) => setPrefs((current) => ({ ...current, rect: movedRect(start, dx, dy, viewport()) })));
+    drag(event, (dx, dy) => setPrefs((current) => ({ ...current, rect: movedRect(start, dx, dy, viewport()) })));
   };
   const moveKeys = (event: KeyboardEvent) => {
     if (event.target !== event.currentTarget) return;
@@ -90,7 +111,7 @@ export function SidePanelFrame({ labelledBy, header, children, footer, onClose, 
   };
   const resize = (edge: ResizeEdge) => (event: ReactPointerEvent) => {
     const start = prefs.rect;
-    dragFrom(event, (dx, dy) => setPrefs((current) => ({ ...current, rect: resizedRect(start, edge, dx, dy, viewport()) })));
+    drag(event, (dx, dy) => setPrefs((current) => ({ ...current, rect: resizedRect(start, edge, dx, dy, viewport()) })));
   };
   const resizeKeys = (event: KeyboardEvent) => {
     const step = event.shiftKey ? BIG_STEP : STEP;
@@ -151,14 +172,10 @@ export function SidePanelFrame({ labelledBy, header, children, footer, onClose, 
 
   if (mobile) {
     return (
-      <>
-        <div aria-hidden="true" onClick={onClose} className="fixed inset-0 z-30 bg-black/40" />
-        <aside aria-labelledby={labelledBy} data-testid={testId} data-kind={kind} data-mode="sheet"
-          className="fixed inset-y-0 right-0 z-40 flex w-full max-w-md flex-col border-l border-border bg-surface-raised shadow-2xl">
-          <div className="flex items-start gap-2 px-4 pb-2 pt-4"><div className="min-w-0 flex-1">{header}</div>{buttons}</div>
-          {body}
-        </aside>
-      </>
+      <SheetPanel labelledBy={labelledBy} testId={testId} kind={kind} onClose={onClose}>
+        <div className="flex items-start gap-2 px-4 pb-2 pt-4"><div className="min-w-0 flex-1">{header}</div>{buttons}</div>
+        {body}
+      </SheetPanel>
     );
   }
 
@@ -209,5 +226,78 @@ function DockedPanel({ labelledBy, testId, kind, width, children }: {
       className="sticky flex max-h-[calc(100vh-2rem)] shrink-0 flex-col rounded-xl border border-card-border bg-surface-raised shadow-sm">
       {children}
     </aside>
+  );
+}
+
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/**
+ * Unter 1024 px ein Blatt über dem Inhalt – dann modal (Review c60bf914): `role="dialog"` mit
+ * `aria-modal`, per Portal an `document.body`, alles andere `inert` (für Maus, Tastatur und
+ * Vorleser unerreichbar), Tab bleibt im Blatt. Angedockt und als Fenster bleibt die Leiste eine
+ * gewöhnliche Region neben der Seite.
+ */
+function SheetPanel({ labelledBy, testId, kind, onClose, children }: {
+  labelledBy: string;
+  testId: string;
+  kind: string;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  const ref = useRef<HTMLElement>(null);
+  const [host] = useState(() => document.createElement('div'));
+  useLayoutEffect(() => {
+    document.body.appendChild(host);
+    // Alles außer dem Blatt tritt zurück. Öffnet das Blatt selbst einen modalen Dialog (TODO,
+    // Bearbeiten, Löschen – sie stehen im Seitenbaum), gilt solange dieser: dann ist nichts inert.
+    const marked = new Set<Element>();
+    const apply = () => {
+      const otherModal = [...document.querySelectorAll('[aria-modal="true"]')].some((element) => !host.contains(element));
+      for (const element of [...document.body.children]) {
+        if (element === host) continue;
+        if (!otherModal && !element.hasAttribute('inert')) {
+          element.setAttribute('inert', '');
+          marked.add(element);
+        } else if (otherModal && marked.has(element)) {
+          element.removeAttribute('inert');
+          marked.delete(element);
+        }
+      }
+    };
+    apply();
+    const observer = new MutationObserver(apply);
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => {
+      observer.disconnect();
+      marked.forEach((element) => element.removeAttribute('inert'));
+      host.remove();
+    };
+  }, [host]);
+
+  const trapTab = (event: KeyboardEvent) => {
+    if (event.key !== 'Tab' || !ref.current) return;
+    const focusable = [...ref.current.querySelectorAll<HTMLElement>(FOCUSABLE)];
+    const first = focusable[0];
+    const last = focusable.at(-1);
+    if (!first || !last) return;
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
+
+  return createPortal(
+    <>
+      <div aria-hidden="true" onClick={onClose} className="fixed inset-0 z-30 bg-black/40" />
+      <aside ref={ref} role="dialog" aria-modal="true" aria-labelledby={labelledBy} data-testid={testId} data-kind={kind}
+        data-mode="sheet" onKeyDown={trapTab}
+        className="fixed inset-y-0 right-0 z-40 flex w-full max-w-md flex-col border-l border-border bg-surface-raised shadow-2xl">
+        {children}
+      </aside>
+    </>,
+    host,
   );
 }
