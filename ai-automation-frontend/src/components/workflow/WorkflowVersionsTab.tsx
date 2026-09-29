@@ -26,22 +26,25 @@ const SOURCE_ICONS: Record<string, typeof User> = {
   untracked: AlertTriangle,
 };
 
+// Colored by role (db79bc54): a person -> human, AI involved (assistant, factory, wish, dialog analysis) -> ai,
+// shipped content (pool, example project, chain/goal templates) plus API and restore -> info,
+// file imports and system -> neutral.
 const SOURCE_COLORS: Record<string, string> = {
   user: 'bg-human-subtle text-human',
   ai: 'bg-ai-subtle text-ai',
-  'pool-install': 'bg-amber-500/20 text-amber-400',
-  'example-project': 'bg-amber-500/20 text-amber-400',
+  'pool-install': 'bg-info-subtle text-info',
+  'example-project': 'bg-info-subtle text-info',
   'goal-guard': 'bg-info-subtle text-info',
-  import: 'bg-green-500/20 text-green-400',
+  import: 'bg-surface-hover text-text-secondary',
   api: 'bg-info-subtle text-info',
   system: 'bg-surface-hover text-text-secondary',
   assistant: 'bg-ai-subtle text-ai',
   factory: 'bg-ai-subtle text-ai',
   wish: 'bg-ai-subtle text-ai',
-  dialog: 'bg-green-500/20 text-green-400',
+  dialog: 'bg-ai-subtle text-ai',
   conversion: 'bg-ai-subtle text-ai',
-  'chain-template': 'bg-green-500/20 text-green-400',
-  'bpmn-import': 'bg-green-500/20 text-green-400',
+  'chain-template': 'bg-info-subtle text-info',
+  'bpmn-import': 'bg-surface-hover text-text-secondary',
   restore: 'bg-info-subtle text-info',
   untracked: 'bg-warning-subtle text-warning',
 };

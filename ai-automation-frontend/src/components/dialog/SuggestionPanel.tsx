@@ -92,8 +92,8 @@ export function SuggestionPanel({
       {suggestion.confidence < 0.7 && (
         <div className={`flex items-center gap-2 p-2 rounded-lg text-xs border ${
           suggestion.confidence < 0.5
-            ? 'bg-red-500/10 border-red-500/20 text-red-400'
-            : 'bg-amber-500/10 border-amber-500/20 text-amber-400'
+            ? 'bg-danger/10 border-danger/20 text-danger'
+            : 'bg-warning/10 border-warning/20 text-warning'
         }`}>
           <AlertCircle className="w-4 h-4 shrink-0" />
           {t.dialog.lowConfidenceWarning}

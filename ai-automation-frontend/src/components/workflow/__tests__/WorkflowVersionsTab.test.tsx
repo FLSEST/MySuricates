@@ -74,6 +74,26 @@ describe('WorkflowVersionsTab provenance', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 
+  // db79bc54: theme tokens by role instead of fixed palette colors
+  it('colors the source badge by role with theme tokens', async () => {
+    server.use(http.get('/api/v1/workflows/wf-1/versions', () => HttpResponse.json({
+      content: [
+        { ...version('v4', 4, null), changeSource: 'user' },
+        { ...version('v3', 3, null), changeSource: 'dialog' },
+        { ...version('v2', 2, null), changeSource: 'pool-install' },
+        { ...version('v1', 1, null), changeSource: 'import' },
+      ],
+      page: 0, size: 20, totalElements: 4, totalPages: 1,
+    })));
+
+    renderWithProviders(<WorkflowVersionsTab workflowId="wf-1" />);
+
+    expect(await screen.findByText('User')).toHaveClass('bg-human-subtle', 'text-human');
+    expect(screen.getByText('Dialog import')).toHaveClass('bg-ai-subtle', 'text-ai');
+    expect(screen.getByText('Pool Install')).toHaveClass('bg-info-subtle', 'text-info');
+    expect(screen.getByText('Import')).toHaveClass('bg-surface-hover', 'text-text-secondary');
+  });
+
   it('marks nothing when the current hash is unknown', async () => {
     server.use(http.get('/api/v1/workflows/wf-1/versions', () => HttpResponse.json({
       content: [version('v1', 1, HASH_OLD)], page: 0, size: 20, totalElements: 1, totalPages: 1,
