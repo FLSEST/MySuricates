@@ -804,6 +804,8 @@ export const de: TranslationKeys = {
     collapseAll: 'Alle einklappen',
     selectMode: 'Auswahlmodus',
     exitSelectMode: 'Auswahlmodus beenden',
+    selectAllInProject: 'Alle auswählen',
+    deselectAllInProject: 'Alle abwählen',
     selected: 'ausgewählt',
     deleteWorkflow: 'Workflow löschen',
     deleteWorkflows: 'Workflows löschen',

@@ -802,6 +802,8 @@ export const en = {
     collapseAll: 'Collapse all',
     selectMode: 'Select mode',
     exitSelectMode: 'Exit select mode',
+    selectAllInProject: 'Select all',
+    deselectAllInProject: 'Deselect all',
     selected: 'selected',
     deleteWorkflow: 'Delete Workflow',
     deleteWorkflows: 'Delete Workflows',
