@@ -28,11 +28,16 @@ export function TodoDropTarget({ node, children }: { node: MapNode; children: Re
   );
 }
 
-/** Die Gruppe eines Arbeitspakets (Kopfzeile samt Zeilen) als Ablagefläche. */
+/**
+ * Die Gruppe eines Arbeitspakets (Kopfzeile samt Zeilen) als Ablagefläche. Kennt das Backend keine
+ * Workflows am Ziel (404), gibt es sie gar nicht – wie das Zielband; dann bleiben nur die TODOs.
+ */
 export function PackageDropTarget({ group, workPackageId }: { group: MapGroup; workPackageId: string }) {
   const drag = useWorkflowMapDrag();
   const id = packageTargetId(workPackageId);
-  const { setNodeRef, isOver } = useDroppable({ id, disabled: !drag });
+  const supported = drag?.context.attachSupported ?? false;
+  const { setNodeRef, isOver } = useDroppable({ id, disabled: !supported });
+  if (!supported) return null;
   const tone = dropToneOf(drag?.judge(id) ?? null, isOver);
   return (
     <rect ref={setNodeRef as unknown as Ref<SVGRectElement>} data-drop-target={id}
@@ -46,7 +51,7 @@ export function PackageDropTarget({ group, workPackageId }: { group: MapGroup; w
 /** Die Kopfzeile „Ganzes Ziel“ über der Karte: ein Workflow hierher wird dem ganzen Ziel zugeordnet. */
 export function GoalDropTarget({ label, hint }: { label: string; hint: string }) {
   const drag = useWorkflowMapDrag();
-  const { setNodeRef, isOver } = useDroppable({ id: GOAL_TARGET_ID, disabled: !drag });
+  const { setNodeRef, isOver } = useDroppable({ id: GOAL_TARGET_ID, disabled: !drag?.context.attachSupported });
   if (!drag || !drag.context.attachSupported) return null;
   const verdict = drag.judge(GOAL_TARGET_ID);
   const active = verdict === 'ok';

@@ -57,12 +57,19 @@ export function useLinkTodoWorkflow(goalId: string) {
     onSuccess: (_todo, { todoId, todoTitle, workflow, previous }) => {
       toast.success(tm.linked.replace('{workflow}', workflow.name).replace('{todo}', todoTitle), {
         label: tm.undo,
-        onClick: () => {
+        onClick: async () => {
+          // wie in onMutate: ein noch laufendes Nachladen (onSettled der Verknüpfung) brächte sonst den
+          // überholten Stand „verknüpft“ zurück, bevor das Rückgängig beim Server angekommen ist
+          await qc.cancelQueries({ queryKey: relationsKey(goalId) });
           patchRelations(qc, goalId, todoId, previous);
-          void put(todoId, previous?.id ?? '')
-            .then(() => toast.success(tm.undone))
-            .catch((err) => toast.error(apiErrorMessage(err, tm.failed)))
-            .finally(refresh);
+          try {
+            await put(todoId, previous?.id ?? '');
+            toast.success(tm.undone);
+          } catch (err) {
+            toast.error(apiErrorMessage(err, tm.failed));
+          } finally {
+            refresh();
+          }
         },
       });
     },
