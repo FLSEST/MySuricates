@@ -7,7 +7,7 @@
  * API: GET /api/v1/schedules/calendar?from={ISO}&to={ISO}
  * Uses the `pastRuns` array from CalendarDataResponse.
  *
- * Color coding: green for COMPLETED, red for FAILED.
+ * Color coding: success token for COMPLETED, danger token for FAILED.
  */
 
 import { api } from '../../api/client';
@@ -17,7 +17,7 @@ import type { CalendarSourceAdapter } from './types';
 export const runsAdapter: CalendarSourceAdapter = {
   sourceId: 'runs',
   label: 'Runs',
-  color: 'bg-green-500',
+  color: 'bg-success',
 
   isAvailable: () => true,
 
@@ -37,7 +37,7 @@ export const runsAdapter: CalendarSourceAdapter = {
           allDay: false,
           source: 'runs',
           sourceLabel: 'Runs',
-          color: isFailed ? 'bg-red-500' : 'bg-green-500',
+          color: isFailed ? 'bg-danger' : 'bg-success',
           status: r.status,
           link: `/workflows/${r.workflowId}/run/${r.id}`,
         };

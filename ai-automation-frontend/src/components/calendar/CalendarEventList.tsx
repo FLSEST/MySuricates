@@ -60,7 +60,7 @@ function EventItem({ event, timeLabel }: { event: UnifiedCalendarEvent; timeLabe
           {event.status && event.source === 'runs' && (
             <>
               <span className="text-xs text-text-tertiary">·</span>
-              <span className={`text-xs ${event.status === 'COMPLETED' ? 'text-green-500' : event.status === 'FAILED' ? 'text-red-500' : 'text-text-tertiary'}`}>
+              <span className={`text-xs ${event.status === 'COMPLETED' ? 'text-success' : event.status === 'FAILED' ? 'text-danger' : 'text-text-tertiary'}`}>
                 {event.status}
               </span>
             </>

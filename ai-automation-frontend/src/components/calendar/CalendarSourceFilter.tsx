@@ -39,7 +39,7 @@ export function CalendarSourceFilter({ sources, onToggle, onColorChange }: Props
             `}
           >
             <span
-              className={`w-2.5 h-2.5 rounded-full cursor-pointer ${source.enabled ? source.color : 'bg-gray-400'}`}
+              className={`w-2.5 h-2.5 rounded-full cursor-pointer ${source.enabled ? source.color : 'bg-text-tertiary'}`}
               onClick={(e) => {
                 e.stopPropagation();
                 if (onColorChange) setPickerFor(pickerFor === source.sourceId ? null : source.sourceId);
@@ -51,7 +51,7 @@ export function CalendarSourceFilter({ sources, onToggle, onColorChange }: Props
           {pickerFor === source.sourceId && onColorChange && (
             <div
               ref={popoverRef}
-              className="absolute top-full left-0 mt-1 z-50 bg-surface border border-border rounded-lg shadow-lg p-2 grid grid-cols-5 gap-1.5"
+              className="absolute top-full left-0 mt-1 z-50 bg-surface border border-border rounded-lg shadow-lg p-2 grid grid-cols-4 gap-1.5"
             >
               {COLOR_PALETTE.map((color) => (
                 <button

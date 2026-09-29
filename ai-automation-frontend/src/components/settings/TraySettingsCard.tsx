@@ -42,9 +42,10 @@ export function TraySettingsCard() {
           <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-[#211a14]">
             <img src="/icons/tray-meerkat.svg" alt="" className="h-12 w-12" />
             <span className="absolute bottom-1 left-1/2 flex -translate-x-1/2 gap-0.5 rounded-full bg-[#211a14] p-0.5">
-              <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
-              <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />
-              <span className="h-2.5 w-2.5 rounded-full bg-red-400" />
+              {/* The real tray icon's fixed colours (TrayIconRenderer), independent of the app theme */}
+              <span className="h-2.5 w-2.5 rounded-full bg-[#36c98f]" />
+              <span className="h-2.5 w-2.5 rounded-full bg-[#f3b63f]" />
+              <span className="h-2.5 w-2.5 rounded-full bg-[#ef5a5a]" />
             </span>
           </div>
           <div>

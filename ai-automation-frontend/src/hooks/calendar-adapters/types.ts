@@ -18,7 +18,7 @@
  * export const myAdapter: CalendarSourceAdapter = {
  *   sourceId: 'my-source',
  *   label: 'My Source',
- *   color: 'bg-orange-500',
+ *   color: 'bg-chart-8',
  *   isAvailable: () => true,
  *   fetchEvents: async (from, to) => {
  *     const data = await api.get(`/my-endpoint?from=${from}&to=${to}`);
@@ -37,7 +37,7 @@ export interface CalendarSourceAdapter {
   /** Display label shown in the source filter toggle */
   label: string;
 
-  /** Tailwind background color class for calendar dots and event stripes */
+  /** Background color class for calendar dots and event stripes: a theme token (bg-chart-1..8 or a status token) */
   color: string;
 
   /**

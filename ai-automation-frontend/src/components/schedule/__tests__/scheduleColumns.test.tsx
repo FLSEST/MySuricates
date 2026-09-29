@@ -70,3 +70,21 @@ describe('schedule list — next run column', () => {
     expect(formatTimestamp('2026-10-02T06:00:00Z', 'de')).toMatch(/^2\.10\.2026, \d{2}:00:00$/);
   });
 });
+
+/** Schedule type badge: recurring stays neutral, one-off and delayed carry theme tokens (19ebb8a5). */
+describe('schedule list — type column', () => {
+  function typeBadge(s: ScheduledWorkflow) {
+    const { result } = renderHook(() => useScheduleColumns({ onEdit: vi.fn(), onDelete: vi.fn(), onToggle: vi.fn() }));
+    const column = result.current.find((c) => c.key === 'type')!;
+    render(<div data-testid="cell">{column.render(s)}</div>);
+    return screen.getByTestId('cell').firstElementChild!;
+  }
+
+  it.each([
+    ['CRON', ['bg-surface-hover', 'text-text-secondary']],
+    ['ONCE', ['bg-info-subtle', 'text-info']],
+    ['DELAYED', ['bg-accent-subtle', 'text-accent']],
+  ] as const)('colours %s with theme tokens', (scheduleType, classes) => {
+    expect(typeBadge({ ...base, scheduleType })).toHaveClass(...classes);
+  });
+});

@@ -31,7 +31,7 @@ export function DialogImport() {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-xl font-semibold text-text">{t.dialog.title}</h1>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20 font-medium">
+            <span className="text-xs px-2 py-0.5 rounded-full bg-warning/10 text-warning border border-warning/20 font-medium">
               {t.dialog.experimental}
             </span>
           </div>
