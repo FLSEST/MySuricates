@@ -147,6 +147,26 @@ class WorkflowMemoryRepositoryTest {
         assertThat(result).isEmpty();
     }
 
+    // --- findByWorkflowIdInAndActiveTrue ---
+
+    /** Die aktiven Memories mehrerer Workflows in einer Abfrage (TODO 5fb7b1e9). */
+    @Test
+    void findByWorkflowIdInAndActiveTrue_returnsOnlyActiveMemoriesOfTheGivenWorkflows() {
+        WorkflowMemory active = repository.save(memory(workflowId, true));
+        WorkflowMemory inactive = repository.save(memory(workflowId, false));
+        WorkflowMemory otherActive = repository.save(memory(otherWorkflowId, true));
+        String notAskedId = workflowRepository.save(Workflow.builder()
+                .project(workflowRepository.findById(workflowId).orElseThrow().getProject())
+                .name("Not Asked").build()).getId();
+        WorkflowMemory foreign = repository.save(memory(notAskedId, true));
+
+        List<WorkflowMemory> result = repository.findByWorkflowIdInAndActiveTrue(List.of(workflowId, otherWorkflowId));
+
+        assertThat(result).extracting(WorkflowMemory::getId)
+                .containsExactlyInAnyOrder(active.getId(), otherActive.getId())
+                .doesNotContain(inactive.getId(), foreign.getId());
+    }
+
     // --- findTop8ByActiveTrueOrderByCreatedAtDesc: Filter und Reihenfolge ---
     // Die unbeschraenkte findByActiveTrueOrderByCreatedAtDesc ist entfernt (7a8481e2); diese Tests
     // pruefen dieselben Eigenschaften an der Abfrage, die der Assistent tatsaechlich stellt.

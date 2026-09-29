@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -166,9 +167,8 @@ class AuditFindingTodoLinkerTest {
         when(findingTodoRepository.findByTodoId("t-1")).thenReturn(List.of(
                 link("f-manual", "t-1", false), link("f-open", "t-1", true), link("f-fixed", "t-1", true),
                 link("f-gone", "t-1", true)));
-        when(findingRepository.findById("f-open")).thenReturn(Optional.of(open));
-        when(findingRepository.findById("f-fixed")).thenReturn(Optional.of(fixed));
-        when(findingRepository.findById("f-gone")).thenReturn(Optional.empty());
+        // "f-gone" ist geloescht: findAllById liefert es einfach nicht mit.
+        when(findingRepository.findAllById(List.of("f-open", "f-fixed", "f-gone"))).thenReturn(List.of(open, fixed));
 
         linker().markAwaitingVerification("t-1");
 
@@ -176,7 +176,18 @@ class AuditFindingTodoLinkerTest {
         assertThat(fixed.getStatus()).isEqualTo(AuditFindingStatus.RESOLVED);
         verify(findingRepository).save(open);
         verify(findingRepository, never()).save(fixed);
-        verify(findingRepository, never()).findById("f-manual");
+        // 5fb7b1e9: eine gebuendelte Abfrage ueber die verwalteten Verknuepfungen, keine je Verknuepfung.
+        verify(findingRepository, times(1)).findAllById(any());
+        verify(findingRepository, never()).findById(any());
+    }
+
+    @Test
+    void markAwaitingVerification_withoutManagedLinksQueriesNoFindings() {
+        when(findingTodoRepository.findByTodoId("t-1")).thenReturn(List.of(link("f-manual", "t-1", false)));
+
+        linker().markAwaitingVerification("t-1");
+
+        verifyNoInteractions(findingRepository);
     }
 
     @Test

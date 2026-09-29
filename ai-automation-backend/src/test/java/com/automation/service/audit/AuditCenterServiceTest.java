@@ -621,8 +621,7 @@ class AuditCenterServiceTest {
                 AuditFindingTodo.builder().findingId(FINDING_ID).todoId(TODO_ID).managed(true).build(),
                 AuditFindingTodo.builder().findingId("f-resolved").todoId(TODO_ID).managed(true).build(),
                 AuditFindingTodo.builder().findingId("f-manual").todoId(TODO_ID).managed(false).build()));
-        when(findingRepository.findById(FINDING_ID)).thenReturn(Optional.of(open));
-        when(findingRepository.findById("f-resolved")).thenReturn(Optional.of(resolved));
+        when(findingRepository.findAllById(List.of(FINDING_ID, "f-resolved"))).thenReturn(List.of(open, resolved));
 
         service.markAwaitingVerification(TODO_ID);
 
@@ -630,7 +629,7 @@ class AuditCenterServiceTest {
         assertThat(resolved.getStatus()).isEqualTo(AuditFindingStatus.RESOLVED);
         verify(findingRepository).save(open);
         verify(findingRepository, never()).save(resolved);
-        verify(findingRepository, never()).findById("f-manual");
+        verify(findingRepository, never()).findById(any());
     }
 
     /** {@code [reportId, count]}-Zeilen wie aus {@code countByReportIds}: abwechselnd Id und Anzahl. */

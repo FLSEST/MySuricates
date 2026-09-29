@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -16,6 +17,12 @@ public interface WorkflowMemoryRepository extends JpaRepository<WorkflowMemory, 
     List<WorkflowMemory> findByWorkflowIdOrderByCreatedAtDesc(String workflowId);
 
     Optional<WorkflowMemory> findByWorkflowIdAndActiveTrue(String workflowId);
+
+    /**
+     * Die aktiven Memories mehrerer Workflows in einer Abfrage — fuer den Wunsch-Prompt, der sonst
+     * je Workflow des Projekts einzeln fragte (TODO 5fb7b1e9). Reihenfolge ist nicht festgelegt.
+     */
+    List<WorkflowMemory> findByWorkflowIdInAndActiveTrue(Collection<String> workflowIds);
 
     /** The five newest active memories — the page suggestions only show that many (TODO bdd11037). */
     List<WorkflowMemory> findTop5ByActiveTrueOrderByCreatedAtDesc();

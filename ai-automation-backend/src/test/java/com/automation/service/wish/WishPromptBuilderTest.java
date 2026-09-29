@@ -430,7 +430,7 @@ class WishPromptBuilderTest {
             WorkflowMemory memory = WorkflowMemory.builder()
                     .id("mem-1").workflowId("wf-1").title("Lesson Learned")
                     .content("Always run tests first").active(true).build();
-            when(memoryRepository.findByWorkflowIdAndActiveTrue("wf-1")).thenReturn(Optional.of(memory));
+            when(memoryRepository.findByWorkflowIdInAndActiveTrue(List.of("wf-1"))).thenReturn(List.of(memory));
 
             String prompt = builder.buildDecomposePrompt(wish);
 
