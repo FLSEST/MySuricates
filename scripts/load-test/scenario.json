@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "_comment": "Festes Lasttest-Szenario. Jede Aenderung an Mengen, Mischung oder Takt ist ein neues Szenario: version hochzaehlen, sonst vergleicht report.py Aepfel mit Birnen (die Baseline sucht nur Laeufe derselben version).",
+  "instance": {
+    "xmx": "1g",
+    "max_concurrent_runs": 10
+  },
+  "seed": {
+    "workflows": 30,
+    "heavy_workflows": 5,
+    "heavy_output_bytes": 200000,
+    "runs": 150,
+    "run_concurrency": 4,
+    "todos": 200
+  },
+  "load": {
+    "warmup_s": 20,
+    "duration_s": 120,
+    "readers": 6,
+    "reader_think_ms": 250,
+    "run_starters": 2,
+    "run_poll_ms": 1000,
+    "todo_writers": 1,
+    "todo_writer_pause_ms": 2000,
+    "heap_sample_s": 5
+  }
+}

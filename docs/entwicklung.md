@@ -625,6 +625,23 @@ Das Script:
 **Voraussetzung:** Sauberer Working Tree (keine uncommitteten Änderungen).
 **Test:** `bash scripts/tests/test-release.sh` fährt den Ablauf in einem Wegwerf-Repo durch.
 
+### Lasttest vor dem Release
+
+Vor jedem Tag wird der Stand unter Last gemessen (TODO 1a6058dc). `release.sh` sucht dafür ein Ergebnis von `scripts/load-test.sh` für genau den Commit, der getaggt wird (HEAD vor dem Bump). **GREEN** läuft durch, **YELLOW** mit Hinweis. **Fehlt** es oder ist es **RED**, fragt `release.sh` nach; ohne Terminal bricht es ab. `--skip-load-test` bzw. `RELEASE_SKIP_LOAD_TEST=1` releast ohne und sagt das.
+
+```bash
+scripts/load-test.sh                 # HEAD messen (baut das JAR aus dem Commit, ~5 min)
+scripts/load-test.sh --ref v0.7.8    # einen anderen Stand; --jar PATH spart den Build
+```
+
+- **Wegwerf-Instanz** aus genau dem Commit (`git archive` + `mvn package`, JAR je Commit im Cache unter `~/.cache/mysuricates/load-test/jars/`): eigener Port, `-Duser.home`/`HOME`/`XDG_CONFIG_HOME` im Arbeitsverzeichnis, eigene DB und eigener API-Key, `env -i` (keine `AUTOMATION_*` der Dev-Shell), kein Docker, kein Backup, kein Tray, kein Rate-Limit, kein Auto-Tagging. `claude`/`codex`/`pi` sind Attrappen im PATH: Ein KI-Aufruf kostet keine Tokens, macht den Lauf aber RED.
+- **Synthetischer Seed** aus `scripts/load-test/scenario.json` (Workflows, davon einige mit 200 KB Step-Output, abgeschlossene Läufe, TODOs) — reproduzierbar und teilbar, keine Kopie der Dev-DB. Jede Änderung an Mengen, Mischung oder Takt zählt `version` hoch; verglichen wird nur mit Läufen derselben Version.
+- **Last wie echte Benutzer** (`driver.py`): Leser rufen die Seiten der Oberfläche mit genau deren API-Aufrufen ab, Lauf-Starter starten Shell-Workflows und pollen die Lauf-Seite bis zum Ende, ein TODO-Schreiber legt an und schaltet Status. Erst Aufwärmen, dann die gemessene Phase. Jede Anfrage mit Client-Zeit und dem `Server-Timing` der Instanz (Warten auf die Connection, Arbeit, SQL).
+- **Auswertung** (`report.py`): p50/p95/p99 je Route, Wartezeit-Anteil, SQL, Antwortgröße, Läufe, Heap; Verdict RED bei mehr als 1 % Fehlern, einem fehlgeschlagenen Lauf, p95 über 5 s oder einem KI-Aufruf, YELLOW bei einer Leseroute über 1 s p95, Heap über 85 % oder p95 ×1,5 gegen die Baseline. Der Wartezeit-Anteil allein ist kein Befund — unter Last wartet bei pool-size 1 fast jede Anfrage (im ersten Lauf 50–79 % bei p95 unter 450 ms); er erklärt nur eine ohnehin langsame Route. **Baseline** ist der jüngste Lauf desselben Szenarios auf einem Vorfahren-Commit, getaggte Stände zuerst.
+- **Ergebnis** unter `~/.local/state/mysuricates/load-test/<zeit>-<sha12>/` (`MYSURICATES_LOAD_TEST_DIR`): `facts.txt` (FAKT-Zeilen), `result.json`, `summary.txt` (für `release.sh`), `raw.json`, `instance.log`.
+
+Aus der Oberfläche läuft er als Pool-Workflow **Lasttest vor dem Release** (`workflow-pool/mysuricates-load-test.json`, Variable `ref`): Das Skript kommt aus dem geprüften Stand, Opus erklärt das Faktenblatt (Engpässe, Vergleich, Empfehlungen), das Gate folgt `FAKT load_verdict`, nie der KI. **Test:** `python3 -m unittest discover -s scripts/tests -p 'test_load_test_*.py'` (Auswertung, Verdict, Baseline, Treiber gegen einen Test-Server); die Rückfrage deckt `test-release.sh` ab.
+
 **Push:** `git push origin main "vX.Y.Z"` (oder `git push --follow-tags`, das nimmt nur annotierte
 Tags mit) — **nicht** `git push --tags`: `staging.sh promote` legt bei jedem Promote ein
 leichtgewichtiges `stable-*`-Tag an (Deployment-Zeitstempel, siehe unten), und `--tags` schöbe alle

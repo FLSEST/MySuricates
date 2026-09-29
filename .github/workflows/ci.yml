@@ -48,6 +48,11 @@ jobs:
         run: |
           bash scripts/tests/test-installer-probe.sh
           python3 -m unittest discover -s scripts/tests -p 'test_installer_probe_report.py'
+      # Der Lasttest selbst baut ein JAR und faehrt eine Wegwerf-Instanz (Workflow "Lasttest vor dem
+      # Release", release.sh fragt danach) — hier nur Auswertung, Verdict, Baseline und Treiber gegen
+      # einen HTTP-Server aus der Standardbibliothek.
+      - name: Lasttest Selbsttest (ohne Instanz)
+        run: python3 -m unittest discover -s scripts/tests -p 'test_load_test_*.py'
       - name: Container-Instanz Selbsttest (deploy/, ohne Docker)
         run: |
           bash scripts/tests/test-host-mounts.sh

@@ -18,7 +18,7 @@ warn() { echo -e "${YELLOW}[release]${NC} $*"; }
 err()  { echo -e "${RED}[release]${NC} $*" >&2; }
 
 usage() {
-    echo "Usage: $(basename "$0") [patch|minor|major]"
+    echo "Usage: $(basename "$0") [patch|minor|major] [--skip-load-test]"
     echo ""
     echo "Releases the next version from the last tag: writes it into pom.xml, package.json and"
     echo "package-lock.json, commits, tags it, and then sets all three to the next -SNAPSHOT."
@@ -26,6 +26,10 @@ usage() {
     echo "  patch  (default)  v0.1.0 → v0.1.1   (afterwards 0.1.2-SNAPSHOT)"
     echo "  minor             v0.1.1 → v0.2.0   (afterwards 0.2.1-SNAPSHOT)"
     echo "  major             v0.2.0 → v1.0.0   (afterwards 1.0.1-SNAPSHOT)"
+    echo ""
+    echo "Before tagging it looks for a load test of the current commit (scripts/load-test.sh)."
+    echo "Missing or RED: it asks; without a terminal it stops. --skip-load-test (or"
+    echo "RELEASE_SKIP_LOAD_TEST=1) releases without one and says so."
 }
 
 # ── Read current version ──────────────────────────────────
@@ -85,14 +89,63 @@ update_package_json() {
     (cd "$FRONTEND_DIR" && npm version "$new_version" --no-git-tag-version --allow-same-version --ignore-scripts >/dev/null)
 }
 
+# ── Load test ─────────────────────────────────────────────
+# Every release is load-tested first (TODO 1a6058dc): scripts/load-test.sh measures the commit on a
+# throwaway instance and leaves summary.txt ("commit=<sha> verdict=<GREEN|YELLOW|RED> …") in its
+# result directory. The commit that counts is HEAD before the bump — the release commit itself
+# changes nothing but version numbers. Missing or RED asks instead of stopping outright; without a
+# terminal there is nobody to ask, so it stops.
+LOAD_TEST_DIR="${MYSURICATES_LOAD_TEST_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/mysuricates/load-test}"
+
+load_test_verdict() {  # $1 = commit → "VERDICT DIR" of the newest result for it, or nothing
+    local commit="$1" dir
+    # Result directories are named <timestamp>-<sha12>, so reverse name order is newest first.
+    for dir in $(ls -1 "$LOAD_TEST_DIR" 2>/dev/null | sort -r); do
+        if grep -q "^commit=${commit} " "$LOAD_TEST_DIR/$dir/summary.txt" 2>/dev/null; then
+            echo "$(sed -n 's/.* verdict=\([A-Z]*\).*/\1/p' "$LOAD_TEST_DIR/$dir/summary.txt") $LOAD_TEST_DIR/$dir"
+            return 0
+        fi
+    done
+}
+
+check_load_test() {
+    local head verdict dir problem answer
+    head="$(git rev-parse HEAD)"
+    read -r verdict dir <<< "$(load_test_verdict "$head")"
+    case "$verdict" in
+        GREEN)  log "Load test:       GREEN (${dir})"; return 0 ;;
+        YELLOW) warn "Load test:       YELLOW — see ${dir}/facts.txt"; return 0 ;;
+        RED)    problem="Load test of ${head:0:12} is RED (${dir}/facts.txt)" ;;
+        *)      problem="No load test for ${head:0:12} — run: scripts/load-test.sh" ;;
+    esac
+    if [ "$SKIP_LOAD_TEST" = 1 ]; then
+        warn "${problem} — skipped (--skip-load-test)"
+        return 0
+    fi
+    if [ ! -t 0 ]; then
+        err "${problem}"
+        err "No terminal to ask. Run the load test or pass --skip-load-test."
+        exit 1
+    fi
+    warn "${problem}"
+    read -r -p "Release anyway? [y/N] " answer
+    case "$answer" in
+        y|Y|yes|j|J|ja) warn "Releasing without a passing load test." ;;
+        *) err "Aborted."; exit 1 ;;
+    esac
+}
+
 # ── Main ──────────────────────────────────────────────────
 
-BUMP="${1:-patch}"
-
-if [[ "$BUMP" == "-h" || "$BUMP" == "--help" ]]; then
-    usage
-    exit 0
-fi
+BUMP="patch"
+SKIP_LOAD_TEST="${RELEASE_SKIP_LOAD_TEST:-0}"
+for arg in "$@"; do
+    case "$arg" in
+        -h|--help) usage; exit 0 ;;
+        --skip-load-test) SKIP_LOAD_TEST=1 ;;
+        *) BUMP="$arg" ;;
+    esac
+done
 
 # Ensure clean working tree
 cd "$PROJECT_ROOT"
@@ -114,6 +167,7 @@ fi
 log "Last release:    ${CURRENT}"
 log "Bump type:       $BUMP"
 log "New version:     $NEXT"
+check_load_test
 echo ""
 
 # Release commit: the version without a suffix — this is what the tag carries
