@@ -52,4 +52,12 @@ public class RequestMetricsConfig {
 
     /** How many stored days form the baseline a route is compared against. */
     private int baselineDays = 7;
+
+    /**
+     * Calls a stored day needs before the performance audit's trend counts it. Lower than
+     * {@link #driftMinCalls}: the trend compares medians over many days, so a quiet day of a
+     * route (the workflow list is opened 5 to 60 times a day) still carries weight — a day with
+     * one or two cold requests does not.
+     */
+    private int trendMinDailyCalls = 5;
 }

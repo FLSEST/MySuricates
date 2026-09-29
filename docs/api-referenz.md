@@ -2365,6 +2365,7 @@ Aktuelle Execution-Konfiguration abrufen (Timeouts, Token-Limits etc.). Enthält
 | `request-metrics-drift-factor` | 1.1–100.0 |
 | `request-metrics-drift-min-calls` | 1–100000 |
 | `request-metrics-baseline-days` | 1–365 |
+| `request-metrics-trend-min-daily-calls` | 1–100000 |
 
 Die Liste ist der Stand von `ExecutionSettingKeys.BOUNDS`. Ein Schlüssel ohne Grenzen dort ist
 über diesen Endpunkt **nicht** erreichbar, auch wenn ein Applier existiert — zwei Wächter-Tests

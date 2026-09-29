@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -33,6 +34,22 @@ public class RequestMetricsQueryService {
     /** Routes measured since the last daily snapshot, most expensive (p95) first. */
     public List<RouteSnapshot> liveWindow() {
         return collector.snapshot();
+    }
+
+    /** Since when the live window counts: the last restart, the last snapshot or midnight. */
+    public Instant liveWindowOpenedAt() {
+        return collector.windowOpenedAt();
+    }
+
+    /**
+     * Every stored row of the last {@code days} days up to and including today, oldest first — one
+     * query, so the audit's trend never loops over routes on the single connection.
+     */
+    @Transactional(readOnly = true)
+    public List<RequestMetricDaily> recentDays(int days) {
+        int window = Math.max(1, Math.min(days, MAX_HISTORY_DAYS));
+        LocalDate today = LocalDate.now(clock);
+        return repository.findByDayBetweenOrderByDayAsc(today.minusDays(window), today);
     }
 
     /** Today's stored rows, most expensive first. */

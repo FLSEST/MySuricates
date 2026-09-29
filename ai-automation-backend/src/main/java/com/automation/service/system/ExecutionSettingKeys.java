@@ -100,7 +100,8 @@ final class ExecutionSettingKeys {
             Map.entry("request-metrics-drift-detection-enabled", Bound.whole(0, 1)),
             Map.entry("request-metrics-drift-factor",           Bound.fraction(1.1, 100.0)),
             Map.entry("request-metrics-drift-min-calls",        Bound.whole(1, 100000)),
-            Map.entry("request-metrics-baseline-days",          Bound.whole(1, 365))
+            Map.entry("request-metrics-baseline-days",          Bound.whole(1, 365)),
+            Map.entry("request-metrics-trend-min-daily-calls",  Bound.whole(1, 100000))
     );
 
     // Frontend sends camelCase keys, backend uses kebab-case internally
@@ -145,7 +146,8 @@ final class ExecutionSettingKeys {
             Map.entry("requestMetricsDriftDetectionEnabled",  "request-metrics-drift-detection-enabled"),
             Map.entry("requestMetricsDriftFactor",            "request-metrics-drift-factor"),
             Map.entry("requestMetricsDriftMinCalls",          "request-metrics-drift-min-calls"),
-            Map.entry("requestMetricsBaselineDays",           "request-metrics-baseline-days")
+            Map.entry("requestMetricsBaselineDays",           "request-metrics-baseline-days"),
+            Map.entry("requestMetricsTrendMinDailyCalls",     "request-metrics-trend-min-daily-calls")
     );
 
     /**
