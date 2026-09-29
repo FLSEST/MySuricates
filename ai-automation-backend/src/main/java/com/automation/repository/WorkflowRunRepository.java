@@ -176,6 +176,10 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, String
 
     long countByWorkflowIdAndStatusAndCompletedAtAfter(String workflowId, RunStatus status, Instant since);
 
+    /** Runs of a workflow in this state that ended at or after {@code since} — the auto-resume check of the scheduler. */
+    List<WorkflowRun> findByWorkflowIdAndStatusAndCompletedAtGreaterThanEqual(String workflowId, RunStatus status,
+                                                                            Instant since);
+
     boolean existsByWorkflowIdAndStatus(String workflowId, RunStatus status);
 
     /** Whether the workflow has a run in one of these states — the scheduler's SKIP check (RUNNING, PAUSED). */
