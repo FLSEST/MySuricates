@@ -12,27 +12,32 @@ import java.util.List;
 
 /**
  * Reads workflow blocks from JSON a model wrote — the one mapping JSON → {@link BlockDefinition} for the
- * factory ({@code FactoryResponseParser}) and the build-check correction ({@code CorrectionAnswer}), so both
- * keep {@code type} (default {@code simple}), {@code name}, {@code config}, {@code requiredCapabilities} and
- * {@code skillIds} (TODO d6be36f3). A dropped {@code name} breaks every {@code {{ block.<name>.output }}}
+ * factory ({@code FactoryResponseParser}), the build-check correction ({@code CorrectionAnswer}), wishes, dialog
+ * import and run conversion, so all of them keep {@code type} (default {@code simple}), {@code name},
+ * {@code config}, {@code requiredCapabilities} and {@code skillIds} (TODO d6be36f3). A dropped {@code name} breaks every {@code {{ block.<name>.output }}}
  * reference of a later block.
  */
 public final class BlockJsonReader {
 
+    /** For {@link #fromMapList}: the values there are plain JSON types, no module of the app mapper is needed. */
+    private static final ObjectMapper PLAIN = new ObjectMapper();
+
     private BlockJsonReader() {
     }
 
-    /** Maps one block object; fields of the wrong JSON kind (e.g. {@code config} as a string) are left out. */
+    /**
+     * Maps one block object; fields of the wrong JSON kind (e.g. {@code config} as a string) are left out, a missing
+     * {@code config} becomes an empty mutable map.
+     */
     public static BlockDefinition toBlock(JsonNode node, ObjectMapper objectMapper) {
         BlockDefinition block = new BlockDefinition();
         block.setType(node.path("type").asText("simple"));
         if (node.hasNonNull("name") && node.get("name").isValueNode()) {
             block.setName(node.get("name").asText());
         }
-        if (node.path("config").isObject()) {
-            block.setConfig(objectMapper.convertValue(node.get("config"),
-                    new TypeReference<LinkedHashMap<String, Object>>() {}));
-        }
+        block.setConfig(node.path("config").isObject()
+                ? objectMapper.convertValue(node.get("config"), new TypeReference<LinkedHashMap<String, Object>>() {})
+                : new LinkedHashMap<>());
         if (node.path("requiredCapabilities").isArray()) {
             block.setRequiredCapabilities(objectMapper.convertValue(node.get("requiredCapabilities"),
                     new TypeReference<List<String>>() {}));
@@ -59,6 +64,24 @@ public final class BlockJsonReader {
             blocks.add(toBlock(node, objectMapper));
         }
         return blocks;
+    }
+
+    /**
+     * The block list of a model answer that was already read into plain Java values (a {@code List} of
+     * {@code Map}s, e.g. {@code parsed.get("blocks")}), mapped by {@link #toBlock}. Entries that are no object are
+     * skipped; anything but a list gives an empty list. Every block gets its own mutable {@code config}.
+     */
+    public static List<BlockDefinition> fromMapList(Object blocks) {
+        if (!(blocks instanceof List<?> list)) {
+            return new ArrayList<>();
+        }
+        List<BlockDefinition> result = new ArrayList<>();
+        for (Object entry : list) {
+            if (entry instanceof java.util.Map<?, ?> map) {
+                result.add(toBlock(PLAIN.valueToTree(map), PLAIN));
+            }
+        }
+        return result;
     }
 
     /**

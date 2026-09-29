@@ -103,6 +103,28 @@ class WorkflowConversionServiceTest {
     }
 
     @Test
+    void suggestWorkflow_aiBlocksKeepNameSkillIdsAndCapabilities() throws Exception {
+        // TODO d6be36f3: the AI path took only type and config — {{ block.fetch.output }} pointed nowhere.
+        WorkflowRun run = buildCompletedRunWithAgenticSteps();
+        when(runRepository.findById("run-1")).thenReturn(Optional.of(run));
+        when(aiProvider.reason(any())).thenReturn(new AiProvider.ReasoningResult("""
+                {"suggestedName": "Report", "blocks": [
+                    {"type": "shell", "name": "fetch", "config": {"command": "cat data.txt"},
+                     "skillIds": ["skill-1"], "requiredCapabilities": ["docker"]},
+                    {"type": "simple", "name": "summarize", "config": {"command": "Fasse zusammen: {{ block.fetch.output }}"}}
+                ]}
+                """, null));
+
+        WorkflowSuggestion suggestion = conversionService.suggestWorkflow("run-1");
+
+        assertThat(suggestion.blocks()).extracting(com.automation.entity.BlockDefinition::getName).containsExactly("fetch", "summarize");
+        assertThat(suggestion.blocks().get(0).getSkillIds()).containsExactly("skill-1");
+        assertThat(suggestion.blocks().get(0).getRequiredCapabilities()).containsExactly("docker");
+        // the reference resolves, so the build check needs no correction round
+        verify(aiProvider, times(1)).reason(any());
+    }
+
+    @Test
     void suggestWorkflow_completedRunWithAgenticSteps_returnsSuggestion() throws Exception {
         WorkflowRun run = buildCompletedRunWithAgenticSteps();
         when(runRepository.findById("run-1")).thenReturn(Optional.of(run));

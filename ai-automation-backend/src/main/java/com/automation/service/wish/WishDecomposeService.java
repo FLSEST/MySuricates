@@ -14,6 +14,7 @@ import com.automation.service.factory.FactoryTestResult;
 import com.automation.service.factory.FactoryVerificationService;
 import com.automation.service.workflow.WorkflowService;
 import com.automation.service.workflow.analyzer.GeneratedWorkflowCheck;
+import com.automation.util.BlockJsonReader;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -238,23 +239,10 @@ public class WishDecomposeService {
         }
     }
 
-    @SuppressWarnings("unchecked")
+    /** The blocks of one decomposed workflow ({@link BlockJsonReader#fromMapList}) with the default timeouts. */
     private List<BlockDefinition> parseBlocks(Object blocksObj) {
-        List<BlockDefinition> blocks = new ArrayList<>();
-        if (!(blocksObj instanceof List<?> blockList)) return blocks;
-
-        for (Object bObj : blockList) {
-            if (!(bObj instanceof Map<?, ?> bMap)) continue;
-            Map<String, Object> blockMap = (Map<String, Object>) bMap;
-            String type = (String) blockMap.getOrDefault("type", "simple");
-            Map<String, Object> config = blockMap.get("config") instanceof Map<?, ?> c
-                    ? new LinkedHashMap<>((Map<String, Object>) c)
-                    : new LinkedHashMap<>();
-
-            applyDefaultTimeouts(type, config);
-
-            blocks.add(BlockDefinition.builder().type(type).config(config).build());
-        }
+        List<BlockDefinition> blocks = BlockJsonReader.fromMapList(blocksObj);
+        blocks.forEach(b -> applyDefaultTimeouts(b.getType(), b.getConfig()));
         return blocks;
     }
 

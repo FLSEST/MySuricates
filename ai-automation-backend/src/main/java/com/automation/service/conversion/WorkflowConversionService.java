@@ -12,6 +12,7 @@ import com.automation.service.workflow.AgentInstructionsService;
 import com.automation.service.workflow.WorkflowService;
 import com.automation.service.workflow.analyzer.GeneratedWorkflowCheck;
 import com.automation.util.JsonRepairUtil;
+import com.automation.util.BlockJsonReader;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -145,20 +146,7 @@ public class WorkflowConversionService {
         String sugName = (String) parsed.getOrDefault("suggestedName", "Auto: " + RuleBasedConversion.truncate(goal, 60));
         String sugDesc = (String) parsed.getOrDefault("suggestedDescription", "");
 
-        List<BlockDefinition> blocks = new ArrayList<>();
-        Object blocksObj = parsed.get("blocks");
-        if (blocksObj instanceof List<?> blockList) {
-            for (Object bObj : blockList) {
-                if (bObj instanceof Map<?, ?> bMap) {
-                    Map<String, Object> blockMap = (Map<String, Object>) bMap;
-                    String type = (String) blockMap.getOrDefault("type", "simple");
-                    Map<String, Object> config = blockMap.get("config") instanceof Map<?, ?> c
-                            ? (Map<String, Object>) c
-                            : new LinkedHashMap<>();
-                    blocks.add(BlockDefinition.builder().type(type).config(config).build());
-                }
-            }
-        }
+        List<BlockDefinition> blocks = BlockJsonReader.fromMapList(parsed.get("blocks"));
 
         if (blocks.isEmpty()) {
             return WorkflowSuggestion.notAvailable();

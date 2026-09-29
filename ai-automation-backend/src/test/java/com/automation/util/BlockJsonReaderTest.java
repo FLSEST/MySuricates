@@ -59,4 +59,24 @@ class BlockJsonReaderTest {
         assertThat(BlockJsonReader.parseAnswer("  ", mapper)).isEmpty();
         assertThat(BlockJsonReader.parseAnswer(null, mapper)).isEmpty();
     }
+
+    @Test
+    void fromMapList_mapsAllFields_skipsNonObjects_configIsMutable() {
+        Object parsed = List.of(
+                Map.of("type", "shell", "name", "fetch", "config", Map.of("command", "ls"),
+                        "skillIds", List.of("s1"), "requiredCapabilities", List.of("docker")),
+                "oops",
+                Map.of("name", "bare"));
+
+        List<BlockDefinition> blocks = BlockJsonReader.fromMapList(parsed);
+
+        assertThat(blocks).extracting(BlockDefinition::getName).containsExactly("fetch", "bare");
+        assertThat(blocks.get(0).getSkillIds()).containsExactly("s1");
+        assertThat(blocks.get(0).getRequiredCapabilities()).containsExactly("docker");
+        assertThat(blocks.get(1).getType()).isEqualTo("simple");
+        blocks.get(0).getConfig().put("timeout_seconds", 60);
+        blocks.get(1).getConfig().put("timeout_seconds", 60);
+        assertThat(BlockJsonReader.fromMapList("nope")).isEmpty();
+        assertThat(BlockJsonReader.fromMapList(null)).isEmpty();
+    }
 }
