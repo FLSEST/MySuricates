@@ -168,7 +168,8 @@ class PageSuggestionServiceTest {
             service.refreshSuggestions("run", "de");
 
             verify(workflowMemoryRepository).findTop5ByActiveTrueOrderByCreatedAtDesc();
-            verify(workflowMemoryRepository, never()).findByActiveTrueOrderByCreatedAtDesc();
+            // Keine weitere Memory-Abfrage — insbesondere keine, die alle aktiven Memories laedt (7a8481e2).
+            verifyNoMoreInteractions(workflowMemoryRepository);
         }
 
         @Test

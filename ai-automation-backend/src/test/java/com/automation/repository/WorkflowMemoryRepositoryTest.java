@@ -147,42 +147,46 @@ class WorkflowMemoryRepositoryTest {
         assertThat(result).isEmpty();
     }
 
-    // --- findByActiveTrueOrderByCreatedAtDesc ---
+    // --- findTop8ByActiveTrueOrderByCreatedAtDesc: Filter und Reihenfolge ---
+    // Die unbeschraenkte findByActiveTrueOrderByCreatedAtDesc ist entfernt (7a8481e2); diese Tests
+    // pruefen dieselben Eigenschaften an der Abfrage, die der Assistent tatsaechlich stellt.
+    // Zeitstempel weit in der Zukunft, damit Reste anderer Tests nicht in die Top 8 ruecken.
 
     @Test
-    void findByActiveTrueOrderByCreatedAtDesc_returnsOnlyActiveEntries() {
-        repository.save(memory(workflowId, true));
-        repository.save(memory(workflowId, false));
-        repository.save(memory(otherWorkflowId, true));
+    void findTop8ByActiveTrue_returnsOnlyActiveEntries() {
+        Instant base = Instant.parse("2999-01-01T00:00:00Z");
+        WorkflowMemory active = repository.save(memoryWithCreatedAt(workflowId, true, base.plusSeconds(1)));
+        WorkflowMemory inactive = repository.save(memoryWithCreatedAt(workflowId, false, base.plusSeconds(2)));
+        WorkflowMemory otherActive = repository.save(memoryWithCreatedAt(otherWorkflowId, true, base));
 
-        List<WorkflowMemory> result = repository.findByActiveTrueOrderByCreatedAtDesc();
+        List<WorkflowMemory> result = repository.findTop8ByActiveTrueOrderByCreatedAtDesc();
 
-        assertThat(result).hasSizeGreaterThanOrEqualTo(2);
-        assertThat(result).allMatch(WorkflowMemory::isActive);
+        assertThat(result).allMatch(WorkflowMemory::isActive)
+                .extracting(WorkflowMemory::getId)
+                .contains(active.getId(), otherActive.getId())
+                .doesNotContain(inactive.getId());
     }
 
     @Test
-    void findByActiveTrueOrderByCreatedAtDesc_emptyWhenNoActiveEntries() {
-        repository.save(memory(workflowId, false));
-        repository.save(memory(otherWorkflowId, false));
+    void findTop8ByActiveTrue_skipsInactiveEntries_evenWhenTheyAreTheNewest() {
+        Instant base = Instant.parse("2999-01-01T00:00:00Z");
+        WorkflowMemory first = repository.save(memoryWithCreatedAt(workflowId, false, base));
+        WorkflowMemory second = repository.save(memoryWithCreatedAt(otherWorkflowId, false, base.plusSeconds(1)));
 
-        List<WorkflowMemory> result = repository.findByActiveTrueOrderByCreatedAtDesc();
+        List<WorkflowMemory> result = repository.findTop8ByActiveTrueOrderByCreatedAtDesc();
 
-        assertThat(result).isEmpty();
+        assertThat(result).extracting(WorkflowMemory::getId).doesNotContain(first.getId(), second.getId());
     }
 
     @Test
-    void findByActiveTrueOrderByCreatedAtDesc_orderedNewestFirst() {
-        Instant older = Instant.now().minusSeconds(60);
-        Instant newer = Instant.now();
+    void findTop8ByActiveTrue_orderedNewestFirst() {
+        Instant base = Instant.parse("2999-01-01T00:00:00Z");
+        WorkflowMemory older = repository.save(memoryWithCreatedAt(workflowId, true, base));
+        WorkflowMemory newer = repository.save(memoryWithCreatedAt(otherWorkflowId, true, base.plusSeconds(60)));
 
-        repository.save(memoryWithCreatedAt(workflowId, true, older));
-        repository.save(memoryWithCreatedAt(otherWorkflowId, true, newer));
+        List<WorkflowMemory> result = repository.findTop8ByActiveTrueOrderByCreatedAtDesc();
 
-        List<WorkflowMemory> result = repository.findByActiveTrueOrderByCreatedAtDesc();
-
-        assertThat(result).hasSizeGreaterThanOrEqualTo(2);
-        assertThat(result.get(0).getCreatedAt()).isAfterOrEqualTo(result.get(1).getCreatedAt());
+        assertThat(result).extracting(WorkflowMemory::getId).startsWith(newer.getId(), older.getId());
     }
 
     // --- deactivateAllForWorkflow ---
