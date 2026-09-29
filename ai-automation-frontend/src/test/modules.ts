@@ -2,6 +2,7 @@ import type { ModuleInfo, ModuleName, ModulePreset, SystemModules } from '../typ
 
 const FEATURES: Array<Pick<ModuleInfo, 'name' | 'tier' | 'maturity' | 'risks' | 'requires'>> = [
   { name: 'dashboard-report', tier: 'standard', maturity: 'stable', risks: [], requires: [] },
+  { name: 'goals', tier: 'standard', maturity: 'stable', risks: [], requires: [] },
   { name: 'chains', tier: 'research', maturity: 'stable', risks: [], requires: [] },
   { name: 'assistant', tier: 'research', maturity: 'experimental', risks: [], requires: [] },
   { name: 'learning', tier: 'research', maturity: 'experimental', risks: [], requires: [] },

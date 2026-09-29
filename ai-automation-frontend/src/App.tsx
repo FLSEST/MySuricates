@@ -1,13 +1,11 @@
-import { lazy, useEffect, useState, type ReactNode } from 'react';
+import { lazy, useEffect, useState } from 'react';
 import { createBrowserRouter, RouterProvider, useParams, Navigate } from 'react-router-dom';
 import { Layout } from './components/layout/Layout';
 import { RouteErrorFallback } from './components/shared/RouteErrorFallback';
 import { ToastContainer } from './components/ui/ToastContainer';
 import { useSettingsStore } from './stores/settingsStore';
-import { useModuleEnabled } from './hooks/useModules';
-import { ModuleDisabled } from './pages/ModuleDisabled';
+import { ModuleRoute } from './pages/ModuleRoute';
 import { api } from './api/client';
-import type { FeatureModuleName } from './types';
 
 const Dashboard = lazy(() => import('./pages/Dashboard').then(m => ({ default: m.Dashboard })));
 const SimpleHome = lazy(() => import('./pages/SimpleHome').then(m => ({ default: m.SimpleHome })));
@@ -63,12 +61,6 @@ function TodosRoute() {
 function ActivityRoute() {
   const { simpleMode } = useSettingsStore();
   return simpleMode ? <SimpleActivity /> : <ActivityLog />;
-}
-
-/** Renders the page only when its module is enabled on this backend; otherwise explains how to enable it. */
-function ModuleRoute({ module, children }: { module: FeatureModuleName; children: ReactNode }) {
-  const enabled = useModuleEnabled(module);
-  return enabled ? <>{children}</> : <ModuleDisabled module={module} />;
 }
 
 /** Redirects /runs/:runId to /workflows/:workflowId/run/:runId */
@@ -144,8 +136,8 @@ const router = createBrowserRouter([
       { path: 'webhooks', element: <ModuleRoute module="webhooks"><Webhooks /></ModuleRoute> },
       { path: 'integrations', element: <ModuleRoute module="integrations"><Integrations /></ModuleRoute> },
       { path: 'cockpit', element: <ProjectCockpit /> },
-      { path: 'goals', element: <Goals /> },
-      { path: 'goals/:goalId', element: <GoalDetail /> },
+      { path: 'goals', element: <ModuleRoute module="goals"><Goals /></ModuleRoute> },
+      { path: 'goals/:goalId', element: <ModuleRoute module="goals"><GoalDetail /></ModuleRoute> },
       { path: 'todos', element: <TodosRoute /> },
       { path: 'activity', element: <ActivityRoute /> },
       { path: 'dlq', element: <DeadLetterQueue /> },

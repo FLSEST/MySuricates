@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach, vi } from 'vitest';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
-import { Route, Routes, useLocation } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { render } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
 import { renderWithProviders } from '../../test/utils';
@@ -67,7 +69,7 @@ function Location() {
   return <p data-testid="location">{location.search}</p>;
 }
 
-function renderGoal(route = '/goals/g1') {
+function serveGoal() {
   server.use(
     http.get('/api/v1/goals/g1', () => HttpResponse.json(detail)),
     http.get('/api/v1/goals/g1/workflows', () => HttpResponse.json([
@@ -79,6 +81,10 @@ function renderGoal(route = '/goals/g1') {
       projectId: 'p1', projectName: 'AutoPilot', source: 'USER', createdAt: '', updatedAt: '',
     })),
   );
+}
+
+function renderGoal(route = '/goals/g1') {
+  serveGoal();
   return renderWithProviders(
     <>
       <Routes><Route path="/goals/:goalId" element={<GoalDetail />} /></Routes>
@@ -246,5 +252,94 @@ describe('TODOs are clickable in every view', () => {
     fireEvent.click(within(first!).getByRole('button', { name: 'Open TODO: Privacy findings' }));
     expect(await screen.findByDisplayValue('Full text')).toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
+  });
+});
+
+// Review c60bf914: the selection replaces its history entry – Back leaves the goal page instead of
+// stepping through every opened item; a small sheet is modal; no drag listener outlives the panel
+describe('GoalSidePanel – history, modal sheet, clean-up', () => {
+  function Back() {
+    const navigate = useNavigate();
+    return <button type="button" onClick={() => navigate(-1)}>Back</button>;
+  }
+  function Where() {
+    const location = useLocation();
+    return <p data-testid="where">{location.pathname}{location.search}</p>;
+  }
+
+  it('does not add a history entry per selection: one Back leaves the goal page', async () => {
+    serveGoal();
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter initialEntries={['/start', '/goals/g1']} initialIndex={1}>
+          <Routes>
+            <Route path="/goals/:goalId" element={<GoalDetail />} />
+            <Route path="/start" element={<p>Start page</p>} />
+          </Routes>
+          <Where />
+          <Back />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'Open work package: Repo clean' }));
+    expect(screen.getByTestId('where')).toHaveTextContent('/goals/g1?item=workpackage:w1');
+    fireEvent.click(screen.getAllByRole('button', { name: 'Open milestone: Code freeze' })[0]!);
+    expect(screen.getByTestId('where')).toHaveTextContent('/goals/g1?item=milestone:ms1');
+    fireEvent.click(within(screen.getByTestId('goal-side-panel')).getByRole('button', { name: 'Close the side panel' }));
+    expect(screen.getByTestId('where')).toHaveTextContent('/goals/g1');
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    expect(screen.getByTestId('where')).toHaveTextContent('/start');
+    expect(screen.getByText('Start page')).toBeInTheDocument();
+  });
+
+  it('makes the small-screen sheet a modal dialog: the page behind is inert, Tab stays inside, a TODO dialog on top still works', async () => {
+    const original = window.matchMedia;
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: query.includes('max-width: 1023px'), media: query, onchange: null,
+      addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn(),
+    }));
+    try {
+      const { container } = renderGoal('/goals/g1?item=workpackage:w1');
+      const sheet = await screen.findByTestId('goal-side-panel');
+      expect(sheet).toHaveAttribute('role', 'dialog');
+      expect(sheet).toHaveAttribute('aria-modal', 'true');
+      expect(container).toHaveAttribute('inert');
+      expect(container.contains(sheet)).toBe(false);
+
+      const buttons = within(sheet).getAllByRole('button');
+      const last = buttons.at(-1)!;
+      act(() => last.focus());
+      fireEvent.keyDown(last, { key: 'Tab' });
+      expect(buttons[0]).toHaveFocus();
+      fireEvent.keyDown(buttons[0]!, { key: 'Tab', shiftKey: true });
+      expect(last).toHaveFocus();
+
+      // the TODO dialog opens in the page – while it is open, the page is usable again
+      fireEvent.click(within(sheet).getByRole('button', { name: 'Open TODO: Privacy findings (Open)' }));
+      expect(await screen.findByDisplayValue('Full text')).toBeInTheDocument();
+      await waitFor(() => expect(container).not.toHaveAttribute('inert'));
+
+      fireEvent.keyDown(screen.getByDisplayValue('Full text'), { key: 'Escape' });
+      await waitFor(() => expect(screen.queryByDisplayValue('Full text')).not.toBeInTheDocument());
+      await waitFor(() => expect(container).toHaveAttribute('inert'));
+      fireEvent.click(within(screen.getByTestId('goal-side-panel')).getByRole('button', { name: 'Close the side panel' }));
+      expect(container).not.toHaveAttribute('inert');
+    } finally {
+      window.matchMedia = original;
+    }
+  });
+
+  it('removes its drag listeners when it closes in the middle of a drag', async () => {
+    renderGoal('/goals/g1?item=workpackage:w1');
+    fireEvent.click(await screen.findByRole('button', { name: 'Detach as a window' }));
+    const added = vi.spyOn(window, 'addEventListener');
+    const removed = vi.spyOn(window, 'removeEventListener');
+    fireEvent.pointerDown(screen.getByTestId('goal-side-panel-titlebar'), { button: 0, clientX: 100, clientY: 100 });
+    expect(added.mock.calls.filter(([type]) => type === 'pointermove')).toHaveLength(1);
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    expect(screen.queryByTestId('goal-side-panel')).not.toBeInTheDocument();
+    expect(removed.mock.calls.filter(([type]) => type === 'pointermove')).toHaveLength(1);
+    added.mockRestore();
+    removed.mockRestore();
   });
 });

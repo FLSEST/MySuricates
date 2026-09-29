@@ -3,6 +3,7 @@ import { api, apiErrorMessage, apiErrorStatus } from '../api/client';
 import { defaultQueryRetry } from '../api/queryDefaults';
 import { useToast } from './useToast';
 import { useT } from '../i18n';
+import { useModuleEnabled } from './useModules';
 import type {
   CreateGoalRequest, DecisionState, Goal, GoalDetail, GoalGuard, GoalMilestone, GoalProject, GoalRelations, GoalStatus, GoalTodoItem,
   GoalWorkPackage, MilestoneState, PageResponse, Todo, UpdateGoalRequest, UpdateTodoPlanningRequest,
@@ -28,8 +29,10 @@ export function useGoals(statuses?: GoalStatus[], projectId?: string) {
     ...(projectId ? [`projectId=${encodeURIComponent(projectId)}`] : []),
   ];
   const query = params.length ? `?${params.join('&')}` : '';
+  const goalsModule = useModuleEnabled('goals');
   return useQuery({
     queryKey: goalKeys.list(statuses, projectId),
+    enabled: goalsModule,
     queryFn: () => api.get<Goal[]>(`/goals${query}`)
       .then((goals) => (projectId ? goals.filter((goal) => !goal.projects || goal.projects.some((p) => p.id === projectId)) : goals)),
     staleTime: 30_000,
@@ -199,10 +202,11 @@ export function normalizeGoalDetail(raw: GoalDetail | RawGoalDetail): GoalDetail
 }
 
 export function useGoal(id: string | undefined) {
+  const goalsModule = useModuleEnabled('goals');
   return useQuery({
     queryKey: goalKeys.detail(id ?? ''),
     queryFn: () => api.get<GoalDetail>(`/goals/${id}`).then(normalizeGoalDetail),
-    enabled: !!id,
+    enabled: goalsModule && !!id,
   });
 }
 
@@ -220,11 +224,12 @@ export function goalRelationsRetry(failureCount: number, error: unknown): boolea
  * bleibt die alte Karte stehen, bis die neue da ist.
  */
 export function useGoalRelations(id: string | undefined, include: string[], enabled = true) {
+  const goalsModule = useModuleEnabled('goals');
   const query = include.length ? `?include=${include.map(encodeURIComponent).join(',')}` : '';
   return useQuery({
     queryKey: goalKeys.relations(id ?? '', include),
     queryFn: () => api.get<GoalRelations>(`/goals/${id}/relations${query}`),
-    enabled: !!id && enabled,
+    enabled: goalsModule && !!id && enabled,
     placeholderData: keepPreviousData,
     staleTime: 15_000,
     retry: (failureCount, error: Error) => goalRelationsRetry(failureCount, error),
@@ -246,6 +251,7 @@ export type CandidatePage = PageResponse<Todo> & { scoped: boolean };
  * die Seite sagt `scoped: false`, damit der Schalter nicht etwas verspricht, das keiner einlöst.
  */
 export function useGoalCandidates(goalId: string | undefined, filter: { q: string; tag: string }, allProjects: boolean, enabled = true) {
+  const goalsModule = useModuleEnabled('goals');
   const q = filter.q.trim();
   const tag = filter.tag.trim();
   return useQuery({
@@ -265,7 +271,7 @@ export function useGoalCandidates(goalId: string | undefined, filter: { q: strin
       if (q) legacy.set('q', q);
       return { ...(await api.get<PageResponse<Todo>>(`/todos?${legacy.toString()}`)), scoped: false };
     },
-    enabled: !!goalId && enabled,
+    enabled: goalsModule && !!goalId && enabled,
     placeholderData: keepPreviousData,
     staleTime: 60_000,
   });

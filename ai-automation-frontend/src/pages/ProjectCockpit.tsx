@@ -10,6 +10,7 @@ import { GoalsSection } from '../components/goal/GoalsSection';
 import { MilestoneDueRow } from '../components/goal/MilestoneDueRow';
 import { priorityColor, sourceIcon } from '../components/todo/todoConstants';
 import { useTodoOverview } from '../hooks/useTodoOverview';
+import { useModuleEnabled } from '../hooks/useModules';
 import { useArchiveStale, useProjectActiveTodos } from '../hooks/useTodos';
 import { todoDeepLink } from '../utils/todoLinks';
 import { formatRelativeShort } from '../utils/formatTime';
@@ -21,6 +22,8 @@ export function ProjectCockpit() {
   const navigate = useNavigate();
   const { data, isLoading, error, refetch } = useTodoOverview();
   const archiveStale = useArchiveStale();
+  // Ziele sind ein Modul: aus, gibt es weder fällige Meilensteine noch die Zielkarten (c60bf914)
+  const goalsModule = useModuleEnabled('goals');
 
   if (isLoading) {
     return (
@@ -35,7 +38,7 @@ export function ProjectCockpit() {
 
   const needsYou = data?.needsYou ?? [];
   // Meilensteine, die bald fällig oder überfällig sind (TODO e192df18); ein älteres Backend liefert sie nicht.
-  const milestonesDue = data?.milestonesDue ?? [];
+  const milestonesDue = goalsModule ? data?.milestonesDue ?? [] : [];
   const attention = needsYou.length + milestonesDue.length;
   const projects = data?.projects ?? [];
   const staleThresholdDays = data?.staleThresholdDays ?? 30;
@@ -86,7 +89,7 @@ export function ProjectCockpit() {
       </section>
 
       {/* Per-project rollup cards */}
-      <GoalsSection />
+      {goalsModule && <GoalsSection />}
 
       <section>
         <div className="flex items-center gap-2 mb-3">
