@@ -5,6 +5,7 @@ import { type ReactNode, createElement } from 'react';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
 import { useConversionSuggestion, useCreateWorkflowFromSuggestion } from '../useConversion';
+import type { BlockDefinition } from '../../types';
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
 afterEach(() => server.resetHandlers());
@@ -59,5 +60,24 @@ describe('useCreateWorkflowFromSuggestion', () => {
     });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data!.id).toBe('w1');
+  });
+
+  it('sends the reviewed suggestion so the server saves exactly what was shown (TODO 935af6d3)', async () => {
+    let body: unknown;
+    server.use(
+      http.post('/api/v1/conversions/runs/:runId/create-workflow', async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json({ id: 'w1', name: 'Reviewed' });
+      }),
+    );
+    const blocks: BlockDefinition[] = [{ type: 'shell', config: { command: 'npm test' } }];
+    const { result } = renderHook(() => useCreateWorkflowFromSuggestion(), { wrapper: createWrapper() });
+    await act(async () => {
+      result.current.mutate({
+        runId: 'r1', projectId: 'p1', name: 'Reviewed', description: 'From the preview', blocks,
+      });
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(body).toEqual({ projectId: 'p1', name: 'Reviewed', description: 'From the preview', blocks });
   });
 });

@@ -3571,9 +3571,17 @@ Workflow aus einem Agentic-Run erstellen.
 ```json
 {
   "projectId": "uuid",
-  "name": "Konvertierter Workflow"
+  "name": "Konvertierter Workflow",
+  "description": "Beschreibung aus der Vorschau",
+  "blocks": [{ "type": "shell", "config": { "command": "npm test" } }]
 }
 ```
+
+`description` und `blocks` sind optional: der geprüfte Vorschlag aus `GET …/suggest`. Mit `blocks`
+werden genau diese Blöcke gespeichert, ohne den Vorschlag neu zu erzeugen (kein KI-Aufruf); `name`
+ist dann Pflicht (sonst `400`), der Lauf muss existieren (`404`) und abgeschlossen sein. Ohne
+`blocks` erzeugt der Server den Vorschlag neu (bisheriges Verhalten). Die Baufehler-Prüfung meldet
+Befunde des gespeicherten Workflows in beiden Fällen im Activity-Log.
 
 **Response:** `WorkflowResponse`
 

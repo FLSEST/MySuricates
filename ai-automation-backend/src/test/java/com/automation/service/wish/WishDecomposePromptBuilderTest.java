@@ -16,6 +16,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
@@ -178,6 +179,59 @@ class WishDecomposePromptBuilderTest {
             assertThat(result)
                     .contains("MyProject (current project")
                     .contains("**Build Pipeline**");
+        }
+
+        /**
+         * 5fb7b1e9: die aktiven Memories aller Projekt-Workflows kommen aus einer Abfrage, nicht aus
+         * einer je Workflow — und stehen trotzdem in der Workflow-Reihenfolge im Prompt.
+         */
+        @Test
+        void projectMemories_comeFromOneBatchedQuery_inWorkflowOrder() {
+            stubDefaults();
+            Wish wish = buildWish("Deploy app");
+            wish.setProjectId("proj-1");
+            Project project = new Project();
+            project.setId("proj-1");
+            project.setName("MyProject");
+            when(projectRepository.findById("proj-1")).thenReturn(Optional.of(project));
+            List<Workflow> workflows = new ArrayList<>();
+            for (String id : List.of("wf-1", "wf-2", "wf-3")) {
+                Workflow wf = new Workflow();
+                wf.setId(id);
+                wf.setName("Workflow " + id);
+                wf.setProject(project);
+                wf.setBlocks(List.of());
+                workflows.add(wf);
+            }
+            when(workflowRepository.findByProjectId("proj-1")).thenReturn(workflows);
+            // Die Datenbank liefert in beliebiger Reihenfolge — hier bewusst umgekehrt.
+            when(memoryRepository.findByWorkflowIdInAndActiveTrue(List.of("wf-1", "wf-2", "wf-3"))).thenReturn(List.of(
+                    WorkflowMemory.builder().workflowId("wf-3").title("Third").content("C").active(true).build(),
+                    WorkflowMemory.builder().workflowId("wf-1").title("First").content("A").active(true).build()));
+
+            String result = builder.buildPrompt(wish);
+
+            assertThat(result).contains("## Accumulated Project Knowledge");
+            assertThat(result.indexOf("### First")).isPositive().isLessThan(result.indexOf("### Third"));
+            verify(memoryRepository, times(1)).findByWorkflowIdInAndActiveTrue(anyCollection());
+            verify(memoryRepository, never()).findByWorkflowIdAndActiveTrue(anyString());
+            // Der Builder liest die Projekt-Workflows fuer Memories und Liste einmal (vorher zweimal);
+            // der zweite Aufruf ist WishPromptHelper.buildExecutionIntelligence.
+            verify(workflowRepository, times(2)).findByProjectId("proj-1");
+        }
+
+        /** Ohne Workflows im Projekt wird nach Memories gar nicht gefragt (kein {@code IN ()}). */
+        @Test
+        void projectWithoutWorkflows_queriesNoMemories() {
+            stubDefaults();
+            Wish wish = buildWish("Build app");
+            wish.setProjectId("proj-1");
+            when(projectRepository.findById("proj-1")).thenReturn(Optional.empty());
+            when(workflowRepository.findByProjectId("proj-1")).thenReturn(List.of());
+
+            builder.buildPrompt(wish);
+
+            verifyNoInteractions(memoryRepository);
         }
 
         @Test

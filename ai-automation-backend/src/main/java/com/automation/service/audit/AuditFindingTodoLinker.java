@@ -55,16 +55,23 @@ class AuditFindingTodoLinker {
         clearAuditReference(findingId, todoId);
     }
 
-    /** Offene Findings, deren verwaltetes TODO erledigt gemeldet wird, warten auf den nächsten Audit-Lauf. */
+    /**
+     * Offene Findings, deren verwaltetes TODO erledigt gemeldet wird, warten auf den nächsten Audit-Lauf.
+     * Die Findings aller verwalteten Verknüpfungen kommen aus einer Abfrage, nicht aus einer je
+     * Verknüpfung (5fb7b1e9); ohne verwaltete Verknüpfung wird gar nicht gefragt.
+     */
     void markAwaitingVerification(String todoId) {
-        for (AuditFindingTodo link : findingTodoRepository.findByTodoId(todoId)) {
-            if (!link.isManaged()) continue;
-            findingRepository.findById(link.getFindingId()).ifPresent(finding -> {
-                if (finding.getStatus() == AuditFindingStatus.OPEN) {
-                    finding.setStatus(AuditFindingStatus.AWAITING_VERIFICATION);
-                    findingRepository.save(finding);
-                }
-            });
+        List<String> managedFindingIds = findingTodoRepository.findByTodoId(todoId).stream()
+                .filter(AuditFindingTodo::isManaged)
+                .map(AuditFindingTodo::getFindingId)
+                .distinct()
+                .toList();
+        if (managedFindingIds.isEmpty()) return;
+        for (AuditFinding finding : findingRepository.findAllById(managedFindingIds)) {
+            if (finding.getStatus() == AuditFindingStatus.OPEN) {
+                finding.setStatus(AuditFindingStatus.AWAITING_VERIFICATION);
+                findingRepository.save(finding);
+            }
         }
     }
 

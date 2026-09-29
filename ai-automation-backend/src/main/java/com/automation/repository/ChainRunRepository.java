@@ -40,8 +40,6 @@ public interface ChainRunRepository extends JpaRepository<ChainRun, String> {
 
     List<ChainRun> findByStatus(RunStatus status);
 
-    List<ChainRun> findByTriggeredByScheduleIdOrderByStartedAtDesc(String scheduleId);
-
     /** A schedule's newest chain runs, at most {@code limit} — its run list (TODO 86777fb4). */
     List<ChainRun> findByTriggeredByScheduleIdOrderByStartedAtDesc(String scheduleId, Limit limit);
 
@@ -60,6 +58,11 @@ public interface ChainRunRepository extends JpaRepository<ChainRun, String> {
            + "WHERE r.triggeredByScheduleId IN :scheduleIds "
            + "ORDER BY r.startedAt DESC")
     List<Object[]> findStatusesByScheduleIds(@Param("scheduleIds") Collection<String> scheduleIds);
+
+    /** Wie {@code WorkflowRunRepository.findStatusesByScheduleIdNewestFirst}, fuer Ketten-Runs (TODO 86286572). */
+    @Query("SELECT r.status FROM ChainRun r WHERE r.triggeredByScheduleId = :scheduleId "
+           + "ORDER BY r.startedAt DESC")
+    List<RunStatus> findStatusesByScheduleIdNewestFirst(@Param("scheduleId") String scheduleId, Pageable pageable);
 
     /**
      * Die Laufliste holt die Kette in derselben Abfrage mit: {@code ChainRun.chain} ist EAGER, ein

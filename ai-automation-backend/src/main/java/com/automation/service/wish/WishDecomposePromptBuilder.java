@@ -67,6 +67,7 @@ public class WishDecomposePromptBuilder {
 
         // Add project context
         String projectName = null;
+        List<Workflow> projectWorkflows = List.of();
         if (wish.getProjectId() != null) {
             Project project = projectRepository.findById(wish.getProjectId()).orElse(null);
             if (project != null) {
@@ -83,10 +84,8 @@ public class WishDecomposePromptBuilder {
             }
 
             // Add active workflow memories from project workflows
-            List<WorkflowMemory> memories = new ArrayList<>();
-            for (Workflow wf : workflowRepository.findByProjectId(wish.getProjectId())) {
-                memoryRepository.findByWorkflowIdAndActiveTrue(wf.getId()).ifPresent(memories::add);
-            }
+            projectWorkflows = workflowRepository.findByProjectId(wish.getProjectId());
+            List<WorkflowMemory> memories = activeMemoriesInWorkflowOrder(projectWorkflows);
             if (!memories.isEmpty()) {
                 sb.append("## Accumulated Project Knowledge (from previous workflow runs)\n\n");
                 for (WorkflowMemory mem : memories) {
@@ -120,7 +119,7 @@ public class WishDecomposePromptBuilder {
 
         // 2. Current project workflows
         if (wish.getProjectId() != null) {
-            List<Workflow> currentProjectWfs = workflowRepository.findByProjectId(wish.getProjectId());
+            List<Workflow> currentProjectWfs = projectWorkflows;
             if (!currentProjectWfs.isEmpty()) {
                 sb.append("### ").append(projectName != null ? projectName : "Current Project")
                         .append(" (current project — use as sub-workflow blocks)\n\n");
@@ -183,6 +182,23 @@ public class WishDecomposePromptBuilder {
         helper.appendAvailableSkills(sb);
 
         return sb.toString();
+    }
+
+    /**
+     * Aktive Memories der Projekt-Workflows aus einer Abfrage statt einer je Workflow (TODO 5fb7b1e9),
+     * in der Reihenfolge der Workflows — so wie die Einzelabfragen sie aneinanderreihten.
+     */
+    private List<WorkflowMemory> activeMemoriesInWorkflowOrder(List<Workflow> workflows) {
+        if (workflows.isEmpty()) return List.of();
+        Map<String, WorkflowMemory> byWorkflowId = new HashMap<>();
+        for (WorkflowMemory memory : memoryRepository.findByWorkflowIdInAndActiveTrue(
+                workflows.stream().map(Workflow::getId).toList())) {
+            byWorkflowId.putIfAbsent(memory.getWorkflowId(), memory);
+        }
+        return workflows.stream()
+                .map(wf -> byWorkflowId.get(wf.getId()))
+                .filter(Objects::nonNull)
+                .toList();
     }
 
     public String buildSystemPrompt(Wish wish) {

@@ -31,6 +31,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.availability.AvailabilityChangeEvent;
 import org.springframework.boot.availability.ReadinessState;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.Limit;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -133,7 +134,7 @@ class SchedulerColdStartIntegrationTest {
         // ContextRefreshedEvent: Spring's first tick, before the cleanup — it must leave everything as it is.
         tick.checkAndExecuteScheduled();
         entityManager.clear();
-        assertThat(workflowRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc(schedule.getId())).isEmpty();
+        assertThat(workflowRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc(schedule.getId(), Limit.unlimited())).isEmpty();
         assertThat(scheduledRepository.findById(schedule.getId()).orElseThrow().getNextRunAt())
                 .as("the occurrence is neither started nor skipped").isEqualTo(missedAt);
 
@@ -143,7 +144,7 @@ class SchedulerColdStartIntegrationTest {
         tick.checkAndExecuteScheduled();
 
         entityManager.clear();
-        List<WorkflowRun> caughtUp = workflowRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc(schedule.getId());
+        List<WorkflowRun> caughtUp = workflowRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc(schedule.getId(), Limit.unlimited());
         caughtUp.forEach(run -> cleanup.add(() -> workflowRunRepository.deleteById(run.getId())));
         assertThat(caughtUp).as("the missed occurrence is caught up once").hasSize(1);
         assertThat(waitForTerminal(caughtUp.get(0)).getStatus()).isEqualTo(RunStatus.COMPLETED);
@@ -163,7 +164,7 @@ class SchedulerColdStartIntegrationTest {
                 .workflow(workflow).cronExpression("0 0 * * * *").enabled(true)
                 .nextRunAt(missedAt).catchUpOnResume(true).build());
         cleanup.add(() -> scheduledRepository.deleteById(schedule.getId()));
-        cleanup.add(() -> workflowRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc(schedule.getId())
+        cleanup.add(() -> workflowRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc(schedule.getId(), Limit.unlimited())
                 .forEach(run -> workflowRunRepository.deleteById(run.getId())));
 
         SchedulerTick tick = new SchedulerTick(scheduledRepository, scheduledExecutor, activityLogService,
@@ -172,14 +173,14 @@ class SchedulerColdStartIntegrationTest {
         tick.checkAndExecuteScheduled();          // ContextRefreshedEvent
         runControlService.cleanupZombieRuns();    // ApplicationReadyEvent
         entityManager.clear();
-        assertThat(workflowRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc(schedule.getId()))
+        assertThat(workflowRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc(schedule.getId(), Limit.unlimited()))
                 .extracting(WorkflowRun::getStatus).doesNotContain(RunStatus.INTERRUPTED);
 
         tick.openAfterStartupCleanup(new AvailabilityChangeEvent<>(this, ReadinessState.ACCEPTING_TRAFFIC));
         tick.checkAndExecuteScheduled();
 
         entityManager.clear();
-        List<WorkflowRun> caughtUp = workflowRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc(schedule.getId());
+        List<WorkflowRun> caughtUp = workflowRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc(schedule.getId(), Limit.unlimited());
         assertThat(caughtUp).hasSize(1);
         assertThat(waitForTerminal(caughtUp.get(0)).getStatus()).isEqualTo(RunStatus.COMPLETED);
     }
