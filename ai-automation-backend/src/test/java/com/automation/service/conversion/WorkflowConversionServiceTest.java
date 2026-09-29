@@ -333,6 +333,126 @@ class WorkflowConversionServiceTest {
         assertThat(result).isSameAs(response);
     }
 
+    // ── Anlegen mit dem geprüften Vorschlag aus der Vorschau (TODO 935af6d3) ──
+
+    @Nested
+    class ReviewedSuggestion {
+
+        private static WorkflowResponse response(String id, String name) {
+            return new WorkflowResponse(id, "proj-1", "Project", null, null, name,
+                    null, null, List.of(), null, Map.of(), List.of(), List.of(), 0, null, null, null, null, Map.of(),
+                    null, null, null, null, null);
+        }
+
+        private List<BlockDefinition> reviewed() {
+            return List.of(
+                    BlockDefinition.builder().type("shell").config(Map.of("command", "set -euo pipefail; npm test")).build(),
+                    // Ein Baufehler (simple ohne command): Die Meldung nach dem Speichern bleibt.
+                    BlockDefinition.builder().type("simple").config(Map.of("prompt", "Fasse zusammen")).build());
+        }
+
+        @Test
+        void withReviewedBlocks_savesExactlyThose_withoutAskingTheModel() throws Exception {
+            when(runRepository.findById("run-1")).thenReturn(Optional.of(buildCompletedRunWithAgenticSteps()));
+            Workflow created = Workflow.builder().id("new-wf").name("Geprüft").build();
+            when(workflowService.create(any(), eq(ChangeSource.CONVERSION))).thenReturn(created);
+            when(workflowMapper.toResponse(created)).thenReturn(response("new-wf", "Geprüft"));
+            List<BlockDefinition> blocks = reviewed();
+
+            WorkflowResponse result = conversionService.createWorkflowFromSuggestion(
+                    "run-1", "proj-1", "Geprüft", "Aus der Vorschau", blocks);
+
+            assertThat(result.id()).isEqualTo("new-wf");
+            ArgumentCaptor<com.automation.dto.request.CreateWorkflowRequest> captor =
+                    ArgumentCaptor.forClass(com.automation.dto.request.CreateWorkflowRequest.class);
+            verify(workflowService).create(captor.capture(), eq(ChangeSource.CONVERSION));
+            assertThat(captor.getValue().projectId()).isEqualTo("proj-1");
+            assertThat(captor.getValue().name()).isEqualTo("Geprüft");
+            assertThat(captor.getValue().description()).isEqualTo("Aus der Vorschau");
+            assertThat(captor.getValue().blocks()).containsExactlyElementsOf(blocks);
+            // Kein neuer Vorschlag: kein KI-Aufruf, kein Provider.
+            verifyNoInteractions(aiProvider, aiProviderRegistry);
+            // Die deterministische Baufehler-Meldung nach dem Speichern bleibt.
+            verify(activityLogService).warn(any(), contains("Baufehler-Prüfung (Konvertierung)"), anyString(),
+                    isNull(), eq("new-wf"));
+        }
+
+        @Test
+        void withReviewedBlocks_checksTheRunInATransaction_andCreatesInAnother() {
+            AtomicReference<Boolean> txDuringRead = new AtomicReference<>();
+            AtomicReference<Boolean> txDuringCreate = new AtomicReference<>();
+            when(runRepository.findById("run-1")).thenAnswer(inv -> {
+                txDuringRead.set(FakeTransactions.active());
+                return Optional.of(buildCompletedRunWithAgenticSteps());
+            });
+            Workflow created = Workflow.builder().id("new-wf").name("Geprüft").build();
+            when(workflowService.create(any(), eq(ChangeSource.CONVERSION))).thenAnswer(inv -> {
+                txDuringCreate.set(FakeTransactions.active());
+                return created;
+            });
+            when(workflowMapper.toResponse(created)).thenReturn(response("new-wf", "Geprüft"));
+
+            proxiedWithFakeTransactions().createWorkflowFromSuggestion("run-1", "proj-1", "Geprüft", null, reviewed());
+
+            assertThat(txDuringRead.get()).isTrue();
+            assertThat(txDuringCreate.get()).isTrue();
+        }
+
+        /** Gleiches Fehlerbild wie suggestWorkflow: unbekannter Lauf → 404. */
+        @Test
+        void withReviewedBlocks_unknownRun_throwsNotFound_andSavesNothing() {
+            when(runRepository.findById("unknown")).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> conversionService.createWorkflowFromSuggestion(
+                    "unknown", "proj-1", "Geprüft", null, reviewed()))
+                    .isInstanceOf(ResourceNotFoundException.class);
+            verifyNoInteractions(workflowService, aiProvider);
+        }
+
+        /** Gleiches Fehlerbild wie der alte Weg: ein nicht abgeschlossener Lauf hat keinen Vorschlag. */
+        @Test
+        void withReviewedBlocks_runNotCompleted_throwsNoConversionAvailable() {
+            WorkflowRun running = buildCompletedRunWithAgenticSteps();
+            running.setStatus(RunStatus.RUNNING);
+            when(runRepository.findById("run-1")).thenReturn(Optional.of(running));
+
+            assertThatThrownBy(() -> conversionService.createWorkflowFromSuggestion(
+                    "run-1", "proj-1", "Geprüft", null, reviewed()))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("No conversion available for run run-1");
+            verifyNoInteractions(workflowService, aiProvider);
+        }
+
+        /** Mit Blöcken gibt es keinen Server-Vorschlag, aus dem der Name käme: Der Client schickt ihn mit. */
+        @Test
+        void withReviewedBlocks_withoutName_isRejected_beforeAnything() {
+            assertThatThrownBy(() -> conversionService.createWorkflowFromSuggestion(
+                    "run-1", "proj-1", " ", null, reviewed()))
+                    .isInstanceOf(IllegalArgumentException.class);
+            verifyNoInteractions(runRepository, workflowService, aiProvider);
+        }
+
+        /** Ohne (oder mit leeren) Blöcken bleibt es beim alten Weg: Der Vorschlag wird neu erzeugt. */
+        @Test
+        void withoutReviewedBlocks_theSuggestionIsCreatedAgain() throws Exception {
+            when(runRepository.findById("run-1")).thenReturn(Optional.of(buildCompletedRunWithAgenticSteps()));
+            when(aiProvider.reason(any())).thenThrow(new RuntimeException("no AI"));
+            Workflow created = Workflow.builder().id("new-wf").name("My Workflow").build();
+            when(workflowService.create(any(), eq(ChangeSource.CONVERSION))).thenReturn(created);
+            when(workflowMapper.toResponse(created)).thenReturn(response("new-wf", "My Workflow"));
+
+            conversionService.createWorkflowFromSuggestion("run-1", "proj-1", "My Workflow", "ignoriert", List.of());
+
+            verify(aiProvider).reason(any());
+            ArgumentCaptor<com.automation.dto.request.CreateWorkflowRequest> captor =
+                    ArgumentCaptor.forClass(com.automation.dto.request.CreateWorkflowRequest.class);
+            verify(workflowService).create(captor.capture(), eq(ChangeSource.CONVERSION));
+            // Der regelbasierte Vorschlag (npm install, npm test), nicht die leere Liste.
+            assertThat(captor.getValue().blocks()).hasSize(2);
+            assertThat(captor.getValue().description()).startsWith("Automatically generated");
+        }
+    }
+
     // ── build check after the AI suggestion (TODO 326d5987) ──
 
     @Nested

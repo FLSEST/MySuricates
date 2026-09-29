@@ -23,8 +23,17 @@ export function ConversionSuggestion({ runId }: { runId: string }) {
   const handleCreate = () => {
     if (!selectedProjectId) return;
 
+    // Den angezeigten Vorschlag mitschicken: Gespeichert wird genau das Geprüfte,
+    // ohne den Vorschlag serverseitig neu (und mit KI-Aufruf) zu erzeugen (TODO 935af6d3).
+    // Der Server verlangt dazu einen Namen; ohne jeden Namen bleibt es beim alten Weg.
+    const name = customName || suggestion.suggestedName || undefined;
     createWorkflow.mutate(
-      { runId, projectId: selectedProjectId, name: customName || undefined },
+      {
+        runId,
+        projectId: selectedProjectId,
+        name,
+        ...(name ? { description: suggestion.suggestedDescription, blocks: suggestion.blocks } : {}),
+      },
       {
         onSuccess: () => {
           addToast('success', t.conversion.created);

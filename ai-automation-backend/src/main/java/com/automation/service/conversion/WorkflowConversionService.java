@@ -76,7 +76,7 @@ public class WorkflowConversionService {
         }
 
         // Regelbasiert gibt es keine KI, die korrigieren könnte: nur melden.
-        WorkflowSuggestion ruleBased = suggestWorkflowRuleBased(agenticSteps);
+        WorkflowSuggestion ruleBased = RuleBasedConversion.suggest(agenticSteps);
         return ruleBased.available()
                 ? ruleBased.withBuildFindings(GeneratedWorkflowCheck.summaryLines(buildCheck.findings(ruleBased.blocks(), null)))
                 : ruleBased;
@@ -100,54 +100,6 @@ public class WorkflowConversionService {
                         && "agentic".equals(s.getMetadata().get("blockType"))
                         && Boolean.TRUE.equals(s.getMetadata().get("goalAchieved")))
                 .toList();
-    }
-
-    @SuppressWarnings("unchecked")
-    private WorkflowSuggestion suggestWorkflowRuleBased(List<StepResult> agenticSteps) {
-        List<BlockDefinition> blocks = new ArrayList<>();
-        String goal = "";
-        int totalActionsAnalyzed = 0;
-
-        for (StepResult step : agenticSteps) {
-            Map<String, Object> meta = step.getMetadata();
-            goal = (String) meta.getOrDefault("goal", "");
-
-            Object iterationsObj = meta.get("iterations");
-            if (!(iterationsObj instanceof List<?> iterList)) continue;
-
-            for (Object iterObj : iterList) {
-                if (!(iterObj instanceof Map<?, ?> iterMap)) continue;
-                Map<String, Object> iter = (Map<String, Object>) iterMap;
-
-                String action = (String) iter.get("action");
-                if (action == null || action.isEmpty()) continue;
-
-                Integer exitCode = iter.get("exitCode") instanceof Number n ? n.intValue() : null;
-                if (exitCode != null && exitCode != 0) continue;
-
-                // Each successful action becomes a simple block
-                Map<String, Object> config = new LinkedHashMap<>();
-                config.put("command", action);
-                config.put("on_failure", "stop");
-
-                BlockDefinition block = BlockDefinition.builder()
-                        .type("simple")
-                        .config(config)
-                        .build();
-                blocks.add(block);
-                totalActionsAnalyzed++;
-            }
-        }
-
-        if (blocks.isEmpty()) {
-            return WorkflowSuggestion.notAvailable();
-        }
-
-        String name = "Auto: " + truncate(goal, 60);
-        String description = "Automatically generated from successful agentic run. " +
-                "Original goal: " + goal;
-
-        return new WorkflowSuggestion(name, description, blocks, goal, totalActionsAnalyzed, true);
     }
 
     @SuppressWarnings("unchecked")
@@ -190,7 +142,7 @@ public class WorkflowConversionService {
         String json = extractJson(response);
         Map<String, Object> parsed = JsonRepairUtil.parseWithRepair(json, new TypeReference<>() {});
 
-        String sugName = (String) parsed.getOrDefault("suggestedName", "Auto: " + truncate(goal, 60));
+        String sugName = (String) parsed.getOrDefault("suggestedName", "Auto: " + RuleBasedConversion.truncate(goal, 60));
         String sugDesc = (String) parsed.getOrDefault("suggestedDescription", "");
 
         List<BlockDefinition> blocks = new ArrayList<>();
@@ -222,24 +174,57 @@ public class WorkflowConversionService {
     }
 
     /**
-     * Not {@code @Transactional} either, for the model call inside {@link #suggestWorkflow}: only
-     * creating the workflow and mapping the response share one transaction, after that call.
+     * Ohne mitgegebenen Vorschlag — der alte Weg für Clients, die nur Projekt und Name schicken:
+     * der Vorschlag wird hier neu erzeugt (mit KI-Aufruf).
      */
     public WorkflowResponse createWorkflowFromSuggestion(String runId, String projectId, String name) {
-        WorkflowSuggestion suggestion = suggestWorkflow(runId);
+        return createWorkflowFromSuggestion(runId, projectId, name, null, null);
+    }
 
-        if (!suggestion.available()) {
-            throw new IllegalStateException("No conversion available for run " + runId);
+    /**
+     * Legt den Workflow aus dem Vorschlag an.
+     *
+     * <p>Sind {@code reviewedBlocks} mitgegeben, ist das der Vorschlag, den der Nutzer in der Vorschau
+     * gesehen und geprüft hat: Genau diese Blöcke (und {@code reviewedDescription}) werden gespeichert,
+     * ohne den Vorschlag neu zu erzeugen — sonst könnte etwas anderes gespeichert werden als angezeigt,
+     * und Vorschau plus Anlegen kosteten mit Korrekturrunde bis zu vier statt zwei KI-Aufrufe
+     * (TODO 935af6d3). Der Lauf wird dann nur billig geprüft (existiert, abgeschlossen) — mit demselben
+     * Fehlerbild wie {@link #suggestWorkflow}. Ohne Blöcke: bisheriges Verhalten, der Vorschlag wird
+     * neu erzeugt.
+     *
+     * <p>Not {@code @Transactional} either, for the model call inside {@link #suggestWorkflow}: only
+     * creating the workflow and mapping the response share one transaction, after that call.
+     */
+    public WorkflowResponse createWorkflowFromSuggestion(String runId, String projectId, String name,
+                                                         String reviewedDescription,
+                                                         List<BlockDefinition> reviewedBlocks) {
+        String workflowName;
+        String description;
+        List<BlockDefinition> blocks;
+        if (reviewedBlocks != null && !reviewedBlocks.isEmpty()) {
+            if (name == null || name.isBlank()) {
+                throw new IllegalArgumentException("name is required when the reviewed blocks are sent");
+            }
+            readOnlyTransactionTemplate.executeWithoutResult(status -> requireCompletedRun(runId));
+            workflowName = name;
+            description = reviewedDescription;
+            blocks = reviewedBlocks;
+        } else {
+            WorkflowSuggestion suggestion = suggestWorkflow(runId);
+            if (!suggestion.available()) {
+                throw new IllegalStateException("No conversion available for run " + runId);
+            }
+            workflowName = name != null && !name.isBlank() ? name : suggestion.suggestedName();
+            description = suggestion.suggestedDescription();
+            blocks = suggestion.blocks();
         }
-
-        String workflowName = name != null && !name.isBlank() ? name : suggestion.suggestedName();
 
         CreateWorkflowRequest request = new CreateWorkflowRequest(
                 projectId,
                 workflowName,
-                suggestion.suggestedDescription(),
+                description,
                 null,
-                suggestion.blocks(),
+                blocks,
                 List.of(),
                 null,
                 null,
@@ -255,9 +240,21 @@ public class WorkflowConversionService {
         // Nach der Transaktion: das Activity-Log gehört nicht in den Speicher-Burst.
         if (created != null) {
             buildCheck.reportRemaining(created.id(), created.name(), "Konvertierung",
-                    buildCheck.findings(suggestion.blocks(), null));
+                    buildCheck.findings(blocks, null));
         }
         return created;
+    }
+
+    /**
+     * Billige Prüfung für den mitgegebenen Vorschlag: gleiches Fehlerbild wie {@link #suggestWorkflow}
+     * (unbekannter Lauf → 404, nicht abgeschlossener → kein Vorschlag), ohne die Schritte zu laden.
+     */
+    private void requireCompletedRun(String runId) {
+        WorkflowRun run = runRepository.findById(runId)
+                .orElseThrow(() -> new ResourceNotFoundException("WorkflowRun", runId));
+        if (run.getStatus() != RunStatus.COMPLETED) {
+            throw new IllegalStateException("No conversion available for run " + runId);
+        }
     }
 
     private String extractJson(String text) {
@@ -268,10 +265,5 @@ public class WorkflowConversionService {
             return text.substring(start, end + 1);
         }
         return text;
-    }
-
-    private String truncate(String s, int max) {
-        if (s == null) return "";
-        return s.length() > max ? s.substring(0, max) + "..." : s;
     }
 }

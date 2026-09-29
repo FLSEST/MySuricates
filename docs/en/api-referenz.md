@@ -3536,9 +3536,17 @@ Create a workflow from an agentic run.
 ```json
 {
   "projectId": "uuid",
-  "name": "Converted Workflow"
+  "name": "Converted Workflow",
+  "description": "Description from the preview",
+  "blocks": [{ "type": "shell", "config": { "command": "npm test" } }]
 }
 ```
+
+`description` and `blocks` are optional: the reviewed suggestion from `GET …/suggest`. With `blocks`,
+exactly these blocks are saved without generating the suggestion again (no AI call); `name` is then
+required (otherwise `400`), and the run must exist (`404`) and be completed. Without `blocks` the
+server generates the suggestion again (previous behaviour). In both cases the build check reports
+findings of the saved workflow in the activity log.
 
 **Response:** `WorkflowResponse`
 

@@ -115,4 +115,13 @@ class ConvertRunToWorkflowRequestTest {
         assertThat(request.toString()).contains("proj-123");
         assertThat(request.toString()).contains("My Workflow");
     }
+
+    /** Alte Clients: nur Projekt und Name — ohne geprüften Vorschlag (TODO 935af6d3). */
+    @Test
+    void should_carryNoReviewedSuggestion_when_builtFromProjectAndNameOnly() {
+        var request = new ConvertRunToWorkflowRequest("proj-123", "My Workflow");
+
+        assertThat(request.description()).isNull();
+        assertThat(request.blocks()).isNull();
+    }
 }
