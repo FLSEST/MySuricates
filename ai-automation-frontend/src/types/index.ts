@@ -40,6 +40,191 @@ export interface UpdateProjectRequest {
   aiContext?: string;
 }
 
+// ── Project Bundle ───────────────────────────────────────
+// One project (workflows, chains, schedules) exported as a portable JSON file. Absolute paths are
+// replaced by `@@path:N@@` tokens so the bundle can be re-imported under a different directory.
+// `GET /projects/{id}/export`, `POST /projects/import/preview`, `POST /projects/import`.
+
+export interface BundleProject {
+  name: string;
+  subtitle?: string | null;
+  description?: string;
+  type: ProjectType;
+  aiContext?: string;
+  config?: Record<string, unknown>;
+}
+
+/** Workflow definition inside a bundle — like a workflow export, minus id/projectId/seal fields. */
+export interface BundleWorkflowDefinition {
+  name: string;
+  description?: string;
+  icon?: string;
+  blocks: BlockDefinition[];
+  instructions?: string;
+  model?: string;
+  provider?: string;
+  effort?: string;
+  version?: string;
+  defaultContext?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+  /** Skills referenced by name (`activatedSkillIds` don't survive the move); missing on import → warning. */
+  activatedSkillNames?: string[];
+}
+
+export interface BundleWorkflowEntry {
+  /** Stable slug within the bundle, referenced by chain entries and `@@workflow:<key>@@` tokens. */
+  key: string;
+  definition: BundleWorkflowDefinition;
+}
+
+export interface BundleChainEntryStep {
+  workflowKey: string;
+  label?: string | null;
+  sortOrder: number;
+  stopOnFailure?: boolean | null;
+  inputContext?: Record<string, unknown>;
+  timeoutMinutes?: number | null;
+}
+
+export interface BundleChain {
+  key: string;
+  name: string;
+  description?: string | null;
+  icon?: string | null;
+  stopOnFailure?: boolean | null;
+  entries: BundleChainEntryStep[];
+}
+
+/** Exactly one of both is set (backend's `BundleTarget`); the preview turns it into `workflow:<key>`/`chain:<key>`. */
+export interface BundleScheduleTarget {
+  workflowKey: string | null;
+  chainKey: string | null;
+}
+
+export interface BundleScheduleEntry {
+  target: BundleScheduleTarget;
+  cronExpression?: string | null;
+  scheduleType: string;
+  scheduledAt?: string | null;
+  delayExpression?: string | null;
+  description?: string;
+  inputContext?: Record<string, unknown>;
+  conflictBehavior?: string;
+  catchUpOnResume?: boolean;
+  maxRuns?: number | null;
+  endDate?: string | null;
+}
+
+export interface BundlePathToken {
+  /** `@@path:N@@` */
+  token: string;
+  /** Original absolute path on the exporting machine — kept as an editing suggestion, not scrubbed. */
+  original: string;
+  occurrences: number;
+  /** First place the token was found, e.g. "Workflow-Name + Feld". */
+  hint: string;
+}
+
+export interface ProjectBundle {
+  format: 'mysuricates-project-bundle';
+  formatVersion: number;
+  exportedAt: string;
+  appVersion: string;
+  project: BundleProject;
+  workflows: BundleWorkflowEntry[];
+  chains: BundleChain[];
+  schedules: BundleScheduleEntry[];
+  paths: BundlePathToken[];
+  skillNames: string[];
+  /** Dangling `sub-workflow` references to workflows outside the bundle — left as-is on export. */
+  warnings?: string[];
+}
+
+// ── Project Bundle: Import Preview ───────────────────────
+
+export interface ProjectBundlePreviewWorkflow {
+  key: string;
+  name: string;
+  blockCount: number;
+  blockTypes: string[];
+  providers: string[];
+  models: string[];
+  /** First 200 characters of every shell field, for the "these run with your rights" preview. */
+  shellCommands: string[];
+  nameTakenInTarget: boolean;
+}
+
+export interface ProjectBundlePreviewChain {
+  key: string;
+  name: string;
+  entries: number;
+}
+
+export interface ProjectBundlePreviewSchedule {
+  /** `workflow:<key>` or `chain:<key>` */
+  target: string;
+  cronExpression?: string | null;
+  willBeDisabled: boolean;
+}
+
+export interface ProjectBundlePreview {
+  project: { name: string; nameTaken: boolean };
+  workflows: ProjectBundlePreviewWorkflow[];
+  chains: ProjectBundlePreviewChain[];
+  schedules: ProjectBundlePreviewSchedule[];
+  paths: BundlePathToken[];
+  warnings: string[];
+}
+
+/**
+ * `POST /projects/import/preview` body. `targetProjectId` is optional: without it every
+ * workflow's `nameTakenInTarget` reports `false` — once an existing target project is chosen in
+ * the dialog, the preview is re-requested with it to get real per-workflow conflicts.
+ */
+export interface ProjectBundlePreviewRequest {
+  bundle: ProjectBundle;
+  targetProjectId?: string;
+}
+
+// ── Project Bundle: Import ───────────────────────────────
+
+export type ProjectBundleImportTarget =
+  | { mode: 'new'; name: string; path?: string }
+  | { mode: 'existing'; projectId: string };
+
+export type ProjectBundleConflictBehavior = 'skip' | 'rename';
+
+export interface ProjectBundleImportRequest {
+  bundle: ProjectBundle;
+  project: ProjectBundleImportTarget;
+  pathMappings: Record<string, string>;
+  onConflict: ProjectBundleConflictBehavior;
+}
+
+export type ProjectBundleItemKind = 'workflow' | 'chain' | 'schedule';
+
+export interface ProjectBundleSkippedItem {
+  kind: ProjectBundleItemKind;
+  key: string;
+  reason: string;
+}
+
+export interface ProjectBundleRenamedItem {
+  kind: ProjectBundleItemKind;
+  key: string;
+  from: string;
+  to: string;
+}
+
+export interface ProjectBundleImportResult {
+  projectId: string;
+  /** Counts only what was newly created — not skipped or renamed items. */
+  created: { workflows: number; chains: number; schedules: number };
+  skipped: ProjectBundleSkippedItem[];
+  renamed: ProjectBundleRenamedItem[];
+  warnings: string[];
+}
+
 // ── Container ────────────────────────────────────────────
 
 export type ContainerStatus = 'CREATED' | 'RUNNING' | 'STOPPED' | 'ERROR';

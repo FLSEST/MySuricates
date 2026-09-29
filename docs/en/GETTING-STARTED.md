@@ -166,6 +166,16 @@ The application is running. A first way in, without building anything:
 3. **Look at the run** — the detail view shows per block its duration, its status and whether it was
    deterministic or called a model.
 
+A project can travel with you: on the project page, **Export** packs the project's workflows,
+chains and schedules into a single `.mysuricates-bundle.json` file. On the project list, **Import
+project** takes such a file back in — into a new project or an existing one. Because absolute
+paths (the project directory, but also fixed paths inside shell blocks) differ between machines,
+the import dialog asks for the right path on this machine for every place found — pre-filled with
+the path from the exporting machine. The preview expands every shell command beforehand: once
+imported, it runs with your own rights on this machine, so it's worth a look, especially for a
+bundle from somewhere else. Schedules deliberately arrive **disabled** and need to be switched back
+on after the import.
+
 Along the way, short **hints** explain the pages and states you meet for the first time, such as a
 waiting approval or a failed run. Each can be dismissed and brought back in its place; *Settings →
 General* switches them all off.
