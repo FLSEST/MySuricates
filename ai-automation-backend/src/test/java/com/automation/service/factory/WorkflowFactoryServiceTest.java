@@ -282,6 +282,31 @@ class WorkflowFactoryServiceTest {
         ), eq(ChangeSource.FACTORY));
     }
 
+    @Test
+    void generateWorkflow_namedBlocksWithBlockReference_keepNamesAndSkillIds() throws IOException {
+        // TODO d6be36f3: the parser dropped name/skillIds, so {{ block.fetch.output }} pointed nowhere
+        // (and the build check spent a correction round on the resulting unknown-block-reference).
+        when(claudeGenerator.generate(anyString(), anyString(), eq(600))).thenReturn("""
+                { "name": "Report", "blocks": [
+                  { "type": "shell", "name": "fetch", "config": { "command": "cat data.txt" }, "skillIds": ["skill-1"] },
+                  { "type": "simple", "name": "summarize", "config": { "command": "Fasse zusammen: {{ block.fetch.output }}" } }
+                ] }
+                """);
+        when(workflowService.create(any(), eq(ChangeSource.FACTORY)))
+                .thenReturn(Workflow.builder().id("wf-1").name("Report").project(testProject).build());
+
+        factoryService.generateWorkflow(new WorkflowFactoryRequest(
+                "Report", null, null, "proj-1", null, false, false, 2, null));
+
+        ArgumentCaptor<CreateWorkflowRequest> captor = ArgumentCaptor.forClass(CreateWorkflowRequest.class);
+        verify(workflowService).create(captor.capture(), eq(ChangeSource.FACTORY));
+        assertThat(captor.getValue().blocks())
+                .extracting(com.automation.entity.BlockDefinition::getName)
+                .containsExactly("fetch", "summarize");
+        assertThat(captor.getValue().blocks().get(0).getSkillIds()).containsExactly("skill-1");
+        verify(claudeGenerator, times(1)).generate(anyString(), anyString(), eq(600));
+    }
+
     // ── runFactory ─────────────────────────────────────
 
     @Test
