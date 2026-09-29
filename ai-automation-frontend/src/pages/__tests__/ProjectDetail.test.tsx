@@ -10,6 +10,9 @@ import { useI18nStore } from '../../i18n';
 import { en } from '../../i18n/en';
 import type { Project } from '../../types';
 
+vi.mock('../../utils/downloadFile', () => ({ downloadFromResponse: vi.fn() }));
+import { downloadFromResponse } from '../../utils/downloadFile';
+
 // jsdom can't run Monaco
 vi.mock('../../components/shared/MonacoEditor', () => ({
   MonacoEditor: ({ value, onChange }: { value: string; onChange?: (v: string) => void }) =>
@@ -117,5 +120,20 @@ describe('ProjectDetail', { timeout: 15_000 }, () => {
     fireEvent.click(dialog.getByRole('button', { name: en.projects.archive }));
     expect(await screen.findByText('project list')).toBeInTheDocument();
     expect(calls).toContainEqual({ method: 'DELETE', path: '/api/v1/projects/p1', body: undefined });
+  });
+
+  it('exports the project as a bundle download', async () => {
+    vi.mocked(downloadFromResponse).mockClear();
+    server.use(http.get('/api/v1/projects/p1/export', () =>
+      HttpResponse.json({ format: 'mysuricates-project-bundle' }, {
+        headers: { 'Content-Disposition': 'attachment; filename="alpha.mysuricates-bundle.json"' },
+      }),
+    ));
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: en.common.export }));
+
+    await waitFor(() => expect(downloadFromResponse).toHaveBeenCalledTimes(1));
+    expect(downloadFromResponse).toHaveBeenCalledWith(expect.any(Response), 'alpha.mysuricates-bundle.json');
   });
 });

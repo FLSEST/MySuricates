@@ -168,6 +168,17 @@ Damit läuft die Anwendung. Ein erster Weg hinein, ohne etwas zu bauen:
 3. **Den Lauf ansehen** — die Detailansicht zeigt je Block Dauer, Status und ob er deterministisch
    war oder ein Modell gerufen hat.
 
+Ein Projekt lässt sich auch mitnehmen: Auf der Projektseite legt **Exportieren** Workflows, Ketten
+und Zeitpläne des Projekts als eine einzelne `.mysuricates-bundle.json`-Datei an. Auf der
+Projektliste nimmt **Projekt importieren** so eine Datei zurück entgegen — als neues oder in ein
+vorhandenes Projekt. Weil absolute Pfade (Projektverzeichnis, aber auch feste Pfade in
+Shell-Blöcken) sich zwischen Rechnern unterscheiden, fragt der Import-Dialog vor dem eigentlichen
+Import je Fundstelle nach dem passenden Pfad auf diesem Rechner — vorbelegt mit dem Pfad vom
+exportierenden Rechner. Die Vorschau klappt vorher jeden Shell-Befehl auf: Er läuft nach dem Import
+mit deinen eigenen Rechten auf diesem Rechner, ein Blick lohnt sich also, besonders bei einem
+fremden Bündel. Zeitpläne kommen bewusst **deaktiviert** an und müssen erst nach dem Import wieder
+eingeschaltet werden.
+
 Unterwegs erklären kurze **Hinweise** die Seiten und Zustände, die man zum ersten Mal sieht, etwa
 eine wartende Freigabe oder einen fehlgeschlagenen Lauf. Jeder lässt sich wegklicken und an seiner
 Stelle zurückholen; unter *Einstellungen → Allgemein* lassen sich alle abschalten.

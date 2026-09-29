@@ -1,7 +1,7 @@
 import { Hint } from '../components/hints/Hint';
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Archive, ArrowLeft, Pencil, GitBranch } from 'lucide-react';
+import { Archive, ArrowLeft, Download, Pencil, GitBranch } from 'lucide-react';
 import { Card, CardHeader, Button, Modal, ModalFooter, ConfirmModal, Spinner } from '../components/ui';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { ErrorState } from '../components/shared/ErrorState';
@@ -13,6 +13,7 @@ import { ProjectContainerCard } from '../components/project/ProjectContainerCard
 import { EMPTY_PROJECT_FORM, type ProjectFormValues } from '../components/project/projectForm';
 import { useWorkflows } from '../hooks/useWorkflows';
 import { useModuleEnabled } from '../hooks/useModules';
+import { useExportProjectBundle, bundleFilename } from '../hooks/useProjectBundle';
 import { useI18nStore, useT } from '../i18n';
 import { formatDate } from '../utils/localeFormat';
 
@@ -27,6 +28,7 @@ export function ProjectDetail() {
   const onboardingModule = useModuleEnabled('onboarding-profiles');
   const updateProject = useUpdateProject();
   const archiveProject = useArchiveProject();
+  const exportBundle = useExportProjectBundle();
 
   const [showEdit, setShowEdit] = useState(false);
   const [showArchive, setShowArchive] = useState(false);
@@ -85,6 +87,16 @@ export function ProjectDetail() {
         <div className="flex items-center gap-2">
           {/* No restore here: GET /projects/{id} answers 404 for archived projects, so this page
               never shows one — they are restored from the archive filter of the project list. */}
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={<Download className="w-4 h-4" />}
+            loading={exportBundle.isPending}
+            aria-label={t.common.export}
+            onClick={() => exportBundle.mutate({ projectId: project.id, fallbackFilename: bundleFilename(project.name) })}
+          >
+            {t.common.export}
+          </Button>
           <Button variant="ghost" size="sm" icon={<Pencil className="w-4 h-4" />} onClick={openEdit}>
             {t.common.edit}
           </Button>
