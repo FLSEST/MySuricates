@@ -296,4 +296,53 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody().getParams()).containsExactlyInAnyOrderEntriesOf(
                 java.util.Map.of("used", "1500", "budget", "1000"));
     }
+
+    // ResponseStatusException keeps the status the controller gave; before, the catch-all answered
+    // every one of them with 500 INTERNAL_ERROR (TODO 1bad5275).
+
+    @Test
+    void handleResponseStatus_keepsNotFound() {
+        ResponseEntity<ErrorResponse> response = handler.handleResponseStatus(
+                new org.springframework.web.server.ResponseStatusException(HttpStatus.NOT_FOUND, "Report not found"));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getCode()).isEqualTo("RESOURCE_NOT_FOUND");
+        assertThat(response.getBody().getError()).isEqualTo("Report not found");
+    }
+
+    @Test
+    void handleResponseStatus_keepsBadRequest() {
+        ResponseEntity<ErrorResponse> response = handler.handleResponseStatus(
+                new org.springframework.web.server.ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid report name"));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getCode()).isEqualTo("INVALID_ARGUMENT");
+    }
+
+    @Test
+    void handleResponseStatus_keepsAnUnmappedStatus_andPicksTheCodeByItsClass() {
+        ResponseEntity<ErrorResponse> clientError = handler.handleResponseStatus(
+                new org.springframework.web.server.ResponseStatusException(HttpStatus.GONE, "gone"));
+        ResponseEntity<ErrorResponse> serverError = handler.handleResponseStatus(
+                new org.springframework.web.server.ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Could not read report"));
+
+        assertThat(clientError.getStatusCode()).isEqualTo(HttpStatus.GONE);
+        assertThat(clientError.getBody()).isNotNull();
+        assertThat(clientError.getBody().getCode()).isEqualTo("INVALID_ARGUMENT");
+        assertThat(serverError.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+        assertThat(serverError.getBody()).isNotNull();
+        assertThat(serverError.getBody().getCode()).isEqualTo("INTERNAL_ERROR");
+        assertThat(serverError.getBody().getError()).isEqualTo("Could not read report");
+    }
+
+    @Test
+    void handleResponseStatus_fallsBackToTheCodesText_withoutReason() {
+        ResponseEntity<ErrorResponse> response = handler.handleResponseStatus(
+                new org.springframework.web.server.ResponseStatusException(HttpStatus.NOT_FOUND));
+
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getError()).isEqualTo("Resource not found");
+    }
 }

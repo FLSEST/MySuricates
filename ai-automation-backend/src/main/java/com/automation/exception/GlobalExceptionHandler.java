@@ -4,6 +4,7 @@ import jakarta.persistence.EntityNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
@@ -13,6 +14,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.HashMap;
@@ -170,6 +172,33 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleEntityNotFound(EntityNotFoundException ex) {
         log.debug("Entity not found: {}", ex.getMessage());
         return respond(ErrorCode.RESOURCE_NOT_FOUND, ex.getMessage() != null ? ex.getMessage() : "Entity not found");
+    }
+
+    // Controllers that throw ResponseStatusException (DocsController, ReportsController) meant the status
+    // they gave — the catch-all below turned every one of them into a 500 (TODO 1bad5275).
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ErrorResponse> handleResponseStatus(ResponseStatusException ex) {
+        HttpStatusCode status = ex.getStatusCode();
+        ErrorCode code = codeFor(status);
+        String message = ex.getReason() != null ? ex.getReason() : code.getDefaultMessage();
+        if (status.is5xxServerError()) {
+            log.error("Request failed with {}: {}", status.value(), message, ex);
+        } else {
+            log.warn("Request refused with {}: {}", status.value(), message);
+        }
+        return ResponseEntity.status(status).body(ErrorResponse.of(code, message));
+    }
+
+    private static ErrorCode codeFor(HttpStatusCode status) {
+        return switch (status.value()) {
+            case 400 -> ErrorCode.INVALID_ARGUMENT;
+            case 404 -> ErrorCode.RESOURCE_NOT_FOUND;
+            case 405 -> ErrorCode.METHOD_NOT_ALLOWED;
+            case 409 -> ErrorCode.STATE_CONFLICT;
+            case 503 -> ErrorCode.SERVICE_UNAVAILABLE;
+            case 504 -> ErrorCode.OPERATION_TIMEOUT;
+            default -> status.is4xxClientError() ? ErrorCode.INVALID_ARGUMENT : ErrorCode.INTERNAL_ERROR;
+        };
     }
 
     @ExceptionHandler(Exception.class)

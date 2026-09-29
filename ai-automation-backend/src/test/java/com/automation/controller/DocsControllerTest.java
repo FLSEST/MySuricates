@@ -96,25 +96,27 @@ class DocsControllerTest {
 
     @Test
     void getDoc_notFound_returnsError() throws Exception {
-        // ResponseStatusException is caught by GlobalExceptionHandler's catch-all
+        // The status the controller gives, not the catch-all's 500 (TODO 1bad5275)
         mockMvc.perform(get("/api/v1/docs/nonexistent.md"))
-                .andExpect(status().is5xxServerError())
-                .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"));
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"))
+                .andExpect(jsonPath("$.error").value("Document not found"));
     }
 
     @Test
     void getDoc_pathTraversal_returnsError() throws Exception {
         mockMvc.perform(get("/api/v1/docs/..%2Fsecret.md"))
-                .andExpect(status().is5xxServerError())
-                .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"));
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_ARGUMENT"));
     }
 
     @Test
     void getDoc_invalidLang_returnsError() throws Exception {
         mockMvc.perform(get("/api/v1/docs/WORKFLOW-GUIDE.md")
                         .param("lang", "fr"))
-                .andExpect(status().is5xxServerError())
-                .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"));
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_ARGUMENT"))
+                .andExpect(jsonPath("$.error").value("Invalid lang parameter"));
     }
 
     @Test
@@ -122,7 +124,8 @@ class DocsControllerTest {
         Files.writeString(tempDir.resolve("secret.txt"), "secret");
 
         mockMvc.perform(get("/api/v1/docs/secret.txt"))
-                .andExpect(status().is5xxServerError())
-                .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"));
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_ARGUMENT"))
+                .andExpect(jsonPath("$.error").value("Only .md files are allowed"));
     }
 }

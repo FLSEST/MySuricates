@@ -108,32 +108,34 @@ class ReportsControllerTest {
 
     @Test
     void getReport_notFound_returnsError() throws Exception {
-        // ResponseStatusException(NOT_FOUND) is caught by GlobalExceptionHandler's catch-all
+        // The status the controller gives, not the catch-all's 500 (TODO 1bad5275)
         mockMvc.perform(get("/api/v1/reports/missing.md"))
-                .andExpect(status().is5xxServerError());
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"))
+                .andExpect(jsonPath("$.error").value("Report not found"));
     }
 
     @Test
     void getReport_pathTraversal_returnsError() throws Exception {
-        // ResponseStatusException(BAD_REQUEST) is caught by GlobalExceptionHandler's catch-all
         mockMvc.perform(get("/api/v1/reports/..%2Fsecret.md"))
-                .andExpect(status().is5xxServerError());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_ARGUMENT"));
     }
 
     @Test
     void getReport_nonMdFile_returnsError() throws Exception {
         Files.writeString(tempDir.resolve("data.txt"), "secret");
 
-        // ResponseStatusException(BAD_REQUEST) is caught by GlobalExceptionHandler's catch-all
         mockMvc.perform(get("/api/v1/reports/data.txt"))
-                .andExpect(status().is5xxServerError());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_ARGUMENT"));
     }
 
     @Test
     void getReport_backslashTraversal_returnsError() throws Exception {
-        // ResponseStatusException(BAD_REQUEST) is caught by GlobalExceptionHandler's catch-all
         mockMvc.perform(get("/api/v1/reports/..\\secret.md"))
-                .andExpect(status().is5xxServerError());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_ARGUMENT"));
     }
 
     @Test
