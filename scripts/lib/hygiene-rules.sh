@@ -159,13 +159,14 @@ HYGIENE_POOL_CREDENTIAL_MARKERS=("X-API-Key" "app_settings")
 HYGIENE_POOL_API_PREFIX="/api/v1/"
 HYGIENE_POOL_API_CALLERS=("curl" "wget" "requests." "urllib" "fetch(" "http.client")
 
-# Ohne API-Key erreichbar (ApiKeyAuthFilter) und deshalb als Lebenszeichen-Sonde
+# Ohne API-Key erreichbar (security/PublicPaths) und deshalb als Lebenszeichen-Sonde
 # erlaubt — mysuricates-performance-audit misst damit die Antwortzeit und liest aus
 # /api/v1/system/jvm-memory die drei Heap-Zahlen (c2cda5ed; /actuator/metrics braucht den Key).
 # Im Shell-Code eines Pool-Blocks ist jeder andere konkrete /api/v1/-Pfad ein Befund, auch ohne
 # Aufruf in der Naehe; verglichen wird exakt wie im Filter (28007626).
 # Dieselbe Liste fuehrt der Workflow-Analyzer fuer Live-Definitionen (SelfAccessRules.KEY_FREE_PROBES,
-# Regel self-api-call, d0348479); SelfAccessRulesTest haelt beide gleich.
+# Regel self-api-call, d0348479); SelfAccessRulesTest haelt beide gleich und prueft, dass jede
+# Sonde in PublicPaths oeffentlich ist.
 HYGIENE_POOL_API_ALLOWED=(
   "/api/v1/system/health" "/api/v1/system/info" "/api/v1/system/auth-status"
   "/api/v1/system/jvm-memory"

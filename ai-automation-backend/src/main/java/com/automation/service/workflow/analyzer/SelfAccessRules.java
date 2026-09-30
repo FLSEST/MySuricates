@@ -26,8 +26,9 @@ import java.util.regex.Pattern;
  *
  * <p><b>Abstimmung mit pool-neutrality.sh</b> — gleiche Ausnahmen, bewusste Unterschiede:
  * <ul>
- *   <li>Erlaubt sind dieselben schlüsselfreien Sonden wie dort ({@link #KEY_FREE_PROBES}, genau wie
- *       im {@code ApiKeyAuthFilter}); {@code /actuator/health} liegt ohnehin nicht unter {@code /api/v1/}.</li>
+ *   <li>Erlaubt sind dieselben schlüsselfreien Sonden wie dort ({@link #KEY_FREE_PROBES}, jede ein
+ *       öffentlicher Pfad aus {@code security.PublicPaths}); {@code /actuator/health} liegt ohnehin nicht
+ *       unter {@code /api/v1/}.</li>
  *   <li>Im Shell-Code genügt wie dort ein konkreter Endpunkt ({@code /api/v1/<segment>}), der Aufruf
  *       darf weit entfernt stehen (Schleifenvariable). Das nackte Präfix ist ein Suchmuster, kein
  *       Aufruf (mocking-gap-audit). <i>Anders als dort</i> zählen ganze Kommentarzeilen nicht und ein
@@ -46,7 +47,7 @@ final class SelfAccessRules {
 
     private SelfAccessRules() {}
 
-    /** Ohne API-Key erreichbar (ApiKeyAuthFilter) — dieselbe Liste wie HYGIENE_POOL_API_ALLOWED. */
+    /** Ohne API-Key erreichbar (Teilmenge von PublicPaths.EXACT) — dieselbe Liste wie HYGIENE_POOL_API_ALLOWED. */
     static final Set<String> KEY_FREE_PROBES = Set.of(
             "/api/v1/system/health", "/api/v1/system/info", "/api/v1/system/auth-status",
             "/api/v1/system/jvm-memory");

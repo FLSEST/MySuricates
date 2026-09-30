@@ -1,6 +1,7 @@
 package com.automation.config;
 
 import com.automation.security.ApiKeyAuthFilter;
+import com.automation.security.PublicPaths;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -24,24 +25,12 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                // Welche Pfade ohne Key erreichbar sind, steht allein in PublicPaths — der
+                // ApiKeyAuthFilter liest dieselben Matcher, um fehlende Keys zu protokollieren.
                 .authorizeHttpRequests(auth -> auth
-                        // Public endpoints
-                        .requestMatchers("/api/v1/system/health").permitAll()
-                        .requestMatchers("/api/v1/system/info").permitAll()
-                        .requestMatchers("/api/v1/system/auth-status").permitAll()
-                        // Genau drei Heap-Zahlen für den Performance-Audit (c2cda5ed); die
-                        // Metrik-Oberfläche unter /actuator/metrics bleibt hinter dem Key.
-                        .requestMatchers("/api/v1/system/jvm-memory").permitAll()
-                        .requestMatchers("/actuator/health").permitAll()
-                        .requestMatchers("/actuator/**").authenticated()
-                        // WebSocket endpoint
-                        .requestMatchers("/ws/**").permitAll()
-                        // Public webhook trigger endpoint
-                        .requestMatchers("/api/v1/webhook/trigger/**").permitAll()
-                        // OAuth2 callback endpoints (public, like webhooks)
-                        .requestMatchers("/api/v1/integrations/*/callback").permitAll()
-                        // All API endpoints require API key
-                        .requestMatchers("/api/**").authenticated()
+                        .requestMatchers(PublicPaths.publicMatchers()).permitAll()
+                        .requestMatchers(PublicPaths.keyRequiredMatchers()).authenticated()
+                        // ausgeliefertes Frontend
                         .anyRequest().permitAll()
                 )
                 .headers(headers -> headers

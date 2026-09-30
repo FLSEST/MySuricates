@@ -1,8 +1,10 @@
 package com.automation.service.workflow.analyzer;
 
 import com.automation.entity.BlockDefinition;
+import com.automation.security.PublicPaths;
 import com.automation.service.workflow.analyzer.AnalyzerFinding.Severity;
 import org.junit.jupiter.api.Test;
+import org.springframework.mock.web.MockHttpServletRequest;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -11,6 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -210,17 +213,36 @@ class SelfAccessRulesTest {
                 .hasSize(1);
     }
 
-    /** Dieselben Ausnahmen wie die Pool-Regel SELF-API: beide Listen dürfen nicht auseinanderlaufen. */
-    @Test
-    void sondenListeStimmtMitPoolNeutralitaetUeberein() throws IOException {
+    /** HYGIENE_POOL_API_ALLOWED aus scripts/lib/hygiene-rules.sh. */
+    private static Set<String> poolAllowedProbes() throws IOException {
         Path rules = Files.exists(Path.of("../scripts/lib/hygiene-rules.sh"))
                 ? Path.of("../scripts/lib/hygiene-rules.sh") : Path.of("scripts/lib/hygiene-rules.sh");
         String text = Files.readString(rules);
         var block = Pattern.compile("HYGIENE_POOL_API_ALLOWED=\\(([^)]*)\\)").matcher(text);
         assertThat(block.find()).as("HYGIENE_POOL_API_ALLOWED in " + rules).isTrue();
-        Set<String> pool = Pattern.compile("\"([^\"]+)\"").matcher(block.group(1)).results()
+        return Pattern.compile("\"([^\"]+)\"").matcher(block.group(1)).results()
                 .map(m -> m.group(1)).collect(Collectors.toSet());
+    }
 
-        assertThat(SelfAccessRules.KEY_FREE_PROBES).isEqualTo(pool);
+    /** Dieselben Ausnahmen wie die Pool-Regel SELF-API: beide Listen dürfen nicht auseinanderlaufen. */
+    @Test
+    void sondenListeStimmtMitPoolNeutralitaetUeberein() throws IOException {
+        assertThat(SelfAccessRules.KEY_FREE_PROBES).isEqualTo(poolAllowedProbes());
+    }
+
+    /**
+     * Jede erlaubte Sonde ist wirklich ohne Key erreichbar: ein exakter öffentlicher Pfad in
+     * {@link PublicPaths}, den weder Filterkette noch ApiKeyAuthFilter als geschützt behandeln.
+     * Sonst verlangte die Regel von Workflows eine Sonde, die nur mit Key antwortet.
+     */
+    @Test
+    void jedeErlaubteSondeIstOhneKeyErreichbar() throws IOException {
+        Set<String> probes = new TreeSet<>(SelfAccessRules.KEY_FREE_PROBES);
+        probes.addAll(poolAllowedProbes());
+        assertThat(PublicPaths.EXACT).containsAll(probes);
+        for (String probe : probes) {
+            assertThat(PublicPaths.requiresKey(new MockHttpServletRequest("GET", probe)))
+                    .as("Sonde %s verlangt einen Key", probe).isFalse();
+        }
     }
 }
