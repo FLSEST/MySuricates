@@ -232,6 +232,82 @@ KI-Kontext für das Projekt generieren (analysiert das Projekt-Verzeichnis).
 
 **Response:** `{ "context": "..." }`
 
+### `GET /api/v1/projects/{id}/export`
+
+Das ganze Projekt als **Bündel** — eine JSON-Datei mit Stammdaten (ohne Pfad, Container, Status, IDs), allen
+Workflows, den Chains, deren Einträge nur Workflows dieses Projekts nennen (nur mit Modul `chains`, sonst
+weggelassen + Warnung), und den Zeitplänen darauf. Nicht enthalten: Läufe, TODOs, Memory, Webhooks,
+TODO-/Completion-Trigger, Siegel, Skills (nur per Name). Format und Pfad-Tokens: [architektur.md → Projekt-Bündel](architektur.md#projekt-bündel).
+
+**Response:** `200`, `Content-Disposition: attachment; filename="<projekt-slug>.mysuricates-bundle.json"`
+
+```json
+{ "format": "mysuricates-project-bundle", "formatVersion": 1, "exportedAt": "…", "appVersion": "…",
+  "project": { "name": "…", "subtitle": null, "description": "…", "type": "CODE", "aiContext": null, "config": {} },
+  "workflows": [ { "key": "tests", "definition": { "name": "Tests", "blocks": [ … ], "activatedSkillNames": [] } } ],
+  "chains": [ { "key": "nightly", "name": "Nightly", "entries": [ { "workflowKey": "tests", "sortOrder": 0 } ] } ],
+  "schedules": [ { "target": { "workflowKey": "tests" }, "cronExpression": "0 0 6 * * *", "scheduleType": "CRON" } ],
+  "paths": [ { "token": "@@path:1@@", "original": "/tmp/app-venv", "occurrences": 2, "hint": "Tests › blocks[0].config.command" } ],
+  "skillNames": [], "warnings": [] }
+```
+
+`404` bei unbekanntem oder archiviertem Projekt.
+
+### `POST /api/v1/projects/import/preview`
+
+Prüft ein Bündel und zeigt, was ein Import anlegen würde — schreibt nichts. Body höchstens 5 MB.
+
+**Request:** `{ "bundle": { … }, "targetProjectId": "<uuid, optional — füllt nameTakenInTarget>" }`
+
+**Response:**
+
+```json
+{ "project": { "name": "…", "nameTaken": true },
+  "workflows": [ { "key": "tests", "name": "Tests", "blockCount": 3, "blockTypes": ["shell", "simple"],
+                   "providers": ["CLAUDE"], "models": ["opus"], "shellCommands": ["erste 200 Zeichen je Shell-Feld"],
+                   "nameTakenInTarget": false } ],
+  "chains": [ { "key": "nightly", "name": "Nightly", "entries": 2 } ],
+  "schedules": [ { "target": "workflow:tests", "cronExpression": "0 0 6 * * *", "willBeDisabled": true } ],
+  "paths": [ { "token": "@@path:1@@", "original": "/tmp/app-venv", "occurrences": 2, "hint": "…" } ],
+  "warnings": [ "…" ] }
+```
+
+`400` mit allen Problemen auf einmal: falsches `format`, `formatVersion` ≠ 1, fehlende Pflichtfelder,
+doppelte Keys, `workflowKey`/`chainKey`/`@@workflow:key@@`/`@@path:N@@` ohne Ziel im Bündel, ungültiger Cron.
+
+### `POST /api/v1/projects/import`
+
+Legt das Bündel in **einer** Transaktion an: Projekt (Modus `new`) → Workflows über den regulären Schreibweg
+(`changeSource` `import`, ungesiegelt, je eine Versionszeile) → `@@workflow:key@@` auf die neuen IDs (zweite
+Versionszeile) → Chains → Zeitpläne, immer **deaktiviert**. Schlägt ein Schritt fehl, wird nichts angelegt.
+
+**Request:**
+
+```json
+{ "bundle": { … },
+  "project": { "mode": "new", "name": "App (Import)", "path": "/home/x/code/app" },
+  "pathMappings": { "@@path:1@@": "/home/x/.venvs/app" },
+  "onConflict": "skip" }
+```
+
+- `project`: `{"mode":"new","name","path"}` (`path` darf leer sein) oder `{"mode":"existing","projectId"}`.
+- `pathMappings`: Pflicht für jedes Token aus `paths` (Vorschlag: `original`); `{{ project_path }}` bleibt Platzhalter.
+- `onConflict` (nur bei `existing`): `skip` (Default; Verweise zeigen auf den vorhandenen gleichnamigen Workflow)
+  oder `rename` (`Name (Import)`, `Name (Import 2)`, …).
+
+**Response:** `201`
+
+```json
+{ "projectId": "…", "created": { "workflows": 8, "chains": 1, "schedules": 2 },
+  "skipped": [ { "kind": "workflow", "key": "tests", "reason": "name exists" } ],
+  "renamed": [ { "kind": "workflow", "key": "report", "from": "Report", "to": "Report (Import)" } ],
+  "warnings": [ "…" ] }
+```
+
+`400` bei fehlender Pfad-Zuordnung (mit Liste der Tokens), ungültigem Bündel oder Ziel; `404` bei unbekanntem
+Zielprojekt. Das Bündel bringt ausführbare Shell-Befehle mit — die Oberfläche zeigt sie in der Vorschau, bevor sie
+den Import anbietet; die API selbst verlangt die Vorschau nicht (API-Key wie jeder Schreibweg).
+
 ---
 
 ## Workflows
@@ -1232,6 +1308,8 @@ angenommen; ein anderer Wert → `400`, die Meldung nennt die erlaubten Werte.
 - **`conflictBehavior`:** Bei `SKIP` entfällt ein Termin, solange das Ziel noch einen Lauf in `RUNNING`
   oder `PAUSED` hat: `nextRunAt` springt auf das nächste Vorkommen, ein einmaliger Zeitplan (`ONCE`,
   `DELAYED`) verfällt, das Activity-Log vermerkt „Schedule skipped (previous run still in progress)“.
+  Ebenso, solange ein unterbrochener Lauf des Workflows auf seine automatische Fortsetzung wartet
+  („Schedule skipped (interrupted run is being resumed automatically)“, `reason: auto-resume-pending`).
   `OVERLAP` startet trotzdem einen zweiten Lauf daneben.
 - **`maxRuns`:** zählt jeden Start des Zeitplans, auch einen fehlgeschlagenen oder abgewiesenen; ein per
   `SKIP` entfallener Termin zählt nicht. Ist die Zahl erreicht, wird der Zeitplan deaktiviert.
@@ -3329,6 +3407,12 @@ Chat-Nachricht an den KI-Assistenten senden.
 | `sessionId` | String | Nein |
 | `requestId` | String | Nein |
 
+`MessageEntry` = `{role, content, toolResults?}`. `toolResults` (optional, nur an Assistenten-Einträgen) sind die
+Ergebnisse der in diesem Zug bestätigten Werkzeuge: `[{"type": "create_workflow", "success": true, "message": "✓ …"}]`.
+Der Server nimmt nur ausgeführte (kein `✗` am Anfang), aus den letzten 3 Assistenten-Zügen, höchstens 5 je Zug und
+je 600 Zeichen, und kennzeichnet sie im Prompt als Daten ([assistant-system.md](assistant-system.md) → „Werkzeug-Ergebnisse
+im Verlauf“). Ohne das Feld bleibt alles wie bisher.
+
 **Response:** `AssistantChatResponse`
 
 ```json
@@ -3388,9 +3472,13 @@ Pending Tool-Call bestätigen (z.B. Workflow-Start durch Assistenten).
 
 ```json
 {
-  "sessionId": "session-uuid"
+  "sessionId": "session-uuid",
+  "language": "en"
 }
 ```
+
+`language` (`de` | `en`, optional, Vorgabe deutsch): Sprache der Baufehler-Prüfung, die `create_workflow`/`update_workflow`
+an ihr Ergebnis hängen.
 
 **Response:** `ToolExecutionResult` (oder `410 Gone` wenn bereits verarbeitet/abgelaufen)
 
@@ -3402,7 +3490,8 @@ Pending Tool-Call ablehnen.
 
 ```json
 {
-  "sessionId": "session-uuid"
+  "sessionId": "session-uuid",
+  "language": "en"
 }
 ```
 

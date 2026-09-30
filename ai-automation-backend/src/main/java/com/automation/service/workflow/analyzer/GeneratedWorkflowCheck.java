@@ -28,6 +28,8 @@ import java.util.List;
  *       (Blockzahl, Blocktyp je Position, Zahl der verschachtelten Blöcke je Container) oder hat die korrigierte
  *       Fassung mehr {@code HIGH}-Befunde, gilt die ursprüngliche. Lässt die Korrektur {@code name},
  *       {@code skillIds} oder {@code requiredCapabilities} eines Blocks weg, kommen sie aus dem Original.</li>
+ *   <li>{@link #reviewRepair} legt dieselben Regeln an eine Reparatur an, die der Aufrufer selbst bei der KI
+ *       geholt hat (Factory-Auto-Fix, TODO 99a9dfb0) — ohne eigenen KI-Aufruf.</li>
  * </ul>
  *
  * <p>Die Prüfung ändert nie selbst etwas und blockiert kein Speichern. Der KI-Aufruf kommt vom Aufrufer
@@ -43,6 +45,8 @@ public class GeneratedWorkflowCheck {
     static final int MAX_LINES = 10;
 
     private static final String SOURCE = "GeneratedWorkflowCheck";
+    private static final String DE = "de";
+    private static final String EN = "en";
 
     private final WorkflowAnalyzer analyzer;
     private final ObjectMapper objectMapper;
@@ -57,6 +61,22 @@ public class GeneratedWorkflowCheck {
     /** Ergebnis von {@link #correctOnce}: die Blöcke, die gespeichert werden, und ihre Befunde ab MEDIUM. */
     public record Correction(List<BlockDefinition> blocks, List<AnalyzerFinding> remaining,
                              boolean attempted, boolean applied) {
+    }
+
+    /**
+     * Ergebnis von {@link #reviewRepair}: übernommen ({@code rejection == null}; {@code blocks} ist die ergänzte
+     * Reparatur) oder verworfen mit Grund ({@code blocks} ist das Original). {@code findings} sind die Befunde ab
+     * MEDIUM der Fassung in {@code blocks}.
+     */
+    public record RepairReview(List<BlockDefinition> blocks, List<AnalyzerFinding> findings, String rejection) {
+
+        static RepairReview rejected(List<BlockDefinition> original, List<AnalyzerFinding> findings, String reason) {
+            return new RepairReview(original, findings, reason);
+        }
+
+        public boolean accepted() {
+            return rejection == null;
+        }
     }
 
     /** Befunde ab MEDIUM einer gespeicherten Definition (samt Metadaten), HIGH zuerst. */
@@ -82,34 +102,55 @@ public class GeneratedWorkflowCheck {
 
     /**
      * Die Befunde als Zeilen, höchstens {@value #MAX_LINES} und bei mehr eine Schlusszeile „… und N weitere“ —
-     * für Ergebnisse, die der Nutzer sieht.
+     * für Ergebnisse, die der Nutzer sieht. Deutsch; {@link #summaryLines(List, String)} für eine andere Sprache.
      */
     public static List<String> summaryLines(List<AnalyzerFinding> findings) {
+        return summaryLines(findings, DE);
+    }
+
+    /**
+     * Wie {@link #summaryLines(List)}, in {@code language} ({@code "en"}, sonst deutsch) — Detailtext und
+     * Schlusszeile („… and N more“) aus {@link AnalyzerFinding#detail(String)} (TODO 81773d7b).
+     */
+    public static List<String> summaryLines(List<AnalyzerFinding> findings, String language) {
+        boolean en = EN.equalsIgnoreCase(language);
         List<String> lines = new ArrayList<>();
         for (int i = 0; i < findings.size() && i < MAX_LINES; i++) {
-            lines.add(line(findings.get(i)));
+            lines.add(line(findings.get(i), language));
         }
         if (findings.size() > MAX_LINES) {
-            lines.add("… und " + (findings.size() - MAX_LINES) + " weitere");
+            int more = findings.size() - MAX_LINES;
+            lines.add(en ? "… and " + more + " more" : "… und " + more + " weitere");
         }
         return lines;
     }
 
-    /** {@link #summaryLines} als Aufzählung, eine Zeile je Befund; leer ohne Befunde. */
+    /** {@link #summaryLines} als Aufzählung, eine Zeile je Befund; leer ohne Befunde. Deutsch. */
     public static String format(List<AnalyzerFinding> findings) {
-        return String.join("\n", summaryLines(findings).stream().map(l -> "- " + l).toList());
+        return format(findings, DE);
     }
 
-    /** Eine Befundzeile: Schwere, Regel, Block (1-basiert, mit Name) und Detail. */
+    /** {@link #format(List)} in {@code language} ({@code "en"}, sonst deutsch). */
+    public static String format(List<AnalyzerFinding> findings, String language) {
+        return String.join("\n", summaryLines(findings, language).stream().map(l -> "- " + l).toList());
+    }
+
+    /** Eine Befundzeile: Schwere, Regel, Block (1-basiert, mit Name) und Detail — deutsch. */
     static String line(AnalyzerFinding f) {
+        return line(f, DE);
+    }
+
+    static String line(AnalyzerFinding f, String language) {
+        boolean en = EN.equalsIgnoreCase(language);
         String where;
         if (f.blockIndex() < 0) {
             where = "Definition";
         } else {
+            boolean named = f.blockName() != null && !f.blockName().isBlank();
             where = "Block " + (f.blockIndex() + 1)
-                    + (f.blockName() != null && !f.blockName().isBlank() ? " „" + f.blockName() + "“" : "");
+                    + (!named ? "" : en ? " \"" + f.blockName() + "\"" : " „" + f.blockName() + "“");
         }
-        return f.severity() + " " + f.rule() + " — " + where + ": " + f.detail();
+        return f.severity() + " " + f.rule() + " — " + where + ": " + f.detail(language);
     }
 
     /**
@@ -136,22 +177,41 @@ public class GeneratedWorkflowCheck {
             log.info("Baufehler-Korrektur: Antwort unbrauchbar, ursprüngliche Fassung bleibt ({} HIGH)", highBefore);
             return new Correction(blocks, before, true, false);
         }
-        String shapeChange = CorrectionAnswer.shapeChange(blocks, corrected);
+        RepairReview review = review(blocks, before, corrected, instructions);
+        if (!review.accepted()) {
+            log.warn("Baufehler-Korrektur verworfen, {}; ursprüngliche Fassung bleibt", review.rejection());
+            return new Correction(blocks, before, true, false);
+        }
+        log.info("Baufehler-Korrektur übernommen: HIGH {} → {}", highBefore, highCount(review.findings()));
+        return new Correction(review.blocks(), review.findings(), true, true);
+    }
+
+    /**
+     * Prüft eine Blockliste, die eine KI aus {@code original} gemacht hat — etwa die Auto-Fix-Reparatur der Factory
+     * (TODO 99a9dfb0) —, nach denselben Regeln wie die Korrekturrunde von {@link #correctOnce}, ohne selbst die KI zu
+     * fragen: Verwerfen, wenn die Struktur nicht gleich geblieben ist ({@link CorrectionAnswer#shapeChange}) oder die
+     * Reparatur mehr {@code HIGH}-Befunde hat als das Original. Weggelassene {@code name}, {@code skillIds} und
+     * {@code requiredCapabilities} kommen aus dem Original ({@code repaired} wird dafür ergänzt).
+     */
+    public RepairReview reviewRepair(List<BlockDefinition> original, List<BlockDefinition> repaired, String instructions) {
+        return review(original, findings(original, instructions), repaired, instructions);
+    }
+
+    private RepairReview review(List<BlockDefinition> original, List<AnalyzerFinding> before,
+                                List<BlockDefinition> repaired, String instructions) {
+        String shapeChange = CorrectionAnswer.shapeChange(original, repaired);
         if (shapeChange != null) {
             // Typischer Fehler: das Modell liefert nur den reparierten Block zurück — die übrigen fielen still weg.
-            log.warn("Baufehler-Korrektur verworfen, Struktur geändert: {} (Blöcke vorher {}, nachher {}); "
-                    + "ursprüngliche Fassung bleibt", shapeChange, blocks.size(), corrected.size());
-            return new Correction(blocks, before, true, false);
+            return RepairReview.rejected(original, before, "Struktur geändert: " + shapeChange);
         }
-        CorrectionAnswer.keepOmittedFields(blocks, corrected);
-        List<AnalyzerFinding> after = findings(corrected, instructions);
-        if (highCount(after) > highBefore) {
-            log.info("Baufehler-Korrektur: korrigierte Fassung hat mehr HIGH-Befunde ({} > {}), ursprüngliche bleibt",
-                    highCount(after), highBefore);
-            return new Correction(blocks, before, true, false);
+        CorrectionAnswer.keepOmittedFields(original, repaired);
+        List<AnalyzerFinding> after = findings(repaired, instructions);
+        long highBefore = highCount(before);
+        long highAfter = highCount(after);
+        if (highAfter > highBefore) {
+            return RepairReview.rejected(original, before, "mehr HIGH-Befunde (" + highBefore + " → " + highAfter + ")");
         }
-        log.info("Baufehler-Korrektur übernommen: HIGH {} → {}", highBefore, highCount(after));
-        return new Correction(corrected, after, true, true);
+        return new RepairReview(repaired, after, null);
     }
 
     String correctionPrompt(List<BlockDefinition> blocks, List<AnalyzerFinding> findings) {

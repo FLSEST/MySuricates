@@ -58,7 +58,8 @@ final class WiringRules {
                 if (!names.contains(referenced)) {
                     out.add(AnalyzerFinding.of("unknown-block-reference", Severity.HIGH, i,
                             blocks.get(i).getName(),
-                            "verweist auf {{ " + key + " }}, aber kein Block heißt \"" + referenced + "\""));
+                            "verweist auf {{ " + key + " }}, aber kein Block heißt \"" + referenced + "\"",
+                            "references {{ " + key + " }}, but no block is named \"" + referenced + "\""));
                 }
             }
         }
@@ -73,7 +74,9 @@ final class WiringRules {
                     out.add(AnalyzerFinding.of("chain-only-placeholder", Severity.MEDIUM, i,
                             blocks.get(i).getName(),
                             "{{ " + key + " }} wird nur innerhalb einer Chain belegt; läuft der Workflow "
-                                    + "einzeln, steht die Zeichenfolge selbst im Prompt"));
+                                    + "einzeln, steht die Zeichenfolge selbst im Prompt",
+                            "{{ " + key + " }} is only set inside a chain; when the workflow runs on its own, "
+                                    + "the literal placeholder ends up in the prompt"));
                 }
             }
         }
@@ -91,7 +94,9 @@ final class WiringRules {
             if (PlaceholderSyntax.keysIn(texts.get(i)).contains(AUDIT_ONLY)) {
                 out.add(AnalyzerFinding.of("audit-only-placeholder", Severity.MEDIUM, i, blocks.get(i).getName(),
                         "{{ " + AUDIT_ONLY + " }} wird nur in einem Audit-Workflow belegt (metadata.audit mit "
-                                + "enabled, key, category und reportBlock); hier steht die Zeichenfolge selbst im Prompt"));
+                                + "enabled, key, category und reportBlock); hier steht die Zeichenfolge selbst im Prompt",
+                        "{{ " + AUDIT_ONLY + " }} is only set in an audit workflow (metadata.audit with "
+                                + "enabled, key, category and reportBlock); here the literal placeholder ends up in the prompt"));
             }
         }
     }
@@ -133,7 +138,10 @@ final class WiringRules {
                 out.add(AnalyzerFinding.of("unwired-output", Severity.MEDIUM, i, block.getName(),
                         "die Ausgabe dieses Blocks wird von keinem späteren Block gelesen "
                                 + "(weder previous_output noch " + byIndex
-                                + (byName == null ? "" : " noch " + byName) + ")"));
+                                + (byName == null ? "" : " noch " + byName) + ")",
+                        "no later block reads the output of this block "
+                                + "(neither previous_output nor " + byIndex
+                                + (byName == null ? "" : " nor " + byName) + ")"));
             }
         }
     }

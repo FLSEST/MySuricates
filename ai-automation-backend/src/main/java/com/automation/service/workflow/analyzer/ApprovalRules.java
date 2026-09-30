@@ -69,6 +69,9 @@ final class ApprovalRules {
         out.add(AnalyzerFinding.of("on-no-without-reject-option", Severity.HIGH, index, name,
                 "setzt on_no: " + onNo + ", aber keine der Optionen " + options
                         + " gilt als Ablehnung (Ablehnungen: " + rejectAnswers + ") — on_no greift nie; "
-                        + "reject_options setzen"));
+                        + "reject_options setzen",
+                "sets on_no: " + onNo + ", but none of the options " + options
+                        + " counts as a rejection (rejections: " + rejectAnswers + ") — on_no never applies; "
+                        + "set reject_options"));
     }
 }

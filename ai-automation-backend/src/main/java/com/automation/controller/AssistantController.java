@@ -37,8 +37,16 @@ public class AssistantController {
     private final PendingToolRegistry pendingToolRegistry;
     private final AssistantToolExecutor toolExecutor;
 
-    /** Optional body for confirm/reject — carries sessionId so the result hits the right history. */
-    public record PendingToolAction(String sessionId) {}
+    /**
+     * Optional body for confirm/reject — carries sessionId so the result hits the right history, and the UI
+     * {@code language} ({@code "en"}/{@code "de"}, TODO 81773d7b) the build check of a workflow tool answers in;
+     * without it German, as before.
+     */
+    public record PendingToolAction(String sessionId, String language) {
+        public PendingToolAction(String sessionId) {
+            this(sessionId, null);
+        }
+    }
 
     @PostMapping("/chat")
     public AssistantChatResponse chat(@Valid @RequestBody AssistantChatRequest request) {
@@ -90,7 +98,7 @@ public class AssistantController {
         if (tool == null) {
             return ResponseEntity.status(410).build();
         }
-        ToolExecutionResult result = toolExecutor.executeConfirmed(tool);
+        ToolExecutionResult result = toolExecutor.executeConfirmed(tool, body != null ? body.language() : null);
         persistResult(body, result);
         broadcaster.broadcastStatus(id, result.success() ? "TOOL_EXECUTED" : "TOOL_FAILED",
                 result.message(), System.nanoTime());

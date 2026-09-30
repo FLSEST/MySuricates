@@ -59,6 +59,55 @@ describe('assistant conversation', () => {
     expect(messages(sessionId).find((m) => m.replyTo === second)?.content).toBe('Re: Two');
   });
 
+  // TODO 2f7766e7: results of confirmed tools travel with their assistant turn; the old form stays without them
+  it('sends the results of executed tools with their assistant turn, never rejected ones', async () => {
+    const requests: AssistantChatRequest[] = [];
+    answering(requests);
+    const sessionId = useAssistantStore.getState().startNewSession();
+    const store = useAssistantStore.getState();
+    store.appendMessage(sessionId, { id: 'u1', role: 'user', content: 'Create it', status: 'sent' });
+    store.appendMessage(sessionId, {
+      id: 'a1', role: 'assistant', content: 'Creating.',
+      pendingTools: [
+        { id: 't1', type: 'create_workflow', description: 'Create', expiresAt: '2099-01-01T00:00:00Z' },
+        { id: 't2', type: 'delete_workflow', description: 'Delete', expiresAt: '2099-01-01T00:00:00Z' },
+      ],
+    });
+    store.appendMessage(sessionId, { id: 'a2', role: 'assistant', content: 'Nothing to do.' });
+    store.recordToolResult(sessionId, { toolId: 't1', type: 'create_workflow', success: true,
+      message: '✓ Workflow created\n\nBuild check: 1 finding(s) from MEDIUM up' });
+    store.recordToolResult(sessionId, { toolId: 't2', type: 'delete_workflow', success: false, message: '✗ Abgelehnt' });
+
+    sendAssistantMessage('Fix it', sessionId, params());
+
+    await waitFor(() => expect(requests).toHaveLength(1));
+    expect(requests[0]!.history).toEqual([
+      { role: 'user', content: 'Create it' },
+      { role: 'assistant', content: 'Creating.', toolResults: [
+        { type: 'create_workflow', success: true, message: '✓ Workflow created\n\nBuild check: 1 finding(s) from MEDIUM up' },
+      ] },
+      { role: 'assistant', content: 'Nothing to do.' },
+    ]);
+  });
+
+  it('keeps a turn whose tools were all rejected in the old form, without the field', async () => {
+    const requests: AssistantChatRequest[] = [];
+    answering(requests);
+    const sessionId = useAssistantStore.getState().startNewSession();
+    const store = useAssistantStore.getState();
+    store.appendMessage(sessionId, {
+      id: 'a1', role: 'assistant', content: 'Deleting.',
+      pendingTools: [{ id: 't2', type: 'delete_workflow', description: 'Delete', expiresAt: '2099-01-01T00:00:00Z' }],
+    });
+    store.recordToolResult(sessionId, { toolId: 't2', type: 'delete_workflow', success: false, message: '✗ Abgelehnt' });
+
+    sendAssistantMessage('Ok', sessionId, params());
+
+    await waitFor(() => expect(requests).toHaveLength(1));
+    expect(requests[0]!.history).toEqual([{ role: 'assistant', content: 'Deleting.' }]);
+    expect(requests[0]!.history[0]).not.toHaveProperty('toolResults');
+  });
+
   it('cancels without an error bubble and takes a queued turn out', async () => {
     const requests: AssistantChatRequest[] = [];
     answering(requests, 5_000);

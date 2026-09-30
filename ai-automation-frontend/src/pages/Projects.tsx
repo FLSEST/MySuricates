@@ -11,6 +11,7 @@ import { useT } from '../i18n';
 import { CreateProjectModal } from '../components/project/CreateProjectModal';
 import { FirstProjectActions } from '../components/project/FirstProjectActions';
 import { ProjectFormFields } from '../components/project/ProjectFormFields';
+import { ProjectImportButton } from '../components/project/ProjectImportButton';
 import type { Project, ProjectType, UpdateProjectRequest } from '../types';
 
 export function Projects() {
@@ -82,9 +83,12 @@ export function Projects() {
           <h1 className="text-2xl font-bold text-text">{t.projects.title}</h1>
           <p className="text-sm text-text-secondary mt-1">{t.projects.subtitle}</p>
         </div>
-        <Button icon={<Plus className="w-4 h-4" />} onClick={() => setShowCreate(true)}>
-          {t.projects.create}
-        </Button>
+        <div className="flex items-center gap-2">
+          <ProjectImportButton />
+          <Button icon={<Plus className="w-4 h-4" />} onClick={() => setShowCreate(true)}>
+            {t.projects.create}
+          </Button>
+        </div>
       </div>
 
       <Hint id="projects-directory" />

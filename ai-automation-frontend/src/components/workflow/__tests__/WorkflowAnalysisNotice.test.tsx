@@ -47,6 +47,25 @@ describe('WorkflowAnalysisNotice', () => {
     expect(screen.getByRole('button', { name: 'Hide findings' })).toHaveAttribute('aria-expanded', 'true');
   });
 
+  // TODO 81773d7b: the new form carries detailEn — the English UI shows it, the German one keeps detail
+  it.each([
+    ['en', 'required key goal is missing', 'Pflichtschlüssel goal fehlt', 'Show findings'],
+    ['de', 'Pflichtschlüssel goal fehlt', 'required key goal is missing', 'Befunde anzeigen'],
+  ] as const)('shows the finding text in the UI language (%s)', async (locale, shown, hidden, button) => {
+    useI18nStore.setState({ locale });
+    server.use(http.get('/api/v1/workflows/wf-1/analyze', () => HttpResponse.json({
+      workflowId: 'wf-1', workflowName: 'Deploy', findingCount: 1, bySeverity: { HIGH: 1 },
+      findings: [{ ...findings[0], detailEn: 'required key goal is missing' }],
+    })));
+
+    renderWithProviders(<WorkflowAnalysisNotice workflow={workflow} />);
+    await screen.findByTestId('workflow-analysis');
+    fireEvent.click(screen.getByRole('button', { name: button }));
+
+    expect(screen.getByText(shown)).toBeInTheDocument();
+    expect(screen.queryByText(hidden)).not.toBeInTheDocument();
+  });
+
   it('counts from the findings when the response has no bySeverity', async () => {
     server.use(http.get('/api/v1/workflows/wf-1/analyze', () => HttpResponse.json({
       workflowId: 'wf-1', workflowName: 'Deploy', findingCount: 1, findings: [findings[0]],

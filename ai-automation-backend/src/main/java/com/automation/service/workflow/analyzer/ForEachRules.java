@@ -34,7 +34,12 @@ final class ForEachRules {
                             + (source == null ? "nicht gesetzt" : "\"" + source + "\"")
                             + " — der Befehl läuft nie, "
                             + (hasItems ? "die Items kommen aus items" : "der Block läuft mit null Items")
-                            + "; items_source: \"command\" setzen"));
+                            + "; items_source: \"command\" setzen",
+                    "sets items_command, but items_source is "
+                            + (source == null ? "not set" : "\"" + source + "\"")
+                            + " — the command never runs, "
+                            + (hasItems ? "the items come from items" : "the block runs with zero items")
+                            + "; set items_source: \"command\""));
         }
     }
 

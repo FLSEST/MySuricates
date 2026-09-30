@@ -11,6 +11,7 @@ import com.automation.service.memory.ConversationPreprocessor;
 import com.automation.service.workflow.AgentInstructionsService;
 import com.automation.service.workflow.WorkflowService;
 import com.automation.service.workflow.analyzer.GeneratedWorkflowCheck;
+import com.automation.util.BlockJsonReader;
 import com.automation.util.JsonRepairUtil;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -127,7 +128,7 @@ public class DialogConversionService {
         double confidence = parsed.get("confidence") instanceof Number n ? n.doubleValue() : 0.5;
         String patternType = (String) parsed.getOrDefault("patternType", "mixed");
 
-        List<BlockDefinition> blocks = parseBlocks(parsed.get("blocks"));
+        List<BlockDefinition> blocks = BlockJsonReader.fromMapList(parsed.get("blocks"));
         if (blocks.isEmpty()) {
             return suggestRuleBased(session, filePath);
         }
@@ -142,7 +143,8 @@ public class DialogConversionService {
                 sugName, sugDesc, check.blocks(),
                 session.sessionId(), filePath, session.projectPath(),
                 confidence, patternType, null, (int) toolCallCount, true,
-                GeneratedWorkflowCheck.summaryLines(check.remaining())
+                GeneratedWorkflowCheck.summaryLines(check.remaining()),
+                GeneratedWorkflowCheck.summaryLines(check.remaining(), "en")
         );
     }
 
@@ -193,11 +195,13 @@ public class DialogConversionService {
 
         String name = "Dialog: " + truncate(session.projectPath(), 50);
         // Regelbasiert gibt es keine KI, die korrigieren könnte: nur melden.
+        var findings = buildCheck.findings(blocks, null);
         return new DialogWorkflowSuggestion(
                 name, "Aus Claude-Code-Session generiert (rule-based)", blocks,
                 session.sessionId(), filePath, session.projectPath(),
                 0.5, "mixed", null, toolCallsAnalyzed, true,
-                GeneratedWorkflowCheck.summaryLines(buildCheck.findings(blocks, null))
+                GeneratedWorkflowCheck.summaryLines(findings),
+                GeneratedWorkflowCheck.summaryLines(findings, "en")
         );
     }
 
@@ -243,23 +247,6 @@ public class DialogConversionService {
         }
 
         return sb.toString().trim();
-    }
-
-    @SuppressWarnings("unchecked")
-    private List<BlockDefinition> parseBlocks(Object blocksObj) {
-        List<BlockDefinition> blocks = new ArrayList<>();
-        if (!(blocksObj instanceof List<?> blockList)) return blocks;
-
-        for (Object bObj : blockList) {
-            if (!(bObj instanceof Map<?, ?> bMap)) continue;
-            Map<String, Object> bTyped = (Map<String, Object>) bMap;
-            String type = (String) bTyped.getOrDefault("type", "simple");
-            Map<String, Object> config = bTyped.get("config") instanceof Map<?, ?> c
-                    ? (Map<String, Object>) c
-                    : new LinkedHashMap<>();
-            blocks.add(BlockDefinition.builder().type(type).config(config).build());
-        }
-        return blocks;
     }
 
     private long countToolCalls(ClaudeJsonlParser.ParsedSession session) {

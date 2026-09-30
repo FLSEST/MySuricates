@@ -75,6 +75,20 @@ class WorkflowAnalyzerControllerTest {
                 .andExpect(jsonPath("$.findings[0].severity").value("HIGH"));
     }
 
+    /** TODO 81773d7b: jeder Befund trägt den Text deutsch ({@code detail}, wie bisher) und englisch ({@code detailEn}). */
+    @Test
+    void analyzeLiefertDetailDeutschUndEnglisch() throws Exception {
+        Workflow w = wf("wf-3", "Zweisprachig");
+        when(workflowService.findByIdEager("wf-3")).thenReturn(w);
+        when(analyzer.analyze(w)).thenReturn(List.of(new AnalyzerFinding("missing-required-config-key", Severity.HIGH,
+                0, "b", "Pflichtschlüssel command fehlt", "required key command is missing")));
+
+        mockMvc.perform(get("/api/v1/workflows/wf-3/analyze"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.findings[0].detail").value("Pflichtschlüssel command fehlt"))
+                .andExpect(jsonPath("$.findings[0].detailEn").value("required key command is missing"));
+    }
+
     @Test
     void analyzeOhneBefundeLiefertLeereZaehlung() throws Exception {
         Workflow w = wf("wf-2", "Sauber");

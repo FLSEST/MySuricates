@@ -92,6 +92,37 @@ class WishDecomposeServiceTest {
         }
 
         @Test
+        void blocksKeepNameSkillIdsAndCapabilities() throws Exception {
+            // TODO d6be36f3: parseBlocks took only type and config — {{ block.fetch.output }} pointed nowhere.
+            Wish wish = createWish("w-1");
+            when(aiProvider.reason(any())).thenReturn(new AiProvider.ReasoningResult("""
+                    {"analysis":"test","strategy":"simple","workflows":[
+                      {"name":"Report","blocks":[
+                    {"type": "shell", "name": "fetch", "config": {"command": "cat data.txt"},
+                     "skillIds": ["skill-1"], "requiredCapabilities": ["docker"]},
+                    {"type": "simple", "name": "summarize", "config": {"command": "Fasse zusammen: {{ block.fetch.output }}"}}
+                      ]}
+                    ],"needsClarification":false}""", null));
+            when(workflowService.create(any(), eq(ChangeSource.WISH)))
+                    .thenReturn(Workflow.builder().id("wf-1").name("Report").build());
+            lenient().when(factoryVerificationService.verifyAndFix(anyString(), anyInt()))
+                    .thenReturn(new FactoryTestResult("OK", null, null));
+
+            service.decompose(wish);
+
+            ArgumentCaptor<CreateWorkflowRequest> captor = ArgumentCaptor.forClass(CreateWorkflowRequest.class);
+            verify(workflowService).create(captor.capture(), eq(ChangeSource.WISH));
+            var blocks = captor.getValue().blocks();
+            assertThat(blocks).extracting(com.automation.entity.BlockDefinition::getName).containsExactly("fetch", "summarize");
+            assertThat(blocks.get(0).getSkillIds()).containsExactly("skill-1");
+            assertThat(blocks.get(0).getRequiredCapabilities()).containsExactly("docker");
+            // the reference resolves, so the build check needs no correction round
+            verify(aiProvider, times(1)).reason(any());
+            // default timeouts still apply to the parsed config
+            assertThat(blocks.get(0).getConfig()).containsKey("timeout_seconds");
+        }
+
+        @Test
         void multipleWorkflows_createsChain() throws Exception {
             Wish wish = createWish("w-1");
             String json = """

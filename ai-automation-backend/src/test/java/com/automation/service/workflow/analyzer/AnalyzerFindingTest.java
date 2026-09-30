@@ -13,8 +13,8 @@ class AnalyzerFindingTest {
 
     @Test
     void ofUebernimmtAlleFelder() {
-        AnalyzerFinding f = AnalyzerFinding.of("r", Severity.LOW, -1, null, "d");
-        assertThat(f).isEqualTo(new AnalyzerFinding("r", Severity.LOW, -1, null, "d"));
+        AnalyzerFinding f = AnalyzerFinding.of("r", Severity.LOW, -1, null, "d", "e");
+        assertThat(f).isEqualTo(new AnalyzerFinding("r", Severity.LOW, -1, null, "d", "e"));
     }
 
     /** Controller und WorkflowAnalyzer filtern/sortieren über die Ordinalzahl: HIGH ist die schwerste. */
@@ -29,11 +29,12 @@ class AnalyzerFindingTest {
     @Test
     void jsonRundreise() throws Exception {
         ObjectMapper mapper = new ObjectMapper();
-        AnalyzerFinding f = new AnalyzerFinding("unwired-output", Severity.MEDIUM, 2, "report", "detail");
+        AnalyzerFinding f = new AnalyzerFinding("unwired-output", Severity.MEDIUM, 2, "report", "detail", "detail en");
 
         String json = mapper.writeValueAsString(f);
 
-        assertThat(json).contains("\"severity\":\"MEDIUM\"").contains("\"blockIndex\":2");
+        assertThat(json).contains("\"severity\":\"MEDIUM\"").contains("\"blockIndex\":2")
+                .contains("\"detail\":\"detail\"").contains("\"detailEn\":\"detail en\"");
         assertThat(mapper.readValue(json, AnalyzerFinding.class)).isEqualTo(f);
     }
 }

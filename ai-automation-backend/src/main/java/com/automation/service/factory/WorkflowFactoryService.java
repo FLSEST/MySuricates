@@ -129,7 +129,13 @@ public class WorkflowFactoryService {
                     log.info("Factory: auto-fix attempt {}/{} for workflow '{}'",
                             retries, request.maxRetries(), workflow.getName());
                     try {
-                        verificationService.autoFixWorkflow(workflow, testResult.error(), request.provider());
+                        FactoryVerificationService.AutoFixOutcome fix =
+                                verificationService.autoFixWorkflow(workflow, testResult.error(), request.provider());
+                        if (!fix.applied()) {
+                            // Workflow unchanged — another test run would only repeat the failure.
+                            retryErrors.add("Retry " + retries + ": " + fix.reason());
+                            continue;
+                        }
                         // Re-fetch after update
                         workflow = workflowService.findById(workflow.getId());
                         testResult = verificationService.deployAndVerify(workflow);
@@ -156,11 +162,13 @@ public class WorkflowFactoryService {
             verificationService.reportTestResult(workflow, testResult.status());
 
             String overallStatus = "PASSED".equals(testResult.status()) ? "VERIFIED" : "FAILED";
+            var findings = buildCheck.findings(workflow);
             return new WorkflowFactoryResult(
                     workflow.getId(), workflow.getName(), overallStatus,
                     testResult.runId(), testResult.status(), testResult.error(),
                     promoted, System.currentTimeMillis() - start, retryErrors,
-                    GeneratedWorkflowCheck.summaryLines(buildCheck.findings(workflow))
+                    GeneratedWorkflowCheck.summaryLines(findings),
+                    GeneratedWorkflowCheck.summaryLines(findings, "en")
             );
         } catch (Exception e) {
             log.error("Factory pipeline failed: {}", e.getMessage(), e);

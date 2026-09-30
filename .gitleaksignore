@@ -1,0 +1,9 @@
+# Bewusst geprüfte gitleaks-Fehlalarme (Fingerprint = Commit:Datei:Regel:Zeile).
+# Nur erfundene Test-Literale; echte Funde nie hier eintragen, sondern entfernen und das Secret rotieren.
+# 794bf6fe (gitleaks-Fehlalarme auf erfundene Test-Token per .gitleaksignore freigeben)
+b7c516063c5e0f2e55350b7f7594f4ac65e5dd7a:ai-automation-backend/src/test/java/com/automation/service/integration/providers/slack/SlackProviderTest.java:generic-api-key:25
+b7c516063c5e0f2e55350b7f7594f4ac65e5dd7a:ai-automation-backend/src/test/java/com/automation/service/integration/providers/slack/SlackHttpClientTest.java:generic-api-key:19
+516ddb15f4848a14c3c926bc513f14a8786afa19:ai-automation-backend/src/test/java/com/automation/service/integration/providers/todoist/TodoistHttpClientTest.java:generic-api-key:18
+516ddb15f4848a14c3c926bc513f14a8786afa19:ai-automation-backend/src/test/java/com/automation/service/integration/providers/todoist/TodoistProviderTest.java:generic-api-key:28
+867d2849896fcca0107366b08de26bf1ebd016c6:ai-automation-backend/src/test/java/com/automation/config/CorsIntegrationTest.java:generic-api-key:38
+867d2849896fcca0107366b08de26bf1ebd016c6:ai-automation-backend/src/test/java/com/automation/config/CorsIntegrationTest.java:generic-api-key:153

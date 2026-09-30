@@ -230,6 +230,82 @@ Generate AI context for the project (analyzes the project directory).
 
 **Response:** `{ "context": "..." }`
 
+### `GET /api/v1/projects/{id}/export`
+
+The whole project as a **bundle** — one JSON file with master data (without path, container, status, ids), all
+workflows, the chains whose entries only name workflows of this project (only with module `chains`, otherwise left
+out + warning), and the schedules on them. Not included: runs, TODOs, memory, webhooks, TODO/completion triggers,
+seals, skills (by name only). Format and path tokens: [architektur.md → Project bundle](architektur.md#project-bundle).
+
+**Response:** `200`, `Content-Disposition: attachment; filename="<project-slug>.mysuricates-bundle.json"`
+
+```json
+{ "format": "mysuricates-project-bundle", "formatVersion": 1, "exportedAt": "…", "appVersion": "…",
+  "project": { "name": "…", "subtitle": null, "description": "…", "type": "CODE", "aiContext": null, "config": {} },
+  "workflows": [ { "key": "tests", "definition": { "name": "Tests", "blocks": [ … ], "activatedSkillNames": [] } } ],
+  "chains": [ { "key": "nightly", "name": "Nightly", "entries": [ { "workflowKey": "tests", "sortOrder": 0 } ] } ],
+  "schedules": [ { "target": { "workflowKey": "tests" }, "cronExpression": "0 0 6 * * *", "scheduleType": "CRON" } ],
+  "paths": [ { "token": "@@path:1@@", "original": "/tmp/app-venv", "occurrences": 2, "hint": "Tests › blocks[0].config.command" } ],
+  "skillNames": [], "warnings": [] }
+```
+
+`404` for an unknown or archived project.
+
+### `POST /api/v1/projects/import/preview`
+
+Checks a bundle and shows what an import would create — writes nothing. Body at most 5 MB.
+
+**Request:** `{ "bundle": { … }, "targetProjectId": "<uuid, optional — fills nameTakenInTarget>" }`
+
+**Response:**
+
+```json
+{ "project": { "name": "…", "nameTaken": true },
+  "workflows": [ { "key": "tests", "name": "Tests", "blockCount": 3, "blockTypes": ["shell", "simple"],
+                   "providers": ["CLAUDE"], "models": ["opus"], "shellCommands": ["first 200 characters per shell field"],
+                   "nameTakenInTarget": false } ],
+  "chains": [ { "key": "nightly", "name": "Nightly", "entries": 2 } ],
+  "schedules": [ { "target": "workflow:tests", "cronExpression": "0 0 6 * * *", "willBeDisabled": true } ],
+  "paths": [ { "token": "@@path:1@@", "original": "/tmp/app-venv", "occurrences": 2, "hint": "…" } ],
+  "warnings": [ "…" ] }
+```
+
+`400` with all problems at once: wrong `format`, `formatVersion` ≠ 1, missing required fields, duplicate keys,
+`workflowKey`/`chainKey`/`@@workflow:key@@`/`@@path:N@@` without a target in the bundle, invalid cron.
+
+### `POST /api/v1/projects/import`
+
+Creates the bundle in **one** transaction: project (mode `new`) → workflows through the regular write path
+(`changeSource` `import`, unsealed, one version row each) → `@@workflow:key@@` to the new ids (second version
+row) → chains → schedules, always **disabled**. If a step fails, nothing is created.
+
+**Request:**
+
+```json
+{ "bundle": { … },
+  "project": { "mode": "new", "name": "App (Import)", "path": "/home/x/code/app" },
+  "pathMappings": { "@@path:1@@": "/home/x/.venvs/app" },
+  "onConflict": "skip" }
+```
+
+- `project`: `{"mode":"new","name","path"}` (`path` may be empty) or `{"mode":"existing","projectId"}`.
+- `pathMappings`: required for every token in `paths` (suggestion: `original`); `{{ project_path }}` stays a placeholder.
+- `onConflict` (only with `existing`): `skip` (default; references point to the existing workflow of that name)
+  or `rename` (`Name (Import)`, `Name (Import 2)`, …).
+
+**Response:** `201`
+
+```json
+{ "projectId": "…", "created": { "workflows": 8, "chains": 1, "schedules": 2 },
+  "skipped": [ { "kind": "workflow", "key": "tests", "reason": "name exists" } ],
+  "renamed": [ { "kind": "workflow", "key": "report", "from": "Report", "to": "Report (Import)" } ],
+  "warnings": [ "…" ] }
+```
+
+`400` for a missing path mapping (listing the tokens), an invalid bundle or target; `404` for an unknown target
+project. The bundle brings executable shell commands along — the UI shows them in the preview before it offers the
+import; the API itself does not require the preview (API key like every other write).
+
 ---
 
 ## Workflows
@@ -1226,6 +1302,8 @@ value → `400`, and the message names the allowed values.
 - **`conflictBehavior`:** with `SKIP`, an occurrence is dropped while the target still has a run in
   `RUNNING` or `PAUSED`: `nextRunAt` moves on to the next occurrence, a one-off schedule (`ONCE`,
   `DELAYED`) expires, and the activity log notes “Schedule skipped (previous run still in progress)”.
+  Likewise while an interrupted run of the workflow waits for its automatic resume (“Schedule skipped
+  (interrupted run is being resumed automatically)”, `reason: auto-resume-pending`).
   `OVERLAP` starts a second run next to it anyway.
 - **`maxRuns`:** counts every start of the schedule, a failed or refused one too; an occurrence dropped by
   `SKIP` does not count. Once the number is reached, the schedule is disabled. Re-enabling does not reset
@@ -3300,6 +3378,12 @@ Send a chat message to the AI assistant.
 | `sessionId` | String | No |
 | `requestId` | String | No |
 
+`MessageEntry` = `{role, content, toolResults?}`. `toolResults` (optional, assistant entries only) are the results of
+the tools confirmed on that turn: `[{"type": "create_workflow", "success": true, "message": "✓ …"}]`. The server takes
+only executed ones (no leading `✗`), from the last 3 assistant turns, at most 5 per turn and 600 characters each, and
+marks them as data in the prompt ([assistant-system.md](assistant-system.md) → "Tool results in the history"). Without
+the field everything stays as before.
+
 **Response:** `AssistantChatResponse`
 
 ```json
@@ -3359,9 +3443,13 @@ Confirm a pending tool call (e.g. workflow start by the assistant).
 
 ```json
 {
-  "sessionId": "session-uuid"
+  "sessionId": "session-uuid",
+  "language": "en"
 }
 ```
+
+`language` (`de` | `en`, optional, default German): language of the build check that `create_workflow`/`update_workflow`
+append to their result.
 
 **Response:** `ToolExecutionResult` (or `410 Gone` if already processed/expired)
 
@@ -3373,7 +3461,8 @@ Reject a pending tool call.
 
 ```json
 {
-  "sessionId": "session-uuid"
+  "sessionId": "session-uuid",
+  "language": "en"
 }
 ```
 

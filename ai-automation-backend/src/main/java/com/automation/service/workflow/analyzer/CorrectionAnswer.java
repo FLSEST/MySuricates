@@ -2,14 +2,11 @@ package com.automation.service.workflow.analyzer;
 
 import com.automation.entity.BlockDefinition;
 import com.automation.executor.NestedBlocks;
-import com.automation.util.JsonRepairUtil;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
+import com.automation.util.BlockJsonReader;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Objects;
 
@@ -74,67 +71,15 @@ final class CorrectionAnswer {
 
     /**
      * Liest eine Blockliste aus einer Modellantwort: ein JSON-Array oder ein Objekt mit {@code blocks},
-     * gern in Code-Fences. Leer, wenn nichts Brauchbares darin steht.
+     * gern in Code-Fences ({@link BlockJsonReader#parseAnswer}, dieselbe Abbildung wie die Factory).
+     * Leer, wenn nichts Brauchbares darin steht.
      */
     static List<BlockDefinition> parse(String response, ObjectMapper objectMapper) {
-        if (response == null || response.isBlank()) {
-            return List.of();
-        }
         try {
-            String text = stripFences(response.trim());
-            int arr = text.indexOf('[');
-            int obj = text.indexOf('{');
-            JsonNode node;
-            if (arr >= 0 && (obj < 0 || arr < obj)) {
-                node = JsonRepairUtil.readTreeWithRepair(text.substring(arr, text.lastIndexOf(']') + 1));
-            } else if (obj >= 0) {
-                node = JsonRepairUtil.readTreeWithRepair(text.substring(obj, text.lastIndexOf('}') + 1)).path("blocks");
-            } else {
-                return List.of();
-            }
-            if (!node.isArray()) {
-                return List.of();
-            }
-            List<BlockDefinition> blocks = new ArrayList<>();
-            for (JsonNode b : node) {
-                if (!b.isObject()) {
-                    return List.of();
-                }
-                blocks.add(toBlock(b, objectMapper));
-            }
-            return blocks;
+            return BlockJsonReader.parseAnswer(response, objectMapper);
         } catch (Exception e) {
             log.debug("Baufehler-Korrektur: Antwort nicht lesbar: {}", e.getMessage());
             return List.of();
         }
-    }
-
-    private static BlockDefinition toBlock(JsonNode b, ObjectMapper objectMapper) {
-        BlockDefinition block = new BlockDefinition();
-        block.setType(b.path("type").asText("simple"));
-        if (b.hasNonNull("name")) {
-            block.setName(b.get("name").asText());
-        }
-        if (b.path("config").isObject()) {
-            block.setConfig(objectMapper.convertValue(b.get("config"), new TypeReference<LinkedHashMap<String, Object>>() {}));
-        }
-        if (b.path("requiredCapabilities").isArray()) {
-            block.setRequiredCapabilities(objectMapper.convertValue(b.get("requiredCapabilities"), new TypeReference<>() {}));
-        }
-        if (b.path("skillIds").isArray()) {
-            block.setSkillIds(objectMapper.convertValue(b.get("skillIds"), new TypeReference<>() {}));
-        }
-        return block;
-    }
-
-    private static String stripFences(String text) {
-        if (text.startsWith("```")) {
-            int firstNewline = text.indexOf('\n');
-            int lastFence = text.lastIndexOf("```");
-            if (firstNewline > 0 && lastFence > firstNewline) {
-                return text.substring(firstNewline + 1, lastFence).trim();
-            }
-        }
-        return text;
     }
 }

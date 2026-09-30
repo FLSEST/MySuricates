@@ -29,11 +29,12 @@ def req(route, ms, status=200, kind="read", wait=0, total=None, sql=2, size=100,
             "srv_total": ms if total is None else total, "sql": sql, "bytes": size, "phase": phase}
 
 
-def raw(requests, runs=None, heap=None, commit="c" * 40, ai=0):
+def raw(requests, runs=None, heap=None, commit="c" * 40, ai=0, host_load=None, cpus=8):
     return {"commit": commit, "scenario": SCENARIO, "load_start": 0, "load_end": 100,
             "started_at": "2026-09-29T10:00:00Z", "finished_at": "2026-09-29T10:03:00Z",
             "requests": requests, "runs": runs or [], "heap": heap or [40.0], "ai_cli_calls": ai,
-            "seed": {"workflows": 30}}
+            "seed": {"workflows": 30}, "host_load": [2.0, 2.4, 3.0] if host_load is None else host_load,
+            "cpus": cpus}
 
 
 def many(route, ms, n=40, **kw):
@@ -119,6 +120,25 @@ class VerdictTest(unittest.TestCase):
         self.assertEqual(report.build_result(raw([]))["verdict"], "RED")
 
 
+class HostLoadTest(unittest.TestCase):
+
+    def test_quiet_host_is_stated_and_not_judged(self):
+        result = report.build_result(raw(many("GET /x", 10)))
+        self.assertEqual(result["host_load"], {"cpus": 8, "median_per_cpu": 0.3, "max_per_cpu": 0.38})
+        self.assertEqual(result["verdict"], "GREEN")
+        self.assertIn("FAKT load_host_load: Median 0.30 | Max 0.38 je CPU (8 CPUs", report.facts(result))
+
+    def test_busy_host_asks_for_a_repeat_instead_of_reporting_regressions(self):
+        busy = report.build_result(raw(many("GET /x", 10), host_load=[9.0, 12.0, 14.0]))
+        self.assertEqual(busy["verdict"], "YELLOW")
+        self.assertIn("Messung wiederholen", busy["reasons"][0])
+
+    def test_missing_load_average_is_stated(self):
+        result = report.build_result(raw(many("GET /x", 10), host_load=[None, None]))
+        self.assertIsNone(result["host_load"])
+        self.assertIn("NICHT GEMESSEN: load_host_load", report.facts(result))
+
+
 class BaselineTest(unittest.TestCase):
 
     def setUp(self):
@@ -157,6 +177,16 @@ class BaselineTest(unittest.TestCase):
         self.assertEqual(result["baseline"]["commit"], self.commits[0])
         self.assertEqual(result["regressions"][0]["factor"], 1.6)
         self.assertEqual(result["verdict"], "YELLOW")
+        self.assertIn("gegen 100 ms in der Baseline", result["reasons"][0])
+
+    def test_busy_host_lists_regressions_but_does_not_count_them(self):
+        self.store("a", self.commits[0], 100, "2026-09-01", tag="v0.1.0")
+        result = report.build_result(raw(many("GET /workflows", 160, n=100), commit=self.commits[3], host_load=[16.0]),
+                                     self.results, self.repo)
+        self.assertEqual(len(result["regressions"]), 1)
+        self.assertEqual(len(result["reasons"]), 1)
+        self.assertIn("Messung wiederholen", result["reasons"][0])
+        self.assertIn("FAKT load_regression_1: GET /workflows", report.facts(result))
 
     def test_only_ancestors_same_scenario_and_not_red(self):
         self.store("other-version", self.commits[1], 10, "2026-09-10", version=999)

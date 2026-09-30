@@ -82,6 +82,23 @@ class GeneratedWorkflowCheckTest {
         assertThat(GeneratedWorkflowCheck.format(List.of())).isEmpty();
     }
 
+    /** TODO 81773d7b: dieselben Zeilen auf Englisch — Detail aus detailEn, englische Anführungszeichen und Schlusszeile. */
+    @Test
+    void formatAufEnglischNimmtDetailEn_undFaelltSonstAufDeutschZurueck() {
+        var f = new AnalyzerFinding("missing-required-config-key", AnalyzerFinding.Severity.HIGH, 1, "report",
+                "Pflichtschlüssel command fehlt", "required key command is missing");
+        List<AnalyzerFinding> many = new ArrayList<>();
+        for (int i = 0; i < 12; i++) {
+            many.add(finding(AnalyzerFinding.Severity.MEDIUM, i));
+        }
+
+        assertThat(GeneratedWorkflowCheck.format(List.of(f), "en"))
+                .isEqualTo("- HIGH missing-required-config-key — Block 2 \"report\": required key command is missing");
+        assertThat(GeneratedWorkflowCheck.format(List.of(f), "de")).isEqualTo(GeneratedWorkflowCheck.format(List.of(f)));
+        assertThat(GeneratedWorkflowCheck.summaryLines(many, "en")).last().isEqualTo("… and 2 more");
+        assertThat(GeneratedWorkflowCheck.summaryLines(many, "en").get(0)).endsWith(": Detail 0");   // ohne detailEn
+    }
+
     @Test
     void formatBegrenztAufZehnZeilenUndZaehltDenRest() {
         List<AnalyzerFinding> many = new ArrayList<>();
@@ -229,6 +246,30 @@ class GeneratedWorkflowCheckTest {
         assertThat(result.blocks().get(0).getSkillIds()).containsExactly("skill-1");
         assertThat(result.blocks().get(0).getRequiredCapabilities()).containsExactly("web");
         assertThat(result.blocks().get(0).getConfig()).containsEntry("command", "Fasse zusammen");
+    }
+
+    @Test
+    void reviewRepairWendetDieRegelnOhneKiAufrufAn() {
+        // Factory-Auto-Fix (TODO 99a9dfb0): die Reparatur holt der Aufrufer selbst, geprüft wird wie in correctOnce.
+        var original = badAndHealthy();
+        original.get(0).setSkillIds(new ArrayList<>(List.of("skill-1")));
+
+        var fehlenderBlock = check.reviewRepair(original, badBlocks(), null);
+        var schlechter = check.reviewRepair(badBlocks(), new ArrayList<>(List.of(
+                block("simple", null, Map.of("prompt", "{{ block.weg.output }}")))), null);
+        var gut = check.reviewRepair(original, new ArrayList<>(List.of(
+                block("simple", null, Map.of("command", "Fasse zusammen")),
+                block("shell", null, Map.of("command", "set -euo pipefail\necho ok")))), null);
+
+        assertThat(fehlenderBlock.accepted()).isFalse();
+        assertThat(fehlenderBlock.rejection()).isEqualTo("Struktur geändert: Blockzahl 2 → 1");
+        assertThat(fehlenderBlock.blocks()).isSameAs(original);
+        assertThat(schlechter.accepted()).isFalse();
+        assertThat(schlechter.rejection()).startsWith("mehr HIGH-Befunde");
+        assertThat(gut.accepted()).isTrue();
+        assertThat(gut.blocks()).extracting(BlockDefinition::getName).containsExactly("zusammenfassung", "ablage");
+        assertThat(gut.blocks().get(0).getSkillIds()).containsExactly("skill-1");
+        assertThat(GeneratedWorkflowCheck.highCount(gut.findings())).isZero();
     }
 
     @Test

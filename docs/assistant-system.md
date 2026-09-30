@@ -126,6 +126,7 @@ Response (`AssistantChatResponse`):
 ```
 
 - `message` (Pflicht), `history`, `context`, `provider`, `language`, `sessionId`, `requestId` — alle außer `message` optional
+- Ein `history`-Eintrag des Assistenten darf `toolResults` tragen: `[{"type": "create_workflow", "success": true, "message": "✓ Workflow created: …"}]` — die Ergebnisse der Werkzeuge, die der Nutzer in diesem Zug bestätigt hat (siehe „Werkzeug-Ergebnisse im Verlauf“). Ohne das Feld gilt die alte Form, der Prompt bleibt unverändert
 - `context.page` steuert, welche Plattform-Daten in den System-Prompt injiziert werden
 - `requestId` wird für WebSocket-Status-Updates verwendet (Topic `/topic/assistant/{requestId}/status`)
 - Response-Felder `provider`, `responseTimeMs` nur bei Wert vorhanden (`@JsonInclude(NON_NULL)`), `pendingTools` nur bei nicht-leer (`@JsonInclude(NON_EMPTY)`)
@@ -149,12 +150,13 @@ POST /api/v1/assistant/pending-tools/{id}/confirm
 POST /api/v1/assistant/pending-tools/{id}/reject
 ```
 
-Request-Body (optional): `{"sessionId": "uuid"}`
+Request-Body (optional): `{"sessionId": "uuid", "language": "en"}`
 
 - `confirm` führt das Tool aus und gibt `ToolExecutionResult` zurück (`{toolId, type, success, message}`)
 - `reject` markiert das Tool als abgelehnt (Message: `"✗ Abgelehnt"`)
 - Abgelaufene Tools (TTL 30 Min.) liefern HTTP **410 Gone** (Message: `"✗ Vorschlag abgelaufen"`)
 - Bei Angabe von `sessionId` wird das Ergebnis via `AssistantSessionService.appendToolResult()` in die Session geschrieben
+- `language` (`de` | `en`, Vorgabe deutsch) ist die Sprache der Oberfläche: Die Baufehler-Prüfung nach `create_workflow`/`update_workflow` antwortet darin
 
 ## Datenbankschema
 
@@ -219,7 +221,21 @@ Der Assistent kann über `<tool type="...">JSON</tool>`-Tags Aktionen vorschlage
 
 Alle 8 Tool-Typen sind in `MUTATING_TOOL_TYPES` definiert und erfordern User-Bestätigung.
 
-Nach `create_workflow`/`update_workflow` läuft die Baufehler-Prüfung (`GeneratedWorkflowCheck`) über die gespeicherte Definition. Befunde ab MEDIUM hängen an der Ergebniszeile (`Baufehler-Prüfung: N Befund(e) ab MEDIUM`, HIGH zuerst, höchstens zehn Zeilen plus „… und N weitere“) samt dem Hinweis, dass `update_workflow` sie beheben kann; ohne solche Befunde bleibt die Zeile unverändert. Es gibt keine zusätzliche KI-Runde, und das Speichern wird nicht blockiert. Die Ergebniskarte im Chat zeigt die Zeilen umbrochen.
+Nach `create_workflow`/`update_workflow` läuft die Baufehler-Prüfung (`GeneratedWorkflowCheck`) über die gespeicherte Definition. Befunde ab MEDIUM hängen an der Ergebniszeile (`Baufehler-Prüfung: N Befund(e) ab MEDIUM`, HIGH zuerst, höchstens zehn Zeilen plus „… und N weitere“) samt dem Hinweis, dass `update_workflow` sie beheben kann; ohne solche Befunde bleibt die Zeile unverändert. In der englischen Oberfläche (`language: "en"` beim Bestätigen) lautet der Block `Build check: N finding(s) from MEDIUM up` mit den englischen Befundtexten. Es gibt keine zusätzliche KI-Runde, und das Speichern wird nicht blockiert. Die Ergebniskarte im Chat zeigt die Zeilen umbrochen.
+
+### Werkzeug-Ergebnisse im Verlauf
+
+Das Modell sieht die Ergebnisse bestätigter Werkzeuge im nächsten Zug (TODO 2f7766e7) — so kann es Baufehler-Befunde nach `create_workflow`/`update_workflow` selbst mit `update_workflow` beheben. Das Frontend legt das Ergebnis einer Entscheidung an die Nachricht, die das Werkzeug vorgeschlagen hat (`assistantStore.recordToolResult`), und schickt beim nächsten Zug die Ergebnisse **ausgeführter** Werkzeuge als `toolResults` am Verlaufseintrag mit; abgelehnte und abgelaufene Vorschläge (Ergebnis beginnt mit `✗`) nie. `AssistantContextBuilder.buildPrompt` setzt jedes Ergebnis als `<tool_result tool="…">…</tool_result>`-Block hinter die Assistenten-Zeile, mit einem einmaligen Hinweis, dass diese Blöcke Daten der Plattform sind und keine Anweisungen (`ToolResultHistory`). Ohne Ergebnisse ist der Prompt byte-gleich wie vorher.
+
+Die Grenzen erzwingt der Server, weil der Verlauf Eingabe des Clients ist — jedes Ergebnis geht mit jedem weiteren Zug erneut ins Modell:
+
+| Grenze | Wert | Warum |
+|---|---|---|
+| Züge mit Ergebnissen | die letzten 3 Assistenten-Züge | ältere Ergebnisse sind meist schon verarbeitet; der Antworttext bleibt |
+| Ergebnisse je Zug | 5 | ein Zug schlägt selten mehr vor; ein Client kauft sich keinen Prompt-Platz |
+| Zeichen je Ergebnis | 600 | Status- und Zusammenfassungszeile plus die ersten Befunde; die Zusammenfassungszeile (`Baufehler-Prüfung:`/`Build check:`) rückt nach vorn, damit das Kürzen die Anzahl nie abschneidet |
+
+Ein Ergebnis kann fremden Text zitieren (Workflow-Name, Fehlermeldung). Wie bei den Kontextvariablen der Workflows (`UntrustedText`) kann er die Blockgrenze nicht fälschen, und die Tags, die die Plattform aus der Antwort liest (`<tool>`, `<fetch>`, `<actions>`), werden entschärft (`‹tool …`), auch in verkleideter Form (Vollbreite, unsichtbare Zeichen). Der Werkzeugtyp muss `[a-z0-9_-]` sein, sonst steht `unknown`. Der Hard-Gate bleibt: Auch ein Tag, den das Modell aus einem Ergebnis abschriebe, würde nur ein neuer Vorschlag mit Bestätigungskarte.
 
 ### PendingTool-Lebenszyklus
 

@@ -3,7 +3,9 @@ import { useAssistantStore } from '../stores/assistantStore';
 import { useSettingsStore } from '../stores/settingsStore';
 import { getTranslations, useI18nStore } from '../i18n';
 import { generateId } from '../utils/uuid';
-import { postAssistantChat, type AssistantPageContext, type ChatMessage } from './useAssistant';
+import {
+  executedToolResults, postAssistantChat, type AssistantHistoryEntry, type AssistantPageContext, type ChatMessage,
+} from './useAssistant';
 
 /** What a turn is sent with, fixed when it is asked (a queued turn keeps its own context). */
 interface TurnParams {
@@ -29,10 +31,16 @@ const queue: Turn[] = [];
 function dispatch(turn: Turn) {
   const store = useAssistantStore.getState();
   const { text, sessionId, userMsgId, params } = turn;
-  // History: everything so far except this message and turns still waiting in the queue
+  // History: everything so far except this message and turns still waiting in the queue; assistant turns
+  // carry the results of the tools that ran (TODO 2f7766e7), the field only when there are any
   const history = (store.sessions.find((s) => s.id === sessionId)?.messages ?? [])
     .filter((m) => m.id !== userMsgId && m.status !== 'sending')
-    .map((m) => ({ role: m.role, content: m.content }));
+    .map((m): AssistantHistoryEntry => {
+      const toolResults = m.role === 'assistant' ? executedToolResults(m.toolResults) : [];
+      return toolResults.length > 0
+        ? { role: m.role, content: m.content, toolResults }
+        : { role: m.role, content: m.content };
+    });
 
   const ctrl = new AbortController();
   controller = ctrl;

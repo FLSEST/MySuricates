@@ -195,7 +195,7 @@ Chains und Sub-Workflows geben die Herkunft ihres Auslösers im reservierten Kon
 ### Schichtenmodell
 
 ```
-Controller (REST API, 52 Controller)
+Controller (REST API, 53 Controller)
     ↓ DTO (Request/Response Records)
 Service (Geschäftslogik)
     ↓ Entity (JPA)
@@ -215,7 +215,7 @@ SQLite (Datei: data/automation.db)
 
 ```
 com.automation
-├── controller/          52 REST-Controller
+├── controller/          53 REST-Controller
 ├── service/
 │   ├── project/         ProjectService, ProjectStatusReconciler, ContainerService (+ DockerContainerGateway, DockerOrphanReconciler), ProjectContextService, PathValidator, OnboardingProfileService (+ OnboardingProfileSeeder), ProjectOnboardingService
 │   ├── workflow/        WorkflowExecutor (+ ExecutionContextFactory, BlockSkillContext, BlockStepRunner, RunCompletionHandler, RunFinalizer, WorkflowContextDataService + PlatformVariableSource-Beans), RunControlService, WorkflowService (+ WorkflowRequestFields), ExecutionBroadcaster, TemplateVerificationService, WorkflowOptimizationService (+ WorkflowOptimizationPrompt), GhostRunWatchdogService, RunCleanupService, AgentInstructionsService, WorkflowTemplateService, BlockOutputValidator, WorkflowExecutionRegistry, IdleContainerReaper, WorkflowTaggingService, WorkflowVersionService, WorkflowContentChangedEvent
@@ -277,11 +277,12 @@ com.automation
 └── util/                JPA-Converter (JSON, BlockDefinitions), RuntimeClasspathGuard (Startsperre gegen `target/classes`)
 ```
 
-### Alle 52 REST-Controller
+### Alle 53 REST-Controller
 
 | Controller | Base-Path | Beschreibung |
 |---|---|---|
 | `ProjectController` | `/api/v1/projects` | CRUD, Archivierung, Container-Lifecycle, Kontext-Generierung |
+| `ProjectBundleController` | `/api/v1/projects` | Projekt-Bündel: `/{id}/export` (Datei-Download), `/import/preview`, `/import` — siehe „Projekt-Bündel“ (Kern; Chains darin nur mit Modul `chains`) |
 | `WorkflowController` | `/api/v1/workflows` | CRUD, Ausführung, Runs, Export/Import, Skills |
 | `WorkflowVersionController` | `/api/v1/workflows` | `/{id}/versions` — Versionsliste, einzelne Version, Restore |
 | `WorkflowAssistController` | `/api/v1/workflows` | `/{id}/optimize`, `/{id}/similar`, `/{id}/repair` (Repair nur mit Modul `factory`) |
@@ -353,7 +354,7 @@ Die Workflow-Engine führt Blöcke sequenziell aus. Die KI-CLIs (Claude, Codex, 
 
 **Resume schneidet nach Blöcken, nicht nach Step-Indizes** (`ResumePlan`): `POST /executions/{id}/resume-from-step` setzt hinter dem letzten COMPLETED-Step an. Maßgeblich ist dessen **Position** in der Blockliste, nicht sein `stepIndex` — Wrapper-Blöcke (foreach, while, retry, conditional, switch) ziehen pro Item/Iteration einen weiteren Index, sodass der Index eines Blocks seiner Position vorauseilt. Grundlage ist die Zusage von `BlockStepRunner`: genau ein persistierter Step pro Top-Level-Block, in Blockreihenfolge (innere Items werden nie gespeichert). Die Steps des fortgesetzten Abschnitts werden über `ExecutionContext.startStepIndicesAt` oberhalb aller bereits persistierten Indizes weitergezählt, bleiben also eindeutig und sortierbar. Vorher wurde der frisch vergebene Index gegen den persistierten verglichen — nach einem Wrapper übersprang der Resume damit Blöcke, die nie gelaufen waren (TODO `1be423b4`).
 
-**Automatisch fortsetzen (Opt-in, TODO 90d10ba1)** — `RunControlService.cleanupZombieRuns` (Start) und der Standby-Zweig von `GhostRunWatchdogService` schreiben beim Markieren in die Run-Metadaten, woraus (`interruptedFrom`: `RUNNING`/`PAUSED`) und wodurch (`interruptedBy`: `RESTART`/`STANDBY`) unterbrochen wurde, und veröffentlichen danach `RunInterruption.Event` mit den markierten Runs — die Reihenfolge ergibt sich aus diesem Aufruf, nicht aus der Listener-Reihenfolge. `RunAutoResumer` sieht damit nur Runs aus dem laufenden JVM-Lebenslauf und setzt davon die fort, die `INTERRUPTED` und vorher `RUNNING` sind, weder Ketten-Eintrag noch Sub-Workflow sind (Quelle `CHAIN`/`SUB_WORKFLOW`, `chain_run_id` oder `__parent_trigger_source` im Kontext), deren Workflow existiert und `metadata.autoResume.enabled` gesetzt hat und die noch keinen Versuch hatten. Der Zähler `autoResumeAttempts` wird in einer eigenen kurzen Transaktion **vor** dem Start gespeichert, dann läuft `WorkflowExecutor.resumeFromStep(runId, TriggerSource.AUTO_RESUME)` durch `RunAdmission`. Die Runs laufen nacheinander auf einem eigenen Thread an, mit `automation.execution.auto-resume.delay-seconds` vor jedem (Laufzeit-Einstellung `run-auto-resume-delay-seconds`, Schalter `run-auto-resume-enabled`); weder Start noch Watchdog-Tick warten darauf. Jede Fortsetzung, Ablehnung und jeder Fehler steht im Activity-Log (Quelle `RunAutoResumer`). Chains (`ChainZombieRunCleaner`) bleiben außen vor.
+**Automatisch fortsetzen (Opt-in, TODO 90d10ba1)** — `RunControlService.cleanupZombieRuns` (Start) und der Standby-Zweig von `GhostRunWatchdogService` schreiben beim Markieren in die Run-Metadaten, woraus (`interruptedFrom`: `RUNNING`/`PAUSED`) und wodurch (`interruptedBy`: `RESTART`/`STANDBY`) unterbrochen wurde, und veröffentlichen danach `RunInterruption.Event` mit den markierten Runs — die Reihenfolge ergibt sich aus diesem Aufruf, nicht aus der Listener-Reihenfolge. `RunAutoResumer` sieht damit nur Runs aus dem laufenden JVM-Lebenslauf und setzt davon die fort, die `INTERRUPTED` und vorher `RUNNING` sind, weder Ketten-Eintrag noch Sub-Workflow sind (Quelle `CHAIN`/`SUB_WORKFLOW`, `chain_run_id` oder `__parent_trigger_source` im Kontext), deren Workflow existiert und `metadata.autoResume.enabled` gesetzt hat und die noch keinen Versuch hatten. Der Zähler `autoResumeAttempts` wird in einer eigenen kurzen Transaktion **vor** dem Start gespeichert, dann läuft `WorkflowExecutor.resumeFromStep(runId, TriggerSource.AUTO_RESUME)` durch `RunAdmission`. Die Runs laufen nacheinander auf einem eigenen Thread an, mit `automation.execution.auto-resume.delay-seconds` vor jedem (Laufzeit-Einstellung `run-auto-resume-delay-seconds`, Schalter `run-auto-resume-enabled`); weder Start noch Watchdog-Tick warten darauf. Jede Fortsetzung, Ablehnung und jeder Fehler steht im Activity-Log (Quelle `RunAutoResumer`). Chains (`ChainZombieRunCleaner`) bleiben außen vor. Gegen den Zeitplan (TODO 070ccc3d): Der unterbrochene Run steht während der Wartezeit auf `INTERRUPTED`, die SKIP-Prüfung (`RUNNING`/`PAUSED`) sah ihn nicht, und ein Nachhol-Run startete daneben. `ScheduleConflictCheck` fragt deshalb vor der Statusprüfung `PendingAutoResumes.forWorkflow`: ein in diesem Lebenslauf unterbrochener, geeigneter Run des Workflows, den `RunAutoResumer` noch nicht erledigt hat, oder der gerade laufende Versuch. Gelesen wird der gespeicherte Stand, nicht die Warteschlange — ein Run zählt ab seiner Markierung, auch bevor das Event ankommt; übergangene Runs (nicht geeignet, Schalter aus, abgelehnt) blockieren nichts. Die Reihenfolge „erst anstehend, dann `RUNNING`“ lässt keine Lücke, weil der fortgesetzte Run `RUNNING` ist, bevor sein Versuch als erledigt gilt.
 
 **Block-Position je Step** (`metadata.blockIndex`): `BlockStepRunner.startStep` schreibt die Position des Blocks in der Top-Level-Liste in die Step-Metadaten, `runStep` hält sie gegen Executor-Metadaten fest. Das Ablauf-Diagramm der Run-Seite ordnet Steps darüber seinen Kästen (`b_<Position>`) zu (`latestStepByBlock` in `stepMetadata.ts`); Runs ohne den Schlüssel fallen auf die Position in der index-sortierten Liste zurück. Nach einem Resume steht der abgebrochene Versuch eines Blocks neben dem neuen — beide mit demselben `blockIndex`, der höhere `stepIndex` ist der aktuelle (TODO `dcba60da`).
 
@@ -617,6 +618,58 @@ Da TODOs zu ~96 % maschinell erzeugt und über viele Projekte verstreut sind, gi
 - **Ghost-Watchdog** (`TodoGhostWatchdogService`): setzt verwaiste IN_PROGRESS-TODOs mit Maschinen-Source (AI/WORKFLOW) zurück auf OPEN, wenn die zugehörige CLI-Session ohne abschließenden Status-PATCH gestorben ist (`updatedAt` älter als Schwelle). Poll alle 5 min (`automation.todo-watchdog.poll-ms`), per Default **AN**; Human-TODOs (Source USER) werden nie angefasst. ActivityLog-WARNING pro Lauf. Runtime-Settings: `todo-watchdog-enabled` [0,1], `todo-watchdog-stale-hours` [1,720] (Default 24h).
 - **Bulk-Status** (`POST /todos/bulk-status`): generischer Bulk-UPDATE für viele TODO-IDs auf einen Status.
 
+## Projekt-Bündel
+
+Ein Projekt lässt sich als **eine JSON-Datei** weitergeben und auf einem anderen Rechner — auch mit anderen
+Ordnern — wieder anlegen (`ProjectBundleController`, Kern; Services in `service/project/bundle/`).
+Endpunkte: [api-referenz.md](api-referenz.md) → `GET /projects/{id}/export`, `POST /projects/import/preview`,
+`POST /projects/import`.
+
+**Format** (`format: mysuricates-project-bundle`, `formatVersion: 1`, Datei `<projekt-slug>.mysuricates-bundle.json`):
+Projekt-Stammdaten ohne Pfad, Container, Status und IDs; die Workflows des Projekts (ohne gelöschte) mit ihrer
+Definition wie beim Einzel-Export, aber ohne ID, Projekt, Siegelfelder und Hash; die Chains, deren Einträge nur
+Workflows dieses Projekts nennen; die Zeitpläne auf diese Workflows und Chains — ohne `enabled`.
+
+**Referenzen ohne UUIDs.** Workflows und Chains tragen einen `key` (Slug des Namens, eindeutig mit `-2`, `-3` …).
+Chain-Einträge und Zeitpläne nennen `workflowKey`/`chainKey`. `sub-workflow`-Blöcke — auch verschachtelt, überall
+wo `NestedBlocks` hinsieht, Schlüssel `workflow_id` und der Altschlüssel `workflowId` — zeigen auf
+`@@workflow:<key>@@`; ein Verweis auf einen Workflow außerhalb des Projekts bleibt als UUID stehen und erscheint
+unter `warnings`. Skills reisen per Name (`activatedSkillNames`, in Blöcken `@@skill:<name>@@`); fehlt ein Skill
+auf dem Zielrechner, wird der Workflow ohne ihn angelegt (Warnung).
+
+**Pfad-Anpassung.** Beim Export werden die Strings der Blöcke (auch verschachtelter), `instructions`,
+`metadata`, `defaultContext` sowie der `inputContext` von Chain-Einträgen und Zeitplänen durchsucht:
+
+- Der Projektpfad wird in Blöcken und `instructions` zu `{{ project_path }}` — dort löst der Executor Platzhalter
+  auf. Kontextwerte und Metadaten werden nicht noch einmal aufgelöst; dort wird er wie jeder andere Pfad ein Token.
+  Ein Projektpfad mit nur einem Segment (`/tmp`) wird nie Platzhalter.
+- Jeder andere absolute Pfad unter `/home/ /Users/ /tmp/ /opt/ /srv/ /mnt/ /var/ /data/ ~/` wird `@@path:N@@`;
+  `metadata.workspace.source_path` gilt als Ganzes als Pfad. Ein Pfad endet an Leerzeichen, Anführungszeichen,
+  `; | ( ) { } < > , :` und am Zeilenende. Beginnt ein Pfad mit einem erfassten Pfad plus `/`, wird er als
+  Unterpfad dieses Tokens geschrieben (`@@path:1@@/tests/.`); der kürzeste gewinnt, die Grenze ist das `/`
+  (`/tmp/app-venv` ist kein Unterpfad von `/tmp/app`).
+- `paths[]` nennt je Token `original`, die Zahl der Fundstellen und die erste als Hinweis. Der Home-Pfad des
+  Exportierenden bleibt in `original` stehen — er ist der Vorschlag beim Import; ein Bündel ist deshalb kein
+  Pool-Artefakt.
+
+**Import.** Die Vorschau validiert (Format, Version, Pflichtfelder, eindeutige Keys, jede Referenz löst im Bündel
+auf — sonst 400 mit allen Problemen) und zeigt Blocktypen, Anbieter, Modelle, die Shell-Befehle (je Feld die ersten
+200 Zeichen), Namenskonflikte und Warnungen. Der Import verlangt für jedes Token eine Zuordnung und schreibt in
+**einer** Transaktion — nur Datenbankarbeit, nichts Langsames: Projekt → Workflows über `WorkflowService` mit
+`ChangeSource.IMPORT` (Versionszeile, ungesiegelt) → Verweise auf die neuen IDs (zweiter Schritt über denselben
+Weg) → Chains → Zeitpläne, **immer deaktiviert**. Gleichnamige Workflows im Zielprojekt werden übersprungen
+(Verweise zeigen dann auf den vorhandenen) oder umbenannt (`Name (Import)`, `Name (Import 2)` …). Scheitert ein
+Schritt, bleibt nichts zurück; der Aktivitätseintrag folgt erst nach dem Commit. Ist das Modul `chains` aus,
+exportiert der Export keine Chains und der Import überspringt sie — beides mit Warnung.
+
+**Sicherheit.** Ein Bündel bringt ausführbare Shell-Befehle mit. Die Oberfläche zeigt sie in der Vorschau und
+bietet den Import erst danach an; die API verlangt die Vorschau nicht zusätzlich — sie ist per API-Key geschützt
+wie jeder Schreibweg. Siegel werden nie übernommen, Zeitpläne nie aktiv angelegt; Webhooks und
+Integrations-Zugangsdaten sind nicht Teil des Bündels.
+
+**Grenzen v1.** Nicht enthalten: TODO- und Completion-Trigger, Webhooks, Memory, Läufe, TODOs, Skills selbst.
+Kein `replace` beim Konflikt. Anfrage höchstens 5 MB.
+
 ## Ziele — TODOs projektübergreifend einordnen (V85)
 
 Ein **Ziel** (`entity/Goal`, `/api/v1/goals`, TODO dc0566f8) sammelt TODOs aus mehreren Projekten, die auf ein Ergebnis einzahlen – etwa den Open-Source-Launch, der AutoPilot und die Website zugleich betrifft. Es ist bewusst schlank: keine Abhängigkeitsgraphen, Sprints oder Zeiterfassung. Alles rund um Ziele ist das Standardmodul `goals` (in jedem Preset an, `automation.modules.goals=false` schaltet es ab, TODO c60bf914): dann antworten `/goals/**` und `PATCH /todos/{id}/planning` mit 404 `MODULE_DISABLED`, TODO-Antworten tragen kein `planning`, `GET /todos?goalId=` ist ein 400 (ein stilles Ignorieren gäbe die ganze Liste), `milestonesDue` im Cockpit ist leer, zielgebundene Zeitpläne (Eingabekontext mit `goal_id`, etwa der Ziel-Wächter) werden übersprungen und rücken weiter, und ein Lauf mit `goal_id` bekommt keine `goal_*`-Variablen. Die Daten bleiben erhalten; nach dem Wiedereinschalten ist alles da. Im Frontend fehlen dann der Menüpunkt „Ziele“, die Zielkarten und fälligen Meilensteine im Cockpit sowie die Einordnung im TODO-Dialog; alle Ziel-Abfragen sind abgeschaltet (`useModuleEnabled('goals')`), `/goals` und `/goals/:goalId` zeigen den Modul-Hinweis (`ModuleRoute`).
@@ -801,7 +854,7 @@ Claude-Code-Sessions können ebenfalls als Vorlage für Workflows dienen:
 ## Workflow Factory
 
 Automatisches Generieren und Verifizieren von Workflows aus einem Topic. Das Block-Schema in den Prompts von Factory, Wishes, Dialog-Import, Run-Konvertierung und Workflow-Optimierung kommt aus `BlockSpecs` (dieselben Texte wie `fetch block-spec` des Assistenten); `PromptBlockSchemaGateTest` prüft jeden dort genannten Blocktyp und Config-Schlüssel gegen die Executoren — die alten Prompts nannten `forEach`, `then_blocks`, `if_true` und andere Schlüssel, die kein Executor liest. Ein Beispiel für retry, foreach, while oder conditional mit Befehl muss außerdem `execution_mode` nennen: Ohne geht der Befehl als Prompt an die KI, und die KI baut nach, was das Beispiel zeigt (der Konvertierungs-Prompt zeigte so ein retry mit `npm test`).
-- **Baufehler-Prüfung nach der Erzeugung** (`service/workflow/analyzer/GeneratedWorkflowCheck`, gemeinsam für Factory, Wünsche, Dialog-Import, Run-Konvertierung und Assistent): Nach der KI-Antwort läuft der `WorkflowAnalyzer` über die Blöcke. Bei HIGH-Befunden bekommt dieselbe KI (gleicher Provider, gleiches Modell, gleicher System-Prompt) **genau eine** Korrekturrunde mit ihrer Blockliste und den Befunden; ist die Antwort unbrauchbar, ändert sie die Struktur (andere Blockzahl, anderer Blocktyp an einer Position, andere Zahl verschachtelter Blöcke in einem Container — typisch: das Modell liefert nur den reparierten Block zurück) oder hat die korrigierte Fassung mehr HIGH-Befunde, gilt die ursprüngliche. Lässt die Korrektur `name`, `skillIds` oder `requiredCapabilities` eines Blocks weg, kommen sie aus dem Original. Bei MEDIUM/LOW gibt es keinen zusätzlichen Aufruf. Danach wird gespeichert wie bisher; die Prüfung ändert nichts selbst und blockiert kein Speichern. Verbliebene Befunde ab MEDIUM stehen in `buildFindings` des Ergebnisses (Factory-`/run`, Vorschläge von Dialog-Import und Run-Konvertierung — die UI zeigt sie als „Baufehler-Prüfung“) und landen beim Speichern als WARN im Activity-Log am Workflow. In der Factory läuft die Prüfung in `generateWorkflow`, also vor jedem Testlauf; regelbasierte Vorschläge (ohne KI) werden nur gemeldet. Der Assistent bekommt keine Korrekturrunde: `create_workflow`/`update_workflow` hängen die Befunde an ihre Ergebniszeile, damit sie im Gespräch per `update_workflow` behoben werden können.
+- **Baufehler-Prüfung nach der Erzeugung** (`service/workflow/analyzer/GeneratedWorkflowCheck`, gemeinsam für Factory, Wünsche, Dialog-Import, Run-Konvertierung und Assistent): Nach der KI-Antwort läuft der `WorkflowAnalyzer` über die Blöcke. Bei HIGH-Befunden bekommt dieselbe KI (gleicher Provider, gleiches Modell, gleicher System-Prompt) **genau eine** Korrekturrunde mit ihrer Blockliste und den Befunden; ist die Antwort unbrauchbar, ändert sie die Struktur (andere Blockzahl, anderer Blocktyp an einer Position, andere Zahl verschachtelter Blöcke in einem Container — typisch: das Modell liefert nur den reparierten Block zurück) oder hat die korrigierte Fassung mehr HIGH-Befunde, gilt die ursprüngliche. Lässt die Korrektur `name`, `skillIds` oder `requiredCapabilities` eines Blocks weg, kommen sie aus dem Original. Bei MEDIUM/LOW gibt es keinen zusätzlichen Aufruf. Danach wird gespeichert wie bisher; die Prüfung ändert nichts selbst und blockiert kein Speichern. Verbliebene Befunde ab MEDIUM stehen in `buildFindings` des Ergebnisses (deutsch; dieselben Zeilen englisch in `buildFindingsEn` — Factory-`/run`, Vorschläge von Dialog-Import und Run-Konvertierung — die UI zeigt sie als „Baufehler-Prüfung“ in ihrer Sprache) und landen beim Speichern als WARN im Activity-Log am Workflow. In der Factory läuft die Prüfung in `generateWorkflow`, also vor jedem Testlauf; regelbasierte Vorschläge (ohne KI) werden nur gemeldet. Der Assistent bekommt keine Korrekturrunde: `create_workflow`/`update_workflow` hängen die Befunde an ihre Ergebniszeile (in der Sprache der Oberfläche), und diese Zeile geht mit dem nächsten Zug gekürzt in den Verlauf des Modells ([assistant-system.md](assistant-system.md) → „Werkzeug-Ergebnisse im Verlauf“), damit es sie per `update_workflow` beheben kann. Jeder Befund (`AnalyzerFinding`) trägt seinen Text deutsch (`detail`) und englisch (`detailEn`); `AnalyzerFindingLanguagesTest` löst jede Regel aus und verlangt beide.
 - `WorkflowFactoryService` — orchestriert den gesamten Factory-Prozess
 - `FactoryVerificationService` — Verify/Fix-Schleife: auf der Test-Instanz ausführen, bei Fehlschlag Blöcke per KI reparieren, Ergebnis an Dev melden (auch für Auto-Repair und Wishes)
 - `ClaudeWorkflowGenerator` / `CodexWorkflowGenerator` — AI-basierte Workflow-Generierung
@@ -816,6 +869,7 @@ Automatisches Generieren und Verifizieren von Workflows aus einem Topic. Das Blo
   - `GET /topics` — verfügbare Topics auflisten
 - Nutzt die Test-Instanz (Port 8090) für sichere Ausführung
 - Ablauf von `POST /run` („Erstellen & Testen“): generieren auf DEV (samt Baufehler-Prüfung, siehe oben) → `syncDefinitions()` → Testlauf auf der Test-Instanz (Polling) → bei `FAILED` und `autoFix` KI-Reparatur auf DEV aus der Fehlermeldung (neue Version), erneut syncen und testen, bis `maxRetries` → Testergebnis auf DEV vermerken → bei `autoPromote` und bestandenem Test Template. `POST /generate` („Workflow erstellen“) führt nur den ersten Schritt aus.
+- **Baufehler-Prüfung nach jeder Auto-Fix-Reparatur** (`FactoryVerificationService.autoFixWorkflow`; genutzt von `/run`, von `verifyAndFix` für Wünsche und Auto-Reparatur und von der lokalen Auto-Reparatur): Bevor eine Reparatur gespeichert wird, legt `GeneratedWorkflowCheck.reviewRepair` dieselben Regeln an wie an die Korrekturrunde — ohne weiteren KI-Aufruf. Ändert die Reparatur die Struktur (andere Blockzahl, anderer Top-Level-Typ an einer Position, andere Zahl verschachtelter Blöcke in einem Container) oder hat sie mehr HIGH-Befunde als die aktuelle Fassung, wird sie mit WARN verworfen und der Workflow bleibt unverändert; weggelassene `name`, `skillIds` und `requiredCapabilities` kommen aus der aktuellen Fassung. In `/run`, `verifyAndFix` und der lokalen Auto-Reparatur zählt ein verworfener Versuch als Fehlversuch ohne erneuten Lauf des unveränderten Workflows; den Grund nennt `/run` in `retryErrors`, die Auto-Reparatur in ihrer Fehlermeldung im Activity-Log. Factory, Korrekturrunde, Wünsche, Dialog-Import und Run-Konvertierung lesen KI-erzeugte Blöcke über dieselbe Abbildung (`util/BlockJsonReader`), so dass `name`, `skillIds` und `requiredCapabilities` erhalten bleiben und `{{ block.<name>.output }}`-Bezüge auflösen.
 - Die UI erklärt das mit einem animierten Ablaufdiagramm (`components/factory/FactoryFlowDiagram`, Geometrie und Zustände in `factoryFlow.ts`). Es folgt den Schaltern Auto-Fix/Auto-Promote (auch direkt in der Karte schaltbar, derselbe Zustand wie im Formular), zeigt für „Workflow erstellen“ den Ein-Schritt-Ablauf mit „Ende · kein Test“, hebt die aktuelle Station und ihren Schritt in der Liste hervor (Abspielen/Pause; bei `prefers-reduced-motion` erst auf Klick, ein Durchlauf) und ist eine Erklärung, keine Live-Anzeige: `/run` ist ein blockierender Aufruf ohne Zwischenereignisse.
 
 ## Workflow Pool

@@ -53,6 +53,33 @@ class FactoryResponseParserTest {
     }
 
     @Test
+    void parseBlocks_keepsNameAndSkillIds() throws Exception {
+        // TODO d6be36f3: without the name every {{ block.<name>.output }} of a later block points nowhere.
+        JsonNode wf = mapper.readTree("""
+                {"blocks":[
+                  {"type":"shell","name":"fetch","config":{"command":"curl x"},"skillIds":["skill-1","skill-2"]},
+                  {"type":"simple","name":"summarize","config":{"command":"Fasse zusammen: {{ block.fetch.output }}"}}
+                ]}""");
+
+        List<BlockDefinition> blocks = parser.parseBlocks(wf);
+
+        assertThat(blocks).extracting(BlockDefinition::getName).containsExactly("fetch", "summarize");
+        assertThat(blocks.get(0).getSkillIds()).containsExactly("skill-1", "skill-2");
+        assertThat(blocks.get(1).getSkillIds()).isNullOrEmpty();
+    }
+
+    @Test
+    void parseBlocksFromArray_keepsNameAndSkillIds() {
+        List<BlockDefinition> blocks = parser.parseBlocksFromArray(
+                "[{\"type\":\"simple\",\"name\":\"review\",\"config\":{\"command\":\"x\"},\"skillIds\":[\"s1\"]}]");
+
+        assertThat(blocks).singleElement().satisfies(b -> {
+            assertThat(b.getName()).isEqualTo("review");
+            assertThat(b.getSkillIds()).containsExactly("s1");
+        });
+    }
+
+    @Test
     void parseBlocks_noBlocksArray_empty() throws Exception {
         assertThat(parser.parseBlocks(mapper.readTree("{\"blocks\":\"nope\"}"))).isEmpty();
         assertThat(parser.parseBlocks(mapper.readTree("{}"))).isEmpty();

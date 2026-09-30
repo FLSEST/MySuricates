@@ -34,6 +34,10 @@ YELLOW_P95_MS = 1000           # eine Leseroute braucht im p95 mehr als 1 s
 # Er erklaert deshalb nur eine Route, die ohnehin zu langsam ist, und steht als Gesamtwert im Blatt.
 YELLOW_HEAP_PERCENT = 85.0
 REGRESSION_FACTOR = 1.5        # p95 einer Route gegen die Baseline
+# Rechnerlast je CPU (1-Minuten-Load, Median der Lastphase), ab der die Messung nicht belastbar ist.
+# Ein Probelauf neben parallelen Builds war 5- bis 20-mal langsamer als der echte Lauf kurz danach —
+# eine Regression gegen die Baseline waere dann ein Fehlalarm (TODO b8e1de5e).
+HOST_BUSY_PER_CPU = 1.0
 MIN_SAMPLES = 30               # darunter ist ein p95 kein Befund
 MIN_MEANINGFUL_MS = 25         # 3 ms gegen 1 ms ist Faktor drei und bedeutet nichts
 
@@ -86,9 +90,24 @@ def run_stats(runs):
     }
 
 
-def verdict(stats, runs, heap_max, total, errors, regressions):
+def host_load(raw):
+    """Median und Maximum der Rechnerlast je CPU waehrend der Lastphase, oder None."""
+    samples = sorted(x for x in raw.get("host_load") or [] if x is not None)
+    cpus = raw.get("cpus") or 0
+    if not samples or cpus <= 0:
+        return None
+    mid = len(samples) // 2
+    median = samples[mid] if len(samples) % 2 else (samples[mid - 1] + samples[mid]) / 2
+    return {"cpus": cpus, "median_per_cpu": round(median / cpus, 2), "max_per_cpu": round(samples[-1] / cpus, 2)}
+
+
+def verdict(stats, runs, heap_max, total, errors, regressions, host=None):
     """(Verdict, Gruende). RED: kaputt oder unbenutzbar langsam, YELLOW: auffaellig, sonst GREEN."""
     red, yellow = [], []
+    host_busy = host is not None and host["median_per_cpu"] > HOST_BUSY_PER_CPU
+    if host_busy:
+        yellow.append("Rechner ausgelastet (Load je CPU im Median %.1f) — Messung wiederholen, Vergleich mit der Baseline nicht belastbar"
+                      % host["median_per_cpu"])
     if total == 0:
         red.append("keine einzige gemessene Anfrage")
     elif errors / total > RED_ERROR_RATE:
@@ -107,7 +126,7 @@ def verdict(stats, runs, heap_max, total, errors, regressions):
             yellow.append("%s p95 %d ms%s" % (route, s["p95_ms"], cause))
     if heap_max is not None and heap_max > YELLOW_HEAP_PERCENT:
         yellow.append("Heap bis %.0f %%" % heap_max)
-    for reg in regressions:
+    for reg in [] if host_busy else regressions:
         yellow.append("%s p95 %d ms gegen %d ms in der Baseline (x%.1f)" % (reg["route"], reg["p95_ms"], reg["baseline_p95_ms"], reg["factor"]))
     if red:
         return "RED", red + yellow
@@ -204,6 +223,7 @@ def build_result(raw, results_root=None, repo=None):
         "wait_share": wait_share,
         "heap_max_percent": heap_max,
         "ai_cli_calls": raw.get("ai_cli_calls"),
+        "host_load": host_load(raw),
         "seed": raw.get("seed", {}),
         "runs": runs,
         "routes": stats,
@@ -214,7 +234,7 @@ def build_result(raw, results_root=None, repo=None):
         "dir": baseline["_dir"], "commit": baseline["commit"], "tag": baseline.get("tag"),
         "finished_at": baseline.get("finished_at")}
     result["regressions"] = regressions
-    result["verdict"], result["reasons"] = verdict(stats, runs, heap_max, total, errors, regressions)
+    result["verdict"], result["reasons"] = verdict(stats, runs, heap_max, total, errors, regressions, result["host_load"])
     if raw.get("ai_cli_calls"):
         # Ein KI-Aufruf im Lasttest kostet Tokens und verfaelscht die Messung — der Stand ist nicht vergleichbar.
         result["verdict"] = "RED"
@@ -254,6 +274,12 @@ def facts(result):
     else:
         lines.append("NICHT GEMESSEN: load_heap_max_percent (/system/jvm-memory lieferte keine Werte)")
     fact("load_ai_cli_calls", result.get("ai_cli_calls") or 0)
+    host = result.get("host_load")
+    if host:
+        fact("load_host_load", "Median %.2f | Max %.2f je CPU (%d CPUs, 1-Minuten-Load waehrend der Lastphase, Instanz und Treiber eingeschlossen)"
+             % (host["median_per_cpu"], host["max_per_cpu"], host["cpus"]))
+    else:
+        lines.append("NICHT GEMESSEN: load_host_load (os.getloadavg auf diesem System nicht verfuegbar)")
     for route, s in sorted(result["routes"].items(), key=lambda kv: kv[1]["p95_ms"], reverse=True):
         wait = "-" if s["wait_share"] is None else "%.1f %%" % (100 * s["wait_share"])
         sql = "-" if s["sql_avg"] is None else "%.1f (max %s)" % (s["sql_avg"], s["sql_max"])

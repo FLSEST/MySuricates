@@ -34,6 +34,13 @@ import java.util.Map;
 @Slf4j
 public class AssistantWorkflowTools {
 
+    /**
+     * Start of the build-check summary line in a tool result, per language. {@code ToolResultHistory} finds it by
+     * this prefix and puts it first when a result is cut for the chat history (TODO 2f7766e7).
+     */
+    static final String BUILD_CHECK_PREFIX_DE = "Baufehler-Prüfung: ";
+    static final String BUILD_CHECK_PREFIX_EN = "Build check: ";
+
     private final WorkflowService workflowService;
     private final WorkflowExecutor workflowExecutor;
     private final RunControlService runControlService;
@@ -41,6 +48,11 @@ public class AssistantWorkflowTools {
     private final GeneratedWorkflowCheck buildCheck;
 
     public String createWorkflow(String json) {
+        return createWorkflow(json, null);
+    }
+
+    /** @param language UI language of the confirming user ({@code "en"}, otherwise German) — for the build check */
+    public String createWorkflow(String json, String language) {
         try {
             Map<String, Object> params = objectMapper.readValue(json, new TypeReference<>() {});
             String projectId = (String) params.get("projectId");
@@ -74,7 +86,7 @@ public class AssistantWorkflowTools {
             );
             Workflow created = workflowService.create(request, ChangeSource.ASSISTANT);
             return "✓ Workflow created: \"" + created.getName() + "\" (ID: " + created.getId() + ")"
-                    + buildCheckNote(created);
+                    + buildCheckNote(created, language);
         } catch (Exception e) {
             log.warn("Assistant create_workflow tool failed. Payload: {}", json, e);
             return "⚠ Could not create workflow: " + e.getMessage();
@@ -82,6 +94,11 @@ public class AssistantWorkflowTools {
     }
 
     public String updateWorkflow(String json) {
+        return updateWorkflow(json, null);
+    }
+
+    /** @param language UI language of the confirming user ({@code "en"}, otherwise German) — for the build check */
+    public String updateWorkflow(String json, String language) {
         try {
             Map<String, Object> params = objectMapper.readValue(json, new TypeReference<>() {});
             String workflowId = (String) params.get("workflowId");
@@ -112,7 +129,7 @@ public class AssistantWorkflowTools {
             );
             Workflow updated = workflowService.update(workflowId, request, ChangeSource.ASSISTANT);
             return "✓ Workflow updated: \"" + updated.getName() + "\" (ID: " + workflowId + ")"
-                    + buildCheckNote(updated);
+                    + buildCheckNote(updated, language);
         } catch (Exception e) {
             log.warn("Assistant update_workflow tool failed. Payload: {}", json, e);
             return "⚠ Could not update workflow: " + e.getMessage();
@@ -123,14 +140,20 @@ public class AssistantWorkflowTools {
      * Build check of the saved definition (TODO 326d5987): findings from MEDIUM up, HIGH first, appended to
      * the result line so the chat can fix them with {@code update_workflow}. Empty without such findings —
      * the line then stays exactly as before. No extra model call; a failing check never fails the tool.
+     * In the confirming user's language (TODO 81773d7b): English for {@code "en"}, German otherwise (as before).
      */
-    private String buildCheckNote(Workflow workflow) {
+    private String buildCheckNote(Workflow workflow, String language) {
         try {
             var findings = buildCheck.findings(workflow);
             if (findings.isEmpty()) {
                 return "";
             }
-            return "\n\nBaufehler-Prüfung: " + findings.size() + " Befund(e) ab MEDIUM\n"
+            if ("en".equalsIgnoreCase(language)) {
+                return "\n\n" + BUILD_CHECK_PREFIX_EN + findings.size() + " finding(s) from MEDIUM up\n"
+                        + GeneratedWorkflowCheck.format(findings, language)
+                        + "\nupdate_workflow can fix them.";
+            }
+            return "\n\n" + BUILD_CHECK_PREFIX_DE + findings.size() + " Befund(e) ab MEDIUM\n"
                     + GeneratedWorkflowCheck.format(findings)
                     + "\nMit update_workflow lassen sie sich beheben.";
         } catch (Exception e) {

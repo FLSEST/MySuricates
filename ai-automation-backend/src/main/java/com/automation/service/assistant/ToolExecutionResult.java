@@ -11,11 +11,17 @@ public record ToolExecutionResult(
         boolean success,
         String message
 ) {
+    /**
+     * Start of the result line of a proposal that never ran — rejected by the user or expired. Such results
+     * stay out of the chat history the model sees (TODO 2f7766e7); executed tools start with {@code ✓}/{@code ⚠}.
+     */
+    public static final String DECLINED_PREFIX = "✗";
+
     public static ToolExecutionResult rejected(String toolId, String type) {
-        return new ToolExecutionResult(toolId, type, false, "✗ Abgelehnt");
+        return new ToolExecutionResult(toolId, type, false, DECLINED_PREFIX + " Abgelehnt");
     }
 
     public static ToolExecutionResult expired(String toolId, String type) {
-        return new ToolExecutionResult(toolId, type, false, "✗ Vorschlag abgelaufen");
+        return new ToolExecutionResult(toolId, type, false, DECLINED_PREFIX + " Vorschlag abgelaufen");
     }
 }

@@ -87,6 +87,7 @@ export function AssistantHistory({
           responseTimeMs: m.role === 'assistant' ? m.responseTimeMs : undefined,
           provider: m.role === 'assistant' ? m.provider : undefined,
           model: m.role === 'assistant' ? m.model : undefined,
+          toolResults: m.role === 'assistant' ? m.toolResults : undefined,
           status: 'sent',
         })),
       };

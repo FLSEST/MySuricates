@@ -36,6 +36,9 @@ class ControllerModuleGateTest {
             "LearningController",
             "NotificationController",
             "ProjectController",
+            // Projekt-Bündel (Export/Vorschau/Import) gehört zu den Projekten; Chains im Bündel
+            // prüfen die Services selbst gegen das Modul chains (übersprungen + Warnung).
+            "ProjectBundleController",
             "ScheduleController",
             "SearchController",
             "SystemAccessController",
