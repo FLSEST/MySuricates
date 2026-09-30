@@ -448,6 +448,16 @@ sed -i "s/Commit \`$TENTH\`/Commit \`deadbeef\`/g" "$DATED/README.de.md"
 OUT=$(bash "$SCRIPT" --root "$DATED" 2>&1); RC=$?
 check "unbekannter Stichtag-Commit ist ein Befund"   'grep -q "stichtag-commit deadbeef unbekannt" <<<"$OUT"'
 check "unbekannter Stichtag: exit 1"                  '[ "$RC" -eq 1 ]'
+# Nach einem History-Rewrite kennt git den alten Hash lokal noch (Sicherungs-Branch), die CI nicht:
+# Ein Stichtag zaehlt nur, wenn er in der Historie von HEAD liegt. Der Seitenzweig hat mit Absicht
+# ebenfalls 10 Commits, damit nur die Vorfahren-Pruefung ihn faengt.
+SIDE="$(cd "$DATED" && git checkout -q -b seite HEAD~21 && $GIT commit -q --allow-empty -m seite \
+          && git rev-parse --short=8 HEAD && git checkout -q -)"
+sed -i "s/deadbeef/$SIDE/g" "$DATED/README.de.md"
+OUT=$(bash "$SCRIPT" --root "$DATED" 2>&1); RC=$?
+check "Stichtag nur auf Seitenzweig ist ein Befund"   'grep -q "stichtag-commit $SIDE unbekannt" <<<"$OUT"'
+check "Stichtag nur auf Seitenzweig: exit 1"          '[ "$RC" -eq 1 ]'
+sed -i "s/$SIDE/deadbeef/g" "$DATED/README.de.md"
 sed -i "s/ (Commit \`deadbeef\`)//; s/ (Stand Commit \`deadbeef\`)//" "$DATED/README.de.md"
 OUT=$(bash "$SCRIPT" --root "$DATED" 2>&1); RC=$?
 check "ohne Stichtag gilt HEAD: Drift gemeldet"      'grep -qE "commits sagt 10, Code 30" <<<"$OUT"'

@@ -203,12 +203,16 @@ fi
 # Stichtag-Commits der README-Kopftabelle ("Stand … Commit `d23a09ed`"): Dort gilt die Zahl des
 # Stichtags, nicht die von HEAD (TODO 65c6dedc). Ein Commit, den git nicht kennt (etwa nach einem
 # History-Rewrite), geht als null mit – der Checker meldet ihn, statt still an HEAD zu messen.
+# Dasselbe gilt fuer einen Commit ausserhalb der Historie von HEAD: Nach einem Rewrite kennt ihn
+# lokal noch ein Sicherungs-Branch, die CI nicht – lokal gruen, in der CI rot (2026-09-30).
 COMMITS_AT_JSON=""
 if [ -n "$COMMITS_JSON" ] && [ -f "$ROOT/README.de.md" ]; then
   pairs=""
   while IFS= read -r sha; do
     [ -z "$sha" ] && continue
-    count="$(git -C "$ROOT" rev-list --count "$sha" 2>/dev/null | tr -d ' ')"
+    count=""
+    git -C "$ROOT" merge-base --is-ancestor "$sha" HEAD 2>/dev/null \
+      && count="$(git -C "$ROOT" rev-list --count "$sha" 2>/dev/null | tr -d ' ')"
     pairs="${pairs}${pairs:+,}\"$sha\":${count:-null}"
   done < <(grep -oE 'Commit `[0-9a-f]{7,40}`' "$ROOT/README.de.md" | grep -oE '[0-9a-f]{7,40}' | sort -u)
   [ -n "$pairs" ] && COMMITS_AT_JSON=",\"commits-at\":{$pairs}"

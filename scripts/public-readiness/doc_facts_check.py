@@ -393,8 +393,8 @@ def check_readme_head(rel, no, line, facts, findings, stichtag=None):
     if stichtag is not None and COMMITS_CLAIM.search(line):
         known = facts.get("commits-at", {})
         if known.get(stichtag) is None:
-            findings.append(f"DRIFT {rel}:{no} stichtag-commit {stichtag} unbekannt – die"
-                            f" Commit-Zahl ist nicht pruefbar | {line.strip()[:120]}")
+            findings.append(f"DRIFT {rel}:{no} stichtag-commit {stichtag} unbekannt oder nicht in der"
+                            f" Historie von HEAD – die Commit-Zahl ist nicht pruefbar | {line.strip()[:120]}")
             return
         expected, basis = known[stichtag], f"Stand {stichtag}"
     if expected is not None:
