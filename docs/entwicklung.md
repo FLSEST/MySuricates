@@ -1028,6 +1028,14 @@ Geprüft wird:
    im Pre-Push-Gate) parsen sie über denselben Helfer `hygiene_private_terms_load` in
    `scripts/lib/hygiene-rules.sh`.
 
+**Aufbewahrung der Run-Workspaces:** Jeder isolierte Checkout (`RunWorkspaceService`, Default
+`~/.mysuricates/workspaces/<projekt>/<run>/`) bleibt nach dem Lauf liegen — niemand räumt ihn
+automatisch weg. `scripts/tools/prune-workspaces.py` entfernt konservativ nur den `repo/`-Checkout
+abgeschlossener, sauberer Läufe: Der zugehörige Run muss laut API `COMPLETED` sein und älter als
+`--retention-days` (Default 30), der Checkout unverändert (`git status --porcelain` leer) und der
+Commit deckungsgleich mit dem Manifest — Logs und Manifeste bleiben erhalten. Ohne `--apply` nur ein
+Trockenlauf (`WOULD REMOVE …`).
+
 Die Hooks (`pre-commit`, `commit-msg`, `pre-push`) installiert `scripts/install-hooks.sh` über
 `core.hooksPath` (läuft in `setup.sh` mit).
 

@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 import unittest
 
-SCRIPT = Path(__file__).resolve().parents[4] / 'scripts/workspace-isolation/prune-workspaces.py'
+SCRIPT = Path(__file__).resolve().parents[4] / 'scripts/tools/prune-workspaces.py'
 spec = importlib.util.spec_from_file_location('retention', SCRIPT)
 retention = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(retention)

@@ -99,7 +99,7 @@ class LocalApiWithoutProxyTest(unittest.TestCase):
         run = self.work / 'workspaces' / 'project' / 'run-1'
         run.mkdir(parents=True)
         (run / 'workspace.json').write_text('{}')
-        result = self.proxied(str(SCRIPTS / 'workspace-isolation/prune-workspaces.py'),
+        result = self.proxied(str(SCRIPTS / 'tools/prune-workspaces.py'),
                               '--root', str(self.work / 'workspaces'), '--api-base', self.base)
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertNotIn('KEEP', result.stdout)  # "KEEP run-1: HTTPError" — the question failed

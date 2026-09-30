@@ -1009,6 +1009,14 @@ What is checked:
    set, added lines, commit messages in the pre-push gate) parses it through the same helper
    `hygiene_private_terms_load` in `scripts/lib/hygiene-rules.sh`.
 
+**Run workspace retention:** every isolated checkout (`RunWorkspaceService`, default
+`~/.mysuricates/workspaces/<project>/<run>/`) stays on disk after the run — nothing removes it
+automatically. `scripts/tools/prune-workspaces.py` conservatively removes only the `repo/` checkout
+of completed, clean runs: the matching run must be `COMPLETED` per the API and older than
+`--retention-days` (default 30), the checkout unchanged (`git status --porcelain` empty), and the
+commit matching the manifest — logs and manifests are kept. Without `--apply` it is a dry run only
+(`WOULD REMOVE …`).
+
 `scripts/install-hooks.sh` installs the hooks (`pre-commit`, `commit-msg`, `pre-push`) via
 `core.hooksPath` (and runs as part of `setup.sh`).
 
