@@ -66,15 +66,20 @@ _hm_login_env() {
   done
 }
 
-# _hm_write_env AI_ENV SELECTED VARS — copies the last line of each of VARS from AI_ENV into an env
-# file of its own for this provider selection (compose's env_file takes a whole file, and ai.env may
-# hold variables of providers this instance does not get). Mode 600 in a 700 directory next to ai.env,
-# rewritten at every start. Without VARS an existing copy is emptied (kept: a compose file that still
-# names it would fail on a missing one). Prints the path; returns 1 when it cannot write.
+# _hm_key_ok KEY — an instance key is a plain file name: a-z, 0-9, - and _, not starting with -.
+_hm_key_ok() { case "$1" in ''|-*|*[!a-z0-9_-]*) return 1 ;; esac; }
+
+# _hm_write_env AI_ENV KEY VARS — copies the last line of each of VARS from AI_ENV into the env file of
+# this instance, container-env/KEY.env (compose's env_file takes a whole file, and ai.env may hold
+# variables of providers this instance does not get). One file per instance, not per selection: a
+# changed selection overwrites it instead of leaving the old secrets behind, and instances with
+# different selections never share one. Mode 600 in a 700 directory next to ai.env, rewritten at every
+# start. Without VARS an existing copy is emptied (kept: a compose file that still names it would fail
+# on a missing one). Prints the path; returns 1 when it cannot write.
 _hm_write_env() {
   local src="$1" dir file v
   dir="$(dirname -- "$src")/container-env"
-  file="$dir/$(printf '%s' "$2" | tr ' ' '-').env"
+  file="$dir/$2.env"
   [ -n "$3" ] || [ -f "$file" ] || return 0
   ( umask 077
     mkdir -p "$dir" && chmod 700 "$dir" || exit 1
@@ -96,7 +101,7 @@ claude_token_plausible() {
 # _hm_passes ID — whether one of ID's login variables goes into the container (reads the caller's $pass)
 _hm_passes() { local v; for v in $(_hm_login_env "$1"); do case " $pass " in *" $v "*) return 0 ;; esac; done; return 1; }
 
-# host_mounts_yaml SERVICE PROJECTS_DIR DOCKER_SOCKET [AI_FROM_HOST] [AI_PROVIDERS] [SWITCH_SOURCE] [SWITCH_PREFIX] [LOGIN_COMMAND]
+# host_mounts_yaml SERVICE PROJECTS_DIR DOCKER_SOCKET [AI_FROM_HOST] [AI_PROVIDERS] [SWITCH_SOURCE] [SWITCH_PREFIX] [LOGIN_COMMAND] [INSTANCE_KEY]
 #   AI_FROM_HOST   programs | login (default) | all
 #   AI_PROVIDERS   subset of claude,codex,pi, comma- or space-separated (default: all three)
 #   SWITCH_SOURCE  where the switches of this instance are changed (a file, or how the starter is called)
@@ -105,11 +110,14 @@ _hm_passes() { local v; for v in $(_hm_login_env "$1"); do case " $pass " in *" 
 #                  (e.g. "scripts/instance.sh login") — empty when the start path has none for this mode
 #                  (AI_FROM_HOST=login or all: the login happens on the machine around the container, not
 #                  in it). Never built from anything the caller does not already have as a literal string.
-#   The last three are only shown on the settings page, which cannot change anything itself.
+#   The three before INSTANCE_KEY are only shown on the settings page, which cannot change anything itself.
+#   INSTANCE_KEY   stable name of this instance (a-z, 0-9, -, _), e.g. instance-mysuricates-main,
+#                  staging-stable, dev-autotrigger-dev: names its copy of the login variables from ai.env
+#                  (container-env/<key>.env). Without a valid key no variable from ai.env goes in.
 # Prints the override on stdout. An unknown mode or provider goes to stderr and returns 2.
 host_mounts_yaml() {
   local service="$1" projects="${2:-}" socket="${3:-0}" access="${4:-login}" wanted="${5:-}"
-  local switch_source="${6:-}" switch_prefix="${7:-}" login_command="${8:-}"
+  local switch_source="${6:-}" switch_prefix="${7:-}" login_command="${8:-}" key="${9:-}"
   local os="${HOST_MOUNTS_OS:-$(uname -s)}"
   local ai_env="${HOST_MOUNTS_AI_ENV:-${XDG_CONFIG_HOME:-$HOME/.config}/mysuricates/ai.env}"
   local home_in=/app/data/providers nm_in=/usr/lib/node_modules
@@ -139,7 +147,10 @@ host_mounts_yaml() {
         case " $pass " in *" $v "*) ;; *) pass="${pass:+$pass }$v" ;; esac
       done
     done
-    if ! envfile="$(_hm_write_env "$ai_env" "$selected" "$pass")"; then
+    if [ -n "$pass" ] && ! _hm_key_ok "$key"; then
+      echo "host-mounts: no valid instance key ('$key': a-z, 0-9, -, _) — login variables from $ai_env stay out" >&2
+      pass=""
+    elif _hm_key_ok "$key" && ! envfile="$(_hm_write_env "$ai_env" "$key" "$pass")"; then
       echo "host-mounts: cannot write the login variables for the container next to $ai_env" >&2
       envfile=""; pass=""
     fi

@@ -73,10 +73,12 @@ AIENV="$TMP/config/mysuricates/ai.env"; CE="$TMP/config/mysuricates/container-en
 printf '%s\n' 'OPENAI_API_KEY=sk-test-openai-4711' 'SOMETHING_ELSE=x' > "$AIENV"; chmod 600 "$AIENV"
 mkdir -p "$TMP/nm/@openai/codex"
 TEST_AI_PROVIDERS=codex bash "$S" write-override test >/dev/null 2>&1
-check "codex selected: its variable via env_file"   'grep -qF "\"$CE/codex.env\"" "$OV/test.override.yml" && grep -qx "OPENAI_API_KEY=sk-test-openai-4711" "$CE/codex.env" && ! grep -q SOMETHING_ELSE "$CE/codex.env"'
+check "codex selected: its variable via env_file"   'grep -qF "\"$CE/staging-test.env\"" "$OV/test.override.yml" && grep -qx "OPENAI_API_KEY=sk-test-openai-4711" "$CE/staging-test.env" && ! grep -q SOMETHING_ELSE "$CE/staging-test.env"'
+STABLE_AI_PROVIDERS=codex bash "$S" write-override stable >/dev/null 2>&1
+check "stable has its own copy"                     'grep -qF "\"$CE/staging-stable.env\"" "$OV/stable.override.yml" && [ "$(ls "$CE" | tr "\n" " ")" = "staging-stable.env staging-test.env " ]'
 check "the value stays out of the override"         '! grep -q 4711 "$OV/test.override.yml"'
 TEST_AI_PROVIDERS=claude bash "$S" write-override test >/dev/null 2>&1
-check "codex not selected: nothing of it"           '! grep -q "env_file" "$OV/test.override.yml"'
+check "codex not selected: nothing of it, copy emptied" '! grep -q "env_file" "$OV/test.override.yml" && ! grep -q 4711 "$CE/staging-test.env" && [ "$(ls "$CE" | wc -l | tr -d " ")" = 2 ]'
 rm -rf "$AIENV" "$CE" "$TMP/nm/@openai"
 
 echo "3) every compose call carries the override"

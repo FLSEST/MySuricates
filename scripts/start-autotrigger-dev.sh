@@ -352,7 +352,8 @@ write_compose_override() {
                       return 2 ;;
   esac
   host_mounts_yaml backend "" "${AUTOTRIGGER_DEV_DOCKER_SOCKET:-0}" "${AUTOTRIGGER_DEV_AI_FROM_HOST:-login}" \
-    "${AUTOTRIGGER_DEV_AI_PROVIDERS:-}" "scripts/start-autotrigger-dev.sh --container" AUTOTRIGGER_DEV_ \
+    "${AUTOTRIGGER_DEV_AI_PROVIDERS:-}" "scripts/start-autotrigger-dev.sh --container" AUTOTRIGGER_DEV_ "" \
+    "dev-${COMPOSE_PROJECT}" \
     > "${COMPOSE_OVERRIDE}" || { echo "Ungueltige AUTOTRIGGER_DEV_AI_*-Werte (siehe oben)." >&2; return 2; }
   echo "KI-Anbieter im Container: ${HOST_MOUNTS_READY:-keiner} (${AUTOTRIGGER_DEV_AI_FROM_HOST:-login}, ${COMPOSE_OVERRIDE})"
   missing="$(host_mounts_missing_text)"

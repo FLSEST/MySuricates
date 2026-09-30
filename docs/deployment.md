@@ -114,8 +114,10 @@ draußen; Starter, Installer und die Einstellungen melden ihn als fehlende Anmel
   `CODEX_API_KEY`; pi: `ANTHROPIC_API_KEY`, `ANTHROPIC_OAUTH_TOKEN`, `OPENAI_API_KEY`, `GEMINI_API_KEY`,
   `OPENROUTER_API_KEY`) — dieselbe Liste, nach der Installer und Einstellungen „angemeldet“ beurteilen.
   `scripts/lib/host-mounts.sh` kopiert beim Start genau die Variablen der Anbieter aus `…AI_PROVIDERS`
-  nach `~/.config/mysuricates/container-env/<auswahl>.env` (600, bei jedem Start neu geschrieben) und
-  gibt Compose diese Kopie; andere Zeilen aus `ai.env` kommen nie hinein. Das gilt für jeden Weg über
+  in eine Kopie je Instanz, `~/.config/mysuricates/container-env/<instanz>.env` (`instance-<container>`,
+  `staging-stable`/`staging-test`, `dev-<compose-projekt>`; 600, bei jedem Start mit der aktuellen
+  Auswahl überschrieben, leer, wenn nichts passt), und gibt Compose diese Kopie; andere Zeilen aus
+  `ai.env` kommen nie hinein, eine geänderte Auswahl lässt keine alte Kopie mit Schlüsseln zurück. Das gilt für jeden Weg über
   diesen Generator: `instance.sh`, `staging.sh`, den Start aus der Oberfläche und den Dev-Container.
   Tryout bindet absichtlich nichts vom Rechner ein und meldet sich im Container selbst an.
 - **Geteilte Variablen** liest jeder gewählte Anbieter, der sie kennt. `ANTHROPIC_API_KEY` gilt für pi

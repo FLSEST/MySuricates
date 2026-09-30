@@ -113,8 +113,11 @@ container — a start from the interface would not even have it. In `login` mode
   `CODEX_API_KEY`; pi: `ANTHROPIC_API_KEY`, `ANTHROPIC_OAUTH_TOKEN`, `OPENAI_API_KEY`, `GEMINI_API_KEY`,
   `OPENROUTER_API_KEY`) — the same list the installer and the settings use to judge "logged in".
   At start `scripts/lib/host-mounts.sh` copies exactly the variables of the providers in
-  `…AI_PROVIDERS` into `~/.config/mysuricates/container-env/<selection>.env` (600, rewritten at every
-  start) and hands that copy to Compose; other lines of `ai.env` never get in. This holds for every way
+  `…AI_PROVIDERS` into one copy per instance, `~/.config/mysuricates/container-env/<instance>.env`
+  (`instance-<container>`, `staging-stable`/`staging-test`, `dev-<compose-project>`; 600, overwritten
+  with the current selection at every start, empty when nothing matches) and hands that copy to
+  Compose; other lines of `ai.env` never get in, and a changed selection leaves no old copy with keys
+  behind. This holds for every way
   through this generator: `instance.sh`, `staging.sh`, a start from the interface and the dev container.
   Tryout deliberately mounts nothing from the machine and logs in inside the container.
 - **Shared variables** are read by every selected provider that knows them. `ANTHROPIC_API_KEY` counts
