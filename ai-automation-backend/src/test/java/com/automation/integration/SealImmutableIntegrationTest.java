@@ -18,6 +18,7 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.ArrayList;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -71,8 +72,25 @@ class SealImmutableIntegrationTest {
                 .andExpect(jsonPath("$.code").value("SEAL_IMMUTABLE"));
 
         assertThat(jdbc.queryForObject("SELECT sealed FROM workflows WHERE id = ?", Boolean.class, workflowId)).isTrue();
-        assertThat(jdbc.queryForObject(
+        assertThat(refusalEntries()).isEqualTo(1);
+    }
+
+    /**
+     * The refusal is written after the request's transaction has ended, on its own thread
+     * ({@code ActivityLogService.logRefusal}) — counting right after the response races that write.
+     */
+    private int refusalEntries() throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        int count;
+        while ((count = countRefusals()) == 0 && System.nanoTime() < deadline) {
+            Thread.sleep(20);
+        }
+        return count;
+    }
+
+    private int countRefusals() {
+        return jdbc.queryForObject(
                 "SELECT COUNT(*) FROM activity_log WHERE workflow_id = ? AND message LIKE 'Unseal refused%'",
-                Integer.class, workflowId)).isEqualTo(1);
+                Integer.class, workflowId);
     }
 }
