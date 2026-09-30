@@ -98,7 +98,8 @@ export function TimelineChip({ todo, workPackages, today, placement, compact = f
     : { width: compact ? '100%' : CHIP_WIDTH };
 
   return (
-    <div ref={setNodeRef} style={style} className={`group ${placement ? '' : 'relative'} ${isDragging ? 'opacity-40' : ''}`}>
+    <div ref={setNodeRef} style={style} data-todo-id={todo.id}
+      className={`group ${placement ? '' : 'relative'} ${isDragging ? 'opacity-40' : ''}`}>
       <button
         ref={triggerRef}
         type="button"

@@ -50,6 +50,15 @@ describe('toastStore', () => {
     expect(plain!.action).toBeUndefined();
   });
 
+  it('addToast takes several actions; the first one stays in `action`', () => {
+    const show = () => {};
+    const undo = () => {};
+    useToastStore.getState().addToast('success', 'Added', [{ label: 'Show', onClick: show }, { label: 'Undo', onClick: undo }]);
+    const [toast] = useToastStore.getState().toasts;
+    expect(toast!.actions).toEqual([{ label: 'Show', onClick: show }, { label: 'Undo', onClick: undo }]);
+    expect(toast!.action).toEqual({ label: 'Show', onClick: show });
+  });
+
   it('removeToast removes the correct toast', () => {
     useToastStore.getState().addToast('info', 'Keep');
     useToastStore.getState().addToast('error', 'Remove');

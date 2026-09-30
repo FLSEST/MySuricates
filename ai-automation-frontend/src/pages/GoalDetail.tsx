@@ -26,13 +26,13 @@ import {
 } from '../components/goal/goalSelection';
 import { planBadge } from '../components/goal/planDisplay';
 import { dayOf } from '../components/goal/timelineLayout';
-import {
-  useAssignGoalTodos, useDeleteGoal, useGoal, useGoalCandidates, useGoalRelations, useUpdateGoal,
-} from '../hooks/useGoals';
+import { useDeleteGoal, useGoal, useGoalCandidates, useGoalRelations, useUpdateGoal } from '../hooks/useGoals';
+import { useAddTodoToGoal, type PackageChoice } from '../hooks/useGoalAddTodo';
+import { useGoalReveal } from '../components/goal/goalReveal';
 import { useI18nStore, useT } from '../i18n';
 import { formatDate } from '../utils/localeFormat';
 import { apiErrorStatus } from '../api/client';
-import type { GoalStatus, GoalTodoItem } from '../types';
+import type { GoalStatus, GoalTodoItem, Todo } from '../types';
 
 const GOAL_STATUSES: GoalStatus[] = ['ACTIVE', 'DONE', 'ARCHIVED'];
 
@@ -146,7 +146,22 @@ export function GoalDetail() {
   }, [data?.todos, data?.workPackages, today, locale, t]);
   const updateGoal = useUpdateGoal();
   const deleteGoal = useDeleteGoal();
-  const assign = useAssignGoalTodos();
+  const add = useAddTodoToGoal(goalId ?? '');
+  // „Zeigen“ im Toast (85889063): Liste und Workflow-Zuordnung haben keinen Platz dafür – dann die Gliederung
+  useEffect(() => {
+    const unsubscribe = useGoalReveal.subscribe((state) => {
+      if (state.request?.goalId !== goalId) return;
+      setView((current) => {
+        if (current !== 'list' && current !== 'map') return current;
+        storeView('outline');
+        return 'outline';
+      });
+    });
+    return () => {
+      unsubscribe();
+      useGoalReveal.getState().clear();
+    };
+  }, [goalId]);
   const structure = useMemo(() => (data ? structureOf(data) : undefined), [data]);
   const decisionScope = useMemo(() => (goalId ? { goalId, enabled: !!data?.decisionsSupported } : null), [goalId, data?.decisionsSupported]);
   // Seitenleiste (c60bf914): Auswahl in der URL, damit Zurück und Neuladen sie behalten
@@ -194,7 +209,17 @@ export function GoalDetail() {
     setView(next);
     storeView(next);
   };
-  const assignTodo = (todoId: string) => assign.mutate({ id: goal.id, todoIds: [todoId] });
+  /** Pakete, in die ein Kandidat passt: die seines Projekts (und solche ohne Projekt), in ihrer Reihenfolge. */
+  const packagesOf = (todo: Todo): PackageChoice[] => [...workPackages]
+    .filter((item) => item.projectId === null || item.projectId === todo.projectId)
+    .sort((a, b) => Number(a.projectId === null) - Number(b.projectId === null) || a.position - b.position)
+    .map((item) => ({ id: item.id, title: item.title }));
+  const assignCandidate = (todo: Todo, workPackage: PackageChoice | null) =>
+    add.addExisting({ todoId: todo.id, projectName: todo.projectName ?? null, workPackage });
+  const assignTodo = (todoId: string) => {
+    const todo = candidates.find((item) => item.id === todoId);
+    add.addExisting({ todoId, projectName: todo?.projectName ?? null, workPackage: null });
+  };
 
   const remove = () => deleteGoal.mutate(goal.id, {
     onSuccess: () => navigate('/goals'),
@@ -303,8 +328,9 @@ export function GoalDetail() {
               candidates={candidates}
               isLoading={candidatesPage.isLoading}
               suggestions={suggestions}
-              onAssign={assignTodo}
-              assigning={assign.isPending}
+              onAssign={assignCandidate}
+              packagesOf={packagesOf}
+              assigning={add.isPending}
               scoped={candidatesPage.data?.scoped ?? false}
               allProjects={allProjects}
               onAllProjectsChange={setAllProjects}

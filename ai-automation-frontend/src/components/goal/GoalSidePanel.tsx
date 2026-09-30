@@ -14,6 +14,7 @@ import { ReachedSwitch } from './ReachedSwitch';
 import { DecisionCounts } from './DecisionCounts';
 import { DecisionMark } from './DecisionMark';
 import { DueChip } from './TodoPlanChips';
+import { PackageTodoAdder } from './PackageTodoAdder';
 import { GoalWorkflowChip } from './GoalWorkflowChip';
 import { attachmentsAt, useGoalWorkflowsScope } from './goalWorkflowsContext';
 import { STATUS_DOT } from './planDisplay';
@@ -242,6 +243,7 @@ function PackageBody({ detail, workPackage, today, onSelect, onOpenTodo }: {
       </div>
       <Section title={tp.todos} testId="panel-todos">
         <PackageTodos todos={detail.todos} workPackageId={workPackage.id} today={today} onOpenTodo={onOpenTodo} empty />
+        <PackageTodoAdd goalId={detail.goal.id} workPackage={workPackage} projectName={project?.name ?? null} />
       </Section>
       <Section title={t.goals.workflows.title} testId="panel-workflows">
         <PackageWorkflowChips workPackageId={workPackage.id} empty />
@@ -272,6 +274,35 @@ function PackageBody({ detail, workPackage, today, onSelect, onOpenTodo }: {
         </Section>
       )}
     </>
+  );
+}
+
+/** „+ TODO“ in der Seitenleiste eines Pakets (85889063): vorhandenes TODO ohne Ziel suchen oder neu anlegen. */
+function PackageTodoAdd({ goalId, workPackage, projectName }: { goalId: string; workPackage: GoalWorkPackage; projectName: string | null }) {
+  const ta = useT().goals.add;
+  const [adding, setAdding] = useState(false);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const refocus = useRef(false);
+  // Nach dem Schließen zurück auf „+ TODO“ – sobald er wieder gerendert ist
+  useEffect(() => {
+    if (adding || !refocus.current) return;
+    refocus.current = false;
+    buttonRef.current?.focus();
+  }, [adding]);
+  if (adding) {
+    return (
+      <PackageTodoAdder goalId={goalId} workPackage={workPackage} projectName={projectName}
+        onClose={() => {
+          refocus.current = true;
+          setAdding(false);
+        }} />
+    );
+  }
+  return (
+    <button ref={buttonRef} type="button" onClick={() => setAdding(true)} aria-label={ta.todoIn.replace('{title}', () => workPackage.title)}
+      className="mt-1.5 inline-flex items-center gap-1 rounded text-xs text-text-secondary hover:text-accent focus-ring">
+      <Plus className="h-3.5 w-3.5" aria-hidden="true" />{ta.todo}
+    </button>
   );
 }
 

@@ -1,6 +1,5 @@
-import { useId, useState } from 'react';
+import { useId } from 'react';
 import { useDroppable } from '@dnd-kit/core';
-import { ChevronRight } from 'lucide-react';
 import { useT } from '../../i18n';
 import {
   BAR_HEIGHT, BAR_TOP, BAR_ZONE, LANE_HEIGHT, barBox, rowDropId, undatedDropId, xOfDay,
@@ -13,6 +12,8 @@ import { WorkPackageMark } from './WorkPackageMark';
 import { DecisionCounts } from './DecisionCounts';
 import { useIsSelected } from './goalSelection';
 import { PackageWorkflows } from './GoalWorkflowsPanel';
+import { UndatedToggle } from './UndatedToggle';
+import { undatedRowId, useUndatedRow } from './timelineUndated';
 import type { GoalWorkPackage, MilestoneState } from '../../types';
 
 /** Abstand der Chips zum oberen Rand einer Zeile ohne Balken. */
@@ -93,7 +94,7 @@ export function PackageRowView({
   const tw = t.goals.workPackages;
   const { dragged, preview } = useDragState();
   const listId = useId();
-  const [showUndated, setShowUndated] = useState(false);
+  const [showUndated, setShowUndated] = useUndatedRow(undatedRowId(row.band, row.key), row.undated.length);
   const id = rowDropId(row.band, row.key);
   const accepts = acceptsDrop(dragged, id);
   const { setNodeRef, isOver } = useDroppable({ id });
@@ -172,22 +173,5 @@ export function PackageRowView({
         ))}
       </div>
     </div>
-  );
-}
-
-/** Zähler der TODOs ohne Datum an der Beschriftung – eingeklappt, bis jemand sie sehen will. */
-export function UndatedToggle({ count, open, controls, onToggle }: {
-  count: number;
-  open: boolean;
-  controls: string;
-  onToggle: (open: boolean) => void;
-}) {
-  const tt = useT().goals.timeline;
-  return (
-    <button type="button" aria-expanded={open} aria-controls={controls} onClick={() => onToggle(!open)}
-      className="inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap rounded hover:text-accent focus-ring">
-      {tt.undatedTodos.replace('{n}', String(count))}
-      <ChevronRight className={`h-3 w-3 transition-transform motion-reduce:transition-none ${open ? 'rotate-90' : ''}`} aria-hidden="true" />
-    </button>
   );
 }

@@ -1,4 +1,4 @@
-import { useId, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { useContext, useId, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { Plus } from 'lucide-react';
 import { useI18nStore, useT } from '../../i18n';
@@ -11,7 +11,9 @@ import type { ChipDragData } from './timelineKeyboard';
 import { acceptsDrop, dropTone, pointerOnly, useDragState } from './timelineDrag';
 import { DayPicker } from './DayPicker';
 import { InlineTitleField } from './InlineTitleField';
-import { LABEL_COLUMN, PackageRowView, UndatedToggle } from './TimelineRows';
+import { LABEL_COLUMN, PackageRowView } from './TimelineRows';
+import { UndatedToggle } from './UndatedToggle';
+import { UndatedContext } from './timelineUndated';
 import { TimelineChip } from './TimelineChip';
 import { WorkPackageMark } from './WorkPackageMark';
 import { DecisionCounts } from './DecisionCounts';
@@ -159,7 +161,11 @@ function UnscheduledTray({ band, adding, creating, addRef, today, workPackages, 
   const tw = t.goals.workPackages;
   const name = band.name ?? t.goals.outline.noProject;
   const listId = useId();
-  const [open, setOpen] = useState<string | null>(null);
+  // Welches Paket seine TODOs ohne Datum zeigt, hält der Zeitstrahl – „Zeigen“ öffnet es von dort (85889063)
+  const shared = useContext(UndatedContext);
+  const [local, setLocal] = useState<string | null>(null);
+  const open = shared ? shared.pill(band.key) : local;
+  const setOpen = (next: string | null) => (shared ? shared.setPill(band.key, next) : setLocal(next));
   const { dragged } = useDragState();
   const id = trayDropId(band.key);
   const accepts = acceptsDrop(dragged, id);

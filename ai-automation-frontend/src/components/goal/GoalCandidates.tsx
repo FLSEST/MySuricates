@@ -1,5 +1,7 @@
-import { Plus, Search, Tag } from 'lucide-react';
+import { ChevronDown, Plus, Search, Tag } from 'lucide-react';
 import { Button, Card, Spinner, Toggle } from '../ui';
+import { DashboardMenu } from '../dashboard/DashboardMenu';
+import type { PackageChoice } from '../../hooks/useGoalAddTodo';
 import { priorityColor } from '../todo/todoConstants';
 import { useT } from '../../i18n';
 import type { Todo } from '../../types';
@@ -15,9 +17,11 @@ export interface CandidateFilter {
  * erscheinen dort gestrichelt. Filter und Daten hält die Zielseite. Seit c60bf914 nur aus den
  * Projekten des Ziels; „Alle Projekte zeigen“ sucht überall und kennzeichnet TODOs aus fremden
  * Projekten. Kann der Server nicht nach Projekten filtern (`scoped` falsch), fehlt der Schalter.
+ * Seit 85889063 fragt „+“ gleich nach dem Arbeitspaket, sobald das Projekt des TODOs im Ziel Pakete
+ * hat: ein kleines Menü „Ohne Arbeitspaket“ und die Pakete in ihrer Reihenfolge, ein Klick genügt.
  */
 export function GoalCandidates({
-  filter, onFilterChange, candidates, isLoading, suggestions, onAssign, assigning,
+  filter, onFilterChange, candidates, isLoading, suggestions, onAssign, packagesOf = () => [], assigning,
   scoped = false, allProjects = false, onAllProjectsChange, goalProjectIds = [],
 }: {
   filter: CandidateFilter;
@@ -26,7 +30,9 @@ export function GoalCandidates({
   isLoading: boolean;
   /** Tag-Vorschläge, etwa `release` und die häufigsten Tags des Ziels. */
   suggestions: string[];
-  onAssign: (todoId: string) => void;
+  onAssign: (todo: Todo, workPackage: PackageChoice | null) => void;
+  /** Pakete, in die das TODO passt (sein Projekt), in ihrer Reihenfolge; leer heißt: „+“ ordnet sofort zu. */
+  packagesOf?: (todo: Todo) => PackageChoice[];
   assigning: boolean;
   /** Der Server kennt `/goals/{id}/candidates` und filtert nach den Projekten des Ziels. */
   scoped?: boolean;
@@ -98,16 +104,48 @@ export function GoalCandidates({
                     {[todo.projectName, ...todo.tags.map((tag) => `#${tag}`)].filter(Boolean).join(' · ')}
                   </p>
                 </div>
-                <Button size="sm" variant="secondary" disabled={assigning} onClick={() => onAssign(todo.id)}
-                  aria-label={`${t.goals.map.assign}: ${todo.title}`}>
-                  <Plus className="w-3.5 h-3.5 mr-1" />
-                  {t.goals.map.assign}
-                </Button>
+                <AssignButton todo={todo} packages={packagesOf(todo)} disabled={assigning} onAssign={onAssign} />
               </li>
             ))}
           </ul>
         </Card>
       )}
     </section>
+  );
+}
+
+const NO_PACKAGE = '__none__';
+
+/** „+ Zuordnen“: ohne passende Pakete ein Knopf, sonst ein Menü mit „Ohne Arbeitspaket“ und den Paketen. */
+function AssignButton({ todo, packages, disabled, onAssign }: {
+  todo: Todo;
+  packages: PackageChoice[];
+  disabled: boolean;
+  onAssign: (todo: Todo, workPackage: PackageChoice | null) => void;
+}) {
+  const t = useT();
+  const label = `${t.goals.map.assign}: ${todo.title}`;
+  if (packages.length === 0) {
+    return (
+      <Button size="sm" variant="secondary" disabled={disabled} onClick={() => onAssign(todo, null)} aria-label={label}>
+        <Plus className="w-3.5 h-3.5 mr-1" />
+        {t.goals.map.assign}
+      </Button>
+    );
+  }
+  return (
+    <DashboardMenu variant="button" label={label} disabled={disabled}
+      icon={(
+        <span className="inline-flex items-center gap-1 text-text">
+          <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+          {t.goals.map.assign}
+          <ChevronDown className="h-3 w-3" aria-hidden="true" />
+        </span>
+      )}
+      items={[
+        { id: NO_PACKAGE, label: t.goals.outline.noWorkPackage },
+        ...packages.map((item) => ({ id: item.id, label: item.title })),
+      ]}
+      onSelect={(id) => onAssign(todo, id === NO_PACKAGE ? null : packages.find((item) => item.id === id) ?? null)} />
   );
 }

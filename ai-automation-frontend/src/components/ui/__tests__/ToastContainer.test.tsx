@@ -24,6 +24,24 @@ describe('ToastContainer', () => {
     expect(useToastStore.getState().toasts).toEqual([]);
   });
 
+  it('offers several buttons below the message; each runs its own action and closes the toast', () => {
+    const show = vi.fn();
+    const undo = vi.fn();
+    render(<ToastContainer />);
+    act(() => useToastStore.getState().addToast('success', 'Added: AutoPilot · Repo', [
+      { label: 'Show', onClick: show }, { label: 'Undo', onClick: undo },
+    ]));
+
+    expect(screen.getAllByRole('button').map((button) => button.textContent || button.getAttribute('aria-label')))
+      .toEqual(['Show', 'Undo', 'Close']);
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    act(() => { vi.advanceTimersByTime(250); });
+
+    expect(undo).toHaveBeenCalledTimes(1);
+    expect(show).not.toHaveBeenCalled();
+    expect(useToastStore.getState().toasts).toEqual([]);
+  });
+
   it('shows only the close button on a toast without action', () => {
     render(<ToastContainer />);
     act(() => useToastStore.getState().addToast('info', 'Saved'));

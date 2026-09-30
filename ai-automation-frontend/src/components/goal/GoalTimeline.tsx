@@ -27,6 +27,9 @@ import { TIMELINE_KEYBOARD_CODES, chipDragData, timelineCollision, timelineKeybo
 import { IDLE, TimelineDragContext, type DragState, type Dragged } from './timelineDrag';
 import { liveLine } from './dragLabel';
 import type { FloatingAnchor } from './floating';
+import { UndatedContext, undatedRows, useUndatedDisclosure } from './timelineUndated';
+import { UndatedSwitch } from './UndatedToggle';
+import { useRevealInView } from './goalReveal';
 import type { Goal, GoalMilestone, GoalProject, GoalTodoItem, GoalWorkPackage } from '../../types';
 
 /** Was gerade als Karte offen ist: ein Paket, ein Meilenstein oder ein neuer Meilenstein. */
@@ -111,7 +114,21 @@ export function GoalTimeline({ goal, todos, workPackages, milestones, projects, 
     [todos, workPackages, projects, axis, width],
   );
   const { marks, lanes } = useMemo(() => milestoneMarks(milestones, axis, width), [milestones, axis, width]);
+  // TODOs ohne Datum (85889063): kleine Zeilen offen, Schalter oben, „Zeigen“ klappt auf
+  const undated = useUndatedDisclosure(goal.id);
+  const withUndated = useMemo(() => undatedRows(bands), [bands]);
+  const undatedTotal = withUndated.reduce((sum, row) => sum + row.todoIds.length, 0);
+  const allUndatedOpen = withUndated.every((row) => undated.value.isOpen(row.rowId, row.todoIds.length));
+  const rootRef = useRef<HTMLElement>(null);
   const todoById = useMemo(() => new Map(todos.map((todo) => [todo.id, todo])), [todos]);
+  useRevealInView(goal.id, rootRef, (id) => todoById.has(id), (todoId) => {
+    const row = withUndated.find((entry) => entry.todoIds.includes(todoId));
+    if (row) undated.value.setOpen(row.rowId, true);
+    for (const band of bands) {
+      const pill = band.unscheduled.find((entry) => entry.undated.some((todo) => todo.id === todoId));
+      if (pill) undated.value.setPill(band.key, pill.workPackage.id);
+    }
+  });
   const packageById = useMemo(() => new Map(workPackages.map((item) => [item.id, item])), [workPackages]);
   const milestoneById = useMemo(() => new Map(milestones.map((item) => [item.id, item])), [milestones]);
   const { mutate: plan } = usePlanGoalTodo(goal.id);
@@ -297,8 +314,9 @@ export function GoalTimeline({ goal, todos, workPackages, milestones, projects, 
   };
 
   return (
-    <section aria-label={tt.label} data-testid="goal-timeline" className="space-y-3">
+    <section ref={rootRef} aria-label={tt.label} data-testid="goal-timeline" className="space-y-3">
       <Hint id="goal-timeline" />
+      {undatedTotal > 0 && <UndatedSwitch total={undatedTotal} allOpen={allUndatedOpen} onChange={undated.setMode} />}
       <p id={barHelpId} className="sr-only">{tt.barHelp}</p>
       <p id={diamondHelpId} className="sr-only">{tt.diamondHelp}</p>
       <p aria-live="polite" className="sr-only" data-testid="timeline-announcer">{spoken}</p>
@@ -313,6 +331,7 @@ export function GoalTimeline({ goal, todos, workPackages, milestones, projects, 
         onDragEnd={handleDragEnd}
         onDragCancel={reset}
       >
+        <UndatedContext.Provider value={undated.value}>
         <TimelineDragContext.Provider value={dragState}>
           <Card padding={false} className="p-3">
             {/* Auf schmalen Bildschirmen scrollt der Zeitstrahl in sich, die Seite nicht */}
@@ -363,6 +382,7 @@ export function GoalTimeline({ goal, todos, workPackages, milestones, projects, 
             </div>
           </Card>
         </TimelineDragContext.Provider>
+        </UndatedContext.Provider>
         {panel?.kind === 'newMilestone' && (
           <MilestoneCard goalId={goal.id} day={Math.min(axis.endDay, Math.max(axis.startDay, today))} workPackages={workPackages}
             projects={projects} onClose={closePanel} anchor={panelAnchor} triggerRef={panelTrigger} align="start" />

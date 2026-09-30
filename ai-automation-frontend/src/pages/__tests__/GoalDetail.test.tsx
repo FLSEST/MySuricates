@@ -350,6 +350,7 @@ describe('GoalDetail', () => {
     expect(asked.todos.at(-1)!.get('tag')).toBe('release');
 
     fireEvent.click(screen.getByRole('button', { name: 'Add: Release notes' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'No work package' }));
     await waitFor(() => expect(assigned).toEqual({ todoIds: ['c1'] }));
   });
 
@@ -379,8 +380,9 @@ describe('GoalDetail', () => {
     );
 
     fireEvent.click(await screen.findByRole('button', { name: 'Add: Release notes' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'No work package' }));
     await waitFor(() => expect(assigned).toEqual([{ todoIds: ['c1'] }]));
-    const toast = await screen.findByText('Added to the goal');
+    const toast = await screen.findByText('Added: AutoPilot · No work package');
     fireEvent.click(within(toast.closest('[data-testid="toast"]') as HTMLElement).getByRole('button', { name: 'Undo' }));
 
     // goalId '' releases the todo; null would mean "unchanged" to the planning endpoint

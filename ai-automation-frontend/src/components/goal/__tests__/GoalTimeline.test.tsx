@@ -228,26 +228,27 @@ describe('GoalTimeline (c60bf914): milestones, bands and bars', () => {
     expect(within(screen.getByRole('region', { name: 'Project band Site' })).getByTestId('timeline-bar-w-site')).toBeInTheDocument();
   });
 
-  it('puts due TODOs under their bar and keeps the undated ones folded as a count at the label', () => {
+  // 85889063 (Flo): „Diese 8 ohne Datum, die sind ziemlich versteckt so“ – small rows stand open
+  it('puts due TODOs under their bar and shows the few undated ones at the label, foldable', () => {
     renderTimeline();
 
     const umbau = screen.getByTestId('timeline-row-p1-w-umbau');
     expect(within(umbau).getByRole('button', { name: /^Privacy findings – Due/ })).toBeInTheDocument();
-    const toggle = within(umbau).getByRole('button', { name: '1 without a date' });
-    expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    expect(within(umbau).queryByRole('button', { name: /^Style probe/ })).not.toBeInTheDocument();
-    fireEvent.click(toggle);
+    const toggle = within(umbau).getByRole('button', { name: '1 TODO without a date' });
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     expect(within(umbau).getByRole('button', { name: 'Style probe – no due date' })).toBeInTheDocument();
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(within(umbau).queryByRole('button', { name: /^Style probe/ })).not.toBeInTheDocument();
 
     // TODOs without a package: a row only because there are some
     const loose = screen.getByTestId(`timeline-row-p1-${NO_PACKAGE}`);
     expect(within(loose).getByRole('button', { name: /^Examples page/ })).toBeInTheDocument();
-    expect(within(loose).getByRole('button', { name: '1 without a date' })).toBeInTheDocument();
+    expect(within(loose).getByRole('button', { name: '1 TODO without a date' })).toBeInTheDocument();
     expect(screen.queryByTestId(`timeline-row-p2-${NO_PACKAGE}`)).not.toBeInTheDocument();
 
     // the tray opens the undated TODOs of its package, too
-    fireEvent.click(within(screen.getByTestId('timeline-tray-p1')).getByRole('button', { name: '1 without a date' }));
+    fireEvent.click(within(screen.getByTestId('timeline-tray-p1')).getByRole('button', { name: '1 TODO without a date' }));
     expect(screen.getByRole('button', { name: 'Handbook text – no due date' })).toBeInTheDocument();
 
     // overdue red, done struck through

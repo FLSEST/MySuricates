@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { CheckCircle2, XCircle, Info, AlertTriangle, X } from 'lucide-react';
-import { useToastStore, type Toast, type ToastType } from '../../stores/toastStore';
+import { useToastStore, type Toast, type ToastAction, type ToastType } from '../../stores/toastStore';
 import { useT } from '../../i18n';
 
 const AUTO_DISMISS_MS = 4000;
@@ -30,7 +30,8 @@ function ToastItem({ toast }: { toast: Toast }) {
   const removeToast = useToastStore((s) => s.removeToast);
   const [exiting, setExiting] = useState(false);
   const [now, setNow] = useState(toast.createdAt);
-  const { action } = toast;
+  const actions = toast.actions ?? (toast.action ? [toast.action] : []);
+  const action = actions[0];
   const dismissMs = action ? ACTION_DISMISS_MS : AUTO_DISMISS_MS;
   // `spent`: time the toast ran before the current stretch; `runningSince` is null while it is held.
   const [spent, setSpent] = useState(0);
@@ -87,18 +88,19 @@ function ToastItem({ toast }: { toast: Toast }) {
       }}
     >
       <div className="shrink-0 mt-0.5">{icons[toast.type]}</div>
-      <p className="flex-1 text-sm text-text leading-snug">{toast.message}</p>
-      {action && (
-        <button
-          type="button"
-          onClick={() => {
-            action.onClick();
-            handleClose();
-          }}
-          className="shrink-0 text-sm font-medium text-accent hover:underline"
-        >
-          {action.label}
-        </button>
+      {actions.length > 1 ? (
+        // Mehrere Knöpfe („Zeigen“, „Rückgängig“) passen nicht neben den Text: sie stehen darunter
+        <div className="min-w-0 flex-1">
+          <p className="text-sm text-text leading-snug">{toast.message}</p>
+          <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1">
+            {actions.map((item) => <ToastButton key={item.label} action={item} onDone={handleClose} />)}
+          </div>
+        </div>
+      ) : (
+        <>
+          <p className="flex-1 text-sm text-text leading-snug">{toast.message}</p>
+          {action && <ToastButton action={action} onDone={handleClose} />}
+        </>
       )}
       <button
         onClick={handleClose}
@@ -115,6 +117,21 @@ function ToastItem({ toast }: { toast: Toast }) {
         />
       </div>
     </div>
+  );
+}
+
+function ToastButton({ action, onDone }: { action: ToastAction; onDone: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        action.onClick();
+        onDone();
+      }}
+      className="shrink-0 text-sm font-medium text-accent hover:underline"
+    >
+      {action.label}
+    </button>
   );
 }
 
