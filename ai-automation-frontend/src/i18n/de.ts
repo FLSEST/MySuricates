@@ -2550,6 +2550,7 @@ export const de: TranslationKeys = {
       placeholder: 'Suchen oder neuer Titel …',
       hits: 'TODOs ohne Ziel aus {project}',
       createNew: 'Neu anlegen: „{title}“',
+      archived: 'Vom Ziel gelöst und archiviert',
       noHits: 'Kein passendes TODO ohne Ziel',
       help: 'Enter nimmt den ersten Treffer oder legt das TODO an, die Pfeiltasten wählen, Escape schließt.',
       close: 'Schließen',

@@ -42,6 +42,25 @@ describe('ToastContainer', () => {
     expect(useToastStore.getState().toasts).toEqual([]);
   });
 
+  it('leaves the toast open after a button marked keepOpen, so the next one can still be used', () => {
+    const show = vi.fn();
+    const undo = vi.fn();
+    render(<ToastContainer />);
+    act(() => useToastStore.getState().addToast('success', 'Added', [
+      { label: 'Show', onClick: show, keepOpen: true }, { label: 'Undo', onClick: undo },
+    ]));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show' }));
+    act(() => { vi.advanceTimersByTime(250); });
+    expect(show).toHaveBeenCalledTimes(1);
+    expect(useToastStore.getState().toasts).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    act(() => { vi.advanceTimersByTime(250); });
+    expect(undo).toHaveBeenCalledTimes(1);
+    expect(useToastStore.getState().toasts).toEqual([]);
+  });
+
   it('shows only the close button on a toast without action', () => {
     render(<ToastContainer />);
     act(() => useToastStore.getState().addToast('info', 'Saved'));

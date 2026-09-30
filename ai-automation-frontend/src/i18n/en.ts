@@ -2553,6 +2553,7 @@ export const en = {
       placeholder: 'Search or new title …',
       hits: 'TODOs without a goal from {project}',
       createNew: 'Create new: “{title}”',
+      archived: 'Removed from the goal and archived',
       noHits: 'No matching TODO without a goal',
       help: 'Enter takes the first hit or creates the TODO, the arrow keys choose, Escape closes.',
       close: 'Close',

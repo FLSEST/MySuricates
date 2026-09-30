@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach, vi } from 'vitest';
-import { screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { act, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
@@ -118,10 +118,12 @@ function serve() {
       candidates.push(created);
       return HttpResponse.json(created, { status: 201 });
     }),
-    http.delete('/api/v1/todos/:id', async ({ request, params }) => {
+    http.put('/api/v1/todos/:id', async ({ request, params }) => {
+      const body = await record(request);
+      return HttpResponse.json({ ...candidates.find((entry) => entry.id === params.id), ...body });
+    }),
+    http.delete('/api/v1/todos/:id', async ({ request }) => {
       await record(request);
-      const at = todos.findIndex((entry) => entry.id === params.id);
-      if (at >= 0) todos.splice(at, 1);
       return new HttpResponse(null, { status: 204 });
     }),
   );
@@ -191,6 +193,12 @@ describe('“Show” after adding', () => {
     expect(within(revealedRow()!).getByRole('button', { name: /^Open TODO: Release notes/ })).toBeVisible();
     expect(scrolled).toHaveBeenCalledWith({ block: 'center', inline: 'center', behavior: 'smooth' });
     expect(useGoalReveal.getState().request).toBeNull();
+
+    // „Zeigen“ lässt den Toast stehen: nach dem Hinschauen lässt es sich noch zurücknehmen
+    // (länger warten, als ein schließender Toast zum Ausblenden braucht)
+    await act(() => new Promise((resolve) => setTimeout(resolve, 400)));
+    fireEvent.click(await toastButton('Added: AutoPilot · Repo clean', 'Undo'));
+    expect(await screen.findByText('Removed from the goal again')).toBeInTheDocument();
   });
 
   it('from the list switches to the outline, because the list has no place for it', async () => {
@@ -268,7 +276,8 @@ describe('“+ TODO” at a work package', () => {
     expect(screen.getByRole('button', { name: 'Add a TODO to “Repo clean”' })).toHaveFocus();
   });
 
-  it('creates a new TODO in the package\'s project when nothing matches; Undo removes it again', async () => {
+  // Review 85889063: Rückgängig löscht nie – vom Ziel lösen und archivieren, auch wenn inzwischen ein Trigger lief
+  it('creates a new TODO in the package\'s project when nothing matches; Undo archives it instead of deleting', async () => {
     const sent = serve();
     renderGoal();
 
@@ -285,7 +294,12 @@ describe('“+ TODO” at a work package', () => {
       { method: 'PATCH', path: '/api/v1/todos/n1/planning', body: { goalId: 'g1', workPackageId: 'w1' } },
     ]));
     fireEvent.click(await toastButton('Added: AutoPilot · Repo clean', 'Undo'));
-    await waitFor(() => expect(sent.at(-1)).toEqual({ method: 'DELETE', path: '/api/v1/todos/n1', body: null }));
+    expect(await screen.findByText('Removed from the goal and archived')).toBeInTheDocument();
+    expect(sent.slice(2)).toEqual([
+      { method: 'PATCH', path: '/api/v1/todos/n1/planning', body: { goalId: '' } },
+      { method: 'PUT', path: '/api/v1/todos/n1', body: { status: 'ARCHIVED' } },
+    ]);
+    expect(sent.some((entry) => entry.method === 'DELETE')).toBe(false);
   });
 
   it('arrow keys choose among the hits and “create new”; Escape closes', async () => {

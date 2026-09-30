@@ -2,10 +2,12 @@ import { create } from 'zustand';
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
-/** A button in the toast, e.g. to show where something went; clicking it also closes the toast. */
+/** A button in the toast, e.g. to show where something went; clicking it closes the toast unless `keepOpen`. */
 export interface ToastAction {
   label: string;
   onClick: () => void;
+  /** Leave the toast open after the click – e.g. “Show”, so “Undo” is still there after a look. */
+  keepOpen?: boolean;
 }
 
 export interface Toast {

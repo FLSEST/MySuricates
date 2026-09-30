@@ -9,7 +9,8 @@ import type { GoalDetail, Todo } from '../types';
 /**
  * TODOs zum Ziel hinzufügen (85889063, Flo: „sollte man dort ja einem Arbeitspaket zuordnen können“).
  * Jedes Hinzufügen sagt im Toast, wo das TODO gelandet ist („Hinzugefügt: Projekt · Paket“), mit
- * „Zeigen“ (springt in der Gliederung bzw. im Zeitstrahl hin) und „Rückgängig“. Das läuft auch, wenn
+ * „Zeigen“ (springt in der Gliederung bzw. im Zeitstrahl hin, der Toast bleibt offen) und „Rückgängig“
+ * (ein eben angelegtes TODO wird archiviert, nie gelöscht). Das läuft auch, wenn
  * die Zielseite schon verlassen ist: nur Client und Stores.
  */
 
@@ -53,15 +54,17 @@ export function useAddTodoToGoal(goalId: string) {
   const place = (todoId: string, workPackage: PackageChoice | null) =>
     api.patch<Todo>(`/todos/${todoId}/planning`, { goalId, ...(workPackage ? { workPackageId: workPackage.id } : {}) });
 
-  const announce = (todoId: string, projectName: string | null, workPackage: PackageChoice | null, undo: () => Promise<unknown>) => {
+  const announce = (todoId: string, projectName: string | null, workPackage: PackageChoice | null, undo: () => Promise<unknown>,
+    undone: string) => {
     const where = `${projectName ?? t.goals.outline.noProject} · ${workPackage?.title ?? t.goals.outline.noWorkPackage}`;
     toast.success(ta.placed.replace('{where}', () => where), [
-      { label: ta.show, onClick: () => reveal(goalId, todoId) },
+      // „Zeigen“ lässt den Toast offen: erst hinschauen, dann noch zurücknehmen können
+      { label: ta.show, onClick: () => reveal(goalId, todoId), keepOpen: true },
       {
         label: t.goals.undoAssign,
         onClick: () => {
           void undo()
-            .then(() => toast.success(t.goals.assignUndone))
+            .then(() => toast.success(undone))
             .catch((err) => toast.error(apiErrorMessage(err, t.goals.saveFailed)))
             .finally(refresh);
         },
@@ -77,7 +80,7 @@ export function useAddTodoToGoal(goalId: string) {
     onSuccess: (result, { todoId, projectName, workPackage }) => {
       if (!workPackage && 'goal' in result) qc.setQueryData(goalKeys.detail(goalId), normalizeGoalDetail(result));
       refresh();
-      announce(todoId, projectName, workPackage, () => unassign(todoId));
+      announce(todoId, projectName, workPackage, () => unassign(todoId), t.goals.assignUndone);
     },
     onError: (err) => toast.error(apiErrorMessage(err, t.goals.saveFailed)),
   });
@@ -94,8 +97,12 @@ export function useAddTodoToGoal(goalId: string) {
     },
     onSuccess: (todo, { projectName, workPackage }) => {
       refresh();
-      // Rückgängig nimmt das eben angelegte TODO wieder weg – es gab es vorher nicht
-      announce(todo.id, projectName, workPackage, () => api.delete<void>(`/todos/${todo.id}`));
+      // Rückgängig löscht nicht: vom Ziel lösen und archivieren – nichts geht verloren, auch wenn
+      // inzwischen ein TodoTrigger lief oder jemand es bearbeitet hat (`PUT` übernimmt nur `status`)
+      announce(todo.id, projectName, workPackage, async () => {
+        await unassign(todo.id);
+        await api.put<Todo>(`/todos/${todo.id}`, { status: 'ARCHIVED' });
+      }, ta.archived);
     },
     onError: (err) => {
       if (err instanceof CreatedButNotPlaced) {

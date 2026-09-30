@@ -126,7 +126,7 @@ function ToastButton({ action, onDone }: { action: ToastAction; onDone: () => vo
       type="button"
       onClick={() => {
         action.onClick();
-        onDone();
+        if (!action.keepOpen) onDone();
       }}
       className="shrink-0 text-sm font-medium text-accent hover:underline"
     >
