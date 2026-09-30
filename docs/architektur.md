@@ -1103,6 +1103,8 @@ Response (DTO) → React Query Cache → UI-Update
 - `/ws/**` (WebSocket)
 - `/actuator/health`
 
+Die Liste steht einmal in `security/PublicPaths` (exakte Pfade, Muster, geschützte Bereiche `/api/**` und `/actuator/**`); `SecurityConfig` baut daraus die Regeln, `ApiKeyAuthFilter` entscheidet mit denselben Matchern, ob ein fehlender Key als SECURITY-Warnung ins Activity-Log geht — nur dort, wo die Kette ihn auch abweist. Exakte Pfade treffen nur sich selbst (kein `/health/`, kein `/health/extra`); alles außerhalb der geschützten Bereiche (das ausgelieferte Frontend) ist frei.
+
 ### Rate Limiting
 
 - **Filter:** `RateLimitFilter` (liest von `RateLimitConfig` Bean)

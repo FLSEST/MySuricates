@@ -3,13 +3,15 @@ package com.automation.security;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.system.ApiKeyService;
 import jakarta.servlet.FilterChain;
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -27,8 +29,8 @@ class ApiKeyAuthFilterTest {
     @Mock
     private ActivityLogService activityLogService;
 
-    @Mock
-    private HttpServletRequest request;
+    /** Echter Request: der Filter matcht den Pfad mit denselben PathPattern-Matchern wie die Filterkette. */
+    private MockHttpServletRequest request;
 
     @Mock
     private HttpServletResponse response;
@@ -39,6 +41,7 @@ class ApiKeyAuthFilterTest {
     @BeforeEach
     void setUp() {
         filter = new ApiKeyAuthFilter(apiKeyService, activityLogService);
+        request = new MockHttpServletRequest("GET", "/");
         SecurityContextHolder.clearContext();
     }
 
@@ -72,7 +75,7 @@ class ApiKeyAuthFilterTest {
     void securityEnabled_validApiKey_authenticates() throws Exception {
         ReflectionTestUtils.setField(filter, "securityEnabled", true);
         when(apiKeyService.getEffectiveApiKey()).thenReturn("my-secret-key");
-        when(request.getHeader("X-API-Key")).thenReturn("my-secret-key");
+        request.addHeader("X-API-Key", "my-secret-key");
         when(apiKeyService.matchesEffectiveApiKey("my-secret-key")).thenReturn(true);
 
         filter.doFilterInternal(request, response, filterChain);
@@ -88,7 +91,7 @@ class ApiKeyAuthFilterTest {
     void securityEnabled_invalidApiKey_doesNotAuthenticate() throws Exception {
         ReflectionTestUtils.setField(filter, "securityEnabled", true);
         when(apiKeyService.getEffectiveApiKey()).thenReturn("my-secret-key");
-        when(request.getHeader("X-API-Key")).thenReturn("wrong-key");
+        request.addHeader("X-API-Key", "wrong-key");
 
         filter.doFilterInternal(request, response, filterChain);
 
@@ -100,8 +103,6 @@ class ApiKeyAuthFilterTest {
     void securityEnabled_missingApiKey_doesNotAuthenticate() throws Exception {
         ReflectionTestUtils.setField(filter, "securityEnabled", true);
         when(apiKeyService.getEffectiveApiKey()).thenReturn("my-secret-key");
-        when(request.getHeader("X-API-Key")).thenReturn(null);
-
         filter.doFilterInternal(request, response, filterChain);
 
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
@@ -112,8 +113,8 @@ class ApiKeyAuthFilterTest {
     void securityEnabled_invalidKey_logsSecurityEvent() throws Exception {
         ReflectionTestUtils.setField(filter, "securityEnabled", true);
         when(apiKeyService.getEffectiveApiKey()).thenReturn("my-secret-key");
-        when(request.getHeader("X-API-Key")).thenReturn("wrong-key");
-        when(request.getRequestURI()).thenReturn("/api/v1/workflows");
+        request.addHeader("X-API-Key", "wrong-key");
+        request.setRequestURI("/api/v1/workflows");
 
         filter.doFilterInternal(request, response, filterChain);
 
@@ -124,8 +125,7 @@ class ApiKeyAuthFilterTest {
     void securityEnabled_noKey_protectedPath_logsSecurityEvent() throws Exception {
         ReflectionTestUtils.setField(filter, "securityEnabled", true);
         when(apiKeyService.getEffectiveApiKey()).thenReturn("my-secret-key");
-        when(request.getHeader("X-API-Key")).thenReturn(null);
-        when(request.getRequestURI()).thenReturn("/api/v1/workflows");
+        request.setRequestURI("/api/v1/workflows");
 
         filter.doFilterInternal(request, response, filterChain);
 
@@ -136,8 +136,7 @@ class ApiKeyAuthFilterTest {
     void securityEnabled_noKey_publicPath_noSecurityLog() throws Exception {
         ReflectionTestUtils.setField(filter, "securityEnabled", true);
         when(apiKeyService.getEffectiveApiKey()).thenReturn("my-secret-key");
-        when(request.getHeader("X-API-Key")).thenReturn(null);
-        when(request.getRequestURI()).thenReturn("/api/v1/system/health");
+        request.setRequestURI("/api/v1/system/health");
 
         filter.doFilterInternal(request, response, filterChain);
 
@@ -148,8 +147,7 @@ class ApiKeyAuthFilterTest {
     void securityEnabled_noKey_webhookTriggerPath_noSecurityLog() throws Exception {
         ReflectionTestUtils.setField(filter, "securityEnabled", true);
         when(apiKeyService.getEffectiveApiKey()).thenReturn("my-secret-key");
-        when(request.getHeader("X-API-Key")).thenReturn(null);
-        when(request.getRequestURI()).thenReturn("/api/v1/webhook/trigger/abc-123");
+        request.setRequestURI("/api/v1/webhook/trigger/abc-123");
 
         filter.doFilterInternal(request, response, filterChain);
 
@@ -160,8 +158,7 @@ class ApiKeyAuthFilterTest {
     void securityEnabled_noKey_systemInfoPath_noSecurityLog() throws Exception {
         ReflectionTestUtils.setField(filter, "securityEnabled", true);
         when(apiKeyService.getEffectiveApiKey()).thenReturn("my-secret-key");
-        when(request.getHeader("X-API-Key")).thenReturn(null);
-        when(request.getRequestURI()).thenReturn("/api/v1/system/info");
+        request.setRequestURI("/api/v1/system/info");
 
         filter.doFilterInternal(request, response, filterChain);
 
@@ -172,8 +169,7 @@ class ApiKeyAuthFilterTest {
     void securityEnabled_noKey_authStatusPath_noSecurityLog() throws Exception {
         ReflectionTestUtils.setField(filter, "securityEnabled", true);
         when(apiKeyService.getEffectiveApiKey()).thenReturn("my-secret-key");
-        when(request.getHeader("X-API-Key")).thenReturn(null);
-        when(request.getRequestURI()).thenReturn("/api/v1/system/auth-status");
+        request.setRequestURI("/api/v1/system/auth-status");
 
         filter.doFilterInternal(request, response, filterChain);
 
@@ -186,8 +182,7 @@ class ApiKeyAuthFilterTest {
         // sonst ein SECURITY-Eintrag "no API key provided".
         ReflectionTestUtils.setField(filter, "securityEnabled", true);
         when(apiKeyService.getEffectiveApiKey()).thenReturn("my-secret-key");
-        when(request.getHeader("X-API-Key")).thenReturn(null);
-        when(request.getRequestURI()).thenReturn("/api/v1/system/jvm-memory");
+        request.setRequestURI("/api/v1/system/jvm-memory");
 
         filter.doFilterInternal(request, response, filterChain);
 
@@ -201,11 +196,67 @@ class ApiKeyAuthFilterTest {
         // Die Ausnahme ist genau ein Pfad: der Nachbar mit den Request-Kosten bleibt geschuetzt.
         ReflectionTestUtils.setField(filter, "securityEnabled", true);
         when(apiKeyService.getEffectiveApiKey()).thenReturn("my-secret-key");
-        when(request.getHeader("X-API-Key")).thenReturn(null);
-        when(request.getRequestURI()).thenReturn("/api/v1/system/request-metrics");
+        request.setRequestURI("/api/v1/system/request-metrics");
 
         filter.doFilterInternal(request, response, filterChain);
 
         verify(activityLogService).warn(any(), contains("no API key"), eq("ApiKeyAuthFilter"), isNull());
+    }
+
+    @Test
+    void securityEnabled_noKey_oauthCallback_noSecurityLog() throws Exception {
+        // Der Anbieter ruft ohne Key zurück; die Filterkette lässt den Callback durch — früher hielt
+        // der Filter ihn trotzdem für geschützt und schrieb bei jedem OAuth-Login eine Warnung.
+        ReflectionTestUtils.setField(filter, "securityEnabled", true);
+        when(apiKeyService.getEffectiveApiKey()).thenReturn("my-secret-key");
+        request.setRequestURI("/api/v1/integrations/github/callback");
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        verify(activityLogService, never()).warn(any(), anyString(), anyString(), any());
+        verify(filterChain).doFilter(request, response);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "/actuator/metrics",
+            "/actuator/metrics/jvm.memory.used",
+            "/actuator/info",
+            "/actuator/health/liveness",
+            "/api/v1/system/health/extra",
+            "/api/v1/system/health/",
+            "/api/v1/integrations/github/callback/extra",
+            "/api/v1/integrations/a/b/callback"
+    })
+    void securityEnabled_noKey_keyRequiredPath_logsSecurityEvent(String path) throws Exception {
+        // Was die Filterkette ohne Key abweist, protokolliert der Filter — auch unter /actuator/**
+        // und für die Nachbarn der öffentlichen Pfade.
+        ReflectionTestUtils.setField(filter, "securityEnabled", true);
+        when(apiKeyService.getEffectiveApiKey()).thenReturn("my-secret-key");
+        request.setRequestURI(path);
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        verify(activityLogService).warn(any(), contains("no API key provided for " + path),
+                eq("ApiKeyAuthFilter"), isNull());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "/actuator/health",
+            "/api/v1/webhook/trigger",
+            "/ws/info",
+            "/",
+            "/assets/app.js",
+            "/workflows/123"
+    })
+    void securityEnabled_noKey_publicOrFrontendPath_noSecurityLog(String path) throws Exception {
+        ReflectionTestUtils.setField(filter, "securityEnabled", true);
+        when(apiKeyService.getEffectiveApiKey()).thenReturn("my-secret-key");
+        request.setRequestURI(path);
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        verify(activityLogService, never()).warn(any(), anyString(), anyString(), any());
     }
 }
