@@ -108,6 +108,11 @@ M_ai_token_hint="Claude im Container: einmal claude setup-token ausführen, dann
 M_ai_token_implausible="In %s steht bei CLAUDE_CODE_OAUTH_TOKEN kein Token (Platzhalter, Leerzeichen oder unter 40 Zeichen) — das zählt nicht als Anmeldung."
 M_ai_token_rejected="Das sieht nicht wie ein Token aus (Platzhalter, Leerzeichen oder unter 40 Zeichen) — nicht gespeichert."
 M_ai_env_only="%s ist hier nur über %s angemeldet — die Variable kommt nicht in den Container. Für den Container auf diesem Rechner anmelden: %s"
+M_ai_env_only_login="%s ist hier nur über %s angemeldet — die Variable kommt nicht von selbst in den Container. Mit --store-ai-env (oder im Terminal mit ja) übernimmt sie der Installer nach %s; sonst auf diesem Rechner anmelden: %s"
+M_ai_env_store_q="%s ist hier nur über %s angemeldet. Für den Container nach %s übernehmen (nur für dich lesbar)?"
+M_ai_env_stored="%s gespeichert in %s (nur für dich lesbar) — Container im Modus login bekommen die Variable beim nächsten Start"
+M_ai_env_not_stored="%s nicht nach %s übernommen (leer, Zeilenumbruch oder Datei nicht schreibbar)"
+M_ai_env_shared_claude="%s liest auch claude — im Container meldet sich claude damit an, nicht mit dem Token"
 M_ai_pi_q="pi mitinstallieren? (%s)"
 M_ai_pi_run="pi installieren (npm)"
 M_ai_pi_failed="pi ließ sich nicht installieren — von Hand: %s"
@@ -178,6 +183,8 @@ M_help="MySuricates-Einrichtung — von der nackten Maschine bis zum Login in ei
   --projects DIR               Projektordner für den Container (Default: Ordner über dem Klon)
   --docker-socket              Container: Shell-Blöcke mit container_image erlauben (volle Docker-Kontrolle)
   --with-pi                    die KI-CLI pi per npm mitinstallieren (Default: nein, auch mit --yes)
+  --store-ai-env               Container, Modus login: eine KI-Anmeldung, die hier nur als Umgebungsvariable
+                               besteht, nach ~/.config/mysuricates/ai.env übernehmen (Default: nein, auch mit --yes)
   --ai-from-host MODUS         Container: was von den KI-Anbietern hineinkommt — login (Default), programs, all
   --ai-providers LISTE         Container: nur diese Anbieter, z. B. claude,codex (Default: alle)
   --name NAME                  Name der Instanz (Default main)

@@ -65,8 +65,9 @@ geprüfter Download ohne sudo).
 
 Für KI-Workflows brauchst du **eine KI-CLI deiner Wahl** — `claude`, `codex` oder `pi` —, bei der
 du angemeldet bist — per Anmeldedatei oder per Umgebungsvariable (`CLAUDE_CODE_OAUTH_TOKEN`,
-`ANTHROPIC_API_KEY`, `OPENAI_API_KEY` …). Eine Instanz im Container sieht nur Anmeldedateien, für Claude
-einen Token ([Deployment → KI-Anbieter im Container](deployment.md#ki-anbieter-im-container)).
+`ANTHROPIC_API_KEY`, `OPENAI_API_KEY` …). Eine Instanz im Container sieht Anmeldedateien und, was in
+`~/.config/mysuricates/ai.env` steht — für Claude einen Token, sonst die Variable; dorthin kommt sie nur
+mit deiner Zustimmung ([Deployment → KI-Anbieter im Container](deployment.md#ki-anbieter-im-container)).
 MySuricates startet auch ohne; der Installer zeigt, welche er findet,
 und die Startseite der Oberfläche sagt es ebenso — samt Befehl für das, was fehlt.
 
@@ -97,7 +98,9 @@ Bauen · Fertig. Mit `b` geht es einen Schritt zurück, mit `q` wird abgebrochen
   Fehlt pi, bietet der Installer an, es per npm mitzuinstallieren — in der geprüften, festen Version
   (Vorgabe nein, ohne Terminal `--with-pi`); für claude und codex nennt er den Befehl. Anmelden musst du dich selbst.
   Im Container nutzt die Instanz die CLI **und** deine Anmeldung vom Rechner — kein zweites Login
-  (unter macOS nur die Anmeldung, das Programm liegt im Image).
+  (unter macOS nur die Anmeldung, das Programm liegt im Image). Bist du bei codex oder pi nur per
+  Umgebungsvariable angemeldet, fragt der Installer, ob er sie nach `~/.config/mysuricates/ai.env`
+  übernehmen soll (Vorgabe nein; ohne Terminal nur mit `--store-ai-env`, auch mit `--yes` nicht von selbst).
 - **Ports:** Default 9090, belegte Ports werden übersprungen — nicht der, den die laufende Instanz
   selbst belegt, wenn sie neu eingerichtet wird. Beim Container zusätzlich der
   Projektordner, den die Instanz sieht (Default: der Ordner über dem Klon, nie das ganze Home).

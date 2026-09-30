@@ -16,7 +16,7 @@ check() {  # $1 = label, $2 = shell condition
 # $1 = extra shell code to run after sourcing (evaluated inside the subshell).
 run_in_script() {
   (
-    export HOME="$TMP/home" XDG_STATE_HOME="$TMP/state"
+    export HOME="$TMP/home" XDG_STATE_HOME="$TMP/state" XDG_CONFIG_HOME="$TMP/config"
     mkdir -p "$HOME" "$XDG_STATE_HOME"
     # shellcheck disable=SC1090
     source "$SCRIPT" >/dev/null 2>&1
@@ -153,6 +153,10 @@ check "socket off by default"               '! grep -q "docker.sock" <<<"$OUT" &
 check "switches named for the settings"     'grep -q "MYSURICATES_SWITCH_PREFIX=AUTOTRIGGER_DEV_" <<<"$OUT"'
 OUT="$(run_in_script "$OVR"'; AUTOTRIGGER_DEV_DOCKER_SOCKET=1 AUTOTRIGGER_DEV_AI_FROM_HOST=all write_compose_override >/dev/null 2>&1; cat "$COMPOSE_OVERRIDE"')"
 check "all + socket on purpose are honored" 'grep -q "/.claude:" <<<"$OUT" && grep -q "/var/run/docker.sock:/var/run/docker.sock" <<<"$OUT"'
+mkdir -p "$TMP/config/mysuricates" "$TMP/nm/@openai/codex"; printf 'OPENAI_API_KEY=sk-test-openai-4711\n' > "$TMP/config/mysuricates/ai.env"
+OUT="$(run_in_script "$OVR"'; AUTOTRIGGER_DEV_AI_PROVIDERS=codex write_compose_override >/dev/null 2>&1; cat "$COMPOSE_OVERRIDE"')"
+check "login variable: the dev container's own copy" 'grep -qF "\"$TMP/config/mysuricates/container-env/dev-autotrigger-dev.env\"" <<<"$OUT" && ! grep -q 4711 <<<"$OUT"'
+rm -rf "$TMP/config" "$TMP/nm/@openai"
 RC="$(run_in_script "$OVR"'; AUTOTRIGGER_DEV_CONTAINER_BIND="0.0.0.0 x" write_compose_override >/dev/null 2>&1; echo $?')"
 check "a bind that is no address refuses the start" '[ "$RC" = 2 ]'
 DCY="$HERE/../../ai-automation-backend/docker-compose.dev-container.yml"

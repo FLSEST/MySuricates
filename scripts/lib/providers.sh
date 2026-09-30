@@ -33,8 +33,8 @@ provider_login_env_names() {
   printf '%s' "$out"
 }
 
-# Angemeldet per Datei unter $HOME — nur so kommt eine Anmeldung von Codex oder Pi in einen Container
-# (scripts/lib/host-mounts.sh bindet Dateien ein, keine Umgebungsvariablen; 90b4422c)
+# Angemeldet per Datei unter $HOME — die bindet scripts/lib/host-mounts.sh ein. Eine Anmeldung nur per
+# Umgebungsvariable kommt nur ueber ~/.config/mysuricates/ai.env in einen Container (setup.sh fragt)
 provider_login_file() {
   local entry file pattern
   for entry in $(provider_get "${1:-}" login_files); do

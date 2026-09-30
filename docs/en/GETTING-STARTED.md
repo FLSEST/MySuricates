@@ -64,8 +64,9 @@ without sudo when the package manager is too old).
 
 For AI workflows you need **an AI CLI of your choice** — `claude`, `codex` or `pi` — that you are
 logged in to — via its login file or an environment variable (`CLAUDE_CODE_OAUTH_TOKEN`,
-`ANTHROPIC_API_KEY`, `OPENAI_API_KEY` …). An instance in a container only sees login files, for Claude a
-token ([Deployment → AI providers in the container](deployment.md#ai-providers-in-the-container)).
+`ANTHROPIC_API_KEY`, `OPENAI_API_KEY` …). An instance in a container sees login files and what is in
+`~/.config/mysuricates/ai.env` — for Claude a token, otherwise the variable; it only goes there with
+your consent ([Deployment → AI providers in the container](deployment.md#ai-providers-in-the-container)).
 MySuricates starts without one; the installer shows which it finds,
 and so does the start page of the interface — with the command for whatever is missing.
 
@@ -95,7 +96,9 @@ Done. `b` goes one step back, `q` quits.
   If pi is missing, the installer offers to install it via npm — in the tested, fixed version
   (default no, without a terminal `--with-pi`); for claude and codex it names the command. Logging in is up to you.
   In the container the instance uses the CLI **and** your login from the machine — no second login
-  (on macOS only the login; the program lives in the image).
+  (on macOS only the login; the program lives in the image). If codex or pi is logged in only via an
+  environment variable, the installer asks whether to copy it into `~/.config/mysuricates/ai.env`
+  (default no; without a terminal only with `--store-ai-env`, never by itself with `--yes`).
 - **Ports:** default 9090, busy ports are skipped — not the one the running instance itself holds
   when it is set up again. For the container also the projects folder the
   instance sees (default: the folder above the clone, never your whole home).
