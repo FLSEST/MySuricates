@@ -129,6 +129,10 @@ deploy/instances/*
 # Lokales Werkzeug fuer den README-Banner (erzeugt docs/assets/readme-banner-*.svg), gehoert nicht ins Repo
 scripts/readme-banner.py
 
+# Privates Werkzeug, lokal behalten (Entscheidung 2026-09-30, TODO 08025915)
+scripts/explainer/
+scripts/install_desktop_launcher.sh
+
 # Private Einmal-Migration der Workspace-Isolierung (lokal behalten, nicht veröffentlichen)
 scripts/workspace-isolation/prepare-*.py
 scripts/workspace-isolation/pool-overrides/
