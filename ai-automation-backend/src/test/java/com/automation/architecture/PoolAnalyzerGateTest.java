@@ -40,17 +40,10 @@ class PoolAnalyzerGateTest {
     /**
      * Schwere Befunde an Definitionen, deren Reparatur ein eigenes TODO trägt: {@code "<Datei> <Regel>"}
      * → Grund. Nur zum Abbauen — tritt der Befund an der geprüften Datei nicht mehr auf, bricht der Test.
-     * Der Schlüssel ist der Dateiname: {@code saas-feature-loop.json} liegt seit 7ddacd1d im Pool
-     * (Scope {@code external}) und wird dort weiter geprüft.
+     * Aktuell leer: {@code saas-feature-loop.json} trug hier zwei Einträge (foreach kann keinen
+     * Unter-Workflow je Eintrag starten) und ist aus dem Pool genommen, bis dieser Block-Typ existiert.
      */
-    private static final Map<String, String> KNOWN_SEVERE = Map.of(
-            "saas-feature-loop.json items-command-without-source",
-            "46b9b229 (Built-in-Template saas-feature-loop läuft nicht): foreach kann noch keinen"
-                    + " Unter-Workflow ausführen, items_source allein repariert ihn nicht",
-            "saas-feature-loop.json missing-required-config-key",
-            "46b9b229 (Built-in-Template saas-feature-loop läuft nicht): der foreach hat kein command, weil"
-                    + " er je Eintrag einen Unter-Workflow starten soll; der verschachtelte sub-workflow-Block"
-                    + " bekommt seine ID erst über workflow_id_lookup, das kein Executor liest");
+    private static final Map<String, String> KNOWN_SEVERE = Map.of();
 
     private final WorkflowAnalyzer analyzer = new WorkflowAnalyzer();
     private final ObjectMapper objectMapper = new ObjectMapper();

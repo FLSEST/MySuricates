@@ -26,7 +26,9 @@ Every definition carries a `scope` field with one of three values:
 All three are legitimate. The `repo` entries are the self-audits this project runs on itself —
 they are here as worked examples of the mechanism, not as tools for your codebase. The
 `external` entries (`saas-*`) drive a SaaS factory with its own `factory` CLI, which is not part
-of this repository. The pool
+of this repository. (The `saas-feature-loop` entry that ran that factory over a whole feature
+list is out for now — no block type can start a sub-workflow per foreach entry yet; it returns
+once one can.) The pool
 browser shows the scope as a badge; from the shell:
 
 ```bash
