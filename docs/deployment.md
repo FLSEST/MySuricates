@@ -93,17 +93,38 @@ Anmeldung (neue Datei, dann Umbenennen). Eine einzeln eingebundene Datei zeigte 
 weiter auf die alte, und nach der nächsten Erneuerung auf dem Rechner wäre der Container abgemeldet.
 Codex und Pi schreiben ihre `auth.json` an Ort und Stelle, dort genügt die Datei. Den Token erzeugt
 `claude setup-token` einmal (er gilt ein Jahr); er gehört als `CLAUDE_CODE_OAUTH_TOKEN=…` nach
-`~/.config/mysuricates/ai.env` mit den Rechten 600, der Installer bietet das an. Compose reicht die
-Datei beim Start als Umgebung durch. Sie landet weder im Image noch im Volume, ist aber für jeden mit
-Docker-Zugriff per `docker inspect` lesbar. Als Anmeldung zählt nur ein Wert, der ein Token sein kann:
+`~/.config/mysuricates/ai.env` mit den Rechten 600, der Installer bietet das an. Compose reicht ihn
+beim Start als Umgebung durch (siehe unten). Er landet weder im Image noch im Volume, ist aber für jeden
+mit Docker-Zugriff per `docker inspect` lesbar. Als Anmeldung zählt nur ein Wert, der ein Token sein kann:
 mindestens 40 Zeichen, ohne Leerzeichen und ohne spitze Klammern. Ein Platzhalter wie `<token>` bleibt
 draußen; Starter, Installer und die Einstellungen melden ihn als fehlende Anmeldung.
 
 **Anmeldung per Umgebungsvariable.** Auf dem Rechner zählt eine gesetzte Variable wie `OPENAI_API_KEY`,
-`ANTHROPIC_API_KEY` oder `GEMINI_API_KEY` als Anmeldung. In den Container kommt sie nicht: Die Schalter
-binden Anmeldedateien ein, für Claude den Token aus `ai.env`. Der Installer sagt das bei einer
-Container-Instanz, statt „angemeldet“ stehen zu lassen, und nennt den Befehl, der die Anmeldedatei
-anlegt (`codex login`, `pi` → `/login`); beim Start meldet `instance.sh` eine fehlende Datei (90b4422c).
+`ANTHROPIC_API_KEY` oder `GEMINI_API_KEY` als Anmeldung. Aus der Shell kommt sie nicht in den Container
+— ein Start aus der Oberfläche hätte sie gar nicht. Im Modus `login` kommt sie aus
+`~/.config/mysuricates/ai.env`, derselben Datei wie der Claude-Token:
+
+- **Nur mit Zustimmung.** Ist codex oder pi bei einer Container-Instanz nur per Variable angemeldet,
+  fragt der Installer im Terminal „Nach …/ai.env übernehmen?“ (Vorgabe nein). Ohne Terminal übernimmt
+  er sie nur mit `--store-ai-env`; `--yes` allein schreibt nie ein Geheimnis. Den Wert zeigt er nirgends,
+  die Datei hat die Rechte 600, ihr Verzeichnis 700; andere Einträge bleiben, eine ältere Zeile derselben
+  Variable wird ersetzt. Von Hand geht es genauso: `VARIABLE=wert` eintragen, `chmod 600`.
+- **Nur die gewählten Anbieter.** Welche Variablen zu einem Anbieter gehören, steht im Anbieter-Katalog
+  des Backends (claude: `CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_API_KEY`; codex: `OPENAI_API_KEY`,
+  `CODEX_API_KEY`; pi: `ANTHROPIC_API_KEY`, `ANTHROPIC_OAUTH_TOKEN`, `OPENAI_API_KEY`, `GEMINI_API_KEY`,
+  `OPENROUTER_API_KEY`) — dieselbe Liste, nach der Installer und Einstellungen „angemeldet“ beurteilen.
+  `scripts/lib/host-mounts.sh` kopiert beim Start genau die Variablen der Anbieter aus `…AI_PROVIDERS`
+  nach `~/.config/mysuricates/container-env/<auswahl>.env` (600, bei jedem Start neu geschrieben) und
+  gibt Compose diese Kopie; andere Zeilen aus `ai.env` kommen nie hinein. Das gilt für jeden Weg über
+  diesen Generator: `instance.sh`, `staging.sh`, den Start aus der Oberfläche und den Dev-Container.
+  Tryout bindet absichtlich nichts vom Rechner ein und meldet sich im Container selbst an.
+- **Geteilte Variablen** liest jeder gewählte Anbieter, der sie kennt. `ANTHROPIC_API_KEY` gilt für pi
+  **und** claude: Ist claude gewählt, meldet sich claude im Container dann mit dem Schlüssel an statt mit
+  dem Token — der Installer sagt das beim Übernehmen.
+- **`programs` und `all`** bekommen nichts aus `ai.env`: Bei `programs` meldet sich jede Instanz selbst
+  an, bei `all` kommen die ganzen Verzeichnisse. Dort nennt der Installer weiter den Befehl, der die
+  Anmeldedatei anlegt (`codex login`, `pi` → `/login`); beim Start meldet `instance.sh` eine fehlende
+  Anmeldung (90b4422c).
 
 **Projekt-Container.** Für einen Lauf startet die Plattform je Projekt einen Container
 (`automation-<projekt-id>`, sobald Docker erreichbar ist, bei Stable und Test über den Socket). Darin

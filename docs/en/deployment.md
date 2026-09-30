@@ -92,17 +92,38 @@ login (new file, then rename). A file mounted on its own would keep pointing at 
 container, and after the next refresh on the machine the container would be logged out. Codex and Pi
 write their `auth.json` in place, so the file is enough there. `claude setup-token` creates the token
 once (valid for a year); it goes into `~/.config/mysuricates/ai.env` as `CLAUDE_CODE_OAUTH_TOKEN=…` with
-mode 600, and the installer offers to do that. Compose passes the file on as environment at start. It
-lands neither in the image nor in the volume, but anyone with Docker access can read it via
+mode 600, and the installer offers to do that. Compose passes it on as environment at start (see
+below). It lands neither in the image nor in the volume, but anyone with Docker access can read it via
 `docker inspect`. Only a value that can be a token counts as a login: at least 40 characters, no spaces
 and no angle brackets. A placeholder such as `<token>` stays out; the starters, the installer and the
 settings report it as a missing login.
 
 **Login via environment variable.** On the machine a set variable such as `OPENAI_API_KEY`,
-`ANTHROPIC_API_KEY` or `GEMINI_API_KEY` counts as a login. It does not reach the container: the switches
-mount login files, for Claude the token from `ai.env`. For a container instance the installer says so
-instead of leaving "logged in" standing, and names the command that creates the login file
-(`codex login`, `pi` → `/login`); at start `instance.sh` reports a missing file (90b4422c).
+`ANTHROPIC_API_KEY` or `GEMINI_API_KEY` counts as a login. It does not travel from the shell into the
+container — a start from the interface would not even have it. In `login` mode it comes from
+`~/.config/mysuricates/ai.env`, the same file as the Claude token:
+
+- **Only with consent.** If codex or pi is logged in only via a variable for a container instance, the
+  installer asks in the terminal "Copy it into …/ai.env?" (default no). Without a terminal it copies
+  only with `--store-ai-env`; `--yes` alone never writes a secret. It never shows the value, the file
+  gets mode 600, its directory 700; other entries stay, an older line of the same variable is replaced.
+  By hand it works the same way: add `VARIABLE=value`, `chmod 600`.
+- **Only the selected providers.** Which variables belong to a provider is in the backend's provider
+  catalog (claude: `CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_API_KEY`; codex: `OPENAI_API_KEY`,
+  `CODEX_API_KEY`; pi: `ANTHROPIC_API_KEY`, `ANTHROPIC_OAUTH_TOKEN`, `OPENAI_API_KEY`, `GEMINI_API_KEY`,
+  `OPENROUTER_API_KEY`) — the same list the installer and the settings use to judge "logged in".
+  At start `scripts/lib/host-mounts.sh` copies exactly the variables of the providers in
+  `…AI_PROVIDERS` into `~/.config/mysuricates/container-env/<selection>.env` (600, rewritten at every
+  start) and hands that copy to Compose; other lines of `ai.env` never get in. This holds for every way
+  through this generator: `instance.sh`, `staging.sh`, a start from the interface and the dev container.
+  Tryout deliberately mounts nothing from the machine and logs in inside the container.
+- **Shared variables** are read by every selected provider that knows them. `ANTHROPIC_API_KEY` counts
+  for pi **and** claude: with claude selected, claude in the container then logs in with the key instead
+  of the token — the installer says so when copying.
+- **`programs` and `all`** get nothing from `ai.env`: with `programs` every instance logs in itself,
+  with `all` the whole directories come in. There the installer keeps naming the command that creates
+  the login file (`codex login`, `pi` → `/login`); at start `instance.sh` reports a missing login
+  (90b4422c).
 
 **Project containers.** For a run the platform starts one container per project
 (`automation-<project-id>`, whenever Docker is reachable — on Stable and Test through the socket).

@@ -190,8 +190,9 @@ der Test-Container mit einem veralteten Backend-JAR (aktuelles Frontend + altes 
 **KI-Anbieter, Docker-Socket und Port in Stable/Test** kommen aus der Override-Datei von `scripts/staging.sh`
 (`scripts/lib/host-mounts.sh` — derselben Stelle wie bei `instance.sh` und dem Dev-Container), auch beim Start aus
 der Oberfläche (`StagingComposeCommand`). Schalter in `~/.config/mysuricates/staging.env`: `STABLE_`/`TEST_` +
-`AI_FROM_HOST` (`login` = Programme + je Anbieter nur die Anmeldung, Standard; Claude per Token aus
-`~/.config/mysuricates/ai.env`), `AI_PROVIDERS`, `DOCKER_SOCKET` (Standard 0), `BIND` (Standard `127.0.0.1`).
+`AI_FROM_HOST` (`login` = Programme + je Anbieter nur die Anmeldung, Standard; Claude per Token, Codex/Pi
+ohne Anmeldedatei per Variable aus `~/.config/mysuricates/ai.env` — nur die der gewählten Anbieter, vom
+Installer nur mit Zustimmung geschrieben), `AI_PROVIDERS`, `DOCKER_SOCKET` (Standard 0), `BIND` (Standard `127.0.0.1`).
 **Sicher per Standard, überall:** jeder Docker-Weg (deploy/, tryout, Stable, Test, Dev-Container) veröffentlicht den
 Port nur auf `127.0.0.1` und bindet keinen Docker-Socket ein; nach außen (`…BIND=0.0.0.0`) oder mit Socket
 (`…DOCKER_SOCKET=1`, nötig für Projekt-Container, Terminal, `container_image`-Blöcke, `docker` in Shell-Blöcken)
