@@ -2188,6 +2188,8 @@ export const en = {
       Execution: 'Run',
       Goal: 'Goal',
       GoalMilestone: 'Milestone',
+      GoalWorkPackage: 'Work package',
+      GoalWorkflow: 'Goal workflow',
       Todo: 'TODO',
       WorkflowVersion: 'Workflow version',
       WebhookTrigger: 'Webhook',

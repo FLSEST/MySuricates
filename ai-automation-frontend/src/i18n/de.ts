@@ -2185,6 +2185,8 @@ export const de: TranslationKeys = {
       Execution: 'Ausführung',
       Goal: 'Ziel',
       GoalMilestone: 'Meilenstein',
+      GoalWorkPackage: 'Arbeitspaket',
+      GoalWorkflow: 'Ziel-Workflow',
       Todo: 'TODO',
       WorkflowVersion: 'Workflow-Version',
       WebhookTrigger: 'Webhook',
