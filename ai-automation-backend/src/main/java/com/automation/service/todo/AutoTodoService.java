@@ -205,13 +205,16 @@ public class AutoTodoService {
             List<Todo> openTodos = todoRepository.findByProjectIdAndSourceAndReferenceTypeAndReferenceIdAndStatusNot(
                     projectId, Todo.Source.WORKFLOW, REFERENCE_TYPE, event.getWorkflowId(), Todo.Status.DONE);
 
-            openTodos.stream()
+            List<Todo> toClose = openTodos.stream()
                     .filter(t -> t.getTags() != null && t.getTags().contains(TAG_AUTO_WORKFLOW))
-                    .forEach(todo -> {
-                        todo.setStatus(Todo.Status.DONE);
-                        todoRepository.save(todo);
-                        log.info("Auto-todo closed: {} ({})", todo.getTitle(), todo.getId());
-                    });
+                    .toList();
+            if (toClose.isEmpty()) {
+                return null;
+            }
+            toClose.forEach(todo -> todo.setStatus(Todo.Status.DONE));
+            // One batched write instead of a save() per todo inside the loop.
+            todoRepository.saveAll(toClose);
+            toClose.forEach(todo -> log.info("Auto-todo closed: {} ({})", todo.getTitle(), todo.getId()));
             return null;
         });
     }

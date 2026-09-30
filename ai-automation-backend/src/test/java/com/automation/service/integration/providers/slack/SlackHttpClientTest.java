@@ -16,7 +16,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /** Transport and error mapping of the Slack Web API client against a local stub. */
 class SlackHttpClientTest {
 
-    private static final String TOKEN = "xoxb-1111-2222-abcdefSECRET";
+    private static final String TOKEN = "xoxb-test-token";
 
     private StubApiServer stub;
     private SlackHttpClient client;

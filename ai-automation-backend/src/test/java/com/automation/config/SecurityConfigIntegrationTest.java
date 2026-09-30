@@ -8,7 +8,9 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -21,11 +23,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ActiveProfiles("integration")
 @TestPropertySource(properties = {
         "automation.security.enabled=true",
-        "automation.security.api-key=test-api-key-12345"
+        "automation.security.api-key=test-api-key"
 })
 class SecurityConfigIntegrationTest {
 
-    private static final String VALID_API_KEY = "test-api-key-12345";
+    private static final String VALID_API_KEY = "test-api-key";
     private static final String API_KEY_HEADER = "X-API-Key";
 
     @Autowired
@@ -126,9 +128,25 @@ class SecurityConfigIntegrationTest {
     }
 
     @Test
+    void protectedEndpoint_publicPathWithSuffix_returns403() throws Exception {
+        // Die oeffentlichen System-Pfade sind exakte Treffer — ein Anhang macht sie nicht frei.
+        mockMvc.perform(get("/api/v1/system/health/extra"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/v1/system/info/extra"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void protectedEndpoint_integrationSnippet_withoutAuth_returns403() throws Exception {
         mockMvc.perform(get("/api/v1/system/integration-snippet"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void nonApiPath_accessibleWithoutAuth() throws Exception {
+        // anyRequest().permitAll(): die ausgelieferte Oberflaeche selbst braucht keinen Key.
+        mockMvc.perform(get("/"))
+                .andExpect(status().is(not(403)));
     }
 
     // --- Group 3: Protected endpoints with valid API key ---
@@ -165,12 +183,32 @@ class SecurityConfigIntegrationTest {
                 .andExpect(status().is(not(403)));
     }
 
+    @Test
+    void csrf_authenticatedPostWithoutCsrfToken_notRejected() throws Exception {
+        // Auch schreibende Aufrufe hinter dem Key kommen ohne CSRF-Token durch — der Key ersetzt es.
+        mockMvc.perform(post("/api/v1/ws-ticket")
+                        .header(API_KEY_HEADER, VALID_API_KEY))
+                .andExpect(status().isOk());
+    }
+
     // --- Group 5: Stateless session ---
 
     @Test
     void sessionManagement_noSessionCookie() throws Exception {
         mockMvc.perform(get("/api/v1/system/health"))
                 .andExpect(header().doesNotExist("Set-Cookie"));
+    }
+
+    @Test
+    void sessionManagement_authenticatedRequest_createsNoSession() throws Exception {
+        // STATELESS: auch nach erfolgreicher Anmeldung per Key entsteht keine Sitzung,
+        // die ein spaeterer Aufruf ohne Key wiederverwenden koennte.
+        MvcResult result = mockMvc.perform(get("/api/v1/projects")
+                        .header(API_KEY_HEADER, VALID_API_KEY))
+                .andExpect(status().isOk())
+                .andExpect(header().doesNotExist("Set-Cookie"))
+                .andReturn();
+        assertThat(result.getRequest().getSession(false)).isNull();
     }
 
     // --- Group 6: Security headers ---
@@ -195,5 +233,21 @@ class SecurityConfigIntegrationTest {
     void headers_xFrameOptionsDeny() throws Exception {
         mockMvc.perform(get("/api/v1/system/health"))
                 .andExpect(header().string("X-Frame-Options", "DENY"));
+    }
+
+    @Test
+    void headers_cspAndFrameOptionsAlsoOnNonApiPaths() throws Exception {
+        // Die Oberflaeche liegt ausserhalb von /api — dort zaehlt die CSP.
+        mockMvc.perform(get("/"))
+                .andExpect(header().string("Content-Security-Policy",
+                        org.hamcrest.Matchers.startsWith("default-src 'self'; script-src 'self';")))
+                .andExpect(header().string("X-Frame-Options", "DENY"));
+    }
+
+    @Test
+    void headers_cspAlsoOnRejectedRequests() throws Exception {
+        mockMvc.perform(get("/api/v1/projects"))
+                .andExpect(status().isForbidden())
+                .andExpect(header().exists("Content-Security-Policy"));
     }
 }

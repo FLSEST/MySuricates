@@ -22,7 +22,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 class SlackProviderTest {
 
-    private static final String TOKEN = "xoxb-1111-2222-abcdefSECRET";
+    private static final String TOKEN = "xoxb-test-token";
     private static final String CREDENTIAL = "Team-Workspace|" + TOKEN;
 
     private final ObjectMapper mapper = new ObjectMapper();

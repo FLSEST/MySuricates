@@ -179,13 +179,50 @@ class AutoTodoServiceTest {
         when(todoRepository.findByProjectIdAndSourceAndReferenceTypeAndReferenceIdAndStatusNot(
                 "proj-1", Todo.Source.WORKFLOW, "workflow_run", "wf-1", Todo.Status.DONE))
                 .thenReturn(List.of(openTodo));
-        when(todoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         autoTodoService.onWorkflowRunCompleted(event);
 
-        ArgumentCaptor<Todo> captor = ArgumentCaptor.forClass(Todo.class);
-        verify(todoRepository).save(captor.capture());
-        assertThat(captor.getValue().getStatus()).isEqualTo(Todo.Status.DONE);
+        verify(todoRepository).saveAll(List.of(openTodo));
+        verify(todoRepository, never()).save(any());
+        assertThat(openTodo.getStatus()).isEqualTo(Todo.Status.DONE);
+    }
+
+    @Test
+    void greenGate_closesSeveralOpenTodosInOneBatchedWrite() {
+        WorkflowRunCompletedEvent event = createEvent(RunStatus.COMPLETED, Map.of(), AUTO_TODO_ENABLED_META);
+        when(gateStatusResolver.resolve(event))
+                .thenReturn(new GateResult(GateStatus.GREEN, "success", null));
+
+        Todo lint = autoTodo("todo-1", "category:lint-failure");
+        Todo manual = Todo.builder().id("todo-2").title("Manual TODO").status(Todo.Status.OPEN)
+                .source(Todo.Source.WORKFLOW).tags(null).referenceType("workflow_run")
+                .referenceId("wf-1").projectId("proj-1").build();
+        Todo build = autoTodo("todo-3", "category:build-failure");
+        when(todoRepository.findByProjectIdAndSourceAndReferenceTypeAndReferenceIdAndStatusNot(
+                "proj-1", Todo.Source.WORKFLOW, "workflow_run", "wf-1", Todo.Status.DONE))
+                .thenReturn(List.of(lint, manual, build));
+
+        autoTodoService.onWorkflowRunCompleted(event);
+
+        // One write for all auto-todos, in query order; the manual one stays untouched.
+        verify(todoRepository, times(1)).saveAll(List.of(lint, build));
+        verify(todoRepository, never()).save(any());
+        assertThat(lint.getStatus()).isEqualTo(Todo.Status.DONE);
+        assertThat(build.getStatus()).isEqualTo(Todo.Status.DONE);
+        assertThat(manual.getStatus()).isEqualTo(Todo.Status.OPEN);
+    }
+
+    private static Todo autoTodo(String id, String categoryTag) {
+        return Todo.builder()
+                .id(id)
+                .title("[Incident] Test — " + categoryTag)
+                .status(Todo.Status.OPEN)
+                .source(Todo.Source.WORKFLOW)
+                .tags("[\"auto:workflow\",\"gate:red\",\"" + categoryTag + "\"]")
+                .referenceType("workflow_run")
+                .referenceId("wf-1")
+                .projectId("proj-1")
+                .build();
     }
 
     @Test
@@ -212,6 +249,7 @@ class AutoTodoServiceTest {
         autoTodoService.onWorkflowRunCompleted(event);
 
         verify(todoRepository, never()).save(any());
+        verify(todoRepository, never()).saveAll(any());
     }
 
     @Test

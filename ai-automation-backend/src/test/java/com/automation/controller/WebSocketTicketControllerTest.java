@@ -23,11 +23,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ActiveProfiles("integration")
 @TestPropertySource(properties = {
         "automation.security.enabled=true",
-        "automation.security.api-key=test-api-key-12345"
+        "automation.security.api-key=test-api-key"
 })
 class WebSocketTicketControllerTest {
 
-    private static final String VALID_API_KEY = "test-api-key-12345";
+    private static final String VALID_API_KEY = "test-api-key";
     private static final String API_KEY_HEADER = "X-API-Key";
 
     @Autowired
