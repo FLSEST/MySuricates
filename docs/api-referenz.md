@@ -629,6 +629,42 @@ Fehlgeschlagenen Workflow auf der Test-Instanz reparieren. Setzt voraus, dass de
 
 **Response:** `202 Accepted` mit `{ "status": "repair_started", "workflowId": "...", "workflowName": "..." }` — versiegelte Workflows: `409 WORKFLOW_SEALED`, bevor die Reparatur startet
 
+### `GET /api/v1/workflows/{id}/analyze`
+
+Deterministische Baufehler-Prüfung einer Definition (kein KI-Aufruf) — meldet nur, verhindert nichts am Speicherweg.
+
+**Response:**
+
+```json
+{
+  "workflowId": "workflow-uuid",
+  "workflowName": "AutoPilot Backend Quality Gate",
+  "findingCount": 2,
+  "bySeverity": { "HIGH": 1, "MEDIUM": 1 },
+  "findings": [ { "rule": "self-api-call", "severity": "HIGH", "...": "..." } ]
+}
+```
+
+### `GET /api/v1/workflows/analyze`
+
+Bestandsprüfung über alle Definitionen — je Workflow nur Zahlen, dazu die Verteilung über die Regeln; die vollen Befunde holt man sich je Workflow über `GET /api/v1/workflows/{id}/analyze`.
+
+**Query-Parameter:** `minSeverity` (`HIGH` oder `MEDIUM`, optional — blendet leichtere Befunde aus)
+
+**Response:**
+
+```json
+{
+  "workflowsChecked": 42,
+  "workflowsAffected": 3,
+  "findingsTotal": 5,
+  "byRule": { "self-api-call": 2, "missing-timeout": 3 },
+  "workflows": [
+    { "workflowId": "workflow-uuid", "workflowName": "...", "findings": 2, "bySeverity": { "HIGH": 1, "MEDIUM": 1 } }
+  ]
+}
+```
+
 ### `POST /api/v1/workflows/{id}/skills`
 
 Skills für einen Workflow aktivieren.
@@ -704,6 +740,57 @@ nicht, wenn die Definition vom Siegel abweicht (`409 WORKFLOW_TAMPERED`). Idempo
 Siegel lösen (gleicher Schalter). Protokolliert einen `SECURITY`-Eintrag mit dem bisherigen Hash.
 
 **Response:** `WorkflowResponse` mit `sealed: false`
+
+### `GET /api/v1/workflows/seal-status`
+
+Siegel-Status aller Workflows für die UI — ohne einen Lauf zu starten (derselbe Check wie `RunAdmission`). Gelistet wird jeder versiegelte Workflow sowie jeder Workflow mit abgelehnten Starts in den letzten sieben Tagen (ein abgelehnter Start hinterlässt keine Run-Zeile — hier wird er sichtbar). Nicht hinter dem `sealing`-Modul: Ein Siegel, das bei eingeschaltetem Schalter gesetzt wurde, bleibt auch nach dem Abschalten sichtbar.
+
+**Response:** `List<WorkflowSealStatusResponse>`
+
+```json
+[
+  {
+    "workflowId": "workflow-uuid",
+    "workflowName": "AutoPilot Backend Quality Gate",
+    "state": "INTACT",
+    "problem": "NONE",
+    "detail": null,
+    "changedSkills": [],
+    "skillsPinned": true,
+    "signed": true,
+    "pinnedSkillCount": 2,
+    "sealedAt": "2026-09-01T10:00:00Z",
+    "refusedStarts": 0,
+    "lastRefusedAt": null,
+    "lastRefusal": null
+  }
+]
+```
+
+`state`: `INTACT`, `VIOLATED` oder `NOT_SEALED`. `problem`: `NONE`, `DEFINITION_CHANGED`, `SKILLS_CHANGED` oder `UNVERIFIABLE`. `skillsPinned`: `false` bei Siegeln von vor V80.
+
+### `GET /api/v1/workflows/{id}/seal-events`
+
+Siegel-Historie eines Workflows (Versiegeln/Lösen), neueste zuerst — bleibt über die Aufbewahrung des Activity-Logs hinaus erhalten.
+
+**Response:** `List<WorkflowSealEventResponse>`
+
+```json
+[
+  {
+    "id": "event-uuid",
+    "workflowId": "workflow-uuid",
+    "workflowName": "AutoPilot Backend Quality Gate",
+    "action": "SEALED",
+    "occurredAt": "2026-09-01T10:00:00Z",
+    "definitionHash": "3f1c…e9",
+    "signed": true,
+    "chainIntact": true
+  }
+]
+```
+
+`chainIntact`: `false`, wenn der Hash dieses Eintrags oder seines Vorgängers nicht mehr passt — die Historie wurde außerhalb der Anwendung verändert.
 
 ---
 
@@ -842,6 +929,32 @@ trägt eine Listenzeile `stepCount`, `lastStepStatus` und `lastStepPreview` (Aus
 Schritts, auf 500 Zeichen gekürzt — in der Datenbank abgeschnitten, die Step-Zeilen werden nicht geladen). Grund: Die Liste trug vorher jeden `step_results.output`
 (TEXT) mit — gemessen 3 061 816 Bytes bei 60 Runs, danach 51 716. Wer die Schritte braucht, holt
 den Run einzeln über `GET /api/v1/executions/{id}`; die Detail-Route liefert unverändert alles.
+
+### `GET /api/v1/executions/pending-input`
+
+Alle Läufe, die gerade auf eine Antwort warten — Approvals und Human-Input, die ältesten zuerst (UI: Sidebar-Eintrag + `/approvals`).
+
+**Response:** `List<PendingInputResponse>`
+
+```json
+[
+  {
+    "runId": "run-uuid",
+    "workflowId": "workflow-uuid",
+    "workflowName": "AutoPilot Backend Quality Gate",
+    "type": "approval",
+    "blockId": "block-id",
+    "question": "Soll fortgefahren werden?",
+    "options": ["Yes", "No"],
+    "rejectOptions": ["No"],
+    "stepIndex": 2,
+    "requestedAt": "2026-09-30T10:00:00Z",
+    "timeoutAt": null
+  }
+]
+```
+
+`type`: `approval` oder `human-input`. `timeoutAt`: `null`, wenn der wartende Block keinen Timeout hat.
 
 ### `GET /api/v1/executions/{id}`
 
@@ -2522,6 +2635,38 @@ Verzeichnisinhalt durchsuchen (nur Unterverzeichnisse, keine versteckten Ordner)
   ]
 }
 ```
+
+### `GET /api/v1/system/request-metrics`
+
+Request-Kosten je Route seit dem letzten Tages-Snapshot (Live-Fenster aus dem Speicher), teuerste (p95) zuerst. Siehe [entwicklung.md → Backend-Tests](entwicklung.md#backend-tests) für die Messkette dahinter.
+
+**Response:** `List<RouteSnapshot>`
+
+```json
+[
+  {
+    "route": "GET /api/v1/todos/{id}",
+    "calls": 120,
+    "p50Ms": 8,
+    "p95Ms": 42,
+    "maxMs": 310,
+    "p95WaitMs": 3,
+    "waitShare": 0.07,
+    "maxSqlStatements": 4,
+    "avgSqlStatements": 2.1,
+    "maxResponseBytes": 4096,
+    "avgResponseBytes": 1024
+  }
+]
+```
+
+### `GET /api/v1/system/request-metrics/daily`
+
+Gespeicherte Tageszeilen — mit `route` die Historie einer Route (älteste zuerst, die Baseline eines Drift-Checks), ohne `route` die Zeilen eines einzelnen Tages.
+
+**Query-Parameter:** `route` (String, optional), `days` (int, Standard: 7 — nur mit `route`)
+
+**Response:** `List<RequestMetricDaily>` (gleiche Felder wie oben, zusätzlich `day`)
 
 ---
 

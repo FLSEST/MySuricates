@@ -241,6 +241,7 @@ TREE_GATES=(
   "Doku-Zahlen gegen den Code|bash|scripts/public-readiness/doc-facts-check.sh"
   "Doku-Verweise und DE/EN-Gleichstand|python3|scripts/public-readiness/docs_parity_check.py"
   "Diagramm-Seiten gegen die Markdown-Quelle|python3|scripts/docs-diagrams.py|--check"
+  "API-Endpunkte gegen docs/api-referenz.md (DE/EN)|bash|scripts/public-readiness/api-endpoint-diff.sh"
 )
 check_tree() {
   local entry label runner script extra out rc

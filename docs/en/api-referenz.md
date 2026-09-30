@@ -625,6 +625,42 @@ Repair a failed workflow on the test instance. Requires that the workflow has fa
 
 **Response:** `202 Accepted` with `{ "status": "repair_started", "workflowId": "...", "workflowName": "..." }` — sealed workflows: `409 WORKFLOW_SEALED` before the repair starts
 
+### `GET /api/v1/workflows/{id}/analyze`
+
+Deterministic build-error check of a definition (no AI call) — reports only, never blocks the save path.
+
+**Response:**
+
+```json
+{
+  "workflowId": "workflow-uuid",
+  "workflowName": "AutoPilot Backend Quality Gate",
+  "findingCount": 2,
+  "bySeverity": { "HIGH": 1, "MEDIUM": 1 },
+  "findings": [ { "rule": "self-api-call", "severity": "HIGH", "...": "..." } ]
+}
+```
+
+### `GET /api/v1/workflows/analyze`
+
+Inventory check across all definitions — per workflow only numbers, plus the distribution across rules; fetch the full findings per workflow via `GET /api/v1/workflows/{id}/analyze`.
+
+**Query Parameters:** `minSeverity` (`HIGH` or `MEDIUM`, optional — hides lighter findings)
+
+**Response:**
+
+```json
+{
+  "workflowsChecked": 42,
+  "workflowsAffected": 3,
+  "findingsTotal": 5,
+  "byRule": { "self-api-call": 2, "missing-timeout": 3 },
+  "workflows": [
+    { "workflowId": "workflow-uuid", "workflowName": "...", "findings": 2, "bySeverity": { "HIGH": 1, "MEDIUM": 1 } }
+  ]
+}
+```
+
 ### `POST /api/v1/workflows/{id}/skills`
 
 Activate skills for a workflow.
@@ -699,6 +735,57 @@ definition no longer matches the seal (`409 WORKFLOW_TAMPERED`). Idempotent; log
 Remove the seal (same switch). Logs a `SECURITY` entry with the previous hash.
 
 **Response:** `WorkflowResponse` with `sealed: false`
+
+### `GET /api/v1/workflows/seal-status`
+
+Seal status of every workflow, for the UI — checked without starting a run (the same check as `RunAdmission`). Lists every sealed workflow plus every workflow with refused starts in the last seven days (a refused start leaves no run row — this is where it becomes visible). Not gated behind the `sealing` module: a seal set while the switch was on stays visible after it is turned off.
+
+**Response:** `List<WorkflowSealStatusResponse>`
+
+```json
+[
+  {
+    "workflowId": "workflow-uuid",
+    "workflowName": "AutoPilot Backend Quality Gate",
+    "state": "INTACT",
+    "problem": "NONE",
+    "detail": null,
+    "changedSkills": [],
+    "skillsPinned": true,
+    "signed": true,
+    "pinnedSkillCount": 2,
+    "sealedAt": "2026-09-01T10:00:00Z",
+    "refusedStarts": 0,
+    "lastRefusedAt": null,
+    "lastRefusal": null
+  }
+]
+```
+
+`state`: `INTACT`, `VIOLATED` or `NOT_SEALED`. `problem`: `NONE`, `DEFINITION_CHANGED`, `SKILLS_CHANGED` or `UNVERIFIABLE`. `skillsPinned`: `false` for seals from before V80.
+
+### `GET /api/v1/workflows/{id}/seal-events`
+
+Seal history of one workflow (sealed/unsealed), newest first — kept beyond the activity log's retention.
+
+**Response:** `List<WorkflowSealEventResponse>`
+
+```json
+[
+  {
+    "id": "event-uuid",
+    "workflowId": "workflow-uuid",
+    "workflowName": "AutoPilot Backend Quality Gate",
+    "action": "SEALED",
+    "occurredAt": "2026-09-01T10:00:00Z",
+    "definitionHash": "3f1c…e9",
+    "signed": true,
+    "chainIntact": true
+  }
+]
+```
+
+`chainIntact`: `false` when this entry's hash or its predecessor's no longer fits — the history was changed outside the application.
 
 ---
 
@@ -837,6 +924,32 @@ steps, a list row carries `stepCount`, `lastStepStatus` and `lastStepPreview` (t
 output, truncated to 500 characters — cut in the database, the step rows are not loaded). Why: the list used to carry every `step_results.output`
 (TEXT) — 3,061,816 bytes measured for 60 runs, 51,716 afterwards. If you need the steps, fetch the
 run individually via `GET /api/v1/executions/{id}`; the detail route still returns everything.
+
+### `GET /api/v1/executions/pending-input`
+
+All runs currently waiting for an answer — approvals and human input, oldest first (UI: sidebar entry + `/approvals`).
+
+**Response:** `List<PendingInputResponse>`
+
+```json
+[
+  {
+    "runId": "run-uuid",
+    "workflowId": "workflow-uuid",
+    "workflowName": "AutoPilot Backend Quality Gate",
+    "type": "approval",
+    "blockId": "block-id",
+    "question": "Continue?",
+    "options": ["Yes", "No"],
+    "rejectOptions": ["No"],
+    "stepIndex": 2,
+    "requestedAt": "2026-09-30T10:00:00Z",
+    "timeoutAt": null
+  }
+]
+```
+
+`type`: `approval` or `human-input`. `timeoutAt`: `null` if the waiting block has no timeout.
 
 ### `GET /api/v1/executions/{id}`
 
@@ -2493,6 +2606,38 @@ Browse directory contents (subdirectories only, no hidden folders).
   ]
 }
 ```
+
+### `GET /api/v1/system/request-metrics`
+
+Request cost per route since the last daily snapshot (live window from memory), most expensive (p95) first. See [entwicklung.md → Backend Tests](entwicklung.md#backend-tests) for the measurement chain behind this.
+
+**Response:** `List<RouteSnapshot>`
+
+```json
+[
+  {
+    "route": "GET /api/v1/todos/{id}",
+    "calls": 120,
+    "p50Ms": 8,
+    "p95Ms": 42,
+    "maxMs": 310,
+    "p95WaitMs": 3,
+    "waitShare": 0.07,
+    "maxSqlStatements": 4,
+    "avgSqlStatements": 2.1,
+    "maxResponseBytes": 4096,
+    "avgResponseBytes": 1024
+  }
+]
+```
+
+### `GET /api/v1/system/request-metrics/daily`
+
+Stored daily rows — with `route` the history of one route (oldest first, the baseline a drift check compares against), without `route` the rows of a single day.
+
+**Query Parameters:** `route` (String, optional), `days` (int, default: 7 — only with `route`)
+
+**Response:** `List<RequestMetricDaily>` (same fields as above, plus `day`)
 
 ---
 

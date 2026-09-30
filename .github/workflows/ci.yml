@@ -144,12 +144,15 @@ jobs:
           python3 scripts/tools/installer-art.py --check
       # Das Zahlen-Gate als eigener Schritt: es lief bisher nur als Fall 20 innerhalb von
       # test-public-hygiene.sh mit — ein Umbau dort haette es unbemerkt aus der CI genommen.
-      # Doku-Zahlen, Doku-Verweise/DE-EN-Gleichstand und Diagramm-Drift laufen ueber dasselbe
-      # Skript wie der pre-push-Hook (--tree), damit Hook und CI nicht auseinanderlaufen.
-      - name: Bestands-Gates (Doku-Zahlen, Doku-Verweise, Diagramm-Seiten) — wie im pre-push-Hook
+      # Doku-Zahlen, Doku-Verweise/DE-EN-Gleichstand, Diagramm-Drift und der API-Endpunkt-Abgleich
+      # laufen ueber dasselbe Skript wie der pre-push-Hook (--tree), damit Hook und CI nicht
+      # auseinanderlaufen.
+      - name: Bestands-Gates (Doku-Zahlen, Doku-Verweise, Diagramm-Seiten, API-Endpunkte) — wie im pre-push-Hook
         run: bash scripts/ci/pre-push-checks.sh --tree
       - name: Doku-Zahlen-Gate Selbsttest
         run: bash scripts/tests/test-doc-facts-check.sh
+      - name: API-Endpunkt-Diff-Gate Selbsttest
+        run: bash scripts/tests/test-api-endpoint-diff.sh
       - name: Doku-Readiness-Gate Selbsttest
         run: bash scripts/tests/test-docs-check.sh
       - name: Evidenz-Scans Selbsttest (Oberflaeche, Architektur, Inventar)
