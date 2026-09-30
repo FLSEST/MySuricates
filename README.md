@@ -10,9 +10,11 @@ way with AI agents — and a working system in which this can be observed.
 MySuricates is a local workflow platform: workflows consist of blocks that are either
 deterministic (shell, branch, loop) or call an AI. From this mix, a control loop has emerged that
 produces findings about its own codebase, turns them into TODOs, triggers fix workflows, and then
-verifies the result again. The code was created largely in AI sessions: 1,641 of 1,825 commits carry
-at least one AI trailer — 1,354 Claude's, 340 the control loop's own (`Generated-By: MySuricates`),
-53 both (as of commit `dd062eda`).
+verifies the result again. The code was created largely in AI sessions, from 2,630 commits in the
+working repository (as of 2026-09-30). <!-- doc-facts-check: ignore — the commit count applies only
+in the working repository; the release handover condenses the history in the public repository to one
+commit per release --> Of these, 2,442 carry at least one AI trailer — 2,155 Claude's, 343 the control
+loop's own (`Generated-By: MySuricates`), 56 both.
 
 **What this is not:** not a product, not a service, no support, no promise of stability. The
 architectural debt is known and is tracked within the system itself as audit findings — see
@@ -94,20 +96,22 @@ complete list with all modules is in [Architecture](docs/en/architektur.md#modul
 
 ## What is in there
 
-As of 2026-09-22 (commit `d23a09ed`, release v0.7.6 plus follow-up work), commit counters and lines
-from the working tree on that day (lines via `wc -l`, including blank and comment lines; backend
-`src/main/java`, frontend `src` including tests). Test numbers from the CI run for this commit,
-dated in the table:
+As of 2026-09-30, after release v0.7.7. Commit counters and lines from the working tree on that
+day (lines via `wc -l`, including blank and comment lines; backend `src/main/java`, frontend `src`
+including tests). The commit counter applies only in the working repository (the release handover
+condenses the history in the public repository to one commit per release); the other numbers apply
+in both, because the handover carries over the release tag's code tree unchanged. Test numbers from
+the most recently documented CI run, with their own date in the table:
 
 | | |
 |---|---|
-| Created since | 2026-02-15, around 1,800 commits, one author |
+| Created since | 2026-02-15, around 2,630 commits in the working repository, one author <!-- doc-facts-check: ignore --> |
 | Backend | Java 21 / Spring Boot 3.5, around 73,000 lines, 53 REST controllers, 95 Flyway migrations |
 | Frontend | React 19 / TypeScript, around 77,000 lines |
 | Tests | Backend 10,476, frontend 1,580 (192 files) — 0 failures, 0 skipped, CI run 35777382298 from 2026-09-22 |
 | Building blocks | 20 block types, 54 workflow templates, 20 blueprints (basic scaffolds to fill in), 19 built-in skills, 18 integration providers |
 
-The test numbers come from the CI run for exactly this commit and are therefore verifiable. The
+The test numbers come from the CI run named in the table and are therefore verifiable. The
 CI definition (`.github/workflows/ci.yml`) has run both suites on every push since 2026-09-12,
 in addition to the hygiene gate and secret scan; since 2026-09-21 on Ubuntu 26.04. Since
 2026-09-29 a suite is skipped when the change demonstrably does not touch it (pure documentation,
