@@ -720,7 +720,7 @@ class ScheduledWorkflowExecutorTest {
         when(scheduledRepository.findByIdWithWorkflowSkills("sched-guard")).thenReturn(Optional.of(scheduled));
         when(scheduledRepository.findById("sched-guard")).thenReturn(Optional.of(scheduled));
         when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        when(workflowRunRepository.existsByWorkflowIdAndStatusIn(eq("wf-1"), eq(ScheduledWorkflowExecutor.BUSY_STATES))).thenReturn(false);
+        when(workflowRunRepository.existsByWorkflowIdAndStatusIn(eq("wf-1"), eq(ScheduleConflictCheck.BUSY_STATES))).thenReturn(false);
 
         assertThat(executor.executeSingleSchedule("sched-guard")).isEmpty();
 
@@ -744,7 +744,7 @@ class ScheduledWorkflowExecutorTest {
         when(scheduledRepository.findByIdWithWorkflowSkills("sched-guard-on")).thenReturn(Optional.of(scheduled));
         when(scheduledRepository.findById("sched-guard-on")).thenReturn(Optional.of(scheduled));
         when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        when(workflowRunRepository.existsByWorkflowIdAndStatusIn(eq("wf-1"), eq(ScheduledWorkflowExecutor.BUSY_STATES))).thenReturn(false);
+        when(workflowRunRepository.existsByWorkflowIdAndStatusIn(eq("wf-1"), eq(ScheduleConflictCheck.BUSY_STATES))).thenReturn(false);
 
         executor.executeSingleSchedule("sched-guard-on");
 
