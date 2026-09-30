@@ -755,9 +755,10 @@ hand over.
 
 **Exclusion list** (`scripts/release-handover.exclude`): git pathspecs with glob magic, each entry
 with a reason. It goes out itself and therefore names nothing private — such files are covered by a
-pattern. Excluded today: the one-off workflow migration of one particular instance
-(`scripts/workspace-isolation/prepare-*.py`, `pool-overrides/`) plus its test, and as a safety net
-the private, untracked paths from `.gitignore`. Excluding a file that a test, the build or the docs
+pattern. It is a safety net for the private, untracked paths from `.gitignore`, among them the
+one-off workflow migration of one particular instance (`scripts/workspace-isolation/prepare-*.py`,
+`pool-overrides/`) plus its test: they live only locally, and the entries take effect only if one of
+them is tracked again by mistake. Excluding a file that a test, the build or the docs
 refer to shows up at the latest in a run with `--with-build`.
 
 **The workflow** lives only in the maintainer's instance (not in the pool: it presumes a public repo

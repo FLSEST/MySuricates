@@ -761,9 +761,10 @@ Exit-Codes: 0 bereit (bzw. verworfen), 1 abgebrochen (Befund oder Vorbedingung),
 
 **Ausschlussliste** (`scripts/release-handover.exclude`): Git-Pfadangaben mit glob-Magie, je Eintrag
 eine Begründung. Sie geht selbst mit hinaus und nennt deshalb keine privaten Namen — solche Dateien
-fasst ein Muster. Heute draußen: die Einmal-Migration der Workflows einer bestimmten Instanz
-(`scripts/workspace-isolation/prepare-*.py`, `pool-overrides/`) samt ihrem Test sowie als
-Sicherheitsnetz die privaten, ungetrackten Pfade aus `.gitignore`. Wer eine Datei ausschließt, auf
+fasst ein Muster. Sie ist ein Sicherheitsnetz für die privaten, ungetrackten Pfade aus `.gitignore`,
+darunter die Einmal-Migration der Workflows einer bestimmten Instanz
+(`scripts/workspace-isolation/prepare-*.py`, `pool-overrides/`) samt ihrem Test: Die liegen nur lokal
+und greifen erst, wenn eine davon versehentlich wieder getrackt wird. Wer eine Datei ausschließt, auf
 die ein Test, der Build oder die Doku verweist, sieht das spätestens am Lauf mit `--with-build`.
 
 **Der Workflow** liegt nur in der Instanz des Maintainers (nicht im Pool: er setzt ein eigenes

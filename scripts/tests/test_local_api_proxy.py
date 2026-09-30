@@ -114,13 +114,15 @@ class LocalApiWithoutProxyTest(unittest.TestCase):
 
     def test_every_script_sending_the_key_opens_without_a_proxy(self):
         # A new script that sends X-API-Key with urllib.request.urlopen would take the proxy again. Downloads
-        # from the net (public-readiness/dep_vuln_check.py) need the proxy — and carry no key.
+        # from the net (public-readiness/dep_vuln_check.py) need the proxy — and carry no key. Only urllib.request
+        # reads the proxy variables: http.client (load-test/driver.py) connects where it is told, and a script
+        # that merely names the header (public-readiness/doc_facts_check.py checks curl examples) sends nothing.
         listed = subprocess.run(['git', 'ls-files', '--cached', '--others', '--exclude-standard', '--', '*.py'],
                                 cwd=SCRIPTS, capture_output=True, text=True)
         names = listed.stdout.split() if listed.returncode == 0 else \
             [str(path.relative_to(SCRIPTS)) for path in SCRIPTS.rglob('*.py')]
-        with_key = sorted(name for name in names if not name.startswith('tests/')
-                          and (SCRIPTS / name).is_file() and 'X-API-Key' in (SCRIPTS / name).read_text())
+        with_key = sorted(name for name in names if not name.startswith('tests/') and (SCRIPTS / name).is_file()
+                          and 'X-API-Key' in (text := (SCRIPTS / name).read_text()) and 'urllib.request' in text)
         self.assertIn('workspace-isolation/apply-migration.py', with_key, 'the search saw nothing')
         through_proxy = [name for name in with_key if 'ProxyHandler({})' not in (SCRIPTS / name).read_text()
                          or 'urlopen(' in (SCRIPTS / name).read_text()]
