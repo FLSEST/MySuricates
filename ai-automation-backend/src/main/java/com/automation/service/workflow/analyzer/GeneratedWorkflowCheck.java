@@ -234,7 +234,7 @@ public class GeneratedWorkflowCheck {
                 %s
 
                 Output ONLY the corrected blocks array as JSON. Do not wrap it in markdown code fences.
-                """.formatted(blocksJson, format(findings));
+                """.formatted(blocksJson, format(findings, "en"));   // English prompt, English findings
     }
 
     /**
