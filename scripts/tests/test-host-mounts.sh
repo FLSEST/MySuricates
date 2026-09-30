@@ -18,6 +18,8 @@ run() {  # $1 = OS, rest = host_mounts_yaml args; stderr goes to $TMP/err, rc to
     host_mounts_missing_text | sed 's/^/#text=/' )
 }
 has()   { grep -qF -- "$1" <<<"$OUT"; }   # literal substring
+mode()  { stat -c %a "$1" 2>/dev/null || stat -f %Lp "$1"; }
+CE="$TMP/config/container-env"   # the per-selection copies of ai.env
 line()  { grep -qxF -- "$1" <<<"$OUT"; }  # exact line
 mkdir -p "$TMP/home" "$TMP/config"
 
@@ -59,12 +61,15 @@ check "hint names claude setup-token"   'has "#text=  claude:" && has "claude se
 echo "3) login with a token in ai.env"
 printf 'CLAUDE_CODE_OAUTH_TOKEN=secret-test-token-0123456789-abcdefghijklmnop\n' > "$TMP/config/ai.env"
 OUT="$(run Linux svc "" 0)"
-check "token file passed as env_file"   'grep -q "^    env_file:" <<<"$OUT" && line "      - \"$TMP/config/ai.env\""'
+check "token passed via its own env_file" 'grep -q "^    env_file:" <<<"$OUT" && line "      - \"$CE/claude-codex-pi.env\"" && ! has "$TMP/config/ai.env"'
+check "the copy holds exactly the token" '[ "$(grep -v "^#" "$CE/claude-codex-pi.env")" = "CLAUDE_CODE_OAUTH_TOKEN=secret-test-token-0123456789-abcdefghijklmnop" ]'
+check "copy 600 in a 700 directory"     '[ "$(mode "$CE/claude-codex-pi.env")" = 600 ] && [ "$(mode "$CE")" = 700 ]'
 check "token value never in override"   '! has "secret-test-token"'
 check "all three ready"                 'has "#count=3" && has "#ready=claude codex pi" && has "#missing=" && ! grep -q "^#missing=." <<<"$OUT"'
 printf 'SOMETHING_ELSE=1\n' > "$TMP/config/ai.env"
 OUT="$(run Linux svc "" 0)"
 check "no token line: no env_file"      '! has "env_file:" && has "#missing=claude:login"'
+check "other variables never copied"    '! grep -q SOMETHING_ELSE "$CE/claude-codex-pi.env" && ! grep -q secret-test-token "$CE/claude-codex-pi.env"'
 printf 'CLAUDE_CODE_OAUTH_TOKEN=secret-test-token-0123456789-abcdefghijklmnop\n' > "$TMP/config/ai.env"
 
 echo "3b) only a plausible token counts as a login (9bef7e8c)"
@@ -90,6 +95,41 @@ plaus() { ( . "$HERE/../lib/host-mounts.sh"; claude_token_plausible "$1" ); }
 check "39 characters are not enough"           '! plaus "$(printf "%039d" 0)"'
 check "40 characters are"                      'plaus "$(printf "%040d" 0)"'
 check "an ellipsis is not a token"             '! plaus "…"'
+printf 'CLAUDE_CODE_OAUTH_TOKEN=secret-test-token-0123456789-abcdefghijklmnop\n' > "$TMP/config/ai.env"
+
+echo "3c) logins that exist only as a variable, from ai.env — only those of the selected providers"
+mv "$TMP/home/.codex/auth.json" "$TMP/codex-auth.json"; mv "$TMP/home/.pi/agent/auth.json" "$TMP/pi-auth.json"
+OUT="$(run Linux svc "" 0 login "codex,pi")"
+check "no file, no variable: codex and pi missing" 'has "#missing=codex:login pi:login" && ! has "env_file:"'
+check "hint names the variables and ai.env"        'has "#text=  codex: keine Anmeldung fuer Container" && has "OPENAI_API_KEY, CODEX_API_KEY in ~/.config/mysuricates/ai.env"'
+printf '%s\n' 'OPENAI_API_KEY=sk-test-openai-4711' 'ANTHROPIC_API_KEY=sk-test-anthropic-4711' 'GEMINI_API_KEY=test-gemini-4711' \
+  'CLAUDE_CODE_OAUTH_TOKEN=secret-test-token-0123456789-abcdefghijklmnop' 'SOMETHING_ELSE=do-not-pass' > "$TMP/config/ai.env"
+body() { grep -v "^#" "$CE/$1.env" | cut -d= -f1 | tr '\n' ' ' | sed 's/ $//'; }
+OUT="$(run Linux svc "" 0 login codex)"
+check "codex: only OPENAI_API_KEY"         'line "      - \"$CE/codex.env\"" && [ "$(body codex)" = OPENAI_API_KEY ] && has "#ready=codex"'
+OUT="$(run Linux svc "" 0 login pi)"
+check "pi: its three, not the Claude token" '[ "$(body pi)" = "ANTHROPIC_API_KEY OPENAI_API_KEY GEMINI_API_KEY" ] && has "#ready=pi"'
+OUT="$(run Linux svc "" 0 login "codex,pi")"
+check "shared variable once"               '[ "$(body codex-pi)" = "OPENAI_API_KEY ANTHROPIC_API_KEY GEMINI_API_KEY" ] && has "#count=2"'
+OUT="$(run Linux svc "" 0 login claude)"
+check "claude: token and ANTHROPIC_API_KEY" '[ "$(body claude)" = "CLAUDE_CODE_OAUTH_TOKEN ANTHROPIC_API_KEY" ]'
+check "unknown variables never passed"     '! grep -rq SOMETHING_ELSE "$CE"'
+check "no value ever in the override"      '! has "4711" && ! has "secret-test-token"'
+printf 'OPENAI_API_KEY=\n' > "$TMP/config/ai.env"
+OUT="$(run Linux svc "" 0 login codex)"
+check "empty value: no login, copy emptied" '! has "env_file:" && has "#missing=codex:login" && [ -z "$(body codex)" ] && ! grep -q 4711 "$CE/codex.env"'
+printf 'OPENAI_API_KEY=sk-test-openai-4711\n' > "$TMP/config/ai.env"
+OUT="$(run Linux svc "" 0 programs codex)"
+check "programs: never from ai.env"        '! has "env_file:"'
+OUT="$(run Linux svc "" 0 all codex)"
+check "all: never from ai.env"             '! has "env_file:"'
+if [ "$(id -u)" != 0 ]; then
+  rm -rf "$CE"; chmod 500 "$TMP/config"
+  OUT="$(run Linux svc "" 0 login codex)"
+  chmod 700 "$TMP/config"
+  check "cannot write the copy: said, not ready" '! has "env_file:" && has "#missing=codex:login" && grep -q "cannot write the login variables" "$TMP/err"'
+fi
+mv "$TMP/codex-auth.json" "$TMP/home/.codex/auth.json"; mv "$TMP/pi-auth.json" "$TMP/home/.pi/agent/auth.json"
 printf 'CLAUDE_CODE_OAUTH_TOKEN=secret-test-token-0123456789-abcdefghijklmnop\n' > "$TMP/config/ai.env"
 
 echo "4) programs: no login from the host at all"

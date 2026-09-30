@@ -120,7 +120,7 @@ check "--with-pi installs pi, nothing started"          '[ "$(NPM_PREFIX="$TMP/n
 unstub pi; unstub npm; rm -rf "$INST"
 check "--with-pi without npm: says so, carries on"     '[ "$(run --yes --dry-run --runtime container --with-pi)" = 0 ] && out | grep -q -- "--with-pi needs npm"'
 stub npm "$NPM_STUB"
-check "--help names --with-pi"                          'bash "$SETUP" --help | grep -q -- "--with-pi" && bash "$SETUP" --help --lang de | grep -q -- "--with-pi"'
+check "--help names --with-pi"                          'bash "$SETUP" --help | grep -- "--with-pi" >/dev/null && bash "$SETUP" --help --lang de | grep -- "--with-pi" >/dev/null'
 # Heruntergeladenes Node: env.sh bringt es auf den PATH, die Shell des Nutzers kennt es nicht
 DD="$TMP/data/mysuricates"; mkdir -p "$DD/node/bin"
 printf 'export PATH="%s/node/bin:$PATH"\n' "$DD" > "$DD/env.sh"
@@ -151,14 +151,51 @@ runvars() {  # "VAR=WERT …" FLAGS… — nur diese Anmelde-Variablen, keine de
   ( for v in $LOGIN_VARS; do unset "$v"; done; for a in $kv; do export "$a"; done; run "$@" )
 }
 rm -rf "$INST"
-check "codex only via OPENAI_API_KEY: says it stays out" '[ "$(runvars OPENAI_API_KEY=sk-test-geheim-42 --yes --dry-run)" = 0 ] && out | grep -qF "codex is logged in here only via OPENAI_API_KEY — the variable does not reach the container. For the container, log in on this machine: codex login"'
+AIE="$TMP/home/.config/mysuricates/ai.env"
+mode() { stat -c %a "$1" 2>/dev/null || stat -f %Lp "$1"; }
+check "codex only via OPENAI_API_KEY: says how it gets in" '[ "$(runvars OPENAI_API_KEY=sk-test-geheim-42 --yes --dry-run)" = 0 ] && out | grep -qF "codex is logged in here only via OPENAI_API_KEY — the variable does not reach the container by itself. With --store-ai-env (or yes in the terminal) the installer copies it into $AIE; otherwise log in on this machine: codex login"'
 check "the value is never shown"                          '! out | grep -q "sk-test-geheim-42"'
+check "--yes alone never writes a secret"                 '[ ! -e "$AIE" ]'
+rm -rf "$INST"
+check "--store-ai-env: copied, value not shown"           '[ "$(runvars OPENAI_API_KEY=sk-test-geheim-42 --yes --dry-run --store-ai-env)" = 0 ] && out | grep -qF "OPENAI_API_KEY saved in $AIE" && ! out | grep -q "sk-test-geheim-42"'
+check "exactly that variable, file 600, directory 700"   '[ "$(cat "$AIE")" = "OPENAI_API_KEY=sk-test-geheim-42" ] && [ "$(mode "$AIE")" = 600 ] && [ "$(mode "$(dirname "$AIE")")" = 700 ]'
+rm -rf "$INST"
+check "already in ai.env: not asked, not rewritten"       '[ "$(runvars OPENAI_API_KEY=sk-test-other-43 --yes --dry-run --store-ai-env)" = 0 ] && ! out | grep -q "only via" && ! out | grep -q "saved in" && grep -qx "OPENAI_API_KEY=sk-test-geheim-42" "$AIE"'
+printf '%s\n' 'CLAUDE_CODE_OAUTH_TOKEN=secret-test-token-0123456789-abcdefghijklmnop' 'OPENAI_API_KEY=' 'KEEP_ME=1' > "$AIE"; rm -rf "$INST"
+check "others kept, the empty line replaced"              '[ "$(runvars OPENAI_API_KEY=sk-test-geheim-42 --yes --dry-run --store-ai-env --ai-providers codex)" = 0 ] && [ "$(grep -c "^OPENAI_API_KEY=" "$AIE")" = 1 ] && grep -qx "OPENAI_API_KEY=sk-test-geheim-42" "$AIE" && grep -qx "KEEP_ME=1" "$AIE" && grep -qx "CLAUDE_CODE_OAUTH_TOKEN=secret-test-token-0123456789-abcdefghijklmnop" "$AIE" && [ "$(mode "$AIE")" = 600 ]'
+rm -rf "$TMP/home/.config" "$INST"; stub pi 'exit 0'
+check "shared by codex and pi: stored once"               '[ "$(runvars "OPENAI_API_KEY=sk-test-geheim-42" --yes --dry-run --store-ai-env --ai-providers codex,pi)" = 0 ] && [ "$(grep -c "^OPENAI_API_KEY=" "$AIE")" = 1 ] && [ "$(out | grep -c "saved in")" = 1 ]'
+rm -rf "$TMP/home/.config" "$INST"
+check "ANTHROPIC_API_KEY for pi: says claude uses it too" '[ "$(runvars "ANTHROPIC_API_KEY=sk-test-geheim-44" --yes --dry-run --store-ai-env --ai-providers claude,pi)" = 0 ] && grep -qx "ANTHROPIC_API_KEY=sk-test-geheim-44" "$AIE" && out | grep -qF "claude reads ANTHROPIC_API_KEY as well" && ! out | grep -q "sk-test-geheim-44"'
+rm -rf "$TMP/home/.config" "$INST"
+check "… not when claude is not selected"                 '[ "$(runvars "ANTHROPIC_API_KEY=sk-test-geheim-44" --yes --dry-run --store-ai-env --ai-providers pi)" = 0 ] && ! out | grep -q "claude reads"'
+unstub pi; rm -rf "$TMP/home/.config" "$INST"
+check "all: no copy, the old hint"                        '[ "$(runvars OPENAI_API_KEY=sk-test-geheim-42 --yes --dry-run --store-ai-env --ai-from-host all)" = 0 ] && [ ! -e "$AIE" ] && out | grep -qF "the variable does not reach the container. For the container, log in on this machine: codex login"'
+# Im Terminal: gefragt, Vorgabe nein — nur ein ausdrueckliches Ja schreibt
+pty_store() {  # TASTEN → Mitschnitt in $TMP/menu (ANSI entfernt); nur OPENAI_API_KEY als Anmelde-Variable
+  local unset_vars="" v
+  for v in $LOGIN_VARS; do unset_vars="$unset_vars -u $v"; done
+  rm -rf "$INST"
+  printf "$1" | timeout 120 script -qec "stty cols 120 rows 50; env $unset_vars HOME='$TMP/home' PATH='$TMP/bin:$TMP/tools' XDG_DATA_HOME='$TMP/data' XDG_STATE_HOME='$TMP/state' XDG_CONFIG_HOME='$TMP/home/.config' MYSURICATES_INSTANCES_DIR='$INST' TERM=xterm-256color OPENAI_API_KEY=sk-test-geheim-42 bash '$SETUP' --dry-run --lang en --runtime container --preset core --provider codex --port 19490" /dev/null 2>&1 \
+    | sed "s/$(printf "\033")\[[0-9;?]*[A-Za-z]//g" | tr -d "\r" > "$TMP/menu"
+}
+if command -v script >/dev/null 2>&1 && script -qec true /dev/null >/dev/null 2>&1 && command -v timeout >/dev/null 2>&1; then
+  pty_store 'n\n\n\nn\n'   # pi: nein · Zugang: login · Uebernehmen: Enter (= nein) · bauen: nein
+  check "guided: asked, default no, nothing written"      'grep -qF "Copy it into $AIE for the container" "$TMP/menu" && grep -qF "[y/N]" "$TMP/menu" && [ ! -e "$AIE" ] && ! grep -q "sk-test-geheim-42" "$TMP/menu"'
+  pty_store 'n\n\ny\nn\n'
+  check "guided: yes writes exactly the variable, 600"    '[ "$(cat "$AIE" 2>/dev/null)" = "OPENAI_API_KEY=sk-test-geheim-42" ] && [ "$(mode "$AIE")" = 600 ] && ! grep -q "sk-test-geheim-42" "$TMP/menu"'
+  rm -rf "$TMP/home/.config"
+else
+  echo "  skip (no usable script command)"
+fi
+rm -rf "$INST"
+check "--help names --store-ai-env"                       'bash "$SETUP" --help | grep -- "--store-ai-env" >/dev/null && bash "$SETUP" --help --lang de | grep -- "--store-ai-env" >/dev/null'
 mkdir -p "$TMP/home/.codex"; echo '{"tokens":1}' > "$TMP/home/.codex/auth.json"; rm -rf "$INST"
 check "with ~/.codex/auth.json: no such hint"             '[ "$(runvars OPENAI_API_KEY=sk-test-geheim-42 --yes --dry-run)" = 0 ] && ! out | grep -q "only via"'
 rm -rf "$TMP/home/.codex" "$INST"
-check "programs: every instance logs in itself, no hint"  '[ "$(runvars OPENAI_API_KEY=x --yes --dry-run --ai-from-host programs)" = 0 ] && ! out | grep -q "only via"'
+check "programs: every instance logs in itself, no hint"  '[ "$(runvars OPENAI_API_KEY=x --yes --dry-run --ai-from-host programs --store-ai-env)" = 0 ] && ! out | grep -q "only via" && [ ! -e "$AIE" ]'
 rm -rf "$INST"
-check "on this machine the variable just works: no hint"  '[ "$(runvars OPENAI_API_KEY=x --yes --dry-run --runtime host)" = 0 ] && ! out | grep -q "only via"'
+check "on this machine the variable just works: no hint"  '[ "$(runvars OPENAI_API_KEY=x --yes --dry-run --runtime host --store-ai-env)" = 0 ] && ! out | grep -q "only via" && [ ! -e "$AIE" ]'
 rm -rf "$INST"
 
 echo "5) staged — Dev · Test · Prod"

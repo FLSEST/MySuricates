@@ -109,6 +109,11 @@ M_ai_token_hint="Claude in a container: run claude setup-token once, then put CL
 M_ai_token_implausible="CLAUDE_CODE_OAUTH_TOKEN in %s is not a token (placeholder, spaces or under 40 characters) — it does not count as a login."
 M_ai_token_rejected="That does not look like a token (placeholder, spaces or under 40 characters) — not saved."
 M_ai_env_only="%s is logged in here only via %s — the variable does not reach the container. For the container, log in on this machine: %s"
+M_ai_env_only_login="%s is logged in here only via %s — the variable does not reach the container by itself. With --store-ai-env (or yes in the terminal) the installer copies it into %s; otherwise log in on this machine: %s"
+M_ai_env_store_q="%s is logged in here only via %s. Copy it into %s for the container (readable only by you)?"
+M_ai_env_stored="%s saved in %s (readable only by you) — containers in login mode get the variable at their next start"
+M_ai_env_not_stored="%s not copied into %s (empty, a line break, or the file is not writable)"
+M_ai_env_shared_claude="claude reads %s as well — in the container claude logs in with it, not with its token"
 M_ai_pi_q="Also install pi? (%s)"
 M_ai_pi_run="Install pi (npm)"
 M_ai_pi_failed="pi could not be installed — by hand: %s"
@@ -179,6 +184,8 @@ M_help="MySuricates setup — from a bare machine to the login in one pass.
   --projects DIR               projects folder for the container (default: the folder above the clone)
   --docker-socket              container: allow shell blocks with container_image (full Docker control)
   --with-pi                    also install the AI CLI pi via npm (default: no, also with --yes)
+  --store-ai-env               container, login mode: copy an AI login that exists here only as an environment
+                               variable into ~/.config/mysuricates/ai.env (default: no, also with --yes)
   --ai-from-host MODE          container: what of the AI providers goes in — login (default), programs, all
   --ai-providers LIST          container: only these providers, e.g. claude,codex (default: all)
   --name NAME                  name of the instance (default main)

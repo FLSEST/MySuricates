@@ -15,7 +15,8 @@ REPO="$TMP/repo"
 mkdir -p "$REPO/scripts/lib" "$REPO/ai-automation-backend/stable-frontend" "$REPO/ai-automation-frontend/dist" \
          "$TMP/bin" "$TMP/home" "$TMP/config/mysuricates" "$TMP/state" "$TMP/nm"
 cp "$R/scripts/staging.sh" "$REPO/scripts/"
-cp "$R/scripts/lib/host-mounts.sh" "$R/scripts/lib/provider-login.sh" "$R/scripts/lib/local-curl.sh" "$REPO/scripts/lib/"
+cp "$R/scripts/lib/host-mounts.sh" "$R/scripts/lib/provider-catalog.generated.sh" "$R/scripts/lib/provider-login.sh" \
+   "$R/scripts/lib/local-curl.sh" "$REPO/scripts/lib/"
 cp "$R/ai-automation-backend/docker-compose.stable.yml" "$R/ai-automation-backend/docker-compose.test.yml" "$REPO/ai-automation-backend/"
 cat > "$TMP/bin/docker" <<'STUB'
 #!/usr/bin/env bash
@@ -66,6 +67,17 @@ printf 'STABLE_AI_FROM_HOST=$(touch %s/pwned)\n' "$TMP" > "$ENVF"
 bash "$S" write-override stable >/dev/null 2>&1; RC=$?
 check "the file is never executed"                  '[ ! -e "$TMP/pwned" ] && [ "$RC" = 2 ]'
 rm -f "$ENVF"
+
+echo "2b) login variables from ai.env: only those of the selected providers (also for a start from the UI)"
+AIENV="$TMP/config/mysuricates/ai.env"; CE="$TMP/config/mysuricates/container-env"
+printf '%s\n' 'OPENAI_API_KEY=sk-test-openai-4711' 'SOMETHING_ELSE=x' > "$AIENV"; chmod 600 "$AIENV"
+mkdir -p "$TMP/nm/@openai/codex"
+TEST_AI_PROVIDERS=codex bash "$S" write-override test >/dev/null 2>&1
+check "codex selected: its variable via env_file"   'grep -qF "\"$CE/codex.env\"" "$OV/test.override.yml" && grep -qx "OPENAI_API_KEY=sk-test-openai-4711" "$CE/codex.env" && ! grep -q SOMETHING_ELSE "$CE/codex.env"'
+check "the value stays out of the override"         '! grep -q 4711 "$OV/test.override.yml"'
+TEST_AI_PROVIDERS=claude bash "$S" write-override test >/dev/null 2>&1
+check "codex not selected: nothing of it"           '! grep -q "env_file" "$OV/test.override.yml"'
+rm -rf "$AIENV" "$CE" "$TMP/nm/@openai"
 
 echo "3) every compose call carries the override"
 : > "$DOCKER_LOG"

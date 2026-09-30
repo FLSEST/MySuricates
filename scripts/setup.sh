@@ -32,13 +32,13 @@ INSTANCES_DIR="${MYSURICATES_INSTANCES_DIR:-$REPO_ROOT/deploy/instances}"
 # shellcheck source=lib/setup-ports.sh
 . "$LIB/setup-ports.sh"   # freie Ports; den der laufenden eigenen Instanz zaehlt er als frei (0e5b82b7)
 # shellcheck source=lib/host-mounts.sh
-. "$LIB/host-mounts.sh"   # claude_token_from_file / claude_token_plausible — dieselbe Regel wie beim Start
+. "$LIB/host-mounts.sh"   # ai_env_value / claude_token_plausible — dieselbe Regel wie beim Start
 [ -r "$DEPS_DATA/env.sh" ] && . "$DEPS_DATA/env.sh"
 
 # --- Flags ------------------------------------------------------------------------------------------
 MODE=""; RUNTIME=""; PRESET=""; MODULES=""; PROVIDER=""; PORT=""; PROJECTS=""; NAME="main"; BIND="127.0.0.1"
 LANG_OPT=""; YES=0; CHECK=0; DRY=0; SHOW_KEY=0; FROM_SOURCE=0; INSTALL=0; START=0; FORCE=0; RECONF=0
-HELP=0; SOCKET_FLAG=0; AI_FROM_HOST=""; AI_PROVIDERS=""; WITH_PI=0
+HELP=0; SOCKET_FLAG=0; AI_FROM_HOST=""; AI_PROVIDERS=""; WITH_PI=0; STORE_AI_ENV=0
 AI_ENV="${XDG_CONFIG_HOME:-$HOME/.config}/mysuricates/ai.env"
 die() { echo "setup.sh: $*" >&2; exit 2; }
 _prev=""
@@ -73,6 +73,7 @@ while [ "$#" -gt 0 ]; do
     --reconfigure) RECONF=1 ;;
     --docker-socket) SOCKET_FLAG=1 ;;
     --with-pi) WITH_PI=1 ;;
+    --store-ai-env) STORE_AI_ENV=1 ;;
     -h|--help) HELP=1 ;;
     *) die "$(msg err_option "$1")" ;;
   esac
@@ -402,12 +403,15 @@ ai_container() {
   return 0
 }
 
-# Angemeldet nur per Umgebungsvariable (90b4422c): Schritt 5 zaehlt das als „angemeldet“, in den
-# Container kommt die Variable aber nicht — host-mounts.sh bindet Anmeldedateien ein, fuer Claude im
-# Modus login den Token aus ai.env (den ai_claude_token anbietet). Das sagen statt es stehen zu lassen.
-# Bei programs meldet sich jede Instanz ohnehin selbst an. Namen der Variablen, nie ihre Werte.
+# Angemeldet nur per Umgebungsvariable (90b4422c): Schritt 5 zaehlt das als „angemeldet“, von selbst
+# kommt die Variable aber nicht in den Container. Im Modus login reicht host-mounts.sh die Anmelde-
+# Variablen der gewaehlten Anbieter aus ai.env durch — dorthin kommen sie nur mit ausdruecklicher
+# Zustimmung: im Terminal gefragt (Vorgabe nein), sonst nur mit --store-ai-env, auch mit --yes nicht
+# von selbst. Bei all kommen ganze Verzeichnisse, keine Variablen (nur der Hinweis); bei programs meldet
+# sich jede Instanz selbst an. Claude laeuft im Modus login ueber den Token (ai_claude_token).
+# Ausgegeben werden Namen der Variablen, nie ihre Werte.
 ai_env_only_hints() {
-  local id vars
+  local id vars v names covered
   [ "$AI_FROM_HOST" = programs ] && return 0
   for id in $(printf '%s' "${AI_PROVIDERS:-$(providers_ids | tr '\n' ',')}" | tr ',' ' '); do
     { [ "$id" = claude ] && [ "$AI_FROM_HOST" = login ]; } && continue
@@ -415,9 +419,43 @@ ai_env_only_hints() {
     provider_login_file "$id" && continue
     vars="$(provider_login_env_names "$id")"
     [ -n "$vars" ] || continue
-    printf '  %s\n' "$(msg ai_env_only "$id" "$(printf '%s' "$vars" | sed 's/ /, /g')" "$(provider_login_line "$id")")"
+    names="$(printf '%s' "$vars" | sed 's/ /, /g')"
+    if [ "$AI_FROM_HOST" != login ]; then
+      printf '  %s\n' "$(msg ai_env_only "$id" "$names" "$(provider_login_line "$id")")"; continue
+    fi
+    # Schon in ai.env (auch eben fuer einen anderen Anbieter uebernommen, z. B. OPENAI_API_KEY): fertig
+    covered=0
+    for v in $(provider_get "$id" login_env); do [ -n "$(ai_env_value "$AI_ENV" "$v")" ] && covered=1; done
+    [ "$covered" = 1 ] && continue
+    if [ "$STORE_AI_ENV" = 1 ] || { [ "$INTERACTIVE" = 1 ] && tui_confirm "$(msg ai_env_store_q "$id" "$names" "$AI_ENV")" n; }; then
+      for v in $vars; do
+        if ai_env_put "$v" "${!v}"; then
+          printf '  %s\n' "$(msg ai_env_stored "$v" "$AI_ENV")"
+          # Geteilt mit Claude (ANTHROPIC_API_KEY): claude nimmt den Schluessel dann vor seinem Token
+          case ",${AI_PROVIDERS:-claude}, $(provider_get claude login_env) " in
+            *,claude,*" $v "*) [ "$id" = claude ] || printf '  %s\n' "$(msg ai_env_shared_claude "$v")" ;;
+          esac
+        else printf '  %s\n' "$(msg ai_env_not_stored "$v" "$AI_ENV")"; fi
+      done
+      continue
+    fi
+    printf '  %s\n' "$(msg ai_env_only_login "$id" "$names" "$AI_ENV" "$(provider_login_line "$id")")"
   done
   return 0
+}
+
+# ai_env_put VAR WERT — VAR=WERT nach ai.env: Datei 600, Verzeichnis 700, andere Eintraege bleiben,
+# eine alte Zeile derselben Variable geht. Der Wert wird nirgends ausgegeben. Einer mit Zeilenumbruch
+# passt in keine env-Datei und wird abgelehnt (Rueckgabe 1).
+ai_env_put() {
+  local dir
+  case "$2" in ''|*"
+"*) return 1 ;; esac
+  dir="$(dirname "$AI_ENV")"
+  ( umask 077
+    mkdir -p "$dir" && chmod 700 "$dir" || exit 1
+    { grep -v "^$1=" "$AI_ENV" 2>/dev/null; printf '%s=%s\n' "$1" "$2"; } > "$AI_ENV.tmp" \
+      && chmod 600 "$AI_ENV.tmp" && mv -f "$AI_ENV.tmp" "$AI_ENV" ) || { rm -f "$AI_ENV.tmp"; return 1; }
 }
 
 ai_claude_token() {
@@ -438,11 +476,7 @@ ai_claude_token() {
     fi
   fi
   if [ -z "$token" ]; then printf '  %s\n' "$(msg ai_token_hint "$AI_ENV")"; return 0; fi
-  mkdir -p "$(dirname "$AI_ENV")"
-  ( umask 077
-    { grep -v '^CLAUDE_CODE_OAUTH_TOKEN=' "$AI_ENV" 2>/dev/null; printf 'CLAUDE_CODE_OAUTH_TOKEN=%s\n' "$token"; } > "$AI_ENV.tmp" ) \
-    && mv "$AI_ENV.tmp" "$AI_ENV" && chmod 600 "$AI_ENV"
-  printf '  %s\n' "$(msg ai_token_saved "$AI_ENV")"
+  ai_env_put CLAUDE_CODE_OAUTH_TOKEN "$token" && printf '  %s\n' "$(msg ai_token_saved "$AI_ENV")"
 }
 
 # pi mitinstallieren (0a078449): nur auf Wunsch — im Terminal gefragt, sonst mit --with-pi; Default
