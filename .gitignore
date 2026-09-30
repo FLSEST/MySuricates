@@ -129,7 +129,7 @@ deploy/instances/*
 # Lokales Werkzeug fuer den README-Banner (erzeugt docs/assets/readme-banner-*.svg), gehoert nicht ins Repo
 scripts/readme-banner.py
 
-# Privates Werkzeug, lokal behalten (Entscheidung 2026-09-30, TODO 08025915)
+# Private Werkzeuge des Maintainers, lokal behalten (Entscheidung 2026-09-30)
 scripts/explainer/
 scripts/install_desktop_launcher.sh
 
