@@ -1,10 +1,14 @@
 package com.automation.service.goal;
 
+import com.automation.exception.ErrorMessage;
+import com.automation.exception.LocalizedArgumentException;
+
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
+import java.util.Map;
 
 /**
  * Datumsangaben von Arbeitspaketen und Meilensteinen (TODO 259f4f66, c60bf914): ein ISO-Zeitpunkt
@@ -35,7 +39,7 @@ final class GoalDates {
                     ? LocalDate.parse(trimmed).atTime(timeOfDay).toInstant(ZoneOffset.UTC)
                     : Instant.parse(trimmed);
         } catch (DateTimeParseException e) {
-            throw new IllegalArgumentException("Ungueltiges Datum: " + trimmed);
+            throw new LocalizedArgumentException(ErrorMessage.INVALID_DATE, Map.of("value", trimmed));
         }
     }
 

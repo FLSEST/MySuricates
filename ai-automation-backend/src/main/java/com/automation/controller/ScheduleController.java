@@ -7,6 +7,9 @@ import com.automation.dto.response.ScheduleRunsResponse;
 import com.automation.dto.response.ScheduledWorkflowResponse;
 import com.automation.dto.response.SchedulerPauseResponse;
 import com.automation.dto.response.UpcomingScheduleResponse;
+import com.automation.exception.ErrorCode;
+import com.automation.exception.ErrorMessage;
+import com.automation.exception.ErrorResponse;
 import com.automation.mapper.ChainMapper;
 import com.automation.mapper.ScheduleMapper;
 import com.automation.mapper.WorkflowMapper;
@@ -112,7 +115,7 @@ public class ScheduleController {
     public ResponseEntity<?> previewCron(@RequestBody Map<String, String> body) {
         String cronExpression = body.get("cronExpression");
         if (cronExpression == null || cronExpression.isBlank()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "cronExpression is required"));
+            return ResponseEntity.badRequest().body(ErrorResponse.of(ErrorMessage.CRON_REQUIRED, Map.of()));
         }
         try {
             List<Instant> runs = upcomingRunsCalculator.getNextRuns(cronExpression, 5);
@@ -122,7 +125,7 @@ public class ScheduleController {
             upcomingRunsCalculator.pausedUntil().ifPresent(until -> preview.put("pausedUntil", until));
             return ResponseEntity.ok(preview);
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest().body(ErrorResponse.from(e, ErrorCode.INVALID_ARGUMENT));
         }
     }
 

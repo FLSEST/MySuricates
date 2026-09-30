@@ -91,6 +91,9 @@ class RateLimitFilterTest {
         writer.flush();
         assertThat(stringWriter.toString()).contains("retryAfterSeconds");
         assertThat(stringWriter.toString()).contains("Rate limit exceeded");
+        var body = new com.fasterxml.jackson.databind.ObjectMapper().readTree(stringWriter.toString());
+        assertThat(body.get("code").asText()).isEqualTo("RATE_LIMITED");
+        assertThat(body.get("params").get("seconds").asText()).isEqualTo(body.get("retryAfterSeconds").asText());
     }
 
     @Test

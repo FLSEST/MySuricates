@@ -1,7 +1,9 @@
 package com.automation.service.integration;
 
-import com.automation.entity.IntegrationConnection;
 import com.automation.entity.IntegrationConnection.ConnectionStatus;
+import com.automation.entity.IntegrationConnection;
+import com.automation.exception.ErrorMessage;
+import com.automation.exception.LocalizedArgumentException;
 import com.automation.repository.IntegrationConnectionRepository;
 import com.automation.service.integration.OAuthStateRegistry.PendingAuthorization;
 import lombok.extern.slf4j.Slf4j;
@@ -131,14 +133,14 @@ public class IntegrationOAuthService {
      */
     public IntegrationConnection handleCallback(String code, String state, String redirectUri) {
         PendingAuthorization pending = stateRegistry.consume(state)
-                .orElseThrow(() -> new IllegalArgumentException("Invalid or expired OAuth state"));
+                .orElseThrow(() -> new LocalizedArgumentException(ErrorMessage.OAUTH_STATE_INVALID));
         return connectFlow.handleCallback(pending.providerId(), pending.connectionName(), code, redirectUri);
     }
 
     /** Read before consuming the state in handleCallback; never supplied by the callback request. */
     public String getCallbackOrigin(String state) {
         return stateRegistry.peek(state)
-                .orElseThrow(() -> new IllegalArgumentException("Invalid or expired OAuth state"))
+                .orElseThrow(() -> new LocalizedArgumentException(ErrorMessage.OAUTH_STATE_INVALID))
                 .callbackOrigin();
     }
 

@@ -6,6 +6,8 @@ import com.automation.dto.response.SyncPreview;
 import com.automation.dto.response.SyncResult;
 import com.automation.dto.response.TestingStatusResponse;
 import com.automation.entity.Workflow;
+import com.automation.exception.ErrorMessage;
+import com.automation.exception.LocalizedStateException;
 import com.automation.repository.WorkflowRepository;
 import com.automation.service.system.ApiKeyService;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -134,9 +136,7 @@ public class TestingService {
     }
 
     public SyncPreview syncPreview() {
-        if (!isHealthy()) {
-            throw new IllegalStateException("Test instance is not running or not healthy. Start it first.");
-        }
+        if (!isHealthy()) throw new LocalizedStateException(ErrorMessage.TEST_INSTANCE_NOT_RUNNING);
         String testApiKey = readContainerApiKey(config.getTestContainerName());
         if (testApiKey == null) {
             throw new IllegalStateException("Could not read API key from test container. Is the container running?");
@@ -149,9 +149,7 @@ public class TestingService {
     }
 
     public SyncResult syncDefinitions(SyncDefinitionsRequest request) {
-        if (!isHealthy()) {
-            throw new IllegalStateException("Test instance is not running or not healthy. Start it first.");
-        }
+        if (!isHealthy()) throw new LocalizedStateException(ErrorMessage.TEST_INSTANCE_NOT_RUNNING);
         String testApiKey = readContainerApiKey(config.getTestContainerName());
         if (testApiKey == null) {
             return new SyncResult(0, 0, 0, 0, List.of("Could not read API key from test container"));
@@ -174,9 +172,7 @@ public class TestingService {
     }
 
     public SyncResult pullChanges() {
-        if (!isHealthy()) {
-            throw new IllegalStateException("Test instance is not running or not healthy. Start it first.");
-        }
+        if (!isHealthy()) throw new LocalizedStateException(ErrorMessage.TEST_INSTANCE_NOT_RUNNING);
 
         return withTestApiKey(() -> {
             String testBaseUrl = deriveTestBaseUrl();
@@ -227,9 +223,7 @@ public class TestingService {
      */
     public String executeWorkflowOnTest(String workflowName, String projectName,
                                          Map<String, Object> context) {
-        if (!isHealthy()) {
-            throw new IllegalStateException("Test instance is not running or not healthy.");
-        }
+        if (!isHealthy()) throw new LocalizedStateException(ErrorMessage.TEST_INSTANCE_NOT_RUNNING);
 
         return withTestApiKey(() -> {
             String baseUrl = deriveTestBaseUrl();

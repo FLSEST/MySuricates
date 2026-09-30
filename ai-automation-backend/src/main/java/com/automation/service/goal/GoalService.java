@@ -13,6 +13,8 @@ import com.automation.dto.response.GoalResponse;
 import com.automation.entity.Goal;
 import com.automation.entity.GoalProject;
 import com.automation.entity.Todo;
+import com.automation.exception.ErrorMessage;
+import com.automation.exception.LocalizedArgumentException;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.repository.GoalMilestoneRepository;
 import com.automation.repository.GoalProjectRepository;
@@ -229,7 +231,7 @@ public class GoalService {
                     ? LocalDate.parse(trimmed).atStartOfDay(ZoneOffset.UTC).toInstant()
                     : Instant.parse(trimmed);
         } catch (DateTimeParseException e) {
-            throw new IllegalArgumentException("Ungueltiges Datum: " + trimmed);
+            throw new LocalizedArgumentException(ErrorMessage.INVALID_DATE, Map.of("value", trimmed));
         }
     }
 

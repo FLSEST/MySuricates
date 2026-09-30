@@ -3,6 +3,7 @@ package com.automation.service.wish;
 import com.automation.config.WishConfig;
 import com.automation.entity.Wish;
 import com.automation.entity.WishStatus;
+import com.automation.exception.ElementNotFoundException;
 import com.automation.repository.WishRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -11,7 +12,6 @@ import org.springframework.stereotype.Service;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -148,7 +148,7 @@ public class WishFulfillmentLoop {
 
     private Wish findById(String id) {
         return wishRepository.findById(id)
-                .orElseThrow(() -> new NoSuchElementException("Wish not found: " + id));
+                .orElseThrow(() -> new ElementNotFoundException("Wish", id));
     }
 
     private boolean isCancelled(String wishId) {

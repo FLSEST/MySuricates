@@ -29,6 +29,11 @@ e.g. `{"code":"WORKFLOW_SEALED","params":{"name":"Nightly"}}` or
 text. The UI then shows its own translation of the code; `error` stays the English text for logs and API
 clients. Without `params`, `error` is free text from the throw site and is shown as it is.
 
+Where one code stands for many messages (`INVALID_ARGUMENT`, `STATE_CONFLICT`, …), `messageKey` comes
+along too — a key of the backend enum `ErrorMessage`, e.g.
+`{"code":"INVALID_ARGUMENT","messageKey":"INVALID_CRON","params":{"expression":"…"}}`. The UI then
+translates the key instead of the code.
+
 **Error Codes:**
 
 | Code | HTTP Status |
@@ -44,6 +49,8 @@ clients. Without `params`, `error` is free text from the throw site and is shown
 | `STATE_CONFLICT` | 409 |
 | `WORKFLOW_SEALED` | 409 |
 | `WORKFLOW_TAMPERED` | 409 |
+| `SKILL_PINNED_BY_SEAL` | 409 |
+| `SEAL_IMMUTABLE` | 403 |
 | `UNATTENDED_REQUIRES_SEAL` | 403 |
 | `WEBHOOK_SIGNATURE_INVALID` | 401 |
 | `NO_TASK_TARGET` | 400 |
@@ -51,7 +58,10 @@ clients. Without `params`, `error` is free text from the throw site and is shown
 | `PROVIDER_NOT_TASK_CAPABLE` | 400 |
 | `SERVICE_UNAVAILABLE` | 503 |
 | `TOKEN_BUDGET_EXCEEDED` | 429 |
+| `RATE_LIMITED` | 429 |
+| `PAYLOAD_TOO_LARGE` | 413 |
 | `OPERATION_TIMEOUT` | 504 |
+| `METHOD_NOT_ALLOWED` | 405 |
 | `RUN_DELETION_DISABLED` | 403 |
 | `INTERNAL_ERROR` | 500 |
 

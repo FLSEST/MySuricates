@@ -345,4 +345,61 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().getError()).isEqualTo("Resource not found");
     }
+
+    // Messages from ErrorMessage carry their key, so the UI can tell apart the many texts one code stands for.
+
+    @Test
+    void handleIllegalArgument_sendsKeyAndParams_forALocalizedMessage() {
+        ResponseEntity<ErrorResponse> response = handler.handleIllegalArgument(
+                new LocalizedArgumentException(ErrorMessage.INVALID_CRON, java.util.Map.of("expression", "x")));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getCode()).isEqualTo("INVALID_ARGUMENT");
+        assertThat(response.getBody().getMessageKey()).isEqualTo("INVALID_CRON");
+        assertThat(response.getBody().getParams()).containsExactlyEntriesOf(java.util.Map.of("expression", "x"));
+        assertThat(response.getBody().getError()).isEqualTo("Invalid cron expression: x");
+    }
+
+    @Test
+    void handleIllegalState_sendsKey_forALocalizedMessage() {
+        ResponseEntity<ErrorResponse> response = handler.handleIllegalState(
+                new LocalizedStateException(ErrorMessage.STABLE_INSTANCE_NOT_RUNNING));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getMessageKey()).isEqualTo("STABLE_INSTANCE_NOT_RUNNING");
+    }
+
+    @Test
+    void handleNoSuchElement_sendsKey_forANamedResource() {
+        ResponseEntity<ErrorResponse> response = handler.handleNoSuchElement(new ElementNotFoundException("Chain run", "r-1"));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getMessageKey()).isEqualTo("NAMED_NOT_FOUND");
+        assertThat(response.getBody().getError()).isEqualTo("Chain run not found: r-1");
+    }
+
+    @Test
+    void handleMissingParameter_sendsKeyAndName() throws Exception {
+        ResponseEntity<ErrorResponse> response = handler.handleMissingParameter(
+                new org.springframework.web.bind.MissingServletRequestParameterException("projectId", "String"));
+
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getMessageKey()).isEqualTo("MISSING_PARAMETER");
+        assertThat(response.getBody().getParams()).containsEntry("name", "projectId");
+    }
+
+    @Test
+    void handleHardening_sendsKey_forAMessageOfItsCode() {
+        ResponseEntity<ErrorResponse> response = handler.handleHardening(new HardeningException(
+                ErrorMessage.RUN_RETENTION_LOCKED, java.util.Map.of("current", "90", "requested", "30")));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getCode()).isEqualTo("RUN_DELETION_DISABLED");
+        assertThat(response.getBody().getMessageKey()).isEqualTo("RUN_RETENTION_LOCKED");
+        assertThat(response.getBody().getError()).endsWith(": 90 -> 30 days");
+    }
 }

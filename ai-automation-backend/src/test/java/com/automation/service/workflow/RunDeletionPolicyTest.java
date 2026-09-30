@@ -1,6 +1,7 @@
 package com.automation.service.workflow;
 
 import com.automation.exception.ErrorCode;
+import com.automation.exception.ErrorMessage;
 import com.automation.exception.HardeningException;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -51,8 +52,10 @@ class RunDeletionPolicyTest {
                 .extracting(e -> ((HardeningException) e).getCode())
                 .isEqualTo(ErrorCode.RUN_DELETION_DISABLED);
         assertThatThrownBy(() -> locked.requireRetentionChangeAllowed(0, 730)).isInstanceOf(HardeningException.class)
-                // Same code, other text: without params the UI keeps the server text instead of the code's translation
-                .satisfies(e -> assertThat(((HardeningException) e).getParams()).isNull());
+                // Same code, other text: its own message key tells the UI which translation to show
+                .satisfies(e -> assertThat(((HardeningException) e).getErrorMessage()).isEqualTo(ErrorMessage.RUN_RETENTION_LOCKED))
+                .satisfies(e -> assertThat(((HardeningException) e).getParams())
+                        .containsExactlyInAnyOrderEntriesOf(java.util.Map.of("current", "0", "requested", "730")));
     }
 
     @Test

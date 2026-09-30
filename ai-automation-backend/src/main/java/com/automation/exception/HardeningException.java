@@ -17,4 +17,8 @@ public class HardeningException extends CodedException {
     public HardeningException(ErrorCode code, String message, Map<String, String> params) {
         super(code, message, params);
     }
+
+    public HardeningException(ErrorMessage errorMessage, Map<String, String> params) {
+        super(errorMessage, params);
+    }
 }

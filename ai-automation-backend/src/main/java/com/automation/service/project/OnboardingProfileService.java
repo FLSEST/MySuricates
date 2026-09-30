@@ -4,6 +4,8 @@ import com.automation.dto.request.CreateOnboardingProfileRequest;
 import com.automation.dto.request.UpdateOnboardingProfileRequest;
 import com.automation.entity.OnboardingProfile;
 import com.automation.entity.OnboardingProfileHistory;
+import com.automation.exception.ErrorMessage;
+import com.automation.exception.LocalizedArgumentException;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.repository.OnboardingProfileHistoryRepository;
 import com.automation.repository.OnboardingProfileRepository;
@@ -47,7 +49,7 @@ public class OnboardingProfileService {
 
         Map<String, String> content = mergeContent(Map.of(), request.content());
         if (content.isEmpty()) {
-            throw new IllegalArgumentException("Profile content needs at least one language");
+            throw new LocalizedArgumentException(ErrorMessage.PROFILE_NEEDS_LANGUAGE);
         }
 
         OnboardingProfile profile = OnboardingProfile.builder()
@@ -74,7 +76,7 @@ public class OnboardingProfileService {
                 ? profile.getContent()
                 : mergeContent(profile.getContent(), request.content());
         if (content.isEmpty()) {
-            throw new IllegalArgumentException("Profile content needs at least one language");
+            throw new LocalizedArgumentException(ErrorMessage.PROFILE_NEEDS_LANGUAGE);
         }
         boolean contentChanged = !content.equals(profile.getContent());
 

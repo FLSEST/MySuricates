@@ -32,6 +32,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(NoSuchElementException.class)
     public ResponseEntity<ErrorResponse> handleNoSuchElement(NoSuchElementException ex) {
+        if (ex instanceof LocalizedError localized) return respond(localized);
         return respond(ErrorCode.RESOURCE_NOT_FOUND, ex.getMessage());
     }
 
@@ -69,37 +70,39 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(TaskExportException.class)
     public ResponseEntity<ErrorResponse> handleTaskExport(TaskExportException ex) {
         log.warn("Task export error [{}]: {}", ex.getCode(), ex.getMessage());
-        return respond(ex.getCode(), ex.getMessage(), ex.getParams());
+        return respond(ex);
     }
 
     @ExceptionHandler(HardeningException.class)
     public ResponseEntity<ErrorResponse> handleHardening(HardeningException ex) {
         log.warn("Hardening rule [{}]: {}", ex.getCode(), ex.getMessage());
-        return respond(ex.getCode(), ex.getMessage(), ex.getParams());
+        return respond(ex);
     }
 
     @ExceptionHandler(ModuleChangeException.class)
     public ResponseEntity<ErrorResponse> handleModuleChange(ModuleChangeException ex) {
         log.warn("Module switch refused [{}]: {}", ex.getCode(), ex.getMessage());
-        return respond(ex.getCode(), ex.getMessage(), ex.getParams());
+        return respond(ex);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException ex) {
         log.warn("Invalid argument: {}", ex.getMessage());
+        if (ex instanceof LocalizedError localized) return respond(localized);
         return respond(ErrorCode.INVALID_ARGUMENT, ex.getMessage());
     }
 
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<ErrorResponse> handleIllegalState(IllegalStateException ex) {
         log.warn("State conflict: {}", ex.getMessage());
+        if (ex instanceof LocalizedError localized) return respond(localized);
         return respond(ErrorCode.STATE_CONFLICT, ex.getMessage());
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ErrorResponse> handleUnreadableBody(HttpMessageNotReadableException ex) {
         log.warn("Unreadable request body: {}", ex.getMessage());
-        return respond(ErrorCode.INVALID_ARGUMENT, "Request body is missing or malformed");
+        return respond(ErrorMessage.MALFORMED_BODY, Map.of());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -129,13 +132,13 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MissingServletRequestParameterException.class)
     public ResponseEntity<ErrorResponse> handleMissingParameter(MissingServletRequestParameterException ex) {
         log.warn("Missing request parameter: {}", ex.getParameterName());
-        return respond(ErrorCode.INVALID_ARGUMENT, "Missing required parameter: " + ex.getParameterName());
+        return respond(ErrorMessage.MISSING_PARAMETER, Map.of("name", ex.getParameterName()));
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
         log.warn("Invalid value for request parameter '{}': {}", ex.getName(), ex.getValue());
-        return respond(ErrorCode.INVALID_ARGUMENT, "Invalid value for parameter '" + ex.getName() + "'");
+        return respond(ErrorMessage.INVALID_PARAMETER_VALUE, Map.of("name", ex.getName()));
     }
 
     // Unknown API path: ResourceHttpRequestHandler's "/**" fallback throws this instead of matching
@@ -209,6 +212,19 @@ public class GlobalExceptionHandler {
 
     private ResponseEntity<ErrorResponse> respond(ErrorCode code, String message) {
         return respond(code, message, null);
+    }
+
+    private ResponseEntity<ErrorResponse> respond(CodedException ex) {
+        if (ex.getErrorMessage() != null) return respond(ex.getErrorMessage(), ex.getParams());
+        return respond(ex.getCode(), ex.getMessage(), ex.getParams());
+    }
+
+    private ResponseEntity<ErrorResponse> respond(LocalizedError error) {
+        return respond(error.errorMessage(), error.params());
+    }
+
+    private ResponseEntity<ErrorResponse> respond(ErrorMessage message, Map<String, String> params) {
+        return ResponseEntity.status(message.getCode().getHttpStatus()).body(ErrorResponse.of(message, params));
     }
 
     /** @param params non-null when code and params describe the message completely (see {@link CodedException}) */

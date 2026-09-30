@@ -1,5 +1,6 @@
 package com.automation.security;
 
+import com.automation.exception.ErrorCode;
 import com.automation.service.system.ApiKeyService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Component
@@ -85,8 +87,12 @@ public class RateLimitFilter extends OncePerRequestFilter {
             response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
             response.setHeader("Retry-After", String.valueOf(retryAfterSeconds));
             response.setContentType("application/json");
-            response.getWriter().write(
-                    "{\"error\": \"Rate limit exceeded\", \"retryAfterSeconds\": " + retryAfterSeconds + "}\n");
+            // Written by hand like the size-limit filter: same fields as ErrorResponse plus retryAfterSeconds
+            response.getWriter().write("{\"code\":\"" + ErrorCode.RATE_LIMITED.name()
+                    + "\",\"error\":\"" + ErrorCode.RATE_LIMITED.getDefaultMessage()
+                    + "\",\"timestamp\":\"" + Instant.now()
+                    + "\",\"params\":{\"seconds\":\"" + retryAfterSeconds + "\"}"
+                    + ",\"retryAfterSeconds\": " + retryAfterSeconds + "}\n");
         }
     }
 

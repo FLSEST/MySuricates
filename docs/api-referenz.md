@@ -31,6 +31,11 @@ beschreiben – etwa `{"code":"WORKFLOW_SEALED","params":{"name":"Nightly"}}` od
 Text. Die Oberfläche zeigt dann ihre eigene Übersetzung des Codes; `error` bleibt der englische Text für
 Logs und API-Clients. Ohne `params` ist `error` Freitext der Wurfstelle und wird so angezeigt.
 
+Wo ein Code für viele Meldungen steht (`INVALID_ARGUMENT`, `STATE_CONFLICT`, …), kommt zusätzlich
+`messageKey` mit – ein Schlüssel des Backend-Enums `ErrorMessage`, etwa
+`{"code":"INVALID_ARGUMENT","messageKey":"INVALID_CRON","params":{"expression":"…"}}`. Die Oberfläche
+übersetzt dann den Schlüssel statt des Codes.
+
 **Error-Codes:**
 
 | Code | HTTP-Status |
@@ -46,6 +51,8 @@ Logs und API-Clients. Ohne `params` ist `error` Freitext der Wurfstelle und wird
 | `STATE_CONFLICT` | 409 |
 | `WORKFLOW_SEALED` | 409 |
 | `WORKFLOW_TAMPERED` | 409 |
+| `SKILL_PINNED_BY_SEAL` | 409 |
+| `SEAL_IMMUTABLE` | 403 |
 | `UNATTENDED_REQUIRES_SEAL` | 403 |
 | `WEBHOOK_SIGNATURE_INVALID` | 401 |
 | `NO_TASK_TARGET` | 400 |
@@ -53,7 +60,10 @@ Logs und API-Clients. Ohne `params` ist `error` Freitext der Wurfstelle und wird
 | `PROVIDER_NOT_TASK_CAPABLE` | 400 |
 | `SERVICE_UNAVAILABLE` | 503 |
 | `TOKEN_BUDGET_EXCEEDED` | 429 |
+| `RATE_LIMITED` | 429 |
+| `PAYLOAD_TOO_LARGE` | 413 |
 | `OPERATION_TIMEOUT` | 504 |
+| `METHOD_NOT_ALLOWED` | 405 |
 | `RUN_DELETION_DISABLED` | 403 |
 | `INTERNAL_ERROR` | 500 |
 

@@ -1,5 +1,8 @@
 package com.automation.service.system;
 
+import com.automation.exception.ErrorMessage;
+import com.automation.exception.LocalizedArgumentException;
+
 import java.util.Map;
 
 /**
@@ -158,7 +161,7 @@ final class ExecutionSettingKeys {
     static String resolve(String key) {
         String resolvedKey = KEY_ALIASES.getOrDefault(key, key);
         if (!BOUNDS.containsKey(resolvedKey)) {
-            throw new IllegalArgumentException("Unknown execution setting: " + key);
+            throw new LocalizedArgumentException(ErrorMessage.UNKNOWN_EXECUTION_SETTING, Map.of("key", String.valueOf(key)));
         }
         return resolvedKey;
     }
@@ -184,7 +187,7 @@ final class ExecutionSettingKeys {
     private static double checkedValue(String key, String value) {
         Bound bound = BOUNDS.get(key);
         if (bound == null) {
-            throw new IllegalArgumentException("Unknown execution setting: " + key);
+            throw new LocalizedArgumentException(ErrorMessage.UNKNOWN_EXECUTION_SETTING, Map.of("key", String.valueOf(key)));
         }
         double parsed = bound.parse(value);
         if (!bound.contains(parsed)) {

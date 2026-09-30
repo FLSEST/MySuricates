@@ -82,7 +82,13 @@ class RequestBodySizeLimitFilterTest {
         verifyNoInteractions(chain);
         assertThat(response.getStatus()).isEqualTo(413);
         assertThat(response.getContentType()).startsWith("application/json");
-        assertThat(response.getContentAsString()).isEqualTo("{\"error\":\"Payload too large\",\"maxBytes\":10}");
+        var body = new com.fasterxml.jackson.databind.ObjectMapper().readTree(response.getContentAsString());
+        assertThat(body.get("code").asText()).isEqualTo("PAYLOAD_TOO_LARGE");
+        assertThat(body.get("error").asText()).isEqualTo("Payload too large");
+        assertThat(body.get("maxBytes").asLong()).isEqualTo(10);
+        // params mark the text as fully described, so the UI shows its own translation
+        assertThat(body.get("params").get("maxBytes").asText()).isEqualTo("10");
+        assertThat(body.get("timestamp").asText()).isNotBlank();
     }
 
     @Test

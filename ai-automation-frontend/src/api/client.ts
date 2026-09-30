@@ -251,7 +251,7 @@ class ApiClient {
         if (response.status === 429) {
           const seconds = parseRetryAfter(response.headers.get('Retry-After'));
           lockAfterRateLimit(path, seconds);
-          throw rateLimitError(seconds, body.error);
+          throw rateLimitError(seconds, localizedErrorText(body));
         }
         const text = localizedErrorText(body);
         throw { ...body, error: text, status: response.status, message: text };

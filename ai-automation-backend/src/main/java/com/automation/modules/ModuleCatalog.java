@@ -1,8 +1,11 @@
 package com.automation.modules;
 
+import com.automation.exception.ErrorMessage;
+
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -171,9 +174,16 @@ public enum ModuleCatalog {
 
     /** User-facing explanation why {@code what} (a block type, endpoint, tool) is unavailable. */
     public String disabledMessage(String what) {
-        return what + " requires module '" + key + "', which is disabled on this instance — set "
-                + property() + "=true and restart" + (kind() == ModuleKind.FEATURE
-                ? " (or switch it on under Settings → Modules if automation.modules.ui-editable is true)" : "");
+        return disabledErrorMessage().format(disabledParams(what));
+    }
+
+    /** The {@link #disabledMessage} as a message the UI translates; feature modules can also be switched at runtime. */
+    public ErrorMessage disabledErrorMessage() {
+        return kind() == ModuleKind.FEATURE ? ErrorMessage.MODULE_DISABLED_SWITCHABLE : ErrorMessage.MODULE_DISABLED;
+    }
+
+    public Map<String, String> disabledParams(String what) {
+        return Map.of("what", String.valueOf(what), "module", key, "property", property());
     }
 
     /** Environment variable form, e.g. {@code AUTOMATION_MODULES_REMOTE_ACCESS}. */

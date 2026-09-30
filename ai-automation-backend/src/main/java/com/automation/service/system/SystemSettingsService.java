@@ -1,12 +1,15 @@
 package com.automation.service.system;
 
 import com.automation.config.BackupConfig;
+import com.automation.exception.ErrorMessage;
+import com.automation.exception.LocalizedArgumentException;
 import com.automation.repository.AppSettingsRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -36,14 +39,14 @@ public class SystemSettingsService {
 
     public Optional<String> getSetting(String key) {
         if (!ALLOWED_SETTINGS.contains(key)) {
-            throw new IllegalArgumentException("Unknown setting: " + key);
+            throw new LocalizedArgumentException(ErrorMessage.UNKNOWN_SETTING, Map.of("key", String.valueOf(key)));
         }
         return appSettingsRepository.get(key);
     }
 
     public void setSetting(String key, String value) {
         if (!ALLOWED_SETTINGS.contains(key)) {
-            throw new IllegalArgumentException("Unknown setting: " + key);
+            throw new LocalizedArgumentException(ErrorMessage.UNKNOWN_SETTING, Map.of("key", String.valueOf(key)));
         }
         if (value == null) {
             throw new IllegalArgumentException("Value must not be null");

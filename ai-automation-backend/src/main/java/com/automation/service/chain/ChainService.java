@@ -7,6 +7,7 @@ import com.automation.entity.ChainEntry;
 import com.automation.entity.ChainRun;
 import com.automation.entity.RunStatus;
 import com.automation.entity.WorkflowChain;
+import com.automation.exception.ElementNotFoundException;
 import com.automation.repository.ChainRunRepository;
 import com.automation.repository.WorkflowChainRepository;
 import com.automation.repository.WorkflowRepository;
@@ -16,7 +17,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.NoSuchElementException;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -32,7 +33,7 @@ public class ChainService {
 
     public WorkflowChain findById(String id) {
         return chainRepository.findById(id)
-                .orElseThrow(() -> new NoSuchElementException("Chain not found: " + id));
+                .orElseThrow(() -> new ElementNotFoundException("Chain", id));
     }
 
     public WorkflowChain create(CreateChainRequest request) {
@@ -90,7 +91,7 @@ public class ChainService {
 
     public ChainRun findRunById(String runId) {
         return chainRunRepository.findById(runId)
-                .orElseThrow(() -> new NoSuchElementException("Chain run not found: " + runId));
+                .orElseThrow(() -> new ElementNotFoundException("Chain run", runId));
     }
 
     private void validateWorkflowIds(List<ChainEntryRequest> entries) {

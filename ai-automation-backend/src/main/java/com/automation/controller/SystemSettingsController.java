@@ -1,5 +1,7 @@
 package com.automation.controller;
 
+import com.automation.exception.ErrorCode;
+import com.automation.exception.ErrorResponse;
 import com.automation.service.system.ExecutionSettingsService;
 import com.automation.service.system.SystemSettingsService;
 import com.automation.service.tray.TraySettingsService;
@@ -52,7 +54,7 @@ public class SystemSettingsController {
             executionSettingsService.updateAll(settings);
             return ResponseEntity.ok(executionSettingsService.getCurrentSettings());
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest().body(ErrorResponse.from(e, ErrorCode.INVALID_ARGUMENT));
         }
     }
 
@@ -66,7 +68,7 @@ public class SystemSettingsController {
         try {
             return ResponseEntity.ok(traySettingsService.update(settings));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest().body(ErrorResponse.from(e, ErrorCode.INVALID_ARGUMENT));
         }
     }
 }

@@ -3,6 +3,8 @@ package com.automation.controller;
 import com.automation.dto.request.ExtractMemoryRequest;
 import com.automation.dto.request.UpdateMemoryRequest;
 import com.automation.dto.response.WorkflowMemoryResponse;
+import com.automation.exception.ErrorCode;
+import com.automation.exception.ErrorResponse;
 import com.automation.mapper.WorkflowMemoryMapper;
 import com.automation.modules.ModuleCatalog;
 import com.automation.modules.RequiresModule;
@@ -43,13 +45,13 @@ public class WorkflowMemoryController {
                     request.provider() != null ? request.provider() : "CLAUDE");
             return ResponseEntity.status(HttpStatus.CREATED).body(memoryMapper.toResponse(memory));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest().body(ErrorResponse.from(e, ErrorCode.INVALID_ARGUMENT));
         } catch (IllegalStateException e) {
-            return ResponseEntity.unprocessableEntity().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.unprocessableEntity().body(ErrorResponse.from(e, ErrorCode.STATE_CONFLICT));
         } catch (IOException e) {
             log.error("Knowledge extraction failed for workflow {}: {}", workflowId, e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
-                    .body(Map.of("error", "Knowledge extraction failed: " + e.getMessage()));
+                    .body(ErrorResponse.of(ErrorCode.INTERNAL_ERROR, "Knowledge extraction failed: " + e.getMessage()));
         }
     }
 

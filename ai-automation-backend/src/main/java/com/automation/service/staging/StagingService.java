@@ -5,6 +5,8 @@ import com.automation.dto.request.SyncDefinitionsRequest;
 import com.automation.dto.response.StagingStatusResponse;
 import com.automation.dto.response.SyncPreview;
 import com.automation.dto.response.SyncResult;
+import com.automation.exception.ErrorMessage;
+import com.automation.exception.LocalizedStateException;
 import com.automation.service.system.ApiKeyService;
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
@@ -216,9 +218,7 @@ public class StagingService {
     }
 
     public SyncPreview syncPreview() {
-        if (!isHealthy()) {
-            throw new IllegalStateException("Stable instance is not running or not healthy. Start it first.");
-        }
+        if (!isHealthy()) throw new LocalizedStateException(ErrorMessage.STABLE_INSTANCE_NOT_RUNNING);
         return previewService.syncPreview(deriveStableBaseUrl(), readContainerApiKey(config.getContainerName()));
     }
 
@@ -227,9 +227,7 @@ public class StagingService {
     }
 
     public SyncResult syncDefinitions(SyncDefinitionsRequest request) {
-        if (!isHealthy()) {
-            throw new IllegalStateException("Stable instance is not running or not healthy. Start it first.");
-        }
+        if (!isHealthy()) throw new LocalizedStateException(ErrorMessage.STABLE_INSTANCE_NOT_RUNNING);
         String stableApiKey = readContainerApiKey(config.getContainerName());
         return syncHelper.syncDefinitionsTo(deriveStableBaseUrl(), stableApiKey, request);
     }

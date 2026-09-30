@@ -7,6 +7,7 @@ import com.automation.entity.ChangeSource;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowChain;
 import com.automation.entity.WorkflowTemplate;
+import com.automation.exception.ElementNotFoundException;
 import com.automation.service.workflow.WorkflowService;
 import com.automation.service.workflow.WorkflowTemplateService;
 import com.automation.util.LocalizedJson;
@@ -18,7 +19,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.Objects;
 
 @Service
@@ -115,7 +115,7 @@ public class ChainTemplateService {
         return TEMPLATES.stream()
                 .filter(t -> t.id().equals(id))
                 .findFirst()
-                .orElseThrow(() -> new NoSuchElementException("Chain template not found: " + id));
+                .orElseThrow(() -> new ElementNotFoundException("Chain template", id));
     }
 
     @Transactional

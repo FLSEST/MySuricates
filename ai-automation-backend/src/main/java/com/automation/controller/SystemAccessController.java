@@ -1,6 +1,8 @@
 package com.automation.controller;
 
 import com.automation.dto.response.RemoteAccessResponse;
+import com.automation.exception.ErrorCode;
+import com.automation.exception.ErrorResponse;
 import com.automation.modules.ModuleCatalog;
 import com.automation.modules.RequiresModule;
 import com.automation.service.system.FileBrowserService;
@@ -51,18 +53,19 @@ public class SystemAccessController {
     record OpenPathRequest(String path) {}
 
     @PostMapping("/open-path")
-    public ResponseEntity<Map<String, String>> openPath(@RequestBody OpenPathRequest request) {
+    public ResponseEntity<?> openPath(@RequestBody OpenPathRequest request) {
         try {
             fileBrowserService.openPath(request.path());
             return ResponseEntity.ok(Map.of("status", "ok"));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest().body(ErrorResponse.from(e, ErrorCode.INVALID_ARGUMENT));
         } catch (IOException e) {
             log.error("Failed to open path: {}", request.path(), e);
-            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.internalServerError().body(ErrorResponse.of(ErrorCode.INTERNAL_ERROR, e.getMessage()));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            return ResponseEntity.internalServerError().body(Map.of("error", "Interrupted while opening path"));
+            return ResponseEntity.internalServerError()
+                    .body(ErrorResponse.of(ErrorCode.INTERNAL_ERROR, "Interrupted while opening path"));
         }
     }
 
@@ -75,7 +78,7 @@ public class SystemAccessController {
     }
 
     @GetMapping("/browse")
-    public ResponseEntity<Map<String, Object>> browseDirectory(
+    public ResponseEntity<?> browseDirectory(
             @RequestParam(required = false) String path) {
         try {
             FileBrowserService.BrowseResult result = fileBrowserService.browseDirectory(path);
@@ -88,9 +91,10 @@ public class SystemAccessController {
             response.put("directories", dirs);
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest().body(ErrorResponse.from(e, ErrorCode.INVALID_ARGUMENT));
         } catch (IOException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Cannot read directory: " + e.getMessage()));
+            return ResponseEntity.badRequest()
+                    .body(ErrorResponse.of(ErrorCode.INVALID_ARGUMENT, "Cannot read directory: " + e.getMessage()));
         }
     }
 }

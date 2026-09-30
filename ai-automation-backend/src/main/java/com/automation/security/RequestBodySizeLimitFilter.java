@@ -1,5 +1,6 @@
 package com.automation.security;
 
+import com.automation.exception.ErrorCode;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ReadListener;
 import jakarta.servlet.ServletException;
@@ -13,6 +14,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.util.UrlPathHelper;
 
 import java.io.IOException;
+import java.time.Instant;
 
 /**
  * Caps the request body of one POST endpoint so a single oversized payload cannot block the
@@ -79,7 +81,11 @@ public abstract class RequestBodySizeLimitFilter extends OncePerRequestFilter {
                 targetPath(), observed >= 0 ? observed : "chunked >", limit);
         response.setStatus(HttpStatus.PAYLOAD_TOO_LARGE.value());
         response.setContentType("application/json");
-        response.getWriter().write("{\"error\":\"Payload too large\",\"maxBytes\":" + limit + "}");
+        response.getWriter().write("{\"code\":\"" + ErrorCode.PAYLOAD_TOO_LARGE.name()
+                + "\",\"error\":\"" + ErrorCode.PAYLOAD_TOO_LARGE.getDefaultMessage()
+                + "\",\"timestamp\":\"" + Instant.now()
+                + "\",\"params\":{\"maxBytes\":\"" + limit + "\"}"
+                + ",\"maxBytes\":" + limit + "}");
     }
 
     /** Unchecked because the servlet API only allows IOException through doFilter. */

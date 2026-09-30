@@ -26,6 +26,8 @@ public enum ErrorCode {
     PROVIDER_NOT_TASK_CAPABLE(HttpStatus.BAD_REQUEST, "Integration provider cannot receive tasks"),
     SERVICE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "Service unavailable"),
     TOKEN_BUDGET_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "Token budget exceeded"),
+    RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "Rate limit exceeded"),
+    PAYLOAD_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE, "Payload too large"),
     OPERATION_TIMEOUT(HttpStatus.GATEWAY_TIMEOUT, "Operation timed out"),
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "Method not allowed"),
     RUN_DELETION_DISABLED(HttpStatus.FORBIDDEN, "Deleting runs is disabled"),

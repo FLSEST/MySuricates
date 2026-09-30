@@ -1,9 +1,11 @@
 package com.automation.service.scheduler;
 
 import com.automation.dto.response.UpcomingScheduleResponse;
-import com.automation.entity.ScheduledWorkflow;
 import com.automation.entity.ScheduledWorkflow.ScheduleType;
 import com.automation.entity.ScheduledWorkflow.TargetType;
+import com.automation.entity.ScheduledWorkflow;
+import com.automation.exception.ErrorMessage;
+import com.automation.exception.LocalizedArgumentException;
 import com.automation.repository.ScheduledWorkflowRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.support.CronExpression;
@@ -19,6 +21,7 @@ import java.time.ZoneId;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -215,7 +218,7 @@ public class UpcomingRunsCalculator {
     /** The next {@code count} runs of a cron expression — after an active skip-until pause. */
     public List<Instant> getNextRuns(String cronExpression, int count) {
         if (!CronExpression.isValidExpression(cronExpression)) {
-            throw new IllegalArgumentException("Invalid cron expression: " + cronExpression);
+            throw new LocalizedArgumentException(ErrorMessage.INVALID_CRON, Map.of("expression", String.valueOf(cronExpression)));
         }
         CronExpression cron = CronExpression.parse(cronExpression);
         List<Instant> result = new ArrayList<>();

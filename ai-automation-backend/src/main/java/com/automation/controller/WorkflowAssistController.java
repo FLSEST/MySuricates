@@ -2,6 +2,8 @@ package com.automation.controller;
 
 import com.automation.entity.Workflow;
 import com.automation.exception.ErrorCode;
+import com.automation.exception.ErrorMessage;
+import com.automation.exception.ErrorResponse;
 import com.automation.exception.HardeningException;
 import com.automation.modules.ModuleCatalog;
 import com.automation.modules.RequiresModule;
@@ -55,7 +57,7 @@ public class WorkflowAssistController {
 
     @PostMapping("/{id}/repair")
     @RequiresModule(ModuleCatalog.FACTORY)
-    public ResponseEntity<Map<String, String>> repairWorkflow(@PathVariable String id) {
+    public ResponseEntity<?> repairWorkflow(@PathVariable String id) {
         // Verify workflow exists
         Workflow workflow = workflowService.findById(id);
         if (workflow.isSealed()) {
@@ -67,8 +69,8 @@ public class WorkflowAssistController {
 
         // Check for FAILED runs
         if (!executionQueryService.hasFailedRuns(id)) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "error", "Workflow '" + workflow.getName() + "' has no failed runs"));
+            return ResponseEntity.badRequest().body(ErrorResponse.of(ErrorMessage.NO_FAILED_RUNS,
+                    Map.of("name", String.valueOf(workflow.getName()))));
         }
 
         autoRepairService.repairWorkflow(id);

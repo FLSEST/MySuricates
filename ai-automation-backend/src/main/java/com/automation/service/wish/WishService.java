@@ -2,6 +2,7 @@ package com.automation.service.wish;
 
 import com.automation.dto.request.WishRespondRequest;
 import com.automation.entity.*;
+import com.automation.exception.ElementNotFoundException;
 import com.automation.repository.ProjectRepository;
 import com.automation.repository.WishRepository;
 import com.automation.service.workflow.WorkflowTemplateService;
@@ -49,7 +50,7 @@ public class WishService {
 
     public Wish findById(String id) {
         return wishRepository.findById(id)
-                .orElseThrow(() -> new NoSuchElementException("Wish not found: " + id));
+                .orElseThrow(() -> new ElementNotFoundException("Wish", id));
     }
 
     public Wish create(String text, String projectId, Integer maxIterations, List<String> referenceWorkflowIds) {
@@ -61,7 +62,7 @@ public class WishService {
             throw new IllegalArgumentException("projectId is required for wish creation");
         }
         projectRepository.findById(projectId)
-                .orElseThrow(() -> new NoSuchElementException("Project not found: " + projectId));
+                .orElseThrow(() -> new ElementNotFoundException("Project", projectId));
 
         Wish wish = Wish.builder()
                 .originalText(text)

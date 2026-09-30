@@ -2258,5 +2258,7 @@ export interface ApiError {
   code?: string;
   /** Present when code + params describe the error completely — the UI then translates the code. */
   params?: Record<string, string>;
+  /** Backend `ErrorMessage` key when the code alone does not tell which message this is. */
+  messageKey?: string;
   fieldErrors?: Record<string, string>;
 }

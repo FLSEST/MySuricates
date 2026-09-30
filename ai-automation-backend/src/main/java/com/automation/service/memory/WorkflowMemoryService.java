@@ -3,6 +3,8 @@ package com.automation.service.memory;
 import com.automation.entity.StepResult;
 import com.automation.entity.WorkflowMemory;
 import com.automation.entity.WorkflowRun;
+import com.automation.exception.ErrorMessage;
+import com.automation.exception.LocalizedArgumentException;
 import com.automation.repository.WorkflowMemoryRepository;
 import com.automation.repository.WorkflowRunRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -160,7 +162,7 @@ public class WorkflowMemoryService {
                 .orElseThrow(() -> new EntityNotFoundException("Memory not found: " + memoryId));
 
         if (!memory.getWorkflowId().equals(workflowId)) {
-            throw new IllegalArgumentException("Memory does not belong to workflow");
+            throw new LocalizedArgumentException(ErrorMessage.MEMORY_NOT_IN_WORKFLOW);
         }
 
         memoryRepository.deactivateAllForWorkflow(workflowId);
@@ -177,7 +179,7 @@ public class WorkflowMemoryService {
                 .orElseThrow(() -> new EntityNotFoundException("Memory not found: " + memoryId));
 
         if (!memory.getWorkflowId().equals(workflowId)) {
-            throw new IllegalArgumentException("Memory does not belong to workflow");
+            throw new LocalizedArgumentException(ErrorMessage.MEMORY_NOT_IN_WORKFLOW);
         }
 
         if (title != null) memory.setTitle(title);
@@ -192,7 +194,7 @@ public class WorkflowMemoryService {
                 .orElseThrow(() -> new EntityNotFoundException("Memory not found: " + memoryId));
 
         if (!memory.getWorkflowId().equals(workflowId)) {
-            throw new IllegalArgumentException("Memory does not belong to workflow");
+            throw new LocalizedArgumentException(ErrorMessage.MEMORY_NOT_IN_WORKFLOW);
         }
 
         memoryRepository.delete(memory);

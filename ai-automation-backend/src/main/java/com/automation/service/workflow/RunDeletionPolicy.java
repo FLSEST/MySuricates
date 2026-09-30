@@ -1,6 +1,7 @@
 package com.automation.service.workflow;
 
 import com.automation.exception.ErrorCode;
+import com.automation.exception.ErrorMessage;
 import com.automation.exception.HardeningException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -44,9 +45,8 @@ public class RunDeletionPolicy {
         if (allowDelete || keptDays(requestedDays) >= keptDays(currentDays)) {
             return;
         }
-        throw new HardeningException(ErrorCode.RUN_DELETION_DISABLED,
-                "Run retention can only be extended while deleting runs is disabled "
-                        + "(automation.executions.allow-delete=false): " + currentDays + " -> " + requestedDays + " days");
+        throw new HardeningException(ErrorMessage.RUN_RETENTION_LOCKED,
+                Map.of("current", String.valueOf(currentDays), "requested", String.valueOf(requestedDays)));
     }
 
     private static long keptDays(int retentionDays) {

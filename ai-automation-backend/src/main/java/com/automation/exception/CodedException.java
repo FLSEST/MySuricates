@@ -17,6 +17,8 @@ public abstract class CodedException extends RuntimeException {
 
     private final ErrorCode code;
     private final Map<String, String> params;
+    /** Set when the message is one of the {@link ErrorMessage}s rather than the code's own text. */
+    private final ErrorMessage errorMessage;
 
     protected CodedException(ErrorCode code, String message) {
         this(code, message, null);
@@ -26,5 +28,13 @@ public abstract class CodedException extends RuntimeException {
         super(message);
         this.code = code;
         this.params = params == null ? null : Map.copyOf(params);
+        this.errorMessage = null;
+    }
+
+    protected CodedException(ErrorMessage errorMessage, Map<String, String> params) {
+        super(errorMessage.format(params));
+        this.code = errorMessage.getCode();
+        this.params = Map.copyOf(params);
+        this.errorMessage = errorMessage;
     }
 }

@@ -1,12 +1,16 @@
 package com.automation.service.scheduler;
 
+
+import com.automation.dto.request.UpdateScheduleRequest;
 import com.automation.entity.ChainRun;
-import com.automation.entity.ScheduledWorkflow;
 import com.automation.entity.ScheduledWorkflow.ScheduleType;
 import com.automation.entity.ScheduledWorkflow.TargetType;
+import com.automation.entity.ScheduledWorkflow;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowChain;
 import com.automation.entity.WorkflowRun;
+import com.automation.exception.ErrorMessage;
+import com.automation.exception.LocalizedArgumentException;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.repository.ChainRunRepository;
 import com.automation.repository.ScheduledWorkflowRepository;
@@ -19,8 +23,6 @@ import org.springframework.data.domain.Limit;
 import org.springframework.scheduling.support.CronExpression;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import com.automation.dto.request.UpdateScheduleRequest;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -163,7 +165,7 @@ public class SchedulerService {
 
         if (scheduled.getScheduleType() == ScheduleType.CRON && request.cronExpression() != null) {
             if (!CronExpression.isValidExpression(request.cronExpression())) {
-                throw new IllegalArgumentException("Invalid cron expression: " + request.cronExpression());
+                throw new LocalizedArgumentException(ErrorMessage.INVALID_CRON, Map.of("expression", String.valueOf(request.cronExpression())));
             }
             scheduled.setCronExpression(request.cronExpression());
             if (scheduled.isEnabled()) {
@@ -265,7 +267,7 @@ public class SchedulerService {
                     throw new IllegalArgumentException("cronExpression is required for CRON schedules");
                 }
                 if (!CronExpression.isValidExpression(cronExpression)) {
-                    throw new IllegalArgumentException("Invalid cron expression: " + cronExpression);
+                    throw new LocalizedArgumentException(ErrorMessage.INVALID_CRON, Map.of("expression", String.valueOf(cronExpression)));
                 }
                 builder.cronExpression(cronExpression).nextRunAt(definitionParser.calculateNextRun(cronExpression));
             }

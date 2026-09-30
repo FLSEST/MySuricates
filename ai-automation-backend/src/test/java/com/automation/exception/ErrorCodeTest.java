@@ -15,7 +15,7 @@ class ErrorCodeTest {
 
     @Test
     void should_containAllExpectedValues_when_enumValuesQueried() {
-        assertThat(ErrorCode.values()).hasSize(24)
+        assertThat(ErrorCode.values()).hasSize(26)
                 .containsExactly(
                         ErrorCode.RESOURCE_NOT_FOUND,
                         ErrorCode.MODULE_DISABLED,
@@ -37,6 +37,8 @@ class ErrorCodeTest {
                         ErrorCode.PROVIDER_NOT_TASK_CAPABLE,
                         ErrorCode.SERVICE_UNAVAILABLE,
                         ErrorCode.TOKEN_BUDGET_EXCEEDED,
+                        ErrorCode.RATE_LIMITED,
+                        ErrorCode.PAYLOAD_TOO_LARGE,
                         ErrorCode.OPERATION_TIMEOUT,
                         ErrorCode.METHOD_NOT_ALLOWED,
                         ErrorCode.RUN_DELETION_DISABLED,
@@ -115,6 +117,8 @@ class ErrorCodeTest {
                 Arguments.of(ErrorCode.PROVIDER_NOT_TASK_CAPABLE, HttpStatus.BAD_REQUEST, "Integration provider cannot receive tasks"),
                 Arguments.of(ErrorCode.SERVICE_UNAVAILABLE, HttpStatus.SERVICE_UNAVAILABLE, "Service unavailable"),
                 Arguments.of(ErrorCode.TOKEN_BUDGET_EXCEEDED, HttpStatus.TOO_MANY_REQUESTS, "Token budget exceeded"),
+                Arguments.of(ErrorCode.RATE_LIMITED, HttpStatus.TOO_MANY_REQUESTS, "Rate limit exceeded"),
+                Arguments.of(ErrorCode.PAYLOAD_TOO_LARGE, HttpStatus.PAYLOAD_TOO_LARGE, "Payload too large"),
                 Arguments.of(ErrorCode.OPERATION_TIMEOUT, HttpStatus.GATEWAY_TIMEOUT, "Operation timed out"),
                 Arguments.of(ErrorCode.METHOD_NOT_ALLOWED, HttpStatus.METHOD_NOT_ALLOWED, "Method not allowed"),
                 Arguments.of(ErrorCode.RUN_DELETION_DISABLED, HttpStatus.FORBIDDEN, "Deleting runs is disabled"),

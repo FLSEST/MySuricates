@@ -7,13 +7,16 @@ import { en } from '../../i18n/en';
 import { api, apiErrorMessage, resetRateLimitBackoff } from '../client';
 import { localizedErrorText } from '../errorText';
 
-// Backend error codes in the UI's language (TODO 325cc733): the backend sends code + params when
-// they describe the message completely, the UI translates the code, everything else keeps the
-// server text.
+// Backend errors in the UI's language (TODO 325cc733, db79450d): the backend sends code + params
+// (and a messageKey where one code stands for many messages) when they describe the message
+// completely, the UI translates them, everything else keeps the server text.
 
 const BACKEND = resolve(__dirname, '../../../../ai-automation-backend/src/main/java/com/automation');
 
-/** Codes whose message is free text from the throw site — no translation, the server text is shown. */
+/**
+ * Codes without a text of their own: the message comes from the throw site — free text, shown as
+ * it is, or an `ErrorMessage` sent with its messageKey and translated from errors.messages.
+ */
 const FREE_TEXT_CODES = [
   'MODULE_DISABLED',
   'VALIDATION_FAILED',
@@ -29,6 +32,15 @@ const FREE_TEXT_CODES = [
 function backendErrorCodes(): string[] {
   const source = readFileSync(join(BACKEND, 'exception/ErrorCode.java'), 'utf8');
   return [...source.matchAll(/^\s{4}([A-Z_]+)\(HttpStatus\./gm)].map((match) => match[1] ?? '');
+}
+
+/** Key → English template of the backend's ErrorMessage enum (one string literal each). */
+function backendErrorMessages(): Record<string, string> {
+  const source = readFileSync(join(BACKEND, 'exception/ErrorMessage.java'), 'utf8');
+  return Object.fromEntries(
+    [...source.matchAll(/^\s{4}([A-Z_]+)\(ErrorCode\.[A-Z_]+, "((?:[^"\\]|\\.)*)"\)[,;]/gm)]
+      .map((match) => [match[1] ?? '', (match[2] ?? '').replace(/\\(.)/g, '$1')]),
+  );
 }
 
 function javaFiles(dir: string): string[] {
@@ -59,7 +71,7 @@ describe('backend error codes', () => {
   it('name every resource type the backend reports as not found', () => {
     const types = new Set<string>();
     for (const file of javaFiles(BACKEND)) {
-      for (const match of readFileSync(file, 'utf8').matchAll(/new ResourceNotFoundException\("([^"]+)"/g)) {
+      for (const match of readFileSync(file, 'utf8').matchAll(/new (?:ResourceNotFound|ElementNotFound)Exception\("([^"]+)"/g)) {
         if (match[1]) types.add(match[1]);
       }
     }
@@ -67,6 +79,21 @@ describe('backend error codes', () => {
 
     const missing = [...types].filter((type) => !(type in en.errors.resources)).sort();
     expect(missing, 'add these to errors.resources in de.ts and en.ts').toEqual([]);
+  });
+});
+
+describe('backend error messages', () => {
+  it('have a text for every key of ErrorMessage.java, in English word for word', () => {
+    const backend = backendErrorMessages();
+    expect(Object.keys(backend).length).toBeGreaterThan(10);
+
+    expect(en.errors.messages).toEqual(backend);
+  });
+
+  it('use the same placeholders in German and English', () => {
+    for (const [key, text] of Object.entries(en.errors.messages)) {
+      expect(placeholders(de.errors.messages[key as keyof typeof de.errors.messages]), key).toEqual(placeholders(text));
+    }
   });
 });
 
@@ -91,6 +118,17 @@ describe('localizedErrorText', () => {
       .toBe('Projekt nicht gefunden (ID: p-1)');
     expect(localizedErrorText({ code: 'RESOURCE_NOT_FOUND', params: { resource: 'Gadget', id: 'g-1' }, error: 'x' }))
       .toBe('Gadget nicht gefunden (ID: g-1)');
+  });
+
+  it('translates by messageKey where the code stands for many messages', () => {
+    expect(localizedErrorText({
+      code: 'INVALID_ARGUMENT',
+      messageKey: 'INVALID_CRON',
+      params: { expression: '* *' },
+      error: 'Invalid cron expression: * *',
+    })).toBe('Ungültiger Cron-Ausdruck: * *');
+    expect(localizedErrorText({ code: 'INVALID_ARGUMENT', messageKey: 'NO_SUCH_KEY', params: {}, error: 'Server text' }))
+      .toBe('Server text');
   });
 
   it('keeps the server text without params — the same code can carry a different message', () => {

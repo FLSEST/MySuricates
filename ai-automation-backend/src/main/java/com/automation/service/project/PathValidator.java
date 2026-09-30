@@ -1,5 +1,8 @@
 package com.automation.service.project;
 
+import com.automation.exception.ErrorMessage;
+import com.automation.exception.LocalizedArgumentException;
+
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -9,6 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -113,11 +117,11 @@ public class PathValidator {
             return;
         }
         if (pathToCheck.equals("/")) {
-            throw new IllegalArgumentException("Path points to a restricted system directory: " + reportedPath);
+            throw new LocalizedArgumentException(ErrorMessage.RESTRICTED_PATH, Map.of("path", String.valueOf(reportedPath)));
         }
         for (String restricted : SYSTEM_DIRECTORIES) {
             if (pathToCheck.equals(restricted) || pathToCheck.startsWith(restricted + "/")) {
-                throw new IllegalArgumentException("Path points to a restricted system directory: " + reportedPath);
+                throw new LocalizedArgumentException(ErrorMessage.RESTRICTED_PATH, Map.of("path", String.valueOf(reportedPath)));
             }
         }
     }
