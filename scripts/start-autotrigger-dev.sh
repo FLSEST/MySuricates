@@ -27,7 +27,7 @@ REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 # Backend und Vite fragen: nie ueber einen Proxy aus der Umgebung, der Key nur ueber stdin (bb4f60a5).
 # shellcheck source=lib/local-curl.sh
 . "${SCRIPT_DIR}/lib/local-curl.sh"
-# api_key(): Env -> Key-Datei, nie die DB (ausgelagert fuer setup-audit-workflows.sh, fff23a6c).
+# api_key(): Env -> Key-Datei, nie die DB (fff23a6c).
 # shellcheck source=lib/api-key.sh
 . "${SCRIPT_DIR}/lib/api-key.sh"
 

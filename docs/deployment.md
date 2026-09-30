@@ -780,8 +780,6 @@ Stable und Test starten **nicht** automatisch — weder beim Boot noch mit dem D
 | Stable | „MySuricates Stable" | `scripts/staging.sh start` |
 | Test | „MySuricates Test" | `scripts/staging.sh test-start` |
 
-Icons (Desktop + Anwendungsmenü) anlegen bzw. erneuern: `scripts/install_desktop_launcher.sh`.
-
 Zwei Mechanismen wurden dafür abgeschaltet:
 - **Docker-Restart-Policy** — `restart: "no"` in `docker-compose.stable.yml` / `docker-compose.test.yml`. Vorher (`unless-stopped`) fuhr der Docker-Daemon beide Container bei jedem Boot wieder hoch.
 - **Dev-Auto-Start** — `automation.staging.auto-start` und `automation.staging.test-auto-start` stehen auf `false`. Vorher startete das Dev-Backend beide Container beim `ApplicationReadyEvent`, sofern ein Snapshot (`stable-frontend/`) vorhanden war und der Container nicht schon lief.

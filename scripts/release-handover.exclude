@@ -15,8 +15,9 @@
 
 # --- Einmal-Migration der Workflows einer bestimmten Instanz ----------------------------------------
 # Die prepare-Skripte tragen Workflow-IDs und Quellpfade der Instanz des Maintainers und
-# Projektnamen, die nicht öffentlich sind. apply-migration.py und prune-workspaces.py sind
-# allgemein (und durch scripts/tests/test_local_api_proxy.py in der CI geprüft) und bleiben drin.
+# Projektnamen, die nicht öffentlich sind. apply-migration.py bleibt daneben drin: allgemein und
+# durch scripts/tests/test_local_api_proxy.py in der CI geprüft (ebenso scripts/tools/prune-workspaces.py,
+# das nichts Privates trägt und deshalb nicht mehr unter workspace-isolation/ liegt).
 scripts/workspace-isolation/prepare-*.py
 # Pool-Overrides für private Projekte derselben Migration.
 scripts/workspace-isolation/pool-overrides/

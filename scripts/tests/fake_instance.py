@@ -46,7 +46,7 @@ class Api(http.server.BaseHTTPRequestHandler):
             return self.answer(404, {})
         if given != self.key:
             return self.answer(401, {"error": "Unauthorized"})
-        if self.path.startswith("/api/v1/executions/"):  # one run (workspace-isolation/prune-workspaces.py)
+        if self.path.startswith("/api/v1/executions/"):  # one run (tools/prune-workspaces.py)
             return self.answer(200, {"id": self.path.split("?")[0].split("/")[4], "status": "RUNNING"})
         if not self.path.startswith("/api/v1/executions?"):
             return self.answer(404, {})

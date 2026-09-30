@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Tests fuer scripts/release-handover.sh. Das Skript laeuft wirklich: ein Wegwerf-Arbeits-Repo mit
 # Tags und den echten Gate-Skripten (public-hygiene, pool-neutrality, pre-push-checks) und ein
-# Wegwerf-"oeffentliches" Repo (lokal: bare + Klon). Nur die drei Doku-Gates, die
-# pre-push-checks.sh --tree aufruft, sind Attrappen — sie brauchen das ganze Projekt.
+# Wegwerf-"oeffentliches" Repo (lokal: bare + Klon). Nur die vier Doku-Gates, die
+# pre-push-checks.sh --tree aufruft, sind Attrappen — sie brauchen das ganze Projekt (der
+# API-Endpunkt-Abgleich z. B. echte Controller-Klassen und docs/api-referenz.md).
 #
 # Geprueft: Ausschlussliste, Inhalt ersetzt (ignorierte Build-Caches bleiben), Commit mit
 # noreply-Autor, annotiertes Tag, Notizdatei, Abbruch bei Gate-Befund (Standard-Regel, private
@@ -46,6 +47,7 @@ cat > "$SRC/scripts/public-readiness/doc-facts-check.sh" <<'SH'
 SH
 printf 'import sys\nsys.exit(0)\n' > "$SRC/scripts/public-readiness/docs_parity_check.py"
 printf 'import sys\nsys.exit(0)\n' > "$SRC/scripts/docs-diagrams.py"
+printf '#!/usr/bin/env bash\nexit 0\n' > "$SRC/scripts/public-readiness/api-endpoint-diff.sh"
 printf '# Ausnahmen\nassets/logo.png\n' > "$SRC/scripts/ci/hygiene-allowlist.txt"
 cat > "$SRC/scripts/release-handover.exclude" <<'EXC'
 # Testliste
