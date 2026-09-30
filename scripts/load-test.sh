@@ -26,6 +26,8 @@ set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$SCRIPT_DIR/.." && pwd)"
+# shellcheck source=lib/local-curl.sh
+. "$SCRIPT_DIR/lib/local-curl.sh"
 REF="HEAD"
 JAR=""
 SCENARIO="$SCRIPT_DIR/load-test/scenario.json"
@@ -128,10 +130,10 @@ JVM_PID=$!
 
 for _ in $(seq 1 180); do
   kill -0 "$JVM_PID" 2>/dev/null || { tail -30 "$WORK/instance.log" >&2; cp "$WORK/instance.log" "$RESULT_DIR/"; fail "Instanz beendete sich beim Start"; }
-  curl -sf --noproxy '*' -m 2 "http://127.0.0.1:$PORT/actuator/health" >/dev/null && break
+  local_curl -sf -m 2 "http://127.0.0.1:$PORT/actuator/health" >/dev/null && break
   sleep 1
 done
-curl -sf --noproxy '*' -m 2 "http://127.0.0.1:$PORT/actuator/health" >/dev/null || fail "Instanz nach 180 s nicht erreichbar"
+local_curl -sf -m 2 "http://127.0.0.1:$PORT/actuator/health" >/dev/null || fail "Instanz nach 180 s nicht erreichbar"
 log "Instanz bereit (PID $JVM_PID)"
 
 # --- 3. Seed und Last --------------------------------------------------------------------------------
