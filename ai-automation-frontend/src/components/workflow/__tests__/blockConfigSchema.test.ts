@@ -22,14 +22,11 @@ const DEFINITION_DIRS = [
 /**
  * Keys in shipped definitions that no executor reads — the editor rightly warns about them there.
  * Listed so this guard stays strict for everything else; fixing the definition removes the entry.
- * github-project-bootstrap, saas-feature-implement and saas-spec-to-buildplan are fixed (TODO
- * 955f765a). Left: saas-feature-loop — since TODO 7ddacd1d a pool entry with scope external, no
- * longer a built-in — nests a sub-workflow in a foreach, which no block type can express yet:
- * TODO 46b9b229 (Built-in-Template saas-feature-loop läuft nicht).
+ * github-project-bootstrap, saas-feature-implement and saas-spec-to-buildplan are fixed. Currently
+ * empty: saas-feature-loop nested a sub-workflow in a foreach, which no block type can express yet,
+ * and was taken out of the pool until it can.
  */
-const KNOWN_INEFFECTIVE = new Set([
-  'foreach.blocks', 'foreach lacks command',
-]);
+const KNOWN_INEFFECTIVE = new Set<string>([]);
 
 type Block = { type: string; config?: Record<string, unknown> };
 
