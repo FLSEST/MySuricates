@@ -450,6 +450,8 @@ erDiagram
 | `async` | INTEGER | NOT NULL, DEFAULT 0 | Asynchrone Ausführung |
 | `writes` | INTEGER | NOT NULL, DEFAULT 0 | Capability verändert Dateien/State (V64). Block-Config muss `allow_writes: true` setzen; Quelle ist `"writes": true` in `skills/builtin/<id>.json` |
 
+**Index:** `idx_capabilities_skill_id` (V95)
+
 ### `workflows`
 
 | Spalte | Typ | Constraints | Beschreibung |
@@ -480,6 +482,8 @@ erDiagram
 | `updated_at` | TEXT | | Aktualisierungszeitpunkt |
 
 **Soft-Delete:** Die Entity-Klasse trägt `@SQLRestriction("deleted_at IS NULL")`. Gelöschte Workflows sind dauerhaft aus allen Abfragen ausgeblendet.
+
+**Index:** `idx_workflows_project_id` (V95)
 
 ### `workflow_skills` (Join-Tabelle)
 
@@ -551,6 +555,8 @@ M:N-Beziehung zwischen Workflows und Skills.
 | `created_at` | TEXT | | Erstellzeitpunkt |
 | `updated_at` | TEXT | | Aktualisierungszeitpunkt |
 
+**Indizes:** `idx_scheduled_workflows_workflow_id`, `idx_scheduled_workflows_chain_id` (V95; der Tabellenneubau in V38 hatte keinen Index)
+
 ### `webhook_triggers`
 
 | Spalte | Typ | Constraints | Beschreibung |
@@ -566,7 +572,7 @@ M:N-Beziehung zwischen Workflows und Skills.
 | `created_at` | TEXT | | Erstellzeitpunkt |
 | `updated_at` | TEXT | | Aktualisierungszeitpunkt |
 
-**Index:** `idx_webhook_triggers_token` auf `secret_token` (UNIQUE)
+**Indizes:** `idx_webhook_triggers_token` auf `secret_token` (UNIQUE), `idx_webhook_triggers_workflow_id` (V95)
 
 ### `workflow_templates`
 
@@ -615,7 +621,7 @@ M:N-Beziehung zwischen Workflows und Skills.
 | `active` | INTEGER | NOT NULL, DEFAULT 0 | 1 = in nachfolgende Runs injizieren |
 | `created_at` | TEXT | NOT NULL | |
 
-**Indizes:** `idx_workflow_memory_workflow`, `idx_workflow_memory_active`
+**Indizes:** `idx_workflow_memory_workflow`, `idx_workflow_memory_active` auf `(workflow_id, active)`, `idx_workflow_memory_active_created_at` auf `(active, created_at)` (V95: neueste aktive Memories über alle Workflows)
 
 ### `workflow_chains`
 
@@ -896,7 +902,7 @@ Startet automatisch einen Ziel-Workflow, wenn ein Quell-Workflow abgeschlossen w
 | `created_at` | TEXT | | Erstellzeitpunkt |
 | `updated_at` | TEXT | | Aktualisierungszeitpunkt |
 
-**Indizes:** `idx_todo_triggers_enabled`
+**Indizes:** `idx_todo_triggers_enabled`, `idx_todo_triggers_target_workflow_id` (V95)
 
 Schliesst den Self-Improvement-Loop: Wenn ein TODO erstellt wird (z.B. durch AutoTodoService), prüft `TodoTriggerService` alle aktiven TodoTrigger. Bei Tag-Match wird der Fix-Workflow gestartet, bei GREEN Gate das TODO geschlossen. Loop-Prevention über `todoTriggerRun`-Metadata-Flag, Max-Attempts-Zähler und Running-Check (V51/V52).
 
@@ -1030,7 +1036,7 @@ UNIQUE-Constraint auf (`workflow_id`, `version_number`). Speichert vollständige
 | `created_at` | TEXT | NOT NULL | Erstellzeitpunkt |
 | `updated_at` | TEXT | | Aktualisierungszeitpunkt |
 
-**Indizes:** `idx_dlq_status`, `idx_dlq_created_at` (DESC). Dead-Letter-Queue für wiederholt fehlgeschlagene Workflow-Runs (V63).
+**Indizes:** `idx_dlq_status`, `idx_dlq_created_at` (DESC), `idx_dead_letter_entries_workflow_run_id` (V95). Dead-Letter-Queue für wiederholt fehlgeschlagene Workflow-Runs (V63).
 
 ### `app_settings`
 
@@ -1402,6 +1408,7 @@ folgt freier Text.
 | V92 | `V92__goal_projects_work_packages_milestones.sql` | neue Tabelle `goal_projects` (aus den TODOs befüllt); die bisherigen Meilensteine werden `goal_work_packages` (Neubau mit `project_id`, `position`, `start_date`/`end_date`, `completed_at`; gemischte Pakete je Minderheitsprojekt aufgeteilt), `todos.milestone_id` → `work_package_id` (vor dem Neubau gesichert und zurückgeschrieben); neue Tabellen `goal_milestones` (Termine des Ziels) und `goal_milestone_work_packages` |
 | V93 | `V93__todo_decisions.sql` | `decision`, `decided_at`, `decided_by` in todos (Entscheidung zur offenen Frage) |
 | V94 | `V94__goal_workflows.sql` | neue Tabelle `goal_workflows` (Workflows am Ziel oder Arbeitspaket, Rolle WORKER/STATUS) |
+| V95 | `V95__index_findby_gaps.sql` | Indizes für abgeleitete Abfragen auf heißen Pfaden: `workflows.project_id`, `scheduled_workflows.workflow_id`/`chain_id`, `webhook_triggers.workflow_id`, `todo_triggers.target_workflow_id`, `capabilities.skill_id`, `dead_letter_entries.workflow_run_id`, `workflow_memory(active, created_at)` |
 
 ## SQLite-Besonderheiten
 

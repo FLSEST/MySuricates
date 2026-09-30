@@ -1266,6 +1266,7 @@ The DB migrations (`src/main/resources/db/migration/`) document the feature time
 | V92 | Goals stage 1: table `goal_projects`; the former milestones become `goal_work_packages` (project, position, period, mixed packages split, `todos.milestone_id` → `work_package_id`); new `goal_milestones` (dates of the goal) and `goal_milestone_work_packages` |
 | V93 | Goals stage 2: decision on the TODO (`todos.decision`, `decided_at`, `decided_by`) |
 | V94 | Goals stage 3: table `goal_workflows` (workflows on a goal or work package) |
+| V95 | Indexes for derived queries on hot paths (`workflows.project_id`, `scheduled_workflows.workflow_id`/`chain_id`, triggers per workflow, `capabilities.skill_id`, `dead_letter_entries.workflow_run_id`, `workflow_memory(active, created_at)`) |
 
 ## Architecture Gates
 
@@ -1308,7 +1309,7 @@ autotrigger/
 │           ├── application-dev.yml    ← Dev profile
 │           ├── agent-instructions.md  ← Base agent instructions
 │           ├── templates/builtin/     ← Built-in template JSON files
-│           └── db/migration/          ← 94 Flyway migrations (V1–V94)
+│           └── db/migration/          ← 95 Flyway migrations (V1–V95)
 │
 └── ai-automation-frontend/
     ├── package.json

@@ -1290,6 +1290,7 @@ Die DB-Migrationen (`src/main/resources/db/migration/`) dokumentieren die Featur
 | V92 | Ziele Stufe 1: Tabelle `goal_projects`; die bisherigen Meilensteine werden `goal_work_packages` (Projekt, Position, Zeitraum, gemischte Pakete aufgeteilt, `todos.milestone_id` → `work_package_id`); neu `goal_milestones` (Termine des Ziels) und `goal_milestone_work_packages` |
 | V93 | Ziele Stufe 2: Entscheidung am TODO (`todos.decision`, `decided_at`, `decided_by`) |
 | V94 | Ziele Stufe 3: Tabelle `goal_workflows` (Workflows am Ziel oder Arbeitspaket) |
+| V95 | Indizes für abgeleitete Abfragen auf heißen Pfaden (`workflows.project_id`, `scheduled_workflows.workflow_id`/`chain_id`, Trigger je Workflow, `capabilities.skill_id`, `dead_letter_entries.workflow_run_id`, `workflow_memory(active, created_at)`) |
 
 ## Architektur-Gates
 
@@ -1332,7 +1333,7 @@ autotrigger/
 │           ├── application-dev.yml    ← Dev-Profil
 │           ├── agent-instructions.md  ← Basis-Agent-Instructions
 │           ├── templates/builtin/     ← Built-in Template JSON-Dateien
-│           └── db/migration/          ← 94 Flyway-Migrationen (V1–V94)
+│           └── db/migration/          ← 95 Flyway-Migrationen (V1–V95)
 │
 └── ai-automation-frontend/
     ├── package.json
