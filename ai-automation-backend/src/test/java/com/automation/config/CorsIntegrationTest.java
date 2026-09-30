@@ -35,7 +35,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ActiveProfiles("integration")
 @TestPropertySource(properties = {
         "automation.security.enabled=true",
-        "automation.security.api-key=test-api-key-12345"
+        "automation.security.api-key=test-api-key"
 })
 class CorsIntegrationTest {
 
@@ -150,7 +150,7 @@ class CorsIntegrationTest {
     }
 
     private String issueTicket() throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/v1/ws-ticket").header("X-API-Key", "test-api-key-12345"))
+        MvcResult result = mockMvc.perform(post("/api/v1/ws-ticket").header("X-API-Key", "test-api-key"))
                 .andExpect(status().isOk())
                 .andReturn();
         return JsonPath.read(result.getResponse().getContentAsString(), "$.ticket");

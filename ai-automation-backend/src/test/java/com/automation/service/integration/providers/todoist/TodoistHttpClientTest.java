@@ -15,7 +15,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /** Transport and error mapping of the Todoist API v1 client against a local stub. */
 class TodoistHttpClientTest {
 
-    private static final String TOKEN = "0123456789abcdef0123456789abcdef01234567";
+    private static final String TOKEN = "test-todoist-token";
 
     private StubApiServer stub;
     private TodoistHttpClient client;

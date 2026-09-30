@@ -25,7 +25,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 class TodoistProviderTest {
 
-    private static final String TOKEN = "0123456789abcdef0123456789abcdef01234567";
+    private static final String TOKEN = "test-todoist-token";
     private static final String CREDENTIAL = "Mein Todoist|" + TOKEN;
     private static final String TASK_ID = "6XGgmFVcrG5RRjVr";
     private static final String PROJECT_ID = "6XGgm6PHrGgMpCFX";
