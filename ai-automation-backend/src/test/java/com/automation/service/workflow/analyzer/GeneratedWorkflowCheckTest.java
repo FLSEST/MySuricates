@@ -146,6 +146,8 @@ class GeneratedWorkflowCheckTest {
         assertThat(calls).hasValue(1);
         assertThat(prompt.get())
                 .contains("HIGH missing-required-config-key")
+                .contains("required key command is missing")
+                .doesNotContain("Pflichtschlüssel")
                 .contains("\"prompt\":\"Fasse zusammen\"")
                 .contains("Output ONLY the corrected blocks array");
         assertThat(result.attempted()).isTrue();
