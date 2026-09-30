@@ -11,8 +11,10 @@ MySuricates ist eine lokale Workflow-Plattform: Workflows bestehen aus Bloecken,
 deterministisch sind (Shell, Verzweigung, Schleife) oder eine KI aufrufen. Aus dieser Mischung ist
 ein Regelkreis entstanden, der Befunde ueber die eigene Codebasis erzeugt, daraus TODOs macht,
 Fix-Workflows anstoesst und das Ergebnis wieder prueft. Der Code ist weitgehend in KI-Sitzungen
-entstanden: 1 641 von 1 825 Commits tragen mindestens einen KI-Trailer — 1 354 den von Claude,
-340 den des Regelkreises selbst (`Generated-By: MySuricates`), 53 beide (Stand Commit `dd062eda`).
+entstanden, aus 2 630 Commits im Arbeits-Repo (Stand 2026-09-30). <!-- doc-facts-check: ignore —
+Commit-Zahl gilt nur im Arbeits-Repo, die Release-Uebergabe fasst die Historie im oeffentlichen
+Repo je Release zu einem Commit zusammen --> Davon tragen 2 442 mindestens einen KI-Trailer —
+2 155 den von Claude, 343 den des Regelkreises selbst (`Generated-By: MySuricates`), 56 beide.
 
 **Was das nicht ist:** kein Produkt, kein Dienst, kein Support, keine Stabilitaetszusage. Die
 Architekturschulden sind bekannt und werden im System selbst als Audit-Befunde gefuehrt — siehe
@@ -95,20 +97,22 @@ steht in [Architektur](docs/architektur.md#module-system-startkonfiguration).
 
 ## Was da steht
 
-Stand 2026-09-22 (Commit `d23a09ed`, Release v0.7.6 plus Nacharbeit), Commit-Zaehler und Zeilen
-aus dem Arbeitsbaum an diesem Tag (Zeilen per `wc -l`, inkl. Leer- und Kommentarzeilen; Backend
-`src/main/java`, Frontend `src` inkl. Tests). Testzahlen aus dem CI-Lauf zu diesem Commit,
-datiert in der Tabelle:
+Stand 2026-09-30, nach Release v0.7.7. Commit-Zaehler und Zeilen aus dem Arbeitsbaum an diesem
+Tag (Zeilen per `wc -l`, inkl. Leer- und Kommentarzeilen; Backend `src/main/java`, Frontend `src`
+inkl. Tests). Der Commit-Zaehler gilt nur im Arbeits-Repo (die Release-Uebergabe fasst die
+Historie im oeffentlichen Repo je Release zu einem Commit zusammen); die uebrigen Zahlen gelten
+in beiden, weil die Uebergabe den Codebaum des Release-Tags unveraendert mitgibt. Testzahlen aus
+dem zuletzt dokumentierten CI-Lauf, mit eigenem Datum in der Tabelle:
 
 | | |
 |---|---|
-| Entstanden seit | 2026-02-15, rund 1 800 Commits, ein Autor |
+| Entstanden seit | 2026-02-15, rund 2 630 Commits im Arbeits-Repo, ein Autor <!-- doc-facts-check: ignore --> |
 | Backend | Java 21 / Spring Boot 3.5, rund 73 000 Zeilen, 53 REST-Controller, 95 Flyway-Migrationen |
 | Frontend | React 19 / TypeScript, rund 77 000 Zeilen |
 | Tests | Backend 10 476, Frontend 1 580 (192 Dateien) — 0 Fehler, 0 uebersprungen, CI-Lauf 35777382298 vom 2026-09-22 |
 | Bausteine | 20 Block-Typen, 54 Workflow-Templates, 20 Blaupausen (Grundgerueste zum Ausfuellen), 19 Built-in Skills, 18 Integrations-Provider |
 
-Die Testzahlen stammen aus dem CI-Lauf zu genau diesem Commit und sind damit nachpruefbar. Die
+Die Testzahlen stammen aus dem in der Tabelle genannten CI-Lauf und sind damit nachpruefbar. Die
 CI-Definition (`.github/workflows/ci.yml`) faehrt seit dem 2026-09-12 beide Suiten bei jedem Push,
 zusaetzlich zu Hygiene-Gate und Secret-Scan; seit dem 2026-09-21 auf Ubuntu 26.04. Seit dem
 2026-09-29 entfaellt eine Suite, wenn die Aenderung sie nachweislich nicht beruehrt (etwa reine

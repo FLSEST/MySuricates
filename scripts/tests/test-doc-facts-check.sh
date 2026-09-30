@@ -463,6 +463,38 @@ OUT=$(bash "$SCRIPT" --root "$DATED" 2>&1); RC=$?
 check "ohne Stichtag gilt HEAD: Drift gemeldet"      'grep -qE "commits sagt 10, Code 30" <<<"$OUT"'
 rm -rf "$DATED"
 
+# TODO 44b1ba55: Die README-Kopftabelle nennt seither keinen Commit-Hash des Arbeits-Repos mehr
+# (Entscheidung Flo, 2026-09-30) — ein per scripts/release-handover.sh erzeugtes oeffentliches Repo
+# kennt diesen Hash nicht und hatte die Stichtag-Pruefung oben dauerhaft rot gefaerbt ("stichtag-commit
+# unbekannt"). Die Commit-Zahl selbst ist ein Arbeits-Repo-Fakt (die Uebergabe fasst die Historie je
+# Release zu einem Commit zusammen) und steht deshalb hinter dem IGNORE_MARKER; alle anderen Zahlen
+# der Tabelle bleiben live gegen den Codebaum geprueft — den gibt die Uebergabe unveraendert mit.
+echo "11d) Kein Commit-Hash-Stichtag mehr: gruen unabhaengig von der tatsaechlichen Commit-Zahl"
+PUBLIC="$TMP/public"
+mkdir -p "$PUBLIC"
+( cd "$FAKE" && tar --exclude=.git -cf - . ) | ( cd "$PUBLIC" && tar -xf - )
+rm -f "$PUBLIC/README.de.md"
+( cd "$PUBLIC" && git init -q . && $GIT add -A && $GIT commit -q -m "Release v9.9.9" )
+cat > "$PUBLIC/README.de.md" <<'MD_EOF'
+# MySuricates
+
+Der Code ist ueberwiegend mit KI entstanden: 1 900 von 2 000 Commits im Arbeits-Repo tragen einen KI-Trailer (Stand 2026-09-30). <!-- doc-facts-check: ignore — nur im Arbeits-Repo, die Release-Uebergabe fasst die Historie zusammen -->
+
+## Was da steht
+
+Stand 2026-09-30, nach Release v9.9.9. Zeilen aus dem Arbeitsbaum an diesem Tag:
+
+| | |
+|---|---|
+| Entstanden seit | 2026-02-15, rund 2 000 Commits im Arbeits-Repo, ein Autor <!-- doc-facts-check: ignore --> |
+| Tests | Backend 8 767, Frontend 1 013 — Lauf vom 2026-09-18 |
+MD_EOF
+OUT=$(bash "$SCRIPT" --root "$PUBLIC" 2>&1); RC=$?
+check "kein Stichtag-Befund trotz fehlendem Commit-Hash" '! grep -q "stichtag-commit" <<<"$OUT"'
+check "keine Commit-Drift trotz 1 Commit vs. behaupteten 2000" '! grep -q "commits sagt" <<<"$OUT"'
+check "die echte (kleine) Commit-Zahl bleibt unbeanstandet: exit 0" '[ "$RC" -eq 0 ]'
+rm -rf "$PUBLIC"
+
 echo "12) Onboarding-Fakten: Versionen, verbotene Muster, nicht existierende Dateien"
 mkdir -p "$FAKE/docs/onboarding"
 cat > "$FAKE/docs/onboarding/README.md" <<'MD_EOF'
