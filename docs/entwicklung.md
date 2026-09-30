@@ -185,18 +185,19 @@ Drei Schutzschichten, alle mechanisch:
    `AUTOMATION_ALLOW_CLASSES_DIR=true`) warnt das ActivityLog beim Start.
 
 Damit sind `mvn test`, `mvn clean` und `npm run build` im Haupt-Checkout für das laufende Backend
-harmlos. **Für Workflows bleibt der QA-Worktree der richtige Ort**, weil zwei gleichzeitige Maven-Läufe
-im selben `target/` (z. B. Scheduled Run + Claude-Session) einander falsche Ergebnisse produzieren:
+harmlos. **Für Workflows bleibt ein eigener Worktree der richtige Ort**, weil zwei gleichzeitige
+Maven-Läufe im selben `target/` (z. B. Scheduled Run + Claude-Session) einander falsche Ergebnisse
+produzieren:
 
 ```bash
-WT=$(scripts/qa-worktree.sh prepare)   # legt/synct ~/.mysuricates/qa-worktree/autotrigger auf HEAD
-cd "$WT/ai-automation-backend" && mvn test
+git worktree add --detach ~/.mysuricates/qa-worktree/autotrigger HEAD
+cd ~/.mysuricates/qa-worktree/autotrigger/ai-automation-backend && mvn test
 ```
 
-Der Worktree ist detached auf `HEAD` des Haupt-Checkouts und bleibt zwischen Läufen bestehen
-(`target/` und `node_modules/` werden wiederverwendet). **Uncommittete Änderungen sind darin nicht
-enthalten** — was dort läuft, testet den committeten Stand. Die Workflows „AutoPilot Backend Quality
-Gate" und „self-care-platform-health" nutzen genau diesen Worktree.
+Ein solcher Worktree ist detached auf einem Commit und kann zwischen Läufen bestehen bleiben
+(`target/` und `node_modules/` werden dann wiederverwendet — vorher `git checkout --detach` bzw.
+`git reset --hard` auf den gewünschten Commit). **Uncommittete Änderungen sind darin nicht
+enthalten** — was dort läuft, testet immer den committeten Stand.
 
 ## Tests
 
@@ -522,10 +523,11 @@ cypress/
 - Selektoren nutzen `aria-label`, Button-Text, `h1`-Text, `placeholder`, `role="switch"` (keine `data-testid`)
 - `before()` / `after()` Hooks sorgen für saubere Testdaten via `cy.apiCleanup()`
 
-`scripts/cleanup-runs.sh` prüft vor jedem Zugriff die Datei mit `PRAGMA quick_check` und bricht bei
-Befund ab (2026-08-04 hat ein DELETE auf einer bereits korrupten DB den Schaden vergrößert). Mit
-`--db <pfad>` lässt sich das Skript gegen eine andere Datei richten. Skript-Tests liegen unter
-`scripts/tests/` und laufen ohne Backend: `bash scripts/tests/test-cleanup-runs.sh`.
+Alte Workflow-Runs aufräumen: einzeln über `DELETE /api/v1/executions/{id}` (siehe
+[API-Referenz](api-referenz.md#delete-apiv1executionsid)), im Bestand automatisch über die
+Run-Retention (Default 90 Tage) — siehe
+[architektur.md → Datenbank-Wartung](architektur.md#datenbank-wartung-sqlite-pool-size1)
+für Details zu Aufbewahrung und Abschaltbarkeit.
 
 ### Installer auf frischer Maschine (Installer-Probe)
 

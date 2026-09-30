@@ -181,19 +181,18 @@ Three protection layers, all mechanical:
    `AUTOMATION_ALLOW_CLASSES_DIR=true`) the ActivityLog warns on startup.
 
 This makes `mvn test`, `mvn clean`, and `npm run build` in the main checkout harmless for the running
-backend. **For workflows, the QA worktree remains the right place**, because two concurrent Maven
-runs in the same `target/` (e.g. a scheduled run + a Claude session) produce incorrect results for
-each other:
+backend. **For workflows, a dedicated worktree remains the right place**, because two concurrent
+Maven runs in the same `target/` (e.g. a scheduled run + a Claude session) produce incorrect results
+for each other:
 
 ```bash
-WT=$(scripts/qa-worktree.sh prepare)   # creates/syncs ~/.mysuricates/qa-worktree/autotrigger to HEAD
-cd "$WT/ai-automation-backend" && mvn test
+git worktree add --detach ~/.mysuricates/qa-worktree/autotrigger HEAD
+cd ~/.mysuricates/qa-worktree/autotrigger/ai-automation-backend && mvn test
 ```
 
-The worktree is detached at the main checkout's `HEAD` and persists between runs (`target/` and
-`node_modules/` are reused). **Uncommitted changes are not included** — whatever runs there tests
-the committed state. The "AutoPilot Backend Quality Gate" and "self-care-platform-health" workflows
-use exactly this worktree.
+Such a worktree is detached at a commit and can persist between runs (`target/` and `node_modules/`
+are then reused — first `git checkout --detach` / `git reset --hard` to the commit you want).
+**Uncommitted changes are not included** — whatever runs there always tests the committed state.
 
 ## Tests
 
@@ -514,10 +513,10 @@ cypress/
 - Selectors use `aria-label`, button text, `h1` text, `placeholder`, `role="switch"` (no `data-testid`)
 - `before()` / `after()` hooks ensure clean test data via `cy.apiCleanup()`
 
-`scripts/cleanup-runs.sh` runs `PRAGMA quick_check` on the file before touching it and aborts on
-any finding (on 2026-08-04 a DELETE on an already corrupt DB made the damage worse). `--db <path>`
-points the script at a different file. Script tests live under `scripts/tests/` and run without a
-backend: `bash scripts/tests/test-cleanup-runs.sh`.
+Clean up old workflow runs: one at a time via `DELETE /api/v1/executions/{id}` (see
+[API reference](api-referenz.md#delete-apiv1executionsid)), in bulk automatically via run retention
+(default 90 days) — see [architektur.md → Database maintenance](architektur.md#database-maintenance-sqlite-pool-size1)
+for retention and how to switch it off.
 
 ### Installer on a fresh machine (installer probe)
 

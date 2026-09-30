@@ -127,12 +127,11 @@ jobs:
       - name: TODO-Batch-Skripte
         run: python3 -m unittest discover -s scripts/tests -p 'test_todo_batch.py'
       # Liefen bisher nur lokal (cad7d821): Dev-Starter (JAR-Laufzeit, Run-Waechter, Proxy, Container-
-      # Modus mit Stubs), das Integritaets-Gate von cleanup-runs.sh und die Seed-Vorlage gegen einen
-      # curl-Stub. Brauchen python3, curl, git, jq, node und script — kein Backend, kein Docker, keine KI-CLI.
-      - name: Dev-Starter, Run-Aufraeumer und Seed-Vorlage Selbsttest
+      # Modus mit Stubs) und die Seed-Vorlage gegen einen curl-Stub. Brauchen python3, curl, git, jq,
+      # node und script — kein Backend, kein Docker, keine KI-CLI.
+      - name: Dev-Starter und Seed-Vorlage Selbsttest
         run: |
           bash scripts/tests/test-start-autotrigger-dev.sh
-          bash scripts/tests/test-cleanup-runs.sh
           bash scripts/tests/test-seed-workflows-example.sh
       - name: Installer-Bausteine Selbsttest (Anbieter, Sprachen, Oberflaeche, Kopf-Grafik)
         run: |

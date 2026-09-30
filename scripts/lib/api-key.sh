@@ -4,9 +4,9 @@
 # ~/.mysuricates/api-key -> ~/.autotrigger/api-key — beide Dateien schreibt ApiKeyService bzw.
 # InstanceAddress bei jedem Backend-Start im Klartext. Leere Ausgabe: kein Key gefunden.
 #
-# Gemeinsam genutzt von start-autotrigger-dev.sh und setup-audit-workflows.sh statt je eigener
-# Kopie; Skripte mit eigenem Env-Override (z. B. AUTOPILOT_API_KEY) pruefen den vor dem Aufruf
-# selbst und rufen api_key() nur als Fallback.
+# Genutzt von start-autotrigger-dev.sh statt einer eigenen Kopie; Skripte mit eigenem
+# Env-Override (z. B. AUTOPILOT_API_KEY) pruefen den vor dem Aufruf selbst und rufen
+# api_key() nur als Fallback.
 
 api_key() {
   if [[ -n "${MYSURICATES_API_KEY:-}" ]]; then
