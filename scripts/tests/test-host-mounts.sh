@@ -103,7 +103,7 @@ mv "$TMP/home/.codex/auth.json" "$TMP/codex-auth.json"; mv "$TMP/home/.pi/agent/
 OUT="$(run Linux svc "" 0 login "codex,pi")"
 check "no file, no variable: codex and pi missing" 'has "#missing=codex:login pi:login" && ! has "env_file:"'
 check "hint names the variables and ai.env"        'has "#text=  codex: keine Anmeldung fuer Container" && has "OPENAI_API_KEY, CODEX_API_KEY in ~/.config/mysuricates/ai.env"'
-printf '%s\n' 'OPENAI_API_KEY=sk-test-openai-4711' 'ANTHROPIC_API_KEY=sk-test-anthropic-4711' 'GEMINI_API_KEY=test-gemini-4711' \
+printf '%s\n' 'OPENAI_API_KEY=test-openai' 'ANTHROPIC_API_KEY=test-anthropic' 'GEMINI_API_KEY=test-gemini-4711' \
   'CLAUDE_CODE_OAUTH_TOKEN=secret-test-token-0123456789-abcdefghijklmnop' 'SOMETHING_ELSE=do-not-pass' > "$TMP/config/ai.env"
 body() { grep -v "^#" "$CE/$1.env" | cut -d= -f1 | tr '\n' ' ' | sed 's/ $//'; }
 OUT="$(run Linux svc "" 0 login codex)"
@@ -131,7 +131,7 @@ check "no value ever in the override"      '! has "4711" && ! has "secret-test-t
 printf 'OPENAI_API_KEY=\n' > "$TMP/config/ai.env"
 OUT="$(run Linux svc "" 0 login codex)"
 check "empty value: no login, copy emptied" '! has "env_file:" && has "#missing=codex:login" && [ -z "$(body inst-a)" ] && ! grep -q 4711 "$CE/inst-a.env"'
-printf 'OPENAI_API_KEY=sk-test-openai-4711\n' > "$TMP/config/ai.env"
+printf 'OPENAI_API_KEY=test-openai\n' > "$TMP/config/ai.env"
 OUT="$(run Linux svc "" 0 programs codex)"
 check "programs: never from ai.env"        '! has "env_file:"'
 OUT="$(run Linux svc "" 0 all codex)"

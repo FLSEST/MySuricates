@@ -153,7 +153,7 @@ check "socket off by default"               '! grep -q "docker.sock" <<<"$OUT" &
 check "switches named for the settings"     'grep -q "MYSURICATES_SWITCH_PREFIX=AUTOTRIGGER_DEV_" <<<"$OUT"'
 OUT="$(run_in_script "$OVR"'; AUTOTRIGGER_DEV_DOCKER_SOCKET=1 AUTOTRIGGER_DEV_AI_FROM_HOST=all write_compose_override >/dev/null 2>&1; cat "$COMPOSE_OVERRIDE"')"
 check "all + socket on purpose are honored" 'grep -q "/.claude:" <<<"$OUT" && grep -q "/var/run/docker.sock:/var/run/docker.sock" <<<"$OUT"'
-mkdir -p "$TMP/config/mysuricates" "$TMP/nm/@openai/codex"; printf 'OPENAI_API_KEY=sk-test-openai-4711\n' > "$TMP/config/mysuricates/ai.env"
+mkdir -p "$TMP/config/mysuricates" "$TMP/nm/@openai/codex"; printf 'OPENAI_API_KEY=test-openai\n' > "$TMP/config/mysuricates/ai.env"
 OUT="$(run_in_script "$OVR"'; AUTOTRIGGER_DEV_AI_PROVIDERS=codex write_compose_override >/dev/null 2>&1; cat "$COMPOSE_OVERRIDE"')"
 check "login variable: the dev container's own copy" 'grep -qF "\"$TMP/config/mysuricates/container-env/dev-autotrigger-dev.env\"" <<<"$OUT" && ! grep -q 4711 <<<"$OUT"'
 rm -rf "$TMP/config" "$TMP/nm/@openai"

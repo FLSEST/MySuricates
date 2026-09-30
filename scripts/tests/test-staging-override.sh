@@ -70,10 +70,10 @@ rm -f "$ENVF"
 
 echo "2b) login variables from ai.env: only those of the selected providers (also for a start from the UI)"
 AIENV="$TMP/config/mysuricates/ai.env"; CE="$TMP/config/mysuricates/container-env"
-printf '%s\n' 'OPENAI_API_KEY=sk-test-openai-4711' 'SOMETHING_ELSE=x' > "$AIENV"; chmod 600 "$AIENV"
+printf '%s\n' 'OPENAI_API_KEY=test-openai' 'SOMETHING_ELSE=x' > "$AIENV"; chmod 600 "$AIENV"
 mkdir -p "$TMP/nm/@openai/codex"
 TEST_AI_PROVIDERS=codex bash "$S" write-override test >/dev/null 2>&1
-check "codex selected: its variable via env_file"   'grep -qF "\"$CE/staging-test.env\"" "$OV/test.override.yml" && grep -qx "OPENAI_API_KEY=sk-test-openai-4711" "$CE/staging-test.env" && ! grep -q SOMETHING_ELSE "$CE/staging-test.env"'
+check "codex selected: its variable via env_file"   'grep -qF "\"$CE/staging-test.env\"" "$OV/test.override.yml" && grep -qx "OPENAI_API_KEY=test-openai" "$CE/staging-test.env" && ! grep -q SOMETHING_ELSE "$CE/staging-test.env"'
 STABLE_AI_PROVIDERS=codex bash "$S" write-override stable >/dev/null 2>&1
 check "stable has its own copy"                     'grep -qF "\"$CE/staging-stable.env\"" "$OV/stable.override.yml" && [ "$(ls "$CE" | tr "\n" " ")" = "staging-stable.env staging-test.env " ]'
 check "the value stays out of the override"         '! grep -q 4711 "$OV/test.override.yml"'

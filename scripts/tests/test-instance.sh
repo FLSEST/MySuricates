@@ -45,7 +45,7 @@ printf 'MYSURICATES_PORT=19404\nMYSURICATES_AI_FROM_HOST=everything\n' > "$TMP/i
 : > "$DOCKER_LOG"
 OUT="$(bash "$SCRIPT" up --name bad --no-wait 2>&1)"; RC=$?
 check "invalid mode: up refuses, no compose"  '[ "$RC" = 2 ] && ! grep -q "^compose " "$DOCKER_LOG" && printf "%s" "$OUT" | grep -q "MYSURICATES_AI_FROM_HOST"'
-mkdir -p "$TMP/config/mysuricates" "$TMP/nm/@openai/codex"; printf 'OPENAI_API_KEY=sk-test-openai-4711\n' > "$TMP/config/mysuricates/ai.env"
+mkdir -p "$TMP/config/mysuricates" "$TMP/nm/@openai/codex"; printf 'OPENAI_API_KEY=test-openai\n' > "$TMP/config/mysuricates/ai.env"
 printf 'MYSURICATES_PORT=19405\nMYSURICATES_AI_PROVIDERS=codex\n' > "$TMP/inst/keyed.env"
 INSTANCE_HEALTH_TIMEOUT=0 bash "$SCRIPT" up --name keyed --no-wait >/dev/null 2>&1
 check "login variable: a copy of its own per instance" 'grep -qF "\"$TMP/config/mysuricates/container-env/instance-mysuricates-keyed.env\"" "$TMP/inst/keyed.override.yml" && ! grep -q 4711 "$TMP/inst/keyed.override.yml"'
