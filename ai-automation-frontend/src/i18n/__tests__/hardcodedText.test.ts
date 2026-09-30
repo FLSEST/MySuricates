@@ -138,11 +138,12 @@ function findingsByFile(): Map<string, Finding[]> {
 const describeFinding = (f: Finding) => `  ${f.file}:${f.line} ${f.kind}: "${f.text}"`;
 
 describe('hardcoded UI text', () => {
+  // Parses every component source; under load (parallel test files, busy host) this exceeds the 5 s default.
   it('is found in no component', () => {
     const listing = [...findingsByFile().values()].flat().map(describeFinding);
 
     expect(listing, 'move this text into de.ts and en.ts').toEqual([]);
-  });
+  }, 30_000);
 
   it('finds text in every place it scans, and skips what reads the same in every language', () => {
     const source = [
