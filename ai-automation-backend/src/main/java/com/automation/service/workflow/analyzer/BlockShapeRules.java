@@ -32,7 +32,7 @@ final class BlockShapeRules {
     private BlockShapeRules() {}
 
     /** Die Felder, die ein Block neben {@code config} haben darf — {@link BlockDefinition}. */
-    static final Set<String> BLOCK_FIELDS = Set.of("type", "name", "config", "requiredCapabilities", "skillIds");
+    static final Set<String> BLOCK_FIELDS = BlockDefinition.FIELDS;
 
     private static final String DEAD_LIST = "blocks";
 

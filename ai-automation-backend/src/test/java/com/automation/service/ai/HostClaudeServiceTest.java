@@ -372,8 +372,7 @@ class HostClaudeServiceTest {
 
         assertThatThrownBy(() -> service.reasonStructured("summarize", null, null, 1))
                 .isInstanceOf(IOException.class)
-                .hasMessageContaining("error_max_turns")
-                .hasMessageNotContaining("\"type\"");
+                .hasMessage("Host Claude reasoning failed: Claude CLI reported an error (error_max_turns) after 1 turn");
     }
 
     @Test
@@ -384,7 +383,7 @@ class HostClaudeServiceTest {
         HostClaudeService.ActionResult result = service.executeAction("do it", null, null, null);
 
         assertThat(result.exitCode()).isNotZero();
-        assertThat(result.text()).isEqualTo("Claude CLI reported an error (success): API Error: 500");
+        assertThat(result.text()).isEqualTo("Claude CLI reported an error: API Error: 500");
         assertThat(result.parsed().isError()).isTrue();
     }
 

@@ -333,4 +333,18 @@ class BlockDefinitionListConverterTest {
         assertThat(converter.convertToDatabaseColumn(List.of(clean)))
                 .doesNotContain("unknownFields").doesNotContain("on_failure");
     }
+
+    @Test
+    void rowWrittenByANewerVersion_withFieldsThisVersionDoesNotKnow_isReadAndKept() {
+        String newer = "[{\"type\":\"simple\",\"config\":{\"command\":\"x\"},\"futureField\":{\"a\":1},"
+                + "\"skillIds\":[\"s\"],\"anotherOne\":true}]";
+
+        List<BlockDefinition> blocks = converter.convertToEntityAttribute(newer);
+
+        assertThat(blocks).hasSize(1);
+        assertThat(blocks.get(0).getSkillIds()).containsExactly("s");
+        assertThat(blocks.get(0).unknownFields()).containsOnlyKeys("anotherOne", "futureField");
+        assertThat(converter.convertToEntityAttribute(converter.convertToDatabaseColumn(blocks)).get(0).unknownFields())
+                .isEqualTo(blocks.get(0).unknownFields());
+    }
 }

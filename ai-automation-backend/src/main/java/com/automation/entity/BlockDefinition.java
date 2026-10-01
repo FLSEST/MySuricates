@@ -10,6 +10,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 
 @Getter
@@ -18,6 +19,9 @@ import java.util.TreeMap;
 @AllArgsConstructor
 @Builder
 public class BlockDefinition {
+
+    /** The fields of a block's JSON a run reads; every other one ends up in {@link #unknownFields()}. */
+    public static final Set<String> FIELDS = Set.of("type", "name", "config", "requiredCapabilities", "skillIds");
 
     private String type;
 

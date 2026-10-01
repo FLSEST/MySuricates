@@ -102,7 +102,8 @@ public class HostClaudeService {
                                              Integer timeoutSeconds, String effort) throws IOException {
         List<String> cmd = buildReasonCommand(prompt, systemPrompt, model, maxTurns, effort);
         var result = executeProcess(cmd, prompt, workingDirectory, timeoutSeconds, "Host Claude reasoning");
-        return new ReasoningResult(CliExit.answerOrThrow("Host Claude reasoning", result.exitCode, result.text), result.parsed);
+        return new ReasoningResult(CliExit.answerOrThrow("Host Claude reasoning", result.exitCode, result.text,
+                result.parsed.failed()), result.parsed);
     }
 
     /**
@@ -181,7 +182,6 @@ public class HostClaudeService {
 
             int exitCode = proc.exitValue();
             ClaudeJsonResponse parsed = ClaudeOutputParser.parseStreamJson(rawOutput);
-            // exit code 0 with is_error/error_* in the result line counts as failed (c6d1a872)
             var outcome = ClaudeCliOutcome.of(rawOutput, exitCode, parsed);
             if (outcome.exitCode() != 0) {
                 log.warn("{} returned exit code {}: {}", label, exitCode, truncate(outcome.text(), 500));

@@ -46,8 +46,6 @@ class PoolAnalyzerGateTest {
      */
     private static final Map<String, String> KNOWN_SEVERE = Map.of();
 
-    private static final Set<String> BLOCK_FIELDS = Set.of("type", "name", "config", "requiredCapabilities", "skillIds");
-
     private final WorkflowAnalyzer analyzer = new WorkflowAnalyzer();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -108,7 +106,7 @@ class PoolAnalyzerGateTest {
             block.setConfig(configOf(node.path("config")));
             // Felder neben config behält BlockDefinition seit d3aa0b28 — der Gate sieht sie wie der Speicherweg
             node.properties().forEach(field -> {
-                if (!BLOCK_FIELDS.contains(field.getKey())) {
+                if (!BlockDefinition.FIELDS.contains(field.getKey())) {
                     block.putUnknownField(field.getKey(), objectMapper.convertValue(field.getValue(), Object.class));
                 }
             });

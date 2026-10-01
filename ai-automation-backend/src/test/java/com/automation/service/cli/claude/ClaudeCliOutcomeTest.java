@@ -22,7 +22,7 @@ class ClaudeCliOutcomeTest {
 
         assertThat(outcome.exitCode()).isEqualTo(ClaudeCliOutcome.REPORTED_ERROR_EXIT_CODE).isNotZero();
         assertThat(outcome.text())
-                .startsWith("Claude CLI reported an error (success) after 1 turn")
+                .startsWith("Claude CLI reported an error after 1 turn")
                 .endsWith(": API Error: 529 Overloaded")
                 .doesNotContain("\"type\"");
     }
@@ -70,7 +70,7 @@ class ClaudeCliOutcomeTest {
                 "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"result\":\"Claude AI usage limit reached\"}", 1);
 
         assertThat(outcome.exitCode()).isEqualTo(1);
-        assertThat(outcome.text()).contains("Claude AI usage limit reached");
+        assertThat(outcome.text()).isEqualTo("Claude CLI reported an error (exit code 1): Claude AI usage limit reached");
     }
 
     @Test
