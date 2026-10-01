@@ -73,6 +73,51 @@ class SelfAccessRulesTest {
         assertThat(shell("python3 - <<'PY'\nbase = 'http://localhost:9090/api/v1'\nPY")).hasSize(1);
     }
 
+    /** TODO 2a0c9420: hinter dem Präfix steht eine Variable statt eines Segments, wie in pool-neutrality.sh. */
+    @Test
+    void praefixMitVariableStattSegmentIstHigh() {
+        assertThat(shell("for E in todos executions; do\n  curl -s \"http://localhost:9090/api/v1/$E\"\ndone"))
+                .singleElement().satisfies(f -> {
+                    assertThat(f.severity()).isEqualTo(Severity.HIGH);
+                    assertThat(f.detail()).contains("/api/v1/$E");
+                });
+        assertThat(shell("curl -s {{ backend_url }}/api/v1/\"${ROUTE}\"")).singleElement()
+                .satisfies(f -> assertThat(f.detail()).contains("/api/v1/${ROUTE}"));
+        assertThat(shell("curl -s https://api.example.com/api/v1/$ITEM")).isEmpty();
+        assertThat(shell("echo '# Request-Kosten der /api/v1-Routen'")).isEmpty();
+    }
+
+    /** TODO 7721d8cb: unter /actuator/ ist nur health schlüsselfrei — /actuator/metrics lieferte still 403. */
+    @Test
+    void actuatorAusserHealthIstHigh() {
+        assertThat(shell("for metric in jvm.memory.used; do\n"
+                + "  curl -s \"{{ backend_url }}/actuator/metrics/$metric\"\ndone"))
+                .singleElement().satisfies(f -> {
+                    assertThat(f.severity()).isEqualTo(Severity.HIGH);
+                    assertThat(f.detail()).contains("/actuator/metrics/");
+                });
+        assertThat(shell("curl -s http://localhost:9090/actuator/env")).singleElement()
+                .satisfies(f -> assertThat(f.detail()).contains("/actuator/env"));
+        assertThat(apply(block("agentic", "a", Map.of("goal",
+                "Hole per curl http://localhost:9090/actuator/metrics/jvm.memory.used den Heap"))))
+                .singleElement().satisfies(f -> assertThat(f.severity()).isEqualTo(Severity.MEDIUM));
+        assertThat(shell("HEALTH=http://localhost:9090/actuator/health\ncurl -sf \"$HEALTH\"")).isEmpty();
+    }
+
+    /** Basis-URL ohne Pfad in einer Variable, der Actuator-Endpunkt entsteht erst am Aufruf (7721d8cb). */
+    @Test
+    void basisUrlMitSpaeteremActuatorSuffixIstHighAusserHealth() {
+        assertThat(shell("HOST=http://localhost:9090; curl \"$HOST/actuator/metrics\"")).singleElement()
+                .satisfies(f -> {
+                    assertThat(f.severity()).isEqualTo(Severity.HIGH);
+                    assertThat(f.detail()).contains("/actuator/metrics");
+                });
+        assertThat(shell("HOST=http://127.0.0.1:9090\ncurl -s ${HOST}/actuator/env")).hasSize(1);
+        assertThat(shell("HOST=http://localhost:9090\ncurl -sf \"$HOST/actuator/health\"")).isEmpty();
+        // Die Basis allein (ohne Endpunkt dahinter) bleibt erlaubt, wie bei /api/v1
+        assertThat(shell("HOST=http://localhost:9090\necho \"$HOST/actuator\"")).isEmpty();
+    }
+
     @Test
     void basisUrlAufSondeOderFremdenHostIstKeinBefund() {
         assertThat(shell("HEALTH=http://localhost:9090/api/v1/system/health\ncurl -sf \"$HEALTH\"")).isEmpty();

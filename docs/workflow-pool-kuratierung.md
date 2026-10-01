@@ -148,7 +148,14 @@ Zwei der drei Muster wären einstufig unbrauchbar, deshalb verlangen sie ein zwe
   deshalb erst ein konkreter Endpunkt (`/api/v1/todos`, nicht das nackte Präfix) zusammen mit
   einem Aufruf in der Umgebung. Im **Shell-Code** eines Blocks genügt der konkrete Endpunkt: Dort
   zählt jeder Pfad, der nicht exakt auf der Liste schlüsselfreier Sonden steht, auch wenn der
-  Aufruf weit entfernt über eine Variable läuft (`for E in /api/v1/…; do curl …$E`).
+  Aufruf weit entfernt über eine Variable läuft (`for E in /api/v1/…; do curl …$E`). Ebenso
+  zählt ein zusammengesetzter Pfad: das Präfix mit einer Variable statt eines Segments
+  (`curl …/api/v1/$E`) und eine Basis-URL in einer Variable (`API=…/api/v1; curl "$API/todos"`) —
+  die Zuweisung ist schon der Befund; bei einer Basis nur mit `/api` erst der spätere Aufruf
+  (`API=…/api; curl "$API/v1/todos"`), wie im Analyzer. Das Präfix in einem Ausgabetext (`/api/v1-Routen`) nicht.
+  Neben `/api/v1/` gilt das für `/actuator/`: Dort antwortet nur `/actuator/health` ohne Key,
+  `/actuator/metrics` lieferte `system-performance-analysis` still 403 (heute liest der Eintrag
+  `/api/v1/system/health` und `/api/v1/system/jvm-memory`).
 - `automation.db` allein ist kein Datenbankzugriff. `mysuricates-performance-audit` sieht sich
   mit `stat -c %s` nur die **Dateigröße** an und schreibt das auch dazu. Verboten ist das Lesen
   des Inhalts, das an Hibernate und der einzigen Connection (pool-size 1) vorbeigeht.

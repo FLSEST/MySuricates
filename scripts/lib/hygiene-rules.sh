@@ -156,7 +156,9 @@ HYGIENE_POOL_CREDENTIAL_MARKERS=("X-API-Key" "app_settings")
 # Eigene REST-API. Das Präfix allein genügt nicht als Befund: mocking-gap-audit
 # führt "/api/v1/" als Suchmuster in einer Liste von Netzwerk-Kennzeichen, und
 # das ist kein Aufruf. Gemeldet wird erst die Kombination aus Pfad und Aufruf.
-HYGIENE_POOL_API_PREFIX="/api/v1/"
+# /actuator/ gehoert dazu: ausser /actuator/health verlangt dort alles den Key (security/PublicPaths,
+# TODO 7721d8cb — /actuator/metrics lieferte system-performance-analysis still 403).
+HYGIENE_POOL_API_PREFIXES=("/api/v1/" "/actuator/")
 HYGIENE_POOL_API_CALLERS=("curl" "wget" "requests." "urllib" "fetch(" "http.client")
 
 # Ohne API-Key erreichbar (security/PublicPaths) und deshalb als Lebenszeichen-Sonde
@@ -169,7 +171,7 @@ HYGIENE_POOL_API_CALLERS=("curl" "wget" "requests." "urllib" "fetch(" "http.clie
 # Sonde in PublicPaths oeffentlich ist.
 HYGIENE_POOL_API_ALLOWED=(
   "/api/v1/system/health" "/api/v1/system/info" "/api/v1/system/auth-status"
-  "/api/v1/system/jvm-memory"
+  "/api/v1/system/jvm-memory" "/actuator/health"
 )
 
 # Direkter Datenbankzugriff. Die Datei anzusehen (stat, du) bleibt erlaubt —

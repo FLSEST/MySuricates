@@ -9,6 +9,8 @@ mkdir -p "$TMP/bin" "$TMP/inst" "$TMP/home"
 cat > "$TMP/bin/docker" <<'STUB'
 #!/usr/bin/env bash
 echo "$*" >> "$DOCKER_LOG"
+# Die Namen gibt instance.sh compose ueber die Umgebung mit — eigenes Log, DOCKER_LOG bleibt eine Zeile je Aufruf
+[ "$1" = compose ] && echo "${MYSURICATES_CONTAINER:-} ${MYSURICATES_IMAGE:-}" >> "${DOCKER_ENV_LOG:-/dev/null}"
 # docker build … - : der Build-Kontext kommt als tar ueber stdin — aufheben, damit der Test ihn prueft
 [ "$1" = build ] && { cat > "${DOCKER_CTX:-/dev/null}"; exit 0; }
 case "$*" in
@@ -64,7 +66,10 @@ check "down stays inside its compose project"   'OWNER=ai-automation-backend bas
 
 echo "1b2) MYSURICATES_PREFIX: own docker names, e.g. for the installer probe"
 : > "$DOCKER_LOG"
-check "prefix: up builds its own image and project" 'MYSURICATES_PREFIX=probe-x OWNER=probe-x-demo INSTANCE_HEALTH_TIMEOUT=0 bash "$SCRIPT" up --name demo --no-wait >/dev/null 2>&1 && grep -q -- "-t probe-x:local -$" "$DOCKER_LOG" && grep -q -- "-p probe-x-demo " "$DOCKER_LOG" && ! grep -q "mysuricates" "$DOCKER_LOG"'
+# Kein Docker-Name mit der Default-Vorsilbe — weder als Argument (Pfade wie $TMPDIR oder der Checkout duerfen
+# "mysuricates" enthalten, Namen stehen als eigenes Wort) noch in der Umgebung fuer compose (427be563)
+export DOCKER_ENV_LOG="$TMP/docker-env.log"; : > "$DOCKER_ENV_LOG"
+check "prefix: up builds its own image and project" 'MYSURICATES_PREFIX=probe-x OWNER=probe-x-demo INSTANCE_HEALTH_TIMEOUT=0 bash "$SCRIPT" up --name demo --no-wait >/dev/null 2>&1 && grep -q -- "-t probe-x:local -$" "$DOCKER_LOG" && grep -q -- "-p probe-x-demo " "$DOCKER_LOG" && ! grep -Eq "(^| )mysuricates[-:]" "$DOCKER_LOG" && grep -qx "probe-x-demo probe-x:local" "$DOCKER_ENV_LOG" && ! grep -q "mysuricates" "$DOCKER_ENV_LOG"'
 check "prefix: key reads from its own container" 'MYSURICATES_PREFIX=probe-x OWNER=probe-x-demo CONTAINER_KEY=k bash "$SCRIPT" key --name demo >/dev/null 2>&1; tail -1 "$DOCKER_LOG" | grep -q " probe-x-demo sh -c .*api-key.* sh "'
 check "prefix: invalid characters refused (exit 2)" 'MYSURICATES_PREFIX="Probe x" bash "$SCRIPT" status --name demo >/dev/null 2>&1; [ $? -eq 2 ]'
 check "compose derives every name from the prefix" '[ "$(grep -c "MYSURICATES_CONTAINER:?" "$HERE/../../deploy/compose.yml")" = 5 ] && grep -q "image: \${MYSURICATES_IMAGE:?}" "$HERE/../../deploy/compose.yml" && ! grep -q "mysuricates-\\\${MYSURICATES_NAME" "$HERE/../../deploy/compose.yml"'

@@ -27,8 +27,8 @@ import java.util.regex.Pattern;
  * <p><b>Abstimmung mit pool-neutrality.sh</b> — gleiche Ausnahmen, bewusste Unterschiede:
  * <ul>
  *   <li>Erlaubt sind dieselben schlüsselfreien Sonden wie dort ({@link #KEY_FREE_PROBES}, jede ein
- *       öffentlicher Pfad aus {@code security.PublicPaths}); {@code /actuator/health} liegt ohnehin nicht
- *       unter {@code /api/v1/}.</li>
+ *       öffentlicher Pfad aus {@code security.PublicPaths}); geprüft werden {@code /api/v1/} und
+ *       {@code /actuator/}, unter dem nur {@code health} ohne Key antwortet (TODO 7721d8cb).</li>
  *   <li>Im Shell-Code genügt wie dort ein konkreter Endpunkt ({@code /api/v1/<segment>}), der Aufruf
  *       darf weit entfernt stehen (Schleifenvariable). Das nackte Präfix ist ein Suchmuster, kein
  *       Aufruf (mocking-gap-audit). <i>Anders als dort</i> zählen ganze Kommentarzeilen nicht und ein
@@ -50,10 +50,13 @@ final class SelfAccessRules {
     /** Ohne API-Key erreichbar (Teilmenge von PublicPaths.EXACT) — dieselbe Liste wie HYGIENE_POOL_API_ALLOWED. */
     static final Set<String> KEY_FREE_PROBES = Set.of(
             "/api/v1/system/health", "/api/v1/system/info", "/api/v1/system/auth-status",
-            "/api/v1/system/jvm-memory");
+            "/api/v1/system/jvm-memory", "/actuator/health");
 
     /** Konkreter Endpunkt: nach dem Präfix muss ein Pfadsegment folgen, wie PATH_AT im Skript. */
-    private static final Pattern ENDPOINT = Pattern.compile("/api/v1/[A-Za-z0-9_][A-Za-z0-9/_.{}<>-]*");
+    private static final Pattern ENDPOINT = Pattern.compile("(?:/api/v1|/actuator)/[A-Za-z0-9_][A-Za-z0-9/_.{}<>-]*");
+
+    /** Präfix, dahinter eine Variable statt eines Segments ({@code curl …/api/v1/$E}, TODO 2a0c9420). */
+    private static final Pattern COMPOSED = Pattern.compile("(?:/api/v1|/actuator)/?[\"']?\\$\\{?[A-Za-z_][A-Za-z0-9_]*}?");
 
     /** Schema und Host direkt vor dem Endpunkt, etwa {@code http://localhost:9090}. */
     private static final Pattern HOST_BEFORE = Pattern.compile("[a-zA-Z][a-zA-Z0-9+.-]*://((?:\\{\\{[^}]*}}|[^/\\s\"'`])+)$");
@@ -67,34 +70,6 @@ final class SelfAccessRules {
 
     /** Wie im Skript: gut eine Befehlszeile um die Fundstelle. */
     private static final int WINDOW = 200;
-
-    /**
-     * Zuweisung einer Basis-URL der eigenen Instanz an eine Variable — Shell ({@code API=…},
-     * {@code export BASE=…}) wie Python ({@code base = '…'}): {@code API=http://127.0.0.1:9090/api/v1;
-     * curl $API/todos} nennt den Endpunkt nie am Stück. Die Zuweisung ist selbst der Befund, egal wo
-     * die Variable später aufgerufen wird. Gruppe 1 ist der Pfad ab {@code /api/v1}.
-     */
-    private static final Pattern BASE_URL_ASSIGNMENT = Pattern.compile(
-            "(?m)(?:^|[\\s;&(])(?:export\\s+)?[A-Za-z_][A-Za-z0-9_]*\\s*=\\s*[\"']?"
-                    + "(?:[a-zA-Z][a-zA-Z0-9+.-]*://)?"
-                    + "(?:localhost|127\\.0\\.0\\.1|0\\.0\\.0\\.0|\\[::1]|host\\.docker\\.internal"
-                    + "|\\{\\{[^}]*}}|\\$\\{?[A-Za-z_][A-Za-z0-9_]*}?)(?::\\d+)?"
-                    + "(/api/v1(?:/[^\\s\"';]*)?)(?=[\"';\\s]|$)");
-
-    /**
-     * Zuweisung einer Basis-URL der eigenen Instanz OHNE Pfad oder NUR mit {@code /api} — die Variable
-     * selbst ist (anders als {@link #BASE_URL_ASSIGNMENT}) kein Befund, eine lokale URL ohne API-Pfad ist
-     * oft legitim (Health, Vite, ein fremder lokaler Dienst). Erst der spätere Aufruf mit einem
-     * {@code /api/v1/<segment>}- bzw. (wenn die Basis schon {@code /api} enthält) {@code /v1/<segment>}-
-     * Suffix macht daraus einen Befund ({@code API=…/api; curl $API/v1/todos}). Gruppe 1 = Variablenname,
-     * Gruppe 2 vorhanden, wenn die Basis schon {@code /api} enthält.
-     */
-    private static final Pattern BASE_URL_ASSIGNMENT_SHORT = Pattern.compile(
-            "(?m)(?:^|[\\s;&(])(?:export\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*[\"']?"
-                    + "(?:[a-zA-Z][a-zA-Z0-9+.-]*://)?"
-                    + "(?:localhost|127\\.0\\.0\\.1|0\\.0\\.0\\.0|\\[::1]|host\\.docker\\.internal"
-                    + "|\\{\\{[^}]*}}|\\$\\{?[A-Za-z_][A-Za-z0-9_]*}?)(?::\\d+)?"
-                    + "(/api)?/?[\"']?(?=[\\s;&)\\n]|$)");
 
     private static final Pattern SQLITE = Pattern.compile("\\bsqlite3\\b");
     private static final Pattern PLATFORM_DB = Pattern.compile("\\bautomation(-[a-z]+)?\\.db\\b");
@@ -130,8 +105,9 @@ final class SelfAccessRules {
         for (String code : shell) {
             String stripped = withoutCommentLines(code);
             String hit = firstSelfEndpoint(stripped, false);
-            if (hit == null) hit = firstBaseUrlAssignment(stripped);
-            if (hit == null) hit = firstShortBaseUrlCall(stripped);
+            if (hit == null) hit = firstComposedEndpoint(stripped);
+            if (hit == null) hit = BaseUrlVariables.firstAssignment(stripped);
+            if (hit == null) hit = BaseUrlVariables.firstLaterCall(stripped);
             if (hit != null) {
                 out.add(AnalyzerFinding.of("self-api-call", Severity.HIGH, i, name,
                         "ruft im Shell-Code die eigene REST-API auf ('" + hit + "') — braucht einen API-Key"
@@ -155,46 +131,24 @@ final class SelfAccessRules {
         }
     }
 
-    /**
-     * Der erste Endpunkt der eigenen API, der keine schlüsselfreie Sonde ist, oder {@code null}. Ein
-     * ausdrücklich fremder Host zählt nie. Mit {@code needsCaller} (Text außerhalb der Shell) nur ein
-     * Endpunkt mit lokalem oder variablem Host und einem Aufrufer in der Nähe.
-     */
-    private static String firstBaseUrlAssignment(String code) {
-        Matcher assignment = BASE_URL_ASSIGNMENT.matcher(code);
-        while (assignment.find()) {
-            String path = assignment.group(1).replaceAll("[./]+$", "");
-            if (!KEY_FREE_PROBES.contains(path)) return path;
-        }
-        return null;
-    }
-
-    /**
-     * Basis-URL ohne Pfad oder nur mit {@code /api} in einer Variable, die später mit einem
-     * {@code /api/v1/<segment>}- bzw. {@code /v1/<segment>}-Suffix aufgerufen wird (Variablenreferenz
-     * als {@code $VAR}, {@code ${VAR}} oder — für Python-f-Strings — {@code {VAR}}). Die Zuweisung
-     * allein ist kein Befund (Sonden und fremde lokale Dienste bleiben erlaubt); erst der Aufruf mit
-     * konkretem Endpunkt macht daraus einen Fund.
-     */
-    private static String firstShortBaseUrlCall(String code) {
-        Matcher assignment = BASE_URL_ASSIGNMENT_SHORT.matcher(code);
-        while (assignment.find()) {
-            String var = assignment.group(1);
-            boolean hasApiPrefix = assignment.group(2) != null;
-            String suffixRegex = hasApiPrefix
-                    ? "/v1/[A-Za-z0-9_][A-Za-z0-9/_.{}<>-]*"
-                    : "/api/v1/[A-Za-z0-9_][A-Za-z0-9/_.{}<>-]*";
-            Matcher usage = Pattern.compile(
-                    "(?:\\$\\{?" + var + "}?|\\{" + var + "})[\"']?(" + suffixRegex + ")").matcher(code);
-            while (usage.find()) {
-                String suffix = usage.group(1).replaceAll("[./]+$", "");
-                String path = hasApiPrefix ? "/api" + suffix : suffix;
-                if (!KEY_FREE_PROBES.contains(path)) return path;
+    /** {@link #COMPOSED} ohne ausdrücklich fremden Host davor, ohne Anführungszeichen, oder {@code null}. */
+    private static String firstComposedEndpoint(String code) {
+        Matcher composed = COMPOSED.matcher(code);
+        while (composed.find()) {
+            Matcher host = HOST_BEFORE.matcher(code.substring(Math.max(0, composed.start() - WINDOW),
+                    composed.start()));
+            if (!host.find() || LOCAL_HOST.matcher(host.group(1)).matches()) {
+                return composed.group().replaceAll("[\"']", "");
             }
         }
         return null;
     }
 
+    /**
+     * Der erste Endpunkt der eigenen API, der keine schlüsselfreie Sonde ist, oder {@code null}. Ein
+     * ausdrücklich fremder Host zählt nie. Mit {@code needsCaller} (Text außerhalb der Shell) nur ein
+     * Endpunkt mit lokalem oder variablem Host und einem Aufrufer in der Nähe.
+     */
     private static String firstSelfEndpoint(String text, boolean needsCaller) {
         Matcher endpoint = ENDPOINT.matcher(text);
         while (endpoint.find()) {
