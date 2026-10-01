@@ -1,3 +1,4 @@
+import { failOnUnhandledRequest } from '../../../test/msw';
 import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach } from 'vitest';
 import { useState } from 'react';
 import { screen, fireEvent, waitFor } from '@testing-library/react';
@@ -8,7 +9,7 @@ import { useI18nStore } from '../../../i18n';
 import { useToastStore } from '../../../stores/toastStore';
 import { RunNotesCard } from '../RunNotesCard';
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+beforeAll(() => server.listen({ onUnhandledRequest: failOnUnhandledRequest }));
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 beforeEach(() => {

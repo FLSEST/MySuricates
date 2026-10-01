@@ -1,3 +1,4 @@
+import { failOnUnhandledRequest } from './msw';
 import { afterAll, afterEach, beforeAll, beforeEach } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { server } from './server';
@@ -31,7 +32,7 @@ export const DASHBOARD_FIXTURE: DashboardData = {
 
 /** msw lifecycle, store resets and the page's default answers — call once at the top of a page test file. */
 export function setupDashboardPageTests(): void {
-  beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+  beforeAll(() => server.listen({ onUnhandledRequest: failOnUnhandledRequest }));
   afterEach(() => server.resetHandlers());
   afterAll(() => server.close());
   beforeEach(() => {
@@ -44,6 +45,11 @@ export function setupDashboardPageTests(): void {
       http.get('/api/v1/learning/dashboard', () => HttpResponse.json(DASHBOARD_FIXTURE)),
       http.get('/api/v1/system/info', () => HttpResponse.json({ version: '1.0.0', buildType: 'SNAPSHOT' })),
       http.get('/api/v1/integrations', () => HttpResponse.json([])),
+      // Finishing an edit that changed something saves a snapshot of the layout
+      http.post('/api/v1/dashboard/layouts', () => HttpResponse.json(
+        { id: 'snapshot', createdAt: '2026-09-15T10:00:00Z', deviceLabel: 'Laptop', formatVersion: 2, viewCount: 1, contentHash: 'h' },
+        { status: 201 },
+      )),
     );
   });
 }

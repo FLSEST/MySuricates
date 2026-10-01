@@ -1,3 +1,4 @@
+import { failOnUnhandledRequest } from '../../../test/msw';
 import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach } from 'vitest';
 import { fireEvent, screen } from '@testing-library/react';
 import { server } from '../../../test/server';
@@ -10,7 +11,7 @@ import { DashboardViewFilterBar } from '../DashboardViewFilterBar';
 
 const activeFilter = () => useDashboardLayoutStore.getState().views[0]?.filter;
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+beforeAll(() => server.listen({ onUnhandledRequest: failOnUnhandledRequest }));
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 beforeEach(() => {

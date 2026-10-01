@@ -1,3 +1,4 @@
+import { failOnUnhandledRequest } from '../../test/msw';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { http, HttpResponse, delay } from 'msw';
@@ -15,7 +16,7 @@ vi.mock('../../hooks/useAssistantWebSocket', () => ({
 }));
 
 beforeAll(() => {
-  server.listen({ onUnhandledRequest: 'bypass' });
+  server.listen({ onUnhandledRequest: failOnUnhandledRequest });
   Element.prototype.scrollIntoView = vi.fn();
 });
 afterEach(() => { server.resetHandlers(); resetAssistantConversation(); });

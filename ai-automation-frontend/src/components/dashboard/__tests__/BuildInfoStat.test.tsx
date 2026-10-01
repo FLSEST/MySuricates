@@ -1,3 +1,4 @@
+import { failOnUnhandledRequest } from '../../../test/msw';
 import { describe, it, expect, beforeAll, afterEach, afterAll } from 'vitest';
 import { screen } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
@@ -16,7 +17,7 @@ function systemInfo(version: string, buildType = 'RELEASE') {
 }
 
 describe('BuildInfoStat', () => {
-  beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+  beforeAll(() => server.listen({ onUnhandledRequest: failOnUnhandledRequest }));
   afterEach(() => server.resetHandlers());
   afterAll(() => server.close());
 

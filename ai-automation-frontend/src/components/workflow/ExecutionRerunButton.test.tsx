@@ -1,3 +1,4 @@
+import { failOnUnhandledRequest } from '../../test/msw';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
@@ -7,7 +8,7 @@ import { renderWithProviders } from '../../test/utils';
 import { ExecutionRerunButton } from './ExecutionRerunButton';
 import type { RunStatus } from '../../types';
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+beforeAll(() => server.listen({ onUnhandledRequest: failOnUnhandledRequest }));
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 

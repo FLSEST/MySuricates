@@ -1,3 +1,4 @@
+import { failOnUnhandledRequest } from '../test/msw';
 import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -10,7 +11,7 @@ import { useI18nStore } from '../i18n';
 // /goals and /goals/:goalId show the module hint and nothing asks the goals endpoints.
 
 beforeAll(() => {
-  server.listen({ onUnhandledRequest: 'bypass' });
+  server.listen({ onUnhandledRequest: failOnUnhandledRequest });
   // jsdom kennt kein scrollIntoView – der Assistent der ganzen App ruft es beim Öffnen
   Element.prototype.scrollIntoView = vi.fn();
 });

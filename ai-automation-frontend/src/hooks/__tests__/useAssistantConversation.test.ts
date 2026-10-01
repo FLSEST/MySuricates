@@ -1,3 +1,4 @@
+import { failOnUnhandledRequest } from '../../test/msw';
 import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach } from 'vitest';
 import { QueryClient } from '@tanstack/react-query';
 import { waitFor } from '@testing-library/react';
@@ -10,7 +11,7 @@ import { en } from '../../i18n/en';
 import { cancelAssistantMessage, resetAssistantConversation, sendAssistantMessage } from '../useAssistantConversation';
 import type { AssistantChatRequest } from '../useAssistant';
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+beforeAll(() => server.listen({ onUnhandledRequest: failOnUnhandledRequest }));
 afterEach(() => { server.resetHandlers(); resetAssistantConversation(); });
 afterAll(() => server.close());
 beforeEach(() => useAssistantStore.setState({ sessions: [], activeSessionId: null, inFlight: null, lastModel: null }));

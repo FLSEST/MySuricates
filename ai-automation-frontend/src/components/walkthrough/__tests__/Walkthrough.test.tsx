@@ -5,6 +5,7 @@
  * These tests pin the gates and the one state bug they can cause: the list shrinking under a
  * reader who is already past its new end.
  */
+import { failOnUnhandledRequest } from '../../../test/msw';
 import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach, vi } from 'vitest';
 import { screen, fireEvent, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
@@ -17,7 +18,7 @@ import type { ModuleName } from '../../../types';
 import { WALKTHROUGH_PANELS } from '../../../data/walkthroughPanels';
 import { Walkthrough } from '../Walkthrough';
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+beforeAll(() => server.listen({ onUnhandledRequest: failOnUnhandledRequest }));
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 beforeEach(() => {

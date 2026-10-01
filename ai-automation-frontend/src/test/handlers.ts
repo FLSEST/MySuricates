@@ -2,6 +2,7 @@ import { http, HttpResponse } from 'msw';
 import { modulesFixture } from './modules';
 
 const BASE = '/api/v1';
+const EMPTY_PAGE = { content: [], page: 0, size: 20, totalElements: 0, totalPages: 0 };
 
 export const handlers = [
   // Projects
@@ -324,4 +325,18 @@ export const handlers = [
   http.get(`${BASE}/dashboard/layouts`, () =>
     HttpResponse.json({ content: [], page: 0, size: 20, totalElements: 0, totalPages: 0 }),
   ),
+
+  // Reads that pages and panels fire on the side — empty by default. Without a handler a test would
+  // fail (src/test/msw.ts, 1f11b1c3); a test that cares overrides them with server.use(...).
+  http.get(`${BASE}/assistant/suggestions`, () => HttpResponse.json([])),
+  http.get(`${BASE}/goals`, () => HttpResponse.json([])),
+  http.get(`${BASE}/integrations`, () => HttpResponse.json([])),
+  http.get(`${BASE}/pool`, () => HttpResponse.json([])),
+  http.get(`${BASE}/executions`, () => HttpResponse.json(EMPTY_PAGE)),
+  http.get(`${BASE}/workflows/:id/runs`, () => HttpResponse.json(EMPTY_PAGE)),
+  http.get(`${BASE}/workflows/:id/similar`, () => HttpResponse.json([])),
+  http.get(`${BASE}/workflows/:id/analyze`, ({ params }) =>
+    HttpResponse.json({ workflowId: params.id, workflowName: '', findingCount: 0, bySeverity: {}, findings: [] }),
+  ),
+  http.get(`${BASE}/dashboard/workflow-results`, () => HttpResponse.json([])),
 ];

@@ -334,7 +334,18 @@ npx tsc --noEmit
 
 # Linting
 npm run lint
+
+# Unit and component tests (Vitest + msw)
+npx vitest run
 ```
+
+**No test reaches a real backend:** in jsdom a relative `fetch('/api/v1/…')` would go to
+`localhost:3000` and, with `npm run dev` running, through the Vite proxy to the dev backend, writing
+requests included. `src/test/setup.ts` therefore replaces `fetch`, XHR `send` and `WebSocket` with
+guards (`src/test/msw.ts`) before any msw server starts, and every msw server listens with
+`onUnhandledRequest: failOnUnhandledRequest`. Any request without a handler is halted and fails the
+test it happened in (or the file, if it arrives after the last test). The fix is always the missing
+handler (`server.use(…)` in the test or a neutral default in `src/test/handlers.ts`), never `'bypass'`.
 
 ### CI on GitHub
 

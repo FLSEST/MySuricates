@@ -1,3 +1,4 @@
+import { failOnUnhandledRequest } from '../../test/msw';
 import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach, vi } from 'vitest';
 import { act, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
@@ -37,7 +38,7 @@ vi.mock('../../hooks/useWebSocket', async () => {
   };
 });
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+beforeAll(() => server.listen({ onUnhandledRequest: failOnUnhandledRequest }));
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 beforeEach(() => {
@@ -64,6 +65,8 @@ function serve() {
   server.use(
     http.get('/api/v1/workflows/:id', () => HttpResponse.json({ id: 'wf-1', name: 'Approval before acting', blocks: [] })),
     http.get('/api/v1/workflows/:id/runs/:runId', () => HttpResponse.json(RUNNING_RUN)),
+    // The run's diagram is not part of this test: no BPMN, the page shows the steps only
+    http.get('/api/v1/workflows/:id/export/bpmn', () => HttpResponse.json({ error: 'not found' }, { status: 404 })),
     http.get('/api/v1/executions/:runId/approval', () => {
       endpoint.calls++;
       return HttpResponse.json(endpoint.open ? { pending: true, ...APPROVAL } : { pending: false });

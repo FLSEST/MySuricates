@@ -1,3 +1,4 @@
+import { failOnUnhandledRequest } from '../../../test/msw';
 import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach, vi } from 'vitest';
 import { useState } from 'react';
 import { screen, fireEvent, waitFor } from '@testing-library/react';
@@ -7,7 +8,7 @@ import { renderWithProviders } from '../../../test/utils';
 import { useI18nStore } from '../../../i18n';
 import { RECENT_RUNS_PAGE_SIZE, WorkflowRecentRuns } from '../WorkflowRecentRuns';
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+beforeAll(() => server.listen({ onUnhandledRequest: failOnUnhandledRequest }));
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 beforeEach(() => useI18nStore.setState({ locale: 'en' }));

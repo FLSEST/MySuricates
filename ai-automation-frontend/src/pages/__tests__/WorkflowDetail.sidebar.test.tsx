@@ -1,3 +1,4 @@
+import { failOnUnhandledRequest } from '../../test/msw';
 import { describe, it, expect, vi, beforeAll, afterAll, afterEach, beforeEach } from 'vitest';
 import { fireEvent, screen } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
@@ -32,7 +33,7 @@ function renderPage() {
 }
 
 describe('WorkflowDetail sidebar', () => {
-  beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+  beforeAll(() => server.listen({ onUnhandledRequest: failOnUnhandledRequest }));
   afterEach(() => server.resetHandlers());
   afterAll(() => server.close());
   beforeEach(() => {

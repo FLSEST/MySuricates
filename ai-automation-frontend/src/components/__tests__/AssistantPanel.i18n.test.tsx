@@ -1,4 +1,6 @@
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { server } from '../../test/server';
+import { failOnUnhandledRequest } from '../../test/msw';
 import { screen } from '@testing-library/react';
 import { renderWithProviders } from '../../test/utils';
 import { useI18nStore } from '../../i18n';
@@ -9,6 +11,11 @@ import { AssistantPanel } from '../AssistantPanel';
 vi.mock('../../hooks/useAssistantWebSocket', () => ({
   useAssistantWebSocket: () => ({ currentPhase: null, events: [] }),
 }));
+
+// Side queries of the component (seal status, runs, suggestions …) get the shared default handlers, never the network.
+beforeAll(() => server.listen({ onUnhandledRequest: failOnUnhandledRequest }));
+afterEach(() => server.resetHandlers());
+afterAll(() => server.close());
 
 beforeAll(() => {
   // jsdom lacks scrollIntoView; the panel scrolls its message list with it.
