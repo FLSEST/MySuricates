@@ -26,7 +26,7 @@ export function IterationDiffSection({ diffs, prevIteration }: { diffs: FieldDif
       {open && (
         <div className="mt-2 space-y-2">
           {diffs.map((diff, i) => (
-            <div key={`${diff.group}-${diff.key}-${i}`} className="rounded border border-border/60 bg-surface-base p-2 space-y-1">
+            <div key={`${diff.group}-${diff.key}-${i}`} className="rounded border border-border/60 bg-surface-secondary p-2 space-y-1">
               <div className="flex items-center gap-2 text-xs">
                 <Badge variant={diff.kind === 'added' ? 'success' : 'warning'}>
                   {diff.kind === 'added' ? labels.added : labels.changed}

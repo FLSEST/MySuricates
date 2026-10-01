@@ -159,9 +159,9 @@ export function buildPaletteTheme(spec: PaletteThemeSpec): ThemeDefinition {
   };
 
   const accentFill = setColor('accent', accent, r.link ?? accent);
-  setColor('success', status.success);
+  const successFill = setColor('success', status.success);
   setColor('warning', status.warning);
-  setColor('danger', status.danger);
+  const dangerFill = setColor('danger', status.danger);
   const taken = [accentFill, status.success, status.warning, status.danger];
   const ai = setColor('ai', roleColor(['purple'], hues, taken));
   const human = setColor('human', roleColor(['teal'], hues, [...taken, ai]));
@@ -170,6 +170,7 @@ export function buildPaletteTheme(spec: PaletteThemeSpec): ThemeDefinition {
   // Solid accent buttons: emphasis variant that carries the inverse text
   const inverse = r.inverse ?? r.bg;
   const lightenForInverse = luminance(inverse) < luminance(accentFill);
+  const emphasisFor = (fill: string) => fitContrast(fill, [inverse], 4.5, luminance(inverse) < luminance(fill));
   const emphasis = fitContrast(accentFill, [inverse], 4.5, lightenForInverse);
   let accentHover = fitContrast(fitContrast(r.accentHover, [inverse], 4.5, lightenForInverse), [r.bg], 4.5, dark);
   if (contrast(accentHover, inverse) < 4.5) accentHover = emphasis;
@@ -193,6 +194,9 @@ export function buildPaletteTheme(spec: PaletteThemeSpec): ThemeDefinition {
     '--color-text-inverse': inverse,
     '--color-accent-hover': accentHover,
     '--color-accent-emphasis': emphasis,
+    // Solid danger/success fills carrying text or an icon (danger button, violated seal, done check)
+    '--color-danger-emphasis': emphasisFor(dangerFill),
+    '--color-success-emphasis': emphasisFor(successFill),
     '--color-sidebar': r.sidebar,
     '--color-sidebar-border': r.sidebarBorder,
     '--color-sidebar-hover': r.sidebarHover,

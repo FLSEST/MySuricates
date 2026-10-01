@@ -2,13 +2,8 @@ import { Coins, Cpu, Zap, Wrench } from 'lucide-react';
 import { Card, CardHeader, Badge } from '../ui';
 import { useRunInsights } from '../../hooks/useInsights';
 import { useI18nStore, useT, type Locale } from '../../i18n';
-import { formatDecimal, formatUsd } from '../../utils/localeFormat';
+import { formatTokenCount, formatUsd } from '../../utils/localeFormat';
 
-function formatTokens(count: number, locale: Locale): string {
-  if (count >= 1_000_000) return `${formatDecimal(count / 1_000_000, locale)}M`;
-  if (count >= 1_000) return `${formatDecimal(count / 1_000, locale)}k`;
-  return String(count);
-}
 
 /**
  * Claude reports the input its prompt cache served apart from inputTokens — with Claude Code's cached
@@ -22,11 +17,11 @@ function CacheTokens({ read, write, locale, className = '' }: {
   const total = (read ?? 0) + (write ?? 0);
   if (total <= 0) return null;
   const hint = t.insights.cacheTokensHint
-    .replace('{read}', formatTokens(read ?? 0, locale))
-    .replace('{write}', formatTokens(write ?? 0, locale));
+    .replace('{read}', formatTokenCount(read ?? 0, locale))
+    .replace('{write}', formatTokenCount(write ?? 0, locale));
   return (
     <span className={`text-text-tertiary ${className}`} title={hint}>
-      +{formatTokens(total, locale)} {t.insights.cacheTokens}
+      +{formatTokenCount(total, locale)} {t.insights.cacheTokens}
     </span>
   );
 }
@@ -55,14 +50,14 @@ export function InsightsPanel({ runId }: { runId: string }) {
           <Cpu className="w-4 h-4 text-accent shrink-0" />
           <div>
             <p className="text-xs text-text-tertiary">{t.insights.totalTokens}</p>
-            <p className="text-sm font-semibold text-text">{formatTokens(insights.totalTokens, locale)}</p>
+            <p className="text-sm font-semibold text-text">{formatTokenCount(insights.totalTokens, locale)}</p>
           </div>
         </div>
         <div className="flex items-center gap-2 p-2 rounded-lg bg-surface">
           <Zap className="w-4 h-4 text-success shrink-0" />
           <div>
             <p className="text-xs text-text-tertiary">{t.insights.inputTokens}</p>
-            <p className="text-sm font-semibold text-text">{formatTokens(insights.totalInputTokens, locale)}</p>
+            <p className="text-sm font-semibold text-text">{formatTokenCount(insights.totalInputTokens, locale)}</p>
             <CacheTokens read={insights.totalCacheReadInputTokens} write={insights.totalCacheCreationInputTokens} locale={locale}
               className="block text-[11px]" />
           </div>
@@ -71,7 +66,7 @@ export function InsightsPanel({ runId }: { runId: string }) {
           <Zap className="w-4 h-4 text-danger shrink-0" />
           <div>
             <p className="text-xs text-text-tertiary">{t.insights.outputTokens}</p>
-            <p className="text-sm font-semibold text-text">{formatTokens(insights.totalOutputTokens, locale)}</p>
+            <p className="text-sm font-semibold text-text">{formatTokenCount(insights.totalOutputTokens, locale)}</p>
           </div>
         </div>
       </div>
@@ -107,7 +102,7 @@ export function InsightsPanel({ runId }: { runId: string }) {
                       )}
                     </div>
                   )}
-                  <span>{formatTokens(step.inputTokens + step.outputTokens, locale)} tok</span>
+                  <span>{t.insights.stepTokens.replace('{count}', formatTokenCount(step.inputTokens + step.outputTokens, locale))}</span>
                   <CacheTokens read={step.cacheReadInputTokens} write={step.cacheCreationInputTokens} locale={locale} />
                   <span className="font-medium text-text">{formatUsd(step.costUsd, locale)}</span>
                 </div>

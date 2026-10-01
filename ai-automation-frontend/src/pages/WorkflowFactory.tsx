@@ -78,7 +78,7 @@ export function WorkflowFactory() {
       <div>
         <div className="flex items-center gap-3">
           <Factory className="w-7 h-7 text-accent" />
-          <h1 className="text-2xl font-bold text-text-primary">{t.factory.title}</h1>
+          <h1 className="text-2xl font-bold text-text">{t.factory.title}</h1>
         </div>
         <p className="text-sm text-text-secondary mt-1">{t.factory.subtitle}</p>
       </div>

@@ -8,13 +8,16 @@
  * Uses the `pastRuns` array from CalendarDataResponse.
  *
  * Color coding: success token for COMPLETED, danger token for FAILED.
+ *
+ * Newer backends send at most 1000 past runs per range plus `pastRunsTotal` (86777fb4); then the
+ * result carries `limited`, and the calendar names the cut. Older backends send all runs and no total.
  */
 
 import { api } from '../../api/client';
 import type { CalendarDataResponse, UnifiedCalendarEvent } from '../../types';
-import type { CalendarSourceAdapter } from './types';
+import type { CalendarSourceAdapter, CalendarSourceResult } from './types';
 
-export const runsAdapter: CalendarSourceAdapter = {
+export const runsAdapter: CalendarSourceAdapter<CalendarSourceResult> = {
   sourceId: 'runs',
   label: 'Runs',
   color: 'bg-success',
@@ -25,8 +28,10 @@ export const runsAdapter: CalendarSourceAdapter = {
     const data = await api.get<CalendarDataResponse>(
       `/schedules/calendar?from=${from}&to=${to}`
     );
+    const pastRuns = data.pastRuns ?? [];
+    const total = data.pastRunsTotal;
 
-    return (data.pastRuns ?? [])
+    const events = pastRuns
       .filter((r) => r.startedAt)
       .map((r): UnifiedCalendarEvent => {
         const isFailed = r.status === 'FAILED';
@@ -42,5 +47,8 @@ export const runsAdapter: CalendarSourceAdapter = {
           link: `/workflows/${r.workflowId}/run/${r.id}`,
         };
       });
+    return total != null && total > pastRuns.length
+      ? { events, limited: { shown: pastRuns.length, total } }
+      : { events };
   },
 };

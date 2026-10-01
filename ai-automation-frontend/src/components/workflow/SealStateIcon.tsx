@@ -32,7 +32,7 @@ export function SealStateIcon({ sealed, status, unrecorded = false }: {
   const state = sealDisplayState(sealed, status);
   if (state === 'violated') {
     return (
-      <span title={s.violatedHint} className="shrink-0 inline-flex p-0.5 rounded bg-danger text-text-inverse" data-testid="seal-violated">
+      <span title={s.violatedHint} className="shrink-0 inline-flex p-0.5 rounded bg-danger-emphasis text-text-inverse" data-testid="seal-violated">
         <ShieldAlert className="w-3 h-3" aria-label={s.violated} />
       </span>
     );
@@ -56,7 +56,7 @@ export function SealBadge({ sealed, status }: { sealed: boolean | null | undefin
   const t = useT();
   const state = sealDisplayState(sealed, status);
   const look = {
-    violated: { cls: 'bg-danger text-text-inverse', icon: ShieldAlert, label: t.workflows.sealView.violated, hint: t.workflows.sealView.violatedHint },
+    violated: { cls: 'bg-danger-emphasis text-text-inverse', icon: ShieldAlert, label: t.workflows.sealView.violated, hint: t.workflows.sealView.violatedHint },
     intact: { cls: 'bg-accent text-text-inverse', icon: Lock, label: t.workflows.sealed, hint: t.workflows.sealedHint },
     unsealed: { cls: 'text-text-secondary border border-dashed border-border-strong', icon: LockOpen, label: t.workflows.sealView.notSealed, hint: t.workflows.sealView.notSealedHint },
   }[state];

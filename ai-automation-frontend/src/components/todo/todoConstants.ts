@@ -49,12 +49,36 @@ export const PROJECT_ACTIVE_TODOS_STALE_MS = 30_000;
 
 export type ViewMode = 'list' | 'board';
 
-export const priorityColor: Record<TodoPriority, string> = {
-  CRITICAL: 'bg-danger ring-2 ring-danger/40',
-  HIGH: 'bg-danger',
-  MEDIUM: 'bg-warning',
-  LOW: 'bg-text-tertiary',
+/**
+ * The one place for priority colours: the theme token of each priority, and whether it is ringed
+ * (CRITICAL — same tone as HIGH, told apart by the ring). Everything below is derived from it.
+ */
+type PriorityTone = 'danger' | 'warning' | 'neutral';
+export const PRIORITY_TONES: Record<TodoPriority, { tone: PriorityTone; ringed: boolean }> = {
+  CRITICAL: { tone: 'danger', ringed: true },
+  HIGH: { tone: 'danger', ringed: false },
+  MEDIUM: { tone: 'warning', ringed: false },
+  LOW: { tone: 'neutral', ringed: false },
 };
+
+// Spelled out per tone: Tailwind only generates classes it finds literally in the source.
+const TONE_BG: Record<PriorityTone, string> = { danger: 'bg-danger', warning: 'bg-warning', neutral: 'bg-text-tertiary' };
+const TONE_RING: Record<PriorityTone, string> = {
+  danger: 'ring-2 ring-danger/40', warning: 'ring-2 ring-warning/40', neutral: 'ring-2 ring-text-tertiary/40',
+};
+const TONE_FILL: Record<PriorityTone, string> = {
+  danger: 'var(--color-danger)', warning: 'var(--color-warning)', neutral: 'var(--color-text-tertiary)',
+};
+
+const derive = <T,>(f: (style: { tone: PriorityTone; ringed: boolean }) => T) =>
+  Object.fromEntries(Object.entries(PRIORITY_TONES).map(([p, style]) => [p, f(style)])) as Record<TodoPriority, T>;
+
+/** Marker classes (list, board, dashboard, goals, simple mode). */
+export const priorityColor: Record<TodoPriority, string> =
+  derive(({ tone, ringed }) => (ringed ? `${TONE_BG[tone]} ${TONE_RING[tone]}` : TONE_BG[tone]));
+
+/** The same tone as a CSS value, for SVG fills (relation map). */
+export const priorityFill: Record<TodoPriority, string> = derive(({ tone }) => TONE_FILL[tone]);
 
 export const sourceIcon = (s: TodoSource) => {
   switch (s) {

@@ -68,7 +68,7 @@ export function FactoryFlowDiagram({
       className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
         mode === value
           ? 'bg-accent text-text-inverse'
-          : 'text-text-secondary hover:text-text-primary hover:bg-surface-hover'
+          : 'text-text-secondary hover:text-text hover:bg-surface-hover'
       }`}
     >
       {label}
@@ -84,7 +84,7 @@ export function FactoryFlowDiagram({
         className="w-full flex items-center gap-2 px-6 py-4 text-left hover:bg-surface-hover transition-colors"
       >
         {open ? <ChevronDown className="w-4 h-4 text-text-secondary" /> : <ChevronRight className="w-4 h-4 text-text-secondary" />}
-        <span className="font-semibold text-text-primary">{f.flowTitle}</span>
+        <span className="font-semibold text-text">{f.flowTitle}</span>
         <span className="text-sm text-text-secondary hidden sm:inline">— {f.flowSubtitle}</span>
       </button>
 
@@ -99,7 +99,7 @@ export function FactoryFlowDiagram({
             <button
               type="button"
               onClick={togglePlaying}
-              className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md border border-border-strong text-text-primary hover:bg-surface-hover transition-colors"
+              className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md border border-border-strong text-text hover:bg-surface-hover transition-colors"
             >
               {playing ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
               {playing ? f.flowPause : f.flowPlay}
@@ -144,7 +144,7 @@ export function FactoryFlowDiagram({
                   key={i}
                   aria-current={current ? 'step' : undefined}
                   className={`flex gap-2.5 rounded-md px-2 py-1 transition-colors ${
-                    current ? 'bg-accent-subtle text-text-primary' : 'text-text-secondary'
+                    current ? 'bg-accent-subtle text-accent' : 'text-text-secondary'
                   }`}
                 >
                   <span className={`shrink-0 w-5 h-5 mt-px rounded-full text-xs font-semibold flex items-center justify-center ${

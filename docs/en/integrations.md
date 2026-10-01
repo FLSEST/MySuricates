@@ -625,7 +625,7 @@ hook `useCalendarAggregated`.
 | `label` | `string` | Display name in the source filter |
 | `color` | `string` | Tailwind background class for calendar dots/event bars |
 | `isAvailable` | `(integrations) => boolean` | Is the source active? System sources `true`; integrations check status `CONNECTED` |
-| `fetchEvents` | `(from, to) => Promise<UnifiedCalendarEvent[]>` | Load + transform events for a time range (used as `queryFn`) |
+| `fetchEvents` | `(from, to) => Promise<UnifiedCalendarEvent[] \| CalendarSourceResult>` | Load + transform events for a time range (used as `queryFn`); a source that cuts its list returns `{ events, limited: { shown, total } }` and the calendar names the cut (the runs adapter at 1000 runs) |
 
 ### Registry (`hooks/calendar-adapters/registry.ts`)
 

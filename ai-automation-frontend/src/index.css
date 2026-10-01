@@ -24,12 +24,14 @@
   --color-success: #6cc66c;
   --color-success-text: #6cc66c;
   --color-success-subtle: #1e3320;
+  --color-success-emphasis: #6cc66c;
   --color-warning: #eba44a;
   --color-warning-text: #eba44a;
   --color-warning-subtle: #3d2e14;
   --color-danger: #e07272;
   --color-danger-text: #e07272;
   --color-danger-subtle: #3d1f1f;
+  --color-danger-emphasis: #e07272;
   --color-ai: #b58ee8;
   --color-ai-text: #b58ee8;
   --color-ai-subtle: #362d34;
@@ -75,7 +77,8 @@
   --color-text-inverse: var(--color-text-inverse);
 
   /* Accent/status/role: --color-<name> is the fill (bg/border/ring/fill/stroke, charts),
-     text-<name> reads the readable text variant, bg-accent the button-safe emphasis. */
+     text-<name> reads the readable text variant, bg-accent the button-safe emphasis.
+     Solid danger/success fills with text or an icon on them: bg-danger-emphasis / bg-success-emphasis. */
   --color-accent: var(--color-accent);
   --color-accent-text: var(--color-accent-text);
   --color-accent-emphasis: var(--color-accent-emphasis);
@@ -88,6 +91,7 @@
   --color-success-text: var(--color-success-text);
   --text-color-success: var(--color-success-text);
   --color-success-subtle: var(--color-success-subtle);
+  --color-success-emphasis: var(--color-success-emphasis);
 
   --color-warning: var(--color-warning);
   --color-warning-text: var(--color-warning-text);
@@ -98,6 +102,7 @@
   --color-danger-text: var(--color-danger-text);
   --text-color-danger: var(--color-danger-text);
   --color-danger-subtle: var(--color-danger-subtle);
+  --color-danger-emphasis: var(--color-danger-emphasis);
   --color-ai: var(--color-ai);
   --color-ai-text: var(--color-ai-text);
   --text-color-ai: var(--color-ai-text);

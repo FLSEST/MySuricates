@@ -15,7 +15,7 @@
  *
  * @example
  * ```ts
- * export const myAdapter: CalendarSourceAdapter = {
+ * export const myAdapter: CalendarSourceAdapter<UnifiedCalendarEvent[]> = {
  *   sourceId: 'my-source',
  *   label: 'My Source',
  *   color: 'bg-chart-8',
@@ -30,7 +30,30 @@
 
 import type { IntegrationProviderInfo, UnifiedCalendarEvent } from '../../types';
 
-export interface CalendarSourceAdapter {
+/** What an adapter returns when the source cut its list: the events plus how many exist in the range. */
+export interface CalendarSourceResult {
+  events: UnifiedCalendarEvent[];
+  /** Set only when the source delivered fewer events than exist (e.g. the runs capped at 1000 per range). */
+  limited?: { shown: number; total: number };
+}
+
+/** A source the calendar had to cut, for the notice above the grid. */
+export interface CalendarSourceLimit {
+  sourceId: string;
+  label: string;
+  shown: number;
+  total: number;
+}
+
+/** What `fetchEvents` may return: the events alone, or the events plus the cut of the source. */
+export type CalendarFetchResult = UnifiedCalendarEvent[] | CalendarSourceResult;
+
+/**
+ * `R` narrows what the adapter returns, so callers of one adapter (tests, other hooks) see its exact shape:
+ * `CalendarSourceAdapter<UnifiedCalendarEvent[]>` for a plain list, `<CalendarSourceResult>` for a source that
+ * may cut its list. The registry holds them all under the default (the union).
+ */
+export interface CalendarSourceAdapter<R extends CalendarFetchResult = CalendarFetchResult> {
   /** Unique identifier, e.g. 'google-calendar', 'schedules', 'runs' */
   sourceId: string;
 
@@ -53,7 +76,8 @@ export interface CalendarSourceAdapter {
   isAvailable: (integrations: IntegrationProviderInfo[]) => boolean;
 
   /**
-   * Fetch events for a time range and transform them to UnifiedCalendarEvent[].
+   * Fetch events for a time range and transform them to UnifiedCalendarEvent[]. A source that may cut
+   * its list returns a CalendarSourceResult instead, so the calendar can say so.
    *
    * Called as the `queryFn` in a useQuery hook. The returned events must have
    * `source` and `color` matching this adapter's `sourceId` and `color`.
@@ -61,5 +85,5 @@ export interface CalendarSourceAdapter {
    * @param from - ISO 8601 start of the time range
    * @param to - ISO 8601 end of the time range
    */
-  fetchEvents: (from: string, to: string) => Promise<UnifiedCalendarEvent[]>;
+  fetchEvents: (from: string, to: string) => Promise<R>;
 }

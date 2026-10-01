@@ -64,7 +64,7 @@ export function FactoryResultsList({
 
   return (
     <div>
-      <h2 className="text-lg font-semibold text-text-primary mb-3">{t.factory.recentRuns}</h2>
+      <h2 className="text-lg font-semibold text-text mb-3">{t.factory.recentRuns}</h2>
       {results.length === 0 && factoryWorkflows.length === 0 ? (
         <Card className="p-8 text-center text-text-secondary">
           <Factory className="w-10 h-10 mx-auto mb-3 opacity-40" />
@@ -77,7 +77,7 @@ export function FactoryResultsList({
               <StatusIcon status={r.status} />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="font-medium text-text-primary truncate">
+                  <span className="font-medium text-text truncate">
                     {r.workflowName ?? t.factory.unknownWorkflow}
                   </span>
                   <ResultStatusBadge status={r.status} />
@@ -152,7 +152,7 @@ export function FactoryResultsList({
                 <StatusIcon status={fw.testStatus === 'PASSED' ? 'VERIFIED' : fw.testStatus === 'FAILED' ? 'FAILED' : 'CREATED'} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="font-medium text-text-primary truncate">{fw.name}</span>
+                    <span className="font-medium text-text truncate">{fw.name}</span>
                     <Badge variant="default">{fw.projectName}</Badge>
                     {fw.testStatus && <ResultStatusBadge status={fw.testStatus === 'PASSED' ? 'VERIFIED' : fw.testStatus} />}
                   </div>

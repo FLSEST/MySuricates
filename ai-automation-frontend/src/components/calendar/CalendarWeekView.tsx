@@ -4,8 +4,6 @@ import type { UnifiedCalendarEvent } from '../../types';
 import { useI18nStore } from '../../i18n';
 import { formatDate, formatTimeOfDay } from '../../utils/localeFormat';
 
-const WEEKDAYS_DE = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-const WEEKDAYS_EN = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 interface Props {
   weekStart: Date;
@@ -15,7 +13,6 @@ interface Props {
 
 export function CalendarWeekView({ weekStart, events, onDayClick }: Props) {
   const locale = useI18nStore((s) => s.locale);
-  const weekdayLabels = locale === 'de' ? WEEKDAYS_DE : WEEKDAYS_EN;
   const now = new Date();
   const todayStr = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
 
@@ -63,7 +60,7 @@ export function CalendarWeekView({ weekStart, events, onDayClick }: Props) {
                 onClick={() => onDayClick?.(day)}
                 className="py-2 px-2 border-b border-border text-center hover:bg-surface-hover transition-colors"
               >
-                <span className="text-xs font-medium text-text-secondary uppercase">{weekdayLabels[i]}</span>
+                <span className="text-xs font-medium text-text-secondary uppercase">{formatDate(day, locale, { weekday: 'short' })}</span>
                 <span className={`
                   block text-lg font-semibold mt-0.5
                   ${isToday ? 'text-accent' : 'text-text'}

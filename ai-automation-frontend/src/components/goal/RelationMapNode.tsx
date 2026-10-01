@@ -5,7 +5,7 @@ import {
 import { truncate, useNodeText } from './relationMapText';
 import type { MapNode, Tone } from './goalRelationLayout';
 import type { PlanBadge } from './planDisplay';
-import type { TodoPriority } from '../../types';
+import { priorityFill } from '../todo/todoConstants';
 
 /** Farben nur aus Tokens (TODO c6ea8f5c): Status und Rollen, Workflows bleiben neutral. */
 const TONE_STROKE: Record<Tone, string> = {
@@ -28,13 +28,6 @@ const TONE_FILL: Record<Tone, string> = {
   danger: 'var(--color-danger-subtle)',
   info: 'var(--color-info-subtle)',
   muted: 'var(--color-surface)',
-};
-
-const PRIORITY_FILL: Record<TodoPriority, string> = {
-  CRITICAL: 'var(--color-danger)',
-  HIGH: 'var(--color-danger)',
-  MEDIUM: 'var(--color-warning)',
-  LOW: 'var(--color-text-tertiary)',
 };
 
 const ICON = 14;
@@ -129,7 +122,7 @@ export function RelationMapNode({ node, dimmed, onHover, onActivate, onAssign, a
         strokeDasharray={node.candidate ? '5 4' : undefined}
       />
       {node.kind === 'todo' && node.todo && (
-        <circle cx={node.x + node.w - 10 - assignWidth} cy={node.y + 10} r={3.5} style={{ fill: PRIORITY_FILL[node.todo.priority] }}>
+        <circle cx={node.x + node.w - 10 - assignWidth} cy={node.y + 10} r={3.5} style={{ fill: priorityFill[node.todo.priority] }}>
           <title>{node.todo.priority}</title>
         </circle>
       )}

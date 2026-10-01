@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { aiStatusFingerprint, defaultProviderReady, orderProviders } from '../aiProviderStatus';
+import {
+  aiStatusFingerprint, defaultProviderReady, orderProviders, providerName, providerOptionLabel, providerOptions,
+} from '../aiProviderStatus';
 import type { AiProviderStatus, AiProviderStatusReport } from '../../../hooks/useSystem';
 
 function provider(id: string, state: AiProviderStatus['state'], defaultProvider = false): AiProviderStatus {
@@ -32,5 +34,20 @@ describe('aiProviderStatus', () => {
       .not.toBe(aiStatusFingerprint(base));
     expect(aiStatusFingerprint(report(provider('CLAUDE', 'LOGIN_MISSING'), provider('CODEX', 'READY', true))))
       .not.toBe(aiStatusFingerprint(base));
+  });
+});
+
+// f206504e: provider names were spelled out per component ("Claude CLI", "Codex (OpenAI)", "pi (Mario Zechner)")
+describe('provider names', () => {
+  it('names known providers from one place, unknown ids as they stand', () => {
+    expect(providerName('CLAUDE')).toBe('Claude');
+    expect(providerName('codex')).toBe('Codex');
+    expect(providerName('OLLAMA')).toBe('OLLAMA');
+    expect(providerOptionLabel('PI')).toBe('Pi (Mario Zechner)');
+    expect(providerOptions(['CLAUDE', 'CODEX', 'X'])).toEqual([
+      { value: 'CLAUDE', label: 'Claude (Anthropic)' },
+      { value: 'CODEX', label: 'Codex (OpenAI)' },
+      { value: 'X', label: 'X' },
+    ]);
   });
 });

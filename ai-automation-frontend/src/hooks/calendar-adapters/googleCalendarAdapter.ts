@@ -18,7 +18,7 @@ function parseGoogleDateTime(dt: { dateTime?: string; date?: string }): { date: 
   return { date: new Date(), allDay: false };
 }
 
-export const googleCalendarAdapter: CalendarSourceAdapter = {
+export const googleCalendarAdapter: CalendarSourceAdapter<UnifiedCalendarEvent[]> = {
   sourceId: 'google-calendar',
   label: 'Google Calendar',
   color: 'bg-chart-1',

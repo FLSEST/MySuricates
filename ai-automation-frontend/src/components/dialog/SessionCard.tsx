@@ -32,7 +32,7 @@ export function SessionCard({
           )}
           <div className="flex items-center gap-1.5 flex-wrap">
             {session.dominantTools.map(tool => (
-              <span key={tool} className="text-xs px-1.5 py-0.5 rounded bg-surface-elevated text-text-secondary font-mono">
+              <span key={tool} className="text-xs px-1.5 py-0.5 rounded bg-surface-secondary text-text-secondary font-mono">
                 {tool}
               </span>
             ))}

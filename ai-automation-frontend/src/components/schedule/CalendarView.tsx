@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useCalendarData } from '../../hooks/useSchedules';
 import { useT, useI18nStore } from '../../i18n';
-import { formatNumber, formatTimeOfDay } from '../../utils/localeFormat';
+import { formatDate, formatNumber, formatTimeOfDay, weekdayNames } from '../../utils/localeFormat';
 import { Spinner } from '../ui';
 import type { CalendarEvent } from '../../types';
 
@@ -15,17 +15,11 @@ function getFirstDayOfWeek(year: number, month: number) {
   return day === 0 ? 6 : day - 1; // Monday = 0
 }
 
-const WEEKDAYS_EN = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const WEEKDAYS_DE = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-const MONTHS_EN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-const MONTHS_DE = ['Januar', 'Februar', 'Maerz', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
 
 export function CalendarView() {
   const t = useT();
   const locale = useI18nStore((s) => s.locale);
-  const isGerman = locale === 'de';
-  const weekdays = isGerman ? WEEKDAYS_DE : WEEKDAYS_EN;
-  const months = isGerman ? MONTHS_DE : MONTHS_EN;
+  const weekdays = useMemo(() => weekdayNames(locale), [locale]);
 
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
@@ -112,13 +106,13 @@ export function CalendarView() {
     <div className="space-y-4">
       {/* Month Navigation */}
       <div className="flex items-center justify-between">
-        <button onClick={prevMonth} className="p-2 rounded-lg hover:bg-surface-hover transition-colors text-text-secondary">
+        <button onClick={prevMonth} aria-label={t.schedules.calendarPreviousMonth} title={t.schedules.calendarPreviousMonth} className="p-2 rounded-lg hover:bg-surface-hover transition-colors text-text-secondary">
           <ChevronLeft className="w-5 h-5" />
         </button>
         <h2 className="text-lg font-semibold text-text">
-          {months[month]} {year}
+          {formatDate(new Date(year, month, 1), locale, { month: 'long', year: 'numeric' })}
         </h2>
-        <button onClick={nextMonth} className="p-2 rounded-lg hover:bg-surface-hover transition-colors text-text-secondary">
+        <button onClick={nextMonth} aria-label={t.schedules.calendarNextMonth} title={t.schedules.calendarNextMonth} className="p-2 rounded-lg hover:bg-surface-hover transition-colors text-text-secondary">
           <ChevronRight className="w-5 h-5" />
         </button>
       </div>
@@ -219,7 +213,7 @@ export function CalendarView() {
       {selectedDay !== null && (
         <div className="bg-surface rounded-xl border border-border p-4">
           <h3 className="text-sm font-semibold text-text mb-3">
-            {selectedDay}. {months[month]} {year}
+            {formatDate(new Date(year, month, selectedDay), locale, { day: 'numeric', month: 'long', year: 'numeric' })}
           </h3>
           {selectedEvents.length === 0 ? (
             <p className="text-sm text-text-secondary">{t.schedules.noEventsOnDay}</p>

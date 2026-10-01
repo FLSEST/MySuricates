@@ -62,7 +62,7 @@ function IterationCard({ iter }: { iter: AgenticIteration }) {
                 <Brain className="w-3 h-3" />
                 {t.workflows.execution.agentic.reasoning}
               </p>
-              <pre className="text-xs font-mono text-text bg-background rounded-sm p-2 overflow-x-auto max-h-32 whitespace-pre-wrap">
+              <pre className="text-xs font-mono text-text bg-surface-secondary rounded-sm p-2 overflow-x-auto max-h-32 whitespace-pre-wrap">
                 {iter.reasoning}
               </pre>
             </div>
@@ -74,7 +74,7 @@ function IterationCard({ iter }: { iter: AgenticIteration }) {
                 <Terminal className="w-3 h-3" />
                 {t.workflows.execution.agentic.action}
               </p>
-              <pre className="text-xs font-mono text-text bg-background rounded-sm p-2 overflow-x-auto max-h-20 whitespace-pre-wrap">
+              <pre className="text-xs font-mono text-text bg-surface-secondary rounded-sm p-2 overflow-x-auto max-h-20 whitespace-pre-wrap">
                 {iter.action}
               </pre>
             </div>
@@ -85,7 +85,7 @@ function IterationCard({ iter }: { iter: AgenticIteration }) {
               <p className="text-xs font-medium text-text-secondary mb-1">
                 {t.workflows.execution.agentic.result}
               </p>
-              <pre className="text-xs font-mono text-text bg-background rounded-sm p-2 overflow-x-auto max-h-40 whitespace-pre-wrap">
+              <pre className="text-xs font-mono text-text bg-surface-secondary rounded-sm p-2 overflow-x-auto max-h-40 whitespace-pre-wrap">
                 <PathLinkedOutput text={iter.output} />
               </pre>
             </div>

@@ -1,3 +1,4 @@
+import { useT } from '../../i18n';
 import type { WorkflowRun } from '../../types';
 
 interface GateStatusBadgeProps {
@@ -8,13 +9,15 @@ interface GateStatusBadgeProps {
 }
 
 // Status tokens instead of fixed palette classes, so every theme colours the gate (6c94dc62)
+// Labels are the same words as the insights gate chart (insights.gateGreen/Yellow/Red)
 const gateConfig = {
-  GREEN:  { bg: 'bg-success-subtle', text: 'text-success', dot: 'bg-success', label: 'OK' },
-  YELLOW: { bg: 'bg-warning-subtle', text: 'text-warning', dot: 'bg-warning', label: 'Findings' },
-  RED:    { bg: 'bg-danger-subtle',  text: 'text-danger',  dot: 'bg-danger',  label: 'Critical' },
-};
+  GREEN:  { bg: 'bg-success-subtle', text: 'text-success', dot: 'bg-success', label: 'gateGreen' },
+  YELLOW: { bg: 'bg-warning-subtle', text: 'text-warning', dot: 'bg-warning', label: 'gateYellow' },
+  RED:    { bg: 'bg-danger-subtle',  text: 'text-danger',  dot: 'bg-danger',  label: 'gateRed' },
+} as const;
 
 export function GateStatusBadge({ run, className = '', compact = false }: GateStatusBadgeProps) {
+  const t = useT();
   const gateStatus = run.metadata?.gate_status as string | undefined;
   if (!gateStatus || !(gateStatus in gateConfig)) return null;
 
@@ -25,7 +28,7 @@ export function GateStatusBadge({ run, className = '', compact = false }: GateSt
   // Show description as label if available and not compact, otherwise use default label
   const displayLabel = !compact && description
     ? description.length > 40 ? description.substring(0, 40) + '…' : description
-    : cfg.label;
+    : t.insights[cfg.label];
 
   const tooltip = [description, category ? `(${category})` : undefined].filter(Boolean).join(' ') || undefined;
 

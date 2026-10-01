@@ -48,7 +48,7 @@ export function WishHeaderCard({ wish, onCancel, onDelete }: {
       <div className="p-4">
         <div className="flex items-start justify-between mb-3">
           <div className="flex-1 min-w-0">
-            <p className="text-text-primary font-medium">{wish.originalText}</p>
+            <p className="text-text font-medium">{wish.originalText}</p>
             {wish.projectName && (
               <p className="text-sm text-text-tertiary mt-1">{t.wishes.project}: {wish.projectName}</p>
             )}

@@ -5,6 +5,7 @@ import { http, HttpResponse } from 'msw';
 import { server } from '../../../test/server';
 import { renderWithProviders } from '../../../test/utils';
 import { useI18nStore } from '../../../i18n';
+import { de } from '../../../i18n/de';
 import type { RunInsights } from '../../../types';
 import { InsightsPanel } from '../InsightsPanel';
 
@@ -67,5 +68,15 @@ describe('InsightsPanel cache tokens', () => {
 
     expect(await screen.findByText('400')).toBeInTheDocument();
     expect(screen.queryByText(/cache/)).not.toBeInTheDocument();
+  });
+
+  // 17eb7994: the per-step token count carried a fixed "tok"
+  it('names the step tokens in the UI language', async () => {
+    payload = WITHOUT_CACHE;
+    useI18nStore.setState({ locale: 'de' });
+    renderWithProviders(<InsightsPanel runId="r1" />);
+
+    expect(await screen.findByText(de.insights.stepTokens.replace('{count}', '500'))).toBeInTheDocument();
+    expect(screen.queryByText(/\btok\b/)).not.toBeInTheDocument();
   });
 });

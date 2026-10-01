@@ -60,7 +60,7 @@ export function toUnifiedEvents(data: CalDavEventList): UnifiedCalendarEvent[] {
     }));
 }
 
-export const caldavAdapter: CalendarSourceAdapter = {
+export const caldavAdapter: CalendarSourceAdapter<UnifiedCalendarEvent[]> = {
   sourceId: 'caldav',
   label: 'CalDAV',
   color: COLOR,

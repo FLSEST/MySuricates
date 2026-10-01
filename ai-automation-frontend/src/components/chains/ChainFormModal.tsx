@@ -116,7 +116,7 @@ export function ChainFormModal({ title, chain, workflows, onSave, onClose, savin
                   <div key={i} className="flex items-center gap-2 p-2 rounded-lg bg-surface-raised border border-border">
                     <span className="text-xs font-mono text-text-tertiary w-5 text-center">{i + 1}</span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-text-primary truncate">{wf?.name ?? entry.workflowId}</p>
+                      <p className="text-sm font-medium text-text truncate">{wf?.name ?? entry.workflowId}</p>
                       {wf?.projectName && <p className="text-xs text-text-tertiary">{wf.projectName}</p>}
                     </div>
                     <div className="flex items-center gap-1">
@@ -149,7 +149,7 @@ export function ChainFormModal({ title, chain, workflows, onSave, onClose, savin
                     className="w-full text-left px-3 py-2 hover:bg-surface-raised text-sm transition-colors"
                     onClick={() => addEntry(wf.id)}
                   >
-                    <span className="font-medium text-text-primary">{wf.name}</span>
+                    <span className="font-medium text-text">{wf.name}</span>
                     <span className="text-text-tertiary ml-2">{wf.projectName}</span>
                   </button>
                 ))}

@@ -4,6 +4,7 @@ import { Card, Button, Input, Select, Spinner, Badge, Toggle } from '../ui';
 import { useProjects } from '../../hooks/useProjects';
 import { useFactoryTopics } from '../../hooks/useWorkflowFactory';
 import { useT } from '../../i18n';
+import { providerOptions } from '../shared/aiProviderStatus';
 import type { FactoryForm } from '../../hooks/useFactoryForm';
 
 /**
@@ -67,9 +68,7 @@ export function FactoryCreateForm({ form }: { form: FactoryForm }) {
             label={t.factory.providerLabel}
             options={[
               { value: '', label: t.factory.providerDefault },
-              { value: 'CLAUDE', label: 'Claude' },
-              { value: 'CODEX', label: 'Codex' },
-              { value: 'PI', label: 'pi (Mario Zechner)' },
+              ...providerOptions(['CLAUDE', 'CODEX', 'PI']),
             ]}
             value={form.provider}
             onChange={e => form.setProvider(e.target.value)}
@@ -93,7 +92,7 @@ export function FactoryCreateForm({ form }: { form: FactoryForm }) {
       {/* Advanced Options */}
       <div className="mt-4 pt-4 border-t border-border">
         <button
-          className="flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors"
+          className="flex items-center gap-1.5 text-sm text-text-secondary hover:text-text transition-colors"
           onClick={() => setShowAdvanced(!showAdvanced)}
         >
           {showAdvanced ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}

@@ -75,7 +75,7 @@ export function Wishes() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-text-primary">{t.wishes.title}</h1>
+        <h1 className="text-2xl font-bold text-text">{t.wishes.title}</h1>
         <p className="text-text-secondary mt-1">{t.wishes.subtitle}</p>
       </div>
 
@@ -117,7 +117,7 @@ export function Wishes() {
                   <div className="p-3">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-text-primary line-clamp-2">{wish.originalText}</p>
+                        <p className="text-sm font-medium text-text line-clamp-2">{wish.originalText}</p>
                         <div className="flex items-center gap-2 mt-1.5">
                           <WishStatusBadge status={wish.status} />
                           {wish.iterationCount > 0 && (

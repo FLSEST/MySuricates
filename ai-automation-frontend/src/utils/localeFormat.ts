@@ -29,6 +29,12 @@ export function formatDate(value: DateInput, locale: Locale, options?: Intl.Date
   return toDate(value).toLocaleDateString(intlLocale(locale), options);
 }
 
+/** Short weekday names from Monday to Sunday ("Mon" … "Sun" / „Mo.“ … „So.“), for calendar column heads. */
+export function weekdayNames(locale: Locale): string[] {
+  // 1 January 2024 was a Monday
+  return Array.from({ length: 7 }, (_, i) => formatDate(new Date(2024, 0, 1 + i), locale, { weekday: 'short' }));
+}
+
 /**
  * A span of dates as the app language writes it, shared parts once ("September 21 – 27, 2026" /
  * „21.–27. September 2026“).
@@ -63,6 +69,22 @@ export function formatUsd(value: number, locale: Locale, fractionDigits?: number
   return formatNumber(value, locale, {
     style: 'currency', currency: 'USD', minimumFractionDigits: digits, maximumFractionDigits: digits,
   });
+}
+
+/**
+ * Decimals for every tick of a cost axis, from its largest value: the same for all ticks, and only as many as
+ * that value needs ("$0.25" / "$0.025" / "$0.0025"). Per-tick decimals from `formatUsd` mix widths and cut labels.
+ */
+export function usdAxisDigits(max: number): number {
+  const top = Math.abs(max);
+  return top === 0 || top >= 0.1 ? 2 : top >= 0.01 ? 3 : 4;
+}
+
+/** A token count, shortened above a thousand ("1.2k", "3.4M" / "1,2k", "3,4M"), below with separators. */
+export function formatTokenCount(count: number, locale: Locale): string {
+  if (count >= 1_000_000) return `${formatDecimal(count / 1_000_000, locale)}M`;
+  if (count >= 1_000) return `${formatDecimal(count / 1_000, locale)}k`;
+  return formatNumber(count, locale);
 }
 
 /** `value` units away from now ("in 3 hours", "vor 5 Minuten"); negative values lie in the past. */

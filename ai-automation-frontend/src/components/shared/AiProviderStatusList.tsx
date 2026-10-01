@@ -4,13 +4,7 @@ import { CopyButton } from './CopyButton';
 import { useI18nStore, useT } from '../../i18n';
 import { formatTimeOfDay } from '../../utils/localeFormat';
 import type { AiProviderStatus, AiProviderStatusReport } from '../../hooks/useSystem';
-import { orderProviders } from './aiProviderStatus';
-
-const PROVIDER_NAMES: Record<string, string> = {
-  CLAUDE: 'Claude',
-  CODEX: 'Codex',
-  PI: 'Pi',
-};
+import { orderProviders, providerName } from './aiProviderStatus';
 
 interface AiProviderStatusListProps {
   report: AiProviderStatusReport;
@@ -84,7 +78,7 @@ function ProviderRow({ provider, showCommands }: { provider: AiProviderStatus; s
     <li data-testid={`ai-provider-${provider.id}`} data-state={provider.state} className="text-sm">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <span className={`w-2 h-2 rounded-full shrink-0 ${dot}`} aria-hidden="true" />
-        <span className="font-medium text-text">{PROVIDER_NAMES[provider.id] ?? provider.id}</span>
+        <span className="font-medium text-text">{providerName(provider.id)}</span>
         {provider.defaultProvider && <Badge variant="accent">{t.defaultBadge}</Badge>}
         <span className={ready ? 'text-success' : 'text-text-secondary'}>{t.states[provider.state]}</span>
         {ready && provider.loginSource && (

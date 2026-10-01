@@ -61,12 +61,12 @@ export function WorkflowResultWidget({ config }: WidgetProps) {
             closed contract — so the label says only what is certain, and stays neutral: the `ai`
             token would claim an AI was involved.
           */}
-          <p className="mt-0.5 flex items-center gap-1 text-[10px] uppercase tracking-wide text-secondary">
+          <p className="mt-0.5 flex items-center gap-1 text-[10px] uppercase tracking-wide text-text-secondary">
             <ClipboardList className="h-3 w-3 shrink-0" />
             {texts.reportedByRun}
           </p>
         </div>
-        <span className="shrink-0 rounded-full bg-surface-raised px-2 py-0.5 text-[10px] font-medium text-secondary">
+        <span className="shrink-0 rounded-full bg-surface-raised px-2 py-0.5 text-[10px] font-medium text-text-secondary">
           {result.status}
         </span>
       </div>
