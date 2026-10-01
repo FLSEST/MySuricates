@@ -102,7 +102,7 @@ export function InsightsPanel({ runId }: { runId: string }) {
                       )}
                     </div>
                   )}
-                  <span>{formatTokenCount(step.inputTokens + step.outputTokens, locale)} tok</span>
+                  <span>{t.insights.stepTokens.replace('{count}', formatTokenCount(step.inputTokens + step.outputTokens, locale))}</span>
                   <CacheTokens read={step.cacheReadInputTokens} write={step.cacheCreationInputTokens} locale={locale} />
                   <span className="font-medium text-text">{formatUsd(step.costUsd, locale)}</span>
                 </div>
