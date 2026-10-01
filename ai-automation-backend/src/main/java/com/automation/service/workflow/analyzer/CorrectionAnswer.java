@@ -38,8 +38,22 @@ final class CorrectionAnswer {
             }
             List<String> nestedBefore = nestedPositions(a);
             List<String> nestedAfter = nestedPositions(b);
-            if (!nestedBefore.equals(nestedAfter)) {
+            if (nestedBefore.size() != nestedAfter.size()) {
                 return "Block " + (i + 1) + ": verschachtelte Blöcke " + nestedBefore.size() + " → " + nestedAfter.size();
+            }
+            String moved = firstMoved(nestedBefore, nestedAfter);
+            if (moved != null) {
+                return "Block " + (i + 1) + ": verschachtelter Block verschoben (" + moved + ")";
+            }
+        }
+        return null;
+    }
+
+    /** Erste Position, an der zwei gleich lange Pfadlisten auseinandergehen, als {@code alt → neu}; sonst {@code null}. */
+    private static String firstMoved(List<String> before, List<String> after) {
+        for (int j = 0; j < before.size(); j++) {
+            if (!before.get(j).equals(after.get(j))) {
+                return before.get(j) + " → " + after.get(j);
             }
         }
         return null;
