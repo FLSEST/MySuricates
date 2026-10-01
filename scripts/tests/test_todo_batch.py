@@ -1021,6 +1021,13 @@ class PoolDefinitionTest(unittest.TestCase):
         self.assertIn("confirm_start.py", check["config"]["command"])
         self.assertLess(names.index(check["name"]), names.index("umsetzen"))
 
+    def test_gates_never_create_auto_todos(self):
+        # Die Kette führt ihre TODOs selbst (Tags, Vermerke); „Verwerfen“ ist eine bewusste Entscheidung. Ohne
+        # ausdrückliches autoTodo.enabled=false griffe die globale Vorgabe und machte aus YELLOW/RED ein Auto-TODO.
+        for name in self.FILES:
+            metadata = json.loads((REPO / "workflow-pool" / name).read_text())["metadata"]
+            self.assertIs(metadata.get("autoTodo", {}).get("enabled"), False, name)
+
     def test_steps_after_starting_do_not_stop_the_run(self):
         config = {b_["name"]: b_["config"] for n, b_ in self.blocks() if n.endswith("abarbeiten.json")}
         for step in ("gestartet", "umsetzen", "pruefen", "review", "review_folgen", "gesamtreview", "bericht", "freigabe_text", "freigabe"):

@@ -23,6 +23,9 @@
     "workspace": {
       "mode": "isolated",
       "source": "commit"
+    },
+    "autoTodo": {
+      "enabled": false
     }
   },
   "defaultContext": {

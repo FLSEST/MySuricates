@@ -26,6 +26,9 @@
       "source": "commit",
       "branch": true,
       "install_npm": true
+    },
+    "autoTodo": {
+      "enabled": false
     }
   },
   "defaultContext": {
