@@ -115,8 +115,14 @@ final class GoalRelationAssembler {
         return workers;
     }
 
+    /**
+     * {@code null}, solange nie ein Fix-Lauf gestartet wurde – auch wenn ein Fix-Workflow verknuepft
+     * ist: Das Verknuepfen setzt {@code IDLE} ({@code TodoService}), das ist noch kein Ergebnis
+     * (TODO 05d4bfe5). Ein geloeschter Lauf hinterlaesst {@code IDLE} mit Versuchen – die bleiben sichtbar.
+     */
     static Result resultOf(GoalRelationRow row, Lookups lookups) {
-        if (row.lastFixRunId() == null && row.fixAttempts() == 0 && row.resolutionState() == null) {
+        boolean neverStarted = row.lastFixRunId() == null && row.fixAttempts() == 0;
+        if (neverStarted && (row.resolutionState() == null || row.resolutionState() == Todo.ResolutionState.IDLE)) {
             return null;
         }
         RunStateRow run = row.lastFixRunId() == null ? null : lookups.runs().get(row.lastFixRunId());
