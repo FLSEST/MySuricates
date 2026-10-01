@@ -83,17 +83,15 @@ class AuditSnapshotApplier {
         List<AuditFinding> saved = applied.isEmpty() ? List.of() : findingRepository.saveAll(applied);
         List<AuditFinding> touched = new ArrayList<>(saved);
         recordOccurrences(saved, appliedItems, report, observedAt);
-        for (AuditFinding finding : saved) {
-            // Nur offene Findings bekommen ein verwaltetes TODO: akzeptierte/verworfene Risiken und
-            // Wiedervorlagen (AWAITING_VERIFICATION nach Verfall) loesen keinen Fix-Loop aus.
-            // Ein unbelegtes Finding ebenfalls nicht — es bleibt sichtbar, kostet aber keine
-            // Arbeitszeit mehr, bis sein Beleg stimmt (TODO a94b56a0).
-            if (ManagedTodoWriter.needsTodo(finding.getSeverity())
-                    && finding.getStatus() == AuditFindingStatus.OPEN
-                    && !finding.isUnverifiedEvidence()) {
-                managedTodoWriter.ensure(finding, report);
-            }
-        }
+        // Nur offene Findings bekommen ein verwaltetes TODO: akzeptierte/verworfene Risiken und
+        // Wiedervorlagen (AWAITING_VERIFICATION nach Verfall) loesen keinen Fix-Loop aus.
+        // Ein unbelegtes Finding ebenfalls nicht — es bleibt sichtbar, kostet aber keine
+        // Arbeitszeit mehr, bis sein Beleg stimmt (TODO a94b56a0).
+        managedTodoWriter.ensureAll(saved.stream()
+                .filter(finding -> ManagedTodoWriter.needsTodo(finding.getSeverity())
+                        && finding.getStatus() == AuditFindingStatus.OPEN
+                        && !finding.isUnverifiedEvidence())
+                .toList(), report);
 
         reportCollisions(event, report, collisions);
 

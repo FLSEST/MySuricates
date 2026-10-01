@@ -52,14 +52,29 @@ class ManagedTodoWriterTest {
         return new ManagedTodoWriter(findingRepository, findingTodoRepository, todoRepository, eventPublisher);
     }
 
-    @Test
-    void ensure_reusesTheExistingManagedTodo_andIgnoresManualLinks() {
-        Todo existing = todo("t-managed", Todo.Status.OPEN);
-        when(findingTodoRepository.findByFindingId(FINDING_ID)).thenReturn(List.of(
-                link("t-manual", false), link("t-managed", true)));
-        when(todoRepository.findById("t-managed")).thenReturn(Optional.of(existing));
+    /** Das TODO, das {@code create} speicherte (save je neuem TODO), mit vergebener ID. */
+    private void stubTodoSave(String id) {
+        when(todoRepository.save(any(Todo.class))).thenAnswer(inv -> {
+            Todo t = inv.getArgument(0);
+            if (t.getId() == null) t.setId(id);
+            return t;
+        });
+    }
 
-        assertThat(writer().ensure(finding(FINDING_ID, AuditFindingStatus.OPEN), report())).isSameAs(existing);
+    private Todo savedTodo() {
+        ArgumentCaptor<Todo> captor = ArgumentCaptor.forClass(Todo.class);
+        verify(todoRepository).save(captor.capture());
+        return captor.getValue();
+    }
+
+    @Test
+    void ensureAll_reusesTheExistingManagedTodo_andIgnoresManualLinks() {
+        Todo existing = todo("t-managed", Todo.Status.OPEN);
+        when(findingTodoRepository.findByFindingIdIn(List.of(FINDING_ID))).thenReturn(List.of(
+                link("t-manual", false), link("t-managed", true)));
+        when(todoRepository.findAllById(List.of("t-managed"))).thenReturn(List.of(existing));
+
+        writer().ensureAll(List.of(finding(FINDING_ID, AuditFindingStatus.OPEN)), report());
 
         verify(todoRepository, never()).save(any());
         verify(todoRepository, never()).saveAll(any());
@@ -67,16 +82,13 @@ class ManagedTodoWriterTest {
     }
 
     @Test
-    void ensure_createsTodoLinkAndEvent_fromFindingAndReport() {
-        when(findingTodoRepository.findByFindingId(FINDING_ID)).thenReturn(List.of());
-        when(todoRepository.save(any(Todo.class))).thenAnswer(inv -> {
-            Todo t = inv.getArgument(0);
-            t.setId("t-new");
-            return t;
-        });
+    void ensureAll_createsTodoLinkAndEvent_fromFindingAndReport() {
+        when(findingTodoRepository.findByFindingIdIn(List.of(FINDING_ID))).thenReturn(List.of());
+        stubTodoSave("t-new");
 
-        Todo created = writer().ensure(finding(FINDING_ID, AuditFindingStatus.OPEN), report());
+        writer().ensureAll(List.of(finding(FINDING_ID, AuditFindingStatus.OPEN)), report());
 
+        Todo created = savedTodo();
         assertThat(created.getTitle()).isEqualTo("Shell-Aufruf ohne Escaping");
         assertThat(created.getStatus()).isEqualTo(Todo.Status.OPEN);
         assertThat(created.getPriority()).isEqualTo(Todo.Priority.CRITICAL);
@@ -104,31 +116,65 @@ class ManagedTodoWriterTest {
     }
 
     @Test
-    void ensure_replacesADanglingManagedLink() {
+    void ensureAll_replacesADanglingManagedLink() {
         AuditFindingTodo dangling = link("t-gone", true);
-        when(findingTodoRepository.findByFindingId(FINDING_ID)).thenReturn(List.of(dangling));
-        when(todoRepository.findById("t-gone")).thenReturn(Optional.empty());
-        when(todoRepository.save(any(Todo.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(findingTodoRepository.findByFindingIdIn(List.of(FINDING_ID))).thenReturn(List.of(dangling));
+        when(todoRepository.findAllById(List.of("t-gone"))).thenReturn(List.of());
+        stubTodoSave("t-new");
 
-        writer().ensure(finding(FINDING_ID, AuditFindingStatus.OPEN), report());
+        writer().ensureAll(List.of(finding(FINDING_ID, AuditFindingStatus.OPEN)), report());
 
-        verify(findingTodoRepository).delete(dangling);
+        verify(findingTodoRepository).deleteAll(List.of(dangling));
         verify(todoRepository).save(any(Todo.class));
     }
 
     @Test
-    void ensure_describesAFindingWithoutDescriptionOrEvidence() {
+    void ensureAll_describesAFindingWithoutDescriptionOrEvidence() {
         AuditFinding finding = finding(FINDING_ID, AuditFindingStatus.OPEN);
         finding.setDescription(null);
         finding.setEvidence(null);
-        when(findingTodoRepository.findByFindingId(FINDING_ID)).thenReturn(List.of());
-        when(todoRepository.save(any(Todo.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(findingTodoRepository.findByFindingIdIn(List.of(FINDING_ID))).thenReturn(List.of());
+        stubTodoSave("t-new");
 
-        Todo created = writer().ensure(finding, report());
+        writer().ensureAll(List.of(finding), report());
 
-        assertThat(created.getDescription())
+        assertThat(savedTodo().getDescription())
                 .startsWith("Audit finding requires remediation.")
                 .contains("Evidence: not provided");
+    }
+
+    /**
+     * Folgebefund zu b2d65a20: Verknuepfungen und vorhandene TODOs aller Findings eines Reports kommen aus je
+     * einer Abfrage, nicht aus findByFindingId und findById je Finding. Angelegt wird nur, was fehlt.
+     */
+    @Test
+    void ensureAll_loadsLinksAndTodosOnceForAllFindings() {
+        AuditFinding withTodo = finding(FINDING_ID, AuditFindingStatus.OPEN);
+        AuditFinding dangling = finding("f-2", AuditFindingStatus.OPEN);
+        AuditFinding fresh = finding("f-3", AuditFindingStatus.OPEN);
+        AuditFindingTodo kept = link("t-1", true);
+        AuditFindingTodo gone = AuditFindingTodo.builder().findingId("f-2").todoId("t-gone").managed(true).build();
+        when(findingTodoRepository.findByFindingIdIn(List.of(FINDING_ID, "f-2", "f-3"))).thenReturn(List.of(kept, gone));
+        when(todoRepository.findAllById(List.of("t-1", "t-gone"))).thenReturn(List.of(todo("t-1", Todo.Status.OPEN)));
+        when(todoRepository.save(any(Todo.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        writer().ensureAll(List.of(withTodo, dangling, fresh), report());
+
+        ArgumentCaptor<Todo> created = ArgumentCaptor.forClass(Todo.class);
+        verify(todoRepository, times(2)).save(created.capture());
+        assertThat(created.getAllValues()).extracting(Todo::getReferenceId).containsExactly("f-2", "f-3");
+        verify(findingTodoRepository).deleteAll(List.of(gone));
+        verify(findingTodoRepository, times(1)).findByFindingIdIn(any());
+        verify(findingTodoRepository, never()).findByFindingId(any());
+        verify(todoRepository, times(1)).findAllById(any());
+        verify(todoRepository, never()).findById(any());
+    }
+
+    @Test
+    void ensureAll_withoutFindingsQueriesNothing() {
+        writer().ensureAll(List.of(), report());
+
+        verifyNoInteractions(findingTodoRepository, todoRepository, eventPublisher);
     }
 
     @Test
