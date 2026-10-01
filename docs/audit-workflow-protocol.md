@@ -341,7 +341,10 @@ nur als Markdown im `previous_report`. Das prüft Abschnitt 10b desselben Tests.
   `HIGH`, wird sein verwaltetes TODO gelöst und archiviert (außer es steht auf `IN_PROGRESS`).
 - Ein auf `DONE` gesetztes verknüpftes TODO – verwaltet oder manuell verknüpft – versetzt ein
   offenes Finding in `AWAITING_VERIFICATION`, sofern kein anderes damit verknüpftes TODO noch
-  offen ist (`OPEN`, `IN_PROGRESS`, `BACKLOG`; TODO `ab1ed481`). Erst der nächste valide
+  offen ist (`OPEN`, `IN_PROGRESS`, `BACKLOG`; TODO `ab1ed481`). Das gilt für jeden Schreibpfad –
+  REST, TodoTrigger-Auto-Close, verknüpfter Workflow, Sammelschließen: Das TODO meldet den Wechsel
+  beim Speichern selbst (Spring-Data-Domainereignis `Todo.Completed`, synchron in derselben
+  Transaktion), `AuditTodoCompletionListener` stellt den Befund um. Erst der nächste valide
   Audit-Snapshot bestätigt die Behebung: Fehlt das Finding darin, wird es `RESOLVED`; wird es
   erneut gemeldet, ist es wieder `OPEN`.
 - Manuell verknüpfte TODOs werden niemals automatisch im Status verändert – auch dann nicht, wenn

@@ -10,7 +10,6 @@ import com.automation.exception.ResourceNotFoundException;
 import com.automation.repository.ProjectRepository;
 import com.automation.repository.TodoRepository;
 import com.automation.repository.WorkflowRepository;
-import com.automation.service.audit.AuditCenterService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -48,9 +47,6 @@ class TodoServiceTest {
 
     @Mock
     private ApplicationEventPublisher eventPublisher;
-
-    @Mock
-    private AuditCenterService auditCenterService;
 
     @Mock
     private TodoGoalConsistency goalConsistency;
@@ -297,7 +293,8 @@ class TodoServiceTest {
         Todo result = todoService.update("t-1", request);
 
         assertThat(result.getStatus()).isEqualTo(Todo.Status.DONE);
-        verify(auditCenterService).markAwaitingVerification("t-1");
+        // Die Audit-Seite haengt am Domainereignis des Saves (AuditTodoCompletionListener), nicht am Service.
+        assertThat(existing.domainEvents()).containsExactly(new Todo.Completed(existing));
     }
 
     @Test
@@ -344,7 +341,7 @@ class TodoServiceTest {
 
         assertThat(result.getStatus()).isEqualTo(Todo.Status.DONE);
         verify(todoRepository).save(todo);
-        verify(auditCenterService).markAwaitingVerification("t-1");
+        assertThat(todo.domainEvents()).containsExactly(new Todo.Completed(todo));
     }
 
     // --- delete ---

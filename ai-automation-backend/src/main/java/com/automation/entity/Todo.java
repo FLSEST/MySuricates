@@ -3,9 +3,13 @@ package com.automation.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.domain.AfterDomainEventPublication;
+import org.springframework.data.domain.DomainEvents;
 import org.springframework.data.annotation.LastModifiedDate;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "todos")
@@ -55,6 +59,14 @@ public class Todo {
     @Column(nullable = false)
     @Builder.Default
     private Status status = Status.OPEN;
+
+    /**
+     * Ereignisse, die Spring Data beim naechsten save/saveAll veroeffentlicht ({@link #domainEvents()}).
+     * Nicht persistiert; der Builder setzt das Feld nicht.
+     */
+    @Transient
+    @Getter(AccessLevel.NONE)
+    private final transient List<Object> domainEvents = new ArrayList<>();
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -200,4 +212,36 @@ public class Todo {
 
     @LastModifiedDate
     private Instant updatedAt;
+
+    /**
+     * Ein TODO ist eben auf {@code DONE} gewechselt. Spring Data veroeffentlicht das Ereignis beim
+     * naechsten save/saveAll synchron in der Transaktion des Aufrufers; die Folge — etwa ein Audit-Befund auf
+     * AWAITING_VERIFICATION — haengt so an keinem einzelnen Schreibpfad. Hier statt in {@code event}, weil
+     * {@code event} schon von {@code entity} abhaengt (kein Paketzyklus).
+     */
+    public record Completed(Todo todo) {
+    }
+
+    /**
+     * Ein Wechsel auf {@code DONE} meldet sich als {@link Completed} — einmal je Wechsel, nicht
+     * bei DONE → DONE (Folgebefund zu ab1ed481). Hibernate laedt per Feldzugriff, das Laden loest also
+     * nichts aus.
+     */
+    public void setStatus(Status status) {
+        if (status == Status.DONE && this.status != Status.DONE) {
+            domainEvents.add(new Completed(this));
+        }
+        this.status = status;
+    }
+
+    /** Fuer Spring Data: beim save/saveAll dieses TODOs veroeffentlicht. */
+    @DomainEvents
+    public List<Object> domainEvents() {
+        return List.copyOf(domainEvents);
+    }
+
+    @AfterDomainEventPublication
+    public void clearDomainEvents() {
+        domainEvents.clear();
+    }
 }

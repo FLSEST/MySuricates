@@ -16,7 +16,6 @@ import com.automation.repository.ProjectRepository;
 import com.automation.repository.TodoRepository;
 import com.automation.repository.WorkflowRepository;
 import com.automation.event.TodoCreatedEvent;
-import com.automation.service.audit.AuditCenterService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -46,7 +45,6 @@ public class TodoService {
     private final WorkflowRepository workflowRepository;
     private final TodoResponseAssembler responseAssembler;
     private final ApplicationEventPublisher eventPublisher;
-    private final AuditCenterService auditCenterService;
     private final TodoGoalConsistency goalConsistency;
     private final ModuleRegistry modules;
 
@@ -142,10 +140,8 @@ public class TodoService {
             todo.setDueDate(request.dueDate().isBlank() ? null : Instant.parse(request.dueDate()));
         }
 
+        // Ein Wechsel auf DONE meldet das TODO beim save selbst (Todo.Completed) — der Audit-Befund folgt dort.
         Todo saved = todoRepository.save(todo);
-        if (request.status() == Todo.Status.DONE) {
-            auditCenterService.markAwaitingVerification(saved.getId());
-        }
         log.info("Updated todo: {} ({})", saved.getTitle(), saved.getId());
         return saved;
     }
@@ -163,10 +159,8 @@ public class TodoService {
         if (request.sessionId() != null) {
             todo.setSessionId(request.sessionId());
         }
+        // Ein Wechsel auf DONE meldet das TODO beim save selbst (Todo.Completed) — der Audit-Befund folgt dort.
         Todo saved = todoRepository.save(todo);
-        if (request.status() == Todo.Status.DONE) {
-            auditCenterService.markAwaitingVerification(saved.getId());
-        }
         log.info("Updated todo status: {} → {} ({})", todo.getTitle(), request.status(), todo.getId());
         return saved;
     }

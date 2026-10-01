@@ -343,7 +343,10 @@ earlier findings only as Markdown in `previous_report`. Section 10b of the same 
   managed TODO is unlinked and archived (unless it is `IN_PROGRESS`).
 - A linked TODO set to `DONE` – managed or manually linked – moves an open finding to
   `AWAITING_VERIFICATION`, unless another TODO linked to it is still open (`OPEN`, `IN_PROGRESS`,
-  `BACKLOG`; TODO `ab1ed481`). Only the next valid audit snapshot confirms the fix: if the finding
+  `BACKLOG`; TODO `ab1ed481`). This holds for every write path – REST, TodoTrigger auto-close, linked
+  workflow, bulk closing: the TODO reports the change itself when saved (Spring Data domain event
+  `Todo.Completed`, synchronously in the same transaction), and `AuditTodoCompletionListener` moves
+  the finding. Only the next valid audit snapshot confirms the fix: if the finding
   is absent from it, it becomes `RESOLVED`; if it is reported again, it is `OPEN` again.
 - Manually linked TODOs are never automatically changed in status – not even when their finding
   becomes `RESOLVED`. An open manual TODO next to a resolved finding is therefore intended; whoever
