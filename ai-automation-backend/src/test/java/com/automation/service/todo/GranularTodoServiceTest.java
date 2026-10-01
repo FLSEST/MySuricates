@@ -66,7 +66,7 @@ class GranularTodoServiceTest {
         service.syncItems("p-1", event(List.of()), new GateResult(GateStatus.YELLOW, "quality", "d"));
 
         assertThat(stale.getStatus()).isEqualTo(Todo.Status.DONE);
-        verify(todoRepository).save(stale);
+        verify(todoRepository).saveAll(List.of(stale));
         verify(similarityService, never()).findSimilar(any(), any(), any());
     }
 
@@ -376,13 +376,49 @@ class GranularTodoServiceTest {
         when(todoRepository.findByProjectIdAndSourceAndReferenceTypeAndReferenceIdAndStatusNot(
                 eq("p-1"), eq(Todo.Source.WORKFLOW), eq("workflow_run"), eq("wf-1"), eq(Todo.Status.DONE)))
                 .thenReturn(List.of(previousTodo));
-        when(todoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         service.syncItems("p-1", event, gate);
 
-        ArgumentCaptor<Todo> captor = ArgumentCaptor.forClass(Todo.class);
-        verify(todoRepository, atLeastOnce()).save(captor.capture());
-        assertThat(captor.getAllValues()).anyMatch(t ->
-                "prev-1".equals(t.getId()) && t.getStatus() == Todo.Status.DONE);
+        verify(todoRepository).saveAll(List.of(previousTodo));
+        assertThat(previousTodo.getStatus()).isEqualTo(Todo.Status.DONE);
+    }
+
+    /** dfb3fee8: mehrere nicht mehr gemeldete TODOs werden in einem saveAll geschlossen, nicht save je TODO. */
+    @Test
+    void closeStale_closesAllStaleTodosInOneBatch_andKeepsTheOthers() {
+        Todo staleA = Todo.builder().id("a").title("Alt A").status(Todo.Status.OPEN)
+                .tags("[\"auto:workflow\",\"item:1\"]").build();
+        Todo stillReported = Todo.builder().id("b").title("Noch da").status(Todo.Status.OPEN)
+                .tags("[\"auto:workflow\",\"item:2\"]").build();
+        Todo notGranular = Todo.builder().id("c").title("Sammel-TODO").status(Todo.Status.OPEN)
+                .tags("[\"auto:workflow\"]").build();
+        Todo staleB = Todo.builder().id("d").title("Alt B").status(Todo.Status.IN_PROGRESS)
+                .tags("[\"auto:workflow\",\"item:3\"]").build();
+        when(todoRepository.findOpenByCompositeKey(anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(Optional.of(stillReported));
+        when(todoRepository.findByProjectIdAndSourceAndReferenceTypeAndReferenceIdAndStatusNot(
+                "p-1", Todo.Source.WORKFLOW, "workflow_run", "wf-1", Todo.Status.DONE))
+                .thenReturn(List.of(staleA, stillReported, notGranular, staleB));
+
+        service.syncItems("p-1", event(List.of(Map.of("title", "Noch da", "priority", "LOW"))),
+                new GateResult(GateStatus.YELLOW, "quality", "d"));
+
+        verify(todoRepository, times(1)).saveAll(List.of(staleA, staleB));
+        verify(todoRepository, never()).save(staleA);
+        verify(todoRepository, never()).save(staleB);
+        assertThat(staleA.getStatus()).isEqualTo(Todo.Status.DONE);
+        assertThat(staleB.getStatus()).isEqualTo(Todo.Status.DONE);
+        assertThat(stillReported.getStatus()).isEqualTo(Todo.Status.OPEN);
+        assertThat(notGranular.getStatus()).isEqualTo(Todo.Status.OPEN);
+    }
+
+    @Test
+    void closeStale_nothingStale_savesNothing() {
+        when(todoRepository.findByProjectIdAndSourceAndReferenceTypeAndReferenceIdAndStatusNot(
+                anyString(), any(), anyString(), anyString(), any())).thenReturn(List.of());
+
+        service.syncItems("p-1", event(List.of()), new GateResult(GateStatus.GREEN, "quality", "ok"));
+
+        verify(todoRepository, never()).saveAll(any());
     }
 }
