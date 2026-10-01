@@ -8,6 +8,7 @@ import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -97,6 +98,25 @@ class DialogTextRulesTest {
                 "I can see the error", "I notice a typo", "Looking at the output", "LET ME look"})
         void erkenntSelbstkommentareOhneGrossKleinschreibung(String text) {
             assertThat(DialogTextRules.isMetaCommentary(text)).isTrue();
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = {"  Let me check", "\n\tLooking at the diff", " I NOTICE a gap"})
+        void erkenntSelbstkommentareTrotzFuehrenderLeerzeichen(String text) {
+            assertThat(DialogTextRules.isMetaCommentary(text)).isTrue();
+        }
+
+        @Test
+        void erkenntSelbstkommentareAuchUnterTuerkischerStandardsprache() {
+            Locale before = Locale.getDefault();
+            Locale.setDefault(Locale.forLanguageTag("tr-TR"));
+            try {
+                // Ohne Locale.ROOT wird aus "I" ein punktloses "ı" und "I'LL NOW" passt nicht mehr.
+                assertThat(DialogTextRules.isMetaCommentary("I'LL NOW run the tests")).isTrue();
+                assertThat(DialogTextRules.isMetaCommentary("I CAN SEE the error")).isTrue();
+            } finally {
+                Locale.setDefault(before);
+            }
         }
 
         @Test

@@ -4,6 +4,7 @@ import com.automation.entity.BlockDefinition;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 
 /**
@@ -39,7 +40,7 @@ final class DialogTextRules {
 
     static boolean isMetaCommentary(String text) {
         if (text == null) return true;
-        String lower = text.toLowerCase();
+        String lower = text.strip().toLowerCase(Locale.ROOT);
         return lower.startsWith("let me") || lower.startsWith("i'll now")
                 || lower.startsWith("i'm going to") || lower.startsWith("i can see")
                 || lower.startsWith("i notice") || lower.startsWith("looking at");
