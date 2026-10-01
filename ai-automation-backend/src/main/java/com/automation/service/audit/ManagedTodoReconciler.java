@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -64,7 +65,8 @@ public class ManagedTodoReconciler {
         Map<String, AuditFinding> findings = findingIds.isEmpty() ? Map.of()
                 : findingRepository.findAllById(findingIds).stream()
                         .collect(Collectors.toMap(AuditFinding::getId, Function.identity()));
-        int changed = 0;
+        // Geaenderte TODOs werden gesammelt und mit einem saveAll geschrieben (e41531e0).
+        List<Todo> changed = new ArrayList<>();
         for (String todoId : todoIds) {
             Todo todo = todos.get(todoId);
             if (todo == null) {
@@ -77,10 +79,12 @@ public class ManagedTodoReconciler {
             log.info("Managed audit TODO {} ({}) moves {} → {}", todo.getId(), todo.getTitle(),
                     todo.getStatus(), target);
             todo.setStatus(target);
-            todoRepository.save(todo);
-            changed++;
+            changed.add(todo);
         }
-        return changed;
+        if (!changed.isEmpty()) {
+            todoRepository.saveAll(changed);
+        }
+        return changed.size();
     }
 
     /**
