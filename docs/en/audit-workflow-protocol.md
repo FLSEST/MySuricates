@@ -22,7 +22,10 @@ only provides an opt-in protocol for versioned reports, stable findings, and TOD
 }
 ```
 
-The workflow block named in `reportBlock` must have the same `name`. Audit keys and
+The workflow block named in `reportBlock` must have the same `name`. If a shell block assembles the
+envelope from the measurement (test coverage), it is the `reportBlock`; the AI block before it is then
+named as `promptBlock` as well. The platform does not read `promptBlock`, only the prompt self-tests
+(`scripts/tests/test-audit-facts.sh`, section 10). Audit keys and
 categories are freely selectable; the backend does not know any project-specific keys or rules.
 An audit workflow does not use `metadata.autoTodo` at the same time: TODOs are managed
 from the structured findings.
@@ -169,7 +172,7 @@ Converted audits in `workflow-pool/`:
 | Architecture review (frontend) | block `frontend_metrics` → `scripts/public-readiness/frontend-metrics.sh` (source imports, lines, module cycles) | `scripts/tests/test-frontend-metrics.sh` |
 | Health check | block `facts` (Surefire totals, exit codes, lint/tsc, bundle, code and docs sizes) | `scripts/tests/test-audit-facts.sh` |
 | Performance audit | block `facts` (health probe, heap numbers from `/api/v1/system/jvm-memory`, DB and bundle files, log lines, source patterns) | `scripts/tests/test-audit-facts.sh` |
-| Test coverage | block `metrics` with the target size `ERWARTETE FINDINGS`, gate counts the envelope against it | `scripts/tests/test-coverage-snapshot.sh` |
+| Test coverage | block `metrics` with the target size `ERWARTETE FINDINGS`; the shell block `report` builds the envelope from it, the AI (block `coach`) only supplies the report, `naechster_schritt` and one text per class; the gate counts the envelope against it | `scripts/tests/test-coverage-snapshot.sh` |
 | Documentation weight check | block `dossier` → `scripts/public-readiness/docs_orphan_scan.py` (reachability, references, maintenance, topic overlap) | `scripts/tests/test_docs_orphan_scan.py`, gate: `scripts/tests/test-audit-facts.sh` |
 
 ### Architecture review: grading in the script
@@ -197,6 +200,21 @@ NCLOC; 598 frontend modules, 7 above 400) and are documented with their reasonin
 Findings that only existed under the old rules are no longer reported: the platform sets open ones
 to `RESOLVED` on the next run, classified ones (`ACCEPTED_RISK`, `DISMISSED`) stay in the Audit
 Center with their classification.
+
+### Test coverage: envelope from the target list
+
+Up to version 4.3.3 the AI wrote the test-coverage envelope itself and miscounted: in the run of
+2026-09-28 it emitted three classes twice, 52 instead of 50 findings. Gate and ingestion rightly
+rejected the run, which left it worthless (TODO `fa66ea31`). Since 4.3.4 the shell block `report`
+builds the envelope: exactly one finding per line of the lists `UNTESTED` and `DUENNE TESTS`, with
+`subject`, severity, title and `evidence` taken from the measurement, `expectedFindings` and
+`snapshotComplete` from the header lines. If a header line is missing or its count does not match
+the lines, the envelope says `snapshotComplete: false`. The AI (block `coach`) only supplies the
+report, the line `naechster_schritt: <subject>` (that finding becomes `HIGH`) and, between
+`BEFUND-TEXTE:` and `ENDE BEFUND-TEXTE`, one sentence per class as `<subject> | <text>`. A missing
+text gets a default; an unknown `subject` and an envelope written by the AI are discarded. The
+measuring block lists every `subject` only once, even for two classes of the same name in different
+packages.
 
 ### When `expectedFindings` does **not** fit
 

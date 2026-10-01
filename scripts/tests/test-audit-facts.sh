@@ -1293,7 +1293,8 @@ section = rules = old = counting = fact_sheet = unmeasured = degraded = 0
 texts = set()
 for name in names:
     definition = json.load(open(os.path.join(pool, name + '.json'), encoding='utf-8'))
-    report = definition['metadata']['audit']['reportBlock']
+    # promptBlock: setzt ein Shell-Block den Envelope zusammen (Test-Abdeckung, fa66ea31), steht der Prompt dort.
+    report = definition['metadata']['audit'].get('promptBlock', definition['metadata']['audit']['reportBlock'])
     prompt = next(b['config']['command'] for b in definition['blocks'] if b.get('name') == report)
     section += prompt.count(SECTION) == 1 and prompt.count('{{ audit_findings }}') == 1
     found = RULES.findall(prompt)

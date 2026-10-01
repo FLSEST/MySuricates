@@ -20,7 +20,10 @@ stellt nur ein opt-in Protokoll für versionierte Reports, stabile Findings und 
 }
 ```
 
-Der in `reportBlock` genannte Workflow-Block braucht denselben `name`. Audit-Keys und
+Der in `reportBlock` genannte Workflow-Block braucht denselben `name`. Setzt ein Shell-Block den
+Envelope aus der Messung zusammen (Test-Abdeckung), ist er der `reportBlock`; der KI-Block davor steht
+dann zusätzlich als `promptBlock`. Die Plattform liest `promptBlock` nicht, nur die Selbsttests der
+Prompts (`scripts/tests/test-audit-facts.sh`, Abschnitt 10). Audit-Keys und
 Kategorien sind frei wählbar; das Backend kennt keine projektspezifischen Keys oder Regeln.
 Ein Audit-Workflow verwendet nicht gleichzeitig `metadata.autoTodo`: TODOs werden aus den
 strukturierten Findings verwaltet.
@@ -169,7 +172,7 @@ Umgestellte Audits im `workflow-pool/`:
 | Architektur-Review (Frontend) | Block `frontend_metrics` → `scripts/public-readiness/frontend-metrics.sh` (Quelltext-Importe, Zeilen, Modul-Zyklen) | `scripts/tests/test-frontend-metrics.sh` |
 | Health-Check | Block `facts` (Surefire-Summen, Exit-Codes, Lint/tsc, Bundle, Code- und Doku-Größen) | `scripts/tests/test-audit-facts.sh` |
 | Performance-Audit | Block `facts` (Health-Sonde, Heap-Zahlen aus `/api/v1/system/jvm-memory`, DB- und Bundle-Dateien, Logzeilen, Quelltext-Muster) | `scripts/tests/test-audit-facts.sh` |
-| Test-Abdeckung | Block `metrics` mit Soll-Größe `ERWARTETE FINDINGS`, Gate zählt den Envelope dagegen | `scripts/tests/test-coverage-snapshot.sh` |
+| Test-Abdeckung | Block `metrics` mit Soll-Größe `ERWARTETE FINDINGS`; der Shell-Block `report` baut daraus den Envelope, die KI (Block `coach`) liefert nur Bericht, `naechster_schritt` und Texte je Klasse; Gate zählt den Envelope dagegen | `scripts/tests/test-coverage-snapshot.sh` |
 | Doku-Zehrprobe | Block `dossier` → `scripts/public-readiness/docs_orphan_scan.py` (Erreichbarkeit, Verweise, Pflegestand, Themen-Überlappung) | `scripts/tests/test_docs_orphan_scan.py`, Gate: `scripts/tests/test-audit-facts.sh` |
 
 ### Architektur-Review: Einstufung im Skript
@@ -198,6 +201,21 @@ NCLOC; 598 Frontend-Module, 7 über 400) und stehen samt Begründung im Skript. 
 nach den alten Regeln bestanden, meldet der Report nicht mehr: Offene setzt die Plattform beim
 nächsten Lauf auf `RESOLVED`, eingeordnete (`ACCEPTED_RISK`, `DISMISSED`) bleiben mit ihrer
 Einordnung im Audit Center stehen.
+
+### Test-Abdeckung: Envelope aus der Soll-Liste
+
+Bis Version 4.3.3 schrieb die KI den Envelope der Test-Abdeckung selbst und zählte dabei falsch: Im
+Lauf vom 2026-09-28 gab sie drei Klassen doppelt aus, 52 statt 50 Findings. Gate und Ingestion
+verwarfen den Lauf zu Recht, er war damit aber wertlos (TODO `fa66ea31`). Seit 4.3.4 baut der
+Shell-Block `report` den Envelope: je Zeile der Listen `UNTESTED` und `DUENNE TESTS` genau ein
+Finding mit `subject`, Schwere, Titel und `evidence` aus der Messung, `expectedFindings` und
+`snapshotComplete` aus den Kopfzeilen. Fehlt eine Kopfzeile oder stimmt ihre Zahl nicht mit den
+Zeilen überein, steht `snapshotComplete: false` im Envelope. Von der KI (Block `coach`) kommen nur
+der Bericht, die Zeile `naechster_schritt: <subject>` (dieses Finding wird `HIGH`) und zwischen
+`BEFUND-TEXTE:` und `ENDE BEFUND-TEXTE` je Klasse ein Satz `<subject> | <Text>`. Fehlt ein Text,
+gilt ein Standardtext; ein unbekanntes `subject` und ein Envelope der KI werden verworfen. Der
+Messblock listet jedes `subject` nur einmal, auch zwei gleichnamige Klassen aus verschiedenen
+Paketen.
 
 ### Wann `expectedFindings` **nicht** passt
 

@@ -121,12 +121,15 @@ echo "4) Soll-Groesse des Snapshots"
 check "Zeile 'ERWARTETE FINDINGS: 23'"        'grep -qx "ERWARTETE FINDINGS: 23" "$TMP/out.txt"'
 
 echo "5) Report-Prompt bindet den Snapshot an die vollstaendige Liste"
+# Seit fa66ea31 setzt der Shell-Block report (metadata.audit.reportBlock) den Envelope zusammen; der
+# KI-Prompt steht im Block metadata.audit.promptBlock.
 PROMPT="$TMP/prompt.txt"
 python3 - "$DEF" > "$PROMPT" <<'PY'
 import json, sys
 definition = json.load(open(sys.argv[1], encoding='utf-8'))
-report = definition['metadata']['audit']['reportBlock']
-print(next(b['config']['command'] for b in definition['blocks'] if b.get('name') == report))
+audit = definition['metadata']['audit']
+prompt = audit.get('promptBlock', audit['reportBlock'])
+print(next(b['config']['command'] for b in definition['blocks'] if b.get('name') == prompt))
 PY
 check "Prompt nennt 'UNTESTED gesamt'"        'grep -q "UNTESTED gesamt" "$PROMPT"'
 check "Prompt nennt kein Top-15-Fenster"      '! grep -q "Top 15" "$PROMPT"'
@@ -137,8 +140,12 @@ check "Prompt kennt den Unvollstaendig-Fall"  'grep -q "snapshotComplete\": *fal
 check "Prompt bekommt die bekannten Befunde"   'grep -q "{{ audit_findings }}" "$PROMPT"'
 check "Empfehlung nur nicht eingeordnete Klassen" \
   'grep -q "^Waehlbar fuer NAECHSTER SCHRITT und die Roadmap (naechste 5) sind nur Klassen, die unter BEKANNTE BEFUNDE nicht ACCEPTED_RISK oder DISMISSED sind" "$PROMPT"'
-check "eingeordnete Klassen bleiben im Envelope" \
-  'grep -q "lass keine gelistete Klasse weg, auch keine eingeordnete (ACCEPTED_RISK, DISMISSED; sie zaehlen in ERWARTETE FINDINGS mit)" "$PROMPT"'
+check "Prompt sagt: eingeordnete Klassen bleiben im Envelope (Zusammenbau, Abschnitt 9)" \
+  'grep -q "laesst keine gelistete Klasse weg, auch keine eingeordnete (ACCEPTED_RISK, DISMISSED; sie zaehlen in ERWARTETE FINDINGS mit)" "$PROMPT"'
+check "Prompt verlangt keinen eigenen Envelope mehr" \
+  'grep -q "Den Envelope (mysuricates:audit-result:v1) schreibst du NICHT" "$PROMPT" && ! grep -q "^Schliesse die Antwort mit genau einem versteckten Envelope ab" "$PROMPT"'
+check "Prompt fordert naechster_schritt und BEFUND-TEXTE an" \
+  'grep -q "naechster_schritt: <subject>" "$PROMPT" && grep -q "^2. Ein Abschnitt, der mit der Zeile \"BEFUND-TEXTE:\" beginnt" "$PROMPT"'
 
 echo "6) Gate-Verdict prueft den Snapshot deterministisch"
 # Platzhalter werden wie in TemplateResolver.resolveShellSafe single-quoted eingesetzt
@@ -336,6 +343,115 @@ check "genau ein ungetesteter Record, Soll-Groesse 1" \
 check "nur die zwei Records ohne Logik ausgenommen" \
   'grep -qx "Datenklassen ausgenommen (DTO/Entity/Repository/Event/Enum/Record/Interface): 2" "$TMP/out-records.txt"'
 check "Messblock laeuft ohne stderr" '[ ! -s "$TMP/err-records.txt" ]'
+
+echo "9) Envelope deterministisch aus der Soll-Liste (fa66ea31)"
+# Run 073e9933: die KI gab drei Klassen doppelt aus (52 statt 50 Findings), das Gate wurde RED und der Lauf
+# war wertlos. Jetzt baut der Shell-Block report den Envelope aus den Listen des Messblocks; die KI liefert
+# nur Bericht, naechster_schritt und Texte je Klasse. Duplikate sind damit unmoeglich, fehlende Texte
+# ersetzt ein Standardtext, ein Envelope der KI zaehlt nicht.
+render_block() {  # $1 = name des Blocks, $2 = metrik-output, $3 = coach-output, $4 = report-output
+  python3 - "$DEF" "$1" "$2" "$3" "$4" <<'PY'
+import json, re, sys
+definition = json.load(open(sys.argv[1], encoding='utf-8'))
+block = [b for b in definition['blocks'] if b.get('name') == sys.argv[2]]
+assert len(block) == 1, f"erwartet genau einen Block {sys.argv[2]}, gefunden: {len(block)}"
+assert block[0]['type'] == 'shell' and block[0]['config'].get('shell_escape_variables') is True
+values = {'block.metrics.output': sys.argv[3], 'block.coach.output': sys.argv[4], 'block.report.output': sys.argv[5]}
+def substitute(match):
+    key = match.group(1).strip()
+    assert key in values, f"unerwarteter Platzhalter: {key}"
+    return "'" + values[key].replace("'", "'\\''") + "'"
+print(re.sub(r'\{\{\s*([^}]+?)\s*}}', substitute, block[0]['config']['command']))
+PY
+}
+check "reportBlock ist der Shell-Block report, promptBlock der KI-Block coach" \
+  'python3 -c "import json,sys; d=json.load(open(sys.argv[1])); a=d[\"metadata\"][\"audit\"]; t={b.get(\"name\"): b[\"type\"] for b in d[\"blocks\"]}; sys.exit(not (a[\"reportBlock\"] == \"report\" and t[\"report\"] == \"shell\" and a[\"promptBlock\"] == \"coach\" and t[\"coach\"] == \"simple\"))" "$DEF"'
+assemble() {  # $1 = metrik-output, $2 = coach-output -> $TMP/report.txt, Envelope-JSON in $TMP/envelope.json
+  render_block report "$1" "$2" "" > "$TMP/report.sh"
+  bash "$TMP/report.sh" > "$TMP/report.txt" 2> "$TMP/report-err.txt"
+  awk '/^<!-- mysuricates:audit-result:v1$/ { getline; print }' "$TMP/report.txt" > "$TMP/envelope.json"
+}
+finding_field() {  # $1 = subject, $2 = feld
+  python3 -c 'import json,sys; e=json.load(open(sys.argv[1])); print(next(f[sys.argv[3]] for f in e["findings"] if f["subject"] == sys.argv[2]))' \
+    "$TMP/envelope.json" "$1" "$2"
+}
+METRICS_OUT="$(cat "$TMP/out.txt")"
+# Wie Run 073e9933: die KI listet Klassen doppelt, nennt eine erfundene, schreibt einen eigenen Envelope
+# mit 25 Findings und benutzt Tab, " | " und Aufzaehlungszeichen gemischt.
+COACH_OUT="$(printf '%s\n' '### Coverage-Coach' '' '**Status**: 40.0%' '' \
+  '**naechster_schritt:** `service/deep/Untested05.java`' '' 'BEFUND-TEXTE:' \
+  "service/deep/Untested20.java${TAB}Groesste Klasse: Kernpfade mit UntestedTest als Vorlage pruefen." \
+  'service/deep/Untested20.java | Doppelt genannt, der erste Text gilt.' \
+  '- controller/NoPublicUntested.java | Enum-Werte und --> Pfeil im Text abdecken.' \
+  'ThinOne.java | Die sechs fehlenden public-Methoden abdecken.' \
+  'service/Erfunden.java | Diese Klasse gibt es nicht.' \
+  'ENDE BEFUND-TEXTE' '' 'gate_status: YELLOW' 'gate_category: test-coverage' 'gate_description: 40%' '' \
+  '<!-- mysuricates:audit-result:v1' \
+  "{\"snapshotComplete\":true,\"expectedFindings\":25,\"findings\":[$(for i in $(seq 1 25); do printf '{"ruleKey":"test-coverage.untested-class","subject":"p/C.java","severity":"MEDIUM","title":"t"},'; done | sed 's/,$//')]}" \
+  '-->')"
+assemble "$METRICS_OUT" "$COACH_OUT"
+check "Zusammenbau laeuft ohne stderr"            '[ ! -s "$TMP/report-err.txt" ]'
+check "genau ein Envelope in der Ausgabe"         '[ "$(grep -c "mysuricates:audit-result:v1" "$TMP/report.txt")" -eq 1 ]'
+check "Envelope ist gueltiges JSON"               'python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$TMP/envelope.json"'
+read -r ENV_TOTAL ENV_UNIQUE ENV_EXPECTED ENV_COMPLETE ENV_HIGH ENV_UNTESTED ENV_THIN <<< "$(python3 -c '
+import json, sys
+e = json.load(open(sys.argv[1]))
+f = e["findings"]
+print(len(f), len({(x["ruleKey"], x["subject"]) for x in f}), e["expectedFindings"], e["snapshotComplete"],
+      sum(x["severity"] == "HIGH" for x in f), sum(x["ruleKey"] == "test-coverage.untested-class" for x in f),
+      sum(x["ruleKey"] == "test-coverage.thin-test" for x in f))' "$TMP/envelope.json")"
+check "23 Findings wie ERWARTETE FINDINGS, keins doppelt" '[ "$ENV_TOTAL" -eq 23 ] && [ "$ENV_UNIQUE" -eq 23 ]'
+check "expectedFindings 23, snapshotComplete true" '[ "$ENV_EXPECTED" -eq 23 ] && [ "$ENV_COMPLETE" = True ]'
+check "21 untested-class, 2 thin-test"             '[ "$ENV_UNTESTED" -eq 21 ] && [ "$ENV_THIN" -eq 2 ]'
+check "genau eine HIGH: der naechste Schritt"      '[ "$ENV_HIGH" -eq 1 ] && [ "$(finding_field service/deep/Untested05.java severity)" = HIGH ]'
+check "uebrige ungetestete MEDIUM, duenne LOW" \
+  '[ "$(finding_field service/deep/Untested20.java severity)" = MEDIUM ] && [ "$(finding_field ThinOne.java severity)" = LOW ]'
+check "Text der KI je Klasse, beim doppelten der erste" \
+  '[ "$(finding_field service/deep/Untested20.java description)" = "Groesste Klasse: Kernpfade mit UntestedTest als Vorlage pruefen." ]'
+check "Aufzaehlungszeichen und \" | \" gelesen, --> entschaerft" \
+  '[ "$(finding_field controller/NoPublicUntested.java description)" = "Enum-Werte und -> Pfeil im Text abdecken." ]'
+check "ohne Text der KI: Standardtext" \
+  'finding_field service/deep/Untested01.java description | grep -q "^Eigenen Test fuer Untested01 anlegen"'
+check "erfundene Klasse nicht im Envelope"         '! grep -q "Erfunden" "$TMP/envelope.json"'
+check "evidence und Titel aus der Messung" \
+  '[ "$(finding_field service/deep/Untested20.java evidence)" = "200 LOC" ] && [ "$(finding_field ThinTwo.java evidence)" = "1/10 @Test/public (10%)" ] && [ "$(finding_field ThinTwo.java title)" = "Duenner Test: ThinTwo" ]'
+check "Bericht bleibt, Texte-Abschnitt und naechster_schritt nicht" \
+  'grep -qx "### Coverage-Coach" "$TMP/report.txt" && grep -qx "gate_status: YELLOW" "$TMP/report.txt" && ! grep -q "BEFUND-TEXTE\|naechster_schritt\|Diese Klasse gibt es nicht" "$TMP/report.txt"'
+GATE_METRICS="$METRICS_OUT" run_gate "$(cat "$TMP/report.txt")"
+check "Gate auf dem zusammengesetzten Report: Status aus dem Bericht" \
+  'grep -qx "gate_status: YELLOW" "$TMP/gate.txt" && grep -qx "gate_category: test-coverage" "$TMP/gate.txt"'
+assemble "$METRICS_OUT" "$(printf '%s\n' 'naechster_schritt: service/Erfunden.java' 'gate_status: GREEN')"
+check "unbekannter naechster Schritt: keine HIGH, alle mit Standardtext" \
+  '! grep -q "\"HIGH\"" "$TMP/envelope.json" && [ "$(grep -o "Eigenen Test fuer" "$TMP/envelope.json" | wc -l)" -eq 21 ]'
+assemble "$(printf '%s\n' "$METRICS_OUT" | sed '/^DUENNE TESTS gesamt:/d')" "$COACH_OUT"
+check "Kopfzeile fehlt: snapshotComplete false" \
+  'python3 -c "import json,sys; sys.exit(json.load(open(sys.argv[1]))[\"snapshotComplete\"] is not False)" "$TMP/envelope.json"'
+GATE_METRICS="$METRICS_OUT" run_gate "$(cat "$TMP/report.txt")"
+check "Kopfzeile fehlt: Gate RED audit-invalid" \
+  'grep -qx "gate_status: RED" "$TMP/gate.txt" && grep -qx "gate_category: audit-invalid" "$TMP/gate.txt"'
+assemble "$(printf '%s\n' "$METRICS_OUT" | sed '/^service\/deep\/Untested03\.java/d')" "$COACH_OUT"
+check "Kopfzeile zaehlt mehr Zeilen als gelistet: snapshotComplete false" 'grep -q "\"snapshotComplete\": false" "$TMP/envelope.json"'
+
+# Gleichnamige Klassen in zwei Paketen ergaeben dasselbe thin-test-subject zweimal: der Messblock listet
+# je Name nur die duennste Zeile, ERWARTETE FINDINGS zaehlt sie einmal.
+FIXD="$TMP/fixture-dup"
+mkdir -p "$FIXD/ai-automation-backend/src/main/java/com/automation/a" "$FIXD/ai-automation-backend/src/main/java/com/automation/b" \
+         "$FIXD/ai-automation-backend/src/test/java/com/automation/a" "$FIXD/ai-automation-frontend/src"
+java_class "$FIXD/ai-automation-backend/src/main/java/com/automation/a/Twin.java" 40 8
+java_class "$FIXD/ai-automation-backend/src/main/java/com/automation/b/Twin.java" 40 10
+printf '%s\n' 'class TwinTest {' '    @Test void a() {}' '}' > "$FIXD/ai-automation-backend/src/test/java/com/automation/a/TwinTest.java"
+echo "export const x = 1;" > "$FIXD/ai-automation-frontend/src/x.ts"
+git init -q "$FIXD" && ( cd "$FIXD" && git -c user.name=t -c user.email=t@example.invalid \
+  add -A && git -c user.name=t -c user.email=t@example.invalid commit -q -m init )
+python3 - "$DEF" "$FIXD" > "$TMP/command-dup.sh" <<'PY'
+import json, sys
+definition = json.load(open(sys.argv[1], encoding='utf-8'))
+block = next(b for b in definition['blocks'] if b.get('name') == 'metrics')
+print(block['config']['command'].replace('{{ project_path }}', sys.argv[2]))
+PY
+( cd "$FIXD" && bash "$TMP/command-dup.sh" ) > "$TMP/out-dup.txt" 2> "$TMP/err-dup.txt"
+check "gleichnamige duenne Klassen: eine Zeile, die duennste" \
+  'grep -qx "DUENNE TESTS gesamt: 1" "$TMP/out-dup.txt" && grep -qx "Twin.java${TAB}1/10${TAB}10%" "$TMP/out-dup.txt" && grep -qx "ERWARTETE FINDINGS: 1" "$TMP/out-dup.txt"'
 
 echo
 echo "passed=$PASS failed=$FAIL"
