@@ -1828,6 +1828,7 @@ export const de: TranslationKeys = {
     executionSave: 'Einstellungen speichern',
     executionSaved: 'Ausführungs-Einstellungen gespeichert',
     executionSaveFailed: 'Ausführungs-Einstellungen konnten nicht gespeichert werden',
+    settingSaveFailed: 'Einstellung konnte nicht gespeichert werden',
   },
   toast: {
     projectCreated: 'Projekt erfolgreich erstellt',

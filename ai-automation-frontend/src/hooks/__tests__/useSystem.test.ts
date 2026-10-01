@@ -48,6 +48,7 @@ vi.mock('../../i18n', () => ({
     settings: {
       executionSaved: 'Execution settings saved',
       executionSaveFailed: 'Failed to save execution settings',
+      settingSaveFailed: 'Could not save the setting',
     },
   }),
   useI18nStore: (selector: (s: { locale: string }) => unknown) =>
@@ -179,6 +180,19 @@ describe('useUpdateExecutionConfig', () => {
 });
 
 describe('useUpdateSystemSetting', () => {
+  it('reports a rejected setting with the server message (c5f3cff5)', async () => {
+    server.use(http.put(`${apiBase}/system/settings/:key`, () =>
+      HttpResponse.json({ error: 'Value out of range' }, { status: 400 })));
+    mocks.toastError.mockClear();
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useUpdateSystemSetting(), { wrapper: Wrapper });
+    await act(async () => {
+      result.current.mutate({ key: 'backup-retain-count', value: '0' });
+    });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(mocks.toastError).toHaveBeenCalledWith('Could not save the setting: Value out of range');
+  });
+
   it('updates a system setting via mutation', async () => {
     const { Wrapper } = createWrapper();
     const { result } = renderHook(() => useUpdateSystemSetting(), { wrapper: Wrapper });

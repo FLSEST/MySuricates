@@ -1,4 +1,4 @@
-import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
 import { api, apiErrorMessage } from '../api/client';
 import { useT } from '../i18n';
 import type { PageResponse, TriggerSource } from '../types';
@@ -195,6 +195,28 @@ export function useAuditFinding(id: string | null) {
   });
 }
 
+/**
+ * A cached page of `useAuditFindingsByStatus` (key `['audit-findings', projectId, auditKey, status]`) after
+ * `updated` was saved: it leaves the pages of other statuses and joins the page of its own audit and status.
+ * The order does not matter, the list sorts itself; `totalElements` follows, so `capped` stays right.
+ */
+export function placeFinding(page: PageResponse<AuditFinding>, key: QueryKey, updated: AuditFinding): PageResponse<AuditFinding> {
+  const [, projectId, auditKey, status] = key;
+  const has = page.content.some((finding) => finding.id === updated.id);
+  const ownPage = projectId === updated.projectId && auditKey === updated.auditKey && status === updated.status;
+  if (typeof status !== 'string') {
+    return has ? { ...page, content: page.content.map((finding) => (finding.id === updated.id ? updated : finding)) } : page;
+  }
+  if (ownPage) {
+    return has
+      ? { ...page, content: page.content.map((finding) => (finding.id === updated.id ? updated : finding)) }
+      : { ...page, content: [...page.content, updated], totalElements: page.totalElements + 1 };
+  }
+  return has
+    ? { ...page, content: page.content.filter((finding) => finding.id !== updated.id), totalElements: Math.max(0, page.totalElements - 1) }
+    : page;
+}
+
 /** What failed, for the toast — the server's reason follows it (a TODO id that does not exist, …). */
 type FindingFailure = 'fileFailed' | 'createTodoFailed' | 'linkTodoFailed';
 
@@ -207,11 +229,11 @@ function useFindingMutation<T>(mutationFn: (input: T) => Promise<AuditFinding>, 
     onError: (err) => toast.error(apiErrorMessage(err, t.auditCenter[failure])),
     onSuccess: (updated) => {
       // The answer goes into every cached page at once: a finding filed under another status drops
-      // out of the filtered list now instead of snapping back until the refetch arrives.
-      queryClient.setQueriesData<PageResponse<AuditFinding>>({ queryKey: ['audit-findings'] }, (page) => page && {
-        ...page,
-        content: page.content.map((finding) => (finding.id === updated.id ? updated : finding)),
-      });
+      // out of the filtered list now instead of snapping back until the refetch arrives, and joins the
+      // page of its new status – otherwise it vanished between the two refetches (c5f3cff5).
+      for (const [key, page] of queryClient.getQueriesData<PageResponse<AuditFinding>>({ queryKey: ['audit-findings'] })) {
+        if (page) queryClient.setQueryData(key, placeFinding(page, key, updated));
+      }
       // A deep link takes its first chips from this entry; a stale status would hide the finding on return.
       queryClient.setQueryData(['audit-finding', updated.id], updated);
       queryClient.invalidateQueries({ queryKey: ['audits'] });

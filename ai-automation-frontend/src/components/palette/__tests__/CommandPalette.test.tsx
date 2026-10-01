@@ -186,6 +186,45 @@ describe('CommandPalette', { timeout: 15_000 }, () => {
       expect(onClose).toHaveBeenCalled();
     });
 
+    it('waits for the semantic search when nothing matches locally, instead of asking the assistant (c5f3cff5)', async () => {
+      server.use(
+        http.get('/api/v1/workflows', () => HttpResponse.json([workflow('w1', 'Deploy app'), workflow('w3', 'Rotate logs')])),
+        http.post('/api/v1/search/workflows/semantic', async () => {
+          await delay(150);
+          return HttpResponse.json([{ workflowId: 'w3', workflowName: 'Rotate logs', reason: 'cleans up old logs', score: 0.9 }]);
+        }),
+      );
+      const { onClose } = renderPalette();
+      await screen.findByText('Deploy app');
+      const input = screen.getByPlaceholderText(en.commandPalette.contexts.workflow.placeholder);
+      fireEvent.change(input, { target: { value: 'qqxxjj' } });
+      act(() => { vi.advanceTimersByTime(250); });
+      key('Enter');
+      expect(useAssistantStore.getState().pendingInput).toBeNull();
+
+      await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/workflows/w3/run/run-1'));
+      expect(executed).toEqual(['w3']);
+      expect(useAssistantStore.getState()).toMatchObject({ pendingInput: null, open: false });
+      expect(onClose).toHaveBeenCalled();
+    });
+
+    it('hands the query to the assistant once the semantic search found nothing either (c5f3cff5)', async () => {
+      server.use(http.post('/api/v1/search/workflows/semantic', async () => {
+        await delay(150);
+        return HttpResponse.json([]);
+      }));
+      renderPalette();
+      await screen.findByText('Deploy app');
+      const input = screen.getByPlaceholderText(en.commandPalette.contexts.workflow.placeholder);
+      fireEvent.change(input, { target: { value: 'qqxxjj' } });
+      act(() => { vi.advanceTimersByTime(250); });
+      key('Enter');
+      expect(useAssistantStore.getState().pendingInput).toBeNull();
+
+      await waitFor(() => expect(useAssistantStore.getState()).toMatchObject({ pendingInput: 'qqxxjj', open: true }));
+      expect(executed).toEqual([]);
+    });
+
     it('waits for the run search, which shows the previous runs while it loads', async () => {
       const runs = (id: string, workflowName: string) => ({
         content: [{ id, workflowId: `wf-${id}`, workflowName, projectName: null, status: 'COMPLETED' }],

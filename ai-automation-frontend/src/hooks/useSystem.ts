@@ -204,6 +204,8 @@ const SETTING_DEPENDENT_QUERIES: Record<string, QueryKey[]> = {
 
 export function useUpdateSystemSetting() {
   const qc = useQueryClient();
+  const toast = useToast();
+  const t = useT();
   return useMutation({
     mutationFn: ({ key, value }: { key: string; value: string }) =>
       api.put(`/system/settings/${key}`, { value }),
@@ -214,6 +216,8 @@ export function useUpdateSystemSetting() {
       qc.invalidateQueries({ queryKey: ['system', 'settings', key] }),
       ...(SETTING_DEPENDENT_QUERIES[key] ?? []).map((queryKey) => qc.invalidateQueries({ queryKey, exact: true })),
     ]),
+    // A rejected value (e.g. out of range) must not look saved (c5f3cff5)
+    onError: (err) => toast.error(apiErrorMessage(err, t.settings.settingSaveFailed)),
   });
 }
 

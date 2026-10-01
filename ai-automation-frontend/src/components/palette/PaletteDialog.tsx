@@ -55,8 +55,10 @@ export function PaletteDialog({ context, onClose, query, setQuery, contextId, cy
   );
 
   const isEmptyQuery = query.trim().length === 0;
-  // An empty query shows the pinned and recent rows, which never wait for a search
-  const resultsPending = !isEmptyQuery && (debouncedQuery !== query || searchPending === true);
+  // An empty query shows the pinned and recent rows, which never wait for a search. Without any row yet, a search
+  // still loading (the semantic one) is waited for too – Enter would otherwise land on the assistant row (c5f3cff5).
+  const resultsPending = !isEmptyQuery
+    && (debouncedQuery !== query || searchPending === true || (loading && results.length === 0));
   // Assistant escape-hatch row appears at the bottom once the query has substance;
   // threshold matches Fuse's minMatchCharLength so we don't offer it for stray keystrokes.
   const hasAssistantRow = assistantModule && query.trim().length >= 2;

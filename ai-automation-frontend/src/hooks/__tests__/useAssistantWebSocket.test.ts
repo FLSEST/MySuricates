@@ -190,6 +190,37 @@ describe('useAssistantWebSocket', () => {
     });
   });
 
+  describe('abrupt close (c5f3cff5)', () => {
+    it('should_set_connected_false_when_the_socket_closes_without_receipt_and_subscribe_again_on_reconnect', async () => {
+      const { result } = renderHook(() => useAssistantWebSocket('req-7', 'sess-7'));
+      await waitFor(() => expect(result.current.connected).toBe(true));
+      await waitFor(() => expect(findSubscription('/topic/assistant/req-7/status')).toBeDefined());
+      const before = subscriptions.length;
+
+      act(() => (lastClientConfig!.onWebSocketClose as (event: unknown) => void)({ code: 1006 }));
+      expect(result.current.connected).toBe(false);
+
+      act(() => onConnectCb!());
+      expect(result.current.connected).toBe(true);
+      const again = subscriptions.slice(before).map((s) => s.destination);
+      expect(again).toEqual(expect.arrayContaining(['/topic/assistant/req-7/status', '/topic/assistant/sess-7/events']));
+    });
+
+    it('should_ignore_the_late_close_of_a_socket_it_already_left', async () => {
+      const { result, rerender } = renderHook(({ id }) => useAssistantWebSocket(id, null), { initialProps: { id: 'req-1' as string | null } });
+      await waitFor(() => expect(result.current.connected).toBe(true));
+      const firstClient = lastClientConfig!;
+
+      rerender({ id: null });
+      rerender({ id: 'req-2' });
+      await waitFor(() => expect(result.current.connected).toBe(true));
+      expect(lastClientConfig).not.toBe(firstClient);
+
+      act(() => (firstClient.onWebSocketClose as (event: unknown) => void)({ code: 1000 }));
+      expect(result.current.connected).toBe(true);
+    });
+  });
+
   describe('status subscription', () => {
     it('should_subscribe_to_status_topic_for_requestId', async () => {
       renderHook(() => useAssistantWebSocket('req-42', null));

@@ -1826,6 +1826,7 @@ export const en = {
     executionSave: 'Save Settings',
     executionSaved: 'Execution settings saved',
     executionSaveFailed: 'Failed to save execution settings',
+    settingSaveFailed: 'Could not save the setting',
   },
   toast: {
     projectCreated: 'Project created successfully',
