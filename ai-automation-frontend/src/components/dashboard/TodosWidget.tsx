@@ -6,16 +6,10 @@ import { useI18nStore, useT } from '../../i18n';
 import { formatRelativeTime } from '../../utils/formatTime';
 import { formatTimestamp } from '../../utils/localeFormat';
 import { todoDeepLink } from '../../utils/todoLinks';
-import type { Todo, TodoPriority } from '../../types';
+import type { Todo } from '../../types';
+import { priorityColor } from '../todo/todoConstants';
 import { WidgetSkeleton } from './WidgetSkeleton';
 import { useDashboardData } from './dashboardDataContext';
-
-const priorityColor: Record<TodoPriority, string> = {
-  CRITICAL: 'bg-danger ring-2 ring-danger/40',
-  HIGH: 'bg-danger',
-  MEDIUM: 'bg-accent',
-  LOW: 'bg-text-tertiary',
-};
 
 const sourceIcon: Record<string, React.ReactNode> = {
   AI: <Bot className="w-3 h-3" />,
@@ -33,7 +27,7 @@ function TodoRow({ todo }: { todo: Todo }) {
       onClick={() => navigate(todoDeepLink(todo))}
     >
       {/* Priority indicator */}
-      <div className={`w-1 h-8 rounded-full shrink-0 ${priorityColor[todo.priority]}`} />
+      <div className={`w-1 h-8 rounded-full shrink-0 ${priorityColor[todo.priority]}`} title={t.todos.priorities[todo.priority]} />
 
       {/* Content */}
       <div className="min-w-0 flex-1">

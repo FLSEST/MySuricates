@@ -49,11 +49,20 @@ export const PROJECT_ACTIVE_TODOS_STALE_MS = 30_000;
 
 export type ViewMode = 'list' | 'board';
 
+/** The one place for priority colours: marker classes (list, board, dashboard, goals …). */
 export const priorityColor: Record<TodoPriority, string> = {
   CRITICAL: 'bg-danger ring-2 ring-danger/40',
   HIGH: 'bg-danger',
   MEDIUM: 'bg-warning',
   LOW: 'bg-text-tertiary',
+};
+
+/** The same tones as CSS values, for SVG fills and inline styles (relation map, simple mode). */
+export const priorityFill: Record<TodoPriority, string> = {
+  CRITICAL: 'var(--color-danger)',
+  HIGH: 'var(--color-danger)',
+  MEDIUM: 'var(--color-warning)',
+  LOW: 'var(--color-text-tertiary)',
 };
 
 export const sourceIcon = (s: TodoSource) => {
