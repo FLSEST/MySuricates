@@ -32,10 +32,32 @@ const resizableWidths = {
 };
 
 /**
- * The open dialogs, the one opened last on top. A confirmation can open above another dialog
- * (23635ef6): Escape then closes only the top one, and the page stays locked until the last closes.
+ * The open dialogs; the one with the highest `order` is on top. A confirmation can open above
+ * another dialog (23635ef6): Escape then closes only the top one, the focus trap applies only to the
+ * top one, and the page stays locked until the last closes. The order is taken when a dialog
+ * renders open (parents render before their children, later siblings after earlier ones), not when
+ * its effect runs – effects run children first, so an outer and an inner dialog opening in the same
+ * commit would otherwise put the outer one on top (0d9072fa).
  */
-const openDialogs: object[] = [];
+const openDialogs = new Set<{ order: number }>();
+let dialogCounter = 0;
+
+function isTopDialog(dialog: { order: number }): boolean {
+  for (const other of openDialogs) if (other.order > dialog.order) return false;
+  return openDialogs.has(dialog);
+}
+
+const TABBABLE = [
+  'a[href]', 'area[href]', 'button:not([disabled])', 'input:not([disabled]):not([type="hidden"])',
+  'select:not([disabled])', 'textarea:not([disabled])', 'iframe', '[contenteditable="true"]',
+  '[tabindex]:not([tabindex="-1"])',
+].join(', ');
+
+function tabbables(container: HTMLElement | null): HTMLElement[] {
+  if (!container) return [];
+  return [...container.querySelectorAll<HTMLElement>(TABBABLE)]
+    .filter((element) => element.tabIndex >= 0 && !element.closest('[hidden], [inert]'));
+}
 
 export function Modal({ open, onClose, title, children, footer, size = 'md', resizable = false }: ModalProps) {
   if (!open) return null;
@@ -53,24 +75,63 @@ function ModalFrame({ onClose, title, children, footer, size, resizable }: Omit<
   const dialogRef = useRef<HTMLDivElement>(null);
   const [maximized, setMaximized] = useState(false);
   // Identity of this open dialog in `openDialogs`; the frame only lives while the dialog is open
-  const [self] = useState(() => ({}));
+  const [self] = useState(() => ({ order: ++dialogCounter }));
+  // Taken while rendering, before a child's autoFocus moves the focus into the dialog
+  const [opener] = useState(() => document.activeElement);
   const titleId = useId();
 
   useEffect(() => {
-    openDialogs.push(self);
+    openDialogs.add(self);
     document.body.style.overflow = 'hidden';
+    // Initial focus: keep it where the content put it (autoFocus), else the first control of body
+    // and footer – in a confirmation that is "Cancel" –, else the dialog itself
+    const dialog = dialogRef.current;
+    if (dialog && !dialog.contains(document.activeElement)) {
+      const header = dialog.firstElementChild;
+      const first = tabbables(dialog).find((element) => !header?.contains(element));
+      (first ?? dialog).focus({ preventScroll: true });
+    }
     return () => {
-      openDialogs.splice(openDialogs.indexOf(self), 1);
-      if (openDialogs.length === 0) document.body.style.overflow = '';
+      openDialogs.delete(self);
+      if (openDialogs.size === 0) document.body.style.overflow = '';
+      // Focus back to what opened the dialog, unless the closing action moved it somewhere on purpose
+      const active = document.activeElement;
+      if (opener instanceof HTMLElement && opener.isConnected
+          && (!active || active === document.body || !active.isConnected || dialog?.contains(active))) {
+        opener.focus({ preventScroll: true });
+      }
     };
-  }, [self]);
+  }, [self, opener]);
 
   useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && openDialogs[openDialogs.length - 1] === self) onClose();
+    const handleKey = (e: KeyboardEvent) => {
+      if (!isTopDialog(self)) return;
+      if (e.key === 'Escape') {
+        onClose();
+      } else if (e.key === 'Tab' && !e.defaultPrevented) {
+        // Focus trap: Tab and Shift+Tab cycle inside the dialog (an editor that inserts a tab
+        // prevents the default and keeps its key)
+        const dialog = dialogRef.current;
+        if (!dialog) return;
+        const items = tabbables(dialog);
+        const first = items[0];
+        const last = items.at(-1);
+        const active = document.activeElement;
+        const inside = !!active && dialog.contains(active);
+        if (!first || !last) {
+          e.preventDefault();
+          dialog.focus({ preventScroll: true });
+        } else if (e.shiftKey && (!inside || active === first || active === dialog)) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && (!inside || active === last)) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
     };
-    window.addEventListener('keydown', handleEsc);
-    return () => window.removeEventListener('keydown', handleEsc);
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
   }, [self, onClose]);
 
   const toggleMaximized = () => {
@@ -94,7 +155,8 @@ function ModalFrame({ onClose, title, children, footer, size, resizable }: Omit<
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className={`relative mx-2 sm:mx-4 bg-surface-overlay border border-border rounded-xl shadow-2xl animate-slide-up ${
+        tabIndex={-1}
+        className={`relative mx-2 sm:mx-4 outline-none bg-surface-overlay border border-border rounded-xl shadow-2xl animate-slide-up ${
           !resizable
             ? `w-full ${sizeStyles[size]}`
             : maximized
