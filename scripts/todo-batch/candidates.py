@@ -4,15 +4,27 @@
 Kandidat: Status OPEN, kein `batch:*`-Tag, keine offene Frage. Läuft noch ein Batch (IN_PROGRESS mit
 `batch:selected` und `batch:started`, nicht hängend), gibt es keine; von Hand ausgewählte zählen gegen `--batch-max`. Nur mit Kandidaten entsteht `<state>/candidates.json` – daran hängt
 `run_if` der Triage. Ausgabe: die Kandidaten als eine JSON-Zeile für den Prompt.
+
+Dazu `near_limit` (TODO 8bbc2368): Dateien, die höchstens `--size-margin` Zeilen unter ihrer Obergrenze stehen
+(oder darüber). Die Grenzen liest das Skript aus der Grenzdatei `--size-ratchet` im Format von
+`SourceSizeRatchetTest` (`MAX_LINES = N` als Standard, `entry("<pfad>", N)` je Ausnahme, Pfade relativ zu
+`--size-root`); gezählt werden die `.java`-Dateien unter `--size-root`. Ohne Grenzdatei bleibt die Liste leer –
+ein Repo ohne Größen-Ratchet lässt die beiden Werte im Kontext leer.
 """
 from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
+from pathlib import Path
 
 import batchlib as b
 
+_MAX_LINES = re.compile(r"\bMAX_LINES\s*=\s*(\d+)")
+_ENTRY = re.compile(r'entry\(\s*"([^"]+)"\s*,\s*(\d+)\s*\)')
+DEFAULT_MAX_LINES = 300
+NEAR_LIMIT_MAX = 40
 FIELDS = ("id", "priority", "tags", "title", "complexity", "suggestedEffort", "description")
 
 
@@ -34,11 +46,38 @@ def select(todos: list[dict], limit: int, batch_max: int | None = None, now=None
     return False, [{key: t.get(key) for key in FIELDS} for t in chosen[:limit]], preselected
 
 
+def ceilings(ratchet_text: str) -> tuple[int, dict[str, int]]:
+    """(Standard-Obergrenze, Obergrenze je Datei relativ zur Quellwurzel) aus der Grenzdatei."""
+    found = _MAX_LINES.search(ratchet_text)
+    return (int(found.group(1)) if found else DEFAULT_MAX_LINES,
+            {path: int(limit) for path, limit in _ENTRY.findall(ratchet_text)})
+
+
+def near_limit(ratchet: Path, root: Path, margin: int, base: Path | None = None) -> list[dict]:
+    """Dateien, die die Triage meiden soll: Abstand zur Obergrenze unter `margin` Zeilen, knappste zuerst."""
+    if not ratchet.is_file() or not root.is_dir():
+        return []
+    default, listed = ceilings(ratchet.read_text(encoding="utf-8", errors="replace"))
+    near = []
+    for path in sorted(root.rglob("*.java")):
+        rel = path.relative_to(root).as_posix()
+        lines = len(path.read_text(encoding="utf-8", errors="replace").splitlines())
+        ceiling = listed.get(rel, default)
+        if ceiling - lines < margin:
+            shown = path.relative_to(base) if base and path.is_relative_to(base) else path
+            near.append({"file": shown.as_posix(), "lines": lines, "ceiling": ceiling})
+    near.sort(key=lambda n: (n["ceiling"] - n["lines"], n["file"]))
+    return near[:NEAR_LIMIT_MAX]
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--state", required=True)
     parser.add_argument("--max", type=int, default=40)
     parser.add_argument("--batch-max", type=int, default=None)
+    parser.add_argument("--size-ratchet", default="", help="Grenzdatei (Format SourceSizeRatchetTest); leer = keine")
+    parser.add_argument("--size-root", default="", help="Quellwurzel, auf die sich die Pfade der Grenzdatei beziehen")
+    parser.add_argument("--size-margin", type=int, default=15)
     args = parser.parse_args(argv)
     state = b.state(args.state)
     try:
@@ -54,8 +93,10 @@ def main(argv=None) -> int:
         target.unlink()
     (state / "active.flag").write_text("1" if active else "0", encoding="utf-8")
     (state / "preselected.txt").write_text(str(preselected), encoding="utf-8")
-    print(json.dumps({"active": active, "count": len(chosen), "preselected": preselected, "candidates": chosen},
-                     ensure_ascii=False, separators=(",", ":")))
+    near = (near_limit(Path(args.size_ratchet), Path(args.size_root), args.size_margin, base=Path.cwd())
+            if chosen and args.size_ratchet.strip() and args.size_root.strip() else [])
+    print(json.dumps({"active": active, "count": len(chosen), "preselected": preselected, "candidates": chosen,
+                      "near_limit": near}, ensure_ascii=False, separators=(",", ":")))
     return 0
 
 

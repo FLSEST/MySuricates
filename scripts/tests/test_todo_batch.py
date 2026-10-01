@@ -172,6 +172,86 @@ class CandidatesTest(unittest.TestCase):
             self.assertFalse((state / "candidates.json").exists())
 
 
+class SizeRatchetTest(unittest.TestCase):
+    """8bbc2368: Dateien an ihrer Größen-Obergrenze gehen als Liste an die Triage."""
+
+    RATCHET = """class SourceSizeRatchetTest {
+    static final int MAX_LINES = 300;
+    static final Map<String, Integer> ALLOWLIST = Map.ofEntries(
+            entry("com/x/Big.java", 411),
+            entry("com/x/Roomy.java", 411),
+            entry("com/x/Gone.java", 500)
+    );
+}
+"""
+
+    def tree(self, root):
+        write(root / "mod/src/test/java/Ratchet.java", self.RATCHET)
+        src = root / "mod/src/main/java/com/x"
+        for name, lines in (("Big.java", 400), ("Roomy.java", 380), ("Edge.java", 290), ("Small.java", 100),
+                            ("Over.java", 305)):
+            write(src / name, "x\n" * lines)
+        write(src / "notes.txt", "x\n" * 299)
+
+    def test_lists_files_close_to_their_ceiling_tightest_first(self):
+        import candidates
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.tree(root)
+            near = candidates.near_limit(root / "mod/src/test/java/Ratchet.java", root / "mod/src/main/java", 15,
+                                         base=root)
+        self.assertEqual([(n["file"], n["lines"], n["ceiling"]) for n in near],
+                         [("mod/src/main/java/com/x/Over.java", 305, 300),
+                          ("mod/src/main/java/com/x/Edge.java", 290, 300),
+                          ("mod/src/main/java/com/x/Big.java", 400, 411)])
+
+    def test_without_or_with_a_missing_ratchet_file_there_is_no_list(self):
+        import candidates
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            write(state / "details.txt", details(todo(A)))
+            code, out = call(candidates.main, "--state", str(state))
+            self.assertEqual((code, json.loads(out)["near_limit"]), (0, []))
+            code, out = call(candidates.main, "--state", str(state), "--size-ratchet", str(state / "fehlt.java"),
+                             "--size-root", str(state))
+            self.assertEqual((code, json.loads(out)["near_limit"]), (0, []))
+            code, out = call(candidates.main, "--state", str(state), "--size-ratchet", "", "--size-root", "")
+            self.assertEqual((code, json.loads(out)["near_limit"]), (0, []))
+
+    def test_main_passes_the_list_with_the_candidates(self):
+        import candidates
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.tree(root)
+            write(root / "state" / "details.txt", details(todo(A)))
+            cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                code, out = call(candidates.main, "--state", "state", "--size-ratchet", "mod/src/test/java/Ratchet.java",
+                                 "--size-root", "mod/src/main/java", "--size-margin", "5")
+            finally:
+                os.chdir(cwd)
+        self.assertEqual(code, 0)
+        self.assertEqual([n["file"] for n in json.loads(out)["near_limit"]], ["mod/src/main/java/com/x/Over.java"])
+
+    def test_pool_triage_gets_the_ratchet_from_the_default_context_and_the_prompt_explains_it(self):
+        definition = json.loads((REPO / "workflow-pool" / "mysuricates-todo-batch-einordnen.json").read_text())
+        context = definition["defaultContext"]
+        self.assertTrue((REPO / context["size_ratchet_file"]).is_file())
+        self.assertTrue((REPO / context["size_ratchet_root"]).is_dir())
+        config = {block["name"]: block["config"] for block in definition["blocks"]}
+        self.assertIn("--size-ratchet {{ size_ratchet_file }}", config["kandidaten"]["command"])
+        self.assertIn("near_limit", config["triage"]["command"])
+        self.assertIn("Split", config["triage"]["command"])
+
+    def test_the_real_ratchet_file_parses(self):
+        import candidates
+        context = json.loads((REPO / "workflow-pool" / "mysuricates-todo-batch-einordnen.json").read_text())["defaultContext"]
+        default, ceilings = candidates.ceilings((REPO / context["size_ratchet_file"]).read_text())
+        self.assertEqual(default, 300)
+        self.assertGreater(len(ceilings), 3)
+
+
 class ChooseTest(unittest.TestCase):
     CANDIDATES = [{"id": A, "title": "Alpha"}, {"id": B, "title": "Beta"}, {"id": C, "title": "Gamma"}]
 
