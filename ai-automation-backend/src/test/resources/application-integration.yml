@@ -64,6 +64,10 @@ automation:
     skip-until: ""
   security:
     enabled: false
+    # A test that enables security without a key generates one and wrote it into the developer's
+    # real ${automation.data-home}/api-key — the key file the installer scripts and agents read
+    # (TODO 88781724). Same per-JVM directory as the setup files below.
+    api-key-file: ${integration.setup.dir:${java.io.tmpdir}/mysuricates-integrationtest-setup}/api-key
   tray:
     enabled: false
   staging:
@@ -106,6 +110,9 @@ automation:
     base-dir: ${integration.setup.dir:${java.io.tmpdir}/mysuricates-integrationtest-setup}/summarization
   factory:
     base-dir: ${integration.setup.dir:${java.io.tmpdir}/mysuricates-integrationtest-setup}/factory
+  # Isolated run checkouts default to ${automation.data-home}/workspaces (TODO 88781724).
+  run-workspace:
+    root: ${integration.setup.dir:${java.io.tmpdir}/mysuricates-integrationtest-setup}/workspaces
 
 
 server:

@@ -2,11 +2,13 @@ package com.automation.config;
 
 import org.junit.jupiter.api.Test;
 
+import java.nio.file.Path;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class InstanceAddressTest {
 
-    private static final String KEY_FILE = "'" + InstanceAddress.apiKeyFile() + "'";
+    private static final String KEY_FILE = "'" + DataHome.dir().resolve("api-key") + "'";
 
     @Test
     void withoutInstallerSettings_theAddressIsLocalhostOnTheServerPort() {
@@ -42,6 +44,16 @@ class InstanceAddressTest {
 
     @Test
     void theKeyFileIsWhereApiKeyServiceWritesIt_inTheDataHome() {
-        assertThat(InstanceAddress.apiKeyFile()).isEqualTo(DataHome.dir().resolve("api-key"));
+        assertThat(new InstanceAddress("", "", 9090).apiKeyFile()).isEqualTo(DataHome.dir().resolve("api-key"));
+        assertThat(new InstanceAddress("", "", 9090, " ").apiKeyFile()).isEqualTo(DataHome.dir().resolve("api-key"));
+    }
+
+    /** 88781724: tests point the key file away from the developer's real data directory. */
+    @Test
+    void aConfiguredKeyFileWinsAndAppearsInTheCommand() {
+        InstanceAddress address = new InstanceAddress("", "", 9090, "/tmp/elsewhere/api-key");
+
+        assertThat(address.apiKeyFile()).isEqualTo(Path.of("/tmp/elsewhere/api-key"));
+        assertThat(address.apiKeyCommand()).isEqualTo("cat '/tmp/elsewhere/api-key'");
     }
 }

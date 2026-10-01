@@ -121,9 +121,16 @@ automation:
     allowed-origins: ${AUTOMATION_CORS_ORIGINS:http://localhost:3000,http://localhost:5173,https://localhost:3000,https://localhost:5173}
   workspace:
     root: ${AUTOMATION_WORKSPACE_ROOT:}
+  # Isolierte Run-Checkouts (Workflow-Option workspace.mode: isolated, RunWorkspaceService). Ein
+  # fortgesetzter Lauf bleibt unter der Wurzel, unter der er begann.
+  run-workspace:
+    root: ${AUTOMATION_RUN_WORKSPACE_ROOT:${automation.data-home}/workspaces}
   security:
     enabled: ${AUTOMATION_SECURITY_ENABLED:true}
     api-key: ${AUTOMATION_API_KEY:}
+    # Hierhin schreibt das Backend den (erzeugten) Key; die Installer-Skripte lesen ihn dort
+    # (scripts/lib/data-home.sh). Nur Tests lenken ihn um (application-integration.yml).
+    api-key-file: ${automation.data-home}/api-key
     trusted-proxies: ${AUTOMATION_TRUSTED_PROXIES:127.0.0.1,::1}
     rate-limit:
       enabled: ${AUTOMATION_RATE_LIMIT_ENABLED:true}

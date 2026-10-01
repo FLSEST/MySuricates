@@ -1041,12 +1041,14 @@ Geprüft wird:
    `scripts/lib/hygiene-rules.sh`.
 
 **Aufbewahrung der Run-Workspaces:** Jeder isolierte Checkout (`RunWorkspaceService`, Default
-`~/.mysuricates/workspaces/<projekt>/<run>/`) bleibt nach dem Lauf liegen — niemand räumt ihn
+`<Datenordner>/workspaces/<projekt>/<run>/`, also `~/.mysuricates/…` bzw. `~/.autotrigger/…`;
+`automation.run-workspace.root`/`AUTOMATION_RUN_WORKSPACE_ROOT`) bleibt nach dem Lauf liegen — niemand räumt ihn
 automatisch weg. `scripts/tools/prune-workspaces.py` entfernt konservativ nur den `repo/`-Checkout
 abgeschlossener, sauberer Läufe: Der zugehörige Run muss laut API `COMPLETED` sein und älter als
 `--retention-days` (Default 30), der Checkout unverändert (`git status --porcelain` leer) und der
 Commit deckungsgleich mit dem Manifest — Logs und Manifeste bleiben erhalten. Ohne `--apply` nur ein
-Trockenlauf (`WOULD REMOVE …`).
+Trockenlauf (`WOULD REMOVE …`). Bis Oktober 2026 lag die Wurzel fest unter `~/.mysuricates/workspaces`;
+ältere Checkouts einer Installation mit `~/.autotrigger` räumt `--root ~/.mysuricates/workspaces` weg.
 
 Die Hooks (`pre-commit`, `commit-msg`, `pre-push`) installiert `scripts/install-hooks.sh` über
 `core.hooksPath` (läuft in `setup.sh` mit).
