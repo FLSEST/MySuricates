@@ -73,7 +73,8 @@ class CorrectionAnswerTest {
                     "cases", List.of(Map.of("blocks", List.of(nested("shell")))))));
             var corrected = List.of(block("switch", Map.of("default", List.of(nested("shell")))));
 
-            assertThat(CorrectionAnswer.shapeChange(original, corrected)).startsWith("Block 1: verschachtelte Blöcke");
+            assertThat(CorrectionAnswer.shapeChange(original, corrected))
+                    .isEqualTo("Block 1: verschachtelter Block verschoben (cases[0] › Block 1 → default › Block 1)");
         }
 
         @Test
