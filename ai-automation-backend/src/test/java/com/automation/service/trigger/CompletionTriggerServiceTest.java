@@ -158,7 +158,6 @@ class CompletionTriggerServiceTest {
                 .triggerOnSuccess(true).triggerOnFailure(false).triggerAlways(false)
                 .enabled(true).build();
         when(repository.findBySourceWorkflowIdAndEnabledTrue("wf-src")).thenReturn(List.of(trigger));
-        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         var event = new WorkflowRunCompletedEvent(this, "run-1", "wf-src", "Source",
                 null, null, RunStatus.COMPLETED, Map.of(), Map.of(), null);
@@ -191,7 +190,6 @@ class CompletionTriggerServiceTest {
                 .triggerOnSuccess(false).triggerOnFailure(true).triggerAlways(false)
                 .enabled(true).build();
         when(repository.findBySourceWorkflowIdAndEnabledTrue("wf-src")).thenReturn(List.of(trigger));
-        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         var event = new WorkflowRunCompletedEvent(this, "run-1", "wf-src", "Source",
                 null, null, RunStatus.FAILED, Map.of(), Map.of(), null);
@@ -208,7 +206,6 @@ class CompletionTriggerServiceTest {
                 .triggerOnSuccess(false).triggerOnFailure(false).triggerAlways(true)
                 .enabled(true).build();
         when(repository.findBySourceWorkflowIdAndEnabledTrue("wf-src")).thenReturn(List.of(trigger));
-        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         var event = new WorkflowRunCompletedEvent(this, "run-1", "wf-src", "Source",
                 null, null, RunStatus.CANCELLED, Map.of(), Map.of(), null);
@@ -242,7 +239,6 @@ class CompletionTriggerServiceTest {
                 .triggerOnSuccess(true).triggerAlways(false)
                 .enabled(true).build();
         when(repository.findBySourceWorkflowIdAndEnabledTrue("wf-src")).thenReturn(List.of(trigger));
-        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         var event = new WorkflowRunCompletedEvent(this, "run-1", "wf-src", "Source",
                 null, null, RunStatus.COMPLETED, Map.of(), Map.of(), null);
@@ -272,5 +268,61 @@ class CompletionTriggerServiceTest {
 
         // Should not throw — error is caught and logged
         service.onWorkflowRunCompleted(event);
+    }
+    /** 986bb1f1: die Zähler aller ausgelösten Trigger in einem saveAll statt save je Trigger. */
+    @Test
+    void onCompleted_savesTheCountersOfAllFiredTriggersInOneBatch() {
+        Workflow otherTarget = Workflow.builder().id("wf-tgt-2").name("Target 2").build();
+        when(workflowService.findByIdEager("wf-tgt-2")).thenReturn(otherTarget);
+        var first = CompletionTrigger.builder().id("t1").sourceWorkflow(sourceWf).targetWorkflow(targetWf)
+                .triggerAlways(true).triggerCount(2).enabled(true).build();
+        var notFiring = CompletionTrigger.builder().id("t2").sourceWorkflow(sourceWf).targetWorkflow(targetWf)
+                .triggerOnSuccess(false).triggerOnFailure(true).enabled(true).build();
+        var second = CompletionTrigger.builder().id("t3").sourceWorkflow(sourceWf).targetWorkflow(otherTarget)
+                .triggerOnSuccess(true).enabled(true).build();
+        when(repository.findBySourceWorkflowIdAndEnabledTrue("wf-src")).thenReturn(List.of(first, notFiring, second));
+
+        service.onWorkflowRunCompleted(new WorkflowRunCompletedEvent(this, "run-1", "wf-src", "Source",
+                null, null, RunStatus.COMPLETED, Map.of(), Map.of(), null));
+
+        verify(repository, times(1)).saveAll(List.of(first, second));
+        verify(repository, never()).save(any());
+        assertThat(first.getTriggerCount()).isEqualTo(3);
+        assertThat(first.getLastTriggeredAt()).isNotNull();
+        assertThat(second.getTriggerCount()).isEqualTo(1);
+        assertThat(notFiring.getTriggerCount()).isZero();
+    }
+
+    /** Ein Trigger, dessen Ziel nicht startet, zählt nicht mit — die übrigen werden trotzdem gespeichert. */
+    @Test
+    void onCompleted_failedStart_isNotCounted_othersAreStillSaved() {
+        Workflow brokenTarget = Workflow.builder().id("wf-broken").name("Broken").build();
+        when(workflowService.findByIdEager("wf-broken")).thenReturn(brokenTarget);
+        when(workflowExecutor.execute(eq(brokenTarget), any(), eq(TriggerSource.COMPLETION_TRIGGER)))
+                .thenThrow(new RuntimeException("boom"));
+        var broken = CompletionTrigger.builder().id("t1").sourceWorkflow(sourceWf).targetWorkflow(brokenTarget)
+                .triggerAlways(true).enabled(true).build();
+        var ok = CompletionTrigger.builder().id("t2").sourceWorkflow(sourceWf).targetWorkflow(targetWf)
+                .triggerAlways(true).enabled(true).build();
+        when(repository.findBySourceWorkflowIdAndEnabledTrue("wf-src")).thenReturn(List.of(broken, ok));
+
+        service.onWorkflowRunCompleted(new WorkflowRunCompletedEvent(this, "run-1", "wf-src", "Source",
+                null, null, RunStatus.COMPLETED, Map.of(), Map.of(), null));
+
+        verify(repository, times(1)).saveAll(List.of(ok));
+        assertThat(broken.getTriggerCount()).isZero();
+    }
+
+    @Test
+    void onCompleted_nothingFired_savesNothing() {
+        var trigger = CompletionTrigger.builder().id("t1").sourceWorkflow(sourceWf).targetWorkflow(targetWf)
+                .triggerOnSuccess(false).triggerOnFailure(true).enabled(true).build();
+        when(repository.findBySourceWorkflowIdAndEnabledTrue("wf-src")).thenReturn(List.of(trigger));
+
+        service.onWorkflowRunCompleted(new WorkflowRunCompletedEvent(this, "run-1", "wf-src", "Source",
+                null, null, RunStatus.COMPLETED, Map.of(), Map.of(), null));
+
+        verify(repository, never()).saveAll(any());
+        verify(repository, never()).save(any());
     }
 }

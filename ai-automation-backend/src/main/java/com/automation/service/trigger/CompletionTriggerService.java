@@ -103,6 +103,9 @@ public class CompletionTriggerService {
     public void onWorkflowRunCompleted(WorkflowRunCompletedEvent event) {
         List<CompletionTrigger> candidates =
                 repository.findBySourceWorkflowIdAndEnabledTrue(event.getWorkflowId());
+        // Zähler der ausgelösten Trigger gesammelt speichern statt save je Trigger (TODO 986bb1f1);
+        // geschrieben wird ohnehin erst beim Commit dieser Transaktion.
+        List<CompletionTrigger> fired = new ArrayList<>();
 
         for (CompletionTrigger trigger : candidates) {
             if (!shouldFire(trigger, event.getStatus())) {
@@ -123,13 +126,16 @@ public class CompletionTriggerService {
                 workflowExecutor.execute(targetWorkflow, context, TriggerSource.COMPLETION_TRIGGER);
                 trigger.setLastTriggeredAt(Instant.now());
                 trigger.setTriggerCount(trigger.getTriggerCount() + 1);
-                repository.save(trigger);
+                fired.add(trigger);
                 log.info("CompletionTrigger fired: {} → {} (status={})",
                         event.getWorkflowId(), targetWorkflow.getId(), event.getStatus());
             } catch (Exception e) {
                 log.error("CompletionTrigger failed to start target workflow {}: {}",
                         trigger.getTargetWorkflow().getId(), e.getMessage());
             }
+        }
+        if (!fired.isEmpty()) {
+            repository.saveAll(fired);
         }
     }
 
