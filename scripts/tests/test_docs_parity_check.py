@@ -273,16 +273,123 @@ class SectionPairingTest(unittest.TestCase):
             code, out = run_script(self.build(tmp, de, en))
             self.assertEqual(code, 0, out)
 
-    def test_without_any_signal_the_later_section_counts_as_missing(self):
-        # Reine Prosa, ganz uebersetzte Ueberschriften: keine Aehnlichkeit, nur die Ebenen.
-        # Dann bleibt es eine Vermutung, und sie faellt wie frueher auf den spaeteren Abschnitt.
+    def align(self, de_text, en_text):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             de_file, en_file = root / "de.md", root / "en.md"
-            de_file.write_text("# D\n\n## Eins\nText.\n\n## Zwei\nMehr Text.\n")
-            en_file.write_text("# D\n\n## One\nText.\n")
-            only_de, only_en = dpc.align_sections(dpc.sections(de_file), dpc.sections(en_file))
-            self.assertEqual((only_de, only_en), ([2], []))
+            de_file.write_text(de_text)
+            en_file.write_text(en_text)
+            de, en = dpc.sections(de_file), dpc.sections(en_file)
+            only_de, only_en = dpc.align_sections(de, en)
+            return [de[i][0] for i in only_de], [en[j][0] for j in only_en]
+
+    def test_without_any_signal_the_later_section_counts_as_missing(self):
+        # Reine Prosa, ganz uebersetzte Ueberschriften, gleiche Gestalt: keine Aehnlichkeit, nur die
+        # Ebenen. Dann bleibt es eine Vermutung, und sie faellt wie frueher auf den spaeteren Abschnitt.
+        got = self.align("# D\n\n## Eins\nText.\n\n## Zwei\nTexte\n", "# D\n\n## One\nText.\n")
+        self.assertEqual(got, (["## Zwei"], []))
+
+    def test_shape_decides_between_prose_sections(self):
+        # Gegenstueck: Nur die Gestalt (Laenge, Zeilen) unterscheidet die Abschnitte -- sie genuegt.
+        # Ohne sie fiele die Vermutung auf "## Zwei" (TODO 3fbff015).
+        de = ("# D\n\n## Eins\nEin langer Absatz, der den Mechanismus ausfuehrlich erklaert und dabei"
+              " mehrere Saetze braucht, um alles zu sagen.\n\n## Zwei\nKurz.\n")
+        en = "# D\n\n## One\nShort.\n"
+        self.assertEqual(self.align(de, en), (["## Eins"], []))
+
+    def test_concept_page_prose_sections(self):
+        # Nachbau von docs/konzepte/*.md: feste Gliederung, reine Prosa, ganz uebersetzte
+        # Ueberschriften. Fehlte "Vorteile", nannte die Pruefung "Nachteile und Kosten" -- der
+        # Betriebsbeleg teilt mit ihm die Zahl `263` und zog ihn zu sich (TODO 3fbff015).
+        de = ("# Haertung\n\n## Wofür taugt das?\n" + "Ein Absatz ueber den Zweck. " * 28 + "\n\n"
+              "## Vorteile\n" + "Ein Absatz ueber den Nutzen. " * 21 + "\n\n"
+              "## Nachteile und Kosten\n" + "Ein Absatz ueber die Kosten. " * 20 + "Seit 263 Laeufen.\n\n"
+              "## Betriebsbeleg\nMessung 2026-09-19, siehe [Daten](betriebsdaten.json).\n\n"
+              "| Groesse | Wert |\n|---|---:|\n| Laeufe | 263 |\n| Siegel | 4 |\n\n"
+              "## Im Code\n- [RunAdmission.java](../RunAdmission.java)\n- [OutputTaint.java](../OutputTaint.java)\n")
+        en = ("# Hardening\n\n## What is it useful for?\n" + "A paragraph about the purpose. " * 25 + "\n\n"
+              "## Drawbacks and costs\n" + "A paragraph about the costs. " * 20 + "Since 263 runs.\n\n"
+              "## Operational evidence\nMeasured 2026-09-19, see [data](betriebsdaten.json).\n\n"
+              "| Measure | Value |\n|---|---:|\n| Runs | 263 |\n| Seals | 4 |\n\n"
+              "## In the code\n- [RunAdmission.java](../RunAdmission.java)\n- [OutputTaint.java](../OutputTaint.java)\n")
+        self.assertEqual(self.align(de, en), (["## Vorteile"], []))
+
+    def test_near_identical_neighbours_are_told_apart_by_heading(self):
+        # Nachbau von docs/api-referenz.md: zwei Endpunkte derselben Ressource mit gleichem Text.
+        # Der Text passt voll auf beide; erst die Ueberschrift entscheidet (TODO 3fbff015).
+        body = "Webhook schalten.\n\n**Response:** `WebhookTriggerResponse` (`tokenVisible: false`)\n\n"
+        body_en = "Toggle the webhook.\n\n**Response:** `WebhookTriggerResponse` (`tokenVisible: false`)\n\n"
+        de = ("# API\n\n### `POST /api/v1/webhooks/{id}/enable`\n" + body
+              + "### `POST /api/v1/webhooks/{id}/disable`\n" + body)
+        en = "# API\n\n### `POST /api/v1/webhooks/{id}/disable`\n" + body_en
+        self.assertEqual(self.align(de, en), (["### `POST /api/v1/webhooks/{id}/enable`"], []))
+
+
+class StockPairingTest(unittest.TestCase):
+    """Die Luecken, die die Zuordnung am Bestand falsch benannte (TODO 3fbff015).
+
+    Probe 2026-10-01: in jeder Datei mit gleicher Ebenenfolge jeden englischen Abschnitt einzeln
+    entfernt -- die Fassung von TODO 2d553479 benannte 29 von 1213 Luecken falsch (dazu ein Fall,
+    der waehrend der Arbeit kippte). Jeder Fall wird hier am echten Dateipaar nachgestellt. Faellt
+    eine Ueberschrift spaeter weg oder weicht die Ebenenfolge ab, wird der Fall uebersprungen, nicht
+    gruen gezaehlt.
+    """
+
+    CASES = (
+        ("WORKFLOW-GUIDE.md", "### Welches Modell wann verwenden"),
+        ("WORKFLOW-GUIDE.md", "### Provider-Regel: Codex ist read-only"),
+        ("WORKFLOW-GUIDE.md", "### History-Komprimierung"),
+        ("WORKFLOW-GUIDE.md", "#### Automatische Extraktion (Auto-Memory)"),
+        ("api-referenz.md", "### `POST /api/v1/webhooks/{id}/enable`"),
+        ("api-referenz.md", "### `GET /api/v1/assistant/suggestions`"),
+        ("architektur.md", "## WebSocket (Live-Logs + Status)"),
+        ("belege.md", "## 2026-09-19 · Das Gate fand den Fehler des Agenten, der es erweiterte"),
+        ("entwicklung.md", "## Abhängigkeits-Meldungen (Frontend)"),
+        ("vision.md", "## Die Idee"),
+        ("vision.md", "## Leitideen"),
+        ("vision.md", "### Beruf"),
+        ("workflow-memory-diagrams.md", "### workflow_memory"),
+        ("onboarding/FAQ.md", "### Muss ich Docker installiert haben?"),
+        ("onboarding/README.md", "## Willkommen!"),
+        ("konzepte/agentische-budgets.md", "## Wofür taugt das?"),
+        ("konzepte/gates.md", "## Wofür taugt das?"),
+        ("konzepte/haertung.md", "## Wofür taugt das?"),
+        ("konzepte/haertung.md", "## Vorteile"),
+        ("konzepte/haertung.md", "## Betriebsbeleg"),
+        ("konzepte/messen-vor-bewerten.md", "## Wofür taugt das?"),
+        ("konzepte/messen-vor-bewerten.md", "## Vorteile"),
+        ("konzepte/persistenz-herkunft.md", "## Wofür taugt das?"),
+        ("konzepte/persistenz-herkunft.md", "## Vorteile"),
+        ("konzepte/selbstverbesserung.md", "## Wofür taugt das?"),
+        ("konzepte/workflow-memory.md", "## Wofür taugt das?"),
+        ("konzepte/workflow-memory.md", "## Vorteile"),
+        ("konzepte/workflow-memory.md", "## Betriebsbeleg"),
+        ("konzepte/zugaenge.md", "## Wofür taugt das?"),
+        ("konzepte/zugaenge.md", "## Vorteile"),
+    )
+
+    def test_previously_misnamed_gaps_are_named_by_their_heading(self):
+        by_file: dict[str, list[str]] = {}
+        for rel, heading in self.CASES:
+            by_file.setdefault(rel, []).append(heading)
+        for rel, wanted in by_file.items():
+            de_file, en_file = REPO / "docs" / rel, REPO / "docs" / "en" / rel
+            if not de_file.exists() or not en_file.exists():
+                for heading in wanted:
+                    with self.subTest(rel=rel, heading=heading):
+                        self.skipTest("Dateipaar fehlt")
+                continue
+            de, en = dpc.sections(de_file), dpc.sections(en_file)
+            same_levels = [dpc._level(h) for h, _ in de] == [dpc._level(h) for h, _ in en]
+            score = dpc.pair_scores(de, en) if same_levels else None
+            for heading in wanted:
+                with self.subTest(rel=rel, heading=heading):
+                    names = [h for h, _ in de]
+                    if score is None or heading not in names:
+                        self.skipTest("Ebenenfolge weicht ab oder Ueberschrift fehlt")
+                    k = names.index(heading)
+                    only_de, only_en = dpc.align_scores([row[:k] + row[k + 1:] for row in score])
+                    self.assertEqual(([names[i] for i in only_de], only_en), ([heading], []))
 
     def test_sections_skip_code_blocks_like_headings(self):
         with tempfile.TemporaryDirectory() as tmp:

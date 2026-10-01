@@ -190,15 +190,37 @@ def _check_dir_pair(root: Path, sub: str, new: list[str], known: list[str]) -> N
 # uebersetzte Ueberschriften) bleibt die Wahl eine Vermutung -- dann gilt, wie frueher, der
 # spaetere Abschnitt als fehlend. Probe am Bestand 2026-09-26: je Datei mit gleicher Ebenenfolge
 # jeden englischen Abschnitt einzeln entfernt; richtig benannt wurden 1058 von 1086 Luecken
-# (Ebenenfolge allein: 248). Die verfehlten sind reine Prosa (docs/konzepte: "Wofuer taugt das?"
+# (Ebenenfolge allein: 248). Die verfehlten waren reine Prosa (docs/konzepte: "Wofuer taugt das?"
 # neben "Vorteile") oder fast gleiche Nachbarn (zwei Endpunkte derselben Ressource).
+#
+# Deshalb seit TODO 3fbff015 zwei Feinsignale, die nur knappe Faelle entscheiden (je hoechstens
+# TIE_WEIGHT, kleiner als jede echte Aehnlichkeit):
+#
+# - die Gestalt des Abschnitts: Textlaenge, Zeilen, Listenpunkte, Tabellenzeilen. Eine Uebersetzung
+#   behaelt sie fast; die Laenge wird um das typische Verhaeltnis EN/DE bereinigt (Englisch ist etwas
+#   kuerzer). Das trennt Prosa-Abschnitte, die sonst nichts verbindet.
+# - die Ueberschrift auch dann, wenn der Text schon voll passt: "…/enable" und "…/disable" haben
+#   denselben Text, aber nur eine passende Ueberschrift.
+#
+# Dazu zaehlen kleine Mengen sprachneutraler Zeichen, die sich GLEICHEN (beide nur `263`), halb:
+# Bis dahin galt dort 0, waehrend ein groesserer Nachbarabschnitt mit derselben Zahl darin einen
+# Jaccard-Wert bekam -- er zog den Abschnitt zu sich. Probe am Bestand 2026-10-01 wie oben: 1213
+# von 1213 (dieselbe Probe mit der Fassung davor: 1184). Die Faelle von damals stehen als
+# StockPairingTest in scripts/tests/test_docs_parity_check.py.
 # ---------------------------------------------------------------------------
 PAIR_BASE = 0.1
+TIE_WEIGHT = 0.05
+SMALL_EQUAL_SET = 0.5
+# Englisch ist kuerzer: Zeichen EN/DE je Dateipaar am Bestand 2026-10-01 zwischen 0.93 und 0.99,
+# Median 0.965. Bewusst eine Konstante, kein Wert je Datei: Den verzerrt gerade der fehlende
+# Abschnitt (in docs/konzepte um ein Sechstel), und mit ihm kippte die Zuordnung.
+LENGTH_RATIO_EN_DE = 0.96
 _HEADING_WORD = re.compile(r"[a-z0-9_.]+")
 _CODE_SPAN = re.compile(r"`([^`\n]+)`")
 _LINK_TARGET = re.compile(r"\]\(([^)\s]+)\)")
 _TOKEN = re.compile(r"[A-Za-z0-9_./:-]+")
 _NEUTRAL = re.compile(r"[0-9_/]|[a-z][A-Z]|\.[a-z]")
+_LIST_ITEM = re.compile(r"(?:[-*+]|\d+\.)\s")
 
 
 def sections(path: Path) -> list[tuple[str, str]]:
@@ -241,19 +263,37 @@ def _neutral_tokens(body: str) -> set[str]:
     return tokens
 
 
-def _features(section: tuple[str, str]) -> tuple[str, str, set[str], set[str]]:
-    """Ebene, Ueberschriftentext, ihre Woerter und die sprachneutralen Zeichen des Abschnitts."""
+def _shape(body: str) -> tuple[int, int, int, int]:
+    """Gestalt eines Abschnitts: Zeichen, Zeilen, Listenpunkte, Tabellenzeilen (ohne Leerzeilen)."""
+    lines = [line.strip() for line in body.splitlines() if line.strip()]
+    return (sum(len(line) for line in lines), len(lines),
+            sum(1 for line in lines if _LIST_ITEM.match(line)),
+            sum(1 for line in lines if line.startswith("|")))
+
+
+def _shape_similarity(de: tuple[int, ...], en: tuple[int, ...]) -> float:
+    """Mittel der Verhaeltnisse kleiner/groesser je Merkmal; die DE-Laenge mal LENGTH_RATIO_EN_DE."""
+    values = (de[0] * LENGTH_RATIO_EN_DE, *de[1:])
+    return sum((min(a, b) + 1) / (max(a, b) + 1) for a, b in zip(values, en)) / len(en)
+
+
+def _features(section: tuple[str, str]) -> tuple:
+    """Ebene, Ueberschriftentext, ihre Woerter, die sprachneutralen Zeichen und die Gestalt."""
     heading, body = section
     text = _heading_text(heading)
     return (_level(heading), text, {w for w in _HEADING_WORD.findall(text) if len(w) >= 2},
-            _neutral_tokens(body))
+            _neutral_tokens(body), _shape(body))
 
 
 def _similarity(de: tuple, en: tuple, matcher: difflib.SequenceMatcher) -> float:
     """Aehnlichkeit zweier Abschnitte gleicher Ebene; matcher traegt en[1] schon als zweite Folge."""
     words = _jaccard(de[2], en[2])
     # Unter drei Zeichen ist ein Treffer Zufall -- ein einzelnes `true` macht keine Verwandtschaft.
-    body = _jaccard(de[3], en[3]) if len(de[3] | en[3]) >= 3 else 0.0
+    # Gleichen sich die kleinen Mengen aber ganz, zaehlt das halb (siehe Kopf).
+    if len(de[3] | en[3]) >= 3:
+        body = _jaccard(de[3], en[3])
+    else:
+        body = SMALL_EQUAL_SET if de[3] and de[3] == en[3] else 0.0
     # Buchstaben vergleichen nur, wenn kein Wort passt: fuer Kognate ("Architektur"/"Architecture").
     # Teilen die Ueberschriften Woerter, sagen die mehr -- und die API-Referenz mit ihren hunderten
     # aehnlichen Endpunkt-Ueberschriften wuerde sonst zur Rechenaufgabe. Erst ab 0.6, darunter
@@ -264,7 +304,8 @@ def _similarity(de: tuple, en: tuple, matcher: difflib.SequenceMatcher) -> float
         if matcher.real_quick_ratio() >= 0.6 and matcher.quick_ratio() >= 0.6:
             ratio = matcher.ratio()
             letters = ratio if ratio >= 0.6 else 0.0
-    return max(words, body, letters)
+    tie = TIE_WEIGHT * (_shape_similarity(de[4], en[4]) + words) / 2
+    return max(words, body, letters) + tie
 
 
 def align_sections(de: list[tuple[str, str]], en: list[tuple[str, str]]) -> tuple[list[int], list[int]]:
