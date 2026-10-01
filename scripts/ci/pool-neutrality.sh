@@ -160,11 +160,12 @@ PY
 # Im Shell-Code eines Blocks genuegt dagegen ein konkreter Endpunkt, der nicht auf
 # der Liste schluesselfreier Sonden steht: der Aufruf kann beliebig weit entfernt
 # stehen, etwa ueber eine Schleifenvariable (for E in /api/v1/...; do curl ...$E,
-# TODO 28007626). Verglichen wird exakt, wie im ApiKeyAuthFilter.
+# TODO 28007626). Verglichen wird exakt, wie im ApiKeyAuthFilter. Neben /api/v1/ zaehlt /actuator/:
+# dort antwortet nur /actuator/health ohne Key (HYGIENE_POOL_API_PREFIXES, TODO 7721d8cb).
 # ---------------------------------------------------------------------------
 scan_api_and_credentials() {
   POOL_CREDENTIAL_MARKERS="$(printf '%s\n' "${HYGIENE_POOL_CREDENTIAL_MARKERS[@]}")" \
-  POOL_API_PREFIX="$HYGIENE_POOL_API_PREFIX" \
+  POOL_API_PREFIXES="$(printf '%s\n' "${HYGIENE_POOL_API_PREFIXES[@]}")" \
   POOL_API_CALLERS="$(printf '%s\n' "${HYGIENE_POOL_API_CALLERS[@]}")" \
   POOL_API_ALLOWED="$(printf '%s\n' "${HYGIENE_POOL_API_ALLOWED[@]}")" \
   POOL_DB_FILES="$(printf '%s\n' "${HYGIENE_POOL_DB_FILES[@]}")" \
@@ -176,7 +177,9 @@ def env_list(name):
     return [v for v in os.environ.get(name, '').splitlines() if v]
 
 CREDENTIALS = env_list('POOL_CREDENTIAL_MARKERS')
-API_PREFIX = os.environ.get('POOL_API_PREFIX', '/api/v1/')
+API_PREFIXES = env_list('POOL_API_PREFIXES') or ['/api/v1/']
+# Die Praefixe ohne Schraegstrich als Alternative: /api/v1|/actuator
+API_BASES = '(?:' + '|'.join(re.escape(p.rstrip('/')) for p in API_PREFIXES) + ')'
 API_CALLERS = env_list('POOL_API_CALLERS')
 API_ALLOWED = env_list('POOL_API_ALLOWED')
 DB_FILES = env_list('POOL_DB_FILES')
@@ -187,11 +190,11 @@ DB_ACCESS = env_list('POOL_DB_ACCESS')
 # eng genug, dass zwei unabhaengige Stellen nicht zusammengezogen werden.
 WINDOW = 200
 
-VERB_CALL = re.compile(r'\b(GET|POST|PUT|PATCH|DELETE)\s+' + re.escape(API_PREFIX))
+VERB_CALL = re.compile(r'\b(GET|POST|PUT|PATCH|DELETE)\s+' + API_BASES + '/')
 # Konkreter Endpunkt: nach dem Praefix muss ein Pfadsegment folgen. Das nackte
 # Praefix ist ein Suchmuster, kein Aufruf — mocking-gap-audit fuehrt '/api/v1/'
 # in einer Liste von Netzwerk-Kennzeichen, direkt neben 'fetch(' und 'axios.'.
-PATH_AT = re.compile(re.escape(API_PREFIX) + r'[A-Za-z0-9_][A-Za-z0-9/_.{}<>-]*')
+PATH_AT = re.compile(API_BASES + r'/[A-Za-z0-9_][A-Za-z0-9/_.{}<>-]*')
 
 
 # Zusammengesetzte Endpunkte (TODO 2a0c9420) — im Shell-Code steht der Pfad dann nie am Stueck:
@@ -199,10 +202,9 @@ PATH_AT = re.compile(re.escape(API_PREFIX) + r'[A-Za-z0-9_][A-Za-z0-9/_.{}<>-]*'
 #   API=http://…/api/v1; curl "$API/todos"     die Basis-URL in einer Variable (auch Python: base = '…')
 # Die Zuweisung ist selbst der Befund, egal wo die Variable spaeter landet; ausser den Sonden liegt unter
 # dem Praefix nichts ohne Key. Das Praefix in einem Ausgabetext ("/api/v1-Routen") bleibt erlaubt.
-API_BASE = API_PREFIX.rstrip('/')
-COMPOSED_AT = re.compile(re.escape(API_BASE) + r'/?["\']?\$\{?[A-Za-z_][A-Za-z0-9_]*\}?')
+COMPOSED_AT = re.compile(API_BASES + r'/?["\']?\$\{?[A-Za-z_][A-Za-z0-9_]*\}?')
 BASE_ASSIGNED = re.compile(r'(?m)(?:^|[\s;&(])((?:export\s+)?[A-Za-z_][A-Za-z0-9_]*\s*=\s*["\']?[^\s"\';]*'
-                           + re.escape(API_BASE) + r'/?)["\']?(?=[\s;&)]|$)')
+                           + API_BASES + r'/?)["\']?(?=[\s;&)]|$)')
 
 
 def composed_call(text):
@@ -275,7 +277,7 @@ for path in sys.argv[1:]:
     if self_api is None:
         self_api = next((hit for text in shells if (hit := composed_call(text))), None)
     if self_api is None:
-        for i, window in windows(raw, API_PREFIX):
+        for i, window in (hit for prefix in API_PREFIXES for hit in windows(raw, prefix)):
             endpoint = PATH_AT.match(raw, i)
             if endpoint is None:
                 continue

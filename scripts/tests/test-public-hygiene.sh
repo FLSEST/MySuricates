@@ -426,6 +426,32 @@ write_pool api-prefix-in-echo-ok <<'JSON'
  "blocks": [{"type": "shell", "config": {"command": "echo '# Request-Kosten der /api/v1-Routen'"}}]}
 JSON
 
+# --- Actuator (TODO 7721d8cb): ausser /actuator/health verlangt alles darunter den Key — /actuator/metrics
+# lieferte system-performance-analysis still 403 und je Lauf SECURITY-Warnungen. ---
+write_pool self-api-actuator-metrics <<'JSON'
+{"name": {"de": "Metriken", "en": "Metrics"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "for metric in jvm.memory.used process.cpu.usage; do\n  curl -s \"{{ backend_url }}/actuator/metrics/$metric\"\ndone"}}]}
+JSON
+
+write_pool self-api-actuator-env <<'JSON'
+{"name": {"de": "Umgebung", "en": "Environment"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "curl -s http://localhost:9090/actuator/env"}}]}
+JSON
+
+write_pool self-api-actuator-prompt <<'JSON'
+{"name": {"de": "Prompt", "en": "Prompt"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
+ "blocks": [{"type": "agentic", "config": {"goal": "Hole per curl GET /actuator/metrics/jvm.memory.used und bewerte den Heap."}}]}
+JSON
+
+write_pool api-actuator-health-ok <<'JSON'
+{"name": {"de": "Health", "en": "Health"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "curl -s -m 5 http://localhost:9090/actuator/health"}}]}
+JSON
+
 OUT=$(bash "$REPO/scripts/ci/pool-neutrality.sh" --all "$POOL" 2>&1); RC=$?
 check "Befunde gemeldet (exit 1)"              '[ "$RC" -eq 1 ]'
 check "ok-portable unbeanstandet"              '! grep -q "ok-portable" <<<"$OUT"'
@@ -477,6 +503,11 @@ check "Praefix plus \${VAR} in Anfuehrungszeichen erkannt" 'grep -q "self-api-co
 check "Basis-URL in einer Variable erkannt"      'grep -q "self-api-base-var\\.json.*SELF-API" <<<"$OUT"'
 check "Basis-URL in Python-Variable erkannt"     'grep -q "self-api-base-var-python.*SELF-API" <<<"$OUT"'
 check "Praefix im Ausgabetext bleibt erlaubt"    '! grep -q "api-prefix-in-echo-ok" <<<"$OUT"'
+check "Actuator-Metriken per Schleife erkannt (7721d8cb)" \
+  'grep -q "self-api-actuator-metrics.*SELF-API.*/actuator/metrics/" <<<"$OUT"'
+check "Actuator-Endpunkt mit Key erkannt"        'grep -q "self-api-actuator-env.*SELF-API.*/actuator/env" <<<"$OUT"'
+check "Actuator-Aufruf im Prompt erkannt"        'grep -q "self-api-actuator-prompt.*SELF-API" <<<"$OUT"'
+check "/actuator/health bleibt erlaubt"          '! grep -q "api-actuator-health-ok" <<<"$OUT"'
 
 echo "13) Blocktyp-Drift: die erzeugte Gate-Liste deckt sich mit der Registry im Backend"
 # Seit TODO bdc784e1 ist HYGIENE_POOL_BLOCK_TYPES nicht mehr handgepflegt, sondern

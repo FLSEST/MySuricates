@@ -152,6 +152,9 @@ Zwei der drei Muster wären einstufig unbrauchbar, deshalb verlangen sie ein zwe
   zählt ein zusammengesetzter Pfad: das Präfix mit einer Variable statt eines Segments
   (`curl …/api/v1/$E`) und eine Basis-URL in einer Variable (`API=…/api/v1; curl "$API/todos"`) —
   die Zuweisung ist schon der Befund. Das Präfix in einem Ausgabetext (`/api/v1-Routen`) nicht.
+  Neben `/api/v1/` gilt das für `/actuator/`: Dort antwortet nur `/actuator/health` ohne Key,
+  `/actuator/metrics` lieferte `system-performance-analysis` still 403 (heute liest der Eintrag
+  `/api/v1/system/health` und `/api/v1/system/jvm-memory`).
 - `automation.db` allein ist kein Datenbankzugriff. `mysuricates-performance-audit` sieht sich
   mit `stat -c %s` nur die **Dateigröße** an und schreibt das auch dazu. Verboten ist das Lesen
   des Inhalts, das an Hibernate und der einzigen Connection (pool-size 1) vorbeigeht.

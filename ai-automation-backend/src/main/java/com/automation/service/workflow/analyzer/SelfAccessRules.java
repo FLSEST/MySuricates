@@ -27,8 +27,8 @@ import java.util.regex.Pattern;
  * <p><b>Abstimmung mit pool-neutrality.sh</b> — gleiche Ausnahmen, bewusste Unterschiede:
  * <ul>
  *   <li>Erlaubt sind dieselben schlüsselfreien Sonden wie dort ({@link #KEY_FREE_PROBES}, jede ein
- *       öffentlicher Pfad aus {@code security.PublicPaths}); {@code /actuator/health} liegt ohnehin nicht
- *       unter {@code /api/v1/}.</li>
+ *       öffentlicher Pfad aus {@code security.PublicPaths}); geprüft werden {@code /api/v1/} und
+ *       {@code /actuator/}, unter dem nur {@code health} ohne Key antwortet (TODO 7721d8cb).</li>
  *   <li>Im Shell-Code genügt wie dort ein konkreter Endpunkt ({@code /api/v1/<segment>}), der Aufruf
  *       darf weit entfernt stehen (Schleifenvariable). Das nackte Präfix ist ein Suchmuster, kein
  *       Aufruf (mocking-gap-audit). <i>Anders als dort</i> zählen ganze Kommentarzeilen nicht und ein
@@ -50,13 +50,13 @@ final class SelfAccessRules {
     /** Ohne API-Key erreichbar (Teilmenge von PublicPaths.EXACT) — dieselbe Liste wie HYGIENE_POOL_API_ALLOWED. */
     static final Set<String> KEY_FREE_PROBES = Set.of(
             "/api/v1/system/health", "/api/v1/system/info", "/api/v1/system/auth-status",
-            "/api/v1/system/jvm-memory");
+            "/api/v1/system/jvm-memory", "/actuator/health");
 
     /** Konkreter Endpunkt: nach dem Präfix muss ein Pfadsegment folgen, wie PATH_AT im Skript. */
-    private static final Pattern ENDPOINT = Pattern.compile("/api/v1/[A-Za-z0-9_][A-Za-z0-9/_.{}<>-]*");
+    private static final Pattern ENDPOINT = Pattern.compile("(?:/api/v1|/actuator)/[A-Za-z0-9_][A-Za-z0-9/_.{}<>-]*");
 
     /** Präfix, dahinter eine Variable statt eines Segments ({@code curl …/api/v1/$E}, TODO 2a0c9420). */
-    private static final Pattern COMPOSED = Pattern.compile("/api/v1/?[\"']?\\$\\{?[A-Za-z_][A-Za-z0-9_]*}?");
+    private static final Pattern COMPOSED = Pattern.compile("(?:/api/v1|/actuator)/?[\"']?\\$\\{?[A-Za-z_][A-Za-z0-9_]*}?");
 
     /** Schema und Host direkt vor dem Endpunkt, etwa {@code http://localhost:9090}. */
     private static final Pattern HOST_BEFORE = Pattern.compile("[a-zA-Z][a-zA-Z0-9+.-]*://((?:\\{\\{[^}]*}}|[^/\\s\"'`])+)$");
@@ -82,7 +82,7 @@ final class SelfAccessRules {
                     + "(?:[a-zA-Z][a-zA-Z0-9+.-]*://)?"
                     + "(?:localhost|127\\.0\\.0\\.1|0\\.0\\.0\\.0|\\[::1]|host\\.docker\\.internal"
                     + "|\\{\\{[^}]*}}|\\$\\{?[A-Za-z_][A-Za-z0-9_]*}?)(?::\\d+)?"
-                    + "(/api/v1(?:/[^\\s\"';]*)?)(?=[\"';\\s]|$)");
+                    + "((?:/api/v1|/actuator)(?:/[^\\s\"';]*)?)(?=[\"';\\s]|$)");
 
     /**
      * Zuweisung einer Basis-URL der eigenen Instanz OHNE Pfad oder NUR mit {@code /api} — die Variable

@@ -87,6 +87,23 @@ class SelfAccessRulesTest {
         assertThat(shell("echo '# Request-Kosten der /api/v1-Routen'")).isEmpty();
     }
 
+    /** TODO 7721d8cb: unter /actuator/ ist nur health schlüsselfrei — /actuator/metrics lieferte still 403. */
+    @Test
+    void actuatorAusserHealthIstHigh() {
+        assertThat(shell("for metric in jvm.memory.used; do\n"
+                + "  curl -s \"{{ backend_url }}/actuator/metrics/$metric\"\ndone"))
+                .singleElement().satisfies(f -> {
+                    assertThat(f.severity()).isEqualTo(Severity.HIGH);
+                    assertThat(f.detail()).contains("/actuator/metrics/");
+                });
+        assertThat(shell("curl -s http://localhost:9090/actuator/env")).singleElement()
+                .satisfies(f -> assertThat(f.detail()).contains("/actuator/env"));
+        assertThat(apply(block("agentic", "a", Map.of("goal",
+                "Hole per curl http://localhost:9090/actuator/metrics/jvm.memory.used den Heap"))))
+                .singleElement().satisfies(f -> assertThat(f.severity()).isEqualTo(Severity.MEDIUM));
+        assertThat(shell("HEALTH=http://localhost:9090/actuator/health\ncurl -sf \"$HEALTH\"")).isEmpty();
+    }
+
     @Test
     void basisUrlAufSondeOderFremdenHostIstKeinBefund() {
         assertThat(shell("HEALTH=http://localhost:9090/api/v1/system/health\ncurl -sf \"$HEALTH\"")).isEmpty();
