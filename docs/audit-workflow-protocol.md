@@ -226,6 +226,10 @@ Statt der Zahl prüft das Gate dort die **Anwesenheit der Pflicht-FAKT-Zeilen**
 schützt — einen Schnappschuss auf ausgefallener Messung —, ohne das Urteil zu erzwingen.
 Der Report-Prompt trägt zusätzlich die Regel, einen unverändert gebliebenen Befund des
 Vorlaufs erneut zu melden: sonst schlösse ein bloßer Sinneswandel ihn als RESOLVED.
+Eingeordnete Befunde (`ACCEPTED_RISK`, `DISMISSED` laut `{{ audit_findings }}`, abgeglichen über
+`ruleKey` + `subject`) führt der Report im Envelope weiter, ins Gate zählen sie aber nicht: sonst bliebe
+die Zehrprobe mit jeder Einordnung dauerhaft YELLOW. Die `gate_description` nennt sie getrennt
+(„dazu N bewusst eingeordnet“).
 
 ## Bekannte Befunde im Prompt: `{{ audit_findings }}`
 

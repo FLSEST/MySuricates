@@ -226,6 +226,10 @@ fact sheet). That catches what `expectedFindings` protects against — a snapsho
 measurement — without forcing the judgement. The report prompt additionally carries the rule to
 report an unchanged finding from the previous run again: otherwise a mere change of mind would close
 it as RESOLVED.
+Triaged findings (`ACCEPTED_RISK`, `DISMISSED` according to `{{ audit_findings }}`, matched by
+`ruleKey` + `subject`) stay in the envelope, but they do not count towards the gate: otherwise the
+documentation weight audit would stay YELLOW for good with every triage. The `gate_description` names
+them separately ("dazu N bewusst eingeordnet").
 
 ## Known findings in the prompt: `{{ audit_findings }}`
 
