@@ -70,9 +70,11 @@ export function Settings() {
   useEffect(() => {
     const targetId = window.location.hash.slice(1);
     if (!targetId) return;
-    window.setTimeout(() => {
+    const timer = window.setTimeout(() => {
       document.getElementById(targetId)?.scrollIntoView({ block: 'start' });
     }, 0);
+    // Left before it ran: the next page must not be scrolled to an element of the same id
+    return () => window.clearTimeout(timer);
   }, []);
 
   const sections: NavSection[] = [
