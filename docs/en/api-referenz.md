@@ -1064,6 +1064,10 @@ Check whether an approval or human input is pending.
 }
 ```
 
+If the block defines a form with several fields (`fields`), it comes along as `fields` (per field `variable_name`,
+`label`, `input_type`, `required`, `default_value`, `options`, …) – as in the WebSocket event `human_input_required`;
+without a form the key is absent.
+
 ### `GET /api/v1/executions/{id}/live-log`
 
 Buffered live lines of a run for replay after a reload or late open (memory only, until 10 minutes after the run ends).

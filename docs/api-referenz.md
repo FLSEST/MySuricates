@@ -1069,6 +1069,10 @@ Prüfen ob ein Approval oder Human-Input ansteht.
 }
 ```
 
+Hat der Block ein Formular mit mehreren Feldern (`fields`), kommt es als `fields` mit (je Feld `variable_name`,
+`label`, `input_type`, `required`, `default_value`, `options`, …) – wie im WebSocket-Ereignis `human_input_required`;
+ohne Formular fehlt das Feld.
+
 ### `GET /api/v1/executions/{id}/live-log`
 
 Gepufferte Live-Zeilen eines Laufs für das Replay nach Reload oder spätem Öffnen (nur im Speicher, bis 10 Minuten nach
