@@ -13,8 +13,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -27,6 +27,8 @@ import java.util.Set;
  * Config: id (Pflicht, Template-fähig), optional title/description/priority/tags —
  * nur gesetzte, nicht leere Felder werden geändert (Null-Semantik von TodoService.update, 4a2edda6).
  * Statt id: updates – viele TODOs des Lauf-Projekts auf einmal, siehe {@link TodoBulkUpdates} (TODO cc0eb3ba).
+ * Das Datum der Vermerke ist der Tag in der Zeitzone der Instanz ({@link Clock}-Bean), nicht UTC – ein
+ * nächtlicher Lauf um 01:30 trüge sonst das Datum des Vortags (d6c0afe6).
  */
 @Component
 @RequiredArgsConstructor
@@ -34,6 +36,7 @@ import java.util.Set;
 public class TodoUpdateBlockExecutor implements BlockExecutor {
 
     private final TodoService todoService;
+    private final Clock clock;
 
     @Override
     public StepResult execute(BlockDefinition block, ExecutionContext context) {
@@ -53,7 +56,7 @@ public class TodoUpdateBlockExecutor implements BlockExecutor {
                 List<JsonNode> entries = TodoBulkUpdates.parse(text);
                 TodoBulkUpdates.Result bulk = TodoBulkUpdates.apply(entries, projectId,
                         Objects.toString(context.getVariable("workflow_name"), ""),
-                        context.getWorkflowRunId(), todoService, LocalDate.now(ZoneOffset.UTC));
+                        context.getWorkflowRunId(), todoService, LocalDate.now(clock));
                 result.setInput("todo-update: " + entries.size() + " Einträge");
                 result.setOutput(bulk.summary());
                 result.setStatus(StepStatus.COMPLETED);

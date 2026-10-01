@@ -129,13 +129,17 @@ class TodoDetailsVariable implements PlatformVariableSource {
                 .toList();
         List<Map<String, Object>> rendered = new ArrayList<>();
         int total = 2;   // [ ]
+        int regular = 0;
         for (Todo todo : matching) {
-            if (rendered.size() == params.limit()) break;
+            // first_tags kommen zusätzlich: sie verdrängen bei kleinem Limit keine regulären TODOs (d6c0afe6)
+            boolean first = isFirst(todo, params);
+            if (!first && regular == params.limit()) break;
             Map<String, Object> entry = entry(todo, params.chars());
             int size = json(entry).getBytes(StandardCharsets.UTF_8).length + 1;
             if (total + size > MAX_TOTAL_BYTES) break;
             total += size;
             rendered.add(entry);
+            if (!first) regular++;
         }
         return render(rendered, matching.size() - rendered.size());
     }
@@ -156,9 +160,12 @@ class TodoDetailsVariable implements PlatformVariableSource {
         return pattern.endsWith("*") ? tag.startsWith(pattern.substring(0, pattern.length() - 1)) : tag.equals(pattern);
     }
 
+    private static boolean isFirst(Todo todo, Params params) {
+        return tagsOf(todo.getTags()).stream().anyMatch(tag -> params.firstTags().stream().anyMatch(p -> tagMatches(p, tag)));
+    }
+
     private static Comparator<Todo> order(Params params) {
-        Comparator<Todo> first = Comparator.comparingInt(todo -> tagsOf(todo.getTags()).stream()
-                .anyMatch(tag -> params.firstTags().stream().anyMatch(p -> tagMatches(p, tag))) ? 0 : 1);
+        Comparator<Todo> first = Comparator.comparingInt(todo -> isFirst(todo, params) ? 0 : 1);
         Comparator<Todo> priority = Comparator.comparingInt(todo ->
                 todo.getPriority() == null ? Integer.MAX_VALUE : -todo.getPriority().ordinal());
         Comparator<Todo> age = Comparator.comparing(Todo::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder()));

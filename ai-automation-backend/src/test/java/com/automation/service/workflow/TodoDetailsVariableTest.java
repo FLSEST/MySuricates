@@ -92,6 +92,23 @@ class TodoDetailsVariableTest {
         assertThat(rows).extracting(r -> r.path("id").asText()).containsExactly("tagged", "high", "old-low", "new-low");
     }
 
+    /** d6c0afe6: TODOs mit {@code first_tags} kommen zusätzlich – sie verdrängen bei kleinem Limit keine regulären. */
+    @Test
+    void value_firstTagTodosDoNotCountAgainstTheLimit() throws Exception {
+        when(todoRepository.findByProjectIdAndStatusIn(eq("proj-1"), anyList())).thenReturn(List.of(
+                todo("t1", "1", Todo.Priority.LOW, "[\"batch:handed-over\"]", "x"),
+                todo("t2", "2", Todo.Priority.LOW, "[\"batch:started\"]", "x"),
+                todo("r1", "3", Todo.Priority.HIGH, null, "x"),
+                todo("r2", "4", Todo.Priority.LOW, null, "x"),
+                todo("r3", "5", Todo.Priority.LOW, null, "x")));
+
+        String value = source.load(request(Map.of("todo_details_exclude_tags", "idee",
+                "todo_details_first_tags", "batch:*", "todo_details_limit", "2"))).get("todo_details");
+
+        assertThat(list(value)).extracting(r -> r.path("id").asText()).containsExactly("t1", "t2", "r1", "r2");
+        assertThat(value).contains("\n(+1 weitere)\n");
+    }
+
     @Test
     void value_descriptionIsCappedAndDefused() throws Exception {
         when(todoRepository.findByProjectIdAndStatusIn(eq("proj-1"), anyList())).thenReturn(List.of(
