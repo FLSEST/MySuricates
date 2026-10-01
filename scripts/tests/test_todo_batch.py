@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
@@ -578,6 +579,49 @@ class ReviewFixesTest(RepoCase):
         self.assertEqual(call(verify.main, "--state", str(self.state), *self.gate_args())[0], 2)
         self.assertEqual(call(handover.main, "--state", str(self.state), "--project-path", str(self.source),
                               "--run", "r")[0], 2)
+
+
+class ReviewVerdictTest(RepoCase):
+    """e402140b: ein Review ohne echtes Urteil (not_reviewed) ist kein sauberes."""
+
+    def test_not_reviewed_is_a_warning_with_the_reason(self):
+        import report, verify
+        (self.state / "base.sha").write_text(run_git(self.clone, "rev-parse", "HEAD").strip())
+        (self.state / "ids.txt").write_text(f"{A}\n")
+        b.write_json(self.state / "titles.json", {A: "Alpha"})
+        self.commit(self.clone, "docs/a.md", "a\n", A)
+        gates = ["--backend-cmd", "true", "--frontend-cmd", "true", "--common-cmd", "true", "--logs", str(self.state / "logs")]
+        call(verify.main, "--state", str(self.state), *gates)
+        (self.state / "review.txt").write_text(
+            f"[{A}]: Ich sehe mir die Änderung an.\nKein Zugriff auf git log – gate_status: RED im Sandbox-Modus\n"
+            f'REVIEW: {{"id": "{A}", "verdict": "not_reviewed", "blocker": [], "major": [], "minor": []}}\n')
+        call(verify.main, "--state", str(self.state), "--after-review", *gates)
+        self.assertEqual(json.loads((self.state / "results.json").read_text())["todos"][A]["status"], "accepted")
+        _, out = call(report.main, "--state", str(self.state), "--run", "run12345-x", "--date", "2026-09-25")
+        self.assertEqual(out.splitlines()[0], "gate_status: YELLOW")
+        approval = (self.state / "approval.md").read_text()
+        self.assertIn("⚠️", approval)
+        self.assertIn("kein Review (Urteil: not_reviewed)", approval)
+        self.assertIn("Kein Zugriff auf git log", approval)
+        self.assertNotIn("gate_status", approval)
+
+    def test_ok_and_findings_without_major_stay_clean(self):
+        import report
+        (self.state / "ids.txt").write_text(f"{A}\n{B}\n")
+        b.write_json(self.state / "results.json", {"base": "x", "order": [A, B], "foreign": [], "discarded": [], "todos": {
+            t: {"status": "accepted", "reason": None, "commits": ["c"], "files": ["f"], "lines": 1} for t in (A, B)}})
+        b.write_json(self.state / "reviews.json", {
+            A: {"verdict": "ok", "blocker": [], "major": [], "minor": []},
+            B: {"verdict": "Findings", "blocker": [], "major": [], "minor": ["klein"]}})
+        with unittest.mock.patch.object(report, "merge_preview", return_value={"state": "sauber", "files": []}):
+            status = report.build(self.state, "main", "run12345-x", "2026-09-25")[0]
+        self.assertEqual(status, "GREEN")
+
+    def test_review_prompt_names_the_allowed_verdicts(self):
+        config = {block["name"]: block["config"] for block in json.loads(
+            (REPO / "workflow-pool" / "mysuricates-todo-batch-abarbeiten.json").read_text())["blocks"]}
+        for verdict in ("ok", "findings", "not_reviewed"):
+            self.assertIn(f'"{verdict}"', config["review"]["command"])
 
 
 class PoolDefinitionTest(unittest.TestCase):

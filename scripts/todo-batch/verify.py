@@ -155,24 +155,30 @@ def findings(values) -> list[str]:
 
 
 def parse_reviews(text: str) -> dict[str, dict]:
-    """Je TODO die letzte REVIEW-Zeile in dessen eigenem foreach-Abschnitt, die auch dessen ID nennt."""
+    """Je TODO die letzte REVIEW-Zeile in dessen eigenem foreach-Abschnitt, die auch dessen ID nennt.
+
+    `reason`: die Zeile davor (oder der Text vor `REVIEW:` in derselben Zeile) – dort nennt ein Review ohne
+    Urteil seinen Grund."""
     reviews = {}
     for todo_id, segment in b.item_segments(text).items():
-        chosen = None
+        chosen, reason, previous = None, "", ""
         for line in segment.splitlines():
             index = line.find("REVIEW:")
-            if index == -1:
-                continue
-            try:
-                data = json.loads(line[index + len("REVIEW:"):].strip())
-            except json.JSONDecodeError:
-                continue
+            data = None
+            if index != -1:
+                try:
+                    data = json.loads(line[index + len("REVIEW:"):].strip())
+                except json.JSONDecodeError:
+                    data = None
             if isinstance(data, dict) and str(data.get("id", "")).lower() == todo_id:
-                chosen = data
+                chosen, reason = data, line[:index].strip() or previous
+            if line.strip():
+                previous = line.strip()
         if chosen is None:
             continue
         entry = {key: findings(chosen.get(key)) for key in ("blocker", "major", "minor")}
         entry["verdict"] = b.plain(chosen.get("verdict", ""), 20)
+        entry["reason"] = b.plain(reason, 200)
         reviews[todo_id] = entry
     return reviews
 
@@ -222,7 +228,8 @@ def draft(state: Path, data: dict) -> None:
     for todo_id in data["order"]:
         r, review = data["todos"][todo_id], reviews.get(todo_id, {})
         hints = (f"Review: {len(review.get('major', []))} wichtig, {len(review.get('minor', []))} klein"
-                 if review else "kein Review")
+                 if b.reviewed(review) else f"kein Review (Urteil: {review.get('verdict') or '–'})" if review
+                 else "kein Review")
         rows.append(f"- {b.short(todo_id)} {b.plain(titles.get(todo_id, ''), 120)}: {r['status']}"
                     + (f" ({b.plain(r['reason'], 160)})" if r.get("reason") else "") + f" · {hints}")
     (state / "report-draft.md").write_text("# Entwurf Batch-Bericht\n\n" + "\n".join(rows) + "\n", encoding="utf-8")

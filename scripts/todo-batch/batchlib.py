@@ -141,6 +141,14 @@ def plain(text, limit: int = 200) -> str:
     return flat if len(flat) <= limit else flat[: limit - 1] + "…"
 
 
+# Review-Urteile, mit denen ein Review stattgefunden hat; alles andere (z. B. `not_reviewed`) ist keins
+VERDICTS = ("ok", "findings")
+
+
+def reviewed(review: dict | None) -> bool:
+    return bool(review) and str(review.get("verdict", "")).strip().lower() in VERDICTS
+
+
 def ensure_isolated(project_path: str) -> None:
     """Bricht ab, wenn das Arbeitsverzeichnis der echte Checkout ist statt eines Klons (Workflow ohne Isolation)."""
     toplevel = os.path.realpath(git("rev-parse", "--show-toplevel").strip())
