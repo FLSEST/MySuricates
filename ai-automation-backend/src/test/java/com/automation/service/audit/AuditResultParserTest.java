@@ -1,8 +1,8 @@
 package com.automation.service.audit;
 
-import com.automation.testsupport.TurkishLocale;
 import com.automation.entity.AuditSeverity;
 import com.automation.service.audit.AuditResultParser.ParsedFinding;
+import com.automation.testsupport.TurkishLocale;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 

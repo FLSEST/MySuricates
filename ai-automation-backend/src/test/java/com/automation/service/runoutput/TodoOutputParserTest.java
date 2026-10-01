@@ -1,7 +1,7 @@
 package com.automation.service.runoutput;
 
-import com.automation.testsupport.TurkishLocale;
 import com.automation.service.runoutput.TodoOutputParser.ParsedTodoItem;
+import com.automation.testsupport.TurkishLocale;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
