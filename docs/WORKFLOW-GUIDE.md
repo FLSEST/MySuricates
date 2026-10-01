@@ -657,7 +657,7 @@ Legen TODOs direkt über den TodoService an bzw. ändern sie — **kein REST-Sel
 | `source_agent` | string | `workflow` | Quell-Agent-Label |
 | `variable_name` | string | `todo_id` | Kontext-Variable, die die neue TODO-ID erhält |
 
-**`todo-update`**: `id` (erforderlich, Template-fähig — z. B. `{{ todo_id }}`), optional `title`/`description`/`priority`/`tags` — nur gesetzte Felder werden geändert, leere Texte gelten als nicht gesetzt.
+**`todo-update`**: `id` (erforderlich, sofern nicht `updates` gesetzt ist – genau einer der beiden; Editor und Analyzer melden keinen oder beide; Template-fähig — z. B. `{{ todo_id }}`), optional `title`/`description`/`priority`/`tags` — nur gesetzte Felder werden geändert, leere Texte gelten als nicht gesetzt.
 
 **`todo-update` mit `updates`** (statt `id`): ändert viele TODOs **des Lauf-Projekts** in einem Schritt. `updates` ist eine JSON-Liste (als Text, Template-fähig, meist `{{ block.<shell>.output }}`; ist die ganze Ausgabe kein JSON, gilt ihre letzte nicht-leere Zeile – ein Skript darf also vorher Zeilen für Menschen ausgeben):
 

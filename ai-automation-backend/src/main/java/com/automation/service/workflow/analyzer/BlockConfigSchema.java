@@ -59,7 +59,7 @@ public final class BlockConfigSchema {
         }
     }
 
-    private record Spec(List<String> required, Map<String, Field> fields) {}
+    private record Spec(List<String> required, List<String> requiredOneOf, Map<String, Field> fields) {}
 
     private static final class Holder {
         private static final BlockConfigSchema INSTANCE = load();
@@ -86,7 +86,10 @@ public final class BlockConfigSchema {
         root.path("blockTypes").properties().forEach(e -> {
             List<String> required = new ArrayList<>();
             e.getValue().path("required").forEach(r -> required.add(r.asText()));
-            types.put(e.getKey(), new Spec(List.copyOf(required), fields(e.getValue().path("fields"), shared)));
+            List<String> oneOf = new ArrayList<>();
+            e.getValue().path("requiredOneOf").forEach(r -> oneOf.add(r.asText()));
+            types.put(e.getKey(), new Spec(List.copyOf(required), List.copyOf(oneOf),
+                    fields(e.getValue().path("fields"), shared)));
         });
         if (types.isEmpty()) {
             throw new IllegalStateException(RESOURCE + " enthält keine Blocktypen");
@@ -144,6 +147,12 @@ public final class BlockConfigSchema {
     public List<String> requiredKeys(String type) {
         Spec spec = type == null ? null : blockTypes.get(type);
         return spec == null ? List.of() : spec.required();
+    }
+
+    /** Schlüssel, von denen genau einer gesetzt sein muss (todo-update: {@code id} oder {@code updates}); sonst leer. */
+    public List<String> requiredOneOfKeys(String type) {
+        Spec spec = type == null ? null : blockTypes.get(type);
+        return spec == null ? List.of() : spec.requiredOneOf();
     }
 
     public Set<String> aiBlockTypes() {

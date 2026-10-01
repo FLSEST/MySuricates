@@ -1,5 +1,5 @@
 {
-  "$comment": "Config keys of every block type: key, type, allowed values, legacy value, required, de/en text. Single source for the Monaco config editor (blockConfigSchema.ts) and the backend analyzer (ConfigKeyRules, copied onto the classpath by the backend build). A string value \"#name\" in a field list refers to sharedFields.name. \"legacy\" = old value still accepted, \"legacyFor\" = old key name of another key, \"ignoreCase\" = the executor compares case-insensitively, \"onlyWith\" = the executor reads the key only when these other keys have these values (\"*\" = the key is set). Whoever teaches an executor a new config key adds it here.",
+  "$comment": "Config keys of every block type: key, type, allowed values, legacy value, required, de/en text. Single source for the Monaco config editor (blockConfigSchema.ts) and the backend analyzer (ConfigKeyRules, copied onto the classpath by the backend build). A string value \"#name\" in a field list refers to sharedFields.name. \"requiredOneOf\" = exactly one of these keys must be set (todo-update: id or updates). \"legacy\" = old value still accepted, \"legacyFor\" = old key name of another key, \"ignoreCase\" = the executor compares case-insensitively, \"onlyWith\" = the executor reads the key only when these other keys have these values (\"*\" = the key is set). Whoever teaches an executor a new config key adds it here.",
   "onFailure": {
     "type": "string",
     "doc": {
@@ -1180,6 +1180,10 @@
       }
     },
     "todo-update": {
+      "requiredOneOf": [
+        "id",
+        "updates"
+      ],
       "fields": {
         "id": {
           "type": "string",

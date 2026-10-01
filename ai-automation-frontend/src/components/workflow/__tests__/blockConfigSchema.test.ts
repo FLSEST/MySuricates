@@ -10,6 +10,7 @@ import {
   buildBlockConfigSchema,
   knownConfigKeys,
   requiredConfigKeys,
+  requiredOneOfConfigKeys,
 } from '../blockConfigSchema';
 
 const REPO = resolve(__dirname, '../../../../..');
@@ -119,6 +120,16 @@ describe('blockConfigSchema', () => {
     expect(requiredConfigKeys('sub-workflow')).toEqual(['workflow_id']);
   });
 
+  // todo-update runs with either `id` or `updates` — neither, or both, fails at run time (TODO d6c0afe6)
+  it('requires exactly one of id and updates for todo-update', () => {
+    expect(requiredOneOfConfigKeys('todo-update')).toEqual(['id', 'updates']);
+    expect(requiredConfigKeys('todo-update')).toEqual([]);
+    const schema = buildBlockConfigSchema('todo-update', 'en');
+    expect(schema.oneOf).toEqual([{ required: ['id'] }, { required: ['updates'] }]);
+    expect(requiredOneOfConfigKeys('shell')).toEqual([]);
+    expect(buildBlockConfigSchema('shell', 'en')).not.toHaveProperty('oneOf');
+  });
+
   it('lets an unknown (server-only) block type through without key warnings', () => {
     expect(buildBlockConfigSchema('future-block', 'en').additionalProperties).toBe(true);
     expect(buildBlockConfigSchema('shell', 'en').additionalProperties).toBe(false);
@@ -144,6 +155,10 @@ describe('blockConfigSchema', () => {
       }
       for (const key of requiredConfigKeys(block.type)) {
         if (!(key in (block.config ?? {})) && !KNOWN_INEFFECTIVE.has(`${block.type} lacks ${key}`)) problems.push(`${where}: ${block.type} lacks ${key}`);
+      }
+      const oneOf = requiredOneOfConfigKeys(block.type);
+      if (oneOf.length && oneOf.filter((key) => key in (block.config ?? {})).length !== 1) {
+        problems.push(`${where}: ${block.type} needs exactly one of ${oneOf.join(', ')}`);
       }
     }
     expect(problems).toEqual([]);
