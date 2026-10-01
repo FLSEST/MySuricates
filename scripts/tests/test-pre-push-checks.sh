@@ -58,6 +58,8 @@ OUT=$(cd "$TMP/clean" && env $SKIP git push origin main 2>&1); RC=$?
 check "push abgelehnt"                           '[ "$RC" -ne 0 ]'
 check "Gate meldet FAILED"                       'grep -q "Pre-Push-Gate FAILED" <<<"$OUT"'
 check "nennt den Commit"                         'grep -q "commit ${SHORT}.*absolute developer path" <<<"$OUT"'
+check "Schlusshinweis passt zur Befundart (Nachricht)" \
+  'grep -q "^Fix (Nachricht/Adresse)" <<<"$OUT" && ! grep -q "^Fix (Ausnahmedateien)" <<<"$OUT"'
 ( cd "$TMP/clean" && git reset -q --hard HEAD~1 )
 
 echo "3) commit-msg-Hook blockiert dieselbe Nachricht schon beim Commit"
@@ -98,6 +100,11 @@ OUT=$(cd "$TMP/clean" && HYGIENE_PRIVATE_TERMS="$TMP/terms.txt" bash scripts/ci/
 check "Begriff erkannt (exit 1, ohne Gross/Klein)" '[ "$RC" -eq 1 ]'
 check "nennt die Listenzeile 2"                  'grep -q "privaten Begriff (Zeile 2 der privaten Begriffsliste)" <<<"$OUT"'
 check "Begriff steht nicht in der Ausgabe"       '! grep -qi "schnecke" <<<"$OUT"'
+( cd "$TMP/clean" && git reset -q --hard HEAD~1 )
+commit_file "$TMP/clean" g.txt "x" "docs: Notiz zur SCHNECKE" $NOREPLY
+OUT=$(cd "$TMP/clean" && HYGIENE_PRIVATE_TERMS="$TMP/terms.txt" bash scripts/ci/pre-push-checks.sh --range HEAD~1..HEAD --skip-tree --skip-build 2>&1); RC=$?
+check "Grossschreibung in der Nachricht wird gefaltet (ohne Bash-4-Expansion)" \
+  '[ "$RC" -eq 1 ] && grep -q "privaten Begriff (Zeile 2" <<<"$OUT"'
 OUT=$(cd "$TMP/clean" && bash scripts/ci/pre-push-checks.sh --range HEAD~1..HEAD --skip-tree --skip-build 2>&1); RC=$?
 check "ohne Liste: hoerbar uebersprungen"        'grep -q "private Begriffe in Commit-Nachrichten werden nicht geprueft" <<<"$OUT"'
 check "ohne Liste: kein Befund (exit 0)"         '[ "$RC" -eq 0 ]'
@@ -235,12 +242,17 @@ check ".gitleaksignore: push abgelehnt"          '[ "$RC" -ne 0 ] && grep -q "Pr
 check "nennt die Datei und den Schalter mit Hash" \
   'grep -q "aendert Ausnahmedateien (.gitleaksignore) — nach Pruefung des Diffs freigeben: MYSURICATES_PREPUSH_ALLOW_RULES=${TIP_SHORT} git push" <<<"$OUT"'
 check "zeigt den Diff-Umfang"                    'grep -q "│ .*\.gitleaksignore" <<<"$OUT"'
+check "Schlusshinweis passt zur Befundart (Ausnahmedateien)" \
+  'grep -q "^Fix (Ausnahmedateien)" <<<"$OUT" && ! grep -q "^Fix (Nachricht" <<<"$OUT"'
 OUT=$(cd "$TMP/clean" && env MYSURICATES_PREPUSH_SKIP=tree,build,rules git push origin main 2>&1); RC=$?
 check "MYSURICATES_PREPUSH_SKIP=rules gibt nicht frei" '[ "$RC" -ne 0 ] && grep -q "deckt geaenderte Ausnahmedateien nicht ab" <<<"$OUT"'
 OUT=$(cd "$TMP/clean" && env $SKIP MYSURICATES_PREPUSH_ALLOW_RULES=1 git push origin main 2>&1); RC=$?
 check "Schalter ohne Hash (=1) gibt nicht frei"   '[ "$RC" -ne 0 ]'
 OUT=$(cd "$TMP/clean" && env $SKIP MYSURICATES_PREPUSH_ALLOW_RULES="$BEFORE_RULES" git push origin main 2>&1); RC=$?
 check "Hash eines anderen Stands gibt nicht frei" '[ "$RC" -ne 0 ]'
+OUT=$(cd "$TMP/clean" && MYSURICATES_PREPUSH_ALLOW_RULES="$(tr '[:lower:]' '[:upper:]' <<<"$TIP_SHORT")" \
+  bash scripts/ci/pre-push-checks.sh --range "${BEFORE_RULES}..HEAD" --skip-tree --skip-build 2>&1); RC=$?
+check "Freigabe-Hash in Grossbuchstaben gilt (exit 0)" '[ "$RC" -eq 0 ]'
 OUT=$(cd "$TMP/clean" && env $SKIP MYSURICATES_PREPUSH_ALLOW_RULES="deadbeef,${TIP_SHORT}" git push origin main 2>&1); RC=$?
 check "Hash dieses Stands gibt frei (exit 0)"    '[ "$RC" -eq 0 ]'
 check "Freigabe laut gemeldet"                   'grep -q "FREIGEGEBEN per MYSURICATES_PREPUSH_ALLOW_RULES fuer ${TIP_SHORT}" <<<"$OUT"'

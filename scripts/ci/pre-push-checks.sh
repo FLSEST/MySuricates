@@ -83,7 +83,12 @@ COUNT=0
 WARN=0
 ZERO="0000000000000000000000000000000000000000"
 
+# Welche Befundarten der Lauf hatte — der Schlusshinweis nennt je Art den passenden Weg.
+# Jede Pruefung setzt KIND, bevor sie fail() rufen kann.
+KIND="meta"
+FAIL_KINDS=","
 fail() {  # $1 = meldung
+  case "$FAIL_KINDS" in *",${KIND},"*) ;; *) FAIL_KINDS="${FAIL_KINDS}${KIND}," ;; esac
   if [ -n "${GITHUB_ACTIONS:-}" ]; then echo "::error::${1}"; else echo "  ✗ ${1}" >&2; fi
   FAIL=1
   COUNT=$((COUNT + 1))
@@ -101,6 +106,10 @@ step() { echo "▶ $1"; }
 # Hygiene-Gate), Meldungen nennen die Listenzeile, nie den Begriff.
 # ---------------------------------------------------------------------------
 TERMS_LOADED=0
+TERMS_LC=()
+# Kleinschreibung ohne Bash-4-Faltung per Parameter-Expansion: macOS bringt Bash 3.2 mit. awk statt tr,
+# weil GNU awk im UTF-8-Locale auch Umlaute faltet; das awk von macOS faltet nur ASCII.
+to_lower() { printf '%s\n' "$1" | awk '{ print tolower($0) }'; }
 load_private_terms() {
   [ "$TERMS_LOADED" -eq 1 ] && return 0
   TERMS_LOADED=1
@@ -110,6 +119,8 @@ load_private_terms() {
     return 0
   fi
   hygiene_private_terms_load "$list"
+  local i
+  for i in "${!HYGIENE_TERMS[@]}"; do TERMS_LC[$i]="$(to_lower "${HYGIENE_TERMS[$i]}")"; done
 }
 
 # ---------------------------------------------------------------------------
@@ -123,7 +134,8 @@ check_email() {  # $1 = label, $2 = rolle, $3 = adresse
 check_message() {  # $1 = label, $2 = nachricht (mehrzeilig)
   local label="$1" line content lc i lc_term entry pat desc
   load_private_terms
-  while IFS= read -r line || [ -n "$line" ]; do
+  # Ein awk-Aufruf je Nachricht: Originalzeile (fd 3) und kleingeschriebene Zeile (fd 4) parallel.
+  while IFS= read -r line <&3 && IFS= read -r lc <&4; do
     [[ "$line" =~ $HYGIENE_COMMIT_TRAILER_REGEX ]] && continue
     case "$line" in '#'*) continue ;; esac   # Kommentarzeilen der Commit-Vorlage
     for entry in "${HYGIENE_PATTERNS[@]}"; do
@@ -131,9 +143,8 @@ check_message() {  # $1 = label, $2 = nachricht (mehrzeilig)
       desc="$(hygiene_desc_of "$entry")"
       case "$line" in *"$pat"*) fail "${label}: Nachricht enthaelt '${pat}' (${desc})" ;; esac
     done
-    lc="${line,,}"
     for i in "${!HYGIENE_TERMS[@]}"; do
-      lc_term="${HYGIENE_TERMS[$i],,}"
+      lc_term="${TERMS_LC[$i]}"
       case "$lc" in
         *"$lc_term"*)
           if [ "${HYGIENE_TERM_WEAK[$i]}" -eq 1 ]; then
@@ -147,10 +158,11 @@ check_message() {  # $1 = label, $2 = nachricht (mehrzeilig)
     if [[ "$line" =~ $HYGIENE_EMAIL_REGEX ]]; then
       fail "${label}: Nachricht enthaelt eine Mailadresse ausserhalb eines Trailers"
     fi
-  done <<<"$2"
+  done 3<<<"$2" 4< <(printf '%s\n' "$2" | awk '{ print tolower($0) }')
 }
 
 check_commits() {  # $@ = rev-list-Argumente
+  KIND="meta"
   local c short ae ce body n=0
   while IFS= read -r c; do
     [ -z "$c" ] && continue
@@ -170,6 +182,7 @@ check_commits() {  # $@ = rev-list-Argumente
 # 2 — Hygiene auf den Bereich, 4 — gitleaks, 5 — Bauprüfung
 # ---------------------------------------------------------------------------
 check_hygiene_range() {  # $1 = A..B
+  KIND="hygiene"
   local out rc warns n
   if [ ! -f "$HYGIENE_GATE" ]; then
     echo "Pre-Push-Gate: Hygiene-Gate fehlt: $HYGIENE_GATE" >&2
@@ -196,6 +209,7 @@ check_hygiene_range() {  # $1 = A..B
 }
 
 check_gitleaks() {  # $1 = A..B
+  KIND="gitleaks"
   local out rc
   if ! command -v gitleaks >/dev/null 2>&1; then
     note "gitleaks ist nicht installiert — Secret-Scan des Bereichs uebersprungen (die CI scannt mit gitleaks-action)"
@@ -238,7 +252,7 @@ rules_allowed_for() {  # $1 = voller Hash der Bereichsspitze
   local v
   local IFS=','
   for v in ${MYSURICATES_PREPUSH_ALLOW_RULES:-}; do
-    v="${v// /}"; v="${v,,}"
+    v="$(printf '%s' "${v// /}" | tr '[:upper:]' '[:lower:]')"
     [ "${#v}" -ge 7 ] || continue
     case "$1" in "$v"*) return 0 ;; esac
   done
@@ -246,6 +260,7 @@ rules_allowed_for() {  # $1 = voller Hash der Bereichsspitze
 }
 
 check_rule_files() {  # $1 = A..B
+  KIND="rules"
   local f files=() tip short stat
   while IFS= read -r f; do
     [ -n "$f" ] && is_rule_file "$f" && files+=("$f")
@@ -291,6 +306,7 @@ check_rule_files() {  # $1 = A..B
 # Eine eigene Liste hier liefe der CI davon: lokal gruen, was die CI baut, oder umgekehrt.
 SCOPES_SCRIPT="$REPO_ROOT/scripts/ci/changed-scopes.sh"
 check_build() {  # $1 = A..B
+  KIND="build"
   local files scopes frontend=0 backend=0 out rc
   if [ ! -f "$SCOPES_SCRIPT" ]; then
     echo "Pre-Push-Gate: Scope-Einordnung fehlt: $SCOPES_SCRIPT" >&2
@@ -343,6 +359,7 @@ TREE_GATES=(
   "API-Endpunkte gegen docs/api-referenz.md (DE/EN)|bash|scripts/public-readiness/api-endpoint-diff.sh"
 )
 check_tree() {
+  KIND="tree"
   local entry label runner script extra out rc
   for entry in "${TREE_GATES[@]}"; do
     IFS='|' read -r label runner script extra <<<"$entry"
@@ -396,6 +413,7 @@ echo "Pre-Push-Gate (${MODE})"
 case "$MODE" in
   message)
     [ -f "$MSG_FILE" ] || { echo "Pre-Push-Gate: Nachrichtendatei fehlt: '${MSG_FILE}'" >&2; exit 2; }
+    KIND="meta"
     ident="$(git var GIT_AUTHOR_IDENT 2>/dev/null)"; ident="${ident#*<}"; check_email "dieser Commit" "Autor" "${ident%%>*}"
     ident="$(git var GIT_COMMITTER_IDENT 2>/dev/null)"; ident="${ident#*<}"; check_email "dieser Commit" "Committer" "${ident%%>*}"
     check_message "dieser Commit" "$(cat "$MSG_FILE")"
@@ -438,8 +456,19 @@ esac
 if [ "$FAIL" -ne 0 ]; then
   echo ""
   echo "Pre-Push-Gate FAILED — ${COUNT} Verstoss/Verstoesse."
-  echo "Fix: Nachricht oder Autor mit git commit --amend (bzw. git rebase -i) korrigieren, Literale ersetzen."
-  echo "Kein Bypass per Reflex — git push --no-verify nur, wenn der Befund bewusst gepruft ist."
+  case "$FAIL_KINDS" in *,meta,*)
+    echo "Fix (Nachricht/Adresse): git commit --amend (nach git config user.email … mit --reset-author), aeltere Commits per git rebase -i; Literale und private Begriffe ersetzen." ;; esac
+  case "$FAIL_KINDS" in *,hygiene,*)
+    echo "Fix (Inhalt): die gemeldeten Zeilen in den Dateien korrigieren und neu committen — die Fundstellen stehen oben." ;; esac
+  case "$FAIL_KINDS" in *,gitleaks,*)
+    echo "Fix (Secret): Geheimnis aus der Historie entfernen (Commit umschreiben) und den Schluessel rotieren; ein Fehlalarm gehoert begruendet in .gitleaksignore — das ist dann eine Ausnahmedatei und braucht die Freigabe." ;; esac
+  case "$FAIL_KINDS" in *,rules,*)
+    echo "Fix (Ausnahmedateien): nichts zu reparieren, aber zu entscheiden — Diff lesen; passt er, gibt ein Mensch genau diesen Stand frei (Befehl oben). Kein Agent setzt den Schalter." ;; esac
+  case "$FAIL_KINDS" in *,tree,*)
+    echo "Fix (Bestands-Gates): das genannte Skript einzeln laufen lassen und Doku bzw. Diagramme nachziehen." ;; esac
+  case "$FAIL_KINDS" in *,build,*)
+    echo "Fix (Bau): den Fehler oben beheben, lokal pruefen (npx tsc --noEmit && npm run lint bzw. mvn -q test-compile), neu committen." ;; esac
+  echo "Kein Bypass per Reflex — git push --no-verify nur, wenn der Befund bewusst geprueft ist."
   exit 1
 fi
 if [ "$WARN" -ne 0 ]; then
