@@ -17,14 +17,14 @@ import { api } from '../../api/client';
 import type { CalendarDataResponse, UnifiedCalendarEvent } from '../../types';
 import type { CalendarSourceAdapter, CalendarSourceResult } from './types';
 
-export const runsAdapter: CalendarSourceAdapter = {
+export const runsAdapter: CalendarSourceAdapter<CalendarSourceResult> = {
   sourceId: 'runs',
   label: 'Runs',
   color: 'bg-success',
 
   isAvailable: () => true,
 
-  fetchEvents: async (from, to): Promise<CalendarSourceResult> => {
+  fetchEvents: async (from, to) => {
     const data = await api.get<CalendarDataResponse>(
       `/schedules/calendar?from=${from}&to=${to}`
     );

@@ -15,7 +15,7 @@
  *
  * @example
  * ```ts
- * export const myAdapter: CalendarSourceAdapter = {
+ * export const myAdapter: CalendarSourceAdapter<UnifiedCalendarEvent[]> = {
  *   sourceId: 'my-source',
  *   label: 'My Source',
  *   color: 'bg-chart-8',
@@ -45,7 +45,15 @@ export interface CalendarSourceLimit {
   total: number;
 }
 
-export interface CalendarSourceAdapter {
+/** What `fetchEvents` may return: the events alone, or the events plus the cut of the source. */
+export type CalendarFetchResult = UnifiedCalendarEvent[] | CalendarSourceResult;
+
+/**
+ * `R` narrows what the adapter returns, so callers of one adapter (tests, other hooks) see its exact shape:
+ * `CalendarSourceAdapter<UnifiedCalendarEvent[]>` for a plain list, `<CalendarSourceResult>` for a source that
+ * may cut its list. The registry holds them all under the default (the union).
+ */
+export interface CalendarSourceAdapter<R extends CalendarFetchResult = CalendarFetchResult> {
   /** Unique identifier, e.g. 'google-calendar', 'schedules', 'runs' */
   sourceId: string;
 
@@ -77,5 +85,5 @@ export interface CalendarSourceAdapter {
    * @param from - ISO 8601 start of the time range
    * @param to - ISO 8601 end of the time range
    */
-  fetchEvents: (from: string, to: string) => Promise<UnifiedCalendarEvent[] | CalendarSourceResult>;
+  fetchEvents: (from: string, to: string) => Promise<R>;
 }

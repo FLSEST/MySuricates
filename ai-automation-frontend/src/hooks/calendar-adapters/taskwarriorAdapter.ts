@@ -39,7 +39,7 @@ function parseTaskwarriorDate(value: string | undefined): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-export const taskwarriorAdapter: CalendarSourceAdapter = {
+export const taskwarriorAdapter: CalendarSourceAdapter<UnifiedCalendarEvent[]> = {
   sourceId: 'taskwarrior',
   label: 'Taskwarrior',
   color: 'bg-chart-8',

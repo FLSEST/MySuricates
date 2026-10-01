@@ -3,7 +3,6 @@ import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../../test/server';
 import { runsAdapter } from '../runsAdapter';
-import type { CalendarSourceResult } from '../types';
 
 beforeAll(() => server.listen({ onUnhandledRequest: failOnUnhandledRequest }));
 afterEach(() => server.resetHandlers());
@@ -17,8 +16,7 @@ function answer(body: Record<string, unknown>) {
   server.use(http.get('/api/v1/schedules/calendar', () => HttpResponse.json({ upcoming: [], ...body })));
 }
 
-const fetchRuns = () =>
-  runsAdapter.fetchEvents('2026-09-01T00:00:00Z', '2026-09-30T23:59:59Z') as Promise<CalendarSourceResult>;
+const fetchRuns = () => runsAdapter.fetchEvents('2026-09-01T00:00:00Z', '2026-09-30T23:59:59Z');
 
 // fbd56d63: the backend cuts a range at 1000 past runs (86777fb4); the unified calendar said nothing about it.
 describe('runsAdapter', () => {

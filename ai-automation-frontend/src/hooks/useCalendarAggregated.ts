@@ -15,10 +15,10 @@ import { useQuery } from '@tanstack/react-query';
 import { useIntegrations } from './useIntegrations';
 import { useCalendarColors } from './useCalendarColors';
 import { CALENDAR_ADAPTERS } from './calendar-adapters/registry';
-import type { CalendarSourceLimit, CalendarSourceResult } from './calendar-adapters/types';
+import type { CalendarFetchResult, CalendarSourceLimit, CalendarSourceResult } from './calendar-adapters/types';
 import type { UnifiedCalendarEvent, CalendarSourceConfig } from '../types';
 
-function toResult(data: UnifiedCalendarEvent[] | CalendarSourceResult | undefined): CalendarSourceResult {
+function toResult(data: CalendarFetchResult | undefined): CalendarSourceResult {
   if (!data) return { events: [] };
   return Array.isArray(data) ? { events: data } : data;
 }

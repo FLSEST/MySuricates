@@ -12,7 +12,7 @@ import { api } from '../../api/client';
 import type { CalendarDataResponse, ScheduledWorkflow, UnifiedCalendarEvent } from '../../types';
 import type { CalendarSourceAdapter } from './types';
 
-export const schedulesAdapter: CalendarSourceAdapter = {
+export const schedulesAdapter: CalendarSourceAdapter<UnifiedCalendarEvent[]> = {
   sourceId: 'schedules',
   label: 'Zeitpläne',
   color: 'bg-chart-3',

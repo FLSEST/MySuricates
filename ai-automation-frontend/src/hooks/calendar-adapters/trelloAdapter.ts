@@ -29,7 +29,7 @@ interface TrelloSearchResponse {
   cards: TrelloCardResponse[];
 }
 
-export const trelloAdapter: CalendarSourceAdapter = {
+export const trelloAdapter: CalendarSourceAdapter<UnifiedCalendarEvent[]> = {
   sourceId: 'trello',
   label: 'Trello',
   color: 'bg-chart-7',
