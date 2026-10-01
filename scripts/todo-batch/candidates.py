@@ -6,10 +6,11 @@ Kandidat: Status OPEN, kein `batch:*`-Tag, keine offene Frage. Läuft noch ein B
 `run_if` der Triage. Ausgabe: die Kandidaten als eine JSON-Zeile für den Prompt.
 
 Dazu `near_limit` (TODO 8bbc2368): Dateien, die höchstens `--size-margin` Zeilen unter ihrer Obergrenze stehen
-(oder darüber). Die Grenzen liest das Skript aus der Grenzdatei `--size-ratchet` im Format von
-`SourceSizeRatchetTest` (`MAX_LINES = N` als Standard, `entry("<pfad>", N)` je Ausnahme, Pfade relativ zu
-`--size-root`); gezählt werden die `.java`-Dateien unter `--size-root`. Ohne Grenzdatei bleibt die Liste leer –
-ein Repo ohne Größen-Ratchet lässt die beiden Werte im Kontext leer.
+(oder darüber). `--size-limits <grenzdatei> <quellwurzel>`: Die Grenzen stehen in der Grenzdatei im Format von
+`SourceSizeRatchetTest` (`MAX_LINES = N` als Standard, `entry("<pfad>", N)` je Ausnahme, Pfade relativ zur
+Quellwurzel); gezählt werden die `.java`-Dateien unter der Quellwurzel. Ohne Grenzdatei bleibt die Liste leer – ein
+Repo ohne Größen-Ratchet lässt die beiden Werte im Kontext leer oder weg. Fehlt ein Kontext-Wert ganz, lässt die
+Plattform den Platzhalter wörtlich stehen (`{{ name }}` → drei Wörter); auch das gilt als „nicht gesetzt“.
 """
 from __future__ import annotations
 
@@ -70,13 +71,29 @@ def near_limit(ratchet: Path, root: Path, margin: int, base: Path | None = None)
     return near[:NEAR_LIMIT_MAX]
 
 
+def size_limits(tokens: list[str]) -> tuple[str, str]:
+    """(Grenzdatei, Quellwurzel) aus `--size-limits`; ein unaufgelöster Platzhalter `{{ … }}` zählt als leer."""
+    values, inside = [], False
+    for token in tokens or []:
+        if token == "{{" or (token.startswith("{{") and not token.endswith("}}")):
+            inside = True
+        elif inside:
+            if token.endswith("}}"):
+                inside = False
+                values.append("")
+        else:
+            values.append("" if token.startswith("{{") else token)
+    values += ["", ""]
+    return values[0].strip(), values[1].strip()
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--state", required=True)
     parser.add_argument("--max", type=int, default=40)
     parser.add_argument("--batch-max", type=int, default=None)
-    parser.add_argument("--size-ratchet", default="", help="Grenzdatei (Format SourceSizeRatchetTest); leer = keine")
-    parser.add_argument("--size-root", default="", help="Quellwurzel, auf die sich die Pfade der Grenzdatei beziehen")
+    parser.add_argument("--size-limits", nargs="*", default=[], metavar="PFAD",
+                        help="Grenzdatei (Format SourceSizeRatchetTest) und Quellwurzel; leer oder fehlend = keine Liste")
     parser.add_argument("--size-margin", type=int, default=15)
     args = parser.parse_args(argv)
     state = b.state(args.state)
@@ -93,8 +110,9 @@ def main(argv=None) -> int:
         target.unlink()
     (state / "active.flag").write_text("1" if active else "0", encoding="utf-8")
     (state / "preselected.txt").write_text(str(preselected), encoding="utf-8")
-    near = (near_limit(Path(args.size_ratchet), Path(args.size_root), args.size_margin, base=Path.cwd())
-            if chosen and args.size_ratchet.strip() and args.size_root.strip() else [])
+    ratchet, root = size_limits(args.size_limits)
+    near = (near_limit(Path(ratchet), Path(root), args.size_margin, base=Path.cwd())
+            if chosen and ratchet and root else [])
     print(json.dumps({"active": active, "count": len(chosen), "preselected": preselected, "candidates": chosen,
                       "near_limit": near}, ensure_ascii=False, separators=(",", ":")))
     return 0

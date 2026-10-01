@@ -212,10 +212,10 @@ class SizeRatchetTest(unittest.TestCase):
             write(state / "details.txt", details(todo(A)))
             code, out = call(candidates.main, "--state", str(state))
             self.assertEqual((code, json.loads(out)["near_limit"]), (0, []))
-            code, out = call(candidates.main, "--state", str(state), "--size-ratchet", str(state / "fehlt.java"),
-                             "--size-root", str(state))
+            code, out = call(candidates.main, "--state", str(state), "--size-limits", str(state / "fehlt.java"),
+                             str(state))
             self.assertEqual((code, json.loads(out)["near_limit"]), (0, []))
-            code, out = call(candidates.main, "--state", str(state), "--size-ratchet", "", "--size-root", "")
+            code, out = call(candidates.main, "--state", str(state), "--size-limits", "", "")
             self.assertEqual((code, json.loads(out)["near_limit"]), (0, []))
 
     def test_main_passes_the_list_with_the_candidates(self):
@@ -227,8 +227,8 @@ class SizeRatchetTest(unittest.TestCase):
             cwd = os.getcwd()
             os.chdir(root)
             try:
-                code, out = call(candidates.main, "--state", "state", "--size-ratchet", "mod/src/test/java/Ratchet.java",
-                                 "--size-root", "mod/src/main/java", "--size-margin", "5")
+                code, out = call(candidates.main, "--state", "state", "--size-limits", "mod/src/test/java/Ratchet.java",
+                                 "mod/src/main/java", "--size-margin", "5")
             finally:
                 os.chdir(cwd)
         self.assertEqual(code, 0)
@@ -240,9 +240,48 @@ class SizeRatchetTest(unittest.TestCase):
         self.assertTrue((REPO / context["size_ratchet_file"]).is_file())
         self.assertTrue((REPO / context["size_ratchet_root"]).is_dir())
         config = {block["name"]: block["config"] for block in definition["blocks"]}
-        self.assertIn("--size-ratchet {{ size_ratchet_file }}", config["kandidaten"]["command"])
+        self.assertIn("--size-limits {{ size_ratchet_file }} {{ size_ratchet_root }}", config["kandidaten"]["command"])
         self.assertIn("near_limit", config["triage"]["command"])
         self.assertIn("Split", config["triage"]["command"])
+
+    @staticmethod
+    def resolve_like_the_engine(command, variables):
+        """Wie TemplateResolver mit shell_escape_variables: bekannte Werte single-quoted, unbekannte bleiben stehen."""
+        import re
+
+        def one(match):
+            name = match.group(1)
+            if name not in variables:
+                return match.group(0)
+            return "'" + str(variables[name]).replace("'", "'\\''") + "'"
+        return re.sub(r"\{\{\s*([\w.]+)\s*\}\}", one, command)
+
+    def run_pool_candidates(self, **size):
+        """Der Block `kandidaten` aus dem Pool, aufgelöst wie zur Laufzeit, gegen eine Kopie der Skripte."""
+        definition = json.loads((REPO / "workflow-pool" / "mysuricates-todo-batch-einordnen.json").read_text())
+        command = {block["name"]: block["config"] for block in definition["blocks"]}["kandidaten"]["command"]
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.tree(root)
+            write(root / ".git/todo-batch/details.txt", details(todo(A)))
+            (root / ".git/todo-batch/bin/scripts").mkdir(parents=True)
+            os.symlink(SCRIPTS, root / ".git/todo-batch/bin/scripts/todo-batch")
+            resolved = self.resolve_like_the_engine(command, {"execution_path": str(root), "batch_max": "6", **size})
+            result = subprocess.run(["bash", "-c", resolved], capture_output=True, text=True)
+        return result.returncode, result.stdout + result.stderr
+
+    def test_pool_command_survives_missing_or_empty_ratchet_variables(self):
+        code, out = self.run_pool_candidates()   # Repo ohne die beiden Schlüssel: Platzhalter bleiben stehen
+        self.assertEqual(code, 0, out)
+        self.assertEqual(json.loads(out.splitlines()[-1])["near_limit"], [])
+        code, out = self.run_pool_candidates(size_ratchet_file="", size_ratchet_root="")
+        self.assertEqual((code, json.loads(out.splitlines()[-1])["near_limit"]), (0, []))
+        code, out = self.run_pool_candidates(size_ratchet_file="mod/src/test/java/Ratchet.java")
+        self.assertEqual((code, json.loads(out.splitlines()[-1])["near_limit"]), (0, []))
+        code, out = self.run_pool_candidates(size_ratchet_file="mod/src/test/java/Ratchet.java",
+                                             size_ratchet_root="mod/src/main/java")
+        self.assertEqual(code, 0, out)
+        self.assertEqual(len(json.loads(out.splitlines()[-1])["near_limit"]), 3)
 
     def test_the_real_ratchet_file_parses(self):
         import candidates

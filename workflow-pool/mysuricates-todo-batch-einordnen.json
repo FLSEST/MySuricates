@@ -61,7 +61,7 @@
         "description": "Kandidaten ohne KI vorfiltern; laeuft noch ein Batch, gibt es keine",
         "shell_escape_variables": true,
         "timeout_seconds": 60,
-        "command": "set -euo pipefail\ncd {{ execution_path }}\npython3 .git/todo-batch/bin/scripts/todo-batch/candidates.py --state .git/todo-batch --max 40 --batch-max {{ batch_max }} --size-ratchet {{ size_ratchet_file }} --size-root {{ size_ratchet_root }}"
+        "command": "set -euo pipefail\ncd {{ execution_path }}\npython3 .git/todo-batch/bin/scripts/todo-batch/candidates.py --state .git/todo-batch --max 40 --batch-max {{ batch_max }} --size-limits {{ size_ratchet_file }} {{ size_ratchet_root }}"
       }
     },
     {
