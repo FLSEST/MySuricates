@@ -3,7 +3,7 @@
 
 Bricht mit Exit 3 ab, wenn das Arbeitsverzeichnis der echte Checkout ist (Workflow ohne Isolation) oder der
 Quell-Checkout nicht auf dem Ziel-Branch steht: Der Klon trägt dessen HEAD, ein Batch auf einem fremden Branch
-wäre falsch. Schreibt `<state>/todos/<id>.md`, `ids.txt`, `base.sha`, `titles.json` und `isolated.ok`, das die
+wäre falsch. Ein leerer Batch ist nie ein Fehler – auch nicht auf einem fremden Branch. Schreibt `<state>/todos/<id>.md`, `ids.txt`, `base.sha`, `titles.json` und `isolated.ok`, das die
 späteren Schritte verlangen. Letzte Zeile der Ausgabe: die `updates`-Liste (IN_PROGRESS + `batch:started`).
 """
 from __future__ import annotations
@@ -42,16 +42,21 @@ def main(argv=None) -> int:
     except b.BatchError as error:
         print(f"Abbruch: {error}.")
         return 3
-    branch = source_branch(args.project_path)
-    if branch != args.target_branch:
-        print(f"Abbruch: Der Quell-Checkout steht auf '{branch}', erwartet '{args.target_branch}'. "
-              "Der Klon trägt dessen Stand – erst zurück auf den Ziel-Branch.")
-        return 3
     try:
         todos = [t for t in b.parse_details(b.read_text(state / "details.txt")) if b.is_uuid(t.get("id"))]
     except (b.BatchError, ValueError) as error:
         print(f"Aufträge nicht lesbar: {error}")
         return 2
+    if not todos:
+        (state / "ids.txt").write_text("", encoding="utf-8")
+        print("0 TODO(s) im Batch – nichts zu tun.")
+        b.emit_updates([])
+        return 0
+    branch = source_branch(args.project_path)
+    if branch != args.target_branch:
+        print(f"Abbruch: Der Quell-Checkout steht auf '{branch}', erwartet '{args.target_branch}'. "
+              "Der Klon trägt dessen Stand – erst zurück auf den Ziel-Branch.")
+        return 3
     briefs = state / "todos"
     briefs.mkdir(exist_ok=True)
     for t in todos:

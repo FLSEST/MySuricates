@@ -2,8 +2,10 @@
 """TODO-Batch, Abarbeiten (TODO cc0eb3ba): Übergabe nach der Freigabe – Branch-Ref ins Quell-Repo, TODOs nachführen.
 
 „Übernehmen“ → `refs/heads/mysuricates/batch-<run8>` im Quell-Repo: nur ein neuer Ref; Arbeitsbaum, andere Refs
-und Remotes bleiben unberührt, ein vorhandener Ref wird nie überschrieben, nichts wird gepusht. „Verwerfen“ →
-nichts. Keine Antwort (Frist abgelaufen) → `--on-timeout`. Fehlen die Prüfergebnisse (Lauf brach vorher ab),
+und Remotes bleiben unberührt, ein vorhandener Ref wird nie überschrieben, nichts wird gepusht. Zeigt der Ref schon
+auf genau diesen Stand (Wiederaufnahme desselben Laufs), gilt die Übergabe als erledigt. Die Merge-Vorschau im
+Vermerk stammt vom Zeitpunkt der Übergabe, nicht aus dem Bericht. „Verwerfen“ → nichts übergeben, Ampel gelb.
+Keine Antwort (Frist abgelaufen) → `--on-timeout`. Fehlen die Prüfergebnisse (Lauf brach vorher ab),
 gehen alle TODOs des Batches mit `batch:failed` zurück. Räumt Build-Verzeichnisse im eigenen Klon weg.
 Letzte Zeile der Ausgabe: die `updates`-Liste.
 """
@@ -44,6 +46,8 @@ def decide(answer: str, has_accepted: bool, on_timeout: str) -> tuple[str, str]:
 def export(project_path: str, run_id: str) -> str:
     ref = f"refs/heads/mysuricates/batch-{b.short(run_id)}"
     if b.git_ok("-C", project_path, "show-ref", "--verify", "--quiet", ref):
+        if b.git("-C", project_path, "rev-parse", ref).strip() == b.git("rev-parse", "HEAD").strip():
+            return ref.removeprefix("refs/heads/")   # derselbe Lauf, schon übergeben
         raise b.BatchError(f"{ref} gibt es schon – nichts überschrieben")
     root = b.git("rev-parse", "--show-toplevel").strip()
     b.git("-C", project_path, "fetch", "--no-tags", "--quiet", root, f"HEAD:{ref}")
@@ -97,10 +101,10 @@ def main(argv=None) -> int:
         print(f"Übergabe nicht möglich: {error}")
         return 2
     data = load_results(state)
-    merge = b.read_json(state / "merge.json", {"state": "unbekannt"})
     decision, why = decide(args.answer, any(r["status"] == "accepted" for r in data["todos"].values()), args.on_timeout)
-    branch, failure = "–", None
+    branch, failure, merge_state = "–", None, "–"
     if decision == "provide":
+        merge_state = b.merge_preview(args.target_branch)["state"]
         try:
             branch = export(args.project_path, args.run)
         except b.BatchError as error:
@@ -109,6 +113,10 @@ def main(argv=None) -> int:
         print("gate_status: RED")
         print("gate_category: todo-batch-handover")
         print(f"gate_description: {b.plain(failure, 300)}")
+    elif decision == "discard":
+        print("gate_status: YELLOW")
+        print("gate_category: todo-batch-handover")
+        print(f"gate_description: Batch verworfen ({why}) – nichts übergeben")
     widget = b.read_json(state / "widget.json", None)
     if widget:
         outcome = {"provide": f"Übergeben: {branch}", "discard": "Verworfen", "none": "Nichts zu übergeben"}[decision]
@@ -121,7 +129,7 @@ def main(argv=None) -> int:
     removed = cleanup(args.cleanup)
     print(f"Übergabe: {decision} ({why})" + (f" → {branch}" if decision == "provide" and not failure else "")
           + (f" – {failure}" if failure else "") + (f"; aufgeräumt: {', '.join(removed)}" if removed else ""))
-    b.emit_updates(plan(decision, data, branch, merge.get("state", "unbekannt"), why, failure))
+    b.emit_updates(plan(decision, data, branch, merge_state, why, failure))
     return 0
 
 

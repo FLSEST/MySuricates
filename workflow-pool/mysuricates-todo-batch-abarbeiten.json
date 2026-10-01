@@ -77,6 +77,18 @@
       }
     },
     {
+      "type": "shell",
+      "name": "gestartet",
+      "config": {
+        "description": "Ergebnis des Start-Updates auswerten – nur bestaetigt gestartete TODOs werden abgearbeitet, uebersprungene nennt der Bericht",
+        "run_if": "test -s .git/todo-batch/ids.txt",
+        "shell_escape_variables": true,
+        "timeout_seconds": 60,
+        "command": "set -euo pipefail\ncd {{ execution_path }}\nprintf '%s' {{ block.starten.output }} > .git/todo-batch/starten.txt\npython3 .git/todo-batch/bin/scripts/todo-batch/confirm_start.py --state .git/todo-batch",
+        "on_failure": "continue"
+      }
+    },
+    {
       "type": "foreach",
       "name": "umsetzen",
       "config": {

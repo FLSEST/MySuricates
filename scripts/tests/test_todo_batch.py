@@ -693,7 +693,7 @@ class ReviewVerdictTest(RepoCase):
         b.write_json(self.state / "reviews.json", {
             A: {"verdict": "ok", "blocker": [], "major": [], "minor": []},
             B: {"verdict": "Findings", "blocker": [], "major": [], "minor": ["klein"]}})
-        with unittest.mock.patch.object(report, "merge_preview", return_value={"state": "sauber", "files": []}):
+        with unittest.mock.patch.object(report.b, "merge_preview", return_value={"state": "sauber", "files": []}):
             status = report.build(self.state, "main", "run12345-x", "2026-09-25")[0]
         self.assertEqual(status, "GREEN")
 
@@ -702,6 +702,195 @@ class ReviewVerdictTest(RepoCase):
             (REPO / "workflow-pool" / "mysuricates-todo-batch-abarbeiten.json").read_text())["blocks"]}
         for verdict in ("ok", "findings", "not_reviewed"):
             self.assertIn(f'"{verdict}"', config["review"]["command"])
+
+
+class FinalReviewFollowUpTest(RepoCase):
+    """d6c0afe6: Nacharbeiten aus dem Abschluss-Review der Batch-Kette."""
+
+    MAVEN_TAIL = ("[INFO] Running com.x.SourceSizeRatchetTest\n"
+                  "[ERROR] Tests run: 2, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.1 s <<< FAILURE!\n"
+                  "[ERROR] Failures: \n"
+                  "[ERROR]   SourceSizeRatchetTest.noProductionSourceGrowsPastTheRatchet:83 "
+                  "HostClaudeService.java grew to 417 lines (ceiling 411). Shrink it.\n"
+                  "[ERROR] Tests run: 10, Failures: 1, Errors: 0, Skipped: 0\n"
+                  "[ERROR] BUILD FAILURE\n"
+                  "[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.5.6:test\n"
+                  "[ERROR] -> [Help 1]\n")
+
+    def gate_args(self, backend="true"):
+        return ["--backend-cmd", backend, "--frontend-cmd", "true", "--common-cmd", "true",
+                "--logs", str(self.state / "logs")]
+
+    def base_state(self, ids):
+        (self.state / "base.sha").write_text(run_git(self.clone, "rev-parse", "HEAD").strip())
+        (self.state / "ids.txt").write_text("".join(f"{i}\n" for i in ids))
+        b.write_json(self.state / "titles.json", {i: f"Titel {i[:4]}" for i in ids})
+
+    def verify(self, backend="true"):
+        import verify
+        return call(verify.main, "--state", str(self.state), *self.gate_args(backend))
+
+    def report(self):
+        import report
+        return call(report.main, "--state", str(self.state), "--run", "run12345-x", "--date", "2026-09-25")
+
+    def handover(self, answer, *extra):
+        import handover
+        return call(handover.main, "--state", str(self.state), "--answer", answer, "--project-path", str(self.source),
+                    "--run", "run12345-x", *extra)
+
+    def accepted_a(self):
+        self.base_state([A])
+        self.commit(self.clone, "docs/a.md", "a\n", A)
+        self.verify()
+        b.write_json(self.state / "reviews.json", {A: {"verdict": "ok", "blocker": [], "major": [], "minor": []}})
+
+    # handover: Übergabe wiederholbar (Resume desselben Laufs)
+    def test_handover_can_be_repeated_for_the_same_run(self):
+        self.accepted_a()
+        self.report()
+        self.assertEqual(self.handover("Übernehmen")[0], 0)
+        code, out = self.handover("Übernehmen")
+        self.assertEqual(code, 0)
+        self.assertNotIn("gate_status: RED", out)
+        self.assertEqual(last_json(out)[0]["add_tags"], [b.HANDED_OVER])
+
+    # batchlib.plain(): unsichtbare Formatzeichen
+    def test_plain_drops_invisible_format_characters(self):
+        self.assertEqual(b.plain("gate​_status⁠: RED﻿ x­y"), "gate status: RED xy")
+        self.assertEqual(b.plain("todo_‍item: x"), "todo item: x")
+
+    # housekeeping: „wieder frei“ heißt OPEN
+    def test_released_handed_over_todo_is_open_again(self):
+        import housekeeping
+        updates, summary = housekeeping.plan([todo(B, "IN_PROGRESS", [b.HANDED_OVER])], merged=set(), in_branches=set())
+        self.assertEqual(summary["released"], [B])
+        self.assertEqual((updates[0]["status"], updates[0]["remove_tags"]), ("OPEN", [b.HANDED_OVER]))
+
+    # handover: Merge-Vorschau zum Zeitpunkt der Übergabe
+    def test_handover_note_has_the_merge_preview_of_its_own_time(self):
+        self.accepted_a()
+        self.report()
+        self.assertEqual(json.loads((self.state / "merge.json").read_text())["state"], "sauber")
+        self.commit(self.source, "docs/a.md", "anders\n")
+        _, out = self.handover("Übernehmen")
+        self.assertIn("Merge-Vorschau: Konflikt", last_json(out)[0]["note"])
+
+    # prepare: ein leerer Batch bricht auch auf fremdem Branch nicht ab
+    def test_empty_batch_on_a_foreign_branch_is_no_error(self):
+        import prepare
+        run_git(self.source, "checkout", "-q", "-b", "feature")
+        write(self.state / "details.txt", details())
+        code, out = call(prepare.main, "--state", str(self.state), "--project-path", str(self.source), "--run", "r")
+        self.assertEqual(code, 0)
+        self.assertEqual(last_json(out), [])
+        self.assertEqual((self.state / "ids.txt").read_text(), "")
+
+    # Abarbeiten: übersprungene Start-Updates fallen auf
+    def test_todos_whose_start_was_skipped_leave_the_batch_and_show_in_the_report(self):
+        import confirm_start
+        self.base_state([A, B, C])
+        (self.state / "starten.txt").write_text(
+            f"✓ 1 aktualisiert, 1 übersprungen\n✓ {A[:8]}\n– {B[:8]}: Status ist IN_PROGRESS\n")
+        code, out = call(confirm_start.main, "--state", str(self.state))
+        self.assertEqual(code, 0)
+        self.assertEqual((self.state / "ids.txt").read_text().split(), [A])
+        skipped = json.loads((self.state / "not_started.json").read_text())
+        self.assertEqual(skipped[B], "Status ist IN_PROGRESS")
+        self.assertIn(C, skipped)
+        self.assertIn("2", out)
+        self.commit(self.clone, "docs/a.md", "a\n", A)
+        self.verify()
+        b.write_json(self.state / "reviews.json", {A: {"verdict": "ok", "blocker": [], "major": [], "minor": []}})
+        _, out = self.report()
+        self.assertEqual(out.splitlines()[0], "gate_status: YELLOW")
+        approval = (self.state / "approval.md").read_text()
+        self.assertIn("nicht gestartet", approval)
+        self.assertIn(B[:8], approval)
+
+    def test_a_failed_start_update_starts_nothing(self):
+        import confirm_start
+        self.base_state([A])
+        (self.state / "starten.txt").write_text("todo-update fehlgeschlagen: updates ist keine JSON-Liste")
+        call(confirm_start.main, "--state", str(self.state))
+        self.assertEqual((self.state / "ids.txt").read_text(), "")
+        _, out = self.report()
+        self.assertEqual(out.splitlines()[0], "gate_status: YELLOW")
+        self.assertIn("nicht gestartet", out)
+
+    # verify: leere Commits kommen nicht in den Branch
+    def test_empty_commits_are_not_taken_over(self):
+        self.base_state([A, B])
+        base = (self.state / "base.sha").read_text()
+        run_git(self.clone, "commit", "-q", "--allow-empty", "-m", f"chore: leer\n\nTodo: {A}")
+        self.commit(self.clone, "docs/a.md", "a\n", A)
+        run_git(self.clone, "commit", "-q", "--allow-empty", "-m", f"chore: nur leer\n\nTodo: {B}")
+        self.verify()
+        results = json.loads((self.state / "results.json").read_text())["todos"]
+        self.assertEqual(results[A]["status"], "accepted")
+        self.assertEqual(results[B]["status"], "skipped")
+        for sha in run_git(self.clone, "rev-list", f"{base}..HEAD").split():
+            self.assertNotEqual(run_git(self.clone, "diff-tree", "--no-commit-id", "--name-only", "-r", sha).strip(), "")
+
+    # report: ein Fehler von git merge-tree ist kein Konflikt
+    def test_merge_tree_error_is_unknown_not_conflict(self):
+        real = subprocess.run
+
+        def fake(args, *rest, **kwargs):
+            if "merge-tree" in args:
+                return subprocess.CompletedProcess(args, 128, "", "fatal: kaputt")
+            return real(args, *rest, **kwargs)
+
+        with unittest.mock.patch.object(b.subprocess, "run", side_effect=fake):
+            self.assertEqual(b.merge_preview("main")["state"], "unbekannt")
+
+    # report/handover: „Verwerfen“ macht die Ampel gelb
+    def test_discard_turns_the_gate_yellow(self):
+        self.accepted_a()
+        self.report()
+        _, out = self.handover("Verwerfen")
+        self.assertIn("gate_status: YELLOW", out)
+        _, out = self.handover("", "--on-timeout", "discard")
+        self.assertIn("gate_status: YELLOW", out)
+
+    # Gates: grün erst im zweiten Versuch → gelb
+    def test_green_only_on_the_second_attempt_turns_the_report_yellow(self):
+        mark = self.state / "flaky.mark"
+        self.accepted_a_with(f"if [ -f {mark} ]; then exit 0; else touch {mark}; exit 1; fi")
+        data = json.loads((self.state / "results.json").read_text())
+        self.assertEqual(data["todos"][A]["status"], "accepted")
+        self.assertTrue(data["flaky"])
+        _, out = self.report()
+        self.assertEqual(out.splitlines()[0], "gate_status: YELLOW")
+        self.assertIn("zweiten Versuch", (self.state / "approval.md").read_text())
+
+    def accepted_a_with(self, backend):
+        self.base_state([A])
+        self.commit(self.clone, "ai-automation-backend/A.java", "class A {}\n", A)
+        self.verify(backend)
+        b.write_json(self.state / "reviews.json", {A: {"verdict": "ok", "blocker": [], "major": [], "minor": []}})
+
+    # verify/handover: der Vermerk nennt den Grund des roten Gates
+    def test_red_gate_reason_names_the_first_meaningful_error_line(self):
+        log = self.state / "maven.txt"
+        log.write_text(self.MAVEN_TAIL)
+        self.accepted_a_with(f"cat {log}; exit 1")
+        reason = json.loads((self.state / "results.json").read_text())["todos"][A]["reason"]
+        self.assertIn("backend: SourceSizeRatchetTest.noProductionSourceGrowsPastTheRatchet:83 HostClaudeService.java grew "
+                      "to 417 lines (ceiling 411)", reason)
+        self.assertNotIn("[ERROR]", reason)
+        self.report()
+        _, out = self.handover("Übernehmen")
+        self.assertIn("grew to 417 lines", last_json(out)[0]["note"])
+
+    def test_first_error_line_for_other_tools(self):
+        import gates
+        self.assertEqual(gates.first_error("> tsc\nsrc/a.ts(3,1): error TS2322: Typ falsch\nnpm ERR! code 2"),
+                         "src/a.ts(3,1): error TS2322: Typ falsch")
+        self.assertEqual(gates.first_error(" FAIL  src/x.test.ts > macht y\nAssertionError: expected 1 to be 2"),
+                         "FAIL src/x.test.ts > macht y")
+        self.assertEqual(gates.first_error("nur Text\nnoch mehr"), "noch mehr")
+        self.assertEqual(gates.first_error(""), "")
 
 
 class PoolDefinitionTest(unittest.TestCase):
@@ -743,9 +932,17 @@ class PoolDefinitionTest(unittest.TestCase):
         self.assertNotIn("…", last)
         self.assertIn('"blocker": []', last)
 
+    def test_the_start_update_is_checked_before_anything_is_worked_on(self):
+        blocks = [b_ for n, b_ in self.blocks() if n.endswith("abarbeiten.json")]
+        names = [b_["name"] for b_ in blocks]
+        check = blocks[names.index("starten") + 1]
+        self.assertIn("{{ block.starten.output }}", check["config"]["command"])
+        self.assertIn("confirm_start.py", check["config"]["command"])
+        self.assertLess(names.index(check["name"]), names.index("umsetzen"))
+
     def test_steps_after_starting_do_not_stop_the_run(self):
         config = {b_["name"]: b_["config"] for n, b_ in self.blocks() if n.endswith("abarbeiten.json")}
-        for step in ("umsetzen", "pruefen", "review", "review_folgen", "gesamtreview", "bericht", "freigabe_text", "freigabe"):
+        for step in ("gestartet", "umsetzen", "pruefen", "review", "review_folgen", "gesamtreview", "bericht", "freigabe_text", "freigabe"):
             self.assertEqual(config[step].get("on_failure"), "continue", step)
 
 
