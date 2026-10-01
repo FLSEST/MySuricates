@@ -452,6 +452,32 @@ write_pool api-actuator-health-ok <<'JSON'
  "blocks": [{"type": "shell", "config": {"command": "curl -s -m 5 http://localhost:9090/actuator/health"}}]}
 JSON
 
+# --- Basis-URL ohne Pfad oder nur mit /api in einer Variable, der Endpunkt entsteht am Aufruf — dieselben
+# Formen wie BaseUrlVariables im Analyzer (Gleichlauf). Die Sonden bleiben erlaubt. ---
+write_pool self-api-short-base-actuator <<'JSON'
+{"name": {"de": "Basis kurz", "en": "Short base"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "BASE=http://localhost:9090; curl $BASE/actuator/metrics"}}]}
+JSON
+
+write_pool self-api-short-base-api <<'JSON'
+{"name": {"de": "Basis /api", "en": "Base /api"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "API=http://localhost:9090/api\ncurl -s \"$API/v1/todos\""}}]}
+JSON
+
+write_pool self-api-short-base-fstring <<'JSON'
+{"name": {"de": "Basis f-String", "en": "Base f-string"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "python3 - <<'PY'\napi = 'http://localhost:9090/api'\nrequests.get(f'{api}/v1/executions')\nPY"}}]}
+JSON
+
+write_pool api-short-base-probes-ok <<'JSON'
+{"name": {"de": "Basis Sonden", "en": "Base probes"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "HOST=http://localhost:9090; curl -sf \"$HOST/actuator/health\"\nAPI=http://localhost:9090/api\ncurl -s \"$API/v1/system/jvm-memory\"\necho \"$API\""}}]}
+JSON
+
 OUT=$(bash "$REPO/scripts/ci/pool-neutrality.sh" --all "$POOL" 2>&1); RC=$?
 check "Befunde gemeldet (exit 1)"              '[ "$RC" -eq 1 ]'
 check "ok-portable unbeanstandet"              '! grep -q "ok-portable" <<<"$OUT"'
@@ -508,6 +534,10 @@ check "Actuator-Metriken per Schleife erkannt (7721d8cb)" \
 check "Actuator-Endpunkt mit Key erkannt"        'grep -q "self-api-actuator-env.*SELF-API.*/actuator/env" <<<"$OUT"'
 check "Actuator-Aufruf im Prompt erkannt"        'grep -q "self-api-actuator-prompt.*SELF-API" <<<"$OUT"'
 check "/actuator/health bleibt erlaubt"          '! grep -q "api-actuator-health-ok" <<<"$OUT"'
+check "Basis ohne Pfad + /actuator/metrics erkannt" 'grep -q "self-api-short-base-actuator.*SELF-API.*/actuator/metrics" <<<"$OUT"'
+check "Basis mit /api + /v1/todos erkannt"       'grep -q "self-api-short-base-api.*SELF-API.*/api/v1/todos" <<<"$OUT"'
+check "Basis mit /api im f-String erkannt"       'grep -q "self-api-short-base-fstring.*SELF-API.*/api/v1/executions" <<<"$OUT"'
+check "Sonden ueber eine Basis-Variable erlaubt" '! grep -q "api-short-base-probes-ok" <<<"$OUT"'
 
 echo "13) Blocktyp-Drift: die erzeugte Gate-Liste deckt sich mit der Registry im Backend"
 # Seit TODO bdc784e1 ist HYGIENE_POOL_BLOCK_TYPES nicht mehr handgepflegt, sondern

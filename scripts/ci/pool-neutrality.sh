@@ -207,6 +207,26 @@ BASE_ASSIGNED = re.compile(r'(?m)(?:^|[\s;&(])((?:export\s+)?[A-Za-z_][A-Za-z0-9
                            + API_BASES + r'/?)["\']?(?=[\s;&)]|$)')
 
 
+# Basis-URL nur mit /api in einer Variable, der Rest erst am Aufruf: API=…/api; curl "$API/v1/todos" (auch
+# Python-f-String {api}/v1/…). Die Zuweisung allein ist kein Befund, erst der Aufruf mit einem Endpunkt, der
+# keine Sonde ist — wie BaseUrlVariables im Analyzer. Eine Basis ganz ohne Pfad braucht keine eigene Regel:
+# $BASE/actuator/metrics nennt den Endpunkt am Stueck, das findet PATH_AT.
+API_ONLY_ASSIGNED = re.compile(r'(?m)(?:^|[\s;&(])(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*["\']?'
+                               r'[^\s"\';]*/api/?["\']?(?=[\s;&)]|$)')
+
+
+def later_api_call(text):
+    """Der erste Endpunkt aus einer /api-Basisvariable mit spaeterem /v1/<segment>, der keine Sonde ist."""
+    for assignment in API_ONLY_ASSIGNED.finditer(text):
+        var = re.escape(assignment.group(1))
+        usage = re.compile(r'(?:\$\{?' + var + r'\}?|\{' + var + r'\})["\']?(/v1/[A-Za-z0-9_][A-Za-z0-9/_.{}<>-]*)')
+        for call in usage.finditer(text):
+            path = '/api' + call.group(1).rstrip('./')
+            if path not in API_ALLOWED:
+                return path
+    return None
+
+
 def composed_call(text):
     """Der erste zusammengesetzte Endpunkt im Shell-Text als (Fundstelle, Art), sonst None."""
     hit = COMPOSED_AT.search(text)
@@ -215,6 +235,9 @@ def composed_call(text):
     hit = BASE_ASSIGNED.search(text)
     if hit:
         return hit.group(1), 'im Shell-Code, Basis-URL in einer Variable'
+    path = later_api_call(text)
+    if path:
+        return path, 'im Shell-Code, Basis-URL /api in einer Variable'
     return None
 
 
