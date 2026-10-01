@@ -7,7 +7,7 @@ import { renderWithProviders } from '../../../test/utils';
 import { useI18nStore } from '../../../i18n';
 import { TodosWidget } from '../TodosWidget';
 import { DashboardDataContext, type DashboardDataValue } from '../dashboardDataContext';
-import { priorityColor, priorityFill } from '../../todo/todoConstants';
+import { PRIORITY_TONES, priorityColor, priorityFill } from '../../todo/todoConstants';
 import type { Todo, TodoPriority } from '../../../types';
 
 // d82ee18e: the dashboard widget used its own priority colours (MEDIUM = accent instead of warning).
@@ -52,10 +52,18 @@ describe('todo priority colours', () => {
     expect(screen.getByTitle('Medium').className).toContain('bg-warning');
   });
 
-  it('keeps the CSS-variable fills (SVG, inline styles) on the same tones as the classes', () => {
+  it('derives classes and SVG fills from the one tone table', () => {
     for (const priority of PRIORITIES) {
-      const tone = priorityColor[priority].split(' ')[0]!.replace(/^bg-/, '');
-      expect(priorityFill[priority]).toBe(`var(--color-${tone})`);
+      const [bg, ...ring] = priorityColor[priority].split(' ');
+      const token = bg!.replace(/^bg-/, '');
+      // class and SVG fill name the same theme token; the ring only where the table rings
+      expect(priorityFill[priority]).toBe(`var(--color-${token})`);
+      expect(ring).toEqual(PRIORITY_TONES[priority].ringed ? ['ring-2', `ring-${token}/40`] : []);
     }
+    // CRITICAL shares HIGH's tone and is told apart by its ring
+    expect(priorityColor.CRITICAL).not.toBe(priorityColor.HIGH);
+    expect(priorityColor).toEqual({
+      CRITICAL: 'bg-danger ring-2 ring-danger/40', HIGH: 'bg-danger', MEDIUM: 'bg-warning', LOW: 'bg-text-tertiary',
+    });
   });
 });

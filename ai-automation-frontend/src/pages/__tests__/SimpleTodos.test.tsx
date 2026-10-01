@@ -6,6 +6,7 @@ import { server } from '../../test/server';
 import { renderWithProviders } from '../../test/utils';
 import { useI18nStore } from '../../i18n';
 import { de } from '../../i18n/de';
+import { priorityColor } from '../../components/todo/todoConstants';
 import { SimpleTodos } from '../SimpleTodos';
 
 beforeAll(() => server.listen({ onUnhandledRequest: failOnUnhandledRequest }));
@@ -39,6 +40,26 @@ describe('SimpleTodos edit dialog', () => {
     const labels = within(dialog).getAllByRole('option').map((o) => o.textContent);
     expect(labels).toEqual([de.todos.priorities.LOW, de.todos.priorities.MEDIUM, de.todos.priorities.HIGH, de.todos.priorities.CRITICAL]);
     expect(labels).not.toContain('MEDIUM');
+  });
+});
+
+// d82ee18e: the simple mode had its own priority colours (HIGH = warning, CRITICAL = HIGH)
+describe('SimpleTodos priority marker', () => {
+  it('uses the shared priority colours, so CRITICAL stays apart from HIGH', async () => {
+    const high = { ...todo, id: 't-h', title: 'Hoch', priority: 'HIGH' };
+    const critical = { ...todo, id: 't-c', title: 'Kritisch', priority: 'CRITICAL' };
+    server.use(http.get('/api/v1/todos', ({ request }) => {
+      const content = new URL(request.url).searchParams.get('status') === 'OPEN' ? [high, critical] : [];
+      return HttpResponse.json({ content, totalElements: content.length, totalPages: 1, number: 0, size: 50 });
+    }));
+
+    renderWithProviders(<SimpleTodos />);
+    await screen.findAllByRole('button', { name: 'Kritisch' });
+    const highMarker = screen.getAllByTitle(de.todos.priorities.HIGH)[0]!;
+    const criticalMarker = screen.getAllByTitle(de.todos.priorities.CRITICAL)[0]!;
+    for (const cls of priorityColor.HIGH.split(' ')) expect(highMarker).toHaveClass(cls);
+    for (const cls of priorityColor.CRITICAL.split(' ')) expect(criticalMarker).toHaveClass(cls);
+    expect(criticalMarker.className).not.toBe(highMarker.className);
   });
 });
 
