@@ -142,7 +142,7 @@ export function requiredConfigKeys(type: string): string[] {
   return SPECS[type]?.required ?? [];
 }
 
-/** Keys of which exactly one must be present (empty when the type has no such rule). */
+/** Keys of which exactly one must be set, an empty text counting as not set (empty when the type has no such rule). */
 export function requiredOneOfConfigKeys(type: string): string[] {
   return SPECS[type]?.requiredOneOf ?? [];
 }
@@ -187,7 +187,8 @@ export function buildBlockConfigSchema(type: string, locale: SchemaLocale): Json
     properties: propertiesFor(type, locale),
     required: requiredConfigKeys(type),
     ...(requiredOneOfConfigKeys(type).length
-      ? { oneOf: requiredOneOfConfigKeys(type).map((key) => ({ required: [key] })) }
+      // An empty text counts as not set — as in the executor and the analyzer
+      ? { oneOf: requiredOneOfConfigKeys(type).map((key) => ({ required: [key], properties: { [key]: { minLength: 1 } } })) }
       : {}),
     // Unknown keys are ignored by the backend — the editor only warns, it never blocks saving
     additionalProperties: !known,

@@ -43,8 +43,9 @@ public class TodoUpdateBlockExecutor implements BlockExecutor {
         Map<String, Object> config = block.getConfig();
         StepResult result = TodoBlockSupport.startResult(context);
         try {
-            if (config.containsKey("updates")) {
-                if (config.containsKey("id")) {
+            // Leere Texte gelten als nicht gesetzt – wie im Analyzer (requiredOneOf in blockConfigSchema.json)
+            if (isSet(config.get("updates"))) {
+                if (isSet(config.get("id"))) {
                     throw new IllegalArgumentException("todo-update: entweder 'id' oder 'updates', nicht beides");
                 }
                 String projectId = Objects.toString(context.getVariable("project_id"), "");
@@ -95,6 +96,10 @@ public class TodoUpdateBlockExecutor implements BlockExecutor {
     @Override
     public Set<String> supportedTypes() {
         return Set.of("todo-update");
+    }
+
+    private static boolean isSet(Object value) {
+        return value != null && !(value instanceof String text && text.isBlank());
     }
 
     /** Leer oder nur Leerraum heißt „nicht ändern“ – der Editor legt den Block mit leeren Feldern an (4a2edda6). */

@@ -107,7 +107,9 @@ final class ConfigKeyRules {
     private static void checkOneOf(BlockConfigSchema schema, String type, Map<String, Object> cfg, Where where,
                                    List<AnalyzerFinding> out) {
         List<String> oneOf = schema.requiredOneOfKeys(type);
-        long present = oneOf.stream().filter(key -> cfg.get(key) != null).count();
+        // Ein leerer Text gilt wie im Executor als nicht gesetzt
+        long present = oneOf.stream().filter(key -> cfg.get(key) != null
+                && !(cfg.get(key) instanceof String text && text.isBlank())).count();
         if (oneOf.isEmpty() || present == 1) return;
         String de = String.join(" oder ", oneOf);
         String en = String.join(" or ", oneOf);

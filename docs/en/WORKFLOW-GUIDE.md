@@ -646,7 +646,7 @@ Create or change TODOs directly through the TodoService — **no REST self-call,
 | `source_agent` | string | `workflow` | Source agent label |
 | `variable_name` | string | `todo_id` | Context variable that receives the new TODO id |
 
-**`todo-update`**: `id` (required unless `updates` is set – exactly one of the two; editor and analyzer flag neither or both; template-capable — e.g. `{{ todo_id }}`), optionally `title`/`description`/`priority`/`tags` — only the fields that are set are changed, empty texts count as not set.
+**`todo-update`**: `id` (required unless `updates` is set – exactly one of the two, an empty text counts as not set; editor and analyzer flag neither or both; template-capable — e.g. `{{ todo_id }}`), optionally `title`/`description`/`priority`/`tags` — only the fields that are set are changed, empty texts count as not set.
 
 **`todo-update` with `updates`** (instead of `id`): changes many TODOs **of the run's project** in one step. `updates` is a JSON list (as text, template-capable, usually `{{ block.<shell>.output }}`; if the whole output is no JSON, its last non-empty line counts – a script may print lines for people first):
 

@@ -165,6 +165,21 @@ class TodoUpdateBlockExecutorTest {
                 request.description().contains("— 2026-10-01 · Batch (Lauf run-1): gestartet")));
     }
 
+    /** Ein leeres {@code id} (Editor-Vorgabe geleert) gilt als nicht gesetzt – wie im Analyzer (requiredOneOf). */
+    @Test
+    void execute_blankIdNextToUpdates_runsTheUpdates() {
+        ExecutionContext ctx = buildContext();
+        ctx.setVariable("project_id", "proj-1");
+        Map<String, Object> config = new HashMap<>();
+        config.put("id", "");
+        config.put("updates", "[]");
+
+        StepResult result = executor.execute(block(config), ctx);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getOutput()).startsWith("✓ 0 aktualisiert");
+    }
+
     @Test
     void execute_idAndUpdates_fail() {
         Map<String, Object> config = new HashMap<>();

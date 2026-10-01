@@ -125,7 +125,11 @@ describe('blockConfigSchema', () => {
     expect(requiredOneOfConfigKeys('todo-update')).toEqual(['id', 'updates']);
     expect(requiredConfigKeys('todo-update')).toEqual([]);
     const schema = buildBlockConfigSchema('todo-update', 'en');
-    expect(schema.oneOf).toEqual([{ required: ['id'] }, { required: ['updates'] }]);
+    // An empty text counts as not set, as in the executor and the analyzer
+    expect(schema.oneOf).toEqual([
+      { required: ['id'], properties: { id: { minLength: 1 } } },
+      { required: ['updates'], properties: { updates: { minLength: 1 } } },
+    ]);
     expect(requiredOneOfConfigKeys('shell')).toEqual([]);
     expect(buildBlockConfigSchema('shell', 'en')).not.toHaveProperty('oneOf');
   });
@@ -157,7 +161,8 @@ describe('blockConfigSchema', () => {
         if (!(key in (block.config ?? {})) && !KNOWN_INEFFECTIVE.has(`${block.type} lacks ${key}`)) problems.push(`${where}: ${block.type} lacks ${key}`);
       }
       const oneOf = requiredOneOfConfigKeys(block.type);
-      if (oneOf.length && oneOf.filter((key) => key in (block.config ?? {})).length !== 1) {
+      const isSet = (key: string) => { const value = block.config?.[key]; return value != null && value !== ''; };
+      if (oneOf.length && oneOf.filter(isSet).length !== 1) {
         problems.push(`${where}: ${block.type} needs exactly one of ${oneOf.join(', ')}`);
       }
     }

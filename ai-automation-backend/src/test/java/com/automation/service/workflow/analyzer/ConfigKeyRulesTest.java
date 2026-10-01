@@ -136,6 +136,10 @@ class ConfigKeyRulesTest {
                         assertThat(f.rule()).isEqualTo("missing-required-config-key");
                         assertThat(f.detail()).contains("id oder updates");
                     });
+            // Ein leerer Text gilt wie im Executor als nicht gesetzt
+            assertThat(keyFindings(block("todo-update", "u", Map.of("id", "", "updates", "[]")))).isEmpty();
+            assertThat(keyFindings(block("todo-update", "u", Map.of("id", " "))))
+                    .singleElement().extracting(AnalyzerFinding::detail).asString().contains("id oder updates");
             assertThat(keyFindings(block("todo-update", "u", Map.of("id", "a", "updates", "[]"))))
                     .singleElement().satisfies(f -> {
                         assertThat(f.rule()).isEqualTo("missing-required-config-key");
