@@ -60,11 +60,6 @@ export function cronWithTime(cron: string, time: string): string | null {
 }
 
 /**
- * Ziel-Wächter an und aus (TODO e192df18, Backend 259f4f66). Beim Einschalten kommt – wie aus dem
- * Katalog „Kachel hinzufügen“ – die Ergebnis-Kachel seines Workflows aufs Dashboard, falls noch keine
- * Ansicht sie zeigt. Ausschalten pausiert nur den Zeitplan und lässt die Kachel stehen.
- */
-/**
  * Uhrzeit des Wächters an der Zielseite ändern (TODO ff6f08fd) – über die Zeitplan-API wie unter
  * „Zeitpläne“: nur der CRON seines Zeitplans ändert sich, ein pausierter Wächter bleibt pausiert.
  */
@@ -84,6 +79,11 @@ export function useSetGuardTime() {
   });
 }
 
+/**
+ * Ziel-Wächter an und aus (TODO e192df18, Backend 259f4f66). Beim Einschalten kommt – wie aus dem
+ * Katalog „Kachel hinzufügen“ – die Ergebnis-Kachel seines Workflows aufs Dashboard, falls noch keine
+ * Ansicht sie zeigt. Ausschalten pausiert nur den Zeitplan und lässt die Kachel stehen.
+ */
 export function useSetGoalGuard() {
   const qc = useQueryClient();
   const toast = useToast();

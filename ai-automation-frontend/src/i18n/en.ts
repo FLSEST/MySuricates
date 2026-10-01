@@ -3304,6 +3304,8 @@ export const en = {
     promoted: 'Workflow promoted as template!',
     generateFailed: 'Generation failed',
     pipelineFailed: 'Factory pipeline failed',
+    verifyRequestFailed: 'Could not start the verification',
+    promoteFailed: 'Failed to promote as template',
     invalidTestInputs: 'Invalid JSON in test inputs',
     unknownError: 'Unknown error',
     unknownWorkflow: 'Unknown',

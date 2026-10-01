@@ -3301,6 +3301,8 @@ export const de: TranslationKeys = {
     promoted: 'Workflow als Template gespeichert!',
     generateFailed: 'Generierung fehlgeschlagen',
     pipelineFailed: 'Factory-Pipeline fehlgeschlagen',
+    verifyRequestFailed: 'Verifizierung konnte nicht gestartet werden',
+    promoteFailed: 'Speichern als Template fehlgeschlagen',
     invalidTestInputs: 'Ungültiges JSON in den Test-Eingaben',
     unknownError: 'Unbekannter Fehler',
     unknownWorkflow: 'Unbekannt',

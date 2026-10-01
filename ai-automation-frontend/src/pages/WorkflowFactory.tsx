@@ -7,6 +7,7 @@ import { useWorkflows } from '../hooks/useWorkflows';
 import { useTestingStatus } from '../hooks/useTesting';
 import { useT } from '../i18n';
 import { useToast } from '../hooks/useToast';
+import { apiErrorMessage } from '../api/client';
 import { ExportToPoolModal } from '../components/factory/ExportToPoolModal';
 import { FactoryFlowDiagram } from '../components/factory/FactoryFlowDiagram';
 import { FactoryCreateForm } from '../components/factory/FactoryCreateForm';
@@ -49,6 +50,7 @@ export function WorkflowFactory() {
           toast.error(t.factory.verifyFailed.replace('{error}', () => result.testError ?? t.factory.unknownError));
         }
       },
+      onError: (err) => toast.error(apiErrorMessage(err, t.factory.verifyRequestFailed)),
     });
   };
 
@@ -58,6 +60,7 @@ export function WorkflowFactory() {
         upsertResult(workflowId, result);
         toast.success(t.factory.promoted);
       },
+      onError: (err) => toast.error(apiErrorMessage(err, t.factory.promoteFailed)),
     });
   };
 
