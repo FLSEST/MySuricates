@@ -174,11 +174,25 @@ class AuditFindingTodoLinkerTest {
 
         assertThat(open.getStatus()).isEqualTo(AuditFindingStatus.AWAITING_VERIFICATION);
         assertThat(fixed.getStatus()).isEqualTo(AuditFindingStatus.RESOLVED);
-        verify(findingRepository).save(open);
-        verify(findingRepository, never()).save(fixed);
+        // e8ca26e9: gesammelt gespeichert, nur das umgestellte Finding, kein save je Finding.
+        verify(findingRepository).saveAll(List.of(open));
+        verify(findingRepository, never()).save(any());
         // 5fb7b1e9: eine gebuendelte Abfrage ueber die verwalteten Verknuepfungen, keine je Verknuepfung.
         verify(findingRepository, times(1)).findAllById(any());
         verify(findingRepository, never()).findById(any());
+    }
+
+    @Test
+    void markAwaitingVerification_savesNothingWhenNoLinkedFindingIsOpen() {
+        AuditFinding fixed = finding("f-fixed", "p-1");
+        fixed.setStatus(AuditFindingStatus.RESOLVED);
+        when(findingTodoRepository.findByTodoId("t-1")).thenReturn(List.of(link("f-fixed", "t-1", true)));
+        when(findingRepository.findAllById(List.of("f-fixed"))).thenReturn(List.of(fixed));
+
+        linker().markAwaitingVerification("t-1");
+
+        verify(findingRepository, never()).saveAll(any());
+        verify(findingRepository, never()).save(any());
     }
 
     @Test

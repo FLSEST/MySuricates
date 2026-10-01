@@ -58,7 +58,8 @@ class AuditFindingTodoLinker {
     /**
      * Offene Findings, deren verwaltetes TODO erledigt gemeldet wird, warten auf den nächsten Audit-Lauf.
      * Die Findings aller verwalteten Verknüpfungen kommen aus einer Abfrage, nicht aus einer je
-     * Verknüpfung (5fb7b1e9); ohne verwaltete Verknüpfung wird gar nicht gefragt.
+     * Verknüpfung (5fb7b1e9); ohne verwaltete Verknüpfung wird gar nicht gefragt. Gespeichert werden
+     * die umgestellten Findings ebenso gesammelt (e8ca26e9).
      */
     void markAwaitingVerification(String todoId) {
         List<String> managedFindingIds = findingTodoRepository.findByTodoId(todoId).stream()
@@ -67,12 +68,12 @@ class AuditFindingTodoLinker {
                 .distinct()
                 .toList();
         if (managedFindingIds.isEmpty()) return;
-        for (AuditFinding finding : findingRepository.findAllById(managedFindingIds)) {
-            if (finding.getStatus() == AuditFindingStatus.OPEN) {
-                finding.setStatus(AuditFindingStatus.AWAITING_VERIFICATION);
-                findingRepository.save(finding);
-            }
-        }
+        List<AuditFinding> awaiting = findingRepository.findAllById(managedFindingIds).stream()
+                .filter(finding -> finding.getStatus() == AuditFindingStatus.OPEN)
+                .toList();
+        if (awaiting.isEmpty()) return;
+        awaiting.forEach(finding -> finding.setStatus(AuditFindingStatus.AWAITING_VERIFICATION));
+        findingRepository.saveAll(awaiting);
     }
 
     Map<String, List<TodoLink>> todoLinks(List<String> findingIds) {

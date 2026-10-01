@@ -627,8 +627,8 @@ class AuditCenterServiceTest {
 
         assertThat(open.getStatus()).isEqualTo(AuditFindingStatus.AWAITING_VERIFICATION);
         assertThat(resolved.getStatus()).isEqualTo(AuditFindingStatus.RESOLVED);
-        verify(findingRepository).save(open);
-        verify(findingRepository, never()).save(resolved);
+        verify(findingRepository).saveAll(List.of(open));
+        verify(findingRepository, never()).save(any());
         verify(findingRepository, never()).findById(any());
     }
 
