@@ -44,4 +44,18 @@ describe('ApprovalDialog', () => {
 
     expect(screen.getByRole('button', { name: 'No' }).className).toContain('bg-danger');
   });
+
+  // 1218a6d0: the German run page showed a fixed "Step 6"
+  it('names the step in the UI language', () => {
+    useI18nStore.setState({ locale: 'de' });
+    renderWithProviders(
+      <ApprovalDialog
+        approval={{ blockId: 'approval-5', question: 'Deploy?', options: ['Ja', 'Nein'], stepIndex: 5 }}
+        onSubmit={() => {}}
+      />,
+    );
+
+    expect(screen.getByText('Schritt 6')).toBeInTheDocument();
+    expect(screen.queryByText('Step 6')).not.toBeInTheDocument();
+  });
 });
