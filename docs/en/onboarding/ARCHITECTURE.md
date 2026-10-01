@@ -175,9 +175,9 @@ Todo (independent)
 ActivityLog (independent)
 ```
 
-### Database Migrations (Flyway, currently V1-V95)
+### Database Migrations (Flyway, currently V1-V96)
 
-The table below describes the base schema (V1-V19). V20-V95 mostly add columns and indexes to these tables plus a few new tables; the full list is under `src/main/resources/db/migration/`.
+The table below describes the base schema (V1-V19). V20-V96 mostly add columns and indexes to these tables plus a few new tables; the full list is under `src/main/resources/db/migration/`.
 
 | Migration | Table | Description |
 |---|---|---|

@@ -1976,6 +1976,8 @@ export interface ChainRun {
   error: string | null;
   metadata: Record<string, unknown>;
   triggeredByScheduleId?: string | null;
+  /** What started the chain (V96); null for older chain runs, absent on older backends */
+  triggerSource?: TriggerSource | null;
 }
 
 export interface ScheduleRunsResponse {

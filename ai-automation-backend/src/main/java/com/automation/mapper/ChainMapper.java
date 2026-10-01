@@ -158,7 +158,8 @@ public class ChainMapper {
                 run.getDurationMs(),
                 run.getError(),
                 run.getMetadata(),
-                run.getTriggeredByScheduleId()
+                run.getTriggeredByScheduleId(),
+                run.getTriggerSource()
         );
     }
 

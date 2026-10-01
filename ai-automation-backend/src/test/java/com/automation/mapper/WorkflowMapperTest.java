@@ -274,6 +274,17 @@ class WorkflowMapperTest extends WorkflowMapper {
             assertThat(item.stepCount()).isEqualTo(1);
         }
 
+        /** TODO 6db47bc2: die Liste nennt den Chain-Run wie die Detail-Route — außerhalb einer Chain null. */
+        @Test
+        void traegtDenChainRunDesLaufs() {
+            WorkflowRun entry = WorkflowRun.builder().id("run-2").status(RunStatus.COMPLETED).chainRunId("chain-run-7").build();
+
+            var items = toRunListItems(List.of(entry, RUN), Map.of(), Map.of());
+
+            assertThat(items.get(0).chainRunId()).isEqualTo("chain-run-7");
+            assertThat(items.get(1).chainRunId()).isNull();
+        }
+
         @Test
         void runOhneSchritte_zaehltNullUndLaesstDenLetztenLeer() {
             var item = toRunListItems(List.of(RUN), Map.of(), Map.of()).get(0);

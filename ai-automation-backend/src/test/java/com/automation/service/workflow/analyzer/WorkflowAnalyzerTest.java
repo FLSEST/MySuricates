@@ -59,6 +59,20 @@ class WorkflowAnalyzerTest {
         assertThat(rules(blocks, null)).contains("chain-only-placeholder");
     }
 
+    /**
+     * TODO 6db47bc2: gemeldet wird nur, was eine Chain tatsächlich setzt. {@code chain_step_output} setzt
+     * niemand — die Meldung „nur innerhalb einer Chain belegt“ hätte dort in die Irre geführt.
+     */
+    @Test
+    void nurVonDerChainGesetzteVariablenSindChainVariablen() {
+        var runId = List.of(block("simple", "a", Map.of("command", "Chain-Run {{ chain_run_id }}")));
+        var stepOutput = List.of(block("simple", "a", Map.of("command", "Nimm {{ chain_step_output }}")));
+
+        assertThat(rules(runId, null)).contains("chain-only-placeholder");
+        assertThat(rules(stepOutput, null)).doesNotContain("chain-only-placeholder");
+        assertThat(WiringRules.CHAIN_ONLY).containsExactlyInAnyOrder("previous_chain_output", "chain_run_id");
+    }
+
     /** TODO 5ae9bd32: {@code audit_findings} gibt es nur in einem Audit-Workflow – die Metadaten entscheiden. */
     @Test
     void auditBefundeOhneAuditWorkflowSindEinBefund_mitGueltigemAuditBlockNicht() {

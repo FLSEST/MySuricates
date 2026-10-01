@@ -1,6 +1,7 @@
 package com.automation.service.workflow.analyzer;
 
 import com.automation.entity.BlockDefinition;
+import com.automation.entity.TriggerSource;
 import com.automation.executor.PlaceholderSyntax;
 import com.automation.service.audit.AuditFindingsContext;
 import com.automation.service.workflow.analyzer.AnalyzerFinding.Severity;
@@ -23,9 +24,12 @@ final class WiringRules {
 
     private WiringRules() {}
 
-    /** Nur innerhalb einer Chain belegt — in einem einzeln laufenden Workflow bleibt er Literal. */
-    private static final Set<String> CHAIN_ONLY = Set.of(
-            "previous_chain_output", "chain_run_id", "chain_step_output");
+    /**
+     * Nur innerhalb einer Chain belegt — in einem einzeln laufenden Workflow bleibt er Literal. Genau die
+     * Schlüssel, die {@code ChainExecutor} jedem Eintrag setzt; {@code chain_step_output} stand hier, obwohl
+     * ihn nichts setzt, auch keine Chain — die Meldung führte dort in die Irre (TODO 6db47bc2).
+     */
+    static final Set<String> CHAIN_ONLY = Set.of("previous_chain_output", TriggerSource.CHAIN_RUN_CONTEXT_KEY);
 
     /** Nur in einem Audit-Workflow belegt (gültiges {@code metadata.audit}) — sonst bleibt er Literal. */
     private static final String AUDIT_ONLY = "audit_findings";

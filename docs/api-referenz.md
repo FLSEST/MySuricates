@@ -929,6 +929,7 @@ trägt eine Listenzeile `stepCount`, `lastStepStatus` und `lastStepPreview` (Aus
 Schritts, auf 500 Zeichen gekürzt — in der Datenbank abgeschnitten, die Step-Zeilen werden nicht geladen). Grund: Die Liste trug vorher jeden `step_results.output`
 (TEXT) mit — gemessen 3 061 816 Bytes bei 60 Runs, danach 51 716. Wer die Schritte braucht, holt
 den Run einzeln über `GET /api/v1/executions/{id}`; die Detail-Route liefert unverändert alles.
+Wie die Detail-Route trägt jede Zeile `chainRunId` (Chain-Run eines Ketteneintrags, sonst `null`; ältere Backends lassen das Feld weg).
 
 ### `GET /api/v1/executions/pending-input`
 
@@ -3032,6 +3033,8 @@ Runs einer bestimmten Chain.
 Einzelnen Chain-Run abrufen.
 
 **Response:** `ChainRunResponse`
+
+`ChainRunResponse.triggerSource` nennt, was die Chain gestartet hat (`MANUAL`, `SCHEDULE`, `WISH`); `null` bei Chain-Runs von vor V96, die kein Zeitplan gestartet hat. Ältere Backends lassen das Feld weg.
 
 ### `POST /api/v1/chains/runs/{runId}/cancel`
 

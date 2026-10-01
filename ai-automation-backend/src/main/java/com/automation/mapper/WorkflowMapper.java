@@ -172,7 +172,8 @@ public abstract class WorkflowMapper {
                 steps.count(),
                 steps.lastStatus(),
                 steps.preview(),
-                run.getSealed());
+                run.getSealed(),
+                run.getChainRunId());
     }
 
     /** Skill pins verified at start; unreadable JSON is shown as none rather than failing the whole response. */

@@ -157,6 +157,7 @@ erDiagram
         TEXT error
         TEXT metadata
         TEXT triggered_by_schedule_id
+        TEXT trigger_source
     }
 
     scheduled_workflows {
@@ -665,6 +666,7 @@ Eine Chain gehört zu keinem Projekt und kann Workflows aus verschiedenen Projek
 | `error` | TEXT | | Fehlermeldung |
 | `metadata` | TEXT | | JSON: Zusätzliche Metadaten |
 | `triggered_by_schedule_id` | TEXT | | ID des auslösenden Schedules (V43) |
+| `trigger_source` | TEXT | | Enum `TriggerSource`: was die Chain gestartet hat (`MANUAL`, `SCHEDULE`, `WISH`), beim Start gesetzt; die Einträge erben ihn über `__parent_trigger_source`. Altbestand: `SCHEDULE`, wenn `triggered_by_schedule_id` gesetzt ist, sonst `NULL` (V96) |
 
 **ChainRunEntry (JSON-Struktur innerhalb `entry_runs`):**
 ```json
@@ -1409,6 +1411,7 @@ folgt freier Text.
 | V93 | `V93__todo_decisions.sql` | `decision`, `decided_at`, `decided_by` in todos (Entscheidung zur offenen Frage) |
 | V94 | `V94__goal_workflows.sql` | neue Tabelle `goal_workflows` (Workflows am Ziel oder Arbeitspaket, Rolle WORKER/STATUS) |
 | V95 | `V95__index_findby_gaps.sql` | Indizes für abgeleitete Abfragen auf heißen Pfaden: `workflows.project_id`, `scheduled_workflows.workflow_id`/`chain_id`, `webhook_triggers.workflow_id`, `todo_triggers.target_workflow_id`, `capabilities.skill_id`, `dead_letter_entries.workflow_run_id`, `workflow_memory(active, created_at)` |
+| V96 | `V96__chain_run_trigger_source.sql` | `trigger_source` in chain_runs (Starter der Chain); Altbestand mit Schedule-ID wird `SCHEDULE`, der Rest bleibt `NULL` |
 
 ## SQLite-Besonderheiten
 

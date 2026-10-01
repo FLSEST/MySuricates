@@ -1272,6 +1272,7 @@ The DB migrations (`src/main/resources/db/migration/`) document the feature time
 | V93 | Goals stage 2: decision on the TODO (`todos.decision`, `decided_at`, `decided_by`) |
 | V94 | Goals stage 3: table `goal_workflows` (workflows on a goal or work package) |
 | V95 | Indexes for derived queries on hot paths (`workflows.project_id`, `scheduled_workflows.workflow_id`/`chain_id`, triggers per workflow, `capabilities.skill_id`, `dead_letter_entries.workflow_run_id`, `workflow_memory(active, created_at)`) |
+| V96 | What started a chain: `chain_runs.trigger_source` |
 
 ## Architecture Gates
 
@@ -1314,7 +1315,7 @@ MySuricates/
 │           ├── application-dev.yml    ← Dev profile
 │           ├── agent-instructions.md  ← Base agent instructions
 │           ├── templates/builtin/     ← Built-in template JSON files
-│           └── db/migration/          ← 95 Flyway migrations (V1–V95)
+│           └── db/migration/          ← 96 Flyway migrations (V1–V96)
 │
 └── ai-automation-frontend/
     ├── package.json

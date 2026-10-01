@@ -924,6 +924,7 @@ steps, a list row carries `stepCount`, `lastStepStatus` and `lastStepPreview` (t
 output, truncated to 500 characters — cut in the database, the step rows are not loaded). Why: the list used to carry every `step_results.output`
 (TEXT) — 3,061,816 bytes measured for 60 runs, 51,716 afterwards. If you need the steps, fetch the
 run individually via `GET /api/v1/executions/{id}`; the detail route still returns everything.
+Like the detail route, every row carries `chainRunId` (the chain run of a chain entry, otherwise `null`; older backends omit the field).
 
 ### `GET /api/v1/executions/pending-input`
 
@@ -3003,6 +3004,8 @@ Runs of a specific chain.
 Retrieve a single chain run.
 
 **Response:** `ChainRunResponse`
+
+`ChainRunResponse.triggerSource` names what started the chain (`MANUAL`, `SCHEDULE`, `WISH`); `null` for chain runs from before V96 that no schedule started. Older backends omit the field.
 
 ### `POST /api/v1/chains/runs/{runId}/cancel`
 

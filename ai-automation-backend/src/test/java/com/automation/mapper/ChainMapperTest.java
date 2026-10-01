@@ -110,6 +110,7 @@ class ChainMapperTest {
             ChainRun run = ChainRun.builder()
                     .id("cr-1").chain(chain).status(RunStatus.COMPLETED)
                     .entryRuns(List.of(runEntry))
+                    .triggerSource(TriggerSource.SCHEDULE)
                     .startedAt(Instant.now()).build();
 
             ChainRunResponse response = mapper.toRunResponse(run);
@@ -119,6 +120,7 @@ class ChainMapperTest {
             assertThat(response.status()).isEqualTo(RunStatus.COMPLETED);
             assertThat(response.entryRuns()).hasSize(1);
             assertThat(response.entryRuns().get(0).workflowName()).isEqualTo("WF A");
+            assertThat(response.triggerSource()).isEqualTo(TriggerSource.SCHEDULE);
         }
 
         @Test
