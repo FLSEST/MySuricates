@@ -12,7 +12,7 @@ import java.nio.file.Path;
  * key file.
  *
  * <p>Root cause (2026-07-09) for the DB path: two quality-gate workflows ran {@code mvn test}
- * concurrently; both JVMs shared the hardcoded {@code /tmp/autotrigger-integrationtest.db}.
+ * concurrently; both JVMs shared the hardcoded {@code /tmp/mysuricates-integrationtest.db}.
  * Two WAL writer processes on one file first collided ({@code SQLITE_BUSY_SNAPSHOT} during
  * Flyway migration) and then corrupted the DB ({@code SQLITE_CORRUPT}), failing 159 tests via
  * the ApplicationContext failure threshold. The pool-size=1 rule only serializes writers
@@ -21,12 +21,12 @@ import java.nio.file.Path;
  * <p>Root cause (2026-08-06) for the key path: {@code application-integration.yml} did not
  * override {@code automation.integration.key-file}, so every {@code @SpringBootTest} with the
  * {@code integration} profile fell through to the production default
- * ({@code ${user.home}/.autotrigger/integration-encryption.key}) and, with empty
+ * ({@code ${automation.data-home}/integration-encryption.key}) and, with empty
  * {@code app_settings}, generated a fresh key straight into the developer's real
- * {@code ~/.autotrigger/}, shadowing the real key on every test run.
+ * {@code ~/.mysuricates/}, shadowing the real key on every test run.
  *
  * <p>Root cause (2026-09-13) for the backup directory: {@code automation.backup.directory}
- * defaults to {@code ${user.home}/.autotrigger/backups/dev} with backups enabled, and the
+ * defaults to {@code ${automation.data-home}/backups/dev} with backups enabled, and the
  * integration profile overrode neither — so every {@code @SpringBootTest} context wrote a
  * startup backup of its throwaway test DB into the developer's real dev backup directory and
  * rotated genuine backups away (retain-count 30).
@@ -34,7 +34,7 @@ import java.nio.file.Path;
  * <p>Root cause (2026-09-24) for the setup directory: {@code SummarizationSetupService} and
  * {@code FactorySetupService} write their instruction files ({@code CLAUDE.md}, {@code AGENTS.md})
  * into {@code automation.summarization.base-dir} and {@code automation.factory.base-dir} on every
- * context start ({@code @PostConstruct}); both default to {@code ${user.home}/.autotrigger/...}, so
+ * context start ({@code @PostConstruct}); both default to {@code ${automation.data-home}/...}, so
  * every {@code @SpringBootTest} context rewrote them in the developer's real home.
  *
  * <p>Registered via {@code META-INF/services/org.junit.platform.launcher.LauncherSessionListener},
@@ -78,27 +78,27 @@ public class IntegrationTestDbSessionListener implements LauncherSessionListener
         String tmpDir = System.getProperty("java.io.tmpdir");
 
         if (System.getProperty(DB_PROPERTY) == null) {
-            ownedDbPath = Path.of(tmpDir, "autotrigger-it-" + pid + "-" + nanos + ".db");
+            ownedDbPath = Path.of(tmpDir, "mysuricates-it-" + pid + "-" + nanos + ".db");
             System.setProperty(DB_PROPERTY, ownedDbPath.toString());
         }
 
         if (System.getProperty(KEY_PROPERTY) == null) {
-            ownedKeyPath = Path.of(tmpDir, "autotrigger-it-key-" + pid + "-" + nanos + ".key");
+            ownedKeyPath = Path.of(tmpDir, "mysuricates-it-key-" + pid + "-" + nanos + ".key");
             System.setProperty(KEY_PROPERTY, ownedKeyPath.toString());
         }
 
         if (System.getProperty(SEAL_KEY_PROPERTY) == null) {
-            ownedSealKeyPath = Path.of(tmpDir, "autotrigger-it-seal-key-" + pid + "-" + nanos + ".key");
+            ownedSealKeyPath = Path.of(tmpDir, "mysuricates-it-seal-key-" + pid + "-" + nanos + ".key");
             System.setProperty(SEAL_KEY_PROPERTY, ownedSealKeyPath.toString());
         }
 
         if (System.getProperty(BACKUP_DIR_PROPERTY) == null) {
-            ownedBackupDir = Path.of(tmpDir, "autotrigger-it-backups-" + pid + "-" + nanos);
+            ownedBackupDir = Path.of(tmpDir, "mysuricates-it-backups-" + pid + "-" + nanos);
             System.setProperty(BACKUP_DIR_PROPERTY, ownedBackupDir.toString());
         }
 
         if (System.getProperty(SETUP_DIR_PROPERTY) == null) {
-            ownedSetupDir = Path.of(tmpDir, "autotrigger-it-setup-" + pid + "-" + nanos);
+            ownedSetupDir = Path.of(tmpDir, "mysuricates-it-setup-" + pid + "-" + nanos);
             System.setProperty(SETUP_DIR_PROPERTY, ownedSetupDir.toString());
         }
     }

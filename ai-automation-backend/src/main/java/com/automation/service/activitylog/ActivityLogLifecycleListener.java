@@ -55,7 +55,7 @@ public class ActivityLogLifecycleListener {
 
         if (RuntimeClasspathGuard.MODE_CLASSES_DIR.equals(runtimeMode)) {
             var warning = "Server runs from target/classes (escape hatch set): any IDE or Maven build in this "
-                    + "checkout can kill it with NoClassDefFoundError — restart via scripts/start-autotrigger-dev.sh";
+                    + "checkout can kill it with NoClassDefFoundError — restart via scripts/start-mysuricates-dev.sh";
             log.warn(warning);
             activityLogService.warn(LogCategory.SYSTEM, warning, "System");
         }

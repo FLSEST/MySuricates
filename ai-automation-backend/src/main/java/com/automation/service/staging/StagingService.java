@@ -1,5 +1,6 @@
 package com.automation.service.staging;
 
+import com.automation.config.DataHome;
 import com.automation.config.StagingConfig;
 import com.automation.dto.request.SyncDefinitionsRequest;
 import com.automation.dto.response.StagingStatusResponse;
@@ -301,9 +302,8 @@ public class StagingService {
             ProcessBuilder pb = new ProcessBuilder(command);
             pb.directory(workDir.toFile());
             pb.redirectErrorStream(true);
-            if (!extraEnv.isEmpty()) {
-                pb.environment().putAll(extraEnv);
-            }
+            pb.environment().putAll(extraEnv);
+            DataHome.export(pb.environment());
             Process p = pb.start();
             currentProcess = p;
 

@@ -59,7 +59,7 @@ class OnboardingTextsShippedTest {
     void noFixedAddressOrPort_theInstanceFillsItIn() {
         for (String key : KEYS) {
             seeder.getDefaultContent(key).forEach((lang, text) -> {
-                assertThat(text).as(key + "/" + lang).doesNotContain("localhost:").doesNotContain("~/.autotrigger");
+                assertThat(text).as(key + "/" + lang).doesNotContain("localhost:").doesNotContain("~/.autotrigger").doesNotContain("~/.mysuricates");
                 assertThat(text).as(key + "/" + lang).doesNotContain("{\"inputContext\"");
             });
         }

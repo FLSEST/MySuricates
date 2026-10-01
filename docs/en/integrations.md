@@ -501,7 +501,7 @@ private and a work account at Google, or two GitHub tokens. Each connection is i
 - Encryption: **AES/GCM/NoPadding**, 128-bit auth tag, 12-byte IV
   (`IntegrationEncryptionService`).
 - The key comes from the env var `AUTOMATION_INTEGRATION_KEY` (Base64-AES key) or from the
-  key file (`automation.integration.key-file`, default `~/.autotrigger/integration-encryption.key`,
+  key file (`automation.integration.key-file`, default `~/.mysuricates/integration-encryption.key`,
   chmod 600); if neither exists, it is generated on first startup and written to the key file.
   A legacy key in `app_settings` (`integration-encryption-key`) is automatically migrated to the
   key file on startup and deleted from the DB — key and ciphertext no longer live in the same

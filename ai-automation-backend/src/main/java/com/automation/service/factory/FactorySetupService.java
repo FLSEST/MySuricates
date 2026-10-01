@@ -14,7 +14,7 @@ import java.nio.file.Path;
 
 /**
  * Sets up the factory working directories and instruction files on startup.
- * Creates ~/.autotrigger/factory/codex/AGENTS.md from bundled resource template.
+ * Creates ~/.mysuricates/factory/codex/AGENTS.md from bundled resource template.
  */
 @Service
 @RequiredArgsConstructor

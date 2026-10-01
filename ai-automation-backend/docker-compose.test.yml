@@ -40,7 +40,7 @@ services:
       # ~/.config/mysuricates/staging.env (262948a4). Ohne die Override-Datei startet der Container
       # ohne KI-Anbieter, ohne Socket und ohne veroeffentlichten Port.
       - ${HOME}/Entwicklung:${HOME}/Entwicklung
-      - ${HOME}/.autotrigger/backups/test:/host-backups/test
+      - ${AUTOMATION_DATA_HOME:-${HOME}/.mysuricates}/backups/test:/host-backups/test
     healthcheck:
       # --noproxy: Docker reicht Proxy-Variablen in den Container, curl schickt auch localhost
       # ueber sie — der Container wurde nie gesund (cf662c01)

@@ -506,7 +506,7 @@ Zeile in `integration_connections`, eindeutig über `(provider_id, connection_na
 - Verschlüsselung: **AES/GCM/NoPadding**, 128-Bit-Auth-Tag, 12-Byte-IV
   (`IntegrationEncryptionService`).
 - Der Schlüssel kommt aus der Env-Var `AUTOMATION_INTEGRATION_KEY` (Base64-AES-Key) oder aus der
-  Key-Datei (`automation.integration.key-file`, Default `~/.autotrigger/integration-encryption.key`,
+  Key-Datei (`automation.integration.key-file`, Default `~/.mysuricates/integration-encryption.key`,
   chmod 600); fehlt beides, wird er beim ersten Start generiert und in die Key-Datei geschrieben.
   Ein Legacy-Schlüssel in `app_settings` (`integration-encryption-key`) wird beim Start automatisch
   in die Key-Datei migriert und aus der DB gelöscht — Schlüssel und Ciphertext liegen damit nicht

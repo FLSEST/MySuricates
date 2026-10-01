@@ -30,7 +30,7 @@ graph TB
 
     subgraph Storage["Persistenz"]
         DB[("SQLite<br/>workflow_memory<br/>workflow_runs<br/>step_results")]
-        FS["Filesystem<br/>~/.autotrigger/summarization/"]
+        FS["Filesystem<br/>~/.mysuricates/summarization/"]
     end
 
     WMP -->|"POST /extract"| CTRL
@@ -347,7 +347,7 @@ ai-automation-frontend/src/
 └── types/
     └── index.ts                          ← WorkflowMemory, ExtractMemoryRequest
 
-~/.autotrigger/summarization/             ← runtime (created at backend start)
+~/.mysuricates/summarization/             ← runtime (created at backend start)
 ├── claude/
 │   └── CLAUDE.md                         ← copy of claude-summarizer.md
 └── codex/
@@ -382,7 +382,7 @@ docs/
 graph LR
     subgraph YAML["application.yml"]
         S["automation.summarization"]
-        S --> BD["base-dir<br/><i>~/.autotrigger/summarization</i>"]
+        S --> BD["base-dir<br/><i>~/.mysuricates/summarization</i>"]
         S --> TO["timeout-seconds<br/><i>120</i>"]
     end
     subgraph ENV["Environment Variables"]

@@ -15,7 +15,7 @@ case "$*" in
   *"compose"*"config"*) exit 0 ;;
   *"com.docker.compose.project"*) [ -n "${OWNER+x}" ] || exit 1; echo "$OWNER"; exit 0 ;;  # Container da? wem gehoert er?
   *"inspect"*) echo healthy ;;
-  "exec "*"api-key") [ -n "${CONTAINER_KEY:-}" ] || exit 1; echo "$CONTAINER_KEY" ;;     # instance.sh key
+  "exec "*"api-key"*) [ -n "${CONTAINER_KEY:-}" ] || exit 1; echo "$CONTAINER_KEY" ;;    # instance.sh key
 esac
 exit 0
 STUB
@@ -65,7 +65,7 @@ check "down stays inside its compose project"   'OWNER=ai-automation-backend bas
 echo "1b2) MYSURICATES_PREFIX: own docker names, e.g. for the installer probe"
 : > "$DOCKER_LOG"
 check "prefix: up builds its own image and project" 'MYSURICATES_PREFIX=probe-x OWNER=probe-x-demo INSTANCE_HEALTH_TIMEOUT=0 bash "$SCRIPT" up --name demo --no-wait >/dev/null 2>&1 && grep -q -- "-t probe-x:local -$" "$DOCKER_LOG" && grep -q -- "-p probe-x-demo " "$DOCKER_LOG" && ! grep -q "mysuricates" "$DOCKER_LOG"'
-check "prefix: key reads from its own container" 'MYSURICATES_PREFIX=probe-x OWNER=probe-x-demo CONTAINER_KEY=k bash "$SCRIPT" key --name demo >/dev/null 2>&1; tail -1 "$DOCKER_LOG" | grep -q " probe-x-demo cat "'
+check "prefix: key reads from its own container" 'MYSURICATES_PREFIX=probe-x OWNER=probe-x-demo CONTAINER_KEY=k bash "$SCRIPT" key --name demo >/dev/null 2>&1; tail -1 "$DOCKER_LOG" | grep -q " probe-x-demo sh -c .*api-key.* sh "'
 check "prefix: invalid characters refused (exit 2)" 'MYSURICATES_PREFIX="Probe x" bash "$SCRIPT" status --name demo >/dev/null 2>&1; [ $? -eq 2 ]'
 check "compose derives every name from the prefix" '[ "$(grep -c "MYSURICATES_CONTAINER:?" "$HERE/../../deploy/compose.yml")" = 5 ] && grep -q "image: \${MYSURICATES_IMAGE:?}" "$HERE/../../deploy/compose.yml" && ! grep -q "mysuricates-\\\${MYSURICATES_NAME" "$HERE/../../deploy/compose.yml"'
 
@@ -321,8 +321,8 @@ if command -v python3 >/dev/null 2>&1 && command -v curl >/dev/null 2>&1; then
   check "lib: instance not answering → unknown"  '[ -z "$(runs "http://127.0.0.1:$RPORT" "$RKEY")" ]'
   # Host: die Fake-API ist der Prozess der Instanz — down meldet die Runs und beendet ihn dann
   printf 'MYSURICATES_RUNTIME=host\nMYSURICATES_PORT=%s\n' "$RPORT" > "$TMP/inst/runs.env"
-  RSTATE="$TMP/state/mysuricates/runs"; mkdir -p "$RSTATE/home/.autotrigger"
-  printf '%s\n' "$RKEY" > "$RSTATE/home/.autotrigger/api-key"
+  RSTATE="$TMP/state/mysuricates/runs"; mkdir -p "$RSTATE/home/.mysuricates"
+  printf '%s\n' "$RKEY" > "$RSTATE/home/.mysuricates/api-key"
   fakeapi "$RPORT" "$RKEY" 3; echo "$APID" > "$RSTATE/instance.pid"
   OUT="$(bash "$SCRIPT" down --name runs 2>&1)"
   check "host down: names the runs it aborts, then stops" 'printf "%s" "$OUT" | grep -qF "mysuricates-runs: 3 Workflow-Run(s) laufen noch" && printf "%s" "$OUT" | grep -q "gestoppt" && ! kill -0 "$APID" 2>/dev/null'
@@ -331,7 +331,7 @@ if command -v python3 >/dev/null 2>&1 && command -v curl >/dev/null 2>&1; then
   OUT="$(bash "$SCRIPT" down --name runs 2>&1)"
   check "host down: no runs, no warning"         '! printf "%s" "$OUT" | grep -q "Workflow-Run" && printf "%s" "$OUT" | grep -q "gestoppt"'
   stopapi
-  printf 'other-key\n' > "$RSTATE/home/.autotrigger/api-key"
+  printf 'other-key\n' > "$RSTATE/home/.mysuricates/api-key"
   fakeapi "$RPORT" "$RKEY" 3; echo "$APID" > "$RSTATE/instance.pid"
   OUT="$(bash "$SCRIPT" down --name runs 2>&1)"
   check "host down: not checkable → stops anyway"  '! printf "%s" "$OUT" | grep -q "Workflow-Run" && printf "%s" "$OUT" | grep -q "gestoppt" && ! kill -0 "$APID" 2>/dev/null'
@@ -380,7 +380,8 @@ if command -v python3 >/dev/null 2>&1 && command -v curl >/dev/null 2>&1; then
   check "lib: empty key → no header (401)"       '[ "$(lib "local_curl_key \"\" -s -o /dev/null -w %{http_code} \"$RUNS_URL\"")" = 401 ] && untouched'
   # Host: die Fake-API ist der Prozess der Instanz
   printf 'MYSURICATES_RUNTIME=host\nMYSURICATES_PORT=%s\n' "$RPORT" > "$TMP/inst/px.env"
-  PXSTATE="$TMP/state/mysuricates/px"; mkdir -p "$PXSTATE/home/.autotrigger"
+  # Instanz von vor der Umbenennung: ihr Key liegt noch in ~/.autotrigger (lib/data-home.sh)
+  PXSTATE="$TMP/state/mysuricates/px"; mkdir -p "$PXSTATE/home/.autotrigger" "$PXSTATE/home/.mysuricates"
   printf '%s\n' "$RKEY" > "$PXSTATE/home/.autotrigger/api-key"; echo "$APID" > "$PXSTATE/instance.pid"
   check "host status: healthy although a proxy is set" '[ "$(proxied bash "$SCRIPT" status --name px)" = "running healthy" ] && untouched'
   OUT="$(proxied bash "$SCRIPT" down --name px 2>&1)"
@@ -428,8 +429,8 @@ if command -v python3 >/dev/null 2>&1 && command -v curl >/dev/null 2>&1 \
   }
   gone() { kill "$1" 2>/dev/null; for _ in $(seq 1 100); do kill -0 "$1" 2>/dev/null || break; sleep 0.05; done; }
   BPORT="$(bfree 19470)"; OTHER=""; FOREIGN=""
-  BSTATE="$TMP/state/mysuricates/bound"; mkdir -p "$BSTATE/frontend" "$BSTATE/home/.autotrigger" "$TMP/bbin"
-  echo jar > "$BSTATE/app.jar"; printf 'bkey\n' > "$BSTATE/home/.autotrigger/api-key"
+  BSTATE="$TMP/state/mysuricates/bound"; mkdir -p "$BSTATE/frontend" "$BSTATE/home/.mysuricates" "$TMP/bbin"
+  echo jar > "$BSTATE/app.jar"; printf 'bkey\n' > "$BSTATE/home/.mysuricates/api-key"
   trap 'stopapi; kill $(cat "$BSTATE/instance.pid" 2>/dev/null) $OTHER $FOREIGN 2>/dev/null; rm -rf "$TMP"' EXIT
   printf '#!/bin/sh\nexec env FAKE_INSTANCE_HOST="$SERVER_ADDRESS" python3 "%s" api "$AUTOMATION_PORT" bkey 1\n' "$FAKE" > "$TMP/bbin/java"
   chmod +x "$TMP/bbin/java"

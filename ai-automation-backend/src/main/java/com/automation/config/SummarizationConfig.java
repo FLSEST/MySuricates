@@ -15,7 +15,7 @@ public class SummarizationConfig {
      * Base directory for summarization working dirs.
      * Each provider gets a subdirectory (claude/, codex/).
      */
-    private String baseDir = System.getProperty("user.home") + "/.autotrigger/summarization";
+    private String baseDir = DataHome.file("summarization");
 
     /**
      * Timeout in seconds for a single summarization CLI call.

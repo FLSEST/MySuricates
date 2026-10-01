@@ -16,7 +16,7 @@ Both accept every connection — a bare listen() without accept() fills its queu
 the next /dev/tcp probe hangs until the kernel gives up. Each ends by itself after FAKE_INSTANCE_TTL
 seconds (default 600), so an aborted test leaves nothing running.
 
-Used by test-instance.sh, test-start-autotrigger-dev.sh, test-setup.sh and test_local_api_proxy.py.
+Used by test-instance.sh, test-start-mysuricates-dev.sh, test-setup.sh and test_local_api_proxy.py.
 """
 import http.server
 import json

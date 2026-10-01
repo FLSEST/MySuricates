@@ -751,15 +751,15 @@ from_source() {
   [ "$CHECK" = 1 ] && exit 0
   bash "$SCRIPT_DIR/install-hooks.sh" >/dev/null 2>&1
   tui_run "npm ci" "$LOG_DIR/npm-ci.log" bash -c "cd '$REPO_ROOT/ai-automation-frontend' && npm ci" || exit 1
-  tui_run "backend (runtime JAR)" "$LOG_DIR/build.log" bash "$SCRIPT_DIR/start-autotrigger-dev.sh" build || exit 1
+  tui_run "backend (runtime JAR)" "$LOG_DIR/build.log" bash "$SCRIPT_DIR/start-mysuricates-dev.sh" build || exit 1
   if [ -e "$cfg" ]; then
     if [ "$FORCE" = 1 ]; then module_preset_update "$cfg" "$PRESET"; fi
   else
     module_preset_write "$cfg" "${PRESET:-core}" "$I18N_LANG"
   fi
   offer_profile   # sonst findet ein spaeterer Aufruf aus der eigenen Shell das heruntergeladene npm nicht
-  [ "$DO_START" = 1 ] || { printf '  ./scripts/start-autotrigger-dev.sh\n'; exit 0; }
-  exec bash "$SCRIPT_DIR/start-autotrigger-dev.sh" $([ "$SHOW_KEY" = 1 ] && echo --show-key)
+  [ "$DO_START" = 1 ] || { printf '  ./scripts/start-mysuricates-dev.sh\n'; exit 0; }
+  exec bash "$SCRIPT_DIR/start-mysuricates-dev.sh" $([ "$SHOW_KEY" = 1 ] && echo --show-key)
 }
 
 # --- Ablauf -----------------------------------------------------------------------------------------

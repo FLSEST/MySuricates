@@ -10,7 +10,7 @@ if (!detectedApiKey) {
   // No API key detected: tests can still run if auth is disabled on the target instance
   // (AUTOMATION_SECURITY_ENABLED=false). Otherwise every authenticated request fails.
   console.warn(
-    '[playwright.config] No API key found (~/.mysuricates/api-key / ~/.autotrigger/api-key). ' +
+    '[playwright.config] No API key found (~/.mysuricates/api-key, older: ~/.autotrigger/api-key). ' +
       'Start the dev backend first so it writes the key file, or run against an instance with ' +
       'AUTOMATION_SECURITY_ENABLED=false.',
   );

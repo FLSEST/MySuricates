@@ -348,7 +348,7 @@ echo "9) the API key hint never points to the log (bc6d1902)"
 check "no 'backend log' in the installer"               '! grep -niE "backend.?log|AUTO-GENERATED" "$SETUP" >/dev/null'
 FE="$HERE/../../ai-automation-frontend/src/i18n"
 check "login dialog does not send users to the log"     '! grep -hE "^ *authHint:" "$FE/de.ts" "$FE/en.ts" | grep -iE "log|AUTO-GENERATED" >/dev/null'
-check "dev starter does not send users to the log"      '! grep -n "siehe Backend-Log" "$HERE/../start-autotrigger-dev.sh" >/dev/null'
+check "dev starter does not send users to the log"      '! grep -n "siehe Backend-Log" "$HERE/../start-mysuricates-dev.sh" >/dev/null'
 
 echo "9b) the build step says whether it built — also after git pull (1c016162)"
 # Ohne --dry-run, aber in einem Wegwerf-Repo mit Stubs: kein Maven, kein npm, java schlaeft nur.
@@ -411,7 +411,7 @@ esac
 STUB
 chmod +x "$B2/curl"
 export RUNS_LOG="$TMP/runs.log" FAKE_PORT="$SPORT" FAKE_KEY="key-29820f58-test"; : > "$RUNS_LOG"
-SKEY="$SSTATE/mysuricates/main/home/.autotrigger/api-key"   # schreibt das echte Backend beim Start
+SKEY="$SSTATE/mysuricates/main/home/.mysuricates/api-key"   # schreibt das echte Backend beim Start
 sval() { sed -n "s/^$1=//p" "$SINST/main.env" 2>/dev/null; }   # nicht cut: 8b ueberschreibt es als Funktion
 srun >/dev/null; mkdir -p "$(dirname "$SKEY")"; printf '%s\n' "$FAKE_KEY" > "$SKEY"
 echo drei > "$SREPO/drei.txt"; scommit drei; H3="$(git -C "$SREPO" rev-parse HEAD)"; P3="$(spid)"; B3="$(builds)"
@@ -451,7 +451,7 @@ case "$*" in
   *com.docker.compose.project*) [ -n "${CONTAINER_UP:-}" ] || exit 1; echo mysuricates-box ;;
   *"{{.State.Status}} {{.State.Health.Status}}"*) [ -n "${CONTAINER_UP:-}" ] || exit 1; echo "running healthy" ;;
   *"{{.State.Health.Status}}"*) echo healthy ;;
-  exec*api-key) [ -n "${CONTAINER_UP:-}" ] || exit 1; echo "$FAKE_KEY" ;;
+  exec*api-key*) [ -n "${CONTAINER_UP:-}" ] || exit 1; echo "$FAKE_KEY" ;;
 esac
 exit 0
 STUB
@@ -459,7 +459,7 @@ chmod +x "$B2/docker"; export DOCKER_LOG="$TMP/docker2.log"
 crun() { : > "$DOCKER_LOG"; : > "$RUNS_LOG"; srun --runtime container --name box "$@"; }
 check "container not running: up as before"             '[ "$(crun)" = 0 ] && grep -q "up -d --no-build" "$DOCKER_LOG"'
 check "container running, runs active: not touched"     '[ "$(CONTAINER_UP=1 FAKE_RUNS=2 crun)" = 0 ] && ! grep -q "up -d" "$DOCKER_LOG" && ! grep -q "^build " "$DOCKER_LOG" && out | grep -qF "box: 2 workflow run(s) still running" && out | grep -qF "scripts/instance.sh down --name box && scripts/instance.sh up --name box"'
-check "... asked with the key from the container"       '[ -s "$RUNS_LOG" ] && grep -q "^exec .*mysuricates-box cat .*api-key" "$DOCKER_LOG"'
+check "... asked with the key from the container"       '[ -s "$RUNS_LOG" ] && grep -q "^exec .*mysuricates-box sh -c .*api-key" "$DOCKER_LOG"'
 check "container running, no runs: up as before"        '[ "$(CONTAINER_UP=1 FAKE_RUNS=0 crun)" = 0 ] && grep -q "up -d --no-build" "$DOCKER_LOG"'
 rm -f "$SINST/box.env" "$SINST/box.override.yml"
 

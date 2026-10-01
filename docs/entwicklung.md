@@ -28,16 +28,16 @@ neuen Rechner siehe **[GETTING-STARTED.md](GETTING-STARTED.md)** (inkl. `scripts
 ### Backend starten
 
 ```bash
-# Aus dem Repo-Root — baut ein Fat-JAR, kopiert es nach ~/.local/state/autotrigger-dev/runtime/
+# Aus dem Repo-Root — baut ein Fat-JAR, kopiert es nach ~/.local/state/mysuricates-dev/runtime/
 # und startet es von dort (Port 9090). Idempotent; startet auch das Frontend.
-scripts/start-autotrigger-dev.sh            # start
-scripts/start-autotrigger-dev.sh restart    # Code-Änderungen übernehmen: stop → JAR bauen → start;
+scripts/start-mysuricates-dev.sh            # start
+scripts/start-mysuricates-dev.sh restart    # Code-Änderungen übernehmen: stop → JAR bauen → start;
                                             # startet Vite mit, falls er fehlt (etwa nach einem Terminal-Absturz)
-scripts/start-autotrigger-dev.sh stop
+scripts/start-mysuricates-dev.sh stop
 
 # Betriebsart: Host (Default) oder Container — dieselben Kommandos (TODO a1236a64)
-scripts/start-autotrigger-dev.sh start --container
-AUTOTRIGGER_DEV_RUNTIME=container scripts/start-autotrigger-dev.sh   # dauerhaft
+scripts/start-mysuricates-dev.sh start --container
+MYSURICATES_DEV_RUNTIME=container scripts/start-mysuricates-dev.sh   # dauerhaft
 ```
 
 **Host oder Container?** Der Host-Weg ist der Default und unverändert. `--container` startet das
@@ -46,11 +46,11 @@ Backend stattdessen per `docker compose` aus `ai-automation-backend/docker-compo
 dort liefe keine KI-CLI). Die Provider-Zugänge mountet der Starter
 zur Laufzeit, und zwar nur die, die es auf diesem Rechner gibt; findet er keinen, sagt er das.
 Der Vite-Dev-Server bleibt in beiden Fällen auf dem Host. Parametrierbar über
-`AUTOTRIGGER_DEV_CONTAINER_PORT`, `AUTOTRIGGER_DEV_CONTAINER_NAME`,
-`AUTOTRIGGER_DEV_COMPOSE_PROJECT`, `AUTOTRIGGER_DEV_PROJECT_ROOT`, `AUTOTRIGGER_DEV_PRESET` —
+`MYSURICATES_DEV_CONTAINER_PORT`, `MYSURICATES_DEV_CONTAINER_NAME`,
+`MYSURICATES_DEV_COMPOSE_PROJECT`, `MYSURICATES_DEV_PROJECT_ROOT`, `MYSURICATES_DEV_PRESET` —
 damit eine Probeinstanz neben der echten laufen kann. Die Prüfungen des Starters (läuft schon ein
 Backend?, Bereitschaft, Run-Check vor `restart`) folgen im Container-Betrieb dem Port aus
-`AUTOTRIGGER_DEV_CONTAINER_PORT`; `MYSURICATES_API_BASE` überschreibt ihn weiterhin.
+`MYSURICATES_DEV_CONTAINER_PORT`; `MYSURICATES_API_BASE` überschreibt ihn weiterhin.
 
 Das Image (`Dockerfile.stable`) kompiliert nichts, es kopiert das JAR aus
 `ai-automation-backend/target/`. Deshalb baut `restart --container` das JAR vorher
@@ -58,11 +58,11 @@ Das Image (`Dockerfile.stable`) kompiliert nichts, es kopiert das JAR aus
 nur mit `--rebuild` oder wenn noch keins liegt, und `build --container` baut nur das JAR (3bfa4e10).
 
 Was von den KI-Anbietern des Rechners in den Container kommt, entscheidet
-`AUTOTRIGGER_DEV_AI_FROM_HOST` (`login` = Programme und je Anbieter nur die Anmeldung, der Standard;
-`programs`; `all` = ganze Anbieter-Verzeichnisse wie früher), dazu `AUTOTRIGGER_DEV_AI_PROVIDERS`
-(Auswahl aus `claude,codex,pi`) und `AUTOTRIGGER_DEV_DOCKER_SOCKET` (Standard `0`; `1` gibt dem Container volle
+`MYSURICATES_DEV_AI_FROM_HOST` (`login` = Programme und je Anbieter nur die Anmeldung, der Standard;
+`programs`; `all` = ganze Anbieter-Verzeichnisse wie früher), dazu `MYSURICATES_DEV_AI_PROVIDERS`
+(Auswahl aus `claude,codex,pi`) und `MYSURICATES_DEV_DOCKER_SOCKET` (Standard `0`; `1` gibt dem Container volle
 Kontrolle über Docker auf dem Rechner und ist nötig für Projekt-Container, Terminal und `container_image`-Blöcke).
-Der Port ist standardmäßig nur auf `127.0.0.1` veröffentlicht, `AUTOTRIGGER_DEV_CONTAINER_BIND=0.0.0.0` öffnet ihn
+Der Port ist standardmäßig nur auf `127.0.0.1` veröffentlicht, `MYSURICATES_DEV_CONTAINER_BIND=0.0.0.0` öffnet ihn
 bewusst fürs lokale Netz. Claude braucht
 dafür einmal `claude setup-token` — Hintergrund in
 [deployment.md → KI-Anbieter im Container](deployment.md#ki-anbieter-im-container). Die Karte
@@ -93,7 +93,7 @@ Der Vite-Dev-Server proxied automatisch `/api/*` und `/ws/*` an `localhost:9090`
 
 Terminal 1 (Backend):
 ```bash
-scripts/start-autotrigger-dev.sh
+scripts/start-mysuricates-dev.sh
 ```
 
 Terminal 2 (Frontend):
@@ -161,8 +161,8 @@ Container siehe [deployment.md → deploy/](deployment.md#eine-instanz-im-contai
 
 ## Builds neben dem laufenden Dev-Backend
 
-Das Dev-Backend läuft aus einer **JAR-Kopie** unter `~/.local/state/autotrigger-dev/runtime/current.jar`
-(`scripts/start-autotrigger-dev.sh`), nicht aus `target/classes`. Grund: Eine JVM mit `-cp target/classes`
+Das Dev-Backend läuft aus einer **JAR-Kopie** unter `~/.local/state/mysuricates-dev/runtime/current.jar`
+(`scripts/start-mysuricates-dev.sh`), nicht aus `target/classes`. Grund: Eine JVM mit `-cp target/classes`
 lädt Klassen über ihre gesamte Lebensdauer lazy von Platte. Jeder Build, der dieses Verzeichnis umschreibt,
 zieht ihr die Klassen unter den Füßen weg → `NoClassDefFoundError`, sticky (die JVM cached den
 Resolution-Fehler), nur ein Neustart heilt ihn. Schreiber gab es drei: Maven aus Workflows/Sessions
@@ -190,8 +190,8 @@ Maven-Läufe im selben `target/` (z. B. Scheduled Run + Claude-Session) einander
 produzieren:
 
 ```bash
-git worktree add --detach ~/.mysuricates/qa-worktree/autotrigger HEAD
-cd ~/.mysuricates/qa-worktree/autotrigger/ai-automation-backend && mvn test
+git worktree add --detach ~/.mysuricates/qa-worktree/mysuricates HEAD
+cd ~/.mysuricates/qa-worktree/mysuricates/ai-automation-backend && mvn test
 ```
 
 Ein solcher Worktree ist detached auf einem Commit und kann zwischen Läufen bestehen bleiben
@@ -302,7 +302,7 @@ Das Faktenblatt hat zwei Teile (TODO f625c113). **Live-Fenster:** Beginn und Dau
 **Tiefer bohren mit JFR:** Wenn Widget oder Watchdog eine heiße Route zeigen, die Kosten aber nicht erklären, liefert der Java Flight Recorder das Profil — im JDK eingebaut, kein async-profiler, kein Agent, kein Overhead im Normalbetrieb:
 
 ```bash
-PID=$(cat ~/.local/state/autotrigger-dev/backend.pid)
+PID=$(cat ~/.local/state/mysuricates-dev/backend.pid)
 jcmd "$PID" JFR.start duration=60s filename=/tmp/hot.jfr settings=profile name=diag
 jcmd "$PID" JFR.check                      # laeuft die Aufnahme noch?
 jfr summary /tmp/hot.jfr                   # welche Ereignisse kamen zusammen
@@ -325,11 +325,11 @@ Welches Werkzeug wann:
 
 **Kein Scheduling im Integrationstest-Profil:** `@EnableScheduling` steht in `config/SchedulingConfig` mit `@Profile("!integration")`. Alle `@SpringBootTest`-Klassen laufen mit `@ActiveProfiles("integration")` und damit ohne Hintergrund-Jobs. Grund: Die Jobs schreiben sonst mitten im Testlauf in dieselbe SQLite-Datei — `HealthAutoTodoService` legt z. B. ein TODO an, sobald Stable oder Test nicht erreichbar ist (die beiden Container-Umgebungen neben der Dev-Instanz, siehe [deployment.md → Drei-Umgebungs-Setup](deployment.md#drei-umgebungs-setup)). Solche Zeilen überleben den `@Transactional`-Rollback (eigener Thread, eigene Transaktion) und lassen global zählende Assertions davon abhängen, ob gerade ein Container läuft. Scheduled-Methoden werden in Tests direkt aufgerufen, ihre Logik bleibt abgedeckt. Wer einen neuen `@Scheduled`-Job baut, testet ihn also per direktem Methodenaufruf — nicht, indem er auf den Tick wartet.
 
-**Integration-Encryption-Key im Testprofil auf Temp-Pfad gepinnt:** Genau wie `integration.db.path` setzt `IntegrationTestDbSessionListener` seit 2026-09-12 zusätzlich `integration.key.path` (per-JVM-Temp-Datei, im Teardown gelöscht), auf das `application-integration.yml` `automation.integration.key-file` verweist — ohne diesen Pin generiert `IntegrationEncryptionService.init()` bei jedem `@SpringBootTest` mit leeren `app_settings` sonst einen frischen AES-Key ins echte `~/.autotrigger/` des Entwicklers (geschehen 2026-08-06, hat den echten Key monatelang überschattet).
+**Integration-Encryption-Key im Testprofil auf Temp-Pfad gepinnt:** Genau wie `integration.db.path` setzt `IntegrationTestDbSessionListener` seit 2026-09-12 zusätzlich `integration.key.path` (per-JVM-Temp-Datei, im Teardown gelöscht), auf das `application-integration.yml` `automation.integration.key-file` verweist — ohne diesen Pin generiert `IntegrationEncryptionService.init()` bei jedem `@SpringBootTest` mit leeren `app_settings` sonst einen frischen AES-Key ins echte `~/.mysuricates/` des Entwicklers (geschehen 2026-08-06, hat den echten Key monatelang überschattet).
 
-**Backups im Testprofil abgeschaltet und auf Temp-Verzeichnis gepinnt:** Dieselbe Falle ein drittes Mal (2026-09-13): `automation.backup` hat als Default `enabled: true` und `directory: ${user.home}/.autotrigger/backups/dev`, und `application-integration.yml` überschrieb beides nicht — jeder Spring-Kontext eines Integrationstests legte beim Start ein Backup seiner Wegwerf-Test-DB ins echte Dev-Backup-Verzeichnis und rotierte damit (retain-count 30) echte Backups weg. Seitdem setzt das Testprofil `automation.backup.enabled: false` und `directory` auf `integration.backup.dir`, das `IntegrationTestDbSessionListener` pro Test-JVM auf ein Temp-Verzeichnis zeigt und beim Session-Ende rekursiv löscht. Zusätzlich ist die Rotation in `DatabaseBackupService` abgesichert: Sie zählt und löscht nur Dateien im eigenen Namensschema `mysuricates-backup-yyyy-MM-dd_HH-mm-ss.db` (`BackupFileNaming.isOwnBackupFile`); manuelle Kopien oder fremde `.db`-Dateien im selben Verzeichnis bleiben sichtbar, werden aber nie rotiert. Prüfen: `ls ~/.autotrigger/backups/dev | wc -l` vor und nach `mvn test -Dtest=ContainerServiceStaleRowIntegrationTest` muss gleich bleiben.
+**Backups im Testprofil abgeschaltet und auf Temp-Verzeichnis gepinnt:** Dieselbe Falle ein drittes Mal (2026-09-13): `automation.backup` hat als Default `enabled: true` und `directory: ${user.home}/.mysuricates/backups/dev`, und `application-integration.yml` überschrieb beides nicht — jeder Spring-Kontext eines Integrationstests legte beim Start ein Backup seiner Wegwerf-Test-DB ins echte Dev-Backup-Verzeichnis und rotierte damit (retain-count 30) echte Backups weg. Seitdem setzt das Testprofil `automation.backup.enabled: false` und `directory` auf `integration.backup.dir`, das `IntegrationTestDbSessionListener` pro Test-JVM auf ein Temp-Verzeichnis zeigt und beim Session-Ende rekursiv löscht. Zusätzlich ist die Rotation in `DatabaseBackupService` abgesichert: Sie zählt und löscht nur Dateien im eigenen Namensschema `mysuricates-backup-yyyy-MM-dd_HH-mm-ss.db` (`BackupFileNaming.isOwnBackupFile`); manuelle Kopien oder fremde `.db`-Dateien im selben Verzeichnis bleiben sichtbar, werden aber nie rotiert. Prüfen: `ls ~/.mysuricates/backups/dev | wc -l` vor und nach `mvn test -Dtest=ContainerServiceStaleRowIntegrationTest` muss gleich bleiben.
 
-**Setup-Verzeichnisse von Zusammenfassung und Factory im Testprofil auf Temp-Verzeichnis gepinnt:** Die Falle ein viertes Mal (2026-09-24): `SummarizationSetupService` und `FactorySetupService` schreiben bei jedem Kontextstart (`@PostConstruct`) ihre Anweisungsdateien nach `automation.summarization.base-dir` bzw. `automation.factory.base-dir`, Default `${user.home}/.autotrigger/summarization` bzw. `.../factory` — jeder Spring-Kontext eines Integrationstests schrieb `summarization/claude/CLAUDE.md`, `summarization/codex/AGENTS.md` und `factory/codex/AGENTS.md` ins echte Home. Seitdem zeigen beide auf `integration.setup.dir`, das `IntegrationTestDbSessionListener` pro Test-JVM auf ein Temp-Verzeichnis setzt und beim Session-Ende rekursiv löscht. `config/IntegrationProfileHomeIsolationTest` hält das fest und prüft zusätzlich jeden Schlüssel der `application*.yml`: Zeigt einer im Testprofil aufgelöst ins echte `~/.autotrigger`, schlägt der Test fehl. Das fängt den nächsten Schreiber dieser Art aber nur, wenn sein Pfad als Schlüssel in einer `application*.yml` steht; Pfade, die der Code selbst aus `user.home` baut (etwa die API-Key-Datei über `InstanceAddress.apiKeyFile()`), sieht der Test nicht.
+**Setup-Verzeichnisse von Zusammenfassung und Factory im Testprofil auf Temp-Verzeichnis gepinnt:** Die Falle ein viertes Mal (2026-09-24): `SummarizationSetupService` und `FactorySetupService` schreiben bei jedem Kontextstart (`@PostConstruct`) ihre Anweisungsdateien nach `automation.summarization.base-dir` bzw. `automation.factory.base-dir`, Default `${user.home}/.mysuricates/summarization` bzw. `.../factory` — jeder Spring-Kontext eines Integrationstests schrieb `summarization/claude/CLAUDE.md`, `summarization/codex/AGENTS.md` und `factory/codex/AGENTS.md` ins echte Home. Seitdem zeigen beide auf `integration.setup.dir`, das `IntegrationTestDbSessionListener` pro Test-JVM auf ein Temp-Verzeichnis setzt und beim Session-Ende rekursiv löscht. `config/IntegrationProfileHomeIsolationTest` hält das fest und prüft zusätzlich jeden Schlüssel der `application*.yml`: Zeigt einer im Testprofil aufgelöst ins echte `~/.mysuricates`, schlägt der Test fehl. Das fängt den nächsten Schreiber dieser Art aber nur, wenn sein Pfad als Schlüssel in einer `application*.yml` steht; Pfade, die der Code selbst aus `user.home` baut (etwa die API-Key-Datei über `InstanceAddress.apiKeyFile()`), sieht der Test nicht.
 
 **Szenario-Tests ohne KI-CLI:** `ScenarioIntegrationTest` fährt Workflow-Definitionen aus `src/test/resources/scenarios/*.json` durch den echten Executor. Jeder KI-Aufruf geht dabei an einen `ScriptedAiProvider` (Provider-IDs `SCRIPTED`, `SCRIPTED_B`) mit festen Antworten, der zugleich jeden Aufruf mitschreibt. So lassen sich Prompt, Modell, Timeout und Provider vor dem Aufruf prüfen, und danach Gate, Auto-TODO und Laufstatus, alles ohne `claude`/`codex`/`pi` und ohne Display. Ein Szenario kann statt eines Laufs auch mehrere Läufe desselben Workflows (`runs`, etwa für den Audit-Lebenszyklus) oder eine Kette (`chain`) fahren und auf Freigaben antworten (`answers`). Ein neuer Fall ist eine neue JSON-Datei. Jede Datei nennt ihre Spec-Quelle und den Vorfall, aus dem sie abgeleitet ist. Katalog und Format stehen in `scenarios/README.md`.
 
@@ -398,9 +398,9 @@ npm run test:e2e
 ```
 
 Den API-Key sucht `cypress.config.ts` in dieser Reihenfolge, ohne die DB anzufassen: `CYPRESS_API_KEY`,
-`CYPRESS_DEV_API_KEY`, die Datei `~/.mysuricates/api-key` bzw. `~/.autotrigger/api-key` (nur lesend;
+`CYPRESS_DEV_API_KEY`, die Datei `~/.autotrigger/api-key` (solange es den alten Ordner gibt) bzw. `~/.mysuricates/api-key` (nur lesend;
 das Backend schreibt seinen Schlüssel bei jedem Start dorthin, `ApiKeyService`/`InstanceAddress`),
-zuletzt `AUTOMATION_API_KEY`. Für die curl-Beispiele dieser Seite also `export DEV_KEY=$(cat ~/.autotrigger/api-key)`.
+zuletzt `AUTOMATION_API_KEY`. Für die curl-Beispiele dieser Seite also `export DEV_KEY=$(cat ~/.mysuricates/api-key)`.
 Mit `CYPRESS_TARGET=test` gilt eine andere Reihenfolge (Test-Instanz läuft im Container, die Datei ist
 dort nicht ohne `docker exec` erreichbar): `CYPRESS_API_KEY`, `CYPRESS_TEST_API_KEY`, `AUTOMATION_API_KEY`.
 Findet Cypress keinen Key, schreibt es eine Warnung auf die Konsole statt still weiterzulaufen — Läufe
@@ -466,7 +466,7 @@ AUTOMATION_RATE_LIMIT_RPM=6000 AUTOMATION_DISCOVERY_AUTO_TAGGING_ENABLED=false \
 ```
 
 - **`-Duser.home`**: Java liest `user.home` aus dem Benutzerkonto, nicht aus `$HOME`. Ohne die Angabe
-  liest und schreibt die Instanz die Dateien der Dev-Instanz unter `~/.autotrigger/` (API-Key-Datei,
+  liest und schreibt die Instanz die Dateien der Dev-Instanz unter `~/.mysuricates/` (API-Key-Datei,
   Schlüssel für Integrationen und Siegel, Backups).
 - **`HOME` und `XDG_CONFIG_HOME` im Scratch-Verzeichnis**: Die KI-CLIs, die das Backend startet, erben `HOME` —
   mit dem echten nutzen sie deine Anmeldung, also echte Tokens. Unter `XDG_CONFIG_HOME` sucht das Backend

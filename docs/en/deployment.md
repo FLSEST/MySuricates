@@ -141,7 +141,7 @@ nothing of Claude.
 |---|---|---|---|
 | `scripts/instance.sh`, including the installer mode "Dev · Test · Prod" | `MYSURICATES_AI_FROM_HOST`, `MYSURICATES_AI_PROVIDERS`, `MYSURICATES_DOCKER_SOCKET`, `MYSURICATES_BIND` in `deploy/instances/<name>.env` | `127.0.0.1` | off |
 | Stable and Test (`scripts/staging.sh`, start from the UI) | `STABLE_…` or `TEST_…` with `AI_FROM_HOST`, `AI_PROVIDERS`, `DOCKER_SOCKET`, `BIND` in `~/.config/mysuricates/staging.env` — read line by line, never executed; an environment variable of the same name wins | `127.0.0.1` | off |
-| Dev container (`scripts/start-autotrigger-dev.sh --container`) | `AUTOTRIGGER_DEV_AI_FROM_HOST`, `AUTOTRIGGER_DEV_AI_PROVIDERS`, `AUTOTRIGGER_DEV_DOCKER_SOCKET`, `AUTOTRIGGER_DEV_CONTAINER_BIND` | `127.0.0.1` | off |
+| Dev container (`scripts/start-mysuricates-dev.sh --container`) | `MYSURICATES_DEV_AI_FROM_HOST`, `MYSURICATES_DEV_AI_PROVIDERS`, `MYSURICATES_DEV_DOCKER_SOCKET`, `MYSURICATES_DEV_CONTAINER_BIND` | `127.0.0.1` | off |
 | Tryout (`scripts/tryout.sh`) | none | `127.0.0.1` | off |
 
 **Secure by default, on every Docker way:** the port is reachable from this machine only, and the
@@ -165,7 +165,7 @@ with ordinary shell and AI blocks keep running. Missing are:
   `scripts/staging.sh` — fail.
 - Starting Stable/Test from the UI of a container instance: that calls `docker compose`.
 
-If you need that, set `STABLE_DOCKER_SOCKET=1` (or `TEST_…`, `AUTOTRIGGER_DEV_DOCKER_SOCKET=1`,
+If you need that, set `STABLE_DOCKER_SOCKET=1` (or `TEST_…`, `MYSURICATES_DEV_DOCKER_SOCKET=1`,
 `MYSURICATES_DOCKER_SOCKET=1`) and restart the instance. With the socket a workflow can reach the whole
 machine via `docker run -v /:/host …`; the boundary above then only guards against mistakes. Until this
 change Stable, Test and the dev container had the socket by default and published their port on all
@@ -304,7 +304,7 @@ Only builds the agent images (`profiles: build-only`), starts no service.
 Stable environment on port 9091:
 - Container: `mysuricates-stable`
 - Profile: `SPRING_PROFILES_ACTIVE=stable`
-- Volumes: `stable-data` (persistent DB), `stable-secrets` (integration and seal keys, kept apart from the DB — 3fb2242c), `stable-frontend/` (read-only; the built UI that `scripts/staging.sh snapshot` copies there from `ai-automation-frontend/dist` — without this folder `staging.sh start` refuses to start), host project directories, backup volume (`~/.autotrigger/backups/stable`); AI providers, Docker socket (off by default) and port (only `127.0.0.1:9091` by default) come from the override file of `scripts/staging.sh` ([AI providers in the container](#ai-providers-in-the-container))
+- Volumes: `stable-data` (persistent DB), `stable-secrets` (integration and seal keys, kept apart from the DB — 3fb2242c), `stable-frontend/` (read-only; the built UI that `scripts/staging.sh snapshot` copies there from `ai-automation-frontend/dist` — without this folder `staging.sh start` refuses to start), host project directories, backup volume (`~/.mysuricates/backups/stable`); AI providers, Docker socket (off by default) and port (only `127.0.0.1:9091` by default) come from the override file of `scripts/staging.sh` ([AI providers in the container](#ai-providers-in-the-container))
 - Named Volume: `stable-data`
 
 ### `docker-compose.test.yml`
@@ -313,7 +313,7 @@ Test instance on port 8090 (uses `docker/Dockerfile.stable` as build base):
 - Container: `mysuricates-test`
 - Image: `ai-automation-backend-test`
 - Profile: `SPRING_PROFILES_ACTIVE=test`
-- Volumes: `test-data` (persistent DB), `test-secrets` (keys as for Stable), `stable-frontend/` (read-only, the same built UI as for Stable), `application-test.yml` (read-only), backup volume (`~/.autotrigger/backups/test`); AI providers, Docker socket and port (`127.0.0.1:8090`) as for Stable
+- Volumes: `test-data` (persistent DB), `test-secrets` (keys as for Stable), `stable-frontend/` (read-only, the same built UI as for Stable), `application-test.yml` (read-only), backup volume (`~/.mysuricates/backups/test`); AI providers, Docker socket and port (`127.0.0.1:8090`) as for Stable
 - Healthcheck: `curl -f http://localhost:8090/api/v1/system/health`
 - Named Volume: `test-data`
 
@@ -428,8 +428,13 @@ automation.modules.preset: core   # optional modules, see Module System
 ```
 
 - API key authentication active (key is auto-generated on first start if `AUTOMATION_API_KEY`
-  is empty — it is then in `~/.autotrigger/api-key` and in the `app_settings` table; the log shows
+  is empty — it is then in `~/.mysuricates/api-key` and in the `app_settings` table; the log shows
   only its last four characters)
+- **Data directory `~/.mysuricates`** (`config/DataHome`): API key, integration and seal keys,
+  backups, setup files. Installations from before the rename (up to v0.7.8) keep `~/.autotrigger` as
+  long as that directory exists — its keys decrypt the stored credentials and verify the seals, so
+  nothing moves them unasked. To switch: stop the backend, move the content of `~/.autotrigger/` to
+  `~/.mysuricates/`, delete the old directory. `AUTOMATION_DATA_HOME` sets the directory explicitly.
 - Rate limiting active (120 req/min, configurable in Settings → Execution)
 - SQLite at `./data/automation.db`
 
@@ -481,7 +486,7 @@ instead of attempting a CLI call. Remote access works differently there:
 1. Install Tailscale on the machine and log in (not in the container)
 2. Expose whatever the container should publish from there, e.g. with
    `tailscale serve --bg --https=443 http://127.0.0.1:<port>` (port = the published container port,
-   see `AUTOTRIGGER_DEV_CONTAINER_PORT`/`docker-compose.*.yml`)
+   see `MYSURICATES_DEV_CONTAINER_PORT`/`docker-compose.*.yml`)
 3. No Tailscale state, no login and no token inside the container — just an ordinary local port that
    the machine forwards itself
 
@@ -664,7 +669,7 @@ backend listens on all interfaces; Vite runs with `host: true`. Started from sou
 instance is therefore reachable on the local network, not just on the machine itself. Every Docker
 way instead publishes the port on `127.0.0.1` only by default — `instance.sh` (`MYSURICATES_BIND`, see
 [One instance in a container](#one-instance-in-a-container-deploy)), Stable and Test
-(`STABLE_BIND`/`TEST_BIND`), the dev container (`AUTOTRIGGER_DEV_CONTAINER_BIND`) and the tryout image
+(`STABLE_BIND`/`TEST_BIND`), the dev container (`MYSURICATES_DEV_CONTAINER_BIND`) and the tryout image
 ([table](#ai-providers-in-the-container)) — changing that also bypasses the usual host firewall rules
 (Docker's port publishing).
 
@@ -790,7 +795,7 @@ Stable and Test do **not** start automatically — neither on boot nor with the 
 
 | Environment | Icon | Command |
 |---|---|---|
-| Dev | "MySuricates Dev" | `scripts/start-autotrigger-dev.sh` |
+| Dev | "MySuricates Dev" | `scripts/start-mysuricates-dev.sh` |
 | Stable | "MySuricates Stable" | `scripts/staging.sh start` |
 | Test | "MySuricates Test" | `scripts/staging.sh test-start` |
 
@@ -875,14 +880,14 @@ Additionally, the app settings `auto-todo-default` and `auto-repair-default` are
 
 Before each definition sync, the backend automatically calls `POST /api/v1/system/backup?reason=pre-sync-definitions` on the **target**. The returned filename is included in `SyncResult.preSyncBackup` and displayed in the frontend toast. Backup success does not block the sync — if the backup fails, the sync proceeds anyway, and the warning ends up in `SyncResult.errors`.
 
-Additionally, `./scripts/staging.sh db-seed` creates a file backup (`~/.autotrigger/backups/stable/mysuricates-backup-<timestamp>-pre-seed.db`) before overwriting the stable DB with the dev DB.
+Additionally, `./scripts/staging.sh db-seed` creates a file backup (`~/.mysuricates/backups/stable/mysuricates-backup-<timestamp>-pre-seed.db`) before overwriting the stable DB with the dev DB.
 
 **Rollback Paths:**
 
 | Snapshot Source | Location | Restore Method |
 |---|---|---|
-| Pre-Sync (Definition Sync) | Target backup directory (`~/.autotrigger/backups/<env>/`) | UI on the target: Settings → Backups → Download; restore manually. |
-| Pre-Seed (`staging.sh db-seed`) | `~/.autotrigger/backups/stable/…-pre-seed.db` | `docker compose -f ai-automation-backend/docker-compose.stable.yml down && docker run --rm -v ai-automation-backend_stable-data:/data -v <backup>:/src/db:ro alpine cp /src/db /data/automation.db && ./scripts/staging.sh start` |
+| Pre-Sync (Definition Sync) | Target backup directory (`~/.mysuricates/backups/<env>/`) | UI on the target: Settings → Backups → Download; restore manually. |
+| Pre-Seed (`staging.sh db-seed`) | `~/.mysuricates/backups/stable/…-pre-seed.db` | `docker compose -f ai-automation-backend/docker-compose.stable.yml down && docker run --rm -v ai-automation-backend_stable-data:/data -v <backup>:/src/db:ro alpine cp /src/db /data/automation.db && ./scripts/staging.sh start` |
 
 Pre-sync backups count towards the regular retention (`automation.backup.retain-count`, default 30) and may be displaced by newer backups.
 

@@ -96,7 +96,7 @@ class IntegrationEncryptionServiceTest {
      * Checks only the generate-branch of {@code init()}: given an explicit {@code @TempDir} path the
      * key is written there. It does <em>not</em> guard the 2026-08-06 incident (integration profile
      * without a pinned {@code automation.integration.key-file}, key generated into the developer's
-     * real {@code ~/.autotrigger/}) — that regression guard is
+     * real {@code ~/.mysuricates/}) — that regression guard is
      * {@code IntegrationEncryptionServiceGuardTest}, which boots the real profile.
      */
     @Test

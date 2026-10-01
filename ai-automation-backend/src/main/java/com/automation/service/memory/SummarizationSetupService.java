@@ -14,7 +14,7 @@ import java.nio.file.Path;
 
 /**
  * Sets up the summarization working directories and instruction files on startup.
- * Creates ~/.autotrigger/summarization/claude/CLAUDE.md and .../codex/AGENTS.md
+ * Creates ~/.mysuricates/summarization/claude/CLAUDE.md and .../codex/AGENTS.md
  * from bundled resource templates.
  */
 @Service

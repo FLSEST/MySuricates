@@ -47,13 +47,13 @@ class FactoryConfigTest {
 
     @Test
     void should_returnUserHomeBasedPath_when_baseDirDefaultIsQueried() {
-        String expectedDir = System.getProperty("user.home") + "/.autotrigger/factory";
+        String expectedDir = DataHome.dir().resolve("factory").toString();
         assertThat(config.getBaseDir()).isEqualTo(expectedDir);
     }
 
     @Test
-    void should_endWithAutotriggerFactory_when_baseDirDefaultIsQueried() {
-        assertThat(config.getBaseDir()).endsWith("/.autotrigger/factory");
+    void should_endWithFactory_when_baseDirDefaultIsQueried() {
+        assertThat(config.getBaseDir()).endsWith("/factory");
     }
 
     @Test

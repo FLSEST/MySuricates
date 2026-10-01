@@ -191,10 +191,6 @@ eine davon laufen nur die deterministischen Bloecke (Shell, Verzweigung, Schleif
 zeigt an, welche CLIs er gefunden hat und ob sie angemeldet sind, verlangt aber keine — ohne CLI
 scheitern KI-Bloecke erst zur Laufzeit.
 
-> **Zum Namen:** Das Projekt heisst MySuricates, einige Skripte tragen noch den frueheren Namen
-> `autotrigger` (etwa `scripts/start-autotrigger-dev.sh`). Beides meint dasselbe; die Umbenennung
-> steht aus.
-
 Dauerhaft einrichten:
 
 ```bash
@@ -210,7 +206,7 @@ Rueckfrage, baut und startet die Instanz. Danach: http://localhost:9090, den API
 wird nur auf ausdruecklichen Wunsch eingebunden.
 
 Wer an MySuricates selbst entwickelt: `./scripts/setup.sh --from-source --start` richtet ein, baut
-das Runtime-JAR und startet damit gleich `./scripts/start-autotrigger-dev.sh` — Backend auf :9090
+das Runtime-JAR und startet damit gleich `./scripts/start-mysuricates-dev.sh` — Backend auf :9090
 und Vite mit Hot Reload auf :3000, in einer Instanz. Ohne `--start` endet der Installer mit
 demselben Befehl als Hinweis; von da an ist er der Weg, die Dev-Instanz zu starten, zu stoppen
 (`stop`) und nach einer Aenderung neu zu bauen (`restart`). Er ist idempotent und startet keine

@@ -1,5 +1,6 @@
 package com.automation.service.staging;
 
+import com.automation.config.DataHome;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -104,6 +105,7 @@ public class DockerContainerManager {
             if (!extraEnv.isEmpty()) {
                 pb.environment().putAll(extraEnv);
             }
+            DataHome.export(pb.environment());
             Process p = pb.start();
 
             try (var reader = new BufferedReader(new InputStreamReader(p.getInputStream()))) {

@@ -10,16 +10,15 @@ function resolveTarget(value: string | undefined): E2ETarget {
 
 // Never read the SQLite DB directly (CLAUDE.md: "NEVER access the SQLite database directly …
 // not from scripts", pool-size=1 lock contention). The backend (ApiKeyService) writes the
-// effective key to a plaintext file on the host at startup — read that instead. Both
-// candidate paths are checked (same order as scripts/start-autotrigger-dev.sh's `api_key()`),
-// since only `.autotrigger/api-key` is currently written by ApiKeyService/InstanceAddress but
-// `.mysuricates/api-key` is treated as the primary name elsewhere in the scripts.
+// effective key to a plaintext file in its data directory at startup — read that instead. Same
+// rule as scripts/lib/data-home.sh: `~/.autotrigger` while an older installation still has it,
+// otherwise `~/.mysuricates`.
 function readApiKeyFile(): string {
   const home = process.env.HOME?.trim();
   if (!home) {
     return '';
   }
-  const candidates = [resolve(home, '.mysuricates/api-key'), resolve(home, '.autotrigger/api-key')];
+  const candidates = [resolve(home, '.autotrigger/api-key'), resolve(home, '.mysuricates/api-key')];
   for (const file of candidates) {
     try {
       const content = readFileSync(file, 'utf-8').trim();
@@ -54,11 +53,11 @@ if (!detectedApiKey) {
   // (AUTOMATION_SECURITY_ENABLED=false). Otherwise every authenticated request fails —
   // there is no key-free way to fetch it (GET /api/v1/system/settings/api-key itself needs
   // the key). Set one explicitly before running:
-  //   export CYPRESS_API_KEY="$(cat ~/.autotrigger/api-key)"   # dev instance on this host
-  //   export CYPRESS_TEST_API_KEY="$(docker exec <container> cat /home/<user>/.autotrigger/api-key)"  # test instance
+  //   export CYPRESS_API_KEY="$(cat ~/.mysuricates/api-key)"   # dev instance on this host (older: ~/.autotrigger)
+  //   export CYPRESS_TEST_API_KEY="$(docker exec <container> cat /home/<user>/.mysuricates/api-key)"  # test instance
   console.warn(
-    '[cypress.config] No API key found (CYPRESS_API_KEY / ~/.autotrigger/api-key). ' +
-      'Set CYPRESS_API_KEY to the key from `cat ~/.autotrigger/api-key`, or run against an ' +
+    '[cypress.config] No API key found (CYPRESS_API_KEY / ~/.mysuricates/api-key). ' +
+      'Set CYPRESS_API_KEY to the key from `cat ~/.mysuricates/api-key`, or run against an ' +
       'instance with AUTOMATION_SECURITY_ENABLED=false.',
   );
 }

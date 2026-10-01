@@ -107,7 +107,7 @@ class ApiKeyServiceTest {
                     .doesNotContain(key)
                     .doesNotContain(key.substring(0, key.length() - 4));
             verify(settingsRepo).set("api-key", key);
-            assertThat(Files.readString(tempHome.resolve(".autotrigger/api-key"))).isEqualTo(key);
+            assertThat(Files.readString(tempHome.resolve(".mysuricates/api-key"))).isEqualTo(key);
         } finally {
             logger.detachAppender(appender);
             logger.setLevel(previousLevel);

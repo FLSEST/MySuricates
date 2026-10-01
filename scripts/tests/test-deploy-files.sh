@@ -101,7 +101,7 @@ for c in deploy/compose.yml ai-automation-backend/docker-compose.stable.yml ai-a
 done
 check "staging.sh: port on 127.0.0.1 unless STABLE_/TEST_BIND" 'grep -q "staging_setting \"\$env\" BIND 127.0.0.1" "$R/scripts/staging.sh"'
 check "staging.sh: socket off unless switched on"             'grep -q "staging_setting \"\$env\" DOCKER_SOCKET 0" "$R/scripts/staging.sh"'
-check "dev starter: socket off unless switched on"            'grep -q "AUTOTRIGGER_DEV_DOCKER_SOCKET:-0" "$R/scripts/start-autotrigger-dev.sh"'
+check "dev starter: socket off unless switched on"            'grep -q "MYSURICATES_DEV_DOCKER_SOCKET:-0" "$R/scripts/start-mysuricates-dev.sh"'
 
 echo "6) health checks ask the own instance directly, never through a proxy (cf662c01)"
 # Docker reicht Proxy-Variablen in den Container (~/.docker/config.json, „proxies“), und curl 8.5 schickt

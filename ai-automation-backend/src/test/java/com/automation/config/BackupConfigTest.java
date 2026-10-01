@@ -57,13 +57,13 @@ class BackupConfigTest {
 
     @Test
     void should_returnUserHomeBasedPath_when_directoryDefaultIsQueried() {
-        String expectedDir = System.getProperty("user.home") + "/.autotrigger/backups";
+        String expectedDir = DataHome.dir().resolve("backups").toString();
         assertThat(config.getDirectory()).isEqualTo(expectedDir);
     }
 
     @Test
-    void should_endWithAutotriggerBackups_when_directoryDefaultIsQueried() {
-        assertThat(config.getDirectory()).endsWith("/.autotrigger/backups");
+    void should_endWithBackups_when_directoryDefaultIsQueried() {
+        assertThat(config.getDirectory()).endsWith("/backups");
     }
 
     // --- Setter/Override tests (simulating @ConfigurationProperties injection) ---

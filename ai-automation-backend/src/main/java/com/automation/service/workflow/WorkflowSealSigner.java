@@ -43,7 +43,7 @@ public class WorkflowSealSigner {
 
     @org.springframework.beans.factory.annotation.Autowired
     public WorkflowSealSigner(
-            @Value("${automation.seal.key-file:${user.home}/.autotrigger/seal-signing.key}") String keyFilePath) {
+            @Value("${automation.seal.key-file:${automation.data-home}/seal-signing.key}") String keyFilePath) {
         this(Path.of(keyFilePath), System::getenv);
     }
 

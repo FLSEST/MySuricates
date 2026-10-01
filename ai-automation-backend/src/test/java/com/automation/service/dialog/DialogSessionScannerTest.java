@@ -41,7 +41,7 @@ class DialogSessionScannerTest {
 
         @Test
         void encodeAndDecode_roundTrip() {
-            String original = "/test/user/Entwicklung/tools/autotrigger";
+            String original = "/test/user/Entwicklung/tools/mysuricates";
             String encoded = DialogSessionScanner.encodeProjectPath(original);
             String decoded = DialogSessionScanner.decodeProjectPath(encoded);
             assertThat(decoded).isEqualTo(original);

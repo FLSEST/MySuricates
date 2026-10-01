@@ -4,7 +4,7 @@
 
 Willkommen bei **MySuricates**. Dieses Dokument gibt dir einen schnellen Ueberblick ueber das Projekt, seinen Zweck und die verwendeten Technologien.
 
-> **Zu den Namen:** Das Produkt heisst **MySuricates**. Das Git-Verzeichnis heisst historisch `autotrigger`, und **AutoPilot** ist der Name des Projekts, unter dem MySuricates seine eigenen Workflows und TODOs fuehrt. Alle drei bezeichnen dieselbe Sache aus verschiedenen Blickwinkeln.
+> **Zu den Namen:** Das Produkt heisst **MySuricates**, und **AutoPilot** ist der Name des Projekts, unter dem MySuricates seine eigenen Workflows und TODOs fuehrt. Beide bezeichnen dieselbe Sache aus verschiedenen Blickwinkeln.
 
 ---
 
@@ -73,7 +73,7 @@ MySuricates ist eine **KI-gesteuerte Workflow-Automatisierungsplattform** mit vi
 ## Projektstruktur (High-Level)
 
 ```
-autotrigger/
+MySuricates/
 ├── ai-automation-backend/       # Spring Boot REST API (Port 9090)
 │   ├── src/main/java/           # Java-Quellcode
 │   ├── src/main/resources/      # Konfiguration & Migrationen
@@ -103,7 +103,7 @@ Fuer die vollstaendige Einrichtung siehe [SETUP.md](SETUP.md). Hier der Kurzuebe
 
 ```bash
 # Backend starten (baut das JAR und startet es aus einer Kopie)
-./scripts/start-autotrigger-dev.sh start
+./scripts/start-mysuricates-dev.sh start
 
 # Frontend starten (neues Terminal)
 cd ai-automation-frontend

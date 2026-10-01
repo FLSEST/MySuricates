@@ -19,7 +19,7 @@ public class FactoryConfig {
     /**
      * Base directory for factory working dirs (claude/, codex/).
      */
-    private String baseDir = System.getProperty("user.home") + "/.autotrigger/factory";
+    private String baseDir = DataHome.file("factory");
 
     /**
      * Timeout in seconds for AI generation calls.

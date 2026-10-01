@@ -31,7 +31,7 @@ class HostCodexServiceTest {
     @Test
     void buildCommand_basic() {
         Path outputFile = Path.of("/tmp/result.txt");
-        Path workDir = Path.of("/home/user/.autotrigger/summarization/codex");
+        Path workDir = Path.of("/home/user/.mysuricates/summarization/codex");
 
         List<String> cmd = service.buildCommand("test prompt", workDir, outputFile);
 

@@ -432,9 +432,9 @@
                                 <fileset>
                                     <directory>/tmp</directory>
                                     <includes>
-                                        <include>autotrigger-integrationtest.db</include>
-                                        <include>autotrigger-integrationtest.db-shm</include>
-                                        <include>autotrigger-integrationtest.db-wal</include>
+                                        <include>mysuricates-integrationtest.db</include>
+                                        <include>mysuricates-integrationtest.db-shm</include>
+                                        <include>mysuricates-integrationtest.db-wal</include>
                                     </includes>
                                 </fileset>
                             </filesets>

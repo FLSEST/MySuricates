@@ -35,8 +35,8 @@ which claude
 ## 1. Clone the Repository
 
 ```bash
-git clone <repository-url>
-cd autotrigger
+git clone https://github.com/FLSEST/MySuricates.git
+cd MySuricates
 ```
 
 ---
@@ -81,7 +81,7 @@ export AUTOMATION_WORKSPACE_ROOT=/path/to/projects
 
 ```bash
 # from the repo root -- builds the JAR, copies it and starts `java -jar`
-./scripts/start-autotrigger-dev.sh start   # or restart | stop
+./scripts/start-mysuricates-dev.sh start   # or restart | stop
 ```
 
 > Do **not** use `mvn spring-boot:run`: the `RuntimeClasspathGuard` aborts a start from `target/classes` with exit code 2 (escape hatch: `automation.runtime.allow-classes-dir`).

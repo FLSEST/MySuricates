@@ -31,7 +31,7 @@ acurl() { local_curl_key "$API_KEY" -sf "$@"; }   # without a key: no header
 check_api() {
   if ! local_curl -sf "${BASE_URL}/system/health" > /dev/null 2>&1; then
     error "AutoPilot API not reachable at ${BASE_URL}"
-    error "Start the backend first: scripts/start-autotrigger-dev.sh"
+    error "Start the backend first: scripts/start-mysuricates-dev.sh"
     exit 1
   fi
   if [[ -z "$API_KEY" ]]; then

@@ -38,7 +38,7 @@ docker load < mysuricates-<version>-tryout.tar.gz
 docker run -d --name mysuricates-tryout -p 127.0.0.1:9095:9090 \
   -e AUTOMATION_CORS_ORIGINS=http://localhost:9095 \
   -v mysuricates-tryout-data:/app/data -v mysuricates-tryout-secrets:/app/secrets mysuricates:tryout
-docker exec -u 1000 mysuricates-tryout cat /app/data/home/.autotrigger/api-key   # API key
+docker exec -u 1000 mysuricates-tryout cat /app/data/home/.mysuricates/api-key  # API key (images up to v0.7.8: .autotrigger)
 docker exec -it -u 1000 mysuricates-tryout claude                                  # AI login
 ```
 
@@ -244,11 +244,11 @@ Working on MySuricates itself needs Vite with hot reload instead of a built inte
 
 ```bash
 ./scripts/setup.sh --from-source --start     # tools, npm ci, runtime JAR, module preset, start
-./scripts/start-autotrigger-dev.sh           # later: backend :9090 + Vite :3000
+./scripts/start-mysuricates-dev.sh           # later: backend :9090 + Vite :3000
 ```
 
 The dev starter shows the API key masked after start (`--show-key` shows it in full); it lives in
-`~/.autotrigger/api-key`. Details: [entwicklung.md](entwicklung.md).
+`~/.mysuricates/api-key`. Details: [entwicklung.md](entwicklung.md).
 
 ---
 

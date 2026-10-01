@@ -10,7 +10,7 @@ check() { if eval "$2"; then echo "  ok   $1"; PASS=$((PASS + 1)); else echo "  
 # Throwaway repo: scripts/tryout.sh + a Dockerfile; v0.1.0 without the tryout stage, v0.2.0 and v0.10.0 with it
 REPO="$TMP/repo"; mkdir -p "$REPO/scripts/lib" "$REPO/deploy"
 cp "$R/scripts/tryout.sh" "$REPO/scripts/"
-cp "$R/scripts/lib/provider-login.sh" "$REPO/scripts/lib/"   # login commands shared with instance.sh/staging.sh
+cp "$R/scripts/lib/provider-login.sh" "$R/scripts/lib/data-home.sh" "$REPO/scripts/lib/"   # login commands shared with instance.sh/staging.sh
 git -C "$REPO" init -q && git -C "$REPO" config user.email t@t && git -C "$REPO" config user.name t
 printf 'FROM x AS runtime\n' > "$REPO/deploy/Dockerfile"
 git -C "$REPO" add -A && git -C "$REPO" commit -qm one && git -C "$REPO" tag v0.1.0
@@ -87,7 +87,7 @@ check "login runs as the instance user with the volume home" 'grep -q -- "exec -
 rm -f "$DOCKER_RAN"
 check "login needs a running container"        'bash "$SCRIPT" login >/dev/null 2>&1; [ $? -eq 2 ]'
 check "login rejects unknown tools"            'EXISTS=1 bash "$SCRIPT" login foo >/dev/null 2>&1; [ $? -eq 2 ]'
-check "key reads the file on the volume"       '[ "$(EXISTS=1 bash "$SCRIPT" key)" = KEY123 ] && grep -q "/app/data/home/.autotrigger/api-key" "$DOCKER_LOG"'
+check "key reads the file on the volume"       '[ "$(EXISTS=1 bash "$SCRIPT" key)" = KEY123 ] && grep -q "sh -c .*/.autotrigger/api-key.*/.mysuricates/api-key.* sh /app/data/home$" "$DOCKER_LOG"'
 : > "$DOCKER_LOG"; EXISTS=1 bash "$SCRIPT" remove >/dev/null 2>&1
 check "remove keeps the data by default"       'grep -q "^rm -f mysuricates-tryout" "$DOCKER_LOG" && ! grep -q "^volume rm" "$DOCKER_LOG"'
 : > "$DOCKER_LOG"; bash "$SCRIPT" remove --data >/dev/null 2>&1

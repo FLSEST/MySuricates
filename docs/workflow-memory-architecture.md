@@ -82,7 +82,7 @@ Schreibvorgang (Schritt 5), weil die Datenbank nur eine Verbindung hat.
   └──────┬───────┘   └──────┬───────┘
          │                   │
          ▼                   ▼
-  ~/.autotrigger/     ~/.autotrigger/
+  ~/.mysuricates/     ~/.mysuricates/
   summarization/      summarization/
   claude/             codex/
   └── CLAUDE.md       └── AGENTS.md
@@ -168,7 +168,7 @@ Schreibvorgang (Schritt 5), weil die Datenbank nur eine Verbindung hat.
 ## 5. Verzeichnisstruktur
 
 ```
-~/.autotrigger/summarization/           ← Konfigurierbar via application.yml
+~/.mysuricates/summarization/           ← Konfigurierbar via application.yml
 ├── claude/                             ← Working Dir für ClaudeSummarizer
 │   └── CLAUDE.md                       ← Instruktionen (aus resources kopiert)
 └── codex/                              ← Working Dir für CodexSummarizer
@@ -192,7 +192,7 @@ beim nächsten Neustart übernommen.
 ```yaml
 automation:
   summarization:
-    base-dir: ${AUTOMATION_SUMMARIZATION_DIR:${user.home}/.autotrigger/summarization}
+    base-dir: ${AUTOMATION_SUMMARIZATION_DIR:${automation.data-home}/summarization}
     timeout-seconds: ${AUTOMATION_SUMMARIZATION_TIMEOUT:120}
 ```
 

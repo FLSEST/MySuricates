@@ -40,8 +40,8 @@ class SummarizationConfigTest {
     class Defaults {
 
         @Test
-        void should_default_baseDir_to_user_home_autotrigger_summarization() {
-            String expected = System.getProperty("user.home") + "/.autotrigger/summarization";
+        void should_default_baseDir_to_data_home_summarization() {
+            String expected = DataHome.dir().resolve("summarization").toString();
             assertThat(config.getBaseDir()).isEqualTo(expected);
         }
 

@@ -139,7 +139,7 @@ class TailscaleServiceTest {
 
     @Test
     void inContainer_whenAutomationInstanceContainerSet_detectsContainerLikeAiProviderStatusService() {
-        TailscaleService service = new TailscaleService(() -> true, env(null), "autotrigger-dev-container");
+        TailscaleService service = new TailscaleService(() -> true, env(null), "mysuricates-dev-container");
 
         RemoteAccessResponse response = service.getStatus();
 

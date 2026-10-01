@@ -1279,7 +1279,7 @@ The blind spot of the bytecode measurement is a dependency that only appears as 
 ## Directory Structure
 
 ```
-autotrigger/
+MySuricates/
 ├── CLAUDE.md                          ← Project instructions for Claude Code
 ├── VISION.md                          ← Pointer to docs/vision.md
 ├── docs/                              ← These documentation files
@@ -1287,7 +1287,7 @@ autotrigger/
 ├── scripts/
 │   ├── release.sh                     ← Version bump + git tag
 │   ├── staging.sh                     ← Manage stable/test environment
-│   └── start-autotrigger-dev.sh       ← Start dev environment
+│   └── start-mysuricates-dev.sh       ← Start dev environment
 │
 ├── ai-automation-backend/
 │   ├── pom.xml

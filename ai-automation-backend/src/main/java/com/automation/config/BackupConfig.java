@@ -17,5 +17,5 @@ public class BackupConfig {
 
     private int retainCount = 30;
 
-    private String directory = System.getProperty("user.home") + "/.autotrigger/backups";
+    private String directory = DataHome.file("backups");
 }

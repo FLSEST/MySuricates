@@ -36,7 +36,7 @@ public class InstanceAddress {
 
     /** The file the API key is written to: {@code user.home} of this JVM (per instance under the installer). */
     public static Path apiKeyFile() {
-        return Path.of(System.getProperty("user.home"), ".autotrigger", "api-key");
+        return DataHome.dir().resolve("api-key");
     }
 
     /** Base URL without a trailing slash, e.g. {@code http://localhost:9090}. */

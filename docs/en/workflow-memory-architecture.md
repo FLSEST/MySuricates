@@ -82,7 +82,7 @@ has only one connection.
   └──────┬───────┘   └──────┬───────┘
          │                   │
          ▼                   ▼
-  ~/.autotrigger/     ~/.autotrigger/
+  ~/.mysuricates/     ~/.mysuricates/
   summarization/      summarization/
   claude/             codex/
   └── CLAUDE.md       └── AGENTS.md
@@ -168,7 +168,7 @@ has only one connection.
 ## 5. Directory Structure
 
 ```
-~/.autotrigger/summarization/           ← Configurable via application.yml
+~/.mysuricates/summarization/           ← Configurable via application.yml
 ├── claude/                             ← Working dir for ClaudeSummarizer
 │   └── CLAUDE.md                       ← Instructions (copied from resources)
 └── codex/                              ← Working dir for CodexSummarizer
@@ -191,7 +191,7 @@ on backend startup. Changes to the resource files take effect on the next restar
 ```yaml
 automation:
   summarization:
-    base-dir: ${AUTOMATION_SUMMARIZATION_DIR:${user.home}/.autotrigger/summarization}
+    base-dir: ${AUTOMATION_SUMMARIZATION_DIR:${automation.data-home}/summarization}
     timeout-seconds: ${AUTOMATION_SUMMARIZATION_TIMEOUT:120}
 ```
 

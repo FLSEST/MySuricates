@@ -48,7 +48,7 @@ All workflow CRUD and execution operations are under `/api/v1/workflows`. A run 
 
 Every call needs the `X-API-Key` header. The backend creates the key on first start; for an instance
 set up by the installer `scripts/instance.sh key --name <name>` shows it, with the source setup it is
-in `~/.autotrigger/api-key`. The `projectId` is the ID of an
+in `~/.mysuricates/api-key`. The `projectId` is the ID of an
 existing project — `GET /api/v1/projects` lists the projects with their `id` field, and in the UI it
 is part of the project page's address (`/projects/<id>`). Full reference:
 [api-referenz.md](api-referenz.md).

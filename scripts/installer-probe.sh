@@ -527,7 +527,7 @@ echo "Report: $OUT/report.html"
 if [ "$KEEP" = 1 ]; then
   if [ "$WAY" = host ]; then
     echo "Instanz läuft weiter: http://localhost:${FPORT}  (Backend :${BPORT})"
-    echo "  API-Key:  docker exec -u probe $NAME cat ${USER_HOME}/.autotrigger/api-key"
+    echo "  API-Key:  docker exec -u probe $NAME cat ${USER_HOME}/.mysuricates/api-key"
     echo "  Aufräumen: docker rm -f $NAME"
   else
     echo "Instanzen laufen weiter (Docker des Rechners, Vorsilbe $PREFIX):"

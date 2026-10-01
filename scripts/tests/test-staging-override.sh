@@ -16,7 +16,7 @@ mkdir -p "$REPO/scripts/lib" "$REPO/ai-automation-backend/stable-frontend" "$REP
          "$TMP/bin" "$TMP/home" "$TMP/config/mysuricates" "$TMP/state" "$TMP/nm"
 cp "$R/scripts/staging.sh" "$REPO/scripts/"
 cp "$R/scripts/lib/host-mounts.sh" "$R/scripts/lib/provider-catalog.generated.sh" "$R/scripts/lib/provider-login.sh" \
-   "$R/scripts/lib/local-curl.sh" "$REPO/scripts/lib/"
+   "$R/scripts/lib/local-curl.sh" "$R/scripts/lib/data-home.sh" "$REPO/scripts/lib/"
 cp "$R/ai-automation-backend/docker-compose.stable.yml" "$R/ai-automation-backend/docker-compose.test.yml" "$REPO/ai-automation-backend/"
 cat > "$TMP/bin/docker" <<'STUB'
 #!/usr/bin/env bash

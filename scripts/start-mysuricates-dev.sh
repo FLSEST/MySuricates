@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# start-autotrigger-dev.sh — startet/stoppt das Dev-Backend (:9090) und den Vite-Dev-Server (:3000).
+# start-mysuricates-dev.sh — startet/stoppt das Dev-Backend (:9090) und den Vite-Dev-Server (:3000).
 #
-#   scripts/start-autotrigger-dev.sh [start] [--rebuild] [--show-key]   # idempotent, Default
-#   scripts/start-autotrigger-dev.sh stop                                # nur Backend
-#   scripts/start-autotrigger-dev.sh restart [--force]                   # Backend: stop -> JAR bauen -> start;
+#   scripts/start-mysuricates-dev.sh [start] [--rebuild] [--show-key]   # idempotent, Default
+#   scripts/start-mysuricates-dev.sh stop                                # nur Backend
+#   scripts/start-mysuricates-dev.sh restart [--force]                   # Backend: stop -> JAR bauen -> start;
 #                                                                        # Frontend nur, falls es nicht laeuft
-#   scripts/start-autotrigger-dev.sh build                               # nur Runtime-JAR bauen (setup.sh), startet nichts
-#   scripts/start-autotrigger-dev.sh [start|stop|restart|build] --container  # Backend im Docker-Container
+#   scripts/start-mysuricates-dev.sh build                               # nur Runtime-JAR bauen (setup.sh), startet nichts
+#   scripts/start-mysuricates-dev.sh [start|stop|restart|build] --container  # Backend im Docker-Container
 #
 # --container: Dockerfile.stable kompiliert nichts, es kopiert das JAR aus target/. restart baut es
 # deshalb vorher immer (mvn clean package), start nur mit --rebuild oder wenn keins liegt, build nur das.
@@ -34,7 +34,7 @@ REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 COMMAND="start"
 # Betriebsart des Backends: host (Default, java -jar) oder container (docker compose).
 # Der Host-Weg bleibt unveraendert; der Container-Weg ist additiv (TODO a1236a64).
-RUNTIME_MODE="${AUTOTRIGGER_DEV_RUNTIME:-host}"
+RUNTIME_MODE="${MYSURICATES_DEV_RUNTIME:-host}"
 SHOW_KEY=0
 FORCE=0
 REBUILD=0
@@ -51,9 +51,20 @@ for arg in "$@"; do
   esac
 done
 
-STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/autotrigger-dev"
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/mysuricates-dev"
+# Einmaliger Umzug vom Namen vor der Umbenennung: PID-Dateien und Runtime-JARs bleiben gueltig
+# (ein laufendes Backend haelt sein JAR offen, das Umbenennen des Ordners stoert es nicht);
+LEGACY_STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/autotrigger-dev"
+# current.jar ist ein absoluter Link und wird auf den neuen Ordner umgebogen.
+if [[ ! -e "${STATE_DIR}" && -d "${LEGACY_STATE_DIR}" ]]; then
+  mv "${LEGACY_STATE_DIR}" "${STATE_DIR}"
+  if [[ -L "${STATE_DIR}/runtime/current.jar" ]]; then
+    ln -sfn "${STATE_DIR}/runtime/$(basename "$(readlink "${STATE_DIR}/runtime/current.jar")")" \
+      "${STATE_DIR}/runtime/current.jar"
+  fi
+fi
 RUNTIME_DIR="${STATE_DIR}/runtime"
-KEEP_JARS="${AUTOTRIGGER_DEV_KEEP_JARS:-2}"
+KEEP_JARS="${MYSURICATES_DEV_KEEP_JARS:-2}"
 mkdir -p "${STATE_DIR}"
 
 BACKEND_DIR="${REPO_ROOT}/ai-automation-backend"
@@ -81,7 +92,7 @@ FRONTEND_PROCESS_PATTERN='(npm|node|vite)'
 BACKEND_PORT=9090
 # Im Container antwortet das Backend auf dem Port, den Compose veroeffentlicht: laeuft-schon-Pruefung,
 # Bereitschaft und Run-Check vor restart folgen ihm — eine Probe neben dem Host-Backend (3bfa4e10).
-if [[ "${RUNTIME_MODE}" == "container" ]]; then BACKEND_PORT="${AUTOTRIGGER_DEV_CONTAINER_PORT:-9090}"; fi
+if [[ "${RUNTIME_MODE}" == "container" ]]; then BACKEND_PORT="${MYSURICATES_DEV_CONTAINER_PORT:-9090}"; fi
 API_BASE="${MYSURICATES_API_BASE:-http://localhost:${BACKEND_PORT}/api/v1}"
 BACKEND_READY_URL="${API_BASE}/system/info"
 # Vite serves HTTPS only when certs/dev.crt exists, otherwise plain HTTP.
@@ -324,38 +335,38 @@ build_backend_jar() {
 
 COMPOSE_FILE="${BACKEND_DIR}/docker-compose.dev-container.yml"
 COMPOSE_OVERRIDE="${STATE_DIR}/dev-container.override.yml"
-COMPOSE_PROJECT="${AUTOTRIGGER_DEV_COMPOSE_PROJECT:-autotrigger-dev}"
+COMPOSE_PROJECT="${MYSURICATES_DEV_COMPOSE_PROJECT:-mysuricates-dev}"
 
 compose_cmd() {
   # Das Image legt einen Benutzer mit den Host-IDs an (Dockerfile.stable), damit die
   # gemounteten Anmeldungen lesbar bleiben. $UID/$GID sind in Bash nicht exportiert,
   # deshalb hier ausdruecklich aus id(1) — ohne sie scheitert der Build im useradd.
-  AUTOTRIGGER_DEV_HOST_USER="${AUTOTRIGGER_DEV_HOST_USER:-$(id -un)}" \
-  AUTOTRIGGER_DEV_HOST_UID="${AUTOTRIGGER_DEV_HOST_UID:-$(id -u)}" \
-  AUTOTRIGGER_DEV_HOST_GID="${AUTOTRIGGER_DEV_HOST_GID:-$(id -g)}" \
+  MYSURICATES_DEV_HOST_USER="${MYSURICATES_DEV_HOST_USER:-$(id -un)}" \
+  MYSURICATES_DEV_HOST_UID="${MYSURICATES_DEV_HOST_UID:-$(id -u)}" \
+  MYSURICATES_DEV_HOST_GID="${MYSURICATES_DEV_HOST_GID:-$(id -g)}" \
   docker compose -p "${COMPOSE_PROJECT}" -f "${COMPOSE_FILE}" -f "${COMPOSE_OVERRIDE}" "$@"
 }
 
 # Override mit dem, was vom Host in den Container kommt (scripts/lib/host-mounts.sh, 262948a4):
-#   AUTOTRIGGER_DEV_AI_FROM_HOST  programs | login (Default) | all
-#   AUTOTRIGGER_DEV_AI_PROVIDERS  Auswahl aus claude,codex,pi (Default: alle)
-#   AUTOTRIGGER_DEV_DOCKER_SOCKET 0 (Default) | 1 = volle Kontrolle ueber Docker auf dem Rechner
+#   MYSURICATES_DEV_AI_FROM_HOST  programs | login (Default) | all
+#   MYSURICATES_DEV_AI_PROVIDERS  Auswahl aus claude,codex,pi (Default: alle)
+#   MYSURICATES_DEV_DOCKER_SOCKET 0 (Default) | 1 = volle Kontrolle ueber Docker auf dem Rechner
 #                                 (Projekt-Container, Terminal, container_image) — bewusst setzen
-#   AUTOTRIGGER_DEV_CONTAINER_BIND Adresse fuer den Port, Default 127.0.0.1; 0.0.0.0 = auch lokales Netz
+#   MYSURICATES_DEV_CONTAINER_BIND Adresse fuer den Port, Default 127.0.0.1; 0.0.0.0 = auch lokales Netz
 #                                 (liest docker-compose.dev-container.yml selbst, hier nur geprueft)
 # Die Projektwurzel bindet docker-compose.dev-container.yml selbst ein.
 write_compose_override() {
-  local HOST_MOUNTS_NODE_MODULES="${AUTOTRIGGER_DEV_NODE_MODULES:-}"   # leer: npm root -g
+  local HOST_MOUNTS_NODE_MODULES="${MYSURICATES_DEV_NODE_MODULES:-}"   # leer: npm root -g
   local missing
-  case "${AUTOTRIGGER_DEV_CONTAINER_BIND:-127.0.0.1}" in
-    *[!0-9a-fA-F.:]*) echo "Ungueltiges AUTOTRIGGER_DEV_CONTAINER_BIND '${AUTOTRIGGER_DEV_CONTAINER_BIND}' (eine IP-Adresse, z. B. 127.0.0.1 oder 0.0.0.0)." >&2
+  case "${MYSURICATES_DEV_CONTAINER_BIND:-127.0.0.1}" in
+    *[!0-9a-fA-F.:]*) echo "Ungueltiges MYSURICATES_DEV_CONTAINER_BIND '${MYSURICATES_DEV_CONTAINER_BIND}' (eine IP-Adresse, z. B. 127.0.0.1 oder 0.0.0.0)." >&2
                       return 2 ;;
   esac
-  host_mounts_yaml backend "" "${AUTOTRIGGER_DEV_DOCKER_SOCKET:-0}" "${AUTOTRIGGER_DEV_AI_FROM_HOST:-login}" \
-    "${AUTOTRIGGER_DEV_AI_PROVIDERS:-}" "scripts/start-autotrigger-dev.sh --container" AUTOTRIGGER_DEV_ "" \
+  host_mounts_yaml backend "" "${MYSURICATES_DEV_DOCKER_SOCKET:-0}" "${MYSURICATES_DEV_AI_FROM_HOST:-login}" \
+    "${MYSURICATES_DEV_AI_PROVIDERS:-}" "scripts/start-mysuricates-dev.sh --container" MYSURICATES_DEV_ "" \
     "dev-${COMPOSE_PROJECT}" \
-    > "${COMPOSE_OVERRIDE}" || { echo "Ungueltige AUTOTRIGGER_DEV_AI_*-Werte (siehe oben)." >&2; return 2; }
-  echo "KI-Anbieter im Container: ${HOST_MOUNTS_READY:-keiner} (${AUTOTRIGGER_DEV_AI_FROM_HOST:-login}, ${COMPOSE_OVERRIDE})"
+    > "${COMPOSE_OVERRIDE}" || { echo "Ungueltige MYSURICATES_DEV_AI_*-Werte (siehe oben)." >&2; return 2; }
+  echo "KI-Anbieter im Container: ${HOST_MOUNTS_READY:-keiner} (${MYSURICATES_DEV_AI_FROM_HOST:-login}, ${COMPOSE_OVERRIDE})"
   missing="$(host_mounts_missing_text)"
   if [[ -n "${missing}" ]]; then
     printf 'Nicht nutzbar im Container:\n%s\n' "${missing}" >&2
@@ -416,7 +427,7 @@ start_backend() {
   echo "Starte Backend (java -jar) ..."
   (
     cd "${BACKEND_DIR}"   # cwd bleibt das Backend-Verzeichnis: ./data/automation.db, user.dir-Nutzer
-    nohup java "${BACKEND_JVM_OPTS[@]}" ${AUTOTRIGGER_DEV_JVM_OPTS:-} -jar "${CURRENT_JAR}" \
+    nohup java "${BACKEND_JVM_OPTS[@]}" ${MYSURICATES_DEV_JVM_OPTS:-} -jar "${CURRENT_JAR}" \
       > "${BACKEND_LOG}" 2>&1 &
     echo "$!" > "${BACKEND_PID_FILE}"
   )
@@ -511,7 +522,8 @@ print_logs_hint() {
 # Drei Fälle: Security aus / eigener Key via Env / auto-generierter Key (Datei).
 # Default maskiert (nur letzte 4 Zeichen) — mit --show-key voll. Sicher für CI/Screen-Sharing.
 print_api_key() {
-  local key_file="${HOME}/.autotrigger/api-key"
+  local key_file
+  key_file="$(data_home)/api-key"
   local key="" src=""
   echo
   if [[ "${AUTOMATION_SECURITY_ENABLED:-true}" == "false" ]]; then
@@ -548,7 +560,7 @@ report_and_exit() {
 
   if [[ "${backend_ok}" -eq 1 && "${frontend_ok}" -eq 1 ]]; then
     echo
-    echo "Autotrigger Dev ist gestartet."
+    echo "MySuricates Dev ist gestartet."
     exit 0
   fi
 
@@ -561,7 +573,7 @@ report_and_exit() {
 main() {
   require_command curl
   require_command python3
-  echo "Autotrigger Dev Starter (${COMMAND})"
+  echo "MySuricates Dev Starter (${COMMAND})"
   echo "Repo: ${REPO_ROOT}"
 
   echo "Betriebsart: ${RUNTIME_MODE}"

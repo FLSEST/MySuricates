@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Tests for scripts/start-autotrigger-dev.sh — JAR runtime handling and the restart run guard.
-# Run: bash scripts/tests/test-start-autotrigger-dev.sh   (exit 0 = all passed)
+# Tests for scripts/start-mysuricates-dev.sh — JAR runtime handling and the restart run guard.
+# Run: bash scripts/tests/test-start-mysuricates-dev.sh   (exit 0 = all passed)
 set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SCRIPT="$HERE/../start-autotrigger-dev.sh"
+SCRIPT="$HERE/../start-mysuricates-dev.sh"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 PASS=0; FAIL=0
 
@@ -133,7 +133,7 @@ sleep 1
 CASE
   script -qec "bash $TMP/frontend-case.sh" /dev/null >/dev/null 2>&1
   sleep 1
-  FE_PID="$(cat "$TMP/state/autotrigger-dev/frontend.pid" 2>/dev/null)"
+  FE_PID="$(cat "$TMP/state/mysuricates-dev/frontend.pid" 2>/dev/null)"
   check "frontend still runs after the terminal closed"  '[ -n "$FE_PID" ] && kill -0 "$FE_PID" 2>/dev/null'
   check "it leads its own session (no controlling tty)"  '[ "$(ps -o sid= -p "$FE_PID" 2>/dev/null | tr -d " ")" = "$FE_PID" ]'
   check "the pid file names the node process itself"     '[[ "$(ps -o args= -p "$FE_PID" 2>/dev/null)" == node* ]]'
@@ -145,23 +145,23 @@ fi
 echo "8) dev container override comes from scripts/lib/host-mounts.sh (262948a4)"
 check "starter sources the mount library"   'grep -q "lib/host-mounts.sh" "$SCRIPT"'
 mkdir -p "$TMP/nm"
-OVR='export HOST_MOUNTS_ASSUME_SOCKET=1 AUTOTRIGGER_DEV_NODE_MODULES="'"$TMP"'/nm"; mkdir -p "$HOME/.claude"; COMPOSE_OVERRIDE="'"$TMP"'/ov.yml"'
+OVR='export HOST_MOUNTS_ASSUME_SOCKET=1 MYSURICATES_DEV_NODE_MODULES="'"$TMP"'/nm"; mkdir -p "$HOME/.claude"; COMPOSE_OVERRIDE="'"$TMP"'/ov.yml"'
 OUT="$(run_in_script "$OVR"'; write_compose_override >/dev/null 2>&1; cat "$COMPOSE_OVERRIDE"')"
 check "override names the backend service"  'grep -q "^  backend:" <<<"$OUT"'
 check "default login: no login directory"   '! grep -q "/.claude:" <<<"$OUT" && grep -q "MYSURICATES_AI_FROM_HOST=login" <<<"$OUT"'
 check "socket off by default"               '! grep -q "docker.sock" <<<"$OUT" && grep -q "MYSURICATES_DOCKER_SOCKET=0" <<<"$OUT"'
-check "switches named for the settings"     'grep -q "MYSURICATES_SWITCH_PREFIX=AUTOTRIGGER_DEV_" <<<"$OUT"'
-OUT="$(run_in_script "$OVR"'; AUTOTRIGGER_DEV_DOCKER_SOCKET=1 AUTOTRIGGER_DEV_AI_FROM_HOST=all write_compose_override >/dev/null 2>&1; cat "$COMPOSE_OVERRIDE"')"
+check "switches named for the settings"     'grep -q "MYSURICATES_SWITCH_PREFIX=MYSURICATES_DEV_" <<<"$OUT"'
+OUT="$(run_in_script "$OVR"'; MYSURICATES_DEV_DOCKER_SOCKET=1 MYSURICATES_DEV_AI_FROM_HOST=all write_compose_override >/dev/null 2>&1; cat "$COMPOSE_OVERRIDE"')"
 check "all + socket on purpose are honored" 'grep -q "/.claude:" <<<"$OUT" && grep -q "/var/run/docker.sock:/var/run/docker.sock" <<<"$OUT"'
 mkdir -p "$TMP/config/mysuricates" "$TMP/nm/@openai/codex"; printf 'OPENAI_API_KEY=test-openai\n' > "$TMP/config/mysuricates/ai.env"
-OUT="$(run_in_script "$OVR"'; AUTOTRIGGER_DEV_AI_PROVIDERS=codex write_compose_override >/dev/null 2>&1; cat "$COMPOSE_OVERRIDE"')"
-check "login variable: the dev container's own copy" 'grep -qF "\"$TMP/config/mysuricates/container-env/dev-autotrigger-dev.env\"" <<<"$OUT" && ! grep -q 4711 <<<"$OUT"'
+OUT="$(run_in_script "$OVR"'; MYSURICATES_DEV_AI_PROVIDERS=codex write_compose_override >/dev/null 2>&1; cat "$COMPOSE_OVERRIDE"')"
+check "login variable: the dev container's own copy" 'grep -qF "\"$TMP/config/mysuricates/container-env/dev-mysuricates-dev.env\"" <<<"$OUT" && ! grep -q 4711 <<<"$OUT"'
 rm -rf "$TMP/config" "$TMP/nm/@openai"
-RC="$(run_in_script "$OVR"'; AUTOTRIGGER_DEV_CONTAINER_BIND="0.0.0.0 x" write_compose_override >/dev/null 2>&1; echo $?')"
+RC="$(run_in_script "$OVR"'; MYSURICATES_DEV_CONTAINER_BIND="0.0.0.0 x" write_compose_override >/dev/null 2>&1; echo $?')"
 check "a bind that is no address refuses the start" '[ "$RC" = 2 ]'
 DCY="$HERE/../../ai-automation-backend/docker-compose.dev-container.yml"
-check "compose file publishes on 127.0.0.1 unless switched" 'grep -qF "host_ip: \"\${AUTOTRIGGER_DEV_CONTAINER_BIND:-127.0.0.1}\"" "$DCY" && [ "$(grep -c "host_ip:" "$DCY")" = 1 ]'
-RC="$(run_in_script "$OVR"'; AUTOTRIGGER_DEV_AI_FROM_HOST=everything write_compose_override >/dev/null 2>&1; echo $?')"
+check "compose file publishes on 127.0.0.1 unless switched" 'grep -qF "host_ip: \"\${MYSURICATES_DEV_CONTAINER_BIND:-127.0.0.1}\"" "$DCY" && [ "$(grep -c "host_ip:" "$DCY")" = 1 ]'
+RC="$(run_in_script "$OVR"'; MYSURICATES_DEV_AI_FROM_HOST=everything write_compose_override >/dev/null 2>&1; echo $?')"
 check "invalid mode refuses the start"      '[ "$RC" = 2 ]'
 check "compose file no longer hard-wires the socket" '! grep -q "docker.sock:/var/run/docker.sock" "$HERE/../../ai-automation-backend/docker-compose.dev-container.yml"'
 
@@ -195,13 +195,13 @@ echo "mvn $*" >> "$CALLS"
 mkdir -p "$(dirname "$0")/target" && echo "fat" > "$(dirname "$0")/target/ai-automation-backend-9.9.9.jar"
 STUB
 chmod +x "$TMP/cbin/docker" "$TMP/cbin/curl" "$TMP/cbin/npm" "$TMP/backend/mvnw"
-CTX='export PATH="'"$TMP"'/cbin:$PATH" CALLS="'"$TMP"'/calls.log" UP_MARKER="'"$TMP"'/up.marker" FE_MARKER="'"$TMP"'/fe.marker" AUTOTRIGGER_DEV_NODE_MODULES="'"$TMP"'/cnm"
+CTX='export PATH="'"$TMP"'/cbin:$PATH" CALLS="'"$TMP"'/calls.log" UP_MARKER="'"$TMP"'/up.marker" FE_MARKER="'"$TMP"'/fe.marker" MYSURICATES_DEV_NODE_MODULES="'"$TMP"'/cnm"
   BACKEND_DIR="'"$TMP"'/backend"; FRONTEND_DIR="'"$TMP"'/frontend"; MVN_CMD="$BACKEND_DIR/mvnw"; COMPOSE_OVERRIDE="'"$TMP"'/cov.yml"; RUNTIME_MODE=container'
-fresh() { rm -rf "$TMP/backend/target" "$TMP/up.marker" "$TMP/fe.marker" "$TMP/state/autotrigger-dev/runtime" "$TMP/state/autotrigger-dev/frontend.pid"; : > "$TMP/calls.log"; }
+fresh() { rm -rf "$TMP/backend/target" "$TMP/up.marker" "$TMP/fe.marker" "$TMP/state/mysuricates-dev/runtime" "$TMP/state/mysuricates-dev/frontend.pid"; : > "$TMP/calls.log"; }
 fresh
 RC="$(run_in_script "$CTX; COMMAND=build; ( main >/dev/null 2>&1 ); echo \$?")"
 check "build --container: exit 0, maven once"            '[ "$RC" = 0 ] && [ "$(grep -c "^mvn .*clean package -DskipTests" "$TMP/calls.log")" = 1 ]'
-check "build --container: no image, nothing started"     '! grep -q "^docker" "$TMP/calls.log" && [ ! -e "$TMP/state/autotrigger-dev/runtime/current.jar" ]'
+check "build --container: no image, nothing started"     '! grep -q "^docker" "$TMP/calls.log" && [ ! -e "$TMP/state/mysuricates-dev/runtime/current.jar" ]'
 fresh
 RC="$(run_in_script "$CTX; COMMAND=restart; ( main >/dev/null 2>&1 ); echo \$?")"
 check "restart --container: exit 0"                      '[ "$RC" = 0 ]'
@@ -230,12 +230,12 @@ STUB
 RC="$(run_in_script "$CTX; COMMAND=restart; ( main >/dev/null 2>&1 ); echo \$?")"
 check "maven fails: restart stops before touching the container" '[ "$RC" != 0 ] && ! grep -q "^docker" "$TMP/calls.log" && ! grep -q "^npm" "$TMP/calls.log"'
 
-echo "10) --container: the checks follow AUTOTRIGGER_DEV_CONTAINER_PORT (3bfa4e10)"
-URL="$(AUTOTRIGGER_DEV_RUNTIME=container AUTOTRIGGER_DEV_CONTAINER_PORT=9190 run_in_script 'echo "$BACKEND_READY_URL"')"
+echo "10) --container: the checks follow MYSURICATES_DEV_CONTAINER_PORT (3bfa4e10)"
+URL="$(MYSURICATES_DEV_RUNTIME=container MYSURICATES_DEV_CONTAINER_PORT=9190 run_in_script 'echo "$BACKEND_READY_URL"')"
 check "container port 9190 → readiness on :9190"         '[ "$URL" = "http://localhost:9190/api/v1/system/info" ]'
-URL="$(AUTOTRIGGER_DEV_CONTAINER_PORT=9190 run_in_script 'echo "$BACKEND_READY_URL"')"
+URL="$(MYSURICATES_DEV_CONTAINER_PORT=9190 run_in_script 'echo "$BACKEND_READY_URL"')"
 check "host mode keeps :9090"                            '[ "$URL" = "http://localhost:9090/api/v1/system/info" ]'
-URL="$(AUTOTRIGGER_DEV_RUNTIME=container AUTOTRIGGER_DEV_CONTAINER_PORT=9190 MYSURICATES_API_BASE=http://x:1/api/v1 run_in_script 'echo "$BACKEND_READY_URL"')"
+URL="$(MYSURICATES_DEV_RUNTIME=container MYSURICATES_DEV_CONTAINER_PORT=9190 MYSURICATES_API_BASE=http://x:1/api/v1 run_in_script 'echo "$BACKEND_READY_URL"')"
 check "MYSURICATES_API_BASE still wins"                  '[ "$URL" = "http://x:1/api/v1/system/info" ]'
 
 echo "11) a proxy from the environment never gets a request meant for the dev backend (bb4f60a5)"
@@ -281,6 +281,26 @@ if command -v python3 >/dev/null 2>&1 && command -v curl >/dev/null 2>&1; then
 else
   echo "  skip (no python3 or curl)"
 fi
+
+echo "12) rename: the old state directory moves along, the data directory keeps working"
+MIG="$TMP/mig"; mkdir -p "$MIG/state/autotrigger-dev/runtime" "$MIG/home"
+echo jar > "$MIG/state/autotrigger-dev/runtime/backend-1.jar"; echo 4711 > "$MIG/state/autotrigger-dev/backend.pid"
+ln -s "$MIG/state/autotrigger-dev/runtime/backend-1.jar" "$MIG/state/autotrigger-dev/runtime/current.jar"
+OUT="$(HOME="$MIG/home" XDG_STATE_HOME="$MIG/state" bash -c 'source "$1" >/dev/null 2>&1; set +e; echo "$STATE_DIR"; readlink "$CURRENT_JAR"; cat "$BACKEND_PID_FILE"' _ "$SCRIPT")"
+check "old state dir moved to mysuricates-dev"           '[ "$(sed -n 1p <<<"$OUT")" = "$MIG/state/mysuricates-dev" ] && [ ! -e "$MIG/state/autotrigger-dev" ]'
+check "current.jar points into the new dir"              '[ "$(sed -n 2p <<<"$OUT")" = "$MIG/state/mysuricates-dev/runtime/backend-1.jar" ] && [ -f "$MIG/state/mysuricates-dev/runtime/current.jar" ]'
+check "the PID file survives the move"                   '[ "$(sed -n 3p <<<"$OUT")" = 4711 ]'
+mkdir -p "$MIG/state/autotrigger-dev"
+HOME="$MIG/home" XDG_STATE_HOME="$MIG/state" bash -c 'source "$1" >/dev/null 2>&1' _ "$SCRIPT"
+check "an existing new dir is never overwritten"         '[ -d "$MIG/state/autotrigger-dev" ] && [ "$(cat "$MIG/state/mysuricates-dev/backend.pid")" = 4711 ]'
+dh() { HOME="$MIG/home" bash -c '. "$1"; unset AUTOMATION_DATA_HOME; data_home' _ "$HERE/../lib/data-home.sh"; }
+check "fresh home: data in ~/.mysuricates"               '[ "$(dh)" = "$MIG/home/.mysuricates" ]'
+mkdir -p "$MIG/home/.mysuricates" "$MIG/home/.autotrigger"; echo old-key > "$MIG/home/.autotrigger/api-key"
+check "older install: ~/.autotrigger as long as it exists" '[ "$(dh)" = "$MIG/home/.autotrigger" ]'
+check "api_key reads the key from there"                 '[ "$(HOME="$MIG/home" bash -c ". \"\$1\"; unset MYSURICATES_API_KEY AUTOMATION_DATA_HOME; api_key" _ "$HERE/../lib/api-key.sh")" = old-key ]'
+check "DATA_HOME_KEY_SH reads the same file"             '[ "$(bash -c ". \"\$1\"; sh -c \"\$DATA_HOME_KEY_SH\" sh \"\$2\"" _ "$HERE/../lib/data-home.sh" "$MIG/home")" = old-key ]'
+rm -rf "$MIG/home/.autotrigger"; echo new-key > "$MIG/home/.mysuricates/api-key"
+check "after the move: ~/.mysuricates"                   '[ "$(dh)" = "$MIG/home/.mysuricates" ] && [ "$(bash -c ". \"\$1\"; sh -c \"\$DATA_HOME_KEY_SH\" sh \"\$2\"" _ "$HERE/../lib/data-home.sh" "$MIG/home")" = new-key ]'
 
 echo
 echo "passed=$PASS failed=$FAIL"

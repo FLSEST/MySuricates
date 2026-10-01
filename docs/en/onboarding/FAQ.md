@@ -10,7 +10,7 @@
 
 ```bash
 # Terminal 1: backend (from the repo root)
-./scripts/start-autotrigger-dev.sh start
+./scripts/start-mysuricates-dev.sh start
 
 # Terminal 2: frontend
 cd ai-automation-frontend

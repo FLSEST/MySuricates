@@ -56,7 +56,7 @@ class IntegrationTestDbSessionListenerTest {
         String path = System.getProperty(DB_PROPERTY);
         assertThat(path)
                 .isNotNull()
-                .contains("autotrigger-it-")
+                .contains("mysuricates-it-")
                 // PID in the name is what separates concurrent mvn processes
                 .contains(String.valueOf(ProcessHandle.current().pid()))
                 .endsWith(".db");
@@ -104,7 +104,7 @@ class IntegrationTestDbSessionListenerTest {
         String path = System.getProperty(KEY_PROPERTY);
         assertThat(path)
                 .isNotNull()
-                .contains("autotrigger-it-key-")
+                .contains("mysuricates-it-key-")
                 .contains(String.valueOf(ProcessHandle.current().pid()))
                 .endsWith(".key");
         // Must never point into the developer's real home directory
@@ -149,9 +149,9 @@ class IntegrationTestDbSessionListenerTest {
         String path = System.getProperty(BACKUP_DIR_PROPERTY);
         assertThat(path)
                 .isNotNull()
-                .contains("autotrigger-it-backups-")
+                .contains("mysuricates-it-backups-")
                 .contains(String.valueOf(ProcessHandle.current().pid()));
-        // Must never point into the developer's real ~/.autotrigger/backups
+        // Must never point into the developer's real ~/.mysuricates/backups
         assertThat(path).doesNotContain(System.getProperty("user.home"));
 
         listener.launcherSessionClosed(null);
@@ -208,9 +208,9 @@ class IntegrationTestDbSessionListenerTest {
         String path = System.getProperty(SETUP_DIR_PROPERTY);
         assertThat(path)
                 .isNotNull()
-                .contains("autotrigger-it-setup-")
+                .contains("mysuricates-it-setup-")
                 .contains(String.valueOf(ProcessHandle.current().pid()));
-        // Summarization and factory instructions must never land in the developer's real ~/.autotrigger
+        // Summarization and factory instructions must never land in the developer's real ~/.mysuricates
         assertThat(path).doesNotContain(System.getProperty("user.home"));
 
         listener.launcherSessionClosed(null);

@@ -1,5 +1,6 @@
 package com.automation.service.integration;
 
+import com.automation.config.DataHome;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -14,10 +15,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Regression guard for the 2026-08-06 bug: every {@code @SpringBootTest} run with the
  * {@code integration} profile fell through to {@link IntegrationEncryptionService}'s
- * production default key-file location ({@code ${user.home}/.autotrigger/...}) because
+ * production default key-file location ({@code ${automation.data-home}/...}) because
  * {@code application-integration.yml} did not override {@code automation.integration.key-file}.
  * With empty {@code app_settings}, {@code init()} then generated a fresh AES key and wrote it
- * into the developer's real {@code ~/.autotrigger/integration-encryption.key}, shadowing the
+ * into the developer's real {@code ~/.mysuricates/integration-encryption.key}, shadowing the
  * real key on every test run.
  *
  * <p>{@code application-integration.yml} now pins {@code automation.integration.key-file} to a
@@ -43,7 +44,7 @@ class IntegrationEncryptionServiceGuardTest {
         assertThat(effectiveKeyFile)
                 .as("automation.integration.key-file must be pinned to a per-JVM temp path in the integration test profile")
                 .doesNotStartWith(userHome)
-                .doesNotContain(".autotrigger");
+                .doesNotStartWith(DataHome.dir().toString());
     }
 
     @Test

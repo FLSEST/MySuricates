@@ -23,6 +23,11 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 . "$SCRIPT_DIR/lib/provider-login.sh"
 # shellcheck source=lib/local-curl.sh
 . "$SCRIPT_DIR/lib/local-curl.sh"   # Health ohne Proxy aus der Umgebung (bb4f60a5)
+# shellcheck source=lib/data-home.sh
+. "$SCRIPT_DIR/lib/data-home.sh"
+# Host-Backups von Stable/Test liegen im Datenordner (die Compose-Dateien lesen AUTOMATION_DATA_HOME,
+# StagingService/TestingService setzen ihn beim Start aus der Oberflaeche ebenso).
+AUTOMATION_DATA_HOME="$(data_home)"; export AUTOMATION_DATA_HOME
 BACKEND_DIR="$PROJECT_ROOT/ai-automation-backend"
 FRONTEND_DIR="$PROJECT_ROOT/ai-automation-frontend"
 COMPOSE_FILE="$BACKEND_DIR/docker-compose.stable.yml"
@@ -253,7 +258,7 @@ cmd_db_seed() {
     fi
 
     # Pre-seed rollback point: copy current stable DB to host-backup dir before overwrite.
-    local backup_dir="${HOME}/.autotrigger/backups/stable"
+    local backup_dir="${AUTOMATION_DATA_HOME}/backups/stable"
     mkdir -p "$backup_dir"
     local timestamp
     timestamp=$(date +%Y-%m-%d_%H-%M-%S)

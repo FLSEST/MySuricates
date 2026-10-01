@@ -12,7 +12,7 @@ import java.util.regex.Pattern;
  * synthetic classes disappear, MapStruct implementations get replaced by error stubs, and the JVM
  * dies later with a sticky {@code NoClassDefFoundError} (incidents 2026-07-27 and 2026-09-13).
  *
- * <p>The dev backend therefore runs from a packaged JAR copy ({@code scripts/start-autotrigger-dev.sh}).
+ * <p>The dev backend therefore runs from a packaged JAR copy ({@code scripts/start-mysuricates-dev.sh}).
  * This guard is the mechanical backstop for the bypass: it runs in {@code main()} before Spring starts,
  * so Spring Boot tests (which never call {@code main()}) and containers (JAR) are unaffected.
  * Escape hatch: {@code -Dautomation.runtime.allow-classes-dir=true} or
@@ -48,7 +48,7 @@ public final class RuntimeClasspathGuard {
         }
         return Optional.of("Refusing to start from target/classes: a running JVM would read classes lazily "
                 + "from a directory that IDE and Maven builds rewrite (NoClassDefFoundError, dead workflow "
-                + "runs). Start the dev backend via scripts/start-autotrigger-dev.sh restart (runs from a "
+                + "runs). Start the dev backend via scripts/start-mysuricates-dev.sh restart (runs from a "
                 + "JAR copy), or set -D" + ALLOW_PROPERTY + "=true / " + ALLOW_ENV + "=true if you really "
                 + "know what you are doing.");
     }

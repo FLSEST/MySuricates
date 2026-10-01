@@ -48,6 +48,8 @@ REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 . "${SCRIPT_DIR}/lib/local-curl.sh"
 # shellcheck source=lib/instance-runs.sh
 . "${SCRIPT_DIR}/lib/instance-runs.sh"
+# shellcheck source=lib/data-home.sh
+. "${SCRIPT_DIR}/lib/data-home.sh"
 INSTANCES_DIR="${MYSURICATES_INSTANCES_DIR:-${REPO_ROOT}/deploy/instances}"
 COMPOSE_FILE="${REPO_ROOT}/deploy/compose.yml"
 # Werkzeuge aus dem Download des Installers (Java/Node ohne Paketmanager), falls vorhanden
@@ -198,12 +200,12 @@ container_cmd() {
     down)
       # Key nur aus dem eigenen Container — einen gleichnamigen aus einer anderen Einrichtung fasst down nicht an
       if [ "$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' "$CONTAINER" 2>/dev/null)" = "$CONTAINER" ]; then
-        warn_running_runs "$(docker exec -u "$HOST_UID" "$CONTAINER" cat "$HOST_HOME/.autotrigger/api-key" 2>/dev/null)"
+        warn_running_runs "$(docker exec -u "$HOST_UID" "$CONTAINER" sh -c "$DATA_HOME_KEY_SH" sh "$HOST_HOME" 2>/dev/null)"
       fi
       compose down ;;
     status) docker inspect -f '{{.State.Status}} {{.State.Health.Status}}' "$CONTAINER" 2>/dev/null || echo "nicht gestartet" ;;
     logs)   compose logs --tail 200 ;;
-    key)    docker exec -u "$HOST_UID" "$CONTAINER" cat "$HOST_HOME/.autotrigger/api-key" ;;
+    key)    docker exec -u "$HOST_UID" "$CONTAINER" sh -c "$DATA_HOME_KEY_SH" sh "$HOST_HOME" ;;
     login)
       # Im Modus login kommt die Anmeldung vom Rechner; eine zweite im Container ueberschriebe dort die
       # eingebundene auth.json (Codex, Pi) oder liefe am Token vorbei (Claude).
@@ -308,7 +310,7 @@ EOF
       (
         cd "$STATE" || exit 1
         # Eigenes user.home je Instanz: sonst teilte sie API-Key-Datei und Integrations-Schluessel
-        # (~/.autotrigger/) mit jeder anderen Instanz dieses Benutzers — etwa einer Dev-Instanz. Java
+        # (~/.mysuricates/) mit jeder anderen Instanz dieses Benutzers — etwa einer Dev-Instanz. Java
         # liest user.home aus dem Konto, nicht aus $HOME. Die KI-CLIs erben weiter das echte $HOME;
         # wo das Backend selbst nach ihnen sucht, zeigen die Properties darauf.
         export AUTOMATION_HOST_HOME="$HOME" AUTOMATION_HOSTPI_CONFIGDIR="$HOME/.pi/agent" \
@@ -334,7 +336,7 @@ EOF
       echo "$CONTAINER wurde nicht rechtzeitig gesund — scripts/instance.sh logs --name $NAME" >&2; exit 1 ;;
     down)
       if ! host_running; then echo "$CONTAINER läuft nicht"; rm -f "$PID_FILE"; exit 0; fi
-      warn_running_runs "$(cat "$STATE/home/.autotrigger/api-key" 2>/dev/null)"
+      warn_running_runs "$(cat "$(data_home "$STATE/home")/api-key" 2>/dev/null)"
       pid="$(cat "$PID_FILE")"
       kill "$pid" 2>/dev/null
       i=0; while kill -0 "$pid" 2>/dev/null && [ "$i" -lt 30 ]; do sleep 1; i=$((i + 1)); done
@@ -345,7 +347,7 @@ EOF
         if health_ok; then echo "running healthy"; else echo "running starting"; fi
       else echo "nicht gestartet"; fi ;;
     logs)   tail -n 200 "$STATE/data/logs/mysuricates.log" 2>/dev/null || tail -n 200 "$STATE/data/logs/stdout.log" ;;
-    key)    cat "$STATE/home/.autotrigger/api-key" ;;
+    key)    cat "$(data_home "$STATE/home")/api-key" ;;
     built)  host_build_state ;;
     login)  die "login gibt es nur fuer Container-Instanzen — im Host-Betrieb nutzen die Programme die Anmeldungen dieses Rechners direkt" ;;
     *)      die "Unbekannter Befehl: $CMD (up|down|status|logs|key|list|login|built)" ;;

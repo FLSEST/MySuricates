@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Compose override with exactly what THIS machine gives a MySuricates container, for every container
 # way of running it: deploy/compose.yml via scripts/instance.sh, the dev container of
-# start-autotrigger-dev.sh and Stable/Test via scripts/staging.sh. This file is the one place that
+# start-mysuricates-dev.sh and Stable/Test via scripts/staging.sh. This file is the one place that
 # decides what comes from the host (TODO fc9de67b, 262948a4).
 #
 # What comes from the host is chosen per instance (MYSURICATES_AI_FROM_HOST, decision of 2026-09-23):
@@ -105,14 +105,14 @@ _hm_passes() { local v; for v in $(_hm_login_env "$1"); do case " $pass " in *" 
 #   AI_FROM_HOST   programs | login (default) | all
 #   AI_PROVIDERS   subset of claude,codex,pi, comma- or space-separated (default: all three)
 #   SWITCH_SOURCE  where the switches of this instance are changed (a file, or how the starter is called)
-#   SWITCH_PREFIX  prefix of the switch names there: MYSURICATES_, STABLE_, TEST_, AUTOTRIGGER_DEV_
+#   SWITCH_PREFIX  prefix of the switch names there: MYSURICATES_, STABLE_, TEST_, MYSURICATES_DEV_
 #   LOGIN_COMMAND  the command that logs in inside THIS container, fixed text the caller already knows
 #                  (e.g. "scripts/instance.sh login") — empty when the start path has none for this mode
 #                  (AI_FROM_HOST=login or all: the login happens on the machine around the container, not
 #                  in it). Never built from anything the caller does not already have as a literal string.
 #   The three before INSTANCE_KEY are only shown on the settings page, which cannot change anything itself.
 #   INSTANCE_KEY   stable name of this instance (a-z, 0-9, -, _), e.g. instance-mysuricates-main,
-#                  staging-stable, dev-autotrigger-dev: names its copy of the login variables from ai.env
+#                  staging-stable, dev-mysuricates-dev: names its copy of the login variables from ai.env
 #                  (container-env/<key>.env). Without a valid key no variable from ai.env goes in.
 # Prints the override on stdout. An unknown mode or provider goes to stderr and returns 2.
 host_mounts_yaml() {

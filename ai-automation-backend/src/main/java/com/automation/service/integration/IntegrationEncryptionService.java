@@ -38,7 +38,7 @@ public class IntegrationEncryptionService {
     @Autowired
     public IntegrationEncryptionService(
             AppSettingsRepository appSettingsRepository,
-            @Value("${automation.integration.key-file:${user.home}/.autotrigger/integration-encryption.key}") String keyFilePath) {
+            @Value("${automation.integration.key-file:${automation.data-home}/integration-encryption.key}") String keyFilePath) {
         this(appSettingsRepository, Path.of(keyFilePath), System::getenv);
     }
 

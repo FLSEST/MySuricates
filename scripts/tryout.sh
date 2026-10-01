@@ -23,6 +23,8 @@ set -uo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/provider-login.sh
 . "${SCRIPT_DIR}/lib/provider-login.sh"
+# shellcheck source=lib/data-home.sh
+. "${SCRIPT_DIR}/lib/data-home.sh"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 CONTAINER="mysuricates-tryout"
 DATA_VOLUME="mysuricates-tryout-data"
@@ -61,7 +63,8 @@ healthy() { [ "$(docker container inspect -f '{{.State.Health.Status}}' "$CONTAI
 port_busy() { (exec 3<>"/dev/tcp/127.0.0.1/$PORT") 2>/dev/null; }   # nimmt schon jemand Verbindungen an?
 need_running() { running || die "$CONTAINER laeuft nicht — scripts/tryout.sh start"; }
 as_user() { docker exec "$@"; }   # Aufrufe im Container immer als der Benutzer der Instanz, nie root
-key() { as_user -u "$TRYOUT_UID" "$CONTAINER" cat "$TRYOUT_HOME/.autotrigger/api-key" 2>/dev/null; }
+# Release-Images von vor der Umbenennung schreiben den Key nach ~/.autotrigger — DATA_HOME_KEY_SH liest beide
+key() { as_user -u "$TRYOUT_UID" "$CONTAINER" sh -c "$DATA_HOME_KEY_SH" sh "$TRYOUT_HOME" 2>/dev/null; }
 
 cmd_build() {
   [ -n "$REF" ] || REF="$(newest_tag)"

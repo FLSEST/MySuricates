@@ -186,10 +186,6 @@ logged in on the machine — `claude` (Anthropic), `codex` (OpenAI), or `pi`. Wi
 only the deterministic blocks run (shell, branch, loop). The installer shows which CLIs it found and
 whether they are logged in, but does not require any — without a CLI, AI blocks fail only at runtime.
 
-> **About the name:** The project is called MySuricates; some scripts still carry the former name
-> `autotrigger` (for example `scripts/start-autotrigger-dev.sh`). Both mean the same thing; the rename
-> is still pending.
-
 Set up permanently:
 
 ```bash
@@ -205,7 +201,7 @@ builds, and starts the instance. Afterwards: http://localhost:9090, the API key 
 is mounted only on explicit request.
 
 If you develop MySuricates itself: `./scripts/setup.sh --from-source --start` sets it up, builds
-the runtime JAR, and immediately starts `./scripts/start-autotrigger-dev.sh` with it — backend on
+the runtime JAR, and immediately starts `./scripts/start-mysuricates-dev.sh` with it — backend on
 :9090 and Vite with hot reload on :3000, in one instance. Without `--start`, the installer ends with
 the same command as a hint; from then on, it is the way to start and stop (`stop`) the dev instance
 and to rebuild after a change (`restart`). It is idempotent and does not start a second instance.

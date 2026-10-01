@@ -1303,7 +1303,7 @@ Der blinde Fleck der Bytecode-Messung sind Abhängigkeiten, die nur als generisc
 ## Verzeichnisstruktur
 
 ```
-autotrigger/
+MySuricates/
 ├── CLAUDE.md                          ← Projektanweisungen für Claude Code
 ├── VISION.md                          ← Verweis auf docs/vision.md
 ├── docs/                              ← Diese Dokumentationsdateien
@@ -1311,7 +1311,7 @@ autotrigger/
 ├── scripts/
 │   ├── release.sh                     ← Versions-Bump + Git-Tag
 │   ├── staging.sh                     ← Stable/Test-Umgebung verwalten
-│   └── start-autotrigger-dev.sh       ← Dev-Umgebung starten
+│   └── start-mysuricates-dev.sh       ← Dev-Umgebung starten
 │
 ├── ai-automation-backend/
 │   ├── pom.xml

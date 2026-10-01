@@ -20,10 +20,10 @@ import java.util.TreeSet;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Regression guard (TODO 6507e230): a test run must not write into the developer's real
- * {@code ~/.autotrigger}.
+ * Regression guard (TODO 6507e230): a test run must not write into the developer's real data
+ * directory ({@link DataHome}: {@code ~/.mysuricates}, on older installations {@code ~/.autotrigger}).
  *
- * <p>The same trap four times: a startup writer defaults to {@code ${user.home}/.autotrigger/...} and
+ * <p>The same trap four times: a startup writer defaults to {@code ${automation.data-home}/...} and
  * the integration profile does not redirect it — the integration encryption key (2026-08-06), the
  * startup backup (2026-09-13), the seal signing key and, found 2026-09-24, the instruction files that
  * {@link SummarizationSetupService} and {@link FactorySetupService} write on every context start. Those
@@ -39,7 +39,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class IntegrationProfileHomeIsolationTest {
 
     /** The developer's real state directory — the test JVM runs as the developer. */
-    private static final Path REAL_STATE_DIR = Path.of(System.getProperty("user.home"), ".autotrigger");
+    private static final Path REAL_STATE_DIR = DataHome.dir();
 
     /** Keys whose default in application.yml points into {@link #REAL_STATE_DIR}; the scan must see them. */
     private static final List<String> KNOWN_HOME_KEYS = List.of(

@@ -5,7 +5,7 @@ spring:
     # never share one SQLite file — two WAL writer processes corrupt it (SQLITE_BUSY_SNAPSHOT
     # → SQLITE_CORRUPT, seen 2026-07-09). The fallback path only applies when the listener
     # did not run (e.g. exotic runners); the pre-test clean in pom.xml keeps it fresh.
-    url: jdbc:sqlite:${integration.db.path:/tmp/autotrigger-integrationtest.db}?journal_mode=WAL&busy_timeout=10000&foreign_keys=true
+    url: jdbc:sqlite:${integration.db.path:/tmp/mysuricates-integrationtest.db}?journal_mode=WAL&busy_timeout=10000&foreign_keys=true
     driver-class-name: org.sqlite.JDBC
     hikari:
       # SQLite supports only one writer — integration tests MUST mirror prod (pool-size=1).
@@ -31,7 +31,7 @@ spring:
     # Use the same file-based URL as the datasource. File DBs persist across
     # DataSource lifetimes (unlike in-memory), so Flyway can use its own
     # non-pooled DataSource without the DB vanishing before HikariCP connects.
-    url: jdbc:sqlite:${integration.db.path:/tmp/autotrigger-integrationtest.db}?journal_mode=WAL&busy_timeout=10000&foreign_keys=true
+    url: jdbc:sqlite:${integration.db.path:/tmp/mysuricates-integrationtest.db}?journal_mode=WAL&busy_timeout=10000&foreign_keys=true
     driver-class-name: org.sqlite.JDBC
 
 automation:
@@ -79,33 +79,33 @@ automation:
     auto-tagging-enabled: false
   backup:
     # Without this override every @SpringBootTest context wrote a startup backup of its
-    # throwaway test DB into the developer's real ${user.home}/.autotrigger/backups/dev and
+    # throwaway test DB into the developer's real ${automation.data-home}/backups/dev and
     # rotated genuine backups away (retain-count 30). integration.backup.dir is set per test
     # JVM by IntegrationTestDbSessionListener (deleted on session close); the fallback path
     # only applies when the listener did not run (e.g. exotic runners).
     enabled: false
-    directory: ${integration.backup.dir:${java.io.tmpdir}/autotrigger-integrationtest-backups}
+    directory: ${integration.backup.dir:${java.io.tmpdir}/mysuricates-integrationtest-backups}
   integration:
     # integration.key.path is set per test JVM by IntegrationTestDbSessionListener (same
     # mechanism as integration.db.path above) so that IntegrationEncryptionService.init()
-    # never falls through to its production default (${user.home}/.autotrigger/...) and
+    # never falls through to its production default (${automation.data-home}/...) and
     # generates/writes a key into the developer's real home directory (happened
     # 2026-08-06, shadowing the real key on every test run). The fallback path only
     # applies when the listener did not run (e.g. exotic runners).
-    key-file: ${integration.key.path:${java.io.tmpdir}/autotrigger-integrationtest.key}
+    key-file: ${integration.key.path:${java.io.tmpdir}/mysuricates-integrationtest.key}
   seal:
     # Same reason as integration.key.path above: without this the seal signing key would be written
-    # to the developer's real home (${user.home}/.autotrigger/seal-signing.key) on every test run.
-    key-file: ${integration.seal.key.path:${java.io.tmpdir}/autotrigger-integrationtest-seal.key}
+    # to the developer's real home (${automation.data-home}/seal-signing.key) on every test run.
+    key-file: ${integration.seal.key.path:${java.io.tmpdir}/mysuricates-integrationtest-seal.key}
   # SummarizationSetupService and FactorySetupService write CLAUDE.md/AGENTS.md into <base-dir>/<provider>
-  # on every context start; the defaults ${user.home}/.autotrigger/summarization|factory made every local
+  # on every context start; the defaults ${automation.data-home}/summarization|factory made every local
   # test run rewrite them in the developer's real home (TODO 6507e230). integration.setup.dir is set per
   # test JVM by IntegrationTestDbSessionListener (deleted on session close); the fallback path only
   # applies when the listener did not run. Guarded by IntegrationProfileHomeIsolationTest.
   summarization:
-    base-dir: ${integration.setup.dir:${java.io.tmpdir}/autotrigger-integrationtest-setup}/summarization
+    base-dir: ${integration.setup.dir:${java.io.tmpdir}/mysuricates-integrationtest-setup}/summarization
   factory:
-    base-dir: ${integration.setup.dir:${java.io.tmpdir}/autotrigger-integrationtest-setup}/factory
+    base-dir: ${integration.setup.dir:${java.io.tmpdir}/mysuricates-integrationtest-setup}/factory
 
 
 server:

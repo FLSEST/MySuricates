@@ -41,8 +41,7 @@ class InstanceAddressTest {
     }
 
     @Test
-    void theKeyFileIsWhereApiKeyServiceWritesIt_underUserHome() {
-        assertThat(InstanceAddress.apiKeyFile().toString())
-                .isEqualTo(System.getProperty("user.home") + "/.autotrigger/api-key");
+    void theKeyFileIsWhereApiKeyServiceWritesIt_inTheDataHome() {
+        assertThat(InstanceAddress.apiKeyFile()).isEqualTo(DataHome.dir().resolve("api-key"));
     }
 }

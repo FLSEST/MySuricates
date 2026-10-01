@@ -102,12 +102,12 @@ automation:
   #   sealing: true
   #   require-signed-seal: true    # Siegel ohne gültige Signatur lehnen ihre Runs ab
   seal:
-    key-file: ${AUTOMATION_SEAL_KEY_FILE:${user.home}/.autotrigger/seal-signing.key}    # HMAC-Key für Siegel — nie in der DB neben dem Siegelwert
+    key-file: ${AUTOMATION_SEAL_KEY_FILE:${automation.data-home}/seal-signing.key}    # HMAC-Key für Siegel — nie in der DB neben dem Siegelwert
   discovery:
     auto-tagging-enabled: ${AUTOMATION_DISCOVERY_AUTO_TAGGING_ENABLED:true}
     semantic-enabled: ${AUTOMATION_DISCOVERY_SEMANTIC_ENABLED:true}
   integration:
-    key-file: ${AUTOMATION_INTEGRATION_KEY_FILE:${user.home}/.autotrigger/integration-encryption.key}    # AES-Key für Integration-Credentials — nie in der DB neben dem Ciphertext
+    key-file: ${AUTOMATION_INTEGRATION_KEY_FILE:${automation.data-home}/integration-encryption.key}    # AES-Key für Integration-Credentials — nie in der DB neben dem Ciphertext
   autopilot:
     project-id: ${AUTOMATION_AUTOPILOT_PROJECT_ID:}    # Optional: UUID des Autopilot-Projekts für Health-Auto-Todos (leer = kein Project-Bezug)
   cli:
@@ -215,13 +215,13 @@ automation:
     retention-minutes: 10
     max-buffered-runs: 20
   summarization:
-    base-dir: ${AUTOMATION_SUMMARIZATION_DIR:${user.home}/.autotrigger/summarization}
+    base-dir: ${AUTOMATION_SUMMARIZATION_DIR:${automation.data-home}/summarization}
     timeout-seconds: ${AUTOMATION_SUMMARIZATION_TIMEOUT:120}
   backup:
     enabled: ${AUTOMATION_BACKUP_ENABLED:true}
     cron: ${AUTOMATION_BACKUP_CRON:0 0 2 * * *}
     retain-count: ${AUTOMATION_BACKUP_RETAIN_COUNT:30}
-    directory: ${AUTOMATION_BACKUP_DIR:${user.home}/.autotrigger/backups/dev}
+    directory: ${AUTOMATION_BACKUP_DIR:${automation.data-home}/backups/dev}
   staging:
     compose-file: ${AUTOMATION_STAGING_COMPOSE:docker-compose.stable.yml}
     backend-dir: ${AUTOMATION_STAGING_BACKEND_DIR:}
@@ -239,7 +239,7 @@ automation:
     test-auto-start: ${AUTOMATION_TEST_AUTO_START:false}
   factory:
     provider: ${AUTOMATION_FACTORY_PROVIDER:CLAUDE}
-    base-dir: ${AUTOMATION_FACTORY_DIR:${user.home}/.autotrigger/factory}
+    base-dir: ${AUTOMATION_FACTORY_DIR:${automation.data-home}/factory}
   docs:
     directory: ${AUTOMATION_DOCS_DIR:../docs}
   reports:

@@ -14,7 +14,7 @@ class RuntimeClasspathGuardTest {
 
         assertThat(RuntimeClasspathGuard.refusalReason(cp, null))
                 .isPresent()
-                .get().asString().contains("start-autotrigger-dev.sh").contains(RuntimeClasspathGuard.ALLOW_PROPERTY);
+                .get().asString().contains("start-mysuricates-dev.sh").contains(RuntimeClasspathGuard.ALLOW_PROPERTY);
         assertThat(RuntimeClasspathGuard.mode(cp)).isEqualTo(RuntimeClasspathGuard.MODE_CLASSES_DIR);
     }
 
@@ -27,7 +27,7 @@ class RuntimeClasspathGuardTest {
 
     @Test
     void allows_a_jar_classpath() {
-        String cp = "/home/x/.local/state/autotrigger-dev/runtime/current.jar";
+        String cp = "/home/x/.local/state/mysuricates-dev/runtime/current.jar";
 
         assertThat(RuntimeClasspathGuard.refusalReason(cp, null)).isEmpty();
         assertThat(RuntimeClasspathGuard.mode(cp)).isEqualTo(RuntimeClasspathGuard.MODE_JAR);
