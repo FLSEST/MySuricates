@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Client, ReconnectionTimeMode } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { api } from '../api/client';
-import type { AgenticState, PendingHumanInput } from '../types';
+import type { AgenticState, HumanInputField, PendingHumanInput } from '../types';
 import type { WsMessage, ForEachState, PendingApproval, LiveLine, LiveLogSnapshot } from '../types/websocket';
 import {
   isStatusMessage, isApprovalRequired, isApprovalResolved,
@@ -21,6 +21,14 @@ export type { ExecutionLogEntry } from './executionLogEntries';
 
 const TERMINAL_STATUSES = ['COMPLETED', 'FAILED', 'CANCELLED'];
 
+/**
+ * The fields of a multi-field form, only when there are any (ec913801) – a backend that does not send them yet
+ * leaves the single-field dialog as before.
+ */
+export function formFields(fields: unknown): Pick<PendingHumanInput, 'fields'> {
+  return Array.isArray(fields) && fields.length > 0 ? { fields: fields as HumanInputField[] } : {};
+}
+
 export interface ExecutionWebSocketOptions {
   /** Stream block output and replay buffered lines on connect (default true). */
   liveOutput?: boolean;
@@ -32,6 +40,8 @@ export function useExecutionWebSocket(runId: string | null, workflowId?: string,
   const [connected, setConnected] = useState(false);
   const [pendingApproval, setPendingApproval] = useState<PendingApproval | null>(null);
   const [pendingHumanInput, setPendingHumanInput] = useState<PendingHumanInput | null>(null);
+  // Counts questions announced without their content (agentic approval) – a change means "ask the server"
+  const [inputSignal, setInputSignal] = useState(0);
   const [agenticStates, setAgenticStates] = useState<Map<number, AgenticState>>(new Map());
   const [forEachStates, setForEachStates] = useState<Map<number, ForEachState>>(new Map());
   const clientRef = useRef<Client | null>(null);
@@ -116,6 +126,8 @@ export function useExecutionWebSocket(runId: string | null, workflowId?: string,
               handleForEachMessage(data, setForEachStates);
             } else if (isAgenticMessage(data)) {
               handleAgenticMessage(data, setAgenticStates);
+              // Carries no question itself – the page fetches it from GET /approval (5b08cf33)
+              if (data.type === 'agentic_approval_required') setInputSignal((n) => n + 1);
             } else if (isApprovalRequired(data)) {
               setPendingApproval({
                 blockId: data.blockId,
@@ -137,6 +149,7 @@ export function useExecutionWebSocket(runId: string | null, workflowId?: string,
                 validationPattern: data.validationPattern,
                 variableName: data.variableName,
                 stepIndex: data.stepIndex,
+                ...formFields(data.fields),
               });
             } else if (isHumanInputResolved(data)) {
               setPendingHumanInput(null);
@@ -202,5 +215,5 @@ export function useExecutionWebSocket(runId: string | null, workflowId?: string,
 
   const clearLogs = useCallback(() => setLogs([]), []);
 
-  return { logs, connected, clearLogs, pendingApproval, pendingHumanInput, agenticStates, forEachStates };
+  return { logs, connected, clearLogs, pendingApproval, pendingHumanInput, inputSignal, agenticStates, forEachStates };
 }

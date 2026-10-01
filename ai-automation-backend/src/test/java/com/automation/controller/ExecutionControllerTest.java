@@ -470,6 +470,38 @@ class ExecutionControllerTest {
                 .andExpect(jsonPath("$.required").value(true));
     }
 
+    /** Ein Formular mit mehreren Feldern kommt wie im WebSocket-Ereignis mit seinen fields (ec913801). */
+    @Test
+    void getPendingApproval_humanInput_carriesFormFields() throws Exception {
+        var approval = ApprovalRequest.builder()
+                .blockId("human-input-3").question("Reise planen")
+                .options(List.of()).stepIndex(3)
+                .type("human-input").inputType("text").variableName("user_input").required(true)
+                .fields(List.of(
+                        Map.of("variable_name", "destination", "label", "Ziel"),
+                        Map.of("variable_name", "nights", "input_type", "number")))
+                .build();
+        when(runControlService.getPendingApproval("run-1")).thenReturn(approval);
+
+        mockMvc.perform(get("/api/v1/executions/run-1/approval"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.fields.length()").value(2))
+                .andExpect(jsonPath("$.fields[0].variable_name").value("destination"))
+                .andExpect(jsonPath("$.fields[1].input_type").value("number"));
+    }
+
+    @Test
+    void getPendingApproval_humanInputWithoutForm_hasNoFields() throws Exception {
+        var approval = ApprovalRequest.builder()
+                .blockId("human-input-1").question("Name?").options(List.of()).stepIndex(1)
+                .type("human-input").inputType("text").variableName("name").required(true).build();
+        when(runControlService.getPendingApproval("run-1")).thenReturn(approval);
+
+        mockMvc.perform(get("/api/v1/executions/run-1/approval"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.fields").doesNotExist());
+    }
+
     @Test
     void approveTodos_returnsOk() throws Exception {
         mockMvc.perform(post("/api/v1/executions/run-1/todos/approve")

@@ -6,6 +6,7 @@ import com.automation.service.ai.HostClaudeService.Turn;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -18,7 +19,10 @@ import java.util.concurrent.CompletableFuture;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -64,6 +68,19 @@ class AgenticApprovalGateTest {
         assertThat(history).contains(new Turn("user", "The user rejected this action. Propose an alternative approach."));
         assertThat(fullOutput.toString()).contains("[iteration 1 - REJECTED]: rm -rf build");
         assertThat(iterData.get("approval")).isEqualTo("rejected");
+    }
+
+    /** Die Laufseite fragt auf das Ereignis hin GET /approval ab – die Frage muss dann schon hinterlegt sein (5b08cf33). */
+    @Test
+    void registersTheQuestionBeforeAnnouncingIt() {
+        ExecutionContext context = contextAnswering(CompletableFuture.completedFuture("Yes"));
+
+        gate.ask(context, 2, 1, plan("do it"), new LinkedHashMap<>(), new StringBuilder(), new ArrayList<>());
+
+        InOrder order = inOrder(context, messagingTemplate);
+        order.verify(context).requestApproval(any(ApprovalRequest.class));
+        order.verify(messagingTemplate).convertAndSend(anyString(), argThat((Object payload) ->
+                payload instanceof Map<?, ?> map && "agentic_approval_required".equals(map.get("type"))));
     }
 
     @Test

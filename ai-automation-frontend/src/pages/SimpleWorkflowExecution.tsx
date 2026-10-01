@@ -91,7 +91,7 @@ export function SimpleWorkflowExecution() {
 
   const { data: workflow } = useWorkflow(id!);
   const { data: run, error: runError, refetch: refetchRun } = useWorkflowRun(id!, runId);
-  const { connected, pendingApproval, pendingHumanInput } = useExecutionWebSocket(runId!, id, { liveOutput: false });
+  const { connected, pendingApproval, pendingHumanInput, inputSignal } = useExecutionWebSocket(runId!, id, { liveOutput: false });
   const pauseExecution = usePauseExecution();
   const resumeExecution = useResumeExecution();
   const cancelExecution = useCancelExecution();
@@ -99,7 +99,7 @@ export function SimpleWorkflowExecution() {
 
   const {
     approval: activeApproval, humanInput: activeHumanInput, dismissedApproval, markAnswered, dismiss, reopen,
-  } = useRunPendingInput(runId, run, { connected, approval: pendingApproval, humanInput: pendingHumanInput });
+  } = useRunPendingInput(runId, run, { connected, approval: pendingApproval, humanInput: pendingHumanInput, inputSignal });
 
   const isRunning = run?.status === 'RUNNING' || run?.status === 'PAUSED';
 

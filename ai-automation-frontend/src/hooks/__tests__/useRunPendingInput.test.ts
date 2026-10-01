@@ -185,4 +185,29 @@ describe('useRunPendingInput', () => {
     await waitFor(() => expect(result.current.dismissedApproval).toBeNull());
     expect(result.current.approval).toBeNull();
   });
+  it('asks again when the socket announces an agentic approval – step and status stay the same (5b08cf33)', async () => {
+    const endpoint = serveApproval();
+    const live = { ...offline, connected: true, inputSignal: 0 };
+    const { result, rerender } = renderPendingInput({ runId: 'run-1', run: run('RUNNING'), live });
+    await waitFor(() => expect(endpoint.calls).toBe(1));
+
+    endpoint.open = true;
+    rerender({ runId: 'run-1', run: run('RUNNING'), live: { ...live, inputSignal: 1 } });
+    await waitFor(() => expect(result.current.approval).toEqual(APPROVAL));
+    expect(endpoint.calls).toBe(2);
+  });
+
+  it('takes the fields of a multi-field form from the query, and works with a backend that sends none (ec913801)', async () => {
+    const human = { pending: true, type: 'human-input', blockId: 'human-input-3', question: 'Trip', stepIndex: 3 };
+    const fields = [{ variable_name: 'destination', label: 'Where?' }, { variable_name: 'nights', input_type: 'number' }];
+    server.use(http.get('/api/v1/executions/:runId/approval', ({ params }) =>
+      HttpResponse.json(params.runId === 'run-1' ? { ...human, fields } : human)));
+
+    const { result, rerender } = renderPendingInput({ runId: 'run-1', run: run('RUNNING'), live: offline });
+    await waitFor(() => expect(result.current.humanInput?.fields).toEqual(fields));
+
+    rerender({ runId: 'run-2', run: { ...run('RUNNING'), id: 'run-2' }, live: offline });
+    await waitFor(() => expect(result.current.humanInput?.prompt).toBe('Trip'));
+    expect(result.current.humanInput?.fields).toBeUndefined();
+  });
 });

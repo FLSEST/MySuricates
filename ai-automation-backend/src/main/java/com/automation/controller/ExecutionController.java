@@ -144,6 +144,10 @@ public class ExecutionController {
             response.put("variableName", request.getVariableName());
             response.put("required", request.isRequired());
             response.put("validationPattern", request.getValidationPattern());
+            // Formular mit mehreren Feldern – wie im WebSocket-Ereignis human_input_required (TODO ec913801)
+            if (request.getFields() != null && !request.getFields().isEmpty()) {
+                response.put("fields", request.getFields());
+            }
         }
         return ResponseEntity.ok(response);
     }

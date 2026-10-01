@@ -38,12 +38,8 @@ public class AgenticApprovalGate {
 
     public Decision ask(ExecutionContext context, int stepIndex, int iteration, AgenticPlan plan,
                         Map<String, Object> iterData, StringBuilder fullOutput, List<Turn> history) {
-        events.broadcast(context.getWorkflowRunId(), stepIndex,
-                "agentic_approval_required",
-                Map.of("iteration", iteration,
-                        "action", plan.getAction(),
-                        "rationale", truncate(plan.getRationale(), TRUNCATE_MEDIUM)));
-
+        // Erst die Frage hinterlegen, dann melden: Die Laufseite fragt auf dieses Ereignis hin
+        // GET /executions/{id}/approval ab (TODO 5b08cf33) und muss die Frage dort schon finden.
         CompletableFuture<String> future = context.requestApproval(
                 ApprovalRequest.builder()
                         .blockId("agentic-" + stepIndex + "-iter-" + iteration)
@@ -53,6 +49,12 @@ public class AgenticApprovalGate {
                         .stepIndex(stepIndex)
                         .timeoutMinutes(30)
                         .build());
+
+        events.broadcast(context.getWorkflowRunId(), stepIndex,
+                "agentic_approval_required",
+                Map.of("iteration", iteration,
+                        "action", plan.getAction(),
+                        "rationale", truncate(plan.getRationale(), TRUNCATE_MEDIUM)));
 
         String answer;
         try {
