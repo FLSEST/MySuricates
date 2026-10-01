@@ -1,6 +1,7 @@
 package com.automation.controller;
 
 import com.automation.entity.DeadLetterEntry;
+import com.automation.exception.ElementNotFoundException;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.security.RateLimitConfig;
 import com.automation.service.activitylog.ActivityLogService;
@@ -104,12 +105,17 @@ class DeadLetterControllerTest {
                 .andExpect(jsonPath("$.errorMessage").value("boom"));
     }
 
+    /** 2b73ff48: an unknown entry is a 404 with a messageKey the UI translates, no longer a 400. */
     @Test
-    void should_return_400_when_getting_unknown_id() throws Exception {
-        when(dlqService.findById("missing")).thenThrow(new IllegalArgumentException("DLQ entry not found: missing"));
+    void should_return_404_when_getting_unknown_id() throws Exception {
+        when(dlqService.findById("missing")).thenThrow(new ElementNotFoundException("DeadLetterEntry", "missing"));
 
         mockMvc.perform(get("/api/v1/dlq/missing"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"))
+                .andExpect(jsonPath("$.messageKey").value("NAMED_NOT_FOUND"))
+                .andExpect(jsonPath("$.params.resource").value("DeadLetterEntry"))
+                .andExpect(jsonPath("$.params.id").value("missing"));
     }
 
     @Test
@@ -134,12 +140,13 @@ class DeadLetterControllerTest {
     }
 
     @Test
-    void should_return_400_when_retrying_unknown_id() throws Exception {
+    void should_return_404_when_retrying_unknown_id() throws Exception {
         when(dlqRetryService.retry("missing"))
-                .thenThrow(new IllegalArgumentException("DLQ entry not found: missing"));
+                .thenThrow(new ElementNotFoundException("DeadLetterEntry", "missing"));
 
         mockMvc.perform(post("/api/v1/dlq/missing/retry"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.messageKey").value("NAMED_NOT_FOUND"));
     }
 
     @Test
@@ -153,10 +160,11 @@ class DeadLetterControllerTest {
     }
 
     @Test
-    void should_return_400_when_discarding_unknown_id() throws Exception {
-        doThrow(new IllegalArgumentException("not found")).when(dlqService).discard("missing");
+    void should_return_404_when_discarding_unknown_id() throws Exception {
+        doThrow(new ElementNotFoundException("DeadLetterEntry", "missing")).when(dlqService).discard("missing");
 
         mockMvc.perform(delete("/api/v1/dlq/missing"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.messageKey").value("NAMED_NOT_FOUND"));
     }
 }

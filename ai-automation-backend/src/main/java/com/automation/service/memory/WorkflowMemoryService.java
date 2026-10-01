@@ -5,11 +5,12 @@ import com.automation.entity.WorkflowMemory;
 import com.automation.entity.WorkflowRun;
 import com.automation.exception.ErrorMessage;
 import com.automation.exception.LocalizedArgumentException;
+import com.automation.exception.LocalizedEntityNotFoundException;
+import com.automation.exception.LocalizedStateException;
 import com.automation.repository.WorkflowMemoryRepository;
 import com.automation.repository.WorkflowRunRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.persistence.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -22,6 +23,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -107,12 +109,12 @@ public class WorkflowMemoryService {
         if (runIds != null && !runIds.isEmpty()) {
             runs = runIds.stream()
                     .map(id -> runRepository.findById(id)
-                            .orElseThrow(() -> new EntityNotFoundException("Run not found: " + id)))
+                            .orElseThrow(() -> new LocalizedEntityNotFoundException("WorkflowRun", id)))
                     .toList();
         } else {
             runs = runRepository.findByWorkflowIdOrderByStartedAtDesc(workflowId);
             if (runs.isEmpty()) {
-                throw new IllegalStateException("No runs found for workflow: " + workflowId);
+                throw new LocalizedStateException(ErrorMessage.MEMORY_NO_RUNS, Map.of("id", String.valueOf(workflowId)));
             }
             // Take the most recent 10 runs
             runs = runs.subList(0, Math.min(10, runs.size()));
@@ -124,7 +126,7 @@ public class WorkflowMemoryService {
                 .toList());
 
         if (allSteps.isEmpty()) {
-            throw new IllegalStateException("No step results found in selected runs");
+            throw new LocalizedStateException(ErrorMessage.MEMORY_NO_STEPS);
         }
 
         List<String> sourceRunIds = new ArrayList<>(runs.stream().map(WorkflowRun::getId).toList());
@@ -160,7 +162,7 @@ public class WorkflowMemoryService {
     @Transactional
     public void activate(String workflowId, String memoryId) {
         WorkflowMemory memory = memoryRepository.findById(memoryId)
-                .orElseThrow(() -> new EntityNotFoundException("Memory not found: " + memoryId));
+                .orElseThrow(() -> new LocalizedEntityNotFoundException("WorkflowMemory", memoryId));
 
         if (!memory.getWorkflowId().equals(workflowId)) {
             throw new LocalizedArgumentException(ErrorMessage.MEMORY_NOT_IN_WORKFLOW);
@@ -177,7 +179,7 @@ public class WorkflowMemoryService {
     @Transactional
     public WorkflowMemory update(String workflowId, String memoryId, String title, String content) {
         WorkflowMemory memory = memoryRepository.findById(memoryId)
-                .orElseThrow(() -> new EntityNotFoundException("Memory not found: " + memoryId));
+                .orElseThrow(() -> new LocalizedEntityNotFoundException("WorkflowMemory", memoryId));
 
         if (!memory.getWorkflowId().equals(workflowId)) {
             throw new LocalizedArgumentException(ErrorMessage.MEMORY_NOT_IN_WORKFLOW);
@@ -192,7 +194,7 @@ public class WorkflowMemoryService {
     @Transactional
     public void delete(String workflowId, String memoryId) {
         WorkflowMemory memory = memoryRepository.findById(memoryId)
-                .orElseThrow(() -> new EntityNotFoundException("Memory not found: " + memoryId));
+                .orElseThrow(() -> new LocalizedEntityNotFoundException("WorkflowMemory", memoryId));
 
         if (!memory.getWorkflowId().equals(workflowId)) {
             throw new LocalizedArgumentException(ErrorMessage.MEMORY_NOT_IN_WORKFLOW);

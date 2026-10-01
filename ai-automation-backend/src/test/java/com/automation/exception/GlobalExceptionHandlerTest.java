@@ -195,6 +195,20 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody().getError()).isEqualTo("Run not found: run-x");
     }
 
+    /** 2b73ff48: the localized variant (WorkflowMemoryService) carries messageKey + params. */
+    @Test
+    void handleEntityNotFound_localized_sendsMessageKeyAndParams() {
+        ResponseEntity<ErrorResponse> response = handler.handleEntityNotFound(
+                new LocalizedEntityNotFoundException("WorkflowMemory", "mem-x"));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getCode()).isEqualTo("RESOURCE_NOT_FOUND");
+        assertThat(response.getBody().getError()).isEqualTo("WorkflowMemory not found: mem-x");
+        assertThat(response.getBody().getMessageKey()).isEqualTo("NAMED_NOT_FOUND");
+        assertThat(response.getBody().getParams()).containsEntry("resource", "WorkflowMemory").containsEntry("id", "mem-x");
+    }
+
     @Test
     void handleMethodNotSupported_returnsMethodNotAllowedStatus() {
         var ex = new HttpRequestMethodNotSupportedException("GET", java.util.List.of("POST"));

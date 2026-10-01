@@ -1,5 +1,8 @@
 package com.automation.service.integration.providers;
 
+import com.automation.exception.ErrorMessage;
+import com.automation.exception.LocalizedArgumentException;
+
 import java.util.Map;
 
 /**
@@ -16,6 +19,14 @@ import java.util.Map;
 public final class IntegrationParams {
 
     private IntegrationParams() {}
+
+    /**
+     * {@code Required parameter missing: <key>} as a message the UI translates (TODO 2b73ff48): the
+     * action test in the integration panel runs an action without params and shows this as a toast.
+     */
+    public static IllegalArgumentException missing(String key) {
+        return new LocalizedArgumentException(ErrorMessage.INTEGRATION_PARAMETER_MISSING, Map.of("name", String.valueOf(key)));
+    }
 
     /** {@code params.get(key)} as int; {@code defaultValue} when missing or blank. */
     public static int intParam(Map<String, Object> params, String key, int defaultValue) {

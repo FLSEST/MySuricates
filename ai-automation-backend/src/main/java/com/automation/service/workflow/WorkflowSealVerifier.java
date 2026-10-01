@@ -1,6 +1,7 @@
 package com.automation.service.workflow;
 
 import com.automation.entity.Workflow;
+import com.automation.exception.ErrorMessage;
 import com.automation.modules.ModuleCatalog;
 import com.automation.modules.ModuleRegistry;
 import lombok.RequiredArgsConstructor;
@@ -40,13 +41,20 @@ public class WorkflowSealVerifier {
      * @param skillsPinned  whether the seal pins skills at all ({@code false} for seals made before V80)
      * @param pins          the verified pins when the seal holds and pins skills, else {@code null}
      * @param detail        human-readable reason for a broken seal, {@code null} when it holds
+     * @param refusal       the same reason as {@link RunAdmission}'s refusal, which the UI translates
+     *                      (TODO 2b73ff48); {@code null} when the seal holds
+     * @param refusalParams its params without the workflow {@code name}, which the caller adds
      */
     public record Verdict(Problem problem, String actualHash, Set<String> changedSkills, boolean skillsPinned,
-                          Map<String, String> pins, String detail, boolean signed) {
+                          Map<String, String> pins, String detail, boolean signed,
+                          ErrorMessage refusal, Map<String, String> refusalParams) {
         public boolean intact() {
             return problem == Problem.NONE;
         }
     }
+
+    /** Every {@code SEAL_*} refusal starts with this; {@link Verdict#detail()} is the rest of it. */
+    static final String REFUSAL_PREFIX = "Sealed workflow '{name}' was not started: ";
 
     private final WorkflowDefinitionHasher hasher;
     private final WorkflowSkillPins skillPins;
@@ -61,11 +69,11 @@ public class WorkflowSealVerifier {
             actual = hasher.hash(workflow);
         } catch (RuntimeException e) {
             return broken(Problem.UNVERIFIABLE, null, Set.of(), skillsPinned,
-                    "its definition could not be verified (" + e.getMessage() + ")");
+                    ErrorMessage.SEAL_DEFINITION_UNVERIFIABLE, Map.of("error", String.valueOf(e.getMessage())));
         }
         if (!actual.equals(workflow.getSealedHash())) {
             return broken(Problem.DEFINITION_CHANGED, actual, Set.of(), skillsPinned,
-                    "its definition no longer matches the seal");
+                    ErrorMessage.SEAL_DEFINITION_CHANGED, Map.of());
         }
         if (!skillsPinned) {
             return withSignature(workflow, actual, null, false);
@@ -77,11 +85,11 @@ public class WorkflowSealVerifier {
             changed = WorkflowSkillPins.changed(sealed, skillPins.pins(workflow));
         } catch (RuntimeException e) {
             return broken(Problem.UNVERIFIABLE, actual, Set.of(), true,
-                    "its skills could not be verified (" + e.getMessage() + ")");
+                    ErrorMessage.SEAL_SKILLS_UNVERIFIABLE, Map.of("error", String.valueOf(e.getMessage())));
         }
         if (!changed.isEmpty()) {
             return broken(Problem.SKILLS_CHANGED, actual, changed, true,
-                    "skill(s) " + String.join(", ", changed) + " changed since sealing — review them and seal again");
+                    ErrorMessage.SEAL_SKILLS_CHANGED, Map.of("skills", String.join(", ", changed)));
         }
         return withSignature(workflow, actual, sealed, true);
     }
@@ -95,20 +103,27 @@ public class WorkflowSealVerifier {
         String signature = workflow.getSealedSignature();
         if (signature != null) {
             if (!signer.verify(workflow.getId(), actualHash, pins, signature)) {
-                return new Verdict(Problem.SIGNATURE_INVALID, actualHash, Set.of(), skillsPinned, null,
-                        "its signature does not match — the seal was forged or copied from another workflow", true);
+                return refused(Problem.SIGNATURE_INVALID, actualHash, Set.of(), skillsPinned, true,
+                        ErrorMessage.SEAL_SIGNATURE_INVALID, Map.of());
             }
-            return new Verdict(Problem.NONE, actualHash, Set.of(), skillsPinned, pins, null, true);
+            return new Verdict(Problem.NONE, actualHash, Set.of(), skillsPinned, pins, null, true, null, Map.of());
         }
         if (modules.isEnabled(ModuleCatalog.REQUIRE_SIGNED_SEAL)) {
-            return new Verdict(Problem.SIGNATURE_MISSING, actualHash, Set.of(), skillsPinned, null,
-                    "it carries no signature (automation.hardening.require-signed-seal) — seal it again", false);
+            return refused(Problem.SIGNATURE_MISSING, actualHash, Set.of(), skillsPinned, false,
+                    ErrorMessage.SEAL_SIGNATURE_MISSING, Map.of());
         }
-        return new Verdict(Problem.NONE, actualHash, Set.of(), skillsPinned, pins, null, false);
+        return new Verdict(Problem.NONE, actualHash, Set.of(), skillsPinned, pins, null, false, null, Map.of());
     }
 
     private static Verdict broken(Problem problem, String actualHash, Set<String> changed, boolean skillsPinned,
-                                  String detail) {
-        return new Verdict(problem, actualHash, changed, skillsPinned, null, detail, false);
+                                  ErrorMessage refusal, Map<String, String> params) {
+        return refused(problem, actualHash, changed, skillsPinned, false, refusal, params);
+    }
+
+    /** The detail is the refusal text after {@link #REFUSAL_PREFIX} — one wording for both. */
+    private static Verdict refused(Problem problem, String actualHash, Set<String> changed, boolean skillsPinned,
+                                   boolean signed, ErrorMessage refusal, Map<String, String> params) {
+        String detail = refusal.format(params).substring(REFUSAL_PREFIX.length());
+        return new Verdict(problem, actualHash, changed, skillsPinned, null, detail, signed, refusal, params);
     }
 }

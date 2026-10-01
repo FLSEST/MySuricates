@@ -28,7 +28,7 @@ final class JiraParams {
 
     static String requireParam(Map<String, Object> params, String key) {
         Object val = params.get(key);
-        if (val == null) throw new IllegalArgumentException("Required parameter missing: " + key);
+        if (val == null) throw IntegrationParams.missing(key);
         return val.toString();
     }
 

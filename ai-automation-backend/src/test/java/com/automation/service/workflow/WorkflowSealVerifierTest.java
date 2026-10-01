@@ -1,6 +1,8 @@
 package com.automation.service.workflow;
 
 import com.automation.entity.Workflow;
+import com.automation.exception.ErrorCode;
+import com.automation.exception.ErrorMessage;
 import com.automation.modules.ModuleCatalog;
 import com.automation.modules.ModuleRegistry;
 import com.automation.service.workflow.WorkflowSealVerifier.Problem;
@@ -11,6 +13,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -117,7 +121,9 @@ class WorkflowSealVerifierTest {
         assertThat(verdict.skillsPinned()).isTrue();
         assertThat(verdict.pins()).isNull();
         assertThat(verdict.signed()).isFalse();
-        assertThat(verdict.detail()).contains("no longer matches the seal");
+        assertThat(verdict.detail()).isEqualTo("its definition no longer matches the seal");
+        assertThat(verdict.refusal()).isEqualTo(ErrorMessage.SEAL_DEFINITION_CHANGED);
+        assertThat(verdict.refusalParams()).isEmpty();
         verifyNoInteractions(skillPins, signer, modules);
     }
 
@@ -209,7 +215,9 @@ class WorkflowSealVerifierTest {
         assertThat(verdict.actualHash()).isNull();
         assertThat(verdict.skillsPinned()).isTrue();
         assertThat(verdict.signed()).isFalse();
-        assertThat(verdict.detail()).contains("definition could not be verified").contains("blocks not serialisable");
+        assertThat(verdict.detail()).isEqualTo("its definition could not be verified (blocks not serialisable)");
+        assertThat(verdict.refusal()).isEqualTo(ErrorMessage.SEAL_DEFINITION_UNVERIFIABLE);
+        assertThat(verdict.refusalParams()).isEqualTo(Map.of("error", "blocks not serialisable"));
         verifyNoInteractions(skillPins, signer, modules);
     }
 
@@ -238,5 +246,17 @@ class WorkflowSealVerifierTest {
         assertThat(verdict.problem()).isEqualTo(Problem.UNVERIFIABLE);
         assertThat(verdict.detail()).contains("skills could not be verified");
         verifyNoInteractions(skillPins, signer, modules);
+    }
+
+    /** 2b73ff48: the detail is cut from the refusal template, so every SEAL_* text must start the same way. */
+    @Test
+    void everySealRefusalStartsWithTheCommonPrefix() {
+        List<ErrorMessage> refusals = Arrays.stream(ErrorMessage.values())
+                .filter(message -> message.name().startsWith("SEAL_")).toList();
+
+        assertThat(refusals).hasSize(6).allSatisfy(message -> {
+            assertThat(message.getTemplate()).startsWith(WorkflowSealVerifier.REFUSAL_PREFIX);
+            assertThat(message.getCode()).isEqualTo(ErrorCode.WORKFLOW_TAMPERED);
+        });
     }
 }

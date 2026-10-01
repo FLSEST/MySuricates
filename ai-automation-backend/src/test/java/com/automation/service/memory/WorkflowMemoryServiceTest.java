@@ -4,6 +4,9 @@ import com.automation.entity.StepResult;
 import com.automation.entity.StepStatus;
 import com.automation.entity.WorkflowMemory;
 import com.automation.entity.WorkflowRun;
+import com.automation.exception.ErrorMessage;
+import com.automation.exception.LocalizedEntityNotFoundException;
+import com.automation.exception.LocalizedError;
 import com.automation.repository.WorkflowMemoryRepository;
 import com.automation.repository.WorkflowRunRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -105,7 +108,9 @@ class WorkflowMemoryServiceTest {
 
         assertThatThrownBy(() -> service.extractKnowledge("wf-1", List.of("missing"), "CLAUDE"))
                 .isInstanceOf(jakarta.persistence.EntityNotFoundException.class)
-                .hasMessageContaining("missing");
+                // 2b73ff48: still an EntityNotFoundException, now with a messageKey the UI translates
+                .isInstanceOf(LocalizedEntityNotFoundException.class)
+                .hasMessage("WorkflowRun not found: missing");
         verifyNoInteractions(claudeSummarizer);
         verify(memoryRepository, never()).save(any());
     }
@@ -135,7 +140,9 @@ class WorkflowMemoryServiceTest {
 
         assertThatThrownBy(() -> service.extractKnowledge("wf-1", null, "CLAUDE"))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("No runs found");
+                .hasMessageContaining("No runs found")
+                .isInstanceOfSatisfying(LocalizedError.class,
+                        error -> assertThat(error.errorMessage()).isEqualTo(ErrorMessage.MEMORY_NO_RUNS));
     }
 
     @Test
@@ -245,6 +252,10 @@ class WorkflowMemoryServiceTest {
         when(memoryRepository.findById("mem-1")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.delete("wf-1", "mem-1"))
-                .isInstanceOf(EntityNotFoundException.class);
+                .isInstanceOf(EntityNotFoundException.class)
+                .isInstanceOfSatisfying(LocalizedError.class, error -> {
+                    assertThat(error.errorMessage()).isEqualTo(ErrorMessage.NAMED_NOT_FOUND);
+                    assertThat(error.params()).containsEntry("resource", "WorkflowMemory").containsEntry("id", "mem-1");
+                });
     }
 }

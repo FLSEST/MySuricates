@@ -5,6 +5,7 @@ import com.automation.dto.AssistantChatResponse;
 import com.automation.dto.response.AssistantSessionDetail;
 import com.automation.dto.response.AssistantSessionSummary;
 import com.automation.entity.AssistantSession;
+import com.automation.exception.ElementNotFoundException;
 import com.automation.repository.AssistantSessionRepository;
 import com.automation.dto.PendingTool;
 import com.automation.service.assistant.ToolExecutionResult;
@@ -159,7 +160,7 @@ public class AssistantSessionService {
     @Transactional(readOnly = true)
     public AssistantSessionDetail getSession(String id) {
         AssistantSession session = sessionRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Session not found: " + id));
+                .orElseThrow(() -> new ElementNotFoundException("AssistantSession", id));
         return new AssistantSessionDetail(
                 session.getId(), resolvePreview(session), session.getPage(),
                 session.getEntityId(), deserializeMessages(session.getMessages()),

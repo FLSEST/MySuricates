@@ -1,5 +1,6 @@
 package com.automation.service.integration.providers.ntfy;
 
+import com.automation.service.integration.providers.IntegrationParams;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -118,7 +119,7 @@ final class NtfyParams {
         body.put("topic", requireTopic(params));
         Object message = params.get("message");
         if (message == null || message.toString().isBlank()) {
-            throw new IllegalArgumentException("Required parameter missing: message");
+            throw IntegrationParams.missing("message");
         }
         body.put("message", message.toString());
         putText(body, "title", params.get("title"));

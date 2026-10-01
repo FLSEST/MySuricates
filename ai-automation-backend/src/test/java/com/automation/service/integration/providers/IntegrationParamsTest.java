@@ -1,5 +1,7 @@
 package com.automation.service.integration.providers;
 
+import com.automation.exception.ErrorMessage;
+import com.automation.exception.LocalizedError;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -76,5 +78,17 @@ class IntegrationParamsTest {
         assertThat(IntegrationParams.parseInt(" 4 ")).isEqualTo(4);
         assertThat(IntegrationParams.parseInt("")).isNull();
         assertThatThrownBy(() -> IntegrationParams.parseInt(4.5)).isInstanceOf(NumberFormatException.class);
+    }
+
+    /** 2b73ff48: the action test in the integration panel shows this as a toast — in the UI's language. */
+    @Test
+    void missing_keepsTheTextAndCarriesAMessageKey() {
+        IllegalArgumentException missing = IntegrationParams.missing("chat_id");
+
+        assertThat(missing).hasMessage("Required parameter missing: chat_id")
+                .isInstanceOfSatisfying(LocalizedError.class, error -> {
+                    assertThat(error.errorMessage()).isEqualTo(ErrorMessage.INTEGRATION_PARAMETER_MISSING);
+                    assertThat(error.params()).isEqualTo(Map.of("name", "chat_id"));
+                });
     }
 }

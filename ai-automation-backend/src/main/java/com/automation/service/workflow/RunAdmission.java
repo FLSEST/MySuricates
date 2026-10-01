@@ -116,8 +116,9 @@ public class RunAdmission {
         activityLog.logRefusal(LogLevel.ERROR, LogCategory.SECURITY,
                 "Run refused — sealed workflow '" + workflow.getName() + "': " + reason,
                 "RunAdmission", workflow.getId(), metadata, workflow.getId());
-        return new HardeningException(ErrorCode.WORKFLOW_TAMPERED,
-                "Sealed workflow '" + workflow.getName() + "' was not started: " + reason);
+        Map<String, String> params = new LinkedHashMap<>(verdict.refusalParams());
+        params.put("name", String.valueOf(workflow.getName()));
+        return new HardeningException(verdict.refusal(), params);
     }
 
 }

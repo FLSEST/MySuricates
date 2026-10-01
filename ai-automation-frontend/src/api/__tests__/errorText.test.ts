@@ -71,7 +71,7 @@ describe('backend error codes', () => {
   it('name every resource type the backend reports as not found', () => {
     const types = new Set<string>();
     for (const file of javaFiles(BACKEND)) {
-      for (const match of readFileSync(file, 'utf8').matchAll(/new (?:ResourceNotFound|ElementNotFound)Exception\("([^"]+)"/g)) {
+      for (const match of readFileSync(file, 'utf8').matchAll(/new (?:ResourceNotFound|ElementNotFound|LocalizedEntityNotFound)Exception\("([^"]+)"/g)) {
         if (match[1]) types.add(match[1]);
       }
     }
@@ -176,5 +176,26 @@ describe('API client', () => {
     useI18nStore.setState({ locale: 'en' });
     const english = await api.post('/todos/t-1/export', {}).catch((e: unknown) => e);
     expect(english).toMatchObject({ message: "Integration 'GITHUB' is not connected" });
+  });
+
+  // 2b73ff48: a refused sealed run names its reason by messageKey. The frontend goes live before the
+  // backend restarts, so the old answer (code without params) must keep showing the server text.
+  it('shows a seal refusal translated from a new backend and as server text from an old one', async () => {
+    const english = "Sealed workflow 'Nightly' was not started: its definition no longer matches the seal";
+    const answer = (body: object) => vi.fn(async () => new Response(JSON.stringify({ ...body, timestamp: 'x' }),
+      { status: 409, headers: { 'Content-Type': 'application/json' } }));
+
+    vi.stubGlobal('fetch', answer({ code: 'WORKFLOW_TAMPERED', error: english }));
+    const old = await api.post('/workflows/w-1/execute', {}).catch((e: unknown) => e);
+    expect(old).toMatchObject({ status: 409, message: english });
+
+    vi.stubGlobal('fetch', answer({
+      code: 'WORKFLOW_TAMPERED', messageKey: 'SEAL_DEFINITION_CHANGED', params: { name: 'Nightly' }, error: english,
+    }));
+    const current = await api.post('/workflows/w-1/execute', {}).catch((e: unknown) => e);
+    expect(current).toMatchObject({
+      status: 409,
+      message: 'Der versiegelte Workflow „Nightly“ wurde nicht gestartet: Seine Definition passt nicht mehr zum Siegel',
+    });
   });
 });

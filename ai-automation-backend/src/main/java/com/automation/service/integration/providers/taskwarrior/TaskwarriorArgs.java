@@ -1,5 +1,6 @@
 package com.automation.service.integration.providers.taskwarrior;
 
+import com.automation.service.integration.providers.IntegrationParams;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -157,7 +158,7 @@ final class TaskwarriorArgs {
     static String requireParam(Map<String, Object> params, String key) {
         Object val = params.get(key);
         if (val == null || val.toString().isBlank()) {
-            throw new IllegalArgumentException("Required parameter missing: " + key);
+            throw IntegrationParams.missing(key);
         }
         return val.toString();
     }

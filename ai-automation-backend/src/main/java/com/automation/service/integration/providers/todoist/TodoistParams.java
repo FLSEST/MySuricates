@@ -29,7 +29,7 @@ final class TodoistParams {
     static String requireParam(Map<String, Object> params, String key) {
         Object val = params.get(key);
         if (val == null || val.toString().isBlank()) {
-            throw new IllegalArgumentException("Required parameter missing: " + key);
+            throw IntegrationParams.missing(key);
         }
         return val.toString();
     }

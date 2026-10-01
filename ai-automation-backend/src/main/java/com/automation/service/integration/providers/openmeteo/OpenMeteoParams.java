@@ -82,7 +82,7 @@ final class OpenMeteoParams {
 
     static double coordinate(Map<String, Object> params, String key, double bound) {
         Object value = params.get(key);
-        if (value == null || value.toString().isBlank()) throw new IllegalArgumentException("Required parameter missing: " + key);
+        if (value == null || value.toString().isBlank()) throw IntegrationParams.missing(key);
         double d;
         try {
             d = value instanceof Number n ? n.doubleValue() : Double.parseDouble(value.toString().trim());

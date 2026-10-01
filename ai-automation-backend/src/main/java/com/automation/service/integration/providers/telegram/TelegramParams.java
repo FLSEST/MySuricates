@@ -32,7 +32,7 @@ final class TelegramParams {
     static Object chatId(Map<String, Object> params) {
         Object val = params.get("chat_id");
         String raw = val == null ? "" : val.toString().trim();
-        if (raw.isEmpty()) throw new IllegalArgumentException("Required parameter missing: chat_id");
+        if (raw.isEmpty()) throw IntegrationParams.missing("chat_id");
         if (NUMERIC_CHAT.matcher(raw).matches()) {
             try {
                 return Long.parseLong(raw);
@@ -52,7 +52,7 @@ final class TelegramParams {
     /** Message text, 1–4096 characters as documented for sendMessage. */
     static String text(Map<String, Object> params) {
         Object val = params.get("text");
-        if (val == null || val.toString().isBlank()) throw new IllegalArgumentException("Required parameter missing: text");
+        if (val == null || val.toString().isBlank()) throw IntegrationParams.missing("text");
         String text = val.toString();
         if (text.length() > MAX_TEXT) {
             throw new IllegalArgumentException("Parameter 'text' is longer than " + MAX_TEXT + " characters");

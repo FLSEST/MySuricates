@@ -6,6 +6,7 @@ import com.automation.entity.BlockDefinition;
 import com.automation.entity.TriggerSource;
 import com.automation.entity.Workflow;
 import com.automation.exception.ErrorCode;
+import com.automation.exception.ErrorMessage;
 import com.automation.exception.HardeningException;
 import com.automation.modules.ModuleRegistry;
 import com.automation.service.activitylog.ActivityLogService;
@@ -119,7 +120,12 @@ class RunAdmissionTest {
         assertThatThrownBy(() -> admission.admit(wf, TriggerSource.WEBHOOK, Map.of()))
                 .isInstanceOf(HardeningException.class)
                 .satisfies(e -> assertThat(((HardeningException) e).getCode()).isEqualTo(ErrorCode.WORKFLOW_TAMPERED))
-                .hasMessageContaining("no longer matches the seal");
+                .hasMessage("Sealed workflow 'Deploy' was not started: its definition no longer matches the seal")
+                // 2b73ff48: the reason travels as messageKey + params, the UI translates it
+                .satisfies(e -> {
+                    assertThat(((HardeningException) e).getErrorMessage()).isEqualTo(ErrorMessage.SEAL_DEFINITION_CHANGED);
+                    assertThat(((HardeningException) e).getParams()).isEqualTo(Map.of("name", "Deploy"));
+                });
         verify(activityLog).logRefusal(eq(LogLevel.ERROR), eq(LogCategory.SECURITY), anyString(), eq("RunAdmission"), eq("wf-1"),
                 argThat(meta -> "WEBHOOK".equals(meta.get("triggerSource")) && hasher.hash(wf).equals(meta.get("actualHash"))),
                 eq("wf-1"));
@@ -221,7 +227,11 @@ class RunAdmissionTest {
                 .admit(sealed, TriggerSource.MANUAL, Map.of()))
                 .isInstanceOf(HardeningException.class)
                 .satisfies(e -> assertThat(((HardeningException) e).getCode()).isEqualTo(ErrorCode.WORKFLOW_TAMPERED))
-                .hasMessageContaining("skill-b").hasMessageNotContaining("skill-a");
+                .hasMessageContaining("skill-b").hasMessageNotContaining("skill-a")
+                .satisfies(e -> {
+                    assertThat(((HardeningException) e).getErrorMessage()).isEqualTo(ErrorMessage.SEAL_SKILLS_CHANGED);
+                    assertThat(((HardeningException) e).getParams()).containsEntry("skills", "skill-b").containsKey("name");
+                });
         verify(activityLog).logRefusal(eq(LogLevel.ERROR), eq(LogCategory.SECURITY), anyString(), eq("RunAdmission"), eq("wf-1"),
                 any(), eq("wf-1"));
         verifyNoInteractions(versionService);
