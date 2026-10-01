@@ -60,10 +60,35 @@ def guard(files: list[str], lines: int, forbidden: list[str], max_lines: int) ->
     return None
 
 
-def pick(shas: list[str]) -> bool:
-    if b.git_ok("cherry-pick", *shas):
+ALREADY_CONTAINED = "Änderung schon enthalten (Commit beim Übernehmen leer)"
+
+
+def pick(shas: list[str]) -> str:
+    """Übernimmt die Commits einzeln: `ok`, `empty` (jede Änderung steckt schon im Stand) oder `conflict`.
+
+    Ein Commit, der beim Übernehmen leer wird, kommt nicht in den Branch; die übrigen schon."""
+    applied = 0
+    for sha in shas:
+        if b.git_ok("cherry-pick", sha):
+            applied += 1
+        elif not b.git("ls-files", "-u").strip() and b.git_ok("diff", "--quiet", "HEAD"):
+            b.git_ok("cherry-pick", "--skip")
+        else:
+            b.git_ok("cherry-pick", "--abort")
+            return "conflict"
+    return "ok" if applied else "empty"
+
+
+def take(todo_id: str, shas: list[str], before: str, results: dict) -> bool:
+    """Übernimmt die Commits eines TODOs; sonst zurück auf `before` und Grund am TODO."""
+    outcome = pick(shas)
+    if outcome == "ok":
         return True
-    b.git_ok("cherry-pick", "--abort")
+    reset_to(before)
+    if outcome == "empty":
+        results[todo_id].update(status="skipped", reason=ALREADY_CONTAINED)
+    else:
+        results[todo_id].update(status="dropped", reason="Konflikt beim Übernehmen")
     return False
 
 
@@ -79,11 +104,8 @@ def rebuild(base: str, ordered: list[tuple[str, list[str]]], results: dict) -> l
     kept = []
     for todo_id, shas in ordered:
         before = b.git("rev-parse", "HEAD").strip()
-        if pick(shas):
+        if take(todo_id, shas, before, results):
             kept.append(todo_id)
-        else:
-            reset_to(before)
-            results[todo_id].update(status="dropped", reason="Konflikt beim Übernehmen")
     return kept
 
 
@@ -95,9 +117,7 @@ def linear(base: str, ordered: list[tuple[str, list[str]]], cfg: GateConfig, res
     retried: list[str] = []
     for todo_id, shas in ordered:
         before = b.git("rev-parse", "HEAD").strip()
-        if not pick(shas):
-            reset_to(before)
-            results[todo_id].update(status="dropped", reason="Konflikt beim Übernehmen")
+        if not take(todo_id, shas, before, results):
             continue
         ok, lines = run_gates(scope_for(changed_files(before), cfg), f"{base}..HEAD", cfg, f"linear-{b.short(todo_id)}")
         if ok:

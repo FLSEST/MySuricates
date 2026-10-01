@@ -886,6 +886,22 @@ class FinalReviewFollowUpTest(RepoCase):
         for sha in run_git(self.clone, "rev-list", f"{base}..HEAD").split():
             self.assertNotEqual(run_git(self.clone, "diff-tree", "--no-commit-id", "--name-only", "-r", sha).strip(), "")
 
+    def test_commit_that_becomes_empty_is_not_taken_and_says_why(self):
+        self.base_state([A, B])
+        self.commit(self.clone, "docs/x.md", "1\n", A)
+        run_git(self.clone, "rm", "-q", "docs/x.md")
+        run_git(self.clone, "commit", "-q", "-m", "chore: fremd, ohne Trailer")
+        self.commit(self.clone, "docs/x.md", "1\n", B)   # dieselbe Änderung wie A – nach dem Neuaufbau leer
+        self.verify()
+        results = json.loads((self.state / "results.json").read_text())["todos"]
+        self.assertEqual(results[A]["status"], "accepted")
+        self.assertEqual(results[B]["status"], "skipped")
+        self.assertIn("Änderung schon enthalten", results[B]["reason"])
+        self.assertEqual(run_git(self.clone, "log", "--format=%s", f"{(self.state / 'base.sha').read_text()}..HEAD")
+                         .split("\n")[0], "feat: x")
+        self.assertEqual(len(run_git(self.clone, "rev-list", f"{(self.state / 'base.sha').read_text()}..HEAD").split()), 1)
+        self.assertEqual(run_git(self.clone, "status", "--porcelain"), "")
+
     # report: ein Fehler von git merge-tree ist kein Konflikt
     def test_merge_tree_error_is_unknown_not_conflict(self):
         real = subprocess.run
