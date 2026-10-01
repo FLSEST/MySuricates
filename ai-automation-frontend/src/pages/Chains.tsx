@@ -139,7 +139,7 @@ export function Chains() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-text-primary">{t.chains.title}</h1>
+          <h1 className="text-2xl font-bold text-text">{t.chains.title}</h1>
           <p className="text-text-secondary mt-1">{t.chains.subtitle}</p>
         </div>
         <div className="flex gap-2">
@@ -181,7 +181,7 @@ export function Chains() {
                       <div className="flex items-center gap-2 min-w-0">
                         <span className="text-lg">{chain.icon || '🔗'}</span>
                         <div className="min-w-0">
-                          <p className="font-medium text-text-primary truncate">{chain.name}</p>
+                          <p className="font-medium text-text truncate">{chain.name}</p>
                           <p className="text-xs text-text-tertiary">
                             {chain.entries.length} {t.chains.entries} · {chain.runCount} {t.common.runs}
                           </p>

@@ -18,7 +18,7 @@ export function ApprovalPanel({ wish }: { wish: Wish }) {
         </h3>
         <p className="text-sm text-text-secondary">{t.wishes.approvalRequired}</p>
         {wish.resultSummary && (
-          <div className="p-3 rounded-lg bg-surface-raised text-sm text-text-primary">
+          <div className="p-3 rounded-lg bg-surface-raised text-sm text-text">
             {wish.resultSummary}
           </div>
         )}
@@ -26,7 +26,7 @@ export function ApprovalPanel({ wish }: { wish: Wish }) {
           value={feedback}
           onChange={(e) => setFeedback(e.target.value)}
           placeholder={t.wishes.refineFeedbackPlaceholder}
-          className="w-full h-20 px-3 py-2 rounded-lg bg-surface-raised border border-border text-text-primary placeholder-text-tertiary resize-none focus:outline-none focus:ring-2 focus:ring-accent text-sm"
+          className="w-full h-20 px-3 py-2 rounded-lg bg-surface-raised border border-border text-text placeholder-text-tertiary resize-none focus:outline-none focus:ring-2 focus:ring-accent text-sm"
         />
         <div className="flex items-center gap-2">
           <Button

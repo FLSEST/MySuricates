@@ -135,7 +135,7 @@ export function AssistantPanel() {
       >
         {open
           ? <X className="w-5 h-5" />
-          : <MeerkatIcon className="text-white" size={22} />
+          : <MeerkatIcon className="text-text-inverse" size={22} />
         }
       </button>
 

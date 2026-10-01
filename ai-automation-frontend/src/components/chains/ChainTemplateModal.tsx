@@ -46,7 +46,7 @@ export function ChainTemplateModal({ onClose }: { onClose: () => void }) {
                 <div className="flex items-start gap-3">
                   <span className="text-2xl">{tmpl.icon}</span>
                   <div className="min-w-0">
-                    <p className="font-semibold text-text-primary text-sm">{resolveName(tmpl.name)}</p>
+                    <p className="font-semibold text-text text-sm">{resolveName(tmpl.name)}</p>
                     <p className="text-xs text-text-secondary mt-0.5">{resolveName(tmpl.description)}</p>
                     <p className="text-xs text-text-tertiary mt-1">
                       {t.chains.installSteps.replace('{count}', String(tmpl.entries.length))}
@@ -64,7 +64,7 @@ export function ChainTemplateModal({ onClose }: { onClose: () => void }) {
                 <select
                   value={projectId}
                   onChange={e => setProjectId(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-surface border border-border text-text-primary text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                  className="w-full px-3 py-2 rounded-lg bg-surface border border-border text-text text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                 >
                   <option value="">— {t.chains.selectProject} —</option>
                   {activeProjects.map(p => (

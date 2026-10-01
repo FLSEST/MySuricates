@@ -22,7 +22,7 @@ export function ClarificationPanel({ wish }: { wish: Wish }) {
         </h3>
         <p className="text-sm text-text-secondary">{t.wishes.clarificationNeeded}</p>
         {question && (
-          <div className="p-3 rounded-lg bg-surface-raised text-sm text-text-primary flex items-start gap-2">
+          <div className="p-3 rounded-lg bg-surface-raised text-sm text-text flex items-start gap-2">
             <MessageCircle className="w-4 h-4 text-warning shrink-0 mt-0.5" />
             {question}
           </div>
@@ -31,7 +31,7 @@ export function ClarificationPanel({ wish }: { wish: Wish }) {
           value={answer}
           onChange={(e) => setAnswer(e.target.value)}
           placeholder={t.wishes.clarificationPlaceholder}
-          className="w-full h-20 px-3 py-2 rounded-lg bg-surface-raised border border-border text-text-primary placeholder-text-tertiary resize-none focus:outline-none focus:ring-2 focus:ring-warning text-sm"
+          className="w-full h-20 px-3 py-2 rounded-lg bg-surface-raised border border-border text-text placeholder-text-tertiary resize-none focus:outline-none focus:ring-2 focus:ring-warning text-sm"
         />
         <div className="flex items-center gap-2">
           <Button

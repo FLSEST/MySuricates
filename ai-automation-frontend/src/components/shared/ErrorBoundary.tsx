@@ -31,7 +31,7 @@ export class ErrorBoundary extends Component<Props, State> {
     if (this.state.hasError) {
       const t = getTranslations();
       return (
-        <div className="min-h-screen flex items-center justify-center bg-bg-primary p-4">
+        <div className="min-h-screen flex items-center justify-center bg-surface p-4">
           <div className="max-w-md w-full text-center space-y-6">
             <div className="flex justify-center">
               <div className="w-16 h-16 rounded-full bg-danger/10 flex items-center justify-center">
@@ -39,7 +39,7 @@ export class ErrorBoundary extends Component<Props, State> {
               </div>
             </div>
             <div className="space-y-2">
-              <h1 className="text-xl font-semibold text-text-primary">{t.errorPage.somethingWentWrong}</h1>
+              <h1 className="text-xl font-semibold text-text">{t.errorPage.somethingWentWrong}</h1>
               <p className="text-sm text-text-secondary">
                 {this.state.error?.message || t.errorPage.unexpectedError}
               </p>
@@ -54,7 +54,7 @@ export class ErrorBoundary extends Component<Props, State> {
               </button>
               <a
                 href="/"
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-text-secondary text-sm font-medium hover:text-text-primary transition-colors"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-text-secondary text-sm font-medium hover:text-text transition-colors"
               >
                 <Home className="w-4 h-4" />
                 {t.errorPage.goHome}

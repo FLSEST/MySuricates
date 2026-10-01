@@ -90,7 +90,7 @@ export function BpmnImportButton() {
           onChange={(e) => setProjectId(e.target.value)}
           options={(projects ?? []).map((p) => ({ value: p.id, label: p.name }))}
         />
-        <p className="mt-3 text-xs text-secondary">{t.workflows.bpmnImportTrustHint}</p>
+        <p className="mt-3 text-xs text-text-secondary">{t.workflows.bpmnImportTrustHint}</p>
       </Modal>
     </>
   );

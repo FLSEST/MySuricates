@@ -95,7 +95,7 @@ export default function WorkflowVersionsTab({ workflowId, currentHash }: { workf
           <div key={v.id} className="border border-border rounded-lg overflow-hidden">
             <button
               onClick={() => setExpandedId(isExpanded ? null : v.id)}
-              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-bg-secondary/50 transition-colors text-left"
+              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-hover transition-colors text-left"
             >
               {isExpanded ? (
                 <ChevronDown className="w-4 h-4 text-text-secondary flex-shrink-0" />
@@ -151,7 +151,7 @@ export default function WorkflowVersionsTab({ workflowId, currentHash }: { workf
                     {t.workflows.restoreVersion}
                   </button>
                 </div>
-                <pre className="text-xs bg-bg-tertiary rounded-md p-3 overflow-x-auto max-h-80 text-text-secondary">
+                <pre className="text-xs bg-surface-secondary rounded-md p-3 overflow-x-auto max-h-80 text-text-secondary">
                   {formatSnapshot(v.snapshot)}
                 </pre>
               </div>
@@ -165,7 +165,7 @@ export default function WorkflowVersionsTab({ workflowId, currentHash }: { workf
           <button
             onClick={() => setPage(p => Math.max(0, p - 1))}
             disabled={page === 0}
-            className="px-3 py-1 text-sm rounded border border-border hover:bg-bg-secondary disabled:opacity-40"
+            className="px-3 py-1 text-sm rounded border border-border hover:bg-surface-hover disabled:opacity-40"
           >
             &laquo;
           </button>
@@ -175,7 +175,7 @@ export default function WorkflowVersionsTab({ workflowId, currentHash }: { workf
           <button
             onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
             disabled={page >= totalPages - 1}
-            className="px-3 py-1 text-sm rounded border border-border hover:bg-bg-secondary disabled:opacity-40"
+            className="px-3 py-1 text-sm rounded border border-border hover:bg-surface-hover disabled:opacity-40"
           >
             &raquo;
           </button>

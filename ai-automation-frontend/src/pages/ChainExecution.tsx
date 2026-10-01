@@ -54,7 +54,7 @@ export function ChainExecution() {
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="sm" icon={<ArrowLeft className="w-4 h-4" />} onClick={() => navigate('/chains')} title={t.common.back} />
           <div>
-            <h1 className="text-2xl font-bold text-text-primary">{t.chains.execution.title}</h1>
+            <h1 className="text-2xl font-bold text-text">{t.chains.execution.title}</h1>
             {run.chainName && (
               <p className="text-text-secondary">{run.chainName}</p>
             )}
@@ -131,7 +131,7 @@ function EntryCard({ entry }: { entry: ChainRunEntry }) {
           <div className="flex items-center gap-3">
             <EntryStatusIcon status={entry.status} />
             <div>
-              <p className="font-medium text-text-primary">
+              <p className="font-medium text-text">
                 {entry.workflowName || entry.workflowId}
               </p>
               {entry.projectName && (

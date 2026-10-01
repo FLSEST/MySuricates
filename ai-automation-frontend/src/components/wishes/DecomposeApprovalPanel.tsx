@@ -23,7 +23,7 @@ export function DecomposeApprovalPanel({ wish }: { wish: Wish }) {
         {wish.decomposition && (
           <div className="space-y-2">
             {typeof wish.decomposition.analysis === 'string' && (
-              <div className="p-3 rounded-lg bg-surface-raised text-sm text-text-primary">
+              <div className="p-3 rounded-lg bg-surface-raised text-sm text-text">
                 {wish.decomposition.analysis}
               </div>
             )}
@@ -41,7 +41,7 @@ export function DecomposeApprovalPanel({ wish }: { wish: Wish }) {
             {wish.generatedWorkflowNames.map((name, i) => (
               <div key={i} className="flex items-center gap-2 p-2 rounded-lg bg-surface-raised">
                 <span className="text-xs font-mono text-text-tertiary w-5 text-right">{i + 1}.</span>
-                <span className="text-sm text-text-primary">{name}</span>
+                <span className="text-sm text-text">{name}</span>
               </div>
             ))}
           </div>
@@ -51,7 +51,7 @@ export function DecomposeApprovalPanel({ wish }: { wish: Wish }) {
           value={feedback}
           onChange={(e) => setFeedback(e.target.value)}
           placeholder={t.wishes.decomposeRefinePlaceholder}
-          className="w-full h-20 px-3 py-2 rounded-lg bg-surface-raised border border-border text-text-primary placeholder-text-tertiary resize-none focus:outline-none focus:ring-2 focus:ring-accent text-sm"
+          className="w-full h-20 px-3 py-2 rounded-lg bg-surface-raised border border-border text-text placeholder-text-tertiary resize-none focus:outline-none focus:ring-2 focus:ring-accent text-sm"
         />
         <div className="flex items-center gap-2">
           <Button

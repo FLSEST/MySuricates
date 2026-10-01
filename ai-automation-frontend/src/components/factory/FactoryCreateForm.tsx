@@ -93,7 +93,7 @@ export function FactoryCreateForm({ form }: { form: FactoryForm }) {
       {/* Advanced Options */}
       <div className="mt-4 pt-4 border-t border-border">
         <button
-          className="flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors"
+          className="flex items-center gap-1.5 text-sm text-text-secondary hover:text-text transition-colors"
           onClick={() => setShowAdvanced(!showAdvanced)}
         >
           {showAdvanced ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}

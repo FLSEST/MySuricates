@@ -27,7 +27,7 @@ export function ChainDetail({ chain, onExecute, onEdit, onDelete }: {
         <div className="p-4">
           <div className="flex items-start justify-between mb-3">
             <div>
-              <h2 className="text-xl font-bold text-text-primary flex items-center gap-2">
+              <h2 className="text-xl font-bold text-text flex items-center gap-2">
                 <span>{chain.icon || '🔗'}</span>
                 {chain.name}
               </h2>
@@ -72,7 +72,7 @@ export function ChainDetail({ chain, onExecute, onEdit, onDelete }: {
                     <div className="flex items-center gap-3 p-3 rounded-lg bg-surface-raised border border-border">
                       <span className="text-xs font-mono text-text-tertiary w-6 text-center">{i + 1}</span>
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-text-primary flex items-center gap-1.5 min-w-0">
+                        <p className="font-medium text-text flex items-center gap-1.5 min-w-0">
                           <span className="truncate">{entry.label || entry.workflowName || entry.workflowId}</span>
                           <SealStateIcon sealed={sealStatuses.has(entry.workflowId)} status={sealStatuses.get(entry.workflowId)} />
                         </p>

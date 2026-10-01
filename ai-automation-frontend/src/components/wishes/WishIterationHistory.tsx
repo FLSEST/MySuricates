@@ -56,7 +56,7 @@ export function WishIterationHistory({ wish, open, onToggle }: {
               return (
                 <div key={idx} className="rounded-lg border border-border bg-surface-raised p-3 space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-text-primary">
+                    <span className="text-sm font-medium text-text">
                       {t.wishes.iteration} {iteration}
                     </span>
                     {timestamp && (
@@ -82,7 +82,7 @@ export function WishIterationHistory({ wish, open, onToggle }: {
                       {workflowIds.map(wfId => (
                         <span
                           key={wfId}
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-surface-base text-accent cursor-pointer hover:underline"
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-surface-secondary text-accent cursor-pointer hover:underline"
                           onClick={() => navigate(`/workflows/${wfId}`)}
                         >
                           {wfId.slice(0, 8)}...
@@ -103,7 +103,7 @@ export function WishIterationHistory({ wish, open, onToggle }: {
                   )}
 
                   {evaluation && (
-                    <div className="rounded bg-surface-base p-2 space-y-1">
+                    <div className="rounded bg-surface-secondary p-2 space-y-1">
                       <div className="flex items-center gap-2">
                         <Badge variant={evaluation.satisfied ? 'success' : 'danger'}>
                           {evaluation.satisfied ? t.wishes.historySatisfied : t.wishes.historyNotSatisfied}

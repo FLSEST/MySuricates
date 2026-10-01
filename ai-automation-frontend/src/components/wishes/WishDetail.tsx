@@ -63,7 +63,7 @@ export function WishDetail({ wishId, onCancel, onDelete }: {
               {t.wishes.decomposition}
             </h3>
             {typeof wish.decomposition.analysis === 'string' && (
-              <p className="text-sm text-text-primary mb-2">{wish.decomposition.analysis}</p>
+              <p className="text-sm text-text mb-2">{wish.decomposition.analysis}</p>
             )}
             {typeof wish.decomposition.strategy === 'string' && (
               <p className="text-sm text-text-tertiary mb-3">{wish.decomposition.strategy}</p>
@@ -88,7 +88,7 @@ export function WishDetail({ wishId, onCancel, onDelete }: {
                 >
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-mono text-text-tertiary">{i + 1}</span>
-                    <span className="text-sm text-text-primary">
+                    <span className="text-sm text-text">
                       {wish.generatedWorkflowNames[i] ?? wfId}
                     </span>
                   </div>
@@ -144,7 +144,7 @@ export function WishDetail({ wishId, onCancel, onDelete }: {
               {t.wishes.result}
             </h3>
             {wish.resultSummary && (
-              <p className="text-sm text-text-primary"><PathLinkedOutput text={wish.resultSummary} /></p>
+              <p className="text-sm text-text"><PathLinkedOutput text={wish.resultSummary} /></p>
             )}
             {wish.error && (
               <p className="text-sm text-danger mt-2"><PathLinkedOutput text={wish.error} /></p>

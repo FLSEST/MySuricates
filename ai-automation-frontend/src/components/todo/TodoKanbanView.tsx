@@ -29,8 +29,8 @@ const KanbanCard = memo(function KanbanCard({ todo, onEdit, onStatusChange, onRe
   return (
     <div
       id={`todo-${todo.id}`}
-      className={`bg-surface-base border rounded-lg p-3 transition-colors cursor-pointer group scroll-mt-4 ${
-        highlighted ? 'border-accent/40 bg-accent/10' : 'border-border hover:border-border-strong'
+      className={`border rounded-lg p-3 transition-colors cursor-pointer group scroll-mt-4 ${
+        highlighted ? 'border-accent/40 bg-accent/10' : 'bg-surface-raised border-border hover:border-border-strong'
       }`}
       onClick={() => onEdit(todo)}
     >

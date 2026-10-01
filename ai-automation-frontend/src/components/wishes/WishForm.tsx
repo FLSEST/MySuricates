@@ -59,14 +59,14 @@ export function WishForm({ onSubmit, isPending, projects, allWorkflows }: WishFo
           value={wishText}
           onChange={(e) => setWishText(e.target.value)}
           placeholder={t.wishes.placeholder}
-          className="w-full h-24 px-3 py-2 rounded-lg bg-surface-raised border border-border text-text-primary placeholder-text-tertiary resize-none focus:outline-none focus:ring-2 focus:ring-accent"
+          className="w-full h-24 px-3 py-2 rounded-lg bg-surface-raised border border-border text-text placeholder-text-tertiary resize-none focus:outline-none focus:ring-2 focus:ring-accent"
         />
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <select
               value={projectId}
               onChange={(e) => setProjectId(e.target.value)}
-              className="px-3 py-2 rounded-lg bg-surface-raised border border-border text-text-primary text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+              className="px-3 py-2 rounded-lg bg-surface-raised border border-border text-text text-sm focus:outline-none focus:ring-2 focus:ring-accent"
             >
               <option value="">{t.wishes.projectHint}</option>
               {projects?.map(p => (
@@ -76,7 +76,7 @@ export function WishForm({ onSubmit, isPending, projects, allWorkflows }: WishFo
             <button
               type="button"
               onClick={() => setShowAdvanced(v => !v)}
-              className="flex items-center gap-1 px-2 py-1.5 text-xs text-text-secondary hover:text-text-primary transition-colors"
+              className="flex items-center gap-1 px-2 py-1.5 text-xs text-text-secondary hover:text-text transition-colors"
             >
               {showAdvanced ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
               {showAdvanced ? t.wishes.hideAdvanced : t.wishes.advanced}
@@ -143,18 +143,18 @@ export function WishForm({ onSubmit, isPending, projects, allWorkflows }: WishFo
               value={workflowSearch}
               onChange={(e) => setWorkflowSearch(e.target.value)}
               placeholder={t.wishes.searchWorkflows}
-              className="w-full px-3 py-1.5 rounded-lg bg-surface-raised border border-border text-text-primary placeholder-text-tertiary text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+              className="w-full px-3 py-1.5 rounded-lg bg-surface-raised border border-border text-text placeholder-text-tertiary text-sm focus:outline-none focus:ring-2 focus:ring-accent"
             />
             <div className="max-h-48 overflow-y-auto rounded-lg border border-border bg-surface-raised">
               {[...workflowsByProject.entries()].map(([projName, wfs]) => (
                 <div key={projName}>
-                  <div className="px-3 py-1 text-[10px] font-semibold text-text-tertiary uppercase tracking-wide bg-surface-base sticky top-0">
+                  <div className="px-3 py-1 text-[10px] font-semibold text-text-tertiary uppercase tracking-wide bg-surface-secondary sticky top-0">
                     {projName}
                   </div>
                   {wfs?.map(wf => (
                     <label
                       key={wf.id}
-                      className="flex items-center gap-2 px-3 py-1.5 hover:bg-surface-base cursor-pointer text-sm"
+                      className="flex items-center gap-2 px-3 py-1.5 hover:bg-surface-hover cursor-pointer text-sm"
                     >
                       <input
                         type="checkbox"
@@ -162,7 +162,7 @@ export function WishForm({ onSubmit, isPending, projects, allWorkflows }: WishFo
                         onChange={() => toggleWorkflow(wf.id)}
                         className="rounded border-border text-accent focus:ring-accent"
                       />
-                      <span className="text-text-primary truncate">{wf.name}</span>
+                      <span className="text-text truncate">{wf.name}</span>
                     </label>
                   ))}
                 </div>

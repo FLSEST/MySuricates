@@ -55,7 +55,7 @@ export function PendingToolCard({ tool, sessionId, existingResult }: {
             disabled={decision.pending}
             className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium
                        bg-transparent text-text-secondary border border-[var(--color-assistant-border)]
-                       hover:bg-[var(--color-assistant-hover)] transition-colors disabled:opacity-60"
+                       hover:bg-[var(--color-assistant-raised)] transition-colors disabled:opacity-60"
           >
             <X className="w-3 h-3" />
             {t.assistant.pendingToolReject}
