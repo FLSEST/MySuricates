@@ -1,3 +1,4 @@
+import { failOnUnhandledRequest } from '../../test/msw';
 import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach, vi } from 'vitest';
 import { act, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
@@ -14,7 +15,7 @@ import type { GoalDetail as GoalDetailData, GoalTodoItem, GoalWorkPackage, Todo 
 // 85889063 (Flo): „Wie funktioniert das mit dem Add bei TODOs auf der Goals-Seite, sollte man dort ja einem
 // Arbeitspaket zuordnen können.“ – „Ich habe + gedrückt und sehe es aber nicht in der Timeline oben“
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+beforeAll(() => server.listen({ onUnhandledRequest: failOnUnhandledRequest }));
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 const scrolled = vi.fn();

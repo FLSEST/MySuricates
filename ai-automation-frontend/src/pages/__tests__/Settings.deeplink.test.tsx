@@ -1,3 +1,4 @@
+import { failOnUnhandledRequest } from '../../test/msw';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
@@ -27,7 +28,7 @@ vi.mock('../../components/settings/ModulesCard', () => ({ ModulesCard: () => nul
 vi.mock('../../components/settings/StartupConfigCard', () => ({ StartupConfigCard: () => null }));
 vi.mock('../../components/dashboard/ApiLatencyCard', () => ({ ApiLatencyCard: () => null }));
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+beforeAll(() => server.listen({ onUnhandledRequest: failOnUnhandledRequest }));
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 
@@ -80,5 +81,22 @@ describe('Settings — sections and #hash deep link', () => {
     // Give the page's zero-delay scroll timer its chance: without a hash it must not scroll
     await new Promise((resolve) => setTimeout(resolve, 10));
     expect(scrollIntoView).not.toHaveBeenCalled();
+  });
+
+  it('drops the pending scroll when the page unmounts before it ran', async () => {
+    window.history.replaceState(null, '', '/settings#infrastructure');
+    const { unmount } = renderWithProviders(<Settings />, { route: '/settings' });
+    // A section with the linked id still in the document — the next page could carry it too
+    const stranger = document.createElement('div');
+    stranger.id = 'infrastructure';
+
+    unmount();
+    document.body.appendChild(stranger);
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(scrollIntoView).not.toHaveBeenCalled();
+    } finally {
+      stranger.remove();
+    }
   });
 });

@@ -1,3 +1,4 @@
+import { failOnUnhandledRequest } from '../../test/msw';
 import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -10,7 +11,7 @@ import { useSettingsStore } from '../../stores/settingsStore';
 import { isNestedAt } from '../../utils/navItems';
 import { sidebarEntryId, useSidebarOrder } from '../useSidebarOrder';
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+beforeAll(() => server.listen({ onUnhandledRequest: failOnUnhandledRequest }));
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 beforeEach(() => {

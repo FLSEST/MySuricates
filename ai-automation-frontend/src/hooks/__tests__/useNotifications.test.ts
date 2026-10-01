@@ -1,3 +1,4 @@
+import { failOnUnhandledRequest } from '../../test/msw';
 import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -5,7 +6,7 @@ import { type ReactNode, createElement } from 'react';
 import { server } from '../../test/server';
 import { useNotifications, useCreateNotification, useDeleteNotification } from '../useNotifications';
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+beforeAll(() => server.listen({ onUnhandledRequest: failOnUnhandledRequest }));
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 

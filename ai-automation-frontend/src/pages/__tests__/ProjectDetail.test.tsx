@@ -1,3 +1,4 @@
+import { failOnUnhandledRequest } from '../../test/msw';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { createElement } from 'react';
@@ -25,7 +26,7 @@ vi.mock('../../components/shared/MonacoEditor', () => ({
 
 import { ProjectDetail } from '../ProjectDetail';
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+beforeAll(() => server.listen({ onUnhandledRequest: failOnUnhandledRequest }));
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 

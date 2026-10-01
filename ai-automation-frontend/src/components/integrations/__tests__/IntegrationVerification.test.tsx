@@ -1,3 +1,4 @@
+import { failOnUnhandledRequest } from '../../../test/msw';
 import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach } from 'vitest';
 import { screen } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
@@ -23,7 +24,7 @@ const provider = (id: string, verification: 'VERIFIED' | 'SIMULATED'): Integrati
   verifiedAgainst: verification === 'VERIFIED' ? 'real service' : null,
 });
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+beforeAll(() => server.listen({ onUnhandledRequest: failOnUnhandledRequest }));
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 

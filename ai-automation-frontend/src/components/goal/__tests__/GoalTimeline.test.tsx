@@ -1,3 +1,4 @@
+import { failOnUnhandledRequest } from '../../../test/msw';
 import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach, vi } from 'vitest';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
@@ -36,7 +37,7 @@ vi.mock('@dnd-kit/core', async (importOriginal) => {
   };
 });
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+beforeAll(() => server.listen({ onUnhandledRequest: failOnUnhandledRequest }));
 afterEach(() => {
   server.resetHandlers();
   vi.useRealTimers();

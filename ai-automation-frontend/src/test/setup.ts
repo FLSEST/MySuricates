@@ -1,7 +1,12 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup, configure } from '@testing-library/react';
-import { afterEach, vi } from 'vitest';
+import { afterAll, afterEach, vi } from 'vitest';
 import { resetAuthStatusCache, resetRateLimitBackoff } from '../api/client';
+import { installNetworkGuards, takeUnhandledRequests, unhandledRequestError } from './msw';
+
+// No real network from a test (1f11b1c3, see ./msw.ts): installed before any msw server starts, so
+// the guards are also the pass-through msw falls back to.
+installNetworkGuards();
 
 // findBy*/waitFor wait 1 s by default. Under the load of the full suite a MSW answer plus the
 // re-render of a whole page regularly takes longer (reproduced with CPU load: a findByRole on the
@@ -20,6 +25,14 @@ afterEach(() => {
   // must not leak from one test into the next (d89b2cc1).
   resetRateLimitBackoff();
   resetAuthStatusCache();
+  const unhandled = takeUnhandledRequests();
+  if (unhandled.length > 0) throw unhandledRequestError(unhandled);
+});
+
+// A request that only arrives after the last test still fails the file.
+afterAll(() => {
+  const unhandled = takeUnhandledRequests();
+  if (unhandled.length > 0) throw unhandledRequestError(unhandled);
 });
 
 // matchMedia mock

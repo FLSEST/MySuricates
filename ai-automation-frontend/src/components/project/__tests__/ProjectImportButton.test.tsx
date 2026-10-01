@@ -1,3 +1,4 @@
+import { failOnUnhandledRequest } from '../../../test/msw';
 import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
@@ -8,7 +9,7 @@ import { en } from '../../../i18n/en';
 import type { ProjectBundle, ProjectBundlePreview, ProjectBundleImportResult } from '../../../types';
 import { ProjectImportButton } from '../ProjectImportButton';
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+beforeAll(() => server.listen({ onUnhandledRequest: failOnUnhandledRequest }));
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 beforeEach(() => {

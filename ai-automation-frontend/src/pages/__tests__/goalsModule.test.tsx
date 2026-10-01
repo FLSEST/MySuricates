@@ -1,3 +1,4 @@
+import { failOnUnhandledRequest } from '../../test/msw';
 import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
@@ -21,7 +22,7 @@ import type { Todo } from '../../types';
 
 const BASE = '/api/v1';
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+beforeAll(() => server.listen({ onUnhandledRequest: failOnUnhandledRequest }));
 afterEach(() => {
   server.resetHandlers();
   localStorage.clear();

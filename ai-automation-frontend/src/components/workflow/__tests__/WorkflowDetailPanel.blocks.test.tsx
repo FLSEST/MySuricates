@@ -1,4 +1,6 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { server } from '../../../test/server';
+import { failOnUnhandledRequest } from '../../../test/msw';
 import { screen, fireEvent } from '@testing-library/react';
 import { renderWithProviders } from '../../../test/utils';
 import { en } from '../../../i18n/en';
@@ -28,6 +30,11 @@ vi.mock('../BpmnDiagramView', () => ({
 }));
 
 import { WorkflowDetailPanel } from '../WorkflowDetailPanel';
+
+// Side queries of the component (seal status, runs, suggestions …) get the shared default handlers, never the network.
+beforeAll(() => server.listen({ onUnhandledRequest: failOnUnhandledRequest }));
+afterEach(() => server.resetHandlers());
+afterAll(() => server.close());
 
 beforeEach(() => {
   moduleState.bpmn = true;

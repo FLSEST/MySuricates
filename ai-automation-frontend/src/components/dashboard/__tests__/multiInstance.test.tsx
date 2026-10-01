@@ -1,3 +1,4 @@
+import { failOnUnhandledRequest } from '../../../test/msw';
 import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach, vi } from 'vitest';
 import { screen, within, fireEvent } from '@testing-library/react';
 import { server } from '../../../test/server';
@@ -40,7 +41,7 @@ function Harness({ editMode = false }: { editMode?: boolean }) {
 
 const slots = () => Array.from(document.querySelectorAll<HTMLElement>('[data-widget-id]'));
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+beforeAll(() => server.listen({ onUnhandledRequest: failOnUnhandledRequest }));
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 beforeEach(() => {

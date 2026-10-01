@@ -1,3 +1,4 @@
+import { failOnUnhandledRequest } from '../../test/msw';
 import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach, vi } from 'vitest';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
@@ -16,7 +17,7 @@ import type { GoalDetail as GoalDetailData, GoalTodoItem } from '../../types';
 // sein. Und man sollte auch besser zu den TODOs kommen … anklickbar.“ – und: „ziehbar und verschiebbar
 // und größenänderbar … bei den tieferen nicht alles erkennbar“.
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+beforeAll(() => server.listen({ onUnhandledRequest: failOnUnhandledRequest }));
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 beforeEach(() => {

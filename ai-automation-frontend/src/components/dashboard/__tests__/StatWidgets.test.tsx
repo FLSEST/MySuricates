@@ -1,3 +1,4 @@
+import { failOnUnhandledRequest } from '../../../test/msw';
 import { describe, it, expect, beforeAll, afterEach, afterAll } from 'vitest';
 import { act, screen } from '@testing-library/react';
 import { server } from '../../../test/server';
@@ -18,7 +19,7 @@ const inDashboard = (ui: React.ReactElement) => (
 // jsdom has no layout: whether a title fits is checked in the browser (cypress/e2e/dashboard.cy.ts).
 // Here: the tile never cuts its title off by design and keeps the full name as tooltip.
 describe('stat tiles', () => {
-  beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+  beforeAll(() => server.listen({ onUnhandledRequest: failOnUnhandledRequest }));
   afterEach(() => server.resetHandlers());
   afterAll(() => server.close());
 

@@ -1,3 +1,4 @@
+import { failOnUnhandledRequest } from '../../../test/msw';
 import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach, vi } from 'vitest';
 import { screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
@@ -9,7 +10,7 @@ import { useI18nStore } from '../../../i18n';
 import { RunHeader } from '../RunHeader';
 import type { Workflow, WorkflowRun } from '../../../types';
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+beforeAll(() => server.listen({ onUnhandledRequest: failOnUnhandledRequest }));
 afterEach(() => {
   server.resetHandlers();
   vi.restoreAllMocks();

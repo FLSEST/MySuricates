@@ -1,3 +1,4 @@
+import { failOnUnhandledRequest } from '../../../test/msw';
 import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach, vi } from 'vitest';
 import { screen } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
@@ -9,7 +10,7 @@ import { Header } from '../Header';
 // The sidebar is closed on mobile, so the menu button has to carry the signal.
 vi.mock('../../../hooks/useIsMobile', () => ({ useIsMobile: () => true }));
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+beforeAll(() => server.listen({ onUnhandledRequest: failOnUnhandledRequest }));
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 beforeEach(() => useI18nStore.setState({ locale: 'en' }));

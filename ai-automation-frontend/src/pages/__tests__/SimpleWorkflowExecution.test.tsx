@@ -1,3 +1,4 @@
+import { failOnUnhandledRequest } from '../../test/msw';
 import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach, vi } from 'vitest';
 import { screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { Routes, Route } from 'react-router-dom';
@@ -14,7 +15,7 @@ vi.mock('../../hooks/useWebSocket', () => ({
   useExecutionWebSocket: () => ({ connected: false, pendingApproval: null, pendingHumanInput: null }),
 }));
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+beforeAll(() => server.listen({ onUnhandledRequest: failOnUnhandledRequest }));
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 beforeEach(() => {

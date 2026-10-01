@@ -1,3 +1,4 @@
+import { failOnUnhandledRequest } from '../../test/msw';
 import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach } from 'vitest';
 import { screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
@@ -11,7 +12,7 @@ import { GoalDetail } from '../GoalDetail';
 import { applyDecisionToDetail } from '../../components/goal/decision';
 import type { GoalDetail as GoalDetailData, GoalRelations, GoalTodoItem, Todo } from '../../types';
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+beforeAll(() => server.listen({ onUnhandledRequest: failOnUnhandledRequest }));
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 beforeEach(() => {
@@ -567,6 +568,12 @@ describe('GoalDetail', () => {
 
   // 52bc1e8c: Workflows am Ziel oder Arbeitspaket anzeigen, starten und als Stand nutzen
   describe('workflows', () => {
+    // The switched-on guard shows the time of its schedule
+    beforeEach(() => {
+      server.use(http.get('/api/v1/schedules/s1', () => HttpResponse.json({
+        id: 's1', workflowId: 'wf-guard', targetType: 'WORKFLOW', scheduleType: 'CRON', cronExpression: '0 0 8 * * *', enabled: true,
+      })));
+    });
     const guardOn = { ...detail, goal: { ...detail.goal, guard: { enabled: true, workflowId: 'wf-guard', scheduleId: 's1', nextRunAt: null } } };
     const attachments = [
       { id: 'guard', goalId: 'g1', workPackageId: null, workflowId: 'wf-guard', workflowName: 'Goal guard: Open-Source-Launch', workflowProjectId: 'p1', role: 'STATUS', guard: true },

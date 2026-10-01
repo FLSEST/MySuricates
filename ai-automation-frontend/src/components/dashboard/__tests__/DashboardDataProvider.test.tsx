@@ -1,3 +1,4 @@
+import { failOnUnhandledRequest } from '../../../test/msw';
 import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach, vi } from 'vitest';
 import { renderHook, screen, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
@@ -11,7 +12,7 @@ import { TotalCostStat } from '../StatWidgets';
 
 let searches: string[] = [];
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+beforeAll(() => server.listen({ onUnhandledRequest: failOnUnhandledRequest }));
 afterEach(() => {
   server.resetHandlers();
   vi.restoreAllMocks();

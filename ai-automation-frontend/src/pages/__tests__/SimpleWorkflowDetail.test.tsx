@@ -1,3 +1,4 @@
+import { failOnUnhandledRequest } from '../../test/msw';
 import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach } from 'vitest';
 import { screen } from '@testing-library/react';
 import { Routes, Route } from 'react-router-dom';
@@ -9,7 +10,7 @@ import { en } from '../../i18n/en';
 import type { WorkflowRunListItem } from '../../types';
 import { SimpleWorkflowDetail } from '../SimpleWorkflowDetail';
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+beforeAll(() => server.listen({ onUnhandledRequest: failOnUnhandledRequest }));
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 beforeEach(() => {
