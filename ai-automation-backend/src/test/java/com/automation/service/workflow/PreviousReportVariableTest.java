@@ -19,6 +19,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.text.Normalizer;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
@@ -190,5 +191,69 @@ class PreviousReportVariableTest {
                 StepResult.builder().stepIndex(1).status(StepStatus.COMPLETED).output("too short").build()));
 
         assertThat(previousReport.value("wf-1")).isEqualTo("(kein vorheriger Report vorhanden)");
+    }
+
+    // --- 75f7b24d: Audit-Workflows bekommen den Report-Block, nicht den längsten Schritt ---------
+
+    private static StepResult step(int index, String blockName, StepStatus status, String output) {
+        return StepResult.builder().stepIndex(index).status(status).output(output)
+                .metadata(new java.util.HashMap<>(Map.of("blockName", blockName))).build();
+    }
+
+    private static PlatformVariableSource.Request auditRequest(String reportBlock) {
+        Map<String, Object> meta = Map.of("audit", Map.of("enabled", true, "key", "health",
+                "category", "health", "reportBlock", reportBlock));
+        return new PlatformVariableSource.Request("wf-1", "p-1", meta, name -> null);
+    }
+
+    @Test
+    void load_auditWorkflow_takesTheReportBlock_notTheLongerFactSheet() {
+        WorkflowRun prev = WorkflowRun.builder().id("run-0").status(RunStatus.COMPLETED).build();
+        when(runRepository.findTop5ByWorkflowIdOrderByStartedAtDesc("wf-1")).thenReturn(List.of(prev));
+        String report = "Bericht: alles im Rahmen.";
+        when(stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc("run-0")).thenReturn(List.of(
+                step(0, "backend_tests", StepStatus.COMPLETED, "t".repeat(5000)),
+                step(1, "facts", StepStatus.COMPLETED, "Faktenblatt ".repeat(400)),
+                step(2, "report", StepStatus.COMPLETED, report),
+                step(3, "gate", StepStatus.COMPLETED, "gate_status: GREEN")));
+
+        assertThat(previousReport.load(auditRequest("report"))).containsEntry("previous_report", report);
+    }
+
+    @Test
+    void load_auditWorkflow_reportBlockFailed_fallsBackToAnEarlierRun_notToTheFactSheet() {
+        WorkflowRun last = WorkflowRun.builder().id("run-1").status(RunStatus.COMPLETED_WITH_ERRORS).build();
+        WorkflowRun before = WorkflowRun.builder().id("run-0").status(RunStatus.COMPLETED).build();
+        when(runRepository.findTop5ByWorkflowIdOrderByStartedAtDesc("wf-1")).thenReturn(List.of(last, before));
+        when(stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc("run-1")).thenReturn(List.of(
+                step(0, "facts", StepStatus.COMPLETED, "data"),
+                step(1, "facts2", StepStatus.COMPLETED, "Faktenblatt ".repeat(400)),
+                step(2, "report", StepStatus.FAILED, "timeout")));
+        when(stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc("run-0")).thenReturn(List.of(
+                step(0, "facts", StepStatus.COMPLETED, "data"),
+                step(1, "report", StepStatus.COMPLETED, "Voriger Bericht")));
+
+        assertThat(previousReport.load(auditRequest("report"))).containsEntry("previous_report", "Voriger Bericht");
+    }
+
+    @Test
+    void load_workflowWithoutAuditMeta_keepsTheLongestStep() {
+        WorkflowRun prev = WorkflowRun.builder().id("run-0").status(RunStatus.COMPLETED).build();
+        when(runRepository.findTop5ByWorkflowIdOrderByStartedAtDesc("wf-1")).thenReturn(List.of(prev));
+        String analysis = "analysis ".repeat(50);
+        when(stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc("run-0")).thenReturn(List.of(
+                step(0, "data", StepStatus.COMPLETED, "x".repeat(5000)),
+                step(1, "report", StepStatus.COMPLETED, analysis)));
+
+        assertThat(previousReport.load(new PlatformVariableSource.Request("wf-1", "p-1", Map.of(), name -> null)))
+                .containsEntry("previous_report", analysis);
+    }
+
+    @Test
+    void reportBlock_readsOnlyANonBlankName() {
+        assertThat(PreviousReportVariable.reportBlock(null)).isNull();
+        assertThat(PreviousReportVariable.reportBlock(Map.of("audit", "x"))).isNull();
+        assertThat(PreviousReportVariable.reportBlock(Map.of("audit", Map.of("reportBlock", " ")))).isNull();
+        assertThat(PreviousReportVariable.reportBlock(Map.of("audit", Map.of("reportBlock", "report")))).isEqualTo("report");
     }
 }
