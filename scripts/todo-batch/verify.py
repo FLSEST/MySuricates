@@ -5,8 +5,9 @@ Geprüft wird nur, was committet ist: Nicht-Committetes im Klon wird vorher verw
 unter `discarded` genannt. Läuft nur in einem Klon, den prepare als isoliert bestätigt hat (sonst Exit 2).
 Nach dem Umsetzen: Zuordnung über den Trailer `Todo: <uuid>` (Commits ohne gültigen Trailer fallen heraus),
 Wächter je TODO (verbotene Pfade, Zeilen-Obergrenze), dann die Gates auf dem ganzen Bereich. Rot → vom
-Basis-Commit aus je TODO übernehmen und prüfen; rote TODOs fallen heraus, die übrigen bauen auf dem geprüften
-Stand weiter. `--after-review`: TODOs mit Blocker aus dem Review fallen heraus, der Rest wird neu geprüft.
+Basis-Commit aus je TODO übernehmen und prüfen; rote TODOs fallen heraus (Vermerk mit der ersten Fehlerzeile des
+Gates), die übrigen bauen auf dem geprüften Stand weiter. Leere Commits kommen nicht in den Branch; ein Gate, das erst
+im zweiten Versuch grün wird, steht unter `flaky`. `--after-review`: TODOs mit Blocker aus dem Review fallen heraus, der Rest wird neu geprüft.
 Ergebnis: `results.json`, `accepted.txt`, `head.sha`; nach dem Review auch `reviews.json`, `report-draft.md`.
 """
 from __future__ import annotations
@@ -17,7 +18,7 @@ import sys
 from pathlib import Path
 
 import batchlib as b
-from gates import LOCKFILES, GateConfig, changed_files, run_gates, scope_for
+from gates import LOCKFILES, GateConfig, changed_files, flaky, red_reasons, run_gates, scope_for
 
 
 def commits_since(base: str) -> list[str]:
@@ -59,10 +60,35 @@ def guard(files: list[str], lines: int, forbidden: list[str], max_lines: int) ->
     return None
 
 
-def pick(shas: list[str]) -> bool:
-    if b.git_ok("cherry-pick", "--allow-empty", *shas):
+ALREADY_CONTAINED = "Änderung schon enthalten (Commit beim Übernehmen leer)"
+
+
+def pick(shas: list[str]) -> str:
+    """Übernimmt die Commits einzeln: `ok`, `empty` (jede Änderung steckt schon im Stand) oder `conflict`.
+
+    Ein Commit, der beim Übernehmen leer wird, kommt nicht in den Branch; die übrigen schon."""
+    applied = 0
+    for sha in shas:
+        if b.git_ok("cherry-pick", sha):
+            applied += 1
+        elif not b.git("ls-files", "-u").strip() and b.git_ok("diff", "--quiet", "HEAD"):
+            b.git_ok("cherry-pick", "--skip")
+        else:
+            b.git_ok("cherry-pick", "--abort")
+            return "conflict"
+    return "ok" if applied else "empty"
+
+
+def take(todo_id: str, shas: list[str], before: str, results: dict) -> bool:
+    """Übernimmt die Commits eines TODOs; sonst zurück auf `before` und Grund am TODO."""
+    outcome = pick(shas)
+    if outcome == "ok":
         return True
-    b.git_ok("cherry-pick", "--abort")
+    reset_to(before)
+    if outcome == "empty":
+        results[todo_id].update(status="skipped", reason=ALREADY_CONTAINED)
+    else:
+        results[todo_id].update(status="dropped", reason="Konflikt beim Übernehmen")
     return False
 
 
@@ -78,30 +104,29 @@ def rebuild(base: str, ordered: list[tuple[str, list[str]]], results: dict) -> l
     kept = []
     for todo_id, shas in ordered:
         before = b.git("rev-parse", "HEAD").strip()
-        if pick(shas):
+        if take(todo_id, shas, before, results):
             kept.append(todo_id)
-        else:
-            reset_to(before)
-            results[todo_id].update(status="dropped", reason="Konflikt beim Übernehmen")
     return kept
 
 
-def linear(base: str, ordered: list[tuple[str, list[str]]], cfg: GateConfig, results: dict) -> None:
-    """Je TODO übernehmen und prüfen; rot → zurück, die übrigen bauen auf dem geprüften Stand weiter."""
+def linear(base: str, ordered: list[tuple[str, list[str]]], cfg: GateConfig, results: dict) -> list[str]:
+    """Je TODO übernehmen und prüfen; rot → zurück, die übrigen bauen auf dem geprüften Stand weiter.
+
+    Rückgabe: die Gates, die dabei erst im zweiten Versuch grün wurden."""
     reset_to(base)
+    retried: list[str] = []
     for todo_id, shas in ordered:
         before = b.git("rev-parse", "HEAD").strip()
-        if not pick(shas):
-            reset_to(before)
-            results[todo_id].update(status="dropped", reason="Konflikt beim Übernehmen")
+        if not take(todo_id, shas, before, results):
             continue
         ok, lines = run_gates(scope_for(changed_files(before), cfg), f"{base}..HEAD", cfg, f"linear-{b.short(todo_id)}")
         if ok:
+            retried += flaky(lines)
             results[todo_id].update(status="accepted", reason=None)
         else:
             reset_to(before)
-            red = [line.split("\n")[0] for line in lines if "ROT" in line]
-            results[todo_id].update(status="dropped", reason="Gate rot: " + "; ".join(red))
+            results[todo_id].update(status="dropped", reason="Gate rot: " + "; ".join(red_reasons(lines)))
+    return sorted(set(retried))
 
 
 def initial(state: Path, cfg: GateConfig, forbidden: list[str], max_lines: int) -> dict:
@@ -112,12 +137,15 @@ def initial(state: Path, cfg: GateConfig, forbidden: list[str], max_lines: int) 
     discarded = b.clean_tree()
     segments = b.item_segments(b.read_text(state / "umsetzen.txt"))
     groups, foreign = group(base, ids)
+    empty = [sha for shas in groups.values() for sha in shas if not files_of(sha)]
+    groups = {t: [sha for sha in shas if sha not in empty] for t, shas in groups.items()}
     results = {t: {"status": None, "reason": None, "commits": groups[t], "files": [], "lines": 0} for t in ids}
     ordered = []
     for todo_id in ids:
         shas = groups[todo_id]
         if not shas:
-            reason = b.last_marker(segments.get(todo_id, ""), "BATCH_SKIP:") or "kein Commit"
+            reason = (b.last_marker(segments.get(todo_id, ""), "BATCH_SKIP:")
+                      or ("nur leere Commits" if any(todo_of(sha, {todo_id}) for sha in empty) else "kein Commit"))
             results[todo_id].update(status="skipped", reason=b.plain(reason, 300))
             continue
         files = sorted({f for sha in shas for f in files_of(sha)})
@@ -128,20 +156,22 @@ def initial(state: Path, cfg: GateConfig, forbidden: list[str], max_lines: int) 
             results[todo_id].update(status="dropped", reason=problem)
         else:
             ordered.append((todo_id, shas))
-    if foreign or any(r["status"] == "dropped" for r in results.values()):
+    if foreign or empty or any(r["status"] == "dropped" for r in results.values()):
         kept = rebuild(base, ordered, results)
         regrouped, _ = group(base, ids)
         ordered = [(t, regrouped[t]) for t in kept]
     gate_lines: list[str] = []
+    retried: list[str] = []
     if ordered:
         ok, gate_lines = run_gates(scope_for(changed_files(base), cfg), f"{base}..HEAD", cfg, "gesamt")
         if ok:
+            retried = flaky(gate_lines)
             for todo_id, _ in ordered:
                 results[todo_id].update(status="accepted")
         else:
-            linear(base, ordered, cfg, results)
-    return {"base": base, "order": ids, "todos": results, "foreign": foreign, "gates": gate_lines,
-            "discarded": discarded}
+            retried = linear(base, ordered, cfg, results)
+    return {"base": base, "order": ids, "todos": results, "foreign": foreign, "empty": empty, "gates": gate_lines,
+            "discarded": discarded, "flaky": retried}
 
 
 # Was ein Modell aus der Formatvorlage abschreibt, statt einen Befund zu nennen
@@ -155,24 +185,30 @@ def findings(values) -> list[str]:
 
 
 def parse_reviews(text: str) -> dict[str, dict]:
-    """Je TODO die letzte REVIEW-Zeile in dessen eigenem foreach-Abschnitt, die auch dessen ID nennt."""
+    """Je TODO die letzte REVIEW-Zeile in dessen eigenem foreach-Abschnitt, die auch dessen ID nennt.
+
+    `reason`: die Zeile davor (oder der Text vor `REVIEW:` in derselben Zeile) – dort nennt ein Review ohne
+    Urteil seinen Grund."""
     reviews = {}
     for todo_id, segment in b.item_segments(text).items():
-        chosen = None
+        chosen, reason, previous = None, "", ""
         for line in segment.splitlines():
             index = line.find("REVIEW:")
-            if index == -1:
-                continue
-            try:
-                data = json.loads(line[index + len("REVIEW:"):].strip())
-            except json.JSONDecodeError:
-                continue
+            data = None
+            if index != -1:
+                try:
+                    data = json.loads(line[index + len("REVIEW:"):].strip())
+                except json.JSONDecodeError:
+                    data = None
             if isinstance(data, dict) and str(data.get("id", "")).lower() == todo_id:
-                chosen = data
+                chosen, reason = data, line[:index].strip() or previous
+            if line.strip():
+                previous = line.strip()
         if chosen is None:
             continue
         entry = {key: findings(chosen.get(key)) for key in ("blocker", "major", "minor")}
         entry["verdict"] = b.plain(chosen.get("verdict", ""), 20)
+        entry["reason"] = b.plain(reason, 200)
         reviews[todo_id] = entry
     return reviews
 
@@ -191,7 +227,8 @@ def after_review(state: Path, cfg: GateConfig) -> dict:
         results[todo_id].update(status="dropped",
                                 reason=("Review-Blocker: " + "; ".join(reviews[todo_id]["blocker"]))[:300])
     if blocked:
-        linear(data["base"], [(t, results[t]["commits"]) for t in accepted if t not in blocked], cfg, results)
+        retried = linear(data["base"], [(t, results[t]["commits"]) for t in accepted if t not in blocked], cfg, results)
+        data["flaky"] = sorted(set(data.get("flaky") or []) | set(retried))
     return data
 
 
@@ -209,6 +246,8 @@ def finish(state: Path, data: dict) -> None:
     print(f"Geprüft: {counts['accepted']} angenommen, {counts['dropped']} herausgefallen, "
           f"{counts['skipped']} übersprungen"
           + (f", {len(data['foreign'])} Commit(s) ohne Trailer entfernt" if data.get("foreign") else "")
+          + (f", {len(data['empty'])} leere(r) Commit(s) entfernt" if data.get("empty") else "")
+          + (f", erst im zweiten Versuch grün: {', '.join(data['flaky'])}" if data.get("flaky") else "")
           + (f", {len(data['discarded'])} nicht committete Datei(en) verworfen" if data.get("discarded") else ""))
     for todo_id in order:
         r = results[todo_id]
@@ -222,7 +261,8 @@ def draft(state: Path, data: dict) -> None:
     for todo_id in data["order"]:
         r, review = data["todos"][todo_id], reviews.get(todo_id, {})
         hints = (f"Review: {len(review.get('major', []))} wichtig, {len(review.get('minor', []))} klein"
-                 if review else "kein Review")
+                 if b.reviewed(review) else f"kein Review (Urteil: {review.get('verdict') or '–'})" if review
+                 else "kein Review")
         rows.append(f"- {b.short(todo_id)} {b.plain(titles.get(todo_id, ''), 120)}: {r['status']}"
                     + (f" ({b.plain(r['reason'], 160)})" if r.get("reason") else "") + f" · {hints}")
     (state / "report-draft.md").write_text("# Entwurf Batch-Bericht\n\n" + "\n".join(rows) + "\n", encoding="utf-8")

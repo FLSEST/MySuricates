@@ -10,6 +10,7 @@ import json
 import os
 import re
 import subprocess
+import unicodedata
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -135,10 +136,43 @@ def last_marker(text: str, marker: str) -> str | None:
 
 
 def plain(text, limit: int = 200) -> str:
-    """Fremder Text für Bericht und Kachel: eine Zeile, gekürzt, ohne Wörter, die ein Marker-Parser zählen würde."""
-    flat = " ".join(str(text or "").split())
+    """Fremder Text für Bericht und Kachel: eine Zeile, gekürzt, ohne Wörter, die ein Marker-Parser zählen würde.
+
+    Unsichtbare Formatzeichen (Unicode Cf: Zero-Width, Soft Hyphen, BOM …) fallen vorher weg – sonst trüge
+    `gate\u200b_status` ein Marker-Wort an der Entschärfung vorbei."""
+    visible = "".join(ch for ch in str(text or "") if unicodedata.category(ch) != "Cf")
+    flat = " ".join(visible.split())
     flat = _MARKER_WORDS.sub(lambda m: f"{m.group(1)} {m.group(2)}", flat)
     return flat if len(flat) <= limit else flat[: limit - 1] + "…"
+
+
+# Review-Urteile, mit denen ein Review stattgefunden hat; alles andere (z. B. `not_reviewed`) ist keins
+VERDICTS = ("ok", "findings")
+
+
+def reviewed(review: dict | None) -> bool:
+    return bool(review) and str(review.get("verdict", "")).strip().lower() in VERDICTS
+
+
+def merge_preview(target: str) -> dict:
+    """Merge-Vorschau des Klon-HEAD gegen `origin/<target>`: sauber, Konflikt (mit Dateien) oder unbekannt.
+
+    `git merge-tree --write-tree` endet mit 0 (sauber) oder 1 (Konflikt); jeder andere Exit-Code ist ein Fehler
+    des Befehls und sagt über den Merge nichts."""
+    if not git_ok("fetch", "-q", "origin", f"+refs/heads/{target}:refs/remotes/origin/{target}"):
+        return {"state": "unbekannt", "files": []}
+    result = subprocess.run(["git", "merge-tree", "--write-tree", "--name-only", f"origin/{target}", "HEAD"],
+                            capture_output=True, text=True)
+    if result.returncode == 0:
+        return {"state": "sauber", "files": []}
+    if result.returncode != 1:
+        return {"state": "unbekannt", "files": []}
+    files = []
+    for line in result.stdout.splitlines()[1:]:
+        if not line.strip():
+            break
+        files.append(line.strip())
+    return {"state": "Konflikt", "files": files[:10]}
 
 
 def ensure_isolated(project_path: str) -> None:

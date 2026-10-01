@@ -100,6 +100,27 @@ final class ConfigKeyRules {
                     where.prefixEn() + "required key " + required + " is missing — without it the " + type
                             + " block cannot run" + (instead == null ? "" : " (" + instead + " is set instead)")));
         }
+        checkOneOf(schema, type, cfg, where, out);
+    }
+
+    /** {@code requiredOneOf}: genau einer der Schlüssel – keiner oder mehrere lassen den Block abbrechen. */
+    private static void checkOneOf(BlockConfigSchema schema, String type, Map<String, Object> cfg, Where where,
+                                   List<AnalyzerFinding> out) {
+        List<String> oneOf = schema.requiredOneOfKeys(type);
+        // Ein leerer Text gilt wie im Executor als nicht gesetzt
+        long present = oneOf.stream().filter(key -> cfg.get(key) != null
+                && !(cfg.get(key) instanceof String text && text.isBlank())).count();
+        if (oneOf.isEmpty() || present == 1) return;
+        String de = String.join(" oder ", oneOf);
+        String en = String.join(" or ", oneOf);
+        out.add(AnalyzerFinding.of("missing-required-config-key", Severity.HIGH, where.index(), where.name(),
+                where.prefix() + (present == 0
+                        ? "Pflichtschlüssel " + de + " fehlt — ohne einen davon kann der " + type + "-Block nicht laufen"
+                        : de + " schließen sich aus — nur einer darf gesetzt sein, sonst bricht der " + type
+                                + "-Block ab"),
+                where.prefixEn() + (present == 0
+                        ? "required key " + en + " is missing — without one of them the " + type + " block cannot run"
+                        : en + " exclude each other — set only one, otherwise the " + type + " block fails")));
     }
 
     private static void checkValue(BlockConfigSchema.Field field, Object value, Where where, List<AnalyzerFinding> out) {

@@ -3,12 +3,14 @@
 
 Die Befehle sind Anpassungspunkte des Workflows (`defaultContext`). `{range}` im gemeinsamen Befehl wird durch
 den geprüften Commit-Bereich ersetzt. Die Ausgabe jedes Gates geht in eine Logdatei; zurück kommen nur Name,
-Ergebnis und bei Rot die letzten Zeilen ohne Stacktrace-Zeilen.
+Ergebnis und bei Rot die letzten Zeilen ohne Stacktrace-Zeilen. `first_error` holt daraus die erste
+aussagekräftige Fehlerzeile für den Vermerk am TODO; `flaky` nennt die Gates, die erst im zweiten Versuch grün wurden.
 """
 from __future__ import annotations
 
 import argparse
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -20,6 +22,14 @@ import batchlib as b
 
 LOCKFILES = ("package-lock.json", "yarn.lock", "pnpm-lock.yaml")
 _SEQUENCE = count(1)
+RETRIED = "im zweiten Versuch"
+# Sammel- und Abschlusszeilen der Werkzeuge: sagen „rot“, aber nicht warum
+_NOISE = re.compile(r"(?i)^(failures:|errors:|tests run:|build failure|failed to execute goal|-> \[help|"
+                    r"re-run maven|to see the full stack trace|for more information about the errors|please refer to|"
+                    r"\[help \d+\]|npm err!|error: process completed with exit code|error: command failed)")
+_ERRORISH = re.compile(r"(?i)(error|fail|assert|expected|exception|fehler|✗|×|zeitüberschreitung)")
+_ANSI = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")   # Farbfolgen (Maven färbt auch in eine Datei)
+_LEVEL = re.compile(r"^\s*\[(ERROR|WARNING|WARN|INFO)\]\s*")
 
 
 @dataclass
@@ -76,10 +86,40 @@ def _run(name: str, command: str, cwd: str, cfg: GateConfig, label: str) -> tupl
             os.killpg(process.pid, signal.SIGKILL)
             process.wait()
             code = None
-    lines = [l for l in log.read_text(encoding="utf-8", errors="replace").splitlines() if not l.lstrip().startswith("at ")]
+    text = _ANSI.sub("", log.read_text(encoding="utf-8", errors="replace"))
+    lines = [l for l in text.splitlines() if not l.lstrip().startswith("at ")]
     if code is None:
         lines.append(f"Zeitüberschreitung nach {cfg.timeout} s")
     return code == 0, "\n".join(lines[-15:])
+
+
+def first_error(tail: str) -> str:
+    """Die erste aussagekräftige Fehlerzeile der Gate-Ausgabe, ohne `[ERROR]`-Präfix; sonst die letzte Zeile."""
+    fallback = ""
+    for raw in _ANSI.sub("", tail or "").splitlines():
+        line = _LEVEL.sub("", raw).strip()
+        if not line or _NOISE.match(line) or "Time elapsed" in line:
+            continue
+        if _ERRORISH.search(raw):
+            return b.plain(line, 200)
+        fallback = line
+    return b.plain(fallback, 200)
+
+
+def red_reasons(lines: list[str]) -> list[str]:
+    """Je rotem Gate `<name>: <erste Fehlerzeile>` aus den Zeilen von `run_gates`."""
+    reasons = []
+    for entry in lines:
+        head, _, tail = entry.partition("\n")
+        if head.endswith(": ROT"):
+            name = head.removesuffix(": ROT")
+            reasons.append(f"{name}: {first_error(tail) or 'ROT'}")
+    return reasons
+
+
+def flaky(lines: list[str]) -> list[str]:
+    """Die Gates, die erst im zweiten Versuch grün wurden."""
+    return [entry.split(":", 1)[0] for entry in lines if RETRIED in entry.split("\n", 1)[0]]
 
 
 def run_gates(scope: list[str], rng: str, cfg: GateConfig, label: str) -> tuple[bool, list[str]]:
@@ -94,7 +134,7 @@ def run_gates(scope: list[str], rng: str, cfg: GateConfig, label: str) -> tuple[
         if retried:
             ok, tail = _run(name, command, cwd, cfg, label)
         if ok:
-            lines.append(f"{name}: grün" + (" im zweiten Versuch (instabil?)" if retried else ""))
+            lines.append(f"{name}: grün" + (f" {RETRIED} (instabil?)" if retried else ""))
         else:
             ok_all = False
             lines.append(f"{name}: ROT\n" + "\n".join("    " + l for l in tail.splitlines()))

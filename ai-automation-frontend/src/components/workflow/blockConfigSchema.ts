@@ -40,6 +40,8 @@ type FieldRef = Field | string;
 
 interface BlockSpec {
   required?: string[];
+  /** Exactly one of these keys must be set (todo-update: `id` or `updates`). */
+  requiredOneOf?: string[];
   fields: Record<string, FieldRef>;
 }
 
@@ -65,9 +67,10 @@ const ON_FAILURE: Field = SOURCE.onFailure;
 /** Keys every block accepts besides `on_failure`: notes for people, run workspace policy, output checks. */
 const COMMON_FIELDS: Record<string, Field> = SOURCE.commonFields;
 const AI_FIELDS: Record<string, Field> = SOURCE.ai.fields;
-const SPECS: Record<string, { required?: string[]; fields: Record<string, Field> }> = Object.fromEntries(
+const SPECS: Record<string, { required?: string[]; requiredOneOf?: string[]; fields: Record<string, Field> }> = Object.fromEntries(
   Object.entries(SOURCE.blockTypes).map(([type, spec]) => [type, {
     required: spec.required,
+    requiredOneOf: spec.requiredOneOf,
     fields: Object.fromEntries(Object.entries(spec.fields).map(([key, ref]) => [key, resolveField(ref)])),
   }]),
 );
@@ -139,6 +142,11 @@ export function requiredConfigKeys(type: string): string[] {
   return SPECS[type]?.required ?? [];
 }
 
+/** Keys of which exactly one must be set, an empty text counting as not set (empty when the type has no such rule). */
+export function requiredOneOfConfigKeys(type: string): string[] {
+  return SPECS[type]?.requiredOneOf ?? [];
+}
+
 /** Allowed values of a key, if it has a fixed set (legacy aliases included). */
 export function allowedConfigValues(type: string, key: string): string[] | null {
   const field = SPECS[type]?.fields[key]
@@ -178,6 +186,10 @@ export function buildBlockConfigSchema(type: string, locale: SchemaLocale): Json
     type: 'object',
     properties: propertiesFor(type, locale),
     required: requiredConfigKeys(type),
+    ...(requiredOneOfConfigKeys(type).length
+      // An empty text counts as not set — as in the executor and the analyzer
+      ? { oneOf: requiredOneOfConfigKeys(type).map((key) => ({ required: [key], properties: { [key]: { minLength: 1 } } })) }
+      : {}),
     // Unknown keys are ignored by the backend — the editor only warns, it never blocks saving
     additionalProperties: !known,
     ...(known ? { defaultSnippets: [{ label: type, body: BLOCK_DEFAULT_CONFIG[type] }] } : {}),

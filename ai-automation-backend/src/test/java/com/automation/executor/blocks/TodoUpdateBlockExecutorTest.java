@@ -6,12 +6,15 @@ import com.automation.entity.StepStatus;
 import com.automation.entity.Todo;
 import com.automation.executor.ExecutionContext;
 import com.automation.service.todo.TodoService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,7 +33,16 @@ class TodoUpdateBlockExecutorTest {
 
     @Mock private TodoService todoService;
 
-    @InjectMocks private TodoUpdateBlockExecutor executor;
+    /** 01:30 in Berlin ist 23:30 UTC am Vortag – der Vermerk soll den Tag der Instanz tragen (d6c0afe6). */
+    private static final Clock BERLIN_NIGHT =
+            Clock.fixed(Instant.parse("2026-09-30T23:30:00Z"), ZoneId.of("Europe/Berlin"));
+
+    private TodoUpdateBlockExecutor executor;
+
+    @BeforeEach
+    void setUp() {
+        executor = new TodoUpdateBlockExecutor(todoService, BERLIN_NIGHT);
+    }
 
     private ExecutionContext buildContext() {
         return ExecutionContext.builder()
@@ -133,6 +145,39 @@ class TodoUpdateBlockExecutorTest {
 
         assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
         assertThat(result.getOutput()).startsWith("✓ 1 aktualisiert, 0 übersprungen");
+    }
+
+    @Test
+    void execute_updates_noteCarriesTheDateOfTheInstanceZoneNotUtc() {
+        String id = "22222222-2222-2222-2222-222222222222";
+        when(todoService.findById(id)).thenReturn(Todo.builder().id(id).projectId("proj-1").status(Todo.Status.OPEN)
+                .description("Alt").build());
+        when(todoService.update(eq(id), any())).thenReturn(Todo.builder().id(id).build());
+        ExecutionContext ctx = buildContext();
+        ctx.setVariable("project_id", "proj-1");
+        ctx.setVariable("workflow_name", "Batch");
+        Map<String, Object> config = new HashMap<>();
+        config.put("updates", "[{\"id\":\"" + id + "\",\"note\":\"gestartet\"}]");
+
+        executor.execute(block(config), ctx);
+
+        verify(todoService).update(eq(id), argThat(request ->
+                request.description().contains("— 2026-10-01 · Batch (Lauf run-1): gestartet")));
+    }
+
+    /** Ein leeres {@code id} (Editor-Vorgabe geleert) gilt als nicht gesetzt – wie im Analyzer (requiredOneOf). */
+    @Test
+    void execute_blankIdNextToUpdates_runsTheUpdates() {
+        ExecutionContext ctx = buildContext();
+        ctx.setVariable("project_id", "proj-1");
+        Map<String, Object> config = new HashMap<>();
+        config.put("id", "");
+        config.put("updates", "[]");
+
+        StepResult result = executor.execute(block(config), ctx);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getOutput()).startsWith("✓ 0 aktualisiert");
     }
 
     @Test

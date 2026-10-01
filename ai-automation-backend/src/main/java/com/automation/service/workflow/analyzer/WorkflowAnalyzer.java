@@ -39,7 +39,7 @@ import java.util.Map;
  *   <li>{@code items-command-without-source} — foreach mit {@code items_command}, aber ohne
  *       {@code items_source: "command"}: der Befehl läuft nie</li>
  *   <li>{@code unknown-config-key} — Config-Schlüssel, den kein Executor liest (auch in verschachtelten Blöcken)</li>
- *   <li>{@code missing-required-config-key} — Pflichtschlüssel des Blocktyps fehlt</li>
+ *   <li>{@code missing-required-config-key} — Pflichtschlüssel des Blocktyps fehlt (bei „genau einer von“ auch: mehrere gesetzt)</li>
  *   <li>{@code invalid-config-value} — Wert außerhalb der festen Werte, etwa {@code on_failure: "fail"}</li>
  *   <li>{@code self-api-call} — Block ruft die REST-API der eigenen Instanz auf (außer den schlüsselfreien
  *       Sonden); im Shell-Code HIGH, im KI-Auftrag MEDIUM zum Prüfen ({@link SelfAccessRules})</li>

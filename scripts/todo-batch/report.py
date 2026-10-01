@@ -2,13 +2,13 @@
 """TODO-Batch, Abarbeiten (TODO cc0eb3ba): Bericht, Merge-Vorschau, Ampel und Dashboard-Kachel – ohne KI.
 
 Prüft zuerst, dass seit der Prüfung niemand den Branch verändert hat (Review und Gesamt-Review dürfen nur lesen);
-sonst zurück auf `head.sha`. Ein angenommenes TODO ohne lesbares Review gilt als „mit Hinweis“, nicht als sauber. Schreibt `approval.md` (die Frage der Freigabe), `merge.json` und `widget.json`.
+sonst zurück auf `head.sha`. Ein angenommenes TODO ohne lesbares Review oder ohne echtes Urteil (`ok`/`findings`, nicht etwa
+`not_reviewed`) gilt als „mit Hinweis“, nicht als sauber. Schreibt `approval.md` (die Frage der Freigabe), `merge.json` und `widget.json`.
 """
 from __future__ import annotations
 
 import argparse
 import json
-import subprocess
 import sys
 from pathlib import Path
 
@@ -28,19 +28,22 @@ def guard_head(state: Path) -> list[str]:
     return ["Nach der Prüfung war der Arbeitsstand verändert – zurückgesetzt auf den geprüften Stand."]
 
 
-def merge_preview(target: str) -> dict:
-    if not b.git_ok("fetch", "-q", "origin", f"+refs/heads/{target}:refs/remotes/origin/{target}"):
-        return {"state": "unbekannt", "files": []}
-    result = subprocess.run(["git", "merge-tree", "--write-tree", "--name-only", f"origin/{target}", "HEAD"],
-                            capture_output=True, text=True)
-    if result.returncode == 0:
-        return {"state": "sauber", "files": []}
-    files = []
-    for line in result.stdout.splitlines()[1:]:
-        if not line.strip():
-            break
-        files.append(line.strip())
-    return {"state": "Konflikt", "files": files[:10]}
+def start_skips(not_started: dict, titles: dict) -> str:
+    return "; ".join(f"{b.short(t)} {b.plain(titles.get(t, ''), 60)} – {b.plain(why, 120)}"
+                     for t, why in list(not_started.items())[:5]) + (" …" if len(not_started) > 5 else "")
+
+
+def warning(review: dict) -> str:
+    """Warum ein angenommenes TODO nur „mit Hinweis“ gilt: kein echtes Review-Urteil und/oder wichtige Befunde."""
+    parts = []
+    if not review:
+        parts.append("kein Review (fehlt oder nicht lesbar)")
+    elif not b.reviewed(review):
+        parts.append(f"kein Review (Urteil: {review.get('verdict') or '–'})"
+                     + (f": {review['reason']}" if review.get("reason") else ""))
+    if review.get("major"):
+        parts.append("Review: " + "; ".join(review["major"]))
+    return "angenommen; " + "; ".join(parts)
 
 
 def build(state: Path, target: str, run_id: str, date: str) -> tuple[str, str, dict, str]:
@@ -51,10 +54,17 @@ def build(state: Path, target: str, run_id: str, date: str) -> tuple[str, str, d
         widget = {"status": "RED", "title": f"TODO-Batch {date}", "summary": summary,
                   "kpis": [{"label": "Angenommen", "value": "0"}], "items": []}
         return "RED", summary, widget, ""
+    not_started = b.read_json(state / "not_started.json", {})
     data = data or {"order": [], "todos": {}}
     reviews = b.read_json(state / "reviews.json", {})
     titles = b.read_json(state / "titles.json", {})
     order = data["order"]
+    if not order and not_started:
+        summary = (f"Kein TODO gestartet – {len(not_started)} TODO(s) nicht gestartet (Start-Update übersprungen): "
+                   + start_skips(not_started, titles))
+        widget = {"status": "YELLOW", "title": f"TODO-Batch {date}", "summary": b.plain(summary, 500),
+                  "kpis": [{"label": "Angenommen", "value": "0"}], "items": []}
+        return "YELLOW", summary, widget, ""
     if not order:
         widget = {"status": "GREEN", "title": f"TODO-Batch {date}", "summary": "Kein TODO ausgewählt.",
                   "kpis": [{"label": "Angenommen", "value": "0"}], "items": []}
@@ -63,14 +73,20 @@ def build(state: Path, target: str, run_id: str, date: str) -> tuple[str, str, d
     for todo_id in order:
         status = data["todos"][todo_id]["status"] or "skipped"
         review = reviews.get(todo_id)
-        kinds[todo_id] = "warned" if status == "accepted" and (not review or review.get("major")) else status
+        kinds[todo_id] = ("warned" if status == "accepted" and (not b.reviewed(review) or review.get("major"))
+                          else status)
     if data.get("discarded"):
         shown = ", ".join(b.plain(f, 80) for f in data["discarded"][:5])
         notes.append(f"Nicht committete Reste verworfen, geprüft wurde nur Committetes: {shown}"
                      + (" …" if len(data["discarded"]) > 5 else ""))
+    if not_started:
+        notes.append(f"{len(not_started)} TODO(s) nicht gestartet (Start-Update übersprungen): "
+                     + start_skips(not_started, titles))
+    if data.get("flaky"):
+        notes.append("Gate erst im zweiten Versuch grün (instabil?): " + ", ".join(b.plain(n, 40) for n in data["flaky"]))
     count = {kind: sum(1 for value in kinds.values() if value == kind) for kind in ICONS}
     accepted = count["accepted"] + count["warned"]
-    merge = merge_preview(target) if accepted else {"state": "–", "files": []}
+    merge = b.merge_preview(target) if accepted else {"state": "–", "files": []}
     b.write_json(state / "merge.json", merge)
     if accepted == 0:
         status = "RED"
@@ -89,8 +105,7 @@ def build(state: Path, target: str, run_id: str, date: str) -> tuple[str, str, d
     for todo_id in order:
         result, review = data["todos"][todo_id], reviews.get(todo_id, {})
         detail = {"accepted": f"{len(result['commits'])} Commit(s), {len(result['files'])} Datei(en), {result['lines']} Zeilen",
-                  "warned": ("angenommen; Review: " + "; ".join(review["major"]) if review.get("major")
-                             else "angenommen; kein Review (fehlt oder nicht lesbar)"),
+                  "warned": warning(review),
                   "dropped": result.get("reason") or "herausgefallen",
                   "skipped": result.get("reason") or "übersprungen"}[kinds[todo_id]]
         lines.append(f"| {ICONS[kinds[todo_id]]} | {b.short(todo_id)} {b.plain(titles.get(todo_id, ''), 100)} "

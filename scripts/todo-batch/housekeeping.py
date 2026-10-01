@@ -39,7 +39,7 @@ def plan(todos: list[dict], merged: set[str], in_branches: set[str], now=None, s
                                     note="Batch-Commit ist gemergt – erledigt", require_tags=[b.HANDED_OVER]))
             summary["closed"].append(todo_id)
         elif b.HANDED_OVER in tags and todo_id not in in_branches:
-            updates.append(b.update(todo_id, remove=[b.HANDED_OVER],
+            updates.append(b.update(todo_id, status="OPEN", remove=[b.HANDED_OVER],
                                     note="Batch-Branch weder gemergt noch vorhanden – wieder frei",
                                     require_tags=[b.HANDED_OVER]))
             summary["released"].append(todo_id)

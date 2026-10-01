@@ -126,6 +126,27 @@ class ConfigKeyRulesTest {
             assertThat(findings.get(0).detail()).contains("gesetzt ist comand");
         }
 
+        /** todo-update läuft mit id oder updates – mit keinem oder beiden bricht er ab (d6c0afe6). */
+        @Test
+        void todoUpdateBrauchtGenauEinenVonIdUndUpdates() {
+            assertThat(keyFindings(block("todo-update", "u", Map.of("id", "{{ todo_id }}")))).isEmpty();
+            assertThat(keyFindings(block("todo-update", "u", Map.of("updates", "{{ block.x.output }}")))).isEmpty();
+            assertThat(keyFindings(block("todo-update", "u", Map.of("title", "Neu"))))
+                    .singleElement().satisfies(f -> {
+                        assertThat(f.rule()).isEqualTo("missing-required-config-key");
+                        assertThat(f.detail()).contains("id oder updates");
+                    });
+            // Ein leerer Text gilt wie im Executor als nicht gesetzt
+            assertThat(keyFindings(block("todo-update", "u", Map.of("id", "", "updates", "[]")))).isEmpty();
+            assertThat(keyFindings(block("todo-update", "u", Map.of("id", " "))))
+                    .singleElement().extracting(AnalyzerFinding::detail).asString().contains("id oder updates");
+            assertThat(keyFindings(block("todo-update", "u", Map.of("id", "a", "updates", "[]"))))
+                    .singleElement().satisfies(f -> {
+                        assertThat(f.rule()).isEqualTo("missing-required-config-key");
+                        assertThat(f.detail()).contains("nur einer");
+                    });
+        }
+
         @Test
         void kurzeSchluesselBekommenKeinenGeratenenVorschlag() {
             assertThat(ConfigKeyRules.suggestion("mode", java.util.Set.of("node", "name"))).isEqualTo("node");
