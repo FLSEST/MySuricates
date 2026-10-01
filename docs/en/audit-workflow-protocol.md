@@ -114,6 +114,9 @@ catalogue as well – as an entry `{"key": …, "subject": …}` instead of a pl
 enforces it, whatever `subject` the model sends; before, it was only a request in the prompt, and a
 deviation came back as a repeat finding without the triage of the old one. Because the catalogue
 value is the one the prompt already demanded, every finding that followed it keeps its fingerprint.
+At startup, `AuditFingerprintMigrationJob` (v5) merges legacy findings with a deviating `subject` onto
+the canonical one – triage included (`ACCEPTED_RISK`/`DISMISSED`, note); if there is none, the
+deviating finding itself becomes canonical.
 File-related rules (`subject = path`) and rules with several permitted values
 (`"ai-automation-backend" or "ai-automation-frontend"`) have no fixed value.
 `AuditRuleKeyCatalogTest` keeps catalogue and prompt in step and checks that a prompt's envelope

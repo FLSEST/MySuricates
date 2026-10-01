@@ -114,7 +114,9 @@ Katalog – als Eintrag `{"key": …, "subject": …}` statt als bloßer String.
 durch, egal welches `subject` das Modell schickt; vorher war es nur eine Bitte im Prompt, und eine
 Abweichung kam als Wiedergänger ohne die Einordnung des alten Befunds zurück. Weil der Katalogwert
 der ist, den der Prompt schon verlangte, behält jeder Befund, der sich daran hielt, seinen
-Fingerprint. Dateibezogene Regeln (`subject = Pfad`) und Regeln mit mehreren erlaubten Werten
+Fingerprint. Altbestand mit abweichendem `subject` führt `AuditFingerprintMigrationJob` (v5) beim
+Start auf den kanonischen Befund zusammen – samt Einordnung (`ACCEPTED_RISK`/`DISMISSED`, Notiz);
+gibt es keinen, wird der abweichende selbst kanonisch. Dateibezogene Regeln (`subject = Pfad`) und Regeln mit mehreren erlaubten Werten
 (`"ai-automation-backend" oder "ai-automation-frontend"`) bleiben ohne festen Wert.
 `AuditRuleKeyCatalogTest` hält Katalog und Prompt gleich und prüft, dass auch das Envelope-Beispiel
 eines Prompts nur einen katalogisierten `ruleKey` (oder den Platzhalter `stabile-regel-id`) nennt.

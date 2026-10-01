@@ -469,6 +469,82 @@ class AuditFingerprintMigrationJobTest {
                 .firstSeenAt(firstSeenAt).lastSeenAt(lastSeenAt).occurrenceCount(2).build());
     }
 
+    // --- Folgebefund zu 802f740a: feste subjects je ruleKey -------------------------------------
+
+    private static final String PUBLIC_READINESS = "project.public-readiness";
+
+    private AuditFinding savePublicReadinessFinding(String ruleKey, String subject, AuditFindingStatus status,
+                                                    Instant firstSeenAt, Instant lastSeenAt) {
+        return findingRepository.saveAndFlush(AuditFinding.builder()
+                .projectId(projectId).auditKey(PUBLIC_READINESS)
+                .fingerprint(legacyFingerprint(PUBLIC_READINESS, ruleKey, subject))
+                .ruleKey(ruleKey).subject(subject).severity(AuditSeverity.MEDIUM)
+                .title("Befund").evidence(subject + ": 3 Treffer").status(status)
+                .resolvedAt(status == AuditFindingStatus.OPEN ? null : lastSeenAt)
+                .firstSeenReportId(reportOld).lastSeenReportId(reportNew)
+                .firstSeenRunId("run-old").lastSeenRunId("run-new")
+                .firstSeenAt(firstSeenAt).lastSeenAt(lastSeenAt).occurrenceCount(1).build());
+    }
+
+    /**
+     * Ein Wiedergaenger mit abweichendem subject einer Regel mit festem Wert traegt die Einordnung; seit die
+     * Ingestion den festen Wert durchsetzt, faende der naechste Lauf ihn nicht mehr. Der Aufraeumlauf fuehrt
+     * ihn auf den kanonischen Befund zusammen — die Einordnung samt Notiz geht mit.
+     */
+    @Test
+    void mergesDriftedSubjectsOfAFixedRuleOntoTheCanonicalFinding_keepingTheirDisposition() {
+        AuditFinding canonical = savePublicReadinessFinding("public.secrets.keyword-hits", "repository",
+                AuditFindingStatus.OPEN, T0, T1);
+        AuditFinding drifted = savePublicReadinessFinding("public.secrets.keyword-hits",
+                "scripts/public-readiness/secrets.sh", AuditFindingStatus.ACCEPTED_RISK, T2, T2);
+        drifted.setDispositionNote("Testschluessel, bewusst eingecheckt");
+        drifted.setDispositionAt(T2);
+        findingRepository.saveAndFlush(drifted);
+
+        job.migrate();
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(findingRepository.findByProjectIdAndAuditKey(projectId, PUBLIC_READINESS))
+                .extracting(AuditFinding::getId).containsExactly(canonical.getId());
+        AuditFinding merged = findingRepository.findById(canonical.getId()).orElseThrow();
+        assertThat(merged.getSubject()).isEqualTo("repository");
+        assertThat(merged.getFingerprint()).isEqualTo(AuditSnapshotApplier.fingerprint(projectId, PUBLIC_READINESS,
+                "public.secrets.keyword-hits", "repository"));
+        assertThat(merged.getStatus()).isEqualTo(AuditFindingStatus.ACCEPTED_RISK);
+        assertThat(merged.getDispositionNote()).isEqualTo("Testschluessel, bewusst eingecheckt");
+
+        job.migrate();
+        entityManager.flush();
+        entityManager.clear();
+
+        AuditFinding again = findingRepository.findById(canonical.getId()).orElseThrow();
+        assertThat(again.getFingerprint()).as("zweiter Lauf aendert nichts").isEqualTo(merged.getFingerprint());
+        assertThat(again.getOccurrenceCount()).isEqualTo(merged.getOccurrenceCount());
+        assertThat(again.getStatus()).isEqualTo(AuditFindingStatus.ACCEPTED_RISK);
+    }
+
+    /** Ohne kanonischen Zwilling wird der abweichende Befund selbst kanonisch — Einordnung bleibt. */
+    @Test
+    void movesALoneDriftedFindingOfAFixedRuleOntoTheFixedSubject() {
+        AuditFinding drifted = savePublicReadinessFinding("public.deadcode.markers", "ai-automation-backend",
+                AuditFindingStatus.DISMISSED, T1, T1);
+        AuditFinding pathRule = savePublicReadinessFinding("public.privacy.private-terms", "docs/notes.md",
+                AuditFindingStatus.OPEN, T1, T1);
+
+        job.migrate();
+        entityManager.flush();
+        entityManager.clear();
+
+        AuditFinding stored = findingRepository.findById(drifted.getId()).orElseThrow();
+        assertThat(stored.getSubject()).isEqualTo("repository");
+        assertThat(stored.getStatus()).isEqualTo(AuditFindingStatus.DISMISSED);
+        assertThat(stored.getFingerprint()).isEqualTo(AuditSnapshotApplier.fingerprint(projectId, PUBLIC_READINESS,
+                "public.deadcode.markers", "repository"));
+        assertThat(findingRepository.findById(pathRule.getId()).orElseThrow().getSubject())
+                .as("Pfadregel: kein fester Wert").isEqualTo("docs/notes.md");
+    }
+
     private ListAppender<ILoggingEvent> attachLogAppender() {
         Logger logger = (Logger) LoggerFactory.getLogger(AuditFingerprintMigrationJob.class);
         previousLogLevel = logger.getLevel();

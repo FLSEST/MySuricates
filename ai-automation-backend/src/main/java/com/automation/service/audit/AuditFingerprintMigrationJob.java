@@ -49,8 +49,10 @@ public class AuditFingerprintMigrationJob {
      * Fingerprints solcher Findings werden neu berechnet.
      * v4: {@code ¦} in Regel oder subject zaehlt im Fingerprint wie {@code |} (TODO 90c4f7db) — ein
      * Finding, das schon mit {@code ¦} gespeichert ist, bekommt seinen neuen Fingerprint.
+     * v5: Regeln mit festem subject im Katalog ({@link AuditRuleKeyCatalog#fixedSubject}, TODO 802f740a) —
+     * Befunde mit abweichendem subject gehen samt Einordnung auf den kanonischen Befund ueber.
      */
-    static final int VERSION = 4;
+    static final int VERSION = 5;
 
     private static final Comparator<AuditFinding> OLDEST_FIRST = Comparator
             .comparing(AuditFinding::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder()))
@@ -175,7 +177,8 @@ public class AuditFingerprintMigrationJob {
         for (AuditFinding finding : findingRepository.findByProjectIdAndAuditKey(scope.projectId(), scope.auditKey())) {
             String normalized = normalizedRuleKey(finding);
             normalizedKeys.put(finding, normalized);
-            groups.computeIfAbsent(newFingerprint(finding, normalized), key -> new ArrayList<>()).add(finding);
+            groups.computeIfAbsent(newFingerprint(finding, normalized, subjectOf(finding, normalized)),
+                    key -> new ArrayList<>()).add(finding);
         }
         Map<String, AuditFinding> survivors = new LinkedHashMap<>();
         List<AuditFinding> mergeTargets = new ArrayList<>();
@@ -206,6 +209,7 @@ public class AuditFingerprintMigrationJob {
         int rehashed = 0;
         for (Map.Entry<String, AuditFinding> survivor : survivors.entrySet()) {
             applyRuleKey(survivor.getValue(), normalizedKeys.get(survivor.getValue()));
+            applyFixedSubject(survivor.getValue(), normalizedKeys.get(survivor.getValue()));
             if (!survivor.getKey().equals(survivor.getValue().getFingerprint())) {
                 survivor.getValue().setFingerprint(survivor.getKey());
                 rehashed++;
@@ -254,10 +258,30 @@ public class AuditFingerprintMigrationJob {
         finding.setRuleKey(normalized);
     }
 
-    /** Erwartet den ueber {@link #normalizedRuleKey} gezogenen ruleKey. */
-    private static String newFingerprint(AuditFinding finding, String ruleKey) {
-        return AuditSnapshotApplier.fingerprint(finding.getProjectId(), finding.getAuditKey(),
-                ruleKey, finding.getSubject());
+    /**
+     * Das subject, unter dem die Ingestion den Befund heute fuehrt: der feste Wert der Regel, sonst das
+     * gespeicherte. So landen Befunde mit abweichendem subject einer festen Regel in derselben Gruppe wie der
+     * kanonische, und der Merge nimmt ihre Einordnung mit (Folgebefund zu 802f740a).
+     */
+    private String subjectOf(AuditFinding finding, String ruleKey) {
+        String fixed = ruleKeyCatalog.fixedSubject(finding.getAuditKey(), ruleKey);
+        return fixed != null ? fixed : finding.getSubject();
+    }
+
+    /** Schreibt den festen Wert — nur am ueberlebenden Datensatz, der Merge setzt sonst den juengsten. */
+    private void applyFixedSubject(AuditFinding finding, String ruleKey) {
+        String fixed = ruleKeyCatalog.fixedSubject(finding.getAuditKey(), ruleKey);
+        if (fixed == null || fixed.equals(finding.getSubject())) {
+            return;
+        }
+        log.info("Audit subject fixed: finding {} '{}' → '{}' (rule {}, project {}, audit {})",
+                finding.getId(), finding.getSubject(), fixed, ruleKey, finding.getProjectId(), finding.getAuditKey());
+        finding.setSubject(fixed);
+    }
+
+    /** Erwartet den ueber {@link #normalizedRuleKey} gezogenen ruleKey und das Subject aus {@link #subjectOf}. */
+    private static String newFingerprint(AuditFinding finding, String ruleKey, String subject) {
+        return AuditSnapshotApplier.fingerprint(finding.getProjectId(), finding.getAuditKey(), ruleKey, subject);
     }
 
     private record Scope(String projectId, String auditKey) {
