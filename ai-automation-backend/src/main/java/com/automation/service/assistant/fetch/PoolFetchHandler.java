@@ -64,6 +64,7 @@ public class PoolFetchHandler {
                 sb.append("Default variables: ").append(entry.defaultContext()).append("\n");
             if (entry.blocks() != null && !entry.blocks().isEmpty()) {
                 sb.append("\nBlocks (").append(entry.blocks().size()).append("):\n");
+                Map<String, String> subWorkflowNames = blockConfigSummaryFormatter.subWorkflowNames(entry.blocks());
                 for (int i = 0; i < entry.blocks().size(); i++) {
                     BlockDefinition block = entry.blocks().get(i);
                     Map<String, Object> cfg = block.getConfig() != null ? block.getConfig() : Map.of();
@@ -71,7 +72,7 @@ public class PoolFetchHandler {
                     sb.append("  ").append(i + 1).append(". [").append(block.getType()).append("]");
                     if (!label.isBlank()) sb.append(" ").append(label);
                     sb.append("\n");
-                    blockConfigSummaryFormatter.appendBlockConfigSummary(sb, block.getType(), cfg);
+                    blockConfigSummaryFormatter.appendBlockConfigSummary(sb, block.getType(), cfg, subWorkflowNames);
                 }
             }
             return sb.toString();
