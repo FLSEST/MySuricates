@@ -435,13 +435,6 @@ class WorkflowExecutorTest {
         assertThat(ctx.resolveTemplate("cd {{ project_path }}")).isEqualTo("cd /workspace/test");
     }
 
-    /**
-     * Regression test for H1: the platform API key MUST NOT be exposed as a
-     * {@code {{ api_key }}} template variable. Doing so would resolve the literal
-     * key into block prompts, then into LLM output, and finally persist it in
-     * {@code StepResult.output}. The key is now delivered via the
-     * {@code AUTOMATION_API_KEY} env var on the spawned CLI process instead.
-     */
     @Test
     void execute_injectsOpenTodosWithIdAndTags() {
         com.automation.entity.Todo todo = com.automation.entity.Todo.builder()
@@ -510,6 +503,13 @@ class WorkflowExecutorTest {
                 .isEqualTo("(keine offenen TODOs)");
     }
 
+    /**
+     * Regression test for H1: the platform API key MUST NOT be exposed as a
+     * {@code {{ api_key }}} template variable. Doing so would resolve the literal
+     * key into block prompts, then into LLM output, and finally persist it in
+     * {@code StepResult.output}. Workflows get no instance key at all — neither here
+     * nor in the CLI process environment (TODO 62037bf2, {@code ChildProcessEnv}).
+     */
     @Test
     void execute_doesNotInjectApiKeyAsTemplateVariable() {
         StepResult step = StepResult.builder()

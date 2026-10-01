@@ -3,11 +3,11 @@ package com.automation.service.ai;
 import com.automation.concurrency.DynamicSemaphore;
 import com.automation.config.HostPiConfig;
 import com.automation.service.live.LiveOutput;
+import com.automation.util.ChildProcessEnv;
 import com.automation.util.ProcessDrain;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
@@ -228,11 +228,7 @@ public class HostPiService {
                                           Integer timeoutSeconds, String label, boolean priority) throws IOException {
         acquireThrottle(priority);
         try {
-            ProcessBuilder pb = new ProcessBuilder(cmd);
-            pb.redirectErrorStream(true);
-            if (workingDirectory != null && !workingDirectory.isBlank()) {
-                pb.directory(new File(workingDirectory));
-            }
+            ProcessBuilder pb = ChildProcessEnv.forAgent(cmd, workingDirectory);
 
             log.debug("{} (prompt length: {} chars, workDir: {})", label, prompt.length(), workingDirectory);
             Process proc = pb.start();

@@ -1,6 +1,7 @@
 package com.automation.service.cli;
 
 import com.automation.config.TaskCommandConfig;
+import com.automation.util.ChildProcessEnv;
 import com.automation.util.HostProcessUtils;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -71,6 +72,7 @@ public class TaskCommandService {
 
         ProcessBuilder pb = new ProcessBuilder(cmd);
         pb.redirectErrorStream(true);
+        ChildProcessEnv.scrub(pb);
         if (env != null) {
             env.forEach((k, v) -> {
                 if (v != null && !v.isBlank()) {

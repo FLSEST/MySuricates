@@ -47,12 +47,10 @@ public class WorkflowContextDataService {
      * <p>The platform API key is intentionally <b>not</b> injected as a template
      * variable. Doing so would resolve the literal key into block prompts, then
      * into LLM output, and finally persist it in {@link com.automation.entity.StepResult#getOutput()}
-     * (SQLite, backups, UI). Instead, the key is set as the {@code AUTOMATION_API_KEY}
-     * environment variable on the CLI process spawned by
-     * {@link com.automation.service.ai.HostClaudeService} and
-     * {@link com.automation.service.ai.HostCodexService}. Templates that need it
-     * use {@code curl -H "X-API-Key: $AUTOMATION_API_KEY"} from the agent's Bash
-     * tool — the resolved value never enters the prompt or persisted output.
+     * (SQLite, backups, UI). Nor does it reach the spawned CLI or shell process as
+     * {@code AUTOMATION_API_KEY}: {@link com.automation.util.ChildProcessEnv} strips it
+     * (TODO 62037bf2) — a prompt with foreign content must not be able to drive the API.
+     * Everything a workflow needs from the platform comes in as a context variable here.
      *
      * <p><b>No shared catch.</b> Every source carries its own error path: one that fails
      * neither costs the others nor leaves its own variables absent — it states the gap

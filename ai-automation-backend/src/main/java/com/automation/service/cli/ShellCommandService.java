@@ -1,6 +1,7 @@
 package com.automation.service.cli;
 
 import com.automation.service.live.LiveOutput;
+import com.automation.util.ChildProcessEnv;
 import com.automation.util.LineListener;
 import com.automation.util.ProcessOutputTee;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +38,8 @@ public class ShellCommandService {
 
         ProcessBuilder pb = new ProcessBuilder("/bin/bash", "-c", command);
         pb.redirectErrorStream(true);
+        // Shell blocks get no instance API key, not even one the backend was started with (TODO 62037bf2).
+        ChildProcessEnv.scrub(pb);
         if (workingDirectory != null && !workingDirectory.isBlank()) {
             pb.directory(new File(workingDirectory));
         }
