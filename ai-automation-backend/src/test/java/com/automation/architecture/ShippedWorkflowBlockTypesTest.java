@@ -52,18 +52,24 @@ class ShippedWorkflowBlockTypesTest {
 
     @Test
     void everyPooledWorkflowUsesKnownBlockTypes() throws IOException {
-        assertKnownTypes(WORKFLOW_POOL);
+        assertThat(WORKFLOW_POOL).as("shipped workflow directory").isDirectory();
+        // Only the tracked pool files ship; private, ignored ones beside them do not (TODO ca858a23).
+        assertKnownTypes(WORKFLOW_POOL, ShippedDefinitions.poolFiles(WORKFLOW_POOL));
     }
 
     private void assertKnownTypes(Path directory) throws IOException {
         assertThat(directory).as("shipped workflow directory").isDirectory();
+        try (Stream<Path> files = Files.list(directory)) {
+            assertKnownTypes(directory, files.filter(f -> f.toString().endsWith(".json")).sorted().toList());
+        }
+    }
+
+    private void assertKnownTypes(Path directory, List<Path> definitionFiles) throws IOException {
         List<String> problems = new ArrayList<>();
         int blocks = 0;
-        try (Stream<Path> files = Files.list(directory)) {
-            for (Path file : files.filter(f -> f.toString().endsWith(".json")).sorted().toList()) {
-                JsonNode root = objectMapper.readTree(Files.readString(file));
-                blocks += collectProblems(root.get("blocks"), file.getFileName().toString(), problems);
-            }
+        for (Path file : definitionFiles) {
+            JsonNode root = objectMapper.readTree(Files.readString(file));
+            blocks += collectProblems(root.get("blocks"), file.getFileName().toString(), problems);
         }
         assertThat(problems).as("unknown block types in " + directory
                 + " (known: " + registry.knownTypesAsText() + ")").isEmpty();

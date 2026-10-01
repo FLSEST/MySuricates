@@ -8,7 +8,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -18,7 +17,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -129,37 +127,9 @@ class PoolAnalyzerGateTest {
     private static List<Path> definitionFiles() throws IOException {
         List<Path> files = new ArrayList<>();
         files.addAll(ShippedDefinitions.templateFiles());
-        Path pool = firstExistingOrNull(Paths.get("../workflow-pool"), Paths.get("workflow-pool"));
-        if (pool != null) files.addAll(trackedJsonFiles(pool));
+        Path pool = ShippedDefinitions.poolDirectoryOrNull();
+        if (pool != null) files.addAll(ShippedDefinitions.poolFiles(pool));
         assertThat(files).as("keine Definitionen gefunden ab " + Paths.get("").toAbsolutePath()).isNotEmpty();
         return files;
-    }
-
-    /** Die versionierten JSON-Dateien eines Verzeichnisses; ohne git bleibt die Liste leer. */
-    private static List<Path> trackedJsonFiles(Path dir) throws IOException {
-        try {
-            Process process = new ProcessBuilder("git", "ls-files", "--", ".")
-                    .directory(dir.toFile()).redirectErrorStream(true).start();
-            List<Path> tracked = new ArrayList<>();
-            try (var reader = new java.io.BufferedReader(
-                    new java.io.InputStreamReader(process.getInputStream()))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    if (line.endsWith(".json")) tracked.add(dir.resolve(line.strip()));
-                }
-            }
-            process.waitFor();
-            return tracked.stream().filter(Files::isRegularFile).sorted().toList();
-        } catch (IOException | InterruptedException e) {
-            if (e instanceof InterruptedException) Thread.currentThread().interrupt();
-            return List.of();
-        }
-    }
-
-    private static Path firstExistingOrNull(Path... candidates) {
-        for (Path candidate : candidates) {
-            if (Files.isDirectory(candidate)) return candidate;
-        }
-        return null;
     }
 }

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { AI_BLOCK_TYPES, BLOCK_TYPES } from '../../../types';
 import {
@@ -38,11 +39,33 @@ function jsonFiles(dir: string): string[] {
   });
 }
 
+/**
+ * The shipped JSON files under dir: what git tracks there (TODO ca858a23). A maintainer keeps
+ * private pool files beside them, ignored via .git/info/exclude — read by a glob, they made this
+ * guard red on that checkout and green in a fresh worktree. Without git (a source archive) every
+ * JSON file counts.
+ */
+function shippedJsonFiles(dir: string): string[] {
+  let listed: string;
+  try {
+    listed = execFileSync('git', ['ls-files', '-z', '--', dir], {
+      cwd: REPO, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'],
+    });
+  } catch {
+    return jsonFiles(join(REPO, dir));
+  }
+  return listed.split('\0')
+    .filter((rel) => rel.endsWith('.json'))
+    .map((rel) => join(REPO, rel))
+    .filter((path) => existsSync(path))
+    .sort();
+}
+
 /** Every top-level block of the shipped definitions, with its origin for readable failures. */
 function shippedBlocks(): Array<{ where: string; block: Block }> {
   const found: Array<{ where: string; block: Block }> = [];
   for (const dir of DEFINITION_DIRS) {
-    for (const file of jsonFiles(join(REPO, dir))) {
+    for (const file of shippedJsonFiles(dir)) {
       let parsed: unknown;
       try { parsed = JSON.parse(readFileSync(file, 'utf8')); } catch { continue; }
       const blocks = (parsed as { blocks?: unknown })?.blocks;

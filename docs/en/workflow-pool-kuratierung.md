@@ -213,6 +213,10 @@ An exported entry is a draft. Before committing:
 
 An entry that does not pass is not tracked. `git rm --cached` is enough: the directory stays
 the working surface of the running instance, only the selection is tracked.
+Likewise, the test gates over the pool (`blockConfigSchema.test.ts`, the Maven gates via
+`ShippedDefinitions.poolFiles`) read only the tracked files — without git, all of them. Private
+entries beside them, ignored via `.git/info/exclude` for example, therefore do not turn the tests
+red.
 
 ### Recurring check
 

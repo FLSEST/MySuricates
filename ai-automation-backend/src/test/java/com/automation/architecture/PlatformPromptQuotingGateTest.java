@@ -5,12 +5,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -156,26 +154,11 @@ class PlatformPromptQuotingGateTest {
     /** Built-in-Templates immer; {@code workflow-pool/} nur, wenn das Repo-Verzeichnis erreichbar ist. */
     private static List<Path> definitionFiles() throws IOException {
         List<Path> files = new ArrayList<>(ShippedDefinitions.templateFiles());
-        Path pool = firstExistingOrNull(Paths.get("../workflow-pool"), Paths.get("workflow-pool"));
+        Path pool = ShippedDefinitions.poolDirectoryOrNull();
         if (pool != null) {
-            files.addAll(jsonFiles(pool));
+            files.addAll(ShippedDefinitions.poolFiles(pool));
         }
         assertThat(files).as("keine Definitionen gefunden ab " + Paths.get("").toAbsolutePath()).isNotEmpty();
         return files;
-    }
-
-    private static List<Path> jsonFiles(Path dir) throws IOException {
-        try (Stream<Path> stream = Files.list(dir)) {
-            return stream.filter(p -> p.toString().endsWith(".json")).sorted().toList();
-        }
-    }
-
-    private static Path firstExistingOrNull(Path... candidates) {
-        for (Path candidate : candidates) {
-            if (Files.isDirectory(candidate)) {
-                return candidate;
-            }
-        }
-        return null;
     }
 }
