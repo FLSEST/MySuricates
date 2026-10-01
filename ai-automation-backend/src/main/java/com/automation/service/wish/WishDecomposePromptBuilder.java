@@ -103,16 +103,14 @@ public class WishDecomposePromptBuilder {
         // 1. Referenced Workflows (user-selected hints)
         if (wish.getReferenceWorkflowIds() != null && !wish.getReferenceWorkflowIds().isEmpty()) {
             sb.append("### Referenced Workflows (user-selected)\n\n");
-            for (String refId : wish.getReferenceWorkflowIds()) {
-                workflowRepository.findById(refId).ifPresent(wf -> {
-                    String pName = wf.getProject() != null ? wf.getProject().getName() : "?";
-                    sb.append("- **").append(wf.getName()).append("** (`").append(wf.getId())
-                            .append("`, Project: ").append(pName).append("): ");
-                    if (wf.getDescription() != null) sb.append(wf.getDescription());
-                    sb.append("\n");
-                    sb.append("  Pipeline: ").append(helper.formatBlockPipeline(wf.getBlocks())).append("\n");
-                    shownIds.add(wf.getId());
-                });
+            for (Workflow wf : referencedWorkflows(wish.getReferenceWorkflowIds())) {
+                String pName = wf.getProject() != null ? wf.getProject().getName() : "?";
+                sb.append("- **").append(wf.getName()).append("** (`").append(wf.getId())
+                        .append("`, Project: ").append(pName).append("): ");
+                if (wf.getDescription() != null) sb.append(wf.getDescription());
+                sb.append("\n");
+                sb.append("  Pipeline: ").append(helper.formatBlockPipeline(wf.getBlocks())).append("\n");
+                shownIds.add(wf.getId());
             }
             sb.append("\n");
         }
@@ -176,7 +174,8 @@ public class WishDecomposePromptBuilder {
         appendMatchingTemplatesAndPool(sb, keywords);
 
         // Execution Intelligence from past runs
-        sb.append(helper.buildExecutionIntelligence(wish.getProjectId()));
+        // Die Projekt-Workflows sind oben schon gelesen — kein zweites findByProjectId (TODO 73036bbd)
+        sb.append(helper.buildExecutionIntelligence(projectWorkflows));
 
         // Add available skills
         helper.appendAvailableSkills(sb);
@@ -199,6 +198,20 @@ public class WishDecomposePromptBuilder {
                 .map(wf -> byWorkflowId.get(wf.getId()))
                 .filter(Objects::nonNull)
                 .toList();
+    }
+
+    /**
+     * Die vom Nutzer gewählten Referenz-Workflows aus einer Abfrage statt {@code findById} je ID
+     * (TODO 51ee8709) — in der Reihenfolge der Auswahl; unbekannte oder gelöschte IDs fallen weg.
+     */
+    private List<Workflow> referencedWorkflows(List<String> referenceIds) {
+        Map<String, Workflow> byId = new HashMap<>();
+        Set<String> ids = referenceIds.stream().filter(Objects::nonNull).collect(Collectors.toCollection(LinkedHashSet::new));
+        if (ids.isEmpty()) return List.of();
+        for (Workflow wf : workflowRepository.findAllById(ids)) {
+            byId.put(wf.getId(), wf);
+        }
+        return referenceIds.stream().map(byId::get).filter(Objects::nonNull).toList();
     }
 
     public String buildSystemPrompt(Wish wish) {

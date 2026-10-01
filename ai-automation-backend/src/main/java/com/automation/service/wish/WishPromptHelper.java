@@ -2,8 +2,6 @@ package com.automation.service.wish;
 
 import com.automation.entity.*;
 import com.automation.repository.SkillRepository;
-import com.automation.repository.WorkflowRepository;
-import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.learning.LearningService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -41,10 +39,8 @@ public class WishPromptHelper {
             "(?i)(analy|audit|review|security|vulnerabilit|architect|assess|inspect|evaluat|quality|scorecard|coverage|debt|radar)",
             Pattern.CASE_INSENSITIVE);
 
-    private final WorkflowRepository workflowRepository;
     private final SkillRepository skillRepository;
     private final LearningService learningService;
-    private final WorkflowRunRepository workflowRunRepository;
 
     public String formatBlockPipeline(List<BlockDefinition> blocks) {
         if (blocks == null || blocks.isEmpty()) return "[empty]";
@@ -132,14 +128,14 @@ public class WishPromptHelper {
         }
     }
 
+    /**
+     * @param projectWorkflows die Workflows des Zielprojekts, wie der Aufrufer sie schon gelesen hat
+     *                         (leer ohne Projekt) — hier nicht ein zweites Mal laden (TODO 73036bbd)
+     */
     @SuppressWarnings("unchecked")
-    public String buildExecutionIntelligence(String projectId) {
+    public String buildExecutionIntelligence(List<Workflow> projectWorkflows) {
         StringBuilder sb = new StringBuilder();
         try {
-            List<Workflow> projectWorkflows = projectId != null
-                    ? workflowRepository.findByProjectId(projectId)
-                    : List.of();
-
             List<String> performanceLines = new ArrayList<>();
             double totalCost = 0;
             long totalRuns = 0;
