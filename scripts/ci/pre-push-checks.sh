@@ -13,6 +13,10 @@
 #      DE/EN-Gleichstand, Diagramm-Drift.
 #   4. gitleaks auf den Bereich — nur wenn installiert, sonst hoerbar uebersprungen.
 #      Es wird nichts nachinstalliert.
+#   4b. Ausnahmedateien im Bereich: Wer .gitleaksignore, die Hygiene-Regeln, das Gate selbst oder
+#      die Hooks im selben Push aendert, lockert womoeglich genau die Pruefung, die ihn gleich
+#      durchwinkt. Das blockiert, bis ein Mensch es fuer genau diesen Stand freigibt
+#      (MYSURICATES_PREPUSH_ALLOW_RULES=<sha des gepushten Stands>); die CI meldet es nur.
 #   5. Bauprüfung nach Scope (dieselbe Einordnung wie die CI, scripts/ci/changed-scopes.sh):
 #      Frontend-Suite betroffen -> tsc + lint; Backend-Suite betroffen -> mvn test-compile.
 #
@@ -24,9 +28,14 @@
 # (--message-file), CI (--tree und --range), von Hand (--range A..B).
 #
 # Usage: bash scripts/ci/pre-push-checks.sh --hook | --range A..B | --tree | --message-file <datei>
-#                                           [--skip-tree] [--skip-build]
+#                                           [--skip-tree] [--skip-build] [--rules-report-only]
+#        --rules-report-only  geaenderte Ausnahmedateien nur melden (Warnung + Job-Summary), nicht
+#                             blockieren — fuer die CI, in der kein Mensch eine Freigabe setzen kann.
 # Env:   MYSURICATES_PREPUSH_SKIP=tree,build — fuer die Hooks, die keine Argumente nehmen.
 #        Jede Auslassung wird gemeldet; ein Gate, das nicht misst, ist nicht gruen.
+#        MYSURICATES_PREPUSH_ALLOW_RULES=<sha>[,<sha>…] — Freigabe geaenderter Ausnahmedateien,
+#        gilt nur fuer den Bereich, dessen Spitze mit diesem Hash beginnt (mind. 7 Zeichen).
+#        Bewusst nicht ueber MYSURICATES_PREPUSH_SKIP abdeckbar.
 # Exit:  0 = sauber, 1 = Verstoss oder Fehlschlag, 2 = Gate nicht lauffaehig
 #
 set -uo pipefail
@@ -51,6 +60,7 @@ RANGE=""
 MSG_FILE=""
 SKIP_TREE=0
 SKIP_BUILD=0
+RULES_REPORT_ONLY=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --hook)         MODE="hook" ;;
@@ -59,6 +69,7 @@ while [ $# -gt 0 ]; do
     --message-file) MODE="message"; MSG_FILE="${2:-}"; shift ;;
     --skip-tree)    SKIP_TREE=1 ;;
     --skip-build)   SKIP_BUILD=1 ;;
+    --rules-report-only) RULES_REPORT_ONLY=1 ;;
     *) echo "Pre-Push-Gate: unbekanntes Argument '$1'" >&2; exit 2 ;;
   esac
   shift
@@ -202,6 +213,77 @@ check_gitleaks() {  # $1 = A..B
   esac
 }
 
+# ---------------------------------------------------------------------------
+# 4b — Ausnahmedateien im Bereich (TODO e8257473)
+#
+# Gate und CI lesen ihre Ausnahmen aus dem Repo selbst. Am 2026-09-30 gab ein Push
+# gitleaks-Fehlalarme per .gitleaksignore frei — abgesprochen, aber der zweite Push lief ohne
+# jeden Hinweis glatt durch. Eine Aenderung an diesen Dateien ist deshalb kein Verstoss, aber
+# eine Entscheidung, die ein Mensch fuer genau diesen Stand trifft. Der Schalter nimmt den
+# Hash der Bereichsspitze, nicht nur "1": ein dauerhaft exportiertes Env deckt so keinen
+# spaeteren Push mit neuen Lockerungen.
+# ---------------------------------------------------------------------------
+is_rule_file() {  # $1 = Pfad
+  case "$1" in
+    .gitleaksignore|.gitleaks.toml) return 0 ;;
+    scripts/lib/hygiene-rules.sh) return 0 ;;
+    scripts/ci/pre-push-checks.sh|scripts/ci/public-hygiene.sh) return 0 ;;
+    scripts/git-hooks/*) return 0 ;;
+    .github/workflows/ci.yml) return 0 ;;
+  esac
+  return 1
+}
+
+rules_allowed_for() {  # $1 = voller Hash der Bereichsspitze
+  local v
+  local IFS=','
+  for v in ${MYSURICATES_PREPUSH_ALLOW_RULES:-}; do
+    v="${v// /}"; v="${v,,}"
+    [ "${#v}" -ge 7 ] || continue
+    case "$1" in "$v"*) return 0 ;; esac
+  done
+  return 1
+}
+
+check_rule_files() {  # $1 = A..B
+  local f files=() tip short stat
+  while IFS= read -r f; do
+    [ -n "$f" ] && is_rule_file "$f" && files+=("$f")
+  done < <(git diff --no-renames --name-only "$1" 2>/dev/null)
+  if [ "${#files[@]}" -eq 0 ]; then
+    note "Ausnahmedateien: im Bereich ${1} unveraendert"
+    return 0
+  fi
+  tip="$(git rev-parse --verify -q "${1#*..}^{commit}")" || tip=""
+  short="$(git rev-parse --short "${tip:-HEAD}" 2>/dev/null)"
+  stat="$(git diff --no-renames --stat "$1" -- "${files[@]}" 2>/dev/null)"
+  echo "  ┌─ Ausnahmedateien geaendert im Bereich ${1} — hieraus lesen Gate und CI ihre Ausnahmen:"
+  printf '%s\n' "$stat" | sed 's/^/  │ /'
+  echo "  └─ Pruefen: git diff ${1} -- ${files[*]}"
+  if [ "$RULES_REPORT_ONLY" -eq 1 ]; then
+    warn "Bereich ${1} aendert Ausnahmedateien (${files[*]}) — Diff pruefen, die CI blockiert das nicht"
+    if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+      {
+        echo "### Pre-Push-Gate: Ausnahmedateien geaendert"
+        echo ""
+        echo "Der Bereich \`${1}\` aendert Dateien, aus denen Gate und CI ihre Ausnahmen lesen. Bitte den Diff pruefen:"
+        echo ""
+        for f in "${files[@]}"; do echo "- \`${f}\`"; done
+        echo ""
+      } >> "$GITHUB_STEP_SUMMARY"
+    fi
+    return 0
+  fi
+  if [ -n "$tip" ] && rules_allowed_for "$tip"; then
+    warn "Ausnahmedateien im Bereich ${1} geaendert — FREIGEGEBEN per MYSURICATES_PREPUSH_ALLOW_RULES fuer ${short} (${files[*]})"
+    return 0
+  fi
+  case ",${MYSURICATES_PREPUSH_SKIP:-}," in
+    *,rules,*) note "MYSURICATES_PREPUSH_SKIP deckt geaenderte Ausnahmedateien nicht ab — Freigabe nur per MYSURICATES_PREPUSH_ALLOW_RULES" ;;
+  esac
+  fail "Bereich ${1} aendert Ausnahmedateien (${files[*]}) — nach Pruefung des Diffs freigeben: MYSURICATES_PREPUSH_ALLOW_RULES=${short} git push"
+}
+
 # Welche Suite eine Aenderung braucht, entscheidet dasselbe Skript wie in der CI
 # (scripts/ci/changed-scopes.sh, TODO c60eb0e2): Backend umgekehrt gefiltert — es baut, ausser
 # jede Datei liegt nachweislich ausserhalb seiner Reichweite (docs/, workflow-pool/, Teile des
@@ -337,6 +419,7 @@ case "$MODE" in
       check_commits "$r"
       check_hygiene_range "$r"
       check_gitleaks "$r"
+      check_rule_files "$r"
     done
     if [ "$SKIP_TREE" -eq 1 ]; then
       note "Bestands-Gates uebersprungen (MYSURICATES_PREPUSH_SKIP bzw. --skip-tree) — die CI prueft sie"

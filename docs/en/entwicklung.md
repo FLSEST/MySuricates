@@ -1060,7 +1060,17 @@ Checked per push range (remote state..local; for a new branch everything no remo
    parity, diagram drift. A missing gate script is a hard error.
 4. **gitleaks on the range** — only if installed, otherwise skipped with a notice. Nothing is
    installed on the fly; CI scans anyway.
-5. **Build check by scope.** The same script as in CI decides which suite is affected
+5. **Exception files in the range.** If the range changes a file from which the gate and CI read
+   their exceptions — `.gitleaksignore`, `.gitleaks.toml`, `scripts/lib/hygiene-rules.sh`,
+   `scripts/ci/pre-push-checks.sh`, `scripts/ci/public-hygiene.sh`, `scripts/git-hooks/*`,
+   `.github/workflows/ci.yml` —, the gate blocks and shows the extent of the diff. Otherwise whoever
+   loosens such a file in the same push would get green from the very check they are weakening.
+   After review, release it for exactly this state only: `MYSURICATES_PREPUSH_ALLOW_RULES=<sha of
+   the tip> git push` (at least 7 characters, several separated by commas; the message names the
+   command). A permanently set `=1` or `MYSURICATES_PREPUSH_SKIP` releases nothing, and the release
+   stays visible as a warning. CI does not block here (`--rules-report-only`); it reports the range
+   as a warning and in the job summary.
+6. **Build check by scope.** The same script as in CI decides which suite is affected
    (`scripts/ci/changed-scopes.sh`): frontend suite → `tsc --noEmit` and `npm run lint` (about a
    minute); backend suite → `mvn -q test-compile` (seconds). The backend is filtered the other way
    round — it also builds for `docs/`, `workflow-pool/`, `scripts/lib/` and `CLAUDE.md`, because

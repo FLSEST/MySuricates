@@ -1081,7 +1081,17 @@ Remote-Ref kennt):
    DE/EN-Gleichstand, Diagramm-Drift. Fehlt eines der Skripte, ist das ein harter Fehler.
 4. **gitleaks auf den Bereich** — nur wenn installiert, sonst hörbar übersprungen. Es wird nichts
    nachinstalliert; die CI scannt ohnehin.
-5. **Bauprüfung nach Scope.** Welche Suite betroffen ist, entscheidet dasselbe Skript wie in der
+5. **Ausnahmedateien im Bereich.** Ändert der Bereich eine Datei, aus der Gate und CI ihre Ausnahmen
+   lesen — `.gitleaksignore`, `.gitleaks.toml`, `scripts/lib/hygiene-rules.sh`,
+   `scripts/ci/pre-push-checks.sh`, `scripts/ci/public-hygiene.sh`, `scripts/git-hooks/*`,
+   `.github/workflows/ci.yml` —, blockiert das Gate und zeigt den Diff-Umfang. Wer so etwas im
+   selben Push lockert, bekäme sonst grün von genau der Prüfung, die er gerade aufweicht. Freigabe
+   nach Durchsicht nur für genau diesen Stand: `MYSURICATES_PREPUSH_ALLOW_RULES=<sha der Spitze>
+   git push` (mindestens 7 Zeichen, mehrere durch Komma; die Meldung nennt den Befehl). Ein
+   dauerhaft gesetztes `=1` oder `MYSURICATES_PREPUSH_SKIP` gibt nichts frei, die Freigabe bleibt
+   als Warnung sichtbar. Die CI blockiert hier nicht (`--rules-report-only`), sondern meldet den
+   Bereich als Warnung und in der Job-Summary.
+6. **Bauprüfung nach Scope.** Welche Suite betroffen ist, entscheidet dasselbe Skript wie in der
    CI (`scripts/ci/changed-scopes.sh`): Frontend-Suite → `tsc --noEmit` und `npm run lint` (etwa
    eine Minute); Backend-Suite → `mvn -q test-compile` (Sekunden). Das Backend ist umgekehrt
    gefiltert — es baut auch bei `docs/`, `workflow-pool/`, `scripts/lib/` und `CLAUDE.md`, weil
