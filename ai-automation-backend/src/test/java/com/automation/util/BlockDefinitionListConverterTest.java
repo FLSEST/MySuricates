@@ -315,4 +315,22 @@ class BlockDefinitionListConverterTest {
         assertThat(restored.get(0).getType()).isEqualTo("simple");
         assertThat(restored.get(0).getConfig()).isEmpty();
     }
+
+    // --- d3aa0b28: Felder neben config gehen nicht mehr still verloren ---
+
+    @Test
+    void unknownBlockFields_surviveTheRoundTrip_andWellFormedBlocksStayUnchanged() {
+        String json = "[{\"type\":\"shell\",\"name\":\"check\",\"config\":{\"command\":\"ls\"},"
+                + "\"on_failure\":\"continue\"}]";
+
+        List<BlockDefinition> blocks = converter.convertToEntityAttribute(json);
+
+        assertThat(blocks.get(0).unknownFields()).containsExactly(Map.entry("on_failure", "continue"));
+        assertThat(blocks.get(0).shouldStopOnFailure()).as("an der falschen Stelle wirkt es nicht").isTrue();
+        assertThat(converter.convertToDatabaseColumn(blocks)).contains("\"on_failure\":\"continue\"");
+
+        BlockDefinition clean = BlockDefinition.builder().type("shell").config(Map.of("command", "ls")).build();
+        assertThat(converter.convertToDatabaseColumn(List.of(clean)))
+                .doesNotContain("unknownFields").doesNotContain("on_failure");
+    }
 }

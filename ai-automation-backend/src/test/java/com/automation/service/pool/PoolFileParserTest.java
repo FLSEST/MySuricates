@@ -307,15 +307,27 @@ class PoolFileParserTest {
                     .hasMessageContaining("bad-block.json: field 'blocks[1].config' is not valid: ");
         }
 
-        /** The mistake in walkthrough-illustrationen.json: on_failure beside config instead of in it. */
+        /**
+         * The mistake in walkthrough-illustrationen.json: on_failure beside config instead of in it. Only this
+         * test's strict mapper used to reject it — the application's mapper dropped it without a word, so the run
+         * stopped anyway. Since d3aa0b28 the block keeps the field on every mapper, and the analyzer names it
+         * after the install, with the block it sits on: reported, not blocked, like every analyzer finding.
+         */
         @Test
-        void unknownBlockField_isNamedWithItsPath() throws Exception {
+        void unknownBlockField_isKept_andTheAnalyzerNamesIt() throws Exception {
             Path file = write("beside.json", """
                     {"name": {"en": "N"}, "blocks": [{"type": "foreach", "config": {}, "on_failure": "continue"}]}
                     """);
 
-            assertThatThrownBy(() -> parse(file, "en"))
-                    .hasMessageContaining("field 'blocks[0].on_failure' is not valid: Unrecognized field \"on_failure\"");
+            PoolWorkflowEntry entry = parse(file, "en");
+
+            assertThat(entry.blocks().get(0).unknownFields()).containsEntry("on_failure", "continue");
+            assertThat(new com.automation.service.workflow.analyzer.WorkflowAnalyzer().analyze(entry.blocks(), null))
+                    .anySatisfy(finding -> {
+                        assertThat(finding.rule()).isEqualTo("unknown-block-field");
+                        assertThat(finding.blockIndex()).isZero();
+                        assertThat(finding.detailEn()).startsWith("on_failure sits next to config instead of inside it");
+                    });
         }
 
         @Test

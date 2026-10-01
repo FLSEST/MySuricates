@@ -469,6 +469,10 @@ GET /api/v1/workflows/{id}/analyze
 #         self-api-call (Shell-Code ruft die eigene REST-API, ausser den schluesselfreien Sonden = HIGH;
 #         KI-Auftrag nennt einen lokalen Aufruf = MEDIUM "pruefen"), direct-db-access (app_settings oder
 #         automation.db mit Lesezugriff = HIGH; sqlite3 allein = MEDIUM "pruefen")
+#         sowie dead-nested-blocks (config.blocks: kein Block-Typ fuehrt die Liste aus = HIGH),
+#         unknown-block-field (Feld neben type/name/config/requiredCapabilities/skillIds; Config-Schluessel
+#         wie on_failure auf Blockebene = HIGH, nahe Schreibweise = MEDIUM, sonst LOW — solche Felder
+#         werden mitgespeichert statt verworfen)
 # Der Analyzer meldet nur — er blockiert keinen Schreibweg und veraendert nichts.
 
 # Bestandslauf ueber alle Definitionen in aktiven Projekten

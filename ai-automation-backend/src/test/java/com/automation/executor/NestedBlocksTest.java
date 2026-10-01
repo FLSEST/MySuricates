@@ -109,4 +109,17 @@ class NestedBlocksTest {
 
         assertThat(labelsOf(config)).isEmpty();
     }
+
+    @Test
+    void nestedCarriesEveryKeyOfItsMap_soStrayFieldsBesideConfigAreVisible() {
+        Map<String, Object> stray = new java.util.LinkedHashMap<>();
+        stray.put("type", "shell");
+        stray.put("config", Map.of("command", "ls"));
+        stray.put("on_failure", "continue");
+        List<java.util.Set<String>> fields = new ArrayList<>();
+
+        NestedBlocks.visit(Map.of("default", List.of(stray)), nested -> fields.add(nested.fields()));
+
+        assertThat(fields).containsExactly(java.util.Set.of("type", "config", "on_failure"));
+    }
 }

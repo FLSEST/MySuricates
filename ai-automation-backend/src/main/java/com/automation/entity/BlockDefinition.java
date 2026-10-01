@@ -1,11 +1,16 @@
 package com.automation.entity;
 
+import com.fasterxml.jackson.annotation.JsonAnyGetter;
+import com.fasterxml.jackson.annotation.JsonAnySetter;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.*;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 
 @Getter
 @Setter
@@ -31,6 +36,33 @@ public class BlockDefinition {
 
     @Builder.Default
     private List<String> skillIds = new ArrayList<>();
+
+    /**
+     * Fields of the block's JSON besides the ones above — {@code "on_failure": "continue"} next to
+     * {@code config} instead of in it. No run reads them; Jackson used to drop them without a word, so the
+     * setting silently had no effect (d3aa0b28). They are kept and written back, so the analyzer can report
+     * them ({@code unknown-block-field}) wherever the definition came from — save, pool install, import.
+     * Sorted, so the definition hash does not depend on their order.
+     */
+    @JsonIgnore
+    @Getter(AccessLevel.NONE)
+    @Setter(AccessLevel.NONE)
+    @Builder.Default
+    private Map<String, Object> unknownFields = new TreeMap<>();
+
+    @JsonAnySetter
+    public void putUnknownField(String key, Object value) {
+        if (unknownFields == null) {
+            unknownFields = new TreeMap<>();
+        }
+        unknownFields.put(key, value);
+    }
+
+    /** The {@linkplain #putUnknownField unknown fields}, read only; empty for a well-formed block. */
+    @JsonAnyGetter
+    public Map<String, Object> unknownFields() {
+        return unknownFields == null ? Map.of() : Collections.unmodifiableMap(unknownFields);
+    }
 
     /**
      * Whether a failure of this block ends the run (or the switch case it sits in). Fail-closed:

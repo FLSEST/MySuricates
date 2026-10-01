@@ -18,11 +18,13 @@ import java.util.Map;
  *
  * <p><b>Wirkungsort</b> (Entscheidung vom 2026-09-19): auf Abruf über die REST-API und als Test
  * über die ausgelieferten Pool-Definitionen. Der Speicherweg bleibt unangetastet — der Analyzer
- * meldet, er blockiert nicht. Seit TODO 326d5987 läuft er außerdem nach jeder KI-Erzeugung einer Definition
+ * meldet, er blockiert nicht — auch Felder, die neben {@code config} stehen ({@code unknown-block-field}),
+ * speichert der Weg mit, statt sie zu verwerfen; die Detailseite zeigt den Befund nach jedem Speichern und
+ * Pool-Install ({@code useWorkflowAnalysis}). Seit TODO 326d5987 läuft er außerdem nach jeder KI-Erzeugung einer Definition
  * ({@link GeneratedWorkflowCheck}): Befunde gehen an die KI zurück oder in das Ergebnis, nie in den Speicherweg.
  *
- * <p><b>Was er heute prüft</b> — fünfzehn Regeln, jede am Text entscheidbar, eine davon am Text samt
- * den Metadaten der Definition, drei am Block-Config-Schema, das auch der Editor nutzt:
+ * <p><b>Was er heute prüft</b> — siebzehn Regeln, jede am Text entscheidbar, eine davon am Text samt
+ * den Metadaten der Definition, vier am Block-Config-Schema, das auch der Editor nutzt:
  * <ul>
  *   <li>{@code unknown-block-reference} — Verweis auf einen Block, den es nicht gibt</li>
  *   <li>{@code chain-only-placeholder} — Chain-Variable in einem einzeln laufenden Workflow</li>
@@ -41,6 +43,11 @@ import java.util.Map;
  *   <li>{@code unknown-config-key} — Config-Schlüssel, den kein Executor liest (auch in verschachtelten Blöcken)</li>
  *   <li>{@code missing-required-config-key} — Pflichtschlüssel des Blocktyps fehlt</li>
  *   <li>{@code invalid-config-value} — Wert außerhalb der festen Werte, etwa {@code on_failure: "fail"}</li>
+ *   <li>{@code dead-nested-blocks} — {@code config.blocks}: kein Executor führt eine blocks-Liste aus, die
+ *       Blöcke darin laufen nie — HIGH ({@link BlockShapeRules})</li>
+ *   <li>{@code unknown-block-field} — Feld neben {@code type}/{@code name}/{@code config}/
+ *       {@code requiredCapabilities}/{@code skillIds}, das kein Lauf liest; HIGH, wenn es ein Config-Schlüssel
+ *       ist ({@code on_failure} neben statt in {@code config})</li>
  *   <li>{@code self-api-call} — Block ruft die REST-API der eigenen Instanz auf (außer den schlüsselfreien
  *       Sonden); im Shell-Code HIGH, im KI-Auftrag MEDIUM zum Prüfen ({@link SelfAccessRules})</li>
  *   <li>{@code direct-db-access} — Block liest die Plattform-Datenbank ({@code app_settings},
@@ -95,6 +102,7 @@ public class WorkflowAnalyzer {
         ApprovalRules.apply(blocks, findings);
         ForEachRules.apply(blocks, findings);
         ConfigKeyRules.apply(blocks, findings);
+        BlockShapeRules.apply(blocks, findings);
         SelfAccessRules.apply(blocks, findings);
         findings.sort((a, b) -> a.severity() != b.severity()
                 ? a.severity().compareTo(b.severity())
