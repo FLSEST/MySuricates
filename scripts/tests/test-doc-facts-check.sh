@@ -799,6 +799,32 @@ OUT=$(bash "$SCRIPT" --root "$FAKE" 2>&1); RC=$?
 check "AGENTS.md wird ohne Pfadangabe geprueft" 'grep -qE "^DRIFT AGENTS.md:2 curl-ohne-noproxy" <<<"$OUT"'
 rm "$FAKE/AGENTS.md"
 
+echo "18) Controller-Aufzaehlung gegen die *Controller.java-Dateien (TODO 65eab274)"
+# Miniatur-Repo: Alpha und Beta. Die Zahl davor prueft schon Fall 2 — hier geht es um die Namen.
+cat > "$FAKE/docs/controller.md" <<'MD_EOF'
+# Controller
+**Controller:** Alpha, Gamma
+**Controllers:** Alpha
+MD_EOF
+OUT=$(bash "$SCRIPT" --root "$FAKE" 2>&1); RC=$?
+check "Controller-Liste: exit 1"              '[ "$RC" -eq 1 ]'
+check "fehlender und unbekannter Name gemeldet" \
+  'grep -qE "^DRIFT docs/controller.md:2 controller-names nennt 1 von 2 Controllern \(es fehlen Beta; unbekannt Gamma\)" <<<"$OUT"'
+check "englische Ueberschrift: fehlender Name gemeldet" \
+  'grep -qE "^DRIFT docs/controller.md:3 controller-names nennt 1 von 2 Controllern \(es fehlen Beta\)" <<<"$OUT"'
+# Gegenprobe: vollstaendige Liste in anderer Reihenfolge, mit Suffix, Backticks und Schlusspunkt;
+# eine Zeile, die nur das Wort Controller erwaehnt, ist keine Aufzaehlung.
+cat > "$FAKE/docs/controller.md" <<'MD_EOF'
+# Controller
+**Controller:** Beta, Alpha
+**Controllers:** `AlphaController`, `BetaController`.
+Jeder Controller: Alpha, Gamma — Fliesstext, keine Aufzaehlung.
+MD_EOF
+OUT=$(bash "$SCRIPT" --root "$FAKE" 2>&1); RC=$?
+check "Gegenprobe: kein controller-names-Befund" '! grep -q "controller-names" <<<"$OUT"'
+check "Gegenprobe: exit 0"                    '[ "$RC" -eq 0 ]'
+rm "$FAKE/docs/controller.md"
+
 echo
 echo "passed=$PASS failed=$FAIL"
 [ "$FAIL" -eq 0 ]
