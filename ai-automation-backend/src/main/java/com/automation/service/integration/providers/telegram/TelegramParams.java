@@ -2,6 +2,7 @@ package com.automation.service.integration.providers.telegram;
 
 import com.automation.service.integration.providers.IntegrationParams;
 
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -74,7 +75,7 @@ final class TelegramParams {
         Object val = params.get(key);
         if (val == null || val.toString().isBlank()) return null;
         if (val instanceof Boolean b) return b;
-        String s = val.toString().trim().toLowerCase();
+        String s = val.toString().trim().toLowerCase(Locale.ROOT);
         if (s.equals("true")) return true;
         if (s.equals("false")) return false;
         throw new IllegalArgumentException("Parameter '" + key + "' must be true or false");

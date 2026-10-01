@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.sql.SQLTransientConnectionException;
+import java.util.Locale;
 
 /**
  * Turns an exception from the assistant chat flow into a stable error code plus a user-facing
@@ -53,7 +54,7 @@ public class AssistantErrorClassifier {
                     "My tool input was not valid (JSON error). " +
                     "Phrase the request more simply or without special characters and try again.");
         }
-        if (msg.toLowerCase().contains("api key")) {
+        if (msg.toLowerCase(Locale.ROOT).contains("api key")) {
             return new ErrorKind("PROVIDER_UNAVAILABLE",
                     "The AI provider is not configured correctly. " +
                     "Check the settings (API key, model).");

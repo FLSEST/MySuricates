@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -90,7 +91,7 @@ public class TodoSimilarityService {
 
     Set<String> extractKeywords(String title) {
         if (title == null || title.isBlank()) return Set.of();
-        return Arrays.stream(title.toLowerCase().split("[\\s,;|()\\[\\]]+"))
+        return Arrays.stream(title.toLowerCase(Locale.ROOT).split("[\\s,;|()\\[\\]]+"))
                 .map(w -> w.replaceAll("[^a-zäöüß0-9-]", ""))
                 .filter(w -> w.length() > 3)
                 .filter(w -> !STOP_WORDS.contains(w))
@@ -120,7 +121,7 @@ public class TodoSimilarityService {
             AiProvider.ReasoningResult result = provider.reason(
                     new AiProvider.ReasoningRequest(prompt, null, null, 1, 30));
 
-            String response = result.text().trim().toUpperCase();
+            String response = result.text().trim().toUpperCase(Locale.ROOT);
             if (response.contains("SAME")) return Similarity.SAME;
             if (response.contains("RELATED")) return Similarity.RELATED;
             return Similarity.DIFFERENT;

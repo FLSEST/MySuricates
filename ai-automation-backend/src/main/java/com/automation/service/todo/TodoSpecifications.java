@@ -12,6 +12,7 @@ import org.springframework.data.jpa.domain.Specification;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * JPA {@link Specification} for the todo list filters (project, status, priority, source, tag,
@@ -106,7 +107,7 @@ public final class TodoSpecifications {
                 predicates.add(cb.like(root.get("tags"), "%" + escapeLikePattern(tag) + "%", '\\'));
             }
             if (q != null && !q.isBlank()) {
-                String pattern = "%" + escapeLikePattern(q.toLowerCase()) + "%";
+                String pattern = "%" + escapeLikePattern(q.toLowerCase(Locale.ROOT)) + "%";
                 predicates.add(cb.or(
                         cb.like(cb.lower(root.get("title")), pattern, '\\'),
                         cb.like(cb.lower(root.get("description")), pattern, '\\')

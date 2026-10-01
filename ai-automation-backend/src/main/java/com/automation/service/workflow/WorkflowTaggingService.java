@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -275,7 +276,7 @@ public class WorkflowTaggingService {
             }
             List<String> tags = rawTags.stream()
                     .filter(o -> o instanceof String s && !s.isBlank())
-                    .map(o -> ((String) o).trim().toLowerCase().replaceAll("[^a-z0-9-]", ""))
+                    .map(o -> ((String) o).trim().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9-]", ""))
                     .filter(s -> !s.isEmpty())
                     .distinct()
                     .limit(MAX_TAGS)

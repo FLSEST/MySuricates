@@ -63,7 +63,7 @@ public class WishPromptHelper {
 
     public Set<String> extractKeywords(String text) {
         if (text == null || text.isBlank()) return Set.of();
-        return Arrays.stream(WORD_SPLIT.split(text.toLowerCase()))
+        return Arrays.stream(WORD_SPLIT.split(text.toLowerCase(Locale.ROOT)))
                 .filter(w -> w.length() >= 3)
                 .filter(w -> !STOP_WORDS.contains(w))
                 .collect(Collectors.toSet());
@@ -72,8 +72,8 @@ public class WishPromptHelper {
     public int scoreRelevance(Set<String> keywords, String name, String description, List<BlockDefinition> blocks) {
         if (keywords.isEmpty()) return 0;
         int score = 0;
-        String nameLower = name != null ? name.toLowerCase() : "";
-        String descLower = description != null ? description.toLowerCase() : "";
+        String nameLower = name != null ? name.toLowerCase(Locale.ROOT) : "";
+        String descLower = description != null ? description.toLowerCase(Locale.ROOT) : "";
 
         for (String kw : keywords) {
             if (nameLower.contains(kw)) score += 3;
@@ -87,7 +87,7 @@ public class WishPromptHelper {
                         .filter(Objects::nonNull)
                         .map(String::valueOf)
                         .collect(Collectors.joining(" "))
-                        .toLowerCase();
+                        .toLowerCase(Locale.ROOT);
                 for (String kw : keywords) {
                     if (configStr.contains(kw)) {
                         score += 1;

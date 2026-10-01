@@ -13,6 +13,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.Locale;
 
 /**
  * Parses the user-facing schedule definition fields (target type, schedule type, conflict
@@ -64,7 +65,7 @@ public class ScheduleDefinitionParser {
         if (expr == null || expr.isBlank()) {
             throw new IllegalArgumentException("Delay expression must not be empty");
         }
-        String trimmed = expr.trim().toLowerCase();
+        String trimmed = expr.trim().toLowerCase(Locale.ROOT);
         try {
             if (trimmed.endsWith("s")) return Duration.ofSeconds(Long.parseLong(trimmed.substring(0, trimmed.length() - 1)));
             if (trimmed.endsWith("m")) return Duration.ofMinutes(Long.parseLong(trimmed.substring(0, trimmed.length() - 1)));

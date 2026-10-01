@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -119,7 +120,7 @@ public class GitWebhookPayloadParser {
         Map<String, Object> result = new HashMap<>();
         result.put("git_provider", "gitlab");
 
-        String eventKind = (String) p.getOrDefault("object_kind", eventHeader.toLowerCase());
+        String eventKind = (String) p.getOrDefault("object_kind", eventHeader.toLowerCase(Locale.ROOT));
         result.put("git_event", eventKind);
 
         // Repository / project

@@ -2,6 +2,7 @@ package com.automation.service.runoutput;
 
 import com.automation.entity.GateStatus;
 
+import java.util.Locale;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -54,7 +55,7 @@ public final class GateStatusOutputParser {
 
         GateStatus status;
         try {
-            status = GateStatus.valueOf(statusMatcher.group(1).toUpperCase());
+            status = GateStatus.valueOf(statusMatcher.group(1).toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
             return Optional.empty();
         }

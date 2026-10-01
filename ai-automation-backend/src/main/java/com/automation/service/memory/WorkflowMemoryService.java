@@ -21,6 +21,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
 @Service
@@ -88,7 +89,7 @@ public class WorkflowMemoryService {
                 .content(result.content())
                 .tags(toJson(result.tags()))
                 .sourceRunIds(toJson(burst.sourceRunIds()))
-                .provider(provider.toUpperCase())
+                .provider(provider.toUpperCase(Locale.ROOT))
                 .active(false)
                 .build();
 
@@ -233,7 +234,7 @@ public class WorkflowMemoryService {
     }
 
     private KnowledgeSummarizer getSummarizer(String provider) {
-        return switch (provider.toUpperCase()) {
+        return switch (provider.toUpperCase(Locale.ROOT)) {
             case "CLAUDE" -> claudeSummarizer;
             case "CODEX" -> codexSummarizer;
             default -> throw new IllegalArgumentException(

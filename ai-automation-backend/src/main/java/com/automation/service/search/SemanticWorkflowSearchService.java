@@ -19,6 +19,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -137,7 +138,7 @@ public class SemanticWorkflowSearchService {
         if (workflows == null || workflows.isEmpty()) return List.of();
 
         String fingerprint = fingerprint(workflows);
-        String cacheKey = capped + ":" + query.trim().toLowerCase() + ":" + fingerprint;
+        String cacheKey = capped + ":" + query.trim().toLowerCase(Locale.ROOT) + ":" + fingerprint;
 
         CachedResult cached = cache.get(cacheKey);
         if (cached != null && !cached.isExpired()) {

@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -56,7 +57,7 @@ public class AuditResultParser {
                 String title = requiredText(node, "title", i);
                 AuditSeverity severity;
                 try {
-                    severity = AuditSeverity.valueOf(requiredText(node, "severity", i).toUpperCase());
+                    severity = AuditSeverity.valueOf(requiredText(node, "severity", i).toUpperCase(Locale.ROOT));
                 } catch (IllegalArgumentException ex) {
                     throw new IllegalArgumentException("findings[" + i + "].severity is invalid");
                 }

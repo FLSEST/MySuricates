@@ -1,5 +1,6 @@
 package com.automation.executor.blocks;
 
+import com.automation.testsupport.TurkishLocale;
 import com.automation.entity.StepResult;
 import com.automation.entity.Todo;
 import com.automation.executor.ExecutionContext;
@@ -66,5 +67,14 @@ class TodoBlockSupportTest {
         assertThat(TodoBlockSupport.parseTags(" backend , bug,ux ")).containsExactly("backend", "bug", "ux");
         assertThat(TodoBlockSupport.parseTags("   ")).isNull();
         assertThat(TodoBlockSupport.parseTags(null)).isNull();
+    }
+
+    /** 80796b2d: under tr-TR "high".toUpperCase() is "HİGH" and silently fell back. */
+    @Test
+    void parsePriorityAndSource_doNotDependOnTheDefaultLocale() {
+        assertThat(TurkishLocale.call(() -> TodoBlockSupport.parsePriority(" high ", Todo.Priority.LOW)))
+                .isEqualTo(Todo.Priority.HIGH);
+        assertThat(TurkishLocale.call(() -> TodoBlockSupport.parseSource("ai", Todo.Source.USER)))
+                .isEqualTo(Todo.Source.AI);
     }
 }

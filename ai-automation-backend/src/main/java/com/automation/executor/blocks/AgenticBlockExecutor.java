@@ -153,7 +153,7 @@ public class AgenticBlockExecutor implements BlockExecutor {
                 fullOutput.append("[iteration ").append(iteration).append(" - ")
                         .append(plan.getGoalStatus()).append("]: ")
                         .append(plan.getSummary()).append("\n");
-                iterData.put("result", plan.getGoalStatus().toLowerCase());
+                iterData.put("result", plan.getGoalStatus().toLowerCase(Locale.ROOT));
                 iterData.put("summary", plan.getSummary());
                 tokenTracker.trackIteration(iterData);
                 events.broadcast(context.getWorkflowRunId(), stepIndex,

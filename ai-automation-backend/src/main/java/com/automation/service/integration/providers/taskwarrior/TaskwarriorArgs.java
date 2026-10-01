@@ -3,6 +3,7 @@ package com.automation.service.integration.providers.taskwarrior;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -41,7 +42,7 @@ final class TaskwarriorArgs {
             }
         }
         if (params.containsKey("priority")) {
-            String pr = paramString(params, "priority", "").trim().toUpperCase();
+            String pr = paramString(params, "priority", "").trim().toUpperCase(Locale.ROOT);
             if (!pr.isEmpty()) {
                 if (!VALID_PRIORITIES.contains(pr)) {
                     throw new IllegalArgumentException("Invalid priority: " + pr + " (expected H, M or L)");
@@ -106,7 +107,7 @@ final class TaskwarriorArgs {
             if (token.startsWith("rc.") || token.startsWith("rc:")) {
                 throw new IllegalArgumentException("Disallowed filter token (rc. overrides not permitted): " + token);
             }
-            if (FORBIDDEN_FILTER_TOKENS.contains(token.toLowerCase())) {
+            if (FORBIDDEN_FILTER_TOKENS.contains(token.toLowerCase(Locale.ROOT))) {
                 throw new IllegalArgumentException("Disallowed filter token (Taskwarrior command keyword): " + token);
             }
             tokens.add(token);
