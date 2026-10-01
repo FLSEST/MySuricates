@@ -62,6 +62,7 @@ class ManagedTodoWriterTest {
         assertThat(writer().ensure(finding(FINDING_ID, AuditFindingStatus.OPEN), report())).isSameAs(existing);
 
         verify(todoRepository, never()).save(any());
+        verify(todoRepository, never()).saveAll(any());
         verifyNoInteractions(eventPublisher);
     }
 
@@ -152,7 +153,7 @@ class ManagedTodoWriterTest {
         writer().reconcile(List.of(resolved, resolved));
 
         assertThat(todo.getStatus()).isEqualTo(Todo.Status.DONE);
-        verify(todoRepository).save(todo);
+        verify(todoRepository).saveAll(List.of(todo));
     }
 
     @Test
@@ -171,6 +172,7 @@ class ManagedTodoWriterTest {
 
         assertThat(todo.getStatus()).isEqualTo(Todo.Status.OPEN);
         verify(todoRepository, never()).save(any());
+        verify(todoRepository, never()).saveAll(any());
     }
 
     @Test
@@ -188,7 +190,7 @@ class ManagedTodoWriterTest {
 
         assertThat(todo.getStatus()).isEqualTo(Todo.Status.OPEN);
         assertThat(todo.getWorkflowRunId()).isEqualTo("run-back");
-        verify(todoRepository).save(todo);
+        verify(todoRepository).saveAll(List.of(todo));
     }
 
     @Test
@@ -203,6 +205,7 @@ class ManagedTodoWriterTest {
         verify(todoRepository).findAllById(List.of("t-gone")); // die manuelle Verknüpfung wird nicht geladen
         verifyNoInteractions(findingRepository);
         verify(todoRepository, never()).save(any());
+        verify(todoRepository, never()).saveAll(any());
     }
 
     /** ba0dcb3a: ein Finding unter der TODO-Schwelle gibt sein TODO frei — archiviert, nicht DONE. */
@@ -224,8 +227,8 @@ class ManagedTodoWriterTest {
         assertThat(todo.getStatus()).isEqualTo(Todo.Status.ARCHIVED);
         assertThat(todo.getReferenceType()).isNull();
         assertThat(todo.getReferenceId()).isNull();
-        verify(findingTodoRepository).delete(managedLink);
-        verify(todoRepository).save(todo);
+        verify(findingTodoRepository).deleteAll(List.of(managedLink));
+        verify(todoRepository).saveAll(List.of(todo));
     }
 
     @Test
@@ -242,7 +245,7 @@ class ManagedTodoWriterTest {
         writer().reconcile(List.of(back));
 
         assertThat(todo.getStatus()).isEqualTo(Todo.Status.ARCHIVED);
-        verify(findingTodoRepository).delete(managedLink);
+        verify(findingTodoRepository).deleteAll(List.of(managedLink));
     }
 
     /** An einem IN_PROGRESS-TODO arbeitet jemand — das bleibt, wie es ist. */
@@ -260,8 +263,9 @@ class ManagedTodoWriterTest {
         writer().reconcile(List.of(medium));
 
         assertThat(todo.getStatus()).isEqualTo(Todo.Status.IN_PROGRESS);
-        verify(findingTodoRepository, never()).delete(any());
+        verify(findingTodoRepository, never()).deleteAll(any());
         verify(todoRepository, never()).save(any());
+        verify(todoRepository, never()).saveAll(any());
     }
 
     @Test
@@ -281,8 +285,9 @@ class ManagedTodoWriterTest {
         writer().reconcile(List.of(medium));
 
         assertThat(todo.getStatus()).isEqualTo(Todo.Status.OPEN);
-        verify(findingTodoRepository, never()).delete(any());
+        verify(findingTodoRepository, never()).deleteAll(any());
         verify(todoRepository, never()).save(any());
+        verify(todoRepository, never()).saveAll(any());
     }
 
     /**
@@ -310,10 +315,8 @@ class ManagedTodoWriterTest {
         writer().reconcile(List.of(f1, f2));
 
         assertThat(todo.getStatus()).isEqualTo(Todo.Status.ARCHIVED);
-        verify(todoRepository, times(1)).save(any());
-        verify(findingTodoRepository).delete(l1);
-        verify(findingTodoRepository).delete(l2);
-        verify(findingTodoRepository, never()).delete(l3);
+        verify(todoRepository, times(1)).saveAll(List.of(todo));
+        verify(findingTodoRepository).deleteAll(List.of(l1, l2));
         assertThat(links).containsExactly(l3);
     }
 
@@ -338,6 +341,10 @@ class ManagedTodoWriterTest {
             links.remove((AuditFindingTodo) inv.getArgument(0));
             return null;
         }).when(findingTodoRepository).delete(any(AuditFindingTodo.class));
+        lenient().doAnswer(inv -> {
+            inv.<Iterable<AuditFindingTodo>>getArgument(0).forEach(links::remove);
+            return null;
+        }).when(findingTodoRepository).deleteAll(any());
         lenient().when(todoRepository.findById(todo.getId())).thenReturn(Optional.of(todo));
         lenient().when(todoRepository.findAllById(any())).thenReturn(List.of(todo));
         lenient().when(findingRepository.findById(anyString())).thenAnswer(inv ->
@@ -380,6 +387,9 @@ class ManagedTodoWriterTest {
         verify(todoRepository, never()).findById(any());
         verify(findingRepository, never()).findById(any());
         verify(findingTodoRepository, never()).findByTodoId(any());
+        // b2d65a20: beide geaenderten TODOs in einem saveAll, kein save je TODO.
+        verify(todoRepository, times(1)).saveAll(List.of(todoAb, todoC));
+        verify(todoRepository, never()).save(any());
     }
 
     private static AuditFindingTodo link(String todoId, boolean managed) {
