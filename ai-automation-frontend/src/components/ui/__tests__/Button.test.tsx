@@ -70,7 +70,7 @@ describe('Button', () => {
 
   it('applies danger variant class', () => {
     render(<Button variant="danger">Delete</Button>);
-    expect(screen.getByRole('button').className).toContain('bg-danger');
+    expect(screen.getByRole('button').className).toContain('bg-danger-emphasis');
   });
 
   it('applies size classes', () => {

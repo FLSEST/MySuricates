@@ -83,6 +83,11 @@ describe.each(THEMES)('theme $id', (theme) => {
     expectContrast('--color-text-inverse', '--color-accent-hover', 4.5);
   });
 
+  it('keeps inverse text readable on solid danger and success fills (bg-danger-emphasis, bg-success-emphasis)', () => {
+    expectContrast('--color-text-inverse', '--color-danger-emphasis', 4.5);
+    expectContrast('--color-text-inverse', '--color-success-emphasis', 4.5);
+  });
+
   it('draws visible, distinguishable chart series', () => {
     for (const chart of CHARTS) for (const bg of SURFACES) expectContrast(chart, bg, 3);
     const firstFive = CHARTS.slice(0, 5).map((k) => tk[k]);

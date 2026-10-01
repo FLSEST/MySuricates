@@ -11,7 +11,9 @@
  * `--color-<name>-text` is the readable text variant. index.css maps the text
  * variant onto the `text-<name>` utilities, so components keep writing
  * `text-success` / `bg-success`. `--color-accent-emphasis` backs `bg-accent`
- * (solid buttons carrying `text-text-inverse`).
+ * (solid buttons carrying `text-text-inverse`). Danger and success fills that carry
+ * text or an icon use `bg-danger-emphasis` / `bg-success-emphasis` — the plain
+ * `bg-danger` / `bg-success` stay the palette tone for dots, bars and charts.
  */
 
 export interface ThemeTokens {
@@ -34,12 +36,14 @@ export interface ThemeTokens {
   '--color-success': string;
   '--color-success-text': string;
   '--color-success-subtle': string;
+  '--color-success-emphasis': string;
   '--color-warning': string;
   '--color-warning-text': string;
   '--color-warning-subtle': string;
   '--color-danger': string;
   '--color-danger-text': string;
   '--color-danger-subtle': string;
+  '--color-danger-emphasis': string;
   '--color-ai': string;
   '--color-ai-text': string;
   '--color-ai-subtle': string;

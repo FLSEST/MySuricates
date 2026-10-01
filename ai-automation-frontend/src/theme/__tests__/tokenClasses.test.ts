@@ -65,10 +65,34 @@ function scan(file: string, source: string, defined: Set<string> = DEFINED): Fin
       .map((m) => ({ file, line: i + 1, match: m[0], token: m[1]! })));
 }
 
+/**
+ * Text on a solid fill needs a contrast-checked pairing (themes.test.ts): `text-text-inverse` on `bg-accent`,
+ * `bg-danger-emphasis` or `bg-success-emphasis` (TODO e2abe6c1). Plain `bg-danger`/`bg-success`/`bg-warning` are the
+ * palette tone for dots and bars; fixed white/black ignores the theme altogether.
+ */
+const SOLID_FILL_TEXT: { pattern: RegExp; why: string }[] = [
+  {
+    pattern: /(?<![\w-])text-(?:white|black)(?![\w-])/,
+    why: 'fixed white/black ignores the theme — text on bg-accent / bg-*-emphasis is text-text-inverse',
+  },
+  {
+    pattern: /(?<![\w-])bg-(?:danger|success|warning)(?![\w/-])[^'"`]*text-text-inverse|text-text-inverse[^'"`]*(?<![\w-])bg-(?:danger|success|warning)(?![\w/-])/,
+    why: 'text on a solid status fill — use bg-danger-emphasis / bg-success-emphasis (warning has none: add it first)',
+  },
+];
+
+function solidFillProblems(file: string, source: string): string[] {
+  return source.split('\n').flatMap((text, i) =>
+    SOLID_FILL_TEXT.filter((rule) => rule.pattern.test(text)).map((rule) => `  ${file}:${i + 1} ${rule.why}`));
+}
+
+function relative(globPath: string): string {
+  return new URL(globPath, 'file:///src/theme/__tests__/').pathname.replace(/^\/src\//, '');
+}
+
 function findings(): Finding[] {
   return Object.entries(SOURCES).flatMap(([path, source]) => {
-    const file = new URL(path, 'file:///src/theme/__tests__/').pathname.replace(/^\/src\//, '');
-    return scan(file, source);
+    return scan(relative(path), source);
   });
 }
 
@@ -90,6 +114,26 @@ describe('theme token classes', () => {
       if (!all.some((f) => f.token === token)) problems.push(`  "${token}" is no longer used — remove it from KNOWN_UNDEFINED`);
     }
     expect(problems.join('\n')).toBe('');
+  });
+
+  it('put text on solid fills only via the contrast-checked pairings', () => {
+    const problems = Object.entries(SOURCES).flatMap(([path, source]) => solidFillProblems(relative(path), source));
+    expect(problems.join('\n')).toBe('');
+  });
+
+  it('flags white text and text on plain status fills, but not the emphasis pairings', () => {
+    const source = [
+      "const a = 'bg-accent text-white';",
+      "const b = 'border-success bg-success text-text-inverse';",
+      "const c = 'text-text-inverse bg-danger';",
+      "const d = 'bg-danger-emphasis text-text-inverse bg-accent text-text-inverse';",
+      "const e = 'bg-danger/10 text-danger'; const f = 'h-2 rounded-full bg-success';",
+    ].join('\n');
+    expect(solidFillProblems('Example.tsx', source).map((p) => p.trim().split(' ')[0])).toEqual([
+      'Example.tsx:1',
+      'Example.tsx:2',
+      'Example.tsx:3',
+    ]);
   });
 
   it('finds undefined tokens with variants and opacity, and leaves defined tokens and other utilities alone', () => {
