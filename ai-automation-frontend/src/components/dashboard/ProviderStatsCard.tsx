@@ -1,6 +1,6 @@
 import { Card, CardHeader } from '../ui';
 import { useI18nStore, useT } from '../../i18n';
-import { formatUsd } from '../../utils/localeFormat';
+import { formatTokenCount, formatUsd } from '../../utils/localeFormat';
 import type { ProviderStats } from '../../types';
 
 interface ProviderStatsCardProps {
@@ -46,7 +46,7 @@ export function ProviderStatsCard({ data }: ProviderStatsCardProps) {
               <span>{Math.round(p.successRate * 100)}% {t.dashboard.successRate.toLowerCase()}</span>
               <span>
                 {p.totalTokens > 0
-                  ? `${(p.totalTokens / 1000).toFixed(0)}k ${t.charts.tokens}`
+                  ? `${formatTokenCount(p.totalTokens, locale)} ${t.charts.tokens}`
                   : '—'}
                 {p.totalCostUsd > 0
                   ? ` · ${formatUsd(p.totalCostUsd, locale)}`

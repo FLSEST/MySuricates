@@ -1,15 +1,10 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { ChartCard } from '../dashboard/ChartCard';
-import { useI18nStore, useT, type Locale } from '../../i18n';
-import { formatDecimal } from '../../utils/localeFormat';
+import { useI18nStore, useT } from '../../i18n';
+import { formatTokenCount } from '../../utils/localeFormat';
 
 const COLORS = ['var(--color-accent)', 'var(--color-chart-1)'];
 
-function formatTokens(n: number, locale: Locale): string {
-  if (n >= 1_000_000) return `${formatDecimal(n / 1_000_000, locale)}M`;
-  if (n >= 1_000) return `${formatDecimal(n / 1_000, locale)}k`;
-  return String(n);
-}
 
 export function TokenBreakdownChart({ input, output }: { input: number; output: number }) {
   const t = useT();
@@ -30,13 +25,13 @@ export function TokenBreakdownChart({ input, output }: { input: number; output: 
             </Pie>
             <Tooltip
               contentStyle={{ backgroundColor: 'var(--color-surface-overlay)', border: '1px solid var(--color-border)', borderRadius: '8px', color: 'var(--color-text)', fontSize: 12 }}
-              formatter={(value) => [formatTokens(Number(value ?? 0), locale)]}
+              formatter={(value) => [formatTokenCount(Number(value ?? 0), locale)]}
             />
           </PieChart>
         </ResponsiveContainer>
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="text-center">
-            <p className="text-lg font-bold text-text">{formatTokens(total, locale)}</p>
+            <p className="text-lg font-bold text-text">{formatTokenCount(total, locale)}</p>
             <p className="text-[10px] text-text-tertiary">{t.insights.tokens}</p>
           </div>
         </div>
@@ -45,7 +40,7 @@ export function TokenBreakdownChart({ input, output }: { input: number; output: 
         {data.map((d, i) => (
           <div key={d.name} className="flex items-center gap-1.5 text-xs text-text-secondary">
             <span className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i] }} />
-            {d.name}: {formatTokens(d.value, locale)}
+            {d.name}: {formatTokenCount(d.value, locale)}
           </div>
         ))}
       </div>

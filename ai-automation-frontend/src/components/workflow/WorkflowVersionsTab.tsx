@@ -138,7 +138,7 @@ export default function WorkflowVersionsTab({ workflowId, currentHash }: { workf
               <div className="px-4 pb-3 border-t border-border">
                 <div className="flex items-center justify-between mt-3 mb-2">
                   <span className="text-xs font-medium text-text-secondary uppercase tracking-wider">
-                    Snapshot
+                    {t.workflows.versionSnapshot}
                   </span>
                   <button
                     onClick={() => handleRestore(v)}

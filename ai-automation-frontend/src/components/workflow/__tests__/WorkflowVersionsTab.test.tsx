@@ -5,6 +5,7 @@ import { http, HttpResponse } from 'msw';
 import { server } from '../../../test/server';
 import { renderWithProviders } from '../../../test/utils';
 import { useI18nStore } from '../../../i18n';
+import { de } from '../../../i18n/de';
 import WorkflowVersionsTab from '../WorkflowVersionsTab';
 
 beforeAll(() => server.listen({ onUnhandledRequest: failOnUnhandledRequest }));
@@ -46,6 +47,19 @@ describe('WorkflowVersionsTab provenance', () => {
 
     expect(await screen.findByText('Goal guard')).toBeInTheDocument();
     expect(screen.queryByText('goal-guard')).not.toBeInTheDocument();
+  });
+
+  // 17eb7994: the heading of the expanded snapshot was fixed English
+  it('labels the expanded snapshot in the UI language', async () => {
+    useI18nStore.setState({ locale: 'de' });
+    server.use(http.get('/api/v1/workflows/wf-1/versions', () => HttpResponse.json({
+      content: [version('v1', 1, HASH_OLD)], page: 0, size: 20, totalElements: 1, totalPages: 1,
+    })));
+    renderWithProviders(<WorkflowVersionsTab workflowId="wf-1" />);
+
+    fireEvent.click(await screen.findByText('bbbbbbbb'));
+    expect(screen.getByText(de.workflows.versionSnapshot)).toBeInTheDocument();
+    expect(screen.queryByText('Snapshot')).not.toBeInTheDocument();
   });
 
   // 23635ef6: the app's own dialog instead of window.confirm

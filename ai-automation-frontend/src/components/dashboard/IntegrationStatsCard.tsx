@@ -1,5 +1,6 @@
 import { Card, CardHeader } from '../ui';
-import { useT } from '../../i18n';
+import { useI18nStore, useT } from '../../i18n';
+import { formatTokenCount } from '../../utils/localeFormat';
 import { useIntegrations } from '../../hooks/useIntegrations';
 import type { IntegrationStats } from '../../types';
 
@@ -27,6 +28,7 @@ function prettyName(id: string, lookup: Record<string, string>): string {
 
 export function IntegrationStatsCard({ data }: IntegrationStatsCardProps) {
   const t = useT();
+  const locale = useI18nStore((s) => s.locale);
   const { data: integrations } = useIntegrations();
 
   if (!data?.length) return null;
@@ -58,7 +60,7 @@ export function IntegrationStatsCard({ data }: IntegrationStatsCardProps) {
               <span>{Math.round(p.successRate * 100)}% {t.dashboard.successRate.toLowerCase()}</span>
               <span>
                 {p.totalTokens > 0
-                  ? `${(p.totalTokens / 1000).toFixed(0)}k ${t.charts.tokens}`
+                  ? `${formatTokenCount(p.totalTokens, locale)} ${t.charts.tokens}`
                   : '—'}
               </span>
             </div>

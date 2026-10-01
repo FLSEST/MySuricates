@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   formatDate, formatDateRange, formatDecimal, formatNumber, formatRelativeUnit, formatTimeOfDay, formatTimestamp, formatUsd,
+  formatTokenCount, usdAxisDigits,
   intlLocale,
 } from '../localeFormat';
 
@@ -59,6 +60,25 @@ describe('localeFormat', () => {
     expect(formatUsd(0, 'en')).toBe('$0.00');
     expect(plain(formatUsd(1234.5, 'de'))).toBe('1.234,50 $');
     expect(formatUsd(0.5, 'en', 4)).toBe('$0.5000');
+  });
+
+  // 17eb7994: token counts as `toFixed(0)` without separators, cost-axis ticks with mixed decimals
+  it('shortens token counts with the separators of the app language', () => {
+    expect(formatTokenCount(950, 'en')).toBe('950');
+    expect(formatTokenCount(1234, 'en')).toBe('1.2k');
+    expect(formatTokenCount(1234, 'de')).toBe('1,2k');
+    expect(formatTokenCount(987_654, 'de')).toBe('987,7k');
+    expect(formatTokenCount(3_450_000, 'en')).toBe('3.5M');
+  });
+
+  it('gives a cost axis one decimal count, as few as its largest value needs', () => {
+    expect(usdAxisDigits(0)).toBe(2);
+    expect(usdAxisDigits(12.5)).toBe(2);
+    expect(usdAxisDigits(0.1)).toBe(2);
+    expect(usdAxisDigits(0.05)).toBe(3);
+    expect(usdAxisDigits(0.004)).toBe(4);
+    const ticks = [0, 0.001, 0.002, 0.003, 0.004].map((v) => formatUsd(v, 'en', usdAxisDigits(0.004)));
+    expect(ticks).toEqual(['$0.0000', '$0.0010', '$0.0020', '$0.0030', '$0.0040']);
   });
 
   it('writes a span of dates with the shared parts once', () => {

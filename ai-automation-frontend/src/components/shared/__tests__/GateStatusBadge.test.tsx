@@ -1,13 +1,17 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { useI18nStore } from '../../../i18n';
+import { de } from '../../../i18n/de';
 import { GateStatusBadge } from '../GateStatusBadge';
+
+afterEach(() => useI18nStore.setState({ locale: 'en' }));
 
 const run = (metadata: Record<string, unknown>) => ({ metadata });
 
 describe('GateStatusBadge', () => {
   // 6c94dc62: fixed green/yellow/red palette classes ignored the theme
   it.each([
-    ['GREEN', 'OK', 'success'],
+    ['GREEN', 'Passed', 'success'],
     ['YELLOW', 'Findings', 'warning'],
     ['RED', 'Critical', 'danger'],
   ])('colours %s with the %s status tokens', (gate, label, token) => {
@@ -25,6 +29,15 @@ describe('GateStatusBadge', () => {
 
     const badge = screen.getByText(`${description.substring(0, 40)}…`);
     expect(badge).toHaveAttribute('title', `${description} (security)`);
+  });
+
+  // 17eb7994: the labels were fixed English
+  it('labels the gate in the UI language', () => {
+    useI18nStore.setState({ locale: 'de' });
+    const { rerender } = render(<GateStatusBadge run={run({ gate_status: 'GREEN' })} />);
+    expect(screen.getByText(de.insights.gateGreen)).toBeInTheDocument();
+    rerender(<GateStatusBadge run={run({ gate_status: 'RED' })} />);
+    expect(screen.getByText(de.insights.gateRed)).toBeInTheDocument();
   });
 
   it('keeps the short label when compact, and renders nothing without a known gate status', () => {
