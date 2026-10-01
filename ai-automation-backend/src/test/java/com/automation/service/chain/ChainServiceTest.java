@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -106,7 +107,7 @@ class ChainServiceTest {
                 "New Chain", "Description", "rocket",
                 List.of(entryRequest), true);
 
-        when(workflowRepository.existsById("wf-1")).thenReturn(true);
+        when(workflowRepository.findExistingIdsIn(any())).thenReturn(List.of("wf-1"));
         when(chainRepository.save(any(WorkflowChain.class))).thenAnswer(inv -> {
             WorkflowChain saved = inv.getArgument(0);
             saved.setId("chain-new");
@@ -134,7 +135,7 @@ class ChainServiceTest {
         CreateChainRequest request = new CreateChainRequest(
                 "Chain", null, null, List.of(entryRequest), null);
 
-        when(workflowRepository.existsById("wf-1")).thenReturn(true);
+        when(workflowRepository.findExistingIdsIn(any())).thenReturn(List.of("wf-1"));
         when(chainRepository.save(any(WorkflowChain.class))).thenAnswer(inv -> inv.getArgument(0));
 
         WorkflowChain result = chainService.create(request);
@@ -151,7 +152,7 @@ class ChainServiceTest {
         CreateChainRequest request = new CreateChainRequest(
                 "Chain", null, null, List.of(entryRequest), true);
 
-        when(workflowRepository.existsById("non-existent-wf")).thenReturn(false);
+        when(workflowRepository.findExistingIdsIn(any())).thenReturn(List.of());
 
         assertThatThrownBy(() -> chainService.create(request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -185,7 +186,7 @@ class ChainServiceTest {
                 null, null, null, List.of(newEntry), false);
 
         when(chainRepository.findById("chain-1")).thenReturn(Optional.of(testChain));
-        when(workflowRepository.existsById("wf-2")).thenReturn(true);
+        when(workflowRepository.findExistingIdsIn(any())).thenReturn(List.of("wf-2"));
         when(chainRepository.save(any(WorkflowChain.class))).thenAnswer(inv -> inv.getArgument(0));
 
         WorkflowChain result = chainService.update("chain-1", request);
@@ -197,7 +198,7 @@ class ChainServiceTest {
         assertThat(result.getEntries().get(0).getLabel()).isEqualTo("New Step");
         assertThat(result.getEntries().get(0).isStopOnFailure()).isFalse();
         assertThat(result.getEntries().get(0).getInputContext()).containsEntry("env", "prod");
-        verify(workflowRepository).existsById("wf-2");
+        verify(workflowRepository).findExistingIdsIn(Set.of("wf-2"));
     }
 
     @Test
@@ -224,7 +225,7 @@ class ChainServiceTest {
                 "wf-1", "Step 1", 0, true, Map.of());
         CreateChainRequest request = new CreateChainRequest(
                 "Chain", "desc", "icon", List.of(entryRequest), false);
-        when(workflowRepository.existsById("wf-1")).thenReturn(true);
+        when(workflowRepository.findExistingIdsIn(any())).thenReturn(List.of("wf-1"));
         when(chainRepository.save(any(WorkflowChain.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -239,7 +240,7 @@ class ChainServiceTest {
                 "wf-1", "My Label", 3, true, Map.of("key", "value"));
         CreateChainRequest request = new CreateChainRequest(
                 "Chain", "desc", "icon", List.of(entryRequest), true);
-        when(workflowRepository.existsById("wf-1")).thenReturn(true);
+        when(workflowRepository.findExistingIdsIn(any())).thenReturn(List.of("wf-1"));
         ArgumentCaptor<WorkflowChain> captor = ArgumentCaptor.forClass(WorkflowChain.class);
         when(chainRepository.save(captor.capture()))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -259,7 +260,7 @@ class ChainServiceTest {
                 "wf-1", "Step", 0, null, null);
         CreateChainRequest request = new CreateChainRequest(
                 "Chain", "desc", "icon", List.of(entryRequest), true);
-        when(workflowRepository.existsById("wf-1")).thenReturn(true);
+        when(workflowRepository.findExistingIdsIn(any())).thenReturn(List.of("wf-1"));
         ArgumentCaptor<WorkflowChain> captor = ArgumentCaptor.forClass(WorkflowChain.class);
         when(chainRepository.save(captor.capture()))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -290,7 +291,7 @@ class ChainServiceTest {
         UpdateChainRequest request = new UpdateChainRequest(
                 null, null, null, List.of(entryRequest), null);
         when(chainRepository.findById("chain-1")).thenReturn(Optional.of(testChain));
-        when(workflowRepository.existsById("wf-missing")).thenReturn(false);
+        when(workflowRepository.findExistingIdsIn(any())).thenReturn(List.of());
 
         assertThatThrownBy(() -> chainService.update("chain-1", request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -390,7 +391,7 @@ class ChainServiceTest {
 
     @Test
     void create_rejectsEntryTimeoutOutsideRange() {
-        when(workflowRepository.existsById("wf-1")).thenReturn(true);
+        when(workflowRepository.findExistingIdsIn(any())).thenReturn(List.of("wf-1"));
         CreateChainRequest request = new CreateChainRequest("K", null, null,
                 List.of(new ChainEntryRequest("wf-1", null, 0, true, Map.of(), 2)), true);
 
@@ -400,7 +401,7 @@ class ChainServiceTest {
 
     @Test
     void create_keepsEntryTimeout() {
-        when(workflowRepository.existsById("wf-1")).thenReturn(true);
+        when(workflowRepository.findExistingIdsIn(any())).thenReturn(List.of("wf-1"));
         when(chainRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         CreateChainRequest request = new CreateChainRequest("K", null, null,
                 List.of(new ChainEntryRequest("wf-1", null, 0, true, Map.of(), 1200)), true);
@@ -408,5 +409,30 @@ class ChainServiceTest {
         WorkflowChain saved = chainService.create(request);
 
         assertThat(saved.getEntries().get(0).getTimeoutMinutes()).isEqualTo(1200);
+    }
+    /** 6299a860: alle Workflow-IDs in einer Abfrage, gemeldet wird die erste fehlende in Eintragsreihenfolge. */
+    @Test
+    void create_checksAllWorkflowIdsInOneQuery_andNamesTheFirstMissingInEntryOrder() {
+        when(workflowRepository.findExistingIdsIn(any())).thenReturn(List.of("wf-1"));
+        CreateChainRequest request = new CreateChainRequest("K", null, null, List.of(
+                new ChainEntryRequest("wf-1", null, 0, true, Map.of()),
+                new ChainEntryRequest("wf-gone-a", null, 1, true, Map.of()),
+                new ChainEntryRequest("wf-gone-b", null, 2, true, Map.of()),
+                new ChainEntryRequest("wf-1", null, 3, true, Map.of())), true);
+
+        assertThatThrownBy(() -> chainService.create(request)).isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Workflow not found: wf-gone-a");
+        verify(workflowRepository, times(1)).findExistingIdsIn(Set.of("wf-1", "wf-gone-a", "wf-gone-b"));
+        verify(workflowRepository, never()).existsById(any());
+        verify(chainRepository, never()).save(any());
+    }
+
+    @Test
+    void create_withoutEntries_queriesNoWorkflows() {
+        when(chainRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        chainService.create(new CreateChainRequest("K", null, null, List.of(), true));
+
+        verifyNoInteractions(workflowRepository);
     }
 }

@@ -16,8 +16,12 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -94,12 +98,21 @@ public class ChainService {
                 .orElseThrow(() -> new ElementNotFoundException("Chain run", runId));
     }
 
+    /**
+     * Alle Workflow-IDs der Einträge in einer Abfrage prüfen statt {@code existsById} je Eintrag
+     * (TODO 6299a860); gemeldet wird wie bisher die erste fehlende ID in Eintragsreihenfolge.
+     */
     private void validateWorkflowIds(List<ChainEntryRequest> entries) {
-        for (ChainEntryRequest entry : entries) {
-            if (!workflowRepository.existsById(entry.workflowId())) {
-                throw new IllegalArgumentException("Workflow not found: " + entry.workflowId());
-            }
-        }
+        if (entries.isEmpty()) return;
+        Set<String> ids = entries.stream().map(ChainEntryRequest::workflowId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        Set<String> existing = ids.isEmpty() ? Set.of() : new HashSet<>(workflowRepository.findExistingIdsIn(ids));
+        entries.stream().map(ChainEntryRequest::workflowId)
+                .filter(id -> !existing.contains(id))
+                .findFirst()
+                .ifPresent(missing -> {
+                    throw new IllegalArgumentException("Workflow not found: " + missing);
+                });
     }
 
     private List<ChainEntry> toEntries(List<ChainEntryRequest> requests) {
