@@ -9,10 +9,10 @@ set before it starts — as in an operator's shell.
 
 Run: python3 -m unittest discover -s scripts/tests -p 'test_local_api_proxy.py'
 """
-import ast
 import io
 import os
 from pathlib import Path
+import re
 import socket
 import subprocess
 import sys
@@ -28,18 +28,36 @@ BUILD = 'fake-build'  # the buildTimestamp fake_instance.py reports
 PROXY_VARIABLES = ('http_proxy', 'https_proxy', 'all_proxy', 'HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY')
 
 
+# The header name at the start of a string: 'X-API-Key', 'X-API-Key: ' + key, f"X-API-Key: {key}", b'X-API-Key'.
+# A pattern (r"^X-API-Key…", r"…--header…X-API-Key") or prose ("sends no X-API-Key") does not start with it.
+HEADER_AT_START = re.compile(r'x-api-key\s*(:|$)', re.IGNORECASE)
+STRING_BODY = re.compile(r'^[A-Za-z]*("""|\'\'\'|"|\')(.*)\1$', re.DOTALL)
+STATEMENT_START = {tokenize.NEWLINE, tokenize.NL, tokenize.INDENT, tokenize.DEDENT, tokenize.ENCODING}
+
+
 def sends_api_key(source):
-    """True when the script names the header as a string of its own — `{'X-API-Key': key}`,
-    `add_header('X-API-Key', key)`, `HEADER = 'X-API-Key'`. The word inside a comment, a docstring or a pattern
-    (public-readiness/doc_facts_check.py looks for curl examples with r"…X-API-Key") sends nothing (f88f738d)."""
-    for token in tokenize.generate_tokens(io.StringIO(source).readline):
-        if token.type != tokenize.STRING:
+    """True when a string in the code begins with the header name — `{'X-API-Key': key}`,
+    `add_header('X-API-Key', key)`, `'X-API-Key: ' + key`, `f"X-API-Key: {key}"`, `b'X-API-Key'`. The word inside
+    a comment, a docstring, a pattern (public-readiness/doc_facts_check.py looks for curl examples with
+    r"…X-API-Key") or prose sends nothing (f88f738d). A file tokenize cannot read counts as sending."""
+    try:
+        tokens = list(tokenize.generate_tokens(io.StringIO(source).readline))
+    except (tokenize.TokenError, SyntaxError):
+        return True
+    for i, token in enumerate(tokens):
+        if token.type == tokenize.STRING:
+            before = tokens[i - 1].type if i else tokenize.NEWLINE
+            after = tokens[i + 1].type if i + 1 < len(tokens) else tokenize.NEWLINE
+            if before in STATEMENT_START and after in (tokenize.NEWLINE, tokenize.ENDMARKER):
+                continue  # a string on its own as a statement: a docstring
+            body = STRING_BODY.match(token.string)
+            text = body.group(2) if body else ''
+        elif token.type == getattr(tokenize, 'FSTRING_START', None):  # Python 3.12+: f-strings in pieces
+            following = tokens[i + 1] if i + 1 < len(tokens) else None
+            text = following.string if following and following.type == tokenize.FSTRING_MIDDLE else ''
+        else:
             continue
-        try:
-            value = ast.literal_eval(token.string)
-        except (ValueError, SyntaxError):
-            continue
-        if isinstance(value, str) and value.lower() == 'x-api-key':
+        if HEADER_AT_START.match(text):
             return True
     return False
 
@@ -48,14 +66,28 @@ class SendsApiKeyTest(unittest.TestCase):
     def test_a_header_set_in_code_counts(self):
         for source in ("urlopen(Request(url, headers={'X-API-Key': key}))\n",
                        'request.add_header("X-API-Key", key)\n',
-                       "HEADER = 'x-api-key'\nrequest.add_header(HEADER, key)\n"):
+                       "HEADER = 'x-api-key'\nrequest.add_header(HEADER, key)\n",
+                       # the header name at the start of a longer string
+                       "line = 'X-API-Key: ' + key\n",
+                       'line = f"X-API-Key: {key}"\n',
+                       "raw = b'X-API-Key'\n",
+                       'line = rf"X-API-Key: {key}"\n'):
             self.assertTrue(sends_api_key(source), source)
+
+    def test_a_file_tokenize_cannot_read_counts_as_sending(self):
+        # Conservative: what cannot be read is checked like a sender
+        self.assertTrue(sends_api_key('headers = {\n'))
+        self.assertTrue(sends_api_key('"""never closed\n'))
 
     def test_the_word_in_a_pattern_comment_or_docstring_does_not(self):
         for source in ('API_KEY_HEADER = re.compile(r"(?:-H|--header)\\s*[\\"\']?X-API-Key", re.I)\n',
                        '# curl -H "X-API-Key: …" without --noproxy\n',
                        '"""Checks the X-API-Key examples in the docs."""\n',
-                       "print('send X-API-Key with curl')\n"):
+                       "print('send X-API-Key with curl')\n",
+                       '"""X-API-Key: the docstring names the header."""\n',
+                       'def f():\n    """X-API-Key: also in a function docstring."""\n    return 1\n',
+                       'PATTERN = re.compile(r"^X-API-Key\\s*:")\n',
+                       'note = f"the {name} sends no X-API-Key"\n'):
             self.assertFalse(sends_api_key(source), source)
 
 
