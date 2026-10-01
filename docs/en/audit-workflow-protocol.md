@@ -314,6 +314,11 @@ leave known findings out, is checked by `scripts/tests/test-audit-facts.sh` (sec
 reads the threshold from `AuditAcceptancePolicy`, so that prompt and platform mean the same by
 "degraded".
 
+The documentation weight audit (Doku-Zehrprobe) and the public readiness evidence also have a valid
+`metadata.audit` and, since TODO `3fb33d9b`, carry the same section (as `## BEKANNTE BEFUNDE …`, in
+line with their headings) and the same rule block, each before its envelope part. Before, they saw
+earlier findings only as Markdown in `previous_report`. Section 10b of the same test checks this.
+
 ## Lifecycle
 
 - Failed runs, missing report blocks, and invalid envelopes are historized as

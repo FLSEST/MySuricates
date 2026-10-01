@@ -312,6 +312,11 @@ keiner mehr verlangt, bekannte Befunde wegzulassen, prüft `scripts/tests/test-a
 (Abschnitt 10). Die Prüfung liest die Schwelle aus `AuditAcceptancePolicy`, damit Prompt und Plattform
 dasselbe unter „verschlechtert“ verstehen.
 
+Die Doku-Zehrprobe und die Public-Readiness-Evidenz haben ebenfalls ein gültiges `metadata.audit` und
+tragen seit TODO `3fb33d9b` denselben Abschnitt (als `## BEKANNTE BEFUNDE …`, passend zu ihren
+Überschriften) und denselben Regelblock, jeweils vor ihrem Envelope-Teil. Vorher sahen sie Vorbefunde
+nur als Markdown im `previous_report`. Das prüft Abschnitt 10b desselben Tests.
+
 ## Lebenszyklus
 
 - Fehlgeschlagene Runs, fehlende Report-Blöcke und ungültige Envelopes werden als

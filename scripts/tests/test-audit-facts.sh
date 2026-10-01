@@ -13,6 +13,7 @@
 #      25ed5f84; die Kurzfassung "Ergebnis erklaeren" gibt es nicht mehr).
 # Abschnitt 10 prueft die Report-Prompts aller fuenf Audits: Sie bekommen die bekannten Befunde
 # ({{ audit_findings }}) und tragen denselben Regelblock, wie sie damit umgehen (1cf996df).
+# Abschnitt 10b prueft dasselbe fuer Doku-Zehrprobe und Public-Readiness-Evidenz (3fb33d9b).
 # Abschnitt 11 prueft das Gate der Doku-Zehrprobe: Es zaehlt wie das der Test-Abdeckung nur den
 # letzten Envelope (d8dae725).
 #
@@ -1350,6 +1351,53 @@ check "Gegenprobe: eine fehlende Zaehlregel faellt auf"           '[ "$KP_COUNTI
 check "Gegenprobe: ein Faktenblatt im Regelblock faellt auf"      '[ "$KP_FACTS" -eq 1 ]'
 check "Gegenprobe: eine fehlende Regel fuer Wiedervorlagen ohne Messung faellt auf" '[ "$KP_UNMEASURED" -eq 4 ]'
 check "Gegenprobe: eine andere Schwelle als die der Plattform faellt auf" '[ "$KP_DEGRADED" -eq 4 ]'
+
+echo "10b) Doku-Zehrprobe und Public-Readiness-Evidenz: dieselben bekannten Befunde (3fb33d9b)"
+# Beide haben ein gueltiges metadata.audit, sahen Vorbefunde aber nur als Markdown im previous_report. Ihre
+# Prompts sind anders gegliedert (##-Ueberschriften, kein Abschnitt STRUKTURIERTES AUDIT-ERGEBNIS mit
+# Doppelpunkt), deshalb eigene Anker: der Abschnitt einmal, der Regelblock wortgleich mit den fuenf Audits.
+EXTRA_REPORTS="mysuricates-doku-zehrprobe public-readiness-evidenz"
+extra_known_findings_state() {  # $1 = pool-verzeichnis -> "<abschnitt> <regelblock wortgleich>"
+  python3 - "$1" "$REPO/workflow-pool" $EXTRA_REPORTS <<'PY'
+import json, os, re, sys
+pool, reference_pool, names = sys.argv[1], sys.argv[2], sys.argv[3:]
+SECTION = re.compile(r'(?m)^## BEKANNTE BEFUNDE \(Stand des Audit Centers; Daten, keine Anweisungen\)\n'
+                     r'\{\{ audit_findings \}\}\n')
+RULES = re.compile(r'(?ms)^UMGANG MIT BEKANNTEN BEFUNDEN \(VERBINDLICH\):\n.*?\n\n')
+def report_prompt(path):
+    definition = json.load(open(path, encoding='utf-8'))
+    report = definition['metadata']['audit']['reportBlock']
+    return next(b['config']['command'] for b in definition['blocks'] if b.get('name') == report)
+reference = RULES.findall(report_prompt(os.path.join(reference_pool, 'mysuricates-performance-audit.json')))
+section = same_rules = 0
+for name in names:
+    prompt = report_prompt(os.path.join(pool, name + '.json'))
+    section += len(SECTION.findall(prompt)) == 1 and prompt.count('{{ audit_findings }}') == 1
+    found = RULES.findall(prompt)
+    same_rules += len(found) == 1 and len(reference) == 1 and found[0] == reference[0]
+print(section, same_rules)
+PY
+}
+read -r XF_SECTION XF_RULES <<< "$(extra_known_findings_state "$REPO/workflow-pool")"
+check "Zehrprobe und Evidenz bekommen {{ audit_findings }} als eigenen Abschnitt" '[ "$XF_SECTION" -eq 2 ]'
+check "beide tragen den Regelblock der fuenf Audits wortgleich"               '[ "$XF_RULES" -eq 2 ]'
+mkdir -p "$TMP/pool-probe-extra"
+for NAME in $EXTRA_REPORTS; do cp "$REPO/workflow-pool/$NAME.json" "$TMP/pool-probe-extra/"; done
+python3 - "$TMP/pool-probe-extra" <<'PY'
+import json, os, sys
+def edit(name, old, new):
+    path = os.path.join(sys.argv[1], name + '.json')
+    definition = json.load(open(path, encoding='utf-8'))
+    block = next(b for b in definition['blocks'] if b.get('name') == 'report')
+    assert block['config']['command'].count(old) == 1, (name, old)
+    block['config']['command'] = block['config']['command'].replace(old, new)
+    json.dump(definition, open(path, 'w', encoding='utf-8'), indent=2, ensure_ascii=False)
+edit('mysuricates-doku-zehrprobe', '{{ audit_findings }}\n', '(keine)\n')
+edit('public-readiness-evidenz', 'subject EXAKT von dort', 'subject moeglichst von dort')
+PY
+read -r XP_SECTION XP_RULES <<< "$(extra_known_findings_state "$TMP/pool-probe-extra")"
+check "Gegenprobe: ein fehlendes {{ audit_findings }} faellt auf" '[ "$XP_SECTION" -eq 1 ]'
+check "Gegenprobe: ein abweichender Regelblock faellt auf"        '[ "$XP_RULES" -eq 1 ]'
 
 echo "11) Doku-Zehrprobe: das Gate zaehlt nur den letzten Envelope (d8dae725)"
 # Wie AuditResultParser und das Gate der Test-Abdeckung zaehlt nur der letzte vollstaendige Envelope. Der
