@@ -323,7 +323,11 @@ dasselbe unter „verschlechtert“ verstehen.
 - `CRITICAL` und `HIGH` erzeugen automatisch verwaltete TODOs. `MEDIUM` kann im Audit
   Center bestätigt werden; `LOW` bleibt zunächst ein Finding. Fällt ein offenes Finding unter
   `HIGH`, wird sein verwaltetes TODO gelöst und archiviert (außer es steht auf `IN_PROGRESS`).
-- Ein auf `DONE` gesetztes verwaltetes TODO versetzt das Finding in
-  `AWAITING_VERIFICATION`. Erst der nächste valide Audit-Snapshot bestätigt die Behebung: Fehlt
-  das Finding darin, wird es `RESOLVED`; wird es erneut gemeldet, ist es wieder `OPEN`.
-- Manuell verknüpfte TODOs werden niemals automatisch im Status verändert.
+- Ein auf `DONE` gesetztes verknüpftes TODO – verwaltet oder manuell verknüpft – versetzt ein
+  offenes Finding in `AWAITING_VERIFICATION`, sofern kein anderes damit verknüpftes TODO noch
+  offen ist (`OPEN`, `IN_PROGRESS`, `BACKLOG`; TODO `ab1ed481`). Erst der nächste valide
+  Audit-Snapshot bestätigt die Behebung: Fehlt das Finding darin, wird es `RESOLVED`; wird es
+  erneut gemeldet, ist es wieder `OPEN`.
+- Manuell verknüpfte TODOs werden niemals automatisch im Status verändert – auch dann nicht, wenn
+  ihr Finding `RESOLVED` wird. Ein offenes manuelles TODO neben einem behobenen Finding ist also
+  gewollt; schließen muss es, wer es angelegt hat.

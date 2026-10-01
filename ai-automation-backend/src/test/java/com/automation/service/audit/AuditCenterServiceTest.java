@@ -612,7 +612,7 @@ class AuditCenterServiceTest {
     }
 
     @Test
-    void markAwaitingVerification_movesOnlyOpenFindingsOfManagedLinks() {
+    void markAwaitingVerification_movesOnlyOpenLinkedFindings() {
         AuditFinding open = finding();
         AuditFinding resolved = finding();
         resolved.setId("f-resolved");
@@ -621,7 +621,11 @@ class AuditCenterServiceTest {
                 AuditFindingTodo.builder().findingId(FINDING_ID).todoId(TODO_ID).managed(true).build(),
                 AuditFindingTodo.builder().findingId("f-resolved").todoId(TODO_ID).managed(true).build(),
                 AuditFindingTodo.builder().findingId("f-manual").todoId(TODO_ID).managed(false).build()));
-        when(findingRepository.findAllById(List.of(FINDING_ID, "f-resolved"))).thenReturn(List.of(open, resolved));
+        when(findingTodoRepository.findByFindingIdIn(List.of(FINDING_ID, "f-resolved", "f-manual"))).thenReturn(List.of(
+                AuditFindingTodo.builder().findingId(FINDING_ID).todoId(TODO_ID).managed(true).build(),
+                AuditFindingTodo.builder().findingId("f-resolved").todoId(TODO_ID).managed(true).build(),
+                AuditFindingTodo.builder().findingId("f-manual").todoId(TODO_ID).managed(false).build()));
+        when(findingRepository.findAllById(List.of(FINDING_ID, "f-resolved", "f-manual"))).thenReturn(List.of(open, resolved));
 
         service.markAwaitingVerification(TODO_ID);
 

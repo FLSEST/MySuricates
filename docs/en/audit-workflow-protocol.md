@@ -325,7 +325,10 @@ reads the threshold from `AuditAcceptancePolicy`, so that prompt and platform me
 - `CRITICAL` and `HIGH` automatically generate managed TODOs. `MEDIUM` can be confirmed in the Audit
   Center; `LOW` remains a finding for the time being. If an open finding drops below `HIGH`, its
   managed TODO is unlinked and archived (unless it is `IN_PROGRESS`).
-- A managed TODO set to `DONE` moves the finding to
-  `AWAITING_VERIFICATION`. Only the next valid audit snapshot confirms the fix: if the finding is
-  absent from it, it becomes `RESOLVED`; if it is reported again, it is `OPEN` again.
-- Manually linked TODOs are never automatically changed in status.
+- A linked TODO set to `DONE` – managed or manually linked – moves an open finding to
+  `AWAITING_VERIFICATION`, unless another TODO linked to it is still open (`OPEN`, `IN_PROGRESS`,
+  `BACKLOG`; TODO `ab1ed481`). Only the next valid audit snapshot confirms the fix: if the finding
+  is absent from it, it becomes `RESOLVED`; if it is reported again, it is `OPEN` again.
+- Manually linked TODOs are never automatically changed in status – not even when their finding
+  becomes `RESOLVED`. An open manual TODO next to a resolved finding is therefore intended; whoever
+  created it closes it.
