@@ -9,6 +9,8 @@ set before it starts — as in an operator's shell.
 
 Run: python3 -m unittest discover -s scripts/tests -p 'test_local_api_proxy.py'
 """
+import ast
+import io
 import os
 from pathlib import Path
 import socket
@@ -16,6 +18,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import tokenize
 import unittest
 
 HERE = Path(__file__).resolve().parent
@@ -23,6 +26,37 @@ SCRIPTS = HERE.parent
 KEY = 'key-cf662c01'
 BUILD = 'fake-build'  # the buildTimestamp fake_instance.py reports
 PROXY_VARIABLES = ('http_proxy', 'https_proxy', 'all_proxy', 'HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY')
+
+
+def sends_api_key(source):
+    """True when the script names the header as a string of its own — `{'X-API-Key': key}`,
+    `add_header('X-API-Key', key)`, `HEADER = 'X-API-Key'`. The word inside a comment, a docstring or a pattern
+    (public-readiness/doc_facts_check.py looks for curl examples with r"…X-API-Key") sends nothing (f88f738d)."""
+    for token in tokenize.generate_tokens(io.StringIO(source).readline):
+        if token.type != tokenize.STRING:
+            continue
+        try:
+            value = ast.literal_eval(token.string)
+        except (ValueError, SyntaxError):
+            continue
+        if isinstance(value, str) and value.lower() == 'x-api-key':
+            return True
+    return False
+
+
+class SendsApiKeyTest(unittest.TestCase):
+    def test_a_header_set_in_code_counts(self):
+        for source in ("urlopen(Request(url, headers={'X-API-Key': key}))\n",
+                       'request.add_header("X-API-Key", key)\n',
+                       "HEADER = 'x-api-key'\nrequest.add_header(HEADER, key)\n"):
+            self.assertTrue(sends_api_key(source), source)
+
+    def test_the_word_in_a_pattern_comment_or_docstring_does_not(self):
+        for source in ('API_KEY_HEADER = re.compile(r"(?:-H|--header)\\s*[\\"\']?X-API-Key", re.I)\n',
+                       '# curl -H "X-API-Key: …" without --noproxy\n',
+                       '"""Checks the X-API-Key examples in the docs."""\n',
+                       "print('send X-API-Key with curl')\n"):
+            self.assertFalse(sends_api_key(source), source)
 
 
 def free_port():
@@ -116,13 +150,14 @@ class LocalApiWithoutProxyTest(unittest.TestCase):
         # A new script that sends X-API-Key with urllib.request.urlopen would take the proxy again. Downloads
         # from the net (public-readiness/dep_vuln_check.py) need the proxy — and carry no key. Only urllib.request
         # reads the proxy variables: http.client (load-test/driver.py) connects where it is told, and a script
-        # that merely names the header (public-readiness/doc_facts_check.py checks curl examples) sends nothing.
+        # that merely names the header (public-readiness/doc_facts_check.py checks curl examples) sends nothing —
+        # sends_api_key looks for the header as a string of its own, not for the word.
         listed = subprocess.run(['git', 'ls-files', '--cached', '--others', '--exclude-standard', '--', '*.py'],
                                 cwd=SCRIPTS, capture_output=True, text=True)
         names = listed.stdout.split() if listed.returncode == 0 else \
             [str(path.relative_to(SCRIPTS)) for path in SCRIPTS.rglob('*.py')]
         with_key = sorted(name for name in names if not name.startswith('tests/') and (SCRIPTS / name).is_file()
-                          and 'X-API-Key' in (text := (SCRIPTS / name).read_text()) and 'urllib.request' in text)
+                          and sends_api_key(text := (SCRIPTS / name).read_text()) and 'urllib.request' in text)
         self.assertIn('workspace-isolation/apply-migration.py', with_key, 'the search saw nothing')
         through_proxy = [name for name in with_key if 'ProxyHandler({})' not in (SCRIPTS / name).read_text()
                          or 'urlopen(' in (SCRIPTS / name).read_text()]
