@@ -13,7 +13,8 @@
 #      DE/EN-Gleichstand, Diagramm-Drift.
 #   4. gitleaks auf den Bereich — nur wenn installiert, sonst hoerbar uebersprungen.
 #      Es wird nichts nachinstalliert.
-#   5. Bauprüfung nach Scope: Frontend beruehrt -> tsc + lint; Backend beruehrt -> mvn test-compile.
+#   5. Bauprüfung nach Scope (dieselbe Einordnung wie die CI, scripts/ci/changed-scopes.sh):
+#      Frontend-Suite betroffen -> tsc + lint; Backend-Suite betroffen -> mvn test-compile.
 #
 # Nicht hier: die volle Testsuite (CI und die Commit-Regel in CLAUDE.md), der getrackte
 # Bestand (public-hygiene.sh --tracked in der CI und in der Kette „Public Readiness") und
@@ -201,22 +202,38 @@ check_gitleaks() {  # $1 = A..B
   esac
 }
 
+# Welche Suite eine Aenderung braucht, entscheidet dasselbe Skript wie in der CI
+# (scripts/ci/changed-scopes.sh, TODO c60eb0e2): Backend umgekehrt gefiltert — es baut, ausser
+# jede Datei liegt nachweislich ausserhalb seiner Reichweite (docs/, workflow-pool/, Teile des
+# Frontends und scripts/lib zaehlen dazu) —, Frontend auch bei templates/ und workflow-pool/.
+# Eine eigene Liste hier liefe der CI davon: lokal gruen, was die CI baut, oder umgekehrt.
+SCOPES_SCRIPT="$REPO_ROOT/scripts/ci/changed-scopes.sh"
 check_build() {  # $1 = A..B
-  local f frontend=0 backend=0 out rc
-  while IFS= read -r f; do
-    case "$f" in
-      *.md) continue ;;
-      ai-automation-frontend/*) frontend=1 ;;
-      ai-automation-backend/*)  backend=1 ;;
-    esac
-  done < <(git diff --name-only "$1" 2>/dev/null)
+  local files scopes frontend=0 backend=0 out rc
+  if [ ! -f "$SCOPES_SCRIPT" ]; then
+    echo "Pre-Push-Gate: Scope-Einordnung fehlt: $SCOPES_SCRIPT" >&2
+    exit 2
+  fi
+  if ! files="$(git diff --no-renames --name-only "$1" 2>/dev/null)"; then
+    echo "Pre-Push-Gate: git diff ${1} fehlgeschlagen — Bau-Scope nicht bestimmbar" >&2
+    exit 2
+  fi
+  if [ -z "$files" ]; then
+    note "Bauprüfung: keine geaenderte Datei in ${1} — nichts zu bauen"
+    return 0
+  fi
+  # Ohne GITHUB_*-Umgebung: changed-scopes.sh soll hier nur die Liste einordnen.
+  scopes="$(printf '%s\n' "$files" | env -u GITHUB_EVENT_NAME -u GITHUB_REF_TYPE bash "$SCOPES_SCRIPT" --files 2>&1)"
+  printf '%s\n' "$scopes" | sed -n 's/^changed-scopes: /  – Scope: /p'
+  grep -qx 'backend=true' <<<"$scopes" && backend=1
+  grep -qx 'frontend=true' <<<"$scopes" && frontend=1
   if [ "$frontend" -eq 0 ] && [ "$backend" -eq 0 ]; then
-    note "Bauprüfung: weder Frontend noch Backend beruehrt — nichts zu bauen"
+    note "Bauprüfung: keine Datei in Reichweite der Backend- oder Frontend-Suite (changed-scopes.sh) — nichts zu bauen"
     return 0
   fi
   if [ "$frontend" -eq 1 ]; then
     if [ ! -d ai-automation-frontend/node_modules ]; then
-      echo "Pre-Push-Gate: Frontend beruehrt, aber ai-automation-frontend/node_modules fehlt — erst npm ci" >&2
+      echo "Pre-Push-Gate: Frontend-Suite betroffen, aber ai-automation-frontend/node_modules fehlt — erst npm ci" >&2
       exit 2
     fi
     step "Frontend: Typpruefung und Lint (tsc --noEmit, npm run lint)"
@@ -225,7 +242,7 @@ check_build() {  # $1 = A..B
   fi
   if [ "$backend" -eq 1 ]; then
     if ! command -v mvn >/dev/null 2>&1; then
-      echo "Pre-Push-Gate: Backend beruehrt, aber mvn fehlt im PATH" >&2
+      echo "Pre-Push-Gate: Backend-Suite betroffen, aber mvn fehlt im PATH" >&2
       exit 2
     fi
     step "Backend: Kompilieren inkl. Tests (mvn -q test-compile)"

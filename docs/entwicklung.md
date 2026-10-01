@@ -1081,9 +1081,12 @@ Remote-Ref kennt):
    DE/EN-Gleichstand, Diagramm-Drift. Fehlt eines der Skripte, ist das ein harter Fehler.
 4. **gitleaks auf den Bereich** — nur wenn installiert, sonst hörbar übersprungen. Es wird nichts
    nachinstalliert; die CI scannt ohnehin.
-5. **Bauprüfung nach Scope.** Frontend berührt → `tsc --noEmit` und `npm run lint` (etwa eine
-   Minute); Backend berührt → `mvn -q test-compile` (Sekunden). Reine Doku-Pushes bleiben bei
-   Sekunden.
+5. **Bauprüfung nach Scope.** Welche Suite betroffen ist, entscheidet dasselbe Skript wie in der
+   CI (`scripts/ci/changed-scopes.sh`): Frontend-Suite → `tsc --noEmit` und `npm run lint` (etwa
+   eine Minute); Backend-Suite → `mvn -q test-compile` (Sekunden). Das Backend ist umgekehrt
+   gefiltert — es baut auch bei `docs/`, `workflow-pool/`, `scripts/lib/` und `CLAUDE.md`, weil
+   seine Tests diese Dateien lesen; nur Frontend-Code und Markdown außerhalb davon lassen es aus.
+   Die Begründung steht als `Scope:`-Zeile in der Ausgabe.
 
 Nicht hier: die volle Testsuite (CI und die Commit-Regel in CLAUDE.md), der getrackte Bestand
 (`--tracked` in der CI und in der Kette „Public Readiness") und alles, was ein Urteil braucht.

@@ -151,12 +151,31 @@ check "meldet kein OK"                           '! grep -q "Pre-Push-Gate OK" <
 echo "14) Bauprüfung nach Scope: Docs beruehren nichts, Frontend ohne node_modules ist ein harter Fehler"
 commit_file "$TMP/clean" notes.md "text" "docs: nur Doku" $NOREPLY
 OUT=$(cd "$TMP/clean" && bash scripts/ci/pre-push-checks.sh --range HEAD~1..HEAD --skip-tree 2>&1); RC=$?
-check "Doku-Push: nichts zu bauen (exit 0)"      '[ "$RC" -eq 0 ] && grep -q "weder Frontend noch Backend beruehrt" <<<"$OUT"'
+check "Doku-Push: nichts zu bauen (exit 0)"      '[ "$RC" -eq 0 ] && grep -q "keine Datei in Reichweite der Backend- oder Frontend-Suite" <<<"$OUT"'
 ( cd "$TMP/clean" && mkdir -p ai-automation-frontend/src )
 commit_file "$TMP/clean" ai-automation-frontend/src/x.ts "export {}" "feat(ui): x" $NOREPLY
 OUT=$(cd "$TMP/clean" && bash scripts/ci/pre-push-checks.sh --range HEAD~1..HEAD --skip-tree 2>&1); RC=$?
 check "Frontend ohne node_modules: exit 2"       '[ "$RC" -eq 2 ]'
 check "verlangt npm ci"                          'grep -q "node_modules fehlt — erst npm ci" <<<"$OUT"'
+
+echo "14b) Bau-Scope wie in der CI: changed-scopes.sh entscheidet (TODO c60eb0e2)"
+# Ein mvn-Ersatz protokolliert den Aufruf; npm/tsc werden nie erreicht, weil node_modules fehlt.
+mkdir -p "$TMP/fakemvn"
+printf '#!/usr/bin/env bash\necho "mvn $*" >> "%s/mvn.log"; exit 0\n' "$TMP" > "$TMP/fakemvn/mvn"; chmod +x "$TMP/fakemvn/mvn"
+( cd "$TMP/clean" && mkdir -p docs ai-automation-backend )
+commit_file "$TMP/clean" docs/handbuch.md "text" "docs: Handbuch" $NOREPLY
+rm -f "$TMP/mvn.log"
+OUT=$(cd "$TMP/clean" && PATH="$TMP/fakemvn:$PATH" bash scripts/ci/pre-push-checks.sh --range HEAD~1..HEAD --skip-tree 2>&1); RC=$?
+check "docs/*.md baut das Backend (liest die CI auch): exit 0" '[ "$RC" -eq 0 ] && grep -q "Backend: OK" <<<"$OUT"'
+check "mvn test-compile wurde aufgerufen"        'grep -q "mvn -q test-compile" "$TMP/mvn.log" 2>/dev/null'
+check "Frontend bleibt aussen vor"               '! grep -q "Frontend: Typpruefung" <<<"$OUT" && grep -q "Frontend-Suite uebersprungen" <<<"$OUT"'
+check "Scope-Begruendung sichtbar"               'grep -q "Scope: 1 Datei(en) — backend=true, frontend=false" <<<"$OUT"'
+( cd "$TMP/clean" && mkdir -p workflow-pool )
+commit_file "$TMP/clean" workflow-pool/x.json "{}" "feat(pool): x" $NOREPLY
+OUT=$(cd "$TMP/clean" && PATH="$TMP/fakemvn:$PATH" bash scripts/ci/pre-push-checks.sh --range HEAD~1..HEAD --skip-tree 2>&1); RC=$?
+check "workflow-pool/ betrifft auch das Frontend (node_modules fehlt: exit 2)" \
+  '[ "$RC" -eq 2 ] && grep -q "Frontend-Suite betroffen, aber .*node_modules fehlt" <<<"$OUT"'
+( cd "$TMP/clean" && git reset -q --hard HEAD~3 )
 
 echo "15) gitleaks: fehlt -> hoerbar uebersprungen; vorhanden -> Fund blockiert"
 OUT=$(cd "$TMP/clean" && PATH="/usr/bin:/bin" /bin/bash -c 'command -v gitleaks >/dev/null && exit 99; bash scripts/ci/pre-push-checks.sh --range HEAD~1..HEAD --skip-tree --skip-build' 2>&1); RC=$?

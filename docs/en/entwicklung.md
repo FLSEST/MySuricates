@@ -1060,8 +1060,12 @@ Checked per push range (remote state..local; for a new branch everything no remo
    parity, diagram drift. A missing gate script is a hard error.
 4. **gitleaks on the range** — only if installed, otherwise skipped with a notice. Nothing is
    installed on the fly; CI scans anyway.
-5. **Build check by scope.** Frontend touched → `tsc --noEmit` and `npm run lint` (about a minute);
-   backend touched → `mvn -q test-compile` (seconds). Docs-only pushes stay at seconds.
+5. **Build check by scope.** The same script as in CI decides which suite is affected
+   (`scripts/ci/changed-scopes.sh`): frontend suite → `tsc --noEmit` and `npm run lint` (about a
+   minute); backend suite → `mvn -q test-compile` (seconds). The backend is filtered the other way
+   round — it also builds for `docs/`, `workflow-pool/`, `scripts/lib/` and `CLAUDE.md`, because
+   its tests read those files; only frontend code and Markdown outside them leave it out. The
+   reasoning is printed as a `Scope:` line.
 
 Not here: the full test suite (CI and the commit rule in CLAUDE.md), the tracked set (`--tracked`
 in CI and in the "Public Readiness" chain) and anything that needs judgement.
