@@ -847,6 +847,21 @@ class FinalReviewFollowUpTest(RepoCase):
         self.assertIn("nicht gestartet", approval)
         self.assertIn(B[:8], approval)
 
+    def test_resumed_run_counts_its_own_started_todos_as_started(self):
+        import confirm_start, prepare
+        write(self.state / "details.txt", details(todo(A, tags=[b.SELECTED]), todo(B, tags=[b.SELECTED])))
+        _, out = call(prepare.main, "--state", str(self.state), "--project-path", str(self.source), "--run", "r")
+        check = [u for u in last_json(out) if u["id"] == A][1]
+        self.assertEqual((check.get("status"), check["require_status"], check["require_tags"]),
+                         (None, "IN_PROGRESS", [b.SELECTED, b.STARTED]))
+        # Wiederaufnahme: A ist schon vom selben Batch gestartet, B hat jemand anders in Arbeit genommen
+        (self.state / "starten.txt").write_text(
+            f"✓ 1 aktualisiert, 3 übersprungen\n– {A[:8]}: Status ist IN_PROGRESS\n✓ {A[:8]}\n"
+            f"– {B[:8]}: Status ist IN_PROGRESS\n– {B[:8]}: Tag fehlt: batch:started\n")
+        call(confirm_start.main, "--state", str(self.state))
+        self.assertEqual((self.state / "ids.txt").read_text().split(), [A])
+        self.assertEqual(json.loads((self.state / "not_started.json").read_text()), {B: "Status ist IN_PROGRESS"})
+
     def test_a_failed_start_update_starts_nothing(self):
         import confirm_start
         self.base_state([A])

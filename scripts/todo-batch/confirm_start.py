@@ -3,7 +3,9 @@
 
 Der `todo-update`-Block `starten` überspringt einen Eintrag, dessen Bedingung nicht mehr passt (etwa ein TODO, das
 inzwischen jemand anders in Arbeit hat), und meldet das nur in seiner Ausgabe: `✓ <id8>` je gestartetem TODO,
-`– <id8>: <grund>` je übersprungenem. Liest diese Ausgabe aus `<state>/starten.txt`; nur bestätigt gestartete TODOs
+`– <id8>: <grund>` je übersprungenem. Je TODO stehen zwei Einträge im Update (prepare.py): der Start und eine
+Bestätigung, die nur bei einem schon gestarteten Batch-TODO greift – ein `✓` genügt, damit es als gestartet gilt
+(auch bei Wiederaufnahme desselben Laufs). Liest diese Ausgabe aus `<state>/starten.txt`; nur bestätigt gestartete TODOs
 bleiben in `ids.txt` und werden abgearbeitet. Die übrigen – auch solche, die die Ausgabe gar nicht nennt, oder alle,
 wenn der Block scheiterte – stehen mit Grund in `not_started.json`; der Bericht nennt sie und wird gelb.
 """
@@ -33,11 +35,11 @@ def confirm(ids: list[str], output: str) -> tuple[list[str], dict[str, str]]:
             started.update(by_short.get(done.group(1).lower(), []))
         elif skipped:
             for todo_id in by_short.get(skipped.group(1).lower(), []):
-                reasons[todo_id] = b.plain(skipped.group(2), 200) or "übersprungen"
+                reasons.setdefault(todo_id, b.plain(skipped.group(2), 200) or "übersprungen")
     if not started and not reasons and (output or "").strip():
         failure = b.plain(output, 200)
         return [], {todo_id: failure for todo_id in ids}
-    kept = [t for t in ids if t in started and t not in reasons]
+    kept = [t for t in ids if t in started]
     return kept, {t: reasons.get(t, NO_RESULT) for t in ids if t not in kept}
 
 

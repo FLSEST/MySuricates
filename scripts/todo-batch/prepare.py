@@ -4,7 +4,10 @@
 Bricht mit Exit 3 ab, wenn das Arbeitsverzeichnis der echte Checkout ist (Workflow ohne Isolation) oder der
 Quell-Checkout nicht auf dem Ziel-Branch steht: Der Klon trägt dessen HEAD, ein Batch auf einem fremden Branch
 wäre falsch. Ein leerer Batch ist nie ein Fehler – auch nicht auf einem fremden Branch. Schreibt `<state>/todos/<id>.md`, `ids.txt`, `base.sha`, `titles.json` und `isolated.ok`, das die
-späteren Schritte verlangen. Letzte Zeile der Ausgabe: die `updates`-Liste (IN_PROGRESS + `batch:started`).
+späteren Schritte verlangen. Letzte Zeile der Ausgabe: die `updates`-Liste – je TODO der Start (IN_PROGRESS +
+`batch:started`, nur aus OPEN) und eine Bestätigung ohne Änderung, die nur greift, wenn das TODO schon von einem
+Batch gestartet ist: So meldet auch ein wiederholtes Start-Update (Wiederaufnahme) das eigene TODO als gestartet,
+ein fremd in Arbeit genommenes aber nicht (confirm_start.py).
 """
 from __future__ import annotations
 
@@ -70,8 +73,10 @@ def main(argv=None) -> int:
     b.write_json(state / "titles.json", {t["id"]: t.get("title") or "" for t in todos})
     (state / b.ISOLATED_MARKER).write_text("1", encoding="utf-8")
     print(f"{len(todos)} TODO(s) im Batch.")
-    b.emit_updates([b.update(t["id"], status="IN_PROGRESS", add=[b.STARTED], note=f"Batch-Lauf {b.short(args.run)} gestartet",
-                             require_tags=[b.SELECTED], require_status="OPEN") for t in todos])
+    b.emit_updates([entry for t in todos for entry in (
+        b.update(t["id"], status="IN_PROGRESS", add=[b.STARTED], note=f"Batch-Lauf {b.short(args.run)} gestartet",
+                 require_tags=[b.SELECTED], require_status="OPEN"),
+        b.update(t["id"], require_tags=[b.SELECTED, b.STARTED], require_status="IN_PROGRESS"))])
     return 0
 
 
