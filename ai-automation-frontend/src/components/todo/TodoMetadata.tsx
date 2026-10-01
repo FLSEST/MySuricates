@@ -22,14 +22,14 @@ export function TodoMetadata({ todo }: { todo: Todo }) {
       )}
       {todo.workflowRunId && (
         <div className="flex items-center gap-2 text-xs text-text-tertiary">
-          <span>Run:</span>
+          <span>{t.todos.originRun}:</span>
           <Link
             to={`/runs/${todo.workflowRunId}`}
             className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] bg-accent/10 text-accent font-medium hover:bg-accent/20 transition-colors"
             title={t.todos.viewRun}
           >
             <ExternalLink className="w-2.5 h-2.5" />
-            Run
+            {t.todos.run}
           </Link>
         </div>
       )}

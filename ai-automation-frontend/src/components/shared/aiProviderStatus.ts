@@ -1,5 +1,16 @@
 import type { AiProviderStatus, AiProviderStatusReport } from '../../hooks/useSystem';
 
+const PROVIDER_NAMES: Record<string, string> = {
+  CLAUDE: 'Claude',
+  CODEX: 'Codex',
+  PI: 'Pi',
+};
+
+/** Display name of a provider id (`CLAUDE` → `Claude`); unknown ids as they stand. */
+export function providerName(id: string): string {
+  return PROVIDER_NAMES[id.toUpperCase()] ?? id;
+}
+
 /** The default provider first — it is the one every AI block without its own provider uses. */
 export function orderProviders(providers: AiProviderStatus[]): AiProviderStatus[] {
   return [...providers].sort((a, b) => Number(b.defaultProvider) - Number(a.defaultProvider));
