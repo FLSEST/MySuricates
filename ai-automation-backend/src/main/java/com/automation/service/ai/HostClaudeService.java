@@ -3,6 +3,7 @@ package com.automation.service.ai;
 import com.automation.concurrency.DynamicSemaphore;
 import com.automation.config.CliPermissionsConfig;
 import com.automation.config.HostClaudeConfig;
+import com.automation.service.cli.claude.ClaudeCliOutcome;
 import com.automation.service.cli.claude.ClaudeJsonResponse;
 import com.automation.service.cli.claude.ClaudeOutputParser;
 import com.automation.service.cli.claude.ClaudeStreamEventFormatter;
@@ -179,13 +180,13 @@ public class HostClaudeService {
             String rawOutput = ProcessDrain.drain(proc, effectiveTimeout, label, ClaudeStreamEventFormatter.listener(LiveOutput.current()));
 
             int exitCode = proc.exitValue();
-            if (exitCode != 0) {
-                log.warn("{} returned exit code {}: {}", label, exitCode, truncate(rawOutput, 500));
-            }
-
             ClaudeJsonResponse parsed = ClaudeOutputParser.parseStreamJson(rawOutput);
-            String text = parsed.result() != null ? parsed.result() : rawOutput;
-            return new ProcessResult(text, exitCode, parsed);
+            // exit code 0 with is_error/error_* in the result line counts as failed (c6d1a872)
+            var outcome = ClaudeCliOutcome.of(rawOutput, exitCode, parsed);
+            if (outcome.exitCode() != 0) {
+                log.warn("{} returned exit code {}: {}", label, exitCode, truncate(outcome.text(), 500));
+            }
+            return new ProcessResult(outcome.text(), outcome.exitCode(), parsed);
         } finally {
             callSemaphore.release();
             if (!priority) {

@@ -97,7 +97,9 @@ public class ClaudeOutputParser {
                     resultLine.usage(),
                     resultLine.modelUsage(),
                     assistantModel != null ? assistantModel : resultLine.assistantModel(),
-                    toolUses.isEmpty() ? resultLine.toolUses() : toolUses
+                    toolUses.isEmpty() ? resultLine.toolUses() : toolUses,
+                    resultLine.subtype(),
+                    resultLine.isError()
             );
         }
 

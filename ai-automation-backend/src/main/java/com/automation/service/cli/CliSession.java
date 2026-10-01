@@ -1,5 +1,6 @@
 package com.automation.service.cli;
 
+import com.automation.service.cli.claude.ClaudeCliOutcome;
 import com.automation.service.cli.claude.ClaudeJsonResponse;
 import com.automation.service.cli.claude.ClaudeOutputParser;
 import lombok.Getter;
@@ -204,8 +205,8 @@ public class CliSession implements Closeable {
             lastActivity = Instant.now();
 
             ClaudeJsonResponse parsed = ClaudeOutputParser.parseStreamJson(rawOutput);
-            String textOutput = parsed.result() != null ? parsed.result() : rawOutput;
-            return new EnrichedCommandResult(textOutput, exitCode, parsed);
+            var outcome = ClaudeCliOutcome.of(rawOutput, exitCode, parsed);
+            return new EnrichedCommandResult(outcome.text(), outcome.exitCode(), parsed);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             proc.destroyForcibly();
