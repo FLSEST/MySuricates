@@ -38,12 +38,21 @@ class AuditSnapshotApplier {
     private final ActivityLogService activityLog;
     private final ManagedTodoWriter managedTodoWriter;
 
+    /**
+     * Bestand und Vorkommen dieses Reports werden einmal geladen, Findings und Vorkommen gesammelt
+     * gespeichert (3deaee34) — vorher je Finding eine Fingerprint-Suche, ein exists und zwei save.
+     * Die Regeln je Finding sind dieselben geblieben.
+     */
     void apply(WorkflowRunCompletedEvent event, AuditReport report,
                List<ParsedFinding> parsedFindings, Set<String> factNames) {
         Instant observedAt = report.getGeneratedAt();
+        List<AuditFinding> known = findingRepository.findByProjectIdAndAuditKey(event.getProjectId(), report.getAuditKey());
+        Map<String, AuditFinding> knownByFingerprint = new HashMap<>();
+        known.forEach(finding -> knownByFingerprint.putIfAbsent(finding.getFingerprint(), finding));
         Set<String> seenFingerprints = new HashSet<>();
         Set<String> reportedRuleKeys = new HashSet<>();
-        List<AuditFinding> touched = new ArrayList<>();
+        List<AuditFinding> applied = new ArrayList<>();
+        List<ParsedFinding> appliedItems = new ArrayList<>();
         List<String> collisions = new ArrayList<>();
 
         for (ParsedFinding reported : parsedFindings) {
@@ -55,67 +64,30 @@ class AuditSnapshotApplier {
                 collisions.add(item.subject());
                 continue;
             }
-
-            AuditFinding finding = findingRepository
-                    .findByProjectIdAndAuditKeyAndFingerprint(event.getProjectId(), report.getAuditKey(), fingerprint)
-                    .orElseGet(() -> AuditFinding.builder()
-                            .projectId(event.getProjectId()).auditKey(report.getAuditKey()).fingerprint(fingerprint)
-                            .ruleKey(ruleKey).subject(item.subject()).status(AuditFindingStatus.OPEN)
-                            .firstSeenReportId(report.getId()).firstSeenRunId(event.getRunId()).firstSeenAt(observedAt)
-                            .occurrenceCount(0).build());
-
-            if (finding.getId() != null) {
-                if (finding.getStatus() == AuditFindingStatus.RESOLVED) {
-                    finding.setRegressionCount(finding.getRegressionCount() + 1);
-                }
-                if (finding.getStatus() == AuditFindingStatus.RESOLVED
-                        || finding.getStatus() == AuditFindingStatus.AWAITING_VERIFICATION) {
-                    finding.setStatus(AuditFindingStatus.OPEN);
-                    finding.setResolvedAt(null);
-                }
-                AuditAcceptancePolicy.Outcome outcome = acceptancePolicy.reassess(finding, item.evidence(), observedAt);
-                if (outcome != AuditAcceptancePolicy.Outcome.UNCHANGED) {
-                    log.info("Accepted audit finding {} ({}) re-assessed: {}", finding.getId(), finding.getTitle(), outcome);
-                }
+            AuditFinding finding = knownByFingerprint.get(fingerprint);
+            if (finding == null) {
+                finding = AuditFinding.builder()
+                        .projectId(event.getProjectId()).auditKey(report.getAuditKey()).fingerprint(fingerprint)
+                        .ruleKey(ruleKey).subject(item.subject()).status(AuditFindingStatus.OPEN)
+                        .firstSeenReportId(report.getId()).firstSeenRunId(event.getRunId()).firstSeenAt(observedAt)
+                        .occurrenceCount(0).build();
+            } else {
+                reopen(finding, item, observedAt);
             }
-            // subject ist reines Anzeigeattribut — der neueste Wert gewinnt, der Fingerprint haengt
-            // an seiner normalisierten Form und bleibt dadurch ueber Drift hinweg stabil.
-            finding.setSubject(item.subject());
-            // Bei jedem Ingest neu gesetzt, in beide Richtungen: ergaenzt der Katalog den Key,
-            // faellt die Markierung beim naechsten Lauf von selbst weg (TODO ffa6d846).
-            finding.setUnknownRuleKey(resolution.unknown());
-            // Ebenso bei jedem Ingest neu: nennt der Beleg einen Messwert dieses Laufs? (a94b56a0)
-            boolean unverified = !EvidenceVerification.isSupported(item.evidence(), factNames);
-            if (unverified && !finding.isUnverifiedEvidence()) {
-                activityLog.warn(ActivityLog.LogCategory.EXECUTION,
-                        "Audit-Finding ohne Beleg im Faktenblatt: " + item.title()
-                                + " (" + report.getAuditKey() + ") — kein verwaltetes TODO",
-                        "AuditIngestionService", event.getRunId(), event.getWorkflowId());
-            }
-            finding.setUnverifiedEvidence(unverified);
-            finding.setSeverity(item.severity());
-            finding.setTitle(item.title());
-            finding.setDescription(item.description());
-            finding.setEvidence(item.evidence());
-            finding.setTags(TodoMapper.listToJson(item.tags()));
-            finding.setLastSeenReportId(report.getId());
-            finding.setLastSeenRunId(event.getRunId());
-            finding.setLastSeenAt(observedAt);
-            finding.setOccurrenceCount(finding.getOccurrenceCount() + 1);
-            finding = findingRepository.save(finding);
-            touched.add(finding);
+            update(finding, item, resolution, event, report, factNames, observedAt);
+            applied.add(finding);
+            appliedItems.add(item);
+        }
 
-            if (!occurrenceRepository.existsByFindingIdAndReportId(finding.getId(), report.getId())) {
-                occurrenceRepository.save(AuditFindingOccurrence.builder()
-                        .findingId(finding.getId()).reportId(report.getId()).severity(item.severity())
-                        .title(item.title()).description(item.description()).evidence(item.evidence())
-                        .tags(TodoMapper.listToJson(item.tags())).observedAt(observedAt).build());
-            }
+        List<AuditFinding> saved = applied.isEmpty() ? List.of() : findingRepository.saveAll(applied);
+        List<AuditFinding> touched = new ArrayList<>(saved);
+        recordOccurrences(saved, appliedItems, report, observedAt);
+        for (AuditFinding finding : saved) {
             // Nur offene Findings bekommen ein verwaltetes TODO: akzeptierte/verworfene Risiken und
             // Wiedervorlagen (AWAITING_VERIFICATION nach Verfall) loesen keinen Fix-Loop aus.
             // Ein unbelegtes Finding ebenfalls nicht — es bleibt sichtbar, kostet aber keine
             // Arbeitszeit mehr, bis sein Beleg stimmt (TODO a94b56a0).
-            if (ManagedTodoWriter.needsTodo(item.severity())
+            if (ManagedTodoWriter.needsTodo(finding.getSeverity())
                     && finding.getStatus() == AuditFindingStatus.OPEN
                     && !finding.isUnverifiedEvidence()) {
                 managedTodoWriter.ensure(finding, report);
@@ -124,16 +96,83 @@ class AuditSnapshotApplier {
 
         reportCollisions(event, report, collisions);
 
-        for (AuditFinding finding : findingRepository.findByProjectIdAndAuditKey(event.getProjectId(), report.getAuditKey())) {
+        List<AuditFinding> resolved = new ArrayList<>();
+        for (AuditFinding finding : known) {
             if (!seenFingerprints.contains(finding.getFingerprint())
                     && (finding.getStatus() == AuditFindingStatus.OPEN
                     || finding.getStatus() == AuditFindingStatus.AWAITING_VERIFICATION)) {
                 finding.setStatus(AuditFindingStatus.RESOLVED);
                 finding.setResolvedAt(observedAt);
-                touched.add(findingRepository.save(finding));
+                resolved.add(finding);
             }
         }
+        if (!resolved.isEmpty()) touched.addAll(findingRepository.saveAll(resolved));
         managedTodoWriter.reconcile(touched);
+    }
+
+    /** Ein bekanntes Finding taucht wieder auf: zurueck ins Offene, Akzeptanz neu bewerten. */
+    private void reopen(AuditFinding finding, ParsedFinding item, Instant observedAt) {
+        if (finding.getStatus() == AuditFindingStatus.RESOLVED) {
+            finding.setRegressionCount(finding.getRegressionCount() + 1);
+        }
+        if (finding.getStatus() == AuditFindingStatus.RESOLVED
+                || finding.getStatus() == AuditFindingStatus.AWAITING_VERIFICATION) {
+            finding.setStatus(AuditFindingStatus.OPEN);
+            finding.setResolvedAt(null);
+        }
+        AuditAcceptancePolicy.Outcome outcome = acceptancePolicy.reassess(finding, item.evidence(), observedAt);
+        if (outcome != AuditAcceptancePolicy.Outcome.UNCHANGED) {
+            log.info("Accepted audit finding {} ({}) re-assessed: {}", finding.getId(), finding.getTitle(), outcome);
+        }
+    }
+
+    /** Die Felder, die jeder Ingest neu setzt. */
+    private void update(AuditFinding finding, ParsedFinding item, AuditRuleKeyCatalog.Resolution resolution,
+                        WorkflowRunCompletedEvent event, AuditReport report, Set<String> factNames,
+                        Instant observedAt) {
+        // subject ist reines Anzeigeattribut — der neueste Wert gewinnt, der Fingerprint haengt
+        // an seiner normalisierten Form und bleibt dadurch ueber Drift hinweg stabil.
+        finding.setSubject(item.subject());
+        // Bei jedem Ingest neu gesetzt, in beide Richtungen: ergaenzt der Katalog den Key,
+        // faellt die Markierung beim naechsten Lauf von selbst weg (TODO ffa6d846).
+        finding.setUnknownRuleKey(resolution.unknown());
+        // Ebenso bei jedem Ingest neu: nennt der Beleg einen Messwert dieses Laufs? (a94b56a0)
+        boolean unverified = !EvidenceVerification.isSupported(item.evidence(), factNames);
+        if (unverified && !finding.isUnverifiedEvidence()) {
+            activityLog.warn(ActivityLog.LogCategory.EXECUTION,
+                    "Audit-Finding ohne Beleg im Faktenblatt: " + item.title()
+                            + " (" + report.getAuditKey() + ") — kein verwaltetes TODO",
+                    "AuditIngestionService", event.getRunId(), event.getWorkflowId());
+        }
+        finding.setUnverifiedEvidence(unverified);
+        finding.setSeverity(item.severity());
+        finding.setTitle(item.title());
+        finding.setDescription(item.description());
+        finding.setEvidence(item.evidence());
+        finding.setTags(TodoMapper.listToJson(item.tags()));
+        finding.setLastSeenReportId(report.getId());
+        finding.setLastSeenRunId(event.getRunId());
+        finding.setLastSeenAt(observedAt);
+        finding.setOccurrenceCount(finding.getOccurrenceCount() + 1);
+    }
+
+    /** Ein Vorkommen je Finding und Report; was der Report schon hat, bleibt (eine Abfrage, ein saveAll). */
+    private void recordOccurrences(List<AuditFinding> saved, List<ParsedFinding> items, AuditReport report,
+                                   Instant observedAt) {
+        if (saved.isEmpty()) return;
+        Set<String> recorded = new HashSet<>(occurrenceRepository.findFindingIdsByReportId(report.getId()));
+        List<AuditFindingOccurrence> occurrences = new ArrayList<>();
+        for (int i = 0; i < saved.size(); i++) {
+            AuditFinding finding = saved.get(i);
+            ParsedFinding item = items.get(i);
+            if (recorded.add(finding.getId())) {
+                occurrences.add(AuditFindingOccurrence.builder()
+                        .findingId(finding.getId()).reportId(report.getId()).severity(item.severity())
+                        .title(item.title()).description(item.description()).evidence(item.evidence())
+                        .tags(TodoMapper.listToJson(item.tags())).observedAt(observedAt).build());
+            }
+        }
+        if (!occurrences.isEmpty()) occurrenceRepository.saveAll(occurrences);
     }
 
     /**

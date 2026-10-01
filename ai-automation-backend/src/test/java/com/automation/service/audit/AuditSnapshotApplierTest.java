@@ -20,14 +20,18 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -51,11 +55,35 @@ class AuditSnapshotApplierTest {
     void setUp() {
         applier = new AuditSnapshotApplier(findingRepository, occurrenceRepository, new AuditAcceptancePolicy(),
                 new AuditRuleKeyCatalog(new ObjectMapper()), activityLog, managedTodoWriter);
-        lenient().when(findingRepository.save(any())).thenAnswer(inv -> {
-            AuditFinding finding = inv.getArgument(0);
-            if (finding.getId() == null) finding.setId("f-new");
-            return finding;
+        lenient().when(findingRepository.saveAll(any())).thenAnswer(inv -> {
+            List<AuditFinding> saved = new ArrayList<>();
+            int next = 0;
+            for (AuditFinding finding : inv.<Iterable<AuditFinding>>getArgument(0)) {
+                if (finding.getId() == null) finding.setId("f-new" + (next++ == 0 ? "" : "-" + next));
+                saved.add(finding);
+            }
+            return saved;
         });
+    }
+
+    /** Alle Findings, die {@code saveAll} bekam, in Aufrufreihenfolge. */
+    @SuppressWarnings("unchecked")
+    private List<AuditFinding> savedFindings() {
+        ArgumentCaptor<Iterable<AuditFinding>> captor = ArgumentCaptor.forClass(Iterable.class);
+        verify(findingRepository, atLeastOnce()).saveAll(captor.capture());
+        List<AuditFinding> all = new ArrayList<>();
+        captor.getAllValues().forEach(batch -> batch.forEach(all::add));
+        return all;
+    }
+
+    /** Alle Vorkommen, die {@code saveAll} bekam. */
+    @SuppressWarnings("unchecked")
+    private List<AuditFindingOccurrence> savedOccurrences() {
+        ArgumentCaptor<Iterable<AuditFindingOccurrence>> captor = ArgumentCaptor.forClass(Iterable.class);
+        verify(occurrenceRepository, atLeastOnce()).saveAll(captor.capture());
+        List<AuditFindingOccurrence> all = new ArrayList<>();
+        captor.getAllValues().forEach(batch -> batch.forEach(all::add));
+        return all;
     }
 
     private void apply(ParsedFinding... findings) {
@@ -75,8 +103,7 @@ class AuditSnapshotApplierTest {
                 .fingerprint(AuditSnapshotApplier.fingerprint(PROJECT, AUDIT_KEY, "shell.pipe|curl", "scripts/a.sh | sh"))
                 .ruleKey("shell.pipe|curl").subject("scripts/a.sh | sh").title("curl | sh im Installer")
                 .severity(AuditSeverity.MEDIUM).status(AuditFindingStatus.OPEN).occurrenceCount(1).build();
-        when(findingRepository.findByProjectIdAndAuditKeyAndFingerprint(PROJECT, AUDIT_KEY, existing.getFingerprint()))
-                .thenReturn(Optional.of(existing));
+        when(findingRepository.findByProjectIdAndAuditKey(PROJECT, AUDIT_KEY)).thenReturn(List.of(existing));
 
         apply(new ParsedFinding("shell.pipe¦curl", "scripts/a.sh ¦ sh", AuditSeverity.MEDIUM,
                 "curl ¦ sh im Installer", null, null, List.of()));
@@ -84,9 +111,8 @@ class AuditSnapshotApplierTest {
         assertThat(existing.getSubject()).isEqualTo("scripts/a.sh | sh");
         assertThat(existing.getTitle()).isEqualTo("curl | sh im Installer");
         assertThat(existing.getOccurrenceCount()).as("derselbe Befund, kein Wiedergaenger").isEqualTo(2);
-        ArgumentCaptor<AuditFindingOccurrence> occurrence = ArgumentCaptor.forClass(AuditFindingOccurrence.class);
-        verify(occurrenceRepository).save(occurrence.capture());
-        assertThat(occurrence.getValue().getTitle()).isEqualTo("curl | sh im Installer");
+        assertThat(savedOccurrences()).singleElement()
+                .extracting(AuditFindingOccurrence::getTitle).isEqualTo("curl | sh im Installer");
     }
 
     // --- Fingerprint mit festen Werten: ohne ¦ wie vor 90c4f7db --------------------------------
@@ -116,11 +142,84 @@ class AuditSnapshotApplierTest {
     void apply_maskedFieldsOfANewFinding_areStoredWithThePipe() {
         apply(new ParsedFinding("shell.pipe¦curl", "b¦c", AuditSeverity.LOW, "x¦y", null, null, List.of()));
 
-        ArgumentCaptor<AuditFinding> saved = ArgumentCaptor.forClass(AuditFinding.class);
-        verify(findingRepository).save(saved.capture());
-        assertThat(saved.getValue()).extracting(AuditFinding::getRuleKey, AuditFinding::getSubject, AuditFinding::getTitle)
+        AuditFinding saved = savedFindings().getFirst();
+        assertThat(saved).extracting(AuditFinding::getRuleKey, AuditFinding::getSubject, AuditFinding::getTitle)
                 .containsExactly("shell.pipe|curl", "b|c", "x|y");
-        assertThat(saved.getValue().getFingerprint())
+        assertThat(saved.getFingerprint())
                 .isEqualTo(AuditSnapshotApplier.fingerprint(PROJECT, AUDIT_KEY, "shell.pipe|curl", "b|c"));
+    }
+
+    // --- TODO 3deaee34: Bestand einmal laden, gesammelt speichern ---------------------------------
+
+    private AuditFinding known(String id, String ruleKey, String subject, AuditFindingStatus status) {
+        return AuditFinding.builder().id(id).projectId(PROJECT).auditKey(AUDIT_KEY)
+                .fingerprint(AuditSnapshotApplier.fingerprint(PROJECT, AUDIT_KEY, ruleKey, subject))
+                .ruleKey(ruleKey).subject(subject).title(subject).severity(AuditSeverity.LOW)
+                .status(status).occurrenceCount(1).build();
+    }
+
+    private static ParsedFinding low(String ruleKey, String subject) {
+        return new ParsedFinding(ruleKey, subject, AuditSeverity.LOW, subject, null, null, List.of());
+    }
+
+    /**
+     * Drei Befunde: einer bekannt, zwei neu, ein bekannter fehlt. Der Bestand kommt aus einer Abfrage, die
+     * Vorkommen des Reports aus einer, gespeichert wird je Art einmal — vorher je Befund eine Suche, ein
+     * exists und zwei save.
+     */
+    @Test
+    void apply_loadsTheStockOnce_andSavesFindingsAndOccurrencesInBatches() {
+        AuditFinding seen = known("f-seen", "rule.a", "A.java", AuditFindingStatus.RESOLVED);
+        AuditFinding gone = known("f-gone", "rule.a", "Gone.java", AuditFindingStatus.OPEN);
+        AuditFinding accepted = known("f-acc", "rule.a", "Acc.java", AuditFindingStatus.ACCEPTED_RISK);
+        when(findingRepository.findByProjectIdAndAuditKey(PROJECT, AUDIT_KEY)).thenReturn(List.of(seen, gone, accepted));
+
+        apply(low("rule.a", "A.java"), low("rule.a", "B.java"), low("rule.b", "C.java"));
+
+        assertThat(seen.getStatus()).as("wieder da").isEqualTo(AuditFindingStatus.OPEN);
+        assertThat(seen.getRegressionCount()).isEqualTo(1);
+        assertThat(seen.getOccurrenceCount()).isEqualTo(2);
+        assertThat(gone.getStatus()).as("fehlt im Snapshot").isEqualTo(AuditFindingStatus.RESOLVED);
+        assertThat(gone.getResolvedAt()).isEqualTo(NOW);
+        assertThat(accepted.getStatus()).as("Einordnung bleibt bei Abwesenheit").isEqualTo(AuditFindingStatus.ACCEPTED_RISK);
+        assertThat(savedFindings()).extracting(AuditFinding::getSubject)
+                .containsExactly("A.java", "B.java", "C.java", "Gone.java");
+        assertThat(savedOccurrences()).extracting(AuditFindingOccurrence::getTitle)
+                .containsExactly("A.java", "B.java", "C.java");
+        verify(findingRepository, times(2)).saveAll(any());
+        verify(findingRepository, times(1)).findByProjectIdAndAuditKey(PROJECT, AUDIT_KEY);
+        verify(findingRepository, never()).findByProjectIdAndAuditKeyAndFingerprint(any(), any(), any());
+        verify(findingRepository, never()).save(any());
+        verify(occurrenceRepository, times(1)).findFindingIdsByReportId("rep-1");
+        verify(occurrenceRepository, times(1)).saveAll(any());
+        verify(occurrenceRepository, never()).existsByFindingIdAndReportId(any(), any());
+        verify(occurrenceRepository, never()).save(any());
+        verify(managedTodoWriter).reconcile(argThat(touched -> touched.size() == 4));
+    }
+
+    /** Ein Vorkommen je Finding und Report: was der Report schon hat, wird nicht noch einmal angelegt. */
+    @Test
+    void apply_skipsAnOccurrenceTheReportAlreadyHas() {
+        AuditFinding seen = known("f-seen", "rule.a", "A.java", AuditFindingStatus.OPEN);
+        when(findingRepository.findByProjectIdAndAuditKey(PROJECT, AUDIT_KEY)).thenReturn(List.of(seen));
+        when(occurrenceRepository.findFindingIdsByReportId("rep-1")).thenReturn(List.of("f-seen"));
+
+        apply(low("rule.a", "A.java"), low("rule.a", "B.java"));
+
+        assertThat(savedOccurrences()).extracting(AuditFindingOccurrence::getFindingId).containsExactly("f-new");
+    }
+
+    /** Ein leerer Snapshot speichert keine Findings, loest aber den Bestand auf. */
+    @Test
+    void apply_emptySnapshot_onlyResolvesTheStock() {
+        AuditFinding gone = known("f-gone", "rule.a", "Gone.java", AuditFindingStatus.AWAITING_VERIFICATION);
+        when(findingRepository.findByProjectIdAndAuditKey(PROJECT, AUDIT_KEY)).thenReturn(List.of(gone));
+
+        apply();
+
+        assertThat(gone.getStatus()).isEqualTo(AuditFindingStatus.RESOLVED);
+        assertThat(savedFindings()).containsExactly(gone);
+        verify(occurrenceRepository, never()).saveAll(any());
+        verify(occurrenceRepository, never()).findFindingIdsByReportId(any());
     }
 }

@@ -63,11 +63,24 @@ class AuditIngestionServiceTest {
             if (report.getId() == null) report.setId("rep-" + UUID.randomUUID());
             return report;
         });
-        lenient().when(findingRepository.save(any())).thenAnswer(inv -> {
-            AuditFinding finding = inv.getArgument(0);
-            if (finding.getId() == null) finding.setId("f-" + UUID.randomUUID());
-            return finding;
+        lenient().when(findingRepository.saveAll(any())).thenAnswer(inv -> {
+            List<AuditFinding> saved = new ArrayList<>();
+            for (AuditFinding finding : inv.<Iterable<AuditFinding>>getArgument(0)) {
+                if (finding.getId() == null) finding.setId("f-" + UUID.randomUUID());
+                saved.add(finding);
+            }
+            return saved;
         });
+    }
+
+    /** Alle Findings, die {@code saveAll} bekam (3deaee34: der Applier speichert gesammelt). */
+    @SuppressWarnings("unchecked")
+    private List<AuditFinding> savedFindings() {
+        ArgumentCaptor<Iterable<AuditFinding>> captor = ArgumentCaptor.forClass(Iterable.class);
+        verify(findingRepository, atLeastOnce()).saveAll(captor.capture());
+        List<AuditFinding> all = new ArrayList<>();
+        captor.getAllValues().forEach(batch -> batch.forEach(all::add));
+        return all;
     }
 
     private WorkflowRunCompletedEvent event(String runId) {
@@ -116,7 +129,7 @@ class AuditIngestionServiceTest {
 
         service.ingest(event("run-1"));
 
-        verify(findingRepository, times(1)).save(any(AuditFinding.class));
+        assertThat(savedFindings()).hasSize(1);
         verify(activityLog).warn(eq(ActivityLog.LogCategory.EXECUTION), contains("application.yml:key-b"),
                 eq("AuditIngestionService"), eq("run-1"), eq("wf-1"));
     }
@@ -127,9 +140,7 @@ class AuditIngestionServiceTest {
 
         service.ingest(event("run-1"));
 
-        ArgumentCaptor<AuditFinding> saved = ArgumentCaptor.forClass(AuditFinding.class);
-        verify(findingRepository, times(2)).save(saved.capture());
-        assertThat(saved.getAllValues()).extracting(AuditFinding::getFingerprint).doesNotHaveDuplicates();
+        assertThat(savedFindings()).hasSize(2).extracting(AuditFinding::getFingerprint).doesNotHaveDuplicates();
         verify(activityLog, never()).warn(any(), contains("gleiche Identitaet"), any(), any(), any());
     }
 
@@ -143,15 +154,9 @@ class AuditIngestionServiceTest {
                 .resolvedAt(acceptedAt).firstSeenReportId("rep-0").lastSeenReportId("rep-0")
                 .firstSeenRunId("run-0").lastSeenRunId("run-0").firstSeenAt(ACCEPTED_AT).lastSeenAt(ACCEPTED_AT)
                 .occurrenceCount(2).build();
-        if (inSnapshot) {
-            // Der echte Fingerprint ist ein SHA-256 ueber projectId/auditKey/ruleKey/subject — das Finding
-            // uebernimmt den angefragten Wert, damit die Abwesenheits-Reconciliation es als gesehen zaehlt.
-            when(findingRepository.findByProjectIdAndAuditKeyAndFingerprint(eq(PROJECT), eq(AUDIT_KEY), anyString()))
-                    .thenAnswer(inv -> { finding.setFingerprint(inv.getArgument(2)); return Optional.of(finding); });
-        } else {
-            when(findingRepository.findByProjectIdAndAuditKeyAndFingerprint(eq(PROJECT), eq(AUDIT_KEY), anyString()))
-                    .thenReturn(Optional.empty());
-        }
+        // Im Snapshot heisst: derselbe Fingerprint wie der Befund im Envelope (size.class / Big.java).
+        finding.setFingerprint(inSnapshot ? AuditSnapshotApplier.fingerprint(PROJECT, AUDIT_KEY, "size.class", "Big.java")
+                : "fp-anderer-befund");
         when(findingRepository.findByProjectIdAndAuditKey(PROJECT, AUDIT_KEY)).thenReturn(List.of(finding));
         return finding;
     }
@@ -270,7 +275,7 @@ class AuditIngestionServiceTest {
         ArgumentCaptor<AuditReport> report = ArgumentCaptor.forClass(AuditReport.class);
         verify(reportRepository).save(report.capture());
         assertThat(report.getValue().getIngestionStatus()).isEqualTo(AuditIngestionStatus.INVALID);
-        verify(findingRepository, never()).save(any());
+        verify(findingRepository, never()).saveAll(any());
     }
 
     /** Ein bekannter Key markiert nicht — auch nicht der auf den Katalog normalisierte. */
@@ -291,16 +296,14 @@ class AuditIngestionServiceTest {
     @Test
     void markIsClearedOnTheNextIngestOnceTheCatalogKnowsTheKey() {
         AuditFinding marked = AuditFinding.builder()
-                .id("f-marked").projectId(PROJECT).auditKey(COVERAGE_KEY).fingerprint("fp")
+                .id("f-marked").projectId(PROJECT).auditKey(COVERAGE_KEY)
+                .fingerprint(AuditSnapshotApplier.fingerprint(PROJECT, COVERAGE_KEY, "test-coverage.untested-class", "Klasse0.java"))
                 .ruleKey("test-coverage.untested-class").subject("Big.java")
                 .severity(AuditSeverity.LOW).title("t").status(AuditFindingStatus.OPEN)
                 .firstSeenReportId("r0").lastSeenReportId("r0").firstSeenRunId("run-0").lastSeenRunId("run-0")
                 .firstSeenAt(ACCEPTED_AT).lastSeenAt(ACCEPTED_AT).unknownRuleKey(true).build();
-        // stubCoverageRunEnvelope statt stubCoverageRun: letzteres setzt den Lookup auf
-        // Optional.empty(), hier soll das vorhandene Finding gefunden werden.
         stubCoverageRunEnvelope("run-1", "test-coverage.untested-class");
-        when(findingRepository.findByProjectIdAndAuditKeyAndFingerprint(eq(PROJECT), eq(COVERAGE_KEY), anyString()))
-                .thenReturn(Optional.of(marked));
+        when(findingRepository.findByProjectIdAndAuditKey(PROJECT, COVERAGE_KEY)).thenReturn(List.of(marked));
 
         service.ingest(event("run-1", COVERAGE_KEY));
 
@@ -321,18 +324,13 @@ class AuditIngestionServiceTest {
     }
 
     private AuditFinding savedFinding() {
-        ArgumentCaptor<AuditFinding> captor = ArgumentCaptor.forClass(AuditFinding.class);
-        verify(findingRepository, atLeastOnce()).save(captor.capture());
-        return captor.getValue();
+        return savedFindings().getLast();
     }
 
     /** Ein Coverage-Run mit je einem LOW-Finding pro ruleKey (LOW erzeugt kein verwaltetes TODO). */
-    /** Coverage-Run ohne Annahme darueber, ob es das Finding schon gibt — das stubt der Aufrufer. */
+    /** Coverage-Run ohne Bestand: jedes Finding ist neu. */
     private void stubCoverageRun(String runId, String... ruleKeys) {
         stubCoverageRunEnvelope(runId, ruleKeys);
-        // lenient: Ein verworfener Report (unbekannter ruleKey) kommt gar nicht bis zur Suche.
-        lenient().when(findingRepository.findByProjectIdAndAuditKeyAndFingerprint(eq(PROJECT), eq(COVERAGE_KEY), anyString()))
-                .thenReturn(Optional.empty());
     }
 
     private void stubCoverageRunEnvelope(String runId, String... ruleKeys) {
@@ -382,7 +380,7 @@ class AuditIngestionServiceTest {
         WorkflowRun run = WorkflowRun.builder().id(runId).workflow(Workflow.builder().name("Health Audit").build())
                 .status(RunStatus.COMPLETED).completedAt(ACCEPTED_AT).steps(new ArrayList<>(List.of(facts, report))).build();
         when(runRepository.findByIdWithSteps(runId)).thenReturn(Optional.of(run));
-        // findingRepository.save ist in setUp gestubt; findBy... liefert per Mockito-Default leer.
+        // findingRepository.saveAll ist in setUp gestubt; findBy... liefert per Mockito-Default leer.
     }
 
     @Test
@@ -391,9 +389,7 @@ class AuditIngestionServiceTest {
 
         service.ingest(event("run-1"));
 
-        ArgumentCaptor<AuditFinding> saved = ArgumentCaptor.forClass(AuditFinding.class);
-        verify(findingRepository, atLeastOnce()).save(saved.capture());
-        assertThat(saved.getAllValues().getFirst().isUnverifiedEvidence()).isTrue();
+        assertThat(savedFindings().getFirst().isUnverifiedEvidence()).isTrue();
         verify(todoRepository, never()).save(any());
         verify(eventPublisher, never()).publishEvent(any(TodoCreatedEvent.class));
     }
@@ -409,9 +405,7 @@ class AuditIngestionServiceTest {
 
         service.ingest(event("run-1"));
 
-        ArgumentCaptor<AuditFinding> saved = ArgumentCaptor.forClass(AuditFinding.class);
-        verify(findingRepository, atLeastOnce()).save(saved.capture());
-        assertThat(saved.getAllValues().getFirst().isUnverifiedEvidence()).isFalse();
+        assertThat(savedFindings().getFirst().isUnverifiedEvidence()).isFalse();
         verify(todoRepository).save(any());
     }
 
@@ -425,8 +419,6 @@ class AuditIngestionServiceTest {
         WorkflowRun run = WorkflowRun.builder().id(runId).workflow(Workflow.builder().name("Coverage").build())
                 .status(RunStatus.COMPLETED).completedAt(ACCEPTED_AT).steps(new ArrayList<>(List.of(step))).build();
         when(runRepository.findByIdWithSteps(runId)).thenReturn(Optional.of(run));
-        lenient().when(findingRepository.findByProjectIdAndAuditKeyAndFingerprint(anyString(), anyString(), anyString()))
-                .thenReturn(Optional.empty());
         // HIGH erzeugt ein verwaltetes TODO — nur im gueltigen Fall, deshalb lenient.
         lenient().when(todoRepository.save(any())).thenAnswer(inv -> {
             Todo todo = inv.getArgument(0);
@@ -451,7 +443,7 @@ class AuditIngestionServiceTest {
         assertThat(report.getValue().getIngestionStatus()).isEqualTo(AuditIngestionStatus.INVALID);
         assertThat(report.getValue().getIngestionError())
                 .contains("test-coverage.voellig-erfunden").contains("test-coverage.untested-class");
-        verify(findingRepository, never()).save(any());
+        verify(findingRepository, never()).saveAll(any());
         verify(todoRepository, never()).save(any());
     }
 
@@ -465,7 +457,7 @@ class AuditIngestionServiceTest {
         ArgumentCaptor<AuditReport> report = ArgumentCaptor.forClass(AuditReport.class);
         verify(reportRepository).save(report.capture());
         assertThat(report.getValue().getIngestionStatus()).isEqualTo(AuditIngestionStatus.VALID);
-        verify(findingRepository, atLeastOnce()).save(any());
+        assertThat(savedFindings()).isNotEmpty();
     }
 
     /** Ein Audit ohne Katalogeintrag vergibt seine Keys frei — unveraendertes Verhalten. */
@@ -478,7 +470,7 @@ class AuditIngestionServiceTest {
         ArgumentCaptor<AuditReport> report = ArgumentCaptor.forClass(AuditReport.class);
         verify(reportRepository).save(report.capture());
         assertThat(report.getValue().getIngestionStatus()).isEqualTo(AuditIngestionStatus.VALID);
-        verify(findingRepository, atLeastOnce()).save(any());
+        assertThat(savedFindings()).isNotEmpty();
     }
 
     /**
