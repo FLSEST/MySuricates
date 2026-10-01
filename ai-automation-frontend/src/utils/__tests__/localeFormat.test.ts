@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   formatDate, formatDateRange, formatDecimal, formatNumber, formatRelativeUnit, formatTimeOfDay, formatTimestamp, formatUsd,
-  formatTokenCount, usdAxisDigits,
+  formatTokenCount, usdAxisDigits, weekdayNames,
   intlLocale,
 } from '../localeFormat';
 
@@ -63,6 +63,13 @@ describe('localeFormat', () => {
   });
 
   // 17eb7994: token counts as `toFixed(0)` without separators, cost-axis ticks with mixed decimals
+  // 17eb7994: the calendars kept their own weekday tables
+  it('names the weekdays from Monday in the app language', () => {
+    expect(weekdayNames('en')).toEqual(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
+    // ICU versions differ on the abbreviation dot („Mo“ / „Mo.“)
+    expect(weekdayNames('de').map((d) => d.replace(/\.$/, ''))).toEqual(['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']);
+  });
+
   it('shortens token counts with the separators of the app language', () => {
     expect(formatTokenCount(950, 'en')).toBe('950');
     expect(formatTokenCount(1234, 'en')).toBe('1.2k');

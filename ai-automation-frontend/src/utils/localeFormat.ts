@@ -29,6 +29,12 @@ export function formatDate(value: DateInput, locale: Locale, options?: Intl.Date
   return toDate(value).toLocaleDateString(intlLocale(locale), options);
 }
 
+/** Short weekday names from Monday to Sunday ("Mon" … "Sun" / „Mo.“ … „So.“), for calendar column heads. */
+export function weekdayNames(locale: Locale): string[] {
+  // 1 January 2024 was a Monday
+  return Array.from({ length: 7 }, (_, i) => formatDate(new Date(2024, 0, 1 + i), locale, { weekday: 'short' }));
+}
+
 /**
  * A span of dates as the app language writes it, shared parts once ("September 21 – 27, 2026" /
  * „21.–27. September 2026“).

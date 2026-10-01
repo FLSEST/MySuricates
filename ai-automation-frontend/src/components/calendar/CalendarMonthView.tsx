@@ -1,9 +1,8 @@
 import { useMemo } from 'react';
 import { useI18nStore } from '../../i18n';
+import { weekdayNames } from '../../utils/localeFormat';
 import type { UnifiedCalendarEvent } from '../../types';
 
-const WEEKDAYS_EN = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const WEEKDAYS_DE = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 
 function getDaysInMonth(year: number, month: number) {
   return new Date(year, month + 1, 0).getDate();
@@ -25,7 +24,7 @@ interface Props {
 
 export function CalendarMonthView({ year, month, events, selectedDay, onSelectDay, onDayDoubleClick }: Props) {
   const locale = useI18nStore((s) => s.locale);
-  const weekdays = locale === 'de' ? WEEKDAYS_DE : WEEKDAYS_EN;
+  const weekdays = weekdayNames(locale);
   const now = new Date();
   const today = now.getFullYear() === year && now.getMonth() === month ? now.getDate() : -1;
   const daysInMonth = getDaysInMonth(year, month);

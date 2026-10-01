@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useCalendarData } from '../../hooks/useSchedules';
 import { useT, useI18nStore } from '../../i18n';
-import { formatDate, formatNumber, formatTimeOfDay } from '../../utils/localeFormat';
+import { formatDate, formatNumber, formatTimeOfDay, weekdayNames } from '../../utils/localeFormat';
 import { Spinner } from '../ui';
 import type { CalendarEvent } from '../../types';
 
@@ -15,14 +15,11 @@ function getFirstDayOfWeek(year: number, month: number) {
   return day === 0 ? 6 : day - 1; // Monday = 0
 }
 
-const WEEKDAYS_EN = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const WEEKDAYS_DE = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 
 export function CalendarView() {
   const t = useT();
   const locale = useI18nStore((s) => s.locale);
-  const isGerman = locale === 'de';
-  const weekdays = isGerman ? WEEKDAYS_DE : WEEKDAYS_EN;
+  const weekdays = useMemo(() => weekdayNames(locale), [locale]);
 
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
