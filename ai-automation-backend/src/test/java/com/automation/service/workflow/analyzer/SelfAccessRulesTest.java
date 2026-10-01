@@ -104,6 +104,20 @@ class SelfAccessRulesTest {
         assertThat(shell("HEALTH=http://localhost:9090/actuator/health\ncurl -sf \"$HEALTH\"")).isEmpty();
     }
 
+    /** Basis-URL ohne Pfad in einer Variable, der Actuator-Endpunkt entsteht erst am Aufruf (7721d8cb). */
+    @Test
+    void basisUrlMitSpaeteremActuatorSuffixIstHighAusserHealth() {
+        assertThat(shell("HOST=http://localhost:9090; curl \"$HOST/actuator/metrics\"")).singleElement()
+                .satisfies(f -> {
+                    assertThat(f.severity()).isEqualTo(Severity.HIGH);
+                    assertThat(f.detail()).contains("/actuator/metrics");
+                });
+        assertThat(shell("HOST=http://127.0.0.1:9090\ncurl -s ${HOST}/actuator/env")).hasSize(1);
+        assertThat(shell("HOST=http://localhost:9090\ncurl -sf \"$HOST/actuator/health\"")).isEmpty();
+        // Die Basis allein (ohne Endpunkt dahinter) bleibt erlaubt, wie bei /api/v1
+        assertThat(shell("HOST=http://localhost:9090\necho \"$HOST/actuator\"")).isEmpty();
+    }
+
     @Test
     void basisUrlAufSondeOderFremdenHostIstKeinBefund() {
         assertThat(shell("HEALTH=http://localhost:9090/api/v1/system/health\ncurl -sf \"$HEALTH\"")).isEmpty();
