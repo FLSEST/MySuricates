@@ -144,7 +144,7 @@ export function FactoryFlowDiagram({
                   key={i}
                   aria-current={current ? 'step' : undefined}
                   className={`flex gap-2.5 rounded-md px-2 py-1 transition-colors ${
-                    current ? 'bg-accent-subtle text-text' : 'text-text-secondary'
+                    current ? 'bg-accent-subtle text-accent' : 'text-text-secondary'
                   }`}
                 >
                   <span className={`shrink-0 w-5 h-5 mt-px rounded-full text-xs font-semibold flex items-center justify-center ${
