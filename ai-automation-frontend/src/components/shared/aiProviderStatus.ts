@@ -1,14 +1,26 @@
 import type { AiProviderStatus, AiProviderStatusReport } from '../../hooks/useSystem';
 
-const PROVIDER_NAMES: Record<string, string> = {
-  CLAUDE: 'Claude',
-  CODEX: 'Codex',
-  PI: 'Pi',
+/** The one place for provider names: display name and who makes the CLI (shown in pickers). */
+const PROVIDERS: Record<string, { name: string; maker: string }> = {
+  CLAUDE: { name: 'Claude', maker: 'Anthropic' },
+  CODEX: { name: 'Codex', maker: 'OpenAI' },
+  PI: { name: 'Pi', maker: 'Mario Zechner' },
 };
 
 /** Display name of a provider id (`CLAUDE` → `Claude`); unknown ids as they stand. */
 export function providerName(id: string): string {
-  return PROVIDER_NAMES[id.toUpperCase()] ?? id;
+  return PROVIDERS[id.toUpperCase()]?.name ?? id;
+}
+
+/** Label in a provider picker: name plus maker (`Codex (OpenAI)`); unknown ids as they stand. */
+export function providerOptionLabel(id: string): string {
+  const provider = PROVIDERS[id.toUpperCase()];
+  return provider ? `${provider.name} (${provider.maker})` : id;
+}
+
+/** Select options for these provider ids. */
+export function providerOptions(ids: readonly string[]): { value: string; label: string }[] {
+  return ids.map((id) => ({ value: id, label: providerOptionLabel(id) }));
 }
 
 /** The default provider first — it is the one every AI block without its own provider uses. */

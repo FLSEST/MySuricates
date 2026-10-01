@@ -1,6 +1,7 @@
 import { Loader2 } from 'lucide-react';
 import { Button, Modal, Select } from '../ui';
 import { useI18nStore, useT } from '../../i18n';
+import { providerOptions } from '../shared/aiProviderStatus';
 import { formatTimestamp } from '../../utils/localeFormat';
 import type { MemoryExtraction } from '../../hooks/useMemoryExtraction';
 import type { WorkflowRun } from '../../types';
@@ -66,11 +67,7 @@ export function MemoryExtractModal({ extraction, runs }: MemoryExtractModalProps
             label={t.memory.selectProvider}
             value={extraction.provider}
             onChange={(e) => extraction.setProvider(e.target.value)}
-            options={[
-              { value: 'CLAUDE', label: 'Claude' },
-              { value: 'CODEX', label: 'Codex (OpenAI)' },
-              { value: 'PI', label: 'pi (Mario Zechner)' },
-            ]}
+            options={providerOptions(['CLAUDE', 'CODEX', 'PI'])}
           />
         </div>
       )}

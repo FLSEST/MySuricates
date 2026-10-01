@@ -1,6 +1,7 @@
 import { Bot } from 'lucide-react';
 import { Card, CardHeader, Select } from '../ui';
 import { ModelField } from '../shared/ModelField';
+import { providerOptions } from '../shared/aiProviderStatus';
 import { useUpdateWorkflow } from '../../hooks/useWorkflows';
 import { useAiProviders } from '../../hooks/useSystem';
 import { useT } from '../../i18n';
@@ -33,10 +34,7 @@ export function WorkflowAiSettingsCards({ workflow }: { workflow: Workflow }) {
           }}
           options={[
             { value: '', label: t.workflows.providerDefault },
-            ...(aiProviders?.providers ?? []).map((p) => ({
-              value: p,
-              label: p === 'CLAUDE' ? 'Claude CLI' : p === 'CODEX' ? 'Codex CLI' : p === 'PI' ? 'pi (Mario Zechner)' : p,
-            })),
+            ...providerOptions(aiProviders?.providers ?? []),
           ]}
         />
         <p className="text-xs text-text-tertiary mt-2 flex items-center gap-1.5">

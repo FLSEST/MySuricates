@@ -3,6 +3,7 @@ import { Card, CardHeader, Toggle, Select, Button } from '../ui';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useI18nStore, type Locale } from '../../i18n';
 import { useT } from '../../i18n';
+import { providerOptions } from '../shared/aiProviderStatus';
 import { useUpdateSystemSetting, useAiProviders, useAssistantModelSetting, useSuggestionsModelSetting, useAutoRepairModeSetting } from '../../hooks/useSystem';
 import { ModelField } from '../shared/ModelField';
 import { useToast } from '../../hooks/useToast';
@@ -118,10 +119,7 @@ export function GeneralSettingsCard() {
               setDefaultAiProvider(e.target.value);
               updateSetting.mutate({ key: 'default-ai-provider', value: e.target.value });
             }}
-            options={(aiProviders?.providers || []).map((p: string) => ({
-              value: p,
-              label: p === 'CLAUDE' ? 'Claude CLI' : p === 'CODEX' ? 'Codex CLI' : p === 'PI' ? 'pi (Mario Zechner)' : p,
-            }))}
+            options={providerOptions(aiProviders?.providers || [])}
           />
         </div>
 
