@@ -73,6 +73,20 @@ class SelfAccessRulesTest {
         assertThat(shell("python3 - <<'PY'\nbase = 'http://localhost:9090/api/v1'\nPY")).hasSize(1);
     }
 
+    /** TODO 2a0c9420: hinter dem Präfix steht eine Variable statt eines Segments, wie in pool-neutrality.sh. */
+    @Test
+    void praefixMitVariableStattSegmentIstHigh() {
+        assertThat(shell("for E in todos executions; do\n  curl -s \"http://localhost:9090/api/v1/$E\"\ndone"))
+                .singleElement().satisfies(f -> {
+                    assertThat(f.severity()).isEqualTo(Severity.HIGH);
+                    assertThat(f.detail()).contains("/api/v1/$E");
+                });
+        assertThat(shell("curl -s {{ backend_url }}/api/v1/\"${ROUTE}\"")).singleElement()
+                .satisfies(f -> assertThat(f.detail()).contains("/api/v1/${ROUTE}"));
+        assertThat(shell("curl -s https://api.example.com/api/v1/$ITEM")).isEmpty();
+        assertThat(shell("echo '# Request-Kosten der /api/v1-Routen'")).isEmpty();
+    }
+
     @Test
     void basisUrlAufSondeOderFremdenHostIstKeinBefund() {
         assertThat(shell("HEALTH=http://localhost:9090/api/v1/system/health\ncurl -sf \"$HEALTH\"")).isEmpty();

@@ -55,6 +55,9 @@ final class SelfAccessRules {
     /** Konkreter Endpunkt: nach dem Präfix muss ein Pfadsegment folgen, wie PATH_AT im Skript. */
     private static final Pattern ENDPOINT = Pattern.compile("/api/v1/[A-Za-z0-9_][A-Za-z0-9/_.{}<>-]*");
 
+    /** Präfix, dahinter eine Variable statt eines Segments ({@code curl …/api/v1/$E}, TODO 2a0c9420). */
+    private static final Pattern COMPOSED = Pattern.compile("/api/v1/?[\"']?\\$\\{?[A-Za-z_][A-Za-z0-9_]*}?");
+
     /** Schema und Host direkt vor dem Endpunkt, etwa {@code http://localhost:9090}. */
     private static final Pattern HOST_BEFORE = Pattern.compile("[a-zA-Z][a-zA-Z0-9+.-]*://((?:\\{\\{[^}]*}}|[^/\\s\"'`])+)$");
 
@@ -130,6 +133,7 @@ final class SelfAccessRules {
         for (String code : shell) {
             String stripped = withoutCommentLines(code);
             String hit = firstSelfEndpoint(stripped, false);
+            if (hit == null) hit = firstComposedEndpoint(stripped);
             if (hit == null) hit = firstBaseUrlAssignment(stripped);
             if (hit == null) hit = firstShortBaseUrlCall(stripped);
             if (hit != null) {
@@ -155,11 +159,19 @@ final class SelfAccessRules {
         }
     }
 
-    /**
-     * Der erste Endpunkt der eigenen API, der keine schlüsselfreie Sonde ist, oder {@code null}. Ein
-     * ausdrücklich fremder Host zählt nie. Mit {@code needsCaller} (Text außerhalb der Shell) nur ein
-     * Endpunkt mit lokalem oder variablem Host und einem Aufrufer in der Nähe.
-     */
+    /** {@link #COMPOSED} ohne ausdrücklich fremden Host davor, ohne Anführungszeichen, oder {@code null}. */
+    private static String firstComposedEndpoint(String code) {
+        Matcher composed = COMPOSED.matcher(code);
+        while (composed.find()) {
+            Matcher host = HOST_BEFORE.matcher(code.substring(Math.max(0, composed.start() - WINDOW),
+                    composed.start()));
+            if (!host.find() || LOCAL_HOST.matcher(host.group(1)).matches()) {
+                return composed.group().replaceAll("[\"']", "");
+            }
+        }
+        return null;
+    }
+
     private static String firstBaseUrlAssignment(String code) {
         Matcher assignment = BASE_URL_ASSIGNMENT.matcher(code);
         while (assignment.find()) {
@@ -195,6 +207,11 @@ final class SelfAccessRules {
         return null;
     }
 
+    /**
+     * Der erste Endpunkt der eigenen API, der keine schlüsselfreie Sonde ist, oder {@code null}. Ein
+     * ausdrücklich fremder Host zählt nie. Mit {@code needsCaller} (Text außerhalb der Shell) nur ein
+     * Endpunkt mit lokalem oder variablem Host und einem Aufrufer in der Nähe.
+     */
     private static String firstSelfEndpoint(String text, boolean needsCaller) {
         Matcher endpoint = ENDPOINT.matcher(text);
         while (endpoint.find()) {

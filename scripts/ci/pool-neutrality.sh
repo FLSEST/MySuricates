@@ -194,6 +194,28 @@ VERB_CALL = re.compile(r'\b(GET|POST|PUT|PATCH|DELETE)\s+' + re.escape(API_PREFI
 PATH_AT = re.compile(re.escape(API_PREFIX) + r'[A-Za-z0-9_][A-Za-z0-9/_.{}<>-]*')
 
 
+# Zusammengesetzte Endpunkte (TODO 2a0c9420) — im Shell-Code steht der Pfad dann nie am Stueck:
+#   for E in todos; do curl …/api/v1/$E       Praefix, dahinter eine Variable statt eines Segments
+#   API=http://…/api/v1; curl "$API/todos"     die Basis-URL in einer Variable (auch Python: base = '…')
+# Die Zuweisung ist selbst der Befund, egal wo die Variable spaeter landet; ausser den Sonden liegt unter
+# dem Praefix nichts ohne Key. Das Praefix in einem Ausgabetext ("/api/v1-Routen") bleibt erlaubt.
+API_BASE = API_PREFIX.rstrip('/')
+COMPOSED_AT = re.compile(re.escape(API_BASE) + r'/?["\']?\$\{?[A-Za-z_][A-Za-z0-9_]*\}?')
+BASE_ASSIGNED = re.compile(r'(?m)(?:^|[\s;&(])((?:export\s+)?[A-Za-z_][A-Za-z0-9_]*\s*=\s*["\']?[^\s"\';]*'
+                           + re.escape(API_BASE) + r'/?)["\']?(?=[\s;&)]|$)')
+
+
+def composed_call(text):
+    """Der erste zusammengesetzte Endpunkt im Shell-Text als (Fundstelle, Art), sonst None."""
+    hit = COMPOSED_AT.search(text)
+    if hit:
+        return hit.group(0).replace('"', '').replace("'", ''), 'im Shell-Code, Pfad aus einer Variable'
+    hit = BASE_ASSIGNED.search(text)
+    if hit:
+        return hit.group(1), 'im Shell-Code, Basis-URL in einer Variable'
+    return None
+
+
 def path_of(endpoint):
     """Der Pfad ohne Satzpunkt am Ende: "Heap aus /api/v1/system/jvm-memory." nennt die Sonde selbst."""
     return endpoint.group(0).rstrip('.')
@@ -250,6 +272,8 @@ for path in sys.argv[1:]:
         pass  # PARSE meldet scan_definition_rules
     self_api = next(((path_of(endpoint), 'im Shell-Code') for text in shells
                      for endpoint in PATH_AT.finditer(text) if path_of(endpoint) not in API_ALLOWED), None)
+    if self_api is None:
+        self_api = next((hit for text in shells if (hit := composed_call(text))), None)
     if self_api is None:
         for i, window in windows(raw, API_PREFIX):
             endpoint = PATH_AT.match(raw, i)

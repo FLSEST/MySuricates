@@ -393,6 +393,39 @@ write_pool api-path-in-prompt-ok <<'JSON'
  "blocks": [{"type": "simple", "config": {"command": "Die Route /api/v1/todos war laut Faktenblatt die langsamste."}}]}
 JSON
 
+# --- Zusammengesetzte Pfade (TODO 2a0c9420): der Endpunkt steht nie am Stueck im Shell-Code, sondern
+# entsteht erst aus Praefix und Variable bzw. aus einer Basis-URL in einer Variable. ---
+write_pool self-api-composed-loop <<'JSON'
+{"name": {"de": "Zusammengesetzt", "en": "Composed"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "for E in todos executions; do\n  curl -s \"http://localhost:9090/api/v1/$E\"\ndone"}}]}
+JSON
+
+write_pool self-api-composed-braces <<'JSON'
+{"name": {"de": "Klammern", "en": "Braces"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "curl -s {{ backend_url }}/api/v1/\"${ROUTE}\""}}]}
+JSON
+
+write_pool self-api-base-var <<'JSON'
+{"name": {"de": "Basis", "en": "Base"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "API=http://localhost:9090/api/v1\ncurl -s \"$API/todos\""}}]}
+JSON
+
+write_pool self-api-base-var-python <<'JSON'
+{"name": {"de": "Basis Python", "en": "Base Python"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "python3 - <<'PY'\nbase = 'http://localhost:9090/api/v1/'\nPY"}}]}
+JSON
+
+# Gegenprobe: das Praefix in einem Ausgabetext ist kein Aufruf (mysuricates-performance-audit).
+write_pool api-prefix-in-echo-ok <<'JSON'
+{"name": {"de": "Ausgabe", "en": "Output"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "echo '# Request-Kosten der /api/v1-Routen'"}}]}
+JSON
+
 OUT=$(bash "$REPO/scripts/ci/pool-neutrality.sh" --all "$POOL" 2>&1); RC=$?
 check "Befunde gemeldet (exit 1)"              '[ "$RC" -eq 1 ]'
 check "ok-portable unbeanstandet"              '! grep -q "ok-portable" <<<"$OUT"'
@@ -438,6 +471,12 @@ check "Pfad im Prompt ohne Aufruf bleibt erlaubt" '! grep -q "api-path-in-prompt
 check "Sonde mit Satzpunkt bleibt erlaubt"       '! grep -q "api-probe-sentence-ok" <<<"$OUT"'
 check "Endpunkt mit Satzpunkt: gemeldet ohne den Punkt" \
   'grep -q "self-api-sentence.*SELF-API.*'"'"'/api/v1/todos'"'"' (im Shell-Code)" <<<"$OUT"'
+check "Praefix plus Schleifenvariable erkannt (2a0c9420)" \
+  'grep -q "self-api-composed-loop.*SELF-API.*/api/v1/\$E" <<<"$OUT"'
+check "Praefix plus \${VAR} in Anfuehrungszeichen erkannt" 'grep -q "self-api-composed-braces.*SELF-API" <<<"$OUT"'
+check "Basis-URL in einer Variable erkannt"      'grep -q "self-api-base-var\\.json.*SELF-API" <<<"$OUT"'
+check "Basis-URL in Python-Variable erkannt"     'grep -q "self-api-base-var-python.*SELF-API" <<<"$OUT"'
+check "Praefix im Ausgabetext bleibt erlaubt"    '! grep -q "api-prefix-in-echo-ok" <<<"$OUT"'
 
 echo "13) Blocktyp-Drift: die erzeugte Gate-Liste deckt sich mit der Registry im Backend"
 # Seit TODO bdc784e1 ist HYGIENE_POOL_BLOCK_TYPES nicht mehr handgepflegt, sondern

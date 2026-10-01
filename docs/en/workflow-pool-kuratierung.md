@@ -147,7 +147,10 @@ Two of the three patterns would be useless as a single stage, so they require a 
   reported is therefore a concrete endpoint (`/api/v1/todos`, not the bare prefix) together
   with a caller nearby. In a block's **shell code** the concrete endpoint is enough: every path
   that is not exactly on the list of key-free probes counts there, even when the call is far
-  away and goes through a variable (`for E in /api/v1/…; do curl …$E`).
+  away and goes through a variable (`for E in /api/v1/…; do curl …$E`). A composed path counts
+  as well: the prefix followed by a variable instead of a segment (`curl …/api/v1/$E`) and a base
+  URL in a variable (`API=…/api/v1; curl "$API/todos"`) — the assignment alone is the finding.
+  The prefix in an output text (`/api/v1-Routen`) is not.
 - `automation.db` on its own is not database access. `mysuricates-performance-audit` only looks
   at the **file size** via `stat -c %s` and says so in a comment. What is forbidden is reading
   the contents, which bypasses Hibernate and the single connection (pool size 1).
