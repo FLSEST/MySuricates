@@ -1,14 +1,14 @@
 package com.automation.service.audit;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.type.MapType;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 
 import java.io.InputStream;
 import java.util.LinkedHashMap;
-import java.util.List;
+import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -23,6 +23,11 @@ import java.util.Set;
  * Deshalb wird ein unbekannter Key erst {@link #normalize(String) normalisiert}; passt er dann
  * immer noch nicht, wird das Finding trotzdem uebernommen (kein Datenverlust) und der Fall
  * gemeldet. Ein auditKey ohne Katalogeintrag wird nicht geprueft.
+ *
+ * <p>Ein Eintrag ist entweder der Key als String oder {@code {"key": …, "subject": …}}: Betrifft eine
+ * Regel das Repository oder ein Modul als Ganzes, steht ihr subject fest ({@link #fixedSubject}), und die
+ * Ingestion setzt es durch, statt sich auf die Bitte im Prompt zu verlassen (TODO 802f740a). Dateibezogene
+ * Regeln haben keinen festen Wert; dort gilt die Pfadregel des Prompts.
  */
 @Slf4j
 @Component
@@ -32,9 +37,13 @@ public class AuditRuleKeyCatalog {
     private static final String COUNT_SUFFIX = "-count";
 
     private final Map<String, Set<String>> allowed;
+    /** auditKey → ruleKey → festes subject, nur fuer Regeln mit festem Wert. */
+    private final Map<String, Map<String, String>> fixedSubjects;
 
     public AuditRuleKeyCatalog(ObjectMapper objectMapper) {
-        this.allowed = load(objectMapper);
+        Catalog catalog = load(objectMapper);
+        this.allowed = catalog.allowed();
+        this.fixedSubjects = catalog.fixedSubjects();
     }
 
     /**
@@ -62,6 +71,16 @@ public class AuditRuleKeyCatalog {
     /** Erlaubte Keys eines Audits (leer, wenn der auditKey nicht im Katalog steht). */
     public Set<String> allowedKeys(String auditKey) {
         return allowed.getOrDefault(auditKey, Set.of());
+    }
+
+    /**
+     * Das feste subject einer Regel, die das Repository oder ein Modul als Ganzes betrifft.
+     *
+     * @param ruleKey der schon aufgeloeste Key ({@link #resolve})
+     * @return der feste Wert oder {@code null}, wenn die Regel keinen hat (dateibezogen, unbekannt)
+     */
+    public String fixedSubject(String auditKey, String ruleKey) {
+        return fixedSubjects.getOrDefault(auditKey, Map.of()).get(ruleKey);
     }
 
     /**
@@ -96,25 +115,36 @@ public class AuditRuleKeyCatalog {
                 || stem.endsWith("ch") || stem.endsWith("sh");
     }
 
-    private static Map<String, Set<String>> load(ObjectMapper objectMapper) {
-        MapType type = objectMapper.getTypeFactory()
-                .constructMapType(LinkedHashMap.class, objectMapper.getTypeFactory().constructType(String.class),
-                        objectMapper.getTypeFactory().constructCollectionType(List.class, String.class));
+    private static Catalog load(ObjectMapper objectMapper) {
         try (InputStream in = new ClassPathResource(RESOURCE).getInputStream()) {
-            Map<String, List<String>> raw = objectMapper.readValue(in, type);
-            Map<String, Set<String>> result = new LinkedHashMap<>();
-            raw.forEach((auditKey, keys) -> {
-                if (!auditKey.startsWith("_")) {
-                    result.put(auditKey, Set.copyOf(keys));
+            JsonNode root = objectMapper.readTree(in);
+            Map<String, Set<String>> allowed = new LinkedHashMap<>();
+            Map<String, Map<String, String>> fixed = new LinkedHashMap<>();
+            root.fields().forEachRemaining(audit -> {
+                if (audit.getKey().startsWith("_")) {
+                    return;
                 }
+                Set<String> keys = new LinkedHashSet<>();
+                Map<String, String> subjects = new LinkedHashMap<>();
+                for (JsonNode entry : audit.getValue()) {
+                    String key = entry.isObject() ? entry.path("key").asText() : entry.asText();
+                    keys.add(key);
+                    if (entry.hasNonNull("subject")) {
+                        subjects.put(key, entry.get("subject").asText());
+                    }
+                }
+                allowed.put(audit.getKey(), Set.copyOf(keys));
+                fixed.put(audit.getKey(), Map.copyOf(subjects));
             });
-            return Map.copyOf(result);
+            return new Catalog(Map.copyOf(allowed), Map.copyOf(fixed));
         } catch (Exception e) {
             // Ohne Katalog wird nicht geprueft — das darf den Start nie verhindern.
             log.error("Audit rule-key catalog {} could not be read, ruleKeys stay unchecked: {}", RESOURCE, e.toString());
-            return Map.of();
+            return new Catalog(Map.of(), Map.of());
         }
     }
+
+    private record Catalog(Map<String, Set<String>> allowed, Map<String, Map<String, String>> fixedSubjects) {}
 
     /**
      * @param ruleKey der zu verwendende Key (normalisiert, sonst der urspruengliche)

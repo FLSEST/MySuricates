@@ -56,12 +56,13 @@ class AuditSnapshotApplier {
         List<String> collisions = new ArrayList<>();
 
         for (ParsedFinding reported : parsedFindings) {
-            ParsedFinding item = unmasked(reported);
-            AuditRuleKeyCatalog.Resolution resolution = resolveRuleKey(event, report, item, reportedRuleKeys);
+            ParsedFinding raw = unmasked(reported);
+            AuditRuleKeyCatalog.Resolution resolution = resolveRuleKey(event, report, raw, reportedRuleKeys);
             String ruleKey = resolution.ruleKey();
+            ParsedFinding item = withFixedSubject(report, ruleKey, raw);
             String fingerprint = fingerprint(event.getProjectId(), report.getAuditKey(), ruleKey, item.subject());
             if (!seenFingerprints.add(fingerprint)) {
-                collisions.add(item.subject());
+                collisions.add(raw.subject());
                 continue;
             }
             AuditFinding finding = knownByFingerprint.get(fingerprint);
@@ -184,6 +185,23 @@ class AuditSnapshotApplier {
         return new ParsedFinding(AuditFindingsContext.unmask(item.ruleKey()), AuditFindingsContext.unmask(item.subject()),
                 item.severity(), AuditFindingsContext.unmask(item.title()), item.description(), item.evidence(),
                 item.tags());
+    }
+
+    /**
+     * Regeln, die das Repository oder ein Modul als Ganzes betreffen, haben im Katalog ein festes subject;
+     * das gilt, egal was das Modell schickt (TODO 802f740a). Vorher stand es nur als Bitte im Prompt, und
+     * ein abweichendes subject kam als Wiedergaenger ohne die Disposition des alten Befunds zurueck. Der
+     * feste Wert ist der, den der Prompt verlangt — ein Befund, der sich daran hielt, behaelt seine Identitaet.
+     */
+    private ParsedFinding withFixedSubject(AuditReport report, String ruleKey, ParsedFinding item) {
+        String fixed = ruleKeyCatalog.fixedSubject(report.getAuditKey(), ruleKey);
+        if (fixed == null || fixed.equals(item.subject())) {
+            return item;
+        }
+        log.info("Audit '{}': subject '{}' of rule {} replaced by its fixed value '{}'",
+                report.getAuditKey(), item.subject(), ruleKey, fixed);
+        return new ParsedFinding(item.ruleKey(), fixed, item.severity(), item.title(), item.description(),
+                item.evidence(), item.tags());
     }
 
     /**

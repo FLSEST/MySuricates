@@ -96,7 +96,7 @@ safeguard. If the field is absent, behaviour is unchanged (TODO `e39379a9`).
 When a prompt fixes the `ruleKey`s its model must use, they are listed in
 `ai-automation-backend/src/main/resources/audit/rule-keys.json` under their `auditKey`. Ingestion
 then normalizes spelling drift (lower case, `_` → `-`, plural before `-count`:
-`god-classes-count` → `god-class-count`). A key that still does not match is ingested anyway — with
+`god-classes-count` → `god-class-count`). A key that still does not match is
 **discarded — and the whole report with it** (TODO `f57945e2`): it is recorded as INVALID, no
 findings are created, and none are marked RESOLVED. A line in the activity log names the unknown
 keys and the permitted ones. An `auditKey` without a catalogue entry is not checked; its prompt
@@ -107,6 +107,17 @@ and therefore passes the counting gate block. Ingesting it anyway creates a set 
 and resolves the entire previous generation — you get just as many repeat findings and start over on
 the real ones. The earlier mark on the finding (`unknownRuleKey`, V75) was the intermediate step
 while there was no harder consequence; it is no longer set.
+
+**Fixed `subject` per rule** (TODO `802f740a`): if a rule concerns the repository or a module as a
+whole and the prompt demands exactly one value (`subject "repository"`), that value is in the
+catalogue as well – as an entry `{"key": …, "subject": …}` instead of a plain string. Ingestion
+enforces it, whatever `subject` the model sends; before, it was only a request in the prompt, and a
+deviation came back as a repeat finding without the triage of the old one. Because the catalogue
+value is the one the prompt already demanded, every finding that followed it keeps its fingerprint.
+File-related rules (`subject = path`) and rules with several permitted values
+(`"ai-automation-backend" or "ai-automation-frontend"`) have no fixed value.
+`AuditRuleKeyCatalogTest` keeps catalogue and prompt in step and checks that a prompt's envelope
+example names only a catalogued `ruleKey` (or the placeholder `stabile-regel-id`).
 
 ### Evidence check: `evidence` must name a measurement of this run
 

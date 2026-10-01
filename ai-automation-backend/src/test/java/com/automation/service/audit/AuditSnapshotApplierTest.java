@@ -87,9 +87,13 @@ class AuditSnapshotApplierTest {
     }
 
     private void apply(ParsedFinding... findings) {
+        applyTo(AUDIT_KEY, findings);
+    }
+
+    private void applyTo(String auditKey, ParsedFinding... findings) {
         WorkflowRunCompletedEvent event = new WorkflowRunCompletedEvent(this, "run-1", "wf-1", "Audit", PROJECT,
                 "/tmp/p", RunStatus.COMPLETED, Map.of(), Map.of(), null);
-        AuditReport report = AuditReport.builder().id("rep-1").projectId(PROJECT).auditKey(AUDIT_KEY)
+        AuditReport report = AuditReport.builder().id("rep-1").projectId(PROJECT).auditKey(auditKey)
                 .generatedAt(NOW).build();
         applier.apply(event, report, List.of(findings), Set.of());
     }
@@ -221,5 +225,64 @@ class AuditSnapshotApplierTest {
         assertThat(savedFindings()).containsExactly(gone);
         verify(occurrenceRepository, never()).saveAll(any());
         verify(occurrenceRepository, never()).findFindingIdsByReportId(any());
+    }
+
+    // --- TODO 802f740a: festes subject je ruleKey aus dem Katalog ---------------------------------
+
+    private static final String PUBLIC_READINESS = "project.public-readiness";
+
+    /** Das Modell weicht vom vorgegebenen subject ab — gespeichert und identifiziert wird der feste Wert. */
+    @Test
+    void apply_aDriftedSubjectOfARuleWithAFixedSubject_isReplacedByTheCatalogValue() {
+        AuditFinding existing = AuditFinding.builder().id("f-keywords").projectId(PROJECT).auditKey(PUBLIC_READINESS)
+                .fingerprint(AuditSnapshotApplier.fingerprint(PROJECT, PUBLIC_READINESS, "public.secrets.keyword-hits",
+                        "repository"))
+                .ruleKey("public.secrets.keyword-hits").subject("repository").title("Treffer")
+                .severity(AuditSeverity.MEDIUM).status(AuditFindingStatus.ACCEPTED_RISK).occurrenceCount(3).build();
+        when(findingRepository.findByProjectIdAndAuditKey(PROJECT, PUBLIC_READINESS)).thenReturn(List.of(existing));
+
+        applyTo(PUBLIC_READINESS, new ParsedFinding("public.secrets.keyword-hits", "scripts/public-readiness/secrets.sh",
+                AuditSeverity.MEDIUM, "Treffer", null, null, List.of()));
+
+        assertThat(savedFindings()).singleElement().isSameAs(existing);
+        assertThat(existing.getSubject()).isEqualTo("repository");
+        assertThat(existing.getStatus()).as("die Einordnung bleibt, kein Wiedergaenger").isEqualTo(AuditFindingStatus.ACCEPTED_RISK);
+        assertThat(existing.getOccurrenceCount()).isEqualTo(4);
+    }
+
+    /**
+     * Wer sich an den Prompt hielt, behaelt seine Identitaet: der Fingerprint des vorgegebenen subjects ist
+     * derselbe wie vor dem Durchsetzen (hier fest gepinnt).
+     */
+    @Test
+    void apply_aPromptCompliantSubject_keepsItsFingerprint() {
+        applyTo(PUBLIC_READINESS, new ParsedFinding("public.docs.missing-license", "LICENSE", AuditSeverity.HIGH,
+                "Keine Lizenz", null, null, List.of()));
+
+        AuditFinding saved = savedFindings().getFirst();
+        assertThat(saved.getSubject()).isEqualTo("LICENSE");
+        assertThat(saved.getFingerprint()).isEqualTo(AuditSnapshotApplier.fingerprint(PROJECT, PUBLIC_READINESS,
+                "public.docs.missing-license", "LICENSE"));
+    }
+
+    /** Dateibezogene Regeln haben keinen festen Wert: dort bleibt das subject des Modells. */
+    @Test
+    void apply_aPathRule_keepsTheSubjectOfTheModel() {
+        applyTo(PUBLIC_READINESS, new ParsedFinding("public.privacy.private-terms", "docs/notes.md", AuditSeverity.LOW,
+                "Privater Begriff", null, null, List.of()));
+
+        assertThat(savedFindings().getFirst().getSubject()).isEqualTo("docs/notes.md");
+    }
+
+    /** Zwei abweichende subjects derselben festen Regel sind ein Befund; gemeldet wird, was das Modell schickte. */
+    @Test
+    void apply_twoSubjectsOfAFixedRule_collapseIntoOneFinding_andTheRawSubjectIsReported() {
+        applyTo(PUBLIC_READINESS,
+                new ParsedFinding("public.deadcode.markers", "ai-automation-backend", AuditSeverity.LOW, "Marker", null, null, List.of()),
+                new ParsedFinding("public.deadcode.markers", "ai-automation-frontend", AuditSeverity.LOW, "Marker", null, null, List.of()));
+
+        assertThat(savedFindings()).singleElement().extracting(AuditFinding::getSubject).isEqualTo("repository");
+        verify(activityLog).warn(any(), org.mockito.ArgumentMatchers.contains("ai-automation-frontend"), any(),
+                any(), any());
     }
 }

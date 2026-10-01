@@ -108,6 +108,17 @@ bekommt ebenso viele Wiedergänger und fängt bei den echten Befunden von vorn a
 Markierung am Finding (`unknownRuleKey`, V75) war die Zwischenstufe, solange es keine härtere
 Konsequenz gab; sie wird nicht mehr neu gesetzt.
 
+**Festes `subject` je Regel** (TODO `802f740a`): Betrifft eine Regel das Repository oder ein Modul als
+Ganzes und verlangt der Prompt genau einen Wert (`subject "repository"`), steht dieser Wert auch im
+Katalog – als Eintrag `{"key": …, "subject": …}` statt als bloßer String. Die Ingestion setzt ihn
+durch, egal welches `subject` das Modell schickt; vorher war es nur eine Bitte im Prompt, und eine
+Abweichung kam als Wiedergänger ohne die Einordnung des alten Befunds zurück. Weil der Katalogwert
+der ist, den der Prompt schon verlangte, behält jeder Befund, der sich daran hielt, seinen
+Fingerprint. Dateibezogene Regeln (`subject = Pfad`) und Regeln mit mehreren erlaubten Werten
+(`"ai-automation-backend" oder "ai-automation-frontend"`) bleiben ohne festen Wert.
+`AuditRuleKeyCatalogTest` hält Katalog und Prompt gleich und prüft, dass auch das Envelope-Beispiel
+eines Prompts nur einen katalogisierten `ruleKey` (oder den Platzhalter `stabile-regel-id`) nennt.
+
 ### Belegprüfung: `evidence` muss eine Messung dieses Laufs nennen
 
 Der Prompt verlangt zu jedem Finding eine Belegzeile — geprüft hat das lange niemand, und ein
