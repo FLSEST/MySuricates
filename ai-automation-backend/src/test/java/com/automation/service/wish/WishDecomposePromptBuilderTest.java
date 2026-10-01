@@ -31,7 +31,6 @@ class WishDecomposePromptBuilderTest {
     @Mock private AgentInstructionsService agentInstructionsService;
     @Mock private SkillRepository skillRepository;
     @Mock private com.automation.service.learning.LearningService learningService;
-    @Mock private WorkflowRunRepository workflowRunRepository;
 
     private final WishConfig wishConfig = new WishConfig();
     private WishDecomposePromptBuilder builder;
@@ -39,7 +38,7 @@ class WishDecomposePromptBuilderTest {
 
     @BeforeEach
     void setUp() {
-        helper = new WishPromptHelper(workflowRepository, skillRepository, learningService, workflowRunRepository);
+        helper = new WishPromptHelper(skillRepository, learningService);
         builder = new WishDecomposePromptBuilder(
                 workflowRepository, projectRepository, templateRepository,
                 memoryRepository, workflowPoolService, agentInstructionsService, helper, wishConfig
@@ -215,9 +214,9 @@ class WishDecomposePromptBuilderTest {
             assertThat(result.indexOf("### First")).isPositive().isLessThan(result.indexOf("### Third"));
             verify(memoryRepository, times(1)).findByWorkflowIdInAndActiveTrue(anyCollection());
             verify(memoryRepository, never()).findByWorkflowIdAndActiveTrue(anyString());
-            // Der Builder liest die Projekt-Workflows fuer Memories und Liste einmal (vorher zweimal);
-            // der zweite Aufruf ist WishPromptHelper.buildExecutionIntelligence.
-            verify(workflowRepository, times(2)).findByProjectId("proj-1");
+            // Memories, Projektliste und Execution Intelligence teilen sich eine Abfrage
+            // (5fb7b1e9, 73036bbd: buildExecutionIntelligence lud sie ein zweites Mal).
+            verify(workflowRepository, times(1)).findByProjectId("proj-1");
         }
 
         /** Ohne Workflows im Projekt wird nach Memories gar nicht gefragt (kein {@code IN ()}). */
@@ -248,13 +247,64 @@ class WishDecomposePromptBuilderTest {
             Project p = new Project();
             p.setName("Other");
             refWf.setProject(p);
-            when(workflowRepository.findById("ref-wf-1")).thenReturn(Optional.of(refWf));
+            when(workflowRepository.findAllById(Set.of("ref-wf-1"))).thenReturn(List.of(refWf));
 
             String result = builder.buildPrompt(wish);
 
             assertThat(result)
                     .contains("### Referenced Workflows")
                     .contains("**Reference Deploy**");
+        }
+
+        /**
+         * 51ee8709: alle Referenz-Workflows aus einer Abfrage, in der Reihenfolge der Auswahl;
+         * eine unbekannte ID fällt wie vorher stillschweigend weg.
+         */
+        @Test
+        void referenceWorkflows_comeFromOneQuery_inSelectionOrder() {
+            stubDefaults();
+            Wish wish = buildWish("Deploy app");
+            wish.setReferenceWorkflowIds(List.of("ref-b", "ref-gone", "ref-a"));
+            List<Workflow> found = new ArrayList<>();
+            for (String id : List.of("ref-a", "ref-b")) {
+                Workflow wf = new Workflow();
+                wf.setId(id);
+                wf.setName("Workflow " + id);
+                wf.setBlocks(List.of());
+                found.add(wf);
+            }
+            when(workflowRepository.findAllById(Set.of("ref-b", "ref-gone", "ref-a"))).thenReturn(found);
+
+            String result = builder.buildPrompt(wish);
+
+            assertThat(result.indexOf("**Workflow ref-b**")).isPositive().isLessThan(result.indexOf("**Workflow ref-a**"));
+            assertThat(result).doesNotContain("ref-gone");
+            verify(workflowRepository, times(1)).findAllById(anyCollection());
+            verify(workflowRepository, never()).findById(anyString());
+        }
+
+        /** 73036bbd: die Execution Intelligence bekommt die schon gelesenen Projekt-Workflows. */
+        @Test
+        void executionIntelligence_usesTheProjectWorkflowsReadOnce() {
+            stubDefaults();
+            Wish wish = buildWish("Deploy app");
+            wish.setProjectId("proj-1");
+            when(projectRepository.findById("proj-1")).thenReturn(Optional.empty());
+            Workflow wf = new Workflow();
+            wf.setId("wf-1");
+            wf.setName("Deploy WF");
+            wf.setBlocks(List.of());
+            when(workflowRepository.findByProjectId("proj-1")).thenReturn(List.of(wf));
+            when(learningService.getWorkflowStats("wf-1")).thenReturn(Map.of(
+                    "totalRuns", 4, "successRate", 0.5, "avgDurationMs", 1000.0));
+            when(learningService.getExecutionInsights("wf-1")).thenReturn(Map.of("avgCostPerRunUsd", 0.01));
+            when(learningService.getOptimizationSuggestions("wf-1")).thenReturn(List.of());
+            when(learningService.getAgenticAnalytics("wf-1")).thenReturn(Map.of("totalAgenticRuns", 0));
+
+            String result = builder.buildPrompt(wish);
+
+            assertThat(result).contains("## Execution Intelligence").contains("**Deploy WF** (4 runs)");
+            verify(workflowRepository, times(1)).findByProjectId("proj-1");
         }
 
         @Test

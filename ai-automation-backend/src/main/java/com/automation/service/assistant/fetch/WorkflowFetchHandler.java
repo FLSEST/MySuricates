@@ -43,6 +43,7 @@ public class WorkflowFetchHandler {
                 var blocks = wf.getBlocks();
                 if (blocks != null && !blocks.isEmpty()) {
                     sb.append("\nBlocks (").append(blocks.size()).append("):\n");
+                    Map<String, String> subWorkflowNames = blockConfigSummaryFormatter.subWorkflowNames(blocks);
                     for (int i = 0; i < blocks.size(); i++) {
                         BlockDefinition block = blocks.get(i);
                         Map<String, Object> cfg = block.getConfig() != null ? block.getConfig() : Map.of();
@@ -50,7 +51,7 @@ public class WorkflowFetchHandler {
                         sb.append("  ").append(i + 1).append(". [").append(block.getType()).append("]");
                         if (!label.isBlank()) sb.append(" ").append(label);
                         sb.append("\n");
-                        blockConfigSummaryFormatter.appendBlockConfigSummary(sb, block.getType(), cfg);
+                        blockConfigSummaryFormatter.appendBlockConfigSummary(sb, block.getType(), cfg, subWorkflowNames);
                     }
                 }
                 return sb.toString();

@@ -1,13 +1,17 @@
 package com.automation.service.assistant.fetch;
 
+import com.automation.entity.BlockDefinition;
 import com.automation.repository.WorkflowRepository;
 import com.automation.service.assistant.format.AssistantFormatUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Renders a one-glance summary of a block's config (prompt/command/condition/…)
@@ -28,6 +32,7 @@ public class BlockConfigSummaryFormatter {
     private record Shown(String key, int maxChars) {
     }
 
+    private static final String WORKFLOW_ID = "workflow_id";
     private static final int SHORT = 80;
     private static final int LONG = 200;
 
@@ -47,7 +52,7 @@ public class BlockConfigSummaryFormatter {
             Map.entry("retry", List.of(text("command", LONG), text("max_retries", SHORT), text("execution_mode", SHORT))),
             Map.entry("approval", List.of(text("question", LONG), text("options", SHORT))),
             Map.entry("human-input", List.of(text("prompt", LONG), text("input_type", SHORT), count("fields"))),
-            Map.entry("sub-workflow", List.of(text("workflow_id", SHORT))),
+            Map.entry("sub-workflow", List.of(text(WORKFLOW_ID, SHORT))),
             Map.entry("compress", List.of(text("source", SHORT), count("stages"))),
             Map.entry("compress-ai", List.of(text("source", SHORT), text("instruction", LONG))));
 
@@ -68,7 +73,39 @@ public class BlockConfigSummaryFormatter {
         return keys;
     }
 
-    public void appendBlockConfigSummary(StringBuilder sb, String type, Map<String, Object> cfg) {
+    /**
+     * Namen aller Sub-Workflows, auf die die Blöcke zeigen ({@code workflow_id}), in einer Abfrage
+     * statt einem {@code findById} je Block (TODO bf009b6f). Soft-gelöschte und unbekannte IDs fehlen
+     * in der Map; die Zusammenfassung zeigt dann die ID.
+     */
+    public Map<String, String> subWorkflowNames(List<BlockDefinition> blocks) {
+        Set<String> ids = new LinkedHashSet<>();
+        if (blocks != null) {
+            for (BlockDefinition block : blocks) {
+                Map<String, Object> cfg = block.getConfig();
+                if (cfg == null || !showsWorkflowId(block.getType())) continue;
+                Object value = cfg.get(WORKFLOW_ID);
+                if (value != null && !String.valueOf(value).isBlank()) ids.add(String.valueOf(value).trim());
+            }
+        }
+        if (ids.isEmpty()) return Map.of();
+        Map<String, String> names = new HashMap<>();
+        for (Object[] row : workflowRepository.findIdAndNameByIdIn(ids)) {
+            if (row[1] != null) names.put((String) row[0], (String) row[1]);
+        }
+        return names;
+    }
+
+    private static boolean showsWorkflowId(String type) {
+        return SHOWN.getOrDefault(type, List.of()).stream().anyMatch(item -> WORKFLOW_ID.equals(item.key()));
+    }
+
+    /**
+     * @param subWorkflowNames Namen aus {@link #subWorkflowNames(List)} — einmal je Workflow bzw.
+     *                         Pool-Eintrag ermitteln, nicht je Block
+     */
+    public void appendBlockConfigSummary(StringBuilder sb, String type, Map<String, Object> cfg,
+                                         Map<String, String> subWorkflowNames) {
         List<Shown> shown = SHOWN.get(type);
         if (shown == null) {
             cfg.forEach((key, value) -> {
@@ -84,8 +121,8 @@ public class BlockConfigSummaryFormatter {
                 if (value instanceof List<?> list) line(sb, item.key(), String.valueOf(list.size()));
             } else if (value != null && !String.valueOf(value).isBlank()) {
                 String text = String.valueOf(value).trim();
-                if ("workflow_id".equals(item.key())) {
-                    line(sb, "sub-workflow", workflowRepository.findById(text).map(w -> w.getName()).orElse(text));
+                if (WORKFLOW_ID.equals(item.key())) {
+                    line(sb, "sub-workflow", subWorkflowNames.getOrDefault(text, text));
                 } else {
                     line(sb, item.key(), AssistantFormatUtils.truncate(text, item.maxChars()));
                 }

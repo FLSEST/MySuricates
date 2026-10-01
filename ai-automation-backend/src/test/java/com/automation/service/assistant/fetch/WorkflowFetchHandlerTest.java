@@ -15,9 +15,13 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -47,6 +51,25 @@ class WorkflowFetchHandlerTest {
         when(workflowRepository.findById("wf-1")).thenReturn(Optional.of(wf));
 
         assertThat(handler.formatWorkflowDetail("wf-1")).endsWith("\nBlocks (1):\n  1. [approval]\n");
+    }
+
+    /** bf009b6f: drei Sub-Workflow-Blöcke, eine Namensabfrage — und findById nur für den Workflow selbst. */
+    @Test
+    void detail_subWorkflowNamesComeFromOneQuery() {
+        Workflow wf = Workflow.builder().id("wf-1").name("Kette").blocks(List.of(
+                BlockDefinition.builder().type("sub-workflow").config(Map.of("workflow_id", "wf-a")).build(),
+                BlockDefinition.builder().type("sub-workflow").config(Map.of("workflow_id", "wf-b")).build(),
+                BlockDefinition.builder().type("sub-workflow").config(Map.of("workflow_id", "wf-gone")).build())).build();
+        when(workflowRepository.findById("wf-1")).thenReturn(Optional.of(wf));
+        when(workflowRepository.findIdAndNameByIdIn(Set.of("wf-a", "wf-b", "wf-gone")))
+                .thenReturn(List.of(new Object[]{"wf-a", "Bauen"}, new Object[]{"wf-b", "Testen"}));
+
+        assertThat(handler.formatWorkflowDetail("wf-1")).endsWith("\nBlocks (3):\n"
+                + "  1. [sub-workflow]\n     sub-workflow: Bauen\n"
+                + "  2. [sub-workflow]\n     sub-workflow: Testen\n"
+                + "  3. [sub-workflow]\n     sub-workflow: wf-gone\n");
+        verify(workflowRepository, times(1)).findIdAndNameByIdIn(any());
+        verify(workflowRepository, times(1)).findById(any());
     }
 
     @Test

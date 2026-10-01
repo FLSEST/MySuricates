@@ -284,6 +284,22 @@ class WorkflowRepositoryTest {
         assertThat(readOnly).extracting(Workflow::getId).doesNotContain(id);
     }
 
+    /** 6299a860: ChainService prüft die Workflow-IDs aller Einträge mit dieser einen Abfrage. */
+    @Test
+    void should_find_existing_ids_excluding_unknown_and_soft_deleted() {
+        Workflow alive = saveWorkflow("ExistingIds-" + System.nanoTime(), activeProject);
+        Workflow softDeleted = saveWorkflow("ExistingIdsDeleted-" + System.nanoTime(), activeProject);
+        softDeleted.setDeletedAt(Instant.now());
+        workflowRepository.save(softDeleted);
+        workflowRepository.flush();
+        entityManager.clear();
+
+        List<String> existing = workflowRepository.findExistingIdsIn(
+                List.of(alive.getId(), softDeleted.getId(), "no-such-workflow"));
+
+        assertThat(existing).containsExactly(alive.getId());
+    }
+
     @Test
     void should_exclude_soft_deleted_from_native_id_name_block_types_query() {
         Workflow alive = saveWorkflow("AliveNative-" + System.nanoTime(), activeProject);

@@ -39,9 +39,7 @@ class WishPromptBuilderTest {
 
     @BeforeEach
     void setUp() {
-        WishPromptHelper helper = new WishPromptHelper(
-                workflowRepository, skillRepository, learningService, workflowRunRepository
-        );
+        WishPromptHelper helper = new WishPromptHelper(skillRepository, learningService);
         WishDecomposePromptBuilder decomposeBuilder = new WishDecomposePromptBuilder(
                 workflowRepository, projectRepository, templateRepository,
                 memoryRepository, workflowPoolService, agentInstructionsService, helper, new WishConfig()
@@ -400,7 +398,7 @@ class WishPromptBuilderTest {
             refWf.setDescription("A reference workflow");
             refWf.setBlocks(List.of(BlockDefinition.builder().type("shell").config(Map.of("command", "echo hi")).build()));
             refWf.setProject(refProject);
-            when(workflowRepository.findById("ref-1")).thenReturn(Optional.of(refWf));
+            when(workflowRepository.findAllById(Set.of("ref-1"))).thenReturn(List.of(refWf));
 
             String prompt = builder.buildDecomposePrompt(wish);
 

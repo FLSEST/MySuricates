@@ -110,6 +110,13 @@ public interface WorkflowRepository extends JpaRepository<Workflow, String> {
     List<Object[]> findIdAndNameByIdIn(@Param("ids") Collection<String> ids);
 
     /**
+     * Welche der IDs zu einem (nicht soft-gelöschten) Workflow gehören — eine Abfrage statt
+     * {@code existsById} je ID (TODO 6299a860). JPQL, also greift {@code @SQLRestriction}.
+     */
+    @Query("SELECT w.id FROM Workflow w WHERE w.id IN :ids")
+    List<String> findExistingIdsIn(@Param("ids") Collection<String> ids);
+
+    /**
      * Names of sealed, not deleted workflows that use a skill — pinned at sealing, activated, or
      * referenced from a block. Conservative on purpose (substring match on the JSON columns): a
      * false positive only asks for an unseal, a false negative would let a sealed workflow change.

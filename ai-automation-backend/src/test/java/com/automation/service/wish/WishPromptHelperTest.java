@@ -4,8 +4,6 @@ import com.automation.entity.BlockDefinition;
 import com.automation.entity.Skill;
 import com.automation.entity.Workflow;
 import com.automation.repository.SkillRepository;
-import com.automation.repository.WorkflowRepository;
-import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.learning.LearningService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -23,16 +21,14 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class WishPromptHelperTest {
 
-    @Mock private WorkflowRepository workflowRepository;
     @Mock private SkillRepository skillRepository;
     @Mock private LearningService learningService;
-    @Mock private WorkflowRunRepository workflowRunRepository;
 
     private WishPromptHelper helper;
 
     @BeforeEach
     void setUp() {
-        helper = new WishPromptHelper(workflowRepository, skillRepository, learningService, workflowRunRepository);
+        helper = new WishPromptHelper(skillRepository, learningService);
     }
 
     // ── formatBlockPipeline ──
@@ -300,14 +296,13 @@ class WishPromptHelperTest {
 
         @Test
         void nullProjectId_returnsEmpty() {
-            String result = helper.buildExecutionIntelligence(null);
+            String result = helper.buildExecutionIntelligence(List.of());
             assertThat(result).isEmpty();
         }
 
         @Test
         void noWorkflows_returnsEmpty() {
-            when(workflowRepository.findByProjectId("p1")).thenReturn(List.of());
-            assertThat(helper.buildExecutionIntelligence("p1")).isEmpty();
+            assertThat(helper.buildExecutionIntelligence(List.of())).isEmpty();
         }
 
         @Test
@@ -315,10 +310,9 @@ class WishPromptHelperTest {
             Workflow wf = new Workflow();
             wf.setId("wf1");
             wf.setName("Test WF");
-            when(workflowRepository.findByProjectId("p1")).thenReturn(List.of(wf));
             when(learningService.getWorkflowStats("wf1")).thenReturn(Map.of("totalRuns", 1));
 
-            String result = helper.buildExecutionIntelligence("p1");
+            String result = helper.buildExecutionIntelligence(List.of(wf));
             assertThat(result).isEmpty();
         }
 
@@ -327,7 +321,6 @@ class WishPromptHelperTest {
             Workflow wf = new Workflow();
             wf.setId("wf1");
             wf.setName("Deploy WF");
-            when(workflowRepository.findByProjectId("p1")).thenReturn(List.of(wf));
             when(learningService.getWorkflowStats("wf1")).thenReturn(Map.of(
                     "totalRuns", 5, "successRate", 0.8, "avgDurationMs", 30000.0
             ));
@@ -337,7 +330,7 @@ class WishPromptHelperTest {
             when(learningService.getOptimizationSuggestions("wf1")).thenReturn(List.of());
             when(learningService.getAgenticAnalytics("wf1")).thenReturn(Map.of("totalAgenticRuns", 0));
 
-            String result = helper.buildExecutionIntelligence("p1");
+            String result = helper.buildExecutionIntelligence(List.of(wf));
 
             assertThat(result)
                     .contains("## Execution Intelligence")
@@ -350,9 +343,11 @@ class WishPromptHelperTest {
 
         @Test
         void exceptionInLearningService_returnsPartial() {
-            when(workflowRepository.findByProjectId("p1")).thenThrow(new RuntimeException("DB error"));
+            Workflow wf = new Workflow();
+            wf.setId("wf1");
+            when(learningService.getWorkflowStats("wf1")).thenThrow(new RuntimeException("DB error"));
 
-            String result = helper.buildExecutionIntelligence("p1");
+            String result = helper.buildExecutionIntelligence(List.of(wf));
             assertThat(result).isEmpty(); // try-catch returns empty
         }
     }

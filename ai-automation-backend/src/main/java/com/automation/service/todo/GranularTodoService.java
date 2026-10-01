@@ -212,18 +212,23 @@ public class GranularTodoService {
         });
     }
 
+    /** Schließt in einer Transaktion alle nicht mehr gemeldeten granularen TODOs, gesammelt per saveAll (TODO dfb3fee8). */
     private void closeStale(TransactionTemplate tx, String projectId, WorkflowRunCompletedEvent event, List<String> currentTitles) {
         tx.execute(status -> {
             List<Todo> open = todoRepository.findByProjectIdAndSourceAndReferenceTypeAndReferenceIdAndStatusNot(
                     projectId, Todo.Source.WORKFLOW, REFERENCE_TYPE, event.getWorkflowId(), Todo.Status.DONE);
+            List<Todo> closed = new ArrayList<>();
             for (Todo todo : open) {
                 boolean granular = todo.getTags() != null && todo.getTags().contains("item:")
                         && todo.getTags().contains(TAG_AUTO_WORKFLOW);
                 if (granular && !currentTitles.contains(todo.getTitle())) {
                     todo.setStatus(Todo.Status.DONE);
-                    todoRepository.save(todo);
+                    closed.add(todo);
                     log.info("Auto-todo (granular) closed — no longer in findings: {}", todo.getTitle());
                 }
+            }
+            if (!closed.isEmpty()) {
+                todoRepository.saveAll(closed);
             }
             return null;
         });

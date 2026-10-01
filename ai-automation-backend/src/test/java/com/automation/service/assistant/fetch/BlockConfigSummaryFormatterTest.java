@@ -1,6 +1,6 @@
 package com.automation.service.assistant.fetch;
 
-import com.automation.entity.Workflow;
+import com.automation.entity.BlockDefinition;
 import com.automation.repository.WorkflowRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -11,9 +11,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -25,7 +29,8 @@ class BlockConfigSummaryFormatterTest {
 
     private String summary(String type, Map<String, Object> cfg) {
         StringBuilder sb = new StringBuilder();
-        formatter.appendBlockConfigSummary(sb, type, cfg);
+        BlockDefinition block = BlockDefinition.builder().type(type).config(cfg).build();
+        formatter.appendBlockConfigSummary(sb, type, cfg, formatter.subWorkflowNames(List.of(block)));
         return sb.toString();
     }
 
@@ -122,10 +127,46 @@ class BlockConfigSummaryFormatterTest {
 
     @Test
     void subWorkflow_showsTheWorkflowNameInsteadOfItsId() {
-        when(workflowRepository.findById("wf-1")).thenReturn(Optional.of(Workflow.builder().name("Nachtlauf").build()));
+        when(workflowRepository.findIdAndNameByIdIn(Set.of("wf-1")))
+                .thenReturn(List.<Object[]>of(new Object[]{"wf-1", "Nachtlauf"}));
 
-        assertThat(summary("sub-workflow", Map.of("workflow_id", "wf-1")))
+        assertThat(summary("sub-workflow", Map.of("workflow_id", " wf-1 ")))
                 .isEqualTo("     sub-workflow: Nachtlauf\n");
+    }
+
+    /** Unbekannte oder soft-gelöschte Workflows fehlen im Ergebnis — dann steht wie bisher die ID da. */
+    @Test
+    void subWorkflow_unknownWorkflow_showsItsId() {
+        when(workflowRepository.findIdAndNameByIdIn(Set.of("wf-gone"))).thenReturn(List.of());
+
+        assertThat(summary("sub-workflow", Map.of("workflow_id", "wf-gone")))
+                .isEqualTo("     sub-workflow: wf-gone\n");
+    }
+
+    /** bf009b6f: die Namen aller Sub-Workflow-Blöcke kommen aus einer Abfrage, nicht aus einem findById je Block. */
+    @Test
+    void subWorkflowNames_resolvesAllSubWorkflowBlocksInOneQuery() {
+        List<BlockDefinition> blocks = List.of(
+                BlockDefinition.builder().type("sub-workflow").config(Map.of("workflow_id", "wf-1")).build(),
+                BlockDefinition.builder().type("shell").config(Map.of("command", "ls", "workflow_id", "wf-x")).build(),
+                BlockDefinition.builder().type("sub-workflow").config(Map.of("workflow_id", "wf-2")).build(),
+                BlockDefinition.builder().type("sub-workflow").config(Map.of("workflow_id", "wf-1")).build(),
+                BlockDefinition.builder().type("sub-workflow").config(Map.of("workflow_id", " ")).build(),
+                BlockDefinition.builder().type("sub-workflow").build());
+        when(workflowRepository.findIdAndNameByIdIn(Set.of("wf-1", "wf-2")))
+                .thenReturn(List.of(new Object[]{"wf-1", "Eins"}, new Object[]{"wf-2", "Zwei"}));
+
+        assertThat(formatter.subWorkflowNames(blocks)).containsExactlyInAnyOrderEntriesOf(Map.of("wf-1", "Eins", "wf-2", "Zwei"));
+        verify(workflowRepository, times(1)).findIdAndNameByIdIn(any());
+        verify(workflowRepository, never()).findById(any());
+    }
+
+    @Test
+    void subWorkflowNames_withoutSubWorkflowBlocks_queriesNothing() {
+        assertThat(formatter.subWorkflowNames(List.of(
+                BlockDefinition.builder().type("shell").config(Map.of("command", "ls")).build()))).isEmpty();
+        assertThat(formatter.subWorkflowNames(null)).isEmpty();
+        verifyNoInteractions(workflowRepository);
     }
 
     @Test
