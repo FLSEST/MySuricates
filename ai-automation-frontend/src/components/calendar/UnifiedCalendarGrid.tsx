@@ -9,20 +9,13 @@ import { CalendarDayView } from './CalendarDayView';
 import { useCalendarAggregated } from '../../hooks/useCalendarAggregated';
 import { useCalendarNavigation, type CalendarViewMode } from '../../hooks/useCalendarNavigation';
 import { useT, useI18nStore } from '../../i18n';
-import { formatDate, formatDateRange } from '../../utils/localeFormat';
+import { formatDate, formatDateRange, formatNumber } from '../../utils/localeFormat';
 
 const DAY_MONTH_YEAR = { day: 'numeric', month: 'long', year: 'numeric' } as const;
-
-const VIEW_LABELS = {
-  month: { de: 'Monat', en: 'Month' },
-  week: { de: 'Woche', en: 'Week' },
-  day: { de: 'Tag', en: 'Day' },
-};
 
 export function UnifiedCalendarGrid() {
   const t = useT();
   const locale = useI18nStore((s) => s.locale);
-  const isGerman = locale === 'de';
 
   const {
     viewMode, year, month, selectedDay, currentDate, weekStart, from, to, isNotToday,
@@ -32,7 +25,7 @@ export function UnifiedCalendarGrid() {
     new Set(['google-calendar', 'caldav', 'trello', 'schedules', 'runs'])
   );
 
-  const { events, sources, isLoading, setSourceColor } = useCalendarAggregated(from, to, enabledSources);
+  const { events, sources, limits = [], isLoading, setSourceColor } = useCalendarAggregated(from, to, enabledSources);
 
   const toggleSource = (sourceId: string) => {
     setEnabledSources((prev) => {
@@ -61,7 +54,7 @@ export function UnifiedCalendarGrid() {
 
       {/* Navigation + View Mode Toggle */}
       <div className="flex items-center justify-between">
-        <button onClick={goPrev} className="p-2 rounded-lg hover:bg-surface-hover transition-colors text-text-secondary">
+        <button onClick={goPrev} aria-label={t.calendar.previous} title={t.calendar.previous} className="p-2 rounded-lg hover:bg-surface-hover transition-colors text-text-secondary">
           <ChevronLeft className="w-5 h-5" />
         </button>
         <div className="flex items-center gap-3">
@@ -72,7 +65,7 @@ export function UnifiedCalendarGrid() {
             </Button>
           )}
         </div>
-        <button onClick={goNext} className="p-2 rounded-lg hover:bg-surface-hover transition-colors text-text-secondary">
+        <button onClick={goNext} aria-label={t.calendar.next} title={t.calendar.next} className="p-2 rounded-lg hover:bg-surface-hover transition-colors text-text-secondary">
           <ChevronRight className="w-5 h-5" />
         </button>
       </div>
@@ -95,12 +88,22 @@ export function UnifiedCalendarGrid() {
                 `}
               >
                 <Icon className="w-3.5 h-3.5" />
-                {VIEW_LABELS[mode][isGerman ? 'de' : 'en']}
+                {t.calendar.views[mode]}
               </button>
             );
           })}
         </div>
       </div>
+
+      {/* A source that cut its list (runs: newest 1000 per range, 86777fb4) says so */}
+      {limits.map((limit) => (
+        <p key={limit.sourceId} className="text-xs text-text-tertiary" data-testid="calendar-source-limited">
+          {(limit.sourceId === 'runs' ? t.calendar.runsLimited : t.calendar.sourceLimited)
+            .replace('{source}', limit.label)
+            .replace('{shown}', formatNumber(limit.shown, locale))
+            .replace('{total}', formatNumber(limit.total, locale))}
+        </p>
+      ))}
 
       {isLoading && (
         <div className="flex justify-center py-4">

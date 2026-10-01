@@ -109,7 +109,7 @@ export const handlers = [
     HttpResponse.json({ schedules: [], total: 0 }),
   ),
   http.get(`${BASE}/schedules/calendar`, () =>
-    HttpResponse.json({ entries: [] }),
+    HttpResponse.json({ upcoming: [], pastRuns: [] }),
   ),
   http.post(`${BASE}/schedules/preview`, () =>
     HttpResponse.json({ runs: ['2025-01-01T00:00:00Z'] }),

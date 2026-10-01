@@ -6,6 +6,7 @@ import type { UnifiedCalendarEvent } from '../../../types';
 import { UnifiedCalendarGrid } from '../UnifiedCalendarGrid';
 
 const requested: Array<{ from: string; to: string }> = [];
+let limits: Array<{ sourceId: string; label: string; shown: number; total: number }> = [];
 const events: UnifiedCalendarEvent[] = [{
   id: 'e1', title: 'Weekly backup', start: new Date(2026, 8, 22, 9, 0), end: new Date(2026, 8, 22, 9, 30),
   allDay: false, source: 'schedules', sourceLabel: 'Schedules', color: 'bg-info',
@@ -15,7 +16,7 @@ const events: UnifiedCalendarEvent[] = [{
 vi.mock('../../../hooks/useCalendarAggregated', () => ({
   useCalendarAggregated: (from: string, to: string) => {
     requested.push({ from, to });
-    return { events, sources: [], isLoading: false, setSourceColor: vi.fn() };
+    return { events, sources: [], limits, isLoading: false, setSourceColor: vi.fn() };
   },
 }));
 
@@ -24,6 +25,7 @@ beforeEach(() => {
   vi.setSystemTime(new Date(2026, 8, 24, 10, 30));
   useI18nStore.setState({ locale: 'en' });
   requested.length = 0;
+  limits = [];
 });
 afterEach(() => vi.useRealTimers());
 
@@ -89,6 +91,22 @@ describe('UnifiedCalendarGrid', { timeout: 15_000 }, () => {
 
     act(() => useI18nStore.setState({ locale: 'en' }));
     expect(heading()).toHaveTextContent('September 28 – October 4, 2026');
+  });
+
+  // fbd56d63: the runs source is cut at 1000 per range; the calendar names the cut like the schedule view
+  it('shows no cut notice while every source delivered all its events', () => {
+    render(<UnifiedCalendarGrid />);
+    expect(screen.queryByTestId('calendar-source-limited')).toBeNull();
+  });
+
+  it.each([
+    ['en', 'The calendar shows the newest 1,000 of 1,500 runs in this range – earlier days are missing some.'],
+    ['de', 'Der Kalender zeigt die neuesten 1.000 von 1.500 Ausführungen in diesem Zeitraum – an früheren Tagen fehlen welche.'],
+  ] as const)('names the cut runs in the UI language (%s)', (locale, text) => {
+    useI18nStore.setState({ locale });
+    limits = [{ sourceId: 'runs', label: 'Runs', shown: 1000, total: 1500 }];
+    render(<UnifiedCalendarGrid />);
+    expect(screen.getByTestId('calendar-source-limited')).toHaveTextContent(text);
   });
 
   it('opens a day on double click', () => {

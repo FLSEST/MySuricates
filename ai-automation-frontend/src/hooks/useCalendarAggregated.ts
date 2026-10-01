@@ -15,7 +15,13 @@ import { useQuery } from '@tanstack/react-query';
 import { useIntegrations } from './useIntegrations';
 import { useCalendarColors } from './useCalendarColors';
 import { CALENDAR_ADAPTERS } from './calendar-adapters/registry';
+import type { CalendarSourceLimit, CalendarSourceResult } from './calendar-adapters/types';
 import type { UnifiedCalendarEvent, CalendarSourceConfig } from '../types';
+
+function toResult(data: UnifiedCalendarEvent[] | CalendarSourceResult | undefined): CalendarSourceResult {
+  if (!data) return { events: [] };
+  return Array.isArray(data) ? { events: data } : data;
+}
 
 export function useCalendarAggregated(from: string, to: string, enabledSources: Set<string>) {
   const { data: integrations } = useIntegrations();
@@ -52,16 +58,24 @@ export function useCalendarAggregated(from: string, to: string, enabledSources: 
       const adapter = CALENDAR_ADAPTERS[i]!;
       if (!enabledSources.has(adapter.sourceId)) return [];
       const userColor = colors[adapter.sourceId];
-      if (!userColor) return query.data ?? [];
+      const sourceEvents = toResult(query.data).events;
+      if (!userColor) return sourceEvents;
       // Apply user color but preserve dynamic per-event colors (e.g. runs red/green)
-      return (query.data ?? []).map((ev) => ({
+      return sourceEvents.map((ev) => ({
         ...ev,
         color: ev.color === adapter.color ? userColor : ev.color,
       }));
     })
     .sort((a, b) => a.start.getTime() - b.start.getTime());
 
+  // Sources that delivered only part of their events in this range
+  const limits: CalendarSourceLimit[] = queries.flatMap((query, i) => {
+    const adapter = CALENDAR_ADAPTERS[i]!;
+    const limited = enabledSources.has(adapter.sourceId) ? toResult(query.data).limited : undefined;
+    return limited ? [{ sourceId: adapter.sourceId, label: adapter.label, ...limited }] : [];
+  });
+
   const isLoading = queries.some((q) => q.isLoading);
 
-  return { events, sources, isLoading, setSourceColor: setColor };
+  return { events, sources, limits, isLoading, setSourceColor: setColor };
 }

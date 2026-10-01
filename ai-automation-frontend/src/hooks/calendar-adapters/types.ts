@@ -30,6 +30,21 @@
 
 import type { IntegrationProviderInfo, UnifiedCalendarEvent } from '../../types';
 
+/** What an adapter returns when the source cut its list: the events plus how many exist in the range. */
+export interface CalendarSourceResult {
+  events: UnifiedCalendarEvent[];
+  /** Set only when the source delivered fewer events than exist (e.g. the runs capped at 1000 per range). */
+  limited?: { shown: number; total: number };
+}
+
+/** A source the calendar had to cut, for the notice above the grid. */
+export interface CalendarSourceLimit {
+  sourceId: string;
+  label: string;
+  shown: number;
+  total: number;
+}
+
 export interface CalendarSourceAdapter {
   /** Unique identifier, e.g. 'google-calendar', 'schedules', 'runs' */
   sourceId: string;
@@ -53,7 +68,8 @@ export interface CalendarSourceAdapter {
   isAvailable: (integrations: IntegrationProviderInfo[]) => boolean;
 
   /**
-   * Fetch events for a time range and transform them to UnifiedCalendarEvent[].
+   * Fetch events for a time range and transform them to UnifiedCalendarEvent[]. A source that may cut
+   * its list returns a CalendarSourceResult instead, so the calendar can say so.
    *
    * Called as the `queryFn` in a useQuery hook. The returned events must have
    * `source` and `color` matching this adapter's `sourceId` and `color`.
@@ -61,5 +77,5 @@ export interface CalendarSourceAdapter {
    * @param from - ISO 8601 start of the time range
    * @param to - ISO 8601 end of the time range
    */
-  fetchEvents: (from: string, to: string) => Promise<UnifiedCalendarEvent[]>;
+  fetchEvents: (from: string, to: string) => Promise<UnifiedCalendarEvent[] | CalendarSourceResult>;
 }

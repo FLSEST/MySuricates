@@ -631,7 +631,7 @@ Hook `useCalendarAggregated`.
 | `label` | `string` | Anzeigename im Quellen-Filter |
 | `color` | `string` | Tailwind-Background-Klasse für Kalender-Punkte/Event-Streifen |
 | `isAvailable` | `(integrations) => boolean` | Quelle aktiv? System-Quellen `true`; Integrationen prüfen Status `CONNECTED` |
-| `fetchEvents` | `(from, to) => Promise<UnifiedCalendarEvent[]>` | Events für Zeitraum laden + transformieren (als `queryFn` genutzt) |
+| `fetchEvents` | `(from, to) => Promise<UnifiedCalendarEvent[] \| CalendarSourceResult>` | Events für Zeitraum laden + transformieren (als `queryFn` genutzt); kappt die Quelle ihre Liste, `{ events, limited: { shown, total } }` zurückgeben – der Kalender nennt den Schnitt (so der Runs-Adapter bei 1000 Läufen) |
 
 ### Registry (`hooks/calendar-adapters/registry.ts`)
 

@@ -1504,6 +1504,11 @@ export const en = {
     today: 'Today',
     noEvents: 'No events on this day',
     allDay: 'All day',
+    previous: 'Previous',
+    next: 'Next',
+    views: { month: 'Month', week: 'Week', day: 'Day' },
+    runsLimited: 'The calendar shows the newest {shown} of {total} runs in this range – earlier days are missing some.',
+    sourceLimited: '{source}: the calendar shows {shown} of {total} entries in this range.',
     sources: {
       googleCalendar: 'Google Calendar',
       schedules: 'Schedules',

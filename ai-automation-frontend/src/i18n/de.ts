@@ -1506,6 +1506,11 @@ export const de: TranslationKeys = {
     today: 'Heute',
     noEvents: 'Keine Einträge an diesem Tag',
     allDay: 'Ganztägig',
+    previous: 'Zurück',
+    next: 'Weiter',
+    views: { month: 'Monat', week: 'Woche', day: 'Tag' },
+    runsLimited: 'Der Kalender zeigt die neuesten {shown} von {total} Ausführungen in diesem Zeitraum – an früheren Tagen fehlen welche.',
+    sourceLimited: '{source}: Der Kalender zeigt {shown} von {total} Einträgen in diesem Zeitraum.',
     sources: {
       googleCalendar: 'Google Calendar',
       schedules: 'Zeitpläne',
