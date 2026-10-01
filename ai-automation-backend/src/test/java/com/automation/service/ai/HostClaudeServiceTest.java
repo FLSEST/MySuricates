@@ -363,6 +363,56 @@ class HostClaudeServiceTest {
         assertThat(result.parsed().numTurns()).isEqualTo(1);
     }
 
+    // --- exit code 0, but the result line reports an error (c6d1a872) ---
+
+    @Test
+    void reasonStructured_exitZeroButIsError_throwsNamingTheSubtype() {
+        HostClaudeService service = ShellScriptCli.claudeReasoning(
+                "{\"type\":\"result\",\"subtype\":\"error_max_turns\",\"is_error\":false,\"num_turns\":1}", 0);
+
+        assertThatThrownBy(() -> service.reasonStructured("summarize", null, null, 1))
+                .isInstanceOf(IOException.class)
+                .hasMessage("Host Claude reasoning failed: Claude CLI reported an error (error_max_turns) after 1 turn");
+    }
+
+    @Test
+    void executeAction_exitZeroButIsError_reportsFailureWithReadableText() throws IOException {
+        String line = "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"result\":\"API Error: 500\"}";
+        HostClaudeService service = scriptedAction(line, 0);
+
+        HostClaudeService.ActionResult result = service.executeAction("do it", null, null, null);
+
+        assertThat(result.exitCode()).isNotZero();
+        assertThat(result.text()).isEqualTo("Claude CLI reported an error: API Error: 500");
+        assertThat(result.parsed().isError()).isTrue();
+    }
+
+    @Test
+    void executeAction_exitZeroAndNoError_isUnchanged() throws IOException {
+        HostClaudeService service = scriptedAction(
+                "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\":\"done\"}", 0);
+
+        HostClaudeService.ActionResult result = service.executeAction("do it", null, null, null);
+
+        assertThat(result.exitCode()).isZero();
+        assertThat(result.text()).isEqualTo("done");
+    }
+
+    private HostClaudeService scriptedAction(String output, int exitCode) {
+        HostClaudeConfig config = new HostClaudeConfig();
+        config.setTimeoutSeconds(30);
+        List<String> script = List.of("/bin/sh", "-c",
+                "cat >/dev/null; printf '%s\\n' \"$1\"; exit " + exitCode, "sh", output);
+        return new HostClaudeService(config, new CliPermissionsConfig()) {
+            @Override
+            List<String> buildActionCommand(String prompt, String model, String systemPrompt,
+                                            List<String> callAllowedTools, List<String> callDisallowedTools,
+                                            String effort) {
+                return script;
+            }
+        };
+    }
+
     // --- per-block timeout override ---
 
     @Test

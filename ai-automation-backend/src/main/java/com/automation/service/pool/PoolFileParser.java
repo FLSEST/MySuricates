@@ -211,7 +211,7 @@ final class PoolFileParser {
             }
         }
 
-        /** Names the path Jackson stopped at, e.g. {@code blocks[3].on_failure}. */
+        /** Names the path Jackson stopped at, e.g. {@code blocks[3].config} (a field beside config is kept, d3aa0b28). */
         private static String blockProblem(IllegalArgumentException e) {
             if (!(e.getCause() instanceof JsonMappingException mapping)) {
                 return "field 'blocks' is not a valid block list: " + e.getMessage();

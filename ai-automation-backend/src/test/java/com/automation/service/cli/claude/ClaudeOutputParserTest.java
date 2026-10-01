@@ -185,4 +185,40 @@ class ClaudeOutputParserTest {
         assertThat(ClaudeOutputParser.extractText(null)).isEmpty();
         assertThat(ClaudeOutputParser.extractText("")).isEmpty();
     }
+
+    // --- is_error / subtype of the result line (c6d1a872) ---
+
+    @Test
+    void parseStreamJson_keepsIsErrorAndSubtype() {
+        String ndjson = """
+                {"type":"assistant","message":{"model":"claude-sonnet-4-6","content":[{"type":"text","text":"..."}]}}
+                {"type":"result","subtype":"error_max_turns","is_error":false,"num_turns":3,"session_id":"s"}
+                """;
+
+        ClaudeJsonResponse parsed = ClaudeOutputParser.parseStreamJson(ndjson);
+
+        assertThat(parsed.subtype()).isEqualTo("error_max_turns");
+        assertThat(parsed.isError()).isFalse();
+        assertThat(parsed.failed()).isTrue();
+        assertThat(parsed.hasResultLine()).isTrue();
+        assertThat(parsed.result()).isNull();
+    }
+
+    @Test
+    void parseStreamJson_successLine_isNotFailed() {
+        ClaudeJsonResponse parsed = ClaudeOutputParser.parseStreamJson(
+                "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\":\"ok\"}");
+
+        assertThat(parsed.failed()).isFalse();
+        assertThat(parsed.hasResultLine()).isTrue();
+    }
+
+    @Test
+    void parseStreamJson_plainText_hasNoResultLine() {
+        ClaudeJsonResponse parsed = ClaudeOutputParser.parseStreamJson("Invalid API key · Please run /login");
+
+        assertThat(parsed.failed()).isFalse();
+        assertThat(parsed.hasResultLine()).isFalse();
+        assertThat(parsed.result()).isEqualTo("Invalid API key · Please run /login");
+    }
 }

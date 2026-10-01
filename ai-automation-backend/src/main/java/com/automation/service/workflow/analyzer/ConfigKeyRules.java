@@ -75,6 +75,8 @@ final class ConfigKeyRules {
             String key = entry.getKey();
             BlockConfigSchema.Field field = fields.get(key);
             if (field == null) {
+                // config.blocks meldet BlockShapeRules genauer (dead-nested-blocks, HIGH)
+                if ("blocks".equals(key)) continue;
                 out.add(AnalyzerFinding.of("unknown-config-key", Severity.MEDIUM, where.index(), where.name(),
                         where.prefix() + "unbekannter Config-Schlüssel " + key + " — der " + type
                                 + "-Block liest ihn nicht, die Einstellung wirkt nicht" + hint(key, suggestable(fields), false),

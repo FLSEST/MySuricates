@@ -60,14 +60,31 @@ class PreviousReportVariable implements PlatformVariableSource {
 
     @Override
     public Map<String, String> load(Request request) {
-        return Map.of(NAME, value(request.workflowId()));
+        return Map.of(NAME, value(request.workflowId(), reportBlock(request.workflowMeta())));
     }
 
     /**
-     * Loads the analysis report from the last completed run of the same workflow.
-     * Returns the longest non-shell step output (the Opus analysis), {@link #defused} and truncated to 3000 chars.
+     * The block an audit workflow names as its report ({@code metadata.audit.reportBlock}, the block whose
+     * output {@code AuditIngestionService} ingests), or {@code null} when the workflow names none.
      */
+    static String reportBlock(Map<String, Object> workflowMeta) {
+        if (workflowMeta == null || !(workflowMeta.get("audit") instanceof Map<?, ?> audit)) return null;
+        Object block = audit.get("reportBlock");
+        return block instanceof String name && !name.isBlank() ? name : null;
+    }
+
     String value(String workflowId) {
+        return value(workflowId, null);
+    }
+
+    /**
+     * Loads the analysis report from the last completed run of the same workflow, {@link #defused} and
+     * truncated to 3000 chars. With a {@code reportBlock} it is that block's output (75f7b24d): the longest
+     * output could be a fact sheet of a shell block — in the health check the test log; a run whose report
+     * block did not complete has no report. Without one it is the longest completed output after the first
+     * step (the shell data collection), when it is longer than 200 chars.
+     */
+    String value(String workflowId, String reportBlock) {
         try {
             List<WorkflowRun> previousRuns = runRepository.findTop5ByWorkflowIdOrderByStartedAtDesc(workflowId);
             for (WorkflowRun prev : previousRuns) {
@@ -75,26 +92,41 @@ class PreviousReportVariable implements PlatformVariableSource {
                     continue;
                 }
                 List<StepResult> steps = stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc(prev.getId());
-                // Find the longest completed non-first step output (skip shell data-collection block)
-                String bestOutput = null;
-                int bestLength = 0;
-                for (int i = 1; i < steps.size(); i++) {
-                    StepResult step = steps.get(i);
-                    if (step.getStatus() != StepStatus.COMPLETED) continue;
-                    String output = step.getOutput();
-                    if (output != null && output.length() > bestLength) {
-                        bestLength = output.length();
-                        bestOutput = output;
-                    }
-                }
-                if (bestOutput != null && bestLength > 200) {
-                    return defused(bestOutput);
+                String report = reportBlock != null ? reportBlockOutput(steps, reportBlock) : longestOutput(steps);
+                if (report != null) {
+                    return defused(report);
                 }
             }
         } catch (Exception e) {
             log.debug("Could not load previous report for workflow {}: {}", workflowId, e.getMessage());
         }
         return NONE;
+    }
+
+    private static String reportBlockOutput(List<StepResult> steps, String reportBlock) {
+        for (StepResult step : steps) {
+            Map<String, Object> meta = step.getMetadata();
+            if (meta == null || !reportBlock.equals(meta.get("blockName"))) continue;
+            String output = step.getOutput();
+            return step.getStatus() == StepStatus.COMPLETED && output != null && !output.isBlank() ? output : null;
+        }
+        return null;
+    }
+
+    /** The longest completed non-first step output (the first is the shell data collection), if > 200 chars. */
+    private static String longestOutput(List<StepResult> steps) {
+        String bestOutput = null;
+        int bestLength = 0;
+        for (int i = 1; i < steps.size(); i++) {
+            StepResult step = steps.get(i);
+            if (step.getStatus() != StepStatus.COMPLETED) continue;
+            String output = step.getOutput();
+            if (output != null && output.length() > bestLength) {
+                bestLength = output.length();
+                bestOutput = output;
+            }
+        }
+        return bestLength > 200 ? bestOutput : null;
     }
 
     /**

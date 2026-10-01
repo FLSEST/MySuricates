@@ -18,6 +18,15 @@ final class CliExit {
 
     /** {@code output} when the CLI ended with 0; otherwise an exception naming the exit code and the message. */
     static String answerOrThrow(String label, int exitCode, String output) throws IOException {
+        return answerOrThrow(label, exitCode, output, false);
+    }
+
+    /**
+     * Like {@link #answerOrThrow(String, int, String)}; with {@code reportedByCli} the CLI itself reported the error in
+     * its result line ({@code ClaudeCliOutcome}) — then {@code output} already is the readable message with subtype
+     * and turns, and the exit code is not the CLI's own. It stands once: {@code "<label> failed: <message>"}.
+     */
+    static String answerOrThrow(String label, int exitCode, String output, boolean reportedByCli) throws IOException {
         if (exitCode == 0) {
             return output;
         }
@@ -25,6 +34,8 @@ final class CliExit {
         if (message.length() > MESSAGE_CHARS) {
             message = message.substring(0, MESSAGE_CHARS) + "...";
         }
-        throw new IOException(label + " failed with exit code " + exitCode + ": " + message);
+        throw new IOException(reportedByCli
+                ? label + " failed: " + message
+                : label + " failed with exit code " + exitCode + ": " + message);
     }
 }

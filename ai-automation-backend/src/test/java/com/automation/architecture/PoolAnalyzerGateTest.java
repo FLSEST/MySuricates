@@ -27,7 +27,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * <p>Geprüft werden die Definitionen unter {@code workflow-pool/} und die Built-in-Templates mit
  * demselben deterministischen Regelsatz, den der REST-Endpunkt auf Abruf anwendet — seit f5153c47
- * samt den Config-Schlüsseln verschachtelter Blöcke (switch-Cases, {@code default}, {@code blocks}). Der
+ * samt den Config-Schlüsseln verschachtelter Blöcke (switch-Cases, {@code default}, {@code blocks}), seit
+ * d3aa0b28 samt den Feldern neben {@code config} ({@code unknown-block-field}). Der
  * Analyzer misst, er bewertet nicht — deshalb ist dieser Test ein Gate und keine Empfehlung.
  *
  * <p>Die Schwelle steht bei {@code HIGH}: Ein Verweis auf einen Block, den es nicht gibt, und ein
@@ -103,6 +104,12 @@ class PoolAnalyzerGateTest {
             block.setType(node.path("type").asText(null));
             block.setName(node.path("name").isTextual() ? node.path("name").asText() : null);
             block.setConfig(configOf(node.path("config")));
+            // Felder neben config behält BlockDefinition seit d3aa0b28 — der Gate sieht sie wie der Speicherweg
+            node.properties().forEach(field -> {
+                if (!BlockDefinition.FIELDS.contains(field.getKey())) {
+                    block.putUnknownField(field.getKey(), objectMapper.convertValue(field.getValue(), Object.class));
+                }
+            });
             out.add(block);
         }
         return out;

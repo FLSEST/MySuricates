@@ -79,4 +79,25 @@ class BlockJsonReaderTest {
         assertThat(BlockJsonReader.fromMapList("nope")).isEmpty();
         assertThat(BlockJsonReader.fromMapList(null)).isEmpty();
     }
+
+    // --- d3aa0b28: Felder neben config bleiben erhalten, der Analyzer meldet sie ---
+
+    @Test
+    void toBlock_keepsFieldsBesideConfig() throws Exception {
+        BlockDefinition block = BlockJsonReader.toBlock(mapper.readTree("""
+                {"type":"shell","name":"check","config":{"command":"ls"},"on_failure":"continue"}"""), mapper);
+
+        assertThat(block.unknownFields()).containsExactly(Map.entry("on_failure", "continue"));
+        assertThat(block.getConfig()).doesNotContainKey("on_failure");
+    }
+
+    @Test
+    void fromMapList_keepsFieldsBesideConfig_andWellFormedBlocksHaveNone() {
+        List<BlockDefinition> blocks = BlockJsonReader.fromMapList(List.of(
+                Map.of("type", "shell", "config", Map.of("command", "ls"), "timeout_seconds", 60),
+                Map.of("type", "simple", "name", "ok", "config", Map.of("command", "x"))));
+
+        assertThat(blocks.get(0).unknownFields()).containsExactly(Map.entry("timeout_seconds", 60));
+        assertThat(blocks.get(1).unknownFields()).isEmpty();
+    }
 }

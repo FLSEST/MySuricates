@@ -18,8 +18,26 @@ public record ClaudeJsonResponse(
         Usage usage,
         @JsonProperty("modelUsage") Map<String, ModelUsage> modelUsage,
         String assistantModel,
-        List<ToolUseEvent> toolUses
+        List<ToolUseEvent> toolUses,
+        String subtype,
+        @JsonProperty("is_error") Boolean isError
 ) {
+    public ClaudeJsonResponse(
+            String result,
+            String sessionId,
+            Double totalCostUsd,
+            Long durationMs,
+            Long durationApiMs,
+            Integer numTurns,
+            Usage usage,
+            Map<String, ModelUsage> modelUsage,
+            String assistantModel,
+            List<ToolUseEvent> toolUses
+    ) {
+        this(result, sessionId, totalCostUsd, durationMs, durationApiMs, numTurns, usage, modelUsage,
+                assistantModel, toolUses, null, null);
+    }
+
     public ClaudeJsonResponse(
             String result,
             String sessionId,
@@ -62,6 +80,20 @@ public record ClaudeJsonResponse(
     public record ModelUsage(int inputTokens, int outputTokens, double costUSD) {}
 
     public record ToolUseEvent(String name, Map<String, Object> input) {}
+
+    /**
+     * Whether the CLI's result line reports a failure: {@code is_error: true} (an API error, a usage
+     * limit) or an {@code error_*} subtype such as {@code error_max_turns} — the CLI ends with exit code
+     * 0 in both cases (c6d1a872). Same rule as the ✗ of the live view ({@link ClaudeStreamEventFormatter}).
+     */
+    public boolean failed() {
+        return Boolean.TRUE.equals(isError) || (subtype != null && subtype.startsWith("error"));
+    }
+
+    /** Whether a {@code result} line was found at all — the parser's fallback for plain text has neither field. */
+    public boolean hasResultLine() {
+        return subtype != null || isError != null;
+    }
 
     public String model() {
         if (assistantModel != null && !assistantModel.isBlank()) {

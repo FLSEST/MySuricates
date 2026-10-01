@@ -27,7 +27,8 @@ public final class BlockJsonReader {
 
     /**
      * Maps one block object; fields of the wrong JSON kind (e.g. {@code config} as a string) are left out, a missing
-     * {@code config} becomes an empty mutable map.
+     * {@code config} becomes an empty mutable map. Any other field ({@code on_failure} beside {@code config}) is kept
+     * as {@link BlockDefinition#unknownFields()}, so the analyzer reports it.
      */
     public static BlockDefinition toBlock(JsonNode node, ObjectMapper objectMapper) {
         BlockDefinition block = new BlockDefinition();
@@ -45,6 +46,12 @@ public final class BlockJsonReader {
         if (node.path("skillIds").isArray()) {
             block.setSkillIds(objectMapper.convertValue(node.get("skillIds"), new TypeReference<List<String>>() {}));
         }
+        // Fields beside these are kept, as on every other way in, so the analyzer reports them (d3aa0b28)
+        node.properties().forEach(field -> {
+            if (!BlockDefinition.FIELDS.contains(field.getKey())) {
+                block.putUnknownField(field.getKey(), objectMapper.convertValue(field.getValue(), Object.class));
+            }
+        });
         return block;
     }
 

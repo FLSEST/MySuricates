@@ -3,6 +3,7 @@ package com.automation.util;
 import com.automation.entity.BlockDefinition;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.AttributeConverter;
 import jakarta.persistence.Converter;
@@ -13,7 +14,14 @@ import java.util.List;
 @Converter
 public class BlockDefinitionListConverter implements AttributeConverter<List<BlockDefinition>, String> {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    /**
+     * Tolerant on reading: a field this version does not know lands in {@link BlockDefinition#unknownFields()}
+     * (any-setter) and is written back, never fails the row — so a later return to this version does not break on
+     * a field a newer one stored (d3aa0b28). FAIL_ON_UNKNOWN_PROPERTIES is off as well, for anything the any-setter
+     * does not cover.
+     */
+    private static final ObjectMapper MAPPER = new ObjectMapper()
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     @Override
     public String convertToDatabaseColumn(List<BlockDefinition> attribute) {

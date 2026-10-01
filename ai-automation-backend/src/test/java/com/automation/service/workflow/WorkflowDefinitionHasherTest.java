@@ -61,6 +61,36 @@ class WorkflowDefinitionHasherTest {
         assertThat(with).isNotEqualTo(without);
     }
 
+    /** d3aa0b28: fields beside config are kept now — without one the hash stays the pinned one, with one it changes. */
+    @Test
+    void unknownBlockField_changesTheHash_withoutOneTheHashStaysAsBefore() {
+        Map<String, Object> audit = Map.of("audit", Map.of("enabled", true));
+        BlockDefinition plain = block("shell", Map.of("command", "echo hi"));
+        BlockDefinition stray = block("shell", Map.of("command", "echo hi"));
+        stray.putUnknownField("on_failure", "continue");
+
+        String without = hasher.hash(snapshot(List.of(plain), audit, List.of("s2", "s1")));
+        String with = hasher.hash(snapshot(List.of(stray), audit, List.of("s2", "s1")));
+
+        assertThat(without).isEqualTo("69c15899e368f22372548814ee406d8c3295f59d3e93966b1575586b5b9ff98b");
+        assertThat(with).isNotEqualTo(without);
+        assertThat(hasher.canonicalJson(snapshot(List.of(stray), audit, List.of())))
+                .contains("{\"config\":{\"command\":\"echo hi\"},\"type\":\"shell\",\"on_failure\":\"continue\"}");
+    }
+
+    @Test
+    void orderOfUnknownBlockFieldsDoesNotMatter() {
+        BlockDefinition ab = block("shell", Map.of("command", "x"));
+        ab.putUnknownField("a", 1);
+        ab.putUnknownField("b", 2);
+        BlockDefinition ba = block("shell", Map.of("command", "x"));
+        ba.putUnknownField("b", 2);
+        ba.putUnknownField("a", 1);
+
+        assertThat(hasher.hash(snapshot(List.of(ab), Map.of(), List.of())))
+                .isEqualTo(hasher.hash(snapshot(List.of(ba), Map.of(), List.of())));
+    }
+
     @Test
     void mapKeyOrderDoesNotMatter() {
         Map<String, Object> ab = new LinkedHashMap<>();

@@ -3,6 +3,7 @@ package com.automation.service.ai;
 import com.automation.concurrency.DynamicSemaphore;
 import com.automation.config.CliPermissionsConfig;
 import com.automation.config.HostClaudeConfig;
+import com.automation.service.cli.claude.ClaudeCliOutcome;
 import com.automation.service.cli.claude.ClaudeJsonResponse;
 import com.automation.service.cli.claude.ClaudeOutputParser;
 import com.automation.service.cli.claude.ClaudeStreamEventFormatter;
@@ -101,7 +102,8 @@ public class HostClaudeService {
                                              Integer timeoutSeconds, String effort) throws IOException {
         List<String> cmd = buildReasonCommand(prompt, systemPrompt, model, maxTurns, effort);
         var result = executeProcess(cmd, prompt, workingDirectory, timeoutSeconds, "Host Claude reasoning");
-        return new ReasoningResult(CliExit.answerOrThrow("Host Claude reasoning", result.exitCode, result.text), result.parsed);
+        return new ReasoningResult(CliExit.answerOrThrow("Host Claude reasoning", result.exitCode, result.text,
+                result.parsed.failed()), result.parsed);
     }
 
     /**
@@ -179,13 +181,12 @@ public class HostClaudeService {
             String rawOutput = ProcessDrain.drain(proc, effectiveTimeout, label, ClaudeStreamEventFormatter.listener(LiveOutput.current()));
 
             int exitCode = proc.exitValue();
-            if (exitCode != 0) {
-                log.warn("{} returned exit code {}: {}", label, exitCode, truncate(rawOutput, 500));
-            }
-
             ClaudeJsonResponse parsed = ClaudeOutputParser.parseStreamJson(rawOutput);
-            String text = parsed.result() != null ? parsed.result() : rawOutput;
-            return new ProcessResult(text, exitCode, parsed);
+            var outcome = ClaudeCliOutcome.of(rawOutput, exitCode, parsed);
+            if (outcome.exitCode() != 0) {
+                log.warn("{} returned exit code {}: {}", label, exitCode, truncate(outcome.text(), 500));
+            }
+            return new ProcessResult(outcome.text(), outcome.exitCode(), parsed);
         } finally {
             callSemaphore.release();
             if (!priority) {

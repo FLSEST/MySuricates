@@ -85,6 +85,20 @@ class AnalyzerFindingLanguagesTest {
                 block("shell", "settings", Map.of("command", "set -euo pipefail\necho app_settings")),
                 block("shell", "db", Map.of("command", "set -euo pipefail\nsqlite3 data/automation.db 'SELECT 1'")),
                 block("shell", "lite", Map.of("command", "set -euo pipefail\nsqlite3 project.db .dump"))), null));
+        // Form: dead-nested-blocks, unknown-block-field (Config-Schlüssel, nahe Schreibweise, sonst; verschachtelt)
+        BlockDefinition loose = block("shell", "loose", Map.of("command", "set -euo pipefail\nls"));
+        loose.putUnknownField("on_failure", "continue");
+        loose.putUnknownField("skill_ids", List.of("s"));
+        loose.putUnknownField("comment", "note");
+        Map<String, Object> strayNested = new HashMap<>();
+        strayNested.put("type", "shell");
+        strayNested.put("config", Map.of("command", "set -euo pipefail\nls"));
+        strayNested.put("timeout_seconds", 60);
+        out.addAll(analyzer.analyze(List.of(
+                block("foreach", "dead", Map.of("items", List.of("a"), "command", "echo {{ item }}",
+                        "blocks", List.of(Map.of("type", "simple", "config", Map.of("command", "x"))))),
+                loose,
+                block("switch", "sw", Map.of("expression", "x", "default", List.of(strayNested)))), null));
         return out;
     }
 
@@ -127,7 +141,12 @@ class AnalyzerFindingLanguagesTest {
                 .anyMatch(t -> t.startsWith("Block 4 › cases[0] › Block 1 \"report\": "))
                 .anyMatch(t -> t.contains("in the nested block 'inner'"))
                 .anyMatch(t -> t.contains("the block runs with zero items"))
-                .anyMatch(t -> t.contains("the items come from items"));
+                .anyMatch(t -> t.contains("the items come from items"))
+                .anyMatch(t -> t.contains("config.blocks (foreach) with 1 block entries never runs"))
+                .anyMatch(t -> t.contains("on_failure sits next to config instead of inside it"))
+                .anyMatch(t -> t.contains("did you mean skillIds?"))
+                .anyMatch(t -> t.contains("unknown block field comment"))
+                .anyMatch(t -> t.startsWith("Block 3 › default › Block 1: timeout_seconds sits next to config"));
     }
 
     @Test

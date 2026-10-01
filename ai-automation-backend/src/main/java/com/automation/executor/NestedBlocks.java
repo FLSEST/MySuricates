@@ -1,12 +1,19 @@
 package com.automation.executor;
 
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 /**
  * Walks the blocks nested inside a block's raw config, depth first: switch {@code cases[].blocks}
- * and {@code default}, plus a plain {@code blocks} list (foreach, retry, conditional).
+ * and {@code default} — the only nested blocks any executor runs — plus a plain {@code config.blocks}
+ * list. <b>No executor runs {@code config.blocks}</b>, on no block type: foreach, retry, conditional and
+ * while run their {@code command} (or {@code then_command}/{@code else_command}), never a block list
+ * (5536c5aa). The list is walked anyway, so that every validation sees what the definition holds; the
+ * analyzer reports it as {@code dead-nested-blocks}.
  *
  * <p>One walker for every validation of the same tree. {@code BlockTypeValidator} and
  * {@link ExecutionMode} used to traverse it separately and had already drifted apart — the type
@@ -29,8 +36,10 @@ public final class NestedBlocks {
      * @param config its {@code config} map, or null when missing or not a map
      * @param path   where it sits below the enclosing top-level block, e.g. {@code "cases[0] › Block 1"}
      *               or {@code "default › Block 2 › blocks › Block 1"}; block numbers count from 1
+     * @param fields every key of the nested block's map — besides {@code name}, {@code type} and
+     *               {@code config} whatever else stands there, which a run never reads
      */
-    public record Nested(String name, String type, Map<String, Object> config, String path) {
+    public record Nested(String name, String type, Map<String, Object> config, String path, Set<String> fields) {
 
         /** Name if it has one, else the type — the label validation messages use. */
         public String label() {
@@ -75,7 +84,8 @@ public final class NestedBlocks {
                     nested.get("name") instanceof String name ? name : null,
                     nested.get("type") instanceof String type ? type : null,
                     nestedConfig,
-                    path));
+                    path,
+                    nested.keySet().stream().map(String::valueOf).collect(Collectors.toCollection(LinkedHashSet::new))));
             visit(nestedConfig, path + " › ", visitor);
         }
     }
