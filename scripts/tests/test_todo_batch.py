@@ -891,6 +891,17 @@ class FinalReviewFollowUpTest(RepoCase):
                          "FAIL src/x.test.ts > macht y")
         self.assertEqual(gates.first_error("nur Text\nnoch mehr"), "noch mehr")
         self.assertEqual(gates.first_error(""), "")
+        # Maven färbt auch in eine Logdatei (Jansi): die Escape-Folgen dürfen den Präfix nicht verdecken
+        self.assertEqual(gates.first_error("[\x1b[1;31mERROR\x1b[m] \x1b[1mA.java:[3,1] cannot find symbol\x1b[m"),
+                         "A.java:[3,1] cannot find symbol")
+
+    def test_gate_tail_has_no_colour_codes(self):
+        import gates
+        cfg = gates.GateConfig("ai-automation-backend", "ai-automation-frontend",
+                               "printf '[\\033[1;31mERROR\\033[m] kaputt\\n'; exit 1", "", "", self.state / "logs")
+        _, lines = gates.run_gates(["backend"], "", cfg, "t")
+        self.assertNotIn("\x1b", lines[0])
+        self.assertIn("[ERROR] kaputt", lines[0])
 
 
 class PoolDefinitionTest(unittest.TestCase):

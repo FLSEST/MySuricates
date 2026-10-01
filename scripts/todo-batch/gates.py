@@ -28,6 +28,7 @@ _NOISE = re.compile(r"(?i)^(failures:|errors:|tests run:|build failure|failed to
                     r"re-run maven|to see the full stack trace|for more information about the errors|please refer to|"
                     r"\[help \d+\]|npm err!|error: process completed with exit code|error: command failed)")
 _ERRORISH = re.compile(r"(?i)(error|fail|assert|expected|exception|fehler|✗|×|zeitüberschreitung)")
+_ANSI = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")   # Farbfolgen (Maven färbt auch in eine Datei)
 _LEVEL = re.compile(r"^\s*\[(ERROR|WARNING|WARN|INFO)\]\s*")
 
 
@@ -85,7 +86,8 @@ def _run(name: str, command: str, cwd: str, cfg: GateConfig, label: str) -> tupl
             os.killpg(process.pid, signal.SIGKILL)
             process.wait()
             code = None
-    lines = [l for l in log.read_text(encoding="utf-8", errors="replace").splitlines() if not l.lstrip().startswith("at ")]
+    text = _ANSI.sub("", log.read_text(encoding="utf-8", errors="replace"))
+    lines = [l for l in text.splitlines() if not l.lstrip().startswith("at ")]
     if code is None:
         lines.append(f"Zeitüberschreitung nach {cfg.timeout} s")
     return code == 0, "\n".join(lines[-15:])
@@ -94,7 +96,7 @@ def _run(name: str, command: str, cwd: str, cfg: GateConfig, label: str) -> tupl
 def first_error(tail: str) -> str:
     """Die erste aussagekräftige Fehlerzeile der Gate-Ausgabe, ohne `[ERROR]`-Präfix; sonst die letzte Zeile."""
     fallback = ""
-    for raw in (tail or "").splitlines():
+    for raw in _ANSI.sub("", tail or "").splitlines():
         line = _LEVEL.sub("", raw).strip()
         if not line or _NOISE.match(line) or "Time elapsed" in line:
             continue
