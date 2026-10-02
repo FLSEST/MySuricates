@@ -143,6 +143,13 @@ deps_candidate() {  # PAKET MANAGER
   esac | sed 's/^[0-9]*://'
 }
 
+# Docker-Dienst starten — nur mit systemd. Ohne (ein Container) laeuft kein Dienst, dort steht der
+# Docker-Socket von aussen bereit; ein Fehlschlag bricht die Installation nicht ab, docker_ready meldet
+# ihn danach. Als Befehlstext, weil setup.sh den Plan per `bash -c` ausfuehrt (ohne deps.sh).
+deps_docker_service_cmd() {
+  echo '{ ! command -v systemctl >/dev/null 2>&1 || sudo systemctl enable --now docker || true; }'
+}
+
 # Wie kommt WERKZEUG auf diesen Rechner? → "pm BEFEHL" | "download BESCHREIBUNG" | "manual HINWEIS"
 deps_method() {
   local tool="$1" pm os cand pkg
@@ -154,13 +161,12 @@ deps_method() {
         # Docker's eigenes Repo fuer Rocky enthaelt (Stand 2026-10) nur die Plugins, kein docker-ce, und
         # AlmaLinux/Oracle kennt get.docker.com gar nicht (24515f13). Deren Pakete sind die von CentOS —
         # der offizielle Weg aus docs.docker.com/engine/install/centos, Repo-Datei per curl (dnf 4 und 5).
-        # Ohne systemd (Container) laeuft kein Dienst; dort steht der Docker-Socket von aussen bereit.
-        echo "pm sudo curl -fsSL -o /etc/yum.repos.d/docker-ce.repo https://download.docker.com/linux/centos/docker-ce.repo && sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin && { ! command -v systemctl >/dev/null 2>&1 || sudo systemctl enable --now docker || true; } && sudo usermod -aG docker $(id -un)"
+        echo "pm sudo curl -fsSL -o /etc/yum.repos.d/docker-ce.repo https://download.docker.com/linux/centos/docker-ce.repo && sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin && $(deps_docker_service_cmd) && sudo usermod -aG docker $(id -un)"
         return
       fi
       case "$pm" in
         apt|dnf) echo "pm curl -fsSL https://get.docker.com | sudo sh && sudo usermod -aG docker $(id -un)" ;;
-        pacman|zypper) echo "pm $(deps_install_cmd "$pm" $(deps_pkg docker "$pm")) && sudo systemctl enable --now docker && sudo usermod -aG docker $(id -un)" ;;
+        pacman|zypper) echo "pm $(deps_install_cmd "$pm" $(deps_pkg docker "$pm")) && $(deps_docker_service_cmd) && sudo usermod -aG docker $(id -un)" ;;
         *) echo "manual https://docs.docker.com/engine/install/" ;;
       esac
       return ;;

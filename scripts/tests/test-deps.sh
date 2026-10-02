@@ -71,18 +71,29 @@ osr fedora "";                       check "fedora stays on get.docker.com" 'dme
 osr rhel "fedora";                   check "rhel stays on get.docker.com"   'dmethod | grep -F get.docker.com >/dev/null'
 osr centos "rhel fedora";            check "centos stays on get.docker.com" 'dmethod | grep -F get.docker.com >/dev/null'
 rm -f "$TMP/os-release";             check "no os-release: get.docker.com"  'dmethod | grep -F get.docker.com >/dev/null'
+# Den Befehl wirklich ausfuehren, alle Werkzeuge gestubbt; $2=1 mit systemctl, 0 ohne (ein Container)
+BASH_BIN="$(command -v bash)"
+runcmd() {  # BEFEHL MIT_SYSTEMCTL → setzt RC, Aufrufe in $TMP/calls
+  rm -rf "$TMP/cmdbin"; mkdir -p "$TMP/cmdbin"; : > "$TMP/calls"
+  for t in curl dnf pacman zypper usermod systemctl; do printf '#!/bin/sh\necho "%s $*" >> "%s/calls"\n' "$t" "$TMP" > "$TMP/cmdbin/$t"; chmod +x "$TMP/cmdbin/$t"; done
+  printf '#!/bin/sh\n"$@"\n' > "$TMP/cmdbin/sudo"; chmod +x "$TMP/cmdbin/sudo"
+  [ "$2" = 1 ] || rm -f "$TMP/cmdbin/systemctl"
+  ( PATH="$TMP/cmdbin"; "$BASH_BIN" -c "$1" ) >/dev/null 2>&1; RC=$?
+}
+started() { [ "$RC" = 0 ] && grep -F "usermod -aG docker" "$TMP/calls" >/dev/null && grep -F "systemctl enable --now docker" "$TMP/calls" >/dev/null; }
+installed() { [ "$RC" = 0 ] && grep -F "usermod -aG docker" "$TMP/calls" >/dev/null; }
 osr rocky "rhel centos fedora"
 CMD="$(dmethod)"; CMD="${CMD#pm }"
-mkdir -p "$TMP/cmdbin"; : > "$TMP/calls"
-for t in curl dnf usermod systemctl; do printf '#!/bin/sh\necho "%s $*" >> "%s/calls"\n' "$t" "$TMP" > "$TMP/cmdbin/$t"; chmod +x "$TMP/cmdbin/$t"; done
-printf '#!/bin/sh\n"$@"\n' > "$TMP/cmdbin/sudo"; chmod +x "$TMP/cmdbin/sudo"
-BASH_BIN="$(command -v bash)"
-( PATH="$TMP/cmdbin"; "$BASH_BIN" -c "$CMD" ) >/dev/null 2>&1; RC=$?
-check "rocky command runs through (stubbed)"                  '[ "$RC" = 0 ] && grep -F "usermod -aG docker" "$TMP/calls" >/dev/null && grep -F "systemctl enable --now docker" "$TMP/calls" >/dev/null'
-rm -f "$TMP/cmdbin/systemctl"; : > "$TMP/calls"
-( PATH="$TMP/cmdbin"; "$BASH_BIN" -c "$CMD" ) >/dev/null 2>&1; RC=$?
-check "without systemd (a container) it still succeeds"       '[ "$RC" = 0 ] && grep -F "usermod -aG docker" "$TMP/calls" >/dev/null'
+runcmd "$CMD" 1; check "rocky command runs through (stubbed)"            'started'
+runcmd "$CMD" 0; check "rocky without systemd (a container) still succeeds" 'installed'
 unstub dnf; rm -f "$TMP/os-release"
+for PMX in pacman zypper; do
+  stub "$PMX" 'exit 0'
+  CMD="$(run "deps_method docker")"; CMD="${CMD#pm }"
+  runcmd "$CMD" 1; check "$PMX: installs and starts the service"        'started'
+  runcmd "$CMD" 0; check "$PMX without systemd (a container) still succeeds" 'installed'
+  unstub "$PMX"
+done
 
 echo "5) verified download"
 if [ -x "$TMP/tools/curl" ]; then
