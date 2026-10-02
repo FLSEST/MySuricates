@@ -2472,7 +2472,7 @@ Download a specific backup.
 
 Retrieve an application setting.
 
-**Allowed Keys:** `auto-todo-default`, `auto-repair-default`, `auto-repair-mode`, `auto-repair-max-retries`, `auto-repair-timeout-seconds`, `default-ai-provider`, `assistant-thinking-phrases`, `assistant-model`, `suggestions-model`, `suggestions-enabled`, `backup-retain-count`
+**Allowed Keys:** `auto-todo-default`, `auto-repair-default`, `auto-repair-mode`, `auto-repair-max-retries`, `auto-repair-timeout-seconds`, `default-ai-provider`, `assistant-thinking-phrases`, `assistant-model`, `suggestions-model`, `suggestions-enabled`, `backup-retain-count`, `github.repo-allowlist`
 
 **Response:** `{ "key": "...", "value": "..." }` — `value` is empty while nothing is stored. For `backup-retain-count`, `"default"` comes along: the value of `automation.backup.retain-count` that applies then (e.g. `{ "key": "backup-retain-count", "value": "", "default": "30" }`).
 

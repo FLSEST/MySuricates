@@ -2479,7 +2479,7 @@ Bestimmtes Backup herunterladen.
 
 Anwendungs-Einstellung abrufen.
 
-**Erlaubte Keys:** `auto-todo-default`, `auto-repair-default`, `auto-repair-mode`, `auto-repair-max-retries`, `auto-repair-timeout-seconds`, `default-ai-provider`, `assistant-thinking-phrases`, `assistant-model`, `suggestions-model`, `suggestions-enabled`, `backup-retain-count`
+**Erlaubte Keys:** `auto-todo-default`, `auto-repair-default`, `auto-repair-mode`, `auto-repair-max-retries`, `auto-repair-timeout-seconds`, `default-ai-provider`, `assistant-thinking-phrases`, `assistant-model`, `suggestions-model`, `suggestions-enabled`, `backup-retain-count`, `github.repo-allowlist`
 
 **Response:** `{ "key": "...", "value": "..." }` — `value` ist leer, solange nichts gespeichert ist. Bei `backup-retain-count` kommt `"default"` dazu: der Wert aus `automation.backup.retain-count`, der dann gilt (z. B. `{ "key": "backup-retain-count", "value": "", "default": "30" }`).
 
