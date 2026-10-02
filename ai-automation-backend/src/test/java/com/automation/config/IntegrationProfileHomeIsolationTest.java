@@ -10,7 +10,6 @@ import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.core.env.EnumerablePropertySource;
 import org.springframework.core.env.PropertySource;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -70,8 +69,7 @@ class IntegrationProfileHomeIsolationTest {
     @Test
     void apiKeyFileAndRunWorkspacesLieOutsideTheRealHome() {
         Path keyFile = instanceAddress.apiKeyFile().toAbsolutePath().normalize();
-        Path workspaceRoot = Path.of((String) ReflectionTestUtils.getField(runWorkspaces, "root"))
-                .toAbsolutePath().normalize();
+        Path workspaceRoot = Path.of(runWorkspaces.root()).toAbsolutePath().normalize();
 
         assertThat(keyFile.startsWith(REAL_STATE_DIR)).as("API key file %s", keyFile).isFalse();
         assertThat(workspaceRoot.startsWith(REAL_STATE_DIR)).as("run workspace root %s", workspaceRoot).isFalse();

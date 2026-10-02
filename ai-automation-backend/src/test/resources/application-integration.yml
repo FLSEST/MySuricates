@@ -110,7 +110,7 @@ automation:
     base-dir: ${integration.setup.dir:${java.io.tmpdir}/mysuricates-integrationtest-setup}/summarization
   factory:
     base-dir: ${integration.setup.dir:${java.io.tmpdir}/mysuricates-integrationtest-setup}/factory
-  # Isolated run checkouts default to ${automation.data-home}/workspaces (TODO 88781724).
+  # Isolated run checkouts default to ~/.mysuricates/workspaces in the real home (TODO 88781724).
   run-workspace:
     root: ${integration.setup.dir:${java.io.tmpdir}/mysuricates-integrationtest-setup}/workspaces
 

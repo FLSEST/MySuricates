@@ -20,6 +20,7 @@ import tempfile
 import time
 import tokenize
 import unittest
+from unittest import mock
 
 HERE = Path(__file__).resolve().parent
 SCRIPTS = HERE.parent
@@ -169,6 +170,19 @@ class LocalApiWithoutProxyTest(unittest.TestCase):
                               '--root', str(self.work / 'workspaces'), '--api-base', self.base)
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertNotIn('KEEP', result.stdout)  # "KEEP run-1: HTTPError" — the question failed
+        self.assert_asked_directly('GET /api/v1/executions/run-1')
+
+    def test_prune_workspaces_default_root_is_the_established_one(self):
+        # 88781724: without --root the script looks where RunWorkspaceService puts the snapshots —
+        # ~/.mysuricates/workspaces, also when the data directory is still ~/.autotrigger
+        (self.work / '.autotrigger').mkdir()
+        run = self.work / '.mysuricates' / 'workspaces' / 'project' / 'run-1'
+        run.mkdir(parents=True)
+        (run / 'workspace.json').write_text('{}')
+        with mock.patch.dict(os.environ):
+            os.environ.pop('AUTOMATION_RUN_WORKSPACE_ROOT', None)
+            result = self.proxied(str(SCRIPTS / 'tools/prune-workspaces.py'), '--api-base', self.base)
+        self.assertEqual(0, result.returncode, result.stderr)
         self.assert_asked_directly('GET /api/v1/executions/run-1')
 
     def test_collect_facts(self):

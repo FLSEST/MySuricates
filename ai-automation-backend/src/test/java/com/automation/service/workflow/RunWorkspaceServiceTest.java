@@ -209,8 +209,23 @@ class RunWorkspaceServiceTest {
     }
 
     /**
-     * 88781724: the default root moved from {@code ~/.mysuricates/workspaces} into the data directory.
-     * A run interrupted before such a change resumes in the checkout it started in.
+     * 88781724: without a setting the root stays where every installation had it — not in the data
+     * directory, which is {@code ~/.autotrigger} on older installations; a setting wins.
+     */
+    @Test
+    void root_unsetKeepsTheEstablishedPlace_aSettingWins() {
+        Path established = Path.of(System.getProperty("user.home"), ".mysuricates", "workspaces");
+        var repository = mock(WorkflowRunRepository.class);
+
+        assertThat(new RunWorkspaceService(repository, new ObjectMapper(), "").root()).isEqualTo(established.toString());
+        assertThat(new RunWorkspaceService(repository, new ObjectMapper(), null).root()).isEqualTo(established.toString());
+        assertThat(new RunWorkspaceService(repository, new ObjectMapper(), " /srv/runs ").root()).isEqualTo("/srv/runs");
+        assertThat(RunWorkspaceService.defaultRoot(directory)).isEqualTo(directory.resolve(".mysuricates/workspaces"));
+    }
+
+    /**
+     * 88781724: a run interrupted before the configured root changed (AUTOMATION_RUN_WORKSPACE_ROOT)
+     * resumes in the checkout it started in.
      */
     @Test
     void resumeStaysUnderTheRootTheRunStartedIn_evenWhenTheConfiguredRootChanged() throws Exception {

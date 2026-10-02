@@ -26,9 +26,11 @@ import java.util.concurrent.TimeUnit;
 /**
  * Run-owned Git snapshots. Slow preparation deliberately takes place outside a transaction.
  *
- * <p>The snapshots live under {@code automation.run-workspace.root}, by default in the data directory
- * ({@code ${automation.data-home}/workspaces}); the integration profile points it at a temp directory
- * (TODO 88781724). A resumed run stays under the root it started in, even if the setting changed meanwhile.
+ * <p>The snapshots live under {@code automation.run-workspace.root} ({@code AUTOMATION_RUN_WORKSPACE_ROOT}),
+ * unset {@code ~/.mysuricates/workspaces} — deliberately not the data directory, so existing installations
+ * keep their place and {@code scripts/tools/prune-workspaces.py} finds them. The integration profile points
+ * it at a temp directory (TODO 88781724). A resumed run stays under the root it started in, even if the
+ * setting changed meanwhile.
  */
 @Service
 public class RunWorkspaceService {
@@ -37,10 +39,21 @@ public class RunWorkspaceService {
     private final String root;
 
     public RunWorkspaceService(WorkflowRunRepository runs, ObjectMapper mapper,
-            @Value("${automation.run-workspace.root:${automation.data-home}/workspaces}") String root) {
+            @Value("${automation.run-workspace.root:}") String root) {
         this.runs = runs;
         this.mapper = mapper;
-        this.root = root;
+        this.root = root == null || root.isBlank()
+                ? defaultRoot(Path.of(System.getProperty("user.home"))).toString() : root.strip();
+    }
+
+    /** The root without a setting: where every installation kept its run workspaces so far. */
+    static Path defaultRoot(Path userHome) {
+        return userHome.resolve(".mysuricates").resolve("workspaces");
+    }
+
+    /** The root new snapshots are created under. */
+    public String root() {
+        return root;
     }
 
     /** Template blocks retain this policy even where the template format has no metadata field. */

@@ -24,9 +24,10 @@ def data_home():
 
 
 def default_root():
-    """automation.run-workspace.root: AUTOMATION_RUN_WORKSPACE_ROOT, else <data home>/workspaces (88781724)."""
+    """automation.run-workspace.root like RunWorkspaceService: AUTOMATION_RUN_WORKSPACE_ROOT, else
+    ~/.mysuricates/workspaces — also with ~/.autotrigger as data directory (88781724)."""
     explicit = os.environ.get('AUTOMATION_RUN_WORKSPACE_ROOT', '').strip()
-    return Path(explicit) if explicit else data_home() / 'workspaces'
+    return Path(explicit) if explicit else Path.home() / '.mysuricates' / 'workspaces'
 
 
 def eligible(root, manifest_path, execution, cutoff):

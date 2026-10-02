@@ -1021,14 +1021,14 @@ What is checked:
    `hygiene_private_terms_load` in `scripts/lib/hygiene-rules.sh`.
 
 **Run workspace retention:** every isolated checkout (`RunWorkspaceService`, default
-`<data directory>/workspaces/<project>/<run>/`, i.e. `~/.mysuricates/…` or `~/.autotrigger/…`;
-`automation.run-workspace.root`/`AUTOMATION_RUN_WORKSPACE_ROOT`) stays on disk after the run — nothing removes it
+`~/.mysuricates/workspaces/<project>/<run>/` — even when the data directory is still `~/.autotrigger`;
+otherwise set by `automation.run-workspace.root`/`AUTOMATION_RUN_WORKSPACE_ROOT`) stays on disk after the run — nothing removes it
 automatically. `scripts/tools/prune-workspaces.py` conservatively removes only the `repo/` checkout
 of completed, clean runs: the matching run must be `COMPLETED` per the API and older than
 `--retention-days` (default 30), the checkout unchanged (`git status --porcelain` empty), and the
 commit matching the manifest — logs and manifests are kept. Without `--apply` it is a dry run only
-(`WOULD REMOVE …`). Until October 2026 the root was fixed at `~/.mysuricates/workspaces`; older checkouts of an
-installation with `~/.autotrigger` are removed with `--root ~/.mysuricates/workspaces`.
+(`WOULD REMOVE …`). The script uses the same root (`AUTOMATION_RUN_WORKSPACE_ROOT`, else
+`~/.mysuricates/workspaces`); `--root` overrides it.
 
 `scripts/install-hooks.sh` installs the hooks (`pre-commit`, `commit-msg`, `pre-push`) via
 `core.hooksPath` (and runs as part of `setup.sh`).
