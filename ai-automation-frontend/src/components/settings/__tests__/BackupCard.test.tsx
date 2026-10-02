@@ -49,4 +49,27 @@ describe('BackupCard retention count', () => {
     expect(screen.getByDisplayValue('21')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^save$/i })).not.toBeInTheDocument();
   });
+
+  /** 8f1343d1: without a stored value the configured default applies, not a number of the UI's own. */
+  it('shows the configured default the backend names when nothing is stored', async () => {
+    vi.mocked(api.get).mockResolvedValue({ key: 'backup-retain-count', value: '', default: '45' });
+    renderWithProviders(<BackupCard />);
+
+    expect(await screen.findByDisplayValue('45')).toBeInTheDocument();
+  });
+
+  it('prefers the stored value over the default', async () => {
+    vi.mocked(api.get).mockResolvedValue({ key: 'backup-retain-count', value: '7', default: '45' });
+    renderWithProviders(<BackupCard />);
+
+    expect(await screen.findByDisplayValue('7')).toBeInTheDocument();
+  });
+
+  it('falls back to 30 against a backend without the default field', async () => {
+    vi.mocked(api.get).mockResolvedValue({ key: 'backup-retain-count', value: '' });
+    renderWithProviders(<BackupCard />);
+
+    expect(await screen.findByDisplayValue('30')).toBeInTheDocument();
+    expect(api.get).toHaveBeenCalledWith('/system/settings/backup-retain-count');
+  });
 });
