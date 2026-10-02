@@ -190,6 +190,18 @@ class HostPiServiceTest {
         assertThat(cmd).containsSubsequence("--thinking", "xhigh");
     }
 
+    /** TODO 20861200: the level a reasoning call ran with, for aiRequest — the same the command carries. */
+    @Test
+    void reasonThinkingLevel_isTheLevelOfTheCommand() {
+        HostPiService service = createService("anthropic", "xhigh");
+
+        assertThat(service.reasonThinkingLevel(null, null)).isEqualTo("xhigh");
+        assertThat(service.reasonThinkingLevel(1, null)).isEqualTo("low");
+        assertThat(service.reasonThinkingLevel(5, "low")).as("explicit effort wins").isEqualTo("low");
+        assertThat(service.buildReasonCommand(null, null, 3, null))
+                .containsSubsequence("--thinking", service.reasonThinkingLevel(3, null));
+    }
+
     // --- combined ---
 
     @Test

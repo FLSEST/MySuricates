@@ -104,9 +104,17 @@ export function useChainRunColumns(): RunColumn<ChainRun>[] {
       key: 'chain',
       header: t.nav.chains,
       render: (r: ChainRun) => (
-        <div className="flex items-center gap-1.5 min-w-0">
-          <Link2 className="w-3.5 h-3.5 text-accent/70 shrink-0" />
-          <span className="font-medium text-text truncate">{r.chainName ?? '-'}</span>
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <Link2 className="w-3.5 h-3.5 text-accent/70 shrink-0" />
+            <span className="font-medium text-text truncate">{r.chainName ?? '-'}</span>
+          </div>
+          {/* What started the chain (V96); older backends and chain runs send none */}
+          {r.triggerSource && (
+            <span className="text-xs text-text-tertiary block truncate" data-testid="chain-trigger-source">
+              {t.workflows.triggeredBy} {t.workflows.triggerSources[r.triggerSource] ?? r.triggerSource}
+            </span>
+          )}
         </div>
       ),
     },

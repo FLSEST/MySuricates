@@ -35,7 +35,12 @@ public class HostPiService {
 
     public record ActionResult(String text, int exitCode) {}
 
-    public record ReasoningResult(String text) {}
+    /** @param thinkingLevel the {@code --thinking} level the call ran with (TODO 20861200) */
+    public record ReasoningResult(String text, String thinkingLevel) {
+        public ReasoningResult(String text) {
+            this(text, null);
+        }
+    }
 
     /** Parsed model string: backend provider name + model id (may itself contain slashes). */
     public record BackendModel(String backend, String modelId) {}
@@ -78,7 +83,8 @@ public class HostPiService {
                                    Integer timeoutSeconds, String effort) throws IOException {
         List<String> cmd = buildReasonCommand(systemPrompt, model, maxTurns, effort);
         var result = executeProcess(cmd, prompt, workingDirectory, timeoutSeconds, "Host pi reasoning", false);
-        return new ReasoningResult(CliExit.answerOrThrow("Host pi reasoning", result.exitCode, result.text));
+        return new ReasoningResult(CliExit.answerOrThrow("Host pi reasoning", result.exitCode, result.text),
+                reasonThinkingLevel(maxTurns, effort));
     }
 
     /** Backwards-compat overload for call-sites written before effort support existed. */
@@ -120,9 +126,7 @@ public class HostPiService {
         applyBackendAndModel(cmd, model);
         cmd.add("--no-tools");
         cmd.add("--thinking");
-        cmd.add(ReasoningEffort.parse(effort)
-                .map(ReasoningEffort::cliValue)
-                .orElseGet(() -> thinkingLevelFor(maxTurns)));
+        cmd.add(reasonThinkingLevel(maxTurns, effort));
         if (systemPrompt != null && !systemPrompt.isBlank()) {
             cmd.add("--system-prompt");
             cmd.add(systemPrompt);
@@ -211,13 +215,9 @@ public class HostPiService {
         cmd.add(parsed.modelId());
     }
 
-    private String thinkingLevelFor(Integer maxTurns) {
-        if (maxTurns == null) {
-            return config.getDefaultThinkingLevel();
-        }
-        if (maxTurns <= 1) return "low";
-        if (maxTurns <= 3) return "medium";
-        return "high";
+    /** The {@code --thinking} level of a reasoning call ({@link PiThinkingLevel}). */
+    String reasonThinkingLevel(Integer maxTurns, String effort) {
+        return PiThinkingLevel.forReasoning(maxTurns, effort, config.getDefaultThinkingLevel());
     }
 
     // --- Process execution (mirrors HostClaudeService) ---

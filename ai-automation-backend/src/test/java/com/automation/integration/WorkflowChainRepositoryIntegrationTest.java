@@ -3,8 +3,11 @@ package com.automation.integration;
 import com.automation.entity.ChainEntry;
 import com.automation.entity.ChainRun;
 import com.automation.entity.RunStatus;
+import com.automation.entity.TriggerSource;
 import com.automation.entity.WorkflowChain;
+import com.automation.repository.ChainRunRepository;
 import com.automation.repository.WorkflowChainRepository;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -30,6 +33,24 @@ import static org.assertj.core.api.Assertions.assertThat;
 class WorkflowChainRepositoryIntegrationTest {
 
     @Autowired private WorkflowChainRepository chainRepository;
+    @Autowired private ChainRunRepository chainRunRepository;
+    @Autowired private EntityManager entityManager;
+
+    /** V96 (TODO 6db47bc2): der Starter der Kette liegt an der Chain-Run-Zeile, nicht nur im Kontext der Einträge. */
+    @Test
+    void chainRun_triggerSource_roundTrip() {
+        WorkflowChain chain = chainRepository.save(WorkflowChain.builder()
+                .name("Chain with Starter").entries(new ArrayList<>()).build());
+        String withSource = chainRunRepository.save(ChainRun.builder().chain(chain).status(RunStatus.RUNNING)
+                .startedAt(Instant.now()).triggerSource(TriggerSource.WISH).build()).getId();
+        String withoutSource = chainRunRepository.save(ChainRun.builder().chain(chain).status(RunStatus.RUNNING)
+                .startedAt(Instant.now()).build()).getId();
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(chainRunRepository.findById(withSource).orElseThrow().getTriggerSource()).isEqualTo(TriggerSource.WISH);
+        assertThat(chainRunRepository.findById(withoutSource).orElseThrow().getTriggerSource()).isNull();
+    }
 
     @Test
     void chainCrud_createAndFind() {

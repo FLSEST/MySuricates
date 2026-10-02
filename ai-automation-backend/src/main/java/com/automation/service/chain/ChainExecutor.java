@@ -78,6 +78,7 @@ public class ChainExecutor {
                 .inputContext(inputContext != null ? new HashMap<>(inputContext) : new HashMap<>())
                 .entryRuns(new ArrayList<>())
                 .triggeredByScheduleId(triggeredByScheduleId)
+                .triggerSource(startedBy)
                 .build();
         run = chainRunRepository.save(run);
 

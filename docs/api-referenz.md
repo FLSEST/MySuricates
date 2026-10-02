@@ -929,6 +929,7 @@ trägt eine Listenzeile `stepCount`, `lastStepStatus` und `lastStepPreview` (Aus
 Schritts, auf 500 Zeichen gekürzt — in der Datenbank abgeschnitten, die Step-Zeilen werden nicht geladen). Grund: Die Liste trug vorher jeden `step_results.output`
 (TEXT) mit — gemessen 3 061 816 Bytes bei 60 Runs, danach 51 716. Wer die Schritte braucht, holt
 den Run einzeln über `GET /api/v1/executions/{id}`; die Detail-Route liefert unverändert alles.
+Wie die Detail-Route trägt jede Zeile `chainRunId` (Chain-Run eines Ketteneintrags, sonst `null`; ältere Backends lassen das Feld weg).
 
 ### `GET /api/v1/executions/pending-input`
 
@@ -2795,13 +2796,13 @@ Tool-Nutzungsmuster eines Workflows (welche Tools wie oft genutzt werden).
 
 Ausführungs-Insights: Trends, Anomalien, Performance-Metriken.
 
-**Response:** `Map<String, Object>`
+**Response:** `Map<String, Object>` — Summen über alle Läufe des Workflows, darunter `totalInputTokens`, `totalOutputTokens`, `totalCacheReadInputTokens`, `totalCacheCreationInputTokens` und `totalThinkingTokens` (Teil der Output-Tokens; die drei letzten seit TODO 20861200, `0`, wenn kein Schritt sie meldet).
 
 ### `GET /api/v1/learning/runs/{runId}/insights`
 
 Detaillierte Insights für einen einzelnen Run.
 
-**Response:** `Map<String, Object>`
+**Response:** `Map<String, Object>` — Summen wie oben, dazu `steps[]` mit den Zahlen je Schritt; `cacheReadInputTokens`, `cacheCreationInputTokens` und `thinkingTokens` nur bei Schritten, die sie melden (Claude).
 
 ### `POST /api/v1/learning/runs/{runId}/rate?rating={1-5}`
 
@@ -3032,6 +3033,8 @@ Runs einer bestimmten Chain.
 Einzelnen Chain-Run abrufen.
 
 **Response:** `ChainRunResponse`
+
+`ChainRunResponse.triggerSource` nennt, was die Chain gestartet hat (`MANUAL`, `SCHEDULE`, `WISH`); `null` bei Chain-Runs von vor V96, die kein Zeitplan gestartet hat. Ältere Backends lassen das Feld weg.
 
 ### `POST /api/v1/chains/runs/{runId}/cancel`
 
@@ -4044,7 +4047,7 @@ Neuen Wunsch erstellen und asynchron erfüllen.
 
 **Response:** `201` mit `WishResponse`
 
-**WishResponse-Felder:** `id`, `originalText`, `status`, `projectId`, `projectName`, `decomposition`, `generatedWorkflowIds`, `generatedWorkflowNames`, `referenceWorkflowIds`, `referenceWorkflowNames`, `generatedChainId`, `iterationCount`, `maxIterations`, `currentRunId`, `resultSummary`, `error`, `iterationHistory`, `metadata`, `autoRefine`, `createdAt`, `updatedAt`
+**WishResponse-Felder:** `id`, `originalText`, `status`, `projectId`, `projectName`, `decomposition`, `generatedWorkflowIds`, `generatedWorkflowNames`, `referenceWorkflowIds`, `referenceWorkflowNames`, `generatedChainId`, `iterationCount`, `maxIterations`, `currentRunId`, `resultSummary`, `error`, `iterationHistory`, `metadata`, `autoRefine`, `stoppedPhase` (Phase, in der ein `FAILED`/`CANCELLED`-Wunsch stehen blieb, sonst `null`; V97), `createdAt`, `updatedAt`
 
 **WishStatus-Werte:** `RECEIVED`, `DECOMPOSING`, `AWAITING_DECOMPOSE_APPROVAL`, `EXECUTING`, `EVALUATING`, `REFINING`, `AWAITING_CLARIFICATION`, `AWAITING_APPROVAL`, `COMPLETED`, `FAILED`, `CANCELLED`
 

@@ -1296,6 +1296,8 @@ Die DB-Migrationen (`src/main/resources/db/migration/`) dokumentieren die Featur
 | V93 | Ziele Stufe 2: Entscheidung am TODO (`todos.decision`, `decided_at`, `decided_by`) |
 | V94 | Ziele Stufe 3: Tabelle `goal_workflows` (Workflows am Ziel oder Arbeitspaket) |
 | V95 | Indizes für abgeleitete Abfragen auf heißen Pfaden (`workflows.project_id`, `scheduled_workflows.workflow_id`/`chain_id`, Trigger je Workflow, `capabilities.skill_id`, `dead_letter_entries.workflow_run_id`, `workflow_memory(active, created_at)`) |
+| V96 | Starter einer Chain: `chain_runs.trigger_source` |
+| V97 | Endphase eines Wunschs: `wishes.stopped_phase` |
 
 ## Architektur-Gates
 
@@ -1338,7 +1340,7 @@ MySuricates/
 │           ├── application-dev.yml    ← Dev-Profil
 │           ├── agent-instructions.md  ← Basis-Agent-Instructions
 │           ├── templates/builtin/     ← Built-in Template JSON-Dateien
-│           └── db/migration/          ← 95 Flyway-Migrationen (V1–V95)
+│           └── db/migration/          ← 97 Flyway-Migrationen (V1–V97)
 │
 └── ai-automation-frontend/
     ├── package.json

@@ -59,4 +59,12 @@ public class ChainRun {
 
     @Column(name = "triggered_by_schedule_id")
     private String triggeredByScheduleId;
+
+    /**
+     * What started the chain (V96, TODO 6db47bc2) — its entry runs inherit it via {@code __parent_trigger_source}.
+     * Null for chain runs from before V96 that no schedule started.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "trigger_source")
+    private TriggerSource triggerSource;
 }

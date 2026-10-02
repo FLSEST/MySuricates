@@ -16,6 +16,9 @@ import java.util.Map;
  * {@code cacheCreationInputTokens} (TODO 20adda30) — {@code null} when the provider does not report
  * it (Codex, Pi, older Claude CLIs). The agentic token budget keeps counting {@code inputTokens}
  * only, so its limits mean what they meant before.
+ *
+ * <p>{@code thinkingTokens} is the part of {@code outputTokens} the model spent on extended thinking
+ * (TODO 20861200) — included in {@code outputTokens}, never added on top; {@code null} when not reported.
  */
 public record AiResponseMetadata(
         int inputTokens,
@@ -28,13 +31,22 @@ public record AiResponseMetadata(
         String sessionId,
         List<String> toolNames,
         Integer cacheReadInputTokens,
-        Integer cacheCreationInputTokens
+        Integer cacheCreationInputTokens,
+        Integer thinkingTokens
 ) {
+    /** Metadata without thinking figures. */
+    public AiResponseMetadata(int inputTokens, int outputTokens, Double costUsd, String model, boolean estimated,
+                              Long durationApiMs, Integer numTurns, String sessionId, List<String> toolNames,
+                              Integer cacheReadInputTokens, Integer cacheCreationInputTokens) {
+        this(inputTokens, outputTokens, costUsd, model, estimated, durationApiMs, numTurns, sessionId, toolNames,
+                cacheReadInputTokens, cacheCreationInputTokens, null);
+    }
+
     /** Metadata without cache figures. */
     public AiResponseMetadata(int inputTokens, int outputTokens, Double costUsd, String model, boolean estimated,
                               Long durationApiMs, Integer numTurns, String sessionId, List<String> toolNames) {
         this(inputTokens, outputTokens, costUsd, model, estimated, durationApiMs, numTurns, sessionId, toolNames,
-                null, null);
+                null, null, null);
     }
 
     /** Extract real metadata from a Claude CLI JSON response. */
@@ -59,7 +71,8 @@ public record AiResponseMetadata(
                 parsed.sessionId(),
                 tools,
                 usage != null ? usage.cacheReadInputTokens() : null,
-                usage != null ? usage.cacheCreationInputTokens() : null
+                usage != null ? usage.cacheCreationInputTokens() : null,
+                usage != null ? usage.thinkingTokens() : null
         );
     }
 
@@ -82,6 +95,7 @@ public record AiResponseMetadata(
         map.put("outputTokens", outputTokens);
         if (cacheReadInputTokens != null) map.put("cacheReadInputTokens", cacheReadInputTokens);
         if (cacheCreationInputTokens != null) map.put("cacheCreationInputTokens", cacheCreationInputTokens);
+        if (thinkingTokens != null) map.put("thinkingTokens", thinkingTokens);
         if (costUsd != null) map.put("costUsd", costUsd);
         if (model != null) map.put("model", model);
         if (estimated) map.put("estimated", true);

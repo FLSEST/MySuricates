@@ -2041,6 +2041,8 @@ export const en = {
     inputTokens: 'Input Tokens',
     outputTokens: 'Output Tokens',
     cacheTokens: 'cache',
+    thinkingTokens: 'incl. {count} thinking',
+    thinkingTokensHint: 'Part of the output tokens the model spent on extended thinking – already included in the output tokens',
     stepTokens: '{count} tokens',
     cacheTokensHint: '{read} read from the prompt cache, {write} written to the cache – on top of the input tokens',
     perStep: 'Per Step Breakdown',

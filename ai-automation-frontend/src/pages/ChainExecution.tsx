@@ -1,6 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowDown, ExternalLink, XCircle, CheckCircle2, AlertCircle, Clock, Loader2 } from 'lucide-react';
 import { Card, Button, Badge, Spinner } from '../components/ui';
+import { TriggerSourceChip } from '../components/workflow/TriggerSourceChip';
 import { useChainRun, useCancelChainRun } from '../hooks/useChains';
 import { useI18nStore, useT } from '../i18n';
 import { formatDuration } from '../utils/formatTime';
@@ -57,6 +58,9 @@ export function ChainExecution() {
             <h1 className="text-2xl font-bold text-text">{t.chains.execution.title}</h1>
             {run.chainName && (
               <p className="text-text-secondary">{run.chainName}</p>
+            )}
+            {run.triggerSource && (
+              <div className="mt-1 text-xs"><TriggerSourceChip source={run.triggerSource} /></div>
             )}
           </div>
         </div>

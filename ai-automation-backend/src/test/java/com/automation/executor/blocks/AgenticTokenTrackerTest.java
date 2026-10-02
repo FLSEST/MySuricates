@@ -56,6 +56,24 @@ class AgenticTokenTrackerTest {
                 .containsEntry("cacheCreationInputTokens", 5000L);
     }
 
+    /** TODO 20861200: thinking is summed into the step, but it is part of outputTokens — not counted twice. */
+    @Test
+    void thinkingTokens_areSummedIntoTheStep_butNotOnTopOfTheOutput() {
+        AiResponseMetadata reason = new AiResponseMetadata(3, 200, 0.01, "claude-opus-5-5", false, null, null, null,
+                List.of(), null, null, 120);
+        AiResponseMetadata act = new AiResponseMetadata(5, 300, 0.02, "claude-opus-5-5", false, null, null, null,
+                List.of(), null, null, 80);
+        Map<String, Object> iterData = new LinkedHashMap<>();
+        tracker.captureReasonMeta(iterData, reason, "prompt", "response", 1);
+        tracker.captureActMeta(iterData, act, "action", "output", 1);
+        tracker.trackIteration(iterData);
+
+        assertThat(tracker.getRunningTotalTokens()).isEqualTo(3 + 200 + 5 + 300);
+        assertThat(tracker.buildFinalMetadata("goal", "criteria", 1, true, null, "opus", "CLAUDE"))
+                .containsEntry("outputTokens", 500)
+                .containsEntry("thinkingTokens", 200L);
+    }
+
     @Test
     void cacheTokens_notReported_leaveNoKeys() {
         Map<String, Object> iterData = new LinkedHashMap<>();
@@ -64,7 +82,7 @@ class AgenticTokenTrackerTest {
         tracker.trackIteration(iterData);
 
         assertThat(tracker.buildFinalMetadata("goal", "criteria", 1, true, null, null, "CODEX"))
-                .doesNotContainKeys("cacheReadInputTokens", "cacheCreationInputTokens");
+                .doesNotContainKeys("cacheReadInputTokens", "cacheCreationInputTokens", "thinkingTokens");
     }
 
     @Test

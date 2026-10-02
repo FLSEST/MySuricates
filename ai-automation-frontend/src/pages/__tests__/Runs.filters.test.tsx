@@ -73,6 +73,21 @@ describe('Runs page — filters in the app language', () => {
     expect(localStorage.getItem('runs-status-filter')).toBe('""');
   });
 
+  it('names what started a chain run when the backend sends it (V96), and nothing for the old shape', async () => {
+    serve();
+    server.use(http.get('/api/v1/chains/runs', () => HttpResponse.json({
+      content: [{ ...chainRun, triggerSource: 'WISH' }, { ...chainRun, id: 'cr-2', chainName: 'Alt' }],
+      page: 0, size: 50, totalElements: 2, totalPages: 1,
+    })));
+    renderWithProviders(<Runs />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Ketten' }));
+    expect(await screen.findByText('Alt')).toBeInTheDocument();
+    const sources = screen.getAllByTestId('chain-trigger-source');
+    expect(sources).toHaveLength(1);
+    expect(sources[0].textContent).toMatch(/^Gestartet durch /);
+  });
+
   it('goes back to the first page when a filter changes', async () => {
     const queries: string[] = [];
     serve(queries, 3);

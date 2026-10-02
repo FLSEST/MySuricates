@@ -147,6 +147,21 @@ class ChainExecutorTest {
         assertThat(saved.getStartedAt()).isNotNull();
         assertThat(saved.getInputContext()).containsEntry("env", "test");
         assertThat(saved.getEntryRuns()).isNotNull().isEmpty();
+        assertThat(saved.getTriggerSource()).as("Starter der Kette (V96)").isEqualTo(TriggerSource.MANUAL);
+    }
+
+    /** TODO 6db47bc2: die Kette hält ihren Starter selbst fest, nicht nur ihre Einträge im Kontext. */
+    @Test
+    void execute_recordsWhatStartedTheChain() {
+        doAnswer(inv -> null).when(virtualThreadExecutor).submit(any(Runnable.class));
+
+        chainExecutor.execute(testChain, Map.of(), "schedule-1");
+        chainExecutor.execute(testChain, Map.of(), null, TriggerSource.WISH);
+
+        ArgumentCaptor<ChainRun> captor = ArgumentCaptor.forClass(ChainRun.class);
+        verify(chainRunRepository, times(2)).save(captor.capture());
+        assertThat(captor.getAllValues()).extracting(ChainRun::getTriggerSource)
+                .containsExactly(TriggerSource.SCHEDULE, TriggerSource.WISH);
     }
 
     @Test

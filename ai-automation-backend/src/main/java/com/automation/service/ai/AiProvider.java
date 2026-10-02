@@ -132,10 +132,20 @@ public interface AiProvider {
 
     // --- Response records ---
 
+    /**
+     * @param thinkingLevel the thinking level the provider chose for this call on its own (pi's
+     *                      {@code --thinking}, from the effort or the maxTurns heuristic, TODO 20861200);
+     *                      {@code null} for providers that pass nothing of their own
+     */
     record ReasoningResult(
             String text,
-            AiResponseMetadata metadata
-    ) {}
+            AiResponseMetadata metadata,
+            String thinkingLevel
+    ) {
+        public ReasoningResult(String text, AiResponseMetadata metadata) {
+            this(text, metadata, null);
+        }
+    }
 
     record ActionResult(
             String text,

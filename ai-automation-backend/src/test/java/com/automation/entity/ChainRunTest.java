@@ -162,7 +162,7 @@ class ChainRunTest {
                 "run-id", chain, RunStatus.RUNNING,
                 entries, inputContext,
                 started, completed, 300000L,
-                "some error", metadata, "sched-1"
+                "some error", metadata, "sched-1", TriggerSource.SCHEDULE
         );
 
         assertThat(run.getId()).isEqualTo("run-id");
@@ -176,6 +176,7 @@ class ChainRunTest {
         assertThat(run.getError()).isEqualTo("some error");
         assertThat(run.getMetadata()).containsEntry("source", "test");
         assertThat(run.getTriggeredByScheduleId()).isEqualTo("sched-1");
+        assertThat(run.getTriggerSource()).isEqualTo(TriggerSource.SCHEDULE);
     }
 
     // --- List mutability ---

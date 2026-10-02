@@ -36,6 +36,8 @@ import java.util.Map;
  *                        Zeichen; der Volltext steht in der Detail-Route
  * @param sealed          Siegelstand beim Start (true = versiegelt und geprüft, false = nicht
  *                        versiegelt, null = Run von vor der Aufzeichnung)
+ * @param chainRunId      Chain-Run, der den Lauf als Eintrag gestartet hat; null außerhalb einer Chain
+ *                        und für Läufe von vor V89 (wie {@link WorkflowRunResponse#chainRunId()})
  */
 public record WorkflowRunListItemResponse(
         String id,
@@ -58,7 +60,8 @@ public record WorkflowRunListItemResponse(
         int stepCount,
         StepStatus lastStepStatus,
         String lastStepPreview,
-        Boolean sealed
+        Boolean sealed,
+        String chainRunId
 ) {
     /** Kompatibilitäts-Konstruktor für Aufrufer von vor der Siegel-Aufzeichnung am Run. */
     public WorkflowRunListItemResponse(String id, String workflowId, String workflowName, String projectName,
@@ -70,7 +73,20 @@ public record WorkflowRunListItemResponse(
                                        String lastStepPreview) {
         this(id, workflowId, workflowName, projectName, projectPath, status, startedAt, completedAt, durationMs,
                 userRating, error, metadata, inputContext, triggeredByScheduleId, definitionHash, definitionVersionId,
-                triggerSource, stepCount, lastStepStatus, lastStepPreview, null);
+                triggerSource, stepCount, lastStepStatus, lastStepPreview, null, null);
+    }
+
+    /** Kompatibilitäts-Konstruktor für Aufrufer von vor dem Kettenbezug in der Liste (TODO 6db47bc2). */
+    public WorkflowRunListItemResponse(String id, String workflowId, String workflowName, String projectName,
+                                       String projectPath, RunStatus status, Instant startedAt, Instant completedAt,
+                                       Long durationMs, Integer userRating, Map<String, Object> error,
+                                       Map<String, Object> metadata, Map<String, Object> inputContext,
+                                       String triggeredByScheduleId, String definitionHash, String definitionVersionId,
+                                       TriggerSource triggerSource, int stepCount, StepStatus lastStepStatus,
+                                       String lastStepPreview, Boolean sealed) {
+        this(id, workflowId, workflowName, projectName, projectPath, status, startedAt, completedAt, durationMs,
+                userRating, error, metadata, inputContext, triggeredByScheduleId, definitionHash, definitionVersionId,
+                triggerSource, stepCount, lastStepStatus, lastStepPreview, sealed, null);
     }
 
     /**

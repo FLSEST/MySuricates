@@ -106,7 +106,7 @@ the most recently documented CI run, with their own date in the table:
 | | |
 |---|---|
 | Created since | 2026-02-15, around 2,630 commits in the working repository, one author <!-- doc-facts-check: ignore --> |
-| Backend | Java 21 / Spring Boot 3.5, around 73,000 lines, 53 REST controllers, 95 Flyway migrations |
+| Backend | Java 21 / Spring Boot 3.5, around 73,000 lines, 53 REST controllers, 97 Flyway migrations |
 | Frontend | React 19 / TypeScript, around 77,000 lines |
 | Tests | Backend 10,476, frontend 1,580 (192 files) — 0 failures, 0 skipped, CI run 35777382298 from 2026-09-22 |
 | Building blocks | 20 block types, 54 workflow templates, 20 blueprints (basic scaffolds to fill in), 19 built-in skills, 18 integration providers |

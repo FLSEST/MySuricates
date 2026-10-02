@@ -67,6 +67,18 @@ class WorkflowRunListItemResponseTest {
         assertThat(back).isEqualTo(sample());
     }
 
+    /** TODO 6db47bc2: die Liste nennt den Chain-Run; ältere Aufrufer (ohne das Feld) bekommen null. */
+    @Test
+    void serializes_the_chain_run_and_defaults_it_to_null() {
+        WorkflowRunListItemResponse entry = new WorkflowRunListItemResponse(
+                "run-3", "wf-1", null, null, null, RunStatus.COMPLETED, null, null, null, null,
+                null, null, null, null, null, null, TriggerSource.CHAIN, 0, null, null, null, "chain-run-1");
+
+        assertThat(MAPPER.valueToTree(entry).get("chainRunId").textValue()).isEqualTo("chain-run-1");
+        assertThat(sample().chainRunId()).isNull();
+        assertThat(MAPPER.valueToTree(sample()).get("chainRunId").isNull()).isTrue();
+    }
+
     @Test
     void run_without_steps_keeps_last_step_fields_null() throws Exception {
         WorkflowRunListItemResponse empty = new WorkflowRunListItemResponse(

@@ -1311,6 +1311,8 @@ export interface StepInsight {
   /** Input served from / written to Claude's prompt cache, apart from inputTokens; absent for other providers and older backends. */
   cacheReadInputTokens?: number;
   cacheCreationInputTokens?: number;
+  /** Part of outputTokens spent on extended thinking (Claude); absent for other providers and older backends. */
+  thinkingTokens?: number;
   model: string | null;
   provider: string | null;
   numTurns: number | null;
@@ -1328,6 +1330,8 @@ export interface RunInsights {
   /** Absent from backends before the cache figures (TODO 20adda30). */
   totalCacheReadInputTokens?: number;
   totalCacheCreationInputTokens?: number;
+  /** Absent from backends before the thinking figures (TODO 20861200). */
+  totalThinkingTokens?: number;
   durationMs: number | null;
   steps: StepInsight[];
 }
@@ -1976,6 +1980,8 @@ export interface ChainRun {
   error: string | null;
   metadata: Record<string, unknown>;
   triggeredByScheduleId?: string | null;
+  /** What started the chain (V96); null for older chain runs, absent on older backends */
+  triggerSource?: TriggerSource | null;
 }
 
 export interface ScheduleRunsResponse {
@@ -2061,6 +2067,8 @@ export interface Wish {
   createdAt: string;
   updatedAt: string;
   autoRefine: boolean;
+  /** Phase a FAILED/CANCELLED wish was in when it stopped (V97); null otherwise, absent on older backends */
+  stoppedPhase?: WishStatus | null;
 }
 
 export interface CreateWishRequest {

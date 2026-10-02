@@ -1,5 +1,7 @@
 package com.automation.service.cli.claude;
 
+import com.automation.service.ai.AiResponseMetadata;
+
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.*;
@@ -151,6 +153,16 @@ class ClaudeOutputParserTest {
                 .containsEntry("model", "claude-opus-5-5");
     }
 
+    /** TODO 20861200: the thinking part of the output, from {@code output_tokens_details} — inside outputTokens. */
+    @Test
+    void parseStreamJson_recordedAuditStep_reportsTheThinkingTokens() {
+        ClaudeJsonResponse parsed = ClaudeOutputParser.parseStreamJson(RECORDED_AUDIT_STEP);
+
+        assertThat(parsed.usage().thinkingTokens()).isEqualTo(377);
+        assertThat(parsed.toMetadata()).containsEntry("thinkingTokens", 377).containsEntry("outputTokens", 918);
+        assertThat(AiResponseMetadata.fromClaudeResponse(parsed).toMap()).containsEntry("thinkingTokens", 377);
+    }
+
     @Test
     void parseStreamJson_resultWithoutCacheFields_reportsNoCacheTokens() {
         String ndjson = """
@@ -161,7 +173,8 @@ class ClaudeOutputParserTest {
 
         assertThat(parsed.usage().cacheReadInputTokens()).isNull();
         assertThat(parsed.usage().cacheCreationInputTokens()).isNull();
-        assertThat(parsed.toMetadata()).doesNotContainKeys("cacheReadInputTokens", "cacheCreationInputTokens");
+        assertThat(parsed.usage().thinkingTokens()).isNull();
+        assertThat(parsed.toMetadata()).doesNotContainKeys("cacheReadInputTokens", "cacheCreationInputTokens", "thinkingTokens");
     }
 
     @Test

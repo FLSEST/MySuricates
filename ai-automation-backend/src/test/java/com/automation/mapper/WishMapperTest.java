@@ -58,6 +58,17 @@ class WishMapperTest {
         assertThat(response.resultSummary()).isEqualTo("Done");
     }
 
+    /** V97 (TODO 92bffe64): the phase a failed wish stopped in reaches the response. */
+    @Test
+    void toResponse_carriesTheStoppedPhase() {
+        Wish wish = Wish.builder().id("w-1").originalText("test").build();
+        wish.setStatus(WishStatus.DECOMPOSING);
+        wish.setStatus(WishStatus.FAILED);
+
+        assertThat(mapper.toResponse(wish).stoppedPhase()).isEqualTo(WishStatus.DECOMPOSING);
+        assertThat(mapper.toResponse(Wish.builder().id("w-2").originalText("t").build()).stoppedPhase()).isNull();
+    }
+
     @Test
     void toResponse_resolvesProjectName() {
         when(projectRepository.findIdAndNameByIdIn(Set.of("p-1"))).thenReturn(rows(new Object[]{"p-1", "MyProject"}));

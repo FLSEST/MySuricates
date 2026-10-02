@@ -85,7 +85,7 @@ export AUTOMATION_WORKSPACE_ROOT=/pfad/zu/projekten
 > **Nicht** `mvn spring-boot:run` verwenden: der `RuntimeClasspathGuard` beendet einen Start aus `target/classes` mit Exit-Code 2 (Escape-Hatch: `automation.runtime.allow-classes-dir`).
 
 Das Backend startet auf **http://localhost:9090**. Beim ersten Start:
-- Flyway fuehrt alle 95 Migrationen aus (V1-V95)
+- Flyway fuehrt alle 97 Migrationen aus (V1-V97)
 - SQLite-Datenbank wird unter `data/automation.db` erstellt
 - 19 Built-in Skills werden geseedet
 - 54 Workflow-Templates werden geseedet
