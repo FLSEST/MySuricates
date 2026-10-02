@@ -20,7 +20,7 @@ class JsonSelectStageTest {
                 Map.of("paths", List.of("meta", "meta.count")), guard);
 
         assertThat(r.output()).isEqualTo("{\"meta\":{\"count\":3,\"source\":\"rss\"}}");
-        assertThat(r.note()).isEqualTo("−6 Zeichen");
+        assertThat(r.note()).isEqualTo("−6 chars");
     }
 
     @Test
@@ -29,9 +29,9 @@ class JsonSelectStageTest {
         StageResult arr = stage.apply("[{\"a\":1}]", Map.of("paths", List.of("a")), guard);
 
         assertThat(obj.output()).isEqualTo("{}");
-        assertThat(obj.note()).isEqualTo("Pfad nicht gefunden: b");
+        assertThat(obj.note()).isEqualTo("path not found: b");
         assertThat(arr.output()).as("Feldpfad ohne [] greift nicht in ein Wurzel-Array").isEqualTo("[]");
-        assertThat(arr.note()).isEqualTo("Pfad nicht gefunden: a");
+        assertThat(arr.note()).isEqualTo("path not found: a");
     }
 
     @Test
@@ -56,20 +56,20 @@ class JsonSelectStageTest {
         StageResult r = stage.apply("{\"a\":\"text\"}", Map.of("paths", List.of("a.b")), guard);
 
         assertThat(r.output()).isEqualTo("{}");
-        assertThat(r.note()).isEqualTo("Pfad nicht gefunden: a.b");
+        assertThat(r.note()).isEqualTo("path not found: a.b");
     }
 
     @Test
     void validate_rejectsMissingEmptyWrongTypeAndMalformedPaths() {
         assertThatThrownBy(() -> stage.validate(Map.of()))
-                .isInstanceOf(CompressionException.class).hasMessage("Stufe json.select: 'paths' braucht mindestens einen Pfad");
+                .isInstanceOf(CompressionException.class).hasMessage("Stage json.select: 'paths' needs at least one path");
         assertThatThrownBy(() -> stage.validate(Map.of("paths", List.of())))
-                .isInstanceOf(CompressionException.class).hasMessageContaining("mindestens einen Pfad");
+                .isInstanceOf(CompressionException.class).hasMessageContaining("at least one path");
         assertThatThrownBy(() -> stage.validate(Map.of("paths", "a")))
-                .isInstanceOf(CompressionException.class).hasMessageContaining("Liste von Texten");
+                .isInstanceOf(CompressionException.class).hasMessageContaining("list of texts");
         assertThatThrownBy(() -> stage.validate(Map.of("paths", List.of("a."))))
-                .isInstanceOf(CompressionException.class).hasMessageContaining("ungültiger Pfad 'a.'");
+                .isInstanceOf(CompressionException.class).hasMessageContaining("invalid path 'a.'");
         assertThatThrownBy(() -> stage.validate(Map.of("paths", List.of(".a"))))
-                .isInstanceOf(CompressionException.class).hasMessageContaining("ungültiger Pfad");
+                .isInstanceOf(CompressionException.class).hasMessageContaining("invalid path");
     }
 }

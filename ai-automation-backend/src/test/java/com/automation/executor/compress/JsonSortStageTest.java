@@ -28,7 +28,7 @@ class JsonSortStageTest {
         StageResult r = stage.apply("[{\"v\":10},{\"v\":9},{\"v\":1.5}]", Map.of("by", "v"), guard);
 
         assertThat(r.output()).isEqualTo("[{\"v\":1.5},{\"v\":9},{\"v\":10}]");
-        assertThat(r.note()).isEqualTo("3 Einträge nach v aufsteigend");
+        assertThat(r.note()).isEqualTo("3 entries by v ascending");
     }
 
     @Test
@@ -46,7 +46,7 @@ class JsonSortStageTest {
         StageResult r = stage.apply(input, Map.of("path", "items", "by", "m.p", "order", "desc"), guard);
 
         assertThat(r.output()).isEqualTo("{\"x\":1,\"items\":[{\"m\":{\"p\":2}},{\"m\":{\"p\":1}}]}");
-        assertThat(r.note()).isEqualTo("2 Einträge nach m.p absteigend");
+        assertThat(r.note()).isEqualTo("2 entries by m.p descending");
         assertThat(stage.apply(input, Map.of("path", "items", "by", "m.p"), guard).output())
                 .isEqualTo("{\"x\":1,\"items\":[{\"m\":{\"p\":1}},{\"m\":{\"p\":2}}]}");
     }
@@ -59,11 +59,11 @@ class JsonSortStageTest {
     @Test
     void validate_byIsRequired_andOrderRestricted() {
         assertThatThrownBy(() -> stage.validate(Map.of()))
-                .isInstanceOf(CompressionException.class).hasMessage("Stufe json.sort: 'by' fehlt");
+                .isInstanceOf(CompressionException.class).hasMessage("Stage json.sort: 'by' is missing");
         assertThatThrownBy(() -> stage.validate(Map.of("by", "v", "order", "DESC")))
-                .isInstanceOf(CompressionException.class).hasMessage("Stufe json.sort: 'order' muss asc oder desc sein");
+                .isInstanceOf(CompressionException.class).hasMessage("Stage json.sort: 'order' must be asc or desc");
         assertThatThrownBy(() -> stage.validate(Map.of("by", 1)))
-                .isInstanceOf(CompressionException.class).hasMessageContaining("'by' muss Text sein");
+                .isInstanceOf(CompressionException.class).hasMessageContaining("'by' must be text");
         stage.validate(Map.of("by", "v", "order", "asc"));
     }
 }

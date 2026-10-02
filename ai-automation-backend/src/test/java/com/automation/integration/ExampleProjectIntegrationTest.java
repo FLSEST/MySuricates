@@ -1,5 +1,7 @@
 package com.automation.integration;
 
+import com.automation.controller.WorkflowController;
+import com.automation.dto.response.WorkflowResponse;
 import com.automation.entity.BlockDefinition;
 import com.automation.entity.Project;
 import com.automation.entity.RunStatus;
@@ -61,6 +63,8 @@ class ExampleProjectIntegrationTest {
     /** {@code ExampleProjectService.EXAMPLE_TEMPLATE_IDS}, spelled out: the list is package-private there. */
     private static final List<String> EXAMPLES = List.of(
             "blueprint-approval", "blueprint-if", "blueprint-loop", "blueprint-todo", "blueprint-report");
+    /** {@code ExampleProjectService.STATUS_TEMPLATE_ID}: the example the dashboard view shows. */
+    private static final String STATUS_EXAMPLE = "blueprint-report";
     private static final EnumSet<RunStatus> TERMINAL = EnumSet.of(RunStatus.COMPLETED,
             RunStatus.COMPLETED_WITH_ERRORS, RunStatus.FAILED, RunStatus.CANCELLED, RunStatus.INTERRUPTED);
 
@@ -93,6 +97,7 @@ class ExampleProjectIntegrationTest {
     @Autowired private AiProviderRegistry providerRegistry;
     @Autowired private ScriptedAiProvider noAiProvider;
     @Autowired private EntityManager entityManager;
+    @Autowired private WorkflowController workflowController;
 
     /** Shell blocks run on the host, as on an installation without Docker. */
     @MockitoBean private ContainerService containerService;
@@ -149,6 +154,23 @@ class ExampleProjectIntegrationTest {
         assertThat(second.project().getId()).isEqualTo(projectId);
         assertThat(second.workflowsAdded()).isZero();
         assertThat(workflowRepository.findByProjectId(projectId)).hasSameSizeAs(workflows);
+    }
+
+    /**
+     * The dashboard view of the example project shows the report example as its status widget
+     * (TODO a0b414ce), not whichever workflow comes first. The frontend finds it in {@code GET
+     * /workflows} by project and template id ({@code exampleProjectView.ts}), so both have to be in
+     * that list.
+     */
+    @Test
+    void theWorkflowListNamesTheReportExampleByTemplateId_forTheStatusWidget() {
+        projectId = exampleProjectService.ensure("de").project().getId();
+
+        List<WorkflowResponse> ofTheProject = workflowController.listWorkflows().stream()
+                .filter(w -> projectId.equals(w.projectId()))
+                .toList();
+
+        assertThat(ofTheProject).extracting(WorkflowResponse::templateId).containsOnlyOnce(STATUS_EXAMPLE);
     }
 
     /**

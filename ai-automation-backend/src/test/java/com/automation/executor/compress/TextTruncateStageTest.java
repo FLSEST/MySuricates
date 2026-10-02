@@ -42,14 +42,14 @@ class TextTruncateStageTest {
 
     @Test
     void notice_usesGermanDigitGrouping() {
-        assertThat(TextTruncateStage.notice(12_345)).isEqualTo("\n[… 12.345 Zeichen ausgelassen …]\n");
+        assertThat(TextTruncateStage.notice(12_345)).isEqualTo("\n[… 12,345 chars omitted …]\n");
     }
 
     @Test
     void budgetBelowNoticeLength_leavesOnlyTheNotice() {
         TextTruncateStage.Cut cut = TextTruncateStage.cut("abcdefghij", 5, TextTruncateStage.Keep.HEAD_TAIL);
 
-        assertThat(cut.text()).isEqualTo("\n[… 10 Zeichen ausgelassen …]\n");
+        assertThat(cut.text()).isEqualTo("\n[… 10 chars omitted …]\n");
         assertThat(cut.omitted()).isEqualTo(10);
     }
 
@@ -81,9 +81,9 @@ class TextTruncateStageTest {
         TextTruncateStage stage = new TextTruncateStage();
 
         assertThatThrownBy(() -> stage.validate(Map.of()))
-                .isInstanceOf(CompressionException.class).hasMessage("Stufe text.truncate: 'max_chars' fehlt");
+                .isInstanceOf(CompressionException.class).hasMessage("Stage text.truncate: 'max_chars' is missing");
         assertThatThrownBy(() -> stage.validate(Map.of("max_chars", 150.5)))
-                .isInstanceOf(CompressionException.class).hasMessageContaining("ganze Zahl zwischen 100 und 1.000.000");
+                .isInstanceOf(CompressionException.class).hasMessageContaining("whole number between 100 and 1,000,000");
         assertThatThrownBy(() -> stage.validate(Map.of("max_chars", 1_000_001)))
                 .isInstanceOf(CompressionException.class).hasMessageContaining("max_chars");
         stage.validate(Map.of("max_chars", 100, "keep", "tail"));

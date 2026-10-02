@@ -11,19 +11,19 @@ public final class StageConfig {
     }
 
     public static String where(String op) {
-        return "Stufe " + op;
+        return "Stage " + op;
     }
 
     public static int intValue(Map<String, Object> c, String key, Integer fallback, int min, int max, String where) {
         Object raw = c == null ? null : c.get(key);
         if (raw == null) {
             if (fallback != null) return fallback;
-            throw new CompressionException(where + ": '" + key + "' fehlt");
+            throw new CompressionException(where + ": '" + key + "' is missing");
         }
         if (!(raw instanceof Number n) || n.doubleValue() != Math.rint(n.doubleValue())
                 || n.longValue() < min || n.longValue() > max) {
-            throw new CompressionException(where + ": '" + key + "' muss eine ganze Zahl zwischen "
-                    + CompressionNumbers.fmt(min) + " und " + CompressionNumbers.fmt(max) + " sein");
+            throw new CompressionException(where + ": '" + key + "' must be a whole number between "
+                    + CompressionNumbers.fmt(min) + " and " + CompressionNumbers.fmt(max));
         }
         return n.intValue();
     }
@@ -32,10 +32,10 @@ public final class StageConfig {
         Object raw = c == null ? null : c.get(key);
         if (raw == null) {
             if (fallback != null) return fallback;
-            throw new CompressionException(where + ": '" + key + "' fehlt");
+            throw new CompressionException(where + ": '" + key + "' is missing");
         }
         if (!(raw instanceof String s)) {
-            throw new CompressionException(where + ": '" + key + "' muss Text sein");
+            throw new CompressionException(where + ": '" + key + "' must be text");
         }
         return s;
     }
@@ -48,7 +48,7 @@ public final class StageConfig {
             list.forEach(v -> out.add((String) v));
             return out;
         }
-        throw new CompressionException(where + ": '" + key + "' muss eine Liste von Texten sein");
+        throw new CompressionException(where + ": '" + key + "' must be a list of texts");
     }
 
     public static boolean flag(Map<String, Object> c, String key) {

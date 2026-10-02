@@ -46,8 +46,8 @@ public class CompressBlockExecutor implements BlockExecutor {
             CompressionSources.Resolved src = CompressionSources.resolve(context, config.get("source"));
             StageChain.Outcome outcome = StageChain.run(steps, src.text(), RegexGuard.startingNow(Duration.ofSeconds(timeout)));
             CompressionOutput.Assembled out = CompressionOutput.assemble(src,
-                    "Stufen: " + String.join(" · ", outcome.notes()), outcome.text(), maxChars);
-            result.setInput("compress " + src.label() + " (" + CompressionNumbers.fmt(src.text().length()) + " Zeichen): "
+                    "Stages: " + String.join(" · ", outcome.notes()), outcome.text(), maxChars);
+            result.setInput("compress " + src.label() + " (" + CompressionNumbers.fmt(src.text().length()) + " chars): "
                     + steps.stream().map(s -> s.stage().op()).collect(Collectors.joining(" › ")));
             result.setOutput(out.text());
             result.setStatus(StepStatus.COMPLETED);
@@ -71,12 +71,12 @@ public class CompressBlockExecutor implements BlockExecutor {
 
     /** {@code error} may be null (an exception without a message) — the step must still say something readable. */
     private static void fail(StepResult result, Map<String, Object> config, String error) {
-        String message = error == null || error.isBlank() ? "unbekannter Fehler" : error;
+        String message = error == null || error.isBlank() ? "unknown error" : error;
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("derivedOutput", true);
         metadata.put("error", message);
         result.setInput("compress: " + config.get("source"));
-        result.setOutput("Komprimierung fehlgeschlagen: " + message);
+        result.setOutput("Compression failed: " + message);
         result.setStatus(StepStatus.FAILED);
         result.setMetadata(metadata);
     }

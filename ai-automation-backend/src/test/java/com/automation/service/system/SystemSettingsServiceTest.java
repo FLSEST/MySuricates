@@ -169,6 +169,15 @@ class SystemSettingsServiceTest {
         assertThat(service.backupRetainCount()).isEqualTo(9);
     }
 
+    /** 8f1343d1: the GET endpoint passes this on, so the settings card shows the configured count. */
+    @Test
+    void defaultValue_isTheConfiguredRetainCount_andEmptyForOtherKeys() {
+        backupConfig.setRetainCount(9);
+
+        assertThat(service.defaultValue("backup-retain-count")).contains("9");
+        assertThat(service.defaultValue("default-ai-provider")).isEmpty();
+    }
+
     /** A value the old write path stored unchecked counts as not set. */
     @ParameterizedTest
     @ValueSource(strings = {"0", "400", "viele"})

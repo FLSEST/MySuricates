@@ -37,6 +37,6 @@ final class JsonLimitStage implements CompressionStage {
         int count = StageConfig.intValue(config, "count", null, 0, 1_000_000, where);
         int removed = Math.max(0, array.size() - count);
         while (array.size() > count) array.remove(array.size() - 1);
-        return new StageResult(JsonPaths.write(doc.root()), "−" + CompressionNumbers.fmt(removed) + " Einträge");
+        return new StageResult(JsonPaths.write(doc.root()), "−" + CompressionNumbers.fmt(removed) + " entries");
     }
 }

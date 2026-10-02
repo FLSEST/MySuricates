@@ -26,8 +26,8 @@ class StageResultTest {
 
         StageChain.Outcome o = StageChain.run(steps, "kurz", RegexGuard.startingNow(Duration.ofSeconds(5)));
 
-        assertThat(o.notes()).containsExactly("text.truncate", "lines.dedupe (−0 Zeilen)");
+        assertThat(o.notes()).containsExactly("text.truncate", "lines.dedupe (−0 lines)");
         assertThat(o.stageMetadata().getFirst()).doesNotContainKey("note");
-        assertThat(o.stageMetadata().get(1)).containsEntry("note", "−0 Zeilen");
+        assertThat(o.stageMetadata().get(1)).containsEntry("note", "−0 lines");
     }
 }

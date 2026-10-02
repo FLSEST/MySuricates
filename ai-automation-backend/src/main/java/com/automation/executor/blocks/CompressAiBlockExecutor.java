@@ -63,14 +63,14 @@ public class CompressAiBlockExecutor implements BlockExecutor {
             CompressionSources.Resolved src = CompressionSources.resolve(context, config.get("source"));
             int limit = compressionConfig.getMaxAiInputChars();
             if (src.text().length() > limit) {
-                throw new CompressionException("Eingabe " + CompressionNumbers.fmt(src.text().length()) + " Zeichen > Limit "
-                        + CompressionNumbers.fmt(limit) + " — davor einen compress-Block einsetzen");
+                throw new CompressionException("Input " + CompressionNumbers.fmt(src.text().length()) + " chars > limit "
+                        + CompressionNumbers.fmt(limit) + " — put a compress block before this one");
             }
             String providerId = context.providerFor(block);
             AiProvider provider = providers.resolve(providerId);
             if (!"CLAUDE".equals(provider.getId())) {
                 throw new CompressionException("Provider " + provider.getId()
-                        + " kann nicht ohne Werkzeuge aufgerufen werden — im Block \"provider\": \"CLAUDE\" setzen");
+                        + " cannot be called without tools — set \"provider\": \"CLAUDE\" in the block");
             }
             String prompt = CompressAiPrompt.build(instruction, Math.max(CompressionOutput.MIN_BODY_CHARS, maxChars - HEADER_RESERVE), src.text());
             Path workdir = createNeutralWorkdir();
@@ -92,15 +92,15 @@ public class CompressAiBlockExecutor implements BlockExecutor {
             }
             if (ai.getMetadata() != null) aiMetadata = ai.getMetadata();
             Map<String, Object> metadata = new HashMap<>(aiMetadata);
-            String input = "compress-ai " + src.label() + " (" + CompressionNumbers.fmt(src.text().length()) + " Zeichen): "
-                    + (instruction.isBlank() ? "(Standard-Zusammenfassung)" : instruction);
+            String input = "compress-ai " + src.label() + " (" + CompressionNumbers.fmt(src.text().length()) + " chars): "
+                    + (instruction.isBlank() ? "(default summary)" : instruction);
             String answer = ai.getOutput() == null ? "" : ai.getOutput().strip();
             if (ai.getStatus() != StepStatus.COMPLETED || answer.isEmpty()) {
                 metadata.put("derivedOutput", true);
                 result = finished(stepIndex, started, input, aiFailureOutput(ai), StepStatus.FAILED, metadata);
             } else {
                 CompressionOutput.Assembled out = CompressionOutput.assemble(src,
-                        "Zusammenfassung: KI (" + provider.getId() + ")", answer, maxChars);
+                        "Summary: AI (" + provider.getId() + ")", answer, maxChars);
                 metadata.putAll(CompressionOutput.metadata(src, out, maxChars, null));
                 result = finished(stepIndex, started, input, out.text(), StepStatus.COMPLETED, metadata);
             }
@@ -121,21 +121,21 @@ public class CompressAiBlockExecutor implements BlockExecutor {
 
     /** Failed call: its (tail-capped) error text; a completed call without text is a failure too. */
     private static String aiFailureOutput(StepResult ai) {
-        String prefix = "KI-Komprimierung fehlgeschlagen: ";
-        if (ai.getStatus() == StepStatus.COMPLETED) return prefix + "KI lieferte keine Antwort";
-        String output = ai.getOutput() == null || ai.getOutput().isBlank() ? "keine Ausgabe" : ai.getOutput();
+        String prefix = "AI compression failed: ";
+        if (ai.getStatus() == StepStatus.COMPLETED) return prefix + "AI returned no answer";
+        String output = ai.getOutput() == null || ai.getOutput().isBlank() ? "no output" : ai.getOutput();
         return prefix + TextTruncateStage.truncate(output, MAX_AI_ERROR_CHARS, TextTruncateStage.Keep.TAIL);
     }
 
     /** {@code error} may be null (an exception without a message) — the step must still say something readable. */
     private static StepResult failed(int stepIndex, Instant started, Map<String, Object> config, String error,
                                      Map<String, Object> aiMetadata) {
-        String message = error == null || error.isBlank() ? "unbekannter Fehler" : error;
+        String message = error == null || error.isBlank() ? "unknown error" : error;
         Map<String, Object> metadata = new HashMap<>(aiMetadata);
         metadata.put("derivedOutput", true);
         metadata.put("error", message);
         return finished(stepIndex, started, "compress-ai: " + config.get("source"),
-                "Komprimierung fehlgeschlagen: " + message, StepStatus.FAILED, metadata);
+                "Compression failed: " + message, StepStatus.FAILED, metadata);
     }
 
     private static StepResult finished(int stepIndex, Instant started, String input, String output, StepStatus status,
@@ -155,7 +155,7 @@ public class CompressAiBlockExecutor implements BlockExecutor {
         try {
             return Files.createTempDirectory("mysuricates-compress-ai-");
         } catch (IOException e) {
-            throw new CompressionException("Arbeitsverzeichnis für compress-ai nicht anlegbar: " + e.getMessage());
+            throw new CompressionException("Cannot create a working directory for compress-ai: " + e.getMessage());
         }
     }
 

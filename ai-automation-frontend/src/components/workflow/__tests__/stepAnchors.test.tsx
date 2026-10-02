@@ -14,7 +14,7 @@ function step(id: string, stepIndex: number, overrides: Partial<StepResult> = {}
 function compressStep(id: string, stepIndex: number, sourceIndex: number): StepResult {
   return step(id, stepIndex, {
     blockType: 'compress',
-    output: '## backend_tests — FAILED · exit 1\nStufen: lines.filter\n\nkurz',
+    output: '## backend_tests — FAILED · exit 1\nStages: lines.filter\n\nkurz',
     metadata: {
       derivedOutput: true,
       compression: {

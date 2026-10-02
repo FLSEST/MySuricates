@@ -91,7 +91,7 @@ class CompressAiBlockExecutorTest {
 
         assertThat(r.getStatus()).isEqualTo(StepStatus.COMPLETED);
         assertThat(r.getOutput()).startsWith("## backend_tests — FAILED · exit 1 · 5 s")
-                .contains("\nZusammenfassung: KI (CLAUDE)\n\n2 Tests fehlgeschlagen: A, B");
+                .contains("\nSummary: AI (CLAUDE)\n\n2 Tests fehlgeschlagen: A, B");
         assertThat(r.getMetadata()).containsEntry("derivedOutput", true).containsKey("aiRequest").containsKey("compression");
         assertThat(r.getInput()).doesNotContain("x".repeat(100)).contains("Nenne Fehler");
         assertThat(Files.exists(workdir)).as("per-call workdir is deleted again after execute").isFalse();
@@ -104,7 +104,7 @@ class CompressAiBlockExecutorTest {
         StepResult r = executor.execute(block(Map.of("source", "backend_tests")), ctx);
 
         assertThat(r.getStatus()).isEqualTo(StepStatus.FAILED);
-        assertThat(r.getOutput()).contains("davor einen compress-Block einsetzen");
+        assertThat(r.getOutput()).contains("put a compress block before this one");
         verifyNoInteractions(commandExecutor);
     }
 
@@ -126,7 +126,7 @@ class CompressAiBlockExecutorTest {
         StepResult r = executor.execute(block(Map.of("source", "backend_tests")), ctx);
 
         assertThat(r.getStatus()).isEqualTo(StepStatus.FAILED);
-        assertThat(r.getOutput()).contains("KI-Komprimierung fehlgeschlagen").doesNotContain("x".repeat(100));
+        assertThat(r.getOutput()).contains("AI compression failed").doesNotContain("x".repeat(100));
         assertThat(r.getMetadata()).containsEntry("derivedOutput", true).containsKey("aiRequest");
     }
 
@@ -150,18 +150,18 @@ class CompressAiBlockExecutorTest {
         StepResult r = executor.execute(block(Map.of("source", "backend_tests")), ctx);
 
         assertThat(r.getStatus()).isEqualTo(StepStatus.FAILED);
-        assertThat(r.getOutput()).isEqualTo("KI-Komprimierung fehlgeschlagen: KI lieferte keine Antwort");
+        assertThat(r.getOutput()).isEqualTo("AI compression failed: AI returned no answer");
         assertThat(r.getMetadata()).containsEntry("derivedOutput", true).containsKey("aiRequest").doesNotContainKey("compression");
     }
 
     @Test
     void aiFailure_outputIsNullSafeAndCappedTo2000Chars() {
-        String prefix = "KI-Komprimierung fehlgeschlagen: ";
+        String prefix = "AI compression failed: ";
         when(commandExecutor.executeStepOnHost(any())).thenReturn(aiAnswer(StepStatus.FAILED, "E".repeat(9_000) + "ENDE"));
 
         StepResult longFailure = executor.execute(block(Map.of("source", "backend_tests")), ctx);
 
-        assertThat(longFailure.getOutput()).startsWith(prefix).endsWith("ENDE").contains("Zeichen ausgelassen");
+        assertThat(longFailure.getOutput()).startsWith(prefix).endsWith("ENDE").contains("chars omitted");
         assertThat(longFailure.getOutput().length()).isLessThanOrEqualTo(prefix.length() + 2_000);
 
         when(commandExecutor.executeStepOnHost(any())).thenReturn(aiAnswer(StepStatus.FAILED, null));
@@ -182,7 +182,7 @@ class CompressAiBlockExecutorTest {
         StepResult r = executor.execute(block(Map.of("source", "backend_tests")), ctx);
 
         assertThat(r.getStatus()).isEqualTo(StepStatus.FAILED);
-        assertThat(r.getOutput()).isEqualTo("Komprimierung fehlgeschlagen: IllegalStateException: kaputt");
+        assertThat(r.getOutput()).isEqualTo("Compression failed: IllegalStateException: kaputt");
         assertThat(r.getMetadata()).containsEntry("derivedOutput", true).containsKey("error").containsKey("aiRequest");
     }
 

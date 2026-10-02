@@ -110,7 +110,7 @@ class CompressBlockExecutorTest {
         StepResult r = executor.execute(block(Map.of("source", "backend_tests",
                 "stages", List.of(Map.of("op", "text.normalize")))), ctx);
 
-        assertThat(r.getOutput()).startsWith("## backend_tests — FAILED · exit 1 · 312 s · 23 → 23 Zeichen\nStufen: text.normalize");
+        assertThat(r.getOutput()).startsWith("## backend_tests — FAILED · exit 1 · 312 s · 23 → 23 chars\nStages: text.normalize");
         assertThat(r.getOutput()).endsWith("\n\nBUILD SUCCESS\nalles gut");
     }
 
@@ -129,7 +129,7 @@ class CompressBlockExecutorTest {
         Map<String, Object> source = (Map<String, Object>) compression.get("source");
         assertThat(source).containsEntry("block", "backend_tests").containsEntry("exitCode", 0);
         assertThat((List<?>) compression.get("stages")).hasSize(1);
-        assertThat(r.getInput()).isEqualTo("compress backend_tests (5 Zeichen): lines.dedupe");
+        assertThat(r.getInput()).isEqualTo("compress backend_tests (5 chars): lines.dedupe");
     }
 
     @Test
@@ -141,7 +141,7 @@ class CompressBlockExecutorTest {
 
         assertThat(r.getStatus()).isEqualTo(StepStatus.COMPLETED);
         assertThat(r.getOutput().length()).isLessThanOrEqualTo(1000);
-        assertThat(r.getOutput()).contains("· Obergrenze (−");
+        assertThat(r.getOutput()).contains("· cap (−");
         assertThat(((Map<?, ?>) r.getMetadata().get("compression")).get("capped")).isEqualTo(true);
     }
 
@@ -154,9 +154,9 @@ class CompressBlockExecutorTest {
                 "stages", List.of(Map.of("op", "text.normalize")), "max_chars", 1000)), ctx);
 
         java.util.regex.Matcher header = java.util.regex.Pattern
-                .compile("Obergrenze \\(−([\\d.]+) Zeichen\\)").matcher(r.getOutput());
+                .compile("cap \\(−([\\d,]+) chars\\)").matcher(r.getOutput());
         java.util.regex.Matcher body = java.util.regex.Pattern
-                .compile("\\[… ([\\d.]+) Zeichen ausgelassen …]").matcher(r.getOutput());
+                .compile("\\[… ([\\d,]+) chars omitted …]").matcher(r.getOutput());
         assertThat(header.find()).isTrue();
         assertThat(body.find()).isTrue();
         assertThat(header.group(1)).isEqualTo(body.group(1));
@@ -170,7 +170,7 @@ class CompressBlockExecutorTest {
                 "stages", List.of(Map.of("op", "text.normalize")))), ctx);
 
         assertThat(r.getStatus()).isEqualTo(StepStatus.COMPLETED);
-        assertThat(r.getOutput()).startsWith("## backend_tests — SKIPPED · 312 s · 14 → 14 Zeichen");
+        assertThat(r.getOutput()).startsWith("## backend_tests — SKIPPED · 312 s · 14 → 14 chars");
         @SuppressWarnings("unchecked")
         Map<String, Object> compression = (Map<String, Object>) r.getMetadata().get("compression");
         assertThat(((Map<?, ?>) compression.get("source")).get("status")).isEqualTo("SKIPPED");
@@ -200,10 +200,10 @@ class CompressBlockExecutorTest {
         StepResult noSource = executor.execute(block(Map.of("stages", stages)), ctx);
 
         assertThat(unknown.getStatus()).isEqualTo(StepStatus.FAILED);
-        assertThat(unknown.getOutput()).contains("Quelle 'fehlt' ist in diesem Run noch nicht gelaufen");
-        assertThat(ambiguous.getOutput()).contains("mehrdeutig");
-        assertThat(invalid.getOutput()).contains("unbekannte Operation 'nope'");
-        assertThat(noSource.getOutput()).contains("'source' fehlt");
+        assertThat(unknown.getOutput()).contains("Source 'fehlt' has not run in this run yet");
+        assertThat(ambiguous.getOutput()).contains("ambiguous");
+        assertThat(invalid.getOutput()).contains("unknown operation 'nope'");
+        assertThat(noSource.getOutput()).contains("'source' is missing");
         assertThat(unknown.getMetadata()).containsEntry("derivedOutput", true);
     }
 
@@ -215,7 +215,7 @@ class CompressBlockExecutorTest {
                 "stages", List.of(Map.of("op", "lines.filter", "include", List.of("ERROR"))))), ctx);
 
         assertThat(r.getStatus()).isEqualTo(StepStatus.COMPLETED);
-        assertThat(r.getOutput()).endsWith("\n\n(leer)");
+        assertThat(r.getOutput()).endsWith("\n\n(empty)");
     }
 
     @Test
@@ -226,7 +226,7 @@ class CompressBlockExecutorTest {
         StepResult r = executor.execute(block(Map.of("source", "backend_tests", "stages", List.of(Map.of("op", "text.normalize")))), ctx);
 
         assertThat(r.getStatus()).isEqualTo(StepStatus.FAILED);
-        assertThat(r.getOutput()).isEqualTo("Komprimierung fehlgeschlagen: IllegalStateException: kaputt");
+        assertThat(r.getOutput()).isEqualTo("Compression failed: IllegalStateException: kaputt");
         assertThat(r.getMetadata()).containsEntry("derivedOutput", true).containsKey("error");
         assertThat(r.getCompletedAt()).isNotNull();
     }
@@ -243,9 +243,9 @@ class CompressBlockExecutorTest {
         StepResult runtime = executor.execute(block(config), runtimeWithoutMessage);
 
         assertThat(blank.getStatus()).isEqualTo(StepStatus.FAILED);
-        assertThat(blank.getOutput()).isEqualTo("Komprimierung fehlgeschlagen: unbekannter Fehler");
-        assertThat(blank.getMetadata()).containsEntry("derivedOutput", true).containsEntry("error", "unbekannter Fehler");
-        assertThat(runtime.getOutput()).isEqualTo("Komprimierung fehlgeschlagen: IllegalStateException");
+        assertThat(blank.getOutput()).isEqualTo("Compression failed: unknown error");
+        assertThat(blank.getMetadata()).containsEntry("derivedOutput", true).containsEntry("error", "unknown error");
+        assertThat(runtime.getOutput()).isEqualTo("Compression failed: IllegalStateException");
     }
 
     @Test
@@ -253,7 +253,7 @@ class CompressBlockExecutorTest {
         ExecutionContext ctx = contextWithShellSource("backend_tests", StepStatus.COMPLETED, 0, "a\nb");
         StepResult first = executor.execute(block(Map.of("source", "backend_tests",
                 "stages", List.of(Map.of("op", "lines.filter", "include", List.of("ERROR"))))), ctx);
-        assertThat(first.getOutput()).endsWith("\n\n(leer)");
+        assertThat(first.getOutput()).endsWith("\n\n(empty)");
         Map<String, Object> md = new HashMap<>(first.getMetadata());
         md.put("blockType", "compress");
         ctx.recordOutput("backend_kompakt", first.getOutput());
@@ -264,8 +264,8 @@ class CompressBlockExecutorTest {
                 .config(Map.of("source", "backend_kompakt", "stages", List.of(Map.of("op", "text.normalize")))).build(), ctx);
 
         assertThat(second.getStatus()).isEqualTo(StepStatus.COMPLETED);
-        assertThat(second.getOutput()).startsWith("## backend_tests (über backend_kompakt) — COMPLETED · exit 0 · 312 s · 0 → 0 Zeichen");
-        assertThat(second.getOutput()).endsWith("\n\n(leer)");
+        assertThat(second.getOutput()).startsWith("## backend_tests (via backend_kompakt) — COMPLETED · exit 0 · 312 s · 0 → 0 chars");
+        assertThat(second.getOutput()).endsWith("\n\n(empty)");
         assertThat(((Map<?, ?>) second.getMetadata().get("compression")).get("inChars")).isEqualTo(0);
     }
 
@@ -276,7 +276,7 @@ class CompressBlockExecutorTest {
 
         StepResult r = executor.execute(block(Map.of("source", "previous", "stages", List.of(Map.of("op", "text.normalize")))), ctx);
 
-        assertThat(r.getOutput()).startsWith("## Schritt 1 — COMPLETED · 312 s").endsWith("\n\nzweite");
+        assertThat(r.getOutput()).startsWith("## step 1 — COMPLETED · 312 s").endsWith("\n\nzweite");
     }
 
     @Test
@@ -293,8 +293,8 @@ class CompressBlockExecutorTest {
         StepResult second = executor.execute(BlockDefinition.builder().type("compress").name("noch_kompakter")
                 .config(Map.of("source", "backend_kompakt", "stages", List.of(Map.of("op", "lines.tail", "lines", 1)))).build(), ctx);
 
-        assertThat(second.getOutput()).startsWith("## backend_tests (über backend_kompakt) — FAILED · exit 1");
-        assertThat(second.getOutput()).doesNotContain("Stufen: text.normalize");
-        assertThat(second.getOutput()).endsWith("\n\n[… 2 Zeilen ausgelassen …]\nZ3");
+        assertThat(second.getOutput()).startsWith("## backend_tests (via backend_kompakt) — FAILED · exit 1");
+        assertThat(second.getOutput()).doesNotContain("Stages: text.normalize");
+        assertThat(second.getOutput()).endsWith("\n\n[… 2 lines omitted …]\nZ3");
     }
 }

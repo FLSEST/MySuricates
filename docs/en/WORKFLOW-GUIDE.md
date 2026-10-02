@@ -683,13 +683,13 @@ Condense the output of **exactly one** earlier block before it reaches subsequen
 **Output format** (both types):
 
 ```
-## backend_tests — FAILED · exit 1 · 312 s · 740.808 → 17.950 Zeichen
-Stufen: text.normalize (−4.102 Zeichen) · lines.filter (−8.914 Zeilen) · text.truncate (−96.004 Zeichen)
+## backend_tests — FAILED · exit 1 · 312 s · 740,808 → 17,950 chars
+Stages: text.normalize (−4,102 chars) · lines.filter (−8,914 lines) · text.truncate (−96,004 chars)
 
 <condensed content>
 ```
 
-Status and exit code come from the stored step data, never from the log text. Gate and TODO markers inside compression outputs are **not** evaluated at run completion — the original step remains authoritative.
+Header and stage lines, notices inside the content and error messages are in English like every other block's output. Status and exit code come from the stored step data, never from the log text. Gate and TODO markers inside compression outputs are **not** evaluated at run completion — the original step remains authoritative.
 
 Any name that also resolves as `{{ block.<name>.output }}` works as a `source` — top-level blocks and named `switch` case blocks (2718c20e). The header then shows the status, exit code and duration of the case step, not those of the whole `switch`. Nested blocks without a name (`foreach`/`while` iterations) only move `previous_output`; there, `"previous"` is the right source.
 

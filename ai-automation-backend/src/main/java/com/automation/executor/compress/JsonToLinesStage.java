@@ -54,14 +54,14 @@ final class JsonToLinesStage implements CompressionStage {
             m.appendTail(sb);
             lines.add(sb.toString().replace('\n', ' '));
         }
-        return new StageResult(String.join("\n", lines), CompressionNumbers.fmt(lines.size()) + " Einträge als Zeilen");
+        return new StageResult(String.join("\n", lines), CompressionNumbers.fmt(lines.size()) + " entries as lines");
     }
 
     private String template(Map<String, Object> config) {
         String where = StageConfig.where(op());
         String template = StageConfig.string(config, "template", null, where);
         if (!FIELD.matcher(template).find()) {
-            throw new CompressionException(where + ": 'template' braucht mindestens einen Platzhalter wie {title}");
+            throw new CompressionException(where + ": 'template' needs at least one placeholder like {title}");
         }
         return template;
     }

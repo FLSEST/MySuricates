@@ -67,19 +67,19 @@ final class JsonSelectStage implements CompressionStage {
         String out = JsonPaths.write(result);
         List<String> missing = paths.stream().map(Path::raw).filter(r -> !matched.contains(r)).toList();
         String note = missing.isEmpty() ? CompressionNumbers.signedChars(out.length() - input.length())
-                : "Pfad nicht gefunden: " + String.join(", ", missing);
+                : "path not found: " + String.join(", ", missing);
         return new StageResult(out, note);
     }
 
     private List<Path> paths(Map<String, Object> config) {
         String where = StageConfig.where(op());
         List<String> raw = StageConfig.strings(config, "paths", where);
-        if (raw.isEmpty()) throw new CompressionException(where + ": 'paths' braucht mindestens einen Pfad");
+        if (raw.isEmpty()) throw new CompressionException(where + ": 'paths' needs at least one path");
         List<Path> paths = new ArrayList<>();
         for (String r : raw) {
             List<String> segments = new ArrayList<>();
             for (String part : r.split("\\.", -1)) {
-                if (part.isEmpty()) throw new CompressionException(where + ": ungültiger Pfad '" + r + "'");
+                if (part.isEmpty()) throw new CompressionException(where + ": invalid path '" + r + "'");
                 if (part.equals(EACH)) {
                     segments.add(EACH);
                 } else if (part.endsWith(EACH)) {

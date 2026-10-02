@@ -46,14 +46,14 @@ final class JsonSortStage implements CompressionStage {
         array.removeAll();
         items.forEach(array::add);
         return new StageResult(JsonPaths.write(doc.root()),
-                CompressionNumbers.fmt(items.size()) + " Einträge nach " + by + (desc ? " absteigend" : " aufsteigend"));
+                CompressionNumbers.fmt(items.size()) + " entries by " + by + (desc ? " descending" : " ascending"));
     }
 
     private boolean descending(Map<String, Object> config) {
         return switch (StageConfig.string(config, "order", "asc", StageConfig.where(op()))) {
             case "asc" -> false;
             case "desc" -> true;
-            default -> throw new CompressionException(StageConfig.where(op()) + ": 'order' muss asc oder desc sein");
+            default -> throw new CompressionException(StageConfig.where(op()) + ": 'order' must be asc or desc");
         };
     }
 

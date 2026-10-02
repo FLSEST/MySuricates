@@ -44,6 +44,15 @@ public class SystemSettingsService {
         return appSettingsRepository.get(key);
     }
 
+    /**
+     * What applies while {@code key} is not stored, for a setting whose default comes from the startup
+     * configuration — so the UI shows that instead of a number of its own (TODO 8f1343d1). Empty for
+     * every other key.
+     */
+    public Optional<String> defaultValue(String key) {
+        return BACKUP_RETAIN_COUNT.equals(key) ? Optional.of(String.valueOf(backupConfig.getRetainCount())) : Optional.empty();
+    }
+
     public void setSetting(String key, String value) {
         if (!ALLOWED_SETTINGS.contains(key)) {
             throw new LocalizedArgumentException(ErrorMessage.UNKNOWN_SETTING, Map.of("key", String.valueOf(key)));

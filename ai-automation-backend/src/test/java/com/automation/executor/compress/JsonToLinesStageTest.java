@@ -26,7 +26,7 @@ class JsonToLinesStageTest {
         StageResult r = stage.apply("[{\"t\":\"eins\\nzwei\"},{\"t\":\"drei\"}]", Map.of("template", "- {t}\n  ende"), guard);
 
         assertThat(r.output()).isEqualTo("- eins zwei   ende\n- drei   ende");
-        assertThat(r.note()).isEqualTo("2 Einträge als Zeilen");
+        assertThat(r.note()).isEqualTo("2 entries as lines");
     }
 
     @Test
@@ -41,16 +41,16 @@ class JsonToLinesStageTest {
         StageResult empty = stage.apply("{\"items\":[]}", Map.of("path", "items", "template", "{t}"), guard);
 
         assertThat(empty.output()).isEmpty();
-        assertThat(empty.note()).isEqualTo("0 Einträge als Zeilen");
+        assertThat(empty.note()).isEqualTo("0 entries as lines");
     }
 
     @Test
     void validate_templateMissingOrWithoutField() {
         assertThatThrownBy(() -> stage.validate(Map.of()))
-                .isInstanceOf(CompressionException.class).hasMessage("Stufe json.to_lines: 'template' fehlt");
+                .isInstanceOf(CompressionException.class).hasMessage("Stage json.to_lines: 'template' is missing");
         assertThatThrownBy(() -> stage.validate(Map.of("template", "{ leer }")))
-                .isInstanceOf(CompressionException.class).hasMessageContaining("mindestens einen Platzhalter");
+                .isInstanceOf(CompressionException.class).hasMessageContaining("at least one placeholder");
         assertThatThrownBy(() -> stage.validate(Map.of("template", "{t}", "path", 3)))
-                .isInstanceOf(CompressionException.class).hasMessageContaining("'path' muss Text sein");
+                .isInstanceOf(CompressionException.class).hasMessageContaining("'path' must be text");
     }
 }

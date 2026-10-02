@@ -158,8 +158,8 @@ Create a new project.
 Create the bundled example project, meant for a fresh installation. The UI offers it while there is no project yet.
 
 - **Directory:** The template `classpath:examples/example-project/` is copied to `<automation.examples.directory>/example-project`. The default is `mysuricates-examples` below the workspace root, or `./data/examples` next to the database without a workspace root. The environment variable for it is `AUTOMATION_EXAMPLES_DIR`. An existing directory is never overwritten.
-- **Workflows:** one workflow per shipped template listed in `ExampleProjectService.EXAMPLE_TEMPLATE_IDS` (currently the blueprints `blueprint-approval`, `blueprint-if`, `blueprint-loop`, `blueprint-todo` and `blueprint-report`, none of them calls AI), with `changeSource` `example-project`.
-- **Idempotent:** An active project that already points at the directory is returned, and missing example workflows are added.
+- **Workflows:** one workflow per shipped template listed in `ExampleProjectService.EXAMPLE_TEMPLATE_IDS` (currently the blueprints `blueprint-approval`, `blueprint-if`, `blueprint-loop`, `blueprint-todo` and `blueprint-report`, none of them calls AI), with `changeSource` `example-project`. A template whose blocks need a module that is switched off (such as `blueprint-report` without `dashboard-report`) is left out and added on the next call once the module is on.
+- **Idempotent:** An active project that already points at the directory is returned, and missing example workflows are added. The description and `README.md` of an older copy are brought up to date only while they still match the text of an earlier version word for word; changed ones stay as they are.
 
 | Parameter | Type | Required | Values |
 |---|---|---|---|
@@ -2478,9 +2478,9 @@ Download a specific backup.
 
 Retrieve an application setting.
 
-**Allowed Keys:** `auto-todo-default`, `auto-repair-default`, `auto-repair-mode`, `auto-repair-max-retries`, `auto-repair-timeout-seconds`, `default-ai-provider`, `assistant-thinking-phrases`, `assistant-model`, `suggestions-model`, `suggestions-enabled`, `backup-retain-count`
+**Allowed Keys:** `auto-todo-default`, `auto-repair-default`, `auto-repair-mode`, `auto-repair-max-retries`, `auto-repair-timeout-seconds`, `default-ai-provider`, `assistant-thinking-phrases`, `assistant-model`, `suggestions-model`, `suggestions-enabled`, `backup-retain-count`, `github.repo-allowlist`
 
-**Response:** `{ "key": "...", "value": "..." }`
+**Response:** `{ "key": "...", "value": "..." }` — `value` is empty while nothing is stored. For `backup-retain-count`, `"default"` comes along: the value of `automation.backup.retain-count` that applies then (e.g. `{ "key": "backup-retain-count", "value": "", "default": "30" }`).
 
 ### `PUT /api/v1/system/settings/{key}`
 

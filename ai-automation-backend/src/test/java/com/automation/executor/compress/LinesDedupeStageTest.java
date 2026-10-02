@@ -17,7 +17,7 @@ class LinesDedupeStageTest {
         StageResult r = stage.apply("a\nb\na\n", null, guard);
 
         assertThat(r.output()).isEqualTo("a\nb\n");
-        assertThat(r.note()).isEqualTo("−1 Zeilen");
+        assertThat(r.note()).isEqualTo("−1 lines");
     }
 
     @Test
@@ -38,7 +38,7 @@ class LinesDedupeStageTest {
         StageResult r = stage.apply("a\nb", Map.of(), guard);
 
         assertThat(r.output()).isEqualTo("a\nb");
-        assertThat(r.note()).isEqualTo("−0 Zeilen");
+        assertThat(r.note()).isEqualTo("−0 lines");
     }
 
     @Test

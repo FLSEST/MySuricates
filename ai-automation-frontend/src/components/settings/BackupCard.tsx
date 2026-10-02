@@ -10,6 +10,18 @@ import { api } from '../../api/client';
 import { Database, Download, HardDrive, Archive } from 'lucide-react';
 
 const retainCountKey = ['system', 'settings', 'backup-retain-count'];
+/** Only for a backend that does not send `default` yet (before TODO 8f1343d1): its built-in count. */
+const LEGACY_RETAIN_DEFAULT = 30;
+
+function retainCountOf(raw: string | undefined): number | undefined {
+  const n = raw ? Number(raw) : NaN;
+  return Number.isInteger(n) && n >= 1 && n <= 365 ? n : undefined;
+}
+
+/** The stored count, else the configured default the backend names, else the old built-in one. */
+function effectiveRetainCount(setting: { value?: string; default?: string }): number {
+  return retainCountOf(setting.value) ?? retainCountOf(setting.default) ?? LEGACY_RETAIN_DEFAULT;
+}
 
 export function BackupCard() {
   const t = useT();
@@ -21,15 +33,15 @@ export function BackupCard() {
   const { data: retainCountSetting } = useQuery({
     queryKey: retainCountKey,
     queryFn: async () => {
-      const r = await api.get<{ value: string }>('/system/settings/backup-retain-count');
-      return r.value ? parseInt(r.value, 10) : 30;
+      const r = await api.get<{ value?: string; default?: string }>('/system/settings/backup-retain-count');
+      return effectiveRetainCount(r);
     },
     staleTime: 5 * 60 * 1000,
   });
   // The field shows the stored value until the user types; the draft only lives while dirty
-  const [retainDraft, setRetainDraft] = useState<number>(30);
+  const [retainDraft, setRetainDraft] = useState<number>(LEGACY_RETAIN_DEFAULT);
   const [retainDirty, setRetainDirty] = useState(false);
-  const retainCount = retainDirty ? retainDraft : (retainCountSetting ?? 30);
+  const retainCount = retainDirty ? retainDraft : (retainCountSetting ?? LEGACY_RETAIN_DEFAULT);
   const updateSetting = useUpdateSystemSetting();
 
   const handleBackup = async () => {

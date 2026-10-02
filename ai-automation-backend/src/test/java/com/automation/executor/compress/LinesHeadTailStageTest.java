@@ -32,16 +32,16 @@ class LinesHeadTailStageTest {
 
         StageResult r = LinesHeadTailStage.tail().apply(input, Map.of("lines", 1), guard);
 
-        assertThat(r.output()).isEqualTo("[… 1.500 Zeilen ausgelassen …]\nende");
-        assertThat(r.note()).isEqualTo("−1.500 Zeilen");
+        assertThat(r.output()).isEqualTo("[… 1,500 lines omitted …]\nende");
+        assertThat(r.note()).isEqualTo("−1,500 lines");
     }
 
     @Test
     void validate_linesRequiredAndPositive() {
         assertThatThrownBy(() -> LinesHeadTailStage.head().validate(Map.of()))
-                .isInstanceOf(CompressionException.class).hasMessage("Stufe lines.head: 'lines' fehlt");
+                .isInstanceOf(CompressionException.class).hasMessage("Stage lines.head: 'lines' is missing");
         assertThatThrownBy(() -> LinesHeadTailStage.tail().validate(Map.of("lines", 0)))
-                .isInstanceOf(CompressionException.class).hasMessageContaining("Stufe lines.tail: 'lines' muss eine ganze Zahl");
+                .isInstanceOf(CompressionException.class).hasMessageContaining("Stage lines.tail: 'lines' must be a whole number");
         LinesHeadTailStage.head().validate(Map.of("lines", 1));
     }
 }

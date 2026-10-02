@@ -24,7 +24,7 @@ class JsonStagesTest {
         StageResult r = new JsonSelectStage().apply(FEED, Map.of("paths", List.of("items[].title", "meta.count", "nope.x")), guard);
 
         assertThat(r.output()).isEqualTo("{\"items\":[{\"title\":\"B\"},{\"title\":\"A\"},{}],\"meta\":{\"count\":3}}");
-        assertThat(r.note()).isEqualTo("Pfad nicht gefunden: nope.x");
+        assertThat(r.note()).isEqualTo("path not found: nope.x");
     }
 
     @Test
@@ -37,7 +37,7 @@ class JsonStagesTest {
     @Test
     void select_nonJsonInput_fails() {
         assertThatThrownBy(() -> new JsonSelectStage().apply("kein json", Map.of("paths", List.of("a")), guard))
-                .isInstanceOf(CompressionException.class).hasMessageContaining("kein gültiges JSON");
+                .isInstanceOf(CompressionException.class).hasMessageContaining("not valid JSON");
     }
 
     @Test
@@ -47,7 +47,7 @@ class JsonStagesTest {
         StageResult lines = new JsonToLinesStage().apply(limited, Map.of("path", "items", "template", "{title} — {url}"), guard);
 
         assertThat(lines.output()).isEqualTo("A — u1\nB — u2");
-        assertThat(lines.note()).isEqualTo("2 Einträge als Zeilen");
+        assertThat(lines.note()).isEqualTo("2 entries as lines");
     }
 
     @Test
@@ -69,7 +69,7 @@ class JsonStagesTest {
         StageResult r = new JsonSelectStage().apply("{\"a\":1e2}", Map.of("paths", List.of("a")), guard);
 
         assertThat(r.output()).isEqualTo("{\"a\":100.0}");
-        assertThat(r.note()).isEqualTo("+2 Zeichen").doesNotContain("−-");
+        assertThat(r.note()).isEqualTo("+2 chars").doesNotContain("−-");
     }
 
     @Test
@@ -82,7 +82,7 @@ class JsonStagesTest {
     @Test
     void limit_notAnArray_fails() {
         assertThatThrownBy(() -> new JsonLimitStage().apply(FEED, Map.of("path", "meta", "count", 1), guard))
-                .isInstanceOf(CompressionException.class).hasMessageContaining("'meta' ist kein Array");
+                .isInstanceOf(CompressionException.class).hasMessageContaining("'meta' is not an array");
     }
 
     /** Shared parse+arrayAt helper: every array stage reports the same two problems the same way. */
@@ -93,27 +93,27 @@ class JsonStagesTest {
         Map<String, Object> toLines = Map.of("path", "meta", "template", "{title}");
 
         assertThatThrownBy(() -> new JsonLimitStage().apply("kein json", limit, guard))
-                .isInstanceOf(CompressionException.class).hasMessage("Stufe json.limit: Eingabe ist kein gültiges JSON");
+                .isInstanceOf(CompressionException.class).hasMessage("Stage json.limit: input is not valid JSON");
         assertThatThrownBy(() -> new JsonSortStage().apply("kein json", sort, guard))
-                .isInstanceOf(CompressionException.class).hasMessage("Stufe json.sort: Eingabe ist kein gültiges JSON");
+                .isInstanceOf(CompressionException.class).hasMessage("Stage json.sort: input is not valid JSON");
         assertThatThrownBy(() -> new JsonToLinesStage().apply("kein json", toLines, guard))
-                .isInstanceOf(CompressionException.class).hasMessage("Stufe json.to_lines: Eingabe ist kein gültiges JSON");
+                .isInstanceOf(CompressionException.class).hasMessage("Stage json.to_lines: input is not valid JSON");
 
         assertThatThrownBy(() -> new JsonLimitStage().apply(FEED, limit, guard))
-                .isInstanceOf(CompressionException.class).hasMessage("Stufe json.limit: 'meta' ist kein Array");
+                .isInstanceOf(CompressionException.class).hasMessage("Stage json.limit: 'meta' is not an array");
         assertThatThrownBy(() -> new JsonSortStage().apply(FEED, sort, guard))
-                .isInstanceOf(CompressionException.class).hasMessage("Stufe json.sort: 'meta' ist kein Array");
+                .isInstanceOf(CompressionException.class).hasMessage("Stage json.sort: 'meta' is not an array");
         assertThatThrownBy(() -> new JsonToLinesStage().apply(FEED, toLines, guard))
-                .isInstanceOf(CompressionException.class).hasMessage("Stufe json.to_lines: 'meta' ist kein Array");
+                .isInstanceOf(CompressionException.class).hasMessage("Stage json.to_lines: 'meta' is not an array");
     }
 
     @Test
     void validation() {
         assertThatThrownBy(() -> new JsonToLinesStage().validate(Map.of("template", "ohne Platzhalter")))
-                .isInstanceOf(CompressionException.class).hasMessageContaining("Platzhalter");
+                .isInstanceOf(CompressionException.class).hasMessageContaining("placeholder");
         assertThatThrownBy(() -> new JsonSortStage().validate(Map.of("by", "date", "order", "zufall")))
                 .isInstanceOf(CompressionException.class).hasMessageContaining("order");
         assertThatThrownBy(() -> new JsonSelectStage().validate(Map.of("paths", List.of("a..b"))))
-                .isInstanceOf(CompressionException.class).hasMessageContaining("ungültiger Pfad");
+                .isInstanceOf(CompressionException.class).hasMessageContaining("invalid path");
     }
 }

@@ -42,7 +42,7 @@ class TextStagesTest {
         String out = TextTruncateStage.truncate(input, 1000, TextTruncateStage.Keep.HEAD_TAIL);
 
         assertThat(out.length()).isLessThanOrEqualTo(1000);
-        assertThat(out).contains("Zeichen ausgelassen");
+        assertThat(out).contains("chars omitted");
         long as = out.chars().filter(c -> c == 'A').count();
         long zs = out.chars().filter(c -> c == 'Z').count();
         assertThat(zs).isGreaterThan(as);
@@ -55,7 +55,7 @@ class TextStagesTest {
         for (TextTruncateStage.Keep keep : TextTruncateStage.Keep.values()) {
             String out = TextTruncateStage.truncate(input, 501, keep);
             assertThat(out.length()).isLessThanOrEqualTo(501);
-            String withoutNotice = out.replaceAll("\\n\\[… [\\d.]+ Zeichen ausgelassen …]\\n", "");
+            String withoutNotice = out.replaceAll("\\n\\[… [\\d,]+ chars omitted …]\\n", "");
             assertThat(withoutNotice.codePoints().allMatch(cp -> cp == 0x1F600)).as(keep.name()).isTrue();
         }
     }

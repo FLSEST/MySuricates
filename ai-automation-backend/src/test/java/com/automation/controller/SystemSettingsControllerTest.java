@@ -62,6 +62,31 @@ class SystemSettingsControllerTest {
                 .andExpect(jsonPath("$.value").value("CLAUDE"));
     }
 
+    /** 8f1343d1: the configured default comes along, so the UI does not fall back to a number of its own. */
+    @Test
+    void getSetting_backupRetainCount_namesTheConfiguredDefault() throws Exception {
+        when(systemSettingsService.isAllowedKey("backup-retain-count")).thenReturn(true);
+        when(systemSettingsService.getSetting("backup-retain-count")).thenReturn(Optional.empty());
+        when(systemSettingsService.defaultValue("backup-retain-count")).thenReturn(Optional.of("45"));
+
+        mockMvc.perform(get("/api/v1/system/settings/backup-retain-count"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.key").value("backup-retain-count"))
+                .andExpect(jsonPath("$.value").value(""))
+                .andExpect(jsonPath("$.default").value("45"));
+    }
+
+    @Test
+    void getSetting_withoutConfiguredDefault_hasNoDefaultField() throws Exception {
+        when(systemSettingsService.isAllowedKey("default-ai-provider")).thenReturn(true);
+        when(systemSettingsService.getSetting("default-ai-provider")).thenReturn(Optional.of("CLAUDE"));
+        when(systemSettingsService.defaultValue("default-ai-provider")).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/api/v1/system/settings/default-ai-provider"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.default").doesNotExist());
+    }
+
     @Test
     void setSetting_defaultAiProvider_succeeds() throws Exception {
         when(systemSettingsService.isAllowedKey("default-ai-provider")).thenReturn(true);

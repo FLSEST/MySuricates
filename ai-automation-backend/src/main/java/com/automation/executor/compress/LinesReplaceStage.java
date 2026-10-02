@@ -41,12 +41,12 @@ final class LinesReplaceStage implements CompressionStage {
             try {
                 replaced = guard.replaceAll(pattern, lines[i], replacement);
             } catch (IllegalArgumentException | IndexOutOfBoundsException e) {
-                throw new CompressionException(where + ": ungültige Ersetzung '" + replacement + "' (" + e.getMessage() + ")");
+                throw new CompressionException(where + ": invalid replacement '" + replacement + "' (" + e.getMessage() + ")");
             }
             if (!replaced.equals(lines[i])) changed++;
             if (i > 0) out.append('\n');
             out.append(replaced);
         }
-        return new StageResult(out.toString(), CompressionNumbers.fmt(changed) + " Zeilen geändert");
+        return new StageResult(out.toString(), CompressionNumbers.fmt(changed) + " lines changed");
     }
 }
