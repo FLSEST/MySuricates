@@ -831,7 +831,7 @@ class WorkflowExecutorTest {
                 .reduce((first, second) -> second).orElseThrow();
         assertThat(compressed.getStatus()).isEqualTo(StepStatus.COMPLETED);
         assertThat(compressed.getOutput())
-                .startsWith("## backend_tests — COMPLETED · exit 1 · 12 s · 14 → 13 Zeichen")
+                .startsWith("## backend_tests — COMPLETED · exit 1 · 12 s · 14 → 13 chars")
                 .endsWith("\n\n2× LOG\nFEHLER");
         verify(simpleBlockExecutor, never()).execute(any(BlockDefinition.class), any(ExecutionContext.class));
         assertThat(captureLastSavedRun().getStatus()).isEqualTo(RunStatus.COMPLETED);
