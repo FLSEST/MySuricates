@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { Modal } from '../Modal';
-import { useState } from 'react';
+import { StrictMode, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useI18nStore } from '../../../i18n';
 
 describe('Modal', () => {
@@ -186,10 +187,65 @@ describe('Modal', () => {
       fireEvent.keyDown(close, { key: 'Tab', shiftKey: true });
       expect(save).toHaveFocus();
 
-      // Focus that slipped out (e.g. a click on the backdrop) comes back with the next Tab
-      screen.getByText('Open').focus();
-      fireEvent.keyDown(document.activeElement!, { key: 'Tab' });
+      // Focus that fell to the page body (e.g. a click on the backdrop) comes back with the next Tab
+      (document.activeElement as HTMLElement).blur();
+      expect(document.body).toHaveFocus();
+      fireEvent.keyDown(document.body, { key: 'Tab' });
       expect(close).toHaveFocus();
+    });
+
+    it('counts only visible controls for the initial focus and the trap', () => {
+      render(
+        <Modal open onClose={vi.fn()} title="T" footer={<><button>Save</button><button style={{ display: 'none' }}>Hidden save</button></>}>
+          <div style={{ display: 'none' }}><input aria-label="Collapsed" /></div>
+          <input aria-label="Shown" style={{ visibility: 'hidden' }} />
+          <input aria-label="Name" />
+        </Modal>,
+      );
+      expect(screen.getByLabelText('Name')).toHaveFocus();
+
+      const save = screen.getByText('Save');
+      save.focus();
+      fireEvent.keyDown(save, { key: 'Tab' });
+      expect(screen.getByLabelText('Close')).toHaveFocus();
+    });
+
+    it('leaves the focus alone in a portal outside the dialog, e.g. a dropdown or a toast', () => {
+      function WithPortal() {
+        return (
+          <Modal open onClose={vi.fn()} title="T">
+            <input aria-label="Name" />
+            {createPortal(<button>Toast action</button>, document.body)}
+          </Modal>
+        );
+      }
+      render(<WithPortal />);
+      const toastAction = screen.getByText('Toast action');
+      toastAction.focus();
+      const notPrevented = fireEvent.keyDown(toastAction, { key: 'Tab' });
+      expect(notPrevented).toBe(true);
+      expect(toastAction).toHaveFocus();
+      fireEvent.keyDown(toastAction, { key: 'Tab', shiftKey: true });
+      expect(toastAction).toHaveFocus();
+    });
+
+    it('sets the initial focus once under StrictMode and keeps the one autoFocus set', () => {
+      function Opening() {
+        const [open, setOpen] = useState(false);
+        return (
+          <>
+            <button onClick={() => setOpen(true)}>Open</button>
+            <Modal open={open} onClose={() => setOpen(false)} title="T">
+              <input aria-label="First" />
+              <input aria-label="Second" autoFocus />
+            </Modal>
+          </>
+        );
+      }
+      render(<StrictMode><Opening /></StrictMode>);
+      screen.getByText('Open').focus();
+      fireEvent.click(screen.getByText('Open'));
+      expect(screen.getByLabelText('Second')).toHaveFocus();
     });
 
     it('leaves Tab alone when an editor inside already handled it', () => {

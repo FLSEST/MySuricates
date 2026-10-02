@@ -53,10 +53,28 @@ const TABBABLE = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(', ');
 
+/**
+ * Whether the user can see the element: `checkVisibility` in the browser; jsdom lacks it (and lays nothing out,
+ * so `getClientRects` is always empty there), then the computed `display`/`visibility` of the element and its
+ * ancestors decide.
+ */
+function isVisible(element: HTMLElement): boolean {
+  if (typeof element.checkVisibility === 'function') return element.checkVisibility({ visibilityProperty: true });
+  for (let node: HTMLElement | null = element; node; node = node.parentElement) {
+    if (getComputedStyle(node).display === 'none') return false;
+  }
+  return getComputedStyle(element).visibility !== 'hidden';
+}
+
 function tabbables(container: HTMLElement | null): HTMLElement[] {
   if (!container) return [];
   return [...container.querySelectorAll<HTMLElement>(TABBABLE)]
-    .filter((element) => element.tabIndex >= 0 && !element.closest('[hidden], [inert]'));
+    .filter((element) => element.tabIndex >= 0 && !element.closest('[hidden], [inert]') && isVisible(element));
+}
+
+/** The page has no focus to speak of: nothing, the body, or an element that is gone. */
+function focusIsLost(active: Element | null): boolean {
+  return !active || active === document.body || !active.isConnected;
 }
 
 export function Modal({ open, onClose, title, children, footer, size = 'md', resizable = false }: ModalProps) {
@@ -78,26 +96,33 @@ function ModalFrame({ onClose, title, children, footer, size, resizable }: Omit<
   const [self] = useState(() => ({ order: ++dialogCounter }));
   // Taken while rendering, before a child's autoFocus moves the focus into the dialog
   const [opener] = useState(() => document.activeElement);
+  // StrictMode mounts the effects twice: the initial focus is set once, the first time
+  const initialFocusDone = useRef(false);
   const titleId = useId();
 
   useEffect(() => {
     openDialogs.add(self);
     document.body.style.overflow = 'hidden';
-    // Initial focus: keep it where the content put it (autoFocus), else the first control of body
-    // and footer – in a confirmation that is "Cancel" –, else the dialog itself
+    // Initial focus: keep it where the content put it (autoFocus), else an `[autofocus]` element, else the first
+    // control of body and footer – in a confirmation that is "Cancel" –, else the dialog itself
     const dialog = dialogRef.current;
-    if (dialog && !dialog.contains(document.activeElement)) {
-      const header = dialog.firstElementChild;
-      const first = tabbables(dialog).find((element) => !header?.contains(element));
-      (first ?? dialog).focus({ preventScroll: true });
+    if (dialog && !initialFocusDone.current) {
+      initialFocusDone.current = true;
+      if (!dialog.contains(document.activeElement)) {
+        const header = dialog.firstElementChild;
+        const marked = dialog.querySelector<HTMLElement>('[autofocus]');
+        const first = tabbables(dialog).find((element) => !header?.contains(element));
+        ((marked && isVisible(marked) ? marked : null) ?? first ?? dialog).focus({ preventScroll: true });
+      }
     }
     return () => {
       openDialogs.delete(self);
       if (openDialogs.size === 0) document.body.style.overflow = '';
+      // A dialog still on the page was not closed – StrictMode's trial unmount – and keeps its focus
+      if (dialog?.isConnected) return;
       // Focus back to what opened the dialog, unless the closing action moved it somewhere on purpose
-      const active = document.activeElement;
-      if (opener instanceof HTMLElement && opener.isConnected
-          && (!active || active === document.body || !active.isConnected || dialog?.contains(active))) {
+      if (opener instanceof HTMLElement && opener !== document.body && opener.isConnected
+          && focusIsLost(document.activeElement)) {
         opener.focus({ preventScroll: true });
       }
     };
@@ -110,21 +135,23 @@ function ModalFrame({ onClose, title, children, footer, size, resizable }: Omit<
         onClose();
       } else if (e.key === 'Tab' && !e.defaultPrevented) {
         // Focus trap: Tab and Shift+Tab cycle inside the dialog (an editor that inserts a tab
-        // prevents the default and keeps its key)
+        // prevents the default and keeps its key). Focus in a portal outside the dialog – a dropdown,
+        // a popover, a toast – is left alone; only focus lost to the page body is brought back.
         const dialog = dialogRef.current;
         if (!dialog) return;
+        const active = document.activeElement;
+        const lost = focusIsLost(active);
+        if (!lost && !dialog.contains(active)) return;
         const items = tabbables(dialog);
         const first = items[0];
         const last = items.at(-1);
-        const active = document.activeElement;
-        const inside = !!active && dialog.contains(active);
         if (!first || !last) {
           e.preventDefault();
           dialog.focus({ preventScroll: true });
-        } else if (e.shiftKey && (!inside || active === first || active === dialog)) {
+        } else if (e.shiftKey && (lost || active === first || active === dialog)) {
           e.preventDefault();
           last.focus();
-        } else if (!e.shiftKey && (!inside || active === last)) {
+        } else if (!e.shiftKey && (lost || active === last)) {
           e.preventDefault();
           first.focus();
         }
