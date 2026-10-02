@@ -491,13 +491,21 @@ AUTOMATION_RATE_LIMIT_RPM=6000 AUTOMATION_DISCOVERY_AUTO_TAGGING_ENABLED=false \
   Schalter (`application-integration.yml`, bewacht von `IntegrationProfileAiIsolationTest`).
 - **`AUTOMATION_RATE_LIMIT_RPM=6000`**: Das Limit von 120 Anfragen je Minute bricht einen Cypress-Lauf sonst ab.
 - Vite für die Oberfläche auf Port `5173` (CORS lässt nur 3000/5173 zu):
-  `VITE_HTTPS=false VITE_API_BASE_URL=http://localhost:19090/api/v1 VITE_WS_BASE_URL=ws://localhost:19090 npx vite --port 5173`.
+  `VITE_CACHE_DIR="$S/vite-cache" VITE_HTTPS=false VITE_API_BASE_URL=http://localhost:19090/api/v1 VITE_WS_BASE_URL=ws://localhost:19090 npx vite --port 5173`.
+- **`VITE_CACHE_DIR`**: Im Worktree ist `node_modules` ein Symlink auf den Haupt-Checkout. Ohne eigenes
+  Verzeichnis schreibt der Abhängigkeits-Optimizer dieses Vite in `node_modules/.vite` des Haupt-Checkouts —
+  denselben Cache, aus dem das laufende Vite auf `:3000` liefert. `vite.config.ts` setzt `cacheDir` auf den
+  Pfad aus der Variable.
 
 ### Testdaten und Cleanup
 
 - **Dev-Target:** erzeugte Cypress-Projekte, Workflows, Chains und Runs landen auf Dev
 - **Test-Target:** dieselben Daten landen auf der Test-Instanz
 - `cy.apiCleanup()` räumt nur Cypress-Testdaten mit dem Prefix `Cypress` auf
+- `chains.cy.ts` führt eine Chain echt aus; jeder Workflow-Lauf startet dabei den Projekt-Container
+  `automation-<projectId>`. Die Spec wartet deshalb das Ende des Chain-Laufs ab, bevor sie die Chain löscht,
+  und räumt in `after()` über die API der Instanz auf (Läufe abwarten, `POST /projects/{id}/stop`, Workflows
+  und Projekt löschen) — nicht über Docker direkt
 - Für die Test-Instanz kann zusätzlich `POST /api/v1/testing/reset` verwendet werden, wenn ein kompletter Reset gewünscht ist
 
 **Teststruktur:**

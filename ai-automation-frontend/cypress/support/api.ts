@@ -19,6 +19,9 @@ function apiHeaders(): Record<string, string> {
   return headers;
 }
 
+/** Run states (workflow and chain runs) that can still start work. */
+const ACTIVE_RUN_STATUSES = ['PENDING', 'RUNNING', 'PAUSED'];
+
 // ── Projects ────────────────────────────────────────────
 
 export function getProjects() {
@@ -35,6 +38,15 @@ export function createProject(
 
 export function deleteProject(id: string) {
   return cy.request({ method: 'DELETE', url: apiUrl(`/projects/${id}`), headers: apiHeaders(), failOnStatusCode: false });
+}
+
+/**
+ * Stops the project's container. A workflow run starts the container `automation-<projectId>` itself
+ * without marking the project RUNNING, and older backends only stop a container on delete when the
+ * project is RUNNING — so a spec whose runs start containers stops them explicitly before deleting.
+ */
+export function stopProject(id: string) {
+  return cy.request({ method: 'POST', url: apiUrl(`/projects/${id}/stop`), headers: apiHeaders(), failOnStatusCode: false });
 }
 
 // ── Workflows ───────────────────────────────────────────
@@ -63,6 +75,25 @@ export function getChains() {
 
 export function deleteChain(id: string) {
   return cy.request({ method: 'DELETE', url: apiUrl(`/chains/${id}`), headers: apiHeaders(), failOnStatusCode: false });
+}
+
+/**
+ * Waits until the chain run is no longer active (one poll per second); after `attempts` polls it is
+ * cancelled. Deleting a chain while its run still starts workflows leaves runs (and the project
+ * container they start) behind.
+ */
+export function settleChainRun(chainId: string, runId: string, attempts = 30): void {
+  cy
+    .request({ method: 'GET', url: apiUrl(`/chains/${chainId}/runs/${runId}`), headers: apiHeaders(), failOnStatusCode: false })
+    .then((resp) => {
+      if (resp.status !== 200 || !ACTIVE_RUN_STATUSES.includes(resp.body.status)) return;
+      if (attempts <= 1) {
+        cy.request({ method: 'POST', url: apiUrl(`/chains/runs/${runId}/cancel`), headers: apiHeaders(), failOnStatusCode: false });
+        return;
+      }
+      cy.wait(1000);
+      settleChainRun(chainId, runId, attempts - 1);
+    });
 }
 
 // ── Schedules ───────────────────────────────────────────
@@ -132,6 +163,32 @@ export function getExecutions() {
     const body = resp.body;
     return Array.isArray(body) ? body : (body.content ?? []);
   });
+}
+
+export function cancelExecution(id: string) {
+  return cy.request({ method: 'POST', url: apiUrl(`/executions/${id}/cancel`), headers: apiHeaders(), failOnStatusCode: false });
+}
+
+/**
+ * Waits until no run of the project is active any more; after `attempts` polls (one per second)
+ * the remaining active runs are cancelled. A run still going would start the project container
+ * again after the spec stopped it.
+ */
+export function settleProjectRuns(projectId: string, attempts = 30): void {
+  cy
+    .request({ method: 'GET', url: apiUrl(`/executions?projectId=${projectId}&size=100`), headers: apiHeaders() })
+    .then((resp) => {
+      const body = resp.body;
+      const runs: { id: string; status: string }[] = Array.isArray(body) ? body : (body.content ?? []);
+      const active = runs.filter((r) => ACTIVE_RUN_STATUSES.includes(r.status));
+      if (active.length === 0) return;
+      if (attempts <= 1) {
+        active.forEach((r) => cancelExecution(r.id));
+        return;
+      }
+      cy.wait(1000);
+      settleProjectRuns(projectId, attempts - 1);
+    });
 }
 
 // ── Skills ──────────────────────────────────────────────

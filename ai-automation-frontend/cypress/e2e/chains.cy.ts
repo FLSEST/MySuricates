@@ -1,3 +1,5 @@
+import * as api from '../support/api';
+
 describe('Chains', () => {
   const runStamp = Date.now();
   let projectId: string;
@@ -22,6 +24,17 @@ describe('Chains', () => {
 
   beforeEach(() => {
     cy.visit('/chains');
+  });
+
+  // Executing the chain runs workflows A and B, and each run starts the real project container
+  // `automation-<projectId>`. Remove it through the instance's API (not Docker directly): let the
+  // runs settle, stop the container, then delete this spec's workflows and project.
+  after(() => {
+    if (!projectId) return;
+    api.settleProjectRuns(projectId);
+    api.stopProject(projectId);
+    [workflowAId, workflowBId].filter(Boolean).forEach((id) => api.deleteWorkflow(id));
+    api.deleteProject(projectId);
   });
 
   function addWorkflowEntry(workflowName: string) {
@@ -78,6 +91,11 @@ describe('Chains', () => {
     cy.contains('button', 'Execute').click();
     cy.url({ timeout: 15000 }).should('match', /\/chains\/[a-f0-9-]+\/run\/[a-f0-9-]+$/);
     cy.contains('h1', 'Chain Execution', { timeout: 15000 }).should('be.visible');
+    // Delete the chain only once its run is over — otherwise the run keeps starting workflows.
+    cy.url().then((url) => {
+      const [, chainId, runId] = url.match(/\/chains\/([a-f0-9-]+)\/run\/([a-f0-9-]+)$/) ?? [];
+      api.settleChainRun(chainId, runId);
+    });
 
     cy.visit('/chains');
     openChainByName(updatedName);

@@ -37,6 +37,10 @@ export default defineConfig(() => {
   );
 
   return {
+    // Vite's dependency optimizer writes to node_modules/.vite by default. A worktree's node_modules
+    // is a symlink to the main checkout, so a second Vite (E2E side instance on :5173) would rewrite
+    // the cache of the Vite already serving :3000 — VITE_CACHE_DIR gives it a cache of its own.
+    ...(process.env.VITE_CACHE_DIR?.trim() ? { cacheDir: path.resolve(process.env.VITE_CACHE_DIR.trim()) } : {}),
     define: {
       __BUILD_TIMESTAMP__: JSON.stringify(new Date().toISOString()),
       // Die Frontend-Version steht sonst nirgends im Bundle. Die Kachel BuildInfoStat stellt sie
