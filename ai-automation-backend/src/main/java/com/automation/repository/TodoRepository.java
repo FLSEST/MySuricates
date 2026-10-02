@@ -290,6 +290,10 @@ public interface TodoRepository extends JpaRepository<Todo, String>, JpaSpecific
      * Bulk status change without loading entities. Sets updatedAt explicitly because
      * bulk JPQL bypasses @LastModifiedDate auditing. Caller must be @Transactional.
      */
+    /** IDs unter {@code ids}, die noch nicht {@code status} haben — wer beim Sammel-UPDATE wirklich wechselt. */
+    @Query("SELECT t.id FROM Todo t WHERE t.id IN :ids AND t.status <> :status")
+    List<String> findIdsNotInStatus(@Param("ids") List<String> ids, @Param("status") Todo.Status status);
+
     @Modifying(clearAutomatically = true)
     @Query("UPDATE Todo t SET t.status = :status, t.updatedAt = :now WHERE t.id IN :ids")
     int bulkSetStatus(@Param("ids") List<String> ids, @Param("status") Todo.Status status, @Param("now") Instant now);

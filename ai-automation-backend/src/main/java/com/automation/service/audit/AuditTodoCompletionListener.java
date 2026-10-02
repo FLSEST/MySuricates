@@ -29,4 +29,10 @@ class AuditTodoCompletionListener {
             auditCenterService.markAwaitingVerification(todoId);
         }
     }
+
+    /** Sammel-UPDATE auf DONE: es laedt keine Entities, deshalb meldet der Service die IDs gesammelt. */
+    @EventListener
+    public void onTodosCompletedInBulk(Todo.CompletedInBulk event) {
+        auditCenterService.markAwaitingVerification(event.todoIds());
+    }
 }

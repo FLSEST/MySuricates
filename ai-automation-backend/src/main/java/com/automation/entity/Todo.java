@@ -223,6 +223,14 @@ public class Todo {
     }
 
     /**
+     * Mehrere TODOs sind per Sammel-UPDATE ({@code TodoRepository.bulkSetStatus}) auf {@code DONE} gewechselt.
+     * Das UPDATE laedt keine Entities, also meldet sich keines selbst ({@link Completed}); der Aufrufer
+     * veroeffentlicht die IDs der tatsaechlich wechselnden TODOs gesammelt.
+     */
+    public record CompletedInBulk(java.util.List<String> todoIds) {
+    }
+
+    /**
      * Ein Wechsel auf {@code DONE} meldet sich als {@link Completed} — einmal je Wechsel, nicht
      * bei DONE → DONE (Folgebefund zu ab1ed481). Hibernate laedt per Feldzugriff, das Laden loest also
      * nichts aus.

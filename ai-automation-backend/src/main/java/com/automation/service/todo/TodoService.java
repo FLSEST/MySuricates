@@ -194,7 +194,14 @@ public class TodoService {
         if (ids == null || ids.isEmpty()) {
             return 0;
         }
+        // Das UPDATE laedt keine Entities: Wer dabei auf DONE wechselt, meldet sich nicht selbst
+        // (Todo.Completed) — also hier gesammelt, damit verknuepfte Audit-Befunde folgen (ab1ed481).
+        List<String> completing = status == Todo.Status.DONE
+                ? todoRepository.findIdsNotInStatus(ids, Todo.Status.DONE) : List.of();
         int updated = todoRepository.bulkSetStatus(ids, status, Instant.now());
+        if (!completing.isEmpty()) {
+            eventPublisher.publishEvent(new Todo.CompletedInBulk(completing));
+        }
         log.info("Bulk updated {} todo(s) → {}", updated, status);
         return updated;
     }

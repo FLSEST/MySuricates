@@ -617,7 +617,7 @@ class AuditCenterServiceTest {
         AuditFinding resolved = finding();
         resolved.setId("f-resolved");
         resolved.setStatus(AuditFindingStatus.RESOLVED);
-        when(findingTodoRepository.findByTodoId(TODO_ID)).thenReturn(List.of(
+        when(findingTodoRepository.findByTodoIdIn(java.util.Set.of(TODO_ID))).thenReturn(List.of(
                 AuditFindingTodo.builder().findingId(FINDING_ID).todoId(TODO_ID).managed(true).build(),
                 AuditFindingTodo.builder().findingId("f-resolved").todoId(TODO_ID).managed(true).build(),
                 AuditFindingTodo.builder().findingId("f-manual").todoId(TODO_ID).managed(false).build()));

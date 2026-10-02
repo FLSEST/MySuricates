@@ -410,6 +410,40 @@ class TodoServiceTest {
         verify(todoRepository).bulkSetStatus(eq(ids), eq(Todo.Status.ARCHIVED), any());
     }
 
+    /**
+     * Review-Befund zu ab1ed481: Das Sammel-UPDATE laedt keine Entities, also meldet kein TODO selbst
+     * {@link Todo.Completed}. Bei Ziel DONE gehen die tatsaechlich wechselnden IDs gesammelt hinaus.
+     */
+    @Test
+    void bulkUpdateStatus_toDone_reportsTheTodosThatActuallyChange() {
+        List<String> ids = List.of("a", "b", "c");
+        when(todoRepository.findIdsNotInStatus(ids, Todo.Status.DONE)).thenReturn(List.of("a", "c"));
+        when(todoRepository.bulkSetStatus(eq(ids), eq(Todo.Status.DONE), any())).thenReturn(3);
+
+        todoService.bulkUpdateStatus(ids, Todo.Status.DONE);
+
+        verify(eventPublisher).publishEvent(new Todo.CompletedInBulk(List.of("a", "c")));
+    }
+
+    @Test
+    void bulkUpdateStatus_toAnotherStatus_reportsNothing() {
+        when(todoRepository.bulkSetStatus(any(), eq(Todo.Status.ARCHIVED), any())).thenReturn(1);
+
+        todoService.bulkUpdateStatus(List.of("a"), Todo.Status.ARCHIVED);
+
+        verify(todoRepository, never()).findIdsNotInStatus(any(), any());
+        verify(eventPublisher, never()).publishEvent(any(Todo.CompletedInBulk.class));
+    }
+
+    @Test
+    void bulkUpdateStatus_toDone_withNothingChanging_reportsNothing() {
+        when(todoRepository.findIdsNotInStatus(List.of("a"), Todo.Status.DONE)).thenReturn(List.of());
+
+        todoService.bulkUpdateStatus(List.of("a"), Todo.Status.DONE);
+
+        verify(eventPublisher, never()).publishEvent(any(Todo.CompletedInBulk.class));
+    }
+
     @Test
     void bulkUpdateStatus_emptyIds_isNoOp() {
         assertThat(todoService.bulkUpdateStatus(List.of(), Todo.Status.ARCHIVED)).isZero();

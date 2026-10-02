@@ -18,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -164,7 +165,7 @@ class AuditFindingTodoLinkerTest {
         AuditFinding open = finding("f-open", "p-1");
         AuditFinding fixed = finding("f-fixed", "p-1");
         fixed.setStatus(AuditFindingStatus.RESOLVED);
-        when(findingTodoRepository.findByTodoId("t-1")).thenReturn(List.of(
+        when(findingTodoRepository.findByTodoIdIn(Set.of("t-1"))).thenReturn(List.of(
                 link("f-open", "t-1", true), link("f-fixed", "t-1", true), link("f-gone", "t-1", true)));
         when(findingTodoRepository.findByFindingIdIn(List.of("f-open", "f-fixed", "f-gone"))).thenReturn(List.of(
                 link("f-open", "t-1", true), link("f-fixed", "t-1", true), link("f-gone", "t-1", true)));
@@ -192,7 +193,7 @@ class AuditFindingTodoLinkerTest {
         AuditFinding open = finding("f-1", "p-1");
         Todo archivedManaged = todo("t-managed", "p-1");
         archivedManaged.setStatus(Todo.Status.ARCHIVED);
-        when(findingTodoRepository.findByTodoId("t-manual")).thenReturn(List.of(link("f-1", "t-manual", false)));
+        when(findingTodoRepository.findByTodoIdIn(Set.of("t-manual"))).thenReturn(List.of(link("f-1", "t-manual", false)));
         when(findingTodoRepository.findByFindingIdIn(List.of("f-1"))).thenReturn(List.of(
                 link("f-1", "t-manual", false), link("f-1", "t-managed", true)));
         when(todoRepository.findAllById(List.of("t-managed"))).thenReturn(List.of(archivedManaged));
@@ -213,7 +214,7 @@ class AuditFindingTodoLinkerTest {
         stillOpen.setStatus(Todo.Status.IN_PROGRESS);
         Todo alsoDone = todo("t-done", "p-1");
         alsoDone.setStatus(Todo.Status.DONE);
-        when(findingTodoRepository.findByTodoId("t-1")).thenReturn(List.of(
+        when(findingTodoRepository.findByTodoIdIn(Set.of("t-1"))).thenReturn(List.of(
                 link("f-1", "t-1", false), link("f-2", "t-1", true)));
         when(findingTodoRepository.findByFindingIdIn(List.of("f-1", "f-2"))).thenReturn(List.of(
                 link("f-1", "t-1", false), link("f-1", "t-other", true),
@@ -228,11 +229,38 @@ class AuditFindingTodoLinkerTest {
         verify(findingRepository).saveAll(List.of(done));
     }
 
+    /**
+     * Sammelschliessen (Review zu ab1ed481): mehrere TODOs werden zugleich DONE. Ein Befund, an dem nur
+     * diese TODOs haengen, wartet; einer mit einem weiteren offenen TODO bleibt OPEN. Je Stufe eine Abfrage.
+     */
+    @Test
+    void markAwaitingVerification_forSeveralTodosAtOnce() {
+        AuditFinding bothDone = finding("f-1", "p-1");
+        AuditFinding stillWorkedOn = finding("f-2", "p-1");
+        Todo open = todo("t-3", "p-1");
+        open.setStatus(Todo.Status.OPEN);
+        when(findingTodoRepository.findByTodoIdIn(Set.of("t-1", "t-2"))).thenReturn(List.of(
+                link("f-1", "t-1", true), link("f-1", "t-2", false), link("f-2", "t-2", false)));
+        when(findingTodoRepository.findByFindingIdIn(List.of("f-1", "f-2"))).thenReturn(List.of(
+                link("f-1", "t-1", true), link("f-1", "t-2", false), link("f-2", "t-2", false),
+                link("f-2", "t-3", true)));
+        when(todoRepository.findAllById(List.of("t-3"))).thenReturn(List.of(open));
+        when(findingRepository.findAllById(List.of("f-1", "f-2"))).thenReturn(List.of(bothDone, stillWorkedOn));
+
+        linker().markAwaitingVerification(List.of("t-1", "t-2"));
+
+        assertThat(bothDone.getStatus()).isEqualTo(AuditFindingStatus.AWAITING_VERIFICATION);
+        assertThat(stillWorkedOn.getStatus()).isEqualTo(AuditFindingStatus.OPEN);
+        verify(findingRepository).saveAll(List.of(bothDone));
+        verify(findingTodoRepository, times(1)).findByTodoIdIn(any());
+        verify(findingTodoRepository, never()).findByTodoId(any());
+    }
+
     @Test
     void markAwaitingVerification_savesNothingWhenNoLinkedFindingIsOpen() {
         AuditFinding fixed = finding("f-fixed", "p-1");
         fixed.setStatus(AuditFindingStatus.RESOLVED);
-        when(findingTodoRepository.findByTodoId("t-1")).thenReturn(List.of(link("f-fixed", "t-1", true)));
+        when(findingTodoRepository.findByTodoIdIn(Set.of("t-1"))).thenReturn(List.of(link("f-fixed", "t-1", true)));
         when(findingTodoRepository.findByFindingIdIn(List.of("f-fixed"))).thenReturn(List.of(link("f-fixed", "t-1", true)));
         when(findingRepository.findAllById(List.of("f-fixed"))).thenReturn(List.of(fixed));
 
@@ -244,7 +272,7 @@ class AuditFindingTodoLinkerTest {
 
     @Test
     void markAwaitingVerification_withoutLinksQueriesNoFindings() {
-        when(findingTodoRepository.findByTodoId("t-1")).thenReturn(List.of());
+        when(findingTodoRepository.findByTodoIdIn(Set.of("t-1"))).thenReturn(List.of());
 
         linker().markAwaitingVerification("t-1");
 

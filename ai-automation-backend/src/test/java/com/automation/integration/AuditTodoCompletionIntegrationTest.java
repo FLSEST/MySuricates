@@ -42,6 +42,7 @@ class AuditTodoCompletionIntegrationTest {
     @Autowired private AuditFindingRepository findingRepository;
     @Autowired private AuditFindingTodoRepository findingTodoRepository;
     @Autowired private AuditReportRepository reportRepository;
+    @Autowired private com.automation.service.todo.TodoService todoService;
 
     private String projectId;
     private String reportId;
@@ -115,5 +116,19 @@ class AuditTodoCompletionIntegrationTest {
         todoRepository.save(todo);
 
         assertThat(statusOf(finding)).isEqualTo(AuditFindingStatus.OPEN);
+    }
+
+    /** Review zu ab1ed481: das Sammel-UPDATE laedt keine Entities — der Befund folgt trotzdem. */
+    @Test
+    void bulkStatusUpdateToDone_movesTheFindings() {
+        AuditFinding a = openFinding("fp-bulk-a");
+        AuditFinding b = openFinding("fp-bulk-b");
+        Todo todoA = linkedTodo(a, true);
+        Todo todoB = linkedTodo(b, false);
+
+        todoService.bulkUpdateStatus(List.of(todoA.getId(), todoB.getId()), Todo.Status.DONE);
+
+        assertThat(statusOf(a)).isEqualTo(AuditFindingStatus.AWAITING_VERIFICATION);
+        assertThat(statusOf(b)).isEqualTo(AuditFindingStatus.AWAITING_VERIFICATION);
     }
 }

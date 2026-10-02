@@ -12,6 +12,7 @@ import com.automation.service.audit.AuditCenterService.TodoLink;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.Collection;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
@@ -69,12 +70,19 @@ class AuditFindingTodoLinker {
      * (5fb7b1e9), gespeichert wird gesammelt (e8ca26e9).
      */
     void markAwaitingVerification(String todoId) {
-        List<String> findingIds = findingTodoRepository.findByTodoId(todoId).stream()
+        markAwaitingVerification(List.of(todoId));
+    }
+
+    /** Dasselbe fuer mehrere zugleich erledigte TODOs (Sammel-UPDATE); keines zaehlt fuer das andere als offen. */
+    void markAwaitingVerification(Collection<String> todoIds) {
+        Set<String> completed = Set.copyOf(todoIds);
+        if (completed.isEmpty()) return;
+        List<String> findingIds = findingTodoRepository.findByTodoIdIn(completed).stream()
                 .map(AuditFindingTodo::getFindingId)
                 .distinct()
                 .toList();
         if (findingIds.isEmpty()) return;
-        Set<String> busy = findingsWithOtherOpenTodo(findingIds, todoId);
+        Set<String> busy = findingsWithOtherOpenTodo(findingIds, completed);
         List<AuditFinding> awaiting = findingRepository.findAllById(findingIds).stream()
                 .filter(finding -> finding.getStatus() == AuditFindingStatus.OPEN)
                 .filter(finding -> !busy.contains(finding.getId()))
@@ -84,10 +92,10 @@ class AuditFindingTodoLinker {
         findingRepository.saveAll(awaiting);
     }
 
-    /** Findings, an denen außer {@code todoId} noch ein offenes TODO hängt. */
-    private Set<String> findingsWithOtherOpenTodo(List<String> findingIds, String todoId) {
+    /** Findings, an denen außer den erledigten TODOs noch ein offenes hängt. */
+    private Set<String> findingsWithOtherOpenTodo(List<String> findingIds, Set<String> completed) {
         List<AuditFindingTodo> others = findingTodoRepository.findByFindingIdIn(findingIds).stream()
-                .filter(link -> !todoId.equals(link.getTodoId()))
+                .filter(link -> !completed.contains(link.getTodoId()))
                 .toList();
         if (others.isEmpty()) return Set.of();
         Set<String> openTodoIds = todoRepository.findAllById(others.stream().map(AuditFindingTodo::getTodoId).distinct().toList())
