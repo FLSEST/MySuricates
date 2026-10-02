@@ -214,7 +214,9 @@ Finding mit `subject`, Schwere, Titel und `evidence` aus der Messung, `expectedF
 Zeilen überein, steht `snapshotComplete: false` im Envelope. Von der KI (Block `coach`) kommen nur
 der Bericht, die Zeile `naechster_schritt: <subject>` (dieses Finding wird `HIGH`) und zwischen
 `BEFUND-TEXTE:` und `ENDE BEFUND-TEXTE` je Klasse ein Satz `<subject> | <Text>`. Fehlt ein Text,
-gilt ein Standardtext; ein unbekanntes `subject` und ein Envelope der KI werden verworfen. Der
+gilt ein Standardtext. Ein `subject` mit anderem Pfad gilt für die Klasse mit demselben Dateinamen,
+wenn er eindeutig ist; sonst wird es wie ein unbekanntes verworfen, ebenso ein Envelope der KI. Fehlt
+`ENDE BEFUND-TEXTE`, endet der Abschnitt an der nächsten `gate_`- oder `naechster_schritt`-Zeile. Der
 Messblock listet jedes `subject` nur einmal, auch zwei gleichnamige Klassen aus verschiedenen
 Paketen.
 

@@ -213,7 +213,10 @@ builds the envelope: exactly one finding per line of the lists `UNTESTED` and `D
 the lines, the envelope says `snapshotComplete: false`. The AI (block `coach`) only supplies the
 report, the line `naechster_schritt: <subject>` (that finding becomes `HIGH`) and, between
 `BEFUND-TEXTE:` and `ENDE BEFUND-TEXTE`, one sentence per class as `<subject> | <text>`. A missing
-text gets a default; an unknown `subject` and an envelope written by the AI are discarded. The
+text gets a default. A `subject` with a different path counts for the class with the same file name
+if that name is unique; otherwise it is discarded like an unknown one, as is an envelope written by
+the AI. If `ENDE BEFUND-TEXTE` is missing, the section ends at the next `gate_` or
+`naechster_schritt` line. The
 measuring block lists every `subject` only once, even for two classes of the same name in different
 packages.
 

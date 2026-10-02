@@ -432,6 +432,28 @@ check "Kopfzeile fehlt: Gate RED audit-invalid" \
 assemble "$(printf '%s\n' "$METRICS_OUT" | sed '/^service\/deep\/Untested03\.java/d')" "$COACH_OUT"
 check "Kopfzeile zaehlt mehr Zeilen als gelistet: snapshotComplete false" 'grep -q "\"snapshotComplete\": false" "$TMP/envelope.json"'
 
+# Fehlt "ENDE BEFUND-TEXTE", endet der Abschnitt an der naechsten gate_- oder naechster_schritt-Zeile: Sonst
+# verschluckte er Urteil und naechsten Schritt (Review fa66ea31).
+assemble "$METRICS_OUT" "$(printf '%s\n' '### Coverage-Coach' 'BEFUND-TEXTE:' \
+  'service/deep/Untested09.java | Text ohne Abschlusszeile.' '' '**gate_status:** YELLOW' 'gate_category: test-coverage' \
+  'naechster_schritt: service/deep/Untested05.java' 'Schlusssatz des Berichts.')"
+check "ohne ENDE BEFUND-TEXTE: gate-Zeilen bleiben im Bericht" \
+  'grep -qx "\*\*gate_status:\*\* YELLOW" "$TMP/report.txt" && grep -qx "gate_category: test-coverage" "$TMP/report.txt" && grep -qx "Schlusssatz des Berichts." "$TMP/report.txt"'
+check "ohne ENDE BEFUND-TEXTE: naechster Schritt wird HIGH, Text davor gilt" \
+  '[ "$(finding_field service/deep/Untested05.java severity)" = HIGH ] && [ "$(finding_field service/deep/Untested09.java description)" = "Text ohne Abschlusszeile." ]'
+# Nennt die KI ein subject mit anderem Pfad, gilt der Text der Klasse mit demselben Dateinamen, wenn er
+# eindeutig ist; sonst bleibt der Standardtext. Dasselbe fuer naechster_schritt.
+TWIN_METRICS="$(printf '%s\n' 'UNTESTED gesamt: 3' "a/Twin.java${TAB}50" "b/Twin.java${TAB}40" "service/deep/Solo.java${TAB}30" '' \
+  'DUENNE TESTS gesamt: 0' '' 'ERWARTETE FINDINGS: 3')"
+assemble "$TWIN_METRICS" "$(printf '%s\n' 'naechster_schritt: com/automation/service/deep/Solo.java' 'BEFUND-TEXTE:' \
+  'Solo.java | Text fuer Solo ueber den Dateinamen.' 'Twin.java | Mehrdeutig, darf nicht greifen.' 'ENDE BEFUND-TEXTE')"
+check "abweichender Pfad, eindeutiger Dateiname: Text der KI" \
+  '[ "$(finding_field service/deep/Solo.java description)" = "Text fuer Solo ueber den Dateinamen." ]'
+check "abweichender Pfad im naechsten Schritt: HIGH ueber den Dateinamen" \
+  '[ "$(finding_field service/deep/Solo.java severity)" = HIGH ]'
+check "mehrdeutiger Dateiname: Standardtext fuer beide" \
+  'finding_field a/Twin.java description | grep -q "^Eigenen Test fuer Twin" && finding_field b/Twin.java description | grep -q "^Eigenen Test fuer Twin"'
+
 # Gleichnamige Klassen in zwei Paketen ergaeben dasselbe thin-test-subject zweimal: der Messblock listet
 # je Name nur die duennste Zeile, ERWARTETE FINDINGS zaehlt sie einmal.
 FIXD="$TMP/fixture-dup"
