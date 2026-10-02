@@ -208,6 +208,57 @@ class RunWorkspaceServiceTest {
         org.mockito.Mockito.verifyNoInteractions(repository);
     }
 
+    /**
+     * 88781724: without a setting the root stays where every installation had it — not in the data
+     * directory, which is {@code ~/.autotrigger} on older installations; a setting wins.
+     */
+    @Test
+    void root_unsetKeepsTheEstablishedPlace_aSettingWins() {
+        Path established = Path.of(System.getProperty("user.home"), ".mysuricates", "workspaces");
+        var repository = mock(WorkflowRunRepository.class);
+
+        assertThat(new RunWorkspaceService(repository, new ObjectMapper(), "").root()).isEqualTo(established.toString());
+        assertThat(new RunWorkspaceService(repository, new ObjectMapper(), null).root()).isEqualTo(established.toString());
+        assertThat(new RunWorkspaceService(repository, new ObjectMapper(), " /srv/runs ").root()).isEqualTo("/srv/runs");
+        assertThat(RunWorkspaceService.defaultRoot(directory)).isEqualTo(directory.resolve(".mysuricates/workspaces"));
+    }
+
+    /**
+     * 88781724: a run interrupted before the configured root changed (AUTOMATION_RUN_WORKSPACE_ROOT)
+     * resumes in the checkout it started in.
+     */
+    @Test
+    void resumeStaysUnderTheRootTheRunStartedIn_evenWhenTheConfiguredRootChanged() throws Exception {
+        Path source = directory.resolve("source");
+        Files.createDirectories(source);
+        git(source, "init", "-q");
+        git(source, "config", "user.email", "test@example.invalid");
+        git(source, "config", "user.name", "Test");
+        Files.writeString(source.resolve("code"), "committed");
+        git(source, "add", ".");
+        git(source, "commit", "-qm", "initial");
+        var project = Project.builder().id("project").name("Example").path(source.toString()).build();
+        var run = WorkflowRun.builder().id("run").build();
+        var repository = mock(WorkflowRunRepository.class);
+        Map<String, Object> policy = Map.of("workspace", Map.of("mode", "isolated",
+                "additional_sources", Map.of("reference", source.toString())));
+        new RunWorkspaceService(repository, new ObjectMapper(), directory.resolve("old-root").toString())
+                .pinSource(run, project, policy, Map.of());
+        var started = new RunWorkspaceService(repository, new ObjectMapper(), directory.resolve("old-root").toString())
+                .prepare(run, project, policy, ExecutionContext.builder().workflowRunId("run").build(), false);
+        Files.writeString(Path.of(started.getPath()).resolve("code"), "run edit");
+
+        var context = ExecutionContext.builder().workflowRunId("run").build();
+        var resumed = new RunWorkspaceService(repository, new ObjectMapper(), directory.resolve("new-root").toString())
+                .prepare(run, project, policy, context, true);
+
+        assertThat(resumed.getPath()).isEqualTo(started.getPath());
+        assertThat(Files.readString(Path.of(resumed.getPath()).resolve("code"))).isEqualTo("run edit");
+        assertThat(String.valueOf(context.getVariable("execution_path_reference")))
+                .startsWith(directory.resolve("old-root").toRealPath().toString());
+        assertThat(directory.resolve("new-root")).doesNotExist();
+    }
+
     private void git(Path source, String... args) throws Exception {
         var command = new java.util.ArrayList<>(java.util.List.of("git", "-C", source.toString()));
         command.addAll(java.util.List.of(args));

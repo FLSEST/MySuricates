@@ -4,8 +4,8 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import com.automation.config.InstanceAddress;
 import com.automation.repository.AppSettingsRepository;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -31,23 +31,17 @@ class ApiKeyServiceTest {
     private AppSettingsRepository settingsRepo;
 
     private ApiKeyService service;
-    private String originalUserHome;
 
     @TempDir
     private Path tempHome;
 
     @BeforeEach
     void setUp() {
-        originalUserHome = System.getProperty("user.home");
-        System.setProperty("user.home", tempHome.toString());
-        service = new ApiKeyService(settingsRepo);
+        // 88781724: the key file is configured, not derived from a redirected user.home
+        service = new ApiKeyService(settingsRepo,
+                new InstanceAddress("", "", 9090, tempHome.resolve("data/api-key").toString()));
         ReflectionTestUtils.setField(service, "configuredApiKey", "");
         ReflectionTestUtils.setField(service, "securityEnabled", true);
-    }
-
-    @AfterEach
-    void tearDown() {
-        System.setProperty("user.home", originalUserHome);
     }
 
     @Test
@@ -107,7 +101,7 @@ class ApiKeyServiceTest {
                     .doesNotContain(key)
                     .doesNotContain(key.substring(0, key.length() - 4));
             verify(settingsRepo).set("api-key", key);
-            assertThat(Files.readString(tempHome.resolve(".mysuricates/api-key"))).isEqualTo(key);
+            assertThat(Files.readString(tempHome.resolve("data/api-key"))).isEqualTo(key);
         } finally {
             logger.detachAppender(appender);
             logger.setLevel(previousLevel);

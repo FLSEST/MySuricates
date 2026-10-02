@@ -2,6 +2,7 @@ package com.automation.controller;
 
 import com.automation.dto.AssistantChatRequest;
 import com.automation.dto.AssistantChatResponse;
+import com.automation.exception.ElementNotFoundException;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.security.RateLimitConfig;
 import com.automation.service.AssistantService;
@@ -383,6 +384,18 @@ class AssistantControllerTest {
     }
 
     // ── Error propagation ─────────────────────────────────────────────────────
+
+    /** 2b73ff48: an unknown session is a 404 the UI translates, no longer a 400 with free text. */
+    @Test
+    void getSession_unknownId_returns404WithMessageKey() throws Exception {
+        when(assistantSessionService.getSession("missing"))
+                .thenThrow(new ElementNotFoundException("AssistantSession", "missing"));
+
+        mockMvc.perform(get("/api/v1/assistant/sessions/missing"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.messageKey").value("NAMED_NOT_FOUND"))
+                .andExpect(jsonPath("$.params.resource").value("AssistantSession"));
+    }
 
     @Test
     void getSession_serviceThrows_propagatesError() throws Exception {

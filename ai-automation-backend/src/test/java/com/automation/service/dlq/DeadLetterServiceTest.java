@@ -3,6 +3,7 @@ package com.automation.service.dlq;
 import com.automation.entity.DeadLetterEntry;
 import com.automation.entity.RunStatus;
 import com.automation.event.WorkflowRunCompletedEvent;
+import com.automation.exception.ElementNotFoundException;
 import com.automation.repository.DeadLetterRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -136,8 +137,9 @@ class DeadLetterServiceTest {
     void findById_unknown_throws() {
         when(repository.findById("missing")).thenReturn(Optional.empty());
 
+        // 2b73ff48: a 404 the UI translates instead of a 400 with free text
         assertThatThrownBy(() -> service.findById("missing"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("missing");
+                .isInstanceOf(ElementNotFoundException.class)
+                .hasMessage("DeadLetterEntry not found: missing");
     }
 }

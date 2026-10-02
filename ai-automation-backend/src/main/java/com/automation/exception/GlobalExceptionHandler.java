@@ -174,6 +174,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(EntityNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleEntityNotFound(EntityNotFoundException ex) {
         log.debug("Entity not found: {}", ex.getMessage());
+        if (ex instanceof LocalizedError localized) return respond(localized);
         return respond(ErrorCode.RESOURCE_NOT_FOUND, ex.getMessage() != null ? ex.getMessage() : "Entity not found");
     }
 

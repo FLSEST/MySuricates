@@ -1,8 +1,10 @@
 package com.automation.service.integration.providers.taskwarrior;
 
+import com.automation.service.integration.providers.IntegrationParams;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -41,7 +43,7 @@ final class TaskwarriorArgs {
             }
         }
         if (params.containsKey("priority")) {
-            String pr = paramString(params, "priority", "").trim().toUpperCase();
+            String pr = paramString(params, "priority", "").trim().toUpperCase(Locale.ROOT);
             if (!pr.isEmpty()) {
                 if (!VALID_PRIORITIES.contains(pr)) {
                     throw new IllegalArgumentException("Invalid priority: " + pr + " (expected H, M or L)");
@@ -106,7 +108,7 @@ final class TaskwarriorArgs {
             if (token.startsWith("rc.") || token.startsWith("rc:")) {
                 throw new IllegalArgumentException("Disallowed filter token (rc. overrides not permitted): " + token);
             }
-            if (FORBIDDEN_FILTER_TOKENS.contains(token.toLowerCase())) {
+            if (FORBIDDEN_FILTER_TOKENS.contains(token.toLowerCase(Locale.ROOT))) {
                 throw new IllegalArgumentException("Disallowed filter token (Taskwarrior command keyword): " + token);
             }
             tokens.add(token);
@@ -156,7 +158,7 @@ final class TaskwarriorArgs {
     static String requireParam(Map<String, Object> params, String key) {
         Object val = params.get(key);
         if (val == null || val.toString().isBlank()) {
-            throw new IllegalArgumentException("Required parameter missing: " + key);
+            throw IntegrationParams.missing(key);
         }
         return val.toString();
     }

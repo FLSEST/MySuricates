@@ -583,6 +583,16 @@ export interface WorkflowSealStatus {
   refusedStarts: number;
   lastRefusedAt: string | null;
   lastRefusal: string | null;
+  /**
+   * What a start answers while the seal is broken, as backend ErrorMessage key + params (TODO
+   * 2b73ff48); `detail` is its English text. Missing from backends before that change.
+   */
+  refusalKey?: string | null;
+  refusalParams?: Record<string, string> | null;
+  /** ErrorCode, ErrorMessage key and params of the latest refusal; without them `lastRefusal` is shown. */
+  lastRefusalCode?: string | null;
+  lastRefusalKey?: string | null;
+  lastRefusalParams?: Record<string, string> | null;
 }
 
 /**

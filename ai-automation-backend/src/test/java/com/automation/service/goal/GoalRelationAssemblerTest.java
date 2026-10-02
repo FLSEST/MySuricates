@@ -167,6 +167,9 @@ class GoalRelationAssemblerTest {
                 Map.of(), List.of());
 
         assertThat(GoalRelationAssembler.resultOf(row("never").build(), lookups)).isNull();
+        assertThat(GoalRelationAssembler.resultOf(row("linked-never-ran").fix(null, 0, Todo.ResolutionState.IDLE).build(), lookups))
+                .as("05d4bfe5: verknuepfter Fix-Workflow (IDLE), der nie lief, hat noch kein Ergebnis")
+                .isNull();
         assertThat(GoalRelationAssembler.resultOf(row("run-deleted-later").fix(null, 2, Todo.ResolutionState.IDLE).build(), lookups))
                 .as("Fix-Lauf geloescht (RunDeletionService setzt IDLE): Versuche bleiben sichtbar")
                 .isEqualTo(new Result(null, null, null, null, 2, Todo.ResolutionState.IDLE));

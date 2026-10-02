@@ -35,7 +35,17 @@ public enum ErrorMessage {
     STABLE_INSTANCE_NOT_RUNNING(ErrorCode.STATE_CONFLICT, "Stable instance is not running or not healthy. Start it first."),
     MODULE_DISABLED(ErrorCode.MODULE_DISABLED, "{what} requires module '{module}', which is disabled on this instance — set {property}=true and restart"),
     MODULE_DISABLED_SWITCHABLE(ErrorCode.MODULE_DISABLED, "{what} requires module '{module}', which is disabled on this instance — set {property}=true and restart (or switch it on under Settings → Modules if automation.modules.ui-editable is true)"),
-    RUN_RETENTION_LOCKED(ErrorCode.RUN_DELETION_DISABLED, "Run retention can only be extended while deleting runs is disabled (automation.executions.allow-delete=false): {current} -> {requested} days");
+    RUN_RETENTION_LOCKED(ErrorCode.RUN_DELETION_DISABLED, "Run retention can only be extended while deleting runs is disabled (automation.executions.allow-delete=false): {current} -> {requested} days"),
+    MEMORY_NO_RUNS(ErrorCode.STATE_CONFLICT, "No runs found for workflow: {id}"),
+    MEMORY_NO_STEPS(ErrorCode.STATE_CONFLICT, "No step results found in selected runs"),
+    INTEGRATION_PARAMETER_MISSING(ErrorCode.INVALID_ARGUMENT, "Required parameter missing: {name}"),
+    // Why RunAdmission refused a sealed workflow (WorkflowSealVerifier.Problem); "{name}" is the workflow
+    SEAL_DEFINITION_CHANGED(ErrorCode.WORKFLOW_TAMPERED, "Sealed workflow '{name}' was not started: its definition no longer matches the seal"),
+    SEAL_SKILLS_CHANGED(ErrorCode.WORKFLOW_TAMPERED, "Sealed workflow '{name}' was not started: skill(s) {skills} changed since sealing — review them and seal again"),
+    SEAL_SIGNATURE_INVALID(ErrorCode.WORKFLOW_TAMPERED, "Sealed workflow '{name}' was not started: its signature does not match — the seal was forged or copied from another workflow"),
+    SEAL_SIGNATURE_MISSING(ErrorCode.WORKFLOW_TAMPERED, "Sealed workflow '{name}' was not started: it carries no signature (automation.hardening.require-signed-seal) — seal it again"),
+    SEAL_DEFINITION_UNVERIFIABLE(ErrorCode.WORKFLOW_TAMPERED, "Sealed workflow '{name}' was not started: its definition could not be verified ({error})"),
+    SEAL_SKILLS_UNVERIFIABLE(ErrorCode.WORKFLOW_TAMPERED, "Sealed workflow '{name}' was not started: its skills could not be verified ({error})");
 
     private static final Pattern PLACEHOLDER = Pattern.compile("\\{(\\w+)}");
 

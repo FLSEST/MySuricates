@@ -22,6 +22,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
@@ -108,7 +109,7 @@ public class PageSuggestionService {
 
     /** Suggestions are kept per page and language; anything but {@code en} counts as German (5157fac2). */
     public static String normalizeLocale(String locale) {
-        return locale != null && locale.trim().toLowerCase().startsWith("en") ? "en" : "de";
+        return locale != null && locale.trim().toLowerCase(Locale.ROOT).startsWith("en") ? "en" : "de";
     }
 
     public List<String> getSuggestions(String page, String locale) {

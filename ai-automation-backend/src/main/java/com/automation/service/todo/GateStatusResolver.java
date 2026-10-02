@@ -6,6 +6,7 @@ import com.automation.event.WorkflowRunCompletedEvent;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.Locale;
 import java.util.Map;
 
 @Component
@@ -25,7 +26,7 @@ public class GateStatusResolver {
         Object explicitGate = meta.get("gate_status");
         if (explicitGate != null) {
             try {
-                GateStatus status = GateStatus.valueOf(explicitGate.toString().toUpperCase());
+                GateStatus status = GateStatus.valueOf(explicitGate.toString().toUpperCase(Locale.ROOT));
                 String category = meta.containsKey("gate_category")
                         ? String.valueOf(meta.get("gate_category"))
                         : deriveCategory(status);

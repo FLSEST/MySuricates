@@ -14,6 +14,22 @@ import urllib.request
 LOCAL = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
 
+def data_home():
+    """The instance's data directory — the rule of config/DataHome.java and scripts/lib/data-home.sh."""
+    explicit = os.environ.get('AUTOMATION_DATA_HOME', '').strip()
+    if explicit:
+        return Path(explicit)
+    legacy = Path.home() / '.autotrigger'
+    return legacy if legacy.is_dir() else Path.home() / '.mysuricates'
+
+
+def default_root():
+    """automation.run-workspace.root like RunWorkspaceService: AUTOMATION_RUN_WORKSPACE_ROOT, else
+    ~/.mysuricates/workspaces — also with ~/.autotrigger as data directory (88781724)."""
+    explicit = os.environ.get('AUTOMATION_RUN_WORKSPACE_ROOT', '').strip()
+    return Path(explicit) if explicit else Path.home() / '.mysuricates' / 'workspaces'
+
+
 def eligible(root, manifest_path, execution, cutoff):
     manifest = json.loads(manifest_path.read_text())
     run = manifest_path.parent
@@ -45,14 +61,14 @@ def eligible(root, manifest_path, execution, cutoff):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--root', type=Path, default=Path.home() / '.mysuricates/workspaces')
+    parser.add_argument('--root', type=Path, default=default_root())
     parser.add_argument('--api-base', default='http://localhost:9090/api/v1')
     parser.add_argument('--retention-days', type=int, default=30)
     parser.add_argument('--apply', action='store_true', help='Actually remove eligible repo directories')
     args = parser.parse_args()
     if args.retention_days < 1:
         parser.error('retention-days must be positive')
-    key = os.environ.get('MYSURICATES_API_KEY') or (Path.home() / '.mysuricates/api-key').read_text().strip()
+    key = os.environ.get('MYSURICATES_API_KEY') or (data_home() / 'api-key').read_text().strip()
     root = args.root.expanduser().resolve()
     cutoff = datetime.now(timezone.utc) - timedelta(days=args.retention_days)
     for path in sorted(root.glob('*/*/workspace.json')):

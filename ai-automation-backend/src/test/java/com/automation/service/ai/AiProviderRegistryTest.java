@@ -3,6 +3,7 @@ package com.automation.service.ai;
 import com.automation.config.AiProviderConfig;
 import com.automation.repository.AppSettingsRepository;
 import com.automation.service.system.AppSettingChangedEvent;
+import com.automation.testsupport.TurkishLocale;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -43,6 +44,25 @@ class AiProviderRegistryTest {
         registry = new AiProviderRegistry(
                 List.of(claudeProvider, codexProvider), config, appSettingsRepository);
         registry.initCache();
+    }
+
+    /** 80796b2d: under tr-TR "pi".toUpperCase() is "Pİ" — the stored default named no provider any more. */
+    @Test
+    void defaultProviderFromSettings_doesNotDependOnTheDefaultLocale() {
+        AiProvider piProvider = mock(AiProvider.class);
+        when(piProvider.getId()).thenReturn("PI");
+        when(appSettingsRepository.get("default-ai-provider")).thenReturn(Optional.of("pi"));
+        AiProviderRegistry withPi = new AiProviderRegistry(
+                List.of(claudeProvider, codexProvider, piProvider), config, appSettingsRepository);
+
+        assertThat(TurkishLocale.call(() -> {
+            withPi.initCache();
+            return withPi.getDefaultProviderId();
+        })).isEqualTo("PI");
+        assertThat(TurkishLocale.call(() -> {
+            withPi.refreshDefaultProviderCache();
+            return withPi.resolve(null);
+        })).isSameAs(piProvider);
     }
 
     @Nested

@@ -1,5 +1,6 @@
 package com.automation.config;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -18,6 +19,11 @@ import java.nio.file.Path;
  *
  * <p>{@code AUTOMATION_INSTANCE_CONTAINER} names the container the backend runs in; the API key file
  * then only exists inside it.
+ *
+ * <p>The key file lies in the data directory ({@code ${automation.data-home}/api-key}, the place the
+ * installer scripts read). {@code automation.security.api-key-file} only exists so that tests can point
+ * it elsewhere — a test that enables security without a key otherwise overwrote the developer's real
+ * key file (TODO 88781724).
  */
 @Component
 public class InstanceAddress {
@@ -25,18 +31,28 @@ public class InstanceAddress {
     private final String url;
     private final String container;
     private final int port;
+    private final Path apiKeyFile;
 
+    /** With the key file in the data directory ({@link DataHome}). */
+    public InstanceAddress(String url, String container, int port) {
+        this(url, container, port, "");
+    }
+
+    @Autowired
     public InstanceAddress(@Value("${automation.instance.url:}") String url,
                            @Value("${automation.instance.container:}") String container,
-                           @Value("${server.port:9090}") int port) {
+                           @Value("${server.port:9090}") int port,
+                           @Value("${automation.security.api-key-file:}") String apiKeyFile) {
         this.url = url == null ? "" : url.strip();
         this.container = container == null ? "" : container.strip();
         this.port = port;
+        this.apiKeyFile = apiKeyFile == null || apiKeyFile.isBlank()
+                ? DataHome.dir().resolve("api-key") : Path.of(apiKeyFile.strip());
     }
 
-    /** The file the API key is written to: {@code user.home} of this JVM (per instance under the installer). */
-    public static Path apiKeyFile() {
-        return DataHome.dir().resolve("api-key");
+    /** The file the API key is written to: in the data directory of this JVM (per instance under the installer). */
+    public Path apiKeyFile() {
+        return apiKeyFile;
     }
 
     /** Base URL without a trailing slash, e.g. {@code http://localhost:9090}. */

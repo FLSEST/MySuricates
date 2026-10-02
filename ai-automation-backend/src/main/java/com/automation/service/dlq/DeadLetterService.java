@@ -3,6 +3,7 @@ package com.automation.service.dlq;
 import com.automation.entity.DeadLetterEntry;
 import com.automation.entity.RunStatus;
 import com.automation.event.WorkflowRunCompletedEvent;
+import com.automation.exception.ElementNotFoundException;
 import com.automation.repository.DeadLetterRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -74,7 +75,7 @@ public class DeadLetterService {
 
     public DeadLetterEntry findById(String id) {
         return repository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("DLQ entry not found: " + id));
+                .orElseThrow(() -> new ElementNotFoundException("DeadLetterEntry", id));
     }
 
     @Transactional

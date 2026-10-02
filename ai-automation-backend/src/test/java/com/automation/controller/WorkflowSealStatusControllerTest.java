@@ -53,7 +53,7 @@ class WorkflowSealStatusControllerTest {
     @Test
     void sealStatus_returnsWhatTheServiceReports() {
         WorkflowSealStatusResponse status = new WorkflowSealStatusResponse("wf-1", "Name", "INTACT", "NONE", null,
-                List.of(), true, true, 2, Instant.parse("2026-09-01T00:00:00Z"), 0, null, null);
+                List.of(), true, true, 2, Instant.parse("2026-09-01T00:00:00Z"), 0, null, null, null, null, null, null, null);
         when(statusService.statusAll()).thenReturn(List.of(status));
 
         assertThat(controller().sealStatus()).containsExactly(status);

@@ -22,6 +22,7 @@ import java.util.UUID;
 public class ApiKeyService {
 
     private final AppSettingsRepository settingsRepo;
+    private final InstanceAddress instanceAddress;
 
     @Value("${automation.security.api-key:}")
     private String configuredApiKey;
@@ -61,8 +62,8 @@ public class ApiKeyService {
         writeApiKeyFile(cachedApiKey);
     }
 
-    private static Path apiKeyFile() {
-        return InstanceAddress.apiKeyFile();
+    private Path apiKeyFile() {
+        return instanceAddress.apiKeyFile();
     }
 
     private void writeApiKeyFile(String key) {

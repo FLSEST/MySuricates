@@ -9,6 +9,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -41,8 +42,8 @@ public class AiProviderRegistry {
     @PostConstruct
     public void initCache() {
         cachedDefaultProviderId = appSettingsRepository.get("default-ai-provider")
-                .filter(v -> !v.isBlank() && providers.containsKey(v.toUpperCase()))
-                .map(String::toUpperCase)
+                .filter(v -> !v.isBlank() && providers.containsKey(v.toUpperCase(Locale.ROOT)))
+                .map(v -> v.toUpperCase(Locale.ROOT))
                 .orElse(config.getDefaultProvider());
         log.info("Default AI provider cached: {}", cachedDefaultProviderId);
     }
@@ -57,8 +58,8 @@ public class AiProviderRegistry {
 
     public void refreshDefaultProviderCache() {
         cachedDefaultProviderId = appSettingsRepository.get("default-ai-provider")
-                .filter(v -> !v.isBlank() && providers.containsKey(v.toUpperCase()))
-                .map(String::toUpperCase)
+                .filter(v -> !v.isBlank() && providers.containsKey(v.toUpperCase(Locale.ROOT)))
+                .map(v -> v.toUpperCase(Locale.ROOT))
                 .orElse(config.getDefaultProvider());
         log.info("Default AI provider cache refreshed: {}", cachedDefaultProviderId);
     }
@@ -101,7 +102,7 @@ public class AiProviderRegistry {
 
     private String resolveId(String workflowProvider) {
         if (workflowProvider != null && !workflowProvider.isBlank()) {
-            return workflowProvider.toUpperCase();
+            return workflowProvider.toUpperCase(Locale.ROOT);
         }
         return getDefaultProviderId();
     }

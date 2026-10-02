@@ -5,8 +5,10 @@ import { http, HttpResponse } from 'msw';
 import { server } from '../../../test/server';
 import { renderWithProviders } from '../../../test/utils';
 import { en } from '../../../i18n/en';
+import { de } from '../../../i18n/de';
 import { useI18nStore } from '../../../i18n';
 import { SealBanner } from '../SealBanner';
+import { useSealStatus } from '../../../hooks/useSealStatus';
 import type { Workflow, WorkflowSealStatus } from '../../../types';
 
 beforeAll(() => server.listen({ onUnhandledRequest: failOnUnhandledRequest }));
@@ -112,5 +114,62 @@ describe('SealBanner', () => {
     })} />);
 
     expect(screen.getByRole('alert')).toHaveTextContent(en.workflows.sealView.problemSignature);
+  });
+
+  // 2b73ff48: the seal status sends the refusal reasons as keys + params. The frontend goes live before the
+  // backend restarts, so the old answer (only English text) must keep working — both via the real request.
+  describe('refusal reasons from /workflows/seal-status', () => {
+    beforeEach(() => useI18nStore.setState({ locale: 'de' }));
+
+    function FromServer() {
+      const sealed = useSealStatus('wf-1');
+      return <SealBanner workflow={workflow({ sealed: true })} status={sealed} />;
+    }
+
+    const english = "Sealed workflow 'Deploy' was not started: its skills could not be verified (store down)";
+    const violated = {
+      ...status({ state: 'VIOLATED', problem: 'UNVERIFIABLE', detail: 'its skills could not be verified (store down)' }),
+      refusedStarts: 1, lastRefusedAt: new Date(Date.now() - 60_000).toISOString(),
+      lastRefusal: "Run refused — sealed workflow 'Deploy': its skills could not be verified (store down)",
+    };
+
+    it('shows the English text from a backend without keys', async () => {
+      server.use(http.get('/api/v1/workflows/seal-status', () => HttpResponse.json([violated])));
+      renderWithProviders(<FromServer />);
+
+      expect(await screen.findByTestId('seal-cause')).toHaveTextContent('its skills could not be verified (store down)');
+      expect(screen.getByTestId('seal-last-refusal')).toHaveTextContent(violated.lastRefusal);
+    });
+
+    it('translates cause and latest refusal from a backend with keys', async () => {
+      const params = { name: 'Deploy', error: 'store down' };
+      server.use(http.get('/api/v1/workflows/seal-status', () => HttpResponse.json([{
+        ...violated, refusalKey: 'SEAL_SKILLS_UNVERIFIABLE', refusalParams: params,
+        lastRefusalCode: 'WORKFLOW_TAMPERED', lastRefusalKey: 'SEAL_SKILLS_UNVERIFIABLE', lastRefusalParams: params,
+      }])));
+      renderWithProviders(<FromServer />);
+
+      const german = de.errors.messages.SEAL_SKILLS_UNVERIFIABLE.replace('{name}', 'Deploy').replace('{error}', 'store down');
+      expect(await screen.findByTestId('seal-cause')).toHaveTextContent(german);
+      expect(screen.getByTestId('seal-last-refusal')).toHaveTextContent(german);
+      expect(screen.getByRole('alert')).not.toHaveTextContent(english);
+    });
+
+    it('translates an unattended refusal of an unsealed workflow by its code', async () => {
+      server.use(http.get('/api/v1/workflows/seal-status', () => HttpResponse.json([{
+        ...status({ state: 'NOT_SEALED', sealedAt: null }), refusedStarts: 1, lastRefusedAt: new Date().toISOString(),
+        lastRefusal: "Run refused — unattended run (SCHEDULE) of unsealed workflow 'Deploy'",
+        lastRefusalCode: 'UNATTENDED_REQUIRES_SEAL', lastRefusalParams: { name: 'Deploy', origin: 'SCHEDULE' },
+      }])));
+      renderWithProviders(<UnsealedFromServer />);
+
+      expect(await screen.findByTestId('seal-last-refusal')).toHaveTextContent(
+        de.errors.codes.UNATTENDED_REQUIRES_SEAL.replace('{name}', 'Deploy').replace('{origin}', 'SCHEDULE'));
+    });
+
+    function UnsealedFromServer() {
+      const sealed = useSealStatus('wf-1');
+      return <SealBanner workflow={workflow()} status={sealed} />;
+    }
   });
 });

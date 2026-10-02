@@ -1,6 +1,7 @@
 package com.automation.service.runoutput;
 
 import com.automation.service.runoutput.TodoOutputParser.ParsedTodoItem;
+import com.automation.testsupport.TurkishLocale;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -310,5 +311,12 @@ class TodoOutputParserTest {
     void parse_bracketTextInsideALine_isNoPrefix() {
         assertThat(TodoOutputParser.parse("Siehe [Link]: todo_item: X | HIGH | a"))
                 .as("nur ein Präfix am Zeilenanfang zählt").isEmpty();
+    }
+
+    /** 80796b2d: under tr-TR "high".toUpperCase() is "HİGH", which no Priority constant matches. */
+    @Test
+    void parse_priorityDoesNotDependOnTheDefaultLocale() {
+        List<ParsedTodoItem> items = TurkishLocale.call(() -> TodoOutputParser.parse("todo_item: X | high | a"));
+        assertThat(items).singleElement().satisfies(item -> assertThat(item.priority()).isEqualTo("HIGH"));
     }
 }

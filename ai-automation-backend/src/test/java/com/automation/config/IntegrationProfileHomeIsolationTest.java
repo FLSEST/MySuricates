@@ -2,6 +2,7 @@ package com.automation.config;
 
 import com.automation.service.factory.FactorySetupService;
 import com.automation.service.memory.SummarizationSetupService;
+import com.automation.service.workflow.RunWorkspaceService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -31,8 +32,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@code factory/codex/AGENTS.md} in the real home on every local {@code mvn test}. The profile points
  * all of them at per-JVM temp paths from {@code IntegrationTestDbSessionListener}; the second test
  * catches the next default of that kind that an {@code application*.yml} configures. Paths the code
- * builds from {@code user.home} itself (such as the API key file, {@code InstanceAddress.apiKeyFile()})
- * are outside its view.
+ * builds from {@code user.home} itself are outside its view — so the API key file
+ * ({@link InstanceAddress#apiKeyFile()}, overwritten by any test enabling security without a key) and the
+ * run workspace root ({@link RunWorkspaceService}, {@code ~/.mysuricates/workspaces} hard-coded) became
+ * yml keys as well (TODO 88781724).
  */
 @SpringBootTest
 @ActiveProfiles("integration")
@@ -44,7 +47,8 @@ class IntegrationProfileHomeIsolationTest {
     /** Keys whose default in application.yml points into {@link #REAL_STATE_DIR}; the scan must see them. */
     private static final List<String> KNOWN_HOME_KEYS = List.of(
             "automation.summarization.base-dir", "automation.factory.base-dir", "automation.backup.directory",
-            "automation.integration.key-file", "automation.seal.key-file");
+            "automation.integration.key-file", "automation.seal.key-file",
+            "automation.security.api-key-file", "automation.run-workspace.root");
 
     @Autowired
     private ConfigurableEnvironment environment;
@@ -54,6 +58,24 @@ class IntegrationProfileHomeIsolationTest {
 
     @Autowired
     private FactorySetupService factorySetup;
+
+    @Autowired
+    private InstanceAddress instanceAddress;
+
+    @Autowired
+    private RunWorkspaceService runWorkspaces;
+
+    /** 88781724: both used to be built from {@code user.home} in code, invisible to the yml scan below. */
+    @Test
+    void apiKeyFileAndRunWorkspacesLieOutsideTheRealHome() {
+        Path keyFile = instanceAddress.apiKeyFile().toAbsolutePath().normalize();
+        Path workspaceRoot = Path.of(runWorkspaces.root()).toAbsolutePath().normalize();
+
+        assertThat(keyFile.startsWith(REAL_STATE_DIR)).as("API key file %s", keyFile).isFalse();
+        assertThat(workspaceRoot.startsWith(REAL_STATE_DIR)).as("run workspace root %s", workspaceRoot).isFalse();
+        assertThat(workspaceRoot.startsWith(Path.of(System.getProperty("user.home"), ".mysuricates")))
+                .as("run workspace root %s", workspaceRoot).isFalse();
+    }
 
     @Test
     void setupServicesWriteTheirInstructionsOutsideTheRealHome() {

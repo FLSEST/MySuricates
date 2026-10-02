@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 @Component
@@ -233,7 +234,7 @@ public class GoogleGmailProvider implements IntegrationProvider {
         for (JsonNode header : payload.path("headers")) {
             String name = header.path("name").asText("");
             if (!name.isBlank()) {
-                headers.put(name.toLowerCase(), header.path("value").asText(""));
+                headers.put(name.toLowerCase(Locale.ROOT), header.path("value").asText(""));
             }
         }
         return headers;
@@ -287,7 +288,7 @@ public class GoogleGmailProvider implements IntegrationProvider {
 
     private static String requireParam(Map<String, Object> params, String key) {
         Object val = params.get(key);
-        if (val == null || val.toString().isBlank()) throw new IllegalArgumentException("Required parameter missing: " + key);
+        if (val == null || val.toString().isBlank()) throw IntegrationParams.missing(key);
         return val.toString();
     }
 

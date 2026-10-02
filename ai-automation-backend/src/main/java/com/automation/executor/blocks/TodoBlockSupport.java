@@ -6,6 +6,7 @@ import com.automation.executor.ExecutionContext;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 
 /** Shared config parsing/result plumbing for the native todo-* blocks. */
 final class TodoBlockSupport {
@@ -33,7 +34,7 @@ final class TodoBlockSupport {
     static Todo.Priority parsePriority(Object value, Todo.Priority fallback) {
         if (value == null) return fallback;
         try {
-            return Todo.Priority.valueOf(value.toString().strip().toUpperCase());
+            return Todo.Priority.valueOf(value.toString().strip().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
             return fallback;
         }
@@ -42,7 +43,7 @@ final class TodoBlockSupport {
     static Todo.Source parseSource(Object value, Todo.Source fallback) {
         if (value == null) return fallback;
         try {
-            return Todo.Source.valueOf(value.toString().toUpperCase());
+            return Todo.Source.valueOf(value.toString().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
             return fallback;
         }

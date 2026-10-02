@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Discovers pi models via {@code pi --offline --list-models}.
@@ -97,7 +98,7 @@ public class PiModelCatalogSource implements ModelCatalogSource {
         if (s == null || s.isBlank() || s.equals("-")) {
             return null;
         }
-        String v = s.trim().toUpperCase();
+        String v = s.trim().toUpperCase(Locale.ROOT);
         try {
             if (v.endsWith("K")) {
                 return (int) Math.round(Double.parseDouble(v.substring(0, v.length() - 1)) * 1_000);

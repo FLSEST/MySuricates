@@ -20,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -78,6 +79,8 @@ class WorkflowSealStatusServiceTest {
         assertThat(status.pinnedSkillCount()).isEqualTo(2);
         assertThat(status.sealedAt()).isEqualTo(Instant.parse("2026-09-20T08:00:00Z"));
         assertThat(status.refusedStarts()).isZero();
+        assertThat(status.refusalKey()).isNull();
+        assertThat(status.refusalParams()).isNull();
     }
 
     @Test
@@ -99,6 +102,31 @@ class WorkflowSealStatusServiceTest {
         assertThat(status.refusedStarts()).isEqualTo(2);
         assertThat(status.lastRefusal()).isEqualTo("Run refused — newest");
         assertThat(status.lastRefusedAt()).isEqualTo(at);
+        // 2b73ff48: the reason as messageKey + params for the UI; a refusal logged without them stays text
+        assertThat(status.refusalKey()).isEqualTo("SEAL_SKILLS_CHANGED");
+        assertThat(status.refusalParams()).isEqualTo(Map.of("skills", "s1", "name", "Deploy"));
+        assertThat(status.lastRefusalCode()).isNull();
+        assertThat(status.lastRefusalKey()).isNull();
+        assertThat(status.lastRefusalParams()).isNull();
+    }
+
+    /** 2b73ff48: RunAdmission logs code, messageKey and params next to the refusal; the status hands them on. */
+    @Test
+    void latestRefusalCarriesItsTranslationKeys() {
+        when(workflowRepository.findSealedWithSkills()).thenReturn(List.of());
+        ActivityLog logged = refusal("wf-9", "Run refused — unattended", Instant.now());
+        logged.setMetadata(new HashMap<>(Map.of("errorCode", "UNATTENDED_REQUIRES_SEAL",
+                "params", Map.of("name", "Nightly", "origin", "SCHEDULE"))));
+        when(activityLogRepository.findBySourceAndTimestampAfterOrderByTimestampDesc(eq("RunAdmission"), any()))
+                .thenReturn(List.of(logged));
+        when(workflowRepository.findIdAndNameByIdIn(anyCollection())).thenReturn(List.<Object[]>of(new Object[]{"wf-9", "Nightly"}));
+
+        WorkflowSealStatusResponse status = service.statusAll().get(0);
+
+        assertThat(status.refusalKey()).isNull();
+        assertThat(status.lastRefusalCode()).isEqualTo("UNATTENDED_REQUIRES_SEAL");
+        assertThat(status.lastRefusalKey()).isNull();
+        assertThat(status.lastRefusalParams()).isEqualTo(Map.of("name", "Nightly", "origin", "SCHEDULE"));
     }
 
     @Test

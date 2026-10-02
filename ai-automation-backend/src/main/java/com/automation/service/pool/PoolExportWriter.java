@@ -14,6 +14,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -141,7 +142,7 @@ public class PoolExportWriter {
     }
 
     private String slugify(String name) {
-        String slug = name.toLowerCase()
+        String slug = name.toLowerCase(Locale.ROOT)
                 .replaceAll("[^a-z0-9]+", "-")
                 .replaceAll("^-|-$", "");
         if (slug.isEmpty()) {

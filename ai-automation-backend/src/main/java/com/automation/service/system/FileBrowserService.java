@@ -49,7 +49,7 @@ public class FileBrowserService {
         try (Stream<Path> entries = Files.list(dirPath)) {
             entries.filter(Files::isDirectory)
                     .filter(p -> !p.getFileName().toString().startsWith("."))
-                    .sorted(Comparator.comparing(p -> p.getFileName().toString().toLowerCase()))
+                    .sorted(Comparator.comparing(p -> p.getFileName().toString().toLowerCase(Locale.ROOT)))
                     .forEach(p -> directories.add(new DirectoryEntry(
                             p.getFileName().toString(),
                             p.toAbsolutePath().toString()

@@ -2,6 +2,7 @@ package com.automation.service.integration.providers.feed;
 
 import com.automation.modules.ModuleCatalog;
 import com.automation.service.integration.OutboundTargetGuard;
+import com.automation.service.integration.providers.IntegrationParams;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -77,7 +78,7 @@ public class FeedFetcher {
 
     /** Absolute http(s) URL with a host; everything else (file:, ftp:, jar:, relative) is rejected. */
     static URI requireHttpUri(String url) {
-        if (url == null || url.isBlank()) throw new IllegalArgumentException("Required parameter missing: url");
+        if (url == null || url.isBlank()) throw IntegrationParams.missing("url");
         URI uri;
         try {
             uri = URI.create(url.trim());

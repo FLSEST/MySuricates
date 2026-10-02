@@ -5,6 +5,7 @@ import { useT, useI18nStore } from '../../i18n';
 import { useSealWorkflow } from '../../hooks/useWorkflows';
 import { useModuleEnabled } from '../../hooks/useModules';
 import { formatDateTime, formatRelativeTime } from '../../utils/formatTime';
+import { localizedErrorText } from '../../api/errorText';
 import { SealConfirmModal } from './SealConfirmModal';
 import type { Workflow, WorkflowSealStatus } from '../../types';
 
@@ -21,12 +22,20 @@ export function SealBanner({ workflow, status }: { workflow: Workflow; status?: 
   const [confirmUnseal, setConfirmUnseal] = useState(false);
   const s = t.workflows.sealView;
 
+  // In the UI's language where the backend sends the keys (TODO 2b73ff48), else its English text
+  const lastRefusal = status?.lastRefusal ? localizedErrorText({
+    code: status.lastRefusalCode ?? undefined,
+    messageKey: status.lastRefusalKey ?? undefined,
+    params: status.lastRefusalParams ?? undefined,
+    error: status.lastRefusal,
+  }) : null;
+
   const refused = status && status.refusedStarts > 0 && status.lastRefusedAt ? (
     <p className="text-xs mt-1" data-testid="seal-refused">
       {s.refusedStarts
         .replace('{count}', String(status.refusedStarts))
         .replace('{when}', formatRelativeTime(status.lastRefusedAt, locale))}
-      {status.lastRefusal && <span className="block text-text-tertiary truncate" title={status.lastRefusal}>{status.lastRefusal}</span>}
+      {lastRefusal && <span className="block text-text-tertiary truncate" title={lastRefusal} data-testid="seal-last-refusal">{lastRefusal}</span>}
     </p>
   ) : null;
 
@@ -53,6 +62,13 @@ export function SealBanner({ workflow, status }: { workflow: Workflow; status?: 
       : status.problem === 'DEFINITION_CHANGED' ? s.problemDefinition
       : status.problem === 'SIGNATURE_INVALID' ? s.problemSignature
       : status.problem === 'SIGNATURE_MISSING' ? s.problemSignatureMissing : s.problemUnverifiable;
+    // Only an unverifiable seal has a cause the text above does not name (the failing check)
+    const cause = status.problem === 'UNVERIFIABLE' && status.detail ? localizedErrorText({
+      code: 'WORKFLOW_TAMPERED',
+      messageKey: status.refusalKey ?? undefined,
+      params: status.refusalParams ?? undefined,
+      error: status.detail,
+    }) : null;
     return (
       <>
         <div role="alert" data-testid="seal-banner" data-state="violated"
@@ -61,6 +77,7 @@ export function SealBanner({ workflow, status }: { workflow: Workflow; status?: 
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold">{s.violatedTitle}</p>
             <p className="text-sm text-text mt-0.5">{reason}</p>
+            {cause && <p className="text-xs text-text-secondary mt-0.5 break-words" data-testid="seal-cause">{cause}</p>}
             <p className="text-xs text-text-secondary mt-1">{s.violatedAction}</p>
             {refused}
           </div>

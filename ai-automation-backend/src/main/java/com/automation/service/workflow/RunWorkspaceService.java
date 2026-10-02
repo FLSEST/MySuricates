@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -22,7 +23,15 @@ import java.util.Map;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.TimeUnit;
 
-/** Run-owned Git snapshots. Slow preparation deliberately takes place outside a transaction. */
+/**
+ * Run-owned Git snapshots. Slow preparation deliberately takes place outside a transaction.
+ *
+ * <p>The snapshots live under {@code automation.run-workspace.root} ({@code AUTOMATION_RUN_WORKSPACE_ROOT}),
+ * unset {@code ~/.mysuricates/workspaces} — deliberately not the data directory, so existing installations
+ * keep their place and {@code scripts/tools/prune-workspaces.py} finds them. The integration profile points
+ * it at a temp directory (TODO 88781724). A resumed run stays under the root it started in, even if the
+ * setting changed meanwhile.
+ */
 @Service
 public class RunWorkspaceService {
     private final WorkflowRunRepository runs;
@@ -30,10 +39,21 @@ public class RunWorkspaceService {
     private final String root;
 
     public RunWorkspaceService(WorkflowRunRepository runs, ObjectMapper mapper,
-            @Value("${automation.run-workspace.root:${user.home}/.mysuricates/workspaces}") String root) {
+            @Value("${automation.run-workspace.root:}") String root) {
         this.runs = runs;
         this.mapper = mapper;
-        this.root = root;
+        this.root = root == null || root.isBlank()
+                ? defaultRoot(Path.of(System.getProperty("user.home"))).toString() : root.strip();
+    }
+
+    /** The root without a setting: where every installation kept its run workspaces so far. */
+    static Path defaultRoot(Path userHome) {
+        return userHome.resolve(".mysuricates").resolve("workspaces");
+    }
+
+    /** The root new snapshots are created under. */
+    public String root() {
+        return root;
     }
 
     /** Template blocks retain this policy even where the template format has no metadata field. */
@@ -128,7 +148,8 @@ public class RunWorkspaceService {
             source = String.valueOf(original.get("sourcePath"));
             mode = String.valueOf(original.get("sourceMode"));
         }
-        List<String> args = new ArrayList<>(List.of("--source", source, "--root", root,
+        String runRoot = resume ? rootOf(run.getMetadata().get("workspace"), project, run, "repo") : root;
+        List<String> args = new ArrayList<>(List.of("--source", source, "--root", runRoot,
                 "--project", project.getId(), "--run", run.getId(), "--mode", mode));
         if (run.getMetadata().get("workspaceSource") instanceof Map<?, ?> pinned) {
             args.addAll(List.of("--commit", String.valueOf(pinned.get("commit"))));
@@ -168,11 +189,13 @@ public class RunWorkspaceService {
                                                  ExecutionContext context, String mode, boolean resume) {
         Map<String, Object> manifests = new HashMap<>();
         if (!(run.getMetadata().get("workspaceAdditionalSources") instanceof Map<?, ?> sources)) return manifests;
+        Map<?, ?> original = run.getMetadata().get("workspaceAdditional") instanceof Map<?, ?> m ? m : Map.of();
         for (var entry : sources.entrySet()) {
             String alias = String.valueOf(entry.getKey());
             Map<?, ?> pinned = (Map<?, ?>) entry.getValue();
+            String runRoot = resume ? rootOf(original.get(alias), project, run, "slots", alias, "repo") : root;
             List<String> args = new ArrayList<>(List.of("--source", String.valueOf(pinned.get("path")),
-                    "--commit", String.valueOf(pinned.get("commit")), "--root", root,
+                    "--commit", String.valueOf(pinned.get("commit")), "--root", runRoot,
                     "--project", project.getId(), "--run", run.getId(), "--slot", alias, "--mode", mode));
             if (resume) args.add("--resume");
             if (Boolean.TRUE.equals(config.get("branch"))) args.add("--branch");
@@ -183,6 +206,20 @@ public class RunWorkspaceService {
             context.setVariable("execution_path_" + alias, manifest.get("executionPath"));
         }
         return manifests;
+    }
+
+    /**
+     * The root a run's snapshot was created under, read back from its manifest
+     * ({@code <root>/<project>/<run>/<tail…>}); the configured root when the manifest does not have that shape.
+     */
+    private String rootOf(Object manifest, Project project, WorkflowRun run, String... tail) {
+        if (!(manifest instanceof Map<?, ?> m) || !(m.get("workspacePath") instanceof String path)) return root;
+        Path created = Path.of(path);
+        Path suffix = Path.of(project.getId(), run.getId()).resolve(Path.of("", tail));
+        if (!created.isAbsolute() || !created.endsWith(suffix)) return root;
+        Path base = created;
+        for (int i = 0; i < suffix.getNameCount(); i++) base = base.getParent();
+        return base.toString();
     }
 
     private Map<String, Object> invoke(List<String> args, ExecutionContext context) {

@@ -2,6 +2,7 @@ package com.automation.service.audit;
 
 import com.automation.entity.AuditSeverity;
 import com.automation.service.audit.AuditResultParser.ParsedFinding;
+import com.automation.testsupport.TurkishLocale;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
@@ -260,5 +261,19 @@ class AuditResultParserTest {
         assertThat(result.error()).startsWith("The last audit result envelope v1 is incomplete or unreadable: ")
                 .contains("Unexpected character");
         assertThat(result.markdown()).isEmpty();
+    }
+
+    /** 80796b2d: under tr-TR "critical".toUpperCase() is "CRİTİCAL" and the envelope was rejected. */
+    @Test
+    void severity_doesNotDependOnTheDefaultLocale() {
+        String output = "Report\n<!-- mysuricates:audit-result:v1\n"
+                + "{\"snapshotComplete\":true,\"findings\":[{\"ruleKey\":\"r\",\"subject\":\"s\","
+                + "\"severity\":\"critical\",\"title\":\"t\"}]}\n-->";
+
+        var result = TurkishLocale.call(() -> parser.parse(output));
+
+        assertThat(result.valid()).isTrue();
+        assertThat(result.findings()).singleElement()
+                .satisfies(finding -> assertThat(finding.severity()).isEqualTo(AuditSeverity.CRITICAL));
     }
 }

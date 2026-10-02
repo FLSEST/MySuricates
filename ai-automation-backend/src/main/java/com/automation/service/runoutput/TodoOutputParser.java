@@ -3,6 +3,7 @@ package com.automation.service.runoutput;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -54,7 +55,7 @@ public final class TodoOutputParser {
 
         while (matcher.find()) {
             String title = cleanMarkdown(matcher.group(1).trim());
-            String priority = matcher.group(2).toUpperCase();
+            String priority = matcher.group(2).toUpperCase(Locale.ROOT);
             List<String> tags = Arrays.stream(matcher.group(3).split(","))
                     .map(String::trim)
                     .filter(s -> !s.isEmpty())

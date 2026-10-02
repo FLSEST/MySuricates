@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Builds the text parts of auto-todos: description (gate description or the run's report step),
@@ -103,7 +104,7 @@ public class AutoTodoTextBuilder {
     String buildTagsJson(GateResult gate) {
         List<String> tags = new ArrayList<>();
         tags.add(AutoTodoService.TAG_AUTO_WORKFLOW);
-        tags.add("gate:" + gate.status().name().toLowerCase());
+        tags.add("gate:" + gate.status().name().toLowerCase(Locale.ROOT));
         tags.add("category:" + gate.category());
         return TodoMapper.listToJson(tags);
     }

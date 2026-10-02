@@ -14,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -67,7 +68,7 @@ public class ConditionalBlockExecutor implements BlockExecutor {
             );
             // First AI call of the block: carries provider/model even when no branch is executed
             StepAiMetadata.carryAi(result, evaluation.metadata());
-            String trimmed = evaluation.output().trim().toUpperCase();
+            String trimmed = evaluation.output().trim().toUpperCase(Locale.ROOT);
             conditionMet = trimmed.equals("TRUE") || trimmed.startsWith("TRUE");
         }
 

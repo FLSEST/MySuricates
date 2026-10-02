@@ -5,6 +5,7 @@ import com.automation.dto.AssistantChatResponse;
 import com.automation.dto.response.AssistantSessionDetail;
 import com.automation.dto.response.AssistantSessionSummary;
 import com.automation.entity.AssistantSession;
+import com.automation.exception.ElementNotFoundException;
 import com.automation.repository.AssistantSessionRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -183,9 +184,10 @@ class AssistantSessionServiceTest {
     void getSession_unknownId_throws() {
         when(sessionRepository.findById("unknown")).thenReturn(Optional.empty());
 
+        // 2b73ff48: a 404 the UI translates instead of a 400 with free text
         assertThatThrownBy(() -> service.getSession("unknown"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Session not found");
+                .isInstanceOf(ElementNotFoundException.class)
+                .hasMessage("AssistantSession not found: unknown");
     }
 
     // ── deleteSession ──────────────────────────────────────────────────────

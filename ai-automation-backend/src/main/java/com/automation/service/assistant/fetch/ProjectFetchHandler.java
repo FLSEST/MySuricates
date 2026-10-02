@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Stream;
 
@@ -149,7 +150,7 @@ public class ProjectFetchHandler {
                 return "'" + relativePath + "' is a directory. Use `<fetch type=\"project_files\">` for listings.\n";
 
             // File type check
-            String fileName = resolved.getFileName().toString().toLowerCase();
+            String fileName = resolved.getFileName().toString().toLowerCase(Locale.ROOT);
             String ext = fileName.contains(".") ? fileName.substring(fileName.lastIndexOf('.') + 1) : "";
             boolean isTextFile = TEXT_EXTENSIONS.contains(ext)
                     || fileName.equals("makefile") || fileName.equals("dockerfile")
