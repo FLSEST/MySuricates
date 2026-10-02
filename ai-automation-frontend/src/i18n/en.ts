@@ -2350,6 +2350,7 @@ export const en = {
     openRun: 'Open run',
     deletedWorkflow: 'Deleted workflow',
     humanInputHint: 'This step expects an input. Enter it on the run page.',
+    formFields: 'Form fields',
     answered: 'Answer sent',
     answerFailed: 'Could not send the answer',
   },

@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
+import type { HumanInputField } from '../types';
 
 /** A run waiting for an answer — what GET /executions/pending-input returns per entry. */
 export interface PendingInput {
@@ -19,6 +20,8 @@ export interface PendingInput {
   requestedAt: string;
   /** when the waiting block gives up; null when unknown */
   timeoutAt: string | null;
+  /** the fields of a human-input form; absent without a form and from older backends (ec913801) */
+  fields?: HumanInputField[];
 }
 
 export const PENDING_INPUTS_KEY = ['pending-input'] as const;

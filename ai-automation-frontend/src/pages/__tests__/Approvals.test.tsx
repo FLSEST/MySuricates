@@ -7,6 +7,7 @@ import { renderWithProviders } from '../../test/utils';
 import { useI18nStore } from '../../i18n';
 import type { PendingInput } from '../../hooks/usePendingInputs';
 import { Approvals } from '../Approvals';
+import { en } from '../../i18n/en';
 
 beforeAll(() => server.listen({ onUnhandledRequest: failOnUnhandledRequest }));
 afterEach(() => server.resetHandlers());
@@ -66,6 +67,24 @@ describe('Approvals page', () => {
     expect(within(card).getByText(/Enter it on the run page/)).toBeInTheDocument();
     expect(within(card).queryByRole('button')).not.toBeInTheDocument();
     expect(within(card).getByRole('link', { name: /Open run/ })).toHaveAttribute('href', '/runs/run-2');
+  });
+
+  it('names the fields a human-input form asks for, and nothing extra without them (ec913801)', async () => {
+    const form: PendingInput = {
+      ...humanInput, runId: 'run-3', blockId: 'human-input-3', workflowId: 'wf-3', workflowName: 'Trip planner',
+      fields: [{ variable_name: 'destination', label: 'Destination' }, { variable_name: 'nights', input_type: 'number' }],
+    };
+    server.use(http.get('/api/v1/executions/pending-input', () => HttpResponse.json([form, humanInput])));
+
+    renderWithProviders(<Approvals />);
+
+    const card = await screen.findByRole('article', { name: 'Trip planner' });
+    const list = within(card).getByRole('list', { name: en.approvals.formFields });
+    expect(within(list).getAllByRole('listitem').map((item) => item.textContent)).toEqual(['Destination', 'nights']);
+    // an older backend sends no fields: the card stays as before
+    const plain = screen.getByRole('article', { name: en.approvals.deletedWorkflow });
+    expect(within(plain).queryByRole('list')).toBeNull();
+    expect(within(plain).getByText(en.approvals.humanInputHint)).toBeInTheDocument();
   });
 
   it('answers an approval in place', async () => {

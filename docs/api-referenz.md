@@ -954,7 +954,8 @@ Alle Läufe, die gerade auf eine Antwort warten — Approvals und Human-Input, d
 ]
 ```
 
-`type`: `approval` oder `human-input`. `timeoutAt`: `null`, wenn der wartende Block keinen Timeout hat.
+`type`: `approval` oder `human-input`. `timeoutAt`: `null`, wenn der wartende Block keinen Timeout hat. Human-Input mit Formular
+trägt zusätzlich `fields` (wie bei `GET /executions/{id}/approval`); ohne Formular fehlt das Feld.
 
 ### `GET /api/v1/executions/{id}`
 

@@ -2347,6 +2347,7 @@ export const de: TranslationKeys = {
     openRun: 'Zum Run',
     deletedWorkflow: 'Gelöschter Workflow',
     humanInputHint: 'Dieser Schritt erwartet eine Eingabe. Die gibst du auf der Run-Seite ein.',
+    formFields: 'Formularfelder',
     answered: 'Antwort gesendet',
     answerFailed: 'Antwort konnte nicht gesendet werden',
   },

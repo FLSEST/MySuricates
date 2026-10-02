@@ -92,6 +92,19 @@ function PendingInputCard({ item }: { item: PendingInput }) {
 
       <ApprovalQuestion question={item.question} maxHeightClass="max-h-[40vh]" />
 
+      {!isApproval && !!item.fields?.length && (
+        <div className="text-sm">
+          <p className="text-text-secondary" id={`${item.runId}-${item.blockId}-fields`}>{t.approvals.formFields}</p>
+          <ul aria-labelledby={`${item.runId}-${item.blockId}-fields`} className="mt-1 flex flex-wrap gap-1.5">
+            {item.fields.map((field) => (
+              <li key={field.variable_name} className="rounded-md border border-border bg-surface px-2 py-0.5 text-text">
+                {field.label || field.variable_name}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center gap-2">
         {isApproval ? (
           item.options.map((option) => (
