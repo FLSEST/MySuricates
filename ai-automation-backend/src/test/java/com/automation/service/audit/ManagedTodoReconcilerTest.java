@@ -51,7 +51,7 @@ class ManagedTodoReconcilerTest {
         assertThat(reconciler().reconcileFinding(FINDING_ID)).isEqualTo(1);
 
         assertThat(todo.getStatus()).isEqualTo(Todo.Status.DONE);
-        verify(todoRepository).save(todo);
+        verify(todoRepository).saveAll(List.of(todo));
     }
 
     @Test
@@ -74,6 +74,7 @@ class ManagedTodoReconcilerTest {
 
         assertThat(todo.getStatus()).isEqualTo(Todo.Status.IN_PROGRESS);
         verify(todoRepository, never()).save(any());
+        verify(todoRepository, never()).saveAll(any());
     }
 
     /** Archiviert ist eine menschliche Entscheidung und bleibt sie. */
@@ -86,6 +87,7 @@ class ManagedTodoReconcilerTest {
 
         assertThat(todo.getStatus()).isEqualTo(Todo.Status.ARCHIVED);
         verify(todoRepository, never()).save(any());
+        verify(todoRepository, never()).saveAll(any());
     }
 
     /** Ein archiviertes TODO wird dagegen geschlossen, wenn alles terminal ist — das ist kein Rueckschritt. */
@@ -107,6 +109,7 @@ class ManagedTodoReconcilerTest {
         assertThat(reconciler().reconcileFinding(FINDING_ID)).isZero();
 
         verify(todoRepository, never()).save(any());
+        verify(todoRepository, never()).saveAll(any());
     }
 
     /**
@@ -141,6 +144,9 @@ class ManagedTodoReconcilerTest {
         verify(todoRepository, never()).findById(any());
         verify(findingTodoRepository, never()).findByTodoId(any());
         verify(findingRepository, never()).findById(any());
+        // e41531e0: beide geaenderten TODOs in einem saveAll, kein save je TODO.
+        verify(todoRepository, times(1)).saveAll(List.of(todoA, todoB));
+        verify(todoRepository, never()).save(any());
     }
 
     /** Ein verwaltetes TODO, das es nicht mehr gibt, wird uebersprungen – ohne weitere Abfrage. */
@@ -152,6 +158,7 @@ class ManagedTodoReconcilerTest {
         assertThat(reconciler().reconcileFinding(FINDING_ID)).isZero();
 
         verify(todoRepository, never()).save(any());
+        verify(todoRepository, never()).saveAll(any());
         verify(findingTodoRepository, never()).findByTodoIdIn(any());
         verify(findingRepository, never()).findAllById(any());
     }
@@ -171,7 +178,7 @@ class ManagedTodoReconcilerTest {
         assertThat(reconciler().reconcileFinding(FINDING_ID)).isEqualTo(1);
 
         assertThat(todo.getStatus()).isEqualTo(Todo.Status.DONE);
-        verify(todoRepository).save(todo);
+        verify(todoRepository).saveAll(List.of(todo));
     }
 
     /** Dasselbe mit einem noch offenen Finding daneben: das geloeschte macht das TODO nicht erledigt. */
@@ -190,6 +197,7 @@ class ManagedTodoReconcilerTest {
 
         assertThat(todo.getStatus()).isEqualTo(Todo.Status.OPEN);
         verify(todoRepository, never()).save(any());
+        verify(todoRepository, never()).saveAll(any());
     }
 
     private void stub(Todo todo, AuditFindingStatus status) {

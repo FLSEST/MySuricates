@@ -4,6 +4,7 @@ import com.automation.entity.AuditFinding;
 import com.automation.entity.AuditFindingOccurrence;
 import com.automation.entity.AuditFindingStatus;
 import com.automation.entity.AuditFindingTodo;
+import com.automation.entity.Todo;
 import com.automation.repository.AuditFindingOccurrenceRepository;
 import com.automation.repository.AuditFindingTodoRepository;
 import com.automation.repository.TodoRepository;
@@ -11,7 +12,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
-import java.util.Optional;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * Fuehrt zwei Findings derselben Identitaet zusammen: Zaehler, Anzeigeattribute, Status samt
@@ -94,40 +101,57 @@ public class AuditFindingMerger {
         return status == AuditFindingStatus.ACCEPTED_RISK || status == AuditFindingStatus.DISMISSED;
     }
 
+    /**
+     * Verknuepfungen der Dublette wandern aufs Ziel; hat das Ziel dasselbe TODO schon, faellt die
+     * Dubletten-Verknuepfung weg (eine verwaltete macht die Ziel-Verknuepfung verwaltet). Die
+     * Ziel-Verknuepfungen und die TODOs kommen aus je einer Abfrage statt einer je Verknuepfung,
+     * geloescht wird gesammelt (d2500abd).
+     */
     private void relinkTodos(AuditFinding target, AuditFinding duplicate) {
-        for (AuditFindingTodo link : findingTodoRepository.findByFindingId(duplicate.getId())) {
-            repointTodoReference(target, duplicate, link.getTodoId());
-            Optional<AuditFindingTodo> existing =
-                    findingTodoRepository.findByFindingIdAndTodoId(target.getId(), link.getTodoId());
-            if (existing.isPresent()) {
+        List<AuditFindingTodo> links = findingTodoRepository.findByFindingId(duplicate.getId());
+        if (links.isEmpty()) return;
+        Map<String, AuditFindingTodo> targetLinks = findingTodoRepository.findByFindingId(target.getId()).stream()
+                .collect(Collectors.toMap(AuditFindingTodo::getTodoId, Function.identity(), (first, second) -> first));
+        Map<String, Todo> todos = todoRepository.findAllById(links.stream().map(AuditFindingTodo::getTodoId).distinct().toList())
+                .stream().collect(Collectors.toMap(Todo::getId, Function.identity()));
+        List<AuditFindingTodo> dropped = new ArrayList<>();
+        for (AuditFindingTodo link : links) {
+            repointTodoReference(target, duplicate, todos.get(link.getTodoId()));
+            AuditFindingTodo existing = targetLinks.get(link.getTodoId());
+            if (existing != null) {
                 if (link.isManaged()) {
-                    existing.get().setManaged(true);
+                    existing.setManaged(true);
                 }
-                findingTodoRepository.delete(link);
+                dropped.add(link);
             } else {
                 link.setFindingId(target.getId());
             }
         }
+        if (!dropped.isEmpty()) findingTodoRepository.deleteAll(dropped);
     }
 
     /** Sonst zeigen der Deep-Link {@code /reports?finding=…} und {@code todo_reference_id} ins Leere. */
-    private void repointTodoReference(AuditFinding target, AuditFinding duplicate, String todoId) {
-        todoRepository.findById(todoId).ifPresent(todo -> {
-            if (ManagedTodoWriter.REFERENCE_TYPE.equals(todo.getReferenceType())
-                    && duplicate.getId().equals(todo.getReferenceId())) {
-                todo.setReferenceId(target.getId());
-            }
-        });
+    private static void repointTodoReference(AuditFinding target, AuditFinding duplicate, Todo todo) {
+        if (todo != null && ManagedTodoWriter.REFERENCE_TYPE.equals(todo.getReferenceType())
+                && duplicate.getId().equals(todo.getReferenceId())) {
+            todo.setReferenceId(target.getId());
+        }
     }
 
+    /** Ein Vorkommen je Report: was das Ziel schon hat, faellt weg; die Report-IDs des Ziels kommen aus einer Abfrage. */
     private void relinkOccurrences(AuditFinding target, AuditFinding duplicate) {
-        for (AuditFindingOccurrence occurrence : occurrenceRepository.findByFindingId(duplicate.getId())) {
-            if (occurrenceRepository.existsByFindingIdAndReportId(target.getId(), occurrence.getReportId())) {
-                occurrenceRepository.delete(occurrence);
+        List<AuditFindingOccurrence> occurrences = occurrenceRepository.findByFindingId(duplicate.getId());
+        if (occurrences.isEmpty()) return;
+        Set<String> targetReports = new HashSet<>(occurrenceRepository.findReportIdsByFindingId(target.getId()));
+        List<AuditFindingOccurrence> dropped = new ArrayList<>();
+        for (AuditFindingOccurrence occurrence : occurrences) {
+            if (targetReports.contains(occurrence.getReportId())) {
+                dropped.add(occurrence);
             } else {
                 occurrence.setFindingId(target.getId());
             }
         }
+        if (!dropped.isEmpty()) occurrenceRepository.deleteAll(dropped);
     }
 
     private static boolean isBefore(Instant candidate, Instant reference) {

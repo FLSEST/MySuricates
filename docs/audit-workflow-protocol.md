@@ -112,6 +112,19 @@ bekommt ebenso viele Wiedergänger und fängt bei den echten Befunden von vorn a
 Markierung am Finding (`unknownRuleKey`, V75) war die Zwischenstufe, solange es keine härtere
 Konsequenz gab; sie wird nicht mehr neu gesetzt.
 
+**Festes `subject` je Regel** (TODO `802f740a`): Betrifft eine Regel das Repository oder ein Modul als
+Ganzes und verlangt der Prompt genau einen Wert (`subject "repository"`), steht dieser Wert auch im
+Katalog – als Eintrag `{"key": …, "subject": …}` statt als bloßer String. Die Ingestion setzt ihn
+durch, egal welches `subject` das Modell schickt; vorher war es nur eine Bitte im Prompt, und eine
+Abweichung kam als Wiedergänger ohne die Einordnung des alten Befunds zurück. Weil der Katalogwert
+der ist, den der Prompt schon verlangte, behält jeder Befund, der sich daran hielt, seinen
+Fingerprint. Altbestand mit abweichendem `subject` führt `AuditFingerprintMigrationJob` (v5) beim
+Start auf den kanonischen Befund zusammen – samt Einordnung (`ACCEPTED_RISK`/`DISMISSED`, Notiz);
+gibt es keinen, wird der abweichende selbst kanonisch. Dateibezogene Regeln (`subject = Pfad`) und Regeln mit mehreren erlaubten Werten
+(`"ai-automation-backend" oder "ai-automation-frontend"`) bleiben ohne festen Wert.
+`AuditRuleKeyCatalogTest` hält Katalog und Prompt gleich und prüft, dass auch das Envelope-Beispiel
+eines Prompts nur einen katalogisierten `ruleKey` (oder den Platzhalter `stabile-regel-id`) nennt.
+
 ### Belegprüfung: `evidence` muss eine Messung dieses Laufs nennen
 
 Der Prompt verlangt zu jedem Finding eine Belegzeile — geprüft hat das lange niemand, und ein
@@ -234,6 +247,10 @@ Statt der Zahl prüft das Gate dort die **Anwesenheit der Pflicht-FAKT-Zeilen**
 schützt — einen Schnappschuss auf ausgefallener Messung —, ohne das Urteil zu erzwingen.
 Der Report-Prompt trägt zusätzlich die Regel, einen unverändert gebliebenen Befund des
 Vorlaufs erneut zu melden: sonst schlösse ein bloßer Sinneswandel ihn als RESOLVED.
+Eingeordnete Befunde (`ACCEPTED_RISK`, `DISMISSED` laut `{{ audit_findings }}`, abgeglichen über
+`ruleKey` + `subject`, normalisiert wie im Fingerprint) führt der Report im Envelope weiter, ins Gate zählen sie aber nicht: sonst bliebe
+die Zehrprobe mit jeder Einordnung dauerhaft YELLOW. Die `gate_description` nennt sie getrennt
+(„dazu N bewusst eingeordnet“).
 
 ## Bekannte Befunde im Prompt: `{{ audit_findings }}`
 
@@ -322,6 +339,11 @@ keiner mehr verlangt, bekannte Befunde wegzulassen, prüft `scripts/tests/test-a
 (Abschnitt 10). Die Prüfung liest die Schwelle aus `AuditAcceptancePolicy`, damit Prompt und Plattform
 dasselbe unter „verschlechtert“ verstehen.
 
+Die Doku-Zehrprobe und die Public-Readiness-Evidenz haben ebenfalls ein gültiges `metadata.audit` und
+tragen seit TODO `3fb33d9b` denselben Abschnitt (als `## BEKANNTE BEFUNDE …`, passend zu ihren
+Überschriften) und denselben Regelblock, jeweils vor ihrem Envelope-Teil. Vorher sahen sie Vorbefunde
+nur als Markdown im `previous_report`. Das prüft Abschnitt 10b desselben Tests.
+
 ## Lebenszyklus
 
 - Fehlgeschlagene Runs, fehlende Report-Blöcke und ungültige Envelopes werden als
@@ -344,7 +366,14 @@ dasselbe unter „verschlechtert“ verstehen.
 - `CRITICAL` und `HIGH` erzeugen automatisch verwaltete TODOs. `MEDIUM` kann im Audit
   Center bestätigt werden; `LOW` bleibt zunächst ein Finding. Fällt ein offenes Finding unter
   `HIGH`, wird sein verwaltetes TODO gelöst und archiviert (außer es steht auf `IN_PROGRESS`).
-- Ein auf `DONE` gesetztes verwaltetes TODO versetzt das Finding in
-  `AWAITING_VERIFICATION`. Erst der nächste valide Audit-Snapshot bestätigt die Behebung: Fehlt
-  das Finding darin, wird es `RESOLVED`; wird es erneut gemeldet, ist es wieder `OPEN`.
-- Manuell verknüpfte TODOs werden niemals automatisch im Status verändert.
+- Ein auf `DONE` gesetztes verknüpftes TODO – verwaltet oder manuell verknüpft – versetzt ein
+  offenes Finding in `AWAITING_VERIFICATION`, sofern kein anderes damit verknüpftes TODO noch
+  offen ist (`OPEN`, `IN_PROGRESS`, `BACKLOG`; TODO `ab1ed481`). Das gilt für jeden Schreibpfad –
+  REST, TodoTrigger-Auto-Close, verknüpfter Workflow, Sammelschließen: Das TODO meldet den Wechsel
+  beim Speichern selbst (Spring-Data-Domainereignis `Todo.Completed`, synchron in derselben
+  Transaktion), `AuditTodoCompletionListener` stellt den Befund um. Erst der nächste valide
+  Audit-Snapshot bestätigt die Behebung: Fehlt das Finding darin, wird es `RESOLVED`; wird es
+  erneut gemeldet, ist es wieder `OPEN`.
+- Manuell verknüpfte TODOs werden niemals automatisch im Status verändert – auch dann nicht, wenn
+  ihr Finding `RESOLVED` wird. Ein offenes manuelles TODO neben einem behobenen Finding ist also
+  gewollt; schließen muss es, wer es angelegt hat.

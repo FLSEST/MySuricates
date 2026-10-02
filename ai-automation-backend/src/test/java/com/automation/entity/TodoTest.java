@@ -10,6 +10,45 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class TodoTest {
 
+    /**
+     * Folgebefund zu ab1ed481: Wird ein TODO DONE, meldet es das beim naechsten save/saveAll selbst
+     * (Spring-Data-Domainereignis). So kann kein Pfad — REST, TodoTrigger-Auto-Close, verknuepfter
+     * Workflow — vergessen, den Audit-Befund auf AWAITING_VERIFICATION zu setzen.
+     */
+    @Nested
+    class CompletionEvent {
+
+        @Test
+        void aTransitionToDone_registersOneCompletionEvent() {
+            Todo todo = Todo.builder().id("t-1").title("t").status(Todo.Status.IN_PROGRESS).build();
+
+            todo.setStatus(Todo.Status.DONE);
+            todo.setStatus(Todo.Status.DONE);
+
+            assertThat(todo.domainEvents()).singleElement()
+                    .isEqualTo(new Todo.Completed(todo));
+        }
+
+        @Test
+        void otherTransitions_registerNothing_andPublicationClearsTheEvents() {
+            Todo todo = Todo.builder().id("t-1").title("t").status(Todo.Status.DONE).build();
+
+            todo.setStatus(Todo.Status.ARCHIVED);
+            todo.setStatus(Todo.Status.OPEN);
+            assertThat(todo.domainEvents()).isEmpty();
+
+            todo.setStatus(Todo.Status.DONE);
+            assertThat(todo.domainEvents()).hasSize(1);
+            todo.clearDomainEvents();
+            assertThat(todo.domainEvents()).isEmpty();
+        }
+
+        @Test
+        void aTodoBuiltAsDone_registersNothing() {
+            assertThat(Todo.builder().title("t").status(Todo.Status.DONE).build().domainEvents()).isEmpty();
+        }
+    }
+
     @Nested
     class BuilderDefaults {
 

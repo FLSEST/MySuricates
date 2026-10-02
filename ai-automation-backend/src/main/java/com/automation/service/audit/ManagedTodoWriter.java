@@ -15,10 +15,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -49,21 +50,36 @@ class ManagedTodoWriter {
         return severity == AuditSeverity.CRITICAL || severity == AuditSeverity.HIGH;
     }
 
-    /** Das verwaltete TODO dieses Findings — vorhandenes wiederverwenden, sonst anlegen. */
-    Todo ensure(AuditFinding finding, AuditReport report) {
-        Optional<AuditFindingTodo> existing = findingTodoRepository.findByFindingId(finding.getId()).stream()
-                .filter(AuditFindingTodo::isManaged).findFirst();
-        if (existing.isPresent()) {
-            Todo linkedTodo = todoRepository.findById(existing.get().getTodoId()).orElse(null);
-            if (linkedTodo != null) return linkedTodo;
-            findingTodoRepository.delete(existing.get());
+    /**
+     * Das verwaltete TODO je Finding — vorhandenes wiederverwenden, sonst anlegen; eine verwaltete
+     * Verknüpfung auf ein gelöschtes TODO wird ersetzt. Verknüpfungen und TODOs aller Findings kommen aus
+     * je einer Abfrage statt aus findByFindingId und findById je Finding (Folgebefund zu b2d65a20).
+     */
+    void ensureAll(List<AuditFinding> findings, AuditReport report) {
+        if (findings.isEmpty()) return;
+        Map<String, AuditFindingTodo> managedByFinding = findingTodoRepository
+                .findByFindingIdIn(findings.stream().map(AuditFinding::getId).toList()).stream()
+                .filter(AuditFindingTodo::isManaged)
+                .collect(Collectors.toMap(AuditFindingTodo::getFindingId, Function.identity(), (first, second) -> first));
+        Set<String> existingTodos = managedByFinding.isEmpty() ? Set.of()
+                : todoRepository.findAllById(findings.stream().map(f -> managedByFinding.get(f.getId()))
+                        .filter(Objects::nonNull).map(AuditFindingTodo::getTodoId).distinct().toList())
+                        .stream().map(Todo::getId).collect(Collectors.toSet());
+        List<AuditFinding> missing = new ArrayList<>();
+        List<AuditFindingTodo> dangling = new ArrayList<>();
+        for (AuditFinding finding : findings) {
+            AuditFindingTodo link = managedByFinding.get(finding.getId());
+            if (link != null && existingTodos.contains(link.getTodoId())) continue;
+            if (link != null) dangling.add(link);
+            missing.add(finding);
         }
-        return create(finding, describe(finding, report), report.getWorkflowRunId());
+        if (!dangling.isEmpty()) findingTodoRepository.deleteAll(dangling);
+        missing.forEach(finding -> create(finding, describe(finding, report), report.getWorkflowRunId()));
     }
 
     /**
      * Legt ein neues verwaltetes TODO für das Finding an, verknüpft es und meldet es. Ob schon eines
-     * existiert, prüft der Aufrufer ({@link #ensure} beim Ingest, {@link AuditFindingTodoLinker} auf Knopfdruck).
+     * existiert, prüft der Aufrufer ({@link #ensureAll} beim Ingest, {@link AuditFindingTodoLinker} auf Knopfdruck).
      */
     Todo create(AuditFinding finding, String description, String workflowRunId) {
         Todo todo = todoRepository.save(Todo.builder()
@@ -106,6 +122,9 @@ class ManagedTodoWriter {
         Map<String, AuditFinding> findings = linkedFindingIds.isEmpty() ? Map.of()
                 : findingRepository.findAllById(linkedFindingIds).stream()
                         .collect(Collectors.toMap(AuditFinding::getId, Function.identity()));
+        // Geschrieben wird gesammelt (b2d65a20): geänderte TODOs per saveAll, gelöste Verknüpfungen per deleteAll.
+        List<Todo> changed = new ArrayList<>();
+        List<AuditFindingTodo> released = new ArrayList<>();
         for (String todoId : todoIds) {
             Todo todo = todos.get(todoId);
             if (todo == null) continue;
@@ -117,28 +136,33 @@ class ManagedTodoWriter {
             boolean belowThreshold = !allTerminal && linked.stream()
                     .filter(f -> !f.getStatus().isTerminal()).noneMatch(f -> needsTodo(f.getSeverity()));
             if (belowThreshold) {
-                release(todo, todoLinks);
+                if (release(todo, todoLinks, released)) changed.add(todo);
             } else if (allTerminal && todo.getStatus() != Todo.Status.DONE) {
                 todo.setStatus(Todo.Status.DONE);
-                todoRepository.save(todo);
+                changed.add(todo);
             } else if (!allTerminal && todo.getStatus() == Todo.Status.DONE) {
                 todo.setStatus(Todo.Status.OPEN);
                 todo.setWorkflowRunId(linked.stream().map(AuditFinding::getLastSeenRunId)
                         .filter(Objects::nonNull).findFirst().orElse(null));
-                todoRepository.save(todo);
+                changed.add(todo);
             }
         }
+        if (!released.isEmpty()) findingTodoRepository.deleteAll(released);
+        if (!changed.isEmpty()) todoRepository.saveAll(changed);
     }
 
     /**
      * Ein Finding unter der TODO-Schwelle (etwa nach geänderten Audit-Kriterien HIGH → MEDIUM) bekäme
      * heute kein TODO — also gibt es sein altes frei: Verknüpfung lösen und archivieren, nicht DONE,
-     * denn behoben ist nichts (TODO ba0dcb3a). Steigt die Schwere wieder, legt {@link #ensure} ein
+     * denn behoben ist nichts (TODO ba0dcb3a). Steigt die Schwere wieder, legt {@link #ensureAll} ein
      * neues an. An einem {@code IN_PROGRESS}-TODO arbeitet jemand; das bleibt unangetastet.
+     * Die verwalteten Verknüpfungen landen in {@code released}, gelöscht und gespeichert wird im Aufrufer.
+     *
+     * @return ob das TODO freigegeben wurde
      */
-    private void release(Todo todo, List<AuditFindingTodo> todoLinks) {
-        if (todo.getStatus() == Todo.Status.IN_PROGRESS) return;
-        todoLinks.stream().filter(AuditFindingTodo::isManaged).forEach(findingTodoRepository::delete);
+    private boolean release(Todo todo, List<AuditFindingTodo> todoLinks, List<AuditFindingTodo> released) {
+        if (todo.getStatus() == Todo.Status.IN_PROGRESS) return false;
+        todoLinks.stream().filter(AuditFindingTodo::isManaged).forEach(released::add);
         if (REFERENCE_TYPE.equals(todo.getReferenceType())) {
             todo.setReferenceType(null);
             todo.setReferenceId(null);
@@ -146,7 +170,7 @@ class ManagedTodoWriter {
         log.info("Managed audit TODO {} ({}) released: no linked open finding is CRITICAL/HIGH any more",
                 todo.getId(), todo.getTitle());
         todo.setStatus(Todo.Status.ARCHIVED);
-        todoRepository.save(todo);
+        return true;
     }
 
     private static String describe(AuditFinding finding, AuditReport report) {

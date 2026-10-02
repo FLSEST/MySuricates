@@ -612,23 +612,27 @@ class AuditCenterServiceTest {
     }
 
     @Test
-    void markAwaitingVerification_movesOnlyOpenFindingsOfManagedLinks() {
+    void markAwaitingVerification_movesOnlyOpenLinkedFindings() {
         AuditFinding open = finding();
         AuditFinding resolved = finding();
         resolved.setId("f-resolved");
         resolved.setStatus(AuditFindingStatus.RESOLVED);
-        when(findingTodoRepository.findByTodoId(TODO_ID)).thenReturn(List.of(
+        when(findingTodoRepository.findByTodoIdIn(java.util.Set.of(TODO_ID))).thenReturn(List.of(
                 AuditFindingTodo.builder().findingId(FINDING_ID).todoId(TODO_ID).managed(true).build(),
                 AuditFindingTodo.builder().findingId("f-resolved").todoId(TODO_ID).managed(true).build(),
                 AuditFindingTodo.builder().findingId("f-manual").todoId(TODO_ID).managed(false).build()));
-        when(findingRepository.findAllById(List.of(FINDING_ID, "f-resolved"))).thenReturn(List.of(open, resolved));
+        when(findingTodoRepository.findByFindingIdIn(List.of(FINDING_ID, "f-resolved", "f-manual"))).thenReturn(List.of(
+                AuditFindingTodo.builder().findingId(FINDING_ID).todoId(TODO_ID).managed(true).build(),
+                AuditFindingTodo.builder().findingId("f-resolved").todoId(TODO_ID).managed(true).build(),
+                AuditFindingTodo.builder().findingId("f-manual").todoId(TODO_ID).managed(false).build()));
+        when(findingRepository.findAllById(List.of(FINDING_ID, "f-resolved", "f-manual"))).thenReturn(List.of(open, resolved));
 
         service.markAwaitingVerification(TODO_ID);
 
         assertThat(open.getStatus()).isEqualTo(AuditFindingStatus.AWAITING_VERIFICATION);
         assertThat(resolved.getStatus()).isEqualTo(AuditFindingStatus.RESOLVED);
-        verify(findingRepository).save(open);
-        verify(findingRepository, never()).save(resolved);
+        verify(findingRepository).saveAll(List.of(open));
+        verify(findingRepository, never()).save(any());
         verify(findingRepository, never()).findById(any());
     }
 

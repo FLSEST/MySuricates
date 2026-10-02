@@ -12,9 +12,12 @@ import com.automation.service.audit.AuditCenterService.TodoLink;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.Collection;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -32,6 +35,9 @@ class AuditFindingTodoLinker {
     private final AuditFindingTodoRepository findingTodoRepository;
     private final TodoRepository todoRepository;
     private final ManagedTodoWriter managedTodoWriter;
+
+    /** Daran wird noch gearbeitet; DONE ist erledigt, ARCHIVED freigegeben. */
+    private static final Set<Todo.Status> STILL_OPEN = EnumSet.of(Todo.Status.OPEN, Todo.Status.IN_PROGRESS, Todo.Status.BACKLOG);
 
     /** Legt das verwaltete TODO an, solange das Finding noch keine verwaltete Verknüpfung hat. */
     void createManagedTodo(AuditFinding finding) {
@@ -56,23 +62,47 @@ class AuditFindingTodoLinker {
     }
 
     /**
-     * Offene Findings, deren verwaltetes TODO erledigt gemeldet wird, warten auf den nächsten Audit-Lauf.
-     * Die Findings aller verwalteten Verknüpfungen kommen aus einer Abfrage, nicht aus einer je
-     * Verknüpfung (5fb7b1e9); ohne verwaltete Verknüpfung wird gar nicht gefragt.
+     * Offene Findings, deren TODO erledigt gemeldet wird, warten auf den nächsten Audit-Lauf — ob das
+     * TODO verwaltet oder manuell verknüpft ist (ab1ed481: sonst blieb ein Befund OPEN, dessen
+     * verwaltetes TODO freigegeben und dessen manuelles erledigt war). Ist ein anderes verknüpftes TODO
+     * noch offen ({@link #STILL_OPEN}), ist die Arbeit am Befund nicht erledigt; er bleibt OPEN.
+     * Verknüpfungen, TODOs und Findings kommen aus je einer Abfrage, nicht aus einer je Verknüpfung
+     * (5fb7b1e9), gespeichert wird gesammelt (e8ca26e9).
      */
     void markAwaitingVerification(String todoId) {
-        List<String> managedFindingIds = findingTodoRepository.findByTodoId(todoId).stream()
-                .filter(AuditFindingTodo::isManaged)
+        markAwaitingVerification(List.of(todoId));
+    }
+
+    /** Dasselbe fuer mehrere zugleich erledigte TODOs (Sammel-UPDATE); keines zaehlt fuer das andere als offen. */
+    void markAwaitingVerification(Collection<String> todoIds) {
+        Set<String> completed = Set.copyOf(todoIds);
+        if (completed.isEmpty()) return;
+        List<String> findingIds = findingTodoRepository.findByTodoIdIn(completed).stream()
                 .map(AuditFindingTodo::getFindingId)
                 .distinct()
                 .toList();
-        if (managedFindingIds.isEmpty()) return;
-        for (AuditFinding finding : findingRepository.findAllById(managedFindingIds)) {
-            if (finding.getStatus() == AuditFindingStatus.OPEN) {
-                finding.setStatus(AuditFindingStatus.AWAITING_VERIFICATION);
-                findingRepository.save(finding);
-            }
-        }
+        if (findingIds.isEmpty()) return;
+        Set<String> busy = findingsWithOtherOpenTodo(findingIds, completed);
+        List<AuditFinding> awaiting = findingRepository.findAllById(findingIds).stream()
+                .filter(finding -> finding.getStatus() == AuditFindingStatus.OPEN)
+                .filter(finding -> !busy.contains(finding.getId()))
+                .toList();
+        if (awaiting.isEmpty()) return;
+        awaiting.forEach(finding -> finding.setStatus(AuditFindingStatus.AWAITING_VERIFICATION));
+        findingRepository.saveAll(awaiting);
+    }
+
+    /** Findings, an denen außer den erledigten TODOs noch ein offenes hängt. */
+    private Set<String> findingsWithOtherOpenTodo(List<String> findingIds, Set<String> completed) {
+        List<AuditFindingTodo> others = findingTodoRepository.findByFindingIdIn(findingIds).stream()
+                .filter(link -> !completed.contains(link.getTodoId()))
+                .toList();
+        if (others.isEmpty()) return Set.of();
+        Set<String> openTodoIds = todoRepository.findAllById(others.stream().map(AuditFindingTodo::getTodoId).distinct().toList())
+                .stream().filter(todo -> STILL_OPEN.contains(todo.getStatus())).map(Todo::getId)
+                .collect(Collectors.toSet());
+        return others.stream().filter(link -> openTodoIds.contains(link.getTodoId()))
+                .map(AuditFindingTodo::getFindingId).collect(Collectors.toSet());
     }
 
     Map<String, List<TodoLink>> todoLinks(List<String> findingIds) {

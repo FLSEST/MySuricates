@@ -16,9 +16,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -169,17 +169,18 @@ class AuditFindingMergerTest {
         Todo managedTodo = Todo.builder().id("t-both").referenceType(ManagedTodoWriter.REFERENCE_TYPE).referenceId("dup").build();
         Todo foreignTodo = Todo.builder().id("t-move").referenceType("something-else").referenceId("dup").build();
         when(findingTodoRepository.findByFindingId("dup")).thenReturn(List.of(moving, colliding));
-        when(findingTodoRepository.findByFindingIdAndTodoId("target", "t-move")).thenReturn(Optional.empty());
-        when(findingTodoRepository.findByFindingIdAndTodoId("target", "t-both")).thenReturn(Optional.of(targetLink));
-        when(todoRepository.findById("t-move")).thenReturn(Optional.of(foreignTodo));
-        when(todoRepository.findById("t-both")).thenReturn(Optional.of(managedTodo));
+        when(findingTodoRepository.findByFindingId("target")).thenReturn(List.of(targetLink));
+        when(todoRepository.findAllById(List.of("t-move", "t-both"))).thenReturn(List.of(foreignTodo, managedTodo));
         when(occurrenceRepository.findByFindingId("dup")).thenReturn(List.of());
 
         merger().merge(target, duplicate);
 
         assertThat(moving.getFindingId()).isEqualTo("target");
-        verify(findingTodoRepository).delete(colliding);
-        verify(findingTodoRepository, never()).delete(moving);
+        verify(findingTodoRepository).deleteAll(List.of(colliding));
+        verify(findingTodoRepository, never()).delete(any());
+        // d2500abd: Ziel-Verknuepfungen und TODOs je eine Abfrage, keine je Verknuepfung.
+        verify(findingTodoRepository, never()).findByFindingIdAndTodoId(any(), any());
+        verify(todoRepository, never()).findById(any());
         assertThat(targetLink.isManaged()).as("verwaltete Dublette macht die Ziel-Verknuepfung verwaltet").isTrue();
         assertThat(managedTodo.getReferenceId()).isEqualTo("target");
         assertThat(foreignTodo.getReferenceId()).as("fremde Referenztypen bleiben unberuehrt").isEqualTo("dup");
@@ -193,14 +194,16 @@ class AuditFindingMergerTest {
         AuditFindingOccurrence clash = AuditFindingOccurrence.builder().findingId("dup").reportId("rep-t").build();
         when(findingTodoRepository.findByFindingId("dup")).thenReturn(List.of());
         when(occurrenceRepository.findByFindingId("dup")).thenReturn(List.of(fresh, clash));
-        when(occurrenceRepository.existsByFindingIdAndReportId("target", "rep-d")).thenReturn(false);
-        when(occurrenceRepository.existsByFindingIdAndReportId("target", "rep-t")).thenReturn(true);
+        when(occurrenceRepository.findReportIdsByFindingId("target")).thenReturn(List.of("rep-t", "rep-older"));
 
         merger().merge(target, duplicate);
 
         assertThat(fresh.getFindingId()).isEqualTo("target");
-        verify(occurrenceRepository).delete(clash);
-        verify(occurrenceRepository, never()).delete(fresh);
+        assertThat(clash.getFindingId()).isEqualTo("dup");
+        verify(occurrenceRepository).deleteAll(List.of(clash));
+        verify(occurrenceRepository, never()).delete(any());
+        // d2500abd: die Reports des Ziels aus einer Abfrage, kein exists je Vorkommen.
+        verify(occurrenceRepository, never()).existsByFindingIdAndReportId(any(), any());
     }
 
     private static AuditFinding finding(String id, AuditFindingStatus status, Instant firstSeen, Instant lastSeen,

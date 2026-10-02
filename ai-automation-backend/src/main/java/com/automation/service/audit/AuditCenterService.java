@@ -173,6 +173,12 @@ public class AuditCenterService {
         todoLinker.markAwaitingVerification(todoId);
     }
 
+    /** Fuer mehrere zugleich erledigte TODOs (Sammel-UPDATE), eine Abfrage je Stufe. */
+    @Transactional
+    public void markAwaitingVerification(java.util.Collection<String> todoIds) {
+        todoLinker.markAwaitingVerification(todoIds);
+    }
+
     private AuditSummary toSummary(AuditReportSummaryRow latest, AuditReportSummaryRow previous,
                                    AuditReportSummaryRow latestAttempt, List<AuditFindingCountRow> counts) {
         Map<String, Long> byStatus = counts.stream().collect(Collectors.groupingBy(

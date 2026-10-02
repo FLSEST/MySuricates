@@ -35,6 +35,21 @@ class AuditRuleKeyCatalogTest {
                 .contains("test-coverage.untested-class", "test-coverage.thin-test");
     }
 
+    /** 802f740a: Eintraege mit festem subject zaehlen als erlaubte Keys und liefern ihren Wert. */
+    @Test
+    void loadsFixedSubjects_andTreatsTheirKeysAsAllowed() {
+        assertThat(catalog.allowedKeys(PUBLIC_READINESS))
+                .contains("public.secrets.keyword-hits", "public.privacy.private-terms");
+        assertThat(catalog.fixedSubject(PUBLIC_READINESS, "public.secrets.keyword-hits")).isEqualTo("repository");
+        assertThat(catalog.fixedSubject(PUBLIC_READINESS, "public.config.root-env-example")).isEqualTo(".env.example");
+        assertThat(catalog.fixedSubject(PUBLIC_READINESS, "public.privacy.private-terms"))
+                .as("Pfadregel: kein fester Wert").isNull();
+        assertThat(catalog.fixedSubject(PUBLIC_READINESS, "public.tests.low-ratio"))
+                .as("zwei erlaubte Module: kein fester Wert").isNull();
+        assertThat(catalog.fixedSubject(COVERAGE, "test-coverage.untested-class")).isNull();
+        assertThat(catalog.fixedSubject("test.audit-ohne-katalog", "x")).isNull();
+    }
+
     @Test
     void commentEntriesAreNoAuditKeys() {
         assertThat(catalog.isChecked("_comment")).isFalse();
@@ -158,6 +173,89 @@ class AuditRuleKeyCatalogTest {
         assertThat(entries).as("keine ruleKey-Eintraege im Evidenz-Prompt gefunden — Listenformat geaendert?")
                 .isNotEmpty();
         assertThat(violations).as("jeder ruleKey des Evidenz-Prompts nennt sein subject").isEmpty();
+    }
+
+    /**
+     * Gate (802f740a): Der Katalog setzt genau die festen subjects durch, die der Evidenz-Prompt verlangt —
+     * je ruleKey mit genau einem {@code subject "<wert>"} denselben Wert, sonst (Pfadregel, mehrere Module)
+     * keinen. Liefen beide auseinander, ueberschriebe die Ingestion ein subject, an das sich das Modell hielt.
+     */
+    @Test
+    void catalogFixedSubjectsAreTheOnesThePublicReadinessPromptDemands() throws IOException {
+        Pattern entry = Pattern.compile("(?m)^- ruleKey \"([a-z0-9][a-z0-9.\\-]*)\"(.*)$");
+        // subject "a" — oder eine Auswahl: subject "a" oder "b" (dann kein fester Wert).
+        Pattern fixedSubject = Pattern.compile("subject (\"[^\"]*\"(?: oder \"[^\"]*\")*)");
+        Pattern quoted = Pattern.compile("\"([^\"]*)\"");
+        List<String> violations = new ArrayList<>();
+        Set<String> promptKeys = new LinkedHashSet<>();
+        for (Path file : poolDefinitions()) {
+            for (ShippedDefinitions.Variant variant : ShippedDefinitions.variants(file)) {
+                JsonNode root = variant.root();
+                if (!PUBLIC_READINESS.equals(root.path("metadata").path("audit").path("key").asText(""))) {
+                    continue;
+                }
+                for (JsonNode block : blocks(root)) {
+                    Matcher matcher = entry.matcher(block.path("config").path("command").asText(""));
+                    while (matcher.find()) {
+                        String ruleKey = matcher.group(1);
+                        promptKeys.add(ruleKey);
+                        List<String> values = new ArrayList<>();
+                        Matcher fixed = fixedSubject.matcher(matcher.group(2));
+                        while (fixed.find()) {
+                            Matcher value = quoted.matcher(fixed.group(1));
+                            while (value.find()) values.add(value.group(1));
+                        }
+                        String expected = values.size() == 1 ? values.getFirst() : null;
+                        String actual = catalog.fixedSubject(PUBLIC_READINESS, ruleKey);
+                        if (!java.util.Objects.equals(expected, actual)) {
+                            violations.add(variant.label() + ": ruleKey '" + ruleKey + "' — Prompt verlangt "
+                                    + (expected == null ? "keinen festen Wert" : "'" + expected + "'")
+                                    + ", Katalog setzt " + (actual == null ? "keinen" : "'" + actual + "'") + " durch");
+                        }
+                    }
+                }
+            }
+        }
+        assertThat(promptKeys).as("keine ruleKey-Eintraege im Evidenz-Prompt gefunden").isNotEmpty();
+        assertThat(catalog.allowedKeys(PUBLIC_READINESS)).as("jeder Katalog-Key steht auch im Prompt")
+                .allMatch(promptKeys::contains);
+        assertThat(violations).as("festes subject in Katalog und Prompt gleich").isEmpty();
+    }
+
+    /**
+     * Gate (802f740a): Auch das Envelope-Beispiel am Ende eines Prompts nennt keinen ruleKey ausserhalb des
+     * Katalogs. Uebernaehme das Modell ihn, verwuerfe die Ingestion den ganzen Report. Erlaubt ist daneben nur
+     * der Schema-Platzhalter {@code stabile-regel-id}, den kein Katalog kennt.
+     */
+    @Test
+    void envelopeExamplesUseACataloguedRuleKeyOrThePlaceholder() throws IOException {
+        Pattern envelopeExample = Pattern.compile("<!--\\s*mysuricates:audit-result:v1.*?-->", Pattern.DOTALL);
+        Pattern ruleKey = Pattern.compile("\"ruleKey\"\\s*:\\s*\"([^\"]*)\"");
+        List<String> violations = new ArrayList<>();
+        int examples = 0;
+        for (Path file : poolDefinitions()) {
+            for (ShippedDefinitions.Variant variant : ShippedDefinitions.variants(file)) {
+                JsonNode root = variant.root();
+                String auditKey = root.path("metadata").path("audit").path("key").asText("");
+                for (JsonNode block : blocks(root)) {
+                    Matcher example = envelopeExample.matcher(block.path("config").path("command").asText(""));
+                    while (example.find()) {
+                        Matcher key = ruleKey.matcher(example.group());
+                        while (key.find()) {
+                            examples++;
+                            String value = key.group(1);
+                            if (!"stabile-regel-id".equals(value) && catalog.isChecked(auditKey)
+                                    && !catalog.allowedKeys(auditKey).contains(value)) {
+                                violations.add(variant.label() + " (" + auditKey + "): Envelope-Beispiel nennt ruleKey '"
+                                        + value + "', der nicht im Katalog steht");
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        assertThat(examples).as("keine Envelope-Beispiele gefunden — Format geaendert?").isPositive();
+        assertThat(violations).isEmpty();
     }
 
     /**

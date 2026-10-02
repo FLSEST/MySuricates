@@ -100,7 +100,7 @@ safeguard. If the field is absent, behaviour is unchanged (TODO `e39379a9`).
 When a prompt fixes the `ruleKey`s its model must use, they are listed in
 `ai-automation-backend/src/main/resources/audit/rule-keys.json` under their `auditKey`. Ingestion
 then normalizes spelling drift (lower case, `_` → `-`, plural before `-count`:
-`god-classes-count` → `god-class-count`). A key that still does not match is ingested anyway — with
+`god-classes-count` → `god-class-count`). A key that still does not match is
 **discarded — and the whole report with it** (TODO `f57945e2`): it is recorded as INVALID, no
 findings are created, and none are marked RESOLVED. A line in the activity log names the unknown
 keys and the permitted ones. An `auditKey` without a catalogue entry is not checked; its prompt
@@ -111,6 +111,20 @@ and therefore passes the counting gate block. Ingesting it anyway creates a set 
 and resolves the entire previous generation — you get just as many repeat findings and start over on
 the real ones. The earlier mark on the finding (`unknownRuleKey`, V75) was the intermediate step
 while there was no harder consequence; it is no longer set.
+
+**Fixed `subject` per rule** (TODO `802f740a`): if a rule concerns the repository or a module as a
+whole and the prompt demands exactly one value (`subject "repository"`), that value is in the
+catalogue as well – as an entry `{"key": …, "subject": …}` instead of a plain string. Ingestion
+enforces it, whatever `subject` the model sends; before, it was only a request in the prompt, and a
+deviation came back as a repeat finding without the triage of the old one. Because the catalogue
+value is the one the prompt already demanded, every finding that followed it keeps its fingerprint.
+At startup, `AuditFingerprintMigrationJob` (v5) merges legacy findings with a deviating `subject` onto
+the canonical one – triage included (`ACCEPTED_RISK`/`DISMISSED`, note); if there is none, the
+deviating finding itself becomes canonical.
+File-related rules (`subject = path`) and rules with several permitted values
+(`"ai-automation-backend" or "ai-automation-frontend"`) have no fixed value.
+`AuditRuleKeyCatalogTest` keeps catalogue and prompt in step and checks that a prompt's envelope
+example names only a catalogued `ruleKey` (or the placeholder `stabile-regel-id`).
 
 ### Evidence check: `evidence` must name a measurement of this run
 
@@ -234,6 +248,10 @@ fact sheet). That catches what `expectedFindings` protects against — a snapsho
 measurement — without forcing the judgement. The report prompt additionally carries the rule to
 report an unchanged finding from the previous run again: otherwise a mere change of mind would close
 it as RESOLVED.
+Triaged findings (`ACCEPTED_RISK`, `DISMISSED` according to `{{ audit_findings }}`, matched by
+`ruleKey` + `subject`, normalised as in the fingerprint) stay in the envelope, but they do not count towards the gate: otherwise the
+documentation weight audit would stay YELLOW for good with every triage. The `gate_description` names
+them separately ("dazu N bewusst eingeordnet").
 
 ## Known findings in the prompt: `{{ audit_findings }}`
 
@@ -325,6 +343,11 @@ leave known findings out, is checked by `scripts/tests/test-audit-facts.sh` (sec
 reads the threshold from `AuditAcceptancePolicy`, so that prompt and platform mean the same by
 "degraded".
 
+The documentation weight audit (Doku-Zehrprobe) and the public readiness evidence also have a valid
+`metadata.audit` and, since TODO `3fb33d9b`, carry the same section (as `## BEKANNTE BEFUNDE …`, in
+line with their headings) and the same rule block, each before its envelope part. Before, they saw
+earlier findings only as Markdown in `previous_report`. Section 10b of the same test checks this.
+
 ## Lifecycle
 
 - Failed runs, missing report blocks, and invalid envelopes are historized as
@@ -347,7 +370,13 @@ reads the threshold from `AuditAcceptancePolicy`, so that prompt and platform me
 - `CRITICAL` and `HIGH` automatically generate managed TODOs. `MEDIUM` can be confirmed in the Audit
   Center; `LOW` remains a finding for the time being. If an open finding drops below `HIGH`, its
   managed TODO is unlinked and archived (unless it is `IN_PROGRESS`).
-- A managed TODO set to `DONE` moves the finding to
-  `AWAITING_VERIFICATION`. Only the next valid audit snapshot confirms the fix: if the finding is
-  absent from it, it becomes `RESOLVED`; if it is reported again, it is `OPEN` again.
-- Manually linked TODOs are never automatically changed in status.
+- A linked TODO set to `DONE` – managed or manually linked – moves an open finding to
+  `AWAITING_VERIFICATION`, unless another TODO linked to it is still open (`OPEN`, `IN_PROGRESS`,
+  `BACKLOG`; TODO `ab1ed481`). This holds for every write path – REST, TodoTrigger auto-close, linked
+  workflow, bulk closing: the TODO reports the change itself when saved (Spring Data domain event
+  `Todo.Completed`, synchronously in the same transaction), and `AuditTodoCompletionListener` moves
+  the finding. Only the next valid audit snapshot confirms the fix: if the finding
+  is absent from it, it becomes `RESOLVED`; if it is reported again, it is `OPEN` again.
+- Manually linked TODOs are never automatically changed in status – not even when their finding
+  becomes `RESOLVED`. An open manual TODO next to a resolved finding is therefore intended; whoever
+  created it closes it.
