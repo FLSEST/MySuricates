@@ -527,4 +527,78 @@ class AuditIngestionServiceTest {
             verifyNoInteractions(applier);
         }
     }
+    /**
+     * Provider und Modell des Reports (fa66ea31): Setzt ein Shell-Block den Envelope zusammen, ist der
+     * reportBlock kein KI-Schritt. Das Modell nennt dann der Schritt des promptBlock, nicht der Workflow.
+     */
+    @Nested
+    class ProviderAndModel {
+
+        private static final String ENVELOPE = "# Report\n<!-- mysuricates:audit-result:v1 "
+                + "{\"snapshotComplete\":true,\"findings\":[]} -->";
+
+        private WorkflowRunCompletedEvent eventWith(Map<String, Object> audit) {
+            return new WorkflowRunCompletedEvent(this, "run-1", "wf-1", "Coverage", PROJECT, "/tmp/p",
+                    RunStatus.COMPLETED, Map.of(), Map.of("audit", audit), null);
+        }
+
+        private void stubRun(Map<String, Object> coachMeta, Map<String, Object> reportMeta) {
+            StepResult coach = StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).output("Bericht")
+                    .metadata(new HashMap<>(coachMeta)).build();
+            StepResult report = StepResult.builder().stepIndex(1).status(StepStatus.COMPLETED).output(ENVELOPE)
+                    .metadata(new HashMap<>(reportMeta)).build();
+            WorkflowRun run = WorkflowRun.builder().id("run-1")
+                    .workflow(Workflow.builder().name("Coverage").provider("CODEX").model("gpt-workflow").build())
+                    .status(RunStatus.COMPLETED).completedAt(ACCEPTED_AT)
+                    .steps(new ArrayList<>(List.of(coach, report))).build();
+            when(runRepository.findByIdWithSteps("run-1")).thenReturn(Optional.of(run));
+        }
+
+        private AuditReport ingested(Map<String, Object> audit) {
+            service.ingest(eventWith(audit));
+            ArgumentCaptor<AuditReport> stored = ArgumentCaptor.forClass(AuditReport.class);
+            verify(reportRepository).save(stored.capture());
+            assertThat(stored.getValue().getIngestionStatus()).isEqualTo(AuditIngestionStatus.VALID);
+            return stored.getValue();
+        }
+
+        private Map<String, Object> audit(boolean withPromptBlock) {
+            Map<String, Object> audit = new HashMap<>(Map.of(
+                    "enabled", true, "key", AUDIT_KEY, "category", "quality", "reportBlock", "report"));
+            if (withPromptBlock) audit.put("promptBlock", "coach");
+            return audit;
+        }
+
+        @Test
+        void promptBlock_namesProviderAndModel_whenTheReportBlockIsAShellStep() {
+            stubRun(Map.of("blockName", "coach", "provider", "CLAUDE", "model", "sonnet"),
+                    Map.of("blockName", "report"));
+
+            AuditReport report = ingested(audit(true));
+
+            assertThat(report.getProvider()).isEqualTo("CLAUDE");
+            assertThat(report.getModel()).isEqualTo("sonnet");
+        }
+
+        @Test
+        void promptStepWithoutValues_fallsBackToTheReportStep_thenToTheWorkflow() {
+            stubRun(Map.of("blockName", "coach"), Map.of("blockName", "report", "provider", "PI"));
+
+            AuditReport report = ingested(audit(true));
+
+            assertThat(report.getProvider()).isEqualTo("PI");
+            assertThat(report.getModel()).isEqualTo("gpt-workflow");
+        }
+
+        @Test
+        void withoutPromptBlock_theReportStepCounts_asBefore() {
+            stubRun(Map.of("blockName", "coach", "provider", "CLAUDE", "model", "sonnet"),
+                    Map.of("blockName", "report"));
+
+            AuditReport report = ingested(audit(false));
+
+            assertThat(report.getProvider()).isEqualTo("CODEX");
+            assertThat(report.getModel()).isEqualTo("gpt-workflow");
+        }
+    }
 }

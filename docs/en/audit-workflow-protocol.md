@@ -24,8 +24,9 @@ only provides an opt-in protocol for versioned reports, stable findings, and TOD
 
 The workflow block named in `reportBlock` must have the same `name`. If a shell block assembles the
 envelope from the measurement (test coverage), it is the `reportBlock`; the AI block before it is then
-named as `promptBlock` as well. The platform does not read `promptBlock`, only the prompt self-tests
-(`scripts/tests/test-audit-facts.sh`, section 10). Audit keys and
+named as `promptBlock` as well. The ingestion takes the report's provider and model from that step
+(otherwise from the `reportBlock`, then from the workflow); the prompt self-tests
+(`scripts/tests/test-audit-facts.sh`, section 10) read the prompt there. Audit keys and
 categories are freely selectable; the backend does not know any project-specific keys or rules.
 An audit workflow does not use `metadata.autoTodo` at the same time: TODOs are managed
 from the structured findings.

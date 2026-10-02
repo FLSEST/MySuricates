@@ -22,8 +22,9 @@ stellt nur ein opt-in Protokoll für versionierte Reports, stabile Findings und 
 
 Der in `reportBlock` genannte Workflow-Block braucht denselben `name`. Setzt ein Shell-Block den
 Envelope aus der Messung zusammen (Test-Abdeckung), ist er der `reportBlock`; der KI-Block davor steht
-dann zusätzlich als `promptBlock`. Die Plattform liest `promptBlock` nicht, nur die Selbsttests der
-Prompts (`scripts/tests/test-audit-facts.sh`, Abschnitt 10). Audit-Keys und
+dann zusätzlich als `promptBlock`. Aus dessen Schritt nimmt die Ingestion Provider und Modell des
+Reports (sonst aus dem `reportBlock`, dann vom Workflow); die Selbsttests der Prompts
+(`scripts/tests/test-audit-facts.sh`, Abschnitt 10) lesen den Prompt dort. Audit-Keys und
 Kategorien sind frei wählbar; das Backend kennt keine projektspezifischen Keys oder Regeln.
 Ein Audit-Workflow verwendet nicht gleichzeitig `metadata.autoTodo`: TODOs werden aus den
 strukturierten Findings verwaltet.
