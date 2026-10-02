@@ -1170,8 +1170,10 @@ eine Diagramm-Quelle, eine Übersetzungstabelle oder das Skript ändert (und von
 schreibt `index.html` (Verzeichnis aus derselben Tabelle wie `diagramme.md`), `de/<name>-diagrams.html`,
 `en/index.html` und `en/<name>-diagrams.html`; jede Seite verlinkt Verzeichnis und andere Sprache. Ist
 eine Übersetzung offen, entsteht nichts (Exit-Code 1). Einmalig in den Repo-Einstellungen nötig:
-Settings → Pages → Source **GitHub Actions** — nicht „Deploy from branch“, das würde ganz `docs/` samt
-`plans/` veröffentlichen.
+Pages auf GitHub Actions stellen (Settings → Pages → Source **GitHub Actions** — nicht „Deploy from
+branch“, das würde ganz `docs/` samt `plans/` veröffentlichen) und die Repo-Variable
+`PAGES_ENABLED=true` setzen (Settings → Secrets and variables → Actions → Variables). Ohne die Variable
+läuft nur der Bau samt `--check`, der Deploy-Job entfällt.
 
 ## Abhängigkeits-Meldungen (Frontend)
 

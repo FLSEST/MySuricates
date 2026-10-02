@@ -4,7 +4,9 @@ name: Pages
 # der Markdown-Quelle (docs/*-diagrams.md + docs/i18n/), nicht aus den HTML-Dateien im Repo —
 # Pages kann so nicht hinter der Quelle zurueckbleiben. Voraussetzung, nur in den
 # Repo-Einstellungen: Settings -> Pages -> Source "GitHub Actions" (nicht "Deploy from branch":
-# das veroeffentlichte ganz docs/ samt plans/ und schickte Markdown durch Jekyll).
+# das veroeffentlichte ganz docs/ samt plans/ und schickte Markdown durch Jekyll) und die
+# Repo-Variable PAGES_ENABLED=true. Ohne sie laeuft nur der Bau (samt --check), der Deploy
+# entfaellt — sonst waere jeder passende Push auf main rot, solange Pages aus ist.
 on:
   push:
     branches: [main]
@@ -43,6 +45,7 @@ jobs:
   deploy:
     name: Auf Pages veroeffentlichen
     needs: build
+    if: vars.PAGES_ENABLED == 'true'
     runs-on: ubuntu-26.04
     # Nur dieser Job darf Pages schreiben; id-token braucht deploy-pages fuer den Nachweis
     # gegenueber Pages (OIDC), nicht fuer Fremddienste.

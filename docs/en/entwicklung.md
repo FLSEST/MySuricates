@@ -1147,9 +1147,11 @@ a diagram source, a translation table or the script (and by hand via `workflow_d
 builds from the Markdown source, not from the HTML files in the repository, and writes `index.html`
 (index from the same table as `diagramme.md`), `de/<name>-diagrams.html`, `en/index.html` and
 `en/<name>-diagrams.html`; every page links the index and the other language. If a translation is
-open, nothing is written (exit code 1). Needed once in the repository settings: Settings → Pages →
-Source **GitHub Actions** — not "Deploy from branch", which would publish all of `docs/` including
-`plans/`.
+open, nothing is written (exit code 1). Needed once in the repository settings: set Pages to GitHub
+Actions (Settings → Pages → Source **GitHub Actions** — not "Deploy from branch", which would publish
+all of `docs/` including `plans/`) and set the repository variable `PAGES_ENABLED=true` (Settings →
+Secrets and variables → Actions → Variables). Without the variable only the build including `--check`
+runs; the deploy job is skipped.
 
 ## Dependency advisories (frontend)
 

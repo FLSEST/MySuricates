@@ -87,6 +87,7 @@ public class ChainService {
     /**
      * Refused (409) while the chain has a pending, running or paused run: the executor would keep
      * starting its workflows — and their project containers — after the chain is gone.
+     * Best effort, without a lock: a run starting at the same moment can slip through.
      */
     public void delete(String id) {
         WorkflowChain chain = findById(id);
