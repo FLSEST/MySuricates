@@ -1,5 +1,6 @@
 package com.automation.service.pool;
 
+import com.automation.architecture.ShippedDefinitions;
 import com.automation.dto.response.PoolWorkflowEntry;
 import com.automation.entity.BlockDefinition;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -9,11 +10,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
-import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -106,12 +105,13 @@ class PoolFileParserTest {
             Path pool = Files.isDirectory(Paths.get("../workflow-pool")) ? Paths.get("../workflow-pool")
                     : Paths.get("workflow-pool");
             assertThat(pool).as("workflow-pool nicht gefunden ab " + Paths.get("").toAbsolutePath()).isDirectory();
-            List<String> gitTracked = trackedPoolFiles(pool);
+            List<Path> gitTracked = ShippedDefinitions.poolFiles(pool);
             assertThat(gitTracked).as("tracked pool files").isNotEmpty();
 
-            for (String filename : gitTracked) {
+            for (Path file : gitTracked) {
+                String filename = file.getFileName().toString();
                 for (String locale : List.of("de", "en")) {
-                    PoolWorkflowEntry entry = PoolFileParser.parse(pool.resolve(filename), objectMapper, locale);
+                    PoolWorkflowEntry entry = PoolFileParser.parse(file, objectMapper, locale);
                     assertThat(entry).as(filename + " (" + locale + ")").isNotNull();
                     assertThat(entry.name()).as(filename).containsKeys("de", "en");
                     assertThat(entry.blocks()).as(filename).isNotEmpty();
@@ -119,20 +119,6 @@ class PoolFileParserTest {
             }
         }
 
-        private List<String> trackedPoolFiles(Path pool) throws Exception {
-            Process git = new ProcessBuilder("git", "ls-files", "--", "*.json")
-                    .directory(pool.toFile()).redirectErrorStream(true).start();
-            String out = new String(git.getInputStream().readAllBytes());
-            if (git.waitFor() == 0 && !out.isBlank()) {
-                return out.lines().map(String::strip).filter(l -> !l.contains("/")).toList();
-            }
-            // Kein git (etwa in einem Quell-Archiv): dann zählen alle Dateien im Verzeichnis.
-            List<String> all = new ArrayList<>();
-            try (DirectoryStream<Path> stream = Files.newDirectoryStream(pool, "*.json")) {
-                stream.forEach(p -> all.add(p.getFileName().toString()));
-            }
-            return all;
-        }
     }
 
     @Nested

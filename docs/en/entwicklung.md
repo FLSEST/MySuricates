@@ -903,7 +903,7 @@ The backend uses three annotation processors that must be correctly ordered in t
 
 The backend comprises **53 REST controllers** and **20 block types**:
 
-**Controllers:** ActivityLog, Assistant, Audit, Chain, ChainTemplate, CompletionTrigger, Conversion, DashboardLayout, DashboardReportAssist, DashboardWorkflow, DeadLetter, Dialog, Docs, Execution, Goal, Integration, Learning, Notification, OnboardingProfile, PageSuggestion, Project, Reports, Schedule, Search, Skill, Staging, System, SystemAccess, SystemAiProvider, SystemMaintenance, SystemModules, SystemRequestMetrics, SystemSettings, Testing, Todo, TodoTrigger, Webhook, WebSocketTicket, Wish, Workflow, WorkflowAnalyzer, WorkflowAssist, WorkflowDebug, WorkflowFactory, WorkflowImport, WorkflowMemory, WorkflowPool, WorkflowSeal, WorkflowSealStatus, WorkflowTemplate, WorkflowVersion
+**Controllers:** ActivityLog, Assistant, Audit, Chain, ChainTemplate, CompletionTrigger, Conversion, DashboardLayout, DashboardReportAssist, DashboardWorkflow, DeadLetter, Dialog, Docs, Execution, Goal, GoalWorkflow, Integration, Learning, Notification, OnboardingProfile, PageSuggestion, Project, ProjectBundle, Reports, Schedule, Search, Skill, Staging, System, SystemAccess, SystemAiProvider, SystemMaintenance, SystemModules, SystemRequestMetrics, SystemSettings, Testing, Todo, TodoTrigger, Webhook, WebSocketTicket, Wish, Workflow, WorkflowAnalyzer, WorkflowAssist, WorkflowDebug, WorkflowFactory, WorkflowImport, WorkflowMemory, WorkflowPool, WorkflowSeal, WorkflowSealStatus, WorkflowTemplate, WorkflowVersion
 
 **Block types:** `simple`, `shell`, `retry`, `conditional`, `foreach`, `while`, `switch`, `agentic`, `approval`, `sub-workflow`, `skill-capability`, `human-input`, `document`, `integration`, `todo-create`, `todo-update`, `todo-close`, `compress`, `compress-ai`, `dashboard-report`
 
@@ -1060,8 +1060,23 @@ Checked per push range (remote state..local; for a new branch everything no remo
    parity, diagram drift. A missing gate script is a hard error.
 4. **gitleaks on the range** — only if installed, otherwise skipped with a notice. Nothing is
    installed on the fly; CI scans anyway.
-5. **Build check by scope.** Frontend touched → `tsc --noEmit` and `npm run lint` (about a minute);
-   backend touched → `mvn -q test-compile` (seconds). Docs-only pushes stay at seconds.
+5. **Exception files in the range.** If the range changes a file from which the gate and CI read
+   their exceptions — `.gitleaksignore`, `.gitleaks.toml`, `scripts/lib/hygiene-rules.sh`,
+   `scripts/ci/pre-push-checks.sh`, `scripts/ci/public-hygiene.sh`, `scripts/ci/changed-scopes.sh`
+   (its list skips builds and tests), `scripts/git-hooks/*`,
+   `.github/workflows/ci.yml` —, the gate blocks and shows the extent of the diff. Otherwise whoever
+   loosens such a file in the same push would get green from the very check they are weakening.
+   After review, release it for exactly this state only: `MYSURICATES_PREPUSH_ALLOW_RULES=<sha of
+   the tip> git push` (at least 7 characters, several separated by commas; the message names the
+   command). A permanently set `=1` or `MYSURICATES_PREPUSH_SKIP` releases nothing, and the release
+   stays visible as a warning. CI does not block here (`--rules-report-only`); it reports the range
+   as a warning and in the job summary.
+6. **Build check by scope.** The same script as in CI decides which suite is affected
+   (`scripts/ci/changed-scopes.sh`): frontend suite → `tsc --noEmit` and `npm run lint` (about a
+   minute); backend suite → `mvn -q test-compile` (seconds). The backend is filtered the other way
+   round — it also builds for `docs/`, `workflow-pool/`, `scripts/lib/` and `CLAUDE.md`, because
+   its tests read those files; only frontend code and Markdown outside them leave it out. The
+   reasoning is printed as a `Scope:` line.
 
 Not here: the full test suite (CI and the commit rule in CLAUDE.md), the tracked set (`--tracked`
 in CI and in the "Public Readiness" chain) and anything that needs judgement.

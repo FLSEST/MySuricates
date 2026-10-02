@@ -5,11 +5,13 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 /**
@@ -70,6 +72,64 @@ public final class ShippedDefinitions {
             }
         }
         return files;
+    }
+
+    /**
+     * The {@code workflow-pool/} directory, seen from the backend module or the repository root;
+     * {@code null} when neither is reachable.
+     */
+    public static Path poolDirectoryOrNull() {
+        for (Path candidate : List.of(Paths.get("../workflow-pool"), Paths.get("workflow-pool"))) {
+            if (Files.isDirectory(candidate)) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The pool files that are actually shipped: the JSON files git tracks directly in {@code pool}
+     * (TODO ca858a23). Next to them a maintainer keeps private definitions, ignored via
+     * {@code .git/info/exclude} — a gate that reads them fails locally on files nobody gets, while a
+     * fresh worktree stays green. Without git (a source archive) every JSON file in the directory
+     * counts — and so it does when git answers with no tracked JSON file at all: a gate that reads
+     * nothing would pass silently.
+     */
+    public static List<Path> poolFiles(Path pool) throws IOException {
+        Optional<List<Path>> tracked = gitTrackedNames(pool).map(names -> names.stream()
+                .filter(name -> name.endsWith(".json"))
+                .map(pool::resolve)
+                .filter(Files::isRegularFile)
+                .sorted()
+                .toList());
+        if (tracked.isPresent() && !tracked.get().isEmpty()) {
+            return tracked.get();
+        }
+        try (Stream<Path> stream = Files.list(pool)) {
+            return stream.filter(p -> p.toString().endsWith(".json")).sorted().toList();
+        }
+    }
+
+    /** Names git tracks directly in {@code dir}; empty when git is missing or {@code dir} is no repo. */
+    private static Optional<List<String>> gitTrackedNames(Path dir) {
+        try {
+            Process git = new ProcessBuilder("git", "ls-files", "-z", "--", ".")
+                    .directory(dir.toFile())
+                    .redirectError(ProcessBuilder.Redirect.DISCARD)
+                    .start();
+            String out = new String(git.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            if (git.waitFor() != 0) {
+                return Optional.empty();
+            }
+            return Optional.of(Stream.of(out.split("\0"))
+                    .filter(name -> !name.isEmpty() && !name.contains("/"))
+                    .toList());
+        } catch (IOException e) {
+            return Optional.empty();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return Optional.empty();
+        }
     }
 
     /** One variant per declared language, or the file itself when it has no {@code i18n} marker. */

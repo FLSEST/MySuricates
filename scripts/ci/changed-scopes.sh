@@ -34,6 +34,9 @@
 #   - workflow-pool/**
 # Aendert sich die CI-Definition oder dieses Skript, laufen beide Suiten.
 #
+# Dieselbe Einordnung nutzt das Pre-Push-Gate fuer seine Bauprüfung (scripts/ci/pre-push-checks.sh,
+# check_build, TODO c60eb0e2) — eine Aenderung hier wirkt lokal und in der CI gleich.
+#
 # Aufrufe:
 #   bash scripts/ci/changed-scopes.sh --files  < liste      Dateiliste von stdin (je Zeile ein Pfad)
 #   BASE=<sha> HEAD=<sha> bash scripts/ci/changed-scopes.sh  Liste aus git diff --no-renames BASE...HEAD
@@ -99,7 +102,7 @@ else
   git cat-file -e "${HEAD}^{commit}" 2>/dev/null || all_true "Kopf ${HEAD} liegt nicht im Checkout"
   # --no-renames: eine verschobene Datei nennt alten UND neuen Pfad — ein Umzug aus dem Backend
   # heraus soll das Backend nicht ueberspringen. Drei Punkte: ab der Merge-Basis.
-  FILES="$(git diff --no-renames --name-only "${BASE}...${HEAD}" 2>/dev/null)" \
+  FILES="$(git -c core.quotePath=false diff --no-renames --name-only "${BASE}...${HEAD}" 2>/dev/null)" \
     || all_true "git diff ${BASE}...${HEAD} fehlgeschlagen"
 fi
 

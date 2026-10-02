@@ -217,6 +217,9 @@ Ein exportierter Eintrag ist ein Entwurf. Vor dem Commit:
 
 Ein Eintrag, der die Fragen nicht besteht, wird nicht getrackt. `git rm --cached` genügt: das
 Verzeichnis bleibt die Arbeitsfläche der laufenden Instanz, getrackt ist nur die Auswahl.
+Ebenso lesen die Test-Gates über den Pool (`blockConfigSchema.test.ts`, die Maven-Gates über
+`ShippedDefinitions.poolFiles`) nur die getrackten Dateien — ohne git alle. Private Einträge
+daneben, etwa per `.git/info/exclude` ignoriert, machen die Tests also nicht rot.
 
 ### Wiederkehrende Prüfung
 

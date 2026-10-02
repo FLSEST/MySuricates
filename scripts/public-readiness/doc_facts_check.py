@@ -498,6 +498,46 @@ def check_block_type_enum(rel, no, line, names, findings):
 
 
 # ---------------------------------------------------------------------------
+# Controller-Aufzaehlung (TODO 65eab274)
+#
+# docs/entwicklung.md (DE/EN) zaehlt unter der Controller-Zahl jeden Controller beim Namen
+# auf ("**Controller:** ActivityLog, Assistant, …"). Die Zahl prueft check_sizes, die Liste
+# driftete trotzdem zweimal ab (51 genannt, 47 aufgezaehlt). Verglichen werden beide
+# Richtungen: jeder *Controller.java unter src/main/java muss genannt sein, jeder genannte
+# Name muss als Klasse existieren. Namen ohne das Suffix "Controller"; steht es doch dabei
+# (oder in Backticks), wird es abgestreift.
+# ---------------------------------------------------------------------------
+CONTROLLER_ENUM = re.compile(r"^\s*\*\*Controllers?:\*\*\s*(.+?)\s*$")
+
+
+def check_controller_enum(rel, no, line, names, findings):
+    if not names:
+        return
+    match = CONTROLLER_ENUM.match(line)
+    if not match:
+        return
+    items = []
+    for raw in match.group(1).split(","):
+        item = raw.strip().strip("`").rstrip(".").strip("`").strip()
+        if item.endswith("Controller") and item != "Controller":
+            item = item[: -len("Controller")]
+        if item:
+            items.append(item)
+    known = set(names)
+    missing = sorted(known - set(items))
+    unknown = sorted(set(items) - known)
+    if not missing and not unknown:
+        return
+    detail = []
+    if missing:
+        detail.append("es fehlen " + ", ".join(missing))
+    if unknown:
+        detail.append("unbekannt " + ", ".join(unknown))
+    findings.append(f"DRIFT {rel}:{no} controller-names nennt {len(set(items) & known)} von"
+                    f" {len(known)} Controllern ({'; '.join(detail)}) | {line.strip()[:120]}")
+
+
+# ---------------------------------------------------------------------------
 # curl mit API-Key ohne --noproxy (TODO 2e3cf243)
 #
 # Mit gesetztem http_proxy schickt curl auch Aufrufe an localhost ueber den Proxy -- samt
@@ -662,6 +702,7 @@ def scan(root, rel, facts, findings):
         check_absent_files(rel, no, line, facts.get("absent-files"), findings)
         check_curl_noproxy(rel, no, lines, findings)
         check_block_type_enum(rel, no, line, facts.get("block-type-names"), findings)
+        check_controller_enum(rel, no, line, facts.get("controller-names"), findings)
         check_test_claim_dated(rel, no, line, lines[no] if no < len(lines) else "",
                               findings)
     check_migration_table(rel, lines, facts.get("migration-max"),

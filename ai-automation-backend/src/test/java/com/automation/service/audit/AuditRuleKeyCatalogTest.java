@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -15,7 +14,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -201,16 +199,13 @@ class AuditRuleKeyCatalogTest {
 
     /** Ausgelieferte Audit-Definitionen ({@code metadata.audit.enabled}) aus {@code workflow-pool/}. */
     private static List<Path> poolDefinitions() throws IOException {
-        Path pool = Files.isDirectory(Paths.get("../workflow-pool")) ? Paths.get("../workflow-pool")
-                : Paths.get("workflow-pool");
-        assertThat(pool).as("workflow-pool nicht gefunden ab " + Paths.get("").toAbsolutePath()).isDirectory();
+        Path pool = ShippedDefinitions.poolDirectoryOrNull();
+        assertThat(pool).as("workflow-pool nicht gefunden ab " + Paths.get("").toAbsolutePath()).isNotNull();
         ObjectMapper mapper = new ObjectMapper();
         List<Path> files = new ArrayList<>();
-        try (Stream<Path> stream = Files.list(pool)) {
-            for (Path candidate : stream.filter(p -> p.toString().endsWith(".json")).sorted().toList()) {
-                if (mapper.readTree(candidate.toFile()).path("metadata").path("audit").path("enabled").asBoolean(false)) {
-                    files.add(candidate);
-                }
+        for (Path candidate : ShippedDefinitions.poolFiles(pool)) {
+            if (mapper.readTree(candidate.toFile()).path("metadata").path("audit").path("enabled").asBoolean(false)) {
+                files.add(candidate);
             }
         }
         assertThat(files).as("keine Audit-Definitionen im Pool gefunden").isNotEmpty();

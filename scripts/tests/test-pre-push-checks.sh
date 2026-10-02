@@ -11,7 +11,8 @@ PASS=0; FAIL=0
 # Die Ausweichorte der Privatlisten liegen ausserhalb des Repos — ohne Isolation faende
 # das Gate die echte Liste des Rechners (siehe test-public-hygiene.sh).
 export XDG_CONFIG_HOME="$TMP/xdg"
-unset HYGIENE_PRIVATE_LIST HYGIENE_PRIVATE_TERMS MYSURICATES_PREPUSH_SKIP GITHUB_ACTIONS
+unset HYGIENE_PRIVATE_LIST HYGIENE_PRIVATE_TERMS MYSURICATES_PREPUSH_SKIP MYSURICATES_PREPUSH_ALLOW_RULES \
+      GITHUB_ACTIONS GITHUB_STEP_SUMMARY
 
 check() {  # $1 = label, $2 = shell condition
   if eval "$2"; then echo "  ok   $1"; PASS=$((PASS + 1)); else echo "  FAIL $1"; FAIL=$((FAIL + 1)); fi
@@ -34,7 +35,7 @@ make_repo() {  # $1 = pfad
   git init -q --bare "$1.remote"
   ( cd "$1" && $NOREPLY add . && $NOREPLY commit -q -m init \
       && git config core.hooksPath scripts/git-hooks && git remote add origin "$1.remote" \
-      && env $SKIP git push -q origin main 2>/dev/null )
+      && env $SKIP MYSURICATES_PREPUSH_ALLOW_RULES="$(git rev-parse HEAD)" git push -q origin main 2>/dev/null )
 }
 commit_file() {  # $1 = repo, $2 = datei, $3 = inhalt, $4 = nachricht, $5.. = git-Praefix
   local repo="$1" f="$2" content="$3" msg="$4"; shift 4
@@ -57,6 +58,8 @@ OUT=$(cd "$TMP/clean" && env $SKIP git push origin main 2>&1); RC=$?
 check "push abgelehnt"                           '[ "$RC" -ne 0 ]'
 check "Gate meldet FAILED"                       'grep -q "Pre-Push-Gate FAILED" <<<"$OUT"'
 check "nennt den Commit"                         'grep -q "commit ${SHORT}.*absolute developer path" <<<"$OUT"'
+check "Schlusshinweis passt zur Befundart (Nachricht)" \
+  'grep -q "^Fix (Nachricht/Adresse)" <<<"$OUT" && ! grep -q "^Fix (Ausnahmedateien)" <<<"$OUT"'
 ( cd "$TMP/clean" && git reset -q --hard HEAD~1 )
 
 echo "3) commit-msg-Hook blockiert dieselbe Nachricht schon beim Commit"
@@ -97,6 +100,19 @@ OUT=$(cd "$TMP/clean" && HYGIENE_PRIVATE_TERMS="$TMP/terms.txt" bash scripts/ci/
 check "Begriff erkannt (exit 1, ohne Gross/Klein)" '[ "$RC" -eq 1 ]'
 check "nennt die Listenzeile 2"                  'grep -q "privaten Begriff (Zeile 2 der privaten Begriffsliste)" <<<"$OUT"'
 check "Begriff steht nicht in der Ausgabe"       '! grep -qi "schnecke" <<<"$OUT"'
+( cd "$TMP/clean" && git reset -q --hard HEAD~1 )
+commit_file "$TMP/clean" g.txt "x" "docs: Notiz zur SCHNECKE" $NOREPLY
+OUT=$(cd "$TMP/clean" && HYGIENE_PRIVATE_TERMS="$TMP/terms.txt" bash scripts/ci/pre-push-checks.sh --range HEAD~1..HEAD --skip-tree --skip-build 2>&1); RC=$?
+check "Grossschreibung in der Nachricht wird gefaltet" \
+  '[ "$RC" -eq 1 ] && grep -q "privaten Begriff (Zeile 2" <<<"$OUT"'
+# Umlaute: "MÜLLER" muss "Müller" treffen — mawk und BSD-awk falten nur ASCII, deshalb ab Bash 4
+# die Parameter-Expansion. Locale ausdruecklich UTF-8, wie auf den CI-Runnern.
+printf 'Müller\n' > "$TMP/umlaut-terms.txt"
+( cd "$TMP/clean" && git reset -q --hard HEAD~1 )
+commit_file "$TMP/clean" g.txt "x" "docs: Notiz von MÜLLER" $NOREPLY
+OUT=$(cd "$TMP/clean" && LC_ALL=C.UTF-8 HYGIENE_PRIVATE_TERMS="$TMP/umlaut-terms.txt" bash scripts/ci/pre-push-checks.sh --range HEAD~1..HEAD --skip-tree --skip-build 2>&1); RC=$?
+check "Umlaut-Grossschreibung wird gefaltet (MÜLLER trifft Müller)" \
+  '[ "$RC" -eq 1 ] && grep -q "privaten Begriff (Zeile 1" <<<"$OUT"'
 OUT=$(cd "$TMP/clean" && bash scripts/ci/pre-push-checks.sh --range HEAD~1..HEAD --skip-tree --skip-build 2>&1); RC=$?
 check "ohne Liste: hoerbar uebersprungen"        'grep -q "private Begriffe in Commit-Nachrichten werden nicht geprueft" <<<"$OUT"'
 check "ohne Liste: kein Befund (exit 0)"         '[ "$RC" -eq 0 ]'
@@ -151,12 +167,36 @@ check "meldet kein OK"                           '! grep -q "Pre-Push-Gate OK" <
 echo "14) Bauprüfung nach Scope: Docs beruehren nichts, Frontend ohne node_modules ist ein harter Fehler"
 commit_file "$TMP/clean" notes.md "text" "docs: nur Doku" $NOREPLY
 OUT=$(cd "$TMP/clean" && bash scripts/ci/pre-push-checks.sh --range HEAD~1..HEAD --skip-tree 2>&1); RC=$?
-check "Doku-Push: nichts zu bauen (exit 0)"      '[ "$RC" -eq 0 ] && grep -q "weder Frontend noch Backend beruehrt" <<<"$OUT"'
+check "Doku-Push: nichts zu bauen (exit 0)"      '[ "$RC" -eq 0 ] && grep -q "keine Datei in Reichweite der Backend- oder Frontend-Suite" <<<"$OUT"'
 ( cd "$TMP/clean" && mkdir -p ai-automation-frontend/src )
 commit_file "$TMP/clean" ai-automation-frontend/src/x.ts "export {}" "feat(ui): x" $NOREPLY
 OUT=$(cd "$TMP/clean" && bash scripts/ci/pre-push-checks.sh --range HEAD~1..HEAD --skip-tree 2>&1); RC=$?
 check "Frontend ohne node_modules: exit 2"       '[ "$RC" -eq 2 ]'
 check "verlangt npm ci"                          'grep -q "node_modules fehlt — erst npm ci" <<<"$OUT"'
+
+echo "14b) Bau-Scope wie in der CI: changed-scopes.sh entscheidet (TODO c60eb0e2)"
+# Ein mvn-Ersatz protokolliert den Aufruf; npm/tsc werden nie erreicht, weil node_modules fehlt.
+mkdir -p "$TMP/fakemvn"
+printf '#!/usr/bin/env bash\necho "mvn $*" >> "%s/mvn.log"; exit 0\n' "$TMP" > "$TMP/fakemvn/mvn"; chmod +x "$TMP/fakemvn/mvn"
+( cd "$TMP/clean" && mkdir -p docs ai-automation-backend )
+commit_file "$TMP/clean" docs/handbuch.md "text" "docs: Handbuch" $NOREPLY
+rm -f "$TMP/mvn.log"
+OUT=$(cd "$TMP/clean" && PATH="$TMP/fakemvn:$PATH" bash scripts/ci/pre-push-checks.sh --range HEAD~1..HEAD --skip-tree 2>&1); RC=$?
+check "docs/*.md baut das Backend (liest die CI auch): exit 0" '[ "$RC" -eq 0 ] && grep -q "Backend: OK" <<<"$OUT"'
+check "mvn test-compile wurde aufgerufen"        'grep -q "mvn -q test-compile" "$TMP/mvn.log" 2>/dev/null'
+check "Frontend bleibt aussen vor"               '! grep -q "Frontend: Typpruefung" <<<"$OUT" && grep -q "Frontend-Suite uebersprungen" <<<"$OUT"'
+check "Scope-Begruendung sichtbar"               'grep -q "Scope: 1 Datei(en) — backend=true, frontend=false" <<<"$OUT"'
+( cd "$TMP/clean" && mkdir -p workflow-pool )
+commit_file "$TMP/clean" workflow-pool/x.json "{}" "feat(pool): x" $NOREPLY
+OUT=$(cd "$TMP/clean" && PATH="$TMP/fakemvn:$PATH" bash scripts/ci/pre-push-checks.sh --range HEAD~1..HEAD --skip-tree 2>&1); RC=$?
+check "workflow-pool/ betrifft auch das Frontend (node_modules fehlt: exit 2)" \
+  '[ "$RC" -eq 2 ] && grep -q "Frontend-Suite betroffen, aber .*node_modules fehlt" <<<"$OUT"'
+( cd "$TMP/clean" && mkdir -p ai-automation-frontend/src )
+commit_file "$TMP/clean" "ai-automation-frontend/src/Übersicht.ts" "export {}" "feat(ui): Übersicht" $NOREPLY
+OUT=$(cd "$TMP/clean" && PATH="$TMP/fakemvn:$PATH" bash scripts/ci/pre-push-checks.sh --range HEAD~1..HEAD --skip-tree 2>&1); RC=$?
+check "Nicht-ASCII-Pfad im Frontend: Frontend-Suite erkannt (nicht als gequoteter Pfad verloren)" \
+  '[ "$RC" -eq 2 ] && grep -q "frontend=true" <<<"$OUT" && grep -q "Frontend-Suite betroffen" <<<"$OUT"'
+( cd "$TMP/clean" && git reset -q --hard HEAD~4 )
 
 echo "15) gitleaks: fehlt -> hoerbar uebersprungen; vorhanden -> Fund blockiert"
 OUT=$(cd "$TMP/clean" && PATH="/usr/bin:/bin" /bin/bash -c 'command -v gitleaks >/dev/null && exit 99; bash scripts/ci/pre-push-checks.sh --range HEAD~1..HEAD --skip-tree --skip-build' 2>&1); RC=$?
@@ -203,6 +243,57 @@ OUT=$(cd "$TMP/clean" && printf 'w\n' > o.txt && $NOREPLY add o.txt && HYGIENE_P
 check "commit-msg-Hook: Commit entsteht"         '[ "$RC" -eq 0 ]'
 check "commit-msg-Hook: Warnung sichtbar" \
   'grep -q "dieser Commit: Nachricht enthaelt einen privaten Begriff, schwach (Zeile 2" <<<"$OUT"'
+( cd "$TMP/clean" && git reset -q --hard HEAD~1 )
+
+echo "19) Geaenderte Ausnahmedateien blockieren bis zur Freigabe fuer genau diesen Stand (TODO e8257473)"
+OUT=$(cd "$TMP/clean" && git ls-remote origin main | cut -c1-40); BEFORE_RULES="$OUT"
+check "Ausgangslage: Remote kennt main"          '[ -n "$BEFORE_RULES" ]'
+commit_file "$TMP/clean" .gitleaksignore "abc123:datei:generic-api-key:1" "chore: Fehlalarm freigeben" $NOREPLY
+TIP=$(cd "$TMP/clean" && git rev-parse HEAD); TIP_SHORT=$(cd "$TMP/clean" && git rev-parse --short HEAD)
+OUT=$(cd "$TMP/clean" && env $SKIP git push origin main 2>&1); RC=$?
+check ".gitleaksignore: push abgelehnt"          '[ "$RC" -ne 0 ] && grep -q "Pre-Push-Gate FAILED" <<<"$OUT"'
+check "nennt die Datei und den Schalter mit Hash" \
+  'grep -q "aendert Ausnahmedateien (.gitleaksignore) — nach Pruefung des Diffs freigeben: MYSURICATES_PREPUSH_ALLOW_RULES=${TIP_SHORT} git push" <<<"$OUT"'
+check "zeigt den Diff-Umfang"                    'grep -q "│ .*\.gitleaksignore" <<<"$OUT"'
+check "Schlusshinweis passt zur Befundart (Ausnahmedateien)" \
+  'grep -q "^Fix (Ausnahmedateien)" <<<"$OUT" && ! grep -q "^Fix (Nachricht" <<<"$OUT"'
+OUT=$(cd "$TMP/clean" && env MYSURICATES_PREPUSH_SKIP=tree,build,rules git push origin main 2>&1); RC=$?
+check "MYSURICATES_PREPUSH_SKIP=rules gibt nicht frei" '[ "$RC" -ne 0 ] && grep -q "deckt geaenderte Ausnahmedateien nicht ab" <<<"$OUT"'
+OUT=$(cd "$TMP/clean" && env $SKIP MYSURICATES_PREPUSH_ALLOW_RULES=1 git push origin main 2>&1); RC=$?
+check "Schalter ohne Hash (=1) gibt nicht frei"   '[ "$RC" -ne 0 ]'
+OUT=$(cd "$TMP/clean" && env $SKIP MYSURICATES_PREPUSH_ALLOW_RULES="$BEFORE_RULES" git push origin main 2>&1); RC=$?
+check "Hash eines anderen Stands gibt nicht frei" '[ "$RC" -ne 0 ]'
+OUT=$(cd "$TMP/clean" && MYSURICATES_PREPUSH_ALLOW_RULES="$(tr '[:lower:]' '[:upper:]' <<<"$TIP_SHORT")" \
+  bash scripts/ci/pre-push-checks.sh --range "${BEFORE_RULES}..HEAD" --skip-tree --skip-build 2>&1); RC=$?
+check "Freigabe-Hash in Grossbuchstaben gilt (exit 0)" '[ "$RC" -eq 0 ]'
+OUT=$(cd "$TMP/clean" && env $SKIP MYSURICATES_PREPUSH_ALLOW_RULES="deadbeef,${TIP_SHORT}" git push origin main 2>&1); RC=$?
+check "Hash dieses Stands gibt frei (exit 0)"    '[ "$RC" -eq 0 ]'
+check "Freigabe laut gemeldet"                   'grep -q "FREIGEGEBEN per MYSURICATES_PREPUSH_ALLOW_RULES fuer ${TIP_SHORT}" <<<"$OUT"'
+check "Freigabe zaehlt als Warnung"              'grep -q "Pre-Push-Gate OK — 1 Warnung(en)" <<<"$OUT"'
+for f in scripts/lib/hygiene-rules.sh scripts/ci/pre-push-checks.sh scripts/ci/changed-scopes.sh scripts/git-hooks/pre-push .gitleaks.toml; do
+  ( cd "$TMP/clean" && printf '\n# geaendert\n' >> "$f" && $NOREPLY add "$f" && $NOREPLY commit -q --no-verify -m "chore: Regel" )
+  OUT=$(cd "$TMP/clean" && bash scripts/ci/pre-push-checks.sh --range HEAD~1..HEAD --skip-tree --skip-build 2>&1); RC=$?
+  check "$f: als Ausnahmedatei erkannt (exit 1)" '[ "$RC" -eq 1 ] && grep -q "aendert Ausnahmedateien ($f)" <<<"$OUT"'
+  ( cd "$TMP/clean" && git reset -q --hard HEAD~1 )
+done
+commit_file "$TMP/clean" p.txt "x" "feat: gewoehnlich" $NOREPLY
+OUT=$(cd "$TMP/clean" && bash scripts/ci/pre-push-checks.sh --range HEAD~1..HEAD --skip-tree --skip-build 2>&1); RC=$?
+check "Gegenprobe: gewoehnliche Datei — unveraendert gemeldet" \
+  '[ "$RC" -eq 0 ] && grep -q "Ausnahmedateien: im Bereich HEAD~1..HEAD unveraendert" <<<"$OUT"'
+( cd "$TMP/clean" && git reset -q --hard HEAD~1 )
+# Scheitert git diff, ist das kein "unveraendert": exit 2, kein OK (Ersatz-git scheitert nur am
+# Aufruf des Gates mit --no-renames --name-only, alles andere reicht er an das echte git durch).
+mkdir -p "$TMP/failgit"
+printf '#!/usr/bin/env bash\nfor a in "$@"; do [ "$a" = "--no-renames" ] && nr=1; [ "$a" = "--name-only" ] && no=1; done\n[ -n "${nr:-}" ] && [ -n "${no:-}" ] && exit 128\nexec %s "$@"\n' "$(command -v git)" > "$TMP/failgit/git"
+chmod +x "$TMP/failgit/git"
+OUT=$(cd "$TMP/clean" && PATH="$TMP/failgit:$PATH" bash scripts/ci/pre-push-checks.sh --range HEAD~1..HEAD --skip-tree --skip-build 2>&1); RC=$?
+check "git diff scheitert: exit 2, nicht unveraendert" \
+  '[ "$RC" -eq 2 ] && grep -q "geaenderte Ausnahmedateien nicht bestimmbar" <<<"$OUT" && ! grep -q "unveraendert\|Pre-Push-Gate OK" <<<"$OUT"'
+( cd "$TMP/clean" && printf 'x\n' >> .gitleaksignore && $NOREPLY add .gitleaksignore && $NOREPLY commit -q --no-verify -m "chore: noch einer" )
+OUT=$(cd "$TMP/clean" && GITHUB_ACTIONS=true GITHUB_STEP_SUMMARY="$TMP/summary.md" bash scripts/ci/pre-push-checks.sh --range HEAD~1..HEAD --skip-tree --skip-build --rules-report-only 2>&1); RC=$?
+check "CI (--rules-report-only): blockiert nicht" '[ "$RC" -eq 0 ]'
+check "CI: Warnung als Annotation"               'grep -q "::warning::Bereich HEAD~1..HEAD aendert Ausnahmedateien (.gitleaksignore)" <<<"$OUT"'
+check "CI: Job-Summary nennt die Datei"          'grep -q "^- \`.gitleaksignore\`" "$TMP/summary.md"'
 ( cd "$TMP/clean" && git reset -q --hard HEAD~1 )
 
 echo

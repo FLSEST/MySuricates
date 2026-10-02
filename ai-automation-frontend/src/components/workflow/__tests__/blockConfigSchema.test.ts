@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { AI_BLOCK_TYPES, BLOCK_TYPES } from '../../../types';
 import {
@@ -39,11 +41,34 @@ function jsonFiles(dir: string): string[] {
   });
 }
 
+/**
+ * The shipped JSON files under dir: what git tracks there (TODO ca858a23). A maintainer keeps
+ * private pool files beside them, ignored via .git/info/exclude — read by a glob, they made this
+ * guard red on that checkout and green in a fresh worktree. Without git (a source archive) every
+ * JSON file counts, and so it does when git lists none there — an empty list would pass silently.
+ */
+function shippedJsonFiles(dir: string, root = REPO): string[] {
+  let listed: string;
+  try {
+    listed = execFileSync('git', ['ls-files', '-z', '--', dir], {
+      cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'],
+    });
+  } catch {
+    return jsonFiles(join(root, dir));
+  }
+  const tracked = listed.split('\0')
+    .filter((rel) => rel.endsWith('.json'))
+    .map((rel) => join(root, rel))
+    .filter((path) => existsSync(path))
+    .sort();
+  return tracked.length > 0 ? tracked : jsonFiles(join(root, dir));
+}
+
 /** Every top-level block of the shipped definitions, with its origin for readable failures. */
 function shippedBlocks(): Array<{ where: string; block: Block }> {
   const found: Array<{ where: string; block: Block }> = [];
   for (const dir of DEFINITION_DIRS) {
-    for (const file of jsonFiles(join(REPO, dir))) {
+    for (const file of shippedJsonFiles(dir)) {
       let parsed: unknown;
       try { parsed = JSON.parse(readFileSync(file, 'utf8')); } catch { continue; }
       const blocks = (parsed as { blocks?: unknown })?.blocks;
@@ -140,6 +165,26 @@ describe('blockConfigSchema', () => {
   });
 
   // Drift guard: the editor must not flag keys or values the shipped definitions really use
+  it('reads only tracked definition files, and all of them when git tracks none there', () => {
+    const root = mkdtempSync(join(tmpdir(), 'pool-'));
+    try {
+      const git = (...args: string[]) => execFileSync('git', args, { cwd: root, stdio: 'ignore' });
+      git('init', '-q');
+      mkdirSync(join(root, 'workflow-pool'));
+      // Nothing tracked yet: falling back to every JSON file, an empty list would pass silently.
+      writeFileSync(join(root, 'workflow-pool', 'private.json'), '{}');
+      expect(shippedJsonFiles('workflow-pool', root).map((f) => f.slice(root.length + 1)))
+        .toEqual(['workflow-pool/private.json']);
+      writeFileSync(join(root, 'workflow-pool', 'shipped.json'), '{}');
+      writeFileSync(join(root, '.git', 'info', 'exclude'), 'workflow-pool/private.json\n');
+      git('add', 'workflow-pool/shipped.json');
+      expect(shippedJsonFiles('workflow-pool', root).map((f) => f.slice(root.length + 1)))
+        .toEqual(['workflow-pool/shipped.json']);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('knows every config key and fixed value the shipped templates, blueprints and pool use', () => {
     const blocks = shippedBlocks();
     expect(blocks.length).toBeGreaterThan(50);

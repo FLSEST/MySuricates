@@ -64,9 +64,11 @@ jobs:
         run: bash scripts/tests/test-public-hygiene.sh
       # Dieselbe Pruefung wie der pre-push-Hook, hier auf die Commits dieses Push-Ereignisses:
       # faengt, was an einem Klon ohne installierte Hooks vorbeikam (Autor-Adresse, Nachricht,
-      # neu hinzugekommene Inhalte). Beim ersten Push eines Refs (auch eines Tags) ist `before`
-      # die Null-Referenz, nach einem Force-Push liegt er nicht im Checkout — beides wird hoerbar
-      # uebersprungen.
+      # neu hinzugekommene Inhalte). Geaenderte Ausnahmedateien (.gitleaksignore, Hygiene-Regeln,
+      # Gate, Hooks, diese Datei) blockieren hier nicht — es gibt keinen Menschen, der freigibt —,
+      # sondern erscheinen als Warnung und in der Job-Summary (--rules-report-only).
+      # Beim ersten Push eines Refs (auch eines Tags) ist `before` die Null-Referenz, nach einem
+      # Force-Push liegt er nicht im Checkout — beides wird hoerbar uebersprungen.
       - name: Pre-Push-Gate auf die Commits dieses Pushes
         if: github.event_name == 'push'
         env:
@@ -75,7 +77,7 @@ jobs:
           if [ "$BEFORE" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
             echo "Kein Bereich (neuer Branch oder Force-Push) — Commit-Pruefung uebersprungen"
           else
-            bash scripts/ci/pre-push-checks.sh --range "${BEFORE}..${GITHUB_SHA}" --skip-tree --skip-build
+            bash scripts/ci/pre-push-checks.sh --range "${BEFORE}..${GITHUB_SHA}" --skip-tree --skip-build --rules-report-only
           fi
       # Dasselbe fuer einen Pull Request, damit auch fremde PRs die Commit-Pruefung bekommen.
       # Geprueft wird der PR-Kopf, nicht der Merge-Commit, den GitHub fuer den Checkout baut —
@@ -94,7 +96,7 @@ jobs:
              || ! MERGE_BASE="$(git merge-base "$PR_BASE" "$PR_HEAD")"; then
             echo "Kein Bereich (Basis oder Kopf des PRs nicht im Checkout) — Commit-Pruefung uebersprungen"
           else
-            bash scripts/ci/pre-push-checks.sh --range "${MERGE_BASE}..${PR_HEAD}" --skip-tree --skip-build
+            bash scripts/ci/pre-push-checks.sh --range "${MERGE_BASE}..${PR_HEAD}" --skip-tree --skip-build --rules-report-only
           fi
       - name: Pre-Push-Gate Selbsttest (Hooks, Nachrichten, Autor-Adresse, Scope)
         run: bash scripts/tests/test-pre-push-checks.sh

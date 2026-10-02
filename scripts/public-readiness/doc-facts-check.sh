@@ -78,6 +78,13 @@ fact_controllers() {
   [ -d "$JAVA_SRC" ] || { MISSING+=("controllers: $JAVA_SRC fehlt"); echo 0; return; }
   find "$JAVA_SRC" -name '*Controller.java' | wc -l | tr -d ' '
 }
+# Die Namen selbst (ohne "Controller"), fuer die Aufzaehlung "**Controller:** A, B, …" in
+# docs/entwicklung.md: Die Zahl stimmte, die Liste darunter war zweimal abgedriftet (TODO 65eab274).
+fact_controller_names() {
+  [ -d "$JAVA_SRC" ] || { echo "[]"; return; }
+  find "$JAVA_SRC" -name '*Controller.java' -printf '%f\n' | sed 's/Controller\.java$//' | sort -u \
+    | sed 's/.*/"&"/' | paste -sd',' - | sed 's/^/[/; s/$/]/'
+}
 fact_migration_max() {
   [ -d "$MIGRATIONS" ] || { MISSING+=("migration-max: $MIGRATIONS fehlt"); echo 0; return; }
   find "$MIGRATIONS" -maxdepth 1 -name 'V*.sql' -printf '%f\n' 2>/dev/null \
@@ -130,6 +137,7 @@ fact_commits() {
 BLOCK_TYPES="$(fact_block_types)"
 BLOCK_TYPE_NAMES="$(fact_block_type_names)"
 CONTROLLERS="$(fact_controllers)"
+CONTROLLER_NAMES="$(fact_controller_names)"
 MIGRATION_MAX="$(fact_migration_max)"
 MIGRATION_COUNT="$(fact_migrations)"
 MIGRATION_NUMBERS="$(fact_migration_numbers)"
@@ -272,13 +280,13 @@ if [ ${#FILES[@]} -eq 0 ]; then
 fi
 
 DOC_FACTS_ROOT="$ROOT" \
-DOC_FACTS="$(printf '{"block-types":%s,"block-type-names":%s,"controllers":%s,"migration-max":%s,"migrations":%s,"migration-numbers":%s,"templates":%s,"skills":%s,"integration-providers":%s%s%s,"versions":{%s},"absent-files":[%s]}' \
-  "$BLOCK_TYPES" "$BLOCK_TYPE_NAMES" "$CONTROLLERS" "$MIGRATION_MAX" "$MIGRATION_COUNT" "$MIGRATION_NUMBERS" \
+DOC_FACTS="$(printf '{"block-types":%s,"block-type-names":%s,"controllers":%s,"controller-names":%s,"migration-max":%s,"migrations":%s,"migration-numbers":%s,"templates":%s,"skills":%s,"integration-providers":%s%s%s,"versions":{%s},"absent-files":[%s]}' \
+  "$BLOCK_TYPES" "$BLOCK_TYPE_NAMES" "$CONTROLLERS" "$CONTROLLER_NAMES" "$MIGRATION_MAX" "$MIGRATION_COUNT" "$MIGRATION_NUMBERS" \
   "$TEMPLATES" "$SKILLS" "$PROVIDERS" "$COMMITS_JSON" "$COMMITS_AT_JSON" "$VERSIONS_JSON" "$ABSENT_JSON")" \
   python3 "$PY" "${FILES[@]}"
 RC=$?
 
 if [ "$RC" -eq 0 ]; then
-  echo "Doku-Zahlen OK — ${#FILES[@]} Dateien, 7 Groessen (Blocktypen $BLOCK_TYPES, Controller $CONTROLLERS, Migrationen $MIGRATION_COUNT/V$MIGRATION_MAX, Templates $TEMPLATES, Skills $SKILLS, Provider $PROVIDERS)${COMMITS_NOTE}, Migrationstabellen, Blocktyp-Aufzaehlungen, Testzahl-Datierung, Zahlen ueber die ausgelieferten Definitionen und --noproxy an API-Key-curls."
+  echo "Doku-Zahlen OK — ${#FILES[@]} Dateien, 7 Groessen (Blocktypen $BLOCK_TYPES, Controller $CONTROLLERS, Migrationen $MIGRATION_COUNT/V$MIGRATION_MAX, Templates $TEMPLATES, Skills $SKILLS, Provider $PROVIDERS)${COMMITS_NOTE}, Migrationstabellen, Blocktyp- und Controller-Aufzaehlungen, Testzahl-Datierung, Zahlen ueber die ausgelieferten Definitionen und --noproxy an API-Key-curls."
 fi
 exit "$RC"

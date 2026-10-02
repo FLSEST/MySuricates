@@ -5,13 +5,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
-import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -130,26 +128,15 @@ class AuditWorkflowContractGateTest {
     }
 
     private static List<Path> auditDefinitions() throws IOException {
-        Path pool = firstExisting(Paths.get("../workflow-pool"), Paths.get("workflow-pool"));
+        Path pool = ShippedDefinitions.poolDirectoryOrNull();
         assertThat(pool).as("workflow-pool nicht gefunden ab " + Paths.get("").toAbsolutePath()).isNotNull();
         List<Path> files = new ArrayList<>();
-        try (Stream<Path> stream = Files.list(pool)) {
-            for (Path candidate : stream.filter(p -> p.toString().endsWith(".json")).sorted().toList()) {
-                if (MAPPER.readTree(candidate.toFile()).path("metadata").path("audit").path("enabled").asBoolean(false)) {
-                    files.add(candidate);
-                }
+        for (Path candidate : ShippedDefinitions.poolFiles(pool)) {
+            if (MAPPER.readTree(candidate.toFile()).path("metadata").path("audit").path("enabled").asBoolean(false)) {
+                files.add(candidate);
             }
         }
         assertThat(files).as("keine Audit-Definitionen im Pool gefunden").isNotEmpty();
         return files;
-    }
-
-    private static Path firstExisting(Path... candidates) {
-        for (Path candidate : candidates) {
-            if (Files.isDirectory(candidate)) {
-                return candidate;
-            }
-        }
-        return null;
     }
 }
