@@ -69,15 +69,31 @@ Uebersetzung den Seitenaufbau oder das Geruest eines Diagramms veraendert. So ka
 deutsche Seite nicht still weiterlaufen, ohne dass die englische nachzieht. Die
 englischen Dateien einer Seite werden nur aus einer stimmigen Tabelle geschrieben.
 
+GitHub Pages (--site DIR, TODO ee5a4a04)
+----------------------------------------
+Schreibt die Seiten fuer GitHub Pages in ein leeres oder neues Verzeichnis, gebaut aus
+der Markdown-Quelle (nicht aus den HTML-Dateien im Repo) — docs/ bleibt unberuehrt:
+
+    DIR/index.html                  Verzeichnis deutsch (dieselbe Tabelle wie diagramme.md)
+    DIR/de/<name>-diagrams.html     deutsche Seiten
+    DIR/en/index.html               Verzeichnis englisch
+    DIR/en/<name>-diagrams.html     englische Seiten
+
+Jede Seite bekommt in der Navigation einen Link zum Verzeichnis und zur anderen Sprache.
+Ist eine Uebersetzung offen, entsteht nichts (Exit 1): Pages zeigt entweder beide Sprachen
+vollstaendig oder bleibt beim letzten Stand. Benutzt von .github/workflows/pages.yml.
+
 Aufruf
 ------
     python3 scripts/docs-diagrams.py                # HTML, englische Seiten, Verzeichnisse
     python3 scripts/docs-diagrams.py --check        # nur pruefen, nichts schreiben
     python3 scripts/docs-diagrams.py --add-missing  # fehlende Schluessel leer eintragen
+    python3 scripts/docs-diagrams.py --site DIR     # Seiten fuer GitHub Pages nach DIR
     python3 scripts/docs-diagrams.py --root DIR     # andere Repo-Wurzel
 
 Exit: 0 = alles deckungsgleich, 1 = Drift (--check) oder offene Uebersetzung,
-      2 = Quelle fehlt/kaputt, Tabelle kaputt oder Mermaid-Syntax ohne Regel
+      2 = Quelle fehlt/kaputt, Tabelle kaputt, Mermaid-Syntax ohne Regel oder
+          --site-Verzeichnis nicht leer
 """
 import json
 import os
@@ -142,6 +158,25 @@ INDEX_TEXT = {
         ),
     },
 }
+
+# Texte der Pages-Fassung (--site) je Sprache; Tabellenkopf und Summe kommen aus INDEX_TEXT.
+SITE_TEXT = {
+    "de": {
+        "intro": ("Ablauf- und Architekturdiagramme, bei jedem Deploy frisch erzeugt aus den"
+                  " Markdown-Quellen im Repository (`docs/*-diagrams.md`)."),
+        "section": "Seiten",
+        "overview": "Übersicht",
+        "other": "English",
+    },
+    "en": {
+        "intro": ("Flow and architecture diagrams, generated afresh on every deploy from the"
+                  " Markdown sources in the repository (`docs/*-diagrams.md`)."),
+        "section": "Pages",
+        "overview": "Overview",
+        "other": "Deutsch",
+    },
+}
+SITE_NOTE = "Erzeugt von scripts/docs-diagrams.py --site aus docs/*-diagrams.md — nicht von Hand bearbeiten."
 
 # ---------------------------------------------------------------------------
 # HTML-Huelle
@@ -1007,7 +1042,7 @@ def plan(root):
             if name.endswith(TABLE_SUFFIX) and name[:-len(TABLE_SUFFIX)] not in stems:
                 problems.append(f"VERWAIST {DOCS_DIRNAME}/{I18N_DIRNAME}/{name} — keine deutsche Seite"
                                 f" {DOCS_DIRNAME}/{name[:-len(TABLE_SUFFIX)]}{SOURCE_SUFFIX}")
-    return files, stale_outputs(docs_dir, en_dir, stems), problems
+    return files, stale_outputs(docs_dir, en_dir, stems), problems, entries, english_entries
 
 
 def run(root, check):
@@ -1016,7 +1051,7 @@ def run(root, check):
         print(f"docs-diagrams: {docs_dir} fehlt", file=sys.stderr)
         return 2
     try:
-        files, stale, problems = plan(root)
+        files, stale, problems, _, _ = plan(root)
     except DocError as exc:
         print(f"docs-diagrams: {exc}", file=sys.stderr)
         return 2
@@ -1104,8 +1139,82 @@ def add_missing(root):
     return 0
 
 
+def site_page(html, links):
+    """Pages-Fassung einer Seite: Verzeichnis und andere Sprache vorn in die Navigation.
+
+    Nur fuer --site; die HTML-Dateien im Repo bleiben, wie sie sind.
+    """
+    extra = "".join(f'  <a href="{href}">{esc(label)}</a>\n' for href, label in links)
+    if html.count("<nav>\n") != 1:                          # pragma: no cover
+        raise DocError("Vorlage ohne eindeutiges <nav>")
+    return html.replace("<nav>\n", "<nav>\n" + extra, 1)
+
+
+def render_site_index(entries, lang, page_dir, other_index):
+    """Verzeichnis als HTML-Seite, aus denselben Eintraegen wie diagramme.md."""
+    text, site_text = INDEX_TEXT[lang], SITE_TEXT[lang]
+    prefix = shared_prefix([doc["title"] for _, doc, _ in entries])
+    rows = [split_row(text["head"])]
+    for stem, doc, count in entries:
+        title = doc["title"][len(prefix):] if prefix else doc["title"]
+        rows.append([f"[{title}]({page_dir}{stem}{TARGET_SUFFIX})", doc["subtitle"], str(count)])
+    total = sum(count for _, _, count in entries)
+    doc = {"title": f"{prefix}{text['title']}",
+           "subtitle": f"{site_text['intro']} · [{site_text['other']}]({other_index})",
+           "sections": [{"heading": site_text["section"], "badge": "", "id": "pages",
+                         "blocks": [("table", (rows, None)),
+                                    ("paragraph", text["total"].format(total=total, pages=len(entries)))],
+                         "subs": []}]}
+    return render_html(doc, SITE_NOTE, lang)
+
+
+def site(root, out_dir):
+    """Seiten fuer GitHub Pages nach out_dir — nur aus einer stimmigen Quelle (siehe Kopf)."""
+    docs_dir = os.path.join(root, DOCS_DIRNAME)
+    if not os.path.isdir(docs_dir):
+        print(f"docs-diagrams: {docs_dir} fehlt", file=sys.stderr)
+        return 2
+    if os.path.exists(out_dir) and (not os.path.isdir(out_dir) or os.listdir(out_dir)):
+        print(f"docs-diagrams: --site braucht ein leeres oder neues Verzeichnis: {out_dir}",
+              file=sys.stderr)
+        return 2
+    try:
+        files, _, problems, entries, english_entries = plan(root)
+    except DocError as exc:
+        print(f"docs-diagrams: {exc}", file=sys.stderr)
+        return 2
+    if problems:
+        for line in problems:
+            print(line)
+        sys.stdout.flush()
+        print(f"docs-diagrams: {len(problems)} Uebersetzungsbefund(e) — keine Pages-Seiten erzeugt.",
+              file=sys.stderr)
+        return 1
+
+    en_dir = os.path.join(docs_dir, EN_DIRNAME)
+    other = {"de": "en", "en": "de"}
+    site_files = {
+        "index.html": render_site_index(entries, "de", "de/", "en/index.html"),
+        "en/index.html": render_site_index(english_entries, "en", "", "../index.html"),
+    }
+    for stem, _, _ in entries:
+        name = stem + TARGET_SUFFIX
+        for lang, source_dir, overview in (("de", docs_dir, "../index.html"), ("en", en_dir, "index.html")):
+            site_files[f"{lang}/{name}"] = site_page(
+                files[os.path.join(source_dir, name)],
+                [(overview, f"← {SITE_TEXT[lang]['overview']}"),
+                 (f"../{other[lang]}/{name}", SITE_TEXT[lang]["other"])])
+    for rel, content in sorted(site_files.items()):
+        path = os.path.join(out_dir, rel)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(content)
+    print(f"Pages-Seiten erzeugt — {len(site_files)} Dateien unter {out_dir}.")
+    return 0
+
+
 def main(argv):
-    root, check, stubs = None, False, False
+    root, check, stubs, site_dir = None, False, False, None
     args = list(argv)
     while args:
         arg = args.pop(0)
@@ -1113,6 +1222,11 @@ def main(argv):
             check = True
         elif arg == "--add-missing":
             stubs = True
+        elif arg == "--site":
+            if not args:
+                print("docs-diagrams: --site braucht ein Verzeichnis", file=sys.stderr)
+                return 2
+            site_dir = args.pop(0)
         elif arg == "--root":
             if not args:
                 print("docs-diagrams: --root braucht ein Verzeichnis", file=sys.stderr)
@@ -1124,12 +1238,14 @@ def main(argv):
         else:
             print(f"docs-diagrams: unbekanntes Argument {arg!r}", file=sys.stderr)
             return 2
-    if check and stubs:
-        print("docs-diagrams: --check und --add-missing schliessen sich aus", file=sys.stderr)
+    if check + stubs + (site_dir is not None) > 1:
+        print("docs-diagrams: --check, --add-missing und --site schliessen sich aus", file=sys.stderr)
         return 2
     if root is None:
         root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     root = os.path.abspath(root)
+    if site_dir is not None:
+        return site(root, os.path.abspath(site_dir))
     if not stubs:
         return run(root, check)
     if not os.path.isdir(os.path.join(root, DOCS_DIRNAME)):

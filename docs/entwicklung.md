@@ -1127,6 +1127,7 @@ und wird erzeugt, ebenso das Verzeichnis [docs/diagramme.md](diagramme.md):
 python3 scripts/docs-diagrams.py                # HTML, englische Seiten und Verzeichnisse neu erzeugen
 python3 scripts/docs-diagrams.py --check        # meldet Drift und Übersetzungslücken, Exit-Code 1
 python3 scripts/docs-diagrams.py --add-missing  # fehlende Übersetzungsschlüssel leer eintragen
+python3 scripts/docs-diagrams.py --site _site   # Seiten für GitHub Pages in ein leeres Verzeichnis
 python3 -m unittest discover -s scripts/tests -p 'test_docs_diagrams.py'
 ```
 
@@ -1161,6 +1162,16 @@ Schlüssel mit leerem Wert in Lesereihenfolge ein; verwaiste bleiben stehen, bis
 oft ist ihr Wert, leicht angepasst, die Übersetzung des neuen Schlüssels. Unbekannte Mermaid-Syntax
 (ein neuer Diagrammtyp, eine Zeile ohne Regel) bricht mit Exit-Code 2 ab, statt deutschen Text still
 durchzulassen.
+
+**GitHub Pages.** `.github/workflows/pages.yml` veröffentlicht die Seiten bei jedem Push auf `main`, der
+eine Diagramm-Quelle, eine Übersetzungstabelle oder das Skript ändert (und von Hand per
+`workflow_dispatch`): erst `--check`, dann `--site _site`, dann `actions/upload-pages-artifact` und
+`actions/deploy-pages`. `--site` baut aus der Markdown-Quelle, nicht aus den HTML-Dateien im Repo, und
+schreibt `index.html` (Verzeichnis aus derselben Tabelle wie `diagramme.md`), `de/<name>-diagrams.html`,
+`en/index.html` und `en/<name>-diagrams.html`; jede Seite verlinkt Verzeichnis und andere Sprache. Ist
+eine Übersetzung offen, entsteht nichts (Exit-Code 1). Einmalig in den Repo-Einstellungen nötig:
+Settings → Pages → Source **GitHub Actions** — nicht „Deploy from branch“, das würde ganz `docs/` samt
+`plans/` veröffentlichen.
 
 ## Abhängigkeits-Meldungen (Frontend)
 

@@ -1106,6 +1106,7 @@ GitHub Pages and is generated, as is the index [docs/en/diagramme.md](diagramme.
 python3 scripts/docs-diagrams.py                # regenerate HTML, English pages and indexes
 python3 scripts/docs-diagrams.py --check        # reports drift and translation gaps, exit code 1
 python3 scripts/docs-diagrams.py --add-missing  # add missing translation keys with empty values
+python3 scripts/docs-diagrams.py --site _site   # pages for GitHub Pages into an empty directory
 python3 -m unittest discover -s scripts/tests -p 'test_docs_diagrams.py'
 ```
 
@@ -1139,6 +1140,16 @@ therefore updates the table in the same commit: `--add-missing` adds new keys wi
 reading order; orphaned keys stay until someone deletes them — often their value, slightly adjusted,
 is the translation of the new key. Unknown Mermaid syntax (a new diagram type, a line without a rule)
 aborts with exit code 2 instead of letting German text through silently.
+
+**GitHub Pages.** `.github/workflows/pages.yml` publishes the pages on every push to `main` that changes
+a diagram source, a translation table or the script (and by hand via `workflow_dispatch`): first
+`--check`, then `--site _site`, then `actions/upload-pages-artifact` and `actions/deploy-pages`. `--site`
+builds from the Markdown source, not from the HTML files in the repository, and writes `index.html`
+(index from the same table as `diagramme.md`), `de/<name>-diagrams.html`, `en/index.html` and
+`en/<name>-diagrams.html`; every page links the index and the other language. If a translation is
+open, nothing is written (exit code 1). Needed once in the repository settings: Settings → Pages →
+Source **GitHub Actions** — not "Deploy from branch", which would publish all of `docs/` including
+`plans/`.
 
 ## Dependency advisories (frontend)
 
