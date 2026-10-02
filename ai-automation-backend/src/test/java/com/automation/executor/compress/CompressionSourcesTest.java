@@ -30,14 +30,14 @@ class CompressionSourcesTest {
     void missingOrNonTextSource_fails() {
         for (Object raw : new Object[]{null, "  ", 42}) {
             assertThatThrownBy(() -> CompressionSources.resolve(ctx, raw))
-                    .isInstanceOf(CompressionException.class).hasMessageContaining("'source' fehlt");
+                    .isInstanceOf(CompressionException.class).hasMessageContaining("'source' is missing");
         }
     }
 
     @Test
     void previous_withoutAnyStep_fails() {
         assertThatThrownBy(() -> CompressionSources.resolve(ctx, "previous"))
-                .isInstanceOf(CompressionException.class).hasMessageContaining("noch kein Schritt");
+                .isInstanceOf(CompressionException.class).hasMessageContaining("no step has run");
     }
 
     @Test
@@ -60,7 +60,7 @@ class CompressionSourcesTest {
 
         CompressionSources.Resolved r = CompressionSources.resolve(ctx, "previous");
 
-        assertThat(r.label()).isEqualTo("Schritt 4");
+        assertThat(r.label()).isEqualTo("step 4");
         assertThat(r.text()).isEmpty();
     }
 
@@ -81,12 +81,12 @@ class CompressionSourcesTest {
     @Test
     void namedSource_notYetRun_or_ambiguous_fails() {
         assertThatThrownBy(() -> CompressionSources.resolve(ctx, "spaeter"))
-                .isInstanceOf(CompressionException.class).hasMessageContaining("'spaeter' ist in diesem Run noch nicht gelaufen");
+                .isInstanceOf(CompressionException.class).hasMessageContaining("'spaeter' has not run in this run yet");
 
         ctx.getSourceSteps().record("dup", step(0, StepStatus.COMPLETED, Map.of()));
         ctx.getSourceSteps().record("dup", step(1, StepStatus.COMPLETED, Map.of()));
         assertThatThrownBy(() -> CompressionSources.resolve(ctx, "dup"))
-                .isInstanceOf(CompressionException.class).hasMessageContaining("mehrdeutig");
+                .isInstanceOf(CompressionException.class).hasMessageContaining("ambiguous");
     }
 
     @Test
@@ -94,11 +94,11 @@ class CompressionSourcesTest {
         Map<String, Object> md = Map.of("derivedOutput", true, "compression",
                 Map.of("source", Map.of("block", "tests", "stepIndex", 1, "status", "FAILED", "exitCode", 2)));
         ctx.getSourceSteps().record("kurz", step(2, StepStatus.COMPLETED, md));
-        ctx.setBlockOutput("kurz", "## tests — FAILED\nStufen: x\n\nKERN");
+        ctx.setBlockOutput("kurz", "## tests — FAILED\nStages: x\n\nKERN");
 
         CompressionSources.Resolved r = CompressionSources.resolve(ctx, "kurz");
 
-        assertThat(r.label()).isEqualTo("tests (über kurz)");
+        assertThat(r.label()).isEqualTo("tests (via kurz)");
         assertThat(r.text()).isEqualTo("KERN");
         assertThat(r.origin().blockName()).isEqualTo("tests");
         assertThat(r.origin().status()).isEqualTo(StepStatus.FAILED);

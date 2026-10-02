@@ -16,7 +16,7 @@ class StageConfigTest {
 
     @Test
     void where_namesTheStage() {
-        assertThat(W).isEqualTo("Stufe x.y");
+        assertThat(W).isEqualTo("Stage x.y");
     }
 
     @Test
@@ -24,7 +24,7 @@ class StageConfigTest {
         assertThat(StageConfig.intValue(null, "n", 7, 0, 10, W)).isEqualTo(7);
         assertThat(StageConfig.intValue(Map.of(), "n", 7, 0, 10, W)).isEqualTo(7);
         assertThatThrownBy(() -> StageConfig.intValue(Map.of(), "n", null, 0, 10, W))
-                .isInstanceOf(CompressionException.class).hasMessage("Stufe x.y: 'n' fehlt");
+                .isInstanceOf(CompressionException.class).hasMessage("Stage x.y: 'n' is missing");
     }
 
     @Test
@@ -40,19 +40,19 @@ class StageConfigTest {
             assertThatThrownBy(() -> StageConfig.intValue(Map.of("n", bad), "n", null, 0, 10, W))
                     .as(String.valueOf(bad))
                     .isInstanceOf(CompressionException.class)
-                    .hasMessage("Stufe x.y: 'n' muss eine ganze Zahl zwischen 0 und 10 sein");
+                    .hasMessage("Stage x.y: 'n' must be a whole number between 0 and 10");
         }
         assertThatThrownBy(() -> StageConfig.intValue(Map.of("n", 0), "n", null, 1, 1_000_000, W))
-                .hasMessageContaining("zwischen 1 und 1.000.000");
+                .hasMessageContaining("between 1 and 1,000,000");
     }
 
     @Test
     void string_fallbackMissingAndWrongType() {
         assertThat(StageConfig.string(null, "s", "def", W)).isEqualTo("def");
         assertThat(StageConfig.string(Map.of("s", ""), "s", "def", W)).as("leerer Text ist ein Wert").isEmpty();
-        assertThatThrownBy(() -> StageConfig.string(Map.of(), "s", null, W)).hasMessage("Stufe x.y: 's' fehlt");
+        assertThatThrownBy(() -> StageConfig.string(Map.of(), "s", null, W)).hasMessage("Stage x.y: 's' is missing");
         assertThatThrownBy(() -> StageConfig.string(Map.of("s", 1), "s", "def", W))
-                .isInstanceOf(CompressionException.class).hasMessage("Stufe x.y: 's' muss Text sein");
+                .isInstanceOf(CompressionException.class).hasMessage("Stage x.y: 's' must be text");
     }
 
     @Test
@@ -66,7 +66,7 @@ class StageConfigTest {
         assertThat(out).containsExactly("a", "b");
         assertThat(StageConfig.strings(null, "l", W)).isEmpty();
         assertThatThrownBy(() -> StageConfig.strings(Map.of("l", Arrays.asList("a", 1)), "l", W))
-                .hasMessage("Stufe x.y: 'l' muss eine Liste von Texten sein");
+                .hasMessage("Stage x.y: 'l' must be a list of texts");
         assertThatThrownBy(() -> StageConfig.strings(Map.of("l", "a"), "l", W)).isInstanceOf(CompressionException.class);
     }
 

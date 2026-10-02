@@ -29,54 +29,54 @@ class RegexGuardTest {
     @Test
     void catastrophicPattern_hitsDeadline() {
         RegexGuard guard = RegexGuard.startingNow(Duration.ofMillis(200));
-        Pattern evil = RegexGuard.compile("^(a+)+$", 0, "Stufe test");
+        Pattern evil = RegexGuard.compile("^(a+)+$", 0, "Stage test");
         String line = "a".repeat(9000) + "!";
         assertThat(line.length()).isLessThanOrEqualTo(RegexGuard.MAX_MATCH_CHARS);
 
         assertThatThrownBy(() -> guard.find(evil, line))
-                .isInstanceOf(CompressionException.class).hasMessageContaining("Zeitlimit");
+                .isInstanceOf(CompressionException.class).hasMessageContaining("Time limit");
     }
 
     @Test
     void nestedQuantifier_onShortLine_hitsDeadline() {
         RegexGuard guard = RegexGuard.startingNow(Duration.ofMillis(300));
-        Pattern evil = RegexGuard.compile("^((a+)+)+$", 0, "Stufe test");
+        Pattern evil = RegexGuard.compile("^((a+)+)+$", 0, "Stage test");
         String line = "a".repeat(40) + "!";
 
         assertTimeoutPreemptively(Duration.ofSeconds(10), () -> assertThatThrownBy(() -> guard.find(evil, line))
-                .isInstanceOf(CompressionException.class).hasMessageContaining("Zeitlimit"));
+                .isInstanceOf(CompressionException.class).hasMessageContaining("Time limit"));
     }
 
     @Test
     void nestedQuantifier_backtrackingNearLineEnd_hitsDeadline() {
         RegexGuard guard = RegexGuard.startingNow(Duration.ofMillis(300));
-        Pattern evil = RegexGuard.compile("^((\\w+)+)+:", 0, "Stufe test");
+        Pattern evil = RegexGuard.compile("^((\\w+)+)+:", 0, "Stage test");
         String line = "w".repeat(90);
 
         assertTimeoutPreemptively(Duration.ofSeconds(10), () -> assertThatThrownBy(() -> guard.find(evil, line))
-                .isInstanceOf(CompressionException.class).hasMessageContaining("Zeitlimit"));
+                .isInstanceOf(CompressionException.class).hasMessageContaining("Time limit"));
     }
 
     @Test
     void matches_usesTheSameDeadline() {
         RegexGuard guard = RegexGuard.startingNow(Duration.ofMillis(300));
-        Pattern evil = RegexGuard.compile("((a+)+)+", 0, "Stufe test");
+        Pattern evil = RegexGuard.compile("((a+)+)+", 0, "Stage test");
 
         assertThat(guard.matches(Pattern.compile("a+"), "aaa")).isTrue();
         assertTimeoutPreemptively(Duration.ofSeconds(10), () -> assertThatThrownBy(() -> guard.matches(evil, "a".repeat(40) + "!"))
-                .isInstanceOf(CompressionException.class).hasMessageContaining("Zeitlimit"));
+                .isInstanceOf(CompressionException.class).hasMessageContaining("Time limit"));
     }
 
     @Test
     void manyShortLines_stopAtTheDeadline_notOnlyBetweenStages() {
         Duration budget = Duration.ofMillis(200);
         RegexGuard guard = RegexGuard.startingNow(budget);
-        Pattern harmless = RegexGuard.compile("^\\w+: \\d+$", 0, "Stufe test");
+        Pattern harmless = RegexGuard.compile("^\\w+: \\d+$", 0, "Stage test");
         long start = System.nanoTime();
 
         assertThatThrownBy(() -> {
             for (int i = 0; i < 5_000_000; i++) guard.find(harmless, "warn: 12345");
-        }).isInstanceOf(CompressionException.class).hasMessageContaining("Zeitlimit");
+        }).isInstanceOf(CompressionException.class).hasMessageContaining("Time limit");
 
         assertThat(Duration.ofNanos(System.nanoTime() - start)).isLessThan(budget.multipliedBy(2));
     }
@@ -88,7 +88,7 @@ class RegexGuardTest {
     @Test
     void stackOverflow_becomesCompressionException() throws InterruptedException {
         RegexGuard guard = RegexGuard.startingNow(Duration.ofSeconds(30));
-        Pattern deep = RegexGuard.compile("^(a|b)*$", 0, "Stufe test");
+        Pattern deep = RegexGuard.compile("^(a|b)*$", 0, "Stage test");
         AtomicReference<Throwable> thrown = new AtomicReference<>();
 
         Thread smallStack = new Thread(null, () -> {
@@ -104,7 +104,7 @@ class RegexGuardTest {
         assertThat(smallStack.isAlive()).as("Matching ist beendet").isFalse();
         assertThat(thrown.get())
                 .isInstanceOf(CompressionException.class)
-                .hasMessage("Muster zu tief verschachtelt für Zeile mit 10.000 Zeichen");
+                .hasMessage("Pattern nested too deeply for a line of 10,000 chars");
     }
 
     @Test
@@ -121,12 +121,12 @@ class RegexGuardTest {
     /** validate() and apply() ask for the same pattern — it must be compiled once, not twice. */
     @Test
     void compile_reusesTheCompiledPattern() {
-        Pattern first = RegexGuard.compile("^ab+c$", 0, "Stufe test");
+        Pattern first = RegexGuard.compile("^ab+c$", 0, "Stage test");
 
-        assertThat(RegexGuard.compile("^ab+c$", 0, "Stufe test")).isSameAs(first);
-        assertThat(RegexGuard.compile("^ab+c$", Pattern.CASE_INSENSITIVE, "Stufe test")).isNotSameAs(first);
-        assertThatThrownBy(() -> RegexGuard.compile("(unvollständig", 0, "Stufe test"))
-                .isInstanceOf(CompressionException.class).hasMessageContaining("ungültiger regulärer Ausdruck");
+        assertThat(RegexGuard.compile("^ab+c$", 0, "Stage test")).isSameAs(first);
+        assertThat(RegexGuard.compile("^ab+c$", Pattern.CASE_INSENSITIVE, "Stage test")).isNotSameAs(first);
+        assertThatThrownBy(() -> RegexGuard.compile("(unvollständig", 0, "Stage test"))
+                .isInstanceOf(CompressionException.class).hasMessageContaining("invalid regular expression");
     }
 
     @Test

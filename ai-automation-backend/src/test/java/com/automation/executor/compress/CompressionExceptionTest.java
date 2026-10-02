@@ -26,6 +26,6 @@ class CompressionExceptionTest {
         CompressionException e = catchThrowableOfType(CompressionException.class,
                 () -> StageChain.run(steps, "kein json", RegexGuard.startingNow(Duration.ofSeconds(5))));
 
-        assertThat(e).hasMessage("Stufe 1 (json.limit): Eingabe ist kein gültiges JSON");
+        assertThat(e).hasMessage("Stage 1 (json.limit): input is not valid JSON");
     }
 }

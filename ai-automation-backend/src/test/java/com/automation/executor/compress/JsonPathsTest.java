@@ -20,7 +20,7 @@ class JsonPathsTest {
     @Test
     void parse_emptyOrInvalid_namesTheOp() {
         assertThatThrownBy(() -> JsonPaths.parse("", "json.x"))
-                .isInstanceOf(CompressionException.class).hasMessage("Stufe json.x: Eingabe ist kein gültiges JSON");
+                .isInstanceOf(CompressionException.class).hasMessage("Stage json.x: input is not valid JSON");
         assertThatThrownBy(() -> JsonPaths.parse("   ", "json.x")).isInstanceOf(CompressionException.class);
         assertThatThrownBy(() -> JsonPaths.parse("{\"a\":", "json.x")).isInstanceOf(CompressionException.class);
     }
@@ -57,11 +57,11 @@ class JsonPathsTest {
         JsonNode root = JsonPaths.parse("{\"a\":1}", "op");
 
         assertThatThrownBy(() -> JsonPaths.arrayAt(root, "", "json.limit"))
-                .isInstanceOf(CompressionException.class).hasMessage("Stufe json.limit: '(Wurzel)' ist kein Array");
+                .isInstanceOf(CompressionException.class).hasMessage("Stage json.limit: '(root)' is not an array");
         assertThatThrownBy(() -> JsonPaths.arrayAt(root, "a", "json.limit"))
-                .hasMessage("Stufe json.limit: 'a' ist kein Array");
+                .hasMessage("Stage json.limit: 'a' is not an array");
         assertThatThrownBy(() -> JsonPaths.arrayAt(root, "nope", "json.limit"))
-                .hasMessage("Stufe json.limit: 'nope' ist kein Array");
+                .hasMessage("Stage json.limit: 'nope' is not an array");
     }
 
     @Test

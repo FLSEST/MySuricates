@@ -6,7 +6,7 @@ import java.util.regex.Pattern;
 
 /**
  * lines.filter — keeps lines matching an include pattern (plus before/after context) and drops exclude
- * matches. With include, gaps are marked "[… N Zeilen …]"; exclude-only removes silently.
+ * matches. With include, gaps are marked "[… N lines …]"; exclude-only removes silently.
  */
 final class LinesFilterStage implements CompressionStage {
 
@@ -31,7 +31,7 @@ final class LinesFilterStage implements CompressionStage {
         List<String> include = StageConfig.strings(config, "include", where);
         List<String> exclude = StageConfig.strings(config, "exclude", where);
         if (include.isEmpty() && exclude.isEmpty()) {
-            throw new CompressionException(where + ": 'include' oder 'exclude' braucht mindestens ein Muster");
+            throw new CompressionException(where + ": 'include' or 'exclude' needs at least one pattern");
         }
         compileAll(include, where);
         compileAll(exclude, where);
@@ -73,13 +73,13 @@ final class LinesFilterStage implements CompressionStage {
                 gap++;
                 continue;
             }
-            if (gap > 0 && !include.isEmpty()) appendLine(out, "[… " + CompressionNumbers.fmt(gap) + " Zeilen …]");
+            if (gap > 0 && !include.isEmpty()) appendLine(out, "[… " + CompressionNumbers.fmt(gap) + " lines …]");
             gap = 0;
             appendLine(out, lines[i]);
             kept++;
         }
-        if (gap > 0 && !include.isEmpty() && kept > 0) appendLine(out, "[… " + CompressionNumbers.fmt(gap) + " Zeilen …]");
-        return new StageResult(out.toString(), kept == 0 ? "keine Treffer" : CompressionNumbers.lines(n - kept));
+        if (gap > 0 && !include.isEmpty() && kept > 0) appendLine(out, "[… " + CompressionNumbers.fmt(gap) + " lines …]");
+        return new StageResult(out.toString(), kept == 0 ? "no matches" : CompressionNumbers.lines(n - kept));
     }
 
     private static void appendLine(StringBuilder sb, String line) {

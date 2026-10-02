@@ -22,7 +22,7 @@ class StageKindTest {
                 Map.of("op", "text.normalize"),
                 Map.of("op", "json.limit", "count", 1))))
                 .isInstanceOf(CompressionException.class)
-                .hasMessage("Stufe 2 (json.limit): erwartet JSON, aber eine vorherige Stufe liefert Text");
+                .hasMessage("Stage 2 (json.limit): expects JSON, but an earlier stage yields text");
     }
 
     @Test
@@ -41,6 +41,6 @@ class StageKindTest {
         assertThatThrownBy(() -> StageChain.parse(List.of(
                 Map.of("op", "json.to_lines", "template", "{v}"),
                 Map.of("op", "json.sort", "by", "v"))))
-                .hasMessageContaining("Stufe 2 (json.sort): erwartet JSON");
+                .hasMessageContaining("Stage 2 (json.sort): expects JSON");
     }
 }

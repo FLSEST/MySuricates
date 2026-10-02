@@ -694,13 +694,13 @@ Verdichten die Ausgabe **genau eines** früheren Blocks, bevor sie an Folgeschri
 **Ausgabeformat** (beide Typen):
 
 ```
-## backend_tests — FAILED · exit 1 · 312 s · 740.808 → 17.950 Zeichen
-Stufen: text.normalize (−4.102 Zeichen) · lines.filter (−8.914 Zeilen) · text.truncate (−96.004 Zeichen)
+## backend_tests — FAILED · exit 1 · 312 s · 740,808 → 17,950 chars
+Stages: text.normalize (−4,102 chars) · lines.filter (−8,914 lines) · text.truncate (−96,004 chars)
 
 <verdichteter Inhalt>
 ```
 
-Status und Exit-Code stammen aus den gespeicherten Schrittdaten, nie aus dem Logtext. Gate- und TODO-Marker in Komprimierungs-Ausgaben werden beim Run-Abschluss **nicht** ausgewertet — maßgeblich bleibt der Originalschritt.
+Kopf- und Stufenzeilen, Hinweise im Inhalt und Fehlermeldungen sind englisch wie die Ausgaben der übrigen Blöcke. Status und Exit-Code stammen aus den gespeicherten Schrittdaten, nie aus dem Logtext. Gate- und TODO-Marker in Komprimierungs-Ausgaben werden beim Run-Abschluss **nicht** ausgewertet — maßgeblich bleibt der Originalschritt.
 
 Als `source` taugt jeder Name, der sich auch als `{{ block.<name>.output }}` auflösen lässt — Top-Level-Blöcke und benannte `switch`-Case-Blöcke (2718c20e). Die Kopfzeile zeigt dann Status, Exit-Code und Dauer des Case-Schritts, nicht die des ganzen `switch`. Verschachtelte Blöcke ohne Namen (`foreach`-, `while`-Durchläufe) bewegen nur `previous_output`; dort ist `"previous"` die passende Quelle.
 

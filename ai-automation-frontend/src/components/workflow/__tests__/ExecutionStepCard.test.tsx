@@ -65,7 +65,7 @@ describe('ExecutionStepCard', () => {
   it('shows a prominent compression panel with source link and stage table', () => {
     const { container } = render(<ExecutionStepCard step={step({
       stepIndex: 4, blockType: 'compress',
-      output: '## backend_tests — FAILED · exit 1\nStufen: lines.filter\n\nkurz',
+      output: '## backend_tests — FAILED · exit 1\nStages: lines.filter\n\nkurz',
       metadata: {
         derivedOutput: true,
         compression: {
@@ -88,7 +88,7 @@ describe('ExecutionStepCard', () => {
   it('shows growth as a plus percentage, never a double sign', () => {
     render(<ExecutionStepCard step={step({
       stepIndex: 2, blockType: 'compress',
-      output: '## feed — COMPLETED\nStufen: json.select\n\n{"a":100.0}',
+      output: '## feed — COMPLETED\nStages: json.select\n\n{"a":100.0}',
       metadata: {
         derivedOutput: true,
         compression: {

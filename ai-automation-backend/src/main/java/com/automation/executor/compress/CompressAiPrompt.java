@@ -1,6 +1,12 @@
 package com.automation.executor.compress;
 
-/** Fixed prompt frame of compress-ai: the source is data, the model only condenses it. */
+import java.util.Locale;
+
+/**
+ * Fixed prompt frame of compress-ai: the source is data, the model only condenses it. The prompt stays
+ * German with German number formatting; only the step output went English (TODO 8f1343d1) — the prompt
+ * language steers the language of the summary.
+ */
 public final class CompressAiPrompt {
 
     public static final String SYSTEM = """
@@ -20,7 +26,7 @@ public final class CompressAiPrompt {
     public static String build(String instruction, int targetChars, String sourceText) {
         String task = instruction == null || instruction.isBlank()
                 ? "Fasse den Inhalt so knapp wie möglich zusammen." : instruction.strip();
-        return "Aufgabe: " + task + "\nHöchstens " + CompressionNumbers.fmt(targetChars) + " Zeichen.\n\n<quelle>\n"
+        return "Aufgabe: " + task + "\nHöchstens " + String.format(Locale.GERMANY, "%,d", targetChars) + " Zeichen.\n\n<quelle>\n"
                 + sourceText + "\n</quelle>\n";
     }
 }

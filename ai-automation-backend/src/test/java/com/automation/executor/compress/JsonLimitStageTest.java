@@ -18,7 +18,7 @@ class JsonLimitStageTest {
         StageResult r = stage.apply("[1,2,3,4]", Map.of("count", 2), guard);
 
         assertThat(r.output()).isEqualTo("[1,2]");
-        assertThat(r.note()).isEqualTo("−2 Einträge");
+        assertThat(r.note()).isEqualTo("−2 entries");
     }
 
     @Test
@@ -26,7 +26,7 @@ class JsonLimitStageTest {
         StageResult r = stage.apply("{\"n\":1,\"a\":{\"items\":[1,2,3]}}", Map.of("path", "a.items", "count", 0), guard);
 
         assertThat(r.output()).isEqualTo("{\"n\":1,\"a\":{\"items\":[]}}");
-        assertThat(r.note()).isEqualTo("−3 Einträge");
+        assertThat(r.note()).isEqualTo("−3 entries");
     }
 
     @Test
@@ -34,17 +34,17 @@ class JsonLimitStageTest {
         StageResult r = stage.apply("[1]", Map.of("count", 10), guard);
 
         assertThat(r.output()).isEqualTo("[1]");
-        assertThat(r.note()).isEqualTo("−0 Einträge");
+        assertThat(r.note()).isEqualTo("−0 entries");
     }
 
     @Test
     void validate_countRequiredAndNonNegative() {
         assertThatThrownBy(() -> stage.validate(Map.of()))
-                .isInstanceOf(CompressionException.class).hasMessage("Stufe json.limit: 'count' fehlt");
+                .isInstanceOf(CompressionException.class).hasMessage("Stage json.limit: 'count' is missing");
         assertThatThrownBy(() -> stage.validate(Map.of("count", -1)))
-                .isInstanceOf(CompressionException.class).hasMessageContaining("zwischen 0 und 1.000.000");
+                .isInstanceOf(CompressionException.class).hasMessageContaining("between 0 and 1,000,000");
         assertThatThrownBy(() -> stage.validate(Map.of("count", 1, "path", 5)))
-                .isInstanceOf(CompressionException.class).hasMessageContaining("'path' muss Text sein");
+                .isInstanceOf(CompressionException.class).hasMessageContaining("'path' must be text");
         stage.validate(Map.of("count", 0));
     }
 }

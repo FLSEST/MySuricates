@@ -33,7 +33,7 @@ class MarkdownSectionStageTest {
         StageResult r = new MarkdownSectionStage().apply(REPORT, Map.of("headings", List.of("gesamtSCORE", "empfehlung")), guard);
 
         assertThat(r.output()).isEqualTo("## Gesamtscore\n7,4 (+0,3)\n### Details\nfein\n\n## Empfehlung\nTests stabilisieren\n");
-        assertThat(r.note()).isEqualTo("2 von 5 Abschnitten");
+        assertThat(r.note()).isEqualTo("2 of 5 sections");
     }
 
     @Test
@@ -41,7 +41,7 @@ class MarkdownSectionStageTest {
         StageResult r = new MarkdownSectionStage().apply(REPORT, Map.of("headings", List.of("Kein Heading")), guard);
 
         assertThat(r.output()).isEmpty();
-        assertThat(r.note()).isEqualTo("kein passender Abschnitt");
+        assertThat(r.note()).isEqualTo("no matching section");
     }
 
     @Test
@@ -57,7 +57,7 @@ class MarkdownSectionStageTest {
         String costlyHeading = "# x" + " ".repeat(900) + "y";
 
         assertThatThrownBy(() -> new MarkdownSectionStage().apply(costlyHeading, Map.of("headings", List.of("zzz"), "level", 6), expired))
-                .isInstanceOf(CompressionException.class).hasMessageContaining("Zeitlimit");
+                .isInstanceOf(CompressionException.class).hasMessageContaining("Time limit");
     }
 
     @Test

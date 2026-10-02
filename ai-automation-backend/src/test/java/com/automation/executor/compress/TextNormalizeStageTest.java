@@ -31,7 +31,7 @@ class TextNormalizeStageTest {
         StageResult r = stage.apply("a\n\nb", null, guard);
 
         assertThat(r.output()).isEqualTo("a\n\nb");
-        assertThat(r.note()).isEqualTo("−0 Zeichen");
+        assertThat(r.note()).isEqualTo("−0 chars");
     }
 
     @Test

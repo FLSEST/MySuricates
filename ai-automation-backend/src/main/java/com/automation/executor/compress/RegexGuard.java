@@ -43,7 +43,7 @@ public final class RegexGuard {
             COMPILED.put(key, compiled);
             return compiled;
         } catch (PatternSyntaxException e) {
-            throw new CompressionException(where + ": ungültiger regulärer Ausdruck '" + regex + "' (" + e.getDescription() + ")");
+            throw new CompressionException(where + ": invalid regular expression '" + regex + "' (" + e.getDescription() + ")");
         }
     }
 
@@ -104,11 +104,11 @@ public final class RegexGuard {
     }
 
     private static CompressionException tooDeep(String line) {
-        return new CompressionException("Muster zu tief verschachtelt für Zeile mit " + CompressionNumbers.fmt(line.length()) + " Zeichen");
+        return new CompressionException("Pattern nested too deeply for a line of " + CompressionNumbers.fmt(line.length()) + " chars");
     }
 
     static CompressionException timeout() {
-        return new CompressionException("Zeitlimit überschritten — regulärer Ausdruck zu aufwendig oder Eingabe zu groß");
+        return new CompressionException("Time limit exceeded — regular expression too costly or input too large");
     }
 
     /**

@@ -36,11 +36,11 @@ public final class TextTruncateStage implements CompressionStage {
     }
 
     private static Keep keep(Map<String, Object> config) {
-        return switch (StageConfig.string(config, "keep", "head_tail", "Stufe text.truncate")) {
+        return switch (StageConfig.string(config, "keep", "head_tail", "Stage text.truncate")) {
             case "head" -> Keep.HEAD;
             case "tail" -> Keep.TAIL;
             case "head_tail" -> Keep.HEAD_TAIL;
-            default -> throw new CompressionException("Stufe text.truncate: 'keep' muss head, tail oder head_tail sein");
+            default -> throw new CompressionException("Stage text.truncate: 'keep' must be head, tail or head_tail");
         };
     }
 
@@ -73,7 +73,7 @@ public final class TextTruncateStage implements CompressionStage {
     }
 
     static String notice(long omitted) {
-        return "\n[… " + CompressionNumbers.fmt(omitted) + " Zeichen ausgelassen …]\n";
+        return "\n[… " + CompressionNumbers.fmt(omitted) + " chars omitted …]\n";
     }
 
     private static String headPart(String text, int max) {

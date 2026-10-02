@@ -27,7 +27,7 @@ final class JsonPaths {
         try {
             return MAPPER.writeValueAsString(node);
         } catch (JsonProcessingException e) {
-            throw new CompressionException("JSON-Ausgabe fehlgeschlagen: " + e.getOriginalMessage());
+            throw new CompressionException("JSON output failed: " + e.getOriginalMessage());
         }
     }
 
@@ -54,8 +54,8 @@ final class JsonPaths {
 
     static ArrayNode arrayAt(JsonNode root, String path, String op) {
         if (at(root, path) instanceof ArrayNode array) return array;
-        String shown = path == null || path.isBlank() ? "(Wurzel)" : path;
-        throw new CompressionException("Stufe " + op + ": '" + shown + "' ist kein Array");
+        String shown = path == null || path.isBlank() ? "(root)" : path;
+        throw new CompressionException("Stage " + op + ": '" + shown + "' is not an array");
     }
 
     static boolean missing(JsonNode node) {
@@ -63,6 +63,6 @@ final class JsonPaths {
     }
 
     private static CompressionException notJson(String op) {
-        return new CompressionException("Stufe " + op + ": Eingabe ist kein gültiges JSON");
+        return new CompressionException("Stage " + op + ": input is not valid JSON");
     }
 }

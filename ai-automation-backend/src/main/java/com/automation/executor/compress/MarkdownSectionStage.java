@@ -60,8 +60,8 @@ final class MarkdownSectionStage implements CompressionStage {
             String trimmed = line.stripLeading();
             if (trimmed.startsWith("```") || trimmed.startsWith("~~~")) fence = !fence;
         }
-        String note = matched == 0 ? "kein passender Abschnitt"
-                : CompressionNumbers.fmt(matched) + " von " + CompressionNumbers.fmt(total) + " Abschnitten";
+        String note = matched == 0 ? "no matching section"
+                : CompressionNumbers.fmt(matched) + " of " + CompressionNumbers.fmt(total) + " sections";
         return new StageResult(String.join("\n", out), note);
     }
 
@@ -94,7 +94,7 @@ final class MarkdownSectionStage implements CompressionStage {
     private List<Pattern> headings(Map<String, Object> config) {
         String where = StageConfig.where(op());
         List<String> raw = StageConfig.strings(config, "headings", where);
-        if (raw.isEmpty()) throw new CompressionException(where + ": 'headings' braucht mindestens einen Eintrag");
+        if (raw.isEmpty()) throw new CompressionException(where + ": 'headings' needs at least one entry");
         return raw.stream().map(r -> RegexGuard.compile(r, Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE, where)).toList();
     }
 

@@ -20,7 +20,7 @@ class LineStagesTest {
         StageResult r = new LinesFilterStage().apply(input, Map.of("exclude", List.of("^\\s+at ")), guard);
 
         assertThat(r.output()).isEqualTo("Exception x\nweiter");
-        assertThat(r.note()).isEqualTo("−2 Zeilen");
+        assertThat(r.note()).isEqualTo("−2 lines");
     }
 
     @Test
@@ -30,7 +30,7 @@ class LineStagesTest {
         StageResult r = new LinesFilterStage().apply(input,
                 Map.of("include", List.of("ERROR"), "before", 1, "after", 1), guard);
 
-        assertThat(r.output()).isEqualTo("[… 1 Zeilen …]\nb\nERROR eins\nc\n[… 2 Zeilen …]\nf\nERROR zwei\ng");
+        assertThat(r.output()).isEqualTo("[… 1 lines …]\nb\nERROR eins\nc\n[… 2 lines …]\nf\nERROR zwei\ng");
     }
 
     @Test
@@ -38,7 +38,7 @@ class LineStagesTest {
         StageResult r = new LinesFilterStage().apply("a\nb", Map.of("include", List.of("ERROR")), guard);
 
         assertThat(r.output()).isEmpty();
-        assertThat(r.note()).isEqualTo("keine Treffer");
+        assertThat(r.note()).isEqualTo("no matches");
     }
 
     @Test
@@ -46,7 +46,7 @@ class LineStagesTest {
         assertThatThrownBy(() -> new LinesFilterStage().validate(Map.of()))
                 .isInstanceOf(CompressionException.class).hasMessageContaining("include");
         assertThatThrownBy(() -> new LinesFilterStage().validate(Map.of("include", List.of("(offen"))))
-                .isInstanceOf(CompressionException.class).hasMessageContaining("ungültiger regulärer Ausdruck");
+                .isInstanceOf(CompressionException.class).hasMessageContaining("invalid regular expression");
     }
 
     @Test
@@ -57,13 +57,13 @@ class LineStagesTest {
                 Map.of("pattern", "^\\d{4}-\\d{2}-\\d{2}T[\\d:.]+Z\\s*", "replacement", ""), guard);
 
         assertThat(r.output()).isEqualTo("INFO start\nINFO start");
-        assertThat(r.note()).isEqualTo("2 Zeilen geändert");
+        assertThat(r.note()).isEqualTo("2 lines changed");
     }
 
     @Test
     void replace_invalidGroupReference_isCompressionException() {
         assertThatThrownBy(() -> new LinesReplaceStage().apply("abc", Map.of("pattern", "b", "replacement", "$3"), guard))
-                .isInstanceOf(CompressionException.class).hasMessageContaining("Ersetzung");
+                .isInstanceOf(CompressionException.class).hasMessageContaining("invalid replacement");
     }
 
     @Test
@@ -73,7 +73,7 @@ class LineStagesTest {
         StageResult r = new LinesDedupeStage().apply(input, Map.of("count", true), guard);
 
         assertThat(r.output()).isEqualTo("3× WARN x\nINFO a\n\nINFO b");
-        assertThat(r.note()).isEqualTo("−2 Zeilen");
+        assertThat(r.note()).isEqualTo("−2 lines");
     }
 
     @Test
@@ -88,9 +88,9 @@ class LineStagesTest {
         String input = "1\n2\n3\n4\n5";
 
         assertThat(LinesHeadTailStage.head().apply(input, Map.of("lines", 2), guard).output())
-                .isEqualTo("1\n2\n[… 3 Zeilen ausgelassen …]");
+                .isEqualTo("1\n2\n[… 3 lines omitted …]");
         assertThat(LinesHeadTailStage.tail().apply(input, Map.of("lines", 2), guard).output())
-                .isEqualTo("[… 3 Zeilen ausgelassen …]\n4\n5");
+                .isEqualTo("[… 3 lines omitted …]\n4\n5");
         assertThat(LinesHeadTailStage.tail().apply(input, Map.of("lines", 9), guard).output()).isEqualTo(input);
     }
 
@@ -100,9 +100,9 @@ class LineStagesTest {
         String input = "a\nb\n";
 
         assertThat(LinesHeadTailStage.tail().apply(input, Map.of("lines", 1), guard).output())
-                .isEqualTo("[… 1 Zeilen ausgelassen …]\nb\n");
+                .isEqualTo("[… 1 lines omitted …]\nb\n");
         assertThat(LinesHeadTailStage.head().apply(input, Map.of("lines", 1), guard).output())
-                .isEqualTo("a\n[… 1 Zeilen ausgelassen …]\n");
+                .isEqualTo("a\n[… 1 lines omitted …]\n");
         assertThat(LinesHeadTailStage.tail().apply(input, Map.of("lines", 2), guard).output()).isEqualTo(input);
     }
 

@@ -51,7 +51,7 @@ final class LinesHeadTailStage implements CompressionStage {
         List<String> lines = Arrays.asList(text.split("\n", -1));
         if (lines.size() <= keep) return new StageResult(input, null);
         int omitted = lines.size() - keep;
-        String notice = "[… " + CompressionNumbers.fmt(omitted) + " Zeilen ausgelassen …]";
+        String notice = "[… " + CompressionNumbers.fmt(omitted) + " lines omitted …]";
         String body = String.join("\n", head ? lines.subList(0, keep) : lines.subList(lines.size() - keep, lines.size()));
         String output = head ? body + "\n" + notice : notice + "\n" + body;
         return new StageResult(trailingNewline ? output + "\n" : output, CompressionNumbers.lines(omitted));
