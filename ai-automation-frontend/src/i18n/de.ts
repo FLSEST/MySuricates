@@ -2240,6 +2240,7 @@ export const de: TranslationKeys = {
       NO_FAILED_RUNS: 'Workflow „{name}“ hat keine fehlgeschlagenen Ausführungen',
       TEST_INSTANCE_NOT_RUNNING: 'Die Test-Instanz läuft nicht oder ist nicht gesund. Starte sie zuerst.',
       STABLE_INSTANCE_NOT_RUNNING: 'Die Stable-Instanz läuft nicht oder ist nicht gesund. Starte sie zuerst.',
+      CHAIN_RUN_ACTIVE: 'Die Kette hat noch einen laufenden oder pausierten Lauf. Warte, bis er fertig ist, oder brich ihn ab und lösche die Kette dann.',
       MODULE_DISABLED: '{what} braucht das Modul „{module}“, das auf dieser Instanz ausgeschaltet ist – setze {property}=true und starte neu',
       MODULE_DISABLED_SWITCHABLE: '{what} braucht das Modul „{module}“, das auf dieser Instanz ausgeschaltet ist – setze {property}=true und starte neu (oder schalte es unter Einstellungen → Module ein, wenn automation.modules.ui-editable an ist)',
       RUN_RETENTION_LOCKED: 'Die Aufbewahrung von Ausführungen lässt sich nur verlängern, solange das Löschen ausgeschaltet ist (automation.executions.allow-delete=false): {current} → {requested} Tage',

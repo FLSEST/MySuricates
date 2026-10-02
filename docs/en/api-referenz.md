@@ -2974,7 +2974,9 @@ Update a chain.
 
 Delete a chain.
 
-**Response:** `204 No Content`
+**Response:** `204 No Content`; `409` (`STATE_CONFLICT`, `messageKey: CHAIN_RUN_ACTIVE`) while the chain has a
+run in status `PENDING`, `RUNNING` or `PAUSED` — it would otherwise keep running without its chain and start
+its workflows. Wait for it or `POST /api/v1/chains/runs/{runId}/cancel` first, then delete.
 
 ### `POST /api/v1/chains/{id}/execute`
 

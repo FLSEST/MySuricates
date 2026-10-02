@@ -266,6 +266,17 @@ class ChainControllerTest {
     }
 
     @Test
+    void deleteChain_returns409WithMessageKey_whenRunActive() throws Exception {
+        doThrow(new com.automation.exception.LocalizedStateException(
+                com.automation.exception.ErrorMessage.CHAIN_RUN_ACTIVE)).when(chainService).delete("busy");
+
+        mockMvc.perform(delete("/api/v1/chains/busy"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("STATE_CONFLICT"))
+                .andExpect(jsonPath("$.messageKey").value("CHAIN_RUN_ACTIVE"));
+    }
+
+    @Test
     void listRuns_returns404_whenChainMissing() throws Exception {
         when(chainService.findRunsByChainId("missing")).thenThrow(new java.util.NoSuchElementException("not found"));
 
