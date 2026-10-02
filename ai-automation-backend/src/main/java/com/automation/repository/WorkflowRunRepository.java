@@ -1,5 +1,6 @@
 package com.automation.repository;
 
+import com.automation.dto.projection.RunOverviewCounts;
 import com.automation.entity.RunStatus;
 import com.automation.entity.WorkflowRun;
 import org.springframework.data.domain.Limit;
@@ -90,20 +91,6 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, String
          + "ORDER BY sr.workflowRun.id, sr.stepIndex")
     List<Object[]> findStepMetadataForDashboard(@Param("since") Instant since);
 
-    /**
-     * Lädt vollständige Runs (inkl. steps + workflow + project) für die wenigen "recentRuns"
-     * des Dashboards. Nur für ≤10 IDs gedacht — hier sind die großen TEXT-Spalten gewollt
-     * (das Frontend zeigt sie). Eager-Fetch, weil getDashboard ohne Transaktion läuft (OSIV aus);
-     * den Container des Projekts aus demselben Grund wie bei {@link #findDashboardWindow(Instant)}.
-     */
-    @Query("SELECT DISTINCT wr FROM WorkflowRun wr "
-         + "JOIN FETCH wr.workflow w "
-         + "LEFT JOIN FETCH w.project p "
-         + "LEFT JOIN FETCH p.container "
-         + "LEFT JOIN FETCH wr.steps "
-         + "WHERE wr.id IN :ids")
-    List<WorkflowRun> findByIdInWithStepsAndWorkflow(@Param("ids") List<String> ids);
-
     @Query("SELECT wr.workflow.id, wr.workflow.name, COUNT(wr) " +
            "FROM WorkflowRun wr " +
            "WHERE wr.workflow IS NOT NULL " +
@@ -121,15 +108,18 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, String
            "LIMIT 5")
     List<Object[]> findTopWorkflowsByProject(@Param("projectId") String projectId);
 
-    /** Runs of one project's workflows — the dashboard overview under a project filter. */
-    @Query("SELECT COUNT(wr) FROM WorkflowRun wr WHERE wr.workflow.project.id = :projectId")
-    long countByProject(@Param("projectId") String projectId);
+    String OVERVIEW_COUNTS = "SELECT new com.automation.dto.projection.RunOverviewCounts(COUNT(wr), "
+         + "COALESCE(SUM(CASE WHEN wr.status IN ('COMPLETED', 'COMPLETED_WITH_ERRORS') THEN 1 ELSE 0 END), 0), "
+         + "COALESCE(SUM(CASE WHEN wr.status = 'FAILED' THEN 1 ELSE 0 END), 0), "
+         + "COALESCE(SUM(CASE WHEN wr.startedAt > :since THEN 1 ELSE 0 END), 0)) FROM WorkflowRun wr";
 
-    @Query("SELECT COUNT(wr) FROM WorkflowRun wr WHERE wr.workflow.project.id = :projectId AND wr.status = :status")
-    long countByProjectAndStatus(@Param("projectId") String projectId, @Param("status") RunStatus status);
+    /** Die Run-Zaehler des Dashboards in einer Abfrage (TODO 2ccb9e40); COALESCE fuer die leere Tabelle. */
+    @Query(OVERVIEW_COUNTS)
+    RunOverviewCounts countOverview(@Param("since") Instant since);
 
-    @Query("SELECT COUNT(wr) FROM WorkflowRun wr WHERE wr.workflow.project.id = :projectId AND wr.startedAt > :since")
-    long countByProjectAndStartedAtAfter(@Param("projectId") String projectId, @Param("since") Instant since);
+    /** {@link #countOverview} fuer die Runs der Workflows eines Projekts (Projektfilter des Dashboards). */
+    @Query(OVERVIEW_COUNTS + " WHERE wr.workflow.project.id = :projectId")
+    RunOverviewCounts countOverviewByProject(@Param("projectId") String projectId, @Param("since") Instant since);
 
     /** The calendar's past runs: newest first, at most {@code limit} (TODO 86777fb4). */
     List<WorkflowRun> findByStartedAtBetweenOrderByStartedAtDesc(Instant from, Instant to, Limit limit);

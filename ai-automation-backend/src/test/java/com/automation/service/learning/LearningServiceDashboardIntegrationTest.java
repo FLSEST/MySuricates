@@ -40,7 +40,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p>Regression coverage for the two bugs introduced by commit 8a93e06e:
  * <ul>
  *   <li>{@code FetchNotFoundException} — a run of a soft-deleted workflow.</li>
- *   <li>{@code LazyInitializationException} — {@code recentRuns} mapping touching un-fetched steps.</li>
+ *   <li>{@code LazyInitializationException} — {@code recentRuns} mapping touching un-fetched steps
+ *       (since TODO 2ccb9e40 the entries carry no steps; name and project must still resolve).</li>
  * </ul>
  */
 @SpringBootTest
@@ -146,11 +147,14 @@ class LearningServiceDashboardIntegrationTest {
         DashboardResponse dashboard = learningService.getDashboard(30, null);
 
         assertThat(dashboard).isNotNull();
-        // The live run is present, with its steps mapped (proves steps were eager-fetched).
+        // The live run is present as a slim entry: name, project and timing from the window query
+        // (workflow + project fetched along), no steps to lazy-load (TODO 2ccb9e40).
         assertThat(dashboard.recentRuns())
                 .anySatisfy(r -> {
                     assertThat(r.workflowId()).isEqualTo(liveWorkflow.getId());
-                    assertThat(r.steps()).isNotEmpty();
+                    assertThat(r.workflowName()).isEqualTo(liveWorkflow.getName());
+                    assertThat(r.projectName()).isEqualTo(project.getName());
+                    assertThat(r.status()).isEqualTo(RunStatus.COMPLETED);
                 });
         // The run of the soft-deleted workflow is excluded.
         assertThat(dashboard.recentRuns())

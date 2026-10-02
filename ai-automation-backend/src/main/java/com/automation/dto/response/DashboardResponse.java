@@ -1,5 +1,8 @@
 package com.automation.dto.response;
 
+import com.automation.entity.RunStatus;
+
+import java.time.Instant;
 import java.util.List;
 
 public record DashboardResponse(
@@ -15,7 +18,7 @@ public record DashboardResponse(
         long totalInputTokens,
         long totalOutputTokens,
         List<TopWorkflowEntry> topWorkflows,
-        List<WorkflowRunResponse> recentRuns,
+        List<RecentRunEntry> recentRuns,
         List<TimeSeriesPoint> timeSeries,
         List<ProviderStats> providerStats,
         List<IntegrationStats> integrationStats,
@@ -30,6 +33,23 @@ public record DashboardResponse(
             String workflowId,
             String workflowName,
             long runCount
+    ) {}
+
+    /**
+     * One line of the "recent runs" widget — only what the dashboard shows, no steps, context or
+     * metadata. Until TODO 2ccb9e40 this was a full {@link WorkflowRunResponse} including every
+     * step's input and output: about 600 KB per call for ten runs, polled every 30 seconds.
+     * The run detail page loads the full run itself.
+     */
+    public record RecentRunEntry(
+            String id,
+            String workflowId,
+            String workflowName,
+            String projectName,
+            RunStatus status,
+            Instant startedAt,
+            Instant completedAt,
+            Long durationMs
     ) {}
 
     public record TimeSeriesPoint(

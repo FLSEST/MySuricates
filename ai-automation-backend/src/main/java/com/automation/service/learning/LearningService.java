@@ -1,9 +1,7 @@
 package com.automation.service.learning;
 
 import com.automation.dto.response.DashboardResponse;
-import com.automation.dto.response.WorkflowRunResponse;
 import com.automation.entity.*;
-import com.automation.mapper.WorkflowMapper;
 import com.automation.repository.WorkflowRepository;
 import com.automation.repository.WorkflowRunRepository;
 import lombok.RequiredArgsConstructor;
@@ -26,7 +24,6 @@ public class LearningService {
 
     private final WorkflowRunRepository runRepository;
     private final WorkflowRepository workflowRepository;
-    private final WorkflowMapper workflowMapper;
     private final WorkflowStatsService statsService;
     private final WorkflowSimilarityService similarityService;
     private final AgenticLearningService agenticService;
@@ -122,26 +119,8 @@ public class LearningService {
                 .average()
                 .orElse(0);
 
-        // recentRuns: the "recent runs" widget needs the full steps (incl. input/output) for at
-        // most 10 runs. findDashboardWindow no longer fetches steps (that would drag every step's
-        // large TEXT columns across the whole window), so fetch them for just these 10 runs.
-        // Eager workflow+project+steps because getDashboard runs without a transaction (OSIV off).
-        List<String> recentIds = recentWindow.stream()
-                .limit(10)
-                .map(WorkflowRun::getId)
-                .toList();
-        List<WorkflowRunResponse> recentRuns;
-        if (recentIds.isEmpty()) {
-            recentRuns = List.of();
-        } else {
-            Map<String, WorkflowRun> recentById = runRepository.findByIdInWithStepsAndWorkflow(recentIds).stream()
-                    .collect(Collectors.toMap(WorkflowRun::getId, r -> r, (a, b) -> a));
-            recentRuns = recentIds.stream()
-                    .map(recentById::get)
-                    .filter(Objects::nonNull)
-                    .map(workflowMapper::toRunResponse)
-                    .toList();
-        }
+        // recentRuns: slim entries from the window already loaded — no query, no steps (TODO 2ccb9e40).
+        List<DashboardResponse.RecentRunEntry> recentRuns = DashboardRecentRuns.of(recentWindow);
 
         // Per-step aggregation source: a lightweight projection (status + metadata only), NOT the
         // full StepResult entities — avoids loading the large input/output/context_delta TEXT

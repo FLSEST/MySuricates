@@ -5,7 +5,7 @@ import { StatusBadge } from '../shared/StatusBadge';
 import { useDashboardData } from './dashboardDataContext';
 import { useT, useI18nStore } from '../../i18n';
 import { formatDuration, formatRelativeTime, formatDateTime } from '../../utils/formatTime';
-import type { WorkflowRun } from '../../types';
+import type { DashboardRecentRun } from '../../types';
 import { WidgetSkeleton } from './WidgetSkeleton';
 
 export function RecentRunsCard() {
@@ -26,7 +26,7 @@ export function RecentRunsCard() {
         </div>
       ) : (
         <div className="divide-y divide-border">
-          {stats.recentRuns.slice(0, 8).map((run: WorkflowRun) => (
+          {stats.recentRuns.slice(0, 8).map((run: DashboardRecentRun) => (
             <div
               key={run.id}
               className="flex items-center justify-between px-5 py-3 hover:bg-surface transition-colors cursor-pointer"

@@ -1,9 +1,9 @@
 package com.automation.service.learning;
 
+import com.automation.dto.projection.RunOverviewCounts;
 import com.automation.dto.response.DashboardResponse;
 import com.automation.entity.*;
 import com.automation.exception.ResourceNotFoundException;
-import com.automation.mapper.WorkflowMapper;
 import com.automation.repository.WorkflowRepository;
 import com.automation.repository.WorkflowRunRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,9 +32,6 @@ class LearningServiceTest {
 
     @Mock
     private WorkflowRepository workflowRepository;
-
-    @Mock
-    private WorkflowMapper workflowMapper;
 
     // Sub-services tested directly
     @InjectMocks
@@ -409,15 +406,11 @@ class LearningServiceTest {
         @Test
         void getDashboard_computesOverview() {
             LearningService learningService = new LearningService(
-                    runRepository, workflowRepository, workflowMapper,
+                    runRepository, workflowRepository,
                     statsService, similarityService, agenticService, insightsService);
 
             when(workflowRepository.count()).thenReturn(2L);
-            when(runRepository.count()).thenReturn(3L);
-            when(runRepository.countByStatus(RunStatus.COMPLETED)).thenReturn(2L);
-            when(runRepository.countByStatus(RunStatus.COMPLETED_WITH_ERRORS)).thenReturn(0L);
-            when(runRepository.countByStatus(RunStatus.FAILED)).thenReturn(1L);
-            when(runRepository.countByStartedAtAfter(any(Instant.class))).thenReturn(0L);
+            when(runRepository.countOverview(any(Instant.class))).thenReturn(new RunOverviewCounts(3, 2, 1, 0));
             when(runRepository.findDashboardWindow(any(Instant.class))).thenReturn(List.of());
             when(runRepository.findTopWorkflows()).thenReturn(List.of());
 
@@ -435,15 +428,12 @@ class LearningServiceTest {
         @Test
         void getDashboard_withProject_usesProjectScopedOverview() {
             LearningService learningService = new LearningService(
-                    runRepository, workflowRepository, workflowMapper,
+                    runRepository, workflowRepository,
                     statsService, similarityService, agenticService, insightsService);
 
             when(workflowRepository.countByProjectId("p-1")).thenReturn(1L);
-            when(runRepository.countByProject("p-1")).thenReturn(4L);
-            when(runRepository.countByProjectAndStatus("p-1", RunStatus.COMPLETED)).thenReturn(2L);
-            when(runRepository.countByProjectAndStatus("p-1", RunStatus.COMPLETED_WITH_ERRORS)).thenReturn(1L);
-            when(runRepository.countByProjectAndStatus("p-1", RunStatus.FAILED)).thenReturn(1L);
-            when(runRepository.countByProjectAndStartedAtAfter(eq("p-1"), any(Instant.class))).thenReturn(3L);
+            when(runRepository.countOverviewByProject(eq("p-1"), any(Instant.class)))
+                    .thenReturn(new RunOverviewCounts(4, 3, 1, 3));
             when(runRepository.findDashboardWindow(any(Instant.class))).thenReturn(List.of());
             when(runRepository.findTopWorkflowsByProject("p-1"))
                     .thenReturn(objectArrayList(new Object[]{"wf-1", "Mine", 4L}));
@@ -459,14 +449,14 @@ class LearningServiceTest {
             assertThat(dashboard.topWorkflows())
                     .extracting(DashboardResponse.TopWorkflowEntry::workflowId).containsExactly("wf-1");
             verify(workflowRepository, never()).count();
-            verify(runRepository, never()).count();
+            verify(runRepository, never()).countOverview(any(Instant.class));
             verify(runRepository, never()).findTopWorkflows();
         }
 
         @Test
         void getDashboard_integrationProvider_isExcludedFromAiProviderStats() {
             LearningService learningService = new LearningService(
-                    runRepository, workflowRepository, workflowMapper,
+                    runRepository, workflowRepository,
                     statsService, similarityService, agenticService, insightsService);
 
             // Run 1: integration step (Trello) followed by an AI step (Claude)
@@ -483,11 +473,7 @@ class LearningServiceTest {
                     .build();
 
             when(workflowRepository.count()).thenReturn(1L);
-            when(runRepository.count()).thenReturn(2L);
-            when(runRepository.countByStatus(RunStatus.COMPLETED)).thenReturn(2L);
-            when(runRepository.countByStatus(RunStatus.COMPLETED_WITH_ERRORS)).thenReturn(0L);
-            when(runRepository.countByStatus(RunStatus.FAILED)).thenReturn(0L);
-            when(runRepository.countByStartedAtAfter(any(Instant.class))).thenReturn(0L);
+            when(runRepository.countOverview(any(Instant.class))).thenReturn(new RunOverviewCounts(2, 2, 0, 0));
             when(runRepository.findDashboardWindow(any(Instant.class)))
                     .thenReturn(List.of(mixedRun, integrationOnlyRun));
             // Steps now come from a lightweight projection (runId, status, metadata), ordered by stepIndex.
@@ -522,7 +508,7 @@ class LearningServiceTest {
         @Test
         void getDashboard_failedIntegrationStep_countsTowardIntegrationStats() {
             LearningService learningService = new LearningService(
-                    runRepository, workflowRepository, workflowMapper,
+                    runRepository, workflowRepository,
                     statsService, similarityService, agenticService, insightsService);
 
             WorkflowRun failedRun = WorkflowRun.builder()
@@ -532,11 +518,7 @@ class LearningServiceTest {
                     .build();
 
             when(workflowRepository.count()).thenReturn(1L);
-            when(runRepository.count()).thenReturn(1L);
-            when(runRepository.countByStatus(RunStatus.COMPLETED)).thenReturn(0L);
-            when(runRepository.countByStatus(RunStatus.COMPLETED_WITH_ERRORS)).thenReturn(0L);
-            when(runRepository.countByStatus(RunStatus.FAILED)).thenReturn(1L);
-            when(runRepository.countByStartedAtAfter(any(Instant.class))).thenReturn(0L);
+            when(runRepository.countOverview(any(Instant.class))).thenReturn(new RunOverviewCounts(1, 0, 1, 0));
             when(runRepository.findDashboardWindow(any(Instant.class)))
                     .thenReturn(List.of(failedRun));
             // Failed integration step still carries executionMode=integration (set in the catch branch).

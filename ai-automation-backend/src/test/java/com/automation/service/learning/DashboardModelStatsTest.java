@@ -1,10 +1,10 @@
 package com.automation.service.learning;
 
+import com.automation.dto.projection.RunOverviewCounts;
 import com.automation.dto.response.DashboardResponse;
 import com.automation.entity.RunStatus;
 import com.automation.entity.StepStatus;
 import com.automation.entity.WorkflowRun;
-import com.automation.mapper.WorkflowMapper;
 import com.automation.repository.WorkflowRepository;
 import com.automation.repository.WorkflowRunRepository;
 import org.junit.jupiter.api.Test;
@@ -60,8 +60,8 @@ class DashboardModelStatsTest {
 
     private DashboardResponse dashboard(List<Map<String, Object>> metadata) {
         var runs = mock(WorkflowRunRepository.class);
-        var service = new LearningService(runs, mock(WorkflowRepository.class), mock(WorkflowMapper.class),
-                null, null, null, null);
+        var service = new LearningService(runs, mock(WorkflowRepository.class), null, null, null, null);
+        when(runs.countOverview(any(Instant.class))).thenReturn(new RunOverviewCounts(1, 0, 1, 1));
         when(runs.findDashboardWindow(any(Instant.class))).thenReturn(List.of(WorkflowRun.builder()
                 .id("run").status(RunStatus.FAILED).startedAt(Instant.now()).build()));
         when(runs.findStepMetadataForDashboard(any(Instant.class))).thenReturn(metadata.stream()

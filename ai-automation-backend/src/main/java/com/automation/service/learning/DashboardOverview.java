@@ -1,7 +1,7 @@
 package com.automation.service.learning;
 
+import com.automation.dto.projection.RunOverviewCounts;
 import com.automation.dto.response.DashboardResponse;
-import com.automation.entity.RunStatus;
 import com.automation.repository.WorkflowRepository;
 import com.automation.repository.WorkflowRunRepository;
 
@@ -18,18 +18,17 @@ record DashboardOverview(long totalWorkflows, long totalRuns, long successfulRun
 
     static DashboardOverview load(WorkflowRunRepository runs, WorkflowRepository workflows,
                                   String projectId, Instant todayStart) {
+        // Die Run-Zaehler kommen aus EINER Abfrage statt aus fuenf count-Aufrufen (TODO 2ccb9e40).
         if (projectId == null || projectId.isBlank()) {
-            return new DashboardOverview(workflows.count(), runs.count(),
-                    runs.countByStatus(RunStatus.COMPLETED) + runs.countByStatus(RunStatus.COMPLETED_WITH_ERRORS),
-                    runs.countByStatus(RunStatus.FAILED), runs.countByStartedAtAfter(todayStart),
-                    toEntries(runs.findTopWorkflows()));
+            return of(workflows.count(), runs.countOverview(todayStart), runs.findTopWorkflows());
         }
-        return new DashboardOverview(workflows.countByProjectId(projectId), runs.countByProject(projectId),
-                runs.countByProjectAndStatus(projectId, RunStatus.COMPLETED)
-                        + runs.countByProjectAndStatus(projectId, RunStatus.COMPLETED_WITH_ERRORS),
-                runs.countByProjectAndStatus(projectId, RunStatus.FAILED),
-                runs.countByProjectAndStartedAtAfter(projectId, todayStart),
-                toEntries(runs.findTopWorkflowsByProject(projectId)));
+        return of(workflows.countByProjectId(projectId), runs.countOverviewByProject(projectId, todayStart),
+                runs.findTopWorkflowsByProject(projectId));
+    }
+
+    private static DashboardOverview of(long totalWorkflows, RunOverviewCounts counts, List<Object[]> topRows) {
+        return new DashboardOverview(totalWorkflows, counts.total(), counts.succeeded(), counts.failed(),
+                counts.startedSince(), toEntries(topRows));
     }
 
     double successRate() {

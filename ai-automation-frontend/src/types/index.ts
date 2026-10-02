@@ -1217,6 +1217,13 @@ export interface TriggerDistribution {
   otherAutomatic?: number;
 }
 
+/**
+ * One row of the dashboard's recent runs. Since TODO 2ccb9e40 the backend sends only these fields
+ * (no steps, metadata or input context); older backends send whole runs, which still fit this type.
+ */
+export type DashboardRecentRun = Pick<WorkflowRun, 'id' | 'workflowId' | 'workflowName' | 'projectName' | 'status' | 'startedAt' | 'durationMs'>
+  & Partial<Pick<WorkflowRun, 'completedAt'>>;
+
 export interface DashboardData {
   totalWorkflows: number;
   totalRuns: number;
@@ -1230,7 +1237,7 @@ export interface DashboardData {
   totalInputTokens: number;
   totalOutputTokens: number;
   topWorkflows: Array<{ workflowId: string; workflowName: string; runCount: number }>;
-  recentRuns: WorkflowRun[];
+  recentRuns: DashboardRecentRun[];
   timeSeries?: TimeSeriesPoint[];
   providerStats?: ProviderStats[];
   integrationStats?: IntegrationStats[];

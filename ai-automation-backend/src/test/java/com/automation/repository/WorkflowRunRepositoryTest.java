@@ -1,5 +1,6 @@
 package com.automation.repository;
 
+import com.automation.dto.projection.RunOverviewCounts;
 import com.automation.entity.Container;
 import com.automation.entity.ContainerStatus;
 import com.automation.entity.Project;
@@ -512,24 +513,34 @@ class WorkflowRunRepositoryTest {
     }
 
     /**
-     * Die zehn letzten Runs des Dashboards ebenso — und hier zaehlt es doppelt: Mit den Schritten
-     * im Join ist jede Schritt-Zeile eine Ergebniszeile, und {@code getDashboard} laeuft ohne
-     * Transaktion, also mit leerem Persistenzkontext. Im RequestCostRatchetTest sieht man das nicht,
-     * weil der Request dort den Persistenzkontext der Testtransaktion mitbenutzt; ohne Transaktion
-     * kostete das Dashboard mit 12 Runs zu je 3 Schritten 52 statt 10 Statements.
+     * Die Run-Zaehler des Dashboards kommen aus einer Abfrage statt aus fuenf (TODO 2ccb9e40):
+     * Erfolg zaehlt COMPLETED und COMPLETED_WITH_ERRORS, „heute" nur Runs nach dem Stichtag. Ohne
+     * Projekt zaehlt die Abfrage die ganze Tabelle — die teilt sich diese JVM mit anderen Tests,
+     * deshalb wird dort die Differenz geprueft; mit Projekt zaehlt sie nur dessen Runs.
      */
     @Test
-    void should_fetch_the_project_container_along_with_the_recent_dashboard_runs() {
-        List<String> seeded = runsWithAndWithoutContainer();
+    void should_count_the_dashboard_overview_in_one_query() {
+        Instant today = Instant.now().minus(1, ChronoUnit.HOURS);
+        RunOverviewCounts before = runRepository.countOverview(today);
+        run(workflowA, RunStatus.COMPLETED, today.plusSeconds(60));
+        run(workflowA, RunStatus.COMPLETED_WITH_ERRORS, today.minus(2, ChronoUnit.DAYS));
+        run(workflowA, RunStatus.FAILED, today.plusSeconds(120));
+        run(workflowA, RunStatus.RUNNING, today.minus(1, ChronoUnit.DAYS));
+        run(workflowB, RunStatus.FAILED, today.plusSeconds(30));
+        entityManager.flush();
 
-        Counted<List<WorkflowRun>> recent = counted(() -> runRepository.findByIdInWithStepsAndWorkflow(seeded));
+        Counted<RunOverviewCounts> all = counted(() -> runRepository.countOverview(today));
+        Counted<RunOverviewCounts> mine = counted(() -> runRepository.countOverviewByProject(project.getId(), today));
 
-        assertThat(recent.statements())
-                .as("one query for the recent runs, not one select containers per step row")
-                .isEqualTo(1);
-        assertThat(recent.result()).hasSize(seeded.size())
-                .allSatisfy(r -> assertThat(r.getSteps()).hasSize(2));
-        assertContainersResolved(recent.result(), seeded);
+        assertThat(all.statements()).as("one query, not five counts").isEqualTo(1);
+        assertThat(mine.statements()).as("one query, not five counts").isEqualTo(1);
+        RunOverviewCounts added = all.result();
+        assertThat(new RunOverviewCounts(added.total() - before.total(), added.succeeded() - before.succeeded(),
+                added.failed() - before.failed(), added.startedSince() - before.startedSince()))
+                .isEqualTo(new RunOverviewCounts(5, 2, 2, 3));
+        assertThat(mine.result()).isEqualTo(new RunOverviewCounts(4, 2, 1, 2));
+        assertThat(runRepository.countOverviewByProject("no-such-project", today))
+                .isEqualTo(new RunOverviewCounts(0, 0, 0, 0));
     }
 
     /**
