@@ -1062,7 +1062,8 @@ Checked per push range (remote state..local; for a new branch everything no remo
    installed on the fly; CI scans anyway.
 5. **Exception files in the range.** If the range changes a file from which the gate and CI read
    their exceptions — `.gitleaksignore`, `.gitleaks.toml`, `scripts/lib/hygiene-rules.sh`,
-   `scripts/ci/pre-push-checks.sh`, `scripts/ci/public-hygiene.sh`, `scripts/git-hooks/*`,
+   `scripts/ci/pre-push-checks.sh`, `scripts/ci/public-hygiene.sh`, `scripts/ci/changed-scopes.sh`
+   (its list skips builds and tests), `scripts/git-hooks/*`,
    `.github/workflows/ci.yml` —, the gate blocks and shows the extent of the diff. Otherwise whoever
    loosens such a file in the same push would get green from the very check they are weakening.
    After review, release it for exactly this state only: `MYSURICATES_PREPUSH_ALLOW_RULES=<sha of

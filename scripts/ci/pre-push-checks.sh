@@ -107,9 +107,17 @@ step() { echo "▶ $1"; }
 # ---------------------------------------------------------------------------
 TERMS_LOADED=0
 TERMS_LC=()
-# Kleinschreibung ohne Bash-4-Faltung per Parameter-Expansion: macOS bringt Bash 3.2 mit. awk statt tr,
-# weil GNU awk im UTF-8-Locale auch Umlaute faltet; das awk von macOS faltet nur ASCII.
-to_lower() { printf '%s\n' "$1" | awk '{ print tolower($0) }'; }
+# Kleinschreibung: ab Bash 4 per Parameter-Expansion (faltet im UTF-8-Locale auch Umlaute, wie
+# bisher). Bash 3.2 (macOS) kennt sie nicht — dort python3, sonst awk (mawk/BSD-awk falten nur
+# ASCII). Die Expansion wird erst zur Laufzeit ausgewertet, Bash 3.2 erreicht diesen Zweig nie.
+if [ "${BASH_VERSINFO[0]}" -ge 4 ]; then
+  lower_stream() { local l; while IFS= read -r l || [ -n "$l" ]; do printf '%s\n' "${l,,}"; done; }
+elif command -v python3 >/dev/null 2>&1; then
+  lower_stream() { python3 -c 'import sys; sys.stdout.write(sys.stdin.read().lower())'; }
+else
+  lower_stream() { awk '{ print tolower($0) }'; }
+fi
+to_lower() { printf '%s\n' "$1" | lower_stream; }
 load_private_terms() {
   [ "$TERMS_LOADED" -eq 1 ] && return 0
   TERMS_LOADED=1
@@ -134,7 +142,7 @@ check_email() {  # $1 = label, $2 = rolle, $3 = adresse
 check_message() {  # $1 = label, $2 = nachricht (mehrzeilig)
   local label="$1" line content lc i lc_term entry pat desc
   load_private_terms
-  # Ein awk-Aufruf je Nachricht: Originalzeile (fd 3) und kleingeschriebene Zeile (fd 4) parallel.
+  # Originalzeile (fd 3) und kleingeschriebene Zeile (fd 4) parallel, gefaltet einmal je Nachricht.
   while IFS= read -r line <&3 && IFS= read -r lc <&4; do
     [[ "$line" =~ $HYGIENE_COMMIT_TRAILER_REGEX ]] && continue
     case "$line" in '#'*) continue ;; esac   # Kommentarzeilen der Commit-Vorlage
@@ -158,7 +166,7 @@ check_message() {  # $1 = label, $2 = nachricht (mehrzeilig)
     if [[ "$line" =~ $HYGIENE_EMAIL_REGEX ]]; then
       fail "${label}: Nachricht enthaelt eine Mailadresse ausserhalb eines Trailers"
     fi
-  done 3<<<"$2" 4< <(printf '%s\n' "$2" | awk '{ print tolower($0) }')
+  done 3<<<"$2" 4< <(printf '%s\n' "$2" | lower_stream)
 }
 
 check_commits() {  # $@ = rev-list-Argumente
@@ -242,6 +250,8 @@ is_rule_file() {  # $1 = Pfad
     .gitleaksignore|.gitleaks.toml) return 0 ;;
     scripts/lib/hygiene-rules.sh) return 0 ;;
     scripts/ci/pre-push-checks.sh|scripts/ci/public-hygiene.sh) return 0 ;;
+    # Fuehrt die Liste der Pfade, die Backend-/Frontend-Bau und -Tests auslassen — lokal wie in der CI.
+    scripts/ci/changed-scopes.sh) return 0 ;;
     scripts/git-hooks/*) return 0 ;;
     .github/workflows/ci.yml) return 0 ;;
   esac
@@ -252,7 +262,7 @@ rules_allowed_for() {  # $1 = voller Hash der Bereichsspitze
   local v
   local IFS=','
   for v in ${MYSURICATES_PREPUSH_ALLOW_RULES:-}; do
-    v="$(printf '%s' "${v// /}" | tr '[:upper:]' '[:lower:]')"
+    v="$(to_lower "${v// /}")"
     [ "${#v}" -ge 7 ] || continue
     case "$1" in "$v"*) return 0 ;; esac
   done
@@ -261,17 +271,22 @@ rules_allowed_for() {  # $1 = voller Hash der Bereichsspitze
 
 check_rule_files() {  # $1 = A..B
   KIND="rules"
-  local f files=() tip short stat
+  local f files=() tip short stat changed
+  # Ein Fehler hier ist kein "unveraendert": dann wuesste das Gate nicht, was es durchlaesst.
+  if ! changed="$(git -c core.quotePath=false diff --no-renames --name-only "$1" 2>/dev/null)"; then
+    echo "Pre-Push-Gate: git diff ${1} fehlgeschlagen — geaenderte Ausnahmedateien nicht bestimmbar" >&2
+    exit 2
+  fi
   while IFS= read -r f; do
     [ -n "$f" ] && is_rule_file "$f" && files+=("$f")
-  done < <(git diff --no-renames --name-only "$1" 2>/dev/null)
+  done <<<"$changed"
   if [ "${#files[@]}" -eq 0 ]; then
     note "Ausnahmedateien: im Bereich ${1} unveraendert"
     return 0
   fi
   tip="$(git rev-parse --verify -q "${1#*..}^{commit}")" || tip=""
   short="$(git rev-parse --short "${tip:-HEAD}" 2>/dev/null)"
-  stat="$(git diff --no-renames --stat "$1" -- "${files[@]}" 2>/dev/null)"
+  stat="$(git -c core.quotePath=false diff --no-renames --stat "$1" -- "${files[@]}" 2>/dev/null)"
   echo "  ┌─ Ausnahmedateien geaendert im Bereich ${1} — hieraus lesen Gate und CI ihre Ausnahmen:"
   printf '%s\n' "$stat" | sed 's/^/  │ /'
   echo "  └─ Pruefen: git diff ${1} -- ${files[*]}"
@@ -312,7 +327,9 @@ check_build() {  # $1 = A..B
     echo "Pre-Push-Gate: Scope-Einordnung fehlt: $SCOPES_SCRIPT" >&2
     exit 2
   fi
-  if ! files="$(git diff --no-renames --name-only "$1" 2>/dev/null)"; then
+  # core.quotePath=false: Nicht-ASCII-Pfade kommen als Klartext, nicht als "docs/\303\244.md" —
+  # sonst ordnete changed-scopes.sh sie falsch ein.
+  if ! files="$(git -c core.quotePath=false diff --no-renames --name-only "$1" 2>/dev/null)"; then
     echo "Pre-Push-Gate: git diff ${1} fehlgeschlagen — Bau-Scope nicht bestimmbar" >&2
     exit 2
   fi

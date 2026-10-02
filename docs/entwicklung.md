@@ -1083,7 +1083,8 @@ Remote-Ref kennt):
    nachinstalliert; die CI scannt ohnehin.
 5. **Ausnahmedateien im Bereich.** Ändert der Bereich eine Datei, aus der Gate und CI ihre Ausnahmen
    lesen — `.gitleaksignore`, `.gitleaks.toml`, `scripts/lib/hygiene-rules.sh`,
-   `scripts/ci/pre-push-checks.sh`, `scripts/ci/public-hygiene.sh`, `scripts/git-hooks/*`,
+   `scripts/ci/pre-push-checks.sh`, `scripts/ci/public-hygiene.sh`, `scripts/ci/changed-scopes.sh`
+   (seine Liste lässt Bau und Tests aus), `scripts/git-hooks/*`,
    `.github/workflows/ci.yml` —, blockiert das Gate und zeigt den Diff-Umfang. Wer so etwas im
    selben Push lockert, bekäme sonst grün von genau der Prüfung, die er gerade aufweicht. Freigabe
    nach Durchsicht nur für genau diesen Stand: `MYSURICATES_PREPUSH_ALLOW_RULES=<sha der Spitze>

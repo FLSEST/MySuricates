@@ -102,7 +102,7 @@ else
   git cat-file -e "${HEAD}^{commit}" 2>/dev/null || all_true "Kopf ${HEAD} liegt nicht im Checkout"
   # --no-renames: eine verschobene Datei nennt alten UND neuen Pfad — ein Umzug aus dem Backend
   # heraus soll das Backend nicht ueberspringen. Drei Punkte: ab der Merge-Basis.
-  FILES="$(git diff --no-renames --name-only "${BASE}...${HEAD}" 2>/dev/null)" \
+  FILES="$(git -c core.quotePath=false diff --no-renames --name-only "${BASE}...${HEAD}" 2>/dev/null)" \
     || all_true "git diff ${BASE}...${HEAD} fehlgeschlagen"
 fi
 
