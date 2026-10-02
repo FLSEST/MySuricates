@@ -2,10 +2,10 @@ import { AlertTriangle } from 'lucide-react';
 import { useMemo } from 'react';
 import { Card, CardHeader } from '../ui';
 import { useT } from '../../i18n';
-import type { WorkflowRun } from '../../types';
+import type { DashboardRecentRun } from '../../types';
 
 interface FailingWorkflowsCardProps {
-  recentRuns?: WorkflowRun[];
+  recentRuns?: Pick<DashboardRecentRun, 'workflowName' | 'status'>[];
 }
 
 interface WorkflowFailStats {

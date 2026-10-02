@@ -2704,7 +2704,9 @@ Workflows und Läufe dieses Projekts ein — auch die Gesamtzahlen (`totalWorkfl
   "topWorkflows": [
     { "workflowId": "uuid", "workflowName": "Code Review", "runCount": 42 }
   ],
-  "recentRuns": [...],
+  "recentRuns": [
+    { "id": "uuid", "workflowId": "uuid", "workflowName": "Code Review", "projectName": "AutoPilot", "status": "COMPLETED", "startedAt": "2025-01-15T08:00:00Z", "completedAt": "2025-01-15T08:00:32Z", "durationMs": 32000 }
+  ],
   "timeSeries": [
     { "date": "2025-01-15", "count": 8, "successRate": 87.5, "failedCount": 1, "avgDurationMs": 32000, "totalCostUsd": 0.45, "totalTokens": 9500 }
   ],
@@ -2731,6 +2733,11 @@ Workflows und Läufe dieses Projekts ein — auch die Gesamtzahlen (`totalWorkfl
   }
 }
 ```
+
+`recentRuns` enthält die bis zu zehn neuesten Läufe im Zeitraum als schlanke Zeilen — nur die Felder
+oben, ohne Schritte, Metadaten und Eingabekontext. Den vollständigen Lauf liefert
+`GET /api/v1/executions/{id}`. Bis TODO 2ccb9e40 waren es ganze Läufe mit allen Schritten (rund 600 KB je
+Aufruf bei einem Abruf alle 30 s).
 
 `modelStats` gruppiert Schritte nach der Kombination aus `requestedModel` (angefordert),
 `provider` (KI-Anbieter) und `model` (gemeldet; wie bisher ohne Datums-Suffix).

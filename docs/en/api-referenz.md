@@ -2675,7 +2675,9 @@ project's workflows and runs — including the overall numbers (`totalWorkflows`
   "topWorkflows": [
     { "workflowId": "uuid", "workflowName": "Code Review", "runCount": 42 }
   ],
-  "recentRuns": [...],
+  "recentRuns": [
+    { "id": "uuid", "workflowId": "uuid", "workflowName": "Code Review", "projectName": "AutoPilot", "status": "COMPLETED", "startedAt": "2025-01-15T08:00:00Z", "completedAt": "2025-01-15T08:00:32Z", "durationMs": 32000 }
+  ],
   "timeSeries": [
     { "date": "2025-01-15", "count": 8, "successRate": 87.5, "failedCount": 1, "avgDurationMs": 32000, "totalCostUsd": 0.45, "totalTokens": 9500 }
   ],
@@ -2702,6 +2704,10 @@ project's workflows and runs — including the overall numbers (`totalWorkflows`
   }
 }
 ```
+
+`recentRuns` holds up to the ten newest runs in the time range as slim rows — only the fields above,
+without steps, metadata, or input context. `GET /api/v1/executions/{id}` returns the full run. Until
+TODO 2ccb9e40 these were whole runs with every step (about 600 KB per call, polled every 30 s).
 
 `modelStats` groups steps by the combination of `requestedModel` (requested),
 `provider` (AI provider), and `model` (reported; date suffixes are removed as before).

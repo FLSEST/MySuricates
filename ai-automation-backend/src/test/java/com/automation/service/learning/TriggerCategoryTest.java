@@ -1,5 +1,6 @@
 package com.automation.service.learning;
 
+import com.automation.dto.projection.DashboardRunRow;
 import com.automation.entity.TriggerSource;
 import com.automation.entity.WorkflowRun;
 import org.junit.jupiter.api.Test;
@@ -53,5 +54,20 @@ class TriggerCategoryTest {
         assertThat(distribution.otherAutomatic()).isEqualTo(2);
         assertThat(distribution.manual()).isZero();
         assertThat(distribution.scheduled()).isZero();
+    }
+
+    /** The dashboard's projected row counts the same way (TODO 2ccb9e40). */
+    @Test
+    void projectedRowsCountLikeRuns() {
+        assertThat(TriggerCategory.of(row(TriggerSource.WISH, null, null))).isEqualTo(TriggerCategory.OTHER_AUTOMATIC);
+        assertThat(TriggerCategory.of(row(null, "s-1", null))).isEqualTo(TriggerCategory.SCHEDULED);
+        assertThat(TriggerCategory.of(row(null, null, "true"))).isEqualTo(TriggerCategory.TODO_TRIGGER);
+        assertThat(TriggerCategory.of(row(null, null, "text"))).isEqualTo(TriggerCategory.MANUAL);
+        assertThat(TriggerCategory.of(row(null, null, null))).isEqualTo(TriggerCategory.MANUAL);
+    }
+
+    private static DashboardRunRow row(TriggerSource source, String scheduleId, String todoTriggerRunType) {
+        return new DashboardRunRow("r", null, null, null, null, source, scheduleId, null, null, null, null, null,
+                null, todoTriggerRunType, null);
     }
 }

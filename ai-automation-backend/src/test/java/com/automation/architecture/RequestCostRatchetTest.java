@@ -223,10 +223,10 @@ class RequestCostRatchetTest {
      * <p>Measured again on 2026-09-25 without the test transaction (TODO 5c56b3d1): every ceiling
      * held to the statement, none had to rise. {@code /learning/dashboard} — the route that had cost
      * 52 instead of 10 statements outside the test transaction — still runs without a transaction
-     * of its own, but since TODO 13d1e2a2 the query for its recent runs
-     * ({@code findByIdInWithStepsAndWorkflow}) fetches the project's container itself. Inside the
-     * test transaction the recent runs had borrowed the containers the window query left in the
-     * shared persistence context, so dropping that fetch stayed green here; now it shows.
+     * of its own, but since TODO 13d1e2a2 the query for its recent runs fetched the project's
+     * container itself. Inside the test transaction the recent runs had borrowed the containers the
+     * window query left in the shared persistence context, so dropping that fetch stayed green
+     * here; now it shows. Since TODO 2ccb9e40 the recent runs need no query of their own at all.
      *
      * <p><b>Some of these ceilings pin a known defect, not a target.</b> The first run of this test
      * found three N+1 patterns and one unbounded response; the ones still open are pinned so that
@@ -242,10 +242,22 @@ class RequestCostRatchetTest {
      *       re-selects it for every row whose project has no container — a found container is
      *       cached, "no container" is not. The queries behind the three routes now fetch the
      *       container along ({@code WorkflowRepository.findAllWithActiveProject},
-     *       {@code WorkflowRunRepository.findDashboardWindow} and
-     *       {@code findByIdInWithStepsAndWorkflow}, TODO 13d1e2a2) — the same move as
-     *       {@code /projects} and {@code /schedules} below. What is left is the query itself plus
-     *       the bundled run counts; the dashboard adds its counters and aggregations.</li>
+     *       the dashboard window query and the recent-runs query,
+     *       TODO 13d1e2a2) — the same move as {@code /projects} and {@code /schedules} below. What
+     *       is left is the query itself plus the bundled run counts; the dashboard adds its
+     *       counters and aggregations.</li>
+     *   <li>{@code /learning/dashboard}: 10 → 5 statements and 650 → 8 kB (measured 616 165 →
+     *       5 665 bytes, TODO 2ccb9e40). Its {@code recentRuns} were full runs with every step's
+     *       input and output, fetched by a query of their own; they are now slim
+     *       {@code RecentRunEntry} rows taken from the window the route loads anyway. The five run
+     *       counters of the overview come from ONE SUM/CASE query
+     *       ({@code WorkflowRunRepository.countOverview}). What is left: workflow count, run
+     *       counters, top workflows, the window and the step metadata. The window is a projection
+     *       ({@code WorkflowRunRepository.findDashboardRows}): no entities, no input context, from
+     *       the metadata/error JSON only the three values SQLite extracts — the bytes it no longer
+     *       reads do not show here, the statement count stays 5. The project filter sits in the
+     *       window and step queries instead of Java; the filtered route is measured as its own
+     *       entry (5 statements, 5 149 bytes).</li>
      *   <li>{@code /projects}: fixed, 4 → 1 statement. It was the same root cause as the three
      *       routes above — the nullable {@code @OneToOne(mappedBy)} {@code Project.container},
      *       resolved once per project. The list now runs through
@@ -393,7 +405,8 @@ class RequestCostRatchetTest {
             Map.entry("/api/v1/workflows", new Cost(2, 26_000)),
             Map.entry("/api/v1/executions", new Cost(5, 60_000)),
             Map.entry("/api/v1/workflows/{wf}/runs", new Cost(4, 5_000)),
-            Map.entry(DASHBOARD, new Cost(10, 650_000)),
+            Map.entry(DASHBOARD, new Cost(5, 8_000)),
+            Map.entry(DASHBOARD + "&projectId={goalProject}", new Cost(5, 7_000)),
             Map.entry("/api/v1/search?q=Workflow", new Cost(2, 18_000)),
             Map.entry("/api/v1/schedules", new Cost(3, 21_000)),
             Map.entry("/api/v1/schedules/{sched}/runs", new Cost(5, 5_000)),

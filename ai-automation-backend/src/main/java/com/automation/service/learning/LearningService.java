@@ -1,9 +1,8 @@
 package com.automation.service.learning;
 
+import com.automation.dto.projection.DashboardRunRow;
 import com.automation.dto.response.DashboardResponse;
-import com.automation.dto.response.WorkflowRunResponse;
 import com.automation.entity.*;
-import com.automation.mapper.WorkflowMapper;
 import com.automation.repository.WorkflowRepository;
 import com.automation.repository.WorkflowRunRepository;
 import lombok.RequiredArgsConstructor;
@@ -26,7 +25,6 @@ public class LearningService {
 
     private final WorkflowRunRepository runRepository;
     private final WorkflowRepository workflowRepository;
-    private final WorkflowMapper workflowMapper;
     private final WorkflowStatsService statsService;
     private final WorkflowSimilarityService similarityService;
     private final AgenticLearningService agenticService;
@@ -82,17 +80,6 @@ public class LearningService {
         return insightsService.getRunInsights(runId);
     }
 
-    /** Safely resolve workflow from run, returning null if the workflow was soft-deleted. */
-    private Workflow safeGetWorkflow(WorkflowRun run) {
-        try {
-            Workflow w = run.getWorkflow();
-            if (w != null) w.getName(); // force proxy init (getId() doesn't trigger it)
-            return w;
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
     public DashboardResponse getDashboard() {
         return getDashboard(30, null);
     }
@@ -103,52 +90,26 @@ public class LearningService {
 
         Instant windowStart = LocalDate.now().minusDays(days)
                 .atStartOfDay(ZoneId.systemDefault()).toInstant();
-        List<WorkflowRun> recentWindow = runRepository.findDashboardWindow(windowStart);
-
-        // Apply optional project filter
-        if (projectId != null && !projectId.isBlank()) {
-            recentWindow = recentWindow.stream()
-                    .filter(r -> {
-                        Workflow w = safeGetWorkflow(r);
-                        return w != null && w.getProject() != null
-                                && projectId.equals(w.getProject().getId());
-                    })
-                    .toList();
-        }
+        // Projected rows (no context, JSON values extracted by SQLite); the project filter sits in
+        // the query, not here (TODO 2ccb9e40).
+        String project = projectId == null || projectId.isBlank() ? null : projectId;
+        List<DashboardRunRow> recentWindow = runRepository.findDashboardRows(windowStart, project);
 
         double avgDurationMs = recentWindow.stream()
-                .filter(r -> r.getDurationMs() != null)
-                .mapToLong(WorkflowRun::getDurationMs)
+                .filter(r -> r.durationMs() != null)
+                .mapToLong(DashboardRunRow::durationMs)
                 .average()
                 .orElse(0);
 
-        // recentRuns: the "recent runs" widget needs the full steps (incl. input/output) for at
-        // most 10 runs. findDashboardWindow no longer fetches steps (that would drag every step's
-        // large TEXT columns across the whole window), so fetch them for just these 10 runs.
-        // Eager workflow+project+steps because getDashboard runs without a transaction (OSIV off).
-        List<String> recentIds = recentWindow.stream()
-                .limit(10)
-                .map(WorkflowRun::getId)
-                .toList();
-        List<WorkflowRunResponse> recentRuns;
-        if (recentIds.isEmpty()) {
-            recentRuns = List.of();
-        } else {
-            Map<String, WorkflowRun> recentById = runRepository.findByIdInWithStepsAndWorkflow(recentIds).stream()
-                    .collect(Collectors.toMap(WorkflowRun::getId, r -> r, (a, b) -> a));
-            recentRuns = recentIds.stream()
-                    .map(recentById::get)
-                    .filter(Objects::nonNull)
-                    .map(workflowMapper::toRunResponse)
-                    .toList();
-        }
+        // recentRuns: slim entries from the window already loaded — no query, no steps (TODO 2ccb9e40).
+        List<DashboardResponse.RecentRunEntry> recentRuns = DashboardRecentRuns.of(recentWindow);
 
         // Per-step aggregation source: a lightweight projection (status + metadata only), NOT the
         // full StepResult entities — avoids loading the large input/output/context_delta TEXT
         // columns for every step in the window (getDashboard never reads them). Keyed by run id;
         // ordered by stepIndex so the "first non-integration step wins" provider logic stays stable.
         Map<String, List<StepAgg>> stepsByRun = new HashMap<>();
-        for (Object[] row : runRepository.findStepMetadataForDashboard(windowStart)) {
+        for (Object[] row : runRepository.findStepMetadataForDashboard(windowStart, project)) {
             String stepRunId = (String) row[0];
             StepStatus stepStatus = (StepStatus) row[1];
             @SuppressWarnings("unchecked")
@@ -196,39 +157,34 @@ public class LearningService {
 
         Map<TriggerCategory, long[]> triggerCounts = new EnumMap<>(TriggerCategory.class);
 
-        for (WorkflowRun run : recentWindow) {
+        for (DashboardRunRow run : recentWindow) {
             String runProvider = null;
-            boolean runSuccess = run.getStatus() == RunStatus.COMPLETED;
+            boolean runSuccess = run.status() == RunStatus.COMPLETED;
             double runCost = 0.0;
             long runTokens = 0;
 
             triggerCounts.computeIfAbsent(TriggerCategory.of(run), k -> new long[1])[0]++;
 
-            // Gate status from run metadata
-            if (run.getMetadata() != null) {
-                Object gateStatus = run.getMetadata().get("gate_status");
-                if (gateStatus instanceof String gs && !gs.isBlank()) {
-                    gateStatusCounts.computeIfAbsent(gs, k -> new long[1])[0]++;
-                }
+            // Gate status from run metadata (text values only, extracted by the query)
+            String gs = run.gateStatus();
+            if (gs != null && !gs.isBlank()) {
+                gateStatusCounts.computeIfAbsent(gs, k -> new long[1])[0]++;
             }
 
-            // Failure reasons
-            if (run.getStatus() == RunStatus.FAILED && run.getError() != null) {
-                Object msg = run.getError().get("message");
-                if (msg instanceof String reason && !reason.isBlank()) {
-                    String truncated = reason.length() > 100 ? reason.substring(0, 100) + "..." : reason;
-                    failureReasonCounts.computeIfAbsent(truncated, k -> new long[1])[0]++;
-                }
+            // Failure reasons (the query sends the message of FAILED runs only)
+            String reason = run.failureMessage();
+            if (run.status() == RunStatus.FAILED && reason != null && !reason.isBlank()) {
+                String truncated = reason.length() > 100 ? reason.substring(0, 100) + "..." : reason;
+                failureReasonCounts.computeIfAbsent(truncated, k -> new long[1])[0]++;
             }
 
             // Cost by workflow
-            Workflow wf = safeGetWorkflow(run);
-            String wfId = wf != null ? wf.getId() : "unknown";
-            String wfName = wf != null ? wf.getName() : "Unknown";
+            String wfId = run.workflowId() != null ? run.workflowId() : "unknown";
+            String wfName = run.workflowName() != null ? run.workflowName() : "Unknown";
             workflowRunCountMap.computeIfAbsent(wfId, k -> new long[1])[0]++;
             workflowNameMap.putIfAbsent(wfId, wfName);
 
-            for (StepAgg step : stepsByRun.getOrDefault(run.getId(), List.of())) {
+            for (StepAgg step : stepsByRun.getOrDefault(run.id(), List.of())) {
                 if (step.metadata() == null) continue;
                 Map<String, Object> meta = step.metadata();
 
@@ -277,8 +233,8 @@ public class LearningService {
             }
 
             // Store per-run aggregates for time series
-            runCostMap.put(run.getId(), new double[]{runCost});
-            runTokensMap.put(run.getId(), new long[]{runTokens});
+            runCostMap.put(run.id(), new double[]{runCost});
+            runTokensMap.put(run.id(), new long[]{runTokens});
 
             // Accumulate cost by workflow
             workflowCostMap.computeIfAbsent(wfId, k -> new double[1])[0] += runCost;
@@ -293,28 +249,28 @@ public class LearningService {
 
         // --- Time series with extended fields ---
         List<DashboardResponse.TimeSeriesPoint> timeSeries = recentWindow.stream()
-                .filter(r -> r.getStartedAt() != null)
-                .collect(Collectors.groupingBy(r -> r.getStartedAt().atZone(ZoneId.systemDefault()).toLocalDate()))
+                .filter(r -> r.startedAt() != null)
+                .collect(Collectors.groupingBy(r -> r.startedAt().atZone(ZoneId.systemDefault()).toLocalDate()))
                 .entrySet().stream()
                 .sorted(Map.Entry.comparingByKey())
                 .map(e -> {
-                    List<WorkflowRun> dayRuns = e.getValue();
+                    List<DashboardRunRow> dayRuns = e.getValue();
                     long count = dayRuns.size();
                     long completed = dayRuns.stream()
-                            .filter(r -> r.getStatus() == RunStatus.COMPLETED
-                                    || r.getStatus() == RunStatus.COMPLETED_WITH_ERRORS).count();
+                            .filter(r -> r.status() == RunStatus.COMPLETED
+                                    || r.status() == RunStatus.COMPLETED_WITH_ERRORS).count();
                     long failed = dayRuns.stream()
-                            .filter(r -> r.getStatus() == RunStatus.FAILED).count();
+                            .filter(r -> r.status() == RunStatus.FAILED).count();
                     double rate = count > 0 ? (double) completed / count : 0;
                     double dayAvgDuration = dayRuns.stream()
-                            .filter(r -> r.getDurationMs() != null)
-                            .mapToLong(WorkflowRun::getDurationMs)
+                            .filter(r -> r.durationMs() != null)
+                            .mapToLong(DashboardRunRow::durationMs)
                             .average().orElse(0);
                     double dayCost = dayRuns.stream()
-                            .mapToDouble(r -> runCostMap.getOrDefault(r.getId(), new double[]{0})[0])
+                            .mapToDouble(r -> runCostMap.getOrDefault(r.id(), new double[]{0})[0])
                             .sum();
                     long dayTokens = dayRuns.stream()
-                            .mapToLong(r -> runTokensMap.getOrDefault(r.getId(), new long[]{0})[0])
+                            .mapToLong(r -> runTokensMap.getOrDefault(r.id(), new long[]{0})[0])
                             .sum();
                     return new DashboardResponse.TimeSeriesPoint(
                             e.getKey().toString(), count, rate, failed, dayAvgDuration, dayCost, dayTokens);

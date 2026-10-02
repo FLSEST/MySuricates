@@ -1,7 +1,7 @@
 package com.automation.service.learning;
 
+import com.automation.dto.projection.RunOverviewCounts;
 import com.automation.dto.response.DashboardResponse.TopWorkflowEntry;
-import com.automation.entity.RunStatus;
 import com.automation.repository.WorkflowRepository;
 import com.automation.repository.WorkflowRunRepository;
 import org.junit.jupiter.api.Test;
@@ -32,11 +32,7 @@ class DashboardOverviewTest {
     @ValueSource(strings = {"  "})
     void zaehltOhneProjektAllesUndErfolgEinschliesslichMitFehlern(String projectId) {
         when(workflows.count()).thenReturn(12L);
-        when(runs.count()).thenReturn(100L);
-        when(runs.countByStatus(RunStatus.COMPLETED)).thenReturn(70L);
-        when(runs.countByStatus(RunStatus.COMPLETED_WITH_ERRORS)).thenReturn(5L);
-        when(runs.countByStatus(RunStatus.FAILED)).thenReturn(20L);
-        when(runs.countByStartedAtAfter(TODAY)).thenReturn(4L);
+        when(runs.countOverview(TODAY)).thenReturn(new RunOverviewCounts(100, 75, 20, 4));
         when(runs.findTopWorkflows()).thenReturn(List.<Object[]>of(
                 new Object[]{"w1", "Nightly", 40L}, new Object[]{"w2", "Audit", 15L}));
 
@@ -45,18 +41,14 @@ class DashboardOverviewTest {
         assertThat(overview).isEqualTo(new DashboardOverview(12, 100, 75, 20, 4, List.of(
                 new TopWorkflowEntry("w1", "Nightly", 40), new TopWorkflowEntry("w2", "Audit", 15))));
         assertThat(overview.successRate()).isEqualTo(0.75);
-        verify(runs, never()).countByProject(anyString());
+        verify(runs, never()).countOverviewByProject(anyString(), any());
         verify(workflows, never()).countByProjectId(anyString());
     }
 
     @Test
     void zaehltMitProjektNurDessenWorkflowsUndRuns() {
         when(workflows.countByProjectId("p1")).thenReturn(3L);
-        when(runs.countByProject("p1")).thenReturn(10L);
-        when(runs.countByProjectAndStatus("p1", RunStatus.COMPLETED)).thenReturn(6L);
-        when(runs.countByProjectAndStatus("p1", RunStatus.COMPLETED_WITH_ERRORS)).thenReturn(1L);
-        when(runs.countByProjectAndStatus("p1", RunStatus.FAILED)).thenReturn(2L);
-        when(runs.countByProjectAndStartedAtAfter("p1", TODAY)).thenReturn(1L);
+        when(runs.countOverviewByProject("p1", TODAY)).thenReturn(new RunOverviewCounts(10, 7, 2, 1));
         when(runs.findTopWorkflowsByProject("p1")).thenReturn(List.<Object[]>of(new Object[]{"w9", "Build", 10L}));
 
         DashboardOverview overview = DashboardOverview.load(runs, workflows, "p1", TODAY);
@@ -66,7 +58,7 @@ class DashboardOverviewTest {
         assertThat(overview.successRate()).isEqualTo(0.7);
         verify(runs, never()).count();
         verify(workflows, never()).count();
-        verify(runs, never()).countByStatus(any());
+        verify(runs, never()).countOverview(any());
         verify(runs, never()).findTopWorkflows();
     }
 
@@ -79,6 +71,7 @@ class DashboardOverviewTest {
 
     @Test
     void ohneRunsKeineTopWorkflows() {
+        when(runs.countOverviewByProject("leer", TODAY)).thenReturn(new RunOverviewCounts(0, 0, 0, 0));
         when(runs.findTopWorkflowsByProject("leer")).thenReturn(List.of());
 
         DashboardOverview overview = DashboardOverview.load(runs, workflows, "leer", TODAY);

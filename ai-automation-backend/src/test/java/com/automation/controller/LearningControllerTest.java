@@ -2,6 +2,7 @@ package com.automation.controller;
 
 import com.automation.dto.response.DashboardResponse;
 import com.automation.dto.response.PlatformStatsResponse;
+import com.automation.entity.RunStatus;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.security.RateLimitConfig;
@@ -16,6 +17,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
@@ -61,6 +63,34 @@ class LearningControllerTest {
                 .andExpect(jsonPath("$.totalRuns").value(20))
                 .andExpect(jsonPath("$.totalInputTokens").value(3000))
                 .andExpect(jsonPath("$.triggerDistribution.manual").value(15));
+    }
+
+    /**
+     * The recent runs carry what the widget shows — no steps, metadata or input context
+     * (TODO 2ccb9e40: they made the response about 600 KB per poll).
+     */
+    @Test
+    void getDashboard_recentRunsAreSlimRows() throws Exception {
+        var recent = new DashboardResponse.RecentRunEntry("run-1", "wf-1", "Nightly", "AutoPilot",
+                RunStatus.FAILED, Instant.parse("2026-10-01T06:00:00Z"), Instant.parse("2026-10-01T06:01:00Z"), 60_000L);
+        DashboardResponse dashboard = new DashboardResponse(
+                1L, 1L, 0L, 0L, 1L, 60_000.0, 0.0, 0.0, 0L, 0L, 0L,
+                List.of(), List.of(recent), List.of(), List.of(), List.of(),
+                List.of(), List.of(), List.of(), List.of(), List.of(),
+                new DashboardResponse.TriggerDistribution(1, 0, 0, 0, 0, 0));
+        when(learningService.getDashboard(30, null)).thenReturn(dashboard);
+
+        mockMvc.perform(get("/api/v1/learning/dashboard"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recentRuns[0].id").value("run-1"))
+                .andExpect(jsonPath("$.recentRuns[0].workflowId").value("wf-1"))
+                .andExpect(jsonPath("$.recentRuns[0].workflowName").value("Nightly"))
+                .andExpect(jsonPath("$.recentRuns[0].projectName").value("AutoPilot"))
+                .andExpect(jsonPath("$.recentRuns[0].status").value("FAILED"))
+                .andExpect(jsonPath("$.recentRuns[0].durationMs").value(60_000))
+                .andExpect(jsonPath("$.recentRuns[0].startedAt").exists())
+                .andExpect(jsonPath("$.recentRuns[0].steps").doesNotExist())
+                .andExpect(jsonPath("$.recentRuns[0].inputContext").doesNotExist());
     }
 
     @Test
