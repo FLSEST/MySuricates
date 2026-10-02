@@ -57,6 +57,18 @@ class ShippedDefinitionsTest {
     }
 
     @Test
+    void poolFiles_whenGitTracksNoJsonThere_fallBackToAllJsonFiles() throws Exception {
+        // git answers with exit 0 and an empty list (repository, but nothing tracked in the pool):
+        // an empty result would let every gate pass without reading anything.
+        Path pool = Files.createDirectories(tmp.resolve("workflow-pool"));
+        git(tmp, "init", "-q");
+        Files.writeString(pool.resolve("only-local.json"), "{}");
+
+        assertThat(ShippedDefinitions.poolFiles(pool)).extracting(p -> p.getFileName().toString())
+                .containsExactly("only-local.json");
+    }
+
+    @Test
     void poolFiles_ofThisRepository_leaveIgnoredFilesOut() throws Exception {
         Path pool = ShippedDefinitions.poolDirectoryOrNull();
         assertThat(pool).as("workflow-pool reachable from the backend module").isNotNull();
@@ -66,9 +78,10 @@ class ShippedDefinitionsTest {
                 .filter(name -> name.endsWith(".json")).toList();
         ignored.waitFor();
 
+        // Usually empty (a fresh worktree has no private files) — then this only checks non-empty.
         assertThat(ShippedDefinitions.poolFiles(pool)).isNotEmpty()
                 .extracting(p -> p.getFileName().toString())
-                .doesNotContainAnyElementsOf(ignoredNames);
+                .noneMatch(ignoredNames::contains);
     }
 
     private static void git(Path dir, String... args) throws Exception {

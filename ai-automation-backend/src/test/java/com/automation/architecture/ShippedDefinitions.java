@@ -92,17 +92,18 @@ public final class ShippedDefinitions {
      * (TODO ca858a23). Next to them a maintainer keeps private definitions, ignored via
      * {@code .git/info/exclude} — a gate that reads them fails locally on files nobody gets, while a
      * fresh worktree stays green. Without git (a source archive) every JSON file in the directory
-     * counts.
+     * counts — and so it does when git answers with no tracked JSON file at all: a gate that reads
+     * nothing would pass silently.
      */
     public static List<Path> poolFiles(Path pool) throws IOException {
-        Optional<List<String>> tracked = gitTrackedNames(pool);
-        if (tracked.isPresent()) {
-            return tracked.get().stream()
-                    .filter(name -> name.endsWith(".json"))
-                    .map(pool::resolve)
-                    .filter(Files::isRegularFile)
-                    .sorted()
-                    .toList();
+        Optional<List<Path>> tracked = gitTrackedNames(pool).map(names -> names.stream()
+                .filter(name -> name.endsWith(".json"))
+                .map(pool::resolve)
+                .filter(Files::isRegularFile)
+                .sorted()
+                .toList());
+        if (tracked.isPresent() && !tracked.get().isEmpty()) {
+            return tracked.get();
         }
         try (Stream<Path> stream = Files.list(pool)) {
             return stream.filter(p -> p.toString().endsWith(".json")).sorted().toList();
