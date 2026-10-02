@@ -149,6 +149,30 @@ class InstanceSyncHelperTest {
         assertThat(result.errors()).containsExactly("Setting 'auto-repair-default': boom");
     }
 
+    /** Ein neu angelegter Workflow verliert auf dem Ziel weder Metadaten noch Standard-Kontext (62422aef). */
+    @Test
+    void sync_newWorkflow_carriesMetadataAndDefaultContext() throws Exception {
+        Project proj = Project.builder().id("p1").name("Proj").path("/proj").type(ProjectType.CODE).build();
+        Workflow wf = Workflow.builder().id("wf1").name("NewWF").project(proj).blocks(List.of())
+                .metadata(new java.util.HashMap<>(Map.of("category", "ops")))
+                .defaultContext(new java.util.HashMap<>(Map.of("env", "prod"))).build();
+        when(projectRepository.findAll()).thenReturn(List.of(proj));
+        when(workflowRepository.findAllReadOnly()).thenReturn(List.of(wf));
+        when(skillRepository.findByBuiltin(false)).thenReturn(List.of());
+        when(httpClient.httpGet(TARGET + "/projects")).thenReturn(objectMapper.readTree("[{\"name\":\"Proj\",\"path\":\"/proj\",\"id\":\"tp1\"}]"));
+        when(httpClient.httpGet(TARGET + "/workflows")).thenReturn(objectMapper.readTree("[]"));
+        when(httpClient.httpGet(TARGET + "/skills")).thenReturn(objectMapper.readTree("[]"));
+        when(httpClient.httpPost(eq(TARGET + "/workflows/import"), any())).thenReturn(objectMapper.readTree("{\"id\":\"twf1\"}"));
+
+        syncHelper.syncDefinitionsTo(TARGET, null, null);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> importCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(httpClient).httpPost(eq(TARGET + "/workflows/import"), importCaptor.capture());
+        assertThat(importCaptor.getValue()).containsEntry("metadata", Map.of("category", "ops"))
+                .containsEntry("defaultContext", Map.of("env", "prod"));
+    }
+
     /** Der Versionsstand kommt mit – per Import wie per PUT (62422aef). */
     @Test
     void sync_carriesTheVersionLabel_onImportAndUpdate() throws Exception {

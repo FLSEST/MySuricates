@@ -177,31 +177,17 @@ public class InstanceSyncHelper {
                 if (existingWorkflow != null) {
                     String targetWorkflowId = existingWorkflow.path("id").asText();
                     workflowIdMapping.put(workflow.getId(), targetWorkflowId);
-                    Map<String, Object> updateBody = new LinkedHashMap<>();
-                    updateBody.put("name", workflow.getName());
-                    updateBody.put("description", workflow.getDescription());
-                    updateBody.put("icon", workflow.getIcon());
-                    updateBody.put("blocks", workflow.getBlocks());
-                    if (workflow.getInstructions() != null) updateBody.put("instructions", workflow.getInstructions());
-                    if (workflow.getModel() != null) updateBody.put("model", workflow.getModel());
-                    putVersion(updateBody, workflow);
-                    if (workflow.getMetadata() != null && !workflow.getMetadata().isEmpty()) {
-                        updateBody.put("metadata", workflow.getMetadata());
-                    }
-                    httpClient.httpPut(targetBaseUrl + "/workflows/" + targetWorkflowId, updateBody);
+                    httpClient.httpPut(targetBaseUrl + "/workflows/" + targetWorkflowId, definitionBody(workflow));
                     workflowsSynced++;
                     markStableSynced(workflow.getId());
                     log.info("Updated workflow on target: {}", workflow.getName());
                 } else {
-                    Map<String, Object> importBody = new LinkedHashMap<>();
+                    Map<String, Object> importBody = definitionBody(workflow);
                     if (targetProjectId != null) importBody.put("projectId", targetProjectId);
-                    importBody.put("name", workflow.getName());
-                    importBody.put("description", workflow.getDescription());
-                    importBody.put("icon", workflow.getIcon());
-                    importBody.put("blocks", workflow.getBlocks());
-                    if (workflow.getInstructions() != null) importBody.put("instructions", workflow.getInstructions());
-                    if (workflow.getModel() != null) importBody.put("model", workflow.getModel());
-                    putVersion(importBody, workflow);
+                    // A new workflow starts with its default context too; an update leaves the target's own
+                    if (workflow.getDefaultContext() != null && !workflow.getDefaultContext().isEmpty()) {
+                        importBody.put("defaultContext", workflow.getDefaultContext());
+                    }
                     JsonNode created = httpClient.httpPost(targetBaseUrl + "/workflows/import", importBody);
                     if (created != null && !created.path("id").isMissingNode()) {
                         workflowIdMapping.put(workflow.getId(), created.path("id").asText());
@@ -402,9 +388,21 @@ public class InstanceSyncHelper {
         });
     }
 
-    /** The version label travels along (TODO 62422aef); a target that does not know the field yet ignores it. */
-    private static void putVersion(Map<String, Object> body, Workflow workflow) {
+    /**
+     * The definition fields PUT and import share. The version label travels along (TODO 62422aef); a target
+     * that does not know a field yet ignores it.
+     */
+    private static Map<String, Object> definitionBody(Workflow workflow) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("name", workflow.getName());
+        body.put("description", workflow.getDescription());
+        body.put("icon", workflow.getIcon());
+        body.put("blocks", workflow.getBlocks());
+        if (workflow.getInstructions() != null) body.put("instructions", workflow.getInstructions());
+        if (workflow.getModel() != null) body.put("model", workflow.getModel());
         if (workflow.getVersion() != null && !workflow.getVersion().isBlank()) body.put("version", workflow.getVersion());
+        if (workflow.getMetadata() != null && !workflow.getMetadata().isEmpty()) body.put("metadata", workflow.getMetadata());
+        return body;
     }
 
     /** Updates stable_synced_at via raw JDBC — bypasses Hibernate to avoid @LastModifiedDate. */
