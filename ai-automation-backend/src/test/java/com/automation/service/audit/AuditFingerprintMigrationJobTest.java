@@ -545,6 +545,60 @@ class AuditFingerprintMigrationJobTest {
                 .as("Pfadregel: kein fester Wert").isEqualTo("docs/notes.md");
     }
 
+    /**
+     * Review zu 802f740a: zwei Befunde derselben festen Regel mit altem subject — einer davon eingeordnet —
+     * und der kanonische. Alle drei werden einer, die Einordnung samt Notiz bleibt, egal in welcher
+     * Reihenfolge der Merge die Wiedergaenger trifft.
+     */
+    @Test
+    void mergesTwoDriftedSubjectsAndTheCanonicalOne_keepingTheAcceptance() {
+        AuditFinding canonical = savePublicReadinessFinding("public.deadcode.markers", "repository",
+                AuditFindingStatus.OPEN, T0, T0);
+        AuditFinding accepted = savePublicReadinessFinding("public.deadcode.markers", "ai-automation-backend",
+                AuditFindingStatus.ACCEPTED_RISK, T1, T1);
+        accepted.setDispositionNote("Marker sind Absicht");
+        accepted.setDispositionAt(T1);
+        findingRepository.saveAndFlush(accepted);
+        savePublicReadinessFinding("public.deadcode.markers", "ai-automation-frontend", AuditFindingStatus.OPEN, T2, T2);
+
+        assertThat(job.migrate()).isTrue();
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(findingRepository.findByProjectIdAndAuditKey(projectId, PUBLIC_READINESS))
+                .extracting(AuditFinding::getId).containsExactly(canonical.getId());
+        AuditFinding merged = findingRepository.findById(canonical.getId()).orElseThrow();
+        assertThat(merged.getSubject()).isEqualTo("repository");
+        assertThat(merged.getStatus()).isEqualTo(AuditFindingStatus.ACCEPTED_RISK);
+        assertThat(merged.getDispositionNote()).isEqualTo("Marker sind Absicht");
+    }
+
+    /**
+     * Review zu 802f740a: Tauschen zwei Ueberlebende ihre Fingerprints, braeche uq(project_id, audit_key,
+     * fingerprint) beim ersten Schreiben — und der Job scheiterte bei jedem Start erneut. Er schreibt
+     * deshalb zweiphasig (erst ein Platzhalter, dann das Ziel).
+     */
+    @Test
+    void twoSurvivorsSwappingTheirFingerprints_doNotBreakTheUniqueConstraint() {
+        String fpA = AuditSnapshotApplier.fingerprint(projectId, PUBLIC_READINESS, "public.privacy.private-terms", "docs/a.md");
+        String fpB = AuditSnapshotApplier.fingerprint(projectId, PUBLIC_READINESS, "public.privacy.private-terms", "docs/b.md");
+        AuditFinding a = savePublicReadinessFinding("public.privacy.private-terms", "docs/a.md", AuditFindingStatus.OPEN, T1, T1);
+        AuditFinding b = savePublicReadinessFinding("public.privacy.private-terms", "docs/b.md", AuditFindingStatus.OPEN, T1, T1);
+        a.setFingerprint("fp-tmp");
+        findingRepository.saveAndFlush(a);
+        b.setFingerprint(fpA);
+        findingRepository.saveAndFlush(b);
+        a.setFingerprint(fpB);
+        findingRepository.saveAndFlush(a);
+
+        assertThat(job.migrate()).as("der Scope laeuft durch").isTrue();
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(findingRepository.findById(a.getId()).orElseThrow().getFingerprint()).isEqualTo(fpA);
+        assertThat(findingRepository.findById(b.getId()).orElseThrow().getFingerprint()).isEqualTo(fpB);
+    }
+
     private ListAppender<ILoggingEvent> attachLogAppender() {
         Logger logger = (Logger) LoggerFactory.getLogger(AuditFingerprintMigrationJob.class);
         previousLogLevel = logger.getLevel();

@@ -206,15 +206,21 @@ public class AuditFingerprintMigrationJob {
         // Erst die Dubletten wirklich loeschen: uq(project_id, audit_key, fingerprint) wuerde sonst
         // brechen, weil Hibernate Updates vor Deletes schreibt.
         findingRepository.flush();
-        int rehashed = 0;
+        // Zweiphasig: Tauschen zwei Ueberlebende ihre Fingerprints, braeche uq(...) schon beim ersten
+        // UPDATE — und der Job scheiterte bei jedem Start erneut. Erst ein eindeutiger Platzhalter je
+        // Datensatz, flush, dann das Ziel.
+        List<Map.Entry<String, AuditFinding>> rehashing = new ArrayList<>();
         for (Map.Entry<String, AuditFinding> survivor : survivors.entrySet()) {
             applyRuleKey(survivor.getValue(), normalizedKeys.get(survivor.getValue()));
             applyFixedSubject(survivor.getValue(), normalizedKeys.get(survivor.getValue()));
             if (!survivor.getKey().equals(survivor.getValue().getFingerprint())) {
-                survivor.getValue().setFingerprint(survivor.getKey());
-                rehashed++;
+                survivor.getValue().setFingerprint("migrating:" + survivor.getValue().getId());
+                rehashing.add(survivor);
             }
         }
+        findingRepository.flush();
+        rehashing.forEach(survivor -> survivor.getValue().setFingerprint(survivor.getKey()));
+        int rehashed = rehashing.size();
         findingRepository.flush();
         closeManagedTodosOfTerminalTargets(mergeTargets);
         return new int[]{merged, rehashed};
