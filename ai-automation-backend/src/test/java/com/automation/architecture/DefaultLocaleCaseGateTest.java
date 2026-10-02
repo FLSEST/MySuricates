@@ -22,7 +22,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 class DefaultLocaleCaseGateTest {
 
     private static final Path MAIN = Path.of("src/main/java");
-    private static final Pattern DEFAULT_LOCALE_CASE = Pattern.compile("\\.to(Upper|Lower)Case\\(\\)");
+    /** A call without arguments, and the method reference {@code String::toUpperCase}, which is the same call. */
+    private static final Pattern DEFAULT_LOCALE_CASE =
+            Pattern.compile("\\.to(Upper|Lower)Case\\(\\)|String::to(Upper|Lower)Case\\b");
 
     @Test
     void caseConversionsNameTheirLocale() throws IOException {
@@ -38,7 +40,7 @@ class DefaultLocaleCaseGateTest {
             }
         }
         assertThat(offenders)
-                .as("toUpperCase()/toLowerCase() depend on the default locale – use Locale.ROOT")
+                .as("toUpperCase()/toLowerCase() and String::toUpperCase depend on the default locale – use Locale.ROOT")
                 .isEmpty();
     }
 }

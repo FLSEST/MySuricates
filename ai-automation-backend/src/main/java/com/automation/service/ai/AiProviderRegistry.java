@@ -43,7 +43,7 @@ public class AiProviderRegistry {
     public void initCache() {
         cachedDefaultProviderId = appSettingsRepository.get("default-ai-provider")
                 .filter(v -> !v.isBlank() && providers.containsKey(v.toUpperCase(Locale.ROOT)))
-                .map(String::toUpperCase)
+                .map(v -> v.toUpperCase(Locale.ROOT))
                 .orElse(config.getDefaultProvider());
         log.info("Default AI provider cached: {}", cachedDefaultProviderId);
     }
@@ -59,7 +59,7 @@ public class AiProviderRegistry {
     public void refreshDefaultProviderCache() {
         cachedDefaultProviderId = appSettingsRepository.get("default-ai-provider")
                 .filter(v -> !v.isBlank() && providers.containsKey(v.toUpperCase(Locale.ROOT)))
-                .map(String::toUpperCase)
+                .map(v -> v.toUpperCase(Locale.ROOT))
                 .orElse(config.getDefaultProvider());
         log.info("Default AI provider cache refreshed: {}", cachedDefaultProviderId);
     }
