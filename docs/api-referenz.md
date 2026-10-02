@@ -3009,7 +3009,9 @@ Chain aktualisieren.
 
 Chain löschen.
 
-**Response:** `204 No Content`
+**Response:** `204 No Content`; `409` (`STATE_CONFLICT`, `messageKey: CHAIN_RUN_ACTIVE`), solange die Chain einen
+Lauf im Status `PENDING`, `RUNNING` oder `PAUSED` hat — der liefe sonst ohne Chain weiter und startete ihre
+Workflows. Erst abwarten oder `POST /api/v1/chains/runs/{runId}/cancel`, dann löschen.
 
 ### `POST /api/v1/chains/{id}/execute`
 

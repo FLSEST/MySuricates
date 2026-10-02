@@ -491,13 +491,21 @@ AUTOMATION_RATE_LIMIT_RPM=6000 AUTOMATION_DISCOVERY_AUTO_TAGGING_ENABLED=false \
   Schalter (`application-integration.yml`, bewacht von `IntegrationProfileAiIsolationTest`).
 - **`AUTOMATION_RATE_LIMIT_RPM=6000`**: Das Limit von 120 Anfragen je Minute bricht einen Cypress-Lauf sonst ab.
 - Vite für die Oberfläche auf Port `5173` (CORS lässt nur 3000/5173 zu):
-  `VITE_HTTPS=false VITE_API_BASE_URL=http://localhost:19090/api/v1 VITE_WS_BASE_URL=ws://localhost:19090 npx vite --port 5173`.
+  `VITE_CACHE_DIR="$S/vite-cache" VITE_HTTPS=false VITE_API_BASE_URL=http://localhost:19090/api/v1 VITE_WS_BASE_URL=ws://localhost:19090 npx vite --port 5173`.
+- **`VITE_CACHE_DIR`**: Im Worktree ist `node_modules` ein Symlink auf den Haupt-Checkout. Ohne eigenes
+  Verzeichnis schreibt der Abhängigkeits-Optimizer dieses Vite in `node_modules/.vite` des Haupt-Checkouts —
+  denselben Cache, aus dem das laufende Vite auf `:3000` liefert. `vite.config.ts` setzt `cacheDir` auf den
+  Pfad aus der Variable.
 
 ### Testdaten und Cleanup
 
 - **Dev-Target:** erzeugte Cypress-Projekte, Workflows, Chains und Runs landen auf Dev
 - **Test-Target:** dieselben Daten landen auf der Test-Instanz
 - `cy.apiCleanup()` räumt nur Cypress-Testdaten mit dem Prefix `Cypress` auf
+- `chains.cy.ts` führt eine Chain echt aus; jeder Workflow-Lauf startet dabei den Projekt-Container
+  `automation-<projectId>`. Die Spec wartet deshalb das Ende des Chain-Laufs ab, bevor sie die Chain löscht,
+  und räumt in `after()` über die API der Instanz auf (Läufe abwarten, `POST /projects/{id}/stop`, Workflows
+  und Projekt löschen) — nicht über Docker direkt
 - Für die Test-Instanz kann zusätzlich `POST /api/v1/testing/reset` verwendet werden, wenn ein kompletter Reset gewünscht ist
 
 **Teststruktur:**
@@ -1121,6 +1129,7 @@ und wird erzeugt, ebenso das Verzeichnis [docs/diagramme.md](diagramme.md):
 python3 scripts/docs-diagrams.py                # HTML, englische Seiten und Verzeichnisse neu erzeugen
 python3 scripts/docs-diagrams.py --check        # meldet Drift und Übersetzungslücken, Exit-Code 1
 python3 scripts/docs-diagrams.py --add-missing  # fehlende Übersetzungsschlüssel leer eintragen
+python3 scripts/docs-diagrams.py --site _site   # Seiten für GitHub Pages in ein leeres Verzeichnis
 python3 -m unittest discover -s scripts/tests -p 'test_docs_diagrams.py'
 ```
 
@@ -1155,6 +1164,18 @@ Schlüssel mit leerem Wert in Lesereihenfolge ein; verwaiste bleiben stehen, bis
 oft ist ihr Wert, leicht angepasst, die Übersetzung des neuen Schlüssels. Unbekannte Mermaid-Syntax
 (ein neuer Diagrammtyp, eine Zeile ohne Regel) bricht mit Exit-Code 2 ab, statt deutschen Text still
 durchzulassen.
+
+**GitHub Pages.** `.github/workflows/pages.yml` veröffentlicht die Seiten bei jedem Push auf `main`, der
+eine Diagramm-Quelle, eine Übersetzungstabelle oder das Skript ändert (und von Hand per
+`workflow_dispatch`): erst `--check`, dann `--site _site`, dann `actions/upload-pages-artifact` und
+`actions/deploy-pages`. `--site` baut aus der Markdown-Quelle, nicht aus den HTML-Dateien im Repo, und
+schreibt `index.html` (Verzeichnis aus derselben Tabelle wie `diagramme.md`), `de/<name>-diagrams.html`,
+`en/index.html` und `en/<name>-diagrams.html`; jede Seite verlinkt Verzeichnis und andere Sprache. Ist
+eine Übersetzung offen, entsteht nichts (Exit-Code 1). Einmalig in den Repo-Einstellungen nötig:
+Pages auf GitHub Actions stellen (Settings → Pages → Source **GitHub Actions** — nicht „Deploy from
+branch“, das würde ganz `docs/` samt `plans/` veröffentlichen) und die Repo-Variable
+`PAGES_ENABLED=true` setzen (Settings → Secrets and variables → Actions → Variables). Ohne die Variable
+läuft nur der Bau samt `--check`, der Deploy-Job entfällt.
 
 ## Abhängigkeits-Meldungen (Frontend)
 

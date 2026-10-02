@@ -2249,6 +2249,7 @@ export const en = {
       NO_FAILED_RUNS: 'Workflow \'{name}\' has no failed runs',
       TEST_INSTANCE_NOT_RUNNING: 'Test instance is not running or not healthy. Start it first.',
       STABLE_INSTANCE_NOT_RUNNING: 'Stable instance is not running or not healthy. Start it first.',
+      CHAIN_RUN_ACTIVE: 'The chain still has a running or paused run. Wait for it to finish or cancel it, then delete the chain.',
       MODULE_DISABLED: '{what} requires module \'{module}\', which is disabled on this instance — set {property}=true and restart',
       MODULE_DISABLED_SWITCHABLE: '{what} requires module \'{module}\', which is disabled on this instance — set {property}=true and restart (or switch it on under Settings → Modules if automation.modules.ui-editable is true)',
       RUN_RETENTION_LOCKED: 'Run retention can only be extended while deleting runs is disabled (automation.executions.allow-delete=false): {current} -> {requested} days',

@@ -480,13 +480,21 @@ AUTOMATION_RATE_LIMIT_RPM=6000 AUTOMATION_DISCOVERY_AUTO_TAGGING_ENABLED=false \
   same switch (`application-integration.yml`, guarded by `IntegrationProfileAiIsolationTest`).
 - **`AUTOMATION_RATE_LIMIT_RPM=6000`**: the limit of 120 requests per minute would otherwise abort a Cypress run.
 - Vite for the UI on port `5173` (CORS admits only 3000/5173):
-  `VITE_HTTPS=false VITE_API_BASE_URL=http://localhost:19090/api/v1 VITE_WS_BASE_URL=ws://localhost:19090 npx vite --port 5173`.
+  `VITE_CACHE_DIR="$S/vite-cache" VITE_HTTPS=false VITE_API_BASE_URL=http://localhost:19090/api/v1 VITE_WS_BASE_URL=ws://localhost:19090 npx vite --port 5173`.
+- **`VITE_CACHE_DIR`**: in a worktree `node_modules` is a symlink to the main checkout. Without a directory
+  of its own, this Vite's dependency optimizer writes to the main checkout's `node_modules/.vite` — the
+  same cache the running Vite on `:3000` serves from. `vite.config.ts` sets `cacheDir` to the path from the
+  variable.
 
 ### Test Data and Cleanup
 
 - **Dev target:** Cypress-created projects, workflows, chains, and runs end up in Dev
 - **Test target:** The same data ends up on the test instance
 - `cy.apiCleanup()` only cleans up Cypress test data with the prefix `Cypress`
+- `chains.cy.ts` really executes a chain; every workflow run starts the project container
+  `automation-<projectId>` along the way. The spec therefore waits for the chain run to end before deleting
+  the chain, and cleans up in `after()` through the instance's API (let the runs settle,
+  `POST /projects/{id}/stop`, delete workflows and project) — not through Docker directly
 - For the test instance, `POST /api/v1/testing/reset` can additionally be used if a complete reset is desired
 
 **Test structure:**
@@ -1100,6 +1108,7 @@ GitHub Pages and is generated, as is the index [docs/en/diagramme.md](diagramme.
 python3 scripts/docs-diagrams.py                # regenerate HTML, English pages and indexes
 python3 scripts/docs-diagrams.py --check        # reports drift and translation gaps, exit code 1
 python3 scripts/docs-diagrams.py --add-missing  # add missing translation keys with empty values
+python3 scripts/docs-diagrams.py --site _site   # pages for GitHub Pages into an empty directory
 python3 -m unittest discover -s scripts/tests -p 'test_docs_diagrams.py'
 ```
 
@@ -1133,6 +1142,18 @@ therefore updates the table in the same commit: `--add-missing` adds new keys wi
 reading order; orphaned keys stay until someone deletes them — often their value, slightly adjusted,
 is the translation of the new key. Unknown Mermaid syntax (a new diagram type, a line without a rule)
 aborts with exit code 2 instead of letting German text through silently.
+
+**GitHub Pages.** `.github/workflows/pages.yml` publishes the pages on every push to `main` that changes
+a diagram source, a translation table or the script (and by hand via `workflow_dispatch`): first
+`--check`, then `--site _site`, then `actions/upload-pages-artifact` and `actions/deploy-pages`. `--site`
+builds from the Markdown source, not from the HTML files in the repository, and writes `index.html`
+(index from the same table as `diagramme.md`), `de/<name>-diagrams.html`, `en/index.html` and
+`en/<name>-diagrams.html`; every page links the index and the other language. If a translation is
+open, nothing is written (exit code 1). Needed once in the repository settings: set Pages to GitHub
+Actions (Settings → Pages → Source **GitHub Actions** — not "Deploy from branch", which would publish
+all of `docs/` including `plans/`) and set the repository variable `PAGES_ENABLED=true` (Settings →
+Secrets and variables → Actions → Variables). Without the variable only the build including `--check`
+runs; the deploy job is skipped.
 
 ## Dependency advisories (frontend)
 

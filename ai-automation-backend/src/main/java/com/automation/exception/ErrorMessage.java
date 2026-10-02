@@ -33,6 +33,7 @@ public enum ErrorMessage {
     NO_FAILED_RUNS(ErrorCode.INVALID_ARGUMENT, "Workflow '{name}' has no failed runs"),
     TEST_INSTANCE_NOT_RUNNING(ErrorCode.STATE_CONFLICT, "Test instance is not running or not healthy. Start it first."),
     STABLE_INSTANCE_NOT_RUNNING(ErrorCode.STATE_CONFLICT, "Stable instance is not running or not healthy. Start it first."),
+    CHAIN_RUN_ACTIVE(ErrorCode.STATE_CONFLICT, "The chain still has a running or paused run. Wait for it to finish or cancel it, then delete the chain."),
     MODULE_DISABLED(ErrorCode.MODULE_DISABLED, "{what} requires module '{module}', which is disabled on this instance — set {property}=true and restart"),
     MODULE_DISABLED_SWITCHABLE(ErrorCode.MODULE_DISABLED, "{what} requires module '{module}', which is disabled on this instance — set {property}=true and restart (or switch it on under Settings → Modules if automation.modules.ui-editable is true)"),
     RUN_RETENTION_LOCKED(ErrorCode.RUN_DELETION_DISABLED, "Run retention can only be extended while deleting runs is disabled (automation.executions.allow-delete=false): {current} -> {requested} days"),

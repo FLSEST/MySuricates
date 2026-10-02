@@ -1,9 +1,12 @@
 import { failOnUnhandledRequest } from '../../test/msw';
-import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { type ReactNode, createElement } from 'react';
+import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
+import { useToastStore } from '../../stores/toastStore';
+import { useI18nStore } from '../../i18n';
 import { useChains, useChain, useCreateChain, useDeleteChain, useExecuteChain } from '../useChains';
 
 beforeAll(() => server.listen({ onUnhandledRequest: failOnUnhandledRequest }));
@@ -61,6 +64,37 @@ describe('useDeleteChain', () => {
       result.current.mutate('ch1');
     });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
+  });
+
+  describe('refused while a chain run is active (409 CHAIN_RUN_ACTIVE)', () => {
+    beforeEach(() => useToastStore.setState({ toasts: [] }));
+    afterEach(() => useI18nStore.setState({ locale: 'en' }));
+
+    const refuse = () => server.use(http.delete('/api/v1/chains/ch1', () => HttpResponse.json(
+      {
+        code: 'STATE_CONFLICT',
+        messageKey: 'CHAIN_RUN_ACTIVE',
+        params: {},
+        error: 'The chain still has a running or paused run. Wait for it to finish or cancel it, then delete the chain.',
+      },
+      { status: 409 },
+    )));
+
+    it.each([
+      ['en', 'The chain still has a running or paused run.'],
+      ['de', 'Die Kette hat noch einen laufenden oder pausierten Lauf.'],
+    ] as const)('shows the reason as an error toast (%s)', async (locale, text) => {
+      useI18nStore.setState({ locale });
+      refuse();
+      const { result } = renderHook(() => useDeleteChain(), { wrapper: createWrapper() });
+      await act(async () => {
+        result.current.mutate('ch1');
+      });
+      await waitFor(() => expect(result.current.isError).toBe(true));
+      const toast = useToastStore.getState().toasts.at(-1);
+      expect(toast?.type).toBe('error');
+      expect(toast?.message).toContain(text);
+    });
   });
 });
 

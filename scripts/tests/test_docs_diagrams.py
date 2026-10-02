@@ -252,6 +252,77 @@ class DocsDiagramsTest(unittest.TestCase):
         self.assertIn("| [Sample page](beispiel-diagrams.md) | Page subtitle | 1 |", index)
         self.assertIn("In total, 2 diagrams across 2 pages.", index)
 
+    # -- GitHub Pages (--site, TODO ee5a4a04) -------------------------------
+    def site(self, *extra):
+        out = self.root / "_site"
+        code, output = self.run_tool("--site", str(out), *extra)
+        return code, output, out
+
+    def test_site_writes_both_languages_and_an_index(self):
+        code, output, out = self.site()
+        self.assertEqual(code, 0, output)
+        for lang in ("de", "en"):
+            for stem in ("beispiel", "zweite"):
+                self.assertTrue((out / lang / f"{stem}-diagrams.html").is_file(), f"{lang}/{stem}")
+        self.assertIn('<html lang="de">', (out / "de" / "beispiel-diagrams.html").read_text(encoding="utf-8"))
+        self.assertIn("<h1>Product — Sample page</h1>",
+                      (out / "en" / "beispiel-diagrams.html").read_text(encoding="utf-8"))
+        self.assertEqual(sorted(p.name for p in out.iterdir()), ["de", "en", "index.html"])
+
+    def test_site_index_comes_from_the_same_table_as_diagramme_md(self):
+        _, _, out = self.site()
+        index = (out / "index.html").read_text(encoding="utf-8")
+        self.assertIn('<html lang="de">', index)
+        self.assertIn('<a href="de/beispiel-diagrams.html">Beispielseite</a>', index)
+        self.assertIn("<td>Untertitel der Seite</td><td>1</td>", index)
+        self.assertIn("Zusammen 2 Diagramme in 2 Seiten.", index)
+        self.assertIn('<a href="en/index.html">English</a>', index)
+        english = (out / "en" / "index.html").read_text(encoding="utf-8")
+        self.assertIn('<html lang="en">', english)
+        self.assertIn('<a href="beispiel-diagrams.html">Sample page</a>', english)
+        self.assertIn("In total, 2 diagrams across 2 pages.", english)
+        self.assertIn('<a href="../index.html">Deutsch</a>', english)
+
+    def test_site_pages_link_to_the_index_and_the_other_language(self):
+        _, _, out = self.site()
+        german = (out / "de" / "beispiel-diagrams.html").read_text(encoding="utf-8")
+        self.assertIn('<a href="../index.html">', german)
+        self.assertIn('<a href="../en/beispiel-diagrams.html">English</a>', german)
+        english = (out / "en" / "beispiel-diagrams.html").read_text(encoding="utf-8")
+        self.assertIn('<a href="index.html">', english)
+        self.assertIn('<a href="../de/beispiel-diagrams.html">Deutsch</a>', english)
+
+    def test_site_is_built_from_the_source_and_leaves_docs_alone(self):
+        """Gebaut wird aus der Markdown-Quelle, nicht aus den HTML-Dateien im Repo."""
+        code, output, _ = self.site()
+        self.assertEqual(code, 0, output)
+        self.assertFalse((self.docs / "beispiel-diagrams.html").exists())
+        self.assertFalse((self.docs / "en").exists())
+
+    def test_site_with_open_translation_fails_without_writing(self):
+        table = dict(TABLE)
+        del table["Ein Punkt"]
+        self.write_table("beispiel", table)
+        code, output, out = self.site()
+        self.assertEqual(code, 1, output)
+        self.assertIn('FEHLT docs/i18n/beispiel-diagrams.en.json: "Ein Punkt"', output)
+        self.assertFalse(out.exists())
+
+    def test_site_refuses_a_non_empty_directory(self):
+        out = self.root / "_site"
+        out.mkdir()
+        (out / "alt.html").write_text("frueher", encoding="utf-8")
+        code, output, _ = self.site()
+        self.assertEqual(code, 2, output)
+        self.assertEqual(sorted(p.name for p in out.iterdir()), ["alt.html"])
+
+    def test_site_excludes_check_and_add_missing(self):
+        self.assertEqual(self.site("--check")[0], 2)
+        self.assertEqual(self.site("--add-missing")[0], 2)
+
+    def test_site_needs_a_directory(self):
+        self.assertEqual(self.run_tool("--site")[0], 2)
+
     # -- Pruefen -----------------------------------------------------------
     def test_check_is_green_right_after_build(self):
         self.build()
@@ -587,6 +658,20 @@ class RepositoryTest(unittest.TestCase):
         self.assertEqual(code, 0, "Diagramm-Seiten weichen von Quelle oder Uebersetzung ab —"
                                   " 'python3 scripts/docs-diagrams.py' laufen lassen\n"
                                   + out.getvalue() + err.getvalue())
+
+    def test_repository_site_has_every_page_in_both_languages(self):
+        with tempfile.TemporaryDirectory() as temp:
+            out = Path(temp) / "_site"
+            with contextlib.redirect_stdout(io.StringIO()) as stdout, \
+                    contextlib.redirect_stderr(io.StringIO()) as stderr:
+                code = tool.main(["--root", str(self.repo), "--site", str(out)])
+            self.assertEqual(code, 0, stdout.getvalue() + stderr.getvalue())
+            stems = sorted(p.name[:-len("-diagrams.md")] for p in (self.repo / "docs").glob("*-diagrams.md"))
+            for lang in ("de", "en"):
+                self.assertEqual(sorted(p.name[:-len("-diagrams.html")]
+                                        for p in (out / lang).glob("*-diagrams.html")), stems)
+            self.assertTrue((out / "index.html").is_file())
+            self.assertTrue((out / "en" / "index.html").is_file())
 
     def test_repository_english_pages_keep_the_german_structure(self):
         sources = sorted((self.repo / "docs").glob("*-diagrams.md"))

@@ -7,6 +7,8 @@ import com.automation.entity.ChainEntry;
 import com.automation.entity.ChainRun;
 import com.automation.entity.RunStatus;
 import com.automation.entity.WorkflowChain;
+import com.automation.exception.ErrorMessage;
+import com.automation.exception.LocalizedStateException;
 import com.automation.repository.ChainRunRepository;
 import com.automation.repository.WorkflowChainRepository;
 import com.automation.repository.WorkflowRepository;
@@ -26,6 +28,7 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -207,6 +210,33 @@ class ChainServiceTest {
 
         chainService.delete("chain-1");
 
+        verify(chainRepository).delete(testChain);
+    }
+
+    /**
+     * Ein laufender oder pausierter Ketten-Lauf startet nach dem Loeschen weiter Workflows (und
+     * deren Projekt-Container) — Loeschen wird deshalb abgewiesen (409), bis der Lauf vorbei oder
+     * abgebrochen ist (Befund aus chains.cy.ts, TODO 413b9f62).
+     */
+    @Test
+    void delete_chainWithActiveRun_isRefusedWithoutDeleting() {
+        when(chainRepository.findById("chain-1")).thenReturn(Optional.of(testChain));
+        when(chainRunRepository.existsByChainIdAndStatusIn(eq("chain-1"), any())).thenReturn(true);
+
+        assertThatThrownBy(() -> chainService.delete("chain-1"))
+                .isInstanceOfSatisfying(LocalizedStateException.class, ex ->
+                        assertThat(ex.errorMessage()).isEqualTo(ErrorMessage.CHAIN_RUN_ACTIVE));
+        verify(chainRepository, never()).delete(any(WorkflowChain.class));
+    }
+
+    @Test
+    void delete_checksPendingRunningAndPausedRuns() {
+        when(chainRepository.findById("chain-1")).thenReturn(Optional.of(testChain));
+
+        chainService.delete("chain-1");
+
+        verify(chainRunRepository).existsByChainIdAndStatusIn("chain-1",
+                java.util.EnumSet.of(RunStatus.PENDING, RunStatus.RUNNING, RunStatus.PAUSED));
         verify(chainRepository).delete(testChain);
     }
 

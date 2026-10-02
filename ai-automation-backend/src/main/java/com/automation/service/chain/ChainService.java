@@ -8,6 +8,8 @@ import com.automation.entity.ChainRun;
 import com.automation.entity.RunStatus;
 import com.automation.entity.WorkflowChain;
 import com.automation.exception.ElementNotFoundException;
+import com.automation.exception.ErrorMessage;
+import com.automation.exception.LocalizedStateException;
 import com.automation.repository.ChainRunRepository;
 import com.automation.repository.WorkflowChainRepository;
 import com.automation.repository.WorkflowRepository;
@@ -16,6 +18,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -77,8 +80,20 @@ public class ChainService {
         return chainRepository.save(chain);
     }
 
+    /** Run states in which a chain run still starts workflows. */
+    private static final Set<RunStatus> ACTIVE_RUN_STATUSES =
+            EnumSet.of(RunStatus.PENDING, RunStatus.RUNNING, RunStatus.PAUSED);
+
+    /**
+     * Refused (409) while the chain has a pending, running or paused run: the executor would keep
+     * starting its workflows — and their project containers — after the chain is gone.
+     * Best effort, without a lock: a run starting at the same moment can slip through.
+     */
     public void delete(String id) {
         WorkflowChain chain = findById(id);
+        if (chainRunRepository.existsByChainIdAndStatusIn(id, ACTIVE_RUN_STATUSES)) {
+            throw new LocalizedStateException(ErrorMessage.CHAIN_RUN_ACTIVE);
+        }
         chainRepository.delete(chain);
     }
 
