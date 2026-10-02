@@ -2,6 +2,8 @@ package com.automation.service.project;
 
 import com.automation.dto.request.CreateProjectRequest;
 import com.automation.dto.request.UpdateProjectRequest;
+import com.automation.entity.Container;
+import com.automation.entity.ContainerStatus;
 import com.automation.entity.Project;
 import com.automation.entity.ProjectStatus;
 import com.automation.entity.ProjectType;
@@ -183,6 +185,35 @@ class ProjectServiceTest {
         verify(projectRepository).save(testProject);
         assertThat(testProject.getArchivedAt()).isNotNull();
         assertThat(testProject.getStatus()).as("archived project must not stay RUNNING").isEqualTo(ProjectStatus.STOPPED);
+    }
+
+    /**
+     * Ein Workflow-Lauf startet den Projekt-Container selbst (RunContainerPreparation), ohne den
+     * Projektstatus auf RUNNING zu setzen. Das Löschen muss diesen Container trotzdem stoppen —
+     * sonst lief er weiter, und der Orphan-Reconciler sah ihn wegen der RUNNING-Zeile nie als
+     * verwaist an (Befund aus chains.cy.ts, TODO 413b9f62).
+     */
+    @Test
+    void delete_stoppedProjectWithRunningContainer_stopsContainer() {
+        testProject.setContainer(Container.builder()
+                .id("cont-1").project(testProject).status(ContainerStatus.RUNNING).build());
+        when(projectRepository.findById("proj-1")).thenReturn(Optional.of(testProject));
+
+        projectService.delete("proj-1");
+
+        verify(containerService).stopContainer(testProject);
+        assertThat(testProject.getArchivedAt()).isNotNull();
+    }
+
+    @Test
+    void delete_stoppedProjectWithStoppedContainer_deletesWithoutStopping() {
+        testProject.setContainer(Container.builder()
+                .id("cont-1").project(testProject).status(ContainerStatus.STOPPED).build());
+        when(projectRepository.findById("proj-1")).thenReturn(Optional.of(testProject));
+
+        projectService.delete("proj-1");
+
+        verify(containerService, never()).stopContainer(any());
     }
 
     @Test

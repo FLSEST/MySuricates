@@ -3,6 +3,7 @@ package com.automation.service.project;
 import com.automation.dto.request.CreateProjectRequest;
 import com.automation.dto.request.UpdateProjectRequest;
 import com.automation.entity.ActivityLog.LogCategory;
+import com.automation.entity.ContainerStatus;
 import com.automation.entity.Project;
 import com.automation.entity.ProjectStatus;
 import com.automation.entity.ProjectType;
@@ -161,7 +162,10 @@ public class ProjectService {
         Archived archived = transactionTemplate.execute(status -> {
             Project p = projectRepository.findById(id)
                     .orElseThrow(() -> new ResourceNotFoundException("Project", id));
-            boolean wasRunning = p.getStatus() == ProjectStatus.RUNNING;
+            // A workflow run starts the container itself (RunContainerPreparation) without setting
+            // the project RUNNING; its RUNNING container row also keeps DockerOrphanReconciler away.
+            boolean wasRunning = p.getStatus() == ProjectStatus.RUNNING
+                    || (p.getContainer() != null && p.getContainer().getStatus() == ContainerStatus.RUNNING);
             p.setArchivedAt(Instant.now());
             // An archived project has no container after this call (stopped below, or reaped by the
             // reconciler if Docker fails); restore() must not bring it back as RUNNING without one.
