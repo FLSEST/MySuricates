@@ -1,10 +1,10 @@
 package com.automation.service.learning;
 
+import com.automation.dto.projection.DashboardRunRow;
 import com.automation.dto.projection.RunOverviewCounts;
 import com.automation.dto.response.DashboardResponse;
 import com.automation.entity.RunStatus;
 import com.automation.entity.StepStatus;
-import com.automation.entity.WorkflowRun;
 import com.automation.repository.WorkflowRepository;
 import com.automation.repository.WorkflowRunRepository;
 import org.junit.jupiter.api.Test;
@@ -15,6 +15,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -62,9 +63,10 @@ class DashboardModelStatsTest {
         var runs = mock(WorkflowRunRepository.class);
         var service = new LearningService(runs, mock(WorkflowRepository.class), null, null, null, null);
         when(runs.countOverview(any(Instant.class))).thenReturn(new RunOverviewCounts(1, 0, 1, 1));
-        when(runs.findDashboardWindow(any(Instant.class))).thenReturn(List.of(WorkflowRun.builder()
-                .id("run").status(RunStatus.FAILED).startedAt(Instant.now()).build()));
-        when(runs.findStepMetadataForDashboard(any(Instant.class))).thenReturn(metadata.stream()
+        when(runs.findDashboardRows(any(Instant.class), isNull())).thenReturn(List.of(new DashboardRunRow(
+                "run", RunStatus.FAILED, Instant.now(), null, null, null, null, null, null, null, null, null,
+                null, null, null)));
+        when(runs.findStepMetadataForDashboard(any(Instant.class), isNull())).thenReturn(metadata.stream()
                 .map(meta -> new Object[]{"run", StepStatus.FAILED, meta}).toList());
         return service.getDashboard(30, null);
     }

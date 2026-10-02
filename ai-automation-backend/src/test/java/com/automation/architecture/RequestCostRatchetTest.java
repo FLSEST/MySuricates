@@ -242,7 +242,7 @@ class RequestCostRatchetTest {
      *       re-selects it for every row whose project has no container — a found container is
      *       cached, "no container" is not. The queries behind the three routes now fetch the
      *       container along ({@code WorkflowRepository.findAllWithActiveProject},
-     *       {@code WorkflowRunRepository.findDashboardWindow} and the recent-runs query,
+     *       the dashboard window query and the recent-runs query,
      *       TODO 13d1e2a2) — the same move as {@code /projects} and {@code /schedules} below. What
      *       is left is the query itself plus the bundled run counts; the dashboard adds its
      *       counters and aggregations.</li>
@@ -252,7 +252,12 @@ class RequestCostRatchetTest {
      *       {@code RecentRunEntry} rows taken from the window the route loads anyway. The five run
      *       counters of the overview come from ONE SUM/CASE query
      *       ({@code WorkflowRunRepository.countOverview}). What is left: workflow count, run
-     *       counters, top workflows, the window and the step metadata.</li>
+     *       counters, top workflows, the window and the step metadata. The window is a projection
+     *       ({@code WorkflowRunRepository.findDashboardRows}): no entities, no input context, from
+     *       the metadata/error JSON only the three values SQLite extracts — the bytes it no longer
+     *       reads do not show here, the statement count stays 5. The project filter sits in the
+     *       window and step queries instead of Java; the filtered route is measured as its own
+     *       entry (5 statements, 5 149 bytes).</li>
      *   <li>{@code /projects}: fixed, 4 → 1 statement. It was the same root cause as the three
      *       routes above — the nullable {@code @OneToOne(mappedBy)} {@code Project.container},
      *       resolved once per project. The list now runs through
@@ -401,6 +406,7 @@ class RequestCostRatchetTest {
             Map.entry("/api/v1/executions", new Cost(5, 60_000)),
             Map.entry("/api/v1/workflows/{wf}/runs", new Cost(4, 5_000)),
             Map.entry(DASHBOARD, new Cost(5, 8_000)),
+            Map.entry(DASHBOARD + "&projectId={goalProject}", new Cost(5, 7_000)),
             Map.entry("/api/v1/search?q=Workflow", new Cost(2, 18_000)),
             Map.entry("/api/v1/schedules", new Cost(3, 21_000)),
             Map.entry("/api/v1/schedules/{sched}/runs", new Cost(5, 5_000)),

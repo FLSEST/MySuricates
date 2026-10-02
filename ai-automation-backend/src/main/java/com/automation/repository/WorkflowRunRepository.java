@@ -1,5 +1,6 @@
 package com.automation.repository;
 
+import com.automation.dto.projection.DashboardRunRow;
 import com.automation.dto.projection.RunOverviewCounts;
 import com.automation.entity.RunStatus;
 import com.automation.entity.WorkflowRun;
@@ -56,40 +57,40 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, String
     List<WorkflowRun> findByStartedAtAfterOrderByStartedAtDesc(Instant since);
 
     /**
-     * Dashboard-Window mit eager-geladenem workflow + project (NICHT steps).
-     * <p>Steps werden bewusst NICHT mehr mitgefetcht: ein {@code LEFT JOIN FETCH wr.steps}
-     * lädt jede StepResult-Zeile inkl. der großen TEXT-Spalten input/output/context_delta
-     * (volle CLI-Outputs) als kartesisches Produkt — bei pool-size=1 hält das die einzige
-     * SQLite-Connection mehrere Sekunden und blockiert alles andere. Die Aggregation in
-     * {@code LearningService.getDashboard} braucht pro Step nur status + metadata; die liefert
-     * {@link #findStepMetadataForDashboard(Instant)} als schlanke Projektion.
-     *
-     * <p>Inner JOIN FETCH auf {@code workflow}: Runs soft-gelöschter Workflows
-     * ({@code @SQLRestriction("deleted_at IS NULL")}) werden bewusst ausgeschlossen.
-     * Ein LEFT JOIN FETCH würde hier {@code FetchNotFoundException} werfen, weil der
-     * nicht-nullable FK gesetzt ist, die Zeile aber durch die Restriction unsichtbar.
-     *
-     * <p>Der Container des Projekts kommt mit: {@code Project.container} ist eine nullable
-     * {@code @OneToOne(mappedBy)}, die Hibernate sonst je Ergebniszeile mit einem eigenen
-     * {@code select containers} auflöst — 60 bei 60 Runs (TODO 13d1e2a2).
+     * Dashboard-Fenster als Projektion (TODO 2ccb9e40): nur die Spalten, die {@code getDashboard}
+     * liest — kein input_context, aus metadata/error nur gate_status, todoTriggerRun und die
+     * Fehlermeldung, von SQLite extrahiert ({@code json_valid} zuerst, sonst wirft
+     * {@code json_extract}). Keine Entities, also auch kein {@code select containers} je Zeile
+     * (TODO 13d1e2a2). Inner JOIN auf workflow: Runs soft-geloeschter Workflows fallen heraus.
+     * {@code projectId} null = alle Projekte; sonst filtert die Abfrage, nicht Java.
      */
-    @Query("SELECT wr FROM WorkflowRun wr "
-         + "JOIN FETCH wr.workflow w "
-         + "LEFT JOIN FETCH w.project p "
-         + "LEFT JOIN FETCH p.container "
-         + "WHERE wr.startedAt > :since "
+    @Query("SELECT new com.automation.dto.projection.DashboardRunRow(wr.id, wr.status, wr.startedAt, "
+         + "wr.completedAt, wr.durationMs, wr.triggerSource, wr.triggeredByScheduleId, wr.workflowName, "
+         + "w.id, w.name, p.id, p.name, "
+         + "CAST(CASE WHEN function('json_valid', wr.metadata) = 1 THEN CASE WHEN function('json_type', "
+         + "wr.metadata, '$.gate_status') = 'text' THEN function('json_extract', wr.metadata, '$.gate_status') "
+         + "END END AS String), "
+         + "CAST(CASE WHEN function('json_valid', wr.metadata) = 1 THEN function('json_type', wr.metadata, "
+         + "'$.todoTriggerRun') END AS String), "
+         + "CAST(CASE WHEN wr.status = 'FAILED' AND function('json_valid', wr.error) = 1 THEN CASE WHEN "
+         + "function('json_type', wr.error, '$.message') = 'text' THEN function('json_extract', wr.error, "
+         + "'$.message') END END AS String)) "
+         + "FROM WorkflowRun wr JOIN wr.workflow w LEFT JOIN w.project p "
+         + "WHERE wr.startedAt > :since AND (:projectId IS NULL OR p.id = :projectId) "
          + "ORDER BY wr.startedAt DESC")
-    List<WorkflowRun> findDashboardWindow(@Param("since") Instant since);
+    List<DashboardRunRow> findDashboardRows(@Param("since") Instant since, @Param("projectId") String projectId);
 
     /**
      * Schlanke Per-Step-Projektion für die Dashboard-Aggregation: nur (runId, status, metadata),
      * NICHT die großen input/output/context_delta-TEXT-Spalten. Sortiert nach Run + stepIndex,
      * damit die Provider-Erkennung (erster Nicht-Integration-Step gewinnt) deterministisch bleibt.
+     * Gleiche Run-Auswahl wie {@link #findDashboardRows} (Projektfilter in der Abfrage).
      */
-    @Query("SELECT sr.workflowRun.id, sr.status, sr.metadata FROM StepResult sr "
-         + "WHERE sr.workflowRun.startedAt > :since "
-         + "ORDER BY sr.workflowRun.id, sr.stepIndex")
-    List<Object[]> findStepMetadataForDashboard(@Param("since") Instant since);
+    @Query("SELECT wr.id, sr.status, sr.metadata FROM StepResult sr JOIN sr.workflowRun wr "
+         + "JOIN wr.workflow w LEFT JOIN w.project p "
+         + "WHERE wr.startedAt > :since AND (:projectId IS NULL OR p.id = :projectId) "
+         + "ORDER BY wr.id, sr.stepIndex")
+    List<Object[]> findStepMetadataForDashboard(@Param("since") Instant since, @Param("projectId") String projectId);
 
     @Query("SELECT wr.workflow.id, wr.workflow.name, COUNT(wr) " +
            "FROM WorkflowRun wr " +
@@ -150,7 +151,7 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, String
      * each workflow's latest run by {@code startedAt}; the outer {@code WHERE} keeps only those
      * whose latest run is in {@code :statuses} (FAILED / COMPLETED_WITH_ERRORS).
      *
-     * <p>Modeled on {@link #findDashboardWindow}: {@code JOIN FETCH} workflow + project but
+     * <p>Modeled on the former dashboard window query: {@code JOIN FETCH} workflow + project but
      * NOT steps — pool-size=1 means we must never load {@code StepResult} TEXT blobs in an
      * aggregation. The inner {@code JOIN FETCH} on workflow also excludes soft-deleted
      * workflows ({@code @SQLRestriction("deleted_at IS NULL")}), so a deleted workflow never

@@ -1,8 +1,7 @@
 package com.automation.repository;
 
+import com.automation.dto.projection.DashboardRunRow;
 import com.automation.dto.projection.RunOverviewCounts;
-import com.automation.entity.Container;
-import com.automation.entity.ContainerStatus;
 import com.automation.entity.Project;
 import com.automation.entity.ProjectStatus;
 import com.automation.entity.ProjectType;
@@ -46,9 +45,6 @@ class WorkflowRunRepositoryTest {
 
     @Autowired
     private ProjectRepository projectRepository;
-
-    @Autowired
-    private ContainerRepository containerRepository;
 
     @Autowired
     private EntityManager entityManager;
@@ -484,32 +480,76 @@ class WorkflowRunRepositoryTest {
         entityManager.clear();
 
         Instant since = now.minus(1, ChronoUnit.DAYS);
-        List<WorkflowRun> window = runRepository.findDashboardWindow(since);
+        List<DashboardRunRow> window = runRepository.findDashboardRows(since, null);
 
         assertThat(window).isNotEmpty();
-        assertThat(window).allSatisfy(r ->
-                assertThat(r.getWorkflow().getId()).isEqualTo(workflowA.getId()));
+        assertThat(window).allSatisfy(r -> assertThat(r.workflowId()).isNotEqualTo(workflowB.getId()));
     }
 
-    // --- Dashboard: der Container des Projekts kommt mit (TODO 13d1e2a2) ---
+    // --- Dashboard-Fenster als Projektion (TODO 2ccb9e40) ---
 
     /**
-     * Das Dashboard-Fenster holt den Container des Projekts in derselben Abfrage.
-     * {@code Project.container} ist eine nullable {@code @OneToOne(mappedBy)}: Ohne den Join loest
-     * Hibernate ihn je Ergebniszeile mit einem eigenen {@code select containers} auf — 60 bei
-     * 60 Runs im RequestCostRatchetTest.
+     * Das Dashboard-Fenster ist eine Projektion: eine Abfrage, keine Entities — also auch kein
+     * {@code select containers} je Zeile (TODO 13d1e2a2) und kein Eingabekontext. Aus metadata und
+     * error kommen nur die drei Werte, die das Dashboard liest, und nur, wenn sie Text sind (bzw.
+     * todoTriggerRun ein JSON-true) — wie zuvor die Pruefungen in Java.
      */
     @Test
-    void should_fetch_the_project_container_along_with_the_dashboard_window() {
-        List<String> seeded = runsWithAndWithoutContainer();
+    void should_project_the_dashboard_window_with_only_the_values_the_dashboard_reads() {
+        Instant now = Instant.now();
+        WorkflowRun failed = run(workflowA, RunStatus.FAILED, now.minusSeconds(30));
+        failed.setMetadata(new java.util.HashMap<>(Map.of("gate_status", "RED", "todoTriggerRun", true)));
+        failed.setError(new java.util.HashMap<>(Map.of("message", "boom")));
+        failed.setInputContext(new java.util.HashMap<>(Map.of("previous_report", "x".repeat(10_000))));
+        failed.setDurationMs(1234L);
+        WorkflowRun odd = run(workflowB, RunStatus.COMPLETED, now.minusSeconds(20));
+        odd.setMetadata(new java.util.HashMap<>(Map.of("gate_status", 7, "todoTriggerRun", "true")));
+        odd.setError(new java.util.HashMap<>(Map.of("message", "not a failure")));
+        runRepository.saveAll(List.of(failed, odd));
+        entityManager.flush();
+        entityManager.clear();
 
-        Counted<List<WorkflowRun>> window = counted(
-                () -> runRepository.findDashboardWindow(Instant.now().minus(1, ChronoUnit.DAYS)));
+        Counted<List<DashboardRunRow>> window = counted(
+                () -> runRepository.findDashboardRows(now.minus(1, ChronoUnit.HOURS), null));
 
-        assertThat(window.statements())
-                .as("one query for the window, not one select containers per run")
-                .isEqualTo(1);
-        assertContainersResolved(window.result(), seeded);
+        assertThat(window.statements()).as("one query, no entity loads").isEqualTo(1);
+        DashboardRunRow a = window.result().stream().filter(r -> r.id().equals(failed.getId())).findFirst().orElseThrow();
+        assertThat(a).isEqualTo(new DashboardRunRow(failed.getId(), RunStatus.FAILED, a.startedAt(), null, 1234L,
+                null, null, workflowA.getName(), workflowA.getId(), workflowA.getName(), project.getId(),
+                project.getName(), "RED", "true", "boom"));
+        assertThat(a.todoTriggerRun()).isTrue();
+        DashboardRunRow b = window.result().stream().filter(r -> r.id().equals(odd.getId())).findFirst().orElseThrow();
+        assertThat(b.gateStatus()).as("a number is no gate status").isNull();
+        assertThat(b.todoTriggerRun()).as("the string \"true\" is no JSON true").isFalse();
+        assertThat(b.failureMessage()).as("only FAILED runs have a failure reason").isNull();
+        assertThat(b.projectName()).isEqualTo(projectB.getName());
+        assertThat(window.result()).extracting(DashboardRunRow::id).containsSubsequence(odd.getId(), failed.getId());
+    }
+
+    /** Der Projektfilter des Dashboards sitzt in beiden Abfragen statt in Java (TODO 2ccb9e40). */
+    @Test
+    void should_filter_the_dashboard_window_and_its_steps_by_project_in_the_query() {
+        Instant now = Instant.now();
+        for (Workflow workflow : List.of(workflowA, workflowB)) {
+            WorkflowRun r = WorkflowRun.builder().workflow(workflow).workflowName(workflow.getName())
+                    .status(RunStatus.COMPLETED).startedAt(now.minusSeconds(10)).build();
+            r.addStep(StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).startedAt(now)
+                    .metadata(new java.util.HashMap<>(Map.of("blockType", "shell"))).build());
+            runRepository.save(r);
+        }
+        entityManager.flush();
+        entityManager.clear();
+        Instant since = now.minus(1, ChronoUnit.HOURS);
+
+        assertThat(runRepository.findDashboardRows(since, project.getId()))
+                .isNotEmpty().allSatisfy(r -> assertThat(r.projectId()).isEqualTo(project.getId()));
+        List<String> projectRunIds = runRepository.findDashboardRows(since, project.getId()).stream()
+                .map(DashboardRunRow::id).toList();
+        assertThat(runRepository.findStepMetadataForDashboard(since, project.getId()))
+                .isNotEmpty().allSatisfy(row -> assertThat(projectRunIds).contains((String) row[0]));
+        assertThat(runRepository.findDashboardRows(since, null)).extracting(DashboardRunRow::projectId)
+                .contains(project.getId(), projectB.getId());
+        assertThat(runRepository.findStepMetadataForDashboard(since, null)).hasSizeGreaterThanOrEqualTo(2);
     }
 
     /**
@@ -541,57 +581,6 @@ class WorkflowRunRepositoryTest {
         assertThat(mine.result()).isEqualTo(new RunOverviewCounts(4, 2, 1, 2));
         assertThat(runRepository.countOverviewByProject("no-such-project", today))
                 .isEqualTo(new RunOverviewCounts(0, 0, 0, 0));
-    }
-
-    /**
-     * Je zwei Runs mit zwei Schritten fuer workflowA (Projekt mit Container) und workflowB (Projekt
-     * ohne). Leert danach den Persistenzkontext, sonst faende die Abfrage die verwalteten Instanzen
-     * vor und muesste nichts nachladen.
-     */
-    private List<String> runsWithAndWithoutContainer() {
-        containerRepository.save(Container.builder()
-                .project(project)
-                .dockerContainerId("docker-run-list")
-                .imageName("automation/test:latest")
-                .status(ContainerStatus.RUNNING)
-                .build());
-        List<String> ids = new ArrayList<>();
-        Instant now = Instant.now();
-        for (Workflow workflow : List.of(workflowA, workflowB)) {
-            for (int r = 0; r < 2; r++) {
-                WorkflowRun run = WorkflowRun.builder()
-                        .workflow(workflow)
-                        .workflowName(workflow.getName())
-                        .status(RunStatus.COMPLETED)
-                        .startedAt(now.minusSeconds(60 + r))
-                        .build();
-                for (int s = 0; s < 2; s++) {
-                    run.addStep(StepResult.builder()
-                            .stepIndex(s)
-                            .status(StepStatus.COMPLETED)
-                            .startedAt(now)
-                            .durationMs(5L)
-                            .build());
-                }
-                ids.add(runRepository.save(run).getId());
-            }
-        }
-        entityManager.flush();
-        entityManager.clear();
-        return ids;
-    }
-
-    /** Runs von workflowA tragen den Container ihres Projekts, Runs von workflowB keinen. */
-    private void assertContainersResolved(List<WorkflowRun> runs, List<String> seeded) {
-        List<WorkflowRun> ours = runs.stream().filter(r -> seeded.contains(r.getId())).toList();
-        assertThat(ours).hasSize(seeded.size());
-        assertThat(ours).filteredOn(r -> r.getWorkflow().getId().equals(workflowA.getId()))
-                .hasSize(2)
-                .allSatisfy(r -> assertThat(r.getWorkflow().getProject().getContainer().getDockerContainerId())
-                        .isEqualTo("docker-run-list"));
-        assertThat(ours).filteredOn(r -> r.getWorkflow().getId().equals(workflowB.getId()))
-                .hasSize(2)
-                .allSatisfy(r -> assertThat(r.getWorkflow().getProject().getContainer()).isNull());
     }
 
     private record Counted<T>(T result, int statements) {}

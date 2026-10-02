@@ -1,5 +1,6 @@
 package com.automation.service.learning;
 
+import com.automation.dto.projection.DashboardRunRow;
 import com.automation.dto.response.DashboardResponse;
 import com.automation.entity.TriggerSource;
 import com.automation.entity.WorkflowRun;
@@ -20,10 +21,18 @@ public enum TriggerCategory {
     OTHER_AUTOMATIC;
 
     public static TriggerCategory of(WorkflowRun run) {
-        TriggerSource source = run.getTriggerSource();
+        return of(run.getTriggerSource(), run.getTriggeredByScheduleId(),
+                run.getMetadata() != null && Boolean.TRUE.equals(run.getMetadata().get("todoTriggerRun")));
+    }
+
+    /** The same from the dashboard's projected run row (TODO 2ccb9e40). */
+    public static TriggerCategory of(DashboardRunRow run) {
+        return of(run.triggerSource(), run.triggeredByScheduleId(), run.todoTriggerRun());
+    }
+
+    private static TriggerCategory of(TriggerSource source, String scheduleId, boolean todoTriggerRun) {
         if (source == null) {
-            if (run.getTriggeredByScheduleId() != null) return SCHEDULED;
-            boolean todoTriggerRun = run.getMetadata() != null && Boolean.TRUE.equals(run.getMetadata().get("todoTriggerRun"));
+            if (scheduleId != null) return SCHEDULED;
             return todoTriggerRun ? TODO_TRIGGER : MANUAL;
         }
         return switch (source) {
