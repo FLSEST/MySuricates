@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createDefaultLayout, isCustomizedLayout, type DashboardView } from '../dashboardLayout';
 import { sanitizeLayout } from '../dashboardLayoutSanitize';
-import { buildExampleProjectView, EXAMPLE_VIEW_WIDGET_IDS, exampleProjectViewId, hasViewForProject } from '../exampleProjectView';
+import { buildExampleProjectView, EXAMPLE_STATUS_TEMPLATE_ID, EXAMPLE_VIEW_WIDGET_IDS, exampleProjectViewId, hasViewForProject, pickStatusWorkflowId } from '../exampleProjectView';
 import { DASHBOARD_WIDGETS } from '../widgetRegistry';
 import { WORKFLOW_STATUS_WIDGET_ID } from '../workflowWidgetContract';
 
@@ -53,5 +53,27 @@ describe('hasViewForProject', () => {
     expect(hasViewForProject([buildExampleProjectView(PROJECT, 'x')!], PROJECT)).toBe(true);
     expect(hasViewForProject([own], PROJECT)).toBe(true);
     expect(hasViewForProject(createDefaultLayout().views, PROJECT)).toBe(false);
+  });
+});
+
+describe('pickStatusWorkflowId', () => {
+  const list = [
+    { id: 'other-report', projectId: 'other', templateId: EXAMPLE_STATUS_TEMPLATE_ID },
+    { id: 'approval', projectId: PROJECT, templateId: 'blueprint-approval' },
+    { id: 'report', projectId: PROJECT, templateId: EXAMPLE_STATUS_TEMPLATE_ID },
+  ];
+
+  it('picks the report example of the project, not its first workflow', () => {
+    expect(EXAMPLE_STATUS_TEMPLATE_ID).toBe('blueprint-report');
+    expect(pickStatusWorkflowId(list, PROJECT)).toBe('report');
+  });
+
+  it('falls back to the first workflow of the project without a report example', () => {
+    expect(pickStatusWorkflowId(list.slice(0, 2), PROJECT)).toBe('approval');
+    expect(pickStatusWorkflowId([{ id: 'old', projectId: PROJECT }], PROJECT)).toBe('old');
+  });
+
+  it('finds nothing for a project without workflows', () => {
+    expect(pickStatusWorkflowId(list, 'empty')).toBeUndefined();
   });
 });

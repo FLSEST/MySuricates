@@ -61,4 +61,19 @@ class ExampleTemplatesShippedTest {
         assertThat(Pattern.compile("\"[^\"]*\"").matcher(declaration.get(0)).results().count())
                 .as("quoted ids on the declaration line").isEqualTo(ExampleProjectService.EXAMPLE_TEMPLATE_IDS.size());
     }
+
+    /**
+     * The dashboard view of the example project is built in the frontend and shows the report
+     * example as its status widget (TODO a0b414ce). Both sides name it; they must name the same
+     * example, and it must be one the project gets.
+     */
+    @Test
+    void theFrontendPicksTheSameStatusExample_andTheProjectGetsIt() throws IOException {
+        Path view = Path.of("..", "ai-automation-frontend", "src", "components", "dashboard", "exampleProjectView.ts");
+        var declared = Pattern.compile("EXAMPLE_STATUS_TEMPLATE_ID = '([^']+)'").matcher(Files.readString(view));
+
+        assertThat(declared.find()).as("EXAMPLE_STATUS_TEMPLATE_ID in %s", view).isTrue();
+        assertThat(declared.group(1)).isEqualTo(ExampleProjectService.STATUS_TEMPLATE_ID);
+        assertThat(ExampleProjectService.EXAMPLE_TEMPLATE_IDS).contains(ExampleProjectService.STATUS_TEMPLATE_ID);
+    }
 }

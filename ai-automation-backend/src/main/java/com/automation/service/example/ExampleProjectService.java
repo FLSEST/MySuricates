@@ -56,6 +56,12 @@ public class ExampleProjectService {
      * Keep the list on one line — the claims fact sheet of the public-readiness chain counts it there.
      */
     static final List<String> EXAMPLE_TEMPLATE_IDS = List.of("blueprint-approval", "blueprint-if", "blueprint-loop", "blueprint-todo", "blueprint-report");
+    /**
+     * The example whose run the dashboard view of the example project shows as its status widget
+     * (TODO a0b414ce). The view itself is built in the frontend ({@code exampleProjectView.ts},
+     * {@code EXAMPLE_STATUS_TEMPLATE_ID}); {@code ExampleTemplatesShippedTest} keeps both in step.
+     */
+    static final String STATUS_TEMPLATE_ID = "blueprint-report";
 
     private static final Map<String, String> NAME = Map.of(
             "de", "Beispielprojekt",

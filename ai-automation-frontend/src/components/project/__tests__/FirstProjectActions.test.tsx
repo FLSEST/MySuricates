@@ -45,8 +45,9 @@ describe('FirstProjectActions', () => {
     server.use(
       http.post('/api/v1/projects/example', () => HttpResponse.json(example, { status: 201 })),
       http.get('/api/v1/workflows', () => HttpResponse.json([
-        { id: 'wf-other', projectId: 'other' },
-        { id: 'wf-example', projectId: 'ex' },
+        { id: 'wf-other', projectId: 'other', templateId: 'blueprint-report' },
+        { id: 'wf-approval', projectId: 'ex', templateId: 'blueprint-approval' },
+        { id: 'wf-example', projectId: 'ex', templateId: 'blueprint-report' },
       ])),
     );
     renderWithProviders(<FirstProjectActions />);
