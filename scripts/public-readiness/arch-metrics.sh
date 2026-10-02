@@ -378,8 +378,12 @@ print('state\tok')
 print('max_lines\t%s' % limit.group(1))
 for path, ceiling in sorted(re.findall(r'entry\("([^"]+)",\s*(\d+)\)', size)):
     print('allowlist\t%s\t%s' % (ceiling, path))
-for a, b in sorted(tuple(sorted(p)) for p in re.findall(r'"([^"\s]+)\s*<->\s*([^"\s]+)"', pairs.group(1))):
+allowed = sorted(tuple(sorted(p)) for p in re.findall(r'"([^"\s]+)\s*<->\s*([^"\s]+)"', pairs.group(1)))
+for a, b in allowed:
     print('pair\t%s\t%s' % (a, b))
+if not allowed:
+    # Leere Allowlist ausdruecklich nennen, sonst sieht sie aus wie ein Muster, das nicht mehr greift.
+    print('# pair\t(keine)')
 for members in (sorted(re.findall(r'"([^"]+)"', group)) for group in re.findall(r'Set\.of\(([^)]*)\)', pinned.group(1))):
     print('component\t%d\t%s' % (len(members), ','.join(members)))
 PY

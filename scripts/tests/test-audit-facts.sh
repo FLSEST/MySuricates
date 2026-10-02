@@ -1293,7 +1293,8 @@ section = rules = old = counting = fact_sheet = unmeasured = degraded = 0
 texts = set()
 for name in names:
     definition = json.load(open(os.path.join(pool, name + '.json'), encoding='utf-8'))
-    report = definition['metadata']['audit']['reportBlock']
+    # promptBlock: setzt ein Shell-Block den Envelope zusammen (Test-Abdeckung, fa66ea31), steht der Prompt dort.
+    report = definition['metadata']['audit'].get('promptBlock', definition['metadata']['audit']['reportBlock'])
     prompt = next(b['config']['command'] for b in definition['blocks'] if b.get('name') == report)
     section += prompt.count(SECTION) == 1 and prompt.count('{{ audit_findings }}') == 1
     found = RULES.findall(prompt)
@@ -1413,6 +1414,73 @@ PY
 check "Envelope-Baustein in den Gates von Test-Abdeckung und Zehrprobe" '[ "$ENV_BLOCKS" -ge 2 ]'
 check "Envelope-Baustein in allen Gates wortgleich"                     '[ "$ENV_TEXTS" -eq 1 ]'
 check "kein Audit-Gate liest Envelopes per sed-Bereich"                 '[ "$ENV_SED" -eq 0 ]'
+
+echo "12) Performance-Audit: eigene Repository-Verben (query*/bulk* u. a.) in Schleifen (23a3fd2f)"
+# Die Verbenliste kannte nur find|save|delete|count|exists|get: queryRuns(...) oder bulkSetStatus(...) je
+# Durchlauf blieben unsichtbar. Lesende Verben (query, read, load, search, stream, list, max, average,
+# aggregate) zaehlen als N+1-Kandidat, schreibende (bulk, update, insert, remove, set, link, unlink,
+# detach, deactivate, increment, touch, prune) als Schreib-Schleife.
+FIX12="$TMP/fixture-verbs"
+MAIN12="$FIX12/ai-automation-backend/src/main/java/com/automation"
+mkdir -p "$MAIN12/service"
+cat > "$MAIN12/service/VerbService.java" <<'JAVA'
+package com.automation.service;
+
+class VerbService {
+    void read(java.util.List<String> ids) {
+        for (String id : ids) {
+            runQueryRepository.queryByWorkflow(id);
+        }
+    }
+
+    void write(java.util.List<String> ids) {
+        for (String id : ids) {
+            todoRepository.bulkSetStatus(java.util.List.of(id), "DONE");
+        }
+    }
+
+    void link(java.util.List<String> ids) {
+        ids.forEach(id -> linkRepository.linkIfAbsent("g", id));
+    }
+
+    void stats(java.util.List<String> projects) {
+        for (String project : projects) {
+            memoryRepository.averageMessageCount(project);
+        }
+    }
+
+    void touch(java.util.List<String> ids) {
+        for (String id : ids) {
+            sessionRepository.touchActivity(id);
+            sessionRepository.queryLatest(id);
+        }
+    }
+
+    void notARepository(java.util.List<String> ids) {
+        for (String id : ids) {
+            settings.setting(id);
+        }
+    }
+}
+JAVA
+printf '%s' "$FIX12" > "$TMP/base12.txt"
+render "$PERF" name:facts "$(json_values project_path="$TMP/base12.txt" request_metrics=)" > "$TMP/perf-facts12.sh"
+PATH="$TMP/fakebin:$PATH" bash "$TMP/perf-facts12.sh" > "$TMP/perf-facts12.out" 2> "$TMP/perf-facts12.err"
+check "laeuft ohne stderr" '[ ! -s "$TMP/perf-facts12.err" ]'
+check "query* in der Schleife ist N+1-Kandidat" \
+  'grep -qx "TREFFER repository_in_loop: service/VerbService.java:6 runQueryRepository.queryByWorkflow (Schleife ab Zeile 5)" "$TMP/perf-facts12.out"'
+check "bulk* in der Schleife ist Schreib-Schleife" \
+  'grep -qx "TREFFER repository_write_in_loop: service/VerbService.java:12 todoRepository.bulkSetStatus (Schleife ab Zeile 11)" "$TMP/perf-facts12.out"'
+check "link* im forEach ist Schreib-Schleife" \
+  'grep -qx "TREFFER repository_write_in_loop: service/VerbService.java:17 linkRepository.linkIfAbsent (Schleife ab Zeile 17)" "$TMP/perf-facts12.out"'
+check "average* in der Schleife ist N+1-Kandidat" \
+  'grep -qx "TREFFER repository_in_loop: service/VerbService.java:22 memoryRepository.averageMessageCount (Schleife ab Zeile 21)" "$TMP/perf-facts12.out"'
+check "touch* schreibt, das query* dahinter liest: der Lesezugriff zaehlt" \
+  'grep -qx "TREFFER repository_in_loop: service/VerbService.java:29 sessionRepository.queryLatest (Schleife ab Zeile 27)" "$TMP/perf-facts12.out"'
+check "FAKT repository_loop_count: 3"       'grep -qx "FAKT repository_loop_count: 3" "$TMP/perf-facts12.out"'
+check "FAKT repository_write_loop_count: 2" 'grep -qx "FAKT repository_write_loop_count: 2" "$TMP/perf-facts12.out"'
+check "Hinweiszeilen nennen query und bulk" \
+  'grep -q "^# repository_loop_count: .*query" "$TMP/perf-facts12.out" && grep -q "^# repository_write_loop_count: .*bulk" "$TMP/perf-facts12.out"'
 
 echo
 echo "passed=$PASS failed=$FAIL"

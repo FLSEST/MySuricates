@@ -358,6 +358,23 @@ check "echter Test: jede Zeile nennt so viele Pakete wie ihre Groesse" \
   'awk -F"\t" "{ if (split(\$3, m, \",\") != \$2) bad++ } END { exit (bad > 0) }" "$TMP/real-cycle-lines.txt"'
 check "echter Test: jede ALLOWLIST-Zeile gelesen" \
   '[ "$REAL_ENTRIES" -ge 1 ] && [ "$(ratchet_lines "$TMP/ratchet-real.out" allowlist | wc -l)" -eq "$REAL_ENTRIES" ]'
+# Leere ALLOWED_PAIRS (seit 759b9fba der echte Stand) darf nicht wie ein Muster aussehen, das nicht mehr
+# greift: der Abschnitt nennt dann ausdruecklich "(keine)" (TODO ca0df066).
+REAL_PAIRS="$(sed -n '/ALLOWED_PAIRS = Set.of(/,/);/p' "$REAL_CYCLES" | grep -c '<->')"
+check "echter Test: ALLOWED_PAIRS zeigt Paare oder (keine), nie nichts" \
+  'if [ "$REAL_PAIRS" -ge 1 ]; then [ "$(ratchet_lines "$TMP/ratchet-real.out" pair | wc -l)" -eq "$REAL_PAIRS" ];
+   else ratchet_lines "$TMP/ratchet-real.out" "# pair" | grep -qx "# pair${TAB}(keine)"; fi'
+mkdir -p "$TMP/scan-empty/$ARCH_TESTS"
+sed 's/ALLOWED_PAIRS = Set.of(/ALLOWED_PAIRS = Set.of();\n    static final Set<String> UNUSED = Set.of(/' \
+  "$SCAN_FIX/$ARCH_TESTS/PackageCycleRatchetTest.java" > "$TMP/scan-empty/$ARCH_TESTS/PackageCycleRatchetTest.java"
+cp "$SCAN_FIX/$ARCH_TESTS/SourceSizeRatchetTest.java" "$TMP/scan-empty/$ARCH_TESTS/"
+metrics_on "$TMP/scan-empty" "$TMP/ratchet-empty.out"
+check "leere ALLOWED_PAIRS: state ok, keine pair-Zeile, dafuer (keine)" \
+  'ratchet_lines "$TMP/ratchet-empty.out" state | grep -qx "state${TAB}ok" &&
+   [ -z "$(ratchet_lines "$TMP/ratchet-empty.out" pair)" ] &&
+   ratchet_lines "$TMP/ratchet-empty.out" "# pair" | grep -qx "# pair${TAB}(keine)"'
+check "nicht leere ALLOWED_PAIRS: kein (keine)" \
+  '! ratchet_lines "$TMP/ratchet-fix.out" "# pair" | grep -qx "# pair${TAB}(keine)"'
 mkdir -p "$TMP/scan-none"
 metrics_on "$TMP/scan-none" "$TMP/ratchet-none.out"
 check "ohne Testdateien: state missing statt einer leeren Liste" \

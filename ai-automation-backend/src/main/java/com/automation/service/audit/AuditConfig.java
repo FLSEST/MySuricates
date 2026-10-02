@@ -9,10 +9,13 @@ import java.util.Map;
  * <p>Umzug aus {@code AuditIngestionService} (TODO e39379a9) — ein eigenes Konzept, eine eigene
  * Datei; der Service stand sonst am Ratchet an.
  *
+ * @param promptBlock   der KI-Block, dessen Schritt Provider und Modell des Reports nennt; ohne Angabe der
+ *                      {@code reportBlock}. Eigens gesetzt, wenn ein Shell-Block den Envelope zusammensetzt
+ *                      (Test-Abdeckung, TODO fa66ea31)
  * @param schemaVersion aktuell nur {@code 1}; eine unbekannte Version macht die Konfiguration
  *                      ungültig, statt sie halb zu verstehen
  */
-record AuditConfig(String key, String category, String reportBlock, int schemaVersion) {
+record AuditConfig(String key, String category, String reportBlock, String promptBlock, int schemaVersion) {
 
     /** @return {@code null}, wenn der Workflow keinen aktivierten, vollständigen Audit-Block trägt */
     static AuditConfig from(Map<String, Object> metadata) {
@@ -23,7 +26,8 @@ record AuditConfig(String key, String category, String reportBlock, int schemaVe
         String reportBlock = text(map.get("reportBlock"));
         int version = map.get("schemaVersion") instanceof Number n ? n.intValue() : 1;
         if (key == null || category == null || reportBlock == null || version != 1) return null;
-        return new AuditConfig(key, category, reportBlock, version);
+        String promptBlock = text(map.get("promptBlock"));
+        return new AuditConfig(key, category, reportBlock, promptBlock != null ? promptBlock : reportBlock, version);
     }
 
     private static String text(Object value) {

@@ -27,7 +27,16 @@ class AuditConfigTest {
     void from_readsACompleteEnabledBlock_schemaVersionDefaultsToOne() {
         AuditConfig config = AuditConfig.from(audit(complete()));
 
-        assertThat(config).isEqualTo(new AuditConfig("mysuricates.health", "health", "report", 1));
+        assertThat(config).isEqualTo(new AuditConfig("mysuricates.health", "health", "report", "report", 1));
+    }
+
+    @Test
+    void from_readsAnOptionalPromptBlock_defaultingToTheReportBlock() {
+        Map<String, Object> block = complete();
+        block.put("promptBlock", "coach");
+
+        assertThat(AuditConfig.from(audit(block))).extracting(AuditConfig::promptBlock).isEqualTo("coach");
+        assertThat(AuditConfig.from(audit(complete()))).extracting(AuditConfig::promptBlock).isEqualTo("report");
     }
 
     @Test

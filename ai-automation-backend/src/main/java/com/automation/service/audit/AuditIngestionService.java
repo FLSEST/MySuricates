@@ -41,9 +41,9 @@ public class AuditIngestionService {
             return;
         }
 
-        StepResult reportStep = run.getSteps().stream()
-                .filter(step -> config.reportBlock().equals(String.valueOf(step.getMetadata().get("blockName"))))
-                .findFirst().orElse(null);
+        StepResult reportStep = step(run, config.reportBlock());
+        // Provider und Modell nennt der KI-Schritt; ein Shell-reportBlock hat keine (TODO fa66ea31).
+        StepResult promptStep = step(run, config.promptBlock());
         String output = reportStep != null ? reportStep.getOutput() : "";
         ParseResult parsed = parser.parse(output);
         boolean successful = run.getStatus() == RunStatus.COMPLETED || run.getStatus() == RunStatus.COMPLETED_WITH_ERRORS;
@@ -65,8 +65,10 @@ public class AuditIngestionService {
                 .markdownContent(parsed.markdown())
                 .gateStatus(parseGate(run.getMetadata().get("gate_status")))
                 .gateDescription(asString(run.getMetadata().get("gate_description")))
-                .provider(firstNonBlank(metadataValue(reportStep, "provider"), run.getWorkflow().getProvider()))
-                .model(firstNonBlank(metadataValue(reportStep, "model"), run.getWorkflow().getModel()))
+                .provider(firstNonBlank(metadataValue(promptStep, "provider"), metadataValue(reportStep, "provider"),
+                        run.getWorkflow().getProvider()))
+                .model(firstNonBlank(metadataValue(promptStep, "model"), metadataValue(reportStep, "model"),
+                        run.getWorkflow().getModel()))
                 .workflowVersion(run.getWorkflow().getVersion())
                 .ingestionStatus(valid ? AuditIngestionStatus.VALID : AuditIngestionStatus.INVALID)
                 .ingestionError(valid ? null : firstNonBlank(error, "Invalid audit snapshot"))
@@ -133,6 +135,11 @@ public class AuditIngestionService {
     private static GateStatus parseGate(Object value) {
         try { return value != null ? GateStatus.valueOf(String.valueOf(value)) : null; }
         catch (IllegalArgumentException ex) { return null; }
+    }
+    private static StepResult step(WorkflowRun run, String blockName) {
+        return run.getSteps().stream()
+                .filter(step -> blockName.equals(String.valueOf(step.getMetadata().get("blockName"))))
+                .findFirst().orElse(null);
     }
     private static String metadataValue(StepResult step, String key) {
         return step != null ? asString(step.getMetadata().get(key)) : null;
