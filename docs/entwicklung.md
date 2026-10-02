@@ -547,6 +547,9 @@ für Details zu Aufbewahrung und Abschaltbarkeit.
 einem frischen Container (Default `ubuntu:24.04`, mit `--image rockylinux:9` auch ein dnf-System),
 auf dem nur git, sudo und tzdata liegen. Geprüft wird immer ein committeter Stand (Default `HEAD`,
 sonst `--ref`), nie der Arbeitsbaum. Braucht Docker.
+Docker selbst installiert `setup.sh` über get.docker.com, auf RHEL-Nachbauten (Rocky, AlmaLinux,
+Oracle Linux) aber aus Dockers CentOS-Repo: Dockers Rocky-Repo enthält kein `docker-ce`, die anderen
+kennt get.docker.com nicht (`deps_rhel_clone` in `scripts/lib/deps.sh`).
 
 ```bash
 ./scripts/installer-probe.sh --interactive          # frische Maschine als Shell — selbst durchklicken
