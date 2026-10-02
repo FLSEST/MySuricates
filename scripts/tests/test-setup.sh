@@ -63,6 +63,12 @@ check "all present → exit 0"                            '[ "$(run --runtime ho
 unstub java
 check "java missing → exit 1 and the plan names it"     '[ "$(run --check --runtime host)" = 1 ] && out | grep -E "^ *java" >/dev/null'
 stub java 'echo "openjdk version \"21.0.8\" 2025-07-15" >&2'
+# Rocky Linux ohne Docker: Dockers Rocky-Repo hat kein docker-ce — der Plan nimmt das CentOS-Repo (24515f13)
+unstub docker; unstub apt-get; stub dnf 'exit 0'
+printf 'ID="rocky"\nID_LIKE="rhel centos fedora"\n' > "$TMP/os-release-rocky"
+check "rocky without docker → plan installs it from Docker's CentOS repo" '[ "$(DEPS_OS_RELEASE="$TMP/os-release-rocky" run --check)" = 1 ] && out | grep -E "^docker +pm +.*linux/centos/docker-ce.repo" >/dev/null && ! out | grep -F get.docker.com >/dev/null'
+unstub dnf; stub apt-get 'exit 0'
+stub docker 'case "$1" in --version) echo "Docker version 29.1.3, build x";; info) exit 0;; esac'
 
 echo "3) one instance on this machine"
 rm -rf "$INST"

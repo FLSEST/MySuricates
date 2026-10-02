@@ -543,6 +543,9 @@ for retention and how to switch it off.
 container (default `ubuntu:24.04`, with `--image rockylinux:9` also a dnf system) that has nothing but
 git, sudo and tzdata. It always checks a committed state (default `HEAD`, otherwise `--ref`), never
 the working tree. Requires Docker.
+`setup.sh` installs Docker itself via get.docker.com, but on RHEL rebuilds (Rocky, AlmaLinux, Oracle
+Linux) from Docker's CentOS repository: Docker's Rocky repository has no `docker-ce`, and get.docker.com
+does not know the others (`deps_rhel_clone` in `scripts/lib/deps.sh`).
 
 ```bash
 ./scripts/installer-probe.sh --interactive          # fresh machine as a shell — click through yourself
