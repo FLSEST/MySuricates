@@ -215,20 +215,9 @@ public class HostPiService {
         cmd.add(parsed.modelId());
     }
 
-    /** The {@code --thinking} level of a reasoning call: an explicit effort, else the maxTurns heuristic. */
+    /** The {@code --thinking} level of a reasoning call ({@link PiThinkingLevel}). */
     String reasonThinkingLevel(Integer maxTurns, String effort) {
-        return ReasoningEffort.parse(effort)
-                .map(ReasoningEffort::cliValue)
-                .orElseGet(() -> thinkingLevelFor(maxTurns));
-    }
-
-    private String thinkingLevelFor(Integer maxTurns) {
-        if (maxTurns == null) {
-            return config.getDefaultThinkingLevel();
-        }
-        if (maxTurns <= 1) return "low";
-        if (maxTurns <= 3) return "medium";
-        return "high";
+        return PiThinkingLevel.forReasoning(maxTurns, effort, config.getDefaultThinkingLevel());
     }
 
     // --- Process execution (mirrors HostClaudeService) ---
