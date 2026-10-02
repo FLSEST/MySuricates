@@ -1464,6 +1464,23 @@ sed -i 's/docs\/d0.md/docs\/anders.md/' "$TMP/zehr-known.txt"
 run_zehr_gate "$(zehr_envelope 2)"
 check "Gegenprobe: ein anderes subject zaehlt nicht als eingeordnet" \
   'grep -qx "gate_status: YELLOW" "$TMP/zehr-gate.out" && grep -q "gemessen, 1 davon" "$TMP/zehr-gate.out"'
+# Abgeglichen wird wie der Fingerprint (Review zu 3fb33d9b): subject ueber AuditSubjectNormalizer (Zusatz ab
+# dem ersten ":" faellt bei Pfaden weg, Rand-Leerzeichen; Gross-/Kleinschreibung zaehlt wie dort), ruleKey wie
+# AuditRuleKeyCatalog.normalize (klein, "_" -> "-").
+sed -i 's/docs\/anders.md/docs\/d0.md/' "$TMP/zehr-known.txt"
+zehr_raw_envelope() {  # $@ = "ruleKey|subject"-Paare
+  local pair findings=''
+  for pair in "$@"; do
+    findings="$findings{\"ruleKey\":\"${pair%%|*}\",\"subject\":\"${pair#*|}\",\"severity\":\"LOW\",\"title\":\"t\"},"
+  done
+  printf '%s\n' '<!-- mysuricates:audit-result:v1' "{\"snapshotComplete\":true,\"findings\":[${findings%,}]}" '-->'
+}
+run_zehr_gate "$(zehr_raw_envelope 'Docs.Orphan| docs/d0.md:12 ' 'docs.orphan|docs/d1.md:Abschnitt 2')"
+check "subject und ruleKey wie im Fingerprint normalisiert: beide eingeordnet, GREEN" \
+  'grep -qx "gate_status: GREEN" "$TMP/zehr-gate.out" && grep -q "(dazu 2 bewusst eingeordnet)" "$TMP/zehr-gate.out"'
+run_zehr_gate "$(zehr_raw_envelope 'docs.orphan|DOCS/d0.md')"
+check "Gegenprobe: anders geschriebener Pfad ist eine andere Identitaet (wie im Fingerprint)" \
+  'grep -qx "gate_status: YELLOW" "$TMP/zehr-gate.out" && grep -q "(dazu 0 bewusst eingeordnet)" "$TMP/zehr-gate.out"'
 printf '%s\n' '{''{ audit_findings }}' > "$TMP/zehr-known.txt"
 run_zehr_gate "$(zehr_envelope 1)"
 check "unaufgeloester Platzhalter: nichts eingeordnet, YELLOW wie bisher" \

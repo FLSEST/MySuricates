@@ -227,7 +227,7 @@ measurement — without forcing the judgement. The report prompt additionally ca
 report an unchanged finding from the previous run again: otherwise a mere change of mind would close
 it as RESOLVED.
 Triaged findings (`ACCEPTED_RISK`, `DISMISSED` according to `{{ audit_findings }}`, matched by
-`ruleKey` + `subject`) stay in the envelope, but they do not count towards the gate: otherwise the
+`ruleKey` + `subject`, normalised as in the fingerprint) stay in the envelope, but they do not count towards the gate: otherwise the
 documentation weight audit would stay YELLOW for good with every triage. The `gate_description` names
 them separately ("dazu N bewusst eingeordnet").
 
