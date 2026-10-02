@@ -2,39 +2,33 @@ package com.automation.service.example;
 
 import com.automation.dto.request.CreateProjectRequest;
 import com.automation.dto.request.CreateWorkflowRequest;
+import com.automation.dto.request.UpdateProjectRequest;
 import com.automation.entity.ChangeSource;
 import com.automation.entity.Project;
 import com.automation.entity.ProjectType;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowTemplate;
+import com.automation.executor.BlockTypeModules;
+import com.automation.modules.ModuleCatalog;
+import com.automation.modules.ModuleRegistry;
 import com.automation.service.project.ProjectService;
 import com.automation.service.workflow.WorkflowService;
 import com.automation.service.workflow.WorkflowTemplateService;
 import com.automation.util.LocalizedJson;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.Resource;
-import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.UncheckedIOException;
-import java.nio.file.DirectoryNotEmptyException;
-import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * The example project a fresh installation creates with one click (TODO d12c7560): a copy of the
@@ -43,13 +37,15 @@ import java.util.stream.Stream;
  *
  * <p>Idempotent: an active project that already points at the copy is returned instead of a second
  * one, missing example workflows are added, and an existing copy is never overwritten — whoever wants
- * a fresh start deletes the directory.
+ * a fresh start deletes the directory. Two exceptions for an older copy (TODO c04ffb86): its
+ * description and README are brought up to date while they are still the text an earlier version
+ * shipped, word for word. An example whose blocks need a module that is switched off is left out
+ * until the module is on again.
  */
 @Service
 @Slf4j
 public class ExampleProjectService {
 
-    static final String SOURCE_ROOT = "examples/example-project/";
     static final String DIRECTORY_NAME = "example-project";
     /**
      * The shipped templates the example project gets, in this order. Named by id on purpose: the
@@ -74,24 +70,33 @@ public class ExampleProjectService {
             "en", "The example workflows need no AI. All they leave behind outside their run is the done TODO "
                     + "of the TODO example. "
                     + "The directory is a copy of the bundled template, so feel free to change it.");
+    /** The descriptions earlier versions gave the project (e70307e8) — replaced while unchanged. */
+    private static final Map<String, String> EARLIER_DESCRIPTION = Map.of(
+            "de", "Die Beispiel-Workflows kommen ohne KI aus und schreiben nichts außerhalb ihres Laufs. "
+                    + "Das Verzeichnis ist eine Kopie der mitgelieferten Vorlage, Änderungen daran sind erlaubt.",
+            "en", "The example workflows need no AI and write nothing outside their run. "
+                    + "The directory is a copy of the bundled template, so feel free to change it.");
 
     public record Result(Project project, boolean created, int workflowsAdded) {}
 
     private final ProjectService projectService;
     private final WorkflowService workflowService;
     private final WorkflowTemplateService templateService;
+    private final ModuleRegistry modules;
     private final TransactionTemplate transactionTemplate;
     private final Path baseDirectory;
 
     public ExampleProjectService(ProjectService projectService,
                                  WorkflowService workflowService,
                                  WorkflowTemplateService templateService,
+                                 ModuleRegistry modules,
                                  PlatformTransactionManager transactionManager,
                                  @Value("${automation.examples.directory:}") String directory,
                                  @Value("${automation.workspace.root:}") String workspaceRoot) {
         this.projectService = projectService;
         this.workflowService = workflowService;
         this.templateService = templateService;
+        this.modules = modules;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.baseDirectory = resolveBaseDirectory(directory, workspaceRoot);
     }
@@ -120,10 +125,14 @@ public class ExampleProjectService {
     public Result ensure(String locale) {
         String lang = LocalizedJson.normalize(locale);
         Path target = baseDirectory.resolve(DIRECTORY_NAME);
-        copyBundledFiles(target);
+        boolean existed = Files.exists(target);
+        ExampleProjectFiles.copyBundled(target);
+        if (existed) {
+            ExampleProjectFiles.refreshUntouchedReadme(target);
+        }
 
         return transactionTemplate.execute(status -> {
-            Optional<Project> existing = findActive(target);
+            Optional<Project> existing = findActive(target).map(this::refreshUntouchedDescription);
             Project project = existing.orElseGet(() -> projectService.create(new CreateProjectRequest(
                     LocalizedJson.pick(NAME, lang),
                     LocalizedJson.pick(SUBTITLE, lang),
@@ -143,6 +152,16 @@ public class ExampleProjectService {
         return projectService.findAll().stream()
                 .filter(p -> p.getPath() != null && samePath(p.getPath(), target))
                 .findFirst();
+    }
+
+    /** An older copy still carrying an earlier description gets the current one, in that language. */
+    private Project refreshUntouchedDescription(Project project) {
+        return EARLIER_DESCRIPTION.entrySet().stream()
+                .filter(earlier -> earlier.getValue().equals(project.getDescription()))
+                .findFirst()
+                .map(earlier -> projectService.update(project.getId(), new UpdateProjectRequest(
+                        null, null, DESCRIPTION.get(earlier.getKey()), null, null, null, null)))
+                .orElse(project);
     }
 
     private static boolean samePath(String path, Path target) {
@@ -171,6 +190,13 @@ public class ExampleProjectService {
             if (present.contains(id)) {
                 continue;
             }
+            List<ModuleCatalog> off = BlockTypeModules.requiredBy(template.getBlocks()).stream()
+                    .filter(module -> !modules.isEnabled(module))
+                    .toList();
+            if (!off.isEmpty()) {
+                log.info("Example template {} needs the switched-off module(s) {}; left out for now", id, off);
+                continue;
+            }
             workflowService.create(new CreateWorkflowRequest(
                     project.getId(),
                     LocalizedJson.pick(template.getName(), lang),
@@ -189,63 +215,5 @@ public class ExampleProjectService {
             added++;
         }
         return added;
-    }
-
-    /**
-     * Copies the bundled files into {@code target} unless it exists. The copy is assembled in a
-     * sibling directory and moved into place, so a failed copy never leaves a half-filled target
-     * that the existence check would then keep forever.
-     */
-    void copyBundledFiles(Path target) {
-        if (Files.exists(target)) {
-            return;
-        }
-        Path staging = null;
-        try {
-            Files.createDirectories(target.getParent());
-            staging = Files.createTempDirectory(target.getParent(), "." + DIRECTORY_NAME + "-");
-            Resource[] resources = new PathMatchingResourcePatternResolver()
-                    .getResources("classpath:" + SOURCE_ROOT + "**/*");
-            for (Resource resource : resources) {
-                copyResource(resource, staging);
-            }
-            Files.move(staging, target, StandardCopyOption.ATOMIC_MOVE);
-            staging = null;
-            log.info("Copied the bundled example project to {}", target);
-        } catch (FileAlreadyExistsException | DirectoryNotEmptyException e) {
-            log.debug("Example project directory appeared concurrently: {}", target);
-        } catch (IOException e) {
-            throw new UncheckedIOException("Could not copy the example project to " + target, e);
-        } finally {
-            deleteQuietly(staging);
-        }
-    }
-
-    private static void copyResource(Resource resource, Path staging) throws IOException {
-        String url = resource.getURL().toString();
-        int start = url.lastIndexOf(SOURCE_ROOT);
-        if (start < 0 || url.endsWith("/") || !resource.isReadable()) {
-            return;   // directory entry (jar) or directory (file system)
-        }
-        String relative = url.substring(start + SOURCE_ROOT.length());
-        Path file = staging.resolve(relative).normalize();
-        if (relative.isEmpty() || !file.startsWith(staging)) {
-            return;
-        }
-        Files.createDirectories(file.getParent());
-        try (InputStream in = resource.getInputStream()) {
-            Files.copy(in, file);
-        }
-    }
-
-    private static void deleteQuietly(Path directory) {
-        if (directory == null || !Files.exists(directory)) {
-            return;
-        }
-        try (Stream<Path> paths = Files.walk(directory)) {
-            paths.sorted(Comparator.reverseOrder()).forEach(p -> p.toFile().delete());
-        } catch (IOException e) {
-            log.warn("Could not remove the staging directory {}", directory, e);
-        }
     }
 }

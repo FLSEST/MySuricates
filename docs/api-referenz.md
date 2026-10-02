@@ -160,8 +160,8 @@ Neues Projekt erstellen.
 Das mitgelieferte Beispielprojekt anlegen, gedacht für eine frische Installation. Die Oberfläche bietet es an, solange es kein Projekt gibt.
 
 - **Verzeichnis:** Die Vorlage `classpath:examples/example-project/` wird nach `<automation.examples.directory>/example-project` kopiert. Standard ist `mysuricates-examples` unter dem Workspace-Root, ohne Workspace-Root `./data/examples` neben der Datenbank. Die Umgebungsvariable dafür ist `AUTOMATION_EXAMPLES_DIR`. Ein vorhandenes Verzeichnis wird nie überschrieben.
-- **Workflows:** je ein Workflow pro mitgelieferter Vorlage, die `ExampleProjectService.EXAMPLE_TEMPLATE_IDS` nennt (derzeit die Blaupausen `blueprint-approval`, `blueprint-if`, `blueprint-loop`, `blueprint-todo` und `blueprint-report`, alle ohne KI), mit `changeSource` `example-project`.
-- **Idempotent:** Ein aktives Projekt, das schon auf das Verzeichnis zeigt, wird zurückgegeben, und fehlende Beispiel-Workflows werden ergänzt.
+- **Workflows:** je ein Workflow pro mitgelieferter Vorlage, die `ExampleProjectService.EXAMPLE_TEMPLATE_IDS` nennt (derzeit die Blaupausen `blueprint-approval`, `blueprint-if`, `blueprint-loop`, `blueprint-todo` und `blueprint-report`, alle ohne KI), mit `changeSource` `example-project`. Eine Vorlage, deren Blöcke ein ausgeschaltetes Modul brauchen (etwa `blueprint-report` ohne `dashboard-report`), wird ausgelassen und beim nächsten Aufruf mit eingeschaltetem Modul ergänzt.
+- **Idempotent:** Ein aktives Projekt, das schon auf das Verzeichnis zeigt, wird zurückgegeben, und fehlende Beispiel-Workflows werden ergänzt. Beschreibung und `README.md` einer älteren Kopie werden nur dann auf den aktuellen Text gebracht, wenn sie noch wortgleich dem Text einer früheren Version entsprechen; geänderte bleiben unangetastet.
 
 | Parameter | Typ | Pflicht | Werte |
 |---|---|---|---|
