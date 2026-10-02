@@ -56,6 +56,34 @@ check "npm comes with the downloaded node"   '! printf "%s\n" "$PLAN" | grep -E 
 PRESENT=""; for t in git curl; do [ -x "$TMP/tools/$t" ] && PRESENT="$PRESENT|$t"; done
 check "present tools are not in the plan"    '[ -z "$PRESENT" ] || ! printf "%s\n" "$PLAN" | grep -E "^(${PRESENT#|}) " >/dev/null'
 
+echo "4b) docker per distribution (24515f13: Docker's Rocky repo has no docker-ce, AlmaLinux is unknown to get.docker.com)"
+unstub apt-get; unstub apt-cache; stub dnf 'exit 0'
+osr() { printf 'ID="%s"\nID_LIKE="%s"\n' "$1" "$2" > "$TMP/os-release"; }
+dmethod() { run "DEPS_OS_RELEASE=$TMP/os-release deps_method docker"; }
+osr rocky "rhel centos fedora"
+check "rocky: Docker's CentOS repository, not get.docker.com" 'dmethod | grep -F "download.docker.com/linux/centos/docker-ce.repo" >/dev/null && ! dmethod | grep -F get.docker.com >/dev/null'
+check "rocky: installs engine, cli, containerd and compose"   'dmethod | grep -E "dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin" >/dev/null'
+check "rocky: starts the service only where systemd is"       'dmethod | grep -F "command -v systemctl" >/dev/null'
+check "rocky: adds the user to the docker group"              'dmethod | grep -E "usermod -aG docker [^ ]+$" >/dev/null'
+osr almalinux "rhel centos fedora";  check "almalinux: CentOS repository" 'dmethod | grep -F "linux/centos/docker-ce.repo" >/dev/null'
+osr ol "fedora";                     check "oracle linux: CentOS repository" 'dmethod | grep -F "linux/centos/docker-ce.repo" >/dev/null'
+osr fedora "";                       check "fedora stays on get.docker.com" 'dmethod | grep -F get.docker.com >/dev/null'
+osr rhel "fedora";                   check "rhel stays on get.docker.com"   'dmethod | grep -F get.docker.com >/dev/null'
+osr centos "rhel fedora";            check "centos stays on get.docker.com" 'dmethod | grep -F get.docker.com >/dev/null'
+rm -f "$TMP/os-release";             check "no os-release: get.docker.com"  'dmethod | grep -F get.docker.com >/dev/null'
+osr rocky "rhel centos fedora"
+CMD="$(dmethod)"; CMD="${CMD#pm }"
+mkdir -p "$TMP/cmdbin"; : > "$TMP/calls"
+for t in curl dnf usermod systemctl; do printf '#!/bin/sh\necho "%s $*" >> "%s/calls"\n' "$t" "$TMP" > "$TMP/cmdbin/$t"; chmod +x "$TMP/cmdbin/$t"; done
+printf '#!/bin/sh\n"$@"\n' > "$TMP/cmdbin/sudo"; chmod +x "$TMP/cmdbin/sudo"
+BASH_BIN="$(command -v bash)"
+( PATH="$TMP/cmdbin"; "$BASH_BIN" -c "$CMD" ) >/dev/null 2>&1; RC=$?
+check "rocky command runs through (stubbed)"                  '[ "$RC" = 0 ] && grep -F "usermod -aG docker" "$TMP/calls" >/dev/null && grep -F "systemctl enable --now docker" "$TMP/calls" >/dev/null'
+rm -f "$TMP/cmdbin/systemctl"; : > "$TMP/calls"
+( PATH="$TMP/cmdbin"; "$BASH_BIN" -c "$CMD" ) >/dev/null 2>&1; RC=$?
+check "without systemd (a container) it still succeeds"       '[ "$RC" = 0 ] && grep -F "usermod -aG docker" "$TMP/calls" >/dev/null'
+unstub dnf; rm -f "$TMP/os-release"
+
 echo "5) verified download"
 if [ -x "$TMP/tools/curl" ]; then
   mkdir -p "$TMP/pkg/node-v9.9.9-linux-x64/bin"

@@ -75,6 +75,18 @@ deps_check() {
 }
 
 # running | no-permission | not-running | missing
+# Ein RHEL-Nachbau (Rocky, AlmaLinux, Oracle Linux …)? RHEL, CentOS und Fedora selbst nicht — die
+# bedient get.docker.com. Test-Override: DEPS_OS_RELEASE (Default /etc/os-release).
+deps_rhel_clone() {
+  local f="${DEPS_OS_RELEASE:-/etc/os-release}" id like
+  [ -r "$f" ] || return 1
+  id="$(awk -F= '$1=="ID"{gsub(/"/,"",$2); print $2}' "$f")"
+  like="$(awk -F= '$1=="ID_LIKE"{gsub(/"/,"",$2); print $2}' "$f")"
+  case "$id" in rhel|centos|fedora|"") return 1 ;; rocky|almalinux|ol) return 0 ;; esac
+  case " $like " in *" rhel "*|*" centos "*) return 0 ;; esac
+  return 1
+}
+
 deps_docker_state() {
   local err
   command -v docker >/dev/null 2>&1 || { echo missing; return; }
@@ -138,6 +150,14 @@ deps_method() {
   case "$tool" in
     docker)
       if [ "$os" = darwin ]; then echo "manual brew install --cask docker   (then start Docker Desktop)"; return; fi
+      if [ "$pm" = dnf ] && deps_rhel_clone; then
+        # Docker's eigenes Repo fuer Rocky enthaelt (Stand 2026-10) nur die Plugins, kein docker-ce, und
+        # AlmaLinux/Oracle kennt get.docker.com gar nicht (24515f13). Deren Pakete sind die von CentOS —
+        # der offizielle Weg aus docs.docker.com/engine/install/centos, Repo-Datei per curl (dnf 4 und 5).
+        # Ohne systemd (Container) laeuft kein Dienst; dort steht der Docker-Socket von aussen bereit.
+        echo "pm sudo curl -fsSL -o /etc/yum.repos.d/docker-ce.repo https://download.docker.com/linux/centos/docker-ce.repo && sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin && { ! command -v systemctl >/dev/null 2>&1 || sudo systemctl enable --now docker || true; } && sudo usermod -aG docker $(id -un)"
+        return
+      fi
       case "$pm" in
         apt|dnf) echo "pm curl -fsSL https://get.docker.com | sudo sh && sudo usermod -aG docker $(id -un)" ;;
         pacman|zypper) echo "pm $(deps_install_cmd "$pm" $(deps_pkg docker "$pm")) && sudo systemctl enable --now docker && sudo usermod -aG docker $(id -un)" ;;
