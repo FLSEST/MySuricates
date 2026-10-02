@@ -87,7 +87,8 @@ public class PiAiProvider implements AiProvider {
         );
         return new ReasoningResult(
                 result.text(),
-                AiResponseMetadata.estimated(request.prompt(), result.text())
+                AiResponseMetadata.estimated(request.prompt(), result.text()),
+                result.thinkingLevel()
         );
     }
 

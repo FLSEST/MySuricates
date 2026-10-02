@@ -2767,13 +2767,13 @@ Tool usage patterns of a workflow (which tools are used how often).
 
 Execution insights: trends, anomalies, performance metrics.
 
-**Response:** `Map<String, Object>`
+**Response:** `Map<String, Object>` — sums over all runs of the workflow, among them `totalInputTokens`, `totalOutputTokens`, `totalCacheReadInputTokens`, `totalCacheCreationInputTokens` and `totalThinkingTokens` (part of the output tokens; the last three since TODO 20861200, `0` when no step reports them).
 
 ### `GET /api/v1/learning/runs/{runId}/insights`
 
 Detailed insights for a single run.
 
-**Response:** `Map<String, Object>`
+**Response:** `Map<String, Object>` — sums as above, plus `steps[]` with the figures per step; `cacheReadInputTokens`, `cacheCreationInputTokens` and `thinkingTokens` only on steps that report them (Claude).
 
 ### `POST /api/v1/learning/runs/{runId}/rate?rating={1-5}`
 

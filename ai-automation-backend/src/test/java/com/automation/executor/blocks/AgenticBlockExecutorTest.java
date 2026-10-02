@@ -985,6 +985,34 @@ class AgenticBlockExecutorTest {
                 .containsEntry("effort", "high");
     }
 
+    /**
+     * TODO 20861200: pi reasons with a --thinking level even without an effort (maxTurns heuristic or its
+     * default) — the step names it, beside the effort that was set (here none).
+     */
+    @Test
+    @SuppressWarnings("unchecked")
+    void execute_piReasoning_namesItsThinkingLevelInAiRequest() throws Exception {
+        com.automation.service.ai.AiProvider pi = mock(com.automation.service.ai.AiProvider.class);
+        when(pi.getId()).thenReturn("PI");
+        when(pi.getCapabilities()).thenReturn(new com.automation.service.ai.AiProviderCapabilities(
+                true, true, true, false, true, false, true, true));
+        when(pi.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
+        when(pi.reason(any())).thenReturn(new com.automation.service.ai.AiProvider.ReasoningResult(
+                "GOAL_STATUS: ACHIEVED\nRATIONALE: done\nACTION:\nSUMMARY: ok",
+                com.automation.service.ai.AiResponseMetadata.estimated(10, 5), "medium"));
+        when(aiProviderRegistry.resolve(any())).thenReturn(pi);
+        when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
+
+        ExecutionContext context = buildContext();
+        context.setProvider("PI");
+
+        StepResult result = executor.execute(buildBlock("Test goal"), context);
+
+        Map<String, Object> aiRequest = (Map<String, Object>) result.getMetadata().get("aiRequest");
+        assertThat(aiRequest).containsEntry("provider", "PI").containsEntry("reasonThinking", "medium")
+                .doesNotContainKey("effort");
+    }
+
     /** Codex has no effort flag: the block does not claim the workflow effort it could not apply (TODO 20adda30). */
     @Test
     @SuppressWarnings("unchecked")
@@ -1007,6 +1035,6 @@ class AgenticBlockExecutorTest {
 
         assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
         Map<String, Object> aiRequest = (Map<String, Object>) result.getMetadata().get("aiRequest");
-        assertThat(aiRequest).containsEntry("provider", "CODEX").doesNotContainKey("effort");
+        assertThat(aiRequest).containsEntry("provider", "CODEX").doesNotContainKeys("effort", "reasonThinking");
     }
 }

@@ -60,6 +60,52 @@ class ExecutionInsightsServiceTest {
         assertThat(models).contains("claude-sonnet-4-6");
     }
 
+    /**
+     * TODO 20861200: the workflow insights sum the cache and thinking figures like the run insights —
+     * before, only the run insights had them. Steps without them (Codex, Pi, older runs) add nothing.
+     */
+    @Test
+    void getExecutionInsights_sumsCacheAndThinkingTokens() {
+        StepResult claude = StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED)
+                .metadata(Map.of("inputTokens", 2, "outputTokens", 918, "cacheReadInputTokens", 13720,
+                        "cacheCreationInputTokens", 48462, "thinkingTokens", 377))
+                .build();
+        StepResult codex = StepResult.builder().stepIndex(1).status(StepStatus.COMPLETED)
+                .metadata(Map.of("inputTokens", 400, "outputTokens", 100, "estimated", true))
+                .build();
+        StepResult later = StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED)
+                .metadata(Map.of("inputTokens", 3, "outputTokens", 50, "cacheReadInputTokens", 280, "thinkingTokens", 23))
+                .build();
+        when(runRepository.findByWorkflowIdOrderByStartedAtDesc("wf-1")).thenReturn(List.of(
+                WorkflowRun.builder().id("r2").status(RunStatus.COMPLETED).steps(new ArrayList<>(List.of(later))).build(),
+                WorkflowRun.builder().id("r1").status(RunStatus.COMPLETED).steps(new ArrayList<>(List.of(claude, codex))).build()));
+
+        Map<String, Object> result = service.getExecutionInsights("wf-1");
+
+        assertThat(result).containsEntry("totalInputTokens", 405L)
+                .containsEntry("totalCacheReadInputTokens", 14000L)
+                .containsEntry("totalCacheCreationInputTokens", 48462L)
+                .containsEntry("totalThinkingTokens", 400L);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void getRunInsights_reportsThinkingTokensPerStepAndInTotal() {
+        StepResult claude = StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED)
+                .metadata(Map.of("inputTokens", 2, "outputTokens", 918, "thinkingTokens", 377)).build();
+        StepResult pi = StepResult.builder().stepIndex(1).status(StepStatus.COMPLETED)
+                .metadata(Map.of("inputTokens", 400, "outputTokens", 100, "estimated", true)).build();
+        when(runRepository.findById("r1")).thenReturn(Optional.of(WorkflowRun.builder().id("r1")
+                .status(RunStatus.COMPLETED).steps(new ArrayList<>(List.of(claude, pi))).build()));
+
+        Map<String, Object> result = service.getRunInsights("r1");
+
+        assertThat(result).containsEntry("totalThinkingTokens", 377L).containsEntry("totalOutputTokens", 1018L);
+        List<Map<String, Object>> steps = (List<Map<String, Object>>) result.get("steps");
+        assertThat(steps.get(0)).containsEntry("thinkingTokens", 377L);
+        assertThat(steps.get(1)).doesNotContainKey("thinkingTokens");
+    }
+
     @Test
     void getExecutionInsights_noMetadata_handlesGracefully() {
         StepResult step = StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).build();

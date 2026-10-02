@@ -61,6 +61,17 @@ class PiAiProviderTest {
         assertThat(result.metadata().estimated()).isTrue();
     }
 
+    /** TODO 20861200: the --thinking level pi reasoned with reaches the caller (agentic aiRequest). */
+    @Test
+    void reason_passesTheThinkingLevelOn() throws IOException {
+        when(hostPiService.reason(eq("prompt"), eq("system"), isNull(), eq("/path"), eq(5), eq(60), isNull()))
+                .thenReturn(new HostPiService.ReasoningResult("out", "high"));
+
+        var result = provider.reason(new AiProvider.ReasoningRequest("prompt", "system", "/path", 5, 60));
+
+        assertThat(result.thinkingLevel()).isEqualTo("high");
+    }
+
     @Test
     void reason_forwardsWorkflowModelToHostService() throws IOException {
         when(hostPiService.reason(eq("prompt"), eq("system"), eq("openai-codex/gpt-5.5"), eq("/path"), eq(3), eq(60), isNull()))

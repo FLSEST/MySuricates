@@ -2043,6 +2043,8 @@ export const de: TranslationKeys = {
     inputTokens: 'Input-Tokens',
     outputTokens: 'Output-Tokens',
     cacheTokens: 'Cache',
+    thinkingTokens: 'davon {count} Denken',
+    thinkingTokensHint: 'Anteil der Output-Tokens, den das Modell mit erweitertem Denken verbraucht hat – schon in den Output-Tokens enthalten',
     stepTokens: '{count} Tokens',
     cacheTokensHint: '{read} aus dem Prompt-Cache gelesen, {write} in den Cache geschrieben – kommt zu den Input-Tokens hinzu',
     perStep: 'Aufschlüsselung pro Schritt',

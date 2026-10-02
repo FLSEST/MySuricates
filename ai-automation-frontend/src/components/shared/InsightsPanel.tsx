@@ -26,6 +26,20 @@ function CacheTokens({ read, write, locale, className = '' }: {
   );
 }
 
+/**
+ * The part of the output tokens spent on extended thinking (TODO 20861200) — already included in them,
+ * so it reads "incl.", never "+". Older backends and other providers send none: no label.
+ */
+function ThinkingTokens({ count, locale, className = '' }: { count?: number; locale: Locale; className?: string }) {
+  const t = useT();
+  if (!count || count <= 0) return null;
+  return (
+    <span className={`text-text-tertiary ${className}`} title={t.insights.thinkingTokensHint}>
+      {t.insights.thinkingTokens.replace('{count}', formatTokenCount(count, locale))}
+    </span>
+  );
+}
+
 export function InsightsPanel({ runId }: { runId: string }) {
   const t = useT();
   const locale = useI18nStore((s) => s.locale);
@@ -67,6 +81,7 @@ export function InsightsPanel({ runId }: { runId: string }) {
           <div>
             <p className="text-xs text-text-tertiary">{t.insights.outputTokens}</p>
             <p className="text-sm font-semibold text-text">{formatTokenCount(insights.totalOutputTokens, locale)}</p>
+            <ThinkingTokens count={insights.totalThinkingTokens} locale={locale} className="block text-[11px]" />
           </div>
         </div>
       </div>
@@ -104,6 +119,7 @@ export function InsightsPanel({ runId }: { runId: string }) {
                   )}
                   <span>{t.insights.stepTokens.replace('{count}', formatTokenCount(step.inputTokens + step.outputTokens, locale))}</span>
                   <CacheTokens read={step.cacheReadInputTokens} write={step.cacheCreationInputTokens} locale={locale} />
+                  <ThinkingTokens count={step.thinkingTokens} locale={locale} />
                   <span className="font-medium text-text">{formatUsd(step.costUsd, locale)}</span>
                 </div>
               </div>

@@ -143,8 +143,9 @@ public class AgenticTokenTracker {
         if (provider != null) metadata.put("provider", provider);
         metadata.put("inputTokens", totalInputTokens);
         metadata.put("outputTokens", totalOutputTokens);
-        putCacheTotal(metadata, "cacheReadInputTokens");
-        putCacheTotal(metadata, "cacheCreationInputTokens");
+        putReportedTotal(metadata, "cacheReadInputTokens");
+        putReportedTotal(metadata, "cacheCreationInputTokens");
+        putReportedTotal(metadata, "thinkingTokens"); // part of outputTokens (TODO 20861200), not on top
         metadata.put("costUsd", totalCostUsd);
         if (!allToolNames.isEmpty()) {
             metadata.put("toolNames", allToolNames);
@@ -173,11 +174,12 @@ public class AgenticTokenTracker {
     // --- Private helpers ---
 
     /**
-     * Sums a cache field over all phases that reported it (TODO 20adda30). Stays out of the budget
-     * on purpose: {@code max_total_tokens} was sized for input without cache and would trip at once.
+     * Sums a cache field (TODO 20adda30) or the thinking tokens (TODO 20861200) over all phases that
+     * reported it. Stays out of the budget on purpose: {@code max_total_tokens} was sized for input
+     * without cache and would trip at once, and thinking is already part of {@code outputTokens}.
      * No phase reported it (Codex, Pi, estimates) — no key at all instead of a misleading 0.
      */
-    private void putCacheTotal(Map<String, Object> metadata, String field) {
+    private void putReportedTotal(Map<String, Object> metadata, String field) {
         long total = 0;
         boolean reported = false;
         for (Map<String, Object> iter : iterationLog) {

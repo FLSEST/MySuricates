@@ -31,6 +31,7 @@ public class ExecutionInsightsService {
         double totalCost = 0.0;
         long totalInputTokens = 0;
         long totalOutputTokens = 0;
+        TokenDetailTotals details = new TokenDetailTotals();
         Set<String> modelsUsed = new LinkedHashSet<>();
         int runsWithInsights = 0;
 
@@ -45,6 +46,7 @@ public class ExecutionInsightsService {
                     totalCost += cost;
                     totalInputTokens += inTok;
                     totalOutputTokens += outTok;
+                    details.add(step.getMetadata(), null);
                     String model = (String) step.getMetadata().get("model");
                     if (model != null) modelsUsed.add(model);
                 }
@@ -62,6 +64,8 @@ public class ExecutionInsightsService {
         insights.put("totalInputTokens", totalInputTokens);
         insights.put("totalOutputTokens", totalOutputTokens);
         insights.put("totalTokens", totalInputTokens + totalOutputTokens);
+        // the same detail sums as the run insights (TODO 20861200) — before, only those had them
+        details.putTotals(insights);
         insights.put("modelsUsed", modelsUsed);
 
         return insights;
@@ -75,8 +79,7 @@ public class ExecutionInsightsService {
         double totalCost = 0.0;
         long totalInputTokens = 0;
         long totalOutputTokens = 0;
-        long totalCacheReadTokens = 0;
-        long totalCacheCreationTokens = 0;
+        TokenDetailTotals details = new TokenDetailTotals();
         List<Map<String, Object>> stepInsights = new ArrayList<>();
 
         for (StepResult step : run.getSteps()) {
@@ -96,15 +99,7 @@ public class ExecutionInsightsService {
                 si.put("costUsd", cost);
                 si.put("inputTokens", inTok);
                 si.put("outputTokens", outTok);
-                // Claude reports the cached input apart from inputTokens (TODO 20adda30); other providers do not
-                if (step.getMetadata().get("cacheReadInputTokens") instanceof Number n) {
-                    si.put("cacheReadInputTokens", n.longValue());
-                    totalCacheReadTokens += n.longValue();
-                }
-                if (step.getMetadata().get("cacheCreationInputTokens") instanceof Number n) {
-                    si.put("cacheCreationInputTokens", n.longValue());
-                    totalCacheCreationTokens += n.longValue();
-                }
+                details.add(step.getMetadata(), si);
                 si.put("model", step.getMetadata().get("model"));
                 si.put("provider", step.getMetadata().get("provider"));
                 si.put("numTurns", step.getMetadata().get("numTurns"));
@@ -122,12 +117,40 @@ public class ExecutionInsightsService {
         result.put("totalInputTokens", totalInputTokens);
         result.put("totalOutputTokens", totalOutputTokens);
         result.put("totalTokens", totalInputTokens + totalOutputTokens);
-        result.put("totalCacheReadInputTokens", totalCacheReadTokens);
-        result.put("totalCacheCreationInputTokens", totalCacheCreationTokens);
+        details.putTotals(result);
         result.put("durationMs", run.getDurationMs());
         result.put("steps", stepInsights);
 
         return result;
+    }
+
+    /**
+     * Token figures only Claude reports, apart from {@code inputTokens}/{@code outputTokens}: the cached
+     * input (TODO 20adda30) and the thinking part of the output (TODO 20861200). Summed over the steps
+     * that carry them; a step without them adds nothing, and the totals are 0 when none did.
+     */
+    private static final class TokenDetailTotals {
+        private static final List<String> FIELDS =
+                List.of("cacheReadInputTokens", "cacheCreationInputTokens", "thinkingTokens");
+        private final long[] totals = new long[FIELDS.size()];
+
+        /** Adds a step's figures; {@code stepInsight} (nullable) gets those the step reported. */
+        void add(Map<String, Object> stepMetadata, Map<String, Object> stepInsight) {
+            for (int i = 0; i < FIELDS.size(); i++) {
+                if (stepMetadata.get(FIELDS.get(i)) instanceof Number n) {
+                    totals[i] += n.longValue();
+                    if (stepInsight != null) stepInsight.put(FIELDS.get(i), n.longValue());
+                }
+            }
+        }
+
+        /** {@code totalCacheReadInputTokens}, {@code totalCacheCreationInputTokens}, {@code totalThinkingTokens}. */
+        void putTotals(Map<String, Object> target) {
+            for (int i = 0; i < FIELDS.size(); i++) {
+                String field = FIELDS.get(i);
+                target.put("total" + Character.toUpperCase(field.charAt(0)) + field.substring(1), totals[i]);
+            }
+        }
     }
 
     @Transactional

@@ -63,18 +63,36 @@ public record ClaudeJsonResponse(
             @JsonProperty("input_tokens") int inputTokens,
             @JsonProperty("output_tokens") int outputTokens,
             @JsonProperty("cache_read_input_tokens") Integer cacheReadInputTokens,
-            @JsonProperty("cache_creation_input_tokens") Integer cacheCreationInputTokens
+            @JsonProperty("cache_creation_input_tokens") Integer cacheCreationInputTokens,
+            @JsonProperty("output_tokens_details") OutputTokensDetails outputTokensDetails
     ) {
         public Usage(int inputTokens, int outputTokens) {
-            this(inputTokens, outputTokens, null, null);
+            this(inputTokens, outputTokens, null, null, null);
         }
 
-        /** Puts the cache fields that the CLI reported into step/run metadata. */
+        public Usage(int inputTokens, int outputTokens, Integer cacheReadInputTokens, Integer cacheCreationInputTokens) {
+            this(inputTokens, outputTokens, cacheReadInputTokens, cacheCreationInputTokens, null);
+        }
+
+        /**
+         * The thinking part of {@code output_tokens} ({@code output_tokens_details.thinking_tokens}, TODO 20861200) —
+         * already counted in {@link #outputTokens()}, never on top. {@code null} when the CLI did not report it.
+         */
+        public Integer thinkingTokens() {
+            return outputTokensDetails != null ? outputTokensDetails.thinkingTokens() : null;
+        }
+
+        /** Puts the cache and thinking fields that the CLI reported into step/run metadata. */
         public void putCacheTokens(Map<String, Object> meta) {
             if (cacheReadInputTokens != null) meta.put("cacheReadInputTokens", cacheReadInputTokens);
             if (cacheCreationInputTokens != null) meta.put("cacheCreationInputTokens", cacheCreationInputTokens);
+            if (thinkingTokens() != null) meta.put("thinkingTokens", thinkingTokens());
         }
     }
+
+    /** {@code usage.output_tokens_details} of the CLI: how much of the output was extended thinking. */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record OutputTokensDetails(@JsonProperty("thinking_tokens") Integer thinkingTokens) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record ModelUsage(int inputTokens, int outputTokens, double costUSD) {}

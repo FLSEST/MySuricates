@@ -80,3 +80,26 @@ describe('InsightsPanel cache tokens', () => {
     expect(screen.queryByText(/\btok\b/)).not.toBeInTheDocument();
   });
 });
+
+describe('InsightsPanel thinking tokens (TODO 20861200)', () => {
+  it('shows the thinking part of the output in the summary and per step', async () => {
+    payload = {
+      ...WITH_CACHE,
+      totalThinkingTokens: 377,
+      steps: [{ ...WITH_CACHE.steps[0], thinkingTokens: 377 }],
+    };
+    renderWithProviders(<InsightsPanel runId="r1" />);
+
+    const labels = await screen.findAllByText('incl. 377 thinking');
+    expect(labels).toHaveLength(2);
+    expect(labels[0]).toHaveAttribute('title', expect.stringContaining('already included in the output tokens'));
+  });
+
+  it('shows no thinking label for a backend without the figures', async () => {
+    payload = WITH_CACHE;
+    renderWithProviders(<InsightsPanel runId="r1" />);
+
+    expect(await screen.findAllByText('+62.2k cache')).toHaveLength(2);
+    expect(screen.queryByText(/thinking/)).not.toBeInTheDocument();
+  });
+});

@@ -91,6 +91,7 @@ public class AgenticBlockExecutor implements BlockExecutor {
         boolean goalAchieved = false;
         boolean approvalRequired = cfg.requireApproval();
         String stopReason = null;
+        String reasonThinking = null; // pi's --thinking level of the REASON calls (TODO 20861200)
 
         while (iteration < cfg.maxIterations() && !context.shouldStop()) {
             // Total timeout check
@@ -124,6 +125,7 @@ public class AgenticBlockExecutor implements BlockExecutor {
                         new AiProvider.ReasoningRequest(conversationPrompt, systemPrompt, model,
                                 null, null, cfg.claudeTimeout(), effort));
                 reasoning = reasonResult.text();
+                if (reasonResult.thinkingLevel() != null) reasonThinking = reasonResult.thinkingLevel();
                 tokenTracker.captureReasonMeta(iterData, reasonResult.metadata(), conversationPrompt, reasoning, iteration);
             } catch (Exception e) {
                 log.error("Host Claude reasoning failed at iteration {}: {}", iteration, e.getMessage());
@@ -263,8 +265,11 @@ public class AgenticBlockExecutor implements BlockExecutor {
                 cfg.goal(), cfg.successCriteria(), iteration, goalAchieved, stopReason,
                 model, provider.getId());
         // Codex ignores an effort (no CLI flag), so its steps do not claim one (TODO 20adda30)
-        metadata.put(StepAiMetadata.AI_REQUEST, StepAiMetadata.aiRequest(provider.getId(), model,
-                provider.getCapabilities().supportsEffort() ? effort : null));
+        Map<String, Object> aiRequest = StepAiMetadata.aiRequest(provider.getId(), model,
+                provider.getCapabilities().supportsEffort() ? effort : null);
+        // pi always reasons with a --thinking level, without an effort the maxTurns heuristic picks it
+        if (reasonThinking != null) aiRequest.put("reasonThinking", reasonThinking);
+        metadata.put(StepAiMetadata.AI_REQUEST, aiRequest);
         result.setMetadata(metadata);
 
         context.setVariable("agentic_goal_achieved", goalAchieved);
