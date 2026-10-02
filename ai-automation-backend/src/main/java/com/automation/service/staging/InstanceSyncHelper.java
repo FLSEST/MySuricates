@@ -184,6 +184,7 @@ public class InstanceSyncHelper {
                     updateBody.put("blocks", workflow.getBlocks());
                     if (workflow.getInstructions() != null) updateBody.put("instructions", workflow.getInstructions());
                     if (workflow.getModel() != null) updateBody.put("model", workflow.getModel());
+                    putVersion(updateBody, workflow);
                     if (workflow.getMetadata() != null && !workflow.getMetadata().isEmpty()) {
                         updateBody.put("metadata", workflow.getMetadata());
                     }
@@ -200,6 +201,7 @@ public class InstanceSyncHelper {
                     importBody.put("blocks", workflow.getBlocks());
                     if (workflow.getInstructions() != null) importBody.put("instructions", workflow.getInstructions());
                     if (workflow.getModel() != null) importBody.put("model", workflow.getModel());
+                    putVersion(importBody, workflow);
                     JsonNode created = httpClient.httpPost(targetBaseUrl + "/workflows/import", importBody);
                     if (created != null && !created.path("id").isMissingNode()) {
                         workflowIdMapping.put(workflow.getId(), created.path("id").asText());
@@ -339,39 +341,9 @@ public class InstanceSyncHelper {
             }
         }
 
-        // 5. Sync auto-todo-default setting
-        try {
-            appSettingsRepository.get("auto-todo-default").ifPresent(value -> {
-                try {
-                    httpClient.httpPut(targetBaseUrl + "/system/settings/auto-todo-default",
-                            Map.of("value", value));
-                    log.info("Synced auto-todo-default setting: {}", value);
-                } catch (Exception e) {
-                    errors.add("Setting 'auto-todo-default': " + e.getMessage());
-                    log.warn("Failed to sync auto-todo-default: {}", e.getMessage());
-                }
-            });
-        } catch (Exception e) {
-            errors.add("Setting 'auto-todo-default' (read): " + e.getMessage());
-            log.warn("Failed to read auto-todo-default: {}", e.getMessage());
-        }
-
-        // 5. Sync auto-repair-default setting
-        try {
-            appSettingsRepository.get("auto-repair-default").ifPresent(value -> {
-                try {
-                    httpClient.httpPut(targetBaseUrl + "/system/settings/auto-repair-default",
-                            Map.of("value", value));
-                    log.info("Synced auto-repair-default setting: {}", value);
-                } catch (Exception e) {
-                    errors.add("Setting 'auto-repair-default': " + e.getMessage());
-                    log.warn("Failed to sync auto-repair-default: {}", e.getMessage());
-                }
-            });
-        } catch (Exception e) {
-            errors.add("Setting 'auto-repair-default' (read): " + e.getMessage());
-            log.warn("Failed to read auto-repair-default: {}", e.getMessage());
-        }
+        // 5. Sync the two default settings
+        syncSetting(targetBaseUrl, "auto-todo-default", errors);
+        syncSetting(targetBaseUrl, "auto-repair-default", errors);
 
         log.info("Definition sync complete: {} projects, {} workflows, {} skills, {} chains synced, {} skipped, {} errors",
                 projectsSynced, workflowsSynced, skillsSynced, chainsSynced, skipped, errors.size());
@@ -407,6 +379,32 @@ public class InstanceSyncHelper {
             log.warn("Pre-sync backup failed on {}, continuing anyway", targetBaseUrl, e);
             return null;
         }
+    }
+
+    /** Copies one app setting to the target; a failure is recorded and does not stop the sync. */
+    private void syncSetting(String targetBaseUrl, String key, List<String> errors) {
+        Optional<String> value;
+        try {
+            value = appSettingsRepository.get(key);
+        } catch (Exception e) {
+            errors.add("Setting '" + key + "' (read): " + e.getMessage());
+            log.warn("Failed to read {}: {}", key, e.getMessage());
+            return;
+        }
+        value.ifPresent(v -> {
+            try {
+                httpClient.httpPut(targetBaseUrl + "/system/settings/" + key, Map.of("value", v));
+                log.info("Synced {} setting: {}", key, v);
+            } catch (Exception e) {
+                errors.add("Setting '" + key + "': " + e.getMessage());
+                log.warn("Failed to sync {}: {}", key, e.getMessage());
+            }
+        });
+    }
+
+    /** The version label travels along (TODO 62422aef); a target that does not know the field yet ignores it. */
+    private static void putVersion(Map<String, Object> body, Workflow workflow) {
+        if (workflow.getVersion() != null && !workflow.getVersion().isBlank()) body.put("version", workflow.getVersion());
     }
 
     /** Updates stable_synced_at via raw JDBC — bypasses Hibernate to avoid @LastModifiedDate. */

@@ -127,6 +127,53 @@ class InstanceSyncHelperTest {
         verify(httpClient).httpPost(eq(TARGET + "/workflows/import"), wfBodyCaptor.capture());
         assertThat(wfBodyCaptor.getValue().get("name")).isEqualTo("NewWF");
         assertThat(wfBodyCaptor.getValue().get("projectId")).isEqualTo("tp1");
+        assertThat(wfBodyCaptor.getValue().get("version")).isEqualTo("1.0.0");
+    }
+
+    @Test
+    void sync_copiesBothDefaultSettings_andRecordsAFailedOne() throws Exception {
+        when(projectRepository.findAll()).thenReturn(List.of());
+        when(workflowRepository.findAllReadOnly()).thenReturn(List.of());
+        when(skillRepository.findByBuiltin(false)).thenReturn(List.of());
+        when(httpClient.httpGet(anyString())).thenReturn(objectMapper.readTree("[]"));
+        when(appSettingsRepository.get("auto-todo-default")).thenReturn(Optional.of("true"));
+        when(appSettingsRepository.get("auto-repair-default")).thenReturn(Optional.of("false"));
+        when(httpClient.httpPut(anyString(), any())).thenAnswer(call -> {
+            if (call.<String>getArgument(0).endsWith("/auto-repair-default")) throw new RuntimeException("boom");
+            return null;
+        });
+
+        SyncResult result = syncHelper.syncDefinitionsTo(TARGET, null, null);
+
+        verify(httpClient).httpPut(TARGET + "/system/settings/auto-todo-default", Map.of("value", "true"));
+        assertThat(result.errors()).containsExactly("Setting 'auto-repair-default': boom");
+    }
+
+    /** Der Versionsstand kommt mit – per Import wie per PUT (62422aef). */
+    @Test
+    void sync_carriesTheVersionLabel_onImportAndUpdate() throws Exception {
+        Project proj = Project.builder().id("p1").name("Proj").path("/proj").type(ProjectType.CODE).build();
+        Workflow fresh = Workflow.builder().id("wf1").name("NewWF").project(proj).version("4.4.0").blocks(List.of()).build();
+        Workflow known = Workflow.builder().id("wf2").name("KnownWF").project(proj).version("2.1.0").blocks(List.of()).build();
+        when(projectRepository.findAll()).thenReturn(List.of(proj));
+        when(workflowRepository.findAllReadOnly()).thenReturn(List.of(fresh, known));
+        when(skillRepository.findByBuiltin(false)).thenReturn(List.of());
+
+        when(httpClient.httpGet(TARGET + "/projects")).thenReturn(objectMapper.readTree("[{\"name\":\"Proj\",\"path\":\"/proj\",\"id\":\"tp1\"}]"));
+        when(httpClient.httpGet(TARGET + "/workflows")).thenReturn(objectMapper.readTree("[{\"name\":\"KnownWF\",\"projectName\":\"Proj\",\"id\":\"twf2\"}]"));
+        when(httpClient.httpGet(TARGET + "/skills")).thenReturn(objectMapper.readTree("[]"));
+        when(httpClient.httpPost(eq(TARGET + "/workflows/import"), any())).thenReturn(objectMapper.readTree("{\"id\":\"twf1\"}"));
+
+        syncHelper.syncDefinitionsTo(TARGET, null, null);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> importCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(httpClient).httpPost(eq(TARGET + "/workflows/import"), importCaptor.capture());
+        assertThat(importCaptor.getValue().get("version")).isEqualTo("4.4.0");
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> updateCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(httpClient).httpPut(eq(TARGET + "/workflows/twf2"), updateCaptor.capture());
+        assertThat(updateCaptor.getValue().get("version")).isEqualTo("2.1.0");
     }
 
     @Test
