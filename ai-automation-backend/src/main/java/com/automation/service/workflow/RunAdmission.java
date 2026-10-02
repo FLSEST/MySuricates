@@ -81,13 +81,14 @@ public class RunAdmission {
         Map<String, Object> metadata = new LinkedHashMap<>();
         metadata.put("triggerSource", source.name());
         metadata.put("effectiveSource", origin);
-        activityLog.logRefusal(LogLevel.WARN, LogCategory.SECURITY,
-                "Run refused — unattended run (" + origin + ") of unsealed workflow '" + workflow.getName() + "'",
-                "RunAdmission", workflow.getId(), metadata, workflow.getId());
-        throw new HardeningException(ErrorCode.UNATTENDED_REQUIRES_SEAL,
+        HardeningException refusal = new HardeningException(ErrorCode.UNATTENDED_REQUIRES_SEAL,
                 "Workflow '" + workflow.getName() + "' was not started: unattended runs (" + origin
                         + ") require a sealed workflow (automation.hardening.require-sealed-for-unattended)",
                 Map.of("name", String.valueOf(workflow.getName()), "origin", origin));
+        activityLog.logRefusal(LogLevel.WARN, LogCategory.SECURITY,
+                "Run refused — unattended run (" + origin + ") of unsealed workflow '" + workflow.getName() + "'",
+                "RunAdmission", workflow.getId(), translatable(metadata, refusal), workflow.getId());
+        throw refusal;
     }
 
     /** Returns the verdict of an intact seal or refuses the run (fail closed: an unverifiable seal is a broken seal). */
@@ -113,12 +114,26 @@ public class RunAdmission {
         if (!verdict.changedSkills().isEmpty()) {
             metadata.put("changedSkills", List.copyOf(verdict.changedSkills()));
         }
-        activityLog.logRefusal(LogLevel.ERROR, LogCategory.SECURITY,
-                "Run refused — sealed workflow '" + workflow.getName() + "': " + reason,
-                "RunAdmission", workflow.getId(), metadata, workflow.getId());
         Map<String, String> params = new LinkedHashMap<>(verdict.refusalParams());
         params.put("name", String.valueOf(workflow.getName()));
-        return new HardeningException(verdict.refusal(), params);
+        HardeningException refusal = new HardeningException(verdict.refusal(), params);
+        activityLog.logRefusal(LogLevel.ERROR, LogCategory.SECURITY,
+                "Run refused — sealed workflow '" + workflow.getName() + "': " + reason,
+                "RunAdmission", workflow.getId(), translatable(metadata, refusal), workflow.getId());
+        return refusal;
+    }
+
+    /**
+     * Code, messageKey and params of the refusal next to the log entry, so the seal status can show
+     * the latest refusal in the UI's language (TODO 2b73ff48, {@link WorkflowSealStatusService}).
+     */
+    private static Map<String, Object> translatable(Map<String, Object> metadata, HardeningException refusal) {
+        metadata.put("errorCode", refusal.getCode().name());
+        if (refusal.getErrorMessage() != null) {
+            metadata.put("messageKey", refusal.getErrorMessage().name());
+        }
+        metadata.put("params", refusal.getParams());
+        return metadata;
     }
 
 }

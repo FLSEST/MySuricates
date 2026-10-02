@@ -62,8 +62,8 @@ public class WorkflowSealStatusService {
                     .collect(Collectors.toMap(row -> (String) row[0], row -> (String) row[1]));
             for (String id : unsealedWithRefusals) {
                 if (names.containsKey(id)) { // deleted workflows drop out
-                    result.add(withRefusals(id, names.get(id), "NOT_SEALED", "NONE", null, List.of(), false, false, 0,
-                            null, refusals.get(id)));
+                    result.add(withRefusals(id, names.get(id), "NOT_SEALED", "NONE", null, null, null, List.of(),
+                            false, false, 0, null, refusals.get(id)));
                 }
             }
         }
@@ -95,19 +95,40 @@ public class WorkflowSealStatusService {
                 pinned = 0; // unreadable pins already make the verdict UNVERIFIABLE
             }
         }
+        Map<String, String> refusalParams = null;
+        if (verdict.refusal() != null) {
+            refusalParams = new LinkedHashMap<>(verdict.refusalParams());
+            refusalParams.put("name", String.valueOf(workflow.getName()));
+        }
         return withRefusals(workflow.getId(), workflow.getName(), verdict.intact() ? "INTACT" : "VIOLATED",
-                verdict.problem().name(), verdict.detail(), changed, verdict.skillsPinned(), verdict.signed(), pinned,
-                workflow.getSealedAt(), refusals);
+                verdict.problem().name(), verdict.detail(), refusalParams == null ? null : verdict.refusal().name(),
+                refusalParams == null ? null : Map.copyOf(refusalParams), changed, verdict.skillsPinned(),
+                verdict.signed(), pinned, workflow.getSealedAt(), refusals);
     }
 
     private static WorkflowSealStatusResponse withRefusals(String id, String name, String state, String problem,
-                                                           String detail, List<SkillRef> changed, boolean skillsPinned,
-                                                           boolean signed, int pinned, Instant sealedAt,
-                                                           List<ActivityLog> refusals) {
+                                                           String detail, String refusalKey,
+                                                           Map<String, String> refusalParams, List<SkillRef> changed,
+                                                           boolean skillsPinned, boolean signed, int pinned,
+                                                           Instant sealedAt, List<ActivityLog> refusals) {
         ActivityLog last = refusals.isEmpty() ? null : refusals.get(0);
+        Map<String, Object> meta = last != null && last.getMetadata() != null ? last.getMetadata() : Map.of();
         return new WorkflowSealStatusResponse(id, name, state, problem, detail, changed, skillsPinned, signed, pinned,
                 sealedAt, refusals.size(), last != null ? last.getTimestamp() : null,
-                last != null ? last.getMessage() : null);
+                last != null ? last.getMessage() : null, refusalKey, refusalParams,
+                textOf(meta.get("errorCode")), textOf(meta.get("messageKey")), paramsOf(meta.get("params")));
+    }
+
+    private static String textOf(Object value) {
+        return value instanceof String text ? text : null;
+    }
+
+    /** The logged params as strings; {@code null} for entries logged without them. */
+    private static Map<String, String> paramsOf(Object value) {
+        if (!(value instanceof Map<?, ?> map)) return null;
+        Map<String, String> params = new LinkedHashMap<>();
+        map.forEach((key, val) -> params.put(String.valueOf(key), String.valueOf(val)));
+        return params;
     }
 
     private List<SkillRef> skillRefs(java.util.Set<String> ids) {

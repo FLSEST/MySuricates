@@ -127,7 +127,11 @@ class RunAdmissionTest {
                     assertThat(((HardeningException) e).getParams()).isEqualTo(Map.of("name", "Deploy"));
                 });
         verify(activityLog).logRefusal(eq(LogLevel.ERROR), eq(LogCategory.SECURITY), anyString(), eq("RunAdmission"), eq("wf-1"),
-                argThat(meta -> "WEBHOOK".equals(meta.get("triggerSource")) && hasher.hash(wf).equals(meta.get("actualHash"))),
+                argThat(meta -> "WEBHOOK".equals(meta.get("triggerSource")) && hasher.hash(wf).equals(meta.get("actualHash"))
+                        // 2b73ff48: the seal status translates the latest refusal from these
+                        && "WORKFLOW_TAMPERED".equals(meta.get("errorCode"))
+                        && "SEAL_DEFINITION_CHANGED".equals(meta.get("messageKey"))
+                        && Map.of("name", "Deploy").equals(meta.get("params"))),
                 eq("wf-1"));
     }
 
@@ -144,7 +148,9 @@ class RunAdmissionTest {
                 .satisfies(e -> assertThat(((HardeningException) e).getParams()).containsEntry("origin", "SCHEDULE").containsKey("name"))
                 .hasMessageContaining("SCHEDULE");
         verify(activityLog).logRefusal(eq(LogLevel.WARN), eq(LogCategory.SECURITY), anyString(), eq("RunAdmission"), eq("wf-1"),
-                argThat(meta -> "SCHEDULE".equals(meta.get("effectiveSource"))), eq("wf-1"));
+                argThat(meta -> "SCHEDULE".equals(meta.get("effectiveSource"))
+                        && "UNATTENDED_REQUIRES_SEAL".equals(meta.get("errorCode")) && !meta.containsKey("messageKey")
+                        && Map.of("name", "Deploy", "origin", "SCHEDULE").equals(meta.get("params"))), eq("wf-1"));
         verifyNoInteractions(versionService);
     }
 
