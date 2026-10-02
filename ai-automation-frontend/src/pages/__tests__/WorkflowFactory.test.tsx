@@ -124,4 +124,30 @@ describe('WorkflowFactory', { timeout: 15_000 }, () => {
     await waitFor(() => expect(useToastStore.getState().toasts.map((toast) => toast.message))
       .toEqual(['Verifizierung fehlgeschlagen: Unbekannter Fehler']));
   });
+  it('reports a failed verify request instead of staying silent (9b8ed881)', async () => {
+    useToastStore.setState({ toasts: [] });
+    server.use(http.post('/api/v1/factory/verify/:id', () => HttpResponse.json({ error: 'Test instance unreachable' }, { status: 503 })));
+    renderWithProviders(<WorkflowFactory />);
+    await screen.findByText('Earlier Pipeline');
+    await waitFor(() => expect(within(card('Earlier Pipeline')).getByTitle(en.factory.verifyExisting)).toBeInTheDocument());
+    fireEvent.click(within(card('Earlier Pipeline')).getByTitle(en.factory.verifyExisting));
+    await waitFor(() => expect(useToastStore.getState().toasts.map((toast) => toast.message))
+      .toEqual([`${en.factory.verifyRequestFailed}: Test instance unreachable`]));
+    expect(within(card('Earlier Pipeline')).getByText(en.factory.statusFailed)).toBeInTheDocument();
+  });
+
+  it('reports a failed promote request (9b8ed881)', async () => {
+    useToastStore.setState({ toasts: [] });
+    server.use(http.post('/api/v1/factory/promote/:id', () => HttpResponse.json({ error: 'Template exists' }, { status: 409 })));
+    renderWithProviders(<WorkflowFactory />);
+    await screen.findByText('Earlier Pipeline');
+    await waitFor(() => expect(within(card('Earlier Pipeline')).getByTitle(en.factory.verifyExisting)).toBeInTheDocument());
+    fireEvent.click(within(card('Earlier Pipeline')).getByTitle(en.factory.verifyExisting));
+    await waitFor(() => expect(within(card('Earlier Pipeline')).getByTitle(en.factory.promoteTemplate)).toBeInTheDocument());
+    useToastStore.setState({ toasts: [] });
+    fireEvent.click(within(card('Earlier Pipeline')).getByTitle(en.factory.promoteTemplate));
+    await waitFor(() => expect(useToastStore.getState().toasts.map((toast) => toast.message))
+      .toEqual([`${en.factory.promoteFailed}: Template exists`]));
+    expect(within(card('Earlier Pipeline')).getByText(en.factory.statusVerified)).toBeInTheDocument();
+  });
 });

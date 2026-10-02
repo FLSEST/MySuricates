@@ -17,6 +17,9 @@ import { useFlushableDebounce } from '../../hooks/useDebounced';
 import { useModuleEnabled } from '../../hooks/useModules';
 import { usePaletteSelection } from './usePaletteSelection';
 
+/** How long Enter waits for a search that only adds results (the semantic one) when nothing matched locally. */
+const SLOW_SEARCH_WAIT_MS = 1500;
+
 export interface PaletteDialogProps {
   context: PaletteContextHandle;
   onClose: () => void;
@@ -55,8 +58,18 @@ export function PaletteDialog({ context, onClose, query, setQuery, contextId, cy
   );
 
   const isEmptyQuery = query.trim().length === 0;
-  // An empty query shows the pinned and recent rows, which never wait for a search
-  const resultsPending = !isEmptyQuery && (debouncedQuery !== query || searchPending === true);
+  // Without any row yet, a search still loading (the semantic one) is waited for too – Enter would otherwise land on
+  // the assistant row (c5f3cff5). At most SLOW_SEARCH_WAIT_MS per query, though: then it counts as "no hits".
+  const slowSearchOnly = loading && results.length === 0;
+  const [gaveUpOn, setGaveUpOn] = useState<string | null>(null);
+  useEffect(() => {
+    if (!slowSearchOnly) return;
+    const timer = setTimeout(() => setGaveUpOn(debouncedQuery), SLOW_SEARCH_WAIT_MS);
+    return () => clearTimeout(timer);
+  }, [slowSearchOnly, debouncedQuery]);
+  // An empty query shows the pinned and recent rows, which never wait for a search.
+  const resultsPending = !isEmptyQuery
+    && (debouncedQuery !== query || searchPending === true || (slowSearchOnly && gaveUpOn !== debouncedQuery));
   // Assistant escape-hatch row appears at the bottom once the query has substance;
   // threshold matches Fuse's minMatchCharLength so we don't offer it for stray keystrokes.
   const hasAssistantRow = assistantModule && query.trim().length >= 2;

@@ -71,4 +71,27 @@ class PendingInputServiceTest {
         assertThat(second.options()).isEmpty();
         assertThat(second.timeoutAt()).isNull();
     }
+
+    /** Ein Human-Input-Formular kommt mit seinen Feldern, ein Approval ohne (ec913801). */
+    @Test
+    void humanInputForm_carriesItsFields_approvalNone() {
+        Instant since = Instant.parse("2026-10-01T08:00:00Z");
+        List<java.util.Map<String, Object>> fields = List.of(
+                java.util.Map.of("variable_name", "destination", "label", "Ziel"),
+                java.util.Map.of("variable_name", "nights", "input_type", "number"));
+        ApprovalRequest form = ApprovalRequest.builder()
+                .blockId("human-input-3").question("Reise planen").type("human-input")
+                .stepIndex(3).requestedAt(since).fields(fields).build();
+        ApprovalRequest approval = ApprovalRequest.builder()
+                .blockId("approval-4").question("Weiter?").options(List.of("Ja", "Nein"))
+                .stepIndex(4).requestedAt(since).build();
+        when(executionRegistry.listPendingInputs()).thenReturn(List.of(
+                new PendingInput("run-1", form), new PendingInput("run-2", approval)));
+        when(runProjections.findWorkflowRefsByRunIds(List.of("run-1", "run-2"))).thenReturn(List.of());
+
+        List<PendingInputResponse> result = service.listPendingInputs();
+
+        assertThat(result.get(0).fields()).isEqualTo(fields);
+        assertThat(result.get(1).fields()).isNull();
+    }
 }

@@ -81,6 +81,8 @@ export function useWorkflowContext(): PaletteContextHandle {
         api.post<SemanticHit[]>('/search/workflows/semantic', { query: q, limit: 5 }),
       enabled: q.length >= 3,
       staleTime: 60_000,
+      // Only a supplement: a failure ends the wait of Enter at once instead of after the retries (c5f3cff5)
+      retry: false,
     });
 
     const items = useMemo(() => {

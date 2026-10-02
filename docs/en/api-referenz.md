@@ -950,7 +950,8 @@ All runs currently waiting for an answer — approvals and human input, oldest f
 ]
 ```
 
-`type`: `approval` or `human-input`. `timeoutAt`: `null` if the waiting block has no timeout.
+`type`: `approval` or `human-input`. `timeoutAt`: `null` if the waiting block has no timeout. Human input with a form
+also carries `fields` (as with `GET /executions/{id}/approval`); without a form the key is absent.
 
 ### `GET /api/v1/executions/{id}`
 
@@ -1064,6 +1065,10 @@ Check whether an approval or human input is pending.
   "validationPattern": null
 }
 ```
+
+If the block defines a form with several fields (`fields`), it comes along as `fields` (per field `variable_name`,
+`label`, `input_type`, `required`, `default_value`, `options`, …) – as in the WebSocket event `human_input_required`;
+without a form the key is absent.
 
 ### `GET /api/v1/executions/{id}/live-log`
 

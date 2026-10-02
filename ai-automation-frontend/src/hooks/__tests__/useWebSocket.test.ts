@@ -311,6 +311,37 @@ describe('useExecutionWebSocket', () => {
     await waitFor(() => expect(result.current.pendingHumanInput).toBeNull());
   });
 
+  it('passes the fields of a multi-field form on, and none for a single field (ec913801)', async () => {
+    const { result } = renderHook(() => useExecutionWebSocket('run-1', 'wf-1'), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.connected).toBe(true));
+    const base = {
+      type: 'human_input_required', blockId: 'human-input-3', prompt: 'Trip', inputType: 'text', options: [],
+      defaultValue: '', required: true, validationPattern: null, variableName: 'user_input', stepIndex: 3,
+    };
+
+    act(() => sendMessage({ ...base, fields: [{ variable_name: 'destination', label: 'Where?' }, { variable_name: 'nights', input_type: 'number' }] }));
+    await waitFor(() => expect(result.current.pendingHumanInput?.fields).toEqual([
+      { variable_name: 'destination', label: 'Where?' }, { variable_name: 'nights', input_type: 'number' },
+    ]));
+
+    act(() => sendMessage({ ...base, stepIndex: 4 }));
+    await waitFor(() => expect(result.current.pendingHumanInput?.stepIndex).toBe(4));
+    expect(result.current.pendingHumanInput).not.toHaveProperty('fields');
+  });
+
+  it('signals an agentic approval, whose question only the approval query returns (5b08cf33)', async () => {
+    const { result } = renderHook(() => useExecutionWebSocket('run-1', 'wf-1'), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.connected).toBe(true));
+    const before = result.current.inputSignal;
+
+    act(() => sendMessage({ type: 'agentic_approval_required', stepIndex: 2, iteration: 1, action: 'rm -rf build', rationale: 'clean' }));
+    await waitFor(() => expect(result.current.inputSignal).toBe(before + 1));
+    expect(result.current.pendingApproval).toBeNull();
+
+    act(() => sendMessage({ type: 'agentic_acting', stepIndex: 2, iteration: 1, action: 'rm -rf build' }));
+    expect(result.current.inputSignal).toBe(before + 1);
+  });
+
   // --- Agentic messages ---
 
   it('handles agentic_started → sets goal and maxIterations', async () => {

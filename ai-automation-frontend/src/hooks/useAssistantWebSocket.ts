@@ -44,6 +44,7 @@ export function useAssistantWebSocket(
     // Kein API-Key in der Handshake-URL: stompjs wartet vor jedem Verbindungsversuch (auch vor
     // jedem Reconnect) auf beforeConnect — dort holen wir ein frisches Einmal-Ticket.
     let wsTicket = '';
+    let disposed = false;
 
     const client = new Client({
       beforeConnect: async () => {
@@ -62,12 +63,19 @@ export function useAssistantWebSocket(
       onConnect: () => setConnected(true),
       onDisconnect: () => setConnected(false),
       onStompError: () => setConnected(false),
+      // onDisconnect needs a DISCONNECT receipt; an abrupt close (backend restart, standby) only ends up here –
+      // without it `connected` stayed true and the reconnect did not subscribe the topics again (c5f3cff5).
+      // A socket this effect already left must not switch off the next one.
+      onWebSocketClose: () => {
+        if (!disposed) setConnected(false);
+      },
     });
 
     clientRef.current = client;
     client.activate();
 
     return () => {
+      disposed = true;
       client.deactivate();
       clientRef.current = null;
       setConnected(false);

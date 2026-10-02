@@ -8,8 +8,11 @@ const SOURCES = import.meta.glob<string>(
   { query: '?raw', import: 'default', eager: true },
 );
 
-/** `confirm(…)` or `window.confirm(…)`, not a method or function that merely ends in "confirm". */
-const BROWSER_CONFIRM = /(^|[^.\w$])(?:window\.)?confirm\s*\(/;
+/**
+ * `confirm(…)`, `window.confirm(…)`, `window?.confirm(…)` or `globalThis.confirm(…)`, not a method or
+ * function that merely ends in "confirm".
+ */
+const BROWSER_CONFIRM = /(^|[^.\w$])(?:(?:window|globalThis)\??\.)?confirm\s*\(/;
 
 /** Comments may name it; only code counts. Keeps `//` inside URLs (`https://…`). */
 function withoutComments(source: string): string {
@@ -37,6 +40,9 @@ describe('Rückfragen', () => {
     expect(offenders('x.tsx', 'if (window.confirm(text)) remove();')).toHaveLength(1);
     expect(offenders('x.tsx', 'if (!confirm(text)) return;')).toHaveLength(1);
     expect(offenders('x.tsx', 'onClick={() => { if (confirm(t.x)) go(); }}')).toHaveLength(1);
+    expect(offenders('x.tsx', 'if (window?.confirm(text)) remove();')).toHaveLength(1);
+    expect(offenders('x.tsx', 'if (globalThis.confirm(text)) remove();')).toHaveLength(1);
+    expect(offenders('x.tsx', 'if (globalThis?.confirm(text)) remove();')).toHaveLength(1);
     expect(offenders('x.tsx', 'await api.confirm(id); onConfirm(); handleConfirm(); confirmReplace(name);')).toEqual([]);
     expect(offenders('x.tsx', '// früher: window.confirm(text)\n/* confirm(x) */')).toEqual([]);
   });

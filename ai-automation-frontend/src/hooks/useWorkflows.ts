@@ -384,6 +384,8 @@ export function useImportWorkflow() {
         model: data.model,
         defaultContext: data.defaultContext,
         metadata: data.metadata,
+        // The version label of the export (62422aef); an older backend ignores the field
+        version: data.version,
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['workflows'] });

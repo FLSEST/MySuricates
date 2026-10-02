@@ -38,7 +38,7 @@ export function WorkflowExecution() {
 
   const { data: workflow } = useWorkflow(id!);
   const { data: run, error: runError, refetch: refetchRun } = useWorkflowRun(id!, runId);
-  const { logs, connected, pendingApproval, pendingHumanInput, agenticStates, forEachStates } = useExecutionWebSocket(runId!, id);
+  const { logs, connected, pendingApproval, pendingHumanInput, inputSignal, agenticStates, forEachStates } = useExecutionWebSocket(runId!, id);
   const learningModule = useModuleEnabled('learning');
   const conversionModule = useModuleEnabled('conversion');
   const rateRun = useRateRun();
@@ -50,7 +50,7 @@ export function WorkflowExecution() {
   const notesDraft = notes.runId === runId ? notes.draft : null;
   const {
     approval: activeApproval, humanInput: activeHumanInput, dismissedApproval, markAnswered, dismiss, reopen,
-  } = useRunPendingInput(runId, run, { connected, approval: pendingApproval, humanInput: pendingHumanInput });
+  } = useRunPendingInput(runId, run, { connected, approval: pendingApproval, humanInput: pendingHumanInput, inputSignal });
 
   const isRunning = run?.status === 'RUNNING' || run?.status === 'PAUSED';
 

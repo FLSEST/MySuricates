@@ -59,6 +59,7 @@ public class PendingInputService {
                 request.getRejectOptions(),
                 request.getStepIndex(),
                 request.getRequestedAt(),
-                timeoutAt);
+                timeoutAt,
+                request.getFields() != null && !request.getFields().isEmpty() ? request.getFields() : null);
     }
 }

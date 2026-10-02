@@ -154,4 +154,17 @@ describe('useWorkflowImportFlow', () => {
     expect(bodies[0]).toMatchObject({ name: 'Renamed', projectId: 'p1' });
     expect(result.current.importData).toBeNull();
   });
+  it('sends the version label of the export along (62422aef)', async () => {
+    const bodies: unknown[] = [];
+    server.use(http.post('/api/v1/workflows/import', async ({ request }) => {
+      bodies.push(await request.json());
+      return HttpResponse.json({ id: 'w-imp' });
+    }));
+    const { result } = setup(useWorkflowImportFlow);
+    act(() => result.current.importReady({ name: 'Pool entry', blocks: [], version: '4.4.0' } as unknown as WorkflowExportData));
+    act(() => result.current.setImportProjectId('p1'));
+    act(() => result.current.runImport());
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toMatchObject({ name: 'Pool entry', projectId: 'p1', version: '4.4.0' });
+  });
 });

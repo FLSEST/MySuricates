@@ -32,10 +32,50 @@ const resizableWidths = {
 };
 
 /**
- * The open dialogs, the one opened last on top. A confirmation can open above another dialog
- * (23635ef6): Escape then closes only the top one, and the page stays locked until the last closes.
+ * The open dialogs; the one with the highest `order` is on top. A confirmation can open above
+ * another dialog (23635ef6): Escape then closes only the top one, the focus trap applies only to the
+ * top one, and the page stays locked until the last closes. The order is taken when a dialog
+ * renders open (parents render before their children, later siblings after earlier ones), not when
+ * its effect runs – effects run children first, so an outer and an inner dialog opening in the same
+ * commit would otherwise put the outer one on top (0d9072fa).
  */
-const openDialogs: object[] = [];
+const openDialogs = new Set<{ order: number }>();
+let dialogCounter = 0;
+
+function isTopDialog(dialog: { order: number }): boolean {
+  for (const other of openDialogs) if (other.order > dialog.order) return false;
+  return openDialogs.has(dialog);
+}
+
+const TABBABLE = [
+  'a[href]', 'area[href]', 'button:not([disabled])', 'input:not([disabled]):not([type="hidden"])',
+  'select:not([disabled])', 'textarea:not([disabled])', 'iframe', '[contenteditable="true"]',
+  '[tabindex]:not([tabindex="-1"])',
+].join(', ');
+
+/**
+ * Whether the user can see the element: `checkVisibility` in the browser; jsdom lacks it (and lays nothing out,
+ * so `getClientRects` is always empty there), then the computed `display`/`visibility` of the element and its
+ * ancestors decide.
+ */
+function isVisible(element: HTMLElement): boolean {
+  if (typeof element.checkVisibility === 'function') return element.checkVisibility({ visibilityProperty: true });
+  for (let node: HTMLElement | null = element; node; node = node.parentElement) {
+    if (getComputedStyle(node).display === 'none') return false;
+  }
+  return getComputedStyle(element).visibility !== 'hidden';
+}
+
+function tabbables(container: HTMLElement | null): HTMLElement[] {
+  if (!container) return [];
+  return [...container.querySelectorAll<HTMLElement>(TABBABLE)]
+    .filter((element) => element.tabIndex >= 0 && !element.closest('[hidden], [inert]') && isVisible(element));
+}
+
+/** The page has no focus to speak of: nothing, the body, or an element that is gone. */
+function focusIsLost(active: Element | null): boolean {
+  return !active || active === document.body || !active.isConnected;
+}
 
 export function Modal({ open, onClose, title, children, footer, size = 'md', resizable = false }: ModalProps) {
   if (!open) return null;
@@ -53,24 +93,72 @@ function ModalFrame({ onClose, title, children, footer, size, resizable }: Omit<
   const dialogRef = useRef<HTMLDivElement>(null);
   const [maximized, setMaximized] = useState(false);
   // Identity of this open dialog in `openDialogs`; the frame only lives while the dialog is open
-  const [self] = useState(() => ({}));
+  const [self] = useState(() => ({ order: ++dialogCounter }));
+  // Taken while rendering, before a child's autoFocus moves the focus into the dialog
+  const [opener] = useState(() => document.activeElement);
+  // StrictMode mounts the effects twice: the initial focus is set once, the first time
+  const initialFocusDone = useRef(false);
   const titleId = useId();
 
   useEffect(() => {
-    openDialogs.push(self);
+    openDialogs.add(self);
     document.body.style.overflow = 'hidden';
+    // Initial focus: keep it where the content put it (autoFocus), else an `[autofocus]` element, else the first
+    // control of body and footer – in a confirmation that is "Cancel" –, else the dialog itself
+    const dialog = dialogRef.current;
+    if (dialog && !initialFocusDone.current) {
+      initialFocusDone.current = true;
+      if (!dialog.contains(document.activeElement)) {
+        const header = dialog.firstElementChild;
+        const marked = dialog.querySelector<HTMLElement>('[autofocus]');
+        const first = tabbables(dialog).find((element) => !header?.contains(element));
+        ((marked && isVisible(marked) ? marked : null) ?? first ?? dialog).focus({ preventScroll: true });
+      }
+    }
     return () => {
-      openDialogs.splice(openDialogs.indexOf(self), 1);
-      if (openDialogs.length === 0) document.body.style.overflow = '';
+      openDialogs.delete(self);
+      if (openDialogs.size === 0) document.body.style.overflow = '';
+      // A dialog still on the page was not closed – StrictMode's trial unmount – and keeps its focus
+      if (dialog?.isConnected) return;
+      // Focus back to what opened the dialog, unless the closing action moved it somewhere on purpose
+      if (opener instanceof HTMLElement && opener !== document.body && opener.isConnected
+          && focusIsLost(document.activeElement)) {
+        opener.focus({ preventScroll: true });
+      }
     };
-  }, [self]);
+  }, [self, opener]);
 
   useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && openDialogs[openDialogs.length - 1] === self) onClose();
+    const handleKey = (e: KeyboardEvent) => {
+      if (!isTopDialog(self)) return;
+      if (e.key === 'Escape') {
+        onClose();
+      } else if (e.key === 'Tab' && !e.defaultPrevented) {
+        // Focus trap: Tab and Shift+Tab cycle inside the dialog (an editor that inserts a tab
+        // prevents the default and keeps its key). Focus in a portal outside the dialog – a dropdown,
+        // a popover, a toast – is left alone; only focus lost to the page body is brought back.
+        const dialog = dialogRef.current;
+        if (!dialog) return;
+        const active = document.activeElement;
+        const lost = focusIsLost(active);
+        if (!lost && !dialog.contains(active)) return;
+        const items = tabbables(dialog);
+        const first = items[0];
+        const last = items.at(-1);
+        if (!first || !last) {
+          e.preventDefault();
+          dialog.focus({ preventScroll: true });
+        } else if (e.shiftKey && (lost || active === first || active === dialog)) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && (lost || active === last)) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
     };
-    window.addEventListener('keydown', handleEsc);
-    return () => window.removeEventListener('keydown', handleEsc);
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
   }, [self, onClose]);
 
   const toggleMaximized = () => {
@@ -94,7 +182,8 @@ function ModalFrame({ onClose, title, children, footer, size, resizable }: Omit<
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className={`relative mx-2 sm:mx-4 bg-surface-overlay border border-border rounded-xl shadow-2xl animate-slide-up ${
+        tabIndex={-1}
+        className={`relative mx-2 sm:mx-4 outline-none bg-surface-overlay border border-border rounded-xl shadow-2xl animate-slide-up ${
           !resizable
             ? `w-full ${sizeStyles[size]}`
             : maximized

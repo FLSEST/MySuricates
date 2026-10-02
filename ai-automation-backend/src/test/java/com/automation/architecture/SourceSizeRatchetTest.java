@@ -49,7 +49,7 @@ class SourceSizeRatchetTest {
             entry("com/automation/service/integration/providers/google/GoogleGmailProvider.java", 330),
             entry("com/automation/service/learning/LearningService.java", 413),
             entry("com/automation/service/repair/AutoRepairService.java", 380),
-            entry("com/automation/service/staging/InstanceSyncHelper.java", 424),
+            entry("com/automation/service/staging/InstanceSyncHelper.java", 420),
             entry("com/automation/service/staging/StagingService.java", 426),
             entry("com/automation/service/staging/TestingService.java", 444),
             entry("com/automation/service/trigger/TodoTriggerService.java", 383),

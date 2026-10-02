@@ -90,4 +90,8 @@ describe('ConfirmModal', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Delete credentials' }));
     expect(onExtra).toHaveBeenCalledTimes(1);
   });
+  it('puts the focus on Cancel when it opens, so Enter does not confirm by accident (0d9072fa)', () => {
+    render(<ConfirmModal open onClose={vi.fn()} onConfirm={vi.fn()} title="Delete?" message="Gone" variant="danger" confirmLabel="Delete" />);
+    expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus();
+  });
 });

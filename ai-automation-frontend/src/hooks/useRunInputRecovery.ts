@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
-import type { PendingApproval } from './useWebSocket';
+import { formFields, type PendingApproval } from './useWebSocket';
 import type { PendingHumanInput } from '../types';
 
 interface PendingInputResponse {
   pending: boolean; blockId?: string; question?: string; options?: string[]; rejectOptions?: string[]; stepIndex?: number;
   type?: string; inputType?: string; defaultValue?: string; variableName?: string;
   required?: boolean; validationPattern?: string | null;
+  /** Multi-field form; older backends do not send it (ec913801). */
+  fields?: unknown;
 }
 
 interface Recovered {
@@ -31,6 +33,7 @@ function toRecovered(runId: string, data: PendingInputResponse): Recovered {
         validationPattern: data.validationPattern ?? null,
         variableName: data.variableName || 'user_input',
         stepIndex: data.stepIndex!,
+        ...formFields(data.fields),
       },
     };
   }

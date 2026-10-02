@@ -1,6 +1,8 @@
 import { failOnUnhandledRequest } from '../../../test/msw';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter } from 'react-router-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { delay, http, HttpResponse } from 'msw';
 import { server } from '../../../test/server';
@@ -184,6 +186,81 @@ describe('CommandPalette', { timeout: 15_000 }, () => {
       await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/workflows/w3/run/run-1'));
       expect(executed).toEqual(['w3']);
       expect(onClose).toHaveBeenCalled();
+    });
+
+    it('waits for the semantic search when nothing matches locally, instead of asking the assistant (c5f3cff5)', async () => {
+      server.use(
+        http.get('/api/v1/workflows', () => HttpResponse.json([workflow('w1', 'Deploy app'), workflow('w3', 'Rotate logs')])),
+        http.post('/api/v1/search/workflows/semantic', async () => {
+          await delay(150);
+          return HttpResponse.json([{ workflowId: 'w3', workflowName: 'Rotate logs', reason: 'cleans up old logs', score: 0.9 }]);
+        }),
+      );
+      const { onClose } = renderPalette();
+      await screen.findByText('Deploy app');
+      const input = screen.getByPlaceholderText(en.commandPalette.contexts.workflow.placeholder);
+      fireEvent.change(input, { target: { value: 'qqxxjj' } });
+      act(() => { vi.advanceTimersByTime(250); });
+      key('Enter');
+      expect(useAssistantStore.getState().pendingInput).toBeNull();
+
+      await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/workflows/w3/run/run-1'));
+      expect(executed).toEqual(['w3']);
+      expect(useAssistantStore.getState()).toMatchObject({ pendingInput: null, open: false });
+      expect(onClose).toHaveBeenCalled();
+    });
+
+    it('waits at most 1.5 s for a semantic search that hangs, then asks the assistant (c5f3cff5)', async () => {
+      server.use(http.post('/api/v1/search/workflows/semantic', async () => {
+        await delay('infinite');
+        return HttpResponse.json([]);
+      }));
+      renderPalette();
+      await screen.findByText('Deploy app');
+      const input = screen.getByPlaceholderText(en.commandPalette.contexts.workflow.placeholder);
+      fireEvent.change(input, { target: { value: 'qqxxjj' } });
+      act(() => { vi.advanceTimersByTime(250); });
+      key('Enter');
+      act(() => { vi.advanceTimersByTime(1000); });
+      expect(useAssistantStore.getState().pendingInput).toBeNull();
+
+      act(() => { vi.advanceTimersByTime(600); });
+      await waitFor(() => expect(useAssistantStore.getState()).toMatchObject({ pendingInput: 'qqxxjj', open: true }));
+      expect(executed).toEqual([]);
+    });
+
+    it('does not wait out retries when the semantic search fails (c5f3cff5)', async () => {
+      server.use(http.post('/api/v1/search/workflows/semantic', () => HttpResponse.json({ error: 'down' }, { status: 500 })));
+      // The app's client retries failed queries; the palette must not wait for that
+      const client = new QueryClient({ defaultOptions: { queries: { gcTime: 0 } } });
+      render(
+        <QueryClientProvider client={client}>
+          <MemoryRouter><CommandPalette open onClose={vi.fn()} /><Location /></MemoryRouter>
+        </QueryClientProvider>,
+      );
+      await screen.findByText('Deploy app');
+      const input = screen.getByPlaceholderText(en.commandPalette.contexts.workflow.placeholder);
+      fireEvent.change(input, { target: { value: 'qqxxjj' } });
+      act(() => { vi.advanceTimersByTime(250); });
+      key('Enter');
+      await waitFor(() => expect(useAssistantStore.getState()).toMatchObject({ pendingInput: 'qqxxjj', open: true }), { timeout: 800 });
+    });
+
+    it('hands the query to the assistant once the semantic search found nothing either (c5f3cff5)', async () => {
+      server.use(http.post('/api/v1/search/workflows/semantic', async () => {
+        await delay(150);
+        return HttpResponse.json([]);
+      }));
+      renderPalette();
+      await screen.findByText('Deploy app');
+      const input = screen.getByPlaceholderText(en.commandPalette.contexts.workflow.placeholder);
+      fireEvent.change(input, { target: { value: 'qqxxjj' } });
+      act(() => { vi.advanceTimersByTime(250); });
+      key('Enter');
+      expect(useAssistantStore.getState().pendingInput).toBeNull();
+
+      await waitFor(() => expect(useAssistantStore.getState()).toMatchObject({ pendingInput: 'qqxxjj', open: true }));
+      expect(executed).toEqual([]);
     });
 
     it('waits for the run search, which shows the previous runs while it loads', async () => {

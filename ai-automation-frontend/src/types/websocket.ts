@@ -1,4 +1,4 @@
-import type { AgenticState, AgenticIteration, AgenticPhase } from './index';
+import type { AgenticState, AgenticIteration, AgenticPhase, HumanInputField } from './index';
 
 // ── Message types ────────────────────────────────────────────────────────
 
@@ -46,6 +46,8 @@ export interface HumanInputRequiredMessage {
   validationPattern: string | null;
   variableName: string;
   stepIndex: number;
+  /** Form with several fields; only sent when the block defines `fields` (ec913801). */
+  fields?: HumanInputField[];
 }
 
 export interface HumanInputResolvedMessage {

@@ -14,6 +14,11 @@ export interface LiveRunInput {
   connected: boolean;
   approval: PendingApproval | null;
   humanInput: PendingHumanInput | null;
+  /**
+   * Changes whenever the socket announces a question without its content – an agentic approval only sends
+   * `agentic_approval_required`, step and status stay the same (5b08cf33).
+   */
+  inputSignal?: number;
 }
 
 /** Questions of one run that the page no longer shows: answered for good, or closed without an answer. */
@@ -40,7 +45,8 @@ function progressSignal(run: WorkflowRun): string {
  * The open approval or human input of a run page — one source for both dialogs. Socket events come first; the
  * query `GET /executions/{id}/approval` fills the gap while the run is running or paused, and is repeated when the
  * socket connects and when the run status or the current step changes (78af069c: an approval that starts after
- * the first query but before the socket subscribes otherwise never shows).
+ * the first query but before the socket subscribes otherwise never shows), and when the socket announces an agentic
+ * approval (5b08cf33).
  *
  * `markAnswered` closes a question for good, at once: the socket keeps reporting it until its `approval_resolved`
  * arrives, and a query already under way may still return it. `dismiss` closes an approval without an answer — the
@@ -49,7 +55,7 @@ function progressSignal(run: WorkflowRun): string {
 export function useRunPendingInput(runId: string | undefined, run: WorkflowRun | undefined, live: LiveRunInput) {
   const active = run?.status === 'RUNNING' || run?.status === 'PAUSED';
   const { recoveredApproval, recoveredHumanInput } = useRunInputRecovery(
-    active ? runId : undefined, active ? `${live.connected}|${progressSignal(run)}` : undefined);
+    active ? runId : undefined, active ? `${live.connected}|${progressSignal(run)}|${live.inputSignal ?? 0}` : undefined);
 
   const [closed, setClosed] = useState<Closed>({ runId, answered: NONE, dismissed: NONE });
   const answered = closed.runId === runId ? closed.answered : NONE;
