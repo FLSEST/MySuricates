@@ -288,6 +288,51 @@ class WishTest {
         assertThat(wish.getMetadata()).containsEntry("origin", "test");
     }
 
+    // --- stoppedPhase (V97, TODO 92bffe64) ---
+
+    /** Failing records the phase it failed in — also the decomposition of a refinement before its history entry. */
+    @Test
+    void failing_recordsThePhaseItFailedIn() {
+        Wish wish = Wish.builder().build();
+        wish.setStatus(WishStatus.EVALUATING);
+        wish.setStatus(WishStatus.REFINING);
+        wish.setStatus(WishStatus.DECOMPOSING);
+
+        wish.setStatus(WishStatus.FAILED);
+
+        assertThat(wish.getStoppedPhase()).isEqualTo(WishStatus.DECOMPOSING);
+    }
+
+    @Test
+    void cancelling_recordsThePhase_andAWaitingWishKeepsItsWaitingStatus() {
+        Wish executing = Wish.builder().build();
+        executing.setStatus(WishStatus.EXECUTING);
+        executing.setStatus(WishStatus.CANCELLED);
+        Wish waiting = Wish.builder().build();
+        waiting.setStatus(WishStatus.AWAITING_APPROVAL);
+        waiting.setStatus(WishStatus.CANCELLED);
+
+        assertThat(executing.getStoppedPhase()).isEqualTo(WishStatus.EXECUTING);
+        assertThat(waiting.getStoppedPhase()).isEqualTo(WishStatus.AWAITING_APPROVAL);
+    }
+
+    /** A second terminal status (cancel after a failure) keeps the phase; a retry and a success clear it. */
+    @Test
+    void terminalAgainKeepsThePhase_retryAndSuccessClearIt() {
+        Wish wish = Wish.builder().build();
+        wish.setStatus(WishStatus.EXECUTING);
+        wish.setStatus(WishStatus.FAILED);
+        wish.setStatus(WishStatus.CANCELLED);
+        assertThat(wish.getStoppedPhase()).isEqualTo(WishStatus.EXECUTING);
+
+        wish.setStatus(WishStatus.RECEIVED);
+        assertThat(wish.getStoppedPhase()).isNull();
+
+        wish.setStatus(WishStatus.EVALUATING);
+        wish.setStatus(WishStatus.COMPLETED);
+        assertThat(wish.getStoppedPhase()).isNull();
+    }
+
     // --- AllArgsConstructor ---
 
     @Test
@@ -303,6 +348,7 @@ class WishTest {
                 "id-1",
                 "wish text",
                 WishStatus.COMPLETED,
+                null,
                 "proj-1",
                 decomp,
                 genIds,
@@ -323,6 +369,7 @@ class WishTest {
         assertThat(wish.getId()).isEqualTo("id-1");
         assertThat(wish.getOriginalText()).isEqualTo("wish text");
         assertThat(wish.getStatus()).isEqualTo(WishStatus.COMPLETED);
+        assertThat(wish.getStoppedPhase()).isNull();
         assertThat(wish.getProjectId()).isEqualTo("proj-1");
         assertThat(wish.getDecomposition()).isEqualTo(decomp);
         assertThat(wish.getGeneratedWorkflowIds()).isEqualTo(genIds);

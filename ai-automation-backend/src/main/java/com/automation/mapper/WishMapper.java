@@ -90,7 +90,8 @@ public class WishMapper {
                 wish.getMetadata(),
                 wish.getCreatedAt(),
                 wish.getUpdatedAt(),
-                wish.isAutoRefine()
+                wish.isAutoRefine(),
+                wish.getStoppedPhase()
         );
     }
 }

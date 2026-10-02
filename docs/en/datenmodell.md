@@ -239,6 +239,7 @@ erDiagram
         TEXT result_summary
         TEXT iteration_history
         TEXT error
+        TEXT stopped_phase
         TEXT metadata
         TEXT created_at
         TEXT updated_at
@@ -857,6 +858,7 @@ Workflows on a goal or one of its work packages (V94, TODO 52bc1e8c). Each attac
 | `result_summary` | TEXT | | Result summary |
 | `iteration_history` | TEXT | | JSON: history of all iterations (V33) |
 | `error` | TEXT | | Error message |
+| `stopped_phase` | TEXT | | Enum WishStatus: phase a `FAILED`/`CANCELLED` wish stopped in (set by `Wish.setStatus`, otherwise `NULL`; existing rows `NULL`) (V97) |
 | `metadata` | TEXT | | JSON: additional info |
 | `created_at` | TEXT | NOT NULL | |
 | `updated_at` | TEXT | NOT NULL | |
@@ -1411,6 +1413,7 @@ in backticks, parentheses behind it give the default or values, free text follow
 | V94 | `V94__goal_workflows.sql` | new table `goal_workflows` (workflows on a goal or work package, role WORKER/STATUS) |
 | V95 | `V95__index_findby_gaps.sql` | Indexes for derived queries on hot paths: `workflows.project_id`, `scheduled_workflows.workflow_id`/`chain_id`, `webhook_triggers.workflow_id`, `todo_triggers.target_workflow_id`, `capabilities.skill_id`, `dead_letter_entries.workflow_run_id`, `workflow_memory(active, created_at)` |
 | V96 | `V96__chain_run_trigger_source.sql` | `trigger_source` in chain_runs (what started the chain); existing rows with a schedule id become `SCHEDULE`, the rest stays `NULL` |
+| V97 | `V97__wish_stopped_phase.sql` | `stopped_phase` in wishes (phase of a failed/cancelled wish, no backfill) |
 
 ## SQLite Specifics
 

@@ -175,7 +175,7 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 
 - Natürlichsprachige Wünsche eingeben und asynchron erfüllen lassen
 - Iterationsanzeige, Feedback geben, Wunsch abbrechen oder kristallisieren
-- Detail (`components/wishes/WishDetail.tsx`): Kopf mit Aktionen, Status-Zeitleiste und Iterationszähler ist `WishHeaderCard.tsx` (bei FAILED zeigt die Zeitleiste die erreichten Schritte und markiert den gescheiterten; das Backend speichert die Phase nicht, sie folgt aus dem neuesten Iterationseintrag), der aufklappbare Iterationsverlauf `WishIterationHistory.tsx`; ob er offen ist, hält `WishDetail`, deshalb bleibt er beim Wechsel zu einem anderen Wunsch offen
+- Detail (`components/wishes/WishDetail.tsx`): Kopf mit Aktionen, Status-Zeitleiste und Iterationszähler ist `WishHeaderCard.tsx` (bei FAILED/CANCELLED zeigt die Zeitleiste die erreichten Schritte und markiert den, in dem der Wunsch stehen blieb — aus `stoppedPhase` (V97); ältere Backends und Wünsche von vor V97 haben keine, dann folgt sie aus dem neuesten Iterationseintrag; bei COMPLETED pulsiert nichts), der aufklappbare Iterationsverlauf `WishIterationHistory.tsx`; ob er offen ist, hält `WishDetail`, deshalb bleibt er beim Wechsel zu einem anderen Wunsch offen
 
 ### WorkflowFactory (`/factory`)
 

@@ -239,6 +239,7 @@ erDiagram
         TEXT result_summary
         TEXT iteration_history
         TEXT error
+        TEXT stopped_phase
         TEXT metadata
         TEXT created_at
         TEXT updated_at
@@ -857,6 +858,7 @@ Workflows am Ziel oder an einem Arbeitspaket (V94, TODO 52bc1e8c). Dieselbe Zuor
 | `result_summary` | TEXT | | Zusammenfassung des Ergebnisses |
 | `iteration_history` | TEXT | | JSON: Verlauf aller Iterationen (V33) |
 | `error` | TEXT | | Fehlermeldung |
+| `stopped_phase` | TEXT | | Enum WishStatus: Phase, in der ein `FAILED`/`CANCELLED`-Wunsch stehen blieb (von `Wish.setStatus` gesetzt, sonst `NULL`; Altbestand `NULL`) (V97) |
 | `metadata` | TEXT | | JSON: Zusatzinfos |
 | `created_at` | TEXT | NOT NULL | |
 | `updated_at` | TEXT | NOT NULL | |
@@ -1412,6 +1414,7 @@ folgt freier Text.
 | V94 | `V94__goal_workflows.sql` | neue Tabelle `goal_workflows` (Workflows am Ziel oder Arbeitspaket, Rolle WORKER/STATUS) |
 | V95 | `V95__index_findby_gaps.sql` | Indizes für abgeleitete Abfragen auf heißen Pfaden: `workflows.project_id`, `scheduled_workflows.workflow_id`/`chain_id`, `webhook_triggers.workflow_id`, `todo_triggers.target_workflow_id`, `capabilities.skill_id`, `dead_letter_entries.workflow_run_id`, `workflow_memory(active, created_at)` |
 | V96 | `V96__chain_run_trigger_source.sql` | `trigger_source` in chain_runs (Starter der Chain); Altbestand mit Schedule-ID wird `SCHEDULE`, der Rest bleibt `NULL` |
+| V97 | `V97__wish_stopped_phase.sql` | `stopped_phase` in wishes (Phase eines gescheiterten/abgebrochenen Wunschs, ohne Nachtrag) |
 
 ## SQLite-Besonderheiten
 

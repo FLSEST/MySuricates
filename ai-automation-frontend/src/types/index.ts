@@ -2067,6 +2067,8 @@ export interface Wish {
   createdAt: string;
   updatedAt: string;
   autoRefine: boolean;
+  /** Phase a FAILED/CANCELLED wish was in when it stopped (V97); null otherwise, absent on older backends */
+  stoppedPhase?: WishStatus | null;
 }
 
 export interface CreateWishRequest {
