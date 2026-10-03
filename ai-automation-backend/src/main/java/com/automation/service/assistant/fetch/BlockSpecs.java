@@ -87,9 +87,8 @@ public final class BlockSpecs {
                     `items` (list of strings, or one item per line), `items_command` (shell command printing one item per \
                     line; read only with `items_source` "command", always runs as shell), `variable_name` (default "item"), \
                     `execution_mode` ("ai" default | "shell"; legacy "claude" = "ai"), `shell_escape_variables` (bool, shell \
-                    mode), `timeout_seconds` (per item; shell default 300), `continue_on_error` (bool, default false — \
-                    failed items do not fail the block), `max_consecutive_failures` (int, default 3, 0 = off — after \
-                    this many failed items in a row the loop stops and the block fails, even with continue_on_error).
+                    mode), `timeout_seconds` (per item; shell default 300), `continue_on_error` (bool, default false — failed items \
+                    do not fail the block), `max_consecutive_failures` (default 3, 0 = off; N failures in a row stop the loop and fail the block, even with continue_on_error).
                     """ + AI_OVERRIDES + """
                     Example config: {"items_source": "command", "items_command": "ls docs/*.md", "execution_mode": "shell", \
                     "command": "wc -l {{ item }}"}
