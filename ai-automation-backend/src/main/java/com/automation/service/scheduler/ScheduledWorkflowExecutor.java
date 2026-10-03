@@ -80,7 +80,7 @@ public class ScheduledWorkflowExecutor {
         // advance() checked the next run against the end date, or the end date was moved forward by
         // an update. It ends the schedule instead of starting once more (TODO 9a3e6c91).
         if (scheduled.getScheduleType() == ScheduleType.CRON
-                && reachesEndDate(scheduled, scheduled.getNextRunAt())) {
+                && ScheduleEndConditions.reachesEndDate(scheduled, scheduled.getNextRunAt())) {
             endAtEndDate(scheduled);
             return Optional.empty();
         }
@@ -199,17 +199,6 @@ public class ScheduledWorkflowExecutor {
                 "ScheduledWorkflowExecutor", scheduled.getId(), metadata);
     }
 
-    /**
-     * True when the end date lies at or before {@code occurrence}: the schedule is over by then
-     * ("disabled when now >= endDate"), so the occurrence does not run. Measured on the occurrence,
-     * not on the moment the tick picks it up, so the last run before the end date does not depend
-     * on where the 60-s tick falls.
-     */
-    private static boolean reachesEndDate(ScheduledWorkflow scheduled, Instant occurrence) {
-        return scheduled.getEndDate() != null && occurrence != null
-                && !occurrence.isBefore(scheduled.getEndDate());
-    }
-
     @Transactional
     public void updateScheduleAfterRun(String scheduleId, ScheduleType scheduleType,
                                         String cronExpression) {
@@ -243,13 +232,13 @@ public class ScheduledWorkflowExecutor {
             }
 
             Instant now = Instant.now(clock);
-            boolean maxRunsReached = scheduled.getMaxRuns() > 0
-                    && scheduled.getRunCount() >= scheduled.getMaxRuns();
+            boolean maxRunsReached = ScheduleEndConditions.maxRunsReached(scheduled);
             // The end date bounds the next run, not only this moment: a next run at or after it is no
             // longer part of the schedule. Setting it anyway started it once after the end date
             // (TODO 9a3e6c91). Without a next run to check (none left, or not computed), now counts.
-            Instant next = maxRunsReached || reachesEndDate(scheduled, now) ? null : calculateNextRun(cronExpression);
-            boolean endDateReached = reachesEndDate(scheduled, next != null ? next : now);
+            Instant next = maxRunsReached || ScheduleEndConditions.reachesEndDate(scheduled, now)
+                    ? null : calculateNextRun(cronExpression);
+            boolean endDateReached = ScheduleEndConditions.reachesEndDate(scheduled, next != null ? next : now);
 
             if (maxRunsReached || endDateReached) {
                 scheduled.setNextRunAt(null);

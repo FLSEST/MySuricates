@@ -19,7 +19,6 @@ import com.automation.entity.BlockDefinition;
 import com.automation.entity.ChangeSource;
 import com.automation.entity.Project;
 import com.automation.entity.ProjectType;
-import com.automation.entity.ScheduledWorkflow;
 import com.automation.entity.Workflow;
 import com.automation.service.chain.ChainService;
 import com.automation.service.project.ProjectService;
@@ -134,13 +133,13 @@ class BundleImportWriter {
                 skipped.add(new Skipped("schedule", s.target().label(), "chain was skipped"));
                 continue;
             }
-            ScheduledWorkflow created = schedulerService.create(
+            // Disabled — never runs before the user looked at it; an end date already passed must not fail the import.
+            schedulerService.createDisabled(
                     chainKey == null ? idByKey.get(s.target().workflowKey()) : null,
                     chainKey == null ? null : chainIdByKey.get(chainKey),
                     chainKey == null ? "WORKFLOW" : "CHAIN", s.cronExpression(), s.description(), s.inputContext(),
                     s.scheduleType(), s.scheduledAt(), s.delayExpression(), s.endDate(), s.maxRuns(),
                     s.conflictBehavior(), s.catchUpOnResume());
-            schedulerService.disable(created.getId()); // never runs before the user looked at it
             schedules++;
         }
 

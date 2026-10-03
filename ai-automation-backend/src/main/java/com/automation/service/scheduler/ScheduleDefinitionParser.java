@@ -1,8 +1,11 @@
 package com.automation.service.scheduler;
 
+import com.automation.entity.ScheduledWorkflow;
 import com.automation.entity.ScheduledWorkflow.ConflictBehavior;
 import com.automation.entity.ScheduledWorkflow.ScheduleType;
 import com.automation.entity.ScheduledWorkflow.TargetType;
+import com.automation.exception.ErrorMessage;
+import com.automation.exception.LocalizedArgumentException;
 import com.automation.util.EnumParameter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.support.CronExpression;
@@ -14,10 +17,12 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * Parses the user-facing schedule definition fields (target type, schedule type, conflict
- * behaviour, delay expression) and computes the next cron occurrence from the injected clock.
+ * behaviour, cron and delay expression, timing) and computes the next cron occurrence from the
+ * injected clock.
  *
  * <p>Extracted from {@code SchedulerService} (Audit-TODO 05dbd0e9). No persistence.
  */
@@ -48,6 +53,40 @@ public class ScheduleDefinitionParser {
      */
     public ConflictBehavior parseConflictBehavior(String conflictBehavior) {
         return EnumParameter.parse(ConflictBehavior.class, "conflictBehavior", conflictBehavior);
+    }
+
+    /** Refuses (400, translated) a cron expression that does not parse. */
+    public void requireValidCron(String cronExpression) {
+        if (!CronExpression.isValidExpression(cronExpression)) {
+            throw new LocalizedArgumentException(ErrorMessage.INVALID_CRON, Map.of("expression", String.valueOf(cronExpression)));
+        }
+    }
+
+    /** The timing fields of a new schedule by its type, with its first run. Moved from {@code SchedulerService}. */
+    void applyTiming(ScheduledWorkflow.ScheduledWorkflowBuilder builder, ScheduleType type,
+                     String cronExpression, Instant scheduledAt, String delayExpression) {
+        switch (type) {
+            case ONCE -> {
+                if (scheduledAt == null) {
+                    throw new IllegalArgumentException("scheduledAt is required for ONCE schedules");
+                }
+                builder.cronExpression("").scheduledAt(scheduledAt).nextRunAt(scheduledAt);
+            }
+            case DELAYED -> {
+                if (delayExpression == null || delayExpression.isBlank()) {
+                    throw new IllegalArgumentException("delayExpression is required for DELAYED schedules (e.g. '2h', '30m', '1d')");
+                }
+                Instant runAt = Instant.now(clock).plus(parseDelay(delayExpression));
+                builder.cronExpression("").scheduledAt(runAt).nextRunAt(runAt).delayExpression(delayExpression);
+            }
+            default -> {
+                if (cronExpression == null || cronExpression.isBlank()) {
+                    throw new IllegalArgumentException("cronExpression is required for CRON schedules");
+                }
+                requireValidCron(cronExpression);
+                builder.cronExpression(cronExpression).nextRunAt(calculateNextRun(cronExpression));
+            }
+        }
     }
 
     public Instant calculateNextRun(String cronExpression) {

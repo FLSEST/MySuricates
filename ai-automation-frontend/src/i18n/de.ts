@@ -2236,6 +2236,8 @@ export const de: TranslationKeys = {
       NAMED_NOT_FOUND: '{resource} nicht gefunden: {id}',
       INVALID_CRON: 'Ungültiger Cron-Ausdruck: {expression}',
       CRON_REQUIRED: 'Cron-Ausdruck fehlt',
+      SCHEDULE_MAX_RUNS_REACHED: 'Der Zeitplan wurde schon {runCount}-mal gestartet, das Maximum ist {maxRuns} – erhöhe die maximalen Ausführungen oder setze sie auf 0 für keine Grenze',
+      SCHEDULE_NEXT_RUN_AFTER_END_DATE: 'Der nächste Termin des Zeitplans ({nextRun}) liegt nicht vor seinem Enddatum ({endDate}) – er würde nie starten',
       UNKNOWN_SETTING: 'Unbekannte Einstellung: {key}',
       UNKNOWN_EXECUTION_SETTING: 'Unbekannte Ausführungseinstellung: {key}',
       RESTRICTED_PATH: 'Der Pfad zeigt auf ein geschütztes Systemverzeichnis: {path}',

@@ -70,7 +70,7 @@ class BundleImportWriterTest {
     void chainsOff_skipsChainsAndTheirSchedules_createsTheRestDisabled() {
         when(projects.createWithOptionalPath(any())).thenReturn(Project.builder().id("p-new").build());
         when(workflows.create(any(), eq(ChangeSource.IMPORT))).thenReturn(Workflow.builder().id("w-new").build());
-        when(schedules.create(anyString(), isNull(), anyString(), anyString(), any(), any(), any(), any(), any(),
+        when(schedules.createDisabled(anyString(), isNull(), anyString(), anyString(), any(), any(), any(), any(), any(),
                 any(), any(), any(), any())).thenReturn(ScheduledWorkflow.builder().id("s-new").build());
         Set<String> warnings = new LinkedHashSet<>(List.of(BundleWarnings.CHAINS_OFF));
 
@@ -81,7 +81,10 @@ class BundleImportWriterTest {
         assertThat(result.skipped()).extracting(BundleImportResult.Skipped::kind).containsExactly("chain", "schedule");
         assertThat(result.warnings()).containsExactly(BundleWarnings.CHAINS_OFF);
         verify(chains, never()).create(any());
-        verify(schedules).disable("s-new");
+        verify(schedules).createDisabled(anyString(), isNull(), anyString(), anyString(), any(), any(), any(), any(),
+                any(), any(), any(), any(), any());
+        verify(schedules, never()).create(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(),
+                any(), any());
 
         ArgumentCaptor<CreateWorkflowRequest> wf = ArgumentCaptor.forClass(CreateWorkflowRequest.class);
         verify(workflows).create(wf.capture(), eq(ChangeSource.IMPORT));

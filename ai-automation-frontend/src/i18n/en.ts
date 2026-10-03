@@ -2239,6 +2239,8 @@ export const en = {
       NAMED_NOT_FOUND: '{resource} not found: {id}',
       INVALID_CRON: 'Invalid cron expression: {expression}',
       CRON_REQUIRED: 'cronExpression is required',
+      SCHEDULE_MAX_RUNS_REACHED: 'The schedule has already started {runCount} time(s), its maximum is {maxRuns} — raise the maximum runs, or set them to 0 for no limit',
+      SCHEDULE_NEXT_RUN_AFTER_END_DATE: 'The schedule\'s next run ({nextRun}) is not before its end date ({endDate}) — it would never start',
       UNKNOWN_SETTING: 'Unknown setting: {key}',
       UNKNOWN_EXECUTION_SETTING: 'Unknown execution setting: {key}',
       RESTRICTED_PATH: 'Path points to a restricted system directory: {path}',
