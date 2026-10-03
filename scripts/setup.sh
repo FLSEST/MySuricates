@@ -101,6 +101,13 @@ for m in $(printf '%s' "$MODULES" | tr ',' ' '); do
   printf '%s\n' "${MODULE_CATALOG_FEATURE_KEYS[@]}" | grep -x "$m" >/dev/null || die "$(msg err_module "$m")"
 done
 
+# Was per Flag kam — im Terminal fragt „Einstellungen aendern“ die uebrigen Werte mit dem Wert der
+# Datei als Vorgabe ab, die per Flag gegebenen nicht (ca902719)
+F_MODE="$MODE"; F_RUNTIME="$RUNTIME"; F_PRESET="$PRESET"; F_PROVIDER="$PROVIDER"; F_PROJECTS="$PROJECTS"
+F_AI_FROM_HOST="$AI_FROM_HOST"; F_AI_PROVIDERS="$AI_PROVIDERS"; FRESH=0
+# from_file FLAGWERT — im Terminal, Werte aus der Datei geladen und der Wert kam nicht per Flag: fragen
+from_file() { [ "$INTERACTIVE" = 1 ] && [ -n "$CHANGE_NAME" ] && [ -z "$1" ]; }
+
 tui_init
 INTERACTIVE=0; [ "$TUI_TTY" = 1 ] && [ "$YES" = 0 ] && INTERACTIVE=1
 # Ohne Terminal und ohne Auftrag: nur pruefen — kein unbeabsichtigtes Installieren aus Pipes und CI
@@ -151,7 +158,7 @@ step_welcome() {
 
 # --- Schritt 2: Modus (bei vorhandener Einrichtung: aendern oder neu) --------------------------------
 step_mode() {
-  local choice rc names
+  local choice rc names def
   section 1
   names="$(existing_instances | tr '\n' ' ')"
   if [ "$INTERACTIVE" = 1 ] && [ -n "$names" ] && [ -z "$MODE$RUNTIME" ] && [ "$RECONF" = 0 ]; then
@@ -160,19 +167,20 @@ step_mode() {
       "$(msg rerun_fresh)|$(msg rerun_fresh_hint)" "$(msg rerun_quit)|"
     rc=$?; [ "$rc" = 0 ] || return "$rc"
     case "$choice" in
-      0) CHANGE_NAME="$(existing_instances | head -n 1)"; load_existing "$CHANGE_NAME"; RECONF=1; return 0 ;;
-      1) RECONF=1 ;;
+      0) CHANGE_NAME="$(existing_instances | head -n 1)"; load_existing "$CHANGE_NAME"; RECONF=1 ;;
+      1) RECONF=1; FRESH=1 ;;   # neu einrichten: die Werte der Datei gelten nicht
       2) return 3 ;;
     esac
   fi
   # --reconfigure, auch ohne Terminal: von den Werten der Datei ausgehen und nur die gegebenen Flags
   # aendern (ca902719) — frueher galten frische Vorgaben: aus einer Instanz auf dem Rechner wurde ohne
   # --runtime eine im Container, das Preset fiel auf core, der Anbieter auf den ersten angemeldeten
-  if [ "$RECONF" = 1 ] && [ -z "$CHANGE_NAME" ] && [ "$MODE" != staged ] && [ -f "$INSTANCES_DIR/$NAME.env" ]; then
+  if [ "$RECONF" = 1 ] && [ "$FRESH" = 0 ] && [ -z "$CHANGE_NAME" ] && [ "$MODE" != staged ] && [ -f "$INSTANCES_DIR/$NAME.env" ]; then
     CHANGE_NAME="$NAME"; load_existing "$NAME"
   fi
-  if [ -z "$MODE$RUNTIME" ] && [ "$INTERACTIVE" = 1 ]; then
-    tui_select choice "$(msg step_of 2 ${#STEPS[@]}) · $(msg mode_title)" 0 \
+  if [ "$INTERACTIVE" = 1 ] && { [ -z "$MODE$RUNTIME" ] || from_file "$F_MODE$F_RUNTIME"; }; then
+    def=0; [ "$RUNTIME" = host ] && def=1; [ "$MODE" = staged ] && def=2
+    tui_select choice "$(msg step_of 2 ${#STEPS[@]}) · $(msg mode_title)" "$def" \
       "$(msg mode_container)|$(msg mode_container_hint) · $(msg recommended)" \
       "$(msg mode_host)|$(msg mode_host_hint)" \
       "$(msg mode_staged)|$(msg mode_staged_hint)"
@@ -281,12 +289,13 @@ docker_ready() {
 
 # --- Schritt 4: Module ------------------------------------------------------------------------------
 step_modules() {
-  local choice rc items key tier on sel hard label=""
+  local choice rc items key tier on sel hard label="" def
   section 3
   if [ "$MODE" = staged ]; then tui_done "$(msg step_modules)" "$(msg modules_staged)$(kept_mark)"; return 0; fi
   CUSTOM_LINES="$LOADED_LINES"   # Zeilen einer Datei, die neu geschrieben wird, bleiben (ca902719)
-  if [ -z "$PRESET" ] && [ "$INTERACTIVE" = 1 ]; then
-    tui_select choice "$(msg step_of 4 ${#STEPS[@]}) · $(msg modules_title)" 0 \
+  if [ "$INTERACTIVE" = 1 ] && { [ -z "$PRESET" ] || from_file "$F_PRESET"; }; then
+    case "$PRESET" in research) def=1 ;; full) def=2 ;; *) def=0 ;; esac
+    tui_select choice "$(msg step_of 4 ${#STEPS[@]}) · $(msg modules_title)" "$def" \
       "$(msg modules_standard)|$(msg modules_standard_hint) · $(msg recommended)" \
       "$(msg modules_research)|$(msg modules_research_hint)" \
       "$(msg modules_full)|$(msg modules_full_hint)" \
@@ -336,7 +345,7 @@ step_modules() {
 
 # --- Schritt 5: KI-Anbieter -------------------------------------------------------------------------
 step_ai() {
-  local id p l lines choice rc opts default=0 i=0 present="" hints=""
+  local id p l lines choice rc opts default=0 i=0 present="" hints="" ask
   section 4
   lines=()
   while read -r id p l; do
@@ -362,12 +371,18 @@ EOF
   offer_pi
   offer_profile
   present="$(providers_status | awk '$2=="present"{print $1}' | tr '\n' ' ')"   # pi kann dazugekommen sein
+  ask=0; from_file "$F_PROVIDER" && ask=1
   if [ -z "$PROVIDER" ]; then
     # Default: der erste angemeldete, sonst der erste vorhandene, sonst der erste bekannte
     PROVIDER="$(providers_status | awk '$2=="present" && $3=="logged-in"{print $1; exit}')"
     [ -n "$PROVIDER" ] || PROVIDER="$(printf '%s\n' $present | head -n 1)"
     [ -n "$PROVIDER" ] || PROVIDER="$(providers_ids | head -n 1)"
+    ask=1
+  fi
+  if [ "$ask" = 1 ]; then
     set -- $present
+    # Der Anbieter aus der Datei bleibt waehlbar, auch wenn er hier fehlt — Enter aendert nichts
+    case " $present " in *" $PROVIDER "*) ;; *) [ -n "$CHANGE_NAME" ] && set -- "$PROVIDER" "$@" ;; esac
     if [ "$INTERACTIVE" = 1 ] && [ "$#" -gt 1 ]; then
       opts=(); i=0
       for id in "$@"; do opts[${#opts[@]}]="$id|$(provider_get "$id" cli)"; [ "$id" = "$PROVIDER" ] && default=$i; i=$((i + 1)); done
@@ -383,12 +398,13 @@ EOF
 # Auswahl und bei `login` fuer Claude der Token (Claude ersetzt seine Anmeldedatei bei jedem Erneuern,
 # eine eingebundene Datei ginge im Container veraltet).
 ai_container() {
-  local choice rc sel id items present all_present
+  local choice rc sel id items present all_present def on
   [ "$RUNTIME" = container ] || return 0
-  if [ -z "$AI_FROM_HOST" ]; then
+  if [ -z "$AI_FROM_HOST" ] || from_file "$F_AI_FROM_HOST"; then
     # Erst nach der Auswahl setzen: wer hier zurueckgeht, bekommt die Frage beim naechsten Mal wieder
     if [ "$INTERACTIVE" = 1 ]; then
-      tui_select choice "$(msg ai_access_q)" 0 "$(msg ai_access_login)" "$(msg ai_access_programs)" "$(msg ai_access_all)"
+      case "$AI_FROM_HOST" in programs) def=1 ;; all) def=2 ;; *) def=0 ;; esac
+      tui_select choice "$(msg ai_access_q)" "$def" "$(msg ai_access_login)" "$(msg ai_access_programs)" "$(msg ai_access_all)"
       rc=$?; [ "$rc" = 0 ] || return "$rc"
       case "$choice" in 1) AI_FROM_HOST=programs ;; 2) AI_FROM_HOST=all ;; *) AI_FROM_HOST=login ;; esac
     else
@@ -397,12 +413,15 @@ ai_container() {
   fi
   present="$(providers_status | awk '$2=="present"{print $1}')"
   all_present="$(echo $present)"
-  if [ -z "$AI_PROVIDERS" ] && [ "$KEPT" = 0 ] && [ "$INTERACTIVE" = 1 ] && [ "$(printf '%s\n' $present | grep -c .)" -gt 1 ]; then
+  if { [ -z "$AI_PROVIDERS" ] || from_file "$F_AI_PROVIDERS"; } && [ "$KEPT" = 0 ] && [ "$INTERACTIVE" = 1 ] && [ "$(printf '%s\n' $present | grep -c .)" -gt 1 ]; then
     items=()
-    for id in $present; do items[${#items[@]}]="on:$id:$id"; done
+    for id in $present; do
+      on=on; case ",${AI_PROVIDERS:-$id}," in *",$id,"*) ;; *) on=off ;; esac   # vorbelegt wie in der Datei
+      items[${#items[@]}]="$on:$id:$id"
+    done
     tui_checklist sel "$(msg ai_providers_q)" "${items[@]}"; rc=$?; [ "$rc" = 0 ] || return "$rc"
     # Alle abgewaehlt ist fast immer ein Versehen — dann bleiben alle
-    if [ -n "$sel" ] && [ "$sel" != "$all_present" ]; then AI_PROVIDERS="$(printf '%s' "$sel" | tr ' ' ',')"; fi
+    if [ -n "$sel" ] && [ "$sel" != "$all_present" ]; then AI_PROVIDERS="$(printf '%s' "$sel" | tr ' ' ',')"; else AI_PROVIDERS=""; fi
   fi
   ai_claude_token
   ai_env_only_hints
@@ -580,9 +599,10 @@ step_ports() {
     # (die laufende eigene Instanz zaehlt als frei, 0e5b82b7)
     p="$(free_port "$PORT" "" "$NAME")"
     [ "$p" = "$PORT" ] || { printf '  %s\n' "$(msg ports_busy "$PORT" "$p")"; PORT="$p"; }
+    [ "$INTERACTIVE" = 1 ] && tui_input PORT "$(msg ports_q "$NAME")" "$PORT"   # Wert der Datei als Vorgabe
   fi
-  if [ "$RUNTIME" = container ] && [ -z "$PROJECTS" ]; then
-    PROJECTS="$(cd "$REPO_ROOT/.." && pwd)"
+  if [ "$RUNTIME" = container ] && { [ -z "$PROJECTS" ] || from_file "$F_PROJECTS"; }; then
+    PROJECTS="${PROJECTS:-$(cd "$REPO_ROOT/.." && pwd)}"
     [ "$INTERACTIVE" = 1 ] && tui_input PROJECTS "$(msg projects_q)" "$PROJECTS"
   fi
   tui_done "$(msg step_ports)" "$PORT${PROJECTS:+ · $PROJECTS}$(kept_mark)"

@@ -347,7 +347,7 @@ check "done box: commands aligned (en)"                  '[ "$(cols)" = 1 ]'
 
 echo "8b) menus fit the panel — nothing cut off (pseudo terminal, stub tools)"
 # Abgeschnitten = „…“ direkt vor dem rechten Rahmen; „Eigene Auswahl…“ mitten in der Zeile ist gewollt
-cut() { sed "s/$(printf "\033")\[[0-9;?]*[A-Za-z]//g" "$1" | tr -d "\r" | grep -E "…[[:space:]]*│[[:space:]]*$" >/dev/null; }
+cut_off() { sed "s/$(printf "\033")\[[0-9;?]*[A-Za-z]//g" "$1" | tr -d "\r" | grep -E "…[[:space:]]*│[[:space:]]*$" >/dev/null; }
 pty_setup() {  # SPRACHE TASTEN FLAGS… → Mitschnitt in $TMP/menu
   local l="$1" keys="$2"; shift 2
   rm -rf "$INST"
@@ -356,15 +356,61 @@ pty_setup() {  # SPRACHE TASTEN FLAGS… → Mitschnitt in $TMP/menu
 if command -v script >/dev/null 2>&1 && script -qec true /dev/null >/dev/null 2>&1; then
   for l in en de; do
     pty_setup "$l" q
-    check "mode menu shown and complete ($l)"             'grep -E "(Step|Schritt) 2 (of|von)" "$TMP/menu" >/dev/null && ! cut "$TMP/menu"'
+    check "mode menu shown and complete ($l)"             'grep -E "(Step|Schritt) 2 (of|von)" "$TMP/menu" >/dev/null && ! cut_off "$TMP/menu"'
     pty_setup "$l" q --runtime host
-    check "module menu shown and complete ($l)"           'grep -E "(Step|Schritt) 4 (of|von)" "$TMP/menu" >/dev/null && ! cut "$TMP/menu"'
+    check "module menu shown and complete ($l)"           'grep -E "(Step|Schritt) 4 (of|von)" "$TMP/menu" >/dev/null && ! cut_off "$TMP/menu"'
     pty_setup "$l" 'n\nq' --runtime container --preset core --provider codex   # n: pi nicht mitinstallieren
     sed "s/$(printf "\033")\[[0-9;?]*[A-Za-z]//g" "$TMP/menu" | tr -d "\r" | grep -A4 -E "(in den Container|into the container)\?" > "$TMP/ai-menu"
-    check "AI access menu shown and complete ($l)"       '[ -s "$TMP/ai-menu" ] && ! cut "$TMP/ai-menu"'
+    check "AI access menu shown and complete ($l)"       '[ -s "$TMP/ai-menu" ] && ! cut_off "$TMP/ai-menu"'
   done
 else
   echo "  skip (no usable script command)"
+fi
+
+echo "8c) change settings in a terminal: the file's values are asked as defaults (ca902719)"
+# Frueher uebersprang „Einstellungen aendern“ (und --reconfigure im Terminal) jeden Schritt, dessen
+# Wert die Datei schon nannte — Modus, Module, Anbieter, Port liessen sich so gar nicht aendern.
+# Die Tasten kommen gruppenweise, jeweils erst, wenn die Ausgabe steht: Menues lesen Zeichen ohne
+# Zeilenpuffer, Rueckfragen ganze Zeilen — auf einmal geschickt, schluckte eine Zeilen-Rueckfrage den
+# Vorrat der naechsten Menues.
+feed() {  # DATEI GRUPPE… — jede Gruppe, sobald die Ausgabe 0,2 s lang nicht waechst
+  local f="$1" k last cur n; shift
+  for k in "$@"; do
+    last=-1; n=0
+    while [ "$n" -lt 150 ]; do sleep 0.2; cur="$(wc -c < "$f" 2>/dev/null || echo 0)"; [ "$cur" -gt 0 ] && [ "$cur" = "$last" ] && break; last="$cur"; n=$((n + 1)); done
+    printf "$k"
+  done
+  sleep 1
+}
+pty_run() {  # "GRUPPE|GRUPPE|…" FLAGS… → Mitschnitt in $TMP/menu(.txt), ohne $INST anzufassen
+  local groups; IFS='|' read -r -a groups <<< "$1"; shift
+  : > "$TMP/menu"
+  feed "$TMP/menu" "${groups[@]}" | timeout 120 script -qec "stty cols 120 rows 50; env HOME='$TMP/home' PATH='$TMP/bin:$TMP/tools' XDG_DATA_HOME='$TMP/data' XDG_STATE_HOME='$TMP/state' XDG_CONFIG_HOME='$TMP/home/.config' MYSURICATES_INSTANCES_DIR='$INST' TERM=xterm-256color bash '$SETUP' --dry-run --lang en $*" /dev/null > "$TMP/menu" 2>&1
+  sed "s/$(printf "\033")\[[0-9;?]*[A-Za-z]//g" "$TMP/menu" | tr -d "\r" > "$TMP/menu.txt"
+}
+if command -v script >/dev/null 2>&1 && script -qec true /dev/null >/dev/null 2>&1 && command -v timeout >/dev/null 2>&1; then
+  C8="$(firstfree 19820)"; C8N="$(firstfree $((C8 + 1)))"
+  c8_file() { rm -rf "$INST"; mkdir -p "$INST"; printf 'MYSURICATES_RUNTIME=host\nMYSURICATES_PORT=%s\nMYSURICATES_PRESET=full\nAUTOMATION_AI_DEFAULT_PROVIDER=PI\n' "$C8" > "$INST/main.env"; }
+  asked() { grep -F "$1" "$TMP/menu.txt" >/dev/null; }
+  # Modus Enter · Module Enter · pi mitinstallieren n · Anbieter Enter · Port Enter · bauen n
+  c8_file; pty_run '\n|\n|n\n|\n|\n|n\n' --reconfigure
+  check "--reconfigure: mode, modules, provider and port are asked" 'asked "Step 2 of 8" && asked "Step 4 of 8" && asked "Which provider should workflows use by default?" && asked "[$C8]:"'
+  check "... Enter everywhere keeps the file's values"   '[ "$(val main MYSURICATES_RUNTIME)" = host ] && [ "$(val main MYSURICATES_PRESET)" = full ] && [ "$(val main AUTOMATION_AI_DEFAULT_PROVIDER)" = PI ] && [ "$(val main MYSURICATES_PORT)" = "$C8" ]'
+  # Module 2 (research), neuer Port — der Rest bleibt
+  c8_file; pty_run "\\n|2|n\\n|\\n|$C8N\\n|n\\n" --reconfigure
+  check "... a choice changes only that value"           '[ "$(val main MYSURICATES_PRESET)" = research ] && [ "$(val main MYSURICATES_PORT)" = "$C8N" ] && [ "$(val main MYSURICATES_RUNTIME)" = host ] && [ "$(val main AUTOMATION_AI_DEFAULT_PROVIDER)" = PI ]'
+  # Ohne --reconfigure: „Einstellungen aendern“ im Auswahlmenue (Enter), danach dieselben Fragen
+  c8_file; pty_run '\n|\n|\n|n\n|\n|\n|n\n'
+  check "change settings: asked with the file's values"  'asked "Change settings of main" && asked "Step 4 of 8" && asked "[$C8]:" && [ "$(val main MYSURICATES_PRESET)" = full ] && [ "$(val main MYSURICATES_RUNTIME)" = host ] && [ "$(val main AUTOMATION_AI_DEFAULT_PROVIDER)" = PI ]'
+  # Per Flag gegeben: nicht noch einmal gefragt (pi n · bauen n)
+  c8_file; pty_run 'n\n|n\n' --reconfigure --runtime host --preset core --provider codex --port "$C8N"
+  check "flags are not asked again"                      '! asked "Step 2 of 8" && ! asked "Step 4 of 8" && ! asked "[$C8N]:" && [ "$(val main MYSURICATES_PRESET)" = core ] && [ "$(val main AUTOMATION_AI_DEFAULT_PROVIDER)" = CODEX ]'
+  # „Neu einrichten“ geht nicht von der Datei aus: Auswahl 2 · Modus 2 (Rechner) · Module · pi n · Port · bauen n
+  c8_file; pty_run '2|2|\n|n\n|\n|n\n'
+  check "set up anew: the file's values do not count"    'asked "Set up again" && [ "$(val main MYSURICATES_PRESET)" = core ] && [ "$(val main AUTOMATION_AI_DEFAULT_PROVIDER)" = CODEX ] && [ "$(val main MYSURICATES_PORT)" = "$(firstfree 9090)" ]'
+  rm -rf "$INST"
+else
+  echo "  skip (no usable script or timeout command)"
 fi
 
 echo "9) the API key hint never points to the log (bc6d1902)"
