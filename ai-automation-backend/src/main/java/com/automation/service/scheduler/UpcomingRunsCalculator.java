@@ -158,7 +158,8 @@ public class UpcomingRunsCalculator {
 
             if (sw.getScheduleType() == ScheduleType.CRON) {
                 int remainingRuns = getRemainingRunLimit(sw);
-                if (remainingRuns == 0) {
+                // A cron expression that no longer parses has no runs; the tick ends it (TODO 565e853b).
+                if (remainingRuns == 0 || !CronExpression.isValidExpression(sw.getCronExpression())) {
                     continue;
                 }
                 Instant effectiveUntil = getEffectiveUntil(until, sw.getEndDate());
