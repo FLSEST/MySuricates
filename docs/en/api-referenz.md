@@ -1436,7 +1436,15 @@ value → `400`, and the message names the allowed values.
   `OVERLAP` starts a second run next to it anyway.
 - **`maxRuns`:** counts every start of the schedule, a failed or refused one too; an occurrence dropped by
   `SKIP` does not count. Once the number is reached, the schedule is disabled. Re-enabling does not reset
-  `runCount` — exactly one more start follows.
+  `runCount`.
+- **No run left → `400`** (since 2026-10-03): if the first occurrence of a `CRON` schedule lies at or after
+  `endDate`, create, update and enable refuse it (`messageKey` `SCHEDULE_NEXT_RUN_AFTER_END_DATE`), as they
+  do `maxRuns` ≤ `runCount` (`SCHEDULE_MAX_RUNS_REACHED`) — before, it looked active and ended silently when
+  it fell due, or started once more after `maxRuns` was lowered. A disabled schedule has no next run and
+  stays editable; enabling it checks. Also `400`: a cron expression without a future occurrence
+  (`SCHEDULE_NO_NEXT_RUN`) and a `ONCE` time more than 60 s in the past (`SCHEDULE_ONCE_IN_PAST`, on create,
+  enable and when the time is moved). `PUT` checks only when `cronExpression`, `scheduledAt`, `endDate` or
+  `maxRuns` are sent.
 - **`catchUpOnResume`:** catches up occurrences of this schedule that fell into a standby or a restart,
   even when the global setting `scheduler-catch-up-on-resume` is off. That setting is on by default — then
   every schedule is caught up anyway, one after another through the catch-up queue.
@@ -1459,13 +1467,15 @@ Update a schedule.
 }
 ```
 
-All fields are optional; only provided fields are updated.
+All fields are optional; only provided fields are updated. If an enabled `CRON` schedule is then left
+without an occurrence before `endDate`, or its `maxRuns` are used up → `400` (see above).
 
 **Response:** `ScheduledWorkflowResponse`
 
 ### `POST /api/v1/schedules/{id}/enable`
 
-Enable a schedule.
+Enable a schedule. A `CRON` schedule whose next occurrence lies at or after `endDate`, whose `maxRuns`
+are used up or whose cron expression no longer parses (`INVALID_CRON`) → `400`.
 
 **Response:** `ScheduledWorkflowResponse`
 

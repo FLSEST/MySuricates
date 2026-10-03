@@ -1442,7 +1442,15 @@ angenommen; ein anderer Wert → `400`, die Meldung nennt die erlaubten Werte.
   `OVERLAP` startet trotzdem einen zweiten Lauf daneben.
 - **`maxRuns`:** zählt jeden Start des Zeitplans, auch einen fehlgeschlagenen oder abgewiesenen; ein per
   `SKIP` entfallener Termin zählt nicht. Ist die Zahl erreicht, wird der Zeitplan deaktiviert.
-  Wiedereinschalten setzt `runCount` nicht zurück — dann folgt genau ein weiterer Start.
+  Wiedereinschalten setzt `runCount` nicht zurück.
+- **Kein Termin mehr übrig → `400`** (seit 2026-10-03): Liegt der erste Termin eines `CRON`-Zeitplans am
+  oder nach `endDate`, weisen Anlegen, Ändern und Einschalten ihn ab (`messageKey`
+  `SCHEDULE_NEXT_RUN_AFTER_END_DATE`), ebenso `maxRuns` ≤ `runCount` (`SCHEDULE_MAX_RUNS_REACHED`) —
+  vorher wirkte er aktiv und endete erst beim Fälligwerden still bzw. startete nach gesenktem `maxRuns`
+  noch einmal. Ein ausgeschalteter Zeitplan hat keinen Termin und bleibt änderbar; geprüft wird beim
+  Einschalten. Ebenso `400`: ein Cron-Ausdruck ohne künftigen Termin (`SCHEDULE_NO_NEXT_RUN`) und ein
+  `ONCE`-Zeitpunkt mehr als 60 s in der Vergangenheit (`SCHEDULE_ONCE_IN_PAST`, beim Anlegen, Einschalten und
+  Verlegen). `PUT` prüft nur, wenn `cronExpression`, `scheduledAt`, `endDate` oder `maxRuns` mitkommen.
 - **`catchUpOnResume`:** holt Termine dieses Zeitplans nach, die in Standby oder einen Neustart fielen,
   auch wenn die globale Einstellung `scheduler-catch-up-on-resume` aus ist. Die ist standardmäßig an —
   dann wird ohnehin jeder Zeitplan nachgeholt, nacheinander über die Catch-up-Warteschlange.
@@ -1465,13 +1473,16 @@ Schedule aktualisieren.
 }
 ```
 
-Alle Felder sind optional; nur übergebene Felder werden aktualisiert.
+Alle Felder sind optional; nur übergebene Felder werden aktualisiert. Bleibt einem eingeschalteten
+`CRON`-Zeitplan danach kein Termin vor `endDate` oder sind seine `maxRuns` aufgebraucht → `400` (siehe
+oben).
 
 **Response:** `ScheduledWorkflowResponse`
 
 ### `POST /api/v1/schedules/{id}/enable`
 
-Schedule aktivieren.
+Schedule aktivieren. Ein `CRON`-Zeitplan, dessen nächster Termin am oder nach `endDate` liegt, dessen
+`maxRuns` aufgebraucht sind oder dessen Cron-Ausdruck nicht mehr parst (`INVALID_CRON`) → `400`.
 
 **Response:** `ScheduledWorkflowResponse`
 

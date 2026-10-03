@@ -144,14 +144,56 @@ public class ScheduleSkipPolicy {
      * failing the view.
      */
     Instant effectiveNextRun(ScheduledWorkflow scheduled, Optional<Instant> skipUntil) {
-        if (!heldBySkipUntil(scheduled, skipUntil)) {
-            return scheduled.getNextRunAt();
+        Instant next = scheduled.getNextRunAt();
+        if (heldBySkipUntil(scheduled, skipUntil)) {
+            try {
+                next = nextRunAfter(scheduled, skipUntil.get());
+            } catch (IllegalArgumentException e) {
+                return scheduled.getNextRunAt();
+            }
         }
-        try {
-            return nextRunAfter(scheduled, skipUntil.get());
-        } catch (IllegalArgumentException e) {
-            return scheduled.getNextRunAt();
+        return endsBefore(scheduled, next) ? null : next;
+    }
+
+    /**
+     * True when a CRON schedule's {@code occurrence} lies at or after its end date: it never starts,
+     * the schedule is over. The skip must not move a schedule there, nor a view show it (TODO 1e801952).
+     */
+    private static boolean endsBefore(ScheduledWorkflow scheduled, Instant occurrence) {
+        return scheduled.getScheduleType() == ScheduleType.CRON
+                && ScheduleEndConditions.reachesEndDate(scheduled, occurrence);
+    }
+
+    /**
+     * Ends a CRON schedule whose cron expression no longer parses (TODO 565e853b) — create and update
+     * refuse one, so it got there by hand in the database or with an old version: disabled and
+     * reported once as an ERROR. Before, its next run could not be computed, so it stayed due and
+     * started again on every tick its target was free, and during a skip-until pause every tick
+     * failed to skip it and wrote an ERROR, one a minute.
+     *
+     * @return true when the schedule was ended
+     */
+    public boolean endIfCronInvalid(ScheduledWorkflow scheduled) {
+        String cron = scheduled.getCronExpression();
+        if (scheduled.getScheduleType() != ScheduleType.CRON || CronExpression.isValidExpression(cron)) {
+            return false;
         }
+        Instant previousNextRunAt = scheduled.getNextRunAt();
+        scheduled.setEnabled(false);
+        scheduled.setNextRunAt(null);
+        scheduledRepository.save(scheduled);
+        log.error("Schedule {} disabled — invalid cron expression '{}'", scheduled.getId(), cron);
+
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("reason", "invalid-cron");
+        metadata.put("cronExpression", String.valueOf(cron));
+        if (previousNextRunAt != null) {
+            metadata.put("previousNextRunAt", previousNextRunAt.toString());
+        }
+        activityLogService.log(LogLevel.ERROR, LogCategory.SCHEDULE,
+                "Schedule disabled (invalid cron expression '" + cron + "'): " + scheduled.getTargetName(),
+                "SchedulerService", scheduled.getId(), metadata);
+        return true;
     }
 
     /** Skip a schedule forward past a manual skip-until maintenance window. */
@@ -185,10 +227,20 @@ public class ScheduleSkipPolicy {
      */
     private void skipSchedule(ScheduledWorkflow scheduled, Instant until, String reason,
                               String message, Map<String, Object> extraMetadata) {
+        if (endIfCronInvalid(scheduled)) {
+            return;
+        }
         Instant previousNextRunAt = scheduled.getNextRunAt();
 
+        boolean endDateReached = false;
         if (scheduled.getScheduleType() == ScheduleType.CRON) {
-            scheduled.setNextRunAt(nextRunAfter(scheduled, until));
+            Instant next = nextRunAfter(scheduled, until);
+            // Not behind the end date: there the schedule is over (TODO 1e801952).
+            endDateReached = endsBefore(scheduled, next);
+            scheduled.setNextRunAt(endDateReached ? null : next);
+            if (endDateReached) {
+                scheduled.setEnabled(false);
+            }
         } else if (scheduled.getScheduleType() == ScheduleType.ONCE
                 || scheduled.getScheduleType() == ScheduleType.DELAYED) {
             // Intentional: a one-off schedule that falls inside the skip window is permanently
@@ -208,6 +260,9 @@ public class ScheduleSkipPolicy {
         }
         if (scheduled.getNextRunAt() != null) {
             metadata.put("nextRunAt", scheduled.getNextRunAt().toString());
+        }
+        if (endDateReached) {
+            metadata.put("endDate", scheduled.getEndDate().toString());
         }
         if (extraMetadata != null) {
             metadata.putAll(extraMetadata);

@@ -580,7 +580,9 @@ class ScheduledWorkflowExecutorTest {
     private ScheduledWorkflowExecutor executorWith(Clock executorClock, ModuleRegistry moduleRegistry) {
         return new ScheduledWorkflowExecutor(scheduledRepository, workflowRunRepository, chainRunRepository,
                 workflowExecutor, chainExecutor, activityLogService, executorClock, moduleRegistry,
-                new ScheduleConflictCheck(workflowRunRepository, chainRunRepository, pendingAutoResumes));
+                new ScheduleConflictCheck(workflowRunRepository, chainRunRepository, pendingAutoResumes),
+                new ScheduleSkipPolicy(new com.automation.config.SchedulerConfig(), scheduledRepository,
+                        activityLogService, mock(SchedulerMaintenanceMode.class)));
     }
 
     private ScheduledWorkflow hourly(String id, Instant nextRunAt, Instant endDate) {
@@ -750,5 +752,60 @@ class ScheduledWorkflowExecutorTest {
 
         verify(workflowExecutor).execute(eq(testWorkflow), eq(Map.of("goal_id", "g1")), any(String.class), isNull(),
                 eq(TriggerSource.SCHEDULE));
+    }
+
+    // --- A cron expression that no longer parses ends the schedule, reported once (TODO 565e853b) ---
+
+    /**
+     * Before: the run started, the next run could not be computed in the finally block, nextRunAt
+     * stayed in the past and the workflow started again as soon as its target was free.
+     */
+    @Test
+    void invalidCron_neverStarts_isDisabledAndReportedOnce() {
+        ScheduledWorkflow scheduled = ScheduledWorkflow.builder()
+                .id("sched-bad-cron").workflow(testWorkflow).cronExpression("not a cron")
+                .scheduleType(ScheduleType.CRON).enabled(true)
+                .nextRunAt(Instant.now().minusSeconds(60)).inputContext(Map.of()).build();
+        when(scheduledRepository.findByIdWithWorkflowSkills("sched-bad-cron")).thenReturn(Optional.of(scheduled));
+        when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        assertThat(executor.executeSingleSchedule("sched-bad-cron")).isEmpty();
+        assertThat(executor.executeSingleSchedule("sched-bad-cron")).isEmpty();
+
+        verifyNoInteractions(workflowExecutor, chainExecutor);
+        assertThat(scheduled.isEnabled()).isFalse();
+        assertThat(scheduled.getNextRunAt()).isNull();
+        assertThat(scheduled.getRunCount()).isZero();
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> meta = ArgumentCaptor.forClass(Map.class);
+        verify(activityLogService).log(eq(LogLevel.ERROR), eq(LogCategory.SCHEDULE),
+                eq("Schedule disabled (invalid cron expression 'not a cron'): Test Workflow"),
+                eq("SchedulerService"), eq("sched-bad-cron"), meta.capture());
+        assertThat(meta.getValue()).containsEntry("reason", "invalid-cron").containsEntry("cronExpression", "not a cron");
+        verifyNoMoreInteractions(activityLogService);
+    }
+
+    // --- A cron expression without a future occurrence ends the schedule (TODO 1e801952) ---
+
+    /** Valid, but 30 February never comes. Before: enabled with nextRunAt null — active-looking, never running. */
+    @Test
+    void cronWithoutAFutureOccurrence_endsTheScheduleAfterItsRun_andReportsItOnce() {
+        ScheduledWorkflow scheduled = ScheduledWorkflow.builder()
+                .id("sched-never").workflow(testWorkflow).cronExpression("0 0 0 30 2 *")
+                .scheduleType(ScheduleType.CRON).enabled(true)
+                .nextRunAt(Instant.now().minusSeconds(60)).inputContext(Map.of()).build();
+        stubScheduleLookups(scheduled);
+        targetBusy(false);
+
+        executor.executeSingleSchedule("sched-never");
+        executor.executeSingleSchedule("sched-never");
+
+        verify(workflowExecutor, times(1)).execute(eq(testWorkflow), eq(Map.of()), eq("sched-never"), isNull(),
+                eq(TriggerSource.SCHEDULE));
+        assertThat(scheduled.isEnabled()).isFalse();
+        assertThat(scheduled.getNextRunAt()).isNull();
+        verify(activityLogService, times(1)).log(eq(LogLevel.INFO), eq(LogCategory.SCHEDULE),
+                eq("Schedule ended (no further occurrence): Test Workflow"), eq("ScheduledWorkflowExecutor"),
+                eq("sched-never"), any());
     }
 }

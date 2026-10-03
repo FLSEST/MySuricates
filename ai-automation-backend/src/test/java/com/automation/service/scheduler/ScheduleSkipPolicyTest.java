@@ -256,6 +256,84 @@ class ScheduleSkipPolicyTest {
         assertThat(policy.effectiveNextRun(broken, Optional.of(local(28, 0, 0)))).isEqualTo(local(27, 8, 0));
     }
 
+    // --- the end date bounds the skip as well (TODO 1e801952) ---
+
+    @Test
+    void skipScheduleUntil_nextRunBehindTheEndDate_endsTheSchedule() {
+        ScheduledWorkflow daily = cron("0 0 8 * * *", local(27, 8, 0));
+        daily.setEndDate(local(28, 12, 0));
+
+        // The pause lasts until the 29th: the next run behind it (29th, 08:00) lies after the end date.
+        policy.skipScheduleUntil(daily, local(29, 0, 0));
+
+        assertThat(daily.getNextRunAt()).isNull();
+        assertThat(daily.isEnabled()).isFalse();
+        verify(scheduledRepository).save(daily);
+    }
+
+    @Test
+    void skipScheduleForColdStart_nextRunBeforeTheEndDate_staysScheduled() {
+        ScheduledWorkflow daily = cron("0 0 8 * * *", local(27, 8, 0));
+        daily.setEndDate(local(28, 8, 1));
+
+        policy.skipScheduleForColdStart(daily, local(27, 9, 0), local(27, 8, 30));
+
+        assertThat(daily.getNextRunAt()).isEqualTo(local(28, 8, 0));
+        assertThat(daily.isEnabled()).isTrue();
+    }
+
+    @Test
+    void effectiveNextRun_runBehindThePauseAtOrAfterTheEndDate_isNone() {
+        Optional<Instant> pause = Optional.of(local(28, 12, 0));
+        ScheduledWorkflow held = cron("0 0 8 * * *", local(27, 8, 0));
+        held.setEndDate(local(29, 8, 0));
+
+        assertThat(policy.effectiveNextRun(held, pause)).isNull();
+        held.setEndDate(local(29, 8, 1));
+        assertThat(policy.effectiveNextRun(held, pause)).isEqualTo(local(29, 8, 0));
+    }
+
+    /** A stored run at or after the end date (old data) never starts — the tick ends the schedule. */
+    @Test
+    void effectiveNextRun_storedRunAtTheEndDate_isNone() {
+        ScheduledWorkflow stored = cron("0 0 8 * * *", local(29, 8, 0));
+        stored.setEndDate(local(29, 8, 0));
+
+        assertThat(policy.effectiveNextRun(stored, Optional.empty())).isNull();
+    }
+
+    // --- a cron expression that no longer parses (TODO 565e853b) ---
+
+    @Test
+    void endIfCronInvalid_leavesAValidCronAndAOneOffAlone() {
+        ScheduledWorkflow oneOff = ScheduledWorkflow.builder().id("s-2").cronExpression("")
+                .scheduleType(ScheduleType.ONCE).enabled(true).nextRunAt(local(27, 8, 0)).build();
+
+        assertThat(policy.endIfCronInvalid(cron("0 0 8 * * *", local(27, 8, 0)))).isFalse();
+        assertThat(policy.endIfCronInvalid(oneOff)).isFalse();
+        assertThat(oneOff.isEnabled()).isTrue();
+        verifyNoInteractions(scheduledRepository, activityLogService);
+    }
+
+    @Test
+    void endIfCronInvalid_disablesAndRecordsTheExpression() {
+        ScheduledWorkflow broken = cron("not a cron", local(27, 8, 0));
+
+        assertThat(policy.endIfCronInvalid(broken)).isTrue();
+
+        assertThat(broken.isEnabled()).isFalse();
+        assertThat(broken.getNextRunAt()).isNull();
+        verify(scheduledRepository).save(broken);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> meta = ArgumentCaptor.forClass(Map.class);
+        verify(activityLogService).log(eq(LogLevel.ERROR), eq(LogCategory.SCHEDULE),
+                eq("Schedule disabled (invalid cron expression 'not a cron'): Daily"), eq("SchedulerService"),
+                eq("s-1"), meta.capture());
+        assertThat(meta.getValue()).containsEntry("reason", "invalid-cron")
+                .containsEntry("cronExpression", "not a cron")
+                .containsEntry("previousNextRunAt", local(27, 8, 0).toString());
+    }
+
     // --- maintenance switch in the same rule (TODO 7704b1e9) ---
 
     @Test

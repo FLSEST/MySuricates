@@ -9,8 +9,6 @@ import com.automation.entity.ScheduledWorkflow;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowChain;
 import com.automation.entity.WorkflowRun;
-import com.automation.exception.ErrorMessage;
-import com.automation.exception.LocalizedArgumentException;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.repository.ChainRunRepository;
 import com.automation.repository.ScheduledWorkflowRepository;
@@ -20,7 +18,6 @@ import com.automation.repository.WorkflowRunRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Limit;
-import org.springframework.scheduling.support.CronExpression;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -113,6 +110,30 @@ public class SchedulerService {
                                      String scheduleType, Instant scheduledAt,
                                      String delayExpression, Instant endDate, Integer maxRuns,
                                      String conflictBehaviorStr, Boolean catchUpOnResume) {
+        return createSchedule(workflowId, chainId, targetTypeStr, cronExpression, description, inputContext,
+                scheduleType, scheduledAt, delayExpression, endDate, maxRuns, conflictBehaviorStr, catchUpOnResume, true);
+    }
+
+    /**
+     * {@link #create} for the bundle import: disabled, so it never runs before the user looked at it.
+     * An end date already passed or used-up runs do not refuse it — enabling checks them (TODO 1e801952).
+     */
+    @Transactional
+    public ScheduledWorkflow createDisabled(String workflowId, String chainId, String targetTypeStr,
+                                            String cronExpression, String description,
+                                            Map<String, Object> inputContext, String scheduleType,
+                                            Instant scheduledAt, String delayExpression, Instant endDate,
+                                            Integer maxRuns, String conflictBehaviorStr, Boolean catchUpOnResume) {
+        return createSchedule(workflowId, chainId, targetTypeStr, cronExpression, description, inputContext,
+                scheduleType, scheduledAt, delayExpression, endDate, maxRuns, conflictBehaviorStr, catchUpOnResume, false);
+    }
+
+    private ScheduledWorkflow createSchedule(String workflowId, String chainId, String targetTypeStr,
+                                             String cronExpression, String description,
+                                             Map<String, Object> inputContext, String scheduleType,
+                                             Instant scheduledAt, String delayExpression, Instant endDate,
+                                             Integer maxRuns, String conflictBehaviorStr, Boolean catchUpOnResume,
+                                             boolean enabled) {
         TargetType targetType = definitionParser.parseTargetType(targetTypeStr);
         requireTarget(targetType, workflowId, chainId);
 
@@ -137,9 +158,17 @@ public class SchedulerService {
 
         resolveTarget(builder, targetType, workflowId, chainId);
 
-        applyTiming(builder, type, cronExpression, scheduledAt, delayExpression);
+        definitionParser.applyTiming(builder, type, cronExpression, scheduledAt, delayExpression);
 
-        ScheduledWorkflow saved = scheduledRepository.save(builder.build());
+        ScheduledWorkflow schedule = builder.build();
+        if (enabled) {
+            ScheduleEndConditions.requireNextRun(schedule);
+            ScheduleEndConditions.requireRunLeft(schedule, Instant.now(clock));
+        } else {
+            schedule.setEnabled(false);
+            schedule.setNextRunAt(null);
+        }
+        ScheduledWorkflow saved = scheduledRepository.save(schedule);
         log.info("Created {} schedule: {} for {} {}",
                 type, saved.getId(), targetType,
                 targetType == TargetType.CHAIN ? chainId : workflowId);
@@ -164,12 +193,11 @@ public class SchedulerService {
         }
 
         if (scheduled.getScheduleType() == ScheduleType.CRON && request.cronExpression() != null) {
-            if (!CronExpression.isValidExpression(request.cronExpression())) {
-                throw new LocalizedArgumentException(ErrorMessage.INVALID_CRON, Map.of("expression", String.valueOf(request.cronExpression())));
-            }
+            definitionParser.requireValidCron(request.cronExpression());
             scheduled.setCronExpression(request.cronExpression());
             if (scheduled.isEnabled()) {
                 scheduled.setNextRunAt(definitionParser.calculateNextRun(request.cronExpression()));
+                ScheduleEndConditions.requireNextRun(scheduled);
             }
         }
 
@@ -189,6 +217,12 @@ public class SchedulerService {
             }
         }
 
+        // Checked only when a field that decides the next run changes: editing the description of old
+        // data stays possible, and a one-off overdue by seconds stays editable.
+        if (request.cronExpression() != null || request.scheduledAt() != null
+                || request.endDate() != null || request.maxRuns() != null) {
+            ScheduleEndConditions.requireRunLeft(scheduled, Instant.now(clock));
+        }
         log.info("Updated schedule: {}", id);
         return scheduledRepository.save(scheduled);
     }
@@ -202,9 +236,12 @@ public class SchedulerService {
                 || scheduled.getScheduleType() == ScheduleType.DELAYED) {
             scheduled.setNextRunAt(scheduled.getScheduledAt());
         } else {
+            definitionParser.requireValidCron(scheduled.getCronExpression());
             scheduled.setNextRunAt(definitionParser.calculateNextRun(scheduled.getCronExpression()));
         }
 
+        ScheduleEndConditions.requireNextRun(scheduled);
+        ScheduleEndConditions.requireRunLeft(scheduled, Instant.now(clock));
         return scheduledRepository.save(scheduled);
     }
 
@@ -243,34 +280,6 @@ public class SchedulerService {
         } else {
             builder.workflow(workflowRepository.findById(workflowId)
                     .orElseThrow(() -> new ResourceNotFoundException("Workflow", workflowId)));
-        }
-    }
-
-    private void applyTiming(ScheduledWorkflow.ScheduledWorkflowBuilder builder, ScheduleType type,
-                             String cronExpression, Instant scheduledAt, String delayExpression) {
-        switch (type) {
-            case ONCE -> {
-                if (scheduledAt == null) {
-                    throw new IllegalArgumentException("scheduledAt is required for ONCE schedules");
-                }
-                builder.cronExpression("").scheduledAt(scheduledAt).nextRunAt(scheduledAt);
-            }
-            case DELAYED -> {
-                if (delayExpression == null || delayExpression.isBlank()) {
-                    throw new IllegalArgumentException("delayExpression is required for DELAYED schedules (e.g. '2h', '30m', '1d')");
-                }
-                Instant runAt = Instant.now(clock).plus(ScheduleDefinitionParser.parseDelay(delayExpression));
-                builder.cronExpression("").scheduledAt(runAt).nextRunAt(runAt).delayExpression(delayExpression);
-            }
-            default -> {
-                if (cronExpression == null || cronExpression.isBlank()) {
-                    throw new IllegalArgumentException("cronExpression is required for CRON schedules");
-                }
-                if (!CronExpression.isValidExpression(cronExpression)) {
-                    throw new LocalizedArgumentException(ErrorMessage.INVALID_CRON, Map.of("expression", String.valueOf(cronExpression)));
-                }
-                builder.cronExpression(cronExpression).nextRunAt(definitionParser.calculateNextRun(cronExpression));
-            }
         }
     }
 }

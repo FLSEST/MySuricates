@@ -4,6 +4,8 @@ import com.automation.dto.response.UpcomingScheduleResponse;
 import com.automation.entity.ScheduledWorkflow;
 import com.automation.entity.ScheduledWorkflow.ScheduleType;
 import com.automation.entity.Workflow;
+import com.automation.exception.ErrorMessage;
+import com.automation.exception.LocalizedArgumentException;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.repository.ScheduledWorkflowRepository;
 import com.automation.repository.WorkflowChainRepository;
@@ -732,4 +734,242 @@ class SchedulerServiceTest {
     }
 
     // --- getRemainingToday: DELAYED schedule treated like ONCE ---
+
+    // --- No run left: create, update and enable refuse the schedule (TODO 1e801952) ---
+
+    private Instant firstHourlyRun() {
+        return new ScheduleDefinitionParser(clock).calculateNextRun("0 0 * * * *");
+    }
+
+    private static void assertRefused(org.assertj.core.api.ThrowableAssert.ThrowingCallable call, ErrorMessage key) {
+        assertThatThrownBy(call).isInstanceOfSatisfying(LocalizedArgumentException.class,
+                e -> assertThat(e.errorMessage()).isEqualTo(key));
+    }
+
+    @Test
+    void create_endDateNotAfterTheFirstRun_isRefused() {
+        when(workflowRepository.findById("wf-1")).thenReturn(Optional.of(testWorkflow));
+
+        assertRefused(() -> schedulerService.create("wf-1", null, null, "0 0 * * * *", "x", null, "CRON", null, null,
+                firstHourlyRun(), null, null, null), ErrorMessage.SCHEDULE_NEXT_RUN_AFTER_END_DATE);
+        verify(scheduledRepository, never()).save(any());
+    }
+
+    @Test
+    void create_endDateAfterTheFirstRun_isAccepted() {
+        when(workflowRepository.findById("wf-1")).thenReturn(Optional.of(testWorkflow));
+        when(scheduledRepository.save(any(ScheduledWorkflow.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ScheduledWorkflow result = schedulerService.create("wf-1", null, null, "0 0 * * * *", "x", null, "CRON", null,
+                null, firstHourlyRun().plusSeconds(1), 1, null, null);
+
+        assertThat(result.isEnabled()).isTrue();
+        assertThat(result.getNextRunAt()).isEqualTo(firstHourlyRun());
+    }
+
+    /** The bundle import creates schedules disabled: an end date long past must not fail the import. */
+    @Test
+    void createDisabled_keepsAScheduleWhoseEndDateHasPassed() {
+        Instant endDate = FIXED_NOW.minus(30, ChronoUnit.DAYS);
+        when(workflowRepository.findById("wf-1")).thenReturn(Optional.of(testWorkflow));
+        when(scheduledRepository.save(any(ScheduledWorkflow.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ScheduledWorkflow result = schedulerService.createDisabled("wf-1", null, null, "0 0 * * * *", "x", null,
+                "CRON", null, null, endDate, 5, null, null);
+
+        assertThat(result.isEnabled()).isFalse();
+        assertThat(result.getNextRunAt()).isNull();
+        assertThat(result.getEndDate()).isEqualTo(endDate);
+        assertThat(result.getMaxRuns()).isEqualTo(5);
+    }
+
+    @Test
+    void update_endDateMovedToTheNextRun_isRefused() {
+        testScheduled.setNextRunAt(firstHourlyRun());
+        when(scheduledRepository.findById("sched-1")).thenReturn(Optional.of(testScheduled));
+
+        assertRefused(() -> schedulerService.update("sched-1", new UpdateScheduleRequest(null, null, null, null,
+                firstHourlyRun(), null, null, null)), ErrorMessage.SCHEDULE_NEXT_RUN_AFTER_END_DATE);
+        verify(scheduledRepository, never()).save(any());
+    }
+
+    /** Before: maxRuns lowered under runCount still let the next occurrence start once. */
+    @Test
+    void update_maxRunsLoweredToTheRunCount_isRefused() {
+        testScheduled.setNextRunAt(firstHourlyRun());
+        testScheduled.setRunCount(3);
+        when(scheduledRepository.findById("sched-1")).thenReturn(Optional.of(testScheduled));
+
+        assertRefused(() -> schedulerService.update("sched-1", new UpdateScheduleRequest(null, null, null, null,
+                null, 3, null, null)), ErrorMessage.SCHEDULE_MAX_RUNS_REACHED);
+        verify(scheduledRepository, never()).save(any());
+    }
+
+    /** The form sends maxRuns with every edit: a finished (disabled) schedule stays editable. */
+    @Test
+    void update_disabledScheduleWithItsRunsUsedUp_staysEditable() {
+        testScheduled.setEnabled(false);
+        testScheduled.setNextRunAt(null);
+        testScheduled.setRunCount(3);
+        testScheduled.setMaxRuns(3);
+        when(scheduledRepository.findById("sched-1")).thenReturn(Optional.of(testScheduled));
+        when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        ScheduledWorkflow result = schedulerService.update("sched-1", new UpdateScheduleRequest("0 0 * * * *",
+                "renamed", null, null, FIXED_NOW.minus(1, ChronoUnit.DAYS), 3, null, null));
+
+        assertThat(result.getDescription()).isEqualTo("renamed");
+        assertThat(result.isEnabled()).isFalse();
+    }
+
+    @Test
+    void enable_runsUsedUp_isRefused() {
+        testScheduled.setEnabled(false);
+        testScheduled.setRunCount(5);
+        testScheduled.setMaxRuns(5);
+        when(scheduledRepository.findById("sched-1")).thenReturn(Optional.of(testScheduled));
+
+        assertRefused(() -> schedulerService.enable("sched-1"), ErrorMessage.SCHEDULE_MAX_RUNS_REACHED);
+        verify(scheduledRepository, never()).save(any());
+    }
+
+    @Test
+    void enable_endDatePassed_isRefused() {
+        testScheduled.setEnabled(false);
+        testScheduled.setEndDate(FIXED_NOW.minus(1, ChronoUnit.DAYS));
+        when(scheduledRepository.findById("sched-1")).thenReturn(Optional.of(testScheduled));
+
+        assertRefused(() -> schedulerService.enable("sched-1"), ErrorMessage.SCHEDULE_NEXT_RUN_AFTER_END_DATE);
+        verify(scheduledRepository, never()).save(any());
+    }
+
+    @Test
+    void enable_cronThatNoLongerParses_isRefusedAsInvalidCron() {
+        testScheduled.setEnabled(false);
+        testScheduled.setCronExpression("not a cron");
+        when(scheduledRepository.findById("sched-1")).thenReturn(Optional.of(testScheduled));
+
+        assertRefused(() -> schedulerService.enable("sched-1"), ErrorMessage.INVALID_CRON);
+        verify(scheduledRepository, never()).save(any());
+    }
+
+    // --- A cron without a future occurrence, a one-off in the past (TODO 1e801952) ---
+
+    @Test
+    void create_cronWithoutAFutureOccurrence_isRefused() {
+        when(workflowRepository.findById("wf-1")).thenReturn(Optional.of(testWorkflow));
+
+        assertRefused(() -> schedulerService.create("wf-1", null, null, "0 0 0 30 2 *", "x", null, "CRON", null, null,
+                null, null, null, null), ErrorMessage.SCHEDULE_NO_NEXT_RUN);
+        verify(scheduledRepository, never()).save(any());
+    }
+
+    @Test
+    void update_cronWithoutAFutureOccurrence_isRefused() {
+        when(scheduledRepository.findById("sched-1")).thenReturn(Optional.of(testScheduled));
+
+        assertRefused(() -> schedulerService.update("sched-1", new UpdateScheduleRequest("0 0 0 30 2 *", null, null,
+                null, null, null, null, null)), ErrorMessage.SCHEDULE_NO_NEXT_RUN);
+        verify(scheduledRepository, never()).save(any());
+    }
+
+    @Test
+    void enable_cronWithoutAFutureOccurrence_isRefused() {
+        testScheduled.setEnabled(false);
+        testScheduled.setCronExpression("0 0 0 30 2 *");
+        when(scheduledRepository.findById("sched-1")).thenReturn(Optional.of(testScheduled));
+
+        assertRefused(() -> schedulerService.enable("sched-1"), ErrorMessage.SCHEDULE_NO_NEXT_RUN);
+        verify(scheduledRepository, never()).save(any());
+    }
+
+    private ScheduledWorkflow onceAt(Instant at, boolean enabled) {
+        return ScheduledWorkflow.builder().id("sched-once-past").workflow(testWorkflow).cronExpression("")
+                .scheduleType(ScheduleType.ONCE).scheduledAt(at).enabled(enabled).build();
+    }
+
+    @Test
+    void create_onceInThePast_isRefused() {
+        when(workflowRepository.findById("wf-1")).thenReturn(Optional.of(testWorkflow));
+
+        assertRefused(() -> schedulerService.create("wf-1", null, null, null, "x", null, "ONCE",
+                FIXED_NOW.minusSeconds(61), null, null, null, null, null), ErrorMessage.SCHEDULE_ONCE_IN_PAST);
+        verify(scheduledRepository, never()).save(any());
+    }
+
+    /** Before: enabling a one-off whose time had passed started it right away. */
+    @Test
+    void enable_onceInThePast_isRefused() {
+        ScheduledWorkflow once = onceAt(FIXED_NOW.minus(1, ChronoUnit.DAYS), false);
+        when(scheduledRepository.findById("sched-once-past")).thenReturn(Optional.of(once));
+
+        assertRefused(() -> schedulerService.enable("sched-once-past"), ErrorMessage.SCHEDULE_ONCE_IN_PAST);
+        verify(scheduledRepository, never()).save(any());
+    }
+
+    @Test
+    void update_onceMovedIntoThePast_isRefused() {
+        ScheduledWorkflow once = onceAt(FIXED_NOW.plus(1, ChronoUnit.HOURS), true);
+        when(scheduledRepository.findById("sched-once-past")).thenReturn(Optional.of(once));
+
+        assertRefused(() -> schedulerService.update("sched-once-past", new UpdateScheduleRequest(null, null, null,
+                FIXED_NOW.minusSeconds(61), null, null, null, null)), ErrorMessage.SCHEDULE_ONCE_IN_PAST);
+        verify(scheduledRepository, never()).save(any());
+    }
+
+    /** The bundle import keeps a past one-off — disabled, it never starts. */
+    @Test
+    void createDisabled_keepsAOneOffInThePast() {
+        when(workflowRepository.findById("wf-1")).thenReturn(Optional.of(testWorkflow));
+        when(scheduledRepository.save(any(ScheduledWorkflow.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ScheduledWorkflow result = schedulerService.createDisabled("wf-1", null, null, null, "x", null, "ONCE",
+                FIXED_NOW.minus(1, ChronoUnit.DAYS), null, null, null, null, null);
+
+        assertThat(result.isEnabled()).isFalse();
+        assertThat(result.getScheduledAt()).isEqualTo(FIXED_NOW.minus(1, ChronoUnit.DAYS));
+    }
+
+    // --- Review: tolerance for a one-off in the running minute, edits of old data (TODO 1e801952) ---
+
+    /** A time picked in the running minute is not "in the past": it starts with the next tick. */
+    @Test
+    void create_onceWithinTheRunningMinute_isAccepted() {
+        when(workflowRepository.findById("wf-1")).thenReturn(Optional.of(testWorkflow));
+        when(scheduledRepository.save(any(ScheduledWorkflow.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ScheduledWorkflow result = schedulerService.create("wf-1", null, null, null, "x", null, "ONCE",
+                FIXED_NOW.minusSeconds(60), null, null, null, null, null);
+
+        assertThat(result.isEnabled()).isTrue();
+        assertThat(result.getNextRunAt()).isEqualTo(FIXED_NOW.minusSeconds(60));
+    }
+
+    @Test
+    void update_onceMovedWithinTheRunningMinute_isAccepted() {
+        ScheduledWorkflow once = onceAt(FIXED_NOW.plus(1, ChronoUnit.HOURS), true);
+        when(scheduledRepository.findById("sched-once-past")).thenReturn(Optional.of(once));
+        when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        ScheduledWorkflow result = schedulerService.update("sched-once-past", new UpdateScheduleRequest(null, null,
+                null, FIXED_NOW.minusSeconds(30), null, null, null, null));
+
+        assertThat(result.getNextRunAt()).isEqualTo(FIXED_NOW.minusSeconds(30));
+    }
+
+    /** Old data with its runs used up: changing only the description must not be refused. */
+    @Test
+    void update_descriptionOnly_ofAnEnabledScheduleWithoutARunLeft_isAccepted() {
+        testScheduled.setNextRunAt(firstHourlyRun());
+        testScheduled.setRunCount(5);
+        testScheduled.setMaxRuns(5);
+        testScheduled.setEndDate(FIXED_NOW.minus(1, ChronoUnit.DAYS));
+        when(scheduledRepository.findById("sched-1")).thenReturn(Optional.of(testScheduled));
+        when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        ScheduledWorkflow result = schedulerService.update("sched-1", new UpdateScheduleRequest(null, "renamed",
+                Map.of("k", "v"), null, null, null, true, "OVERLAP"));
+
+        assertThat(result.getDescription()).isEqualTo("renamed");
+    }
 }

@@ -88,6 +88,26 @@ class UpcomingRunsCalculatorTest {
         assertThat(result.schedules().get(0).workflowName()).isEqualTo("Test Workflow");
     }
 
+    /**
+     * A cron expression that no longer parses (by hand in the database, an old version) must not fail
+     * the dashboard until the tick ends that schedule (TODO 565e853b): it has no runs to show.
+     */
+    @Test
+    void getRemainingToday_invalidCron_isLeftOut_andTheOthersStillShow() {
+        ScheduledWorkflow broken = ScheduledWorkflow.builder()
+                .id("sched-broken").workflow(testWorkflow).cronExpression("not a cron")
+                .scheduleType(ScheduleType.CRON).enabled(true).build();
+        ScheduledWorkflow everyMinute = ScheduledWorkflow.builder()
+                .id("sched-ok").workflow(testWorkflow).cronExpression("0 * * * * *")
+                .scheduleType(ScheduleType.CRON).enabled(true).build();
+        when(scheduledRepository.findByEnabledTrue()).thenReturn(List.of(broken, everyMinute));
+
+        UpcomingScheduleResponse result = calculator.getRemainingThisWeek();
+
+        assertThat(result.schedules()).isNotEmpty()
+                .allSatisfy(run -> assertThat(run.scheduleId()).isEqualTo("sched-ok"));
+    }
+
     @Test
     void getRemainingToday_onceSchedule_futureToday_included() {
         Instant inOneHour = FIXED_NOW.plus(1, ChronoUnit.HOURS);

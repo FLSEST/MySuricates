@@ -23,6 +23,11 @@ public enum ErrorMessage {
     NAMED_NOT_FOUND(ErrorCode.RESOURCE_NOT_FOUND, "{resource} not found: {id}"),
     INVALID_CRON(ErrorCode.INVALID_ARGUMENT, "Invalid cron expression: {expression}"),
     CRON_REQUIRED(ErrorCode.INVALID_ARGUMENT, "cronExpression is required"),
+    // A schedule without a run left (ScheduleEndConditions, TODO 1e801952)
+    SCHEDULE_MAX_RUNS_REACHED(ErrorCode.INVALID_ARGUMENT, "The schedule has already started {runCount} time(s), its maximum is {maxRuns} — raise the maximum runs, or set them to 0 for no limit"),
+    SCHEDULE_NEXT_RUN_AFTER_END_DATE(ErrorCode.INVALID_ARGUMENT, "The schedule's next run ({nextRun}) is not before its end date ({endDate}) — it would never start"),
+    SCHEDULE_NO_NEXT_RUN(ErrorCode.INVALID_ARGUMENT, "The cron expression {expression} has no future occurrence — the schedule would never start"),
+    SCHEDULE_ONCE_IN_PAST(ErrorCode.INVALID_ARGUMENT, "The run time {scheduledAt} lies in the past — choose a time in the future"),
     UNKNOWN_SETTING(ErrorCode.INVALID_ARGUMENT, "Unknown setting: {key}"),
     UNKNOWN_EXECUTION_SETTING(ErrorCode.INVALID_ARGUMENT, "Unknown execution setting: {key}"),
     RESTRICTED_PATH(ErrorCode.INVALID_ARGUMENT, "Path points to a restricted system directory: {path}"),

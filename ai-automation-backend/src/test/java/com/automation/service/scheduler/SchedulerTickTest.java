@@ -551,29 +551,37 @@ class SchedulerTickTest {
 
     // ---- One broken schedule must not stop the others of the tick (TODO 68a3d91e) ---------------
 
-    /** A due CRON schedule whose expression no longer parses: skipping it past a pause throws. */
-    private ScheduledWorkflow brokenCron(String id, Instant nextRunAt) {
-        return ScheduledWorkflow.builder()
-                .id(id).workflow(testWorkflow).cronExpression("not a cron")
-                .scheduleType(ScheduleType.CRON).enabled(true).nextRunAt(nextRunAt).build();
+    /**
+     * Writes fail for the schedule "broken" — the database refuses it, say. Until 565e853b a cron
+     * expression that no longer parses was the example; such a schedule is now ended instead
+     * (tests below), so the isolation is shown with a failing write.
+     */
+    private void savesFailFor(String brokenId) {
+        when(scheduledRepository.save(any())).thenAnswer(inv -> {
+            ScheduledWorkflow saved = inv.getArgument(0);
+            if (brokenId.equals(saved.getId())) {
+                throw new IllegalStateException("database is locked");
+            }
+            return saved;
+        });
     }
 
     @Test
     void skipUntil_aScheduleThatCannotBeSkipped_doesNotStopTheOthers() {
         Instant dueAt = FIXED_NOW.minusSeconds(60);
         Instant skipUntil = FIXED_NOW.plus(1, ChronoUnit.HOURS);
-        ScheduledWorkflow broken = brokenCron("broken", dueAt);
+        ScheduledWorkflow broken = cronSchedule("broken", dueAt, false);
         ScheduledWorkflow healthy = cronSchedule("healthy", dueAt, false);
         when(schedulerConfig.getSkipUntil()).thenReturn(skipUntil.toString());
         // The broken one first: before the fix its exception ended the loop right there.
         when(scheduledRepository.findDueSchedules(FIXED_NOW)).thenReturn(List.of(broken, healthy));
-        when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        savesFailFor("broken");
 
         tick.checkAndExecuteScheduled();
 
         verify(scheduledExecutor, never()).executeSingleSchedule(any());
         assertThat(healthy.getNextRunAt()).isAfterOrEqualTo(skipUntil);
-        assertThat(broken.getNextRunAt()).isEqualTo(dueAt);
+        verify(scheduledRepository).save(healthy);
         verify(activityLogService).error(eq(LogCategory.SCHEDULE), startsWith("Schedule skip failed:"),
                 eq("SchedulerService"), eq("broken"));
     }
@@ -583,12 +591,12 @@ class SchedulerTickTest {
         ReflectionTestUtils.setField(tick, "startedAt", FIXED_NOW.minus(10, ChronoUnit.MINUTES));
         Instant missedAt = FIXED_NOW.minus(1, ChronoUnit.HOURS);
         Instant skipUntil = FIXED_NOW.plus(2, ChronoUnit.HOURS);
-        ScheduledWorkflow broken = brokenCron("broken", missedAt);
+        ScheduledWorkflow broken = cronSchedule("broken", missedAt, false);
         ScheduledWorkflow healthy = cronSchedule("healthy", missedAt, false);
         when(schedulerConfig.getResumeGraceMinutes()).thenReturn(5L);
         when(schedulerConfig.getSkipUntil()).thenReturn(skipUntil.toString());
         when(scheduledRepository.findDueSchedules(FIXED_NOW)).thenReturn(List.of(broken, healthy));
-        when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        savesFailFor("broken");
 
         tick.checkAndExecuteScheduled();
 
@@ -599,6 +607,63 @@ class SchedulerTickTest {
         verify(activityLogService).warn(eq(LogCategory.SCHEDULE),
                 contains("2 missed schedule(s): 1 skipped forward, 0 queued for sequential catch-up, 1 failed"),
                 eq("SchedulerService"));
+    }
+
+    // ---- A cron expression that no longer parses ends the schedule, reported once (TODO 565e853b) -----
+
+    /** A due CRON schedule whose expression no longer parses (written by hand or by a version restore). */
+    private ScheduledWorkflow brokenCron(String id, Instant nextRunAt) {
+        return ScheduledWorkflow.builder()
+                .id(id).workflow(testWorkflow).cronExpression("not a cron")
+                .scheduleType(ScheduleType.CRON).enabled(true).nextRunAt(nextRunAt).build();
+    }
+
+    /** findDueSchedules as the database answers it: enabled, with a next run not after {@code now}. */
+    private void dueFromDatabase(ScheduledWorkflow... schedules) {
+        when(scheduledRepository.findDueSchedules(any(Instant.class))).thenAnswer(inv -> {
+            Instant now = inv.getArgument(0);
+            return java.util.Arrays.stream(schedules)
+                    .filter(s -> s.isEnabled() && s.getNextRunAt() != null && !s.getNextRunAt().isAfter(now))
+                    .toList();
+        });
+        when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    }
+
+    /** Before: every tick of the pause failed to skip it and wrote an ERROR — one a minute. */
+    @Test
+    void skipUntil_invalidCron_isDisabledAndReportedOnce_notEveryMinute() {
+        ScheduledWorkflow broken = brokenCron("broken", FIXED_NOW.minusSeconds(60));
+        when(schedulerConfig.getSkipUntil()).thenReturn(FIXED_NOW.plus(1, ChronoUnit.HOURS).toString());
+        dueFromDatabase(broken);
+
+        tick.checkAndExecuteScheduled();
+        tick.checkAndExecuteScheduled();
+        tick.checkAndExecuteScheduled();
+
+        assertThat(broken.isEnabled()).isFalse();
+        assertThat(broken.getNextRunAt()).isNull();
+        verify(scheduledExecutor, never()).executeSingleSchedule(any());
+        verify(activityLogService).log(eq(LogLevel.ERROR), eq(LogCategory.SCHEDULE),
+                eq("Schedule disabled (invalid cron expression 'not a cron'): Test Workflow"),
+                eq("SchedulerService"), eq("broken"), any());
+        verifyNoMoreInteractions(activityLogService);
+    }
+
+    @Test
+    void coldStart_invalidCron_isDisabledAndCountedAsSkipped_notFailedAgainAndAgain() {
+        ReflectionTestUtils.setField(tick, "startedAt", FIXED_NOW.minus(10, ChronoUnit.MINUTES));
+        ScheduledWorkflow broken = brokenCron("broken", FIXED_NOW.minus(1, ChronoUnit.HOURS));
+        when(schedulerConfig.getResumeGraceMinutes()).thenReturn(5L);
+        dueFromDatabase(broken);
+
+        tick.checkAndExecuteScheduled();
+        tick.checkAndExecuteScheduled();
+
+        assertThat(broken.isEnabled()).isFalse();
+        verify(scheduledExecutor, never()).executeSingleSchedule(any());
+        verify(activityLogService).log(eq(LogLevel.ERROR), eq(LogCategory.SCHEDULE),
+                startsWith("Schedule disabled (invalid cron expression"), any(), eq("broken"), any());
+        verify(activityLogService, never()).error(any(), any(), any(), any());
     }
 
     @Test
