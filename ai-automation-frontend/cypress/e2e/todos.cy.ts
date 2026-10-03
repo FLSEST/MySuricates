@@ -150,7 +150,7 @@ describe('Todos', () => {
       cy.contains('Cypress Gamma Todo').click();
       cy.get('[role="dialog"]').within(() => {
         cy.get('input').first().clear().type('Cypress Updated Todo');
-        // The dialog's own Save: the planning panel above it has a separate "Save planning" button
+        // The dialog's one Save stores the TODO and, if changed, its planning (bbee09e6)
         cy.contains('button', /^Save$/).click();
       });
       cy.wait('@saveTodo').then(({ request, response }) => {

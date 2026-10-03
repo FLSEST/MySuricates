@@ -1,34 +1,29 @@
 import { useId } from 'react';
 import { Target } from 'lucide-react';
-import { Button, Input, Select } from '../ui';
+import { Input, Select } from '../ui';
 import { RatedByMark } from './GoalBadges';
-import { useSyncedState } from '../../hooks/useSyncedState';
-import { useGoal, useGoals, useUpdateTodoPlanning } from '../../hooks/useGoals';
+import { useGoals } from '../../hooks/useGoals';
 import { useI18nStore, useT } from '../../i18n';
 import type { Todo } from '../../types';
 import { rangeText } from './dragLabel';
 import { packageRange } from './timelineLayout';
-import { COMPLEXITIES, EFFORTS, forBackend, formOf, packageOptions, planningChanges, planningConflict, withGoal } from './planning';
+import { COMPLEXITIES, EFFORTS, packageOptions, withGoal } from './planning';
+import type { TodoPlanningForm } from './useTodoPlanningForm';
 
 /**
  * Einordnung eines TODOs im Bearbeiten-Dialog (TODO dc0566f8): Ziel, Arbeitspaket (nur solche des
  * TODO-Projekts, c60bf914), Komplexität, empfohlener Effort, Begründung, offene Frage und
- * Entscheidung (68a5e24e). Speichert für sich, getrennt vom übrigen Formular.
+ * Entscheidung (68a5e24e). Den Zustand hält der Dialog (`useTodoPlanningForm`); gespeichert wird mit
+ * seinem „Speichern“ (bbee09e6), einen eigenen Knopf gibt es nicht mehr.
  */
-export function TodoPlanningPanel({ todo }: { todo: Todo }) {
+export function TodoPlanningPanel({ todo, planning }: { todo: Todo; planning: TodoPlanningForm }) {
   const t = useT();
   const locale = useI18nStore((s) => s.locale);
   const { data: goals = [] } = useGoals();
-  const update = useUpdateTodoPlanning();
-  const [form, setForm] = useSyncedState(todo, formOf);
+  const { form, setForm, conflict, loaded } = planning;
   const decisionId = useId();
-  const changes = planningChanges(formOf(todo), form);
-  const dirty = Object.keys(changes).length > 0;
-  const conflict = planningConflict(changes);
   // Entscheidungen kennt erst ein Backend ab 68a5e24e – ein älteres ließe das Feld stillschweigend fallen
   const decisions = todo.planning?.decisionState !== undefined;
-  const { data: goal } = useGoal(form.goalId || undefined);
-  const loaded = goal && goal.goal.id === form.goalId ? goal : undefined;
   const packages = loaded ? packageOptions(loaded.workPackages, todo.projectId, form.workPackageId) : [];
   const packageLabel = (item: (typeof packages)[number]) => {
     const range = packageRange(item);
@@ -99,12 +94,6 @@ export function TodoPlanningPanel({ todo }: { todo: Todo }) {
           </p>
         </div>
       )}
-      <div className="flex justify-end">
-        <Button size="sm" variant="secondary" disabled={!dirty || conflict || update.isPending}
-          onClick={() => update.mutate({ id: todo.id, data: forBackend(changes, loaded?.legacyBackend) })}>
-          {t.goals.savePlanning}
-        </Button>
-      </div>
     </fieldset>
   );
 }

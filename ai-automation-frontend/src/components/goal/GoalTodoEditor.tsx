@@ -6,6 +6,8 @@ import { useProjects } from '../../hooks/useProjects';
 import { useWorkflows } from '../../hooks/useWorkflows';
 import { useIntegrations } from '../../hooks/useIntegrations';
 import { goalKeys } from '../../hooks/useGoals';
+import { closeAfter } from '../../hooks/useTodoEditor';
+import type { AfterTodoSave } from '../todo/TodoEditModal';
 import type { Todo, UpdateTodoRequest } from '../../types';
 
 function formOf(todo: Todo): UpdateTodoRequest {
@@ -38,12 +40,12 @@ export function GoalTodoEditor({ todoId, onClose }: { todoId: string; onClose: (
   const [edit, setEdit] = useState<{ id: string; form: UpdateTodoRequest; tags: string[] } | null>(null);
   if (todo && edit?.id !== todo.id) setEdit({ id: todo.id, form: formOf(todo), tags: [...todo.tags] });
 
-  const save = () => {
+  const save = (afterSave: AfterTodoSave) => {
     if (!todo || !edit) return;
     updateTodo.mutate({ id: todo.id, data: { ...edit.form, tags: edit.tags } }, {
       onSuccess: () => {
         qc.invalidateQueries({ queryKey: goalKeys.all });
-        onClose();
+        closeAfter(afterSave, onClose);
       },
     });
   };

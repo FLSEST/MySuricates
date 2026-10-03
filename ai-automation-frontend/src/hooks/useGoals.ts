@@ -340,8 +340,8 @@ export function useUpdateTodoPlanning() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: goalKeys.all });
       qc.invalidateQueries({ queryKey: ['todos'] });
-      toast.success(t.goals.planningSaved);
     },
+    // Kein eigener Erfolgs-Toast: gespeichert wird mit dem TODO-Dialog, der „TODO aktualisiert“ meldet (bbee09e6)
     onError: (err) => toast.error(apiErrorMessage(err, t.goals.saveFailed)),
   });
 }

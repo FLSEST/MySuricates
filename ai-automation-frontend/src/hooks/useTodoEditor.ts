@@ -4,6 +4,14 @@ import { filterShowsStatus } from '../components/todo/todoConstants';
 import type { useTodoFilters } from './useTodoFilters';
 import type { Todo, UpdateTodoRequest } from '../types';
 
+/**
+ * Schließt den Dialog nach dem PUT erst, wenn `afterSave` gelungen ist. Scheitert es, hat dessen
+ * Mutation den Fehler schon gemeldet; der Dialog bleibt offen, ein erneutes „Speichern“ holt es nach.
+ */
+export function closeAfter(afterSave: (() => Promise<void>) | undefined, close: () => void): void {
+  void (afterSave ? afterSave() : Promise.resolve()).then(close, () => {});
+}
+
 type TodoFilters = ReturnType<typeof useTodoFilters>;
 
 /**
@@ -75,14 +83,15 @@ export function useTodoEditor(filters: Pick<TodoFilters,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [linkedTodo]);
 
-  const save = () => {
+  /** PUT, dann `afterSave` (die Einordnung, bbee09e6); schließt erst, wenn beides gespeichert ist. */
+  const save = (afterSave?: () => Promise<void>) => {
     if (!editTodo) return;
     const data: UpdateTodoRequest = {
       ...editForm,
       tags: editTagsList,
     };
     updateTodo.mutate({ id: editTodo.id, data }, {
-      onSuccess: closeEdit,
+      onSuccess: () => closeAfter(afterSave, closeEdit),
     });
   };
 

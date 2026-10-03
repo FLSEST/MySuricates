@@ -6,6 +6,7 @@ import { server } from '../../../test/server';
 import { renderWithProviders } from '../../../test/utils';
 import { useI18nStore } from '../../../i18n';
 import { TodoPlanningPanel } from '../TodoPlanningPanel';
+import { useTodoPlanningForm } from '../useTodoPlanningForm';
 import type { GoalWorkPackage, Todo } from '../../../types';
 
 beforeAll(() => server.listen({ onUnhandledRequest: failOnUnhandledRequest }));
@@ -57,12 +58,23 @@ function serve(sent: unknown[], legacy = false) {
   );
 }
 
+/** Panel plus the dialog's save step: since bbee09e6 the dialog holds the state and saves it with its own Save. */
+function Planning({ todo }: { todo: Todo }) {
+  const planning = useTodoPlanningForm(todo);
+  return (
+    <>
+      <TodoPlanningPanel todo={todo} planning={planning} />
+      <button type="button" disabled={planning.conflict} onClick={() => void planning.save()}>Dialog save</button>
+    </>
+  );
+}
+
 // c60bf914: the planning field picks the work package, filtered to the TODO's project
 describe('TodoPlanningPanel – work package', () => {
   it('offers only packages of the TODO\'s project with their span and saves a new one as workPackageId', async () => {
     const sent: unknown[] = [];
     serve(sent);
-    renderWithProviders(<TodoPlanningPanel todo={todoWith({ workPackageId: 'w-legal' })} />);
+    renderWithProviders(<Planning todo={todoWith({ workPackageId: 'w-legal' })} />);
 
     const select = await screen.findByRole('combobox', { name: 'Work package' });
     await waitFor(() => expect(within(select).getAllByRole('option').map((option) => option.textContent?.replace(/\s/g, ' ')))
@@ -70,14 +82,14 @@ describe('TodoPlanningPanel – work package', () => {
     expect(select).toHaveValue('w-legal');
 
     fireEvent.change(select, { target: { value: 'w-docs' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save planning' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Dialog save' }));
     await waitFor(() => expect(sent).toEqual([{ workPackageId: 'w-docs' }]));
   });
 
   it('resets the package when the goal changes and lists the packages of the new goal', async () => {
     const sent: unknown[] = [];
     serve(sent);
-    renderWithProviders(<TodoPlanningPanel todo={todoWith({ workPackageId: 'w-legal' })} />);
+    renderWithProviders(<Planning todo={todoWith({ workPackageId: 'w-legal' })} />);
 
     await screen.findByRole('option', { name: 'Docs' });
     fireEvent.change(screen.getByRole('combobox', { name: 'Goal' }), { target: { value: 'g2' } });
@@ -86,20 +98,20 @@ describe('TodoPlanningPanel – work package', () => {
     await waitFor(() => expect(within(select).getAllByRole('option').map((option) => option.textContent))
       .toEqual(['No work package', 'Other goal · no time span']));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Save planning' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Dialog save' }));
     await waitFor(() => expect(sent).toEqual([{ goalId: 'g2', workPackageId: '' }]));
   });
 
   it('reads the package an older backend still calls milestoneId, and sends it under that name', async () => {
     const sent: unknown[] = [];
     serve(sent, true);
-    renderWithProviders(<TodoPlanningPanel todo={todoWith({ milestoneId: 'w-legal' })} />);
+    renderWithProviders(<Planning todo={todoWith({ milestoneId: 'w-legal' })} />);
 
     const select = await screen.findByRole('combobox', { name: 'Work package' });
     await waitFor(() => expect(within(select).getAllByRole('option')).toHaveLength(3));
     expect(select).toHaveValue('w-legal');
     fireEvent.change(select, { target: { value: 'w-docs' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save planning' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Dialog save' }));
     await waitFor(() => expect(sent).toEqual([{ milestoneId: 'w-docs' }]));
   });
 });
@@ -110,7 +122,7 @@ describe('TodoPlanningPanel – decision', () => {
     const sent: unknown[] = [];
     serve(sent);
     const { unmount } = renderWithProviders(
-      <TodoPlanningPanel todo={todoWith({ openQuestion: 'Which licence?', decisionState: 'QUESTION', decision: null })} />,
+      <Planning todo={todoWith({ openQuestion: 'Which licence?', decisionState: 'QUESTION', decision: null })} />,
     );
 
     const field = await screen.findByLabelText('Decision');
@@ -118,14 +130,15 @@ describe('TodoPlanningPanel – decision', () => {
     fireEvent.change(field, { target: { value: 'MIT' } });
     fireEvent.change(screen.getByLabelText('Open question'), { target: { value: 'And GPL?' } });
     expect(screen.getByRole('alert')).toHaveTextContent('A new question and a decision at once do not go together');
-    expect(screen.getByRole('button', { name: 'Save planning' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Dialog save' })).toBeDisabled();
 
     fireEvent.change(screen.getByLabelText('Open question'), { target: { value: 'Which licence?' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save planning' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Dialog save' }));
     await waitFor(() => expect(sent).toEqual([{ decision: 'MIT' }]));
     unmount();
+    expect(screen.queryByRole('button', { name: 'Save planning' })).not.toBeInTheDocument();
 
-    renderWithProviders(<TodoPlanningPanel todo={todoWith({ openQuestion: 'Which licence?' })} />);
+    renderWithProviders(<Planning todo={todoWith({ openQuestion: 'Which licence?' })} />);
     await screen.findByRole('combobox', { name: 'Goal' });
     expect(screen.queryByLabelText('Decision')).not.toBeInTheDocument();
   });
