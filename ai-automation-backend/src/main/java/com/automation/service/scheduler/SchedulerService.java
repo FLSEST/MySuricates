@@ -217,8 +217,10 @@ public class SchedulerService {
             }
         }
 
-        // A one-off is checked only when its time is changed — one overdue by seconds stays editable.
-        if (scheduled.getScheduleType() != ScheduleType.ONCE || request.scheduledAt() != null) {
+        // Checked only when a field that decides the next run changes: editing the description of old
+        // data stays possible, and a one-off overdue by seconds stays editable.
+        if (request.cronExpression() != null || request.scheduledAt() != null
+                || request.endDate() != null || request.maxRuns() != null) {
             ScheduleEndConditions.requireRunLeft(scheduled, Instant.now(clock));
         }
         log.info("Updated schedule: {}", id);

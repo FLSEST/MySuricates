@@ -893,7 +893,7 @@ class SchedulerServiceTest {
         when(workflowRepository.findById("wf-1")).thenReturn(Optional.of(testWorkflow));
 
         assertRefused(() -> schedulerService.create("wf-1", null, null, null, "x", null, "ONCE",
-                FIXED_NOW.minusSeconds(60), null, null, null, null, null), ErrorMessage.SCHEDULE_ONCE_IN_PAST);
+                FIXED_NOW.minusSeconds(61), null, null, null, null, null), ErrorMessage.SCHEDULE_ONCE_IN_PAST);
         verify(scheduledRepository, never()).save(any());
     }
 
@@ -913,7 +913,7 @@ class SchedulerServiceTest {
         when(scheduledRepository.findById("sched-once-past")).thenReturn(Optional.of(once));
 
         assertRefused(() -> schedulerService.update("sched-once-past", new UpdateScheduleRequest(null, null, null,
-                FIXED_NOW.minusSeconds(1), null, null, null, null)), ErrorMessage.SCHEDULE_ONCE_IN_PAST);
+                FIXED_NOW.minusSeconds(61), null, null, null, null)), ErrorMessage.SCHEDULE_ONCE_IN_PAST);
         verify(scheduledRepository, never()).save(any());
     }
 
@@ -928,5 +928,48 @@ class SchedulerServiceTest {
 
         assertThat(result.isEnabled()).isFalse();
         assertThat(result.getScheduledAt()).isEqualTo(FIXED_NOW.minus(1, ChronoUnit.DAYS));
+    }
+
+    // --- Review: tolerance for a one-off in the running minute, edits of old data (TODO 1e801952) ---
+
+    /** A time picked in the running minute is not "in the past": it starts with the next tick. */
+    @Test
+    void create_onceWithinTheRunningMinute_isAccepted() {
+        when(workflowRepository.findById("wf-1")).thenReturn(Optional.of(testWorkflow));
+        when(scheduledRepository.save(any(ScheduledWorkflow.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ScheduledWorkflow result = schedulerService.create("wf-1", null, null, null, "x", null, "ONCE",
+                FIXED_NOW.minusSeconds(60), null, null, null, null, null);
+
+        assertThat(result.isEnabled()).isTrue();
+        assertThat(result.getNextRunAt()).isEqualTo(FIXED_NOW.minusSeconds(60));
+    }
+
+    @Test
+    void update_onceMovedWithinTheRunningMinute_isAccepted() {
+        ScheduledWorkflow once = onceAt(FIXED_NOW.plus(1, ChronoUnit.HOURS), true);
+        when(scheduledRepository.findById("sched-once-past")).thenReturn(Optional.of(once));
+        when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        ScheduledWorkflow result = schedulerService.update("sched-once-past", new UpdateScheduleRequest(null, null,
+                null, FIXED_NOW.minusSeconds(30), null, null, null, null));
+
+        assertThat(result.getNextRunAt()).isEqualTo(FIXED_NOW.minusSeconds(30));
+    }
+
+    /** Old data with its runs used up: changing only the description must not be refused. */
+    @Test
+    void update_descriptionOnly_ofAnEnabledScheduleWithoutARunLeft_isAccepted() {
+        testScheduled.setNextRunAt(firstHourlyRun());
+        testScheduled.setRunCount(5);
+        testScheduled.setMaxRuns(5);
+        testScheduled.setEndDate(FIXED_NOW.minus(1, ChronoUnit.DAYS));
+        when(scheduledRepository.findById("sched-1")).thenReturn(Optional.of(testScheduled));
+        when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        ScheduledWorkflow result = schedulerService.update("sched-1", new UpdateScheduleRequest(null, "renamed",
+                Map.of("k", "v"), null, null, null, true, "OVERLAP"));
+
+        assertThat(result.getDescription()).isEqualTo("renamed");
     }
 }

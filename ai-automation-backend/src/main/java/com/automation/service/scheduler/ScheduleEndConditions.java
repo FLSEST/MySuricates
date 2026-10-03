@@ -5,6 +5,7 @@ import com.automation.entity.ScheduledWorkflow.ScheduleType;
 import com.automation.exception.ErrorMessage;
 import com.automation.exception.LocalizedArgumentException;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 
@@ -16,6 +17,9 @@ import java.util.Map;
  * {@code maxRuns} lowered under {@code runCount} by an update, started once more.
  */
 final class ScheduleEndConditions {
+
+    /** How far a one-off may lie behind now and still count as "now" — one tick (TODO 1e801952). */
+    static final Duration ONCE_TOLERANCE = Duration.ofSeconds(60);
 
     private ScheduleEndConditions() {
     }
@@ -52,8 +56,8 @@ final class ScheduleEndConditions {
     /**
      * Refuses (400) an enabled schedule that has no run left: a CRON schedule whose runs are used up
      * or whose next run lies at or after its end date; a
-     * ONCE schedule whose time lies before {@code now} — enabled, it would start at once. A disabled
-     * schedule has no next run and passes — enabling it checks again. DELAYED is not checked: its
+     * ONCE schedule whose time lies more than {@link #ONCE_TOLERANCE} before {@code now} — enabled, it
+     * would start at once. A disabled schedule has no next run and passes — enabling it checks again. DELAYED is not checked: its
      * time is computed from now.
      */
     static void requireRunLeft(ScheduledWorkflow scheduled, Instant now) {
@@ -61,7 +65,8 @@ final class ScheduleEndConditions {
             return;
         }
         if (scheduled.getScheduleType() == ScheduleType.ONCE) {
-            if (scheduled.getNextRunAt() != null && scheduled.getNextRunAt().isBefore(now)) {
+            // A time in the running minute is not the past: it starts with the next tick.
+            if (scheduled.getNextRunAt() != null && scheduled.getNextRunAt().isBefore(now.minus(ONCE_TOLERANCE))) {
                 throw new LocalizedArgumentException(ErrorMessage.SCHEDULE_ONCE_IN_PAST,
                         Map.of("scheduledAt", scheduled.getNextRunAt().toString()));
             }
