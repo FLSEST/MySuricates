@@ -1,7 +1,7 @@
 import { failOnUnhandledRequest } from '../../test/msw';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
 import { renderWithProviders } from '../../test/utils';
@@ -78,6 +78,24 @@ describe('/schedules?schedule=<id>', () => {
     expect(row?.className).toContain('bg-accent-subtle');
     expect(document.getElementById('schedule-s1')).not.toHaveAttribute('aria-current');
     expect(await screen.findByText(en.schedules.noRuns)).toBeInTheDocument();
+  });
+
+  // Review: a second link while the page is mounted (e.g. from the run panel) must move the highlight too
+  it('follows a new ?schedule= while the page stays mounted', async () => {
+    function LinkToS1() {
+      const navigate = useNavigate();
+      return <button type="button" onClick={() => navigate('/schedules?schedule=s1')}>to s1</button>;
+    }
+    renderWithProviders(<><Schedules /><LinkToS1 /></>, { route: '/schedules?schedule=s2' });
+    expect(await screen.findByText('Linked report')).toBeInTheDocument();
+    await waitFor(() => expect(document.getElementById('schedule-s2')).toHaveAttribute('aria-current', 'true'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'to s1' }));
+    await waitFor(() => expect(document.getElementById('schedule-s1')).toHaveAttribute('aria-current', 'true'));
+    expect(document.getElementById('schedule-s2')).not.toHaveAttribute('aria-current');
+    // its run history opens instead of the previous one
+    await waitFor(() => expect(document.getElementById('schedule-s1')!.nextElementSibling?.textContent)
+      .toContain(en.schedules.noRuns));
   });
 
   it('applies the filters as usual without a link', async () => {

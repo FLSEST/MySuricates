@@ -13,6 +13,7 @@ import { CatchUpQueueBanner } from '../components/schedule/CatchUpQueueBanner';
 import { SkipUntilBanner } from '../components/schedule/SkipUntilBanner';
 import { useSchedules, useToggleSchedule, useDeleteSchedule, useMaintenanceMode, useSetMaintenanceMode, useCatchUpQueue } from '../hooks/useSchedules';
 import { useScheduleFilters } from '../hooks/useScheduleFilters';
+import { useSyncedState } from '../hooks/useSyncedState';
 import { useScheduleForm } from '../hooks/useScheduleForm';
 import { useWorkflows } from '../hooks/useWorkflows';
 import { useChains } from '../hooks/useChains';
@@ -43,7 +44,10 @@ export function Schedules() {
   const [searchParams] = useSearchParams();
   const linkedId = searchParams.get(SCHEDULE_PARAM);
   const [view, setView] = useState<'list' | 'calendar'>('list');
-  const [expandedScheduleId, setExpandedScheduleId] = useState<string | null>(linkedId);
+  // A new link while the page stays mounted opens that schedule instead (useSyncedState re-derives on change)
+  const [expandedScheduleId, setExpandedScheduleId] = useSyncedState<string | null, string | null>(
+    linkedId, (id, prev) => id ?? prev ?? null,
+  );
 
   const filters = useScheduleFilters(schedules, linkedId);
   const scrolledTo = useRef<string | null>(null);
