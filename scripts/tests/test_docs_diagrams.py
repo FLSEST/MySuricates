@@ -57,6 +57,8 @@ Text links.
 
 ```text
 projekt/
+├── alt.java     ← Weg damit [ENTFERNT]
+├── zahl.java    ← 400/422
 └── datei.java   ← Kommentar [NEU]
 ```
 
@@ -97,6 +99,8 @@ TABLE = {
     "Kopf": "Head",
     "Wert": "Value",
     "b | c": "b | c",
+    "Weg damit": "Gone",
+    "Kommentar": "Comment",
     "Einzelner Unterabschnitt": "Single subsection",
     "Auch": "Also",
     "Tabelle": "Table",
@@ -226,10 +230,29 @@ class DocsDiagramsTest(unittest.TestCase):
         page = (self.en / "beispiel-diagrams.md").read_text(encoding="utf-8")
         self.assertIn('    A["Start<br/>two lines"] --> B["List<Ding>"]', page)
 
-    def test_english_page_keeps_code_blocks_unchanged(self):
+    def test_english_tree_translates_comments_and_markers_only(self):
+        """Pfade bleiben, Kommentare hinter ← kommen aus der Tabelle, Marken je Sprache (08e6fa4d)."""
         self.build()
         page = (self.en / "beispiel-diagrams.md").read_text(encoding="utf-8")
-        self.assertIn("```text\nprojekt/\n└── datei.java   ← Kommentar [NEU]\n```", page)
+        self.assertIn("```text\nprojekt/\n├── alt.java     ← Gone [REMOVED]\n"
+                      "├── zahl.java    ← 400/422\n└── datei.java   ← Comment [NEW]\n```", page)
+
+    def test_english_tree_html_shows_english_badges(self):
+        self.build()
+        html = (self.en / "beispiel-diagrams.html").read_text(encoding="utf-8")
+        self.assertIn('<span class="comment">← Comment</span>', html)
+        self.assertIn('<span class="badge badge-green">NEW</span>', html)
+        self.assertIn('<span class="badge badge-red">REMOVED</span>', html)
+        self.assertNotIn("Kommentar", html)
+        self.assertNotIn(">NEU<", html)
+
+    def test_untranslated_tree_comment_is_red(self):
+        table = dict(TABLE)
+        del table["Kommentar"]
+        self.write_table("beispiel", table)
+        code, output = self.run_tool("--check")
+        self.assertEqual(code, 1, output)
+        self.assertIn('"Kommentar"', output)
 
     def test_english_page_keeps_structure_and_mermaid_skeleton(self):
         self.build()
@@ -549,6 +572,13 @@ class SegmentTest(unittest.TestCase):
         self.assertNotIn("`a`", self.segments)                   # nur Inline-Code
         self.assertNotIn("A", self.segments)                     # Knoten-ID
         self.assertFalse(any("datei.java" in s for s in self.segments))
+
+    def test_tree_comments_are_segments_without_markers(self):
+        """Der Kommentar hinter ← ist ein Textstueck, ohne Marke; ohne Buchstaben keins (08e6fa4d)."""
+        self.assertIn("Kommentar", self.segments)
+        self.assertIn("Weg damit", self.segments)
+        self.assertNotIn("400/422", self.segments)
+        self.assertFalse(any("[NEU]" in s or "[ENTFERNT]" in s for s in self.segments))
 
     def test_no_duplicates(self):
         self.assertEqual(len(self.segments), len(set(self.segments)))

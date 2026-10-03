@@ -91,7 +91,7 @@ bash "$S" promote >/dev/null 2>&1
 check "promote builds with it" 'grep -qF -- "compose -f $STABLE_YML -f $OV/stable.override.yml build" "$DOCKER_LOG"'
 bash "$S" test-start >/dev/null 2>&1; bash "$S" test-stop >/dev/null 2>&1
 check "test-start / test-stop" 'grep -qF -- "compose -f $TEST_YML -f $OV/test.override.yml up -d" "$DOCKER_LOG" && grep -qF -- "compose -f $TEST_YML -f $OV/test.override.yml down" "$DOCKER_LOG"'
-check "no call without it"     '! grep -E "^compose " "$DOCKER_LOG" | grep -v -- "override.yml" | grep -q .'
+check "no call without it"     '! grep -E "^compose " "$DOCKER_LOG" | grep -v -- "override.yml" | grep . >/dev/null'
 printf 'STABLE_AI_FROM_HOST=everything\n' > "$ENVF"; : > "$DOCKER_LOG"
 bash "$S" start >/dev/null 2>&1; RC=$?
 check "invalid switch: start refuses before compose" '[ "$RC" = 2 ] && ! grep -q "^compose " "$DOCKER_LOG"'
@@ -111,7 +111,7 @@ check "unknown provider: refused"      'RUNNING=1 MODE=programs bash "$S" login 
 
 echo "5) compose files no longer hard-wire the host or the port"
 for f in "$R/ai-automation-backend/docker-compose.stable.yml" "$R/ai-automation-backend/docker-compose.test.yml"; do
-  check "$(basename "$f"): no provider mounts, no socket" '! grep -E "^\s+- " "$f" | grep -qE "/seed/|\.claude|\.codex|\.pi[:/]|\.local/(bin|share)[^ ]*:|docker\.sock:"'
+  check "$(basename "$f"): no provider mounts, no socket" '! grep -E "^\s+- " "$f" | grep -E "/seed/|\.claude|\.codex|\.pi[:/]|\.local/(bin|share)[^ ]*:|docker\.sock:" >/dev/null'
   check "$(basename "$f"): publishes no port itself (the override does)" '! grep -qE "^\s+ports:" "$f"'
 done
 check "staging.sh parses"               'bash -n "$R/scripts/staging.sh"'

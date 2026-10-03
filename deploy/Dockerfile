@@ -113,10 +113,14 @@ RUN apt-get update \
 COPY --from=backend /opt/java/openjdk /opt/java/jdk
 COPY --from=backend /usr/share/maven /usr/share/maven
 RUN ln -s /usr/share/maven/bin/mvn /usr/local/bin/mvn
-# Die Links auf codex/pi aus der runtime-Stufe zeigen genau auf diese Pakete. pi in derselben Version
-# wie der Installer (PiAiProvider.PINNED_VERSION, ProviderCatalogTest prueft den Gleichstand; c3a4cbf6)
+# Die Links auf codex/pi aus der runtime-Stufe zeigen genau auf diese Pakete. Alle drei CLIs in
+# derselben Version wie der Katalog des Installers (<Anbieter>AiProvider.PINNED_VERSION,
+# ProviderCatalogTest prueft den Gleichstand; pi c3a4cbf6, Claude und Codex 38f30352)
+ARG CLAUDE_VERSION=2.1.288
+ARG CODEX_VERSION=0.154.0
 ARG PI_VERSION=0.74.2
-RUN npm install -g --no-audit --no-fund @anthropic-ai/claude-code @openai/codex @earendil-works/pi-coding-agent@${PI_VERSION} \
+RUN npm install -g --no-audit --no-fund @anthropic-ai/claude-code@${CLAUDE_VERSION} @openai/codex@${CODEX_VERSION} \
+      @earendil-works/pi-coding-agent@${PI_VERSION} \
  && npm cache clean --force
 # HOME auf dem Daten-Volume: KI-Logins, API-Key und eigene Projekte ueberstehen einen Neuaufbau.
 # Preset research: Chains, Memory, Assistent … ja; Netz- und Host-Module (Fernzugriff, Staging,

@@ -281,11 +281,11 @@ Alle Dateien, die zum Workflow-Memory-Feature gehören.
 ```text
 ai-automation-backend/src/main/java/com/automation/
 ├── config/
-│   ├── SummarizationConfig.java          ← base-dir + timeout (automation.summarization)
-│   └── HostClaudeConfig.java             ← timeout of the Claude CLI
+│   ├── SummarizationConfig.java          ← base-dir + Timeout (automation.summarization)
+│   └── HostClaudeConfig.java             ← Timeout der Claude-CLI
 │
 ├── controller/
-│   └── WorkflowMemoryController.java     ← REST API, errors 400/422/502
+│   └── WorkflowMemoryController.java     ← REST-API, Fehler 400/422/502
 │
 ├── dto/
 │   ├── request/
@@ -295,36 +295,36 @@ ai-automation-backend/src/main/java/com/automation/
 │       └── WorkflowMemoryResponse.java
 │
 ├── entity/
-│   └── WorkflowMemory.java               ← JPA entity
+│   └── WorkflowMemory.java               ← JPA-Entity
 │
 ├── mapper/
-│   └── WorkflowMemoryMapper.java         ← MapStruct entity ↔ DTO
+│   └── WorkflowMemoryMapper.java         ← MapStruct Entity ↔ DTO
 │
 ├── repository/
 │   └── WorkflowMemoryRepository.java     ← Spring Data JPA
 │
 ├── service/ai/
 │   ├── HostClaudeService.java            ← reasonStructured(…, workDir, maxTurns)
-│   ├── HostCodexService.java             ← codex exec wrapper
-│   └── RunContextFiles.java              ← .claude/rules/project-memory.md, appended for Codex/Pi
+│   ├── HostCodexService.java             ← Hülle um codex exec
+│   └── RunContextFiles.java              ← .claude/rules/project-memory.md, für Codex/Pi angehängt
 │
 └── service/memory/
-    ├── KnowledgeSummarizer.java          ← interface + SummarizationResult
-    ├── ClaudeSummarizer.java             ← claude -p, --max-turns 1, work dir
-    ├── CodexSummarizer.java              ← codex exec, work dir
-    ├── ConversationPreprocessor.java     ← rule-based compression
-    ├── SummarizationSetupService.java    ← work dirs + CLAUDE.md/AGENTS.md at startup
-    ├── AutoMemoryExtractionListener.java ← automatic extraction after successful runs
-    └── WorkflowMemoryService.java        ← orchestration, getSummarizer(), writeActiveMemoryToProject()
+    ├── KnowledgeSummarizer.java          ← Interface + SummarizationResult
+    ├── ClaudeSummarizer.java             ← claude -p, --max-turns 1, Arbeitsverzeichnis
+    ├── CodexSummarizer.java              ← codex exec, Arbeitsverzeichnis
+    ├── ConversationPreprocessor.java     ← regelbasierte Verdichtung
+    ├── SummarizationSetupService.java    ← Arbeitsverzeichnisse + CLAUDE.md/AGENTS.md beim Start
+    ├── AutoMemoryExtractionListener.java ← automatische Extraktion nach erfolgreichen Runs
+    └── WorkflowMemoryService.java        ← Ablaufsteuerung, getSummarizer(), writeActiveMemoryToProject()
 
 ai-automation-backend/src/main/resources/
-├── agent-instructions.md                 ← base instructions (block execution)
+├── agent-instructions.md                 ← Basis-Anweisungen (Block-Ausführung)
 ├── application.yml                       ← automation.summarization.base-dir / timeout-seconds
 ├── db/migration/
 │   └── V16__create_workflow_memory_table.sql
 └── summarization/
-    ├── claude-summarizer.md              ← template → CLAUDE.md
-    └── codex-summarizer.md               ← template → AGENTS.md
+    ├── claude-summarizer.md              ← Vorlage → CLAUDE.md
+    └── codex-summarizer.md               ← Vorlage → AGENTS.md
 
 ai-automation-backend/src/test/java/com/automation/
 ├── service/ai/
@@ -341,17 +341,17 @@ ai-automation-backend/src/test/java/com/automation/
 
 ai-automation-frontend/src/
 ├── components/workflow/
-│   └── WorkflowMemoryPanel.tsx           ← provider CLAUDE or CODEX
+│   └── WorkflowMemoryPanel.tsx           ← Anbieter CLAUDE oder CODEX
 ├── hooks/
-│   └── useWorkflowMemory.ts              ← TanStack Query hooks
+│   └── useWorkflowMemory.ts              ← TanStack-Query-Hooks
 └── types/
     └── index.ts                          ← WorkflowMemory, ExtractMemoryRequest
 
-~/.mysuricates/summarization/             ← runtime (created at backend start)
+~/.mysuricates/summarization/             ← Laufzeit (beim Backend-Start angelegt)
 ├── claude/
-│   └── CLAUDE.md                         ← copy of claude-summarizer.md
+│   └── CLAUDE.md                         ← Kopie von claude-summarizer.md
 └── codex/
-    └── AGENTS.md                         ← copy of codex-summarizer.md
+    └── AGENTS.md                         ← Kopie von codex-summarizer.md
 
 docs/
 └── workflow-memory-architecture.md

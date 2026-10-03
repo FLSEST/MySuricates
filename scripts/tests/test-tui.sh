@@ -20,7 +20,7 @@ echo "1) box"
 OUT="$(color 'tui_box "Step 4 of 8 · Modules" "Profile  (•) Standard" "Prüfung: äöü ✓" "$(printf "\033[1mfett\033[0m")"')"
 check "all box lines have one visible width"     '[ "$(printf "%s\n" "$OUT" | widths | wc -l)" -eq 1 ]'
 check "width is the panel width (78)"            '[ "$(printf "%s\n" "$OUT" | widths)" = 78 ]'
-check "title in the top border"                  'printf "%s\n" "$OUT" | head -1 | visible | grep "Step 4 of 8" >/dev/null'
+check "title in the top border"                  'printf "%s\n" "$OUT" | sed -n 1p | visible | grep "Step 4 of 8" >/dev/null'
 LONG="$(printf "x%.0s" $(seq 1 120))"
 OUT="$(plain "tui_box T $LONG")"
 check "long lines are cut, not wrapped"          '[ "$(printf "%s\n" "$OUT" | widths)" = 78 ] && [ "$(printf "%s\n" "$OUT" | wc -l)" -eq 3 ]'
@@ -29,7 +29,7 @@ echo "2) rail"
 OUT="$(plain 'tui_rail 2 Welcome Mode Checks Modules AI Ports Build Done')"
 check "done, current, pending marked"            'printf "%s" "$OUT" | grep "✓ Welcome ─ ✓ Mode ─ ● Checks ─ ○ Modules" >/dev/null'
 OUT="$(plain 'tui_rail 5 Willkommen Modus Prüfung Module KI Ports Bauen Fertig Zusatzschritt Nochmehr')"
-check "too long: done steps collapse to ✓"       '[ "$(printf "%s\n" "$OUT" | visible | head -1 | wc -m)" -le 80 ] && printf "%s" "$OUT" | grep "● Ports" >/dev/null'
+check "too long: done steps collapse to ✓"       '[ "$(printf "%s\n" "$OUT" | visible | sed -n 1p | wc -m)" -le 80 ] && printf "%s" "$OUT" | grep "● Ports" >/dev/null'
 
 echo "3) runner"
 OUT="$(plain "tui_run \"Say hello\" \"$TMP/ok.log\" sh -c 'echo hello; echo world'"; echo "rc=$?")"
@@ -91,6 +91,6 @@ check "done lines: value column equal with ü"     '[ "$(printf "%s\n" "$OUT" | 
 echo "6) portability"
 check "no bash-4-only syntax (code, not comments)" '! grep -v "^[[:space:]]*#" "$LIB/tui.sh" | grep -nE "declare -g?A|mapfile|readarray|\\$\\{[A-Za-z_]+(,,|\\^\\^)\\}|read [^|]*-t [0-9]*\\.[0-9]" >/dev/null'
 OUT="$( ( . "$LIB/tui.sh"; LC_ALL=C TUI_FORCE_PLAIN=1 tui_init; tui_box T "a" ) 2>&1 )"
-check "without UTF-8 the frames are ASCII"       'printf "%s" "$OUT" | head -1 | grep "^+-" >/dev/null'
+check "without UTF-8 the frames are ASCII"       'printf "%s" "$OUT" | sed -n 1p | grep "^+-" >/dev/null'
 
 echo; echo "passed=$PASS failed=$FAIL"; [ "$FAIL" -eq 0 ]

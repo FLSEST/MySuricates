@@ -36,8 +36,10 @@ zweite, von Hand gepflegte englische Fassung gibt es nicht.
 
 Textstuecke (= Schluessel) sind Titel, Untertitel, Ueberschriften samt Beiwort,
 Absaetze, Listenpunkte, Tabellenzellen und die Mermaid-Beschriftungen — welche das je
-Diagrammtyp sind, steht in scripts/lib/mermaid_labels.py. Unveraendert bleiben
-Knoten-IDs, Pfeile, Codebloecke und Dateibaeume. Ein Textstueck ohne Buchstaben
+Diagrammtyp sind, steht in scripts/lib/mermaid_labels.py — dazu in Dateibaeumen und
+Codebloecken der Kommentar hinter "←" (ohne Marke, 08e6fa4d). Unveraendert bleiben
+Knoten-IDs, Pfeile und der Rest der Codebloecke; die Marken [NEU]/[ENTFERNT] heissen
+englisch [NEW]/[REMOVED] (TREE_MARKERS_EN), ohne Tabelle. Ein Textstueck ohne Buchstaben
 ausserhalb von Inline-Code (`mvn test`, "9090", "—") braucht keinen Eintrag; ein Wert
 gleich dem Schluessel ist erlaubt (Klassennamen, schon englische Beschriftungen).
 
@@ -561,7 +563,32 @@ def mermaid_body(code):
     return MERMAID_MARKUP.sub(lambda m: f"<{m.group(1)}{m.group(2)}>", esc(code))
 
 
-TREE_BADGES = (("[NEU]", "green"), ("[ENTFERNT]", "red"))
+TREE_BADGES = (("[NEU]", "green"), ("[ENTFERNT]", "red"), ("[NEW]", "green"), ("[REMOVED]", "red"))
+# Marken je Sprache (08e6fa4d): die deutsche Quelle schreibt [NEU]/[ENTFERNT], die englische Seite
+# bekommt [NEW]/[REMOVED] — feste Woerter, keine Eintraege in der Uebersetzungstabelle.
+TREE_MARKERS_EN = {"[NEU]": "[NEW]", "[ENTFERNT]": "[REMOVED]"}
+TREE_MARKER = re.compile(r"\s*\[(?:NEU|ENTFERNT|NEW|REMOVED)\]")
+TREE_COMMENT = re.compile(r"^(\s*)(.*?)(\s*)$")
+
+
+def tree_text(code, fn, markers=None):
+    """Codeblock mit uebersetzten Kommentaren hinter "←" und Marken nach markers (08e6fa4d).
+
+    fn(kommentar) bekommt den Kommentar ohne Marken und ohne Leerraum am Rand; die Marken
+    stehen danach wieder hinter dem Kommentar. Pfad und Baumstriche bleiben, wie sie sind.
+    """
+    markers = markers or {}
+    out = []
+    for line in code.split("\n"):
+        if "←" in line:
+            head, _, tail = line.partition("←")
+            found = "".join(TREE_MARKER.findall(tail))
+            lead, comment, trail = TREE_COMMENT.match(TREE_MARKER.sub("", tail)).groups()
+            line = f"{head}←{lead}{fn(comment) if comment else comment}{trail}{found}"
+        for german, other in markers.items():
+            line = line.replace(german, other)
+        out.append(line)
+    return "\n".join(out)
 TREE_DIR = re.compile(r"(?<![\w./~-])([\w.~@-]+(?:/[\w.~@-]+)*/)(?=\s|$)")
 
 
@@ -766,12 +793,13 @@ def needs_translation(text, markdown=True):
     return bool(LETTER.search(CODE_SPAN.sub("", text) if markdown else text))
 
 
-def map_text(doc, fn):
+def map_text(doc, fn, markers=None):
     """Neue Seite, in der jedes Textstueck durch fn(text, markdown) ersetzt ist.
 
     Die Reihenfolge ist die Lesereihenfolge. segments() und translate() gehen beide diesen
     Weg — so kennt die Tabelle genau die Stellen, die die Seite hat, nicht mehr und nicht
-    weniger. Codebloecke gehen unveraendert durch, Diagramme nur mit neuen Beschriftungen.
+    weniger. Diagramme bekommen nur neue Beschriftungen, Codebloecke nur neue Kommentare
+    hinter "←" und die Marken nach markers (tree_text).
     """
     def blocks(items):
         out = []
@@ -784,6 +812,8 @@ def map_text(doc, fn):
                 payload = ([[fn(cell, True) for cell in cells] for cells in payload[0]], payload[1])
             elif kind == "mermaid":
                 payload = mermaid_labels.translate(payload, lambda label: fn(label, False))
+            elif kind == "code":
+                payload = (payload[0], tree_text(payload[1], lambda c: fn(c, False), markers))
             out.append((kind, payload))
         return out
 
@@ -851,7 +881,7 @@ def translate(doc, table):
             invalid.append((text, reason))
         return value
 
-    english = map_text(doc, lookup)
+    english = map_text(doc, lookup, TREE_MARKERS_EN)
     orphans = [key for key in table if key not in used]
     return english, missing, invalid, orphans
 
@@ -859,9 +889,12 @@ def translate(doc, table):
 def shape(doc):
     """Aufbau einer Seite ohne ihre Texte — fuer Deutsch und Englisch identisch.
 
-    Codebloecke gehen woertlich ein, Diagramme als Geruest ohne Beschriftungen, Listen und
-    Tabellen mit ihrer Groesse, Absaetze nur als Art.
+    Codebloecke gehen woertlich ein bis auf die Kommentare hinter "←" und die Sprache der
+    Marken, Diagramme als Geruest ohne Beschriftungen, Listen und Tabellen mit ihrer Groesse,
+    Absaetze nur als Art.
     """
+    neutral = {other: german for german, other in TREE_MARKERS_EN.items()}
+
     def blocks(items):
         out = []
         for kind, payload in items:
@@ -872,7 +905,7 @@ def shape(doc):
             elif kind == "mermaid":
                 out.append((kind, mermaid_labels.skeleton(payload)))
             elif kind == "code":
-                out.append((kind, payload))
+                out.append((kind, payload[0], tree_text(payload[1], lambda c: "…", neutral)))
             else:
                 out.append((kind,))
         return out

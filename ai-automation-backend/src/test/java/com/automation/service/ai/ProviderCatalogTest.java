@@ -86,9 +86,9 @@ class ProviderCatalogTest {
     }
 
     /**
-     * pi kommt in einer festen Version, im Installer wie im Tryout-Image (c3a4cbf6): eine neue Version
-     * kann {@code --thinking} oder {@code <backend>/<model>} brechen, ohne dass es auffaellt. Beide Wege
-     * nennen dieselbe Version — das Tryout-Image traegt sie als {@code ARG PI_VERSION}.
+     * Die KI-CLIs kommen in einer festen Version, im Installer wie im Tryout-Image (pi c3a4cbf6, Claude
+     * und Codex 38f30352): eine neue Version kann Flags oder Ausgabeformat brechen, ohne dass es
+     * auffaellt. Beide Wege nennen dieselbe Version — das Tryout-Image traegt sie als {@code ARG}.
      */
     @Test
     void piIsPinnedAlikeInInstallerAndTryoutImage() throws Exception {
@@ -96,14 +96,39 @@ class ProviderCatalogTest {
         ProviderSetup pi = new PiAiProvider(mock(HostPiService.class)).setup();
         assertThat(pi.install()).as("Installer (--with-pi)")
                 .isEqualTo("npm install -g @earendil-works/pi-coding-agent@" + PiAiProvider.PINNED_VERSION);
+        assertPinnedInTryoutImage("PI_VERSION", PiAiProvider.PINNED_VERSION, "@earendil-works/pi-coding-agent");
+    }
 
+    @Test
+    void claudeIsPinnedAlikeInInstallerAndTryoutImage() throws Exception {
+        assertThat(ClaudeAiProvider.PINNED_VERSION).as("Claude-Version").matches("\\d+\\.\\d+\\.\\d+");
+        ProviderSetup claude = new ClaudeAiProvider(mock(HostClaudeService.class)).setup();
+        // Beide Wege des Katalogs in derselben Version: der native Installer nimmt sie als Argument
+        assertThat(claude.install()).as("Installer-Katalog (claude)")
+                .isEqualTo("curl -fsSL https://claude.ai/install.sh | bash -s " + ClaudeAiProvider.PINNED_VERSION
+                        + "   (or: npm install -g @anthropic-ai/claude-code@" + ClaudeAiProvider.PINNED_VERSION + ")");
+        assertPinnedInTryoutImage("CLAUDE_VERSION", ClaudeAiProvider.PINNED_VERSION, "@anthropic-ai/claude-code");
+    }
+
+    @Test
+    void codexIsPinnedAlikeInInstallerAndTryoutImage() throws Exception {
+        assertThat(CodexAiProvider.PINNED_VERSION).as("Codex-Version").matches("\\d+\\.\\d+\\.\\d+");
+        ProviderSetup codex = new CodexAiProvider(mock(HostCodexService.class),
+                mock(com.automation.config.SummarizationConfig.class)).setup();
+        assertThat(codex.install()).as("Installer-Katalog (codex)")
+                .isEqualTo("npm install -g @openai/codex@" + CodexAiProvider.PINNED_VERSION);
+        assertPinnedInTryoutImage("CODEX_VERSION", CodexAiProvider.PINNED_VERSION, "@openai/codex");
+    }
+
+    /** {@code ARG <arg>=<version>} in der Tryout-Stufe, das Paket nur mit {@code @${<arg>}}, nie ohne Version. */
+    private static void assertPinnedInTryoutImage(String arg, String version, String pkg) throws IOException {
         List<String> dockerfile = Files.readAllLines(DOCKERFILE);
-        assertThat(dockerfile).as(DOCKERFILE + ": ARG PI_VERSION wie PiAiProvider.PINNED_VERSION")
-                .contains("ARG PI_VERSION=" + PiAiProvider.PINNED_VERSION);
-        assertThat(dockerfile).as(DOCKERFILE + ": die Tryout-Stufe installiert pi in dieser Version")
-                .anySatisfy(line -> assertThat(line).startsWith("RUN npm install -g")
-                        .contains(" @earendil-works/pi-coding-agent@${PI_VERSION}"))
-                .noneSatisfy(line -> assertThat(line).containsPattern("@earendil-works/pi-coding-agent(\\s|$)"));
+        assertThat(dockerfile).as(DOCKERFILE + ": ARG " + arg + " wie PINNED_VERSION")
+                .contains("ARG " + arg + "=" + version);
+        String installed = String.join("\n", dockerfile);
+        assertThat(installed).as(DOCKERFILE + ": die Tryout-Stufe installiert " + pkg + " in dieser Version")
+                .contains(" " + pkg + "@${" + arg + "}")
+                .doesNotContainPattern(java.util.regex.Pattern.quote(pkg) + "(\\s|$)");
     }
 
     /**

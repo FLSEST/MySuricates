@@ -411,7 +411,7 @@ check "Text der KI je Klasse, beim doppelten der erste" \
 check "Aufzaehlungszeichen und \" | \" gelesen, --> entschaerft" \
   '[ "$(finding_field controller/NoPublicUntested.java description)" = "Enum-Werte und -> Pfeil im Text abdecken." ]'
 check "ohne Text der KI: Standardtext" \
-  'finding_field service/deep/Untested01.java description | grep -q "^Eigenen Test fuer Untested01 anlegen"'
+  'finding_field service/deep/Untested01.java description | grep "^Eigenen Test fuer Untested01 anlegen" >/dev/null'
 check "erfundene Klasse nicht im Envelope"         '! grep -q "Erfunden" "$TMP/envelope.json"'
 check "evidence und Titel aus der Messung" \
   '[ "$(finding_field service/deep/Untested20.java evidence)" = "200 LOC" ] && [ "$(finding_field ThinTwo.java evidence)" = "1/10 @Test/public (10%)" ] && [ "$(finding_field ThinTwo.java title)" = "Duenner Test: ThinTwo" ]'
@@ -452,7 +452,7 @@ check "abweichender Pfad, eindeutiger Dateiname: Text der KI" \
 check "abweichender Pfad im naechsten Schritt: HIGH ueber den Dateinamen" \
   '[ "$(finding_field service/deep/Solo.java severity)" = HIGH ]'
 check "mehrdeutiger Dateiname: Standardtext fuer beide" \
-  'finding_field a/Twin.java description | grep -q "^Eigenen Test fuer Twin" && finding_field b/Twin.java description | grep -q "^Eigenen Test fuer Twin"'
+  'finding_field a/Twin.java description | grep "^Eigenen Test fuer Twin" >/dev/null && finding_field b/Twin.java description | grep "^Eigenen Test fuer Twin" >/dev/null'
 
 # Gleichnamige Klassen in zwei Paketen ergaeben dasselbe thin-test-subject zweimal: der Messblock listet
 # je Name nur die duennste Zeile, ERWARTETE FINDINGS zaehlt sie einmal.

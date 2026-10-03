@@ -114,7 +114,7 @@ check "Verzeichnissumme deep=12"   "grep -qx '12${TAB}1${TAB}deep' '$TMP/fix1.tx
 # ## files (b8c06b94): NCLOC ohne die zehn Importzeilen (auch mehrzeilig und Seiteneffekt), Zeilen, Aenderungen
 # (kein git in der Fixture: 0) — Eingabe der Einstufung arch-findings.py.
 check "## files: deep/c.tsx mit 2 NCLOC von 12 Zeilen" \
-  "sed -n '/^## files\$/,/^## summary\$/p' '$TMP/fix1.txt' | grep -qx '2${TAB}12${TAB}0${TAB}deep/c.tsx'"
+  "sed -n '/^## files\$/,/^## summary\$/p' '$TMP/fix1.txt' | grep -x '2${TAB}12${TAB}0${TAB}deep/c.tsx' >/dev/null"
 check "## files: eine Zeile je Produktionsmodul" \
   "[ \"\$(sed -n '/^## files\$/,/^## summary\$/p' '$TMP/fix1.txt' | grep -cE '^[0-9]+${TAB}[0-9]+${TAB}[0-9]+${TAB}')\" -eq 9 ]"
 
@@ -207,7 +207,7 @@ measured "$TMP/fix1.txt" > "$TMP/fix1.measured"; measured "$TMP/fix2.txt" > "$TM
 check "zweiter Lauf exit 0"            '[ "$RC" -eq 0 ]'
 check "gemessener Teil byte-identisch" 'diff -q "$TMP/fix1.measured" "$TMP/fix2.measured" >/dev/null'
 if ! diff -q "$TMP/fix1.measured" "$TMP/fix2.measured" >/dev/null 2>&1; then
-  diff -u "$TMP/fix1.measured" "$TMP/fix2.measured" | head -20
+  diff -u "$TMP/fix1.measured" "$TMP/fix2.measured" | sed -n 1,20p
 fi
 
 echo "6) Fehlerpfade melden NICHT GEMESSEN statt Sauberkeit"

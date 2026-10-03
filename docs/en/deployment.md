@@ -180,8 +180,8 @@ without Docker: `bash scripts/tests/test-host-mounts.sh`, `bash scripts/tests/te
 
 `deploy/Dockerfile` has two targets. `runtime` is the image of an installed instance (above; tools
 and AI logins come from the machine). `tryout` builds on it and brings everything itself, so
-MySuricates can be tried without installing it: AI CLIs (pi in the same fixed version as the
-installer, [entwicklung.md → pi version](entwicklung.md#pi-version-installer-and-tryout)), `python3-pip`/`-venv`, JDK and Maven from
+MySuricates can be tried without installing it: AI CLIs (in the same fixed versions as the
+installer, [entwicklung.md → AI CLI versions](entwicklung.md#ai-cli-versions-installer-and-tryout)), `python3-pip`/`-venv`, JDK and Maven from
 the build stage (`JAVA_HOME=/opt/java/jdk`), preset `research`. `HOME` lives on the data volume
 (`/app/data/home`), so logins and the API key survive a rebuild. Deliberately left out: gcc/make,
 Go, Rust, Gradle — if you need more, build `FROM mysuricates:tryout`.
@@ -837,6 +837,7 @@ The test instance is a dedicated Docker container for automated workflow tests:
 - `TestingService` — manages the test Docker container
 - No auto-start on boot (`automation.staging.test-auto-start=false`) — start via the "MySuricates Test" icon or `staging.sh test-start`
 - No auto-sync of definitions on boot (only on `reset`)
+- No AI tagging in the background (`AUTOMATION_DISCOVERY_AUTO_TAGGING_ENABLED=false` in `docker-compose.test.yml`) — created workflows, e.g. from Cypress with `CYPRESS_TARGET=test`, cost no tokens
 - Database can be reset via API (`POST /api/v1/testing/reset`)
 
 **Key Files:**

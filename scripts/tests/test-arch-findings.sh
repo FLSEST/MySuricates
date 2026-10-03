@@ -169,7 +169,7 @@ done
 check "jede Befundzeile hat vier Spalten" \
   "section '$TMP/out.txt' findings | awk -F'\t' 'NF != 4 { bad++ } END { exit bad > 0 }'"
 check "kein subject enthaelt einen Doppelpunkt" \
-  "! section '$TMP/out.txt' findings | cut -f2 | grep -q ':'"
+  "! section '$TMP/out.txt' findings | cut -f2 | grep ':' >/dev/null"
 check "not_measured leer bei vollstaendigen Blaettern" '[ -z "$(summary "$TMP/out.txt" not_measured)" ]'
 python3 "$FINDINGS" > /dev/null 2>&1; RC_USAGE=$?
 check "falscher Aufruf endet mit 2" '[ "$RC_USAGE" -eq 2 ]'
@@ -199,7 +199,7 @@ check "500 NCLOC, 4 Aenderungen: Beobachtung, kein Befund" \
 check "500 NCLOC, 5 Aenderungen: Befund MEDIUM" \
   '[ "$(finding "$TMP/out.txt" "$P/HotBig.java")" = "arch.god-class${TAB}MEDIUM" ]'
 check "stabile Datei: evidence sagt stabil" \
-  'section "$TMP/out.txt" observations | grep -q "StableBig.java${TAB}.*4 Aenderungen in 90 Tagen (stabil, Hotspot ab 5)"'
+  'section "$TMP/out.txt" observations | grep "StableBig.java${TAB}.*4 Aenderungen in 90 Tagen (stabil, Hotspot ab 5)" >/dev/null'
 
 echo "4) Ratchet-Dateien: nie wegen reiner Groesse, nur als Hotspot"
 check "Ratchet-Datei, stabil: nur Beobachtung" \
@@ -207,7 +207,7 @@ check "Ratchet-Datei, stabil: nur Beobachtung" \
 check "Ratchet-Datei, Hotspot: Befund, ohne Herabstufung" \
   '[ "$(finding "$TMP/out.txt" "$P/RatchetHot.java")" = "arch.god-class${TAB}MEDIUM" ]'
 check "evidence nennt die Ratchet-Obergrenze ohne Einheit" \
-  'evidence "$TMP/out.txt" "$P/RatchetHot.java" | grep -q "Ratchet-Obergrenze 450$"'
+  'evidence "$TMP/out.txt" "$P/RatchetHot.java" | grep "Ratchet-Obergrenze 450$" >/dev/null'
 
 echo "5) Kollaborateure 9/10"
 check "9 deps, Hotspot, klein: kein Befund, keine Beobachtung" \
@@ -225,9 +225,9 @@ check "kleine, stabile Datei taucht nirgends auf" \
 
 echo "6) Paketkopplung erzeugt keinen Befund"
 check "kein Befund fuer ein Paket (52 ausgehend)" \
-  '! section "$TMP/out.txt" findings | cut -f2 | grep -qE "^com\.automation\.(controller|service\.workflow)$"'
+  '! section "$TMP/out.txt" findings | cut -f2 | grep -E "^com\.automation\.(controller|service\.workflow)$" >/dev/null'
 check "kein Befund fuer ein Frontend-Verzeichnis (30 ausgehend)" \
-  '! section "$TMP/out.txt" findings | cut -f2 | grep -qx "frontend/src/pages"'
+  '! section "$TMP/out.txt" findings | cut -f2 | grep -x "frontend/src/pages" >/dev/null'
 check "arch.high-coupling nur fuer Dateien" \
   'section "$TMP/out.txt" findings | awk -F"\t" "\$1 == \"arch.high-coupling\" && \$2 !~ /\\.java\$/ { bad++ } END { exit bad > 0 }"'
 
@@ -236,7 +236,7 @@ check "bekannte Komponente (Teil von CYCLE_COMPONENTS): MEDIUM" \
   '[ "$(finding "$TMP/out.txt" cycles/component/com.automation.k1)" = "arch.package-cycle${TAB}MEDIUM" ]'
 check "neue Komponente: HIGH, evidence nennt die neuen Pakete" \
   '[ "$(finding "$TMP/out.txt" cycles/component/com.automation.n1)" = "arch.package-cycle${TAB}HIGH" ] \
-     && evidence "$TMP/out.txt" cycles/component/com.automation.n1 | grep -q "com.automation.n1,com.automation.n2,com.automation.n3"'
+     && evidence "$TMP/out.txt" cycles/component/com.automation.n1 | grep "com.automation.n1,com.automation.n2,com.automation.n3" >/dev/null'
 check "Komponente mit neuem Paar: CRITICAL" \
   '[ "$(finding "$TMP/out.txt" cycles/component/com.automation.p1)" = "arch.package-cycle${TAB}CRITICAL" ]'
 check "Paar in gemeldeter Komponente: kein eigener Befund" \
@@ -282,7 +282,7 @@ python3 "$FINDINGS" "$TMP/backend-nojdeps.txt" "$TMP/frontend.txt" > "$TMP/nojde
 check "jdeps gescheitert: Zyklen und Schichten nicht gemessen" \
   '[ "$(summary "$TMP/nojdeps.txt" not_measured)" = "backend_cycles,backend_layers" ]'
 check "jdeps gescheitert: keine Zyklen- oder Schichtbefunde" \
-  '! section "$TMP/nojdeps.txt" findings | grep -qE "^arch\.(package-cycle|cross-layer-violation)${TAB}(cycles/component/com|cycles/pair|layer)"'
+  '! section "$TMP/nojdeps.txt" findings | grep -E "^arch\.(package-cycle|cross-layer-violation)${TAB}(cycles/component/com|cycles/pair|layer)" >/dev/null'
 check "jdeps gescheitert: Groessenbefunde bleiben (Quelltext gemessen)" \
   '[ "$(finding "$TMP/nojdeps.txt" "$P/HotBig.java")" = "arch.god-class${TAB}MEDIUM" ]'
 with_error() {  # $1 = Blatt, $2 = Fehlermarke, $3 = Ziel — haengt error=<marke> an ## summary
@@ -293,7 +293,7 @@ for MARK in collaborators_failed ncloc_failed shallow_history no_git_repo; do
   python3 "$FINDINGS" "$TMP/backend-$MARK.txt" "$TMP/frontend.txt" > "$TMP/be-$MARK.txt"
   check "Backend error=$MARK: Groessen nicht gemessen, keine Datei-Befunde" \
     '[ "$(summary "$TMP/be-$MARK.txt" not_measured)" = "backend_sizes" ] \
-       && ! section "$TMP/be-$MARK.txt" findings | cut -f2 | grep -q "\.java$"'
+       && ! section "$TMP/be-$MARK.txt" findings | cut -f2 | grep "\.java$" >/dev/null'
   check "Backend error=$MARK: Zyklen und Frontend bleiben gemessen" \
     '[ -n "$(finding "$TMP/be-$MARK.txt" cycles/component/com.automation.k1)" ] \
        && [ -n "$(finding "$TMP/be-$MARK.txt" frontend/src/pages/Big.tsx)" ]'
@@ -327,7 +327,7 @@ check "Zaehler in ## findings_summary passen zu ## findings" \
   '[ "$(summary "$TMP/out.txt" findings)" -eq "$(section "$TMP/out.txt" findings | wc -l | tr -d " ")" ] \
      && [ "$(summary "$TMP/out.txt" critical)" -eq "$(section "$TMP/out.txt" findings | cut -f3 | grep -cx CRITICAL)" ]'
 check "Befunde nach Schwere sortiert (CRITICAL zuerst)" \
-  '[ "$(section "$TMP/out.txt" findings | head -1 | cut -f3)" = CRITICAL ]'
+  '[ "$(section "$TMP/out.txt" findings | sed -n 1p | cut -f3)" = CRITICAL ]'
 check "jeder vergebene ruleKey steht im Prompt und im Katalog" 'python3 - "$TMP/out.txt" "$POOL" "$CATALOG" "$FINDINGS" <<'"'"'PY'"'"'
 import json, re, sys
 out, pool, catalog, script = sys.argv[1:5]
@@ -340,7 +340,7 @@ assert emitted and emitted <= declared, (emitted, declared)
 assert declared == allowed == keys, (declared, allowed, keys)
 PY'
 check "evidence traegt die Einheiten der Verschlechterungspruefung (Zeilen, deps)" \
-  'evidence "$TMP/out.txt" "$P/Band601Deps11.java" | grep -qE "\(700 Zeilen\), 11 deps"'
+  'evidence "$TMP/out.txt" "$P/Band601Deps11.java" | grep -E "\(700 Zeilen\), 11 deps" >/dev/null'
 
 echo "11) NCLOC-Zaehlung (ncloc.py)"
 mkdir -p "$TMP/nc"
@@ -433,11 +433,11 @@ check "flacher Klon ist wirklich flach" '[ "$(git -C "$TMP/shallow" rev-parse --
 check "arch-metrics.sh: error=shallow_history" 'grep -qE "^error=.*shallow_history" "$TMP/shallow-backend.txt"'
 check "frontend-metrics.sh: error=shallow_history" 'grep -qE "^error=.*shallow_history" "$TMP/shallow-frontend.txt"'
 check "Einstufung: Groessen beider Seiten nicht gemessen" \
-  'summary "$TMP/shallow-findings.txt" not_measured | tr "," "\n" | grep -qx backend_sizes \
-     && summary "$TMP/shallow-findings.txt" not_measured | tr "," "\n" | grep -qx frontend_sizes'
+  'summary "$TMP/shallow-findings.txt" not_measured | tr "," "\n" | grep -x backend_sizes >/dev/null \
+     && summary "$TMP/shallow-findings.txt" not_measured | tr "," "\n" | grep -x frontend_sizes >/dev/null'
 check "Gegenprobe voller Klon: keine shallow_history, Groessen gemessen" \
   '! grep -q shallow_history "$TMP/full-backend.txt" "$TMP/full-frontend.txt" \
-     && ! summary "$TMP/full-findings.txt" not_measured | grep -qE "(backend|frontend)_sizes"'
+     && ! summary "$TMP/full-findings.txt" not_measured | grep -E "(backend|frontend)_sizes" >/dev/null'
 check "Gegenprobe voller Klon: Aenderungen gezaehlt (3 je Datei)" \
   'grep -qE "^[0-9]+${TAB}[0-9]+${TAB}3${TAB}-${TAB}com/automation/x/X.java$" "$TMP/full-backend.txt"'
 

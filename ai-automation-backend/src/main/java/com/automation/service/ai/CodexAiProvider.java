@@ -22,6 +22,15 @@ import java.util.List;
 @Slf4j
 public class CodexAiProvider implements AiProvider {
 
+    /**
+     * Die Codex-CLI-Version, die der Katalog des Installers nennt und das Tryout-Image installiert
+     * (38f30352, wie {@link PiAiProvider#PINNED_VERSION}): eine neue Version kann die Aufrufe von
+     * {@link HostCodexService} ({@code exec}, {@code -m}, Sandbox-Flags) brechen. Update-Weg:
+     * docs/entwicklung.md → „Versionen der KI-CLIs“; {@code ProviderCatalogTest} haelt
+     * {@code ARG CODEX_VERSION} in deploy/Dockerfile gleich.
+     */
+    public static final String PINNED_VERSION = "0.154.0";
+
     private final HostCodexService hostCodexService;
     private final SummarizationConfig summarizationConfig;
 
@@ -37,7 +46,7 @@ public class CodexAiProvider implements AiProvider {
 
     @Override
     public ProviderSetup setup() {
-        return new ProviderSetup("codex", "npm install -g @openai/codex", "codex login",
+        return new ProviderSetup("codex", "npm install -g @openai/codex@" + PINNED_VERSION, "codex login",
                 java.util.List.of(".codex/auth.json"),
                 java.util.List.of("OPENAI_API_KEY", "CODEX_API_KEY"),
                 ".codex", "CODEX_HOME");

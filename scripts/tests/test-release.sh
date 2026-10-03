@@ -49,11 +49,11 @@ git -C "$TMP" tag v0.1.0
 export MYSURICATES_LOAD_TEST_DIR="$TMP/load-test"
 unset RELEASE_SKIP_LOAD_TEST
 
-pom_version() { sed -n '/<\/parent>/,$ { s/.*<version>\(.*\)<\/version>.*/\1/p; }' "$TMP/ai-automation-backend/pom.xml" | head -1; }
+pom_version() { sed -n '/<\/parent>/,$ { s/.*<version>\(.*\)<\/version>.*/\1/p; }' "$TMP/ai-automation-backend/pom.xml" | sed -n 1p; }
 # npm version schreibt die Datei einzeilig zurueck — deshalb nicht zeilenweise schneiden
-json_version() { sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1; }
+json_version() { sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | sed -n 1p; }
 pkg_version() { json_version < "$TMP/ai-automation-frontend/package.json"; }
-at_tag() { git -C "$TMP" show "$1:ai-automation-backend/pom.xml" | sed -n '/<\/parent>/,$ { s/.*<version>\(.*\)<\/version>.*/\1/p; }' | head -1; }
+at_tag() { git -C "$TMP" show "$1:ai-automation-backend/pom.xml" | sed -n '/<\/parent>/,$ { s/.*<version>\(.*\)<\/version>.*/\1/p; }' | sed -n 1p; }
 
 echo "1) Patch-Release nach v0.1.0"
 OUT="$( (cd "$TMP" && bash scripts/release.sh patch --skip-load-test) </dev/null 2>&1 )"; RC=$?

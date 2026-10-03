@@ -56,7 +56,7 @@ pi present logged-out" ]'
 check "ANTHROPIC_API_KEY: claude and pi"        '[ "$(run "export ANTHROPIC_API_KEY=x; providers_status" | grep -c " logged-in$")" = 2 ]'
 check "OPENAI_API_KEY logs codex in"            'run "export OPENAI_API_KEY=x; providers_status" | grep -x "codex present logged-in" >/dev/null'
 check "an empty variable is not a login"        'run "export CLAUDE_CODE_OAUTH_TOKEN=; providers_status" | grep -x "claude present logged-out" >/dev/null'
-check "the value is never printed"              '! run "export CLAUDE_CODE_OAUTH_TOKEN=sk-secret-123; providers_status; provider_logged_in claude" 2>&1 | grep -q sk-secret'
+check "the value is never printed"              '! run "export CLAUDE_CODE_OAUTH_TOKEN=sk-secret-123; providers_status; provider_logged_in claude" 2>&1 | grep sk-secret >/dev/null'
 
 echo "4b) file login vs. variable login — only files reach a container (90b4422c)"
 check "names of the set variables, not values"  '[ "$(run "export ANTHROPIC_API_KEY=sk-secret-1 GEMINI_API_KEY=g-secret-2; provider_login_env_names pi")" = "ANTHROPIC_API_KEY GEMINI_API_KEY" ]'

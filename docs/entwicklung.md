@@ -616,22 +616,28 @@ aus dem geprüften Stand, nicht aus dem gerade ausgecheckten Branch. Die Skript-
 Docker: `bash scripts/tests/test-installer-probe.sh` und
 `python3 -m unittest discover -s scripts/tests -p 'test_installer_probe_report.py'`.
 
-### pi-Version (Installer und Tryout)
+### Versionen der KI-CLIs (Installer und Tryout)
 
-pi kommt in einer festen Version (c3a4cbf6): Eine neue pi-Version kann die Aufrufe von
-`PiAiProvider`/`HostPiService` (`--thinking`, `<backend>/<model>`) brechen, ohne dass es auffällt.
-Die Version steht an einer Stelle, `PiAiProvider.PINNED_VERSION`; daraus entstehen der
-Installationsbefehl im Katalog des Installers (`--with-pi`, Statuskarte) und — per Test abgeglichen —
-`ARG PI_VERSION` der Tryout-Stufe in `deploy/Dockerfile`. Auf eine neue Version heben:
+Claude, Codex und pi kommen in einer festen Version (pi c3a4cbf6, Claude und Codex 38f30352): Eine
+neue CLI-Version kann Flags oder das Ausgabeformat ändern, auf die `HostClaudeService`,
+`HostCodexService` und `HostPiService` bauen (`--output-format`, `exec`/`-m`, `--thinking`,
+`<backend>/<model>`), ohne dass es auffällt. Die Version steht je Anbieter an einer Stelle,
+`ClaudeAiProvider`/`CodexAiProvider`/`PiAiProvider.PINNED_VERSION`; daraus entstehen der
+Installationsbefehl im Katalog des Installers (Statuskarte, `--with-pi`; Claude auch beim nativen
+Installer `bash -s <version>`) und — per Test abgeglichen — `ARG CLAUDE_VERSION`, `ARG CODEX_VERSION`
+und `ARG PI_VERSION` der Tryout-Stufe in `deploy/Dockerfile`. Die native Claude-CLI aktualisiert
+sich auf dem Rechner selbst (Auto-Update): Der Pin legt dort nur den Erstzustand einer frischen
+Installation fest. Im Tryout-Image bleibt er, weil dort `DISABLE_AUTOUPDATER=1` gilt. Auf eine neue Version heben:
 
-1. Die neue Version auf dem eigenen Rechner installieren (`npm install -g @earendil-works/pi-coding-agent@<version>`)
-   und einen Workflow mit pi laufen lassen — mit Modell `<backend>/<model>` und gesetztem `effort`.
-2. `PINNED_VERSION` in `PiAiProvider` und `ARG PI_VERSION` in `deploy/Dockerfile` setzen.
+1. Die neue Version auf dem eigenen Rechner installieren (`npm install -g @anthropic-ai/claude-code@<version>`,
+   `@openai/codex@<version>` bzw. `@earendil-works/pi-coding-agent@<version>`) und einen Workflow mit
+   diesem Anbieter laufen lassen — bei pi mit Modell `<backend>/<model>` und gesetztem `effort`.
+2. `PINNED_VERSION` im Anbieter und das passende `ARG …_VERSION` in `deploy/Dockerfile` setzen.
 3. Den Katalog neu erzeugen:
    `cd ai-automation-backend && ./mvnw test -Dtest=ProviderCatalogTest -Dprovider.catalog.write=true`
    (derselbe Test prüft danach den Gleichstand mit dem Dockerfile).
-4. `./scripts/installer-probe.sh --setup-flags "--with-pi"` und, vor dem nächsten Tryout-Image,
-   `scripts/tryout.sh build --ref HEAD`.
+4. `./scripts/installer-probe.sh` (für pi mit `--setup-flags "--with-pi"`) und, vor dem nächsten
+   Tryout-Image, `scripts/tryout.sh build --ref HEAD`.
 
 ## Versionierung & Releases
 
@@ -1154,6 +1160,8 @@ der Oberfläche): Schlüssel ist das deutsche Textstück, Wert das englische. Te
 Untertitel, Überschriften samt Beiwort, Absätze, Listenpunkte, Tabellenzellen und die
 Mermaid-Beschriftungen — Knotentexte, Kantenlabels, `subgraph`-Titel, Notizen, Sequenz-Nachrichten,
 `alt`/`loop`-Beschriftungen; die Regeln je Diagrammtyp stehen in `scripts/lib/mermaid_labels.py`.
+In Codeblöcken und Dateibäumen ist der Kommentar hinter `←` ein Textstück (ohne Marke); die Marken
+`[NEU]`/`[ENTFERNT]` heißen auf der englischen Seite `[NEW]`/`[REMOVED]`, ohne Tabelleneintrag (08e6fa4d).
 Knoten-IDs werden nie übersetzt, auch wo Mermaid sie anzeigt (`PENDING --> RUNNING`,
 `subgraph Compose`): Was in beiden Sprachen verschieden heißen soll, braucht eine Beschriftung
 (`ID["Text"]`). Ein Textstück ohne Buchstaben außerhalb von Inline-Code braucht keinen Eintrag, ein

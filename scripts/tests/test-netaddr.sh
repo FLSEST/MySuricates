@@ -48,7 +48,7 @@ echo "4) lines of the final message"
 OUT_LOCAL="$(run linux en "netaddr_lines 127.0.0.1 9090")"
 check "local: only localhost, no VPN hint"        '[ "$OUT_LOCAL" = "→  http://localhost:9090" ]'
 OUT="$(run linux en "netaddr_lines 0.0.0.0 9090")"
-check "0.0.0.0: localhost first"                  '[ "$(printf "%s\n" "$OUT" | head -n 1)" = "→  http://localhost:9090" ]'
+check "0.0.0.0: localhost first"                  '[ "$(printf "%s\n" "$OUT" | sed -n 1p)" = "→  http://localhost:9090" ]'
 check "0.0.0.0: network address named"            'printf "%s" "$OUT" | grep -F "http://192.168.1.20:9090   (from the network)" >/dev/null'
 check "0.0.0.0: VPN hint"                         'printf "%s" "$OUT" | grep "VPN" >/dev/null'
 OUT="$(run none de "netaddr_lines 0.0.0.0 9090")"

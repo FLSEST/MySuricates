@@ -182,8 +182,8 @@ Schaltern. Tests ohne Docker: `bash scripts/tests/test-host-mounts.sh`,
 
 `deploy/Dockerfile` hat zwei Ziele. `runtime` ist das Image einer eingerichteten Instanz (oben; die
 Werkzeuge und KI-Anmeldungen kommen vom Rechner). `tryout` baut darauf auf und bringt alles selbst
-mit, damit man MySuricates ohne Installation ausprobieren kann: KI-CLIs (pi in derselben festen Version
-wie der Installer, [entwicklung.md → pi-Version](entwicklung.md#pi-version-installer-und-tryout)), `python3-pip`/`-venv`, JDK
+mit, damit man MySuricates ohne Installation ausprobieren kann: KI-CLIs (in denselben festen Versionen
+wie der Installer, [entwicklung.md → Versionen der KI-CLIs](entwicklung.md#versionen-der-ki-clis-installer-und-tryout)), `python3-pip`/`-venv`, JDK
 und Maven aus der Build-Stufe (`JAVA_HOME=/opt/java/jdk`), Preset `research`. `HOME` liegt auf dem
 Daten-Volume (`/app/data/home`), Anmeldungen und API-Key überstehen also einen Neuaufbau. Bewusst
 nicht enthalten: gcc/make, Go, Rust, Gradle — wer mehr braucht, baut `FROM mysuricates:tryout`.
@@ -847,6 +847,7 @@ Die Test-Instanz ist ein dedizierter Docker-Container für automatisierte Workfl
 - `TestingService` — verwaltet den Test-Docker-Container
 - Kein Auto-Start beim Boot (`automation.staging.test-auto-start=false`) — Start via Icon „MySuricates Test" bzw. `staging.sh test-start`
 - Kein Auto-Sync von Definitionen beim Boot (nur bei `reset`)
+- Kein KI-Tagging im Hintergrund (`AUTOMATION_DISCOVERY_AUTO_TAGGING_ENABLED=false` in `docker-compose.test.yml`) — angelegte Workflows, etwa aus Cypress mit `CYPRESS_TARGET=test`, kosten keine Tokens
 - Datenbank kann via API zurückgesetzt werden (`POST /api/v1/testing/reset`)
 
 **Key-Dateien:**

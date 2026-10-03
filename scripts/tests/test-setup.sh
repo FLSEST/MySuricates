@@ -77,14 +77,14 @@ check "instance file for host"                          '[ "$(val main MYSURICAT
 check "default provider is the one installed (codex)"   '[ "$(val main AUTOMATION_AI_DEFAULT_PROVIDER)" = CODEX ]'
 check "dry run names the start command"                 'out | grep "instance.sh up --name main" >/dev/null'
 check "host: no container switches for the AI"          '[ -z "$(val main MYSURICATES_AI_FROM_HOST)" ]'
-check "host: says it does not start after a reboot"     'out | grep -qF "After a reboot of this machine main does not start by itself — then: scripts/instance.sh up --name main"'
+check "host: says it does not start after a reboot"     'out | grep -F "After a reboot of this machine main does not start by itself — then: scripts/instance.sh up --name main" >/dev/null'
 
 echo "4) one instance in a container (default)"
 rm -rf "$INST"
 check "--yes --dry-run → container"                     '[ "$(run --yes --dry-run)" = 0 ] && [ "$(val main MYSURICATES_RUNTIME)" = container ]'
 check "projects: folder above the clone"                '[ "$(val main MYSURICATES_PROJECTS)" = "$(cd "$HERE/../../.." && pwd)" ]'
 check "docker socket off by default"                    '[ "$(val main MYSURICATES_DOCKER_SOCKET)" = 0 ]'
-check "container: no reboot warning (restarts with Docker)" '! out | grep -q "does not start by itself"'
+check "container: no reboot warning (restarts with Docker)" '! out | grep "does not start by itself" >/dev/null'
 rm -rf "$INST"
 check "--docker-socket mounts it on request"            '[ "$(run --yes --dry-run --docker-socket)" = 0 ] && [ "$(val main MYSURICATES_DOCKER_SOCKET)" = 1 ]'
 
@@ -114,26 +114,28 @@ export NPM_LOG="$TMP/npm.log"; : > "$NPM_LOG"
 OLD_SHELL="${SHELL:-}"; export SHELL=/bin/bash   # Profil: ~/.profile (ohne ~/.bash_profile)
 # Der Befehl aus dem Katalog, in einer festen Version (c3a4cbf6) — die Version steht nur dort
 PI_NPM="$(. "$HERE/../lib/provider-catalog.generated.sh"; printf '%s' "${PROVIDER__pi__install#npm }")"
-check "pi comes in a pinned version"                    'printf "%s" "$PI_NPM" | grep -qE "^install -g @earendil-works/pi-coding-agent@[0-9]+\.[0-9]+\.[0-9]+$"'
+check "pi comes in a pinned version"                    'printf "%s" "$PI_NPM" | grep -E "^install -g @earendil-works/pi-coding-agent@[0-9]+\.[0-9]+\.[0-9]+$" >/dev/null'
 rm -rf "$INST"
-check "default: no pi, also with --yes"                 '[ "$(run --yes --dry-run --runtime host)" = 0 ] && ! out | grep -q "pi-coding-agent" && [ ! -s "$NPM_LOG" ]'
+check "default: no pi, also with --yes"                 '[ "$(run --yes --dry-run --runtime host)" = 0 ] && ! out | grep "pi-coding-agent" >/dev/null && [ ! -s "$NPM_LOG" ]'
 rm -rf "$INST"
-check "--with-pi: npm -g with sudo where root owns it"  '[ "$(run --yes --dry-run --runtime host --with-pi)" = 0 ] && out | grep -qF "would run: sudo npm $PI_NPM"'
+check "--with-pi: npm -g with sudo where root owns it"  '[ "$(run --yes --dry-run --runtime host --with-pi)" = 0 ] && out | grep -F "would run: sudo npm $PI_NPM" >/dev/null'
 mkdir -p "$TMP/npmprefix"; rm -rf "$INST"
-check "--with-pi: without sudo where npm may write"     '[ "$(NPM_PREFIX="$TMP/npmprefix" run --yes --dry-run --runtime host --with-pi)" = 0 ] && out | grep -qF "would run: npm $PI_NPM" && ! out | grep -qF "sudo npm"'
+check "--with-pi: without sudo where npm may write"     '[ "$(NPM_PREFIX="$TMP/npmprefix" run --yes --dry-run --runtime host --with-pi)" = 0 ] && out | grep -F "would run: npm $PI_NPM" >/dev/null && ! out | grep -F "sudo npm" >/dev/null'
 rm -rf "$INST"
-check "--with-pi installs pi, nothing started"          '[ "$(NPM_PREFIX="$TMP/npmprefix" NPM_CREATES="$TMP/bin/pi" run --install --runtime host --with-pi)" = 0 ] && grep -qxF "$PI_NPM" "$NPM_LOG" && out | grep -qE "Install pi \(npm\)" && [ -x "$TMP/bin/pi" ] && [ -f "$INST/main.env" ]'
+check "--with-pi installs pi, nothing started"          '[ "$(NPM_PREFIX="$TMP/npmprefix" NPM_CREATES="$TMP/bin/pi" run --install --runtime host --with-pi)" = 0 ] && grep -qxF "$PI_NPM" "$NPM_LOG" && out | grep -E "Install pi \(npm\)" >/dev/null && [ -x "$TMP/bin/pi" ] && [ -f "$INST/main.env" ]'
 unstub pi; unstub npm; rm -rf "$INST"
-check "--with-pi without npm: says so, carries on"     '[ "$(run --yes --dry-run --runtime container --with-pi)" = 0 ] && out | grep -q -- "--with-pi needs npm"'
+check "--with-pi without npm: says so, carries on"     '[ "$(run --yes --dry-run --runtime container --with-pi)" = 0 ] && out | grep -- "--with-pi needs npm" >/dev/null'
 stub npm "$NPM_STUB"
 check "--help names --with-pi"                          'bash "$SETUP" --help | grep -- "--with-pi" >/dev/null && bash "$SETUP" --help --lang de | grep -- "--with-pi" >/dev/null'
 # Heruntergeladenes Node: env.sh bringt es auf den PATH, die Shell des Nutzers kennt es nicht
 DD="$TMP/data/mysuricates"; mkdir -p "$DD/node/bin"
 printf 'export PATH="%s/node/bin:$PATH"\n' "$DD" > "$DD/env.sh"
 rm -rf "$INST"
-check "--yes: profile untouched, the line is shown"    '[ "$(run --yes --dry-run --runtime host)" = 0 ] && out | grep -qF "only with this line in ~/.profile: . $DD/env.sh" && [ ! -e "$TMP/home/.profile" ]'
+check "--yes: profile untouched, the line is shown"    '[ "$(run --yes --dry-run --runtime host)" = 0 ] && out | grep -F "only with this line in ~/.profile: . $DD/env.sh" >/dev/null && [ ! -e "$TMP/home/.profile" ]'
 printf '#!/bin/sh\n%s\n' "$NPM_STUB" > "$DD/node/bin/npm"; chmod +x "$DD/node/bin/npm"; unstub codex; rm -rf "$INST"
-check "no CLI yet: full npm commands with env.sh first" '[ "$(run --yes --dry-run --runtime host)" = 0 ] && out | grep -qF "install: . $DD/env.sh && npm install -g @openai/codex   log in: . $DD/env.sh && codex login"'
+CODEX_NPM="$(. "$HERE/../lib/provider-catalog.generated.sh"; printf '%s' "$PROVIDER__codex__install")"   # gepinnt (38f30352)
+check "codex comes in a pinned version"                 'printf "%s" "$CODEX_NPM" | grep -E "^npm install -g @openai/codex@[0-9]+\.[0-9]+\.[0-9]+$" >/dev/null'
+check "no CLI yet: full npm commands with env.sh first" '[ "$(run --yes --dry-run --runtime host)" = 0 ] && out | grep -F "install: . $DD/env.sh && $CODEX_NPM   log in: . $DD/env.sh && codex login" >/dev/null'
 check "the commands are not cut off by the box"         '! out | grep -E "install: .*…" >/dev/null'
 stub codex 'exit 0'
 pty_profile() {  # TASTEN → Mitschnitt in $TMP/menu; ohne --dry-run, gebaut wird nicht (n)
@@ -159,24 +161,24 @@ runvars() {  # "VAR=WERT …" FLAGS… — nur diese Anmelde-Variablen, keine de
 rm -rf "$INST"
 AIE="$TMP/home/.config/mysuricates/ai.env"
 mode() { stat -c %a "$1" 2>/dev/null || stat -f %Lp "$1"; }
-check "codex only via OPENAI_API_KEY: says how it gets in" '[ "$(runvars OPENAI_API_KEY=sk-test-geheim-42 --yes --dry-run)" = 0 ] && out | grep -qF "codex is logged in here only via OPENAI_API_KEY — the variable does not reach the container by itself. With --store-ai-env (or yes in the terminal) the installer copies it into $AIE; otherwise log in on this machine: codex login"'
-check "the value is never shown"                          '! out | grep -q "sk-test-geheim-42"'
+check "codex only via OPENAI_API_KEY: says how it gets in" '[ "$(runvars OPENAI_API_KEY=sk-test-geheim-42 --yes --dry-run)" = 0 ] && out | grep -F "codex is logged in here only via OPENAI_API_KEY — the variable does not reach the container by itself. With --store-ai-env (or yes in the terminal) the installer copies it into $AIE; otherwise log in on this machine: codex login" >/dev/null'
+check "the value is never shown"                          '! out | grep "sk-test-geheim-42" >/dev/null'
 check "--yes alone never writes a secret"                 '[ ! -e "$AIE" ]'
 rm -rf "$INST"
-check "--store-ai-env: copied, value not shown"           '[ "$(runvars OPENAI_API_KEY=sk-test-geheim-42 --yes --dry-run --store-ai-env)" = 0 ] && out | grep -qF "OPENAI_API_KEY saved in $AIE" && ! out | grep -q "sk-test-geheim-42"'
+check "--store-ai-env: copied, value not shown"           '[ "$(runvars OPENAI_API_KEY=sk-test-geheim-42 --yes --dry-run --store-ai-env)" = 0 ] && out | grep -F "OPENAI_API_KEY saved in $AIE" >/dev/null && ! out | grep "sk-test-geheim-42" >/dev/null'
 check "exactly that variable, file 600, directory 700"   '[ "$(cat "$AIE")" = "OPENAI_API_KEY=sk-test-geheim-42" ] && [ "$(mode "$AIE")" = 600 ] && [ "$(mode "$(dirname "$AIE")")" = 700 ]'
 rm -rf "$INST"
-check "already in ai.env: not asked, not rewritten"       '[ "$(runvars OPENAI_API_KEY=sk-test-other-43 --yes --dry-run --store-ai-env)" = 0 ] && ! out | grep -q "only via" && ! out | grep -q "saved in" && grep -qx "OPENAI_API_KEY=sk-test-geheim-42" "$AIE"'
+check "already in ai.env: not asked, not rewritten"       '[ "$(runvars OPENAI_API_KEY=sk-test-other-43 --yes --dry-run --store-ai-env)" = 0 ] && ! out | grep "only via" >/dev/null && ! out | grep "saved in" >/dev/null && grep -qx "OPENAI_API_KEY=sk-test-geheim-42" "$AIE"'
 printf '%s\n' 'CLAUDE_CODE_OAUTH_TOKEN=secret-test-token-0123456789-abcdefghijklmnop' 'OPENAI_API_KEY=' 'KEEP_ME=1' > "$AIE"; rm -rf "$INST"
 check "others kept, the empty line replaced"              '[ "$(runvars OPENAI_API_KEY=sk-test-geheim-42 --yes --dry-run --store-ai-env --ai-providers codex)" = 0 ] && [ "$(grep -c "^OPENAI_API_KEY=" "$AIE")" = 1 ] && grep -qx "OPENAI_API_KEY=sk-test-geheim-42" "$AIE" && grep -qx "KEEP_ME=1" "$AIE" && grep -qx "CLAUDE_CODE_OAUTH_TOKEN=secret-test-token-0123456789-abcdefghijklmnop" "$AIE" && [ "$(mode "$AIE")" = 600 ]'
 rm -rf "$TMP/home/.config" "$INST"; stub pi 'exit 0'
 check "shared by codex and pi: stored once"               '[ "$(runvars "OPENAI_API_KEY=sk-test-geheim-42" --yes --dry-run --store-ai-env --ai-providers codex,pi)" = 0 ] && [ "$(grep -c "^OPENAI_API_KEY=" "$AIE")" = 1 ] && [ "$(out | grep -c "saved in")" = 1 ]'
 rm -rf "$TMP/home/.config" "$INST"
-check "ANTHROPIC_API_KEY for pi: says claude uses it too" '[ "$(runvars "ANTHROPIC_API_KEY=sk-test-geheim-44" --yes --dry-run --store-ai-env --ai-providers claude,pi)" = 0 ] && grep -qx "ANTHROPIC_API_KEY=sk-test-geheim-44" "$AIE" && out | grep -qF "claude reads ANTHROPIC_API_KEY as well" && ! out | grep -q "sk-test-geheim-44"'
+check "ANTHROPIC_API_KEY for pi: says claude uses it too" '[ "$(runvars "ANTHROPIC_API_KEY=sk-test-geheim-44" --yes --dry-run --store-ai-env --ai-providers claude,pi)" = 0 ] && grep -qx "ANTHROPIC_API_KEY=sk-test-geheim-44" "$AIE" && out | grep -F "claude reads ANTHROPIC_API_KEY as well" >/dev/null && ! out | grep "sk-test-geheim-44" >/dev/null'
 rm -rf "$TMP/home/.config" "$INST"
-check "… not when claude is not selected"                 '[ "$(runvars "ANTHROPIC_API_KEY=sk-test-geheim-44" --yes --dry-run --store-ai-env --ai-providers pi)" = 0 ] && ! out | grep -q "claude reads"'
+check "… not when claude is not selected"                 '[ "$(runvars "ANTHROPIC_API_KEY=sk-test-geheim-44" --yes --dry-run --store-ai-env --ai-providers pi)" = 0 ] && ! out | grep "claude reads" >/dev/null'
 unstub pi; rm -rf "$TMP/home/.config" "$INST"
-check "all: no copy, the old hint"                        '[ "$(runvars OPENAI_API_KEY=sk-test-geheim-42 --yes --dry-run --store-ai-env --ai-from-host all)" = 0 ] && [ ! -e "$AIE" ] && out | grep -qF "the variable does not reach the container. For the container, log in on this machine: codex login"'
+check "all: no copy, the old hint"                        '[ "$(runvars OPENAI_API_KEY=sk-test-geheim-42 --yes --dry-run --store-ai-env --ai-from-host all)" = 0 ] && [ ! -e "$AIE" ] && out | grep -F "the variable does not reach the container. For the container, log in on this machine: codex login" >/dev/null'
 # Im Terminal: gefragt, Vorgabe nein — nur ein ausdrueckliches Ja schreibt
 pty_store() {  # TASTEN → Mitschnitt in $TMP/menu (ANSI entfernt); nur OPENAI_API_KEY als Anmelde-Variable
   local unset_vars="" v
@@ -197,11 +199,11 @@ fi
 rm -rf "$INST"
 check "--help names --store-ai-env"                       'bash "$SETUP" --help | grep -- "--store-ai-env" >/dev/null && bash "$SETUP" --help --lang de | grep -- "--store-ai-env" >/dev/null'
 mkdir -p "$TMP/home/.codex"; echo '{"tokens":1}' > "$TMP/home/.codex/auth.json"; rm -rf "$INST"
-check "with ~/.codex/auth.json: no such hint"             '[ "$(runvars OPENAI_API_KEY=sk-test-geheim-42 --yes --dry-run)" = 0 ] && ! out | grep -q "only via"'
+check "with ~/.codex/auth.json: no such hint"             '[ "$(runvars OPENAI_API_KEY=sk-test-geheim-42 --yes --dry-run)" = 0 ] && ! out | grep "only via" >/dev/null'
 rm -rf "$TMP/home/.codex" "$INST"
-check "programs: every instance logs in itself, no hint"  '[ "$(runvars OPENAI_API_KEY=x --yes --dry-run --ai-from-host programs --store-ai-env)" = 0 ] && ! out | grep -q "only via" && [ ! -e "$AIE" ]'
+check "programs: every instance logs in itself, no hint"  '[ "$(runvars OPENAI_API_KEY=x --yes --dry-run --ai-from-host programs --store-ai-env)" = 0 ] && ! out | grep "only via" >/dev/null && [ ! -e "$AIE" ]'
 rm -rf "$INST"
-check "on this machine the variable just works: no hint"  '[ "$(runvars OPENAI_API_KEY=x --yes --dry-run --runtime host --store-ai-env)" = 0 ] && ! out | grep -q "only via" && [ ! -e "$AIE" ]'
+check "on this machine the variable just works: no hint"  '[ "$(runvars OPENAI_API_KEY=x --yes --dry-run --runtime host --store-ai-env)" = 0 ] && ! out | grep "only via" >/dev/null && [ ! -e "$AIE" ]'
 rm -rf "$INST"
 
 echo "5) staged — Dev · Test · Prod"
@@ -254,26 +256,47 @@ if command -v python3 >/dev/null 2>&1 && python3 -c "import socket; socket.socke
   check "taken only on 127.0.0.1: free for --bind $BADDR" '(exec 3<>"/dev/tcp/127.0.0.1/$Q") 2>/dev/null && [ "$(run --yes --dry-run --runtime host --bind $BADDR)" = 0 ] && [ "$(val main MYSURICATES_PORT)" = "$Q" ]'
   [ -z "$L1" ] || bgone "$L1"
   L2="$(blisten "$BADDR" "$Q")"; rm -rf "$INST"
-  check "taken on the bound address: the next free one there" '[ "$(run --yes --dry-run --runtime host --bind $BADDR)" = 0 ] && N="$(freeon "$BADDR" $((Q + 1)))" && [ "$(val main MYSURICATES_PORT)" = "$N" ] && out | grep -qF "is in use — taking $N"'
+  check "taken on the bound address: the next free one there" '[ "$(run --yes --dry-run --runtime host --bind $BADDR)" = 0 ] && N="$(freeon "$BADDR" $((Q + 1)))" && [ "$(val main MYSURICATES_PORT)" = "$N" ] && out | grep -F "is in use — taking $N" >/dev/null'
   bgone "$L2"; rm -rf "$INST"; mkdir -p "$INST"
 else
   echo "  skip (no python3, or $BADDR is not a loopback address here — macOS)"
 fi
 
 echo "7) an existing setup is kept unless asked"
-printf 'MYSURICATES_RUNTIME=host\nMYSURICATES_PORT=9777\nMYSURICATES_PRESET=full\n' > "$INST/main.env"
-check "kept without --reconfigure"                      '[ "$(run --yes --dry-run --runtime host)" = 0 ] && [ "$(val main MYSURICATES_PORT)" = 9777 ]'
-check "--preset core --force changes only the preset"   '[ "$(run --yes --dry-run --runtime host --preset core --force)" = 0 ] && [ "$(val main MYSURICATES_PRESET)" = core ] && [ "$(val main MYSURICATES_PORT)" = 9777 ]'
-check "--reconfigure rewrites it"                       '[ "$(run --yes --dry-run --runtime host --reconfigure)" = 0 ] && [ "$(val main MYSURICATES_PORT)" = "$(firstfree 9090)" ]'
-
-echo "7b) a kept file: the steps show its values, not ones that never reach it (fd4eb89f)"
-# Frueher meldete der Ports-Schritt „nehme 9091“ (die eigene laufende Instanz belegt 9090) und der
-# KI-Schritt einen neuen Standard-Anbieter — beides landete nie in der behaltenen Datei.
 step() {  # LABEL — was hinter „✓ LABEL“ steht; tui_done fuellt LABEL auf 10 Zeichen auf
   local pre
   pre="$1$(printf "%$(( ${#1} < 10 ? 11 - ${#1} : 1 ))s" "")"
   out | sed -n "s/^ *[^ ]* $pre\\(.*\\)\$/\\1/p" | tail -n 1
 }
+printf 'MYSURICATES_RUNTIME=host\nMYSURICATES_PORT=9777\nMYSURICATES_PRESET=full\n' > "$INST/main.env"
+check "kept without --reconfigure"                      '[ "$(run --yes --dry-run --runtime host)" = 0 ] && [ "$(val main MYSURICATES_PORT)" = 9777 ]'
+check "--preset core --force changes only the preset"   '[ "$(run --yes --dry-run --runtime host --preset core --force)" = 0 ] && [ "$(val main MYSURICATES_PRESET)" = core ] && [ "$(val main MYSURICATES_PORT)" = 9777 ]'
+check "--reconfigure rewrites it"                       '[ "$(run --yes --dry-run --runtime host --reconfigure)" = 0 ] && grep -q "^# MySuricates-Instanz" "$INST/main.env"'
+# --reconfigure ohne Terminal geht von den Werten der Datei aus und aendert nur gegebene Flags (ca902719).
+# Frueher galten frische Vorgaben: ohne --port 9090, ohne --runtime container, Preset core, erster Anbieter.
+R7P="$(firstfree 9777)"
+check "--reconfigure: the port of the file stays"       '[ "$(val main MYSURICATES_PORT)" = "$R7P" ] && [ "$(step Ports)" = "$R7P" ]'
+printf 'MYSURICATES_RUNTIME=host\nMYSURICATES_PORT=9777\nMYSURICATES_PRESET=full\nMYSURICATES_ENVIRONMENT=Prod\nMYSURICATES_HARDENING_SEALING=true\nAUTOMATION_AI_DEFAULT_PROVIDER=PI\nAUTOMATION_HARDENING_REQUIRESIGNEDSEAL=true\nAUTOMATION_MODULES_CHAINS=false\nAUTOMATION_CUSTOM_BY_HAND=x' > "$INST/main.env"
+check "--reconfigure --yes: runtime, preset, provider stay" '[ "$(run --yes --dry-run --reconfigure)" = 0 ] && [ "$(val main MYSURICATES_RUNTIME)" = host ] && [ "$(val main MYSURICATES_PRESET)" = full ] && [ "$(val main AUTOMATION_AI_DEFAULT_PROVIDER)" = PI ] && [ "$(val main MYSURICATES_PORT)" = "$R7P" ]'
+check "... environment, seal switch and AUTOMATION_* lines stay" '[ "$(val main MYSURICATES_ENVIRONMENT)" = Prod ] && [ "$(val main MYSURICATES_HARDENING_SEALING)" = true ] && [ "$(val main AUTOMATION_HARDENING_REQUIRESIGNEDSEAL)" = true ] && [ "$(val main AUTOMATION_MODULES_CHAINS)" = false ] && [ "$(val main AUTOMATION_CUSTOM_BY_HAND)" = x ] && [ "$(grep -c "^AUTOMATION_AI_DEFAULT_PROVIDER=" "$INST/main.env")" = 1 ]'
+check "--reconfigure --preset research: only the preset" '[ "$(run --yes --dry-run --reconfigure --preset research)" = 0 ] && [ "$(val main MYSURICATES_PRESET)" = research ] && [ "$(val main MYSURICATES_RUNTIME)" = host ] && [ "$(val main AUTOMATION_AI_DEFAULT_PROVIDER)" = PI ] && [ "$(val main MYSURICATES_PORT)" = "$R7P" ]'
+R7N="$(firstfree 19790)"
+check "--reconfigure --port N --provider codex: only those" '[ "$(run --yes --dry-run --reconfigure --port "$R7N" --provider codex)" = 0 ] && [ "$(val main MYSURICATES_PORT)" = "$R7N" ] && [ "$(val main AUTOMATION_AI_DEFAULT_PROVIDER)" = CODEX ] && [ "$(val main MYSURICATES_PRESET)" = research ] && [ "$(val main MYSURICATES_RUNTIME)" = host ]'
+check "--reconfigure --runtime container: the runtime changes" '[ "$(run --yes --dry-run --reconfigure --runtime container)" = 0 ] && [ "$(val main MYSURICATES_RUNTIME)" = container ] && [ "$(val main MYSURICATES_PORT)" = "$R7N" ] && [ "$(val main AUTOMATION_AI_DEFAULT_PROVIDER)" = CODEX ]'
+printf 'MYSURICATES_RUNTIME=container\nMYSURICATES_PORT=%s\nMYSURICATES_BIND=0.0.0.0\nMYSURICATES_PRESET=core\nMYSURICATES_PROJECTS=/srv/projekte\nMYSURICATES_DOCKER_SOCKET=1\nMYSURICATES_AI_FROM_HOST=programs\nMYSURICATES_AI_PROVIDERS=codex\nAUTOMATION_AI_DEFAULT_PROVIDER=CODEX\n' "$R7N" > "$INST/main.env"
+check "--reconfigure, container: bind, projects, socket, AI access stay" '[ "$(run --yes --dry-run --reconfigure)" = 0 ] && [ "$(val main MYSURICATES_BIND)" = 0.0.0.0 ] && [ "$(val main MYSURICATES_PROJECTS)" = /srv/projekte ] && [ "$(val main MYSURICATES_DOCKER_SOCKET)" = 1 ] && [ "$(val main MYSURICATES_AI_FROM_HOST)" = programs ] && [ "$(val main MYSURICATES_AI_PROVIDERS)" = codex ]'
+check "--reconfigure --mode staged: not from main.env"  '[ "$(run --yes --dry-run --reconfigure --mode staged)" = 0 ] && [ "$(val dev MYSURICATES_PRESET)" = full ] && [ "$(val prod MYSURICATES_HARDENING_SEALING)" = true ]'
+rm -f "$INST/dev.env" "$INST/test.env" "$INST/prod.env"
+# Gleicher Schluessel ersetzt statt angehaengt; ein Preset verwirft alte Modul-Ueberschreibungen (ca902719)
+printf 'MYSURICATES_RUNTIME=host\nMYSURICATES_PORT=%s\nMYSURICATES_PRESET=core\nAUTOMATION_AI_DEFAULT_PROVIDER=CODEX\nAUTOMATION_MODULES_CHAINS=true\nAUTOMATION_MODULES_GOALS=false\nAUTOMATION_MODULES_UIEDITABLE=true\nAUTOMATION_HARDENING_SEALING=true\n' "$R7N" > "$INST/main.env"
+count() { grep -c "^$2=" "$INST/$1.env"; }
+check "--reconfigure --modules twice: one line per key"   '[ "$(run --yes --dry-run --reconfigure --modules chains,memory)" = 0 ] && [ "$(run --yes --dry-run --reconfigure --modules memory)" = 0 ] && [ "$(count main AUTOMATION_MODULES_CHAINS)" = 1 ] && [ "$(count main AUTOMATION_MODULES_MEMORY)" = 1 ] && [ "$(count main AUTOMATION_HARDENING_SEALING)" = 1 ] && [ "$(val main AUTOMATION_MODULES_GOALS)" = false ]'
+check "--reconfigure --preset: old module overrides go, hardening and ui-editable stay" '[ "$(run --yes --dry-run --reconfigure --preset research)" = 0 ] && [ "$(val main MYSURICATES_PRESET)" = research ] && [ "$(count main AUTOMATION_MODULES_CHAINS)" = 0 ] && [ "$(count main AUTOMATION_MODULES_GOALS)" = 0 ] && [ "$(count main AUTOMATION_MODULES_MEMORY)" = 0 ] && [ "$(val main AUTOMATION_HARDENING_SEALING)" = true ] && [ "$(val main AUTOMATION_MODULES_UIEDITABLE)" = true ]'
+check "--reconfigure --preset --modules: only the new override" '[ "$(run --yes --dry-run --reconfigure --preset core --modules bpmn)" = 0 ] && [ "$(val main AUTOMATION_MODULES_BPMN)" = true ] && [ "$(grep -c "^AUTOMATION_MODULES_" "$INST/main.env")" = 2 ]'
+
+echo "7b) a kept file: the steps show its values, not ones that never reach it (fd4eb89f)"
+# Frueher meldete der Ports-Schritt „nehme 9091“ (die eigene laufende Instanz belegt 9090) und der
+# KI-Schritt einen neuen Standard-Anbieter — beides landete nie in der behaltenen Datei.
 rm -rf "$INST"; mkdir -p "$INST"
 printf 'MYSURICATES_RUNTIME=host\nMYSURICATES_PORT=9777\nMYSURICATES_PRESET=full\nAUTOMATION_AI_DEFAULT_PROVIDER=PI\n' > "$INST/main.env"
 cp "$INST/main.env" "$TMP/kept.env"
@@ -281,12 +304,12 @@ check "kept: exit 0, the file stays as it was"          '[ "$(run --yes --dry-ru
 check "ports: the port of the file, marked"             '[ "$(step Ports)" = "9777 · from deploy/instances/main.env" ]'
 check "AI: the provider of the file, marked"            '[ "$(step AI)" = "pi · from deploy/instances/main.env" ]'
 check "mode and modules: from the file, marked"         '[ "$(step Mode)" = "One instance — on this machine · from deploy/instances/main.env" ] && [ "$(step Modules)" = "full · from deploy/instances/main.env" ]'
-check "the login hint names the provider of the file"   'out | grep -qF "Log in to pi before the first AI workflow"'
+check "the login hint names the provider of the file"   'out | grep -F "Log in to pi before the first AI workflow" >/dev/null'
 # Nach dem Befehl der Hinweis in der Sprache des Installers: der Katalog nennt nur den Schluessel (eab43a8b)
-check "... pi's note after the command, English"        'out | grep -qF "pi, then /login in pi — or an API key as environment variable (see pi --help)"'
-check "... and German with --lang de"                   '[ "$(run --yes --dry-run --lang de)" = 0 ] && out | grep -qF "Vor dem ersten KI-Workflow bei pi anmelden:" && out | grep -qF "pi, dann /login in pi — oder ein API-Schlüssel als Umgebungsvariable (siehe pi --help)" && ! out | grep -q "then /login"'
-check "flags that do not apply are named"              '[ "$(run --yes --dry-run --port 9555 --provider codex --runtime container)" = 0 ] && out | grep -qF "not used: --runtime container, --port 9555, --provider codex" && cmp -s "$INST/main.env" "$TMP/kept.env" && [ "$(step Ports)" = "9777 · from deploy/instances/main.env" ]'
-check "--preset --force: the preset goes into the file" '[ "$(run --yes --dry-run --preset research --force)" = 0 ] && [ "$(val main MYSURICATES_PRESET)" = research ] && [ "$(step Modules)" = "research · written into deploy/instances/main.env" ] && ! out | grep -q "not used"'
+check "... pi's note after the command, English"        'out | grep -F "pi, then /login in pi — or an API key as environment variable (see pi --help)" >/dev/null'
+check "... and German with --lang de"                   '[ "$(run --yes --dry-run --lang de)" = 0 ] && out | grep -F "Vor dem ersten KI-Workflow bei pi anmelden:" >/dev/null && out | grep -F "pi, dann /login in pi — oder ein API-Schlüssel als Umgebungsvariable (siehe pi --help)" >/dev/null && ! out | grep "then /login" >/dev/null'
+check "flags that do not apply are named"              '[ "$(run --yes --dry-run --port 9555 --provider codex --runtime container)" = 0 ] && out | grep -F "not used: --runtime container, --port 9555, --provider codex" >/dev/null && cmp -s "$INST/main.env" "$TMP/kept.env" && [ "$(step Ports)" = "9777 · from deploy/instances/main.env" ]'
+check "--preset --force: the preset goes into the file" '[ "$(run --yes --dry-run --preset research --force)" = 0 ] && [ "$(val main MYSURICATES_PRESET)" = research ] && [ "$(step Modules)" = "research · written into deploy/instances/main.env" ] && ! out | grep "not used" >/dev/null'
 cp "$TMP/kept.env" "$INST/main.env"
 check "German: aus der Datei"                           '[ "$(run --yes --dry-run --lang de)" = 0 ] && [ "$(step Ports)" = "9777 · aus deploy/instances/main.env" ]'
 printf 'MYSURICATES_PORT=19730\nAUTOMATION_AI_DEFAULT_PROVIDER=CODEX\nMYSURICATES_AI_FROM_HOST=programs\nMYSURICATES_PROJECTS=/srv/projekte\n' > "$INST/main.env"
@@ -297,7 +320,7 @@ if command -v python3 >/dev/null 2>&1; then
   ( python3 -c "import socket,time; s=socket.socket(); s.bind(('127.0.0.1', $LP)); s.listen(1); time.sleep(60)" >/dev/null 2>&1 & echo $! > "$TMP/listener.pid" )
   for _ in $(seq 1 100); do (exec 3<>"/dev/tcp/127.0.0.1/$LP") 2>/dev/null && break; sleep 0.05; done
   printf 'MYSURICATES_RUNTIME=host\nMYSURICATES_PORT=%s\n' "$LP" > "$INST/main.env"
-  check "own instance on the port: no 'is in use — taking'" '[ "$(run --yes --dry-run)" = 0 ] && ! out | grep -q "is in use" && [ "$(step Ports)" = "$LP · from deploy/instances/main.env" ]'
+  check "own instance on the port: no 'is in use — taking'" '[ "$(run --yes --dry-run)" = 0 ] && ! out | grep "is in use" >/dev/null && [ "$(step Ports)" = "$LP · from deploy/instances/main.env" ]'
   kill "$(cat "$TMP/listener.pid")" 2>/dev/null
 else
   echo "  skip (no python3 for a listener)"
@@ -307,7 +330,7 @@ for f in dev:19710 test:19711 prod:19712; do printf 'MYSURICATES_RUNTIME=contain
 check "staged, all kept: ports from the files, marked"  '[ "$(run --yes --dry-run --mode staged)" = 0 ] && [ "$(step Ports)" = "Dev 19710 · Test 19711 · Prod 19712 · files kept: dev, test, prod" ]'
 check "staged, all kept: AI from the files"             '[ "$(step AI)" = "pi · files kept: dev, test, prod" ]'
 printf 'MYSURICATES_RUNTIME=container\nMYSURICATES_PORT=19711\nAUTOMATION_AI_DEFAULT_PROVIDER=CODEX\n' > "$INST/test.env"
-check "staged, differing providers: each named; flags not used are named" '[ "$(run --yes --dry-run --mode staged --provider claude)" = 0 ] && [ "$(step AI)" = "dev pi · test codex · prod pi · files kept: dev, test, prod" ] && out | grep -qF "Keeping deploy/instances/{dev,test,prod}.env — not used: --provider claude"'
+check "staged, differing providers: each named; flags not used are named" '[ "$(run --yes --dry-run --mode staged --provider claude)" = 0 ] && [ "$(step AI)" = "dev pi · test codex · prod pi · files kept: dev, test, prod" ] && out | grep -F "Keeping deploy/instances/{dev,test,prod}.env — not used: --provider claude" >/dev/null'
 rm -f "$INST/test.env"
 T2="$(firstfree 8090 "19710 19712")"
 check "staged, one new: its port avoids the kept ones"  '[ "$(run --yes --dry-run --mode staged)" = 0 ] && [ "$(val test MYSURICATES_PORT)" = "$T2" ] && [ "$(step Ports)" = "Dev 19710 · Test $T2 · Prod 19712 · files kept: dev, prod" ]'
@@ -330,7 +353,7 @@ check "done box: commands aligned (en)"                  '[ "$(cols)" = 1 ]'
 
 echo "8b) menus fit the panel — nothing cut off (pseudo terminal, stub tools)"
 # Abgeschnitten = „…“ direkt vor dem rechten Rahmen; „Eigene Auswahl…“ mitten in der Zeile ist gewollt
-cut() { sed "s/$(printf "\033")\[[0-9;?]*[A-Za-z]//g" "$1" | tr -d "\r" | grep -E "…[[:space:]]*│[[:space:]]*$" >/dev/null; }
+cut_off() { sed "s/$(printf "\033")\[[0-9;?]*[A-Za-z]//g" "$1" | tr -d "\r" | grep -E "…[[:space:]]*│[[:space:]]*$" >/dev/null; }
 pty_setup() {  # SPRACHE TASTEN FLAGS… → Mitschnitt in $TMP/menu
   local l="$1" keys="$2"; shift 2
   rm -rf "$INST"
@@ -339,15 +362,65 @@ pty_setup() {  # SPRACHE TASTEN FLAGS… → Mitschnitt in $TMP/menu
 if command -v script >/dev/null 2>&1 && script -qec true /dev/null >/dev/null 2>&1; then
   for l in en de; do
     pty_setup "$l" q
-    check "mode menu shown and complete ($l)"             'grep -E "(Step|Schritt) 2 (of|von)" "$TMP/menu" >/dev/null && ! cut "$TMP/menu"'
+    check "mode menu shown and complete ($l)"             'grep -E "(Step|Schritt) 2 (of|von)" "$TMP/menu" >/dev/null && ! cut_off "$TMP/menu"'
     pty_setup "$l" q --runtime host
-    check "module menu shown and complete ($l)"           'grep -E "(Step|Schritt) 4 (of|von)" "$TMP/menu" >/dev/null && ! cut "$TMP/menu"'
+    check "module menu shown and complete ($l)"           'grep -E "(Step|Schritt) 4 (of|von)" "$TMP/menu" >/dev/null && ! cut_off "$TMP/menu"'
     pty_setup "$l" 'n\nq' --runtime container --preset core --provider codex   # n: pi nicht mitinstallieren
     sed "s/$(printf "\033")\[[0-9;?]*[A-Za-z]//g" "$TMP/menu" | tr -d "\r" | grep -A4 -E "(in den Container|into the container)\?" > "$TMP/ai-menu"
-    check "AI access menu shown and complete ($l)"       '[ -s "$TMP/ai-menu" ] && ! cut "$TMP/ai-menu"'
+    check "AI access menu shown and complete ($l)"       '[ -s "$TMP/ai-menu" ] && ! cut_off "$TMP/ai-menu"'
   done
 else
   echo "  skip (no usable script command)"
+fi
+
+echo "8c) change settings in a terminal: the file's values are asked as defaults (ca902719)"
+# Frueher uebersprang „Einstellungen aendern“ (und --reconfigure im Terminal) jeden Schritt, dessen
+# Wert die Datei schon nannte — Modus, Module, Anbieter, Port liessen sich so gar nicht aendern.
+# Die Tasten kommen gruppenweise, jeweils erst, wenn die Ausgabe steht: Menues lesen Zeichen ohne
+# Zeilenpuffer, Rueckfragen ganze Zeilen — auf einmal geschickt, schluckte eine Zeilen-Rueckfrage den
+# Vorrat der naechsten Menues.
+feed() {  # DATEI GRUPPE… — jede Gruppe, sobald die Ausgabe 0,2 s lang nicht waechst
+  local f="$1" k last cur n; shift
+  for k in "$@"; do
+    last=-1; n=0
+    while [ "$n" -lt 150 ]; do sleep 0.2; cur="$(wc -c < "$f" 2>/dev/null || echo 0)"; [ "$cur" -gt 0 ] && [ "$cur" = "$last" ] && break; last="$cur"; n=$((n + 1)); done
+    printf "$k"
+  done
+  sleep 1
+}
+pty_run() {  # "GRUPPE|GRUPPE|…" FLAGS… → Mitschnitt in $TMP/menu(.txt), ohne $INST anzufassen
+  local groups; IFS='|' read -r -a groups <<< "$1"; shift
+  : > "$TMP/menu"
+  feed "$TMP/menu" "${groups[@]}" | timeout 120 script -qec "stty cols 120 rows 50; env HOME='$TMP/home' PATH='$TMP/bin:$TMP/tools' XDG_DATA_HOME='$TMP/data' XDG_STATE_HOME='$TMP/state' XDG_CONFIG_HOME='$TMP/home/.config' MYSURICATES_INSTANCES_DIR='$INST' TERM=xterm-256color bash '$SETUP' --dry-run --lang en $*" /dev/null > "$TMP/menu" 2>&1
+  sed "s/$(printf "\033")\[[0-9;?]*[A-Za-z]//g" "$TMP/menu" | tr -d "\r" > "$TMP/menu.txt"
+}
+if command -v script >/dev/null 2>&1 && script -qec true /dev/null >/dev/null 2>&1 && command -v timeout >/dev/null 2>&1; then
+  C8="$(firstfree 19820)"; C8N="$(firstfree $((C8 + 1)))"
+  c8_file() { rm -rf "$INST"; mkdir -p "$INST"; printf 'MYSURICATES_RUNTIME=host\nMYSURICATES_PORT=%s\nMYSURICATES_PRESET=full\nAUTOMATION_AI_DEFAULT_PROVIDER=PI\n' "$C8" > "$INST/main.env"; }
+  asked() { grep -F "$1" "$TMP/menu.txt" >/dev/null; }
+  # Modus Enter · Module Enter · pi mitinstallieren n · Anbieter Enter · Port Enter · bauen n
+  c8_file; pty_run '\n|\n|n\n|\n|\n|n\n' --reconfigure
+  check "--reconfigure: mode, modules, provider and port are asked" 'asked "Step 2 of 8" && asked "Step 4 of 8" && asked "Which provider should workflows use by default?" && asked "[$C8]:"'
+  check "... Enter everywhere keeps the file's values"   '[ "$(val main MYSURICATES_RUNTIME)" = host ] && [ "$(val main MYSURICATES_PRESET)" = full ] && [ "$(val main AUTOMATION_AI_DEFAULT_PROVIDER)" = PI ] && [ "$(val main MYSURICATES_PORT)" = "$C8" ]'
+  # Module 2 (research), neuer Port — der Rest bleibt
+  c8_file; pty_run "\\n|2|n\\n|\\n|$C8N\\n|n\\n" --reconfigure
+  check "... a choice changes only that value"           '[ "$(val main MYSURICATES_PRESET)" = research ] && [ "$(val main MYSURICATES_PORT)" = "$C8N" ] && [ "$(val main MYSURICATES_RUNTIME)" = host ] && [ "$(val main AUTOMATION_AI_DEFAULT_PROVIDER)" = PI ]'
+  # Ohne --reconfigure: „Einstellungen aendern“ im Auswahlmenue (Enter), danach dieselben Fragen
+  c8_file; pty_run '\n|\n|\n|n\n|\n|\n|n\n'
+  check "change settings: asked with the file's values"  'asked "Change settings of main" && asked "Step 4 of 8" && asked "[$C8]:" && [ "$(val main MYSURICATES_PRESET)" = full ] && [ "$(val main MYSURICATES_RUNTIME)" = host ] && [ "$(val main AUTOMATION_AI_DEFAULT_PROVIDER)" = PI ]'
+  # „Eigene“ in der Datei, im Menue ein Preset gewaehlt: die alten Modul-Ueberschreibungen gelten nicht weiter
+  c8_file; printf 'AUTOMATION_MODULES_CHAINS=true\nAUTOMATION_MODULES_GOALS=false\nAUTOMATION_HARDENING_SEALING=true\n' >> "$INST/main.env"
+  pty_run '\n|1|n\n|\n|\n|n\n' --reconfigure
+  check "custom → preset in the menu: old module overrides gone, hardening stays" '[ "$(val main MYSURICATES_PRESET)" = core ] && ! grep -q "^AUTOMATION_MODULES_" "$INST/main.env" && [ "$(val main AUTOMATION_HARDENING_SEALING)" = true ]'
+  # Per Flag gegeben: nicht noch einmal gefragt (pi n · bauen n)
+  c8_file; pty_run 'n\n|n\n' --reconfigure --runtime host --preset core --provider codex --port "$C8N"
+  check "flags are not asked again"                      '! asked "Step 2 of 8" && ! asked "Step 4 of 8" && ! asked "[$C8N]:" && [ "$(val main MYSURICATES_PRESET)" = core ] && [ "$(val main AUTOMATION_AI_DEFAULT_PROVIDER)" = CODEX ]'
+  # „Neu einrichten“ geht nicht von der Datei aus: Auswahl 2 · Modus 2 (Rechner) · Module · pi n · Port · bauen n
+  c8_file; pty_run '2|2|\n|n\n|\n|n\n'
+  check "set up anew: the file's values do not count"    'asked "Set up again" && [ "$(val main MYSURICATES_PRESET)" = core ] && [ "$(val main AUTOMATION_AI_DEFAULT_PROVIDER)" = CODEX ] && [ "$(val main MYSURICATES_PORT)" = "$(firstfree 9090)" ]'
+  rm -rf "$INST"
+else
+  echo "  skip (no usable script or timeout command)"
 fi
 
 echo "9) the API key hint never points to the log (bc6d1902)"
@@ -382,17 +455,17 @@ srun() { senv bash "$SREPO/scripts/setup.sh" --yes --runtime host --port "$SPORT
 sinst() { senv bash "$SREPO/scripts/instance.sh" "$@" --name main; }
 builds() { grep -c build "$MVN_LOG"; }
 spid() { cat "$SSTATE/mysuricates/main/instance.pid" 2>/dev/null; }
-check "fresh: exit 0, built once, says build"           '[ "$(srun)" = 0 ] && [ "$(builds)" = 1 ] && out | grep -q "Build and start main"'
-check "done box: how to update after git pull"          'out | grep -q "git pull && scripts/instance.sh down --name main" && out | grep -qE "^[│|] +scripts/instance.sh up --name main"'
+check "fresh: exit 0, built once, says build"           '[ "$(srun)" = 0 ] && [ "$(builds)" = 1 ] && out | grep "Build and start main" >/dev/null'
+check "done box: how to update after git pull"          'out | grep "git pull && scripts/instance.sh down --name main" >/dev/null && out | grep -E "^[│|] +scripts/instance.sh up --name main" >/dev/null'
 H1="$(git -C "$SREPO" rev-parse HEAD)"; P1="$(spid)"
-check "running, same state: not rebuilt, says so"       '[ "$(srun)" = 0 ] && [ "$(builds)" = 1 ] && out | grep -q "main is already running — existing build, not rebuilt (state ${H1:0:8})" && ! out | grep -q "Build and start" && [ "$(spid)" = "$P1" ]'
+check "running, same state: not rebuilt, says so"       '[ "$(srun)" = 0 ] && [ "$(builds)" = 1 ] && out | grep "main is already running — existing build, not rebuilt (state ${H1:0:8})" >/dev/null && ! out | grep "Build and start" >/dev/null && [ "$(spid)" = "$P1" ]'
 echo neu > "$SREPO/neu.txt"; scommit zwei; H2="$(git -C "$SREPO" rev-parse HEAD)"
-check "git pull while running: rebuilt and restarted"   '[ "$(srun)" = 0 ] && [ "$(builds)" = 2 ] && out | grep -q "main runs state ${H1:0:8}, the clone is at ${H2:0:8}" && [ "$(spid)" != "$P1" ]'
+check "git pull while running: rebuilt and restarted"   '[ "$(srun)" = 0 ] && [ "$(builds)" = 2 ] && out | grep "main runs state ${H1:0:8}, the clone is at ${H2:0:8}" >/dev/null && [ "$(spid)" != "$P1" ]'
 check "the instance now runs the new build"             '[ "$(cat "$SSTATE/mysuricates/main/app.jar")" = "$(git -C "$SREPO" rev-parse --short HEAD)" ] && [ "$(sinst built)" = "current $H2" ]'
 sinst down >/dev/null 2>&1
-check "stopped, same state: started without a build"    '[ "$(srun --lang de)" = 0 ] && [ "$(builds)" = 2 ] && out | grep -q "main starten — vorhanden, nicht neu gebaut (Stand ${H2:0:8})"'
+check "stopped, same state: started without a build"    '[ "$(srun --lang de)" = 0 ] && [ "$(builds)" = 2 ] && out | grep "main starten — vorhanden, nicht neu gebaut (Stand ${H2:0:8})" >/dev/null'
 P2="$(spid)"
-check "--reconfigure: restarted, not rebuilt"          '[ "$(srun --reconfigure)" = 0 ] && [ "$(builds)" = 2 ] && [ "$(spid)" != "$P2" ] && out | grep -q "Start main — existing build, not rebuilt"'
+check "--reconfigure: restarted, not rebuilt"          '[ "$(srun --reconfigure)" = 0 ] && [ "$(builds)" = 2 ] && [ "$(spid)" != "$P2" ] && out | grep "Start main — existing build, not rebuilt" >/dev/null'
 sinst down >/dev/null 2>&1
 
 echo "9c) a restart never aborts running workflow runs unasked (29820f58)"
@@ -422,17 +495,17 @@ sval() { sed -n "s/^$1=//p" "$SINST/main.env" 2>/dev/null; }   # nicht cut: 8b u
 srun >/dev/null; mkdir -p "$(dirname "$SKEY")"; printf '%s\n' "$FAKE_KEY" > "$SKEY"
 echo drei > "$SREPO/drei.txt"; scommit drei; H3="$(git -C "$SREPO" rev-parse HEAD)"; P3="$(spid)"; B3="$(builds)"
 check "runs active, --yes: neither stopped nor rebuilt"  '[ "$(FAKE_RUNS=2 srun)" = 0 ] && [ "$(spid)" = "$P3" ] && kill -0 "$P3" 2>/dev/null && [ "$(builds)" = "$B3" ]'
-check "... says how many and how to restart later"      'out | grep -qF "main: 2 workflow run(s) still running" && out | grep -qF "scripts/instance.sh down --name main && scripts/instance.sh up --name main" && ! out | grep -q "building anew and restarting"'
-check "... names the old and the new state"             'out | grep -qF "main keeps running state ${H2:0:8}, not restarted (the clone is at ${H3:0:8})"'
-check "... done box still shows the running instance"   'out | grep -qF "http://localhost:$SPORT"'
+check "... says how many and how to restart later"      'out | grep -F "main: 2 workflow run(s) still running" >/dev/null && out | grep -F "scripts/instance.sh down --name main && scripts/instance.sh up --name main" >/dev/null && ! out | grep "building anew and restarting" >/dev/null'
+check "... names the old and the new state"             'out | grep -F "main keeps running state ${H2:0:8}, not restarted (the clone is at ${H3:0:8})" >/dev/null'
+check "... done box still shows the running instance"   'out | grep -F "http://localhost:$SPORT" >/dev/null'
 check "asked with the key on stdin, never in arguments"  '[ -s "$RUNS_LOG" ] && ! grep -qF "$FAKE_KEY" "$RUNS_LOG" && grep -qF "http://127.0.0.1:$SPORT/api/v1/executions?status=RUNNING" "$RUNS_LOG"'
-check "German: the same, in German"                     '[ "$(FAKE_RUNS=1 srun --lang de)" = 0 ] && [ "$(spid)" = "$P3" ] && out | grep -qF "main: noch 1 Workflow-Run(s) aktiv"'
-check "no runs: rebuilt and restarted as before"        '[ "$(FAKE_RUNS=0 srun)" = 0 ] && [ "$(spid)" != "$P3" ] && [ "$(builds)" = "$((B3 + 1))" ] && ! out | grep -q "still running"'
+check "German: the same, in German"                     '[ "$(FAKE_RUNS=1 srun --lang de)" = 0 ] && [ "$(spid)" = "$P3" ] && out | grep -F "main: noch 1 Workflow-Run(s) aktiv" >/dev/null'
+check "no runs: rebuilt and restarted as before"        '[ "$(FAKE_RUNS=0 srun)" = 0 ] && [ "$(spid)" != "$P3" ] && [ "$(builds)" = "$((B3 + 1))" ] && ! out | grep "still running" >/dev/null'
 echo vier > "$SREPO/vier.txt"; scommit vier; P4="$(spid)"; B4="$(builds)"
-check "instance not answering: as before, and says so"  '[ "$(srun)" = 0 ] && [ "$(spid)" != "$P4" ] && [ "$(builds)" = "$((B4 + 1))" ] && out | grep -qF "main: running workflow runs could not be checked"'
+check "instance not answering: as before, and says so"  '[ "$(srun)" = 0 ] && [ "$(spid)" != "$P4" ] && [ "$(builds)" = "$((B4 + 1))" ] && out | grep -F "main: running workflow runs could not be checked" >/dev/null'
 P5="$(spid)"; SPORT2="$(firstfree $((SPORT + 1)))"
 check "--reconfigure, runs active: not restarted"       '[ "$(FAKE_RUNS=1 srun --reconfigure --port "$SPORT2")" = 0 ] && [ "$(spid)" = "$P5" ] && [ "$(sval MYSURICATES_PORT)" = "$SPORT2" ]'
-check "... asked the port it runs on, shows that one"   'out | grep -qF "main: 1 workflow run(s) still running" && out | grep -qF "main keeps running with its previous settings" && out | grep -qF "http://localhost:$SPORT" && ! out | grep -qF "http://localhost:$SPORT2"'
+check "... asked the port it runs on, shows that one"   'out | grep -F "main: 1 workflow run(s) still running" >/dev/null && out | grep -F "main keeps running with its previous settings" >/dev/null && out | grep -F "http://localhost:$SPORT" >/dev/null && ! out | grep -F "http://localhost:$SPORT2" >/dev/null'
 sinst down >/dev/null 2>&1; srun --reconfigure >/dev/null   # zurueck auf SPORT, laeuft
 printf '%s\n' "$FAKE_KEY" > "$SKEY"; echo fuenf > "$SREPO/fuenf.txt"; scommit fuenf; P6="$(spid)"
 spty() {  # TASTEN → Mitschnitt in $TMP/menu; im Terminal, ohne --yes
@@ -464,7 +537,7 @@ STUB
 chmod +x "$B2/docker"; export DOCKER_LOG="$TMP/docker2.log"
 crun() { : > "$DOCKER_LOG"; : > "$RUNS_LOG"; srun --runtime container --name box "$@"; }
 check "container not running: up as before"             '[ "$(crun)" = 0 ] && grep -q "up -d --no-build" "$DOCKER_LOG"'
-check "container running, runs active: not touched"     '[ "$(CONTAINER_UP=1 FAKE_RUNS=2 crun)" = 0 ] && ! grep -q "up -d" "$DOCKER_LOG" && ! grep -q "^build " "$DOCKER_LOG" && out | grep -qF "box: 2 workflow run(s) still running" && out | grep -qF "scripts/instance.sh down --name box && scripts/instance.sh up --name box"'
+check "container running, runs active: not touched"     '[ "$(CONTAINER_UP=1 FAKE_RUNS=2 crun)" = 0 ] && ! grep -q "up -d" "$DOCKER_LOG" && ! grep -q "^build " "$DOCKER_LOG" && out | grep -F "box: 2 workflow run(s) still running" >/dev/null && out | grep -F "scripts/instance.sh down --name box && scripts/instance.sh up --name box" >/dev/null'
 check "... asked with the key from the container"       '[ -s "$RUNS_LOG" ] && grep -q "^exec .*mysuricates-box sh -c .*api-key" "$DOCKER_LOG"'
 check "container running, no runs: up as before"        '[ "$(CONTAINER_UP=1 FAKE_RUNS=0 crun)" = 0 ] && grep -q "up -d --no-build" "$DOCKER_LOG"'
 rm -f "$SINST/box.env" "$SINST/box.override.yml"
@@ -487,7 +560,7 @@ if command -v python3 >/dev/null 2>&1; then
   check "the own instance runs and listens on its port"  '[ -n "$P7" ] && kill -0 "$P7" 2>/dev/null && listening "$OWN"'
   sreconf() { senv bash "$SREPO/scripts/setup.sh" --yes --runtime host --reconfigure "$@" < /dev/null > "$TMP/out" 2>&1; echo $?; }
   check "--reconfigure without --port: its port stays"   '[ "$(sreconf)" = 0 ] && [ "$(sval MYSURICATES_PORT)" = "$OWN" ] && [ "$(step Ports)" = "$OWN" ]'
-  check "... restarted there, shown there"               '[ "$(spid)" != "$P7" ] && kill -0 "$(spid)" 2>/dev/null && listening "$OWN" && out | grep -qF "http://localhost:$OWN"'
+  check "... restarted there, shown there"               '[ "$(spid)" != "$P7" ] && kill -0 "$(spid)" 2>/dev/null && listening "$OWN" && out | grep -F "http://localhost:$OWN" >/dev/null'
   sinst down >/dev/null 2>&1
   # Gegenprobe: laeuft die Instanz nicht, zaehlt ein Lauscher auf dem Port weiter als belegt
   listener "$OWN" foreign; NEXT="$(firstfree 9090)"
@@ -528,12 +601,27 @@ LE2="$(LEH 127.0.0.1 "" "" 0 0)"
 check "no flags: bind/ai-from-host/ai-providers/docker-socket from the file" \
   '[ "$(unset -f cut; printf "%s" "$LE2" | cut -d"|" -f1-4)" = "127.0.0.2|all|codex,pi|1" ]'
 check "no flags: the hardening switch of the file is carried into CUSTOM_LINES" \
-  'printf "%s" "$LE2" | grep -q "AUTOMATION_HARDENING_SEALING=true"'
+  'printf "%s" "$LE2" | grep "AUTOMATION_HARDENING_SEALING=true" >/dev/null'
 LE3="$(LEH 0.0.0.0 programs "" 1 1)"
 check "a flag wins over the file (bind, ai-from-host, docker-socket)" \
   '[ "$(unset -f cut; printf "%s" "$LE3" | cut -d"|" -f1-4)" = "0.0.0.0|programs|codex,pi|1" ]'
 
 echo "10) bash 3.2 hygiene"
 check "no bash-4-only syntax (code)"                    '! grep -v "^[[:space:]]*#" "$SETUP" | grep -nE "declare -g?A|mapfile|readarray|\\$\\{[A-Za-z_]+(,,|\\^\\^)\\}" >/dev/null'
+
+# Leser, die vor dem Ende der Eingabe aufhoeren — grep -q/-m beim ersten Treffer, head nach N Zeilen,
+# sed mit q —, lassen den Schreiber vor dem | in SIGPIPE laufen, und pipefail macht die Pipeline zum
+# Fehler: wackelig, je nach Ausgabe und Last (e7ff6cc2, 38f30352). In den Skript-Tests deshalb
+# „| grep … >/dev/null“ und „| sed -n 1p“ (liest bis zum Ende); diese Zeile haelt die Muster aus allen
+# Suiten unter pipefail fern.
+early_readers() {
+  local f
+  for f in "$HERE"/*.sh; do
+    grep -q pipefail "$f" || continue
+    grep -nE '(^|[^|])[|][[:space:]]*(grep[[:space:]]+(-[[:alnum:]-]+[[:space:]]+)*-[[:alpha:]]*[qm]|head([[:space:]]|$)|sed[[:space:]][^|]*[0-9$/]q)' "$f" \
+      | grep -vE '^[0-9]+:[[:space:]]*#' | sed "s|^|$(basename "$f"):|"
+  done
+}
+check "no early-closing reader (grep -q/-m, head, sed q) under pipefail in scripts/tests (SIGPIPE)" '[ -z "$(early_readers)" ] || { early_readers | sed "s/^/         /"; false; }'
 
 echo; echo "passed=$PASS failed=$FAIL"; [ "$FAIL" -eq 0 ]

@@ -46,7 +46,7 @@ check "programs mode: login command for the card" 'grep -q "MYSURICATES_LOGIN_CO
 printf 'MYSURICATES_PORT=19404\nMYSURICATES_AI_FROM_HOST=everything\n' > "$TMP/inst/bad.env"
 : > "$DOCKER_LOG"
 OUT="$(bash "$SCRIPT" up --name bad --no-wait 2>&1)"; RC=$?
-check "invalid mode: up refuses, no compose"  '[ "$RC" = 2 ] && ! grep -q "^compose " "$DOCKER_LOG" && printf "%s" "$OUT" | grep -q "MYSURICATES_AI_FROM_HOST"'
+check "invalid mode: up refuses, no compose"  '[ "$RC" = 2 ] && ! grep -q "^compose " "$DOCKER_LOG" && printf "%s" "$OUT" | grep "MYSURICATES_AI_FROM_HOST" >/dev/null'
 mkdir -p "$TMP/config/mysuricates" "$TMP/nm/@openai/codex"; printf 'OPENAI_API_KEY=test-openai\n' > "$TMP/config/mysuricates/ai.env"
 printf 'MYSURICATES_PORT=19405\nMYSURICATES_AI_PROVIDERS=codex\n' > "$TMP/inst/keyed.env"
 INSTANCE_HEALTH_TIMEOUT=0 bash "$SCRIPT" up --name keyed --no-wait >/dev/null 2>&1
@@ -70,7 +70,7 @@ echo "1b2) MYSURICATES_PREFIX: own docker names, e.g. for the installer probe"
 # "mysuricates" enthalten, Namen stehen als eigenes Wort) noch in der Umgebung fuer compose (427be563)
 export DOCKER_ENV_LOG="$TMP/docker-env.log"; : > "$DOCKER_ENV_LOG"
 check "prefix: up builds its own image and project" 'MYSURICATES_PREFIX=probe-x OWNER=probe-x-demo INSTANCE_HEALTH_TIMEOUT=0 bash "$SCRIPT" up --name demo --no-wait >/dev/null 2>&1 && grep -q -- "-t probe-x:local -$" "$DOCKER_LOG" && grep -q -- "-p probe-x-demo " "$DOCKER_LOG" && ! grep -Eq "(^| )mysuricates[-:]" "$DOCKER_LOG" && grep -qx "probe-x-demo probe-x:local" "$DOCKER_ENV_LOG" && ! grep -q "mysuricates" "$DOCKER_ENV_LOG"'
-check "prefix: key reads from its own container" 'MYSURICATES_PREFIX=probe-x OWNER=probe-x-demo CONTAINER_KEY=k bash "$SCRIPT" key --name demo >/dev/null 2>&1; tail -1 "$DOCKER_LOG" | grep -q " probe-x-demo sh -c .*api-key.* sh "'
+check "prefix: key reads from its own container" 'MYSURICATES_PREFIX=probe-x OWNER=probe-x-demo CONTAINER_KEY=k bash "$SCRIPT" key --name demo >/dev/null 2>&1; tail -1 "$DOCKER_LOG" | grep " probe-x-demo sh -c .*api-key.* sh " >/dev/null'
 check "prefix: invalid characters refused (exit 2)" 'MYSURICATES_PREFIX="Probe x" bash "$SCRIPT" status --name demo >/dev/null 2>&1; [ $? -eq 2 ]'
 check "compose derives every name from the prefix" '[ "$(grep -c "MYSURICATES_CONTAINER:?" "$HERE/../../deploy/compose.yml")" = 5 ] && grep -q "image: \${MYSURICATES_IMAGE:?}" "$HERE/../../deploy/compose.yml" && ! grep -q "mysuricates-\\\${MYSURICATES_NAME" "$HERE/../../deploy/compose.yml"'
 
@@ -212,24 +212,24 @@ check "first up builds once"                   '[ "$(builds)" = 1 ]'
 check "the commit of the build is noted"       '[ "$(cat "$STATE3/built-from" 2>/dev/null)" = "$(head_of)" ]'
 check "built: current + commit"                '[ "$(inst built)" = "current $(head_of)" ]'
 : > "$MVN_LOG"; OUT="$(inst up 2>&1)"
-check "running, current: nothing built, no warning" '[ "$(builds)" = 0 ] && printf "%s" "$OUT" | grep -q "läuft bereits" && ! printf "%s" "$OUT" | grep -q "nicht übernommen"'
+check "running, current: nothing built, no warning" '[ "$(builds)" = 0 ] && printf "%s" "$OUT" | grep "läuft bereits" >/dev/null && ! printf "%s" "$OUT" | grep "nicht übernommen" >/dev/null'
 OLD="$(head_of)"; echo neu > "$REPO2/neu.txt"; commit zwei; NEW="$(head_of)"
 check "new commit: built says outdated OLD NEW" '[ "$(inst built)" = "outdated $OLD $NEW" ]'
 PID_BEFORE="$(cat "$STATE3/instance.pid")"
 : > "$MVN_LOG"; OUT="$(inst up 2>&1)"; RC=$?
-check "running, outdated: says so, with both commits and the way" '[ "$RC" = 0 ] && printf "%s" "$OUT" | grep -q "nicht übernommen" && printf "%s" "$OUT" | grep -q "${OLD:0:8}" && printf "%s" "$OUT" | grep -q "${NEW:0:8}" && printf "%s" "$OUT" | grep -q "instance.sh down --name upd"'
+check "running, outdated: says so, with both commits and the way" '[ "$RC" = 0 ] && printf "%s" "$OUT" | grep "nicht übernommen" >/dev/null && printf "%s" "$OUT" | grep "${OLD:0:8}" >/dev/null && printf "%s" "$OUT" | grep "${NEW:0:8}" >/dev/null && printf "%s" "$OUT" | grep "instance.sh down --name upd" >/dev/null'
 check "running, outdated: neither built nor stopped" '[ "$(builds)" = 0 ] && [ "$(cat "$STATE3/instance.pid")" = "$PID_BEFORE" ] && kill -0 "$PID_BEFORE" 2>/dev/null'
 OUT="$(inst up --rebuild 2>&1)"
-check "running: --rebuild is not silently ignored" 'printf "%s" "$OUT" | grep -q -- "nicht übernommen" && [ "$(builds)" = 0 ]'
+check "running: --rebuild is not silently ignored" 'printf "%s" "$OUT" | grep -- "nicht übernommen" >/dev/null && [ "$(builds)" = 0 ]'
 inst down >/dev/null 2>&1
 : > "$MVN_LOG"; OUT="$(inst up 2>&1)"
-check "stopped, outdated: up builds anew and says why" '[ "$(builds)" = 1 ] && printf "%s" "$OUT" | grep -q "baue neu"'
+check "stopped, outdated: up builds anew and says why" '[ "$(builds)" = 1 ] && printf "%s" "$OUT" | grep "baue neu" >/dev/null'
 check "app.jar comes from the new commit"      '[ "$(cat "$STATE3/app.jar")" = "$(git -C "$REPO2" rev-parse --short HEAD)" ] && [ "$(inst built)" = "current $NEW" ]'
 inst down >/dev/null 2>&1
 : > "$MVN_LOG"; OUT="$(inst up 2>&1)"
-check "stopped, current: starts without building, names the commit" '[ "$(builds)" = 0 ] && printf "%s" "$OUT" | grep -q "nicht neu gebaut (Stand ${NEW:0:8})"'
+check "stopped, current: starts without building, names the commit" '[ "$(builds)" = 0 ] && printf "%s" "$OUT" | grep "nicht neu gebaut (Stand ${NEW:0:8})" >/dev/null'
 OUT="$(inst up --rebuild 2>&1)"
-check "running, current: --rebuild names the way" 'printf "%s" "$OUT" | grep -q -- "--rebuild wirkt erst" && [ "$(builds)" = 0 ]'
+check "running, current: --rebuild names the way" 'printf "%s" "$OUT" | grep -- "--rebuild wirkt erst" >/dev/null && [ "$(builds)" = 0 ]'
 inst down >/dev/null 2>&1
 rm -f "$STATE3/built-from"   # Build aus der Zeit vor dem Vermerk
 check "no note: outdated, build unknown"       '[ "$(inst built)" = "outdated - $NEW" ]'
@@ -330,26 +330,26 @@ if command -v python3 >/dev/null 2>&1 && command -v curl >/dev/null 2>&1; then
   printf '%s\n' "$RKEY" > "$RSTATE/home/.mysuricates/api-key"
   fakeapi "$RPORT" "$RKEY" 3; echo "$APID" > "$RSTATE/instance.pid"
   OUT="$(bash "$SCRIPT" down --name runs 2>&1)"
-  check "host down: names the runs it aborts, then stops" 'printf "%s" "$OUT" | grep -qF "mysuricates-runs: 3 Workflow-Run(s) laufen noch" && printf "%s" "$OUT" | grep -q "gestoppt" && ! kill -0 "$APID" 2>/dev/null'
+  check "host down: names the runs it aborts, then stops" 'printf "%s" "$OUT" | grep -F "mysuricates-runs: 3 Workflow-Run(s) laufen noch" >/dev/null && printf "%s" "$OUT" | grep "gestoppt" >/dev/null && ! kill -0 "$APID" 2>/dev/null'
   stopapi
   fakeapi "$RPORT" "$RKEY" 0; echo "$APID" > "$RSTATE/instance.pid"
   OUT="$(bash "$SCRIPT" down --name runs 2>&1)"
-  check "host down: no runs, no warning"         '! printf "%s" "$OUT" | grep -q "Workflow-Run" && printf "%s" "$OUT" | grep -q "gestoppt"'
+  check "host down: no runs, no warning"         '! printf "%s" "$OUT" | grep "Workflow-Run" >/dev/null && printf "%s" "$OUT" | grep "gestoppt" >/dev/null'
   stopapi
   printf 'other-key\n' > "$RSTATE/home/.mysuricates/api-key"
   fakeapi "$RPORT" "$RKEY" 3; echo "$APID" > "$RSTATE/instance.pid"
   OUT="$(bash "$SCRIPT" down --name runs 2>&1)"
-  check "host down: not checkable → stops anyway"  '! printf "%s" "$OUT" | grep -q "Workflow-Run" && printf "%s" "$OUT" | grep -q "gestoppt" && ! kill -0 "$APID" 2>/dev/null'
+  check "host down: not checkable → stops anyway"  '! printf "%s" "$OUT" | grep "Workflow-Run" >/dev/null && printf "%s" "$OUT" | grep "gestoppt" >/dev/null && ! kill -0 "$APID" 2>/dev/null'
   stopapi
   # Container: Key aus dem Container (docker exec), Port aus der Instanz-Datei
   printf 'MYSURICATES_PORT=%s\n' "$RPORT" > "$TMP/inst/cruns.env"
   fakeapi "$RPORT" "$RKEY" 1; : > "$DOCKER_LOG"
   OUT="$(OWNER=mysuricates-cruns CONTAINER_KEY="$RKEY" bash "$SCRIPT" down --name cruns 2>&1)"
-  check "container down: names the runs, then compose down" 'printf "%s" "$OUT" | grep -qF "mysuricates-cruns: 1 Workflow-Run(s) laufen noch" && tail -n 1 "$DOCKER_LOG" | grep -q "mysuricates-cruns.* down$"'
+  check "container down: names the runs, then compose down" 'printf "%s" "$OUT" | grep -F "mysuricates-cruns: 1 Workflow-Run(s) laufen noch" >/dev/null && tail -n 1 "$DOCKER_LOG" | grep "mysuricates-cruns.* down$" >/dev/null'
   OUT="$(OWNER=mysuricates-cruns bash "$SCRIPT" down --name cruns 2>&1)"
-  check "container down: no key (not running) → no warning" '! printf "%s" "$OUT" | grep -q "Workflow-Run" && tail -n 1 "$DOCKER_LOG" | grep -q " down$"'
+  check "container down: no key (not running) → no warning" '! printf "%s" "$OUT" | grep "Workflow-Run" >/dev/null && tail -n 1 "$DOCKER_LOG" | grep " down$" >/dev/null'
   : > "$DOCKER_LOG"; OUT="$(OWNER=ai-automation-backend CONTAINER_KEY="$RKEY" bash "$SCRIPT" down --name cruns 2>&1)"
-  check "container down: a foreign container is not asked" '! grep -q "^exec " "$DOCKER_LOG" && ! printf "%s" "$OUT" | grep -q "Workflow-Run" && tail -n 1 "$DOCKER_LOG" | grep -q -- "-p mysuricates-cruns .* down$"'
+  check "container down: a foreign container is not asked" '! grep -q "^exec " "$DOCKER_LOG" && ! printf "%s" "$OUT" | grep "Workflow-Run" >/dev/null && tail -n 1 "$DOCKER_LOG" | grep -- "-p mysuricates-cruns .* down$" >/dev/null'
   stopapi
   rm -f "$TMP/inst/runs.env" "$TMP/inst/cruns.env" "$TMP/inst/cruns.override.yml"
 else
@@ -378,9 +378,9 @@ if command -v python3 >/dev/null 2>&1 && command -v curl >/dev/null 2>&1; then
   check "control: a plain curl goes through the fake proxy" '! untouched'
   lib() { proxied env PATH="$TMP/curlspy:$PATH" bash -c ". '$LIBCURL'; $1"; }
   RUNS_URL="http://127.0.0.1:$RPORT/api/v1/executions?status=RUNNING&size=1"
-  check "lib: local_curl reaches the instance directly"  'lib "local_curl -fsS --max-time 3 http://127.0.0.1:$RPORT/api/v1/system/health" | grep -q UP && untouched'
+  check "lib: local_curl reaches the instance directly"  'lib "local_curl -fsS --max-time 3 http://127.0.0.1:$RPORT/api/v1/system/health" | grep UP >/dev/null && untouched'
   : > "$TMP/curlspy.log"
-  check "lib: local_curl_key — the key reaches the instance" 'lib "local_curl_key $RKEY -fsS --max-time 3 \"$RUNS_URL\"" | grep -q "\"totalElements\": 2" && untouched'
+  check "lib: local_curl_key — the key reaches the instance" 'lib "local_curl_key $RKEY -fsS --max-time 3 \"$RUNS_URL\"" | grep "\"totalElements\": 2" >/dev/null && untouched'
   check "... never curl's arguments"             '[ -s "$TMP/curlspy.log" ] && ! grep -qF "$RKEY" "$TMP/curlspy.log"'
   check "lib: empty key → no header (401)"       '[ "$(lib "local_curl_key \"\" -s -o /dev/null -w %{http_code} \"$RUNS_URL\"")" = 401 ] && untouched'
   # Host: die Fake-API ist der Prozess der Instanz
@@ -390,14 +390,14 @@ if command -v python3 >/dev/null 2>&1 && command -v curl >/dev/null 2>&1; then
   printf '%s\n' "$RKEY" > "$PXSTATE/home/.autotrigger/api-key"; echo "$APID" > "$PXSTATE/instance.pid"
   check "host status: healthy although a proxy is set" '[ "$(proxied bash "$SCRIPT" status --name px)" = "running healthy" ] && untouched'
   OUT="$(proxied bash "$SCRIPT" down --name px 2>&1)"
-  check "host down: runs asked directly, then stopped" 'printf "%s" "$OUT" | grep -qF "mysuricates-px: 2 Workflow-Run(s) laufen noch" && printf "%s" "$OUT" | grep -q gestoppt && untouched'
+  check "host down: runs asked directly, then stopped" 'printf "%s" "$OUT" | grep -F "mysuricates-px: 2 Workflow-Run(s) laufen noch" >/dev/null && printf "%s" "$OUT" | grep gestoppt >/dev/null && untouched'
   stopapi
   # up wartet auf Health — der java-Stub startet die Fake-API auf dem Port der Instanz
   mkdir -p "$TMP/pxbin" "$UPSTATE/frontend"; echo jar > "$UPSTATE/app.jar"
   printf '#!/bin/sh\nexec python3 "%s" api "$AUTOMATION_PORT" "%s" 0\n' "$FAKE" "$RKEY" > "$TMP/pxbin/java"; chmod +x "$TMP/pxbin/java"
   printf 'MYSURICATES_RUNTIME=host\nMYSURICATES_PORT=%s\n' "$RPORT" > "$TMP/inst/pxup.env"
   OUT="$(proxied env PATH="$TMP/pxbin:$PATH" INSTANCE_HEALTH_TIMEOUT=6 GIT_CEILING_DIRECTORIES="$TMP" bash "$HSCRIPT" up --name pxup 2>&1)"; RC=$?
-  check "host up: healthy although a proxy is set" '[ "$RC" = 0 ] && printf "%s" "$OUT" | grep -qF "mysuricates-pxup läuft: http://localhost:$RPORT" && untouched'
+  check "host up: healthy although a proxy is set" '[ "$RC" = 0 ] && printf "%s" "$OUT" | grep -F "mysuricates-pxup läuft: http://localhost:$RPORT" >/dev/null && untouched'
   env PATH="$TMP/pxbin:$PATH" bash "$HSCRIPT" down --name pxup >/dev/null 2>&1
   kill "$PXPID" 2>/dev/null
   rm -f "$TMP/inst/px.env" "$TMP/inst/pxup.env"
@@ -412,7 +412,7 @@ fi
 CURLS="$(cd "$HERE/.." && git grep --untracked -nIE "(^|[^[:alnum:]_-])curl[[:space:]]+(-|\"|'|\\\$|http|\\\\)" -- . 2>/dev/null)"
 NAKED="$(printf '%s\n' "$CURLS" | grep -vE '^(tests/|lib/local-curl\.sh:|lib/deps\.sh:|lib/provider-catalog\.generated\.sh:)' \
   | grep -vE '^[^:]+:[0-9]+:[[:space:]]*#')"
-check "every curl to the own instance goes through lib/local-curl.sh" 'printf "%s" "$CURLS" | grep -q "^lib/local-curl.sh:" && { [ -z "$NAKED" ] || { printf "%s\n" "$NAKED" | sed "s/^/         /"; false; }; }'
+check "every curl to the own instance goes through lib/local-curl.sh" 'printf "%s" "$CURLS" | grep "^lib/local-curl.sh:" >/dev/null && { [ -z "$NAKED" ] || { printf "%s\n" "$NAKED" | sed "s/^/         /"; false; }; }'
 
 echo "9) bound to one address: health, port and runs asked there, not on 127.0.0.1 (3d002903)"
 # Mit --bind auf eine Adresse (LAN, Tailscale) lauscht die Instanz nur dort. health_ok fragte 127.0.0.1 —
@@ -443,15 +443,15 @@ if command -v python3 >/dev/null 2>&1 && command -v curl >/dev/null 2>&1 \
   binst() { env PATH="$TMP/bbin:$PATH" INSTANCE_HEALTH_TIMEOUT=6 GIT_CEILING_DIRECTORIES="$TMP" bash "$HSCRIPT" "$@" --name bound 2>&1; }
   OTHER="$(listen 127.0.0.1 proxy "$BPORT" "$TMP/other.log")"
   OUT="$(binst up)"; RC=$?
-  check "up: healthy on the bound address; 127.0.0.1 taken by someone else does not count" '[ "$RC" = 0 ] && printf "%s" "$OUT" | grep -qF "mysuricates-bound läuft: http://$BADDR:$BPORT"'
+  check "up: healthy on the bound address; 127.0.0.1 taken by someone else does not count" '[ "$RC" = 0 ] && printf "%s" "$OUT" | grep -F "mysuricates-bound läuft: http://$BADDR:$BPORT" >/dev/null'
   check "status: running healthy"                 '[ "$(binst status)" = "running healthy" ]'
   OUT="$(binst down)"
-  check "down: the runs asked at the bound address" 'printf "%s" "$OUT" | grep -qF "mysuricates-bound: 1 Workflow-Run(s) laufen noch" && printf "%s" "$OUT" | grep -q gestoppt'
+  check "down: the runs asked at the bound address" 'printf "%s" "$OUT" | grep -F "mysuricates-bound: 1 Workflow-Run(s) laufen noch" >/dev/null && printf "%s" "$OUT" | grep gestoppt >/dev/null'
   gone "$OTHER"; OTHER=""
   # Jemand anderes auf der gebundenen Adresse: up lehnt ab, bevor es etwas startet
   FOREIGN="$(listen "$BADDR" api "$BPORT" x 0)"
   OUT="$(binst up)"; RC=$?
-  check "up: port taken on the bound address → refused, nothing started" '[ "$RC" = 2 ] && printf "%s" "$OUT" | grep -qF "Port $BPORT ist schon belegt" && [ ! -s "$BSTATE/instance.pid" ]'
+  check "up: port taken on the bound address → refused, nothing started" '[ "$RC" = 2 ] && printf "%s" "$OUT" | grep -F "Port $BPORT ist schon belegt" >/dev/null && [ ! -s "$BSTATE/instance.pid" ]'
   gone "$FOREIGN"; FOREIGN=""
   rm -f "$TMP/inst/bound.env"
 else

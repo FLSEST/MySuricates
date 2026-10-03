@@ -11,7 +11,7 @@ check() { if eval "$2"; then echo "  ok   $1"; PASS=$((PASS + 1)); else echo "  
 IGNORE="$R/.dockerignore"; DF="$R/deploy/Dockerfile"; EP="$R/deploy/entrypoint.sh"
 
 echo "1) build context"
-check "dockerignore starts with deny-all"      '[ "$(grep -v "^#" "$IGNORE" | grep -v "^$" | head -1)" = "*" ]'
+check "dockerignore starts with deny-all"      '[ "$(grep -v "^#" "$IGNORE" | grep -v "^$" | sed -n 1p)" = "*" ]'
 check "worktrees never in the context"         '! grep -q "^!\.claude" "$IGNORE"'
 check "local instance config never in image"   '! grep -q "^!ai-automation-backend/config" "$IGNORE" && ! grep -q "^!ai-automation-backend$" "$IGNORE"'
 check "frontend node_modules excluded"         'grep -q "^ai-automation-frontend/node_modules$" "$IGNORE"'
@@ -56,12 +56,14 @@ for f in docker-compose.stable.yml docker-compose.test.yml docker-compose.dev-co
   check "$f: both key files on /app/secrets" 'grep -q "AUTOMATION_INTEGRATION_KEY_FILE=/app/secrets/" "$C" && grep -q "AUTOMATION_SEAL_KEY_FILE=/app/secrets/" "$C"'
   check "$f: own secrets volume, declared"   'grep -qE "^      - [a-z-]+-secrets:/app/secrets$" "$C" && grep -qE "^  [a-z-]+-secrets:$" "$C"'
 done
+# Die Test-Instanz (:8090) taggt Workflows nicht per KI (5d008bba) — Cypress legt dort Workflows an
+check "docker-compose.test.yml: no AI auto-tagging" 'grep -qx "      - AUTOMATION_DISCOVERY_AUTO_TAGGING_ENABLED=false" "$R/ai-automation-backend/docker-compose.test.yml"'
 check "Dockerfile.stable prepares /app/secrets"  'grep -q "/app/secrets" "$R/ai-automation-backend/docker/Dockerfile.stable"'
 check "backend entrypoint hands /app/secrets to the app user" 'grep -q "chown .*/app/secrets" "$BEP" && grep -q "chmod 700 /app/secrets" "$BEP"'
 
 echo "5) agent-devops: third-party APT repos never frozen in an old layer cache (97e1529d)"
 ADF="$R/ai-automation-backend/docker/Dockerfile.agent-devops"; DC="$R/ai-automation-backend/docker-compose.yml"
-line_of() { grep -n "$1" "$ADF" | head -n 1 | cut -d: -f1; }
+line_of() { grep -n "$1" "$ADF" | sed -n 1p | cut -d: -f1; }
 check "APT_REFRESH comes before the gh and the Docker repo" '[ "$(line_of "^ARG APT_REFRESH")" -lt "$(line_of "cli.github.com/packages/githubcli")" ] && [ "$(line_of "^ARG APT_REFRESH")" -lt "$(line_of "download.docker.com")" ]'
 check "pinned binaries stay before it (cached)"   '[ "$(line_of "^ARG GITLEAKS_VERSION")" -lt "$(line_of "^ARG APT_REFRESH")" ] && [ "$(line_of "^ARG TRIVY_VERSION")" -lt "$(line_of "^ARG APT_REFRESH")" ]'
 check "the gh layer uses APT_REFRESH itself"      'grep -q "RUN echo \"APT_REFRESH=\${APT_REFRESH" "$ADF"'
@@ -72,10 +74,10 @@ echo "5b) the same in every image: third-party repos and unpinned packages refre
 # deploy/Dockerfile und Dockerfile.stable holen NodeSource und Docker aus Fremd-Repos, agent-python
 # ungepinnte pip-Pakete — alles blieb beim ersten Bau stehen. Jedes getrackte Dockerfile mit einem
 # Fremd-Repo braucht das ARG davor, auch ein kuenftiges.
-lof() { grep -n "$2" "$1" | head -n 1 | cut -d: -f1; }   # DATEI MUSTER — Nummer der ersten Zeile
+lof() { grep -n "$2" "$1" | sed -n 1p | cut -d: -f1; }   # DATEI MUSTER — Nummer der ersten Zeile
 SDF="$R/ai-automation-backend/docker/Dockerfile.stable"; PDF="$R/ai-automation-backend/docker/Dockerfile.agent-python"
 DFS="$(cd "$R" && git ls-files '*Dockerfile*' 2>/dev/null)"
-check "Dockerfiles found (deploy, stable, agent-devops)" 'printf "%s\n" "$DFS" | grep -qx deploy/Dockerfile && printf "%s\n" "$DFS" | grep -qx ai-automation-backend/docker/Dockerfile.stable && printf "%s\n" "$DFS" | grep -qx ai-automation-backend/docker/Dockerfile.agent-devops'
+check "Dockerfiles found (deploy, stable, agent-devops)" 'printf "%s\n" "$DFS" | grep -x deploy/Dockerfile >/dev/null && printf "%s\n" "$DFS" | grep -x ai-automation-backend/docker/Dockerfile.stable >/dev/null && printf "%s\n" "$DFS" | grep -x ai-automation-backend/docker/Dockerfile.agent-devops >/dev/null'
 for f in $DFS; do
   grep -q "sources.list.d/" "$R/$f" || continue
   check "$f: every third-party repo behind ARG APT_REFRESH" '[ -n "$(lof "$R/$f" "^ARG APT_REFRESH=")" ] && [ "$(lof "$R/$f" "^ARG APT_REFRESH=")" -lt "$(lof "$R/$f" "sources.list.d/")" ] && grep -q "RUN echo \"APT_REFRESH=\${APT_REFRESH" "$R/$f"'
@@ -123,7 +125,7 @@ hc_lines() {
   done
 }
 HC="$(hc_lines)"; T="$(printf '\t')"
-check "found: HEALTHCHECK and compose healthcheck"   'printf "%s\n" "$HC" | grep -q "^deploy/Dockerfile${T}curl " && printf "%s\n" "$HC" | grep -q "^ai-automation-backend/docker-compose.test.yml${T}\[\"CMD\", \"curl\""'
+check "found: HEALTHCHECK and compose healthcheck"   'printf "%s\n" "$HC" | grep "^deploy/Dockerfile${T}curl " >/dev/null && printf "%s\n" "$HC" | grep "^ai-automation-backend/docker-compose.test.yml${T}\[\"CMD\", \"curl\"" >/dev/null'
 NAKED_HC="$(printf '%s\n' "$HC" | grep curl | grep -vF -e "${T}curl --noproxy '*' " -e '["CMD", "curl", "--noproxy", "*", ')"
 check "every health check curl carries --noproxy '*'" '[ -z "$NAKED_HC" ] || { printf "%s\n" "$NAKED_HC" | sed "s/^/         /"; false; }'
 # Und so, wie Docker sie ausfuehrt — Shell-Form ueber sh -c, im Verzeichnis mit Dateien (ein ungequotetes *

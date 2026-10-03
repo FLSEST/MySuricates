@@ -30,6 +30,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
+import static org.hamcrest.Matchers.hasEntry;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.Mockito.when;
@@ -278,8 +279,10 @@ class SystemAiProviderControllerTest {
                 .andExpect(jsonPath("$.providers[0].defaultProvider").value(true))
                 .andExpect(jsonPath("$.providers[1].state").value("LOGIN_MISSING"))
                 .andExpect(jsonPath("$.providers[1].login").value("codex login"))
-                .andExpect(jsonPath("$.providers[1].loginVia").doesNotExist())
-                .andExpect(jsonPath("$.providers[1].loginNote").doesNotExist())
+                // Felder ohne Wert kommen als null, sie fehlen nicht — so zeigt es docs/api-referenz.md (38f30352)
+                .andExpect(jsonPath("$", hasEntry("loginCommand", (Object) null)))
+                .andExpect(jsonPath("$.providers[1]", hasEntry("loginVia", (Object) null)))
+                .andExpect(jsonPath("$.providers[1]", hasEntry("loginNote", (Object) null)))
                 // eab43a8b: what follows the command comes as a key the interface translates
                 .andExpect(jsonPath("$.providers[2].login").value("pi"))
                 .andExpect(jsonPath("$.providers[2].loginNote").value("pi_slash_login"));

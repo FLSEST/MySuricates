@@ -2376,32 +2376,36 @@ Whether the AI CLIs on the backend's machine are ready: per provider the program
 ```json
 {
   "container": false,
+  "loginCommand": null,
   "checkedAt": "2026-09-24T10:00:00Z",
   "providers": [
     {
       "id": "CLAUDE", "cli": "claude", "state": "READY",
       "installed": true, "loggedIn": true, "loginVia": "ENVIRONMENT", "loginSource": "CLAUDE_CODE_OAUTH_TOKEN",
-      "install": "curl -fsSL https://claude.ai/install.sh | bash   (or: npm install -g @anthropic-ai/claude-code)",
-      "login": "claude auth login", "defaultProvider": true
+      "install": "curl -fsSL https://claude.ai/install.sh | bash -s <version>   (or: npm install -g @anthropic-ai/claude-code@<version>)",
+      "login": "claude auth login", "defaultProvider": true, "loginNote": null
     },
     {
       "id": "CODEX", "cli": "codex", "state": "LOGIN_MISSING",
       "installed": true, "loggedIn": false, "loginVia": null, "loginSource": null,
-      "install": "npm install -g @openai/codex", "login": "codex login", "defaultProvider": false
+      "install": "npm install -g @openai/codex@<version>", "login": "codex login",
+      "defaultProvider": false, "loginNote": null
     },
     {
       "id": "PI", "cli": "pi", "state": "LOGIN_MISSING",
       "installed": true, "loggedIn": false, "loginVia": null, "loginSource": null,
       "install": "npm install -g @earendil-works/pi-coding-agent@<version>", "login": "pi",
-      "loginNote": "pi_slash_login", "defaultProvider": false
+      "defaultProvider": false, "loginNote": "pi_slash_login"
     }
   ]
 }
 ```
 
 `state`: `READY` (program and login found), `LOGIN_MISSING` (program found, no login), `NOT_INSTALLED` (program missing). `loginSource`: the variable name or the login file as `~/…` — or as `$VARIABLE/…` when a container instance moves the directory (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `PI_CODING_AGENT_DIR`). `container: true` means the backend runs in a container: the programs and logins inside it are what counts.
-`login` is only the command; what to do after it comes as a key in `loginNote` (missing when the command says it
+`login` is only the command; what to do after it comes as a key in `loginNote` (`null` when the command says it
 all) — the interface translates it (`aiProviderStatus.loginNotes`), and so does the installer (`M_login_note_<key>`).
+
+Fields without a value come as `null`, they are not left out. `loginCommand` names, in a container, the fixed login command of the start path (e.g. `scripts/tryout.sh login [claude|codex|pi]`), otherwise `null`; `install` names the pinned CLI version ([entwicklung.md → AI CLI versions](entwicklung.md#ai-cli-versions-installer-and-tryout)).
 
 ### `POST /api/v1/system/ai-providers/status/refresh`
 

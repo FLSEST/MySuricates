@@ -22,14 +22,14 @@ PROVIDER_IDS=(
 )
 
 PROVIDER__claude__cli="claude"
-PROVIDER__claude__install="curl -fsSL https://claude.ai/install.sh | bash   (or: npm install -g @anthropic-ai/claude-code)"
+PROVIDER__claude__install="curl -fsSL https://claude.ai/install.sh | bash -s 2.1.288   (or: npm install -g @anthropic-ai/claude-code@2.1.288)"
 PROVIDER__claude__login="claude auth login"
 PROVIDER__claude__login_files=".claude/.credentials.json .claude.json:oauthAccount"
 PROVIDER__claude__login_env="CLAUDE_CODE_OAUTH_TOKEN ANTHROPIC_API_KEY"
 PROVIDER__claude__login_note=""
 
 PROVIDER__codex__cli="codex"
-PROVIDER__codex__install="npm install -g @openai/codex"
+PROVIDER__codex__install="npm install -g @openai/codex@0.154.0"
 PROVIDER__codex__login="codex login"
 PROVIDER__codex__login_files=".codex/auth.json"
 PROVIDER__codex__login_env="OPENAI_API_KEY CODEX_API_KEY"
