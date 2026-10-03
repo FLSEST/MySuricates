@@ -54,30 +54,30 @@ check "APT_REFRESH passed, empty by default (8b7a39b9)" 'grep -q -- "--build-arg
 : > "$DOCKER_LOG"; MYSURICATES_APT_REFRESH=2026-10 bash "$SCRIPT" build >/dev/null 2>&1
 check "... a new value from the environment"   'grep -q -- "--build-arg APT_REFRESH=2026-10 -t" "$DOCKER_LOG"'
 check "version + revision labels"              'grep -q "image.version=0.10.0" "$DOCKER_LOG" && grep -q "image.revision=$(git -C "$REPO" rev-parse v0.10.0)" "$DOCKER_LOG"'
-check "context is the tag, not the worktree"   'tar -xOf "$DOCKER_CTX" deploy/Dockerfile | grep -q tryout && ! tar -xOf "$DOCKER_CTX" deploy/Dockerfile | grep -q dirty'
+check "context is the tag, not the worktree"   'tar -xOf "$DOCKER_CTX" deploy/Dockerfile | grep tryout >/dev/null && ! tar -xOf "$DOCKER_CTX" deploy/Dockerfile | grep dirty >/dev/null'
 OUT="$(bash "$SCRIPT" build --ref v0.1.0 2>&1)"; RC=$?
-check "old tag without tryout stage refused"   '[ "$RC" = 2 ] && printf "%s" "$OUT" | grep -q "Tryout-Stufe"'
+check "old tag without tryout stage refused"   '[ "$RC" = 2 ] && printf "%s" "$OUT" | grep "Tryout-Stufe" >/dev/null'
 OUT="$(bash "$SCRIPT" build --ref nope 2>&1)"; RC=$?
 check "unknown ref refused"                    '[ "$RC" = 2 ]'
 
 echo "3) start: nothing from the host is mounted"
 : > "$DOCKER_LOG"; OUT="$(bash "$SCRIPT" start --port 9123 2>&1)"
 RUN="$(grep "^run " "$DOCKER_LOG")"
-check "binds to localhost only"                'printf "%s" "$RUN" | grep -q -- "-p 127.0.0.1:9123:9090"'
+check "binds to localhost only"                'printf "%s" "$RUN" | grep -- "-p 127.0.0.1:9123:9090" >/dev/null'
 check "only the two tryout volumes"            '[ "$(printf "%s" "$RUN" | grep -o -- "-v [^ ]*" | tr "\n" " ")" = "-v mysuricates-tryout-data:/app/data -v mysuricates-tryout-secrets:/app/secrets " ]'
-check "no docker socket, no host paths"        '! printf "%s" "$RUN" | grep -q "docker.sock\|/home/\|/seed"'
-check "CORS matches the chosen port"           'printf "%s" "$RUN" | grep -q "AUTOMATION_CORS_ORIGINS=http://localhost:9123"'
-check "login command for the status card"      'printf "%s" "$RUN" | grep -q -- "-e MYSURICATES_LOGIN_COMMAND=scripts/tryout.sh login \[claude|codex|pi\]"'
+check "no docker socket, no host paths"        '! printf "%s" "$RUN" | grep "docker.sock\|/home/\|/seed" >/dev/null'
+check "CORS matches the chosen port"           'printf "%s" "$RUN" | grep "AUTOMATION_CORS_ORIGINS=http://localhost:9123" >/dev/null'
+check "login command for the status card"      'printf "%s" "$RUN" | grep -- "-e MYSURICATES_LOGIN_COMMAND=scripts/tryout.sh login \[claude|codex|pi\]" >/dev/null'
 rm -f "$DOCKER_RAN"; OUT="$(NO_IMAGE=1 bash "$SCRIPT" start 2>&1)"; RC=$?
-check "missing image: clear hint"              '[ "$RC" = 2 ] && printf "%s" "$OUT" | grep -q "build"'
+check "missing image: clear hint"              '[ "$RC" = 2 ] && printf "%s" "$OUT" | grep "build" >/dev/null'
 : > "$DOCKER_LOG"; OUT="$(EXISTS=1 PORT_OUT=9123 bash "$SCRIPT" start 2>&1)"
 check "existing container is reused"           '! grep -q "^run " "$DOCKER_LOG"'
-check "prints address and key"                 'printf "%s" "$OUT" | grep -q "http://localhost:9123" && printf "%s" "$OUT" | grep -q KEY123'
+check "prints address and key"                 'printf "%s" "$OUT" | grep "http://localhost:9123" >/dev/null && printf "%s" "$OUT" | grep KEY123 >/dev/null'
 
 rm -f "$DOCKER_RAN"; python3 -c 'import socket,time;s=socket.socket();s.bind(("127.0.0.1",0));s.listen();print(s.getsockname()[1],flush=True);time.sleep(30)' > "$TMP/port" & LSN=$!
 for _ in 1 2 3 4 5 6 7 8 9 10; do [ -s "$TMP/port" ] && break; sleep 0.2; done
 : > "$DOCKER_LOG"; OUT="$(bash "$SCRIPT" start --port "$(cat "$TMP/port")" 2>&1)"; RC=$?; kill "$LSN" 2>/dev/null
-check "busy port refused before docker run"    '[ "$RC" = 2 ] && printf "%s" "$OUT" | grep -q belegt && ! grep -q "^run " "$DOCKER_LOG"'
+check "busy port refused before docker run"    '[ "$RC" = 2 ] && printf "%s" "$OUT" | grep belegt >/dev/null && ! grep -q "^run " "$DOCKER_LOG"'
 : > "$DOCKER_LOG"; OUT="$(RUN_FAILS=1 bash "$SCRIPT" start --port 1 2>&1)"; RC=$?
 check "failed run leaves no container behind"  '[ "$RC" = 2 ] && grep -q "^rm -f mysuricates-tryout" "$DOCKER_LOG"'
 

@@ -75,7 +75,7 @@ echo "5b) the same in every image: third-party repos and unpinned packages refre
 lof() { grep -n "$2" "$1" | head -n 1 | cut -d: -f1; }   # DATEI MUSTER — Nummer der ersten Zeile
 SDF="$R/ai-automation-backend/docker/Dockerfile.stable"; PDF="$R/ai-automation-backend/docker/Dockerfile.agent-python"
 DFS="$(cd "$R" && git ls-files '*Dockerfile*' 2>/dev/null)"
-check "Dockerfiles found (deploy, stable, agent-devops)" 'printf "%s\n" "$DFS" | grep -qx deploy/Dockerfile && printf "%s\n" "$DFS" | grep -qx ai-automation-backend/docker/Dockerfile.stable && printf "%s\n" "$DFS" | grep -qx ai-automation-backend/docker/Dockerfile.agent-devops'
+check "Dockerfiles found (deploy, stable, agent-devops)" 'printf "%s\n" "$DFS" | grep -x deploy/Dockerfile >/dev/null && printf "%s\n" "$DFS" | grep -x ai-automation-backend/docker/Dockerfile.stable >/dev/null && printf "%s\n" "$DFS" | grep -x ai-automation-backend/docker/Dockerfile.agent-devops >/dev/null'
 for f in $DFS; do
   grep -q "sources.list.d/" "$R/$f" || continue
   check "$f: every third-party repo behind ARG APT_REFRESH" '[ -n "$(lof "$R/$f" "^ARG APT_REFRESH=")" ] && [ "$(lof "$R/$f" "^ARG APT_REFRESH=")" -lt "$(lof "$R/$f" "sources.list.d/")" ] && grep -q "RUN echo \"APT_REFRESH=\${APT_REFRESH" "$R/$f"'
@@ -123,7 +123,7 @@ hc_lines() {
   done
 }
 HC="$(hc_lines)"; T="$(printf '\t')"
-check "found: HEALTHCHECK and compose healthcheck"   'printf "%s\n" "$HC" | grep -q "^deploy/Dockerfile${T}curl " && printf "%s\n" "$HC" | grep -q "^ai-automation-backend/docker-compose.test.yml${T}\[\"CMD\", \"curl\""'
+check "found: HEALTHCHECK and compose healthcheck"   'printf "%s\n" "$HC" | grep "^deploy/Dockerfile${T}curl " >/dev/null && printf "%s\n" "$HC" | grep "^ai-automation-backend/docker-compose.test.yml${T}\[\"CMD\", \"curl\"" >/dev/null'
 NAKED_HC="$(printf '%s\n' "$HC" | grep curl | grep -vF -e "${T}curl --noproxy '*' " -e '["CMD", "curl", "--noproxy", "*", ')"
 check "every health check curl carries --noproxy '*'" '[ -z "$NAKED_HC" ] || { printf "%s\n" "$NAKED_HC" | sed "s/^/         /"; false; }'
 # Und so, wie Docker sie ausfuehrt — Shell-Form ueber sh -c, im Verzeichnis mit Dateien (ein ungequotetes *

@@ -472,7 +472,7 @@ PY
 )"
 KEYED_PATHS=""
 for P in $PERF_API_PATHS; do
-  printf '%s\n' "${HYGIENE_POOL_API_ALLOWED[@]}" | grep -qxF "$P" || KEYED_PATHS="$KEYED_PATHS $P"
+  printf '%s\n' "${HYGIENE_POOL_API_ALLOWED[@]}" | grep -xF "$P" >/dev/null || KEYED_PATHS="$KEYED_PATHS $P"
 done
 check "Blatt ruft nur schluesselfreie Endpunkte" '[ -n "$PERF_API_PATHS" ] && [ -z "$KEYED_PATHS" ]'
 # c2cda5ed: /actuator/metrics verlangt den Key — die Heap-Zahlen kommen vom schmalen Endpunkt.

@@ -280,7 +280,7 @@ check "## files nennt NCLOC, Zeilen und Aenderungen je Datei" \
   "sed -n '/^## files\$/,/^## ratchet\$/p' '$TMP/scan-metrics.out' | grep -E '^[0-9]+${TAB}[0-9]+${TAB}[0-9]+${TAB}(-|[0-9]+)${TAB}com/automation/service/BusyService\.java\$' >/dev/null"
 # NCLOC der Bean: 3 Kopfzeilen + 21 Felder + schliessende Klammer; die 200 Filler-Kommentare zaehlen nicht.
 check "BusyService: NCLOC ohne Kommentarzeilen (25 von 225 Zeilen)" \
-  "sed -n '/^## files\$/,/^## ratchet\$/p' '$TMP/scan-metrics.out' | grep -qx '25${TAB}225${TAB}0${TAB}7${TAB}com/automation/service/BusyService.java'"
+  "sed -n '/^## files\$/,/^## ratchet\$/p' '$TMP/scan-metrics.out' | grep -x '25${TAB}225${TAB}0${TAB}7${TAB}com/automation/service/BusyService.java' >/dev/null"
 
 echo "5c) Faktenblatt nennt die Grenzen der Architektur-Tests (810b12e9, seit b8c06b94 in ## ratchet)"
 # PackageCycleRatchetTest haelt jede Zyklus-Komponente mit mehr als zwei Paketen fest. ## ratchet gibt sie
@@ -334,9 +334,9 @@ check "je Komponente eine Zeile, Mitglieder sortiert, Reihenfolge wie im Test" \
 check "ALLOWED_PAIRS als sortiertes Paar" \
   '[ "$(ratchet_lines "$TMP/ratchet-fix.out" pair)" = "pair${TAB}com.automation.a${TAB}com.automation.b" ]'
 check "ALLOWLIST mit Obergrenze je Datei" \
-  'ratchet_lines "$TMP/ratchet-fix.out" allowlist | grep -qx "allowlist${TAB}330${TAB}com/automation/service/BusyService.java"'
+  'ratchet_lines "$TMP/ratchet-fix.out" allowlist | grep -x "allowlist${TAB}330${TAB}com/automation/service/BusyService.java" >/dev/null'
 check "state ok und MAX_LINES gelesen" \
-  'ratchet_lines "$TMP/ratchet-fix.out" state | grep -qx "state${TAB}ok" && ratchet_lines "$TMP/ratchet-fix.out" max_lines | grep -qx "max_lines${TAB}300"'
+  'ratchet_lines "$TMP/ratchet-fix.out" state | grep -x "state${TAB}ok" >/dev/null && ratchet_lines "$TMP/ratchet-fix.out" max_lines | grep -x "max_lines${TAB}300" >/dev/null'
 check "summary nennt ratchet_state=ok" 'grep -qx "ratchet_state=ok" "$TMP/ratchet-fix.out"'
 # Die echten Testdateien: faellt ihre Schreibweise aus dem Muster, faellt es hier auf und nicht erst im
 # Review (dort hiesse ein leerer Abschnitt nur "nicht herabstufen").
@@ -349,11 +349,11 @@ ratchet_lines "$TMP/ratchet-real.out" component > "$TMP/real-cycle-lines.txt"
 REAL_MAX="$(sed -nE 's/.*MAX_CYCLE_COMPONENT_SIZE = ([0-9]+);.*/\1/p' "$REAL_CYCLES")"
 REAL_GROUPS="$(sed -n '/CYCLE_COMPONENTS = List.of(/,/);/p' "$REAL_CYCLES" | grep -c 'Set.of(')"
 REAL_ENTRIES="$(grep -cE 'entry\("[^"]+", [0-9]+\)' "$REAL_SIZES")"
-check "echter Test: state ok"                      'ratchet_lines "$TMP/ratchet-real.out" state | grep -qx "state${TAB}ok"'
+check "echter Test: state ok"                      'ratchet_lines "$TMP/ratchet-real.out" state | grep -x "state${TAB}ok" >/dev/null'
 check "echter Test: eine Zeile je Set.of-Gruppe" \
   '[ "$REAL_GROUPS" -ge 1 ] && [ "$(wc -l < "$TMP/real-cycle-lines.txt")" -eq "$REAL_GROUPS" ]'
 check "echter Test: die erste Komponente hat MAX_CYCLE_COMPONENT_SIZE Pakete" \
-  '[ -n "$REAL_MAX" ] && head -1 "$TMP/real-cycle-lines.txt" | grep -q "^component${TAB}$REAL_MAX${TAB}com\.automation\."'
+  '[ -n "$REAL_MAX" ] && head -1 "$TMP/real-cycle-lines.txt" | grep "^component${TAB}$REAL_MAX${TAB}com\.automation\." >/dev/null'
 check "echter Test: jede Zeile nennt so viele Pakete wie ihre Groesse" \
   'awk -F"\t" "{ if (split(\$3, m, \",\") != \$2) bad++ } END { exit (bad > 0) }" "$TMP/real-cycle-lines.txt"'
 check "echter Test: jede ALLOWLIST-Zeile gelesen" \
@@ -363,18 +363,18 @@ check "echter Test: jede ALLOWLIST-Zeile gelesen" \
 REAL_PAIRS="$(sed -n '/ALLOWED_PAIRS = Set.of(/,/);/p' "$REAL_CYCLES" | grep -c '<->')"
 check "echter Test: ALLOWED_PAIRS zeigt Paare oder (keine), nie nichts" \
   'if [ "$REAL_PAIRS" -ge 1 ]; then [ "$(ratchet_lines "$TMP/ratchet-real.out" pair | wc -l)" -eq "$REAL_PAIRS" ];
-   else ratchet_lines "$TMP/ratchet-real.out" "# pair" | grep -qx "# pair${TAB}(keine)"; fi'
+   else ratchet_lines "$TMP/ratchet-real.out" "# pair" | grep -x "# pair${TAB}(keine)" >/dev/null; fi'
 mkdir -p "$TMP/scan-empty/$ARCH_TESTS"
 sed 's/ALLOWED_PAIRS = Set.of(/ALLOWED_PAIRS = Set.of();\n    static final Set<String> UNUSED = Set.of(/' \
   "$SCAN_FIX/$ARCH_TESTS/PackageCycleRatchetTest.java" > "$TMP/scan-empty/$ARCH_TESTS/PackageCycleRatchetTest.java"
 cp "$SCAN_FIX/$ARCH_TESTS/SourceSizeRatchetTest.java" "$TMP/scan-empty/$ARCH_TESTS/"
 metrics_on "$TMP/scan-empty" "$TMP/ratchet-empty.out"
 check "leere ALLOWED_PAIRS: state ok, keine pair-Zeile, dafuer (keine)" \
-  'ratchet_lines "$TMP/ratchet-empty.out" state | grep -qx "state${TAB}ok" &&
+  'ratchet_lines "$TMP/ratchet-empty.out" state | grep -x "state${TAB}ok" >/dev/null &&
    [ -z "$(ratchet_lines "$TMP/ratchet-empty.out" pair)" ] &&
-   ratchet_lines "$TMP/ratchet-empty.out" "# pair" | grep -qx "# pair${TAB}(keine)"'
+   ratchet_lines "$TMP/ratchet-empty.out" "# pair" | grep -x "# pair${TAB}(keine)" >/dev/null'
 check "nicht leere ALLOWED_PAIRS: kein (keine)" \
-  '! ratchet_lines "$TMP/ratchet-fix.out" "# pair" | grep -qx "# pair${TAB}(keine)"'
+  '! ratchet_lines "$TMP/ratchet-fix.out" "# pair" | grep -x "# pair${TAB}(keine)" >/dev/null'
 mkdir -p "$TMP/scan-none"
 metrics_on "$TMP/scan-none" "$TMP/ratchet-none.out"
 check "ohne Testdateien: state missing statt einer leeren Liste" \

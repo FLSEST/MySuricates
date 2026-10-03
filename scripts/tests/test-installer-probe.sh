@@ -98,8 +98,8 @@ printf '#!/usr/bin/env bash\necho "$*" >> "$DOCKER_CALLS"\nexit 0\n' > "$TMP/bin
 PATH="$TMP/bin3:$PATH" INSTALLER_PROBE_PHASE_TIMEOUT=20 timeout 120 bash "$PROBE" --no-screenshots --out "$TMP/p6" \
   --setup-flags "--with-pi --preset research" </dev/null >"$TMP/out" 2>&1
 phase_cmd() { awk -F'\t' -v n="$1" '$1 == n { print $2 }' "$TMP/p6/phases.tsv" 2>/dev/null; }
-check "phase 2 carries the flags"                       'phase_cmd 2-einrichten | grep -qF -- "--lang de --with-pi --preset research"'
-check "phase 1 (check only) does not"                   'phase_cmd 1-pruefen | grep -qF -- "--lang de" && ! phase_cmd 1-pruefen | grep -qF -- "--with-pi"'
+check "phase 2 carries the flags"                       'phase_cmd 2-einrichten | grep -F -- "--lang de --with-pi --preset research" >/dev/null'
+check "phase 1 (check only) does not"                   'phase_cmd 1-pruefen | grep -F -- "--lang de" >/dev/null && ! phase_cmd 1-pruefen | grep -F -- "--with-pi" >/dev/null'
 
 echo "7) container ways: host socket, same path, own names — and only those cleaned up"
 # docker nimmt alles an; ps/volume/network ls listen Namen dieses Laufs (Vorsilbe aus `run --name`)
@@ -135,15 +135,15 @@ STUB
   check "the machine: host network, host socket"        'grep -E "^run -d --name $N --network host -v $TMP/d.sock:/var/run/docker.sock " "$DOCKER_CALLS" >/dev/null'
   check "the clone folder under the same path"          'grep -E "^run .* -v ([^ :]+/machine):\1 " "$DOCKER_CALLS" >/dev/null'
   check "the probe user gets this machine's IDs"        'grep -F -- "-e PROBE_UID=$(id -u) -e PROBE_SOCK_GID=$(stat -c %g "$TMP/d.sock" 2>/dev/null || stat -f %g "$TMP/d.sock") $N bash -c" "$DOCKER_CALLS" >/dev/null'
-  check "setup.sh with the defaults, only the port set" 'awk -F"\t" "\$1==\"2-einrichten\" {print \$2}" "$TMP/p7/phases.tsv" | grep -qx -- "./scripts/setup.sh --yes --port 19871 --lang de"'
-  check "check phase names the way (no mode question)" 'awk -F"\t" "\$1==\"1-pruefen\" {print \$2}" "$TMP/p7/phases.tsv" | grep -qx -- "./scripts/setup.sh --check --runtime container --lang de"'
+  check "setup.sh with the defaults, only the port set" 'awk -F"\t" "\$1==\"2-einrichten\" {print \$2}" "$TMP/p7/phases.tsv" | grep -x -- "./scripts/setup.sh --yes --port 19871 --lang de" >/dev/null'
+  check "check phase names the way (no mode question)" 'awk -F"\t" "\$1==\"1-pruefen\" {print \$2}" "$TMP/p7/phases.tsv" | grep -x -- "./scripts/setup.sh --check --runtime container --lang de" >/dev/null'
   check "setup.sh sees the run's prefix"                'grep -E "^exec -i -u probe .* -e MYSURICATES_PREFIX=$N " "$DOCKER_CALLS" >/dev/null'
   check "cleanup: the machine and its instance"         'grep -qx "rm -f $N" "$DOCKER_CALLS" && grep -qx "rm -f $N-main" "$DOCKER_CALLS"'
   check "cleanup: its volumes, network and image"       'grep -qx "volume rm $N-main-data" "$DOCKER_CALLS" && grep -qx "volume rm $N-main-secrets" "$DOCKER_CALLS" && grep -qx "network rm $N-main_default" "$DOCKER_CALLS" && grep -qx "image rm $N:local" "$DOCKER_CALLS"'
   check "cleanup: nothing else"                         '! grep -E "^(rm|volume rm|network rm|image rm) " "$DOCKER_CALLS" | grep -vE " $N(-main(-data|-secrets|_default)?|:local)?$" | grep . >/dev/null'
   : > "$DOCKER_CALLS"
   way --way staged --port 19874 --out "$TMP/p8" >/dev/null
-  check "staged: Dev · Test · Prod from the port on"     'awk -F"\t" "\$1==\"2-einrichten\" {print \$2}" "$TMP/p8/phases.tsv" | grep -qx -- "./scripts/setup.sh --yes --mode staged --port 19874 --lang de" && awk -F"\t" "\$1==\"1-pruefen\" {print \$2}" "$TMP/p8/phases.tsv" | grep -q -- "--mode staged"'
+  check "staged: Dev · Test · Prod from the port on"     'awk -F"\t" "\$1==\"2-einrichten\" {print \$2}" "$TMP/p8/phases.tsv" | grep -x -- "./scripts/setup.sh --yes --mode staged --port 19874 --lang de" >/dev/null && awk -F"\t" "\$1==\"1-pruefen\" {print \$2}" "$TMP/p8/phases.tsv" | grep -- "--mode staged" >/dev/null'
   check "staged: its own checks are in the report"       'grep -q "^Drei Instanzen gesund" "$TMP/p8/checks.tsv" && grep -q "^Prod mit Siegelpflicht" "$TMP/p8/checks.tsv"'
   check "staged: red without instances"                  'grep -q "gate_status: RED" "$TMP/out"'
   : > "$DOCKER_CALLS"

@@ -45,11 +45,11 @@ STUB
   export CURL_LOG="$TMP/curl.log"; : > "$CURL_LOG"
   OUT="$(env PATH="$TMP/bin:$PATH" TMPDIR="$TMP/tmp" LC_ALL=C AUTOPILOT_URL=http://127.0.0.1:9 \
     AUTOPILOT_API_KEY=seed-key bash "$SCRIPT" 2>&1)"; RC=$?
-  check "runs through: exit 0, Done."          '[ "$RC" = 0 ] && printf "%s" "$OUT" | grep -q "Done\."'
-  check "no unbound variable at the end"       '! printf "%s" "$OUT" | grep -q "unbound variable"'
+  check "runs through: exit 0, Done."          '[ "$RC" = 0 ] && printf "%s" "$OUT" | grep "Done\." >/dev/null'
+  check "no unbound variable at the end"       '! printf "%s" "$OUT" | grep "unbound variable" >/dev/null'
   check "the temporary workflow file is gone"  '[ -z "$(ls -A "$TMP/tmp")" ]'
   check "project, workflow and schedule created" 'grep -q "^POST .*/projects$" "$CURL_LOG" && grep -q "^POST .*/workflows$" "$CURL_LOG" && grep -q "^POST .*/schedules$" "$CURL_LOG"'
-  check "the key via stdin only, never in curl's arguments" 'grep -q "stdin: X-API-Key: seed-key" "$CURL_LOG" && ! grep -v "stdin:" "$CURL_LOG" | grep -q seed-key'
+  check "the key via stdin only, never in curl's arguments" 'grep -q "stdin: X-API-Key: seed-key" "$CURL_LOG" && ! grep -v "stdin:" "$CURL_LOG" | grep seed-key >/dev/null'
 else
   echo "  skip (no jq)"
 fi
