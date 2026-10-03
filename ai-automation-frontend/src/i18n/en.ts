@@ -2953,6 +2953,7 @@ export const en = {
     },
   },
   todos: {
+    savedWithoutPlanning: 'Todo saved, but not its planning',
     fixRun: 'Fix run',
     statusShort: { OPEN: 'Open', IN_PROGRESS: 'WIP', DONE: 'Done', BACKLOG: 'Backlog' },
     resumeSession: 'Resume the agent session — copy the command',

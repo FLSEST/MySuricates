@@ -11,8 +11,10 @@ import { EMPTY_PLANNING, forBackend, formOf, planningChanges, planningConflict, 
  */
 export function useTodoPlanningForm(todo: Todo | null) {
   const update = useUpdateTodoPlanning();
-  const [form, setForm] = useSyncedState<PlanningForm, Todo | null>(
-    todo, (source, prev) => (source ? formOf(source) : prev ?? EMPTY_PLANNING),
+  // Neu abgeleitet nur beim Wechsel des TODOs (Öffnen, anderes TODO), nicht bei jedem neuen Objekt: Der
+  // Refetch nach dem PUT hätte sonst bei gescheitertem PATCH die Eingaben verworfen (bbee09e6, Review)
+  const [form, setForm] = useSyncedState<PlanningForm, string | null>(
+    todo?.id ?? null, (id, prev) => (id && todo ? formOf(todo) : prev ?? EMPTY_PLANNING),
   );
   const changes = todo ? planningChanges(formOf(todo), form) : {};
   const dirty = Object.keys(changes).length > 0;

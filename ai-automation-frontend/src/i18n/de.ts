@@ -2950,6 +2950,7 @@ export const de: TranslationKeys = {
     },
   },
   todos: {
+    savedWithoutPlanning: 'TODO gespeichert, die Einordnung aber nicht',
     fixRun: 'Fix-Run',
     statusShort: { OPEN: 'Offen', IN_PROGRESS: 'Läuft', DONE: 'Erledigt', BACKLOG: 'Backlog' },
     resumeSession: 'Agenten-Sitzung fortsetzen — Befehl kopieren',

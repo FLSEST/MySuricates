@@ -122,7 +122,11 @@ export function useCreateTodo() {
   });
 }
 
-export function useUpdateTodo() {
+/**
+ * `quietSuccess`: no "Todo updated" toast – the TODO dialog reports success itself once its planning is
+ * saved too, and a failed planning instead (bbee09e6).
+ */
+export function useUpdateTodo(options: { quietSuccess?: boolean } = {}) {
   const qc = useQueryClient();
   const toast = useToast();
   const t = useT();
@@ -131,7 +135,7 @@ export function useUpdateTodo() {
       api.put<Todo>(`/todos/${id}`, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['todos'] });
-      toast.success(t.toast.todoUpdated);
+      if (!options.quietSuccess) toast.success(t.toast.todoUpdated);
     },
     onError: (err) => toast.error(apiErrorMessage(err, t.toast.todoUpdateFailed)),
   });

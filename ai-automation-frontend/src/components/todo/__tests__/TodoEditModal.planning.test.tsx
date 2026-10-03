@@ -6,13 +6,20 @@ import { server } from '../../../test/server';
 import { renderWithProviders } from '../../../test/utils';
 import { useI18nStore } from '../../../i18n';
 import { useTodoEditor } from '../../../hooks/useTodoEditor';
+import { useToastStore } from '../../../stores/toastStore';
+import { en } from '../../../i18n/en';
 import { TodoEditModal } from '../TodoEditModal';
 import type { Todo } from '../../../types';
 
 beforeAll(() => server.listen({ onUnhandledRequest: failOnUnhandledRequest }));
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
-beforeEach(() => useI18nStore.setState({ locale: 'en' }));
+beforeEach(() => {
+  useI18nStore.setState({ locale: 'en' });
+  useToastStore.setState({ toasts: [] });
+});
+
+const messages = () => useToastStore.getState().toasts.map((toast) => `${toast.type}: ${toast.message}`);
 
 function todoWith(planning: Record<string, unknown> = {}): Todo {
   return {
@@ -85,6 +92,7 @@ describe('TodoEditModal – one Save for TODO and planning', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(calls.map((c) => c.method)).toEqual(['PUT', 'PATCH']);
     expect(calls[1]!.body).toEqual({ complexity: 'L' });
+    expect(messages()).toEqual([`success: ${en.toast.todoUpdated}`]);
   });
 
   it('sends no planning call when the planning is unchanged', async () => {
@@ -105,6 +113,8 @@ describe('TodoEditModal – one Save for TODO and planning', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled());
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Complexity' })).toHaveValue('XL');
+    // no "Todo updated" – the TODO is saved, its planning is not
+    expect(messages()).toEqual([`error: ${en.todos.savedWithoutPlanning}: planning refused`]);
 
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(calls.map((c) => c.method)).toEqual(['PUT', 'PATCH', 'PUT', 'PATCH']));

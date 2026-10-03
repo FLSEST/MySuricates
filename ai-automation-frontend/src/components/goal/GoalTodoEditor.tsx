@@ -6,7 +6,7 @@ import { useProjects } from '../../hooks/useProjects';
 import { useWorkflows } from '../../hooks/useWorkflows';
 import { useIntegrations } from '../../hooks/useIntegrations';
 import { goalKeys } from '../../hooks/useGoals';
-import { closeAfter } from '../../hooks/useTodoEditor';
+import { useCloseAfterSave } from '../../hooks/useTodoEditor';
 import type { AfterTodoSave } from '../todo/TodoEditModal';
 import type { Todo, UpdateTodoRequest } from '../../types';
 
@@ -34,7 +34,8 @@ export function GoalTodoEditor({ todoId, onClose }: { todoId: string; onClose: (
   const { data: projects = [] } = useProjects();
   const { data: workflows = [] } = useWorkflows();
   const { data: integrations = [] } = useIntegrations();
-  const updateTodo = useUpdateTodo();
+  const updateTodo = useUpdateTodo({ quietSuccess: true });
+  const closeAfter = useCloseAfterSave();
   const exportTodo = useExportTodo();
   // Formular erst füllen, wenn das TODO da ist – und nur einmal je TODO
   const [edit, setEdit] = useState<{ id: string; form: UpdateTodoRequest; tags: string[] } | null>(null);
