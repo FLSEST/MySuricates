@@ -583,11 +583,12 @@ Execute a workflow.
   "triggerSource": "MANUAL",
   "definitionHash": "3f1c…e9",
   "definitionVersionId": "version-uuid",
-  "chainRunId": null
+  "chainRunId": null,
+  "chainId": null
 }
 ```
 
-`definitionHash`/`definitionVersionId` are `null` when `automation.hardening.provenance` is off. `chainRunId` names the chain run that started the run as one of its entries (`triggerSource: CHAIN`, after a resume `RESUME`), otherwise `null` — also for retries and sub-workflows, which only inherit `{{ chain_run_id }}` with the context; runs from before V89 have none. Refused starts create no run: `409 WORKFLOW_TAMPERED` (sealed definition modified), `403 UNATTENDED_REQUIRES_SEAL` (unattended triggers only).
+`definitionHash`/`definitionVersionId` are `null` when `automation.hardening.provenance` is off. `chainRunId` names the chain run that started the run as one of its entries (`triggerSource: CHAIN`, after a resume `RESUME`), otherwise `null` — also for retries and sub-workflows, which only inherit `{{ chain_run_id }}` with the context; runs from before V89 have none. `chainId` names the chain of that chain run (for the link `/chains?chain=<id>`, 3a35ced1), otherwise `null` – also when the chain run is gone; only the detail response carries it, older backends omit it. Refused starts create no run: `409 WORKFLOW_TAMPERED` (sealed definition modified), `403 UNATTENDED_REQUIRES_SEAL` (unattended triggers only).
 
 ### `GET /api/v1/workflows/{id}/runs`
 

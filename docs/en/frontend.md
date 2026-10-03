@@ -152,7 +152,7 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 
 ### Chains (`/chains`, `/chains/:id/run/:runId`)
 
-- Split-panel layout: chain list on the left, detail/execution on the right; the selected chain lives in the URL (`/chains?chain=<id>`, 3a35ced1) – the filter link used by the report head and the chain run (name and back button); there is no page per chain
+- Split-panel layout: chain list on the left, detail/execution on the right; the selected chain lives in the URL (`/chains?chain=<id>`, 3a35ced1) – the filter link used by the report head, the chain run (name and back button) and the run header (`RunProvenance`, “Show chain” once the response carries `chainId`); there is no page per chain
 - Pipeline visualization of chain entries
 - Create/edit modal with workflow search and sorting
 - ChainExecution: live polling for entry status, navigation to individual workflow runs

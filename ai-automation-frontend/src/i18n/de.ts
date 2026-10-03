@@ -984,6 +984,7 @@ export const de: TranslationKeys = {
     },
     definitionHash: 'Definition',
     definitionHashHint: 'SHA-256 der Workflow-Definition, die dieser Run ausgeführt hat',
+    showChain: 'Kette anzeigen',
     triggeredBy: 'Gestartet durch',
     versionCurrent: 'aktuell',
     sourceLabels: {

@@ -982,6 +982,7 @@ export const en = {
     },
     definitionHash: 'Definition',
     definitionHashHint: 'SHA-256 of the workflow definition this run executed',
+    showChain: 'Show chain',
     triggeredBy: 'Started by',
     versionCurrent: 'current',
     sourceLabels: {

@@ -12,6 +12,11 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 /**
  * Tests for the protected helper methods in WorkflowMapper.
@@ -27,6 +32,44 @@ class WorkflowMapperTest extends WorkflowMapper {
     @Override public StepResultResponse toStepResponse(StepResult step) { return null; }
     @Override public WorkflowResponse toResponse(Workflow workflow, Map<String, Long> runCounts) { return null; }
     @Override public List<WorkflowResponse> toResponseList(List<Workflow> workflows, Map<String, Long> runCounts) { return null; }
+
+    /** 3a35ced1: the run origin links the chain page, so the detail response names the chain of its chain run. */
+    @Nested
+    class ChainOfTheChainRun {
+
+        @Test
+        void detailResponse_namesTheChain_fromOneLookupOfTheChainRun() {
+            WorkflowMapperImpl mapper = new WorkflowMapperImpl();
+            mapper.chainRunRepository = mock(com.automation.repository.ChainRunRepository.class);
+            when(mapper.chainRunRepository.findChainIdById("chain-run-7")).thenReturn(java.util.Optional.of("chain-3"));
+
+            WorkflowRunResponse response = mapper.toRunResponse(WorkflowRun.builder().id("run-1")
+                    .triggerSource(TriggerSource.CHAIN).chainRunId("chain-run-7").build());
+
+            assertThat(response.chainRunId()).isEqualTo("chain-run-7");
+            assertThat(response.chainId()).isEqualTo("chain-3");
+        }
+
+        @Test
+        void runOutsideAChain_looksNothingUp() {
+            WorkflowMapperImpl mapper = new WorkflowMapperImpl();
+            mapper.chainRunRepository = mock(com.automation.repository.ChainRunRepository.class);
+
+            assertThat(mapper.toRunResponse(WorkflowRun.builder().id("run-1").build()).chainId()).isNull();
+            verify(mapper.chainRunRepository, never()).findChainIdById(any());
+        }
+
+        @Test
+        void deletedChainRun_orMapperWithoutRepository_leavesTheChainOut() {
+            WorkflowMapperImpl mapper = new WorkflowMapperImpl();
+            WorkflowRun run = WorkflowRun.builder().id("run-1").chainRunId("chain-run-gone").build();
+            assertThat(mapper.toRunResponse(run).chainId()).isNull();
+
+            mapper.chainRunRepository = mock(com.automation.repository.ChainRunRepository.class);
+            when(mapper.chainRunRepository.findChainIdById("chain-run-gone")).thenReturn(java.util.Optional.empty());
+            assertThat(mapper.toRunResponse(run).chainId()).isNull();
+        }
+    }
 
     @Nested
     class SafeWorkflowId {

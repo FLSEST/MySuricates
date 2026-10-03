@@ -53,6 +53,13 @@ public interface ChainRunRepository extends JpaRepository<ChainRun, String> {
            + "FROM ChainRun cr JOIN cr.chain c WHERE cr.id IN :ids")
     List<com.automation.dto.projection.ChainRunOriginRow> findOriginRows(@Param("ids") Collection<String> ids);
 
+    /**
+     * Die Kette eines Ketten-Runs, ohne den Run zu laden – für den Link der Run-Herkunft auf
+     * {@code /chains?chain=<id>} (3a35ced1). Leer, wenn der Ketten-Run gelöscht ist.
+     */
+    @Query("SELECT cr.chain.id FROM ChainRun cr WHERE cr.id = :id")
+    java.util.Optional<String> findChainIdById(@Param("id") String id);
+
     /** Wie {@code WorkflowRunRepository.findStatusesByScheduleIds}, fuer Ketten-Runs (TODO 172a6a67). */
     @Query("SELECT r.triggeredByScheduleId, r.status, r.startedAt FROM ChainRun r "
            + "WHERE r.triggeredByScheduleId IN :scheduleIds "

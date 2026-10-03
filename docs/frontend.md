@@ -152,7 +152,7 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 
 ### Chains (`/chains`, `/chains/:id/run/:runId`)
 
-- Split-Panel-Layout: Chain-Liste links, Detail/Ausführung rechts; die gewählte Kette steht in der URL (`/chains?chain=<id>`, 3a35ced1) – Filter-Link für Bericht-Kopf und Ketten-Lauf (Name und Zurück-Knopf), eine Detailseite je Kette gibt es nicht
+- Split-Panel-Layout: Chain-Liste links, Detail/Ausführung rechts; die gewählte Kette steht in der URL (`/chains?chain=<id>`, 3a35ced1) – Filter-Link für Bericht-Kopf, Ketten-Lauf (Name und Zurück-Knopf) und Run-Kopf (`RunProvenance`, „Kette anzeigen“, sobald die Antwort `chainId` trägt), eine Detailseite je Kette gibt es nicht
 - Pipeline-Visualisierung der Chain-Entries
 - Erstellen/Bearbeiten-Modal mit Workflow-Suche und Sortierung
 - ChainExecution: Live-Polling für Entry-Status, Navigation zu einzelnen Workflow-Runs
