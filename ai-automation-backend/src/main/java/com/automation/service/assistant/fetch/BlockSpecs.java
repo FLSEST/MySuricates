@@ -60,8 +60,8 @@ public final class BlockSpecs {
                     Required config: `goal` (string) — self-contained: absolute paths, exact names (ACT does not see what \
                     REASON saw).
                     Optional: `success_criteria` (string), `max_iterations` (default 10), `iteration_timeout_seconds` \
-                    (default 300), `total_timeout_seconds` (default 1800), `max_total_tokens` (default 200000, input + output \
-                    of all calls), `max_repeated_actions` (default 3), `require_approval` (bool — approval before every \
+                    (default 300), `total_timeout_seconds` (default 1800), `max_total_tokens` (default 200000, uncached input \
+                    + output of all calls; cache tokens do not count), `max_repeated_actions` (default 3), `require_approval` (bool — approval before every \
                     action), `timeout_seconds` (per CLI call, REASON and ACT).
                     """ + AI_OVERRIDES + """
                     Example config: {"goal": "Make mvn test pass in /home/user/app/backend without changing any test", \

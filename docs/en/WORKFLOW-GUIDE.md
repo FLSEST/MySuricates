@@ -250,7 +250,7 @@ Executes an autonomous Goal-Reason-Act-Observe loop. The most powerful but also 
 | `max_iterations` | int | 10 | Hard iteration upper limit |
 | `iteration_timeout_seconds` | int | 300 | Wall-clock timeout per iteration |
 | `total_timeout_seconds` | int | 1800 | Total block timeout (30 min) |
-| `max_total_tokens` | int | 200000 | Token budget (input+output across all iterations) |
+| `max_total_tokens` | int | 200000 | Token budget across all iterations: uncached input + output of REASON and ACT, without cache tokens (see below) |
 | `max_repeated_actions` | int | 3 | Abort after N identical actions |
 | `require_approval` | bool | false | Approval gate before each action |
 | `timeout_seconds` | int | null | Claude CLI timeout per call (REASON + ACT) |
@@ -267,6 +267,8 @@ Executes an autonomous Goal-Reason-Act-Observe loop. The most powerful but also 
   }
 }
 ```
+
+**What `max_total_tokens` counts**: per iteration `inputTokens` + `outputTokens` of the REASON and the ACT phase — that is, the uncached input and the output (thinking tokens are part of `outputTokens`). Cache tokens (`cacheReadInputTokens`, `cacheCreationInputTokens`) deliberately do **not** count: the budget is meant to stay close to cost, not to context size. With Claude the cached part of a call is often orders of magnitude larger than the uncached one; counted in, the usual budgets (100,000–400,000) would already break in the first iteration (decision 114c2ee3). Codex and Pi report no real figures, there the estimate counts (characters / 4, `estimated: true`). The check runs after each iteration: if the sum is above the budget, the block ends with `[TOKEN BUDGET EXCEEDED: …]`, so the last iteration still runs to completion. How much context actually went through the cache is shown in the step metadata and the run's insights card.
 
 **When to use**: Complex multi-step tasks that require judgment — creating files, fixing code, building projects. See [Agentic Block Deep Dive](#8-agentic-block-deep-dive) for details.
 
@@ -1464,7 +1466,7 @@ Old files from previous runs can pollute the agentic block's context (e.g. glob 
 | `max_iterations` | 10 | Hard stop after N iterations |
 | `iteration_timeout_seconds` | 300 | Wall-clock timeout per iteration |
 | `total_timeout_seconds` | 1800 | Total timeout (30 min) |
-| `max_total_tokens` | 200,000 | Token budget (input+output) |
+| `max_total_tokens` | 200,000 | Token budget (uncached input + output, without cache tokens) |
 | `max_repeated_actions` | 3 | Abort after N identical actions |
 | `require_approval` | false | Human gate before each action |
 

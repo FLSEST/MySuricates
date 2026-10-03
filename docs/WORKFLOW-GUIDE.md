@@ -261,7 +261,7 @@ Führt eine autonome Goal-Reason-Act-Observe-Schleife aus. Der mächtigste, aber
 | `max_iterations` | int | 10 | Harte Iterationsobergrenze |
 | `iteration_timeout_seconds` | int | 300 | Wall-Clock-Timeout pro Iteration |
 | `total_timeout_seconds` | int | 1800 | Gesamt-Block-Timeout (30 Min) |
-| `max_total_tokens` | int | 200000 | Token-Budget (Input+Output über alle Iterationen) |
+| `max_total_tokens` | int | 200000 | Token-Budget über alle Iterationen: ungecachte Eingabe + Ausgabe von REASON und ACT, ohne Cache-Tokens (siehe unten) |
 | `max_repeated_actions` | int | 3 | Abbruch nach N identischen Aktionen |
 | `require_approval` | bool | false | Freigabe-Gate vor jeder Aktion |
 | `timeout_seconds` | int | null | Claude-CLI-Timeout pro Aufruf (REASON + ACT) |
@@ -278,6 +278,8 @@ Führt eine autonome Goal-Reason-Act-Observe-Schleife aus. Der mächtigste, aber
   }
 }
 ```
+
+**Was `max_total_tokens` zählt**: je Iteration `inputTokens` + `outputTokens` der REASON- und der ACT-Phase — also die ungecachte Eingabe und die Ausgabe (Denk-Tokens stecken in `outputTokens`). Cache-Tokens (`cacheReadInputTokens`, `cacheCreationInputTokens`) zählen bewusst **nicht** mit: Das Budget soll nah an den Kosten bleiben, nicht an der Kontextgröße. Bei Claude ist der gecachte Teil eines Aufrufs oft um Größenordnungen größer als der ungecachte; mitgezählt würden die üblichen Budgets (100.000–400.000) schon in der ersten Iteration reißen (Entscheidung 114c2ee3). Codex und Pi melden keine echten Zahlen, dort zählt die Schätzung (Zeichen / 4, `estimated: true`). Geprüft wird nach jeder Iteration: Liegt die Summe über dem Budget, endet der Block mit `[TOKEN BUDGET EXCEEDED: …]`; die letzte Iteration läuft also zu Ende. Wie viel Kontext tatsächlich durch den Cache ging, zeigen die Step-Metadaten und die Insights-Karte des Laufs.
 
 **Wann verwenden**: Komplexe mehrstufige Aufgaben, die Urteilsvermögen erfordern — Dateien erstellen, Code reparieren, Projekte bauen. Siehe [Agentic Block Deep Dive](#8-agentic-block-deep-dive) für Details.
 
@@ -1489,7 +1491,7 @@ Alte Dateien aus vorherigen Runs können den Kontext des Agentic-Blocks verschmu
 | `max_iterations` | 10 | Harter Stopp nach N Iterationen |
 | `iteration_timeout_seconds` | 300 | Wall-Clock-Timeout pro Iteration |
 | `total_timeout_seconds` | 1800 | Gesamt-Timeout (30 Min) |
-| `max_total_tokens` | 200.000 | Token-Budget (Input+Output) |
+| `max_total_tokens` | 200.000 | Token-Budget (ungecachte Eingabe + Ausgabe, ohne Cache-Tokens) |
 | `max_repeated_actions` | 3 | Abbruch nach N identischen Aktionen |
 | `require_approval` | false | Menschliches Gate vor jeder Aktion |
 

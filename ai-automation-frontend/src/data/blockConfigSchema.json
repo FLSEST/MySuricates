@@ -369,8 +369,8 @@
         "max_total_tokens": {
           "type": "integer",
           "doc": {
-            "de": "Token-Budget über alle Runden, Input + Output (Standard 200 000).",
-            "en": "Token budget across all rounds, input + output (default 200,000)."
+            "de": "Token-Budget über alle Runden: ungecachte Eingabe + Ausgabe, Cache-Tokens zählen nicht (Standard 200 000).",
+            "en": "Token budget across all rounds: uncached input + output, cache tokens do not count (default 200,000)."
           },
           "default": 200000,
           "minimum": 1
