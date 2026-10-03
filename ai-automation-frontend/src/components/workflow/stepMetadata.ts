@@ -188,3 +188,8 @@ export function compressionFacts(step: StepResult): CompressionFacts | null {
       : [],
   };
 }
+
+/** WAITING_APPROVAL counts as running only while its run still runs (TODO 4eea7a87). */
+export function stepWaitsForPerson(step: StepResult, runActive: boolean): boolean {
+  return step.status === 'WAITING_APPROVAL' && runActive;
+}

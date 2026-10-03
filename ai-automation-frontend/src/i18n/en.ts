@@ -1039,6 +1039,7 @@ export const en = {
       rate: 'Rate:',
       stepNumber: 'Step {n}',
       waitingForPerson: 'Waiting for you – approval or input pending',
+      waitingAborted: 'Run ended – the question was left unanswered',
       stepKind: {
         ai: 'AI',
         deterministic: 'Deterministic',

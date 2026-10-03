@@ -50,4 +50,16 @@ describe('ForEachStepCard', () => {
     expect(screen.queryByText(/items$/)).not.toBeInTheDocument();
     expect(screen.getByText(/\[a\]: ok/)).toBeInTheDocument();
   });
+
+  // 4eea7a87: a foreach that waits for a person (approval in its run) shows it like the agentic card
+  it('shows a waiting step as waiting for you and keeps the progress area', () => {
+    render(<ForEachStepCard step={{ ...step(undefined), status: 'WAITING_APPROVAL', output: '' }} />);
+    expect(screen.getByRole('img', { name: 'Waiting for you – approval or input pending' })).toHaveClass('text-human');
+  });
+
+  it('shows a step left waiting in an ended run as abandoned, not as waiting for you', () => {
+    render(<ForEachStepCard step={{ ...step(undefined), status: 'WAITING_APPROVAL', output: '' }} runActive={false} />);
+    expect(screen.getByRole('img', { name: 'Run ended – the question was left unanswered' })).toHaveClass('text-text-tertiary');
+    expect(screen.queryByRole('img', { name: /Waiting for you/ })).not.toBeInTheDocument();
+  });
 });

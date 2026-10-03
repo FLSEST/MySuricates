@@ -142,4 +142,22 @@ describe('WorkflowExecution approval dialog', () => {
     expect(await screen.findByRole('dialog')).toHaveTextContent('Deploy to production?');
     expect(endpoint.answers).toEqual([]);
   });
+
+  // 4eea7a87: a step left in WAITING_APPROVAL by a run that ended (restart, cancel) must not ask for the user
+  it('shows the waiting step of a running run as waiting for you, of an interrupted run as abandoned', async () => {
+    serve();
+    server.use(http.get('/api/v1/workflows/:id/runs/:runId', () =>
+      HttpResponse.json({ ...RUNNING_RUN, steps: [step(0, 'WAITING_APPROVAL')] })));
+    const first = renderPage();
+    expect(await screen.findByRole('img', { name: 'Waiting for you – approval or input pending' })).toBeInTheDocument();
+    first.unmount();
+
+    server.use(http.get('/api/v1/workflows/:id/runs/:runId', () =>
+      HttpResponse.json({ ...RUNNING_RUN, status: 'INTERRUPTED', steps: [step(0, 'WAITING_APPROVAL')] })),
+    // An ended run loads its insights; not part of this test
+    http.get('/api/v1/learning/runs/:runId/insights', () => HttpResponse.json({ error: 'not found' }, { status: 404 })));
+    renderPage();
+    expect(await screen.findByRole('img', { name: 'Run ended – the question was left unanswered' })).toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: /Waiting for you/ })).not.toBeInTheDocument();
+  });
 });

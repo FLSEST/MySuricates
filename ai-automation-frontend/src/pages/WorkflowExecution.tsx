@@ -56,7 +56,7 @@ export function WorkflowExecution() {
 
   // BPMN-Diagramm nur laden, wenn es einen Run mit Schritten gibt (Ablauf-Visualisierung)
   const { data: bpmnXml } = useWorkflowBpmn(id!, (run?.steps?.length ?? 0) > 0);
-  const { statusByBlock, stepHighlight, selectStep } = useRunDiagramSync(run?.steps);
+  const { statusByBlock, stepHighlight, selectStep } = useRunDiagramSync(run?.steps, isRunning);
 
   const handleRate = (rating: number) => {
     rateRun.mutate({ runId: runId!, rating, workflowId: id! });
@@ -140,11 +140,11 @@ export function WorkflowExecution() {
                 className={stepHighlight?.index === step.stepIndex ? 'ring-2 ring-accent ring-inset rounded-lg bg-accent/5' : ''}
               >
                 {stepBlockType(step) === 'agentic' ? (
-                  <AgenticStepCard step={step} agenticState={agenticStates.get(step.stepIndex)} />
+                  <AgenticStepCard step={step} agenticState={agenticStates.get(step.stepIndex)} runActive={isRunning} />
                 ) : stepBlockType(step) === 'foreach' ? (
-                  <ForEachStepCard step={step} forEachState={forEachStates.get(step.stepIndex)} />
+                  <ForEachStepCard step={step} forEachState={forEachStates.get(step.stepIndex)} runActive={isRunning} />
                 ) : (
-                  <ExecutionStepCard step={step} />
+                  <ExecutionStepCard step={step} runActive={isRunning} />
                 )}
               </div>
             ))}

@@ -7,7 +7,8 @@ import { stepMetadataSummary, wrapperFacts, formatMetadataValue } from './stepMe
 import { StepCardFrame, StepCardHeader, StepWaitingIcon } from './StepCardChrome';
 import { CompressionPanel } from './CompressionPanel';
 
-export function ExecutionStepCard({ step }: { step: StepResult }) {
+/** `runActive` false: the run has ended, a step left waiting is shown as abandoned (default: running). */
+export function ExecutionStepCard({ step, runActive = true }: { step: StepResult; runActive?: boolean }) {
   const t = useT();
   const [inputExpanded, setInputExpanded] = useState(false);
   const [systemPromptExpanded, setSystemPromptExpanded] = useState(false);
@@ -28,7 +29,7 @@ export function ExecutionStepCard({ step }: { step: StepResult }) {
         ) : step.status === 'RUNNING' ? (
           <div className="w-5 h-5 rounded-full border-2 border-accent border-t-transparent animate-spin" />
         ) : step.status === 'WAITING_APPROVAL' ? (
-          <StepWaitingIcon />
+          <StepWaitingIcon runActive={runActive} />
         ) : (
           <div className="w-5 h-5 rounded-full border-2 border-border" />
         )}

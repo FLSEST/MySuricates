@@ -33,6 +33,11 @@ describe('useRunDiagramSync', () => {
     expect([...result.current.statusByBlock]).toEqual([[0, 'running']]);
   });
 
+  it('does not show a waiting step of an ended run as running', () => {
+    const { result } = renderHook(() => useRunDiagramSync([step(0, 'WAITING_APPROVAL', 0)], false));
+    expect(result.current.statusByBlock.size).toBe(0);
+  });
+
   it('has nothing to colour without steps', () => {
     const { result } = renderHook(() => useRunDiagramSync(undefined));
     expect(result.current.statusByBlock.size).toBe(0);
