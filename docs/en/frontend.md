@@ -849,7 +849,7 @@ Responsive hook, detects mobile breakpoint (max-width: 1023px) for adaptive UI a
 - **Hook:** `useT()` → returns the current translation object
 - **Store:** `useI18nStore()` → `locale`, `setLocale()`
 - **Toggle:** Button in the header
-- **Dates and numbers:** only through `src/utils/localeFormat.ts` (`formatDate`, `formatTimeOfDay`, `formatTimestamp`, `formatNumber`, `formatRelativeUnit`) or `src/utils/formatTime.ts`, always with `locale` from `useI18nStore` — without a locale the browser writes in its own language. `src/__tests__/localeFormat.guard.test.ts` allows `Intl` and the `toLocale…String` methods nowhere else
+- **Dates and numbers:** only through `src/utils/localeFormat.ts` (`formatDate`, `formatTimeOfDay`, `formatTimestamp`, `formatNumber`, `formatRelativeUnit`) or `src/utils/formatTime.ts`, always with `locale` from `useI18nStore` — without a locale the browser writes in its own language. `src/__tests__/localeFormat.guard.test.ts` allows `Intl` and the `toLocale…String` methods nowhere else. Times of day use the 24-hour clock in both languages (`hourCycle: 'h23'` in every date/time formatter, a passed `hour12` is dropped; 571524a5)
 - **`<html lang>`:** follows the app language (`syncDocumentLanguage()` in `main.tsx`), for screen readers and hyphenation
 
 ### Translation Structure

@@ -849,7 +849,7 @@ Responsive-Hook, erkennt Mobile-Breakpoint (max-width: 1023px) für adaptive UI-
 - **Hook:** `useT()` → gibt das aktuelle Übersetzungsobjekt zurück
 - **Store:** `useI18nStore()` → `locale`, `setLocale()`
 - **Umschalten:** Button im Header
-- **Datum und Zahl:** nur über `src/utils/localeFormat.ts` (`formatDate`, `formatTimeOfDay`, `formatTimestamp`, `formatNumber`, `formatRelativeUnit`) bzw. `src/utils/formatTime.ts`, immer mit `locale` aus `useI18nStore` — ohne Locale schreibt der Browser in seiner eigenen Sprache. `src/__tests__/localeFormat.guard.test.ts` lässt `Intl` und die `toLocale…String`-Methoden nirgends sonst zu
+- **Datum und Zahl:** nur über `src/utils/localeFormat.ts` (`formatDate`, `formatTimeOfDay`, `formatTimestamp`, `formatNumber`, `formatRelativeUnit`) bzw. `src/utils/formatTime.ts`, immer mit `locale` aus `useI18nStore` — ohne Locale schreibt der Browser in seiner eigenen Sprache. `src/__tests__/localeFormat.guard.test.ts` lässt `Intl` und die `toLocale…String`-Methoden nirgends sonst zu. Uhrzeiten stehen in beiden Sprachen im 24-h-Format (`hourCycle: 'h23'` in allen Datums-/Zeitformatierern, ein übergebenes `hour12` wird verworfen; 571524a5)
 - **`<html lang>`:** folgt der App-Sprache (`syncDocumentLanguage()` in `main.tsx`), für Screenreader und Silbentrennung
 
 ### Übersetzungsstruktur
