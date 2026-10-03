@@ -20,7 +20,6 @@
   "POST /api/v1/activity-log": "POST /api/v1/activity-log",
   "activity_log (SQLite)": "activity_log (SQLite)",
   "STOMP /topic/activity-log": "STOMP /topic/activity-log",
-  "Activity-Seite (fragt alle 10 s ab)": "Activity page (polls every 10 s)",
   "GET /api/v1/activity-log": "GET /api/v1/activity-log",
   "Kategorie": "Category",
   "Beispiele": "Examples",
@@ -47,5 +46,8 @@
   "Header": "Header",
   "Bedeutung": "Meaning",
   "Verbleibende Anfragen im aktuellen 1-Minuten-Fenster": "Remaining requests in the current 1-minute window",
-  "Bei 429: Sekunden, bis das Fenster wieder frei ist": "On 429: seconds until the window frees up again"
+  "Bei 429: Sekunden, bis das Fenster wieder frei ist": "On 429: seconds until the window frees up again",
+  "neuer Eintrag": "new entry",
+  "Activity-Seite": "Activity page",
+  "Die Activity-Seiten (Pro und Simple Mode) abonnieren `/topic/activity-log` und laden die Liste nach, sobald ein Eintrag kommt — höchstens einmal je Sekunde, weil ein Lauf Einträge in Schüben schreibt. Steht die Verbindung nicht (älteres Backend, Netz, kein Ticket), fragen sie wie früher alle 10 s ab.": "The Activity pages (Pro and Simple Mode) subscribe to `/topic/activity-log` and reload the list as soon as an entry arrives — at most once per second, because a run writes entries in bursts. Without a connection (older backend, network, no ticket) they poll every 10 s as before."
 }

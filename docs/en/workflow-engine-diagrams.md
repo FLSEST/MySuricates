@@ -187,7 +187,7 @@ A step with status FAILED ends the run unless `on_failure` is `"continue"`.
 | `simple` | AI | `timeout_seconds`, `provider`, `model`, `effort` | the AI CLI ends with an error |
 | `shell` | Shell | `timeout_seconds`, `container_image`, `checked_command`, `shell_escape_variables` | the exit code is not 0 |
 | `retry` | AI | `execution_mode`=ai/shell, `max_retries`, `delay`, `exponential_backoff`, `timeout_seconds` | all attempts fail |
-| `foreach` | AI | `execution_mode`=ai/shell, `items_source`=list/command, `continue_on_error`, `max_consecutive_failures`, `timeout_seconds` | an item fails (unless `continue_on_error`); `max_consecutive_failures` items fail in a row (default 3, even with `continue_on_error`) |
+| `foreach` | AI | `execution_mode`=ai/shell, `items_source`=list/command, `continue_on_error`, `max_consecutive_failures`, `timeout_seconds` | an item fails (unless `continue_on_error`); `max_consecutive_failures` items fail in a row (default 3, also with `continue_on_error`) |
 | `while` | AI | `execution_mode`=ai/shell, `condition_command`, `max_iterations`, `timeout_seconds` | an iteration fails |
 | `conditional` | AI | `execution_mode`=ai/shell, `then_command`, `else_command`, `timeout_seconds` | the chosen command fails |
 | `switch` | – | `expression`, `cases`, `default` | a block in the chosen case fails |

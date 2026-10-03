@@ -35,7 +35,7 @@ flowchart LR
     UI -->|"GET /api/v1/activity-log"| ALS
 ```
 
-The activity pages (pro and simple mode) subscribe to `/topic/activity-log` and reload the list as soon as an entry arrives — at most once per second, because a run writes entries in bursts. While that connection is down (older backend, network, no ticket) they poll every 10 s as before.
+The Activity pages (Pro and Simple Mode) subscribe to `/topic/activity-log` and reload the list as soon as an entry arrives — at most once per second, because a run writes entries in bursts. Without a connection (older backend, network, no ticket) they poll every 10 s as before.
 
 | Category | Examples |
 |---|---|
