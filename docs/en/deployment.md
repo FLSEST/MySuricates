@@ -837,6 +837,7 @@ The test instance is a dedicated Docker container for automated workflow tests:
 - `TestingService` — manages the test Docker container
 - No auto-start on boot (`automation.staging.test-auto-start=false`) — start via the "MySuricates Test" icon or `staging.sh test-start`
 - No auto-sync of definitions on boot (only on `reset`)
+- No AI tagging in the background (`AUTOMATION_DISCOVERY_AUTO_TAGGING_ENABLED=false` in `docker-compose.test.yml`) — created workflows, e.g. from Cypress with `CYPRESS_TARGET=test`, cost no tokens
 - Database can be reset via API (`POST /api/v1/testing/reset`)
 
 **Key Files:**

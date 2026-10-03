@@ -56,6 +56,8 @@ for f in docker-compose.stable.yml docker-compose.test.yml docker-compose.dev-co
   check "$f: both key files on /app/secrets" 'grep -q "AUTOMATION_INTEGRATION_KEY_FILE=/app/secrets/" "$C" && grep -q "AUTOMATION_SEAL_KEY_FILE=/app/secrets/" "$C"'
   check "$f: own secrets volume, declared"   'grep -qE "^      - [a-z-]+-secrets:/app/secrets$" "$C" && grep -qE "^  [a-z-]+-secrets:$" "$C"'
 done
+# Die Test-Instanz (:8090) taggt Workflows nicht per KI (5d008bba) — Cypress legt dort Workflows an
+check "docker-compose.test.yml: no AI auto-tagging" 'grep -qx "      - AUTOMATION_DISCOVERY_AUTO_TAGGING_ENABLED=false" "$R/ai-automation-backend/docker-compose.test.yml"'
 check "Dockerfile.stable prepares /app/secrets"  'grep -q "/app/secrets" "$R/ai-automation-backend/docker/Dockerfile.stable"'
 check "backend entrypoint hands /app/secrets to the app user" 'grep -q "chown .*/app/secrets" "$BEP" && grep -q "chmod 700 /app/secrets" "$BEP"'
 

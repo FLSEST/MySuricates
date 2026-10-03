@@ -28,6 +28,10 @@ services:
       # `compose down` weg — und mit ihnen die verschlüsselten Integrations-Zugänge und die Siegel.
       - AUTOMATION_INTEGRATION_KEY_FILE=/app/secrets/integration-encryption.key
       - AUTOMATION_SEAL_KEY_FILE=/app/secrets/seal-signing.key
+      # Kein KI-Tagging im Hintergrund (5d008bba): Sonst startet jeder angelegte oder geaenderte
+      # Workflow — auch die, die Cypress mit CYPRESS_TARGET=test hier anlegt — einen KI-Aufruf mit der
+      # Anmeldung des Containers. Wie die Integrationstests und die E2E-Nebeninstanz.
+      - AUTOMATION_DISCOVERY_AUTO_TAGGING_ENABLED=false
     volumes:
       - test-data:/app/data
       - test-secrets:/app/secrets

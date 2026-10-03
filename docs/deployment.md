@@ -847,6 +847,7 @@ Die Test-Instanz ist ein dedizierter Docker-Container für automatisierte Workfl
 - `TestingService` — verwaltet den Test-Docker-Container
 - Kein Auto-Start beim Boot (`automation.staging.test-auto-start=false`) — Start via Icon „MySuricates Test" bzw. `staging.sh test-start`
 - Kein Auto-Sync von Definitionen beim Boot (nur bei `reset`)
+- Kein KI-Tagging im Hintergrund (`AUTOMATION_DISCOVERY_AUTO_TAGGING_ENABLED=false` in `docker-compose.test.yml`) — angelegte Workflows, etwa aus Cypress mit `CYPRESS_TARGET=test`, kosten keine Tokens
 - Datenbank kann via API zurückgesetzt werden (`POST /api/v1/testing/reset`)
 
 **Key-Dateien:**
