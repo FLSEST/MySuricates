@@ -211,7 +211,7 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 
 ### WorkflowDetail (`/workflows/:id`) — Erweiterungen
 
-- **Memory-Tab:** Workflow-Memory-Einträge anzeigen, aktivieren, löschen, neu extrahieren (`WorkflowMemoryPanel.tsx`; ein Eintrag ist `WorkflowMemoryItem.tsx`, der Extraktions-Dialog `MemoryExtractModal.tsx` mit Zustand in `hooks/useMemoryExtraction.ts`: gewählte Läufe, Anbieter, Sekundenzähler, nach Erfolg schließen)
+- **Memory-Tab:** Workflow-Memory-Einträge anzeigen, aktivieren, löschen, neu extrahieren (`WorkflowMemoryPanel.tsx`; ein Eintrag ist `WorkflowMemoryItem.tsx`, der Extraktions-Dialog `MemoryExtractModal.tsx` mit Zustand in `hooks/useMemoryExtraction.ts`: gewählte Läufe, Anbieter, Sekundenzähler, nach Erfolg schließen). Ohne Läufe bleibt „Wissen extrahieren“ gesperrt – die Extraktion lernt aus Läufen –, auch wenn schon Gedächtnis-Versionen da sind; das Panel nennt dann den Grund (`extractionAvailability`, gezählt über alle Läufe, 442702e2)
 - **Instructions-Tab:** Workflow-spezifische Agent-Instructions im Monaco-Editor bearbeiten
 - **Gate-Status:** Anzeige des letzten Gate-Status im Run-Verlauf
 - **BPMN-Diagramm:** `BpmnDiagramView.tsx` zeichnet den BPMN-Export als SVG (Zoom, Klick/Hover je Block, Live-Status im Run). Die reine Logik — XML lesen, oben→unten-Layout, Beschriftungen umbrechen, Element-ID → Block-Auswahl — liegt in `bpmnLayout.ts` (Test `bpmnLayout.test.ts`), die Formen und Marker je Element-Typ in `BpmnShapes.tsx`.
