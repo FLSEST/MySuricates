@@ -89,7 +89,7 @@ export function WorkflowDetailSidebar({
         </Card>
       </fieldset>
 
-      {memoryModule && <WorkflowMemoryPanel workflowId={workflow.id} runs={runs?.content} />}
+      {memoryModule && <WorkflowMemoryPanel workflowId={workflow.id} runs={runs?.content} runTotal={runs?.totalElements} />}
 
       <fieldset disabled={sealed} className="min-w-0 space-y-4" title={sealed ? t.workflows.sealedLocked : undefined}>
         <WorkflowAiSettingsCards workflow={workflow} />

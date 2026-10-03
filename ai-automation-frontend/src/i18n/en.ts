@@ -2329,6 +2329,7 @@ export const en = {
   memory: {
     title: 'Workflow Memory',
     extractKnowledge: 'Extract Knowledge',
+    extractNeedsRuns: 'Knowledge can only be extracted once the workflow has runs — the extraction learns from them.',
     extracting: 'Extracting...',
     extractingHint: 'This may take 30–60 seconds',
     noMemories: 'No memory versions yet. Extract knowledge from past runs.',

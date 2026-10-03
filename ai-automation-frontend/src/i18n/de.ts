@@ -2326,6 +2326,7 @@ export const de: TranslationKeys = {
   memory: {
     title: 'Workflow-Gedächtnis',
     extractKnowledge: 'Wissen extrahieren',
+    extractNeedsRuns: 'Wissen lässt sich erst extrahieren, wenn der Workflow Läufe hat – die Extraktion lernt aus ihnen.',
     extracting: 'Extrahiere...',
     extractingHint: 'Das kann 30–60 Sekunden dauern',
     noMemories: 'Noch keine Gedächtnis-Versionen. Extrahiere Wissen aus vergangenen Ausführungen.',
