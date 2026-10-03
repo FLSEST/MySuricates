@@ -99,8 +99,8 @@ export function ProviderCard({
   const ready = isReadyWithoutConnection(provider);
   return (
     <Card
-      className={`cursor-pointer transition-all hover:border-primary/50 ${
-        selected ? 'border-primary ring-1 ring-primary/30' : ''
+      className={`cursor-pointer transition-all hover:border-accent/50 ${
+        selected ? 'border-accent ring-1 ring-accent/30' : ''
       }`}
       onClick={onToggle}
     >
