@@ -469,6 +469,95 @@ class AuditFingerprintMigrationJobTest {
                 .firstSeenAt(firstSeenAt).lastSeenAt(lastSeenAt).occurrenceCount(2).build());
     }
 
+    // --- v6 (87a1dac0): Klassenname = Pfad, Kennzahl-Regeln mit FAKT-Namen ----------------------
+
+    /**
+     * Derselbe Befund stand einmal unter dem Klassennamen (akzeptiert) und einmal unter dem Pfad (offen, mit
+     * verwaltetem TODO). Der Aufraeumlauf fuehrt beide zusammen; die Akzeptanz gewinnt, das TODO schliesst.
+     */
+    @Test
+    void mergesClassNameAndPathOfTheSameClass_keepingTheAcceptedRisk() {
+        AuditFinding accepted = saveFinding("AssistantService", AuditFindingStatus.ACCEPTED_RISK, 2, T0, T1, reportOld, "run-old");
+        accepted.setDispositionNote("Fassade, Aufteilung geplant");
+        accepted.setDispositionEvidence("AssistantService: 420 Zeilen");
+        accepted.setDispositionAt(T1);
+        accepted.setResolvedAt(T1);
+        findingRepository.saveAndFlush(accepted);
+        AuditFinding path = saveFinding("com/automation/service/AssistantService.java", AuditFindingStatus.OPEN, 1,
+                T2, T2, reportNew, "run-new");
+        String todoId = todoRepository.save(Todo.builder().title("AssistantService aufteilen")
+                .status(Todo.Status.OPEN).priority(Todo.Priority.HIGH).projectId(projectId)
+                .source(Todo.Source.WORKFLOW).sourceAgent("audit-center")
+                .referenceType("audit_finding").referenceId(path.getId()).build()).getId();
+        findingTodoRepository.save(AuditFindingTodo.builder().findingId(path.getId()).todoId(todoId).managed(true).build());
+
+        job.migrate();
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(findingRepository.findByProjectIdAndAuditKey(projectId, AUDIT_KEY))
+                .extracting(AuditFinding::getId).containsExactly(accepted.getId());
+        AuditFinding merged = findingRepository.findById(accepted.getId()).orElseThrow();
+        assertThat(merged.getStatus()).isEqualTo(AuditFindingStatus.ACCEPTED_RISK);
+        assertThat(merged.getDispositionNote()).isEqualTo("Fassade, Aufteilung geplant");
+        assertThat(merged.getDispositionEvidence()).isEqualTo("AssistantService: 420 Zeilen");
+        assertThat(merged.getOccurrenceCount()).isEqualTo(3);
+        assertThat(merged.getSubject()).as("neuester subject gewinnt")
+                .isEqualTo("com/automation/service/AssistantService.java");
+        assertThat(merged.getFingerprint())
+                .isEqualTo(AuditSnapshotApplier.fingerprint(projectId, AUDIT_KEY, RULE_KEY, "AssistantService"));
+        assertThat(todoRepository.findById(todoId)).get().extracting(Todo::getStatus).isEqualTo(Todo.Status.DONE);
+
+        job.migrate();
+        entityManager.flush();
+        entityManager.clear();
+
+        AuditFinding again = findingRepository.findById(accepted.getId()).orElseThrow();
+        assertThat(again.getFingerprint()).as("zweiter Lauf aendert nichts").isEqualTo(merged.getFingerprint());
+        assertThat(again.getOccurrenceCount()).isEqualTo(3);
+        assertThat(again.getStatus()).isEqualTo(AuditFindingStatus.ACCEPTED_RISK);
+    }
+
+    /** Kennzahl-Regel: gedriftete subjects ("Datenbank", "DB-Groesse") gehen auf den FAKT-Namen ueber. */
+    @Test
+    void mergesDriftedSubjectsOfAMetricRuleOntoTheFactName_keepingTheAcceptedRisk() {
+        String performance = "mysuricates.performance";
+        AuditFinding first = saveScopedFinding(performance, "perf.db.size", "Datenbank", AuditFindingStatus.RESOLVED, T0, T0);
+        AuditFinding accepted = saveScopedFinding(performance, "perf.db.size", "DB-Groesse",
+                AuditFindingStatus.ACCEPTED_RISK, T1, T1);
+        accepted.setDispositionNote("Wachstum erwartet, Retention greift");
+        accepted.setDispositionAt(T1);
+        findingRepository.saveAndFlush(accepted);
+        AuditFinding latest = saveScopedFinding(performance, "perf.db.size", "database_bytes", AuditFindingStatus.OPEN, T2, T2);
+
+        job.migrate();
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(findingRepository.findByProjectIdAndAuditKey(projectId, performance))
+                .extracting(AuditFinding::getId).containsExactly(first.getId());
+        AuditFinding merged = findingRepository.findById(first.getId()).orElseThrow();
+        assertThat(merged.getSubject()).isEqualTo("database_bytes");
+        assertThat(merged.getStatus()).isEqualTo(AuditFindingStatus.ACCEPTED_RISK);
+        assertThat(merged.getDispositionNote()).isEqualTo("Wachstum erwartet, Retention greift");
+        assertThat(merged.getFingerprint()).isEqualTo(
+                AuditSnapshotApplier.fingerprint(projectId, performance, "perf.db.size", "database_bytes"));
+        assertThat(findingRepository.findById(latest.getId())).isEmpty();
+    }
+
+    private AuditFinding saveScopedFinding(String auditKey, String ruleKey, String subject, AuditFindingStatus status,
+                                           Instant firstSeenAt, Instant lastSeenAt) {
+        return findingRepository.saveAndFlush(AuditFinding.builder()
+                .projectId(projectId).auditKey(auditKey)
+                .fingerprint(legacyFingerprint(auditKey, ruleKey, subject))
+                .ruleKey(ruleKey).subject(subject).severity(AuditSeverity.MEDIUM)
+                .title("Befund").evidence("FAKT database_bytes: 1000").status(status)
+                .resolvedAt(status == AuditFindingStatus.OPEN ? null : lastSeenAt)
+                .firstSeenReportId(reportOld).lastSeenReportId(reportNew)
+                .firstSeenRunId("run-old").lastSeenRunId("run-new")
+                .firstSeenAt(firstSeenAt).lastSeenAt(lastSeenAt).occurrenceCount(1).build());
+    }
+
     // --- Folgebefund zu 802f740a: feste subjects je ruleKey -------------------------------------
 
     private static final String PUBLIC_READINESS = "project.public-readiness";

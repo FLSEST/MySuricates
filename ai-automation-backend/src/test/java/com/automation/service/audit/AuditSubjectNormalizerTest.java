@@ -18,17 +18,31 @@ class AuditSubjectNormalizerTest {
             // Methoden-Suffix hinter einem Klassennamen faellt weg
             "ContainerShellService.execute | ContainerShellService",
             "TemplateResolver.resolveShell | TemplateResolver",
-            "com.automation.service.Foo.bar | com.automation.service.Foo",
+            // Voll qualifiziert: Methode und Paket fallen weg, es bleibt der Klassenname (87a1dac0)
+            "com.automation.service.Foo.bar | Foo",
             // Schluesselzusatz hinter dem ersten Doppelpunkt faellt weg
             "application.yml:key-store-password | application.yml",
             "src/main/resources/application.yml:key-store-password | src/main/resources/application.yml",
             // Dateiname mit klein geschriebenem Praefix bleibt ganz (keine Klasse davor)
             "application.yml | application.yml",
             "docker-compose.yml | docker-compose.yml",
-            // Pfade mit / bleiben ganz
-            "src/main/java/com/automation/Foo.java | src/main/java/com/automation/Foo.java",
-            // Paketpfad endet auf einem Klassennamen -> nichts abschneiden
-            "com.automation.service.Foo | com.automation.service.Foo",
+            // Klassenname und Pfad sind dieselbe Identitaet (87a1dac0)
+            "src/main/java/com/automation/Foo.java | Foo",
+            "com/automation/service/AssistantService.java | AssistantService",
+            "service/audit/ManagedTodoWriter.java | ManagedTodoWriter",
+            "com/automation/service/AssistantService.java:42 | AssistantService",
+            "AssistantService.java | AssistantService",
+            "com.automation.service.AssistantService | AssistantService",
+            "frontend/src/pages/Workflows.tsx | Workflows",
+            "ai-automation-frontend/src/api/ErrorText.ts | ErrorText",
+            // Andere Pfade bleiben ganz: klein geschriebene Module gibt es mehrfach, Tests sind keine Klasse
+            "frontend/src/api/client.ts | frontend/src/api/client.ts",
+            "frontend/src/hooks/index.ts | frontend/src/hooks/index.ts",
+            "frontend/src/pages/Todos.test.tsx | frontend/src/pages/Todos.test.tsx",
+            "src/main/resources/db/migration/V95__x.sql | src/main/resources/db/migration/V95__x.sql",
+            "GET /api/v1/workflows | GET /api/v1/workflows",
+            "cycles/component/com.automation.config | cycles/component/com.automation.config",
+            "layer/com.automation.controller->com.automation.repository | layer/com.automation.controller->com.automation.repository",
             // Ohne Punkt bleibt alles stehen
             "ContainerShellService | ContainerShellService",
             // Gross-/Kleinschreibung bleibt unveraendert, ein gross geschriebener Suffix ist keine Methode
@@ -64,6 +78,8 @@ class AuditSubjectNormalizerTest {
     @ParameterizedTest
     @ValueSource(strings = {"ContainerShellService.execute", "application.yml:key-store-password",
             "com.automation.service.Foo.bar", "src/main/java/com/automation/Foo.java", "application.yml",
+            "com/automation/service/AssistantService.java", "frontend/src/pages/Workflows.tsx",
+            "com.automation.service.AssistantService", "frontend/src/api/client.ts",
             "package : com.automation.controller", "safe-inventory:git-status"})
     void isIdempotent(String input) {
         String once = AuditSubjectNormalizer.normalize(input);

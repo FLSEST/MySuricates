@@ -118,11 +118,18 @@ catalogue as well – as an entry `{"key": …, "subject": …}` instead of a pl
 enforces it, whatever `subject` the model sends; before, it was only a request in the prompt, and a
 deviation came back as a repeat finding without the triage of the old one. Because the catalogue
 value is the one the prompt already demanded, every finding that followed it keeps its fingerprint.
-At startup, `AuditFingerprintMigrationJob` (v5) merges legacy findings with a deviating `subject` onto
+At startup, `AuditFingerprintMigrationJob` (since v5) merges legacy findings with a deviating `subject` onto
 the canonical one – triage included (`ACCEPTED_RISK`/`DISMISSED`, note); if there is none, the
 deviating finding itself becomes canonical.
 File-related rules (`subject = path`) and rules with several permitted values
 (`"ai-automation-backend" or "ai-automation-frontend"`) have no fixed value.
+**Metric rules** (one finding per measured value) have the FACT name their prompt lists under
+"Kennzahl-Befunde" as their fixed value – in the performance audit `perf.db.size` → `database_bytes`,
+`perf.frontend.bundle-size` → `frontend_bundle_js_bytes`, `perf.frontend.lazy-chunk-preloaded` →
+`frontend_lazy_chunk_preloaded`, plus the collective finding `perf.db.unindexed-column` →
+`unindexed_findby_columns` (TODO `87a1dac0`; before, the subject drifted between "Datenbank",
+"DB-Größe" and the FACT name, and every run created a new finding). Version 6 of the clean-up run
+merges these findings, and those that only stood apart under class name and path, triage included.
 `AuditRuleKeyCatalogTest` keeps catalogue and prompt in step and checks that a prompt's envelope
 example names only a catalogued `ruleKey` (or the placeholder `stabile-regel-id`).
 

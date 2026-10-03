@@ -118,10 +118,18 @@ Katalog – als Eintrag `{"key": …, "subject": …}` statt als bloßer String.
 durch, egal welches `subject` das Modell schickt; vorher war es nur eine Bitte im Prompt, und eine
 Abweichung kam als Wiedergänger ohne die Einordnung des alten Befunds zurück. Weil der Katalogwert
 der ist, den der Prompt schon verlangte, behält jeder Befund, der sich daran hielt, seinen
-Fingerprint. Altbestand mit abweichendem `subject` führt `AuditFingerprintMigrationJob` (v5) beim
+Fingerprint. Altbestand mit abweichendem `subject` führt `AuditFingerprintMigrationJob` (seit v5) beim
 Start auf den kanonischen Befund zusammen – samt Einordnung (`ACCEPTED_RISK`/`DISMISSED`, Notiz);
 gibt es keinen, wird der abweichende selbst kanonisch. Dateibezogene Regeln (`subject = Pfad`) und Regeln mit mehreren erlaubten Werten
 (`"ai-automation-backend" oder "ai-automation-frontend"`) bleiben ohne festen Wert.
+**Kennzahl-Regeln** (ein Befund je Messwert) haben den FAKT-Namen als festen Wert, den ihr Prompt
+unter „Kennzahl-Befunde“ nennt – im Performance-Audit `perf.db.size` → `database_bytes`,
+`perf.frontend.bundle-size` → `frontend_bundle_js_bytes`, `perf.frontend.lazy-chunk-preloaded` →
+`frontend_lazy_chunk_preloaded`, dazu das Sammel-Finding `perf.db.unindexed-column` →
+`unindexed_findby_columns` (TODO `87a1dac0`; vorher driftete das subject zwischen „Datenbank“,
+„DB-Größe“ und dem FAKT-Namen, und jeder Lauf legte einen neuen Befund an). v6 des Aufräumlaufs
+führt diese Befunde und die, die nur unter Klassenname bzw. Pfad getrennt standen, samt Einordnung
+zusammen.
 `AuditRuleKeyCatalogTest` hält Katalog und Prompt gleich und prüft, dass auch das Envelope-Beispiel
 eines Prompts nur einen katalogisierten `ruleKey` (oder den Platzhalter `stabile-regel-id`) nennt.
 

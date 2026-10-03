@@ -5,7 +5,8 @@ import java.util.regex.Pattern;
 /**
  * Normalisiert das modellgenerierte {@code subject} eines Audit-Findings, damit der Fingerprint
  * nicht bei jedem Run driftet (Audit-TODO 0e19648d). Beobachtete Drift: {@code ContainerShellService}
- * ↔ {@code ContainerShellService.execute}, {@code application.yml} ↔ {@code application.yml:key-store-password}.
+ * ↔ {@code ContainerShellService.execute}, {@code application.yml} ↔ {@code application.yml:key-store-password},
+ * {@code AssistantService} ↔ {@code com/automation/service/AssistantService.java} (TODO 87a1dac0).
  *
  * <p>Reine Funktion, bewusst konservativ:
  * <ul>
@@ -15,17 +16,31 @@ import java.util.regex.Pattern;
  *       den zweiten Befund (TODO 94fda6ef),</li>
  *   <li>sonst (Datei, Klasse, Pfad vor dem {@code :}) faellt alles ab dem ersten {@code :} weg
  *       (Schluessel, Zeilennummer),</li>
+ *   <li>ein Pfad, dessen letztes Segment eine Quelldatei mit Klassennamen ist ({@code .java},
+ *       {@code .ts}, {@code .tsx}, gross beginnend), wird zum Klassennamen: Klassenname und Pfad sind
+ *       dieselbe Identitaet, egal ob {@code com/automation/…}, {@code service/…} oder ohne Pfad (TODO
+ *       87a1dac0). Im Backend ist jeder einfache Klassenname eindeutig; klein geschriebene Module
+ *       ({@code index.ts}, {@code types.ts}) kommen mehrfach vor und bleiben deshalb Pfade,</li>
+ *   <li>ein voll qualifizierter Klassenname ({@code com.automation.service.AssistantService}) wird
+ *       ebenso zum einfachen Klassennamen,</li>
  *   <li>ein Suffix hinter dem letzten {@code .} faellt weg, wenn es klein beginnt (Methode) und das
  *       Segment davor gross beginnt (Klassenname) — {@code application.yml} bleibt also ganz,</li>
- *   <li>Subjects mit {@code /} sind Pfade und bleiben unangetastet,</li>
+ *   <li>alle anderen Subjects mit {@code /} sind Pfade und bleiben unangetastet,</li>
  *   <li>Rand-Leerzeichen werden getrimmt, die Gross-/Kleinschreibung bleibt unveraendert.</li>
  * </ul>
  * Die Funktion ist idempotent: {@code normalize(normalize(x)).equals(normalize(x))}.
+ *
+ * <p>Kennzahl-Regeln (ein Befund je Messwert, subject = FAKT-Name) stabilisiert nicht diese Funktion,
+ * sondern der feste Wert im ruleKey-Katalog ({@link AuditRuleKeyCatalog#fixedSubject}).
  */
 public final class AuditSubjectNormalizer {
 
     /** Art-Wort vor dem Doppelpunkt: klein, ohne Punkt und Schraegstrich (also keine Datei, keine Klasse). */
     private static final Pattern KIND = Pattern.compile("[a-z][a-z0-9-]*");
+    /** Quelldatei, deren Name ein Klassen- bzw. Komponentenname ist: {@code AssistantService.java}, {@code Todos.tsx}. */
+    private static final Pattern CLASS_FILE = Pattern.compile("([A-Z][A-Za-z0-9_]*)\\.(java|tsx|ts)");
+    /** Voll qualifizierter Klassenname: klein geschriebene Paketsegmente, dann der Klassenname. */
+    private static final Pattern QUALIFIED_CLASS = Pattern.compile("(?:[a-z_][a-z0-9_]*\\.)+([A-Z][A-Za-z0-9_]*)");
 
     private AuditSubjectNormalizer() {
     }
@@ -43,9 +58,21 @@ public final class AuditSubjectNormalizer {
             }
             value = head;
         }
-        if (value.isEmpty() || value.indexOf('/') >= 0) {
+        if (value.isEmpty()) {
             return value;
         }
+        int slash = value.lastIndexOf('/');
+        if (slash >= 0) {
+            var classFile = CLASS_FILE.matcher(value.substring(slash + 1));
+            return classFile.matches() ? classFile.group(1) : value;
+        }
+        String withoutMethod = withoutMethodSuffix(value);
+        var qualified = QUALIFIED_CLASS.matcher(withoutMethod);
+        return qualified.matches() ? qualified.group(1) : withoutMethod;
+    }
+
+    /** {@code Klasse.methode} → {@code Klasse}; {@code application.yml} und {@code Application.YML} bleiben. */
+    private static String withoutMethodSuffix(String value) {
         int lastDot = value.lastIndexOf('.');
         if (lastDot <= 0 || lastDot == value.length() - 1) {
             return value;
