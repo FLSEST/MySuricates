@@ -82,4 +82,39 @@ class ApprovalGateTest {
         assertThat(gate.remembered("q")).isEqualTo("b");
         assertThat(gate.remembered("other")).isNull();
     }
+
+    // ── Warten anzeigen (TODO 4eea7a87) ──
+
+    @Test
+    void request_meldetWarten_undAwaitDasEnde() throws Exception {
+        java.util.List<Boolean> events = new java.util.ArrayList<>();
+        gate.onWait(events::add);
+
+        CompletableFuture<String> future = gate.request(ApprovalRequest.builder().question("Weiter?").build());
+        assertThat(events).containsExactly(true);
+        gate.resolve("Ja");
+
+        assertThat(gate.await(future, 1, java.util.concurrent.TimeUnit.SECONDS)).isEqualTo("Ja");
+        assertThat(events).containsExactly(true, false);
+    }
+
+    @Test
+    void awaitMeldetDasEndeAuchBeimTimeout() {
+        java.util.List<Boolean> events = new java.util.ArrayList<>();
+        gate.onWait(events::add);
+        CompletableFuture<String> future = gate.request(ApprovalRequest.builder().build());
+
+        assertThatThrownBy(() -> gate.await(future, 1, java.util.concurrent.TimeUnit.MILLISECONDS))
+                .isInstanceOf(java.util.concurrent.TimeoutException.class);
+        assertThat(events).containsExactly(true, false);
+    }
+
+    @Test
+    void ohneZuhoererLaeuftDasWartenWieBisher() throws Exception {
+        gate.onWait(null);
+        CompletableFuture<String> future = gate.request(ApprovalRequest.builder().build());
+        gate.resolve("Ja");
+
+        assertThat(gate.await(future, 1, java.util.concurrent.TimeUnit.SECONDS)).isEqualTo("Ja");
+    }
 }

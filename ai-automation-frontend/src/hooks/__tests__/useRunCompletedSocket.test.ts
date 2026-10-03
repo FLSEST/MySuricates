@@ -4,6 +4,7 @@ import { renderHook, act } from '@testing-library/react';
 let onConnectCb: (() => void) | null = null;
 let onDisconnectCb: (() => void) | null = null;
 let onStompErrorCb: (() => void) | null = null;
+let onWebSocketCloseCb: (() => void) | null = null;
 let lastWsUrl: string | null = null;
 
 interface SubscribeRecord { destination: string; callback: (msg: { body: string }) => void }
@@ -20,6 +21,7 @@ vi.mock('@stomp/stompjs', () => {
       onConnectCb = config.onConnect as () => void;
       onDisconnectCb = config.onDisconnect as () => void;
       onStompErrorCb = config.onStompError as () => void;
+      onWebSocketCloseCb = config.onWebSocketClose as () => void;
       capturedWebSocketFactory = config.webSocketFactory as (() => unknown) | undefined;
       capturedBeforeConnect = config.beforeConnect as (() => Promise<void>) | undefined;
     }
@@ -83,6 +85,16 @@ describe('useRunCompletedSocket', () => {
     expect(result.current).toBe(false);
   });
 
+  // A backend restart drops the socket without a DISCONNECT frame — the caller must fall back to polling
+  it('reports connected as false again when the socket closes without a DISCONNECT', () => {
+    const { result } = renderHook(() => useRunCompletedSocket(true, vi.fn()));
+    expect(result.current).toBe(true);
+
+    act(() => { onWebSocketCloseCb?.(); });
+
+    expect(result.current).toBe(false);
+  });
+
   it('reports run_completed messages and ignores anything else', () => {
     const onRunCompleted = vi.fn();
     renderHook(() => useRunCompletedSocket(true, onRunCompleted));
@@ -91,6 +103,7 @@ describe('useRunCompletedSocket', () => {
     deliver(JSON.stringify({ type: 'run_completed', runId: 'run-1', workflowId: 'wf-a1', status: 'COMPLETED' }));
     deliver(JSON.stringify({ type: 'something_else', workflowId: 'wf-a1' }));
     deliver('not json');
+    deliver('null');
     deliver(JSON.stringify({ type: 'run_completed', workflowId: 42 }));
 
     expect(onRunCompleted).toHaveBeenCalledTimes(1);

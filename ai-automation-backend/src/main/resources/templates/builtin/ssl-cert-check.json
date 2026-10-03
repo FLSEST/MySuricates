@@ -11,12 +11,13 @@
   },
   "category" : "INFRA",
   "sortOrder" : 46,
-  "version" : "1.0.0",
+  "version" : "1.0.1",
   "model" : null,
   "instructions" : "Prüfe SSL-Zertifikate. Variablen: domains (zeilengetrennte Liste von Hostnamen), warn_days (Warnung wenn Ablauf innerhalb N Tage, default 30).",
   "blocks" : [ {
     "type" : "foreach",
     "config" : {
+      "max_consecutive_failures" : 0,
       "variable_name" : "domain",
       "items_source" : "list",
       "items" : "{{ domains }}",

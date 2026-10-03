@@ -7,7 +7,8 @@ import { Badge } from '../ui';
 import { PathLinkedOutput } from '../shared/PathLinkedOutput';
 import { useT } from '../../i18n';
 import type { StepResult, AgenticState, AgenticIteration } from '../../types';
-import { StepCardFrame, StepCardHeader } from './StepCardChrome';
+import { StepCardFrame, StepCardHeader, StepWaitingIcon } from './StepCardChrome';
+import { stepWaitsForPerson } from './stepMetadata';
 
 function IterationCard({ iter }: { iter: AgenticIteration }) {
   const [expanded, setExpanded] = useState(false);
@@ -99,13 +100,16 @@ function IterationCard({ iter }: { iter: AgenticIteration }) {
 interface AgenticStepCardProps {
   step: StepResult;
   agenticState?: AgenticState;
+  /** false once the run has ended — a step left waiting then no longer counts as running. */
+  runActive?: boolean;
 }
 
-export function AgenticStepCard({ step, agenticState }: AgenticStepCardProps) {
+export function AgenticStepCard({ step, agenticState, runActive = true }: AgenticStepCardProps) {
   const [expanded, setExpanded] = useState(true);
   const t = useT();
 
-  const isRunning = step.status === 'RUNNING';
+  // Waiting for an approval (require_approval) is part of the run, not its end
+  const isRunning = step.status === 'RUNNING' || stepWaitsForPerson(step, runActive);
   const goalAchieved = agenticState?.goalAchieved;
   const iterations = agenticState?.iterations ?? [];
   const currentIteration = agenticState?.currentIteration ?? 0;
@@ -118,6 +122,8 @@ export function AgenticStepCard({ step, agenticState }: AgenticStepCardProps) {
           <CheckCircle2 className="w-5 h-5 text-success" />
         ) : goalAchieved === false ? (
           <AlertCircle className="w-5 h-5 text-danger" />
+        ) : step.status === 'WAITING_APPROVAL' ? (
+          <StepWaitingIcon runActive={runActive} />
         ) : isRunning ? (
           <Loader2 className="w-5 h-5 text-accent animate-spin" />
         ) : step.status === 'COMPLETED' ? (

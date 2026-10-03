@@ -15,7 +15,7 @@
   },
   "category": "BASICS",
   "sortOrder": 5,
-  "version": "1.1.1",
+  "version": "1.1.2",
   "model": null,
   "instructions": null,
   "blocks": [
@@ -37,9 +37,10 @@
         "shell_escape_variables": true,
         "command": "set -eu\n# placeholder - replace with what should happen per item\nif [ {{ item }} = beta ]; then echo 'fails on purpose: beta' >&2; exit 1; fi\nprintf 'done: %s\\n' {{ item }}",
         "description": {
-          "de": "Ein Befehl pro Element; continue_on_error lässt die übrigen weiterlaufen. Ersetze die Liste (oder nimm items_command mit items_source: command) und den Befehl.",
-          "en": "One command per item; continue_on_error keeps the others going. Replace the list (or use items_command with items_source: command) and the command."
-        }
+          "de": "Ein Befehl pro Element; continue_on_error lässt die übrigen weiterlaufen, max_consecutive_failures: 0 auch nach mehreren Fehlern in Folge (sonst Abbruch nach 3). Ersetze die Liste (oder nimm items_command mit items_source: command) und den Befehl.",
+          "en": "One command per item; continue_on_error keeps the others going, max_consecutive_failures: 0 even after several failures in a row (otherwise it stops after 3). Replace the list (or use items_command with items_source: command) and the command."
+        },
+        "max_consecutive_failures": 0
       }
     },
     {

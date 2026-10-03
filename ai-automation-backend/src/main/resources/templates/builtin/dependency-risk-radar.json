@@ -11,7 +11,7 @@
   },
   "category" : "CODE",
   "sortOrder" : 23,
-  "version" : "1.0.0",
+  "version" : "1.0.1",
   "model" : null,
   "instructions" : "Scanne alle Repos unterhalb des Projektpfads nach npm- oder Maven-Abhaengigkeiten, identifiziere kritische Updates und liefere einen priorisierten Aktionsplan.",
   "blocks" : [ {
@@ -26,6 +26,7 @@
       "items_source" : "command",
       "execution_mode" : "shell",
       "items_command" : "find . -maxdepth 2 \\( -name package.json -o -name pom.xml \\) -print | xargs -n1 dirname | sort -u",
+      "max_consecutive_failures" : 0,
       "variable_name" : "repo",
       "timeout_seconds" : 600,
       "command" : "set -euo pipefail; cd \"{{ repo }}\"; if [ -f package.json ]; then echo \"=== {{ repo }} (npm) ===\"; npm outdated --json || true; elif [ -f pom.xml ]; then echo \"=== {{ repo }} (maven) ===\"; mvn -q versions:display-dependency-updates || true; else echo \"=== {{ repo }} (unknown) ===\"; fi"

@@ -369,8 +369,8 @@
         "max_total_tokens": {
           "type": "integer",
           "doc": {
-            "de": "Token-Budget über alle Runden, Input + Output (Standard 200 000).",
-            "en": "Token budget across all rounds, input + output (default 200,000)."
+            "de": "Token-Budget über alle Runden: ungecachte Eingabe + Ausgabe, Cache-Tokens zählen nicht (Standard 200 000).",
+            "en": "Token budget across all rounds: uncached input + output, cache tokens do not count (default 200,000)."
           },
           "default": 200000,
           "minimum": 1
@@ -609,6 +609,15 @@
             "en": "Failed items do not fail the block, it ends COMPLETED."
           },
           "default": false
+        },
+        "max_consecutive_failures": {
+          "type": "integer",
+          "doc": {
+            "de": "Nach so vielen fehlgeschlagenen Items in Folge hört die Schleife auf, die übrigen laufen nicht mehr und der Block scheitert, auch mit `continue_on_error` (Standard 3, 0 = aus).",
+            "en": "After this many failed items in a row the loop stops, the remaining items do not run and the block fails, even with `continue_on_error` (default 3, 0 = off)."
+          },
+          "default": 3,
+          "minimum": 0
         },
         "container_image": "#wrapper_container_image",
         "mount_docker_socket": "#wrapper_mount_docker_socket",
@@ -925,8 +934,8 @@
         "workflowId": {
           "type": "string",
           "doc": {
-            "de": "Alte Schreibweise von `workflow_id`, wird weiter gelesen.",
-            "en": "Old spelling of `workflow_id`, still read."
+            "de": "Alte Schreibweise von `workflow_id`: wird noch gelesen, fällt später weg. Stattdessen `workflow_id` verwenden.",
+            "en": "Old spelling of `workflow_id`: still read, will be dropped later. Use `workflow_id` instead."
           },
           "legacyFor": "workflow_id"
         }

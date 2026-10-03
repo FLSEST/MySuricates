@@ -1,11 +1,14 @@
 import { failOnUnhandledRequest } from '../../test/msw';
-import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach, vi } from 'vitest';
 import { screen } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
 import { renderWithProviders } from '../../test/utils';
 import { useI18nStore } from '../../i18n';
 import { SimpleActivity } from '../SimpleActivity';
+
+// No live socket in the test — the page then loads (and polls) as before
+vi.mock('../../hooks/useTopicSocket', () => ({ useTopicSocket: () => false }));
 
 beforeAll(() => server.listen({ onUnhandledRequest: failOnUnhandledRequest }));
 afterEach(() => server.resetHandlers());

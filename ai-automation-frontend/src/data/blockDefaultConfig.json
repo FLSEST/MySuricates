@@ -2,7 +2,7 @@
   "simple": { "command": "" },
   "shell": { "command": "", "timeout_seconds": 300 },
   "retry": { "command": "", "max_retries": 3, "delay": 5 },
-  "foreach": { "items_source": "command", "items_command": "", "variable_name": "item", "command": "" },
+  "foreach": { "items_source": "command", "items_command": "", "variable_name": "item", "command": "", "max_consecutive_failures": 3 },
   "while": { "condition_command": "", "command": "", "max_iterations": 10 },
   "conditional": { "condition": "", "then_command": "", "else_command": "" },
   "skill-capability": { "capability": "", "input": "{{ previous_output }}" },

@@ -44,6 +44,19 @@ describe('ExecutionStepCard', () => {
     expect(screen.getByText('Human')).toBeInTheDocument();
   });
 
+  // 4eea7a87: the backend marks the step WAITING_APPROVAL while a person decides
+  it('shows a waiting step with its own icon and label', () => {
+    render(<ExecutionStepCard step={step({ blockType: 'approval', status: 'WAITING_APPROVAL', output: '' })} />);
+    expect(screen.getByRole('img', { name: 'Waiting for you – approval or input pending' })).toHaveClass('text-human');
+  });
+
+  // An interrupted/failed/cancelled run no longer waits — the step must not ask for the user
+  it('shows a step left waiting in an ended run as abandoned', () => {
+    render(<ExecutionStepCard step={step({ blockType: 'approval', status: 'WAITING_APPROVAL', output: '' })} runActive={false} />);
+    expect(screen.getByRole('img', { name: 'Run ended – the question was left unanswered' })).toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: /Waiting for you/ })).not.toBeInTheDocument();
+  });
+
   // 31b7aca8: the step note (config.description) reaches the run view via metadata
   it('shows the step note under the header', () => {
     render(<ExecutionStepCard step={step({ metadata: { blockType: 'shell', blockName: 'pruefen', blockDescription: 'Ersetze die Pruefung.' } })} />);

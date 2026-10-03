@@ -1045,6 +1045,8 @@ export const de: TranslationKeys = {
       jumpToLatest: 'Zu den neuesten Zeilen',
       linesSkipped: '… {count} Zeilen übersprungen',
       stepNumber: 'Schritt {n}',
+      waitingForPerson: 'Wartet auf dich – Freigabe oder Eingabe offen',
+      waitingAborted: 'Lauf beendet – die Frage blieb unbeantwortet',
       stepKind: {
         ai: 'KI',
         deterministic: 'Deterministisch',

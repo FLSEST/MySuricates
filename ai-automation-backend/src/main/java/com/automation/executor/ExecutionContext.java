@@ -12,8 +12,12 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 @Getter
 @Builder
@@ -274,6 +278,18 @@ public class ExecutionContext {
     public AtomicReference<ApprovalRequest> getCurrentApprovalRequest() { return approvals.currentRequest(); }
 
     public CompletableFuture<String> requestApproval(ApprovalRequest request) { return approvals.request(request); }
+
+    /**
+     * Wartet auf die Antwort zu {@link #requestApproval} — statt {@code future.get}, damit der Schritt
+     * nach dem Warten wieder als laufend gilt (siehe {@link #onApprovalWait}).
+     */
+    public String awaitApproval(CompletableFuture<String> future, long timeout, TimeUnit unit)
+            throws InterruptedException, ExecutionException, TimeoutException {
+        return approvals.await(future, timeout, unit);
+    }
+
+    /** Meldet, wann der laufende Schritt auf eine Freigabe oder Eingabe wartet ({@code null} = niemand). */
+    public void onApprovalWait(Consumer<Boolean> listener) { approvals.onWait(listener); }
 
     public void resolveApproval(String answer) { approvals.resolve(answer); }
 

@@ -58,7 +58,7 @@ public class AgenticApprovalGate {
 
         String answer;
         try {
-            answer = future.get(30, TimeUnit.MINUTES);
+            answer = context.awaitApproval(future, 30, TimeUnit.MINUTES);
         } catch (java.util.concurrent.TimeoutException e) {
             iterData.put("result", "approval_timeout");
             fullOutput.append("[iteration ").append(iteration)

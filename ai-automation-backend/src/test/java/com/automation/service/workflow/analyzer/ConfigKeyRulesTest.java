@@ -69,10 +69,48 @@ class ConfigKeyRulesTest {
             assertThat(findings.get(0).detail()).contains("workflow_id");
         }
 
-        /** Der Executor liest die alte Schreibweise weiter — sie ist weder unbekannt noch fehlt workflow_id. */
+        /**
+         * Der Executor liest die alte Schreibweise weiter — sie ist weder unbekannt noch fehlt workflow_id. Sie läuft
+         * aber aus (5ee07e94): ein LOW-Hinweis mit dem neuen Namen.
+         */
         @Test
-        void subWorkflowMitAlterSchreibweiseWorkflowIdIstKeinBefund() {
-            assertThat(keyFindings(block("sub-workflow", "alt", Map.of("workflowId", "abc")))).isEmpty();
+        void subWorkflowMitAlterSchreibweiseWorkflowIdIstNurEinHinweis() {
+            var findings = keyFindings(block("sub-workflow", "alt", Map.of("workflowId", "abc")));
+
+            assertThat(findings).extracting(AnalyzerFinding::rule, AnalyzerFinding::severity, AnalyzerFinding::blockIndex)
+                    .containsExactly(tuple("legacy-config-key", Severity.LOW, 0));
+            assertThat(findings.get(0).detail())
+                    .isEqualTo("workflowId ist die alte Schreibweise von workflow_id — sie wird noch gelesen, fällt aber "
+                            + "später weg; den Schlüssel in workflow_id umbenennen");
+            assertThat(findings.get(0).detailEn()).endsWith("rename the key to workflow_id");
+        }
+
+        /** Stehen beide da, gilt workflow_id; der Hinweis sagt, dass der alte Schlüssel weg kann. */
+        @Test
+        void subWorkflowMitBeidenSchreibweisenRaetZumEntfernen() {
+            var findings = keyFindings(block("sub-workflow", "beide", Map.of("workflow_id", "neu", "workflowId", "alt")));
+
+            assertThat(findings).singleElement().satisfies(f -> {
+                assertThat(f.rule()).isEqualTo("legacy-config-key");
+                assertThat(f.detail()).endsWith("workflow_id ist auch gesetzt und gilt, workflowId entfernen");
+                assertThat(f.detailEn()).endsWith("workflow_id is set as well and wins, remove workflowId");
+            });
+        }
+
+        /** Auch verschachtelt, mit Pfad. */
+        @Test
+        void verschachtelterSubWorkflowMitAlterSchreibweise() {
+            Map<String, Object> inner = new HashMap<>();
+            inner.put("type", "sub-workflow");
+            inner.put("name", "kind");
+            inner.put("config", Map.of("workflowId", "abc"));
+            var findings = keyFindings(block("switch", "weiche", Map.of("expression", "x",
+                    "cases", List.of(Map.of("value", "a", "blocks", List.of(inner))))));
+
+            assertThat(findings).singleElement().satisfies(f -> {
+                assertThat(f.rule()).isEqualTo("legacy-config-key");
+                assertThat(f.detail()).startsWith("Block 1 › cases[0] › Block 1 „kind“: workflowId ist die alte");
+            });
         }
 
         @Test

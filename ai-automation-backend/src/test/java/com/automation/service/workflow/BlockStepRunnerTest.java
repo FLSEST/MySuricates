@@ -97,6 +97,62 @@ class BlockStepRunnerTest {
         order.verify(broadcaster).broadcastStepResult("run-1", step);
     }
 
+    // ── runStep: waiting for a person (TODO 4eea7a87) ──────────────────────
+
+    @Test
+    void runStep_whileApprovalIsOpen_stepShowsWaitingApproval_thenRunningAgain() throws Exception {
+        BlockDefinition block = block("frage", null);
+        StepResult step = runner.startStep(run, 0, block, 0);
+        List<StepStatus> saved = new ArrayList<>();
+        List<StepStatus> broadcast = new ArrayList<>();
+        when(stepResultRepository.save(step)).thenAnswer(inv -> {
+            saved.add(step.getStatus());
+            return step;
+        });
+        org.mockito.Mockito.doAnswer(inv -> broadcast.add(step.getStatus()))
+                .when(broadcaster).broadcastStepResult("run-1", step);
+        when(blockExecutor.execute(eq(block), any())).thenAnswer(inv -> {
+            ExecutionContext ctx = inv.getArgument(1);
+            var future = ctx.requestApproval(com.automation.executor.ApprovalRequest.builder()
+                    .blockId("approval-0").question("Go?").stepIndex(0).build());
+            assertThat(step.getStatus()).as("while the question is open").isEqualTo(StepStatus.WAITING_APPROVAL);
+            ctx.resolveApproval("Yes");
+            String answer = ctx.awaitApproval(future, 1, java.util.concurrent.TimeUnit.SECONDS);
+            assertThat(step.getStatus()).as("after the answer").isEqualTo(StepStatus.RUNNING);
+            return result(StepStatus.COMPLETED, answer);
+        });
+
+        runner.runStep(step, block, blockExecutor, context, run, null);
+
+        assertThat(saved).containsExactly(StepStatus.WAITING_APPROVAL, StepStatus.RUNNING, StepStatus.COMPLETED);
+        assertThat(broadcast).containsExactly(StepStatus.WAITING_APPROVAL, StepStatus.RUNNING, StepStatus.COMPLETED);
+        assertThat(step.getStatus()).isEqualTo(StepStatus.COMPLETED);
+    }
+
+    @Test
+    void runStep_afterTheStep_noLongerListensForApprovals() {
+        BlockDefinition block = block("b", null);
+        when(blockExecutor.execute(eq(block), any())).thenReturn(result(StepStatus.COMPLETED, "ok"));
+        StepResult step = runner.startStep(run, 0, block, 0);
+        runner.runStep(step, block, blockExecutor, context, run, null);
+        org.mockito.Mockito.clearInvocations(stepResultRepository, broadcaster);
+
+        context.requestApproval(com.automation.executor.ApprovalRequest.builder().blockId("x").question("?").build());
+
+        assertThat(step.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        verifyNoInteractions(stepResultRepository, broadcaster);
+    }
+
+    @Test
+    void markWaiting_saveFails_doesNotBreakTheApproval() {
+        StepResult step = runner.startStep(run, 0, block("b", null), 0);
+        when(stepResultRepository.save(step)).thenThrow(new IllegalStateException("db down"));
+
+        runner.markWaiting(run, step, true);
+
+        assertThat(step.getStatus()).isEqualTo(StepStatus.WAITING_APPROVAL);
+    }
+
     // ── runStep: validation ────────────────────────────────────────────────
 
     @Test

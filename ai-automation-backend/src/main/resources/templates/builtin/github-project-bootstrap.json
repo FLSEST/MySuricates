@@ -11,7 +11,7 @@
   },
   "category" : "CODE",
   "sortOrder" : 27,
-  "version" : "1.1.2",
+  "version" : "1.1.3",
   "model" : null,
   "instructions" : "Erstelle ein neues GitHub-Repository mit Standardkonfiguration. Variablen: repo_name, visibility (public/private), org (Organisation oder 'none').",
   "blocks" : [ {
@@ -26,6 +26,7 @@
     "config" : {
       "items_source" : "list",
       "execution_mode" : "shell",
+      "max_consecutive_failures" : 0,
       "variable_name" : "label",
       "command" : "set -euo pipefail\ncd \"{{ repo_name }}\"\nNAME=\"$(echo '{{ label }}' | cut -d: -f1)\"\nCOLOR=\"$(echo '{{ label }}' | cut -d: -f2)\"\ngh label create \"$NAME\" --color \"$COLOR\" --force\necho \"Label created: $NAME\"",
       "items" : [ "bug:d73a4a", "feature:0e8a16", "documentation:0075ca", "refactor:e4e669", "urgent:b60205", "good-first-issue:7057ff" ]

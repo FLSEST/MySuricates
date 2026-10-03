@@ -5,8 +5,8 @@ import { useT } from '../../i18n';
 import { PathLinkedOutput } from '../shared/PathLinkedOutput';
 import type { StepResult } from '../../types';
 import type { ForEachState, ForEachItemState } from '../../hooks/useWebSocket';
-import { persistedForEachItems, persistedTotalItems, stepMetadataSummary } from './stepMetadata';
-import { StepCardFrame, StepCardHeader } from './StepCardChrome';
+import { persistedForEachItems, persistedTotalItems, stepMetadataSummary, stepWaitsForPerson } from './stepMetadata';
+import { StepCardFrame, StepCardHeader, StepWaitingIcon } from './StepCardChrome';
 
 interface ForEachItemRowProps {
   item: ForEachItemState;
@@ -48,9 +48,11 @@ function ForEachItemRow({ item }: ForEachItemRowProps) {
 interface ForEachStepCardProps {
   step: StepResult;
   forEachState?: ForEachState;
+  /** false once the run has ended — a step left waiting then no longer counts as running. */
+  runActive?: boolean;
 }
 
-export function ForEachStepCard({ step, forEachState }: ForEachStepCardProps) {
+export function ForEachStepCard({ step, forEachState, runActive = true }: ForEachStepCardProps) {
   const t = useT();
   const [expanded, setExpanded] = useState(false);
 
@@ -60,7 +62,8 @@ export function ForEachStepCard({ step, forEachState }: ForEachStepCardProps) {
   const totalItems = forEachState?.totalItems ?? persistedTotalItems(step) ?? items.length;
   const hasItemData = forEachState != null || items.length > 0;
   const progress = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : null;
-  const isRunning = step.status === 'RUNNING';
+  // Waiting for a person (TODO 4eea7a87) is part of the run, as in AgenticStepCard
+  const isRunning = step.status === 'RUNNING' || stepWaitsForPerson(step, runActive);
   const { provider, model, requestedModel, showRequestedModel } = stepMetadataSummary(step);
 
   return (
@@ -70,6 +73,8 @@ export function ForEachStepCard({ step, forEachState }: ForEachStepCardProps) {
           <CheckCircle2 className="w-5 h-5 text-success" />
         ) : step.status === 'FAILED' ? (
           <AlertCircle className="w-5 h-5 text-danger" />
+        ) : step.status === 'WAITING_APPROVAL' ? (
+          <StepWaitingIcon runActive={runActive} />
         ) : isRunning ? (
           <div className="w-5 h-5 rounded-full border-2 border-accent border-t-transparent animate-spin" />
         ) : (

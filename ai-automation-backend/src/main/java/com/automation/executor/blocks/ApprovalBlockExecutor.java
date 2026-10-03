@@ -99,7 +99,7 @@ public class ApprovalBlockExecutor implements BlockExecutor {
                 }
 
                 try {
-                    answer = future.get(timeoutMinutes, TimeUnit.MINUTES);
+                    answer = context.awaitApproval(future, timeoutMinutes, TimeUnit.MINUTES);
                 } catch (TimeoutException e) {
                     log.warn("Approval timed out for question: {}", question);
                     return buildResult(stepIndex, start, question, "Timed out waiting for approval",

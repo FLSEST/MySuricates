@@ -102,8 +102,11 @@ function fieldSchema(field: Field, locale: SchemaLocale): JsonSchema {
   if (field.default !== undefined) schema.default = field.default;
   if (field.minimum !== undefined) schema.minimum = field.minimum;
   if (field.items) schema.items = field.items;
-  // An old key name the executor still reads: valid, never offered
-  if (field.legacyFor) schema.doNotSuggest = true;
+  // An old key name the executor still reads: valid, never offered, struck through as being phased out
+  if (field.legacyFor) {
+    schema.doNotSuggest = true;
+    schema.deprecationMessage = field.doc[locale];
+  }
   if (field.values) {
     const values = field.values.map(({ value }) => value);
     const docs = field.values.map(({ doc }) => doc[locale]);

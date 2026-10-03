@@ -1104,7 +1104,7 @@ Einzige persistente Systemkonfiguration außerhalb der `application.yml`.
 | `COMPLETED` | Erfolgreich |
 | `FAILED` | Fehlgeschlagen |
 | `SKIPPED` | Übersprungen (z.B. bei Conditional) |
-| `WAITING_APPROVAL` | Wartet auf Genehmigung (Approval/HumanInput-Block) |
+| `WAITING_APPROVAL` | Wartet auf eine Person: Freigabe oder Eingabe offen (approval, human-input, agentic mit `require_approval`, auch verschachtelt). Gesetzt, solange die Frage offen ist; danach wieder `RUNNING`, dann der Endstatus |
 
 ### SkillCategory
 
@@ -1295,12 +1295,12 @@ folgt freier Text.
 | `shell` | `command` (Shell-Skript), `timeout_seconds`, `shell_escape_variables`, `container_image` |
 | `retry` | `command`, `max_retries` (3), `delay` (5), `exponential_backoff`, `execution_mode` (`ai`/`shell`) |
 | `conditional` | `condition`, `then_command`, `else_command`, `execution_mode` |
-| `foreach` | `command`, `items_source` (`list`/`command`), `items`, `items_command`, `variable_name` (`item`), `execution_mode`, `continue_on_error` |
+| `foreach` | `command`, `items_source` (`list`/`command`), `items`, `items_command`, `variable_name` (`item`), `execution_mode`, `continue_on_error`, `max_consecutive_failures` (`3`, `0` = aus) |
 | `while` | `command`, `condition_command`, `max_iterations` (100), `execution_mode` |
 | `switch` | `expression`, `cases` (Liste mit `value`, `blocks`), `default` |
 | `agentic` | `goal`, `success_criteria`, `max_iterations` (10), `iteration_timeout_seconds` (300), `total_timeout_seconds` (1800), `max_total_tokens` (200000), `max_repeated_actions` (3), `require_approval` (false) |
 | `approval` | `question`, `options`, `reject_options`, `on_no`, `variable_name`, `timeout_minutes` (30), `mode`, `auto_answer` |
-| `sub-workflow` | `workflow_id` |
+| `sub-workflow` | `workflow_id` (veraltet und noch gelesen: `workflowId` — der Analyzer meldet ihn als `legacy-config-key`) |
 | `skill-capability` | `capability`, `input`, `params`, `allow_writes`; der Skill der Capability steht in `skillIds` am Block |
 | `human-input` | `prompt`, `input_type` (text/textarea/number/select/checkbox/date), `variable_name`, `options`, `default_value`, `required`, `timeout_minutes` (30), `use_default_on_timeout`, `fields` |
 | `document` | `file_path`, `variable_name`, `fail_on_empty`, `min_characters` |

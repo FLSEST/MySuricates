@@ -11,7 +11,7 @@
   },
   "category" : "INFRA",
   "sortOrder" : 47,
-  "version" : "1.0.0",
+  "version" : "1.0.1",
   "model" : null,
   "instructions" : "Prüfe Service-Health. Variablen: service_urls (zeilengetrennte HTTP/HTTPS URLs), timeout_seconds (default 10).",
   "blocks" : [ {
@@ -23,6 +23,7 @@
   }, {
     "type" : "foreach",
     "config" : {
+      "max_consecutive_failures" : 0,
       "variable_name" : "service_url",
       "items_source" : "list",
       "items" : "{{ service_urls }}",

@@ -77,7 +77,10 @@ class AnalyzerFindingLanguagesTest {
                 block("retry", "r", Map.of("command", "npm test", "container_image", "node:24")),
                 block("foreach", "f", Map.of("items", List.of("a"), "comand", "echo")),
                 block("switch", "w", Map.of("expression", "{{ previous_output }}",
-                        "cases", List.of(Map.of("value", "GREEN", "blocks", List.of(nested)))))), null));
+                        "cases", List.of(Map.of("value", "GREEN", "blocks", List.of(nested))))),
+                // Alter Schlüsselname: allein (umbenennen) und neben dem neuen (entfernen)
+                block("sub-workflow", "old", Map.of("workflowId", "abc")),
+                block("sub-workflow", "both", Map.of("workflow_id", "abc", "workflowId", "abc"))), null));
         // Eigene Plattform: self-api-call (Shell und Auftrag), direct-db-access (app_settings, Plattform-DB, sqlite3)
         out.addAll(analyzer.analyze(List.of(
                 block("shell", "api", Map.of("command", "set -euo pipefail\ncurl http://localhost:9090/api/v1/todos")),
@@ -144,6 +147,8 @@ class AnalyzerFindingLanguagesTest {
                 .anyMatch(t -> t.contains("the items come from items"))
                 .anyMatch(t -> t.contains("config.blocks (foreach) with 1 block entries never runs"))
                 .anyMatch(t -> t.contains("on_failure sits next to config instead of inside it"))
+                .anyMatch(t -> t.endsWith("rename the key to workflow_id"))
+                .anyMatch(t -> t.endsWith("workflow_id is set as well and wins, remove workflowId"))
                 .anyMatch(t -> t.contains("did you mean skillIds?"))
                 .anyMatch(t -> t.contains("unknown block field comment"))
                 .anyMatch(t -> t.startsWith("Block 3 › default › Block 1: timeout_seconds sits next to config"));

@@ -1104,7 +1104,7 @@ The only persistent system configuration outside of `application.yml`.
 | `COMPLETED` | Successful |
 | `FAILED` | Failed |
 | `SKIPPED` | Skipped (e.g. in conditional) |
-| `WAITING_APPROVAL` | Waiting for approval (approval/human-input block) |
+| `WAITING_APPROVAL` | Waiting for a person: approval or input pending (approval, human-input, agentic with `require_approval`, nested ones too). Set while the question is open; afterwards `RUNNING` again, then the final status |
 
 ### SkillCategory
 
@@ -1294,12 +1294,12 @@ in backticks, parentheses behind it give the default or values, free text follow
 | `shell` | `command` (shell script), `timeout_seconds`, `shell_escape_variables`, `container_image` |
 | `retry` | `command`, `max_retries` (3), `delay` (5), `exponential_backoff`, `execution_mode` (`ai`/`shell`) |
 | `conditional` | `condition`, `then_command`, `else_command`, `execution_mode` |
-| `foreach` | `command`, `items_source` (`list`/`command`), `items`, `items_command`, `variable_name` (`item`), `execution_mode`, `continue_on_error` |
+| `foreach` | `command`, `items_source` (`list`/`command`), `items`, `items_command`, `variable_name` (`item`), `execution_mode`, `continue_on_error`, `max_consecutive_failures` (`3`, `0` = off) |
 | `while` | `command`, `condition_command`, `max_iterations` (100), `execution_mode` |
 | `switch` | `expression`, `cases` (list with `value`, `blocks`), `default` |
 | `agentic` | `goal`, `success_criteria`, `max_iterations` (10), `iteration_timeout_seconds` (300), `total_timeout_seconds` (1800), `max_total_tokens` (200000), `max_repeated_actions` (3), `require_approval` (false) |
 | `approval` | `question`, `options`, `reject_options`, `on_no`, `variable_name`, `timeout_minutes` (30), `mode`, `auto_answer` |
-| `sub-workflow` | `workflow_id` |
+| `sub-workflow` | `workflow_id` (deprecated, still read: `workflowId` — the analyzer reports it as `legacy-config-key`) |
 | `skill-capability` | `capability`, `input`, `params`, `allow_writes`; the capability's skill goes in `skillIds` on the block |
 | `human-input` | `prompt`, `input_type` (text/textarea/number/select/checkbox/date), `variable_name`, `options`, `default_value`, `required`, `timeout_minutes` (30), `use_default_on_timeout`, `fields` |
 | `document` | `file_path`, `variable_name`, `fail_on_empty`, `min_characters` |

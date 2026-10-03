@@ -15,7 +15,7 @@
   },
   "category": "COMBINATIONS",
   "sortOrder": 15,
-  "version": "1.1.0",
+  "version": "1.1.1",
   "model": null,
   "instructions": null,
   "blocks": [
@@ -37,7 +37,8 @@
         "description": {
           "de": "Beschreibt jeden Kandidaten der Liste. Ersetze die Liste (items) und wie ein Kandidat beschrieben wird.",
           "en": "Describes every candidate of the list. Replace the list (items) and how a candidate is described."
-        }
+        },
+        "max_consecutive_failures": 0
       }
     },
     {
@@ -87,7 +88,8 @@
         "description": {
           "de": "Arbeitet die Liste erst nach dem Ja ab. Ersetze den Befehl pro Element — die Liste muss zu „sammeln“ passen.",
           "en": "Works through the list only after the yes. Replace the per-item command — the list must match the collecting step."
-        }
+        },
+        "max_consecutive_failures": 0
       }
     }
   ]

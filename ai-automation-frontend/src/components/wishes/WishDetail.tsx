@@ -130,7 +130,8 @@ export function WishDetail({ wishId, onCancel, onDelete }: {
             {/* Run-scoped anchors: the page may show the steps of more than one run, `step-N` alone would collide. */}
             <StepAnchorScope value={wish.currentRunId ?? ''}>
               {currentRun.steps.map(step => (
-                <ExecutionStepCard key={step.id} step={step} />
+                <ExecutionStepCard key={step.id} step={step}
+                  runActive={currentRun.status === 'RUNNING' || currentRun.status === 'PAUSED'} />
               ))}
             </StepAnchorScope>
           </div>

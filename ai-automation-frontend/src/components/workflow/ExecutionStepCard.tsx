@@ -4,10 +4,11 @@ import { PathLinkedOutput } from '../shared/PathLinkedOutput';
 import { useT } from '../../i18n';
 import type { StepResult } from '../../types';
 import { stepMetadataSummary, wrapperFacts, formatMetadataValue } from './stepMetadata';
-import { StepCardFrame, StepCardHeader } from './StepCardChrome';
+import { StepCardFrame, StepCardHeader, StepWaitingIcon } from './StepCardChrome';
 import { CompressionPanel } from './CompressionPanel';
 
-export function ExecutionStepCard({ step }: { step: StepResult }) {
+/** `runActive` false: the run has ended, a step left waiting is shown as abandoned (default: running). */
+export function ExecutionStepCard({ step, runActive = true }: { step: StepResult; runActive?: boolean }) {
   const t = useT();
   const [inputExpanded, setInputExpanded] = useState(false);
   const [systemPromptExpanded, setSystemPromptExpanded] = useState(false);
@@ -27,6 +28,8 @@ export function ExecutionStepCard({ step }: { step: StepResult }) {
           <AlertCircle className="w-5 h-5 text-danger" />
         ) : step.status === 'RUNNING' ? (
           <div className="w-5 h-5 rounded-full border-2 border-accent border-t-transparent animate-spin" />
+        ) : step.status === 'WAITING_APPROVAL' ? (
+          <StepWaitingIcon runActive={runActive} />
         ) : (
           <div className="w-5 h-5 rounded-full border-2 border-border" />
         )}

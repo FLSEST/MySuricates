@@ -201,6 +201,122 @@ class ForEachBlockExecutorTest {
         verify(commandExecutor, times(3)).executeStepOnHost(any(HostExecutionRequest.class));
     }
 
+    // --- max_consecutive_failures (TODO a6659a46) ---
+
+    private static StepResult itemResult(StepStatus status, String output) {
+        return StepResult.builder().stepIndex(0).status(status).output(output).build();
+    }
+
+    private BlockDefinition foreachOver(List<String> items, Map<String, Object> extra) {
+        Map<String, Object> config = new HashMap<>();
+        config.put("items", items);
+        config.put("command", "rebuild {{ item }}");
+        config.putAll(extra);
+        return BlockDefinition.builder().type("foreach").config(config).build();
+    }
+
+    @Test
+    void execute_threeFailuresInARow_stopsAndNamesTheReason() {
+        // 4a8cabc4 follow-up: 37 of 42 items hit "You've hit your session limit", foreach called them all
+        StepResult quota = itemResult(StepStatus.FAILED, "You've hit your session limit");
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
+                .thenReturn(itemResult(StepStatus.COMPLETED, "ok"), quota, quota, quota);
+
+        StepResult result = executor.execute(
+                foreachOver(List.of("a", "b", "c", "d", "e", "f", "g"), Map.of()), context);
+
+        verify(commandExecutor, times(4)).executeStepOnHost(any(HostExecutionRequest.class));
+        assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(result.getMetadata())
+                .containsEntry("abortedAfterConsecutiveFailures", 3)
+                .containsEntry("skippedItemCount", 3)
+                .containsEntry("failedItemCount", 3)
+                .containsEntry("totalItems", 7);
+        assertThat((String) result.getMetadata().get(StepFailureSummary.KEY))
+                .startsWith("stopped after 3 consecutive failed items (max_consecutive_failures), 3 items not run\n"
+                        + "3/7 items failed: b, c, d\n[b]: You've hit your session limit");
+        assertThat(result.getOutput()).endsWith("[max_consecutive_failures] stopped after 3 consecutive failed items"
+                + " (max_consecutive_failures), 3 items not run");
+    }
+
+    @Test
+    void execute_continueOnError_stillStopsAfterThreeFailuresInARow_andFails() {
+        StepResult quota = itemResult(StepStatus.FAILED, "You've hit your session limit");
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class))).thenReturn(quota);
+
+        StepResult result = executor.execute(
+                foreachOver(List.of("a", "b", "c", "d"), Map.of("continue_on_error", true)), context);
+
+        verify(commandExecutor, times(3)).executeStepOnHost(any(HostExecutionRequest.class));
+        assertThat(result.getStatus()).as("continue_on_error tolerates failed items, not unrun ones")
+                .isEqualTo(StepStatus.FAILED);
+        assertThat(result.getOutput()).contains("[continue_on_error] 3/4 items failed: a, b, c",
+                "[max_consecutive_failures] stopped after 3 consecutive failed items");
+        assertThat((String) result.getMetadata().get(StepFailureSummary.KEY))
+                .startsWith("stopped after 3 consecutive failed items (max_consecutive_failures), 1 item not run\n");
+    }
+
+    @Test
+    void execute_successBetweenFailures_resetsTheCount() {
+        StepResult bad = itemResult(StepStatus.FAILED, "error");
+        StepResult ok = itemResult(StepStatus.COMPLETED, "ok");
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
+                .thenReturn(bad, bad, ok, bad, bad, ok);
+
+        StepResult result = executor.execute(
+                foreachOver(List.of("a", "b", "c", "d", "e", "f"), Map.of("continue_on_error", true)), context);
+
+        verify(commandExecutor, times(6)).executeStepOnHost(any(HostExecutionRequest.class));
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getMetadata()).doesNotContainKeys("abortedAfterConsecutiveFailures", "skippedItemCount");
+    }
+
+    @Test
+    void execute_lastItemCompletesTheRun_isNoAbort() {
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
+                .thenReturn(itemResult(StepStatus.FAILED, "error"));
+
+        StepResult result = executor.execute(foreachOver(List.of("a", "b", "c"), Map.of()), context);
+
+        verify(commandExecutor, times(3)).executeStepOnHost(any(HostExecutionRequest.class));
+        assertThat(result.getMetadata()).doesNotContainKey("abortedAfterConsecutiveFailures");
+        assertThat((String) result.getMetadata().get(StepFailureSummary.KEY)).startsWith("3/3 items failed: a, b, c");
+    }
+
+    @Test
+    void execute_maxConsecutiveFailuresZero_runsEveryItem() {
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
+                .thenReturn(itemResult(StepStatus.FAILED, "error"));
+
+        StepResult result = executor.execute(
+                foreachOver(List.of("a", "b", "c", "d", "e"), Map.of("max_consecutive_failures", 0)), context);
+
+        verify(commandExecutor, times(5)).executeStepOnHost(any(HostExecutionRequest.class));
+        assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(result.getMetadata()).doesNotContainKey("abortedAfterConsecutiveFailures");
+    }
+
+    @Test
+    void execute_customMaxConsecutiveFailuresAsText_isHonoured() {
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
+                .thenReturn(itemResult(StepStatus.FAILED, "error"));
+
+        StepResult result = executor.execute(
+                foreachOver(List.of("a", "b", "c", "d", "e"), Map.of("max_consecutive_failures", "1")), context);
+
+        verify(commandExecutor, times(1)).executeStepOnHost(any(HostExecutionRequest.class));
+        assertThat(result.getMetadata()).containsEntry("skippedItemCount", 4);
+    }
+
+    @Test
+    void maxConsecutiveFailures_readsNumbersAndText_fallsBackToDefault() {
+        assertThat(ForEachBlockExecutor.maxConsecutiveFailures(null)).isEqualTo(3);
+        assertThat(ForEachBlockExecutor.maxConsecutiveFailures(5)).isEqualTo(5);
+        assertThat(ForEachBlockExecutor.maxConsecutiveFailures(" 2 ")).isEqualTo(2);
+        assertThat(ForEachBlockExecutor.maxConsecutiveFailures(-1)).isZero();
+        assertThat(ForEachBlockExecutor.maxConsecutiveFailures("{{ limit }}")).isEqualTo(3);
+    }
+
     @Test
     void execute_continueOnError_allItemsSucceed_noFailureMetadata() {
         StepResult success = StepResult.builder()

@@ -463,7 +463,8 @@ GET /api/v1/workflows/{id}/analyze
 #         on-no-without-reject-option (Approval mit on_no, aber keine Option lehnt ab),
 #         items-command-without-source (foreach mit items_command, aber ohne items_source "command"),
 #         unknown-config-key (Schluessel, den der Block nicht liest), missing-required-config-key,
-#         invalid-config-value (on_failure ausser stop/continue = HIGH) — gegen das Block-Config-Schema
+#         invalid-config-value (on_failure ausser stop/continue = HIGH), legacy-config-key (alter Schluesselname,
+#         der noch wirkt, aber auslaeuft, etwa workflowId am sub-workflow = LOW) — gegen das Block-Config-Schema
 #         des Editors (ai-automation-frontend/src/data/blockConfigSchema.json), auch in verschachtelten
 #         Bloecken; deren detail beginnt mit dem Pfad, z. B. "Block 2 › cases[0] › Block 1: …",
 #         self-api-call (Shell-Code ruft die eigene REST-API, ausser den schluesselfreien Sonden = HIGH;

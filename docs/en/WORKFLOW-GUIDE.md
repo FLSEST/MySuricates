@@ -79,7 +79,7 @@ MySuricates supports 20 block types. Each block has a `type` and a `config` map.
 
 **Restoring an old version** (`POST /api/v1/workflows/{id}/versions/{versionId}/restore`) passes the same check: if the old definition uses a type that no longer exists, the restore fails with 400 — a definition the platform can no longer run does not come back.
 
-**Help in the block editor:** The config field knows the keys of every block type. Ctrl+Space suggests keys and allowed values (e.g. `on_failure` → `stop`/`continue`), a second Ctrl+Space shows their explanation, and hovering a key explains it together with its values. Unknown keys, wrong values and missing required fields are underlined in yellow; saving still works. The dialog can be resized from its lower right corner and maximised. Block skills are only offered for blocks that call the AI in the project directory. The keys and texts live in `ai-automation-frontend/src/data/blockConfigSchema.json`: whoever teaches an executor a new config key adds it there. `blockConfigSchema.test.ts` checks the schema against all shipped templates, blueprints and pool workflows, `ExecutorConfigKeyDriftTest` against the keys the executors read. The analyzer uses the same file: the workflow page shows the findings of the build check below its header (in the UI language), among them unknown keys (`unknown-config-key`, e.g. `command` instead of `goal` in an agentic block or `container_image` on a retry block without `execution_mode: shell`), missing required keys (`missing-required-config-key`) and invalid values (`invalid-config-value`, e.g. `on_failure: "fail"`) – also in nested blocks, with a path like "Block 2 › cases[0] › Block 1". It also reports access to the platform itself: `self-api-call` (shell code calls the instance's REST API, e.g. `curl localhost:9090/api/v1/todos` or `/actuator/metrics`, also composed like `…/api/v1/$E`; the key-free probes `/actuator/health`, `/api/v1/system/health`, `/api/v1/system/jvm-memory`, `/api/v1/system/info`, `/api/v1/system/auth-status` are exempt; an AI prompt that names such a call is only MEDIUM, to be checked) and `direct-db-access` (`app_settings` or `automation.db` with a read; `sqlite3` alone is MEDIUM because it may be a project's own file). Use instead: context variables like `{{ open_todos }}`, the blocks `todo-create`/`todo-update`/`todo-close`, and the integration block for external services. Workflows an AI generates (assistant, factory, wishes, dialog import, run conversion) go through the same check right after generation: on HIGH findings the AI gets one correction round, remaining findings are shown in the result or the activity log (details: [architektur.md](architektur.md) → Workflow Factory).
+**Help in the block editor:** The config field knows the keys of every block type. Ctrl+Space suggests keys and allowed values (e.g. `on_failure` → `stop`/`continue`), a second Ctrl+Space shows their explanation, and hovering a key explains it together with its values. Unknown keys, wrong values and missing required fields are underlined in yellow; saving still works. The dialog can be resized from its lower right corner and maximised. Block skills are only offered for blocks that call the AI in the project directory. The keys and texts live in `ai-automation-frontend/src/data/blockConfigSchema.json`: whoever teaches an executor a new config key adds it there. `blockConfigSchema.test.ts` checks the schema against all shipped templates, blueprints and pool workflows, `ExecutorConfigKeyDriftTest` against the keys the executors read. The analyzer uses the same file: the workflow page shows the findings of the build check below its header (in the UI language), among them unknown keys (`unknown-config-key`, e.g. `command` instead of `goal` in an agentic block or `container_image` on a retry block without `execution_mode: shell`), missing required keys (`missing-required-config-key`) and invalid values (`invalid-config-value`, e.g. `on_failure: "fail"`), plus, as a LOW hint, old key names that still work but are being phased out (`legacy-config-key`, e.g. `workflowId` instead of `workflow_id` on a sub-workflow) – also in nested blocks, with a path like "Block 2 › cases[0] › Block 1". It also reports access to the platform itself: `self-api-call` (shell code calls the instance's REST API, e.g. `curl localhost:9090/api/v1/todos` or `/actuator/metrics`, also composed like `…/api/v1/$E`; the key-free probes `/actuator/health`, `/api/v1/system/health`, `/api/v1/system/jvm-memory`, `/api/v1/system/info`, `/api/v1/system/auth-status` are exempt; an AI prompt that names such a call is only MEDIUM, to be checked) and `direct-db-access` (`app_settings` or `automation.db` with a read; `sqlite3` alone is MEDIUM because it may be a project's own file). Use instead: context variables like `{{ open_todos }}`, the blocks `todo-create`/`todo-update`/`todo-close`, and the integration block for external services. Workflows an AI generates (assistant, factory, wishes, dialog import, run conversion) go through the same check right after generation: on HIGH findings the AI gets one correction round, remaining findings are shown in the result or the activity log (details: [architektur.md](architektur.md) → Workflow Factory).
 
 **What sits on a block but never runs** is reported by the analyzer as well: `dead-nested-blocks` (HIGH) for a `config.blocks` list – no block type runs it; foreach, retry, conditional and while run their `command`, switch only `cases[].blocks` and `default`. `unknown-block-field` for a field next to `type`, `name`, `config`, `requiredCapabilities` and `skillIds`: HIGH when it is a config key (`"on_failure": "continue"` next to `config` instead of inside it – the run stops anyway), MEDIUM for a near spelling of a block field (`skill_ids`), otherwise LOW. MySuricates keeps such fields when saving instead of silently dropping them, so the workflow page shows them after a save or a pool install.
 
@@ -250,7 +250,7 @@ Executes an autonomous Goal-Reason-Act-Observe loop. The most powerful but also 
 | `max_iterations` | int | 10 | Hard iteration upper limit |
 | `iteration_timeout_seconds` | int | 300 | Wall-clock timeout per iteration |
 | `total_timeout_seconds` | int | 1800 | Total block timeout (30 min) |
-| `max_total_tokens` | int | 200000 | Token budget (input+output across all iterations) |
+| `max_total_tokens` | int | 200000 | Token budget across all iterations: uncached input + output of REASON and ACT, without cache tokens (see below) |
 | `max_repeated_actions` | int | 3 | Abort after N identical actions |
 | `require_approval` | bool | false | Approval gate before each action |
 | `timeout_seconds` | int | null | Claude CLI timeout per call (REASON + ACT) |
@@ -267,6 +267,8 @@ Executes an autonomous Goal-Reason-Act-Observe loop. The most powerful but also 
   }
 }
 ```
+
+**What `max_total_tokens` counts**: per iteration `inputTokens` + `outputTokens` of the REASON and the ACT phase — that is, the uncached input and the output (thinking tokens are part of `outputTokens`). Cache tokens (`cacheReadInputTokens`, `cacheCreationInputTokens`) deliberately do **not** count: the budget is meant to stay close to cost, not to context size. With Claude the cached part of a call is often orders of magnitude larger than the uncached one; counted in, the usual budgets (100,000–400,000) would already break in the first iteration (decision 114c2ee3). Codex and Pi report no real figures, there the estimate counts (characters / 4, `estimated: true`). The check runs after each iteration: if the sum is above the budget, the block ends with `[TOKEN BUDGET EXCEEDED: …]`, so the last iteration still runs to completion. How much context actually went through the cache is shown in the step metadata and the run's insights card.
 
 **When to use**: Complex multi-step tasks that require judgment — creating files, fixing code, building projects. See [Agentic Block Deep Dive](#8-agentic-block-deep-dive) for details.
 
@@ -401,6 +403,7 @@ Executes a command for each item in a list.
 | `execution_mode` | string | `"ai"` | `"ai"` (AI, provider from `provider` on the block/workflow) or `"shell"`; `"claude"` still means `"ai"`, other values are rejected |
 | `timeout_seconds` | int | 300 | Timeout per iteration |
 | `continue_on_error` | bool | `false` | `true`: failed items do not fail the block — it completes, follow-up blocks run. Failures are summarised in the output (`N/M items failed: ...`). `false`: a failed item fails the block, the remaining items still run. In both cases the step metadata lists the failures (`failedItemCount`, `failedItems`, `totalItems`) |
+| `max_consecutive_failures` | int | `3` | After this many failed items **in a row** the loop stops: the remaining items no longer run and the block fails — even with `continue_on_error: true`. A successful item resets the count. `0` turns the stop off. Metadata: `abortedAfterConsecutiveFailures`, `skippedItemCount` |
 
 ```json
 {
@@ -421,6 +424,10 @@ Executes a command for each item in a list.
 **Empty item lists**: Empty and whitespace-only lines are discarded — in the `items_command` output as well as in inline `items`. An empty output therefore yields **zero** iterations (the block completes with metadata `totalItems: 0`) instead of one iteration with an empty item. An empty list is thus the clean way to skip a loop.
 
 **`continue_on_error` vs. `on_failure`**: `continue_on_error: true` tolerates item failures *inside* the block (the block completes, e.g. 29/30 items succeeded → follow-up blocks such as commit/gate run). The block-level `on_failure: "continue"` only lets the workflow go on despite a FAILED block — the block itself stays FAILED.
+
+> **Default changed in 2026-10:** foreach stops after **3 failed items in a row** — with and without `continue_on_error`; the remaining items no longer run. `max_consecutive_failures: 0` restores the old behaviour (every item runs, however many fail). The shipped templates whose purpose is a complete pass (e.g. `test-matrix`, `service-health-monitor`, `ssl-cert-check`) set `0`.
+
+**Stop after failures in a row** (`max_consecutive_failures`): an exhausted quota ("You've hit your session limit") fails every further AI item the same way. Without a stop, foreach still called all the remaining ones — in "Hunt Quality Rebuild" 37 of 42 items failed like that and cost time. Since a6659a46 the loop stops after three failures in a row; the error message names the reason first: `Step 1 (foreach) failed: stopped after 3 consecutive failed items (max_consecutive_failures), 34 items not run`, followed by the failed items as below. `continue_on_error` tolerates failed items, not items that never ran — so the block fails then too; with `on_failure: "continue"` the workflow still goes on. Loops in which failures in a row are normal (say "is the service reachable?" over many hosts) set `max_consecutive_failures: 0`.
 
 **Error message**: When the block fails, the run's error message starts with the failed items and the error of the first one, e.g. `Step 1 (foreach) failed: 1/37 items failed: erkner` followed by `[erkner]: API Error: …`. The block output stays the transcript of all items in their order, so a failed item sits between successful ones there; their text alone ("GATE PASS …") does not tell why the block failed.
 
@@ -543,6 +550,7 @@ Executes another workflow as a nested step.
 | Config Key | Type | Default | Description |
 |---|---|---|---|
 | `workflow_id` | string | **required** | ID of the workflow to execute |
+| `workflowId` | string | — | Old spelling of `workflow_id`: still read, will be dropped later. The analyzer reports it as `legacy-config-key` (LOW); if `workflow_id` is set next to it, only `workflow_id` counts |
 
 **Limits**: Maximum nesting depth of 5 levels. Circular references are detected. 30-minute timeout.
 
@@ -1461,7 +1469,7 @@ Old files from previous runs can pollute the agentic block's context (e.g. glob 
 | `max_iterations` | 10 | Hard stop after N iterations |
 | `iteration_timeout_seconds` | 300 | Wall-clock timeout per iteration |
 | `total_timeout_seconds` | 1800 | Total timeout (30 min) |
-| `max_total_tokens` | 200,000 | Token budget (input+output) |
+| `max_total_tokens` | 200,000 | Token budget (uncached input + output, without cache tokens) |
 | `max_repeated_actions` | 3 | Abort after N identical actions |
 | `require_approval` | false | Human gate before each action |
 
