@@ -625,9 +625,9 @@ neue CLI-Version kann Flags oder das Ausgabeformat ändern, auf die `HostClaudeS
 `ClaudeAiProvider`/`CodexAiProvider`/`PiAiProvider.PINNED_VERSION`; daraus entstehen der
 Installationsbefehl im Katalog des Installers (Statuskarte, `--with-pi`; Claude auch beim nativen
 Installer `bash -s <version>`) und — per Test abgeglichen — `ARG CLAUDE_VERSION`, `ARG CODEX_VERSION`
-und `ARG PI_VERSION` der Tryout-Stufe in `deploy/Dockerfile`. Auf dem eigenen Rechner aktualisiert
-sich die Claude-CLI weiter selbst; gepinnt ist, was ein frischer Rechner und das Tryout-Image
-bekommen. Auf eine neue Version heben:
+und `ARG PI_VERSION` der Tryout-Stufe in `deploy/Dockerfile`. Die native Claude-CLI aktualisiert
+sich auf dem Rechner selbst (Auto-Update): Der Pin legt dort nur den Erstzustand einer frischen
+Installation fest. Im Tryout-Image bleibt er, weil dort `DISABLE_AUTOUPDATER=1` gilt. Auf eine neue Version heben:
 
 1. Die neue Version auf dem eigenen Rechner installieren (`npm install -g @anthropic-ai/claude-code@<version>`,
    `@openai/codex@<version>` bzw. `@earendil-works/pi-coding-agent@<version>`) und einen Workflow mit

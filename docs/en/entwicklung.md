@@ -615,8 +615,9 @@ anyone noticing. The version lives in one place per provider,
 `ClaudeAiProvider`/`CodexAiProvider`/`PiAiProvider.PINNED_VERSION`; from it come the install command
 in the installer's catalog (status card, `--with-pi`; for Claude also the native installer's
 `bash -s <version>`) and — kept equal by a test — `ARG CLAUDE_VERSION`, `ARG CODEX_VERSION` and
-`ARG PI_VERSION` of the tryout stage in `deploy/Dockerfile`. On your own machine the Claude CLI keeps
-updating itself; what is pinned is what a fresh machine and the tryout image get. Moving to a new
+`ARG PI_VERSION` of the tryout stage in `deploy/Dockerfile`. The native Claude CLI updates itself on
+the machine (auto-update): there the pin only sets the initial state of a fresh install. In the
+tryout image it stays, because `DISABLE_AUTOUPDATER=1` is set there. Moving to a new
 version:
 
 1. Install the new version on your own machine (`npm install -g @anthropic-ai/claude-code@<version>`,

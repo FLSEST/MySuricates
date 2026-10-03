@@ -287,6 +287,12 @@ printf 'MYSURICATES_RUNTIME=container\nMYSURICATES_PORT=%s\nMYSURICATES_BIND=0.0
 check "--reconfigure, container: bind, projects, socket, AI access stay" '[ "$(run --yes --dry-run --reconfigure)" = 0 ] && [ "$(val main MYSURICATES_BIND)" = 0.0.0.0 ] && [ "$(val main MYSURICATES_PROJECTS)" = /srv/projekte ] && [ "$(val main MYSURICATES_DOCKER_SOCKET)" = 1 ] && [ "$(val main MYSURICATES_AI_FROM_HOST)" = programs ] && [ "$(val main MYSURICATES_AI_PROVIDERS)" = codex ]'
 check "--reconfigure --mode staged: not from main.env"  '[ "$(run --yes --dry-run --reconfigure --mode staged)" = 0 ] && [ "$(val dev MYSURICATES_PRESET)" = full ] && [ "$(val prod MYSURICATES_HARDENING_SEALING)" = true ]'
 rm -f "$INST/dev.env" "$INST/test.env" "$INST/prod.env"
+# Gleicher Schluessel ersetzt statt angehaengt; ein Preset verwirft alte Modul-Ueberschreibungen (ca902719)
+printf 'MYSURICATES_RUNTIME=host\nMYSURICATES_PORT=%s\nMYSURICATES_PRESET=core\nAUTOMATION_AI_DEFAULT_PROVIDER=CODEX\nAUTOMATION_MODULES_CHAINS=true\nAUTOMATION_MODULES_GOALS=false\nAUTOMATION_MODULES_UIEDITABLE=true\nAUTOMATION_HARDENING_SEALING=true\n' "$R7N" > "$INST/main.env"
+count() { grep -c "^$2=" "$INST/$1.env"; }
+check "--reconfigure --modules twice: one line per key"   '[ "$(run --yes --dry-run --reconfigure --modules chains,memory)" = 0 ] && [ "$(run --yes --dry-run --reconfigure --modules memory)" = 0 ] && [ "$(count main AUTOMATION_MODULES_CHAINS)" = 1 ] && [ "$(count main AUTOMATION_MODULES_MEMORY)" = 1 ] && [ "$(count main AUTOMATION_HARDENING_SEALING)" = 1 ] && [ "$(val main AUTOMATION_MODULES_GOALS)" = false ]'
+check "--reconfigure --preset: old module overrides go, hardening and ui-editable stay" '[ "$(run --yes --dry-run --reconfigure --preset research)" = 0 ] && [ "$(val main MYSURICATES_PRESET)" = research ] && [ "$(count main AUTOMATION_MODULES_CHAINS)" = 0 ] && [ "$(count main AUTOMATION_MODULES_GOALS)" = 0 ] && [ "$(count main AUTOMATION_MODULES_MEMORY)" = 0 ] && [ "$(val main AUTOMATION_HARDENING_SEALING)" = true ] && [ "$(val main AUTOMATION_MODULES_UIEDITABLE)" = true ]'
+check "--reconfigure --preset --modules: only the new override" '[ "$(run --yes --dry-run --reconfigure --preset core --modules bpmn)" = 0 ] && [ "$(val main AUTOMATION_MODULES_BPMN)" = true ] && [ "$(grep -c "^AUTOMATION_MODULES_" "$INST/main.env")" = 2 ]'
 
 echo "7b) a kept file: the steps show its values, not ones that never reach it (fd4eb89f)"
 # Frueher meldete der Ports-Schritt „nehme 9091“ (die eigene laufende Instanz belegt 9090) und der
@@ -402,6 +408,10 @@ if command -v script >/dev/null 2>&1 && script -qec true /dev/null >/dev/null 2>
   # Ohne --reconfigure: „Einstellungen aendern“ im Auswahlmenue (Enter), danach dieselben Fragen
   c8_file; pty_run '\n|\n|\n|n\n|\n|\n|n\n'
   check "change settings: asked with the file's values"  'asked "Change settings of main" && asked "Step 4 of 8" && asked "[$C8]:" && [ "$(val main MYSURICATES_PRESET)" = full ] && [ "$(val main MYSURICATES_RUNTIME)" = host ] && [ "$(val main AUTOMATION_AI_DEFAULT_PROVIDER)" = PI ]'
+  # „Eigene“ in der Datei, im Menue ein Preset gewaehlt: die alten Modul-Ueberschreibungen gelten nicht weiter
+  c8_file; printf 'AUTOMATION_MODULES_CHAINS=true\nAUTOMATION_MODULES_GOALS=false\nAUTOMATION_HARDENING_SEALING=true\n' >> "$INST/main.env"
+  pty_run '\n|1|n\n|\n|\n|n\n' --reconfigure
+  check "custom → preset in the menu: old module overrides gone, hardening stays" '[ "$(val main MYSURICATES_PRESET)" = core ] && ! grep -q "^AUTOMATION_MODULES_" "$INST/main.env" && [ "$(val main AUTOMATION_HARDENING_SEALING)" = true ]'
   # Per Flag gegeben: nicht noch einmal gefragt (pi n · bauen n)
   c8_file; pty_run 'n\n|n\n' --reconfigure --runtime host --preset core --provider codex --port "$C8N"
   check "flags are not asked again"                      '! asked "Step 2 of 8" && ! asked "Step 4 of 8" && ! asked "[$C8N]:" && [ "$(val main MYSURICATES_PRESET)" = core ] && [ "$(val main AUTOMATION_AI_DEFAULT_PROVIDER)" = CODEX ]'

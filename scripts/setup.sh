@@ -288,11 +288,43 @@ docker_ready() {
 }
 
 # --- Schritt 4: Module ------------------------------------------------------------------------------
+# Zeilen einer Datei, die neu geschrieben wird, bleiben (ca902719) — aber nie doppelt: custom_set ersetzt
+# eine Zeile mit demselben Schluessel, statt eine zweite anzuhaengen.
+custom_set() {  # SCHLUESSEL=WERT
+  local key="${1%%=*}" line out=""
+  while IFS= read -r line; do
+    [ -n "$line" ] && [ "${line%%=*}" != "$key" ] && out="$out$line
+"
+  done <<EOF
+${CUSTOM_LINES:-}
+EOF
+  CUSTOM_LINES="$out$1
+"
+}
+# custom_drop_modules [all] — die Modul-Ueberschreibungen der Datei verwerfen: wer ein Preset (neu) waehlt,
+# bekommt das Preset, nicht still die Auswahl von frueher. AUTOMATION_MODULES_UIEDITABLE ist kein
+# Modul und bleibt — ausser mit all (die eigene Auswahl fragt es neu ab). Haertungs-Zeilen bleiben immer.
+custom_drop_modules() {
+  local line out=""
+  while IFS= read -r line; do
+    case "$line" in
+      "") continue ;;
+      AUTOMATION_MODULES_UIEDITABLE=*) [ "${1:-}" = all ] && continue ;;
+      AUTOMATION_MODULES_*) continue ;;
+    esac
+    out="$out$line
+"
+  done <<EOF
+${CUSTOM_LINES:-}
+EOF
+  CUSTOM_LINES="$out"
+}
 step_modules() {
   local choice rc items key tier on sel hard label="" def
   section 3
   if [ "$MODE" = staged ]; then tui_done "$(msg step_modules)" "$(msg modules_staged)$(kept_mark)"; return 0; fi
   CUSTOM_LINES="$LOADED_LINES"   # Zeilen einer Datei, die neu geschrieben wird, bleiben (ca902719)
+  [ -z "$F_PRESET" ] || custom_drop_modules   # --preset: das Preset gilt, keine alten Ueberschreibungen
   if [ "$INTERACTIVE" = 1 ] && { [ -z "$PRESET" ] || from_file "$F_PRESET"; }; then
     case "$PRESET" in research) def=1 ;; full) def=2 ;; *) def=0 ;; esac
     tui_select choice "$(msg step_of 4 ${#STEPS[@]}) · $(msg modules_title)" "$def" \
@@ -302,9 +334,9 @@ step_modules() {
       "$(msg modules_custom)|$(msg modules_custom_hint)"
     rc=$?; [ "$rc" = 0 ] || return "$rc"
     case "$choice" in
-      0) PRESET=core ;; 1) PRESET=research ;; 2) PRESET=full ;;
+      0) PRESET=core; custom_drop_modules ;; 1) PRESET=research; custom_drop_modules ;; 2) PRESET=full; custom_drop_modules ;;
       3)
-        PRESET=core; label="$(msg modules_custom_done)"
+        PRESET=core; label="$(msg modules_custom_done)"; custom_drop_modules all
         items=()
         for key in "${MODULE_CATALOG_FEATURE_KEYS[@]}"; do
           tier="$(module_catalog_get TIER "$key")"; on=off; [ "$tier" = standard ] && on=on
@@ -313,10 +345,8 @@ step_modules() {
         tui_checklist sel "$(msg modules_pick_title)" "${items[@]}"; rc=$?; [ "$rc" = 0 ] || return "$rc"
         for key in "${MODULE_CATALOG_FEATURE_KEYS[@]}"; do
           tier="$(module_catalog_get TIER "$key")"
-          if printf ' %s ' "$sel" | grep " $key " >/dev/null; then [ "$tier" = standard ] || CUSTOM_LINES="$CUSTOM_LINES$(prop_env "$(module_catalog_get PROPERTY "$key")")=true
-"
-          else [ "$tier" = standard ] && CUSTOM_LINES="$CUSTOM_LINES$(prop_env "$(module_catalog_get PROPERTY "$key")")=false
-"; fi
+          if printf ' %s ' "$sel" | grep " $key " >/dev/null; then [ "$tier" = standard ] || custom_set "$(prop_env "$(module_catalog_get PROPERTY "$key")")=true"
+          else [ "$tier" = standard ] && custom_set "$(prop_env "$(module_catalog_get PROPERTY "$key")")=false"; fi
         done
         items=()
         for key in "${MODULE_CATALOG_HARDENING_KEYS[@]}"; do
@@ -326,18 +356,15 @@ step_modules() {
         tui_checklist hard "$(msg modules_hardening_title)" "${items[@]}"; rc=$?; [ "$rc" = 0 ] || return "$rc"
         for key in "${MODULE_CATALOG_HARDENING_KEYS[@]}"; do
           on=false; printf ' %s ' "$hard" | grep " $key " >/dev/null && on=true
-          CUSTOM_LINES="$CUSTOM_LINES$(prop_env "$(module_catalog_get PROPERTY "$key")")=$on
-"
+          custom_set "$(prop_env "$(module_catalog_get PROPERTY "$key")")=$on"
         done
-        tui_confirm "$(msg modules_ui_editable_q)" n && CUSTOM_LINES="${CUSTOM_LINES}AUTOMATION_MODULES_UIEDITABLE=true
-"
+        tui_confirm "$(msg modules_ui_editable_q)" n && custom_set AUTOMATION_MODULES_UIEDITABLE=true
         if [ "$RUNTIME" = container ]; then tui_confirm "$(msg socket_q)" n && SOCKET=1; fi ;;
     esac
   fi
   PRESET="${PRESET:-core}"
   for key in $(printf '%s' "$MODULES" | tr ',' ' '); do
-    CUSTOM_LINES="$CUSTOM_LINES$(prop_env "$(module_catalog_get PROPERTY "$key")")=true
-"
+    custom_set "$(prop_env "$(module_catalog_get PROPERTY "$key")")=true"
   done
   tui_done "$(msg step_modules)" "${label:-$PRESET}${MODULES:+ + $MODULES}$(kept_mark modules)"
   return 0
