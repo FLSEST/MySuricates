@@ -1160,6 +1160,8 @@ der Oberfläche): Schlüssel ist das deutsche Textstück, Wert das englische. Te
 Untertitel, Überschriften samt Beiwort, Absätze, Listenpunkte, Tabellenzellen und die
 Mermaid-Beschriftungen — Knotentexte, Kantenlabels, `subgraph`-Titel, Notizen, Sequenz-Nachrichten,
 `alt`/`loop`-Beschriftungen; die Regeln je Diagrammtyp stehen in `scripts/lib/mermaid_labels.py`.
+In Codeblöcken und Dateibäumen ist der Kommentar hinter `←` ein Textstück (ohne Marke); die Marken
+`[NEU]`/`[ENTFERNT]` heißen auf der englischen Seite `[NEW]`/`[REMOVED]`, ohne Tabelleneintrag (08e6fa4d).
 Knoten-IDs werden nie übersetzt, auch wo Mermaid sie anzeigt (`PENDING --> RUNNING`,
 `subgraph Compose`): Was in beiden Sprachen verschieden heißen soll, braucht eine Beschriftung
 (`ID["Text"]`). Ein Textstück ohne Buchstaben außerhalb von Inline-Code braucht keinen Eintrag, ein

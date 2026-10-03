@@ -1138,7 +1138,9 @@ translation table per page, `docs/i18n/<name>-diagrams.en.json` (the same patter
 `de.ts`/`en.ts`): the key is the German text segment, the value its English translation. Segments are
 titles, subtitles, headings with their tagline, paragraphs, list items, table cells and the Mermaid
 labels — node texts, edge labels, `subgraph` titles, notes, sequence messages, `alt`/`loop` labels;
-the rules per diagram type live in `scripts/lib/mermaid_labels.py`. Node IDs are never translated,
+the rules per diagram type live in `scripts/lib/mermaid_labels.py`. In code blocks and file trees the
+comment after `←` is a segment (without its marker); the markers `[NEU]`/`[ENTFERNT]` read
+`[NEW]`/`[REMOVED]` on the English page, without a table entry (08e6fa4d). Node IDs are never translated,
 even where Mermaid displays them (`PENDING --> RUNNING`, `subgraph Compose`): whatever should read
 differently in the two languages needs a label (`ID["Text"]`). A segment without letters outside
 inline code needs no entry; a value equal to its key is fine (class names, labels that are already

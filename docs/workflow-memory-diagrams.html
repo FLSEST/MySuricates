@@ -436,11 +436,11 @@ erDiagram
   <pre class="tree">
 <span class="dir">ai-automation-backend/src/main/java/com/automation/</span>
 ├── <span class="dir">config/</span>
-│   ├── SummarizationConfig.java          <span class="comment">← base-dir + timeout (automation.summarization)</span>
-│   └── HostClaudeConfig.java             <span class="comment">← timeout of the Claude CLI</span>
+│   ├── SummarizationConfig.java          <span class="comment">← base-dir + Timeout (automation.summarization)</span>
+│   └── HostClaudeConfig.java             <span class="comment">← Timeout der Claude-CLI</span>
 │
 ├── <span class="dir">controller/</span>
-│   └── WorkflowMemoryController.java     <span class="comment">← REST API, errors 400/422/502</span>
+│   └── WorkflowMemoryController.java     <span class="comment">← REST-API, Fehler 400/422/502</span>
 │
 ├── <span class="dir">dto/</span>
 │   ├── <span class="dir">request/</span>
@@ -450,36 +450,36 @@ erDiagram
 │       └── WorkflowMemoryResponse.java
 │
 ├── <span class="dir">entity/</span>
-│   └── WorkflowMemory.java               <span class="comment">← JPA entity</span>
+│   └── WorkflowMemory.java               <span class="comment">← JPA-Entity</span>
 │
 ├── <span class="dir">mapper/</span>
-│   └── WorkflowMemoryMapper.java         <span class="comment">← MapStruct entity ↔ DTO</span>
+│   └── WorkflowMemoryMapper.java         <span class="comment">← MapStruct Entity ↔ DTO</span>
 │
 ├── <span class="dir">repository/</span>
 │   └── WorkflowMemoryRepository.java     <span class="comment">← Spring Data JPA</span>
 │
 ├── <span class="dir">service/ai/</span>
 │   ├── HostClaudeService.java            <span class="comment">← reasonStructured(…, workDir, maxTurns)</span>
-│   ├── HostCodexService.java             <span class="comment">← codex exec wrapper</span>
-│   └── RunContextFiles.java              <span class="comment">← .claude/rules/project-memory.md, appended for Codex/Pi</span>
+│   ├── HostCodexService.java             <span class="comment">← Hülle um codex exec</span>
+│   └── RunContextFiles.java              <span class="comment">← .claude/rules/project-memory.md, für Codex/Pi angehängt</span>
 │
 └── <span class="dir">service/memory/</span>
-    ├── KnowledgeSummarizer.java          <span class="comment">← interface + SummarizationResult</span>
-    ├── ClaudeSummarizer.java             <span class="comment">← claude -p, --max-turns 1, work dir</span>
-    ├── CodexSummarizer.java              <span class="comment">← codex exec, work dir</span>
-    ├── ConversationPreprocessor.java     <span class="comment">← rule-based compression</span>
-    ├── SummarizationSetupService.java    <span class="comment">← work dirs + CLAUDE.md/AGENTS.md at startup</span>
-    ├── AutoMemoryExtractionListener.java <span class="comment">← automatic extraction after successful runs</span>
-    └── WorkflowMemoryService.java        <span class="comment">← orchestration, getSummarizer(), writeActiveMemoryToProject()</span>
+    ├── KnowledgeSummarizer.java          <span class="comment">← Interface + SummarizationResult</span>
+    ├── ClaudeSummarizer.java             <span class="comment">← claude -p, --max-turns 1, Arbeitsverzeichnis</span>
+    ├── CodexSummarizer.java              <span class="comment">← codex exec, Arbeitsverzeichnis</span>
+    ├── ConversationPreprocessor.java     <span class="comment">← regelbasierte Verdichtung</span>
+    ├── SummarizationSetupService.java    <span class="comment">← Arbeitsverzeichnisse + CLAUDE.md/AGENTS.md beim Start</span>
+    ├── AutoMemoryExtractionListener.java <span class="comment">← automatische Extraktion nach erfolgreichen Runs</span>
+    └── WorkflowMemoryService.java        <span class="comment">← Ablaufsteuerung, getSummarizer(), writeActiveMemoryToProject()</span>
 
 <span class="dir">ai-automation-backend/src/main/resources/</span>
-├── agent-instructions.md                 <span class="comment">← base instructions (block execution)</span>
+├── agent-instructions.md                 <span class="comment">← Basis-Anweisungen (Block-Ausführung)</span>
 ├── application.yml                       <span class="comment">← automation.summarization.base-dir / timeout-seconds</span>
 ├── <span class="dir">db/migration/</span>
 │   └── V16__create_workflow_memory_table.sql
 └── <span class="dir">summarization/</span>
-    ├── claude-summarizer.md              <span class="comment">← template → CLAUDE.md</span>
-    └── codex-summarizer.md               <span class="comment">← template → AGENTS.md</span>
+    ├── claude-summarizer.md              <span class="comment">← Vorlage → CLAUDE.md</span>
+    └── codex-summarizer.md               <span class="comment">← Vorlage → AGENTS.md</span>
 
 <span class="dir">ai-automation-backend/src/test/java/com/automation/</span>
 ├── <span class="dir">service/ai/</span>
@@ -496,17 +496,17 @@ erDiagram
 
 <span class="dir">ai-automation-frontend/src/</span>
 ├── <span class="dir">components/workflow/</span>
-│   └── WorkflowMemoryPanel.tsx           <span class="comment">← provider CLAUDE or CODEX</span>
+│   └── WorkflowMemoryPanel.tsx           <span class="comment">← Anbieter CLAUDE oder CODEX</span>
 ├── <span class="dir">hooks/</span>
-│   └── useWorkflowMemory.ts              <span class="comment">← TanStack Query hooks</span>
+│   └── useWorkflowMemory.ts              <span class="comment">← TanStack-Query-Hooks</span>
 └── <span class="dir">types/</span>
     └── index.ts                          <span class="comment">← WorkflowMemory, ExtractMemoryRequest</span>
 
-<span class="dir">~/.mysuricates/summarization/</span>             <span class="comment">← runtime (created at backend start)</span>
+<span class="dir">~/.mysuricates/summarization/</span>             <span class="comment">← Laufzeit (beim Backend-Start angelegt)</span>
 ├── <span class="dir">claude/</span>
-│   └── CLAUDE.md                         <span class="comment">← copy of claude-summarizer.md</span>
+│   └── CLAUDE.md                         <span class="comment">← Kopie von claude-summarizer.md</span>
 └── <span class="dir">codex/</span>
-    └── AGENTS.md                         <span class="comment">← copy of codex-summarizer.md</span>
+    └── AGENTS.md                         <span class="comment">← Kopie von codex-summarizer.md</span>
 
 <span class="dir">docs/</span>
 └── workflow-memory-architecture.md
