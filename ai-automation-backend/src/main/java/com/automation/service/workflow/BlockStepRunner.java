@@ -69,6 +69,24 @@ public class BlockStepRunner {
         return step;
     }
 
+    /**
+     * WAITING_APPROVAL while the run waits for a person, RUNNING again afterwards (TODO 4eea7a87) —
+     * persisted and broadcast like the RUNNING placeholder. Runs in the run's own thread; a failure
+     * here must not break the approval itself.
+     */
+    void markWaiting(WorkflowRun run, StepResult step, boolean waiting) {
+        StepStatus status = waiting ? StepStatus.WAITING_APPROVAL : StepStatus.RUNNING;
+        if (step.getStatus() == status) return;
+        step.setStatus(status);
+        try {
+            stepResultRepository.save(step);
+            broadcaster.broadcastStepResult(run.getId(), step);
+        } catch (RuntimeException e) {
+            log.warn("Run {}: step {} could not be marked {}: {}", run.getId(), step.getStepIndex(), status,
+                    e.getMessage());
+        }
+    }
+
     /** Block types whose {@code config.description} is content (the TODO text), not a note on the step. */
     private static final Set<String> DESCRIPTION_IS_CONTENT = Set.of("todo-create", "todo-update");
 
@@ -95,12 +113,15 @@ public class BlockStepRunner {
         // starts streams into the live log under this step's index, nested blocks included, and
         // those processes are registered with the run so a cancel kills them.
         StepResult result;
+        // While an approval or human input is open the step shows WAITING_APPROVAL, nested blocks included
+        context.onApprovalWait(waiting -> markWaiting(run, step, waiting));
         try {
             result = LiveOutput.bind(liveLog.sinkFor(run.getId(), step.getStepIndex(), block.getName()),
                     () -> ProcessTracking.bind(context.processTracker(),
                             () -> runIfGate.skipIfUnmet(block, context)
                                     .orElseGet(() -> executeValidated(step, block, executor, context, run))));
         } finally {
+            context.onApprovalWait(null);
             liveLog.flush(run.getId()); // live lines must reach the client before the final step message
         }
 

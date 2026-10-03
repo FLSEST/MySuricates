@@ -111,7 +111,7 @@ public class HumanInputBlockExecutor implements BlockExecutor {
 
         String answer;
         try {
-            answer = future.get(timeoutMinutes, TimeUnit.MINUTES);
+            answer = context.awaitApproval(future, timeoutMinutes, TimeUnit.MINUTES);
         } catch (TimeoutException e) {
             log.warn("Human input timed out for prompt: {}", prompt);
             if (useDefaultOnTimeout && defaultValue != null && !defaultValue.isEmpty()) {

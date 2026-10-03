@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import {
   Clock, Terminal, Sparkles, Brain, Repeat, GitBranch, RefreshCw, ShieldCheck, Layers,
   MessageSquare, Route, RotateCcw, Wrench, Plug, FileText, ListPlus, SquarePen, ListChecks,
-  Bot, Cog, User, CircleHelp, Shrink, LayoutDashboard,
+  Bot, Cog, User, CircleHelp, Shrink, LayoutDashboard, Hand,
 } from 'lucide-react';
 import { Badge } from '../ui';
 import { useI18nStore, useT } from '../../i18n';
@@ -12,6 +12,13 @@ import { stepBlockName, stepBlockNote, stepBlockType, stepKind, type StepKind } 
 import { useStepAnchor } from './stepAnchors';
 
 const ICON = 'w-3 h-3';
+
+/** Status icon of a step that waits for an approval or human input (`WAITING_APPROVAL`, TODO 4eea7a87). */
+export function StepWaitingIcon() {
+  const t = useT();
+  const label = t.workflows.execution.waitingForPerson;
+  return <Hand className="w-5 h-5 text-human" role="img" aria-label={label}><title>{label}</title></Hand>;
+}
 
 const BLOCK_TYPE_ICONS: Record<BlockType, ReactNode> = {
   shell: <Terminal className={ICON} />,

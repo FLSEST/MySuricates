@@ -1104,7 +1104,7 @@ The only persistent system configuration outside of `application.yml`.
 | `COMPLETED` | Successful |
 | `FAILED` | Failed |
 | `SKIPPED` | Skipped (e.g. in conditional) |
-| `WAITING_APPROVAL` | Waiting for approval (approval/human-input block) |
+| `WAITING_APPROVAL` | Waiting for a person: approval or input pending (approval, human-input, agentic with `require_approval`, nested ones too). Set while the question is open; afterwards `RUNNING` again, then the final status |
 
 ### SkillCategory
 

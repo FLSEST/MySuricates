@@ -27,6 +27,12 @@ describe('useRunDiagramSync', () => {
     expect([...result.current.statusByBlock]).toEqual([[0, 'completed'], [1, 'failed'], [2, 'running']]);
   });
 
+  // 4eea7a87: a step waiting for a person is still the active block
+  it('shows a block whose step waits for approval as running', () => {
+    const { result } = renderHook(() => useRunDiagramSync([step(0, 'WAITING_APPROVAL', 0)]));
+    expect([...result.current.statusByBlock]).toEqual([[0, 'running']]);
+  });
+
   it('has nothing to colour without steps', () => {
     const { result } = renderHook(() => useRunDiagramSync(undefined));
     expect(result.current.statusByBlock.size).toBe(0);

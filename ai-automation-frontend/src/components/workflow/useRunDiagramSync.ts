@@ -18,7 +18,8 @@ export function useRunDiagramSync(steps: StepResult[] | undefined) {
   const statusByBlock = useMemo(() => {
     const map = new Map<number, RunStatus>();
     for (const [blockIndex, step] of stepByBlock) {
-      const s = step.status === 'RUNNING' ? 'running' : step.status === 'COMPLETED' ? 'completed' : step.status === 'FAILED' ? 'failed' : undefined;
+      // A step waiting for a person is still the active block of the run
+      const s = step.status === 'RUNNING' || step.status === 'WAITING_APPROVAL' ? 'running' : step.status === 'COMPLETED' ? 'completed' : step.status === 'FAILED' ? 'failed' : undefined;
       if (s) map.set(blockIndex, s);
     }
     return map;

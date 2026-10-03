@@ -27,14 +27,16 @@ export interface ExecutionLogEntry {
   skipped?: number;
 }
 
-/** Mutable per-run lookup the mapping reads and fills: block names and steps with live output. */
+/** Mutable per-run lookup the mapping reads and fills: block names, steps with live output, waiting steps. */
 export interface StepLogContext {
   labels: Map<number, string>;
   liveSteps: Set<number>;
+  /** Steps that reported WAITING_APPROVAL — their next RUNNING continues the step instead of starting it. */
+  waitingSteps?: Set<number>;
 }
 
 export function createStepLogContext(): StepLogContext {
-  return { labels: new Map(), liveSteps: new Set() };
+  return { labels: new Map(), liveSteps: new Set(), waitingSteps: new Set() };
 }
 
 /** 1-based like the step cards ("Schritt 1"), so a log line and its card match. */
@@ -112,8 +114,13 @@ export function eventToEntry(
     const label = stepLabel(data.stepIndex, ctx);
     const level: LogLevel = data.status === 'FAILED' ? 'ERROR' : 'INFO';
     const extra = { stepIndex: data.stepIndex, stepLabel: label };
+    if (data.status === 'WAITING_APPROVAL') {
+      // The step waits for a person (TODO 4eea7a87); the question itself comes as its own message
+      (ctx.waitingSteps ??= new Set()).add(data.stepIndex);
+      return entry('WARN', `[${label}] waiting for approval or input`, extra);
+    }
     if (data.status === 'RUNNING' && !data.output) {
-      return entry('INFO', `[${label}] started`, extra);
+      return entry('INFO', `[${label}] ${ctx.waitingSteps?.delete(data.stepIndex) ? 'continues' : 'started'}`, extra);
     }
     if (ctx.liveSteps.has(data.stepIndex)) {
       // The output already streamed line by line — only close the step.

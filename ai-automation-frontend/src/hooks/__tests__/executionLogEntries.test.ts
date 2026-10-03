@@ -29,6 +29,25 @@ describe('eventToEntry', () => {
       .toMatchObject({ level: 'ERROR', message: '[Step 1 · Scan] boom' });
   });
 
+  // TODO 4eea7a87: the step reports WAITING_APPROVAL while a person decides, then RUNNING again
+  it('marks a step that waits for a person and continues it afterwards', () => {
+    const ctx = createStepLogContext();
+    const step = (status: string) => ({ stepIndex: 2, status, input: '', output: '', durationMs: 0, blockName: 'Gate' });
+    expect(map(step('RUNNING'), ctx).message).toBe('[Step 3 · Gate] started');
+    expect(map(step('WAITING_APPROVAL'), ctx))
+      .toMatchObject({ level: 'WARN', message: '[Step 3 · Gate] waiting for approval or input', stepIndex: 2 });
+    expect(map(step('RUNNING'), ctx).message).toBe('[Step 3 · Gate] continues');
+    expect(map(step('RUNNING'), ctx).message).toBe('[Step 3 · Gate] started');
+  });
+
+  it('accepts a context without waitingSteps (older callers)', () => {
+    const ctx = { labels: new Map<number, string>(), liveSteps: new Set<number>() };
+    expect(map({ stepIndex: 0, status: 'WAITING_APPROVAL', input: '', output: '', durationMs: 0 }, ctx).message)
+      .toBe('[Step 1] waiting for approval or input');
+    expect(map({ stepIndex: 0, status: 'RUNNING', input: '', output: '', durationMs: 0 }, ctx).message)
+      .toBe('[Step 1] continues');
+  });
+
   it('closes a step that streamed live lines with status and duration', () => {
     const ctx = createStepLogContext();
     liveLinesToEntries('b', [{ seq: 0, stepIndex: 2, kind: 'line', text: 'x', ts: 0 }], ctx);

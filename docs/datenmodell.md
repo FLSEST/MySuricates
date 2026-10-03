@@ -1104,7 +1104,7 @@ Einzige persistente Systemkonfiguration außerhalb der `application.yml`.
 | `COMPLETED` | Erfolgreich |
 | `FAILED` | Fehlgeschlagen |
 | `SKIPPED` | Übersprungen (z.B. bei Conditional) |
-| `WAITING_APPROVAL` | Wartet auf Genehmigung (Approval/HumanInput-Block) |
+| `WAITING_APPROVAL` | Wartet auf eine Person: Freigabe oder Eingabe offen (approval, human-input, agentic mit `require_approval`, auch verschachtelt). Gesetzt, solange die Frage offen ist; danach wieder `RUNNING`, dann der Endstatus |
 
 ### SkillCategory
 
