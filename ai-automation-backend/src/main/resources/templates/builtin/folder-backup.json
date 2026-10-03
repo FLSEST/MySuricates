@@ -11,7 +11,7 @@
   },
   "category" : "DATA",
   "sortOrder" : 26,
-  "version" : "1.0.0",
+  "version" : "1.0.1",
   "model" : null,
   "instructions" : "Sichere alle Unterordner des aktuellen Projektverzeichnisses (ausser backup) in komprimierte Tar-Archive mit Zeitstempel nach backup/. Keine KI-Beteiligung, reine Shell-Ausfuehrung.",
   "blocks" : [ {
@@ -26,6 +26,7 @@
       "items_source" : "command",
       "execution_mode" : "shell",
       "items_command" : "find . -mindepth 1 -maxdepth 1 -type d ! -name backup -exec basename {} \\;",
+      "max_consecutive_failures" : 0,
       "variable_name" : "item",
       "timeout_seconds" : 900,
       "command" : "set -euo pipefail; src=\"{{ item }}\"; ts=\"$(date +%Y%m%d-%H%M%S)\"; tar -czf backup/\"${src}-${ts}.tgz\" \"$src\"; sha256sum backup/\"${src}-${ts}.tgz\""
