@@ -221,8 +221,9 @@ Befunde. Die Regeln:
 Die Schwellen sind am Bestand vom 2026-09-26 kalibriert (1048 Backend-Dateien, keine über 400
 NCLOC; 598 Frontend-Module, 7 über 400) und stehen samt Begründung im Skript. Befunde, die nur
 nach den alten Regeln bestanden, meldet der Report nicht mehr: Offene setzt die Plattform beim
-nächsten Lauf auf `RESOLVED`, eingeordnete (`ACCEPTED_RISK`, `DISMISSED`) bleiben mit ihrer
-Einordnung im Audit Center stehen.
+nächsten Lauf auf `RESOLVED`. Eingeordnete (`ACCEPTED_RISK`, `DISMISSED`) erbt ein neuer Befund derselben
+Datei unter anderem ruleKey; die übrigen schließt die Plattform, sobald ihr ruleKey nicht mehr im Katalog
+steht oder drei gültige Läufe sie nicht mehr gemeldet haben (siehe Lebenszyklus).
 
 ### Test-Abdeckung: Envelope aus der Soll-Liste
 
@@ -290,8 +291,8 @@ ACCEPTED_RISK | MEDIUM | performance.bundle-size | frontend/dist | Bundle über 
 - Höchstens 250 Zeilen und 60 000 Bytes, gemessen nach dem Shell-Quoting: Ein Shell-Befehl geht
   als ein Argument an `bash -c`, und Linux erlaubt je Argument 128 KiB. Wird es eng, behält der
   Block zuerst `ACCEPTED_RISK`, dann `AWAITING_VERIFICATION`, `DISMISSED` und zuletzt `OPEN`:
-  Eingeordnete werden nie `RESOLVED` und wachsen deshalb nur, und gerade sie soll ein Prompt
-  weiterführen. Die Restzeile nennt die fehlenden je Status, etwa `(+8 weitere: OPEN 8)`; die
+  Eingeordnete werden erst nach drei Läufen ohne Wiedersehen `RESOLVED` und sammeln sich deshalb an,
+  und gerade sie soll ein Prompt weiterführen. Die Restzeile nennt die fehlenden je Status, etwa `(+8 weitere: OPEN 8)`; die
   Kopfzeile zählt immer alle.
 - Titel, `subject` und Einordnung sind wie bei `{{ open_todos }}` auf eine Zeile gebracht,
   gekürzt (Titel 200, `subject` 300, Einordnung 200 Zeichen) und von Plattform-Markern, dem
@@ -359,8 +360,18 @@ nur als Markdown im `previous_report`. Das prüft Abschnitt 10b desselben Tests.
 - Ein valider vollständiger Snapshot aktualisiert vorhandene Findings und legt neue an.
 - Ein zuvor offenes Finding, das im nächsten validen Snapshot fehlt, wird `RESOLVED`.
 - Ein erneut auftretendes `RESOLVED`-Finding wird als Regression wieder geöffnet.
-- `ACCEPTED_RISK` und `DISMISSED` bleiben unverändert, wenn sie im Snapshot fehlen. Nur `OPEN`
-  und `AWAITING_VERIFICATION` werden `RESOLVED`.
+- `ACCEPTED_RISK` und `DISMISSED` fallen bei Abwesenheit nicht sofort auf `RESOLVED`
+  (`AuditDispositionLifecycle`, TODOs `b2e3da6a`/`276ac76f`), die Notiz nennt jeweils den Grund:
+  - **Regelwechsel je Datei:** Meldet derselbe Lauf für dasselbe Datei- bzw. Klassen-`subject` (normalisiert)
+    einen neuen Befund unter anderem `ruleKey`, erbt der neue Status und Einordnung (`Übernommen von
+    <alter ruleKey> (Regelwechsel)`; eine Akzeptanz behält ihre Frist, Vergleichsbasis wird die neue
+    Evidence), der alte wird `RESOLVED` (`Ersetzt durch <neuer ruleKey> (Regelwechsel)`). Nicht bei
+    subjects ohne Datei (`repository`, FAKT-Namen) und nicht bei Regeln mit festem subject.
+  - **Regel ausgemustert:** Steht der `ruleKey` nicht mehr im Katalog des Audits, kann ihn kein gültiger
+    Report mehr melden – `RESOLVED` mit `Regel nicht mehr im Katalog`.
+  - **Nicht mehr gesehen:** Fehlt der Befund in drei gültigen Läufen in Folge (der aktuelle
+    eingeschlossen), wird er `RESOLVED` mit `Nicht mehr gemessen/ersetzt: 3 Läufe ohne Wiedersehen`.
+    Taucht er später wieder auf, ist er eine Regression (`OPEN`) – die Einordnung ist dann neu zu treffen.
 - Taucht ein `ACCEPTED_RISK`-Finding wieder auf, prüft `AuditAcceptancePolicy` es gegen den
   Beleg zum Zeitpunkt der Akzeptanz: Liegt ein Messwert um mehr als 10 % darüber oder hat die
   Änderungsrate die Hotspot-Schwelle neu erreicht, wird es wieder

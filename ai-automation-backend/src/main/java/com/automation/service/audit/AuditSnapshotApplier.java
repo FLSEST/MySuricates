@@ -19,7 +19,8 @@ import java.util.*;
 /**
  * Uebernimmt die Findings eines gueltigen Audit-Reports in den Bestand: gleicht jedes Finding per
  * Fingerprint ab, oeffnet oder bewertet bekannte neu, haelt Vorkommen und verwaltete TODOs nach und
- * setzt auf RESOLVED, was der Snapshot nicht mehr enthaelt.
+ * setzt auf RESOLVED, was der Snapshot nicht mehr enthaelt — eingeordnete Befunde nach den Regeln von
+ * {@link AuditDispositionLifecycle}.
  *
  * <p>Umzug aus {@code AuditIngestionService} (Audit-TODO aac5fbf7): Der Service prueft und speichert
  * den Report, hier wird er angewendet — innerhalb der Transaktion von
@@ -37,6 +38,7 @@ class AuditSnapshotApplier {
     private final AuditRuleKeyCatalog ruleKeyCatalog;
     private final ActivityLogService activityLog;
     private final ManagedTodoWriter managedTodoWriter;
+    private final AuditDispositionLifecycle dispositionLifecycle;
 
     /**
      * Bestand und Vorkommen dieses Reports werden einmal geladen, Findings und Vorkommen gesammelt
@@ -52,6 +54,7 @@ class AuditSnapshotApplier {
         Set<String> seenFingerprints = new HashSet<>();
         Set<String> reportedRuleKeys = new HashSet<>();
         List<AuditFinding> applied = new ArrayList<>();
+        List<AuditFinding> created = new ArrayList<>();
         List<ParsedFinding> appliedItems = new ArrayList<>();
         List<String> collisions = new ArrayList<>();
 
@@ -72,6 +75,7 @@ class AuditSnapshotApplier {
                         .ruleKey(ruleKey).subject(item.subject()).status(AuditFindingStatus.OPEN)
                         .firstSeenReportId(report.getId()).firstSeenRunId(event.getRunId()).firstSeenAt(observedAt)
                         .occurrenceCount(0).build();
+                created.add(finding);
             } else {
                 reopen(finding, item, observedAt);
             }
@@ -79,6 +83,11 @@ class AuditSnapshotApplier {
             applied.add(finding);
             appliedItems.add(item);
         }
+
+        List<AuditFinding> absent = known.stream()
+                .filter(finding -> !seenFingerprints.contains(finding.getFingerprint())).toList();
+        // Vor dem Speichern und vor ensureAll: ein Nachfolger, der eine Einordnung erbt, bekommt kein TODO.
+        List<AuditFinding> superseded = dispositionLifecycle.inheritOnRuleChange(created, absent, observedAt);
 
         List<AuditFinding> saved = applied.isEmpty() ? List.of() : findingRepository.saveAll(applied);
         List<AuditFinding> touched = new ArrayList<>(saved);
@@ -95,16 +104,18 @@ class AuditSnapshotApplier {
 
         reportCollisions(event, report, collisions);
 
-        List<AuditFinding> resolved = new ArrayList<>();
-        for (AuditFinding finding : known) {
-            if (!seenFingerprints.contains(finding.getFingerprint())
-                    && (finding.getStatus() == AuditFindingStatus.OPEN
-                    || finding.getStatus() == AuditFindingStatus.AWAITING_VERIFICATION)) {
+        List<AuditFinding> resolved = new ArrayList<>(superseded);
+        for (AuditFinding finding : absent) {
+            if (finding.getStatus() == AuditFindingStatus.OPEN
+                    || finding.getStatus() == AuditFindingStatus.AWAITING_VERIFICATION) {
                 finding.setStatus(AuditFindingStatus.RESOLVED);
                 finding.setResolvedAt(observedAt);
                 resolved.add(finding);
             }
         }
+        // Eingeordnete schliesst die Abwesenheit nicht sofort: nur bei ausgemusterter Regel oder nach
+        // mehreren Laeufen ohne Wiedersehen (b2e3da6a, 276ac76f).
+        resolved.addAll(dispositionLifecycle.retireAbsent(absent, report, observedAt));
         if (!resolved.isEmpty()) touched.addAll(findingRepository.saveAll(resolved));
         managedTodoWriter.reconcile(touched);
     }

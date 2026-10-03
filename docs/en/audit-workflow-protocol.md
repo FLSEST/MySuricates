@@ -220,8 +220,9 @@ rules:
 The thresholds are calibrated on the code base of 2026-09-26 (1048 backend files, none above 400
 NCLOC; 598 frontend modules, 7 above 400) and are documented with their reasoning in the script.
 Findings that only existed under the old rules are no longer reported: the platform sets open ones
-to `RESOLVED` on the next run, classified ones (`ACCEPTED_RISK`, `DISMISSED`) stay in the Audit
-Center with their classification.
+to `RESOLVED` on the next run. A new finding for the same file under another ruleKey inherits a
+classification (`ACCEPTED_RISK`, `DISMISSED`); the platform resolves the remaining classified ones once
+their ruleKey has left the catalogue or three valid runs no longer reported them (see Lifecycle).
 
 ### Test coverage: envelope from the target list
 
@@ -294,7 +295,8 @@ note.
 - At most 250 lines and 60,000 bytes, measured after shell quoting: a shell command goes to `bash -c`
   as one argument, and Linux allows 128 KiB per argument. When it gets tight, the block keeps
   `ACCEPTED_RISK` first, then `AWAITING_VERIFICATION`, `DISMISSED` and `OPEN` last: classified findings
-  never become `RESOLVED`, so they only grow, and they are exactly what a prompt should carry forward.
+  only become `RESOLVED` after three runs without a sighting, so they accumulate, and they are exactly
+  what a prompt should carry forward.
   The rest line names the missing ones per status, for example `(+8 weitere: OPEN 8)`; the header always
   counts all of them.
 - Title, `subject` and disposition are flattened to one line as in `{{ open_todos }}`, capped (title
@@ -362,8 +364,19 @@ earlier findings only as Markdown in `previous_report`. Section 10b of the same 
 - A valid complete snapshot updates existing findings and creates new ones.
 - A previously open finding that is absent from the next valid snapshot becomes `RESOLVED`.
 - A re-appearing `RESOLVED` finding is reopened as a regression.
-- `ACCEPTED_RISK` and `DISMISSED` stay unchanged when they are absent from the snapshot. Only `OPEN`
-  and `AWAITING_VERIFICATION` become `RESOLVED`.
+- `ACCEPTED_RISK` and `DISMISSED` do not become `RESOLVED` on a single absence
+  (`AuditDispositionLifecycle`, TODOs `b2e3da6a`/`276ac76f`); the note names the reason each time:
+  - **Rule change per file:** if the same run reports a new finding for the same (normalised) file or
+    class `subject` under another `ruleKey`, the new one inherits status and classification
+    (`Übernommen von <old ruleKey> (Regelwechsel)`; an acceptance keeps its deadline, the new evidence
+    becomes the comparison base), and the old one becomes `RESOLVED` (`Ersetzt durch <new ruleKey>
+    (Regelwechsel)`). Not for subjects that name no file (`repository`, FACT names) and not for rules
+    with a fixed subject.
+  - **Rule retired:** if the `ruleKey` is no longer in the audit's catalogue, no valid report can
+    report it any more – `RESOLVED` with `Regel nicht mehr im Katalog`.
+  - **No longer seen:** if the finding is missing from three consecutive valid runs (the current one
+    included), it becomes `RESOLVED` with `Nicht mehr gemessen/ersetzt: 3 Läufe ohne Wiedersehen`. If it
+    shows up again later, it is a regression (`OPEN`) – the classification has to be made anew.
 - If an `ACCEPTED_RISK` finding re-appears, `AuditAcceptancePolicy` checks it against the evidence
   frozen at acceptance: if a measured value lies more than 10 % above it or the change rate has newly
   reached the hotspot threshold, the finding becomes `OPEN`

@@ -52,7 +52,8 @@ public class AuditFindingsContext implements AuditContextSource {
             AuditFindingStatus.AWAITING_VERIFICATION, AuditFindingStatus.ACCEPTED_RISK, AuditFindingStatus.DISMISSED);
     /**
      * Welche Zeilen der Deckel behaelt: zuerst ACCEPTED_RISK (nur ein gemeldeter wird neu bewertet), dann
-     * Wiedervorlagen und DISMISSED – eingeordnete werden nie RESOLVED und wachsen deshalb nur –, zuletzt OPEN,
+     * Wiedervorlagen und DISMISSED – eingeordnete werden erst nach drei Laeufen ohne Wiedersehen RESOLVED
+     * ({@link AuditDispositionLifecycle}) und sammeln sich deshalb an –, zuletzt OPEN,
      * den der Audit ohnehin neu misst. Gezeigt wird danach wie {@link #SHOWN}.
      */
     static final List<AuditFindingStatus> KEPT_FIRST = List.of(AuditFindingStatus.ACCEPTED_RISK,
