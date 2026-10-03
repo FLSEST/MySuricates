@@ -1,0 +1,64 @@
+import { useEffect, useRef, useState } from 'react';
+import { Client, ReconnectionTimeMode } from '@stomp/stompjs';
+import SockJS from 'sockjs-client';
+import { api } from '../api/client';
+
+/**
+ * Subscribes to one broadcast topic (`/topic/...`) while `enabled`, handing every frame to `onMessage` as
+ * parsed JSON. One connection per caller. Returns whether the connection is up — callers that replaced
+ * polling with the topic fall back to polling while it is not (old backend, network, no ticket).
+ */
+export function useTopicSocket(topic: string, enabled: boolean, onMessage: (data: unknown) => void): boolean {
+  const [connected, setConnected] = useState(false);
+  // Kept in a ref so a new callback identity never tears the connection down.
+  const callbackRef = useRef(onMessage);
+  useEffect(() => { callbackRef.current = onMessage; }, [onMessage]);
+
+  useEffect(() => {
+    if (!enabled) return;
+
+    // Kein API-Key in der Handshake-URL: stompjs wartet vor jedem Verbindungsversuch (auch vor jedem
+    // Reconnect) auf beforeConnect — dort holen wir ein frisches Einmal-Ticket.
+    let wsTicket = '';
+
+    const client = new Client({
+      beforeConnect: async () => {
+        wsTicket = await api.fetchWsTicket().catch(() => '');
+      },
+      // Nur der WebSocket-Transport: ein SockJS-Fallback (xhr-streaming …) eröffnet eine neue Session
+      // und bräuchte ein zweites Ticket — das erste ist dann schon verbraucht.
+      webSocketFactory: () =>
+        new SockJS(`${window.location.origin}/ws?ticket=${encodeURIComponent(wsTicket)}`, null, {
+          transports: ['websocket'],
+        }),
+      reconnectDelay: 5000,
+      // Jeder Versuch kostet einen POST /ws-ticket — bei totem Backend nicht ewig im 5s-Takt klopfen
+      reconnectTimeMode: ReconnectionTimeMode.EXPONENTIAL,
+      maxReconnectDelay: 60_000,
+      onConnect: () => {
+        setConnected(true);
+        client.subscribe(topic, (message) => {
+          let data: unknown;
+          try {
+            data = JSON.parse(message.body);
+          } catch {
+            return; // A malformed frame is never worth breaking the page for.
+          }
+          callbackRef.current(data);
+        });
+      },
+      onDisconnect: () => setConnected(false),
+      onWebSocketClose: () => setConnected(false),
+      onStompError: () => setConnected(false),
+    });
+
+    client.activate();
+
+    return () => {
+      void client.deactivate();
+      setConnected(false);
+    };
+  }, [topic, enabled]);
+
+  return connected;
+}
