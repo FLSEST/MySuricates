@@ -46,6 +46,7 @@ public class ScheduledWorkflowExecutor {
     private final Clock clock;
     private final ModuleRegistry modules;
     private final ScheduleConflictCheck conflictCheck;
+    private final ScheduleSkipPolicy skipPolicy;
 
     /**
      * Execute a scheduled workflow/chain.
@@ -67,6 +68,11 @@ public class ScheduledWorkflowExecutor {
         if (scheduled == null || !scheduled.isEnabled()
                 || scheduled.getNextRunAt() == null
                 || scheduled.getNextRunAt().isAfter(Instant.now(clock))) {
+            return Optional.empty();
+        }
+
+        // A cron expression that no longer parses: ended once instead of started on every tick (TODO 565e853b).
+        if (skipPolicy.endIfCronInvalid(scheduled)) {
             return Optional.empty();
         }
 

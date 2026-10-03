@@ -154,6 +154,38 @@ public class ScheduleSkipPolicy {
         }
     }
 
+    /**
+     * Ends a CRON schedule whose cron expression no longer parses (TODO 565e853b) — create and update
+     * refuse one, so it got there by hand in the database or with an old version: disabled and
+     * reported once as an ERROR. Before, its next run could not be computed, so it stayed due and
+     * started again on every tick its target was free, and during a skip-until pause every tick
+     * failed to skip it and wrote an ERROR, one a minute.
+     *
+     * @return true when the schedule was ended
+     */
+    public boolean endIfCronInvalid(ScheduledWorkflow scheduled) {
+        String cron = scheduled.getCronExpression();
+        if (scheduled.getScheduleType() != ScheduleType.CRON || CronExpression.isValidExpression(cron)) {
+            return false;
+        }
+        Instant previousNextRunAt = scheduled.getNextRunAt();
+        scheduled.setEnabled(false);
+        scheduled.setNextRunAt(null);
+        scheduledRepository.save(scheduled);
+        log.error("Schedule {} disabled — invalid cron expression '{}'", scheduled.getId(), cron);
+
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("reason", "invalid-cron");
+        metadata.put("cronExpression", String.valueOf(cron));
+        if (previousNextRunAt != null) {
+            metadata.put("previousNextRunAt", previousNextRunAt.toString());
+        }
+        activityLogService.log(LogLevel.ERROR, LogCategory.SCHEDULE,
+                "Schedule disabled (invalid cron expression '" + cron + "'): " + scheduled.getTargetName(),
+                "SchedulerService", scheduled.getId(), metadata);
+        return true;
+    }
+
     /** Skip a schedule forward past a manual skip-until maintenance window. */
     public void skipScheduleUntil(ScheduledWorkflow scheduled, Instant until) {
         Map<String, Object> extra = new HashMap<>();
@@ -185,6 +217,9 @@ public class ScheduleSkipPolicy {
      */
     private void skipSchedule(ScheduledWorkflow scheduled, Instant until, String reason,
                               String message, Map<String, Object> extraMetadata) {
+        if (endIfCronInvalid(scheduled)) {
+            return;
+        }
         Instant previousNextRunAt = scheduled.getNextRunAt();
 
         if (scheduled.getScheduleType() == ScheduleType.CRON) {

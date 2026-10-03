@@ -256,6 +256,38 @@ class ScheduleSkipPolicyTest {
         assertThat(policy.effectiveNextRun(broken, Optional.of(local(28, 0, 0)))).isEqualTo(local(27, 8, 0));
     }
 
+    // --- a cron expression that no longer parses (TODO 565e853b) ---
+
+    @Test
+    void endIfCronInvalid_leavesAValidCronAndAOneOffAlone() {
+        ScheduledWorkflow oneOff = ScheduledWorkflow.builder().id("s-2").cronExpression("")
+                .scheduleType(ScheduleType.ONCE).enabled(true).nextRunAt(local(27, 8, 0)).build();
+
+        assertThat(policy.endIfCronInvalid(cron("0 0 8 * * *", local(27, 8, 0)))).isFalse();
+        assertThat(policy.endIfCronInvalid(oneOff)).isFalse();
+        assertThat(oneOff.isEnabled()).isTrue();
+        verifyNoInteractions(scheduledRepository, activityLogService);
+    }
+
+    @Test
+    void endIfCronInvalid_disablesAndRecordsTheExpression() {
+        ScheduledWorkflow broken = cron("not a cron", local(27, 8, 0));
+
+        assertThat(policy.endIfCronInvalid(broken)).isTrue();
+
+        assertThat(broken.isEnabled()).isFalse();
+        assertThat(broken.getNextRunAt()).isNull();
+        verify(scheduledRepository).save(broken);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> meta = ArgumentCaptor.forClass(Map.class);
+        verify(activityLogService).log(eq(LogLevel.ERROR), eq(LogCategory.SCHEDULE),
+                eq("Schedule disabled (invalid cron expression 'not a cron'): Daily"), eq("SchedulerService"),
+                eq("s-1"), meta.capture());
+        assertThat(meta.getValue()).containsEntry("reason", "invalid-cron")
+                .containsEntry("cronExpression", "not a cron")
+                .containsEntry("previousNextRunAt", local(27, 8, 0).toString());
+    }
+
     // --- maintenance switch in the same rule (TODO 7704b1e9) ---
 
     @Test
