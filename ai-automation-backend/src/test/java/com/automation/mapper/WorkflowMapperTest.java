@@ -28,7 +28,6 @@ class WorkflowMapperTest extends WorkflowMapper {
     @Override public WorkflowResponse toResponse(Workflow workflow) { return null; }
     @Override public List<WorkflowResponse> toResponseList(List<Workflow> workflows) { return null; }
     @Override public WorkflowRunResponse toRunResponse(WorkflowRun run) { return null; }
-    @Override public List<WorkflowRunResponse> toRunResponseList(List<WorkflowRun> runs) { return null; }
     @Override public StepResultResponse toStepResponse(StepResult step) { return null; }
     @Override public WorkflowResponse toResponse(Workflow workflow, Map<String, Long> runCounts) { return null; }
     @Override public List<WorkflowResponse> toResponseList(List<Workflow> workflows, Map<String, Long> runCounts) { return null; }

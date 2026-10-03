@@ -117,8 +117,8 @@ public abstract class WorkflowMapper {
     @Named("runSingle")
     public abstract WorkflowRunResponse toRunResponse(WorkflowRun run);
 
-    @IterableMapping(qualifiedByName = "runSingle")
-    public abstract List<WorkflowRunResponse> toRunResponseList(List<WorkflowRun> runs);
+    // Bewusst ohne Listenvariante: chainIdOf fragt je Run einmal – Run-Listen gehen über die
+    // WorkflowRunListItemResponse-Zeilen unten, die keine Kette nachschlagen (3a35ced1, kein N+1).
 
     // --- Run lists: workflow/project labels from ONE query (avoids the per-run lazy-load of
     // WorkflowRun.workflow, TODO 9db34f3b) ---
