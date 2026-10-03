@@ -96,7 +96,9 @@ describe('RateLimitBanner (c168293d)', () => {
 
     const banner = view.getByRole('status');
     expect(banner.textContent).toContain('Too many requests');
-    expect(banner.textContent).toContain(new Date(NOW + 5_000).toLocaleTimeString('en-US'));
+    // 24 h in English too (571524a5)
+    expect(banner.textContent).toContain(new Date(NOW + 5_000).toLocaleTimeString('en-US', { hourCycle: 'h23' }));
+    expect(banner.textContent).not.toMatch(/\d\s[AP]M/);
   });
 
   it('verschwindet ohne eigenen Takt — der Client meldet den Ablauf', async () => {
