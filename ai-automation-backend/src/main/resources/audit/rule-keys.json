@@ -23,7 +23,7 @@
     "bleiben Strings. AuditRuleKeyCatalogTest haelt den Wert mit dem Prompt gleich.",
     "",
     "Kennzahl-Regeln (ein Befund je Messwert) haben als festes subject den FAKT-Namen, den ihr Prompt",
-    "unter 'Kennzahl-Befunde' nennt (TODO 87a1dac0) — sonst driftete das subject zwischen 'Datenbank',",
+    "unter 'Kennzahl-Befunde' nennt (Performance-Audit, Health-Check; TODO 87a1dac0) — sonst driftete das subject zwischen 'Datenbank',",
     "'DB-Groesse' und 'database_bytes', und jeder Lauf legte einen neuen Befund an."
   ],
   "mysuricates.test-coverage": [
@@ -38,10 +38,10 @@
     "arch.package-cycle"
   ],
   "mysuricates.health": [
-    "health.tests-failing",
+    {"key": "health.tests-failing", "subject": "backend_tests_failures"},
     "health.build-broken",
-    "health.lint-findings",
-    "health.type-errors",
+    {"key": "health.lint-findings", "subject": "frontend_lint_problems"},
+    {"key": "health.type-errors", "subject": "frontend_tsc_errors"},
     "health.log-errors",
     "health.doc-drift",
     "health.provider-unavailable",

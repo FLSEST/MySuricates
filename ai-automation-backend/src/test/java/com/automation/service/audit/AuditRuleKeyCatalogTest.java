@@ -271,6 +271,17 @@ class AuditRuleKeyCatalogTest {
         assertThat(catalog.fixedSubject(performance, "perf.request.slow-route")).as("Route").isNull();
     }
 
+    /** 87a1dac0: Kennzahl-Regeln des Health-Checks haben den FAKT-Namen als festes subject. */
+    @Test
+    void metricRulesOfTheHealthCheckHaveTheFactNameAsFixedSubject() {
+        String health = "mysuricates.health";
+        assertThat(catalog.fixedSubject(health, "health.tests-failing")).isEqualTo("backend_tests_failures");
+        assertThat(catalog.fixedSubject(health, "health.lint-findings")).isEqualTo("frontend_lint_problems");
+        assertThat(catalog.fixedSubject(health, "health.type-errors")).isEqualTo("frontend_tsc_errors");
+        assertThat(catalog.fixedSubject(health, "health.build-broken")).as("Backend oder Frontend").isNull();
+        assertThat(catalog.fixedSubject(health, "health.doc-drift")).as("Pfad").isNull();
+    }
+
     /**
      * Gate (87a1dac0): Ein festes subject ausserhalb des Evidenz-Prompts muss im Prompt seines Audits in einer
      * Zeile zusammen mit seinem ruleKey stehen — sonst setzte die Ingestion einen Wert durch, den das Modell nie

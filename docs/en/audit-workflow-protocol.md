@@ -127,7 +127,8 @@ File-related rules (`subject = path`) and rules with several permitted values
 "Kennzahl-Befunde" as their fixed value – in the performance audit `perf.db.size` → `database_bytes`,
 `perf.frontend.bundle-size` → `frontend_bundle_js_bytes`, `perf.frontend.lazy-chunk-preloaded` →
 `frontend_lazy_chunk_preloaded`, plus the collective finding `perf.db.unindexed-column` →
-`unindexed_findby_columns` (TODO `87a1dac0`; before, the subject drifted between "Datenbank",
+`unindexed_findby_columns`; in the health check `health.tests-failing` → `backend_tests_failures`,
+`health.lint-findings` → `frontend_lint_problems`, `health.type-errors` → `frontend_tsc_errors` (TODO `87a1dac0`; before, the subject drifted between "Datenbank",
 "DB-Größe" and the FACT name, and every run created a new finding). Version 6 of the clean-up run
 merges these findings, and those that only stood apart under class name and path, triage included.
 `AuditRuleKeyCatalogTest` keeps catalogue and prompt in step and checks that a prompt's envelope

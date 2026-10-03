@@ -33,8 +33,14 @@ class AuditSubjectNormalizerTest {
             "com/automation/service/AssistantService.java:42 | AssistantService",
             "AssistantService.java | AssistantService",
             "com.automation.service.AssistantService | AssistantService",
-            "frontend/src/pages/Workflows.tsx | Workflows",
-            "ai-automation-frontend/src/api/ErrorText.ts | ErrorText",
+            // Frontend-Module bleiben Pfade: ActivityLog.tsx ist nicht die Java-Klasse ActivityLog. Nur die
+            // Praefix-Varianten desselben Moduls werden angeglichen.
+            "frontend/src/pages/Workflows.tsx | frontend/src/pages/Workflows.tsx",
+            "ai-automation-frontend/src/pages/Workflows.tsx | frontend/src/pages/Workflows.tsx",
+            "src/pages/Workflows.tsx | frontend/src/pages/Workflows.tsx",
+            "ai-automation-frontend/src/api/ErrorText.ts | frontend/src/api/ErrorText.ts",
+            "frontend/src/pages/ActivityLog.tsx:42 | frontend/src/pages/ActivityLog.tsx",
+            "ActivityLog.tsx | ActivityLog.tsx",
             // Andere Pfade bleiben ganz: klein geschriebene Module gibt es mehrfach, Tests sind keine Klasse
             "frontend/src/api/client.ts | frontend/src/api/client.ts",
             "frontend/src/hooks/index.ts | frontend/src/hooks/index.ts",
@@ -78,11 +84,22 @@ class AuditSubjectNormalizerTest {
     @ParameterizedTest
     @ValueSource(strings = {"ContainerShellService.execute", "application.yml:key-store-password",
             "com.automation.service.Foo.bar", "src/main/java/com/automation/Foo.java", "application.yml",
-            "com/automation/service/AssistantService.java", "frontend/src/pages/Workflows.tsx",
+            "com/automation/service/AssistantService.java", "ai-automation-frontend/src/pages/Workflows.tsx",
+            "src/pages/Workflows.tsx", "ActivityLog.tsx",
             "com.automation.service.AssistantService", "frontend/src/api/client.ts",
             "package : com.automation.controller", "safe-inventory:git-status"})
     void isIdempotent(String input) {
         String once = AuditSubjectNormalizer.normalize(input);
         assertThat(AuditSubjectNormalizer.normalize(once)).isEqualTo(once);
+    }
+
+    /** Gleichnamige Klasse in Backend und Frontend: zwei Identitaeten, egal in welcher Schreibweise. */
+    @Test
+    void sameNameInBackendAndFrontend_staysApart() {
+        String backend = AuditSubjectNormalizer.normalize("com/automation/entity/ActivityLog.java");
+        assertThat(backend).isEqualTo("ActivityLog");
+        assertThat(AuditSubjectNormalizer.normalize("frontend/src/pages/ActivityLog.tsx")).isNotEqualTo(backend);
+        assertThat(AuditSubjectNormalizer.normalize("ai-automation-frontend/src/pages/ActivityLog.tsx")).isNotEqualTo(backend);
+        assertThat(AuditSubjectNormalizer.normalize("ActivityLog.tsx")).isNotEqualTo(backend);
     }
 }

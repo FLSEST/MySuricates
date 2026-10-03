@@ -126,7 +126,8 @@ gibt es keinen, wird der abweichende selbst kanonisch. Dateibezogene Regeln (`su
 unter „Kennzahl-Befunde“ nennt – im Performance-Audit `perf.db.size` → `database_bytes`,
 `perf.frontend.bundle-size` → `frontend_bundle_js_bytes`, `perf.frontend.lazy-chunk-preloaded` →
 `frontend_lazy_chunk_preloaded`, dazu das Sammel-Finding `perf.db.unindexed-column` →
-`unindexed_findby_columns` (TODO `87a1dac0`; vorher driftete das subject zwischen „Datenbank“,
+`unindexed_findby_columns`; im Health-Check `health.tests-failing` → `backend_tests_failures`,
+`health.lint-findings` → `frontend_lint_problems`, `health.type-errors` → `frontend_tsc_errors` (TODO `87a1dac0`; vorher driftete das subject zwischen „Datenbank“,
 „DB-Größe“ und dem FAKT-Namen, und jeder Lauf legte einen neuen Befund an). v6 des Aufräumlaufs
 führt diese Befunde und die, die nur unter Klassenname bzw. Pfad getrennt standen, samt Einordnung
 zusammen.

@@ -518,6 +518,24 @@ class AuditFingerprintMigrationJobTest {
         assertThat(again.getStatus()).isEqualTo(AuditFindingStatus.ACCEPTED_RISK);
     }
 
+    /** Gleichnamige Klasse in Backend und Frontend: der Aufraeumlauf fuehrt sie nicht zusammen. */
+    @Test
+    void keepsTheBackendClassAndTheFrontendModuleOfTheSameNameApart() {
+        AuditFinding backend = saveFinding("com/automation/entity/ActivityLog.java", AuditFindingStatus.ACCEPTED_RISK,
+                1, T0, T1, reportOld, "run-old");
+        AuditFinding frontend = saveFinding("frontend/src/pages/ActivityLog.tsx", AuditFindingStatus.OPEN,
+                1, T2, T2, reportNew, "run-new");
+
+        job.migrate();
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(findingRepository.findByProjectIdAndAuditKey(projectId, AUDIT_KEY))
+                .extracting(AuditFinding::getId).containsExactlyInAnyOrder(backend.getId(), frontend.getId());
+        assertThat(findingRepository.findById(frontend.getId()).orElseThrow().getStatus())
+                .isEqualTo(AuditFindingStatus.OPEN);
+    }
+
     /** Kennzahl-Regel: gedriftete subjects ("Datenbank", "DB-Groesse") gehen auf den FAKT-Namen ueber. */
     @Test
     void mergesDriftedSubjectsOfAMetricRuleOntoTheFactName_keepingTheAcceptedRisk() {

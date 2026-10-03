@@ -16,13 +16,15 @@ import java.util.regex.Pattern;
  *       den zweiten Befund (TODO 94fda6ef),</li>
  *   <li>sonst (Datei, Klasse, Pfad vor dem {@code :}) faellt alles ab dem ersten {@code :} weg
  *       (Schluessel, Zeilennummer),</li>
- *   <li>ein Pfad, dessen letztes Segment eine Quelldatei mit Klassennamen ist ({@code .java},
- *       {@code .ts}, {@code .tsx}, gross beginnend), wird zum Klassennamen: Klassenname und Pfad sind
- *       dieselbe Identitaet, egal ob {@code com/automation/…}, {@code service/…} oder ohne Pfad (TODO
- *       87a1dac0). Im Backend ist jeder einfache Klassenname eindeutig; klein geschriebene Module
- *       ({@code index.ts}, {@code types.ts}) kommen mehrfach vor und bleiben deshalb Pfade,</li>
+ *   <li>ein Pfad auf eine Java-Klasse ({@code .java}, gross beginnend) wird zum Klassennamen:
+ *       Klassenname und Pfad sind dieselbe Identitaet, egal ob {@code com/automation/…}, {@code service/…}
+ *       oder ohne Pfad (TODO 87a1dac0). Im Backend ist jeder einfache Klassenname eindeutig,</li>
  *   <li>ein voll qualifizierter Klassenname ({@code com.automation.service.AssistantService}) wird
  *       ebenso zum einfachen Klassennamen,</li>
+ *   <li>ein Frontend-Modul ({@code .ts}, {@code .tsx}) bleibt ein Pfad, auch ohne Verzeichnis — sonst fiele
+ *       {@code ActivityLog.tsx} mit der Java-Klasse {@code ActivityLog} zusammen, und klein geschriebene Module
+ *       wie {@code index.ts} gibt es mehrfach. Angeglichen werden nur die Praefix-Varianten:
+ *       {@code ai-automation-frontend/src/…} und {@code src/…} werden zu {@code frontend/src/…},</li>
  *   <li>ein Suffix hinter dem letzten {@code .} faellt weg, wenn es klein beginnt (Methode) und das
  *       Segment davor gross beginnt (Klassenname) — {@code application.yml} bleibt also ganz,</li>
  *   <li>alle anderen Subjects mit {@code /} sind Pfade und bleiben unangetastet,</li>
@@ -37,8 +39,10 @@ public final class AuditSubjectNormalizer {
 
     /** Art-Wort vor dem Doppelpunkt: klein, ohne Punkt und Schraegstrich (also keine Datei, keine Klasse). */
     private static final Pattern KIND = Pattern.compile("[a-z][a-z0-9-]*");
-    /** Quelldatei, deren Name ein Klassen- bzw. Komponentenname ist: {@code AssistantService.java}, {@code Todos.tsx}. */
-    private static final Pattern CLASS_FILE = Pattern.compile("([A-Z][A-Za-z0-9_]*)\\.(java|tsx|ts)");
+    /** Java-Quelldatei, deren Name der Klassenname ist: {@code AssistantService.java}. */
+    private static final Pattern CLASS_FILE = Pattern.compile("([A-Z][A-Za-z0-9_]*)\\.java");
+    private static final String FRONTEND = "frontend/";
+    private static final String FRONTEND_MODULE_DIR = "ai-automation-frontend/";
     /** Voll qualifizierter Klassenname: klein geschriebene Paketsegmente, dann der Klassenname. */
     private static final Pattern QUALIFIED_CLASS = Pattern.compile("(?:[a-z_][a-z0-9_]*\\.)+([A-Z][A-Za-z0-9_]*)");
 
@@ -61,6 +65,9 @@ public final class AuditSubjectNormalizer {
         if (value.isEmpty()) {
             return value;
         }
+        if (value.endsWith(".ts") || value.endsWith(".tsx")) {
+            return frontendPath(value);
+        }
         int slash = value.lastIndexOf('/');
         if (slash >= 0) {
             var classFile = CLASS_FILE.matcher(value.substring(slash + 1));
@@ -69,6 +76,14 @@ public final class AuditSubjectNormalizer {
         String withoutMethod = withoutMethodSuffix(value);
         var qualified = QUALIFIED_CLASS.matcher(withoutMethod);
         return qualified.matches() ? qualified.group(1) : withoutMethod;
+    }
+
+    /** Einheitliches Praefix fuer Frontend-Module: {@code frontend/src/…}. */
+    private static String frontendPath(String value) {
+        if (value.startsWith(FRONTEND_MODULE_DIR)) {
+            return FRONTEND + value.substring(FRONTEND_MODULE_DIR.length());
+        }
+        return value.startsWith("src/") ? FRONTEND + value : value;
     }
 
     /** {@code Klasse.methode} → {@code Klasse}; {@code application.yml} und {@code Application.YML} bleiben. */

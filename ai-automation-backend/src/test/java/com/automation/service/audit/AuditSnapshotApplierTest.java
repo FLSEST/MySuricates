@@ -289,4 +289,14 @@ class AuditSnapshotApplierTest {
         verify(activityLog).warn(any(), org.mockito.ArgumentMatchers.contains("ai-automation-frontend"), any(),
                 any(), any());
     }
+
+    /** 87a1dac0: ActivityLog gibt es als Java-Klasse und als Frontend-Seite — zwei Befunde, keine Kollision. */
+    @Test
+    void apply_backendClassAndFrontendModuleOfTheSameName_areTwoFindings() {
+        apply(low("rule.a", "com/automation/entity/ActivityLog.java"), low("rule.a", "frontend/src/pages/ActivityLog.tsx"));
+
+        assertThat(savedFindings()).extracting(AuditFinding::getSubject)
+                .containsExactly("com/automation/entity/ActivityLog.java", "frontend/src/pages/ActivityLog.tsx");
+        verify(activityLog, never()).warn(any(), any(), any(), any(), any());
+    }
 }
