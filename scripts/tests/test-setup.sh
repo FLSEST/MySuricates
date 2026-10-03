@@ -553,16 +553,19 @@ check "a flag wins over the file (bind, ai-from-host, docker-socket)" \
 echo "10) bash 3.2 hygiene"
 check "no bash-4-only syntax (code)"                    '! grep -v "^[[:space:]]*#" "$SETUP" | grep -nE "declare -g?A|mapfile|readarray|\\$\\{[A-Za-z_]+(,,|\\^\\^)\\}" >/dev/null'
 
-# grep -q endet beim ersten Treffer, der Schreiber vor dem | bekommt SIGPIPE, und pipefail macht die
-# Pipeline zum Fehler — wackelig, je nach Ausgabe und Last (e7ff6cc2, 38f30352). In den Skript-Tests
-# deshalb „| grep … >/dev/null“; diese Zeile haelt das Muster aus allen Suiten unter pipefail fern.
-piped_grep_q() {
+# Leser, die vor dem Ende der Eingabe aufhoeren — grep -q/-m beim ersten Treffer, head nach N Zeilen,
+# sed mit q —, lassen den Schreiber vor dem | in SIGPIPE laufen, und pipefail macht die Pipeline zum
+# Fehler: wackelig, je nach Ausgabe und Last (e7ff6cc2, 38f30352). In den Skript-Tests deshalb
+# „| grep … >/dev/null“ und „| sed -n 1p“ (liest bis zum Ende); diese Zeile haelt die Muster aus allen
+# Suiten unter pipefail fern.
+early_readers() {
   local f
   for f in "$HERE"/*.sh; do
     grep -q pipefail "$f" || continue
-    grep -nE '(^|[^|])[|][[:space:]]*grep[[:space:]]+(-[[:alnum:]-]+[[:space:]]+)*-[[:alpha:]]*q' "$f" | grep -vE '^[0-9]+:[[:space:]]*#' | sed "s|^|$(basename "$f"):|"
+    grep -nE '(^|[^|])[|][[:space:]]*(grep[[:space:]]+(-[[:alnum:]-]+[[:space:]]+)*-[[:alpha:]]*[qm]|head([[:space:]]|$)|sed[[:space:]][^|]*[0-9$/]q)' "$f" \
+      | grep -vE '^[0-9]+:[[:space:]]*#' | sed "s|^|$(basename "$f"):|"
   done
 }
-check "no piped grep -q under pipefail in scripts/tests (SIGPIPE)" '[ -z "$(piped_grep_q)" ] || { piped_grep_q | sed "s/^/         /"; false; }'
+check "no early-closing reader (grep -q/-m, head, sed q) under pipefail in scripts/tests (SIGPIPE)" '[ -z "$(early_readers)" ] || { early_readers | sed "s/^/         /"; false; }'
 
 echo; echo "passed=$PASS failed=$FAIL"; [ "$FAIL" -eq 0 ]

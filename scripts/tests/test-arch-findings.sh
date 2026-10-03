@@ -327,7 +327,7 @@ check "Zaehler in ## findings_summary passen zu ## findings" \
   '[ "$(summary "$TMP/out.txt" findings)" -eq "$(section "$TMP/out.txt" findings | wc -l | tr -d " ")" ] \
      && [ "$(summary "$TMP/out.txt" critical)" -eq "$(section "$TMP/out.txt" findings | cut -f3 | grep -cx CRITICAL)" ]'
 check "Befunde nach Schwere sortiert (CRITICAL zuerst)" \
-  '[ "$(section "$TMP/out.txt" findings | head -1 | cut -f3)" = CRITICAL ]'
+  '[ "$(section "$TMP/out.txt" findings | sed -n 1p | cut -f3)" = CRITICAL ]'
 check "jeder vergebene ruleKey steht im Prompt und im Katalog" 'python3 - "$TMP/out.txt" "$POOL" "$CATALOG" "$FINDINGS" <<'"'"'PY'"'"'
 import json, re, sys
 out, pool, catalog, script = sys.argv[1:5]

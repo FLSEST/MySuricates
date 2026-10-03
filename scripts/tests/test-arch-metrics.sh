@@ -141,7 +141,7 @@ measured "$TMP/run1.txt" > "$TMP/run1.measured"; measured "$TMP/run2.txt" > "$TM
 check "zweiter Lauf exit 0"                  '[ "$RC2" -eq 0 ]'
 check "gemessener Teil byte-identisch"       'diff -q "$TMP/run1.measured" "$TMP/run2.measured" >/dev/null'
 if ! diff -q "$TMP/run1.measured" "$TMP/run2.measured" >/dev/null 2>&1; then
-  diff -u "$TMP/run1.measured" "$TMP/run2.measured" | head -20
+  diff -u "$TMP/run1.measured" "$TMP/run2.measured" | sed -n 1,20p
 fi
 
 echo "4) Unbrauchbares Wurzelverzeichnis wird gemeldet statt still ignoriert"
@@ -457,7 +457,7 @@ check "zweiter Lauf nutzt das Kompilat (reused)"     'grep -qx "compile=reused" 
 check "compiled/reused unterscheiden sich wirklich"  '! diff -q "$TMP/fix1.txt" "$TMP/fix2.txt" >/dev/null'
 check "gemessener Teil trotzdem byte-identisch"      'diff -q "$TMP/fix1.measured" "$TMP/fix2.measured" >/dev/null'
 if ! diff -q "$TMP/fix1.measured" "$TMP/fix2.measured" >/dev/null 2>&1; then
-  diff -u "$TMP/fix1.measured" "$TMP/fix2.measured" | head -20
+  diff -u "$TMP/fix1.measured" "$TMP/fix2.measured" | sed -n 1,20p
 fi
 
 # Der Aufruf im Pool-Workflow lautet `bash scripts/public-readiness/arch-metrics.sh "$BASE"`.
@@ -519,7 +519,7 @@ measured "$TMP/cache1.txt" > "$TMP/cache1.measured"; measured "$TMP/cache2.txt" 
 check "Cache misst dasselbe wie das frische Kompilat" \
   'diff -q "$TMP/cache1.measured" "$TMP/cache2.measured" >/dev/null'
 if ! diff -q "$TMP/cache1.measured" "$TMP/cache2.measured" >/dev/null 2>&1; then
-  diff -u "$TMP/cache1.measured" "$TMP/cache2.measured" | head -20
+  diff -u "$TMP/cache1.measured" "$TMP/cache2.measured" | sed -n 1,20p
 fi
 
 # Ein Cache-Treffer auf den Commit-Stand waere bei geaenderten Dateien eine falsche Messung:

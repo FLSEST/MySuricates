@@ -207,7 +207,7 @@ measured "$TMP/fix1.txt" > "$TMP/fix1.measured"; measured "$TMP/fix2.txt" > "$TM
 check "zweiter Lauf exit 0"            '[ "$RC" -eq 0 ]'
 check "gemessener Teil byte-identisch" 'diff -q "$TMP/fix1.measured" "$TMP/fix2.measured" >/dev/null'
 if ! diff -q "$TMP/fix1.measured" "$TMP/fix2.measured" >/dev/null 2>&1; then
-  diff -u "$TMP/fix1.measured" "$TMP/fix2.measured" | head -20
+  diff -u "$TMP/fix1.measured" "$TMP/fix2.measured" | sed -n 1,20p
 fi
 
 echo "6) Fehlerpfade melden NICHT GEMESSEN statt Sauberkeit"
