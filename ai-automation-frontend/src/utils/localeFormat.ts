@@ -19,14 +19,24 @@ function toDate(value: DateInput): Date {
   return value instanceof Date ? value : new Date(value);
 }
 
-/** Date and time of day ("9/24/2026, 2:05:33 PM" / "24.9.2026, 14:05:33"), or the fields in `options`. */
+/**
+ * The time of day always on a 24-hour clock, in English too (571524a5: `formatTimestamp` read "2:05 PM",
+ * `formatDateTime` "14:05"). `hourCycle` instead of `hour12: false`, which some engines turn into "24:07" after
+ * midnight; a caller's `hour12` would override `hourCycle`, so it goes. Without time fields it changes nothing.
+ */
+function clock24(options?: Intl.DateTimeFormatOptions): Intl.DateTimeFormatOptions {
+  const { hour12: _ignored, ...rest } = options ?? {};
+  return { ...rest, hourCycle: 'h23' };
+}
+
+/** Date and time of day ("9/24/2026, 14:05:33" / "24.9.2026, 14:05:33"), or the fields in `options`. */
 export function formatTimestamp(value: DateInput, locale: Locale, options?: Intl.DateTimeFormatOptions): string {
-  return toDate(value).toLocaleString(intlLocale(locale), options);
+  return toDate(value).toLocaleString(intlLocale(locale), clock24(options));
 }
 
 /** The date ("9/24/2026" / "24.9.2026"), or the fields in `options`. */
 export function formatDate(value: DateInput, locale: Locale, options?: Intl.DateTimeFormatOptions): string {
-  return toDate(value).toLocaleDateString(intlLocale(locale), options);
+  return toDate(value).toLocaleDateString(intlLocale(locale), clock24(options));
 }
 
 /** Short weekday names from Monday to Sunday ("Mon" … "Sun" / „Mo.“ … „So.“), for calendar column heads. */
@@ -42,12 +52,12 @@ export function weekdayNames(locale: Locale): string[] {
 export function formatDateRange(
   start: DateInput, end: DateInput, locale: Locale, options: Intl.DateTimeFormatOptions,
 ): string {
-  return new Intl.DateTimeFormat(intlLocale(locale), options).formatRange(toDate(start), toDate(end));
+  return new Intl.DateTimeFormat(intlLocale(locale), clock24(options)).formatRange(toDate(start), toDate(end));
 }
 
-/** The time of day ("2:05:33 PM" / "14:05:33"), or the fields in `options`. */
+/** The time of day on a 24-hour clock ("14:05:33" in both languages), or the fields in `options`. */
 export function formatTimeOfDay(value: DateInput, locale: Locale, options?: Intl.DateTimeFormatOptions): string {
-  return toDate(value).toLocaleTimeString(intlLocale(locale), options);
+  return toDate(value).toLocaleTimeString(intlLocale(locale), clock24(options));
 }
 
 /** A number with the separators of the app language ("1,234.5" / "1.234,5"). */
