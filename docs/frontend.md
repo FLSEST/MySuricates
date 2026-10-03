@@ -141,6 +141,7 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 
 - Tabelle: Workflow, Cron-Ausdruck, nächste/letzte Ausführung, Status-Toggle
 - Erstellen-Modal: Workflow-Auswahl + Cron-Ausdruck + Beschreibung
+- Filter-Link `/schedules?schedule=<id>` (`utils/entityLinks.ts`, 3a35ced1; eine Detailseite je Zeitplan gibt es nicht): hebt die Zeile hervor, zeigt sie trotz gespeicherter Filter (`useScheduleFilters(…, pinnedId)`), klappt ihre Läufe auf und scrollt hin. Darauf verlinken der Auslöser-Chip eines vom Zeitplan gestarteten Laufs (Run-Kopf, Ketten-Lauf, Audit-Bericht) und im Bericht-Kopf der Zeitplan ohne erfassten Auslöser
 
 ### Webhooks (`/webhooks`)
 
@@ -151,7 +152,7 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 
 ### Chains (`/chains`, `/chains/:id/run/:runId`)
 
-- Split-Panel-Layout: Chain-Liste links, Detail/Ausführung rechts
+- Split-Panel-Layout: Chain-Liste links, Detail/Ausführung rechts; die gewählte Kette steht in der URL (`/chains?chain=<id>`, 3a35ced1) – Filter-Link für Bericht-Kopf, Ketten-Lauf (Name und Zurück-Knopf) und Run-Kopf (`RunProvenance`, „Kette anzeigen“, sobald die Antwort `chainId` trägt), eine Detailseite je Kette gibt es nicht
 - Pipeline-Visualisierung der Chain-Entries
 - Erstellen/Bearbeiten-Modal mit Workflow-Suche und Sortierung
 - ChainExecution: Live-Polling für Entry-Status, Navigation zu einzelnen Workflow-Runs
@@ -204,14 +205,14 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 ### Audit Center (`/reports`)
 
 - **Übersicht:** je Audit Gate, Trend, „offen X · akzeptiert Y“ (offen samt kritisch/hoch aus `openFindingsBySeverity`, akzeptiert aus `findingsByStatus`) und der letzte Lauf; „letzter Versuch ungültig“, wenn der neueste Report nicht gültig war
-- **Bericht:** angezeigt wird der Report zu `latestReportId`, also der neueste gültige. Der Kopf nennt Datum mit Uhrzeit, den Run (Kurz-ID, Link), den Auslöser als `TriggerSourceChip`, die Kette (Link auf den Ketten-Lauf, eine Seite je Kette gibt es nicht) oder ohne Kette den Zeitplan, sofern der Chip ihn nicht schon nennt, dazu „Definition #N“, Workflow-Version und Provider/Modell. War der neueste Versuch ungültig, sagt ein Hinweis mit Datum und Fehlertext, dass der Bericht älter ist. „Evidenz-Run“ und die Historie zeigen auf den Run des jeweiligen Reports; die Historie trägt je Eintrag Auslöser und Kette
+- **Bericht:** angezeigt wird der Report zu `latestReportId`, also der neueste gültige. Der Kopf nennt Datum mit Uhrzeit, den Run (Kurz-ID, Link), den Auslöser als `TriggerSourceChip`, die Kette (Name → `/chains?chain=<id>`, Symbol daneben → Ketten-Lauf) oder ohne Kette den Zeitplan (`/schedules?schedule=<id>`: über den Chip, sonst als eigener Link), dazu „Definition #N“, Workflow-Version und Provider/Modell. War der neueste Versuch ungültig, sagt ein Hinweis mit Datum und Fehlertext, dass der Bericht älter ist. „Evidenz-Run“ und die Historie zeigen auf den Run des jeweiligen Reports; die Historie trägt je Eintrag Auslöser und Kette
 - **Findings:** Statusfilter als `FilterChips`: „Offen“ (`OPEN` + `AWAITING_VERIFICATION`, Standard), „Akzeptiert“, „Verworfen“, „Behoben“, Zähler aus `findingsByStatus`. `useAuditFindingsByStatus` lädt je gewähltem Status eine Seite (200) über den Parameter `status`, damit ein Status mit vielen Befunden die übrigen nicht verdrängt; reicht eine Seite nicht, sagt das ein Hinweis. `?finding=<id>` öffnet den Befund, schaltet seinen Chip mit ein und scrollt ihn einmal ins Bild, sobald seine Liste vollständig ist; „nicht gefunden“ erscheint erst, wenn Befund und Audit-Liste geladen sind. Ein Klick auf ein Audit in der Übersicht verbraucht den Link (der Parameter fällt weg), jedes Audit beginnt mit eigenen Chips. „Beleg ungeprüft“ markiert `unverifiedEvidence` (kein verwaltetes TODO); scheitert Einordnen, TODO anlegen oder Verknüpfen, meldet ein Toast den Grund (`apiErrorMessage`). Fällt ein Befund nach dem Einordnen aus dem Filter, nennt ein Toast den neuen Chip und schaltet ihn auf Wunsch ein
 - **Legacy:** dateibasierte Markdown-Berichte, nur lesend
 - **Aufbau:** Die Seite verdrahtet Ansicht, Reiter und `hooks/useActiveAudit.ts`: Gemerkt werden nur Projekt und Schlüssel, das Audit kommt aus der aktuellen `/audits`-Liste, damit Zähler nach dem Einordnen nachziehen. Bausteine in `components/audit/`: `AuditOverview` (mit `FindingCounts`), `AuditDetail`, `ReportOrigin` (Kopf, `OlderReportNotice`, `ReportChain`), `ReportHistory`, `AuditFindings` mit `AuditFindingItem` und `FindingDisposition`, `LegacyReports` und kleine Teile in `AuditParts`. Einordnen, TODO anlegen und verknüpfen hält `hooks/useFindingActions.ts`, das Filtermodell `utils/auditFindingFilter.ts`, den angezeigten Report `useShownAuditReport`. Eine Mutation schreibt ihre Antwort in die Findings-Seiten und in den Einzel-Befund (`['audit-finding', id]`), den ein Deep-Link beim nächsten Öffnen liest
 
 ### WorkflowDetail (`/workflows/:id`) — Erweiterungen
 
-- **Memory-Tab:** Workflow-Memory-Einträge anzeigen, aktivieren, löschen, neu extrahieren (`WorkflowMemoryPanel.tsx`; ein Eintrag ist `WorkflowMemoryItem.tsx`, der Extraktions-Dialog `MemoryExtractModal.tsx` mit Zustand in `hooks/useMemoryExtraction.ts`: gewählte Läufe, Anbieter, Sekundenzähler, nach Erfolg schließen)
+- **Memory-Tab:** Workflow-Memory-Einträge anzeigen, aktivieren, löschen, neu extrahieren (`WorkflowMemoryPanel.tsx`; ein Eintrag ist `WorkflowMemoryItem.tsx`, der Extraktions-Dialog `MemoryExtractModal.tsx` mit Zustand in `hooks/useMemoryExtraction.ts`: gewählte Läufe, Anbieter, Sekundenzähler, nach Erfolg schließen). Ohne Läufe bleibt „Wissen extrahieren“ gesperrt – die Extraktion lernt aus Läufen –, auch wenn schon Gedächtnis-Versionen da sind; das Panel nennt dann den Grund (`extractionAvailability`, gezählt über alle Läufe, 442702e2)
 - **Instructions-Tab:** Workflow-spezifische Agent-Instructions im Monaco-Editor bearbeiten
 - **Gate-Status:** Anzeige des letzten Gate-Status im Run-Verlauf
 - **BPMN-Diagramm:** `BpmnDiagramView.tsx` zeichnet den BPMN-Export als SVG (Zoom, Klick/Hover je Block, Live-Status im Run). Die reine Logik — XML lesen, oben→unten-Layout, Beschriftungen umbrechen, Element-ID → Block-Auswahl — liegt in `bpmnLayout.ts` (Test `bpmnLayout.test.ts`), die Formen und Marker je Element-Typ in `BpmnShapes.tsx`.
@@ -849,7 +850,7 @@ Responsive-Hook, erkennt Mobile-Breakpoint (max-width: 1023px) für adaptive UI-
 - **Hook:** `useT()` → gibt das aktuelle Übersetzungsobjekt zurück
 - **Store:** `useI18nStore()` → `locale`, `setLocale()`
 - **Umschalten:** Button im Header
-- **Datum und Zahl:** nur über `src/utils/localeFormat.ts` (`formatDate`, `formatTimeOfDay`, `formatTimestamp`, `formatNumber`, `formatRelativeUnit`) bzw. `src/utils/formatTime.ts`, immer mit `locale` aus `useI18nStore` — ohne Locale schreibt der Browser in seiner eigenen Sprache. `src/__tests__/localeFormat.guard.test.ts` lässt `Intl` und die `toLocale…String`-Methoden nirgends sonst zu
+- **Datum und Zahl:** nur über `src/utils/localeFormat.ts` (`formatDate`, `formatTimeOfDay`, `formatTimestamp`, `formatNumber`, `formatRelativeUnit`) bzw. `src/utils/formatTime.ts`, immer mit `locale` aus `useI18nStore` — ohne Locale schreibt der Browser in seiner eigenen Sprache. `src/__tests__/localeFormat.guard.test.ts` lässt `Intl` und die `toLocale…String`-Methoden nirgends sonst zu. Uhrzeiten stehen in beiden Sprachen im 24-h-Format (`hourCycle: 'h23'` in allen Datums-/Zeitformatierern, ein übergebenes `hour12` wird verworfen; 571524a5)
 - **`<html lang>`:** folgt der App-Sprache (`syncDocumentLanguage()` in `main.tsx`), für Screenreader und Silbentrennung
 
 ### Übersetzungsstruktur

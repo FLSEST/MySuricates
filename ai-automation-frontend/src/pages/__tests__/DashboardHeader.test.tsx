@@ -32,7 +32,9 @@ describe('Dashboard header', { timeout: 20_000 }, () => {
     const header = await renderDashboard();
 
     const clock = within(header).getByTestId('live-clock');
-    expect(clock.textContent?.replace(/\s/g, ' ')).toContain('02:05:33 PM');
+    // 24 h in English too (571524a5)
+    expect(clock).toHaveTextContent('14:05:33');
+    expect(clock.textContent).not.toMatch(/[AP]M/);
     expect(clock).toHaveTextContent('Thursday, 09/24/2026');
   });
 

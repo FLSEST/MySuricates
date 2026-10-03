@@ -9,6 +9,7 @@ import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowRun;
 import com.automation.modules.ModuleCatalog;
 import com.automation.modules.ModuleRegistry;
+import com.automation.repository.ChainRunRepository;
 import com.automation.repository.WorkflowRepository;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.workflow.WorkflowDefinitionHasher;
@@ -44,6 +45,21 @@ public abstract class WorkflowMapper {
 
     @Autowired(required = false)
     protected ModuleRegistry modules;
+
+    // Optional like the hasher: a mapper built in a test without Spring names no chain
+    @Autowired(required = false)
+    protected ChainRunRepository chainRunRepository;
+
+    /**
+     * Die Kette des Ketten-Runs, aus dem der Run stammt (3a35ced1) – eine Abfrage nur auf die
+     * Fremdschlüsselspalte, kein Lazy-Zugriff (OSIV ist aus). Nur die Detailantwort trägt sie.
+     */
+    protected String chainIdOf(WorkflowRun run) {
+        if (run.getChainRunId() == null || chainRunRepository == null) {
+            return null;
+        }
+        return chainRunRepository.findChainIdById(run.getChainRunId()).orElse(null);
+    }
 
     protected String definitionHashOf(Workflow workflow) {
         if (definitionHasher == null || modules == null || !modules.isEnabled(ModuleCatalog.PROVENANCE)) {
@@ -97,11 +113,12 @@ public abstract class WorkflowMapper {
     @Mapping(target = "projectName", expression = "java(safeProjectName(run))")
     @Mapping(target = "projectPath", expression = "java(safeProjectPath(run))")
     @Mapping(target = "sealedSkillPins", expression = "java(sealedSkillPinsOf(run))")
+    @Mapping(target = "chainId", expression = "java(chainIdOf(run))")
     @Named("runSingle")
     public abstract WorkflowRunResponse toRunResponse(WorkflowRun run);
 
-    @IterableMapping(qualifiedByName = "runSingle")
-    public abstract List<WorkflowRunResponse> toRunResponseList(List<WorkflowRun> runs);
+    // Bewusst ohne Listenvariante: chainIdOf fragt je Run einmal – Run-Listen gehen über die
+    // WorkflowRunListItemResponse-Zeilen unten, die keine Kette nachschlagen (3a35ced1, kein N+1).
 
     // --- Run lists: workflow/project labels from ONE query (avoids the per-run lazy-load of
     // WorkflowRun.workflow, TODO 9db34f3b) ---

@@ -2,12 +2,19 @@ import { Modal, Button, Input, Select, TagInput } from '../ui';
 import { useT } from '../../i18n';
 import { useModuleEnabled } from '../../hooks/useModules';
 import { TodoPlanningPanel } from '../goal/TodoPlanningPanel';
+import { useTodoPlanningForm } from '../goal/useTodoPlanningForm';
 import { TodoExportSection } from './TodoExportSection';
 import { TodoMetadata } from './TodoMetadata';
 import type { Todo, TodoStatus, TodoPriority, UpdateTodoRequest, Project, Workflow, IntegrationProviderInfo } from '../../types';
 
 const STATUSES: TodoStatus[] = ['OPEN', 'IN_PROGRESS', 'DONE', 'BACKLOG', 'ARCHIVED'];
 const PRIORITIES: TodoPriority[] = ['LOW', 'MEDIUM', 'HIGH'];
+
+/**
+ * Was nach dem gespeicherten TODO (PUT) noch zu speichern ist – die Einordnung (bbee09e6). Der Aufrufer
+ * schließt den Dialog erst, wenn es erfüllt ist; weist es ab, bleibt er offen.
+ */
+export type AfterTodoSave = () => Promise<void>;
 
 interface TodoEditModalProps {
   editTodo: Todo | null;
@@ -20,7 +27,8 @@ interface TodoEditModalProps {
   onClose: () => void;
   onFormChange: (form: UpdateTodoRequest) => void;
   onTagsChange: (tags: string[]) => void;
-  onSave: () => void;
+  /** PUT des TODOs, dann `afterSave` abwarten, dann schließen. */
+  onSave: (afterSave: AfterTodoSave) => void;
   integrations: IntegrationProviderInfo[];
   onExport: (provider: string, target: string) => void;
   exportLoading?: boolean;
@@ -45,6 +53,8 @@ export function TodoEditModal({
   const t = useT();
   const goalsModule = useModuleEnabled('goals');
   const integrationsModule = useModuleEnabled('integrations');
+  // Einordnung gehört zum Modul „Ziele“ (c60bf914) – aus, gibt es sie nicht
+  const planning = useTodoPlanningForm(goalsModule ? editTodo : null);
 
   return (
     <Modal
@@ -58,9 +68,9 @@ export function TodoEditModal({
             {t.common.cancel}
           </Button>
           <Button
-            onClick={onSave}
-            loading={isLoading}
-            disabled={!editForm.title?.trim()}
+            onClick={() => onSave(planning.save)}
+            loading={isLoading || planning.saving}
+            disabled={!editForm.title?.trim() || planning.conflict}
           >
             {t.common.save}
           </Button>
@@ -167,8 +177,7 @@ export function TodoEditModal({
           placeholder="bug, performance, ux"
         />
 
-        {/* Einordnung gehört zum Modul „Ziele“ (c60bf914) – aus, gibt es sie nicht */}
-        {editTodo && goalsModule && <TodoPlanningPanel todo={editTodo} />}
+        {editTodo && goalsModule && <TodoPlanningPanel todo={editTodo} planning={planning} />}
 
         {editTodo && integrationsModule && (
           <TodoExportSection

@@ -1,8 +1,9 @@
 import { Link } from 'react-router-dom';
-import { AlertTriangle, Calendar, Link2 } from 'lucide-react';
+import { AlertTriangle, Calendar, ExternalLink, Link2 } from 'lucide-react';
 import type { AuditReport, AuditSummary } from '../../hooks/useAuditCenter';
 import { useT, type Locale } from '../../i18n';
 import { formatTimestamp } from '../../utils/localeFormat';
+import { chainLink, scheduleLink, scheduleTriggerLink } from '../../utils/entityLinks';
 import { TriggerSourceChip } from '../workflow/TriggerSourceChip';
 import { TemplateValue } from './AuditParts';
 
@@ -33,11 +34,14 @@ export function ReportOrigin({ report, locale }: { report: AuditReport; locale: 
     <Link to={`/workflows/${report.workflowId}/run/${report.workflowRunId}`} className="text-accent hover:underline">
       <TemplateValue template={t.auditCenter.runShort} placeholder="{id}"><span className="font-mono">{report.workflowRunId.slice(0, 8)}</span></TemplateValue>
     </Link>
-    <TriggerSourceChip source={report.triggerSource} />
+    {/* The chain's schedule is behind the chain, not a second origin */}
+    <TriggerSourceChip source={report.triggerSource}
+      to={report.chainRunId ? null : scheduleTriggerLink(report.triggerSource, report.scheduleId)} />
     <ReportChain report={report} />
-    {!report.chainRunId && report.scheduleId && report.triggerSource !== 'SCHEDULE' && <span className="inline-flex items-center gap-1">
+    {!report.chainRunId && report.scheduleId && report.triggerSource !== 'SCHEDULE' && <Link to={scheduleLink(report.scheduleId)}
+      title={t.auditCenter.openSchedule} className="inline-flex items-center gap-1 text-accent hover:underline" data-testid="report-schedule">
       <Calendar className="w-3 h-3" /> {t.auditCenter.schedule}
-    </span>}
+    </Link>}
     {report.definitionVersionNumber != null && <span>{t.auditCenter.definitionVersion.replace('{number}', String(report.definitionVersionNumber))}</span>}
     {report.workflowVersion && <span>{t.auditCenter.workflowVersion.replace('{version}', report.workflowVersion)}</span>}
     <span>{report.provider ?? t.auditCenter.providerDefault} / {report.model ?? t.auditCenter.providerDefault}</span>
@@ -45,14 +49,22 @@ export function ReportOrigin({ report, locale }: { report: AuditReport; locale: 
   </div>;
 }
 
-/** The chain a report's run was an entry of; its name links to that chain run (there is no chain detail page). */
+/**
+ * The chain a report's run was an entry of: its name links to the chain on the chains page (3a35ced1),
+ * the icon beside it to the chain run.
+ */
 export function ReportChain({ report }: { report: AuditReport }) {
   const t = useT();
   if (report.chainId && report.chainRunId) {
-    return <Link to={`/chains/${report.chainId}/run/${report.chainRunId}`} title={t.auditCenter.openChainRun}
-      className="inline-flex items-center gap-1 text-accent hover:underline" data-testid="report-chain">
-      <Link2 className="w-3 h-3" /> {t.auditCenter.chainNamed.replace('{name}', report.chainName ?? report.chainId.slice(0, 8))}
-    </Link>;
+    return <span className="inline-flex items-center gap-1" data-testid="report-chain">
+      <Link to={chainLink(report.chainId)} title={t.auditCenter.openChain} className="inline-flex items-center gap-1 text-accent hover:underline">
+        <Link2 className="w-3 h-3" /> {t.auditCenter.chainNamed.replace('{name}', report.chainName ?? report.chainId.slice(0, 8))}
+      </Link>
+      <Link to={`/chains/${report.chainId}/run/${report.chainRunId}`} aria-label={t.auditCenter.openChainRun}
+        title={t.auditCenter.openChainRun} className="text-accent hover:text-accent-hover" data-testid="report-chain-run">
+        <ExternalLink className="w-3 h-3" />
+      </Link>
+    </span>;
   }
   if (report.chainRunId) return <span className="inline-flex items-center gap-1" data-testid="report-chain"><Link2 className="w-3 h-3" /> {t.auditCenter.chainGone}</span>;
   return null;

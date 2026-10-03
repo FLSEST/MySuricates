@@ -6,7 +6,7 @@ import { type ReactNode, createElement } from 'react';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
 import { createTestQueryClient } from '../../test/utils';
-import { useMemoryExtraction } from '../useMemoryExtraction';
+import { extractionAvailability, useMemoryExtraction } from '../useMemoryExtraction';
 
 beforeAll(() => server.listen({ onUnhandledRequest: failOnUnhandledRequest }));
 afterEach(() => {
@@ -33,6 +33,15 @@ function serveExtract(status = 200) {
   }));
   return { bodies, release: () => release() };
 }
+
+// 442702e2: extraction learns from runs — without any it stays locked, memory versions or not
+describe('extractionAvailability', () => {
+  it('is ready with runs, locked without, and waits while the runs load', () => {
+    expect(extractionAvailability(3)).toBe('ready');
+    expect(extractionAvailability(0)).toBe('noRuns');
+    expect(extractionAvailability(undefined)).toBe('loading');
+  });
+});
 
 describe('useMemoryExtraction', () => {
   it('sends the chosen runs and provider, then closes and clears the selection', async () => {

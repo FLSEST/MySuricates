@@ -2,6 +2,16 @@ import { useEffect, useState } from 'react';
 import { useExtractMemory } from './useWorkflowMemory';
 
 /**
+ * Whether an extraction can start. It learns from runs, so a workflow without any cannot — even when it
+ * already has memory versions from runs that were deleted since (442702e2); the panel then says why instead
+ * of only greying the button. `runCount` undefined means the runs are still loading.
+ */
+export function extractionAvailability(runCount: number | undefined): 'ready' | 'loading' | 'noRuns' {
+  if (runCount === undefined) return 'loading';
+  return runCount > 0 ? 'ready' : 'noRuns';
+}
+
+/**
  * State of the "extract knowledge" dialog of a workflow: which runs to learn from (none chosen
  * means the server picks), which provider, and the seconds the running extraction has taken.
  * A successful extraction closes the dialog and clears the selection.

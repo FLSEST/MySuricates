@@ -76,7 +76,7 @@ export function Integrations() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Plug className="w-6 h-6 text-primary" />
+        <Plug className="w-6 h-6 text-accent" />
         <h1 className="text-2xl font-bold text-text">{t.integrations.title}</h1>
       </div>
       <p className="text-text-secondary">{t.integrations.subtitle}</p>

@@ -67,7 +67,7 @@ export function SetupGuidePanel({ providerId, displayName, requiresCredentials =
                   onClick={() => setOpenStep(isOpen ? -1 : i)}
                   className="flex items-center gap-3 w-full p-3 text-left hover:bg-surface-secondary transition-colors"
                 >
-                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold shrink-0">
+                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-accent-subtle text-accent text-xs font-bold shrink-0">
                     {i + 1}
                   </span>
                   <ChevronRight className={`w-4 h-4 text-text-secondary transition-transform duration-200 shrink-0 ${isOpen ? 'rotate-90' : ''}`} />
@@ -103,7 +103,7 @@ export function SetupGuidePanel({ providerId, displayName, requiresCredentials =
                           href={step.link.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                          className="inline-flex items-center gap-1 text-sm text-accent hover:underline"
                         >
                           <ExternalLink className="w-3 h-3" />
                           {step.link.label[lang]}
@@ -135,7 +135,7 @@ export function SetupGuidePanel({ providerId, displayName, requiresCredentials =
               href={`https://trello.com/1/authorize?expiration=never&scope=read,write&response_type=token&name=MySuricates&key=${encodeURIComponent(clientId.trim())}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+              className="inline-flex items-center gap-1 text-sm text-accent hover:underline"
             >
               <ExternalLink className="w-3 h-3" />
               {lang === 'de' ? 'Token generieren' : 'Generate Token'}

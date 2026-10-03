@@ -4,6 +4,7 @@ import { Badge } from '../ui';
 import type { AuditReport } from '../../hooks/useAuditCenter';
 import { useT, type Locale } from '../../i18n';
 import { formatDateTime } from '../../utils/formatTime';
+import { scheduleTriggerLink } from '../../utils/entityLinks';
 import { TriggerSourceChip } from '../workflow/TriggerSourceChip';
 import { GateBadge } from './AuditParts';
 import { ReportChain } from './ReportOrigin';
@@ -18,7 +19,8 @@ export function ReportHistory({ reports, locale }: { reports: AuditReport[]; loc
         <div>
           <div className="flex gap-2 items-center flex-wrap text-xs">
             <GateBadge status={report.gateStatus} /><Badge variant={report.ingestionStatus === 'VALID' ? 'success' : 'danger'}>{report.ingestionStatus}</Badge>
-            <TriggerSourceChip source={report.triggerSource} />
+            <TriggerSourceChip source={report.triggerSource}
+              to={report.chainRunId ? null : scheduleTriggerLink(report.triggerSource, report.scheduleId)} />
             <ReportChain report={report} />
           </div>
           <p className="text-sm text-text-secondary mt-2">{report.gateDescription ?? report.ingestionError ?? t.auditCenter.noDescription}</p>

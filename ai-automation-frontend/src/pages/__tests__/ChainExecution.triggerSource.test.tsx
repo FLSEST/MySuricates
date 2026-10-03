@@ -35,6 +35,16 @@ describe('ChainExecution — Starter der Kette', () => {
 
     const chip = await screen.findByTestId('trigger-source');
     expect(chip).toHaveTextContent('Gestartet durch');
+    // ohne Zeitplan-ID kein Link
+    expect(chip.tagName).toBe('SPAN');
+  });
+
+  // 3a35ced1: Kette und Zeitplan der Herkunft sind verlinkt
+  it('verlinkt die Kette auf die Kettenseite und den Starter auf seinen Zeitplan', async () => {
+    renderRun({ ...oldShape, triggerSource: 'SCHEDULE', triggeredByScheduleId: 's-9' });
+
+    expect(await screen.findByTestId('trigger-source')).toHaveAttribute('href', '/schedules?schedule=s-9');
+    expect(screen.getByRole('link', { name: 'Release' })).toHaveAttribute('href', '/chains?chain=c-1');
   });
 
   it('zeigt bei älteren Backends ohne das Feld keinen Starter, die Seite bleibt vollständig', async () => {

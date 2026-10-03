@@ -1,10 +1,11 @@
-import { useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowDown, ExternalLink, XCircle, CheckCircle2, AlertCircle, Clock, Loader2 } from 'lucide-react';
 import { Card, Button, Badge, Spinner } from '../components/ui';
 import { TriggerSourceChip } from '../components/workflow/TriggerSourceChip';
 import { useChainRun, useCancelChainRun } from '../hooks/useChains';
 import { useI18nStore, useT } from '../i18n';
 import { formatDuration } from '../utils/formatTime';
+import { chainLink, scheduleTriggerLink } from '../utils/entityLinks';
 import type { ChainRunEntry } from '../types';
 
 function EntryStatusIcon({ status }: { status: string }) {
@@ -53,14 +54,20 @@ export function ChainExecution() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" icon={<ArrowLeft className="w-4 h-4" />} onClick={() => navigate('/chains')} title={t.common.back} />
+          <Button variant="ghost" size="sm" icon={<ArrowLeft className="w-4 h-4" />} onClick={() => navigate(chainLink(run.chainId))} title={t.common.back} />
           <div>
             <h1 className="text-2xl font-bold text-text">{t.chains.execution.title}</h1>
             {run.chainName && (
-              <p className="text-text-secondary">{run.chainName}</p>
+              <p>
+                <Link to={chainLink(run.chainId)} className="text-text-secondary hover:text-accent hover:underline" data-testid="chain-run-chain">
+                  {run.chainName}
+                </Link>
+              </p>
             )}
             {run.triggerSource && (
-              <div className="mt-1 text-xs"><TriggerSourceChip source={run.triggerSource} /></div>
+              <div className="mt-1 text-xs">
+                <TriggerSourceChip source={run.triggerSource} to={scheduleTriggerLink(run.triggerSource, run.triggeredByScheduleId)} />
+              </div>
             )}
           </div>
         </div>

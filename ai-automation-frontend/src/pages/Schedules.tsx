@@ -1,5 +1,6 @@
 import { Hint } from '../components/hints/Hint';
-import { useState, Fragment } from 'react';
+import { useState, Fragment, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Calendar, Plus, List, ChevronDown, ChevronRight, Pause, Play, AlertTriangle, Search } from 'lucide-react';
 import { Card, Button, Spinner } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
@@ -12,12 +13,14 @@ import { CatchUpQueueBanner } from '../components/schedule/CatchUpQueueBanner';
 import { SkipUntilBanner } from '../components/schedule/SkipUntilBanner';
 import { useSchedules, useToggleSchedule, useDeleteSchedule, useMaintenanceMode, useSetMaintenanceMode, useCatchUpQueue } from '../hooks/useSchedules';
 import { useScheduleFilters } from '../hooks/useScheduleFilters';
+import { useSyncedState } from '../hooks/useSyncedState';
 import { useScheduleForm } from '../hooks/useScheduleForm';
 import { useWorkflows } from '../hooks/useWorkflows';
 import { useChains } from '../hooks/useChains';
 import { useModuleEnabled } from '../hooks/useModules';
 import { useExecutionConfig } from '../hooks/useSystem';
 import { useT } from '../i18n';
+import { SCHEDULE_PARAM } from '../utils/entityLinks';
 
 export function Schedules() {
   const t = useT();
@@ -36,10 +39,23 @@ export function Schedules() {
     ? undefined
     : executionConfig.schedulerCatchUpOnResume === 1;
 
+  // `?schedule=<id>` (3a35ced1): reports and runs link to one schedule — it is highlighted, shown
+  // despite the filters and opened on its run history
+  const [searchParams] = useSearchParams();
+  const linkedId = searchParams.get(SCHEDULE_PARAM);
   const [view, setView] = useState<'list' | 'calendar'>('list');
-  const [expandedScheduleId, setExpandedScheduleId] = useState<string | null>(null);
+  // A new link while the page stays mounted opens that schedule instead (useSyncedState re-derives on change)
+  const [expandedScheduleId, setExpandedScheduleId] = useSyncedState<string | null, string | null>(
+    linkedId, (id, prev) => id ?? prev ?? null,
+  );
 
-  const filters = useScheduleFilters(schedules);
+  const filters = useScheduleFilters(schedules, linkedId);
+  const scrolledTo = useRef<string | null>(null);
+  useEffect(() => {
+    if (!linkedId || !schedules?.some((s) => s.id === linkedId) || scrolledTo.current === linkedId) return;
+    scrolledTo.current = linkedId;
+    document.getElementById(`schedule-${linkedId}`)?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+  }, [schedules, linkedId]);
   const scheduleForm = useScheduleForm();
 
   const columns = useScheduleColumns({
@@ -219,7 +235,8 @@ export function Schedules() {
                 )}
                 {filters.filtered.map((s) => (
                   <Fragment key={s.id}>
-                    <tr className="transition-colors">
+                    <tr id={`schedule-${s.id}`} aria-current={s.id === linkedId ? 'true' : undefined}
+                      className={`transition-colors ${s.id === linkedId ? 'bg-accent-subtle ring-1 ring-inset ring-accent' : ''}`}>
                       <td className="pl-3 pr-0 py-3">
                         <button
                           onClick={() => setExpandedScheduleId(expandedScheduleId === s.id ? null : s.id)}

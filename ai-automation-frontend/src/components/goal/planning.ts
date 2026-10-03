@@ -15,6 +15,11 @@ export interface PlanningForm {
   decision: string;
 }
 
+/** Formular ohne TODO (Dialog geschlossen). */
+export const EMPTY_PLANNING: PlanningForm = {
+  goalId: '', workPackageId: '', complexity: '', suggestedEffort: '', ratingNote: '', openQuestion: '', decision: '',
+};
+
 export function formOf(todo: Todo): PlanningForm {
   const p = todo.planning;
   return {

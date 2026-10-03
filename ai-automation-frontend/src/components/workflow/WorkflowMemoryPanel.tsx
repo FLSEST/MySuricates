@@ -5,7 +5,7 @@ import { MonacoEditor } from '../shared/MonacoEditor';
 import {
   useWorkflowMemories, useActivateMemory, useUpdateMemory, useDeleteMemory,
 } from '../../hooks/useWorkflowMemory';
-import { useMemoryExtraction } from '../../hooks/useMemoryExtraction';
+import { extractionAvailability, useMemoryExtraction } from '../../hooks/useMemoryExtraction';
 import { useT } from '../../i18n';
 import { MemoryExtractModal } from './MemoryExtractModal';
 import { WorkflowMemoryItem } from './WorkflowMemoryItem';
@@ -15,10 +15,13 @@ interface Props {
   workflowId: string;
   /** List rows are enough — the panel reads no steps. */
   runs?: Omit<WorkflowRun, 'steps'>[];
+  /** All runs of the workflow, not just the shown page; without it the page's rows count. */
+  runTotal?: number;
 }
 
-export function WorkflowMemoryPanel({ workflowId, runs }: Props) {
+export function WorkflowMemoryPanel({ workflowId, runs, runTotal }: Props) {
   const t = useT();
+  const availability = extractionAvailability(runTotal ?? runs?.length);
   const { data: memories } = useWorkflowMemories(workflowId);
   const extraction = useMemoryExtraction(workflowId);
   const activateMemory = useActivateMemory(workflowId);
@@ -54,12 +57,19 @@ export function WorkflowMemoryPanel({ workflowId, runs }: Props) {
             variant="secondary"
             icon={<Sparkles className="w-3.5 h-3.5" />}
             onClick={extraction.show}
-            disabled={!runs?.length}
+            disabled={availability !== 'ready'}
+            title={availability === 'noRuns' ? t.memory.extractNeedsRuns : undefined}
           >
             {t.memory.extractKnowledge}
           </Button>
         }
       />
+
+      {availability === 'noRuns' && (
+        <p className="text-xs text-text-tertiary mb-3" data-testid="memory-extract-needs-runs">
+          {t.memory.extractNeedsRuns}
+        </p>
+      )}
 
       {!memories?.length ? (
         <p className="text-sm text-text-tertiary flex items-center gap-2">

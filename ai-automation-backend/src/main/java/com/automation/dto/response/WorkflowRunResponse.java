@@ -17,6 +17,8 @@ import java.util.Map;
  * @param sealedSkillPins     skill content hashes verified at start ({skillId: sha256}), null if none
  * @param chainRunId          chain run that started this run as one of its entries; null outside a
  *                            chain and for runs from before this was recorded
+ * @param chainId             chain of that chain run, for the link to the chains page (3a35ced1); null
+ *                            without chain run or when the chain run is gone
  */
 public record WorkflowRunResponse(
         String id,
@@ -39,8 +41,22 @@ public record WorkflowRunResponse(
         TriggerSource triggerSource,
         Boolean sealed,
         Map<String, String> sealedSkillPins,
-        String chainRunId
+        String chainRunId,
+        String chainId
 ) {
+    /** Compat constructor for call-sites written before the response named the chain (3a35ced1). */
+    public WorkflowRunResponse(String id, String workflowId, String workflowName, String projectName, String projectPath,
+                               RunStatus status, List<StepResultResponse> steps, Instant startedAt, Instant completedAt,
+                               Long durationMs, Integer userRating, Map<String, Object> error,
+                               Map<String, Object> metadata, Map<String, Object> inputContext,
+                               String triggeredByScheduleId, String definitionHash, String definitionVersionId,
+                               TriggerSource triggerSource, Boolean sealed, Map<String, String> sealedSkillPins,
+                               String chainRunId) {
+        this(id, workflowId, workflowName, projectName, projectPath, status, steps, startedAt, completedAt, durationMs,
+                userRating, error, metadata, inputContext, triggeredByScheduleId, definitionHash, definitionVersionId,
+                triggerSource, sealed, sealedSkillPins, chainRunId, null);
+    }
+
     /** Compat constructor for call-sites written before runs recorded their chain run. */
     public WorkflowRunResponse(String id, String workflowId, String workflowName, String projectName, String projectPath,
                                RunStatus status, List<StepResultResponse> steps, Instant startedAt, Instant completedAt,
@@ -50,7 +66,7 @@ public record WorkflowRunResponse(
                                TriggerSource triggerSource, Boolean sealed, Map<String, String> sealedSkillPins) {
         this(id, workflowId, workflowName, projectName, projectPath, status, steps, startedAt, completedAt, durationMs,
                 userRating, error, metadata, inputContext, triggeredByScheduleId, definitionHash, definitionVersionId,
-                triggerSource, sealed, sealedSkillPins, null);
+                triggerSource, sealed, sealedSkillPins, (String) null);
     }
 
     /** Compat constructor for call-sites written before the seal state was recorded on runs. */

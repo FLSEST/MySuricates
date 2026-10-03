@@ -332,16 +332,13 @@ export function useReorderGoal() {
 /** Ziel, Rang und Einschätzung eines TODOs; ohne `ratedBy` gilt die Änderung als menschlich. */
 export function useUpdateTodoPlanning() {
   const qc = useQueryClient();
-  const toast = useToast();
-  const t = useT();
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpdateTodoPlanningRequest }) =>
       api.patch<Todo>(`/todos/${id}/planning`, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: goalKeys.all });
       qc.invalidateQueries({ queryKey: ['todos'] });
-      toast.success(t.goals.planningSaved);
     },
-    onError: (err) => toast.error(apiErrorMessage(err, t.goals.saveFailed)),
+    // Keine eigenen Toasts: gespeichert wird mit dem TODO-Dialog, der Erfolg und Fehlschlag meldet (bbee09e6)
   });
 }

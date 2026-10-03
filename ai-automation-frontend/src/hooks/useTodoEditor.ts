@@ -1,8 +1,30 @@
 import { useEffect, useRef, useState } from 'react';
+import { apiErrorMessage } from '../api/client';
+import { useT } from '../i18n';
+import { useToast } from './useToast';
 import { useExportTodo, useTodo, useUpdateTodo } from './useTodos';
 import { filterShowsStatus } from '../components/todo/todoConstants';
 import type { useTodoFilters } from './useTodoFilters';
 import type { Todo, UpdateTodoRequest } from '../types';
+
+/**
+ * Nach dem PUT des TODO-Dialogs (mit `useUpdateTodo({ quietSuccess: true })`): `afterSave` (die Einordnung)
+ * abwarten, dann „TODO aktualisiert“ melden und schließen. Scheitert es, sagt ein Fehler-Toast, dass das TODO
+ * gespeichert ist, die Einordnung nicht; der Dialog bleibt offen, ein erneutes „Speichern“ holt es nach (bbee09e6).
+ */
+export function useCloseAfterSave() {
+  const toast = useToast();
+  const t = useT();
+  return (afterSave: (() => Promise<void>) | undefined, close: () => void): void => {
+    void (afterSave ? afterSave() : Promise.resolve()).then(
+      () => {
+        toast.success(t.toast.todoUpdated);
+        close();
+      },
+      (err: unknown) => toast.error(apiErrorMessage(err, t.todos.savedWithoutPlanning)),
+    );
+  };
+}
 
 type TodoFilters = ReturnType<typeof useTodoFilters>;
 
@@ -20,7 +42,8 @@ export function useTodoEditor(filters: Pick<TodoFilters,
   // paginated list), so it works regardless of persisted filters and page.
   const linkedTodoId = searchParams.get('todoId') ?? '';
   const { data: linkedTodo } = useTodo(linkedTodoId);
-  const updateTodo = useUpdateTodo();
+  const updateTodo = useUpdateTodo({ quietSuccess: true });
+  const closeAfter = useCloseAfterSave();
   const exportTodo = useExportTodo();
 
   // Edit modal state
@@ -75,14 +98,15 @@ export function useTodoEditor(filters: Pick<TodoFilters,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [linkedTodo]);
 
-  const save = () => {
+  /** PUT, dann `afterSave` (die Einordnung, bbee09e6); schließt erst, wenn beides gespeichert ist. */
+  const save = (afterSave?: () => Promise<void>) => {
     if (!editTodo) return;
     const data: UpdateTodoRequest = {
       ...editForm,
       tags: editTagsList,
     };
     updateTodo.mutate({ id: editTodo.id, data }, {
-      onSuccess: closeEdit,
+      onSuccess: () => closeAfter(afterSave, closeEdit),
     });
   };
 

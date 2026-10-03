@@ -6,7 +6,7 @@ import {
 } from '../localeFormat';
 
 // Local time, so the expectations hold in every time zone. ICU may put a narrow no-break space
-// before AM/PM; the tests compare with plain spaces.
+// between parts; the tests compare with plain spaces.
 const THURSDAY = new Date(2026, 8, 24, 14, 5, 33);
 const plain = (text: string) => text.replace(/\s/g, ' ');
 
@@ -26,11 +26,28 @@ describe('localeFormat', () => {
   });
 
   it('writes times and timestamps in the app language', () => {
-    expect(plain(formatTimeOfDay(THURSDAY, 'en'))).toBe('2:05:33 PM');
+    expect(plain(formatTimeOfDay(THURSDAY, 'en'))).toBe('14:05:33');
     expect(formatTimeOfDay(THURSDAY, 'de')).toBe('14:05:33');
-    expect(plain(formatTimestamp(THURSDAY, 'en'))).toBe('9/24/2026, 2:05:33 PM');
+    expect(plain(formatTimestamp(THURSDAY, 'en'))).toBe('9/24/2026, 14:05:33');
     expect(formatTimestamp(THURSDAY, 'de')).toBe('24.9.2026, 14:05:33');
     expect(formatTimestamp(THURSDAY, 'de', { day: '2-digit', month: '2-digit' })).toBe('24.09.');
+  });
+
+  // 571524a5: English showed 12 h in formatTimestamp but 24 h in formatDateTime and the assistant
+  it('writes the time of day with a 24-hour clock in every language and every formatter', () => {
+    const MIDNIGHT = new Date(2026, 8, 24, 0, 7, 0);
+    for (const locale of ['en', 'de'] as const) {
+      expect(plain(formatTimeOfDay(THURSDAY, locale, { hour: '2-digit', minute: '2-digit' }))).toBe('14:05');
+      // `hour12: false` alone made some engines write "24:07" after midnight
+      expect(plain(formatTimeOfDay(MIDNIGHT, locale, { hour: '2-digit', minute: '2-digit', hour12: false }))).toBe('00:07');
+      expect(plain(formatTimeOfDay(MIDNIGHT, locale, { timeStyle: 'short' }))).toBe('00:07');
+      expect(plain(formatTimestamp(THURSDAY, locale, { hour: 'numeric', minute: '2-digit' }))).toBe('14:05');
+      expect(plain(formatDate(THURSDAY, locale, { hour: '2-digit', minute: '2-digit' }))).toMatch(/2026, 14:05$/);
+      expect(plain(formatTimestamp(THURSDAY, locale, { dateStyle: 'short', timeStyle: 'short' }))).toMatch(/14:05$/);
+      expect(plain(formatDateRange(THURSDAY, new Date(2026, 8, 24, 16, 30), locale, { hour: '2-digit', minute: '2-digit' })))
+        .toMatch(/^14:05\s?–\s?16:30( Uhr)?$/);
+    }
+    expect(plain(formatTimestamp(THURSDAY, 'en', { dateStyle: 'medium', timeStyle: 'short' }))).toBe('Sep 24, 2026, 14:05');
   });
 
   it('takes ISO strings and epoch milliseconds as well as dates', () => {

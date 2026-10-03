@@ -85,6 +85,8 @@ class WorkflowRunResponseTest {
                 null, null, null, null, null, null, null, null, "hash", "ver-1", TriggerSource.CHAIN, false, null);
 
         assertThat(inChain.chainRunId()).isEqualTo("chain-run-7");
+        // 3a35ced1: the chain itself is additive – the constructor without it leaves it null
+        assertThat(inChain.chainId()).isNull();
         assertThat(beforeChainRuns.chainRunId()).isNull();
         assertThat(beforeChainRuns.triggerSource()).isEqualTo(TriggerSource.CHAIN);
     }

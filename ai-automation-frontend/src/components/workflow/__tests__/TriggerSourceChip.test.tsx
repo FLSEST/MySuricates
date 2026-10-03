@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { renderWithProviders } from '../../../test/utils';
 import { en } from '../../../i18n/en';
 import { TriggerSourceChip } from '../TriggerSourceChip';
 import { RunProvenance } from '../RunProvenance';
@@ -39,6 +40,13 @@ describe('RunProvenance', () => {
 
     expect(screen.getByTestId('run-provenance')).toContainElement(screen.getByTestId('trigger-source'));
     expect(screen.getByTestId('trigger-source')).toHaveTextContent(en.workflows.triggerSources.CHAIN);
+  });
+
+  // 3a35ced1: the run origin leads to the schedule that started the run
+  it('links the trigger to its schedule when a schedule started the run', () => {
+    renderWithProviders(<RunProvenance run={{ ...run, triggerSource: 'SCHEDULE', triggeredByScheduleId: 's-1' }} />);
+
+    expect(screen.getByTestId('trigger-source')).toHaveAttribute('href', '/schedules?schedule=s-1');
   });
 
   it('leaves the chip out for a run without recorded trigger', () => {

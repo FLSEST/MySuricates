@@ -1,6 +1,8 @@
-import { Lock, LockOpen, Minus } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Link2, Lock, LockOpen, Minus } from 'lucide-react';
 import { CopyButton } from '../shared/CopyButton';
 import { TriggerSourceChip } from './TriggerSourceChip';
+import { chainLink, scheduleTriggerLink } from '../../utils/entityLinks';
 import { useT } from '../../i18n';
 import type { WorkflowRun } from '../../types';
 
@@ -36,7 +38,15 @@ export function RunProvenance({ run }: { run: WorkflowRun }) {
           {t.workflows.sealView.unrecorded}
         </span>
       )}
-      <TriggerSourceChip source={run.triggerSource} />
+      <TriggerSourceChip source={run.triggerSource} to={scheduleTriggerLink(run.triggerSource, run.triggeredByScheduleId)} />
+      {/* The chain this run was an entry of (3a35ced1); older backends send no chainId – then nothing, as before */}
+      {run.chainRunId && run.chainId && (
+        <Link to={chainLink(run.chainId)} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-raised text-accent hover:underline"
+              data-testid="run-chain">
+          <Link2 className="w-3 h-3" />
+          {t.workflows.showChain}
+        </Link>
+      )}
       {run.definitionHash && (
         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-raised font-mono"
               title={t.workflows.definitionHashHint}>

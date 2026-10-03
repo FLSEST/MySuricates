@@ -56,6 +56,6 @@ export function formatRelativeShort(dateStr: string, locale: Locale): string {
 /** Day, month and 24-hour time ("09/24 14:05" / "24.09. 14:05"). */
 export function formatDateTime(dateStr: string, locale: Locale): string {
   const datePart = formatDate(dateStr, locale, { day: '2-digit', month: '2-digit' });
-  const timePart = formatTimeOfDay(dateStr, locale, { hour: '2-digit', minute: '2-digit', hour12: false });
+  const timePart = formatTimeOfDay(dateStr, locale, { hour: '2-digit', minute: '2-digit' });
   return `${datePart} ${timePart}`;
 }

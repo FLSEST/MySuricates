@@ -20,9 +20,7 @@ const SOURCES = import.meta.glob<string>(
 );
 
 /** Undefined token name → why it is still in use. */
-const KNOWN_UNDEFINED: Record<string, string> = {
-  primary: 'dd030fa0 (Token `primary` existiert nicht) – waits for the decision which token replaces it',
-};
+const KNOWN_UNDEFINED: Record<string, string> = {};
 
 /** Colour names the theme defines: `--color-<name>` inside `@theme inline { … }`. */
 function definedTokens(css: string): Set<string> {
