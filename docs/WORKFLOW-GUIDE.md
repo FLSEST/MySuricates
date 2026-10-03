@@ -412,6 +412,7 @@ Führt einen Befehl für jedes Item in einer Liste aus.
 | `execution_mode` | string | `"ai"` | `"ai"` (KI, Provider aus `provider` am Block/Workflow) oder `"shell"`; `"claude"` gilt weiter als `"ai"`, andere Werte werden abgelehnt |
 | `timeout_seconds` | int | 300 | Timeout pro Iteration |
 | `continue_on_error` | bool | `false` | `true`: fehlgeschlagene Items lassen den Block nicht scheitern — er endet COMPLETED, Folge-Blöcke laufen. Fehler werden im Output zusammengefasst (`N/M items failed: ...`). `false`: ein fehlgeschlagenes Item lässt den Block scheitern, die übrigen Items laufen trotzdem. In beiden Fällen listen die Step-Metadaten die Fehler (`failedItemCount`, `failedItems`, `totalItems`) |
+| `max_consecutive_failures` | int | `3` | Nach so vielen fehlgeschlagenen Items **in Folge** hört die Schleife auf: die übrigen Items laufen nicht mehr, der Block scheitert — auch mit `continue_on_error: true`. Ein erfolgreiches Item setzt den Zähler zurück. `0` schaltet den Abbruch ab. Metadaten: `abortedAfterConsecutiveFailures`, `skippedItemCount` |
 
 ```json
 {
@@ -432,6 +433,8 @@ Führt einen Befehl für jedes Item in einer Liste aus.
 **Leere Item-Listen**: Leere und reine Whitespace-Zeilen werden verworfen — in der `items_command`-Ausgabe wie in inline `items`. Eine leere Ausgabe ergibt damit **null** Iterationen (Block endet COMPLETED, Metadaten `totalItems: 0`) statt einer Iteration mit leerem Item. Eine leere Liste ist also der saubere Weg, eine Schleife zu überspringen.
 
 **Abgrenzung `continue_on_error` vs. `on_failure`**: `continue_on_error: true` toleriert Item-Fehler *innerhalb* des Blocks (Block endet COMPLETED, z. B. 29/30 Items erfolgreich → Folge-Blöcke wie Commit/Gate laufen). Das blockweite `on_failure: "continue"` lässt dagegen nur den Workflow trotz FAILED-Block weiterlaufen — der Block selbst bleibt FAILED.
+
+**Abbruch nach Fehlern in Folge** (`max_consecutive_failures`): Ein erschöpftes Kontingent („You've hit your session limit“) lässt jedes weitere KI-Item genauso scheitern. Ohne Abbruch rief foreach trotzdem alle übrigen auf — in „Hunt Quality Rebuild“ scheiterten so 37 von 42 Items und kosteten Zeit. Seit a6659a46 stoppt die Schleife nach drei Fehlern in Folge; die Fehlermeldung nennt den Grund zuerst: `Step 1 (foreach) failed: stopped after 3 consecutive failed items (max_consecutive_failures), 34 items not run`, darunter die gescheiterten Items wie unten. `continue_on_error` toleriert gescheiterte Items, aber keine, die gar nicht liefen — deshalb scheitert der Block auch dann; mit `on_failure: "continue"` läuft der Workflow trotzdem weiter. Schleifen, in denen Fehler in Serie normal sind (etwa „ist der Dienst erreichbar?“ über viele Hosts), setzen `max_consecutive_failures: 0`.
 
 **Fehlermeldung**: Scheitert der Block, beginnt die Fehlermeldung des Laufs mit den gescheiterten Items und dem Fehler des ersten, z. B. `Step 1 (foreach) failed: 1/37 items failed: erkner` und darunter `[erkner]: API Error: …`. Die Ausgabe des Blocks bleibt das Protokoll aller Items in ihrer Reihenfolge. Ein gescheitertes Item steht dort also zwischen erfolgreichen; aus deren Text allein („GATE PASS …“) lässt sich nicht ablesen, warum der Block scheiterte.
 

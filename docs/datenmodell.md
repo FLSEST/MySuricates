@@ -1295,7 +1295,7 @@ folgt freier Text.
 | `shell` | `command` (Shell-Skript), `timeout_seconds`, `shell_escape_variables`, `container_image` |
 | `retry` | `command`, `max_retries` (3), `delay` (5), `exponential_backoff`, `execution_mode` (`ai`/`shell`) |
 | `conditional` | `condition`, `then_command`, `else_command`, `execution_mode` |
-| `foreach` | `command`, `items_source` (`list`/`command`), `items`, `items_command`, `variable_name` (`item`), `execution_mode`, `continue_on_error` |
+| `foreach` | `command`, `items_source` (`list`/`command`), `items`, `items_command`, `variable_name` (`item`), `execution_mode`, `continue_on_error`, `max_consecutive_failures` (`3`, `0` = aus) |
 | `while` | `command`, `condition_command`, `max_iterations` (100), `execution_mode` |
 | `switch` | `expression`, `cases` (Liste mit `value`, `blocks`), `default` |
 | `agentic` | `goal`, `success_criteria`, `max_iterations` (10), `iteration_timeout_seconds` (300), `total_timeout_seconds` (1800), `max_total_tokens` (200000), `max_repeated_actions` (3), `require_approval` (false) |

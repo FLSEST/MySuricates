@@ -58,6 +58,7 @@ Die ersten zehn Zeilen sind die Startmenge aus fdf79a86, die übrigen stammen au
 | 19 | Ziel-Wächter: ein Lauf der mitgelieferten Vorlage `goal-guard` mit `goal_id` bekommt `goal_status`/`goal_guard_*` und meldet ohne KI Rot mit dem überfälligen Meilenstein und TODO an die Dashboard-Kachel (259f4f66) | `goal-guard-reports-overdue` |
 | 20 | Audit-Workflow: der zweite Lauf sieht in `{{ audit_findings }}` die Befunde des ersten, der erste „(keine bekannten Befunde)“; sein Sub-Workflow ohne `metadata.audit` bekommt die Variable auch über die Variablen-Übergabe nicht (3643beac) | `audit-findings-reach-the-next-run` (zwei Läufe) |
 | 21 | `todo_details` filtert (Ausschluss-Tag, Status-Liste) und liefert Beschreibungen; `todo-update` mit `updates` schreibt nur, wo `require_status` passt; `run_if` überspringt einen KI-Block ohne Aufruf (cc0eb3ba) | `todo-details-drive-bulk-update` |
+| 22 | foreach hört nach drei fehlgeschlagenen Items in Folge auf (`max_consecutive_failures`, Standard 3), auch mit `continue_on_error`; die Lauf-Fehlermeldung nennt den Grund zuerst (a6659a46) | `foreach-stops-after-consecutive-failures` |
 
 ### Aus der Historie, noch ohne Szenario
 

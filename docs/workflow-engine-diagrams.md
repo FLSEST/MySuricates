@@ -185,7 +185,7 @@ Ein Schritt mit Status FAILED beendet den Run, solange `on_failure` nicht `"cont
 | `simple` | KI | `timeout_seconds`, `provider`, `model`, `effort` | die KI-CLI mit Fehler endet |
 | `shell` | Shell | `timeout_seconds`, `container_image`, `checked_command`, `shell_escape_variables` | der Exit-Code nicht 0 ist |
 | `retry` | KI | `execution_mode`=ai/shell, `max_retries`, `delay`, `exponential_backoff`, `timeout_seconds` | alle Versuche scheitern |
-| `foreach` | KI | `execution_mode`=ai/shell, `items_source`=list/command, `continue_on_error`, `timeout_seconds` | ein Item scheitert (außer mit `continue_on_error`) |
+| `foreach` | KI | `execution_mode`=ai/shell, `items_source`=list/command, `continue_on_error`, `max_consecutive_failures`, `timeout_seconds` | ein Item scheitert (außer mit `continue_on_error`); `max_consecutive_failures` Items in Folge scheitern (Standard 3, auch mit `continue_on_error`) |
 | `while` | KI | `execution_mode`=ai/shell, `condition_command`, `max_iterations`, `timeout_seconds` | eine Iteration scheitert |
 | `conditional` | KI | `execution_mode`=ai/shell, `then_command`, `else_command`, `timeout_seconds` | der gewählte Befehl scheitert |
 | `switch` | – | `expression`, `cases`, `default` | ein Block im gewählten case scheitert |

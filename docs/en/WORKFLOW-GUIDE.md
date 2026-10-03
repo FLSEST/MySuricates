@@ -401,6 +401,7 @@ Executes a command for each item in a list.
 | `execution_mode` | string | `"ai"` | `"ai"` (AI, provider from `provider` on the block/workflow) or `"shell"`; `"claude"` still means `"ai"`, other values are rejected |
 | `timeout_seconds` | int | 300 | Timeout per iteration |
 | `continue_on_error` | bool | `false` | `true`: failed items do not fail the block — it completes, follow-up blocks run. Failures are summarised in the output (`N/M items failed: ...`). `false`: a failed item fails the block, the remaining items still run. In both cases the step metadata lists the failures (`failedItemCount`, `failedItems`, `totalItems`) |
+| `max_consecutive_failures` | int | `3` | After this many failed items **in a row** the loop stops: the remaining items no longer run and the block fails — even with `continue_on_error: true`. A successful item resets the count. `0` turns the stop off. Metadata: `abortedAfterConsecutiveFailures`, `skippedItemCount` |
 
 ```json
 {
@@ -421,6 +422,8 @@ Executes a command for each item in a list.
 **Empty item lists**: Empty and whitespace-only lines are discarded — in the `items_command` output as well as in inline `items`. An empty output therefore yields **zero** iterations (the block completes with metadata `totalItems: 0`) instead of one iteration with an empty item. An empty list is thus the clean way to skip a loop.
 
 **`continue_on_error` vs. `on_failure`**: `continue_on_error: true` tolerates item failures *inside* the block (the block completes, e.g. 29/30 items succeeded → follow-up blocks such as commit/gate run). The block-level `on_failure: "continue"` only lets the workflow go on despite a FAILED block — the block itself stays FAILED.
+
+**Stop after failures in a row** (`max_consecutive_failures`): an exhausted quota ("You've hit your session limit") fails every further AI item the same way. Without a stop, foreach still called all the remaining ones — in "Hunt Quality Rebuild" 37 of 42 items failed like that and cost time. Since a6659a46 the loop stops after three failures in a row; the error message names the reason first: `Step 1 (foreach) failed: stopped after 3 consecutive failed items (max_consecutive_failures), 34 items not run`, followed by the failed items as below. `continue_on_error` tolerates failed items, not items that never ran — so the block fails then too; with `on_failure: "continue"` the workflow still goes on. Loops in which failures in a row are normal (say "is the service reachable?" over many hosts) set `max_consecutive_failures: 0`.
 
 **Error message**: When the block fails, the run's error message starts with the failed items and the error of the first one, e.g. `Step 1 (foreach) failed: 1/37 items failed: erkner` followed by `[erkner]: API Error: …`. The block output stays the transcript of all items in their order, so a failed item sits between successful ones there; their text alone ("GATE PASS …") does not tell why the block failed.
 

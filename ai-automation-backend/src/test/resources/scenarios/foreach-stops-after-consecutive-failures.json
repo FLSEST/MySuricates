@@ -1,0 +1,77 @@
+{
+  "id": "foreach-stops-after-consecutive-failures",
+  "title": "foreach hört nach drei Fehlern in Folge auf (max_consecutive_failures), auch mit continue_on_error, und nennt den Grund",
+  "derivedFrom": {
+    "spec": "WORKFLOW-GUIDE foreach: max_consecutive_failures (Standard 3, 0 = aus) bricht nach N fehlgeschlagenen Items in Folge ab, auch mit continue_on_error; der Block scheitert und die Lauf-Fehlermeldung nennt den Grund",
+    "incidents": [
+      "a6659a46 (foreach nach wiederholten Kontingentfehlern abbrechen (max_failures) – Produktentscheidung)",
+      "Hunt Quality Rebuild: 37 bzw. 42 Items scheiterten an 'You've hit your session limit', foreach rief die übrigen trotzdem auf"
+    ]
+  },
+  "workflow": {
+    "provider": "SCRIPTED",
+    "blocks": [
+      {
+        "type": "foreach",
+        "name": "je_ort",
+        "config": {
+          "items": [
+            "bad-zwischenahn",
+            "erkner",
+            "etzenrot",
+            "gotha",
+            "erfurt",
+            "weimar"
+          ],
+          "variable_name": "slug",
+          "continue_on_error": true,
+          "command": "Ort: {{ slug }}. Baue den Hunt neu."
+        }
+      }
+    ]
+  },
+  "ai": {
+    "SCRIPTED": [
+      {
+        "match": "Ort: bad-zwischenahn.",
+        "respond": "GATE PASS: bad-zwischenahn"
+      },
+      {
+        "respond": "You've hit your session limit · resets 3pm",
+        "exitCode": 1
+      }
+    ]
+  },
+  "expect": {
+    "runStatus": "FAILED",
+    "runError": {
+      "startsWith": "Step 0 (foreach) failed: stopped after 3 consecutive failed items (max_consecutive_failures), 2 items not run",
+      "contains": [
+        "3/6 items failed: erkner, etzenrot, gotha",
+        "[erkner]: You've hit your session limit"
+      ],
+      "notContains": [
+        "erfurt",
+        "weimar"
+      ]
+    },
+    "aiCallCount": {
+      "SCRIPTED": 4
+    },
+    "steps": [
+      {
+        "index": 0,
+        "status": "FAILED",
+        "outputContains": [
+          "[bad-zwischenahn]: GATE PASS",
+          "[continue_on_error] 3/6 items failed: erkner, etzenrot, gotha",
+          "[max_consecutive_failures] stopped after 3 consecutive failed items"
+        ],
+        "outputNotContains": [
+          "[erfurt]",
+          "[weimar]"
+        ]
+      }
+    ]
+  }
+}

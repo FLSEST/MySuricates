@@ -39,6 +39,12 @@ public class ForEachBlockExecutor implements BlockExecutor {
     private static final int FAILED_NAMES_MAX_CHARS = 160;
     private static final int ERROR_HEAD_CHARS = 80;
     private static final int ERROR_TAIL_CHARS = 240;
+    /**
+     * Default of {@code max_consecutive_failures} (TODO a6659a46): after this many failed items in a row
+     * the loop stops instead of calling the rest — a quota error ("You've hit your session limit") fails
+     * every following item too and only burns time. {@code 0} switches it off.
+     */
+    static final int DEFAULT_MAX_CONSECUTIVE_FAILURES = 3;
 
     private final CommandExecutorService commandExecutor;
     private final ExecutionBroadcaster broadcaster;
@@ -52,6 +58,7 @@ public class ForEachBlockExecutor implements BlockExecutor {
         boolean isShell = ExecutionMode.isShell(config);
         boolean escapeVariables = Boolean.TRUE.equals(config.get("shell_escape_variables"));
         boolean continueOnError = Boolean.parseBoolean(String.valueOf(config.getOrDefault("continue_on_error", "false")));
+        int maxConsecutiveFailures = maxConsecutiveFailures(config.get("max_consecutive_failures"));
         int shellTimeout = ((Number) config.getOrDefault("timeout_seconds", SHELL_TIMEOUT_SECONDS)).intValue();
         Integer claudeTimeout = config.containsKey("timeout_seconds")
                 ? ((Number) config.get("timeout_seconds")).intValue()
@@ -92,6 +99,8 @@ public class ForEachBlockExecutor implements BlockExecutor {
         String runId = context.getWorkflowRunId();
         int stepIndex = aggregateResult.getStepIndex();
         int totalItems = items.size();
+        int consecutiveFailures = 0;
+        int skippedItems = 0;
 
         for (int i = 0; i < items.size(); i++) {
             String item = items.get(i);
@@ -163,7 +172,22 @@ public class ForEachBlockExecutor implements BlockExecutor {
                 if (firstFailureOutput == null) {
                     firstFailureOutput = itemResult.getOutput() != null ? itemResult.getOutput() : "";
                 }
+                consecutiveFailures++;
+            } else {
+                consecutiveFailures = 0;
             }
+            if (maxConsecutiveFailures > 0 && consecutiveFailures >= maxConsecutiveFailures && i < totalItems - 1) {
+                skippedItems = totalItems - 1 - i;
+                break;
+            }
+        }
+
+        String abortReason = skippedItems > 0 ? abortReason(consecutiveFailures, skippedItems) : null;
+        if (abortReason != null) {
+            log.warn("foreach in run {} {}", runId, abortReason);
+            StepAiMetadata.put(aggregateResult, "abortedAfterConsecutiveFailures", consecutiveFailures);
+            StepAiMetadata.put(aggregateResult, "skippedItemCount", skippedItems);
+            outputs.append("\n[max_consecutive_failures] ").append(abortReason);
         }
 
         if (anyFailed) {
@@ -172,15 +196,19 @@ public class ForEachBlockExecutor implements BlockExecutor {
             if (continueOnError) {
                 outputs.append("\n[continue_on_error] ").append(failedItems.size()).append("/").append(totalItems)
                         .append(" items failed: ").append(String.join(", ", failedItems));
-            } else {
-                StepFailureSummary.put(aggregateResult, failureSummary(failedItems, firstFailureOutput, totalItems));
+            }
+            if (!continueOnError || abortReason != null) {
+                String summary = failureSummary(failedItems, firstFailureOutput, totalItems);
+                StepFailureSummary.put(aggregateResult, abortReason != null ? abortReason + "\n" + summary : summary);
             }
         }
         StepAiMetadata.put(aggregateResult, "totalItems", totalItems);
         StepAiMetadata.put(aggregateResult, "items", List.copyOf(recordedItems));
 
         aggregateResult.setOutput(outputs.toString().trim());
-        aggregateResult.setStatus(anyFailed && !continueOnError ? StepStatus.FAILED : StepStatus.COMPLETED);
+        // continue_on_error tolerates failed items, not a loop that stopped with items left unrun
+        aggregateResult.setStatus((anyFailed && !continueOnError) || abortReason != null
+                ? StepStatus.FAILED : StepStatus.COMPLETED);
         aggregateResult.setCompletedAt(Instant.now());
         aggregateResult.setDurationMs(
                 aggregateResult.getCompletedAt().toEpochMilli() - aggregateResult.getStartedAt().toEpochMilli()
@@ -209,6 +237,25 @@ public class ForEachBlockExecutor implements BlockExecutor {
         String error = TruncationUtil.smart(firstFailureOutput.strip(), ERROR_HEAD_CHARS, ERROR_TAIL_CHARS);
         return failedItems.size() + "/" + totalItems + " items failed: " + names
                 + "\n[" + truncate(failedItems.get(0), ITEM_LABEL_MAX_CHARS) + "]: " + error;
+    }
+
+    /** Why the loop stopped early, for the output and the run error. */
+    static String abortReason(int consecutiveFailures, int skippedItems) {
+        return "stopped after " + consecutiveFailures + " consecutive failed items (max_consecutive_failures), "
+                + skippedItems + " " + (skippedItems == 1 ? "item" : "items") + " not run";
+    }
+
+    /** {@code max_consecutive_failures}: a number or numeric text; missing or unreadable = default, below 0 = off. */
+    static int maxConsecutiveFailures(Object raw) {
+        if (raw instanceof Number n) return Math.max(0, n.intValue());
+        if (raw instanceof String s && !s.isBlank()) {
+            try {
+                return Math.max(0, Integer.parseInt(s.strip()));
+            } catch (NumberFormatException e) {
+                return DEFAULT_MAX_CONSECUTIVE_FAILURES;
+            }
+        }
+        return DEFAULT_MAX_CONSECUTIVE_FAILURES;
     }
 
     /**

@@ -610,6 +610,15 @@
           },
           "default": false
         },
+        "max_consecutive_failures": {
+          "type": "integer",
+          "doc": {
+            "de": "Nach so vielen fehlgeschlagenen Items in Folge hört die Schleife auf, die übrigen laufen nicht mehr und der Block scheitert, auch mit `continue_on_error` (Standard 3, 0 = aus).",
+            "en": "After this many failed items in a row the loop stops, the remaining items do not run and the block fails, even with `continue_on_error` (default 3, 0 = off)."
+          },
+          "default": 3,
+          "minimum": 0
+        },
         "container_image": "#wrapper_container_image",
         "mount_docker_socket": "#wrapper_mount_docker_socket",
         "mounts": "#wrapper_mounts"
