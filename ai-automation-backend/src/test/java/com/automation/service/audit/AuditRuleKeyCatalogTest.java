@@ -258,6 +258,71 @@ class AuditRuleKeyCatalogTest {
         assertThat(violations).isEmpty();
     }
 
+    /** 87a1dac0: Kennzahl-Regeln des Performance-Audits haben den FAKT-Namen als festes subject. */
+    @Test
+    void metricRulesOfThePerformanceAuditHaveTheFactNameAsFixedSubject() {
+        String performance = "mysuricates.performance";
+        assertThat(catalog.fixedSubject(performance, "perf.db.size")).isEqualTo("database_bytes");
+        assertThat(catalog.fixedSubject(performance, "perf.frontend.bundle-size")).isEqualTo("frontend_bundle_js_bytes");
+        assertThat(catalog.fixedSubject(performance, "perf.frontend.lazy-chunk-preloaded"))
+                .isEqualTo("frontend_lazy_chunk_preloaded");
+        assertThat(catalog.fixedSubject(performance, "perf.db.unindexed-column")).isEqualTo("unindexed_findby_columns");
+        assertThat(catalog.fixedSubject(performance, "perf.db.repository-loop")).as("Pfadregel").isNull();
+        assertThat(catalog.fixedSubject(performance, "perf.request.slow-route")).as("Route").isNull();
+    }
+
+    /** 87a1dac0: Kennzahl-Regeln des Health-Checks haben den FAKT-Namen als festes subject. */
+    @Test
+    void metricRulesOfTheHealthCheckHaveTheFactNameAsFixedSubject() {
+        String health = "mysuricates.health";
+        assertThat(catalog.fixedSubject(health, "health.tests-failing")).isEqualTo("backend_tests_failures");
+        assertThat(catalog.fixedSubject(health, "health.lint-findings")).isEqualTo("frontend_lint_problems");
+        assertThat(catalog.fixedSubject(health, "health.type-errors")).isEqualTo("frontend_tsc_errors");
+        assertThat(catalog.fixedSubject(health, "health.build-broken")).as("Backend oder Frontend").isNull();
+        assertThat(catalog.fixedSubject(health, "health.doc-drift")).as("Pfad").isNull();
+    }
+
+    /**
+     * Gate (87a1dac0): Ein festes subject ausserhalb des Evidenz-Prompts muss im Prompt seines Audits in einer
+     * Zeile zusammen mit seinem ruleKey stehen — sonst setzte die Ingestion einen Wert durch, den das Modell nie
+     * zu sehen bekommt, und die Tabelle BEKANNTE BEFUNDE zeigte ihm ein subject, das es nicht kennt. Ein fester
+     * Wert muss ausserdem die Normalisierung unveraendert ueberstehen.
+     */
+    @Test
+    void fixedSubjectsOfOtherAuditsStandNextToTheirRuleKeyInThePrompt() throws IOException {
+        List<String> violations = new ArrayList<>();
+        int checked = 0;
+        for (Path file : poolDefinitions()) {
+            for (ShippedDefinitions.Variant variant : ShippedDefinitions.variants(file)) {
+                JsonNode root = variant.root();
+                String auditKey = root.path("metadata").path("audit").path("key").asText("");
+                if (PUBLIC_READINESS.equals(auditKey)) {
+                    continue;
+                }
+                List<String> lines = new ArrayList<>();
+                for (JsonNode block : blocks(root)) {
+                    lines.addAll(block.path("config").path("command").asText("").lines().toList());
+                }
+                for (String ruleKey : catalog.allowedKeys(auditKey)) {
+                    String fixed = catalog.fixedSubject(auditKey, ruleKey);
+                    if (fixed == null) {
+                        continue;
+                    }
+                    checked++;
+                    if (!fixed.equals(AuditSubjectNormalizer.normalize(fixed))) {
+                        violations.add(auditKey + ": fester subject-Wert '" + fixed + "' uebersteht die Normalisierung nicht");
+                    }
+                    if (lines.stream().noneMatch(line -> line.contains(ruleKey) && line.contains(fixed))) {
+                        violations.add(variant.label() + " (" + auditKey + "): keine Prompt-Zeile nennt ruleKey '"
+                                + ruleKey + "' zusammen mit seinem festen subject '" + fixed + "'");
+                    }
+                }
+            }
+        }
+        assertThat(checked).as("keine festen subjects ausserhalb des Evidenz-Prompts gefunden").isPositive();
+        assertThat(violations).isEmpty();
+    }
+
     /**
      * ruleKeys, die ein Prompt seinem Modell woertlich vorgibt. Das Envelope-Beispiel am Ende jedes
      * Prompts zaehlt nicht: dort stehen Schema-Platzhalter ({@code "ruleKey":"stabile-regel-id"},

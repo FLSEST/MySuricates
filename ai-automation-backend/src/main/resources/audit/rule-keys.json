@@ -20,7 +20,11 @@
     "Regeln, die das Repository oder ein Modul als Ganzes betreffen und im Prompt genau EINEN festen",
     "Wert haben (subject \"<wert>\"); die Ingestion setzt ihn durch, egal was das Modell schickt",
     "(TODO 802f740a). Dateibezogene Regeln (subject = Pfad) und Regeln mit mehreren erlaubten Werten",
-    "bleiben Strings. AuditRuleKeyCatalogTest haelt den Wert mit dem Prompt gleich."
+    "bleiben Strings. AuditRuleKeyCatalogTest haelt den Wert mit dem Prompt gleich.",
+    "",
+    "Kennzahl-Regeln (ein Befund je Messwert) haben als festes subject den FAKT-Namen, den ihr Prompt",
+    "unter 'Kennzahl-Befunde' nennt (Performance-Audit, Health-Check; TODO 87a1dac0) — sonst driftete das subject zwischen 'Datenbank',",
+    "'DB-Groesse' und 'database_bytes', und jeder Lauf legte einen neuen Befund an."
   ],
   "mysuricates.test-coverage": [
     "test-coverage.untested-class",
@@ -34,26 +38,26 @@
     "arch.package-cycle"
   ],
   "mysuricates.health": [
-    "health.tests-failing",
+    {"key": "health.tests-failing", "subject": "backend_tests_failures"},
     "health.build-broken",
-    "health.lint-findings",
-    "health.type-errors",
+    {"key": "health.lint-findings", "subject": "frontend_lint_problems"},
+    {"key": "health.type-errors", "subject": "frontend_tsc_errors"},
     "health.log-errors",
     "health.doc-drift",
     "health.provider-unavailable",
     "health.gate-incident"
   ],
   "mysuricates.performance": [
-    "perf.db.size",
+    {"key": "perf.db.size", "subject": "database_bytes"},
     "perf.db.vacuum-missing",
-    "perf.db.unindexed-column",
+    {"key": "perf.db.unindexed-column", "subject": "unindexed_findby_columns"},
     "perf.db.connection-hold",
     "perf.db.repository-loop",
     "perf.log.timeouts",
     "perf.log.warnings",
     "perf.log.errors",
-    "perf.frontend.bundle-size",
-    "perf.frontend.lazy-chunk-preloaded",
+    {"key": "perf.frontend.bundle-size", "subject": "frontend_bundle_js_bytes"},
+    {"key": "perf.frontend.lazy-chunk-preloaded", "subject": "frontend_lazy_chunk_preloaded"},
     "perf.request.slow-route",
     "perf.request.sql-statements",
     "perf.request.connection-wait",

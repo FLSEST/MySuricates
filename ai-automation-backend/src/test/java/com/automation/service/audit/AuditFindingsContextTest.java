@@ -168,7 +168,7 @@ class AuditFindingsContextTest {
         assertThat(block.lines().filter(line -> line.startsWith("OPEN | "))).hasSize(AuditFindingsContext.MAX_FINDINGS);
     }
 
-    /** The cap keeps what a prompt has to carry forward: classified findings only grow, they never become RESOLVED. */
+    /** The cap keeps what a prompt has to carry forward: classified findings accumulate, they only become RESOLVED after three runs without a sighting. */
     @Test
     void findings_overTheCap_keepTheClassifiedOnes_andDropOpenOnesFirst() {
         List<AuditFinding.AuditFindingBuilder> many = new ArrayList<>();

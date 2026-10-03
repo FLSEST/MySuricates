@@ -57,7 +57,8 @@ class AuditIngestionServiceTest {
                 new AuditResultParser(new ObjectMapper()), ruleKeyCatalog, activityLog,
                 new AuditSnapshotApplier(findingRepository, occurrenceRepository, new AuditAcceptancePolicy(),
                         ruleKeyCatalog, activityLog,
-                        new ManagedTodoWriter(findingRepository, findingTodoRepository, todoRepository, eventPublisher)));
+                        new ManagedTodoWriter(findingRepository, findingTodoRepository, todoRepository, eventPublisher),
+                        new AuditDispositionLifecycle(ruleKeyCatalog, reportRepository)));
         when(reportRepository.save(any())).thenAnswer(inv -> {
             AuditReport report = inv.getArgument(0);
             if (report.getId() == null) report.setId("rep-" + UUID.randomUUID());
@@ -365,6 +366,38 @@ class AuditIngestionServiceTest {
         assertThat(finding.getStatus()).isEqualTo(AuditFindingStatus.ACCEPTED_RISK);
         assertThat(finding.getDispositionNote()).isEqualTo("Bewusst gross");
         verify(todoRepository).save(any());
+    }
+
+    /**
+     * 276ac76f: Health-Befunde aus dem alten Regel-Schema (complexity.god-class-count) standen nach jedem gueltigen
+     * Lauf weiter als akzeptiert in den Zaehlern. Der naechste gueltige, vollstaendige Snapshot schliesst sie.
+     */
+    @Test
+    void acceptedFindingWithARuleKeyNoLongerInTheCatalog_isResolvedByTheNextValidSnapshot() {
+        String health = "mysuricates.health";
+        AuditFinding legacy = AuditFinding.builder()
+                .id("f-legacy").projectId(PROJECT).auditKey(health).fingerprint("fp-legacy")
+                .ruleKey("complexity.god-class-count").subject("god_class_count").severity(AuditSeverity.MEDIUM)
+                .title("Zu viele grosse Klassen").status(AuditFindingStatus.ACCEPTED_RISK)
+                .dispositionNote("Bekannt, Abbau laeuft").dispositionAt(ACCEPTED_AT).resolvedAt(ACCEPTED_AT)
+                .firstSeenAt(ACCEPTED_AT).lastSeenAt(ACCEPTED_AT).occurrenceCount(3).build();
+        when(findingRepository.findByProjectIdAndAuditKey(PROJECT, health)).thenReturn(List.of(legacy));
+        String envelope = "<!-- mysuricates:audit-result:v1 {\"snapshotComplete\":true,\"findings\":[{\"ruleKey\":"
+                + "\"health.lint-findings\",\"subject\":\"frontend_lint_errors\",\"severity\":\"LOW\","
+                + "\"title\":\"ESLint meldet 2 Fehler\"}]} -->\n# Report";
+        StepResult step = StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).output(envelope)
+                .metadata(new HashMap<>(Map.of("blockName", "report"))).build();
+        Instant now = ACCEPTED_AT.plus(Duration.ofDays(20));
+        when(runRepository.findByIdWithSteps("run-1")).thenReturn(Optional.of(WorkflowRun.builder().id("run-1")
+                .workflow(Workflow.builder().name("Health").build()).status(RunStatus.COMPLETED).completedAt(now)
+                .steps(new ArrayList<>(List.of(step))).build()));
+
+        service.ingest(event("run-1", health));
+
+        assertThat(legacy.getStatus()).isEqualTo(AuditFindingStatus.RESOLVED);
+        assertThat(legacy.getResolvedAt()).isEqualTo(now);
+        assertThat(legacy.getDispositionNote()).isEqualTo("Bekannt, Abbau laeuft\nRegel nicht mehr im Katalog");
+        assertThat(savedFindings()).contains(legacy);
     }
 
     /** Run mit Faktenblatt-Block: Beleg-Pruefung greift (TODO a94b56a0). */

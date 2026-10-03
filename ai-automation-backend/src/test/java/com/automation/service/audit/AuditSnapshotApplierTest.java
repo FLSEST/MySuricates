@@ -9,6 +9,7 @@ import com.automation.entity.RunStatus;
 import com.automation.event.WorkflowRunCompletedEvent;
 import com.automation.repository.AuditFindingOccurrenceRepository;
 import com.automation.repository.AuditFindingRepository;
+import com.automation.repository.AuditReportRepository;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.audit.AuditResultParser.ParsedFinding;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -48,13 +49,16 @@ class AuditSnapshotApplierTest {
     @Mock private AuditFindingOccurrenceRepository occurrenceRepository;
     @Mock private ActivityLogService activityLog;
     @Mock private ManagedTodoWriter managedTodoWriter;
+    @Mock private AuditReportRepository reportRepository;
+
+    private final AuditRuleKeyCatalog catalog = new AuditRuleKeyCatalog(new ObjectMapper());
 
     private AuditSnapshotApplier applier;
 
     @BeforeEach
     void setUp() {
         applier = new AuditSnapshotApplier(findingRepository, occurrenceRepository, new AuditAcceptancePolicy(),
-                new AuditRuleKeyCatalog(new ObjectMapper()), activityLog, managedTodoWriter);
+                catalog, activityLog, managedTodoWriter, new AuditDispositionLifecycle(catalog, reportRepository));
         lenient().when(findingRepository.saveAll(any())).thenAnswer(inv -> {
             List<AuditFinding> saved = new ArrayList<>();
             int next = 0;
@@ -284,5 +288,15 @@ class AuditSnapshotApplierTest {
         assertThat(savedFindings()).singleElement().extracting(AuditFinding::getSubject).isEqualTo("repository");
         verify(activityLog).warn(any(), org.mockito.ArgumentMatchers.contains("ai-automation-frontend"), any(),
                 any(), any());
+    }
+
+    /** 87a1dac0: ActivityLog gibt es als Java-Klasse und als Frontend-Seite — zwei Befunde, keine Kollision. */
+    @Test
+    void apply_backendClassAndFrontendModuleOfTheSameName_areTwoFindings() {
+        apply(low("rule.a", "com/automation/entity/ActivityLog.java"), low("rule.a", "frontend/src/pages/ActivityLog.tsx"));
+
+        assertThat(savedFindings()).extracting(AuditFinding::getSubject)
+                .containsExactly("com/automation/entity/ActivityLog.java", "frontend/src/pages/ActivityLog.tsx");
+        verify(activityLog, never()).warn(any(), any(), any(), any(), any());
     }
 }

@@ -13,6 +13,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -132,5 +133,21 @@ class AuditReportRepositoryTest {
 
         assertThat(reportRepository.findByProjectIdOrderByGeneratedAtDesc(projectId))
                 .extracting(AuditReport::getId).containsExactly(b.getId(), a.getId());
+    }
+
+    /** Die Zeitpunkte gueltiger Vorlaeufe — Grundlage der Drei-Laeufe-Regel fuer eingeordnete Befunde (b2e3da6a). */
+    @Test
+    void findValidGeneratedAtBefore_listsOnlyValidEarlierReportsOfTheScope_newestFirst() {
+        Instant now = Instant.parse("2026-10-03T10:00:00Z");
+        save(projectId, AUDIT_KEY, now, AuditIngestionStatus.VALID);                              // der aktuelle selbst
+        save(projectId, AUDIT_KEY, now.minus(Duration.ofDays(1)), AuditIngestionStatus.VALID);
+        save(projectId, AUDIT_KEY, now.minus(Duration.ofDays(2)), AuditIngestionStatus.INVALID);  // zaehlt nicht als Lauf
+        save(projectId, AUDIT_KEY, now.minus(Duration.ofDays(3)), AuditIngestionStatus.VALID);
+        save(projectId, AUDIT_KEY, now.minus(Duration.ofDays(4)), AuditIngestionStatus.VALID);
+        save(projectId, "test.other-key", now.minus(Duration.ofHours(1)), AuditIngestionStatus.VALID);
+        save("p-other-" + UUID.randomUUID(), AUDIT_KEY, now.minus(Duration.ofHours(2)), AuditIngestionStatus.VALID);
+
+        assertThat(reportRepository.findValidGeneratedAtBefore(projectId, AUDIT_KEY, now, PageRequest.of(0, 2)))
+                .containsExactly(now.minus(Duration.ofDays(1)), now.minus(Duration.ofDays(3)));
     }
 }

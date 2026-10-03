@@ -51,8 +51,13 @@ public class AuditFingerprintMigrationJob {
      * Finding, das schon mit {@code ¦} gespeichert ist, bekommt seinen neuen Fingerprint.
      * v5: Regeln mit festem subject im Katalog ({@link AuditRuleKeyCatalog#fixedSubject}, TODO 802f740a) —
      * Befunde mit abweichendem subject gehen samt Einordnung auf den kanonischen Befund ueber.
+     * v6: Klassenname und Java-Pfad sind dieselbe Identitaet, Frontend-Module tragen einheitlich
+     * {@code frontend/src/…} ({@link AuditSubjectNormalizer}), Kennzahl-Regeln von Performance-Audit und
+     * Health-Check haben den FAKT-Namen als festes subject (TODO 87a1dac0) — Befunde, die bisher
+     * unter {@code AssistantService} und {@code com/automation/service/AssistantService.java} getrennt standen,
+     * gehen samt Einordnung zusammen.
      */
-    static final int VERSION = 5;
+    static final int VERSION = 6;
 
     private static final Comparator<AuditFinding> OLDEST_FIRST = Comparator
             .comparing(AuditFinding::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder()))

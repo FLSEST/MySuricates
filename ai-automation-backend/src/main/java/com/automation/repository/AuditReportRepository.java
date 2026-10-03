@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -20,6 +21,16 @@ public interface AuditReportRepository extends JpaRepository<AuditReport, String
     Page<AuditReport> findByProjectIdAndAuditKeyAndIngestionStatusOrderByGeneratedAtDesc(
             String projectId, String auditKey, AuditIngestionStatus ingestionStatus, Pageable pageable);
     List<AuditReport> findByProjectIdOrderByGeneratedAtDesc(String projectId);
+
+    /**
+     * Zeitpunkte der gueltigen Reports eines Audits vor {@code before}, neueste zuerst — nur die Spalte, kein
+     * Markdown. Grundlage der Regel „eingeordnet, aber N Laeufe nicht mehr gesehen“ (TODO b2e3da6a).
+     */
+    @Query("SELECT r.generatedAt FROM AuditReport r WHERE r.projectId = :projectId AND r.auditKey = :auditKey "
+            + "AND r.ingestionStatus = com.automation.entity.AuditIngestionStatus.VALID AND r.generatedAt < :before "
+            + "ORDER BY r.generatedAt DESC")
+    List<Instant> findValidGeneratedAtBefore(@Param("projectId") String projectId, @Param("auditKey") String auditKey,
+                                             @Param("before") Instant before, Pageable pageable);
 
     String SUMMARY_ROW = "SELECT new com.automation.dto.projection.AuditReportSummaryRow(r.id, r.projectId, "
             + "r.workflowId, r.workflowRunId, r.auditKey, r.category, r.title, r.gateStatus, r.gateDescription, "
