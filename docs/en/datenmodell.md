@@ -1299,7 +1299,7 @@ in backticks, parentheses behind it give the default or values, free text follow
 | `switch` | `expression`, `cases` (list with `value`, `blocks`), `default` |
 | `agentic` | `goal`, `success_criteria`, `max_iterations` (10), `iteration_timeout_seconds` (300), `total_timeout_seconds` (1800), `max_total_tokens` (200000), `max_repeated_actions` (3), `require_approval` (false) |
 | `approval` | `question`, `options`, `reject_options`, `on_no`, `variable_name`, `timeout_minutes` (30), `mode`, `auto_answer` |
-| `sub-workflow` | `workflow_id` |
+| `sub-workflow` | `workflow_id` (deprecated, still read: `workflowId` — the analyzer reports it as `legacy-config-key`) |
 | `skill-capability` | `capability`, `input`, `params`, `allow_writes`; the capability's skill goes in `skillIds` on the block |
 | `human-input` | `prompt`, `input_type` (text/textarea/number/select/checkbox/date), `variable_name`, `options`, `default_value`, `required`, `timeout_minutes` (30), `use_default_on_timeout`, `fields` |
 | `document` | `file_path`, `variable_name`, `fail_on_empty`, `min_characters` |

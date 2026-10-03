@@ -934,8 +934,8 @@
         "workflowId": {
           "type": "string",
           "doc": {
-            "de": "Alte Schreibweise von `workflow_id`, wird weiter gelesen.",
-            "en": "Old spelling of `workflow_id`, still read."
+            "de": "Alte Schreibweise von `workflow_id`: wird noch gelesen, fällt später weg. Stattdessen `workflow_id` verwenden.",
+            "en": "Old spelling of `workflow_id`: still read, will be dropped later. Use `workflow_id` instead."
           },
           "legacyFor": "workflow_id"
         }

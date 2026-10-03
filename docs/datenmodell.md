@@ -1300,7 +1300,7 @@ folgt freier Text.
 | `switch` | `expression`, `cases` (Liste mit `value`, `blocks`), `default` |
 | `agentic` | `goal`, `success_criteria`, `max_iterations` (10), `iteration_timeout_seconds` (300), `total_timeout_seconds` (1800), `max_total_tokens` (200000), `max_repeated_actions` (3), `require_approval` (false) |
 | `approval` | `question`, `options`, `reject_options`, `on_no`, `variable_name`, `timeout_minutes` (30), `mode`, `auto_answer` |
-| `sub-workflow` | `workflow_id` |
+| `sub-workflow` | `workflow_id` (veraltet und noch gelesen: `workflowId` — der Analyzer meldet ihn als `legacy-config-key`) |
 | `skill-capability` | `capability`, `input`, `params`, `allow_writes`; der Skill der Capability steht in `skillIds` am Block |
 | `human-input` | `prompt`, `input_type` (text/textarea/number/select/checkbox/date), `variable_name`, `options`, `default_value`, `required`, `timeout_minutes` (30), `use_default_on_timeout`, `fields` |
 | `document` | `file_path`, `variable_name`, `fail_on_empty`, `min_characters` |

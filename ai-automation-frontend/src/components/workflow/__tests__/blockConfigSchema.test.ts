@@ -142,6 +142,8 @@ describe('blockConfigSchema', () => {
     }
     const workflowId = (buildBlockConfigSchema('sub-workflow', 'en').properties as Record<string, Record<string, unknown>>).workflowId!;
     expect(workflowId.doNotSuggest).toBe(true);
+    // Phased out (TODO 5ee07e94): the editor strikes it through and names the replacement
+    expect(workflowId.deprecationMessage).toContain('`workflow_id`');
     expect(requiredConfigKeys('sub-workflow')).toEqual(['workflow_id']);
   });
 

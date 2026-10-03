@@ -43,6 +43,8 @@ import java.util.Map;
  *   <li>{@code unknown-config-key} — Config-Schlüssel, den kein Executor liest (auch in verschachtelten Blöcken)</li>
  *   <li>{@code missing-required-config-key} — Pflichtschlüssel des Blocktyps fehlt (bei „genau einer von“ auch: mehrere gesetzt)</li>
  *   <li>{@code invalid-config-value} — Wert außerhalb der festen Werte, etwa {@code on_failure: "fail"}</li>
+ *   <li>{@code legacy-config-key} — alter Schlüsselname, der noch wirkt, aber ausläuft ({@code workflowId} am
+ *       sub-workflow) — LOW</li>
  *   <li>{@code dead-nested-blocks} — {@code config.blocks}: kein Executor führt eine blocks-Liste aus, die
  *       Blöcke darin laufen nie — HIGH ({@link BlockShapeRules})</li>
  *   <li>{@code unknown-block-field} — Feld neben {@code type}/{@code name}/{@code config}/

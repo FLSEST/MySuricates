@@ -23,6 +23,9 @@ import java.util.Set;
  *   <li>{@code invalid-config-value} ({@code HIGH} bei {@code on_failure}, sonst {@code MEDIUM}) — Wert
  *       außerhalb der festen Werte des Schlüssels. Werte mit {@code {{} (Platzhalter) werden erst zur
  *       Laufzeit bekannt und bleiben ungeprüft; Legacy-Werte gelten als gültig.</li>
+ *   <li>{@code legacy-config-key} ({@code LOW}) — alter Name eines Schlüssels ({@code legacyFor} im Schema,
+ *       etwa {@code workflowId} am sub-workflow): wirkt noch, läuft aber aus (TODO 5ee07e94). Die Meldung
+ *       nennt den neuen Namen; ist der auch gesetzt, gilt nur er.</li>
  * </ul>
  *
  * <p>Blocktypen ohne Schema bleiben ungeprüft. {@code items_source} eines foreach mit
@@ -82,6 +85,8 @@ final class ConfigKeyRules {
                                 + "-Block liest ihn nicht, die Einstellung wirkt nicht" + hint(key, suggestable(fields), false),
                         where.prefixEn() + "unknown config key " + key + " — the " + type
                                 + " block does not read it, the setting has no effect" + hint(key, suggestable(fields), true)));
+            } else if (field.legacyFor() != null) {
+                out.add(legacyKey(field, cfg, where));
             } else if (!onlyWithMet(field, cfg)) {
                 out.add(AnalyzerFinding.of("unknown-config-key", Severity.MEDIUM, where.index(), where.name(),
                         where.prefix() + key + " wirkt nur mit " + condition(field) + " — so liest der " + type
@@ -155,6 +160,21 @@ final class ConfigKeyRules {
     private static boolean skipValueCheck(String type, String key, Map<String, Object> cfg) {
         return "foreach".equals(type) && "items_source".equals(key)
                 && cfg.get("items_command") instanceof String command && !command.isBlank();
+    }
+
+    /** Alter Schlüsselname: wirkt noch, läuft aus — mit dem Namen, der ihn ersetzt. */
+    private static AnalyzerFinding legacyKey(BlockConfigSchema.Field field, Map<String, Object> cfg, Where where) {
+        String current = field.legacyFor();
+        boolean both = cfg.get(current) != null;
+        return AnalyzerFinding.of("legacy-config-key", Severity.LOW, where.index(), where.name(),
+                where.prefix() + field.key() + " ist die alte Schreibweise von " + current + " — sie wird noch gelesen, "
+                        + "fällt aber später weg" + (both
+                        ? "; " + current + " ist auch gesetzt und gilt, " + field.key() + " entfernen"
+                        : "; den Schlüssel in " + current + " umbenennen"),
+                where.prefixEn() + field.key() + " is the old spelling of " + current + " — still read, but it will "
+                        + "be dropped later" + (both
+                        ? "; " + current + " is set as well and wins, remove " + field.key()
+                        : "; rename the key to " + current));
     }
 
     /** Ob ein alter Name des Pflichtschlüssels gesetzt ist, den der Executor weiter liest ({@code workflowId}). */
