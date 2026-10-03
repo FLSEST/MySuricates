@@ -245,6 +245,15 @@ public class ScheduledWorkflowExecutor {
                 scheduled.setEnabled(false);
                 log.info("Schedule {} disabled — end condition met (maxRuns={}, runCount={}, endDate={})",
                         scheduleId, scheduled.getMaxRuns(), scheduled.getRunCount(), scheduled.getEndDate());
+            } else if (next == null) {
+                // A valid expression without a future occurrence (30 February): ended like at the end
+                // date and reported once, instead of enabled with no next run (TODO 1e801952).
+                scheduled.setEnabled(false);
+                scheduled.setNextRunAt(null);
+                log.info("Schedule {} disabled — cron expression '{}' has no further occurrence", scheduleId, cronExpression);
+                activityLogService.log(LogLevel.INFO, LogCategory.SCHEDULE,
+                        "Schedule ended (no further occurrence): " + scheduled.getTargetName(),
+                        "ScheduledWorkflowExecutor", scheduleId, Map.of("reason", "no-next-run"));
             } else {
                 scheduled.setNextRunAt(next);
                 log.info("Schedule {} {}, next run at: {}",

@@ -37,12 +37,37 @@ final class ScheduleEndConditions {
     }
 
     /**
-     * Refuses (400) an enabled CRON schedule that has no run left: its runs are used up, or its
-     * next run lies at or after its end date. A disabled schedule has no next run and passes —
-     * enabling it checks again.
+     * Refuses (400) an enabled CRON schedule whose next run was just computed and came out empty: a
+     * valid expression without a future occurrence (30 February). Checked only where the next run is
+     * computed — create, enable, a new expression — so an edit of other fields stays possible.
      */
-    static void requireRunLeft(ScheduledWorkflow scheduled) {
-        if (!scheduled.isEnabled() || scheduled.getScheduleType() != ScheduleType.CRON) {
+    static void requireNextRun(ScheduledWorkflow scheduled) {
+        if (scheduled.isEnabled() && scheduled.getScheduleType() == ScheduleType.CRON
+                && scheduled.getNextRunAt() == null) {
+            throw new LocalizedArgumentException(ErrorMessage.SCHEDULE_NO_NEXT_RUN,
+                    Map.of("expression", String.valueOf(scheduled.getCronExpression())));
+        }
+    }
+
+    /**
+     * Refuses (400) an enabled schedule that has no run left: a CRON schedule whose runs are used up
+     * or whose next run lies at or after its end date; a
+     * ONCE schedule whose time lies before {@code now} — enabled, it would start at once. A disabled
+     * schedule has no next run and passes — enabling it checks again. DELAYED is not checked: its
+     * time is computed from now.
+     */
+    static void requireRunLeft(ScheduledWorkflow scheduled, Instant now) {
+        if (!scheduled.isEnabled()) {
+            return;
+        }
+        if (scheduled.getScheduleType() == ScheduleType.ONCE) {
+            if (scheduled.getNextRunAt() != null && scheduled.getNextRunAt().isBefore(now)) {
+                throw new LocalizedArgumentException(ErrorMessage.SCHEDULE_ONCE_IN_PAST,
+                        Map.of("scheduledAt", scheduled.getNextRunAt().toString()));
+            }
+            return;
+        }
+        if (scheduled.getScheduleType() != ScheduleType.CRON) {
             return;
         }
         if (maxRunsReached(scheduled)) {

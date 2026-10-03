@@ -21,6 +21,7 @@ import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +43,7 @@ public class SchedulerService {
     private final WorkflowChainRepository workflowChainRepository;
     private final WorkflowRunRepository workflowRunRepository;
     private final ChainRunRepository chainRunRepository;
+    private final Clock clock;
     private final ScheduleDefinitionParser definitionParser;
 
     /**
@@ -160,7 +162,8 @@ public class SchedulerService {
 
         ScheduledWorkflow schedule = builder.build();
         if (enabled) {
-            ScheduleEndConditions.requireRunLeft(schedule);
+            ScheduleEndConditions.requireNextRun(schedule);
+            ScheduleEndConditions.requireRunLeft(schedule, Instant.now(clock));
         } else {
             schedule.setEnabled(false);
             schedule.setNextRunAt(null);
@@ -194,6 +197,7 @@ public class SchedulerService {
             scheduled.setCronExpression(request.cronExpression());
             if (scheduled.isEnabled()) {
                 scheduled.setNextRunAt(definitionParser.calculateNextRun(request.cronExpression()));
+                ScheduleEndConditions.requireNextRun(scheduled);
             }
         }
 
@@ -213,7 +217,10 @@ public class SchedulerService {
             }
         }
 
-        ScheduleEndConditions.requireRunLeft(scheduled);
+        // A one-off is checked only when its time is changed — one overdue by seconds stays editable.
+        if (scheduled.getScheduleType() != ScheduleType.ONCE || request.scheduledAt() != null) {
+            ScheduleEndConditions.requireRunLeft(scheduled, Instant.now(clock));
+        }
         log.info("Updated schedule: {}", id);
         return scheduledRepository.save(scheduled);
     }
@@ -231,7 +238,8 @@ public class SchedulerService {
             scheduled.setNextRunAt(definitionParser.calculateNextRun(scheduled.getCronExpression()));
         }
 
-        ScheduleEndConditions.requireRunLeft(scheduled);
+        ScheduleEndConditions.requireNextRun(scheduled);
+        ScheduleEndConditions.requireRunLeft(scheduled, Instant.now(clock));
         return scheduledRepository.save(scheduled);
     }
 

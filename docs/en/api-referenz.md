@@ -1441,7 +1441,9 @@ value → `400`, and the message names the allowed values.
   `endDate`, create, update and enable refuse it (`messageKey` `SCHEDULE_NEXT_RUN_AFTER_END_DATE`), as they
   do `maxRuns` ≤ `runCount` (`SCHEDULE_MAX_RUNS_REACHED`) — before, it looked active and ended silently when
   it fell due, or started once more after `maxRuns` was lowered. A disabled schedule has no next run and
-  stays editable; enabling it checks.
+  stays editable; enabling it checks. Also `400`: a cron expression without a future occurrence
+  (`SCHEDULE_NO_NEXT_RUN`) and a `ONCE` time in the past (`SCHEDULE_ONCE_IN_PAST`, on create, enable and
+  when the time is moved).
 - **`catchUpOnResume`:** catches up occurrences of this schedule that fell into a standby or a restart,
   even when the global setting `scheduler-catch-up-on-resume` is off. That setting is on by default — then
   every schedule is caught up anyway, one after another through the catch-up queue.

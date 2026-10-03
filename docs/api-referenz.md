@@ -1448,7 +1448,8 @@ angenommen; ein anderer Wert → `400`, die Meldung nennt die erlaubten Werte.
   `SCHEDULE_NEXT_RUN_AFTER_END_DATE`), ebenso `maxRuns` ≤ `runCount` (`SCHEDULE_MAX_RUNS_REACHED`) —
   vorher wirkte er aktiv und endete erst beim Fälligwerden still bzw. startete nach gesenktem `maxRuns`
   noch einmal. Ein ausgeschalteter Zeitplan hat keinen Termin und bleibt änderbar; geprüft wird beim
-  Einschalten.
+  Einschalten. Ebenso `400`: ein Cron-Ausdruck ohne künftigen Termin (`SCHEDULE_NO_NEXT_RUN`) und ein
+  `ONCE`-Zeitpunkt in der Vergangenheit (`SCHEDULE_ONCE_IN_PAST`, beim Anlegen, Einschalten und Verlegen).
 - **`catchUpOnResume`:** holt Termine dieses Zeitplans nach, die in Standby oder einen Neustart fielen,
   auch wenn die globale Einstellung `scheduler-catch-up-on-resume` aus ist. Die ist standardmäßig an —
   dann wird ohnehin jeder Zeitplan nachgeholt, nacheinander über die Catch-up-Warteschlange.

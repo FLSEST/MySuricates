@@ -784,4 +784,28 @@ class ScheduledWorkflowExecutorTest {
         assertThat(meta.getValue()).containsEntry("reason", "invalid-cron").containsEntry("cronExpression", "not a cron");
         verifyNoMoreInteractions(activityLogService);
     }
+
+    // --- A cron expression without a future occurrence ends the schedule (TODO 1e801952) ---
+
+    /** Valid, but 30 February never comes. Before: enabled with nextRunAt null — active-looking, never running. */
+    @Test
+    void cronWithoutAFutureOccurrence_endsTheScheduleAfterItsRun_andReportsItOnce() {
+        ScheduledWorkflow scheduled = ScheduledWorkflow.builder()
+                .id("sched-never").workflow(testWorkflow).cronExpression("0 0 0 30 2 *")
+                .scheduleType(ScheduleType.CRON).enabled(true)
+                .nextRunAt(Instant.now().minusSeconds(60)).inputContext(Map.of()).build();
+        stubScheduleLookups(scheduled);
+        targetBusy(false);
+
+        executor.executeSingleSchedule("sched-never");
+        executor.executeSingleSchedule("sched-never");
+
+        verify(workflowExecutor, times(1)).execute(eq(testWorkflow), eq(Map.of()), eq("sched-never"), isNull(),
+                eq(TriggerSource.SCHEDULE));
+        assertThat(scheduled.isEnabled()).isFalse();
+        assertThat(scheduled.getNextRunAt()).isNull();
+        verify(activityLogService, times(1)).log(eq(LogLevel.INFO), eq(LogCategory.SCHEDULE),
+                eq("Schedule ended (no further occurrence): Test Workflow"), eq("ScheduledWorkflowExecutor"),
+                eq("sched-never"), any());
+    }
 }
