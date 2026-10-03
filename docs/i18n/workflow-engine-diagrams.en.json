@@ -143,8 +143,6 @@
   "der Exit-Code nicht 0 ist": "the exit code is not 0",
   "`execution_mode`=ai/shell, `max_retries`, `delay`, `exponential_backoff`, `timeout_seconds`": "`execution_mode`=ai/shell, `max_retries`, `delay`, `exponential_backoff`, `timeout_seconds`",
   "alle Versuche scheitern": "all attempts fail",
-  "`execution_mode`=ai/shell, `items_source`=list/command, `continue_on_error`, `timeout_seconds`": "`execution_mode`=ai/shell, `items_source`=list/command, `continue_on_error`, `timeout_seconds`",
-  "ein Item scheitert (außer mit `continue_on_error`)": "an item fails (unless `continue_on_error`)",
   "`execution_mode`=ai/shell, `condition_command`, `max_iterations`, `timeout_seconds`": "`execution_mode`=ai/shell, `condition_command`, `max_iterations`, `timeout_seconds`",
   "eine Iteration scheitert": "an iteration fails",
   "`execution_mode`=ai/shell, `then_command`, `else_command`, `timeout_seconds`": "`execution_mode`=ai/shell, `then_command`, `else_command`, `timeout_seconds`",
@@ -171,5 +169,7 @@
   "`automation.security.rate-limit.*`: standardmäßig an, 120 Anfragen pro Minute": "`automation.security.rate-limit.*`: on by default, 120 requests per minute",
   "CORS: `automation.cors.allowed-origins`": "CORS: `automation.cors.allowed-origins`",
   "Dateistruktur": "File Structure",
-  "Kernklassen": "Core Classes"
+  "Kernklassen": "Core Classes",
+  "`execution_mode`=ai/shell, `items_source`=list/command, `continue_on_error`, `max_consecutive_failures`, `timeout_seconds`": "`execution_mode`=ai/shell, `items_source`=list/command, `continue_on_error`, `max_consecutive_failures`, `timeout_seconds`",
+  "ein Item scheitert (außer mit `continue_on_error`); `max_consecutive_failures` Items in Folge scheitern (Standard 3, auch mit `continue_on_error`)": "an item fails (unless `continue_on_error`); `max_consecutive_failures` items fail in a row (default 3, also with `continue_on_error`)"
 }

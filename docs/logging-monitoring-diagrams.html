@@ -184,8 +184,10 @@ flowchart LR
     PLG["Plugins / Agents"] --&gt;|"POST /api/v1/activity-log"| ALS
     ALS --&gt; DB["activity_log (SQLite)"]
     ALS --&gt; TOP["STOMP /topic/activity-log"]
-    UI["Activity-Seite (fragt alle 10 s ab)"] --&gt;|"GET /api/v1/activity-log"| ALS
+    TOP --&gt;|"neuer Eintrag"| UI["Activity-Seite"]
+    UI --&gt;|"GET /api/v1/activity-log"| ALS
   </pre>
+  <p>Die Activity-Seiten (Pro und Simple Mode) abonnieren <code>/topic/activity-log</code> und laden die Liste nach, sobald ein Eintrag kommt — höchstens einmal je Sekunde, weil ein Lauf Einträge in Schüben schreibt. Steht die Verbindung nicht (älteres Backend, Netz, kein Ticket), fragen sie wie früher alle 10 s ab.</p>
   <table>
     <thead><tr><th>Kategorie</th><th>Beispiele</th></tr></thead>
     <tbody>
