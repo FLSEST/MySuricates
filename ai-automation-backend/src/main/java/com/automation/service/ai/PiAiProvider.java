@@ -26,7 +26,7 @@ public class PiAiProvider implements AiProvider {
      * Die pi-Version, die der Installer ({@code --with-pi}) und das Tryout-Image installieren (c3a4cbf6).
      * Gepinnt, weil eine neue pi-Version die Aufrufe dieser Klasse ({@code --thinking},
      * {@code <backend>/<model>}) brechen kann, ohne dass es auffaellt. Update-Weg: docs/entwicklung.md →
-     * „pi-Version“; {@code ProviderCatalogTest} haelt {@code ARG PI_VERSION} in deploy/Dockerfile gleich.
+     * „Versionen der KI-CLIs“; {@code ProviderCatalogTest} haelt {@code ARG PI_VERSION} in deploy/Dockerfile gleich.
      */
     public static final String PINNED_VERSION = "0.74.2";
 

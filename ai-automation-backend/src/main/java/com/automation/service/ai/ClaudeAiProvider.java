@@ -16,6 +16,15 @@ import java.util.List;
 @Slf4j
 public class ClaudeAiProvider implements AiProvider {
 
+    /**
+     * Die Claude-CLI-Version, die der Katalog des Installers nennt und das Tryout-Image installiert
+     * (38f30352, wie {@link PiAiProvider#PINNED_VERSION}): eine neue Version kann Flags oder das
+     * Ausgabeformat aendern, die {@link HostClaudeService} nutzt, ohne dass es auffaellt. Update-Weg:
+     * docs/entwicklung.md → „Versionen der KI-CLIs“; {@code ProviderCatalogTest} haelt
+     * {@code ARG CLAUDE_VERSION} in deploy/Dockerfile gleich.
+     */
+    public static final String PINNED_VERSION = "2.1.288";
+
     private final HostClaudeService hostClaudeService;
 
     @Override
@@ -32,7 +41,8 @@ public class ClaudeAiProvider implements AiProvider {
     public ProviderSetup setup() {
         // macOS legt die Anmeldung im Schluesselbund ab; dann bleibt .claude.json mit oauthAccount
         return new ProviderSetup("claude",
-                "curl -fsSL https://claude.ai/install.sh | bash   (or: npm install -g @anthropic-ai/claude-code)",
+                "curl -fsSL https://claude.ai/install.sh | bash -s " + PINNED_VERSION
+                        + "   (or: npm install -g @anthropic-ai/claude-code@" + PINNED_VERSION + ")",
                 "claude auth login",
                 java.util.List.of(".claude/.credentials.json", ".claude.json:oauthAccount"),
                 // claude setup-token bzw. API-Schluessel statt Anmeldedatei

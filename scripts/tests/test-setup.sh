@@ -133,7 +133,9 @@ printf 'export PATH="%s/node/bin:$PATH"\n' "$DD" > "$DD/env.sh"
 rm -rf "$INST"
 check "--yes: profile untouched, the line is shown"    '[ "$(run --yes --dry-run --runtime host)" = 0 ] && out | grep -F "only with this line in ~/.profile: . $DD/env.sh" >/dev/null && [ ! -e "$TMP/home/.profile" ]'
 printf '#!/bin/sh\n%s\n' "$NPM_STUB" > "$DD/node/bin/npm"; chmod +x "$DD/node/bin/npm"; unstub codex; rm -rf "$INST"
-check "no CLI yet: full npm commands with env.sh first" '[ "$(run --yes --dry-run --runtime host)" = 0 ] && out | grep -F "install: . $DD/env.sh && npm install -g @openai/codex   log in: . $DD/env.sh && codex login" >/dev/null'
+CODEX_NPM="$(. "$HERE/../lib/provider-catalog.generated.sh"; printf '%s' "$PROVIDER__codex__install")"   # gepinnt (38f30352)
+check "codex comes in a pinned version"                 'printf "%s" "$CODEX_NPM" | grep -E "^npm install -g @openai/codex@[0-9]+\.[0-9]+\.[0-9]+$" >/dev/null'
+check "no CLI yet: full npm commands with env.sh first" '[ "$(run --yes --dry-run --runtime host)" = 0 ] && out | grep -F "install: . $DD/env.sh && $CODEX_NPM   log in: . $DD/env.sh && codex login" >/dev/null'
 check "the commands are not cut off by the box"         '! out | grep -E "install: .*…" >/dev/null'
 stub codex 'exit 0'
 pty_profile() {  # TASTEN → Mitschnitt in $TMP/menu; ohne --dry-run, gebaut wird nicht (n)
