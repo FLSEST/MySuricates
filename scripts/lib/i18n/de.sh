@@ -189,7 +189,8 @@ M_help="MySuricates-Einrichtung — von der nackten Maschine bis zum Login in ei
   --ai-providers LISTE         Container: nur diese Anbieter, z. B. claude,codex (Default: alle)
   --name NAME                  Name der Instanz (Default main)
   --lang de                    Deutsch (Default Englisch)
-  --reconfigure                vorhandene Instanz-Datei neu schreiben (sonst bleibt sie, ihre Werte gelten)
+  --reconfigure                vorhandene Instanz-Datei neu schreiben: ihre Werte bleiben, gegebene Flags
+                               ändern sie (ohne bleibt die Datei, wie sie ist)
   --preset core --force        in einer vorhandenen Einrichtung nur das Preset ändern
   --dry-run                    nichts installieren, bauen oder starten — nur zeigen und Dateien schreiben
   --show-key                   API-Key am Ende vollständig zeigen (Default: maskiert)

@@ -261,19 +261,34 @@ else
 fi
 
 echo "7) an existing setup is kept unless asked"
-printf 'MYSURICATES_RUNTIME=host\nMYSURICATES_PORT=9777\nMYSURICATES_PRESET=full\n' > "$INST/main.env"
-check "kept without --reconfigure"                      '[ "$(run --yes --dry-run --runtime host)" = 0 ] && [ "$(val main MYSURICATES_PORT)" = 9777 ]'
-check "--preset core --force changes only the preset"   '[ "$(run --yes --dry-run --runtime host --preset core --force)" = 0 ] && [ "$(val main MYSURICATES_PRESET)" = core ] && [ "$(val main MYSURICATES_PORT)" = 9777 ]'
-check "--reconfigure rewrites it"                       '[ "$(run --yes --dry-run --runtime host --reconfigure)" = 0 ] && [ "$(val main MYSURICATES_PORT)" = "$(firstfree 9090)" ]'
-
-echo "7b) a kept file: the steps show its values, not ones that never reach it (fd4eb89f)"
-# Frueher meldete der Ports-Schritt „nehme 9091“ (die eigene laufende Instanz belegt 9090) und der
-# KI-Schritt einen neuen Standard-Anbieter — beides landete nie in der behaltenen Datei.
 step() {  # LABEL — was hinter „✓ LABEL“ steht; tui_done fuellt LABEL auf 10 Zeichen auf
   local pre
   pre="$1$(printf "%$(( ${#1} < 10 ? 11 - ${#1} : 1 ))s" "")"
   out | sed -n "s/^ *[^ ]* $pre\\(.*\\)\$/\\1/p" | tail -n 1
 }
+printf 'MYSURICATES_RUNTIME=host\nMYSURICATES_PORT=9777\nMYSURICATES_PRESET=full\n' > "$INST/main.env"
+check "kept without --reconfigure"                      '[ "$(run --yes --dry-run --runtime host)" = 0 ] && [ "$(val main MYSURICATES_PORT)" = 9777 ]'
+check "--preset core --force changes only the preset"   '[ "$(run --yes --dry-run --runtime host --preset core --force)" = 0 ] && [ "$(val main MYSURICATES_PRESET)" = core ] && [ "$(val main MYSURICATES_PORT)" = 9777 ]'
+check "--reconfigure rewrites it"                       '[ "$(run --yes --dry-run --runtime host --reconfigure)" = 0 ] && grep -q "^# MySuricates-Instanz" "$INST/main.env"'
+# --reconfigure ohne Terminal geht von den Werten der Datei aus und aendert nur gegebene Flags (ca902719).
+# Frueher galten frische Vorgaben: ohne --port 9090, ohne --runtime container, Preset core, erster Anbieter.
+R7P="$(firstfree 9777)"
+check "--reconfigure: the port of the file stays"       '[ "$(val main MYSURICATES_PORT)" = "$R7P" ] && [ "$(step Ports)" = "$R7P" ]'
+printf 'MYSURICATES_RUNTIME=host\nMYSURICATES_PORT=9777\nMYSURICATES_PRESET=full\nMYSURICATES_ENVIRONMENT=Prod\nMYSURICATES_HARDENING_SEALING=true\nAUTOMATION_AI_DEFAULT_PROVIDER=PI\nAUTOMATION_HARDENING_REQUIRESIGNEDSEAL=true\nAUTOMATION_MODULES_CHAINS=false\nAUTOMATION_CUSTOM_BY_HAND=x' > "$INST/main.env"
+check "--reconfigure --yes: runtime, preset, provider stay" '[ "$(run --yes --dry-run --reconfigure)" = 0 ] && [ "$(val main MYSURICATES_RUNTIME)" = host ] && [ "$(val main MYSURICATES_PRESET)" = full ] && [ "$(val main AUTOMATION_AI_DEFAULT_PROVIDER)" = PI ] && [ "$(val main MYSURICATES_PORT)" = "$R7P" ]'
+check "... environment, seal switch and AUTOMATION_* lines stay" '[ "$(val main MYSURICATES_ENVIRONMENT)" = Prod ] && [ "$(val main MYSURICATES_HARDENING_SEALING)" = true ] && [ "$(val main AUTOMATION_HARDENING_REQUIRESIGNEDSEAL)" = true ] && [ "$(val main AUTOMATION_MODULES_CHAINS)" = false ] && [ "$(val main AUTOMATION_CUSTOM_BY_HAND)" = x ] && [ "$(grep -c "^AUTOMATION_AI_DEFAULT_PROVIDER=" "$INST/main.env")" = 1 ]'
+check "--reconfigure --preset research: only the preset" '[ "$(run --yes --dry-run --reconfigure --preset research)" = 0 ] && [ "$(val main MYSURICATES_PRESET)" = research ] && [ "$(val main MYSURICATES_RUNTIME)" = host ] && [ "$(val main AUTOMATION_AI_DEFAULT_PROVIDER)" = PI ] && [ "$(val main MYSURICATES_PORT)" = "$R7P" ]'
+R7N="$(firstfree 19790)"
+check "--reconfigure --port N --provider codex: only those" '[ "$(run --yes --dry-run --reconfigure --port "$R7N" --provider codex)" = 0 ] && [ "$(val main MYSURICATES_PORT)" = "$R7N" ] && [ "$(val main AUTOMATION_AI_DEFAULT_PROVIDER)" = CODEX ] && [ "$(val main MYSURICATES_PRESET)" = research ] && [ "$(val main MYSURICATES_RUNTIME)" = host ]'
+check "--reconfigure --runtime container: the runtime changes" '[ "$(run --yes --dry-run --reconfigure --runtime container)" = 0 ] && [ "$(val main MYSURICATES_RUNTIME)" = container ] && [ "$(val main MYSURICATES_PORT)" = "$R7N" ] && [ "$(val main AUTOMATION_AI_DEFAULT_PROVIDER)" = CODEX ]'
+printf 'MYSURICATES_RUNTIME=container\nMYSURICATES_PORT=%s\nMYSURICATES_BIND=0.0.0.0\nMYSURICATES_PRESET=core\nMYSURICATES_PROJECTS=/srv/projekte\nMYSURICATES_DOCKER_SOCKET=1\nMYSURICATES_AI_FROM_HOST=programs\nMYSURICATES_AI_PROVIDERS=codex\nAUTOMATION_AI_DEFAULT_PROVIDER=CODEX\n' "$R7N" > "$INST/main.env"
+check "--reconfigure, container: bind, projects, socket, AI access stay" '[ "$(run --yes --dry-run --reconfigure)" = 0 ] && [ "$(val main MYSURICATES_BIND)" = 0.0.0.0 ] && [ "$(val main MYSURICATES_PROJECTS)" = /srv/projekte ] && [ "$(val main MYSURICATES_DOCKER_SOCKET)" = 1 ] && [ "$(val main MYSURICATES_AI_FROM_HOST)" = programs ] && [ "$(val main MYSURICATES_AI_PROVIDERS)" = codex ]'
+check "--reconfigure --mode staged: not from main.env"  '[ "$(run --yes --dry-run --reconfigure --mode staged)" = 0 ] && [ "$(val dev MYSURICATES_PRESET)" = full ] && [ "$(val prod MYSURICATES_HARDENING_SEALING)" = true ]'
+rm -f "$INST/dev.env" "$INST/test.env" "$INST/prod.env"
+
+echo "7b) a kept file: the steps show its values, not ones that never reach it (fd4eb89f)"
+# Frueher meldete der Ports-Schritt „nehme 9091“ (die eigene laufende Instanz belegt 9090) und der
+# KI-Schritt einen neuen Standard-Anbieter — beides landete nie in der behaltenen Datei.
 rm -rf "$INST"; mkdir -p "$INST"
 printf 'MYSURICATES_RUNTIME=host\nMYSURICATES_PORT=9777\nMYSURICATES_PRESET=full\nAUTOMATION_AI_DEFAULT_PROVIDER=PI\n' > "$INST/main.env"
 cp "$INST/main.env" "$TMP/kept.env"

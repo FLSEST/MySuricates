@@ -198,7 +198,8 @@ man sie zuschaltet.
 `./scripts/setup.sh` erneut starten → **Einstellungen ändern** (Port, Module, KI-Anbieter).
 Mit `--yes` und ohne `--reconfigure` bleibt eine vorhandene Instanz-Datei, wie sie ist: Die Schritte
 zeigen dann ihre Werte („aus deploy/instances/main.env“), und Flags, die dagegen nicht wirken, nennt
-der Installer; `--reconfigure` schreibt die Datei neu.
+der Installer; `--reconfigure` schreibt die Datei neu — auch ohne Terminal von ihren Werten aus, nur
+die übergebenen Flags ändern etwas (`--reconfigure --yes --port 9095` verlegt nur den Port).
 Oder direkt die Datei `deploy/instances/main.env` bearbeiten und die Instanz neu starten
 (`scripts/instance.sh down --name main`, dann `up --name main`):
 

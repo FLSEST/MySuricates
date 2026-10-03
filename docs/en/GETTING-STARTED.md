@@ -194,7 +194,8 @@ off, and the template picker then says how to switch them on.
 Run `./scripts/setup.sh` again → **Change settings** (port, modules, AI provider). With `--yes` and
 without `--reconfigure`, an existing instance file stays as it is: the steps then show its values
 ("from deploy/instances/main.env"), and the installer names flags that do not apply against it;
-`--reconfigure` rewrites the file. Or edit `deploy/instances/main.env` and restart the instance
+`--reconfigure` rewrites the file — also without a terminal starting from its values, only the
+flags given change something (`--reconfigure --yes --port 9095` moves only the port). Or edit `deploy/instances/main.env` and restart the instance
 (`scripts/instance.sh down --name main`, then `up --name main`):
 
 - `MYSURICATES_PORT`, `MYSURICATES_BIND`, `MYSURICATES_PRESET`, `MYSURICATES_PROJECTS`

@@ -190,7 +190,8 @@ M_help="MySuricates setup — from a bare machine to the login in one pass.
   --ai-providers LIST          container: only these providers, e.g. claude,codex (default: all)
   --name NAME                  name of the instance (default main)
   --lang de                    Deutsch (default English)
-  --reconfigure                rewrite an existing instance file (otherwise it stays, its values count)
+  --reconfigure                rewrite an existing instance file: its values stay, given flags change them
+                               (without it the file stays as it is)
   --preset core --force        in an existing setup change only the preset
   --dry-run                    install, build and start nothing — only show and write the files
   --show-key                   show the full API key at the end (default: masked)

@@ -38,7 +38,8 @@ INSTANCES_DIR="${MYSURICATES_INSTANCES_DIR:-$REPO_ROOT/deploy/instances}"
 # --- Flags ------------------------------------------------------------------------------------------
 MODE=""; RUNTIME=""; PRESET=""; MODULES=""; PROVIDER=""; PORT=""; PROJECTS=""; NAME="main"; BIND="127.0.0.1"
 LANG_OPT=""; YES=0; CHECK=0; DRY=0; SHOW_KEY=0; FROM_SOURCE=0; INSTALL=0; START=0; FORCE=0; RECONF=0
-HELP=0; SOCKET_FLAG=0; AI_FROM_HOST=""; AI_PROVIDERS=""; WITH_PI=0; STORE_AI_ENV=0
+HELP=0; SOCKET_FLAG=0; CHANGE_NAME=""; PORT_LOADED=0; LOADED_LINES=""
+LOADED_ENVIRONMENT=""; LOADED_SEALING=false; LOADED_REQUIRE_SEALED=false; AI_FROM_HOST=""; AI_PROVIDERS=""; WITH_PI=0; STORE_AI_ENV=0
 AI_ENV="${XDG_CONFIG_HOME:-$HOME/.config}/mysuricates/ai.env"
 die() { echo "setup.sh: $*" >&2; exit 2; }
 _prev=""
@@ -164,6 +165,12 @@ step_mode() {
       2) return 3 ;;
     esac
   fi
+  # --reconfigure, auch ohne Terminal: von den Werten der Datei ausgehen und nur die gegebenen Flags
+  # aendern (ca902719) — frueher galten frische Vorgaben: aus einer Instanz auf dem Rechner wurde ohne
+  # --runtime eine im Container, das Preset fiel auf core, der Anbieter auf den ersten angemeldeten
+  if [ "$RECONF" = 1 ] && [ -z "$CHANGE_NAME" ] && [ "$MODE" != staged ] && [ -f "$INSTANCES_DIR/$NAME.env" ]; then
+    CHANGE_NAME="$NAME"; load_existing "$NAME"
+  fi
   if [ -z "$MODE$RUNTIME" ] && [ "$INTERACTIVE" = 1 ]; then
     tui_select choice "$(msg step_of 2 ${#STEPS[@]}) · $(msg mode_title)" 0 \
       "$(msg mode_container)|$(msg mode_container_hint) · $(msg recommended)" \
@@ -277,7 +284,7 @@ step_modules() {
   local choice rc items key tier on sel hard label=""
   section 3
   if [ "$MODE" = staged ]; then tui_done "$(msg step_modules)" "$(msg modules_staged)$(kept_mark)"; return 0; fi
-  CUSTOM_LINES=""
+  CUSTOM_LINES="$LOADED_LINES"   # Zeilen einer Datei, die neu geschrieben wird, bleiben (ca902719)
   if [ -z "$PRESET" ] && [ "$INTERACTIVE" = 1 ]; then
     tui_select choice "$(msg step_of 4 ${#STEPS[@]}) · $(msg modules_title)" 0 \
       "$(msg modules_standard)|$(msg modules_standard_hint) · $(msg recommended)" \
@@ -568,6 +575,11 @@ step_ports() {
     PORT="$(free_port 9090 "" "$NAME")"
     [ "$PORT" = 9090 ] || printf '  %s\n' "$(msg ports_busy 9090 "$PORT")"
     [ "$INTERACTIVE" = 1 ] && tui_input PORT "$(msg ports_q "$NAME")" "$PORT"
+  elif [ "$PORT_LOADED" = 1 ]; then
+    # Port aus der Datei, die neu geschrieben wird: bleibt — ausser ein anderer belegt ihn inzwischen
+    # (die laufende eigene Instanz zaehlt als frei, 0e5b82b7)
+    p="$(free_port "$PORT" "" "$NAME")"
+    [ "$p" = "$PORT" ] || { printf '  %s\n' "$(msg ports_busy "$PORT" "$p")"; PORT="$p"; }
   fi
   if [ "$RUNTIME" = container ] && [ -z "$PROJECTS" ]; then
     PROJECTS="$(cd "$REPO_ROOT/.." && pwd)"
@@ -672,7 +684,7 @@ step_build() {
     write_instance prod container "$P_PROD" core Prod true true
     INSTANCES="dev test prod"
   else
-    write_instance "$NAME" "$RUNTIME" "$PORT" "$PRESET" "" false false
+    write_instance "$NAME" "$RUNTIME" "$PORT" "$PRESET" "$LOADED_ENVIRONMENT" "$LOADED_SEALING" "$LOADED_REQUIRE_SEALED"
     INSTANCES="$NAME"
   fi
   STARTED=0

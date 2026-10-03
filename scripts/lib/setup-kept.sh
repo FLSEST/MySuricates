@@ -4,8 +4,8 @@
 # zeigten die Schritte trotzdem Vorgaben, die nie in die Datei kamen — „Port 9090 belegt, nehme 9091“,
 # weil die eigene laufende Instanz 9090 belegt, oder einen neuen Standard-Anbieter. Jetzt gelten die
 # Werte der Datei, auch gegen Flags, und die Schritte sagen, woher sie kommen; nicht wirkende Flags
-# nennt eine Zeile. Dazu load_existing: die Werte einer Datei als Vorbelegung, wenn sie neu geschrieben
-# wird („Einstellungen aendern“). Liest und setzt die Variablen des Installers — fuer sich allein nicht
+# nennt eine Zeile. Dazu load_existing: die Werte einer Datei als Ausgangspunkt, wenn sie neu geschrieben
+# wird („Einstellungen aendern“, --reconfigure). Liest und setzt die Variablen des Installers — fuer sich allein nicht
 # nutzbar. bash 3.2 (macOS).
 
 KEPT=0          # 1 = jede Datei dieses Laufs bleibt (die eine Instanz, oder Dev, Test und Prod)
@@ -88,15 +88,19 @@ kept_mark() {
 # der erste freie ab BASIS, der nicht schon vergeben ist; den der laufenden Instanz NAME zaehlt er als frei
 kept_port() { if is_kept "$1"; then kept_value "$1" MYSURICATES_PORT; else free_port "$2" "${3:-}" "$1"; fi; }
 
-# load_existing NAME — die Werte einer vorhandenen Instanz als Vorbelegung fuer „Einstellungen aendern“;
-# Flags gehen vor. Wie kept_value: je Schluessel ein Wert, die letzte Zeile gewinnt (0e5b82b7).
-# Nimmt auch BIND, AI_FROM_HOST, AI_PROVIDERS, den Docker-Socket und die Haertungs-Schalter mit
-# (fbb1c61e) — sonst schreibt ein Reconfigure ohne die passenden Flags stillschweigend die Vorgaben
-# (127.0.0.1, kein Socket, keine Haertung) in die Datei.
+# load_existing NAME — die Werte einer vorhandenen Instanz als Ausgangspunkt fuer „Einstellungen aendern“
+# und fuer --reconfigure, auch ohne Terminal (ca902719): Flags gehen vor, alles andere bleibt, wie es in
+# der Datei steht. Wie kept_value: je Schluessel ein Wert, die letzte Zeile gewinnt (0e5b82b7).
+# Nimmt auch BIND, AI_FROM_HOST, AI_PROVIDERS, den Docker-Socket (fbb1c61e), Umgebung und Siegel-Schalter
+# mit, dazu jede AUTOMATION_*-Zeile (Haertung, Module, von Hand ergaenzt) — sonst schreibt ein Reconfigure
+# ohne die passenden Flags stillschweigend die Vorgaben (127.0.0.1, kein Socket, keine Haertung) in die
+# Datei. Setzt LOADED_LINES (fuer step_modules) und PORT_LOADED=1, wenn der Port aus der Datei kommt.
 load_existing() {
+  local p0="${PORT:-}" line
   NAME="$1"; MODE=one
   RUNTIME="${RUNTIME:-$(kept_or "$1" MYSURICATES_RUNTIME container)}"
   PORT="${PORT:-$(kept_value "$1" MYSURICATES_PORT)}"
+  PORT_LOADED=0; [ -n "$p0" ] || [ -z "$PORT" ] || PORT_LOADED=1
   PRESET="${PRESET:-$(kept_value "$1" MYSURICATES_PRESET)}"
   PROVIDER="${PROVIDER:-$(kept_value "$1" AUTOMATION_AI_DEFAULT_PROVIDER | tr 'A-Z' 'a-z')}"
   PROJECTS="${PROJECTS:-$(kept_value "$1" MYSURICATES_PROJECTS)}"
@@ -108,11 +112,15 @@ load_existing() {
   # SOCKET traegt zu diesem Zeitpunkt schon SOCKET_FLAG (0 ohne --docker-socket) — wie bei kept_load
   # zaehlt nur ein gegebenes --docker-socket als Flag, kein "aus".
   [ "${SOCKET_FLAG:-0}" = 1 ] || SOCKET="$(kept_or "$1" MYSURICATES_DOCKER_SOCKET 0)"
-  local key prop val
-  for key in "${MODULE_CATALOG_HARDENING_KEYS[@]}"; do
-    prop="$(prop_env "$(module_catalog_get PROPERTY "$key")")"
-    val="$(kept_value "$1" "$prop")"
-    [ -z "$val" ] || CUSTOM_LINES="${CUSTOM_LINES:-}$prop=$val
-"
-  done
+  LOADED_ENVIRONMENT="$(kept_value "$1" MYSURICATES_ENVIRONMENT)"
+  LOADED_SEALING="$(kept_or "$1" MYSURICATES_HARDENING_SEALING false)"
+  LOADED_REQUIRE_SEALED="$(kept_or "$1" MYSURICATES_HARDENING_REQUIRE_SEALED false)"
+  # AUTOMATION_*-Zeilen in ihrer Reihenfolge (die letzte gewinnt weiter); den Standard-Anbieter schreibt
+  # write_instance selbst
+  LOADED_LINES=""
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in AUTOMATION_AI_DEFAULT_PROVIDER=*) ;; AUTOMATION_*=*) LOADED_LINES="$LOADED_LINES$line
+" ;; esac
+  done < "$INSTANCES_DIR/$1.env"
+  CUSTOM_LINES="${CUSTOM_LINES:-}$LOADED_LINES"
 }
