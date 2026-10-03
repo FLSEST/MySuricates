@@ -10,8 +10,10 @@ export type ScheduleSort = 'nextRun' | 'lastRun' | 'name' | 'created';
 /**
  * Persisted filter/sort state for the schedules list plus the derived
  * (filtered + sorted) rows and the distinct project names for the dropdown.
+ * `pinnedId` (the schedule a link points to, `?schedule=`, 3a35ced1) stays in the rows whatever the
+ * persisted filters say — otherwise a forgotten filter would hide exactly the linked schedule.
  */
-export function useScheduleFilters(schedules: ScheduledWorkflow[] | undefined) {
+export function useScheduleFilters(schedules: ScheduledWorkflow[] | undefined, pinnedId?: string | null) {
   const [targetTypeFilter, setTargetTypeFilter] = usePersistedState<TargetTypeFilter>('schedules-target-filter', 'ALL');
   const [scheduleTypeFilter, setScheduleTypeFilter] = usePersistedState<ScheduleTypeFilter>('schedules-type-filter', 'ALL');
   const [enabledFilter, setEnabledFilter] = usePersistedState<EnabledFilter>('schedules-enabled-filter', 'ALL');
@@ -27,19 +29,20 @@ export function useScheduleFilters(schedules: ScheduledWorkflow[] | undefined) {
   const filtered = useMemo(() => {
     if (!schedules) return [];
     let result = [...schedules];
+    const keep = (match: (s: ScheduledWorkflow) => boolean) => (s: ScheduledWorkflow) => s.id === pinnedId || match(s);
 
-    if (targetTypeFilter !== 'ALL') result = result.filter(s => s.targetType === targetTypeFilter);
-    if (scheduleTypeFilter !== 'ALL') result = result.filter(s => s.scheduleType === scheduleTypeFilter);
-    if (enabledFilter === 'ON') result = result.filter(s => s.enabled);
-    if (enabledFilter === 'OFF') result = result.filter(s => !s.enabled);
-    if (projectFilter) result = result.filter(s => s.projectName === projectFilter);
+    if (targetTypeFilter !== 'ALL') result = result.filter(keep(s => s.targetType === targetTypeFilter));
+    if (scheduleTypeFilter !== 'ALL') result = result.filter(keep(s => s.scheduleType === scheduleTypeFilter));
+    if (enabledFilter === 'ON') result = result.filter(keep(s => s.enabled));
+    if (enabledFilter === 'OFF') result = result.filter(keep(s => !s.enabled));
+    if (projectFilter) result = result.filter(keep(s => s.projectName === projectFilter));
     if (search.trim()) {
       const q = search.toLowerCase();
-      result = result.filter(s =>
+      result = result.filter(keep(s =>
         s.workflowName?.toLowerCase().includes(q) ||
         s.chainName?.toLowerCase().includes(q) ||
         s.description?.toLowerCase().includes(q)
-      );
+      ));
     }
 
     result.sort((a, b) => {
@@ -53,7 +56,7 @@ export function useScheduleFilters(schedules: ScheduledWorkflow[] | undefined) {
     });
 
     return result;
-  }, [schedules, targetTypeFilter, scheduleTypeFilter, enabledFilter, projectFilter, search, sortBy]);
+  }, [schedules, pinnedId, targetTypeFilter, scheduleTypeFilter, enabledFilter, projectFilter, search, sortBy]);
 
   return {
     targetTypeFilter, setTargetTypeFilter,

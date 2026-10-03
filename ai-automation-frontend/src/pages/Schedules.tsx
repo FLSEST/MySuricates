@@ -1,5 +1,6 @@
 import { Hint } from '../components/hints/Hint';
-import { useState, Fragment } from 'react';
+import { useState, Fragment, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Calendar, Plus, List, ChevronDown, ChevronRight, Pause, Play, AlertTriangle, Search } from 'lucide-react';
 import { Card, Button, Spinner } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
@@ -18,6 +19,7 @@ import { useChains } from '../hooks/useChains';
 import { useModuleEnabled } from '../hooks/useModules';
 import { useExecutionConfig } from '../hooks/useSystem';
 import { useT } from '../i18n';
+import { SCHEDULE_PARAM } from '../utils/entityLinks';
 
 export function Schedules() {
   const t = useT();
@@ -36,10 +38,20 @@ export function Schedules() {
     ? undefined
     : executionConfig.schedulerCatchUpOnResume === 1;
 
+  // `?schedule=<id>` (3a35ced1): reports and runs link to one schedule — it is highlighted, shown
+  // despite the filters and opened on its run history
+  const [searchParams] = useSearchParams();
+  const linkedId = searchParams.get(SCHEDULE_PARAM);
   const [view, setView] = useState<'list' | 'calendar'>('list');
-  const [expandedScheduleId, setExpandedScheduleId] = useState<string | null>(null);
+  const [expandedScheduleId, setExpandedScheduleId] = useState<string | null>(linkedId);
 
-  const filters = useScheduleFilters(schedules);
+  const filters = useScheduleFilters(schedules, linkedId);
+  const scrolledTo = useRef<string | null>(null);
+  useEffect(() => {
+    if (!linkedId || !schedules?.some((s) => s.id === linkedId) || scrolledTo.current === linkedId) return;
+    scrolledTo.current = linkedId;
+    document.getElementById(`schedule-${linkedId}`)?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+  }, [schedules, linkedId]);
   const scheduleForm = useScheduleForm();
 
   const columns = useScheduleColumns({
@@ -219,7 +231,8 @@ export function Schedules() {
                 )}
                 {filters.filtered.map((s) => (
                   <Fragment key={s.id}>
-                    <tr className="transition-colors">
+                    <tr id={`schedule-${s.id}`} aria-current={s.id === linkedId ? 'true' : undefined}
+                      className={`transition-colors ${s.id === linkedId ? 'bg-accent-subtle ring-1 ring-inset ring-accent' : ''}`}>
                       <td className="pl-3 pr-0 py-3">
                         <button
                           onClick={() => setExpandedScheduleId(expandedScheduleId === s.id ? null : s.id)}

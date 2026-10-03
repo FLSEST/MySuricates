@@ -1,6 +1,7 @@
 import { Lock, LockOpen, Minus } from 'lucide-react';
 import { CopyButton } from '../shared/CopyButton';
 import { TriggerSourceChip } from './TriggerSourceChip';
+import { scheduleTriggerLink } from '../../utils/entityLinks';
 import { useT } from '../../i18n';
 import type { WorkflowRun } from '../../types';
 
@@ -36,7 +37,7 @@ export function RunProvenance({ run }: { run: WorkflowRun }) {
           {t.workflows.sealView.unrecorded}
         </span>
       )}
-      <TriggerSourceChip source={run.triggerSource} />
+      <TriggerSourceChip source={run.triggerSource} to={scheduleTriggerLink(run.triggerSource, run.triggeredByScheduleId)} />
       {run.definitionHash && (
         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-raised font-mono"
               title={t.workflows.definitionHashHint}>

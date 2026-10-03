@@ -141,6 +141,7 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 
 - Table: workflow, cron expression, next/last execution, status toggle
 - Create modal: workflow selection + cron expression + description
+- Filter link `/schedules?schedule=<id>` (`utils/entityLinks.ts`, 3a35ced1; there is no page per schedule): highlights the row, shows it despite stored filters (`useScheduleFilters(…, pinnedId)`), opens its runs and scrolls to it. The trigger chip of a run its schedule started links here (run header, chain run, audit report), and so does the schedule in a report head without a recorded trigger
 
 ### Webhooks (`/webhooks`)
 
@@ -151,7 +152,7 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 
 ### Chains (`/chains`, `/chains/:id/run/:runId`)
 
-- Split-panel layout: chain list on the left, detail/execution on the right
+- Split-panel layout: chain list on the left, detail/execution on the right; the selected chain lives in the URL (`/chains?chain=<id>`, 3a35ced1) – the filter link used by the report head and the chain run (name and back button); there is no page per chain
 - Pipeline visualization of chain entries
 - Create/edit modal with workflow search and sorting
 - ChainExecution: live polling for entry status, navigation to individual workflow runs
@@ -204,7 +205,7 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 ### Audit Center (`/reports`)
 
 - **Overview:** per audit the gate, trend, “open X · accepted Y” (open with critical/high from `openFindingsBySeverity`, accepted from `findingsByStatus`) and the last run; “last attempt invalid” when the newest report was not valid
-- **Report:** the page shows the report named by `latestReportId`, i.e. the newest valid one. Its head names date and time, the run (short ID, link), the trigger as `TriggerSourceChip`, the chain (link to the chain run; there is no page per chain) or, without a chain, the schedule unless the chip already names it, plus “Definition #N”, workflow version and provider/model. When the newest attempt was invalid, a notice with date and error text says that the report is older. “Evidence run” and the history point at the run of the respective report; each history entry carries trigger and chain
+- **Report:** the page shows the report named by `latestReportId`, i.e. the newest valid one. Its head names date and time, the run (short ID, link), the trigger as `TriggerSourceChip`, the chain (name → `/chains?chain=<id>`, icon beside it → chain run) or, without a chain, the schedule (`/schedules?schedule=<id>`: through the chip, otherwise as a link of its own), plus “Definition #N”, workflow version and provider/model. When the newest attempt was invalid, a notice with date and error text says that the report is older. “Evidence run” and the history point at the run of the respective report; each history entry carries trigger and chain
 - **Findings:** status filter as `FilterChips`: “Open” (`OPEN` + `AWAITING_VERIFICATION`, the default), “Accepted”, “Dismissed”, “Resolved”, counts from `findingsByStatus`. `useAuditFindingsByStatus` loads one page (200) per chosen status through the `status` parameter, so a status with many findings cannot push the others out; when one page is not enough, a note says so. `?finding=<id>` opens the finding, switches its chip on as well and scrolls it into view once its list is complete; “not found” appears only once both the finding and the audit list have loaded. A click on an audit in the overview uses the link up (the parameter goes away), and every audit starts with its own chips. “Evidence unverified” marks `unverifiedEvidence` (no managed TODO); when filing, creating or linking a TODO fails, a toast gives the reason (`apiErrorMessage`). When a finding leaves the filter after being filed, a toast names its new chip and switches it on on request
 - **Legacy:** file-based Markdown reports, read-only
 - **Structure:** the page wires view, tabs and `hooks/useActiveAudit.ts`: only project and key are kept, the audit comes from the current `/audits` list, so counts follow after a finding was filed. Building blocks in `components/audit/`: `AuditOverview` (with `FindingCounts`), `AuditDetail`, `ReportOrigin` (head, `OlderReportNotice`, `ReportChain`), `ReportHistory`, `AuditFindings` with `AuditFindingItem` and `FindingDisposition`, `LegacyReports` and small parts in `AuditParts`. Filing, creating and linking TODOs live in `hooks/useFindingActions.ts`, the filter model in `utils/auditFindingFilter.ts`, the shown report in `useShownAuditReport`. A mutation writes its answer into the findings pages and into the single finding (`['audit-finding', id]`) that a deep link reads the next time it opens

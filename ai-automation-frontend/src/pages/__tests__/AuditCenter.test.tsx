@@ -366,7 +366,11 @@ describe('AuditCenter report head', () => {
     expect(head).toHaveTextContent(/Report from .*2026/);
     expect(within(head).getByRole('link', { name: 'Run d08d6770' })).toHaveAttribute('href', `/workflows/w1/run/${runId}`);
     expect(within(head).getByTestId('trigger-source')).toHaveTextContent('Started byschedule');
-    expect(within(head).getByRole('link', { name: /Chain Weekly audits/ })).toHaveAttribute('href', '/chains/chain-1/run/chain-run-1');
+    // 3a35ced1: the chain name leads to the chain, the icon beside it to the chain run
+    expect(within(head).getByRole('link', { name: /Chain Weekly audits/ })).toHaveAttribute('href', '/chains?chain=chain-1');
+    expect(within(head).getByRole('link', { name: 'Open chain run' })).toHaveAttribute('href', '/chains/chain-1/run/chain-run-1');
+    // the chip does not lead to the schedule: that one started the chain
+    expect(within(head).getByTestId('trigger-source').tagName).toBe('SPAN');
     expect(head).toHaveTextContent('Definition #12');
     expect(head).toHaveTextContent('Workflow v3.0.0');
     expect(head).toHaveTextContent('CLAUDE / opus');
@@ -381,9 +385,19 @@ describe('AuditCenter report head', () => {
     await openAudit();
 
     const head = await screen.findByTestId('report-origin');
-    expect(within(head).getByText('Schedule')).toBeInTheDocument();
+    expect(within(head).getByRole('link', { name: 'Schedule' })).toHaveAttribute('href', '/schedules?schedule=sched-1');
     expect(within(head).queryByTestId('trigger-source')).toBeNull();
     expect(within(head).queryByTestId('report-chain')).toBeNull();
+  });
+
+  // 3a35ced1: a run its schedule started links to that schedule
+  it('links the trigger chip of a scheduled run without chain to its schedule', async () => {
+    useReports([{ ...report, chainRunId: null, chainId: null, chainName: null }]);
+    await openAudit();
+
+    const head = await screen.findByTestId('report-origin');
+    expect(within(head).getByTestId('trigger-source')).toHaveAttribute('href', '/schedules?schedule=sched-1');
+    expect(within(head).queryByTestId('report-schedule')).toBeNull();
   });
 
   it('shows what an older backend sends, without origin fields', async () => {

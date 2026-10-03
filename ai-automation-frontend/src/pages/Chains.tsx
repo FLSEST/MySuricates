@@ -1,6 +1,6 @@
 import { Hint } from '../components/hints/Hint';
-import { useState, useMemo, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Link2, Plus, Play, Layers } from 'lucide-react';
 import { Card, Button, Input, ConfirmModal, Spinner } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
@@ -14,6 +14,7 @@ import { useWorkflows } from '../hooks/useWorkflows';
 import { useT } from '../i18n';
 import { extractWorkflowVariables } from '../utils/extractWorkflowVariables';
 import { readContextSchema } from '../utils/contextSchema';
+import { CHAIN_PARAM } from '../utils/entityLinks';
 import type { WorkflowChain, CreateChainRequest } from '../types';
 
 
@@ -27,7 +28,17 @@ export function Chains() {
   const deleteChain = useDeleteChain();
   const executeChain = useExecuteChain();
 
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // The selected chain lives in the URL (`?chain=<id>`, 3a35ced1): reports and runs link to it, and
+  // the link survives a reload
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedId = searchParams.get(CHAIN_PARAM);
+  const setSelectedId = useCallback((id: string | null) => {
+    setSearchParams((params) => {
+      const next = new URLSearchParams(params);
+      if (id) next.set(CHAIN_PARAM, id); else next.delete(CHAIN_PARAM);
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
   const [search, setSearch] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
@@ -46,6 +57,14 @@ export function Chains() {
     if (selectedId) return filtered.find(c => c.id === selectedId) ?? filtered[0];
     return filtered[0];
   }, [filtered, selectedId]);
+
+  // A linked chain far down the list is brought into view once
+  const scrolledTo = useRef<string | null>(null);
+  useEffect(() => {
+    if (!selectedId || !chains?.some((c) => c.id === selectedId) || scrolledTo.current === selectedId) return;
+    scrolledTo.current = selectedId;
+    document.getElementById(`chain-${selectedId}`)?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
+  }, [chains, selectedId]);
 
   // Collect all template variables and defaults across chain workflows
   const getChainVariables = useCallback((chain: WorkflowChain) => {
@@ -125,7 +144,7 @@ export function Chains() {
         if (selectedId === deleteConfirm.chain?.id) setSelectedId(null);
       },
     });
-  }, [deleteChain, deleteConfirm, selectedId]);
+  }, [deleteChain, deleteConfirm, selectedId, setSelectedId]);
 
   if (isLoading) {
     return <div className="flex items-center justify-center h-64"><Spinner text={t.common.loading} /></div>;
@@ -173,8 +192,14 @@ export function Chains() {
               {filtered.map(chain => (
                 <Card
                   key={chain.id}
+                  id={`chain-${chain.id}`}
+                  aria-current={selectedChain?.id === chain.id ? 'true' : undefined}
                   className={`cursor-pointer transition-all ${selectedChain?.id === chain.id ? 'ring-2 ring-accent' : ''}`}
-                  onClick={() => setSelectedId(chain.id)}
+                  onClick={() => {
+                    // Clicking marks the click as handled, so the list does not jump back to it
+                    scrolledTo.current = chain.id;
+                    setSelectedId(chain.id);
+                  }}
                 >
                   <div className="p-3">
                     <div className="flex items-center justify-between">
