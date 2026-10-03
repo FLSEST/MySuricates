@@ -115,7 +115,7 @@ class AuditSnapshotApplier {
         }
         // Eingeordnete schliesst die Abwesenheit nicht sofort: nur bei ausgemusterter Regel oder nach
         // mehreren Laeufen ohne Wiedersehen (b2e3da6a, 276ac76f).
-        resolved.addAll(dispositionLifecycle.retireAbsent(absent, report, observedAt));
+        resolved.addAll(dispositionLifecycle.retireAbsent(absent, report, factNames, observedAt));
         if (!resolved.isEmpty()) touched.addAll(findingRepository.saveAll(resolved));
         managedTodoWriter.reconcile(touched);
     }

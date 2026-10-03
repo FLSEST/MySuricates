@@ -367,12 +367,17 @@ nur als Markdown im `previous_report`. Das prüft Abschnitt 10b desselben Tests.
     einen neuen Befund unter anderem `ruleKey`, erbt der neue Status und Einordnung (`Übernommen von
     <alter ruleKey> (Regelwechsel)`; eine Akzeptanz behält ihre Frist, Vergleichsbasis wird die neue
     Evidence), der alte wird `RESOLVED` (`Ersetzt durch <neuer ruleKey> (Regelwechsel)`). Nicht bei
-    subjects ohne Datei (`repository`, FAKT-Namen) und nicht bei Regeln mit festem subject.
+    subjects ohne Datei (`repository`, FAKT-Namen, Routen, einzelne Wörter – Datei heißt Pfad mit `/`,
+    Dateiendung oder CamelCase-Klasse mit mindestens zwei Großbuchstaben) und nicht bei Regeln mit festem
+    subject. Jeder Vorgänger vererbt höchstens einmal; ein Nachfolger mit höherer Schwere (`CRITICAL`/`HIGH`
+    statt vorher niedriger) erbt nichts und ist neu einzuordnen.
   - **Regel ausgemustert:** Steht der `ruleKey` nicht mehr im Katalog des Audits, kann ihn kein gültiger
     Report mehr melden – `RESOLVED` mit `Regel nicht mehr im Katalog`.
   - **Nicht mehr gesehen:** Fehlt der Befund in drei gültigen Läufen in Folge (der aktuelle
     eingeschlossen), wird er `RESOLVED` mit `Nicht mehr gemessen/ersetzt: 3 Läufe ohne Wiedersehen`.
-    Taucht er später wieder auf, ist er eine Regression (`OPEN`) – die Einordnung ist dann neu zu treffen.
+    Bei einer Kennzahl-Regel (festes subject in FAKT-Form) schließt nur ein Lauf, der den FAKT gemessen
+    hat; fehlt er im Faktenblatt, bleibt die Einordnung (Teil-Messung). Taucht der Befund später wieder auf,
+    ist er eine Regression (`OPEN`) – die Einordnung ist dann neu zu treffen.
 - Taucht ein `ACCEPTED_RISK`-Finding wieder auf, prüft `AuditAcceptancePolicy` es gegen den
   Beleg zum Zeitpunkt der Akzeptanz: Liegt ein Messwert um mehr als 10 % darüber oder hat die
   Änderungsrate die Hotspot-Schwelle neu erreicht, wird es wieder

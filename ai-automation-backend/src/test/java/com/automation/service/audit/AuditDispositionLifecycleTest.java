@@ -179,6 +179,84 @@ class AuditDispositionLifecycleTest {
         assertThat(accepted.getStatus()).isEqualTo(AuditFindingStatus.ACCEPTED_RISK);
     }
 
+    /** Zwei Vorgaenger, zwei Nachfolger derselben Datei: jeder Vorgaenger vererbt hoechstens einmal. */
+    @Test
+    void eachPredecessorPassesItsDispositionOnAtMostOnce() {
+        AuditFinding accepted = disposed("f-acc", UNCHECKED, "rule.a", "Foo.java", AuditFindingStatus.ACCEPTED_RISK, NOW);
+        accepted.setDispositionAt(ACCEPTED_AT.plus(Duration.ofDays(1)));
+        AuditFinding dismissed = disposed("f-dis", UNCHECKED, "rule.b", "Foo.java", AuditFindingStatus.DISMISSED, NOW);
+        stock(UNCHECKED, accepted, dismissed);
+
+        apply(UNCHECKED, finding("rule.c", "Foo.java"), finding("rule.d", "Foo.java"));
+
+        assertThat(savedFindings().stream().filter(f -> f.getRuleKey().startsWith("rule.") && f.getId().startsWith("f-new"))
+                .map(AuditFinding::getStatus).toList())
+                .containsExactlyInAnyOrder(AuditFindingStatus.ACCEPTED_RISK, AuditFindingStatus.DISMISSED);
+        assertThat(accepted.getDispositionNote()).endsWith(AuditDispositionLifecycle.NOTE_SUPERSEDED + "rule.c (Regelwechsel)");
+        assertThat(dismissed.getDispositionNote()).endsWith(AuditDispositionLifecycle.NOTE_SUPERSEDED + "rule.d (Regelwechsel)");
+    }
+
+    /** Ein schwererer Nachfolger (HIGH statt LOW) erbt keine Einordnung — er ist neu zu bewerten. */
+    @Test
+    void moreSevereSuccessor_inheritsNothing() {
+        AuditFinding dismissed = disposed("f-dis", ARCHITECTURE, "god-class", "WorkflowExecutor",
+                AuditFindingStatus.DISMISSED, NOW);
+        dismissed.setSeverity(AuditSeverity.LOW);
+        stock(ARCHITECTURE, dismissed);
+
+        apply(ARCHITECTURE, finding("arch.high-coupling", "com/automation/service/workflow/WorkflowExecutor.java"));
+
+        assertThat(savedFindings().stream().filter(f -> "arch.high-coupling".equals(f.getRuleKey())).findFirst()
+                .orElseThrow().getStatus()).isEqualTo(AuditFindingStatus.OPEN);
+        assertThat(dismissed.getDispositionNote()).doesNotContain(AuditDispositionLifecycle.NOTE_SUPERSEDED);
+    }
+
+    /** Nur Pfade oder CamelCase-Klassen sind Dateien: ein einzelnes Wort oder eine Route vererbt nichts. */
+    @Test
+    void subjectsThatAreNoPathOrCamelCaseClass_passNothingOn() {
+        AuditFinding word = disposed("f-word", UNCHECKED, "rule.a", "Scheduler", AuditFindingStatus.ACCEPTED_RISK, NOW);
+        AuditFinding route = disposed("f-route", UNCHECKED, "rule.a", "GET /api/v1/workflows",
+                AuditFindingStatus.ACCEPTED_RISK, NOW);
+        stock(UNCHECKED, word, route);
+
+        apply(UNCHECKED, finding("rule.b", "Scheduler"), finding("rule.b", "GET /api/v1/workflows"));
+
+        assertThat(savedFindings().stream().filter(f -> "rule.b".equals(f.getRuleKey())).map(AuditFinding::getStatus))
+                .containsOnly(AuditFindingStatus.OPEN);
+    }
+
+    // --- Teil-Messung: Kennzahl ohne Messwert in diesem Lauf --------------------------------------
+
+    /** Steht der FAKT einer Kennzahl-Regel nicht im Faktenblatt, zaehlt der Lauf fuer ihren Befund nicht als Abwesenheit. */
+    @Test
+    void metricFindingWhoseFactWasNotMeasured_isNotRetired() {
+        String performance = "mysuricates.performance";
+        AuditFinding accepted = disposed("f-db", performance, "perf.db.size", "database_bytes",
+                AuditFindingStatus.ACCEPTED_RISK, NOW.minus(Duration.ofDays(3)));
+        stock(performance, accepted);
+        lenient().when(reportRepository.findValidGeneratedAtBefore(eq(PROJECT), eq(performance), eq(NOW), any()))
+                .thenReturn(List.of(NOW.minus(Duration.ofDays(1)), NOW.minus(Duration.ofDays(2))));
+
+        apply(performance, Set.of("source_files_scanned"));
+
+        assertThat(accepted.getStatus()).isEqualTo(AuditFindingStatus.ACCEPTED_RISK);
+    }
+
+    /** Gegenprobe: gemessen und drei Laeufe nicht gemeldet — dann schliesst er. */
+    @Test
+    void metricFindingWhoseFactWasMeasured_isRetiredAfterThreeRuns() {
+        String performance = "mysuricates.performance";
+        AuditFinding accepted = disposed("f-db", performance, "perf.db.size", "database_bytes",
+                AuditFindingStatus.ACCEPTED_RISK, NOW.minus(Duration.ofDays(3)));
+        stock(performance, accepted);
+        when(reportRepository.findValidGeneratedAtBefore(eq(PROJECT), eq(performance), eq(NOW), any()))
+                .thenReturn(List.of(NOW.minus(Duration.ofDays(1)), NOW.minus(Duration.ofDays(2))));
+
+        apply(performance, Set.of("database_bytes"));
+
+        assertThat(accepted.getStatus()).isEqualTo(AuditFindingStatus.RESOLVED);
+    }
+
     // --- Drei Laeufe ohne Wiedersehen -------------------------------------------------------------
 
     /**
@@ -239,11 +317,15 @@ class AuditDispositionLifecycleTest {
     }
 
     private void apply(String auditKey, ParsedFinding... findings) {
+        apply(auditKey, Set.of(), findings);
+    }
+
+    private void apply(String auditKey, Set<String> factNames, ParsedFinding... findings) {
         WorkflowRunCompletedEvent event = new WorkflowRunCompletedEvent(this, "run-1", "wf-1", "Audit", PROJECT,
                 "/tmp/p", RunStatus.COMPLETED, Map.of(), Map.of(), null);
         AuditReport report = AuditReport.builder().id("rep-1").projectId(PROJECT).auditKey(auditKey)
                 .generatedAt(NOW).build();
-        applier.apply(event, report, List.of(findings), Set.of());
+        applier.apply(event, report, List.of(findings), factNames);
     }
 
     @SuppressWarnings("unchecked")

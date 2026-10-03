@@ -33,6 +33,13 @@ class AuditSubjectNormalizerTest {
             "com/automation/service/AssistantService.java:42 | AssistantService",
             "AssistantService.java | AssistantService",
             "com.automation.service.AssistantService | AssistantService",
+            // Kein Java-FQN: ein Paketsegment allein, Dateiendung als letztes Segment, kein CamelCase
+            "pom.XML | pom.XML",
+            "docs.README | docs.README",
+            "x.Yml | x.Yml",
+            "config.app.Yml | config.app.Yml",
+            "service.Foo | service.Foo",
+            "com.example.CONSTANTS | com.example.CONSTANTS",
             // Frontend-Module bleiben Pfade: ActivityLog.tsx ist nicht die Java-Klasse ActivityLog. Nur die
             // Praefix-Varianten desselben Moduls werden angeglichen.
             "frontend/src/pages/Workflows.tsx | frontend/src/pages/Workflows.tsx",
@@ -101,5 +108,23 @@ class AuditSubjectNormalizerTest {
         assertThat(AuditSubjectNormalizer.normalize("frontend/src/pages/ActivityLog.tsx")).isNotEqualTo(backend);
         assertThat(AuditSubjectNormalizer.normalize("ai-automation-frontend/src/pages/ActivityLog.tsx")).isNotEqualTo(backend);
         assertThat(AuditSubjectNormalizer.normalize("ActivityLog.tsx")).isNotEqualTo(backend);
+    }
+
+    /**
+     * Grundlage der Klassennamen-Normalisierung (87a1dac0): Unter src/main/java ist jeder einfache Klassenname
+     * eindeutig. Kaeme ein zweiter dazu, fielen die Audit-Befunde beider Klassen auf eine Identitaet.
+     */
+    @Test
+    void simpleClassNamesUnderSrcMainJavaAreUnique() throws java.io.IOException {
+        java.nio.file.Path root = java.nio.file.Paths.get("src/main/java");
+        if (!java.nio.file.Files.isDirectory(root)) root = java.nio.file.Paths.get("ai-automation-backend/src/main/java");
+        java.util.Map<String, java.util.List<String>> byName = new java.util.TreeMap<>();
+        try (var files = java.nio.file.Files.walk(root)) {
+            files.filter(f -> f.toString().endsWith(".java")).forEach(f -> byName
+                    .computeIfAbsent(f.getFileName().toString(), k -> new java.util.ArrayList<>()).add(f.toString()));
+        }
+        assertThat(byName).as("Quellbaum gefunden").isNotEmpty();
+        assertThat(byName.values().stream().filter(paths -> paths.size() > 1).toList())
+                .as("doppelte einfache Klassennamen — AuditSubjectNormalizer setzte ihre Befunde gleich").isEmpty();
     }
 }

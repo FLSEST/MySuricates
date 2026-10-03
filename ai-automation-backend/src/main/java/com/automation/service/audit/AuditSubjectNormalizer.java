@@ -1,5 +1,7 @@
 package com.automation.service.audit;
 
+import java.util.Locale;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
@@ -43,8 +45,16 @@ public final class AuditSubjectNormalizer {
     private static final Pattern CLASS_FILE = Pattern.compile("([A-Z][A-Za-z0-9_]*)\\.java");
     private static final String FRONTEND = "frontend/";
     private static final String FRONTEND_MODULE_DIR = "ai-automation-frontend/";
-    /** Voll qualifizierter Klassenname: klein geschriebene Paketsegmente, dann der Klassenname. */
-    private static final Pattern QUALIFIED_CLASS = Pattern.compile("(?:[a-z_][a-z0-9_]*\\.)+([A-Z][A-Za-z0-9_]*)");
+    /**
+     * Voll qualifizierter Java-Klassenname: mindestens zwei klein geschriebene Paketsegmente, dann ein
+     * CamelCase-Name ({@code com.automation.Foo}). {@code pom.XML}, {@code docs.README} oder
+     * {@code service.Foo} sind keiner.
+     */
+    private static final Pattern QUALIFIED_CLASS = Pattern.compile(
+            "(?:[a-z_][a-z0-9_]*\\.){2,}([A-Z][A-Za-z0-9_]*[a-z][A-Za-z0-9_]*)");
+    /** Dateiendungen, die als letztes Segment nie ein Klassenname sind ({@code config.app.Yml}). */
+    private static final Set<String> FILE_EXTENSIONS = Set.of("yml", "yaml", "xml", "json", "md", "properties",
+            "java", "ts", "tsx", "js", "jsx", "sql", "sh", "txt", "html", "css", "toml", "gradle", "kt", "env");
 
     private AuditSubjectNormalizer() {
     }
@@ -75,7 +85,8 @@ public final class AuditSubjectNormalizer {
         }
         String withoutMethod = withoutMethodSuffix(value);
         var qualified = QUALIFIED_CLASS.matcher(withoutMethod);
-        return qualified.matches() ? qualified.group(1) : withoutMethod;
+        return qualified.matches() && !FILE_EXTENSIONS.contains(qualified.group(1).toLowerCase(Locale.ROOT))
+                ? qualified.group(1) : withoutMethod;
     }
 
     /** Einheitliches Praefix fuer Frontend-Module: {@code frontend/src/…}. */

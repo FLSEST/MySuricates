@@ -371,13 +371,18 @@ earlier findings only as Markdown in `previous_report`. Section 10b of the same 
     class `subject` under another `ruleKey`, the new one inherits status and classification
     (`Übernommen von <old ruleKey> (Regelwechsel)`; an acceptance keeps its deadline, the new evidence
     becomes the comparison base), and the old one becomes `RESOLVED` (`Ersetzt durch <new ruleKey>
-    (Regelwechsel)`). Not for subjects that name no file (`repository`, FACT names) and not for rules
-    with a fixed subject.
+    (Regelwechsel)`). Not for subjects that name no file (`repository`, FACT names, routes, single words –
+    a file means a path with `/`, a file extension or a CamelCase class with at least two capitals) and
+    not for rules with a fixed subject. Each predecessor passes its classification on at most once; a
+    successor of higher severity (`CRITICAL`/`HIGH` where it used to be lower) inherits nothing and has
+    to be classified anew.
   - **Rule retired:** if the `ruleKey` is no longer in the audit's catalogue, no valid report can
     report it any more – `RESOLVED` with `Regel nicht mehr im Katalog`.
   - **No longer seen:** if the finding is missing from three consecutive valid runs (the current one
-    included), it becomes `RESOLVED` with `Nicht mehr gemessen/ersetzt: 3 Läufe ohne Wiedersehen`. If it
-    shows up again later, it is a regression (`OPEN`) – the classification has to be made anew.
+    included), it becomes `RESOLVED` with `Nicht mehr gemessen/ersetzt: 3 Läufe ohne Wiedersehen`. For a
+    metric rule (fixed subject in FACT form) only a run that measured the FACT resolves it; if the FACT is
+    missing from the fact sheet, the classification stays (partial measurement). If the finding shows up
+    again later, it is a regression (`OPEN`) – the classification has to be made anew.
 - If an `ACCEPTED_RISK` finding re-appears, `AuditAcceptancePolicy` checks it against the evidence
   frozen at acceptance: if a measured value lies more than 10 % above it or the change rate has newly
   reached the hotspot threshold, the finding becomes `OPEN`
