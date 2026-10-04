@@ -128,6 +128,10 @@ jobs:
       # TODO-Batch (cc0eb3ba): Skripte gegen Wegwerf-Repos, braucht nur python3 und git.
       - name: TODO-Batch-Skripte
         run: python3 -m unittest discover -s scripts/tests -p 'test_todo_batch.py'
+      # README-Sync (c13a942b): Abschnitts-Diff, Einsetzen und Byte-Gate gegen Wegwerf-Repos,
+      # dazu der Gleichlauf der echten READMEs — braucht nur python3 und git.
+      - name: README-Sync-Skript
+        run: python3 -m unittest discover -s scripts/tests -p 'test_readme_sync.py'
       # Liefen bisher nur lokal (cad7d821): Dev-Starter (JAR-Laufzeit, Run-Waechter, Proxy, Container-
       # Modus mit Stubs) und die Seed-Vorlage gegen einen curl-Stub. Brauchen python3, curl, git, jq,
       # node und script — kein Backend, kein Docker, keine KI-CLI.

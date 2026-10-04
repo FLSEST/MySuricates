@@ -13,7 +13,8 @@
 #   4. Notizen aus scripts/release-notes.sh nach release-notes/<tag>.md (die Release-Action im
 #      öffentlichen Repo nimmt diese Datei), Commit "Release <tag>".
 #   5. Gates auf genau diesem Commit: public-hygiene --tracked (mit privaten Listen),
-#      pool-neutrality, gitleaks (falls installiert), Doku-Gates (pre-push-checks.sh --tree),
+#      pool-neutrality, README-Sync-Stand (README.md gibt die README.de.md des Tags wieder),
+#      gitleaks (falls installiert), Doku-Gates (pre-push-checks.sh --tree),
 #      mit --with-build zusätzlich mvn test, tsc und lint im Ziel.
 #      Ein Befund nimmt den Commit zurück — das Ziel steht danach wie vorher.
 #   6. Annotiertes Tag. KEIN Push: Das Skript endet mit dem Push-Befehl.
@@ -414,6 +415,16 @@ gate_script() {  # $1 = Name, $2 = Skriptpfad im Ziel, Rest = Argumente
 
 gate_script "Public-Hygiene (--tracked)" scripts/ci/public-hygiene.sh --tracked
 gate_script "Pool-Neutralität" scripts/ci/pool-neutrality.sh
+# README-Sync (c13a942b): README.md muss die README.de.md des Releases wiedergeben. Im Ziel gibt es
+# den Commit aus dem Sync-Stand nicht — aufloesbar bleibt er dort nur ueber den Inhalts-Hash, und
+# der passt nur, wenn vor dem Tag synchronisiert wurde. Tags vor dem Skript haben es noch nicht.
+if [ -f "$TARGET/scripts/readme-sync/readme_sync.py" ]; then
+    run_gate "README-Sync-Stand" python3 scripts/readme-sync/readme_sync.py --root . check --current
+else
+    echo "▶ README-Sync-Stand"
+    echo "    scripts/readme-sync/readme_sync.py fehlt im Tag (älter als der Sync-Stand) — übersprungen"
+    GATE_SUMMARY+=("README-Sync-Stand: übersprungen (Skript fehlt im Tag)")
+fi
 
 if command -v gitleaks >/dev/null 2>&1; then
     if [ -n "$OLD" ]; then LEAK_RANGE="${OLD}..${NEW}"; else LEAK_RANGE="$NEW"; fi

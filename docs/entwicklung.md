@@ -780,7 +780,10 @@ Das Skript:
    das zuletzt übergebene Release, die Links zeigen ins öffentliche Repo) und committet
    `Release <tag>`.
 5. Prüft genau diesen Commit: Treue (jede Datei hat Blob und Modus wie im Tag, nichts sonst außer
-   `release-notes/`), `public-hygiene.sh --tracked`, `pool-neutrality.sh`, gitleaks (falls
+   `release-notes/`), `public-hygiene.sh --tracked`, `pool-neutrality.sh`, den README-Sync-Stand
+   (`readme_sync.py check --current`: `README.md` gibt die `README.de.md` des Tags wieder — im
+   öffentlichen Repo lässt er sich nur über den Inhalts-Hash im Marker auflösen, vor dem Tag also
+   den Sync laufen lassen), gitleaks (falls
    installiert), die Doku-Gates (`pre-push-checks.sh --tree`), mit `--with-build` außerdem
    `mvn test` sowie `npm ci` (nur ohne `node_modules`), `tsc --noEmit` und `npm run lint`. Jeder
    Befund nimmt den Commit zurück; das Ziel steht danach wie vorher.
