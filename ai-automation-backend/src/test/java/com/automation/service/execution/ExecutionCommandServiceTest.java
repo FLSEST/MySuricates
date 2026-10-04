@@ -10,6 +10,7 @@ import com.automation.mapper.WorkflowMapper;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.workflow.WorkflowExecutor;
 import com.automation.service.workflow.WorkflowService;
+import com.automation.testsupport.FakeTransactions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -18,6 +19,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.mockito.ArgumentMatchers.eq;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -51,6 +53,29 @@ class ExecutionCommandServiceTest {
         when(workflowMapper.toRunResponse(newRun)).thenReturn(response);
 
         assertThat(service.retry("run-1")).isSameAs(response);
+    }
+
+    /**
+     * fe06ebf9: the new run's thread must not start inside the request transaction — it would run
+     * before the run row is committed (and wait for the single pooled connection meanwhile).
+     */
+    @Test
+    void retry_startsTheRunOutsideATransaction() {
+        ExecutionCommandService proxied = FakeTransactions.proxy(service, FakeTransactions.manager());
+        Workflow workflow = Workflow.builder().id("wf-1").build();
+        WorkflowRun run = WorkflowRun.builder().id("run-1").workflow(workflow).status(RunStatus.FAILED).build();
+        WorkflowRun newRun = WorkflowRun.builder().id("run-2").status(RunStatus.RUNNING).build();
+        AtomicBoolean startedInTransaction = new AtomicBoolean(true);
+        when(executionQueryService.findById("run-1")).thenReturn(run);
+        when(workflowService.findByIdEager("wf-1")).thenReturn(workflow);
+        when(workflowExecutor.execute(eq(workflow), any(), eq(TriggerSource.RETRY))).thenAnswer(inv -> {
+            startedInTransaction.set(FakeTransactions.active());
+            return newRun;
+        });
+
+        proxied.retry("run-1");
+
+        assertThat(startedInTransaction).as("execute() ran inside a transaction").isFalse();
     }
 
     @Test
