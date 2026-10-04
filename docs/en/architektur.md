@@ -153,7 +153,7 @@ The three `private-network-guard` switches control the **outbound guard** (`Outb
 **Since 2026-10: unattended starts with a HIGH `self-api-call`/`direct-db-access` are refused** — rule (3) above is new and has no switch. Whoever updates an existing instance checks before the restart which workflows would be affected:
 
 ```bash
-curl -s -H "X-API-Key: $KEY" "http://localhost:9090/api/v1/workflows/analyze?minSeverity=HIGH"
+curl -s --noproxy '*' -H "X-API-Key: $KEY" "http://localhost:9090/api/v1/workflows/analyze?minSeverity=HIGH"
 ```
 
 If `byRule` lists `self-api-call` or `direct-db-access`, those workflows no longer start from a schedule, webhook, trigger or chain after the update (`403 UNATTENDED_PLATFORM_ACCESS`, a SECURITY entry in the activity log). Remedy: data via context variables, TODOs via the todo blocks, external services via the integration block; started by hand they keep running.

@@ -154,7 +154,7 @@ Die drei `private-network-guard`-Schalter steuern den **Outbound-Guard** (`Outbo
 **Seit 2026-10: unbeaufsichtigte Starts mit HIGH `self-api-call`/`direct-db-access` werden abgewiesen** — Regel (3) oben ist neu und kennt keinen Schalter. Wer eine bestehende Instanz aktualisiert, prüft vor dem Neustart, welche Workflows betroffen wären:
 
 ```bash
-curl -s -H "X-API-Key: $KEY" "http://localhost:9090/api/v1/workflows/analyze?minSeverity=HIGH"
+curl -s --noproxy '*' -H "X-API-Key: $KEY" "http://localhost:9090/api/v1/workflows/analyze?minSeverity=HIGH"
 ```
 
 Steht in `byRule` `self-api-call` oder `direct-db-access`, starten diese Workflows nach dem Update nicht mehr per Zeitplan, Webhook, Trigger oder Kette (`403 UNATTENDED_PLATFORM_ACCESS`, SECURITY-Eintrag im Activity-Log). Abhilfe: Daten über Kontextvariablen, TODOs über die todo-Blöcke, fremde Dienste über den Integrations-Block; von Hand starten sie weiter.
