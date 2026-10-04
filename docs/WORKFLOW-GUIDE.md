@@ -1310,6 +1310,13 @@ fehlen aber (stiller Fehlschlag). Deshalb:
 - **Schreibende Codex-Workflows über Pi:** `"provider": "PI"`, `"model": "openai-codex/gpt-5.5"` — der
   ACT-Pfad von Pi hat read/write/edit/bash-Tools und kann schreiben (Beispiel: `pi-smoke-test`).
 
+**Sandbox startet nicht:** Meldet Codex' eigene Ausgabe einen Startfehler der Sandbox (`bwrap: …`, etwa
+`bwrap: setting up uid map: Permission denied` oder vereinzelt `bwrap: loopback: Failed RTM_NEWADDR: Operation not
+permitted`), scheitert der Schritt mit „Codex sandbox could not start on this host (…)“ — auch bei Exit-Code 0 und
+auch, wenn die Antwort nur aus dieser Fehlerzeile besteht. Der Provider wiederholt den Aufruf nicht; eine
+blinde Antwort ohne Dateizugriff geht nicht an den nächsten Schritt weiter. Zeilen, die auch im Prompt oder
+in der eigentlichen Antwort stehen (das Modell schreibt *über* bwrap), zählen nicht.
+
 ### Modell setzen
 
 Via API:

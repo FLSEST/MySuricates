@@ -157,7 +157,7 @@ class HostCodexServiceTest {
                 "codex",
                 "I could not read the repository, so here is a general answer.");
 
-        assertThat(HostCodexService.sandboxFailure(output, "I could not read the repository, so here is a general answer."))
+        assertThat(HostCodexService.sandboxFailure(output, "I could not read the repository, so here is a general answer.", null))
                 .contains("bwrap: setting up uid map: Permission denied");
     }
 
@@ -165,8 +165,8 @@ class HostCodexServiceTest {
     void sandboxFailure_ignoresOutputWithoutSandboxErrors() {
         String output = "exec bash -lc 'ls src' in /work\nMain.java\ncodex\nAll good.";
 
-        assertThat(HostCodexService.sandboxFailure(output, "All good.")).isEmpty();
-        assertThat(HostCodexService.sandboxFailure(null, "All good.")).isEmpty();
+        assertThat(HostCodexService.sandboxFailure(output, "All good.", null)).isEmpty();
+        assertThat(HostCodexService.sandboxFailure(null, "All good.", null)).isEmpty();
     }
 
     @Test
@@ -174,12 +174,63 @@ class HostCodexServiceTest {
         String answer = "Explanation of the log line:\nbwrap: setting up uid map: Permission denied\nmeans user namespaces are off.";
         String output = "codex\n" + answer;
 
-        assertThat(HostCodexService.sandboxFailure(output, answer)).isEmpty();
+        assertThat(HostCodexService.sandboxFailure(output, answer, null)).isEmpty();
     }
 
     @Test
     void sandboxFailure_toleratesIndentedToolOutput() {
-        assertThat(HostCodexService.sandboxFailure("  bwrap: Creating new namespace failed: Operation not permitted\n", "done"))
+        assertThat(HostCodexService.sandboxFailure("  bwrap: Creating new namespace failed: Operation not permitted\n", "done", null))
                 .contains("bwrap: Creating new namespace failed: Operation not permitted");
+    }
+
+    // --- 51958d17: loopback failure, error-only answers, prompt quotes ---
+
+    @Test
+    void sandboxFailure_detectsTheLoopbackFailureOfAParallelRun() {
+        String output = String.join("\n",
+                "exec bash -lc 'cat README.md' in /work",
+                " exited 1 in 4ms:",
+                "bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted",
+                "codex",
+                "Ich konnte die Dateien nicht lesen.");
+
+        assertThat(HostCodexService.sandboxFailure(output, "Ich konnte die Dateien nicht lesen.", "Review the README"))
+                .contains("bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted");
+    }
+
+    @Test
+    void sandboxFailure_detectsTheMarkerAfterAColon() {
+        String output = "ERROR codex_core::exec: sandbox failed: bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted";
+
+        assertThat(HostCodexService.sandboxFailure(output, "done", null)).isPresent();
+    }
+
+    @Test
+    void sandboxFailure_anAnswerThatIsOnlyTheErrorIsNoAnswer() {
+        String error = "bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted";
+
+        assertThat(HostCodexService.sandboxFailure("codex\n" + error + "\n" + error, error, "Review the diff"))
+                .contains(error);
+        assertThat(HostCodexService.sandboxFailure(null, "\n  " + error + "  \n", null)).contains(error);
+    }
+
+    @Test
+    void sandboxFailure_ignoresTheErrorQuotedInThePrompt() {
+        String prompt = "TODO: Codex-Review scheitert an der Sandbox:\nbwrap: loopback: Failed RTM_NEWADDR: Operation not permitted";
+        String answer = "The fix belongs in HostCodexService.";
+
+        assertThat(HostCodexService.sandboxFailure("user\n" + prompt + "\ncodex\n" + answer, answer, prompt)).isEmpty();
+    }
+
+    @Test
+    void sandboxFailure_ignoresTheMarkerQuotedInSourceCode() {
+        String output = String.join("\n",
+                "exec bash -lc 'cat HostCodexService.java' in /work",
+                "    private static final List<String> PREFIXES = List.of(\"bwrap:\");",
+                "     * without user namespaces (\"bwrap: setting up uid map: Permission denied\").",
+                "codex",
+                "Looks fine.");
+
+        assertThat(HostCodexService.sandboxFailure(output, "Looks fine.", null)).isEmpty();
     }
 }
