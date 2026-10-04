@@ -216,8 +216,11 @@ languages at once.
   (`"integrity": "MISSING"`, the UI shows a notice).
 - **Gate**: `PoolIntegrityGateTest` checks that every tracked pool file carries a matching field.
   After a deliberate hand edit, write the checksums anew and commit them with it:
-  `./mvnw test -Dtest=PoolIntegrityGateTest -Dpool.integrity.write=true` (it replaces or appends
+  `cd ai-automation-backend && ./mvnw test -Dtest='PoolIntegrityGateTest*' -Dpool.integrity.write=true` (it replaces or appends
   only that one line, the file's layout stays).
+- **Try it locally:** delete the `integrity` line of a pool file → the install succeeds with a
+  warning (`"integrity": "MISSING"`); change a value in the content → the install is refused with
+  `400`.
 
 The workflow export (`GET /workflows/export/{id}`) carries the same field;
 `POST /workflows/import` checks it the same way (`IMPORT_INTEGRITY_MISMATCH`). There the checksum

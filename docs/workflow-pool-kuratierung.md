@@ -220,8 +220,11 @@ weggelassen, Reihenfolge der Blöcke bleibt; dieselbe Normalisierung wie beim
   (`"integrity": "MISSING"`, die Oberfläche zeigt einen Hinweis).
 - **Gate**: `PoolIntegrityGateTest` prüft, dass jede getrackte Pool-Datei ein passendes Feld
   trägt. Nach einer gewollten Änderung von Hand die Prüfsummen neu schreiben und mitcommitten:
-  `./mvnw test -Dtest=PoolIntegrityGateTest -Dpool.integrity.write=true` (ersetzt bzw. ergänzt
+  `cd ai-automation-backend && ./mvnw test -Dtest='PoolIntegrityGateTest*' -Dpool.integrity.write=true` (ersetzt bzw. ergänzt
   nur die eine Zeile, das Layout der Datei bleibt).
+- **Lokal ausprobieren:** In einer Pool-Datei die `integrity`-Zeile löschen → der Install gelingt
+  mit Warnung (`"integrity": "MISSING"`); einen Wert im Inhalt ändern → der Install wird mit `400`
+  abgelehnt.
 
 Der Workflow-Export (`GET /workflows/export/{id}`) trägt dasselbe Feld; `POST /workflows/import`
 prüft es genauso (`IMPORT_INTEGRITY_MISMATCH`). Dort deckt die Prüfsumme alles ab, was der
