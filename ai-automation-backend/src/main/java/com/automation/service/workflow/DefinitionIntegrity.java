@@ -44,6 +44,9 @@ public final class DefinitionIntegrity {
 
     public static final String FIELD = "integrity";
     public static final String PREFIX = "sha256:";
+    /** What an import takes over unchanged — the fields the export/import checksum covers. */
+    private static final List<String> IMPORT_FIELDS = List.of(
+            "description", "icon", "blocks", "instructions", "model", "version", "defaultContext", "metadata");
 
     private DefinitionIntegrity() {
     }
@@ -85,6 +88,18 @@ public final class DefinitionIntegrity {
     }
 
     /**
+     * Checksum of a {@code POST /workflows/import} body built as a map (instance sync, TODO b18939a6):
+     * over the same fields as {@link #ofExport}, taken from the body as it is sent.
+     */
+    public static String ofImportBody(Map<String, Object> body) {
+        Map<String, Object> document = new LinkedHashMap<>();
+        for (String field : IMPORT_FIELDS) {
+            document.put(field, body.get(field));
+        }
+        return compute(document);
+    }
+
+    /**
      * Refuses an import whose checksum does not match ({@link ErrorMessage#IMPORT_INTEGRITY_MISMATCH}, 400)
      * and logs a warning for one without a checksum.
      */
@@ -106,15 +121,12 @@ public final class DefinitionIntegrity {
     private static Map<String, Object> exportDocument(String description, String icon, List<BlockDefinition> blocks,
                                                       String instructions, String model, String version,
                                                       Map<String, Object> defaultContext, Map<String, Object> metadata) {
+        List<Object> values = java.util.Arrays.asList(description, icon, blocks, instructions, model, version,
+                defaultContext, metadata);
         Map<String, Object> document = new LinkedHashMap<>();
-        document.put("description", description);
-        document.put("icon", icon);
-        document.put("blocks", blocks);
-        document.put("instructions", instructions);
-        document.put("model", model);
-        document.put("version", version);
-        document.put("defaultContext", defaultContext);
-        document.put("metadata", metadata);
+        for (int i = 0; i < IMPORT_FIELDS.size(); i++) {
+            document.put(IMPORT_FIELDS.get(i), values.get(i));
+        }
         return document;
     }
 

@@ -1,5 +1,7 @@
 package com.automation.service.staging;
 
+import com.automation.dto.IntegrityCheck;
+import com.automation.dto.request.ImportWorkflowRequest;
 import com.automation.dto.request.SyncDefinitionsRequest;
 import com.automation.dto.response.SyncPreview;
 import com.automation.dto.response.SyncResult;
@@ -9,6 +11,7 @@ import com.automation.repository.ProjectRepository;
 import com.automation.repository.SkillRepository;
 import com.automation.repository.WorkflowChainRepository;
 import com.automation.repository.WorkflowRepository;
+import com.automation.service.workflow.DefinitionIntegrity;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -171,6 +174,39 @@ class InstanceSyncHelperTest {
         verify(httpClient).httpPost(eq(TARGET + "/workflows/import"), importCaptor.capture());
         assertThat(importCaptor.getValue()).containsEntry("metadata", Map.of("category", "ops"))
                 .containsEntry("defaultContext", Map.of("env", "prod"));
+    }
+
+    /**
+     * b18939a6: Der Import-Body trägt die Prüfsumme über genau die gesendeten Felder — das Ziel prüft sie
+     * nach dem Transport (JSON hin und zurück) als VERIFIED und schreibt keine Warnung „no integrity checksum“.
+     * Ein leeres Versions-Label fehlt im Body und darf die Prüfsumme deshalb nicht verfälschen.
+     */
+    @Test
+    void sync_newWorkflow_sendsAnIntegrityChecksumTheTargetVerifies() throws Exception {
+        Project proj = Project.builder().id("p1").name("Proj").path("/proj").type(ProjectType.CODE).build();
+        BlockDefinition block = BlockDefinition.builder().type("shell").name("scan")
+                .config(new java.util.LinkedHashMap<>(Map.of("command", "ls", "timeout_seconds", 60, "ratio", 0.5))).build();
+        Workflow wf = Workflow.builder().id("wf1").name("NewWF").project(proj).blocks(List.of(block))
+                .instructions("Be brief").model("opus").version("  ")
+                .metadata(new java.util.HashMap<>(Map.of("category", "ops")))
+                .defaultContext(new java.util.HashMap<>(Map.of("env", "prod"))).build();
+        when(projectRepository.findAll()).thenReturn(List.of(proj));
+        when(workflowRepository.findAllReadOnly()).thenReturn(List.of(wf));
+        when(skillRepository.findByBuiltin(false)).thenReturn(List.of());
+        when(httpClient.httpGet(TARGET + "/projects")).thenReturn(objectMapper.readTree("[{\"name\":\"Proj\",\"path\":\"/proj\",\"id\":\"tp1\"}]"));
+        when(httpClient.httpGet(TARGET + "/workflows")).thenReturn(objectMapper.readTree("[]"));
+        when(httpClient.httpGet(TARGET + "/skills")).thenReturn(objectMapper.readTree("[]"));
+        when(httpClient.httpPost(eq(TARGET + "/workflows/import"), any())).thenReturn(objectMapper.readTree("{\"id\":\"twf1\"}"));
+
+        syncHelper.syncDefinitionsTo(TARGET, null, null);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> importCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(httpClient).httpPost(eq(TARGET + "/workflows/import"), importCaptor.capture());
+        assertThat((String) importCaptor.getValue().get("integrity")).startsWith("sha256:");
+        ImportWorkflowRequest onTarget = objectMapper.readValue(
+                objectMapper.writeValueAsString(importCaptor.getValue()), ImportWorkflowRequest.class);
+        assertThat(DefinitionIntegrity.verifyImport(onTarget).status()).isEqualTo(IntegrityCheck.Status.VERIFIED);
     }
 
     /** Der Versionsstand kommt mit – per Import wie per PUT (62422aef). */
