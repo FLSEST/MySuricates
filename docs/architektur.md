@@ -449,6 +449,7 @@ Der Switch-Block evaluiert einen Ausdruck gegen mehrere Cases:
 - Zirkuläre Referenzen werden via `__parent_workflow_ids` erkannt
 - Maximale Verschachtelungstiefe: 5 Ebenen
 - Polling-basierter Abschluss, 30-Minuten-Timeout
+- Start, Wächter und Warten liegen in `SubWorkflowLauncher`; denselben Weg nimmt `foreach` mit `workflow_id` je Item (TODO a5c9fbbf). `workflow_id` darf ein Platzhalter aus einer vertrauenswürdigen Kontextvariable sein, nie aus Webhook-Daten oder Blockausgaben
 - `@Lazy`-Injection auf `WorkflowExecutor` nur dort, wo ein Aufrufer selbst Runs startet (Sub-Workflow, Chains, Trigger); reine Status-Abfragen (aktive Runs, Container-IDs, Approvals) gehen direkt an `WorkflowExecutionRegistry`, das Steuern eines laufenden Runs an `RunControlService`, der den `WorkflowExecutor` nicht braucht
 
 ### Human-Input Block

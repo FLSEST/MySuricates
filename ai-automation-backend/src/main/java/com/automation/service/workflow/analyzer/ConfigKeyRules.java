@@ -107,12 +107,12 @@ final class ConfigKeyRules {
                     where.prefixEn() + "required key " + required + " is missing — without it the " + type
                             + " block cannot run" + (instead == null ? "" : " (" + instead + " is set instead)")));
         }
-        checkOneOf(schema, type, cfg, where, out);
+        checkOneOf(schema, type, cfg, fields, where, out);
     }
 
     /** {@code requiredOneOf}: genau einer der Schlüssel – keiner oder mehrere lassen den Block abbrechen. */
-    private static void checkOneOf(BlockConfigSchema schema, String type, Map<String, Object> cfg, Where where,
-                                   List<AnalyzerFinding> out) {
+    private static void checkOneOf(BlockConfigSchema schema, String type, Map<String, Object> cfg,
+                                   Map<String, BlockConfigSchema.Field> fields, Where where, List<AnalyzerFinding> out) {
         List<String> oneOf = schema.requiredOneOfKeys(type);
         // Ein leerer Text gilt wie im Executor als nicht gesetzt
         long present = oneOf.stream().filter(key -> cfg.get(key) != null
@@ -120,13 +120,17 @@ final class ConfigKeyRules {
         if (oneOf.isEmpty() || present == 1) return;
         String de = String.join(" oder ", oneOf);
         String en = String.join(" or ", oneOf);
+        String instead = present > 0 ? null : oneOf.stream().map(key -> presentInstead(cfg, fields, key))
+                .filter(java.util.Objects::nonNull).findFirst().orElse(null);
         out.add(AnalyzerFinding.of("missing-required-config-key", Severity.HIGH, where.index(), where.name(),
                 where.prefix() + (present == 0
                         ? "Pflichtschlüssel " + de + " fehlt — ohne einen davon kann der " + type + "-Block nicht laufen"
+                                + (instead == null ? "" : " (gesetzt ist " + instead + ")")
                         : de + " schließen sich aus — nur einer darf gesetzt sein, sonst bricht der " + type
                                 + "-Block ab"),
                 where.prefixEn() + (present == 0
                         ? "required key " + en + " is missing — without one of them the " + type + " block cannot run"
+                                + (instead == null ? "" : " (" + instead + " is set instead)")
                         : en + " exclude each other — set only one, otherwise the " + type + " block fails")));
     }
 

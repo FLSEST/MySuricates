@@ -89,6 +89,15 @@ class ModelUseTest {
         assertThat(ModelUse.needsAiAsBlueprint(List.of(block("simple", Map.of("command", "x"))))).isTrue();
     }
 
+    /** TODO a5c9fbbf: a foreach that starts a workflow per item is a sub-workflow, even in shell mode. */
+    @Test
+    void aForeachWithWorkflowId_countsAsAi_evenInShellMode() {
+        assertThat(ModelUse.needsAi(List.of(block("foreach", Map.of("items", List.of("a"),
+                "workflow_id", "{{ wf }}", "execution_mode", "shell"))))).isTrue();
+        assertThat(ModelUse.needsAi(List.of(block("foreach", Map.of("items", List.of("a"),
+                "command", "echo", "execution_mode", "shell"))))).isFalse();
+    }
+
     @Test
     void blocksWithoutTypeOrConfig_areNoModelCalls() {
         List<BlockDefinition> blocks = new java.util.ArrayList<>();

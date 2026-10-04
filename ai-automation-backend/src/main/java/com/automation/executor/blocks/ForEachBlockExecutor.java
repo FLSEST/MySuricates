@@ -11,14 +11,13 @@ import com.automation.executor.StepFailureSummary;
 import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.cli.HostExecutionRequest;
 import com.automation.service.workflow.ExecutionBroadcaster;
-import com.automation.util.TruncationUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -33,21 +32,10 @@ public class ForEachBlockExecutor implements BlockExecutor {
 
     /** Upper bound for the per-item summary persisted in the step metadata (keeps the row small). */
     static final int MAX_RECORDED_ITEMS = 500;
-    private static final int ITEM_LABEL_MAX_CHARS = 120;
-    /** Budget of the failure summary: failed item names, then the error of the first one (head + tail). */
-    private static final int FAILED_LABEL_MAX_CHARS = 60;
-    private static final int FAILED_NAMES_MAX_CHARS = 160;
-    private static final int ERROR_HEAD_CHARS = 80;
-    private static final int ERROR_TAIL_CHARS = 240;
-    /**
-     * Default of {@code max_consecutive_failures} (TODO a6659a46): after this many failed items in a row
-     * the loop stops instead of calling the rest — a quota error ("You've hit your session limit") fails
-     * every following item too and only burns time. {@code 0} switches it off.
-     */
-    static final int DEFAULT_MAX_CONSECUTIVE_FAILURES = 3;
 
     private final CommandExecutorService commandExecutor;
     private final ExecutionBroadcaster broadcaster;
+    private final SubWorkflowLauncher subWorkflows;
 
     @Override
     @SuppressWarnings("unchecked")
@@ -58,7 +46,10 @@ public class ForEachBlockExecutor implements BlockExecutor {
         boolean isShell = ExecutionMode.isShell(config);
         boolean escapeVariables = Boolean.TRUE.equals(config.get("shell_escape_variables"));
         boolean continueOnError = Boolean.parseBoolean(String.valueOf(config.getOrDefault("continue_on_error", "false")));
-        int maxConsecutiveFailures = maxConsecutiveFailures(config.get("max_consecutive_failures"));
+        int maxConsecutiveFailures = ForEachFailures.maxConsecutiveFailures(config.get("max_consecutive_failures"));
+        // workflow_id: one sub-workflow run per item instead of the command (TODO a5c9fbbf)
+        String configuredWorkflow = config.get("workflow_id") instanceof String id && !id.isBlank() ? id : null;
+        Map<String, Object> childMapping = config.get("context") instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of();
         int shellTimeout = ((Number) config.getOrDefault("timeout_seconds", SHELL_TIMEOUT_SECONDS)).intValue();
         Integer claudeTimeout = config.containsKey("timeout_seconds")
                 ? ((Number) config.get("timeout_seconds")).intValue()
@@ -74,13 +65,13 @@ public class ForEachBlockExecutor implements BlockExecutor {
             // items_command always runs as shell — it collects iteration targets, not AI work
             String output = commandExecutor.executeShellCommandOnHost(
                     context.getProjectPath(), itemsCommand, shellTimeout).output();
-            items = splitIntoItems(output);
+            items = ForEachItems.splitIntoItems(output);
         } else {
             Object rawItems = config.get("items");
             if (rawItems instanceof List<?> list) {
                 items = list.stream().map(Object::toString).filter(item -> !item.isBlank()).toList();
             } else if (rawItems instanceof String s) {
-                items = splitIntoItems(s);
+                items = ForEachItems.splitIntoItems(s);
             } else {
                 items = List.of();
             }
@@ -90,6 +81,17 @@ public class ForEachBlockExecutor implements BlockExecutor {
         aggregateResult.setStepIndex(context.nextStepIndex());
         aggregateResult.setStartedAt(Instant.now());
         aggregateResult.setInput("foreach " + variableName + " in [" + items.size() + " items]");
+
+        String workflowId = null;
+        if (configuredWorkflow != null) {
+            StringBuilder refusal = new StringBuilder();
+            if (command != null && !command.isBlank()) refusal.append("command and workflow_id exclude each other");
+            else workflowId = SubWorkflowLauncher.resolveWorkflowId(configuredWorkflow, context, refusal);
+            if (workflowId == null) return refused(aggregateResult, refusal.toString(), items.size());
+            StepAiMetadata.put(aggregateResult, "subWorkflowId", workflowId);
+            // The output copies the child runs' outputs; their markers count in the child runs only (6e5d6e2c)
+            StepAiMetadata.put(aggregateResult, "derivedOutput", true);
+        }
 
         StringBuilder outputs = new StringBuilder();
         boolean anyFailed = false;
@@ -101,6 +103,7 @@ public class ForEachBlockExecutor implements BlockExecutor {
         int totalItems = items.size();
         int consecutiveFailures = 0;
         int skippedItems = 0;
+        Set<String> itemFields = Set.of();
 
         for (int i = 0; i < items.size(); i++) {
             String item = items.get(i);
@@ -114,38 +117,22 @@ public class ForEachBlockExecutor implements BlockExecutor {
             ));
 
             // Items collected by items_command inherit the run's taint; static items are trusted
-            if (itemsFromCommand) context.setDerivedVariable(variableName, item);
-            else context.setVariable(variableName, item);
-            String resolvedCommand = isShell
-                    ? context.resolveShellTemplate(command, escapeVariables)
-                    : context.resolvePromptTemplate(command);
+            Map<String, Object> itemVariables = new LinkedHashMap<>();
+            itemVariables.put(variableName, item);
+            itemVariables.put(variableName + "_index", i);
+            Map<String, String> fields = ForEachItems.fields(variableName, item);
+            itemVariables.putAll(fields);
+            // The fields of the previous item must not stand in for missing ones of this item
+            itemFields.stream().filter(name -> !fields.containsKey(name)).forEach(context.getVariables()::remove);
+            itemFields = fields.keySet();
+            itemVariables.forEach((name, value) -> {
+                if (itemsFromCommand) context.setDerivedVariable(name, value);
+                else context.setVariable(name, value);
+            });
 
-            StepResult itemResult;
-            if (isShell) {
-                itemResult = commandExecutor.executeStepAsShell(
-                        context.getProjectPath(),
-                        CommandExecutorService.buildResolvedShellBlock(config, resolvedCommand, context),
-                        context.nextStepIndex(),
-                        shellTimeout
-                );
-            } else {
-                itemResult = commandExecutor.executeStepOnHost(
-                        HostExecutionRequest.builder()
-                                .projectPath(context.getProjectPath())
-                                .block(BlockDefinition.builder()
-                                        .type("simple")
-                                        .config(Map.of("command", resolvedCommand))
-                                        .build())
-                                .stepIndex(context.nextStepIndex())
-                                .systemPrompt(context.getInstructionPrefix())
-                                .model(context.modelFor(block))
-                                .timeoutSeconds(claudeTimeout)
-                                .providerId(context.providerFor(block))
-                                .effort(context.effortFor(block))
-                                .build()
-                );
-            }
-
+            StepResult itemResult = workflowId != null
+                    ? runWorkflow(workflowId, childMapping, context)
+                    : runCommand(block, command, isShell, escapeVariables, shellTimeout, claudeTimeout, context);
             boolean failed = itemResult.getStatus() == StepStatus.FAILED;
             broadcaster.broadcastLogMessage(runId, "foreach_item_completed", Map.of(
                     "stepIndex", stepIndex,
@@ -153,18 +140,20 @@ public class ForEachBlockExecutor implements BlockExecutor {
                     "item", item,
                     "totalItems", totalItems,
                     "status", itemResult.getStatus().name(),
-                    "output", itemResult.getOutput() != null ? itemResult.getOutput() : ""
+                    "output", itemResult.getOutput() != null ? itemResult.getOutput() : "",
+                    "subRunId", subRunId(itemResult)
             ));
 
             outputs.append("[").append(item).append("]: ").append(itemResult.getOutput()).append("\n");
             StepAiMetadata.carryAi(aggregateResult, itemResult);
             if (recordedItems.size() < MAX_RECORDED_ITEMS) {
-                recordedItems.add(Map.of(
+                Map<String, Object> recorded = new LinkedHashMap<>(Map.of(
                         "index", i,
-                        "item", truncate(item, ITEM_LABEL_MAX_CHARS),
+                        "item", truncate(item, ForEachFailures.ITEM_LABEL_MAX_CHARS),
                         "status", itemResult.getStatus().name(),
-                        "durationMs", itemResult.getDurationMs() != null ? itemResult.getDurationMs() : 0L
-                ));
+                        "durationMs", itemResult.getDurationMs() != null ? itemResult.getDurationMs() : 0L));
+                if (!subRunId(itemResult).isEmpty()) recorded.put("subRunId", subRunId(itemResult));
+                recordedItems.add(recorded);
             }
             if (failed) {
                 anyFailed = true;
@@ -182,7 +171,7 @@ public class ForEachBlockExecutor implements BlockExecutor {
             }
         }
 
-        String abortReason = skippedItems > 0 ? abortReason(consecutiveFailures, skippedItems) : null;
+        String abortReason = skippedItems > 0 ? ForEachFailures.abortReason(consecutiveFailures, skippedItems) : null;
         if (abortReason != null) {
             log.warn("foreach in run {} {}", runId, abortReason);
             StepAiMetadata.put(aggregateResult, "abortedAfterConsecutiveFailures", consecutiveFailures);
@@ -198,7 +187,7 @@ public class ForEachBlockExecutor implements BlockExecutor {
                         .append(" items failed: ").append(String.join(", ", failedItems));
             }
             if (!continueOnError || abortReason != null) {
-                String summary = failureSummary(failedItems, firstFailureOutput, totalItems);
+                String summary = ForEachFailures.failureSummary(failedItems, firstFailureOutput, totalItems);
                 StepFailureSummary.put(aggregateResult, abortReason != null ? abortReason + "\n" + summary : summary);
             }
         }
@@ -217,54 +206,64 @@ public class ForEachBlockExecutor implements BlockExecutor {
         return aggregateResult;
     }
 
-    /**
-     * Where the block failed, for the run error (TODO 4a8cabc4): the failed items first, then the
-     * first one with its error — {@code "2/5 items failed: a, b\n[a]: <error>"}. The output cannot
-     * say that: it lists every item in order, so a failed item sits between successful ones.
-     */
-    static String failureSummary(List<String> failedItems, String firstFailureOutput, int totalItems) {
-        StringBuilder names = new StringBuilder();
-        int listed = 0;
-        for (String item : failedItems) {
-            String label = truncate(item, FAILED_LABEL_MAX_CHARS);
-            if (listed > 0 && names.length() + label.length() > FAILED_NAMES_MAX_CHARS) break;
-            names.append(listed > 0 ? ", " : "").append(label);
-            listed++;
+    /** One item as a command: a shell call or an AI call, as before {@code workflow_id} existed. */
+    private StepResult runCommand(BlockDefinition block, String command, boolean isShell, boolean escapeVariables,
+                                  int shellTimeout, Integer claudeTimeout, ExecutionContext context) {
+        Map<String, Object> config = block.getConfig();
+        if (isShell) {
+            String resolvedCommand = context.resolveShellTemplate(command, escapeVariables);
+            return commandExecutor.executeStepAsShell(context.getProjectPath(),
+                    CommandExecutorService.buildResolvedShellBlock(config, resolvedCommand, context),
+                    context.nextStepIndex(), shellTimeout);
         }
-        if (listed < failedItems.size()) {
-            names.append(", … (+").append(failedItems.size() - listed).append(")");
-        }
-        String error = TruncationUtil.smart(firstFailureOutput.strip(), ERROR_HEAD_CHARS, ERROR_TAIL_CHARS);
-        return failedItems.size() + "/" + totalItems + " items failed: " + names
-                + "\n[" + truncate(failedItems.get(0), ITEM_LABEL_MAX_CHARS) + "]: " + error;
-    }
-
-    /** Why the loop stopped early, for the output and the run error. */
-    static String abortReason(int consecutiveFailures, int skippedItems) {
-        return "stopped after " + consecutiveFailures + " consecutive failed items (max_consecutive_failures), "
-                + skippedItems + " " + (skippedItems == 1 ? "item" : "items") + " not run";
-    }
-
-    /** {@code max_consecutive_failures}: a number or numeric text; missing or unreadable = default, below 0 = off. */
-    static int maxConsecutiveFailures(Object raw) {
-        if (raw instanceof Number n) return Math.max(0, n.intValue());
-        if (raw instanceof String s && !s.isBlank()) {
-            try {
-                return Math.max(0, Integer.parseInt(s.strip()));
-            } catch (NumberFormatException e) {
-                return DEFAULT_MAX_CONSECUTIVE_FAILURES;
-            }
-        }
-        return DEFAULT_MAX_CONSECUTIVE_FAILURES;
+        return commandExecutor.executeStepOnHost(HostExecutionRequest.builder()
+                .projectPath(context.getProjectPath())
+                .block(BlockDefinition.builder().type("simple")
+                        .config(Map.of("command", context.resolvePromptTemplate(command))).build())
+                .stepIndex(context.nextStepIndex())
+                .systemPrompt(context.getInstructionPrefix())
+                .model(context.modelFor(block))
+                .timeoutSeconds(claudeTimeout)
+                .providerId(context.providerFor(block))
+                .effort(context.effortFor(block))
+                .build());
     }
 
     /**
-     * Splits newline-separated item sources into items. Blank lines never become an iteration —
-     * an empty command output means zero items, not one empty item (which would cost an AI call).
+     * One item as a run of workflow {@code workflowId}, through the same {@link SubWorkflowLauncher} as the
+     * sub-workflow block. The child sees the item variables and, per {@code context} entry, the resolved
+     * value under its own name; those derived values carry the run's taint like the item itself.
      */
-    private static List<String> splitIntoItems(String raw) {
-        if (raw == null || raw.isBlank()) return List.of();
-        return Arrays.stream(raw.split("\n")).filter(line -> !line.isBlank()).toList();
+    private StepResult runWorkflow(String workflowId, Map<String, Object> mapping, ExecutionContext context) {
+        Instant start = Instant.now();
+        mapping.forEach((name, template) ->
+                context.setDerivedVariable(name, context.resolvePromptTemplate(String.valueOf(template))));
+        SubWorkflowLauncher.Outcome outcome = subWorkflows.run(workflowId, context);
+        Instant end = Instant.now();
+        StepResult result = StepResult.builder()
+                .output(outcome.output())
+                .status(outcome.success() ? StepStatus.COMPLETED : StepStatus.FAILED)
+                .startedAt(start).completedAt(end).durationMs(end.toEpochMilli() - start.toEpochMilli())
+                .build();
+        if (outcome.started()) StepAiMetadata.put(result, "subRunId", outcome.subRunId());
+        return result;
+    }
+
+    private static String subRunId(StepResult itemResult) {
+        return itemResult.getMetadata() != null && itemResult.getMetadata().get("subRunId") instanceof String id ? id : "";
+    }
+
+    /** A workflow_id that names no workflow the run may start: the block fails before the first item. */
+    private static StepResult refused(StepResult aggregateResult, String reason, int totalItems) {
+        aggregateResult.setOutput(reason);
+        StepFailureSummary.put(aggregateResult, reason);
+        StepAiMetadata.put(aggregateResult, "totalItems", totalItems);
+        StepAiMetadata.put(aggregateResult, "items", List.of());
+        aggregateResult.setStatus(StepStatus.FAILED);
+        aggregateResult.setCompletedAt(Instant.now());
+        aggregateResult.setDurationMs(
+                aggregateResult.getCompletedAt().toEpochMilli() - aggregateResult.getStartedAt().toEpochMilli());
+        return aggregateResult;
     }
 
     @Override

@@ -402,7 +402,7 @@ Im Beispiel gibt ein früherer Block namens `ampel` nur `GREEN`, `YELLOW` oder `
 
 ### `foreach` — Ueber Items iterieren
 
-Führt einen Befehl für jedes Item in einer Liste aus.
+Führt einen Befehl für jedes Item in einer Liste aus – oder, mit `workflow_id`, je Item einen Lauf eines anderen Workflows.
 
 | Config-Schlüssel | Typ | Default | Beschreibung |
 |---|---|---|---|
@@ -410,7 +410,9 @@ Führt einen Befehl für jedes Item in einer Liste aus.
 | `items_source` | string | `"list"` | `"command"` (Shell-Ausgabe) oder `"list"` (inline) |
 | `items_command` | string | — | Shell-Befehl, ein Item pro Zeile (nur bei `items_source: "command"`) |
 | `items` | list | — | Inline-Liste von Items (nur bei `items_source: "list"`) |
-| `command` | string | **erforderlich** | Befehl pro Item |
+| `command` | string | **erforderlich** (oder `workflow_id`) | Befehl pro Item |
+| `workflow_id` | string | — | Statt `command`: je Item ein Lauf dieses Workflows (siehe „Sub-Workflow je Item“). `command` und `workflow_id` schließen sich aus |
+| `context` | map | — | Nur mit `workflow_id`: zusätzliche Variablen für den Kind-Lauf je Item, Name → Vorlage (`{"feature_id": "{{ feature.id }}"}`) |
 | `execution_mode` | string | `"ai"` | `"ai"` (KI, Provider aus `provider` am Block/Workflow) oder `"shell"`; `"claude"` gilt weiter als `"ai"`, andere Werte werden abgelehnt |
 | `timeout_seconds` | int | 300 | Timeout pro Iteration |
 | `continue_on_error` | bool | `false` | `true`: fehlgeschlagene Items lassen den Block nicht scheitern — er endet COMPLETED, Folge-Blöcke laufen. Fehler werden im Output zusammengefasst (`N/M items failed: ...`). `false`: ein fehlgeschlagenes Item lässt den Block scheitern, die übrigen Items laufen trotzdem. In beiden Fällen listen die Step-Metadaten die Fehler (`failedItemCount`, `failedItems`, `totalItems`) |
@@ -431,6 +433,26 @@ Führt einen Befehl für jedes Item in einer Liste aus.
 ```
 
 **Hinweis**: `items_command` wird immer als Shell-Befehl ausgeführt (unabhängig von `execution_mode`), da es nur die Iterations-Ziele sammelt.
+
+**Item-Variablen**: Neben `{{ <variable_name> }}` steht der Index des Items (ab 0) als `{{ <variable_name>_index }}` bereit. Ist ein Item ein JSON-Objekt (eine Zeile wie `{"id": "auth", "desc": "Login"}`), stehen seine Felder der obersten Ebene als `{{ <variable_name>.<feld> }}` bereit (verschachtelte Werte als JSON-Text); Felder des vorigen Items verschwinden beim nächsten. Items aus `items_command` erben den Taint des Laufs, auch ihre Felder.
+
+**Sub-Workflow je Item** (`workflow_id`, seit a5c9fbbf): Statt eines Befehls startet foreach je Item einen eigenen Lauf des genannten Workflows – derselbe Mechanismus wie der `sub-workflow`-Block (`SubWorkflowLauncher`): Zulassung über `RunAdmission` als `SUB_WORKFLOW` mit der Herkunft des Eltern-Laufs, höchstens 5 Ebenen, kein Zirkel, 30 Minuten je Kind-Lauf. Der Kind-Lauf bekommt die Variablen dieses Laufs (ohne dessen Plattform-Daten) samt Item-Variablen und den Werten aus `context`; der Taint reist mit. Jeder Kind-Lauf erscheint einzeln in der Lauf-Liste, die Lauf-Seite verlinkt ihn je Item (Metadaten `items[].subRunId`, Schritt-Metadatum `subWorkflowId`). Ein Item scheitert, wenn sein Kind-Lauf nicht `COMPLETED` endet; `continue_on_error` und `max_consecutive_failures` gelten wie bei Befehlen. Die Ausgabe ist das Protokoll `[item]: <letzte Ausgabe des Kind-Laufs>` und trägt `derivedOutput: true` – Marker darin zählen nur in den Kind-Läufen. `execution_mode`, `timeout_seconds` und die KI-Schlüssel wirken in dieser Betriebsart nicht.
+
+`workflow_id` darf ein Platzhalter sein (`"{{ feature_workflow_id }}"`) – so bleiben Pool-Einträge frei von Instanz-UUIDs. Erlaubt sind nur vertrauenswürdige Kontextvariablen: Ein Platzhalter aus Webhook-Daten, `previous_output` oder einer Blockausgabe ließe fremde Eingaben einen beliebigen Workflow der Instanz wählen; der Block scheitert dann vor dem ersten Item, ebenso bei einem Platzhalter, der sich nicht auflöst. Dasselbe gilt für `workflow_id` am `sub-workflow`-Block.
+
+```json
+{
+  "type": "foreach",
+  "config": {
+    "items_source": "command",
+    "items_command": "printf '%s' {{ feature_order_json }} | python3 -c 'import json,sys; [print(json.dumps(f)) for f in json.load(sys.stdin)]'",
+    "shell_escape_variables": true,
+    "variable_name": "feature",
+    "workflow_id": "{{ feature_workflow_id }}",
+    "context": { "feature_id": "{{ feature.id }}", "feature_desc": "{{ feature.desc }}" }
+  }
+}
+```
 
 **Leere Item-Listen**: Leere und reine Whitespace-Zeilen werden verworfen — in der `items_command`-Ausgabe wie in inline `items`. Eine leere Ausgabe ergibt damit **null** Iterationen (Block endet COMPLETED, Metadaten `totalItems: 0`) statt einer Iteration mit leerem Item. Eine leere Liste ist also der saubere Weg, eine Schleife zu überspringen.
 
@@ -560,7 +582,7 @@ Führt einen anderen Workflow als verschachtelten Schritt aus.
 
 | Config-Schlüssel | Typ | Default | Beschreibung |
 |---|---|---|---|
-| `workflow_id` | string | **erforderlich** | ID des auszuführenden Workflows |
+| `workflow_id` | string | **erforderlich** | ID des auszuführenden Workflows; ein Platzhalter aus einer vertrauenswürdigen Kontextvariable ist erlaubt (siehe `foreach` → „Sub-Workflow je Item“) |
 | `workflowId` | string | — | Alte Schreibweise von `workflow_id`: wird noch gelesen, fällt später weg. Der Analyzer meldet sie als `legacy-config-key` (LOW); steht `workflow_id` daneben, gilt nur `workflow_id` |
 
 **Limits**: Maximale Verschachtelungstiefe von 5 Ebenen. Zirkuläre Referenzen werden erkannt. 30-Minuten-Timeout.
@@ -569,7 +591,7 @@ Führt einen anderen Workflow als verschachtelten Schritt aus.
 
 **Marker**: Der Schritt reicht die letzte Ausgabe des Child-Runs nur durch (Step-Metadatum `derivedOutput: true`). `gate_status:`- und `todo_item:`-Marker darin werden ausschliesslich im Child-Run ausgewertet — der Parent-Run übernimmt sie bewusst nicht in seine Gate-Zusammenfassung oder TODO-Liste.
 
-**Wann verwenden**: Komplexe Workflows aus kleineren, wiederverwendbaren zusammensetzen.
+**Wann verwenden**: Komplexe Workflows aus kleineren, wiederverwendbaren zusammensetzen. Denselben Workflow je Eintrag einer Liste: `foreach` mit `workflow_id`.
 
 ---
 
@@ -1374,7 +1396,7 @@ Regeln:
 - Der `integration`-Block nutzt `provider` für den Integrations-Provider und ist kein KI-Block — dort wirkt kein Override.
 - Im Block-Editor der UI erscheinen die Felder „KI-Anbieter und Modell für diesen Block" nur bei KI-fähigen Block-Typen; die Modell-Vorschläge kommen vom Host-Katalog des gewählten Anbieters (`GET /api/v1/system/ai-providers/{id}/models`), Freitext bleibt erlaubt.
 - Die tatsächlich verwendeten Werte stehen im Step-Metadata der Run-Details: `aiRequest.provider`, `aiRequest.model`, `aiRequest.effort` (für `agentic` zusätzlich top-level `provider`/`model`).
-- Wrapper-Blöcke (`retry`, `foreach`, `while`, `conditional`, `switch`, `skill-capability`) übernehmen `aiRequest`, `provider` und `requestedModel` ihres **ersten inneren KI-Aufrufs** in ihren Sammel-Step (Anbieter und Modell sind pro Block konstant); die Run-Seite zeigt sie als Pills. Zusätzliche Schlüssel: `foreach` → `totalItems` + `items` (`{index, item, status, durationMs}`, max. 500, Item-Label auf 120 Zeichen gekürzt), `while` → `iterationCount` + `iterations`, `retry` → `attempts` + `maxAttempts`, `conditional` → `conditionMet`, `switch` → `expression` + `matchedCase`. Reine Shell-Iterationen tragen kein `aiRequest`.
+- Wrapper-Blöcke (`retry`, `foreach`, `while`, `conditional`, `switch`, `skill-capability`) übernehmen `aiRequest`, `provider` und `requestedModel` ihres **ersten inneren KI-Aufrufs** in ihren Sammel-Step (Anbieter und Modell sind pro Block konstant); die Run-Seite zeigt sie als Pills. Zusätzliche Schlüssel: `foreach` → `totalItems` + `items` (`{index, item, status, durationMs}`, mit `workflow_id` dazu `subRunId`; max. 500, Item-Label auf 120 Zeichen gekürzt), `while` → `iterationCount` + `iterations`, `retry` → `attempts` + `maxAttempts`, `conditional` → `conditionMet`, `switch` → `expression` + `matchedCase`. Reine Shell-Iterationen tragen kein `aiRequest`.
 
 ---
 

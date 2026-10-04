@@ -1,46 +1,24 @@
 package com.automation.executor.blocks;
 
-import com.automation.entity.*;
+import com.automation.entity.BlockDefinition;
+import com.automation.entity.StepResult;
+import com.automation.entity.StepStatus;
 import com.automation.exception.WorkflowExecutionException;
 import com.automation.executor.BlockExecutor;
 import com.automation.executor.ExecutionContext;
-import com.automation.repository.StepResultRepository;
-import com.automation.repository.WorkflowRunRepository;
-import com.automation.service.workflow.WorkflowContextDataService;
-import com.automation.service.workflow.WorkflowExecutor;
-import com.automation.service.workflow.WorkflowService;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.annotation.Lazy;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import java.time.Duration;
 import java.time.Instant;
-import java.util.*;
+import java.util.Map;
+import java.util.Set;
 
+/** Runs another workflow as one step; the run itself is {@link SubWorkflowLauncher}'s job. */
 @Component
-@Slf4j
+@RequiredArgsConstructor
 public class SubWorkflowBlockExecutor implements BlockExecutor {
 
-    private static final Duration MAX_WAIT = Duration.ofMinutes(30);
-    private static final int MAX_DEPTH = 5;
-
-    private final WorkflowService workflowService;
-    private final WorkflowExecutor workflowExecutor;
-    private final WorkflowRunRepository runRepository;
-    private final StepResultRepository stepResultRepository;
-    private final WorkflowContextDataService contextDataService;
-
-    public SubWorkflowBlockExecutor(WorkflowService workflowService,
-                                    @Lazy WorkflowExecutor workflowExecutor,
-                                    WorkflowRunRepository runRepository,
-                                    StepResultRepository stepResultRepository,
-                                    WorkflowContextDataService contextDataService) {
-        this.workflowService = workflowService;
-        this.workflowExecutor = workflowExecutor;
-        this.runRepository = runRepository;
-        this.stepResultRepository = stepResultRepository;
-        this.contextDataService = contextDataService;
-    }
+    private final SubWorkflowLauncher launcher;
 
     @Override
     public Set<String> supportedTypes() {
@@ -52,144 +30,41 @@ public class SubWorkflowBlockExecutor implements BlockExecutor {
         int stepIndex = context.nextStepIndex();
         Instant start = Instant.now();
 
-        String workflowId = (String) block.getConfig().get("workflow_id");
-        if (workflowId == null || workflowId.isBlank()) {
+        String configured = (String) block.getConfig().get("workflow_id");
+        if (configured == null || configured.isBlank()) {
             // Fallback: accept legacy camelCase key
-            workflowId = (String) block.getConfig().get("workflowId");
+            configured = (String) block.getConfig().get("workflowId");
         }
-        if (workflowId == null || workflowId.isBlank()) {
+        if (configured == null || configured.isBlank()) {
             throw new WorkflowExecutionException("Sub-workflow block requires 'workflow_id' in config");
         }
 
-        // Check recursion depth
-        @SuppressWarnings("unchecked")
-        List<String> parentIds = (List<String>) context.getVariables()
-                .getOrDefault("__parent_workflow_ids", new ArrayList<>());
-        if (parentIds.size() >= MAX_DEPTH) {
-            return StepResult.builder()
-                    .stepIndex(stepIndex)
-                    .input("[Sub-Workflow] " + workflowId)
-                    .output("Maximum sub-workflow depth (" + MAX_DEPTH + ") exceeded")
-                    .startedAt(start)
-                    .completedAt(Instant.now())
-                    .status(StepStatus.FAILED)
-                    .build();
+        StringBuilder refusal = new StringBuilder();
+        String workflowId = SubWorkflowLauncher.resolveWorkflowId(configured, context, refusal);
+        SubWorkflowLauncher.Outcome outcome = workflowId != null
+                ? launcher.run(workflowId, context)
+                : SubWorkflowLauncher.Outcome.refused(configured, refusal.toString());
+        Instant end = Instant.now();
+
+        StepResult.StepResultBuilder result = StepResult.builder()
+                .stepIndex(stepIndex)
+                .input("[Sub-Workflow] " + (outcome.workflowName() != null ? outcome.workflowName() : outcome.workflowId()))
+                .output(outcome.output())
+                .startedAt(start)
+                .completedAt(end)
+                .durationMs(end.toEpochMilli() - start.toEpochMilli())
+                .status(outcome.success() ? StepStatus.COMPLETED : StepStatus.FAILED);
+        if (outcome.started()) {
+            result.metadata(Map.of(
+                    "subWorkflowId", outcome.workflowId(),
+                    "subWorkflowName", outcome.workflowName(),
+                    "subRunId", outcome.subRunId(),
+                    "subRunStatus", outcome.subRunStatus().name(),
+                    // The output is a copy of the child's; its gate_status/todo_item markers
+                    // are evaluated in the child run only, never again here (6e5d6e2c).
+                    "derivedOutput", true
+            ));
         }
-        if (parentIds.contains(workflowId)) {
-            return StepResult.builder()
-                    .stepIndex(stepIndex)
-                    .input("[Sub-Workflow] " + workflowId)
-                    .output("Circular sub-workflow reference detected: " + workflowId)
-                    .startedAt(start)
-                    .completedAt(Instant.now())
-                    .status(StepStatus.FAILED)
-                    .build();
-        }
-
-        try {
-            Workflow subWorkflow = workflowService.findById(workflowId);
-
-            // Build child context with parent variables — without the parent's platform data: the child gets its
-            // own injected, and the copy only bloated the child's stored input_context (open_todos alone carries
-            // up to 150 titles). Its taint still travels, see exportTaint below (TODO 2a0695ff).
-            Map<String, Object> childContext = new HashMap<>(context.getVariables());
-            childContext.keySet().removeAll(contextDataService.platformVariableNames());
-            childContext.put("previous_output", context.getPreviousOutput() != null ? context.getPreviousOutput() : "");
-            List<String> newParentIds = new ArrayList<>(parentIds);
-            newParentIds.add(workflowId);
-            childContext.put("__parent_workflow_ids", newParentIds);
-            TriggerSource origin = TriggerSource.effectiveOfRun(context.getVariables());
-            if (origin != null) {
-                childContext.put(TriggerSource.PARENT_CONTEXT_KEY, origin.name());
-            } else {
-                childContext.remove(TriggerSource.PARENT_CONTEXT_KEY); // unknown origin counts as unattended
-            }
-            // Taint travels into the child run: its shell blocks escape the same values
-            childContext.putAll(context.exportTaint());
-
-            // Execute sub-workflow
-            WorkflowRun subRun = workflowExecutor.execute(subWorkflow, childContext, TriggerSource.SUB_WORKFLOW);
-
-            // Poll for completion
-            WorkflowRun completed = waitForCompletion(subRun.getId());
-            Instant end = Instant.now();
-
-            String output = buildOutput(completed);
-            boolean success = completed.getStatus() == RunStatus.COMPLETED;
-
-            return StepResult.builder()
-                    .stepIndex(stepIndex)
-                    .input("[Sub-Workflow] " + subWorkflow.getName())
-                    .output(output)
-                    .startedAt(start)
-                    .completedAt(end)
-                    .durationMs(end.toEpochMilli() - start.toEpochMilli())
-                    .status(success ? StepStatus.COMPLETED : StepStatus.FAILED)
-                    .metadata(Map.of(
-                            "subWorkflowId", workflowId,
-                            "subWorkflowName", subWorkflow.getName(),
-                            "subRunId", completed.getId(),
-                            "subRunStatus", completed.getStatus().name(),
-                            // The output is a copy of the child's; its gate_status/todo_item markers
-                            // are evaluated in the child run only, never again here (6e5d6e2c).
-                            "derivedOutput", true
-                    ))
-                    .build();
-
-        } catch (Exception e) {
-            log.error("Sub-workflow {} execution failed: {}", workflowId, e.getMessage(), e);
-            Instant end = Instant.now();
-            return StepResult.builder()
-                    .stepIndex(stepIndex)
-                    .input("[Sub-Workflow] " + workflowId)
-                    .output("Sub-workflow execution failed: " + e.getMessage())
-                    .startedAt(start)
-                    .completedAt(end)
-                    .durationMs(end.toEpochMilli() - start.toEpochMilli())
-                    .status(StepStatus.FAILED)
-                    .build();
-        }
-    }
-
-    private WorkflowRun waitForCompletion(String runId) {
-        Instant deadline = Instant.now().plus(MAX_WAIT);
-        while (Instant.now().isBefore(deadline)) {
-            WorkflowRun run = runRepository.findById(runId).orElseThrow(() ->
-                    new WorkflowExecutionException("Sub-workflow run " + runId + " disappeared while waiting"));
-            if (run.getStatus() != RunStatus.RUNNING && run.getStatus() != RunStatus.PENDING) {
-                return run;
-            }
-            try {
-                Thread.sleep(2000);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new WorkflowExecutionException("Interrupted while waiting for sub-workflow");
-            }
-        }
-        throw new WorkflowExecutionException("Sub-workflow timed out after " + MAX_WAIT.toMinutes() + " minutes");
-    }
-
-    private String buildOutput(WorkflowRun run) {
-        List<StepResult> steps = stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc(run.getId());
-        StringBuilder sb = new StringBuilder();
-        sb.append("Sub-workflow completed with status: ").append(run.getStatus()).append("\n");
-        for (StepResult step : steps) {
-            sb.append("[Step ").append(step.getStepIndex()).append("] ")
-                    .append(step.getStatus())
-                    .append(": ").append(truncate(step.getOutput(), 500)).append("\n");
-        }
-        // Return last step output as main output
-        if (!steps.isEmpty()) {
-            StepResult lastStep = steps.get(steps.size() - 1);
-            if (lastStep.getOutput() != null) {
-                return lastStep.getOutput();
-            }
-        }
-        return sb.toString();
-    }
-
-    private String truncate(String s, int maxLen) {
-        if (s == null) return "";
-        return s.length() > maxLen ? s.substring(0, maxLen) + "..." : s;
+        return result.build();
     }
 }

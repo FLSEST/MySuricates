@@ -164,6 +164,20 @@ class ConfigKeyRulesTest {
             assertThat(findings.get(0).detail()).contains("gesetzt ist comand");
         }
 
+        /** foreach läuft mit command oder workflow_id (a5c9fbbf); context wirkt nur mit workflow_id. */
+        @Test
+        void foreachBrauchtGenauEinenVonCommandUndWorkflowId() {
+            assertThat(keyFindings(block("foreach", "f", Map.of("items", List.of("a"), "command", "echo")))).isEmpty();
+            assertThat(keyFindings(block("foreach", "f", Map.of("items", List.of("a"), "workflow_id", "{{ wf }}",
+                    "context", Map.of("x", "{{ item.id }}"))))).isEmpty();
+            assertThat(keyFindings(block("foreach", "f", Map.of("items", List.of("a"), "command", "echo",
+                    "workflow_id", "wf")))).singleElement()
+                    .satisfies(f -> assertThat(f.detail()).contains("schließen sich aus"));
+            assertThat(keyFindings(block("foreach", "f", Map.of("items", List.of("a"), "command", "echo",
+                    "context", Map.of("x", "y"))))).singleElement()
+                    .satisfies(f -> assertThat(f.detail()).contains("context wirkt nur mit workflow_id"));
+        }
+
         /** todo-update läuft mit id oder updates – mit keinem oder beiden bricht er ab (d6c0afe6). */
         @Test
         void todoUpdateBrauchtGenauEinenVonIdUndUpdates() {

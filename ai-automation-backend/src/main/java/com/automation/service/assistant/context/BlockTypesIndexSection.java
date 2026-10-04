@@ -20,7 +20,7 @@ public class BlockTypesIndexSection implements AssistantContextSection {
             new BlockTypeEntry("shell", "Runs a shell command, optionally in a container (no API access, no DB access)"),
             new BlockTypeEntry("agentic", "Goal-driven agent (`goal`) with REASON+ACT per iteration, long-running, with token budget"),
             new BlockTypeEntry("conditional", "If/else: evaluates `condition` (AI or shell), runs `then_command` or `else_command`"),
-            new BlockTypeEntry("foreach", "Runs `command` once per item (`items` or the lines of `items_command`)"),
+            new BlockTypeEntry("foreach", "Runs `command` — or workflow `workflow_id` — once per item (`items` or the lines of `items_command`)"),
             new BlockTypeEntry("while", "Repeats `command` while `condition_command` holds, at most `max_iterations` times"),
             new BlockTypeEntry("switch", "Matches `expression` against case values, runs the nested shell/simple blocks of the match"),
             new BlockTypeEntry("retry", "Runs `command` again on failure (`max_retries`, `delay`, optional exponential backoff)"),

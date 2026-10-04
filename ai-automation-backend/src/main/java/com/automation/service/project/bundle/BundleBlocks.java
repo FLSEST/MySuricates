@@ -20,6 +20,8 @@ import java.util.regex.Pattern;
 final class BundleBlocks {
 
     static final String SUB_WORKFLOW = "sub-workflow";
+    /** Block types that start another workflow by {@code workflow_id}: foreach does it per item (a5c9fbbf). */
+    private static final Set<String> WORKFLOW_STARTERS = Set.of(SUB_WORKFLOW, "foreach");
     /** Current key and the legacy key the sub-workflow executor still reads. */
     static final List<String> WORKFLOW_ID_KEYS = List.of("workflow_id", "workflowId");
     static final Pattern WORKFLOW_REF = Pattern.compile("@@workflow:([^@\\s]+)@@");
@@ -67,11 +69,11 @@ final class BundleBlocks {
                                            String workflowName) {
         List<String> warnings = new ArrayList<>();
         forEachBlock(blocks, (type, config) -> {
-            if (!SUB_WORKFLOW.equals(type) || config == null) {
+            if (!WORKFLOW_STARTERS.contains(type) || config == null) {
                 return;
             }
             for (String idKey : WORKFLOW_ID_KEYS) {
-                if (config.get(idKey) instanceof String id && !id.isBlank()) {
+                if (config.get(idKey) instanceof String id && isFixedId(id)) {
                     String key = keyById.get(id);
                     if (key != null) {
                         config.put(idKey, workflowRef(key));
@@ -88,15 +90,20 @@ final class BundleBlocks {
     static List<String> externalRefs(List<Map<String, Object>> blocks) {
         List<String> ids = new ArrayList<>();
         forEachBlock(blocks, (type, config) -> {
-            if (SUB_WORKFLOW.equals(type) && config != null) {
+            if (WORKFLOW_STARTERS.contains(type) && config != null) {
                 for (String idKey : WORKFLOW_ID_KEYS) {
-                    if (config.get(idKey) instanceof String id && !id.isBlank() && !WORKFLOW_REF.matcher(id).matches()) {
+                    if (config.get(idKey) instanceof String id && isFixedId(id) && !WORKFLOW_REF.matcher(id).matches()) {
                         ids.add(id);
                     }
                 }
             }
         });
         return ids;
+    }
+
+    /** A concrete id — not blank and no {@code {{ … }}} placeholder, which the run resolves from its context. */
+    private static boolean isFixedId(String id) {
+        return !id.isBlank() && !id.contains("{{");
     }
 
     /** All {@code @@workflow:<key>@@} keys used anywhere in the blocks. */

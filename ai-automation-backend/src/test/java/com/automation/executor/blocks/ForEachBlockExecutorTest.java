@@ -161,7 +161,7 @@ class ForEachBlockExecutorTest {
         List<String> failed = IntStream.range(0, 37).mapToObj(i -> "ort-" + i).toList();
         String longError = "x".repeat(2_000) + "You've hit your session limit";
 
-        String summary = ForEachBlockExecutor.failureSummary(failed, longError, 50);
+        String summary = ForEachFailures.failureSummary(failed, longError, 50);
 
         assertThat(summary).startsWith("37/50 items failed: ort-0, ort-1, ")
                 .contains("… (+")
@@ -310,11 +310,11 @@ class ForEachBlockExecutorTest {
 
     @Test
     void maxConsecutiveFailures_readsNumbersAndText_fallsBackToDefault() {
-        assertThat(ForEachBlockExecutor.maxConsecutiveFailures(null)).isEqualTo(3);
-        assertThat(ForEachBlockExecutor.maxConsecutiveFailures(5)).isEqualTo(5);
-        assertThat(ForEachBlockExecutor.maxConsecutiveFailures(" 2 ")).isEqualTo(2);
-        assertThat(ForEachBlockExecutor.maxConsecutiveFailures(-1)).isZero();
-        assertThat(ForEachBlockExecutor.maxConsecutiveFailures("{{ limit }}")).isEqualTo(3);
+        assertThat(ForEachFailures.maxConsecutiveFailures(null)).isEqualTo(3);
+        assertThat(ForEachFailures.maxConsecutiveFailures(5)).isEqualTo(5);
+        assertThat(ForEachFailures.maxConsecutiveFailures(" 2 ")).isEqualTo(2);
+        assertThat(ForEachFailures.maxConsecutiveFailures(-1)).isZero();
+        assertThat(ForEachFailures.maxConsecutiveFailures("{{ limit }}")).isEqualTo(3);
     }
 
     @Test

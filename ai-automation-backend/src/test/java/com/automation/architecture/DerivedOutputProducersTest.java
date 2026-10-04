@@ -57,7 +57,9 @@ class DerivedOutputProducersTest {
             // shared header/metadata builder of both compression blocks
             "com/automation/executor/compress/CompressionOutput.java", 1,
             // sub-workflow: a copy of the child run's outputs, already evaluated in the child
-            "com/automation/executor/blocks/SubWorkflowBlockExecutor.java", 1);
+            "com/automation/executor/blocks/SubWorkflowBlockExecutor.java", 1,
+            // foreach with workflow_id: the child runs' outputs behind their [item] prefix (a5c9fbbf)
+            "com/automation/executor/blocks/ForEachBlockExecutor.java", 1);
 
     /** file → number of places that read the marker. */
     private static final Map<String, Integer> READERS = Map.of(

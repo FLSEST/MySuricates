@@ -83,6 +83,24 @@ class BundleAssemblerTest {
                 .containsEntry("workflow_id", "w-child");
     }
 
+    /** foreach with workflow_id starts the child per item (a5c9fbbf); a placeholder id is resolved at run time. */
+    @Test
+    void foreachWorkflowIdBecomesAKey_aPlaceholderStaysWithoutWarning() {
+        Workflow child = workflow("w-child", "Child");
+        Workflow parent = workflow("w-parent", "Parent",
+                block("foreach", Map.of("items", List.of("a"), "workflow_id", "w-child")),
+                block("foreach", Map.of("items", List.of("a"), "workflow_id", "{{ feature_workflow_id }}")),
+                block("sub-workflow", Map.of("workflow_id", "{{ child_id }}")));
+
+        ProjectBundle bundle = assemble(List.of(parent, child), List.of(), List.of(), true);
+        BundleWorkflow p = bundle.workflows().stream().filter(w -> w.key().equals("parent")).findFirst().orElseThrow();
+
+        assertThat(blockConfig(p, 0)).containsEntry("workflow_id", "@@workflow:child@@");
+        assertThat(blockConfig(p, 1)).containsEntry("workflow_id", "{{ feature_workflow_id }}");
+        assertThat(blockConfig(p, 2)).containsEntry("workflow_id", "{{ child_id }}");
+        assertThat(bundle.warnings()).isEmpty();
+    }
+
     @Test
     void skillsTravelByName() {
         Workflow w = workflow("w-1", "A", BlockDefinition.builder().type("simple").config(new HashMap<>())

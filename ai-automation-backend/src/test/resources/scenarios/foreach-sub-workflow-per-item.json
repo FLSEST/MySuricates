@@ -1,0 +1,102 @@
+{
+  "id": "foreach-sub-workflow-per-item",
+  "title": "foreach mit workflow_id startet je Eintrag einen Kind-Lauf, Item-Felder und context-Zuordnung kommen an, Kind-Marker zählen nur im Kind",
+  "derivedFrom": {
+    "spec": "WORKFLOW-GUIDE foreach: workflow_id statt command – je Item ein Lauf wie beim sub-workflow-Block, Item als {{ <variable_name> }}, Index als {{ <variable_name>_index }}, Felder eines JSON-Items als {{ <variable_name>.<feld> }}, context ordnet Werte für das Kind zu; workflow_id darf aus einer vertrauenswürdigen Kontextvariable kommen; die Ausgabe ist eine Kopie (derivedOutput)",
+    "incidents": [
+      "a5c9fbbf (foreach: Sub-Workflow je Eintrag starten (dann saas-feature-loop zurück in den Pool))",
+      "46b9b229 (Built-in-Template saas-feature-loop läuft nicht: foreach kann keinen Sub-Workflow je Eintrag starten)"
+    ]
+  },
+  "workflows": {
+    "feature": {
+      "provider": "SCRIPTED",
+      "blocks": [
+        {
+          "type": "simple",
+          "name": "umsetzen",
+          "config": {
+            "command": "Kind: setze {{ feature_id }} um ({{ feature_desc }}) in {{ slug }}, Eintrag {{ current_feature_index }}."
+          }
+        }
+      ]
+    }
+  },
+  "workflow": {
+    "provider": "SCRIPTED",
+    "blocks": [
+      {
+        "type": "foreach",
+        "name": "je_feature",
+        "config": {
+          "items_source": "command",
+          "items_command": "printf '%s\\n' '{\"id\": \"auth\", \"desc\": \"Login\"}' '{\"id\": \"billing\", \"desc\": \"Abo\"}'",
+          "variable_name": "current_feature",
+          "workflow_id": "{{ feature_workflow_id }}",
+          "context": {
+            "feature_id": "{{ current_feature.id }}",
+            "feature_desc": "{{ current_feature.desc }}"
+          }
+        }
+      }
+    ]
+  },
+  "context": {
+    "feature_workflow_id": "@feature",
+    "slug": "shop"
+  },
+  "ai": {
+    "SCRIPTED": [
+      {
+        "match": "Kind: setze auth",
+        "respond": "auth fertig\ngate_status: GREEN\ngate_category: build\ngate_description: ok"
+      },
+      {
+        "match": "Kind: setze billing",
+        "respond": "billing fertig\ntodo_item: Abo-Tests ergänzen | MEDIUM | testing | fehlen noch\ngate_status: YELLOW\ngate_category: build\ngate_description: Tests fehlen"
+      }
+    ]
+  },
+  "expect": {
+    "runStatus": "COMPLETED",
+    "gate": "none",
+    "markers": {
+      "gates": 0,
+      "todos": 0
+    },
+    "aiCallCount": {
+      "SCRIPTED": 2
+    },
+    "aiCalls": {
+      "SCRIPTED": [
+        {
+          "promptContains": [
+            "Kind: setze auth um (Login) in shop, Eintrag 0."
+          ],
+          "promptNotContains": [
+            "{{"
+          ]
+        },
+        {
+          "promptContains": [
+            "Kind: setze billing um (Abo) in shop, Eintrag 1."
+          ],
+          "promptNotContains": [
+            "{{"
+          ]
+        }
+      ]
+    },
+    "steps": [
+      {
+        "index": 0,
+        "status": "COMPLETED",
+        "outputContains": [
+          "]: auth fertig",
+          "]: billing fertig",
+          "gate_status: YELLOW"
+        ]
+      }
+    ]
+  }
+}

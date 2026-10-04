@@ -62,8 +62,8 @@ class SubWorkflowBlockExecutorTest {
     @BeforeEach
     void setUp() {
         lenient().when(contextDataService.platformVariableNames()).thenReturn(PLATFORM_NAMES);
-        executor = new SubWorkflowBlockExecutor(workflowService, workflowExecutor, runRepository, stepResultRepository,
-                contextDataService);
+        executor = new SubWorkflowBlockExecutor(new SubWorkflowLauncher(workflowService, workflowExecutor, runRepository,
+                stepResultRepository, contextDataService));
         context = ExecutionContext.builder()
                 .containerId("container-1")
                 .workflowRunId("run-1")
@@ -444,5 +444,35 @@ class SubWorkflowBlockExecutorTest {
                 .containsEntry("previous_output", "a | b");
         assertThat((List<String>) child.get(ExecutionContext.UNTRUSTED_OUTPUTS_VARIABLE))
                 .contains("bewertung", ExecutionContext.PREVIOUS_OUTPUT_NAME);
+    }
+
+    /** TODO a5c9fbbf: workflow_id may name the child through a trusted variable (portable pool entries). */
+    @Test
+    void execute_workflowIdFromATrustedVariable_runsThatWorkflow() {
+        context.setVariable("child_workflow_id", "sub-wf-1");
+        Workflow subWorkflow = Workflow.builder().id("sub-wf-1").name("Sub Workflow").build();
+        when(workflowService.findById("sub-wf-1")).thenReturn(subWorkflow);
+        WorkflowRun subRun = WorkflowRun.builder().id("sub-run-1").workflow(subWorkflow).status(RunStatus.COMPLETED).build();
+        when(workflowExecutor.execute(eq(subWorkflow), any(Map.class), eq(TriggerSource.SUB_WORKFLOW))).thenReturn(subRun);
+        when(runRepository.findById("sub-run-1")).thenReturn(Optional.of(subRun));
+
+        StepResult result = executor.execute(BlockDefinition.builder().type("sub-workflow")
+                .config(new HashMap<>(Map.of("workflow_id", "{{ child_workflow_id }}"))).build(), context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getMetadata()).containsEntry("subWorkflowId", "sub-wf-1");
+    }
+
+    /** Outside input must not pick which workflow of the instance runs. */
+    @Test
+    void execute_workflowIdFromAnUntrustedVariableOrOutput_isRefused() {
+        context.setUntrustedVariable("target", "sub-wf-1");
+        for (String id : List.of("{{ target }}", "{{ previous_output }}", "{{ block.scan.output }}", "{{ unknown }}")) {
+            StepResult result = executor.execute(BlockDefinition.builder().type("sub-workflow")
+                    .config(new HashMap<>(Map.of("workflow_id", id))).build(), context);
+
+            assertThat(result.getStatus()).as(id).isEqualTo(StepStatus.FAILED);
+        }
+        org.mockito.Mockito.verifyNoInteractions(workflowService, workflowExecutor);
     }
 }
