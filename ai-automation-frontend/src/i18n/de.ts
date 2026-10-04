@@ -1785,6 +1785,7 @@ export const de: TranslationKeys = {
     stagedUnreachable: 'nicht erreichbar',
     stagedKeyMissing: 'Key fehlt',
     stagedKeyMissingHint: 'Dev kennt den API-Key dieses Ziels noch nicht. Auf dem Rechner ausführen:',
+    syncNotesTitle: 'Bleibt zurück',
     settingsNavSystem: 'System',
     // Execution settings
     execution: 'Ausführung',
@@ -2269,7 +2270,7 @@ export const de: TranslationKeys = {
       NO_FAILED_RUNS: 'Workflow „{name}“ hat keine fehlgeschlagenen Ausführungen',
       TEST_INSTANCE_NOT_RUNNING: 'Die Test-Instanz läuft nicht oder ist nicht gesund. Starte sie zuerst.',
       STABLE_INSTANCE_NOT_RUNNING: 'Die Stable-Instanz läuft nicht oder ist nicht gesund. Starte sie zuerst.',
-      CONTAINER_API_KEY_MISSING: 'Container {container} hat keine API-Key-Datei ({file}) — die Instanz schreibt sie bei jedem Start; mit aktuellem Build neu starten (scripts/staging.sh promote oder test-promote)',
+      CONTAINER_API_KEY_MISSING: 'Container {container} hat keine API-Key-Datei ({file}), und diese Instanz gibt ihm keinen Key mit — von hier aus neu starten (scripts/staging.sh promote oder test-promote)',
       CONTAINER_API_KEY_UNREADABLE: 'Der API-Key von Container {container} ließ sich nicht lesen: {error}',
       SYNC_TARGET_NOT_CONFIGURED: 'Das Sync-Ziel „{target}“ ist auf dieser Instanz nicht eingerichtet',
       SYNC_TARGET_KEY_MISSING: 'Kein API-Key für das Sync-Ziel „{target}“: {keyFile} fehlt oder ist leer — holen mit scripts/instance.sh sync-keys',

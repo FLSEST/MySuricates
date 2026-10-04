@@ -132,7 +132,7 @@ class StagingServiceTest {
     @Test
     void syncDefinitions_missingKeyFile_failsClearlyInsteadOfReadingTheDatabase() {
         when(dockerManager.isHealthy(anyString())).thenReturn(true);
-        when(dockerManager.readApiKey("mysuricates-stable")).thenThrow(new com.automation.exception.LocalizedStateException(
+        when(dockerManager.readApiKey(eq("mysuricates-stable"), any())).thenThrow(new com.automation.exception.LocalizedStateException(
                 com.automation.exception.ErrorMessage.CONTAINER_API_KEY_MISSING,
                 java.util.Map.of("container", "mysuricates-stable", "file", "/home/user/.mysuricates/api-key")));
 
@@ -145,7 +145,8 @@ class StagingServiceTest {
     @Test
     void syncDefinitions_usesTheKeyFromTheContainersKeyFile() {
         when(dockerManager.isHealthy(anyString())).thenReturn(true);
-        when(dockerManager.readApiKey("mysuricates-stable")).thenReturn("stable-key");
+        when(apiKeyService.getEffectiveApiKey()).thenReturn("dev-key");
+        when(dockerManager.readApiKey("mysuricates-stable", "dev-key")).thenReturn("stable-key");
 
         service.syncDefinitions();
 

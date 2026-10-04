@@ -3,6 +3,7 @@ package com.automation.service.staging;
 import com.automation.dto.request.SyncDefinitionsRequest;
 import com.automation.dto.response.SyncPreview;
 import com.automation.dto.response.SyncPreviewItem;
+import com.automation.entity.BlockDefinition;
 import com.automation.entity.ChainEntry;
 import com.automation.entity.Project;
 import com.automation.entity.Workflow;
@@ -23,6 +24,7 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 /** What Prod may receive (TODO 84a78bb7): only intact seals, their projects/skills, chains made of them. */
@@ -39,6 +41,13 @@ class SealedSyncScopeTest {
     void setUp() {
         scope = new SealedSyncScope(workflowRepository, chainRepository, verifier, FakeTransactions.manager());
         Workflow intact = workflow("w-ok", "p-1");
+        // calls an unsealed sub-workflow — top level (legacy key) and nested in a foreach
+        intact.setBlocks(new java.util.ArrayList<>(List.of(
+                BlockDefinition.builder().type("sub-workflow").config(new java.util.HashMap<>(Map.of("workflowId", "w-unsealed"))).build(),
+                BlockDefinition.builder().type("foreach").config(new java.util.HashMap<>(Map.of("blocks", List.of(
+                        Map.of("type", "sub-workflow", "name", "inner", "config", Map.of("workflow_id", "w-other")))))).build())));
+        lenient().when(workflowRepository.findIdAndNameByIdIn(any())).thenReturn(List.of(
+                new Object[]{"w-unsealed", "Report draft"}, new Object[]{"w-other", "Cleanup"}));
         Workflow broken = workflow("w-broken", "p-2");
         when(workflowRepository.findSealedWithSkills()).thenReturn(List.of(intact, broken));
         when(verifier.verify(any())).thenAnswer(inv -> verdict(((Workflow) inv.getArgument(0)).getId().equals("w-ok")));
@@ -79,6 +88,22 @@ class SealedSyncScopeTest {
         assertThat(restricted.workflows()).extracting(SyncPreviewItem::id).containsExactly("w-ok");
         assertThat(restricted.skills()).extracting(SyncPreviewItem::id).containsExactly("s-1");
         assertThat(restricted.chains()).isEmpty();
+        assertThat(restricted.notes()).hasSize(3);
+    }
+
+    /** What goes to Prod but depends on something that stays in Dev is named — sub-workflows and chains. */
+    @Test
+    void namesUnsealedSubWorkflowsAndLeftOutChains() {
+        SealedSyncScope.Scope s = scope.scope();
+
+        assertThat(s.notes()).containsExactly(
+                "Workflow 'w-ok' calls sub-workflow 'Cleanup', which is not sealed — it stays in Dev and must already exist on Prod",
+                "Workflow 'w-ok' calls sub-workflow 'Report draft', which is not sealed — it stays in Dev and must already exist on Prod",
+                "Chain 'c-mixed' stays in Dev: 'Report draft' is not sealed");
+        // a sync names the notes of the workflows it sends, and of the chains asked for
+        assertThat(s.notesFor(List.of(), List.of("c-ok"))).isEmpty();
+        assertThat(s.notesFor(List.of("w-ok"), List.of())).hasSize(2);
+        assertThat(s.notesFor(List.of(), null)).containsExactly("Chain 'c-mixed' stays in Dev: 'Report draft' is not sealed");
     }
 
     private static Workflow workflow(String id, String projectId) {

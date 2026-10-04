@@ -247,11 +247,12 @@ public class StagingService {
     // ── Container API key helper ──────────────────────────
 
     /**
-     * The container's API key from the key file in its data folder ({@link DockerContainerManager#readApiKey}),
-     * never from its database. Throws a {@code LocalizedStateException} that says what is missing.
+     * The container's API key from the key file in its data folder, else the key it was started with
+     * (this instance's, {@link #apiKeyEnv}) — never from its database ({@link DockerContainerManager#readApiKey}).
+     * Throws a {@code LocalizedStateException} that says what is missing.
      */
     String readContainerApiKey(String containerName) {
-        return dockerManager.readApiKey(containerName);
+        return dockerManager.readApiKey(containerName, apiKeyService.getEffectiveApiKey());
     }
 
     // ── Internal helpers ──────────────────────────────────

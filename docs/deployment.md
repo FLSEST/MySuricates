@@ -893,6 +893,9 @@ Definition-Sync unten, samt Rollback-Punkt auf dem Ziel). Was der Installer daf�
   Test oder Prod dabei noch nicht oder wurde ein Key neu erzeugt, den Befehl später noch einmal ausführen.
 - Dev versiegelt (ohne Pflicht für unbeaufsichtigte Runs), denn **nach Prod gehen nur versiegelte
   Definitionen**: Workflows, deren Siegel hält, ihre Projekte und Skills, Chains nur aus solchen Workflows.
+  Ruft ein versiegelter Workflow einen unversiegelten Teil-Workflow (`sub-workflow`) auf, bleibt dieser in
+  Dev und muss auf Prod schon vorhanden sein; eine Chain mit einem unversiegelten Workflow bleibt ganz in Dev.
+  Vorschau und Ergebnis nennen beides unter `notes`.
   Auf Prod kommt die Kopie unversiegelt an — dort prüfen und versiegeln; Prod startet unbeaufsichtigt nur
   versiegelte Workflows. Ist die Prod-Kopie versiegelt und `seal-immutable` an, lehnt Prod ein späteres
   Übertragen derselben Definition ab (steht in `SyncResult.errors`), bis sie dort entsiegelt ist.

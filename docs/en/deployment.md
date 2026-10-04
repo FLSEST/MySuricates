@@ -882,8 +882,10 @@ including the rollback point on the target). What the installer enters for that:
   (readable by your user only, git-ignored). The installer runs it after the start; if Test or Prod are not
   running yet, or a key was regenerated, run the command again later.
 - Dev seals (without requiring seals for unattended runs), because **only sealed definitions go to Prod**:
-  workflows whose seal holds, their projects and skills, chains made only of such workflows. The copy
-  arrives on Prod unsealed — review and seal it there; Prod starts only sealed workflows unattended. Once
+  workflows whose seal holds, their projects and skills, chains made only of such workflows. If a sealed
+  workflow calls an unsealed sub-workflow (`sub-workflow`), that one stays in Dev and must already exist on
+  Prod; a chain with an unsealed workflow stays in Dev entirely. Preview and result name both under `notes`.
+  The copy arrives on Prod unsealed — review and seal it there; Prod starts only sealed workflows unattended. Once
   the Prod copy is sealed and `seal-immutable` is on, Prod refuses a later transfer of the same definition
   (listed in `SyncResult.errors`) until it is unsealed there.
 - A `dev.env` from a staged setup made before the sync has `MYSURICATES_HARDENING_SEALING=false`: then

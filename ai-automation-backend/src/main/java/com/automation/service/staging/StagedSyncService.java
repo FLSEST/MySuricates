@@ -19,6 +19,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.function.Supplier;
 
 /**
@@ -54,28 +58,58 @@ public class StagedSyncService {
     private record Resolved(Target target, String baseUrl, String apiKey) {
     }
 
+    /** Connect and read timeout of the status probe of one target. */
+    static final int PROBE_TIMEOUT_MS = 3_000;
+
     private final StagingConfig config;
     private final InstanceSyncHelper syncHelper;
     private final SyncPreviewService previewService;
     private final InstanceHttpClient httpClient;
     private final SealedSyncScope sealedScope;
 
-    /** The configured targets with key and health state; an unconfigured one is left out. */
+    /**
+     * The configured targets with key and reachability; an unconfigured one is left out. The settings card
+     * polls this: all targets are asked at once, each with a short timeout on {@code /system/info} — a
+     * hanging target costs {@link #PROBE_TIMEOUT_MS}, not the 40 s of a sync call.
+     */
     public List<SyncTargetResponse> targets() {
-        List<SyncTargetResponse> result = new ArrayList<>();
+        List<Target> configured = new ArrayList<>();
         for (Target target : Target.values()) {
-            StagingConfig.Target cfg = settings(target);
-            if (isBlank(cfg.getUrl())) {
-                continue;
+            if (!isBlank(settings(target).getUrl())) {
+                configured.add(target);
             }
-            String key = readKey(cfg.getKeyFile());
-            String baseUrl = apiBase(cfg.getUrl());
-            JsonNode info = withKey(key, () -> httpClient.httpGet(baseUrl + "/system/info"));
-            boolean reachable = info != null || healthy(baseUrl, key);
-            String version = info != null ? info.path("version").asText(null) : null;
-            result.add(new SyncTargetResponse(target.id(), cfg.getUrl(), key != null, reachable, target.sealedOnly, version));
+        }
+        List<SyncTargetResponse> result = new ArrayList<>();
+        try (ExecutorService probes = Executors.newVirtualThreadPerTaskExecutor()) {
+            List<Future<SyncTargetResponse>> futures = configured.stream()
+                    .map(target -> probes.submit(() -> status(target)))
+                    .toList();
+            for (int i = 0; i < futures.size(); i++) {
+                result.add(statusOrUnreachable(futures.get(i), configured.get(i)));
+            }
         }
         return result;
+    }
+
+    private SyncTargetResponse status(Target target) {
+        StagingConfig.Target cfg = settings(target);
+        String key = readKey(cfg.getKeyFile());
+        String baseUrl = apiBase(cfg.getUrl());
+        JsonNode info = withKey(key, () -> httpClient.httpGet(baseUrl + "/system/info", PROBE_TIMEOUT_MS));
+        String version = info != null ? info.path("version").asText(null) : null;
+        return new SyncTargetResponse(target.id(), cfg.getUrl(), key != null, info != null, target.sealedOnly, version);
+    }
+
+    private SyncTargetResponse statusOrUnreachable(Future<SyncTargetResponse> future, Target target) {
+        try {
+            return future.get();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (ExecutionException e) {
+            log.debug("Status of sync target {} failed: {}", target.id(), e.getMessage());
+        }
+        StagingConfig.Target cfg = settings(target);
+        return new SyncTargetResponse(target.id(), cfg.getUrl(), readKey(cfg.getKeyFile()) != null, false, target.sealedOnly, null);
     }
 
     public SyncPreview preview(String name) {
@@ -86,9 +120,15 @@ public class StagedSyncService {
 
     public SyncResult sync(String name, SyncDefinitionsRequest request) {
         Resolved r = resolve(name);
-        SyncDefinitionsRequest effective = r.target().sealedOnly ? sealedScope.restrict(request) : request;
         log.info("Definition sync to {} ({})", r.target().id(), r.baseUrl());
-        return syncHelper.syncDefinitionsTo(r.baseUrl(), r.apiKey(), effective);
+        if (!r.target().sealedOnly) {
+            return syncHelper.syncDefinitionsTo(r.baseUrl(), r.apiKey(), request);
+        }
+        SealedSyncScope.Scope scope = sealedScope.scope();
+        SyncDefinitionsRequest effective = SealedSyncScope.restrict(request, scope);
+        SyncResult result = syncHelper.syncDefinitionsTo(r.baseUrl(), r.apiKey(), effective);
+        List<String> notes = scope.notesFor(effective.workflowIds(), request == null ? null : request.chainIds());
+        return result == null ? null : result.withNotes(notes);
     }
 
     // ── Resolution ──────────────────────────────────────────

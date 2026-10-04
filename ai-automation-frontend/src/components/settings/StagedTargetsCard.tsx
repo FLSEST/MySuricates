@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Card, CardHeader, Button } from '../ui';
 import { StatusBadge } from '../shared/StatusBadge';
 import { SyncSelectModal } from './SyncSelectModal';
+import { SyncNotes } from './SyncNotes';
 import { useT } from '../../i18n';
 import { apiErrorMessage } from '../../api/client';
 import { useToastStore } from '../../stores/toastStore';
@@ -107,6 +108,7 @@ export function StagedTargetsCard({ targets }: { targets: SyncTarget[] }) {
                         {t.settings.syncPreBackupHint.replace('{filename}', result.preSyncBackup)}
                       </p>
                     )}
+                    <SyncNotes notes={result.notes} title={t.settings.syncNotesTitle} />
                     {result.errors.length > 0 && (
                       <div className="text-xs text-danger">
                         <p>{t.settings.testingSyncErrors.replace('{count}', String(result.errors.length))}</p>

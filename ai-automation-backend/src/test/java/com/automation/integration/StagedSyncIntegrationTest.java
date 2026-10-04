@@ -82,6 +82,7 @@ class StagedSyncIntegrationTest {
     private String sealedName;
     private String unsealedId;
     private String unsealedName;
+    private final List<String> extraIds = new ArrayList<>();
 
     @BeforeEach
     void setUp() throws Exception {
@@ -104,7 +105,10 @@ class StagedSyncIntegrationTest {
 
     @AfterEach
     void tearDown() {
-        for (String id : List.of(sealedId, unsealedId)) {
+        List<String> ids = new ArrayList<>(extraIds);
+        ids.add(sealedId);
+        ids.add(unsealedId);
+        for (String id : ids) {
             jdbc.update("DELETE FROM workflow_seal_events WHERE workflow_id = ?", id);
             jdbc.update("DELETE FROM workflow_versions WHERE workflow_id = ?", id);
             jdbc.update("DELETE FROM activity_log WHERE workflow_id = ?", id);
@@ -181,6 +185,28 @@ class StagedSyncIntegrationTest {
         mockMvc.perform(get("/api/v1/staging/targets/test/sync-preview"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.workflows[*].id").value(hasItem(unsealedId)));
+    }
+
+    @Test
+    void prodNamesTheUnsealedSubWorkflowThatStaysBehind() throws Exception {
+        Workflow caller = workflowRepository.save(Workflow.builder()
+                .name("Caller " + System.nanoTime()).project(projectRepository.findById(projectId).orElseThrow())
+                .blocks(new ArrayList<>(List.of(com.automation.entity.BlockDefinition.builder().name("call").type("sub-workflow")
+                        .config(new java.util.HashMap<>(java.util.Map.of("workflow_id", unsealedId))).build())))
+                .build());
+        extraIds.add(caller.getId());
+        mockMvc.perform(post("/api/v1/workflows/{id}/seal", caller.getId())).andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/staging/targets/prod/sync-preview"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.notes[*]").value(hasItem(org.hamcrest.Matchers.containsString("'" + unsealedName + "'"))));
+        mockMvc.perform(post("/api/v1/staging/targets/prod/sync-definitions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"workflowIds\":[\"" + caller.getId() + "\"]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.workflowsSynced").value(1))
+                .andExpect(jsonPath("$.notes[0]").value(org.hamcrest.Matchers.containsString("'" + unsealedName + "', which is not sealed")));
+        assertThat(imported("/prod")).containsExactly(caller.getName());
     }
 
     @Test

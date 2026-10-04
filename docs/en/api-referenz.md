@@ -3838,7 +3838,8 @@ not empty), `reachable`, `sealedOnly` (Prod: sealed definitions only), `version`
 Preview Dev → `test` or `prod`. For Prod only what may go there: workflows with an intact seal, their projects and
 skills, chains made only of such workflows.
 
-**Response:** `SyncPreview`; `409` (`STATE_CONFLICT`) with `messageKey` `SYNC_TARGET_NOT_CONFIGURED`,
+**Response:** `SyncPreview`, for Prod with `notes` (what stays in Dev although a sealed workflow calls it:
+unsealed sub-workflows, chains with unsealed workflows); `409` (`STATE_CONFLICT`) with `messageKey` `SYNC_TARGET_NOT_CONFIGURED`,
 `SYNC_TARGET_KEY_MISSING` or `SYNC_TARGET_UNREACHABLE`
 
 ### `POST /api/v1/staging/targets/{target}/sync-definitions`
@@ -3847,7 +3848,7 @@ Transfer definitions from Dev to `test` or `prod`. Request as for `POST /api/v1/
 the selection is narrowed to sealed definitions, never widened. Dev reads the target's API key from the key file on
 every call (`scripts/instance.sh sync-keys --name dev`), never from the target's database.
 
-**Response:** `SyncResult`; errors as for the preview
+**Response:** `SyncResult` (for Prod with `notes` as in the preview, limited to the workflows sent); errors as for the preview
 
 ---
 

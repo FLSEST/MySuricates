@@ -3869,7 +3869,8 @@ und nicht leer), `reachable`, `sealedOnly` (Prod: nur versiegelte Definitionen),
 Vorschau Dev → `test` bzw. `prod`. Für Prod nur, was dorthin darf: Workflows mit intaktem Siegel, ihre Projekte und
 Skills, Chains nur aus solchen Workflows.
 
-**Response:** `SyncPreview`; `409` (`STATE_CONFLICT`) mit `messageKey` `SYNC_TARGET_NOT_CONFIGURED`,
+**Response:** `SyncPreview`, für Prod mit `notes` (was in Dev bleibt, obwohl ein versiegelter Workflow es
+aufruft: unversiegelte Teil-Workflows, Chains mit unversiegelten Workflows); `409` (`STATE_CONFLICT`) mit `messageKey` `SYNC_TARGET_NOT_CONFIGURED`,
 `SYNC_TARGET_KEY_MISSING` oder `SYNC_TARGET_UNREACHABLE`
 
 ### `POST /api/v1/staging/targets/{target}/sync-definitions`
@@ -3878,7 +3879,7 @@ Definitionen von Dev nach `test` bzw. `prod` übertragen. Request wie bei `POST 
 für Prod wird die Auswahl auf versiegelte Definitionen eingeengt, nie erweitert. Den API-Key des Ziels liest Dev bei
 jedem Aufruf aus der Key-Datei (`scripts/instance.sh sync-keys --name dev`), nie aus der Datenbank des Ziels.
 
-**Response:** `SyncResult`; Fehler wie bei der Vorschau
+**Response:** `SyncResult` (für Prod mit `notes` wie in der Vorschau, beschränkt auf die übertragenen Workflows); Fehler wie bei der Vorschau
 
 ---
 

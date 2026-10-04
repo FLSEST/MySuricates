@@ -1157,6 +1157,8 @@ export interface SyncResult {
   skipped: number;
   errors: string[];
   preSyncBackup: string | null;
+  /** What stayed behind on purpose (Prod: references to unsealed workflows) — newer backends only. */
+  notes?: string[];
 }
 
 // ── Sync Preview / Selective Sync ─────────────────────────
@@ -1166,6 +1168,8 @@ export interface SyncPreview {
   workflows: SyncPreviewItem[];
   skills: SyncPreviewItem[];
   chains?: SyncPreviewItem[];
+  /** What a sync would leave behind (Prod: references to unsealed workflows) — newer backends only. */
+  notes?: string[];
 }
 
 export interface WorkflowDiff {

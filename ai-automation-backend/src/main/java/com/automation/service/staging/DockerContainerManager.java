@@ -22,7 +22,7 @@ import java.util.Map;
  *   <li>{@link #containerExists(String)} — check if a named container exists, running or not</li>
  *   <li>{@link #isHealthy(String)} — HTTP health check</li>
  *   <li>{@link #runCommand(String, Path, Map, String...)} — run a command with output logging</li>
- *   <li>{@link #readApiKey(String)} — the API key a container wrote into its data folder</li>
+ *   <li>{@link #readApiKey(String, String)} — the API key a container wrote into its data folder</li>
  * </ul>
  */
 @Component
@@ -85,19 +85,25 @@ public class DockerContainerManager {
     /**
      * The API key of a Stable/Test container, read from the key file the instance writes into its data
      * folder at every start ({@code ApiKeyService}) — like {@code scripts/instance.sh key}, never from the
-     * instance's database.
+     * instance's database. Without the file the key passed to the container at its start counts: Stable
+     * and Test get this instance's key as {@code AUTOMATION_API_KEY}, and with a configured key
+     * {@code ApiKeyService} writes no file.
      *
-     * @throws LocalizedStateException {@code CONTAINER_API_KEY_MISSING} when the file is not there (the
-     *                                 container was started by a build from before the file), else
-     *                                 {@code CONTAINER_API_KEY_UNREADABLE} (container not running, no docker …)
+     * @param keyPassedAtStart the key the container was started with ({@code AUTOMATION_API_KEY}), or blank
+     * @throws LocalizedStateException {@code CONTAINER_API_KEY_MISSING} when neither file nor passed key
+     *                                 is there, else {@code CONTAINER_API_KEY_UNREADABLE} (container not
+     *                                 running, no docker …)
      */
-    public String readApiKey(String containerName) {
+    public String readApiKey(String containerName, String keyPassedAtStart) {
         CommandResult result = capture("docker", "exec", containerName, "sh", "-c", KEY_FILE_SH);
         String output = result.output().trim();
         if (result.exitCode() == 0 && !output.isEmpty()) {
             return output;
         }
         if (result.exitCode() == 3) {
+            if (keyPassedAtStart != null && !keyPassedAtStart.isBlank()) {
+                return keyPassedAtStart;
+            }
             throw new LocalizedStateException(ErrorMessage.CONTAINER_API_KEY_MISSING,
                     Map.of("container", containerName, "file", output));
         }

@@ -138,9 +138,6 @@ public class TestingService {
     public SyncPreview syncPreview() {
         if (!isHealthy()) throw new LocalizedStateException(ErrorMessage.TEST_INSTANCE_NOT_RUNNING);
         String testApiKey = readContainerApiKey(config.getTestContainerName());
-        if (testApiKey == null) {
-            throw new IllegalStateException("Could not read API key from test container. Is the container running?");
-        }
         return previewService.syncPreview(deriveTestBaseUrl(), testApiKey);
     }
 
@@ -155,9 +152,6 @@ public class TestingService {
             testApiKey = readContainerApiKey(config.getTestContainerName());
         } catch (LocalizedStateException e) {
             return new SyncResult(0, 0, 0, 0, List.of(e.getMessage()));
-        }
-        if (testApiKey == null) {
-            return new SyncResult(0, 0, 0, 0, List.of("Could not read API key from test container"));
         }
         return syncHelper.syncDefinitionsTo(deriveTestBaseUrl(), testApiKey, request);
     }
@@ -323,11 +317,12 @@ public class TestingService {
     }
 
     /**
-     * The container's API key from the key file in its data folder ({@link DockerContainerManager#readApiKey}),
-     * never from its database. Throws a {@code LocalizedStateException} that says what is missing.
+     * The container's API key from the key file in its data folder, else the key it was started with
+     * (this instance's, see {@link #start}) — never from its database ({@link DockerContainerManager#readApiKey}).
+     * Throws a {@code LocalizedStateException} that says what is missing.
      */
     String readContainerApiKey(String containerName) {
-        return dockerManager.readApiKey(containerName);
+        return dockerManager.readApiKey(containerName, apiKeyService.getEffectiveApiKey());
     }
 
     // ── Internal helpers ──────────────────────────────────

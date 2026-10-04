@@ -185,7 +185,7 @@ class TestingServiceTest {
         stagingConfig.setTestHealthUrl("http://localhost:8090/api/v1/system/health");
         TestingService spied = spy(testingService);
         doReturn(true).when(spied).isHealthy();
-        when(dockerContainerManager.readApiKey(anyString())).thenThrow(new com.automation.exception.LocalizedStateException(
+        when(dockerContainerManager.readApiKey(anyString(), any())).thenThrow(new com.automation.exception.LocalizedStateException(
                 com.automation.exception.ErrorMessage.CONTAINER_API_KEY_MISSING,
                 java.util.Map.of("container", "mysuricates-test", "file", "/home/user/.autotrigger/api-key")));
 
@@ -196,18 +196,18 @@ class TestingServiceTest {
         verify(instanceSyncHelper, never()).syncDefinitionsTo(anyString(), anyString(), any());
     }
 
+    /** Test started from Dev gets Dev's key as AUTOMATION_API_KEY and writes no key file — the sync passes it along. */
     @Test
-    void syncDefinitions_nullApiKey_returnsErrorResult() {
+    void syncDefinitions_passesTheOwnKeyAsFallbackForAContainerWithoutKeyFile() {
         stagingConfig.setTestHealthUrl("http://localhost:8090/api/v1/system/health");
         TestingService spied = spy(testingService);
         doReturn(true).when(spied).isHealthy();
-        doReturn(null).when(spied).readContainerApiKey(anyString());
+        when(apiKeyService.getEffectiveApiKey()).thenReturn("dev-key");
+        when(dockerContainerManager.readApiKey("mysuricates-test", "dev-key")).thenReturn("dev-key");
 
-        SyncResult result = spied.syncDefinitions();
+        spied.syncDefinitions();
 
-        assertThat(result.errors()).isNotEmpty();
-        assertThat(result.errors().get(0)).contains("API key");
-        verify(instanceSyncHelper, never()).syncDefinitionsTo(anyString(), anyString(), any());
+        verify(instanceSyncHelper).syncDefinitionsTo(eq("http://localhost:8090/api/v1"), eq("dev-key"), any());
     }
 
     @Test

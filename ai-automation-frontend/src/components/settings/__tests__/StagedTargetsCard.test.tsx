@@ -63,6 +63,25 @@ describe('StagedTargetsCard (84a78bb7)', () => {
     expect(await screen.findByText('1 workflows, 0 projects, 0 skills synced (0 skipped)')).toBeInTheDocument();
   });
 
+  it('names what stays behind in Dev — in the preview and after the transfer', async () => {
+    const note = "Workflow 'Deploy' calls sub-workflow 'Draft', which is not sealed — it stays in Dev and must already exist on Prod";
+    server.use(
+      http.get('/api/v1/staging/targets/prod/sync-preview', () => HttpResponse.json({ ...preview, notes: [note] })),
+      http.post('/api/v1/staging/targets/prod/sync-definitions', () => HttpResponse.json(
+        { projectsSynced: 0, workflowsSynced: 1, skillsSynced: 0, chainsSynced: 0, skipped: 0, errors: [], preSyncBackup: null, notes: [note] })),
+    );
+    renderWithProviders(<StagedTargetsCard targets={[target({ name: 'prod', url: 'http://prod:9090', sealedOnly: true })]} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Transfer to Prod' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(await within(dialog).findByText(note)).toBeInTheDocument();
+    expect(within(dialog).getByText(en.settings.syncNotesTitle)).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: en.settings.syncItemCount.replace('{count}', '1') }));
+
+    const card = within(await screen.findByTestId('staged-target-prod'));
+    expect(await card.findByText(note)).toBeInTheDocument();
+  });
+
   it('shows a refused transfer as an error instead of losing it', async () => {
     server.use(
       http.get('/api/v1/staging/targets/test/sync-preview', () => HttpResponse.json(preview)),
