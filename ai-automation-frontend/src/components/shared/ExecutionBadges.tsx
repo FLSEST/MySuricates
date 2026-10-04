@@ -9,8 +9,11 @@ const modeConfig: Record<ExecutionMode, { icon: typeof Terminal; label: string; 
   approval: { icon: ShieldCheck, label: 'Approval', color: 'text-human' },
 };
 
-export function ExecutionBadges({ blocks, className = '' }: { blocks: BlockDefinition[]; className?: string }) {
-  const modes = getExecutionModes(blocks);
+/** `shippedBlueprints`: the blueprint ids a package may call model-free (blueprint gallery only, 093d2f11). */
+export function ExecutionBadges({ blocks, className = '', shippedBlueprints }: {
+  blocks: BlockDefinition[]; className?: string; shippedBlueprints?: ReadonlySet<string>;
+}) {
+  const modes = getExecutionModes(blocks, shippedBlueprints);
   if (modes.length === 0) return null;
   return (
     <span className={`flex items-center gap-1 ${className}`}>

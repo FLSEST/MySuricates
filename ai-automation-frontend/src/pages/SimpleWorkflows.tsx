@@ -17,13 +17,13 @@ import {
 import { useSettingsStore } from '../stores/settingsStore';
 import { useProjects } from '../hooks/useProjects';
 import { useT, useI18nStore } from '../i18n';
-import { resolveTemplateName } from '../utils/templateUtils';
+import { blueprintPartIds, resolveTemplateName } from '../utils/templateUtils';
 import { curateWorkflows } from '../utils/curateWorkflows';
 import { AREA_COLORS } from '../utils/homeTiles';
 import { useLatestRunStatuses } from '../hooks/useLatestRunStatuses';
 import type { CreateWorkflowRequest, WorkflowTemplate, PoolWorkflowEntry, Workflow } from '../types';
 import { useInstallPoolWorkflow, usePoolWorkflows } from '../hooks/usePool';
-import { useTemplates } from '../hooks/useTemplates';
+import { useInstallTemplate, useTemplates } from '../hooks/useTemplates';
 
 export function SimpleWorkflows() {
   const t = useT();
@@ -34,6 +34,7 @@ export function SimpleWorkflows() {
   const { data: projects } = useProjects();
   const createWorkflow = useCreateWorkflow();
   const installPoolWorkflow = useInstallPoolWorkflow();
+  const installTemplate = useInstallTemplate();
   const simpleRun = useSimpleRun();
   const deleteWorkflow = useDeleteWorkflow();
 
@@ -159,6 +160,16 @@ export function SimpleWorkflows() {
     const payload = autoTodoDefault
       ? { ...form, metadata: { ...form.metadata, autoTodo: { enabled: true } } }
       : form;
+
+    // A blueprint package (e.g. from ?template=) is created by the server, which wires its part (093d2f11)
+    if (selectedTemplate && form.templateId === selectedTemplate.id && blueprintPartIds(selectedTemplate).length > 0) {
+      installTemplate.mutate(
+        { templateId: selectedTemplate.id, projectId: form.projectId, name: form.name, description: form.description,
+          ...(payload.metadata ? { metadata: payload.metadata } : {}) },
+        { onSuccess: (data) => { onDone(); navigate(`/workflows/${data.workflowId}`); } },
+      );
+      return;
+    }
     createWorkflow.mutate(payload, {
       onSuccess: (wf) => { onDone(); navigate(`/workflows/${wf.id}`); },
     });
@@ -288,7 +299,7 @@ export function SimpleWorkflows() {
         selectedTemplate={selectedTemplate}
         form={form}
         projects={projects}
-        createLoading={createWorkflow.isPending || installPoolWorkflow.isPending}
+        createLoading={createWorkflow.isPending || installPoolWorkflow.isPending || installTemplate.isPending}
         onFormChange={setForm}
         onTemplateSelect={handleTemplateSelect}
         onPoolSelect={handlePoolSelect}

@@ -33,10 +33,11 @@ function caseBlocks(config: Record<string, unknown>): RawBlock[] {
  * AI follows the backend's `ModelUse` rule, which also decides a template's `needsAi`: the model
  * block types always; foreach, while, conditional and retry unless they run as shell; a switch
  * through a `simple` case block that does not run as shell; a sub-workflow, because the workflow
- * it starts is not part of this definition — unless it still names a shipped blueprint (a blueprint
- * package before installation, TODO 093d2f11), whose cost `BlueprintGateTest` pins.
+ * it starts is not part of this definition — unless it still names one of `shippedBlueprints` (a
+ * blueprint package before installation, TODO 093d2f11, like `ModelUse.needsAiAsBlueprint`), whose
+ * cost `BlueprintGateTest` pins. Without that list the prefix alone promises nothing.
  */
-export function getExecutionModes(blocks: BlockDefinition[]): ExecutionMode[] {
+export function getExecutionModes(blocks: BlockDefinition[], shippedBlueprints?: ReadonlySet<string>): ExecutionMode[] {
   const modes = new Set<ExecutionMode>();
   for (const b of blocks) {
     const t = b.type;
@@ -45,7 +46,7 @@ export function getExecutionModes(blocks: BlockDefinition[]): ExecutionMode[] {
     else if (MODEL_TYPES.has(t)) modes.add('ai');
     else if (t === 'sub-workflow') {
       const id = config.workflow_id;
-      if (!(typeof id === 'string' && id.startsWith(BLUEPRINT_PREFIX))) modes.add('ai');
+      if (!(typeof id === 'string' && id.startsWith(BLUEPRINT_PREFIX) && shippedBlueprints?.has(id))) modes.add('ai');
     }
     else if (t === 'approval') modes.add('approval');
     else if (COMMAND_WRAPPERS.has(t)) modes.add(runsAsShell(config) ? 'shell' : 'ai');

@@ -118,4 +118,32 @@ class WorkflowRequestFieldsTest {
         assertThat(WorkflowRequestFields.normalizeEffort("HIGH")).isEqualTo("high");
         assertThatThrownBy(() -> WorkflowRequestFields.normalizeEffort("turbo")).isInstanceOf(IllegalArgumentException.class);
     }
+
+    /**
+     * Review 093d2f11: a sub-workflow that still names a blueprint would fail at run time — the
+     * package is created through the template installation, which wires the id. Create and update refuse it.
+     */
+    @Test
+    void anUnwiredBlueprintReference_isRefusedWithATranslatedMessage() {
+        List<BlockDefinition> blocks = List.of(BlockDefinition.builder().type("sub-workflow").name("teil")
+                .config(Map.of("workflow_id", "blueprint-sub-workflow-part")).build());
+        var project = com.automation.entity.Project.builder().id("p").build();
+        var create = new com.automation.dto.request.CreateWorkflowRequest("p", "x", null, null, blocks, null,
+                null, null, null, "blueprint-sub-workflow", null, null, null);
+
+        assertThatThrownBy(() -> WorkflowRequestFields.newWorkflow(project, create))
+                .isInstanceOf(com.automation.exception.LocalizedArgumentException.class)
+                .satisfies(e -> assertThat(((com.automation.exception.LocalizedArgumentException) e).errorMessage())
+                        .isEqualTo(com.automation.exception.ErrorMessage.UNWIRED_BLUEPRINT_REFERENCE))
+                .hasMessageContaining("blueprint-sub-workflow-part")
+                .hasMessageContaining("/workflow-templates/");
+        assertThatThrownBy(() -> WorkflowRequestFields.apply(workflow(),
+                new UpdateWorkflowRequest(null, null, null, blocks, null, null, null, null, null)))
+                .isInstanceOf(com.automation.exception.LocalizedArgumentException.class);
+
+        List<BlockDefinition> wired = List.of(BlockDefinition.builder().type("sub-workflow")
+                .config(Map.of("workflow_id", "3f0c1d2e-0000-4000-8000-000000000000")).build());
+        assertThat(WorkflowRequestFields.apply(workflow(),
+                new UpdateWorkflowRequest(null, null, null, wired, null, null, null, null, null))).isTrue();
+    }
 }

@@ -36,6 +36,15 @@ export function useCreateTemplate() {
 }
 
 /**
+ * The route itself is unknown (`GlobalExceptionHandler.handleNoResourceFound`: "No endpoint: …"), not
+ * a missing template or blueprint, which the new endpoint reports as 404 too.
+ */
+function isMissingEndpoint(err: unknown): boolean {
+  const e = err as { status?: number; message?: string; error?: string } | null;
+  return e?.status === 404 && /^No endpoint/.test(e.message ?? e.error ?? '');
+}
+
+/**
  * Creates a workflow from a template on the server, together with the blueprints its sub-workflow
  * blocks call, wired to their new ids (TODO 093d2f11). Used for blueprint packages; names and steps
  * come in the UI language.
@@ -52,7 +61,11 @@ export function useInstallTemplate() {
       qc.invalidateQueries({ queryKey: ['workflows'] });
       toast.success(t.toast.workflowCreated);
     },
-    onError: (err) => toast.error(apiErrorMessage(err, t.toast.workflowCreateFailed)),
+    // An older backend (the frontend goes live before the restart) has no install endpoint: say so
+    // instead of a bare 404, and never fall back to a plain create that would name a blueprint
+    onError: (err) => toast.error(isMissingEndpoint(err)
+      ? t.blueprints.installNeedsNewerBackend
+      : apiErrorMessage(err, t.toast.workflowCreateFailed)),
   });
 }
 

@@ -117,6 +117,20 @@ class WorkflowTemplateMapperTest {
             assertThat(runsAnywhere.requiredModules()).isEmpty();
             assertThat(runsAnywhere.needsAi()).isFalse();
         }
+
+        /** Review 093d2f11: only a blueprint may count a package call to a blueprint as model-free. */
+        @Test
+        void aPackageCallIsModelFree_onlyInABlueprint() {
+            List<BlockDefinition> call = List.of(BlockDefinition.builder().type("sub-workflow")
+                    .config(Map.of("workflow_id", "blueprint-sub-workflow-part")).build());
+            WorkflowTemplate blueprint = WorkflowTemplate.builder().id("blueprint-x").name(Map.of("en", "B"))
+                    .blocks(call).kind(com.automation.entity.TemplateKind.BLUEPRINT).build();
+            WorkflowTemplate userTemplate = WorkflowTemplate.builder().id("u-1").name(Map.of("en", "U"))
+                    .blocks(call).build();
+
+            assertThat(mapper.toResponse(blueprint).needsAi()).isFalse();
+            assertThat(mapper.toResponse(userTemplate).needsAi()).isTrue();
+        }
     }
 
     @Test

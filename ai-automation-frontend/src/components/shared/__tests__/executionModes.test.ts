@@ -40,9 +40,14 @@ describe('getExecutionModes', () => {
   });
 
   // 093d2f11: a blueprint package before installation names its part, whose cost the backend gate pins
-  it('judges a sub-workflow that still names a shipped blueprint by that blueprint, like ModelUse', () => {
-    expect(getExecutionModes([block('sub-workflow', { workflow_id: 'blueprint-sub-workflow-part' })])).toEqual([]);
-    expect(getExecutionModes([block('sub-workflow', {})])).toEqual(['ai']);
+  it('judges a sub-workflow naming a shipped blueprint by that blueprint, and only then', () => {
+    const call = [block('sub-workflow', { workflow_id: 'blueprint-sub-workflow-part' })];
+    const shipped = new Set(['blueprint-sub-workflow-part']);
+    expect(getExecutionModes(call, shipped)).toEqual([]);
+    // the prefix alone promises nothing: unknown part, or no list of shipped blueprints at all
+    expect(getExecutionModes(call, new Set(['blueprint-other']))).toEqual(['ai']);
+    expect(getExecutionModes(call)).toEqual(['ai']);
+    expect(getExecutionModes([block('sub-workflow', {})], shipped)).toEqual(['ai']);
   });
 
   it('shows nothing for purely deterministic non-shell blocks', () => {

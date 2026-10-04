@@ -2021,6 +2021,7 @@ export const en = {
       AI: 'With AI (uses tokens)',
       AROUND: 'Around workflows',
     },
+    installNeedsNewerBackend: 'The server creates this package, and the running backend cannot do that yet – please restart the instance and try again.',
     packageNote: 'Package: creating it also creates the called sub-workflow in the same project, with its id already filled in.',
   },
   pool: {
@@ -2265,6 +2266,7 @@ export const en = {
       MODULE_DISABLED: '{what} requires module \'{module}\', which is disabled on this instance — set {property}=true and restart',
       MODULE_DISABLED_SWITCHABLE: '{what} requires module \'{module}\', which is disabled on this instance — set {property}=true and restart (or switch it on under Settings → Modules if automation.modules.ui-editable is true)',
       RUN_RETENTION_LOCKED: 'Run retention can only be extended while deleting runs is disabled (automation.executions.allow-delete=false): {current} -> {requested} days',
+      UNWIRED_BLUEPRINT_REFERENCE: 'Block \'{block}\' calls the blueprint {blueprint} instead of a workflow — create the package through the template installation (POST /api/v1/workflow-templates/<id>/install), which also creates the called workflow',
       MEMORY_NO_RUNS: 'No runs found for workflow: {id}',
       MEMORY_NO_STEPS: 'No step results found in selected runs',
       INTEGRATION_PARAMETER_MISSING: 'Required parameter missing: {name}',

@@ -42,6 +42,8 @@ public enum ErrorMessage {
     MODULE_DISABLED(ErrorCode.MODULE_DISABLED, "{what} requires module '{module}', which is disabled on this instance — set {property}=true and restart"),
     MODULE_DISABLED_SWITCHABLE(ErrorCode.MODULE_DISABLED, "{what} requires module '{module}', which is disabled on this instance — set {property}=true and restart (or switch it on under Settings → Modules if automation.modules.ui-editable is true)"),
     RUN_RETENTION_LOCKED(ErrorCode.RUN_DELETION_DISABLED, "Run retention can only be extended while deleting runs is disabled (automation.executions.allow-delete=false): {current} -> {requested} days"),
+    // A sub-workflow still naming a blueprint instead of a workflow (TemplatePackageInstaller, TODO 093d2f11)
+    UNWIRED_BLUEPRINT_REFERENCE(ErrorCode.INVALID_ARGUMENT, "Block '{block}' calls the blueprint {blueprint} instead of a workflow — create the package through the template installation (POST /api/v1/workflow-templates/<id>/install), which also creates the called workflow"),
     MEMORY_NO_RUNS(ErrorCode.STATE_CONFLICT, "No runs found for workflow: {id}"),
     MEMORY_NO_STEPS(ErrorCode.STATE_CONFLICT, "No step results found in selected runs"),
     INTEGRATION_PARAMETER_MISSING(ErrorCode.INVALID_ARGUMENT, "Required parameter missing: {name}"),

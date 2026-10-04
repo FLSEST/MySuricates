@@ -8,6 +8,8 @@ import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
 import { useI18nStore } from '../../i18n';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { useToastStore } from '../../stores/toastStore';
+import { de } from '../../i18n/de';
 import { useWorkflowCreateFlow } from '../useWorkflowCreateFlow';
 import { useWorkflowExecuteFlow } from '../useWorkflowExecuteFlow';
 import { useWorkflowImportFlow } from '../useWorkflowImportFlow';
@@ -122,6 +124,34 @@ describe('useWorkflowCreateFlow', () => {
     expect(installs).toEqual([['blueprint-sub-workflow', {
       projectId: 'p1', name: 'Prüfen', description: 'Prüft', metadata: { autoTodo: { enabled: true } }, locale: 'de',
     }]]);
+  });
+
+  // Review 093d2f11: the frontend goes live before the backend restarts — an old backend has no install endpoint
+  it('says the instance needs a restart when the install endpoint is missing, and creates nothing', async () => {
+    const creates: unknown[] = [];
+    server.use(
+      http.post('/api/v1/workflow-templates/:id/install', () => HttpResponse.json(
+        { code: 'RESOURCE_NOT_FOUND', error: 'No endpoint: POST /api/v1/workflow-templates/blueprint-sub-workflow/install' },
+        { status: 404 })),
+      http.post('/api/v1/workflows', async ({ request }) => {
+        creates.push(await request.json());
+        return HttpResponse.json({ id: 'w-plain' });
+      }),
+    );
+    const pkg = {
+      ...template, id: 'blueprint-sub-workflow', kind: 'BLUEPRINT',
+      blocks: [{ type: 'sub-workflow', config: { workflow_id: 'blueprint-sub-workflow-part' } }],
+    } as unknown as WorkflowTemplate;
+    const { result } = setup(useWorkflowCreateFlow);
+
+    act(() => result.current.selectTemplate(pkg));
+    act(() => result.current.setForm({ ...result.current.form, projectId: 'p1' }));
+    act(() => result.current.create());
+
+    await waitFor(() => expect(useToastStore.getState().toasts.map((x) => x.message))
+      .toContain(de.blueprints.installNeedsNewerBackend));
+    expect(creates).toEqual([]);
+    expect(result.current.createStep).toBe('details');
   });
 
   it('opens with the template from ?new=1&template= chosen — a hint\'s blueprint link', async () => {

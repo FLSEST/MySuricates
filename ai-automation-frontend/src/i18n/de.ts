@@ -2023,6 +2023,7 @@ export const de: TranslationKeys = {
       AI: 'Mit KI (verbraucht Tokens)',
       AROUND: 'Rund um Workflows',
     },
+    installNeedsNewerBackend: 'Dieses Paket legt der Server an, und das laufende Backend kann das noch nicht – bitte die Instanz neu starten und es dann erneut versuchen.',
     packageNote: 'Paket: Beim Anlegen entsteht zusätzlich der aufgerufene Teil-Workflow im selben Projekt, seine ID ist schon eingetragen.',
   },
   pool: {
@@ -2262,6 +2263,7 @@ export const de: TranslationKeys = {
       MODULE_DISABLED: '{what} braucht das Modul „{module}“, das auf dieser Instanz ausgeschaltet ist – setze {property}=true und starte neu',
       MODULE_DISABLED_SWITCHABLE: '{what} braucht das Modul „{module}“, das auf dieser Instanz ausgeschaltet ist – setze {property}=true und starte neu (oder schalte es unter Einstellungen → Module ein, wenn automation.modules.ui-editable an ist)',
       RUN_RETENTION_LOCKED: 'Die Aufbewahrung von Ausführungen lässt sich nur verlängern, solange das Löschen ausgeschaltet ist (automation.executions.allow-delete=false): {current} → {requested} Tage',
+      UNWIRED_BLUEPRINT_REFERENCE: 'Block „{block}“ ruft die Blaupause {blueprint} statt eines Workflows auf – lege das Paket über die Vorlagen-Installation an (POST /api/v1/workflow-templates/<id>/install), die den aufgerufenen Workflow mit anlegt',
       MEMORY_NO_RUNS: 'Für den Workflow gibt es keine Ausführungen: {id}',
       MEMORY_NO_STEPS: 'Die gewählten Ausführungen haben keine Schritt-Ergebnisse',
       INTEGRATION_PARAMETER_MISSING: 'Pflichtparameter fehlt: {name}',
