@@ -84,8 +84,10 @@ public class OutboundTargetGuard {
     }
 
     /**
-     * Same check as {@link #check}, returning the first address the host resolved to (all of them
-     * passed) — the address a caller should connect to. {@code null} while {@code flag} is off.
+     * Same check as {@link #check}, returning the address a caller should connect to (all of them
+     * passed): the first IPv4 address, else the first one — IPv4 first like the JDK's own default
+     * ({@code java.net.preferIPv6Addresses=false}), so a host without IPv6 route still connects.
+     * {@code null} while {@code flag} is off.
      */
     public InetAddress checkedAddress(URI uri, ModuleCatalog flag) {
         if (!enabled(flag)) return null;
@@ -108,6 +110,9 @@ public class OutboundTargetGuard {
                         + " is a local or private network address — integrations only fetch from public "
                         + "addresses. To allow local sources, set " + flag.property() + "=false and restart.");
             }
+        }
+        for (InetAddress address : addresses) {
+            if (address instanceof Inet4Address) return address;
         }
         return addresses[0];
     }

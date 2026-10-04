@@ -19,8 +19,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * declares its target kind, and the outbound guard, the redirect rule and the connection to the
  * checked address come with it — whether the guard applies no longer depends on someone thinking of
  * it. Building a client anywhere else ({@code HttpClient.newBuilder}, {@code RestTemplate},
- * {@code WebClient}, {@code URL.openConnection} …) fails this test until it moves to the factory or is
- * pinned in {@link #EXEMPT} with its reason. The declared target kind of every client is pinned in
+ * {@code WebClient}, {@code URL.openConnection}, {@code HttpURLConnection}, a raw {@code Socket} …)
+ * fails this test until it moves to the factory or is pinned in {@link #EXEMPT} with its reason. The declared target kind of every client is pinned in
  * {@link #TARGET_KINDS}, so that changing it (e.g. a fixed host that starts taking a URL from the
  * connection) shows up in review.
  */
@@ -33,13 +33,17 @@ class OutboundHttpGateTest {
 
     private static final Pattern RAW_CLIENT = Pattern.compile(
             "HttpClient\\s*\\.\\s*new(Builder|HttpClient)\\s*\\(|\\bRestTemplate(Builder)?\\b|\\bWebClient\\b"
-                    + "|\\bRestClient\\b|\\.\\s*openConnection\\s*\\(|\\.\\s*openStream\\s*\\(");
+                    + "|\\bRestClient\\b|\\.\\s*openConnection\\s*\\(|\\.\\s*openStream\\s*\\("
+                    + "|\\bHttpURLConnection\\b|\\bHttpClient\\s*\\.\\s*Builder\\b|\\bnew\\s+Socket\\s*\\("
+                    + "|\\bjava\\.net\\.Socket\\b");
 
-    /** file → why it may open HTTP connections without the factory. */
+    /** file → why it may open HTTP connections (or sockets) without the factory. */
     private static final Map<String, String> EXEMPT = Map.of(
             // the own stable/test instance on localhost (staging module), with the dev API key
             "com/automation/service/staging/InstanceHttpClient.java", "own staging instances on localhost",
-            "com/automation/service/staging/DockerContainerManager.java", "health probe of the own container");
+            "com/automation/service/staging/DockerContainerManager.java", "health probe of the own container",
+            // TCP port probe of the instance endpoints the tray shows, no request is sent
+            "com/automation/service/tray/TrayInstanceMonitor.java", "port probe of the own instances");
 
     /** Where integrations and notifications must not hold a raw JDK client at all (not even an injected one). */
     private static final Set<String> NO_RAW_CLIENT_TYPE_UNDER = Set.of(
@@ -123,10 +127,16 @@ class OutboundHttpGateTest {
         for (String line : new String[]{
                 "HttpClient.newBuilder()", "HttpClient.newHttpClient()", "new RestTemplate()",
                 "RestTemplateBuilder builder", "WebClient.create(url)", "RestClient.builder()",
-                "url.openConnection()", "URI.create(x).toURL().openStream()"}) {
+                "url.openConnection()", "URI.create(x).toURL().openStream()",
+                "HttpURLConnection conn = (HttpURLConnection) url.openConnection();",
+                "HttpClient.Builder builder = HttpClient.newBuilder();", "java.net.http.HttpClient.Builder b",
+                "try (Socket socket = new Socket()) {", "import java.net.Socket;"}) {
             assertThat(RAW_CLIENT.matcher(line).find()).as(line).isTrue();
         }
         assertThat(RAW_CLIENT.matcher("OutboundHttp.fixedHost(Duration.ofSeconds(10))").find()).isFalse();
         assertThat(RAW_CLIENT.matcher("private final OutboundClient httpClient;").find()).isFalse();
+        // the Docker daemon client is no outbound HTTP client of an integration
+        assertThat(RAW_CLIENT.matcher("new ZerodepDockerHttpClient.Builder()").find()).isFalse();
+        assertThat(RAW_CLIENT.matcher("import java.net.SocketAddress;").find()).isFalse();
     }
 }

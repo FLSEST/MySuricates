@@ -145,4 +145,18 @@ class OutboundTargetGuardTest {
                 .isEqualTo(InetAddress.getByName("93.184.216.34"));
         assertThat(guard(false, Map.of()).checkedAddress(URI.create("http://127.0.0.1/"), FEEDS)).isNull();
     }
+
+    @Test
+    void checkedAddressPrefersTheFirstIpv4_afterCheckingEveryAddress() throws Exception {
+        OutboundTargetGuard guard = guard(true, Map.of(
+                "dual.example", new String[]{"2606:4700::1111", "93.184.216.34", "8.8.8.8"},
+                "v6only.example", new String[]{"2606:4700::1111", "2001:4860:4860::8888"},
+                "dual-bad.example", new String[]{"2606:4700::1111", "93.184.216.34", "::1"}));
+        assertThat(guard.checkedAddress(URI.create("http://dual.example/"), FEEDS))
+                .isEqualTo(InetAddress.getByName("93.184.216.34"));
+        assertThat(guard.checkedAddress(URI.create("http://v6only.example/"), FEEDS))
+                .isEqualTo(InetAddress.getByName("2606:4700::1111"));
+        assertThatThrownBy(() -> guard.checkedAddress(URI.create("http://dual-bad.example/"), FEEDS))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
 }
