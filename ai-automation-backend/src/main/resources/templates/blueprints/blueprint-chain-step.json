@@ -1,0 +1,38 @@
+{
+  "id": "blueprint-chain-step",
+  "icon": "🔗",
+  "i18n": [
+    "de",
+    "en"
+  ],
+  "name": {
+    "de": "Glied einer Kette",
+    "en": "Link in a chain"
+  },
+  "description": {
+    "de": "Rund um Workflows: der zweite Workflow einer Kette, 0 Tokens. Er liest mit {{ previous_chain_output }} die letzte Ausgabe seines Vorgängers. So geht's: Die Kettenvorlage „Kette aus zwei Blaupausen“ (Modul chains) legt „Ampel“ und diesen Workflow an und reiht sie hintereinander. Einzeln gestartet hat er keinen Vorgänger. Ersetze die Weiterverarbeitung.",
+    "en": "Around workflows: the second workflow of a chain, 0 tokens. It reads its predecessor's last output with {{ previous_chain_output }}. How to: the chain template “Chain of two blueprints” (module chains) creates “Traffic light” and this workflow and puts them in a row. Started on its own it has no predecessor. Replace the follow-up."
+  },
+  "category": "AROUND",
+  "sortOrder": 29,
+  "version": "1.0.0",
+  "model": null,
+  "instructions": null,
+  "blocks": [
+    {
+      "type": "shell",
+      "name": {
+        "de": "vorgaenger",
+        "en": "predecessor"
+      },
+      "config": {
+        "command": "set -eu\n# only a chain sets previous_chain_output; started on its own the placeholder text stays\nprev=$(printf '%s' {{ previous_chain_output }})\ncase \"$prev\" in *'{{'*) prev='(started on its own - no predecessor)' ;; esac\n# placeholder - replace with what this link does with its predecessor's result\nprintf 'predecessor said:\\n%s\\n' \"$prev\"",
+        "shell_escape_variables": true,
+        "description": {
+          "de": "Liest die letzte Ausgabe des Vorgängers in der Kette. Ersetze die Weiterverarbeitung.",
+          "en": "Reads the last output of the predecessor in the chain. Replace the follow-up."
+        }
+      }
+    }
+  ]
+}

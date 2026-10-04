@@ -1,0 +1,51 @@
+{
+  "id": "blueprint-memory",
+  "icon": "📒",
+  "i18n": [
+    "de",
+    "en"
+  ],
+  "name": {
+    "de": "Workflow-Memory nutzen",
+    "en": "Using workflow memory"
+  },
+  "description": {
+    "de": "Rund um Workflows: zeigt, was ein Lauf aus dem Workflow-Memory mitbekommt, 0 Tokens. Vor jedem Lauf schreibt die Plattform das aktive Memory nach .claude/rules/project-memory.md im Projekt; Claude liest es von selbst, andere Anbieter bekommen es an den Systemprompt gehängt. So geht's: nach ein paar Läufen im Memory-Tab des Workflows Erkenntnisse extrahieren (ein Modellaufruf, Modul memory) oder Auto-Memory einschalten.",
+    "en": "Around workflows: shows what a run gets from workflow memory, 0 tokens. Before every run the platform writes the active memory to .claude/rules/project-memory.md in the project; Claude reads it by itself, other providers get it appended to the system prompt. How to: after a few runs extract insights in the workflow's memory tab (one model call, module memory) or switch on auto-memory."
+  },
+  "category": "AROUND",
+  "sortOrder": 30,
+  "version": "1.0.0",
+  "model": null,
+  "instructions": null,
+  "blocks": [
+    {
+      "type": "shell",
+      "name": {
+        "de": "memory_lesen",
+        "en": "read_memory"
+      },
+      "config": {
+        "command": "set -eu\n# what the next AI step of this run would get from workflow memory\nf=.claude/rules/project-memory.md\nif [ -s \"$f\" ]; then\n  printf 'active memory, %s lines:\\n' \"$(wc -l < \"$f\" | tr -d ' ')\"\n  head -n 20 \"$f\"\nelse\n  echo 'no active memory yet - extract one after a few runs'\nfi",
+        "description": {
+          "de": "Zeigt das aktive Memory dieses Workflows, so wie es vor dem Lauf ins Projekt geschrieben wurde. Ohne aktives Memory ist die Datei weg.",
+          "en": "Shows this workflow's active memory as it was written into the project before the run. Without active memory the file is gone."
+        }
+      }
+    },
+    {
+      "type": "shell",
+      "name": {
+        "de": "erkenntnis",
+        "en": "insight"
+      },
+      "config": {
+        "command": "set -eu\n# placeholder - a run that leaves something worth remembering\nprintf 'insight: the working directory holds %s entries\\n' \"$(ls -A | wc -l | tr -d ' ')\"",
+        "description": {
+          "de": "Hinterlässt eine Beobachtung, aus der eine spätere Extraktion Wissen machen kann. Ersetze sie durch das, was dein Workflow lernen soll.",
+          "en": "Leaves an observation that a later extraction can turn into knowledge. Replace it with what your workflow should learn."
+        }
+      }
+    }
+  ]
+}

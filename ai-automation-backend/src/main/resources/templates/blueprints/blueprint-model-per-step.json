@@ -1,0 +1,75 @@
+{
+  "id": "blueprint-model-per-step",
+  "icon": "🎚️",
+  "i18n": [
+    "de",
+    "en"
+  ],
+  "name": {
+    "de": "Modell pro Schritt",
+    "en": "Model per step"
+  },
+  "description": {
+    "de": "KI-Blaupause (2 Modellaufrufe): Ein günstiger Schritt sortiert mit kleinem Modell und effort low vor, ein zweiter fasst mit Anbieter und Modell des Workflows zusammen. provider, model und effort am Block gehen den Werten des Workflows vor, diese dem Systemstandard. Passe Modell und Anbieter an deine Anmeldung an.",
+    "en": "AI blueprint (2 model calls): a cheap step presorts with a small model and effort low, a second one summarizes with the workflow's provider and model. provider, model and effort on a block take precedence over the workflow's values, which take precedence over the system default. Adapt model and provider to your login."
+  },
+  "category": "AI",
+  "sortOrder": 22,
+  "version": "1.0.0",
+  "model": null,
+  "instructions": null,
+  "blocks": [
+    {
+      "type": "shell",
+      "name": {
+        "de": "sammeln",
+        "en": "collect"
+      },
+      "config": {
+        "command": "# placeholder - replace with the items you want sorted\nprintf '%s\\n' 'renew TLS certificate (expires in 3 days)' 'update README typo' 'plan next quarter'",
+        "description": {
+          "de": "Liefert die Einträge. Ersetze den Befehl durch deine eigene Liste.",
+          "en": "Produces the items. Replace the command with your own list."
+        }
+      }
+    },
+    {
+      "type": "simple",
+      "name": {
+        "de": "vorsortieren",
+        "en": "presort"
+      },
+      "config": {
+        "provider": "CLAUDE",
+        "model": "haiku",
+        "effort": "low",
+        "command": {
+          "de": "Ordne jede Zeile genau einer Kategorie zu: dringend, normal oder später. Antworte nur mit „Zeile → Kategorie“, eine Zeile je Eintrag. Schreibe keine Dateien und führe keine Befehle aus.\n\n{{ block.sammeln.output }}",
+          "en": "Assign each line exactly one category: urgent, normal or later. Answer only with “line → category”, one line per item. Do not write any files and do not run any commands.\n\n{{ block.collect.output }}"
+        },
+        "description": {
+          "de": "Günstiger Schritt: provider, model und effort stehen am Block und gelten nur hier. Das Modell haiku passt nur zu CLAUDE – bei einem anderen Anbieter beide Schlüssel ändern oder entfernen.",
+          "en": "Cheap step: provider, model and effort sit on the block and apply only here. The model haiku only fits CLAUDE – with another provider change or remove both keys."
+        }
+      }
+    },
+    {
+      "type": "simple",
+      "name": {
+        "de": "zusammenfassen",
+        "en": "summarize"
+      },
+      "config": {
+        "effort": "medium",
+        "command": {
+          "de": "Fasse diese Einordnung in höchstens zwei Sätzen auf Deutsch zusammen: Was ist zuerst zu tun? Schreibe keine Dateien und führe keine Befehle aus.\n\n{{ previous_output }}",
+          "en": "Summarize this sorting in at most two sentences in English: what comes first? Do not write any files and do not run any commands.\n\n{{ previous_output }}"
+        },
+        "description": {
+          "de": "Ohne provider und model am Block: läuft mit Anbieter und Modell des Workflows, sonst mit dem Systemstandard. Nur effort medium ist hier gesetzt.",
+          "en": "No provider or model on the block: runs with the workflow's provider and model, otherwise with the system default. Only effort medium is set here."
+        }
+      }
+    }
+  ]
+}

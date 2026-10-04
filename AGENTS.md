@@ -398,7 +398,7 @@ POST /api/v1/workflows/{id}/versions/{versionId}/restore
 
 **Hinweise:**
 - Versionen werden automatisch bei jedem Update erstellt (nur bei Änderung an Blocks, Instructions, Model, Provider, Metadata, DefaultContext, Skills)
-- Jede Version beschreibt den Zustand **nach** einer Änderung und trägt `definitionHash` (SHA-256 der Definition). `changeSource` bestimmt der Server, nicht der Request: `user`, `assistant`, `factory` (auch Auto-Repair), `wish`, `dialog`, `conversion`, `chain-template`, `pool-install`, `example-project`, `goal-guard`, `import`, `bpmn-import`, `restore`, `untracked` (Stand ohne Version, z. B. Altbestand oder Änderung am Service vorbei). Ältere Zeilen können noch `ai`/`api` tragen.
+- Jede Version beschreibt den Zustand **nach** einer Änderung und trägt `definitionHash` (SHA-256 der Definition). `changeSource` bestimmt der Server, nicht der Request: `user`, `assistant`, `factory` (auch Auto-Repair), `wish`, `dialog`, `conversion`, `chain-template`, `template-install`, `pool-install`, `example-project`, `goal-guard`, `import`, `bpmn-import`, `restore`, `untracked` (Stand ohne Version, z. B. Altbestand oder Änderung am Service vorbei). Ältere Zeilen können noch `ai`/`api` tragen.
 - Kosmetische Änderungen (Name, Beschreibung, Icon, Versions-Label `version`) erzeugen keine Version
 - Context-Variablen in Workflows: `{{ workflow_version }}` (Versionsnummer), `{{ workflow_changed_since_last_run }}` (true/false), `{{ workflow_definition_hash }}`, `{{ trigger_source }}`
 

@@ -908,6 +908,29 @@ Einen bestehenden Workflow als neues Template speichern (Name, Beschreibung, Bl�
 
 **Response:** `201` mit `WorkflowTemplateResponse`
 
+### `POST /api/v1/workflow-templates/{id}/install`
+
+Workflow aus einem Template im Projekt anlegen — samt den Blaupausen, die seine `sub-workflow`-Blöcke aufrufen
+(TODO 093d2f11). Ein Blaupausen-Paket nennt im `workflow_id` die aufgerufene Blaupause (`blueprint-…`); die
+Installation legt sie zuerst im selben Projekt an und trägt dann ihre neue ID ein. Ein Template ohne solchen Verweis
+entsteht wie mit `POST /workflows`. `changeSource` der Versionen: `template-install`.
+
+**Request:**
+
+```json
+{ "projectId": "uuid", "name": "Mein Paket", "description": "…", "locale": "de", "metadata": { "autoTodo": { "enabled": true } } }
+```
+
+| Feld | Typ | Pflicht |
+|---|---|---|
+| `projectId` | String | Ja |
+| `name`, `description` | String | Nein: leer → die des Templates in `locale` |
+| `locale` | String (`de`/`en`) | Nein: Sprache der Namen und der Schritte; ohne Angabe Englisch |
+| `metadata` | Object | Nein: wie bei `POST /workflows`, nur für den angelegten Workflow, nicht für die Teile |
+
+**Response:** `201` mit `{ "workflowId": "uuid", "workflowName": "…", "partWorkflowIds": ["uuid"] }`; eine unbekannte
+Blaupause im Verweis → `404`, ohne dass etwas angelegt wird.
+
 ---
 
 ## Executions

@@ -56,9 +56,9 @@ class ChainTemplateServiceTest {
     class FindTests {
 
         @Test
-        void findAll_returns5BuiltInTemplates() {
+        void findAll_returns6BuiltInTemplates() {
             List<BuiltInChainTemplate> templates = chainTemplateService.findAll();
-            assertThat(templates).hasSize(5);
+            assertThat(templates).hasSize(6);
         }
 
         /** An entry whose template no longer ships (moved to the pool) would fail every install. */

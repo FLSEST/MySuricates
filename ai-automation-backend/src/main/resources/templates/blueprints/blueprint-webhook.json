@@ -1,0 +1,38 @@
+{
+  "id": "blueprint-webhook",
+  "icon": "🪝",
+  "i18n": [
+    "de",
+    "en"
+  ],
+  "name": {
+    "de": "Per Webhook starten (mit Signatur)",
+    "en": "Starting via webhook (signed)"
+  },
+  "description": {
+    "de": "Rund um Workflows: liest die Felder event und ref aus dem JSON-Body eines Webhook-Aufrufs, 0 Tokens. So geht's: einen Webhook für diesen Workflow anlegen (Modul webhooks) und mit dem Härtungsschalter webhook-signatures ein Signatur-Secret erzeugen; jeder Aufruf schickt dann X-Signature: sha256=<HMAC-SHA256 des Bodys>, sonst 401. Felder des Bodys gelten als fremde Eingabe. Ersetze die Verarbeitung.",
+    "en": "Around workflows: reads the fields event and ref from a webhook call's JSON body, 0 tokens. How to: add a webhook for this workflow (module webhooks) and create a signing secret with the hardening switch webhook-signatures; every call then sends X-Signature: sha256=<HMAC-SHA256 of the body>, otherwise 401. Body fields count as outside input. Replace the processing."
+  },
+  "category": "AROUND",
+  "sortOrder": 27,
+  "version": "1.0.0",
+  "model": null,
+  "instructions": null,
+  "blocks": [
+    {
+      "type": "shell",
+      "name": {
+        "de": "ereignis",
+        "en": "event"
+      },
+      "config": {
+        "command": "set -eu\n# event and ref come from the webhook body; started by hand without them the placeholder text stays\nevent=$(printf '%s' {{ event }})\nref=$(printf '%s' {{ ref }})\ncase \"$event\" in *'{{'*) event='(not set - started by hand)' ;; esac\ncase \"$ref\" in *'{{'*) ref='(not set)' ;; esac\n# placeholder - replace with what should happen for this event\nprintf 'event=%s\\nref=%s\\n' \"$event\" \"$ref\"",
+        "shell_escape_variables": true,
+        "description": {
+          "de": "Body-Felder werden zu Variablen des Laufs ({{ event }}, {{ ref }}). shell_escape_variables quotet sie, damit ein fremder Wert nie Teil des Befehls wird. Ersetze die Verarbeitung.",
+          "en": "Body fields become variables of the run ({{ event }}, {{ ref }}). shell_escape_variables quotes them, so an outside value never becomes part of the command. Replace the processing."
+        }
+      }
+    }
+  ]
+}

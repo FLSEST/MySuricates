@@ -18,7 +18,11 @@ import java.util.Set;
  * <li>{@code switch} only compares; a case block does when it is a {@code simple} block without
  *     {@code execution_mode: shell} ({@code SwitchBlockExecutor} runs nothing but shell and simple).</li>
  * <li>{@code sub-workflow} counts as a model call: the workflow it starts is not part of this
- *     definition, so nothing here can promise that it runs without AI.</li>
+ *     definition, so nothing here can promise that it runs without AI. Except a blueprint package
+ *     before installation (TODO 093d2f11): its {@code workflow_id} still names the shipped blueprint
+ *     that the installation creates alongside ({@code blueprint-…}), and {@code BlueprintGateTest}
+ *     pins that such a part is model-free outside the AI group — inside it the parent calls a model
+ *     itself anyway. Installed, the id is a workflow id again and the call counts as before.</li>
  * </ul>
  *
  * <p>Only the platform's own provider calls are visible here — a shell command that starts an AI
@@ -28,6 +32,8 @@ public final class ModelUse {
 
     private static final Set<String> MODEL_TYPES = Set.of("simple", "agentic", "skill-capability", "compress-ai");
     private static final Set<String> COMMAND_WRAPPERS = Set.of("foreach", "while", "conditional", "retry");
+    /** Same prefix as {@code TemplatePackageInstaller.BLUEPRINT_PREFIX} — executor must not depend on the service layer. */
+    private static final String BLUEPRINT_PREFIX = "blueprint-";
 
     private ModelUse() {
     }
@@ -49,8 +55,11 @@ public final class ModelUse {
         if (type == null) {
             return false;
         }
-        if (MODEL_TYPES.contains(type) || "sub-workflow".equals(type)) {
+        if (MODEL_TYPES.contains(type)) {
             return true;
+        }
+        if ("sub-workflow".equals(type)) {
+            return !(config != null && config.get("workflow_id") instanceof String id && id.startsWith(BLUEPRINT_PREFIX));
         }
         if (COMMAND_WRAPPERS.contains(type)) {
             return !runsAsShell(config);

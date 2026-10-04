@@ -4,7 +4,7 @@ import { useToast } from './useToast';
 import { useI18nStore, useT } from '../i18n';
 import { downloadJSON } from '../utils/downloadFile';
 import { resolveTemplateName } from '../utils/templateUtils';
-import type { WorkflowTemplate, CreateWorkflowTemplateRequest } from '../types';
+import type { WorkflowTemplate, CreateWorkflowTemplateRequest, InstallTemplateRequest, TemplateInstallResponse } from '../types';
 
 /**
  * Templates with their steps in the UI language: bilingual templates carry {de,en} texts in their
@@ -29,6 +29,27 @@ export function useCreateTemplate() {
       api.post<WorkflowTemplate>('/workflow-templates', data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['workflow-templates'] });
+      toast.success(t.toast.workflowCreated);
+    },
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.workflowCreateFailed)),
+  });
+}
+
+/**
+ * Creates a workflow from a template on the server, together with the blueprints its sub-workflow
+ * blocks call, wired to their new ids (TODO 093d2f11). Used for blueprint packages; names and steps
+ * come in the UI language.
+ */
+export function useInstallTemplate() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const t = useT();
+  const locale = useI18nStore((s) => s.locale);
+  return useMutation({
+    mutationFn: ({ templateId, ...request }: InstallTemplateRequest & { templateId: string }) =>
+      api.post<TemplateInstallResponse>(`/workflow-templates/${encodeURIComponent(templateId)}/install`, { ...request, locale }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['workflows'] });
       toast.success(t.toast.workflowCreated);
     },
     onError: (err) => toast.error(apiErrorMessage(err, t.toast.workflowCreateFailed)),

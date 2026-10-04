@@ -5,7 +5,7 @@ import { TemplateSelector } from './TemplateSelector';
 import type { CreateWorkflowRequest, Project, WorkflowTemplate } from '../../types';
 import type { TranslationKeys } from '../../i18n';
 import type { Locale } from '../../i18n';
-import { resolveTemplateName } from '../../utils/templateUtils';
+import { blueprintPartIds, resolveTemplateName } from '../../utils/templateUtils';
 import { useCreateProject } from '../../hooks/useProjects';
 import { FirstProjectActions } from '../project/FirstProjectActions';
 import { ProjectFormFields } from '../project/ProjectFormFields';
@@ -128,6 +128,11 @@ export function WorkflowCreateFlow({
                 <p className="text-xs text-text-secondary">
                   {selectedTemplate.blocks.length} {t.workflows.blocks.toLowerCase()}
                 </p>
+                {blueprintPartIds(selectedTemplate).length > 0 && (
+                  <p className="text-xs text-text-secondary mt-1" data-testid="blueprint-package-note">
+                    {t.blueprints.packageNote}
+                  </p>
+                )}
               </div>
             </div>
           )}

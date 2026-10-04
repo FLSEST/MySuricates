@@ -400,6 +400,21 @@ export interface WorkflowTemplate {
   needsAi?: boolean;
 }
 
+/** `POST /workflow-templates/{id}/install` (TODO 093d2f11); `locale` is added by the hook. */
+export interface InstallTemplateRequest {
+  projectId: string;
+  name?: string;
+  description?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface TemplateInstallResponse {
+  workflowId: string;
+  workflowName: string;
+  /** The workflows created for the blueprints its sub-workflow blocks call, in call order */
+  partWorkflowIds: string[];
+}
+
 export interface CreateWorkflowTemplateRequest {
   name: Record<string, string>;
   description?: Record<string, string>;

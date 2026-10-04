@@ -1,0 +1,60 @@
+{
+  "id": "blueprint-integration",
+  "icon": "🌦️",
+  "i18n": [
+    "de",
+    "en"
+  ],
+  "name": {
+    "de": "Integration abfragen",
+    "en": "Querying an integration"
+  },
+  "description": {
+    "de": "Rund um Workflows: Ein integration-Block fragt Open-Meteo nach dem aktuellen Wetter für feste Koordinaten – ein Dienst ohne Zugangsdaten, also ohne Einrichtung, 0 Tokens. Andere Dienste verbindest du vorher auf der Integrationen-Seite, danach genügen provider, action und params. Braucht das Modul integrations und Netz. Ersetze Dienst, Aktion und Parameter.",
+    "en": "Around workflows: an integration block asks Open-Meteo for the current weather at fixed coordinates – a service without credentials, so no setup, 0 tokens. Other services are connected on the integrations page first, after that provider, action and params are enough. Needs the module integrations and network. Replace service, action and parameters."
+  },
+  "category": "AROUND",
+  "sortOrder": 31,
+  "version": "1.0.0",
+  "model": null,
+  "instructions": null,
+  "blocks": [
+    {
+      "type": "integration",
+      "name": {
+        "de": "wetter",
+        "en": "weather"
+      },
+      "config": {
+        "provider": "open-meteo",
+        "action": "forecast",
+        "params": {
+          "latitude": 52.52,
+          "longitude": 13.41,
+          "days": 1,
+          "hourly": "",
+          "daily": ""
+        },
+        "description": {
+          "de": "Ruft eine Aktion eines angebundenen Dienstes auf; die Antwort ist die Ausgabe des Schritts. Open-Meteo braucht keine Verbindung. Ersetze provider, action und params.",
+          "en": "Calls an action of a connected service; the answer is the step's output. Open-Meteo needs no connection. Replace provider, action and params."
+        }
+      }
+    },
+    {
+      "type": "shell",
+      "name": {
+        "de": "auswerten",
+        "en": "evaluate"
+      },
+      "config": {
+        "command": "set -eu\nset -- {{ previous_output }}\n# placeholder - replace with what you do with the answer\nprintf 'answer_chars=%s\\n' \"$(printf '%s' \"$1\" | wc -c | tr -d ' ')\"\nprintf '%s\\n' \"$1\" | head -c 600",
+        "shell_escape_variables": true,
+        "description": {
+          "de": "Verarbeitet die Antwort des Dienstes ({{ previous_output }}), gequotet wie jede fremde Eingabe. Ersetze die Auswertung.",
+          "en": "Processes the service's answer ({{ previous_output }}), quoted like any outside input. Replace the evaluation."
+        }
+      }
+    }
+  ]
+}

@@ -92,6 +92,63 @@ describe('useWorkflowCreateFlow', () => {
     expect(installs).toEqual([['pool-1', { projectId: 'p1', name: 'Aufräumen', locale: 'de' }]]);
   });
 
+  // 093d2f11: a blueprint package names its part; the server creates both and wires the id
+  it('installs a blueprint package on the server instead of creating it with the name as workflow_id', async () => {
+    const installs: unknown[] = [];
+    const creates: unknown[] = [];
+    server.use(
+      http.post('/api/v1/workflow-templates/:id/install', async ({ params, request }) => {
+        installs.push([params.id, await request.json()]);
+        return HttpResponse.json({ workflowId: 'w-parent', workflowName: 'Paket', partWorkflowIds: ['w-part'] }, { status: 201 });
+      }),
+      http.post('/api/v1/workflows', async ({ request }) => {
+        creates.push(await request.json());
+        return HttpResponse.json({ id: 'w-plain' });
+      }),
+    );
+    useSettingsStore.setState({ autoTodoDefault: true });
+    const pkg = {
+      ...template, id: 'blueprint-sub-workflow', kind: 'BLUEPRINT',
+      blocks: [{ type: 'sub-workflow', config: { workflow_id: 'blueprint-sub-workflow-part' } }],
+    } as unknown as WorkflowTemplate;
+    const { result, location } = setup(useWorkflowCreateFlow);
+
+    act(() => result.current.selectTemplate(pkg));
+    act(() => result.current.setForm({ ...result.current.form, projectId: 'p1' }));
+    act(() => result.current.create());
+
+    await waitFor(() => expect(location.current).toBe('/workflows/w-parent'));
+    expect(creates).toEqual([]);
+    expect(installs).toEqual([['blueprint-sub-workflow', {
+      projectId: 'p1', name: 'Prüfen', description: 'Prüft', metadata: { autoTodo: { enabled: true } }, locale: 'de',
+    }]]);
+  });
+
+  it('opens with the template from ?new=1&template= chosen — a hint\'s blueprint link', async () => {
+    server.use(http.get('/api/v1/workflow-templates', () => HttpResponse.json([template])));
+    const location = { search: '' };
+    function Spy() {
+      location.search = useLocation().search;
+      return null;
+    }
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={['/workflows?new=1&template=t1']}>
+          {children}
+          <Routes><Route path="*" element={<Spy />} /></Routes>
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+    const { result } = renderHook(useWorkflowCreateFlow, { wrapper });
+
+    expect(result.current.createStep).toBe('template');
+    await waitFor(() => expect(result.current.createStep).toBe('details'));
+    expect(result.current.selectedTemplate?.id).toBe('t1');
+    expect(result.current.form).toMatchObject({ name: 'Prüfen', templateId: 't1' });
+    expect(location.search).toBe('');
+  });
+
   it('starts blank without a template and closes again', () => {
     const { result } = setup(useWorkflowCreateFlow);
     act(() => result.current.selectTemplate(null));

@@ -75,6 +75,14 @@ class ModelUseTest {
         assertThat(ModelUse.needsAi(List.of(block("sub-workflow", Map.of("workflow_id", "w-1"))))).isTrue();
     }
 
+    /** TODO 093d2f11: before installation the package names its part, whose cost BlueprintGateTest pins. */
+    @Test
+    void aSubWorkflowNamingAShippedBlueprint_isJudgedByThatBlueprint() {
+        assertThat(ModelUse.needsAi(List.of(block("sub-workflow", Map.of("workflow_id", "blueprint-sub-workflow-part")))))
+                .isFalse();
+        assertThat(ModelUse.needsAi(List.of(block("sub-workflow", Map.of())))).isTrue();
+    }
+
     @Test
     void blocksWithoutTypeOrConfig_areNoModelCalls() {
         List<BlockDefinition> blocks = new java.util.ArrayList<>();

@@ -1,0 +1,66 @@
+{
+  "id": "blueprint-sub-workflow",
+  "icon": "🧩",
+  "i18n": [
+    "de",
+    "en"
+  ],
+  "name": {
+    "de": "Teil-Workflow aufrufen (Paket)",
+    "en": "Calling a sub-workflow (package)"
+  },
+  "description": {
+    "de": "Paket aus zwei Workflows, 0 Tokens: Dieser Workflow reicht eine Eingabe an den Teil-Workflow „Teil-Workflow: Eingabe prüfen“ weiter, wartet auf ihn und liest sein Ergebnis. Beim Anlegen entstehen beide im selben Projekt, die ID des Teils ist schon eingetragen. Ersetze Eingabe und Weiterverarbeitung.",
+    "en": "Package of two workflows, 0 tokens: this workflow hands an input to the sub-workflow “Sub-workflow: checking an input”, waits for it and reads its result. Creating it creates both in the same project, with the part's id already filled in. Replace the input and the follow-up."
+  },
+  "category": "BASICS",
+  "sortOrder": 20,
+  "version": "1.0.0",
+  "model": null,
+  "instructions": null,
+  "blocks": [
+    {
+      "type": "shell",
+      "name": {
+        "de": "eingabe",
+        "en": "input"
+      },
+      "config": {
+        "command": "# placeholder - replace with whatever the part should work on\nprintf '%s\\n' alpha beta gamma",
+        "description": {
+          "de": "Liefert die Eingabe. Der Teil-Workflow bekommt sie als {{ previous_output }}, dazu die Variablen dieses Laufs.",
+          "en": "Produces the input. The sub-workflow gets it as {{ previous_output }}, along with this run's variables."
+        }
+      }
+    },
+    {
+      "type": "sub-workflow",
+      "name": {
+        "de": "teil",
+        "en": "part"
+      },
+      "config": {
+        "workflow_id": "blueprint-sub-workflow-part",
+        "description": {
+          "de": "Startet den Teil-Workflow als eigenen Lauf und wartet, bis er fertig ist (höchstens 30 Minuten). workflow_id trägt nach dem Anlegen die ID des mitangelegten Teils – trage eine andere ein, um einen anderen Workflow aufzurufen.",
+          "en": "Starts the sub-workflow as a run of its own and waits until it is done (30 minutes at most). After creation, workflow_id holds the id of the part created along with it – enter another one to call a different workflow."
+        }
+      }
+    },
+    {
+      "type": "shell",
+      "name": {
+        "de": "ergebnis",
+        "en": "result"
+      },
+      "config": {
+        "command": "set -eu\nset -- {{ previous_output }}\nprintf 'the part answered:\\n%s\\n' \"$1\"",
+        "shell_escape_variables": true,
+        "description": {
+          "de": "Liest die letzte Ausgabe des Teil-Workflows ({{ previous_output }}). Seine Ampel zählt nur in seinem eigenen Lauf.",
+          "en": "Reads the sub-workflow's last output ({{ previous_output }}). Its traffic light only counts in its own run."
+        }
+      }
+    }
+  ]
+}

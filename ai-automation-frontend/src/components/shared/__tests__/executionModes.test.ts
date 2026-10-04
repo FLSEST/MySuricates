@@ -39,6 +39,12 @@ describe('getExecutionModes', () => {
     expect(getExecutionModes([block('sub-workflow', { workflow_id: 'w-1' })])).toEqual(['ai']);
   });
 
+  // 093d2f11: a blueprint package before installation names its part, whose cost the backend gate pins
+  it('judges a sub-workflow that still names a shipped blueprint by that blueprint, like ModelUse', () => {
+    expect(getExecutionModes([block('sub-workflow', { workflow_id: 'blueprint-sub-workflow-part' })])).toEqual([]);
+    expect(getExecutionModes([block('sub-workflow', {})])).toEqual(['ai']);
+  });
+
   it('shows nothing for purely deterministic non-shell blocks', () => {
     expect(getExecutionModes([
       block('integration', { provider: 'github' }), block('todo-create', { title: 'x' }), block('document'),

@@ -10,7 +10,7 @@
   "workflows-start": {
     "title": "Three places to start from",
     "points": [
-      "Blueprints are empty frames that show how blocks connect: run one, look at it, replace the placeholders",
+      "Blueprints are empty frames that show how blocks connect: run one, look at it, replace the placeholders. The group “Around workflows” shows what starts a workflow from outside, connects it and lets it remember",
       "Templates are finished flows for one purpose; the pool offers ready-made workflows from a local folder",
       "Each is only a starting point: every step can be changed, and a blank workflow works too"
     ]
@@ -147,7 +147,8 @@
     "points": [
       "A chain runs its workflows strictly in order, never in parallel, and may mix projects",
       "Each workflow receives the result of the previous one's last step as {{ previous_chain_output }}",
-      "Whether a failure stops the chain is set for the chain and for each of its steps"
+      "Whether a failure stops the chain is set for the chain and for each of its steps",
+      "The chain template “Chain of two blueprints” shows the hand-over without AI"
     ]
   },
   "skills-packages": {

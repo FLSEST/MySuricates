@@ -7,6 +7,8 @@ import com.automation.exception.GlobalExceptionHandler;
 import com.automation.mapper.WorkflowTemplateMapper;
 import com.automation.security.RateLimitConfig;
 import com.automation.service.system.ApiKeyService;
+import com.automation.entity.Workflow;
+import com.automation.service.workflow.TemplatePackageInstaller;
 import com.automation.service.workflow.TemplateVerificationService;
 import com.automation.service.workflow.WorkflowTemplateService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -42,6 +44,7 @@ class WorkflowTemplateControllerTest {
 
     @MockitoBean private WorkflowTemplateMapper templateMapper;
     @MockitoBean private TemplateVerificationService verificationService;
+    @MockitoBean private TemplatePackageInstaller packageInstaller;
     @MockitoBean private ApiKeyService apiKeyService;
     @MockitoBean private RateLimitConfig rateLimitConfig;
 
@@ -156,5 +159,30 @@ class WorkflowTemplateControllerTest {
 
         mockMvc.perform(post("/api/v1/workflow-templates/from-workflow/w-1"))
                 .andExpect(status().isCreated());
+    }
+
+    @Test
+    void installTemplate_returns201_withThePartIds() throws Exception {
+        when(packageInstaller.install("blueprint-sub-workflow", "p-1", "Mine", null, "de", null))
+                .thenReturn(new TemplatePackageInstaller.Installed(
+                        Workflow.builder().id("wf-2").name("Mine").build(),
+                        List.of(Workflow.builder().id("wf-1").name("Part").build())));
+
+        mockMvc.perform(post("/api/v1/workflow-templates/blueprint-sub-workflow/install")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"projectId\":\"p-1\",\"name\":\"Mine\",\"locale\":\"de\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.workflowId").value("wf-2"))
+                .andExpect(jsonPath("$.workflowName").value("Mine"))
+                .andExpect(jsonPath("$.partWorkflowIds[0]").value("wf-1"));
+    }
+
+    @Test
+    void installTemplate_withoutProject_returns400() throws Exception {
+        mockMvc.perform(post("/api/v1/workflow-templates/blueprint-sub-workflow/install")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Mine\"}"))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(packageInstaller);
     }
 }

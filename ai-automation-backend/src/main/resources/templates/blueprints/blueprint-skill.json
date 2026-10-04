@@ -1,0 +1,56 @@
+{
+  "id": "blueprint-skill",
+  "icon": "🧰",
+  "i18n": [
+    "de",
+    "en"
+  ],
+  "name": {
+    "de": "Skill einbinden",
+    "en": "Using a skill"
+  },
+  "description": {
+    "de": "KI-Blaupause (1 Modellaufruf, nur lesend): Ein skill-capability-Block ruft die Fähigkeit summarize_text des eingebauten Skills „Smart Summarizer“ auf; der Skill steht am Block (skillIds) und bringt seinen eigenen KI-Kontext mit. Braucht das Modul skills. Ersetze Skill, Fähigkeit und Eingabe.",
+    "en": "AI blueprint (1 model call, read-only): a skill-capability block calls the capability summarize_text of the built-in skill “Smart Summarizer”; the skill sits on the block (skillIds) and brings its own AI context. Needs the module skills. Replace skill, capability and input."
+  },
+  "category": "AI",
+  "sortOrder": 24,
+  "version": "1.0.0",
+  "model": null,
+  "instructions": null,
+  "blocks": [
+    {
+      "type": "shell",
+      "name": "text",
+      "config": {
+        "command": "# placeholder - replace with the text you want summarized\nprintf '%s\\n\\n%s\\n' 'The release moved from Friday to Monday because two integration tests failed on the build server. Both failures came from an expired test certificate, which has since been renewed.' 'The team agreed to check certificate expiry dates in the weekly maintenance run from now on.'",
+        "description": {
+          "de": "Liefert den Text. Ersetze den Befehl durch deine Quelle (Datei, Protokoll …).",
+          "en": "Produces the text. Replace the command with your source (file, log …)."
+        }
+      }
+    },
+    {
+      "type": "skill-capability",
+      "name": {
+        "de": "zusammenfassen",
+        "en": "summarize"
+      },
+      "skillIds": [
+        "builtin-smart-summarizer"
+      ],
+      "config": {
+        "capability": "summarize_text",
+        "input": {
+          "de": "Fasse in höchstens drei Stichpunkten auf Deutsch zusammen:\n\n{{ block.text.output }}",
+          "en": "Summarize in at most three bullet points in English:\n\n{{ block.text.output }}"
+        },
+        "effort": "low",
+        "description": {
+          "de": "Ruft die Fähigkeit des Skills auf, der am Block steht (skillIds). Ohne allow_writes bleibt der Aufruf nur lesend. Wähle Skill und Fähigkeit passend zu deiner Aufgabe.",
+          "en": "Calls the capability of the skill on the block (skillIds). Without allow_writes the call stays read-only. Pick the skill and capability that fit your task."
+        }
+      }
+    }
+  ]
+}

@@ -10,7 +10,7 @@ import { missingModules, splitByAvailability } from './templateAvailability';
 import type { WorkflowTemplate } from '../../types';
 
 /** Gallery order of the blueprint groups; a group the backend doesn't know yet goes last. */
-const GROUPS = ['BASICS', 'COMBINATIONS', 'AI'] as const;
+const GROUPS = ['BASICS', 'COMBINATIONS', 'AROUND', 'AI'] as const;
 type Group = (typeof GROUPS)[number];
 
 interface BlueprintBrowserProps {

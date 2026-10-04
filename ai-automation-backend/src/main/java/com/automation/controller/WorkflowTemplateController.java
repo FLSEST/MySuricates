@@ -1,10 +1,13 @@
 package com.automation.controller;
 
 import com.automation.dto.request.CreateWorkflowTemplateRequest;
+import com.automation.dto.request.InstallTemplateRequest;
 import com.automation.dto.request.UpdateWorkflowTemplateRequest;
+import com.automation.dto.response.TemplateInstallResponse;
 import com.automation.dto.response.WorkflowTemplateResponse;
 import com.automation.mapper.TemplateResponseLocalizer;
 import com.automation.mapper.WorkflowTemplateMapper;
+import com.automation.service.workflow.TemplatePackageInstaller;
 import com.automation.service.workflow.TemplateVerificationService;
 import com.automation.service.workflow.WorkflowTemplateService;
 import jakarta.validation.Valid;
@@ -23,6 +26,7 @@ public class WorkflowTemplateController {
     private final WorkflowTemplateService templateService;
     private final WorkflowTemplateMapper templateMapper;
     private final TemplateVerificationService verificationService;
+    private final TemplatePackageInstaller packageInstaller;
 
     /** @param locale {@code de}/{@code en}: language of the steps of bilingual templates; without it English */
     @GetMapping
@@ -57,6 +61,20 @@ public class WorkflowTemplateController {
     public ResponseEntity<Void> deleteTemplate(@PathVariable String id) {
         templateService.delete(id);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Creates a workflow from the template in a project, plus the blueprints its sub-workflow blocks
+     * call, wired to their new ids (TODO 093d2f11).
+     */
+    @PostMapping("/{id}/install")
+    public ResponseEntity<TemplateInstallResponse> installTemplate(
+            @PathVariable String id, @Valid @RequestBody InstallTemplateRequest request) {
+        var installed = packageInstaller.install(id, request.projectId(), request.name(), request.description(),
+                request.locale(), request.metadata());
+        return ResponseEntity.status(HttpStatus.CREATED).body(new TemplateInstallResponse(
+                installed.workflow().getId(), installed.workflow().getName(),
+                installed.parts().stream().map(w -> w.getId()).toList()));
     }
 
     @PostMapping("/from-workflow/{workflowId}")

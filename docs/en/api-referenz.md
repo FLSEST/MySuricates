@@ -903,6 +903,29 @@ Save an existing workflow as a new template (name, description, blocks, instruct
 
 **Response:** `201` with `WorkflowTemplateResponse`
 
+### `POST /api/v1/workflow-templates/{id}/install`
+
+Create a workflow from a template in a project — together with the blueprints its `sub-workflow` blocks call
+(TODO 093d2f11). A blueprint package names the called blueprint in `workflow_id` (`blueprint-…`); the installation
+creates it first in the same project and then fills in its new id. A template without such a reference is created as
+with `POST /workflows`. `changeSource` of the versions: `template-install`.
+
+**Request:**
+
+```json
+{ "projectId": "uuid", "name": "My package", "description": "…", "locale": "en", "metadata": { "autoTodo": { "enabled": true } } }
+```
+
+| Field | Type | Required |
+|---|---|---|
+| `projectId` | String | Yes |
+| `name`, `description` | String | No: blank → the template's own in `locale` |
+| `locale` | String (`de`/`en`) | No: language of names and steps; English without it |
+| `metadata` | Object | No: as with `POST /workflows`, only for the created workflow, not for the parts |
+
+**Response:** `201` with `{ "workflowId": "uuid", "workflowName": "…", "partWorkflowIds": ["uuid"] }`; an unknown
+blueprint in the reference → `404`, and nothing is created.
+
 ---
 
 ## Executions

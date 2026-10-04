@@ -12,11 +12,15 @@
  * `version`: raise it only when the content changes in substance. Dismissing is stored per id with
  * the version it applied to, so a raised version shows the hint again to everyone who has hints on.
  *
+ * `blueprint`: a shipped blueprint that shows the thing at work (TODO 093d2f11). The hint links to it —
+ * the create dialog with that blueprint chosen — instead of describing a click path.
+ *
  * `hints.test.ts` keeps this registry, the copy in every language and the `<Hint id>` usages in step.
  */
 export const HINTS = {
   'dashboard-views': { version: 1 },
-  'workflows-start': { version: 1 },
+  // v2: the blueprint group "around workflows" (093d2f11).
+  'workflows-start': { version: 2 },
   'run-steps': { version: 1 },
   'run-failed': { version: 1 },
   // v2: the run does not wait forever — the step has a time limit (30 minutes by default).
@@ -28,7 +32,8 @@ export const HINTS = {
   'runs-list': { version: 1 },
   'approvals-inbox': { version: 1 },
   // v2: catching up missed times depends on a setting (on by default, off on some instances) — no default claimed.
-  'schedules-timing': { version: 2 },
+  // v3: links the schedule blueprint (093d2f11).
+  'schedules-timing': { version: 3, blueprint: 'blueprint-schedule' },
   'calendar-overview': { version: 1 },
   'cockpit-overview': { version: 1 },
   'goals-overview': { version: 1 },
@@ -43,10 +48,13 @@ export const HINTS = {
   'dlq-retry': { version: 1 },
   'wishes-loop': { version: 1 },
   'factory-create': { version: 1 },
-  'chains-sequence': { version: 1 },
+  // v2: the chain template of two blueprints (093d2f11).
+  'chains-sequence': { version: 2 },
   'skills-packages': { version: 1 },
-  'webhooks-trigger': { version: 1 },
-  'integrations-connect': { version: 1 },
+  // v2: links the signed-webhook blueprint (093d2f11).
+  'webhooks-trigger': { version: 2, blueprint: 'blueprint-webhook' },
+  // v2: links the integration blueprint (093d2f11).
+  'integrations-connect': { version: 2, blueprint: 'blueprint-integration' },
   'debug-failing': { version: 1 },
   'audit-findings': { version: 1 },
   'insights-numbers': { version: 1 },
@@ -58,8 +66,14 @@ export const HINTS = {
   'simple-create': { version: 1 },
   // Only while assistant, factory and wishes are all off (preset core): the ways to build from a description.
   'build-from-description': { version: 1 },
-} as const satisfies Record<string, { version: number }>;
+} as const satisfies Record<string, { version: number; blueprint?: `blueprint-${string}` }>;
 
 export type HintId = keyof typeof HINTS;
 
 export const HINT_IDS = Object.keys(HINTS) as HintId[];
+
+/** The blueprint a hint links to, if any. */
+export function hintBlueprint(id: HintId): string | undefined {
+  const entry = HINTS[id];
+  return 'blueprint' in entry ? entry.blueprint : undefined;
+}

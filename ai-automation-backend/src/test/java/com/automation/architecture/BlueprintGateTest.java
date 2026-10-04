@@ -10,7 +10,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.stream.Stream;
@@ -25,12 +27,17 @@ import static org.assertj.core.api.Assertions.assertThat;
  * outside the {@code AI} category, no block calls a model. That means no AI block types, every wrapper
  * that runs a command carries {@code execution_mode: shell} (without it, foreach/while/conditional/retry
  * would ask the AI), and switch cases contain only shell blocks. Each blueprint is also bilingual and
- * sits in one of the three gallery groups.
+ * sits in one of the gallery groups.
+ *
+ * <p>Stage 2 (TODO 093d2f11): a sub-workflow block names the blueprint it calls ({@code "workflow_id":
+ * "blueprint-…"}), and the installation creates both and wires the id ({@code TemplatePackageInstaller}).
+ * Such a reference must name a shipped blueprint that calls no further one, sit on the top level (the
+ * only place the installer wires) and, outside {@code AI}, name a blueprint that is model-free too.
  */
 class BlueprintGateTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
-    private static final Set<String> CATEGORIES = Set.of("BASICS", "COMBINATIONS", "AI");
+    private static final Set<String> CATEGORIES = Set.of("BASICS", "COMBINATIONS", "AI", "AROUND");
     private static final Set<String> AI_TYPES = Set.of("simple", "agentic", "compress-ai", "skill-capability");
     private static final Set<String> COMMAND_WRAPPERS = Set.of("foreach", "while", "conditional", "retry");
 
@@ -103,6 +110,64 @@ class BlueprintGateTest {
                 .anyMatch(p -> p.contains("switch"));
     }
 
+    @Test
+    void subWorkflowsCallAShippedBlueprint_thatTheInstallationCanWire() throws IOException {
+        Map<String, JsonNode> byId = new HashMap<>();
+        for (Path file : blueprintFiles()) {
+            JsonNode root = MAPPER.readTree(file.toFile());
+            byId.put(root.path("id").asText(), root);
+        }
+        List<String> problems = new ArrayList<>();
+        int references = 0;
+        for (JsonNode root : byId.values()) {
+            String label = root.path("id").asText();
+            List<String> nested = new ArrayList<>();
+            walkBlocks(root.path("blocks"), label, (path, block) -> {
+                if ("sub-workflow".equals(block.path("type").asText()) && path.contains(".switch.")) {
+                    nested.add(path + ": sub-workflow in einem switch kann die Installation nicht verdrahten");
+                }
+            });
+            problems.addAll(nested);
+            for (String called : references(root)) {
+                references++;
+                JsonNode part = byId.get(called);
+                if (part == null) {
+                    problems.add(label + " → " + called + ": keine ausgelieferte Blaupause");
+                    continue;
+                }
+                if (!references(part).isEmpty()) {
+                    problems.add(label + " → " + called + ": ruft selbst wieder eine Blaupause auf");
+                }
+                if (!"AI".equals(root.path("category").asText()) && "AI".equals(part.path("category").asText())) {
+                    problems.add(label + " → " + called + ": ruft ausserhalb von AI eine KI-Blaupause auf");
+                }
+            }
+        }
+        assertThat(references).as("mindestens ein Paket aus Eltern und Teil").isPositive();
+        assertThat(problems).isEmpty();
+    }
+
+    @Test
+    void aSubWorkflowOutsideTheAiGroup_needsAShippedBlueprint() throws IOException {
+        JsonNode bad = MAPPER.readTree("""
+                {"category": "BASICS", "blocks": [
+                  {"type": "sub-workflow", "config": {"workflow_id": "3f0c1d2e-0000-4000-8000-000000000000"}}]}""");
+
+        assertThat(modelCalls(bad, "bad.json")).anyMatch(p -> p.contains("sub-workflow"));
+    }
+
+    /** Top-level {@code workflow_id}s with the blueprint prefix — what {@code TemplatePackageInstaller} wires. */
+    private static List<String> references(JsonNode root) {
+        List<String> ids = new ArrayList<>();
+        for (JsonNode block : root.path("blocks")) {
+            String id = block.path("config").path("workflow_id").asText("");
+            if ("sub-workflow".equals(block.path("type").asText()) && id.startsWith("blueprint-")) {
+                ids.add(id);
+            }
+        }
+        return ids;
+    }
+
     static List<String> modelCalls(JsonNode root, String label) {
         List<String> problems = new ArrayList<>();
         walkBlocks(root.path("blocks"), label, (path, block) -> {
@@ -112,6 +177,10 @@ class BlueprintGateTest {
             }
             if (COMMAND_WRAPPERS.contains(type) && !"shell".equals(block.path("config").path("execution_mode").asText())) {
                 problems.add(path + ": " + type + " ohne execution_mode: shell fragt die KI");
+            }
+            // A workflow outside this definition promises nothing — only a shipped blueprint does (checked above)
+            if ("sub-workflow".equals(type) && !block.path("config").path("workflow_id").asText("").startsWith("blueprint-")) {
+                problems.add(path + ": sub-workflow ruft keinen ausgelieferten Teil auf, die Kosten sind offen");
             }
         });
         return problems;
