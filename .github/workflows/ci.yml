@@ -135,6 +135,14 @@ jobs:
         run: |
           bash scripts/tests/test-start-mysuricates-dev.sh
           bash scripts/tests/test-seed-workflows-example.sh
+      # Liefen in keinem CI-Schritt und nicht in Maven (159e3e66): Gate-Bloecke der kombinierten
+      # Pool-Workflows (leerer/unbekannter Bericht = YELLOW) und das mitgelieferte run-workspace.py
+      # samt Aufbewahrung. Brauchen nur python3, bash und git.
+      - name: Pool-Gates und Run-Workspace (Python-Tests des Backends)
+        run: python3 -m unittest discover -s ai-automation-backend/src/test/python -p 'test_*.py'
+      # tryout.sh mit Docker-Stub in einem Wegwerf-Repo — kein echtes Docker (159e3e66).
+      - name: Tryout-Skript Selbsttest (ohne Docker)
+        run: bash scripts/tests/test-tryout.sh
       - name: Installer-Bausteine Selbsttest (Anbieter, Sprachen, Oberflaeche, Kopf-Grafik)
         run: |
           bash scripts/tests/test-providers.sh
@@ -176,9 +184,12 @@ jobs:
       - name: Audit-Fakten Selbsttest
         run: bash scripts/tests/test-audit-facts.sh
       # Einstufung des Architektur-Reviews (b8c06b94): liest nur Fixture-Faktenblaetter, kein jdeps,
-      # kein Maven. Die Mess-Suiten test-arch-metrics.sh/test-frontend-metrics.sh laufen lokal.
+      # kein Maven. test-arch-metrics.sh braucht einen Build (jdeps) und laeuft lokal.
       - name: Architektur-Einstufung Selbsttest
         run: bash scripts/tests/test-arch-findings.sh
+      # Frontend-Messung gegen eine Fixture: reines Lesen, kein npm, kein node_modules (159e3e66).
+      - name: Frontend-Metriken Selbsttest
+        run: bash scripts/tests/test-frontend-metrics.sh
       - name: Coverage-Snapshot Selbsttest
         run: bash scripts/tests/test-coverage-snapshot.sh
       - name: Schwachstellen-Scan Selbsttest (ohne Netz)
