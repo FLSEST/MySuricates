@@ -2,6 +2,12 @@
 
 <p align="center"><img src="docs/assets/readme-banner-en.svg" alt="MySuricates – Build your own workflows with your suricates and let them help you keep an eye on every step. Deterministic wherever possible. Any provider: swap it out and keep your flow. Keep track of what you have done and what you are doing. Put your suricates to work the way you need them. Workflows, chains, skills, templates, schedules, TODOs, integrations, webhooks, human-in-the-loop, assistant, BPMN, versions, gates, memory, dashboard, audit, highly configurable, fully customizable, features can be switched off, and more."></p>
 
+<p align="center">
+  <a href="https://github.com/FLSEST/MySuricates/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/FLSEST/MySuricates/ci.yml?branch=main&amp;label=CI" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/FLSEST/MySuricates" alt="License"></a>
+  <a href="https://github.com/FLSEST/MySuricates/releases/latest"><img src="https://img.shields.io/github/v/release/FLSEST/MySuricates" alt="Release"></a>
+</p>
+
 # MySuricates
 
 A research project on the question of how far software development can be run in a controlled

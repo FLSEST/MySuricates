@@ -2,6 +2,12 @@
 
 <p align="center"><img src="docs/assets/readme-banner-de.svg" alt="MySuricates – Baue deine eigenen Workflows mit deinen Erdmännchen und lass sie dir helfen, jeden Schritt im Blick zu behalten. Deterministisch, wo es geht. Jeder Anbieter: Wechsle ihn und behalte deinen Ablauf. Behalte im Blick, was du getan hast und was du tust. Setze deine Erdmännchen ein, so wie du sie brauchst. Workflows, Ketten, Skills, Vorlagen, Zeitpläne, TODOs, Integrationen, Webhooks, Human-in-the-Loop, Assistent, BPMN, Versionen, Gates, Memory, Dashboard, Audit, hoch konfigurierbar, komplett individualisierbar, Features abschaltbar und mehr."></p>
 
+<p align="center">
+  <a href="https://github.com/FLSEST/MySuricates/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/FLSEST/MySuricates/ci.yml?branch=main&amp;label=CI" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/FLSEST/MySuricates" alt="Lizenz"></a>
+  <a href="https://github.com/FLSEST/MySuricates/releases/latest"><img src="https://img.shields.io/github/v/release/FLSEST/MySuricates" alt="Release"></a>
+</p>
+
 # MySuricates
 
 Ein Forschungsprojekt zur Frage, wie weit sich Softwareentwicklung mit KI-Agenten kontrolliert
