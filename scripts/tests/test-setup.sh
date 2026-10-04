@@ -85,6 +85,7 @@ check "--yes --dry-run → container"                     '[ "$(run --yes --dry-
 check "projects: folder above the clone"                '[ "$(val main MYSURICATES_PROJECTS)" = "$(cd "$HERE/../../.." && pwd)" ]'
 check "docker socket off by default"                    '[ "$(val main MYSURICATES_DOCKER_SOCKET)" = 0 ]'
 check "container: no reboot warning (restarts with Docker)" '! out | grep "does not start by itself" >/dev/null'
+check "one instance: no shared network, no sync targets" '[ -z "$(val main MYSURICATES_NETWORK)" ] && ! grep -q "SYNC" "$INST/main.env" && ! out | grep -F "sync-keys" >/dev/null'
 rm -rf "$INST"
 check "--docker-socket mounts it on request"            '[ "$(run --yes --dry-run --docker-socket)" = 0 ] && [ "$(val main MYSURICATES_DOCKER_SOCKET)" = 1 ]'
 
@@ -217,6 +218,18 @@ check "test is like prod"                               '[ "$(val test MYSURICAT
 check "display names Dev / Test / Prod"                 '[ "$(val prod MYSURICATES_ENVIRONMENT)" = Prod ] && [ "$(val dev MYSURICATES_ENVIRONMENT)" = Dev ]'
 check "staged runs in containers"                       '[ "$(val test MYSURICATES_RUNTIME)" = container ]'
 check "staged: only the login in all three"             '[ "$(val dev MYSURICATES_AI_FROM_HOST)" = login ] && [ "$(val prod MYSURICATES_AI_FROM_HOST)" = login ]'
+# Definition-Sync Dev → Test / Prod (84a78bb7): gemeinsames Netz, Ziele unter ihrem Instanznamen, Keys aus Dateien
+check "staged: all three in one network"                '[ "$(val dev MYSURICATES_NETWORK)" = staged ] && [ "$(val test MYSURICATES_NETWORK)" = staged ] && [ "$(val prod MYSURICATES_NETWORK)" = staged ]'
+check "staged: dev knows test and prod (URL + key file)" '[ "$(val dev MYSURICATES_SYNC_TARGETS)" = test,prod ] && [ "$(val dev AUTOMATION_SYNC_TEST_URL)" = http://test:9090 ] && [ "$(val dev AUTOMATION_SYNC_PROD_URL)" = http://prod:9090 ] && [ "$(val dev AUTOMATION_SYNC_TEST_KEY_FILE)" = /app/sync-keys/test.key ] && [ "$(val dev AUTOMATION_SYNC_PROD_KEY_FILE)" = /app/sync-keys/prod.key ]'
+check "staged: only dev has sync targets"               '[ -z "$(val test MYSURICATES_SYNC_TARGETS)" ] && [ -z "$(val prod AUTOMATION_SYNC_PROD_URL)" ]'
+check "staged: dev seals (prod takes only sealed), runs unattended unsealed" '[ "$(val dev MYSURICATES_HARDENING_SEALING)" = true ] && [ "$(val dev MYSURICATES_HARDENING_REQUIRE_SEALED)" = false ]'
+check "staged: no key in any file, no host.docker.internal" '! grep -il "api.key=\|host.docker.internal" "$INST"/dev.env "$INST"/test.env "$INST"/prod.env >/dev/null'
+check "staged dry run names the key fetch"              'out | grep -F "scripts/instance.sh sync-keys --name dev" >/dev/null'
+# Behaltene Dateien von vor dem Sync: fehlende Zeilen kommen dazu, vorhandene bleiben
+sed -i.bak "/^MYSURICATES_NETWORK=/d; /^MYSURICATES_SYNC_TARGETS=/d; /^AUTOMATION_SYNC_/d; /Definition-Sync/d" "$INST/dev.env" "$INST/test.env"; rm -f "$INST"/*.bak
+printf 'AUTOMATION_SYNC_PROD_URL=http://elsewhere:9090\n' >> "$INST/dev.env"
+check "kept files get the sync lines, own values stay"  '[ "$(run --yes --dry-run --mode staged)" = 0 ] && [ "$(val test MYSURICATES_NETWORK)" = staged ] && [ "$(val dev AUTOMATION_SYNC_TEST_URL)" = http://test:9090 ] && [ "$(val dev AUTOMATION_SYNC_PROD_URL)" = http://elsewhere:9090 ] && [ "$(grep -c "^AUTOMATION_SYNC_PROD_URL=" "$INST/dev.env")" = 1 ]'
+check "a second run adds nothing twice"                 '[ "$(run --yes --dry-run --mode staged)" = 0 ] && [ "$(grep -c "^MYSURICATES_NETWORK=" "$INST/dev.env")" = 1 ] && [ "$(grep -c "Definition-Sync" "$INST/dev.env")" = 1 ]'
 rm -rf "$INST"
 D="$(firstfree 19750)"; T="$(firstfree 19751 "$D")"; P="$(firstfree 19752 "$D $T")"
 check "staged --port N: Dev from N, Test N+1, Prod N+2"  '[ "$(run --yes --dry-run --mode staged --port 19750)" = 0 ] && [ "$(val dev MYSURICATES_PORT)" = "$D" ] && [ "$(val test MYSURICATES_PORT)" = "$T" ] && [ "$(val prod MYSURICATES_PORT)" = "$P" ]'

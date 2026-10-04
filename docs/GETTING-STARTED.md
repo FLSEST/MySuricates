@@ -86,14 +86,16 @@ Bauen · Fertig. Mit `b` geht es einen Schritt zurück, mit `q` wird abgebrochen
 
 - **Modus:** eine Instanz im Container (nur Docker nötig), eine Instanz direkt auf diesem Rechner,
   oder gestaffelt **Dev · Test · Prod** — in Dev Workflows planen und bauen (Factory, Assistent),
-  in Test prüfen, in Prod verlässlich laufen lassen. Workflows wandern vorerst per Export und
-  Import in der Oberfläche; ein automatischer Abgleich zwischen den dreien ist noch nicht eingerichtet.
+  in Test prüfen, in Prod verlässlich laufen lassen. Dev überträgt seine Definitionen unter
+  **Einstellungen → Umgebungen** nach Test und Prod — nach Prod nur versiegelte. Die Ziele und den Weg
+  zu ihren API-Keys trägt der Installer ein; laufen Test oder Prod beim Einrichten noch nicht, holt
+  `scripts/instance.sh sync-keys --name dev` die Keys später ([deployment.md](deployment.md#gestufter-betrieb-dev--test--prod)).
 - **Module:** Standard (kleinste Oberfläche), Research, Voll oder eine eigene Auswahl samt Härtung.
   Die Namen sagen beim ersten Lauf noch wenig — das ist in Ordnung: Die Wahl ist nicht endgültig
   (Abschnitt 4), im Zweifel Standard nehmen. Was die Module tun, steht in
   [architektur.md](architektur.md) und [deployment.md](deployment.md).
-  Beim gestaffelten Betrieb bekommt Dev alle Module, Test und Prod Standard mit Siegeln
-  („unbeaufsichtigt nur versiegelte Workflows“).
+  Beim gestaffelten Betrieb bekommt Dev alle Module und Siegel (ohne Pflicht), Test und Prod Standard
+  mit Siegeln („unbeaufsichtigt nur versiegelte Workflows“).
 - **KI:** claude, codex und pi gleichrangig mit Anmeldestatus; du wählst den Standard-Anbieter.
   Fehlt pi, bietet der Installer an, es per npm mitzuinstallieren — in der geprüften, festen Version
   (Vorgabe nein, ohne Terminal `--with-pi`); für claude und codex nennt er den Befehl. Anmelden musst du dich selbst.

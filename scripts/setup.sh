@@ -723,12 +723,44 @@ restart_ok() {  # NAME → 0 = neu starten
 }
 short_sha() { if [ "${1:--}" = - ]; then msg build_state_unknown; else printf '%s' "${1:0:8}"; fi; }
 
+# Gestufter Betrieb (84a78bb7): Dev kennt Test und Prod — alle drei im gemeinsamen Docker-Netz, dort
+# unter ihrem Instanznamen erreichbar (nicht ueber host.docker.internal: die Ports liegen nur auf
+# 127.0.0.1); Dev liest die Keys der Ziele aus Dateien, die `instance.sh sync-keys` holt. Fehlende
+# Zeilen kommen auch in behaltene Dateien — was dort schon steht, bleibt.
+ensure_line() {  # NAME SCHLUESSEL WERT
+  local f="$INSTANCES_DIR/$1.env"
+  grep "^$2=" "$f" >/dev/null 2>&1 || printf '%s=%s\n' "$2" "$3" >> "$f"
+}
+staged_sync_lines() {
+  local n f="$INSTANCES_DIR/dev.env"
+  for n in dev test prod; do ensure_line "$n" MYSURICATES_NETWORK staged; done
+  grep '^MYSURICATES_SYNC_TARGETS=' "$f" >/dev/null 2>&1 \
+    || printf '# Definition-Sync nach Test und Prod (Einstellungen → Umgebungen); Keys: scripts/instance.sh sync-keys --name dev\n' >> "$f"
+  ensure_line dev MYSURICATES_SYNC_TARGETS test,prod
+  ensure_line dev AUTOMATION_SYNC_TEST_URL http://test:9090
+  ensure_line dev AUTOMATION_SYNC_TEST_KEY_FILE /app/sync-keys/test.key
+  ensure_line dev AUTOMATION_SYNC_PROD_URL http://prod:9090
+  ensure_line dev AUTOMATION_SYNC_PROD_KEY_FILE /app/sync-keys/prod.key
+}
+# Nach dem Start: die Keys von Test und Prod fuer Dev holen. Laeuft ein Ziel nicht, nennt der
+# Installer den Befehl fuer spaeter.
+fetch_sync_keys() {
+  local cmd="scripts/instance.sh sync-keys --name dev" run="bash '$SCRIPT_DIR/instance.sh' sync-keys --name dev"
+  if [ "$DRY" = 1 ]; then printf '  %s\n' "$(msg dry_run "$cmd")"; return 0; fi
+  [ "$DOCKER_SG" = 1 ] && run="sg docker -c \"$run\""
+  mkdir -p "$LOG_DIR"
+  if bash -c "$run" > "$LOG_DIR/sync-keys.log" 2>&1; then printf '  %s\n' "$(msg sync_keys_ok)"
+  else printf '  %s\n' "$(msg sync_keys_later "$cmd")"; fi
+}
+
 step_build() {
   section 6
   if [ "$MODE" = staged ]; then
-    write_instance dev container "$P_DEV" full Dev false false
+    # Dev versiegelt (ohne Pflicht fuer unbeaufsichtigte Runs): nach Prod gehen nur versiegelte Definitionen
+    write_instance dev container "$P_DEV" full Dev true false
     write_instance test container "$P_TEST" core Test true true
     write_instance prod container "$P_PROD" core Prod true true
+    staged_sync_lines
     INSTANCES="dev test prod"
   else
     write_instance "$NAME" "$RUNTIME" "$PORT" "$PRESET" "$LOADED_ENVIRONMENT" "$LOADED_SEALING" "$LOADED_REQUIRE_SEALED"
@@ -739,6 +771,9 @@ step_build() {
   if [ "$DO_START" = 1 ]; then
     for n in $INSTANCES; do start_instance "$n" || return 1; done
     STARTED=1
+    [ "$MODE" = staged ] && fetch_sync_keys
+  elif [ "$MODE" = staged ]; then
+    printf '  %s\n' "$(msg sync_keys_later "scripts/instance.sh sync-keys --name dev")"
   fi
   return 0
 }
