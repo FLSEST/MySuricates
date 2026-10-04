@@ -292,5 +292,21 @@
       "Englisch, wo es eine Übersetzung gibt, sonst die deutsche Fassung",
       "Der Assistent greift auf Teile davon zurück, wenn du ihn zum Workflow-Bau fragst"
     ]
+  },
+  "todo-triggers-fix": {
+    "title": "Ein TODO startet seinen Fix-Workflow",
+    "points": [
+      "Passt ein neues TODO zum Tag-Muster, startet der Trigger den Ziel-Workflow und gibt ihm das TODO als Variablen mit (todo_title, todo_priority …)",
+      "Meldet der Lauf GREEN, schließt autoClose das TODO; bei YELLOW oder RED bleibt es offen",
+      "maxAttempts und ein laufender Fix-Lauf bremsen Wiederholungen; ein enges Tag-Muster verhindert, dass jeder Fund einen Lauf auslöst"
+    ]
+  },
+  "workflow-memory": {
+    "title": "Was der Workflow aus früheren Läufen weiß",
+    "points": [
+      "Aus ausgewählten Läufen fasst ein Modellaufruf Erkenntnisse zusammen; aktiv ist immer nur eine Version",
+      "Vor jedem Lauf landet das aktive Memory als .claude/rules/project-memory.md im Projekt, KI-Schritte lesen es mit",
+      "Auto-Memory extrahiert nach jeder festgelegten Zahl erfolgreicher Läufe von selbst"
+    ]
   }
 }

@@ -292,5 +292,21 @@
       "English where a translation exists, otherwise the German version",
       "The assistant draws on parts of it when you ask about building workflows"
     ]
+  },
+  "todo-triggers-fix": {
+    "title": "A TODO starts its fix workflow",
+    "points": [
+      "When a new TODO matches the tag pattern, the trigger starts the target workflow and passes the TODO as variables (todo_title, todo_priority …)",
+      "If the run reports GREEN, autoClose closes the TODO; on YELLOW or RED it stays open",
+      "maxAttempts and a fix run still in progress keep repeats in check; a narrow tag pattern stops every finding from starting a run"
+    ]
+  },
+  "workflow-memory": {
+    "title": "What the workflow knows from earlier runs",
+    "points": [
+      "One model call condenses insights from chosen runs; only one version is active at a time",
+      "Before every run the active memory is placed in the project as .claude/rules/project-memory.md, and AI steps read it",
+      "Auto-memory extracts by itself after a set number of successful runs"
+    ]
   }
 }

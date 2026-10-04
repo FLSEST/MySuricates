@@ -83,6 +83,16 @@ describe('Hint', () => {
     expect(link.getAttribute('href')).toBe('/workflows?new=1&template=blueprint-schedule');
   });
 
+  it.each([
+    ['todo-triggers-fix', 'blueprint-todo-trigger'],
+    ['workflow-memory', 'blueprint-memory'],
+  ] as const)('%s in place links %s', (id, blueprint) => {
+    render(<MemoryRouter><Hint id={id} /></MemoryRouter>);
+
+    expect(screen.getByRole('link', { name: de.hints.tryBlueprint }).getAttribute('href'))
+      .toBe(`/workflows?new=1&template=${blueprint}`);
+  });
+
   it('links only blueprints that ship', () => {
     const dir = resolve(__dirname, '../../../../../ai-automation-backend/src/main/resources/templates/blueprints');
     const ids = readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => f.replace(/\.json$/, ''));

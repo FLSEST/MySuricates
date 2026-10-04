@@ -49,6 +49,9 @@ export const HINTS = {
   'wishes-loop': { version: 1 },
   'factory-create': { version: 1 },
   // v2: the chain template of two blueprints (093d2f11).
+  // 093d2f11: hints in place for TODO triggers and workflow memory, each linking its blueprint.
+  'todo-triggers-fix': { version: 1, blueprint: 'blueprint-todo-trigger' },
+  'workflow-memory': { version: 1, blueprint: 'blueprint-memory' },
   'chains-sequence': { version: 2 },
   'skills-packages': { version: 1 },
   // v2: links the signed-webhook blueprint (093d2f11).
