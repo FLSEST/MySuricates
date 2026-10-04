@@ -1,6 +1,7 @@
 package com.automation.service.integration.providers.caldav;
 
 import com.automation.service.integration.providers.caldav.CalDavHttpClient.DavResult;
+import com.automation.testsupport.TestTargetGuards;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,7 +16,7 @@ class CalDavHttpClientTest {
 
     private FakeDavServer server;
     private CalDavCredentials cred;
-    private final CalDavHttpClient client = new CalDavHttpClient();
+    private final CalDavHttpClient client = new CalDavHttpClient(TestTargetGuards.outbound());
 
     @BeforeEach
     void start() throws Exception {

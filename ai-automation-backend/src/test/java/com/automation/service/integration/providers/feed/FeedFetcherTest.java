@@ -9,6 +9,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.net.InetSocketAddress;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -20,7 +21,7 @@ class FeedFetcherTest {
 
     private HttpServer server;
     private String base;
-    private final FeedFetcher fetcher = new FeedFetcher(TestTargetGuards.onWithLoopbackServerAsPublic());
+    private final FeedFetcher fetcher = new FeedFetcher(TestTargetGuards.outbound(TestTargetGuards.onWithLoopbackServerAsPublic()));
 
     @BeforeEach
     void start() throws Exception {
@@ -84,6 +85,19 @@ class FeedFetcherTest {
     }
 
     @Test
+    void redirectTarget_neverDowngradesFromHttpsToHttp() {
+        URI secure = URI.create("https://feeds.example/rss?token=geheim");
+        assertThatThrownBy(() -> FeedFetcher.redirectTarget(secure, "http://feeds.example/rss"))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("from https to http")
+                .hasMessageNotContaining("geheim");
+        assertThat(FeedFetcher.redirectTarget(secure, "/neu").toString()).isEqualTo("https://feeds.example/neu");
+        assertThat(FeedFetcher.redirectTarget(URI.create("http://feeds.example/a"), "https://cdn.example/b").getScheme())
+                .isEqualTo("https");
+        assertThat(FeedFetcher.redirectTarget(URI.create("http://feeds.example/a"), "http://other.example/b").getHost())
+                .isEqualTo("other.example");
+    }
+
+    @Test
     void fetch_endlessRedirectStopsAfterMaxHops() {
         AtomicInteger hits = new AtomicInteger();
         server.createContext("/loop", ex -> {
@@ -106,7 +120,7 @@ class FeedFetcherTest {
 
     @Test
     void fetch_sizeCap_appliesToDeclaredLengthAndToActualBytes() {
-        FeedFetcher small = new FeedFetcher(TestTargetGuards.off(), 100);
+        FeedFetcher small = new FeedFetcher(TestTargetGuards.outbound(TestTargetGuards.off()), 100);
         serve("/big", 200, "x".repeat(101), null);
         assertThatThrownBy(() -> small.fetch(base + "/big")).isInstanceOf(IllegalStateException.class).hasMessageContaining("larger than");
 
@@ -130,7 +144,7 @@ class FeedFetcherTest {
             ex.sendResponseHeaders(200, -1);
             ex.close();
         });
-        assertThatThrownBy(() -> new FeedFetcher(TestTargetGuards.on()).fetch(base + "/x"))
+        assertThatThrownBy(() -> new FeedFetcher(TestTargetGuards.outbound(TestTargetGuards.on())).fetch(base + "/x"))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThat(hits.get()).isZero();
     }
@@ -138,7 +152,7 @@ class FeedFetcherTest {
     @Test
     void fetch_connectionFailureIsWrapped() {
         server.stop(0);
-        assertThatThrownBy(() -> new FeedFetcher(TestTargetGuards.off()).fetch(base + "/x"))
+        assertThatThrownBy(() -> new FeedFetcher(TestTargetGuards.outbound(TestTargetGuards.off())).fetch(base + "/x"))
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining("Feed request failed");
     }
 

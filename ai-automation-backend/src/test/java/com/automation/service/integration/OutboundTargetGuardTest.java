@@ -41,7 +41,10 @@ class OutboundTargetGuardTest {
             "224.0.0.1", "239.255.255.250", "255.255.255.255",
             "[::1]", "[::]", "[fc00::1]", "[fd12:3456::1]", "[fe80::1]", "[febf::1]", "[fec0::1]",
             "[ff02::1]", "[::ffff:127.0.0.1]", "[::ffff:169.254.169.254]", "[::ffff:10.0.0.1]",
-            "[::127.0.0.1]", "[64:ff9b::a9fe:a9fe]"})
+            "[::127.0.0.1]", "[64:ff9b::a9fe:a9fe]",
+            // 6to4 (2002::/16) and Teredo (2001:0::/32: server in bytes 4-7, client bit-inverted at the end)
+            "[2002:7f00:1::]", "[2002:a9fe:a9fe::1]", "[2002:c0a8:101::1]",
+            "[2001:0:4136:e378:8000:63bf:80ff:fffe]", "[2001:0:a00:1:8000:63bf:f7f7:f7f7]"})
     void refusesInternalAddresses(String host) {
         assertThatThrownBy(() -> LITERALS.check(URI.create("http://" + host + "/x"), FEEDS))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -52,7 +55,8 @@ class OutboundTargetGuardTest {
     @ParameterizedTest
     @ValueSource(strings = {"93.184.216.34", "8.8.8.8", "172.32.0.1", "172.15.255.255", "100.128.0.1",
             "100.63.255.255", "192.169.0.1", "169.255.0.1", "203.0.113.10",
-            "[2606:4700::1111]", "[2001:4860:4860::8888]", "[::ffff:8.8.8.8]", "[64:ff9b::808:808]"})
+            "[2606:4700::1111]", "[2001:4860:4860::8888]", "[::ffff:8.8.8.8]", "[64:ff9b::808:808]",
+            "[2002:808:808::1]", "[2001:0:4136:e378:8000:63bf:f7f7:f7f7]"})
     void allowsPublicAddresses(String host) {
         assertThatCode(() -> LITERALS.check(URI.create("https://" + host + "/feed.ics"), FEEDS)).doesNotThrowAnyException();
     }
@@ -116,6 +120,7 @@ class OutboundTargetGuardTest {
         OutboundTargetGuard defaults = TestTargetGuards.defaults();
         assertThat(defaults.enabled(FEEDS)).isTrue();
         assertThat(defaults.enabled(HTTP_API)).isFalse();
+        assertThat(defaults.enabled(ModuleCatalog.PRIVATE_NETWORK_GUARD_OWN_SERVICES)).isFalse();
 
         assertThatThrownBy(() -> defaults.check(URI.create("http://10.0.0.5/feed.xml"), FEEDS))
                 .hasMessageContaining("automation.hardening.private-network-guard=false");
@@ -131,5 +136,13 @@ class OutboundTargetGuardTest {
     @Test
     void urlWithoutHostIsRefused() {
         assertThatThrownBy(() -> LITERALS.check(URI.create("file:///etc/passwd"), FEEDS)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void checkedAddressIsTheFirstResolvedAddress_orNullWhileSwitchedOff() throws Exception {
+        OutboundTargetGuard guard = guard(true, Map.of("multi.example", new String[]{"93.184.216.34", "8.8.8.8"}));
+        assertThat(guard.checkedAddress(URI.create("http://multi.example/"), FEEDS))
+                .isEqualTo(InetAddress.getByName("93.184.216.34"));
+        assertThat(guard(false, Map.of()).checkedAddress(URI.create("http://127.0.0.1/"), FEEDS)).isNull();
     }
 }

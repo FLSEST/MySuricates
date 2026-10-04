@@ -62,7 +62,7 @@ class HttpApiClientTest {
             respond(exchange, 200, "text/plain", "outside");
         });
         server.start();
-        client = new HttpApiClient(JSON, TestTargetGuards.onWithLoopbackServerAsPublic());
+        client = new HttpApiClient(JSON, TestTargetGuards.outbound(TestTargetGuards.onWithLoopbackServerAsPublic()));
     }
 
     @AfterEach
@@ -177,12 +177,12 @@ class HttpApiClientTest {
     @Test
     void localTargetsAreReachableByDefault_andRefusedBeforeAnyRequestWithTheSwitchOn() {
         HttpApiTarget target = target("");
-        HttpApiClient byDefault = new HttpApiClient(JSON, TestTargetGuards.defaults());
+        HttpApiClient byDefault = new HttpApiClient(JSON, TestTargetGuards.outbound(TestTargetGuards.defaults()));
         assertThat(byDefault.send(target, HttpApiRequest.from(target, Map.of("path", "echo"), JSON)).get("status")).isEqualTo(200);
         assertThat(requests).hasSize(1);
         requests.clear();
 
-        HttpApiClient guarded = new HttpApiClient(JSON, TestTargetGuards.on());
+        HttpApiClient guarded = new HttpApiClient(JSON, TestTargetGuards.outbound(TestTargetGuards.on()));
 
         assertThatThrownBy(() -> guarded.send(target, HttpApiRequest.from(target, Map.of("path", "echo"), JSON)))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -190,7 +190,7 @@ class HttpApiClientTest {
                 .hasMessageContaining("automation.hardening.private-network-guard-http-api=false");
         assertThat(requests).isEmpty();
 
-        HttpApiClient open = new HttpApiClient(JSON, TestTargetGuards.off());
+        HttpApiClient open = new HttpApiClient(JSON, TestTargetGuards.outbound(TestTargetGuards.off()));
         assertThat(open.send(target, HttpApiRequest.from(target, Map.of("path", "echo"), JSON)).get("status")).isEqualTo(200);
         assertThat(requests).hasSize(1);
     }

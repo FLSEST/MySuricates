@@ -36,7 +36,7 @@ class ICalFeedProviderTest {
     private HttpServer server;
     private String base;
     private final AtomicReference<String> userAgent = new AtomicReference<>();
-    private final ICalFeedProvider provider = new ICalFeedProvider(new ICalFeedFetcher(TestTargetGuards.onWithLoopbackServerAsPublic()));
+    private final ICalFeedProvider provider = new ICalFeedProvider(new ICalFeedFetcher(TestTargetGuards.outbound(TestTargetGuards.onWithLoopbackServerAsPublic())));
 
     @BeforeEach
     void start() throws Exception {

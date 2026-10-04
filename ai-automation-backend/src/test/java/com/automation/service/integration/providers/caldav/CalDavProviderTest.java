@@ -2,6 +2,7 @@ package com.automation.service.integration.providers.caldav;
 
 import com.automation.service.integration.IntegrationAction;
 import com.automation.service.integration.IntegrationVerification;
+import com.automation.testsupport.TestTargetGuards;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -64,7 +65,7 @@ class CalDavProviderTest {
     @BeforeEach
     void start() throws Exception {
         server = new FakeDavServer();
-        provider = new CalDavProvider(new ObjectMapper(), new CalDavHttpClient());
+        provider = new CalDavProvider(new ObjectMapper(), new CalDavHttpClient(TestTargetGuards.outbound()));
         token = server.base() + "/dav|alex:app-pw";
         server.on("PROPFIND /dav/", 207, PRINCIPAL)
                 .on("PROPFIND /dav/principals/alex/", 207, HOME)

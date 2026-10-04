@@ -1,6 +1,7 @@
 package com.automation.service.integration.providers.caldav;
 
 import com.automation.service.integration.providers.ical.ICalDateTime;
+import com.automation.testsupport.TestTargetGuards;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -48,7 +49,7 @@ class CalDavEventsTest {
     void start() throws Exception {
         server = new FakeDavServer();
         cred = CalDavCredentials.parse(server.base() + "/dav|alex:pw");
-        CalDavHttpClient http = new CalDavHttpClient();
+        CalDavHttpClient http = new CalDavHttpClient(TestTargetGuards.outbound());
         events = new CalDavEvents(http, new CalDavDiscovery(http));
     }
 

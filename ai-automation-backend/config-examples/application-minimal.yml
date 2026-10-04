@@ -35,3 +35,5 @@ automation:
     private-network-guard: false
     # http-api may reach localhost and private networks (the default).
     private-network-guard-http-api: false
+    # CalDAV, Gitea, GitLab, ntfy and webhook notifications may reach your own network (the default).
+    private-network-guard-own-services: false

@@ -232,59 +232,72 @@ geprüft, ein Umschalten zur Laufzeit wirkt sofort.
 
 ### Abrufe ins lokale Netz
 
-iCal-Feed, RSS/Atom und HTTP-API rufen URLs ab, die im Workflow oder in der Verbindung stehen. Damit sie
-nicht zum Sprungbrett in das Netz der Instanz werden, geht jeder Abruf durch `OutboundTargetGuard`
-(`service/integration/`). Ob geprüft wird, entscheidet je Provider ein Härtungsschalter:
+Integrationen rufen URLs ab, die im Workflow oder in der Verbindung stehen (iCal-Feed, RSS/Atom, HTTP-API,
+die Server-URL von CalDAV, Gitea, GitLab, ntfy, Webhook-Benachrichtigungen). Damit sie nicht zum Sprungbrett
+in das Netz der Instanz werden, bekommt jeder ausgehende Abruf seinen HTTP-Client von `OutboundHttp`
+(`service/integration/`), und der Client prüft das Ziel mit `OutboundTargetGuard`. Ob geprüft wird,
+entscheidet die Zielart des Providers (siehe unten) mit ihrem Härtungsschalter:
 
 | Schalter | Umgebungsvariable | Default | Gilt für |
 |---|---|---|---|
 | `automation.hardening.private-network-guard` | `AUTOMATION_HARDENING_PRIVATE_NETWORK_GUARD` | `true` | iCal-Feed, RSS/Atom |
+| `automation.hardening.private-network-guard-own-services` | `AUTOMATION_HARDENING_PRIVATE_NETWORK_GUARD_OWN_SERVICES` | `false` | CalDAV, Gitea/Forgejo, GitLab, ntfy, Webhook-Benachrichtigungen |
 | `automation.hardening.private-network-guard-http-api` | `AUTOMATION_HARDENING_PRIVATE_NETWORK_GUARD_HTTP_API` | `false` | HTTP-API |
 
-Die HTTP-API ist standardmäßig offen, weil Dienste im eigenen Netz ihr häufigstes Ziel sind. Ist ein
-Schalter an, gilt:
+Eigene Dienste und die HTTP-API sind standardmäßig offen, weil ihr häufigstes Ziel im eigenen Netz liegt.
+Die HTTP-API hat einen eigenen Schalter, weil bei ihr der Workflow den Pfad jedes Aufrufs bestimmt; bei den
+übrigen eigenen Diensten steht nur die Server-URL in der Verbindung. Ist ein Schalter an, gilt:
 
 - Der Host wird aufgelöst, und **jede** gelieferte Adresse muss öffentlich sein. Abgelehnt werden
   Loopback (`127.0.0.0/8`, `::1`, also auch `localhost`), `0.0.0.0/8` und `::`, private Netze
   (`10/8`, `172.16/12`, `192.168/16`, `fc00::/7`, `fec0::/10`), `100.64.0.0/10` (Carrier-NAT, Tailscale),
   Link-Local (`169.254/16` samt Cloud-Metadaten `169.254.169.254`, `fe80::/10`), Multicast und Broadcast —
-  auch als IPv4 in IPv6 verpackt (`::ffff:…`, `::a.b.c.d`, NAT64 `64:ff9b::/96`). Ein öffentlicher Name,
-  der auf eine interne Adresse zeigt, fällt damit ebenso auf wie eine IP in der URL.
-- **Weiterleitungen:** iCal-Feed und RSS/Atom folgen ihnen selbst und prüfen jeden Hop vor dem Verbinden;
-  die HTTP-API folgt keinen.
+  auch als IPv4 in IPv6 verpackt (`::ffff:…`, `::a.b.c.d`, NAT64 `64:ff9b::/96`, 6to4 `2002::/16`,
+  Teredo `2001::/32`). Ein öffentlicher Name, der auf eine interne Adresse zeigt, fällt damit ebenso auf
+  wie eine IP in der URL.
+- **Weiterleitungen:** Kein Client folgt ihnen selbst. iCal-Feed und RSS/Atom folgen ihnen von Hand (höchstens
+  fünf, nie von https zu http) und schicken jeden Hop als neuen Abruf durch dieselbe Prüfung; alle anderen
+  geben ein 3xx zurück.
+- **An die geprüfte Adresse gebunden:** Bei `http://` mit Hostnamen verbindet sich der Client mit genau der
+  Adresse, die die Prüfung zugelassen hat, und prüft beim Verbinden noch einmal — ein Name, dessen
+  DNS-Antwort zwischen Prüfung und Abruf wechselt (DNS-Rebinding), führt nicht ins eigene Netz. Bei
+  `https://` löst der HTTP-Client den Namen selbst auf; ein umgebogener Name scheitert dann an der
+  Zertifikatsprüfung, weil der interne Dienst kein Zertifikat für den öffentlichen Namen hat. Ist für die JVM
+  ein Proxy gesetzt (`http.proxyHost`), löst dieser auf.
 - Die Fehlermeldung nennt Host und Adresse und den Schalter; ein nicht auflösbarer Host ist ein Fehler,
   kein Durchlass.
-- **Grenze:** Zwischen dieser Auflösung und der des HTTP-Clients liegt ein kurzes Fenster — ein Name, dessen
-  DNS-Antwort genau dazwischen wechselt (DNS-Rebinding mit sehr kurzer TTL), wird nicht erkannt.
 
-Beide Schalter sind wie alle Härtungsschalter nur in der Startkonfiguration änderbar, nie per REST — ein
-abgeflossener API-Key kann eine Sperre weder lösen noch setzen. Wirksam nach Neustart; `false` gibt lokale
-Quellen bewusst frei (etwa einen Kalender im Heimnetz).
+Wie alle Härtungsschalter sind sie nur in der Startkonfiguration änderbar, nie per REST — ein abgeflossener
+API-Key kann eine Sperre weder lösen noch setzen. Wirksam nach Neustart; `false` gibt lokale Ziele bewusst
+frei (etwa einen Kalender im Heimnetz).
 
-**Zusätzlich auf Container-Ebene:** Die Prüfung gilt nur für diese drei Provider. Wer mehr will, kann die
-ausgehenden Verbindungen des MySuricates-Containers selbst einschränken, etwa über ein eigenes
-Docker-Netzwerk oder Firewall-Regeln auf dem Host. Das trifft dann aber alles im Container — auch die
-KI-CLIs, Shell-Blöcke und die übrigen Integrationen —, also vorher klären, welche Ziele diese brauchen.
+**Zusätzlich auf Container-Ebene:** Die Prüfung gilt nur für die Integrationen und Benachrichtigungen. Wer
+mehr will, kann die ausgehenden Verbindungen des MySuricates-Containers selbst einschränken, etwa über ein
+eigenes Docker-Netzwerk oder Firewall-Regeln auf dem Host. Das trifft dann aber alles im Container — auch
+die KI-CLIs, Shell-Blöcke und die Integrationen mit festem Host —, also vorher klären, welche Ziele diese
+brauchen.
 
 #### Zielart eines Providers (Outbound-Guard)
 
 `OutboundTargetGuard` ist der **Outbound-Guard**: die Prüfung, wohin die Instanz selbst Verbindungen aufbaut.
 Er schützt nicht die Instanz vor Zugriffen von außen (dafür sind Bindung auf `127.0.0.1` und API-Key da),
 sondern das Netz der Instanz davor, dass eine eingegebene URL die Instanz als Sprungbrett benutzt. Welche
-Rolle er für einen Provider spielt, folgt aus dessen **Zielart**:
+Rolle er für einen Provider spielt, folgt aus dessen **Zielart** (`OutboundTarget`):
 
-| Zielart | Woher die URL kommt | Outbound-Guard | Provider heute |
+| Zielart | Woher die URL kommt | Outbound-Guard | Provider |
 |---|---|---|---|
-| fester Host | steht im Code | nicht nötig | GitHub, Google, Slack, Telegram, Todoist, Trello, Open-Meteo, OAuth-Token-Endpunkte |
-| öffentliche Quelle | frei eingegeben, soll aus dem Internet kommen | an (`private-network-guard`) | iCal-Feed, RSS/Atom |
-| eigener Dienst | frei eingegebene Basis-URL eines selbst betriebenen Dienstes | per Schalter, Standard aus (Heimnetz ist legitim) | HTTP-API (`private-network-guard-http-api`); CalDAV, Gitea, GitLab, Jira/Confluence mit eigener URL und ntfy mit eigenem Server prüfen noch nicht |
+| fester Host (`OutboundHttp.fixedHost`) | steht im Code | nicht nötig | GitHub, Google Calendar/Gmail, Jira/Confluence (Atlassian Cloud), Slack, Telegram, Todoist, Trello, Open-Meteo, OAuth-Token-Endpunkte |
+| öffentliche Quelle (`OutboundTarget.publicSource()`) | frei eingegeben, soll aus dem Internet kommen | an (`private-network-guard`) | iCal-Feed, RSS/Atom |
+| eigener Dienst (`OutboundTarget.ownService()`) | frei eingegebene Basis-URL eines selbst betriebenen Dienstes | per Schalter, Standard aus (Heimnetz ist legitim) | CalDAV, Gitea/Forgejo, GitLab, ntfy, Webhook-Benachrichtigungen (`private-network-guard-own-services`); HTTP-API (`private-network-guard-http-api`) |
 
-**Neuer Provider:** zuerst die Zielart festlegen. Kommt eine URL aus Verbindung, Parametern oder
-Workflow, geht jeder Abruf — auch jeder Hop einer Weiterleitung — durch `OutboundTargetGuard.check`, mit
-dem Schalter, der zur Zielart passt. Noch baut jeder Provider seinen HTTP-Client selbst; geplant ist eine
-gemeinsame Stelle für ausgehende Clients, an der die Zielart deklariert wird und ein Architektur-Test
-eigene Clients verbietet. Nicht vom Outbound-Guard erfasst sind Shell-Blöcke (Code des Besitzers, bewusst
-frei) und die KI-CLIs (eigene Werkzeuge und Rechte).
+**Neuer Provider:** zuerst die Zielart festlegen und den HTTP-Client mit ihr von `OutboundHttp` holen —
+`OutboundHttp.fixedHost(…)` für einen Host im Code, sonst `outboundHttp.client(OutboundTarget.…, …)`.
+Prüfung, Weiterleitungsregel und Bindung an die geprüfte Adresse kommen mit dem Client; wer Weiterleitungen
+folgen will, schickt jeden Hop wieder durch `send`. `OutboundHttpGateTest` lässt den Build scheitern, wenn
+irgendwo sonst ein HTTP-Client entsteht (`HttpClient.newBuilder`, `RestTemplate`, `WebClient`,
+`openConnection` …), und hält die Zielart jedes Clients fest — eine geänderte Zielart fällt im Review auf.
+Nicht vom Outbound-Guard erfasst sind Shell-Blöcke (Code des Besitzers, bewusst frei) und die KI-CLIs
+(eigene Werkzeuge und Rechte).
 
 ### OAuth-Endpunkte & Scopes je Provider
 

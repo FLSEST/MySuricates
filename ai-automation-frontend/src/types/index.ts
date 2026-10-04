@@ -2215,12 +2215,13 @@ export interface DialogWorkflowSuggestion {
 export type FeatureModuleName =
   | 'dashboard-report' | 'goals'
   | 'chains' | 'assistant' | 'learning' | 'memory' | 'audit' | 'bpmn'
-  | 'integrations' | 'webhooks' | 'remote-access' | 'terminal' | 'staging'
+  | 'integrations' | 'http-api' | 'webhooks' | 'remote-access' | 'terminal' | 'staging'
   | 'conversion' | 'dialog-import' | 'onboarding-profiles' | 'skills' | 'debug' | 'factory' | 'wishes';
 
 export type HardeningModuleName =
   | 'provenance' | 'sealing' | 'require-sealed-for-unattended' | 'require-signed-seal' | 'seal-immutable'
-  | 'webhook-signatures' | 'private-network-guard' | 'private-network-guard-http-api';
+  | 'webhook-signatures' | 'private-network-guard' | 'private-network-guard-http-api'
+  | 'private-network-guard-own-services';
 
 export type ModuleName = FeatureModuleName | HardeningModuleName;
 

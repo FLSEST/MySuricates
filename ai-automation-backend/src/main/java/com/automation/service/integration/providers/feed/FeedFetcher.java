@@ -1,6 +1,8 @@
 package com.automation.service.integration.providers.feed;
 
-import com.automation.modules.ModuleCatalog;
+import com.automation.service.integration.OutboundClient;
+import com.automation.service.integration.OutboundHttp;
+import com.automation.service.integration.OutboundTarget;
 import com.automation.service.integration.OutboundTargetGuard;
 import com.automation.service.integration.providers.IntegrationParams;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,7 +11,6 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
@@ -17,9 +18,10 @@ import java.util.Locale;
 import java.util.Set;
 
 /**
- * Downloads a feed with hard limits: http/https only and a public target ({@link OutboundTargetGuard}),
- * both checked for every redirect hop, at most {@value #MAX_REDIRECTS} redirects followed by hand,
- * a response-size cap and timeouts.
+ * Downloads a feed with hard limits: http/https only and a public target ({@link OutboundTargetGuard},
+ * applied by the {@link OutboundTarget#publicSource() public-source} client), both checked for every
+ * redirect hop, at most {@value #MAX_REDIRECTS} redirects followed by hand and never from https to
+ * http, a response-size cap and timeouts.
  */
 @Component
 public class FeedFetcher {
@@ -31,19 +33,15 @@ public class FeedFetcher {
             + "application/xml;q=0.9, text/xml;q=0.9, */*;q=0.5";
 
     private final int maxBytes;
-    private final OutboundTargetGuard guard;
-    private final HttpClient httpClient = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(10))
-            .followRedirects(HttpClient.Redirect.NEVER)
-            .build();
+    private final OutboundClient httpClient;
 
     @Autowired
-    public FeedFetcher(OutboundTargetGuard guard) {
-        this(guard, DEFAULT_MAX_BYTES);
+    public FeedFetcher(OutboundHttp outbound) {
+        this(outbound, DEFAULT_MAX_BYTES);
     }
 
-    FeedFetcher(OutboundTargetGuard guard, int maxBytes) {
-        this.guard = guard;
+    FeedFetcher(OutboundHttp outbound, int maxBytes) {
+        this.httpClient = outbound.client(OutboundTarget.publicSource(), Duration.ofSeconds(10));
         this.maxBytes = maxBytes;
     }
 
@@ -51,14 +49,13 @@ public class FeedFetcher {
         URI uri = requireHttpUri(url);
         try {
             for (int hop = 0; hop <= MAX_REDIRECTS; hop++) {
-                guard.check(uri, ModuleCatalog.PRIVATE_NETWORK_GUARD);
                 HttpResponse<InputStream> response = httpClient.send(request(uri), HttpResponse.BodyHandlers.ofInputStream());
                 try (InputStream body = response.body()) {
                     int status = response.statusCode();
                     if (REDIRECTS.contains(status)) {
                         String location = response.headers().firstValue("Location")
                                 .orElseThrow(() -> new IllegalStateException("Feed redirect without Location header"));
-                        uri = requireHttpUri(uri.resolve(location.trim()).toString());
+                        uri = redirectTarget(uri, location);
                         continue;
                     }
                     if (status >= 400) throw new IllegalStateException("Feed request failed: HTTP " + status + " for " + uri);
@@ -74,6 +71,15 @@ public class FeedFetcher {
             throw new IllegalStateException("Feed request failed: " + e.getMessage(), e);
         }
         throw new IllegalStateException("Feed request failed: more than " + MAX_REDIRECTS + " redirects");
+    }
+
+    /** Next hop: http/https with a host, never from https down to http (the feed URL may carry a token). */
+    static URI redirectTarget(URI from, String location) {
+        URI next = requireHttpUri(from.resolve(location.trim()).toString());
+        if ("https".equalsIgnoreCase(from.getScheme()) && !"https".equalsIgnoreCase(next.getScheme())) {
+            throw new IllegalStateException("Feed at " + from.getHost() + " redirected from https to http");
+        }
+        return next;
     }
 
     /** Absolute http(s) URL with a host; everything else (file:, ftp:, jar:, relative) is rejected. */

@@ -1,15 +1,16 @@
 package com.automation.service.integration.providers.httpapi;
 
 import com.automation.modules.ModuleCatalog;
+import com.automation.service.integration.OutboundClient;
+import com.automation.service.integration.OutboundHttp;
+import com.automation.service.integration.OutboundTarget;
 import com.automation.service.integration.OutboundTargetGuard;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
@@ -20,7 +21,8 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Sends one {@link HttpApiRequest} and turns the answer into the action result. With the hardening
+ * Sends one {@link HttpApiRequest} and turns the answer into the action result. The client is an
+ * {@link OutboundTarget#ownService(ModuleCatalog) own service} with its own switch: with the hardening
  * flag {@code private-network-guard-http-api} on, the target must be a public address
  * ({@link OutboundTargetGuard}, checked on every request). Redirects are
  * never followed (a 3xx comes back with its {@code location}), the response is read up to
@@ -37,25 +39,15 @@ class HttpApiClient {
     private static final int ERROR_SNIPPET_CHARS = 500;
 
     private final ObjectMapper objectMapper;
-    private final HttpClient httpClient;
-    private final OutboundTargetGuard guard;
+    private final OutboundClient httpClient;
 
-    @Autowired
-    HttpApiClient(ObjectMapper objectMapper, OutboundTargetGuard guard) {
-        this(objectMapper, HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(10))
-                .followRedirects(HttpClient.Redirect.NEVER)
-                .build(), guard);
-    }
-
-    HttpApiClient(ObjectMapper objectMapper, HttpClient httpClient, OutboundTargetGuard guard) {
+    HttpApiClient(ObjectMapper objectMapper, OutboundHttp outbound) {
         this.objectMapper = objectMapper;
-        this.httpClient = httpClient;
-        this.guard = guard;
+        this.httpClient = outbound.client(OutboundTarget.ownService(ModuleCatalog.PRIVATE_NETWORK_GUARD_HTTP_API),
+                Duration.ofSeconds(10));
     }
 
     Map<String, Object> send(HttpApiTarget target, HttpApiRequest request) {
-        guard.check(request.uri(), ModuleCatalog.PRIVATE_NETWORK_GUARD_HTTP_API);
         HttpRequest.Builder builder = HttpRequest.newBuilder(request.uri()).timeout(request.timeout());
         request.headers().forEach(builder::header);
         if (target.hasAuth()) builder.header(target.authName(), target.authValue());

@@ -6,6 +6,9 @@ import com.automation.entity.RunStatus;
 import com.automation.event.WorkflowRunCompletedEvent;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.repository.NotificationConfigRepository;
+import com.automation.service.integration.OutboundClient;
+import com.automation.service.integration.OutboundHttp;
+import com.automation.service.integration.OutboundTarget;
 import com.automation.service.tray.SystemTrayService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -18,7 +21,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
@@ -33,22 +35,26 @@ public class NotificationService {
 
     private final NotificationConfigRepository repository;
     private final ObjectMapper objectMapper;
-    private final HttpClient httpClient;
+    private final OutboundClient httpClient;
     private final TransactionTemplate readOnlyTransactionTemplate;
 
     @Autowired(required = false)
     private SystemTrayService systemTrayService;
 
+    /**
+     * Webhook URLs are entered freely and often point at a service in the own network, so they are an
+     * {@link OutboundTarget#ownService() own service}: refused for local targets only with
+     * {@code private-network-guard-own-services} on.
+     */
     @Autowired
     public NotificationService(NotificationConfigRepository repository, ObjectMapper objectMapper,
-                               PlatformTransactionManager transactionManager) {
-        this(repository, objectMapper, transactionManager, HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(5))
-                .build());
+                               PlatformTransactionManager transactionManager, OutboundHttp outbound) {
+        this(repository, objectMapper, transactionManager,
+                outbound.client(OutboundTarget.ownService(), Duration.ofSeconds(5)));
     }
 
     NotificationService(NotificationConfigRepository repository, ObjectMapper objectMapper,
-                        PlatformTransactionManager transactionManager, HttpClient httpClient) {
+                        PlatformTransactionManager transactionManager, OutboundClient httpClient) {
         this.repository = repository;
         this.objectMapper = objectMapper;
         this.httpClient = httpClient;

@@ -3,6 +3,8 @@ package com.automation.service.integration.providers.google;
 import com.automation.service.integration.IntegrationAction;
 import com.automation.service.integration.IntegrationProvider;
 import com.automation.service.integration.OAuthConfig;
+import com.automation.service.integration.OutboundClient;
+import com.automation.service.integration.OutboundHttp;
 import com.automation.service.integration.providers.IntegrationParams;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -12,7 +14,6 @@ import org.springframework.stereotype.Component;
 
 import java.net.URI;
 import java.net.URLEncoder;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
@@ -29,9 +30,7 @@ public class GoogleCalendarProvider implements IntegrationProvider {
 
     private final ObjectMapper objectMapper;
 
-    private final HttpClient httpClient = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(10))
-            .build();
+    private final OutboundClient httpClient = OutboundHttp.fixedHost(Duration.ofSeconds(10));
 
     @Override
     public String getProviderId() {

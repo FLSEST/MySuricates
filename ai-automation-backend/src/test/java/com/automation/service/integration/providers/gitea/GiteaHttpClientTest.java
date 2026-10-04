@@ -1,5 +1,6 @@
 package com.automation.service.integration.providers.gitea;
 
+import com.automation.testsupport.TestTargetGuards;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
@@ -18,7 +19,7 @@ class GiteaHttpClientTest {
 
     private HttpServer server;
     private String base;
-    private final GiteaHttpClient client = new GiteaHttpClient(new ObjectMapper());
+    private final GiteaHttpClient client = new GiteaHttpClient(new ObjectMapper(), TestTargetGuards.outbound());
     private final AtomicReference<String> auth = new AtomicReference<>();
     private final AtomicReference<String> method = new AtomicReference<>();
     private final AtomicReference<String> body = new AtomicReference<>();

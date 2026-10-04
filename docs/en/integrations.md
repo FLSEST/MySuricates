@@ -233,58 +233,70 @@ effect at once.
 
 ### Fetches into the local network
 
-iCal feed, RSS/Atom and HTTP API fetch URLs that are written in the workflow or the connection. So that they
-cannot be used as a stepping stone into the instance's network, every fetch goes through `OutboundTargetGuard`
-(`service/integration/`). Whether it checks is decided per provider by a hardening switch:
+Integrations fetch URLs that are written in the workflow or the connection (iCal feed, RSS/Atom, HTTP API,
+the server URL of CalDAV, Gitea, GitLab, ntfy, webhook notifications). So that they cannot be used as a
+stepping stone into the instance's network, every outbound fetch gets its HTTP client from `OutboundHttp`
+(`service/integration/`), and the client checks the target with `OutboundTargetGuard`. Whether it checks is
+decided by the provider's target kind (see below) with its hardening switch:
 
 | Switch | Environment variable | Default | Applies to |
 |---|---|---|---|
 | `automation.hardening.private-network-guard` | `AUTOMATION_HARDENING_PRIVATE_NETWORK_GUARD` | `true` | iCal feed, RSS/Atom |
+| `automation.hardening.private-network-guard-own-services` | `AUTOMATION_HARDENING_PRIVATE_NETWORK_GUARD_OWN_SERVICES` | `false` | CalDAV, Gitea/Forgejo, GitLab, ntfy, webhook notifications |
 | `automation.hardening.private-network-guard-http-api` | `AUTOMATION_HARDENING_PRIVATE_NETWORK_GUARD_HTTP_API` | `false` | HTTP API |
 
-The HTTP API is open by default because services in your own network are its most common target. While a
-switch is on:
+Own services and the HTTP API are open by default because their most common target is in your own network.
+The HTTP API has a switch of its own because there the workflow decides the path of every call; for the
+other own services only the server URL is in the connection. While a switch is on:
 
 - The host is resolved, and **every** address it returns must be public. Refused are loopback
   (`127.0.0.0/8`, `::1`, so `localhost` too), `0.0.0.0/8` and `::`, private networks (`10/8`, `172.16/12`,
   `192.168/16`, `fc00::/7`, `fec0::/10`), `100.64.0.0/10` (carrier-grade NAT, Tailscale), link-local
   (`169.254/16` including the cloud metadata endpoint `169.254.169.254`, `fe80::/10`), multicast and
-  broadcast — also IPv4 wrapped in IPv6 (`::ffff:…`, `::a.b.c.d`, NAT64 `64:ff9b::/96`). A public name that
-  points at an internal address is caught just like an IP in the URL.
-- **Redirects:** iCal feed and RSS/Atom follow them themselves and check every hop before connecting; the
-  HTTP API follows none.
+  broadcast — also IPv4 wrapped in IPv6 (`::ffff:…`, `::a.b.c.d`, NAT64 `64:ff9b::/96`, 6to4 `2002::/16`,
+  Teredo `2001::/32`). A public name that points at an internal address is caught just like an IP in the
+  URL.
+- **Redirects:** no client follows them by itself. iCal feed and RSS/Atom follow them by hand (at most five,
+  never from https to http) and send every hop as a new fetch through the same check; all others return the
+  3xx.
+- **Bound to the checked address:** for `http://` with a host name the client connects to exactly the
+  address the check accepted, and checks once more when connecting — a name whose DNS answer changes
+  between check and fetch (DNS rebinding) does not lead into your own network. For `https://` the HTTP
+  client resolves the name itself; a rebound name then fails the certificate check, because the internal
+  service has no certificate for the public name. If a proxy is set for the JVM (`http.proxyHost`), the
+  proxy resolves.
 - The error names host, address and the switch; a host that does not resolve is an error, not a pass.
-- **Limit:** there is a short window between this lookup and the HTTP client's own — a name whose DNS answer
-  changes exactly in between (DNS rebinding with a very short TTL) is not caught.
 
-Like every hardening switch, both can only be changed in the startup configuration, never over REST — a
-leaked API key can neither lift nor set a block. Effective after a restart; `false` allows local sources on
+Like every hardening switch, they can only be changed in the startup configuration, never over REST — a
+leaked API key can neither lift nor set a block. Effective after a restart; `false` allows local targets on
 purpose (a calendar in the home network, say).
 
-**Additionally at container level:** the check covers these three providers only. Whoever wants more can
-restrict the outbound connections of the MySuricates container themselves, for instance with a dedicated
-Docker network or firewall rules on the host. That then affects everything in the container — the AI CLIs,
-shell blocks and the other integrations too — so first work out which targets they need.
+**Additionally at container level:** the check covers the integrations and notifications only. Whoever wants
+more can restrict the outbound connections of the MySuricates container themselves, for instance with a
+dedicated Docker network or firewall rules on the host. That then affects everything in the container — the
+AI CLIs, shell blocks and the integrations with a fixed host too — so first work out which targets they need.
 
 #### Target kind of a provider (outbound guard)
 
 `OutboundTargetGuard` is the **outbound guard**: the check on where the instance itself connects to. It does
 not protect the instance from access from outside (binding to `127.0.0.1` and the API key do that), but the
 instance's network from an entered URL that uses the instance as a stepping stone. Its role for a provider
-follows from the provider's **target kind**:
+follows from the provider's **target kind** (`OutboundTarget`):
 
-| Target kind | Where the URL comes from | Outbound guard | Providers today |
+| Target kind | Where the URL comes from | Outbound guard | Providers |
 |---|---|---|---|
-| fixed host | written in the code | not needed | GitHub, Google, Slack, Telegram, Todoist, Trello, Open-Meteo, OAuth token endpoints |
-| public source | entered freely, meant to come from the internet | on (`private-network-guard`) | iCal feed, RSS/Atom |
-| own service | freely entered base URL of a self-hosted service | by switch, off by default (the home network is legitimate) | HTTP API (`private-network-guard-http-api`); CalDAV, Gitea, GitLab, Jira/Confluence with their own URL and ntfy with its own server do not check yet |
+| fixed host (`OutboundHttp.fixedHost`) | written in the code | not needed | GitHub, Google Calendar/Gmail, Jira/Confluence (Atlassian Cloud), Slack, Telegram, Todoist, Trello, Open-Meteo, OAuth token endpoints |
+| public source (`OutboundTarget.publicSource()`) | entered freely, meant to come from the internet | on (`private-network-guard`) | iCal feed, RSS/Atom |
+| own service (`OutboundTarget.ownService()`) | freely entered base URL of a self-hosted service | by switch, off by default (the home network is legitimate) | CalDAV, Gitea/Forgejo, GitLab, ntfy, webhook notifications (`private-network-guard-own-services`); HTTP API (`private-network-guard-http-api`) |
 
-**New provider:** decide the target kind first. If a URL comes from the connection, the parameters or the
-workflow, every fetch — including every hop of a redirect — goes through `OutboundTargetGuard.check`, with
-the switch that matches the target kind. For now every provider builds its own HTTP client; a shared place
-for outbound clients is planned, where the target kind is declared and an architecture test forbids
-clients of their own. Not covered by the outbound guard: shell blocks (the owner's code, deliberately
-unrestricted) and the AI CLIs (their own tools and permissions).
+**New provider:** decide the target kind first and get the HTTP client for it from `OutboundHttp` —
+`OutboundHttp.fixedHost(…)` for a host in the code, otherwise `outboundHttp.client(OutboundTarget.…, …)`.
+The check, the redirect rule and the binding to the checked address come with the client; whoever wants to
+follow redirects sends every hop through `send` again. `OutboundHttpGateTest` fails the build when an HTTP
+client is created anywhere else (`HttpClient.newBuilder`, `RestTemplate`, `WebClient`, `openConnection` …)
+and pins the target kind of every client — a changed target kind shows up in review. Not covered by the
+outbound guard: shell blocks (the owner's code, deliberately unrestricted) and the AI CLIs (their own tools
+and permissions).
 
 ### OAuth Endpoints & Scopes per Provider
 

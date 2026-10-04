@@ -95,7 +95,7 @@ Environment form: `AUTOMATION_MODULES_PRESET`, `AUTOMATION_MODULES_<NAME>`, `AUT
 | `research` | `chains`, `assistant`, `learning` (analytics endpoints; dashboard data stays core), `memory`, `audit`, `bpmn` | chains stable, others experimental |
 | `advanced` (outward-facing) | `integrations` (incl. TODO tracker export, calendar adapters), `http-api` (general HTTP API connection, requires `integrations`), `webhooks`, `remote-access` (Tailscale), `terminal` (run terminal over WebSocket), `staging` | stable / staging experimental |
 | `advanced` (low use) | `conversion`, `dialog-import` (requires conversion), `onboarding-profiles`, `skills`, `debug`, `factory` (incl. auto-repair), `wishes` (requires chains) | legacy / experimental |
-| `hardening` | `provenance` (on by default), `sealing`, `require-sealed-for-unattended`, `webhook-signatures`, `private-network-guard` (on by default), `private-network-guard-http-api` | experimental |
+| `hardening` | `provenance` (on by default), `sealing`, `require-sealed-for-unattended`, `webhook-signatures`, `private-network-guard` (on by default), `private-network-guard-http-api`, `private-network-guard-own-services` | experimental |
 
 The catalog is additionally exported as plain bash arrays to `scripts/lib/module-catalog.generated.sh`
 — read by `scripts/lib/module-preset.sh`, which runs before every build and therefore must not
@@ -140,8 +140,9 @@ Switches under `automation.hardening.*` — the same mechanism as modules (start
 | `webhook-signatures` | off | module `webhooks` | Per-webhook signing secret (HMAC-SHA256) |
 | `private-network-guard` | on | — | iCal feed and RSS/Atom feed fetch public addresses only (see [Integrations](integrations.md#fetches-into-the-local-network)) |
 | `private-network-guard-http-api` | off | — | The same block for http-api (own network reachable otherwise) |
+| `private-network-guard-own-services` | off | — | The same block for own services: CalDAV, Gitea, GitLab, ntfy, webhook notifications |
 
-The two `private-network-guard` switches control the **outbound guard** (`OutboundTargetGuard`): where the instance itself connects to. Which provider uses which switch follows from its target kind — see [Integrations → Target kind of a provider](integrations.md#target-kind-of-a-provider-outbound-guard).
+The three `private-network-guard` switches control the **outbound guard** (`OutboundTargetGuard`): where the instance itself connects to. Outbound HTTP clients only come from `OutboundHttp`, which applies it per target kind; which provider uses which switch follows from its target kind — see [Integrations → Target kind of a provider](integrations.md#target-kind-of-a-provider-outbound-guard).
 
 **Definition hash** — `WorkflowDefinitionHasher` hashes the `WorkflowSnapshot` (blocks, instructions, model, provider, effort, metadata, defaultContext, sorted skill IDs) as canonical JSON (sorted keys, empty values omitted) with its own `ObjectMapper`, so Jackson customizing never changes the hash. Name, description, icon and tags are labels and are not hashed. Old version rows get their hash at startup (`WorkflowVersionHashBackfillService`). Context variables: `{{ workflow_definition_hash }}`, `{{ trigger_source }}`.
 

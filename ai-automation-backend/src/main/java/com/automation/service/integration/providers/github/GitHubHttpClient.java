@@ -1,11 +1,12 @@
 package com.automation.service.integration.providers.github;
 
+import com.automation.service.integration.OutboundClient;
+import com.automation.service.integration.OutboundHttp;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
@@ -21,9 +22,7 @@ public class GitHubHttpClient {
     private static final String API_VERSION = "2022-11-28";
 
     private final ObjectMapper objectMapper;
-    private final HttpClient httpClient = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(10))
-            .build();
+    private final OutboundClient httpClient = OutboundHttp.fixedHost(Duration.ofSeconds(10));
 
     public <T> T get(String url, String token, Class<T> responseType) {
         return send(requestBuilder(url, token).GET().build(), responseType);
