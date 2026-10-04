@@ -48,9 +48,12 @@ Jeder Eintrag trägt ein Pflichtfeld `scope` mit genau einem von drei Werten:
 | `portable` | über `project_path` (o. ä. Kontextvariablen) parametrisiert | läuft in jedem Projekt, das der Installierende auswählt |
 | `external` | braucht ein Werkzeug außerhalb dieses Repositories und des gewählten Projekts | die Beschreibung nennt die Voraussetzung, etwa die SaaS-Factory (`saas-factory/` mit der CLI `tools/factory`) |
 
-Der `saas-feature-loop`-Eintrag, der die SaaS-Factory über eine ganze Feature-Liste laufen ließ,
-ist aus dem Pool genommen: Kein Blocktyp kann bislang je `foreach`-Eintrag einen eigenen
-Unter-Workflow starten. Er kommt zurück, sobald das geht.
+Der `saas-feature-loop`-Eintrag lässt die SaaS-Factory über eine ganze Feature-Liste laufen: Ein
+`foreach` mit `workflow_id` startet je Feature den installierten `saas-feature-implement` als
+eigenen Lauf. Weil der Pool keine Instanz-UUIDs enthalten darf, kommt dessen ID zur Laufzeit als
+Kontextvariable `feature_workflow_id` – beide Einträge installieren und die ID des zweiten
+mitgeben. Zwischen dem 2026-09-30 und a5c9fbbf war der Eintrag aus dem Pool genommen, weil `foreach`
+das noch nicht konnte.
 
 Alle drei sind legitim, aber sie sind verschieden nützlich: wer einen `repo`-Eintrag in sein
 eigenes Projekt installiert, bekommt einen Workflow, der ins Leere läuft, und ein

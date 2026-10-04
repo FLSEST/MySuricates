@@ -26,8 +26,8 @@ const DEFINITION_DIRS = [
  * Keys in shipped definitions that no executor reads — the editor rightly warns about them there.
  * Listed so this guard stays strict for everything else; fixing the definition removes the entry.
  * github-project-bootstrap, saas-feature-implement and saas-spec-to-buildplan are fixed. Currently
- * empty: saas-feature-loop nested a sub-workflow in a foreach, which no block type can express yet,
- * and was taken out of the pool until it can.
+ * empty: saas-feature-loop nested a sub-workflow in a foreach; since foreach takes `workflow_id`
+ * (a5c9fbbf) it says so with a schema key.
  */
 const KNOWN_INEFFECTIVE = new Set<string>([]);
 
