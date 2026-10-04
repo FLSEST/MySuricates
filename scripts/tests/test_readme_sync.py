@@ -7,6 +7,7 @@ bewacht.
 
 Run: python3 -m unittest discover -s scripts/tests -p 'test_readme_sync.py'
 """
+import hashlib
 import importlib.util
 import subprocess
 import sys
@@ -80,6 +81,10 @@ ARCH_DE = "# Architektur\n\n## Datenmodell\n\n## Ablauf\n"
 ARCH_EN = "# Architecture\n\n## Data model\n\n## Flow\n"
 
 
+def sha(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
 def git(root: Path, *args: str) -> str:
     return subprocess.run(["git", *args], cwd=root, capture_output=True, text=True, check=True).stdout
 
@@ -104,7 +109,8 @@ class Repo:
         (self.root / "docs" / "nur-de.md").write_text("# Nur deutsch\n", encoding="utf-8")
         self.write_de(DE)
         self.base = self.commit("de")
-        self.write_en(EN.format(commit=self.base[:12]))
+        self.marker = f"{self.base[:12]} sha256:{sha(DE)}"
+        self.write_en(EN.format(commit=self.marker))
         self.commit("en")
 
     def write_de(self, text: str) -> None:
@@ -115,6 +121,12 @@ class Repo:
 
     def en(self) -> str:
         return (self.root / "README.md").read_text(encoding="utf-8")
+
+    def de(self) -> str:
+        return (self.root / "README.de.md").read_text(encoding="utf-8")
+
+    def body(self) -> str:
+        return self.en().rsplit("<!-- synced-from", 1)[0]
 
     def commit(self, msg: str) -> str:
         git(self.root, "add", "-A")
@@ -171,20 +183,21 @@ class PlanApplyTest(unittest.TestCase):
         self.assertIn("gate_status: GREEN", out)
         after = self.repo.en()
         self.assertEqual(after, before.replace("wording.", "new wording.", 1)
-                         .replace(f"synced-from: {self.repo.base[:12]}", f"synced-from: {new}"))
+                         .replace(self.repo.marker, f"{new} sha256:{sha(self.repo.de())}"))
         self.assertEqual(run(self.repo.root, "has-work")[0], 1)
 
     def test_rewrap_only_needs_no_translation(self):
         self.repo.change_de("Erster Absatz im\nWortlaut.", "Erster Absatz\nim Wortlaut.")
         rc, out = run(self.repo.root, "plan")
         self.assertEqual(rc, 0, out)
-        self.assertIn("nichts zu uebersetzen", out)
+        self.assertIn("Kein KI-Auftrag", out)
         self.assertEqual(run(self.repo.root, "has-work")[0], 1)
-        before = self.repo.en()
+        before = self.repo.body()
         rc, out = run(self.repo.root, "apply", "--translations", "-", stdin="ignored")
         self.assertEqual(rc, 0, out)
         self.assertIn("gate_status: GREEN", out)
-        self.assertEqual(self.repo.en(), before)
+        self.assertEqual(self.repo.body(), before)
+        self.assertIn(f"sha256:{sha(self.repo.de())}", self.repo.en())  # Sync-Stand rueckt vor
 
     def test_inserted_and_deleted_blocks(self):
         text = (self.repo.root / "README.de.md").read_text(encoding="utf-8")
@@ -200,7 +213,7 @@ class PlanApplyTest(unittest.TestCase):
         en = self.repo.en()
         self.assertIn("# Title\n\nNew paragraph.\n\nFirst paragraph in the author's\nwording.\n\n| A | B |", en)
         self.assertNotIn("Second paragraph", en)
-        self.assertTrue(en.endswith(f"<!-- synced-from: {new} -->\n"))
+        self.assertTrue(en.endswith(f"<!-- synced-from: {new} sha256:{sha(self.repo.de())} -->\n"))
 
     def test_links_are_rewritten_deterministically(self):
         self.repo.change_de("Zweiter Absatz, siehe [Architektur](docs/arch.md#datenmodell).",
@@ -230,13 +243,13 @@ class PlanApplyTest(unittest.TestCase):
         self.repo.change_de("mit deinen Erdmännchen.", "mit deinen Erdmännchen, jetzt neu.")
         rc, out = run(self.repo.root, "plan")
         self.assertEqual(rc, 0, out)
-        self.assertIn("nichts zu uebersetzen", out)
-        before = self.repo.en()
+        self.assertIn("Kein KI-Auftrag", out)
+        before = self.repo.body()
         rc, out = run(self.repo.root, "apply", "--translations", "-", stdin="")
         self.assertEqual(rc, 0, out)
         self.assertIn("gate_status: YELLOW", out)
         self.assertIn("`banner`", out)
-        self.assertEqual(self.repo.en(), before)
+        self.assertEqual(self.repo.body(), before)
 
     def test_task_carries_the_glossary(self):
         self.repo.change_de("Erster Absatz", "Erster Absatz der Erdmännchen")
@@ -307,7 +320,7 @@ class PreconditionTest(unittest.TestCase):
         self.assertIn("Sync-Stand unbekannt", out)
 
     def test_unknown_marker_commit(self):
-        self.repo.write_en(self.repo.en().replace(self.repo.base[:12], "deadbeefdead"))
+        self.repo.write_en(self.repo.en().replace(self.repo.marker, "deadbeefdead"))  # ohne Hash
         self.repo.commit("bad marker")
         rc, out = run(self.repo.root, "plan")
         self.assertEqual(rc, 2)
@@ -332,37 +345,141 @@ class PreconditionTest(unittest.TestCase):
         new = self.repo.change_de("Erster Absatz", "Erster neuer Absatz")
         rc, out = run(self.repo.root, "mark")
         self.assertEqual(rc, 0, out)
-        self.assertTrue(self.repo.en().endswith(f"\n\n<!-- synced-from: {new} -->\n"))
+        self.assertTrue(self.repo.en().endswith(f"\n\n<!-- synced-from: {new} sha256:{sha(self.repo.de())} -->\n"))
         self.assertEqual(self.repo.en().count("synced-from"), 1)
 
 
 class GateTest(unittest.TestCase):
-    """verify() unabhaengig von apply: jede Abweichung ausserhalb der Regionen faellt auf."""
+    """verify() unabhaengig von apply: jede Abweichung ausserhalb der uebersetzten Bloecke faellt auf."""
+
+    OLD = rs.Marker("abc1234", None)
+    NEW = rs.Marker("abc9999", "f" * 64)
 
     def setUp(self):
-        self.snapshot, _ = rs.split_marker(rs.parse(EN.format(commit="abc1234")))
+        self.snapshot, _ = rs.split_marker(rs.parse(EN.format(commit=self.OLD.commit)))
         self.de = rs.parse(DE)
-        self.regions = [["equal", 0, 3, 0, 3], ["replace", 3, 4, 3, 4], ["equal", 4, 9, 4, 9]]
+        self.items = [{"keep": i} for i in range(9)]
+        self.items[3] = {"translate": True, "template": 3}
 
     def final(self, mutate=lambda t: t) -> str:
-        text = EN.format(commit="abc9999").replace("wording.", "new wording.", 1)
+        text = EN.format(commit=f"{self.NEW.commit} sha256:{self.NEW.hash}").replace("wording.", "new wording.", 1)
         return mutate(text)
 
-    def test_change_inside_region_passes(self):
-        self.assertEqual(rs.verify(self.snapshot, self.regions, self.de, self.final(), "abc9999"), [])
+    def test_change_inside_translated_block_passes(self):
+        self.assertEqual(rs.verify(self.snapshot, self.items, self.de, self.final(), self.NEW), [])
 
-    def test_byte_outside_region_fails(self):
+    def test_byte_outside_translated_blocks_fails(self):
         for mutate in (
             lambda t: t.replace("suricates", "meerkats"),
             lambda t: t.replace("| 1 commit |", "| 1 commit  |"),
             lambda t: t.replace("# Title\n\n", "# Title\n\n\n"),
             lambda t: t.replace("source.**\n", "source.**\n\nExtra.\n"),
+            lambda t: t.replace("echo welt", "  echo welt"),
         ):
-            problems = rs.verify(self.snapshot, self.regions, self.de, self.final(mutate), "abc9999")
+            problems = rs.verify(self.snapshot, self.items, self.de, self.final(mutate), self.NEW)
             self.assertTrue(problems, mutate)
 
     def test_wrong_marker_fails(self):
-        self.assertTrue(rs.verify(self.snapshot, self.regions, self.de, self.final(), "fff0000"))
+        self.assertTrue(rs.verify(self.snapshot, self.items, self.de, self.final(), rs.Marker("fff0000", None)))
+
+
+class ReviewFixTest(unittest.TestCase):
+    """Nachbesserungen aus dem Review (Codebloecke exakt, Verschiebungen, Inhalts-Hash, Nur-Loeschen)."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.repo = Repo(self._tmp.name)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def de(self) -> str:
+        return self.repo.de()
+
+    def test_code_block_indentation_counts_as_change(self):
+        self.repo.change_de("echo welt\n```", "  echo welt\n```")
+        rc, out = run(self.repo.root, "plan")
+        self.assertEqual(rc, 0, out)
+        self.assertIn("=== EN 7 ===", out)
+
+    def test_moved_block_keeps_its_english_text_without_ai(self):
+        para = "Zweiter Absatz, siehe [Architektur](docs/arch.md#datenmodell).\n\n"
+        text = self.de().replace(para, "").replace("---\n", para + "---\n")
+        self.repo.write_de(text)
+        new = self.repo.commit("move")[:12]
+        rc, out = run(self.repo.root, "plan")
+        self.assertEqual(rc, 0, out)
+        self.assertNotIn("=== EN", out)
+        self.assertEqual(run(self.repo.root, "has-work")[0], 1)
+        rc, out = run(self.repo.root, "apply", "--translations", "-", stdin="")
+        self.assertEqual(rc, 0, out)
+        self.assertIn("gate_status: GREEN", out)
+        en = self.repo.en()
+        self.assertIn("echo welt\n```\n\nSecond paragraph, see [architecture](docs/en/arch.md#data-model).\n\n---\n", en)
+        self.assertEqual(en.count("Second paragraph"), 1)
+        self.assertIn(f"synced-from: {new} sha256:{sha(text)}", en)
+
+    def test_moved_and_edited_block_gets_its_english_template(self):
+        para = "Zweiter Absatz, siehe [Architektur](docs/arch.md#datenmodell).\n\n"
+        text = self.de().replace(para, "").replace("---\n", para.replace("Zweiter", "Zweiter, neuer") + "---\n")
+        self.repo.write_de(text)
+        self.repo.commit("move+edit")
+        rc, out = run(self.repo.root, "plan")
+        self.assertEqual(rc, 0, out)
+        self.assertIn("=== EN 7 ===", out)
+        self.assertIn("Second paragraph, see [architecture]", out)
+
+    def test_delete_only_run_needs_no_ai_and_advances_the_marker(self):
+        para = "Zweiter Absatz, siehe [Architektur](docs/arch.md#datenmodell).\n\n"
+        text = self.de().replace(para, "")
+        self.repo.write_de(text)
+        new = self.repo.commit("delete")[:12]
+        rc, out = run(self.repo.root, "plan")
+        self.assertEqual(rc, 0, out)
+        self.assertEqual(run(self.repo.root, "has-work")[0], 1)
+        rc, out = run(self.repo.root, "apply", "--translations", "-", stdin="")
+        self.assertEqual(rc, 0, out)
+        self.assertIn("gate_status: GREEN", out)
+        self.assertNotIn("Second paragraph", self.repo.en())
+        self.assertTrue(self.repo.en().endswith(f"<!-- synced-from: {new} sha256:{sha(text)} -->\n"))
+
+    def test_marker_carries_the_content_hash(self):
+        rc, out = run(self.repo.root, "mark")
+        self.assertEqual(rc, 0, out)
+        self.assertTrue(self.repo.en().endswith(f"<!-- synced-from: {self.repo.base[:12]} sha256:{sha(DE)} -->\n"))
+
+    def test_unknown_commit_with_matching_hash_continues(self):
+        # Release-Uebergabe/History-Rewrite: den Commit gibt es nicht mehr, den Inhalt schon
+        en = self.repo.en().rsplit("<!-- synced-from", 1)[0] + f"<!-- synced-from: deadbeefdead sha256:{sha(DE)} -->\n"
+        self.repo.write_en(en)
+        self.repo.commit("rewritten")
+        rc, out = run(self.repo.root, "plan")
+        self.assertEqual(rc, 0, out)
+        self.assertIn("Kein KI-Auftrag", out)
+        self.assertEqual(run(self.repo.root, "check", "--current")[0], 0)
+
+    def test_unknown_commit_and_unknown_hash_asks_for_mark(self):
+        en = self.repo.en().rsplit("<!-- synced-from", 1)[0] + f"<!-- synced-from: deadbeefdead sha256:{'0' * 64} -->\n"
+        self.repo.write_en(en)
+        self.repo.commit("lost")
+        rc, out = run(self.repo.root, "plan")
+        self.assertEqual(rc, 2)
+        self.assertIn("mark", out)
+
+    def test_hash_contradicting_the_commit_is_refused(self):
+        en = self.repo.en().rsplit("<!-- synced-from", 1)[0] + f"<!-- synced-from: {self.repo.base[:12]} sha256:{'0' * 64} -->\n"
+        self.repo.write_en(en)
+        self.repo.commit("contradiction")
+        rc, out = run(self.repo.root, "plan")
+        self.assertEqual(rc, 2)
+        self.assertIn("mark", out)
+
+    def test_check_current_reports_pending_sync(self):
+        self.assertEqual(run(self.repo.root, "check", "--current")[0], 0)
+        self.repo.change_de("Erster Absatz", "Erster neuer Absatz")
+        rc, out = run(self.repo.root, "check", "--current")
+        self.assertEqual(rc, 1, out)
+        self.assertEqual(run(self.repo.root, "check")[0], 0)  # Gleichlauf zum Sync-Stand bleibt
 
 
 if __name__ == "__main__":

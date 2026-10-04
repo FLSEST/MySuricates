@@ -75,7 +75,7 @@ Further rules of the house:
 - **New behaviour needs a test.** A gate that does not measure is green.
 - **German and English documentation are updated together.** `README.md` is
   generated from `README.de.md` — edit the German source, never the generated
-  file. Its last line, `<!-- synced-from: <commit> -->`, names the version of
+  file. Its last line, `<!-- synced-from: <commit> sha256:<hash> -->`, names the version of
   the German file it reflects; `scripts/readme-sync/readme_sync.py` translates
   only the blocks changed since then and leaves every other byte alone.
 - **Never access the SQLite database directly.** Not from code, not from shell
@@ -129,7 +129,7 @@ auf Pull Requests.
   nicht abgeschaltet oder gelöscht, um eine Änderung grün zu bekommen.
 - **Deutsch und Englisch zusammen pflegen.** `README.md` wird aus
   `README.de.md` erzeugt — die deutsche Quelle bearbeiten, nie die erzeugte Datei.
-  Ihre letzte Zeile, `<!-- synced-from: <commit> -->`, nennt den Stand der
+  Ihre letzte Zeile, `<!-- synced-from: <commit> sha256:<hash> -->`, nennt den Stand der
   deutschen Datei, den sie wiedergibt; `scripts/readme-sync/readme_sync.py`
   übersetzt nur die seitdem geänderten Blöcke und lässt jedes andere Byte stehen.
 - **Sicherheitslücken** nicht als öffentliches Issue, sondern über den Meldeweg

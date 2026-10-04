@@ -6,37 +6,48 @@ Workflow "README DE<->EN Sync" bei jeder Aenderung die ganze Datei neu und aende
 festgelegten Wortlaut ("suricates" -> "meerkats"). Dieses Skript macht alles Deterministische
 an dem Workflow; die KI uebersetzt nur noch die Abschnitte, die sich geaendert haben.
 
-Sync-Stand: die letzte Zeile von README.md, `<!-- synced-from: <commit> -->`. Sie nennt den
-Commit, dessen README.de.md die englische Fassung wiedergibt.
+Sync-Stand: die letzte Zeile von README.md, `<!-- synced-from: <commit> sha256:<hash> -->`.
+Sie nennt den Commit, dessen README.de.md die englische Fassung wiedergibt, und den
+SHA-256 dieses Inhalts. Den Commit gibt es nach einem History-Rewrite oder im oeffentlichen
+Repo (Release-Uebergabe: ein Commit je Release) nicht mehr — dann sucht `plan` den Stand von
+README.de.md mit diesem Hash in der Historie. Findet sich keiner: von Hand angleichen, `mark`.
 
 Abschnitt: ein durch Leerzeilen begrenzter Block (Absatz, Ueberschrift, Tabelle, Liste,
 Code-Block samt seiner Leerzeilen, Zitat). Beide READMEs fuehren dieselbe Folge von Bloecken;
 Block i der englischen Datei ist die Uebersetzung von Block i der deutschen am Sync-Stand.
 `plan` vergleicht README.de.md am Sync-Stand mit HEAD Block fuer Block (Zeilenumbrueche
-zaehlen nicht) und legt nur fuer die geaenderten Bloecke einen Uebersetzungsauftrag an.
+zaehlen nicht, in Code-Bloecken zaehlt jedes Zeichen):
+- unveraenderte und nur verschobene Bloecke: die englische Fassung bleibt Byte fuer Byte,
+- geloeschte Bloecke: fallen weg,
+- neue oder geaenderte Bloecke: gehen an die KI, mit der bisherigen englischen Fassung des
+  aehnlichsten weggefallenen Blocks als Vorlage.
+Gibt es nichts zu uebersetzen (nur Loeschen/Verschieben), entsteht kein Auftrag; `apply`
+schreibt das Ergebnis ohne KI und rueckt den Sync-Stand vor.
 
 Feste Bausteine (Sprachumschalter, Banner, Fussnote) uebersetzt keine KI: Sie bleiben in
 README.md wie sie sind. Aendert sich einer davon in der deutschen Datei, meldet `apply` das als
 Warnung — von Hand nachziehen.
 
 Gate: `apply` setzt die Uebersetzungen ein, schreibt Doku-Links deterministisch auf die
-englische Fassung um und prueft danach, dass README.md ausserhalb der geaenderten Bloecke
-Byte fuer Byte dem Stand vor dem Lauf entspricht.
+englische Fassung um und prueft danach, dass jeder nicht uebersetzte Block Byte fuer Byte dem
+Stand vor dem Lauf entspricht.
 
 Befehle (Zustand unter `$(git rev-parse --git-path readme-sync)`, liegt in .git, nie committet):
     plan                      Auftrag fuer die KI auf stdout, Zustand ablegen
     has-work                  Exit 0, wenn es etwas zu uebersetzen gibt (fuer run_if)
     apply --translations F    Antwort der KI einsetzen, Gate-Zeilen ausgeben (F = Datei oder -)
-    check                     Gleichlauf und Sync-Stand der beiden READMEs pruefen
+    check [--current]         Gleichlauf zum Sync-Stand pruefen; --current: und der Sync-Stand
+                              ist die aktuelle README.de.md (Gate der Release-Uebergabe)
     mark [--commit C]         Sync-Stand setzen (nach einer Uebersetzung von Hand)
 
-Exit: 0 = ok (auch YELLOW), 1 = Gate RED, 2 = Vorbedingung verletzt (nichts geschrieben).
-Nur Standardbibliothek.
+Exit: 0 = ok (auch YELLOW), 1 = Gate RED / check fehlgeschlagen, 2 = Vorbedingung verletzt
+(nichts geschrieben). Nur Standardbibliothek.
 """
 from __future__ import annotations
 
 import argparse
 import difflib
+import hashlib
 import json
 import os
 import re
@@ -51,9 +62,10 @@ from md_common import FENCE, headings, mirror_pair, slug  # noqa: E402
 
 SOURCE = "README.de.md"
 TARGET = "README.md"
-MARKER_RE = re.compile(r"^<!-- synced-from: ([0-9a-f]{7,40}) -->$")
-MARKER_FMT = "<!-- synced-from: {} -->"
+MARKER_RE = re.compile(r"^<!-- synced-from: ([0-9a-f]{7,40})(?: sha256:([0-9a-f]{64}))? -->$")
 GATE_CATEGORY = "readme-sync"
+#: Mindestaehnlichkeit, ab der ein weggefallener Block als Vorlage fuer einen neuen gilt.
+TEMPLATE_MIN_RATIO = 0.5
 
 #: Feste Bausteine: Name -> Erkennung am ersten Block-Inhalt. Sie werden nie uebersetzt.
 FIXED = {
@@ -74,6 +86,7 @@ GLOSSARY = {
 LINK = re.compile(r"\[([^\]]*)\]\(([^)\s]+)\)")
 TRANSLATION_HEAD = re.compile(r"^\s*=== EN (\d+) ===\s*$")
 TRANSLATION_END = re.compile(r"^\s*=== END ===\s*$")
+MARK_HINT = "README.md von Hand angleichen und `readme_sync.py mark` ausfuehren"
 
 
 class PreconditionError(Exception):
@@ -152,6 +165,16 @@ def kind(body: str) -> str:
     return "para"
 
 
+def key(body: str) -> str:
+    """Vergleichsschluessel eines Blocks: feste Bausteine nach Namen, Code exakt, sonst norm()."""
+    name = fixed_name(body)
+    if name:
+        return "\0fixed:" + name
+    if kind(body) == "code":
+        return "\0code:" + body  # Einrueckung ist in Code Inhalt
+    return norm(body)
+
+
 def table_shape(body: str) -> list[int]:
     """Spaltenzahl je Tabellenzeile (escapte `\\|` zaehlen nicht)."""
     return [len(re.findall(r"(?<!\\)\|", line)) for line in body.strip("\n").split("\n")]
@@ -165,110 +188,59 @@ def fixed_name(body: str) -> str | None:
     return None
 
 
-def split_marker(doc: Doc) -> tuple[Doc, str | None]:
-    """Trennt den Sync-Stand (letzter Block) ab; liefert (Rumpf, Commit oder None)."""
+def first_line(body: str) -> str:
+    return body.strip().split("\n", 1)[0][:60]
+
+
+def sha256(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+# --------------------------------------------------------------------------- Sync-Stand
+
+
+@dataclass
+class Marker:
+    commit: str
+    hash: str | None
+
+    def line(self) -> str:
+        return f"<!-- synced-from: {self.commit}" + (f" sha256:{self.hash}" if self.hash else "") + " -->"
+
+
+def split_marker(doc: Doc) -> tuple[Doc, Marker | None]:
+    """Trennt den Sync-Stand (letzter Block) ab; liefert (Rumpf, Marker oder None)."""
     if doc.chunks:
         m = MARKER_RE.match(doc.chunks[-1].body.strip())
         if m:
-            return Doc(doc.prefix, doc.chunks[:-1]), m.group(1)
+            return Doc(doc.prefix, doc.chunks[:-1]), Marker(m.group(1), m.group(2))
     return doc, None
 
 
-def with_marker(body: Doc, commit: str) -> str:
+def with_marker(body: Doc, marker: Marker) -> str:
     chunks = list(body.chunks)
     if chunks and not chunks[-1].gap:
         last = chunks[-1]
         body_text = last.body if last.body.endswith("\n") else last.body + "\n"
         chunks[-1] = Chunk(body_text, "\n")
-    return Doc(body.prefix, chunks).render() + MARKER_FMT.format(commit) + "\n"
+    return Doc(body.prefix, chunks).render() + marker.line() + "\n"
 
 
 def check_parallel(de: Doc, en: Doc, what: str) -> None:
     if len(de.chunks) != len(en.chunks):
         raise PreconditionError(
             f"{TARGET} passt nicht Block fuer Block zu {what}: {len(en.chunks)} gegen "
-            f"{len(de.chunks)} Bloecke. Erst angleichen (oder von Hand uebersetzen und `mark`)."
+            f"{len(de.chunks)} Bloecke. {MARK_HINT}."
         )
     for i, (d, e) in enumerate(zip(de.chunks, en.chunks)):
         if kind(d.body) != kind(e.body):
             raise PreconditionError(
                 f"{TARGET} Block {i + 1} ist {kind(e.body)}, in {what} {kind(d.body)}: "
-                f"{first_line(e.body)!r} / {first_line(d.body)!r}"
+                f"{first_line(e.body)!r} / {first_line(d.body)!r}. {MARK_HINT}."
             )
 
 
-def first_line(body: str) -> str:
-    return body.strip().split("\n", 1)[0][:60]
-
-
-# --------------------------------------------------------------------------- Plan
-
-
-def diff_regions(old_de: Doc, new_de: Doc) -> list[list]:
-    def keys(doc: Doc) -> list[str]:
-        out = []
-        for c in doc.chunks:
-            name = fixed_name(c.body)
-            out.append("\0fixed:" + name if name else norm(c.body))
-        return out
-
-    matcher = difflib.SequenceMatcher(None, keys(old_de), keys(new_de), autojunk=False)
-    return [list(op) for op in matcher.get_opcodes()]
-
-
-def fixed_changes(old_de: Doc, new_de: Doc) -> list[str]:
-    def fixed(doc: Doc) -> dict[str, str]:
-        return {n: norm(c.body) for c in doc.chunks if (n := fixed_name(c.body))}
-
-    old, new = fixed(old_de), fixed(new_de)
-    return sorted(n for n in old.keys() & new.keys() if old[n] != new[n])
-
-
-def build_task(regions: list[list], old_de: Doc, new_de: Doc, en: Doc) -> str:
-    out = [
-        "Translate the changed blocks of the German README.de.md into English for README.md.",
-        "Only these blocks are translated; every other line of README.md stays as it is.",
-        "",
-        "Rules:",
-        "1. Where a block has a previous English version, change ONLY what corresponds to the "
-        "change between the old and the new German text. Keep every other word, punctuation "
-        "mark and line break of the previous English version exactly as it is — that wording "
-        "is deliberate.",
-        "2. Keep the Markdown structure of each block: same block type, a table keeps its rows "
-        "and columns, a list its items. No blank lines inside a block (except inside a code "
-        "fence).",
-        "3. Keep code, commands, identifiers, file paths, HTML comment syntax and every link "
-        "target (the part in parentheses) exactly as in the German "
-        "text — the tool rewrites documentation links to the English docs itself. Numbers use "
-        "English formatting (2 630 -> 2,630) like the previous English version.",
-        "4. Fixed terms: " + "; ".join(f"{k} -> {v}" for k, v in GLOSSARY.items()) + ".",
-        "5. Do not create, edit or delete any file. Answer ONLY with the blocks below, each "
-        "introduced by its marker line, and end with the line `=== END ===`:",
-        "",
-    ]
-    wanted = [j for tag, _i1, _i2, j1, j2 in regions if tag != "equal" for j in range(j1, j2)]
-    for j in wanted:
-        out += [f"=== EN {j + 1} ===", "<English text of block {}>".format(j + 1)]
-    out += ["=== END ===", ""]
-    n = 0
-    for tag, i1, i2, j1, j2 in regions:
-        if tag == "equal":
-            continue
-        n += 1
-        out.append(f"## Change {n} ({tag}, README.de.md blocks {j1 + 1}-{j2})" if j2 > j1
-                   else f"## Change {n} (German blocks removed — nothing to translate)")
-        if i2 > i1:
-            out += ["", "Old German version:", "<<<", "".join(old_de.chunks[i].raw for i in range(i1, i2)).rstrip("\n"), ">>>"]
-            out += ["", "Previous English version (keep its wording wherever the German text did not change):", "<<<",
-                    "".join(en.chunks[i].raw for i in range(i1, i2)).rstrip("\n"), ">>>"]
-        for j in range(j1, j2):
-            out += ["", f"New German block {j + 1} (answer with `=== EN {j + 1} ===`):", "<<<",
-                    new_de.chunks[j].body.rstrip("\n"), ">>>"]
-        out.append("")
-    return "\n".join(out)
-
-
-# --------------------------------------------------------------------------- Git / Zustand
+# --------------------------------------------------------------------------- Git
 
 
 def git(root: Path, *args: str, check: bool = True) -> str:
@@ -276,6 +248,51 @@ def git(root: Path, *args: str, check: bool = True) -> str:
     if check and proc.returncode != 0:
         raise PreconditionError(f"git {' '.join(args)}: {proc.stderr.strip() or proc.returncode}")
     return proc.stdout
+
+
+def show_source(root: Path, commit: str) -> str | None:
+    proc = subprocess.run(["git", "show", f"{commit}:{SOURCE}"], cwd=root, capture_output=True,
+                          text=True, encoding="utf-8")
+    return proc.stdout if proc.returncode == 0 else None
+
+
+def short(root: Path, commit: str) -> str:
+    return git(root, "rev-parse", "--short=12", commit).strip()
+
+
+def resolve_synced_source(root: Path, marker: Marker) -> tuple[str, str]:
+    """README.de.md am Sync-Stand als (Commit, Text).
+
+    Erst ueber den Commit; gibt es ihn nicht (History-Rewrite, Release-Uebergabe), ueber den
+    Inhalts-Hash in der Historie von README.de.md. Widersprechen sich Commit und Hash oder
+    passt nichts, ist der Sync-Stand nicht belastbar — Exit 2.
+    """
+    text = show_source(root, marker.commit)
+    if text is not None:
+        if marker.hash and sha256(text) != marker.hash:
+            raise PreconditionError(
+                f"Sync-Stand widerspruechlich: {SOURCE} in {marker.commit} hat nicht den Hash aus "
+                f"dem Marker. {MARK_HINT}."
+            )
+        return marker.commit, text
+    if marker.hash:
+        for commit in git(root, "log", "--format=%H", "--", SOURCE, check=False).split():
+            candidate = show_source(root, commit)
+            if candidate is not None and sha256(candidate) == marker.hash:
+                return short(root, commit), candidate
+    raise PreconditionError(
+        f"Sync-Stand {marker.commit} ist in diesem Repository unbekannt"
+        + (" und kein Stand von README.de.md hat den Hash aus dem Marker" if marker.hash else
+           " und der Marker traegt keinen Inhalts-Hash")
+        + f". {MARK_HINT}."
+    )
+
+
+def source_commit(root: Path) -> str:
+    sha = git(root, "log", "-1", "--format=%H", "--", SOURCE).strip()
+    if not sha:
+        raise PreconditionError(f"{SOURCE} ist in keinem Commit enthalten")
+    return short(root, sha)
 
 
 def state_dir(root: Path, explicit: str | None) -> Path:
@@ -293,11 +310,106 @@ def repo_root(explicit: str | None) -> Path:
     return Path(out.stdout.strip())
 
 
-def source_commit(root: Path) -> str:
-    sha = git(root, "log", "-1", "--format=%H", "--", SOURCE).strip()
-    if not sha:
-        raise PreconditionError(f"{SOURCE} ist in keinem Commit enthalten")
-    return git(root, "rev-parse", "--short=12", sha).strip()
+# --------------------------------------------------------------------------- Plan
+
+
+def build_items(old_de: Doc, new_de: Doc) -> list[dict]:
+    """Je Block der neuen deutschen Fassung: {"keep": i} (englischer Block i bleibt Byte fuer
+    Byte) oder {"translate": True, "template": i | None} (Vorlage: bisherige Fassung von i)."""
+    old_keys = [key(c.body) for c in old_de.chunks]
+    new_keys = [key(c.body) for c in new_de.chunks]
+    items: list[dict | None] = [None] * len(new_keys)
+    unmatched_old: list[int] = []
+    region_of: dict[int, list[int]] = {}
+    matcher = difflib.SequenceMatcher(None, old_keys, new_keys, autojunk=False)
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        if tag == "equal":
+            for k in range(i2 - i1):
+                items[j1 + k] = {"keep": i1 + k}
+            continue
+        unmatched_old.extend(range(i1, i2))
+        for j in range(j1, j2):
+            region_of[j] = list(range(i1, i2))
+    # Verschiebung: geloescht und unter gleichem Schluessel anderswo wieder eingefuegt
+    for j in sorted(region_of):
+        match = next((i for i in unmatched_old if old_keys[i] == new_keys[j]), None)
+        if match is not None:
+            items[j] = {"keep": match}
+            unmatched_old.remove(match)
+    for j in sorted(region_of):
+        if items[j] is not None:
+            continue
+        if fixed_name(new_de.chunks[j].body):
+            raise PreconditionError(
+                f"Fester Baustein `{fixed_name(new_de.chunks[j].body)}` in {SOURCE} neu (Block {j + 1}) "
+                f"— {MARK_HINT}."
+            )
+        items[j] = {"translate": True, "template": best_template(j, region_of[j], unmatched_old, old_de, new_de)}
+    return items  # type: ignore[return-value]
+
+
+def best_template(j: int, region: list[int], unmatched_old: list[int], old_de: Doc, new_de: Doc) -> int | None:
+    """Aehnlichster weggefallener Block: im eigenen Ersetzungsbereich ohne Schwelle, sonst ab
+    TEMPLATE_MIN_RATIO (ein verschobener und dabei geaenderter Block)."""
+    target = norm(new_de.chunks[j].body)
+
+    def ratio(i: int) -> float:
+        return difflib.SequenceMatcher(None, norm(old_de.chunks[i].body), target, autojunk=False).ratio()
+
+    same_kind = [i for i in unmatched_old if kind(old_de.chunks[i].body) == kind(new_de.chunks[j].body)]
+    local = [i for i in same_kind if i in region]
+    if local:
+        return max(local, key=ratio)
+    scored = [(ratio(i), i) for i in same_kind]
+    best = max(scored, default=None)
+    return best[1] if best and best[0] >= TEMPLATE_MIN_RATIO else None
+
+
+def fixed_changes(old_de: Doc, new_de: Doc) -> list[str]:
+    def fixed(doc: Doc) -> dict[str, str]:
+        return {n: norm(c.body) for c in doc.chunks if (n := fixed_name(c.body))}
+
+    old, new = fixed(old_de), fixed(new_de)
+    return sorted(n for n in old.keys() & new.keys() if old[n] != new[n])
+
+
+def build_task(items: list[dict], old_de: Doc, new_de: Doc, en: Doc) -> str:
+    out = [
+        "Translate the changed blocks of the German README.de.md into English for README.md.",
+        "Only these blocks are translated; every other line of README.md stays as it is.",
+        "",
+        "Rules:",
+        "1. Where a block has a previous English version, change ONLY what corresponds to the "
+        "change between the old and the new German text. Keep every other word, punctuation "
+        "mark and line break of the previous English version exactly as it is — that wording "
+        "is deliberate.",
+        "2. Keep the Markdown structure of each block: same block type, a table keeps its rows "
+        "and columns, a list its items. No blank lines inside a block (except inside a code "
+        "fence).",
+        "3. Keep code, commands, identifiers, file paths, HTML comment syntax and every link "
+        "target (the part in parentheses) exactly as in the German text — the tool rewrites "
+        "documentation links to the English docs itself. Numbers use English formatting "
+        "(2 630 -> 2,630) like the previous English version.",
+        "4. Fixed terms: " + "; ".join(f"{k} -> {v}" for k, v in GLOSSARY.items()) + ".",
+        "5. Do not create, edit or delete any file. Answer ONLY with the blocks below, each "
+        "introduced by its marker line, and end with the line `=== END ===`:",
+        "",
+    ]
+    wanted = [j for j, item in enumerate(items) if item.get("translate")]
+    for j in wanted:
+        out += [f"=== EN {j + 1} ===", f"<English text of block {j + 1}>"]
+    out += ["=== END ===", ""]
+    for j in wanted:
+        out += [f"## Block {j + 1}", "", "New German text:", "<<<", new_de.chunks[j].body.rstrip("\n"), ">>>"]
+        i = items[j]["template"]
+        if i is not None:
+            out += ["", "Old German text:", "<<<", old_de.chunks[i].body.rstrip("\n"), ">>>",
+                    "", "Previous English text (keep its wording wherever the German text did not change):",
+                    "<<<", en.chunks[i].body.rstrip("\n"), ">>>"]
+        else:
+            out += ["", "(new block — no previous English version)"]
+        out.append("")
+    return "\n".join(out)
 
 
 def cmd_plan(root: Path, state: Path) -> int:
@@ -307,58 +419,40 @@ def cmd_plan(root: Path, state: Path) -> int:
             f"Sync-Stand nennt einen Commit, und das Gate vergleicht mit dem committeten Stand)."
         )
     en_text = (root / TARGET).read_text(encoding="utf-8")
-    en, old_commit = split_marker(parse(en_text))
-    if not old_commit:
-        raise PreconditionError(
-            f"{TARGET} endet nicht mit `{MARKER_FMT.format('<commit>')}` — Sync-Stand unbekannt. "
-            f"Mit `mark --commit <c>` setzen (c = Commit, dessen {SOURCE} {TARGET} wiedergibt)."
-        )
-    proc = subprocess.run(["git", "show", f"{old_commit}:{SOURCE}"], cwd=root, capture_output=True,
-                          text=True, encoding="utf-8")
-    if proc.returncode != 0:
-        raise PreconditionError(
-            f"Sync-Stand {old_commit} ist in diesem Repository unbekannt (etwa nach einem "
-            f"History-Rewrite): {proc.stderr.strip()}. Von Hand angleichen und `mark`."
-        )
-    old_de = parse(proc.stdout)
-    new_commit = source_commit(root)
+    en, marker = split_marker(parse(en_text))
+    if not marker:
+        raise PreconditionError(f"{TARGET} endet nicht mit `<!-- synced-from: … -->` — Sync-Stand unbekannt. {MARK_HINT}.")
+    old_commit, old_text = resolve_synced_source(root, marker)
+    old_de = parse(old_text)
     new_de_text = (root / SOURCE).read_text(encoding="utf-8")
     new_de = parse(new_de_text)
     check_parallel(old_de, en, f"{SOURCE}@{old_commit}")
-
-    regions = diff_regions(old_de, new_de)
-    for tag, _i1, _i2, j1, j2 in regions:
-        for j in range(j1, j2):
-            if tag != "equal" and fixed_name(new_de.chunks[j].body):
-                raise PreconditionError(
-                    f"Fester Baustein `{fixed_name(new_de.chunks[j].body)}` in {SOURCE} neu oder "
-                    f"verschoben (Block {j + 1}) — von Hand in {TARGET} nachziehen und `mark`."
-                )
-    changed = [r for r in regions if r[0] != "equal"]
+    items = build_items(old_de, new_de)
 
     shutil.rmtree(state / "run", ignore_errors=True)
     run = state / "run"
     run.mkdir(parents=True, exist_ok=True)
     (run / "snapshot-README.md").write_text(en_text, encoding="utf-8")
     (run / "source-README.de.md").write_text(new_de_text, encoding="utf-8")
-    (run / "old-README.de.md").write_text(proc.stdout, encoding="utf-8")
+    new_marker = Marker(source_commit(root), sha256(new_de_text))
     plan = {
         "old_commit": old_commit,
-        "new_commit": new_commit,
-        "regions": regions,
+        "new_marker": {"commit": new_marker.commit, "hash": new_marker.hash},
+        "items": items,
         "fixed_changed": fixed_changes(old_de, new_de),
     }
     (run / "plan.json").write_text(json.dumps(plan, indent=1), encoding="utf-8")
 
-    blocks = sum(r[4] - r[3] for r in changed)
-    if not changed:
-        print(f"README-Sync: nichts zu uebersetzen — {SOURCE} unveraendert seit {old_commit}"
-              f" (aktuell {new_commit}).")
+    kept = sum(1 for it in items if "keep" in it)
+    todo = sum(1 for it in items if it.get("translate"))
+    summary = (f"README-Sync ({SOURCE} {old_commit} -> {new_marker.commit}): {todo} Block/Bloecke zu "
+               f"uebersetzen, {kept} unveraendert uebernommen, {len(en.chunks) - kept} ersetzt oder geloescht.")
+    if not todo:
+        print(summary + " Kein KI-Auftrag; apply schreibt ohne KI.")
         return 0
-    task = build_task(regions, old_de, new_de, en)
+    task = build_task(items, old_de, new_de, en)
     (run / "task.md").write_text(task, encoding="utf-8")
-    print(f"README-Sync: {len(changed)} Aenderung(en), {blocks} Block/Bloecke zu uebersetzen "
-          f"({SOURCE} {old_commit} -> {new_commit}).")
+    print(summary)
     print()
     print(task)
     return 0
@@ -483,29 +577,24 @@ def rewrite_links(text: str, root: Path, warnings: list[str]) -> str:
     return LINK.sub(repl, text)
 
 
-def verify(snapshot: Doc, regions: list[list], new_de: Doc, final_text: str, commit: str) -> list[str]:
-    """Gate: ausserhalb der geaenderten Bloecke kein Byte anders; Sync-Stand gesetzt."""
-    final, marker = split_marker(parse(final_text))
-    if marker != commit:
-        return [f"Sync-Stand in {TARGET} ist {marker!r}, erwartet {commit!r}"]
+def verify(snapshot: Doc, items: list[dict], new_de: Doc, final_text: str, marker: Marker) -> list[str]:
+    """Gate: jeder nicht uebersetzte Block Byte fuer Byte wie vorher; Sync-Stand gesetzt."""
+    final, found = split_marker(parse(final_text))
+    if found != marker:
+        return [f"Sync-Stand in {TARGET} ist {found.line() if found else None!r}, erwartet {marker.line()!r}"]
     if final.prefix != snapshot.prefix:
         return [f"{TARGET}: Text vor dem ersten Block geaendert"]
-    pos = 0
-    for tag, i1, i2, j1, j2 in regions:
-        if tag == "equal":
-            for i in range(i1, i2):
-                if pos >= len(final.chunks) or final.chunks[pos].raw != snapshot.chunks[i].raw:
-                    got = first_line(final.chunks[pos].body) if pos < len(final.chunks) else "(Dateiende)"
-                    return [f"{TARGET} Block {pos + 1} weicht ausserhalb der geaenderten Abschnitte ab "
-                            f"(erwartet {first_line(snapshot.chunks[i].body)!r}, gefunden {got!r})"]
-                pos += 1
-        else:
-            for j in range(j1, j2):
-                if pos >= len(final.chunks) or kind(final.chunks[pos].body) != kind(new_de.chunks[j].body):
-                    return [f"{TARGET} Block {pos + 1}: erwartet die Uebersetzung von {SOURCE} Block {j + 1}"]
-                pos += 1
-    if pos != len(final.chunks):
-        return [f"{TARGET} hat {len(final.chunks) - pos} Block/Bloecke mehr als erwartet"]
+    if len(final.chunks) != len(items):
+        return [f"{TARGET} hat {len(final.chunks)} Bloecke, erwartet {len(items)}"]
+    for k, item in enumerate(items):
+        got = final.chunks[k]
+        if "keep" in item:
+            want = snapshot.chunks[item["keep"]]
+            if got.raw != want.raw:
+                return [f"{TARGET} Block {k + 1} weicht ausserhalb der geaenderten Abschnitte ab "
+                        f"(erwartet {first_line(want.body)!r}, gefunden {first_line(got.body)!r})"]
+        elif kind(got.body) != kind(new_de.chunks[k].body):
+            return [f"{TARGET} Block {k + 1}: erwartet die Uebersetzung von {SOURCE} Block {k + 1}"]
     return []
 
 
@@ -522,7 +611,8 @@ def cmd_apply(root: Path, state: Path, translations_arg: str) -> int:
     plan = json.loads((run / "plan.json").read_text(encoding="utf-8"))
     snapshot_text = (run / "snapshot-README.md").read_text(encoding="utf-8")
     source_text = (run / "source-README.de.md").read_text(encoding="utf-8")
-    regions, new_commit = plan["regions"], plan["new_commit"]
+    items = plan["items"]
+    new_marker = Marker(plan["new_marker"]["commit"], plan["new_marker"]["hash"])
     snapshot, _ = split_marker(parse(snapshot_text))
     new_de = parse(source_text)
     warnings = [f"Fester Baustein `{n}` in {SOURCE} geaendert — in {TARGET} von Hand nachziehen"
@@ -535,87 +625,91 @@ def cmd_apply(root: Path, state: Path, translations_arg: str) -> int:
     if current != snapshot_text:
         warnings.append(f"{TARGET} wurde waehrend des Laufs veraendert — verworfen, aus dem Stand vor dem Lauf neu aufgebaut")
 
-    expected = [j for tag, _i1, _i2, j1, j2 in regions if tag != "equal" for j in range(j1, j2)]
-    changed = [r for r in regions if r[0] != "equal"]
-    if not changed:
+    def restore() -> None:
         if current != snapshot_text:
             (root / TARGET).write_text(snapshot_text, encoding="utf-8")
-        status = "YELLOW" if warnings else "GREEN"
-        for w in warnings:
-            print(f"WARNUNG: {w}")
-        gate(status, "; ".join(warnings) or f"{TARGET} aktuell (Sync-Stand {plan['old_commit']})")
-        return 0
 
-    raw = sys.stdin.read() if translations_arg == "-" else Path(translations_arg).read_text(encoding="utf-8")
-    try:
-        translations = parse_translations(raw)
-    except ValueError as exc:
-        translations, errors = {}, [str(exc)]
-    else:
-        errors = validate(translations, expected, new_de)
-    if errors:
-        if current != snapshot_text:
-            (root / TARGET).write_text(snapshot_text, encoding="utf-8")
-        for e in errors:
-            print(f"FEHLER: {e}")
-        gate("RED", f"Uebersetzung unbrauchbar ({errors[0]}) — {TARGET} unveraendert")
-        return 1
+    expected = [j for j, item in enumerate(items) if item.get("translate")]
+    translations: dict[int, str] = {}
+    if expected:
+        raw = sys.stdin.read() if translations_arg == "-" else Path(translations_arg).read_text(encoding="utf-8")
+        try:
+            translations = parse_translations(raw)
+        except ValueError as exc:
+            errors = [str(exc)]
+        else:
+            errors = validate(translations, expected, new_de)
+        if errors:
+            restore()
+            for e in errors:
+                print(f"FEHLER: {e}")
+            gate("RED", f"Uebersetzung unbrauchbar ({errors[0]}) — {TARGET} unveraendert")
+            return 1
 
     chunks: list[Chunk] = []
-    for tag, i1, i2, j1, j2 in regions:
-        if tag == "equal":
-            chunks.extend(snapshot.chunks[i1:i2])
-            continue
-        for k, j in enumerate(range(j1, j2)):
+    for j, item in enumerate(items):
+        if "keep" in item:
+            chunks.append(snapshot.chunks[item["keep"]])
+        else:
             text = rewrite_links(translations[j + 1], root, warnings)
-            gap = snapshot.chunks[i1 + k].gap if i1 + k < i2 else "\n"
+            template = item.get("template")
+            gap = snapshot.chunks[template].gap if template is not None else "\n"
             chunks.append(Chunk(text + "\n", gap or "\n"))
-    final_text = with_marker(Doc(snapshot.prefix, chunks), new_commit)
-    problems = verify(snapshot, regions, new_de, final_text, new_commit)
+    final_text = with_marker(Doc(snapshot.prefix, chunks), new_marker)
+    problems = verify(snapshot, items, new_de, final_text, new_marker)
     if problems:
-        if current != snapshot_text:
-            (root / TARGET).write_text(snapshot_text, encoding="utf-8")
+        restore()
         gate("RED", problems[0])
         return 1
-    (root / TARGET).write_text(final_text, encoding="utf-8")
+    if final_text != current:
+        (root / TARGET).write_text(final_text, encoding="utf-8")
     (run / "task.md").unlink(missing_ok=True)
 
-    print(f"README-Sync: {len(expected)} Block/Bloecke uebersetzt und eingesetzt, Sync-Stand "
-          f"{plan['old_commit']} -> {new_commit}:")
-    for tag, i1, i2, j1, j2 in changed:
-        print(f"- {tag}: {SOURCE} Block {j1 + 1}-{j2} (vorher {TARGET} Block {i1 + 1}-{i2})")
+    kept = sum(1 for it in items if "keep" in it)
+    print(f"README-Sync: {len(expected)} Block/Bloecke uebersetzt, {kept} unveraendert uebernommen, "
+          f"{len(snapshot.chunks) - kept} ersetzt oder geloescht; Sync-Stand {plan['old_commit']} -> {new_marker.commit}")
+    for j in expected:
+        print(f"- uebersetzt: {SOURCE} Block {j + 1}")
     for w in warnings:
         print(f"WARNUNG: {w}")
-    status = "YELLOW" if warnings else "GREEN"
-    gate(status, "; ".join(warnings) if warnings else
-         f"{len(expected)} Block/Bloecke uebersetzt, ausserhalb kein Byte geaendert")
+    gate("YELLOW" if warnings else "GREEN", "; ".join(warnings) if warnings else
+         f"{len(expected)} Block/Bloecke uebersetzt, jeder andere Block Byte fuer Byte wie vorher")
     return 0
 
 
 # --------------------------------------------------------------------------- check / mark
 
 
-def cmd_check(root: Path) -> int:
-    en, commit = split_marker(parse((root / TARGET).read_text(encoding="utf-8")))
-    de = parse((root / SOURCE).read_text(encoding="utf-8"))
-    if not commit:
-        print(f"{TARGET}: kein Sync-Stand (`{MARKER_FMT.format('<commit>')}` als letzte Zeile)")
+def cmd_check(root: Path, current: bool) -> int:
+    en, marker = split_marker(parse((root / TARGET).read_text(encoding="utf-8")))
+    if not marker:
+        print(f"{TARGET}: kein Sync-Stand (`<!-- synced-from: … -->` als letzte Zeile). {MARK_HINT}.")
         return 1
+    source_text = (root / SOURCE).read_text(encoding="utf-8")
     try:
-        check_parallel(de, en, SOURCE)
+        commit, synced_text = resolve_synced_source(root, marker)
+        check_parallel(parse(synced_text), en, f"{SOURCE}@{commit}")
     except PreconditionError as exc:
         print(str(exc))
         return 1
-    print(f"ok: {TARGET} und {SOURCE} laufen Block fuer Block gleich ({len(de.chunks)} Bloecke), "
-          f"Sync-Stand {commit}")
+    if current and sha256(synced_text) != sha256(source_text):
+        print(f"{TARGET} gibt {SOURCE}@{commit} wieder, {SOURCE} hat sich seitdem geaendert — "
+              f"erst den Workflow \"README DE<->EN Sync\" laufen lassen (oder von Hand angleichen und `mark`).")
+        return 1
+    print(f"ok: {TARGET} laeuft Block fuer Block mit {SOURCE}@{commit} gleich ({len(en.chunks)} Bloecke)"
+          + ("" if sha256(synced_text) == sha256(source_text) else f"; {SOURCE} seitdem geaendert"))
     return 0
 
 
 def cmd_mark(root: Path, commit: str | None) -> int:
-    sha = git(root, "rev-parse", "--short=12", f"{commit}^{{commit}}").strip() if commit else source_commit(root)
+    sha = short(root, f"{commit}^{{commit}}") if commit else source_commit(root)
+    text = show_source(root, sha)
+    if text is None:
+        raise PreconditionError(f"{SOURCE} fehlt in {sha}")
     en, _ = split_marker(parse((root / TARGET).read_text(encoding="utf-8")))
-    (root / TARGET).write_text(with_marker(en, sha), encoding="utf-8")
-    print(f"{TARGET}: Sync-Stand {sha}")
+    marker = Marker(sha, sha256(text))
+    (root / TARGET).write_text(with_marker(en, marker), encoding="utf-8")
+    print(f"{TARGET}: {marker.line()}")
     return 0
 
 
@@ -628,14 +722,16 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("has-work")
     p_apply = sub.add_parser("apply")
     p_apply.add_argument("--translations", required=True, help="Antwort der KI (Datei oder -)")
-    sub.add_parser("check")
+    p_check = sub.add_parser("check")
+    p_check.add_argument("--current", action="store_true",
+                         help="zusaetzlich: der Sync-Stand ist die aktuelle README.de.md")
     p_mark = sub.add_parser("mark")
     p_mark.add_argument("--commit")
     args = ap.parse_args(argv)
     try:
         root = repo_root(args.root)
         if args.cmd == "check":
-            return cmd_check(root)
+            return cmd_check(root, args.current)
         if args.cmd == "mark":
             return cmd_mark(root, args.commit)
         state = state_dir(root, args.state)

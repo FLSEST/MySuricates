@@ -771,7 +771,9 @@ The script:
    the last handed-over release, the links point to the public repo) and commits `Release <tag>`.
 5. Checks exactly this commit: fidelity (every file has the same blob and mode as in the tag,
    nothing else apart from `release-notes/`), `public-hygiene.sh --tracked`,
-   `pool-neutrality.sh`, gitleaks (if installed), the docs gates (`pre-push-checks.sh --tree`),
+   `pool-neutrality.sh`, the README sync state (`readme_sync.py check --current`: `README.md`
+   reflects the tag's `README.de.md` — in the public repo it resolves only via the content hash in
+   the marker, so run the sync before tagging), gitleaks (if installed), the docs gates (`pre-push-checks.sh --tree`),
    with `--with-build` also `mvn test` plus `npm ci` (only without `node_modules`),
    `tsc --noEmit` and `npm run lint`. Any finding takes the commit back; the target is as before.
 6. Sets the annotated tag and ends with the diff statistics, the gate summary, the lines
