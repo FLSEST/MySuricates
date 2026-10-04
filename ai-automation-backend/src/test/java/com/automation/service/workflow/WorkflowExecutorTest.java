@@ -202,7 +202,8 @@ class WorkflowExecutorTest {
                         new RunIfGate(commandExecutorService)),
                 new RunFinalizer(runRepository, broadcaster, eventPublisher),
                 runWorkspaceService,
-                new RunAdmission(ModuleRegistry.of(Map.of(), Map.of()), new WorkflowDefinitionHasher(), new WorkflowSealVerifier(new WorkflowDefinitionHasher(), org.mockito.Mockito.mock(WorkflowSkillPins.class), RunAdmissionTest.unsignedSigner(), ModuleRegistry.of(Map.of(), Map.of())), workflowVersionService, activityLogService)
+                new RunAdmission(ModuleRegistry.of(Map.of(), Map.of()), new WorkflowDefinitionHasher(), new WorkflowSealVerifier(new WorkflowDefinitionHasher(), org.mockito.Mockito.mock(WorkflowSkillPins.class), RunAdmissionTest.unsignedSigner(), ModuleRegistry.of(Map.of(), Map.of())), workflowVersionService, activityLogService,
+                        new com.automation.service.workflow.analyzer.WorkflowAnalyzer())
         );
     }
 
@@ -1347,7 +1348,8 @@ class WorkflowExecutorTest {
                         new RunIfGate(commandExecutorService)),
                 new RunFinalizer(runRepository, broadcaster, eventPublisher),
                 runWorkspaceService,
-                new RunAdmission(ModuleRegistry.of(Map.of(), Map.of()), new WorkflowDefinitionHasher(), new WorkflowSealVerifier(new WorkflowDefinitionHasher(), org.mockito.Mockito.mock(WorkflowSkillPins.class), RunAdmissionTest.unsignedSigner(), ModuleRegistry.of(Map.of(), Map.of())), workflowVersionService, activityLogService)
+                new RunAdmission(ModuleRegistry.of(Map.of(), Map.of()), new WorkflowDefinitionHasher(), new WorkflowSealVerifier(new WorkflowDefinitionHasher(), org.mockito.Mockito.mock(WorkflowSkillPins.class), RunAdmissionTest.unsignedSigner(), ModuleRegistry.of(Map.of(), Map.of())), workflowVersionService, activityLogService,
+                        new com.automation.service.workflow.analyzer.WorkflowAnalyzer())
         );
     }
 

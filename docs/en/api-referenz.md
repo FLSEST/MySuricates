@@ -52,6 +52,7 @@ translates the key instead of the code.
 | `SKILL_PINNED_BY_SEAL` | 409 |
 | `SEAL_IMMUTABLE` | 403 |
 | `UNATTENDED_REQUIRES_SEAL` | 403 |
+| `UNATTENDED_PLATFORM_ACCESS` | 403 |
 | `WEBHOOK_SIGNATURE_INVALID` | 401 |
 | `NO_TASK_TARGET` | 400 |
 | `PROVIDER_NOT_CONNECTED` | 409 |
@@ -592,7 +593,7 @@ Execute a workflow.
 }
 ```
 
-`definitionHash`/`definitionVersionId` are `null` when `automation.hardening.provenance` is off. `chainRunId` names the chain run that started the run as one of its entries (`triggerSource: CHAIN`, after a resume `RESUME`), otherwise `null` — also for retries and sub-workflows, which only inherit `{{ chain_run_id }}` with the context; runs from before V89 have none. `chainId` names the chain of that chain run (for the link `/chains?chain=<id>`, 3a35ced1), otherwise `null` – also when the chain run is gone; only the detail response carries it, older backends omit it. Refused starts create no run: `409 WORKFLOW_TAMPERED` (sealed definition modified), `403 UNATTENDED_REQUIRES_SEAL` (unattended triggers only).
+`definitionHash`/`definitionVersionId` are `null` when `automation.hardening.provenance` is off. `chainRunId` names the chain run that started the run as one of its entries (`triggerSource: CHAIN`, after a resume `RESUME`), otherwise `null` — also for retries and sub-workflows, which only inherit `{{ chain_run_id }}` with the context; runs from before V89 have none. `chainId` names the chain of that chain run (for the link `/chains?chain=<id>`, 3a35ced1), otherwise `null` – also when the chain run is gone; only the detail response carries it, older backends omit it. Refused starts create no run: `409 WORKFLOW_TAMPERED` (sealed definition modified), `403 UNATTENDED_REQUIRES_SEAL` (unattended triggers only), `403 UNATTENDED_PLATFORM_ACCESS` (unattended trigger, definition with a `HIGH` finding `self-api-call`/`direct-db-access`).
 
 ### `GET /api/v1/workflows/{id}/runs`
 
@@ -1689,7 +1690,7 @@ curl -X POST "$URL" -H 'Content-Type: application/json' -H "X-Signature: sha256=
 ```
 
 With `automation.hardening.require-sealed-for-unattended` a webhook only starts sealed workflows (otherwise
-`403 UNATTENDED_REQUIRES_SEAL`).
+`403 UNATTENDED_REQUIRES_SEAL`). A workflow that accesses the platform itself (`HIGH` finding `self-api-call`/`direct-db-access`) is never started by a webhook (`403 UNATTENDED_PLATFORM_ACCESS`).
 
 **Response:** `WorkflowRunResponse`
 

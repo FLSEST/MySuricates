@@ -10,6 +10,7 @@ import com.automation.exception.ErrorMessage;
 import com.automation.exception.HardeningException;
 import com.automation.modules.ModuleRegistry;
 import com.automation.service.activitylog.ActivityLogService;
+import com.automation.service.workflow.analyzer.WorkflowAnalyzer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -57,7 +58,7 @@ class RunAdmissionTest {
         String hash = hasher.hash(wf);
         when(versionService.findVersionIdByHash("wf-1", hash)).thenReturn(Optional.of("ver-7"));
 
-        RunAdmission.Ticket ticket = new RunAdmission(ModuleRegistry.of(Map.of(), Map.of()), hasher, new WorkflowSealVerifier(hasher, skillPins, unsignedSigner(), ModuleRegistry.of(Map.of(), Map.of())), versionService, activityLog)
+        RunAdmission.Ticket ticket = new RunAdmission(ModuleRegistry.of(Map.of(), Map.of()), hasher, new WorkflowSealVerifier(hasher, skillPins, unsignedSigner(), ModuleRegistry.of(Map.of(), Map.of())), versionService, activityLog, new WorkflowAnalyzer())
                 .admit(wf, TriggerSource.SCHEDULE, Map.of());
 
         assertThat(ticket.definitionHash()).isEqualTo(hash);
@@ -68,7 +69,7 @@ class RunAdmissionTest {
     void hashWithoutVersionWhenNoRowMatches() {
         when(versionService.findVersionIdByHash(anyString(), anyString())).thenReturn(Optional.empty());
 
-        RunAdmission.Ticket ticket = new RunAdmission(ModuleRegistry.allEnabled(), hasher, new WorkflowSealVerifier(hasher, skillPins, unsignedSigner(), ModuleRegistry.of(Map.of(), Map.of())), versionService, activityLog)
+        RunAdmission.Ticket ticket = new RunAdmission(ModuleRegistry.allEnabled(), hasher, new WorkflowSealVerifier(hasher, skillPins, unsignedSigner(), ModuleRegistry.of(Map.of(), Map.of())), versionService, activityLog, new WorkflowAnalyzer())
                 .admit(workflow(), TriggerSource.MANUAL, Map.of());
 
         assertThat(ticket.definitionHash()).hasSize(64);
@@ -78,7 +79,7 @@ class RunAdmissionTest {
     @Test
     void recordsNothingWhenProvenanceIsOff() {
         RunAdmission admission = new RunAdmission(
-                ModuleRegistry.of(Map.of(), Map.of("provenance", "false")), hasher, new WorkflowSealVerifier(hasher, skillPins, unsignedSigner(), ModuleRegistry.of(Map.of(), Map.of())), versionService, activityLog);
+                ModuleRegistry.of(Map.of(), Map.of("provenance", "false")), hasher, new WorkflowSealVerifier(hasher, skillPins, unsignedSigner(), ModuleRegistry.of(Map.of(), Map.of())), versionService, activityLog, new WorkflowAnalyzer());
 
         RunAdmission.Ticket ticket = admission.admit(workflow(), TriggerSource.MANUAL, Map.of());
 
@@ -91,7 +92,7 @@ class RunAdmissionTest {
         Workflow broken = Workflow.builder().id("wf-x").blocks(new ArrayList<>()).activatedSkills(null).build();
         when(versionService.findVersionIdByHash(anyString(), any())).thenThrow(new IllegalStateException("db down"));
 
-        RunAdmission.Ticket ticket = new RunAdmission(ModuleRegistry.of(Map.of(), Map.of()), hasher, new WorkflowSealVerifier(hasher, skillPins, unsignedSigner(), ModuleRegistry.of(Map.of(), Map.of())), versionService, activityLog)
+        RunAdmission.Ticket ticket = new RunAdmission(ModuleRegistry.of(Map.of(), Map.of()), hasher, new WorkflowSealVerifier(hasher, skillPins, unsignedSigner(), ModuleRegistry.of(Map.of(), Map.of())), versionService, activityLog, new WorkflowAnalyzer())
                 .admit(broken, TriggerSource.WEBHOOK, Map.of());
 
         assertThat(ticket.definitionHash()).isNull();
@@ -103,7 +104,7 @@ class RunAdmissionTest {
         wf.setSealed(true);
         wf.setSealedHash(hasher.hash(wf));
 
-        RunAdmission.Ticket ticket = new RunAdmission(ModuleRegistry.of(Map.of(), Map.of("provenance", "false")), hasher, new WorkflowSealVerifier(hasher, skillPins, unsignedSigner(), ModuleRegistry.of(Map.of(), Map.of())), versionService, activityLog)
+        RunAdmission.Ticket ticket = new RunAdmission(ModuleRegistry.of(Map.of(), Map.of("provenance", "false")), hasher, new WorkflowSealVerifier(hasher, skillPins, unsignedSigner(), ModuleRegistry.of(Map.of(), Map.of())), versionService, activityLog, new WorkflowAnalyzer())
                 .admit(wf, TriggerSource.SCHEDULE, Map.of());
 
         assertThat(ticket.definitionHash()).isNull(); // provenance off — but the seal was still verified
@@ -115,7 +116,7 @@ class RunAdmissionTest {
         Workflow wf = workflow();
         wf.setSealed(true);
         wf.setSealedHash("0".repeat(64));
-        RunAdmission admission = new RunAdmission(ModuleRegistry.of(Map.of(), Map.of("provenance", "false")), hasher, new WorkflowSealVerifier(hasher, skillPins, unsignedSigner(), ModuleRegistry.of(Map.of(), Map.of())), versionService, activityLog);
+        RunAdmission admission = new RunAdmission(ModuleRegistry.of(Map.of(), Map.of("provenance", "false")), hasher, new WorkflowSealVerifier(hasher, skillPins, unsignedSigner(), ModuleRegistry.of(Map.of(), Map.of())), versionService, activityLog, new WorkflowAnalyzer());
 
         assertThatThrownBy(() -> admission.admit(wf, TriggerSource.WEBHOOK, Map.of()))
                 .isInstanceOf(HardeningException.class)
@@ -137,7 +138,7 @@ class RunAdmissionTest {
 
     private RunAdmission policyOn() {
         return new RunAdmission(ModuleRegistry.of(Map.of(),
-                Map.of("sealing", "true", "require-sealed-for-unattended", "true")), hasher, new WorkflowSealVerifier(hasher, skillPins, unsignedSigner(), ModuleRegistry.of(Map.of(), Map.of())), versionService, activityLog);
+                Map.of("sealing", "true", "require-sealed-for-unattended", "true")), hasher, new WorkflowSealVerifier(hasher, skillPins, unsignedSigner(), ModuleRegistry.of(Map.of(), Map.of())), versionService, activityLog, new WorkflowAnalyzer());
     }
 
     @Test
@@ -171,7 +172,7 @@ class RunAdmissionTest {
     void policyOffLetsUnattendedRunsOfUnsealedWorkflowsThrough() {
         when(versionService.findVersionIdByHash(anyString(), anyString())).thenReturn(Optional.empty());
 
-        new RunAdmission(ModuleRegistry.of(Map.of(), Map.of()), hasher, new WorkflowSealVerifier(hasher, skillPins, unsignedSigner(), ModuleRegistry.of(Map.of(), Map.of())), versionService, activityLog)
+        new RunAdmission(ModuleRegistry.of(Map.of(), Map.of()), hasher, new WorkflowSealVerifier(hasher, skillPins, unsignedSigner(), ModuleRegistry.of(Map.of(), Map.of())), versionService, activityLog, new WorkflowAnalyzer())
                 .admit(workflow(), TriggerSource.TODO_TRIGGER, Map.of());
 
         verifyNoInteractions(activityLog);
@@ -199,7 +200,7 @@ class RunAdmissionTest {
         Workflow spy = org.mockito.Mockito.spy(broken);
         org.mockito.Mockito.doThrow(new IllegalStateException("lazy")).when(spy).getActivatedSkills();
 
-        assertThatThrownBy(() -> new RunAdmission(ModuleRegistry.allEnabled(), hasher, new WorkflowSealVerifier(hasher, skillPins, unsignedSigner(), ModuleRegistry.of(Map.of(), Map.of())), versionService, activityLog)
+        assertThatThrownBy(() -> new RunAdmission(ModuleRegistry.allEnabled(), hasher, new WorkflowSealVerifier(hasher, skillPins, unsignedSigner(), ModuleRegistry.of(Map.of(), Map.of())), versionService, activityLog, new WorkflowAnalyzer())
                 .admit(spy, TriggerSource.MANUAL, Map.of()))
                 .isInstanceOf(HardeningException.class)
                 .hasMessageContaining("could not be verified");
@@ -218,7 +219,7 @@ class RunAdmissionTest {
         Workflow sealed = sealedWithPins(Map.of("skill-a", "h1"));
         when(skillPins.pins(sealed)).thenReturn(Map.of("skill-a", "h1"));
 
-        new RunAdmission(ModuleRegistry.of(Map.of(), Map.of("provenance", "false")), hasher, new WorkflowSealVerifier(hasher, skillPins, unsignedSigner(), ModuleRegistry.of(Map.of(), Map.of())), versionService, activityLog)
+        new RunAdmission(ModuleRegistry.of(Map.of(), Map.of("provenance", "false")), hasher, new WorkflowSealVerifier(hasher, skillPins, unsignedSigner(), ModuleRegistry.of(Map.of(), Map.of())), versionService, activityLog, new WorkflowAnalyzer())
                 .admit(sealed, TriggerSource.SCHEDULE, Map.of());
 
         verifyNoInteractions(activityLog);
@@ -229,7 +230,7 @@ class RunAdmissionTest {
         Workflow sealed = sealedWithPins(Map.of("skill-a", "h1", "skill-b", "h2"));
         when(skillPins.pins(sealed)).thenReturn(Map.of("skill-a", "h1", "skill-b", "tampered"));
 
-        assertThatThrownBy(() -> new RunAdmission(ModuleRegistry.allEnabled(), hasher, new WorkflowSealVerifier(hasher, skillPins, unsignedSigner(), ModuleRegistry.of(Map.of(), Map.of())), versionService, activityLog)
+        assertThatThrownBy(() -> new RunAdmission(ModuleRegistry.allEnabled(), hasher, new WorkflowSealVerifier(hasher, skillPins, unsignedSigner(), ModuleRegistry.of(Map.of(), Map.of())), versionService, activityLog, new WorkflowAnalyzer())
                 .admit(sealed, TriggerSource.MANUAL, Map.of()))
                 .isInstanceOf(HardeningException.class)
                 .satisfies(e -> assertThat(((HardeningException) e).getCode()).isEqualTo(ErrorCode.WORKFLOW_TAMPERED))
@@ -248,7 +249,7 @@ class RunAdmissionTest {
         Workflow sealed = sealedWithPins(Map.of("skill-a", "h1"));
         when(skillPins.pins(sealed)).thenReturn(Map.of("skill-a", WorkflowSkillPins.MISSING));
 
-        assertThatThrownBy(() -> new RunAdmission(ModuleRegistry.allEnabled(), hasher, new WorkflowSealVerifier(hasher, skillPins, unsignedSigner(), ModuleRegistry.of(Map.of(), Map.of())), versionService, activityLog)
+        assertThatThrownBy(() -> new RunAdmission(ModuleRegistry.allEnabled(), hasher, new WorkflowSealVerifier(hasher, skillPins, unsignedSigner(), ModuleRegistry.of(Map.of(), Map.of())), versionService, activityLog, new WorkflowAnalyzer())
                 .admit(sealed, TriggerSource.MANUAL, Map.of()))
                 .isInstanceOf(HardeningException.class).hasMessageContaining("skill-a");
     }
@@ -258,7 +259,7 @@ class RunAdmissionTest {
         Workflow sealed = sealedWithPins(Map.of("skill-a", "h1"));
         when(skillPins.pins(sealed)).thenThrow(new IllegalStateException("db down"));
 
-        assertThatThrownBy(() -> new RunAdmission(ModuleRegistry.allEnabled(), hasher, new WorkflowSealVerifier(hasher, skillPins, unsignedSigner(), ModuleRegistry.of(Map.of(), Map.of())), versionService, activityLog)
+        assertThatThrownBy(() -> new RunAdmission(ModuleRegistry.allEnabled(), hasher, new WorkflowSealVerifier(hasher, skillPins, unsignedSigner(), ModuleRegistry.of(Map.of(), Map.of())), versionService, activityLog, new WorkflowAnalyzer())
                 .admit(sealed, TriggerSource.MANUAL, Map.of()))
                 .isInstanceOf(HardeningException.class).hasMessageContaining("skills could not be verified");
     }
@@ -269,7 +270,7 @@ class RunAdmissionTest {
         legacy.setSealed(true);
         legacy.setSealedHash(hasher.hash(legacy));
 
-        new RunAdmission(ModuleRegistry.of(Map.of(), Map.of("provenance", "false")), hasher, new WorkflowSealVerifier(hasher, skillPins, unsignedSigner(), ModuleRegistry.of(Map.of(), Map.of())), versionService, activityLog)
+        new RunAdmission(ModuleRegistry.of(Map.of(), Map.of("provenance", "false")), hasher, new WorkflowSealVerifier(hasher, skillPins, unsignedSigner(), ModuleRegistry.of(Map.of(), Map.of())), versionService, activityLog, new WorkflowAnalyzer())
                 .admit(legacy, TriggerSource.MANUAL, Map.of());
 
         verifyNoInteractions(skillPins, activityLog);
@@ -282,7 +283,7 @@ class RunAdmissionTest {
         when(versionService.findVersionIdByHash(anyString(), anyString())).thenReturn(Optional.empty());
 
         RunAdmission.Ticket ticket = new RunAdmission(ModuleRegistry.allEnabled(), hasher,
-                new WorkflowSealVerifier(hasher, skillPins, unsignedSigner(), ModuleRegistry.of(Map.of(), Map.of())), versionService, activityLog)
+                new WorkflowSealVerifier(hasher, skillPins, unsignedSigner(), ModuleRegistry.of(Map.of(), Map.of())), versionService, activityLog, new WorkflowAnalyzer())
                 .admit(sealed, TriggerSource.SCHEDULE, Map.of());
 
         assertThat(ticket.sealed()).isTrue();
@@ -295,7 +296,7 @@ class RunAdmissionTest {
         when(versionService.findVersionIdByHash(anyString(), anyString())).thenReturn(Optional.empty());
 
         RunAdmission.Ticket ticket = new RunAdmission(ModuleRegistry.allEnabled(), hasher,
-                new WorkflowSealVerifier(hasher, skillPins, unsignedSigner(), ModuleRegistry.of(Map.of(), Map.of())), versionService, activityLog)
+                new WorkflowSealVerifier(hasher, skillPins, unsignedSigner(), ModuleRegistry.of(Map.of(), Map.of())), versionService, activityLog, new WorkflowAnalyzer())
                 .admit(workflow(), TriggerSource.MANUAL, Map.of());
 
         assertThat(ticket.sealed()).isFalse();
@@ -310,7 +311,7 @@ class RunAdmissionTest {
 
     private RunAdmission admissionWith(WorkflowSealSigner signer, ModuleRegistry registry) {
         return new RunAdmission(registry, hasher, new WorkflowSealVerifier(hasher, skillPins, signer, registry),
-                versionService, activityLog);
+                versionService, activityLog, new WorkflowAnalyzer());
     }
 
     @Test
@@ -354,5 +355,83 @@ class RunAdmissionTest {
                 .admit(sealed, TriggerSource.MANUAL, Map.of()))
                 .isInstanceOf(HardeningException.class)
                 .hasMessageContaining("no signature");
+    }
+
+    // --- e7e93fba: unattended runs of definitions that reach into the platform itself ---
+
+    private RunAdmission defaults() {
+        return new RunAdmission(ModuleRegistry.of(Map.of(), Map.of("provenance", "false")), hasher,
+                new WorkflowSealVerifier(hasher, skillPins, unsignedSigner(), ModuleRegistry.of(Map.of(), Map.of())),
+                versionService, activityLog, new WorkflowAnalyzer());
+    }
+
+    private static Workflow withBlocks(BlockDefinition... blocks) {
+        return Workflow.builder().id("wf-1").name("Deploy").blocks(new ArrayList<>(List.of(blocks)))
+                .activatedSkills(new ArrayList<>()).build();
+    }
+
+    private static BlockDefinition shell(String name, String command) {
+        return BlockDefinition.builder().type("shell").name(name).config(new java.util.HashMap<>(Map.of("command", command))).build();
+    }
+
+    private static Workflow selfApiCaller() {
+        return withBlocks(shell("ok", "make"),
+                shell("fetch", "curl -s -H \"X-API-Key: $(cat ~/.mysuricates/api-key)\" http://localhost:9090/api/v1/todos"));
+    }
+
+    @Test
+    void unattendedRunWithSelfApiCallIsRefusedAndLoggedAsSecurity() {
+        assertThatThrownBy(() -> defaults().admit(selfApiCaller(), TriggerSource.SCHEDULE, Map.of()))
+                .isInstanceOf(HardeningException.class)
+                .satisfies(e -> assertThat(((HardeningException) e).getCode()).isEqualTo(ErrorCode.UNATTENDED_PLATFORM_ACCESS))
+                .satisfies(e -> assertThat(((HardeningException) e).getParams()).isEqualTo(
+                        Map.of("name", "Deploy", "origin", "SCHEDULE", "rule", "self-api-call", "block", "2")))
+                .hasMessageContaining("self-api-call in block 2");
+        verify(activityLog).logRefusal(eq(LogLevel.WARN), eq(LogCategory.SECURITY), anyString(), eq("RunAdmission"), eq("wf-1"),
+                argThat(meta -> "SCHEDULE".equals(meta.get("effectiveSource"))
+                        && "UNATTENDED_PLATFORM_ACCESS".equals(meta.get("errorCode"))
+                        && meta.get("findings") instanceof List<?> findings && findings.size() == 1),
+                eq("wf-1"));
+    }
+
+    @Test
+    void everyUnattendedSourceIsRefused_directDbAccessToo() {
+        Workflow db = withBlocks(shell("db", "sqlite3 data/automation.db 'SELECT value FROM app_settings'"));
+        for (TriggerSource source : List.of(TriggerSource.WEBHOOK, TriggerSource.TODO_TRIGGER,
+                TriggerSource.COMPLETION_TRIGGER, TriggerSource.AUTO_REPAIR, TriggerSource.AUTO_RESUME, TriggerSource.WISH)) {
+            assertThatThrownBy(() -> defaults().admit(db, source, Map.of())).as(source.name())
+                    .isInstanceOf(HardeningException.class)
+                    .satisfies(e -> assertThat(((HardeningException) e).getParams()).containsEntry("rule", "direct-db-access"));
+        }
+        // a chain or sub-workflow inherits its origin — unattended or unknown counts as unattended
+        assertThatThrownBy(() -> defaults().admit(db, TriggerSource.CHAIN,
+                Map.of(TriggerSource.PARENT_CONTEXT_KEY, "SCHEDULE"))).isInstanceOf(HardeningException.class);
+        assertThatThrownBy(() -> defaults().admit(db, TriggerSource.SUB_WORKFLOW, Map.of()))
+                .isInstanceOf(HardeningException.class)
+                .satisfies(e -> assertThat(((HardeningException) e).getParams()).containsEntry("origin", "unknown"));
+    }
+
+    @Test
+    void aPersonMayStillStartIt() {
+        for (TriggerSource source : List.of(TriggerSource.MANUAL, TriggerSource.RETRY, TriggerSource.RESUME,
+                TriggerSource.TODO_RESOLUTION, TriggerSource.ASSISTANT)) {
+            assertThat(defaults().admit(selfApiCaller(), source, Map.of())).as(source.name()).isNotNull();
+        }
+        assertThat(defaults().admit(selfApiCaller(), TriggerSource.CHAIN,
+                Map.of(TriggerSource.PARENT_CONTEXT_KEY, "MANUAL"))).isNotNull();
+        verifyNoInteractions(activityLog);
+    }
+
+    @Test
+    void mediumFindingsAndOtherRulesDoNotStopUnattendedRuns() {
+        Workflow prompt = withBlocks(BlockDefinition.builder().type("simple").name("p").config(new java.util.HashMap<>(Map.of(
+                "command", "Hole die TODOs mit curl http://localhost:9090/api/v1/todos"))).build());
+        Workflow probe = withBlocks(shell("health", "curl -sf http://localhost:9090/api/v1/system/health"));
+        Workflow projectDb = withBlocks(shell("own", "sqlite3 app/local.db '.tables'"));
+
+        for (Workflow wf : List.of(prompt, probe, projectDb, workflow())) {
+            assertThat(defaults().admit(wf, TriggerSource.SCHEDULE, Map.of())).isNotNull();
+        }
+        verifyNoInteractions(activityLog);
     }
 }

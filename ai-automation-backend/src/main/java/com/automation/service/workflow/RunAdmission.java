@@ -25,7 +25,10 @@ import java.util.List;
  * <p>Rules, in order: a sealed definition must match its seal, and so must the content of every
  * skill it uses (always); with
  * {@code automation.hardening.require-sealed-for-unattended} an unattended run — or a chain /
- * sub-workflow run whose origin is unattended or unknown — needs a sealed workflow.
+ * sub-workflow run whose origin is unattended or unknown — needs a sealed workflow; an unattended
+ * run of a definition that reaches into the platform itself (analyzer rules {@code self-api-call} /
+ * {@code direct-db-access} at {@code HIGH}) is refused (always, TODO e7e93fba). Saving such a
+ * definition stays allowed and a person may still start it.
  */
 @Slf4j
 @Component
@@ -48,6 +51,7 @@ public class RunAdmission {
     private final WorkflowSealVerifier sealVerifier;
     private final WorkflowVersionService versionService;
     private final ActivityLogService activityLog;
+    private final PlatformAccessCheck platformAccess;
 
     public Ticket admit(Workflow workflow, TriggerSource source, Map<String, Object> inputContext) {
         // Seals are checked regardless of the switches: a seal must not lapse because a flag changed.
@@ -55,6 +59,7 @@ public class RunAdmission {
         if (!workflow.isSealed() && modules.isEnabled(ModuleCatalog.REQUIRE_SEALED_FOR_UNATTENDED)) {
             requireAttended(workflow, source, inputContext);
         }
+        refusePlatformAccessWhenUnattended(workflow, source, inputContext);
         Boolean sealed = workflow.isSealed();
         String pins = verdict != null && verdict.pins() != null ? WorkflowSkillPins.toJson(verdict.pins()) : null;
         if (!modules.isEnabled(ModuleCatalog.PROVENANCE)) {
@@ -72,12 +77,53 @@ public class RunAdmission {
         }
     }
 
-    private void requireAttended(Workflow workflow, TriggerSource source, Map<String, Object> inputContext) {
+    /** The effective origin when nobody started the run — {@code "unknown"} counts as unattended — else null. */
+    private static String unattendedOrigin(TriggerSource source, Map<String, Object> inputContext) {
         TriggerSource effective = source.effective(inputContext);
         if (effective != null && !effective.unattended()) {
+            return null;
+        }
+        return effective != null ? effective.name() : "unknown";
+    }
+
+    /**
+     * A shell block that calls the instance's REST API or reads its database holds the API key in plain
+     * text and bypasses context injection; unattended, nobody would notice (TODO e7e93fba). Pattern rules
+     * only — no AI call, no database — so the check costs nothing measurable at run start.
+     */
+    private void refusePlatformAccessWhenUnattended(Workflow workflow, TriggerSource source, Map<String, Object> inputContext) {
+        String origin = unattendedOrigin(source, inputContext);
+        if (origin == null) {
             return;
         }
-        String origin = effective != null ? effective.name() : "unknown";
+        List<PlatformAccessCheck.Violation> findings = platformAccess.unattendedViolations(workflow.getBlocks());
+        if (findings.isEmpty()) {
+            return;
+        }
+        PlatformAccessCheck.Violation first = findings.get(0);
+        String block = String.valueOf(first.blockIndex() + 1);
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("triggerSource", source.name());
+        metadata.put("effectiveSource", origin);
+        metadata.put("findings", findings.stream().map(f -> Map.of(
+                "rule", f.rule(), "block", f.blockIndex() + 1, "detail", f.detail())).toList());
+        HardeningException refusal = new HardeningException(ErrorCode.UNATTENDED_PLATFORM_ACCESS,
+                "Workflow '" + workflow.getName() + "' was not started: unattended runs (" + origin + ") of workflows"
+                        + " that access the platform directly are refused — " + first.rule() + " in block " + block
+                        + ". A person can still start it; better use context variables or the todo blocks",
+                Map.of("name", String.valueOf(workflow.getName()), "origin", origin, "rule", first.rule(), "block", block));
+        activityLog.logRefusal(LogLevel.WARN, LogCategory.SECURITY,
+                "Run refused — unattended run (" + origin + ") of workflow '" + workflow.getName()
+                        + "' with platform access: " + first.rule() + " in block " + block,
+                "RunAdmission", workflow.getId(), translatable(metadata, refusal), workflow.getId());
+        throw refusal;
+    }
+
+    private void requireAttended(Workflow workflow, TriggerSource source, Map<String, Object> inputContext) {
+        String origin = unattendedOrigin(source, inputContext);
+        if (origin == null) {
+            return;
+        }
         Map<String, Object> metadata = new LinkedHashMap<>();
         metadata.put("triggerSource", source.name());
         metadata.put("effectiveSource", origin);

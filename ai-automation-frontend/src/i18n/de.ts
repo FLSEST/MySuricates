@@ -2188,6 +2188,7 @@ export const de: TranslationKeys = {
       SKILL_PINNED_BY_SEAL: 'Skill „{name}“ wird von versiegelten Workflows genutzt ({workflows}) – entsiegle sie zuerst',
       SEAL_IMMUTABLE: 'Workflow „{name}“ lässt sich nicht entsiegeln: automation.hardening.seal-immutable ist eingeschaltet (Startkonfiguration)',
       UNATTENDED_REQUIRES_SEAL: 'Workflow „{name}“ wurde nicht gestartet: unbeaufsichtigte Läufe ({origin}) brauchen einen versiegelten Workflow (automation.hardening.require-sealed-for-unattended)',
+      UNATTENDED_PLATFORM_ACCESS: 'Workflow „{name}“ wurde nicht gestartet: unbeaufsichtigte Läufe ({origin}) von Workflows mit direktem Plattformzugriff sind gesperrt – {rule} in Block {block}. Von Hand starten geht weiter; besser Kontextvariablen oder die todo-Blöcke nutzen.',
       WEBHOOK_SIGNATURE_INVALID: 'Header {header} fehlt oder ist ungültig (erwartet: sha256=<Hex-HMAC-SHA256 des Request-Bodys>)',
       NO_TASK_TARGET: 'Kein Ziel für den Task-Export konfiguriert ({setting})',
       PROVIDER_NOT_TASK_CAPABLE: 'Integration „{provider}“ kann keine Tasks aufnehmen',

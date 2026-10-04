@@ -2,11 +2,13 @@ package com.automation.service.workflow.analyzer;
 
 import com.automation.entity.BlockDefinition;
 import com.automation.entity.Workflow;
+import com.automation.service.workflow.PlatformAccessCheck;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Prüft eine Workflow-Definition deterministisch auf bekannte Baufehler — ohne KI-Aufruf.
@@ -22,6 +24,8 @@ import java.util.Map;
  * speichert der Weg mit, statt sie zu verwerfen; die Detailseite zeigt den Befund nach jedem Speichern und
  * Pool-Install ({@code useWorkflowAnalysis}). Seit TODO 326d5987 läuft er außerdem nach jeder KI-Erzeugung einer Definition
  * ({@link GeneratedWorkflowCheck}): Befunde gehen an die KI zurück oder in das Ergebnis, nie in den Speicherweg.
+ * Einzige Sperre (TODO e7e93fba): {@code RunAdmission} verweigert unbeaufsichtigte Starts bei
+ * {@link #UNATTENDED_REFUSAL_RULES} mit {@code HIGH} — gespeichert und von Hand gestartet wird weiter.
  *
  * <p><b>Was er heute prüft</b> — siebzehn Regeln, jede am Text entscheidbar, eine davon am Text samt
  * den Metadaten der Definition, vier am Block-Config-Schema, das auch der Editor nutzt:
@@ -74,7 +78,31 @@ import java.util.Map;
  * etwa ein Feld in der Definition, das den Gate-Auftrag ausdrücklich macht.
  */
 @Service
-public class WorkflowAnalyzer {
+public class WorkflowAnalyzer implements PlatformAccessCheck {
+
+    /**
+     * Regeln, deren {@code HIGH}-Befund einen unbeaufsichtigten Start verweigert ({@code RunAdmission},
+     * TODO e7e93fba): Speichern bleibt erlaubt, der Analyzer meldet dort nur.
+     */
+    public static final Set<String> UNATTENDED_REFUSAL_RULES = Set.of("self-api-call", "direct-db-access");
+
+    /**
+     * Die {@code HIGH}-Befunde der {@link #UNATTENDED_REFUSAL_RULES}, in Blockreihenfolge — nur die
+     * Plattformzugriffs-Regeln, reine Mustersuche ohne KI und ohne Datenbank, billig genug für jeden
+     * Laufstart.
+     */
+    @Override
+    public List<Violation> unattendedViolations(List<BlockDefinition> blocks) {
+        if (blocks == null || blocks.isEmpty()) {
+            return List.of();
+        }
+        List<AnalyzerFinding> findings = new ArrayList<>();
+        SelfAccessRules.apply(blocks, findings);
+        return findings.stream()
+                .filter(f -> f.severity() == AnalyzerFinding.Severity.HIGH && UNATTENDED_REFUSAL_RULES.contains(f.rule()))
+                .map(f -> new Violation(f.rule(), f.blockIndex(), f.detailEn() != null ? f.detailEn() : f.detail()))
+                .toList();
+    }
 
     /** Befunde einer Definition, schwerste zuerst und innerhalb gleicher Schwere in Blockreihenfolge. */
     public List<AnalyzerFinding> analyze(Workflow workflow) {
