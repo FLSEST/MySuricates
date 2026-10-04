@@ -574,7 +574,7 @@ Executes another workflow as a nested step.
 | `workflow_id` | string | **required** | ID of the workflow to execute; a placeholder from a trusted context variable is allowed (see `foreach` → "Sub-workflow per item") |
 | `workflowId` | string | — | Old spelling of `workflow_id`: still read, will be dropped later. The analyzer reports it as `legacy-config-key` (LOW); if `workflow_id` is set next to it, only `workflow_id` counts |
 
-**Limits**: Maximum nesting depth of 5 levels. Circular references are detected. 30-minute timeout.
+**Limits**: Maximum nesting depth of 5 levels. Circular references are detected. 30-minute timeout. Cancelling the parent run also cancels the child run it is waiting for (likewise for `foreach` with `workflow_id`).
 
 **Context**: The child run gets the parent run's variables and its `{{ previous_output }}`, but not its platform data (`previous_report`, `open_todos`, `request_metrics`, `goal_status`/`goal_guard_*`, `audit_findings`): the platform injects those into the child run itself, computed for it. A value under one of these names is not taken from any other input context either. The parent run's taint travels along.
 

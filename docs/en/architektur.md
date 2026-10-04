@@ -443,7 +443,7 @@ The switch block evaluates an expression against multiple cases:
 - Executes another workflow as a nested block
 - Circular references are detected via `__parent_workflow_ids`
 - Maximum nesting depth: 5 levels
-- Polling-based completion, 30-minute timeout
+- Polling-based completion, 30-minute timeout; a cancelled parent run cancels the child run via `RunControlService.cancelExecution`
 - Start, guards and waiting live in `SubWorkflowLauncher`; `foreach` with `workflow_id` takes the same path per item (TODO a5c9fbbf). `workflow_id` may be a placeholder from a trusted context variable, never from webhook data or block outputs
 - `@Lazy` injection on `WorkflowExecutor` only where a caller starts runs itself (sub-workflow, chains, triggers); pure status queries (active runs, container ids, approvals) go straight to `WorkflowExecutionRegistry`, controlling a running run goes to `RunControlService`, which does not need `WorkflowExecutor`
 

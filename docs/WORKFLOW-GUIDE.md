@@ -585,7 +585,7 @@ Führt einen anderen Workflow als verschachtelten Schritt aus.
 | `workflow_id` | string | **erforderlich** | ID des auszuführenden Workflows; ein Platzhalter aus einer vertrauenswürdigen Kontextvariable ist erlaubt (siehe `foreach` → „Sub-Workflow je Item“) |
 | `workflowId` | string | — | Alte Schreibweise von `workflow_id`: wird noch gelesen, fällt später weg. Der Analyzer meldet sie als `legacy-config-key` (LOW); steht `workflow_id` daneben, gilt nur `workflow_id` |
 
-**Limits**: Maximale Verschachtelungstiefe von 5 Ebenen. Zirkuläre Referenzen werden erkannt. 30-Minuten-Timeout.
+**Limits**: Maximale Verschachtelungstiefe von 5 Ebenen. Zirkuläre Referenzen werden erkannt. 30-Minuten-Timeout. Wird der Eltern-Lauf abgebrochen, bricht er auch den Kind-Lauf ab, auf den er gerade wartet (ebenso bei `foreach` mit `workflow_id`).
 
 **Kontext**: Der Child-Run bekommt die Variablen des Parent-Runs und dessen `{{ previous_output }}`, aber nicht dessen Plattform-Daten (`previous_report`, `open_todos`, `request_metrics`, `goal_status`/`goal_guard_*`, `audit_findings`): Die injiziert die Plattform dem Child-Run selbst, für ihn berechnet. Ein Wert unter einem dieser Namen wird auch aus keinem anderen Eingabe-Kontext übernommen. Der Taint des Parent-Runs reist mit.
 

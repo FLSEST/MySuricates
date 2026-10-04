@@ -10,6 +10,7 @@ import com.automation.executor.ExecutionContext;
 import com.automation.executor.PlaceholderSyntax;
 import com.automation.repository.StepResultRepository;
 import com.automation.repository.WorkflowRunRepository;
+import com.automation.service.workflow.RunControlService;
 import com.automation.service.workflow.WorkflowContextDataService;
 import com.automation.service.workflow.WorkflowExecutor;
 import com.automation.service.workflow.WorkflowService;
@@ -42,17 +43,22 @@ public class SubWorkflowLauncher {
     private final WorkflowRunRepository runRepository;
     private final StepResultRepository stepResultRepository;
     private final WorkflowContextDataService contextDataService;
+    private final RunControlService runControl;
+    /** How often the parent looks at its child; package-private so tests need not wait two seconds. */
+    Duration pollInterval = Duration.ofSeconds(2);
 
     public SubWorkflowLauncher(WorkflowService workflowService,
                                @Lazy WorkflowExecutor workflowExecutor,
                                WorkflowRunRepository runRepository,
                                StepResultRepository stepResultRepository,
-                               WorkflowContextDataService contextDataService) {
+                               WorkflowContextDataService contextDataService,
+                               @Lazy RunControlService runControl) {
         this.workflowService = workflowService;
         this.workflowExecutor = workflowExecutor;
         this.runRepository = runRepository;
         this.stepResultRepository = stepResultRepository;
         this.contextDataService = contextDataService;
+        this.runControl = runControl;
     }
 
     /**
@@ -113,7 +119,7 @@ public class SubWorkflowLauncher {
             name = subWorkflow.getName();
             WorkflowRun subRun = workflowExecutor.execute(subWorkflow, childContext(context, parentIds, workflowId),
                     TriggerSource.SUB_WORKFLOW);
-            WorkflowRun completed = waitForCompletion(subRun.getId());
+            WorkflowRun completed = waitForCompletion(subRun.getId(), context);
             return new Outcome(workflowId, name, completed.getId(), completed.getStatus(), buildOutput(completed),
                     completed.getStatus() == RunStatus.COMPLETED);
         } catch (Exception e) {
@@ -145,16 +151,26 @@ public class SubWorkflowLauncher {
         return childContext;
     }
 
-    private WorkflowRun waitForCompletion(String runId) {
+    /**
+     * Polls the child until it ends. A cancelled parent cancels the child once and keeps waiting for its
+     * final status — otherwise the child ran on and the parent's thread waited up to {@link #MAX_WAIT}.
+     */
+    private WorkflowRun waitForCompletion(String runId, ExecutionContext parent) {
         Instant deadline = Instant.now().plus(MAX_WAIT);
+        boolean childCancelled = false;
         while (Instant.now().isBefore(deadline)) {
+            if (!childCancelled && parent.shouldStop()) {
+                log.info("Parent run {} cancelled — cancelling sub-workflow run {}", parent.getWorkflowRunId(), runId);
+                runControl.cancelExecution(runId);
+                childCancelled = true;
+            }
             WorkflowRun run = runRepository.findById(runId).orElseThrow(() ->
                     new WorkflowExecutionException("Sub-workflow run " + runId + " disappeared while waiting"));
             if (run.getStatus() != RunStatus.RUNNING && run.getStatus() != RunStatus.PENDING) {
                 return run;
             }
             try {
-                Thread.sleep(2000);
+                Thread.sleep(pollInterval.toMillis());
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 throw new WorkflowExecutionException("Interrupted while waiting for sub-workflow");
