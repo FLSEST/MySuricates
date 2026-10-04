@@ -1,0 +1,38 @@
+{
+  "id": "blueprint-sub-workflow-part",
+  "icon": "🔩",
+  "i18n": [
+    "de",
+    "en"
+  ],
+  "name": {
+    "de": "Teil-Workflow: Eingabe prüfen",
+    "en": "Sub-workflow: checking an input"
+  },
+  "description": {
+    "de": "Der aufgerufene Teil aus dem Paket „Teil-Workflow aufrufen“: liest die Eingabe des aufrufenden Laufs über {{ previous_output }}, zählt ihre Zeilen und meldet eine Ampel. Läuft auch allein, dann ohne Eingabe (YELLOW). Ersetze die Prüfung.",
+    "en": "The called part of the package “Calling a sub-workflow”: reads the calling run's input via {{ previous_output }}, counts its lines and reports a traffic light. Also runs on its own, then without input (YELLOW). Replace the check."
+  },
+  "category": "BASICS",
+  "sortOrder": 21,
+  "version": "1.0.0",
+  "model": null,
+  "instructions": null,
+  "blocks": [
+    {
+      "type": "shell",
+      "name": {
+        "de": "pruefen",
+        "en": "check"
+      },
+      "config": {
+        "command": "set -eu\nset -- {{ previous_output }}\n# placeholder - replace with your check of the input\nif [ -z \"$1\" ]; then\n  echo 'no input - started on its own'\n  printf 'gate_status: %s\\ngate_category: %s\\ngate_description: %s\\n' YELLOW blueprint-part 'started without input'\nelse\n  printf 'lines=%s\\n' \"$(printf '%s\\n' \"$1\" | grep -c .)\"\n  printf 'gate_status: %s\\ngate_category: %s\\ngate_description: %s\\n' GREEN blueprint-part 'input checked'\nfi",
+        "shell_escape_variables": true,
+        "description": {
+          "de": "Liest die Eingabe des aufrufenden Laufs. Die letzte Ausgabe dieses Workflows geht an ihn zurück. Ersetze die Prüfung.",
+          "en": "Reads the calling run's input. This workflow's last output goes back to it. Replace the check."
+        }
+      }
+    }
+  ]
+}

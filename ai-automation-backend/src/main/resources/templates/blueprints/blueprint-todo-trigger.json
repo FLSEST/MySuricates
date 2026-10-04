@@ -1,0 +1,52 @@
+{
+  "id": "blueprint-todo-trigger",
+  "icon": "🔁",
+  "i18n": [
+    "de",
+    "en"
+  ],
+  "name": {
+    "de": "Von einem TODO-Trigger gestartet",
+    "en": "Started by a TODO trigger"
+  },
+  "description": {
+    "de": "Rund um Workflows: ein Fix-Workflow, den ein TODO-Trigger startet, 0 Tokens. Er bekommt das TODO als Variablen (todo_id, todo_title, todo_priority …) und meldet GREEN – mit autoClose wird das TODO dann erledigt. So geht's: einen TODO-Trigger mit diesem Workflow als Ziel anlegen, das Tag-Muster eng wählen (etwa blueprint-demo), maxAttempts 1; dann ein TODO mit diesem Tag anlegen. Ersetze die Bearbeitung.",
+    "en": "Around workflows: a fix workflow that a TODO trigger starts, 0 tokens. It gets the TODO as variables (todo_id, todo_title, todo_priority …) and reports GREEN – with autoClose the TODO is then marked done. How to: add a TODO trigger with this workflow as its target, keep the tag pattern narrow (e.g. blueprint-demo), maxAttempts 1; then create a TODO with that tag. Replace the processing."
+  },
+  "category": "AROUND",
+  "sortOrder": 28,
+  "version": "1.0.0",
+  "model": null,
+  "instructions": null,
+  "blocks": [
+    {
+      "type": "shell",
+      "name": {
+        "de": "todo_lesen",
+        "en": "read_todo"
+      },
+      "config": {
+        "command": "set -eu\n# the trigger passes the TODO as variables; started by hand the placeholder text stays\ntitle=$(printf '%s' {{ todo_title }})\npriority=$(printf '%s' {{ todo_priority }})\ncase \"$title\" in *'{{'*) title='(no TODO - started by hand)' ;; esac\ncase \"$priority\" in *'{{'*) priority='-' ;; esac\nprintf 'todo=%s\\npriority=%s\\n' \"$title\" \"$priority\"",
+        "shell_escape_variables": true,
+        "description": {
+          "de": "Liest das TODO, das den Lauf ausgelöst hat. Titel und Beschreibung sind Text von außen, deshalb gequotet (shell_escape_variables).",
+          "en": "Reads the TODO that started the run. Title and description are outside text, hence quoted (shell_escape_variables)."
+        }
+      }
+    },
+    {
+      "type": "shell",
+      "name": {
+        "de": "erledigen",
+        "en": "resolve"
+      },
+      "config": {
+        "command": "# placeholder - replace with the actual fix\nprintf 'gate_status: %s\\ngate_category: %s\\ngate_description: %s\\n' GREEN blueprint-fix 'placeholder fix done'",
+        "description": {
+          "de": "Meldet GREEN – nur dann schließt autoClose das TODO. Bei YELLOW oder RED bleibt es offen. Ersetze den Platzhalter durch die eigentliche Bearbeitung.",
+          "en": "Reports GREEN – only then does autoClose close the TODO. On YELLOW or RED it stays open. Replace the placeholder with the actual fix."
+        }
+      }
+    }
+  ]
+}

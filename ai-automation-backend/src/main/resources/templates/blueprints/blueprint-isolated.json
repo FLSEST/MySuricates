@@ -1,0 +1,56 @@
+{
+  "id": "blueprint-isolated",
+  "icon": "🧪",
+  "i18n": [
+    "de",
+    "en"
+  ],
+  "name": {
+    "de": "Isoliert im Klon laufen",
+    "en": "Running isolated in a clone"
+  },
+  "description": {
+    "de": "Rund um Workflows: Der erste Block setzt workspace.mode isolated – der Lauf arbeitet in einem frischen Klon des Projekts vom letzten Commit, das Original bleibt unberührt, 0 Tokens. Voraussetzung: Das Projektverzeichnis ist ein Git-Repository mit mindestens einem Commit; Uncommittetes sieht der Klon nicht. Ersetze die Schritte.",
+    "en": "Around workflows: the first block sets workspace.mode isolated – the run works in a fresh clone of the project from the last commit and the original stays untouched, 0 tokens. Requirement: the project directory is a Git repository with at least one commit; the clone does not see uncommitted changes. Replace the steps."
+  },
+  "category": "AROUND",
+  "sortOrder": 32,
+  "version": "1.0.0",
+  "model": null,
+  "instructions": null,
+  "blocks": [
+    {
+      "type": "shell",
+      "name": {
+        "de": "klon",
+        "en": "clone"
+      },
+      "config": {
+        "workspace": {
+          "mode": "isolated",
+          "source": "commit"
+        },
+        "command": "set -eu\nprintf 'working_dir=%s\\n' \"$(pwd)\"\nprintf 'commit=%s\\n' \"$(git rev-parse --short HEAD)\"\n# placeholder - replace with work that must not touch the original\nprintf 'scratch\\n' > blueprint-isolated.txt\necho 'wrote blueprint-isolated.txt in the clone'",
+        "description": {
+          "de": "workspace.mode isolated am ersten Block: Der Lauf arbeitet in einem frischen Klon vom letzten Commit. Hier darf geschrieben werden, das Original bleibt unberührt. Ersetze die Arbeit.",
+          "en": "workspace.mode isolated on the first block: the run works in a fresh clone of the last commit. Writing is fine here, the original stays untouched. Replace the work."
+        }
+      }
+    },
+    {
+      "type": "shell",
+      "name": {
+        "de": "nachweis",
+        "en": "proof"
+      },
+      "config": {
+        "command": "set -eu\nset -- {{ project_path }}\nif [ -e \"$1/blueprint-isolated.txt\" ]; then\n  echo 'original_has_file=yes'\nelse\n  echo 'original_has_file=no - the original stays untouched'\nfi",
+        "shell_escape_variables": true,
+        "description": {
+          "de": "Prüft das Originalprojekt ({{ project_path }}): Die Datei aus dem Klon ist dort nicht angekommen.",
+          "en": "Checks the original project ({{ project_path }}): the file from the clone has not arrived there."
+        }
+      }
+    }
+  ]
+}

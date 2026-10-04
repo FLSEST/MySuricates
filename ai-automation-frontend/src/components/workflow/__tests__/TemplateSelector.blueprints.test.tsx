@@ -24,6 +24,15 @@ const templates = [
   { ...base, id: 'blueprint-intake', kind: 'BLUEPRINT', category: 'COMBINATIONS', sortOrder: 2,
     name: { de: 'Meldung aufnehmen', en: 'Taking in a report' }, description: { de: 'Formular', en: 'Form' },
     blocks: [{ type: 'human-input', config: { prompt: '?' } }] },
+  { ...base, id: 'blueprint-sub-workflow', kind: 'BLUEPRINT', category: 'BASICS', sortOrder: 3,
+    name: { de: 'Teil-Workflow aufrufen', en: 'Calling a sub-workflow' }, description: { de: 'Paket', en: 'Package' },
+    blocks: [{ type: 'sub-workflow', config: { workflow_id: 'blueprint-sub-workflow-part' } }] },
+  { ...base, id: 'blueprint-sub-workflow-part', kind: 'BLUEPRINT', category: 'BASICS', sortOrder: 5,
+    name: { de: 'Teil', en: 'The part' }, description: { de: 'Teil', en: 'Part' },
+    blocks: [{ type: 'shell', config: { command: 'true' } }] },
+  { ...base, id: 'blueprint-schedule', kind: 'BLUEPRINT', category: 'AROUND', sortOrder: 4,
+    name: { de: 'Per Zeitplan starten', en: 'Starting on a schedule' }, description: { de: 'Zeitplan', en: 'Schedule' },
+    blocks: [{ type: 'shell', config: { command: 'date' } }] },
 ];
 
 describe('TemplateSelector — blueprints', () => {
@@ -70,5 +79,18 @@ describe('TemplateSelector — blueprints', () => {
     expect(await screen.findByRole('region', { name: 'Grundverknüpfungen' })).toBeInTheDocument();
     expect(screen.getByText('Freigabe vor dem Handeln')).toBeInTheDocument();
     expect(screen.getAllByRole('button').slice(0, 3).map((b) => b.textContent)).toEqual(['Blaupausen', 'Vorlagen', 'Pool']);
+  });
+
+  // 093d2f11: the group "around workflows"; a package before installation is no AI call
+  it('groups the blueprints around workflows, and a package shows no AI badge', async () => {
+    server.use(http.get('/api/v1/workflow-templates', () => HttpResponse.json(templates)));
+
+    renderWithProviders(<TemplateSelector onSelect={() => {}} />);
+
+    const around = await screen.findByRole('region', { name: 'Around workflows' });
+    expect(within(around).getByText('Starting on a schedule')).toBeInTheDocument();
+    const card = screen.getByText('Calling a sub-workflow').closest('[class*="cursor-pointer"]') as HTMLElement;
+    expect(card).toBeTruthy();
+    expect(within(card).queryByText('AI')).not.toBeInTheDocument();
   });
 });

@@ -15,6 +15,8 @@ public enum ChangeSource {
     DIALOG("dialog"),
     CONVERSION("conversion"),
     CHAIN_TEMPLATE("chain-template"),
+    /** Installing a template on the server, together with the blueprints its sub-workflow blocks name (TemplatePackageInstaller). */
+    TEMPLATE_INSTALL("template-install"),
     POOL_INSTALL("pool-install"),
     /** The bundled example project: its example workflows, created from the shipped templates listed in ExampleProjectService. */
     EXAMPLE_PROJECT("example-project"),

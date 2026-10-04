@@ -10,7 +10,7 @@
   "workflows-start": {
     "title": "Drei Orte zum Anfangen",
     "points": [
-      "Blaupausen sind leere Gerüste, die zeigen, wie sich Blöcke verknüpfen: starten, ansehen, Platzhalter ersetzen",
+      "Blaupausen sind leere Gerüste, die zeigen, wie sich Blöcke verknüpfen: starten, ansehen, Platzhalter ersetzen. Die Gruppe „Rund um Workflows“ zeigt, was einen Workflow von außen startet, verbindet und erinnern lässt",
       "Vorlagen sind fertige Abläufe für einen Zweck, der Pool bringt fertige Workflows aus einem lokalen Ordner",
       "Jeder davon ist nur ein Anfang: Jeder Schritt lässt sich ändern, und ein leerer Workflow geht auch"
     ]
@@ -147,7 +147,8 @@
     "points": [
       "Eine Kette führt ihre Workflows streng nacheinander aus, nie parallel, und darf Projekte mischen",
       "Jeder Workflow bekommt das Ergebnis des letzten Schritts seines Vorgängers als {{ previous_chain_output }}",
-      "Ob ein Fehlschlag die Kette anhält, legst du für die Kette und für jeden ihrer Schritte fest"
+      "Ob ein Fehlschlag die Kette anhält, legst du für die Kette und für jeden ihrer Schritte fest",
+      "Die Kettenvorlage „Kette aus zwei Blaupausen“ zeigt das Weiterreichen ohne KI"
     ]
   },
   "skills-packages": {
@@ -290,6 +291,22 @@
       "Die Doku aus dem docs-Ordner: Workflow-Bau, Architektur, API, Betrieb und Entwicklung",
       "Englisch, wo es eine Übersetzung gibt, sonst die deutsche Fassung",
       "Der Assistent greift auf Teile davon zurück, wenn du ihn zum Workflow-Bau fragst"
+    ]
+  },
+  "todo-triggers-fix": {
+    "title": "Ein TODO startet seinen Fix-Workflow",
+    "points": [
+      "Passt ein neues TODO zum Tag-Muster, startet der Trigger den Ziel-Workflow und gibt ihm das TODO als Variablen mit (todo_title, todo_priority …)",
+      "Meldet der Lauf GREEN, schließt autoClose das TODO; bei YELLOW oder RED bleibt es offen",
+      "maxAttempts und ein laufender Fix-Lauf bremsen Wiederholungen; ein enges Tag-Muster verhindert, dass jeder Fund einen Lauf auslöst"
+    ]
+  },
+  "workflow-memory": {
+    "title": "Was der Workflow aus früheren Läufen weiß",
+    "points": [
+      "Aus ausgewählten Läufen fasst ein Modellaufruf Erkenntnisse zusammen; aktiv ist immer nur eine Version",
+      "Vor jedem Lauf landet das aktive Memory als .claude/rules/project-memory.md im Projekt, KI-Schritte lesen es mit",
+      "Auto-Memory extrahiert nach jeder festgelegten Zahl erfolgreicher Läufe von selbst"
     ]
   }
 }

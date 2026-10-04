@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { Plus, Trash2, Zap, CheckCircle } from 'lucide-react';
 import { Card, CardHeader, Button, Modal, Select, Input, Toggle, Badge, Spinner } from '../ui';
 import { useT } from '../../i18n';
+import { Hint } from '../hints/Hint';
 import {
   useTodoTriggers,
   useCreateTodoTrigger,
@@ -70,6 +71,7 @@ export function TodoTriggerSection() {
           />
         </div>
         <div className="p-5 pt-3 space-y-2">
+          <Hint id="todo-triggers-fix" />
           {isLoading ? (
             <div className="flex justify-center py-4"><Spinner /></div>
           ) : triggers.length === 0 ? (

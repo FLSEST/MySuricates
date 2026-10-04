@@ -75,6 +75,20 @@ class ModelUseTest {
         assertThat(ModelUse.needsAi(List.of(block("sub-workflow", Map.of("workflow_id", "w-1"))))).isTrue();
     }
 
+    /**
+     * TODO 093d2f11: before installation a blueprint package names its part, whose cost BlueprintGateTest
+     * pins — but only a blueprint may claim that; any other definition with the prefix still counts as AI.
+     */
+    @Test
+    void aSubWorkflowNamingABlueprint_isModelFreeOnlyInsideABlueprint() {
+        List<BlockDefinition> pkg = List.of(block("sub-workflow", Map.of("workflow_id", "blueprint-sub-workflow-part")));
+
+        assertThat(ModelUse.needsAiAsBlueprint(pkg)).isFalse();
+        assertThat(ModelUse.needsAi(pkg)).as("ein Workflow oder eine Vorlage mit dem Präfix").isTrue();
+        assertThat(ModelUse.needsAiAsBlueprint(List.of(block("sub-workflow", Map.of("workflow_id", "w-1"))))).isTrue();
+        assertThat(ModelUse.needsAiAsBlueprint(List.of(block("simple", Map.of("command", "x"))))).isTrue();
+    }
+
     @Test
     void blocksWithoutTypeOrConfig_areNoModelCalls() {
         List<BlockDefinition> blocks = new java.util.ArrayList<>();

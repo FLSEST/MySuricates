@@ -1,0 +1,37 @@
+{
+  "id": "blueprint-schedule",
+  "icon": "⏰",
+  "i18n": [
+    "de",
+    "en"
+  ],
+  "name": {
+    "de": "Per Zeitplan starten",
+    "en": "Starting on a schedule"
+  },
+  "description": {
+    "de": "Rund um Workflows: ein kurzer Prüflauf für einen Zeitplan, 0 Tokens. So geht's: am Workflow einen Zeitplan anlegen, Typ CRON (sechs Felder, Sekunden zuerst, etwa 0 0 7 * * MON-FRI), zum Ausprobieren maxRuns 3, Konfliktverhalten SKIP lassen – dann startet kein zweiter Lauf, solange einer läuft. Ersetze die Prüfung.",
+    "en": "Around workflows: a short check run for a schedule, 0 tokens. How to: add a schedule to the workflow, type CRON (six fields, seconds first, e.g. 0 0 7 * * MON-FRI), maxRuns 3 to try it out, leave the conflict behaviour at SKIP – then no second run starts while one is still running. Replace the check."
+  },
+  "category": "AROUND",
+  "sortOrder": 26,
+  "version": "1.0.0",
+  "model": null,
+  "instructions": null,
+  "blocks": [
+    {
+      "type": "shell",
+      "name": {
+        "de": "pruefen",
+        "en": "check"
+      },
+      "config": {
+        "command": "set -eu\n# placeholder - replace with the check that should run on its own\nfree_mb=$(df -Pk . | awk 'NR==2 {printf \"%d\", $4/1024}')\nprintf 'checked=%s free_mb=%s\\n' \"$(date '+%Y-%m-%d %H:%M')\" \"$free_mb\"\nif [ \"$free_mb\" -lt 1024 ]; then\n  printf 'gate_status: %s\\ngate_category: %s\\ngate_description: %s\\n' YELLOW blueprint-schedule 'less than 1 GB free'\nelse\n  printf 'gate_status: %s\\ngate_category: %s\\ngate_description: %s\\n' GREEN blueprint-schedule 'enough free space'\nfi",
+        "description": {
+          "de": "Läuft unbeaufsichtigt: keine Freigabe, keine Eingabe – ein Zeitplan wartet auf niemanden. Die Ampel zeigt im Kalender und auf dem Dashboard, wie der Lauf ausging. Ersetze die Prüfung.",
+          "en": "Runs unattended: no approval, no input – a schedule waits for nobody. The traffic light shows in the calendar and on the dashboard how the run went. Replace the check."
+        }
+      }
+    }
+  ]
+}

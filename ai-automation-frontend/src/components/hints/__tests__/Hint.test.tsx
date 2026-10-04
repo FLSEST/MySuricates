@@ -1,9 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { readdirSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { useI18nStore } from '../../../i18n';
 import { de } from '../../../i18n/de';
 import deHints from '../../../data/hints.de.json';
-import { HINTS } from '../../../data/hints';
+import { HINTS, HINT_IDS, hintBlueprint } from '../../../data/hints';
 import { useSettingsStore } from '../../../stores/settingsStore';
 import { useToastStore } from '../../../stores/toastStore';
 import { Hint } from '../Hint';
@@ -70,5 +73,33 @@ describe('Hint', () => {
     useSettingsStore.getState().resetHints();
 
     expect(useSettingsStore.getState()).toMatchObject({ hintsEnabled: true, dismissedHints: {} });
+  });
+
+  // 093d2f11: a hint with a blueprint links to the create dialog with it chosen
+  it('links its blueprint, opening the create dialog with it chosen', () => {
+    render(<MemoryRouter><Hint id="schedules-timing" /></MemoryRouter>);
+
+    const link = screen.getByRole('link', { name: de.hints.tryBlueprint });
+    expect(link.getAttribute('href')).toBe('/workflows?new=1&template=blueprint-schedule');
+  });
+
+  it.each([
+    ['todo-triggers-fix', 'blueprint-todo-trigger'],
+    ['workflow-memory', 'blueprint-memory'],
+  ] as const)('%s in place links %s', (id, blueprint) => {
+    render(<MemoryRouter><Hint id={id} /></MemoryRouter>);
+
+    expect(screen.getByRole('link', { name: de.hints.tryBlueprint }).getAttribute('href'))
+      .toBe(`/workflows?new=1&template=${blueprint}`);
+  });
+
+  it('links only blueprints that ship', () => {
+    const dir = resolve(__dirname, '../../../../../ai-automation-backend/src/main/resources/templates/blueprints');
+    const ids = readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => f.replace(/\.json$/, ''));
+    expect(ids.length).toBeGreaterThan(0);
+    for (const id of HINT_IDS) {
+      const blueprint = hintBlueprint(id);
+      if (blueprint) expect(ids, id).toContain(blueprint);
+    }
   });
 });

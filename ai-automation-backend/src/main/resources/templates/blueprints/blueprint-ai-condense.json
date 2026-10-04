@@ -1,0 +1,70 @@
+{
+  "id": "blueprint-ai-condense",
+  "icon": "🧠",
+  "i18n": [
+    "de",
+    "en"
+  ],
+  "name": {
+    "de": "KI verdichtet eine lange Ausgabe",
+    "en": "AI condenses a long output"
+  },
+  "description": {
+    "de": "KI-Blaupause (1 Modellaufruf ohne Werkzeuge): compress-ai verdichtet die lange Ausgabe eines Schritts auf höchstens 800 Zeichen, bevor sie weitergeht; das Original bleibt unter {{ block.long_output.output }} erhalten. Läuft nur mit dem Anbieter CLAUDE. Ohne KI, nach Regeln: Blaupause „Ausgabe verdichten“.",
+    "en": "AI blueprint (1 model call without tools): compress-ai condenses a step's long output to at most 800 characters before it moves on; the original stays available as {{ block.long_output.output }}. Runs with the provider CLAUDE only. Without AI, by rules: blueprint “Condensing output”."
+  },
+  "category": "AI",
+  "sortOrder": 23,
+  "version": "1.0.0",
+  "model": null,
+  "instructions": null,
+  "blocks": [
+    {
+      "type": "shell",
+      "name": "long_output",
+      "config": {
+        "command": "set -eu\n# placeholder - replace with a command that prints a lot\ni=1\nwhile [ \"$i\" -le 120 ]; do\n  case $i in\n    37) printf 'line %s: WARNING retrying connection to cache\\n' \"$i\" ;;\n    88) printf 'line %s: ERROR job report could not be written\\n' \"$i\" ;;\n    *) printf 'line %s: status ok\\n' \"$i\" ;;\n  esac\n  i=$((i+1))\ndone",
+        "description": {
+          "de": "Erzeugt eine lange Ausgabe. Ersetze den Befehl durch deinen eigenen (Build-Log, Testlauf …).",
+          "en": "Produces a long output. Replace the command with your own (build log, test run …)."
+        }
+      }
+    },
+    {
+      "type": "compress-ai",
+      "name": {
+        "de": "verdichten",
+        "en": "condense"
+      },
+      "config": {
+        "source": "long_output",
+        "instruction": {
+          "de": "Nenne nur Warnungen und Fehler, je eine Zeile mit Zeilennummer, und zum Schluss die Zahl der unauffälligen Zeilen.",
+          "en": "List only warnings and errors, one line each with its line number, and finally the number of unremarkable lines."
+        },
+        "max_chars": 800,
+        "provider": "CLAUDE",
+        "effort": "low",
+        "description": {
+          "de": "Der einzige KI-Aufruf: verdichtet genau einen früheren Block (source) nach der Anweisung, ohne Werkzeuge und ohne Projektdateien. Passe Anweisung und Länge an.",
+          "en": "The only AI call: condenses exactly one earlier block (source) by the instruction, without tools and without project files. Adjust the instruction and the length."
+        }
+      }
+    },
+    {
+      "type": "shell",
+      "name": {
+        "de": "weiter",
+        "en": "next"
+      },
+      "config": {
+        "command": "set -eu\nset -- {{ previous_output }}\nprintf 'condensed_chars=%s\\n' \"$(printf '%s' \"$1\" | wc -c | tr -d ' ')\"",
+        "shell_escape_variables": true,
+        "description": {
+          "de": "Arbeitet mit der verdichteten Fassung weiter; das Original bleibt unter block.long_output erhalten.",
+          "en": "Carries on with the condensed version; the original stays available as block.long_output."
+        }
+      }
+    }
+  ]
+}

@@ -70,7 +70,7 @@ class BuiltInTemplateLoaderTest {
     @Test
     void blueprints_callAModelOnlyInTheAiGroup_asThePickerShowsIt() {
         assertThat(templates.stream().filter(t -> t.getKind() == TemplateKind.BLUEPRINT))
-                .allSatisfy(bp -> assertThat(ModelUse.needsAi(bp.getBlocks())).as(bp.getId())
+                .allSatisfy(bp -> assertThat(ModelUse.needsAiAsBlueprint(bp.getBlocks())).as(bp.getId())
                         .isEqualTo("AI".equals(bp.getCategory())));
     }
 

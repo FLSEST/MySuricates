@@ -18,7 +18,8 @@ import java.util.Set;
  * <li>{@code switch} only compares; a case block does when it is a {@code simple} block without
  *     {@code execution_mode: shell} ({@code SwitchBlockExecutor} runs nothing but shell and simple).</li>
  * <li>{@code sub-workflow} counts as a model call: the workflow it starts is not part of this
- *     definition, so nothing here can promise that it runs without AI.</li>
+ *     definition, so nothing here can promise that it runs without AI. Only a shipped blueprint
+ *     package before installation is judged differently ({@link #needsAiAsBlueprint}).</li>
  * </ul>
  *
  * <p>Only the platform's own provider calls are visible here — a shell command that starts an AI
@@ -28,29 +29,50 @@ public final class ModelUse {
 
     private static final Set<String> MODEL_TYPES = Set.of("simple", "agentic", "skill-capability", "compress-ai");
     private static final Set<String> COMMAND_WRAPPERS = Set.of("foreach", "while", "conditional", "retry");
+    /** Same prefix as {@code TemplatePackageInstaller.BLUEPRINT_PREFIX} — executor must not depend on the service layer. */
+    private static final String BLUEPRINT_PREFIX = "blueprint-";
 
     private ModelUse() {
     }
 
     /** True when at least one block of the list can call an AI model. */
     public static boolean needsAi(List<BlockDefinition> blocks) {
+        return needsAi(blocks, false);
+    }
+
+    /**
+     * {@link #needsAi} for the blocks of a template of kind {@code BLUEPRINT} (TODO 093d2f11). A blueprint
+     * package names its part before installation ({@code "workflow_id": "blueprint-…"}); the installation
+     * creates exactly that shipped blueprint alongside, and {@code BlueprintGateTest} pins that it is
+     * model-free outside the AI group — inside it the parent calls a model itself anyway. Any other
+     * definition with such an id gets no exemption: there the name promises nothing.
+     */
+    public static boolean needsAiAsBlueprint(List<BlockDefinition> blocks) {
+        return needsAi(blocks, true);
+    }
+
+    private static boolean needsAi(List<BlockDefinition> blocks, boolean blueprint) {
         if (blocks == null) {
             return false;
         }
         for (BlockDefinition block : blocks) {
-            if (block != null && callsModel(block.getType(), block.getConfig())) {
+            if (block != null && callsModel(block.getType(), block.getConfig(), blueprint)) {
                 return true;
             }
         }
         return false;
     }
 
-    private static boolean callsModel(String type, Map<String, Object> config) {
+    private static boolean callsModel(String type, Map<String, Object> config, boolean blueprint) {
         if (type == null) {
             return false;
         }
-        if (MODEL_TYPES.contains(type) || "sub-workflow".equals(type)) {
+        if (MODEL_TYPES.contains(type)) {
             return true;
+        }
+        if ("sub-workflow".equals(type)) {
+            return !(blueprint && config != null && config.get("workflow_id") instanceof String id
+                    && id.startsWith(BLUEPRINT_PREFIX));
         }
         if (COMMAND_WRAPPERS.contains(type)) {
             return !runsAsShell(config);

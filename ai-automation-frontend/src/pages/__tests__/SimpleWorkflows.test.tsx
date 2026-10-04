@@ -93,6 +93,39 @@ describe('SimpleWorkflows — ?template= and ?pool= (hits of the home field)', (
   });
 });
 
+// Review 093d2f11: a blueprint package reached via ?template= goes through the server installation
+describe('SimpleWorkflows — blueprint package', () => {
+  it('installs it on the server instead of creating a workflow that names a blueprint', async () => {
+    const installs: unknown[] = [];
+    const creates: unknown[] = [];
+    server.use(
+      http.get('/api/v1/workflow-templates', () => HttpResponse.json([
+        { id: 'blueprint-sub-workflow', name: { en: 'Calling a sub-workflow', de: 'Teil' }, description: { en: 'Package', de: 'Paket' },
+          icon: '', category: 'BASICS', kind: 'BLUEPRINT', instructions: null, model: null,
+          blocks: [{ type: 'sub-workflow', config: { workflow_id: 'blueprint-sub-workflow-part' } }] },
+      ])),
+      http.post('/api/v1/workflow-templates/:id/install', async ({ params, request }) => {
+        installs.push([params.id, await request.json()]);
+        return HttpResponse.json({ workflowId: 'w-parent', workflowName: 'Calling a sub-workflow', partWorkflowIds: ['w-part'] }, { status: 201 });
+      }),
+      http.post('/api/v1/workflows', async ({ request }) => {
+        creates.push(await request.json());
+        return HttpResponse.json({ id: 'w-plain' });
+      }),
+    );
+    renderAt('/workflows?template=blueprint-sub-workflow');
+
+    const dialog = await screen.findByRole('dialog');
+    await within(dialog).findByDisplayValue('Calling a sub-workflow');
+    fireEvent.change(within(dialog).getByRole('combobox'), { target: { value: 'p1' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: en.common.create }));
+
+    await waitFor(() => expect(installs).toHaveLength(1));
+    expect(installs[0]).toEqual(['blueprint-sub-workflow', expect.objectContaining({ projectId: 'p1', locale: 'en' })]);
+    expect(creates).toEqual([]);
+  });
+});
+
 // 23635ef6: the app's own dialog instead of window.confirm
 describe('SimpleWorkflows — delete', () => {
   it('names the workflow and deletes it only after confirmation', async () => {

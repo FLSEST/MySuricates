@@ -7,6 +7,7 @@ import {
 } from '../../hooks/useWorkflowMemory';
 import { extractionAvailability, useMemoryExtraction } from '../../hooks/useMemoryExtraction';
 import { useT } from '../../i18n';
+import { Hint } from '../hints/Hint';
 import { MemoryExtractModal } from './MemoryExtractModal';
 import { WorkflowMemoryItem } from './WorkflowMemoryItem';
 import type { WorkflowRun, WorkflowMemory } from '../../types';
@@ -64,6 +65,8 @@ export function WorkflowMemoryPanel({ workflowId, runs, runTotal }: Props) {
           </Button>
         }
       />
+
+      <Hint id="workflow-memory" className="mb-3" />
 
       {availability === 'noRuns' && (
         <p className="text-xs text-text-tertiary mb-3" data-testid="memory-extract-needs-runs">

@@ -3,14 +3,18 @@ package com.automation.service.workflow;
 import com.automation.dto.WorkflowSnapshot;
 import com.automation.dto.request.CreateWorkflowRequest;
 import com.automation.dto.request.UpdateWorkflowRequest;
+import com.automation.entity.BlockDefinition;
 import com.automation.entity.Project;
 import com.automation.entity.Workflow;
+import com.automation.exception.ErrorMessage;
+import com.automation.exception.LocalizedArgumentException;
 import com.automation.executor.ExecutionMode;
 import com.automation.service.ai.ReasoningEffort;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -29,10 +33,29 @@ final class WorkflowRequestFields {
     private WorkflowRequestFields() {
     }
 
+    /**
+     * A sub-workflow that still names a blueprint ({@code blueprint-…}) would fail at run time: only the
+     * template installation creates the called workflow and fills in its id (TODO 093d2f11).
+     */
+    static void rejectUnwiredBlueprints(List<BlockDefinition> blocks) {
+        if (blocks == null) {
+            return;
+        }
+        for (BlockDefinition block : blocks) {
+            if (block != null && "sub-workflow".equals(block.getType()) && block.getConfig() != null
+                    && block.getConfig().get("workflow_id") instanceof String id
+                    && id.startsWith(TemplatePackageInstaller.BLUEPRINT_PREFIX)) {
+                throw new LocalizedArgumentException(ErrorMessage.UNWIRED_BLUEPRINT_REFERENCE, Map.of(
+                        "block", block.getName() != null ? block.getName() : block.getType(), "blueprint", id));
+            }
+        }
+    }
+
     /** A new workflow of {@code project} from the request — without skills, which need the repository. */
     static Workflow newWorkflow(Project project, CreateWorkflowRequest request) {
         BlockNameRules.rejectReservedNames(request.blocks());
         ExecutionMode.rejectUnknown(request.blocks());
+        rejectUnwiredBlueprints(request.blocks());
 
         Workflow workflow = Workflow.builder()
                 .project(project)
@@ -78,6 +101,7 @@ final class WorkflowRequestFields {
         if (request.blocks() != null) {
             BlockNameRules.rejectReservedNames(request.blocks());
             ExecutionMode.rejectUnknown(request.blocks());
+            rejectUnwiredBlueprints(request.blocks());
             workflow.setBlocks(request.blocks());
         }
         if (request.instructions() != null) {

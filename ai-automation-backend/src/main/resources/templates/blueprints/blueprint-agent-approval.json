@@ -1,0 +1,76 @@
+{
+  "id": "blueprint-agent-approval",
+  "icon": "🕵️",
+  "i18n": [
+    "de",
+    "en"
+  ],
+  "name": {
+    "de": "Agent mit Freigabe (teuer)",
+    "en": "Agent with approval (expensive)"
+  },
+  "description": {
+    "de": "KI-Blaupause, teuer: Ein agentic-Block plant und handelt in Runden, je Runde mindestens zwei Modellaufrufe. Vorher fragt eine Freigabe, ob du die Kosten willst; require_approval hält zusätzlich vor jeder Aktion an. Kleines Budget: 3 Runden, 40 000 Tokens, 10 Minuten. Ersetze Ziel und Erfolgskriterium.",
+    "en": "AI blueprint, expensive: an agentic block plans and acts in rounds, at least two model calls per round. An approval first asks whether you want the cost; require_approval also stops before every action. Small budget: 3 rounds, 40,000 tokens, 10 minutes. Replace the goal and the success criterion."
+  },
+  "category": "AI",
+  "sortOrder": 25,
+  "version": "1.0.0",
+  "model": null,
+  "instructions": null,
+  "blocks": [
+    {
+      "type": "approval",
+      "name": {
+        "de": "kosten_ok",
+        "en": "cost_ok"
+      },
+      "config": {
+        "question": {
+          "de": "## Agent starten?\n\nDer nächste Schritt ist ein Agent: Er ruft das Modell mehrmals auf (bis zu 3 Runden, höchstens 40 000 Tokens) und fragt vor jeder Aktion noch einmal. **Nein** beendet den Lauf ohne Modellaufruf.",
+          "en": "## Start the agent?\n\nThe next step is an agent: it calls the model several times (up to 3 rounds, at most 40,000 tokens) and asks again before every action. **No** ends the run without a model call."
+        },
+        "options": [
+          {
+            "de": "Ja",
+            "en": "Yes"
+          },
+          {
+            "de": "Nein",
+            "en": "No"
+          }
+        ],
+        "on_no": "fail",
+        "timeout_minutes": 60,
+        "description": {
+          "de": "Macht die Kosten sichtbar, bevor sie entstehen. Bei Nein scheitert der Lauf, ohne dass ein Modell gerufen wurde.",
+          "en": "Makes the cost visible before it is incurred. On no the run fails without any model call."
+        }
+      }
+    },
+    {
+      "type": "agentic",
+      "name": "agent",
+      "config": {
+        "goal": {
+          "de": "Finde heraus, wie viele Dateien (ohne Unterordner) im Arbeitsverzeichnis liegen, und antworte mit dieser Zahl. Ändere, erstelle oder lösche keine Dateien.",
+          "en": "Find out how many files (not counting subdirectories) are in the working directory and answer with that number. Do not change, create or delete any files."
+        },
+        "success_criteria": {
+          "de": "Die Antwort nennt die Zahl der Dateien im Arbeitsverzeichnis.",
+          "en": "The answer states the number of files in the working directory."
+        },
+        "max_iterations": 3,
+        "max_total_tokens": 40000,
+        "iteration_timeout_seconds": 180,
+        "total_timeout_seconds": 600,
+        "require_approval": true,
+        "effort": "low",
+        "description": {
+          "de": "Plant (REASON), handelt (ACT) und prüft das Ergebnis, bis das Erfolgskriterium erfüllt oder das Budget aufgebraucht ist. require_approval legt dir jede geplante Aktion zur Freigabe vor. Ersetze Ziel und Erfolgskriterium, bevor du das Budget erhöhst.",
+          "en": "Plans (REASON), acts (ACT) and checks the result until the success criterion is met or the budget is used up. require_approval puts every planned action to you for approval. Replace the goal and the success criterion before you raise the budget."
+        }
+      }
+    }
+  ]
+}

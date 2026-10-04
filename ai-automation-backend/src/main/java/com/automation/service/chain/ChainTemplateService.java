@@ -104,6 +104,20 @@ public class ChainTemplateService {
                             new BuiltInChainTemplate.Entry("sprint-retrospective",
                                     Map.of("de", "Sprint-Retrospektive durchführen", "en", "Run sprint retrospective"))
                     )
+            ),
+            // Learning chain without AI (TODO 093d2f11): two blueprints, the second reads the first's output
+            new BuiltInChainTemplate(
+                    "blueprint-chain",
+                    Map.of("de", "Kette aus zwei Blaupausen", "en", "Chain of two blueprints"),
+                    Map.of("de", "Ohne KI: „Ampel“ meldet eine Ampel, „Glied einer Kette“ liest ihre letzte Ausgabe über {{ previous_chain_output }}",
+                            "en", "Without AI: “Traffic light” reports a traffic light, “Link in a chain” reads its last output via {{ previous_chain_output }}"),
+                    "🔗",
+                    List.of(
+                            new BuiltInChainTemplate.Entry("blueprint-gate",
+                                    Map.of("de", "Prüfen", "en", "Check")),
+                            new BuiltInChainTemplate.Entry("blueprint-chain-step",
+                                    Map.of("de", "Weiterverarbeiten", "en", "Carry on"))
+                    )
             )
     );
 

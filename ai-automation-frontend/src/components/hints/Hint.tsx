@@ -1,9 +1,10 @@
 import { useId } from 'react';
 import { Lightbulb } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { Button } from '../ui';
 import { useT } from '../../i18n';
 import { useHintText } from '../../i18n/hints';
-import { HINTS, type HintId } from '../../data/hints';
+import { HINTS, hintBlueprint, type HintId } from '../../data/hints';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useToast } from '../../hooks/useToast';
 
@@ -13,7 +14,8 @@ import { useToast } from '../../hooks/useToast';
  * Shown until dismissed for its current version; afterwards a small button in the same spot brings
  * it back. Renders nothing while hints are switched off (settings, or "hide all" on any hint).
  * A card in the page flow, not a floating tooltip: it moves with the layout instead of pointing at
- * coordinates. The copy is rendered as React text only.
+ * coordinates. The copy is rendered as React text only. A hint with a `blueprint` links to it: the
+ * create dialog with that blueprint chosen (`/workflows?new=1&template=…`, TODO 093d2f11).
  */
 export function Hint({ id, className = '' }: { id: HintId; className?: string }) {
   const t = useT();
@@ -28,6 +30,7 @@ export function Hint({ id, className = '' }: { id: HintId; className?: string })
 
   if (!enabled) return null;
   const { version } = HINTS[id];
+  const blueprint = hintBlueprint(id);
 
   if (dismissedVersion === version) {
     return (
@@ -63,6 +66,15 @@ export function Hint({ id, className = '' }: { id: HintId; className?: string })
           <Button size="sm" variant="secondary" onClick={() => dismissHint(id, version)}>
             {t.hints.understood}
           </Button>
+          {blueprint && (
+            <Link
+              to={`/workflows?new=1&template=${encodeURIComponent(blueprint)}`}
+              data-hint-blueprint={blueprint}
+              className="inline-flex items-center rounded-md px-2.5 py-1 text-xs font-medium text-info hover:bg-info/10 transition-colors"
+            >
+              {t.hints.tryBlueprint}
+            </Link>
+          )}
           <Button
             size="sm"
             variant="ghost"
