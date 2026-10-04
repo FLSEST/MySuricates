@@ -49,7 +49,7 @@ class CalDavEventsTest {
     void start() throws Exception {
         server = new FakeDavServer();
         cred = CalDavCredentials.parse(server.base() + "/dav|alex:pw");
-        CalDavHttpClient http = new CalDavHttpClient(TestTargetGuards.outbound());
+        CalDavHttpClient http = new CalDavHttpClient(TestTargetGuards.loopbackOnly());
         events = new CalDavEvents(http, new CalDavDiscovery(http));
     }
 

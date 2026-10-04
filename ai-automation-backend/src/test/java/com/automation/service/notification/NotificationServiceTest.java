@@ -50,7 +50,7 @@ class NotificationServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new NotificationService(repository, objectMapper, FakeTransactions.manager(), TestTargetGuards.outbound());
+        service = new NotificationService(repository, objectMapper, FakeTransactions.manager(), TestTargetGuards.loopbackOnly());
     }
 
     @Nested
@@ -288,7 +288,8 @@ class NotificationServiceTest {
                 config.setTriggerAlways(true);
                 when(repository.findEnabledForWorkflow(any())).thenReturn(List.of(config));
 
-                service.onWorkflowRunCompleted(createEvent(RunStatus.COMPLETED));
+                new NotificationService(repository, objectMapper, FakeTransactions.manager(), TestTargetGuards.outbound())
+                        .onWorkflowRunCompleted(createEvent(RunStatus.COMPLETED));
                 assertThat(hits.get()).as("switch off (default): the own network is reachable").isEqualTo(1);
 
                 new NotificationService(repository, objectMapper, FakeTransactions.manager(),

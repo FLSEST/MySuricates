@@ -18,7 +18,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class NtfyHttpClientTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final NtfyHttpClient client = new NtfyHttpClient(objectMapper, TestTargetGuards.outbound());
+    private final NtfyHttpClient client = new NtfyHttpClient(objectMapper, TestTargetGuards.loopbackOnly());
     private final AtomicReference<String> auth = new AtomicReference<>();
     private final AtomicReference<String> body = new AtomicReference<>();
     private final AtomicReference<String> contentType = new AtomicReference<>();
@@ -111,7 +111,7 @@ class NtfyHttpClientTest {
         assertThatThrownBy(() -> client.get(base + "/", null))
                 .isInstanceOf(IllegalStateException.class).hasMessageStartingWith("ntfy request failed");
 
-        NtfyHttpClient dead = new NtfyHttpClient(objectMapper, TestTargetGuards.outbound());
+        NtfyHttpClient dead = new NtfyHttpClient(objectMapper, TestTargetGuards.loopbackOnly());
         assertThatThrownBy(() -> dead.get("http://127.0.0.1:1/", null))
                 .isInstanceOf(IllegalStateException.class).hasMessageStartingWith("ntfy request failed");
     }

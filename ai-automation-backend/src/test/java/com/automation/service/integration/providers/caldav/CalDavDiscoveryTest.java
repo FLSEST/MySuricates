@@ -33,7 +33,7 @@ class CalDavDiscoveryTest {
     void start() throws Exception {
         server = new FakeDavServer();
         cred = CalDavCredentials.parse(server.base() + "/dav|alex:pw");
-        discovery = new CalDavDiscovery(new CalDavHttpClient(TestTargetGuards.outbound()));
+        discovery = new CalDavDiscovery(new CalDavHttpClient(TestTargetGuards.loopbackOnly()));
     }
 
     @AfterEach

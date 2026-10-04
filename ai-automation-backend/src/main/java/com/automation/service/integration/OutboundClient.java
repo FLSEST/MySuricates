@@ -61,16 +61,25 @@ public class OutboundClient {
     }
 
     /**
+     * The target check of this client's {@link OutboundTarget} on its own — for a caller that wants
+     * to log or report a refusal before it builds the request. {@link #send} runs it anyway.
+     */
+    public void checkTarget(URI uri) {
+        if (target.guarded()) guard.check(uri, target.flag());
+    }
+
+    /**
      * Sends {@code request} like {@link HttpClient#send} — after the target check of this client's
      * {@link OutboundTarget}. A 3xx comes back as it is.
      */
     public <T> HttpResponse<T> send(HttpRequest request, HttpResponse.BodyHandler<T> handler)
             throws IOException, InterruptedException {
-        if (target.guarded()) guard.check(request.uri(), target.flag());
+        checkTarget(request.uri());
         return http.send(request, handler);
     }
 
-    static boolean isIpLiteral(String host) {
+    /** IPv4 dotted quad or IPv6 (bracketed or not) — a host that needs no DNS lookup. */
+    public static boolean isIpLiteral(String host) {
         return host != null && (host.startsWith("[") || host.indexOf(':') >= 0 || IPV4_LITERAL.matcher(host).matches());
     }
 

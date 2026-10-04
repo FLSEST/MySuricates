@@ -19,7 +19,7 @@ class GiteaHttpClientTest {
 
     private HttpServer server;
     private String base;
-    private final GiteaHttpClient client = new GiteaHttpClient(new ObjectMapper(), TestTargetGuards.outbound());
+    private final GiteaHttpClient client = new GiteaHttpClient(new ObjectMapper(), TestTargetGuards.loopbackOnly());
     private final AtomicReference<String> auth = new AtomicReference<>();
     private final AtomicReference<String> method = new AtomicReference<>();
     private final AtomicReference<String> body = new AtomicReference<>();

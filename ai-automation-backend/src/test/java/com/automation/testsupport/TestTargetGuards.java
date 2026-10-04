@@ -1,10 +1,12 @@
 package com.automation.testsupport;
 
 import com.automation.modules.ModuleRegistry;
+import com.automation.service.integration.OutboundClient;
 import com.automation.service.integration.OutboundHttp;
 import com.automation.service.integration.OutboundTargetGuard;
 
 import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.Map;
 
 /** {@link OutboundTargetGuard} variants for tests that talk to a loopback {@code HttpServer}. */
@@ -19,6 +21,22 @@ public final class TestTargetGuards {
     /** Outbound clients with the catalog defaults: public sources guarded, own services and http-api not. */
     public static OutboundHttp outbound() {
         return new OutboundHttp(defaults());
+    }
+
+    /**
+     * Outbound clients for unit tests that must never leave the machine: every guarded client (public
+     * source, own service, http-api) reaches loopback only. Any other name fails as unresolvable without a
+     * DNS lookup, any other IP literal as a non-public address — no request goes out. Fixed-host clients
+     * are not guarded; their tests point them at a loopback stub through their test constructors.
+     */
+    public static OutboundHttp loopbackOnly() {
+        return new OutboundHttp(new OutboundTargetGuard(registry(true), host -> {
+            if ("localhost".equalsIgnoreCase(host)) return new InetAddress[]{InetAddress.getLoopbackAddress()};
+            if (!OutboundClient.isIpLiteral(host)) {
+                throw new UnknownHostException(host + ": no DNS in unit tests");
+            }
+            return new InetAddress[]{InetAddress.getByName(host)};
+        }, address -> !address.isLoopbackAddress()));
     }
 
     /** Outbound clients checked by {@code guard}. */

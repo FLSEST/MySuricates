@@ -21,7 +21,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class NtfyProviderTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final NtfyProvider provider = new NtfyProvider(objectMapper, new NtfyHttpClient(objectMapper, TestTargetGuards.outbound()));
+    private final NtfyProvider provider = new NtfyProvider(objectMapper, new NtfyHttpClient(objectMapper, TestTargetGuards.loopbackOnly()));
     private HttpServer server;
     private String base;
     private final AtomicReference<String> auth = new AtomicReference<>();

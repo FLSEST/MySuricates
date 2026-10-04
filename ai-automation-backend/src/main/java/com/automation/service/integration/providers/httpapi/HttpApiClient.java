@@ -48,6 +48,14 @@ class HttpApiClient {
     }
 
     Map<String, Object> send(HttpApiTarget target, HttpApiRequest request) {
+        String where = request.method() + " " + request.uri().getRawAuthority() + request.uri().getRawPath();
+        try {
+            httpClient.checkTarget(request.uri());
+        } catch (RuntimeException e) {
+            log.warn("http-api request blocked: {} — {}", where, e.getMessage());
+            throw e;
+        }
+
         HttpRequest.Builder builder = HttpRequest.newBuilder(request.uri()).timeout(request.timeout());
         request.headers().forEach(builder::header);
         if (target.hasAuth()) builder.header(target.authName(), target.authValue());
@@ -55,7 +63,6 @@ class HttpApiClient {
                 ? HttpRequest.BodyPublishers.noBody()
                 : HttpRequest.BodyPublishers.ofByteArray(request.body()));
 
-        String where = request.method() + " " + request.uri().getRawAuthority() + request.uri().getRawPath();
         log.info("http-api request: {}", where);
         HttpResponse<InputStream> response;
         byte[] bytes;

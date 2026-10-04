@@ -1,5 +1,9 @@
 package com.automation.service.integration.providers.httpapi;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.automation.testsupport.TestTargetGuards;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -8,6 +12,7 @@ import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -19,6 +24,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.InstanceOfAssertFactories.STRING;
 
 /**
  * {@link HttpApiClient} against a loopback {@link HttpServer} — checks the wire behaviour (method,
@@ -193,6 +199,33 @@ class HttpApiClientTest {
         HttpApiClient open = new HttpApiClient(JSON, TestTargetGuards.outbound(TestTargetGuards.off()));
         assertThat(open.send(target, HttpApiRequest.from(target, Map.of("path", "echo"), JSON)).get("status")).isEqualTo(200);
         assertThat(requests).hasSize(1);
+    }
+
+    @Test
+    void aBlockedRequestIsLoggedAsBlocked_neverAsSent() {
+        HttpApiTarget target = target("X-Api-Key: s3cret-token");
+        HttpApiClient guarded = new HttpApiClient(JSON, TestTargetGuards.outbound(TestTargetGuards.on()));
+        Logger logger = (Logger) LoggerFactory.getLogger(HttpApiClient.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        Level previous = logger.getLevel();
+        logger.setLevel(Level.INFO);
+        try {
+            assertThatThrownBy(() -> guarded.send(target, HttpApiRequest.from(target, Map.of("path", "echo"), JSON)))
+                    .isInstanceOf(IllegalArgumentException.class);
+
+            assertThat(appender.list).extracting(ILoggingEvent::getFormattedMessage)
+                    .singleElement(STRING)
+                    .startsWith("http-api request blocked: GET 127.0.0.1:")
+                    .contains("private-network-guard-http-api")
+                    .doesNotContain("s3cret");
+            assertThat(appender.list.get(0).getLevel()).isEqualTo(Level.WARN);
+        } finally {
+            logger.setLevel(previous);
+            logger.detachAppender(appender);
+        }
+        assertThat(requests).isEmpty();
     }
 
     @Test

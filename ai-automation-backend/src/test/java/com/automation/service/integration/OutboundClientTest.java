@@ -152,6 +152,20 @@ class OutboundClientTest {
         assertThat(get(client, base + "/ok").body()).isEqualTo("ok");
     }
 
+    @Test
+    void loopbackOnly_reachesTheLoopbackServer_andRefusesEverythingElseWithoutALookup() throws Exception {
+        OutboundHttp offline = TestTargetGuards.loopbackOnly();
+        for (OutboundTarget target : new OutboundTarget[]{OutboundTarget.publicSource(), OutboundTarget.ownService(),
+                OutboundTarget.ownService(ModuleCatalog.PRIVATE_NETWORK_GUARD_HTTP_API)}) {
+            OutboundClient client = offline.client(target, TIMEOUT);
+            assertThat(get(client, base + "/ok").body()).isEqualTo("ok");
+            assertThatThrownBy(() -> get(client, "https://hooks.slack.com/test"))
+                    .isInstanceOf(IllegalStateException.class).hasMessageContaining("could not be resolved");
+            assertThatThrownBy(() -> get(client, "http://203.0.113.10/x")).isInstanceOf(IllegalArgumentException.class);
+        }
+        assertThat(hits.get()).isEqualTo(3);
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"127.0.0.1", "203.0.113.10", "[::1]", "::1"})
     void ipLiteralsNeedNoPinning(String host) {

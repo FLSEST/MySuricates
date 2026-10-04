@@ -19,7 +19,7 @@ class GitLabHttpClientTest {
 
     private HttpServer server;
     private String base;
-    private final GitLabHttpClient client = new GitLabHttpClient(new ObjectMapper(), TestTargetGuards.outbound());
+    private final GitLabHttpClient client = new GitLabHttpClient(new ObjectMapper(), TestTargetGuards.loopbackOnly());
     private final AtomicReference<String> privateToken = new AtomicReference<>();
     private final AtomicReference<String> authorization = new AtomicReference<>();
     private final AtomicReference<String> method = new AtomicReference<>();

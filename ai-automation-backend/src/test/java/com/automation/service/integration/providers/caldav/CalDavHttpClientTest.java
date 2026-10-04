@@ -16,7 +16,7 @@ class CalDavHttpClientTest {
 
     private FakeDavServer server;
     private CalDavCredentials cred;
-    private final CalDavHttpClient client = new CalDavHttpClient(TestTargetGuards.outbound());
+    private final CalDavHttpClient client = new CalDavHttpClient(TestTargetGuards.loopbackOnly());
 
     @BeforeEach
     void start() throws Exception {

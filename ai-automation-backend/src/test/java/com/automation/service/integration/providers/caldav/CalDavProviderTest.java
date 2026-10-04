@@ -65,7 +65,7 @@ class CalDavProviderTest {
     @BeforeEach
     void start() throws Exception {
         server = new FakeDavServer();
-        provider = new CalDavProvider(new ObjectMapper(), new CalDavHttpClient(TestTargetGuards.outbound()));
+        provider = new CalDavProvider(new ObjectMapper(), new CalDavHttpClient(TestTargetGuards.loopbackOnly()));
         token = server.base() + "/dav|alex:app-pw";
         server.on("PROPFIND /dav/", 207, PRINCIPAL)
                 .on("PROPFIND /dav/principals/alex/", 207, HOME)
