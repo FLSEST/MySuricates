@@ -145,6 +145,8 @@ M_runs_active="%s: noch %s Workflow-Run(s) aktiv — ein Neustart bräche sie ab
 M_runs_later="Neu starten, sobald sie fertig sind: %s"
 M_sync_keys_ok="Die Keys von Test und Prod liegen bei Dev — Definitionen überträgt es unter Einstellungen → Umgebungen (nach Prod nur versiegelte)"
 M_sync_keys_later="Für den Definition-Sync braucht Dev die Keys von Test und Prod — sobald beide laufen: %s"
+M_sealing_dev_off="Dev versiegelt nicht (MYSURICATES_HARDENING_SEALING=false in %s) — nach Prod gehen nur versiegelte Definitionen. Auf true setzen und Dev neu starten, oder: %s"
+M_sealing_dev_now="Dev versiegelt jetzt — nach Prod gehen nur versiegelte Definitionen"
 M_runs_kept="%s läuft weiter, nicht neu gestartet"
 M_runs_kept_settings="%s läuft weiter mit den bisherigen Einstellungen, nicht neu gestartet"
 M_runs_kept_outdated="%s läuft weiter mit Stand %s, nicht neu gestartet (der Klon steht auf %s)"

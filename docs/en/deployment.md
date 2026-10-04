@@ -886,6 +886,11 @@ including the rollback point on the target). What the installer enters for that:
   arrives on Prod unsealed — review and seal it there; Prod starts only sealed workflows unattended. Once
   the Prod copy is sealed and `seal-immutable` is on, Prod refuses a later transfer of the same definition
   (listed in `SyncResult.errors`) until it is unsealed there.
+- A `dev.env` from a staged setup made before the sync has `MYSURICATES_HARDENING_SEALING=false`: then
+  nothing can be sealed in Dev and the list for Prod stays empty. The installer keeps the line and points
+  this out; to fix it set it to `true` and restart Dev
+  (`scripts/instance.sh down --name dev && scripts/instance.sh up --name dev`) or run
+  `scripts/setup.sh --mode staged --reconfigure` (rewrites all three files).
 
 ### Definition Sync (Dev → Stable / Dev → Test)
 

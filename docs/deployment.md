@@ -896,6 +896,11 @@ Definition-Sync unten, samt Rollback-Punkt auf dem Ziel). Was der Installer daf�
   Auf Prod kommt die Kopie unversiegelt an — dort prüfen und versiegeln; Prod startet unbeaufsichtigt nur
   versiegelte Workflows. Ist die Prod-Kopie versiegelt und `seal-immutable` an, lehnt Prod ein späteres
   Übertragen derselben Definition ab (steht in `SyncResult.errors`), bis sie dort entsiegelt ist.
+- Eine `dev.env` aus einer gestuften Einrichtung von vor dem Sync hat `MYSURICATES_HARDENING_SEALING=false`:
+  Dann lässt sich in Dev nichts versiegeln, und die Liste für Prod bleibt leer. Der Installer behält die
+  Zeile und weist darauf hin; abhelfen: auf `true` setzen und Dev neu starten
+  (`scripts/instance.sh down --name dev && scripts/instance.sh up --name dev`) oder
+  `scripts/setup.sh --mode staged --reconfigure` (schreibt alle drei Dateien neu).
 
 ### Definition-Sync (Dev → Stable / Dev → Test)
 

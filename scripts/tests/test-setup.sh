@@ -230,6 +230,11 @@ sed -i.bak "/^MYSURICATES_NETWORK=/d; /^MYSURICATES_SYNC_TARGETS=/d; /^AUTOMATIO
 printf 'AUTOMATION_SYNC_PROD_URL=http://elsewhere:9090\n' >> "$INST/dev.env"
 check "kept files get the sync lines, own values stay"  '[ "$(run --yes --dry-run --mode staged)" = 0 ] && [ "$(val test MYSURICATES_NETWORK)" = staged ] && [ "$(val dev AUTOMATION_SYNC_TEST_URL)" = http://test:9090 ] && [ "$(val dev AUTOMATION_SYNC_PROD_URL)" = http://elsewhere:9090 ] && [ "$(grep -c "^AUTOMATION_SYNC_PROD_URL=" "$INST/dev.env")" = 1 ]'
 check "a second run adds nothing twice"                 '[ "$(run --yes --dry-run --mode staged)" = 0 ] && [ "$(grep -c "^MYSURICATES_NETWORK=" "$INST/dev.env")" = 1 ] && [ "$(grep -c "Definition-Sync" "$INST/dev.env")" = 1 ]'
+check "new staged setup: no sealing warning"            '! out | grep -F "Dev does not seal" >/dev/null'
+# dev.env von vor dem Sync: versiegelt nicht — Hinweis, wie Prod-Sync zu Siegeln kommt; --reconfigure stellt um
+sed -i.bak "s/^MYSURICATES_HARDENING_SEALING=.*/MYSURICATES_HARDENING_SEALING=false/" "$INST/dev.env"; rm -f "$INST"/*.bak
+check "kept dev without seals: says Prod needs them and how" '[ "$(run --yes --dry-run --mode staged)" = 0 ] && out | grep -F "Dev does not seal (MYSURICATES_HARDENING_SEALING=false in deploy/instances/dev.env)" >/dev/null && out | grep -F "scripts/setup.sh --mode staged --reconfigure" >/dev/null && [ "$(val dev MYSURICATES_HARDENING_SEALING)" = false ]'
+check "--reconfigure: dev seals now, and says so"       '[ "$(run --yes --dry-run --mode staged --reconfigure)" = 0 ] && [ "$(val dev MYSURICATES_HARDENING_SEALING)" = true ] && out | grep -F "Dev seals now" >/dev/null && ! out | grep -F "Dev does not seal" >/dev/null && [ "$(val dev AUTOMATION_SYNC_PROD_URL)" = http://prod:9090 ]'
 rm -rf "$INST"
 D="$(firstfree 19750)"; T="$(firstfree 19751 "$D")"; P="$(firstfree 19752 "$D $T")"
 check "staged --port N: Dev from N, Test N+1, Prod N+2"  '[ "$(run --yes --dry-run --mode staged --port 19750)" = 0 ] && [ "$(val dev MYSURICATES_PORT)" = "$D" ] && [ "$(val test MYSURICATES_PORT)" = "$T" ] && [ "$(val prod MYSURICATES_PORT)" = "$P" ]'

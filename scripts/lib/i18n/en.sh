@@ -146,6 +146,8 @@ M_runs_active="%s: %s workflow run(s) still running — a restart would abort th
 M_runs_later="Restart once they are done: %s"
 M_sync_keys_ok="Keys of Test and Prod are with Dev — it transfers definitions under Settings → Environments (to Prod only sealed ones)"
 M_sync_keys_later="Dev needs the keys of Test and Prod for the definition sync — once both run: %s"
+M_sealing_dev_off="Dev does not seal (MYSURICATES_HARDENING_SEALING=false in %s) — only sealed definitions go to Prod. Set it to true and restart Dev, or: %s"
+M_sealing_dev_now="Dev seals now — only sealed definitions go to Prod"
 M_runs_kept="%s keeps running, not restarted"
 M_runs_kept_settings="%s keeps running with its previous settings, not restarted"
 M_runs_kept_outdated="%s keeps running state %s, not restarted (the clone is at %s)"

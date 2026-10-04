@@ -742,6 +742,17 @@ staged_sync_lines() {
   ensure_line dev AUTOMATION_SYNC_PROD_URL http://prod:9090
   ensure_line dev AUTOMATION_SYNC_PROD_KEY_FILE /app/sync-keys/prod.key
 }
+# Nach Prod gehen nur versiegelte Definitionen (84a78bb7). Eine Dev-Datei von vor dem Sync versiegelt
+# nicht — bleibt sie, sagt der Installer, wie es geht; schreibt --reconfigure sie neu, dass Dev jetzt siegelt.
+sealing_hint() {  # VORHER (Wert von MYSURICATES_HARDENING_SEALING vor dem Schreiben)
+  local now
+  now="$(kept_value dev MYSURICATES_HARDENING_SEALING)"
+  if [ "$now" != true ]; then
+    printf '  %s%s%s\n' "$C_AMBER" "$(msg sealing_dev_off "deploy/instances/dev.env" "scripts/setup.sh --mode staged --reconfigure")" "$C_RESET"
+  elif [ "${1:-}" = false ]; then
+    printf '  %s\n' "$(msg sealing_dev_now)"
+  fi
+}
 # Nach dem Start: die Keys von Test und Prod fuer Dev holen. Laeuft ein Ziel nicht, nennt der
 # Installer den Befehl fuer spaeter.
 fetch_sync_keys() {
@@ -757,10 +768,13 @@ step_build() {
   section 6
   if [ "$MODE" = staged ]; then
     # Dev versiegelt (ohne Pflicht fuer unbeaufsichtigte Runs): nach Prod gehen nur versiegelte Definitionen
+    local sealing_before
+    sealing_before="$(kept_value dev MYSURICATES_HARDENING_SEALING)"
     write_instance dev container "$P_DEV" full Dev true false
     write_instance test container "$P_TEST" core Test true true
     write_instance prod container "$P_PROD" core Prod true true
     staged_sync_lines
+    sealing_hint "$sealing_before"
     INSTANCES="dev test prod"
   else
     write_instance "$NAME" "$RUNTIME" "$PORT" "$PRESET" "$LOADED_ENVIRONMENT" "$LOADED_SEALING" "$LOADED_REQUIRE_SEALED"
