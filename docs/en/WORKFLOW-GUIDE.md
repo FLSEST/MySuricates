@@ -1287,7 +1287,7 @@ missing (silent failure). Therefore:
 - **Writing Codex workflows go through Pi:** `"provider": "PI"`, `"model": "openai-codex/gpt-5.5"` — Pi's
   ACT path has read/write/edit/bash tools and can write (example: `pi-smoke-test`).
 
-**Sandbox does not start:** if Codex' own output reports a sandbox start failure (`bwrap: …`, e.g.
+**Sandbox does not start:** if Codex' own output reports a sandbox start failure (a line that starts with `bwrap:`, or with `ERROR`/`exec failed` and contains `…: bwrap:`, e.g.
 `bwrap: setting up uid map: Permission denied` or, now and then, `bwrap: loopback: Failed RTM_NEWADDR: Operation not
 permitted`), the step fails with "Codex sandbox could not start on this host (…)" — even with exit code 0 and even
 when the answer consists of nothing but that error line. The provider does not retry the call; a blind answer

@@ -233,4 +233,27 @@ class HostCodexServiceTest {
 
         assertThat(HostCodexService.sandboxFailure(output, "Looks fine.", null)).isEmpty();
     }
+
+    /**
+     * Review w8: a Codex review that reads this class and its test must not fail — the marker after a
+     * colon inside source or a test string is not Codex' own error line.
+     */
+    @Test
+    void sandboxFailure_ignoresSourceAndTestLinesAboutBwrap_inToolOutputAndAnswer() {
+        String javadoc = "     * start the line or follow a blank or colon (\"exec failed: bwrap: …\"); quoted in source code";
+        String testLine = "        String output = \"ERROR codex_core::exec: sandbox failed: bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted\";";
+        String answer = "HostCodexService.java:40 documents the marker:\n" + javadoc.trim()
+                + "\nHostCodexServiceTest.java:203 checks it:\n" + testLine.trim();
+        String output = String.join("\n",
+                "exec bash -lc 'sed -n 36,45p src/main/java/com/automation/service/ai/HostCodexService.java' in /work",
+                javadoc,
+                "exec bash -lc 'sed -n 200,206p src/test/java/com/automation/service/ai/HostCodexServiceTest.java' in /work",
+                testLine,
+                "codex",
+                "Review done, see answer.");
+
+        assertThat(HostCodexService.sandboxFailure(output, "Review done, see answer.", null)).isEmpty();
+        assertThat(HostCodexService.sandboxFailure(output + "\n" + answer, answer, null)).isEmpty();
+        assertThat(HostCodexService.sandboxFailure(null, javadoc + "\n" + testLine, null)).isEmpty();
+    }
 }

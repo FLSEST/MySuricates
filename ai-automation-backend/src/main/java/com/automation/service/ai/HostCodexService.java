@@ -36,11 +36,11 @@ public class HostCodexService {
     /**
      * Tool-execution errors that mean Codex' sandbox never started — e.g. bwrap without user
      * namespaces ("bwrap: setting up uid map: Permission denied") or without a loopback device
-     * ("bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted", TODO 51958d17). The marker may
-     * start the line or follow a blank or colon ("exec failed: bwrap: …"); quoted in source code
-     * ({@code "bwrap: …"}) it does not count.
+     * ("bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted", TODO 51958d17). Only a line that
+     * starts with the marker, or with {@code ERROR}/{@code exec failed} and carries it after a colon,
+     * counts: source code, tests and docs that mention bwrap mid-line (review w8) do not.
      */
-    private static final Pattern SANDBOX_FAILURE = Pattern.compile("(?:^|[\\s:])bwrap: ?");
+    private static final Pattern SANDBOX_FAILURE = Pattern.compile("^(?:bwrap:|(?:ERROR|exec failed)\\b.*: bwrap:)");
 
     private final SummarizationConfig config;
 

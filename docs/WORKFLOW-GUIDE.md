@@ -1310,7 +1310,7 @@ fehlen aber (stiller Fehlschlag). Deshalb:
 - **Schreibende Codex-Workflows über Pi:** `"provider": "PI"`, `"model": "openai-codex/gpt-5.5"` — der
   ACT-Pfad von Pi hat read/write/edit/bash-Tools und kann schreiben (Beispiel: `pi-smoke-test`).
 
-**Sandbox startet nicht:** Meldet Codex' eigene Ausgabe einen Startfehler der Sandbox (`bwrap: …`, etwa
+**Sandbox startet nicht:** Meldet Codex' eigene Ausgabe einen Startfehler der Sandbox (eine Zeile, die mit `bwrap:` beginnt oder mit `ERROR`/`exec failed` und `…: bwrap:` enthält, etwa
 `bwrap: setting up uid map: Permission denied` oder vereinzelt `bwrap: loopback: Failed RTM_NEWADDR: Operation not
 permitted`), scheitert der Schritt mit „Codex sandbox could not start on this host (…)“ — auch bei Exit-Code 0 und
 auch, wenn die Antwort nur aus dieser Fehlerzeile besteht. Der Provider wiederholt den Aufruf nicht; eine
