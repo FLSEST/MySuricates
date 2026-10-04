@@ -23,7 +23,7 @@ export function useInstallChainTemplate() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['chains'] });
       queryClient.invalidateQueries({ queryKey: ['workflows'] });
-      toast.success(t.chains.templateInstalled?.replace('{name}', data.chainName) ?? `"${data.chainName}" installiert`);
+      toast.success(t.chains.templateInstalled.replace('{name}', data.chainName));
     },
     onError: (err) => {
       toast.error(err.message);

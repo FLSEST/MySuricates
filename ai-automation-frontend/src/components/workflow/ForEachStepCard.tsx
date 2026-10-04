@@ -150,7 +150,7 @@ export function ForEachStepCard({ step, forEachState, runActive = true }: ForEac
               onClick={() => setExpanded(!expanded)}
             >
               {expanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-              {expanded ? 'Hide items' : `Show ${items.length} items`}
+              {expanded ? t.workflows.foreachHideItems : t.workflows.foreachShowItems.replace('{n}', String(items.length))}
             </button>
             {expanded && (
               <div className="space-y-1.5 max-h-64 overflow-y-auto">

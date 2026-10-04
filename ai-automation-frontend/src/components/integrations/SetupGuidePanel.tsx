@@ -138,7 +138,7 @@ export function SetupGuidePanel({ providerId, displayName, requiresCredentials =
               className="inline-flex items-center gap-1 text-sm text-accent hover:underline"
             >
               <ExternalLink className="w-3 h-3" />
-              {lang === 'de' ? 'Token generieren' : 'Generate Token'}
+              {t.integrations.generateToken}
             </a>
           )}
           <Input

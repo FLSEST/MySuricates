@@ -1,5 +1,6 @@
 export const en = {
   common: {
+    noData: 'No data',
     showMore: 'Show more',
     showLess: 'Show less',
     total: 'Total',
@@ -503,6 +504,8 @@ export const en = {
     },
   },
   projects: {
+    noContainer: 'No container',
+    namePlaceholder: 'My Project',
     title: 'Projects',
     subtitle: 'Manage your automation projects',
     create: 'New Project',
@@ -622,6 +625,8 @@ export const en = {
     dragToReorder: 'Drag to reorder',
     foreachItems: '{done}/{total} items',
     foreachChildRun: 'Child run',
+    foreachShowItems: 'Show {n} items',
+    foreachHideItems: 'Hide items',
     title: 'Workflows',
     subtitle: 'Build and manage automation workflows',
     create: 'New Workflow',
@@ -1326,6 +1331,7 @@ export const en = {
     secretFailed: 'Could not change the signing secret',
   },
   integrations: {
+    generateToken: 'Generate Token',
     title: 'Integrations',
     subtitle: 'Connect external services and use them in workflows',
     empty: 'No integrations available',
