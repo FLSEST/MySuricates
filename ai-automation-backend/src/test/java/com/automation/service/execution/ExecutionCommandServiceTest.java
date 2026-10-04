@@ -87,13 +87,28 @@ class ExecutionCommandServiceTest {
     }
 
     @Test
-    void resumeFromStep_delegatesToExecutorAndMaps() {
+    void resumeFromStep_delegatesToExecutorAndReadsTheResponseAfresh() {
         WorkflowRun resumed = WorkflowRun.builder().id("run-1").status(RunStatus.RUNNING).build();
         WorkflowRunResponse response = mock(WorkflowRunResponse.class);
         when(workflowExecutor.resumeFromStep("run-1", TriggerSource.RESUME)).thenReturn(resumed);
-        when(workflowMapper.toRunResponse(resumed)).thenReturn(response);
+        when(executionQueryService.getExecutionResponse("run-1")).thenReturn(response);
 
         assertThat(service.resumeFromStep("run-1")).isSameAs(response);
+    }
+
+    /** fe06ebf9: like retry, resume must not wrap the executor (which starts the run thread) in a transaction. */
+    @Test
+    void resumeFromStep_runsTheExecutorOutsideATransaction() {
+        ExecutionCommandService proxied = FakeTransactions.proxy(service, FakeTransactions.manager());
+        AtomicBoolean inTransaction = new AtomicBoolean(true);
+        when(workflowExecutor.resumeFromStep("run-1", TriggerSource.RESUME)).thenAnswer(inv -> {
+            inTransaction.set(FakeTransactions.active());
+            return WorkflowRun.builder().id("run-1").status(RunStatus.RUNNING).build();
+        });
+
+        proxied.resumeFromStep("run-1");
+
+        assertThat(inTransaction).as("resumeFromStep() ran inside a transaction").isFalse();
     }
 
     @Test

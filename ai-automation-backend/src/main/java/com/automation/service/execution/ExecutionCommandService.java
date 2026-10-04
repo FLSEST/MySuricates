@@ -45,9 +45,14 @@ public class ExecutionCommandService {
         return workflowMapper.toRunResponse(workflowExecutor.execute(workflow, run.getInputContext(), TriggerSource.RETRY));
     }
 
-    @Transactional
+    /**
+     * Not {@code @Transactional} for the same reason as {@link #retry}: the executor commits its own short
+     * transaction before the run thread starts. The response is read afresh (own read transaction) —
+     * mapping walks the run's lazy steps.
+     */
     public WorkflowRunResponse resumeFromStep(String runId) {
-        return workflowMapper.toRunResponse(workflowExecutor.resumeFromStep(runId, TriggerSource.RESUME));
+        WorkflowRun started = workflowExecutor.resumeFromStep(runId, TriggerSource.RESUME);
+        return executionQueryService.getExecutionResponse(started.getId());
     }
 
     /** Stores free-text notes in the run metadata; blank notes remove the entry. */

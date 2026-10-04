@@ -203,7 +203,8 @@ class WorkflowExecutorTest {
                 new RunFinalizer(runRepository, broadcaster, eventPublisher),
                 runWorkspaceService,
                 new RunAdmission(ModuleRegistry.of(Map.of(), Map.of()), new WorkflowDefinitionHasher(), new WorkflowSealVerifier(new WorkflowDefinitionHasher(), org.mockito.Mockito.mock(WorkflowSkillPins.class), RunAdmissionTest.unsignedSigner(), ModuleRegistry.of(Map.of(), Map.of())), workflowVersionService, activityLogService,
-                        new com.automation.service.workflow.analyzer.WorkflowAnalyzer())
+                        new com.automation.service.workflow.analyzer.WorkflowAnalyzer()),
+                com.automation.testsupport.FakeTransactions.manager()
         );
     }
 
@@ -838,6 +839,37 @@ class WorkflowExecutorTest {
         assertThat(captureLastSavedRun().getStatus()).isEqualTo(RunStatus.COMPLETED);
     }
 
+    /**
+     * fe06ebf9: the run is marked RUNNING inside the executor's own short transaction, and its thread
+     * starts only after that commit — before, it started inside the caller's transaction.
+     */
+    @Test
+    void resumeFromStep_marksTheRunInItsTransaction_andStartsTheThreadAfterTheCommit() {
+        WorkflowRun interrupted = WorkflowRun.builder().id("run-1").workflow(testWorkflow).workflowName("Test Workflow")
+                .status(RunStatus.INTERRUPTED).startedAt(Instant.now()).build();
+        when(runRepository.findById("run-1")).thenReturn(Optional.of(interrupted));
+        when(stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc("run-1")).thenReturn(List.of(
+                StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).output("first-output").build()));
+        List<Boolean> savedRunningInTransaction = new ArrayList<>();
+        when(runRepository.save(any(WorkflowRun.class))).thenAnswer(inv -> {
+            WorkflowRun run = inv.getArgument(0);
+            if (run.getStatus() == RunStatus.RUNNING && savedRunningInTransaction.isEmpty()) {
+                savedRunningInTransaction.add(com.automation.testsupport.FakeTransactions.active());
+            }
+            return run;
+        });
+        List<Boolean> blockRanInTransaction = new ArrayList<>();
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class))).thenAnswer(inv -> {
+            blockRanInTransaction.add(com.automation.testsupport.FakeTransactions.active());
+            return StepResult.builder().stepIndex(1).status(StepStatus.COMPLETED).output("ok").build();
+        });
+
+        workflowExecutor.resumeFromStep("run-1", TriggerSource.RESUME);
+
+        assertThat(savedRunningInTransaction).containsExactly(true);
+        assertThat(blockRanInTransaction).containsExactly(false);   // the (synchronous) run thread came after the commit
+    }
+
     @Test
     void resumeFromStep_nonInterruptedRun_throws() {
         WorkflowRun completed = WorkflowRun.builder().id("run-1").workflow(testWorkflow).status(RunStatus.COMPLETED).build();
@@ -1349,7 +1381,8 @@ class WorkflowExecutorTest {
                 new RunFinalizer(runRepository, broadcaster, eventPublisher),
                 runWorkspaceService,
                 new RunAdmission(ModuleRegistry.of(Map.of(), Map.of()), new WorkflowDefinitionHasher(), new WorkflowSealVerifier(new WorkflowDefinitionHasher(), org.mockito.Mockito.mock(WorkflowSkillPins.class), RunAdmissionTest.unsignedSigner(), ModuleRegistry.of(Map.of(), Map.of())), workflowVersionService, activityLogService,
-                        new com.automation.service.workflow.analyzer.WorkflowAnalyzer())
+                        new com.automation.service.workflow.analyzer.WorkflowAnalyzer()),
+                com.automation.testsupport.FakeTransactions.manager()
         );
     }
 
