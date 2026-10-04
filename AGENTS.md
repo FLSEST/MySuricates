@@ -413,6 +413,7 @@ DELETE /api/v1/webhooks/{id}/secret
 
 - Versiegelt: PUT/DELETE mit Definitionsänderung → `409 WORKFLOW_SEALED`; manipulierte Definition startet nicht → `409 WORKFLOW_TAMPERED`
 - `require-sealed-for-unattended`: Schedules, Webhooks, TODO-/Completion-Trigger, Auto-Repair und Wishes (auch über Chains/Sub-Workflows) starten nur versiegelte Workflows → sonst `403 UNATTENDED_REQUIRES_SEAL`
+- Immer (ohne Schalter): Dieselben unbeaufsichtigten Auslöser starten keinen Workflow, den der Analyzer mit `HIGH` `self-api-call`/`direct-db-access` meldet → `403 UNATTENDED_PLATFORM_ACCESS`; Speichern und manueller Start bleiben erlaubt
 - Runs tragen `triggerSource`, `definitionHash`, `definitionVersionId`; Einträge einer Chain zusätzlich `chainRunId`
 
 ### 9. Test-Instanz

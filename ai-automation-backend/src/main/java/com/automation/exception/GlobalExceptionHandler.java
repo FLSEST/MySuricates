@@ -25,13 +25,18 @@ import java.util.NoSuchElementException;
 @Slf4j
 public class GlobalExceptionHandler {
 
+    // The three "not found" handlers log method and path (no stack trace): a 404 on a write (e.g. a
+    // retry or resume) used to leave no trace at all — WARN, TODO fe06ebf9. GET/HEAD 404s are routine
+    // polling of stale or deleted ids (run pages, lists) and stay on DEBUG so they do not flood the log.
     @ExceptionHandler(ResourceNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleNotFound(ResourceNotFoundException ex) {
+    public ResponseEntity<ErrorResponse> handleNotFound(ResourceNotFoundException ex, HttpServletRequest request) {
+        logNotFound(request, ex.getMessage());
         return respond(ErrorCode.RESOURCE_NOT_FOUND, ex.getMessage(), ex.getParams());
     }
 
     @ExceptionHandler(NoSuchElementException.class)
-    public ResponseEntity<ErrorResponse> handleNoSuchElement(NoSuchElementException ex) {
+    public ResponseEntity<ErrorResponse> handleNoSuchElement(NoSuchElementException ex, HttpServletRequest request) {
+        logNotFound(request, ex.getMessage());
         if (ex instanceof LocalizedError localized) return respond(localized);
         return respond(ErrorCode.RESOURCE_NOT_FOUND, ex.getMessage());
     }
@@ -172,8 +177,8 @@ public class GlobalExceptionHandler {
     // Repositories/services that look up by id with EntityNotFoundException (e.g. an unknown run id
     // passed to the memory extraction) were answered with 500 — it is a client error.
     @ExceptionHandler(EntityNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleEntityNotFound(EntityNotFoundException ex) {
-        log.debug("Entity not found: {}", ex.getMessage());
+    public ResponseEntity<ErrorResponse> handleEntityNotFound(EntityNotFoundException ex, HttpServletRequest request) {
+        logNotFound(request, ex.getMessage());
         if (ex instanceof LocalizedError localized) return respond(localized);
         return respond(ErrorCode.RESOURCE_NOT_FOUND, ex.getMessage() != null ? ex.getMessage() : "Entity not found");
     }
@@ -209,6 +214,15 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleGeneral(Exception ex) {
         log.error("Unhandled exception", ex);
         return respond(ErrorCode.INTERNAL_ERROR, "Internal server error", Map.of());
+    }
+
+    private static void logNotFound(HttpServletRequest request, String message) {
+        String method = request.getMethod();
+        if ("GET".equals(method) || "HEAD".equals(method)) {
+            log.debug("Not found: {} {} – {}", method, request.getRequestURI(), message);
+        } else {
+            log.warn("Not found: {} {} – {}", method, request.getRequestURI(), message);
+        }
     }
 
     private ResponseEntity<ErrorResponse> respond(ErrorCode code, String message) {

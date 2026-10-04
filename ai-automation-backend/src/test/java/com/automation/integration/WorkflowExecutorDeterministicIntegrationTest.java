@@ -99,6 +99,26 @@ class WorkflowExecutorDeterministicIntegrationTest {
         assertThat(steps.get(1).getOutput()).isEqualTo("prev=alpha");
     }
 
+    /**
+     * fe06ebf9: retry runs outside a transaction (the run thread must not start before the row is
+     * committed) — the original run's workflow and input context still load, and the new run completes.
+     */
+    @Test
+    void retry_outsideATransaction_startsACommittedRunWithTheOriginalContext() {
+        Project project = createProject("retry-service");
+        Workflow workflow = createWorkflow(project, "retry service", shell("printf 'v=%s' '{{ value }}'"));
+        WorkflowRun original = executeAndWait(workflow, Map.of("value", "42"));
+        entityManager.clear();
+
+        var response = executionCommandService.retry(original.getId());
+
+        WorkflowRun retried = waitForTerminal(workflowRunRepository.findById(response.id()).orElseThrow());
+        assertThat(retried.getId()).isNotEqualTo(original.getId());
+        assertThat(retried.getTriggerSource()).isEqualTo(TriggerSource.RETRY);
+        assertThat(retried.getStatus()).isEqualTo(RunStatus.COMPLETED);
+        assertThat(singleStepOutput(retried)).isEqualTo("v=42");
+    }
+
     @Test
     void conditionalBlock_executesThenAndElseBranchesInShellMode() {
         Project project = createProject("conditional");

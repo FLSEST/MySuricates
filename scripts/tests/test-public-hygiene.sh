@@ -285,6 +285,24 @@ write_pool app-settings-key <<'JSON'
  "blocks": [{"type": "simple", "config": {"command": "Den API-Key aus app_settings holen."}}]}
 JSON
 
+write_pool key-file-read <<'JSON'
+{"name": {"de": "Schlüsseldatei", "en": "Key file"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "KEY=$(cat ~/.mysuricates/api-key); echo ${#KEY}"}}]}
+JSON
+
+write_pool key-file-data-home-fn <<'JSON'
+{"name": {"de": "Datenordner-Funktion", "en": "Data home function"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "KEY=$(cat \"$(data_home \"$HOME\")/api-key\")"}}]}
+JSON
+
+write_pool key-file-data-home <<'JSON'
+{"name": {"de": "Datenordner", "en": "Data home"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "wc -c \"${AUTOMATION_DATA_HOME}/api-key\""}}]}
+JSON
+
 write_pool db-sqlite <<'JSON'
 {"name": {"de": "DB", "en": "DB"},
  "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
@@ -505,6 +523,9 @@ check "curl auf die eigene API erkannt"        'grep -q "self-api-curl.*SELF-API
 check "API-Aufruf im Prompt erkannt"           'grep -q "self-api-prompt.*SELF-API" <<<"$OUT"'
 check "X-API-Key erkannt"                      'grep -q "api-key-header.*CREDENTIAL" <<<"$OUT"'
 check "app_settings erkannt"                   'grep -q "app-settings-key.*CREDENTIAL" <<<"$OUT"'
+check "Schlüsseldatei ohne curl erkannt"       'grep -q "key-file-read.*CREDENTIAL" <<<"$OUT"'
+check "Schlüsseldatei im Datenordner erkannt"  'grep -q "key-file-data-home\.json.*CREDENTIAL" <<<"$OUT"'
+check "Schlüsseldatei über data_home erkannt"  'grep -q "key-file-data-home-fn.*CREDENTIAL" <<<"$OUT"'
 check "sqlite3 auf die DB erkannt"             'grep -q "db-sqlite.*DB-DIRECT" <<<"$OUT"'
 check "Dateigroesse der DB bleibt erlaubt"     '! grep -q "db-filesize-ok" <<<"$OUT"'
 check "auth-freie Health-Sonde bleibt erlaubt" '! grep -q "api-health-ok" <<<"$OUT"'

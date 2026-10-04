@@ -12,6 +12,12 @@ import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.core.MethodParameter;
+import org.springframework.mock.web.MockHttpServletRequest;
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+import org.slf4j.LoggerFactory;
 
 import java.util.NoSuchElementException;
 
@@ -20,6 +26,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 class GlobalExceptionHandlerTest {
+
+    private static final MockHttpServletRequest GET_RUN = new MockHttpServletRequest("GET", "/api/v1/executions/run-2");
 
     private GlobalExceptionHandler handler;
 
@@ -32,7 +40,7 @@ class GlobalExceptionHandlerTest {
     void handleNotFound_returnsNotFoundStatus() {
         var ex = new ResourceNotFoundException("Workflow", "abc-123");
 
-        ResponseEntity<ErrorResponse> response = handler.handleNotFound(ex);
+        ResponseEntity<ErrorResponse> response = handler.handleNotFound(ex, GET_RUN);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(response.getBody()).isNotNull();
@@ -45,7 +53,7 @@ class GlobalExceptionHandlerTest {
     void handleNoSuchElement_returnsNotFoundStatus() {
         var ex = new NoSuchElementException("Element missing");
 
-        ResponseEntity<ErrorResponse> response = handler.handleNoSuchElement(ex);
+        ResponseEntity<ErrorResponse> response = handler.handleNoSuchElement(ex, GET_RUN);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(response.getBody()).isNotNull();
@@ -187,7 +195,7 @@ class GlobalExceptionHandlerTest {
     @Test
     void handleEntityNotFound_returnsNotFoundWithMessage() {
         ResponseEntity<ErrorResponse> response = handler.handleEntityNotFound(
-                new jakarta.persistence.EntityNotFoundException("Run not found: run-x"));
+                new jakarta.persistence.EntityNotFoundException("Run not found: run-x"), GET_RUN);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(response.getBody()).isNotNull();
@@ -199,7 +207,7 @@ class GlobalExceptionHandlerTest {
     @Test
     void handleEntityNotFound_localized_sendsMessageKeyAndParams() {
         ResponseEntity<ErrorResponse> response = handler.handleEntityNotFound(
-                new LocalizedEntityNotFoundException("WorkflowMemory", "mem-x"));
+                new LocalizedEntityNotFoundException("WorkflowMemory", "mem-x"), GET_RUN);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(response.getBody()).isNotNull();
@@ -242,7 +250,7 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void handleNotFound_sendsResourceAndIdAsParams() {
-        ResponseEntity<ErrorResponse> response = handler.handleNotFound(new ResourceNotFoundException("Workflow", "abc-123"));
+        ResponseEntity<ErrorResponse> response = handler.handleNotFound(new ResourceNotFoundException("Workflow", "abc-123"), GET_RUN);
 
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().getParams()).containsExactlyInAnyOrderEntriesOf(
@@ -387,7 +395,7 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void handleNoSuchElement_sendsKey_forANamedResource() {
-        ResponseEntity<ErrorResponse> response = handler.handleNoSuchElement(new ElementNotFoundException("Chain run", "r-1"));
+        ResponseEntity<ErrorResponse> response = handler.handleNoSuchElement(new ElementNotFoundException("Chain run", "r-1"), GET_RUN);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(response.getBody()).isNotNull();
@@ -415,5 +423,44 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody().getCode()).isEqualTo("RUN_DELETION_DISABLED");
         assertThat(response.getBody().getMessageKey()).isEqualTo("RUN_RETENTION_LOCKED");
         assertThat(response.getBody().getError()).endsWith(": 90 -> 30 days");
+    }
+
+    /**
+     * fe06ebf9: a 404 after a write (POST retry/resume …) must leave a trace — WARN with method and
+     * path, without a stack trace. Review w8: GET 404s come from polling (run pages, stale ids) and
+     * stay on DEBUG, or they would flood the log.
+     */
+    @Test
+    void notFoundHandlers_warnForWrites_debugForGetPolling_withoutStackTrace() {
+        MockHttpServletRequest retry = new MockHttpServletRequest("POST", "/api/v1/executions/run-2/retry");
+        Logger logger = (Logger) LoggerFactory.getLogger(GlobalExceptionHandler.class);
+        Level previousLevel = logger.getLevel();
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        logger.setLevel(Level.DEBUG); // logback-test.xml quiets the test log
+        try {
+            handler.handleNotFound(new ResourceNotFoundException("Execution", "run-2"), retry);
+            handler.handleNoSuchElement(new NoSuchElementException("Element missing"), retry);
+            handler.handleEntityNotFound(new jakarta.persistence.EntityNotFoundException("Run not found"), retry);
+            handler.handleNotFound(new ResourceNotFoundException("Execution", "run-2"), GET_RUN);
+            handler.handleNoSuchElement(new NoSuchElementException("Element missing"), GET_RUN);
+            handler.handleEntityNotFound(new jakarta.persistence.EntityNotFoundException("Run not found"), GET_RUN);
+        } finally {
+            logger.detachAppender(appender);
+            logger.setLevel(previousLevel);
+            appender.stop();
+        }
+
+        assertThat(appender.list).hasSize(6).allSatisfy(event -> assertThat(event.getThrowableProxy()).isNull());
+        assertThat(appender.list.subList(0, 3)).allSatisfy(event -> {
+            assertThat(event.getLevel()).isEqualTo(Level.WARN);
+            assertThat(event.getFormattedMessage()).contains("POST /api/v1/executions/run-2/retry");
+        });
+        assertThat(appender.list.subList(3, 6)).allSatisfy(event -> {
+            assertThat(event.getLevel()).isEqualTo(Level.DEBUG);
+            assertThat(event.getFormattedMessage()).contains("GET /api/v1/executions/run-2");
+        });
+        assertThat(appender.list.get(0).getFormattedMessage()).contains("Execution not found with id: run-2");
     }
 }

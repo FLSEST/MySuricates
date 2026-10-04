@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -33,10 +34,13 @@ import java.util.concurrent.TimeoutException;
 public class HostCodexService {
 
     /**
-     * Line prefixes of tool-execution errors that mean Codex' sandbox never started — e.g. bwrap
-     * without user namespaces ("bwrap: setting up uid map: Permission denied").
+     * Tool-execution errors that mean Codex' sandbox never started — e.g. bwrap without user
+     * namespaces ("bwrap: setting up uid map: Permission denied") or without a loopback device
+     * ("bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted", TODO 51958d17). Only a line that
+     * starts with the marker, or with {@code ERROR}/{@code exec failed} and carries it after a colon,
+     * counts: source code, tests and docs that mention bwrap mid-line (review w8) do not.
      */
-    private static final List<String> SANDBOX_FAILURE_PREFIXES = List.of("bwrap:");
+    private static final Pattern SANDBOX_FAILURE = Pattern.compile("^(?:bwrap:|(?:ERROR|exec failed)\\b.*: bwrap:)");
 
     private final SummarizationConfig config;
 
@@ -120,6 +124,8 @@ public class HostCodexService {
                 int exitCode = proc.exitValue();
                 if (exitCode != 0) {
                     String stderr = new String(outputFuture.get(1, TimeUnit.SECONDS)).trim();
+                    // The transcript header fills the first 200 chars — name the sandbox failure instead
+                    failOnBrokenSandbox(stderr, null, prompt);
                     log.warn("Codex returned exit code {}: {}", exitCode, truncate(stderr, 500));
                     throw new IOException("Codex failed with exit code " + exitCode + ": " + truncate(stderr, 200));
                 }
@@ -129,14 +135,14 @@ public class HostCodexService {
                 // Read result from output file
                 if (Files.exists(outputFile) && Files.size(outputFile) > 0) {
                     String answer = Files.readString(outputFile).trim();
-                    failOnBrokenSandbox(processOutput, answer);
+                    failOnBrokenSandbox(processOutput, answer, prompt);
                     return answer;
                 }
 
                 // Fallback: use stdout
                 String stdout = processOutput.trim();
                 if (!stdout.isEmpty()) {
-                    failOnBrokenSandbox(stdout, null);
+                    failOnBrokenSandbox(stdout, null, prompt);
                     return stdout;
                 }
 
@@ -158,33 +164,52 @@ public class HostCodexService {
 
     /**
      * Exit code 0 and an answer do not prove Codex could work: when its sandbox fails to start,
-     * every tool call errors and Codex still answers without having read a single file. Such a
-     * block must fail instead of passing an answer without codebase on to the next step.
+     * every tool call errors and Codex still answers without having read a single file — sometimes
+     * with nothing but the error line. Such a block must fail (and is not retried) instead of passing
+     * an answer without codebase on to the next step. A non-zero exit gets the same clear message.
      */
-    private static void failOnBrokenSandbox(String processOutput, String answer) throws IOException {
-        Optional<String> failure = sandboxFailure(processOutput, answer);
+    private static void failOnBrokenSandbox(String processOutput, String answer, String prompt) throws IOException {
+        Optional<String> failure = sandboxFailure(processOutput, answer, prompt);
         if (failure.isPresent()) {
-            log.warn("Codex sandbox is not working on this host: {}", failure.get());
-            throw new IOException("Codex sandbox is not working on this host (" + failure.get()
-                    + ") — the block ran without file access. Use provider PI with an openai-codex/… model instead.");
+            log.warn("Codex sandbox could not start on this host: {}", failure.get());
+            throw new IOException("Codex sandbox could not start on this host (" + failure.get()
+                    + ") — the step fails instead of passing on an answer without file access; it is not retried."
+                    + " If this keeps happening, use provider PI with an openai-codex/… model instead.");
         }
     }
 
     /**
-     * Finds a sandbox start failure in Codex' own process output. Lines that also appear in the final
-     * answer are ignored, so a model merely writing about bwrap does not fail the block.
+     * Finds a sandbox start failure in Codex' own process output. Lines that also appear in the
+     * final answer or in the prompt are ignored, so a model merely writing about bwrap — or a prompt
+     * quoting the error — does not fail the block. An answer that consists of nothing but sandbox
+     * failure lines is a failure itself, quoted or not.
      */
-    static Optional<String> sandboxFailure(String processOutput, String answer) {
-        if (processOutput == null) {
-            return Optional.empty();
-        }
-        Set<String> answerLines = answer == null ? Set.of()
-                : answer.lines().map(String::trim).collect(Collectors.toSet());
-        return processOutput.lines()
+    static Optional<String> sandboxFailure(String processOutput, String answer, String prompt) {
+        Set<String> ignored = new java.util.HashSet<>(nonBlankLines(answer));
+        ignored.addAll(nonBlankLines(prompt));
+        Optional<String> inOutput = processOutput == null ? Optional.empty() : processOutput.lines()
                 .map(String::trim)
-                .filter(line -> SANDBOX_FAILURE_PREFIXES.stream().anyMatch(line::startsWith))
-                .filter(line -> !answerLines.contains(line))
+                .filter(HostCodexService::isSandboxFailureLine)
+                .filter(line -> !ignored.contains(line))
                 .findFirst();
+        if (inOutput.isPresent()) {
+            return inOutput;
+        }
+        List<String> answerLines = List.copyOf(nonBlankLines(answer));
+        if (!answerLines.isEmpty() && answerLines.stream().allMatch(HostCodexService::isSandboxFailureLine)) {
+            return Optional.of(answerLines.get(0));
+        }
+        return Optional.empty();
+    }
+
+    private static boolean isSandboxFailureLine(String line) {
+        return SANDBOX_FAILURE.matcher(line).find();
+    }
+
+    private static java.util.LinkedHashSet<String> nonBlankLines(String text) {
+        return text == null ? new java.util.LinkedHashSet<>() : text.lines().map(String::trim)
+                .filter(line -> !line.isEmpty())
+                .collect(Collectors.toCollection(java.util.LinkedHashSet::new));
     }
 
     /**

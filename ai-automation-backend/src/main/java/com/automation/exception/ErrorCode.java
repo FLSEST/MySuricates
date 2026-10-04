@@ -20,6 +20,7 @@ public enum ErrorCode {
     SKILL_PINNED_BY_SEAL(HttpStatus.CONFLICT, "Skill is used by a sealed workflow"),
     SEAL_IMMUTABLE(HttpStatus.FORBIDDEN, "Unsealing is disabled in the startup configuration"),
     UNATTENDED_REQUIRES_SEAL(HttpStatus.FORBIDDEN, "Unattended runs require a sealed workflow"),
+    UNATTENDED_PLATFORM_ACCESS(HttpStatus.FORBIDDEN, "Unattended runs of workflows that access the platform directly are refused"),
     WEBHOOK_SIGNATURE_INVALID(HttpStatus.UNAUTHORIZED, "Missing or invalid webhook signature"),
     NO_TASK_TARGET(HttpStatus.BAD_REQUEST, "No task export target configured"),
     PROVIDER_NOT_CONNECTED(HttpStatus.CONFLICT, "Integration provider not connected"),

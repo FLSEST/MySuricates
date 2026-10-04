@@ -30,17 +30,29 @@ public class ExecutionCommandService {
     private final WorkflowRunRepository runRepository;
     private final WorkflowMapper workflowMapper;
 
-    /** Starts a fresh run of the same workflow with the original input context. */
-    @Transactional
+    /**
+     * Starts a fresh run of the same workflow with the original input context.
+     *
+     * <p>Deliberately not {@code @Transactional} (same as {@code POST /workflows/{id}/execute}): the
+     * executor hands the new run to its thread right away, and inside a surrounding transaction that
+     * thread would start before the run row is committed — with pool-size 1 it then waits for the
+     * request's connection, and the client may ask for a run that is not visible yet (TODO fe06ebf9).
+     * The lookups below run in their own short read transactions; the workflow is loaded eagerly.
+     */
     public WorkflowRunResponse retry(String runId) {
         WorkflowRun run = executionQueryService.findById(runId);
         var workflow = workflowService.findByIdEager(run.getWorkflow().getId());
         return workflowMapper.toRunResponse(workflowExecutor.execute(workflow, run.getInputContext(), TriggerSource.RETRY));
     }
 
-    @Transactional
+    /**
+     * Not {@code @Transactional} for the same reason as {@link #retry}: the executor commits its own short
+     * transaction before the run thread starts. The response is read afresh (own read transaction) —
+     * mapping walks the run's lazy steps.
+     */
     public WorkflowRunResponse resumeFromStep(String runId) {
-        return workflowMapper.toRunResponse(workflowExecutor.resumeFromStep(runId, TriggerSource.RESUME));
+        WorkflowRun started = workflowExecutor.resumeFromStep(runId, TriggerSource.RESUME);
+        return executionQueryService.getExecutionResponse(started.getId());
     }
 
     /** Stores free-text notes in the run metadata; blank notes remove the entry. */

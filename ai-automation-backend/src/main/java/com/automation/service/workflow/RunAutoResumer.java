@@ -188,7 +188,8 @@ public class RunAutoResumer {
             return false;
         }
         try {
-            WorkflowRun started = tx.execute(status -> workflowExecutor.resumeFromStep(runId, TriggerSource.AUTO_RESUME));
+            // no surrounding transaction: resumeFromStep commits its own before the run thread starts (fe06ebf9)
+            WorkflowRun started = workflowExecutor.resumeFromStep(runId, TriggerSource.AUTO_RESUME);
             boolean restarted = started != null && !runId.equals(started.getId());   // no finished block: full retry
             if (restarted) {
                 tx.executeWithoutResult(status -> markRestarted(runId, started.getId()));

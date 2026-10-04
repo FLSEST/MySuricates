@@ -15,6 +15,8 @@ import com.automation.service.project.ContainerService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -49,6 +51,7 @@ public class WorkflowExecutor {
     private final RunFinalizer finalizer;
     private final RunWorkspaceService workspaces;
     private final RunAdmission admission;
+    private final PlatformTransactionManager transactionManager;
 
     // Active execution tracking is delegated to WorkflowExecutionRegistry; controlling a run that
     // already exists (pause/resume/cancel/approval, ad-hoc commands) to RunControlService.
@@ -358,76 +361,72 @@ public class WorkflowExecutor {
         }
     }
 
-    /** Resumes an INTERRUPTED run after its last completed step (none ⇒ full retry) — RESUME by a person, AUTO_RESUME by {@link RunAutoResumer}. */
+    /** What the resume transaction hands over: the run and either a detached segment or a full retry. */
+    private record ResumeStart(WorkflowRun run, WorkflowSnapshot wf, ResumePlan plan, ResumeContext context,
+                               Workflow retryWorkflow, Map<String, Object> retryMetadata) {}
+
+    /**
+     * Resumes an INTERRUPTED run after its last completed step (none ⇒ full retry) — RESUME by a person,
+     * AUTO_RESUME by {@link RunAutoResumer}. Loads, admits and marks the run in a short transaction of its
+     * own and starts the run thread only after that commit; callers must not hold one (TODO fe06ebf9).
+     */
     public WorkflowRun resumeFromStep(String runId, TriggerSource source) {
+        ResumeStart start;
+        try {
+            start = new TransactionTemplate(transactionManager).execute(status -> prepareResume(runId, source));
+        } catch (RuntimeException | Error e) {
+            executionRegistry.unregister(runId); // registered in the transaction, which did not commit
+            throw e;
+        }
+        if (start.retryWorkflow() != null) {
+            return execute(start.retryWorkflow(), start.run().getInputContext(), null, start.retryMetadata(), source);
+        }
+        try {
+            broadcaster.broadcastRunStatus(runId, RunStatus.RUNNING);
+            submitExecution(runId, () -> executeBlocks(runId, start.run().getWorkflow().getId(), start.run().getWorkflow().getName(),
+                    start.wf(), start.context().variables(), start.plan(), start.context().previousOutput()));
+        } catch (Throwable t) {
+            executionRegistry.unregister(runId); // no thread took over — do not leave it registered
+            throw t;
+        }
+        return start.run();
+    }
+
+    private ResumeStart prepareResume(String runId, TriggerSource source) {
         WorkflowRun run = runRepository.findById(runId)
                 .orElseThrow(() -> new ResourceNotFoundException("WorkflowRun", runId));
-
         if (run.getStatus() != RunStatus.INTERRUPTED) {
             throw new WorkflowExecutionException("Run " + runId + " cannot be resumed: status is " + run.getStatus());
         }
-
         List<StepResult> persistedSteps = stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc(runId);
-        List<StepResult> completedSteps = persistedSteps.stream()
-                .filter(s -> s.getStatus() == StepStatus.COMPLETED)
-                .toList();
-
+        List<StepResult> completedSteps = persistedSteps.stream().filter(s -> s.getStatus() == StepStatus.COMPLETED).toList();
+        final Workflow workflow = run.getWorkflow();
         if (completedSteps.isEmpty() && !run.getMetadata().containsKey("workspace")) {
             log.info("Resume requested for run {} but no completed steps found — falling back to full retry", runId);
-            return execute(run.getWorkflow(), run.getInputContext(), null, RunAutoResumer.carryOver(run, source), source);
+            workflow.getBlocks().size(); workflow.getActivatedSkills().size(); // execute() reads them after this transaction
+            return new ResumeStart(run, null, null, null, workflow, RunAutoResumer.carryOver(run, source));
         }
-
         ResumePlan plan = ResumePlan.after(persistedSteps);
-
-        // Reconstruct context: inputContext + step outputs from DB + accumulated user vars (contextDelta)
-        Map<String, Object> reconstructed = new HashMap<>(run.getInputContext() != null ? run.getInputContext() : Map.of());
-        String lastOutput = "";
-        for (StepResult step : completedSteps) {
-            String out = step.getOutput() != null ? step.getOutput() : "";
-            reconstructed.put("step_" + step.getStepIndex() + "_output", out);
-            lastOutput = out;
-            if (step.getContextDelta() != null) {
-                reconstructed.putAll(step.getContextDelta());
-            }
-        }
-        final String previousOutput = lastOutput;
-        final Map<String, Object> contextForResume = Map.copyOf(reconstructed);
-
-        // Load workflow data eagerly before updating run status
-        final Workflow workflow = run.getWorkflow();
+        ResumeContext context = ResumeContext.rebuild(run.getInputContext(), completedSteps);
         final WorkflowSnapshot wf;
         try {
             wf = snapshot(workflow);
         } catch (Exception e) {
             throw new WorkflowExecutionException("Failed to load workflow data for resume: " + e.getMessage(), e);
         }
-
         // Announce first: a failing log write leaves the run INTERRUPTED, not RUNNING-with-nobody.
         activityLogService.info(LogCategory.EXECUTION,
                 "Resuming workflow after " + plan.blocksToSkip() + " completed block(s): " + workflow.getName(),
                 "WorkflowExecutor", runId, workflow.getId());
-
         // Reset run to RUNNING — the resumed segment runs today's definition, so provenance is re-taken
-        RunAdmission.Ticket ticket = admission.admit(workflow, source, contextForResume);
+        RunAdmission.Ticket ticket = admission.admit(workflow, source, context.variables());
         run.setTriggerSource(source); run.setDefinitionHash(ticket.definitionHash()); run.setDefinitionVersionId(ticket.definitionVersionId());
         run.setSealed(ticket.sealed()); run.setSealedSkillPins(ticket.sealedSkillPins());
         run.setStatus(RunStatus.RUNNING);
-        run.setError(null);
-        run.setCompletedAt(null);
+        run.setError(null); run.setCompletedAt(null);
         runRepository.save(run);
-
-        final String wfId = workflow.getId();
-        final String wfName = workflow.getName();
         executionRegistry.registerProvisional(runId); // controllable as soon as it is RUNNING
-        try {
-            broadcaster.broadcastRunStatus(runId, RunStatus.RUNNING);
-            submitExecution(runId, () -> executeBlocks(runId, wfId, wfName, wf, contextForResume, plan, previousOutput));
-        } catch (Throwable t) {
-            executionRegistry.unregister(runId); // no thread took over — do not leave it registered
-            throw t;
-        }
-
-        return run;
+        return new ResumeStart(run, wf, plan, context, null, null);
     }
 
     private BlockExecutor findExecutor(String blockType) {

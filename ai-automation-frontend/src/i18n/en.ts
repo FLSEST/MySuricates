@@ -2191,6 +2191,7 @@ export const en = {
       SKILL_PINNED_BY_SEAL: 'Skill \'{name}\' is used by sealed workflow(s) {workflows} — unseal them first',
       SEAL_IMMUTABLE: 'Workflow \'{name}\' cannot be unsealed: automation.hardening.seal-immutable is on (startup configuration)',
       UNATTENDED_REQUIRES_SEAL: 'Workflow \'{name}\' was not started: unattended runs ({origin}) require a sealed workflow (automation.hardening.require-sealed-for-unattended)',
+      UNATTENDED_PLATFORM_ACCESS: 'Workflow \'{name}\' was not started: unattended runs ({origin}) of workflows that access the platform directly are refused – {rule} in block {block}. A person can still start it; better use context variables or the todo blocks.',
       WEBHOOK_SIGNATURE_INVALID: 'Missing or invalid {header} header (expected sha256=<hex HMAC-SHA256 of the request body>)',
       NO_TASK_TARGET: 'No target configured for the task export ({setting})',
       PROVIDER_NOT_TASK_CAPABLE: 'Integration \'{provider}\' cannot receive tasks',

@@ -181,6 +181,25 @@ class RunAutoResumerTest {
         assertThat(resumer.isIdle()).isTrue();
     }
 
+    /** fe06ebf9: the resumer must not wrap resumeFromStep (which starts the run thread) in its transaction. */
+    @Test
+    void resumesOutsideATransaction() {
+        Workflow wf = workflow("wf-1", true);
+        WorkflowRun run = interrupted("r1", wf, "RUNNING");
+        stored(run);
+        storedWorkflow(wf);
+        java.util.concurrent.atomic.AtomicBoolean inTransaction = new java.util.concurrent.atomic.AtomicBoolean(true);
+        when(workflowExecutor.resumeFromStep("r1", TriggerSource.AUTO_RESUME)).thenAnswer(inv -> {
+            inTransaction.set(FakeTransactions.active());
+            return run;
+        });
+
+        resumer.onRunsInterrupted(new RunInterruption.Event(List.of("r1"), RunInterruption.Cause.RESTART));
+        runScheduled();
+
+        assertThat(inTransaction).as("resumeFromStep() ran inside a transaction").isFalse();
+    }
+
     @Test
     void workflowWithoutOptIn_orDeleted_isLeftAlone() {
         Workflow plain = workflow("wf-1", false);

@@ -54,6 +54,7 @@ Wo ein Code für viele Meldungen steht (`INVALID_ARGUMENT`, `STATE_CONFLICT`, �
 | `SKILL_PINNED_BY_SEAL` | 409 |
 | `SEAL_IMMUTABLE` | 403 |
 | `UNATTENDED_REQUIRES_SEAL` | 403 |
+| `UNATTENDED_PLATFORM_ACCESS` | 403 |
 | `WEBHOOK_SIGNATURE_INVALID` | 401 |
 | `NO_TASK_TARGET` | 400 |
 | `PROVIDER_NOT_CONNECTED` | 409 |
@@ -596,7 +597,7 @@ Workflow ausführen.
 }
 ```
 
-`definitionHash`/`definitionVersionId` sind `null`, wenn `automation.hardening.provenance` aus ist. `chainRunId` nennt den Chain-Run, der den Lauf als Eintrag gestartet hat (`triggerSource: CHAIN`, nach einem Fortsetzen `RESUME`), sonst `null` — auch bei Retry und Sub-Workflows, die `{{ chain_run_id }}` nur mit dem Kontext erben; Läufe von vor V89 haben keinen. `chainId` nennt die Kette dieses Chain-Runs (für den Link `/chains?chain=<id>`, 3a35ced1), sonst `null` – auch wenn der Chain-Run gelöscht ist; nur die Detailantwort trägt das Feld, ältere Backends lassen es weg. Abgelehnte Starts erzeugen keinen Run: `409 WORKFLOW_TAMPERED` (versiegelte Definition verändert), `403 UNATTENDED_REQUIRES_SEAL` (nur bei unbeaufsichtigten Auslösern).
+`definitionHash`/`definitionVersionId` sind `null`, wenn `automation.hardening.provenance` aus ist. `chainRunId` nennt den Chain-Run, der den Lauf als Eintrag gestartet hat (`triggerSource: CHAIN`, nach einem Fortsetzen `RESUME`), sonst `null` — auch bei Retry und Sub-Workflows, die `{{ chain_run_id }}` nur mit dem Kontext erben; Läufe von vor V89 haben keinen. `chainId` nennt die Kette dieses Chain-Runs (für den Link `/chains?chain=<id>`, 3a35ced1), sonst `null` – auch wenn der Chain-Run gelöscht ist; nur die Detailantwort trägt das Feld, ältere Backends lassen es weg. Abgelehnte Starts erzeugen keinen Run: `409 WORKFLOW_TAMPERED` (versiegelte Definition verändert), `403 UNATTENDED_REQUIRES_SEAL` (nur bei unbeaufsichtigten Auslösern), `403 UNATTENDED_PLATFORM_ACCESS` (unbeaufsichtigter Auslöser, Definition mit `HIGH`-Befund `self-api-call`/`direct-db-access`).
 
 ### `GET /api/v1/workflows/{id}/runs`
 
@@ -1696,7 +1697,7 @@ curl -X POST "$URL" -H 'Content-Type: application/json' -H "X-Signature: sha256=
 ```
 
 Mit `automation.hardening.require-sealed-for-unattended` startet ein Webhook nur versiegelte Workflows (sonst
-`403 UNATTENDED_REQUIRES_SEAL`).
+`403 UNATTENDED_REQUIRES_SEAL`). Einen Workflow, der auf die eigene Plattform zugreift (`HIGH`-Befund `self-api-call`/`direct-db-access`), startet ein Webhook nie (`403 UNATTENDED_PLATFORM_ACCESS`).
 
 **Response:** `WorkflowRunResponse`
 

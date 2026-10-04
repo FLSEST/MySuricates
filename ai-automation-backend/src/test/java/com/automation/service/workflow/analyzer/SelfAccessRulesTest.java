@@ -252,6 +252,46 @@ class SelfAccessRulesTest {
         assertThat(shell("# kein sqlite3 hier\nls")).isEmpty();
     }
 
+    /** TODO ee8bb93d: wer die Schlüsseldatei liest, hält den Key im Klartext — auch ohne curl danach. */
+    @Test
+    void schluesseldateiLesenImShellCodeIstHighAuchOhneCurl() {
+        assertThat(shell("KEY=$(cat ~/.mysuricates/api-key)\necho \"key ok\"")).singleElement().satisfies(f -> {
+            assertThat(f.rule()).isEqualTo("self-api-call");
+            assertThat(f.severity()).isEqualTo(Severity.HIGH);
+            assertThat(f.detail()).contains(".mysuricates/api-key", "Klartext");
+            assertThat(f.detailEn()).contains("reads the instance's API key");
+        });
+        assertThat(shell("KEY=$(< \"$HOME/.autotrigger/api-key\")")).singleElement()
+                .satisfies(f -> assertThat(f.severity()).isEqualTo(Severity.HIGH));
+        assertThat(shell("head -c 64 \"${AUTOMATION_DATA_HOME}/api-key\" > /tmp/k")).hasSize(1);
+        assertThat(shell("cat \"$(data_home \"$STATE/home\")/api-key\"")).hasSize(1);
+        assertThat(apply(block("foreach", "f", Map.of("items_command", "cat ~/.mysuricates/api-key",
+                "command", "x")))).singleElement().satisfies(f -> assertThat(f.severity()).isEqualTo(Severity.HIGH));
+    }
+
+    @Test
+    void schluesseldateiImKiAuftragIstMediumUndKommentarOderAndereDateiKeinBefund() {
+        assertThat(apply(block("simple", "p", Map.of("command",
+                "Lies den Schlüssel aus ~/.mysuricates/api-key und rufe damit die Instanz auf"))))
+                .singleElement().satisfies(f -> {
+                    assertThat(f.rule()).isEqualTo("self-api-call");
+                    assertThat(f.severity()).isEqualTo(Severity.MEDIUM);
+                    assertThat(f.detail()).contains("prüfen");
+                });
+        assertThat(shell("# nie ~/.mysuricates/api-key lesen\nls")).isEmpty();
+        assertThat(shell("cat ~/.config/tool/api-keys.txt; ls ~/.mysuricates/backups")).isEmpty();
+        assertThat(shell("cat ~/.mysuricates/api-keys.txt")).isEmpty();
+    }
+
+    /** Review w8: Kopien der Schlüsseldatei enthalten denselben Schlüssel — sie treffen bewusst mit. */
+    @Test
+    void kopienDerSchluesseldateiSindEbenfallsHigh() {
+        assertThat(shell("cp ~/.mysuricates/api-key.bak /tmp/k")).singleElement()
+                .satisfies(f -> assertThat(f.severity()).isEqualTo(Severity.HIGH));
+        assertThat(shell("cat \"$HOME/.autotrigger/api-key-backup\"")).singleElement()
+                .satisfies(f -> assertThat(f.severity()).isEqualTo(Severity.HIGH));
+    }
+
     @Test
     void jeRegelUndBlockHoechstensEinBefund() {
         assertThat(shell("curl localhost:9090/api/v1/todos\ncurl localhost:9090/api/v1/executions"))
