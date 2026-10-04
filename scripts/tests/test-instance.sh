@@ -36,6 +36,10 @@ check "bash -n"                               'bash -n "$SCRIPT"'
 check "--help lists the commands"             'bash "$SCRIPT" --help | grep "up|down|status|logs|key|list" >/dev/null'
 check "--help names built (1c016162)"         'bash "$SCRIPT" --help | grep -- "built  --name NAME" >/dev/null'
 check "unknown instance exits 2"              'bash "$SCRIPT" up --name nope >/dev/null 2>&1; [ $? -eq 2 ]'
+printf 'MYSURICATES_PORT=19401\n' > "$TMP/inst/-dash.env"
+OUT="$(bash "$SCRIPT" status --name -dash 2>&1)"; RC=$?
+check "name with a leading - refused (exit 2), never reaches docker" '[ "$RC" = 2 ] && printf "%s" "$OUT" | grep -F "Name" >/dev/null && ! grep -q -- "--dash\|mysuricates--dash" "$DOCKER_LOG" 2>/dev/null'
+rm -f "$TMP/inst/-dash.env"
 INSTANCE_HEALTH_TIMEOUT=0 bash "$SCRIPT" up --name demo --no-wait >/dev/null 2>&1
 check "compose project named after instance"  'grep -q -- "-p mysuricates-demo" "$DOCKER_LOG"'
 check "uses deploy/compose.yml + override"    'grep -q "deploy/compose.yml" "$DOCKER_LOG" && grep -q "demo.override.yml" "$DOCKER_LOG"'

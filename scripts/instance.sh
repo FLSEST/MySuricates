@@ -86,7 +86,8 @@ if [ "$CMD" = list ]; then
 fi
 
 [ -n "$NAME" ] || die "--name fehlt"
-case "$NAME" in *[!a-z0-9-]*) die "Name nur aus a-z, 0-9 und -" ;; esac
+# Nicht mit - am Anfang: der Name wird zu Docker-Namen und Argumenten (mysuricates--x, -x.env)
+case "$NAME" in *[!a-z0-9-]*|-*) die "Name nur aus a-z, 0-9 und - (nicht am Anfang)" ;; esac
 # mysuricates-tryout und seine Volumes gehoeren scripts/tryout.sh — nie eine Instanz darueberlegen
 [ "$NAME" != tryout ] || die "Der Name 'tryout' ist fuer scripts/tryout.sh reserviert"
 ENV_FILE="$INSTANCES_DIR/$NAME.env"
