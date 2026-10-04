@@ -80,9 +80,9 @@ public final class BlockSpecs {
                     "else_command": "echo no package.json", "execution_mode": "shell"}
                     """),
             Map.entry("foreach", """
-                    **Block type: foreach** — Runs `command` once per item (a command, not nested blocks).
-                    Required config: `command` (string) — prompt or shell command per item; the item is {{ item }} (or the \
-                    name set in `variable_name`).
+                    **Block type: foreach** — Runs `command` once per item (a command, not nested blocks) — or, with `workflow_id` instead, one run of that workflow per item (like sub-workflow; `context`: map name → template of extra child variables).
+                    Required config: `command` (string) — prompt or shell command per item — or `workflow_id` instead, never both; the item is {{ item }} (or the \
+                    name set in `variable_name`), its index {{ item_index }}, fields of a JSON-object item {{ item.<field> }}.
                     Optional: `items_source` ("list" default: take `items` | "command": the lines of `items_command`), \
                     `items` (list of strings, or one item per line), `items_command` (shell command printing one item per \
                     line; read only with `items_source` "command", always runs as shell), `variable_name` (default "item"), \
@@ -150,7 +150,7 @@ public final class BlockSpecs {
                     **Block type: sub-workflow** — Runs another workflow as one step and waits for it (up to 30 minutes).
                     Required config: `workflow_id` (string) — id of an existing workflow.
                     There is no input mapping: the child run starts with all variables of this run plus \
-                    {{ previous_output }}. At most 5 levels deep; a circular call fails.
+                    {{ previous_output }}. At most 5 levels deep; a circular call fails. `workflow_id` may be a placeholder of a trusted context variable.
                     Output: the last step output of the child run; its "gate_status:" and "todo_item:" markers count in \
                     the child only.
                     Example config: {"workflow_id": "<workflow-uuid>"}

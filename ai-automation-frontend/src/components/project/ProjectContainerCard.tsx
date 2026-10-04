@@ -24,7 +24,7 @@ export function ProjectContainerCard({ project }: { project: Project }) {
           </div>
           <div>
             <p className="text-sm font-medium text-text">
-              {project.container?.imageName ?? 'No container'}
+              {project.container?.imageName ?? t.projects.noContainer}
             </p>
             <StatusBadge status={project.container?.status ?? 'STOPPED'} />
           </div>

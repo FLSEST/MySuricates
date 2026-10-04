@@ -170,6 +170,6 @@
   "CORS: `automation.cors.allowed-origins`": "CORS: `automation.cors.allowed-origins`",
   "Dateistruktur": "File Structure",
   "Kernklassen": "Core Classes",
-  "`execution_mode`=ai/shell, `items_source`=list/command, `continue_on_error`, `max_consecutive_failures`, `timeout_seconds`": "`execution_mode`=ai/shell, `items_source`=list/command, `continue_on_error`, `max_consecutive_failures`, `timeout_seconds`",
-  "ein Item scheitert (außer mit `continue_on_error`); `max_consecutive_failures` Items in Folge scheitern (Standard 3, auch mit `continue_on_error`)": "an item fails (unless `continue_on_error`); `max_consecutive_failures` items fail in a row (default 3, also with `continue_on_error`)"
+  "`execution_mode`=ai/shell, `items_source`=list/command, `continue_on_error`, `max_consecutive_failures`, `timeout_seconds`, `workflow_id` + `context` (je Item ein Kind-Lauf statt Befehl)": "`execution_mode`=ai/shell, `items_source`=list/command, `continue_on_error`, `max_consecutive_failures`, `timeout_seconds`, `workflow_id` + `context` (one child run per item instead of a command)",
+  "ein Item scheitert (außer mit `continue_on_error`); `max_consecutive_failures` Items in Folge scheitern (Standard 3, auch mit `continue_on_error`); mit `workflow_id`: ein Kind-Lauf endet nicht `COMPLETED`": "an item fails (unless `continue_on_error`); `max_consecutive_failures` items fail in a row (default 3, also with `continue_on_error`); with `workflow_id`: a child run does not end `COMPLETED`"
 }

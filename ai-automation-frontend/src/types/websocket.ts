@@ -151,6 +151,8 @@ export interface ForEachItemCompletedMessage {
   totalItems: number;
   status: string;
   output: string;
+  /** foreach with workflow_id: the child run of this item ('' when none started; absent from older backends). */
+  subRunId?: string;
 }
 
 export type ForEachMessage = ForEachItemStartedMessage | ForEachItemCompletedMessage;
@@ -160,6 +162,8 @@ export interface ForEachItemState {
   item: string;
   status: 'running' | 'completed' | 'failed';
   output?: string;
+  /** foreach with workflow_id: the child run of this item (TODO a5c9fbbf). */
+  subRunId?: string;
 }
 
 export interface ForEachState {
@@ -301,7 +305,12 @@ export function handleForEachMessage(
     } else if (msg.type === 'foreach_item_completed') {
       const items = current.items.map((i) =>
         i.itemIndex === msg.itemIndex
-          ? { ...i, status: (msg.status === 'FAILED' ? 'failed' : 'completed') as ForEachItemState['status'], output: msg.output }
+          ? {
+            ...i,
+            status: (msg.status === 'FAILED' ? 'failed' : 'completed') as ForEachItemState['status'],
+            output: msg.output,
+            ...(msg.subRunId ? { subRunId: msg.subRunId } : {}),
+          }
           : i,
       );
       updated.set(msg.stepIndex, {

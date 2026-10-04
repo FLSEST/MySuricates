@@ -3,6 +3,7 @@ import { Input, Select, Modal, ModalFooter } from '../ui';
 import { MonacoEditor } from '../shared/MonacoEditor';
 import { BlockAiOverrideFields } from './BlockAiOverrideFields';
 import { DashboardReportFields } from './DashboardReportFields';
+import { ForEachWorkflowField } from './ForEachWorkflowField';
 import { BlockSkillPicker } from './BlockSkillPicker';
 import { IntegrationBlockVerificationNotice } from '../integrations/IntegrationVerification';
 import { BLOCK_DEFAULT_CONFIG, buildBlockConfigSchema } from './blockConfigSchema';
@@ -139,6 +140,14 @@ export function BlockEditorModal({
               { value: '', label: t.common.selectWorkflow },
               ...(allWorkflows?.filter((w) => w.id !== workflowId).map((w) => ({ value: w.id, label: `${w.icon || ''} ${w.name}`.trim() })) ?? []),
             ]}
+          />
+        )}
+        {block.type === 'foreach' && (
+          <ForEachWorkflowField
+            configJson={block.config}
+            onConfigChange={(config) => setBlock({ ...block, config })}
+            allWorkflows={allWorkflows}
+            workflowId={workflowId}
           />
         )}
         {block.type === 'integration' && <IntegrationBlockVerificationNotice configJson={block.config} />}

@@ -39,8 +39,8 @@ class PoolAnalyzerGateTest {
     /**
      * Schwere Befunde an Definitionen, deren Reparatur ein eigenes TODO trägt: {@code "<Datei> <Regel>"}
      * → Grund. Nur zum Abbauen — tritt der Befund an der geprüften Datei nicht mehr auf, bricht der Test.
-     * Aktuell leer: {@code saas-feature-loop.json} trug hier zwei Einträge (foreach kann keinen
-     * Unter-Workflow je Eintrag starten) und ist aus dem Pool genommen, bis dieser Block-Typ existiert.
+     * Aktuell leer: {@code saas-feature-loop.json} trug hier zwei Einträge, bis foreach mit
+     * {@code workflow_id} einen Unter-Workflow je Eintrag starten konnte (a5c9fbbf).
      */
     private static final Map<String, String> KNOWN_SEVERE = Map.of();
 

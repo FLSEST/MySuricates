@@ -148,7 +148,8 @@ export function persistedForEachItems(step: StepResult): ForEachItemState[] {
     const itemIndex = typeof record.index === 'number' ? record.index : position;
     const item = typeof record.item === 'string' ? record.item : String(record.item ?? '');
     const status = record.status === 'COMPLETED' ? 'completed' : 'failed';
-    items.push({ itemIndex, item, status });
+    const subRunId = typeof record.subRunId === 'string' && record.subRunId ? record.subRunId : undefined;
+    items.push({ itemIndex, item, status, ...(subRunId ? { subRunId } : {}) });
   });
   return items;
 }

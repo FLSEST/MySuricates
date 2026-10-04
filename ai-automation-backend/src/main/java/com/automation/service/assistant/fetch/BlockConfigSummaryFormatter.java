@@ -45,7 +45,7 @@ public class BlockConfigSummaryFormatter {
             Map.entry("conditional", List.of(text("condition", LONG), text("then_command", 150),
                     text("else_command", 150), text("execution_mode", SHORT))),
             Map.entry("foreach", List.of(text("items_source", SHORT), text("items", 150), text("items_command", 150),
-                    text("command", LONG), text("execution_mode", SHORT))),
+                    text("command", LONG), text(WORKFLOW_ID, SHORT), text("execution_mode", SHORT))),
             Map.entry("while", List.of(text("condition_command", 150), text("command", LONG),
                     text("max_iterations", SHORT), text("execution_mode", SHORT))),
             Map.entry("switch", List.of(text("expression", 120), count("cases"), count("default"))),

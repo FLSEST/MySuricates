@@ -154,7 +154,7 @@ export function Schedules() {
                 className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
                   filters.targetTypeFilter === v ? 'bg-accent text-text-inverse' : 'text-text-secondary hover:text-text hover:bg-surface-raised'
                 }`}>
-                {v === 'ALL' ? t.common.all : v === 'WORKFLOW' ? 'Workflow' : 'Chain'}
+                {v === 'ALL' ? t.common.all : v === 'WORKFLOW' ? t.common.workflow : t.common.chain}
               </button>
             ))}
           </div>

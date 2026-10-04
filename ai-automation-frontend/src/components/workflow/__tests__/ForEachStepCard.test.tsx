@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { ForEachStepCard } from '../ForEachStepCard';
 import type { StepResult } from '../../../types';
 import type { ForEachState } from '../../../types/websocket';
@@ -30,6 +31,22 @@ describe('ForEachStepCard', () => {
     expect(screen.getByText('a')).toBeInTheDocument();
     expect(screen.getByText('b')).toBeInTheDocument();
     expect(screen.getByText('failed')).toBeInTheDocument();
+  });
+
+  // a5c9fbbf: foreach with workflow_id — each item links to its own child run
+  it('links an item to its child run when the backend recorded one', () => {
+    render(<MemoryRouter><ForEachStepCard step={step({
+      totalItems: 2,
+      items: [
+        { index: 0, item: 'auth', status: 'COMPLETED', durationMs: 5, subRunId: 'sub-1' },
+        { index: 1, item: 'billing', status: 'FAILED', durationMs: 7 },
+      ],
+    })} /></MemoryRouter>);
+
+    fireEvent.click(screen.getByText('Show 2 items'));
+    const links = screen.getAllByRole('link', { name: /Child run/ });
+    expect(links).toHaveLength(1);
+    expect(links[0]).toHaveAttribute('href', '/runs/sub-1');
   });
 
   it('prefers the live WebSocket state over persisted metadata', () => {

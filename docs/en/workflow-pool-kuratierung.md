@@ -48,9 +48,12 @@ Every entry carries a mandatory `scope` field with exactly one of three values:
 | `portable` | parameterised via `project_path` (or similar context variables) | runs in whichever project the installer picks |
 | `external` | needs a tool outside this repository and the chosen project | the description names the requirement, such as the SaaS factory (`saas-factory/` with the CLI `tools/factory`) |
 
-The `saas-feature-loop` entry, which ran the SaaS factory over a whole feature list, is out of
-the pool: no block type can yet start a sub-workflow per `foreach` entry. It returns once one
-can.
+The `saas-feature-loop` entry runs the SaaS factory over a whole feature list: a `foreach` with
+`workflow_id` starts the installed `saas-feature-implement` once per feature, each as its own
+run. Since the pool must not contain instance UUIDs, that workflow's id comes in at run time as
+the context variable `feature_workflow_id` — install both entries and pass the id of the second.
+Between 2026-09-30 and a5c9fbbf the entry was out of the pool because `foreach` could not do
+this yet.
 
 All three are legitimate, but they are useful in different ways: installing a `repo` entry
 into your own project gets you a workflow with nothing to work on, and an `external` entry only

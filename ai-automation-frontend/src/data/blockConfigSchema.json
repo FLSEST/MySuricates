@@ -534,15 +534,33 @@
       }
     },
     "foreach": {
-      "required": [
-        "command"
+      "requiredOneOf": [
+        "command",
+        "workflow_id"
       ],
       "fields": {
         "command": {
           "type": "string",
           "doc": {
-            "de": "Befehl pro Item. Das Item steht als `{{ <variable_name> }}` bereit.",
-            "en": "Command per item. The item is available as `{{ <variable_name> }}`."
+            "de": "Befehl pro Item. Das Item steht als `{{ <variable_name> }}` bereit, sein Index als `{{ <variable_name>_index }}`, bei einem JSON-Objekt seine Felder als `{{ <variable_name>.<feld> }}`. Entweder `command` oder `workflow_id`.",
+            "en": "Command per item. The item is available as `{{ <variable_name> }}`, its index as `{{ <variable_name>_index }}`, and for a JSON object its fields as `{{ <variable_name>.<field> }}`. Either `command` or `workflow_id`."
+          }
+        },
+        "workflow_id": {
+          "type": "string",
+          "doc": {
+            "de": "Statt `command`: je Item ein Lauf dieses Workflows, wie beim sub-workflow-Block (eigener Lauf je Item, max. 5 Ebenen, kein Zirkel). Der Kind-Lauf bekommt die Variablen dieses Laufs samt Item. Ein Platzhalter wie `{{ feature_workflow_id }}` ist erlaubt, aber nur aus vertrauenswürdigen Kontextvariablen.",
+            "en": "Instead of `command`: one run of this workflow per item, as with the sub-workflow block (its own run per item, max. 5 levels, no cycles). The child run gets this run's variables including the item. A placeholder such as `{{ feature_workflow_id }}` is allowed, but only from trusted context variables."
+          }
+        },
+        "context": {
+          "type": "object",
+          "doc": {
+            "de": "Nur mit `workflow_id`: zusätzliche Variablen für den Kind-Lauf je Item, Name → Vorlage, z. B. `{\"feature_id\": \"{{ feature.id }}\"}`.",
+            "en": "Only with `workflow_id`: extra variables for the child run per item, name → template, e.g. `{\"feature_id\": \"{{ feature.id }}\"}`."
+          },
+          "onlyWith": {
+            "workflow_id": "*"
           }
         },
         "variable_name": {
@@ -927,8 +945,8 @@
         "workflow_id": {
           "type": "string",
           "doc": {
-            "de": "ID des Workflows, der als Schritt läuft (max. 5 Ebenen tief).",
-            "en": "ID of the workflow to run as a step (max. 5 levels deep)."
+            "de": "ID des Workflows, der als Schritt läuft (max. 5 Ebenen tief). Ein Platzhalter wie `{{ child_workflow_id }}` ist erlaubt, aber nur aus vertrauenswürdigen Kontextvariablen – nicht aus Webhook-Daten oder Blockausgaben.",
+            "en": "ID of the workflow to run as a step (max. 5 levels deep). A placeholder such as `{{ child_workflow_id }}` is allowed, but only from trusted context variables – not from webhook data or block outputs."
           }
         },
         "workflowId": {

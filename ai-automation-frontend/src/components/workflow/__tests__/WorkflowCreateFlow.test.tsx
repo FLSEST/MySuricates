@@ -66,7 +66,7 @@ describe('WorkflowCreateFlow with projects', () => {
     const onFormChange = renderDetails([project]);
 
     fireEvent.click(screen.getByRole('button', { name: de.workflows.newProject }));
-    fireEvent.change(screen.getByPlaceholderText('My Project'), { target: { value: 'Neu' } });
+    fireEvent.change(screen.getByPlaceholderText('Mein Projekt'), { target: { value: 'Neu' } });
     fireEvent.change(screen.getByPlaceholderText('/home/user/projects/my-project'), { target: { value: '/tmp/new' } });
     fireEvent.click(screen.getByRole('button', { name: de.common.create }));
 

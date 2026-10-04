@@ -391,7 +391,7 @@ In the example, an earlier block named `ampel` prints only `GREEN`, `YELLOW` or 
 
 ### `foreach` — Iterate Over Items
 
-Executes a command for each item in a list.
+Executes a command for each item in a list — or, with `workflow_id`, one run of another workflow per item.
 
 | Config Key | Type | Default | Description |
 |---|---|---|---|
@@ -399,7 +399,9 @@ Executes a command for each item in a list.
 | `items_source` | string | `"list"` | `"command"` (shell output) or `"list"` (inline) |
 | `items_command` | string | — | Shell command, one item per line (only for `items_source: "command"`) |
 | `items` | list | — | Inline list of items (only for `items_source: "list"`) |
-| `command` | string | **required** | Command per item |
+| `command` | string | **required** (or `workflow_id`) | Command per item |
+| `workflow_id` | string | — | Instead of `command`: one run of this workflow per item (see "Sub-workflow per item"). `command` and `workflow_id` exclude each other |
+| `context` | map | — | Only with `workflow_id`: extra variables for the child run per item, name → template (`{"feature_id": "{{ feature.id }}"}`) |
 | `execution_mode` | string | `"ai"` | `"ai"` (AI, provider from `provider` on the block/workflow) or `"shell"`; `"claude"` still means `"ai"`, other values are rejected |
 | `timeout_seconds` | int | 300 | Timeout per iteration |
 | `continue_on_error` | bool | `false` | `true`: failed items do not fail the block — it completes, follow-up blocks run. Failures are summarised in the output (`N/M items failed: ...`). `false`: a failed item fails the block, the remaining items still run. In both cases the step metadata lists the failures (`failedItemCount`, `failedItems`, `totalItems`) |
@@ -420,6 +422,28 @@ Executes a command for each item in a list.
 ```
 
 **Note**: `items_command` is always executed as a shell command (regardless of `execution_mode`), since it only collects the iteration targets.
+
+**Item variables**: Besides `{{ <variable_name> }}`, the item's index (from 0) is available as `{{ <variable_name>_index }}`. If an item is a JSON object (a line like `{"id": "auth", "desc": "Login"}`), its top-level fields are available as `{{ <variable_name>.<field> }}` (nested values as JSON text); the previous item's fields disappear with the next one. Items from `items_command` inherit the run's taint, their fields too.
+
+**Sub-workflow per item** (`workflow_id`, since a5c9fbbf): Instead of a command, foreach starts a run of the named workflow per item — the same mechanism as the `sub-workflow` block (`SubWorkflowLauncher`): admission through `RunAdmission` as `SUB_WORKFLOW` with the parent run's origin, at most 5 levels, no cycles, 30 minutes per child run. The child run gets this run's variables (without its platform data) plus the item variables and the values from `context`; the taint travels along. Every child run shows up in the run list on its own, and the run page links it per item (metadata `items[].subRunId`, step metadata `subWorkflowId`). An item fails when its child run does not end `COMPLETED`; `continue_on_error` and `max_consecutive_failures` apply as for commands. The output is the log `[item]: <last output of the child run>` and carries `derivedOutput: true` — markers in it count in the child runs only. `execution_mode`, `timeout_seconds` and the AI keys have no effect in this mode.
+
+`workflow_id` may be a placeholder (`"{{ feature_workflow_id }}"`) — that keeps pool entries free of instance UUIDs. It is resolved **once before the first item**, so all items run the same workflow; `{{ item }}` or item fields do not pick a workflow per entry. Only trusted context variables are allowed, i.e. ones the run has not marked untrusted (webhook data, values derived from tainted outputs): a placeholder from webhook data, `previous_output` or a block output would let outside input pick any workflow of the instance; the block then fails before the first item, as it does for a placeholder that does not resolve. The same holds for `workflow_id` on the `sub-workflow` block.
+
+`context` must not set anything the platform or the loop owns: no keys starting with `__` (parent chain, taint, origin), no platform data (`open_todos`, `previous_report`, …), none of the run's own values (`previous_output`, `workflow_id`, `workflow_run_id`, `trigger_source`, …) and not the item variables (`<variable_name>`, `<variable_name>_index`, `<variable_name>.<field>`). Such a name fails the block before the first item and states the reason.
+
+```json
+{
+  "type": "foreach",
+  "config": {
+    "items_source": "command",
+    "items_command": "printf '%s' {{ feature_order_json }} | python3 -c 'import json,sys; [print(json.dumps(f)) for f in json.load(sys.stdin)]'",
+    "shell_escape_variables": true,
+    "variable_name": "feature",
+    "workflow_id": "{{ feature_workflow_id }}",
+    "context": { "feature_id": "{{ feature.id }}", "feature_desc": "{{ feature.desc }}" }
+  }
+}
+```
 
 **Empty item lists**: Empty and whitespace-only lines are discarded — in the `items_command` output as well as in inline `items`. An empty output therefore yields **zero** iterations (the block completes with metadata `totalItems: 0`) instead of one iteration with an empty item. An empty list is thus the clean way to skip a loop.
 
@@ -549,16 +573,16 @@ Executes another workflow as a nested step.
 
 | Config Key | Type | Default | Description |
 |---|---|---|---|
-| `workflow_id` | string | **required** | ID of the workflow to execute |
+| `workflow_id` | string | **required** | ID of the workflow to execute; a placeholder from a trusted context variable is allowed (see `foreach` → "Sub-workflow per item") |
 | `workflowId` | string | — | Old spelling of `workflow_id`: still read, will be dropped later. The analyzer reports it as `legacy-config-key` (LOW); if `workflow_id` is set next to it, only `workflow_id` counts |
 
-**Limits**: Maximum nesting depth of 5 levels. Circular references are detected. 30-minute timeout.
+**Limits**: Maximum nesting depth of 5 levels. Circular references are detected. 30-minute timeout. Cancelling the parent run also cancels the child run it is waiting for (likewise for `foreach` with `workflow_id`).
 
 **Context**: The child run gets the parent run's variables and its `{{ previous_output }}`, but not its platform data (`previous_report`, `open_todos`, `request_metrics`, `goal_status`/`goal_guard_*`, `audit_findings`): the platform injects those into the child run itself, computed for it. A value under one of these names is not taken from any other input context either. The parent run's taint travels along.
 
 **Markers**: The step merely passes the child run's last output through (step metadata `derivedOutput: true`). Any `gate_status:` and `todo_item:` markers inside it are evaluated in the child run only — the parent run deliberately leaves them out of its gate summary and TODO list.
 
-**When to use**: Composing complex workflows from smaller, reusable ones.
+**When to use**: Composing complex workflows from smaller, reusable ones. The same workflow per entry of a list: `foreach` with `workflow_id`.
 
 ---
 
@@ -1351,7 +1375,7 @@ Rules:
 - The `integration` block uses `provider` for the integration provider and is not an AI block — no override applies there.
 - In the UI block editor, the "AI provider and model for this block" fields appear only on AI-capable block types; the model suggestions come from the host catalog of the chosen provider (`GET /api/v1/system/ai-providers/{id}/models`), free text remains allowed.
 - The values actually used appear in the step metadata of the run details: `aiRequest.provider`, `aiRequest.model`, `aiRequest.effort` (for `agentic` additionally top-level `provider`/`model`).
-- Wrapper blocks (`retry`, `foreach`, `while`, `conditional`, `switch`, `skill-capability`) carry the `aiRequest`, `provider`, and `requestedModel` of their **first inner AI call** into their aggregate step (provider and model are constant per block); the run page shows them as pills. Additional keys: `foreach` → `totalItems` + `items` (`{index, item, status, durationMs}`, max. 500, item label truncated to 120 characters), `while` → `iterationCount` + `iterations`, `retry` → `attempts` + `maxAttempts`, `conditional` → `conditionMet`, `switch` → `expression` + `matchedCase`. Pure shell iterations carry no `aiRequest`.
+- Wrapper blocks (`retry`, `foreach`, `while`, `conditional`, `switch`, `skill-capability`) carry the `aiRequest`, `provider`, and `requestedModel` of their **first inner AI call** into their aggregate step (provider and model are constant per block); the run page shows them as pills. Additional keys: `foreach` → `totalItems` + `items` (`{index, item, status, durationMs}`, plus `subRunId` with `workflow_id`; max. 500, item label truncated to 120 characters), `while` → `iterationCount` + `iterations`, `retry` → `attempts` + `maxAttempts`, `conditional` → `conditionMet`, `switch` → `expression` + `matchedCase`. Pure shell iterations carry no `aiRequest`.
 
 ---
 

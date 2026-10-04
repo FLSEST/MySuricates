@@ -44,7 +44,7 @@ export function ProjectFormFields<T extends ProjectFormValues>({
         label={t.projects.name}
         value={value.name}
         onChange={(e) => onChange({ ...value, name: e.target.value })}
-        placeholder={placeholders ? 'My Project' : undefined}
+        placeholder={placeholders ? t.projects.namePlaceholder : undefined}
       />
       <Input
         label={t.projects.subtitleField}

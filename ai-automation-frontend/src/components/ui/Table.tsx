@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useT } from '../../i18n';
 
 interface Column<T> {
   key: string;
@@ -16,10 +17,11 @@ interface TableProps<T> {
 }
 
 export function Table<T>({ columns, data, keyExtractor, onRowClick, emptyText }: TableProps<T>) {
+  const t = useT();
   if (data.length === 0) {
     return (
       <div className="py-12 text-center text-text-tertiary text-sm">
-        {emptyText ?? 'No data'}
+        {emptyText ?? t.common.noData}
       </div>
     );
   }

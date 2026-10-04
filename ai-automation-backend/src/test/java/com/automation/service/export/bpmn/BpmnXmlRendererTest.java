@@ -125,6 +125,16 @@ class BpmnXmlRendererTest {
         }
     }
 
+    /** a5c9fbbf: Aufrufaktivität mit calledElement und Multi-Instance-Marker, XSD-gültig über den Katalog. */
+    @Test
+    void foreachMitWorkflowIdRendertCallActivityMitMultiInstance() {
+        String xml = render(WorkflowFixtures.roundtripCatalog().stream()
+                .filter(w -> "LoopWorkflow".equals(w.getName())).findFirst().orElseThrow());
+        assertThat(xml).containsPattern("<callActivity[^>]*calledElement=\"wf-feature\"");
+        assertThat(xml).containsPattern("(?s)<callActivity.*<multiInstanceLoopCharacteristics isSequential=\"true\"/>.*</callActivity>");
+        assertThat(xml).doesNotContain("<subProcess");
+    }
+
     @Test
     void extensionElementsTragenDieOriginalConfig() {
         String xml = render(WorkflowFixtures.linear());

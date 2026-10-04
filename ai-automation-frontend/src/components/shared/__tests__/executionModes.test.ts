@@ -50,6 +50,11 @@ describe('getExecutionModes', () => {
     expect(getExecutionModes([block('sub-workflow', {})], shipped)).toEqual(['ai']);
   });
 
+  it('counts a foreach with workflow_id as AI, even in shell mode (a5c9fbbf)', () => {
+    expect(getExecutionModes([block('foreach', { workflow_id: '{{ wf }}', execution_mode: 'shell' })])).toEqual(['ai']);
+    expect(getExecutionModes([block('foreach', { command: 'echo', execution_mode: 'shell' })])).toEqual(['shell']);
+  });
+
   it('shows nothing for purely deterministic non-shell blocks', () => {
     expect(getExecutionModes([
       block('integration', { provider: 'github' }), block('todo-create', { title: 'x' }), block('document'),

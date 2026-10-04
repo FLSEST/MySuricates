@@ -67,6 +67,19 @@ const LANGUAGE_NEUTRAL = new Set([
   'bug, performance, ux',
 ]);
 
+/**
+ * Text that reads the same in both languages only where it stands — a status, a product term, a field name, an
+ * example — so it is accepted in that file and nowhere else. Path relative to src/.
+ */
+const LANGUAGE_NEUTRAL_AT: Record<string, readonly string[]> = {
+  'components/AssistantPanel.tsx': ['Online'],
+  'components/settings/NotificationsCard.tsx': ['Webhook', 'Desktop'],
+  'components/integrations/SetupGuidePanel.tsx': ['Client ID', 'Client Secret'],
+  'components/settings/RemoteAccessCard.tsx': ['IP:'],
+  'components/workflow/CompressionPanel.tsx': ['· exit'],
+  'components/project/ProjectFormFields.tsx': ['/home/user/projects/my-project'],
+};
+
 interface Finding {
   file: string;
   line: number;
@@ -87,36 +100,51 @@ function isLanguageText(text: string): boolean {
   return /\p{L}{2,}/u.test(text.replace(/\{[^}]*\}/g, '')) && !LANGUAGE_NEUTRAL.has(text);
 }
 
-function literalText(node: ts.Node | undefined): string | undefined {
-  if (!node) return undefined;
-  if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return node.text;
-  if (ts.isTemplateExpression(node)) return [node.head.text, ...node.templateSpans.map((span) => span.literal.text)].join(' ');
-  if (ts.isJsxExpression(node)) return literalText(node.expression);
-  return undefined;
+/**
+ * Every literal a node can evaluate to: a string or template, both branches of `a ? b : c`, the right side of
+ * `a && b` and both sides of `a || b` / `a ?? b`, through parentheses. A ternary child once hid
+ * "Hide items" / `Show ${n} items` from this gate.
+ */
+function literalTexts(node: ts.Node | undefined): string[] {
+  if (!node) return [];
+  if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return [node.text];
+  if (ts.isTemplateExpression(node)) return [[node.head.text, ...node.templateSpans.map((span) => span.literal.text)].join(' ')];
+  if (ts.isJsxExpression(node) || ts.isParenthesizedExpression(node)) return literalTexts(node.expression);
+  if (ts.isConditionalExpression(node)) return [...literalTexts(node.whenTrue), ...literalTexts(node.whenFalse)];
+  if (ts.isBinaryExpression(node)) {
+    const op = node.operatorToken.kind;
+    if (op === ts.SyntaxKind.AmpersandAmpersandToken) return literalTexts(node.right);
+    if (op === ts.SyntaxKind.BarBarToken || op === ts.SyntaxKind.QuestionQuestionToken) {
+      return [...literalTexts(node.left), ...literalTexts(node.right)];
+    }
+  }
+  return [];
 }
 
 function scan(file: string, source: string): Finding[] {
   const kind = file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
   const sf = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, kind);
   const findings: Finding[] = [];
-  const add = (node: ts.Node, what: string, raw: string | undefined) => {
-    const text = raw === undefined ? '' : normalize(raw);
-    if (!isLanguageText(text)) return;
-    findings.push({ file, line: sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1, kind: what, text });
+  const add = (node: ts.Node, what: string, raws: string[]) => {
+    for (const raw of raws) {
+      const text = normalize(raw);
+      if (!isLanguageText(text) || LANGUAGE_NEUTRAL_AT[file]?.includes(text)) continue;
+      findings.push({ file, line: sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1, kind: what, text });
+    }
   };
   const visit = (node: ts.Node) => {
     if (ts.isJsxText(node)) {
-      add(node, 'text', node.text);
+      add(node, 'text', [node.text]);
     } else if (ts.isJsxExpression(node) && ts.isJsxElement(node.parent)) {
-      add(node, 'text', literalText(node.expression));
+      add(node, 'text', literalTexts(node.expression));
     } else if (ts.isJsxAttribute(node) && VISIBLE_ATTRIBUTES.has(node.name.getText(sf))) {
-      add(node, node.name.getText(sf), literalText(node.initializer));
+      add(node, node.name.getText(sf), literalTexts(node.initializer));
     } else if (ts.isCallExpression(node)) {
       const callee = node.expression.getText(sf);
       if (/^toast\.\w+$/.test(callee) || /^(window\.)?(confirm|alert|prompt)$/.test(callee)) {
-        add(node, callee, literalText(node.arguments[0]));
+        add(node, callee, literalTexts(node.arguments[0]));
       } else if (callee === 'apiErrorMessage') {
-        add(node, callee, literalText(node.arguments[1]));
+        add(node, callee, literalTexts(node.arguments[1]));
       }
     }
     ts.forEachChild(node, visit);
@@ -170,6 +198,38 @@ describe('hardcoded UI text', () => {
       'text: Plain text',
       'text: Literal child',
       'aria-label: Remove',
+    ]);
+  });
+
+  // Review a5c9fbbf: a word that is neutral in one place stays a finding everywhere else
+  it('accepts place-bound neutral text only in its own file', () => {
+    const source = 'export const X = () => <p>Online {"Webhook"}</p>;';
+    expect(scan('components/Other.tsx', source).map((f) => f.text)).toEqual(['Online', 'Webhook']);
+    expect(scan('components/AssistantPanel.tsx', source).map((f) => f.text)).toEqual(['Webhook']);
+  });
+
+  // a5c9fbbf follow-up: "Hide items" / `Show ${n} items` in a ternary child slipped through
+  it('finds text in the branches of a conditional child and behind && / || / ??', () => {
+    const source = [
+      'export function X() {',
+      '  return (<div title={open ? "Collapse" : "Expand"}>',
+      "    {expanded ? 'Hide items' : `Show ${n} items`}",
+      "    {busy && 'Loading data'}",
+      "    {(label ?? 'No label')}",
+      '    {count > 0 ? count : null}',
+      '  </div>);',
+      '}',
+    ].join('\n');
+
+    const texts = scan('Example.tsx', source).map((f) => `${f.kind}: ${f.text}`);
+
+    expect(texts).toEqual([
+      'title: Collapse',
+      'title: Expand',
+      'text: Hide items',
+      'text: Show items',
+      'text: Loading data',
+      'text: No label',
     ]);
   });
 });

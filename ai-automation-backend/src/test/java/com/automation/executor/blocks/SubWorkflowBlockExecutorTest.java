@@ -45,10 +45,15 @@ class SubWorkflowBlockExecutorTest {
     @Mock
     private WorkflowContextDataService contextDataService;
 
+    @Mock
+    private com.automation.service.workflow.RunControlService runControl;
+
     /** What the real collector reserves (pinned against the sources in PlatformVariableSourceWiringTest). */
     private static final Set<String> PLATFORM_NAMES = platformNames();
 
     private SubWorkflowBlockExecutor executor;
+
+    private SubWorkflowLauncher launcher;
 
     private ExecutionContext context;
 
@@ -62,8 +67,11 @@ class SubWorkflowBlockExecutorTest {
     @BeforeEach
     void setUp() {
         lenient().when(contextDataService.platformVariableNames()).thenReturn(PLATFORM_NAMES);
-        executor = new SubWorkflowBlockExecutor(workflowService, workflowExecutor, runRepository, stepResultRepository,
-                contextDataService);
+        SubWorkflowLauncher launcher = new SubWorkflowLauncher(workflowService, workflowExecutor, runRepository,
+                stepResultRepository, contextDataService, runControl);
+        launcher.pollInterval = java.time.Duration.ofMillis(5);
+        this.launcher = launcher;
+        executor = new SubWorkflowBlockExecutor(launcher);
         context = ExecutionContext.builder()
                 .containerId("container-1")
                 .workflowRunId("run-1")
@@ -444,5 +452,114 @@ class SubWorkflowBlockExecutorTest {
                 .containsEntry("previous_output", "a | b");
         assertThat((List<String>) child.get(ExecutionContext.UNTRUSTED_OUTPUTS_VARIABLE))
                 .contains("bewertung", ExecutionContext.PREVIOUS_OUTPUT_NAME);
+    }
+
+    /** TODO a5c9fbbf: workflow_id may name the child through a trusted variable (portable pool entries). */
+    @Test
+    void execute_workflowIdFromATrustedVariable_runsThatWorkflow() {
+        context.setVariable("child_workflow_id", "sub-wf-1");
+        Workflow subWorkflow = Workflow.builder().id("sub-wf-1").name("Sub Workflow").build();
+        when(workflowService.findById("sub-wf-1")).thenReturn(subWorkflow);
+        WorkflowRun subRun = WorkflowRun.builder().id("sub-run-1").workflow(subWorkflow).status(RunStatus.COMPLETED).build();
+        when(workflowExecutor.execute(eq(subWorkflow), any(Map.class), eq(TriggerSource.SUB_WORKFLOW))).thenReturn(subRun);
+        when(runRepository.findById("sub-run-1")).thenReturn(Optional.of(subRun));
+
+        StepResult result = executor.execute(BlockDefinition.builder().type("sub-workflow")
+                .config(new HashMap<>(Map.of("workflow_id", "{{ child_workflow_id }}"))).build(), context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getMetadata()).containsEntry("subWorkflowId", "sub-wf-1");
+    }
+
+    /** Outside input must not pick which workflow of the instance runs. */
+    @Test
+    void execute_workflowIdFromAnUntrustedVariableOrOutput_isRefused() {
+        context.setUntrustedVariable("target", "sub-wf-1");
+        for (String id : List.of("{{ target }}", "{{ previous_output }}", "{{ block.scan.output }}", "{{ unknown }}")) {
+            StepResult result = executor.execute(BlockDefinition.builder().type("sub-workflow")
+                    .config(new HashMap<>(Map.of("workflow_id", id))).build(), context);
+
+            assertThat(result.getStatus()).as(id).isEqualTo(StepStatus.FAILED);
+        }
+        org.mockito.Mockito.verifyNoInteractions(workflowService, workflowExecutor);
+    }
+
+    /** a5c9fbbf follow-up: cancelling the parent cancels the child it is waiting for, instead of waiting up to 30 min. */
+    @Test
+    void execute_parentCancelledWhileWaiting_cancelsTheChildRun() {
+        Workflow subWorkflow = Workflow.builder().id("sub-wf-1").name("Sub Workflow").build();
+        when(workflowService.findById("sub-wf-1")).thenReturn(subWorkflow);
+        WorkflowRun running = WorkflowRun.builder().id("sub-run-1").workflow(subWorkflow).status(RunStatus.RUNNING).build();
+        WorkflowRun cancelled = WorkflowRun.builder().id("sub-run-1").workflow(subWorkflow).status(RunStatus.CANCELLED).build();
+        when(workflowExecutor.execute(eq(subWorkflow), any(Map.class), eq(TriggerSource.SUB_WORKFLOW))).thenReturn(running);
+        int[] polls = {0};
+        when(runRepository.findById("sub-run-1")).thenAnswer(inv -> {
+            if (++polls[0] == 2) context.cancel();          // the parent is cancelled while the child runs
+            return Optional.of(polls[0] > 3 ? cancelled : running);
+        });
+        org.mockito.Mockito.doAnswer(inv -> null).when(runControl).cancelExecution("sub-run-1");
+
+        StepResult result = executor.execute(BlockDefinition.builder().type("sub-workflow")
+                .config(new HashMap<>(Map.of("workflow_id", "sub-wf-1"))).build(), context);
+
+        verify(runControl).cancelExecution("sub-run-1");
+        assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(result.getMetadata()).containsEntry("subRunStatus", "CANCELLED");
+    }
+
+    private Workflow childThatKeepsRunning() {
+        Workflow subWorkflow = Workflow.builder().id("sub-wf-1").name("Sub Workflow").build();
+        when(workflowService.findById("sub-wf-1")).thenReturn(subWorkflow);
+        WorkflowRun running = WorkflowRun.builder().id("sub-run-1").workflow(subWorkflow).status(RunStatus.RUNNING).build();
+        when(workflowExecutor.execute(eq(subWorkflow), any(Map.class), eq(TriggerSource.SUB_WORKFLOW))).thenReturn(running);
+        return subWorkflow;
+    }
+
+    private StepResult runSubWorkflowBlock() {
+        return executor.execute(BlockDefinition.builder().type("sub-workflow")
+                .config(new HashMap<>(Map.of("workflow_id", "sub-wf-1"))).build(), context);
+    }
+
+    /** Review a5c9fbbf: a parent that gives up waiting must not leave its child running on its own. */
+    @Test
+    void execute_waitTimesOut_cancelsTheChildBeforeFailing() {
+        Workflow subWorkflow = childThatKeepsRunning();
+        when(runRepository.findById("sub-run-1")).thenReturn(Optional.of(
+                WorkflowRun.builder().id("sub-run-1").workflow(subWorkflow).status(RunStatus.RUNNING).build()));
+        launcher.maxWait = java.time.Duration.ofMillis(30);
+
+        StepResult result = runSubWorkflowBlock();
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(result.getOutput()).contains("timed out");
+        verify(runControl).cancelExecution("sub-run-1");
+    }
+
+    @Test
+    void execute_interruptedWhileWaiting_cancelsTheChildBeforeFailing() {
+        Workflow subWorkflow = childThatKeepsRunning();
+        when(runRepository.findById("sub-run-1")).thenAnswer(inv -> {
+            Thread.currentThread().interrupt();     // the next sleep throws
+            return Optional.of(WorkflowRun.builder().id("sub-run-1").workflow(subWorkflow).status(RunStatus.RUNNING).build());
+        });
+        try {
+            StepResult result = runSubWorkflowBlock();
+
+            assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+            assertThat(result.getOutput()).contains("Interrupted");
+            verify(runControl).cancelExecution("sub-run-1");
+        } finally {
+            Thread.interrupted();                   // leave no flag for the next test
+        }
+    }
+
+    @Test
+    void execute_unreadableParentIds_failsTheStepInsteadOfThrowing() {
+        context.getVariables().put("__parent_workflow_ids", "not-a-list");
+
+        StepResult result = runSubWorkflowBlock();
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+        org.mockito.Mockito.verifyNoInteractions(workflowExecutor);
     }
 }

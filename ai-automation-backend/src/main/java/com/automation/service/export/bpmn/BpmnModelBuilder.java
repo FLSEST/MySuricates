@@ -114,7 +114,10 @@ class BpmnModelBuilder implements BpmnGatewayBuilder.ChainBuilder {
         return switch (type) {
             case "conditional" -> gateways.buildConditional(block, idBase);
             case "switch" -> gateways.buildSwitch(block, idBase);
-            case "foreach", "while" -> buildLoop(block, idBase);
+            // foreach mit workflow_id ruft je Item einen Workflow auf: Aufrufaktivität mit Multi-Instance (a5c9fbbf)
+            case "foreach" -> BpmnBlockText.str(block.getConfig(), "workflow_id").isBlank()
+                    ? buildLoop(block, idBase) : singleTask(block, idBase);
+            case "while" -> buildLoop(block, idBase);
             default -> singleTask(block, idBase);
         };
     }
@@ -127,7 +130,7 @@ class BpmnModelBuilder implements BpmnGatewayBuilder.ChainBuilder {
             case "shell", "compress" -> SCRIPT_TASK;
             case "simple", "agentic", "skill-capability", "integration", "document", "compress-ai" -> SERVICE_TASK;
             case "approval", "human-input" -> USER_TASK;
-            case "sub-workflow" -> CALL_ACTIVITY;
+            case "sub-workflow", "foreach" -> CALL_ACTIVITY;
             case "retry" -> "shell".equals(BpmnBlockText.str(config, "execution_mode")) ? SCRIPT_TASK : SERVICE_TASK;
             default -> TASK;
         };
@@ -152,6 +155,7 @@ class BpmnModelBuilder implements BpmnGatewayBuilder.ChainBuilder {
         }
         if (kind == CALL_ACTIVITY) {
             n.calledElement = BpmnBlockText.str(config, "workflow_id");
+            if ("foreach".equals(type)) n.loop = "multiInstanceSequential";
         }
         if (kind == TASK) {
             n.warning = "Unbekannter Block-Typ: " + type;

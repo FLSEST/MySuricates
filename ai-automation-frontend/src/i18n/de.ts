@@ -2,6 +2,7 @@ import type { TranslationKeys } from './en';
 
 export const de: TranslationKeys = {
   common: {
+    noData: 'Keine Daten',
     showMore: 'Mehr anzeigen',
     showLess: 'Weniger anzeigen',
     total: 'Gesamt',
@@ -505,6 +506,8 @@ export const de: TranslationKeys = {
     },
   },
   projects: {
+    noContainer: 'Kein Container',
+    namePlaceholder: 'Mein Projekt',
     title: 'Projekte',
     subtitle: 'Verwalte deine Automatisierungsprojekte',
     create: 'Neues Projekt',
@@ -623,6 +626,9 @@ export const de: TranslationKeys = {
   workflows: {
     dragToReorder: 'Zum Umsortieren ziehen',
     foreachItems: '{done}/{total} Elemente',
+    foreachChildRun: 'Kind-Lauf',
+    foreachShowItems: '{n} Elemente anzeigen',
+    foreachHideItems: 'Elemente ausblenden',
     title: 'Workflows',
     subtitle: 'Erstelle und verwalte Automatisierungs-Workflows',
     create: 'Neuer Workflow',
@@ -811,6 +817,8 @@ export const de: TranslationKeys = {
     approveTodos: 'Todos anlegen',
     rejectTodos: 'Ablehnen',
     selectSubWorkflow: 'Sub-Workflow auswählen',
+    foreachWorkflow: 'Sub-Workflow je Eintrag (statt Befehl)',
+    foreachWorkflowNone: 'Keiner – Befehl je Eintrag ausführen',
     optimize: 'Mit KI optimieren',
     optimizing: 'Optimiere...',
     optimizeResult: 'Optimierungsvorschlag',
@@ -1325,6 +1333,7 @@ export const de: TranslationKeys = {
     secretFailed: 'Signatur-Secret konnte nicht geändert werden',
   },
   integrations: {
+    generateToken: 'Token generieren',
     title: 'Integrationen',
     subtitle: 'Externe Dienste verbinden und in Workflows nutzen',
     empty: 'Keine Integrationen verfügbar',

@@ -106,6 +106,10 @@ final class WorkflowFixtures {
                         "condition", "test -f out.txt", "then_command", "cat out.txt", "execution_mode", "shell")))),
                 workflow("Loop", List.of(block("foreach", "Songs erstellen", ordered(
                         "variable_name", "item", "items", List.of("a", "b"), "command", "Verarbeite {{ item }}")))),
+                // foreach mit workflow_id (a5c9fbbf): Aufrufaktivität je Item statt Unterprozess mit Befehl
+                workflow("LoopWorkflow", List.of(block("foreach", "je Feature", ordered(
+                        "variable_name", "feature", "items", List.of("a", "b"), "workflow_id", "wf-feature",
+                        "context", ordered("feature_id", "{{ feature.id }}"))))),
                 workflow("While", List.of(block("while", null, ordered(
                         "command", "npm test", "condition_command", "echo weiter", "execution_mode", "shell",
                         "max_iterations", 5)))),

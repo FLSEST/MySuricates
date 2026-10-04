@@ -18,8 +18,9 @@ import java.util.Set;
  * <li>{@code switch} only compares; a case block does when it is a {@code simple} block without
  *     {@code execution_mode: shell} ({@code SwitchBlockExecutor} runs nothing but shell and simple).</li>
  * <li>{@code sub-workflow} counts as a model call: the workflow it starts is not part of this
- *     definition, so nothing here can promise that it runs without AI. Only a shipped blueprint
- *     package before installation is judged differently ({@link #needsAiAsBlueprint}).</li>
+ *     definition, so nothing here can promise that it runs without AI. The same holds for a
+ *     {@code foreach} with {@code workflow_id}, whatever its {@code execution_mode}. Only a shipped
+ *     blueprint package before installation is judged differently ({@link #needsAiAsBlueprint}).</li>
  * </ul>
  *
  * <p>Only the platform's own provider calls are visible here — a shell command that starts an AI
@@ -70,7 +71,7 @@ public final class ModelUse {
         if (MODEL_TYPES.contains(type)) {
             return true;
         }
-        if ("sub-workflow".equals(type)) {
+        if ("sub-workflow".equals(type) || startsWorkflowPerItem(type, config)) {
             return !(blueprint && config != null && config.get("workflow_id") instanceof String id
                     && id.startsWith(BLUEPRINT_PREFIX));
         }
@@ -78,6 +79,11 @@ public final class ModelUse {
             return !runsAsShell(config);
         }
         return "switch".equals(type) && aCaseBlockCallsModel(config);
+    }
+
+    private static boolean startsWorkflowPerItem(String type, Map<String, Object> config) {
+        return "foreach".equals(type) && config != null
+                && config.get("workflow_id") instanceof String id && !id.isBlank();
     }
 
     /** Exactly the blocks {@code SwitchBlockExecutor} can run: {@code cases[].blocks} and {@code default}. */

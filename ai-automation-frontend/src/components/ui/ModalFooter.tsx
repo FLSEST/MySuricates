@@ -1,4 +1,5 @@
 import { Button } from './Button';
+import { useT } from '../../i18n';
 
 interface ModalFooterProps {
   onCancel: () => void;
@@ -21,10 +22,11 @@ export function ModalFooter({
   actionDisabled = false,
   cancelVariant = 'secondary',
 }: ModalFooterProps) {
+  const t = useT();
   return (
     <>
       <Button variant={cancelVariant} onClick={onCancel}>
-        {cancelLabel ?? 'Cancel'}
+        {cancelLabel ?? t.common.cancel}
       </Button>
       <Button
         variant={actionVariant}
