@@ -153,8 +153,10 @@ fi
 # Zugangsdaten: keine Ausnahme, das Vorkommen allein ist der Befund. Dazu die Schlüsseldatei der
 # Instanz im Datenordner (DataHome, auch ohne curl danach: wer sie liest, hält den Key im Klartext,
 # TODO ee8bb93d) — derselbe Pfad, den der Analyzer als self-api-call meldet (SelfAccessRules.KEY_FILE).
+# ")/api-key" fängt den Datenordner aus einer Befehlsersetzung ($(data_home …)/api-key, lib/data-home.sh).
+# Kopien wie api-key.bak oder api-key-backup treffen bewusst mit: Sie enthalten denselben Schlüssel.
 HYGIENE_POOL_CREDENTIAL_MARKERS=("X-API-Key" "app_settings" ".mysuricates/api-key" ".autotrigger/api-key"
-  "AUTOMATION_DATA_HOME/api-key" "AUTOMATION_DATA_HOME}/api-key")
+  "AUTOMATION_DATA_HOME/api-key" "AUTOMATION_DATA_HOME}/api-key" ")/api-key")
 
 # Eigene REST-API. Das Präfix allein genügt nicht als Befund: mocking-gap-audit
 # führt "/api/v1/" als Suchmuster in einer Liste von Netzwerk-Kennzeichen, und

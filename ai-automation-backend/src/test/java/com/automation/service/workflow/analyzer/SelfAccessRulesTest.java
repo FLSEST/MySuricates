@@ -280,6 +280,16 @@ class SelfAccessRulesTest {
                 });
         assertThat(shell("# nie ~/.mysuricates/api-key lesen\nls")).isEmpty();
         assertThat(shell("cat ~/.config/tool/api-keys.txt; ls ~/.mysuricates/backups")).isEmpty();
+        assertThat(shell("cat ~/.mysuricates/api-keys.txt")).isEmpty();
+    }
+
+    /** Review w8: Kopien der Schlüsseldatei enthalten denselben Schlüssel — sie treffen bewusst mit. */
+    @Test
+    void kopienDerSchluesseldateiSindEbenfallsHigh() {
+        assertThat(shell("cp ~/.mysuricates/api-key.bak /tmp/k")).singleElement()
+                .satisfies(f -> assertThat(f.severity()).isEqualTo(Severity.HIGH));
+        assertThat(shell("cat \"$HOME/.autotrigger/api-key-backup\"")).singleElement()
+                .satisfies(f -> assertThat(f.severity()).isEqualTo(Severity.HIGH));
     }
 
     @Test

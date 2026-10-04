@@ -76,7 +76,11 @@ final class SelfAccessRules {
     /** Wie im Skript: gut eine Befehlszeile um die Fundstelle. */
     private static final int WINDOW = 200;
 
-    /** Die Schlüsseldatei der Instanz im Datenordner (DataHome, InstanceAddress.apiKeyFile). */
+    /**
+     * Die Schlüsseldatei der Instanz im Datenordner (DataHome, InstanceAddress.apiKeyFile). Die Grenze
+     * {@code \b} hinter {@code api-key} lässt Kopien wie {@code api-key.bak}/{@code api-key-backup} bewusst
+     * mittreffen (derselbe Schlüssel), andere Dateien wie {@code api-keys.txt} nicht.
+     */
     private static final Pattern KEY_FILE = Pattern.compile(
             "(?:\\.mysuricates|\\.autotrigger|AUTOMATION_DATA_HOME}?|\\bdata_home\\b[^\\n]{0,60}?)/api-key\\b");
 
