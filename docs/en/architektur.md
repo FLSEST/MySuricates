@@ -205,7 +205,7 @@ Chains and sub-workflows pass their starter's origin on in the reserved context 
 ### Layer Model
 
 ```
-Controller (REST API, 53 Controllers)
+Controller (REST API, 54 Controllers)
     ↓ DTO (Request/Response Records)
 Service (Business Logic)
     ↓ Entity (JPA)
@@ -225,7 +225,7 @@ SQLite (File: data/automation.db)
 
 ```
 com.automation
-├── controller/          53 REST Controllers
+├── controller/          54 REST Controllers
 ├── service/
 │   ├── project/         ProjectService, ProjectStatusReconciler, ContainerService (+ DockerContainerGateway, DockerOrphanReconciler), ProjectContextService, PathValidator, OnboardingProfileService (+ OnboardingProfileSeeder), ProjectOnboardingService
 │   ├── workflow/        WorkflowExecutor (+ ExecutionContextFactory, BlockSkillContext, BlockStepRunner, RunCompletionHandler, RunFinalizer, WorkflowContextDataService + PlatformVariableSource beans), RunControlService, WorkflowService (+ WorkflowRequestFields), ExecutionBroadcaster, TemplateVerificationService, WorkflowOptimizationService (+ WorkflowOptimizationPrompt), GhostRunWatchdogService, RunCleanupService, AgentInstructionsService, WorkflowTemplateService, BlockOutputValidator, WorkflowExecutionRegistry, IdleContainerReaper, WorkflowTaggingService, WorkflowVersionService, WorkflowContentChangedEvent
@@ -287,7 +287,7 @@ com.automation
 └── util/                JPA Converters (JSON, BlockDefinitions), RuntimeClasspathGuard (refuses a start from `target/classes`)
 ```
 
-### All 53 REST Controllers
+### All 54 REST Controllers
 
 | Controller | Base Path | Description |
 |---|---|---|
@@ -325,6 +325,7 @@ com.automation
 | `NotificationController` | `/api/v1/notifications` | CRUD, enable/disable |
 | `WishController` | `/api/v1/wishes` | CRUD, cancel, respond, crystallize |
 | `StagingController` | `/api/v1/staging` | Status, start, stop, promote, promote-cancel, sync-preview, sync-definitions |
+| `StagedSyncController` | `/api/v1/staging/targets` | Staged setup: sync targets Test/Prod from the startup configuration, per target sync-preview and sync-definitions (to Prod only sealed ones) |
 | `TestingController` | `/api/v1/testing` | Status, start, stop, reset, sync-preview, sync-definitions, report-result, pull-changes |
 | `SystemController` | `/api/v1/system` | Health, auth-status, info, jvm-memory, settings, execution-config, AI-providers, AI-provider-catalog, capabilities, backup, backups, remote-access, vacuum, browse, open-path, repair, client-errors, integration-snippet |
 | `IntegrationController` | `/api/v1/integrations` | OAuth flow, credentials, actions, provider list, task export targets |

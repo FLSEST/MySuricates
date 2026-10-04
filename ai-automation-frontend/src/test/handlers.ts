@@ -16,6 +16,9 @@ export const handlers = [
   ),
   http.delete(`${BASE}/projects/:id`, () => new HttpResponse(null, { status: 204 })),
 
+  // Sync targets of the staged setup (84a78bb7) — none by default
+  http.get(`${BASE}/staging/targets`, () => HttpResponse.json([])),
+
   // Runs waiting for an answer — none by default (the sidebar polls this on every page)
   http.get(`${BASE}/executions/pending-input`, () => HttpResponse.json([])),
 

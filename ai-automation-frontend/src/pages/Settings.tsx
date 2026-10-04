@@ -15,6 +15,8 @@ import { BackupCard } from '../components/settings/BackupCard';
 import { SystemInfoCard } from '../components/settings/SystemInfoCard';
 import { StagingCard } from '../components/settings/StagingCard';
 import { TestingCard } from '../components/settings/TestingCard';
+import { StagedTargetsCard } from '../components/settings/StagedTargetsCard';
+import { useStagedTargets } from '../hooks/useStagedSync';
 import { NotificationsCard } from '../components/settings/NotificationsCard';
 import { ExecutionSettingsCard } from '../components/settings/ExecutionSettingsCard';
 import { WishSettingsCard } from '../components/settings/WishSettingsCard';
@@ -50,6 +52,10 @@ export function Settings() {
   const testingSync = useTestingSync();
   const testingPullChanges = useTestingPullChanges();
   const repairAllFailed = useRepairAllFailed();
+  // Staged setup (84a78bb7): the sync targets come from the startup configuration — without advanced mode too
+  const { data: stagedTargets } = useStagedTargets();
+  const hasStagedTargets = (stagedTargets?.length ?? 0) > 0;
+  const showEnvironments = stagingModule && (advancedMode || hasStagedTargets);
 
   // Collapsible section state — all start closed except general
   // A deep link (#section) opens its section from the start; the effect below only scrolls to it
@@ -83,7 +89,7 @@ export function Settings() {
     { id: 'tray', label: t.settings.trayNavTitle, visible: true, parentId: 'appearance' },
     { id: 'execution', label: t.settings.settingsNavExecution, visible: !simpleMode },
     { id: 'infrastructure', label: t.settings.settingsNavInfrastructure, visible: !simpleMode },
-    { id: 'environments', label: t.settings.settingsNavEnvironments, visible: advancedMode && stagingModule },
+    { id: 'environments', label: t.settings.settingsNavEnvironments, visible: showEnvironments },
     { id: 'modules', label: t.modules.navTitle, visible: true },
     { id: 'system', label: t.settings.settingsNavSystem, visible: true },
   ];
@@ -132,42 +138,47 @@ export function Settings() {
             </SettingsSection>
           )}
 
-          {advancedMode && stagingModule && (
+          {showEnvironments && (
             <SettingsSection id="environments" title={t.settings.settingsNavEnvironments} collapsible open={!!openSections['environments']} onToggle={() => toggleSection('environments')}>
-              <StagingCard
-                staging={staging}
-                devVersion={sysInfo?.version}
-                onStart={() => stagingStart.mutate()}
-                onStop={() => stagingStop.mutate()}
-                onPromote={() => stagingPromote.mutate()}
-                onCancel={() => stagingCancel.mutate()}
-                onSyncAll={() => stagingSync.mutateAsync(undefined)}
-                onSyncSelective={(req) => stagingSync.mutateAsync(req)}
-                syncResult={stagingSync.data}
-                startLoading={stagingStart.isPending}
-                stopLoading={stagingStop.isPending}
-                promoteLoading={stagingPromote.isPending}
-                syncLoading={stagingSync.isPending}
-              />
-              <TestingCard
-                testing={testing}
-                devVersion={sysInfo?.version}
-                onStart={() => testingStart.mutate()}
-                onStop={() => testingStop.mutate()}
-                onReset={() => testingReset.mutateAsync()}
-                onSyncAll={() => testingSync.mutateAsync(undefined)}
-                onSyncSelective={(req) => testingSync.mutateAsync(req)}
-                onPullChanges={() => testingPullChanges.mutateAsync()}
-                onRepairAll={() => repairAllFailed.mutate(false)}
-                syncResult={testingSync.data}
-                pullResult={testingPullChanges.data}
-                startLoading={testingStart.isPending}
-                stopLoading={testingStop.isPending}
-                resetLoading={testingReset.isPending}
-                syncLoading={testingSync.isPending}
-                pullLoading={testingPullChanges.isPending}
-                repairAllLoading={repairAllFailed.isPending}
-              />
+              {hasStagedTargets && <StagedTargetsCard targets={stagedTargets ?? []} />}
+              {advancedMode && (
+                <>
+                  <StagingCard
+                    staging={staging}
+                    devVersion={sysInfo?.version}
+                    onStart={() => stagingStart.mutate()}
+                    onStop={() => stagingStop.mutate()}
+                    onPromote={() => stagingPromote.mutate()}
+                    onCancel={() => stagingCancel.mutate()}
+                    onSyncAll={() => stagingSync.mutateAsync(undefined)}
+                    onSyncSelective={(req) => stagingSync.mutateAsync(req)}
+                    syncResult={stagingSync.data}
+                    startLoading={stagingStart.isPending}
+                    stopLoading={stagingStop.isPending}
+                    promoteLoading={stagingPromote.isPending}
+                    syncLoading={stagingSync.isPending}
+                  />
+                  <TestingCard
+                    testing={testing}
+                    devVersion={sysInfo?.version}
+                    onStart={() => testingStart.mutate()}
+                    onStop={() => testingStop.mutate()}
+                    onReset={() => testingReset.mutateAsync()}
+                    onSyncAll={() => testingSync.mutateAsync(undefined)}
+                    onSyncSelective={(req) => testingSync.mutateAsync(req)}
+                    onPullChanges={() => testingPullChanges.mutateAsync()}
+                    onRepairAll={() => repairAllFailed.mutate(false)}
+                    syncResult={testingSync.data}
+                    pullResult={testingPullChanges.data}
+                    startLoading={testingStart.isPending}
+                    stopLoading={testingStop.isPending}
+                    resetLoading={testingReset.isPending}
+                    syncLoading={testingSync.isPending}
+                    pullLoading={testingPullChanges.isPending}
+                    repairAllLoading={repairAllFailed.isPending}
+                  />
+                </>
+              )}
             </SettingsSection>
           )}
 

@@ -1191,6 +1191,17 @@ export interface SyncDefinitionsRequest {
   chainIds?: string[];
 }
 
+/** A sync target of the staged setup (Dev → Test / Prod), GET /staging/targets (84a78bb7). */
+export interface SyncTarget {
+  name: 'test' | 'prod' | string;
+  url: string;
+  keyPresent: boolean;
+  reachable: boolean;
+  /** Prod: only sealed definitions go there. */
+  sealedOnly: boolean;
+  version: string | null;
+}
+
 // ── Testing ───────────────────────────────────────────────
 
 export interface TestingStatus {

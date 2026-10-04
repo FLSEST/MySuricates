@@ -3824,6 +3824,31 @@ All fields are optional; without filters, all definitions are synchronized.
 
 **Response:** `SyncResult` with `projectsSynced`, `workflowsSynced`, `skillsSynced`, `chainsSynced`, `skipped`, `errors`, `preSyncBackup`
 
+### `GET /api/v1/staging/targets`
+
+Sync targets of the staged setup (`scripts/setup.sh --mode staged`): Test and Prod as Dev knows them from the
+startup configuration (`automation.staging.targets.{test,prod}.url` / `.key-file`, written by the installer into
+`deploy/instances/dev.env`). Targets that are not configured are left out.
+
+**Response:** list of `SyncTargetResponse` with `name` (`test`/`prod`), `url`, `keyPresent` (key file exists and is
+not empty), `reachable`, `sealedOnly` (Prod: sealed definitions only), `version`
+
+### `GET /api/v1/staging/targets/{target}/sync-preview`
+
+Preview Dev → `test` or `prod`. For Prod only what may go there: workflows with an intact seal, their projects and
+skills, chains made only of such workflows.
+
+**Response:** `SyncPreview`; `409` (`STATE_CONFLICT`) with `messageKey` `SYNC_TARGET_NOT_CONFIGURED`,
+`SYNC_TARGET_KEY_MISSING` or `SYNC_TARGET_UNREACHABLE`
+
+### `POST /api/v1/staging/targets/{target}/sync-definitions`
+
+Transfer definitions from Dev to `test` or `prod`. Request as for `POST /api/v1/staging/sync-definitions`; for Prod
+the selection is narrowed to sealed definitions, never widened. Dev reads the target's API key from the key file on
+every call (`scripts/instance.sh sync-keys --name dev`), never from the target's database.
+
+**Response:** `SyncResult`; errors as for the preview
+
 ---
 
 ## Testing (Test Instance)
