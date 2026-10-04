@@ -45,10 +45,19 @@ public class InstanceHttpClient {
     }
 
     public JsonNode httpGet(String url) {
+        return httpGet(url, 10_000, 30_000);
+    }
+
+    /** {@link #httpGet(String)} with a short timeout for status probes (connect and read each {@code timeoutMs}). */
+    public JsonNode httpGet(String url, int timeoutMs) {
+        return httpGet(url, timeoutMs, timeoutMs);
+    }
+
+    private JsonNode httpGet(String url, int connectTimeoutMs, int readTimeoutMs) {
         try {
             HttpURLConnection conn = (HttpURLConnection) URI.create(url).toURL().openConnection();
-            conn.setConnectTimeout(10_000);
-            conn.setReadTimeout(30_000);
+            conn.setConnectTimeout(connectTimeoutMs);
+            conn.setReadTimeout(readTimeoutMs);
             conn.setRequestProperty("Accept", "application/json");
             addApiKeyHeader(conn);
             int code = conn.getResponseCode();

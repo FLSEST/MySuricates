@@ -42,10 +42,10 @@ class ChildProcessEnvGateTest {
             Map.entry("com/automation/service/cli/CliSession.java", "docker exec, no env passed"),
             Map.entry("com/automation/service/cli/ContainerCommandProcess.java", "docker run, no env passed"),
             Map.entry("com/automation/service/staging/DockerContainerManager.java", "docker CLI, fixed commands"),
-            // staging/test instances get the dev key on purpose (StagingService/TestingService env)
+            // staging/test instances get the dev key on purpose (StagingService env; TestingService
+            // starts its commands through DockerContainerManager and reads keys from the key file)
             Map.entry("com/automation/service/staging/StagingComposeCommand.java", "compose for stable/test"),
             Map.entry("com/automation/service/staging/StagingService.java", "passes the key on purpose"),
-            Map.entry("com/automation/service/staging/TestingService.java", "passes the key on purpose"),
             Map.entry("com/automation/service/system/FileBrowserService.java", "xdg-open on user action"),
             Map.entry("com/automation/service/system/HostTailscaleSelfQuery.java", "tailscale status"),
             Map.entry("com/automation/service/system/TailscaleService.java", "tailscale CLI"),

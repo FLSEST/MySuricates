@@ -138,9 +138,6 @@ public class TestingService {
     public SyncPreview syncPreview() {
         if (!isHealthy()) throw new LocalizedStateException(ErrorMessage.TEST_INSTANCE_NOT_RUNNING);
         String testApiKey = readContainerApiKey(config.getTestContainerName());
-        if (testApiKey == null) {
-            throw new IllegalStateException("Could not read API key from test container. Is the container running?");
-        }
         return previewService.syncPreview(deriveTestBaseUrl(), testApiKey);
     }
 
@@ -150,9 +147,11 @@ public class TestingService {
 
     public SyncResult syncDefinitions(SyncDefinitionsRequest request) {
         if (!isHealthy()) throw new LocalizedStateException(ErrorMessage.TEST_INSTANCE_NOT_RUNNING);
-        String testApiKey = readContainerApiKey(config.getTestContainerName());
-        if (testApiKey == null) {
-            return new SyncResult(0, 0, 0, 0, List.of("Could not read API key from test container"));
+        String testApiKey;
+        try {
+            testApiKey = readContainerApiKey(config.getTestContainerName());
+        } catch (LocalizedStateException e) {
+            return new SyncResult(0, 0, 0, 0, List.of(e.getMessage()));
         }
         return syncHelper.syncDefinitionsTo(deriveTestBaseUrl(), testApiKey, request);
     }
@@ -303,9 +302,11 @@ public class TestingService {
     // ── API key helpers ────────────────────────────────────
 
     private <T> T withTestApiKey(java.util.function.Supplier<T> action) {
-        String apiKey = readContainerApiKey(config.getTestContainerName());
-        if (apiKey == null) {
-            log.warn("Could not read API key from test container — requests may fail with 401");
+        String apiKey = null;
+        try {
+            apiKey = readContainerApiKey(config.getTestContainerName());
+        } catch (LocalizedStateException e) {
+            log.warn("{} — requests may fail with 401", e.getMessage());
         }
         httpClient.setTargetApiKeyOverride(apiKey);
         try {
@@ -315,23 +316,13 @@ public class TestingService {
         }
     }
 
+    /**
+     * The container's API key from the key file in its data folder, else the key it was started with
+     * (this instance's, see {@link #start}) — never from its database ({@link DockerContainerManager#readApiKey}).
+     * Throws a {@code LocalizedStateException} that says what is missing.
+     */
     String readContainerApiKey(String containerName) {
-        try {
-            ProcessBuilder pb = new ProcessBuilder("docker", "exec", containerName,
-                    "python3", "-c",
-                    "import sqlite3; conn=sqlite3.connect('/app/data/automation.db'); c=conn.cursor(); c.execute(\"SELECT value FROM app_settings WHERE key='api-key'\"); r=c.fetchone(); print(r[0] if r else ''); conn.close()");
-            pb.redirectErrorStream(true);
-            Process p = pb.start();
-            String output = new String(p.getInputStream().readAllBytes()).trim();
-            int exit = p.waitFor();
-            if (exit == 0 && !output.isEmpty()) {
-                log.debug("Read API key from container {}", containerName);
-                return output;
-            }
-        } catch (Exception e) {
-            log.warn("Failed to read API key from container {}: {}", containerName, e.getMessage());
-        }
-        return null;
+        return dockerManager.readApiKey(containerName, apiKeyService.getEffectiveApiKey());
     }
 
     // ── Internal helpers ──────────────────────────────────

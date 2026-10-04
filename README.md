@@ -112,7 +112,7 @@ the most recently documented CI run, with their own date in the table:
 | | |
 |---|---|
 | Created since | 2026-02-15, around 2,630 commits in the working repository, one author <!-- doc-facts-check: ignore --> |
-| Backend | Java 21 / Spring Boot 3.5, around 73,000 lines, 53 REST controllers, 97 Flyway migrations |
+| Backend | Java 21 / Spring Boot 3.5, around 73,000 lines, 54 REST controllers, 97 Flyway migrations |
 | Frontend | React 19 / TypeScript, around 77,000 lines |
 | Tests | Backend 10,476, frontend 1,580 (192 files) — 0 failures, 0 skipped, CI run 35777382298 from 2026-09-22 |
 | Building blocks | 20 block types, 54 workflow templates, 33 blueprints (basic scaffolds to fill in), 19 built-in skills, 18 integration providers |
@@ -229,4 +229,4 @@ Please do **not** report security vulnerabilities as public issues; use the repo
 
 > 🌍 **README.de.md is the source, `README.md` the translation.** Content changes belong in the German file. The author generates the English version from it in their MySuricates instance using the "README DE↔EN Sync" workflow; the repository holds only the result, not the workflow. So if you contribute from outside, change the German source and adjust `README.md` by hand in the same commit — or change only the German one and note in the pull request that the translation still needs to follow.
 
-<!-- synced-from: af9517fa1e13 sha256:af18ef952312a180098e7c1f13218ca8196695c7ede98ade64562e9c237db8fb -->
+<!-- synced-from: eebd21309500 sha256:ad1b1441154c1716c9e4e34ded84692a2e8bd354be3e7c8ceeb44e3fe2eaacec -->

@@ -1,6 +1,8 @@
 package com.automation.service.staging;
 
 import com.automation.config.DataHome;
+import com.automation.exception.ErrorMessage;
+import com.automation.exception.LocalizedStateException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -20,6 +22,7 @@ import java.util.Map;
  *   <li>{@link #containerExists(String)} — check if a named container exists, running or not</li>
  *   <li>{@link #isHealthy(String)} — HTTP health check</li>
  *   <li>{@link #runCommand(String, Path, Map, String...)} — run a command with output logging</li>
+ *   <li>{@link #readApiKey(String, String)} — the API key a container wrote into its data folder</li>
  * </ul>
  */
 @Component
@@ -64,6 +67,63 @@ public class DockerContainerManager {
         } catch (Exception e) {
             log.debug("Container status check failed for '{}': {}", containerName, e.getMessage());
             return "";
+        }
+    }
+
+    /**
+     * The key file in the container's data folder — the same rule as {@code DataHome} and
+     * {@code scripts/lib/data-home.sh}: {@code $HOME/.autotrigger} while it exists, else
+     * {@code $HOME/.mysuricates}. Exit 3 and the path when the file is missing or empty.
+     */
+    static final String KEY_FILE_SH = "if [ -d \"$HOME/.autotrigger\" ]; then f=\"$HOME/.autotrigger/api-key\"; "
+            + "else f=\"$HOME/.mysuricates/api-key\"; fi; [ -s \"$f\" ] || { printf '%s' \"$f\"; exit 3; }; cat \"$f\"";
+
+    /** Output and exit code of a short command. */
+    record CommandResult(int exitCode, String output) {
+    }
+
+    /**
+     * The API key of a Stable/Test container, read from the key file the instance writes into its data
+     * folder at every start ({@code ApiKeyService}) — like {@code scripts/instance.sh key}, never from the
+     * instance's database. Without the file the key passed to the container at its start counts: Stable
+     * and Test get this instance's key as {@code AUTOMATION_API_KEY}, and with a configured key
+     * {@code ApiKeyService} writes no file.
+     *
+     * @param keyPassedAtStart the key the container was started with ({@code AUTOMATION_API_KEY}), or blank
+     * @throws LocalizedStateException {@code CONTAINER_API_KEY_MISSING} when neither file nor passed key
+     *                                 is there, else {@code CONTAINER_API_KEY_UNREADABLE} (container not
+     *                                 running, no docker …)
+     */
+    public String readApiKey(String containerName, String keyPassedAtStart) {
+        CommandResult result = capture("docker", "exec", containerName, "sh", "-c", KEY_FILE_SH);
+        String output = result.output().trim();
+        if (result.exitCode() == 0 && !output.isEmpty()) {
+            return output;
+        }
+        if (result.exitCode() == 3) {
+            if (keyPassedAtStart != null && !keyPassedAtStart.isBlank()) {
+                return keyPassedAtStart;
+            }
+            throw new LocalizedStateException(ErrorMessage.CONTAINER_API_KEY_MISSING,
+                    Map.of("container", containerName, "file", output));
+        }
+        throw new LocalizedStateException(ErrorMessage.CONTAINER_API_KEY_UNREADABLE,
+                Map.of("container", containerName, "error", output.isEmpty() ? "exit " + result.exitCode() : output));
+    }
+
+    /** Runs a short command and returns its output; exit -1 and the message when it cannot start. */
+    CommandResult capture(String... command) {
+        try {
+            ProcessBuilder pb = new ProcessBuilder(command);
+            pb.redirectErrorStream(true);
+            Process p = pb.start();
+            String output = new String(p.getInputStream().readAllBytes());
+            return new CommandResult(p.waitFor(), output);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return new CommandResult(-1, "interrupted");
+        } catch (Exception e) {
+            return new CommandResult(-1, String.valueOf(e.getMessage()));
         }
     }
 

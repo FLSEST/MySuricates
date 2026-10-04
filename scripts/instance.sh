@@ -10,9 +10,10 @@
 #   scripts/instance.sh built  --name NAME                           # Host: Stand des Builds gegen den Klon
 #   scripts/instance.sh list                                          # alle Instanzen mit Port
 #   scripts/instance.sh login  --name NAME [claude|codex|pi]         # eigene Anmeldung (nur AI_FROM_HOST=programs)
+#   scripts/instance.sh sync-keys --name NAME                        # Keys der Sync-Ziele holen (gestuft: dev)
 #
 # Jede Instanz ist eine Datei deploy/instances/NAME.env (git-ignoriert; der Installer schreibt sie).
-# Commands: up|down|status|logs|key|list|login|built
+# Commands: up|down|status|logs|key|list|login|built|sync-keys
 #
 # Steuerung (MYSURICATES_*): RUNTIME container|host, PORT (Pflicht), BIND (127.0.0.1), PRESET
 # (core|research|full), LANG (de|en, Sprache der Adresszeilen; Default de), PROJECTS (Container: Ordner, der eingebunden wird; Default Ordner ueber dem
@@ -21,8 +22,11 @@
 # Programme + je Anbieter nur die Anmeldung), AI_PROVIDERS (Auswahl aus claude,codex,pi), HARDENING_SEALING,
 # HARDENING_REQUIRE_SEALED (true|false), ENVIRONMENT (Anzeigename), APT_REFRESH (Container: ein neuer
 # Wert, etwa der Monat, holt NodeSource- und Docker-Repo des Images frisch), PREFIX (Container: Vorsilbe
-# der Docker-Namen PREFIX-NAME und des Images PREFIX:local, Default mysuricates). Jede AUTOMATION_*-Zeile geht
-# unveraendert an die Instanz (Einzelmodule, Haertung, AUTOMATION_AI_DEFAULT_PROVIDER …).
+# der Docker-Namen PREFIX-NAME und des Images PREFIX:local, Default mysuricates), NETWORK (Container: gemeinsames
+# Docker-Netz PREFIX-NETWORK, in dem die Instanz unter ihrem Namen erreichbar ist — gestuft: staged), SYNC_TARGETS
+# (Instanzen, deren API-Key sync-keys nach deploy/instances/NAME.sync-keys/ holt; im Container read-only unter
+# /app/sync-keys). Jede AUTOMATION_*-Zeile geht unveraendert an die Instanz (Einzelmodule, Haertung,
+# AUTOMATION_AI_DEFAULT_PROVIDER, AUTOMATION_SYNC_* …).
 #
 # Host: gebaut wird in eine Kopie unter ${XDG_STATE_HOME:-~/.local/state}/mysuricates/NAME/ (JAR +
 # Frontend), das Backend liefert das Frontend selbst aus — ein Prozess, ein Port. `up` baut neu, wenn
@@ -69,7 +73,7 @@ while [ "$#" -gt 0 ]; do
   esac
   shift
 done
-case "$CMD" in -h|--help|"") sed -n '3,15p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;; esac
+case "$CMD" in -h|--help|"") sed -n '3,16p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;; esac
 
 env_value() { grep "^$2=" "$1" 2>/dev/null | tail -n 1 | cut -d= -f2-; }
 
@@ -82,7 +86,8 @@ if [ "$CMD" = list ]; then
 fi
 
 [ -n "$NAME" ] || die "--name fehlt"
-case "$NAME" in *[!a-z0-9-]*) die "Name nur aus a-z, 0-9 und -" ;; esac
+# Nicht mit - am Anfang: der Name wird zu Docker-Namen und Argumenten (mysuricates--x, -x.env)
+case "$NAME" in *[!a-z0-9-]*|-*) die "Name nur aus a-z, 0-9 und - (nicht am Anfang)" ;; esac
 # mysuricates-tryout und seine Volumes gehoeren scripts/tryout.sh — nie eine Instanz darueberlegen
 [ "$NAME" != tryout ] || die "Der Name 'tryout' ist fuer scripts/tryout.sh reserviert"
 ENV_FILE="$INSTANCES_DIR/$NAME.env"
@@ -107,6 +112,8 @@ BIND="${MYSURICATES_BIND:-127.0.0.1}"
 PREFIX="${MYSURICATES_PREFIX:-mysuricates}"
 case "$PREFIX" in *[!a-z0-9-]*|-*) die "MYSURICATES_PREFIX nur aus a-z, 0-9 und - (nicht am Anfang)" ;; esac
 CONTAINER="$PREFIX-$NAME"; IMAGE="$PREFIX:local"
+case "${MYSURICATES_NETWORK:-}" in *[!a-z0-9-]*|-*) die "MYSURICATES_NETWORK nur aus a-z, 0-9 und - (nicht am Anfang)" ;; esac
+case "${MYSURICATES_SYNC_TARGETS:-}" in *[!a-z0-9,-]*) die "MYSURICATES_SYNC_TARGETS: Instanznamen, durch Komma getrennt" ;; esac
 export MYSURICATES_NAME="$NAME" MYSURICATES_ENV_FILE="$ENV_FILE" MYSURICATES_CONTAINER="$CONTAINER" MYSURICATES_IMAGE="$IMAGE"
 HOST_UID="$(id -u)"; HOST_GID="$(id -g)"; HOST_USER="$(id -un)"; HOST_HOME="$HOME"
 export HOST_UID HOST_GID HOST_USER HOST_HOME
@@ -143,6 +150,52 @@ wait_health() {
 }
 
 # ---------------------------------------------------------------------------------------------------
+# Gestufter Betrieb: Definition-Sync Dev → Test / Prod (84a78bb7)
+# ---------------------------------------------------------------------------------------------------
+# Dev erreicht Test und Prod ueber ein gemeinsames Docker-Netz unter deren Instanznamen
+# (http://test:9090) — nicht ueber host.docker.internal: die Ports liegen nur auf 127.0.0.1 des
+# Rechners, und die erreicht ein Container unter Linux darueber nicht. Die API-Keys der Ziele holt
+# sync-keys ueber `key` (Datenordner der Ziel-Instanz, nie aus deren DB) in eine Datei je Ziel; Dev
+# liest sie read-only unter /app/sync-keys (AUTOMATION_SYNC_*_KEY_FILE).
+staged_network() { [ -z "${MYSURICATES_NETWORK:-}" ] || printf '%s-%s' "$PREFIX" "$MYSURICATES_NETWORK"; }
+sync_keys_dir() { printf '%s/%s.sync-keys' "$INSTANCES_DIR" "$NAME"; }
+sync_targets() { printf '%s' "${MYSURICATES_SYNC_TARGETS:-}" | tr ',' ' '; }
+
+# Zusatz-Datei fuer docker compose: Netz (mit dem Instanznamen als Alias) und Key-Ordner. Rueckgabe 1 =
+# nichts davon eingestellt, keine Datei noetig.
+staged_yaml() {
+  local net
+  net="$(staged_network)"
+  [ -n "$net" ] || [ -n "${MYSURICATES_SYNC_TARGETS:-}" ] || return 1
+  printf '# Geschrieben von scripts/instance.sh up aus %s — nicht von Hand aendern.\nservices:\n  app:\n' "$ENV_FILE"
+  [ -z "$net" ] || printf '    networks:\n      default: {}\n      staged:\n        aliases: ["%s"]\n' "$NAME"
+  [ -z "${MYSURICATES_SYNC_TARGETS:-}" ] || printf '    volumes:\n      - "%s:/app/sync-keys:ro"\n' "$(sync_keys_dir)"
+  [ -z "$net" ] || printf 'networks:\n  staged:\n    name: "%s"\n    external: true\n' "$net"
+  return 0
+}
+
+if [ "$CMD" = sync-keys ]; then
+  [ -n "${MYSURICATES_SYNC_TARGETS:-}" ] || die "$NAME hat keine Sync-Ziele (MYSURICATES_SYNC_TARGETS in $ENV_FILE)"
+  dir="$(sync_keys_dir)"
+  mkdir -p "$dir" && chmod 700 "$dir" || die "$dir lässt sich nicht anlegen"
+  rc=0
+  for t in $(sync_targets); do
+    [ "$t" != "$NAME" ] || continue
+    # Ohne die MYSURICATES_*-Werte dieser Instanz — das Ziel liest seine eigene Datei
+    key="$(for v in $(compgen -e); do case "$v" in MYSURICATES_PREFIX|MYSURICATES_INSTANCES_DIR) ;; MYSURICATES_*) unset "$v" ;; esac; done
+           bash "$SCRIPT_DIR/instance.sh" key --name "$t" 2>/dev/null | tr -d '\r\n')"
+    if [ -n "$key" ] && (umask 077 && printf '%s\n' "$key" > "$dir/$t.key.tmp") && mv -f "$dir/$t.key.tmp" "$dir/$t.key"; then
+      echo "$t: Key übernommen ($dir/$t.key)"
+    else
+      rm -f "$dir/$t.key.tmp"
+      echo "$t: kein Key — läuft die Instanz? scripts/instance.sh up --name $t, dann noch einmal sync-keys" >&2
+      rc=1
+    fi
+  done
+  exit "$rc"
+fi
+
+# ---------------------------------------------------------------------------------------------------
 # Container
 # ---------------------------------------------------------------------------------------------------
 # Build-Kontext des Images: die getrackten Dateien des Klons, wie sie im Arbeitsbaum liegen (git
@@ -159,8 +212,11 @@ tracked_files_tar() {
 is_git_clone() { [ "$(git -C "$REPO_ROOT" rev-parse --show-toplevel 2>/dev/null)" = "$(cd "$REPO_ROOT" && pwd -P)" ]; }
 
 container_cmd() {
-  local override="$INSTANCES_DIR/$NAME.override.yml" owner missing login_command
-  compose() { docker compose -p "$CONTAINER" -f "$COMPOSE_FILE" -f "$override" "$@"; }
+  local override="$INSTANCES_DIR/$NAME.override.yml" staged="$INSTANCES_DIR/$NAME.staged.yml" owner missing login_command net
+  compose() {
+    if [ -f "$staged" ]; then docker compose -p "$CONTAINER" -f "$COMPOSE_FILE" -f "$override" -f "$staged" "$@"
+    else docker compose -p "$CONTAINER" -f "$COMPOSE_FILE" -f "$override" "$@"; fi
+  }
   build_image() {
     if is_git_clone; then
       echo "Baue Image $IMAGE aus den getrackten Dateien des Klons ..."
@@ -192,6 +248,16 @@ container_cmd() {
         || die "Ungültige KI-Schalter in $ENV_FILE (MYSURICATES_AI_FROM_HOST=programs|login|all, MYSURICATES_AI_PROVIDERS=claude,codex,pi)"
       missing="$(host_mounts_missing_text)"
       [ -z "$missing" ] || printf 'KI-Anbieter, die dieser Container nicht nutzen kann:\n%s\n' "$missing" >&2
+      # Gestufter Betrieb (84a78bb7): gemeinsames Netz und Key-Ordner — beides muss vor compose up da sein,
+      # sonst legt Docker den Ordner als root an
+      net="$(staged_network)"
+      if [ -n "$net" ] && ! docker network inspect "$net" >/dev/null 2>&1; then
+        docker network create "$net" >/dev/null || die "Docker-Netz $net lässt sich nicht anlegen"
+      fi
+      if [ -n "${MYSURICATES_SYNC_TARGETS:-}" ]; then
+        mkdir -p "$(sync_keys_dir)" && chmod 700 "$(sync_keys_dir)" || die "$(sync_keys_dir) lässt sich nicht anlegen"
+      fi
+      if staged_yaml > "$staged.tmp"; then mv -f "$staged.tmp" "$staged"; else rm -f "$staged.tmp" "$staged"; fi
       build_image || exit 1
       compose up -d --no-build || exit 1
       [ "$WAIT" = 1 ] || exit 0
@@ -214,7 +280,7 @@ container_cmd() {
       provider_login_argv "${TOOL:-claude}" || die "login kennt claude, codex, pi"
       docker exec -it -u "$HOST_UID" "$CONTAINER" "${PROVIDER_LOGIN_ARGV[@]}" ;;
     built)  die "built gibt es nur für Host-Instanzen — im Container baut docker compose das Image bei jedem up" ;;
-    *)      die "Unbekannter Befehl: $CMD (up|down|status|logs|key|list|login|built)" ;;
+    *)      die "Unbekannter Befehl: $CMD (up|down|status|logs|key|list|login|built|sync-keys)" ;;
   esac
 }
 container_healthy() { [ "$(docker inspect -f '{{.State.Health.Status}}' "$CONTAINER" 2>/dev/null)" = healthy ]; }
@@ -350,7 +416,7 @@ EOF
     key)    cat "$(data_home "$STATE/home")/api-key" ;;
     built)  host_build_state ;;
     login)  die "login gibt es nur fuer Container-Instanzen — im Host-Betrieb nutzen die Programme die Anmeldungen dieses Rechners direkt" ;;
-    *)      die "Unbekannter Befehl: $CMD (up|down|status|logs|key|list|login|built)" ;;
+    *)      die "Unbekannter Befehl: $CMD (up|down|status|logs|key|list|login|built|sync-keys)" ;;
   esac
 }
 

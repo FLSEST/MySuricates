@@ -246,6 +246,15 @@ automation:
     # Zum Reaktivieren: AUTOMATION_STAGING_AUTO_START / AUTOMATION_TEST_AUTO_START=true.
     auto-start: ${AUTOMATION_STAGING_AUTO_START:false}
     test-auto-start: ${AUTOMATION_TEST_AUTO_START:false}
+    # Gestufter Betrieb (setup.sh --mode staged, TODO 84a78bb7): Dev kennt Test und Prod über URL und
+    # Key-Datei; beides schreibt der Installer in deploy/instances/dev.env. Leer = kein Ziel.
+    targets:
+      test:
+        url: ${AUTOMATION_SYNC_TEST_URL:}
+        key-file: ${AUTOMATION_SYNC_TEST_KEY_FILE:}
+      prod:
+        url: ${AUTOMATION_SYNC_PROD_URL:}
+        key-file: ${AUTOMATION_SYNC_PROD_KEY_FILE:}
   factory:
     provider: ${AUTOMATION_FACTORY_PROVIDER:CLAUDE}
     base-dir: ${AUTOMATION_FACTORY_DIR:${automation.data-home}/factory}

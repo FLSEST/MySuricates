@@ -1157,6 +1157,8 @@ export interface SyncResult {
   skipped: number;
   errors: string[];
   preSyncBackup: string | null;
+  /** What stayed behind on purpose (Prod: references to unsealed workflows) — newer backends only. */
+  notes?: string[];
 }
 
 // ── Sync Preview / Selective Sync ─────────────────────────
@@ -1166,6 +1168,8 @@ export interface SyncPreview {
   workflows: SyncPreviewItem[];
   skills: SyncPreviewItem[];
   chains?: SyncPreviewItem[];
+  /** What a sync would leave behind (Prod: references to unsealed workflows) — newer backends only. */
+  notes?: string[];
 }
 
 export interface WorkflowDiff {
@@ -1189,6 +1193,17 @@ export interface SyncDefinitionsRequest {
   workflowIds?: string[];
   skillIds?: string[];
   chainIds?: string[];
+}
+
+/** A sync target of the staged setup (Dev → Test / Prod), GET /staging/targets (84a78bb7). */
+export interface SyncTarget {
+  name: 'test' | 'prod' | string;
+  url: string;
+  keyPresent: boolean;
+  reachable: boolean;
+  /** Prod: only sealed definitions go there. */
+  sealedOnly: boolean;
+  version: string | null;
 }
 
 // ── Testing ───────────────────────────────────────────────

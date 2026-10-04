@@ -85,13 +85,16 @@ Done. `b` goes one step back, `q` quits.
 
 - **Mode:** one instance in a container (only Docker needed), one instance directly on this machine,
   or staged **Dev · Test · Prod** — plan and build workflows in Dev (Factory, assistant), check them
-  in Test, run them reliably in Prod. For now workflows move by export and import in the interface;
-  an automatic sync between the three is not set up yet.
+  in Test, run them reliably in Prod. Dev transfers its definitions to Test and Prod under
+  **Settings → Environments** — to Prod only sealed ones. The installer enters the targets and where
+  their API keys come from; if Test or Prod are not running yet during setup,
+  `scripts/instance.sh sync-keys --name dev` fetches the keys later ([deployment.md](deployment.md#staged-setup-dev--test--prod)).
 - **Modules:** Standard (smallest surface), Research, Full or your own selection incl. hardening.
   The names say little on the first run — that is fine: the choice is not final (section 4); when
   in doubt take Standard. What the modules do is in [architektur.md](architektur.md) and
   [deployment.md](deployment.md).
-  Staged: Dev gets all modules, Test and Prod get Standard with seals ("unattended runs only sealed").
+  Staged: Dev gets all modules and seals (not required), Test and Prod get Standard with seals
+  ("unattended runs only sealed").
 - **AI:** claude, codex and pi side by side with their login state; you pick the default provider.
   If pi is missing, the installer offers to install it via npm — in the tested, fixed version
   (default no, without a terminal `--with-pi`); for claude and codex it names the command. Logging in is up to you.

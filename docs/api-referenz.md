@@ -3855,6 +3855,32 @@ Alle Felder optional; ohne Filter werden alle Definitionen synchronisiert.
 
 **Response:** `SyncResult` mit `projectsSynced`, `workflowsSynced`, `skillsSynced`, `chainsSynced`, `skipped`, `errors`, `preSyncBackup`
 
+### `GET /api/v1/staging/targets`
+
+Sync-Ziele des gestuften Betriebs (`scripts/setup.sh --mode staged`): Test und Prod, wie Dev sie aus der
+Startkonfiguration kennt (`automation.staging.targets.{test,prod}.url` / `.key-file`, vom Installer in
+`deploy/instances/dev.env` geschrieben). Nicht eingerichtete Ziele fehlen in der Liste.
+
+**Response:** Liste von `SyncTargetResponse` mit `name` (`test`/`prod`), `url`, `keyPresent` (Key-Datei vorhanden
+und nicht leer), `reachable`, `sealedOnly` (Prod: nur versiegelte Definitionen), `version`
+
+### `GET /api/v1/staging/targets/{target}/sync-preview`
+
+Vorschau Dev → `test` bzw. `prod`. Für Prod nur, was dorthin darf: Workflows mit intaktem Siegel, ihre Projekte und
+Skills, Chains nur aus solchen Workflows.
+
+**Response:** `SyncPreview`, für Prod mit `notes` (was in Dev bleibt, obwohl ein versiegelter Workflow es
+aufruft: unversiegelte Teil-Workflows, Chains mit unversiegelten Workflows); `409` (`STATE_CONFLICT`) mit `messageKey` `SYNC_TARGET_NOT_CONFIGURED`,
+`SYNC_TARGET_KEY_MISSING` oder `SYNC_TARGET_UNREACHABLE`
+
+### `POST /api/v1/staging/targets/{target}/sync-definitions`
+
+Definitionen von Dev nach `test` bzw. `prod` übertragen. Request wie bei `POST /api/v1/staging/sync-definitions`;
+für Prod wird die Auswahl auf versiegelte Definitionen eingeengt, nie erweitert. Den API-Key des Ziels liest Dev bei
+jedem Aufruf aus der Key-Datei (`scripts/instance.sh sync-keys --name dev`), nie aus der Datenbank des Ziels.
+
+**Response:** `SyncResult` (für Prod mit `notes` wie in der Vorschau, beschränkt auf die übertragenen Workflows); Fehler wie bei der Vorschau
+
 ---
 
 ## Testing (Test-Instanz)

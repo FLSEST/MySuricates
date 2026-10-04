@@ -38,6 +38,8 @@ scripts/instance.sh down --name main     # stop; data stays in the volumes, runn
 | `MYSURICATES_ENVIRONMENT` | display name, e.g. `Prod` |
 | `MYSURICATES_APT_REFRESH` | a new value (e.g. the month) makes the next `up` fetch the image's NodeSource and Docker repos afresh instead of taking keys, package lists and packages from the layer cache of the first build; also works as an environment variable (8b7a39b9) |
 | `MYSURICATES_PREFIX` | prefix of the Docker names, default `mysuricates`: container and compose project `<prefix>-<name>`, volumes `<prefix>-<name>-data`/`-secrets`, image `<prefix>:local`; also works as an environment variable. The installer probe uses it to keep its instances apart from real ones on the same machine |
+| `MYSURICATES_NETWORK` | shared Docker network `<prefix>-<value>`; in it the instance is reachable under its name (`http://test:9090`). Staged: `staged` in all three files |
+| `MYSURICATES_SYNC_TARGETS` | instances whose API key `instance.sh sync-keys` fetches into `deploy/instances/<name>.sync-keys/`; inside the container the folder is read-only at `/app/sync-keys`. Staged: `test,prod` in `dev.env` |
 
 The image is built from the tracked files of the clone (`git ls-files`) as they are in the working
 tree: changed tracked files go in, whatever exists only locally — such as pool definitions kept out
@@ -863,6 +865,34 @@ The test instance is a dedicated Docker container for automated workflow tests:
 `MYSURICATES_APT_REFRESH=$(date +%Y-%m) ./scripts/staging.sh promote` (likewise `test-promote`) fetches
 the image's NodeSource and Docker repos (`Dockerfile.stable`) afresh instead of taking them from the
 layer cache of the first build (8b7a39b9).
+
+### Staged setup (Dev · Test · Prod)
+
+`scripts/setup.sh --mode staged` creates three instances. Dev transfers its definitions to Test and Prod
+under **Settings → Environments** (`/api/v1/staging/targets`, same rules as the definition sync below,
+including the rollback point on the target). What the installer enters for that:
+
+- all three in one shared Docker network (`MYSURICATES_NETWORK=staged`), reachable there under their
+  instance name — Dev talks to `http://test:9090` and `http://prod:9090`. Not via `host.docker.internal`:
+  the ports are published on `127.0.0.1` of the machine only, which a container on Linux cannot reach that way.
+- in `dev.env` the targets: `AUTOMATION_SYNC_TEST_URL`/`_KEY_FILE`, `AUTOMATION_SYNC_PROD_URL`/`_KEY_FILE`
+  (properties `automation.staging.targets.{test,prod}.url`/`.key-file`).
+- `scripts/instance.sh sync-keys --name dev` fetches the API keys of Test and Prod — via `instance.sh key`
+  from the target instance's data folder, never from its database — into `deploy/instances/dev.sync-keys/`
+  (readable by your user only, git-ignored). The installer runs it after the start; if Test or Prod are not
+  running yet, or a key was regenerated, run the command again later.
+- Dev seals (without requiring seals for unattended runs), because **only sealed definitions go to Prod**:
+  workflows whose seal holds, their projects and skills, chains made only of such workflows. If a sealed
+  workflow calls an unsealed sub-workflow (`sub-workflow`), that one stays in Dev and must already exist on
+  Prod; a chain with an unsealed workflow stays in Dev entirely. Preview and result name both under `notes`.
+  The copy arrives on Prod unsealed — review and seal it there; Prod starts only sealed workflows unattended. Once
+  the Prod copy is sealed and `seal-immutable` is on, Prod refuses a later transfer of the same definition
+  (listed in `SyncResult.errors`) until it is unsealed there.
+- A `dev.env` from a staged setup made before the sync has `MYSURICATES_HARDENING_SEALING=false`: then
+  nothing can be sealed in Dev and the list for Prod stays empty. The installer keeps the line and points
+  this out; to fix it set it to `true` and restart Dev
+  (`scripts/instance.sh down --name dev && scripts/instance.sh up --name dev`) or run
+  `scripts/setup.sh --mode staged --reconfigure` (rewrites all three files).
 
 ### Definition Sync (Dev → Stable / Dev → Test)
 

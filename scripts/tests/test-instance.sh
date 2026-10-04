@@ -16,8 +16,11 @@ echo "$*" >> "$DOCKER_LOG"
 case "$*" in
   *"compose"*"config"*) exit 0 ;;
   *"com.docker.compose.project"*) [ -n "${OWNER+x}" ] || exit 1; echo "$OWNER"; exit 0 ;;  # Container da? wem gehoert er?
+  "network inspect "*) [ -n "${NET_EXISTS:-}" ] || exit 1 ;;                                # gemeinsames Netz da?
   *"inspect"*) echo healthy ;;
-  "exec "*"api-key"*) [ -n "${CONTAINER_KEY:-}" ] || exit 1; echo "$CONTAINER_KEY" ;;    # instance.sh key
+  # instance.sh key; CONTAINER_KEY=per-container: je Container ein eigener Key (key-of-<container>)
+  "exec "*"api-key"*) [ -n "${CONTAINER_KEY:-}" ] || exit 1
+    if [ "$CONTAINER_KEY" = per-container ]; then echo "key-of-$4"; else echo "$CONTAINER_KEY"; fi ;;
 esac
 exit 0
 STUB
@@ -33,6 +36,10 @@ check "bash -n"                               'bash -n "$SCRIPT"'
 check "--help lists the commands"             'bash "$SCRIPT" --help | grep "up|down|status|logs|key|list" >/dev/null'
 check "--help names built (1c016162)"         'bash "$SCRIPT" --help | grep -- "built  --name NAME" >/dev/null'
 check "unknown instance exits 2"              'bash "$SCRIPT" up --name nope >/dev/null 2>&1; [ $? -eq 2 ]'
+printf 'MYSURICATES_PORT=19401\n' > "$TMP/inst/-dash.env"
+OUT="$(bash "$SCRIPT" status --name -dash 2>&1)"; RC=$?
+check "name with a leading - refused (exit 2), never reaches docker" '[ "$RC" = 2 ] && printf "%s" "$OUT" | grep -F "Name" >/dev/null && ! grep -q -- "--dash\|mysuricates--dash" "$DOCKER_LOG" 2>/dev/null'
+rm -f "$TMP/inst/-dash.env"
 INSTANCE_HEALTH_TIMEOUT=0 bash "$SCRIPT" up --name demo --no-wait >/dev/null 2>&1
 check "compose project named after instance"  'grep -q -- "-p mysuricates-demo" "$DOCKER_LOG"'
 check "uses deploy/compose.yml + override"    'grep -q "deploy/compose.yml" "$DOCKER_LOG" && grep -q "demo.override.yml" "$DOCKER_LOG"'
@@ -457,6 +464,38 @@ if command -v python3 >/dev/null 2>&1 && command -v curl >/dev/null 2>&1 \
 else
   echo "  skip (no python3 or curl, or $BADDR is not a loopback address here — macOS)"
 fi
+
+echo "10) staged: shared network, instance name as host, sync keys (84a78bb7)"
+printf 'MYSURICATES_PORT=19460\nMYSURICATES_NETWORK=staged\nMYSURICATES_SYNC_TARGETS=test,prod\nAUTOMATION_SYNC_TEST_URL=http://test:9090\n' > "$TMP/inst/dev.env"
+printf 'MYSURICATES_PORT=19461\nMYSURICATES_NETWORK=staged\n' > "$TMP/inst/test.env"
+printf 'MYSURICATES_PORT=19462\nMYSURICATES_NETWORK=staged\n' > "$TMP/inst/prod.env"
+: > "$DOCKER_LOG"
+OWNER=mysuricates-dev INSTANCE_HEALTH_TIMEOUT=0 bash "$SCRIPT" up --name dev --no-wait >/dev/null 2>&1
+SY="$TMP/inst/dev.staged.yml"
+check "up creates the shared network once"       'grep -qx "network create mysuricates-staged" "$DOCKER_LOG"'
+check "compose gets the staged file as well"     'grep "^compose " "$DOCKER_LOG" | grep -- "-f $SY up" >/dev/null'
+check "reachable under its instance name"        'grep -q "aliases: \[\"dev\"\]" "$SY" && grep -q "name: \"mysuricates-staged\"" "$SY" && grep -q "external: true" "$SY"'
+check "key folder read-only at /app/sync-keys"   'grep -qF "\"$TMP/inst/dev.sync-keys:/app/sync-keys:ro\"" "$SY" && [ -d "$TMP/inst/dev.sync-keys" ] && [ "$(stat -c %a "$TMP/inst/dev.sync-keys" 2>/dev/null || stat -f %Lp "$TMP/inst/dev.sync-keys")" = 700 ]'
+: > "$DOCKER_LOG"
+NET_EXISTS=1 OWNER=mysuricates-test INSTANCE_HEALTH_TIMEOUT=0 bash "$SCRIPT" up --name test --no-wait >/dev/null 2>&1
+check "existing network is reused, not created"  '! grep -q "network create" "$DOCKER_LOG"'
+check "a target joins without a key folder"      'grep -q "aliases: \[\"test\"\]" "$TMP/inst/test.staged.yml" && ! grep -q sync-keys "$TMP/inst/test.staged.yml"'
+check "no host.docker.internal anywhere"         '! grep -rq "host.docker.internal" "$SY" "$HERE/../../deploy/compose.yml"'
+OUT="$(CONTAINER_KEY=per-container bash "$SCRIPT" sync-keys --name dev 2>&1)"; RC=$?
+check "sync-keys: one key file per target"       '[ "$RC" = 0 ] && [ "$(cat "$TMP/inst/dev.sync-keys/test.key")" = key-of-mysuricates-test ] && [ "$(cat "$TMP/inst/dev.sync-keys/prod.key")" = key-of-mysuricates-prod ]'
+check "sync-keys: files only for the owner"      '[ "$(stat -c %a "$TMP/inst/dev.sync-keys/prod.key" 2>/dev/null || stat -f %Lp "$TMP/inst/dev.sync-keys/prod.key")" = 600 ]'
+check "sync-keys: key via docker exec, never via sqlite" 'grep "^exec " "$DOCKER_LOG" | grep " mysuricates-prod sh -c .*api-key" >/dev/null && ! grep -qi "sqlite" "$DOCKER_LOG"'
+check "sync-keys: the prefix carries over"       'MYSURICATES_PREFIX=probe-y CONTAINER_KEY=per-container bash "$SCRIPT" sync-keys --name dev >/dev/null 2>&1 && [ "$(cat "$TMP/inst/dev.sync-keys/test.key")" = key-of-probe-y-test ]'
+OUT="$(bash "$SCRIPT" sync-keys --name dev 2>&1)"; RC=$?
+check "sync-keys: target not running → exit 1, says how, old key stays" '[ "$RC" = 1 ] && printf "%s" "$OUT" | grep -F "scripts/instance.sh up --name test" >/dev/null && [ "$(cat "$TMP/inst/dev.sync-keys/test.key")" = key-of-probe-y-test ]'
+OUT="$(bash "$SCRIPT" sync-keys --name test 2>&1)"; RC=$?
+check "sync-keys without targets → exit 2"       '[ "$RC" = 2 ] && printf "%s" "$OUT" | grep -F "MYSURICATES_SYNC_TARGETS" >/dev/null'
+printf 'MYSURICATES_PORT=19463\nMYSURICATES_NETWORK=Bad_Net\n' > "$TMP/inst/badnet.env"
+check "invalid network name refused (exit 2)"    'bash "$SCRIPT" status --name badnet >/dev/null 2>&1; [ $? -eq 2 ]'
+: > "$DOCKER_LOG"
+OWNER=mysuricates-demo INSTANCE_HEALTH_TIMEOUT=0 bash "$SCRIPT" up --name demo --no-wait >/dev/null 2>&1
+check "one instance: no network, no staged file" '! grep -q "^network" "$DOCKER_LOG" && [ ! -e "$TMP/inst/demo.staged.yml" ] && ! grep -q "staged.yml" "$DOCKER_LOG"'
+rm -rf "$TMP/inst/dev.env" "$TMP/inst/test.env" "$TMP/inst/prod.env" "$TMP/inst/badnet.env" "$TMP/inst/"*.staged.yml "$TMP/inst/"*.override.yml "$TMP/inst/dev.sync-keys"
 
 check "no bash-4-only syntax"                 '! grep -nE "declare -g?A|mapfile|readarray" "$SCRIPT"'
 echo; echo "passed=$PASS failed=$FAIL"; [ "$FAIL" -eq 0 ]

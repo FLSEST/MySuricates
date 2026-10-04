@@ -39,6 +39,8 @@ scripts/instance.sh down --name main     # stoppen; Daten bleiben in den Volumes
 | `MYSURICATES_ENVIRONMENT` | Anzeigename, z. B. `Prod` |
 | `MYSURICATES_APT_REFRESH` | ein neuer Wert (etwa der Monat) holt beim nächsten `up` NodeSource- und Docker-Repo des Images frisch, statt Schlüssel, Paketlisten und Pakete aus dem Schichten-Cache des ersten Baus zu nehmen; geht auch als Umgebungsvariable (8b7a39b9) |
 | `MYSURICATES_PREFIX` | Vorsilbe der Docker-Namen, Default `mysuricates`: Container und Compose-Projekt `<vorsilbe>-<name>`, Volumes `<vorsilbe>-<name>-data`/`-secrets`, Image `<vorsilbe>:local`; geht auch als Umgebungsvariable. Die Installer-Probe hält damit ihre Instanzen von echten desselben Rechners getrennt |
+| `MYSURICATES_NETWORK` | gemeinsames Docker-Netz `<vorsilbe>-<wert>`; darin ist die Instanz unter ihrem Namen erreichbar (`http://test:9090`). Gestuft: `staged` in allen drei Dateien |
+| `MYSURICATES_SYNC_TARGETS` | Instanzen, deren API-Key `instance.sh sync-keys` nach `deploy/instances/<name>.sync-keys/` holt; der Ordner ist im Container read-only unter `/app/sync-keys`. Gestuft: `test,prod` in `dev.env` |
 
 Das Image entsteht aus den getrackten Dateien des Klons (`git ls-files`), wie sie im Arbeitsbaum
 liegen: Geänderte getrackte Dateien kommen mit, was nur lokal liegt — etwa per `.git/info/exclude`
@@ -873,6 +875,35 @@ Die Test-Instanz ist ein dedizierter Docker-Container für automatisierte Workfl
 `MYSURICATES_APT_REFRESH=$(date +%Y-%m) ./scripts/staging.sh promote` (ebenso `test-promote`) holt
 NodeSource- und Docker-Repo des Images (`Dockerfile.stable`) frisch, statt sie aus dem Schichten-Cache
 des ersten Baus zu übernehmen (8b7a39b9).
+
+### Gestufter Betrieb (Dev · Test · Prod)
+
+`scripts/setup.sh --mode staged` legt drei Instanzen an. Dev überträgt seine Definitionen unter
+**Einstellungen → Umgebungen** nach Test und Prod (`/api/v1/staging/targets`, gleiche Regeln wie der
+Definition-Sync unten, samt Rollback-Punkt auf dem Ziel). Was der Installer dafür einträgt:
+
+- alle drei in einem gemeinsamen Docker-Netz (`MYSURICATES_NETWORK=staged`), darin erreichbar unter ihrem
+  Instanznamen — Dev spricht `http://test:9090` und `http://prod:9090` an. Nicht über `host.docker.internal`:
+  die Ports liegen nur auf `127.0.0.1` des Rechners, und die erreicht ein Container unter Linux darüber nicht.
+- in `dev.env` die Ziele: `AUTOMATION_SYNC_TEST_URL`/`_KEY_FILE`, `AUTOMATION_SYNC_PROD_URL`/`_KEY_FILE`
+  (Properties `automation.staging.targets.{test,prod}.url`/`.key-file`).
+- die API-Keys von Test und Prod holt `scripts/instance.sh sync-keys --name dev` — über `instance.sh key`
+  aus dem Datenordner der Ziel-Instanz, nie aus deren Datenbank — nach `deploy/instances/dev.sync-keys/`
+  (nur für den eigenen Benutzer lesbar, git-ignoriert). Der Installer ruft es nach dem Start auf; laufen
+  Test oder Prod dabei noch nicht oder wurde ein Key neu erzeugt, den Befehl später noch einmal ausführen.
+- Dev versiegelt (ohne Pflicht für unbeaufsichtigte Runs), denn **nach Prod gehen nur versiegelte
+  Definitionen**: Workflows, deren Siegel hält, ihre Projekte und Skills, Chains nur aus solchen Workflows.
+  Ruft ein versiegelter Workflow einen unversiegelten Teil-Workflow (`sub-workflow`) auf, bleibt dieser in
+  Dev und muss auf Prod schon vorhanden sein; eine Chain mit einem unversiegelten Workflow bleibt ganz in Dev.
+  Vorschau und Ergebnis nennen beides unter `notes`.
+  Auf Prod kommt die Kopie unversiegelt an — dort prüfen und versiegeln; Prod startet unbeaufsichtigt nur
+  versiegelte Workflows. Ist die Prod-Kopie versiegelt und `seal-immutable` an, lehnt Prod ein späteres
+  Übertragen derselben Definition ab (steht in `SyncResult.errors`), bis sie dort entsiegelt ist.
+- Eine `dev.env` aus einer gestuften Einrichtung von vor dem Sync hat `MYSURICATES_HARDENING_SEALING=false`:
+  Dann lässt sich in Dev nichts versiegeln, und die Liste für Prod bleibt leer. Der Installer behält die
+  Zeile und weist darauf hin; abhelfen: auf `true` setzen und Dev neu starten
+  (`scripts/instance.sh down --name dev && scripts/instance.sh up --name dev`) oder
+  `scripts/setup.sh --mode staged --reconfigure` (schreibt alle drei Dateien neu).
 
 ### Definition-Sync (Dev → Stable / Dev → Test)
 

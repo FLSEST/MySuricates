@@ -444,6 +444,11 @@ Body: { "workflowName": "...", "status": "PASSED|FAILED|SKIPPED" }
 - Custom Skills: Match by name → skip if exists
 - **Nicht synchronisiert:** workflow_runs, step_results, scheduled_workflows, webhook_triggers
 
+**Gestufter Betrieb** (`scripts/setup.sh --mode staged`): Dev kennt Test und Prod aus seiner Startkonfiguration —
+`GET /api/v1/staging/targets`, je Ziel `GET …/targets/{test|prod}/sync-preview` und
+`POST …/targets/{test|prod}/sync-definitions` (Body wie oben). Nach Prod gehen nur versiegelte Definitionen;
+die Keys der Ziele holt `scripts/instance.sh sync-keys --name dev` ([docs/deployment.md](docs/deployment.md)).
+
 ### 10. Hilfreich
 
 ```bash

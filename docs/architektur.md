@@ -206,7 +206,7 @@ Chains und Sub-Workflows geben die Herkunft ihres Auslösers im reservierten Kon
 ### Schichtenmodell
 
 ```
-Controller (REST API, 53 Controller)
+Controller (REST API, 54 Controller)
     ↓ DTO (Request/Response Records)
 Service (Geschäftslogik)
     ↓ Entity (JPA)
@@ -226,7 +226,7 @@ SQLite (Datei: data/automation.db)
 
 ```
 com.automation
-├── controller/          53 REST-Controller
+├── controller/          54 REST-Controller
 ├── service/
 │   ├── project/         ProjectService, ProjectStatusReconciler, ContainerService (+ DockerContainerGateway, DockerOrphanReconciler), ProjectContextService, PathValidator, OnboardingProfileService (+ OnboardingProfileSeeder), ProjectOnboardingService
 │   ├── workflow/        WorkflowExecutor (+ ExecutionContextFactory, BlockSkillContext, BlockStepRunner, RunCompletionHandler, RunFinalizer, WorkflowContextDataService + PlatformVariableSource-Beans), RunControlService, WorkflowService (+ WorkflowRequestFields), ExecutionBroadcaster, TemplateVerificationService, WorkflowOptimizationService (+ WorkflowOptimizationPrompt), GhostRunWatchdogService, RunCleanupService, AgentInstructionsService, WorkflowTemplateService, BlockOutputValidator, WorkflowExecutionRegistry, IdleContainerReaper, WorkflowTaggingService, WorkflowVersionService, WorkflowContentChangedEvent
@@ -288,7 +288,7 @@ com.automation
 └── util/                JPA-Converter (JSON, BlockDefinitions), RuntimeClasspathGuard (Startsperre gegen `target/classes`)
 ```
 
-### Alle 53 REST-Controller
+### Alle 54 REST-Controller
 
 | Controller | Base-Path | Beschreibung |
 |---|---|---|
@@ -326,6 +326,7 @@ com.automation
 | `NotificationController` | `/api/v1/notifications` | CRUD, Enable/Disable |
 | `WishController` | `/api/v1/wishes` | CRUD, Cancel, Respond, Crystallize |
 | `StagingController` | `/api/v1/staging` | Status, Start, Stop, Promote, Promote-Cancel, Sync-Preview, Sync-Definitions |
+| `StagedSyncController` | `/api/v1/staging/targets` | Gestufter Betrieb: Sync-Ziele Test/Prod aus der Startkonfiguration, je Ziel Sync-Preview und Sync-Definitions (nach Prod nur versiegelte) |
 | `TestingController` | `/api/v1/testing` | Status, Start, Stop, Reset, Sync-Preview, Sync-Definitions, Report-Result, Pull-Changes |
 | `SystemController` | `/api/v1/system` | Health, Auth-Status, Info, JVM-Memory, Settings, Execution-Config, AI-Providers, AI-Provider-Katalog, Capabilities, Backup, Backups, Remote-Access, Vacuum, Browse, Open-Path, Repair, Client-Errors, Integration-Snippet |
 | `IntegrationController` | `/api/v1/integrations` | OAuth-Flow, Credentials, Actions, Provider-Liste, Task-Export-Ziele |

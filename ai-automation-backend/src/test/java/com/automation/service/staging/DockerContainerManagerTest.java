@@ -1,12 +1,20 @@
 package com.automation.service.staging;
 
+import com.automation.exception.ErrorMessage;
+import com.automation.exception.LocalizedStateException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 
 class DockerContainerManagerTest {
 
@@ -129,5 +137,107 @@ class DockerContainerManagerTest {
     @Test
     void isRunning_blankName_returnsFalse() {
         assertThat(manager.isRunning("   ")).isFalse();
+    }
+
+    // ── API key of a Stable/Test container: key file, never the database ──
+
+    @Test
+    void readApiKey_readsTheKeyFileViaDockerExec_neverSql() {
+        DockerContainerManager m = spy(manager);
+        doReturn(new DockerContainerManager.CommandResult(0, "stable-key\n")).when(m).capture(any(String[].class));
+
+        assertThat(m.readApiKey("mysuricates-stable", null)).isEqualTo("stable-key");
+        verify(m).capture("docker", "exec", "mysuricates-stable", "sh", "-c", DockerContainerManager.KEY_FILE_SH);
+        assertThat(DockerContainerManager.KEY_FILE_SH).contains("api-key").doesNotContainIgnoringCase("sqlite");
+    }
+
+    @Test
+    void readApiKey_missingFile_saysWhichFileAndHowToGetIt() {
+        DockerContainerManager m = spy(manager);
+        doReturn(new DockerContainerManager.CommandResult(3, "/home/user/.autotrigger/api-key")).when(m).capture(any(String[].class));
+
+        assertThatThrownBy(() -> m.readApiKey("mysuricates-test", null))
+                .isInstanceOfSatisfying(LocalizedStateException.class, e -> {
+                    assertThat(e.errorMessage()).isEqualTo(ErrorMessage.CONTAINER_API_KEY_MISSING);
+                    assertThat(e.params()).containsEntry("file", "/home/user/.autotrigger/api-key")
+                            .containsEntry("container", "mysuricates-test");
+                })
+                .hasMessageContaining("test-promote");
+    }
+
+    /** Stable/Test started from Dev get its key as AUTOMATION_API_KEY — ApiKeyService writes no file then. */
+    @Test
+    void readApiKey_missingFile_butKeyPassedAtStart_usesThatKey() {
+        DockerContainerManager m = spy(manager);
+        doReturn(new DockerContainerManager.CommandResult(3, "/home/user/.mysuricates/api-key")).when(m).capture(any(String[].class));
+
+        assertThat(m.readApiKey("mysuricates-test", "dev-key")).isEqualTo("dev-key");
+    }
+
+    @Test
+    void readApiKey_missingFile_andNoKeyPassed_failsClearly() {
+        DockerContainerManager m = spy(manager);
+        doReturn(new DockerContainerManager.CommandResult(3, "/home/user/.mysuricates/api-key")).when(m).capture(any(String[].class));
+
+        assertThatThrownBy(() -> m.readApiKey("mysuricates-test", " "))
+                .isInstanceOfSatisfying(LocalizedStateException.class,
+                        e -> assertThat(e.errorMessage()).isEqualTo(ErrorMessage.CONTAINER_API_KEY_MISSING));
+    }
+
+    @Test
+    void readApiKey_fileWins_overThePassedKey() {
+        DockerContainerManager m = spy(manager);
+        doReturn(new DockerContainerManager.CommandResult(0, "file-key")).when(m).capture(any(String[].class));
+
+        assertThat(m.readApiKey("mysuricates-stable", "dev-key")).isEqualTo("file-key");
+    }
+
+    @Test
+    void readApiKey_containerNotRunning_isUnreadable_evenWithAPassedKey() {
+        DockerContainerManager m = spy(manager);
+        doReturn(new DockerContainerManager.CommandResult(1, "Error response from daemon: container is not running"))
+                .when(m).capture(any(String[].class));
+
+        assertThatThrownBy(() -> m.readApiKey("mysuricates-test", "dev-key"))
+                .isInstanceOfSatisfying(LocalizedStateException.class,
+                        e -> assertThat(e.errorMessage()).isEqualTo(ErrorMessage.CONTAINER_API_KEY_UNREADABLE));
+    }
+
+    @Test
+    void readApiKey_containerNotRunning_isUnreadable() {
+        DockerContainerManager m = spy(manager);
+        doReturn(new DockerContainerManager.CommandResult(1, "Error response from daemon: container is not running"))
+                .when(m).capture(any(String[].class));
+
+        assertThatThrownBy(() -> m.readApiKey("mysuricates-test", null))
+                .isInstanceOfSatisfying(LocalizedStateException.class,
+                        e -> assertThat(e.errorMessage()).isEqualTo(ErrorMessage.CONTAINER_API_KEY_UNREADABLE))
+                .hasMessageContaining("not running");
+    }
+
+    /** The shell rule itself, run locally: legacy folder first (like DataHome), exit 3 + path without a file. */
+    @Test
+    void keyFileScript_followsTheDataHomeRule(@TempDir Path home) throws Exception {
+        DockerContainerManager.CommandResult none = runScript(home);
+        assertThat(none.exitCode()).isEqualTo(3);
+        assertThat(none.output()).isEqualTo(home.resolve(".mysuricates/api-key").toString());
+
+        Files.createDirectories(home.resolve(".mysuricates"));
+        Files.writeString(home.resolve(".mysuricates/api-key"), "new-key");
+        assertThat(runScript(home).output()).isEqualTo("new-key");
+
+        Files.createDirectories(home.resolve(".autotrigger"));
+        assertThat(runScript(home).exitCode()).isEqualTo(3);
+        Files.writeString(home.resolve(".autotrigger/api-key"), "legacy-key");
+        assertThat(runScript(home).output()).isEqualTo("legacy-key");
+    }
+
+    private static DockerContainerManager.CommandResult runScript(Path home) throws Exception {
+        ProcessBuilder pb = new ProcessBuilder("sh", "-c", DockerContainerManager.KEY_FILE_SH);
+        pb.environment().put("HOME", home.toString());
+        pb.redirectErrorStream(true);
+        Process p = pb.start();
+        String out = new String(p.getInputStream().readAllBytes());
+        return new DockerContainerManager.CommandResult(p.waitFor(), out);
     }
 }

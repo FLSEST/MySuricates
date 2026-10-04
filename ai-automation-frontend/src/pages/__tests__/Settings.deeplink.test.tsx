@@ -21,6 +21,11 @@ vi.mock('../../components/settings/BackupCard', () => ({ BackupCard: () => null 
 vi.mock('../../components/settings/SystemInfoCard', () => ({ SystemInfoCard: () => null }));
 vi.mock('../../components/settings/StagingCard', () => ({ StagingCard: () => null }));
 vi.mock('../../components/settings/TestingCard', () => ({ TestingCard: () => null }));
+vi.mock('../../components/settings/StagedTargetsCard', () => ({
+  StagedTargetsCard: ({ targets }: { targets: Array<{ name: string }> }) => (
+    <div data-testid="staged-targets">{targets.map((t) => t.name).join(',')}</div>
+  ),
+}));
 vi.mock('../../components/settings/NotificationsCard', () => ({ NotificationsCard: () => null }));
 vi.mock('../../components/settings/ExecutionSettingsCard', () => ({ ExecutionSettingsCard: () => null }));
 vi.mock('../../components/settings/WishSettingsCard', () => ({ WishSettingsCard: () => null }));
@@ -98,5 +103,33 @@ describe('Settings — sections and #hash deep link', () => {
     } finally {
       stranger.remove();
     }
+  });
+
+  // Staged setup (84a78bb7): the targets show without advanced mode; an older backend without the
+  // endpoint (404) leaves the section as it was
+  it('shows the environments section with the sync targets of the staged setup', async () => {
+    server.use(http.get('/api/v1/staging/targets', () => HttpResponse.json([
+      { name: 'test', url: 'http://test:9090', keyPresent: true, reachable: true, sealedOnly: false, version: null },
+      { name: 'prod', url: 'http://prod:9090', keyPresent: false, reachable: true, sealedOnly: true, version: null },
+    ])));
+    window.history.replaceState(null, '', '/settings#environments');
+    renderWithProviders(<Settings />, { route: '/settings' });
+
+    await waitFor(() => expect(document.getElementById('environments')).not.toBeNull());
+    expect(sectionToggle('environments')).toHaveAttribute('aria-expanded', 'true');
+    expect(within(document.getElementById('environments')!).getByTestId('staged-targets')).toHaveTextContent('test,prod');
+  });
+
+  it('keeps the environments section hidden without targets or with an older backend', async () => {
+    let asked = false;
+    server.use(http.get('/api/v1/staging/targets', () => {
+      asked = true;
+      return HttpResponse.json({ error: 'No static resource' }, { status: 404 });
+    }));
+    renderWithProviders(<Settings />, { route: '/settings' });
+
+    await waitFor(() => expect(asked).toBe(true));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(document.getElementById('environments')).toBeNull();
   });
 });
