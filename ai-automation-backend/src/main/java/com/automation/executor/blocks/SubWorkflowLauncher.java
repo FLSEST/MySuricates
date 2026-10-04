@@ -46,6 +46,8 @@ public class SubWorkflowLauncher {
     private final RunControlService runControl;
     /** How often the parent looks at its child; package-private so tests need not wait two seconds. */
     Duration pollInterval = Duration.ofSeconds(2);
+    /** How long the parent waits for its child; package-private for tests. */
+    Duration maxWait = MAX_WAIT;
 
     public SubWorkflowLauncher(WorkflowService workflowService,
                                @Lazy WorkflowExecutor workflowExecutor,
@@ -104,17 +106,15 @@ public class SubWorkflowLauncher {
      * back as an unsuccessful {@link Outcome}.
      */
     public Outcome run(String workflowId, ExecutionContext context) {
-        @SuppressWarnings("unchecked")
-        List<String> parentIds = (List<String>) context.getVariables()
-                .getOrDefault("__parent_workflow_ids", new ArrayList<>());
-        if (parentIds.size() >= MAX_DEPTH) {
-            return Outcome.refused(workflowId, "Maximum sub-workflow depth (" + MAX_DEPTH + ") exceeded");
-        }
-        if (parentIds.contains(workflowId)) {
-            return Outcome.refused(workflowId, "Circular sub-workflow reference detected: " + workflowId);
-        }
         String name = null;
         try {
+            List<String> parentIds = parentIds(context);
+            if (parentIds.size() >= MAX_DEPTH) {
+                return Outcome.refused(workflowId, "Maximum sub-workflow depth (" + MAX_DEPTH + ") exceeded");
+            }
+            if (parentIds.contains(workflowId)) {
+                return Outcome.refused(workflowId, "Circular sub-workflow reference detected: " + workflowId);
+            }
             Workflow subWorkflow = workflowService.findById(workflowId);
             name = subWorkflow.getName();
             WorkflowRun subRun = workflowExecutor.execute(subWorkflow, childContext(context, parentIds, workflowId),
@@ -126,6 +126,16 @@ public class SubWorkflowLauncher {
             log.error("Sub-workflow {} execution failed: {}", workflowId, e.getMessage(), e);
             return new Outcome(workflowId, name, null, null, "Sub-workflow execution failed: " + e.getMessage(), false);
         }
+    }
+
+    /** {@code __parent_workflow_ids} as a list of ids; anything else is no chain the guards can trust. */
+    private static List<String> parentIds(ExecutionContext context) {
+        Object raw = context.getVariables().get("__parent_workflow_ids");
+        if (raw == null) return new ArrayList<>();
+        if (!(raw instanceof List<?> list) || !list.stream().allMatch(String.class::isInstance)) {
+            throw new WorkflowExecutionException("__parent_workflow_ids is not a list of workflow ids");
+        }
+        return list.stream().map(String.class::cast).toList();
     }
 
     /**
@@ -156,7 +166,7 @@ public class SubWorkflowLauncher {
      * final status — otherwise the child ran on and the parent's thread waited up to {@link #MAX_WAIT}.
      */
     private WorkflowRun waitForCompletion(String runId, ExecutionContext parent) {
-        Instant deadline = Instant.now().plus(MAX_WAIT);
+        Instant deadline = Instant.now().plus(maxWait);
         boolean childCancelled = false;
         while (Instant.now().isBefore(deadline)) {
             if (!childCancelled && parent.shouldStop()) {
@@ -173,10 +183,22 @@ public class SubWorkflowLauncher {
                 Thread.sleep(pollInterval.toMillis());
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
+                cancelOrphan(runId, childCancelled);
                 throw new WorkflowExecutionException("Interrupted while waiting for sub-workflow");
             }
         }
-        throw new WorkflowExecutionException("Sub-workflow timed out after " + MAX_WAIT.toMinutes() + " minutes");
+        // Giving up without cancelling would leave the child running next to the following ones (foreach)
+        cancelOrphan(runId, childCancelled);
+        throw new WorkflowExecutionException("Sub-workflow timed out after " + maxWait.toMinutes() + " minutes");
+    }
+
+    private void cancelOrphan(String runId, boolean alreadyCancelled) {
+        if (alreadyCancelled) return;
+        try {
+            runControl.cancelExecution(runId);
+        } catch (RuntimeException e) {
+            log.warn("Could not cancel sub-workflow run {} after giving up on it: {}", runId, e.getMessage());
+        }
     }
 
     /** The child's last step output; without one, a status line per step. */

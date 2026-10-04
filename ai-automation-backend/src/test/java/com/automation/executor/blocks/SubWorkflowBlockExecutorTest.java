@@ -53,6 +53,8 @@ class SubWorkflowBlockExecutorTest {
 
     private SubWorkflowBlockExecutor executor;
 
+    private SubWorkflowLauncher launcher;
+
     private ExecutionContext context;
 
     private static Set<String> platformNames() {
@@ -68,6 +70,7 @@ class SubWorkflowBlockExecutorTest {
         SubWorkflowLauncher launcher = new SubWorkflowLauncher(workflowService, workflowExecutor, runRepository,
                 stepResultRepository, contextDataService, runControl);
         launcher.pollInterval = java.time.Duration.ofMillis(5);
+        this.launcher = launcher;
         executor = new SubWorkflowBlockExecutor(launcher);
         context = ExecutionContext.builder()
                 .containerId("container-1")
@@ -502,5 +505,61 @@ class SubWorkflowBlockExecutorTest {
         verify(runControl).cancelExecution("sub-run-1");
         assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
         assertThat(result.getMetadata()).containsEntry("subRunStatus", "CANCELLED");
+    }
+
+    private Workflow childThatKeepsRunning() {
+        Workflow subWorkflow = Workflow.builder().id("sub-wf-1").name("Sub Workflow").build();
+        when(workflowService.findById("sub-wf-1")).thenReturn(subWorkflow);
+        WorkflowRun running = WorkflowRun.builder().id("sub-run-1").workflow(subWorkflow).status(RunStatus.RUNNING).build();
+        when(workflowExecutor.execute(eq(subWorkflow), any(Map.class), eq(TriggerSource.SUB_WORKFLOW))).thenReturn(running);
+        return subWorkflow;
+    }
+
+    private StepResult runSubWorkflowBlock() {
+        return executor.execute(BlockDefinition.builder().type("sub-workflow")
+                .config(new HashMap<>(Map.of("workflow_id", "sub-wf-1"))).build(), context);
+    }
+
+    /** Review a5c9fbbf: a parent that gives up waiting must not leave its child running on its own. */
+    @Test
+    void execute_waitTimesOut_cancelsTheChildBeforeFailing() {
+        Workflow subWorkflow = childThatKeepsRunning();
+        when(runRepository.findById("sub-run-1")).thenReturn(Optional.of(
+                WorkflowRun.builder().id("sub-run-1").workflow(subWorkflow).status(RunStatus.RUNNING).build()));
+        launcher.maxWait = java.time.Duration.ofMillis(30);
+
+        StepResult result = runSubWorkflowBlock();
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(result.getOutput()).contains("timed out");
+        verify(runControl).cancelExecution("sub-run-1");
+    }
+
+    @Test
+    void execute_interruptedWhileWaiting_cancelsTheChildBeforeFailing() {
+        Workflow subWorkflow = childThatKeepsRunning();
+        when(runRepository.findById("sub-run-1")).thenAnswer(inv -> {
+            Thread.currentThread().interrupt();     // the next sleep throws
+            return Optional.of(WorkflowRun.builder().id("sub-run-1").workflow(subWorkflow).status(RunStatus.RUNNING).build());
+        });
+        try {
+            StepResult result = runSubWorkflowBlock();
+
+            assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+            assertThat(result.getOutput()).contains("Interrupted");
+            verify(runControl).cancelExecution("sub-run-1");
+        } finally {
+            Thread.interrupted();                   // leave no flag for the next test
+        }
+    }
+
+    @Test
+    void execute_unreadableParentIds_failsTheStepInsteadOfThrowing() {
+        context.getVariables().put("__parent_workflow_ids", "not-a-list");
+
+        StepResult result = runSubWorkflowBlock();
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+        org.mockito.Mockito.verifyNoInteractions(workflowExecutor);
     }
 }
