@@ -471,6 +471,8 @@ export interface WorkflowExportData {
   defaultContext?: Record<string, unknown>;
   metadata?: Record<string, unknown>;
   exportedAt?: string;
+  /** `sha256:<hex>` over the content; the import refuses a file that no longer matches (b18939a6). Older exports have none. */
+  integrity?: string;
 }
 
 // ── Workflow Pool ────────────────────────────────────────

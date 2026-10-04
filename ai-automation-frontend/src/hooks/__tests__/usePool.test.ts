@@ -70,6 +70,35 @@ describe('useInstallPoolWorkflow', () => {
 
     expect(body).toMatchObject({ projectId: 'proj1', locale: 'de' });
   });
+
+  describe('integrity of the pool file (b18939a6)', () => {
+    afterEach(() => useToastStore.setState({ toasts: [] }));
+
+    async function install(response: Record<string, unknown>) {
+      useI18nStore.setState({ locale: 'en' });
+      useToastStore.setState({ toasts: [] });
+      server.use(http.post('/api/v1/pool/:poolId/install', () => HttpResponse.json(response)));
+      const { result } = renderHook(() => useInstallPoolWorkflow(), { wrapper: createWrapper() });
+      await act(async () => {
+        result.current.mutate({ poolId: 'p1', projectId: 'proj1' });
+      });
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      return useToastStore.getState().toasts;
+    }
+
+    it('warns when the file carries no checksum', async () => {
+      const toasts = await install({ workflowId: 'w1', workflowName: 'Old', created: true, integrity: 'MISSING' });
+      expect(toasts.map((toast) => toast.type)).toEqual(['success', 'warning']);
+      expect(toasts[1].message).toMatch(/no checksum/);
+    });
+
+    it('does not warn for a verified file, nor for an older backend without the field', async () => {
+      expect((await install({ workflowId: 'w1', workflowName: 'New', created: true, integrity: 'VERIFIED' }))
+        .map((toast) => toast.type)).toEqual(['success']);
+      expect((await install({ workflowId: 'w1', workflowName: 'Older', created: true }))
+        .map((toast) => toast.type)).toEqual(['success']);
+    });
+  });
 });
 
 describe('usePoolExport', () => {

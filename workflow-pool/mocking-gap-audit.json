@@ -41,5 +41,6 @@
     "proposal_stage": "v2",
     "intended_usage": "test-realism-audit",
     "output_focus": "confirmed-bugs-plus-todos"
-  }
+  },
+  "integrity": "sha256:afe8604c1d13907da9bb6150b02dfd3acb7bff976b935e2cdae9ac5b7d70c865"
 }

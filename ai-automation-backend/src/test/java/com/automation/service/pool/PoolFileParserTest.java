@@ -1,6 +1,7 @@
 package com.automation.service.pool;
 
 import com.automation.architecture.ShippedDefinitions;
+import com.automation.dto.IntegrityCheck;
 import com.automation.dto.response.PoolWorkflowEntry;
 import com.automation.entity.BlockDefinition;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -34,6 +35,34 @@ class PoolFileParserTest {
 
     private PoolWorkflowEntry parse(Path file, String locale) throws IOException {
         return PoolFileParser.parse(file, objectMapper, locale);
+    }
+
+    /** TODO b18939a6: one checksum over the raw file — the same for every language the steps resolve to. */
+    @Nested
+    class Integrity {
+
+        @Test
+        void bilingualFile_hasOneChecksumForBothLanguages() throws Exception {
+            String content = """
+                    {"name": {"de": "Zwei", "en": "Two"}, "i18n": ["de", "en"],
+                     "blocks": [{"type": "simple", "config": {"prompt": {"de": "Hallo", "en": "Hello"}}}]%s}
+                    """;
+            Path file = write("bilingual.json", content.formatted(""));
+            String checksum = parse(file, "de").integrity().actual();
+            write("bilingual.json", content.formatted(", \"integrity\": \"" + checksum + "\""));
+
+            assertThat(parse(file, "de").integrity().status()).isEqualTo(IntegrityCheck.Status.VERIFIED);
+            assertThat(parse(file, "en").integrity().status()).isEqualTo(IntegrityCheck.Status.VERIFIED);
+        }
+
+        @Test
+        void fileWithoutChecksum_isMissing_stillLoads() throws Exception {
+            Path file = write("plain.json", """
+                    {"name": {"en": "Plain"}, "blocks": [{"type": "shell", "config": {"command": "ls"}}]}
+                    """);
+
+            assertThat(parse(file, "en").integrity().status()).isEqualTo(IntegrityCheck.Status.MISSING);
+        }
     }
 
     @Nested

@@ -199,6 +199,42 @@ exporting instance and therefore falls under the rule. After the export, a workf
 `sub-workflow` block is **not an installable pool entry** until the `workflowId` has been filled
 in by hand or replaced with a context variable — `sanitizedPaths` names the exact spot.
 
+### Checksum (`integrity`)
+
+Every pool file carries `"integrity": "sha256:<hex>"` as its last field — SHA-256 over the
+canonical content of the whole file without that field (keys sorted, empty values left out,
+block order kept; the same normalisation as the `definition_hash`,
+`service/workflow/DefinitionIntegrity`). Field name after npm (`package-lock.json`), format
+after OCI (`sha256:<hex>`). Formatting and key order do not change the checksum, any change of
+content does — including name, description or `scope`, and for bilingual files for both
+languages at once.
+
+- **Export** (`PoolExportWriter`) writes the field.
+- **Install** recomputes it: a mismatch → `400` (`POOL_INTEGRITY_MISMATCH`, naming the file, the
+  declared and the computed value), nothing is created. Without the field (an older or
+  hand-written file) the entry is installed with a warning: in the log and in the response
+  (`"integrity": "MISSING"`, the UI shows a notice).
+- **Gate**: `PoolIntegrityGateTest` checks that every tracked pool file carries a matching field.
+  After a deliberate hand edit, write the checksums anew and commit them with it:
+  `cd ai-automation-backend && ./mvnw test -Dtest='PoolIntegrityGateTest*' -Dpool.integrity.write=true` (it replaces or appends
+  only that one line, the file's layout stays).
+- **Try it locally:** delete the `integrity` line of a pool file → the install succeeds with a
+  warning (`"integrity": "MISSING"`); change a value in the content → the install is refused with
+  `400`.
+
+The workflow export (`GET /workflows/export/{id}`) carries the same field;
+`POST /workflows/import` checks it the same way (`IMPORT_INTEGRITY_MISMATCH`). There the checksum
+covers everything the import takes over unchanged — not the name, which the import dialog lets
+you change, and not `exportedAt`.
+
+**What this protects against — and what not.** The checksum detects transport errors and
+accidental changes (a hand correction, a merge, a tool rewriting the file). It does **not**
+protect against deliberate forgery: whoever changes the file can compute the checksum anew.
+Only a signature with a key outside the file would help against that (like the `.asc` next to
+the `.sha256` on Maven Central). For the shipped pool the versioning in the repository is the
+guarantor on purpose: whoever decides what is in `workflow-pool/` also decides the checksum — a
+separate signature would only pay off once pool files came from outside sources.
+
 ### Release step before the commit
 
 An exported entry is a draft. Before committing:
@@ -210,6 +246,8 @@ An exported entry is a draft. Before committing:
    dependencies on tools outside the repository.
 3. Re-read `scope`: does the promise hold? A `portable` entry that only works with one
    particular project layout is a `repo` entry.
+4. After a hand edit, write the checksum anew (see above), otherwise `PoolIntegrityGateTest`
+   fails — and the install would refuse the file.
 
 An entry that does not pass is not tracked. `git rm --cached` is enough: the directory stays
 the working surface of the running instance, only the selection is tracked.

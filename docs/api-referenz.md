@@ -465,9 +465,12 @@ Workflow als portables JSON exportieren (ohne IDs, ohne Projekt-Zuordnung).
   "version": "1.0.0",
   "defaultContext": {},
   "metadata": {},
-  "exportedAt": "2025-02-22T14:00:00Z"
+  "exportedAt": "2025-02-22T14:00:00Z",
+  "integrity": "sha256:9f2c…"
 }
 ```
+
+`integrity` ist die Prüfsumme über alles, was der Import übernimmt (ohne `name` und `exportedAt`); `POST /api/v1/workflows/import` prüft sie. Details: [Kuratierung → Prüfsumme](workflow-pool-kuratierung.md#prüfsumme-integrity).
 
 ### `GET /api/v1/workflows/{id}/export/bpmn`
 
@@ -517,6 +520,7 @@ Workflow aus JSON importieren (exportiertes Format + Zielprojekt).
 | `model` | String | Nein |
 | `updateIfExists` | Boolean | Nein (Standard: `false`) |
 | `version` | String | Nein — Versions-Label des Exports (`4.4.0`); fehlt es oder ist es leer, bleibt es beim Standard `1.0.0` bzw. beim bisherigen Label |
+| `integrity` | String | Nein — Prüfsumme des Exports (`sha256:<hex>`). Passt sie nicht zum Inhalt: `400` mit `messageKey` `IMPORT_INTEGRITY_MISMATCH`, es wird nichts geschrieben. Fehlt sie: Import mit Warnung im Log |
 
 Wenn `updateIfExists=true` und ein Workflow gleichen Namens im Zielprojekt existiert, wird dieser aktualisiert statt neu erstellt – samt `version`, wie bei `PUT` und der Pool-Neuinstallation.
 
@@ -3952,7 +3956,9 @@ Pool-Workflow in ein Projekt installieren.
 | `forceCreate` | Boolean | Nein |
 | `locale` | String (`de`/`en`) | Nein: Sprache von Name, Beschreibung und Schritten; ohne Angabe Englisch. Ein früher in der anderen Sprache installierter Workflow wird aktualisiert, nicht dupliziert |
 
-**Response:** `{ "workflowId": "uuid", "workflowName": "...", "created": true }`
+**Response:** `{ "workflowId": "uuid", "workflowName": "...", "created": true, "integrity": "VERIFIED" }`
+
+`integrity`: `VERIFIED` (Prüfsumme der Pool-Datei passt) oder `MISSING` (Datei ohne Prüfsumme, mit Warnung installiert). Passt die Prüfsumme nicht, wird nicht installiert: `400` mit `messageKey` `POOL_INTEGRITY_MISMATCH`.
 
 ### `POST /api/v1/pool/export/{workflowId}`
 

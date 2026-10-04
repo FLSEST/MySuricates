@@ -28,7 +28,8 @@ import java.util.List;
 @Component
 public class WorkflowDefinitionHasher {
 
-    private static final JsonMapper CANONICAL = JsonMapper.builder()
+    /** Shared with {@link DefinitionIntegrity}, so an import checksum is canonicalised exactly like this hash. */
+    static final JsonMapper CANONICAL = JsonMapper.builder()
             .enable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)
             .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)
             .disable(SerializationFeature.INDENT_OUTPUT)
@@ -40,9 +41,14 @@ public class WorkflowDefinitionHasher {
     }
 
     public String hash(WorkflowSnapshot snapshot) {
+        return sha256Hex(canonicalJson(snapshot));
+    }
+
+    /** Lower-case hex SHA-256 of the UTF-8 bytes of {@code text}. */
+    static String sha256Hex(String text) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            return HexFormat.of().formatHex(digest.digest(canonicalJson(snapshot).getBytes(StandardCharsets.UTF_8)));
+            return HexFormat.of().formatHex(digest.digest(text.getBytes(StandardCharsets.UTF_8)));
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 not available", e);
         }

@@ -87,5 +87,6 @@
       "source": "commit",
       "install_npm": true
     }
-  }
+  },
+  "integrity": "sha256:bc3f9bc6cdc52bc97b4636be9ce22d068c8e07c567e12e01915a703967ebad2c"
 }

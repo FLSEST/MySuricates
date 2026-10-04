@@ -38,5 +38,6 @@
       "command" : "set -euo pipefail\nFACTORY=\"${FACTORY_ROOT:-./saas-factory}\"\nset -- {{ slug }}; SLUG=\"$*\"\nTARGET=\"$FACTORY/$SLUG\"\ncd \"$TARGET\"\nif [ -f docker-compose.yml ]; then\n  docker compose build 2>&1 | tail -50\n  docker compose up -d 2>&1 | tail -20\n  sleep 10\nfi\n\"$FACTORY/tools/factory\" smoke \"$TARGET\" --timeout 60 || echo 'Smoke-Test fehlgeschlagen (non-fatal beim leeren Skelett)'"
     },
     "requiredCapabilities" : [ ]
-  } ]
+  } ],
+  "integrity": "sha256:51bc36def0b60fbaa3c4a271a2848e6789b00a58dc49dcd95d8590dcb1983414"
 }

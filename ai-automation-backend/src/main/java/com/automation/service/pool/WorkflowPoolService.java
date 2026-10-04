@@ -1,6 +1,7 @@
 package com.automation.service.pool;
 
 import com.automation.config.WorkflowPoolConfig;
+import com.automation.dto.IntegrityCheck;
 import com.automation.dto.request.CreateWorkflowRequest;
 import com.automation.dto.request.ExportToPoolRequest;
 import com.automation.dto.request.InstallPoolWorkflowRequest;
@@ -9,6 +10,8 @@ import com.automation.dto.response.ExportToPoolResponse;
 import com.automation.dto.response.PoolWorkflowEntry;
 import com.automation.entity.ChangeSource;
 import com.automation.entity.Workflow;
+import com.automation.exception.ErrorMessage;
+import com.automation.exception.LocalizedArgumentException;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.repository.ProjectRepository;
 import com.automation.service.workflow.WorkflowService;
@@ -89,11 +92,13 @@ public class WorkflowPoolService {
                 .orElseThrow(() -> new ResourceNotFoundException("PoolWorkflow", id));
     }
 
-    public record InstallResult(Workflow workflow, boolean created) {}
+    /** @param integrity {@code VERIFIED} or {@code MISSING} — a mismatching file is refused, never installed */
+    public record InstallResult(Workflow workflow, boolean created, IntegrityCheck.Status integrity) {}
 
     public InstallResult install(String poolId, InstallPoolWorkflowRequest request) {
         String locale = LocalizedJson.normalize(request.locale());
         PoolWorkflowEntry entry = findById(poolId, locale);
+        IntegrityCheck.Status integrity = verifyIntegrity(entry);
 
         String resolvedName = request.name() != null && !request.name().isBlank()
                 ? request.name()
@@ -126,7 +131,7 @@ public class WorkflowPoolService {
                 );
                 Workflow updated = workflowService.update(existing.get().getId(), updateRequest, ChangeSource.POOL_INSTALL);
                 log.info("Updated pool workflow '{}' in-place: workflow '{}' ({})", poolId, updated.getName(), updated.getId());
-                return new InstallResult(updated, false);
+                return new InstallResult(updated, false, integrity);
             }
         }
 
@@ -149,7 +154,28 @@ public class WorkflowPoolService {
 
         Workflow workflow = workflowService.create(createRequest, ChangeSource.POOL_INSTALL);
         log.info("Installed pool workflow '{}' as new workflow '{}' ({})", poolId, workflow.getName(), workflow.getId());
-        return new InstallResult(workflow, true);
+        return new InstallResult(workflow, true, integrity);
+    }
+
+    /**
+     * Refuses a pool file whose {@code integrity} checksum does not match its content (400, naming file,
+     * declared and computed value); one without a checksum installs with a warning (TODO b18939a6).
+     */
+    private IntegrityCheck.Status verifyIntegrity(PoolWorkflowEntry entry) {
+        IntegrityCheck check = entry.integrity();
+        if (check == null) {
+            return IntegrityCheck.Status.MISSING;
+        }
+        if (check.mismatch()) {
+            log.warn("Refusing pool file {}: integrity {} declared, {} computed", entry.filename(),
+                    check.declared(), check.actual());
+            throw new LocalizedArgumentException(ErrorMessage.POOL_INTEGRITY_MISMATCH, Map.of(
+                    "file", entry.filename(), "declared", check.declared(), "actual", check.actual()));
+        }
+        if (check.status() == IntegrityCheck.Status.MISSING) {
+            log.warn("Pool file {} carries no integrity checksum — its content could not be verified", entry.filename());
+        }
+        return check.status();
     }
 
     /**

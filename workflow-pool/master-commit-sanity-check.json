@@ -65,5 +65,6 @@
       "install_npm": true,
       "allow_working_tree_target": true
     }
-  }
+  },
+  "integrity": "sha256:701bcd579a957187ded10794c51a66fc715c7025c5e21781674118d3f0435ddd"
 }

@@ -107,5 +107,6 @@
         "command": "set -euo pipefail\ncd {{ execution_path }}\npython3 .git/todo-batch/bin/scripts/todo-batch/triage_report.py --state .git/todo-batch --date \"$(date +%F)\""
       }
     }
-  ]
+  ],
+  "integrity": "sha256:c3fa42d13d7402033b0c1409ff7edb83c2e861c1b8ff9216144a3889fc152708"
 }

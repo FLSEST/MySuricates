@@ -26,7 +26,8 @@ import java.util.*;
 /**
  * Pushes the local definitions (projects, workflows, custom skills, chains, two settings) to a
  * Stable/Test instance, with a pre-sync backup on the target and stable_synced_at bookkeeping.
- * Transport lives in {@link InstanceHttpClient}, the dry-run in {@link SyncPreviewService}.
+ * Transport lives in {@link InstanceHttpClient}, the request bodies in {@link SyncRequestBodies}, the dry-run
+ * in {@link SyncPreviewService}.
  */
 @Component
 @RequiredArgsConstructor
@@ -119,16 +120,7 @@ public class InstanceSyncHelper {
                     skipped++;
                     log.debug("Project already exists on target: {}", project.getName());
                 } else {
-                    Map<String, Object> body = new LinkedHashMap<>();
-                    body.put("name", project.getName());
-                    body.put("type", project.getType().name());
-                    body.put("path", project.getPath());
-                    if (project.getSubtitle() != null) body.put("subtitle", project.getSubtitle());
-                    if (project.getDescription() != null) body.put("description", project.getDescription());
-                    if (project.getConfig() != null && !project.getConfig().isEmpty()) {
-                        body.put("config", project.getConfig());
-                    }
-                    JsonNode created = httpClient.httpPost(targetBaseUrl + "/projects", body);
+                    JsonNode created = httpClient.httpPost(targetBaseUrl + "/projects", SyncRequestBodies.project(project));
                     if (created != null) {
                         projectIdMapping.put(project.getId(), created.path("id").asText());
                         projectsSynced++;
@@ -177,18 +169,13 @@ public class InstanceSyncHelper {
                 if (existingWorkflow != null) {
                     String targetWorkflowId = existingWorkflow.path("id").asText();
                     workflowIdMapping.put(workflow.getId(), targetWorkflowId);
-                    httpClient.httpPut(targetBaseUrl + "/workflows/" + targetWorkflowId, definitionBody(workflow));
+                    httpClient.httpPut(targetBaseUrl + "/workflows/" + targetWorkflowId, SyncRequestBodies.definition(workflow));
                     workflowsSynced++;
                     markStableSynced(workflow.getId());
                     log.info("Updated workflow on target: {}", workflow.getName());
                 } else {
-                    Map<String, Object> importBody = definitionBody(workflow);
-                    if (targetProjectId != null) importBody.put("projectId", targetProjectId);
-                    // A new workflow starts with its default context too; an update leaves the target's own
-                    if (workflow.getDefaultContext() != null && !workflow.getDefaultContext().isEmpty()) {
-                        importBody.put("defaultContext", workflow.getDefaultContext());
-                    }
-                    JsonNode created = httpClient.httpPost(targetBaseUrl + "/workflows/import", importBody);
+                    JsonNode created = httpClient.httpPost(targetBaseUrl + "/workflows/import",
+                            SyncRequestBodies.workflowImport(workflow, targetProjectId));
                     if (created != null && !created.path("id").isMissingNode()) {
                         workflowIdMapping.put(workflow.getId(), created.path("id").asText());
                     }
@@ -225,16 +212,7 @@ public class InstanceSyncHelper {
                     skipped++;
                     log.debug("Skill already exists on target: {}", skill.getName());
                 } else {
-                    Map<String, Object> skillBody = new LinkedHashMap<>();
-                    skillBody.put("name", skill.getName());
-                    skillBody.put("description", skill.getDescription());
-                    skillBody.put("icon", skill.getIcon());
-                    skillBody.put("category", skill.getCategory().name());
-                    skillBody.put("aiContext", skill.getAiContext());
-                    if (skill.getConfigSchema() != null && !skill.getConfigSchema().isEmpty()) {
-                        skillBody.put("configSchema", skill.getConfigSchema());
-                    }
-                    httpClient.httpPost(targetBaseUrl + "/skills/import", skillBody);
+                    httpClient.httpPost(targetBaseUrl + "/skills/import", SyncRequestBodies.skill(skill));
                     skillsSynced++;
                     log.info("Synced skill: {}", skill.getName());
                 }
@@ -287,15 +265,7 @@ public class InstanceSyncHelper {
                         missingMapping = true;
                         break;
                     }
-                    Map<String, Object> entryBody = new LinkedHashMap<>();
-                    entryBody.put("workflowId", targetWorkflowId);
-                    if (entry.getLabel() != null) entryBody.put("label", entry.getLabel());
-                    entryBody.put("sortOrder", entry.getSortOrder());
-                    entryBody.put("stopOnFailure", entry.isStopOnFailure());
-                    if (entry.getInputContext() != null && !entry.getInputContext().isEmpty()) {
-                        entryBody.put("inputContext", entry.getInputContext());
-                    }
-                    entriesBody.add(entryBody);
+                    entriesBody.add(SyncRequestBodies.chainEntry(entry, targetWorkflowId));
                 }
                 if (missingMapping) continue;
                 if (entriesBody.isEmpty()) {
@@ -303,12 +273,7 @@ public class InstanceSyncHelper {
                     continue;
                 }
 
-                Map<String, Object> chainBody = new LinkedHashMap<>();
-                chainBody.put("name", chain.getName());
-                if (chain.getDescription() != null) chainBody.put("description", chain.getDescription());
-                if (chain.getIcon() != null) chainBody.put("icon", chain.getIcon());
-                chainBody.put("entries", entriesBody);
-                chainBody.put("stopOnFailure", chain.isStopOnFailure());
+                Map<String, Object> chainBody = SyncRequestBodies.chain(chain, entriesBody);
 
                 JsonNode existingChain = targetChainsByName.get(chain.getName());
                 if (existingChain != null) {
@@ -386,23 +351,6 @@ public class InstanceSyncHelper {
                 log.warn("Failed to sync {}: {}", key, e.getMessage());
             }
         });
-    }
-
-    /**
-     * The definition fields PUT and import share. The version label travels along (TODO 62422aef); a target
-     * that does not know a field yet ignores it.
-     */
-    private static Map<String, Object> definitionBody(Workflow workflow) {
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("name", workflow.getName());
-        body.put("description", workflow.getDescription());
-        body.put("icon", workflow.getIcon());
-        body.put("blocks", workflow.getBlocks());
-        if (workflow.getInstructions() != null) body.put("instructions", workflow.getInstructions());
-        if (workflow.getModel() != null) body.put("model", workflow.getModel());
-        if (workflow.getVersion() != null && !workflow.getVersion().isBlank()) body.put("version", workflow.getVersion());
-        if (workflow.getMetadata() != null && !workflow.getMetadata().isEmpty()) body.put("metadata", workflow.getMetadata());
-        return body;
     }
 
     /** Updates stable_synced_at via raw JDBC — bypasses Hibernate to avoid @LastModifiedDate. */

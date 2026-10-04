@@ -51,7 +51,10 @@ public enum ErrorMessage {
     SEAL_SIGNATURE_INVALID(ErrorCode.WORKFLOW_TAMPERED, "Sealed workflow '{name}' was not started: its signature does not match — the seal was forged or copied from another workflow"),
     SEAL_SIGNATURE_MISSING(ErrorCode.WORKFLOW_TAMPERED, "Sealed workflow '{name}' was not started: it carries no signature (automation.hardening.require-signed-seal) — seal it again"),
     SEAL_DEFINITION_UNVERIFIABLE(ErrorCode.WORKFLOW_TAMPERED, "Sealed workflow '{name}' was not started: its definition could not be verified ({error})"),
-    SEAL_SKILLS_UNVERIFIABLE(ErrorCode.WORKFLOW_TAMPERED, "Sealed workflow '{name}' was not started: its skills could not be verified ({error})");
+    SEAL_SKILLS_UNVERIFIABLE(ErrorCode.WORKFLOW_TAMPERED, "Sealed workflow '{name}' was not started: its skills could not be verified ({error})"),
+    // An imported file whose integrity checksum does not match its content (DefinitionIntegrity, TODO b18939a6)
+    POOL_INTEGRITY_MISMATCH(ErrorCode.INVALID_ARGUMENT, "Pool file {file} was not installed: its integrity checksum does not match its content (declared {declared}, computed {actual}) — it was changed after the export"),
+    IMPORT_INTEGRITY_MISMATCH(ErrorCode.INVALID_ARGUMENT, "Workflow file '{name}' was not imported: its integrity checksum does not match its content (declared {declared}, computed {actual}) — it was changed or damaged after the export");
 
     private static final Pattern PLACEHOLDER = Pattern.compile("\\{(\\w+)}");
 

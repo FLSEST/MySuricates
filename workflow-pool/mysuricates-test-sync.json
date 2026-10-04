@@ -93,5 +93,6 @@
       "install_npm": true,
       "branch": true
     }
-  }
+  },
+  "integrity": "sha256:d3c987244e2643a050c3ef58a22d95a6b132daa23a7ad368f76399664feaa2a4"
 }

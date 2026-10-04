@@ -41,6 +41,13 @@ grep -h '"scope"' workflow-pool/*.json | tr -d ' ",' | sort | uniq -c
 paths, no credentials, no direct database access, no calls to the platform's own REST API.
 It runs in the pre-commit hook and in CI.
 
+Every file ends with an `"integrity": "sha256:…"` checksum over its content; the install refuses
+a file that no longer matches it. After editing a file by hand, write the checksums anew and
+commit them with the change:
+`cd ai-automation-backend && ./mvnw test -Dtest='PoolIntegrityGateTest*' -Dpool.integrity.write=true`.
+The checksum catches accidental changes, not deliberate ones — whoever edits the file can
+recompute it.
+
 The full reasoning — what belongs here versus in a built-in template, every rule and how
 entries are maintained — is in
 [docs/workflow-pool-kuratierung.md](../docs/workflow-pool-kuratierung.md)

@@ -54,5 +54,6 @@
         "timeout_seconds": 60
       }
     }
-  ]
+  ],
+  "integrity": "sha256:9c3abc33f42de739934985f5eb0e927debc7e240b36bf8ac4ddb33445fba141c"
 }

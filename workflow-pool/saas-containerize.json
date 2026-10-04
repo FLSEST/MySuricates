@@ -39,5 +39,6 @@
       "command" : "set -euo pipefail\nFACTORY=\"${FACTORY_ROOT:-./saas-factory}\"\nDECISION=\"{{ containerize_decision }}\"\nSLUG=\"{{ slug }}\"\nif [ \"$DECISION\" = 'No' ]; then\n  \"$FACTORY/tools/factory\" create-todo \"Manual Review nötig: $SLUG nach Containerize abgelehnt\" --tag manual-review --tag \"$SLUG\" --priority HIGH --workflow-run '{{ workflow_run_id }}' --reference-type 'containerize_rejected' --reference-id \"$SLUG\" >&2 || true\nfi\necho \"Decision: $DECISION\""
     },
     "requiredCapabilities" : [ ]
-  } ]
+  } ],
+  "integrity": "sha256:b96331590c9014995f24c132a66c227534fe08e6cad6ff1a824007a40f13060b"
 }

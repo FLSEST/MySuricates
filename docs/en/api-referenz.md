@@ -461,9 +461,12 @@ Export a workflow as portable JSON (without IDs, without project assignment).
   "instructions": null,
   "model": null,
   "version": "1.0.0",
-  "exportedAt": "2025-02-22T14:00:00Z"
+  "exportedAt": "2025-02-22T14:00:00Z",
+  "integrity": "sha256:9f2c…"
 }
 ```
+
+`integrity` is the checksum over everything the import takes over (without `name` and `exportedAt`); `POST /api/v1/workflows/import` checks it. Details: [Curation → Checksum](workflow-pool-kuratierung.md#checksum-integrity).
 
 ### `GET /api/v1/workflows/{id}/export/bpmn`
 
@@ -513,6 +516,7 @@ Import a workflow from JSON (exported format + target project).
 | `model` | String | No |
 | `updateIfExists` | Boolean | No (default: `false`) |
 | `version` | String | No — the export's version label (`4.4.0`); missing or blank keeps the default `1.0.0` or the current label |
+| `integrity` | String | No — the export's checksum (`sha256:<hex>`). If it does not match the content: `400` with `messageKey` `IMPORT_INTEGRITY_MISMATCH`, nothing is written. Without it: imported with a warning in the log |
 
 When `updateIfExists=true` and a workflow with the same name exists in the target project, it will be updated instead of creating a new one — `version` included, as with `PUT` and a pool reinstall.
 
@@ -3921,7 +3925,9 @@ Install a pool workflow into a project.
 | `forceCreate` | Boolean | No |
 | `locale` | String (`de`/`en`) | No: language of name, description and steps; English when omitted. A workflow installed earlier in the other language is updated, not duplicated |
 
-**Response:** `{ "workflowId": "uuid", "workflowName": "...", "created": true }`
+**Response:** `{ "workflowId": "uuid", "workflowName": "...", "created": true, "integrity": "VERIFIED" }`
+
+`integrity`: `VERIFIED` (the pool file's checksum matches) or `MISSING` (file without checksum, installed with a warning). If the checksum does not match, nothing is installed: `400` with `messageKey` `POOL_INTEGRITY_MISMATCH`.
 
 ### `POST /api/v1/pool/export/{workflowId}`
 

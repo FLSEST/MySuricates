@@ -28,5 +28,6 @@
       "goal" : "Aktualisiere die Doku im Projekt {{ slug }} (Pfad: ${FACTORY_ROOT:-./saas-factory}/{{ slug }}).\n\nLies zuerst:\n- spec.md (falls vorhanden, eine Ebene höher: ../{{ slug }}.spec.md oder im Eltern-Projekt)\n- src/app/page.tsx und ggf. src/app/(marketing)/page.tsx\n- prisma/schema.prisma\n- package.json (für Stack + Scripts)\n\nDann:\n1. README.md überschreiben mit:\n   - 1-Satz-Beschreibung (von Spec, nicht erfunden)\n   - Quick-Start: docker compose up -d, Port aus .factory-port\n   - Stack-Liste (eine Zeile)\n   - Verzeichnis-Struktur (3-5 Zeilen)\n   - Kontakt-Hinweis: 'Generiert von SaaS-Factory'\n2. CHANGELOG.md anhängen oder neu erstellen mit:\n   ## YYYY-MM-DD\n   - <Feature 1 in einem Satz>\n   - <Feature 2 in einem Satz>\n   ...\n\nWICHTIG: Knapp halten. Maximal 60 Zeilen README, 20 Zeilen CHANGELOG-Eintrag."
     },
     "requiredCapabilities" : [ ]
-  } ]
+  } ],
+  "integrity": "sha256:48ebf43f9c0075c606ca3f1319ac1e99c695be658626713d62e2e65e2a8bcb33"
 }

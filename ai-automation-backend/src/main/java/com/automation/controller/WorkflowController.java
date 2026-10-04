@@ -21,6 +21,7 @@ import com.automation.service.execution.ExecutionQueryService;
 import com.automation.service.project.ProjectService;
 import com.automation.service.export.ProcessFormatAdapter;
 import com.automation.service.workflow.WorkflowExecutor;
+import com.automation.service.workflow.DefinitionIntegrity;
 import com.automation.service.workflow.WorkflowService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -116,7 +117,7 @@ public class WorkflowController {
     @GetMapping("/export/{id}")
     public ExportWorkflowResponse exportWorkflow(@PathVariable String id) {
         var workflow = workflowService.findById(id);
-        return new ExportWorkflowResponse(
+        var export = new ExportWorkflowResponse(
                 workflow.getName(),
                 workflow.getDescription(),
                 workflow.getIcon(),
@@ -128,6 +129,7 @@ public class WorkflowController {
                 workflow.getMetadata(),
                 Instant.now()
         );
+        return export.withIntegrity(DefinitionIntegrity.ofExport(export));
     }
 
     /** Exportiert den Workflow als BPMN 2.0 XML (Spec: docs/plans/2026-07-09-bpmn-integration-design.md). */
@@ -146,6 +148,7 @@ public class WorkflowController {
 
     @PostMapping("/import")
     public ResponseEntity<WorkflowResponse> importWorkflow(@Valid @RequestBody ImportWorkflowRequest request) {
+        DefinitionIntegrity.verifyImport(request); // mismatch → 400 before anything is written (TODO b18939a6)
         String projectId = request.projectId();
         if (projectId == null || projectId.isBlank()) {
             projectId = projectService.getOrCreateCollectionProject().getId();

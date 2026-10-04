@@ -1,7 +1,9 @@
 package com.automation.service.pool;
 
+import com.automation.dto.IntegrityCheck;
 import com.automation.dto.response.PoolWorkflowEntry;
 import com.automation.entity.BlockDefinition;
+import com.automation.service.workflow.DefinitionIntegrity;
 import com.automation.util.LocalizedJson;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonMappingException;
@@ -89,11 +91,13 @@ final class PoolFileParser {
         }
 
         String filename = file.getFileName().toString();
+        // Over the raw file, before the language is resolved: one checksum for both languages
+        IntegrityCheck integrity = DefinitionIntegrity.check(root);
         return new PoolWorkflowEntry(
                 filename.replace(".json", ""), name, description == null ? Map.of() : description,
                 icon == null ? "📋" : icon, category, scope, tags == null ? List.of() : tags,
                 blocks, instructions, model, effort, version == null ? "1.0.0" : version, author,
-                defaultContext, metadata, filename
+                defaultContext, metadata, filename, integrity
         );
     }
 

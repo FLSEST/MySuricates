@@ -40,5 +40,6 @@
   "author": "MySuricates",
   "defaultContext": {
     "project_path": "/path/to/project"
-  }
+  },
+  "integrity": "sha256:0a7ad452f1d2bb83a443fcefd4a2863fe358f4a4154b0c8ee1ea1275a205b06d"
 }
