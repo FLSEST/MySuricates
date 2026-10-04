@@ -63,6 +63,12 @@ export function WorkflowImportModal({
               </p>
             </div>
           </div>
+          {/* Without a checksum the server imports with a warning only (b18939a6); a mismatch it refuses itself */}
+          {!importData.integrity && (
+            <p className="text-xs text-warning" data-testid="import-integrity-missing">
+              {t.workflows.importIntegrityMissing}
+            </p>
+          )}
           <div>
             <Select
               label={t.workflows.importSelectProject}

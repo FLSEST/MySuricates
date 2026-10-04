@@ -3,6 +3,7 @@ package com.automation.service.pool;
 import com.automation.dto.request.ExportToPoolRequest;
 import com.automation.dto.response.ExportToPoolResponse;
 import com.automation.entity.Workflow;
+import com.automation.service.workflow.DefinitionIntegrity;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -56,7 +57,11 @@ public class PoolExportWriter {
         Map<String, Object> generic = objectMapper.convertValue(poolJson, new TypeReference<>() {});
         PoolExportSanitizer sanitizer = new PoolExportSanitizer();
         @SuppressWarnings("unchecked")
-        Map<String, Object> sanitized = (Map<String, Object>) sanitizer.scrub(generic);
+        Map<String, Object> scrubbed = (Map<String, Object>) sanitizer.scrub(generic);
+        // Last field, over everything above it — what the install checks again (TODO b18939a6)
+        Map<String, Object> sanitized = new LinkedHashMap<>(scrubbed);
+        sanitized.remove(DefinitionIntegrity.FIELD);
+        sanitized.put(DefinitionIntegrity.FIELD, DefinitionIntegrity.compute(sanitized));
         if (!sanitizer.removedPaths().isEmpty()) {
             log.warn("Pool-Export von '{}' ({}): Instanz-Bindungen entfernt: {}",
                     workflow.getName(), workflow.getId(), sanitizer.removedPaths());

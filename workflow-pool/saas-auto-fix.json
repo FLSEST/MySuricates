@@ -52,5 +52,6 @@
       "command" : "set -euo pipefail\nRESULT={{ previous_output }}\nif echo \"$RESULT\" | grep -qE 'AUTO_FIX_ABORTED|AUTO_FIX_FAILED'; then\n  echo 'GATE_RED'\nelse\n  echo 'GATE_GREEN'\nfi"
     },
     "requiredCapabilities" : [ ]
-  } ]
+  } ],
+  "integrity": "sha256:6b5491c5748bf83d037233c6338892470473111f47da2478946f26a0522d486e"
 }

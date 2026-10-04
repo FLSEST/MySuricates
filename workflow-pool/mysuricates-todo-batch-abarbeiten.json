@@ -218,5 +218,6 @@
         "updates": "{{ block.uebergabe.output }}"
       }
     }
-  ]
+  ],
+  "integrity": "sha256:df12ec3f9d8d746a8939a1e9d0977c39ef9ff35514902bf34586b8c0a599bdfa"
 }

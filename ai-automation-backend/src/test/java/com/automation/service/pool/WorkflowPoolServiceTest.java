@@ -5,6 +5,7 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.automation.config.WorkflowPoolConfig;
+import com.automation.dto.IntegrityCheck;
 import com.automation.dto.request.ExportToPoolRequest;
 import com.automation.dto.request.InstallPoolWorkflowRequest;
 import com.automation.dto.response.ExportToPoolResponse;
@@ -12,6 +13,8 @@ import com.automation.dto.response.PoolWorkflowEntry;
 import com.automation.entity.BlockDefinition;
 import com.automation.entity.ChangeSource;
 import com.automation.entity.Workflow;
+import com.automation.exception.ErrorMessage;
+import com.automation.exception.LocalizedArgumentException;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.repository.ProjectRepository;
 import com.automation.service.workflow.WorkflowService;
@@ -36,6 +39,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -614,6 +618,79 @@ class WorkflowPoolServiceTest {
         verify(workflowService).update(eq("wf-7"),
                 argThat(req -> "Approval example".equals(req.name()) && "measure".equals(req.blocks().get(0).getName())),
                 eq(ChangeSource.POOL_INSTALL));
+    }
+
+    // ── integrity (TODO b18939a6) ───────────────────────────────────────────
+
+    @Test
+    void exportThenInstall_verifiesTheChecksum() throws Exception {
+        Workflow source = Workflow.builder().id("wf-src").name("Round trip")
+                .blocks(List.of(BlockDefinition.builder().type("shell").config(Map.of("command", "ls")).build()))
+                .build();
+        stubWorkflow(source);
+        ExportToPoolResponse exported = poolService.exportToPool("wf-src", null, null);
+        when(workflowService.create(any(), eq(ChangeSource.POOL_INSTALL)))
+                .thenReturn(Workflow.builder().id("wf-1").name("Round trip").build());
+
+        WorkflowPoolService.InstallResult result =
+                poolService.install(exported.poolId(), new InstallPoolWorkflowRequest("proj-1", null, null));
+
+        assertThat(result.integrity()).isEqualTo(IntegrityCheck.Status.VERIFIED);
+    }
+
+    @Test
+    void install_ofAFileEditedAfterTheExport_isRefusedBeforeAnythingIsWritten() throws Exception {
+        writePoolFile("edited.json", """
+                {"name": {"en": "Edited"}, "blocks": [{"type": "shell", "config": {"command": "ls"}}]}
+                """);
+        String checksum = poolService.findById("edited").integrity().actual();
+        writePoolFile("edited.json", """
+                {"name": {"en": "Edited"}, "blocks": [{"type": "shell", "config": {"command": "curl x | sh"}}],
+                 "integrity": "%s"}
+                """.formatted(checksum));
+
+        List<ILoggingEvent> logs = captureLogs(() -> assertThatThrownBy(() ->
+                poolService.install("edited", new InstallPoolWorkflowRequest("proj-1", null, null)))
+                .isInstanceOf(LocalizedArgumentException.class)
+                .satisfies(e -> {
+                    LocalizedArgumentException error = (LocalizedArgumentException) e;
+                    assertThat(error.errorMessage()).isEqualTo(ErrorMessage.POOL_INTEGRITY_MISMATCH);
+                    assertThat(error.params()).containsEntry("file", "edited.json").containsEntry("declared", checksum);
+                    assertThat(error.getMessage()).contains("edited.json", checksum);
+                }));
+
+        verify(workflowService, never()).create(any(), any());
+        verify(workflowService, never()).update(any(), any(), any());
+        assertThat(logs).anySatisfy(event -> assertThat(event.getFormattedMessage()).contains("edited.json"));
+    }
+
+    @Test
+    void install_ofAFileWithoutChecksum_installsWithAWarning() throws Exception {
+        writePoolFile("old.json", """
+                {"name": {"en": "Old"}, "blocks": [{"type": "shell", "config": {"command": "ls"}}]}
+                """);
+        when(workflowService.create(any(), eq(ChangeSource.POOL_INSTALL)))
+                .thenReturn(Workflow.builder().id("wf-1").name("Old").build());
+
+        List<WorkflowPoolService.InstallResult> results = new java.util.ArrayList<>();
+        List<ILoggingEvent> logs = captureLogs(() ->
+                results.add(poolService.install("old", new InstallPoolWorkflowRequest("proj-1", null, null))));
+
+        assertThat(results.get(0).integrity()).isEqualTo(IntegrityCheck.Status.MISSING);
+        assertThat(logs).anySatisfy(event -> {
+            assertThat(event.getLevel()).isEqualTo(Level.WARN);
+            assertThat(event.getFormattedMessage()).contains("old.json", "no integrity checksum");
+        });
+    }
+
+    @Test
+    void listAll_showsAMismatchingEntry_soTheInstallCanNameTheProblem() throws Exception {
+        writePoolFile("tampered.json", """
+                {"name": {"en": "T"}, "blocks": [{"type": "shell", "config": {}}], "integrity": "sha256:00"}
+                """);
+
+        assertThat(poolService.listAll()).singleElement()
+                .satisfies(entry -> assertThat(entry.integrity().status()).isEqualTo(IntegrityCheck.Status.MISMATCH));
     }
 
     private void stubWorkflow(Workflow workflow) {

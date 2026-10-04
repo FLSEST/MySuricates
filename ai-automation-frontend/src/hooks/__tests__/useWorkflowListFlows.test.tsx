@@ -167,4 +167,16 @@ describe('useWorkflowImportFlow', () => {
     await waitFor(() => expect(bodies).toHaveLength(1));
     expect(bodies[0]).toMatchObject({ name: 'Pool entry', projectId: 'p1', version: '4.4.0' });
   });
+  it('sends the checksum of the export along, so the server can refuse a changed file (b18939a6)', async () => {
+    const bodies: unknown[] = [];
+    server.use(http.post('/api/v1/workflows/import', async ({ request }) => {
+      bodies.push(await request.json());
+      return HttpResponse.json({ id: 'w-imp' });
+    }));
+    const { result } = setup(useWorkflowImportFlow);
+    act(() => result.current.importReady({ name: 'Signed', blocks: [], integrity: 'sha256:ab' } as unknown as WorkflowExportData));
+    act(() => result.current.runImport());
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toMatchObject({ name: 'Signed', integrity: 'sha256:ab' });
+  });
 });

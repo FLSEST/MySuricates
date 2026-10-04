@@ -22,5 +22,6 @@
   ],
   "model": "opus",
   "version": "1.0.0",
-  "author": "MySuricates"
+  "author": "MySuricates",
+  "integrity": "sha256:01207b6c6f59bd17618836793b4c3dcbcbde91937bec3511b760290e50c4461b"
 }

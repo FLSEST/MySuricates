@@ -20,10 +20,13 @@ export function useInstallPoolWorkflow() {
   const locale = useI18nStore((s) => s.locale);
   return useMutation({
     mutationFn: ({ poolId, projectId, name, forceCreate }: { poolId: string; projectId: string; name?: string; forceCreate?: boolean }) =>
-      api.post<{ workflowId: string; workflowName: string; created: boolean }>(`/pool/${poolId}/install`, { projectId, name, forceCreate, locale }),
+      api.post<{ workflowId: string; workflowName: string; created: boolean; integrity?: 'VERIFIED' | 'MISSING' }>(
+        `/pool/${poolId}/install`, { projectId, name, forceCreate, locale }),
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['workflows'] });
       toast.success(data.created ? t.toast.poolWorkflowInstalled : t.toast.poolWorkflowUpdated);
+      // An older backend sends no `integrity` — then there is nothing to warn about (b18939a6)
+      if (data.integrity === 'MISSING') toast.warning(t.toast.poolIntegrityMissing);
     },
     onError: (err) => toast.error(apiErrorMessage(err, t.toast.poolInstallFailed)),
   });

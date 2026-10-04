@@ -48,5 +48,6 @@
       "question" : "## Build-Plan Review\n\n{{ previous_output }}\n\n**Yes** = Plan akzeptieren, weiter zu Scaffold\n**Edit** = Plan ändern (gib im Folge-Run einen modifizierten Plan als Kontext mit)\n**Abort** = Pipeline abbrechen"
     },
     "requiredCapabilities" : [ ]
-  } ]
+  } ],
+  "integrity": "sha256:c6ae9e7aaf26de892a80a851c33257b754631fa542f38f9ce9045f33a7ac96a6"
 }

@@ -54,5 +54,6 @@
     },
     "requiredCapabilities" : [ ],
     "skillIds" : [ "builtin-code-review" ]
-  } ]
+  } ],
+  "integrity": "sha256:f7f84c75bb74265c4679b25eb2ee272b2225f29ae83e8f86ee390151febea41c"
 }

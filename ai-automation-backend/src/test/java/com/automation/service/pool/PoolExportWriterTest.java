@@ -1,9 +1,11 @@
 package com.automation.service.pool;
 
+import com.automation.dto.IntegrityCheck;
 import com.automation.dto.request.ExportToPoolRequest;
 import com.automation.dto.response.ExportToPoolResponse;
 import com.automation.entity.BlockDefinition;
 import com.automation.entity.Workflow;
+import com.automation.service.workflow.DefinitionIntegrity;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -56,7 +58,7 @@ class PoolExportWriterTest {
         assertThat(res.sanitizedPaths()).isEmpty();
         Map<String, Object> json = read(poolDir.resolve(res.filename()));
         assertThat(json.keySet()).containsExactly(
-                "name", "icon", "category", "scope", "blocks", "version", "author");
+                "name", "icon", "category", "scope", "blocks", "version", "author", "integrity");
         assertThat(json.get("name")).isEqualTo(Map.of("de", "Täglicher Bericht!", "en", "Täglicher Bericht!"));
         assertThat(json).containsEntry("icon", "🔧")
                 .containsEntry("category", "CUSTOM")
@@ -80,7 +82,8 @@ class PoolExportWriterTest {
         assertThat(res.filename()).isEqualTo("daily-report.json");
         Map<String, Object> json = read(tmp.resolve("daily-report.json"));
         assertThat(json.keySet()).containsExactly("name", "description", "icon", "category", "scope", "tags",
-                "blocks", "instructions", "model", "effort", "version", "author", "defaultContext", "metadata");
+                "blocks", "instructions", "model", "effort", "version", "author", "defaultContext", "metadata",
+                "integrity");
         assertThat(json.get("name")).isEqualTo(Map.of("de", "Tagesbericht", "en", "Daily Report"));
         assertThat(json.get("description")).isEqualTo(Map.of("de", "Beschreibung", "en", "Desc EN"));
         assertThat(json).containsEntry("category", "REPORTING").containsEntry("scope", "repo")
@@ -141,5 +144,20 @@ class PoolExportWriterTest {
         assertThat(res.sanitizedPaths()).anyMatch(p -> p.contains("workflowId"));
         String content = Files.readString(tmp.resolve(res.filename()));
         assertThat(content).doesNotContain(UUID_A).contains("\"keep\" : \"ja\"");
+    }
+
+    /** TODO b18939a6: the written file carries its checksum, and the install side verifies it. */
+    @Test
+    void schreibtDiePruefsummeAlsLetztesFeld_undDieDateiBestehtDiePruefung() throws IOException {
+        Workflow wf = base().instructions("Sei knapp.").metadata(Map.of("projectId", UUID_A, "k", 1.5)).build();
+
+        ExportToPoolResponse res = writer.write(wf, null, PoolScope.PORTABLE, tmp);
+
+        Path file = tmp.resolve(res.filename());
+        Map<String, Object> json = read(file);
+        assertThat(List.copyOf(json.keySet())).last().isEqualTo("integrity");
+        assertThat((String) json.get("integrity")).startsWith("sha256:");
+        IntegrityCheck check = DefinitionIntegrity.check(mapper.readTree(file.toFile()));
+        assertThat(check.status()).isEqualTo(IntegrityCheck.Status.VERIFIED);
     }
 }

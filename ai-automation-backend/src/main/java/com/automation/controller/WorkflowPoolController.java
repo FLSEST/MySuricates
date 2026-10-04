@@ -41,7 +41,9 @@ public class WorkflowPoolController {
         return ResponseEntity.ok(Map.of(
                 "workflowId", result.workflow().getId(),
                 "workflowName", result.workflow().getName(),
-                "created", result.created()
+                "created", result.created(),
+                // VERIFIED | MISSING (installed with a warning); a mismatch is a 400 (TODO b18939a6)
+                "integrity", result.integrity().name()
         ));
     }
 

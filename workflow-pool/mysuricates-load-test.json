@@ -52,5 +52,6 @@
         "shell_escape_variables": true
       }
     }
-  ]
+  ],
+  "integrity": "sha256:7c28fa43c84eef9367418d467a73187340192078041c53b23f0d51c773056bc8"
 }

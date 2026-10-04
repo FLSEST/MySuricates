@@ -56,5 +56,6 @@
       "source": "commit",
       "install_npm": false
     }
-  }
+  },
+  "integrity": "sha256:0815a6bc336744cc417b50b64cd92718da12f3f1aeb180327b46a0d95e1d6c74"
 }

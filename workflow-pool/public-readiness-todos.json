@@ -64,5 +64,6 @@
     "autoMemoryExtraction": {
       "enabled": false
     }
-  }
+  },
+  "integrity": "sha256:b2d8cfb06ad012afeeb5d30129520edd324ea34837ffcaed9eb181baa4d52d87"
 }

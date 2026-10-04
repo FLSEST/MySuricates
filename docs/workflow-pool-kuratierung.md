@@ -203,6 +203,39 @@ ist nach dem Export deshalb **kein installierbarer Pool-Eintrag**, solange die `
 nicht von Hand nachgetragen oder durch eine Kontextvariable ersetzt wurde — `sanitizedPaths`
 nennt genau die Stelle.
 
+### Prüfsumme (`integrity`)
+
+Jede Pool-Datei trägt als letztes Feld `"integrity": "sha256:<hex>"` — SHA-256 über den
+kanonischen Inhalt der ganzen Datei ohne dieses Feld (Schlüssel sortiert, leere Werte
+weggelassen, Reihenfolge der Blöcke bleibt; dieselbe Normalisierung wie beim
+`definition_hash`, `service/workflow/DefinitionIntegrity`). Feldname nach npm
+(`package-lock.json`), Format nach OCI (`sha256:<hex>`). Formatierung und Schlüsselreihenfolge
+ändern die Prüfsumme nicht, jede inhaltliche Änderung schon — auch an Name, Beschreibung oder
+`scope`, und bei zweisprachigen Dateien für beide Sprachen zugleich.
+
+- **Export** (`PoolExportWriter`) schreibt das Feld.
+- **Install** rechnet nach: Abweichung → `400` (`POOL_INTEGRITY_MISMATCH`, mit Datei, angegebenem
+  und berechnetem Wert), es wird nichts angelegt. Fehlt das Feld (ältere oder von Hand
+  geschriebene Datei), wird installiert, aber gewarnt: im Log und in der Antwort
+  (`"integrity": "MISSING"`, die Oberfläche zeigt einen Hinweis).
+- **Gate**: `PoolIntegrityGateTest` prüft, dass jede getrackte Pool-Datei ein passendes Feld
+  trägt. Nach einer gewollten Änderung von Hand die Prüfsummen neu schreiben und mitcommitten:
+  `./mvnw test -Dtest=PoolIntegrityGateTest -Dpool.integrity.write=true` (ersetzt bzw. ergänzt
+  nur die eine Zeile, das Layout der Datei bleibt).
+
+Der Workflow-Export (`GET /workflows/export/{id}`) trägt dasselbe Feld; `POST /workflows/import`
+prüft es genauso (`IMPORT_INTEGRITY_MISMATCH`). Dort deckt die Prüfsumme alles ab, was der
+Import unverändert übernimmt — nicht den Namen, den der Import-Dialog ändern lässt, und nicht
+`exportedAt`.
+
+**Was das schützt — und was nicht.** Die Prüfsumme erkennt Übertragungsfehler und versehentliche
+Änderungen (eine Handkorrektur, ein Merge, ein Werkzeug, das die Datei umschreibt). Sie schützt
+**nicht** vor absichtlicher Fälschung: Wer die Datei ändert, kann die Prüfsumme neu berechnen.
+Dagegen hülfe nur eine Signatur mit einem Schlüssel außerhalb der Datei (wie bei Maven Central
+die `.asc` neben der `.sha256`). Für den ausgelieferten Pool bürgt bewusst die Versionierung im
+Repository: Wer bestimmt, was in `workflow-pool/` steht, bestimmt auch die Prüfsumme — eine
+eigene Signatur brächte erst etwas, wenn Pool-Dateien aus fremden Quellen kämen.
+
 ### Freigabe vor dem Commit
 
 Ein exportierter Eintrag ist ein Entwurf. Vor dem Commit:
@@ -214,6 +247,8 @@ Ein exportierter Eintrag ist ein Entwurf. Vor dem Commit:
    auf Werkzeuge außerhalb des Repositories.
 3. `scope` gegenlesen: Stimmt die Zusage? Ein `portable`-Eintrag, der nur mit einem bestimmten
    Projektaufbau funktioniert, ist ein `repo`-Eintrag.
+4. Nach einer Handänderung die Prüfsumme neu schreiben (siehe oben), sonst schlägt
+   `PoolIntegrityGateTest` an — und der Install würde die Datei ablehnen.
 
 Ein Eintrag, der die Fragen nicht besteht, wird nicht getrackt. `git rm --cached` genügt: das
 Verzeichnis bleibt die Arbeitsfläche der laufenden Instanz, getrackt ist nur die Auswahl.
