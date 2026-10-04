@@ -330,7 +330,7 @@ Test instance on port 8090 (uses `docker/Dockerfile.stable` as build base):
 | `AUTOMATION_MODULES_PRESET` | `core` | Optional modules at startup: `core`, `research` or `full` (see [Module System](architektur.md#module-system-startup-configuration)) |
 | `AUTOMATION_MODULES_<NAME>` | (preset) | Switch a single module, e.g. `AUTOMATION_MODULES_REMOTE_ACCESS=true` — wins over the preset |
 | `AUTOMATION_MODULES_UI_EDITABLE` | `false` | `true` = feature modules can also be switched in the settings (applies immediately). Anyone with the API key can then turn on e.g. webhooks or the terminal — keep it off on publicly reachable instances |
-| `AUTOMATION_HARDENING_<NAME>` | `provenance`, `private-network-guard`: `true`, others `false` | Hardening flags `PROVENANCE`, `SEALING` (requires provenance), `REQUIRE_SEALED_FOR_UNATTENDED` (requires sealing), `WEBHOOK_SIGNATURES` (requires module webhooks), `PRIVATE_NETWORK_GUARD` (iCal/RSS feeds only to public addresses), `PRIVATE_NETWORK_GUARD_HTTP_API` (the same for http-api, default `false`) — see [Workflow Hardening](architektur.md#workflow-hardening-optional) |
+| `AUTOMATION_HARDENING_<NAME>` | `provenance`, `private-network-guard`: `true`, others `false` | Hardening flags `PROVENANCE`, `SEALING` (requires provenance), `REQUIRE_SEALED_FOR_UNATTENDED` (requires sealing), `WEBHOOK_SIGNATURES` (requires module webhooks), `PRIVATE_NETWORK_GUARD` (iCal/RSS feeds only to public addresses), `PRIVATE_NETWORK_GUARD_HTTP_API` (the same for http-api, default `false`), `PRIVATE_NETWORK_GUARD_OWN_SERVICES` (the same for CalDAV, Gitea, GitLab, ntfy and webhook notifications, default `false`) — see [Workflow Hardening](architektur.md#workflow-hardening-optional) |
 | `AUTOMATION_HOST_CLAUDE_TIMEOUT` | `300` | Global Claude CLI timeout in seconds (declared in `application.yml`) |
 | `AUTOMATION_HOST_CLAUDE_MAX_TOKENS` | (empty) | Optional per-call token limit for Claude CLI |
 | `AUTOMATION_DISCOVERY_AUTO_TAGGING_ENABLED` | `true` | Tags and category of a workflow via AI (`suggestions-model`), after every create/change and at startup for untagged workflows — `false` saves these background calls (test and side instances) |
@@ -379,6 +379,7 @@ AUTOMATION_HARDENING_REQUIRE_SEALED_FOR_UNATTENDED=false
 AUTOMATION_HARDENING_WEBHOOK_SIGNATURES=false
 AUTOMATION_HARDENING_PRIVATE_NETWORK_GUARD=false
 AUTOMATION_HARDENING_PRIVATE_NETWORK_GUARD_HTTP_API=false
+AUTOMATION_HARDENING_PRIVATE_NETWORK_GUARD_OWN_SERVICES=false
 ```
 
 ```bash
@@ -391,6 +392,7 @@ AUTOMATION_HARDENING_REQUIRE_SEALED_FOR_UNATTENDED=true   # seal workflows first
 AUTOMATION_HARDENING_WEBHOOK_SIGNATURES=true
 AUTOMATION_HARDENING_PRIVATE_NETWORK_GUARD=true
 AUTOMATION_HARDENING_PRIVATE_NETWORK_GUARD_HTTP_API=true
+AUTOMATION_HARDENING_PRIVATE_NETWORK_GUARD_OWN_SERVICES=true
 ```
 
 > **Before "maximal":** `require-sealed-for-unattended` refuses every unattended run of an unsealed workflow (schedules, webhooks, TODO/completion triggers, auto-repair, wishes — also through chains and sub-workflows). Seal the affected workflows first, or keep this one switch `false`. With `full` and `ui-editable`, anyone holding the API key can also turn on modules with network, credential and host access — only on instances that are not publicly reachable.

@@ -98,6 +98,7 @@ automation:
   # provenance (Default true) · sealing · require-sealed-for-unattended · require-signed-seal · webhook-signatures
   # · private-network-guard (Default true: iCal/RSS-Feed rufen keine lokalen/privaten Adressen ab)
   # · private-network-guard-http-api (Default false: dieselbe Sperre für http-api, das eigene Netz bleibt sonst erreichbar)
+  # · private-network-guard-own-services (Default false: dieselbe Sperre für CalDAV, Gitea, GitLab, ntfy, Webhook-Benachrichtigungen)
   # hardening:
   #   sealing: true
   #   require-signed-seal: true    # Siegel ohne gültige Signatur lehnen ihre Runs ab

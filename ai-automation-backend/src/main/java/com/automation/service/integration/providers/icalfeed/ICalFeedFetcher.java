@@ -1,6 +1,8 @@
 package com.automation.service.integration.providers.icalfeed;
 
-import com.automation.modules.ModuleCatalog;
+import com.automation.service.integration.OutboundClient;
+import com.automation.service.integration.OutboundHttp;
+import com.automation.service.integration.OutboundTarget;
 import com.automation.service.integration.OutboundTargetGuard;
 import com.automation.service.integration.providers.ical.CalendarParams;
 import org.springframework.stereotype.Component;
@@ -9,7 +11,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
@@ -19,7 +20,8 @@ import java.util.Set;
 
 /**
  * Downloads a public iCalendar feed: http/https only ({@code webcal://} is read as https), a public
- * target ({@link OutboundTargetGuard}), 10 s connect / 20 s total timeout, at most {@link #MAX_BYTES}
+ * target ({@link OutboundTargetGuard}, applied by the {@link OutboundTarget#publicSource() public-source}
+ * client), 10 s connect / 20 s total timeout, at most {@link #MAX_BYTES}
  * and only a body that is an iCalendar. Redirects are followed by hand (at most
  * {@value #MAX_REDIRECTS}, never from https to http) so that every hop passes the same checks.
  * Feed URLs often carry a secret token in path or query (private Google/Outlook links), so errors
@@ -32,20 +34,15 @@ public class ICalFeedFetcher {
     static final int MAX_REDIRECTS = 5;
     private static final Set<Integer> REDIRECTS = Set.of(301, 302, 303, 307, 308);
 
-    private final OutboundTargetGuard guard;
-    private final HttpClient httpClient = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(10))
-            .followRedirects(HttpClient.Redirect.NEVER)
-            .build();
+    private final OutboundClient httpClient;
 
-    public ICalFeedFetcher(OutboundTargetGuard guard) {
-        this.guard = guard;
+    public ICalFeedFetcher(OutboundHttp outbound) {
+        this.httpClient = outbound.client(OutboundTarget.publicSource(), Duration.ofSeconds(10));
     }
 
     public String fetch(URI url) {
         URI uri = url;
         for (int hop = 0; hop <= MAX_REDIRECTS; hop++) {
-            guard.check(uri, ModuleCatalog.PRIVATE_NETWORK_GUARD);
             HttpResponse<InputStream> response = send(uri);
             int status = response.statusCode();
             if (REDIRECTS.contains(status)) {
@@ -68,6 +65,8 @@ public class ICalFeedFetcher {
                 .build();
         try {
             return httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            throw e; // refused or unresolvable target: the guard's message names host, address and switch
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("iCal feed request interrupted", e);

@@ -36,3 +36,5 @@ automation:
     private-network-guard: true
     # The same check for http-api: services in your own network are refused as well.
     private-network-guard-http-api: true
+    # The same check for CalDAV, Gitea, GitLab, ntfy and webhook notifications.
+    private-network-guard-own-services: true

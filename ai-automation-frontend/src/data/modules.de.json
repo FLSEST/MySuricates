@@ -114,5 +114,9 @@
   "private-network-guard-http-api": {
     "name": "HTTP-API: keine Abrufe ins lokale Netz",
     "description": "Dieselbe Adressprüfung für die HTTP-API-Verbindung. Standardmäßig aus, weil Dienste im eigenen Netz ein häufiges Ziel der HTTP-API sind; eingeschaltet lehnt sie auch diese ab."
+  },
+  "private-network-guard-own-services": {
+    "name": "Eigene Dienste: keine Abrufe ins lokale Netz",
+    "description": "Dieselbe Adressprüfung für Integrationen, die einen selbst betriebenen Dienst unter der eingetragenen Adresse ansprechen (CalDAV, Gitea/Forgejo, GitLab, ntfy), und für Webhook-Benachrichtigungen. Standardmäßig aus, weil diese Dienste meist im eigenen Netz laufen; eingeschaltet lehnt sie auch diese ab."
   }
 }

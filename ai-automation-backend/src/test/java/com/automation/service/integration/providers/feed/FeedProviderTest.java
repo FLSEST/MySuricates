@@ -22,7 +22,7 @@ class FeedProviderTest {
 
     private HttpServer server;
     private String base;
-    private final FeedProvider provider = new FeedProvider(new FeedFetcher(TestTargetGuards.onWithLoopbackServerAsPublic()));
+    private final FeedProvider provider = new FeedProvider(new FeedFetcher(TestTargetGuards.outbound(TestTargetGuards.onWithLoopbackServerAsPublic())));
 
     @BeforeEach
     void start() throws Exception {
@@ -131,12 +131,12 @@ class FeedProviderTest {
             ex.close();
         });
 
-        assertThatThrownBy(() -> new FeedFetcher(TestTargetGuards.defaults()).fetch(base + "/local"))
+        assertThatThrownBy(() -> new FeedFetcher(TestTargetGuards.outbound(TestTargetGuards.defaults())).fetch(base + "/local"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("local or private network address");
         assertThat(hits).hasValue(0);
 
-        assertThat(new FeedFetcher(TestTargetGuards.off()).fetch(base + "/local")).isNotEmpty();
+        assertThat(new FeedFetcher(TestTargetGuards.outbound(TestTargetGuards.off())).fetch(base + "/local")).isNotEmpty();
         assertThat(hits).hasValue(1);
     }
 
@@ -161,7 +161,7 @@ class FeedProviderTest {
     @Test
     void fetcher_enforcesSizeLimit() {
         serve("/big", 200, FeedParserTest.RSS, null);
-        FeedFetcher small = new FeedFetcher(TestTargetGuards.off(), 100);
+        FeedFetcher small = new FeedFetcher(TestTargetGuards.outbound(TestTargetGuards.off()), 100);
 
         assertThatThrownBy(() -> small.fetch(base + "/big"))
                 .isInstanceOf(IllegalStateException.class)

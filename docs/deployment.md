@@ -333,7 +333,7 @@ Test-Instanz auf Port 8090 (nutzt `docker/Dockerfile.stable` als Build-Basis):
 | `AUTOMATION_MODULES_PRESET` | `core` | Optionale Module beim Start: `core`, `research` oder `full` (siehe [Module-System](architektur.md#module-system-startkonfiguration)) |
 | `AUTOMATION_MODULES_<NAME>` | (Preset) | Einzelnes Modul an/aus, z. B. `AUTOMATION_MODULES_REMOTE_ACCESS=true` — schlägt das Preset |
 | `AUTOMATION_MODULES_UI_EDITABLE` | `false` | `true` = Funktionsmodule zusätzlich in den Settings schaltbar (sofort wirksam). Dann kann jeder mit API-Key z. B. Webhooks oder das Terminal einschalten — auf öffentlich erreichbaren Instanzen aus lassen |
-| `AUTOMATION_HARDENING_<NAME>` | `provenance`, `private-network-guard`: `true`, Rest `false` | Härtungs-Flags `PROVENANCE`, `SEALING` (braucht provenance), `REQUIRE_SEALED_FOR_UNATTENDED` (braucht sealing), `WEBHOOK_SIGNATURES` (braucht Modul webhooks), `PRIVATE_NETWORK_GUARD` (iCal-/RSS-Feeds nur an öffentliche Adressen), `PRIVATE_NETWORK_GUARD_HTTP_API` (dasselbe für http-api, Default `false`) — siehe [Workflow-Härtung](architektur.md#workflow-härtung-optional) |
+| `AUTOMATION_HARDENING_<NAME>` | `provenance`, `private-network-guard`: `true`, Rest `false` | Härtungs-Flags `PROVENANCE`, `SEALING` (braucht provenance), `REQUIRE_SEALED_FOR_UNATTENDED` (braucht sealing), `WEBHOOK_SIGNATURES` (braucht Modul webhooks), `PRIVATE_NETWORK_GUARD` (iCal-/RSS-Feeds nur an öffentliche Adressen), `PRIVATE_NETWORK_GUARD_HTTP_API` (dasselbe für http-api, Default `false`), `PRIVATE_NETWORK_GUARD_OWN_SERVICES` (dasselbe für CalDAV, Gitea, GitLab, ntfy und Webhook-Benachrichtigungen, Default `false`) — siehe [Workflow-Härtung](architektur.md#workflow-härtung-optional) |
 | `AUTOMATION_HOST_CLAUDE_TIMEOUT` | `300` | Globaler Claude-CLI-Timeout in Sekunden (in `application.yml` deklariert) |
 | `AUTOMATION_HOST_CLAUDE_MAX_TOKENS` | (leer) | Optionales per-Call Token-Limit für Claude CLI |
 | `AUTOMATION_DISCOVERY_AUTO_TAGGING_ENABLED` | `true` | Tags und Kategorie eines Workflows per KI (`suggestions-model`), nach jedem Anlegen/Ändern und beim Start für Workflows ohne Tags — `false` spart diese Hintergrund-Aufrufe (Test- und Nebeninstanzen) |
@@ -382,6 +382,7 @@ AUTOMATION_HARDENING_REQUIRE_SEALED_FOR_UNATTENDED=false
 AUTOMATION_HARDENING_WEBHOOK_SIGNATURES=false
 AUTOMATION_HARDENING_PRIVATE_NETWORK_GUARD=false
 AUTOMATION_HARDENING_PRIVATE_NETWORK_GUARD_HTTP_API=false
+AUTOMATION_HARDENING_PRIVATE_NETWORK_GUARD_OWN_SERVICES=false
 ```
 
 ```bash
@@ -394,6 +395,7 @@ AUTOMATION_HARDENING_REQUIRE_SEALED_FOR_UNATTENDED=true   # seal workflows first
 AUTOMATION_HARDENING_WEBHOOK_SIGNATURES=true
 AUTOMATION_HARDENING_PRIVATE_NETWORK_GUARD=true
 AUTOMATION_HARDENING_PRIVATE_NETWORK_GUARD_HTTP_API=true
+AUTOMATION_HARDENING_PRIVATE_NETWORK_GUARD_OWN_SERVICES=true
 ```
 
 > **Vor „maximal“:** `require-sealed-for-unattended` lehnt jeden unbeaufsichtigten Run eines unversiegelten Workflows ab (Schedules, Webhooks, TODO-/Completion-Trigger, Auto-Repair, Wishes — auch über Chains und Sub-Workflows). Erst die betroffenen Workflows versiegeln oder diesen einen Schalter auf `false` lassen. Mit `full` und `ui-editable` kann außerdem jeder mit API-Key Module mit Netzwerk-, Zugangsdaten- und Host-Zugriff einschalten — nur auf nicht öffentlich erreichbaren Instanzen.

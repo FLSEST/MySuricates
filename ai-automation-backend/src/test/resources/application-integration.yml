@@ -54,6 +54,7 @@ automation:
     webhook-signatures: false
     private-network-guard: true
     private-network-guard-http-api: false
+    private-network-guard-own-services: false
   scheduler:
     # The dev config parks skip-until on a future instant to pause the triggers and turns
     # catch-up-on-resume off along with it; tests must not inherit either. Values = the defaults

@@ -18,7 +18,7 @@ class ICalFeedFetcherTest {
 
     private HttpServer server;
     private String base;
-    private final ICalFeedFetcher fetcher = new ICalFeedFetcher(TestTargetGuards.onWithLoopbackServerAsPublic());
+    private final ICalFeedFetcher fetcher = new ICalFeedFetcher(TestTargetGuards.outbound(TestTargetGuards.onWithLoopbackServerAsPublic()));
 
     @BeforeEach
     void start() throws Exception {
@@ -114,10 +114,10 @@ class ICalFeedFetcherTest {
     @Test
     void fetch_refusesLocalTargetsByDefault_andReachesThemWithTheSwitchOff() {
         serve("/cal.ics", 200, "BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n".getBytes(StandardCharsets.UTF_8), false);
-        assertThatThrownBy(() -> new ICalFeedFetcher(TestTargetGuards.defaults()).fetch(URI.create(base + "/cal.ics")))
+        assertThatThrownBy(() -> new ICalFeedFetcher(TestTargetGuards.outbound(TestTargetGuards.defaults())).fetch(URI.create(base + "/cal.ics")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("local or private network address");
-        assertThat(new ICalFeedFetcher(TestTargetGuards.off()).fetch(URI.create(base + "/cal.ics"))).startsWith("BEGIN:VCALENDAR");
+        assertThat(new ICalFeedFetcher(TestTargetGuards.outbound(TestTargetGuards.off())).fetch(URI.create(base + "/cal.ics"))).startsWith("BEGIN:VCALENDAR");
     }
 
     @Test

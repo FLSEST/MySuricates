@@ -108,7 +108,12 @@ public enum ModuleCatalog {
     PRIVATE_NETWORK_GUARD_HTTP_API("private-network-guard-http-api", HARDENING, EXPERIMENTAL, false, Set.of(),
             List.of(),
             "The same address check for the http-api integration. Off by default, because services in your "
-                    + "own network are a common http-api target; turn it on to refuse them as well.");
+                    + "own network are a common http-api target; turn it on to refuse them as well."),
+    PRIVATE_NETWORK_GUARD_OWN_SERVICES("private-network-guard-own-services", HARDENING, EXPERIMENTAL, false,
+            Set.of(), List.of(),
+            "The same address check for integrations that talk to a self-hosted service at the address you "
+                    + "enter (CalDAV, Gitea/Forgejo, GitLab, ntfy) and for webhook notifications. Off by "
+                    + "default, because these services usually run in your own network.");
 
     private final String key;
     private final ModuleTier tier;

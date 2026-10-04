@@ -1,11 +1,12 @@
 package com.automation.service.integration.providers.trello;
 
+import com.automation.service.integration.OutboundClient;
+import com.automation.service.integration.OutboundHttp;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
@@ -20,9 +21,7 @@ import java.time.Duration;
 public class TrelloHttpClient {
 
     private final ObjectMapper objectMapper;
-    private final HttpClient httpClient = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(10))
-            .build();
+    private final OutboundClient httpClient = OutboundHttp.fixedHost(Duration.ofSeconds(10));
 
     public <T> T get(String url, Class<T> responseType) {
         return send(HttpRequest.newBuilder()

@@ -166,7 +166,7 @@ Plugin-Framework für externe Dienste. Jeder Provider ist ein Spring `@Component
 2. OAuth-Config, Actions, `executeAction()` implementieren
 3. Setup Guide in `frontend/src/data/integrationSetupGuides.ts`
 4. Optional: Kalender-Adapter in `frontend/src/hooks/calendar-adapters/`
-5. **Zielart festlegen (Outbound-Guard)**: fester Host / öffentliche Quelle / eigener Dienst. Jede URL aus Verbindung, Parametern oder Workflow geht — samt jedem Redirect-Hop — durch `OutboundTargetGuard.check` mit dem passenden Härtungsschalter (`private-network-guard` für öffentliche Quellen, Standard an; eigene Dienste per eigenem Schalter, Standard aus). Shell-Blöcke und KI-CLIs erfasst der Guard bewusst nicht. Details: [docs/integrations.md](docs/integrations.md) → „Zielart eines Providers“
+5. **Zielart festlegen (Outbound-Guard)**: fester Host / öffentliche Quelle / eigener Dienst — und den HTTP-Client damit von `OutboundHttp` holen (`OutboundHttp.fixedHost(…)` bzw. `outboundHttp.client(OutboundTarget.publicSource()|ownService(), …)`), nie selbst bauen. Der Client prüft jedes Ziel per `OutboundTargetGuard` mit dem Schalter der Zielart (`private-network-guard` für öffentliche Quellen, Standard an; `private-network-guard-own-services` bzw. `-http-api` für eigene Dienste, Standard aus), folgt keiner Weiterleitung selbst (jeder Hop = neuer geprüfter `send`) und verbindet sich bei http mit der geprüften Adresse. `OutboundHttpGateTest` verbietet andere HTTP-Clients und hält die Zielart je Client fest. Shell-Blöcke und KI-CLIs erfasst der Guard bewusst nicht. Details: [docs/integrations.md](docs/integrations.md) → „Zielart eines Providers“
 
 Vollständige Referenz (Provider-Tabelle, Block-Config, Kalender-Adapter, Credentials): [docs/integrations.md](docs/integrations.md)
 

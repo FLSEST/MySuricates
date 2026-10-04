@@ -114,5 +114,9 @@
   "private-network-guard-http-api": {
     "name": "HTTP API: no fetches into the local network",
     "description": "The same address check for the HTTP API connection. Off by default, because services in your own network are a common HTTP API target; turned on, it refuses them as well."
+  },
+  "private-network-guard-own-services": {
+    "name": "Own services: no fetches into the local network",
+    "description": "The same address check for integrations that talk to a self-hosted service at the address you enter (CalDAV, Gitea/Forgejo, GitLab, ntfy) and for webhook notifications. Off by default, because these services usually run in your own network; turned on, it refuses them as well."
   }
 }

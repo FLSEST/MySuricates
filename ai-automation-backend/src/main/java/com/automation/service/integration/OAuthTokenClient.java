@@ -7,7 +7,6 @@ import org.springframework.stereotype.Component;
 
 import java.net.URI;
 import java.net.URLEncoder;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
@@ -17,7 +16,8 @@ import java.util.regex.Pattern;
 /**
  * All outbound HTTP of the OAuth2 flow: token exchange, refresh and revocation.
  *
- * <p>Kept out of {@link IntegrationOAuthService} so that the service holds no {@link HttpClient}
+ * <p>Kept out of {@link IntegrationOAuthService} so that the service holds no HTTP client
+ * (token endpoints are fixed hosts: {@link OutboundHttp#fixedHost})
  * and the slow calls sit behind one seam.
  *
  * <p>Exception messages carry the provider id and the HTTP status but <b>never</b> the provider's
@@ -40,9 +40,7 @@ public class OAuthTokenClient {
 
     private final ObjectMapper objectMapper;
 
-    private final HttpClient httpClient = HttpClient.newBuilder()
-            .connectTimeout(TIMEOUT)
-            .build();
+    private final OutboundClient httpClient = OutboundHttp.fixedHost(TIMEOUT);
 
     public OAuthTokenClient(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;

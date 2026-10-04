@@ -44,6 +44,7 @@ MODULE_CATALOG_KEYS=(
   webhook-signatures
   private-network-guard
   private-network-guard-http-api
+  private-network-guard-own-services
 )
 
 MODULE_CATALOG_FEATURE_KEYS=(
@@ -79,6 +80,7 @@ MODULE_CATALOG_HARDENING_KEYS=(
   webhook-signatures
   private-network-guard
   private-network-guard-http-api
+  private-network-guard-own-services
 )
 
 # MODULE_CATALOG_TIER
@@ -111,6 +113,7 @@ MODULE_CATALOG_TIER__seal_immutable="hardening"
 MODULE_CATALOG_TIER__webhook_signatures="hardening"
 MODULE_CATALOG_TIER__private_network_guard="hardening"
 MODULE_CATALOG_TIER__private_network_guard_http_api="hardening"
+MODULE_CATALOG_TIER__private_network_guard_own_services="hardening"
 
 # MODULE_CATALOG_MATURITY
 MODULE_CATALOG_MATURITY__dashboard_report="stable"
@@ -142,6 +145,7 @@ MODULE_CATALOG_MATURITY__seal_immutable="experimental"
 MODULE_CATALOG_MATURITY__webhook_signatures="experimental"
 MODULE_CATALOG_MATURITY__private_network_guard="experimental"
 MODULE_CATALOG_MATURITY__private_network_guard_http_api="experimental"
+MODULE_CATALOG_MATURITY__private_network_guard_own_services="experimental"
 
 # MODULE_CATALOG_DEFAULT
 MODULE_CATALOG_DEFAULT__dashboard_report="true"
@@ -173,6 +177,7 @@ MODULE_CATALOG_DEFAULT__seal_immutable="false"
 MODULE_CATALOG_DEFAULT__webhook_signatures="false"
 MODULE_CATALOG_DEFAULT__private_network_guard="true"
 MODULE_CATALOG_DEFAULT__private_network_guard_http_api="false"
+MODULE_CATALOG_DEFAULT__private_network_guard_own_services="false"
 
 # MODULE_CATALOG_PROPERTY
 MODULE_CATALOG_PROPERTY__dashboard_report="automation.modules.dashboard-report"
@@ -204,6 +209,7 @@ MODULE_CATALOG_PROPERTY__seal_immutable="automation.hardening.seal-immutable"
 MODULE_CATALOG_PROPERTY__webhook_signatures="automation.hardening.webhook-signatures"
 MODULE_CATALOG_PROPERTY__private_network_guard="automation.hardening.private-network-guard"
 MODULE_CATALOG_PROPERTY__private_network_guard_http_api="automation.hardening.private-network-guard-http-api"
+MODULE_CATALOG_PROPERTY__private_network_guard_own_services="automation.hardening.private-network-guard-own-services"
 
 # MODULE_CATALOG_RISKS
 MODULE_CATALOG_RISKS__dashboard_report=""
@@ -235,6 +241,7 @@ MODULE_CATALOG_RISKS__seal_immutable=""
 MODULE_CATALOG_RISKS__webhook_signatures=""
 MODULE_CATALOG_RISKS__private_network_guard=""
 MODULE_CATALOG_RISKS__private_network_guard_http_api=""
+MODULE_CATALOG_RISKS__private_network_guard_own_services=""
 
 # MODULE_CATALOG_REQUIRES
 MODULE_CATALOG_REQUIRES__dashboard_report=""
@@ -266,6 +273,7 @@ MODULE_CATALOG_REQUIRES__seal_immutable="sealing"
 MODULE_CATALOG_REQUIRES__webhook_signatures="webhooks"
 MODULE_CATALOG_REQUIRES__private_network_guard=""
 MODULE_CATALOG_REQUIRES__private_network_guard_http_api=""
+MODULE_CATALOG_REQUIRES__private_network_guard_own_services=""
 
 # MODULE_TEXT_NAME
 MODULE_TEXT_NAME__de__dashboard_report="Dashboard-Bericht"
@@ -297,6 +305,7 @@ MODULE_TEXT_NAME__de__seal_immutable="Entsiegeln gesperrt"
 MODULE_TEXT_NAME__de__webhook_signatures="Webhook-Signaturen (HMAC)"
 MODULE_TEXT_NAME__de__private_network_guard="Feeds: keine Abrufe ins lokale Netz"
 MODULE_TEXT_NAME__de__private_network_guard_http_api="HTTP-API: keine Abrufe ins lokale Netz"
+MODULE_TEXT_NAME__de__private_network_guard_own_services="Eigene Dienste: keine Abrufe ins lokale Netz"
 MODULE_TEXT_NAME__en__dashboard_report="Dashboard report"
 MODULE_TEXT_NAME__en__goals="Goals"
 MODULE_TEXT_NAME__en__chains="Chains"
@@ -326,6 +335,7 @@ MODULE_TEXT_NAME__en__seal_immutable="Unsealing locked"
 MODULE_TEXT_NAME__en__webhook_signatures="Webhook signatures (HMAC)"
 MODULE_TEXT_NAME__en__private_network_guard="Feeds: no fetches into the local network"
 MODULE_TEXT_NAME__en__private_network_guard_http_api="HTTP API: no fetches into the local network"
+MODULE_TEXT_NAME__en__private_network_guard_own_services="Own services: no fetches into the local network"
 
 # MODULE_TEXT_DESC
 MODULE_TEXT_DESC__de__dashboard_report="Block-Typ, mit dem ein Workflow das Dashboard-Ergebnis aus Config-Feldern füllt, plus der KI-Vorschlag für diese Felder im Editor."
@@ -357,6 +367,7 @@ MODULE_TEXT_DESC__de__seal_immutable="Entsiegeln ist über die Oberfläche und d
 MODULE_TEXT_DESC__de__webhook_signatures="Signatur-Secret je Webhook (HMAC-SHA256 im Header X-Signature); ein gespeichertes Secret gilt immer, der Schalter regelt nur Setzen und Entfernen."
 MODULE_TEXT_DESC__de__private_network_guard="iCal-Feed und RSS/Atom-Feed rufen nur öffentliche Adressen ab: Ziele auf localhost, in privaten Netzen, Link-Local (samt Cloud-Metadaten 169.254.169.254), 0.0.0.0/:: oder Multicast werden abgelehnt – geprüft werden die aufgelösten IP-Adressen, auch bei jeder Weiterleitung. Ausschalten gibt lokale Feeds bewusst frei."
 MODULE_TEXT_DESC__de__private_network_guard_http_api="Dieselbe Adressprüfung für die HTTP-API-Verbindung. Standardmäßig aus, weil Dienste im eigenen Netz ein häufiges Ziel der HTTP-API sind; eingeschaltet lehnt sie auch diese ab."
+MODULE_TEXT_DESC__de__private_network_guard_own_services="Dieselbe Adressprüfung für Integrationen, die einen selbst betriebenen Dienst unter der eingetragenen Adresse ansprechen (CalDAV, Gitea/Forgejo, GitLab, ntfy), und für Webhook-Benachrichtigungen. Standardmäßig aus, weil diese Dienste meist im eigenen Netz laufen; eingeschaltet lehnt sie auch diese ab."
 MODULE_TEXT_DESC__en__dashboard_report="Block type that lets a workflow fill the dashboard result from config fields, plus the editor's AI proposal for those fields."
 MODULE_TEXT_DESC__en__goals="Goals with projects, work packages and milestones, TODO planning (size, effort, question/decision), workflows on a goal and the goal guard. Off: goal pages and planning disappear, the data is kept."
 MODULE_TEXT_DESC__en__chains="Chains several workflows into a pipeline that runs one after another."
@@ -386,3 +397,4 @@ MODULE_TEXT_DESC__en__seal_immutable="Unsealing is no longer possible through th
 MODULE_TEXT_DESC__en__webhook_signatures="Per-webhook signing secret (HMAC-SHA256 in the X-Signature header); a stored secret is always enforced, the switch only gates setting and removing it."
 MODULE_TEXT_DESC__en__private_network_guard="iCal feed and RSS/Atom feed fetch public addresses only: targets on localhost, in private networks, link-local (including cloud metadata 169.254.169.254), 0.0.0.0/:: or multicast are refused — the resolved IP addresses are checked, on every redirect too. Turning it off allows local feeds on purpose."
 MODULE_TEXT_DESC__en__private_network_guard_http_api="The same address check for the HTTP API connection. Off by default, because services in your own network are a common HTTP API target; turned on, it refuses them as well."
+MODULE_TEXT_DESC__en__private_network_guard_own_services="The same address check for integrations that talk to a self-hosted service at the address you enter (CalDAV, Gitea/Forgejo, GitLab, ntfy) and for webhook notifications. Off by default, because these services usually run in your own network; turned on, it refuses them as well."

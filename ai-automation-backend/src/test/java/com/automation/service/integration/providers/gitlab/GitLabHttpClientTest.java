@@ -1,5 +1,6 @@
 package com.automation.service.integration.providers.gitlab;
 
+import com.automation.testsupport.TestTargetGuards;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
@@ -18,7 +19,7 @@ class GitLabHttpClientTest {
 
     private HttpServer server;
     private String base;
-    private final GitLabHttpClient client = new GitLabHttpClient(new ObjectMapper());
+    private final GitLabHttpClient client = new GitLabHttpClient(new ObjectMapper(), TestTargetGuards.loopbackOnly());
     private final AtomicReference<String> privateToken = new AtomicReference<>();
     private final AtomicReference<String> authorization = new AtomicReference<>();
     private final AtomicReference<String> method = new AtomicReference<>();

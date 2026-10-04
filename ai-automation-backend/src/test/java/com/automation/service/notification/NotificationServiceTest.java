@@ -7,9 +7,12 @@ import com.automation.entity.RunStatus;
 import com.automation.event.WorkflowRunCompletedEvent;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.repository.NotificationConfigRepository;
+import com.automation.service.integration.OutboundClient;
 import com.automation.service.tray.SystemTrayService;
 import com.automation.testsupport.FakeTransactions;
+import com.automation.testsupport.TestTargetGuards;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -20,12 +23,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
 
-import java.net.http.HttpClient;
+import java.net.InetSocketAddress;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.*;
@@ -46,7 +50,7 @@ class NotificationServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new NotificationService(repository, objectMapper, FakeTransactions.manager());
+        service = new NotificationService(repository, objectMapper, FakeTransactions.manager(), TestTargetGuards.loopbackOnly());
     }
 
     @Nested
@@ -266,6 +270,36 @@ class NotificationServiceTest {
             // Should not throw
             service.onWorkflowRunCompleted(createEvent(RunStatus.COMPLETED));
         }
+
+        /** Webhooks are an own service: local targets only refused with private-network-guard-own-services on. */
+        @Test
+        void webhookToALocalTarget_isSentByDefault_andRefusedWithTheOwnServicesSwitchOn() throws Exception {
+            HttpServer hook = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+            AtomicInteger hits = new AtomicInteger();
+            hook.createContext("/hook", ex -> {
+                hits.incrementAndGet();
+                ex.sendResponseHeaders(204, -1);
+                ex.close();
+            });
+            hook.start();
+            try {
+                NotificationConfig config = createConfig("c-1", ChannelType.WEBHOOK);
+                config.setWebhookUrl("http://127.0.0.1:" + hook.getAddress().getPort() + "/hook");
+                config.setTriggerAlways(true);
+                when(repository.findEnabledForWorkflow(any())).thenReturn(List.of(config));
+
+                new NotificationService(repository, objectMapper, FakeTransactions.manager(), TestTargetGuards.outbound())
+                        .onWorkflowRunCompleted(createEvent(RunStatus.COMPLETED));
+                assertThat(hits.get()).as("switch off (default): the own network is reachable").isEqualTo(1);
+
+                new NotificationService(repository, objectMapper, FakeTransactions.manager(),
+                        TestTargetGuards.outbound(TestTargetGuards.on()))
+                        .onWorkflowRunCompleted(createEvent(RunStatus.COMPLETED));
+                assertThat(hits.get()).as("switch on: refused before any request").isEqualTo(1);
+            } finally {
+                hook.stop(0);
+            }
+        }
     }
 
     @Nested
@@ -275,7 +309,7 @@ class NotificationServiceTest {
         @Test
         void webhook_isSentOutsideAnyTransaction_afterAShortReadBurst() throws Exception {
             PlatformTransactionManager transactions = FakeTransactions.manager();
-            HttpClient httpClient = mock(HttpClient.class);
+            OutboundClient httpClient = mock(OutboundClient.class);
             NotificationService proxied = FakeTransactions.proxy(
                     new NotificationService(repository, objectMapper, transactions, httpClient), transactions);
             NotificationConfig config = createConfig("c-1", ChannelType.WEBHOOK);

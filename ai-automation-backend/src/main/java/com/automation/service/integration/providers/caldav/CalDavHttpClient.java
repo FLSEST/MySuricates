@@ -1,11 +1,13 @@
 package com.automation.service.integration.providers.caldav;
 
+import com.automation.service.integration.OutboundClient;
+import com.automation.service.integration.OutboundHttp;
+import com.automation.service.integration.OutboundTarget;
 import com.automation.service.integration.providers.ical.CalendarParams;
 import org.springframework.stereotype.Component;
 
 import java.io.InputStream;
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
@@ -16,6 +18,8 @@ import java.time.Duration;
  * Depth / If-Match / If-None-Match headers, a response size cap and the error mapping the provider
  * relies on. Redirects are not followed — a redirect would carry the Basic-Auth header along — but
  * reported with their target so the user can enter the right URL. Messages never contain the password.
+ * The server is an {@link OutboundTarget#ownService() own service}: local targets are refused only
+ * with {@code private-network-guard-own-services} on.
  */
 @Component
 public class CalDavHttpClient {
@@ -23,10 +27,11 @@ public class CalDavHttpClient {
     static final long MAX_RESPONSE_BYTES = 10L * 1024 * 1024;
     private static final String XML = "application/xml; charset=utf-8";
 
-    private final HttpClient httpClient = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(10))
-            .followRedirects(HttpClient.Redirect.NEVER)
-            .build();
+    private final OutboundClient httpClient;
+
+    public CalDavHttpClient(OutboundHttp outbound) {
+        this.httpClient = outbound.client(OutboundTarget.ownService(), Duration.ofSeconds(10));
+    }
 
     /** Status, body and ETag of a successful call. */
     public record DavResult(int status, String body, String etag) {}
@@ -78,7 +83,7 @@ public class CalDavHttpClient {
             response = httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofInputStream());
             body = new String(CalendarParams.readBounded(response.body(), MAX_RESPONSE_BYTES, "CalDAV response"),
                     StandardCharsets.UTF_8);
-        } catch (IllegalStateException e) {
+        } catch (IllegalStateException | IllegalArgumentException e) {
             throw e;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

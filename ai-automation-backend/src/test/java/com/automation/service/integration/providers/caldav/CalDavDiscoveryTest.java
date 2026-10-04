@@ -1,5 +1,6 @@
 package com.automation.service.integration.providers.caldav;
 
+import com.automation.testsupport.TestTargetGuards;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -32,7 +33,7 @@ class CalDavDiscoveryTest {
     void start() throws Exception {
         server = new FakeDavServer();
         cred = CalDavCredentials.parse(server.base() + "/dav|alex:pw");
-        discovery = new CalDavDiscovery(new CalDavHttpClient());
+        discovery = new CalDavDiscovery(new CalDavHttpClient(TestTargetGuards.loopbackOnly()));
     }
 
     @AfterEach

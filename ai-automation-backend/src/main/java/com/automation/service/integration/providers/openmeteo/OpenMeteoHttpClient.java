@@ -1,12 +1,13 @@
 package com.automation.service.integration.providers.openmeteo;
 
+import com.automation.service.integration.OutboundClient;
+import com.automation.service.integration.OutboundHttp;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
@@ -28,9 +29,7 @@ public class OpenMeteoHttpClient {
     private final ObjectMapper objectMapper;
     private final String forecastUrl;
     private final String geocodingUrl;
-    private final HttpClient httpClient = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(10))
-            .build();
+    private final OutboundClient httpClient = OutboundHttp.fixedHost(Duration.ofSeconds(10));
 
     @Autowired
     public OpenMeteoHttpClient(ObjectMapper objectMapper) {

@@ -10,6 +10,7 @@ const FEATURES: Array<Pick<ModuleInfo, 'name' | 'tier' | 'maturity' | 'risks' | 
   { name: 'audit', tier: 'research', maturity: 'experimental', risks: [], requires: [] },
   { name: 'bpmn', tier: 'research', maturity: 'experimental', risks: [], requires: [] },
   { name: 'integrations', tier: 'advanced', maturity: 'stable', risks: ['credentials', 'network'], requires: [] },
+  { name: 'http-api', tier: 'advanced', maturity: 'experimental', risks: ['credentials', 'network'], requires: ['integrations'] },
   { name: 'webhooks', tier: 'advanced', maturity: 'stable', risks: ['network'], requires: [] },
   { name: 'remote-access', tier: 'advanced', maturity: 'stable', risks: ['network'], requires: [] },
   { name: 'terminal', tier: 'advanced', maturity: 'stable', risks: ['host-access'], requires: [] },
@@ -32,6 +33,7 @@ const HARDENING: Array<Pick<ModuleInfo, 'name' | 'requires'>> = [
   { name: 'webhook-signatures', requires: ['webhooks'] },
   { name: 'private-network-guard', requires: [] },
   { name: 'private-network-guard-http-api', requires: [] },
+  { name: 'private-network-guard-own-services', requires: [] },
 ];
 
 function envName(prefix: string, name: string) {

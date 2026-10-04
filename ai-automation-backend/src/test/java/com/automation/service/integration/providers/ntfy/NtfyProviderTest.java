@@ -1,6 +1,7 @@
 package com.automation.service.integration.providers.ntfy;
 
 import com.automation.service.integration.IntegrationVerification;
+import com.automation.testsupport.TestTargetGuards;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
@@ -20,7 +21,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class NtfyProviderTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final NtfyProvider provider = new NtfyProvider(objectMapper, new NtfyHttpClient(objectMapper));
+    private final NtfyProvider provider = new NtfyProvider(objectMapper, new NtfyHttpClient(objectMapper, TestTargetGuards.loopbackOnly()));
     private HttpServer server;
     private String base;
     private final AtomicReference<String> auth = new AtomicReference<>();
