@@ -37,12 +37,6 @@ const LANGUAGE_NEUTRAL = new Set([
   'global',
   'Hostname:',
   'Cron:',
-  'Online',
-  'Webhook',
-  'Desktop',
-  'Client ID',
-  'Client Secret',
-  'IP:',
   // Abbreviations, units, keys, code
   'BE',
   'FE',
@@ -53,14 +47,12 @@ const LANGUAGE_NEUTRAL = new Set([
   'ESC',
   '(Alt+ )',
   'async',
-  '· exit',
   'provider=',
   'model=',
   'requested=',
   ': sha256=<hex>',
   ': claude --resume',
   // Addresses and example values in input fields
-  '/home/user/projects/my-project',
   'localhost:8090',
   'localhost:9091',
   'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
@@ -74,6 +66,19 @@ const LANGUAGE_NEUTRAL = new Set([
   'tag1, tag2, tag3',
   'bug, performance, ux',
 ]);
+
+/**
+ * Text that reads the same in both languages only where it stands — a status, a product term, a field name, an
+ * example — so it is accepted in that file and nowhere else. Path relative to src/.
+ */
+const LANGUAGE_NEUTRAL_AT: Record<string, readonly string[]> = {
+  'components/AssistantPanel.tsx': ['Online'],
+  'components/settings/NotificationsCard.tsx': ['Webhook', 'Desktop'],
+  'components/integrations/SetupGuidePanel.tsx': ['Client ID', 'Client Secret'],
+  'components/settings/RemoteAccessCard.tsx': ['IP:'],
+  'components/workflow/CompressionPanel.tsx': ['· exit'],
+  'components/project/ProjectFormFields.tsx': ['/home/user/projects/my-project'],
+};
 
 interface Finding {
   file: string;
@@ -123,7 +128,7 @@ function scan(file: string, source: string): Finding[] {
   const add = (node: ts.Node, what: string, raws: string[]) => {
     for (const raw of raws) {
       const text = normalize(raw);
-      if (!isLanguageText(text)) continue;
+      if (!isLanguageText(text) || LANGUAGE_NEUTRAL_AT[file]?.includes(text)) continue;
       findings.push({ file, line: sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1, kind: what, text });
     }
   };
@@ -194,6 +199,13 @@ describe('hardcoded UI text', () => {
       'text: Literal child',
       'aria-label: Remove',
     ]);
+  });
+
+  // Review a5c9fbbf: a word that is neutral in one place stays a finding everywhere else
+  it('accepts place-bound neutral text only in its own file', () => {
+    const source = 'export const X = () => <p>Online {"Webhook"}</p>;';
+    expect(scan('components/Other.tsx', source).map((f) => f.text)).toEqual(['Online', 'Webhook']);
+    expect(scan('components/AssistantPanel.tsx', source).map((f) => f.text)).toEqual(['Webhook']);
   });
 
   // a5c9fbbf follow-up: "Hide items" / `Show ${n} items` in a ternary child slipped through
