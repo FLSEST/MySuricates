@@ -130,6 +130,29 @@ class StagingServiceTest {
     }
 
     @Test
+    void syncDefinitions_missingKeyFile_failsClearlyInsteadOfReadingTheDatabase() {
+        when(dockerManager.isHealthy(anyString())).thenReturn(true);
+        when(dockerManager.readApiKey("mysuricates-stable")).thenThrow(new com.automation.exception.LocalizedStateException(
+                com.automation.exception.ErrorMessage.CONTAINER_API_KEY_MISSING,
+                java.util.Map.of("container", "mysuricates-stable", "file", "/home/user/.mysuricates/api-key")));
+
+        assertThatThrownBy(() -> service.syncDefinitions())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("/home/user/.mysuricates/api-key");
+        verify(syncHelper, never()).syncDefinitionsTo(any(), any(), any());
+    }
+
+    @Test
+    void syncDefinitions_usesTheKeyFromTheContainersKeyFile() {
+        when(dockerManager.isHealthy(anyString())).thenReturn(true);
+        when(dockerManager.readApiKey("mysuricates-stable")).thenReturn("stable-key");
+
+        service.syncDefinitions();
+
+        verify(syncHelper).syncDefinitionsTo("http://localhost:9091/api/v1", "stable-key", null);
+    }
+
+    @Test
     void deriveStableBaseUrl_extractsFromHealthUrl() {
         config.setHealthUrl("http://localhost:9091/api/v1/system/health");
         assertThat(service.deriveStableBaseUrl()).isEqualTo("http://localhost:9091/api/v1");

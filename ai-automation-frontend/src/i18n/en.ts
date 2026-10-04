@@ -2272,6 +2272,8 @@ export const en = {
       NO_FAILED_RUNS: 'Workflow \'{name}\' has no failed runs',
       TEST_INSTANCE_NOT_RUNNING: 'Test instance is not running or not healthy. Start it first.',
       STABLE_INSTANCE_NOT_RUNNING: 'Stable instance is not running or not healthy. Start it first.',
+      CONTAINER_API_KEY_MISSING: 'Container {container} has no API key file ({file}) — the instance writes it at every start; restart it with a current build (scripts/staging.sh promote or test-promote)',
+      CONTAINER_API_KEY_UNREADABLE: 'Could not read the API key of container {container}: {error}',
       SYNC_TARGET_NOT_CONFIGURED: 'Sync target \'{target}\' is not configured on this instance',
       SYNC_TARGET_KEY_MISSING: 'No API key for sync target \'{target}\': {keyFile} is missing or empty — fetch it with scripts/instance.sh sync-keys',
       SYNC_TARGET_UNREACHABLE: 'Sync target \'{target}\' does not answer at {url}',

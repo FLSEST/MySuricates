@@ -181,6 +181,22 @@ class TestingServiceTest {
     }
 
     @Test
+    void syncDefinitions_missingKeyFile_returnsTheClearMessage() {
+        stagingConfig.setTestHealthUrl("http://localhost:8090/api/v1/system/health");
+        TestingService spied = spy(testingService);
+        doReturn(true).when(spied).isHealthy();
+        when(dockerContainerManager.readApiKey(anyString())).thenThrow(new com.automation.exception.LocalizedStateException(
+                com.automation.exception.ErrorMessage.CONTAINER_API_KEY_MISSING,
+                java.util.Map.of("container", "mysuricates-test", "file", "/home/user/.autotrigger/api-key")));
+
+        SyncResult result = spied.syncDefinitions();
+
+        assertThat(result.errors()).singleElement().asString()
+                .contains("/home/user/.autotrigger/api-key").contains("test-promote");
+        verify(instanceSyncHelper, never()).syncDefinitionsTo(anyString(), anyString(), any());
+    }
+
+    @Test
     void syncDefinitions_nullApiKey_returnsErrorResult() {
         stagingConfig.setTestHealthUrl("http://localhost:8090/api/v1/system/health");
         TestingService spied = spy(testingService);
