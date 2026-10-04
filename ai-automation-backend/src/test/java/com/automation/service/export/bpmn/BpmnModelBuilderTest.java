@@ -210,6 +210,22 @@ class BpmnModelBuilderTest {
         }
     }
 
+    /** a5c9fbbf: foreach mit workflow_id ruft je Item einen Workflow auf — CallActivity mit Multi-Instance. */
+    @Test
+    void foreachMitWorkflowIdWirdZuCallActivityMitMultiInstance() {
+        BpmnModel model = build(WorkflowFixtures.workflow("LoopWf", List.of(
+                WorkflowFixtures.block("foreach", "je Feature", Map.of(
+                        "variable_name", "feature", "workflow_id", "wf-feature")))));
+
+        assertThat(model.nodes).noneMatch(n -> n.kind == BpmnModel.Kind.SUB_PROCESS);
+        BpmnModel.Node call = model.nodes.stream()
+                .filter(n -> n.kind == BpmnModel.Kind.CALL_ACTIVITY).findFirst().orElseThrow();
+        assertThat(call.loop).isEqualTo("multiInstanceSequential");
+        assertThat(call.calledElement).isEqualTo("wf-feature");
+        assertThat(call.blockType).isEqualTo("foreach");
+        assertThat(call.name).isEqualTo("je Feature");
+    }
+
     @Test
     void whileWirdZuSubProcessMitStandardLoop() {
         BpmnModel model = build(WorkflowFixtures.workflow("While", List.of(
