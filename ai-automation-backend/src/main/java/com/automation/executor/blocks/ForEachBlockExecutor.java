@@ -85,7 +85,12 @@ public class ForEachBlockExecutor implements BlockExecutor {
         String workflowId = null;
         if (configuredWorkflow != null) {
             StringBuilder refusal = new StringBuilder();
+            Set<String> platformNames = subWorkflows.platformVariableNames();
+            String reserved = childMapping.keySet().stream()
+                    .map(name -> SubWorkflowLauncher.reservedReason(name, variableName, platformNames))
+                    .filter(java.util.Objects::nonNull).findFirst().orElse(null);
             if (command != null && !command.isBlank()) refusal.append("command and workflow_id exclude each other");
+            else if (reserved != null) refusal.append(reserved);
             else workflowId = SubWorkflowLauncher.resolveWorkflowId(configuredWorkflow, context, refusal);
             if (workflowId == null) return refused(aggregateResult, refusal.toString(), items.size());
             StepAiMetadata.put(aggregateResult, "subWorkflowId", workflowId);

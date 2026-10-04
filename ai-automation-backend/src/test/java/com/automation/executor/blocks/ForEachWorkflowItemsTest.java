@@ -197,4 +197,18 @@ class ForEachWorkflowItemsTest {
         verify(launcher, never()).run(anyString(), any(ExecutionContext.class));
         verify(commandExecutor, never()).executeStepOnHost(any(HostExecutionRequest.class));
     }
+
+    /** Review a5c9fbbf: `context` must not overwrite what the platform or the loop itself owns in the child. */
+    @Test
+    void contextMappingToAReservedName_failsTheBlockBeforeTheFirstItem() {
+        when(launcher.platformVariableNames()).thenReturn(java.util.Set.of("open_todos"));
+        for (String name : List.of("__parent_workflow_ids", "__untrusted_keys", "open_todos", "previous_output",
+                "feature", "feature_index", "feature.id", "workflow_id", "workflow_run_id", "trigger_source")) {
+            StepResult result = executor.execute(foreach(List.of("a"), Map.of("context", Map.of(name, "x"))), context);
+
+            assertThat(result.getStatus()).as(name).isEqualTo(StepStatus.FAILED);
+            assertThat(result.getOutput()).as(name).contains("context").contains(name);
+        }
+        verify(launcher, never()).run(anyString(), any(ExecutionContext.class));
+    }
 }

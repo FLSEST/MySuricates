@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Starts one child run of another workflow and waits for it — the mechanism behind the
@@ -78,6 +79,37 @@ public class SubWorkflowLauncher {
         public boolean started() {
             return subRunId != null;
         }
+    }
+
+    /**
+     * Values every run gets from the platform or its own start — {@code ContextDeltaCalculator.SYSTEM_VAR_KEYS}
+     * without the platform data (that comes from {@link #platformVariableNames()}); pinned against it in
+     * {@code SubWorkflowReservedNamesTest}.
+     */
+    static final Set<String> RUN_VARIABLES = Set.of("previous_output", "workflow_run_id", "workflow_id",
+            "workflow_name", "project_id", "project_path", "model", "provider", "effort", "started_at",
+            "run_timestamp", "workflow_version", "workflow_changed_since_last_run", "workflow_definition_hash",
+            "trigger_source");
+
+    /**
+     * Why foreach's {@code context} may not set {@code name} in the child, or null: reserved keys
+     * ({@code __…}: parent chain, taint, origin), platform data, the run's own values, and the loop's item
+     * variables — a mapping must not forge any of them.
+     */
+    public static String reservedReason(String name, String itemVariable, Set<String> platformNames) {
+        if (name.startsWith("__")) return "context may not set the reserved key " + name;
+        if (platformNames.contains(name) || RUN_VARIABLES.contains(name)) {
+            return "context may not set " + name + " — the platform sets it for every run";
+        }
+        if (name.equals(itemVariable) || name.equals(itemVariable + "_index") || name.startsWith(itemVariable + ".")) {
+            return "context may not set " + name + " — the loop sets it per item";
+        }
+        return null;
+    }
+
+    /** Names the platform injects into every run itself; a value handed to a child must not stand in for them. */
+    public Set<String> platformVariableNames() {
+        return contextDataService.platformVariableNames();
     }
 
     /**
