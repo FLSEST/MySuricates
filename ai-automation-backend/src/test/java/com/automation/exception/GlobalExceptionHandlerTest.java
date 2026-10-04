@@ -425,16 +425,24 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody().getError()).endsWith(": 90 -> 30 days");
     }
 
-    /** fe06ebf9: a 404 must leave a trace — WARN with method and path, without a stack trace. */
+    /**
+     * fe06ebf9: a 404 after a write (POST retry/resume …) must leave a trace — WARN with method and
+     * path, without a stack trace. Review w8: GET 404s come from polling (run pages, stale ids) and
+     * stay on DEBUG, or they would flood the log.
+     */
     @Test
-    void notFoundHandlers_logWarnWithMethodAndPath_withoutStackTrace() {
+    void notFoundHandlers_warnForWrites_debugForGetPolling_withoutStackTrace() {
+        MockHttpServletRequest retry = new MockHttpServletRequest("POST", "/api/v1/executions/run-2/retry");
         Logger logger = (Logger) LoggerFactory.getLogger(GlobalExceptionHandler.class);
         Level previousLevel = logger.getLevel();
         ListAppender<ILoggingEvent> appender = new ListAppender<>();
         appender.start();
         logger.addAppender(appender);
-        logger.setLevel(Level.WARN); // logback-test.xml quiets the test log
+        logger.setLevel(Level.DEBUG); // logback-test.xml quiets the test log
         try {
+            handler.handleNotFound(new ResourceNotFoundException("Execution", "run-2"), retry);
+            handler.handleNoSuchElement(new NoSuchElementException("Element missing"), retry);
+            handler.handleEntityNotFound(new jakarta.persistence.EntityNotFoundException("Run not found"), retry);
             handler.handleNotFound(new ResourceNotFoundException("Execution", "run-2"), GET_RUN);
             handler.handleNoSuchElement(new NoSuchElementException("Element missing"), GET_RUN);
             handler.handleEntityNotFound(new jakarta.persistence.EntityNotFoundException("Run not found"), GET_RUN);
@@ -444,10 +452,14 @@ class GlobalExceptionHandlerTest {
             appender.stop();
         }
 
-        assertThat(appender.list).hasSize(3).allSatisfy(event -> {
+        assertThat(appender.list).hasSize(6).allSatisfy(event -> assertThat(event.getThrowableProxy()).isNull());
+        assertThat(appender.list.subList(0, 3)).allSatisfy(event -> {
             assertThat(event.getLevel()).isEqualTo(Level.WARN);
+            assertThat(event.getFormattedMessage()).contains("POST /api/v1/executions/run-2/retry");
+        });
+        assertThat(appender.list.subList(3, 6)).allSatisfy(event -> {
+            assertThat(event.getLevel()).isEqualTo(Level.DEBUG);
             assertThat(event.getFormattedMessage()).contains("GET /api/v1/executions/run-2");
-            assertThat(event.getThrowableProxy()).isNull();
         });
         assertThat(appender.list.get(0).getFormattedMessage()).contains("Execution not found with id: run-2");
     }

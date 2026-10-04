@@ -25,9 +25,9 @@ import java.util.NoSuchElementException;
 @Slf4j
 public class GlobalExceptionHandler {
 
-    // The three "not found" handlers log at WARN with method and path (no stack trace): a 404 right
-    // after a write (e.g. a retry whose new run the client then could not load) used to leave no
-    // trace at all in the log — TODO fe06ebf9.
+    // The three "not found" handlers log method and path (no stack trace): a 404 on a write (e.g. a
+    // retry or resume) used to leave no trace at all — WARN, TODO fe06ebf9. GET/HEAD 404s are routine
+    // polling of stale or deleted ids (run pages, lists) and stay on DEBUG so they do not flood the log.
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleNotFound(ResourceNotFoundException ex, HttpServletRequest request) {
         logNotFound(request, ex.getMessage());
@@ -217,7 +217,12 @@ public class GlobalExceptionHandler {
     }
 
     private static void logNotFound(HttpServletRequest request, String message) {
-        log.warn("Not found: {} {} – {}", request.getMethod(), request.getRequestURI(), message);
+        String method = request.getMethod();
+        if ("GET".equals(method) || "HEAD".equals(method)) {
+            log.debug("Not found: {} {} – {}", method, request.getRequestURI(), message);
+        } else {
+            log.warn("Not found: {} {} – {}", method, request.getRequestURI(), message);
+        }
     }
 
     private ResponseEntity<ErrorResponse> respond(ErrorCode code, String message) {
