@@ -621,6 +621,7 @@ export const en = {
   workflows: {
     dragToReorder: 'Drag to reorder',
     foreachItems: '{done}/{total} items',
+    foreachChildRun: 'Child run',
     title: 'Workflows',
     subtitle: 'Build and manage automation workflows',
     create: 'New Workflow',
@@ -809,6 +810,8 @@ export const en = {
     approveTodos: 'Create todos',
     rejectTodos: 'Dismiss',
     selectSubWorkflow: 'Select sub-workflow',
+    foreachWorkflow: 'Sub-workflow per item (instead of a command)',
+    foreachWorkflowNone: 'None – run the command per item',
     optimize: 'Optimize with AI',
     optimizing: 'Optimizing...',
     optimizeResult: 'Optimization Suggestion',

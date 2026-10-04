@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { CheckCircle2, AlertCircle, ChevronDown, ChevronRight, List } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { CheckCircle2, AlertCircle, ChevronDown, ChevronRight, ExternalLink, List } from 'lucide-react';
 import { Badge } from '../ui';
 import { useT } from '../../i18n';
 import { PathLinkedOutput } from '../shared/PathLinkedOutput';
@@ -13,27 +14,39 @@ interface ForEachItemRowProps {
 }
 
 function ForEachItemRow({ item }: ForEachItemRowProps) {
+  const t = useT();
   const [expanded, setExpanded] = useState(false);
 
   return (
     <div className="border border-border rounded-lg overflow-hidden">
-      <button
-        className="w-full flex items-center gap-2 p-2 hover:bg-surface-raised transition-colors text-left"
-        onClick={() => setExpanded(!expanded)}
-      >
-        {item.status === 'running' ? (
-          <div className="w-4 h-4 rounded-full border-2 border-accent border-t-transparent animate-spin shrink-0" />
-        ) : item.status === 'completed' ? (
-          <CheckCircle2 className="w-4 h-4 text-success shrink-0" />
-        ) : (
-          <AlertCircle className="w-4 h-4 text-danger shrink-0" />
+      <div className="flex items-center">
+        <button
+          className="flex-1 min-w-0 flex items-center gap-2 p-2 hover:bg-surface-raised transition-colors text-left"
+          onClick={() => setExpanded(!expanded)}
+        >
+          {item.status === 'running' ? (
+            <div className="w-4 h-4 rounded-full border-2 border-accent border-t-transparent animate-spin shrink-0" />
+          ) : item.status === 'completed' ? (
+            <CheckCircle2 className="w-4 h-4 text-success shrink-0" />
+          ) : (
+            <AlertCircle className="w-4 h-4 text-danger shrink-0" />
+          )}
+          <span className="text-xs font-mono text-text flex-1 truncate">{item.item}</span>
+          <Badge variant={item.status === 'completed' ? 'success' : item.status === 'failed' ? 'danger' : 'default'}>
+            {item.status}
+          </Badge>
+          {item.output && (expanded ? <ChevronDown className="w-3 h-3 text-text-tertiary shrink-0" /> : <ChevronRight className="w-3 h-3 text-text-tertiary shrink-0" />)}
+        </button>
+        {item.subRunId && (
+          <Link
+            to={`/runs/${item.subRunId}`}
+            className="flex items-center gap-1 px-2 text-xs text-accent hover:underline shrink-0"
+          >
+            <ExternalLink className="w-3 h-3" />
+            {t.workflows.foreachChildRun}
+          </Link>
         )}
-        <span className="text-xs font-mono text-text flex-1 truncate">{item.item}</span>
-        <Badge variant={item.status === 'completed' ? 'success' : item.status === 'failed' ? 'danger' : 'default'}>
-          {item.status}
-        </Badge>
-        {item.output && (expanded ? <ChevronDown className="w-3 h-3 text-text-tertiary shrink-0" /> : <ChevronRight className="w-3 h-3 text-text-tertiary shrink-0" />)}
-      </button>
+      </div>
       {expanded && item.output && (
         <div className="border-t border-border p-2 bg-surface">
           <pre className="text-xs text-text font-mono whitespace-pre-wrap max-h-32 overflow-y-auto">

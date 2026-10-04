@@ -623,6 +623,7 @@ export const de: TranslationKeys = {
   workflows: {
     dragToReorder: 'Zum Umsortieren ziehen',
     foreachItems: '{done}/{total} Elemente',
+    foreachChildRun: 'Kind-Lauf',
     title: 'Workflows',
     subtitle: 'Erstelle und verwalte Automatisierungs-Workflows',
     create: 'Neuer Workflow',
@@ -811,6 +812,8 @@ export const de: TranslationKeys = {
     approveTodos: 'Todos anlegen',
     rejectTodos: 'Ablehnen',
     selectSubWorkflow: 'Sub-Workflow auswählen',
+    foreachWorkflow: 'Sub-Workflow je Eintrag (statt Befehl)',
+    foreachWorkflowNone: 'Keiner – Befehl je Eintrag ausführen',
     optimize: 'Mit KI optimieren',
     optimizing: 'Optimiere...',
     optimizeResult: 'Optimierungsvorschlag',

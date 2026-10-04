@@ -27,6 +27,11 @@ function caseBlocks(config: Record<string, unknown>): RawBlock[] {
   return [...fromCases, ...(Array.isArray(config.default) ? (config.default as RawBlock[]) : [])];
 }
 
+/** foreach with `workflow_id` runs a whole workflow per item (TODO a5c9fbbf). */
+function startsWorkflowPerItem(type: string, config: Record<string, unknown>): boolean {
+  return type === 'foreach' && typeof config.workflow_id === 'string' && config.workflow_id.trim() !== '';
+}
+
 /**
  * Which execution modes (shell / AI / approval) a block list uses, in first-seen order.
  *
@@ -35,7 +40,8 @@ function caseBlocks(config: Record<string, unknown>): RawBlock[] {
  * through a `simple` case block that does not run as shell; a sub-workflow, because the workflow
  * it starts is not part of this definition — unless it still names one of `shippedBlueprints` (a
  * blueprint package before installation, TODO 093d2f11, like `ModelUse.needsAiAsBlueprint`), whose
- * cost `BlueprintGateTest` pins. Without that list the prefix alone promises nothing.
+ * cost `BlueprintGateTest` pins. Without that list the prefix alone promises nothing. A foreach with
+ * `workflow_id` counts like a sub-workflow.
  */
 export function getExecutionModes(blocks: BlockDefinition[], shippedBlueprints?: ReadonlySet<string>): ExecutionMode[] {
   const modes = new Set<ExecutionMode>();
@@ -44,7 +50,7 @@ export function getExecutionModes(blocks: BlockDefinition[], shippedBlueprints?:
     const config = configOf(b);
     if (t === 'shell') modes.add('shell');
     else if (MODEL_TYPES.has(t)) modes.add('ai');
-    else if (t === 'sub-workflow') {
+    else if (t === 'sub-workflow' || startsWorkflowPerItem(t, config)) {
       const id = config.workflow_id;
       if (!(typeof id === 'string' && id.startsWith(BLUEPRINT_PREFIX) && shippedBlueprints?.has(id))) modes.add('ai');
     }
