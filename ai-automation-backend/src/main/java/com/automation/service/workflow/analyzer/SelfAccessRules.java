@@ -37,6 +37,11 @@ import java.util.regex.Pattern;
  *   <li>Außerhalb des Shell-Codes (KI-Auftrag) meldet die Regel nur einen lokalen Endpunkt mit Aufrufer
  *       in der Nähe, und nur als {@code MEDIUM} „prüfen": Ob die KI den Aufruf wirklich ausführt, lässt
  *       sich am Text nicht entscheiden.</li>
+ *   <li>Die Schlüsseldatei der Instanz ({@code ~/.mysuricates/api-key}, {@code ~/.autotrigger/api-key},
+ *       {@code $AUTOMATION_DATA_HOME/api-key}, {@code $(data_home …)/api-key}) im Shell-Code ist
+ *       {@code HIGH} — auch ohne {@code curl} danach (TODO ee8bb93d): Wer den Schlüssel liest, hält ihn
+ *       im Klartext, egal wohin er ihn weiterreicht. Im KI-Auftrag nur {@code MEDIUM} „prüfen". Der
+ *       Pool meldet dieselben Pfade als Zugangsdaten ({@code HYGIENE_POOL_CREDENTIAL_MARKERS}).</li>
  *   <li>{@code sqlite3} allein ist dort schon ein Befund, hier nur {@code MEDIUM} „prüfen": Ein
  *       Live-Workflow darf mit der SQLite-Datei seines Projekts arbeiten. {@code HIGH} wird es erst mit
  *       dem Namen der Plattform-DB ({@code automation.db}, {@code automation-dev.db}) oder der
@@ -70,6 +75,10 @@ final class SelfAccessRules {
 
     /** Wie im Skript: gut eine Befehlszeile um die Fundstelle. */
     private static final int WINDOW = 200;
+
+    /** Die Schlüsseldatei der Instanz im Datenordner (DataHome, InstanceAddress.apiKeyFile). */
+    private static final Pattern KEY_FILE = Pattern.compile(
+            "(?:\\.mysuricates|\\.autotrigger|AUTOMATION_DATA_HOME}?|\\bdata_home\\b[^\\n]{0,60}?)/api-key\\b");
 
     private static final Pattern SQLITE = Pattern.compile("\\bsqlite3\\b");
     private static final Pattern PLATFORM_DB = Pattern.compile("\\bautomation(-[a-z]+)?\\.db\\b");
@@ -117,6 +126,17 @@ final class SelfAccessRules {
                 return;
             }
         }
+        for (String code : shell) {
+            Matcher keyFile = KEY_FILE.matcher(withoutCommentLines(code));
+            if (keyFile.find()) {
+                out.add(AnalyzerFinding.of("self-api-call", Severity.HIGH, i, name,
+                        "liest im Shell-Code den API-Schlüssel der Instanz ('" + keyFile.group() + "') — damit"
+                                + " hält der Block ihn im Klartext, auch ohne Aufruf der REST-API" + ALTERNATIVE,
+                        "reads the instance's API key in shell code ('" + keyFile.group() + "') — the block then"
+                                + " holds it in plain text, even without calling the REST API" + ALTERNATIVE_EN));
+                return;
+            }
+        }
         for (String text : all) {
             if (shell.contains(text)) continue;
             String hit = firstSelfEndpoint(text, true);
@@ -126,6 +146,18 @@ final class SelfAccessRules {
                                 + " KI ihn ausführen soll" + ALTERNATIVE,
                         "the prompt mentions a call to the instance's own REST API ('" + hit + "') — check whether"
                                 + " the AI is meant to make it" + ALTERNATIVE_EN));
+                return;
+            }
+        }
+        for (String text : all) {
+            if (shell.contains(text)) continue;
+            Matcher keyFile = KEY_FILE.matcher(text);
+            if (keyFile.find()) {
+                out.add(AnalyzerFinding.of("self-api-call", Severity.MEDIUM, i, name,
+                        "der Auftrag nennt die Schlüsseldatei der Instanz ('" + keyFile.group() + "') — prüfen,"
+                                + " ob die KI sie lesen soll" + ALTERNATIVE,
+                        "the prompt mentions the instance's key file ('" + keyFile.group() + "') — check whether"
+                                + " the AI is meant to read it" + ALTERNATIVE_EN));
                 return;
             }
         }
