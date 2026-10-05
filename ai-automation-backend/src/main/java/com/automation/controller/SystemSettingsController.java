@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** Laufzeit-Settings unter /api/v1/system: App-Settings und Execution-Config. */
+/** Runtime settings under /api/v1/system: application settings and execution config. */
 @RestController
 @RequestMapping("/api/v1/system")
 @RequiredArgsConstructor
@@ -42,7 +42,8 @@ public class SystemSettingsController {
 
     /**
      * Stores an application setting from {@code value} in the body.
-     * Keys outside the allowed list, or a missing {@code value}, are 400.
+     * Keys outside the allowed list, or a missing {@code value}, are 400. {@code backup-retain-count} takes
+     * 1–365, checked before anything is stored, and applies from the next backup rotation on, also after a restart.
      */
     @PutMapping("/settings/{key}")
     public ResponseEntity<Void> setSetting(@PathVariable String key, @RequestBody Map<String, String> body) {
@@ -66,6 +67,8 @@ public class SystemSettingsController {
     /**
      * Changes execution settings with immediate effect and returns the full current set.
      * All values are checked before any is applied, so an invalid one (400) leaves every setting unchanged.
+     * Keys are the kebab-case names or their camelCase aliases; an unknown key or a value outside its bounds
+     * ({@code ExecutionSettingKeys.BOUNDS}) is 400. Stored values are applied again after a restart.
      */
     @PutMapping("/execution-config")
     public ResponseEntity<?> updateExecutionConfig(@RequestBody Map<String, String> settings) {

@@ -54,7 +54,7 @@ Workflows, die an Dinge denken, die in einer Sitzung vergessen gingen.
 | Baustein | | Wozu |
 |---|---|---|
 | Vorlagen, Pool, Blaupausen | Kern | Fertige Workflows übernehmen und anpassen; Blaupausen sind Grundgerüste zum Ausfüllen. → [Pool](../workflow-pool/README.md) |
-| Auslöser | Kern | Zeitplan, Folge auf einen Lauf, Folge auf ein TODO. → [Zugänge](konzepte/zugaenge.md) · Zum Ausprobieren: Blaupausen „Per Zeitplan starten“, „Von einem TODO-Trigger gestartet“, „Per Webhook starten (mit Signatur)“ (+full). |
+| Auslöser | Kern | Zeitplan, Folge auf einen Lauf, Folge auf ein TODO. → [Zugänge](konzepte/zugaenge.md) · Zum Ausprobieren: Blaupausen „Per Zeitplan starten“, „Von einem TODO-Trigger gestartet“, „Per Webhook starten (mit Signatur)“ (+full, Schalter `webhook-signatures`). |
 | Teil-Workflows | Kern | Ein Workflow ruft einen anderen auf, auch einmal je Eintrag einer Liste. Zum Ausprobieren: Blaupause „Teil-Workflow aufrufen (Paket)“. |
 | Ziele | Kern | TODOs und Workflows auf ein Ergebnis hin bündeln. Zum Ausprobieren: Vorlage „Ziel-Wächter“. |
 | Dashboard-Bericht | Kern | Ein Workflow legt sein Ergebnis als Kachel aufs Dashboard. Zum Ausprobieren: Blaupause „Ergebnis melden“. |

@@ -25,9 +25,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Hilfen rund um einen bestehenden Workflow: Optimierungsvorschlag, ähnliche Workflows,
- * Reparatur nach fehlgeschlagenen Runs. Aus {@link WorkflowController} herausgelöst
- * (6c2a2ad7), Pfade unverändert.
+ * Help with an existing workflow: optimization suggestion, similar workflows, repair after failed
+ * runs. Split off from {@link WorkflowController} (6c2a2ad7), paths unchanged.
  */
 @RestController
 @RequestMapping("/api/v1/workflows")
@@ -52,7 +51,7 @@ public class WorkflowAssistController {
 
     /**
      * Lists other workflows whose block types overlap with this one, most similar first, at most {@code limit}
-     * entries.
+     * entries. {@code limit} defaults to 5 and is capped at 20.
      */
     @GetMapping("/{id}/similar")
     public List<Map<String, Object>> getSimilarWorkflows(

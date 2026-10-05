@@ -32,7 +32,8 @@ public class ConversionController {
     /**
      * Creates a workflow from a run's suggestion in the given project.
      * With {@code blocks} (the reviewed suggestion) exactly these are saved without a new AI call, and {@code name} is required;
-     * without them the suggestion is generated again.
+     * without them the suggestion is generated again. An unknown run is 404, a run that is not COMPLETED or has nothing
+     * to convert is 409; the answer is 200 with the new workflow.
      */
     @PostMapping("/runs/{runId}/create-workflow")
     public ResponseEntity<WorkflowResponse> createWorkflow(

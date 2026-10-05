@@ -55,7 +55,8 @@ public class ScheduleController {
 
     /**
      * Lists the runs still due today.
-     * {@code projectId} (optional): only the schedules of that project's workflows — the dashboard filter.
+     * {@code projectId} (optional): only the schedules of that project's workflows — the dashboard filter;
+     * chains belong to no project and are left out then.
      */
     @GetMapping("/remaining-today")
     public UpcomingScheduleResponse getRemainingToday(@RequestParam(required = false) String projectId) {
@@ -82,9 +83,9 @@ public class ScheduleController {
     static final int CALENDAR_RUNS_MAX_LIMIT = 5000;
 
     /**
-     * Die neuesten Runs eines Zeitplans als Listenzeilen: Anzahl und Vorschau des letzten Schritts
-     * statt aller Schritte (TODO 168e3d7f) — die Detail-Route eines Runs liefert den Volltext. Je Art
-     * hoechstens {@code limit}, dazu die Gesamtzahl (TODO 86777fb4).
+     * Lists a schedule's newest workflow and chain runs as list rows, with step count and last-step preview.
+     * The detail route of a run has the full text (TODO 168e3d7f). At most {@code limit} per kind
+     * (default 50, clamped to 1–500), plus the total of each (TODO 86777fb4).
      */
     @GetMapping("/{id}/runs")
     @Transactional(readOnly = true)
@@ -112,7 +113,8 @@ public class ScheduleController {
     /**
      * Returns the calendar data between {@code from} and {@code to}: upcoming schedules and past runs.
      * Upcoming = schedules whose next real run lies in the period (behind a skip-until pause). Past
-     * runs: the newest {@code limit} of the period plus their total (TODO 86777fb4).
+     * runs: the newest {@code limit} of the period plus their total (TODO 86777fb4). {@code from} and
+     * {@code to} are required; {@code limit} defaults to 1000 and is clamped to 1–5000.
      */
     @GetMapping("/calendar")
     @Transactional(readOnly = true)
@@ -127,7 +129,8 @@ public class ScheduleController {
 
     /**
      * Previews the next run times of the cron expression in {@code cronExpression}.
-     * A missing or invalid expression is 400; during a skip-until pause the times start after it and {@code pausedUntil} is set.
+     * It returns 5 times. A missing or invalid expression is 400; during a skip-until pause the times start
+     * after it and {@code pausedUntil} is set.
      */
     @PostMapping("/preview")
     public ResponseEntity<?> previewCron(@RequestBody Map<String, String> body) {
@@ -150,6 +153,8 @@ public class ScheduleController {
     /**
      * Creates a schedule for a workflow ({@code workflowId}) or a chain ({@code targetType: CHAIN}, {@code chainId}) and answers 201.
      * Unknown enum values, an invalid cron expression or a schedule without any run left are 400.
+     * {@code targetType}, {@code scheduleType} and {@code conflictBehavior} are trimmed and ignore case;
+     * the defaults are {@code WORKFLOW}, {@code CRON} and {@code SKIP}.
      */
     @PostMapping
     public ResponseEntity<ScheduledWorkflowResponse> createSchedule(

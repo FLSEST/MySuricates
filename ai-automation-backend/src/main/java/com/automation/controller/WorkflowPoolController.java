@@ -61,7 +61,9 @@ public class WorkflowPoolController {
 
     /**
      * Writes the workflow as a new pool file and answers {@code 201}; instance bindings such as ids are removed
-     * and listed in {@code sanitizedPaths}.
+     * and listed in {@code sanitizedPaths}. Id keys ({@code projectId}, {@code workflowId}, ...) with a concrete value
+     * and UUID values are dropped, placeholders like {@code {{ project_id }}} stay, and a UUID inside a text becomes
+     * {@code REDACTED-UUID}. An unknown {@code scope} is 400.
      *
      * @param scope {@code repo}, {@code portable} oder {@code external} — Pool-Metadatum, ohne Angabe {@code portable}.
      *              Regelwerk: {@code docs/workflow-pool-kuratierung.md}.

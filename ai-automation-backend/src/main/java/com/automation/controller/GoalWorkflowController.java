@@ -15,11 +15,11 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 /**
- * Workflows am Ziel oder an einem Arbeitspaket (TODO 52bc1e8c Ziele Stufe 3): anzeigen, anhaengen,
- * Rolle aendern, loesen. Gestartet wird ueber {@code POST /api/v1/workflows/{id}/execute} mit
- * {@code goal_id} (und optional {@code work_package_id}, {@code goal_locale}) im Kontext; den Stand
- * liefert {@code GET /api/v1/dashboard/workflow-results}. Ein eingeschalteter Ziel-Waechter steht als
- * Eintrag {@code "guard"} zuerst in der Liste.
+ * Workflows on a goal or one of its work packages (TODO 52bc1e8c Ziele Stufe 3): list, attach, change
+ * role, detach. They are started through {@code POST /api/v1/workflows/{id}/execute} with
+ * {@code goal_id} (and optionally {@code work_package_id}, {@code goal_locale}) in the context; their
+ * state comes from {@code GET /api/v1/dashboard/workflow-results}. A goal guard that is switched on is
+ * listed first as the entry {@code "guard"}.
  */
 @RestController
 @RequiresModule(ModuleCatalog.GOALS)
@@ -55,7 +55,7 @@ public class GoalWorkflowController {
         return goalWorkflowService.updateRole(goalId, attachmentId, request.role());
     }
 
-    /** Loest die Zuordnung, der Workflow bleibt; {@code guard} → 400 (der Waechter hat seinen Schalter). */
+    /** Detaches the workflow, which itself stays; {@code guard} → 400 (the guard has its own switch). */
     @DeleteMapping("/{attachmentId}")
     public ResponseEntity<Void> detach(@PathVariable String goalId, @PathVariable String attachmentId) {
         goalWorkflowService.detach(goalId, attachmentId);

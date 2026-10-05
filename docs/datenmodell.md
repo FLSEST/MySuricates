@@ -591,13 +591,14 @@ Speichert Assistenten-Chat-Sessions für das Floating-Chat-Panel (V41, V58).
 | Spalte | Typ | Constraints | Beschreibung |
 |---|---|---|---|
 | `id` | TEXT | PK | UUID |
-| `page` | TEXT | NOT NULL, UNIQUE | Seiten-Identifier |
+| `page` | TEXT | NOT NULL | Seiten-Identifier |
+| `locale` | TEXT | NOT NULL, DEFAULT 'de' | Sprache des Vorschlagssatzes; `UNIQUE (page, locale)` |
 | `suggestions` | TEXT | NOT NULL, DEFAULT '[]' | JSON-Array der Vorschläge |
 | `generated_by` | TEXT | NOT NULL, DEFAULT 'CLAUDE' | Generator (z.B. `CLAUDE`) |
-| `generated_at` | TEXT | NOT NULL | Generierungszeitpunkt |
+| `generated_at` | REAL | NOT NULL | Generierungszeitpunkt |
 | `based_on_sessions` | INTEGER | NOT NULL, DEFAULT 0 | Anzahl zugrunde liegender Sessions |
 
-KI-generierte Aktionsvorschläge pro Seite, basierend auf Assistenten-Sessions (V42).
+KI-generierte Aktionsvorschläge pro Seite und Sprache, basierend auf Assistenten-Sessions (V42; seit V91 je Sprache ein Satz, der Bestand gilt als deutsch).
 
 ### `integration_connections`
 
@@ -970,4 +971,4 @@ Die Migrationen liegen unter `ai-automation-backend/src/main/resources/db/migrat
 - **Busy Timeout:** 10 Sekunden (`?busy_timeout=10000`)
 - **Connection Pool:** HikariCP mit max. 1 Verbindung (SQLite erlaubt nur einen gleichzeitigen Schreibzugriff; Pool-Size=1 serialisiert alle DB-Operationen)
 - **Dialect:** `org.hibernate.community.dialect.SQLiteDialect`
-- **NIEMALS direkt in die DB schreiben** (via `sqlite3` CLI oder SQL). Immer REST-API oder Service/Repository-Layer verwenden — direkte Schreibzugriffe umgehen den Hibernate-Cache und verursachen inkonsistenten Zustand.
+- **NIEMALS direkt auf die DB zugreifen, weder lesend noch schreibend** (via `sqlite3` CLI oder SQL – auch nicht aus Workflow-Shell-Blöcken oder Skripten). Immer REST-API oder Service/Repository-Layer verwenden — direkter Zugriff umgeht den Hibernate-Cache, verursacht inkonsistenten Zustand und konkurriert um die eine Verbindung (HikariCP pool-size=1).

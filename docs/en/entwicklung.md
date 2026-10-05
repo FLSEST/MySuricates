@@ -125,7 +125,11 @@ the type to `BLOCK_TYPES` (`src/types/index.ts`), `BlockTypesIndexSection` and
 `BlockSpecs` (`BlockSpecConfigKeysGateTest` checks every key named there against the executor) and,
 for the editor, add the starting config and the keys to `src/data/blockDefaultConfig.json` and
 `src/data/blockConfigSchema.json` (`blockConfigSchema.test.ts`). If the type belongs to a module, it goes
-into `executor/BlockTypeModules`.
+into `executor/BlockTypeModules`. If the type calls an AI, it also goes into `AI_BLOCK_TYPES`
+(`src/types/index.ts`: the editor fields `provider`/`model`/`effort`, equal to `ai.blockTypes` in the
+schema, `blockConfigSchema.test.ts`), into `executor/ModelUse` (`needsAi`: the AI badge and the "Runs
+without AI" filter of the templates) and into `ALWAYS_AI_BLOCK_TYPES` in `components/workflow/stepMetadata.ts`
+(the step kind in a run).
 
 **New table.** A Flyway migration `V{N}__description.sql` under `src/main/resources/db/migration/` —
 determine the next number fresh (`ls ai-automation-backend/src/main/resources/db/migration | sort -V | tail -1`),
@@ -1145,6 +1149,9 @@ Hand ändern -->` and a hand-written introduction from `scripts/docs-reference/<
 everything after it comes from the source, a change by hand does not last. Whatever a table lacks belongs
 in the source: the purpose of an endpoint is the first sentence of its handler method's Javadoc (without
 Javadoc the cell stays empty), the explanation of a config key is its `doc` text in the schema.
+The first sentence is English, because the same cell appears in the English version too. Further
+sentences of the Javadoc appear below the area's table as “Notes” – that is where the rules a caller must
+know belong (status codes and their meaning, limits, conflicts, side effects), not field lists.
 
 `docs_parity_check.py` calls `--check` and reports a stale page as a finding. So the check applies
 wherever the documentation gate runs, the pre-push gate included: whoever changes an endpoint, its
@@ -1178,7 +1185,7 @@ pinned through an `overrides` entry in `package.json` — like `dompurify`, whic
   first row yields NULL. Model: `WorkflowRunProjectionRepository.findOriginColumns` with
   `WorkflowRunProjectionRepositoryTest`. Columns with a declared type (`w.name`) and JPQL queries are not
   affected.
-- **NEVER write directly to the DB** (via `sqlite3` CLI or SQL). Always use the REST API or service/repository layer — direct writes bypass the Hibernate cache.
+- **NEVER access the DB directly, neither reading nor writing** (via `sqlite3` CLI or SQL – not from workflow shell blocks or scripts either). Always use the REST API or service/repository layer — direct access bypasses the Hibernate cache and competes for the single connection (HikariCP pool-size=1).
 
 ### Docker Dependency
 

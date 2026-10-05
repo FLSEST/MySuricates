@@ -113,10 +113,10 @@ Runs a command on the host, with `container_image` in a container ([Execution En
 **Placeholders in shell commands** – the rules you need to know:
 
 - Values from outside (webhook payload including `git_*`) as well as `{{ previous_report }}` and `{{ open_todos }}` are **always** put in single quotes by the platform in shell commands (never in AI prompts). A run that carries such data is *tainted*: from then on block outputs (`{{ previous_output }}`, `{{ block.<name>.output }}`, `{{ step_N_output }}`, `foreach` items) are quoted too, in sub-workflows and after a resume as well. The same applies once platform data stood in the prompt of an AI block and its output is recorded.
-- So write such placeholders **unquoted** and give the block `"shell_escape_variables": true`. Inside your own quotes the escaping does nothing: `PREV='{{ previous_output }}'` becomes `PREV=''x; id''` for the value `x; id` and runs `id`. Without the option the value arrives raw in clean runs. Safe form: `set -- {{ previous_output }}` and then `ANSWER="${1:-}"` (for the shipped definitions `TemplateHygieneGateTest` and `PlatformPromptQuotingGateTest` enforce it).
+- So write such placeholders **unquoted** and give the block `"shell_escape_variables": true`. Inside your own quotes the escaping does nothing: `PREV='{{ previous_output }}'` becomes `PREV=''x; id''` for the value `x; id` and runs `id`. Without the option, values from `defaultContext` and system variables stay raw, and so do all block outputs in runs without outside data (schedule, manual start, TodoTrigger, chain) – a multi-line value then splits the command. Safe form: `set -- {{ previous_output }}` and then `ANSWER="${1:-}"` (for the shipped definitions `TemplateHygieneGateTest` and `PlatformPromptQuotingGateTest` enforce it).
 - An unset variable stays literally in place: `set -- {{ source_dir }}; SOURCE_DIR="$*"`, recognisable by `[ "$SOURCE_DIR" = "{{ source_dir }}" ]`.
 - In a quoted heredoc (`<<'PY'`) a placeholder ends up as source code in the interpreter. Pass values on the shell line (`PROJECT_ID={{ project_id }} python3 - <<'PY'`, in the script `os.environ['PROJECT_ID']`); shell blocks get no other environment variables.
-- `scripts/lib/shell_placeholder_audit.py <definitions.json>` classifies every output placeholder in shell fields by its role and reports only what needs a change (exit 1 = finding).
+- `scripts/lib/shell_placeholder_audit.py <definitions.json>` classifies every output placeholder in shell fields by its role and reports only what needs a change (exit 1 = finding). Its input is the answer of `GET /api/v1/workflows` or a pool file; the script fetches nothing itself. Placeholders in the body of a heredoc count as harmless there and must not be escaped, or quotes end up in the text.
 
 Trust model: [deployment.md → Three trust classes](deployment.md#three-trust-classes-for-context-values).
 
@@ -129,7 +129,7 @@ An autonomous loop of REASON and ACT per iteration – the most powerful and mos
   "success_criteria": "index.html contains every section.", "max_iterations": 8, "timeout_seconds": 600 } }
 ```
 
-- `max_total_tokens` counts per iteration `inputTokens` + `outputTokens` of REASON and ACT, cache tokens (`cacheReadInputTokens`, `cacheCreationInputTokens`) deliberately not – counted, the usual budgets would break in the first iteration already. Codex and Pi report no real numbers; there the estimate counts (characters / 4, `estimated: true`). It is checked after every iteration; if the sum is above the budget, the block ends with `[TOKEN BUDGET EXCEEDED: …]`.
+- `max_total_tokens` counts per iteration `inputTokens` + `outputTokens` of REASON and ACT, cache tokens (`cacheReadInputTokens`, `cacheCreationInputTokens`) deliberately not – counted, the usual budgets would break in the first iteration already. Codex and Pi report no real numbers; there the estimate counts (characters / 4, `estimated: true`). It is checked after every iteration; if the sum is above the budget, the block ends with `[TOKEN BUDGET EXCEEDED: …]`. So the last iteration runs to its end – the budget can be exceeded by up to one iteration.
 - Two timeouts: `timeout_seconds` per CLI call, `iteration_timeout_seconds` per iteration – see [The Dual-Timeout Trap](#the-dual-timeout-trap).
 
 ### `retry` — Retry on Failure
@@ -161,6 +161,7 @@ Compares the resolved `expression` with the `value` of every case (alternatives 
 ```
 
 - Compared without leading and trailing whitespace (an AI answer `GREEN` with a line break matches `GREEN`); case matters.
+- Without a match and without `default` the block ends quietly COMPLETED (output `No matching case for: …`, metadata `matchedCase: "none"`) – to notice an unexpected value, give `default` a block that fails.
 - Nested blocks may only be `shell` or `simple`, other types are refused.
 - The blocks of a case pass `{{ previous_output }}` along; whoever needs the state before the switch names the block before it. A `name` on a case block makes its output available as `{{ block.<name>.output }}`; the output of the switch is the concatenation of all case blocks that ran.
 - `gate_status` does not work as an expression: the run evaluates the markers only at the end.
@@ -176,7 +177,7 @@ Runs `command` for every item from `items` or from the lines of `items_command` 
 ```
 
 - Item variables: `{{ <variable_name> }}`, `{{ <variable_name>_index }}` (from 0), for a JSON object its top-level fields as `{{ <variable_name>.<field> }}`. Empty lines are dropped; an empty list means zero iterations (COMPLETED, `totalItems: 0`).
-- Failures: if an item fails, the block fails (the remaining items still run); with `continue_on_error: true` it ends COMPLETED (`N/M items failed: …`). After `max_consecutive_failures` failures **in a row** (default 3, since 2026-10) the loop stops and the block fails, even with `continue_on_error`; `0` turns this off, e.g. for reachability checks across many hosts. `on_failure: "continue"`, in contrast, only lets the workflow carry on after the FAILED block.
+- Failures: if an item fails, the block fails (the remaining items still run); with `continue_on_error: true` it ends COMPLETED (`N/M items failed: …`). After `max_consecutive_failures` failures **in a row** (default 3, since 2026-10) the loop stops and the block fails, even with `continue_on_error` – that tolerates failed items, but not items that never ran. Reason: a used-up quota makes every further AI item fail the same way; without the stop one run lost 37 of 42 items like this. The message names the reason first (`stopped after 3 consecutive failed items (max_consecutive_failures), 34 items not run`), the failed items below it. `0` turns the stop off, e.g. for reachability checks across many hosts. `on_failure: "continue"`, in contrast, only lets the workflow carry on after the FAILED block.
 - The error message starts with the failed items (`Step 1 (foreach) failed: 1/37 items failed: erkner`); the block output stays the log of all items in their order.
 - **Sub-workflow per item** (`workflow_id`): one run of its own per item, as with the `sub-workflow` block (`SubWorkflowLauncher`, admitted as `SUB_WORKFLOW`). The child run gets this run's variables without platform data, the item variables and the values from `context`; the taint travels along. An item fails when its child run does not end `COMPLETED`. The output `[item]: <last output>` carries `derivedOutput: true` – markers count only in the child runs. `execution_mode`, `timeout_seconds` and the AI keys have no effect in this mode.
 - A placeholder in `workflow_id` is resolved **once before the first item** and only from trusted context variables – not from webhook data or block outputs –, otherwise the block fails before the first item. `context` must not set reserved names (keys with `__`, platform data, values of the run, the item variables).
@@ -261,7 +262,7 @@ Create, change or close TODOs directly through the TodoService – no REST self-
   { "type": "todo-close", "config": { "id": "{{ todo_id }}" } } ]
 ```
 
-- `todo-update` needs exactly one of: `id` (one TODO; only set, non-empty fields change) or `updates`, a JSON list for up to 50 TODOs **of the run's project**. `note` is appended to the description (`— <date> · <workflow> (run <id8>): <note>`, date in the instance's time zone); at most 10 tags each. Broken JSON, no list or an unknown key fail the step before anything is written; an unsuitable entry is skipped with a reason (`✓ N aktualisiert, M übersprungen`).
+- `todo-update` needs exactly one of: `id` (one TODO; only set, non-empty fields change) or `updates`, a JSON list for up to 50 TODOs **of the run's project**. `note` is appended to the description (`— <date> · <workflow> (run <id8>): <note>`, date in the instance's time zone) as one line, cut to 1000 characters and with markers defused (`UntrustedText.inline`); `add_tags`/`remove_tags`/`require_tags` take at most 10 tags each from `[A-Za-z0-9_:.-]{1,60}` (`TodoBulkUpdates`), otherwise the entry is skipped. Broken JSON, no list or an unknown key fail the step before anything is written; an unsuitable entry is skipped with a reason (`✓ N aktualisiert, M übersprungen`).
 - For a **dynamic number** of TODOs from analysis workflows use `todo_item:` markers ([TODO markers](#todo-markers-todo_item)); audit templates use the `mysuricates:audit-result:v1` envelope.
 
 ### `compress` / `compress-ai` — Visibly Condense Outputs
@@ -585,6 +586,12 @@ expects a verdict (`GateExpectation`). If none arrives, it turns YELLOW `gate-mi
 follow-up TODO. Word AI prompts that must not write markers without the key ("no status lines") and
 set the verdict in the closing shell block. Seen 2026-09-20 in the documentation review.
 
+**An unreadable verdict turns YELLOW.** If the run metadata hold a `gate_status` that is neither
+GREEN nor YELLOW nor RED, it is logged and the run becomes YELLOW `gate-invalid`
+(`GateStatusResolver`). The value may only sharpen the verdict derived from the run status, never
+soften it: a `FAILED` run stays RED. Reason: an unreadable value used to fall silently to GREEN – a
+checking workflow whose AI step failed quietly could not be told apart from a workflow without a gate.
+
 **Shell block example** with gate emission:
 ```bash
 set -euo pipefail
@@ -651,7 +658,7 @@ todo_item: Test the useWebSocket hook | MEDIUM | frontend,testing
 
 ### Dashboard marker (`dashboard_widget:`)
 
-A workflow can also report its dashboard result as a marker line in a block output. The deliberately configured way is the [`dashboard-report` block](#dashboard-report--report-the-dashboard-result-without-a-marker); once it has written, no marker is evaluated. The JSON may span several lines:
+A workflow can also report its dashboard result as a marker line in a block output. The deliberately configured way is the [`dashboard-report` block](#dashboard-report--report-the-dashboard-result-without-a-marker); once it has written, no marker is evaluated – not even a broken one sets `dashboard_widget_error` then. The JSON may span several lines:
 
 ```
 dashboard_widget: {"title": "Nightly QA", "status": "YELLOW",
@@ -660,8 +667,8 @@ dashboard_widget: {"title": "Nightly QA", "status": "YELLOW",
 ```
 
 - Fields and bounds as for the `dashboard-report` block ([block reference](block-referenz.md#dashboard-report)): `status` is required (`GREEN`, `YELLOW`, `RED`), KPI `label` and `value` at most 40 characters each, `value` is a **string**, `trend` `UP`/`DOWN`/`FLAT`. An unknown field – in a KPI object too – rejects the whole contract, as does an empty, too long or not single-line text (control, zero-width, bidi, separator, private-use characters). It is checked at the end of the run and again when read.
-- At most 8192 characters are read. If several blocks report a marker, the last one wins; outputs of compression blocks (`derivedOutput`) do not count. **Two markers in the same block output reject that output** (`resultState: INVALID`): a quoted marker must never override the report's own result.
-- Write the marker at the start of a line, the JSON right behind it (a code block on the next line works too). The dashboard shows the content as text only – no Markdown, HTML, link or image.
+- At most 8192 characters are read; if the brace has not closed by then, the marker is invalid. If several blocks report a marker, the last one wins; outputs of compression blocks (`derivedOutput`) do not count. **Two markers in the same block output reject that output** (`resultState: INVALID`): a quoted marker must never override the report's own result.
+- Write the marker at the start of a line, the JSON right behind it (a code block on the next line works too). Reason: if it stands mid-line and a blank line separates it from its JSON – or a non-breaking space (U+00A0) or a NEL (U+0085) separates the colon from the JSON –, it is not recognised; then a marker quoted from foreign text can be the only one recognised and win. The dashboard shows the content as text only – no Markdown, HTML, link or image.
 - Reading: `GET /api/v1/dashboard/workflow-results?workflowIds=…` returns per workflow the last run and `resultState` (`VALID`, `INVALID` or `MISSING`).
 
 ### `checked_command` / `check_category` — Gate Derived Automatically from the Exit Code

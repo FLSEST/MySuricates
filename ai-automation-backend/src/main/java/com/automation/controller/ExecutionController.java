@@ -55,7 +55,7 @@ public class ExecutionController {
         return executionQueryService.listExecutionResponses(page, size, status, workflowId, projectId, search);
     }
 
-    /** Alle Läufe, die gerade auf eine Antwort warten — Approvals und Human-Input, die ältesten zuerst. */
+    /** Lists all runs currently waiting for an answer — approvals and human input, oldest first. */
     @GetMapping("/pending-input")
     public List<PendingInputResponse> listPendingInputs() {
         return pendingInputService.listPendingInputs();
@@ -68,8 +68,8 @@ public class ExecutionController {
     }
 
     /**
-     * Gepufferte Live-Zeilen eines Laufs (nur im Speicher, bis ~10 min nach Laufende) fuer das Replay
-     * nach einem Reload. {@code available=false} statt 404, wenn nichts gepuffert ist.
+     * Returns a run's buffered live lines (in memory only, until ~10 min after the run ends) for the
+     * replay after a reload. {@code available=false} instead of 404 when nothing is buffered.
      */
     @GetMapping("/{id}/live-log")
     public RunLiveLogService.Snapshot getLiveLog(@PathVariable String id,
@@ -78,12 +78,12 @@ public class ExecutionController {
     }
 
     /**
-     * Loescht einen Lauf samt Schritten und den losen Verweisen darauf.
+     * Deletes a run with its steps and the loose references to it.
      *
-     * <p>409, wenn der Lauf noch aktiv ist oder ein Audit-Bericht an ihm haengt.
-     * TODOs und Audit-Daten werden nie mitgeloescht — siehe {@link RunDeletionService}.
-     * 403 {@code RUN_DELETION_DISABLED}, wenn {@code automation.executions.allow-delete=false}
-     * ({@link RunDeletionPolicy}) — geprueft vor jedem Lookup, verraet also nicht, ob es den Lauf gibt.
+     * <p>409 while the run is still active or an audit report belongs to it.
+     * TODOs and audit data are never deleted with it — see {@link RunDeletionService}.
+     * 403 {@code RUN_DELETION_DISABLED} when {@code automation.executions.allow-delete=false}
+     * ({@link RunDeletionPolicy}) — checked before any lookup, so it does not reveal whether the run exists.
      */
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteExecution(@PathVariable String id) {
@@ -131,7 +131,7 @@ public class ExecutionController {
         return ResponseEntity.ok(executionCommandService.resumeFromStep(id));
     }
 
-    /** Beantwortet die offene Frage des Laufs. 400, wenn ein Approval die Antwort nicht als Option anbietet. */
+    /** Answers the run's open question. 400 when an approval does not offer the answer as an option. */
     @PostMapping("/{id}/approve")
     public ResponseEntity<Void> approveExecution(
             @PathVariable String id,

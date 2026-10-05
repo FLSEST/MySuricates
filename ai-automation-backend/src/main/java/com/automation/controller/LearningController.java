@@ -28,8 +28,9 @@ public class LearningController {
     private final PlatformStatsService platformStatsService;
 
     /**
-     * Returns the dashboard figures for the last {@code days} days: runs, success rate, cost, tokens, time series and per-model stats.
+     * Returns the dashboard figures: all-time run counts and success rate, plus cost, tokens, time series and model stats of the last {@code days} days.
      * {@code projectId} restricts every value, the overall counts included, to that project's workflows and runs.
+     * {@code recentRuns} holds at most the ten newest runs of the window, without steps.
      */
     @GetMapping("/dashboard")
     public DashboardResponse getDashboard(

@@ -271,7 +271,7 @@ public class WorkflowExecutor {
         } catch (Throwable t) {
             // Throwable, not Exception: an Error (NoClassDefFoundError from a build rewriting
             // target/classes) would leave the run at RUNNING and surface as an anonymous ghost run
-            // 30 min later. See docs/plans/2026-07-27-ghost-run-root-cause-fixes.md
+            // 30 min later.
             String detail = t.getMessage() != null ? t.getMessage() : t.getClass().getName();
             String message = t.getClass().getSimpleName() + ": " + detail;
             log.error("Workflow execution failed: {}", runId, t);

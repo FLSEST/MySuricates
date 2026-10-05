@@ -74,6 +74,8 @@ public class SkillController {
     /**
      * Updates a custom skill.
      * Custom skills only (built-in → 409); a skill used by a sealed workflow → 409 SKILL_PINNED_BY_SEAL.
+     * Only name, description, icon, category and {@code aiContext} change; {@code configSchema}, the
+     * capabilities and the version label stay as they are.
      */
     @PutMapping("/{id}")
     public SkillResponse updateSkill(@PathVariable String id, @Valid @RequestBody UpdateSkillRequest request) {

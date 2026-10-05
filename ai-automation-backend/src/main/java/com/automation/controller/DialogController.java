@@ -34,7 +34,7 @@ public class DialogController {
             Path.of(System.getProperty("user.home"), ".claude", "projects");
 
     /**
-     * Zählt Sessions pro Projekt-Verzeichnis (schnell, kein File-Lesen).
+     * Counts the sessions per project directory (fast, without reading the files).
      */
     @GetMapping("/sessions/count")
     public Map<String, Integer> countSessionsPerProject() {
@@ -42,9 +42,9 @@ public class DialogController {
     }
 
     /**
-     * Listet Sessions mit Metadaten.
-     * Mit projectPath: hohes Limit (einzelnes Projekt, alle Sessions sichtbar).
-     * Ohne projectPath: konservativeres Limit (für "Other Sessions").
+     * Lists sessions with their metadata.
+     * {@code limit} (default 50) is capped at 2000 with {@code projectPath} (one project, all sessions visible)
+     * and at 500 without it (for "Other Sessions").
      */
     @GetMapping("/sessions")
     public List<DialogSessionInfo> listSessions(
@@ -55,7 +55,7 @@ public class DialogController {
     }
 
     /**
-     * Gibt alle bekannten Projekt-Pfade zurück (für Filter-Dropdown).
+     * Returns all known project paths (for the filter dropdown).
      */
     @GetMapping("/projects")
     public List<String> listProjectPaths() {
@@ -63,7 +63,8 @@ public class DialogController {
     }
 
     /**
-     * Analysiert eine Session mit KI und liefert eine Workflow-Suggestion.
+     * Analyzes a session with AI and returns a workflow suggestion.
+     * {@code filePath} must be a {@code .jsonl} file under {@code ~/.claude/projects}; any other path is 400.
      */
     @PostMapping("/sessions/analyze")
     public DialogWorkflowSuggestion analyzeSession(
@@ -73,7 +74,8 @@ public class DialogController {
     }
 
     /**
-     * Erstellt einen Workflow aus einer Suggestion (mit optionalen User-Anpassungen).
+     * Creates a workflow from a suggestion (with optional user adjustments).
+     * {@code projectId} is required; the answer is 200 with the new workflow.
      */
     @PostMapping("/sessions/create-workflow")
     public ResponseEntity<WorkflowResponse> createWorkflow(

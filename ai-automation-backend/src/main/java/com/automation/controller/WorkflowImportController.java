@@ -21,9 +21,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Import externer Prozessformate als NEUER Workflow (Roundtrip zum Export in
- * {@link WorkflowController}). Eigener Controller, damit {@code WorkflowController} unter der
- * Ratchet-Decke bleibt. Spec: docs/plans/2026-07-13-bpmn-import-design.md.
+ * Imports external process formats as a NEW workflow (round trip to the export in
+ * {@link WorkflowController}). A controller of its own so that {@code WorkflowController} stays
+ * below the size ratchet.
  */
 @RequiresModule(ModuleCatalog.BPMN)
 @RestController
@@ -36,9 +36,9 @@ public class WorkflowImportController {
     private final ProcessFormatImporter bpmnImportAdapter;
 
     /**
-     * Importiert einen zuvor exportierten BPMN-Prozess (mit {@code mysuricates:blockConfig}) als
-     * neuen Workflow im Projekt. Fremd-BPMN, kaputtes XML oder zu große Eingaben → 400; es wird
-     * nichts angelegt, wenn der Import scheitert (Parsen + Validieren vor {@code create}).
+     * Imports a previously exported BPMN process (with {@code mysuricates:blockConfig}) as a new
+     * workflow in the project. Foreign BPMN, broken XML or oversized input → 400; nothing is created
+     * when the import fails (parsing and validation run before {@code create}).
      */
     @PostMapping(value = "/bpmn", consumes = {MediaType.APPLICATION_XML_VALUE, MediaType.TEXT_XML_VALUE})
     public ResponseEntity<WorkflowResponse> importWorkflowFromBpmn(

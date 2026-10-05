@@ -35,6 +35,7 @@ public class WorkflowFactoryController {
 
     /**
      * Generate a workflow from a topic (preview only, no testing).
+     * {@code topic} is required; the answer is 201 with the new workflow.
      */
     @PostMapping("/generate")
     public ResponseEntity<?> generate(@Valid @RequestBody WorkflowFactoryRequest request) throws IOException {
@@ -44,6 +45,7 @@ public class WorkflowFactoryController {
 
     /**
      * Full factory pipeline: generate → deploy to test → verify → optionally promote.
+     * {@code maxRetries} (default 2) bounds the repair attempts made with {@code autoFix}.
      */
     @PostMapping("/run")
     public ResponseEntity<WorkflowFactoryResult> run(@Valid @RequestBody WorkflowFactoryRequest request) {

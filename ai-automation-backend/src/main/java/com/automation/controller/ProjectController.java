@@ -57,6 +57,9 @@ public class ProjectController {
     /**
      * The bundled example project for a fresh installation: created on the first call (201), returned
      * on every further call (200) — with any example workflow it lacks added.
+     * Its files are copied to {@code automation.examples.directory}; an existing copy is never overwritten.
+     * An example whose blocks need a switched-off module is left out until a later call with the module on;
+     * {@code locale} ({@code de}/{@code en}, default {@code en}) picks the language of names and workflows.
      */
     @PostMapping("/example")
     public ResponseEntity<ProjectResponse> ensureExampleProject(@RequestParam(required = false) String locale) {

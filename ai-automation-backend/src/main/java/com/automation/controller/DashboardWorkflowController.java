@@ -25,7 +25,13 @@ public class DashboardWorkflowController {
 
     private final DashboardWorkflowService service;
 
-    /** Ids outside the allowed shape or more than DashboardWorkflowService.MAX_WORKFLOWS of them → 400. */
+    /**
+     * Returns, per requested workflow, its latest run and its validated dashboard result, never step output.
+     * {@code workflowIds} (repeated or comma-separated) takes at most 50 ids of the form
+     * {@code ^[a-z0-9][a-z0-9-]{0,79}$}, otherwise 400; without ids the list is empty. One entry per distinct id in
+     * request order; an unknown or soft-deleted workflow has {@code available: false} and {@code resultState: MISSING},
+     * and {@code result} is only set when {@code resultState} is {@code VALID}.
+     */
     @GetMapping
     public List<DashboardWorkflowResultResponse> results(
             @RequestParam(name = "workflowIds", required = false) List<String> workflowIds) {

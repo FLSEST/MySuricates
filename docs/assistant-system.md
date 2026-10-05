@@ -87,8 +87,9 @@ Das Assistant-System besteht aus fünf Bereichen:
 
 ## API-Endpunkte
 
-Anfrage- und Antwortformate stehen in der [API-Referenz](api-referenz.md) (Abschnitt zum Assistenten). Was
-dort nicht steht:
+Die Endpunkte samt Zweck und Regeln listet die [API-Referenz](api-referenz.md#apiv1assistant); die Formate
+von Anfrage und Antwort stehen in den DTOs `AssistantChatRequest`, `AssistantChatResponse` und `PendingTool`
+unter `ai-automation-backend/src/main/java/com/automation/dto/`. Was dort nicht steht:
 
 - `context.page` entscheidet, welche Plattform-Daten in den System-Prompt kommen (siehe [Kontext-Injektion](#kontext-injektion)); `requestId` ist das Thema der Status-Meldungen per WebSocket (`/topic/assistant/{requestId}/status`).
 - Ein `pendingTools`-Eintrag trägt `subject` — den aufgelösten Namen (Workflow-Name, Workflow des Laufs, Aufgaben-Titel, Ketten-Name; unauflösbar: gekürzte ID mit `params.ref = "id"`) — und `params` mit kleinen Werten wie `priority`/`status`; `description` ist der englische Ersatzsatz für ältere Clients.

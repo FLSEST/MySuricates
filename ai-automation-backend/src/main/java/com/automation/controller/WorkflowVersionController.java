@@ -23,8 +23,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Versionsgeschichte eines Workflows: auflisten, einzeln abrufen, wiederherstellen.
- * Aus {@link WorkflowController} herausgelöst (6c2a2ad7), Pfade unverändert.
+ * Version history of a workflow: list, fetch one, restore.
+ * Split off from {@link WorkflowController} (6c2a2ad7), paths unchanged.
  */
 @RestController
 @RequestMapping("/api/v1/workflows")

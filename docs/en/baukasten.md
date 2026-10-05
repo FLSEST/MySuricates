@@ -54,7 +54,7 @@ remember the things that were forgotten during a session.
 | Building block | | What for |
 |---|---|---|
 | Templates, pool, blueprints | Core | Take ready-made workflows and adapt them; blueprints are scaffolds to fill in. → [Pool](../../workflow-pool/README.md) |
-| Triggers | Core | Schedule, follow-up to a run, follow-up to a TODO. → [Access paths](konzepte/zugaenge.md) · To try: blueprints “Starting on a schedule”, “Started by a TODO trigger”, “Starting via webhook (signed)” (+full). |
+| Triggers | Core | Schedule, follow-up to a run, follow-up to a TODO. → [Access paths](konzepte/zugaenge.md) · To try: blueprints “Starting on a schedule”, “Started by a TODO trigger”, “Starting via webhook (signed)” (+full, switch `webhook-signatures`). |
 | Sub-workflows | Core | One workflow calls another, also once per entry of a list. To try: blueprint “Calling a sub-workflow (package)”. |
 | Goals | Core | Bundle TODOs and workflows towards one result. To try: template “Goal guard”. |
 | Dashboard report | Core | A workflow puts its result on the dashboard as a tile. To try: blueprint “Reporting a result”. |

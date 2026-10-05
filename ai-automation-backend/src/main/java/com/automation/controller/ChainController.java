@@ -64,7 +64,8 @@ public class ChainController {
 
     /**
      * Deletes a chain; answers 204.
-     * Refused with 409 while the chain has an active run; cancel the run first.
+     * Refused with 409 while the chain has an active run ({@code PENDING}, {@code RUNNING} or {@code PAUSED}),
+     * which would otherwise go on starting the chain's workflows; cancel the run first.
      */
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteChain(@PathVariable String id) {

@@ -33,7 +33,10 @@ public class DeadLetterController {
         return dlqService.findById(id);
     }
 
-    /** Starts the workflow again with the input context of the failed run and marks the entry as retried. */
+    /**
+     * Starts the workflow again with the input context of the failed run and marks the entry as retried.
+     * If the workflow or the failed run no longer exists, nothing starts, but the entry is still marked retried.
+     */
     @PostMapping("/{id}/retry")
     public ResponseEntity<DeadLetterEntry> retry(@PathVariable String id) {
         return ResponseEntity.ok(dlqRetryService.retry(id));

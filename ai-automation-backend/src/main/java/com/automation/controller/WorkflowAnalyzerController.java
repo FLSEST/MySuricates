@@ -18,8 +18,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Deterministische Baufehler-Prüfung von Workflow-Definitionen — auf Abruf, nie blockierend
- * (TODO 182bd224). Der Speicherweg bleibt unangetastet: Der Analyzer meldet, er verhindert nichts.
+ * Deterministic check of workflow definitions for construction errors — on demand, never blocking
+ * (TODO 182bd224). Saving is left untouched: the analyzer reports, it prevents nothing.
  */
 @RestController
 @RequestMapping("/api/v1/workflows")
@@ -29,7 +29,7 @@ public class WorkflowAnalyzerController {
     private final WorkflowService workflowService;
     private final WorkflowAnalyzer analyzer;
 
-    /** Befunde einer Definition. */
+    /** Returns the findings of one workflow definition. */
     @GetMapping("/{id}/analyze")
     public ResponseEntity<AnalysisResponse> analyze(@PathVariable String id) {
         Workflow workflow = workflowService.findByIdEager(id);
@@ -39,13 +39,13 @@ public class WorkflowAnalyzerController {
     }
 
     /**
-     * Bestandsprüfung über alle Definitionen in aktiven Projekten.
+     * Checks all definitions in active projects.
      *
-     * <p>Antwortet bewusst verdichtet: je Workflow nur Zahlen, dazu die Verteilung über die Regeln.
-     * Die vollen Befunde holt man sich je Workflow — eine Vollausgabe über hunderte Definitionen
-     * wäre ein Megabyte, das niemand liest.
+     * <p>The answer is condensed on purpose: only counts per workflow, plus the distribution over the
+     * rules. The full findings come per workflow — a full output over hundreds of definitions would be a
+     * megabyte nobody reads.
      *
-     * @param minSeverity {@code HIGH} oder {@code MEDIUM} blendet leichtere Befunde aus
+     * @param minSeverity {@code HIGH} or {@code MEDIUM} hides lighter findings
      */
     @GetMapping("/analyze")
     public ResponseEntity<InventoryResponse> analyzeAll(

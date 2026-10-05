@@ -32,7 +32,8 @@ public class SystemRequestMetricsController {
 
     /**
      * Stored daily rows for one route, oldest first — the baseline a drift check compares against.
-     * Without {@code route} the rows of a single day are returned instead.
+     * Without {@code route} today's stored rows of all routes are returned instead, most expensive first;
+     * {@code days} (default 7, at most 90) only applies with {@code route}.
      */
     @GetMapping("/daily")
     public List<RequestMetricDaily> daily(@RequestParam(required = false) String route,
