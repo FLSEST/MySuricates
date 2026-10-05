@@ -73,7 +73,8 @@ public class WorkflowController {
     /**
      * Changes the given fields of a workflow; fields left out stay as they are.
      * A definition change writes a new version and is refused on a sealed workflow ({@code 409 WORKFLOW_SEALED});
-     * name and {@code version} label are no definition change and stay editable.
+     * name and {@code version} label are no definition change and stay editable. A blank {@code version} or one
+     * over 255 characters is 400 – leave the field out to keep the label.
      */
     @PutMapping("/{id}")
     public ResponseEntity<WorkflowResponse> updateWorkflow(@PathVariable String id, @RequestBody UpdateWorkflowRequest request) {
@@ -175,7 +176,8 @@ public class WorkflowController {
      * Imports a workflow from its JSON export and answers {@code 201}.
      * With {@code updateIfExists} a workflow of the same name in the target project is updated instead
      * ({@code 200}); without {@code projectId} it goes to the collection project. A checksum in {@code integrity}
-     * that does not match the content is rejected with {@code 400} before anything is written.
+     * that does not match the content is rejected with {@code 400} before anything is written. A blank
+     * {@code version} keeps the default label on a new workflow and the previous one on an update.
      */
     @PostMapping("/import")
     public ResponseEntity<WorkflowResponse> importWorkflow(@Valid @RequestBody ImportWorkflowRequest request) {

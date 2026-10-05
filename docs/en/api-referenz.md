@@ -219,7 +219,7 @@ Notes:
 
 - `GET /api/v1/chains/runs` — `status` ignores case (unknown value: 400); `search` matches the chain name.
 - `POST /api/v1/chains/runs/{runId}/cancel` — Answers 200 even if the run is not active.
-- `DELETE /api/v1/chains/{id}` — Refused with 409 while the chain has an active run; cancel the run first.
+- `DELETE /api/v1/chains/{id}` — Refused with 409 while the chain has an active run (`PENDING`, `RUNNING` or `PAUSED`), which would otherwise go on starting the chain's workflows; cancel the run first.
 - `POST /api/v1/chains/{id}/execute` — The optional body is the input context of the run.
 
 ## /api/v1/completion-triggers
@@ -252,7 +252,7 @@ Source: `ConversionController` – Turns the successful agentic steps of a run i
 
 Notes:
 
-- `POST /api/v1/conversions/runs/{runId}/create-workflow` — With `blocks` (the reviewed suggestion) exactly these are saved without a new AI call, and `name` is required; without them the suggestion is generated again.
+- `POST /api/v1/conversions/runs/{runId}/create-workflow` — With `blocks` (the reviewed suggestion) exactly these are saved without a new AI call, and `name` is required; without them the suggestion is generated again. An unknown run is 404, a run that is not COMPLETED or has nothing to convert is 409; the answer is 200 with the new workflow.
 - `GET /api/v1/conversions/runs/{runId}/suggest` — Tries an AI conversion first and falls back to rule-based; without such steps the suggestion is marked unavailable.
 
 ## /api/v1/dashboard
@@ -265,17 +265,19 @@ Sources:
 
 | Endpoint | Purpose | Module |
 |---|---|---|
-| `GET /api/v1/dashboard/layouts` | Lists saved dashboard layout versions page by page, newest first, without their content. | core |
+| `GET /api/v1/dashboard/layouts` | Lists saved dashboard layout versions page by page, newest first, without their content; `size` is capped at 100. | core |
 | `POST /api/v1/dashboard/layouts` | Saves the dashboard layout as a new version (`201`), or answers `200` when it equals the newest one. | core |
 | `GET /api/v1/dashboard/layouts/{id}` | Returns one dashboard layout version including its layout content. | core |
 | `PATCH /api/v1/dashboard/layouts/{id}` | Sets or removes (`null`) the name of a layout version. | core |
 | `POST /api/v1/dashboard/report-assist` | Has an AI propose the fields of a `dashboard-report` block for `workflowId` from one of its runs. | `dashboard-report` |
-| `GET /api/v1/dashboard/workflow-results` | Ids outside the allowed shape or more than DashboardWorkflowService.MAX_WORKFLOWS of them → 400. | core |
+| `GET /api/v1/dashboard/workflow-results` | Returns, per requested workflow, its latest run and its validated dashboard result, never step output. | core |
 
 Notes:
 
-- `POST /api/v1/dashboard/layouts` — Without `force` a `baseVersionId` other than the newest version is refused with `409`. The body is validated field by field in DashboardLayoutValidator (unknown fields → 400).
-- `POST /api/v1/dashboard/report-assist` — 400 for a missing id, 404 for an unknown workflow, 409 when the setting is off, the provider is missing, there is no usable run, or the answer did not match the contract.
+- `POST /api/v1/dashboard/layouts` — The comparison ignores `activeViewId` (each device shows its own view), which is still stored and must name a view. Without `force: true` a `baseVersionId` other than the newest version is refused with `409 STATE_CONFLICT`: another device saved in between. The body is validated field by field (unknown fields → 400) with the limits of the frontend's `LAYOUT_LIMITS` (at most 20 views, 100 widgets per view); over `automation.dashboard.layout.max-request-bytes` (default 256 KiB) it is 413. Each save trims the unnamed versions to the newest `dashboard-layout-retention-count` (default 100); named ones are never trimmed.
+- `PATCH /api/v1/dashboard/layouts/{id}` — A name has 1–80 characters; a named version is never deleted automatically.
+- `POST /api/v1/dashboard/report-assist` — One tool-less call to the `CLAUDE` CLI over the tail of the latest run, checked against the `dashboard_widget` contract; neither the raw answer nor the run output leaves the server. 400 for a missing id, 404 for an unknown workflow, 409 (with a fixed message) when the execution setting `dashboard-report-assist-enabled` is off, the Claude CLI is missing on this host, there is no usable run, or the answer did not match the contract.
+- `GET /api/v1/dashboard/workflow-results` — `workflowIds` (repeated or comma-separated) takes at most 50 ids of the form `^[a-z0-9][a-z0-9-]{0,79}$`, otherwise 400; without ids the list is empty. One entry per distinct id in request order; an unknown or soft-deleted workflow has `available: false` and `resultState: MISSING`, and `result` is only set when `resultState` is `VALID`.
 
 ## /api/v1/debug
 
@@ -303,7 +305,9 @@ Source: `DialogController` – Dialog import: turns recorded Claude Code session
 
 Notes:
 
-- `GET /api/v1/dialog/sessions` — With `projectPath` a high limit (one project, all sessions visible), without it a more conservative one (for "Other Sessions").
+- `GET /api/v1/dialog/sessions` — `limit` (default 50) is capped at 2000 with `projectPath` (one project, all sessions visible) and at 500 without it (for "Other Sessions").
+- `POST /api/v1/dialog/sessions/analyze` — `filePath` must be a `.jsonl` file under `~/.claude/projects`; any other path is 400.
+- `POST /api/v1/dialog/sessions/create-workflow` — `projectId` is required; the answer is 200 with the new workflow.
 
 ## /api/v1/dlq
 
@@ -315,6 +319,10 @@ Source: `DeadLetterController` – Dead letter queue: failed workflow runs, kept
 | `GET /api/v1/dlq/{id}` | Returns one dead letter entry. | core |
 | `DELETE /api/v1/dlq/{id}` | Discards a dead letter entry: it is marked `DISCARDED`, not deleted; answers 204. | core |
 | `POST /api/v1/dlq/{id}/retry` | Starts the workflow again with the input context of the failed run and marks the entry as retried. | core |
+
+Notes:
+
+- `POST /api/v1/dlq/{id}/retry` — If the workflow or the failed run no longer exists, nothing starts, but the entry is still marked retried.
 
 ## /api/v1/docs
 
@@ -373,6 +381,11 @@ Source: `WorkflowFactoryController` – Workflow factory: has an AI generate wor
 | `GET /api/v1/factory/topics` | Get available topic categories for the factory. | `factory` |
 | `POST /api/v1/factory/verify/{id}` | Verify an existing workflow on the test instance. | `factory` |
 
+Notes:
+
+- `POST /api/v1/factory/generate` — `topic` is required; the answer is 201 with the new workflow.
+- `POST /api/v1/factory/run` — `maxRetries` (default 2) bounds the repair attempts made with `autoFix`.
+
 ## /api/v1/goals
 
 Sources:
@@ -394,7 +407,7 @@ Sources:
 | `GET /api/v1/goals/{id}/candidates` | Lists open TODOs without a goal that could belong to it, by default only from the goal's projects (`allProjects=true`: from all). | `goals` |
 | `POST /api/v1/goals/{id}/guard` | Switches the goal guard on or off. | `goals` |
 | `GET /api/v1/goals/{id}/milestones` | Lists the goal's milestones by date, then title, with state and package counters. | `goals` |
-| `POST /api/v1/goals/{id}/milestones` | Creates a milestone (201); `dueDate` is required, `workPackageIds` must belong to the same goal. | `goals` |
+| `POST /api/v1/goals/{id}/milestones` | Creates a milestone (201); `dueDate` is required, `workPackageIds` must belong to the same goal (else 400). | `goals` |
 | `PUT /api/v1/goals/{id}/milestones/{milestoneId}` | Updates a milestone; `workPackageIds` replaces its links, `reached` only without linked packages (else 400). | `goals` |
 | `DELETE /api/v1/goals/{id}/milestones/{milestoneId}` | Deletes the milestone (204); the linked work packages stay. | `goals` |
 | `PUT /api/v1/goals/{id}/order` | Sets the order: the TODOs named get rank 1..n, all other TODOs of the goal none. | `goals` |
@@ -407,7 +420,7 @@ Sources:
 | `POST /api/v1/goals/{id}/work-packages` | Adds a work package at the end of its project (201); without `projectId` only if the goal has exactly one project. | `goals` |
 | `PUT /api/v1/goals/{id}/work-packages/order` | Reorders the work packages of ONE project; the answer lists all work packages of the goal. | `goals` |
 | `PUT /api/v1/goals/{id}/work-packages/{workPackageId}` | Partially updates a work package; `""` clears a date, the result needs both dates or none (else 400). | `goals` |
-| `DELETE /api/v1/goals/{id}/work-packages/{workPackageId}` | Deletes the work package (204); its TODOs stay in the goal, milestones lose the link. | `goals` |
+| `DELETE /api/v1/goals/{id}/work-packages/{workPackageId}` | Deletes the work package (204); its TODOs stay in the goal, milestones lose the link, its workflow attachments go. | `goals` |
 
 Notes:
 
@@ -416,13 +429,18 @@ Notes:
 - `GET /api/v1/goals/{goalId}/workflows` — Soft-deleted workflows are left out.
 - `POST /api/v1/goals/{goalId}/workflows` — A work package of another goal is a 400, an unknown workflow a 404, the same attachment twice a 409.
 - `GET /api/v1/goals/{id}` — Reading records the moment a work package or milestone is first found complete or reached.
+- `DELETE /api/v1/goals/{id}` — Work packages, milestones and workflow attachments go with it; the guard's workflow stays.
 - `GET /api/v1/goals/{id}/candidates` — Paged like `GET /api/v1/todos`.
-- `POST /api/v1/goals/{id}/guard` — The first switch-on creates a workflow from the template `goal-guard` plus a daily schedule; after that only the schedule is enabled or disabled.
+- `POST /api/v1/goals/{id}/guard` — The first switch-on creates a workflow from the template `goal-guard` plus a daily schedule; after that only the schedule is enabled or disabled. An invalid `cron` or no project to put the workflow in is 400.
+- `PUT /api/v1/goals/{id}/order` — Every id must already belong to the goal (else 400).
+- `PUT /api/v1/goals/{id}/projects/order` — A project not in the goal is 400.
 - `DELETE /api/v1/goals/{id}/projects/{projectId}` — While work packages or TODOs of the goal still belong to it, the answer is 409 – with `cascade=true` the work packages are deleted and the TODOs detached.
-- `GET /api/v1/goals/{id}/relations` — `include` adds up to 20 TODOs not yet assigned as candidates (`candidate: true`).
+- `GET /api/v1/goals/{id}/relations` — `include` adds up to 20 TODOs not yet assigned as candidates (`candidate: true`); ids of TODOs that already belong to a goal are skipped.
+- `POST /api/v1/goals/{id}/todos` — A TODO of another goal moves here and loses its work package.
 - `GET /api/v1/goals/{id}/work-packages` — The state is OPEN/DUE_SOON/OVERDUE/REACHED based on the end; without a period only OPEN/REACHED.
-- `POST /api/v1/goals/{id}/work-packages` — A named project not yet in the goal is added to it; `startDate` and `endDate` come together or not at all.
-- `PUT /api/v1/goals/{id}/work-packages/{workPackageId}` — `projectId` can change only while no TODOs are assigned to the package.
+- `POST /api/v1/goals/{id}/work-packages` — A named project not yet in the goal is added to it; `startDate` and `endDate` come together or not at all. The title has at most 200 characters.
+- `PUT /api/v1/goals/{id}/work-packages/order` — That project's packages not named follow behind; packages of different projects are 400, one of another goal 404.
+- `PUT /api/v1/goals/{id}/work-packages/{workPackageId}` — `projectId` can change only while no TODOs are assigned to the package; the package then moves to the end of the new project.
 
 ## /api/v1/integrations
 
@@ -454,7 +472,7 @@ Source: `LearningController` – Run statistics: dashboard figures, platform cou
 
 | Endpoint | Purpose | Module |
 |---|---|---|
-| `GET /api/v1/learning/dashboard` | Returns the dashboard figures for the last `days` days: runs, success rate, cost, tokens, time series and per-model stats. | core |
+| `GET /api/v1/learning/dashboard` | Returns the dashboard figures: all-time run counts and success rate, plus cost, tokens, time series and model stats of the last `days` days. | core |
 | `GET /api/v1/learning/platform-stats` | Returns platform-wide counts: projects, workflows, skills, templates, schedules, webhooks, chains, triggers, TODOs and wishes. | core |
 | `GET /api/v1/learning/runs/{runId}/insights` | Returns cost and token sums of one run plus the figures per step. | `learning` |
 | `POST /api/v1/learning/runs/{runId}/rate` | Stores a user rating for a run; the query parameter `rating` must be between 1 and 5. | core |
@@ -469,7 +487,7 @@ Source: `LearningController` – Run statistics: dashboard figures, platform cou
 
 Notes:
 
-- `GET /api/v1/learning/dashboard` — `projectId` restricts every value, the overall counts included, to that project's workflows and runs.
+- `GET /api/v1/learning/dashboard` — `projectId` restricts every value, the overall counts included, to that project's workflows and runs. `recentRuns` holds at most the ten newest runs of the window, without steps.
 
 ## /api/v1/notifications
 
@@ -486,7 +504,7 @@ Source: `NotificationController` – Notification configs that send a webhook or
 
 Notes:
 
-- `POST /api/v1/notifications` — Without `workflowId` it fires for every workflow; `messageTemplate` may use placeholders like `{{status}}`.
+- `POST /api/v1/notifications` — Without `workflowId` it fires for every workflow; `messageTemplate` may use placeholders like `{{status}}`. `triggerOnSuccess` covers COMPLETED and COMPLETED_WITH_ERRORS, `triggerOnFailure` FAILED and INTERRUPTED, `triggerAlways` any status. Placeholders, written without spaces: `{{workflow_name}}`, `{{workflow_id}}`, `{{run_id}}`, `{{status}}`, `{{error_message}}`; without a template a default message is sent. A `WEBHOOK` config without `webhookUrl` is accepted but sends nothing.
 
 ## /api/v1/onboarding-profiles
 
@@ -507,6 +525,8 @@ Notes:
 
 - `POST /api/v1/onboarding-profiles` — `content` is Markdown per language and needs at least one filled language; a taken `key` is a 400.
 - `PUT /api/v1/onboarding-profiles/{id}` — A content change keeps the old text in the history and rewrites the onboarding files of the projects using it.
+- `POST /api/v1/onboarding-profiles/{id}/reset` — A custom profile is a 400. Afterwards `customized` is `false`, and a changed text rewrites the onboarding files of the projects using the profile.
+- `GET /api/v1/onboarding-profiles/{id}/shipped` — A custom profile has no shipped text: 404.
 
 ## /api/v1/pool
 
@@ -521,6 +541,7 @@ Source: `WorkflowPoolController` – Workflow pool: list and install the shared 
 
 Notes:
 
+- `POST /api/v1/pool/export/{workflowId}` — Id keys (`projectId`, `workflowId`, ...) with a concrete value and UUID values are dropped, placeholders like `{{ project_id }}` stay, and a UUID inside a text becomes `REDACTED-UUID`. An unknown `scope` is 400.
 - `POST /api/v1/pool/{id}/install` — The copy is also found under its name in the other language; `forceCreate` always creates a new one. A pool file whose checksum does not match is refused with `400`; the answer's `integrity` says `VERIFIED` or `MISSING`.
 
 ## /api/v1/projects
@@ -556,6 +577,7 @@ Sources:
 Notes:
 
 - `POST /api/v1/projects` — `path` must be an existing directory (under the workspace root if one is set), otherwise 400.
+- `POST /api/v1/projects/example` — Its files are copied to `automation.examples.directory`; an existing copy is never overwritten. An example whose blocks need a switched-off module is left out until a later call with the module on; `locale` (`de`/`en`, default `en`) picks the language of names and workflows.
 - `POST /api/v1/projects/import` — Every path token needs an entry in `pathMappings`, otherwise 400 and nothing is created.
 - `DELETE /api/v1/projects/{id}` — `POST /{id}/restore` brings it back.
 - `GET /api/v1/projects/{id}/export` — An unknown or archived project is a 404.
@@ -603,14 +625,14 @@ Source: `ScheduleController` – Time-based starts of workflows and chains: cron
 Notes:
 
 - `GET /api/v1/schedules` — `nextRunAt` is the next run that will actually start; during a skip-until pause `pausedUntil` names its end, and while the maintenance switch is on `nextRunAt` is null and `maintenance` true.
-- `POST /api/v1/schedules` — Unknown enum values, an invalid cron expression or a schedule without any run left are 400.
-- `GET /api/v1/schedules/calendar` — Upcoming = schedules whose next real run lies in the period (behind a skip-until pause). Past runs: the newest `limit` of the period plus their total.
+- `POST /api/v1/schedules` — Unknown enum values, an invalid cron expression or a schedule without any run left are 400. `targetType`, `scheduleType` and `conflictBehavior` are trimmed and ignore case; the defaults are `WORKFLOW`, `CRON` and `SKIP`.
+- `GET /api/v1/schedules/calendar` — Upcoming = schedules whose next real run lies in the period (behind a skip-until pause). Past runs: the newest `limit` of the period plus their total. `from` and `to` are required; `limit` defaults to 1000 and is clamped to 1–5000.
 - `POST /api/v1/schedules/maintenance` — The switch is stored and survives a restart.
-- `POST /api/v1/schedules/preview` — A missing or invalid expression is 400; during a skip-until pause the times start after it and `pausedUntil` is set.
-- `GET /api/v1/schedules/remaining-today` — `projectId` (optional): only the schedules of that project's workflows — the dashboard filter.
+- `POST /api/v1/schedules/preview` — It returns 5 times. A missing or invalid expression is 400; during a skip-until pause the times start after it and `pausedUntil` is set.
+- `GET /api/v1/schedules/remaining-today` — `projectId` (optional): only the schedules of that project's workflows — the dashboard filter; chains belong to no project and are left out then.
 - `PUT /api/v1/schedules/{id}` — If an enabled cron schedule is then left without a run before `endDate` or `maxRuns`, the answer is 400.
 - `POST /api/v1/schedules/{id}/enable` — An unparsable cron expression, a passed `endDate` or used-up `maxRuns` is 400.
-- `GET /api/v1/schedules/{id}/runs` — The detail route of a run has the full text. At most `limit` per kind, plus the total of each.
+- `GET /api/v1/schedules/{id}/runs` — The detail route of a run has the full text. At most `limit` per kind (default 50, clamped to 1–500), plus the total of each.
 
 ## /api/v1/search
 
@@ -623,7 +645,7 @@ Source: `SearchController` – Aggregates search across workflows (and later run
 
 Notes:
 
-- `GET /api/v1/search` — An empty `q` yields an empty list; `limit` is capped at 50.
+- `GET /api/v1/search` — An empty `q` yields an empty list; `limit` (default 20) is capped at 50.
 - `POST /api/v1/search/workflows/semantic` — Answers 204 when semantic search is switched off (`automation.discovery.semantic-enabled`).
 
 ## /api/v1/skills
@@ -645,7 +667,7 @@ Source: `SkillController` – Skills and their capabilities: list, create, edit,
 
 Notes:
 
-- `PUT /api/v1/skills/{id}` — Custom skills only (built-in → 409); a skill used by a sealed workflow → 409 SKILL_PINNED_BY_SEAL.
+- `PUT /api/v1/skills/{id}` — Custom skills only (built-in → 409); a skill used by a sealed workflow → 409 SKILL_PINNED_BY_SEAL. Only name, description, icon, category and `aiContext` change; `configSchema`, the capabilities and the version label stay as they are.
 - `DELETE /api/v1/skills/{id}` — A built-in skill or one used by a sealed workflow is refused with 409.
 
 ## /api/v1/staging
@@ -728,22 +750,22 @@ Sources:
 
 Notes:
 
-- `GET /api/v1/system/ai-providers/status` — Cached, see `AiProviderStatusService`; never a token or file content.
-- `GET /api/v1/system/ai-providers/{id}/models` — Never fails because of a missing CLI — see `ModelCatalog#available()`.
+- `GET /api/v1/system/ai-providers/status` — Cached, see `AiProviderStatusService`; never a token or file content. `READY` means program and login were found, not that the login is still valid.
+- `GET /api/v1/system/ai-providers/{id}/models` — A failed probe (CLI missing, timeout, unreadable output) never fails the request: `available` is then `false`, `reason` says why and `models` is empty. An unknown provider id is 404.
 - `POST /api/v1/system/backup` — An optional `reason` goes into the activity log; old backups beyond the retain count are deleted.
 - `GET /api/v1/system/browse` — The root and system directories are refused with 400, as is a path that is no readable directory.
 - `GET /api/v1/system/capabilities` — Block types whose module is switched off are left out.
-- `PUT /api/v1/system/execution-config` — All values are checked before any is applied, so an invalid one (400) leaves every setting unchanged.
+- `PUT /api/v1/system/execution-config` — All values are checked before any is applied, so an invalid one (400) leaves every setting unchanged. Keys are the kebab-case names or their camelCase aliases; an unknown key or a value outside its bounds (`ExecutionSettingKeys.BOUNDS`) is 400. Stored values are applied again after a restart.
 - `GET /api/v1/system/health` — The components list database response time and Docker state.
-- `GET /api/v1/system/integration-snippet` — With a `projectPath` of a known project it uses that project's id and lists its workflows; `locale` picks the language.
-- `GET /api/v1/system/jvm-memory` — The performance audit measures memory with it without opening all of `/actuator/metrics`, which reveals routes and load profile and stays behind the key. The source is the MemoryMXBean, not Micrometer: `jvm.memory.max` sums over pools whose maximum is undefined (`-1`).
+- `GET /api/v1/system/integration-snippet` — With a `projectPath` of a known project it uses that project's id and lists its workflows; `locale` picks the language (default `en`).
+- `GET /api/v1/system/jvm-memory` — The performance audit measures memory with it without opening all of `/actuator/metrics`, which reveals routes and load profile and stays behind the key. The source is the MemoryMXBean, not Micrometer: `jvm.memory.max` sums over pools whose maximum is undefined (`-1`). Without a known heap maximum, maximum and percentage are `null` rather than guessed; the percentage has one decimal.
 - `PUT /api/v1/system/modules/{name}` — An unknown module name is 404; the change is recorded as a SECURITY entry in the activity log.
 - `POST /api/v1/system/open-path` — An empty, missing or system path (`/etc`, `/proc`, ...) is 400.
 - `POST /api/v1/system/remote-access/enable` — A failing Tailscale command, or an instance running in a container, is 503.
 - `POST /api/v1/system/repair-failed` — Without `force=true` only workflows with auto-repair enabled; sealed workflows are always skipped.
-- `GET /api/v1/system/request-metrics/daily` — Without `route` the rows of a single day are returned instead.
+- `GET /api/v1/system/request-metrics/daily` — Without `route` today's stored rows of all routes are returned instead, most expensive first; `days` (default 7, at most 90) only applies with `route`.
 - `GET /api/v1/system/settings/{key}` — `value` is the stored value or empty; `default`, only for a setting whose default comes from the startup configuration (`backup-retain-count`), is what applies while nothing is stored.
-- `PUT /api/v1/system/settings/{key}` — Keys outside the allowed list, or a missing `value`, are 400.
+- `PUT /api/v1/system/settings/{key}` — Keys outside the allowed list, or a missing `value`, are 400. `backup-retain-count` takes 1–365, checked before anything is stored, and applies from the next backup rotation on, also after a restart.
 - `PUT /api/v1/system/tray-config` — `publicUrl` must use HTTPS, plain HTTP only for localhost (400 otherwise).
 
 ## /api/v1/testing
@@ -804,19 +826,20 @@ Source: `TodoController` – TODOs: list, create, edit and close them, start the
 | `PUT /api/v1/todos/{id}` | Updates the fields sent in the body and leaves the others unchanged. | core |
 | `DELETE /api/v1/todos/{id}` | Deletes a TODO permanently. | core |
 | `POST /api/v1/todos/{id}/export` | Creates a task for the TODO in an external tracker and returns its reference; a TODO already exported returns the existing link. | `integrations` |
-| `PATCH /api/v1/todos/{id}/planning` | Sets a TODO's goal, rank and assessment (complexity, effort, reasoning, open question). | `goals` |
+| `PATCH /api/v1/todos/{id}/planning` | Sets a TODO's goal, work package, rank, assessment (complexity, effort, reasoning, open question) and decision. | `goals` |
 | `POST /api/v1/todos/{id}/resolve` | Starts the TODO's linked fix workflow and sets the TODO to IN_PROGRESS. | core |
 | `PATCH /api/v1/todos/{id}/status` | Sets the status of a TODO (`status` required), optionally recording the `sessionId` that changed it. | core |
 
 Notes:
 
-- `GET /api/v1/todos` — ARCHIVED TODOs only appear when `status` names them, an unknown status, priority or source returns 400, and `goalId=none` selects TODOs without a goal.
-- `POST /api/v1/todos` — Defaults are OPEN, MEDIUM and source USER; an unknown `projectId` or `linkedWorkflowId` returns 404, and a new OPEN TODO can start matching TODO triggers.
+- `GET /api/v1/todos` — ARCHIVED TODOs only appear when `status` names them; status, priority and source ignore case, an unknown value returns 400, and `goalId=none` selects TODOs without a goal.
+- `POST /api/v1/todos` — Defaults are OPEN, MEDIUM and source USER; an unknown `projectId` or `linkedWorkflowId` returns 404, and a new OPEN TODO can start matching TODO triggers. `agentSessionRef` keeps only the conversation UUID found in the value (a whole `claude --resume` command is accepted); a value without a UUID is dropped.
 - `POST /api/v1/todos/archive-stale` — Optional `projectId` scopes it to one project; omit to archive across all. Returns `{"archived": n}`.
 - `POST /api/v1/todos/bulk-status` — Returns `{"updated": n}`.
-- `GET /api/v1/todos/similar` — Frontend calls this to offer merge/link options to the user.
+- `GET /api/v1/todos/similar` — `projectId` and `title` are required. Frontend calls this to offer merge/link options to the user.
 - `PUT /api/v1/todos/{id}` — An empty `dueDate` or `linkedWorkflowId` clears it; an unknown project or workflow id returns 404.
 - `POST /api/v1/todos/{id}/export` — Provider and target come from the body or the project's `taskExport` setting.
+- `PATCH /api/v1/todos/{id}/planning` — A `goalId` in the same request is applied first; an unknown goal or work package is 404. `goalRank` of 0 or less removes the rank, a rank without a goal is 400. Sending `complexity`, `suggestedEffort` or `ratingNote` stamps `ratedAt`, with `ratedBy` defaulting to `USER`; other values than S/M/L/XL or low/medium/high/xhigh are 400.
 - `POST /api/v1/todos/{id}/resolve` — Returns 400 without a linked workflow and 409 when the TODO is DONE or its last fix run is still running.
 
 ## /api/v1/webhook
@@ -829,7 +852,7 @@ Source: `WebhookController` – Webhooks: manage the tokens that start a workflo
 
 Notes:
 
-- `POST /api/v1/webhook/trigger/{token}` — An optional JSON object body is merged over `defaultContext` (keys starting with `__` return 400); with a signing secret the call needs a valid `X-Signature` header, else 401.
+- `POST /api/v1/webhook/trigger/{token}` — An optional JSON object body is merged over `defaultContext` (keys starting with `__` return 400); with a signing secret the call needs a valid `X-Signature` header, else 401. A body that is no JSON object is 400, an unknown token 404, a disabled webhook 409.
 
 ## /api/v1/webhooks
 
@@ -846,12 +869,14 @@ Source: `WebhookController` – Webhooks: manage the tokens that start a workflo
 | `POST /api/v1/webhooks/{id}/enable` | Enables a webhook. | `webhooks` |
 | `POST /api/v1/webhooks/{id}/regenerate-token` | Rotates a webhook's secret token. | `webhooks` |
 | `POST /api/v1/webhooks/{id}/secret` | Creates or rotates the signing secret; the response is the only place it is ever shown. | `webhook-signatures` |
-| `DELETE /api/v1/webhooks/{id}/secret` | Removes the signing secret, so trigger calls no longer need a signature. | `webhook-signatures` |
+| `DELETE /api/v1/webhooks/{id}/secret` | Removes the signing secret, so trigger calls no longer need a signature; logged as `SECURITY`. | `webhook-signatures` |
 
 Notes:
 
+- `GET /api/v1/webhooks` — Masked means the first 8 characters plus `…`; only create and regenerate-token show the full token.
 - `POST /api/v1/webhooks` — Only this response shows the full token and URL (`tokenVisible: true`) – store them right away.
-- `POST /api/v1/webhooks/{id}/regenerate-token` — Like `#createWebhook`, the response is the only place the new token is ever revealed in full — every other management endpoint masks it.
+- `POST /api/v1/webhooks/{id}/regenerate-token` — Like creating a webhook, the response is the only place the new token is ever revealed in full — every other management endpoint masks it. The old token stops working at once; `lastTriggeredAt` and `triggerCount` stay, and a `SECURITY` entry is written to the activity log.
+- `POST /api/v1/webhooks/{id}/secret` — From then on every trigger call needs a valid signature; a `SECURITY` entry is logged.
 
 ## /api/v1/wishes
 
@@ -885,6 +910,10 @@ Source: `WorkflowTemplateController` – Workflow templates and blueprints: list
 | `PUT /api/v1/workflow-templates/{id}` | Changes the given fields of a template; fields left out stay as they are. | core |
 | `DELETE /api/v1/workflow-templates/{id}` | Deletes a user template (`204`); a built-in template is refused with `409`. | core |
 | `POST /api/v1/workflow-templates/{id}/install` | Creates a workflow from the template in a project, plus the blueprints its sub-workflow blocks call, wired to their new ids. | core |
+
+Notes:
+
+- `POST /api/v1/workflow-templates/{id}/install` — An unknown referenced blueprint is a 404 and nothing is created. A blank `name` or `description` takes the template's in `locale` (default English); `metadata` goes to the new workflow only, not to the blueprints it calls.
 
 ## /api/v1/workflows
 
@@ -937,16 +966,17 @@ Notes:
 
 - `POST /api/v1/workflows` — The first version row is written with it; unknown block types are rejected.
 - `GET /api/v1/workflows/analyze` — The answer is condensed on purpose: only counts per workflow, plus the distribution over the rules. The full findings come per workflow — a full output over hundreds of definitions would be a megabyte nobody reads.
-- `POST /api/v1/workflows/import` — With `updateIfExists` a workflow of the same name in the target project is updated instead (`200`); without `projectId` it goes to the collection project. A checksum in `integrity` that does not match the content is rejected with `400` before anything is written.
+- `POST /api/v1/workflows/import` — With `updateIfExists` a workflow of the same name in the target project is updated instead (`200`); without `projectId` it goes to the collection project. A checksum in `integrity` that does not match the content is rejected with `400` before anything is written. A blank `version` keeps the default label on a new workflow and the previous one on an update.
 - `POST /api/v1/workflows/import/bpmn` — Foreign BPMN, broken XML or oversized input → 400; nothing is created when the import fails (parsing and validation run before `create`).
-- `PUT /api/v1/workflows/{id}` — A definition change writes a new version and is refused on a sealed workflow (`409 WORKFLOW_SEALED`); name and `version` label are no definition change and stay editable.
+- `PUT /api/v1/workflows/{id}` — A definition change writes a new version and is refused on a sealed workflow (`409 WORKFLOW_SEALED`); name and `version` label are no definition change and stay editable. A blank `version` or one over 255 characters is 400 – leave the field out to keep the label.
 - `POST /api/v1/workflows/{id}/execute` — The optional `context` is merged over the workflow's default context. A refused start creates no run.
 - `POST /api/v1/workflows/{id}/optimize` — Changes nothing; a failed AI call comes back as `200` with `error: true` and a `message`.
 - `POST /api/v1/workflows/{id}/repair` — Without a failed run `400`; a sealed workflow is refused with `409 WORKFLOW_SEALED`.
 - `POST /api/v1/workflows/{id}/seal` — Afterwards definition changes and deletion are refused and a changed definition no longer starts.
+- `GET /api/v1/workflows/{id}/similar` — `limit` defaults to 5 and is capped at 20.
 - `POST /api/v1/workflows/{id}/unseal` — Refused with `403 SEAL_IMMUTABLE` while `automation.hardening.seal-immutable` is on.
 - `POST /api/v1/workflows/{id}/versions/{versionId}/restore` — A sealed workflow is refused with `409 WORKFLOW_SEALED`.
-- `POST /api/v1/workflows/{workflowId}/memory/extract` — Without `runIds` the workflow's latest runs are used; `provider` defaults to `CLAUDE`. No runs or no steps: `422`.
+- `POST /api/v1/workflows/{workflowId}/memory/extract` — Without `runIds` the workflow's latest runs are used; `provider` defaults to `CLAUDE`. No runs or no steps: `422`; a failed AI call: `502`.
 - `PUT /api/v1/workflows/{workflowId}/memory/{memoryId}/activate` — The active entry is written into the project before each run so the executing agent can read it.
 
 ## /api/v1/ws-ticket

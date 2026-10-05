@@ -36,6 +36,10 @@ public class NotificationController {
     /**
      * Creates a notification config (201); {@code name} and {@code channelType} ({@code WEBHOOK} or {@code DESKTOP}) are required.
      * Without {@code workflowId} it fires for every workflow; {@code messageTemplate} may use placeholders like {@code {{status}}}.
+     * {@code triggerOnSuccess} covers COMPLETED and COMPLETED_WITH_ERRORS, {@code triggerOnFailure} FAILED and
+     * INTERRUPTED, {@code triggerAlways} any status. Placeholders, written without spaces: {@code {{workflow_name}}},
+     * {@code {{workflow_id}}}, {@code {{run_id}}}, {@code {{status}}}, {@code {{error_message}}}; without a template a
+     * default message is sent. A {@code WEBHOOK} config without {@code webhookUrl} is accepted but sends nothing.
      */
     @PostMapping
     public ResponseEntity<NotificationConfigResponse> create(

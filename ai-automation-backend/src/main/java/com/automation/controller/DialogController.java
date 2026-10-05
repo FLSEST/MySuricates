@@ -43,8 +43,8 @@ public class DialogController {
 
     /**
      * Lists sessions with their metadata.
-     * With {@code projectPath} a high limit (one project, all sessions visible),
-     * without it a more conservative one (for "Other Sessions").
+     * {@code limit} (default 50) is capped at 2000 with {@code projectPath} (one project, all sessions visible)
+     * and at 500 without it (for "Other Sessions").
      */
     @GetMapping("/sessions")
     public List<DialogSessionInfo> listSessions(
@@ -64,6 +64,7 @@ public class DialogController {
 
     /**
      * Analyzes a session with AI and returns a workflow suggestion.
+     * {@code filePath} must be a {@code .jsonl} file under {@code ~/.claude/projects}; any other path is 400.
      */
     @PostMapping("/sessions/analyze")
     public DialogWorkflowSuggestion analyzeSession(
@@ -74,6 +75,7 @@ public class DialogController {
 
     /**
      * Creates a workflow from a suggestion (with optional user adjustments).
+     * {@code projectId} is required; the answer is 200 with the new workflow.
      */
     @PostMapping("/sessions/create-workflow")
     public ResponseEntity<WorkflowResponse> createWorkflow(

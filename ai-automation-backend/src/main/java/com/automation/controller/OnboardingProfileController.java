@@ -69,13 +69,20 @@ public class OnboardingProfileController {
         return ResponseEntity.noContent().build();
     }
 
-    /** Sets a built-in profile back to the current shipped text; the previous text goes into the history. */
+    /**
+     * Sets a built-in profile back to the current shipped text; the previous text goes into the history.
+     * A custom profile is a 400. Afterwards {@code customized} is {@code false}, and a changed text rewrites
+     * the onboarding files of the projects using the profile.
+     */
     @PostMapping("/{id}/reset")
     public OnboardingProfileResponse resetProfile(@PathVariable String id) {
         return toResponseWithHistory(profileService.resetToDefault(id));
     }
 
-    /** The current shipped text of a built-in profile, to compare with an edited one before taking it over. */
+    /**
+     * The current shipped text of a built-in profile, to compare with an edited one before taking it over.
+     * A custom profile has no shipped text: 404.
+     */
     @GetMapping("/{id}/shipped")
     public ShippedOnboardingProfileResponse getShipped(@PathVariable String id) {
         OnboardingProfile profile = profileService.findById(id);

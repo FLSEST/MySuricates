@@ -81,7 +81,8 @@ public class SystemAccessController {
 
     /**
      * Renders the base onboarding text as a Markdown snippet to paste into a project, e.g. into an {@code AGENTS.md}.
-     * With a {@code projectPath} of a known project it uses that project's id and lists its workflows; {@code locale} picks the language.
+     * With a {@code projectPath} of a known project it uses that project's id and lists its workflows; {@code locale} picks the
+     * language (default {@code en}).
      */
     @RequiresModule(ModuleCatalog.ONBOARDING_PROFILES)
     @GetMapping(value = "/integration-snippet", produces = "text/markdown")

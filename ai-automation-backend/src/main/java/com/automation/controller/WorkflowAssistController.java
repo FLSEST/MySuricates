@@ -51,7 +51,7 @@ public class WorkflowAssistController {
 
     /**
      * Lists other workflows whose block types overlap with this one, most similar first, at most {@code limit}
-     * entries.
+     * entries. {@code limit} defaults to 5 and is capped at 20.
      */
     @GetMapping("/{id}/similar")
     public List<Map<String, Object>> getSimilarWorkflows(

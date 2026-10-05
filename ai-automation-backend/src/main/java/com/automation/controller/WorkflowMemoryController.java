@@ -39,7 +39,7 @@ public class WorkflowMemoryController {
     /**
      * Has an AI summarize the steps of the given runs into a new, inactive memory entry and answers {@code 201}.
      * Without {@code runIds} the workflow's latest runs are used; {@code provider} defaults to {@code CLAUDE}.
-     * No runs or no steps: {@code 422}.
+     * No runs or no steps: {@code 422}; a failed AI call: {@code 502}.
      */
     @PostMapping("/extract")
     public ResponseEntity<?> extract(

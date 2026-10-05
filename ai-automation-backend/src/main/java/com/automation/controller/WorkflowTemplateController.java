@@ -74,7 +74,9 @@ public class WorkflowTemplateController {
 
     /**
      * Creates a workflow from the template in a project, plus the blueprints its sub-workflow blocks
-     * call, wired to their new ids (TODO 093d2f11).
+     * call, wired to their new ids (TODO 093d2f11). An unknown referenced blueprint is a 404 and nothing
+     * is created. A blank {@code name} or {@code description} takes the template's in {@code locale}
+     * (default English); {@code metadata} goes to the new workflow only, not to the blueprints it calls.
      */
     @PostMapping("/{id}/install")
     public ResponseEntity<TemplateInstallResponse> installTemplate(

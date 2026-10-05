@@ -36,7 +36,10 @@ public class WebhookController {
 
     // --- Management endpoints ---
 
-    /** Lists all webhooks; tokens and URLs are masked to their first characters. */
+    /**
+     * Lists all webhooks; tokens and URLs are masked to their first characters.
+     * Masked means the first 8 characters plus {@code …}; only create and regenerate-token show the full token.
+     */
     @GetMapping("/api/v1/webhooks")
     public List<WebhookTriggerResponse> listWebhooks(HttpServletRequest request) {
         return webhookService.findAll().stream()
@@ -83,23 +86,27 @@ public class WebhookController {
     }
 
     /**
-     * Rotates a webhook's secret token. Like {@link #createWebhook}, the response is the
-     * only place the new token is ever revealed in full — every other management endpoint
-     * masks it.
+     * Rotates a webhook's secret token. Like creating a webhook, the response is the only place the
+     * new token is ever revealed in full — every other management endpoint masks it. The old token
+     * stops working at once; {@code lastTriggeredAt} and {@code triggerCount} stay, and a
+     * {@code SECURITY} entry is written to the activity log.
      */
     @PostMapping("/api/v1/webhooks/{id}/regenerate-token")
     public WebhookTriggerResponse regenerateToken(@PathVariable String id, HttpServletRequest request) {
         return toResponseWithUrl(webhookService.regenerateToken(id), request, TokenVisibility.REVEAL);
     }
 
-    /** Creates or rotates the signing secret; the response is the only place it is ever shown. */
+    /**
+     * Creates or rotates the signing secret; the response is the only place it is ever shown.
+     * From then on every trigger call needs a valid signature; a {@code SECURITY} entry is logged.
+     */
     @RequiresModule(ModuleCatalog.WEBHOOK_SIGNATURES)
     @PostMapping("/api/v1/webhooks/{id}/secret")
     public WebhookSigningSecretResponse generateSigningSecret(@PathVariable String id) {
         return new WebhookSigningSecretResponse(webhookService.generateSigningSecret(id), WebhookSignatureVerifier.HEADER);
     }
 
-    /** Removes the signing secret, so trigger calls no longer need a signature. */
+    /** Removes the signing secret, so trigger calls no longer need a signature; logged as {@code SECURITY}. */
     @RequiresModule(ModuleCatalog.WEBHOOK_SIGNATURES)
     @DeleteMapping("/api/v1/webhooks/{id}/secret")
     public ResponseEntity<Void> removeSigningSecret(@PathVariable String id) {
@@ -119,7 +126,8 @@ public class WebhookController {
     /**
      * Starts the webhook's workflow without API key; the token in the path authorizes the call.
      * An optional JSON object body is merged over {@code defaultContext} (keys starting with {@code __} return 400);
-     * with a signing secret the call needs a valid {@code X-Signature} header, else 401.
+     * with a signing secret the call needs a valid {@code X-Signature} header, else 401. A body that is no
+     * JSON object is 400, an unknown token 404, a disabled webhook 409.
      */
     @PostMapping("/api/v1/webhook/trigger/{token}")
     public ResponseEntity<WorkflowRunResponse> triggerWebhook(

@@ -108,7 +108,8 @@ public class SystemController {
      * Returns the heap usage as exactly three numbers, without an API key (c2cda5ed). The performance
      * audit measures memory with it without opening all of {@code /actuator/metrics}, which reveals
      * routes and load profile and stays behind the key. The source is the MemoryMXBean, not Micrometer:
-     * {@code jvm.memory.max} sums over pools whose maximum is undefined ({@code -1}).
+     * {@code jvm.memory.max} sums over pools whose maximum is undefined ({@code -1}). Without a known heap
+     * maximum, maximum and percentage are {@code null} rather than guessed; the percentage has one decimal.
      */
     @GetMapping("/jvm-memory")
     public Map<String, Object> jvmMemory() {

@@ -28,8 +28,11 @@ public class DashboardReportAssistController {
 
     /**
      * Has an AI propose the fields of a {@code dashboard-report} block for {@code workflowId} from one of its runs.
-     * 400 for a missing id, 404 for an unknown workflow, 409 when the setting is off, the provider
-     * is missing, there is no usable run, or the answer did not match the contract.
+     * One tool-less call to the {@code CLAUDE} CLI over the tail of the latest run, checked against the
+     * {@code dashboard_widget} contract; neither the raw answer nor the run output leaves the server.
+     * 400 for a missing id, 404 for an unknown workflow, 409 (with a fixed message) when the execution setting
+     * {@code dashboard-report-assist-enabled} is off, the Claude CLI is missing on this host, there is no usable
+     * run, or the answer did not match the contract.
      */
     @PostMapping
     public DashboardReportAssistResponse propose(@RequestBody DashboardReportAssistRequest request) {

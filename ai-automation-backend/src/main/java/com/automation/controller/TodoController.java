@@ -49,8 +49,8 @@ public class TodoController {
 
     /**
      * Lists TODOs page by page, most urgent first, filtered by project, status, priority, source, tag, text or goal.
-     * ARCHIVED TODOs only appear when {@code status} names them, an unknown status, priority or source returns 400,
-     * and {@code goalId=none} selects TODOs without a goal.
+     * ARCHIVED TODOs only appear when {@code status} names them; status, priority and source ignore case, an unknown
+     * value returns 400, and {@code goalId=none} selects TODOs without a goal.
      */
     @GetMapping
     public PageResponse<TodoResponse> listTodos(
@@ -69,7 +69,8 @@ public class TodoController {
     /**
      * Creates a TODO and returns it with 201; only {@code title} is required.
      * Defaults are OPEN, MEDIUM and source USER; an unknown {@code projectId} or {@code linkedWorkflowId} returns 404,
-     * and a new OPEN TODO can start matching TODO triggers.
+     * and a new OPEN TODO can start matching TODO triggers. {@code agentSessionRef} keeps only the conversation UUID
+     * found in the value (a whole {@code claude --resume} command is accepted); a value without a UUID is dropped.
      */
     @PostMapping
     public ResponseEntity<TodoResponse> createTodo(@Valid @RequestBody CreateTodoRequest request) {
@@ -92,7 +93,13 @@ public class TodoController {
         return todoService.updateAndReturn(id, request);
     }
 
-    /** Sets a TODO's goal, rank and assessment (complexity, effort, reasoning, open question) – TODO dc0566f8. */
+    /**
+     * Sets a TODO's goal, work package, rank, assessment (complexity, effort, reasoning, open question) and decision.
+     * A {@code goalId} in the same request is applied first; an unknown goal or work package is 404.
+     * {@code goalRank} of 0 or less removes the rank, a rank without a goal is 400. Sending {@code complexity},
+     * {@code suggestedEffort} or {@code ratingNote} stamps {@code ratedAt}, with {@code ratedBy} defaulting to
+     * {@code USER}; other values than S/M/L/XL or low/medium/high/xhigh are 400.
+     */
     @PatchMapping("/{id}/planning")
     @RequiresModule(ModuleCatalog.GOALS)
     public TodoResponse updateTodoPlanning(@PathVariable String id, @RequestBody UpdateTodoPlanningRequest request) {
@@ -167,7 +174,7 @@ public class TodoController {
 
     /**
      * Check for similar TODOs before creating a new one.
-     * Frontend calls this to offer merge/link options to the user.
+     * {@code projectId} and {@code title} are required. Frontend calls this to offer merge/link options to the user.
      */
     @GetMapping("/similar")
     public List<SimilarTodoResponse> findSimilar(

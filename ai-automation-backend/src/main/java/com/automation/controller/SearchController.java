@@ -42,7 +42,7 @@ public class SearchController {
 
     /**
      * Searches workflows by name, description, tags and category for {@code q} and returns the best matches.
-     * An empty {@code q} yields an empty list; {@code limit} is capped at 50.
+     * An empty {@code q} yields an empty list; {@code limit} (default 20) is capped at 50.
      */
     @GetMapping
     public SearchResponse search(

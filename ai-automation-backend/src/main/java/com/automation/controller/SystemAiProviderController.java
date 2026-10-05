@@ -147,7 +147,9 @@ public class SystemAiProviderController {
 
     /**
      * Models the provider offers on this host, discovered from the CLI / its local caches and
-     * served from a TTL cache. Never fails because of a missing CLI — see {@link ModelCatalog#available()}.
+     * served from a TTL cache. A failed probe (CLI missing, timeout, unreadable output) never fails the
+     * request: {@code available} is then {@code false}, {@code reason} says why and {@code models} is empty.
+     * An unknown provider id is 404.
      */
     @GetMapping("/ai-providers/{id}/models")
     public ModelCatalog models(@PathVariable String id) {
@@ -163,7 +165,8 @@ public class SystemAiProviderController {
     /**
      * Per provider: program on the PATH, login found (file or environment variable), and the commands
      * for what is missing — for the start page and the settings (f5a273ae). Cached, see
-     * {@link AiProviderStatusService}; never a token or file content.
+     * {@link AiProviderStatusService}; never a token or file content. {@code READY} means program and
+     * login were found, not that the login is still valid.
      */
     @GetMapping("/ai-providers/status")
     public AiProviderStatusReport aiProviderStatus() {
