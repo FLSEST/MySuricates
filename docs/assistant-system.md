@@ -87,120 +87,13 @@ Das Assistant-System besteht aus fünf Bereichen:
 
 ## API-Endpunkte
 
-### Chat
+Anfrage- und Antwortformate stehen in der [API-Referenz](api-referenz.md) (Abschnitt zum Assistenten). Was
+dort nicht steht:
 
-```
-POST /api/v1/assistant/chat
-```
-
-Request-Body (`AssistantChatRequest`):
-```json
-{
-  "message": "Erkläre mir den letzten Workflow-Fehler",
-  "history": [{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}],
-  "context": {
-    "page": "workflows",
-    "entityId": "optional",
-    "projectId": "optional",
-    "workflowId": "abc-123",
-    "runId": "optional",
-    "pathname": "/workflows/abc-123"
-  },
-  "provider": "optional-provider-id",
-  "language": "de",
-  "sessionId": "optional-uuid",
-  "requestId": "optional-uuid"
-}
-```
-
-Response (`AssistantChatResponse`):
-```json
-{
-  "message": "Der Workflow ist fehlgeschlagen weil...",
-  "actions": [],
-  "model": "sonnet",
-  "provider": "CLAUDE",
-  "responseTimeMs": 3200,
-  "pendingTools": []
-}
-```
-
-- `message` (Pflicht), `history`, `context`, `provider`, `language`, `sessionId`, `requestId` — alle außer `message` optional
-- Ein `history`-Eintrag des Assistenten darf `toolResults` tragen: `[{"type": "create_workflow", "success": true, "message": "✓ Workflow created: …"}]` — die Ergebnisse der Werkzeuge, die der Nutzer in diesem Zug bestätigt hat (siehe „Werkzeug-Ergebnisse im Verlauf“). Ohne das Feld gilt die alte Form, der Prompt bleibt unverändert
-- `context.page` steuert, welche Plattform-Daten in den System-Prompt injiziert werden
-- `requestId` wird für WebSocket-Status-Updates verwendet (Topic `/topic/assistant/{requestId}/status`)
-- Response-Felder `provider`, `responseTimeMs` nur bei Wert vorhanden (`@JsonInclude(NON_NULL)`), `pendingTools` nur bei nicht-leer (`@JsonInclude(NON_EMPTY)`)
-- Ein `pendingTools`-Eintrag: `{"id", "type", "description", "subject", "params", "expiresAt"}` — `subject` ist der aufgelöste Name (Workflow-Name, Workflow des Laufs, Aufgaben-Titel, Ketten-Name; unauflösbar: gekürzte ID mit `params.ref = "id"`), `params` kleine Werte wie `priority`/`status`, `description` der englische Ersatzsatz für ältere Clients
-
-### Page Suggestions
-
-```
-GET  /api/v1/assistant/suggestions?page=workflows&locale=en
-POST /api/v1/assistant/suggestions/refresh?page=workflows&locale=en
-```
-
-- Vorschläge gibt es je Seite **und Sprache** (`locale` = `de` | `en`, Vorgabe `de`, V91). Das Frontend sendet die Sprache der Oberfläche, und der Refresh nach einem Chat nimmt die Sprache des Chats (`AssistantChatRequest.language`).
-- `GET` gibt gecachte Vorschläge als `List<String>` zurück (sofort, kein KI-Aufruf)
-- `POST /refresh` generiert neue Vorschläge via Claude und gibt sie zurück (blocking)
-
-### Pending Tools
-
-```
-POST /api/v1/assistant/pending-tools/{id}/confirm
-POST /api/v1/assistant/pending-tools/{id}/reject
-```
-
-Request-Body (optional): `{"sessionId": "uuid", "language": "en"}`
-
-- `confirm` führt das Tool aus und gibt `ToolExecutionResult` zurück (`{toolId, type, success, message}`)
-- `reject` markiert das Tool als abgelehnt (Message: `"✗ Abgelehnt"`)
-- Abgelaufene Tools (TTL 30 Min.) liefern HTTP **410 Gone** (Message: `"✗ Vorschlag abgelaufen"`)
-- Bei Angabe von `sessionId` wird das Ergebnis via `AssistantSessionService.appendToolResult()` in die Session geschrieben
-- `language` (`de` | `en`, Vorgabe deutsch) ist die Sprache der Oberfläche: Die Baufehler-Prüfung nach `create_workflow`/`update_workflow` antwortet darin
-
-## Datenbankschema
-
-### assistant_sessions (V41)
-
-Speichert Chat-Verläufe als JSON-Array pro Session.
-
-| Spalte | Typ | Beschreibung |
-|---|---|---|
-| `id` | TEXT PK | Session-UUID |
-| `page` | TEXT | UI-Seite (z.B. `"workflows"`) |
-| `entity_id` | TEXT | Optionale Entity-Referenz (z.B. Workflow-ID) |
-| `preview` | TEXT | Erste User-Nachricht (max 100 Zeichen, V58) |
-| `messages` | TEXT | JSON-Array der Chat-Nachrichten (volle Laenge) |
-| `message_count` | INTEGER | Anzahl der Nachrichten |
-| `started_at` | REAL | Erstellungszeitpunkt |
-| `ended_at` | REAL | Letzter Update |
-
-### page_suggestions (V42)
-
-Cached Vorschläge pro UI-Seite.
-
-| Spalte | Typ | Beschreibung |
-|---|---|---|
-| `id` | TEXT PK | UUID |
-| `page` | TEXT NOT NULL UNIQUE | UI-Seite (z.B. `"dashboard"`) |
-| `suggestions` | TEXT NOT NULL DEFAULT '[]' | JSON-Array der Vorschläge |
-| `generated_by` | TEXT NOT NULL DEFAULT 'CLAUDE' | Generator-Kennung |
-| `generated_at` | REAL NOT NULL | Zeitpunkt der letzten Generierung |
-| `based_on_sessions` | INTEGER NOT NULL DEFAULT 0 | Anzahl berücksichtigter Sessions |
-
-## Controller-Zuständigkeiten
-
-Beide Controller sind unter dem Base-Path `/api/v1/assistant` registriert:
-
-| Controller | Endpunkte | Beschreibung |
-|---|---|---|
-| `AssistantController` | `POST /chat` | Chat-Anfrage verarbeiten, Session persistieren |
-| `AssistantController` | `GET /sessions` | Letzte 50 Sessions mit Preview (ohne Messages) |
-| `AssistantController` | `GET /sessions/{id}` | Einzelne Session mit allen Nachrichten |
-| `AssistantController` | `DELETE /sessions/{id}` | Session löschen |
-| `AssistantController` | `POST /pending-tools/{id}/confirm` | PendingTool bestätigen und ausführen |
-| `AssistantController` | `POST /pending-tools/{id}/reject` | PendingTool ablehnen |
-| `PageSuggestionController` | `GET /suggestions`, `POST /suggestions/refresh` | Seitenspezifische Vorschläge |
+- `context.page` entscheidet, welche Plattform-Daten in den System-Prompt kommen (siehe [Kontext-Injektion](#kontext-injektion)); `requestId` ist das Thema der Status-Meldungen per WebSocket (`/topic/assistant/{requestId}/status`).
+- Ein `pendingTools`-Eintrag trägt `subject` — den aufgelösten Namen (Workflow-Name, Workflow des Laufs, Aufgaben-Titel, Ketten-Name; unauflösbar: gekürzte ID mit `params.ref = "id"`) — und `params` mit kleinen Werten wie `priority`/`status`; `description` ist der englische Ersatzsatz für ältere Clients.
+- Vorschläge gibt es je Seite **und Sprache** (`locale`, V91). Das Frontend fragt in der Sprache der Oberfläche, der Refresh nach einem Chat nimmt die Sprache des Chats. `GET /suggestions` antwortet aus dem Cache ohne KI-Aufruf, `POST /suggestions/refresh` erzeugt neu und blockiert.
+- `confirm` führt das Werkzeug aus, `reject` markiert es als abgelehnt (`"✗ Abgelehnt"`); ein abgelaufenes liefert **410 Gone** (`"✗ Vorschlag abgelaufen"`). Mit `sessionId` landet das Ergebnis über `AssistantSessionService.appendToolResult()` in der Session, `language` bestimmt die Sprache der Baufehler-Prüfung.
 
 ## Tools (Server-seitige Aktionen)
 
@@ -250,12 +143,6 @@ Ein Ergebnis kann fremden Text zitieren (Workflow-Name, Fehlermeldung). Wie bei 
 
 `AssistantToolExecutor.sanitizeJson()` normalisiert 10 Unicode-Fullwidth-Zeichen vor dem JSON-Parse (z.B. `，` → `,`, `：` → `:`, `｛`/`｝` → `{`/`}`, `"` / `"` → `"`).
 
-### Safety-Regeln
-
-- Alle Tool-Tags werden als PendingTools registriert — keine direkte Ausführung ohne User-Bestätigung
-- Abgelaufene PendingTools (>30 Min.) werden mit HTTP 410 Gone abgewiesen
-- `PendingToolRegistry.cleanupExpired()` räumt alle 5 Minuten auf
-
 ## Fetch-Mechanismus (Dynamisches Nachladen)
 
 Der Assistent kann über `<fetch type="..." id="..."/>`-Tags zusätzliche Daten nachladen. `AssistantFetchService` (`service/assistant/AssistantFetchService.java`) löst diese auf und liefert die Daten als Supplemental-Kontext zurück.
@@ -264,30 +151,13 @@ Der Assistent kann über `<fetch type="..." id="..."/>`-Tags zusätzliche Daten 
 - Truncation-Marker zeigen Größeninfo: `[... skipped N of M characters ...]` (tail-bewusst via `TruncationUtil.smart`, Kopf + Ende bleiben erhalten) bzw. `[Output truncated: N of M characters]` (Legacy head-first)
 - Auto-Fetch ist auf bestimmte Typen beschränkt (`AUTO_FETCH_TYPES`)
 
-### Verfügbare Fetch-Typen (18)
+### Fetch-Typen
 
-| Typ | Beschreibung | Truncation |
-|-----|-------------|------------|
-| `run_detail` | Run-Detail mit Steps | Error: smart(200,400), Output: smart(200,600) — tail-bewusst |
-| `step_output` | Einzelner Step-Output (`runId/stepNumber`); Paging via `?offset=<n>` / `?tail=<n>` | Default smart(2000,6000); Window/Tail max 8000 |
-| `workflow_detail` | Workflow-Überblick; je Block die Schlüssel, die sein Executor liest (`BlockConfigSummaryFormatter`, von `BlockSpecConfigKeysGateTest` geprüft) | Desc: 150, Instructions: 400, Prompt/Goal/Befehl: 200, Shell-Befehl: 300 |
-| `workflow-full` | Vollständiger Workflow inkl. Config | Instructions: 600, Config-Values: 300 |
-| `workflow-inputs` | Workflow-Input-Variablen | Values: 100 |
-| `workflow_runs` | Letzte Runs eines Workflows | Top 5, Error: 100 |
-| `find_workflow` | Workflow-Suche nach Name | Max 20 Ergebnisse |
-| `wish_detail` | Wish-Detail | Text: 200, Error: 300 |
-| `docs` | Dokumentations-Sektion | Voll: 8000, Sektion: 12000 |
-| `pool_workflows` | Alle Workflows im Pool | Desc: 120 |
-| `pool_workflow` | Einzelner Pool-Workflow, Blöcke wie `workflow_detail` | Instructions: 500 |
-| `project_context` | Projekt-Kontext via `ProjectContextService` | — |
-| `project_files` | Projekt-Dateiliste | Max 50 Top-Level, Tiefe 1, Max 10 Sub-Einträge |
-| `project_file` | Einzelne Projektdatei | Max 500KB, Content: 8000 |
-| `skill` | Skill-Detail | Desc: 200, AI-Context: 400, Capability-Desc: 100 |
-| `integration` | Integration-Detail | Desc: 200, Account: 80, Action-Desc: 100 |
-| `chain` | Chain-Detail | Desc: 200 |
-| `block-spec` | Block-Typ-Spezifikation je Typ (`BlockSpecs`, eine für jeden Typ der Registry; `BlockTypeListsGuardTest` hält sie vollständig, `BlockSpecConfigKeysGateTest` prüft jeden genannten Config-Schlüssel gegen den Quelltext des Executors; die Prompts von Factory, Wishes, Dialog-Import, Run-Konvertierung und Workflow-Optimierung rendern dieselben Texte mit `BlockSpecs.reference`) | — |
+Die Typen und ihre Kürzungsgrenzen stehen in den Handlern unter `service/assistant/fetch/`; welche ohne
+Rückfrage nachgeladen werden, legt `AssistantFetchPolicy.AUTO_FETCH_TYPES` fest. Zwei Regeln stehen nur hier:
 
-Doc-Dateien: `workflow-guide` → `docs/WORKFLOW-GUIDE.md`, `architektur` → `docs/architektur.md`, `vision` → `docs/vision.md`
+- `block-spec` liefert die Spezifikation eines Blocktyps aus `BlockSpecs` (eine für jeden Typ der Registry; `BlockTypeListsGuardTest` hält sie vollständig). Die Prompts von Factory, Wishes, Dialog-Import, Run-Konvertierung und Workflow-Optimierung rendern dieselben Texte mit `BlockSpecs.reference`, und `BlockSpecConfigKeysGateTest` prüft jeden dort genannten Config-Schlüssel gegen den Quelltext des Executors.
+- `docs` lädt nur drei Dateien (`DocsFetchHandler`): `workflow-guide` → `docs/WORKFLOW-GUIDE.md`, `architektur` → `docs/architektur.md`, `vision` → `docs/vision.md`. Ohne Abschnitt kommt das Inhaltsverzeichnis der `## `-Überschriften; einzelne Abschnitte gibt es nur im Workflow-Guide, sonst den Anfang der Datei.
 
 ## Kontext-Injektion
 
@@ -321,26 +191,12 @@ Doc-Dateien: `workflow-guide` → `docs/WORKFLOW-GUIDE.md`, `architektur` → `d
 
 **Sonderfall RUNS**: Wenn ein Run-ID aufgelöst werden kann, wird `buildRunFocusedSystemPrompt()` verwendet — ein schlanker Prompt mit nur dem Run/Workflow-Detail, ohne globale Sections. Der Workflow wird dabei separat per `workflowRepository.findById()` geladen (kein Lazy-Proxy-Zugriff — OSIV ist aus; kein `JOIN FETCH` — `@SQLRestriction` auf `Workflow` würde bei Soft-Delete `FetchNotFoundException` werfen). Bei **FAILED**-Runs wird die Diagnose-Evidenz direkt vorgeladen: Block-Typ + Block-Config des gescheiterten Steps sowie der Step-Output tail-bewusst (`TruncationUtil.smart(output, 500, 4000)`) — eine Diagnose braucht damit in der Regel keinen Fetch-Roundtrip mehr.
 
-### 9 Context-Section-Klassen (Paket `service/assistant/context/`)
+### Context-Section-Klassen
 
-Alle implementieren `AssistantContextSection` mit `append(StringBuilder sb, boolean compact)`:
-
-1. **RunsContextSection** — Aktive Runs + letzte 10 Runs
-2. **TodosContextSection** — Alle nicht-DONE Todos; compact: Counts nach Priorität, full: Top 10
-3. **WishesContextSection** — Aktive Wishes (Limit 5), fehlgeschlagene (Limit 5)
-4. **SchedulesContextSection** — Nächste 24h
-5. **SkillsIndexSection** — Max 20 Einträge, Desc: 80 Zeichen
-6. **IntegrationsIndexSection** — Alle Provider mit Connected/Disconnected-Status
-7. **ChainsIndexSection** — Max 15 Einträge, Desc: 80 Zeichen
-8. **BlockTypesIndexSection** — 20 Block-Typen (statische Liste; deckungsgleich mit den 20 registrierten Block-Executoren, gepinnt durch `BlockTypeListsGuardTest`; Config-Schlüssel in den Kurzbeschreibungen prüft `BlockSpecConfigKeysGateTest`)
-9. **FailedWorkflowsContextSection** — Kaputte Workflows via `WorkflowDebugService`, Error: 160 Zeichen
-
-### Zusätzlich auf **OVERVIEW**-Seiten
-
-- **Workflows** — Max **25** Workflows (fokussiertes Projekt priorisiert), Desc gekürzt auf **60** Zeichen
-- **Letzte 5 Sessions** — Erste User-Nachricht (**150** Zeichen) + erste Assistenten-Antwort (**100** Zeichen)
-- **Workflow Memory** — Bis zu **8** aktive Memories (**300** Zeichen pro Memory)
-- **Projekt-Dateien** — Max **300** Zeichen, nur `docs/`-Unterverzeichnis expandiert (Limit 5 Dateien)
+Die Sections sind Klassen im Paket `service/assistant/context/`, die meisten mit der Schnittstelle
+`AssistantContextSection` (`append(StringBuilder sb, boolean compact)`); wie viele Einträge und Zeichen sie
+zeigen, steht dort. `BlockTypesIndexSection` ist zugleich die Blocktyp-Liste des Assistenten, die
+`BlockTypeListsGuardTest` mit den Executoren gleich hält.
 
 ## Modell-Auswahl
 
@@ -365,25 +221,10 @@ Der Assistent ist als Floating-Panel im Root-Layout (`Layout.tsx`) implementiert
 
 ### Zustand Store (`stores/assistantStore.ts`)
 
-Persistence-Key: `'assistant-sessions'` (localStorage)
-
-| State | Typ | Default |
-|-------|-----|---------|
-| `open` | boolean | false |
-| `sessions` | ChatSession[] | [] |
-| `activeSessionId` | string \| null | null |
-| `showHistory` | boolean | false |
-| `panelWidth` | number | 420 |
-| `panelHeight` | number | 600 |
-| `pendingInput` | string \| null | null |
-| `pendingContext` | AssistantPageContext \| null | null |
-| `inFlight` | `{ sessionId, requestId, userMsgId }` \| null | null (flüchtig) |
-| `lastModel` | string \| null | null (flüchtig) |
-
-- `startNewSession()` — erzeugt neue Session, Limit **20** Sessions (`MAX_SESSIONS`)
-- `appendMessage()` — Preview aus erster User-Nachricht (60 Zeichen)
-- `hydrateSession()` — Backend-Session in den Store übernehmen (für History-Loading)
-- `pendingInput` / `pendingContext` — von externen Seiten gesetzt, beim nächsten Send konsumiert
+Persistiert unter `assistant-sessions` im `localStorage` (Sessions und Panel-Größe); höchstens 20 Sessions
+(`MAX_SESSIONS`), älteste fallen heraus. `pendingInput` und `pendingContext` setzen andere Seiten, die
+nächste Nachricht verbraucht sie (siehe [Externe Trigger](#externe-trigger)); `inFlight` und `lastModel`
+sind flüchtig. `hydrateSession()` übernimmt eine Backend-Session in den Store.
 
 ### Session-Management (`components/assistant/AssistantHistory.tsx`)
 
@@ -395,11 +236,9 @@ Persistence-Key: `'assistant-sessions'` (localStorage)
 
 ### Page Suggestions
 
-- `AssistantEmptyState` (`components/assistant/AssistantWelcome.tsx`): Anzeige wenn keine Nachrichten — MeerkatIcon + Suggestion-Buttons
-- `ContextChips` (gleiche Datei): Horizontale scrollbare Pill-Bar über Nachrichten (dismissible)
-- `SuggestionButton` in Header (`components/layout/Header.tsx`): Sparkles-Icon, Dropdown mit max 4 Vorschlägen
-- `CommandPalette` (`components/palette/CommandPalette.tsx`): „Ask the assistant"-Zeile ab 2 Zeichen Query
-- Klick auf Suggestion füllt Input vor (kein Auto-Send)
+Vorschläge erscheinen im leeren Panel (`components/assistant/AssistantWelcome.tsx`), als Chips über den
+Nachrichten, im Header (`SuggestionButton`, höchstens vier) und als Zeile „Ask the assistant“ in der
+Command-Palette. Ein Klick füllt nur das Eingabefeld, gesendet wird nicht automatisch.
 
 ### WebSocket-Integration (`hooks/useAssistantWebSocket.ts`)
 
@@ -418,9 +257,9 @@ Zwei STOMP-Subscriptions:
 
 ### Weitere Komponenten
 
-- **AssistantMessage** (`components/assistant/AssistantMessage.tsx`): Nachrichtenblase mit Collapse ab 300 px Höhe; Markdown-Rendering (react-markdown + remark-gfm) in `AssistantMarkdown.tsx`, `ActionButton.tsx` für `run_workflow`/`show_workflow`/`show_run`/`start_wish`/`ask_choice`, `PendingToolCard.tsx` mit Confirm/Reject (Zustand in `hooks/usePendingToolDecision.ts`)
-- **StatusIndicator** (`components/assistant/AssistantWelcome.tsx`): WebSocket-Phasen oder rotierende Thinking-Phrases (2,5s Intervall)
-- **assistantPanelUtils** (`components/assistantPanelUtils.ts`): `parsePageContext(pathname)` extrahiert strukturierten Kontext aus URL
+Den Seitenkontext (`context.page`, IDs) leitet `parsePageContext(pathname)` in
+`components/assistantPanelUtils.ts` aus der URL ab. Nachricht, Markdown, Aktionsknöpfe und die
+Bestätigungskarte liegen unter `components/assistant/`.
 
 ### Externe Trigger
 
