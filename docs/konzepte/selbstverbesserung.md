@@ -1,4 +1,3 @@
-<!-- concept-facts-sha256: 47f72cd8883f6032a246606f7af297a20af1c83a1a13ed6078d019d53951318a -->
 <!-- concept-source: d7e7e28cf7209b4369ad33467bb4fe781a178baa -->
 
 # Der Selbstverbesserungs-Kreislauf
@@ -24,18 +23,7 @@ Der Mechanismus trennt Erkennung, Arbeitsauftrag, Ausführung und Bewertung. Dad
 
 ## Nachteile und Kosten
 
-Der Nutzen hängt stark von guten Trigger-Regeln, TODO-Qualität und nachgelagerter Verifikation ab. Aktuell sind acht aktive TODO-Trigger nur ein Bestandswert, kein Effektivitätsnachweis. Dass bei 2016 von 2018 TODOs kein optionaler resolutionState gesetzt ist, belegt keine unterbrochene Prüfkette, sondern fehlende Daten auf einem manuellen Resolve-Pfad. Kausaler Nutzen, Fehlerquote und Verifikationsabdeckung fehlen ausdrücklich.
-
-## Betriebsbeleg
-
-Messung: **2026-09-19 (UTC)**, eine lokale Entwicklungsinstanz. Bestandszähler beziehen sich auf die über REST sichtbaren Datensätze; Schrittzahlen zählen gespeicherte Schritte mit Typ-Metadaten im 30-Tage-Fenster. Wrapper zählen einmal. Dies ist kein Wirksamkeitsnachweis.
-
-| Messgröße | Anzahl / Bezugsgröße |
-|---|---:|
-| TODOs ohne Zustand im optionalen Resolve-Pfad | 2016 / 2018 |
-| Aktive TODO-Trigger | 8 |
-
-[Definitionen, Messgrenzen und Rohzähler](betriebsdaten.json) · [Messmethode und Wiederholung](README.md)
+Der Nutzen hängt stark von guten Trigger-Regeln, TODO-Qualität und nachgelagerter Verifikation ab. Belege für kausalen Nutzen, Fehlerquote und Verifikationsabdeckung fehlen.
 
 ## Im Code
 

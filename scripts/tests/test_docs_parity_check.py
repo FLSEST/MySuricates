@@ -299,7 +299,8 @@ class SectionPairingTest(unittest.TestCase):
         self.assertEqual(self.align(de, en), (["## Eins"], []))
 
     def test_concept_page_prose_sections(self):
-        # Nachbau von docs/konzepte/*.md: feste Gliederung, reine Prosa, ganz uebersetzte
+        # Nachbau von docs/konzepte/*.md im damaligen Stand (mit Messabschnitt, den die Seiten seit
+        # TODO 1ab3ad21 nicht mehr haben): feste Gliederung, reine Prosa, ganz uebersetzte
         # Ueberschriften. Fehlte "Vorteile", nannte die Pruefung "Nachteile und Kosten" -- der
         # Betriebsbeleg teilt mit ihm die Zahl `263` und zog ihn zu sich (TODO 3fbff015).
         de = ("# Haertung\n\n## Wofür taugt das?\n" + "Ein Absatz ueber den Zweck. " * 28 + "\n\n"
@@ -348,7 +349,6 @@ class StockPairingTest(unittest.TestCase):
         ("konzepte/gates.md", "## Wofür taugt das?"),
         ("konzepte/haertung.md", "## Wofür taugt das?"),
         ("konzepte/haertung.md", "## Vorteile"),
-        ("konzepte/haertung.md", "## Betriebsbeleg"),
         ("konzepte/messen-vor-bewerten.md", "## Wofür taugt das?"),
         ("konzepte/messen-vor-bewerten.md", "## Vorteile"),
         ("konzepte/persistenz-herkunft.md", "## Wofür taugt das?"),
@@ -356,7 +356,6 @@ class StockPairingTest(unittest.TestCase):
         ("konzepte/selbstverbesserung.md", "## Wofür taugt das?"),
         ("konzepte/workflow-memory.md", "## Wofür taugt das?"),
         ("konzepte/workflow-memory.md", "## Vorteile"),
-        ("konzepte/workflow-memory.md", "## Betriebsbeleg"),
         ("konzepte/zugaenge.md", "## Wofür taugt das?"),
         ("konzepte/zugaenge.md", "## Vorteile"),
     )

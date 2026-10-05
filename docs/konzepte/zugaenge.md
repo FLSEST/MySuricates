@@ -1,4 +1,3 @@
-<!-- concept-facts-sha256: 47f72cd8883f6032a246606f7af297a20af1c83a1a13ed6078d019d53951318a -->
 <!-- concept-source: d7e7e28cf7209b4369ad33467bb4fe781a178baa -->
 
 # Zugaenge: Zeitplan, Ereignis, Plugin und UI
@@ -25,22 +24,6 @@ Der wichtigste Nutzen ist Vereinheitlichung: neue Startwege müssen nicht jeweil
 ## Nachteile und Kosten
 
 Die Lösung garantiert keine genau-einmalige Ausführung. Unbeaufsichtigte Starts hängen von Konfiguration und aktivierten Triggern ab, nicht allein vom Code. Außerdem ist der Betrieb auf einen API-Schlüssel und lokalen Einbenutzerbetrieb ausgelegt; Mandanten- oder Rechtekonzepte sind damit nicht belegt.
-
-Der aktuelle Betriebsbefund ist nur ein Bestand: 24 von 48 Zeitplänen sind aktiv, aktive Webhooks fehlen, TODO-Trigger sind aktiv, Abschluss-Trigger nicht. Daraus lassen sich weder Nutzung, fachlicher Nutzen, Fehlerquote noch Prüfungsabdeckung ableiten; ältere Lebenszeitvergleiche fehlen wegen Aufbewahrung, Soft-Deletion und veränderlicher Metadaten.
-
-## Betriebsbeleg
-
-Messung: **2026-09-19 (UTC)**, eine lokale Entwicklungsinstanz. Bestandszähler beziehen sich auf die über REST sichtbaren Datensätze; Schrittzahlen zählen gespeicherte Schritte mit Typ-Metadaten im 30-Tage-Fenster. Wrapper zählen einmal. Dies ist kein Wirksamkeitsnachweis.
-
-| Messgröße | Anzahl / Bezugsgröße |
-|---|---:|
-| Aktive Zeitpläne | 24 |
-| Zeitpläne insgesamt | 48 |
-| Aktive Webhooks | 0 |
-| Aktive TODO-Trigger | 8 |
-| Aktive Abschluss-Trigger | 0 |
-
-[Definitionen, Messgrenzen und Rohzähler](betriebsdaten.json) · [Messmethode und Wiederholung](README.md)
 
 ## Im Code
 

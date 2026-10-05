@@ -1,6 +1,5 @@
 <!-- last-sync: 2026-09-23 from: docs/konzepte/haertung.md -->
 
-<!-- concept-facts-sha256: 47f72cd8883f6032a246606f7af297a20af1c83a1a13ed6078d019d53951318a -->
 <!-- concept-source: d7e7e28cf7209b4369ad33467bb4fe781a178baa -->
 
 # Hardening: Seal, Admission, and Taint
@@ -24,18 +23,7 @@ This is useful, for example, for production automations that start on a schedule
 
 ## Drawbacks and costs
 
-Hardening is not complete prompt-injection protection, not a process sandbox, and not a trust guarantee for imported definitions. More protection means operational effort: workflows must be sealed deliberately, and optional rules can block unattended runs. The current operational finding shows 263 API-visible workflow definitions in active projects, 0 of them sealed. This is an inventory value, not a measure of execution or usefulness. Domain-level benefit, error rates, and verification coverage are missing; older ticket counts are not comparable because of retention, soft deletion, and changed metadata.
-
-## Operational evidence
-
-Measurement: **2026-09-19 (UTC)**, one local development instance. Inventory counters refer to the records visible via REST; step counts count stored steps with type metadata in the 30-day window. Wrappers count once. This is not proof of effectiveness.
-
-| Metric | Count / denominator |
-|---|---:|
-| Sealed visible workflows | 0 / 263 |
-| Visible workflows in active projects | 263 |
-
-[Definitions, measurement limits, and raw counters](../../konzepte/betriebsdaten.json) · [Measurement method and repetition](README.md)
+Hardening is not complete prompt-injection protection, not a process sandbox, and not a trust guarantee for imported definitions. More protection means operational effort: workflows must be sealed deliberately, and optional rules can block unattended runs.
 
 ## In the code
 

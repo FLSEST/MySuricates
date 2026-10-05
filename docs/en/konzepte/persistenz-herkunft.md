@@ -1,6 +1,5 @@
 <!-- last-sync: 2026-09-23 from: docs/konzepte/persistenz-herkunft.md -->
 
-<!-- concept-facts-sha256: 47f72cd8883f6032a246606f7af297a20af1c83a1a13ed6078d019d53951318a -->
 <!-- concept-source: d7e7e28cf7209b4369ad33467bb4fe781a178baa -->
 
 # Persistence and provenance
@@ -23,18 +22,7 @@ The mechanism separates readable metadata from the executable definition: name, 
 
 ## Drawbacks and costs
 
-Provenance can be disabled; in that case, the hash and version reference remain empty. Legacy data may be missing. The definition hash does not prove the origin of an imported file and is not a snapshot of the environment, input data, or external services. Retention limits the history, while soft deletion and changed metadata make time-based comparisons harder. Currently, 1235 runs are retained in the dataset; this is not a lifetime value and is not limited to 30 days. 856 of 1253 AI TODOs have a non-empty session ID, but that does not prove resumable transcripts. From this inventory data, there are no reliable statements about usefulness, error rate, or test coverage.
-
-## Operational evidence
-
-Measurement: **2026-09-19 (UTC)**, a local development instance. Inventory counters refer to the datasets visible via REST; step counts count stored steps with type metadata in the 30-day window. Wrappers are counted once. This is not evidence of effectiveness.
-
-| Metric | Count / reference size |
-|---|---:|
-| Stored runs (all periods) | 1235 |
-| AI TODOs with filled session ID | 856 / 1253 |
-
-[Definitions, measurement limits, and raw counters](../../konzepte/betriebsdaten.json) · [Measurement method and repetition](README.md)
+Provenance can be disabled; in that case, the hash and version reference remain empty. Legacy data may be missing. The definition hash does not prove the origin of an imported file and is not a snapshot of the environment, input data, or external services. Retention limits the history, while soft deletion and changed metadata make time-based comparisons harder. A populated session ID on an AI TODO does not prove a resumable transcript.
 
 ## In the code
 

@@ -1,4 +1,3 @@
-<!-- concept-facts-sha256: 47f72cd8883f6032a246606f7af297a20af1c83a1a13ed6078d019d53951318a -->
 <!-- concept-source: d7e7e28cf7209b4369ad33467bb4fe781a178baa -->
 
 # Deterministisch messen vor KI-Bewertung
@@ -22,19 +21,7 @@ Der Mechanismus spart Modellarbeit dort, wo einfache Werkzeuge reichen. Messunge
 
 ## Nachteile und Kosten
 
-Shell ist nicht kostenlos: Befehle brauchen Zeit, Ressourcen, Pflege und passende Werkzeuge. Ergebnisse sind nur so gut wie Messskripte, Datenqualität und aktuelle Umgebung; veränderte Daten können andere Resultate erzeugen. Ein Betriebsbefund zeigt vor allem Nutzung: In der 30-Tage-Stichprobe machen Shell-Schritte einen großen Anteil der typisierten Schrittaufzeichnungen aus, während für viele sichtbare Workflow-Definitionen kein Lauf mehr gespeichert ist. Das belegt keinen fachlichen Nutzen, keine Kosteneinsparung und keine Fehlerquote. Daten zu Verifikationsabdeckung und kausalem Nutzen fehlen.
-
-## Betriebsbeleg
-
-Messung: **2026-09-19 (UTC)**, eine lokale Entwicklungsinstanz. Bestandszähler beziehen sich auf die über REST sichtbaren Datensätze; Schrittzahlen zählen gespeicherte Schritte mit Typ-Metadaten im 30-Tage-Fenster. Wrapper zählen einmal. Dies ist kein Wirksamkeitsnachweis.
-
-| Messgröße | Anzahl / Bezugsgröße |
-|---|---:|
-| Shell-Schritte im 30-Tage-Fenster | 144 / 223 |
-| Simple-Schritte im 30-Tage-Fenster | 41 / 223 |
-| Workflows ohne gespeicherten Run | 202 / 263 |
-
-[Definitionen, Messgrenzen und Rohzähler](betriebsdaten.json) · [Messmethode und Wiederholung](README.md)
+Shell ist nicht kostenlos: Befehle brauchen Zeit, Ressourcen, Pflege und passende Werkzeuge. Ergebnisse sind nur so gut wie Messskripte, Datenqualität und aktuelle Umgebung; veränderte Daten können andere Resultate erzeugen. Daten zu Verifikationsabdeckung und kausalem Nutzen fehlen.
 
 ## Im Code
 
