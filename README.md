@@ -14,33 +14,6 @@ A research project on the question of how software development and other work ch
 and how that work can be put together in different ways from repeatable, as traceable as possible
 building blocks — and a working system in which this can be observed.
 
-## Questions that come up along the way
-
-There are already very different answers to these questions today.
-
-> **How do I work with strong LLMs if I don't just want to hand agent systems more tasks on demand
-> or simply let them run free?**
-
-1. Tasks and side threads that come out of a piece of work **do not disappear into the void** — TODO
-   system, history. MySuricates knows the project, the project knows MySuricates. On top of that,
-   workflows that **think of the things that were forgotten during the session**.
-2. How do I build flows that **combine deterministic and non-deterministic** — and how do I make that
-   **visible** (versions, runs, process steps)? And from there: what different kinds of steps does
-   that take?
-3. How do I make the whole thing **independent of providers**?
-4. How do I build **loops (loop engineering)** like the audit system that make a run comparable with
-   earlier ones, find questions that were already asked, and let **people evaluate** the result?
-5. From this, **many additional ideas** emerged: how to get there, how to connect it, how to make it
-   visible.
-
-The answers are building blocks, and you don't need all of them. What you already have, you connect —
-an existing task system instead of the built-in TODOs, for example. Which building block belongs to
-which answer, and which approaches (loop engineering, spec-driven development or orchestrating
-agents, for example) can be built from the same blocks, is shown in [Building blocks](docs/en/baukasten.md).
-
-After installation only the core is on (preset `core`); `research` and `full` switch on further
-modules — which ones is listed under [Before you start it](#before-you-start-it) and in [Building blocks](docs/en/baukasten.md).
-
 ## Quickstart
 
 Just trying it out — all you need is Docker:
@@ -65,7 +38,7 @@ Ordered by depth: the overview first, then the individual building blocks, then 
 
 | Document | Content |
 |---|---|
-| [Building blocks](docs/en/baukasten.md) | The question behind it and its four answers as building blocks: what belongs to the core, what is switched on, what you have yourself or connect — and approaches such as loop engineering or spec-driven development built from the same blocks |
+| [Building blocks](docs/en/baukasten.md) | The starting question and its answers as building blocks: what belongs to the core, what is switched on, what you have yourself or connect — and approaches such as loop engineering or spec-driven development built from the same blocks |
 | [Getting Started](docs/en/GETTING-STARTED.md) | Try it out without installation (tryout image) and first installation with the guided installer (container, machine, or dev · test · prod) |
 
 **Building blocks in depth**
@@ -97,6 +70,33 @@ Ordered by depth: the overview first, then the individual building blocks, then 
 | [Frontend](docs/en/frontend.md) | Structure and rules: state, API client, i18n, design system and themes |
 
 For agents that call the REST API directly, [AGENTS.md](AGENTS.md) is the starting point.
+
+## Questions that come up along the way
+
+There are already very different answers to these questions today.
+
+> **How do I work with strong LLMs if I don't just want to hand agent systems more tasks on demand
+> or simply let them run free?**
+
+1. Tasks and side threads that come out of a piece of work **do not disappear into the void** — TODO
+   system, history. MySuricates knows the project, the project knows MySuricates. On top of that,
+   workflows that **think of the things that were forgotten during the session**.
+2. How do I build flows that **combine deterministic and non-deterministic** — and how do I make that
+   **visible** (versions, runs, process steps)? And from there: what different kinds of steps does
+   that take?
+3. How do I make the whole thing **independent of providers**?
+4. How do I build **loops (loop engineering)** like the audit system that make a run comparable with
+   earlier ones, find questions that were already asked, and let **people evaluate** the result?
+5. From this, **many additional ideas** emerged: how to get there, how to connect it, how to make it
+   visible.
+
+The answers are building blocks, and you don't need all of them. What you already have, you connect —
+an existing task system instead of the built-in TODOs, for example. Which building block belongs to
+which answer, and which approaches (loop engineering, spec-driven development or orchestrating
+agents, for example) can be built from the same blocks, is shown in [Building blocks](docs/en/baukasten.md).
+
+After installation only the core is on (preset `core`); `research` and `full` switch on further
+modules — which ones is listed under [Before you start it](#before-you-start-it) and in [Building blocks](docs/en/baukasten.md).
 
 ## Guiding ideas
 

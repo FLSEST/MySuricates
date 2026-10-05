@@ -14,34 +14,6 @@ Ein Forschungsprojekt zur Frage, wie sich Softwareentwicklung und andere Arbeit 
 und wie sich diese Arbeit aus wiederholbaren, möglichst nachvollziehbaren Bausteinen unterschiedlich
 zusammensetzen lässt — und ein lauffähiges System, an dem sich das beobachten lässt.
 
-## Fragen, die dabei entstehen
-
-Auf diese Fragen gibt es heute schon sehr unterschiedliche Antworten.
-
-> **Wie arbeite ich mit starken LLMs, wenn ich Agentensystemen nicht nur auf Zuruf weitere Aufgaben geben
-> oder sie einfach frei laufen lassen will?**
-
-1. Aufgaben und Nebenstränge, die aus einer Arbeit entstehen, **verschwinden nicht im Leeren** —
-   TODO-System, Historie. MySuricates kennt das Projekt, das Projekt kennt MySuricates. Dazu Workflows,
-   die **an Sachen denken, die in der Sitzung vergessen gingen**.
-2. Wie baue ich Abläufe, die **deterministisch und nicht-deterministisch kombinieren** — und wie mache
-   ich das **sichtbar** (Versionen, Läufe, Prozessschritte)? Daraus dann: was braucht es da alles für
-   unterschiedliche Schritte?
-3. Wie mache ich das Ganze **unabhängig von Anbietern**?
-4. Wie baue ich **Schleifen (Loop-Engineering)** wie das Audit-System, die einen Lauf mit früheren
-   vergleichbar machen, schon einmal gestellte Fragen wiederfinden und das Ergebnis von **Menschen
-   bewerten** lassen?
-5. Daraus sind **viele zusätzliche Ideen** entstanden: wie man dahin kommt, wie man es verknüpft, wie
-   man es sichtbar macht.
-
-Die Antworten sind Bausteine, und man braucht nicht alle. Was man schon hat, schließt man an — etwa
-ein vorhandenes Aufgabensystem statt der eigenen TODOs. Welcher Baustein zu welcher Antwort gehört und
-welche Ansätze (etwa Loop-Engineering, Spec-Driven Development oder Agenten orchestrieren) sich aus
-denselben Bausteinen bauen lassen, zeigt der [Baukasten](docs/baukasten.md).
-
-Nach der Installation ist nur der Kern an (Preset `core`); `research` und `full` schalten weitere
-Module zu — welche, steht unter [Bevor du es startest](#bevor-du-es-startest) und im [Baukasten](docs/baukasten.md).
-
 ## Schnellstart
 
 Nur ausprobieren — dafuer braucht es nur Docker:
@@ -66,7 +38,7 @@ Geordnet nach Tiefe: erst der Überblick, dann die einzelnen Bausteine, dann das
 
 | Dokument | Inhalt |
 |---|---|
-| [Baukasten](docs/baukasten.md) | Die Frage dahinter und ihre vier Antworten als Bausteine: was zum Kern gehoert, was zugeschaltet wird, was man selbst hat oder anschliesst — und Ansaetze wie Loop-Engineering oder Spec-Driven Development aus denselben Bausteinen |
+| [Baukasten](docs/baukasten.md) | Die Ausgangsfrage und ihre Antworten als Bausteine: was zum Kern gehoert, was zugeschaltet wird, was man selbst hat oder anschliesst — und Ansaetze wie Loop-Engineering oder Spec-Driven Development aus denselben Bausteinen |
 | [Getting Started](docs/GETTING-STARTED.md) | Ausprobieren ohne Installation (Tryout-Image) und Erstinstallation mit dem gefuehrten Installer (Container, Rechner oder Dev · Test · Prod) |
 
 **Bausteine vertiefen**
@@ -98,6 +70,34 @@ Geordnet nach Tiefe: erst der Überblick, dann die einzelnen Bausteine, dann das
 | [Frontend](docs/frontend.md) | Aufbau und Regeln: State, API-Client, i18n, Design-System und Themes |
 
 Fuer Agenten, die die REST-API direkt ansprechen, ist [AGENTS.md](AGENTS.md) der Einstieg.
+
+## Fragen, die dabei entstehen
+
+Auf diese Fragen gibt es heute schon sehr unterschiedliche Antworten.
+
+> **Wie arbeite ich mit starken LLMs, wenn ich Agentensystemen nicht nur auf Zuruf weitere Aufgaben geben
+> oder sie einfach frei laufen lassen will?**
+
+1. Aufgaben und Nebenstränge, die aus einer Arbeit entstehen, **verschwinden nicht im Leeren** —
+   TODO-System, Historie. MySuricates kennt das Projekt, das Projekt kennt MySuricates. Dazu Workflows,
+   die **an Sachen denken, die in der Sitzung vergessen gingen**.
+2. Wie baue ich Abläufe, die **deterministisch und nicht-deterministisch kombinieren** — und wie mache
+   ich das **sichtbar** (Versionen, Läufe, Prozessschritte)? Daraus dann: was braucht es da alles für
+   unterschiedliche Schritte?
+3. Wie mache ich das Ganze **unabhängig von Anbietern**?
+4. Wie baue ich **Schleifen (Loop-Engineering)** wie das Audit-System, die einen Lauf mit früheren
+   vergleichbar machen, schon einmal gestellte Fragen wiederfinden und das Ergebnis von **Menschen
+   bewerten** lassen?
+5. Daraus sind **viele zusätzliche Ideen** entstanden: wie man dahin kommt, wie man es verknüpft, wie
+   man es sichtbar macht.
+
+Die Antworten sind Bausteine, und man braucht nicht alle. Was man schon hat, schließt man an — etwa
+ein vorhandenes Aufgabensystem statt der eigenen TODOs. Welcher Baustein zu welcher Antwort gehört und
+welche Ansätze (etwa Loop-Engineering, Spec-Driven Development oder Agenten orchestrieren) sich aus
+denselben Bausteinen bauen lassen, zeigt der [Baukasten](docs/baukasten.md).
+
+Nach der Installation ist nur der Kern an (Preset `core`); `research` und `full` schalten weitere
+Module zu — welche, steht unter [Bevor du es startest](#bevor-du-es-startest) und im [Baukasten](docs/baukasten.md).
 
 ## Leitideen
 
