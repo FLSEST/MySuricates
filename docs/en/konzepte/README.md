@@ -79,6 +79,9 @@ python3 scripts/concepts/pages.py check --root . --work docs/en/konzepte --langu
 python3 scripts/concepts/pages.py check --root . --work docs/konzepte --only gates,haertung
 ```
 
+Two catalog entries (`zusammenstoepseln`, `anbieter-unabhaengig`) have no page yet; without `--only`,
+`check` reports them as missing.
+
 The [catalog](../../../scripts/concepts/catalog.json) is the shared source for
 topics, code evidence, both language versions of the Mermaid diagrams, and the
 rows of the overview. The comment on each page contains the checked source commit.
