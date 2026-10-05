@@ -167,38 +167,24 @@ findet die Varianten unter [KI-Anbieter im Container](docs/deployment.md#ki-anbi
 
 ## Installation
 
-> Neuer Rechner (Linux, macOS, Windows ueber WSL2), evtl. ohne Java/Node/Docker? → **[Getting Started](docs/GETTING-STARTED.md)**
-> fuehrt Schritt fuer Schritt durch das Setup. Kurzform: `git clone https://github.com/FLSEST/MySuricates.git && cd MySuricates && ./scripts/setup.sh`.
-
-**Voraussetzung fuer KI-Bloecke:** Mindestens eine der unterstuetzten Kommandozeilen muss auf dem
-Rechner installiert und angemeldet sein — `claude` (Anthropic), `codex` (OpenAI) oder `pi`. Ohne
-eine davon laufen nur die deterministischen Bloecke (Shell, Verzweigung, Schleife). Der Installer
-zeigt an, welche CLIs er gefunden hat und ob sie angemeldet sind, verlangt aber keine — ohne CLI
-scheitern KI-Bloecke erst zur Laufzeit.
-
-Dauerhaft einrichten:
-
 ```bash
-git clone https://github.com/FLSEST/MySuricates.git
-cd MySuricates
+git clone https://github.com/FLSEST/MySuricates.git && cd MySuricates
 ./scripts/setup.sh              # gefuehrt, auf Englisch; auf Deutsch: ./scripts/setup.sh --lang de
 ```
 
-Der Installer fragt nach dem Weg — eine Instanz im Container (empfohlen), direkt auf dem Rechner
-oder gestuft **Dev · Test · Prod** — und nach den Modulen, installiert fehlende Werkzeuge nach
-Rueckfrage, baut und startet die Instanz. Danach: http://localhost:9090, den API-Key zeigt
-`scripts/instance.sh key --name main`. Die Instanz lauscht nur auf `127.0.0.1`; der Docker-Socket
-wird nur auf ausdruecklichen Wunsch eingebunden.
+Der Installer fragt nach dem Weg – eine Instanz im Container (empfohlen), direkt auf dem Rechner oder
+gestuft Dev · Test · Prod – und nach den Modulen, installiert fehlende Werkzeuge nach Rückfrage und
+startet die Instanz. Am Ende nennt er ihre Adresse: Sie lauscht nur auf `127.0.0.1`, auf Port 9090 oder
+dem nächsten freien; gestuft bekommt jede Stufe ihren eigenen Port. Den API-Key zeigt
+`scripts/instance.sh key --name main`. Schritt für Schritt, auch unter Windows über WSL2:
+[Getting Started](docs/GETTING-STARTED.md).
 
-Wer an MySuricates selbst entwickelt: `./scripts/setup.sh --from-source --start` richtet ein, baut
-das Runtime-JAR und startet damit gleich `./scripts/start-mysuricates-dev.sh` — Backend auf :9090
-und Vite mit Hot Reload auf :3000, in einer Instanz. Ohne `--start` endet der Installer mit
-demselben Befehl als Hinweis; von da an ist er der Weg, die Dev-Instanz zu starten, zu stoppen
-(`stop`) und nach einer Aenderung neu zu bauen (`restart`). Er ist idempotent und startet keine
-zweite Instanz. Siehe [Entwicklung](docs/entwicklung.md).
+**KI-Blöcke** brauchen mindestens eine angemeldete Kommandozeile – `claude`, `codex` oder `pi`. Der
+Installer zeigt, welche er findet, verlangt aber keine; ohne sie laufen nur die deterministischen Blöcke.
 
-<!-- Screenshot-Platzhalter -->
-<!-- ![Dashboard](docs/screenshots/dashboard.png) -->
+**Am Code mitarbeiten:** `./scripts/setup.sh --from-source --start` richtet ein und startet die
+Dev-Instanz (Backend auf :9090, Vite mit Hot Reload auf :3000); danach startet, stoppt und baut
+`./scripts/start-mysuricates-dev.sh start|stop|restart` sie neu. Siehe [Entwicklung](docs/entwicklung.md).
 
 ## Beiträge und Support
 

@@ -163,37 +163,24 @@ memory, or histories. If you want to share less or everything, see the variants 
 
 ## Installation
 
-> New machine (Linux, macOS, Windows via WSL2), possibly without Java/Node/Docker? → **[Getting Started](docs/en/GETTING-STARTED.md)**
-> guides you through the setup step by step. Short version: `git clone https://github.com/FLSEST/MySuricates.git && cd MySuricates && ./scripts/setup.sh`.
-
-**Requirement for AI blocks:** At least one of the supported command lines must be installed and
-logged in on the machine — `claude` (Anthropic), `codex` (OpenAI), or `pi`. Without one of them,
-only the deterministic blocks run (shell, branch, loop). The installer shows which CLIs it found and
-whether they are logged in, but does not require any — without a CLI, AI blocks fail only at runtime.
-
-Set up permanently:
-
 ```bash
-git clone https://github.com/FLSEST/MySuricates.git
-cd MySuricates
+git clone https://github.com/FLSEST/MySuricates.git && cd MySuricates
 ./scripts/setup.sh              # guided, in English; in German: ./scripts/setup.sh --lang de
 ```
 
-The installer asks for the path — an instance in a container (recommended), directly on the machine,
-or staged **Dev · Test · Prod** — and for the modules, installs missing tools after confirmation,
-builds, and starts the instance. Afterwards: http://localhost:9090, the API key is shown by
-`scripts/instance.sh key --name main`. The instance listens only on `127.0.0.1`; the Docker socket
-is mounted only on explicit request.
+The installer asks for the route – one instance in a container (recommended), directly on the machine,
+or staged Dev · Test · Prod – and for the modules, installs missing tools after asking, and starts the
+instance. At the end it shows the address: the instance listens only on `127.0.0.1`, on port 9090 or
+the next free one; when staged, each stage gets its own port. `scripts/instance.sh key --name main`
+shows the API key. Step by step, also on Windows via WSL2: [Getting Started](docs/en/GETTING-STARTED.md).
 
-If you develop MySuricates itself: `./scripts/setup.sh --from-source --start` sets it up, builds
-the runtime JAR, and immediately starts `./scripts/start-mysuricates-dev.sh` with it — backend on
-:9090 and Vite with hot reload on :3000, in one instance. Without `--start`, the installer ends with
-the same command as a hint; from then on, it is the way to start and stop (`stop`) the dev instance
-and to rebuild after a change (`restart`). It is idempotent and does not start a second instance.
-See [Development](docs/en/entwicklung.md).
+**AI blocks** need at least one logged-in command line – `claude`, `codex`, or `pi`. The installer
+shows which ones it finds but requires none; without one, only the deterministic blocks run.
 
-<!-- Screenshot placeholder -->
-<!-- ![Dashboard](docs/screenshots/dashboard.png) -->
+**Working on the code:** `./scripts/setup.sh --from-source --start` sets up and starts the dev instance
+(backend on :9090, Vite with hot reload on :3000); afterwards
+`./scripts/start-mysuricates-dev.sh start|stop|restart` starts, stops and rebuilds it. See
+[Development](docs/en/entwicklung.md).
 
 ## Contributions and support
 
