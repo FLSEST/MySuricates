@@ -68,11 +68,19 @@ public class GoalController {
         return goalService.list(status, projectId);
     }
 
+    /**
+     * Creates a goal (201); {@code title} is required, optional {@code projectIds} are attached in that order.
+     * An unknown project id is a 404.
+     */
     @PostMapping
     public ResponseEntity<GoalResponse> createGoal(@Valid @RequestBody CreateGoalRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(goalService.create(request));
     }
 
+    /**
+     * Returns the goal with its TODOs, progress per project, projects, work packages and milestones.
+     * Reading records the moment a work package or milestone is first found complete or reached.
+     */
     @GetMapping("/{id}")
     public GoalDetailResponse getGoal(@PathVariable String id) {
         return goalService.detail(id);
@@ -89,6 +97,7 @@ public class GoalController {
         return relationsService.relations(id, include);
     }
 
+    /** Partially updates a goal: {@code null} keeps a field, an empty {@code description} or {@code targetDate} clears it. */
     @PutMapping("/{id}")
     public GoalResponse updateGoal(@PathVariable String id, @RequestBody UpdateGoalRequest request) {
         return goalService.update(id, request);
@@ -160,6 +169,10 @@ public class GoalController {
         return workPackageService.list(id);
     }
 
+    /**
+     * Adds a work package at the end of its project (201); without {@code projectId} only if the goal has exactly one project.
+     * A named project not yet in the goal is added to it; {@code startDate} and {@code endDate} come together or not at all.
+     */
     @PostMapping("/{id}/work-packages")
     public ResponseEntity<GoalWorkPackageResponse> createWorkPackage(@PathVariable String id,
                                                                      @Valid @RequestBody CreateGoalWorkPackageRequest request) {
@@ -172,6 +185,10 @@ public class GoalController {
         return workPackageService.reorder(id, request.ids());
     }
 
+    /**
+     * Partially updates a work package; {@code ""} clears a date, the result needs both dates or none (else 400).
+     * {@code projectId} can change only while no TODOs are assigned to the package.
+     */
     @PutMapping("/{id}/work-packages/{workPackageId}")
     public GoalWorkPackageResponse updateWorkPackage(@PathVariable String id, @PathVariable String workPackageId,
                                                      @RequestBody UpdateGoalWorkPackageRequest request) {
@@ -191,6 +208,7 @@ public class GoalController {
         return milestoneService.list(id);
     }
 
+    /** Creates a milestone (201); {@code dueDate} is required, {@code workPackageIds} must belong to the same goal. */
     @PostMapping("/{id}/milestones")
     public ResponseEntity<GoalMilestoneResponse> createMilestone(@PathVariable String id,
                                                                  @Valid @RequestBody CreateGoalMilestoneRequest request) {

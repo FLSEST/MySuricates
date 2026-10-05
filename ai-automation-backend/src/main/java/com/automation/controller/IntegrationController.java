@@ -47,6 +47,7 @@ public class IntegrationController {
         this.responses = new IntegrationProviderResponses(objectMapper);
     }
 
+    /** Lists all providers with connection status, actions and account info; top-level fields describe {@code default}. */
     @GetMapping
     public List<IntegrationProviderResponse> listProviders() {
         return registry.getAllProviders().stream()
@@ -54,6 +55,7 @@ public class IntegrationController {
                 .toList();
     }
 
+    /** Returns one provider with the same fields as the list. */
     @GetMapping("/{providerId}")
     public IntegrationProviderResponse getProvider(@PathVariable String providerId) {
         return toProviderResponse(registry.getProvider(providerId));
@@ -69,6 +71,10 @@ public class IntegrationController {
                 .toList();
     }
 
+    /**
+     * Returns the OAuth {@code authorizationUrl} for the popup and the {@code callbackOrigin} its result comes from.
+     * {@code frontendOrigin} must be the API's own origin or one CORS allows (else 400); no client credentials is a 409.
+     */
     @GetMapping("/{providerId}/connect")
     public Map<String, String> getAuthorizationUrl(
             @PathVariable String providerId,
@@ -106,6 +112,10 @@ public class IntegrationController {
         return OAuthCallbackPage.render(connection.getProviderId(), callbackOrigin);
     }
 
+    /**
+     * Stores {@code clientId} and {@code clientSecret} encrypted for the connection, creating it if new.
+     * Both are required unless the provider needs no credentials; a provider without OAuth flow checks them right away.
+     */
     @PostMapping("/{providerId}/credentials")
     public IntegrationProviderResponse saveCredentials(
             @PathVariable String providerId,
@@ -126,6 +136,7 @@ public class IntegrationController {
         return toProviderResponse(provider);
     }
 
+    /** Disconnects: clears the stored tokens and revokes an OAuth token at the provider; client credentials stay (204). */
     @DeleteMapping("/{providerId}/connection")
     public ResponseEntity<Void> disconnect(@PathVariable String providerId,
                                            @RequestParam(required = false) String connection) {
@@ -133,6 +144,7 @@ public class IntegrationController {
         return ResponseEntity.noContent().build();
     }
 
+    /** Deletes the whole connection including its client credentials and revokes an OAuth token at the provider (204). */
     @DeleteMapping("/{providerId}/credentials")
     public ResponseEntity<Void> deleteCredentials(@PathVariable String providerId,
                                                   @RequestParam(required = false) String connection) {
@@ -140,6 +152,7 @@ public class IntegrationController {
         return ResponseEntity.noContent().build();
     }
 
+    /** Lists the provider's actions; {@code available} is {@code false} when the connection lacks a required scope. */
     @GetMapping("/{providerId}/actions")
     public List<IntegrationActionResponse> getActions(@PathVariable String providerId,
                                                       @RequestParam(required = false) String connection) {
@@ -149,6 +162,7 @@ public class IntegrationController {
         return responses.actions(provider, scopes);
     }
 
+    /** Runs one action with the body as its parameters and returns the provider's result; an unconnected provider is a 409. */
     @PostMapping("/{providerId}/actions/{action}")
     public ResponseEntity<Object> testAction(
             @PathVariable String providerId,
@@ -162,6 +176,7 @@ public class IntegrationController {
         return ResponseEntity.ok(result);
     }
 
+    /** Lists the targets a TODO can be exported to (e.g. boards or lists); empty if the provider cannot export or the call fails. */
     @GetMapping("/{providerId}/task-targets")
     public List<TaskExportCapable.TaskTarget> taskTargets(@PathVariable String providerId,
                                                           @RequestParam(required = false) String connection) {

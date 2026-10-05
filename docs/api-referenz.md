@@ -117,7 +117,7 @@ Quelle: `ActivityLogController` – Activity log: read the platform's event log 
 Quellen:
 
 - `AssistantController` – AI assistant chat: messages, stored chat sessions and confirming or rejecting the tools it proposes.
-- `PageSuggestionController`
+- `PageSuggestionController` – Quick-action suggestions the assistant offers per page of the UI.
 
 | Endpunkt | Zweck | Modul |
 |---|---|---|
@@ -127,8 +127,8 @@ Quellen:
 | `GET /api/v1/assistant/sessions` | Lists the most recent assistant chat sessions, newest first. | `assistant` |
 | `GET /api/v1/assistant/sessions/{id}` | Returns one assistant chat session with its messages. | `assistant` |
 | `DELETE /api/v1/assistant/sessions/{id}` | Deletes an assistant chat session. | `assistant` |
-| `GET /api/v1/assistant/suggestions` |  | `assistant` |
-| `POST /api/v1/assistant/suggestions/refresh` |  | `assistant` |
+| `GET /api/v1/assistant/suggestions` | Returns the stored quick-action suggestions for `page`, or built-in defaults if none are stored yet. | `assistant` |
+| `POST /api/v1/assistant/suggestions/refresh` | Generates new suggestions for `page` with an AI call based on recent assistant sessions, stores and returns them. | `assistant` |
 
 ## /api/v1/audit-findings
 
@@ -271,25 +271,25 @@ Quelle: `DocsController` – Serves the Markdown documentation from the configur
 
 ## /api/v1/executions
 
-Quelle: `ExecutionController`
+Quelle: `ExecutionController` – Workflow runs: list and inspect them, control running ones and answer the questions they wait on.
 
 | Endpunkt | Zweck | Modul |
 |---|---|---|
-| `GET /api/v1/executions` |  | Kern |
+| `GET /api/v1/executions` | Lists workflow runs page by page, newest first, without their steps (fetch one run for those). | Kern |
 | `GET /api/v1/executions/pending-input` | Alle Läufe, die gerade auf eine Antwort warten — Approvals und Human-Input, die ältesten zuerst. | Kern |
-| `GET /api/v1/executions/{id}` |  | Kern |
+| `GET /api/v1/executions/{id}` | Returns one workflow run including all its steps. | Kern |
 | `DELETE /api/v1/executions/{id}` | Loescht einen Lauf samt Schritten und den losen Verweisen darauf. | Kern |
-| `GET /api/v1/executions/{id}/approval` |  | Kern |
+| `GET /api/v1/executions/{id}/approval` | Returns the approval or human input the run is waiting for, or `{"pending": false}`. | Kern |
 | `POST /api/v1/executions/{id}/approve` | Beantwortet die offene Frage des Laufs. | Kern |
-| `POST /api/v1/executions/{id}/cancel` |  | Kern |
-| `POST /api/v1/executions/{id}/command` |  | Kern |
+| `POST /api/v1/executions/{id}/cancel` | Cancels a running or queued run. | Kern |
+| `POST /api/v1/executions/{id}/command` | Sends an ad-hoc command to the Claude session in the container of a running run and returns its output. | Kern |
 | `GET /api/v1/executions/{id}/live-log` | Gepufferte Live-Zeilen eines Laufs (nur im Speicher, bis ~10 min nach Laufende) fuer das Replay nach einem Reload. | Kern |
-| `PATCH /api/v1/executions/{id}/notes` |  | Kern |
-| `POST /api/v1/executions/{id}/pause` |  | Kern |
-| `POST /api/v1/executions/{id}/resume` |  | Kern |
-| `POST /api/v1/executions/{id}/resume-from-step` |  | Kern |
-| `POST /api/v1/executions/{id}/retry` |  | Kern |
-| `POST /api/v1/executions/{id}/todos/approve` |  | Kern |
+| `PATCH /api/v1/executions/{id}/notes` | Stores a free-text note on the run; a blank `notes` removes it. | Kern |
+| `POST /api/v1/executions/{id}/pause` | Pauses a running run before its next block; answers 200 even if the run is not active. | Kern |
+| `POST /api/v1/executions/{id}/resume` | Resumes a paused run; answers 200 even if the run is not active. | Kern |
+| `POST /api/v1/executions/{id}/resume-from-step` | Continues an `INTERRUPTED` run after its last completed step; without completed steps it starts over. | Kern |
+| `POST /api/v1/executions/{id}/retry` | Starts the run's workflow again as a new run with the same input context. | Kern |
+| `POST /api/v1/executions/{id}/todos/approve` | Creates (`approved: true`) or discards the TODOs a run proposed for approval. | Kern |
 
 ## /api/v1/factory
 
@@ -313,18 +313,18 @@ Quellen:
 | Endpunkt | Zweck | Modul |
 |---|---|---|
 | `GET /api/v1/goals` | Ohne `status`: aktive und erledigte Ziele, neueste zuerst. | `goals` |
-| `POST /api/v1/goals` |  | `goals` |
-| `GET /api/v1/goals/{goalId}/workflows` |  | `goals` |
-| `POST /api/v1/goals/{goalId}/workflows` |  | `goals` |
-| `PATCH /api/v1/goals/{goalId}/workflows/{attachmentId}` |  | `goals` |
+| `POST /api/v1/goals` | Creates a goal (201); `title` is required, optional `projectIds` are attached in that order. | `goals` |
+| `GET /api/v1/goals/{goalId}/workflows` | Lists the workflows attached to the goal: the guard first (if switched on), then those on the goal, then those on work packages. | `goals` |
+| `POST /api/v1/goals/{goalId}/workflows` | Attaches a workflow to the goal or one of its work packages (201); `role` is `WORKER` (default) or `STATUS`. | `goals` |
+| `PATCH /api/v1/goals/{goalId}/workflows/{attachmentId}` | Changes the role of an attachment (`WORKER` or `STATUS`); the `guard` entry cannot be changed (400). | `goals` |
 | `DELETE /api/v1/goals/{goalId}/workflows/{attachmentId}` | Loest die Zuordnung, der Workflow bleibt; `guard` → 400 (der Waechter hat seinen Schalter). | `goals` |
-| `GET /api/v1/goals/{id}` |  | `goals` |
-| `PUT /api/v1/goals/{id}` |  | `goals` |
+| `GET /api/v1/goals/{id}` | Returns the goal with its TODOs, progress per project, projects, work packages and milestones. | `goals` |
+| `PUT /api/v1/goals/{id}` | Partially updates a goal: `null` keeps a field, an empty `description` or `targetDate` clears it. | `goals` |
 | `DELETE /api/v1/goals/{id}` | Loescht das Ziel; seine TODOs bleiben und verlieren nur die Zuordnung, ein Waechter pausiert. | `goals` |
 | `GET /api/v1/goals/{id}/candidates` | „Könnte dazugehören“: offene TODOs ohne Ziel, standardmaessig nur aus den Projekten des Ziels (`allProjects=true`: aus allen). | `goals` |
 | `POST /api/v1/goals/{id}/guard` | Ziel-Waechter ein- oder ausschalten: beim ersten Einschalten Workflow aus der Vorlage `goal-guard` plus taeglicher Zeitplan, danach nur noch Zeitplan an/aus. | `goals` |
 | `GET /api/v1/goals/{id}/milestones` | Meilensteine des Ziels nach Datum, dann Titel, mit Zustand und Paket-Zaehlern. | `goals` |
-| `POST /api/v1/goals/{id}/milestones` |  | `goals` |
+| `POST /api/v1/goals/{id}/milestones` | Creates a milestone (201); `dueDate` is required, `workPackageIds` must belong to the same goal. | `goals` |
 | `PUT /api/v1/goals/{id}/milestones/{milestoneId}` | `workPackageIds` ersetzt die Verknuepfungen; `reached` nur ohne verknuepfte Pakete. | `goals` |
 | `DELETE /api/v1/goals/{id}/milestones/{milestoneId}` | Loescht den Meilenstein; die verknuepften Arbeitspakete bleiben. | `goals` |
 | `PUT /api/v1/goals/{id}/order` | Reihenfolge: die genannten TODOs bekommen Rang 1..n, alle uebrigen des Ziels keinen. | `goals` |
@@ -334,9 +334,9 @@ Quellen:
 | `GET /api/v1/goals/{id}/relations` | Relationskarte: je TODO Herkunft, Bearbeitung (Fix-Workflow, passende TodoTrigger) und Ergebnis. | `goals` |
 | `POST /api/v1/goals/{id}/todos` | Ordnet TODOs dem Ziel zu (ohne Rang – sie stehen hinter den eingeordneten). | `goals` |
 | `GET /api/v1/goals/{id}/work-packages` | Arbeitspakete des Ziels nach Projekt-Position und Position im Projekt, mit Zustand (OPEN/DUE_SOON/OVERDUE/REACHED auf Basis des Endes; ohne Zeitraum nur OPEN/REACHED) und Zaehlern. | `goals` |
-| `POST /api/v1/goals/{id}/work-packages` |  | `goals` |
+| `POST /api/v1/goals/{id}/work-packages` | Adds a work package at the end of its project (201); without `projectId` only if the goal has exactly one project. | `goals` |
 | `PUT /api/v1/goals/{id}/work-packages/order` | Arbeitspakete EINES Projekts neu ordnen; Antwort: alle Arbeitspakete des Ziels. | `goals` |
-| `PUT /api/v1/goals/{id}/work-packages/{workPackageId}` |  | `goals` |
+| `PUT /api/v1/goals/{id}/work-packages/{workPackageId}` | Partially updates a work package; `""` clears a date, the result needs both dates or none (else 400). | `goals` |
 | `DELETE /api/v1/goals/{id}/work-packages/{workPackageId}` | Loescht das Arbeitspaket; seine TODOs bleiben im Ziel, Meilensteine verlieren die Verknuepfung. | `goals` |
 
 ## /api/v1/integrations
@@ -345,63 +345,63 @@ Quelle: `IntegrationController` – Integration providers and their connections.
 
 | Endpunkt | Zweck | Modul |
 |---|---|---|
-| `GET /api/v1/integrations` |  | `integrations` |
-| `GET /api/v1/integrations/{providerId}` |  | `integrations` |
-| `GET /api/v1/integrations/{providerId}/actions` |  | `integrations` |
-| `POST /api/v1/integrations/{providerId}/actions/{action}` |  | `integrations` |
+| `GET /api/v1/integrations` | Lists all providers with connection status, actions and account info; top-level fields describe `default`. | `integrations` |
+| `GET /api/v1/integrations/{providerId}` | Returns one provider with the same fields as the list. | `integrations` |
+| `GET /api/v1/integrations/{providerId}/actions` | Lists the provider's actions; `available` is `false` when the connection lacks a required scope. | `integrations` |
+| `POST /api/v1/integrations/{providerId}/actions/{action}` | Runs one action with the body as its parameters and returns the provider's result; an unconnected provider is a 409. | `integrations` |
 | `GET /api/v1/integrations/{providerId}/callback` | OAuth2 callback endpoint — public (no API key required). | `integrations` |
-| `GET /api/v1/integrations/{providerId}/connect` |  | `integrations` |
-| `DELETE /api/v1/integrations/{providerId}/connection` |  | `integrations` |
+| `GET /api/v1/integrations/{providerId}/connect` | Returns the OAuth `authorizationUrl` for the popup and the `callbackOrigin` its result comes from. | `integrations` |
+| `DELETE /api/v1/integrations/{providerId}/connection` | Disconnects: clears the stored tokens and revokes an OAuth token at the provider; client credentials stay (204). | `integrations` |
 | `GET /api/v1/integrations/{providerId}/connections` | Every stored connection of a provider, `default` first. | `integrations` |
-| `POST /api/v1/integrations/{providerId}/credentials` |  | `integrations` |
-| `DELETE /api/v1/integrations/{providerId}/credentials` |  | `integrations` |
-| `GET /api/v1/integrations/{providerId}/task-targets` |  | `integrations` |
+| `POST /api/v1/integrations/{providerId}/credentials` | Stores `clientId` and `clientSecret` encrypted for the connection, creating it if new. | `integrations` |
+| `DELETE /api/v1/integrations/{providerId}/credentials` | Deletes the whole connection including its client credentials and revokes an OAuth token at the provider (204). | `integrations` |
+| `GET /api/v1/integrations/{providerId}/task-targets` | Lists the targets a TODO can be exported to (e.g. boards or lists); empty if the provider cannot export or the call fails. | `integrations` |
 
 ## /api/v1/learning
 
-Quelle: `LearningController` – Dashboard, platform stats and run rating are core; analytics belong to the learning module.
+Quelle: `LearningController` – Run statistics: dashboard figures, platform counts, per-workflow and per-run analytics, and run ratings.
 
 | Endpunkt | Zweck | Modul |
 |---|---|---|
-| `GET /api/v1/learning/dashboard` |  | Kern |
-| `GET /api/v1/learning/platform-stats` |  | Kern |
-| `GET /api/v1/learning/runs/{runId}/insights` |  | `learning` |
-| `POST /api/v1/learning/runs/{runId}/rate` |  | Kern |
-| `GET /api/v1/learning/workflows/{workflowId}/agentic-analytics` |  | `learning` |
-| `GET /api/v1/learning/workflows/{workflowId}/agentic-history` |  | `learning` |
-| `GET /api/v1/learning/workflows/{workflowId}/execution-insights` |  | `learning` |
-| `GET /api/v1/learning/workflows/{workflowId}/similar` |  | `learning` |
-| `GET /api/v1/learning/workflows/{workflowId}/stats` |  | `learning` |
-| `GET /api/v1/learning/workflows/{workflowId}/step-analytics` |  | `learning` |
-| `GET /api/v1/learning/workflows/{workflowId}/suggestions` |  | `learning` |
-| `GET /api/v1/learning/workflows/{workflowId}/tool-patterns` |  | `learning` |
+| `GET /api/v1/learning/dashboard` | Returns the dashboard figures for the last `days` days: runs, success rate, cost, tokens, time series and per-model stats. | Kern |
+| `GET /api/v1/learning/platform-stats` | Returns platform-wide counts: projects, workflows, skills, templates, schedules, webhooks, chains, triggers, TODOs and wishes. | Kern |
+| `GET /api/v1/learning/runs/{runId}/insights` | Returns cost and token sums of one run plus the figures per step. | `learning` |
+| `POST /api/v1/learning/runs/{runId}/rate` | Stores a user rating for a run; the query parameter `rating` must be between 1 and 5. | Kern |
+| `GET /api/v1/learning/workflows/{workflowId}/agentic-analytics` | Summarizes the recent agentic steps of a workflow: how often the goal was reached and the average iterations. | `learning` |
+| `GET /api/v1/learning/workflows/{workflowId}/agentic-history` | Lists the most recent agentic steps of a workflow with goal, iterations, outcome and the sequence of actions taken. | `learning` |
+| `GET /api/v1/learning/workflows/{workflowId}/execution-insights` | Returns cost and token sums over all runs of a workflow, plus the models used. | `learning` |
+| `GET /api/v1/learning/workflows/{workflowId}/similar` | Lists other workflows with a similar set of block types, most similar first. | `learning` |
+| `GET /api/v1/learning/workflows/{workflowId}/stats` | Returns run statistics of one workflow: counts per outcome, success rate, durations and average rating. | `learning` |
+| `GET /api/v1/learning/workflows/{workflowId}/step-analytics` | Returns statistics per step index of a workflow across all its runs. | `learning` |
+| `GET /api/v1/learning/workflows/{workflowId}/suggestions` | Returns optimization hints derived from the workflow's runs, e.g. low success rate, failing or slow steps, high cost. | `learning` |
+| `GET /api/v1/learning/workflows/{workflowId}/tool-patterns` | Returns which tools the workflow's AI steps used, how often, and recurring tool sequences. | `learning` |
 
 ## /api/v1/notifications
 
-Quelle: `NotificationController`
+Quelle: `NotificationController` – Notification configs that send a webhook or desktop message when a workflow run finishes.
 
 | Endpunkt | Zweck | Modul |
 |---|---|---|
-| `GET /api/v1/notifications` |  | Kern |
-| `POST /api/v1/notifications` |  | Kern |
-| `GET /api/v1/notifications/{id}` |  | Kern |
-| `DELETE /api/v1/notifications/{id}` |  | Kern |
-| `POST /api/v1/notifications/{id}/disable` |  | Kern |
-| `POST /api/v1/notifications/{id}/enable` |  | Kern |
+| `GET /api/v1/notifications` | Lists all notification configs. | Kern |
+| `POST /api/v1/notifications` | Creates a notification config (201); `name` and `channelType` (`WEBHOOK` or `DESKTOP`) are required. | Kern |
+| `GET /api/v1/notifications/{id}` | Returns one notification config. | Kern |
+| `DELETE /api/v1/notifications/{id}` | Deletes the notification config (204). | Kern |
+| `POST /api/v1/notifications/{id}/disable` | Switches the notification config off. | Kern |
+| `POST /api/v1/notifications/{id}/enable` | Switches the notification config on. | Kern |
 
 ## /api/v1/onboarding-profiles
 
-Quelle: `OnboardingProfileController`
+Quelle: `OnboardingProfileController` – Onboarding profiles: the built-in and custom texts a project's onboarding file for AI agents is assembled from.
 
 | Endpunkt | Zweck | Modul |
 |---|---|---|
-| `GET /api/v1/onboarding-profiles` |  | `onboarding-profiles` |
-| `POST /api/v1/onboarding-profiles` |  | `onboarding-profiles` |
-| `GET /api/v1/onboarding-profiles/{id}` |  | `onboarding-profiles` |
-| `PUT /api/v1/onboarding-profiles/{id}` |  | `onboarding-profiles` |
-| `DELETE /api/v1/onboarding-profiles/{id}` |  | `onboarding-profiles` |
-| `GET /api/v1/onboarding-profiles/{id}/history` |  | `onboarding-profiles` |
-| `POST /api/v1/onboarding-profiles/{id}/reset` |  | `onboarding-profiles` |
+| `GET /api/v1/onboarding-profiles` | Lists all onboarding profiles in their sort order. | `onboarding-profiles` |
+| `POST /api/v1/onboarding-profiles` | Creates a custom profile (201); `key` (lowercase letters, digits, dashes), `name`, `content` and `type` are required. | `onboarding-profiles` |
+| `GET /api/v1/onboarding-profiles/{id}` | Returns one onboarding profile. | `onboarding-profiles` |
+| `PUT /api/v1/onboarding-profiles/{id}` | Updates name, description or content of a profile; only the languages sent in `content` are replaced. | `onboarding-profiles` |
+| `DELETE /api/v1/onboarding-profiles/{id}` | Deletes a custom profile and its history (204); built-in profiles cannot be deleted (400). | `onboarding-profiles` |
+| `GET /api/v1/onboarding-profiles/{id}/history` | Lists the earlier versions of a profile's content, newest first. | `onboarding-profiles` |
+| `POST /api/v1/onboarding-profiles/{id}/reset` | Sets a built-in profile back to the current shipped text; the previous text goes into the history. | `onboarding-profiles` |
 | `GET /api/v1/onboarding-profiles/{id}/shipped` | The current shipped text of a built-in profile, to compare with an edited one before taking it over. | `onboarding-profiles` |
 
 ## /api/v1/pool
@@ -420,30 +420,30 @@ Quelle: `WorkflowPoolController`
 Quellen:
 
 - `ProjectBundleController` – A whole project as one file: export, preview of an import, import.
-- `ProjectController`
+- `ProjectController` – Projects: create, edit, archive and restore them, start or stop their container, and manage their onboarding file.
 
 | Endpunkt | Zweck | Modul |
 |---|---|---|
-| `GET /api/v1/projects` |  | Kern |
-| `POST /api/v1/projects` |  | Kern |
-| `GET /api/v1/projects/archived` |  | Kern |
+| `GET /api/v1/projects` | Lists all projects that are not archived. | Kern |
+| `POST /api/v1/projects` | Creates a project (201); `name`, `type` and `path` are required. | Kern |
+| `GET /api/v1/projects/archived` | Lists the archived projects. | Kern |
 | `POST /api/v1/projects/example` | The bundled example project for a fresh installation: created on the first call (201), returned on every further call (200) — with any example workflow it lacks added. | Kern |
-| `POST /api/v1/projects/import` |  | Kern |
-| `POST /api/v1/projects/import/preview` |  | Kern |
-| `GET /api/v1/projects/{id}` |  | Kern |
-| `PUT /api/v1/projects/{id}` |  | Kern |
-| `DELETE /api/v1/projects/{id}` |  | Kern |
-| `GET /api/v1/projects/{id}/export` |  | Kern |
-| `POST /api/v1/projects/{id}/generate-context` |  | Kern |
-| `POST /api/v1/projects/{id}/onboarding/disable` |  | `onboarding-profiles` |
-| `POST /api/v1/projects/{id}/onboarding/enable` |  | `onboarding-profiles` |
-| `GET /api/v1/projects/{id}/onboarding/preview` |  | `onboarding-profiles` |
-| `POST /api/v1/projects/{id}/onboarding/refresh` |  | `onboarding-profiles` |
-| `GET /api/v1/projects/{id}/onboarding/status` |  | `onboarding-profiles` |
-| `POST /api/v1/projects/{id}/restore` |  | Kern |
-| `POST /api/v1/projects/{id}/start` |  | Kern |
-| `POST /api/v1/projects/{id}/stop` |  | Kern |
-| `GET /api/v1/projects/{id}/workflows` |  | Kern |
+| `POST /api/v1/projects/import` | Imports a bundle into a new or existing project in one transaction (201); schedules arrive disabled. | Kern |
+| `POST /api/v1/projects/import/preview` | Validates a bundle and shows what an import would create, including its shell commands; writes nothing. | Kern |
+| `GET /api/v1/projects/{id}` | Returns one project; an archived project is a 404. | Kern |
+| `PUT /api/v1/projects/{id}` | Updates the fields sent and keeps the others; a new `path` is checked like on create. | Kern |
+| `DELETE /api/v1/projects/{id}` | Archives the project (204) and stops its container if it was running; its workflows stay. | Kern |
+| `GET /api/v1/projects/{id}/export` | Downloads the project as a bundle file: master data, workflows, chains and schedules, with local paths as tokens. | Kern |
+| `POST /api/v1/projects/{id}/generate-context` | Generates an AI context text from the project directory with the default AI provider and stores it as `aiContext`. | Kern |
+| `POST /api/v1/projects/{id}/onboarding/disable` | Switches onboarding off and deletes the onboarding file if MySuricates wrote it. | `onboarding-profiles` |
+| `POST /api/v1/projects/{id}/onboarding/enable` | Switches onboarding on and writes the onboarding file from the chosen profiles into the project directory. | `onboarding-profiles` |
+| `GET /api/v1/projects/{id}/onboarding/preview` | Returns the onboarding file text as it would be written, as `{"content": …}`, without writing it. | `onboarding-profiles` |
+| `POST /api/v1/projects/{id}/onboarding/refresh` | Writes the onboarding file again from the current profiles; does nothing while onboarding is off. | `onboarding-profiles` |
+| `GET /api/v1/projects/{id}/onboarding/status` | Returns the onboarding state: on or off, format, profiles, language, file path and whether the file exists or is foreign. | `onboarding-profiles` |
+| `POST /api/v1/projects/{id}/restore` | Restores an archived project. | Kern |
+| `POST /api/v1/projects/{id}/start` | Creates and starts the project's Docker container and returns the project with status `RUNNING`, or `ERROR` if it failed. | Kern |
+| `POST /api/v1/projects/{id}/stop` | Stops the project's Docker container and returns the project with status `STOPPED`. | Kern |
+| `GET /api/v1/projects/{id}/workflows` | Lists the workflows of a project with their run counts. | Kern |
 
 ## /api/v1/reports
 

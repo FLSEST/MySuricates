@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
+/** Workflow runs: list and inspect them, control running ones and answer the questions they wait on. */
 @RestController
 @RequestMapping("/api/v1/executions")
 @RequiredArgsConstructor
@@ -38,6 +39,10 @@ public class ExecutionController {
     private final RunLiveLogService runLiveLogService;
     private final PendingInputService pendingInputService;
 
+    /**
+     * Lists workflow runs page by page, newest first, without their steps (fetch one run for those).
+     * Filters: {@code status} (case-insensitive, unknown value: 400), {@code workflowId}, {@code projectId}, {@code search} (workflow name).
+     */
     @GetMapping
     public PageResponse<WorkflowRunListItemResponse> listExecutions(
             @RequestParam(defaultValue = "0") int page,
@@ -56,6 +61,7 @@ public class ExecutionController {
         return pendingInputService.listPendingInputs();
     }
 
+    /** Returns one workflow run including all its steps. */
     @GetMapping("/{id}")
     public ResponseEntity<WorkflowRunResponse> getExecution(@PathVariable String id) {
         return ResponseEntity.ok(executionQueryService.getExecutionResponse(id));
@@ -86,29 +92,40 @@ public class ExecutionController {
         return ResponseEntity.noContent().build();
     }
 
+    /** Pauses a running run before its next block; answers 200 even if the run is not active. */
     @PostMapping("/{id}/pause")
     public ResponseEntity<Void> pauseExecution(@PathVariable String id) {
         runControlService.pauseExecution(id);
         return ResponseEntity.ok().build();
     }
 
+    /** Resumes a paused run; answers 200 even if the run is not active. */
     @PostMapping("/{id}/resume")
     public ResponseEntity<Void> resumeExecution(@PathVariable String id) {
         runControlService.resumeExecution(id);
         return ResponseEntity.ok().build();
     }
 
+    /**
+     * Cancels a running or queued run.
+     * A run still marked {@code RUNNING} without an active execution is set to {@code CANCELLED} directly.
+     */
     @PostMapping("/{id}/cancel")
     public ResponseEntity<Void> cancelExecution(@PathVariable String id) {
         runControlService.cancelExecution(id);
         return ResponseEntity.ok().build();
     }
 
+    /** Starts the run's workflow again as a new run with the same input context. */
     @PostMapping("/{id}/retry")
     public ResponseEntity<WorkflowRunResponse> retryExecution(@PathVariable String id) {
         return ResponseEntity.ok(executionCommandService.retry(id));
     }
 
+    /**
+     * Continues an {@code INTERRUPTED} run after its last completed step; without completed steps it starts over.
+     * Other statuses are refused.
+     */
     @PostMapping("/{id}/resume-from-step")
     public ResponseEntity<WorkflowRunResponse> resumeFromStep(@PathVariable String id) {
         return ResponseEntity.ok(executionCommandService.resumeFromStep(id));
@@ -123,6 +140,10 @@ public class ExecutionController {
         return ResponseEntity.ok().build();
     }
 
+    /**
+     * Returns the approval or human input the run is waiting for, or {@code {"pending": false}}.
+     * Includes {@code options} and {@code rejectOptions}; human input adds its input fields.
+     */
     @GetMapping("/{id}/approval")
     public ResponseEntity<Map<String, Object>> getPendingApproval(@PathVariable String id) {
         ApprovalRequest request = runControlService.getPendingApproval(id);
@@ -152,6 +173,7 @@ public class ExecutionController {
         return ResponseEntity.ok(response);
     }
 
+    /** Creates ({@code approved: true}) or discards the TODOs a run proposed for approval. */
     @PostMapping("/{id}/todos/approve")
     public ResponseEntity<Void> approveTodos(
             @PathVariable String id,
@@ -160,6 +182,7 @@ public class ExecutionController {
         return ResponseEntity.ok().build();
     }
 
+    /** Stores a free-text note on the run; a blank {@code notes} removes it. */
     @PatchMapping("/{id}/notes")
     public ResponseEntity<WorkflowRunResponse> updateNotes(
             @PathVariable String id,
@@ -167,6 +190,7 @@ public class ExecutionController {
         return ResponseEntity.ok(executionCommandService.updateNotes(id, body.get("notes")));
     }
 
+    /** Sends an ad-hoc command to the Claude session in the container of a running run and returns its output. */
     @PostMapping("/{id}/command")
     public ResponseEntity<Map<String, String>> executeCommand(
             @PathVariable String id,
