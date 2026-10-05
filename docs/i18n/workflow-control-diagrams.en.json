@@ -33,7 +33,7 @@
   "Ghost-Run ohne Thread": "ghost run without a thread",
   "Run direkt auf CANCELLED setzen": "set the run to CANCELLED directly",
   "Approval Flow": "Approval Flow",
-  "ApprovalBlock & Agentic": "ApprovalBlock & Agentic",
+  "ApprovalBlockExecutor & AgenticApprovalGate": "ApprovalBlockExecutor & AgenticApprovalGate",
   "ApprovalBlockExecutor": "ApprovalBlockExecutor",
   "WebSocket /topic/executions/{runId}/logs": "WebSocket /topic/executions/{runId}/logs",
   "User": "User",

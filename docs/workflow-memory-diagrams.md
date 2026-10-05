@@ -61,7 +61,7 @@ Schritt für Schritt: Runs lesen, verdichten, zusammenfassen, speichern. Der KI-
 sequenceDiagram
     participant B as Browser
     participant C as Controller
-    participant S as MemoryService
+    participant S as WorkflowMemoryService
     participant P as Preprocessor
     participant SM as Summarizer<br/>(Claude/Codex)
     participant CLI as CLI auf Host<br/>(claude/codex)
@@ -71,7 +71,7 @@ sequenceDiagram
     C->>S: extractKnowledge()
     S->>DB: Runs laden<br/>(letzte 10 oder spezifische IDs)
     DB-->>S: List<WorkflowRun>
-    S->>S: StepResults sammeln
+    S->>S: Schritte (StepResult) sammeln
     S->>P: preprocess(steps)
     Note over P: Code-Blöcke über 30 Zeilen ersetzen<br/>Data-Dumps über 20 Zeilen ersetzen<br/>Meta-Kommentare entfernen<br/>Wiederholte Zeilen zusammenfassen<br/>Agentic-Iterationen verdichten
     P-->>S: preprocessed String
@@ -165,7 +165,7 @@ Die aktive Memory eines Workflows schreibt der Run vor dem ersten Block in das P
 ```mermaid
 sequenceDiagram
     participant WE as WorkflowExecutor<br/>(ExecutionContextFactory)
-    participant MS as MemoryService
+    participant MS as WorkflowMemoryService
     participant DB as SQLite
     participant FS as Filesystem
     participant CLI as KI-CLI<br/>(Block Execution)
@@ -184,7 +184,7 @@ sequenceDiagram
     Note over CLI: Claude CLI liest automatisch<br/>alle .claude/rules/*.md<br/>inkl. project-memory.md,<br/>Codex und Pi bekommen sie<br/>an den System-Prompt gehängt
 
     CLI-->>WE: Ergebnis
-    WE->>DB: WorkflowRun + StepResults speichern
+    WE->>DB: WorkflowRun + Schritte (StepResult) speichern
 
     Note over DB: Gespeicherte Runs können<br/>später für neue<br/>Memory-Extraktion genutzt werden
 ```
@@ -276,7 +276,7 @@ Beim Aktivieren wird `active=false` für alle anderen Memories desselben Workflo
 
 ## Dateistruktur — *Projekt + Runtime*
 
-Alle Dateien, die zum Workflow-Memory-Feature gehören.
+Die wichtigsten Dateien des Workflow-Memory-Features. Tests liegen unter `ai-automation-backend/src/test/java/com/automation/`, meist im Paket der getesteten Klasse.
 
 ```text
 ai-automation-backend/src/main/java/com/automation/
@@ -325,19 +325,6 @@ ai-automation-backend/src/main/resources/
 └── summarization/
     ├── claude-summarizer.md              ← Vorlage → CLAUDE.md
     └── codex-summarizer.md               ← Vorlage → AGENTS.md
-
-ai-automation-backend/src/test/java/com/automation/
-├── service/ai/
-│   ├── HostClaudeServiceTest.java
-│   └── HostCodexServiceTest.java
-└── service/memory/
-    ├── AutoMemoryExtractionListenerTest.java
-    ├── ClaudeSummarizerTest.java
-    ├── CodexSummarizerTest.java
-    ├── ConversationPreprocessorTest.java
-    ├── KnowledgeSummarizerTest.java
-    ├── SummarizationSetupServiceTest.java
-    └── WorkflowMemoryServiceTest.java
 
 ai-automation-frontend/src/
 ├── components/workflow/

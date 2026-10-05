@@ -705,10 +705,10 @@ echo "16) Produktname im Seitentitel (TODO e3101cd6)"
 # Bis e3101cd6 hiessen alle Diagramm-Seiten "AutoPilot — …". AutoPilot ist nur der Name des
 # Projekts, unter dem MySuricates seine TODOs fuehrt; im Fliesstext darf er stehen bleiben.
 cat > "$FAKE/docs/titel-diagrams.md" <<'MD_EOF'
-# AutoPilot — Scheduler & Cron
-## AutoPilot - Frontend Flow
+# AutoPilot — Workflow Engine
+## AutoPilot - Workflow Memory
 AutoPilot ist der Name des Projekts, unter dem MySuricates seine eigenen TODOs fuehrt.
-# MySuricates — Scheduler & Cron
+# MySuricates — Workflow Engine
 MD_EOF
 OUT=$(bash "$SCRIPT" --root "$FAKE" 2>&1); RC=$?
 check "Seitentitel mit altem Produktnamen gemeldet" \

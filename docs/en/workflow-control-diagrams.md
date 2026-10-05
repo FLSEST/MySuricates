@@ -66,7 +66,7 @@ sequenceDiagram
     end
 ```
 
-## Approval Flow — *ApprovalBlock & Agentic*
+## Approval Flow — *ApprovalBlockExecutor & AgenticApprovalGate*
 
 ```mermaid
 sequenceDiagram
