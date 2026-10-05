@@ -33,6 +33,7 @@ public class DashboardLayoutController {
     private final DashboardLayoutVersionMapper mapper;
     private final ObjectMapper objectMapper;
 
+    /** Lists saved dashboard layout versions page by page, newest first, without their content. */
     @GetMapping
     public PageResponse<DashboardLayoutVersionSummary> list(@RequestParam(defaultValue = "0") int page,
                                                             @RequestParam(defaultValue = "20") int size) {
@@ -41,6 +42,7 @@ public class DashboardLayoutController {
                 result.getTotalElements(), result.getTotalPages());
     }
 
+    /** Returns one dashboard layout version including its layout content. */
     @GetMapping("/{id}")
     public DashboardLayoutVersionResponse get(@PathVariable String id) throws JsonProcessingException {
         DashboardLayoutVersion version = service.get(id);
@@ -49,7 +51,11 @@ public class DashboardLayoutController {
                 objectMapper.readTree(version.getContent()));
     }
 
-    /** The body is validated field by field in DashboardLayoutValidator (unknown fields → 400). */
+    /**
+     * Saves the dashboard layout as a new version ({@code 201}), or answers {@code 200} when it equals the newest one.
+     * Without {@code force} a {@code baseVersionId} other than the newest version is refused with {@code 409}.
+     * The body is validated field by field in DashboardLayoutValidator (unknown fields → 400).
+     */
     @PostMapping
     public ResponseEntity<DashboardLayoutVersionSummary> save(@RequestBody JsonNode body) {
         DashboardLayoutVersionService.SaveResult result = service.save(body);
@@ -57,6 +63,7 @@ public class DashboardLayoutController {
                 .body(mapper.toSummary(result.version()));
     }
 
+    /** Sets or removes ({@code null}) the name of a layout version. */
     @PatchMapping("/{id}")
     public DashboardLayoutVersionSummary rename(@PathVariable String id, @RequestBody JsonNode body) {
         return mapper.toSummary(service.rename(id, body));

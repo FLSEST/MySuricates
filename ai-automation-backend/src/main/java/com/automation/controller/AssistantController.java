@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+/** AI assistant chat: messages, stored chat sessions and confirming or rejecting the tools it proposes. */
 @RequiresModule(ModuleCatalog.ASSISTANT)
 @RestController
 @RequestMapping("/api/v1/assistant")
@@ -48,6 +49,10 @@ public class AssistantController {
         }
     }
 
+    /**
+     * Sends a message to the AI assistant and returns its answer with suggested actions and pending tools.
+     * With {@code sessionId} the exchange is appended to that stored session.
+     */
     @PostMapping("/chat")
     public AssistantChatResponse chat(@Valid @RequestBody AssistantChatRequest request) {
         // Cancel running suggestion refresh to free up CLI capacity for chat
@@ -70,16 +75,19 @@ public class AssistantController {
         return response;
     }
 
+    /** Lists the most recent assistant chat sessions, newest first. */
     @GetMapping("/sessions")
     public List<AssistantSessionSummary> listSessions() {
         return assistantSessionService.listRecentSessions();
     }
 
+    /** Returns one assistant chat session with its messages. */
     @GetMapping("/sessions/{id}")
     public AssistantSessionDetail getSession(@PathVariable String id) {
         return assistantSessionService.getSession(id);
     }
 
+    /** Deletes an assistant chat session. */
     @DeleteMapping("/sessions/{id}")
     public void deleteSession(@PathVariable String id) {
         assistantSessionService.deleteSession(id);
@@ -105,6 +113,10 @@ public class AssistantController {
         return ResponseEntity.ok(result);
     }
 
+    /**
+     * Rejects a tool the assistant proposed, without executing it.
+     * Returns 410 Gone if the tool has already been handled or expired.
+     */
     @PostMapping("/pending-tools/{id}/reject")
     public ResponseEntity<ToolExecutionResult> rejectPendingTool(
             @PathVariable String id,

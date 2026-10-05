@@ -27,6 +27,7 @@ public class DashboardReportAssistController {
     private final DashboardReportAssistService service;
 
     /**
+     * Has an AI propose the fields of a {@code dashboard-report} block for {@code workflowId} from one of its runs.
      * 400 for a missing id, 404 for an unknown workflow, 409 when the setting is off, the provider
      * is missing, there is no usable run, or the answer did not match the contract.
      */

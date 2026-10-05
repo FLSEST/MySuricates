@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
+/** Workflow memory: knowledge distilled from a workflow's runs, of which one entry can be active per workflow. */
 @RequiresModule(ModuleCatalog.MEMORY)
 @RestController
 @RequestMapping("/api/v1/workflows/{workflowId}/memory")
@@ -29,11 +30,17 @@ public class WorkflowMemoryController {
     private final WorkflowMemoryService memoryService;
     private final WorkflowMemoryMapper memoryMapper;
 
+    /** Lists the workflow's memory entries, newest first. */
     @GetMapping
     public List<WorkflowMemoryResponse> list(@PathVariable String workflowId) {
         return memoryMapper.toResponseList(memoryService.findByWorkflowId(workflowId));
     }
 
+    /**
+     * Has an AI summarize the steps of the given runs into a new, inactive memory entry and answers {@code 201}.
+     * Without {@code runIds} the workflow's latest runs are used; {@code provider} defaults to {@code CLAUDE}.
+     * No runs or no steps: {@code 422}.
+     */
     @PostMapping("/extract")
     public ResponseEntity<?> extract(
             @PathVariable String workflowId,
@@ -55,6 +62,7 @@ public class WorkflowMemoryController {
         }
     }
 
+    /** Changes title and/or content of a memory entry; a field left out stays as it is. */
     @PutMapping("/{memoryId}")
     public WorkflowMemoryResponse update(
             @PathVariable String workflowId,
@@ -65,6 +73,10 @@ public class WorkflowMemoryController {
         return memoryMapper.toResponse(memory);
     }
 
+    /**
+     * Makes this memory entry the workflow's active one and deactivates all others ({@code 204}).
+     * The active entry is written into the project before each run so the executing agent can read it.
+     */
     @PutMapping("/{memoryId}/activate")
     public ResponseEntity<Void> activate(
             @PathVariable String workflowId,
@@ -73,6 +85,7 @@ public class WorkflowMemoryController {
         return ResponseEntity.noContent().build();
     }
 
+    /** Deletes a memory entry ({@code 204}). */
     @DeleteMapping("/{memoryId}")
     public ResponseEntity<Void> delete(
             @PathVariable String workflowId,

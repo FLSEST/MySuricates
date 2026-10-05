@@ -33,6 +33,10 @@ public class ProjectBundleController {
     private final ProjectBundlePreviewService previewService;
     private final ProjectBundleImportService importService;
 
+    /**
+     * Downloads the project as a bundle file: master data, workflows, chains and schedules, with local paths as tokens.
+     * An unknown or archived project is a 404.
+     */
     @GetMapping("/{id}/export")
     public ResponseEntity<ProjectBundle> exportProject(@PathVariable String id) {
         ProjectBundleExportService.Export export = exportService.export(id);
@@ -43,11 +47,16 @@ public class ProjectBundleController {
                 .body(export.bundle());
     }
 
+    /** Validates a bundle and shows what an import would create, including its shell commands; writes nothing. */
     @PostMapping(value = "/import/preview", consumes = MediaType.APPLICATION_JSON_VALUE)
     public BundlePreview previewImport(@RequestBody String body) {
         return previewService.preview(body);
     }
 
+    /**
+     * Imports a bundle into a new or existing project in one transaction (201); schedules arrive disabled.
+     * Every path token needs an entry in {@code pathMappings}, otherwise 400 and nothing is created.
+     */
     @PostMapping(value = "/import", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<BundleImportResult> importProject(@RequestBody String body) {
         return ResponseEntity.status(HttpStatus.CREATED).body(importService.importBundle(body));

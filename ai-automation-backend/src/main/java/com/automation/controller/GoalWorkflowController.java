@@ -29,17 +29,26 @@ public class GoalWorkflowController {
 
     private final GoalWorkflowService goalWorkflowService;
 
+    /**
+     * Lists the workflows attached to the goal: the guard first (if switched on), then those on the goal,
+     * then those on work packages. Soft-deleted workflows are left out.
+     */
     @GetMapping
     public List<GoalWorkflowResponse> list(@PathVariable String goalId) {
         return goalWorkflowService.list(goalId);
     }
 
+    /**
+     * Attaches a workflow to the goal or one of its work packages (201); {@code role} is {@code WORKER} (default) or {@code STATUS}.
+     * A work package of another goal is a 400, an unknown workflow a 404, the same attachment twice a 409.
+     */
     @PostMapping
     public ResponseEntity<GoalWorkflowResponse> attach(@PathVariable String goalId,
                                                        @Valid @RequestBody AttachGoalWorkflowRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(goalWorkflowService.attach(goalId, request));
     }
 
+    /** Changes the role of an attachment ({@code WORKER} or {@code STATUS}); the {@code guard} entry cannot be changed (400). */
     @PatchMapping("/{attachmentId}")
     public GoalWorkflowResponse updateRole(@PathVariable String goalId, @PathVariable String attachmentId,
                                            @Valid @RequestBody UpdateGoalWorkflowRequest request) {

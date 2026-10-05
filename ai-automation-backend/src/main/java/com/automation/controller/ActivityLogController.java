@@ -13,6 +13,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+/** Activity log: read the platform's event log and let plugins add their own entries. */
 @RestController
 @RequestMapping("/api/v1/activity-log")
 @RequiredArgsConstructor
@@ -21,6 +22,10 @@ public class ActivityLogController {
     private final ActivityLogService activityLogService;
     private final ActivityLogMapper activityLogMapper;
 
+    /**
+     * Lists activity log entries page by page, newest first, optionally filtered by level, category and workflow.
+     * {@code level} and {@code category} ignore case; an unknown value is rejected with 400.
+     */
     @GetMapping
     public PageResponse<ActivityLogResponse> getLogs(
             @RequestParam(defaultValue = "0") int page,
@@ -44,6 +49,10 @@ public class ActivityLogController {
         );
     }
 
+    /**
+     * Writes an entry of category {@code PLUGIN} to the activity log and returns it with 201.
+     * {@code message} is required; {@code level} defaults to {@code INFO}, {@code source} to {@code plugin}.
+     */
     @PostMapping
     public ResponseEntity<ActivityLogResponse> createPluginLog(@RequestBody CreateActivityLogRequest request) {
         if (request.message() == null || request.message().isBlank()) {

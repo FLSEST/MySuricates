@@ -19,6 +19,10 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Workflow factory: has an AI generate workflows from a topic, verify them on the test instance and promote them
+ * to templates.
+ */
 @RequiresModule(ModuleCatalog.FACTORY)
 @RestController
 @RequestMapping("/api/v1/factory")

@@ -49,6 +49,7 @@ public class SystemAiProviderController {
     @Value("${automation.environment:Dev}")
     private String environment;
 
+    /** Lists the registered AI providers, the default provider and each provider's declared capabilities. */
     @GetMapping("/ai-providers")
     public Map<String, Object> aiProviders() {
         return Map.of(
@@ -58,6 +59,10 @@ public class SystemAiProviderController {
         );
     }
 
+    /**
+     * Describes what this instance offers: API and app version, all API routes, the block types usable now and the module state.
+     * Block types whose module is switched off are left out.
+     */
     @GetMapping("/capabilities")
     public SystemCapabilitiesResponse capabilities() {
         List<SystemCapabilitiesResponse.RouteCapabilityResponse> routes = requestMappingHandlerMapping
