@@ -1169,6 +1169,36 @@ all of `docs/` including `plans/`) and set the repository variable `PAGES_ENABLE
 Secrets and variables → Actions → Variables). Without the variable only the build including `--check`
 runs; the deploy job is skipped.
 
+## Generated references
+
+Two reference pages are generated from the code instead of maintained by hand, each in German and English:
+
+| Page | Source |
+|---|---|
+| [api-referenz.md](api-referenz.md) | REST controllers under `ai-automation-backend/src/main/java/com/automation/controller/`, `ErrorCode`, module names from `ModuleCatalog` |
+| [block-referenz.md](block-referenz.md) | `ai-automation-frontend/src/data/blockConfigSchema.json` |
+
+```bash
+python3 scripts/docs-reference.py --write   # rewrite both pages in both languages
+python3 scripts/docs-reference.py --check   # compare only: exit code 1 names every stale page
+python3 -m unittest discover -s scripts/tests -p 'test_docs_parity_check.py'
+```
+
+Every generated page starts with the comment `<!-- Erzeugt von scripts/docs-reference.py – nicht von
+Hand ändern -->` and a hand-written introduction from `scripts/docs-reference/<page>.<de|en>.md`;
+everything after it comes from the source, a change by hand does not last. Whatever a table lacks belongs
+in the source: the purpose of an endpoint is the first sentence of its handler method's Javadoc (without
+Javadoc the cell stays empty), the explanation of a config key is its `doc` text in the schema.
+
+`docs_parity_check.py` calls `--check` and reports a stale page as a finding. So the check applies
+wherever the documentation gate runs, the pre-push gate included: whoever changes an endpoint, its
+Javadoc or a config key regenerates the pages in the same commit. `api-endpoint-diff.sh` keeps comparing
+the endpoints with both versions of the API reference independently.
+
+[datenmodell.md](datenmodell.md) is not generated: the JPA entities name tables and columns, but many
+foreign keys (those of `todos`, for example) are plain text fields there, and `NOT NULL`, defaults and
+`ON DELETE` exist only in the Flyway migrations.
+
 ## Dependency advisories (frontend)
 
 `npm audit` in the frontend reports **0 vulnerabilities** after the updates from 2026-09-12.
