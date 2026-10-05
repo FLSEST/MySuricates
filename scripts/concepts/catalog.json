@@ -8,10 +8,6 @@
       "ai-automation-backend/src/main/java/com/automation/service/runoutput/GateStatusOutputParser.java",
       "ai-automation-backend/src/main/java/com/automation/service/workflow/RunCompletionHandler.java"
     ],
-    "metrics": [
-      "steps_shell",
-      "retained_runs"
-    ],
     "notes": "Unterscheide technische Run-Status und fachliche Gate-Marker. Fehlender oder ungueltiger Marker kann aktuell aus COMPLETED zu GREEN abgeleitet werden: keine Vollstaendigkeitsgarantie. Ampel allein beweist keine Qualitaet; deterministische Pruefung und Beleg erforderlich.",
     "diagram_de": "flowchart LR\n  A[\"Blockausgabe\"] --> B[\"Marker lesen\"]\n  B --> C[\"Schwerstes Urteil\"]\n  C --> D[\"GREEN / YELLOW / RED\"]\n  D --> E[\"Bericht und Folgeaktion\"]",
     "diagram_en": "flowchart LR\n  A[\"Block output\"] --> B[\"Read markers\"]\n  B --> C[\"Most severe verdict\"]\n  C --> D[\"GREEN / YELLOW / RED\"]\n  D --> E[\"Report and follow-up\"]",
@@ -29,11 +25,7 @@
       "ai-automation-backend/src/main/java/com/automation/service/trigger/TodoTriggerService.java",
       "ai-automation-backend/src/main/java/com/automation/service/todo/GateStatusResolver.java"
     ],
-    "metrics": [
-      "todos_without_resolution_state",
-      "activeTodoTriggers"
-    ],
-    "notes": "Audit-Befund, TODO, regelbasierter Fix-Run und erneute Pruefung sind getrennte Schritte. Automatische Trigger sind konfigurationsabhaengig. Ein DONE oder technisch erfolgreicher Fix ist kein fachlicher Nachweis. resolutionState ist optionaler manueller Resolve-Pfad, sein Fehlen belegt KEINE unterbrochene Verifikationskette.",
+    "notes": "Audit-Befund, TODO, regelbasierter Fix-Run und erneute Pruefung sind getrennte Schritte. Automatische Trigger sind konfigurationsabhaengig. Ein DONE oder technisch erfolgreicher Fix ist kein fachlicher Nachweis.",
     "diagram_de": "flowchart LR\n  A[\"Pruefen\"] --> B[\"Befund / TODO\"]\n  B --> C[\"Trigger oder Mensch\"]\n  C --> D[\"Fix ausfuehren\"]\n  D --> E[\"Erneut pruefen\"]\n  E --> A",
     "diagram_en": "flowchart LR\n  A[\"Check\"] --> B[\"Finding / TODO\"]\n  B --> C[\"Trigger or person\"]\n  C --> D[\"Execute fix\"]\n  D --> E[\"Verify again\"]\n  E --> A",
     "label_de": "Selbstverbesserung",
@@ -49,10 +41,6 @@
       "ai-automation-backend/src/main/java/com/automation/service/workflow/WorkflowVersionService.java",
       "ai-automation-backend/src/main/java/com/automation/service/workflow/WorkflowDefinitionHasher.java",
       "ai-automation-backend/src/main/java/com/automation/service/workflow/RunAdmission.java"
-    ],
-    "metrics": [
-      "retained_runs",
-      "ai_todos_with_session"
     ],
     "notes": "Run, Schritte, Versionssnapshot, Hash und triggerSource helfen Rekonstruktion. provenance ist schaltbar; Altdaten koennen fehlen. DefinitionHash ist kein Herkunftsnachweis einer importierten Datei und kein kompletter Umgebungs-/Daten-Snapshot. Retention begrenzt Geschichte; Session-ID garantiert kein fortsetzbares KI-Transkript.",
     "diagram_de": "flowchart LR\n  A[\"Definitionsaenderung\"] --> B[\"Version und Hash\"]\n  B --> C[\"Run mit Ausloeser\"]\n  C --> D[\"Schritte und Ergebnisse\"]\n  D --> E[\"Nachvollziehen\"]",
@@ -71,10 +59,6 @@
       "ai-automation-backend/src/main/java/com/automation/executor/blocks/AgenticStopRules.java",
       "ai-automation-backend/src/main/java/com/automation/executor/blocks/AgenticTokenTracker.java"
     ],
-    "metrics": [
-      "steps_agentic",
-      "steps_shell"
-    ],
     "notes": "Reason/Act, Iterationen, Zeit, kumulierte Token und Wiederholungen. Tokenmessung anbieterabhaengig; Pruefung nach Aufruf kann Budget ueberschreiten. Nicht als Sandbox oder harte Euro-Kostenobergrenze darstellen. Agentische Bloecke fuer offene Aufgaben, shell fuer deterministische Arbeit.",
     "diagram_de": "flowchart LR\n  A[\"Ziel\"] --> B[\"Reason\"]\n  B --> C[\"Act\"]\n  C --> D[\"Beobachten und Budgets pruefen\"]\n  D -->|weiter| B\n  D -->|fertig oder Grenze| E[\"Ende\"]",
     "diagram_en": "flowchart LR\n  A[\"Goal\"] --> B[\"Reason\"]\n  B --> C[\"Act\"]\n  C --> D[\"Observe and check budgets\"]\n  D -->|continue| B\n  D -->|done or limit| E[\"Stop\"]",
@@ -92,14 +76,7 @@
       "ai-automation-backend/src/main/java/com/automation/service/workflow/RunAdmission.java",
       "ai-automation-backend/src/main/java/com/automation/controller/WorkflowController.java"
     ],
-    "metrics": [
-      "activeSchedules",
-      "totalSchedules",
-      "activeWebhooks",
-      "activeTodoTriggers",
-      "activeCompletionTriggers"
-    ],
-    "notes": "Verschiedene Ausloeser fuehren zum gleichen WorkflowExecutor/RunAdmission. Externes Session-Plugin nutzt REST; kein dynamisches Plattform-Plugin-System behaupten. Ein API-Key, lokaler Einbenutzerbetrieb; unbeaufsichtigte Starts sind konfigurationsabhaengig. Aktivierte Trigger messen Konfiguration, nicht Nutzung. Keine allgemeine exactly-once-Garantie.",
+    "notes": "Verschiedene Ausloeser fuehren zum gleichen WorkflowExecutor/RunAdmission. Externes Session-Plugin nutzt REST; kein dynamisches Plattform-Plugin-System behaupten. Ein API-Key, lokaler Einbenutzerbetrieb; unbeaufsichtigte Starts sind konfigurationsabhaengig. Keine allgemeine exactly-once-Garantie.",
     "diagram_de": "flowchart LR\n  A[\"Zeitplan\"] --> E[\"Zulassungspruefung\"]\n  B[\"Ereignis\"] --> E\n  C[\"Plugin / REST\"] --> E\n  D[\"UI\"] --> E\n  E --> F[\"Workflow-Run\"]",
     "diagram_en": "flowchart LR\n  A[\"Schedule\"] --> E[\"Admission check\"]\n  B[\"Event\"] --> E\n  C[\"Plugin / REST\"] --> E\n  D[\"UI\"] --> E\n  E --> F[\"Workflow run\"]",
     "label_de": "Zugänge",
@@ -114,11 +91,6 @@
     "sources": [
       "ai-automation-backend/src/main/java/com/automation/executor/blocks/ShellBlockExecutor.java",
       "ai-automation-backend/src/main/java/com/automation/service/runoutput/GateStatusOutputParser.java"
-    ],
-    "metrics": [
-      "steps_shell",
-      "steps_simple",
-      "workflows_never_run"
     ],
     "notes": "Trenne Fakten sammeln, KI einordnen und Ergebnis pruefen. shell braucht keine Modelltoken, aber Zeit/Ressourcen; Shell ist mit veraenderten Daten/Umgebung nicht automatisch reproduzierbar. Messskriptabdeckung und Datenqualitaet begrenzen Aussage. Befunde und Prozentanteile sind keine nachgewiesene Kosteneinsparung. foreach nicht pauschal deterministisch zaehlen.",
     "diagram_de": "flowchart LR\n  A[\"Daten / Code\"] --> B[\"Messskript\"]\n  B --> C[\"Faktenblatt\"]\n  C --> D[\"KI-Einordnung\"]\n  D --> E[\"Deterministisches Gate\"]\n  E --> F[\"Bericht\"]",
@@ -136,10 +108,6 @@
       "ai-automation-backend/src/main/java/com/automation/service/memory/WorkflowMemoryService.java",
       "ai-automation-backend/src/main/java/com/automation/service/workflow/ExecutionContextFactory.java"
     ],
-    "metrics": [
-      "activeMemoryEntries",
-      "workflows"
-    ],
     "notes": "Extraktion aus Runs, Versionen/aktive Memory, Einschleusen in Folgeaufrufe. Lies Aktivierungs-/Autoextraktionsverhalten aus Code genau. Memory ist KI-Zusammenfassung, keine gepruefte Wahrheit; falsche/veraltete Inhalte koennen sich fortpflanzen. Promptumfang und Extraktion kosten Ressourcen. Lokale Speicherung bedeutet nicht, dass KI-Aufrufe lokal bleiben.",
     "diagram_de": "flowchart LR\n  A[\"Vergangene Runs\"] --> B[\"Wissen extrahieren\"]\n  B --> C[\"Memory-Version\"]\n  C --> D[\"Aktive Memory\"]\n  D --> E[\"Kontext des naechsten Runs\"]",
     "diagram_en": "flowchart LR\n  A[\"Past runs\"] --> B[\"Extract knowledge\"]\n  B --> C[\"Memory version\"]\n  C --> D[\"Active memory\"]\n  D --> E[\"Context of the next run\"]",
@@ -156,10 +124,6 @@
       "ai-automation-backend/src/main/java/com/automation/service/workflow/RunAdmission.java",
       "ai-automation-backend/src/main/java/com/automation/executor/OutputTaint.java",
       "ai-automation-backend/src/main/java/com/automation/executor/ExecutionContextTaint.java"
-    ],
-    "metrics": [
-      "workflows_sealed",
-      "workflows"
     ],
     "notes": "Siegel schuetzt vorhandene Definition, RunAdmission prueft vor Run, require-sealed-for-unattended optional, Taint markiert fremde Inhalte und Shell-Quoting. Kein vollstaendiger Prompt-Injection-Schutz, keine Prozess-Sandbox, keine Vertrauensgarantie importierter Definitionen. Default core+provenance, andere Schalter opt-in; bestehende Siegel gelten auch bei ausgeschaltetem Schalter. Keine operative Konfiguration aus Quellcode-Defaults ableiten.",
     "diagram_de": "flowchart LR\n  A[\"Definition + Ausloeser\"] --> B[\"Siegel / Zulassung\"]\n  B --> C[\"Run\"]\n  D[\"Fremde Inhalte\"] --> E[\"Taint-Markierung\"]\n  E --> C\n  C --> F[\"Shell-Platzhalter quoten\"]",
@@ -180,11 +144,7 @@
       "ai-automation-backend/src/main/java/com/automation/executor/blocks/SubWorkflowBlockExecutor.java",
       "ai-automation-backend/src/main/java/com/automation/service/chain/ChainExecutor.java"
     ],
-    "metrics": [
-      "steps_integration",
-      "steps_skill_capability"
-    ],
-    "notes": "Vier Bausteinarten, alle als Block oder Kette in derselben Workflow-Definition: Integrationen (IntegrationProvider-Komponenten, beim Start von der IntegrationRegistry eingesammelt, je Aufruf gegen den Modul-Schalter geprüft; integration-Block mit provider, action und optional benannter Verbindung connection, ohne Namen gilt default), Skills (skill-capability-Block, standardmäßig nur lesende Werkzeuge, Schreiben nur mit allow_writes), Sub-Workflows (Block startet einen anderen Workflow, wartet auf ihn, reicht previous_output und Taint weiter; Tiefe höchstens 5, Zirkelbezug wird abgewiesen, Wartezeit begrenzt) und Chains (Workflows nacheinander, previous_chain_output als Übergabe, Stopp bei Fehler und Abbruch). Grenzen ehrlich: Ein neuer Integrations-Provider ist Java-Code im Backend, kein zur Laufzeit nachladbares Plugin. Provider sind nur teils gegen den echten Dienst geprüft (VERIFIED), sonst SIMULATED. Übergaben sind Text und Kontextvariablen, kein typisierter Datenvertrag zwischen Bausteinen. Chains und Sub-Workflows haben keine eigene Messgröße im Snapshot; Integrations- und Skill-Schritte sind eine 30-Tage-Stichprobe, keine Nutzungs- oder Erfolgsquote.",
+    "notes": "Vier Bausteinarten, alle als Block oder Kette in derselben Workflow-Definition: Integrationen (IntegrationProvider-Komponenten, beim Start von der IntegrationRegistry eingesammelt, je Aufruf gegen den Modul-Schalter geprüft; integration-Block mit provider, action und optional benannter Verbindung connection, ohne Namen gilt default), Skills (skill-capability-Block, standardmäßig nur lesende Werkzeuge, Schreiben nur mit allow_writes), Sub-Workflows (Block startet einen anderen Workflow, wartet auf ihn, reicht previous_output und Taint weiter; Tiefe höchstens 5, Zirkelbezug wird abgewiesen, Wartezeit begrenzt) und Chains (Workflows nacheinander, previous_chain_output als Übergabe, Stopp bei Fehler und Abbruch). Grenzen ehrlich: Ein neuer Integrations-Provider ist Java-Code im Backend, kein zur Laufzeit nachladbares Plugin. Provider sind nur teils gegen den echten Dienst geprüft (VERIFIED), sonst SIMULATED. Übergaben sind Text und Kontextvariablen, kein typisierter Datenvertrag zwischen Bausteinen.",
     "diagram_de": "flowchart LR\n  A[\"Chain\"] --> B[\"Workflow\"]\n  B --> C[\"Block\"]\n  C --> D[\"Integration + benannte Verbindung\"]\n  C --> E[\"Skill\"]\n  C --> F[\"Sub-Workflow\"]\n  B -->|\"Ausgabe\"| G[\"Nächster Workflow der Chain\"]",
     "diagram_en": "flowchart LR\n  A[\"Chain\"] --> B[\"Workflow\"]\n  B --> C[\"Block\"]\n  C --> D[\"Integration + named connection\"]\n  C --> E[\"Skill\"]\n  C --> F[\"Sub-workflow\"]\n  B -->|\"output\"| G[\"Next workflow in the chain\"]",
     "label_de": "Zusammenstöpseln",
@@ -202,11 +162,7 @@
       "ai-automation-backend/src/main/java/com/automation/service/ai/catalog/ModelCatalogService.java",
       "ai-automation-backend/src/main/java/com/automation/service/ai/PiAiProvider.java"
     ],
-    "metrics": [
-      "workflows_explicit_provider",
-      "workflows_explicit_effort"
-    ],
-    "notes": "Rangfolge Block > Workflow > Systemstandard für provider, model und effort (BlockAiSettings); ein Block mit anderem Provider erbt das Workflow-Modell nicht, weil Modell-IDs anbieterspezifisch sind. AiProviderRegistry löst die ID auf und fällt bei unbekannter ID auf den Standard zurück. Es gibt zwei direkte CLI-Adapter (Claude, Codex) und Pi als Tor zu weiteren Modell-Backends über <backend>/<modell>; NICHT als \"drei gleichwertige Provider\" darstellen. Der Modellkatalog wird vom Host erfragt (ModelCatalogService mit Cache, Quellen je Provider), Freitext bleibt erlaubt. Grenzen ehrlich: Fähigkeiten unterscheiden sich je Adapter (AiProviderCapabilities: Codex ohne effort und ohne getrennten Systemprompt, Pi-Token nur geschätzt), ein Wechsel ist also nicht verlustfrei. Die KI-CLIs laufen als Prozesse auf dem Host und müssen dort installiert und angemeldet sein; eine Kapselung der KI-Aufrufe im Container ist noch nicht erreicht. Unabhängigkeit heißt austauschbarer Aufruf, nicht gleiche Ergebnisqualität. Die Zähler zeigen nur Definitionen mit eigenem Workflow-Provider bzw. -Effort; Block-Einstellungen und tatsächlich genutzte Anbieter je Run sind nicht im Snapshot.",
+    "notes": "Rangfolge Block > Workflow > Systemstandard für provider, model und effort (BlockAiSettings); ein Block mit anderem Provider erbt das Workflow-Modell nicht, weil Modell-IDs anbieterspezifisch sind. AiProviderRegistry löst die ID auf und fällt bei unbekannter ID auf den Standard zurück. Es gibt zwei direkte CLI-Adapter (Claude, Codex) und Pi als Tor zu weiteren Modell-Backends über <backend>/<modell>; NICHT als \"drei gleichwertige Provider\" darstellen. Der Modellkatalog wird vom Host erfragt (ModelCatalogService mit Cache, Quellen je Provider), Freitext bleibt erlaubt. Grenzen ehrlich: Fähigkeiten unterscheiden sich je Adapter (AiProviderCapabilities: Codex ohne effort und ohne getrennten Systemprompt, Pi-Token nur geschätzt), ein Wechsel ist also nicht verlustfrei. Die KI-CLIs laufen als Prozesse auf dem Host und müssen dort installiert und angemeldet sein; eine Kapselung der KI-Aufrufe im Container ist noch nicht erreicht. Unabhängigkeit heißt austauschbarer Aufruf, nicht gleiche Ergebnisqualität.",
     "diagram_de": "flowchart LR\n  A[\"Block > Workflow > System\"] --> B[\"Provider-Registry\"]\n  B --> C[\"Claude-CLI auf dem Host\"]\n  B --> D[\"Codex-CLI auf dem Host\"]\n  B --> E[\"Pi auf dem Host\"]\n  E --> F[\"Weitere Modell-Backends\"]\n  G[\"Modellkatalog vom Host\"] -.-> A",
     "diagram_en": "flowchart LR\n  A[\"Block > workflow > system\"] --> B[\"Provider registry\"]\n  B --> C[\"Claude CLI on the host\"]\n  B --> D[\"Codex CLI on the host\"]\n  B --> E[\"Pi on the host\"]\n  E --> F[\"Further model backends\"]\n  G[\"Model catalog from the host\"] -.-> A",
     "label_de": "Anbieter-Unabhängigkeit",
