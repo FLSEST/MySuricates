@@ -187,6 +187,11 @@ Regeln:
   selbst, eigene Quotes (`BASE="{{ project_path }}"`) landen sonst im Wert. Sie rufen weder
   die REST-API auf noch öffnen sie die SQLite-Datenbank.
 
+**Faktenblatt aus einem Werkzeug:** Ein Shell-Block im Werkzeug-Modus mit `output_format: sarif`
+([WORKFLOW-GUIDE.md](WORKFLOW-GUIDE.md) → Werkzeug-Container) liefert das Faktenblatt selbst: `FAKT <prefix>_findings`
+und die Zahlen je Schwere, eine `TREFFER`-Zeile je Befund, bei Ausfall `NICHT GEMESSEN: <prefix>_findings (…)`.
+Das Gate prüft dann `<prefix>_findings` als Pflicht-Fakt; die Belegprüfung kennt die Namen wie jede andere FAKT-Zeile.
+
 Umgestellte Audits im `workflow-pool/`:
 
 | Workflow | Messung | Selbsttest |
