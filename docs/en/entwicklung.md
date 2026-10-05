@@ -83,20 +83,82 @@ npm run dev
 ```
 
 The Vite dev server automatically proxies `/api/*` and `/ws/*` to `localhost:9090`.
+`scripts/start-mysuricates-dev.sh` already starts it; running `npm run dev` by hand is only needed
+without the starter. Open: `http://localhost:3000`
 
-### Starting Both in Parallel
+## Getting into the code
 
-Terminal 1 (Backend):
-```bash
-scripts/start-mysuricates-dev.sh
-```
+The repository holds two applications and the tooling around them: `ai-automation-backend/` is the
+Spring Boot backend (Java 21), `ai-automation-frontend/` the React UI (TypeScript, Vite). `scripts/`
+holds the starter, installer, staging and the gates, `workflow-pool/` the shipped workflow definitions,
+`deploy/` the container route. The inner structure is described in [architektur.md](architektur.md),
+tables and fields in [datenmodell.md](datenmodell.md), the endpoints in [api-referenz.md](api-referenz.md).
+Which libraries apply in which version is in `pom.xml` and `package.json`.
 
-Terminal 2 (Frontend):
-```bash
-cd ai-automation-frontend && npm run dev
-```
+**Reading order, backend** (under `com.automation`; `LayerRuleTest` pins the layers controller → service →
+repository):
 
-Open: `http://localhost:3000`
+1. `service/workflow/WorkflowExecutor` — accepts a start, has `RunAdmission` check it and runs the
+   blocks on a virtual thread; `BlockStepRunner` creates the step for each block.
+2. `executor/ExecutionContext` — the run state every block receives: variables, the predecessor's
+   output, pause and cancel, approvals; the `{{ … }}` placeholders are resolved there.
+3. `executor/BlockExecutor` and the executors under `executor/blocks/` — one per block type;
+   `AgenticBlockExecutor` shows the REASON/ACT loop.
+4. `service/cli/CommandExecutorService` and `service/ai/HostClaudeService` — how an AI call becomes a
+   process on the host (prompt via stdin, provider via `AiProviderRegistry`).
+5. `service/workflow/WorkflowService` → `WorkflowMutationGateway` — the only write path for
+   definitions (versions, seals).
+
+**Reading order, frontend** (under `ai-automation-frontend/src/`):
+
+1. `App.tsx` — every route, each page via `lazy()`, pages of optional modules inside `ModuleRoute`.
+2. `api/client.ts` — the single HTTP client `api`, which sends the API key from the `settingsStore`.
+3. `hooks/useWorkflows.ts` — the pattern of all hooks: `useQuery` to read, `useMutation` with
+   invalidation to write.
+4. `types/index.ts` and `stores/` — shared types (including `BLOCK_TYPES`) and the client state.
+
+**New block type.** A `@Component` implementing `BlockExecutor`; `supportedTypes()` is the single source
+of which types exist (`BlockTypeRegistry` collects them, an unknown type is refused on save). Then add
+the type to `BLOCK_TYPES` (`src/types/index.ts`), `BlockTypesIndexSection` and
+`AssistantToolValidator.KNOWN_BLOCK_TYPES` — `BlockTypeListsGuardTest` and
+`types/__tests__/blockTypes.test.ts` keep the lists in step with the executors —, write a spec in
+`BlockSpecs` (`BlockSpecConfigKeysGateTest` checks every key named there against the executor) and,
+for the editor, add the starting config and the keys to `src/data/blockDefaultConfig.json` and
+`src/data/blockConfigSchema.json` (`blockConfigSchema.test.ts`). If the type belongs to a module, it goes
+into `executor/BlockTypeModules`.
+
+**New table.** A Flyway migration `V{N}__description.sql` under `src/main/resources/db/migration/` —
+determine the next number fresh (`ls ai-automation-backend/src/main/resources/db/migration | sort -V | tail -1`),
+never guess —, then entity, repository and service. Lazy associations are loaded by a `@Transactional`
+method in the service: Open Session In View is off.
+
+**New controller.** Assign it to a module with `@RequiresModule(…)` or list it consciously as core in
+`CORE_CONTROLLERS` of `ControllerModuleGateTest`.
+
+**New page.** A file under `src/pages/`, a route in `App.tsx` via `lazy()`, a menu entry in
+`utils/navItems.ts` with the required field `hint`: `navHints.test.ts` checks that the page renders its
+hint. Visible text only through `de.ts` and `en.ts`.
+
+**Module catalog changed.** `scripts/lib/module-catalog.generated.sh` is not maintained by hand but
+generated from `modules/ModuleCatalog` and the display texts (`src/data/modules.<lang>.json`):
+`cd ai-automation-backend && ./mvnw test -Dtest=ModuleCatalogTextsTest -Dmodule.catalog.write=true`.
+Without it the test fails. `scripts/lib/module-preset.sh` reads the file before every build, on purpose
+without a backend or `jq`.
+
+**Soft delete.** `@SQLRestriction("deleted_at IS NULL")` hides deleted workflows from every query.
+Projects are filtered through `archived_at` and repository methods, not via `@SQLRestriction` — that
+would break the eagerly loaded `Workflow.project`.
+
+Common symptoms when setting up:
+
+| Symptom | Remedy |
+|---|---|
+| Port 9090 in use | stop the other process or set `AUTOMATION_PORT` |
+| `SQLITE_BUSY` | only one backend instance per database file |
+| `claude` not found during a run | the AI CLIs run on the host, so `claude` must be on the backend's `PATH` |
+| `permission denied` on the Docker socket | add the user to the `docker` group |
+| CORS error (403 `Invalid CORS request`) | add the address, together with the localhost entries, to `AUTOMATION_CORS_ORIGINS` — switching security off changes nothing about CORS |
+| `mvn: command not found` | use the wrapper `./mvnw` |
 
 ## Build
 
@@ -114,7 +176,7 @@ mvn clean package -DskipTests
 # Build JAR (with tests)
 mvn clean package
 
-# Output: target/ai-automation-backend-0.7.3-SNAPSHOT.jar
+# Output: target/ai-automation-backend-<version>.jar
 ```
 
 **Docs on the classpath:** `src/main/resources/docs/` (architektur, WORKFLOW-GUIDE, audit-workflow-protocol,
@@ -144,15 +206,11 @@ npm run build
 
 ### Docker Images
 
-```bash
-cd ai-automation-backend
-
-# Agent images (a new AGENT_APT_REFRESH fetches the gh and Docker repos and the pip packages afresh, 97e1529d, 8b7a39b9)
-AGENT_APT_REFRESH=$(date +%Y-%m) docker compose --profile build-only build
-```
-
-There is no standalone backend image through this compose file any more — for an instance in a
-container see [deployment.md → deploy/](deployment.md#one-instance-in-a-container-deploy).
+The agent images for shell blocks with `container_image` are built by
+`docker compose --profile build-only build` in `ai-automation-backend/`; when they are needed and how to
+refresh their third-party repos is in [deployment.md → Docker Compose](deployment.md#docker-compose).
+An image for a running instance exists only through
+[deploy/](deployment.md#one-instance-in-a-container-deploy).
 
 ## Builds next to the running dev backend
 
@@ -274,7 +332,7 @@ Locally the same option works; it is deliberately not the default in `pom.xml`, 
 
 **Class-size ratchet:** `architecture/SourceSizeRatchetTest` counts the lines of every file under `src/main/java` and fails as soon as a file exceeds 300 lines without being on the test's allowlist — or a listed file grows past its recorded ceiling. The list only moves one way: whoever shrinks a listed class lowers its ceiling; once it drops to ≤300 lines the entry is removed. New files above 300 lines get split, not listed (audit TODO 1e248ab9). No external dependency, plain JUnit.
 
-**Request cost ratchet:** `architecture/RequestCostRatchetTest` measures two **deterministic** costs for the routes the UI hits on every page load (`/todos`, `/workflows`, `/projects`, `/executions`, `/workflows/{id}/runs`, `/learning/dashboard`, `/search`, `/schedules`, `/schedules/{id}/runs`, `/schedules/calendar`, `/goals` with detail, relations, work packages and milestones, `/wishes`, `/audits` with the report history of one audit) and compares them against the `BASELINE` map in the test: the number of SQL statements and the response size in bytes. No milliseconds — wall-clock time on a developer machine depends on host load, JIT warm-up and who currently holds the single SQLite connection, so it would flake. The two pinned costs are reproducible and are exactly the ones that went wrong before: an N+1 turns 3 statements into 33 (`1e465a9e perf(api)`), a fetched TEXT blob turns a small response into a huge one (`443fa57e perf(dashboard)`). Counting goes through a Hibernate `StatementInspector` (`metrics/CountingStatementInspector` → `metrics/SqlStatementCounter`, ThreadLocal, registered in `config/StatementInspectorConfig`). Every route is measured without a surrounding transaction, the way production serves it (OSIV is off): the seed is committed, each request opens its own transactions or none, and the test empties the seeded tables after every test. Inside the test transaction the request had shared its persistence context — a service without a transaction of its own looked as cheap as one with, and `/learning/dashboard` measured 10 statements instead of 52 (TODO 5c56b3d1). The test measures against a database file of its own, freshly migrated, instead of the one the test JVM shares: rows another integration test leaves behind without a rollback would otherwise shift every ceiling — in one `-Dtest` selection two projects and three workflows were enough for a red run (TODO 5695d482); before every seed it checks that the seeded tables are empty. Like the class-size ratchet the list only moves one way: ceilings drop when a route gets cheaper (the hint test prints the new number). **A ceiling may temporarily pin a known defect, not a target** — the first run found three N+1 patterns and one unbounded response (TODOs 13d1e2a2, 9db34f3b, a05c9504); they were pinned so the gate stayed green and nothing got *worse*, and all of them are fixed by now. Since 13d1e2a2 every measured route is also held to the growth criterion: its statement count must not rise when the seed doubles. Raising a ceiling needs a reason in the commit message.
+**Request cost ratchet:** `architecture/RequestCostRatchetTest` measures two **deterministic** costs for the routes the UI hits on every page load (which ones is in the test's `BASELINE` map) and compares them against the ceilings there: the number of SQL statements and the response size in bytes. No milliseconds — wall-clock time on a developer machine depends on host load, JIT warm-up and who currently holds the single SQLite connection, so it would flake. The two pinned costs are reproducible and are exactly the ones that went wrong before: an N+1 turns 3 statements into 33 (`1e465a9e perf(api)`), a fetched TEXT blob turns a small response into a huge one (`443fa57e perf(dashboard)`). Counting goes through a Hibernate `StatementInspector` (`metrics/CountingStatementInspector` → `metrics/SqlStatementCounter`, ThreadLocal, registered in `config/StatementInspectorConfig`). Every route is measured without a surrounding transaction, the way production serves it (OSIV is off): the seed is committed, each request opens its own transactions or none, and the test empties the seeded tables after every test. Inside the test transaction the request had shared its persistence context — a service without a transaction of its own looked as cheap as one with, and `/learning/dashboard` measured 10 statements instead of 52 (TODO 5c56b3d1). The test measures against a database file of its own, freshly migrated, instead of the one the test JVM shares: rows another integration test leaves behind without a rollback would otherwise shift every ceiling — in one `-Dtest` selection two projects and three workflows were enough for a red run (TODO 5695d482); before every seed it checks that the seeded tables are empty. Like the class-size ratchet the list only moves one way: ceilings drop when a route gets cheaper (the hint test prints the new number). **A ceiling may temporarily pin a known defect, not a target** — the first run found three N+1 patterns and one unbounded response (TODOs 13d1e2a2, 9db34f3b, a05c9504); they were pinned so the gate stayed green and nothing got *worse*, and all of them are fixed by now. Since 13d1e2a2 every measured route is also held to the growth criterion: its statement count must not rise when the seed doubles. Raising a ceiling needs a reason in the commit message.
 
 **No AI call inside a transaction:** `architecture/SlowCallInTransactionRatchetTest` reads the compiled bytecode (with the ASM copy inside spring-core, no new dependency) and fails as soon as a transaction encloses a call that starts a process: every `execute*` of `CommandExecutorService` (AI CLI, shell, container), the CLI wrappers `HostClaudeService`/`HostCodexService`/`HostPiService`, `ShellCommandService`/`ContainerShellService`, and `AiProvider.reason`/`executeAction` – also through an implementing class or a provider taken from `AiProviderRegistry`. Likewise every HTTP call that waits on a foreign server: `HttpClient.send`/`sendAsync` and opening, streams and reading the answer of `URLConnection`, `HttpURLConnection` and `HttpsURLConnection` (`connect`, `getInputStream`, `getOutputStream`, `getResponseCode`, `getHeaderField`, `getErrorStream` …; the scan compares the declared type, so each one is listed in `HTTP_CALLS`) – a webhook target that runs into its timeout would hold the connection just as long. Transactions are `@Transactional` methods (also through the class annotation, not with `NOT_SUPPORTED`/`NEVER`) and the callbacks of `TransactionTemplate.execute`; every call on the same object is followed – private helpers, lambdas, method references. With pool-size 1 such a call would hold the only connection for its whole duration. Calls into other beans stay invisible to the scan: it pins the direct shape and is no proof over the whole call graph. The exception list `KNOWN_EXCEPTIONS` is empty and only ever shrinks. The fix always has the same shape – a short read burst through `TransactionTemplate`, the AI call without a transaction, a short write burst (`WorkflowMemoryService#extractKnowledge`, `PageSuggestionService#refreshSuggestions`). Unit tests check the boundary with `testsupport/FakeTransactions`: a transaction manager without a database and a proxy that applies `@Transactional` the way the application context does; inside the mocked call, `FakeTransactions.active()` tells whether a transaction is open right now.
 
@@ -497,35 +555,7 @@ AUTOMATION_RATE_LIMIT_RPM=6000 AUTOMATION_DISCOVERY_AUTO_TAGGING_ENABLED=false \
   `POST /projects/{id}/stop`, delete workflows and project) — not through Docker directly
 - For the test instance, `POST /api/v1/testing/reset` can additionally be used if a complete reset is desired
 
-**Test structure:**
-
-```
-cypress/
-  support/
-    e2e.ts          ← API key via cy.env(); before every page load: key, English locale, welcome tour seen
-    target.ts       ← E2E target: API address (Cypress.expose) and the loaded API key
-    commands.ts     ← Custom commands (apiCreateProject, shouldShowToast, navTo, ...)
-    api.ts          ← HTTP helpers for test data setup (CRUD against backend API)
-  e2e/
-    activity-log.cy.ts       ← Activity log view
-    assistant-panel.cy.ts    ← Assistant panel
-    chains.cy.ts             ← Chains CRUD and execution
-    dashboard.cy.ts          ← Stat cards, charts, quick actions
-    navigation.cy.ts         ← Sidebar navigation, routing, collapse/expand
-    project-detail.cy.ts     ← Project detail page
-    projects.cy.ts           ← Projects CRUD (create, search, detail, delete)
-    responsive-layout.cy.ts  ← Responsive layout
-    runs.cy.ts               ← Workflow runs view
-    schedules.cy.ts          ← Schedules CRUD, toggle, table
-    settings.cy.ts           ← Theme, language, API key, system health
-    skills.cy.ts             ← Skill catalog, filter, detail slide-over
-    staging.cy.ts            ← Staging management
-    todos.cy.ts              ← Todos CRUD
-    webhooks.cy.ts           ← Webhooks CRUD, toggle, copy button
-    wishes.cy.ts             ← Wishes
-    workflow-execution.cy.ts ← Workflow execution
-    workflows.cy.ts          ← Workflows CRUD, template selection, detail, blocks, skills
-```
+Specs live under `cypress/e2e/`, the helpers (API key, target, custom commands, test data through the API) under `cypress/support/`.
 
 **Conventions:**
 - English locale and the seen welcome tour are set via `localStorage` before every page load (otherwise the tour covers every page)
@@ -686,26 +716,22 @@ scripts/load-test.sh --ref v0.7.8    # another commit; --jar PATH skips the buil
 
 From the UI it runs as the pool workflow **Load test before a release** (`workflow-pool/mysuricates-load-test.json`, variable `ref`): the script comes from the commit under test, Opus explains the fact sheet (bottlenecks, comparison, recommendations), the gate follows `FAKT load_verdict`, never the AI. **Test:** `python3 -m unittest discover -s scripts/tests -p 'test_load_test_*.py'` (evaluation, verdict, baseline, driver against a test server); `test-release.sh` covers the prompt.
 
-**Push:** `git push origin main "vX.Y.Z"` (or `git push --follow-tags`, which only takes annotated
-tags along) — **not** `git push --tags`: every `staging.sh promote` creates a lightweight `stable-*`
-tag (deployment timestamp, see below), and `--tags` would push all of those to GitHub too, mixing
-them into the release list.
-
 ### Interaction with Staging
 
-The stable environment is a Docker container on port 9091 holding a frozen state of the code for everyday use, next to the dev instance running from source; `scripts/staging.sh` builds and manages it ([deployment.md → Three-Environment Setup](deployment.md#three-environment-setup)). After a release, `./scripts/staging.sh promote` can be run to deploy the new version to the stable environment. The settings page then shows a version comparison (Dev vs. Stable) and recommends a promote if the versions differ.
+After a release, `./scripts/staging.sh promote` brings the new version into the stable environment, a
+Docker container on port 9091 next to the dev instance. Version comparison and promote recommendation in
+the settings: [deployment.md → Version Display](deployment.md#version-display).
 
 ### Git Tags
-
-There are two types of git tags:
 
 | Tag Format | Created by | Kind | Purpose |
 |---|---|---|---|
 | `v0.1.1` | `release.sh` | annotated (`git tag -a`) | Semver release marker, triggers `release.yml` |
 | `stable-20250225-143022` | `staging.sh promote` | lightweight | Deployment timestamp, stays local |
 
-That's why it's `git push --follow-tags` rather than `git push --tags`: `--follow-tags` only takes
-annotated tags along, `--tags` would push every local `stable-*` tag to GitHub too.
+**Push:** `git push origin main "vX.Y.Z"` or `git push --follow-tags` — both only take the annotated tag
+along. **Not** `git push --tags`: that would push every local `stable-*` tag to GitHub too, mixing it into
+the release list.
 
 ### GitHub release on every tag
 
@@ -916,76 +942,6 @@ The backend uses three annotation processors that must be correctly ordered in t
 1. **Lombok** — Generates getters, setters, builders, etc.
 2. **MapStruct** — Generates mapper implementations
 3. **lombok-mapstruct-binding** — Bridge between Lombok and MapStruct
-
-## Architecture Notes for Developers
-
-### Backend Structure
-
-The backend comprises **54 REST controllers** and **20 block types**:
-
-**Controllers:** ActivityLog, Assistant, Audit, Chain, ChainTemplate, CompletionTrigger, Conversion, DashboardLayout, DashboardReportAssist, DashboardWorkflow, DeadLetter, Dialog, Docs, Execution, Goal, GoalWorkflow, Integration, Learning, Notification, OnboardingProfile, PageSuggestion, Project, ProjectBundle, Reports, Schedule, Search, Skill, StagedSync, Staging, System, SystemAccess, SystemAiProvider, SystemMaintenance, SystemModules, SystemRequestMetrics, SystemSettings, Testing, Todo, TodoTrigger, Webhook, WebSocketTicket, Wish, Workflow, WorkflowAnalyzer, WorkflowAssist, WorkflowDebug, WorkflowFactory, WorkflowImport, WorkflowMemory, WorkflowPool, WorkflowSeal, WorkflowSealStatus, WorkflowTemplate, WorkflowVersion
-
-**Block types:** `simple`, `shell`, `retry`, `conditional`, `foreach`, `while`, `switch`, `agentic`, `approval`, `sub-workflow`, `skill-capability`, `human-input`, `document`, `integration`, `todo-create`, `todo-update`, `todo-close`, `compress`, `compress-ai`, `dashboard-report`
-
-**Flyway migrations:** V1–V97 (SQLite)
-
-### Gate Status System
-
-Workflow blocks can emit quality gate markers:
-```
-gate_status: GREEN|YELLOW|RED
-gate_category: <category>
-gate_description: <description>
-```
-- The gate does not change the run status; `COMPLETED_WITH_ERRORS` only comes from a failed `checked_command` step
-- With AutoTodo on the workflow: RED → TODO with HIGH, YELLOW → with MEDIUM priority (`AutoTodoService`)
-- `GateStatusOutputParser` parses the markers from block outputs
-
-### Chains
-
-Chains sequence multiple workflows in order:
-- `ChainService` / `ChainExecutor` for CRUD and execution
-- Cross-project: a chain does not belong to any project
-- `previous_chain_output` as a context variable between entries
-- WebSocket status broadcasts to `/topic/chains/{chainRunId}/status`
-
-### Workflow Memory
-
-Workflows can accumulate knowledge across runs:
-- `WorkflowMemoryService.extractKnowledge()` — AI-based extraction via `KnowledgeSummarizer`
-- Active entries are injected into subsequent runs
-- Extraction only with `CLAUDE` (default) or `CODEX` (`WorkflowMemoryService.getSummarizer`) — unlike
-  workflow blocks, Pi is not wired in here
-
-### Soft-Delete Pattern
-
-- **Workflows:** `@SQLRestriction("deleted_at IS NULL")` on the entity class — automatically excluded from all queries
-- **Projects:** `archived_at IS NOT NULL` = archived — filtering via repository methods (no `@SQLRestriction`, as it would break eager-loaded `Workflow.project` associations)
-
-### Seeder
-
-- **SkillSeeder:** Creates 19 built-in skills on startup (idempotent, updates on version bump) and registers them in the `SkillRegistry`
-- Skill definitions as JSON + prompt `.md` under `src/main/resources/skills/builtin/`
-- **WorkflowTemplateSeeder:** Creates 54 built-in templates on startup (idempotent, updates on version bump) and removes built-in rows whose file no longer ships
-- Template definitions as JSON under `src/main/resources/templates/builtin/`
-
-### Module Catalog
-
-Whoever adds or changes a module in `modules/ModuleCatalog` must regenerate
-`scripts/lib/module-catalog.generated.sh` — the file is not hand-maintained, it is derived from the
-catalog and the display texts (`ai-automation-frontend/src/data/modules.<lang>.json`) by
-`ModuleCatalogTextsTest`:
-
-```bash
-cd ai-automation-backend && ./mvnw test -Dtest=ModuleCatalogTextsTest -Dmodule.catalog.write=true
-```
-
-Without regeneration, the test fails red as soon as the generated file no longer matches the
-catalog. `scripts/lib/module-preset.sh` reads the generated file before every build — deliberately
-without requiring a backend or `jq`. `scripts/setup.sh --lang de|en` only chooses the display
-language of the module texts in the terminal (default: the `$LANG` prefix, else `en`); it never
-changes the outcome (which modules are active). Details on the catalog itself:
-[architektur.md](architektur.md#module-system-startup-configuration).
 
 ## Hygiene gate
 
@@ -1201,26 +1157,11 @@ foreign keys (those of `todos`, for example) are plain text fields there, and `N
 
 ## Dependency advisories (frontend)
 
-`npm audit` in the frontend reports **0 vulnerabilities** after the updates from 2026-09-12.
-After an initial reduction from twenty to seven, the two remaining major upgrades were carried
-out as well.
-
-**Cleared:** the runtime chain first. `dompurify` arrived via `@monaco-editor/react` →
-`monaco-editor` and sat at 3.4.12, the upper edge of the vulnerable range (GHSA-55q2-fjhq-7xh7,
-XSS through a detached subtree). A plain update does not move it because an `overrides` entry pins
-the version — that entry is now `^3.4.13`, installed is 3.4.15. Then `npm audit fix` without
-`--force` for everything else in range.
-
-**Further updates:**
-
-| Package | Update |
-|---|---|
-| `cypress` and its transitives | Cypress 15.21.1 replaces the vulnerable dependencies of Cypress 13; `qs` is updated too. |
-| `react-router-dom` / `react-router` | Version 7.18.3 fixes the reported router findings. The existing protection `isInternalAppPath()` against protocol-relative and backslash paths stays in place. |
-
-Re-check with `npm audit`, `npm test` and `npm run build` (including the TypeScript check).
-Cypress 15 requires Node.js 20/22/24+ and, on Linux, glibc >= 2.31;
-see the [Cypress migration notes](https://www.cypress.io/blog/cypress-15-made-simple-upgrade-paths-from-13-and-14).
+`npm audit` in the frontend is the source for the current state. One trap when fixing: if a package is
+pinned through an `overrides` entry in `package.json` — like `dompurify`, which arrives via
+`@monaco-editor/react` → `monaco-editor` —, a plain update does not move it. Raise the entry first, then
+`npm audit fix` without `--force` for everything else in range. Re-check with `npm audit`, `npm test` and
+`npm run build` (including the TypeScript check).
 
 ## Known Limitations
 
@@ -1241,16 +1182,15 @@ see the [Cypress migration notes](https://www.cypress.io/blog/cypress-15-made-si
 
 ### Docker Dependency
 
-- The backend boots even without a running Docker daemon (the Docker client is initialized lazily).
-- Without Docker, container-execution blocks in workflows cannot be executed.
-- Agent images must be built beforehand (`docker compose --profile build-only build`).
+- Without Docker, shell blocks with `container_image` cannot run; their agent images must be built
+  beforehand (`docker compose --profile build-only build`).
 - **AI CLIs (Claude, Codex, Pi) in workflow blocks always run on the host**, not in the project container, so they need no Docker. Only ad-hoc commands during a run (`claude` via `docker exec`) and the terminal use the project container.
 
 ### Security
 
-- The Docker socket mount gives the backend host-level Docker access. In production environments, at minimum API key auth should be enabled.
-- By default CORS admits only the dev servers on `localhost` (3000/5173), plus the instance's own Tailscale address with `remote-access`; further origins via `AUTOMATION_CORS_ORIGINS` ([Where it listens](deployment.md#where-it-listens)).
-- Rate limiting is active by default (120 req/min). Configurable at runtime in Settings → Execution.
+Started from source, the instance listens on all interfaces. What follows from that — API key, Docker
+socket, CORS, rate limit — is in
+[deployment.md → Trust model and network exposure](deployment.md#trust-model-and-network-exposure).
 
 ### Frontend
 
