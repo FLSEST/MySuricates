@@ -73,761 +73,226 @@ Zugriff in Block-Configs mit `{{ filepath }}` oder `{{ language }}`.
 
 ## 2. Block-Typ-Referenz
 
-MySuricates unterstützt 20 Block-Typen. Jeder Block hat einen `type` und eine `config`-Map.
+MySuricates unterstützt 20 Block-Typen. Jeder Block hat einen `type` und eine `config`-Map. **Alle Config-Schlüssel** mit Typ, Pflicht, Standard und erlaubten Werten stehen in der erzeugten [Block-Referenz](block-referenz.md). Hier steht je Typ, wozu er taugt, ein minimales Beispiel und was man über sein Verhalten wissen muss.
 
-**Unbekannte Block-Typen werden beim Speichern abgelehnt** (HTTP 400, Fehlermeldung nennt den Typ und die erlaubten Typen). Geprüft wird gegen die Executor-Registry (`BlockTypeRegistry` — alle registrierten `BlockExecutor`-Beans), rekursiv auch in verschachtelten Blöcken (`switch`-`cases[].blocks` und `default`). Ein fehlender oder leerer `type` zählt dabei als unbekannt. Das gilt für jeden Schreibweg gleichermassen: UI, REST-API, Import, Pool-Installation, Seeder und Factory. Ein Tippfehler wie `"shel"` scheitert damit sofort und nicht erst mitten im Run.
+**Prüfung beim Speichern.** Unbekannte Block-Typen werden abgelehnt (HTTP 400, die Meldung nennt den Typ und die erlaubten Typen), geprüft gegen die Executor-Registry (`BlockTypeRegistry`), rekursiv auch in `switch`-`cases[].blocks` und `default`. Ein fehlender oder leerer `type` zählt als unbekannt. Das gilt für jeden Schreibweg (UI, REST-API, Import, Pool-Installation, Seeder, Factory) und auch für das Wiederherstellen einer alten Version: eine nicht mehr ausführbare Definition kommt nicht zurück.
 
-Auch das **Wiederherstellen einer alten Version** (`POST /api/v1/workflows/{id}/versions/{versionId}/restore`) geht durch diese Prüfung: enthält die alte Definition einen Typ, den es heute nicht mehr gibt, scheitert die Wiederherstellung mit 400 — eine nicht mehr ausführbare Definition kommt nicht zurück.
+**Editor und Analyzer.** Das Konfigurationsfeld des Block-Editors schlägt Schlüssel und Werte vor (Strg+Leertaste, ein zweites Mal zeigt die Erklärung) und markiert unbekannte Schlüssel, falsche Werte und fehlende Pflichtfelder gelb; Speichern bleibt möglich. Dieselbe Quelle, `blockConfigSchema.json`, nutzt der Analyzer, dessen Befunde die Workflow-Seite unter dem Kopf zeigt: `unknown-config-key`, `missing-required-config-key`, `invalid-config-value`, `legacy-config-key` (LOW, alter Schlüsselname wie `workflowId`), `dead-nested-blocks` (HIGH: eine Liste `config.blocks` führt kein Typ aus) und `unknown-block-field` (HIGH, wenn ein Config-Schlüssel neben statt in `config` steht – solche Felder werden mitgespeichert, nicht verworfen). Dazu der Zugriff auf die eigene Plattform: `self-api-call` (Shell-Code ruft die REST-API der Instanz oder liest ihre Schlüsseldatei; ausgenommen die schlüsselfreien Sonden) und `direct-db-access`. Ein `HIGH`-Befund dieser beiden sperrt unbeaufsichtigte Starts (`403 UNATTENDED_PLATFORM_ACCESS`, SECURITY-Eintrag, kein Run); von Hand startet der Workflow weiter ([architektur.md](architektur.md) → Workflow-Härtung). Stattdessen: Kontextvariablen wie `{{ open_todos }}`, die `todo-*`-Blöcke und für fremde Dienste der `integration`-Block. Von einer KI erzeugte Workflows laufen gleich nach der Erzeugung durch dieselbe Prüfung. Wer einem Executor einen neuen Config-Schlüssel beibringt, trägt ihn in `blockConfigSchema.json` ein (`ExecutorConfigKeyDriftTest`).
 
-**Hilfe im Block-Editor:** Das Konfigurationsfeld kennt die Schlüssel jedes Block-Typs. Strg+Leertaste schlägt Schlüssel und erlaubte Werte vor (z. B. `on_failure` → `stop`/`continue`), ein zweites Strg+Leertaste zeigt die Erklärung dazu, und der Hover über einen Schlüssel erklärt ihn samt seinen Werten. Unbekannte Schlüssel, falsche Werte und fehlende Pflichtfelder werden gelb markiert, das Speichern bleibt trotzdem möglich. Der Dialog lässt sich an der rechten unteren Ecke aufziehen und maximieren. Die Block-Skills erscheinen nur bei Blöcken, die die KI im Projektverzeichnis aufrufen. Quelle der Schlüssel und Texte ist `ai-automation-frontend/src/data/blockConfigSchema.json`: Wer einem Executor einen neuen Config-Schlüssel beibringt, trägt ihn dort ein. `blockConfigSchema.test.ts` gleicht das Schema mit allen mitgelieferten Vorlagen, Blaupausen und Pool-Workflows ab, `ExecutorConfigKeyDriftTest` mit den Schlüsseln, die die Executoren lesen. Dieselbe Datei nutzt der Analyzer: Die Workflow-Seite zeigt unter dem Kopf die Befunde der Baufehler-Prüfung (in der Sprache der Oberfläche), darunter unbekannte Schlüssel (`unknown-config-key`, etwa `command` statt `goal` im agentic-Block oder `container_image` eines retry-Blocks ohne `execution_mode: shell`), fehlende Pflichtschlüssel (`missing-required-config-key`) und ungültige Werte (`invalid-config-value`, etwa `on_failure: "fail"`), dazu als LOW-Hinweis alte Schlüsselnamen, die noch wirken, aber auslaufen (`legacy-config-key`, etwa `workflowId` statt `workflow_id` am sub-workflow) – auch in verschachtelten Blöcken, mit Pfad wie „Block 2 › cases[0] › Block 1“. Ebenfalls gemeldet wird der Zugriff auf die eigene Plattform: `self-api-call` (Shell-Code ruft die REST-API der Instanz, etwa `curl localhost:9090/api/v1/todos` oder `/actuator/metrics`, auch zusammengesetzt wie `…/api/v1/$E`; ausgenommen die schlüsselfreien Sonden `/actuator/health`, `/api/v1/system/health`, `/api/v1/system/jvm-memory`, `/api/v1/system/info`, `/api/v1/system/auth-status`; ebenso das Lesen der Schlüsseldatei der Instanz – `~/.mysuricates/api-key`, `~/.autotrigger/api-key`, `$AUTOMATION_DATA_HOME/api-key` – im Shell-Code, auch ohne `curl` danach; nennt ein KI-Auftrag so einen Aufruf oder die Schlüsseldatei, nur als MEDIUM zum Prüfen) und `direct-db-access` (`app_settings` oder `automation.db` mit Lesezugriff; `sqlite3` allein als MEDIUM, weil es auch die Datei eines Projekts sein kann). Stattdessen: Kontextvariablen wie `{{ open_todos }}`, die Blöcke `todo-create`/`todo-update`/`todo-close`, für fremde Dienste der Integrations-Block. Speichern bleibt mit diesen Befunden möglich, aber ein `HIGH`-Befund von `self-api-call` oder `direct-db-access` sperrt unbeaufsichtigte Starts (Zeitplan, Webhook, Trigger, Chain/Sub-Workflow ohne Menschen am Anfang): `403 UNATTENDED_PLATFORM_ACCESS`, ein SECURITY-Eintrag im Activity-Log, kein Run; von Hand startet der Workflow weiter (Details: [architektur.md](architektur.md) → Workflow-Härtung). Workflows, die eine KI erzeugt (Assistent, Factory, Wünsche, Dialog-Import, Run-Konvertierung), laufen gleich nach der Erzeugung durch dieselbe Prüfung: Bei HIGH-Befunden bekommt die KI eine Korrekturrunde, verbliebene Befunde zeigt das Ergebnis bzw. das Activity-Log (Details: [architektur.md](architektur.md) → Workflow Factory).
+### Felder am Block
 
-**Was an einem Block steht, aber nie läuft**, meldet der Analyzer ebenfalls: `dead-nested-blocks` (HIGH) für eine Liste `config.blocks` – kein Block-Typ führt sie aus; foreach, retry, conditional und while führen ihren `command` aus, switch nur `cases[].blocks` und `default`. `unknown-block-field` für ein Feld neben `type`, `name`, `config`, `requiredCapabilities` und `skillIds`: HIGH, wenn es ein Config-Schlüssel ist (`"on_failure": "continue"` neben statt in `config` – der Lauf stoppt trotzdem), MEDIUM bei naher Schreibweise eines Blockfelds (`skill_ids`), sonst LOW. Solche Felder speichert MySuricates mit, statt sie still zu verwerfen, damit die Workflow-Seite sie nach dem Speichern oder einem Pool-Install anzeigt.
+Neben `type` und `config` kennt ein Block diese Felder:
 
-### Allgemeine Block-Eigenschaften
+| Feld | Bedeutung |
+|---|---|
+| `name` | Name, unter dem spätere Blöcke die Ausgabe per `{{ block.<name>.output }}` lesen. Empfohlen: Buchstaben, Ziffern, `_` und `-`; abgelehnt wird nur der reservierte Name `previous_output` (`BlockNameRules`). Workflowweit eindeutig halten – bei Gleichheit gewinnt der zuletzt geschriebene Wert. |
+| `skillIds` | Skills, die **zusätzlich** zu den Workflow-Skills für diesen Block gelten; der `WorkflowExecutor` stellt danach den Ausgangsstand wieder her |
 
-Jeder Block unterstützt neben seinen typspezifischen Config-Feldern auch diese allgemeinen Eigenschaften:
+Die Schlüssel, die jeder Block in `config` versteht, stehen unter [Gemeinsame Felder](block-referenz.md#gemeinsame-felder). Was man dazu wissen muss:
 
-| Config-Schlüssel | Typ | Default | Beschreibung |
-|---|---|---|---|
-| `on_failure` | string | `"stop"` | Verhalten bei Fehler: `"stop"` (Workflow beenden) oder `"continue"` (mit nächstem Block fortfahren) |
-| `run_if` | string | null | **Nur oberste Ebene**: Shell-Test vor dem Block, im Arbeitsverzeichnis des Laufs (bei Isolation im Klon), höchstens 60 s. Exit 0 → der Block läuft; sonst ist er `SKIPPED` mit der Ausgabe `Übersprungen (run_if: exit N)` – sein Executor wird nicht gerufen (kein KI-Aufruf, keine Freigabe, nichts geschrieben), eine `variable_name`-Variable bleibt ungesetzt. Platzhalter wie in jedem Shell-Feld (fremde Werte immer gequotet, `shell_escape_variables` für alle). Typisch: `test -s .git/state/ids.txt`. |
-| `provider` | string | null | **Nur KI-fähige Blöcke** (`simple`, `agentic`, `skill-capability`, `compress-ai` sowie der Inline-`command` von `retry`, `foreach`, `while`, `conditional`, `switch`): KI-Anbieter nur für diesen Block (`CLAUDE`, `PI`, `CODEX`; bei `compress-ai` nur `CLAUDE`). Präzedenz Block > Workflow > System-Default. Beim `integration`-Block bezeichnet `provider` dagegen den Integrations-Provider (`google-calendar`, …). |
-| `model` | string | null | **Nur KI-fähige Blöcke** (inkl. `compress-ai`): Modell nur für diesen Block (CLI-Alias `opus`/`sonnet`, konkrete ID oder pi `<backend>/<model>`). Präzedenz Block > Workflow > Provider-Default. Setzt ein Block einen *anderen* `provider` als der Workflow, wird das Workflow-Modell nicht vererbt (Modell-IDs sind anbieterspezifisch). |
-| `effort` | string | null | **Nur KI-fähige Blöcke**: Denkaufwand `low`/`medium`/`high`/`xhigh` nur für diesen Block, siehe [Reasoning-Effort](#reasoning-effort-denkaufwand). |
-
-Zusätzlich unterstützt jeder Block optionale Top-Level-Felder (neben `type`, nicht in `config`):
-
-| Feld | Typ | Default | Beschreibung |
-|---|---|---|---|
-| `name` | string | – | Name, unter dem spätere Blöcke die Ausgabe dieses Blocks per `{{ block.<name>.output }}` lesen. Empfohlen sind Buchstaben, Ziffern, `_` und `-`, keine Punkte und kein Leerraum — geprüft wird das beim Speichern nicht; abgelehnt wird nur der reservierte Name `previous_output` (`BlockNameRules`) |
-| `skillIds` | string[] | `[]` | Skill-IDs die **zusätzlich** zu den Workflow-Skills für diesen Block aktiviert werden |
-
-**Standard-Verhalten**: Wenn ein Block fehlschlägt (Status `FAILED`), stoppt der Workflow und der Run wird als `FAILED` markiert. Mit `"on_failure": "continue"` fährt der Workflow mit dem nächsten Block fort. Jeder andere Wert (etwa `"fail"` oder ein Tippfehler) stoppt wie `"stop"` — nur `continue` (Groß-/Kleinschreibung egal) lässt weiterlaufen.
-
-**Per-Block Skills**: Blöcke können über `skillIds` eigene Skills mitbringen, die additiv zu den Workflow-Level-Skills gelten. Der `WorkflowExecutor` merged beide Listen vor der Ausführung und stellt den Baseline-Zustand nach dem Block wieder her. Beispiel:
-
-```json
-{
-  "type": "simple",
-  "config": { "command": "Analysiere den Code auf Sicherheitslücken" },
-  "skillIds": ["builtin-code-review", "builtin-security-analyzer"]
-}
-```
-
----
+- **`on_failure`**: Ein FAILED-Block beendet den Run (FAILED). Nur `continue` (Groß-/Kleinschreibung egal) lässt den Workflow weiterlaufen; jeder andere Wert, auch ein Tippfehler wie `"fail"`, stoppt wie `stop`.
+- **`run_if`** (nur oberste Ebene): Ein Exit-Code ≠ 0 macht den Block `SKIPPED` mit der Ausgabe `Übersprungen (run_if: exit N)`; sein Executor wird nicht gerufen, eine `variable_name`-Variable bleibt ungesetzt. Typisch: `test -s .git/state/ids.txt`.
+- **`provider`/`model`/`effort`** (KI-fähige Blöcke): Vorrang Block > Workflow > System-Standard, siehe [Reasoning-Effort](#reasoning-effort-denkaufwand). Beim `integration`-Block meint `provider` dagegen den Integrations-Anbieter.
 
 ### `simple` — KI-Textverarbeitung
 
-Sendet den Prompt an die Claude CLI auf dem Host. Keine Shell-Ausführung.
-
-| Config-Schlüssel | Typ | Default | Beschreibung |
-|---|---|---|---|
-| `command` | string | **erforderlich** | Der Prompt, der an Claude gesendet wird |
-| `timeout_seconds` | int | null | Claude-CLI-Timeout (wenn null, gilt der globale `automation.host-claude.timeout-seconds`-Wert) |
+Ein Prompt an die KI-CLI auf dem Host, eine Antwort; keine Shell. Für Analyse, Zusammenfassung, Review.
 
 ```json
-{
-  "type": "simple",
-  "config": {
-    "command": "Analysiere den folgenden Code und liste Verbesserungsvorschläge auf:\n\n{{ previous_output }}"
-  }
-}
+{ "type": "simple", "config": { "command": "Fasse zusammen:\n\n{{ previous_output }}" } }
 ```
-
-**Wann verwenden**: Textanalyse, Zusammenfassung, Code-Review, Content-Generierung — jede Aufgabe, die KI-Reasoning ohne Shell-Zugriff benötigt.
-
----
 
 ### `shell` — Shell-Befehl-Ausführung
 
-Führt einen Shell-Befehl auf dem Host oder innerhalb eines Docker-Containers aus.
-
-| Config-Schlüssel | Typ | Default | Beschreibung |
-|---|---|---|---|
-| `command` | string | **erforderlich** | Shell-Befehl(e) zur Ausführung |
-| `container_image` | string | null | Docker-Image (siehe Ausführungsumgebung; Server kann per Allowlist einschränken) |
-| `timeout_seconds` | int | 300 | Ausführungs-Timeout |
-| `shell_escape_variables` | bool | false | **Alle** Template-Variablen POSIX-sicher escapen (Single-Quotes). Variablen aus Webhook-Payloads (inkl. `git_*`), die daraus abgeleiteten Block-Ausgaben sowie `{{ previous_report }}` und `{{ open_todos }}` werden **immer** escaped, unabhängig von dieser Option |
-| `mount_docker_socket` | bool | false | Docker-Socket in den Container mounten (nur wirksam wenn `container_image` gesetzt) |
-| `mounts` | list | `[]` | Zusätzliche Docker-Volume-Mounts im Format `host:container[:ro\|rw]` (nur wirksam wenn `container_image` gesetzt) |
-| `checked_command` | bool | false | Leitet aus dem Exit-Code automatisch ein Gate ab (`gate_status`/`gate_category`/`gate_description`, siehe [Quality-Gate-Marker](#quality-gate-marker) → „`checked_command` / `check_category`") und stellt `set -e -o pipefail` voran |
-| `check_category` | string | `build-check` | Kategorie für das aus `checked_command` abgeleitete Gate — nur ein Rückfall, wenn das Skript selbst keine `gate_category` liefert |
-
-> **Platzhalter in Heredocs:** `{{ var }}` innerhalb eines quoted Heredocs (`<<'PY'`) landet als
-> Quelltext im Interpreter — bei `PID = '{{ project_id }}'` wird jeder Wert mit `'` zu Python-Code.
-> Werte deshalb auf der Shell-Zeile übergeben und im Skript aus der Umgebung lesen:
-> `PROJECT_ID={{ project_id }} python3 - <<'PY'` … `os.environ['PROJECT_ID']`, Block-Option
-> `"shell_escape_variables": true`. Shell-Blöcke erhalten sonst keine Umgebungsvariablen.
-
-> **Begriff „Taint“:** Ein Run gilt als *getaintet* (gefärbt), sobald Daten von außen — etwa die
-> Nutzlast eines Webhooks — in ihn geflossen sind. Ab dann setzt die Plattform auch Block-Ausgaben
-> in Shell-Befehlen in Single-Quotes, weil ein Block fremde Bytes weitergeben kann. Die Regeln im
-> Einzelnen stehen unten unter „Taint-Propagation“, das Vertrauensmodell in
-> [deployment.md → Drei Vertrauensklassen](deployment.md#drei-vertrauensklassen-für-kontextwerte).
->
-> **Nicht vertrauenswürdige Variablen:** Alles, was ein Webhook-Aufrufer liefert (Payload-Felder und
-> die daraus abgeleiteten `git_*`-Felder), landet in Shell-Befehlen (`shell`, `foreach`, `while`, `retry`,
-> `conditional` und in `switch` verschachtelte Blöcke, jeweils im Shell-Modus) grundsätzlich in Single-Quotes — auch ohne `shell_escape_variables`. Solche
-> Platzhalter deshalb **unquoted** schreiben (`git checkout {{ git_branch }}`, nicht `"{{ git_branch }}"`),
-> sonst stehen die Quotes doppelt. **Und das ist nicht nur Kosmetik: in eigenen Quotes ist das
-> Escaping wirkungslos.** Beim Wert `x; id` wird `PREV='{{ previous_output }}'` zu
-> `PREV=''x; id''` — die Shell führt das als `PREV=x` **und danach** `id` aus. Einen untrusted
-> oder getainteten Platzhalter deshalb nie in Quotes setzen, sondern immer ohne Quotes schreiben
-> (`PREV={{ previous_output }}`) **und den Block mit `"shell_escape_variables": true` versehen** —
-> ohne Taint kommt der Wert sonst roh, und ein mehrzeiliger Output zerlegt den Befehl. Unquoted plus
-> Escape-Option ist die einzige Form, die in beiden Fällen stimmt; der Test `TemplateHygieneGateTest`
-> erzwingt sie für Built-in-Templates und den Pool. Werte aus `defaultContext` und System-Variablen
-> bleiben ohne die Option roh.
->
-> **Unbelegte Workflow-Variablen:** Bleibt eine Variable unbelegt, steht ihr Platzhalter wörtlich im
-> Befehl; unquoted wäre `SOURCE_DIR={{ source_dir }}` dann ein Shell-Fehler. Idiom:
-> `set -- {{ source_dir }}; SOURCE_DIR="$*"` — belegt liefert es den escapten Wert, unbelegt den
-> wörtlichen Platzhalter, den man wie bisher mit `[ "$SOURCE_DIR" = "{{ source_dir }}" ]` erkennt.
-
-> **Taint-Propagation auf Block-Ausgaben:** In einem webhook-getriggerten Run — und in jedem daraus
-> gestarteten Sub-Workflow sowie nach einem Resume — werden auch `{{ previous_output }}`,
-> `{{ block.<name>.output }}`, `{{ step_N_output }}` und die Items eines `items_command`
-> single-quoted. Grund: ein Block kann die Payload in seine Ausgabe tragen, ohne den Platzhalter
-> überhaupt zu nennen (Datei lesen, API aufrufen). Der Taint entsteht, sobald der Run irgendeinen
-> untrusted Input trägt, und bleibt bis zum Ende des Runs bestehen. Diese Platzhalter also ebenfalls
-> **unquoted** schreiben. In Runs ohne untrusted Input (Schedule, manueller Start, TodoTrigger,
-> Chain) bleiben alle Block-Ausgaben unverändert roh.
-
-> **`{{ previous_report }}` / `{{ open_todos }}`:** Beide werden **immer** als nicht
-> vertrauenswürdig behandelt und in Shell-Blöcken deshalb **stets single-quoted** — in jedem Run,
-> unabhängig vom Trigger und von `shell_escape_variables`. Grund: `previous_report` ist der Output
-> eines früheren Runs (der eine Webhook-Payload verarbeitet haben kann), `open_todos` enthält
-> Titel aus importierten Issues. Diese Platzhalter also **unquoted** schreiben
-> (`REPORT={{ previous_report }}`, nicht `REPORT="{{ previous_report }}"`). In KI-Prompts wird der
-> Wert weiterhin roh eingesetzt (dort wird nie escaped).
->
-> **Beide Platzhalter lösen Taint-Propagation aus — auf zwei Wegen:**
->
-> 1. **Substitution in ein Shell-Feld färbt den ganzen Lauf.** Sobald `{{ previous_report }}` oder
->    `{{ open_todos }}` wirklich in `command`, `items_command`, `condition`, … eines Shell-Blocks
->    eingesetzt wird, werden **ab diesem Punkt** auch alle Block-Ausgaben des Laufs
->    (`{{ previous_output }}`, `{{ block.<name>.output }}`, `{{ step_N_output }}`, `foreach`-Items)
->    single-quoted — genau wie in einem webhook-getriggerten Lauf.
-> 2. **Ein KI-Prompt färbt die Ausgabe dieses Blocks — und ab ihr den Lauf.** Standen
->    Plattform-Daten im Prompt eines KI-Blocks (`simple`, `agentic`, `skill-capability` sowie die
->    Nicht-Shell-Zweige von `foreach`/`while`/`conditional`/`retry`/`switch`), gilt dessen Ausgabe
->    als nicht vertrauenswürdig: Ein folgender Shell-Block bekommt sie single-quoted. Sobald diese
->    Ausgabe verbucht ist, ist der Lauf gefärbt, und zwar klebrig wie in Fall 1 — auch alle
->    **weiteren** Block-Ausgaben und die daraus abgeleiteten Variablen (`{{ step_N_output }}`,
->    `foreach`-Items, `document`-Extrakte) werden ab da gequotet, und der Taint wird über
->    `exportTaint()` an Sub-Workflows und an ein Resume weitergereicht. Der Prompt allein färbt
->    nichts: Wird keine Ausgabe verbucht, bleibt der Lauf sauber.
->
-> Ein Lauf, der die beiden Platzhalter überhaupt nicht verwendet, bleibt unverändert: Block-Ausgaben
-> werden roh eingesetzt wie bisher.
->
-> **Sichere Form für Folge-Blöcke:** `"shell_escape_variables": true` setzen und den Platzhalter
-> **unquoted** über `set --` in eine Variable holen —
-> `set -- {{ previous_output }}` und danach `ANTWORT="${1:-}"`. Das funktioniert in gefärbten wie in
-> sauberen Läufen gleich und ist die Form, die die ausgelieferten Definitionen verwenden (das
-> Gate `PlatformPromptQuotingGateTest` erzwingt sie dort).
->
-> **Bestand prüfen statt raten:** `scripts/lib/shell_placeholder_audit.py <definitionen.json>`
-> ordnet jeden Output-Platzhalter in Shell-Feldern nach seiner syntaktischen Rolle ein
-> (gequotet · Heredoc-Inhalt · `set --` · Zuweisung · Wortauftrennung) und meldet nur, was
-> wirklich eine Änderung braucht. Die Datei ist die Antwort von `GET /api/v1/workflows` oder
-> eine Pool-Definition — das Skript ruft selbst nichts ab. Exit 1 = Befund.
-> Heredoc-Inhalte dürfen dabei **nicht** escaped werden, sonst landen Anführungszeichen im Text.
->
-> Vollständiges Trust-Modell (drei Vertrauensklassen, reservierte Kontextschlüssel, bekannte
-> Grenzen): [architektur.md → Vertrauensklassen der Kontextwerte](architektur.md#workflow-härtung-optional).
+Führt einen Befehl auf dem Host aus, mit `container_image` in einem Container ([Ausführungsumgebung](#7-ausführungsumgebung)). `checked_command` leitet aus dem Exit-Code ein Gate ab ([Quality-Gate-Marker](#quality-gate-marker)).
 
 ```json
-{
-  "type": "shell",
-  "config": {
-    "command": "set -euo pipefail\ngit log --oneline -20"
-  }
-}
+{ "type": "shell", "config": { "command": "set -euo pipefail\ngit log --oneline -20" } }
 ```
 
-**Wann verwenden**: Skripte ausführen, Daten sammeln, Build-Befehle, Dateioperationen — alles was deterministische Shell-Ausführung benötigt.
+**Platzhalter in Shell-Befehlen** – die Regeln, die man kennen muss:
 
----
+- Werte von außen (Webhook-Payload samt `git_*`) sowie `{{ previous_report }}` und `{{ open_todos }}` setzt die Plattform in Shell-Befehlen **immer** in Single-Quotes (in KI-Prompts nie). Ein Lauf, der solche Daten trägt, ist *getaintet*: Ab dann werden auch Block-Ausgaben (`{{ previous_output }}`, `{{ block.<name>.output }}`, `{{ step_N_output }}`, `foreach`-Items) gequotet, ebenso in Sub-Workflows und nach einem Resume. Gleiches gilt, sobald Plattform-Daten im Prompt eines KI-Blocks standen und dessen Ausgabe verbucht ist.
+- Solche Platzhalter deshalb **unquoted** schreiben und den Block mit `"shell_escape_variables": true` versehen. In eigenen Quotes ist das Escaping wirkungslos: `PREV='{{ previous_output }}'` wird beim Wert `x; id` zu `PREV=''x; id''` und führt `id` aus. Ohne die Option kommt der Wert in sauberen Läufen roh. Sichere Form: `set -- {{ previous_output }}` und danach `ANTWORT="${1:-}"` (für die ausgelieferten Definitionen erzwingen das `TemplateHygieneGateTest` und `PlatformPromptQuotingGateTest`).
+- Eine unbelegte Variable bleibt wörtlich stehen: `set -- {{ source_dir }}; SOURCE_DIR="$*"`, erkennbar an `[ "$SOURCE_DIR" = "{{ source_dir }}" ]`.
+- In einem quoted Heredoc (`<<'PY'`) landet ein Platzhalter als Quelltext im Interpreter. Werte auf der Shell-Zeile übergeben (`PROJECT_ID={{ project_id }} python3 - <<'PY'`, im Skript `os.environ['PROJECT_ID']`); andere Umgebungsvariablen bekommen Shell-Blöcke nicht.
+- `scripts/lib/shell_placeholder_audit.py <definitionen.json>` ordnet jeden Output-Platzhalter in Shell-Feldern nach seiner Rolle ein und meldet nur, was eine Änderung braucht (Exit 1 = Befund).
+
+Vertrauensmodell: [deployment.md → Drei Vertrauensklassen](deployment.md#drei-vertrauensklassen-für-kontextwerte).
 
 ### `agentic` — Zielgesteuerter KI-Agent
 
-Führt eine autonome Goal-Reason-Act-Observe-Schleife aus. Der mächtigste, aber auch teuerste Block-Typ.
-
-| Config-Schlüssel | Typ | Default | Beschreibung |
-|---|---|---|---|
-| `goal` | string | **erforderlich** | Was der Agent erreichen soll |
-| `success_criteria` | string | `""` | Woran Erfolg gemessen wird |
-| `max_iterations` | int | 10 | Harte Iterationsobergrenze |
-| `iteration_timeout_seconds` | int | 300 | Wall-Clock-Timeout pro Iteration |
-| `total_timeout_seconds` | int | 1800 | Gesamt-Block-Timeout (30 Min) |
-| `max_total_tokens` | int | 200000 | Token-Budget über alle Iterationen: ungecachte Eingabe + Ausgabe von REASON und ACT, ohne Cache-Tokens (siehe unten) |
-| `max_repeated_actions` | int | 3 | Abbruch nach N identischen Aktionen |
-| `require_approval` | bool | false | Freigabe-Gate vor jeder Aktion |
-| `timeout_seconds` | int | null | Claude-CLI-Timeout pro Aufruf (REASON + ACT) |
+Autonome Schleife aus REASON und ACT je Iteration – der mächtigste und teuerste Typ, für mehrstufige Aufgaben mit Urteil. Details: [Agentic Block Deep Dive](#8-agentic-block-deep-dive).
 
 ```json
-{
-  "type": "agentic",
-  "config": {
-    "goal": "Erstelle eine Portfolio-Webseite in portfolio/ basierend auf {{ filepath }}.",
-    "success_criteria": "index.html existiert und enthält alle Sektionen.",
-    "max_iterations": 8,
-    "timeout_seconds": 600,
-    "max_total_tokens": 300000
-  }
-}
+{ "type": "agentic", "config": { "goal": "Erstelle portfolio/index.html aus {{ filepath }}.",
+  "success_criteria": "index.html enthält alle Sektionen.", "max_iterations": 8, "timeout_seconds": 600 } }
 ```
 
-**Was `max_total_tokens` zählt**: je Iteration `inputTokens` + `outputTokens` der REASON- und der ACT-Phase — also die ungecachte Eingabe und die Ausgabe (Denk-Tokens stecken in `outputTokens`). Cache-Tokens (`cacheReadInputTokens`, `cacheCreationInputTokens`) zählen bewusst **nicht** mit: Das Budget soll nah an den Kosten bleiben, nicht an der Kontextgröße. Bei Claude ist der gecachte Teil eines Aufrufs oft um Größenordnungen größer als der ungecachte; mitgezählt würden die üblichen Budgets (100.000–400.000) schon in der ersten Iteration reißen (Entscheidung 114c2ee3). Codex und Pi melden keine echten Zahlen, dort zählt die Schätzung (Zeichen / 4, `estimated: true`). Geprüft wird nach jeder Iteration: Liegt die Summe über dem Budget, endet der Block mit `[TOKEN BUDGET EXCEEDED: …]`; die letzte Iteration läuft also zu Ende. Wie viel Kontext tatsächlich durch den Cache ging, zeigen die Step-Metadaten und die Insights-Karte des Laufs.
-
-**Wann verwenden**: Komplexe mehrstufige Aufgaben, die Urteilsvermögen erfordern — Dateien erstellen, Code reparieren, Projekte bauen. Siehe [Agentic Block Deep Dive](#8-agentic-block-deep-dive) für Details.
-
----
+- `max_total_tokens` zählt je Iteration `inputTokens` + `outputTokens` von REASON und ACT, Cache-Tokens (`cacheReadInputTokens`, `cacheCreationInputTokens`) bewusst nicht – mitgezählt rissen übliche Budgets schon in der ersten Iteration. Codex und Pi melden keine echten Zahlen, dort zählt die Schätzung (Zeichen / 4, `estimated: true`). Geprüft wird nach jeder Iteration; liegt die Summe darüber, endet der Block mit `[TOKEN BUDGET EXCEEDED: …]`.
+- Zwei Timeouts: `timeout_seconds` je CLI-Aufruf, `iteration_timeout_seconds` je Iteration – siehe [Die Dual-Timeout-Falle](#die-dual-timeout-falle).
 
 ### `retry` — Wiederholung bei Fehler
 
-Wiederholt einen Befehl bis zu N Mal mit einer Pause zwischen den Versuchen.
-
-| Config-Schlüssel | Typ | Default | Beschreibung |
-|---|---|---|---|
-| `command` | string | **erforderlich** | Auszuführender Befehl |
-| `max_retries` | int | 3 | Maximale Wiederholungsversuche |
-| `delay` | int | 5 | Pause zwischen Versuchen (Sekunden) |
-| `exponential_backoff` | bool | false | Pause bei jedem Versuch verdoppeln |
-| `execution_mode` | string | `"ai"` | `"ai"` (KI, Provider aus `provider` am Block/Workflow) oder `"shell"`; `"claude"` gilt weiter als `"ai"`, andere Werte werden abgelehnt |
-| `timeout_seconds` | int | 300 | Ausführungs-Timeout pro Versuch |
+Wiederholt `command` bis zu `max_retries`-mal mit `delay` Sekunden Pause; mit `exponential_backoff` verdoppelt sich die Pause je Versuch (`delay`, `delay * 2`, `delay * 4`, …). Für instabile Tests und Netzwerkaufrufe.
 
 ```json
-{
-  "type": "retry",
-  "config": {
-    "command": "npm test",
-    "max_retries": 3,
-    "delay": 5,
-    "execution_mode": "shell"
-  }
-}
+{ "type": "retry", "config": { "command": "npm test", "max_retries": 3, "delay": 5, "execution_mode": "shell" } }
 ```
-
-**Exponential Backoff**: Wenn `exponential_backoff: true`, wird die Wartezeit bei jedem Versuch verdoppelt: 1. Versuch = `delay` Sekunden, 2. Versuch = `delay * 2`, 3. Versuch = `delay * 4`, usw.
-
-**Wann verwenden**: Instabile Tests, netzwerkabhängige Operationen, API-Aufrufe die vorübergehend fehlschlagen können.
-
----
 
 ### `conditional` — If/Then/Else
 
-Wertet eine Bedingung aus und führt einen von zwei Zweigen aus.
-
-| Config-Schlüssel | Typ | Default | Beschreibung |
-|---|---|---|---|
-| `condition` | string | **erforderlich** | Auszuwertende Bedingung |
-| `then_command` | string | null | Befehl wenn Bedingung wahr (wenn null, wird nichts ausgeführt) |
-| `else_command` | string | null | Befehl wenn Bedingung falsch |
-| `execution_mode` | string | `"ai"` | `"ai"` (KI, Provider aus `provider` am Block/Workflow) oder `"shell"`; `"claude"` gilt weiter als `"ai"`, andere Werte werden abgelehnt |
-| `timeout_seconds` | int | 300 | Ausführungs-Timeout |
+Wertet `condition` aus und führt `then_command` oder `else_command` aus. `execution_mode` gilt für Bedingung und Zweige: `shell` → Exit 0 = wahr; `ai` (Standard) → die KI antwortet TRUE oder FALSE.
 
 ```json
-{
-  "type": "conditional",
-  "config": {
-    "condition": "test -f package.json",
-    "then_command": "npm test",
-    "else_command": "echo 'Keine Tests'",
-    "execution_mode": "shell"
-  }
-}
+{ "type": "conditional", "config": { "condition": "test -f package.json", "then_command": "npm test",
+  "else_command": "echo 'Keine Tests'", "execution_mode": "shell" } }
 ```
-
-**Bedingungsauswertung**: Im `shell`-Modus gilt Exit-Code 0 = wahr, ungleich 0 = falsch. Im `ai`-Modus (Standard) beantwortet die KI die Bedingung mit "TRUE" oder "FALSE".
-
-**Dual-Modus**: `execution_mode` steuert sowohl die Bedingungsauswertung als auch die Ausführung von `then_command`/`else_command`. `timeout_seconds` gilt für beide.
-
-**Wann verwenden**: Verzweigungslogik basierend auf Dateiexistenz, vorheriger Ausgabe, Umgebungsprüfungen.
-
----
 
 ### `switch` — Mehrweg-Verzweigung
 
-Wertet einen Ausdruck aus und leitet die Ausführung zum passenden Case weiter. Wie eine switch/case-Anweisung.
-
-| Config-Schlüssel | Typ | Default | Beschreibung |
-|---|---|---|---|
-| `expression` | string | **erforderlich** | Auszuwertender Ausdruck (unterstützt `${var}` und `{{ var }}`) |
-| `cases` | list | **erforderlich** | Liste von Case-Objekten mit `value` und `blocks` |
-| `default` | list | null | Blöcke bei keinem Treffer |
-
-Jeder Case hat:
-- `value`: String zum Abgleich (Pipe-getrennte Alternativen: `"error|critical"`)
-- `blocks`: Liste von Block-Definitionen bei Treffer
-
-Verglichen wird ohne Leerzeichen und Zeilenumbrüche an Anfang und Ende, beim aufgelösten Ausdruck wie bei jedem `value`. Endet die Antwort eines KI-Blocks mit einem Zeilenumbruch, trifft `GREEN` also trotzdem den Case `GREEN`. Groß- und Kleinschreibung zählen weiter. Eingabe und Metadaten des Schritts (`expression`) zeigen den Rohwert.
-
-Verschachtelte Blöcke in `cases` und `default` sind auf `shell` und `simple` beschränkt — andere Typen (auch `compress`/`compress-ai`) werden mit einer Fehlermeldung abgelehnt.
-
-Ein `name` am verschachtelten Block macht dessen Ausgabe als `{{ block.<name>.output }}` in Folgeschritten verfügbar; ohne Namen bleibt nur `{{ previous_output }}`. Die Ausgabe des switch-Blocks selbst bleibt die Verkettung aller ausgeführten Case-Blöcke.
-
-Die Blöcke eines Case laufen nacheinander und schieben dabei `{{ previous_output }}` weiter — wie die Iterationen einer `while`-Schleife. Der zweite Block eines Case sieht also die Ausgabe des ersten, nicht mehr die des Schritts vor dem switch (auch bei unbenannten Blöcken). Wer den Stand von vor dem switch braucht, benennt den betreffenden Block und referenziert `{{ block.<name>.output }}`.
-
-Blocknamen sollten workflowweit eindeutig sein: bei Namensgleichheit gewinnt der zuletzt geschriebene Wert. Ein Case-Kind überschreibt also einen gleichnamigen früheren Block, und nach dem switch überschreibt dessen Gesamtausgabe wiederum ein gleichnamiges Kind.
-
-Im Beispiel gibt ein früherer Block namens `ampel` nur `GREEN`, `YELLOW` oder `RED` aus. `gate_status` taugt als Ausdruck nicht: Es ist keine Laufvariable — der Run wertet die `gate_status:`-Marker erst am Ende aus (Run-Metadaten), `${gate_status}` bliebe leer und landete immer im `default`.
+Vergleicht den aufgelösten `expression` mit dem `value` jedes Case (Alternativen mit `|`) und führt die Blöcke des Treffers aus, sonst `default`. Im Beispiel gibt ein früherer Block `ampel` nur `GREEN`, `YELLOW` oder `RED` aus.
 
 ```json
-{
-  "type": "switch",
-  "config": {
-    "expression": "{{ block.ampel.output }}",
-    "cases": [
-      {
-        "value": "GREEN",
-        "blocks": [{ "type": "shell", "config": { "command": "echo 'Alles gut'" } }]
-      },
-      {
-        "value": "YELLOW|RED",
-        "blocks": [{ "type": "shell", "config": { "command": "echo 'Probleme gefunden'" } }]
-      }
-    ],
-    "default": [
-      { "type": "shell", "config": { "command": "echo 'Unbekannter Status'" } }
-    ]
-  }
-}
+{ "type": "switch", "config": { "expression": "{{ block.ampel.output }}",
+  "cases": [ { "value": "GREEN", "blocks": [{ "type": "shell", "config": { "command": "echo 'Alles gut'" } }] },
+             { "value": "YELLOW|RED", "blocks": [{ "type": "shell", "config": { "command": "echo 'Probleme'" } }] } ],
+  "default": [{ "type": "shell", "config": { "command": "echo 'Unbekannt'" } }] } }
 ```
 
-**Wann verwenden**: Mehrweg-Verzweigung wenn `conditional` (binäres if/else) nicht ausreicht. Routing basierend auf Status-Codes, Umgebungsnamen oder Gate-Ergebnissen.
-
----
+- Verglichen wird ohne Leerraum am Anfang und Ende (eine KI-Antwort `GREEN` mit Zeilenumbruch trifft `GREEN`); Groß-/Kleinschreibung zählt.
+- Verschachtelte Blöcke dürfen nur `shell` oder `simple` sein, andere Typen werden abgelehnt.
+- Die Blöcke eines Case schieben `{{ previous_output }}` weiter; wer den Stand vor dem switch braucht, benennt den Block davor. Ein `name` am Case-Block macht seine Ausgabe als `{{ block.<name>.output }}` verfügbar; die Ausgabe des switch ist die Verkettung aller ausgeführten Case-Blöcke.
+- `gate_status` taugt nicht als Ausdruck: Die Marker wertet der Run erst am Ende aus.
 
 ### `foreach` — Ueber Items iterieren
 
-Führt einen Befehl für jedes Item in einer Liste aus – oder, mit `workflow_id`, je Item einen Lauf eines anderen Workflows.
-
-| Config-Schlüssel | Typ | Default | Beschreibung |
-|---|---|---|---|
-| `variable_name` | string | `"item"` | Name der Schleifenvariable |
-| `items_source` | string | `"list"` | `"command"` (Shell-Ausgabe) oder `"list"` (inline) |
-| `items_command` | string | — | Shell-Befehl, ein Item pro Zeile (nur bei `items_source: "command"`) |
-| `items` | list | — | Inline-Liste von Items (nur bei `items_source: "list"`) |
-| `command` | string | **erforderlich** (oder `workflow_id`) | Befehl pro Item |
-| `workflow_id` | string | — | Statt `command`: je Item ein Lauf dieses Workflows (siehe „Sub-Workflow je Item“). `command` und `workflow_id` schließen sich aus |
-| `context` | map | — | Nur mit `workflow_id`: zusätzliche Variablen für den Kind-Lauf je Item, Name → Vorlage (`{"feature_id": "{{ feature.id }}"}`) |
-| `execution_mode` | string | `"ai"` | `"ai"` (KI, Provider aus `provider` am Block/Workflow) oder `"shell"`; `"claude"` gilt weiter als `"ai"`, andere Werte werden abgelehnt |
-| `timeout_seconds` | int | 300 | Timeout pro Iteration |
-| `continue_on_error` | bool | `false` | `true`: fehlgeschlagene Items lassen den Block nicht scheitern — er endet COMPLETED, Folge-Blöcke laufen. Fehler werden im Output zusammengefasst (`N/M items failed: ...`). `false`: ein fehlgeschlagenes Item lässt den Block scheitern, die übrigen Items laufen trotzdem. In beiden Fällen listen die Step-Metadaten die Fehler (`failedItemCount`, `failedItems`, `totalItems`) |
-| `max_consecutive_failures` | int | `3` | Nach so vielen fehlgeschlagenen Items **in Folge** hört die Schleife auf: die übrigen Items laufen nicht mehr, der Block scheitert — auch mit `continue_on_error: true`. Ein erfolgreiches Item setzt den Zähler zurück. `0` schaltet den Abbruch ab. Metadaten: `abortedAfterConsecutiveFailures`, `skippedItemCount` |
+Führt `command` für jedes Item aus `items` oder aus den Zeilen von `items_command` aus (das läuft immer als Shell) – oder mit `workflow_id` je Item einen Lauf eines anderen Workflows.
 
 ```json
-{
-  "type": "foreach",
-  "config": {
-    "variable_name": "repo",
-    "items_source": "command",
-    "items_command": "find . -maxdepth 2 -name package.json | xargs -n1 dirname | sort -u",
-    "execution_mode": "shell",
-    "timeout_seconds": 600,
-    "command": "cd '{{ repo }}' && npm outdated --json || true"
-  }
-}
+{ "type": "foreach", "config": { "variable_name": "repo", "items_source": "command",
+  "items_command": "find . -maxdepth 2 -name package.json | xargs -n1 dirname | sort -u",
+  "execution_mode": "shell", "shell_escape_variables": true, "command": "cd {{ repo }} && npm outdated --json || true" } }
 ```
 
-**Hinweis**: `items_command` wird immer als Shell-Befehl ausgeführt (unabhängig von `execution_mode`), da es nur die Iterations-Ziele sammelt.
-
-**Item-Variablen**: Neben `{{ <variable_name> }}` steht der Index des Items (ab 0) als `{{ <variable_name>_index }}` bereit. Ist ein Item ein JSON-Objekt (eine Zeile wie `{"id": "auth", "desc": "Login"}`), stehen seine Felder der obersten Ebene als `{{ <variable_name>.<feld> }}` bereit (verschachtelte Werte als JSON-Text); Felder des vorigen Items verschwinden beim nächsten. Items aus `items_command` erben den Taint des Laufs, auch ihre Felder.
-
-**Sub-Workflow je Item** (`workflow_id`, seit a5c9fbbf): Statt eines Befehls startet foreach je Item einen eigenen Lauf des genannten Workflows – derselbe Mechanismus wie der `sub-workflow`-Block (`SubWorkflowLauncher`): Zulassung über `RunAdmission` als `SUB_WORKFLOW` mit der Herkunft des Eltern-Laufs, höchstens 5 Ebenen, kein Zirkel, 30 Minuten je Kind-Lauf. Der Kind-Lauf bekommt die Variablen dieses Laufs (ohne dessen Plattform-Daten) samt Item-Variablen und den Werten aus `context`; der Taint reist mit. Jeder Kind-Lauf erscheint einzeln in der Lauf-Liste, die Lauf-Seite verlinkt ihn je Item (Metadaten `items[].subRunId`, Schritt-Metadatum `subWorkflowId`). Ein Item scheitert, wenn sein Kind-Lauf nicht `COMPLETED` endet; `continue_on_error` und `max_consecutive_failures` gelten wie bei Befehlen. Die Ausgabe ist das Protokoll `[item]: <letzte Ausgabe des Kind-Laufs>` und trägt `derivedOutput: true` – Marker darin zählen nur in den Kind-Läufen. `execution_mode`, `timeout_seconds` und die KI-Schlüssel wirken in dieser Betriebsart nicht.
-
-`workflow_id` darf ein Platzhalter sein (`"{{ feature_workflow_id }}"`) – so bleiben Pool-Einträge frei von Instanz-UUIDs. Er wird **einmal vor dem ersten Item** aufgelöst, alle Items laufen also gegen denselben Workflow; `{{ item }}` oder Item-Felder wählen keinen Workflow je Eintrag. Erlaubt sind nur vertrauenswürdige Kontextvariablen, also solche, die der Lauf nicht als untrusted markiert hat (Webhook-Daten, aus getainteten Ausgaben abgeleitete Werte): Ein Platzhalter aus Webhook-Daten, `previous_output` oder einer Blockausgabe ließe fremde Eingaben einen beliebigen Workflow der Instanz wählen; der Block scheitert dann vor dem ersten Item, ebenso bei einem Platzhalter, der sich nicht auflöst. Dasselbe gilt für `workflow_id` am `sub-workflow`-Block.
-
-`context` darf nichts setzen, was Plattform oder Schleife selbst besitzen: keine Schlüssel mit `__` (Elternkette, Taint, Herkunft), keine Plattform-Daten (`open_todos`, `previous_report`, …), keine Werte des Laufs (`previous_output`, `workflow_id`, `workflow_run_id`, `trigger_source`, …) und nicht die Item-Variablen (`<variable_name>`, `<variable_name>_index`, `<variable_name>.<feld>`). Ein solcher Name lässt den Block vor dem ersten Item scheitern und nennt den Grund.
-
-```json
-{
-  "type": "foreach",
-  "config": {
-    "items_source": "command",
-    "items_command": "printf '%s' {{ feature_order_json }} | python3 -c 'import json,sys; [print(json.dumps(f)) for f in json.load(sys.stdin)]'",
-    "shell_escape_variables": true,
-    "variable_name": "feature",
-    "workflow_id": "{{ feature_workflow_id }}",
-    "context": { "feature_id": "{{ feature.id }}", "feature_desc": "{{ feature.desc }}" }
-  }
-}
-```
-
-**Leere Item-Listen**: Leere und reine Whitespace-Zeilen werden verworfen — in der `items_command`-Ausgabe wie in inline `items`. Eine leere Ausgabe ergibt damit **null** Iterationen (Block endet COMPLETED, Metadaten `totalItems: 0`) statt einer Iteration mit leerem Item. Eine leere Liste ist also der saubere Weg, eine Schleife zu überspringen.
-
-**Abgrenzung `continue_on_error` vs. `on_failure`**: `continue_on_error: true` toleriert Item-Fehler *innerhalb* des Blocks (Block endet COMPLETED, z. B. 29/30 Items erfolgreich → Folge-Blöcke wie Commit/Gate laufen). Das blockweite `on_failure: "continue"` lässt dagegen nur den Workflow trotz FAILED-Block weiterlaufen — der Block selbst bleibt FAILED.
-
-> **Geändertes Standardverhalten seit 2026-10:** foreach bricht nach **3 fehlgeschlagenen Items in Folge** ab — mit und ohne `continue_on_error`; die übrigen Items laufen nicht mehr. `max_consecutive_failures: 0` stellt das alte Verhalten wieder her (alle Items laufen, egal wie viele scheitern). Die mitgelieferten Vorlagen, deren Zweck ein vollständiger Durchlauf ist (z. B. `test-matrix`, `service-health-monitor`, `ssl-cert-check`), setzen `0`.
-
-**Abbruch nach Fehlern in Folge** (`max_consecutive_failures`): Ein erschöpftes Kontingent („You've hit your session limit“) lässt jedes weitere KI-Item genauso scheitern. Ohne Abbruch rief foreach trotzdem alle übrigen auf — in „Hunt Quality Rebuild“ scheiterten so 37 von 42 Items und kosteten Zeit. Seit a6659a46 stoppt die Schleife nach drei Fehlern in Folge; die Fehlermeldung nennt den Grund zuerst: `Step 1 (foreach) failed: stopped after 3 consecutive failed items (max_consecutive_failures), 34 items not run`, darunter die gescheiterten Items wie unten. `continue_on_error` toleriert gescheiterte Items, aber keine, die gar nicht liefen — deshalb scheitert der Block auch dann; mit `on_failure: "continue"` läuft der Workflow trotzdem weiter. Schleifen, in denen Fehler in Serie normal sind (etwa „ist der Dienst erreichbar?“ über viele Hosts), setzen `max_consecutive_failures: 0`.
-
-**Fehlermeldung**: Scheitert der Block, beginnt die Fehlermeldung des Laufs mit den gescheiterten Items und dem Fehler des ersten, z. B. `Step 1 (foreach) failed: 1/37 items failed: erkner` und darunter `[erkner]: API Error: …`. Die Ausgabe des Blocks bleibt das Protokoll aller Items in ihrer Reihenfolge. Ein gescheitertes Item steht dort also zwischen erfolgreichen; aus deren Text allein („GATE PASS …“) lässt sich nicht ablesen, warum der Block scheiterte.
-
-**Wann verwenden**: Verarbeitung mehrerer Dateien, Repos oder Items mit derselben Operation.
-
----
+- Item-Variablen: `{{ <variable_name> }}`, `{{ <variable_name>_index }}` (ab 0), bei einem JSON-Objekt die Felder der obersten Ebene als `{{ <variable_name>.<feld> }}`. Leere Zeilen werden verworfen; eine leere Liste ergibt null Iterationen (COMPLETED, `totalItems: 0`).
+- Fehler: Scheitert ein Item, scheitert der Block (die übrigen Items laufen trotzdem); mit `continue_on_error: true` endet er COMPLETED (`N/M items failed: …`). Nach `max_consecutive_failures` Fehlern **in Folge** (Standard 3, seit 2026-10) hört die Schleife auf und der Block scheitert, auch mit `continue_on_error`; `0` schaltet das ab, etwa für Erreichbarkeitsprüfungen über viele Hosts. `on_failure: "continue"` lässt dagegen nur den Workflow nach dem FAILED-Block weiterlaufen.
+- Die Fehlermeldung beginnt mit den gescheiterten Items (`Step 1 (foreach) failed: 1/37 items failed: erkner`); die Block-Ausgabe bleibt das Protokoll aller Items in ihrer Reihenfolge.
+- **Sub-Workflow je Item** (`workflow_id`): je Item ein eigener Lauf wie beim `sub-workflow`-Block (`SubWorkflowLauncher`, Zulassung als `SUB_WORKFLOW`). Der Kind-Lauf bekommt die Variablen dieses Laufs ohne Plattform-Daten, die Item-Variablen und die Werte aus `context`; der Taint reist mit. Ein Item scheitert, wenn sein Kind-Lauf nicht `COMPLETED` endet. Die Ausgabe `[item]: <letzte Ausgabe>` trägt `derivedOutput: true` – Marker zählen nur in den Kind-Läufen. `execution_mode`, `timeout_seconds` und die KI-Schlüssel wirken hier nicht.
+- Ein Platzhalter in `workflow_id` wird **einmal vor dem ersten Item** aufgelöst und nur aus vertrauenswürdigen Kontextvariablen – nicht aus Webhook-Daten oder Blockausgaben –, sonst scheitert der Block vor dem ersten Item. `context` darf keine reservierten Namen setzen (Schlüssel mit `__`, Plattform-Daten, Werte des Laufs, die Item-Variablen).
 
 ### `while` — Schleife bis Bedingung
 
-Wiederholt einen Befehl bis eine Bedingung erfüllt ist oder die maximale Iterationszahl erreicht wird.
-
-| Config-Schlüssel | Typ | Default | Beschreibung |
-|---|---|---|---|
-| `condition_command` | string | null | Bedingung, die jede Iteration ausgewertet wird. Ohne `condition_command` läuft die Schleife bis `max_iterations` oder Kommando-Fehler |
-| `command` | string | **erforderlich** | Befehl pro Iteration |
-| `max_iterations` | int | 100 | Maximale Schleifendurchläufe |
-| `execution_mode` | string | `"ai"` | `"ai"` (KI, Provider aus `provider` am Block/Workflow) oder `"shell"`; `"claude"` gilt weiter als `"ai"`, andere Werte werden abgelehnt |
-| `timeout_seconds` | int | 300 | Ausführungs-Timeout pro Iteration |
+Wiederholt `command`, solange `condition_command` gilt, höchstens `max_iterations`-mal; ohne `condition_command` bis `max_iterations` oder zum ersten Fehler. `shell`: Exit 0 = weiter; `ai` (Standard): `false`, `0` oder eine leere Antwort = Stopp.
 
 ```json
-{
-  "type": "while",
-  "config": {
-    "condition_command": "Bewerte die Qualität auf einer Skala von 1-10. Antworte NUR mit 'true' wenn unter 8, oder 'false' wenn 8 oder höher.",
-    "command": "Verbessere den Text. Gib die vollständig überarbeitete Version aus.",
-    "max_iterations": 3
-  }
-}
+{ "type": "while", "config": { "condition_command": "Antworte NUR mit 'true', wenn die Qualität unter 8 liegt.",
+  "command": "Verbessere den Text. Gib die vollständige Fassung aus.", "max_iterations": 3 } }
 ```
-
-**Bedingungsauswertung**: Im `shell`-Modus gilt Exit-Code 0 = weitermachen, ungleich 0 = stopp. Im `ai`-Modus (Standard) gilt "false", "0" oder leere Antwort = stopp, alles andere = weitermachen.
-
-**Dual-Modus**: `execution_mode` steuert sowohl die Bedingungsauswertung als auch die Befehlsausführung. `timeout_seconds` gilt für beide.
-
-**Wann verwenden**: Iterative Verfeinerung, Polling bis eine Bedingung erfüllt ist.
-
----
 
 ### `approval` — Menschliche Freigabe
 
-Pausiert die Ausführung und wartet auf menschliche Freigabe. Beantwortet wird im Dialog auf der Run-Seite oder auf der Seite **Freigaben** (`/approvals`). Deren Eintrag erscheint in der Seitenleiste und pulsiert, solange ein Lauf wartet.
-
-| Config-Schlüssel | Typ | Default | Beschreibung |
-|---|---|---|---|
-| `question` | string | `"Approval required"` | Freigabe-Frage (Markdown). Platzhalter wie `{{ block.X.output }}` werden vor der Anzeige aufgelöst |
-| `options` | list | `["Yes", "Yes always", "No"]` | Verfügbare Antwortmöglichkeiten. `POST /approve` nimmt nur diese an (Groß-/Kleinschreibung egal), sonst 400 |
-| `reject_options` | list | `["No", "Nein"]` | Welche Antworten eine Ablehnung sind und `on_no` auslösen (Groß-/Kleinschreibung egal) |
-| `variable_name` | string | `"approval_answer"` | Kontext-Variable für die Antwort |
-| `timeout_minutes` | int | 30 | Wartezeit |
-| `mode` | string | `"ask"` | `"ask"` (interaktiv) oder `"auto"` (nutzt `auto_answer`) |
-| `auto_answer` | string | — | Automatische Antwort wenn `mode` = `"auto"` |
-| `on_no` | string | `"continue"` | Verhalten bei einer Ablehnung (siehe `reject_options`): `"continue"` (weiter, Status COMPLETED), `"fail"` (FAILED), oder `"skip"` (SKIPPED) |
+Pausiert, bis eine Person antwortet – im Dialog der Run-Seite oder auf der Seite **Freigaben** (`/approvals`), deren Eintrag in der Seitenleiste pulsiert, solange ein Lauf wartet. Für Schritte vor Push, Deploy oder Löschen.
 
 ```json
-{
-  "type": "approval",
-  "config": {
-    "question": "## Ergebnis\n\n{{ previous_output }}\n\nFortfahren?",
-    "options": ["Yes", "No", "Abort"],
-    "reject_options": ["No", "Abort"],
-    "variable_name": "pr_decision",
-    "timeout_minutes": 60,
-    "on_no": "fail"
-  }
-}
+{ "type": "approval", "config": { "question": "## Ergebnis\n\n{{ previous_output }}\n\nFortfahren?",
+  "options": ["Yes", "No", "Abort"], "reject_options": ["No", "Abort"], "on_no": "fail" } }
 ```
 
-**Eigene Optionen**: Ohne `reject_options` gelten nur „No“ und „Nein“ als Ablehnung. Wer andere Ablehnungen anbietet (im Beispiel „Abort“), muss sie in `reject_options` nennen. Sonst läuft der Workflow trotz `on_no` weiter.
-
-**"Yes always"**: Wenn der Benutzer "Yes always" wählt, wird die Antwort für diese Frage für den Rest des Runs gemerkt — nachfolgende Approval-Blöcke mit derselben Frage werden automatisch beantwortet.
-
-**Auto-Modus**: Mit `"mode": "auto"` und `"auto_answer": "Yes"` wird der Block sofort ohne Benutzerinteraktion beantwortet. Nützlich für CI/CD-Pipelines.
-
-**Wann verwenden**: Vor destruktiven Operationen (Push, Deploy, Löschen), Quality Gates.
-
----
+- `POST /api/v1/executions/{id}/approve` nimmt nur die `options` an (Groß-/Kleinschreibung egal), sonst 400. Ablehnung ist, was in `reject_options` steht (Standard „No“/„Nein“) – eigene Ablehnungen dort nennen, sonst läuft der Workflow trotz `on_no` weiter.
+- „Yes always“ merkt die Antwort für dieselbe Frage bis zum Ende des Runs. `mode: "auto"` mit `auto_answer` antwortet sofort, ohne Person.
 
 ### `human-input` — Benutzereingabe sammeln
 
-Pausiert die Ausführung, bis der Benutzer einen Wert eingibt oder ein Formular ausfüllt.
-
-| Config-Schlüssel | Typ | Default | Beschreibung |
-|---|---|---|---|
-| `prompt` | string | `"Please provide input:"` | Frage an den Benutzer (Platzhalter werden aufgelöst) |
-| `input_type` | string | `"text"` | Feld im Dialog: `"text"` (Freitext), `"textarea"` (mehrzeilig), `"number"`, `"select"` (Auswahl aus `options`), `"checkbox"` (Antwort `"true"`/`"false"`), `"date"` (`JJJJ-MM-TT`). Die Antwort kommt immer als Text in die Variable |
-| `variable_name` | string | `"user_input"` | Kontext-Variable für die Eingabe |
-| `options` | list | `[]` | Auswahlmöglichkeiten (für `select`-Typ) |
-| `default_value` | string | `""` | Standardwert bei Timeout |
-| `required` | bool | true | Ob Eingabe erforderlich ist |
-| `validation_pattern` | string | — | Regex-Pattern zur Validierung |
-| `timeout_minutes` | int | 30 | Wartezeit |
-| `use_default_on_timeout` | bool | **true** | Bei Timeout den Standardwert verwenden statt fehlzuschlagen |
-| `fields` | list | `[]` | Multi-Field-Formular: jeder Eintrag hat `variable_name`, `label`, `input_type`, `required`, `default_value`, `options`, `placeholder`, `description`, `validation_pattern` |
+Pausiert, bis eine Person einen Wert eingibt oder ein Formular (`fields`) ausfüllt; die Antwort kommt immer als Text in die Variable `variable_name`.
 
 ```json
-{
-  "type": "human-input",
-  "config": {
-    "prompt": "Welche Sprache soll die Dokumentation haben?",
-    "input_type": "select",
-    "variable_name": "doc_language",
-    "options": ["Deutsch", "English", "Francais"],
-    "default_value": "Deutsch",
-    "timeout_minutes": 15,
-    "use_default_on_timeout": true
-  }
-}
+{ "type": "human-input", "config": { "prompt": "Welche Sprache soll die Doku haben?", "input_type": "select",
+  "variable_name": "doc_language", "options": ["Deutsch", "English"], "default_value": "Deutsch" } }
 ```
 
-**Timeout-Verhalten**: Wenn `use_default_on_timeout` = true (Standard) und ein `default_value` gesetzt ist, wird bei Timeout der Standardwert verwendet und der Block endet mit COMPLETED. Wenn false oder kein Standardwert gesetzt, endet der Block mit FAILED.
-
-**Wann verwenden**: Parameter zur Laufzeit abfragen, interaktive Workflows.
-
----
+Bei Timeout endet der Block mit `default_value` COMPLETED, wenn `use_default_on_timeout` gilt (Standard) und ein Standardwert gesetzt ist, sonst FAILED.
 
 ### `sub-workflow` — Verschachtelter Workflow
 
-Führt einen anderen Workflow als verschachtelten Schritt aus.
+Führt einen anderen Workflow als Schritt aus und wartet auf ihn: höchstens 5 Ebenen, Zirkel werden erkannt, 30 Minuten. Bricht der Eltern-Lauf ab, bricht er auch den Kind-Lauf ab. Denselben Workflow je Listeneintrag startet `foreach` mit `workflow_id`.
 
-| Config-Schlüssel | Typ | Default | Beschreibung |
-|---|---|---|---|
-| `workflow_id` | string | **erforderlich** | ID des auszuführenden Workflows; ein Platzhalter aus einer vertrauenswürdigen Kontextvariable ist erlaubt (siehe `foreach` → „Sub-Workflow je Item“) |
-| `workflowId` | string | — | Alte Schreibweise von `workflow_id`: wird noch gelesen, fällt später weg. Der Analyzer meldet sie als `legacy-config-key` (LOW); steht `workflow_id` daneben, gilt nur `workflow_id` |
+```json
+{ "type": "sub-workflow", "config": { "workflow_id": "<workflow-uuid>" } }
+```
 
-**Limits**: Maximale Verschachtelungstiefe von 5 Ebenen. Zirkuläre Referenzen werden erkannt. 30-Minuten-Timeout. Wird der Eltern-Lauf abgebrochen, bricht er auch den Kind-Lauf ab, auf den er gerade wartet (ebenso bei `foreach` mit `workflow_id`).
-
-**Kontext**: Der Child-Run bekommt die Variablen des Parent-Runs und dessen `{{ previous_output }}`, aber nicht dessen Plattform-Daten (`previous_report`, `open_todos`, `request_metrics`, `goal_status`/`goal_guard_*`, `audit_findings`): Die injiziert die Plattform dem Child-Run selbst, für ihn berechnet. Ein Wert unter einem dieser Namen wird auch aus keinem anderen Eingabe-Kontext übernommen. Der Taint des Parent-Runs reist mit.
-
-**Marker**: Der Schritt reicht die letzte Ausgabe des Child-Runs nur durch (Step-Metadatum `derivedOutput: true`). `gate_status:`- und `todo_item:`-Marker darin werden ausschliesslich im Child-Run ausgewertet — der Parent-Run übernimmt sie bewusst nicht in seine Gate-Zusammenfassung oder TODO-Liste.
-
-**Wann verwenden**: Komplexe Workflows aus kleineren, wiederverwendbaren zusammensetzen. Denselben Workflow je Eintrag einer Liste: `foreach` mit `workflow_id`.
-
----
+- Der Kind-Lauf bekommt die Variablen und `{{ previous_output }}` des Eltern-Laufs, aber nicht dessen Plattform-Daten (`previous_report`, `open_todos`, `request_metrics`, `goal_status`/`goal_guard_*`, `audit_findings`) – die berechnet die Plattform für ihn selbst. Der Taint reist mit.
+- Die Ausgabe ist die letzte des Kind-Laufs (`derivedOutput: true`); `gate_status:`- und `todo_item:`-Marker darin zählen nur im Kind-Lauf. Platzhalter in `workflow_id`: wie bei `foreach`.
 
 ### `skill-capability` — Skill aufrufen
 
-Ruft die Fähigkeit eines registrierten Skills auf.
-
-| Config-Schlüssel | Typ | Default | Beschreibung |
-|---|---|---|---|
-| `capability` | string | **erforderlich** | Fähigkeitsname (z.B. `"review_code"` aus `builtin-code-review`, `"summarize_text"` aus `builtin-smart-summarizer`) |
-| `input` | string | `""` | Eingabedaten (optional, Default: leerer String) |
-| `params` | map | `{}` | Zusätzliche Parameter |
-| `timeout_seconds` | int | null | Claude-CLI-Timeout |
-| `allow_writes` | bool | `false` | Erlaubt der Capability Schreibzugriff aufs Repo. Erforderlich für `writes:true`-Capabilities (test-generator, feature-implementer). Ohne `allow_writes` läuft der Block read-only (Tool-Whitelist Read/Grep/Glob/WebFetch/WebSearch/Task/TodoWrite). |
-
-**Skill am Block:** Die Capability wird nur über die `skillIds` **des Blocks** aufgelöst (Feld neben `config`, siehe „Per-Block Skills“ oben); die Skills des Workflows zählen hier nicht. Ohne passenden Skill am Block läuft der Aufruf nur mit dem Capability-Namen als Aufgabe — ohne ihre Beschreibung und ohne den KI-Kontext des Skills, und die `writes`-Prüfung greift nicht (es bleibt die Read-Only-Whitelist, solange `allow_writes` fehlt).
+Ruft die Fähigkeit eines Skills als einen KI-Aufruf auf.
 
 ```json
-{
-  "type": "skill-capability",
-  "skillIds": ["builtin-code-review"],
-  "config": {
-    "capability": "review_code",
-    "input": "Prüfe: {{ previous_output }}",
-    "params": { "max_entries": 5 }
-  }
-}
+{ "type": "skill-capability", "skillIds": ["builtin-code-review"],
+  "config": { "capability": "review_code", "input": "Prüfe: {{ previous_output }}" } }
 ```
 
-**Wann verwenden**: Spezialisierte Skills nutzen (OCR, Web-Suche, Analyse).
+- Aufgelöst wird die Capability nur über die `skillIds` **des Blocks**. Ohne passenden Skill läuft nur der Capability-Name als Aufgabe – ohne Beschreibung, KI-Kontext und `writes`-Prüfung.
+- Ohne `allow_writes` läuft die CLI mit einer Read-Only-Whitelist (Read/Grep/Glob/WebFetch/WebSearch/Task/ TodoWrite); eine `writes:true`-Capability (`builtin-test-generator/*`, `builtin-feature-implementer/*`) scheitert dann sofort.
+- Endet die KI-CLI mit Exit-Code ≠ 0, scheitert der Schritt wie ein `simple`-Block.
 
-**Sicherheit**: Capabilities deklarieren über `Capability.writes`, ob sie Dateien schreiben. Built-in `writes:true`: `builtin-test-generator/*`, `builtin-feature-implementer/*`. Ein Block, der eine `writes:true`-Capability aufruft ohne `"allow_writes": true`, fällt sofort fehl mit klarer Meldung. Für alle anderen Fälle wird der Host-CLI mit einer Read-Only-Tool-Whitelist gestartet (Defense-in-Depth).
+### `integration` — Externer Dienst
 
-**Fehler**: Endet die KI-CLI mit einem Exit-Code ungleich 0 (Limit, fehlende Anmeldung, Absturz), scheitert der Schritt wie ein `simple`-Block, und ihre Meldung steht in der Ausgabe. Weiter läuft der Workflow dann nur mit `"on_failure": "continue"`.
-
----
+Ruft eine Action eines verbundenen Integrations-Anbieters auf: [Integration Block](#integration-block-plugin-system).
 
 ### `document` — Text aus Dokumenten extrahieren
 
-Liest eine Datei (PDF, DOCX, XLSX, PPTX, HTML, TXT, EPUB, RTF, …) und extrahiert den Plain-Text via Apache Tika. Pure Java, keine nativen Abhängigkeiten. Ausgabe ist der extrahierte Text als `previous_output` (und optional als benannte Variable). Kosten: 0 Tokens.
-
-| Config-Schlüssel | Typ | Default | Beschreibung |
-|---|---|---|---|
-| `file_path` | string | **erforderlich** | Pfad zur Datei. Absolut oder relativ zum Projekt-Pfad. Unterstützt Templates (`{{ variable }}`). |
-| `variable_name` | string | null | Wenn gesetzt, wird der extrahierte Text zusätzlich in diese Kontext-Variable geschrieben. |
-| `fail_on_empty` | bool | `false` | Wenn true, FAILT der Block wenn der extrahierte Text leer/unter Schwelle ist. |
-| `min_characters` | int | `1` | Schwelle für `fail_on_empty`: weniger Zeichen gelten als leer. |
+Extrahiert den Text einer Datei (PDF mit Text-Layer, DOCX/XLSX/PPTX, HTML/XML, TXT, EPUB, RTF, ODT) über Apache Tika, ohne native Abhängigkeiten, 0 Tokens.
 
 ```json
-{
-  "type": "document",
-  "config": {
-    "file_path": "{{ invoice_path }}",
-    "variable_name": "invoice_text",
-    "fail_on_empty": true,
-    "min_characters": 50
-  }
-}
+{ "type": "document", "config": { "file_path": "{{ invoice_path }}", "variable_name": "invoice_text", "fail_on_empty": true } }
 ```
 
-**Unterstützte Formate (Auswahl)**: PDF (mit Text-Layer), DOCX/XLSX/PPTX, HTML/XML, TXT, EPUB, RTF, ODT.
-
-**Limits**:
-- Default max. 50 MB pro Datei (konfigurierbar via `automation.document.max-bytes`)
-- Default max. 5 Mio. Zeichen Output (konfigurierbar via `automation.document.max-characters`)
-- Pfad-Traversal (`../`) aus dem Projekt-Pfad wird blockiert
-- Gescannte PDFs ohne Text-Layer liefern leeren Output → OCR ist aktuell nicht Teil dieses Blocks (folgt in einer späteren Ausbaustufe)
-
-**Wann verwenden**: Rechnungs-/Vertragstext extrahieren, PDF-Reports zusammenfassen (Kombination mit `simple`-Block), Dokumenten-Klassifikation, Vorverarbeitung für LLM-Analyse ohne Vision-Token-Kosten.
-
-**Beispiel-Kombination mit `simple`**:
-```json
-[
-  { "type": "document", "config": { "file_path": "{{ pdf }}", "variable_name": "text" } },
-  { "type": "simple", "config": { "command": "Fasse zusammen:\n\n{{ text }}" } }
-]
-```
-
----
+Grenzen: 50 MB je Datei (`automation.document.max-bytes`), 5 Mio. Zeichen Ausgabe (`automation.document.max-characters`); `../` aus dem Projekt-Pfad wird blockiert. Gescannte PDFs ohne Text-Layer liefern leeren Text – kein OCR.
 
 ### `todo-create` / `todo-update` / `todo-close` — Native TODO-Operationen
 
-Legen TODOs direkt über den TodoService an bzw. ändern sie — **kein REST-Self-Call, kein DB-Zugriff, 0 Tokens**. Ersetzen das Anti-Pattern `curl POST /api/v1/todos` aus shell-/agentic-Blöcken.
-
-**`todo-create`**:
-
-| Config-Schlüssel | Typ | Default | Beschreibung |
-|---|---|---|---|
-| `title` | string | **erforderlich** | Titel (Template-fähig) |
-| `description` | string | null | Markdown-Beschreibung (Template-fähig) |
-| `priority` | string | `MEDIUM` | HIGH / MEDIUM / LOW / CRITICAL |
-| `tags` | list oder string | null | Liste oder kommagetrennt |
-| `project_id` | string | Kontext-Variable `project_id` | Ziel-Projekt |
-| `source` | string | `WORKFLOW` | USER / AI / WORKFLOW |
-| `source_agent` | string | `workflow` | Quell-Agent-Label |
-| `variable_name` | string | `todo_id` | Kontext-Variable, die die neue TODO-ID erhält |
-
-**`todo-update`**: `id` (erforderlich, sofern nicht `updates` gesetzt ist – genau einer der beiden, ein leerer Text gilt als nicht gesetzt; Editor und Analyzer melden keinen oder beide; Template-fähig — z. B. `{{ todo_id }}`), optional `title`/`description`/`priority`/`tags` — nur gesetzte Felder werden geändert, leere Texte gelten als nicht gesetzt.
-
-**`todo-update` mit `updates`** (statt `id`): ändert viele TODOs **des Lauf-Projekts** in einem Schritt. `updates` ist eine JSON-Liste (als Text, Template-fähig, meist `{{ block.<shell>.output }}`; ist die ganze Ausgabe kein JSON, gilt ihre letzte nicht-leere Zeile – ein Skript darf also vorher Zeilen für Menschen ausgeben):
-
-| Schlüssel je Eintrag | Bedeutung |
-|---|---|
-| `id` | volle UUID eines TODOs im Projekt des Laufs |
-| `status` | `OPEN`, `IN_PROGRESS`, `DONE` oder `BACKLOG` (DONE wie beim Schließen, auch für Audit-TODOs) |
-| `add_tags` / `remove_tags` | Tags hinzufügen / entfernen (je höchstens 10, Zeichen `A–Z a–z 0–9 _ : . -`) |
-| `note` | Vermerk, an die Beschreibung angehängt als `— <Datum> · <Workflow> (Lauf <id8>): <note>` (Datum in der Zeitzone der Instanz, nicht UTC; ≤ 1000 Zeichen, Marker entschärft) |
-| `require_tags` / `require_status` | Bedingung – sonst wird der Eintrag übersprungen |
-
-Höchstens 50 Einträge. Kaputtes JSON, keine Liste oder ein unbekannter Schlüssel lassen den Schritt scheitern, bevor etwas geschrieben ist; ein unpassender Eintrag (ungültige ID, fremdes Projekt, Bedingung nicht erfüllt) wird mit Grund übersprungen. Ausgabe: `✓ N aktualisiert, M übersprungen` und je Eintrag eine Zeile.
-
-**`todo-close`**: `id` (erforderlich, Template-fähig) — setzt den Status auf DONE.
+Legen TODOs direkt über den TodoService an, ändern oder schließen sie – kein REST-Self-Call, kein DB-Zugriff, 0 Tokens.
 
 ```json
-[
-  { "type": "todo-create", "config": { "title": "Fix {{ component }}", "priority": "HIGH", "tags": ["bug"] } },
+[ { "type": "todo-create", "config": { "title": "Fix {{ component }}", "priority": "HIGH", "tags": ["bug"] } },
   { "type": "simple", "config": { "command": "Behebe das Problem ..." } },
-  { "type": "todo-close", "config": { "id": "{{ todo_id }}" } }
-]
+  { "type": "todo-close", "config": { "id": "{{ todo_id }}" } } ]
 ```
 
-**Wann verwenden**: Deterministische Einzel-TODO-Operationen (Tracking-TODO anlegen und am Ende schließen). Für **dynamisch viele** TODOs aus allgemeinen Analyse-Workflows `todo_item:`-Marker verwenden (siehe [TODO-Marker](#todo-marker-todo_item)). Strukturierte v4-Audit-Templates verwenden stattdessen das versionierte `mysuricates:audit-result:v1`-Envelope; das Audit Center verwaltet daraus Findings und TODO-Verknüpfungen.
-
----
+- `todo-update` braucht genau eins: `id` (ein TODO; nur gesetzte, nicht leere Felder ändern sich) oder `updates`, eine JSON-Liste für bis zu 50 TODOs **des Lauf-Projekts**. `note` wird an die Beschreibung gehängt (`— <Datum> · <Workflow> (Lauf <id8>): <note>`, Datum in der Zeitzone der Instanz); Tags je höchstens 10. Kaputtes JSON, keine Liste oder ein unbekannter Schlüssel lassen den Schritt scheitern, bevor etwas geschrieben ist; ein unpassender Eintrag wird mit Grund übersprungen (`✓ N aktualisiert, M übersprungen`).
+- Für **dynamisch viele** TODOs aus Analyse-Workflows `todo_item:`-Marker verwenden ([TODO-Marker](#todo-marker-todo_item)); Audit-Templates nutzen das Envelope `mysuricates:audit-result:v1`.
 
 ### `compress` / `compress-ai` — Ausgaben sichtbar verdichten
 
-Verdichten die Ausgabe **genau eines** früheren Blocks, bevor sie an Folgeschritte geht. Das Original bleibt unverändert unter `{{ block.<quelle>.output }}`; der Komprimierungsblock hat seine eigene Ausgabe `{{ block.<name>.output }}`. Die Komprimierung ist **endgültig** — wer alles sehen will, referenziert das Original.
-
-**Ausgabeformat** (beide Typen):
-
-```
-## backend_tests — FAILED · exit 1 · 312 s · 740,808 → 17,950 chars
-Stages: text.normalize (−4,102 chars) · lines.filter (−8,914 lines) · text.truncate (−96,004 chars)
-
-<verdichteter Inhalt>
-```
-
-Kopf- und Stufenzeilen, Hinweise im Inhalt und Fehlermeldungen sind englisch wie die Ausgaben der übrigen Blöcke. Status und Exit-Code stammen aus den gespeicherten Schrittdaten, nie aus dem Logtext. Gate- und TODO-Marker in Komprimierungs-Ausgaben werden beim Run-Abschluss **nicht** ausgewertet — maßgeblich bleibt der Originalschritt.
-
-Als `source` taugt jeder Name, der sich auch als `{{ block.<name>.output }}` auflösen lässt — Top-Level-Blöcke und benannte `switch`-Case-Blöcke (2718c20e). Die Kopfzeile zeigt dann Status, Exit-Code und Dauer des Case-Schritts, nicht die des ganzen `switch`. Verschachtelte Blöcke ohne Namen (`foreach`-, `while`-Durchläufe) bewegen nur `previous_output`; dort ist `"previous"` die passende Quelle.
-
-**`compress`** (Regeln, 0 Tokens):
-
-| Config-Schlüssel | Typ | Default | Beschreibung |
-|---|---|---|---|
-| `source` | string | **erforderlich** | Blockname eines früheren Blocks (auch eines benannten `switch`-Case-Blocks) oder `"previous"` |
-| `stages` | Liste | **erforderlich** | Stufen `{ "op": …, … }`, laufen der Reihe nach |
-| `max_chars` | int | 20000 | harte Obergrenze inkl. Kopfzeilen; darüber wird head/tail gekürzt |
-| `timeout_seconds` | int | 30 | Zeitbudget (schützt vor aufwendigen Regex) |
-
-| Stufe | Optionen | Wirkung |
-|---|---|---|
-| `text.normalize` | — | ANSI, CR, Leerraum am Zeilenende, Leerzeilen-Folgen |
-| `text.truncate` | `max_chars`, `keep` (`head`/`tail`/`head_tail`) | kürzen an Zeilengrenzen, Hinweis zählt zum Limit |
-| `lines.filter` | `include`, `exclude` (Regex-Listen), `before`, `after` | Treffer mit Kontext behalten / Zeilen entfernen |
-| `lines.replace` | `pattern`, `replacement` | Regex-Ersetzung je Zeile (z. B. Zeitstempel weg) |
-| `lines.dedupe` | `count`, `consecutive_only` | Wiederholungen entfernen, optional `37× …` |
-| `lines.head` / `lines.tail` | `lines` | erste / letzte n Zeilen |
-| `markdown.section` | `headings` (Regex, ohne Groß/Klein), `level` | nur passende Abschnitte |
-| `json.select` | `paths` (`items[].title`, `meta.count`) | nur diese Felder, gültiges JSON |
-| `json.limit` | `path`, `count` | Array kürzen |
-| `json.sort` | `path`, `by`, `order` | Array sortieren, fehlende Werte zuletzt |
-| `json.to_lines` | `path`, `template` (`{title} — {url}`) | ein Eintrag pro Zeile — einfache geschweifte Klammern |
-
-JSON-Stufen brauchen JSON als Eingabe und müssen vor Textstufen stehen.
-
-**`compress-ai`** (ein KI-Aufruf ohne Werkzeuge): `source` (erforderlich), `instruction` (reiner Text, Platzhalter werden **nicht** aufgelöst), `max_chars` (Default 4.000, Minimum 500), `model`, `effort`, `timeout_seconds`. Läuft in einem frischen, privaten Arbeitsverzeichnis je Aufruf (kein Projekt-`CLAUDE.md`, keine MCP-Server, keine Plugin-Hooks — `--tools ""`, `--strict-mcp-config`, `--setting-sources local`). Wegen `--setting-sources local` gelten Claude-Einstellungen auf Benutzerebene (z. B. `env` oder `apiKeyHelper` in `~/.claude/settings.json`) für diesen Aufruf **nicht**. Nur Provider `CLAUDE`; ein abweichender `provider` schlägt fehl — läuft der Workflow mit einem anderen Provider, im Block `"provider": "CLAUDE"` setzen. Eingaben über der Einstellung `compress-ai-max-input-chars` (Default 60.000) scheitern ohne Aufruf — davor einen `compress`-Block setzen.
-
-> **Grenze — `--bare` ist die stärkere Isolation, aber nicht nutzbar (TODO edb38a38):** Die Claude-CLI
-> kennt mit `--bare` einen Minimalmodus, der zusätzlich Hooks, LSP, Plugin-Sync, Auto-Memory und die
-> `CLAUDE.md`-Erkennung abschaltet. Er kommt hier trotzdem nicht zum Einsatz, weil `--bare` laut
-> `claude --help` auch die **Keychain-Leseoperationen** überspringt: „Anthropic auth is strictly
-> `ANTHROPIC_API_KEY` or `apiKeyHelper` via `--settings` (OAuth and keychain are never read)". Auf
-> einem Host, der wie üblich per OAuth angemeldet ist, bricht der Aufruf deshalb ab — auf dem
-> Dev-Host geprüft: `claude -p --bare "Antworte mit OK"` → `Not logged in · Please run /login`
-> (Exit-Code 1), während `claude -p --setting-sources local "Antworte mit OK"` → `OK` liefert.
-> `--bare` wäre also nur für Instanzen möglich, die ausschließlich mit `ANTHROPIC_API_KEY` arbeiten.
+Verdichten die Ausgabe **genau eines** früheren Blocks: `source` ist ein Blockname (auch ein benannter `switch`-Case-Block) oder `"previous"`. Das Original bleibt unter `{{ block.<quelle>.output }}`, die Verdichtung ist endgültig.
 
 ```json
-[
-  { "type": "shell", "name": "backend_tests", "config": { "command": "mvn -q test", "on_failure": "continue", "checked_command": true } },
+[ { "type": "shell", "name": "backend_tests", "config": { "command": "mvn -q test", "on_failure": "continue", "checked_command": true } },
   { "type": "compress", "name": "backend_kompakt", "config": { "source": "backend_tests", "stages": [
-      { "op": "text.normalize" },
-      { "op": "lines.filter", "exclude": ["^\\s+at "] },
-      { "op": "lines.dedupe", "count": true },
+      { "op": "text.normalize" }, { "op": "lines.filter", "exclude": ["^\\s+at "] },
       { "op": "text.truncate", "max_chars": 18000, "keep": "head_tail" } ] } },
-  { "type": "simple", "name": "report", "config": { "command": "Bewerte:\n{{ block.backend_kompakt.output }}" } }
-]
+  { "type": "simple", "config": { "command": "Bewerte:\n{{ block.backend_kompakt.output }}" } } ]
 ```
 
-**Nicht erlaubt:** als verschachtelter Block in `switch` (wird abgelehnt).
-
----
+- Die Ausgabe beginnt mit einer Kopfzeile aus Quelle, Status, Exit-Code, Dauer und Zeichen vorher → nachher und einer Zeile mit den Stufen (englisch); Status und Exit-Code stammen aus den gespeicherten Schrittdaten. Gate- und TODO-Marker darin werden nicht ausgewertet.
+- `compress`: Die [Stufen](block-referenz.md#stufen) laufen der Reihe nach, JSON-Stufen vor Textstufen.
+- `compress-ai`: ein werkzeugloser Aufruf, nur Provider `CLAUDE` (sonst am Block `"provider": "CLAUDE"`), in einem frischen, privaten Arbeitsverzeichnis (`--tools ""`, `--strict-mcp-config`, `--setting-sources local` – Claude-Einstellungen auf Benutzerebene gelten nicht). Eingaben über der Einstellung `compress-ai-max-input-chars` (Standard 60.000) scheitern ohne Aufruf. Das stärker isolierte `--bare` liest keine OAuth-Anmeldung und ist deshalb nicht im Einsatz (TODO edb38a38).
+- Beide sind als verschachtelter Block in `switch` nicht erlaubt.
 
 ### `dashboard-report` — Dashboard-Ergebnis ohne Marker melden
 
-Füllt das **Dashboard-Ergebnis** dieses Runs direkt aus der Block-Config — dieselben Felder, dieselben Grenzen und dieselbe Prüfung wie der Marker `dashboard_widget:` (eine JSON-Zeile in der Ausgabe eines Schritts, siehe [api-referenz.md](api-referenz.md#marker-dashboard_widget-im-workflow)), aber **ohne Markerzeile und ohne Textsuche**. Deterministisch: kein KI-Aufruf, keine Shell, 0 Tokens.
-
-Modul: `dashboard-report` (Standard an, abschaltbar). Module sind optionale Funktionen, die die Startkonfiguration ein- oder ausschaltet, hier per `automation.modules.dashboard-report: false` ([architektur.md → Module-System](architektur.md#module-system-startkonfiguration)). Ist es aus, verweigert der Block und der Typ wird im Editor nicht angeboten.
-
-| Config-Schlüssel | Typ | Default | Beschreibung |
-|---|---|---|---|
-| `status` | string | **erforderlich** | `GREEN`, `YELLOW` oder `RED` (Template-fähig) |
-| `title` | string | – | Titel, ≤ 80 Zeichen |
-| `summary` | string | – | Zusammenfassung, ≤ 500 Zeichen |
-| `kpis` | Liste von Objekten | – | ≤ 6 × `{ label (≤ 40), value (≤ 40, String), trend? (UP/DOWN/FLAT) }` |
-| `items` | Liste von Strings | – | ≤ 10 Einträge, je ≤ 200 Zeichen |
-
-Im Beispiel gibt ein früherer Block `ampel` nur `GREEN`, `YELLOW` oder `RED` aus (wie im switch-Beispiel). `{{ gate_status }}` gibt es während des Laufs nicht — der Platzhalter bliebe unaufgelöst und ließe den Block scheitern.
+Füllt das Dashboard-Ergebnis des Runs direkt aus der Config – dieselben Felder, Grenzen und Prüfung wie der [Marker `dashboard_widget:`](#dashboard-marker-dashboard_widget), aber ohne Textsuche; kein KI-Aufruf, 0 Tokens. Modul `dashboard-report` (Standard an).
 
 ```json
-{ "type": "dashboard-report", "name": "report", "config": {
-  "status": "{{ block.ampel.output }}",
-  "title": "Nightly QA",
-  "kpis": [{ "label": "Hunts", "value": "{{ hunt_count }}", "trend": "UP" }],
-  "items": ["{{ finding_1 }}"],
-  "summary": "{{ block.analyse.output }}"
-} }
+{ "type": "dashboard-report", "config": { "status": "{{ block.ampel.output }}", "title": "Nightly QA",
+  "kpis": [{ "label": "Hunts", "value": "{{ hunt_count }}", "trend": "UP" }], "summary": "{{ block.analyse.output }}" } }
 ```
 
-**Regeln:**
-
-- Alle Werte sind Template-fähig. Ein Platzhalter, der zur Laufzeit **leer** ist, lässt das Feld entfallen (bei `status` ist das ein Fehler). Ein KPI-Objekt entfällt nur, wenn **alle** seine Werte leer sind; ein halb gefülltes lässt den Block scheitern.
-- Ein Platzhalter, der **nicht aufgelöst** werden konnte (unbekannte Variable — der Resolver lässt ihn wörtlich stehen), **lässt den Block scheitern** und nennt das Feld. Lieber ein roter Schritt als `{{ hunt_count }}` als Kennzahl auf dem Dashboard.
-- Jeder Verstoß gegen den Vertrag (zu lang, unbekanntes Feld in einem KPI, Zahl statt String, unsichtbare Zeichen) lässt den Schritt **FAILED** werden; die Meldung nennt das Feld (`kpis[2].value`), nie den Wert.
-- Unbekannte Schlüssel auf oberster Ebene werden ignoriert (dort stehen legitim Plattform-Schlüssel wie `timeout_seconds`); unbekannte Schlüssel **innerhalb** eines KPI-Objekts werden abgelehnt.
-- Die Schritt-Ausgabe enthält nur Zählwerte, nie Vertragswerte — auf Englisch wie bei den übrigen Blöcken, etwa `✓ Dashboard report GREEN · title · 4 KPIs · 0 items`.
-
-**Vorrang vor dem Marker:** Hat ein `dashboard-report`-Block ein Ergebnis geschrieben, wird der Marker `dashboard_widget:` in **keiner** Schritt-Ausgabe mehr ausgewertet. Der Block ist der bewusst konfigurierte Weg; ohne diese Regel könnte eine Markerzeile in der Ausgabe eines späteren KI-Schritts den Bericht überschreiben. Zwei `dashboard-report`-Blöcke in einem Workflow: der zuletzt ausgeführte gewinnt.
-
-**Im Editor** hat der Block zusätzlich zur JSON-Bearbeitung ein Formular, mit einem optionalen Knopf „Vorschlag aus dem letzten Run" (ein KI-Aufruf; Einstellungen → Ausführung, braucht den Anbieter `CLAUDE`). Der Vorschlag wird angezeigt und erst nach „Übernehmen" in die Config geschrieben.
-
-**Wann verwenden**: immer dann, wenn ein Workflow ein Dashboard-Ergebnis melden soll. Den Marker nur noch, wenn die Werte erst im Text einer KI entstehen und es keine Variable dafür gibt.
+- Ein zur Laufzeit leerer Platzhalter lässt das Feld entfallen (bei `status` ein Fehler); ein KPI entfällt nur, wenn alle seine Werte leer sind. Ein **unaufgelöster** Platzhalter oder ein Vertragsbruch (zu lang, unbekanntes Feld in einem KPI, Zahl statt String, unsichtbare Zeichen) lässt den Schritt scheitern; die Meldung nennt das Feld, nie den Wert.
+- Hat ein `dashboard-report`-Block geschrieben, wird kein `dashboard_widget:`-Marker mehr ausgewertet; von zwei Blöcken gewinnt der zuletzt ausgeführte. `{{ gate_status }}` gibt es während des Laufs nicht.
+- Im Editor hat der Block ein Formular mit einem optionalen Knopf „Vorschlag aus dem letzten Run“ (ein KI-Aufruf, Einstellungen → Ausführung, Anbieter `CLAUDE`); übernommen wird erst nach Bestätigung.
 
 ---
 
@@ -1194,6 +659,21 @@ todo_item: useWebSocket-Hook testen | MEDIUM | frontend,testing
   eine KI-Ähnlichkeitssuche mit einem gleichen oder verwandten offenen TODO (`relatedTodoId`),
   angelegt wird es trotzdem.
 
+### Dashboard-Marker (`dashboard_widget:`)
+
+Ein Workflow kann sein Dashboard-Ergebnis auch als Markerzeile in einer Blockausgabe melden. Der bewusst konfigurierte Weg ist der [`dashboard-report`-Block](#dashboard-report--dashboard-ergebnis-ohne-marker-melden); hat er geschrieben, wird kein Marker ausgewertet. Das JSON darf über mehrere Zeilen gehen:
+
+```
+dashboard_widget: {"title": "Nightly QA", "status": "YELLOW",
+  "kpis": [{"label": "Hunts", "value": "1361", "trend": "UP"}],
+  "items": ["3 Hunts ohne Route"], "summary": "Zwei Befunde."}
+```
+
+- Felder und Grenzen wie beim `dashboard-report`-Block ([Block-Referenz](block-referenz.md#dashboard-report)): `status` ist Pflicht (`GREEN`, `YELLOW`, `RED`), KPI-`label` und -`value` je ≤ 40 Zeichen, `value` ist ein **String**, `trend` `UP`/`DOWN`/`FLAT`. Ein unbekanntes Feld – auch in einem KPI-Objekt – lehnt den ganzen Vertrag ab, ebenso ein leerer, zu langer oder nicht einzeiliger Text (Steuer-, Zero-Width-, Bidi-, Separator-, Private-Use-Zeichen). Geprüft wird beim Run-Ende und beim Lesen erneut.
+- Gelesen wird höchstens 8192 Zeichen weit. Melden mehrere Blöcke einen Marker, gewinnt der letzte; Ausgaben von Komprimierungs-Blöcken (`derivedOutput`) zählen nicht. **Zwei Marker in derselben Blockausgabe lehnen diese Ausgabe ab** (`resultState: INVALID`): Ein zitierter Marker darf das eigene Ergebnis nie überstimmen.
+- Den Marker am Zeilenanfang schreiben, das JSON direkt dahinter (ein Codeblock in der nächsten Zeile geht auch). Das Dashboard zeigt den Inhalt nur als Text – kein Markdown, HTML, Link oder Bild.
+- Lesen: `GET /api/v1/dashboard/workflow-results?workflowIds=…` liefert je Workflow den letzten Run und `resultState` (`VALID`, `INVALID` oder `MISSING`).
+
 ### `checked_command` / `check_category` — Gate automatisch aus dem Exit-Code
 
 Statt selbst `gate_status`-Zeilen zu `echo`en, kann ein `shell`-Block das dem `CheckedCommandGate`
@@ -1247,17 +727,7 @@ Getestet in `ShellBlockExecutorTest` (u. a. `execute_checkedCommandExitZero_does
 
 ### Standardwerte
 
-Quelle: `ExecutionDefaults.java`
-
-| Einstellung | Default | Beschreibung |
-|---|---|---|
-| `SHELL_TIMEOUT_SECONDS` | 300 (5 Min) | Shell- und Simple-Block-Timeout |
-| `AGENTIC_MAX_ITERATIONS` | 10 | Agentic-Block-Iterationsobergrenze |
-| `AGENTIC_ITERATION_TIMEOUT_SECONDS` | 300 (5 Min) | Wall-Clock-Timeout pro Iteration |
-| `AGENTIC_TOTAL_TIMEOUT_SECONDS` | 1800 (30 Min) | Gesamt-Agentic-Block-Timeout |
-| `AGENTIC_MAX_TOTAL_TOKENS` | 200.000 | Token-Budget (Input+Output) |
-| `INTERACTION_TIMEOUT_MINUTES` | 30 | Approval-/Human-Input-Timeout |
-| `SUB_WORKFLOW_MAX_WAIT_MINUTES` | 30 | Sub-Workflow-Fertigstellungs-Timeout |
+Die Standardwerte der Config-Schlüssel stehen in der [Block-Referenz](block-referenz.md), die Konstanten dahinter in `ExecutionDefaults.java`. Ohne `timeout_seconds` enden Shell- und Simple-Blöcke nach 300 s; Approval und Human-Input warten 30 Minuten, ein Sub-Workflow ebenso.
 
 ### Die Dual-Timeout-Falle
 
@@ -1520,14 +990,7 @@ Alte Dateien aus vorherigen Runs können den Kontext des Agentic-Blocks verschmu
 
 ### Sicherheitslimits
 
-| Config-Schlüssel | Default | Zweck |
-|---|---|---|
-| `max_iterations` | 10 | Harter Stopp nach N Iterationen |
-| `iteration_timeout_seconds` | 300 | Wall-Clock-Timeout pro Iteration |
-| `total_timeout_seconds` | 1800 | Gesamt-Timeout (30 Min) |
-| `max_total_tokens` | 200.000 | Token-Budget (ungecachte Eingabe + Ausgabe, ohne Cache-Tokens) |
-| `max_repeated_actions` | 3 | Abbruch nach N identischen Aktionen |
-| `require_approval` | false | Menschliches Gate vor jeder Aktion |
+Iterationen (`max_iterations`), Zeit je Iteration und insgesamt, Token-Budget (`max_total_tokens`), Abbruch nach wiederholten identischen Aktionen (`max_repeated_actions`) und eine Freigabe vor jeder Aktion (`require_approval`) – Standardwerte in der [Block-Referenz](block-referenz.md#agentic).
 
 ### Action-Komprimierung
 
@@ -1680,12 +1143,7 @@ Ruft Actions von verbundenen externen Diensten auf (Google Calendar, Trello, etc
 
 ### Config
 
-| Feld | Pflicht | Beschreibung |
-|------|---------|--------------|
-| `provider` | Ja | Provider-ID: `google-calendar`, `trello`, etc. |
-| `action` | Ja | Action-Name, z.B. `list_events`, `create_card` |
-| `params` | Nein | Parameter als Key-Value, unterstützt `{{ template_vars }}` |
-| `connection` | Nein | Benannte Verbindung des Providers, z.B. `arbeit` — wenn mehrere Konten/Dienste desselben Providers eingerichtet sind (Integrationen-Seite → „Verbindungen“). Default `default`, Platzhalter erlaubt |
+`provider` (Anbieter-ID wie `google-calendar` oder `trello`), `action` (etwa `list_events`, `create_card`), `params` (Platzhalter erlaubt) und optional `connection` – die benannte Verbindung, wenn mehrere Konten oder Dienste desselben Anbieters eingerichtet sind (Standard `default`). Alle Schlüssel: [Block-Referenz](block-referenz.md#integration).
 
 ### Beispiel: Nächste Google Calendar Events abrufen
 
