@@ -6,7 +6,8 @@
 
 Je Bereich (erstes Pfadsegment nach `/api/v1`) eine Tabelle: Methode und Pfad, als Zweck der erste Satz
 des Javadoc der Handler-Methode – ohne Javadoc bleibt die Zelle leer – und das Modul aus `@RequiresModule`
-(„Kern“ = immer an). Request- und Response-Felder stehen in den DTOs unter
+(„Kern“ = immer an). Was das Javadoc danach sagt – Statuscodes, Grenzen, Nebenwirkungen –, steht unter der
+Tabelle als „Hinweise“. Die Javadocs sind meist englisch. Request- und Response-Felder stehen in den DTOs unter
 `ai-automation-backend/src/main/java/com/automation/dto/`, das Verhalten im Controller, den die Zeile
 „Quelle“ nennt.
 

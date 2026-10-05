@@ -1145,6 +1145,9 @@ Hand ändern -->` and a hand-written introduction from `scripts/docs-reference/<
 everything after it comes from the source, a change by hand does not last. Whatever a table lacks belongs
 in the source: the purpose of an endpoint is the first sentence of its handler method's Javadoc (without
 Javadoc the cell stays empty), the explanation of a config key is its `doc` text in the schema.
+The first sentence is English, because the same cell appears in the English version too. Further
+sentences of the Javadoc appear below the area's table as “Notes” – that is where the rules a caller must
+know belong (status codes and their meaning, limits, conflicts, side effects), not field lists.
 
 `docs_parity_check.py` calls `--check` and reports a stale page as a finding. So the check applies
 wherever the documentation gate runs, the pre-push gate included: whoever changes an endpoint, its

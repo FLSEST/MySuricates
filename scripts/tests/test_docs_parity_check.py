@@ -424,6 +424,15 @@ public class FooController {
     @GetMapping("/{id}")
     public Foo get(@PathVariable String id) { return null; }
 
+    /**
+     * Ersetzt ein Foo. Antwortet mit {@code 409}, solange es benutzt wird (TODO 9a8b7c6d).
+     * <p>Siehe {@link FooService#replace}.
+     *
+     * @return das Foo
+     */
+    @PutMapping("/{id}")
+    public Foo replace(@PathVariable String id) { return null; }
+
     @PostMapping
     @RequiresModule(ModuleCatalog.WEBHOOKS)
     public Foo create() { return null; }
@@ -533,6 +542,26 @@ class GeneratedReferenceTest(unittest.TestCase):
             self.assertIn("| `POST /api/v1/foos` |  | `webhooks` |", en)
             self.assertIn("Source: `FooController`", en)
             self.assertIn("## Error codes", en)
+
+    def test_api_page_lists_the_rest_of_the_javadoc_as_notes(self):
+        # Was nach dem ersten Satz steht, gehoert nicht in die Tabelle, geht aber auch nicht verloren:
+        # Liste unter der Tabelle, ohne Block-Tags, Herkunftskuerzel und Inline-Tags; Endpunkte ohne
+        # weiteren Text fehlen in der Liste.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.build(tmp)
+            code, _, err = self.run_reference(root, "--write")
+            self.assertEqual(code, 0, err)
+            notes = ("- `GET /api/v1/foos/{id}` — Dieser Satz gehoert nicht mehr dazu.\n"
+                     "- `PUT /api/v1/foos/{id}` — Antwortet mit `409`, solange es benutzt wird."
+                     " Siehe `FooService#replace`.\n")
+            page = (root / "docs" / "api-referenz.md").read_text(encoding="utf-8")
+            self.assertIn("| `PUT /api/v1/foos/{id}` | Ersetzt ein Foo. | `chains` |\n"
+                          "| `GET /api/v1/foos/{id}/text` |  | `chains` |\n\nHinweise:\n\n" + notes, page)
+            self.assertNotIn("@param", page)
+            self.assertNotIn("das Foo", page)
+            en = (root / "docs" / "en" / "api-referenz.md").read_text(encoding="utf-8")
+            self.assertIn("\n\nNotes:\n\n" + notes, en)
+            self.assertNotIn("Hinweise", en)
 
     def test_api_page_satisfies_the_endpoint_diff(self):
         # api-endpoint-diff.sh sucht "METHODE /api/v1/..." in beiden Fassungen — die erzeugte Seite muss passen.
@@ -663,6 +692,33 @@ class FirstSentenceTest(unittest.TestCase):
     def test_block_tags_and_paragraphs_end_the_description(self):
         self.assertEqual(self.sentence("Ohne Punkt", "@param x egal"), "Ohne Punkt")
         self.assertEqual(self.sentence("Kopf ohne Punkt <p>Absatz."), "Kopf ohne Punkt")
+
+
+class DescribeTest(unittest.TestCase):
+    """Rest der Beschreibung nach dem ersten Satz — Quelle der Hinweise unter einer API-Tabelle."""
+
+    def describe(self, *lines):
+        return ref.describe(list(lines))
+
+    def test_rest_follows_the_first_sentence(self):
+        self.assertEqual(self.describe("Erster Satz. Zweiter, z. B. mit", "Umbruch. Dritter."),
+                         ("Erster Satz.", "Zweiter, z. B. mit Umbruch. Dritter."))
+
+    def test_no_rest(self):
+        self.assertEqual(self.describe("Nur ein Satz.", "", "@return x"), ("Nur ein Satz.", ""))
+
+    def test_paragraphs_join_with_a_space(self):
+        self.assertEqual(self.describe("Kopf. Mitte.<p>Absatz eins.</p>", "<p>Absatz zwei."),
+                         ("Kopf.", "Mitte. Absatz eins. Absatz zwei."))
+        self.assertEqual(self.describe("Kopf ohne Punkt <p>Absatz."), ("Kopf ohne Punkt", "Absatz."))
+
+    def test_block_tags_end_the_rest(self):
+        self.assertEqual(self.describe("Kopf. Regel.", "@param x egal", "@throws Foo nie"), ("Kopf.", "Regel."))
+
+    def test_inline_tags_and_origin_references_in_the_rest(self):
+        self.assertEqual(self.describe("Kopf. Mit {@code 409} (TODO 1a2b3c4d), siehe {@link Foo#bar}",
+                                       "und {@link Foo#baz baz} &lt;x&gt;."),
+                         ("Kopf.", "Mit `409`, siehe `Foo#bar` und baz <x>."))
 
 
 class RepoTest(unittest.TestCase):

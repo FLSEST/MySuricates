@@ -1170,6 +1170,9 @@ Hand ändern -->` und einer von Hand gepflegten Einleitung aus `scripts/docs-ref
 alles danach kommt aus der Quelle, eine Änderung von Hand hat keinen Bestand. Was in einer Tabelle fehlt,
 gehört in die Quelle: Den Zweck eines Endpunkts liefert der erste Satz des Javadoc seiner Handler-Methode
 (ohne Javadoc bleibt die Zelle leer), die Erklärung eines Config-Schlüssels sein `doc`-Text im Schema.
+Der erste Satz ist englisch, weil dieselbe Zelle auch in der englischen Fassung steht. Weitere Sätze des
+Javadoc erscheinen unter der Tabelle des Bereichs als „Hinweise“ – dorthin gehören die Regeln, die ein
+Aufrufer kennen muss (Statuscodes mit Bedeutung, Grenzen, Konflikte, Nebenwirkungen), nicht Feldlisten.
 
 `docs_parity_check.py` ruft `--check` auf und meldet eine veraltete Seite als Befund. Damit greift die
 Prüfung überall, wo das Doku-Gate läuft, auch im Pre-Push-Gate: Wer einen Endpunkt, sein Javadoc oder

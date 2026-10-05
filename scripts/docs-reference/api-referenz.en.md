@@ -6,7 +6,8 @@
 
 One table per area (first path segment after `/api/v1`): method and path, as purpose the first sentence
 of the handler method's Javadoc – without Javadoc the cell stays empty – and the module from
-`@RequiresModule` (“core” = always on). Request and response fields are in the DTOs under
+`@RequiresModule` (“core” = always on). Whatever the Javadoc says after that – status codes, limits, side
+effects – is listed below the table as “Notes”. Request and response fields are in the DTOs under
 `ai-automation-backend/src/main/java/com/automation/dto/`, the behaviour in the controller named in the
 “Source” line.
 

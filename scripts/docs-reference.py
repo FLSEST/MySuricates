@@ -19,6 +19,10 @@ API: je Bereich (erstes Pfadsegment nach /api/v1) ein Abschnitt mit der Tabelle 
     weil das Diff-Skript genau diese Schreibweise in der Doku sucht.
   - Zweck ist der erste Satz des Javadoc der Handler-Methode. Fehlt das Javadoc, bleibt die Zelle leer —
     erfunden wird nichts. Kuerzel wie "(TODO 1a2b3c4d)" fallen weg, {@code x} wird zu `x`.
+  - Hinweise: Was im Javadoc der Handler-Methode nach dem ersten Satz steht (bis zum ersten Block-Tag wie
+    @param/@return/@throws), erscheint unter der Tabelle des Bereichs als Liste "Hinweise" (EN "Notes"),
+    eine Zeile je Endpunkt: "- `METHODE /pfad` — Text". So bleiben Regeln (Statuscodes, Grenzen,
+    Nebenwirkungen) sichtbar, die nicht in den einen Satz der Tabelle passen.
   - Modul: @RequiresModule an der Methode, sonst an der Klasse (dieselbe Reihenfolge wie
     ModuleGuardInterceptor), sonst Kern.
   - Verlinkbar ist ein Bereich ("api-referenz.md#apiv1schedules"), kein einzelner Endpunkt: Tabellenzeilen
@@ -73,6 +77,7 @@ TEXT = {
         "source": "Quelle",
         "sources": "Quellen",
         "api_head": "| Endpunkt | Zweck | Modul |",
+        "notes": "Hinweise",
         "core": "Kern",
         "common_heading": "Gemeinsame Felder",
         "common_intro": "Gelten für jeden Block-Typ.",
@@ -98,6 +103,7 @@ TEXT = {
         "source": "Source",
         "sources": "Sources",
         "api_head": "| Endpoint | Purpose | Module |",
+        "notes": "Notes",
         "core": "core",
         "common_heading": "Common fields",
         "common_intro": "Apply to every block type.",
@@ -154,6 +160,7 @@ _HIDE = "\u2063"  # unsichtbares Trennzeichen, haelt Abkuerzungspunkte waehrend 
 _TODO_REF = re.compile(r"\s*\((?:TODO\s+)?[0-9a-f]{8}\b[^()]*\)|\s*[–—-]\s*TODO\s+[0-9a-f]{8}\b")
 _HTML_CODE = re.compile(r"<code>(.*?)</code>", re.S)
 _HTML_TAG = re.compile(r"</?[a-zA-Z][^>]*>")
+_PARAGRAPH = re.compile(r"</?p\b[^>]*>")
 _SENTENCE_END = re.compile(r"[.!?](?=\s|$)")
 
 
@@ -189,28 +196,44 @@ def _inline_tags(text: str) -> str:
     return "".join(out)
 
 
-def first_sentence(javadoc_lines: list[str]) -> str:
-    """Erster Satz eines Javadoc-Blocks (Zeilen ohne /** */ und Sternchen)."""
+def _plain(text: str) -> str:
+    """Javadoc-Text als einzeiliges Markdown: Inline-Tags, HTML, Entities und Herkunftskuerzel aufgeloest."""
+    text = _inline_tags(text)
+    text = _HTML_CODE.sub(lambda m: f"`{m.group(1)}`", text)
+    text = _PARAGRAPH.sub(" ", text)
+    text = _HTML_TAG.sub("", text)
+    text = text.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
+    text = _TODO_REF.sub("", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def describe(javadoc_lines: list[str]) -> tuple[str, str]:
+    """(erster Satz, Rest) der Beschreibung eines Javadoc-Blocks (Zeilen ohne /** */ und Sternchen).
+
+    Die Beschreibung endet am ersten Block-Tag (@param, @return, @throws, ...). Der erste Satz endet am
+    ersten Satzzeichen vor Leerraum oder am ersten <p>; der Rest ist alles danach, ebenfalls einzeilig.
+    """
     text_lines: list[str] = []
     for line in javadoc_lines:
         if line.startswith("@"):  # Block-Tag: dort endet die Beschreibung
             break
         text_lines.append(line)
-    text = " ".join(text_lines)
-    text = re.split(r"<p\b[^>]*>", text, maxsplit=1)[0]
-    text = _inline_tags(text)
-    text = _HTML_CODE.sub(lambda m: f"`{m.group(1)}`", text)
-    text = _HTML_TAG.sub("", text)
-    text = text.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
-    text = _TODO_REF.sub("", text)
-    text = re.sub(r"\s+", " ", text).strip()
-    hidden = text
+    parts = _PARAGRAPH.split(" ".join(text_lines), maxsplit=1)
+    head = _plain(parts[0])
+    tail = _plain(parts[1]) if len(parts) > 1 else ""
+    hidden = head
     for abbr in ABBREVIATIONS:
         hidden = hidden.replace(abbr, abbr.replace(".", _HIDE))
     match = _SENTENCE_END.search(hidden)
-    if match:
-        hidden = hidden[:match.end()]
-    return hidden.replace(_HIDE, ".").strip()
+    first, rest = (hidden[:match.end()], hidden[match.end():]) if match else (hidden, "")
+    first = first.replace(_HIDE, ".").strip()
+    rest = " ".join(x for x in (rest.replace(_HIDE, ".").strip(), tail) if x)
+    return first, rest
+
+
+def first_sentence(javadoc_lines: list[str]) -> str:
+    """Erster Satz eines Javadoc-Blocks (Zeilen ohne /** */ und Sternchen)."""
+    return describe(javadoc_lines)[0]
 
 
 def javadoc_above(lines: list[str], index: int) -> list[str] | None:
@@ -283,6 +306,7 @@ class Endpoint:
     purpose: str
     module: str | None
     controller: str
+    notes: str = ""
 
 
 @dataclass
@@ -334,7 +358,7 @@ def extract_endpoints(root: str) -> tuple[list[Endpoint], dict[str, Controller]]
                 quoted = extract_path_literals(args)
                 paths = quoted if quoted else [""]
                 doc = javadoc_above(lines, i)
-                purpose = first_sentence(doc) if doc else ""
+                purpose, notes = describe(doc) if doc else ("", "")
                 method_module = _method_module(lines, i)
                 module = method_module or class_module
                 for method in methods:
@@ -342,7 +366,7 @@ def extract_endpoints(root: str) -> tuple[list[Endpoint], dict[str, Controller]]
                         full = (base.rstrip("/") + "/" + p.lstrip("/")) if p else base
                         endpoints.append(Endpoint(method.upper(), clean_path(full), purpose,
                                                   modules.get(module, module.lower()) if module else None,
-                                                  controller))
+                                                  controller, notes))
     return endpoints, controllers
 
 
@@ -398,8 +422,11 @@ def render_api(root: str, lang: str, intro: str) -> str:
         known = rows.get(key)
         if known is None:
             rows[key] = ep
-        elif ep.purpose and ep.purpose not in known.purpose:
-            known.purpose = f"{known.purpose} · {ep.purpose}" if known.purpose else ep.purpose
+        else:
+            if ep.purpose and ep.purpose not in known.purpose:
+                known.purpose = f"{known.purpose} · {ep.purpose}" if known.purpose else ep.purpose
+            if ep.notes and ep.notes not in known.notes:
+                known.notes = f"{known.notes} · {ep.notes}" if known.notes else ep.notes
     by_area: dict[str, list[Endpoint]] = {}
     for ep in rows.values():
         by_area.setdefault(area_of(ep.path), []).append(ep)
@@ -418,6 +445,11 @@ def render_api(root: str, lang: str, intro: str) -> str:
             module = f"`{ep.module}`" if ep.module else t["core"]
             out.append(f"| `{ep.method} {ep.path}` | {cell(ep.purpose)} | {module} |")
         out.append("")
+        noted = [ep for ep in eps if ep.notes]
+        if noted:
+            out += [f"{t['notes']}:", ""]
+            out += [f"- `{ep.method} {ep.path}` — {ep.notes}" for ep in noted]
+            out.append("")
     return "\n".join(out).rstrip("\n") + "\n"
 
 
