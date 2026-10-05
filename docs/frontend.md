@@ -49,7 +49,7 @@ Das Dashboard rendert die Widgets aus der Registry `components/dashboard/widgetR
 
 ### Zustand-Stores (`src/stores/`)
 
-Client-Zustand — Einstellungen samt API-Key, Theme, Sidebar, Dashboard-Layout, Assistent, Toasts — liegt in Zustand-Stores unter `src/stores/`; die Sprache hält `useI18nStore` in `src/i18n/index.ts`. Was den Neuladen überleben soll, speichert `persist` im `localStorage`, mit einer Format-Version und einer Migration beim Laden.
+Client-Zustand — Einstellungen samt API-Key, Theme, Sidebar, Dashboard-Layout, Assistent, Toasts — liegt in Zustand-Stores unter `src/stores/`; die Sprache hält `useI18nStore` in `src/i18n/index.ts`. Was den Neuladen überleben soll, speichert `persist` im `localStorage`. Eine Format-Version mit Migration beim Laden haben nur Einstellungen, Theme und Dashboard-Layout (`settingsStore`, `themeStore`, `dashboardLayoutStore`); Sidebar, Assistent, Dashboard-Sync und Sprache werden ohne Migration gespeichert.
 
 ### TanStack Query (Server State)
 

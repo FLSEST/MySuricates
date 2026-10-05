@@ -125,7 +125,11 @@ the type to `BLOCK_TYPES` (`src/types/index.ts`), `BlockTypesIndexSection` and
 `BlockSpecs` (`BlockSpecConfigKeysGateTest` checks every key named there against the executor) and,
 for the editor, add the starting config and the keys to `src/data/blockDefaultConfig.json` and
 `src/data/blockConfigSchema.json` (`blockConfigSchema.test.ts`). If the type belongs to a module, it goes
-into `executor/BlockTypeModules`.
+into `executor/BlockTypeModules`. If the type calls an AI, it also goes into `AI_BLOCK_TYPES`
+(`src/types/index.ts`: the editor fields `provider`/`model`/`effort`, equal to `ai.blockTypes` in the
+schema, `blockConfigSchema.test.ts`), into `executor/ModelUse` (`needsAi`: the AI badge and the "Runs
+without AI" filter of the templates) and into `ALWAYS_AI_BLOCK_TYPES` in `components/workflow/stepMetadata.ts`
+(the step kind in a run).
 
 **New table.** A Flyway migration `V{N}__description.sql` under `src/main/resources/db/migration/` —
 determine the next number fresh (`ls ai-automation-backend/src/main/resources/db/migration | sort -V | tail -1`),
@@ -1181,7 +1185,7 @@ pinned through an `overrides` entry in `package.json` — like `dompurify`, whic
   first row yields NULL. Model: `WorkflowRunProjectionRepository.findOriginColumns` with
   `WorkflowRunProjectionRepositoryTest`. Columns with a declared type (`w.name`) and JPQL queries are not
   affected.
-- **NEVER write directly to the DB** (via `sqlite3` CLI or SQL). Always use the REST API or service/repository layer — direct writes bypass the Hibernate cache.
+- **NEVER access the DB directly, neither reading nor writing** (via `sqlite3` CLI or SQL – not from workflow shell blocks or scripts either). Always use the REST API or service/repository layer — direct access bypasses the Hibernate cache and competes for the single connection (HikariCP pool-size=1).
 
 ### Docker Dependency
 

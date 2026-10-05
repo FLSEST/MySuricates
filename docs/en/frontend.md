@@ -49,7 +49,7 @@ The dashboard renders the widgets from the registry `components/dashboard/widget
 
 ### Zustand stores (`src/stores/`)
 
-Client state — settings including the API key, theme, sidebar, dashboard layout, assistant, toasts — lives in Zustand stores under `src/stores/`; the language is held by `useI18nStore` in `src/i18n/index.ts`. Whatever has to survive a reload is stored in `localStorage` by `persist`, with a format version and a migration on load.
+Client state — settings including the API key, theme, sidebar, dashboard layout, assistant, toasts — lives in Zustand stores under `src/stores/`; the language is held by `useI18nStore` in `src/i18n/index.ts`. Whatever has to survive a reload is stored in `localStorage` by `persist`. Only settings, theme and dashboard layout (`settingsStore`, `themeStore`, `dashboardLayoutStore`) have a format version with a migration on load; sidebar, assistant, dashboard sync and language are stored without one.
 
 ### TanStack Query (Server State)
 

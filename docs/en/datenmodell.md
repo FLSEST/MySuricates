@@ -591,13 +591,14 @@ Stores assistant chat sessions for the floating chat panel (V41, V58).
 | Column | Type | Constraints | Description |
 |---|---|---|---|
 | `id` | TEXT | PK | UUID |
-| `page` | TEXT | NOT NULL, UNIQUE | Page identifier |
+| `page` | TEXT | NOT NULL | Page identifier |
+| `locale` | TEXT | NOT NULL, DEFAULT 'de' | Language of the suggestion set; `UNIQUE (page, locale)` |
 | `suggestions` | TEXT | NOT NULL, DEFAULT '[]' | JSON array of suggestions |
 | `generated_by` | TEXT | NOT NULL, DEFAULT 'CLAUDE' | Generator (e.g. `CLAUDE`) |
-| `generated_at` | TEXT | NOT NULL | Generation timestamp |
+| `generated_at` | REAL | NOT NULL | Generation timestamp |
 | `based_on_sessions` | INTEGER | NOT NULL, DEFAULT 0 | Number of underlying sessions |
 
-AI-generated action suggestions per page, based on assistant sessions (V42).
+AI-generated action suggestions per page and language, based on assistant sessions (V42; since V91 one set per language, existing rows count as German).
 
 ### `integration_connections`
 
@@ -969,4 +970,4 @@ The migrations live under `ai-automation-backend/src/main/resources/db/migration
 - **Busy timeout:** 10 seconds (`?busy_timeout=10000`)
 - **Connection pool:** HikariCP with max 1 connection (SQLite only allows one concurrent writer; pool-size=1 serializes all DB operations)
 - **Dialect:** `org.hibernate.community.dialect.SQLiteDialect`
-- **NEVER write directly to the DB** (via `sqlite3` CLI or SQL). Always use the REST API or service/repository layer — direct writes bypass the Hibernate cache and cause inconsistent state.
+- **NEVER access the DB directly, neither reading nor writing** (via `sqlite3` CLI or SQL – not from workflow shell blocks or scripts either). Always use the REST API or service/repository layer — direct access bypasses the Hibernate cache, causes inconsistent state and competes for the single connection (HikariCP pool-size=1).

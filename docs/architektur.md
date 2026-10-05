@@ -83,7 +83,7 @@ automation:
 
 Env-Form: `AUTOMATION_MODULES_PRESET`, `AUTOMATION_MODULES_<NAME>`, `AUTOMATION_HARDENING_<NAME>` (Bindestriche als `_`, z. B. `AUTOMATION_MODULES_REMOTE_ACCESS=true`). Stable- und Test-Profil setzen `full`; `scripts/setup.sh` schreibt das gewählte Preset nach `ai-automation-backend/config/application.yml`. Vorlagen „minimal“ und „maximal“: `ai-automation-backend/config-examples/`, erklärt in [deployment.md](deployment.md#konfigurationen-minimal-und-maximal). `scripts/setup.sh --lang de|en` wählt nur die Anzeigesprache der Modultexte im Terminal (Default: `$LANG`-Präfix, sonst `en`) — das Ergebnis (welche Module aktiv sind) ändert sich dadurch nicht.
 
-**Katalog** (einzige Quelle: `modules/ModuleCatalog`, 21 Feature-Module + 8 Härtungsschalter = 29 Schlüssel):
+**Katalog** (einzige Quelle: `modules/ModuleCatalog` – dort stehen auch Standardwerte, Abhängigkeiten und Beschreibungen):
 
 | Stufe | Module | Reifegrad |
 |---|---|---|
@@ -91,7 +91,7 @@ Env-Form: `AUTOMATION_MODULES_PRESET`, `AUTOMATION_MODULES_<NAME>`, `AUTOMATION_
 | `research` | `chains`, `assistant`, `learning` (Analyse-Endpunkte; Dashboard-Daten bleiben Kern), `memory`, `audit`, `bpmn` | chains stabil, Rest experimentell |
 | `advanced` (nach außen) | `integrations` (inkl. TODO-Tracker-Export, Kalender-Adapter), `http-api` (allgemeine HTTP-API-Verbindung, braucht `integrations`), `webhooks`, `remote-access` (Tailscale), `terminal` (Run-Terminal per WebSocket), `staging` | stabil / staging experimentell |
 | `advanced` (wenig genutzt) | `conversion`, `dialog-import` (benötigt conversion), `onboarding-profiles`, `skills`, `debug`, `factory` (inkl. Auto-Repair), `wishes` (benötigt chains) | Altlast / experimentell |
-| `hardening` | `provenance` (Default an), `sealing`, `require-sealed-for-unattended`, `webhook-signatures`, `private-network-guard` (Default an), `private-network-guard-http-api`, `private-network-guard-own-services` | experimentell |
+| `hardening` | `provenance` (Default an), `sealing`, `require-sealed-for-unattended`, `require-signed-seal`, `seal-immutable`, `webhook-signatures`, `private-network-guard` (Default an), `private-network-guard-http-api`, `private-network-guard-own-services` | experimentell |
 
 Der Katalog wird zusätzlich als reine Bash-Arrays nach `scripts/lib/module-catalog.generated.sh` exportiert,
 damit die Skripte ohne Backend auskommen — erzeugt, nicht gepflegt, siehe

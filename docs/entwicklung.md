@@ -132,6 +132,10 @@ gleich —, eine Spezifikation in `BlockSpecs` anlegen (`BlockSpecConfigKeysGate
 genannten Schlüssel gegen den Executor) und für den Editor Startkonfiguration und Schlüssel in
 `src/data/blockDefaultConfig.json` und `src/data/blockConfigSchema.json` ergänzen
 (`blockConfigSchema.test.ts`). Gehört der Typ zu einem Modul, kommt er nach `executor/BlockTypeModules`.
+Ruft der Typ eine KI auf, gehört er außerdem nach `AI_BLOCK_TYPES` (`src/types/index.ts`: Editor-Felder
+`provider`/`model`/`effort`, gleich mit `ai.blockTypes` im Schema, `blockConfigSchema.test.ts`), nach
+`executor/ModelUse` (`needsAi`: KI-Kennzeichen und Filter „Läuft ohne KI“ der Vorlagen) und nach
+`ALWAYS_AI_BLOCK_TYPES` in `components/workflow/stepMetadata.ts` (Schrittart im Lauf).
 
 **Neue Tabelle.** Flyway-Migration `V{N}__beschreibung.sql` unter `src/main/resources/db/migration/` —
 die nächste Nummer frisch ermitteln (`ls ai-automation-backend/src/main/resources/db/migration | sort -V | tail -1`),
@@ -1206,7 +1210,7 @@ und `ON DELETE` stehen nur in den Flyway-Migrationen.
   so festlegen, dass die erste Zeile NULL liefert. Vorbild: `WorkflowRunProjectionRepository.findOriginColumns`
   mit `WorkflowRunProjectionRepositoryTest`. Spalten mit deklariertem Typ (`w.name`) und JPQL-Abfragen
   betrifft das nicht.
-- **NIEMALS direkt in die DB schreiben** (via `sqlite3` CLI oder SQL). Immer REST-API oder Service/Repository-Layer verwenden — direkte Schreibzugriffe umgehen den Hibernate-Cache.
+- **NIEMALS direkt auf die DB zugreifen, weder lesend noch schreibend** (via `sqlite3` CLI oder SQL – auch nicht aus Workflow-Shell-Blöcken oder Skripten). Immer REST-API oder Service/Repository-Layer verwenden — direkter Zugriff umgeht den Hibernate-Cache und konkurriert um die eine Verbindung (HikariCP pool-size=1).
 
 ### Docker-Abhängigkeit
 
