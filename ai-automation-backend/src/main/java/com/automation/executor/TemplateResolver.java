@@ -110,6 +110,23 @@ final class TemplateResolver {
         return substituteSentinels(resolved, deferred);
     }
 
+    /**
+     * Whether {@code template} names a value that {@link #resolveShell} would quote: an untrusted or platform
+     * variable, a tainted block output or a tainted {@code previous_output}. For callers with no shell to quote
+     * in — tool-mode container arguments (TODO d3a7f5e2) — which therefore refuse such values.
+     */
+    static boolean namesEscapedValue(String template, Taint taint) {
+        for (String key : PlaceholderSyntax.keysIn(template)) {
+            if (taint.variables().contains(key)) return true;
+            if ("previous_output".equals(key) && taint.previousOutput()) return true;
+            if (key.startsWith("block.") && key.endsWith(".output")
+                    && taint.outputs().contains(key.substring("block.".length(), key.length() - ".output".length()))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     static String shellEscape(String value) {
         if (value == null) return "''";
         return "'" + value.replace("'", "'\\''") + "'";
