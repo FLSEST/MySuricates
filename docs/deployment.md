@@ -250,77 +250,20 @@ die Docker API. Gebraucht werden sie so:
 
 ## Dockerfiles
 
-### Agent Node (`docker/Dockerfile.agent-node`)
+Die Dockerfiles der Agent-Images und von Stable/Test liegen unter `ai-automation-backend/docker/`; was sie
+installieren, steht dort. Zwei Fallen beim Bauen:
 
-- **Base:** `node:22-slim`
-- **Tools:** git, curl, jq
-- **User:** `agent` (UID 1000)
-- **Claude CLI:** Verzeichnisse vorbereitet (Binary + Config vom Host gemountet)
-- **CMD:** `tail -f /dev/null` (Container bleibt aktiv für `docker exec`)
+- **Fremd-Repos frisch holen:** In `Dockerfile.agent-devops` stehen die Schichten mit Fremd-Repos (gh,
+  Docker) zuletzt, hinter `ARG APT_REFRESH`. Ein neuer Wert (Compose: `AGENT_APT_REFRESH`, etwa der Monat)
+  baut sie neu, statt Schlüssel und Paketlisten aus einem alten Layer-Cache zu übernehmen — daran scheiterte
+  ein Build mit `NO_PUBKEY`, obwohl der aktuelle Schlüsselbund stimmte (97e1529d). gitleaks und trivy sind
+  fest gepinnt.
+- **Python-Pakete:** `Dockerfile.agent-python` installiert seine Pakete ungepinnt hinter `ARG PIP_REFRESH`;
+  derselbe `AGENT_APT_REFRESH` holt die aktuellen, sonst blieben sie auf dem Stand des ersten Baus
+  (8b7a39b9).
 
-### Agent Python (`docker/Dockerfile.agent-python`)
-
-- **Base:** `python:3.12-slim`
-- **Tools:** git, curl, jq
-- **Pakete:** anthropic, pandas, numpy, requests, beautifulsoup4 — ungepinnt, hinter `ARG PIP_REFRESH`:
-  Derselbe `AGENT_APT_REFRESH` wie bei agent-devops installiert die aktuellen, sonst blieben sie auf dem
-  Stand des ersten Baus (8b7a39b9)
-
-### Agent DevOps (`docker/Dockerfile.agent-devops`)
-
-- **Base:** `ubuntu:24.04`
-- **Tools:** git, curl, jq, bash, python3
-- **GitHub CLI:** `gh` aus dem offiziellen APT-Repository
-- **Security-Tools:** gitleaks, trivy (Binaries mit SHA256-Verifizierung, multi-arch)
-- **Docker:** Docker CE CLI (nur Client, kein Daemon)
-- **Frische:** Die Layer mit Fremd-Repos (gh, Docker) stehen zuletzt, hinter `ARG APT_REFRESH`. Ein
-  neuer Wert (Compose: `AGENT_APT_REFRESH`, etwa der Monat) baut sie neu, statt Schlüssel und
-  Paketlisten aus einem alten Layer-Cache zu übernehmen — daran scheiterte ein Build mit `NO_PUBKEY`,
-  obwohl der aktuelle Schlüsselbund stimmte (97e1529d). gitleaks und trivy sind fest gepinnt.
-- **User:** `agent` (UID 1000)
-- **CMD:** `tail -f /dev/null`
-
-### Agent Java (`docker/Dockerfile.agent-java`)
-
-- **Base:** `eclipse-temurin:21-jdk-jammy`
-- **Tools:** maven, git, curl, jq, bash, python3, libreoffice-writer (headless DOCX→PDF)
-- **Fonts:** fonts-liberation, fonts-dejavu
-- **User:** `agent` (UID 1000)
-- **CMD:** `tail -f /dev/null`
-
-### Stable (`docker/Dockerfile.stable`)
-
-- **Base:** `eclipse-temurin:21-jre-jammy` (Ubuntu-basiert, glibc für Claude CLI)
-- **ARGs:** `HOST_USER`, `HOST_UID`, `HOST_GID`, `HOST_HOME` — für User-Mapping mit dem Host
-- **Tools:** curl, git, gosu, python3, jq, nodejs, npm, wget, unzip, Docker CE CLI
-- **Entrypoint:** `entrypoint.sh` (User-Switching via gosu, Docker-Socket-Permissions)
-- **Port:** 9091
-- **Healthcheck:** `curl -f http://localhost:9091/api/v1/system/health`
-- **JVM:** ZGC (Generational), 256MB–1GB Heap, headless AWT
-
-## Docker Compose Files
-
-### `docker-compose.yml` (Haupt)
-
-Baut nur die Agent-Images (`profiles: build-only`), startet keinen Service.
-
-### `docker-compose.stable.yml`
-
-Stable-Umgebung auf Port 9091:
-- Container: `mysuricates-stable`
-- Profil: `SPRING_PROFILES_ACTIVE=stable`
-- Volumes: `stable-data` (persistente DB), `stable-secrets` (Integrations- und Siegel-Schlüssel, getrennt von der DB — 3fb2242c), `stable-frontend/` (read-only; die gebaute Oberfläche, die `scripts/staging.sh snapshot` aus `ai-automation-frontend/dist` dorthin kopiert — ohne diesen Ordner verweigert `staging.sh start` den Start), Host-Projektverzeichnisse, Backup-Volume (`~/.mysuricates/backups/stable`); KI-Anbieter Docker-Socket (Standard aus) und Port (Standard nur `127.0.0.1:9091`) kommen aus der Override-Datei von `scripts/staging.sh` ([KI-Anbieter im Container](#ki-anbieter-im-container))
-- Named Volume: `stable-data`
-
-### `docker-compose.test.yml`
-
-Test-Instanz auf Port 8090 (nutzt `docker/Dockerfile.stable` als Build-Basis):
-- Container: `mysuricates-test`
-- Image: `ai-automation-backend-test`
-- Profil: `SPRING_PROFILES_ACTIVE=test`
-- Volumes: `test-data` (persistente DB), `test-secrets` (Schlüssel wie bei Stable), `stable-frontend/` (read-only, dieselbe gebaute Oberfläche wie bei Stable), `application-test.yml` (read-only), Backup-Volume (`~/.mysuricates/backups/test`); KI-Anbieter, Docker-Socket und Port (`127.0.0.1:8090`) wie bei Stable
-- Healthcheck: `curl -f http://localhost:8090/api/v1/system/health`
-- Named Volume: `test-data`
+`Dockerfile.stable` (Basis von Stable und Test) ist Ubuntu-basiert, weil die Claude-CLI glibc braucht, und
+gleicht den Benutzer über die ARGs `HOST_USER`, `HOST_UID`, `HOST_GID` und `HOST_HOME` dem Rechner an.
 
 ## Umgebungsvariablen
 
@@ -461,8 +404,6 @@ AUTOMATION_RATE_LIMIT_ENABLED=true   # optional
 - Rate Limiting empfohlen
 - Docker Socket nur bei Bedarf (`MYSURICATES_DOCKER_SOCKET=1`, siehe oben) — gibt der Instanz volle Kontrolle über Docker auf dem Rechner
 
-**Hinweis:** HikariCP Pool-Size ist auf 1 gesetzt. SQLite erlaubt nur einen gleichzeitigen Schreibzugriff. Pool-Size=1 serialisiert alle DB-Operationen — kein Lock-Contention. Pool-Size erhöhen erst sinnvoll beim Wechsel auf PostgreSQL.
-
 ## Tailscale Remote-Access
 
 Das Modul `remote-access` macht das Backend über Tailscale von außerhalb des lokalen Netzwerks
@@ -531,19 +472,14 @@ Mögliche `status`-Werte: `UP` (DB + Docker ok), `DEGRADED` (DB ok, Docker nicht
 
 ## Datenbank-Backup
 
-Die SQLite-Datenbank ist eine einzelne Datei:
-
-```bash
-# Backup erstellen
-cp data/automation.db data/automation.db.backup
-
-# Oder bei laufendem System (WAL-Modus)
-sqlite3 data/automation.db ".backup 'data/automation.db.backup'"
-```
-
-**Speicherort:** `ai-automation-backend/data/automation.db` (lokal) bzw. `/app/data/automation.db` (Docker)
-
-Die Datei enthält alle Projekte, Workflows, Runs, Skills, Schedules, Webhooks, Chains, Todos, Integrations, Templates und weitere Entitäten. Ein Backup dieser Datei sichert den gesamten Zustand der Plattform.
+Die SQLite-Datenbank ist eine einzelne Datei (`ai-automation-backend/data/automation.db` lokal,
+`/app/data/automation.db` im Container) und enthält den gesamten Zustand der Plattform. Das Backend sichert
+sie selbst: täglich um 02:00 (`automation.backup.cron`) nach `automation.backup.directory` (Standard
+`<Datenordner>/backups/dev`, Stable und Test haben eigene Verzeichnisse), die letzten
+`automation.backup.retain-count` Sicherungen (Standard 30) bleiben. Eine Sicherung sofort:
+`POST /api/v1/system/backup`; Liste und Download unter Einstellungen → Backups. Eine Kopie von Hand (`cp`)
+nur bei gestopptem Backend — auf die laufende Datei greift nichts außer dem Backend zu (Hibernate-Cache,
+ein einziger Schreiber).
 
 ## Reverse-Proxy
 
@@ -654,18 +590,11 @@ Grenzen, die man kennen sollte:
 
 - **In KI-Prompts wird nichts escaped.** Ein Prompt ist keine Kommandozeile; gegen Prompt-Injection
   hilft das Modell nicht.
-- **Eine KI-Antwort nach einem Prompt mit Plattform-Daten ist selbst gefärbt.** Stehen
-  Plattform-Daten im Prompt eines `simple`-, `agentic`- oder `skill-capability`-Blocks (auch in der
-  verschachtelten Form), gilt die Ausgabe genau dieses Blocks als nicht vertrauenswürdig: Ein
-  folgender Shell-Block bekommt `{{ previous_output }}` **single-quoted**. Sobald diese gefärbte
-  Ausgabe verbucht ist, ist der Lauf gefärbt — und die Färbung ist klebrig wie immer: Auch alle
-  **weiteren** Blockausgaben und die daraus abgeleiteten Variablen (`step_N_output`,
-  `foreach`-Items, `document`-Extrakte) werden ab da gequotet, und `exportTaint()` gibt das an
-  Sub-Workflows und an ein Resume weiter. In der Praxis heisst das: Praktisch jeder Audit- oder
-  Report-Workflow, der `previous_report` in einem Prompt liest, läuft ab diesem Block im gequoteten
-  Modus. **Setze in eigenen Workflows in jedem Shell-Block, der die Ausgabe eines KI-Blocks
-  weiterverarbeitet, `"shell_escape_variables": true`** — dann verhält sich der Block in gefärbten
-  wie in ungefärbten Läufen gleich.
+- **Eine KI-Antwort nach einem Prompt mit Plattform-Daten ist selbst gefärbt.** Ein folgender Shell-Block
+  bekommt ihre Ausgabe single-quoted, und ab da jede weitere Blockausgabe des Laufs. **Setze in eigenen
+  Workflows in jedem Shell-Block, der die Ausgabe eines KI-Blocks weiterverarbeitet,
+  `"shell_escape_variables": true`** — dann verhält sich der Block in gefärbten wie in ungefärbten Läufen
+  gleich.
 - **Was das Quoting nicht abwehrt:** Gequotet wird der Text der KI-Antwort, nicht ihr Zustandekommen.
   Gegen inhaltliche Manipulation (Prompt-Injection) hilft das Trust-Modell nicht.
 - **Selbst geschriebene Dateien sieht das Quoting nicht.** Ein Shell-Block, der einen gefärbten Wert
@@ -719,7 +648,7 @@ Ausgenommen sind:
 | `/api/v1/system/health`, `/system/info`, `/system/auth-status` | Statusabfragen vor dem Login |
 | `/api/v1/system/jvm-memory` | Heap-Belegung als genau drei Zahlen (`jvm_memory_used_bytes`, `jvm_memory_max_bytes`, `jvm_heap_used_percent`) für den Performance-Audit |
 | `/actuator/health` | Healthcheck für Docker |
-| `/ws/**` | WebSocket-Handshake (der Key wird dort als Query-Parameter geprüft) |
+| `/ws/**` | WebSocket-Handshake (authentifiziert per Einmal-Ticket aus `POST /api/v1/ws-ticket`, siehe [Reverse-Proxy](#reverse-proxy)) |
 | `/api/v1/webhook/trigger/**` | Oeffentlicher Webhook-Eingang |
 | `/api/v1/integrations/*/callback` | OAuth-Rückleitungen |
 
@@ -754,8 +683,9 @@ vertraulich zu behandeln wie der Key selbst.
 
 ### Webhooks
 
-Der Trigger-Endpunkt wird allein durch ein Token im Pfad geschützt (32 Zufallsbytes aus
-`SecureRandom`). Es gibt keine Signaturprüfung und keinen Replay-Schutz. Als Gegengewicht gilt ein
+Der Trigger-Endpunkt wird durch ein Token im Pfad geschützt (32 Zufallsbytes aus
+`SecureRandom`). Eine Signaturprüfung gibt es nur, wenn der Webhook ein Signatur-Secret hat (HMAC-SHA256, siehe
+[Workflow-Härtung](architektur.md#workflow-härtung-optional)); Replay-Schutz gibt es nicht. Als Gegengewicht gilt ein
 fest verdrahtetes Limit von 10 Anfragen pro Minute und IP — unabhängig vom globalen Rate-Limit-
 Schalter —, die Nutzlast ist auf 50 Felder begrenzt, und alle vom Aufrufer stammenden Werte werden
 als nicht vertrauenswürdig markiert und in Shell-Blöcken immer escaped.
@@ -834,7 +764,7 @@ Die Stable-Umgebung ist ein Docker-Container, der Backend + eingebettetes React-
 
 **Key-Dateien:**
 - `ai-automation-backend/docker/Dockerfile.stable` — Ubuntu-basiert (glibc für Claude CLI)
-- `ai-automation-backend/docker-compose.stable.yml` — Daten, Frontend, Projekte; KI-Anbieter und Socket über `scripts/staging.sh write-override stable`
+- `ai-automation-backend/docker-compose.stable.yml` — Container `mysuricates-stable`, Profil `stable`; Volumes `stable-data` (Datenbank), `stable-secrets` (Schlüssel, siehe unten), `stable-frontend/` (read-only: die gebaute Oberfläche, die `scripts/staging.sh snapshot` aus `ai-automation-frontend/dist` dorthin kopiert — ohne diesen Ordner verweigert `staging.sh start` den Start), Projektordner und Backups (`~/.mysuricates/backups/stable`); KI-Anbieter, Docker-Socket und Port über `scripts/staging.sh write-override stable`
 - `ai-automation-backend/src/main/resources/application-stable.yml` — Port 9091, Auto-Start deaktiviert, Frontend-Serving aktiviert
 
 **Schlüssel:** Integrations- und Siegel-Schlüssel liegen im Volume `stable-secrets`, getrennt von der
@@ -855,7 +785,7 @@ Die Test-Instanz ist ein dedizierter Docker-Container für automatisierte Workfl
 - Datenbank kann via API zurückgesetzt werden (`POST /api/v1/testing/reset`)
 
 **Key-Dateien:**
-- `ai-automation-backend/docker-compose.test.yml` — Container `mysuricates-test`, Port 8090, Profil `test`
+- `ai-automation-backend/docker-compose.test.yml` — Container `mysuricates-test`, Port 8090, Profil `test`, Build-Basis `docker/Dockerfile.stable`; Volumes `test-data`, `test-secrets`, `stable-frontend/` (dieselbe gebaute Oberfläche wie bei Stable), `application-test.yml` (read-only) und Backups (`~/.mysuricates/backups/test`); KI-Anbieter, Docker-Socket und Port (`127.0.0.1:8090`) wie bei Stable
 
 ### Staging CLI-Verwaltung
 
@@ -941,21 +871,6 @@ In Settings → Stable wird ein Versionsvergleich angezeigt:
 - **Dev**: Version aus `/api/v1/system/info`
 - **Stable**: Version aus dem Stable-Container's `/api/v1/system/info`
 
-Wenn die Versionen abweichen (z.B. nach einem Release), wird ein Promote empfohlen.
-
-### Release + Promote Workflow
-
-```bash
-# 1. Version bumpen
-./scripts/release.sh           # z.B. 0.3.2 → 0.3.3
-
-# 2. Neue Version in Stable deployen
-./scripts/staging.sh promote   # Baut und startet Stable mit der neuen Version
-```
-
-### Git-Tags
-
-| Tag-Format | Erstellt durch | Zweck |
-|---|---|---|
-| `v0.3.2` | `release.sh` | Semver-Release-Markierung |
-| `stable-20250225-143022` | `staging.sh promote` | Deployment-Zeitstempel |
+Wenn die Versionen abweichen (z.B. nach einem Release), wird ein Promote empfohlen
+(`./scripts/staging.sh promote`). Versionen, Release-Script und Git-Tags:
+[entwicklung.md → Versionierung & Releases](entwicklung.md#versionierung--releases).
