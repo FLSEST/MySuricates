@@ -407,4 +407,27 @@ class ContainerShellServiceTest {
             throw new RuntimeException(e);
         }
     }
+
+    @Test
+    void executeTool_imageNotAllowed_returnsRejectionAndSkipsDocker() {
+        when(imageAllowlist.isAllowed("forbidden-image:latest")).thenReturn(false);
+
+        ShellCommandService.ShellResult result = service.executeTool(new ContainerToolRequest(
+                "forbidden-image:latest", List.of("--version"), "/tmp", null, null, List.of(), false, 10), () -> false);
+
+        assertThat(result.exitCode()).isEqualTo(125);
+        verify(activityLogService).warn(any(), contains("Container image not allowed"), anyString(), isNull());
+        verifyNoInteractions(hostProcessUtils);
+    }
+
+    @Test
+    void executeTool_appliesTheExtraMountPolicy_andStopsBeforeDockerWhenCancelled() {
+        when(hostProcessUtils.getHostUid()).thenReturn("1000");
+
+        ShellCommandService.ShellResult result = service.executeTool(new ContainerToolRequest(
+                "img:1", List.of("--version"), "/tmp", null, null, List.of("/data:/data"), false, 10), () -> true);
+
+        assertThat(result.exitCode()).isEqualTo(130);
+        verify(activityLogService).warn(any(), contains("Extra mount denied"), anyString(), isNull());
+    }
 }
