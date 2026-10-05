@@ -1637,6 +1637,7 @@ SEC="$REPO/workflow-pool/mysuricates-security-audit.json"
 report_prompt "$SEC" "$TMP/sec-prompt.txt"
 check "Prompt bekommt das trivy-Faktenblatt"         'grep -qF "{{ block.trivy.output }}" "$TMP/sec-prompt.txt"'
 check "Prompt bekommt das gitleaks-Faktenblatt"      'grep -qF "{{ block.gitleaks.output }}" "$TMP/sec-prompt.txt"'
+check "Prompt bekommt das JAR-Faktenblatt"           'grep -qF "{{ block.trivy_jar.output }}" "$TMP/sec-prompt.txt"'
 check "Prompt bekommt den Datenblock beim Namen"     'grep -qF "{{ block.data.output }}" "$TMP/sec-prompt.txt"'
 check "Prompt verbietet eigenes Zaehlen"             'grep -qi "zaehle und schaetze nichts selbst" "$TMP/sec-prompt.txt"'
 check "Prompt kennt NICHT GEMESSEN"                  'grep -q "NICHT GEMESSEN" "$TMP/sec-prompt.txt"'
@@ -1681,8 +1682,14 @@ for b in d['blocks']:
     c = b.get('config', {})
     if 'container_args' in c:
         print(b.get('name'), c.get('output_format'), c.get('on_failure'), 'command' in c, '--redact' in c['container_args'])
+        print('args', b.get('name'), ' '.join(c['container_args']))
 PY
 check "trivy: Werkzeug-Block, SARIF, weiter bei Fehler" 'grep -qx "trivy sarif continue False False" "$TMP/sec-tools.txt"'
+# trivy fs liest nur Lockfiles; das gebaute JAR (transitive Maven-Abhaengigkeiten) prueft nur rootfs
+check "trivy_jar: Werkzeug-Block, SARIF, weiter bei Fehler" 'grep -qx "trivy_jar sarif continue False False" "$TMP/sec-tools.txt"'
+check "trivy_jar scannt den target-Ordner per rootfs" \
+  'grep -q "^args trivy_jar trivy rootfs /workspace/ai-automation-backend/target " "$TMP/sec-tools.txt"'
+check "trivy zaehlt Entwicklungs-Abhaengigkeiten mit (wie npm audit)" 'grep -qF "\"--include-dev-deps\"" "$SEC"'
 check "gitleaks: schwaerzt Secrets"                     'grep -qx "gitleaks sarif continue False True" "$TMP/sec-tools.txt"'
 check "trivy ueberspringt Playwright-Artefakte"         'grep -qF "\"**/playwright/results\"" "$SEC"'
 check "gitleaks nur Branches, Tags, Remotes (kein Stash)" 'grep -qF "\"--log-opts=--branches --tags --remotes\"" "$SEC"'
@@ -1695,9 +1702,12 @@ printf '%s\n' '{{ block.trivy.output }}' > "$TMP/sec-trivy-placeholder.txt"
 printf '%s\n' 'FAKT git_history_visible: ja' 'FAKT backend_jar: app.jar vom 2026-10-05' > "$TMP/sec-data.txt"
 printf '%s\n' 'NICHT GEMESSEN: git_history_visible (.git ist kein Verzeichnis)' > "$TMP/sec-data-worktree.txt"
 printf '%s\n' '### Report' 'gate_status: GREEN' > "$TMP/sec-report-green.txt"
-sec_gate() {  # $1 = trivy-blatt, $2 = gitleaks-blatt, $3 = datenblock, $4 = report
+printf '%s\n' '## FAKTENBLATT trivy_jar (Trivy 0.70.0, 1 SARIF-Datei)' 'FAKT trivy_jar_findings: 3' 'FAKT trivy_jar_exit_code: 0' > "$TMP/sec-trivyjar.txt"
+printf '%s\n' '## FAKTENBLATT trivy_jar' 'NICHT GEMESSEN: trivy_jar_findings (keine SARIF-Datei in /out)' > "$TMP/sec-trivyjar-missing.txt"
+printf '%s\n' 'FAKT git_history_visible: ja' 'NICHT GEMESSEN: backend_jar (kein gebautes JAR)' > "$TMP/sec-data-nojar.txt"
+sec_gate() {  # $1 = trivy-blatt, $2 = gitleaks-blatt, $3 = datenblock, $4 = report, $5 = JAR-blatt (Standard: gemessen)
   render "$SEC" label:Gate-Verdict "$(json_values block.report.output="$4" block.trivy.output="$1" \
-    block.gitleaks.output="$2" block.data.output="$3")" > "$TMP/sec-gate.sh"
+    block.gitleaks.output="$2" block.data.output="$3" block.trivy_jar.output="${5:-$TMP/sec-trivyjar.txt}")" > "$TMP/sec-gate.sh"
   bash "$TMP/sec-gate.sh" > "$TMP/sec-gate.out" 2> "$TMP/sec-gate.err"
 }
 sec_gate "$TMP/sec-trivy.txt" "$TMP/sec-leaks.txt" "$TMP/sec-data.txt" "$TMP/sec-report-green.txt"
@@ -1715,6 +1725,10 @@ check "Git-Worktree ohne Historie: gitleaks zaehlt nicht, RED" 'grep -qx "gate_s
 printf '%s\n' '## FAKTENBLATT gitleaks (gitleaks v8.0.0, 1 SARIF-Datei)' 'FAKT gitleaks_findings: 0' 'FAKT gitleaks_exit_code: 1' > "$TMP/sec-leaks-exit1.txt"
 sec_gate "$TMP/sec-trivy.txt" "$TMP/sec-leaks-exit1.txt" "$TMP/sec-data.txt" "$TMP/sec-report-green.txt"
 check "Exit-Code != 0 trotz Faktenblatt: RED"            'grep -qx "gate_status: RED" "$TMP/sec-gate.out" && grep -q "^gate_description: .*gitleaks_findings" "$TMP/sec-gate.out"'
+sec_gate "$TMP/sec-trivy.txt" "$TMP/sec-leaks.txt" "$TMP/sec-data.txt" "$TMP/sec-report-green.txt" "$TMP/sec-trivyjar-missing.txt"
+check "JAR vorhanden, aber nicht gemessen: RED"          'grep -qx "gate_status: RED" "$TMP/sec-gate.out" && grep -q "^gate_description: .*trivy_jar_findings" "$TMP/sec-gate.out"'
+sec_gate "$TMP/sec-trivy.txt" "$TMP/sec-leaks.txt" "$TMP/sec-data-nojar.txt" "$TMP/sec-report-green.txt" "$TMP/sec-trivyjar-missing.txt"
+check "kein gebautes JAR: das JAR ist keine Pflicht"      'grep -qx "gate_status: GREEN" "$TMP/sec-gate.out"'
 
 echo
 echo "passed=$PASS failed=$FAIL"
