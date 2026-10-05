@@ -1,6 +1,5 @@
 <!-- last-sync: 2026-09-23 from: docs/konzepte/workflow-memory.md -->
 
-<!-- concept-facts-sha256: 47f72cd8883f6032a246606f7af297a20af1c83a1a13ed6078d019d53951318a -->
 <!-- concept-source: d7e7e28cf7209b4369ad33467bb4fe781a178baa -->
 
 # Workflow Memory
@@ -23,18 +22,7 @@ The mechanism makes implicit run knowledge reusable without permanently maintain
 
 ## Drawbacks and costs
 
-The memory is an AI summary, not verified truth. Errors, omissions, or outdated assumptions can propagate into later runs, especially when automatic activation is used. Each extraction and each time it is sent along increases effort, latency, and prompt size; local storage also does not mean that the AI calls involved remain local. Operationally, 6 active memory entries in the instance and 263 visible workflow definitions in active projects are currently recorded. This describes only inventory and configuration, not usefulness. Data on causal success, error rate, retention comparability, or domain-specific verification coverage is missing.
-
-## Operational evidence
-
-Measurement: **2026-09-19 (UTC)**, a local development instance. Inventory counters refer to the records visible via REST; step counts count stored steps with type metadata in the 30-day window. Wrappers are counted once. This is not evidence of effectiveness.
-
-| Metric | Count / reference value |
-|---|---:|
-| Active memory entries | 6 |
-| Visible workflows in active projects | 263 |
-
-[Definitions, measurement limits, and raw counters](../../konzepte/betriebsdaten.json) · [Measurement method and repetition](README.md)
+The memory is an AI summary, not verified truth. Errors, omissions, or outdated assumptions can propagate into later runs, especially when automatic activation is used. Each extraction and each time it is sent along increases effort, latency, and prompt size; local storage also does not mean that the AI calls involved remain local.
 
 ## In the code
 

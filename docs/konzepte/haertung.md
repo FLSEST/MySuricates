@@ -1,4 +1,3 @@
-<!-- concept-facts-sha256: 47f72cd8883f6032a246606f7af297a20af1c83a1a13ed6078d019d53951318a -->
 <!-- concept-source: d7e7e28cf7209b4369ad33467bb4fe781a178baa -->
 
 # Haertung: Siegel, Zulassung und Taint
@@ -22,18 +21,7 @@ Sinnvoll ist das etwa für produktive Automationen, die zeitgesteuert, per Webho
 
 ## Nachteile und Kosten
 
-Die Härtung ist kein vollständiger Prompt-Injection-Schutz, keine Prozess-Sandbox und keine Vertrauensgarantie für importierte Definitionen. Mehr Schutz bedeutet Bedienaufwand: Workflows müssen bewusst versiegelt werden, und optionale Regeln können unbeaufsichtigte Läufe blockieren. Der aktuelle Betriebsbefund zeigt 263 API-sichtbare Workflow-Definitionen in aktiven Projekten, davon 0 versiegelt. Das ist ein Bestandswert, kein Ausführungs- oder Nutzenmaß. Fachlicher Nutzen, Fehlerraten und Verifikationsabdeckung fehlen; ältere Ticketzahlen sind wegen Retention, Soft Deletion und geänderter Metadaten nicht vergleichbar.
-
-## Betriebsbeleg
-
-Messung: **2026-09-19 (UTC)**, eine lokale Entwicklungsinstanz. Bestandszähler beziehen sich auf die über REST sichtbaren Datensätze; Schrittzahlen zählen gespeicherte Schritte mit Typ-Metadaten im 30-Tage-Fenster. Wrapper zählen einmal. Dies ist kein Wirksamkeitsnachweis.
-
-| Messgröße | Anzahl / Bezugsgröße |
-|---|---:|
-| Versiegelte sichtbare Workflows | 0 / 263 |
-| Sichtbare Workflows in aktiven Projekten | 263 |
-
-[Definitionen, Messgrenzen und Rohzähler](betriebsdaten.json) · [Messmethode und Wiederholung](README.md)
+Die Härtung ist kein vollständiger Prompt-Injection-Schutz, keine Prozess-Sandbox und keine Vertrauensgarantie für importierte Definitionen. Mehr Schutz bedeutet Bedienaufwand: Workflows müssen bewusst versiegelt werden, und optionale Regeln können unbeaufsichtigte Läufe blockieren.
 
 ## Im Code
 

@@ -1,4 +1,3 @@
-<!-- concept-facts-sha256: 47f72cd8883f6032a246606f7af297a20af1c83a1a13ed6078d019d53951318a -->
 <!-- concept-source: d7e7e28cf7209b4369ad33467bb4fe781a178baa -->
 
 # Agentische Bloecke mit Budgets
@@ -19,18 +18,7 @@ Agentische Budgets begrenzen einen Block, der nicht nur einen festen Befehl ausf
 Der Mechanismus macht offene KI-Arbeit kontrollierbarer und nachvollziehbarer. Jede Iteration sammelt Begründung, Aktion, Ergebnis, Dauer, Token-Metadaten und am Ende Status, Stop-Grund und Zielerreichung. Ereignisse können den Fortschritt live anzeigen. Wiederholungsschutz verhindert einfache Endlosschleifen, Timeouts beenden hängende Schritte, und das Tokenbudget bricht ab, wenn der laufende Verbrauch den Grenzwert überschreitet. Dadurch lässt sich exploratives Vorgehen in Workflows einbauen, ohne vollständig auf manuelle Beobachtung angewiesen zu sein.
 
 ## Nachteile und Kosten
-Das Budget ist keine Sandbox und keine harte Kostenobergrenze. Tokenwerte hängen vom Anbieter ab; fehlen echte Nutzungsdaten, wird geschätzt. Die Budgetprüfung erfolgt nach einem Aufruf, daher kann der Grenzwert überschritten werden. Bei mehreren blinden Iterationen ohne reale Usage-Daten wird abgebrochen, außer ein Anbieter arbeitet erwartbar mit Schätzungen. Betriebsdaten zeigen nur Nutzung, keinen Nutzen: In einer 30-Tage-Stichprobe waren 7 von 223 typisierten Records agentisch, 144 Shell-Blöcke. Wegen Retention, Soft-Deletion und wechselnder Metadaten ist das nicht mit älteren Beständen vergleichbar; Fehlerquoten, fachlicher Erfolg und Verifikationsabdeckung fehlen.
-
-## Betriebsbeleg
-
-Messung: **2026-09-19 (UTC)**, eine lokale Entwicklungsinstanz. Bestandszähler beziehen sich auf die über REST sichtbaren Datensätze; Schrittzahlen zählen gespeicherte Schritte mit Typ-Metadaten im 30-Tage-Fenster. Wrapper zählen einmal. Dies ist kein Wirksamkeitsnachweis.
-
-| Messgröße | Anzahl / Bezugsgröße |
-|---|---:|
-| Agentische Schritte im 30-Tage-Fenster | 7 / 223 |
-| Shell-Schritte im 30-Tage-Fenster | 144 / 223 |
-
-[Definitionen, Messgrenzen und Rohzähler](betriebsdaten.json) · [Messmethode und Wiederholung](README.md)
+Das Budget ist keine Sandbox und keine harte Kostenobergrenze. Tokenwerte hängen vom Anbieter ab; fehlen echte Nutzungsdaten, wird geschätzt. Die Budgetprüfung erfolgt nach einem Aufruf, daher kann der Grenzwert überschritten werden. Bei mehreren blinden Iterationen ohne reale Usage-Daten wird abgebrochen, außer ein Anbieter arbeitet erwartbar mit Schätzungen.
 
 ## Im Code
 

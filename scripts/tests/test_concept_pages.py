@@ -1,6 +1,5 @@
 """Failure-path checks for the concept-page publication gate; no AI or backend needed."""
 import contextlib
-import datetime as dt
 import importlib.util
 import io
 import json
@@ -10,6 +9,7 @@ import unittest
 from unittest.mock import patch
 
 SCRIPTS = Path(__file__).resolve().parents[1]
+REPO = SCRIPTS.parent
 
 
 def load(name):
@@ -31,14 +31,7 @@ class PublicationGateTest(unittest.TestCase):
         self.work = self.root / 'run'
         (self.work / 'drafts').mkdir(parents=True)
         self.catalog = pages.read_json(pages.CATALOG)
-        keys = {key for item in self.catalog for key in item['metrics']}
-        self.facts = self.root / 'facts.json'
-        self.facts.write_text(json.dumps({'schema': 1,
-            'collected_at': dt.datetime.now(dt.timezone.utc).isoformat(),
-            'limitations': ['Test fixture'],
-            'metrics': {key: {'value': 2, 'denominator': 7} for key in keys}}))
-        (self.work / 'manifest.json').write_text(json.dumps({'source_commit': 'a' * 40,
-            'facts_sha256': pages.digest(self.facts)}))
+        (self.work / 'manifest.json').write_text(json.dumps({'source_commit': 'a' * 40}))
         for item in self.catalog:
             for source in item['sources']:
                 target = self.root / source
@@ -49,11 +42,11 @@ class PublicationGateTest(unittest.TestCase):
                 for heading in pages.HEADINGS['de'])
             (self.work / 'drafts' / (item['slug'] + '.md')).write_text(body)
         with contextlib.redirect_stdout(io.StringIO()):
-            pages.assemble(self.root, self.work, self.facts)
+            pages.assemble(self.root, self.work)
 
     def gate(self, language='de', directory=None):
         with contextlib.redirect_stdout(io.StringIO()):
-            pages.check(self.root, directory or self.work / 'de', self.facts, language)
+            pages.check(self.root, directory or self.work / 'de', language)
 
     def test_complete_pages_pass(self):
         self.gate()
@@ -69,14 +62,29 @@ class PublicationGateTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'diagram'):
             self.gate()
 
-    def test_changed_measurement_does_not_pass(self):
+    def test_assembled_page_has_the_fixed_sections_only(self):
+        text = (self.work / 'de/gates.md').read_text()
+        self.assertTrue(text.startswith('<!-- concept-source: ' + 'a' * 40 + ' -->\n'))
+        self.assertEqual(pages.re.findall(r'^## (.+)$', text, pages.re.M),
+                         pages.HEADINGS['de'] + [pages.CODE_HEADING['de']])
+
+    def test_extra_section_does_not_pass(self):
+        # The pages carry no measurement any more; a dated evidence section must not creep back in.
         path = self.work / 'de/gates.md'
-        path.write_text(path.read_text().replace('| 2 / 7 |', '| 20 / 7 |'))
-        with self.assertRaisesRegex(ValueError, 'measurement'):
+        path.write_text(path.read_text().replace(
+            '## Im Code', '## Betriebsbeleg\n\n| Messgröße | 2 / 7 |\n\n## Im Code'))
+        with self.assertRaisesRegex(ValueError, 'sections'):
             self.gate()
 
-    def test_snapshot_swap_does_not_pass(self):
-        self.facts.write_text(self.facts.read_text() + '\n')
+    def test_renamed_code_section_does_not_pass(self):
+        path = self.work / 'de/gates.md'
+        path.write_text(path.read_text().replace('## Im Code', '## Quellen'))
+        with self.assertRaisesRegex(ValueError, 'sections'):
+            self.gate()
+
+    def test_missing_source_commit_does_not_pass(self):
+        path = self.work / 'de/gates.md'
+        path.write_text(pages.re.sub(r'<!-- concept-source: [0-9a-f]+ -->\n', '', path.read_text()))
         with self.assertRaisesRegex(ValueError, 'provenance'):
             self.gate()
 
@@ -91,24 +99,45 @@ class PublicationGateTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Private data'):
             self.gate()
 
-    def test_old_measurements_rejected_before_ai_call(self):
-        data = pages.read_json(self.facts)
-        data['collected_at'] = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=2)).isoformat()
-        self.facts.write_text(json.dumps(data))
-        with self.assertRaisesRegex(ValueError, '24 hours'):
-            pages.prepare(self.root, self.root / 'new-run', self.facts)
+    def test_prepare_packs_notes_and_sources_without_measurement(self):
+        with patch.object(pages.subprocess, 'check_output', return_value='b' * 40 + '\n'), \
+                contextlib.redirect_stdout(io.StringIO()):
+            pages.prepare(self.root, self.root / 'new-run')
+        self.assertEqual(pages.read_json(self.root / 'new-run/manifest.json'), {'source_commit': 'b' * 40})
+        packet = (self.root / 'new-run/packets/gates.txt').read_text()
+        self.assertIn(self.catalog[0]['notes'], packet)
+        self.assertIn('### ' + self.catalog[0]['sources'][0], packet)
+        self.assertNotIn('Betriebsdaten', packet)
+        self.assertFalse((self.root / 'new-run/facts.json').exists())
 
     def test_english_assembly_fixes_source_links_and_diagrams(self):
         target = self.root / 'docs/en/konzepte'
         target.mkdir(parents=True)
         for item in self.catalog:
             text = (self.work / 'de' / (item['slug'] + '.md')).read_text()
-            for german, english in zip(pages.HEADINGS['de'], pages.HEADINGS['en']):
-                text = text.replace('## ' + german, '## ' + english)
+            text = translate_headings(text)
             (target / (item['slug'] + '.md')).write_text('<!-- last-sync: fixture -->\n\n' + text)
         with contextlib.redirect_stdout(io.StringIO()):
-            pages.finish_english(self.root, target, self.facts)
+            pages.finish_english(self.root, target)
         self.gate('en', target)
+
+    def test_english_page_with_german_code_heading_does_not_pass(self):
+        target = self.root / 'docs/en/konzepte'
+        target.mkdir(parents=True)
+        for item in self.catalog:
+            text = (self.work / 'de' / (item['slug'] + '.md')).read_text()
+            text = translate_headings(text).replace('## ' + pages.CODE_HEADING['en'], '## Im Code')
+            (target / (item['slug'] + '.md')).write_text('<!-- last-sync: fixture -->\n\n' + text)
+        with self.assertRaisesRegex(ValueError, 'sections'), contextlib.redirect_stdout(io.StringIO()):
+            pages.finish_english(self.root, target)
+
+
+def translate_headings(text):
+    """Stand-in for the translator: German section headings to the agreed English ones."""
+    for german, english in zip(pages.HEADINGS['de'] + [pages.CODE_HEADING['de']],
+                               pages.HEADINGS['en'] + [pages.CODE_HEADING['en']]):
+        text = text.replace('## ' + german, '## ' + english)
+    return text
 
 
 class OnlyFilterTest(unittest.TestCase):
@@ -118,7 +147,7 @@ class OnlyFilterTest(unittest.TestCase):
         base = PublicationGateTest()
         base.setUp()
         self.addCleanup(base.temp.cleanup)
-        self.root, self.facts, self.catalog = base.root, base.facts, base.catalog
+        self.root, self.catalog = base.root, base.catalog
         self.items = pages.select('zusammenstoepseln,anbieter-unabhaengig')
         self.work = self.root / 'only-run'
         (self.work / 'drafts').mkdir(parents=True)
@@ -145,19 +174,12 @@ class OnlyFilterTest(unittest.TestCase):
 
     def test_filtered_prepare_writes_only_selected_packets(self):
         with patch.object(pages.subprocess, 'check_output', return_value='a' * 40):
-            self.run_quietly(pages.prepare, self.root, self.root / 'prep', self.facts, self.items)
+            self.run_quietly(pages.prepare, self.root, self.root / 'prep', self.items)
         self.assertEqual(sorted(p.name for p in (self.root / 'prep/packets').iterdir()),
                          ['anbieter-unabhaengig.txt', 'zusammenstoepseln.txt'])
 
-    def test_missing_metric_named_before_ai_call(self):
-        data = pages.read_json(self.facts)
-        del data['metrics']['steps_integration']
-        self.facts.write_text(json.dumps(data))
-        with self.assertRaisesRegex(ValueError, 'steps_integration'):
-            pages.prepare(self.root, self.root / 'prep', self.facts, self.items)
-
     def test_filtered_assembly_adds_index_rows_and_checks_only_selection(self):
-        self.run_quietly(pages.assemble, self.root, self.work, self.facts, self.items)
+        self.run_quietly(pages.assemble, self.root, self.work, self.items)
         target = self.work / 'de'
         self.assertEqual(sorted(p.name for p in target.iterdir()),
                          ['README.md', 'anbieter-unabhaengig.md', 'zusammenstoepseln.md'])
@@ -165,27 +187,25 @@ class OnlyFilterTest(unittest.TestCase):
         self.assertIn('| [Gates](gates.md) | Handgeschriebene Frage? |', index)
         self.assertEqual(index.count('](zusammenstoepseln.md)'), 1)
         self.assertLess(index.index('](anbieter-unabhaengig.md)'), index.index('## Weiter'))
-        self.run_quietly(pages.check, self.root, target, self.facts, 'de', self.items)
+        self.run_quietly(pages.check, self.root, target, 'de', self.items)
         with self.assertRaisesRegex(ValueError, 'gates'):
-            self.run_quietly(pages.check, self.root, target, self.facts, 'de')
+            self.run_quietly(pages.check, self.root, target, 'de')
 
     def test_index_untouched_when_rows_exist(self):
         self.index.write_text(pages.add_index_rows(self.index.read_text(), self.items, 'de'))
-        self.run_quietly(pages.assemble, self.root, self.work, self.facts, self.items)
+        self.run_quietly(pages.assemble, self.root, self.work, self.items)
         self.assertFalse((self.work / 'de/README.md').exists())
 
     def test_filtered_english_finish_adds_rows_to_existing_translation(self):
-        self.run_quietly(pages.assemble, self.root, self.work, self.facts, self.items)
+        self.run_quietly(pages.assemble, self.root, self.work, self.items)
         target = self.root / 'docs/en/konzepte'
         target.mkdir(parents=True)
         for item in self.items:
-            text = (self.work / 'de' / (item['slug'] + '.md')).read_text()
-            for german, english in zip(pages.HEADINGS['de'], pages.HEADINGS['en']):
-                text = text.replace('## ' + german, '## ' + english)
+            text = translate_headings((self.work / 'de' / (item['slug'] + '.md')).read_text())
             (target / (item['slug'] + '.md')).write_text('<!-- last-sync: fixture -->\n\n' + text)
         (target / 'README.md').write_text('| Mechanism | Guiding question |\n|---|---|\n'
                                           '| [Gates](gates.md) | Hand-written question? |\n')
-        self.run_quietly(pages.finish_english, self.root, target, self.facts, self.items)
+        self.run_quietly(pages.finish_english, self.root, target, self.items)
         index = (target / 'README.md').read_text()
         self.assertIn('| [Gates](gates.md) | Hand-written question? |', index)
         self.assertIn('[Provider independence](anbieter-unabhaengig.md)', index)
@@ -201,6 +221,14 @@ class OnlyFilterTest(unittest.TestCase):
             pages.list_items(self.items, True, True)
         self.assertEqual(only.getvalue().split(),
                          ['konzepte/zusammenstoepseln.md', 'konzepte/anbieter-unabhaengig.md'])
+
+
+class CatalogTest(unittest.TestCase):
+    def test_catalog_carries_no_measurement(self):
+        # Operational measurements left the concept pages (1ab3ad21); the catalog names none.
+        for item in pages.read_json(pages.CATALOG):
+            with self.subTest(slug=item['slug']):
+                self.assertNotIn('metrics', item)
 
 
 class CollectorTest(unittest.TestCase):
@@ -222,9 +250,11 @@ class CollectorTest(unittest.TestCase):
         self.assertEqual(result['metrics']['todos_without_resolution_state']['value'], 1)
         self.assertNotIn('PRIVATE', json.dumps(result))
         self.assertNotIn('secret-fixture', json.dumps(result))
-        # A step count the catalog needs is measured as zero, not left out (prepare would stop).
-        self.assertEqual(result['metrics']['steps_integration']['value'], 0)
         self.assertEqual(result['metrics']['steps_shell']['value'], 2)
+
+    def test_default_output_stays_out_of_the_docs(self):
+        # A measurement is a report of one installation, not documentation: gitignored reports/.
+        self.assertEqual(collector.DEFAULT_OUTPUT.relative_to(REPO).parts[0], 'reports')
 
 
 if __name__ == '__main__':

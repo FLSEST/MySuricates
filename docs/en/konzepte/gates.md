@@ -1,6 +1,5 @@
 <!-- last-sync: 2026-09-23 from: docs/konzepte/gates.md -->
 
-<!-- concept-facts-sha256: 47f72cd8883f6032a246606f7af297a20af1c83a1a13ed6078d019d53951318a -->
 <!-- concept-source: d7e7e28cf7209b4369ad33467bb4fe781a178baa -->
 
 # Gates: a machine-readable verdict
@@ -23,18 +22,7 @@ The mechanism separates technical execution from domain-specific assessment. One
 
 ## Drawbacks and costs
 
-A gate does not prove quality; it only proves that a marker was recognized or a technical status was derived. Especially important: a COMPLETED run without a marker can become GREEN even though no domain-specific completeness check is documented. Data on causal benefit, error rate, and check coverage is missing. The operational finding only shows inventory and usage context: 1235 stored runs are not a lifetime value, and 144 of 223 typed step records from the last 30 days are shell blocks, not gate successes or domain-specific benefit.
-
-## Operational evidence
-
-Measurement: **2026-09-19 (UTC)**, one local development instance. Inventory counters refer to the records visible via REST; step counts count stored steps with type metadata in the 30-day window. Wrappers count once. This is not proof of effectiveness.
-
-| Metric | Count / reference size |
-|---|---:|
-| Shell steps in the 30-day window | 144 / 223 |
-| Stored runs (all periods) | 1235 |
-
-[Definitions, measurement limits, and raw counters](../../konzepte/betriebsdaten.json) · [Measurement method and repetition](README.md)
+A gate does not prove quality; it only proves that a marker was recognized or a technical status was derived. Especially important: a COMPLETED run without a marker can become GREEN even though no domain-specific completeness check is documented. Data on causal benefit, error rate, and check coverage is missing.
 
 ## In the code
 

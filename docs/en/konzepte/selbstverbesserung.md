@@ -1,6 +1,5 @@
 <!-- last-sync: 2026-09-23 from: docs/konzepte/selbstverbesserung.md -->
 
-<!-- concept-facts-sha256: 47f72cd8883f6032a246606f7af297a20af1c83a1a13ed6078d019d53951318a -->
 <!-- concept-source: d7e7e28cf7209b4369ad33467bb4fe781a178baa -->
 
 # The self-improvement loop
@@ -26,18 +25,7 @@ The mechanism separates detection, work order, execution, and assessment. This a
 
 ## Drawbacks and costs
 
-The benefit depends heavily on good trigger rules, TODO quality, and downstream verification. Currently, eight active TODO triggers are only an inventory value, not proof of effectiveness. The fact that 2016 of 2018 TODOs have no optional resolutionState set does not prove a broken verification chain, but rather missing data on a manual resolve path. Causal benefit, error rate, and verification coverage are explicitly missing.
-
-## Operational evidence
-
-Measurement: **2026-09-19 (UTC)**, a local development instance. Inventory counters refer to the records visible via REST; step counts count stored steps with type metadata in the 30-day window. Wrappers count once. This is not proof of effectiveness.
-
-| Metric | Count / denominator |
-|---|---:|
-| TODOs without state in the optional resolve path | 2016 / 2018 |
-| Active TODO triggers | 8 |
-
-[Definitions, measurement limits, and raw counters](../../konzepte/betriebsdaten.json) · [Measurement method and repetition](README.md)
+The benefit depends heavily on good trigger rules, TODO quality, and downstream verification. Evidence of causal benefit, error rate, and verification coverage is missing.
 
 ## In the code
 
