@@ -18,7 +18,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Zugriffs-Oberfläche unter /api/v1/system: Remote Access (Tailscale) und lokales Dateisystem. */
+/** Access endpoints under /api/v1/system: remote access (Tailscale) and the local file system. */
 @RestController
 @RequestMapping("/api/v1/system")
 @RequiredArgsConstructor

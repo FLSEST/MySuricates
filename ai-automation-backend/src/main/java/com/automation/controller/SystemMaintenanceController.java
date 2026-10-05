@@ -20,7 +20,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
-/** Wartung unter /api/v1/system: Auto-Repair, VACUUM, Datenbank-Backups. */
+/** Maintenance under /api/v1/system: auto-repair, VACUUM, database backups. */
 @RestController
 @RequestMapping("/api/v1/system")
 @RequiredArgsConstructor

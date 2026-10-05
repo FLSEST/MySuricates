@@ -30,7 +30,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
-/** AI-Provider- und Capability-Auskunft unter /api/v1/system. */
+/** AI providers and capabilities under /api/v1/system. */
 @RestController
 @RequestMapping("/api/v1/system")
 @RequiredArgsConstructor

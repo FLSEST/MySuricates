@@ -92,7 +92,7 @@ public class TodoController {
         return todoService.updateAndReturn(id, request);
     }
 
-    /** Ziel, Rang und Einschaetzung (Komplexitaet, Effort, Begruendung, offene Frage) – TODO dc0566f8. */
+    /** Sets a TODO's goal, rank and assessment (complexity, effort, reasoning, open question) – TODO dc0566f8. */
     @PatchMapping("/{id}/planning")
     @RequiresModule(ModuleCatalog.GOALS)
     public TodoResponse updateTodoPlanning(@PathVariable String id, @RequestBody UpdateTodoPlanningRequest request) {

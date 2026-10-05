@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** Laufzeit-Settings unter /api/v1/system: App-Settings und Execution-Config. */
+/** Runtime settings under /api/v1/system: application settings and execution config. */
 @RestController
 @RequestMapping("/api/v1/system")
 @RequiredArgsConstructor

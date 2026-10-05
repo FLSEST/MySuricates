@@ -82,9 +82,9 @@ public class ScheduleController {
     static final int CALENDAR_RUNS_MAX_LIMIT = 5000;
 
     /**
-     * Die neuesten Runs eines Zeitplans als Listenzeilen: Anzahl und Vorschau des letzten Schritts
-     * statt aller Schritte (TODO 168e3d7f) — die Detail-Route eines Runs liefert den Volltext. Je Art
-     * hoechstens {@code limit}, dazu die Gesamtzahl (TODO 86777fb4).
+     * Lists a schedule's newest workflow and chain runs as list rows, with step count and last-step preview.
+     * The detail route of a run has the full text (TODO 168e3d7f). At most {@code limit} per kind,
+     * plus the total of each (TODO 86777fb4).
      */
     @GetMapping("/{id}/runs")
     @Transactional(readOnly = true)

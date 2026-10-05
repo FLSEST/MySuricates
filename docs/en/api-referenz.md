@@ -295,15 +295,15 @@ Source: `DialogController` – Dialog import: turns recorded Claude Code session
 
 | Endpoint | Purpose | Module |
 |---|---|---|
-| `GET /api/v1/dialog/projects` | Gibt alle bekannten Projekt-Pfade zurück (für Filter-Dropdown). | `dialog-import` |
-| `GET /api/v1/dialog/sessions` | Listet Sessions mit Metadaten. | `dialog-import` |
-| `POST /api/v1/dialog/sessions/analyze` | Analysiert eine Session mit KI und liefert eine Workflow-Suggestion. | `dialog-import` |
-| `GET /api/v1/dialog/sessions/count` | Zählt Sessions pro Projekt-Verzeichnis (schnell, kein File-Lesen). | `dialog-import` |
-| `POST /api/v1/dialog/sessions/create-workflow` | Erstellt einen Workflow aus einer Suggestion (mit optionalen User-Anpassungen). | `dialog-import` |
+| `GET /api/v1/dialog/projects` | Returns all known project paths (for the filter dropdown). | `dialog-import` |
+| `GET /api/v1/dialog/sessions` | Lists sessions with their metadata. | `dialog-import` |
+| `POST /api/v1/dialog/sessions/analyze` | Analyzes a session with AI and returns a workflow suggestion. | `dialog-import` |
+| `GET /api/v1/dialog/sessions/count` | Counts the sessions per project directory (fast, without reading the files). | `dialog-import` |
+| `POST /api/v1/dialog/sessions/create-workflow` | Creates a workflow from a suggestion (with optional user adjustments). | `dialog-import` |
 
 Notes:
 
-- `GET /api/v1/dialog/sessions` — Mit projectPath: hohes Limit (einzelnes Projekt, alle Sessions sichtbar). Ohne projectPath: konservativeres Limit (für "Other Sessions").
+- `GET /api/v1/dialog/sessions` — With `projectPath` a high limit (one project, all sessions visible), without it a more conservative one (for "Other Sessions").
 
 ## /api/v1/dlq
 
@@ -336,14 +336,14 @@ Source: `ExecutionController` – Workflow runs: list and inspect them, control 
 | Endpoint | Purpose | Module |
 |---|---|---|
 | `GET /api/v1/executions` | Lists workflow runs page by page, newest first, without their steps (fetch one run for those). | core |
-| `GET /api/v1/executions/pending-input` | Alle Läufe, die gerade auf eine Antwort warten — Approvals und Human-Input, die ältesten zuerst. | core |
+| `GET /api/v1/executions/pending-input` | Lists all runs currently waiting for an answer — approvals and human input, oldest first. | core |
 | `GET /api/v1/executions/{id}` | Returns one workflow run including all its steps. | core |
-| `DELETE /api/v1/executions/{id}` | Loescht einen Lauf samt Schritten und den losen Verweisen darauf. | core |
+| `DELETE /api/v1/executions/{id}` | Deletes a run with its steps and the loose references to it. | core |
 | `GET /api/v1/executions/{id}/approval` | Returns the approval or human input the run is waiting for, or `{"pending": false}`. | core |
-| `POST /api/v1/executions/{id}/approve` | Beantwortet die offene Frage des Laufs. | core |
+| `POST /api/v1/executions/{id}/approve` | Answers the run's open question. | core |
 | `POST /api/v1/executions/{id}/cancel` | Cancels a running or queued run. | core |
 | `POST /api/v1/executions/{id}/command` | Sends an ad-hoc command to the Claude session in the container of a running run and returns its output. | core |
-| `GET /api/v1/executions/{id}/live-log` | Gepufferte Live-Zeilen eines Laufs (nur im Speicher, bis ~10 min nach Laufende) fuer das Replay nach einem Reload. | core |
+| `GET /api/v1/executions/{id}/live-log` | Returns a run's buffered live lines (in memory only, until ~10 min after the run ends) for the replay after a reload. | core |
 | `PATCH /api/v1/executions/{id}/notes` | Stores a free-text note on the run; a blank `notes` removes it. | core |
 | `POST /api/v1/executions/{id}/pause` | Pauses a running run before its next block; answers 200 even if the run is not active. | core |
 | `POST /api/v1/executions/{id}/resume` | Resumes a paused run; answers 200 even if the run is not active. | core |
@@ -354,11 +354,11 @@ Source: `ExecutionController` – Workflow runs: list and inspect them, control 
 Notes:
 
 - `GET /api/v1/executions` — Filters: `status` (case-insensitive, unknown value: 400), `workflowId`, `projectId`, `search` (workflow name).
-- `DELETE /api/v1/executions/{id}` — 409, wenn der Lauf noch aktiv ist oder ein Audit-Bericht an ihm haengt. TODOs und Audit-Daten werden nie mitgeloescht — siehe `RunDeletionService`. 403 `RUN_DELETION_DISABLED`, wenn `automation.executions.allow-delete=false` (`RunDeletionPolicy`) — geprueft vor jedem Lookup, verraet also nicht, ob es den Lauf gibt.
+- `DELETE /api/v1/executions/{id}` — 409 while the run is still active or an audit report belongs to it. TODOs and audit data are never deleted with it — see `RunDeletionService`. 403 `RUN_DELETION_DISABLED` when `automation.executions.allow-delete=false` (`RunDeletionPolicy`) — checked before any lookup, so it does not reveal whether the run exists.
 - `GET /api/v1/executions/{id}/approval` — Includes `options` and `rejectOptions`; human input adds its input fields.
-- `POST /api/v1/executions/{id}/approve` — 400, wenn ein Approval die Antwort nicht als Option anbietet.
+- `POST /api/v1/executions/{id}/approve` — 400 when an approval does not offer the answer as an option.
 - `POST /api/v1/executions/{id}/cancel` — A run still marked `RUNNING` without an active execution is set to `CANCELLED` directly.
-- `GET /api/v1/executions/{id}/live-log` — `available=false` statt 404, wenn nichts gepuffert ist.
+- `GET /api/v1/executions/{id}/live-log` — `available=false` instead of 404 when nothing is buffered.
 - `POST /api/v1/executions/{id}/resume-from-step` — Other statuses are refused.
 
 ## /api/v1/factory
@@ -377,48 +377,50 @@ Source: `WorkflowFactoryController` – Workflow factory: has an AI generate wor
 
 Sources:
 
-- `GoalController` – Ziele: TODOs projektuebergreifend auf ein Ergebnis hin sammeln, ordnen und den Fortschritt zeigen.
-- `GoalWorkflowController` – Workflows am Ziel oder an einem Arbeitspaket: anzeigen, anhaengen, Rolle aendern, loesen.
+- `GoalController` – Goals: collect TODOs across projects towards one outcome, order them and show the progress.
+- `GoalWorkflowController` – Workflows on a goal or one of its work packages: list, attach, change role, detach.
 
 | Endpoint | Purpose | Module |
 |---|---|---|
-| `GET /api/v1/goals` | Ohne `status`: aktive und erledigte Ziele, neueste zuerst. | `goals` |
+| `GET /api/v1/goals` | Lists goals, newest first; without `status` the active and done ones. | `goals` |
 | `POST /api/v1/goals` | Creates a goal (201); `title` is required, optional `projectIds` are attached in that order. | `goals` |
 | `GET /api/v1/goals/{goalId}/workflows` | Lists the workflows attached to the goal: the guard first (if switched on), then those on the goal, then those on work packages. | `goals` |
 | `POST /api/v1/goals/{goalId}/workflows` | Attaches a workflow to the goal or one of its work packages (201); `role` is `WORKER` (default) or `STATUS`. | `goals` |
 | `PATCH /api/v1/goals/{goalId}/workflows/{attachmentId}` | Changes the role of an attachment (`WORKER` or `STATUS`); the `guard` entry cannot be changed (400). | `goals` |
-| `DELETE /api/v1/goals/{goalId}/workflows/{attachmentId}` | Loest die Zuordnung, der Workflow bleibt; `guard` → 400 (der Waechter hat seinen Schalter). | `goals` |
+| `DELETE /api/v1/goals/{goalId}/workflows/{attachmentId}` | Detaches the workflow, which itself stays; `guard` → 400 (the guard has its own switch). | `goals` |
 | `GET /api/v1/goals/{id}` | Returns the goal with its TODOs, progress per project, projects, work packages and milestones. | `goals` |
 | `PUT /api/v1/goals/{id}` | Partially updates a goal: `null` keeps a field, an empty `description` or `targetDate` clears it. | `goals` |
-| `DELETE /api/v1/goals/{id}` | Loescht das Ziel; seine TODOs bleiben und verlieren nur die Zuordnung, ein Waechter pausiert. | `goals` |
-| `GET /api/v1/goals/{id}/candidates` | „Könnte dazugehören“: offene TODOs ohne Ziel, standardmaessig nur aus den Projekten des Ziels (`allProjects=true`: aus allen). | `goals` |
-| `POST /api/v1/goals/{id}/guard` | Ziel-Waechter ein- oder ausschalten: beim ersten Einschalten Workflow aus der Vorlage `goal-guard` plus taeglicher Zeitplan, danach nur noch Zeitplan an/aus. | `goals` |
-| `GET /api/v1/goals/{id}/milestones` | Meilensteine des Ziels nach Datum, dann Titel, mit Zustand und Paket-Zaehlern. | `goals` |
+| `DELETE /api/v1/goals/{id}` | Deletes the goal (204); its TODOs stay and only lose the assignment, a guard is paused. | `goals` |
+| `GET /api/v1/goals/{id}/candidates` | Lists open TODOs without a goal that could belong to it, by default only from the goal's projects (`allProjects=true`: from all). | `goals` |
+| `POST /api/v1/goals/{id}/guard` | Switches the goal guard on or off. | `goals` |
+| `GET /api/v1/goals/{id}/milestones` | Lists the goal's milestones by date, then title, with state and package counters. | `goals` |
 | `POST /api/v1/goals/{id}/milestones` | Creates a milestone (201); `dueDate` is required, `workPackageIds` must belong to the same goal. | `goals` |
-| `PUT /api/v1/goals/{id}/milestones/{milestoneId}` | `workPackageIds` ersetzt die Verknuepfungen; `reached` nur ohne verknuepfte Pakete. | `goals` |
-| `DELETE /api/v1/goals/{id}/milestones/{milestoneId}` | Loescht den Meilenstein; die verknuepften Arbeitspakete bleiben. | `goals` |
-| `PUT /api/v1/goals/{id}/order` | Reihenfolge: die genannten TODOs bekommen Rang 1..n, alle uebrigen des Ziels keinen. | `goals` |
-| `POST /api/v1/goals/{id}/projects` | Projekt ans Ende der Zielprojekte haengen; schon zugeordnet = unveraendert (idempotent). | `goals` |
-| `PUT /api/v1/goals/{id}/projects/order` | Zielprojekte neu ordnen: die genannten vorn, die uebrigen in bisheriger Folge dahinter. | `goals` |
-| `DELETE /api/v1/goals/{id}/projects/{projectId}` | Projekt vom Ziel loesen. | `goals` |
-| `GET /api/v1/goals/{id}/relations` | Relationskarte: je TODO Herkunft, Bearbeitung (Fix-Workflow, passende TodoTrigger) und Ergebnis. | `goals` |
-| `POST /api/v1/goals/{id}/todos` | Ordnet TODOs dem Ziel zu (ohne Rang – sie stehen hinter den eingeordneten). | `goals` |
-| `GET /api/v1/goals/{id}/work-packages` | Arbeitspakete des Ziels nach Projekt-Position und Position im Projekt, mit Zustand (OPEN/DUE_SOON/OVERDUE/REACHED auf Basis des Endes; ohne Zeitraum nur OPEN/REACHED) und Zaehlern. | `goals` |
+| `PUT /api/v1/goals/{id}/milestones/{milestoneId}` | Updates a milestone; `workPackageIds` replaces its links, `reached` only without linked packages (else 400). | `goals` |
+| `DELETE /api/v1/goals/{id}/milestones/{milestoneId}` | Deletes the milestone (204); the linked work packages stay. | `goals` |
+| `PUT /api/v1/goals/{id}/order` | Sets the order: the TODOs named get rank 1..n, all other TODOs of the goal none. | `goals` |
+| `POST /api/v1/goals/{id}/projects` | Appends a project to the goal's projects; one already assigned stays unchanged (idempotent). | `goals` |
+| `PUT /api/v1/goals/{id}/projects/order` | Reorders the goal's projects: those named first, the others behind them in their previous order. | `goals` |
+| `DELETE /api/v1/goals/{id}/projects/{projectId}` | Detaches a project from the goal (204). | `goals` |
+| `GET /api/v1/goals/{id}/relations` | Returns the goal's relation map: per TODO its origin, its handling (fix workflow, matching TODO triggers) and its result. | `goals` |
+| `POST /api/v1/goals/{id}/todos` | Assigns TODOs to the goal without a rank – they come after the ranked ones. | `goals` |
+| `GET /api/v1/goals/{id}/work-packages` | Lists the goal's work packages by project position and position in the project, with state and counters. | `goals` |
 | `POST /api/v1/goals/{id}/work-packages` | Adds a work package at the end of its project (201); without `projectId` only if the goal has exactly one project. | `goals` |
-| `PUT /api/v1/goals/{id}/work-packages/order` | Arbeitspakete EINES Projekts neu ordnen; Antwort: alle Arbeitspakete des Ziels. | `goals` |
+| `PUT /api/v1/goals/{id}/work-packages/order` | Reorders the work packages of ONE project; the answer lists all work packages of the goal. | `goals` |
 | `PUT /api/v1/goals/{id}/work-packages/{workPackageId}` | Partially updates a work package; `""` clears a date, the result needs both dates or none (else 400). | `goals` |
-| `DELETE /api/v1/goals/{id}/work-packages/{workPackageId}` | Loescht das Arbeitspaket; seine TODOs bleiben im Ziel, Meilensteine verlieren die Verknuepfung. | `goals` |
+| `DELETE /api/v1/goals/{id}/work-packages/{workPackageId}` | Deletes the work package (204); its TODOs stay in the goal, milestones lose the link. | `goals` |
 
 Notes:
 
-- `GET /api/v1/goals` — Mit `projectId` nur die Ziele, denen dieses Projekt zugeordnet ist.
+- `GET /api/v1/goals` — With `projectId` only the goals this project is assigned to.
 - `POST /api/v1/goals` — An unknown project id is a 404.
 - `GET /api/v1/goals/{goalId}/workflows` — Soft-deleted workflows are left out.
 - `POST /api/v1/goals/{goalId}/workflows` — A work package of another goal is a 400, an unknown workflow a 404, the same attachment twice a 409.
 - `GET /api/v1/goals/{id}` — Reading records the moment a work package or milestone is first found complete or reached.
-- `GET /api/v1/goals/{id}/candidates` — Seite wie `GET /todos`.
-- `DELETE /api/v1/goals/{id}/projects/{projectId}` — Haengen daran im Ziel noch Arbeitspakete oder TODOs: 409 – mit `cascade=true` werden die Arbeitspakete geloescht und die TODOs vom Ziel geloest.
-- `GET /api/v1/goals/{id}/relations` — `include` holt bis zu 20 noch nicht zugeordnete TODOs als Kandidaten dazu (`candidate: true`).
+- `GET /api/v1/goals/{id}/candidates` — Paged like `GET /api/v1/todos`.
+- `POST /api/v1/goals/{id}/guard` — The first switch-on creates a workflow from the template `goal-guard` plus a daily schedule; after that only the schedule is enabled or disabled.
+- `DELETE /api/v1/goals/{id}/projects/{projectId}` — While work packages or TODOs of the goal still belong to it, the answer is 409 – with `cascade=true` the work packages are deleted and the TODOs detached.
+- `GET /api/v1/goals/{id}/relations` — `include` adds up to 20 TODOs not yet assigned as candidates (`candidate: true`).
+- `GET /api/v1/goals/{id}/work-packages` — The state is OPEN/DUE_SOON/OVERDUE/REACHED based on the end; without a period only OPEN/REACHED.
 - `POST /api/v1/goals/{id}/work-packages` — A named project not yet in the goal is added to it; `startDate` and `endDate` come together or not at all.
 - `PUT /api/v1/goals/{id}/work-packages/{workPackageId}` — `projectId` can change only while no TODOs are assigned to the package.
 
@@ -596,7 +598,7 @@ Source: `ScheduleController` – Time-based starts of workflows and chains: cron
 | `DELETE /api/v1/schedules/{id}` | Deletes a schedule (204). | core |
 | `POST /api/v1/schedules/{id}/disable` | Disables a schedule and clears its next run. | core |
 | `POST /api/v1/schedules/{id}/enable` | Enables a schedule and computes its next run. | core |
-| `GET /api/v1/schedules/{id}/runs` | Die neuesten Runs eines Zeitplans als Listenzeilen: Anzahl und Vorschau des letzten Schritts statt aller Schritte — die Detail-Route eines Runs liefert den Volltext. | core |
+| `GET /api/v1/schedules/{id}/runs` | Lists a schedule's newest workflow and chain runs as list rows, with step count and last-step preview. | core |
 
 Notes:
 
@@ -608,7 +610,7 @@ Notes:
 - `GET /api/v1/schedules/remaining-today` — `projectId` (optional): only the schedules of that project's workflows — the dashboard filter.
 - `PUT /api/v1/schedules/{id}` — If an enabled cron schedule is then left without a run before `endDate` or `maxRuns`, the answer is 400.
 - `POST /api/v1/schedules/{id}/enable` — An unparsable cron expression, a passed `endDate` or used-up `maxRuns` is 400.
-- `GET /api/v1/schedules/{id}/runs` — Je Art hoechstens `limit`, dazu die Gesamtzahl.
+- `GET /api/v1/schedules/{id}/runs` — The detail route of a run has the full text. At most `limit` per kind, plus the total of each.
 
 ## /api/v1/search
 
@@ -679,13 +681,13 @@ Notes:
 
 Sources:
 
-- `SystemAccessController` – Zugriffs-Oberfläche unter /api/v1/system: Remote Access (Tailscale) und lokales Dateisystem.
-- `SystemAiProviderController` – AI-Provider- und Capability-Auskunft unter /api/v1/system.
-- `SystemController` – Kern-Auskunft unter /api/v1/system: Health, Plattform-Info, Auth-Status, Heap-Belegung und Client-Fehler-Meldungen.
-- `SystemMaintenanceController` – Wartung unter /api/v1/system: Auto-Repair, VACUUM, Datenbank-Backups.
+- `SystemAccessController` – Access endpoints under /api/v1/system: remote access (Tailscale) and the local file system.
+- `SystemAiProviderController` – AI providers and capabilities under /api/v1/system.
+- `SystemController` – Core information under /api/v1/system: health, platform info, auth status, heap usage and client error reports.
+- `SystemMaintenanceController` – Maintenance under /api/v1/system: auto-repair, VACUUM, database backups.
 - `SystemModulesController` – Runtime module switches for the settings UI.
 - `SystemRequestMetricsController` – Request costs per route: the live window from memory and the stored daily history.
-- `SystemSettingsController` – Laufzeit-Settings unter /api/v1/system: App-Settings und Execution-Config.
+- `SystemSettingsController` – Runtime settings under /api/v1/system: application settings and execution config.
 
 | Endpoint | Purpose | Module |
 |---|---|---|
@@ -708,7 +710,7 @@ Sources:
 | `GET /api/v1/system/health` | Health check without a key: `UP`, `DEGRADED` (Docker expected but not answering) or `DOWN` (database unreachable). | core |
 | `GET /api/v1/system/info` | Returns name, version, build, Java version, runtime mode, environment and the rate-limit figures; reachable without a key. | core |
 | `GET /api/v1/system/integration-snippet` | Renders the base onboarding text as a Markdown snippet to paste into a project, e.g. into an `AGENTS.md`. | `onboarding-profiles` |
-| `GET /api/v1/system/jvm-memory` | Heap-Belegung als genau drei Zahlen, ohne API-Key: der Performance-Audit misst damit den Speicher, ohne dass die ganze Metrik-Oberfläche unter `/actuator/metrics` frei wird — die verrät Routen und Lastprofil und bleibt hinter dem Key. | core |
+| `GET /api/v1/system/jvm-memory` | Returns the heap usage as exactly three numbers, without an API key. | core |
 | `PUT /api/v1/system/modules/{name}` | Switches a feature module on or off (`enabled`) with immediate effect and returns the state of all modules. | core |
 | `DELETE /api/v1/system/modules/{name}/override` | Drops the settings override of a module so it follows the startup configuration again; returns the state of all modules. | core |
 | `POST /api/v1/system/open-path` | Opens a file or directory (`path`) in the desktop's file manager on the host. | core |
@@ -734,7 +736,7 @@ Notes:
 - `PUT /api/v1/system/execution-config` — All values are checked before any is applied, so an invalid one (400) leaves every setting unchanged.
 - `GET /api/v1/system/health` — The components list database response time and Docker state.
 - `GET /api/v1/system/integration-snippet` — With a `projectPath` of a known project it uses that project's id and lists its workflows; `locale` picks the language.
-- `GET /api/v1/system/jvm-memory` — Quelle ist der MemoryMXBean, nicht Micrometer: `jvm.memory.max` summiert über Pools, deren Maximum undefiniert (`-1`) ist.
+- `GET /api/v1/system/jvm-memory` — The performance audit measures memory with it without opening all of `/actuator/metrics`, which reveals routes and load profile and stays behind the key. The source is the MemoryMXBean, not Micrometer: `jvm.memory.max` sums over pools whose maximum is undefined (`-1`).
 - `PUT /api/v1/system/modules/{name}` — An unknown module name is 404; the change is recorded as a SECURITY entry in the activity log.
 - `POST /api/v1/system/open-path` — An empty, missing or system path (`/etc`, `/proc`, ...) is 400.
 - `POST /api/v1/system/remote-access/enable` — A failing Tailscale command, or an instance running in a container, is 503.
@@ -802,7 +804,7 @@ Source: `TodoController` – TODOs: list, create, edit and close them, start the
 | `PUT /api/v1/todos/{id}` | Updates the fields sent in the body and leaves the others unchanged. | core |
 | `DELETE /api/v1/todos/{id}` | Deletes a TODO permanently. | core |
 | `POST /api/v1/todos/{id}/export` | Creates a task for the TODO in an external tracker and returns its reference; a TODO already exported returns the existing link. | `integrations` |
-| `PATCH /api/v1/todos/{id}/planning` | Ziel, Rang und Einschaetzung (Komplexitaet, Effort, Begruendung, offene Frage). | `goals` |
+| `PATCH /api/v1/todos/{id}/planning` | Sets a TODO's goal, rank and assessment (complexity, effort, reasoning, open question). | `goals` |
 | `POST /api/v1/todos/{id}/resolve` | Starts the TODO's linked fix workflow and sets the TODO to IN_PROGRESS. | core |
 | `PATCH /api/v1/todos/{id}/status` | Sets the status of a TODO (`status` required), optionally recording the `sessionId` that changed it. | core |
 
@@ -888,30 +890,30 @@ Source: `WorkflowTemplateController` – Workflow templates and blueprints: list
 
 Sources:
 
-- `WorkflowAnalyzerController` – Deterministische Baufehler-Prüfung von Workflow-Definitionen — auf Abruf, nie blockierend.
-- `WorkflowAssistController` – Hilfen rund um einen bestehenden Workflow: Optimierungsvorschlag, ähnliche Workflows, Reparatur nach fehlgeschlagenen Runs.
+- `WorkflowAnalyzerController` – Deterministic check of workflow definitions for construction errors — on demand, never blocking.
+- `WorkflowAssistController` – Help with an existing workflow: optimization suggestion, similar workflows, repair after failed runs.
 - `WorkflowController` – Workflows: create, read, change and delete them, start runs, list their runs and move them as JSON.
-- `WorkflowImportController` – Import externer Prozessformate als NEUER Workflow (Roundtrip zum Export in `WorkflowController`).
+- `WorkflowImportController` – Imports external process formats as a NEW workflow (round trip to the export in `WorkflowController`).
 - `WorkflowMemoryController` – Workflow memory: knowledge distilled from a workflow's runs, of which one entry can be active per workflow.
 - `WorkflowSealController` – Seal / unseal a workflow.
 - `WorkflowSealStatusController` – Read-only seal status for the UI.
-- `WorkflowVersionController` – Versionsgeschichte eines Workflows: auflisten, einzeln abrufen, wiederherstellen.
+- `WorkflowVersionController` – Version history of a workflow: list, fetch one, restore.
 
 | Endpoint | Purpose | Module |
 |---|---|---|
 | `GET /api/v1/workflows` | Lists all workflows of projects that are not archived, each with its run count. | core |
 | `POST /api/v1/workflows` | Creates a workflow in the project named by `projectId` and answers `201`. | core |
-| `GET /api/v1/workflows/analyze` | Bestandsprüfung über alle Definitionen in aktiven Projekten. | core |
+| `GET /api/v1/workflows/analyze` | Checks all definitions in active projects. | core |
 | `GET /api/v1/workflows/export/{id}` | Exports the workflow as portable JSON without ids or project, with an `integrity` checksum that `POST /api/v1/workflows/import` verifies. | core |
 | `POST /api/v1/workflows/import` | Imports a workflow from its JSON export and answers `201`. | core |
-| `POST /api/v1/workflows/import/bpmn` | Importiert einen zuvor exportierten BPMN-Prozess (mit `mysuricates:blockConfig`) als neuen Workflow im Projekt. | `bpmn` |
+| `POST /api/v1/workflows/import/bpmn` | Imports a previously exported BPMN process (with `mysuricates:blockConfig`) as a new workflow in the project. | `bpmn` |
 | `GET /api/v1/workflows/seal-status` | Every sealed workflow plus every workflow with refused starts in the last seven days. | core |
 | `GET /api/v1/workflows/{id}` | Returns one workflow with its blocks and activated skills. | core |
 | `PUT /api/v1/workflows/{id}` | Changes the given fields of a workflow; fields left out stay as they are. | core |
 | `DELETE /api/v1/workflows/{id}` | Soft-deletes a workflow (`204`); a sealed workflow is refused with `409 WORKFLOW_SEALED`. | core |
-| `GET /api/v1/workflows/{id}/analyze` | Befunde einer Definition. | core |
+| `GET /api/v1/workflows/{id}/analyze` | Returns the findings of one workflow definition. | core |
 | `POST /api/v1/workflows/{id}/execute` | Starts a manual run and returns it right away with status `RUNNING`; the blocks run in the background. | core |
-| `GET /api/v1/workflows/{id}/export/bpmn` | Exportiert den Workflow als BPMN 2.0 XML (Spec: docs/plans/2026-07-09-bpmn-integration-design.md). | `bpmn` |
+| `GET /api/v1/workflows/{id}/export/bpmn` | Exports the workflow as BPMN 2.0 XML for download. | `bpmn` |
 | `POST /api/v1/workflows/{id}/optimize` | Asks the workflow's AI provider for an optimization suggestion and returns it as JSON. | core |
 | `POST /api/v1/workflows/{id}/repair` | Starts an AI repair of a workflow with failed runs in the background and answers `202`. | `factory` |
 | `GET /api/v1/workflows/{id}/runs` | Lists the workflow's runs, newest first, paginated (`page`, `size`) and without their steps. | core |
@@ -934,9 +936,9 @@ Sources:
 Notes:
 
 - `POST /api/v1/workflows` — The first version row is written with it; unknown block types are rejected.
-- `GET /api/v1/workflows/analyze` — Antwortet bewusst verdichtet: je Workflow nur Zahlen, dazu die Verteilung über die Regeln. Die vollen Befunde holt man sich je Workflow — eine Vollausgabe über hunderte Definitionen wäre ein Megabyte, das niemand liest.
+- `GET /api/v1/workflows/analyze` — The answer is condensed on purpose: only counts per workflow, plus the distribution over the rules. The full findings come per workflow — a full output over hundreds of definitions would be a megabyte nobody reads.
 - `POST /api/v1/workflows/import` — With `updateIfExists` a workflow of the same name in the target project is updated instead (`200`); without `projectId` it goes to the collection project. A checksum in `integrity` that does not match the content is rejected with `400` before anything is written.
-- `POST /api/v1/workflows/import/bpmn` — Fremd-BPMN, kaputtes XML oder zu große Eingaben → 400; es wird nichts angelegt, wenn der Import scheitert (Parsen + Validieren vor `create`).
+- `POST /api/v1/workflows/import/bpmn` — Foreign BPMN, broken XML or oversized input → 400; nothing is created when the import fails (parsing and validation run before `create`).
 - `PUT /api/v1/workflows/{id}` — A definition change writes a new version and is refused on a sealed workflow (`409 WORKFLOW_SEALED`); name and `version` label are no definition change and stay editable.
 - `POST /api/v1/workflows/{id}/execute` — The optional `context` is merged over the workflow's default context. A refused start creates no run.
 - `POST /api/v1/workflows/{id}/optimize` — Changes nothing; a failed AI call comes back as `200` with `error: true` and a `message`.

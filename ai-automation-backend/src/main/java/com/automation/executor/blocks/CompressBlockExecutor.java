@@ -24,8 +24,7 @@ import java.util.stream.Collectors;
 
 /**
  * compress — deterministic compression of one earlier block output through a stage chain. No AI, no DB,
- * no process. The original output stays untouched; this step's output is the compressed text (spec
- * docs/plans/2026-09-15-komprimierungs-bloecke-design.md).
+ * no process. The original output stays untouched; this step's output is the compressed text.
  */
 @Component
 public class CompressBlockExecutor implements BlockExecutor {

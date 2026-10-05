@@ -157,7 +157,7 @@ public class WorkflowController {
         return export.withIntegrity(DefinitionIntegrity.ofExport(export));
     }
 
-    /** Exportiert den Workflow als BPMN 2.0 XML (Spec: docs/plans/2026-07-09-bpmn-integration-design.md). */
+    /** Exports the workflow as BPMN 2.0 XML for download. */
     @GetMapping("/{id}/export/bpmn")
     @RequiresModule(ModuleCatalog.BPMN)
     public ResponseEntity<String> exportWorkflowAsBpmn(@PathVariable String id) {
