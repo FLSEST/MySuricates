@@ -78,7 +78,7 @@ Geordnet nach Tiefe: erst der Überblick, dann die einzelnen Bausteine, dann das
 | [Integrations](docs/integrations.md) | Plugin-System, OAuth, Provider-Referenz |
 | [Audit-Protokoll](docs/audit-workflow-protocol.md) | Wie Befunde entstehen, Gate-Status, TODO-Verknuepfung |
 | [Assistant](docs/assistant-system.md) | Chat-Assistent, Sessions, Suggestions |
-| [Diagramme](docs/diagramme.md) | Neun Seiten Ablauf- und Architekturdiagramme (Engine, Steuerung und Status, Scheduler, Skills, Memory, Request-Pfad, Frontend, Deployment, Logging und Monitoring) |
+| [Diagramme](docs/diagramme.md) | Ablaufdiagramme zum Kern: Workflow-Engine, Steuerung und Status, Workflow-Memory |
 
 **Nachschlagen**
 

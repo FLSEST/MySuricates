@@ -77,7 +77,7 @@ Ordered by depth: the overview first, then the individual building blocks, then 
 | [Integrations](docs/en/integrations.md) | Plugin system, OAuth, provider reference |
 | [Audit Protocol](docs/en/audit-workflow-protocol.md) | How findings are created, gate status, TODO linking |
 | [Assistant](docs/en/assistant-system.md) | Chat assistant, sessions, suggestions |
-| [Diagrams](docs/en/diagramme.md) | Nine pages of flow and architecture diagrams (engine, control and status, scheduler, skills, memory, request path, frontend, deployment, logging, and monitoring) |
+| [Diagrams](docs/en/diagramme.md) | Flow diagrams of the core: workflow engine, control and status, workflow memory |
 
 **Reference**
 
