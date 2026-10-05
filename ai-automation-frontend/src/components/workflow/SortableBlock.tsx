@@ -6,6 +6,7 @@ import { useSettingsStore } from '../../stores/settingsStore';
 import { useT } from '../../i18n';
 import { compressedSourcesUsed, compressionSummary, isCompressionBlock } from './compression';
 import { blockNote } from './blockEdit';
+import { shellSummary } from './shellSummary';
 import type { BlockDefinition, BlockType } from '../../types';
 import type { BadgeVariant } from '../ui/Badge';
 
@@ -128,7 +129,7 @@ export function SortableBlock({ id, index, block, onEdit, onRemove, allBlocks = 
         ) : block.type === 'shell' ? (
           <p className="text-sm text-text-secondary truncate flex items-center gap-1.5">
             <Terminal className="w-3.5 h-3.5 text-accent shrink-0" />
-            <code className="font-mono text-xs">{String(block.config.command || '')}</code>
+            <code className="font-mono text-xs">{shellSummary(block.config)}</code>
           </p>
         ) : block.type === 'sub-workflow' ? (
           <p className="text-sm text-text-secondary truncate flex items-center gap-1.5">

@@ -36,6 +36,12 @@ describe('SortableBlock', () => {
     expect(screen.getByTestId('block-note')).toHaveTextContent('Ersetze die Pruefung.');
   });
 
+  it('shows image and arguments for a shell block in tool mode', () => {
+    renderBlock({ type: 'shell', name: 'trivy', config: { container_image: 'img:1', container_args: ['fs', '/workspace'] } });
+
+    expect(screen.getByText('img:1 fs /workspace')).toBeInTheDocument();
+  });
+
   it('shows no note for a TODO block, whose description is the TODO text', () => {
     renderBlock({ type: 'todo-create', name: 'melden', config: { title: 'Befund', description: 'Text des TODOs' } });
 
