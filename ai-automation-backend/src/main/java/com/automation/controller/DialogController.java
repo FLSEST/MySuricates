@@ -19,6 +19,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
+/** Dialog import: turns recorded Claude Code sessions (JSONL files under {@code ~/.claude/projects}) into workflows. */
 @RequiresModule(ModuleCatalog.DIALOG_IMPORT)
 @RestController
 @RequestMapping("/api/v1/dialog")

@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+/** Built-in chain templates that can be installed into a project as a chain with its workflows. */
 @RequiresModule(ModuleCatalog.CHAINS)
 @RestController
 @RequestMapping("/api/v1/chain-templates")
@@ -24,6 +25,7 @@ public class ChainTemplateController {
 
     private final ChainTemplateService chainTemplateService;
 
+    /** Lists the built-in chain templates with their entries. */
     @GetMapping
     public List<ChainTemplateResponse> listTemplates() {
         return chainTemplateService.findAll().stream()
@@ -31,11 +33,16 @@ public class ChainTemplateController {
                 .toList();
     }
 
+    /** Returns one built-in chain template. */
     @GetMapping("/{id}")
     public ChainTemplateResponse getTemplate(@PathVariable String id) {
         return toResponse(chainTemplateService.findById(id));
     }
 
+    /**
+     * Installs a chain template into a project: creates one workflow per entry plus the chain, answers 201.
+     * {@code projectId} is required; {@code locale} picks the language of names, labels and bilingual steps (German if omitted).
+     */
     @PostMapping("/{id}/install")
     public ResponseEntity<ChainInstallResponse> installTemplate(
             @PathVariable String id,

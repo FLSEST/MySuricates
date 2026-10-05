@@ -105,112 +105,112 @@ Aus `ErrorCode` (`ai-automation-backend/src/main/java/com/automation/exception/E
 
 ## /api/v1/activity-log
 
-Quelle: `ActivityLogController`
+Quelle: `ActivityLogController` – Activity log: read the platform's event log and let plugins add their own entries.
 
 | Endpunkt | Zweck | Modul |
 |---|---|---|
-| `GET /api/v1/activity-log` |  | Kern |
-| `POST /api/v1/activity-log` |  | Kern |
+| `GET /api/v1/activity-log` | Lists activity log entries page by page, newest first, optionally filtered by level, category and workflow. | Kern |
+| `POST /api/v1/activity-log` | Writes an entry of category `PLUGIN` to the activity log and returns it with 201. | Kern |
 
 ## /api/v1/assistant
 
 Quellen:
 
-- `AssistantController`
+- `AssistantController` – AI assistant chat: messages, stored chat sessions and confirming or rejecting the tools it proposes.
 - `PageSuggestionController`
 
 | Endpunkt | Zweck | Modul |
 |---|---|---|
-| `POST /api/v1/assistant/chat` |  | `assistant` |
+| `POST /api/v1/assistant/chat` | Sends a message to the AI assistant and returns its answer with suggested actions and pending tools. | `assistant` |
 | `POST /api/v1/assistant/pending-tools/{id}/confirm` | Executes a previously proposed tool after explicit user confirmation. | `assistant` |
-| `POST /api/v1/assistant/pending-tools/{id}/reject` |  | `assistant` |
-| `GET /api/v1/assistant/sessions` |  | `assistant` |
-| `GET /api/v1/assistant/sessions/{id}` |  | `assistant` |
-| `DELETE /api/v1/assistant/sessions/{id}` |  | `assistant` |
+| `POST /api/v1/assistant/pending-tools/{id}/reject` | Rejects a tool the assistant proposed, without executing it. | `assistant` |
+| `GET /api/v1/assistant/sessions` | Lists the most recent assistant chat sessions, newest first. | `assistant` |
+| `GET /api/v1/assistant/sessions/{id}` | Returns one assistant chat session with its messages. | `assistant` |
+| `DELETE /api/v1/assistant/sessions/{id}` | Deletes an assistant chat session. | `assistant` |
 | `GET /api/v1/assistant/suggestions` |  | `assistant` |
 | `POST /api/v1/assistant/suggestions/refresh` |  | `assistant` |
 
 ## /api/v1/audit-findings
 
-Quelle: `AuditController`
+Quelle: `AuditController` – Audit center: results of audit workflows (gate status per report), the findings derived from them and their TODOs.
 
 | Endpunkt | Zweck | Modul |
 |---|---|---|
-| `GET /api/v1/audit-findings` |  | `audit` |
-| `GET /api/v1/audit-findings/{id}` |  | `audit` |
-| `PATCH /api/v1/audit-findings/{id}` |  | `audit` |
-| `POST /api/v1/audit-findings/{id}/todo-links` |  | `audit` |
-| `DELETE /api/v1/audit-findings/{id}/todo-links/{todoId}` |  | `audit` |
-| `POST /api/v1/audit-findings/{id}/todos` |  | `audit` |
+| `GET /api/v1/audit-findings` | Lists findings across all audits page by page, most severe first, then most recently seen. | `audit` |
+| `GET /api/v1/audit-findings/{id}` | Returns one finding with its linked TODOs. | `audit` |
+| `PATCH /api/v1/audit-findings/{id}` | Changes a finding's status and/or disposition note; fields left out stay unchanged. | `audit` |
+| `POST /api/v1/audit-findings/{id}/todo-links` | Links an existing TODO (`todoId`) to the finding. | `audit` |
+| `DELETE /api/v1/audit-findings/{id}/todo-links/{todoId}` | Removes the link between a finding and a TODO; answers 204. | `audit` |
+| `POST /api/v1/audit-findings/{id}/todos` | Creates a TODO managed by MySuricates from the finding and returns the finding with its TODO links. | `audit` |
 
 ## /api/v1/audit-reports
 
-Quelle: `AuditController`
+Quelle: `AuditController` – Audit center: results of audit workflows (gate status per report), the findings derived from them and their TODOs.
 
 | Endpunkt | Zweck | Modul |
 |---|---|---|
-| `GET /api/v1/audit-reports/{id}` |  | `audit` |
+| `GET /api/v1/audit-reports/{id}` | Returns one audit report including its Markdown text. | `audit` |
 
 ## /api/v1/audits
 
-Quelle: `AuditController`
+Quelle: `AuditController` – Audit center: results of audit workflows (gate status per report), the findings derived from them and their TODOs.
 
 | Endpunkt | Zweck | Modul |
 |---|---|---|
-| `GET /api/v1/audits` |  | `audit` |
-| `GET /api/v1/audits/{auditKey}` |  | `audit` |
-| `GET /api/v1/audits/{auditKey}/reports` |  | `audit` |
+| `GET /api/v1/audits` | Lists every audit (per project and `auditKey`) with its latest valid report and finding counts. | `audit` |
+| `GET /api/v1/audits/{auditKey}` | Returns one audit: its summary with finding counts and its latest valid report including the text. | `audit` |
+| `GET /api/v1/audits/{auditKey}/reports` | Lists the reports of an audit page by page, newest first; `projectId` is required. | `audit` |
 
 ## /api/v1/chain-templates
 
-Quelle: `ChainTemplateController`
+Quelle: `ChainTemplateController` – Built-in chain templates that can be installed into a project as a chain with its workflows.
 
 | Endpunkt | Zweck | Modul |
 |---|---|---|
-| `GET /api/v1/chain-templates` |  | `chains` |
-| `GET /api/v1/chain-templates/{id}` |  | `chains` |
-| `POST /api/v1/chain-templates/{id}/install` |  | `chains` |
+| `GET /api/v1/chain-templates` | Lists the built-in chain templates with their entries. | `chains` |
+| `GET /api/v1/chain-templates/{id}` | Returns one built-in chain template. | `chains` |
+| `POST /api/v1/chain-templates/{id}/install` | Installs a chain template into a project: creates one workflow per entry plus the chain, answers 201. | `chains` |
 
 ## /api/v1/chains
 
-Quelle: `ChainController`
+Quelle: `ChainController` – Workflow chains: define sequences of workflows, start them and follow their runs.
 
 | Endpunkt | Zweck | Modul |
 |---|---|---|
-| `GET /api/v1/chains` |  | `chains` |
-| `POST /api/v1/chains` |  | `chains` |
-| `GET /api/v1/chains/runs` |  | `chains` |
-| `POST /api/v1/chains/runs/{runId}/cancel` |  | `chains` |
-| `GET /api/v1/chains/{id}` |  | `chains` |
-| `PUT /api/v1/chains/{id}` |  | `chains` |
-| `DELETE /api/v1/chains/{id}` |  | `chains` |
-| `POST /api/v1/chains/{id}/execute` |  | `chains` |
-| `GET /api/v1/chains/{id}/runs` |  | `chains` |
-| `GET /api/v1/chains/{id}/runs/{runId}` |  | `chains` |
+| `GET /api/v1/chains` | Lists all workflow chains. | `chains` |
+| `POST /api/v1/chains` | Creates a chain from an ordered list of workflow entries and returns it with 201. | `chains` |
+| `GET /api/v1/chains/runs` | Lists the runs of all chains page by page, newest first. | `chains` |
+| `POST /api/v1/chains/runs/{runId}/cancel` | Asks a running chain run to stop; it starts no further entries. | `chains` |
+| `GET /api/v1/chains/{id}` | Returns one chain with its entries. | `chains` |
+| `PUT /api/v1/chains/{id}` | Updates a chain; fields left out stay unchanged, `entries` replaces the whole entry list. | `chains` |
+| `DELETE /api/v1/chains/{id}` | Deletes a chain; answers 204. | `chains` |
+| `POST /api/v1/chains/{id}/execute` | Starts a chain run in the background and returns it with 201; the entries then run one after another. | `chains` |
+| `GET /api/v1/chains/{id}/runs` | Lists the runs of one chain, newest first. | `chains` |
+| `GET /api/v1/chains/{id}/runs/{runId}` | Returns one chain run with its entry runs. | `chains` |
 
 ## /api/v1/completion-triggers
 
-Quelle: `CompletionTriggerController`
+Quelle: `CompletionTriggerController` – Completion triggers: start a target workflow automatically when a source workflow finishes.
 
 | Endpunkt | Zweck | Modul |
 |---|---|---|
-| `GET /api/v1/completion-triggers` |  | Kern |
-| `POST /api/v1/completion-triggers` |  | Kern |
-| `GET /api/v1/completion-triggers/workflow/{workflowId}/as-source` |  | Kern |
-| `GET /api/v1/completion-triggers/workflow/{workflowId}/as-target` |  | Kern |
-| `GET /api/v1/completion-triggers/{id}` |  | Kern |
-| `DELETE /api/v1/completion-triggers/{id}` |  | Kern |
-| `POST /api/v1/completion-triggers/{id}/disable` |  | Kern |
-| `POST /api/v1/completion-triggers/{id}/enable` |  | Kern |
+| `GET /api/v1/completion-triggers` | Lists all completion triggers. | Kern |
+| `POST /api/v1/completion-triggers` | Creates a completion trigger from source to target workflow and returns it with 201. | Kern |
+| `GET /api/v1/completion-triggers/workflow/{workflowId}/as-source` | Lists the triggers that fire when the given workflow finishes. | Kern |
+| `GET /api/v1/completion-triggers/workflow/{workflowId}/as-target` | Lists the triggers that start the given workflow. | Kern |
+| `GET /api/v1/completion-triggers/{id}` | Returns one completion trigger. | Kern |
+| `DELETE /api/v1/completion-triggers/{id}` | Deletes a completion trigger; answers 204. | Kern |
+| `POST /api/v1/completion-triggers/{id}/disable` | Disables a trigger without deleting it. | Kern |
+| `POST /api/v1/completion-triggers/{id}/enable` | Enables a trigger; the cycle check runs again first. | Kern |
 
 ## /api/v1/conversions
 
-Quelle: `ConversionController`
+Quelle: `ConversionController` – Turns the successful agentic steps of a run into a reusable workflow.
 
 | Endpunkt | Zweck | Modul |
 |---|---|---|
-| `POST /api/v1/conversions/runs/{runId}/create-workflow` |  | `conversion` |
-| `GET /api/v1/conversions/runs/{runId}/suggest` |  | `conversion` |
+| `POST /api/v1/conversions/runs/{runId}/create-workflow` | Creates a workflow from a run's suggestion in the given project. | `conversion` |
+| `GET /api/v1/conversions/runs/{runId}/suggest` | Suggests a workflow built from the agentic steps of a run that reached their goal. | `conversion` |
 
 ## /api/v1/dashboard
 
@@ -222,11 +222,11 @@ Quellen:
 
 | Endpunkt | Zweck | Modul |
 |---|---|---|
-| `GET /api/v1/dashboard/layouts` |  | Kern |
-| `POST /api/v1/dashboard/layouts` | The body is validated field by field in DashboardLayoutValidator (unknown fields → 400). | Kern |
-| `GET /api/v1/dashboard/layouts/{id}` |  | Kern |
-| `PATCH /api/v1/dashboard/layouts/{id}` |  | Kern |
-| `POST /api/v1/dashboard/report-assist` | 400 for a missing id, 404 for an unknown workflow, 409 when the setting is off, the provider is missing, there is no usable run, or the answer did not match the contract. | `dashboard-report` |
+| `GET /api/v1/dashboard/layouts` | Lists saved dashboard layout versions page by page, newest first, without their content. | Kern |
+| `POST /api/v1/dashboard/layouts` | Saves the dashboard layout as a new version (`201`), or answers `200` when it equals the newest one. | Kern |
+| `GET /api/v1/dashboard/layouts/{id}` | Returns one dashboard layout version including its layout content. | Kern |
+| `PATCH /api/v1/dashboard/layouts/{id}` | Sets or removes (`null`) the name of a layout version. | Kern |
+| `POST /api/v1/dashboard/report-assist` | Has an AI propose the fields of a `dashboard-report` block for `workflowId` from one of its runs. | `dashboard-report` |
 | `GET /api/v1/dashboard/workflow-results` | Ids outside the allowed shape or more than DashboardWorkflowService.MAX_WORKFLOWS of them → 400. | Kern |
 
 ## /api/v1/debug
@@ -239,7 +239,7 @@ Quelle: `WorkflowDebugController` – Workflow-Debug endpoints — back the /deb
 
 ## /api/v1/dialog
 
-Quelle: `DialogController`
+Quelle: `DialogController` – Dialog import: turns recorded Claude Code sessions (JSONL files under `~/.claude/projects`) into workflows.
 
 | Endpunkt | Zweck | Modul |
 |---|---|---|
@@ -251,23 +251,23 @@ Quelle: `DialogController`
 
 ## /api/v1/dlq
 
-Quelle: `DeadLetterController`
+Quelle: `DeadLetterController` – Dead letter queue: failed workflow runs, kept for retry or discard.
 
 | Endpunkt | Zweck | Modul |
 |---|---|---|
-| `GET /api/v1/dlq` |  | Kern |
-| `GET /api/v1/dlq/{id}` |  | Kern |
-| `DELETE /api/v1/dlq/{id}` |  | Kern |
-| `POST /api/v1/dlq/{id}/retry` |  | Kern |
+| `GET /api/v1/dlq` | Lists dead letter entries page by page, most recent failure first; optional `status` filter. | Kern |
+| `GET /api/v1/dlq/{id}` | Returns one dead letter entry. | Kern |
+| `DELETE /api/v1/dlq/{id}` | Discards a dead letter entry: it is marked `DISCARDED`, not deleted; answers 204. | Kern |
+| `POST /api/v1/dlq/{id}/retry` | Starts the workflow again with the input context of the failed run and marks the entry as retried. | Kern |
 
 ## /api/v1/docs
 
-Quelle: `DocsController`
+Quelle: `DocsController` – Serves the Markdown documentation from the configured docs directory (`automation.docs.directory`) to the UI.
 
 | Endpunkt | Zweck | Modul |
 |---|---|---|
-| `GET /api/v1/docs` |  | Kern |
-| `GET /api/v1/docs/{name}` |  | Kern |
+| `GET /api/v1/docs` | Lists the Markdown documents of the docs directory, German and English, each with name, label and language. | Kern |
+| `GET /api/v1/docs/{name}` | Returns the Markdown content of one document; `lang` is `de` (default) or `en`. | Kern |
 
 ## /api/v1/executions
 
