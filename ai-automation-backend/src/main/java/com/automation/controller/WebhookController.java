@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+/** Webhooks: manage the tokens that start a workflow from outside, and the public trigger endpoint itself. */
 @RequiresModule(ModuleCatalog.WEBHOOKS)
 @RestController
 @RequiredArgsConstructor
@@ -35,6 +36,7 @@ public class WebhookController {
 
     // --- Management endpoints ---
 
+    /** Lists all webhooks; tokens and URLs are masked to their first characters. */
     @GetMapping("/api/v1/webhooks")
     public List<WebhookTriggerResponse> listWebhooks(HttpServletRequest request) {
         return webhookService.findAll().stream()
@@ -42,11 +44,13 @@ public class WebhookController {
                 .toList();
     }
 
+    /** Returns one webhook with masked token. */
     @GetMapping("/api/v1/webhooks/{id}")
     public WebhookTriggerResponse getWebhook(@PathVariable String id, HttpServletRequest request) {
         return toResponseWithUrl(webhookService.findById(id), request, TokenVisibility.MASK);
     }
 
+    /** Lists the webhooks of a workflow with masked tokens. */
     @GetMapping("/api/v1/webhooks/workflow/{workflowId}")
     public List<WebhookTriggerResponse> getByWorkflow(
             @PathVariable String workflowId, HttpServletRequest request) {
@@ -55,6 +59,10 @@ public class WebhookController {
                 .toList();
     }
 
+    /**
+     * Creates an enabled webhook for {@code workflowId} and returns it with 201.
+     * Only this response shows the full token and URL ({@code tokenVisible: true}) – store them right away.
+     */
     @PostMapping("/api/v1/webhooks")
     public ResponseEntity<WebhookTriggerResponse> createWebhook(
             @Valid @RequestBody CreateWebhookRequest req, HttpServletRequest request) {
@@ -62,11 +70,13 @@ public class WebhookController {
         return ResponseEntity.status(HttpStatus.CREATED).body(toResponseWithUrl(webhook, request, TokenVisibility.REVEAL));
     }
 
+    /** Enables a webhook. */
     @PostMapping("/api/v1/webhooks/{id}/enable")
     public WebhookTriggerResponse enableWebhook(@PathVariable String id, HttpServletRequest request) {
         return toResponseWithUrl(webhookService.enable(id), request, TokenVisibility.MASK);
     }
 
+    /** Disables a webhook; calls to its trigger URL then return 409. */
     @PostMapping("/api/v1/webhooks/{id}/disable")
     public WebhookTriggerResponse disableWebhook(@PathVariable String id, HttpServletRequest request) {
         return toResponseWithUrl(webhookService.disable(id), request, TokenVisibility.MASK);
@@ -89,6 +99,7 @@ public class WebhookController {
         return new WebhookSigningSecretResponse(webhookService.generateSigningSecret(id), WebhookSignatureVerifier.HEADER);
     }
 
+    /** Removes the signing secret, so trigger calls no longer need a signature. */
     @RequiresModule(ModuleCatalog.WEBHOOK_SIGNATURES)
     @DeleteMapping("/api/v1/webhooks/{id}/secret")
     public ResponseEntity<Void> removeSigningSecret(@PathVariable String id) {
@@ -96,6 +107,7 @@ public class WebhookController {
         return ResponseEntity.noContent().build();
     }
 
+    /** Deletes a webhook; its token stops working. */
     @DeleteMapping("/api/v1/webhooks/{id}")
     public ResponseEntity<Void> deleteWebhook(@PathVariable String id) {
         webhookService.delete(id);
@@ -104,6 +116,11 @@ public class WebhookController {
 
     // --- Public trigger endpoint (no API key required) ---
 
+    /**
+     * Starts the webhook's workflow without API key; the token in the path authorizes the call.
+     * An optional JSON object body is merged over {@code defaultContext} (keys starting with {@code __} return 400);
+     * with a signing secret the call needs a valid {@code X-Signature} header, else 401.
+     */
     @PostMapping("/api/v1/webhook/trigger/{token}")
     public ResponseEntity<WorkflowRunResponse> triggerWebhook(
             @PathVariable String token,
@@ -117,6 +134,9 @@ public class WebhookController {
         return ResponseEntity.ok(workflowMapper.toRunResponse(run));
     }
 
+    /** Whether a management response carries the full bearer token or its masked prefix. */
+    enum TokenVisibility { REVEAL, MASK }
+
     /**
      * Builds the response for a webhook. The secret token (and the URL derived from it) is
      * only shown in full when {@code reveal} is true — that is exclusively the case right
@@ -124,9 +144,6 @@ public class WebhookController {
      * 8 characters, since the full token is a bearer credential for the public trigger
      * endpoint.
      */
-    /** Whether a management response carries the full bearer token or its masked prefix. */
-    enum TokenVisibility { REVEAL, MASK }
-
     private WebhookTriggerResponse toResponseWithUrl(WebhookTrigger w, HttpServletRequest request,
                                                      TokenVisibility visibility) {
         WebhookTriggerResponse mapped = webhookMapper.toResponse(w);

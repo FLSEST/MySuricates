@@ -575,92 +575,92 @@ Quellen:
 
 ## /api/v1/testing
 
-Quelle: `TestingController`
+Quelle: `TestingController` – Controls the Test instance container: start, stop, reset, push definitions to it and pull changes back.
 
 | Endpunkt | Zweck | Modul |
 |---|---|---|
-| `POST /api/v1/testing/pull-changes` |  | `staging` |
-| `POST /api/v1/testing/report-result` |  | `staging` |
-| `POST /api/v1/testing/reset` |  | `staging` |
-| `POST /api/v1/testing/start` |  | `staging` |
-| `GET /api/v1/testing/status` |  | `staging` |
-| `POST /api/v1/testing/stop` |  | `staging` |
-| `POST /api/v1/testing/sync-definitions` |  | `staging` |
-| `GET /api/v1/testing/sync-preview` |  | `staging` |
+| `POST /api/v1/testing/pull-changes` | Takes instructions and model of the Test instance's workflows into the workflows with the same name and project here. | `staging` |
+| `POST /api/v1/testing/report-result` | Records a test result as test status of the workflow with this name and project name. | `staging` |
+| `POST /api/v1/testing/reset` | Wipes the Test database volume, starts the container fresh and pushes all definitions to it. | `staging` |
+| `POST /api/v1/testing/start` | Starts the Test container with this instance's API key and waits for its health check. | `staging` |
+| `GET /api/v1/testing/status` | Reports whether the Test container is running and healthy, plus its version and build timestamp when healthy. | `staging` |
+| `POST /api/v1/testing/stop` | Stops the Test container. | `staging` |
+| `POST /api/v1/testing/sync-definitions` | Copies definitions from this instance to the Test instance, after a backup there. | `staging` |
+| `GET /api/v1/testing/sync-preview` | Lists which projects, workflows, skills and chains a sync would create or update on the Test instance. | `staging` |
 
 ## /api/v1/todo-triggers
 
-Quelle: `TodoTriggerController`
+Quelle: `TodoTriggerController` – TODO triggers: start a fix workflow automatically when an open TODO matches tags, project, source and priority.
 
 | Endpunkt | Zweck | Modul |
 |---|---|---|
-| `GET /api/v1/todo-triggers` |  | Kern |
-| `POST /api/v1/todo-triggers` |  | Kern |
-| `GET /api/v1/todo-triggers/workflow/{workflowId}` |  | Kern |
-| `GET /api/v1/todo-triggers/{id}` |  | Kern |
-| `DELETE /api/v1/todo-triggers/{id}` |  | Kern |
-| `POST /api/v1/todo-triggers/{id}/disable` |  | Kern |
-| `POST /api/v1/todo-triggers/{id}/enable` |  | Kern |
+| `GET /api/v1/todo-triggers` | Lists all TODO triggers. | Kern |
+| `POST /api/v1/todo-triggers` | Creates a TODO trigger and returns it with 201; `tagPattern` and `targetWorkflowId` are required. | Kern |
+| `GET /api/v1/todo-triggers/workflow/{workflowId}` | Lists the TODO triggers that start the given workflow. | Kern |
+| `GET /api/v1/todo-triggers/{id}` | Returns one TODO trigger. | Kern |
+| `DELETE /api/v1/todo-triggers/{id}` | Deletes a TODO trigger. | Kern |
+| `POST /api/v1/todo-triggers/{id}/disable` | Disables a TODO trigger; it then ignores new and existing TODOs. | Kern |
+| `POST /api/v1/todo-triggers/{id}/enable` | Enables a TODO trigger. | Kern |
 
 ## /api/v1/todos
 
-Quelle: `TodoController`
+Quelle: `TodoController` – TODOs: list, create, edit and close them, start their fix workflow, export them to a tracker, find duplicates.
 
 | Endpunkt | Zweck | Modul |
 |---|---|---|
-| `GET /api/v1/todos` |  | Kern |
-| `POST /api/v1/todos` |  | Kern |
+| `GET /api/v1/todos` | Lists TODOs page by page, most urgent first, filtered by project, status, priority, source, tag, text or goal. | Kern |
+| `POST /api/v1/todos` | Creates a TODO and returns it with 201; only `title` is required. | Kern |
 | `POST /api/v1/todos/archive-stale` | Archive stale auto-todos now (cockpit "Verstaubtes archivieren"). | Kern |
 | `POST /api/v1/todos/bulk-status` | Bulk status change (e.g. archive selected todos). | Kern |
-| `GET /api/v1/todos/count` |  | Kern |
+| `GET /api/v1/todos/count` | Counts TODOs per status, optionally only those of `projectId`. | Kern |
 | `GET /api/v1/todos/overview` | Cross-project cockpit overview: per-project rollups + a global "Braucht dich" lane. | Kern |
 | `GET /api/v1/todos/similar` | Check for similar TODOs before creating a new one. | Kern |
-| `GET /api/v1/todos/{id}` |  | Kern |
-| `PUT /api/v1/todos/{id}` |  | Kern |
-| `DELETE /api/v1/todos/{id}` |  | Kern |
-| `POST /api/v1/todos/{id}/export` |  | `integrations` |
+| `GET /api/v1/todos/{id}` | Returns one TODO. | Kern |
+| `PUT /api/v1/todos/{id}` | Updates the fields sent in the body and leaves the others unchanged. | Kern |
+| `DELETE /api/v1/todos/{id}` | Deletes a TODO permanently. | Kern |
+| `POST /api/v1/todos/{id}/export` | Creates a task for the TODO in an external tracker and returns its reference; a TODO already exported returns the existing link. | `integrations` |
 | `PATCH /api/v1/todos/{id}/planning` | Ziel, Rang und Einschaetzung (Komplexitaet, Effort, Begruendung, offene Frage). | `goals` |
-| `POST /api/v1/todos/{id}/resolve` |  | Kern |
-| `PATCH /api/v1/todos/{id}/status` |  | Kern |
+| `POST /api/v1/todos/{id}/resolve` | Starts the TODO's linked fix workflow and sets the TODO to IN_PROGRESS. | Kern |
+| `PATCH /api/v1/todos/{id}/status` | Sets the status of a TODO (`status` required), optionally recording the `sessionId` that changed it. | Kern |
 
 ## /api/v1/webhook
 
-Quelle: `WebhookController`
+Quelle: `WebhookController` – Webhooks: manage the tokens that start a workflow from outside, and the public trigger endpoint itself.
 
 | Endpunkt | Zweck | Modul |
 |---|---|---|
-| `POST /api/v1/webhook/trigger/{token}` |  | `webhooks` |
+| `POST /api/v1/webhook/trigger/{token}` | Starts the webhook's workflow without API key; the token in the path authorizes the call. | `webhooks` |
 
 ## /api/v1/webhooks
 
-Quelle: `WebhookController`
+Quelle: `WebhookController` – Webhooks: manage the tokens that start a workflow from outside, and the public trigger endpoint itself.
 
 | Endpunkt | Zweck | Modul |
 |---|---|---|
-| `GET /api/v1/webhooks` |  | `webhooks` |
-| `POST /api/v1/webhooks` |  | `webhooks` |
-| `GET /api/v1/webhooks/workflow/{workflowId}` |  | `webhooks` |
-| `GET /api/v1/webhooks/{id}` |  | `webhooks` |
-| `DELETE /api/v1/webhooks/{id}` |  | `webhooks` |
-| `POST /api/v1/webhooks/{id}/disable` |  | `webhooks` |
-| `POST /api/v1/webhooks/{id}/enable` |  | `webhooks` |
+| `GET /api/v1/webhooks` | Lists all webhooks; tokens and URLs are masked to their first characters. | `webhooks` |
+| `POST /api/v1/webhooks` | Creates an enabled webhook for `workflowId` and returns it with 201. | `webhooks` |
+| `GET /api/v1/webhooks/workflow/{workflowId}` | Lists the webhooks of a workflow with masked tokens. | `webhooks` |
+| `GET /api/v1/webhooks/{id}` | Returns one webhook with masked token. | `webhooks` |
+| `DELETE /api/v1/webhooks/{id}` | Deletes a webhook; its token stops working. | `webhooks` |
+| `POST /api/v1/webhooks/{id}/disable` | Disables a webhook; calls to its trigger URL then return 409. | `webhooks` |
+| `POST /api/v1/webhooks/{id}/enable` | Enables a webhook. | `webhooks` |
 | `POST /api/v1/webhooks/{id}/regenerate-token` | Rotates a webhook's secret token. | `webhooks` |
 | `POST /api/v1/webhooks/{id}/secret` | Creates or rotates the signing secret; the response is the only place it is ever shown. | `webhook-signatures` |
-| `DELETE /api/v1/webhooks/{id}/secret` |  | `webhook-signatures` |
+| `DELETE /api/v1/webhooks/{id}/secret` | Removes the signing secret, so trigger calls no longer need a signature. | `webhook-signatures` |
 
 ## /api/v1/wishes
 
-Quelle: `WishController`
+Quelle: `WishController` – Wishes: a request in plain words that an AI loop decomposes into workflows, runs, evaluates and refines.
 
 | Endpunkt | Zweck | Modul |
 |---|---|---|
-| `GET /api/v1/wishes` |  | `wishes` |
-| `POST /api/v1/wishes` |  | `wishes` |
-| `GET /api/v1/wishes/{id}` |  | `wishes` |
-| `DELETE /api/v1/wishes/{id}` |  | `wishes` |
-| `POST /api/v1/wishes/{id}/cancel` |  | `wishes` |
-| `POST /api/v1/wishes/{id}/crystallize` |  | `wishes` |
-| `POST /api/v1/wishes/{id}/respond` |  | `wishes` |
+| `GET /api/v1/wishes` | Lists all wishes, newest first. | `wishes` |
+| `POST /api/v1/wishes` | Creates a wish and starts fulfilling it in the background; returns it with 201. | `wishes` |
+| `GET /api/v1/wishes/{id}` | Returns one wish with its status, iterations and generated workflows. | `wishes` |
+| `DELETE /api/v1/wishes/{id}` | Deletes a wish; only COMPLETED, FAILED or CANCELLED wishes can be deleted (else 409). | `wishes` |
+| `POST /api/v1/wishes/{id}/cancel` | Stops the fulfillment loop and marks a wish that is not finished yet as CANCELLED. | `wishes` |
+| `POST /api/v1/wishes/{id}/crystallize` | Saves the first generated workflow of a completed wish as a template and returns `templateId`. | `wishes` |
+| `POST /api/v1/wishes/{id}/respond` | Responds to a wish with `action` ACCEPT, REFINE, CANCEL, CLARIFY or RETRY plus optional `feedback`. | `wishes` |
 
 ## /api/v1/workflow-templates
 
@@ -729,4 +729,4 @@ Quelle: `WebSocketTicketController` – Hands out short-lived, single-use ticket
 
 | Endpunkt | Zweck | Modul |
 |---|---|---|
-| `POST /api/v1/ws-ticket` |  | Kern |
+| `POST /api/v1/ws-ticket` | Issues a single-use ticket for the WebSocket handshake URL; it expires after `expiresInSeconds`. | Kern |

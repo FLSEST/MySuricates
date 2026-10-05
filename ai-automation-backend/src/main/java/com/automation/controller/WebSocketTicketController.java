@@ -21,6 +21,7 @@ public class WebSocketTicketController {
 
     private final WebSocketTicketService ticketService;
 
+    /** Issues a single-use ticket for the WebSocket handshake URL; it expires after {@code expiresInSeconds}. */
     @PostMapping
     public WsTicketResponse issue() {
         return new WsTicketResponse(ticketService.issue(), ticketService.getTtlSeconds());
