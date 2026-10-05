@@ -46,6 +46,7 @@ Docker volume. Permanent setup: [Installation](#installation) below or step by s
 
 | Document | Content |
 |---|---|
+| [Building blocks](docs/en/baukasten.md) | The question behind it and its four answers as building blocks: what belongs to the core, what is switched on, what you have yourself or connect — and approaches such as loop engineering or spec-driven development built from the same blocks |
 | [Getting Started](docs/en/GETTING-STARTED.md) | Try it out without installation (tryout image) and first installation with the guided installer (container, machine, or dev · test · prod) |
 | [Concepts](docs/en/konzepte/README.md) | Eight mechanisms to adopt — gates, self-improvement, hardening, and more — each with a flow diagram, code evidence, and dated measurement |
 | [Workflow Guide](docs/en/WORKFLOW-GUIDE.md) | Block types, patterns, timeouts |

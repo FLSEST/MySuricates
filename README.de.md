@@ -46,6 +46,7 @@ oder Schritt fuer Schritt in [Getting Started](docs/GETTING-STARTED.md).
 
 | Dokument | Inhalt |
 |---|---|
+| [Baukasten](docs/baukasten.md) | Die Frage dahinter und ihre vier Antworten als Bausteine: was zum Kern gehoert, was zugeschaltet wird, was man selbst hat oder anschliesst — und Ansaetze wie Loop-Engineering oder Spec-Driven Development aus denselben Bausteinen |
 | [Getting Started](docs/GETTING-STARTED.md) | Ausprobieren ohne Installation (Tryout-Image) und Erstinstallation mit dem gefuehrten Installer (Container, Rechner oder Dev · Test · Prod) |
 | [Konzepte](docs/konzepte/README.md) | Acht Mechanismen zum Uebernehmen — Gates, Selbstverbesserung, Haertung u. a. —, je mit Ablaufdiagramm, Codebelegen und datierter Messung |
 | [Workflow-Guide](docs/WORKFLOW-GUIDE.md) | Block-Typen, Patterns, Timeouts |
