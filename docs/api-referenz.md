@@ -293,7 +293,7 @@ Quelle: `ExecutionController` – Workflow runs: list and inspect them, control 
 
 ## /api/v1/factory
 
-Quelle: `WorkflowFactoryController`
+Quelle: `WorkflowFactoryController` – Workflow factory: has an AI generate workflows from a topic, verify them on the test instance and promote them to templates.
 
 | Endpunkt | Zweck | Modul |
 |---|---|---|
@@ -406,14 +406,14 @@ Quelle: `OnboardingProfileController` – Onboarding profiles: the built-in and 
 
 ## /api/v1/pool
 
-Quelle: `WorkflowPoolController`
+Quelle: `WorkflowPoolController` – Workflow pool: list and install the shared workflow files of the pool directory, and export a workflow into it.
 
 | Endpunkt | Zweck | Modul |
 |---|---|---|
-| `GET /api/v1/pool` |  | Kern |
-| `POST /api/v1/pool/export/{workflowId}` |  | Kern |
-| `GET /api/v1/pool/{id}` |  | Kern |
-| `POST /api/v1/pool/{id}/install` |  | Kern |
+| `GET /api/v1/pool` | Lists the workflows of the pool directory, sorted by English name; empty when the pool is switched off. | Kern |
+| `POST /api/v1/pool/export/{workflowId}` | Writes the workflow as a new pool file and answers `201`; instance bindings such as ids are removed and listed in `sanitizedPaths`. | Kern |
+| `GET /api/v1/pool/{id}` | Returns one pool workflow; `locale` as for the list. | Kern |
+| `POST /api/v1/pool/{id}/install` | Installs a pool workflow into the project `projectId`, or updates the copy an earlier install left there. | Kern |
 
 ## /api/v1/projects
 
@@ -664,16 +664,16 @@ Quelle: `WishController` – Wishes: a request in plain words that an AI loop de
 
 ## /api/v1/workflow-templates
 
-Quelle: `WorkflowTemplateController`
+Quelle: `WorkflowTemplateController` – Workflow templates and blueprints: list, maintain, create from a workflow, and install into a project.
 
 | Endpunkt | Zweck | Modul |
 |---|---|---|
-| `GET /api/v1/workflow-templates` |  | Kern |
-| `POST /api/v1/workflow-templates` |  | Kern |
-| `POST /api/v1/workflow-templates/from-workflow/{workflowId}` |  | Kern |
-| `GET /api/v1/workflow-templates/{id}` |  | Kern |
-| `PUT /api/v1/workflow-templates/{id}` |  | Kern |
-| `DELETE /api/v1/workflow-templates/{id}` |  | Kern |
+| `GET /api/v1/workflow-templates` | Lists all templates and blueprints by `sortOrder`, each with the projects it was verified in. | Kern |
+| `POST /api/v1/workflow-templates` | Creates a user template (`builtIn` is always `false`) and answers `201`. | Kern |
+| `POST /api/v1/workflow-templates/from-workflow/{workflowId}` | Saves a workflow's name, description, blocks, instructions and model as a new user template (`201`). | Kern |
+| `GET /api/v1/workflow-templates/{id}` | Returns one template; `locale` as for the list. | Kern |
+| `PUT /api/v1/workflow-templates/{id}` | Changes the given fields of a template; fields left out stay as they are. | Kern |
+| `DELETE /api/v1/workflow-templates/{id}` | Deletes a user template (`204`); a built-in template is refused with `409`. | Kern |
 | `POST /api/v1/workflow-templates/{id}/install` | Creates a workflow from the template in a project, plus the blueprints its sub-workflow blocks call, wired to their new ids. | Kern |
 
 ## /api/v1/workflows
@@ -682,46 +682,46 @@ Quellen:
 
 - `WorkflowAnalyzerController` – Deterministische Baufehler-Prüfung von Workflow-Definitionen — auf Abruf, nie blockierend.
 - `WorkflowAssistController` – Hilfen rund um einen bestehenden Workflow: Optimierungsvorschlag, ähnliche Workflows, Reparatur nach fehlgeschlagenen Runs.
-- `WorkflowController`
+- `WorkflowController` – Workflows: create, read, change and delete them, start runs, list their runs and move them as JSON.
 - `WorkflowImportController` – Import externer Prozessformate als NEUER Workflow (Roundtrip zum Export in `WorkflowController`).
-- `WorkflowMemoryController`
+- `WorkflowMemoryController` – Workflow memory: knowledge distilled from a workflow's runs, of which one entry can be active per workflow.
 - `WorkflowSealController` – Seal / unseal a workflow.
 - `WorkflowSealStatusController` – Read-only seal status for the UI.
 - `WorkflowVersionController` – Versionsgeschichte eines Workflows: auflisten, einzeln abrufen, wiederherstellen.
 
 | Endpunkt | Zweck | Modul |
 |---|---|---|
-| `GET /api/v1/workflows` |  | Kern |
-| `POST /api/v1/workflows` |  | Kern |
+| `GET /api/v1/workflows` | Lists all workflows of projects that are not archived, each with its run count. | Kern |
+| `POST /api/v1/workflows` | Creates a workflow in the project named by `projectId` and answers `201`. | Kern |
 | `GET /api/v1/workflows/analyze` | Bestandsprüfung über alle Definitionen in aktiven Projekten. | Kern |
-| `GET /api/v1/workflows/export/{id}` |  | Kern |
-| `POST /api/v1/workflows/import` |  | Kern |
+| `GET /api/v1/workflows/export/{id}` | Exports the workflow as portable JSON without ids or project, with an `integrity` checksum that `POST /api/v1/workflows/import` verifies. | Kern |
+| `POST /api/v1/workflows/import` | Imports a workflow from its JSON export and answers `201`. | Kern |
 | `POST /api/v1/workflows/import/bpmn` | Importiert einen zuvor exportierten BPMN-Prozess (mit `mysuricates:blockConfig`) als neuen Workflow im Projekt. | `bpmn` |
 | `GET /api/v1/workflows/seal-status` | Every sealed workflow plus every workflow with refused starts in the last seven days. | Kern |
-| `GET /api/v1/workflows/{id}` |  | Kern |
-| `PUT /api/v1/workflows/{id}` |  | Kern |
-| `DELETE /api/v1/workflows/{id}` |  | Kern |
+| `GET /api/v1/workflows/{id}` | Returns one workflow with its blocks and activated skills. | Kern |
+| `PUT /api/v1/workflows/{id}` | Changes the given fields of a workflow; fields left out stay as they are. | Kern |
+| `DELETE /api/v1/workflows/{id}` | Soft-deletes a workflow (`204`); a sealed workflow is refused with `409 WORKFLOW_SEALED`. | Kern |
 | `GET /api/v1/workflows/{id}/analyze` | Befunde einer Definition. | Kern |
-| `POST /api/v1/workflows/{id}/execute` |  | Kern |
+| `POST /api/v1/workflows/{id}/execute` | Starts a manual run and returns it right away with status `RUNNING`; the blocks run in the background. | Kern |
 | `GET /api/v1/workflows/{id}/export/bpmn` | Exportiert den Workflow als BPMN 2.0 XML (Spec: docs/plans/2026-07-09-bpmn-integration-design.md). | `bpmn` |
-| `POST /api/v1/workflows/{id}/optimize` |  | Kern |
-| `POST /api/v1/workflows/{id}/repair` |  | `factory` |
-| `GET /api/v1/workflows/{id}/runs` |  | Kern |
-| `GET /api/v1/workflows/{id}/runs/{runId}` |  | Kern |
-| `POST /api/v1/workflows/{id}/seal` |  | `sealing` |
+| `POST /api/v1/workflows/{id}/optimize` | Asks the workflow's AI provider for an optimization suggestion and returns it as JSON. | Kern |
+| `POST /api/v1/workflows/{id}/repair` | Starts an AI repair of a workflow with failed runs in the background and answers `202`. | `factory` |
+| `GET /api/v1/workflows/{id}/runs` | Lists the workflow's runs, newest first, paginated (`page`, `size`) and without their steps. | Kern |
+| `GET /api/v1/workflows/{id}/runs/{runId}` | Returns one run with its steps; the run is looked up by `runId` alone. | Kern |
+| `POST /api/v1/workflows/{id}/seal` | Seals the workflow: records and signs the hash of its definition and of its skills; idempotent. | `sealing` |
 | `GET /api/v1/workflows/{id}/seal-events` | Sealing and unsealing of one workflow, newest first — kept beyond the activity log's retention. | Kern |
-| `GET /api/v1/workflows/{id}/similar` |  | Kern |
-| `POST /api/v1/workflows/{id}/skills` |  | `skills` |
-| `DELETE /api/v1/workflows/{id}/skills/{skillId}` |  | `skills` |
-| `POST /api/v1/workflows/{id}/unseal` |  | `sealing` |
-| `GET /api/v1/workflows/{id}/versions` |  | Kern |
-| `GET /api/v1/workflows/{id}/versions/{versionId}` |  | Kern |
-| `POST /api/v1/workflows/{id}/versions/{versionId}/restore` |  | Kern |
-| `GET /api/v1/workflows/{workflowId}/memory` |  | `memory` |
-| `POST /api/v1/workflows/{workflowId}/memory/extract` |  | `memory` |
-| `PUT /api/v1/workflows/{workflowId}/memory/{memoryId}` |  | `memory` |
-| `DELETE /api/v1/workflows/{workflowId}/memory/{memoryId}` |  | `memory` |
-| `PUT /api/v1/workflows/{workflowId}/memory/{memoryId}/activate` |  | `memory` |
+| `GET /api/v1/workflows/{id}/similar` | Lists other workflows whose block types overlap with this one, most similar first, at most `limit` entries. | Kern |
+| `POST /api/v1/workflows/{id}/skills` | Activates the skills in `skillIds` for the workflow; already active ones are kept once. | `skills` |
+| `DELETE /api/v1/workflows/{id}/skills/{skillId}` | Deactivates one skill for the workflow. | `skills` |
+| `POST /api/v1/workflows/{id}/unseal` | Removes the seal and logs the previous hash as a `SECURITY` entry; idempotent. | `sealing` |
+| `GET /api/v1/workflows/{id}/versions` | Lists the workflow's versions, newest first, paginated (`page`, `size`). | Kern |
+| `GET /api/v1/workflows/{id}/versions/{versionId}` | Returns one version with its definition snapshot; a version of another workflow answers `404`. | Kern |
+| `POST /api/v1/workflows/{id}/versions/{versionId}/restore` | Sets the workflow's definition back to this version; the change is recorded as a new version. | Kern |
+| `GET /api/v1/workflows/{workflowId}/memory` | Lists the workflow's memory entries, newest first. | `memory` |
+| `POST /api/v1/workflows/{workflowId}/memory/extract` | Has an AI summarize the steps of the given runs into a new, inactive memory entry and answers `201`. | `memory` |
+| `PUT /api/v1/workflows/{workflowId}/memory/{memoryId}` | Changes title and/or content of a memory entry; a field left out stays as it is. | `memory` |
+| `DELETE /api/v1/workflows/{workflowId}/memory/{memoryId}` | Deletes a memory entry (`204`). | `memory` |
+| `PUT /api/v1/workflows/{workflowId}/memory/{memoryId}/activate` | Makes this memory entry the workflow's active one and deactivates all others (`204`). | `memory` |
 
 ## /api/v1/ws-ticket
 

@@ -40,12 +40,20 @@ public class WorkflowAssistController {
     private final WorkflowSimilarityService workflowSimilarityService;
     private final AutoRepairService autoRepairService;
 
+    /**
+     * Asks the workflow's AI provider for an optimization suggestion and returns it as JSON.
+     * Changes nothing; a failed AI call comes back as {@code 200} with {@code error: true} and a {@code message}.
+     */
     @PostMapping("/{id}/optimize")
     public ResponseEntity<Map<String, Object>> optimizeWorkflow(@PathVariable String id) {
         Map<String, Object> suggestion = optimizationService.optimizeWorkflow(id);
         return ResponseEntity.ok(suggestion);
     }
 
+    /**
+     * Lists other workflows whose block types overlap with this one, most similar first, at most {@code limit}
+     * entries.
+     */
     @GetMapping("/{id}/similar")
     public List<Map<String, Object>> getSimilarWorkflows(
             @PathVariable String id,
@@ -55,6 +63,10 @@ public class WorkflowAssistController {
         return all.size() > capped ? all.subList(0, capped) : all;
     }
 
+    /**
+     * Starts an AI repair of a workflow with failed runs in the background and answers {@code 202}.
+     * Without a failed run {@code 400}; a sealed workflow is refused with {@code 409 WORKFLOW_SEALED}.
+     */
     @PostMapping("/{id}/repair")
     @RequiresModule(ModuleCatalog.FACTORY)
     public ResponseEntity<?> repairWorkflow(@PathVariable String id) {
