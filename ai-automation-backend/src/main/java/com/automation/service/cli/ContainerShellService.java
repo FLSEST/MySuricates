@@ -109,13 +109,37 @@ public class ContainerShellService {
     public ShellResult execute(String command, String projectPath, int timeoutSeconds,
                                String containerImage, boolean mountDockerSocket,
                                List<String> extraMounts, java.util.function.BooleanSupplier cancelled) {
+        Admission admission = admit(containerImage, mountDockerSocket, extraMounts);
+        if (admission.rejection() != null) return admission.rejection();
+
+        List<String> dockerCmd = buildDockerCommand(command, projectPath, containerImage, admission.socket(), admission.mounts());
+
+        log.debug("Container shell execute (image: {}, workDir: {}, timeout: {}s): {}",
+                containerImage, projectPath, timeoutSeconds,
+                command.length() > 200 ? command.substring(0, 200) + "..." : command);
+
+        return ContainerCommandProcess.execute(dockerCmd, timeoutSeconds, cancelled);
+    }
+
+    /** Tool mode: the image's own entrypoint runs with {@code request.args()}, no shell (TODO d3a7f5e2). */
+    public ShellResult executeTool(ContainerToolRequest request, java.util.function.BooleanSupplier cancelled) {
+        Admission admission = admit(request.image(), request.mountDockerSocket(), request.extraMounts());
+        if (admission.rejection() != null) return admission.rejection();
+        List<String> dockerCmd = ContainerToolCommand.build(hostProcessUtils.getHostUid(), request,
+                admission.socket(), admission.mounts());
+        log.debug("Container tool execute (image: {}, timeout: {}s): {}", request.image(), request.timeoutSeconds(), request.args());
+        return ContainerCommandProcess.execute(dockerCmd, request.timeoutSeconds(), cancelled);
+    }
+
+    /** Outcome of the policy checks both modes share; {@code rejection} set ⇒ do not start a container. */
+    private record Admission(ShellResult rejection, boolean socket, List<String> mounts) {}
+
+    private Admission admit(String containerImage, boolean mountDockerSocket, List<String> extraMounts) {
         if (!imageAllowlist.isAllowed(containerImage)) {
             String msg = "Container image not allowed by automation.execution.allowed-container-images: " + containerImage;
             activityLogService.warn(LogCategory.SECURITY, msg, "ContainerShellService", null);
-            return new ShellResult(msg, 125, 0);
+            return new Admission(new ShellResult(msg, 125, 0), false, List.of());
         }
-
-
         boolean effectiveMount = mountDockerSocket && allowDockerSocketMount;
         if (mountDockerSocket && !allowDockerSocketMount) {
             log.warn("Docker socket mount requested but denied by server policy (automation.execution.allow-docker-socket-mount=false)");
@@ -128,16 +152,7 @@ public class ContainerShellService {
                     "Docker socket mounted for container execution (image: " + containerImage + ")",
                     "ContainerShellService", null);
         }
-
-        List<String> safeExtraMounts = filterExtraMounts(extraMounts, containerImage);
-
-        List<String> dockerCmd = buildDockerCommand(command, projectPath, containerImage, effectiveMount, safeExtraMounts);
-
-        log.debug("Container shell execute (image: {}, workDir: {}, timeout: {}s): {}",
-                containerImage, projectPath, timeoutSeconds,
-                command.length() > 200 ? command.substring(0, 200) + "..." : command);
-
-        return ContainerCommandProcess.execute(dockerCmd, timeoutSeconds, cancelled);
+        return new Admission(null, effectiveMount, filterExtraMounts(extraMounts, containerImage));
     }
 
     /**

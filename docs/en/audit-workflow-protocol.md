@@ -187,6 +187,12 @@ Rules:
   itself, so your own quotes (`BASE="{{ project_path }}"`) would end up inside the value.
   They neither call the REST API nor open the SQLite database.
 
+**Fact sheet from a tool:** A shell block in tool mode with `output_format: sarif`
+([WORKFLOW-GUIDE.md](WORKFLOW-GUIDE.md) → Tool Containers) delivers the fact sheet itself: `FAKT <prefix>_findings`
+and the counts per severity, one `TREFFER` line per finding, and `NICHT GEMESSEN: <prefix>_findings (…)` when the tool
+failed. The gate then checks `<prefix>_findings` as a mandatory fact; the evidence check knows these names like any
+other FAKT line.
+
 Converted audits in `workflow-pool/`:
 
 | Workflow | Measurement | Self-test |

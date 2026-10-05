@@ -231,9 +231,10 @@ public class ExecutionContext {
                 taint.snapshot(), taint::substitutedIntoShell);
     }
 
-    static String shellEscape(String value) {
-        return TemplateResolver.shellEscape(value);
-    }
+    /** Whether the template names a value a shell line would quote (untrusted/platform variable, tainted output). */
+    public boolean namesEscapedValue(String template) { return TemplateResolver.namesEscapedValue(template, taint.snapshot()); }
+
+    static String shellEscape(String value) { return TemplateResolver.shellEscape(value); }
 
     public boolean shouldStop() {
         return cancelled.get();

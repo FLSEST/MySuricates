@@ -954,4 +954,36 @@ class ExecutionContextTest {
         assertThat(context.modelFor(sameProvider)).isEqualTo("sonnet");
         assertThat(context.modelFor(otherProvider)).isNull();
     }
+
+    @org.junit.jupiter.api.Nested
+    class NamesEscapedValue {
+
+        @Test
+        void untrustedVariable_inBothSpellings() {
+            context.setUntrustedVariable("branch", "--config=/x");
+            assertThat(context.namesEscapedValue("--ref={{ branch }}")).isTrue();
+            assertThat(context.namesEscapedValue("--ref={{branch}}")).isTrue();
+        }
+
+        @Test
+        void platformVariable() {
+            context.setUntrustedPlatformVariable("open_todos", "x");
+            assertThat(context.namesEscapedValue("{{ open_todos }}")).isTrue();
+        }
+
+        @Test
+        void taintedOutputs() {
+            context.setUntrustedVariable("payload", "x");
+            context.recordOutput("scan", "out");
+            assertThat(context.namesEscapedValue("{{ block.scan.output }}")).isTrue();
+            assertThat(context.namesEscapedValue("{{ previous_output }}")).isTrue();
+        }
+
+        @Test
+        void trustedValuesAndPlainText() {
+            context.setVariable("target", "/workspace/sub");
+            context.recordOutput("scan", "out");
+            assertThat(context.namesEscapedValue("{{ target }} {{ block.scan.output }} {{ previous_output }} fs")).isFalse();
+        }
+    }
 }

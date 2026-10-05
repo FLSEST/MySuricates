@@ -1447,6 +1447,54 @@ For shell blocks that need more tools, set `container_image`:
 }
 ```
 
+### Tool Containers (Sensors)
+
+With `container_args` instead of `command` a shell block starts an image with **its own entrypoint**:
+`docker run … <image> <args…>`, without `/bin/bash -c`. This also runs tool images that have an `ENTRYPOINT` or no
+bash (Alpine), such as OWASP Dependency-Check, trivy or gitleaks. The project is mounted **read-only** at
+`/workspace`; image allowlist, socket and mount policy, cancellation and timeout apply as with `container_image`.
+
+| Key | Meaning |
+|---|---|
+| `container_args` | Arguments as a list. Needs `container_image`, excludes `command`. Each argument is resolved on its own; the block refuses untrusted placeholders (webhook input, tainted outputs, `open_todos` and the like). |
+| `output_format` | `raw` (default: the tool's output, the exit code decides) or `sarif`. |
+| `output_dir` | Only with `sarif`: path in the container (default `/out`) where the platform mounts an empty directory per step. The tool must write its SARIF file there. |
+| `cache_dir` | Path in the container for a persistent cache per image (`<data directory>/tool-cache/<image>`), for example a vulnerability database. |
+| `fact_prefix` | Prefix of the fact names, default: the block name. |
+
+With `output_format: sarif` the step output is a fact sheet following the
+[audit protocol](audit-workflow-protocol.md): `FAKT <prefix>_findings`, `_critical`, `_high`, `_medium`, `_low`,
+`_suppressed`, `_exit_code` and one line per finding, `TREFFER <prefix>: <path>:<line> <SEVERITY> <rule> – <text>`
+(at most 200). The severity comes from `security-severity`, otherwise from the SARIF `level`. The block never prints
+code snippets. Readable SARIF means `COMPLETED`, even with an exit code ≠ 0; without it the sheet says
+`NICHT GEMESSEN: <prefix>_findings (…)` and the step is `FAILED` (for audits: `on_failure: continue`).
+Also not measured: a run without a result list (`results` missing) and an aborted container (timeout, cancel, exit
+125–127 or 137), even if a SARIF file is already there. The tool log below carries `| ` in front of every line, so
+that no log line counts as a `FAKT`.
+
+```json
+{
+  "name": "trivy",
+  "type": "shell",
+  "config": {
+    "container_image": "automation-agent-devops:latest",
+    "container_args": ["trivy", "fs", "/workspace", "--scanners", "vuln", "--cache-dir", "/cache",
+                       "--format", "sarif", "--output", "/out/trivy.sarif"],
+    "cache_dir": "/cache",
+    "output_format": "sarif",
+    "timeout_seconds": 900,
+    "on_failure": "continue"
+  }
+}
+```
+
+Limits: no host network (scanning the running instance does not work this way), no environment variables, fixed
+limits of 2 GB / 100 processes, top level only (not inside foreach/retry and the like; editor and analyzer flag it
+there), and like `container_image` only where the backend's paths are host paths (dev, host installation). If the
+project directory is missing, the container does not start instead of scanning an empty directory. Git tools see no
+history in a git worktree: `.git` is a file there with a path outside the container, and some tools (such as
+`gitleaks git`) then report 0 findings without an error.
+
 ---
 
 ## 8. Agentic Block Deep Dive

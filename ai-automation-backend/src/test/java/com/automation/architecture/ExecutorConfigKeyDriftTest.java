@@ -58,7 +58,9 @@ class ExecutorConfigKeyDriftTest {
             "buildResolvedShellBlock(config,",
             new Delegate("com/automation/service/cli/CommandExecutorService.java", "buildResolvedShellBlock"),
             "AgenticBlockConfig.from(block.getConfig(),",
-            new Delegate("com/automation/executor/blocks/AgenticBlockConfig.java", "from"));
+            new Delegate("com/automation/executor/blocks/AgenticBlockConfig.java", "from"),
+            "ContainerToolSpec.from(config,",
+            new Delegate("com/automation/executor/blocks/ContainerToolSpec.java", "from"));
 
     /** {@code ExecutionMode} liest seinen Schlüssel über eine Konstante, nicht über ein Literal. */
     private static final String EXECUTION_MODE_CALL = "ExecutionMode.isShell(config";

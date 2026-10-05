@@ -199,6 +199,35 @@ class ConfigKeyRulesTest {
                     });
         }
 
+        /** Werkzeug-Modus gibt es nur auf oberster Ebene: verschachtelt meldet der Analyzer ihn, command bleibt Pflicht. */
+        @Test
+        void werkzeugModusInVerschachteltenBloeckenWirdGemeldet() {
+            Map<String, Object> inner = new HashMap<>();
+            inner.put("type", "shell");
+            inner.put("name", "scan");
+            inner.put("config", Map.of("container_image", "img:1", "container_args", List.of("fs")));
+            var findings = keyFindings(block("switch", "weiche", Map.of("expression", "x",
+                    "cases", List.of(Map.of("value", "a", "blocks", List.of(inner))))));
+
+            assertThat(findings).anySatisfy(f -> {
+                assertThat(f.rule()).isEqualTo("unknown-config-key");
+                assertThat(f.detail()).contains("container_args", "oberster Ebene");
+            }).anySatisfy(f -> {
+                assertThat(f.rule()).isEqualTo("missing-required-config-key");
+                assertThat(f.detail()).contains("command");
+            });
+        }
+
+        /** Shell läuft mit command oder im Werkzeug-Modus mit container_args – nie mit beiden (d3a7f5e2). */
+        @Test
+        void shellBrauchtGenauEinenVonCommandUndContainerArgs() {
+            assertThat(keyFindings(block("shell", "s", Map.of("container_image", "img:1",
+                    "container_args", List.of("fs"), "output_format", "sarif", "cache_dir", "/cache")))).isEmpty();
+            assertThat(keyFindings(block("shell", "s", Map.of("command", "echo",
+                    "container_image", "img:1", "container_args", List.of("fs")))))
+                    .singleElement().extracting(AnalyzerFinding::rule).isEqualTo("missing-required-config-key");
+        }
+
         @Test
         void kurzeSchluesselBekommenKeinenGeratenenVorschlag() {
             assertThat(ConfigKeyRules.suggestion("mode", java.util.Set.of("node", "name"))).isEqualTo("node");

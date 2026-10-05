@@ -252,6 +252,10 @@ final class SelfAccessRules {
         if (config == null) return;
         if ("shell".equals(type) || ExecutionMode.isShell(config)) {
             SHELL_KEYS.forEach(key -> addText(config.get(key), out));
+            // Werkzeug-Modus (d3a7f5e2): die Argumente eines Containers laufen wie Shell-Code
+            if (config.get("container_args") instanceof List<?> args) {
+                addText(String.join(" ", args.stream().map(String::valueOf).toList()), out);
+            }
         }
         ALWAYS_SHELL_KEYS.forEach(key -> addText(config.get(key), out));
     }

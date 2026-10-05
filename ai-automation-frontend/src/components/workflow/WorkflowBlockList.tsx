@@ -18,6 +18,7 @@ import { useWorkflowBpmn } from '../../hooks/useWorkflows';
 import { useModuleEnabled } from '../../hooks/useModules';
 import { useT, type TranslationKeys } from '../../i18n';
 import type { BlockDefinition } from '../../types';
+import { shellSummary } from './shellSummary';
 import type { BlockFlash as DiagramBlockFlash, DiagramSelection } from './BpmnDiagramView';
 
 const BpmnDiagramView = lazy(() => import('./BpmnDiagramView'));
@@ -68,7 +69,7 @@ const BLOCK_TYPE_ICONS: Record<string, React.ReactNode> = {
 
 function getBlockLabel(block: { type: string; config: Record<string, unknown> }): string {
   const prompt = block.config.prompt as string | undefined;
-  const command = block.config.command as string | undefined;
+  const command = block.type === 'shell' ? shellSummary(block.config) : (block.config.command as string | undefined);
   const label = prompt || command || '';
   return label.length > 60 ? label.slice(0, 60) + '…' : label;
 }

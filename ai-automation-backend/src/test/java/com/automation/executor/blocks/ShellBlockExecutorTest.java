@@ -27,10 +27,12 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isA;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -41,6 +43,9 @@ class ShellBlockExecutorTest {
 
     @Mock
     private ContainerShellService containerShellService;
+
+    @Mock
+    private ContainerToolStep containerToolStep;
 
     @InjectMocks
     private ShellBlockExecutor executor;
@@ -520,5 +525,39 @@ class ShellBlockExecutorTest {
                 .build();
 
         assertThat(executor.execute(block, context).getInput()).isEqualTo("echo a | b");
+    }
+
+    @Test
+    void toolMode_delegatesToContainerToolStep() {
+        BlockDefinition block = BlockDefinition.builder().type("shell").name("trivy")
+                .config(new HashMap<>(Map.of("container_image", "img:1", "container_args", List.of("fs"))))
+                .build();
+        StepResult expected = new StepResult();
+        when(containerToolStep.execute(eq(block), isA(ContainerToolSpec.class), eq(context))).thenReturn(expected);
+
+        assertThat(executor.execute(block, context)).isSameAs(expected);
+        verifyNoInteractions(shellService, containerShellService);
+    }
+
+    /** Review I2: the editor's default shell config carries command "" — that counts as unset, as in the analyzer. */
+    @Test
+    void toolMode_withBlankCommandFromTheEditorDefault_runsTheTool() {
+        BlockDefinition block = BlockDefinition.builder().type("shell").name("trivy")
+                .config(new HashMap<>(Map.of("command", "", "container_image", "img:1", "container_args", List.of("fs"))))
+                .build();
+        StepResult expected = new StepResult();
+        when(containerToolStep.execute(eq(block), isA(ContainerToolSpec.class), eq(context))).thenReturn(expected);
+
+        assertThat(executor.execute(block, context)).isSameAs(expected);
+    }
+
+    @Test
+    void toolMode_withCommand_isRefused() {
+        BlockDefinition block = BlockDefinition.builder().type("shell")
+                .config(new HashMap<>(Map.of("command", "echo", "container_image", "img", "container_args", List.of())))
+                .build();
+
+        assertThatThrownBy(() -> executor.execute(block, context))
+                .isInstanceOf(WorkflowExecutionException.class).hasMessageContaining("either 'command' or 'container_args'");
     }
 }

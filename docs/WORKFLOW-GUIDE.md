@@ -1472,6 +1472,54 @@ Für Shell-Blöcke die mehr Tools benötigen, `container_image` setzen:
 }
 ```
 
+### Werkzeug-Container (Messfühler)
+
+Mit `container_args` statt `command` startet ein Shell-Block ein Image mit **dessen eigenem Einstiegsbefehl**:
+`docker run … <image> <args…>`, ohne `/bin/bash -c`. So laufen auch Werkzeug-Images mit `ENTRYPOINT` oder
+ohne bash (Alpine), etwa OWASP Dependency-Check, trivy oder gitleaks. Das Projekt liegt **nur lesbar** unter
+`/workspace`; Image-Allowlist, Socket- und Mount-Politik, Abbruch und Timeout gelten wie bei `container_image`.
+
+| Schlüssel | Bedeutung |
+|---|---|
+| `container_args` | Argumente als Liste. Braucht `container_image`, schließt `command` aus. Jedes Argument wird einzeln aufgelöst; nicht vertrauenswürdige Platzhalter (Webhook-Daten, belastete Ausgaben, `open_todos` & Co.) lehnt der Block ab. |
+| `output_format` | `raw` (Standard: Ausgabe des Werkzeugs, Exit-Code entscheidet) oder `sarif`. |
+| `output_dir` | Nur bei `sarif`: Pfad im Container (Standard `/out`), an dem die Plattform je Schritt einen leeren Ordner einbindet. Das Werkzeug muss seine SARIF-Datei dorthin schreiben. |
+| `cache_dir` | Pfad im Container für einen dauerhaften Cache je Image (`<Datenordner>/tool-cache/<image>`), etwa für eine Schwachstellen-Datenbank. |
+| `fact_prefix` | Präfix der Faktennamen, Standard: Block-Name. |
+
+Mit `output_format: sarif` ist die Schrittausgabe ein Faktenblatt nach dem
+[Audit-Protokoll](audit-workflow-protocol.md): `FAKT <prefix>_findings`, `_critical`, `_high`, `_medium`, `_low`,
+`_suppressed`, `_exit_code` und je Befund eine Zeile `TREFFER <prefix>: <pfad>:<zeile> <SCHWERE> <regel> – <text>`
+(höchstens 200). Die Schwere kommt aus `security-severity`, sonst aus dem SARIF-`level`. Code-Ausschnitte gibt der
+Block nie aus. Lesbares SARIF heißt `COMPLETED`, auch bei Exit-Code ≠ 0; fehlt es, steht
+`NICHT GEMESSEN: <prefix>_findings (…)` da und der Schritt ist `FAILED` (für Audits: `on_failure: continue`).
+Ebenso nicht gemessen: ein Lauf ohne Ergebnisliste (`results` fehlt) und ein abgebrochener Container (Timeout,
+Abbruch, Exit 125–127 oder 137), auch wenn schon eine SARIF-Datei daliegt. Das Werkzeug-Log darunter steht mit
+`| ` vor jeder Zeile, damit keine Logzeile als `FAKT` gilt.
+
+```json
+{
+  "name": "trivy",
+  "type": "shell",
+  "config": {
+    "container_image": "automation-agent-devops:latest",
+    "container_args": ["trivy", "fs", "/workspace", "--scanners", "vuln", "--cache-dir", "/cache",
+                       "--format", "sarif", "--output", "/out/trivy.sarif"],
+    "cache_dir": "/cache",
+    "output_format": "sarif",
+    "timeout_seconds": 900,
+    "on_failure": "continue"
+  }
+}
+```
+
+Grenzen: kein Host-Netz (ein Scan der laufenden Instanz geht so nicht), keine Umgebungsvariablen, feste Grenzen
+2 GB / 100 Prozesse, nur auf oberster Ebene (nicht in foreach/retry & Co.; Editor und Analyzer melden es dort), und
+wie `container_image` nur dort, wo die Pfade des Backends Host-Pfade sind (Dev, Host-Installation). Fehlt der
+Projektordner, startet der Container nicht, statt ein leeres Verzeichnis zu prüfen. Git-Werkzeuge sehen in einem
+Git-Worktree keine Historie: `.git` ist dort eine Datei mit einem Pfad außerhalb des Containers, und manche
+Werkzeuge (etwa `gitleaks git`) melden dann ohne Fehler 0 Befunde.
+
 ---
 
 ## 8. Agentic Block Deep Dive

@@ -85,6 +85,12 @@ final class ConfigKeyRules {
                                 + "-Block liest ihn nicht, die Einstellung wirkt nicht" + hint(key, suggestable(fields), false),
                         where.prefixEn() + "unknown config key " + key + " — the " + type
                                 + " block does not read it, the setting has no effect" + hint(key, suggestable(fields), true)));
+            } else if (field.topLevelOnly() && where.path() != null) {
+                out.add(AnalyzerFinding.of("unknown-config-key", Severity.MEDIUM, where.index(), where.name(),
+                        where.prefix() + key + " wirkt nur auf oberster Ebene, nicht in einem verschachtelten "
+                                + type + "-Block — hier liest ihn niemand",
+                        where.prefixEn() + key + " only works on a top-level block, not in a nested " + type
+                                + " block — nothing reads it here"));
             } else if (field.legacyFor() != null) {
                 out.add(legacyKey(field, cfg, where));
             } else if (!onlyWithMet(field, cfg)) {
@@ -98,7 +104,18 @@ final class ConfigKeyRules {
             }
         }
 
-        for (String required : schema.requiredKeys(type)) {
+        // Verschachtelt fallen topLevelOnly-Schlüssel aus requiredOneOf; bleibt einer übrig, ist er Pflicht
+        List<String> oneOf = schema.requiredOneOfKeys(type);
+        List<String> requiredKeys = new java.util.ArrayList<>(schema.requiredKeys(type));
+        if (where.path() != null) {
+            List<String> nestedOneOf = oneOf.stream()
+                    .filter(key -> fields.get(key) == null || !fields.get(key).topLevelOnly()).toList();
+            if (nestedOneOf.size() == 1 && oneOf.size() > 1) {
+                requiredKeys.add(nestedOneOf.get(0));
+                oneOf = List.of();
+            }
+        }
+        for (String required : requiredKeys) {
             if (cfg.get(required) != null || legacyKeyPresent(fields, required, cfg)) continue;
             String instead = presentInstead(cfg, fields, required);
             out.add(AnalyzerFinding.of("missing-required-config-key", Severity.HIGH, where.index(), where.name(),
@@ -107,13 +124,12 @@ final class ConfigKeyRules {
                     where.prefixEn() + "required key " + required + " is missing — without it the " + type
                             + " block cannot run" + (instead == null ? "" : " (" + instead + " is set instead)")));
         }
-        checkOneOf(schema, type, cfg, fields, where, out);
+        checkOneOf(oneOf, type, cfg, fields, where, out);
     }
 
     /** {@code requiredOneOf}: genau einer der Schlüssel – keiner oder mehrere lassen den Block abbrechen. */
-    private static void checkOneOf(BlockConfigSchema schema, String type, Map<String, Object> cfg,
+    private static void checkOneOf(List<String> oneOf, String type, Map<String, Object> cfg,
                                    Map<String, BlockConfigSchema.Field> fields, Where where, List<AnalyzerFinding> out) {
-        List<String> oneOf = schema.requiredOneOfKeys(type);
         // Ein leerer Text gilt wie im Executor als nicht gesetzt
         long present = oneOf.stream().filter(key -> cfg.get(key) != null
                 && !(cfg.get(key) instanceof String text && text.isBlank())).count();

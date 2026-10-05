@@ -40,6 +40,18 @@ class SelfAccessRulesTest {
         return apply(block("shell", "s", Map.of("command", command)));
     }
 
+    /** Werkzeug-Modus (d3a7f5e2): die Argumente eines Containers laufen wie Shell-Code. */
+    @Test
+    void werkzeugArgumenteGegenDieEigeneApiSindHigh() {
+        List<AnalyzerFinding> out = apply(block("shell", "probe", Map.of("container_image", "curlimages/curl",
+                "container_args", List.of("-s", "http://localhost:9090/api/v1/todos"))));
+
+        assertThat(out).singleElement().satisfies(f -> {
+            assertThat(f.rule()).isEqualTo("self-api-call");
+            assertThat(f.severity()).isEqualTo(Severity.HIGH);
+        });
+    }
+
     @Test
     void curlGegenDieEigeneApiImShellBlockIstHigh() {
         List<AnalyzerFinding> out = shell("set -euo pipefail\n"
