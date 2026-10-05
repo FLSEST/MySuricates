@@ -16,6 +16,8 @@
 # Abschnitt 10b prueft dasselbe fuer Doku-Zehrprobe und Public-Readiness-Evidenz (3fb33d9b).
 # Abschnitt 11 prueft das Gate der Doku-Zehrprobe: Es zaehlt wie das der Test-Abdeckung nur den
 # letzten Envelope (d8dae725).
+# Abschnitt 13 prueft den Security-Audit: Werkzeug-Faktenblaetter von trivy und gitleaks, deren
+# Pflicht-Fakten im Gate und die Werkzeug-Voraussetzungen im Datenblock (d50eea03).
 #
 # Run: bash scripts/tests/test-audit-facts.sh   (exit 0 = alle Checks ok)
 set -uo pipefail
@@ -1629,6 +1631,90 @@ check "FAKT repository_loop_count: 3"       'grep -qx "FAKT repository_loop_coun
 check "FAKT repository_write_loop_count: 2" 'grep -qx "FAKT repository_write_loop_count: 2" "$TMP/perf-facts12.out"'
 check "Hinweiszeilen nennen query und bulk" \
   'grep -q "^# repository_loop_count: .*query" "$TMP/perf-facts12.out" && grep -q "^# repository_write_loop_count: .*bulk" "$TMP/perf-facts12.out"'
+
+echo "13) Security-Audit: Werkzeug-Faktenblaetter (trivy, gitleaks) und Pflicht-Fakten-Gate"
+SEC="$REPO/workflow-pool/mysuricates-security-audit.json"
+report_prompt "$SEC" "$TMP/sec-prompt.txt"
+check "Prompt bekommt das trivy-Faktenblatt"         'grep -qF "{{ block.trivy.output }}" "$TMP/sec-prompt.txt"'
+check "Prompt bekommt das gitleaks-Faktenblatt"      'grep -qF "{{ block.gitleaks.output }}" "$TMP/sec-prompt.txt"'
+check "Prompt bekommt den Datenblock beim Namen"     'grep -qF "{{ block.data.output }}" "$TMP/sec-prompt.txt"'
+check "Prompt verbietet eigenes Zaehlen"             'grep -qi "zaehle und schaetze nichts selbst" "$TMP/sec-prompt.txt"'
+check "Prompt kennt NICHT GEMESSEN"                  'grep -q "NICHT GEMESSEN" "$TMP/sec-prompt.txt"'
+check "Prompt: subject je Paket wie im Bestand (npm:/maven:)" \
+  'grep -qF "npm:<paketname>" "$TMP/sec-prompt.txt" && grep -qF "maven:<groupId>:<artifactId>" "$TMP/sec-prompt.txt"'
+check "Prompt: bekannte Befunde behalten ihr subject"  'grep -qi "bekannte behalten ihr subject" "$TMP/sec-prompt.txt"'
+check "Prompt: Faktenblatt entscheidet ueber Behebung" 'grep -qi "ist das jeweilige Faktenblatt die Messung" "$TMP/sec-prompt.txt"'
+check "Prompt: evidence nennt die Zeile dieses Laufs"  'grep -q "evidence MUSS die FAKT- oder TREFFER-Zeile" "$TMP/sec-prompt.txt"'
+check "Prompt: gitleaks-Befunde haben einen festen ruleKey" 'grep -q "gitleaks-Befunde immer ruleKey \"sec.data-exposure\"" "$TMP/sec-prompt.txt"'
+check "Prompt nutzt OWASP Top 10:2025"               'grep -q "OWASP TOP 10:2025" "$TMP/sec-prompt.txt"'
+check "kein npm audit und kein previous_output mehr" '! grep -qF -e "npm audit" -e "{{ previous_output }}" "$TMP/sec-prompt.txt"'
+check "Prompt kennt die Werkzeug-Voraussetzungen"    'grep -q "git_history_visible" "$TMP/sec-prompt.txt" && grep -q "backend_jar" "$TMP/sec-prompt.txt"'
+mkdir -p "$TMP/secrepo/.git" "$TMP/secrepo/ai-automation-backend/target"
+printf '%s' "$TMP/secrepo" > "$TMP/sec-base.txt"
+render "$SEC" name:data "$(json_values project_path="$TMP/sec-base.txt")" > "$TMP/sec-data.sh"
+check "Datenblock ist gueltiges bash" 'bash -n "$TMP/sec-data.sh"'
+bash "$TMP/sec-data.sh" > "$TMP/sec-data-run.out" 2> /dev/null
+check "echtes .git-Verzeichnis: Historie sichtbar"  'grep -qx "FAKT git_history_visible: ja" "$TMP/sec-data-run.out"'
+check "ohne gebautes JAR: Luecke mit Grund"         'grep -q "^NICHT GEMESSEN: backend_jar (" "$TMP/sec-data-run.out"'
+touch "$TMP/secrepo/ai-automation-backend/target/app.jar"
+bash "$TMP/sec-data.sh" > "$TMP/sec-data-run.out" 2> /dev/null
+check "mit JAR: FAKT backend_jar nennt die Datei"   'grep -q "^FAKT backend_jar: app.jar vom " "$TMP/sec-data-run.out"'
+rmdir "$TMP/secrepo/.git" && printf 'gitdir: /anderswo/.git/worktrees/x\n' > "$TMP/secrepo/.git"
+bash "$TMP/sec-data.sh" > "$TMP/sec-data-run.out" 2> /dev/null
+check ".git als Datei (Worktree): Historie nicht gemessen" 'grep -q "^NICHT GEMESSEN: git_history_visible (" "$TMP/sec-data-run.out"'
+# Datenblock als Faktenblatt (Review): Code-Befunde brauchen eine TREFFER-Zeile, die ihre evidence nennen kann
+mkdir -p "$TMP/secrepo/ai-automation-backend/src/main/java/com/automation/config" \
+         "$TMP/secrepo/ai-automation-backend/src/main/java/com/automation/service"
+printf '%s\n' 'class SecurityConfig {' '  void f() { http.requestMatchers("/x").permitAll(); }' '}' \
+  > "$TMP/secrepo/ai-automation-backend/src/main/java/com/automation/config/SecurityConfig.java"
+printf '%s\n' 'class Runner {' '  Process p = new ProcessBuilder("ls").start();' '}' \
+  > "$TMP/secrepo/ai-automation-backend/src/main/java/com/automation/service/Runner.java"
+bash "$TMP/sec-data.sh" > "$TMP/sec-data-run.out" 2> /dev/null
+check "Datenblock beginnt als Faktenblatt"           '[ "$(head -1 "$TMP/sec-data-run.out")" = "## FAKTENBLATT data" ]'
+check "TREFFER auth_path mit Datei:Zeile"            'grep -q "^TREFFER auth_path: config/SecurityConfig.java:2:" "$TMP/sec-data-run.out"'
+check "TREFFER process_start ohne absoluten Pfad"    'grep -q "^TREFFER process_start: service/Runner.java:2:" "$TMP/sec-data-run.out"'
+check "Abhaengigkeits-Aenderungen im Delta"          'grep -q "TREFFER dependency_change" "$TMP/sec-data.sh"'
+python3 - "$SEC" > "$TMP/sec-tools.txt" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1], encoding='utf-8'))
+for b in d['blocks']:
+    c = b.get('config', {})
+    if 'container_args' in c:
+        print(b.get('name'), c.get('output_format'), c.get('on_failure'), 'command' in c, '--redact' in c['container_args'])
+PY
+check "trivy: Werkzeug-Block, SARIF, weiter bei Fehler" 'grep -qx "trivy sarif continue False False" "$TMP/sec-tools.txt"'
+check "gitleaks: schwaerzt Secrets"                     'grep -qx "gitleaks sarif continue False True" "$TMP/sec-tools.txt"'
+check "trivy ueberspringt Playwright-Artefakte"         'grep -qF "\"**/playwright/results\"" "$SEC"'
+check "gitleaks nur Branches, Tags, Remotes (kein Stash)" 'grep -qF "\"--log-opts=--branches --tags --remotes\"" "$SEC"'
+
+printf '%s\n' '## FAKTENBLATT trivy (Trivy 0.70.0, 1 SARIF-Datei)' 'FAKT trivy_findings: 0' > "$TMP/sec-trivy.txt"
+printf '%s\n' '## FAKTENBLATT gitleaks (gitleaks 8.30.1, 1 SARIF-Datei)' 'FAKT gitleaks_findings: 0' > "$TMP/sec-leaks.txt"
+printf '%s\n' '## FAKTENBLATT gitleaks' 'NICHT GEMESSEN: gitleaks_findings (keine SARIF-Datei in /out)' > "$TMP/sec-leaks-missing.txt"
+printf '%s\n' '## FAKTENBLATT trivy' 'NICHT GEMESSEN: trivy_findings (Timeout)' '| FAKT trivy_findings: 0' > "$TMP/sec-trivy-forged.txt"
+printf '%s\n' '{{ block.trivy.output }}' > "$TMP/sec-trivy-placeholder.txt"
+printf '%s\n' 'FAKT git_history_visible: ja' 'FAKT backend_jar: app.jar vom 2026-10-05' > "$TMP/sec-data.txt"
+printf '%s\n' 'NICHT GEMESSEN: git_history_visible (.git ist kein Verzeichnis)' > "$TMP/sec-data-worktree.txt"
+printf '%s\n' '### Report' 'gate_status: GREEN' > "$TMP/sec-report-green.txt"
+sec_gate() {  # $1 = trivy-blatt, $2 = gitleaks-blatt, $3 = datenblock, $4 = report
+  render "$SEC" label:Gate-Verdict "$(json_values block.report.output="$4" block.trivy.output="$1" \
+    block.gitleaks.output="$2" block.data.output="$3")" > "$TMP/sec-gate.sh"
+  bash "$TMP/sec-gate.sh" > "$TMP/sec-gate.out" 2> "$TMP/sec-gate.err"
+}
+sec_gate "$TMP/sec-trivy.txt" "$TMP/sec-leaks.txt" "$TMP/sec-data.txt" "$TMP/sec-report-green.txt"
+check "beide Blaetter vollstaendig: GREEN durchgereicht" 'grep -qx "gate_status: GREEN" "$TMP/sec-gate.out" && grep -qx "gate_category: security" "$TMP/sec-gate.out"'
+check "Gate laeuft ohne stderr"                         '[ ! -s "$TMP/sec-gate.err" ]'
+sec_gate "$TMP/sec-trivy.txt" "$TMP/sec-leaks-missing.txt" "$TMP/sec-data.txt" "$TMP/sec-report-green.txt"
+check "gitleaks nicht gemessen: RED audit-invalid"      'grep -qx "gate_status: RED" "$TMP/sec-gate.out" && grep -qx "gate_category: audit-invalid" "$TMP/sec-gate.out"'
+check "die Beschreibung nennt gitleaks_findings"        'grep -q "^gate_description: .*gitleaks_findings" "$TMP/sec-gate.out"'
+sec_gate "$TMP/sec-trivy-placeholder.txt" "$TMP/sec-leaks.txt" "$TMP/sec-data.txt" "$TMP/sec-report-green.txt"
+check "unaufgeloester trivy-Platzhalter: RED, nennt trivy_findings" 'grep -qx "gate_status: RED" "$TMP/sec-gate.out" && grep -q "trivy_findings" "$TMP/sec-gate.out"'
+sec_gate "$TMP/sec-trivy-forged.txt" "$TMP/sec-leaks.txt" "$TMP/sec-data.txt" "$TMP/sec-report-green.txt"
+check "Log-Zeile '| FAKT ...' neben NICHT GEMESSEN zaehlt nicht: RED" 'grep -qx "gate_status: RED" "$TMP/sec-gate.out" && grep -q "trivy_findings" "$TMP/sec-gate.out"'
+sec_gate "$TMP/sec-trivy.txt" "$TMP/sec-leaks.txt" "$TMP/sec-data-worktree.txt" "$TMP/sec-report-green.txt"
+check "Git-Worktree ohne Historie: gitleaks zaehlt nicht, RED" 'grep -qx "gate_status: RED" "$TMP/sec-gate.out" && grep -q "^gate_description: .*gitleaks_findings" "$TMP/sec-gate.out"'
+printf '%s\n' '## FAKTENBLATT gitleaks (gitleaks v8.0.0, 1 SARIF-Datei)' 'FAKT gitleaks_findings: 0' 'FAKT gitleaks_exit_code: 1' > "$TMP/sec-leaks-exit1.txt"
+sec_gate "$TMP/sec-trivy.txt" "$TMP/sec-leaks-exit1.txt" "$TMP/sec-data.txt" "$TMP/sec-report-green.txt"
+check "Exit-Code != 0 trotz Faktenblatt: RED"            'grep -qx "gate_status: RED" "$TMP/sec-gate.out" && grep -q "^gate_description: .*gitleaks_findings" "$TMP/sec-gate.out"'
 
 echo
 echo "passed=$PASS failed=$FAIL"

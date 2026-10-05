@@ -202,6 +202,7 @@ Umgestellte Audits im `workflow-pool/`:
 | Performance-Audit | Block `facts` (Health-Sonde, Heap-Zahlen aus `/api/v1/system/jvm-memory`, DB- und Bundle-Dateien, Logzeilen, Quelltext-Muster) | `scripts/tests/test-audit-facts.sh` |
 | Test-Abdeckung | Block `metrics` mit Soll-Größe `ERWARTETE FINDINGS`; der Shell-Block `report` baut daraus den Envelope, die KI (Block `coach`) liefert nur Bericht, `naechster_schritt` und Texte je Klasse; Gate zählt den Envelope dagegen | `scripts/tests/test-coverage-snapshot.sh` |
 | Doku-Zehrprobe | Block `dossier` → `scripts/public-readiness/docs_orphan_scan.py` (Erreichbarkeit, Verweise, Pflegestand, Themen-Überlappung) | `scripts/tests/test_docs_orphan_scan.py`, Gate: `scripts/tests/test-audit-facts.sh` |
+| Security-Audit | Blöcke `trivy` (Lockfiles, `pom.xml`, gebautes Backend-JAR) und `gitleaks` (Git-Historie) im Werkzeug-Modus (`automation-agent-devops`, SARIF → Faktenblatt); Block `data` für Code-Fundstellen, Git-Delta und die Voraussetzungen der Werkzeuge (`git_history_visible`, `backend_jar`); Gate: Pflicht-Fakten `trivy_findings`, `gitleaks_findings` | `scripts/tests/test-audit-facts.sh` (Abschnitt 13) |
 
 ### Architektur-Review: Einstufung im Skript
 

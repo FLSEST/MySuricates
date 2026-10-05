@@ -203,6 +203,7 @@ Converted audits in `workflow-pool/`:
 | Performance audit | block `facts` (health probe, heap numbers from `/api/v1/system/jvm-memory`, DB and bundle files, log lines, source patterns) | `scripts/tests/test-audit-facts.sh` |
 | Test coverage | block `metrics` with the target size `ERWARTETE FINDINGS`; the shell block `report` builds the envelope from it, the AI (block `coach`) only supplies the report, `naechster_schritt` and one text per class; the gate counts the envelope against it | `scripts/tests/test-coverage-snapshot.sh` |
 | Documentation weight check | block `dossier` → `scripts/public-readiness/docs_orphan_scan.py` (reachability, references, maintenance, topic overlap) | `scripts/tests/test_docs_orphan_scan.py`, gate: `scripts/tests/test-audit-facts.sh` |
+| Security audit | blocks `trivy` (lockfiles, `pom.xml`, built backend JAR) and `gitleaks` (git history) in tool mode (`automation-agent-devops`, SARIF → fact sheet); block `data` for code locations, git delta and the tools' preconditions (`git_history_visible`, `backend_jar`); gate: mandatory facts `trivy_findings`, `gitleaks_findings` | `scripts/tests/test-audit-facts.sh` (section 13) |
 
 ### Architecture review: grading in the script
 
