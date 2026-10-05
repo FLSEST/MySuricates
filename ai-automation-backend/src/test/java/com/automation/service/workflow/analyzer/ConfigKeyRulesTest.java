@@ -199,6 +199,16 @@ class ConfigKeyRulesTest {
                     });
         }
 
+        /** Shell läuft mit command oder im Werkzeug-Modus mit container_args – nie mit beiden (d3a7f5e2). */
+        @Test
+        void shellBrauchtGenauEinenVonCommandUndContainerArgs() {
+            assertThat(keyFindings(block("shell", "s", Map.of("container_image", "img:1",
+                    "container_args", List.of("fs"), "output_format", "sarif", "cache_dir", "/cache")))).isEmpty();
+            assertThat(keyFindings(block("shell", "s", Map.of("command", "echo",
+                    "container_image", "img:1", "container_args", List.of("fs")))))
+                    .singleElement().extracting(AnalyzerFinding::rule).isEqualTo("missing-required-config-key");
+        }
+
         @Test
         void kurzeSchluesselBekommenKeinenGeratenenVorschlag() {
             assertThat(ConfigKeyRules.suggestion("mode", java.util.Set.of("node", "name"))).isEqualTo("node");

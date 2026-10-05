@@ -26,11 +26,18 @@ public class ShellBlockExecutor implements BlockExecutor {
 
     private final ShellCommandService shellService;
     private final ContainerShellService containerShellService;
+    private final ContainerToolStep containerToolStep;
 
     @Override
     public StepResult execute(BlockDefinition block, ExecutionContext context) {
         Map<String, Object> config = block.getConfig();
         Object rawCommand = config.get("command");
+        if (config.containsKey("container_args")) {
+            if (rawCommand != null) {
+                throw new WorkflowExecutionException("Shell block takes either 'command' or 'container_args', not both");
+            }
+            return containerToolStep.execute(block, ContainerToolSpec.from(config, block.getName()), context);
+        }
         if (rawCommand == null) {
             throw new WorkflowExecutionException("Shell block requires a 'command' in config");
         }

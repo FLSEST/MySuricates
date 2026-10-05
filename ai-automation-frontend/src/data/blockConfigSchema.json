@@ -256,8 +256,9 @@
       }
     },
     "shell": {
-      "required": [
-        "command"
+      "requiredOneOf": [
+        "command",
+        "container_args"
       ],
       "fields": {
         "command": {
@@ -300,6 +301,77 @@
           },
           "items": {
             "type": "string"
+          }
+        },
+        "container_args": {
+          "type": "array",
+          "doc": {
+            "de": "Werkzeug-Modus statt `command`: Argumente für den Einstiegsbefehl des Images, ohne Shell. Das Projekt liegt nur lesbar unter /workspace. Nicht vertrauenswürdige Platzhalter (Webhook-Daten, Plattformdaten) werden abgelehnt.",
+            "en": "Tool mode instead of `command`: arguments for the image's own entrypoint, no shell. The project is mounted read-only at /workspace. Untrusted placeholders (webhook input, platform data) are refused."
+          },
+          "items": {
+            "type": "string"
+          },
+          "onlyWith": {
+            "container_image": "*"
+          }
+        },
+        "output_format": {
+          "type": "string",
+          "doc": {
+            "de": "Was als Ausgabe des Schritts gilt.",
+            "en": "What counts as the step's output."
+          },
+          "values": [
+            {
+              "value": "raw",
+              "doc": {
+                "de": "Ausgabe des Werkzeugs, Exit-Code entscheidet (Standard).",
+                "en": "The tool's output, the exit code decides (default)."
+              }
+            },
+            {
+              "value": "sarif",
+              "doc": {
+                "de": "Faktenblatt aus den SARIF-Dateien im Ausgabeordner (`FAKT`/`TREFFER`, sonst `NICHT GEMESSEN`).",
+                "en": "Fact sheet from the SARIF files in the output directory (`FAKT`/`TREFFER`, otherwise `NICHT GEMESSEN`)."
+              }
+            }
+          ],
+          "default": "raw",
+          "onlyWith": {
+            "container_args": "*"
+          }
+        },
+        "output_dir": {
+          "type": "string",
+          "doc": {
+            "de": "Pfad im Container, an dem die Plattform je Schritt einen leeren Ausgabeordner einbindet; das Werkzeug schreibt seine SARIF-Datei dorthin.",
+            "en": "Path in the container where the platform mounts an empty output directory per step; the tool writes its SARIF file there."
+          },
+          "default": "/out",
+          "onlyWith": {
+            "output_format": "sarif"
+          }
+        },
+        "cache_dir": {
+          "type": "string",
+          "doc": {
+            "de": "Pfad im Container für einen dauerhaften Cache je Image (etwa eine Schwachstellen-Datenbank).",
+            "en": "Path in the container for a persistent cache per image (such as a vulnerability database)."
+          },
+          "onlyWith": {
+            "container_args": "*"
+          }
+        },
+        "fact_prefix": {
+          "type": "string",
+          "doc": {
+            "de": "Präfix der FAKT-/TREFFER-Namen; Standard ist der Block-Name.",
+            "en": "Prefix of the FAKT/TREFFER names; defaults to the block name."
+          },
+          "onlyWith": {
+            "output_format": "sarif"
           }
         },
         "checked_command": {

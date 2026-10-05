@@ -157,8 +157,15 @@ describe('blockConfigSchema', () => {
       { required: ['id'], properties: { id: { minLength: 1 } } },
       { required: ['updates'], properties: { updates: { minLength: 1 } } },
     ]);
-    expect(requiredOneOfConfigKeys('shell')).toEqual([]);
-    expect(buildBlockConfigSchema('shell', 'en')).not.toHaveProperty('oneOf');
+    expect(requiredOneOfConfigKeys('approval')).toEqual([]);
+    expect(buildBlockConfigSchema('approval', 'en')).not.toHaveProperty('oneOf');
+  });
+
+  // d3a7f5e2: a shell block runs either a command or, in tool mode, an image with container_args
+  it('requires exactly one of command and container_args for shell', () => {
+    expect(requiredOneOfConfigKeys('shell')).toEqual(['command', 'container_args']);
+    expect(requiredConfigKeys('shell')).toEqual([]);
+    expect(buildBlockConfigSchema('shell', 'en')).toHaveProperty('oneOf');
   });
 
   it('lets an unknown (server-only) block type through without key warnings', () => {

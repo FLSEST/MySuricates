@@ -23,7 +23,8 @@ class WorkspaceCheckTest {
         var context = ExecutionContext.builder().workflowRunId("run").build();
         context.setProjectPath(directory.toString());
         context.setRunMetadata("workspace", Map.of("logsPath", directory.toString(), "sourceCommit", "abc"));
-        var executor = new ShellBlockExecutor(new ShellCommandService(), mock(ContainerShellService.class));
+        var executor = new ShellBlockExecutor(new ShellCommandService(), mock(ContainerShellService.class),
+                mock(ContainerToolStep.class));
         var block = new BlockDefinition();
         block.setType("shell");
         block.setConfig(Map.of("command", "(echo compiler-failure; exit 7) | tail -10",

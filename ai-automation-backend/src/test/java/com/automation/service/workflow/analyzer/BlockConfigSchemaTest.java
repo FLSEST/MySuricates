@@ -78,7 +78,9 @@ class BlockConfigSchemaTest {
 
         @Test
         void pflichtschluesselJeTyp() {
-            assertThat(schema.requiredKeys("shell")).containsExactly("command");
+            // Werkzeug-Modus (d3a7f5e2): genau einer von command und container_args
+            assertThat(schema.requiredKeys("shell")).isEmpty();
+            assertThat(schema.requiredOneOfKeys("shell")).containsExactly("command", "container_args");
             assertThat(schema.requiredKeys("switch")).containsExactly("expression", "cases");
             assertThat(schema.requiredKeys("integration")).containsExactly("provider", "action");
             assertThat(schema.requiredKeys("approval")).isEmpty();
