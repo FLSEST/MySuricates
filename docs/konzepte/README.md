@@ -5,6 +5,9 @@ kosten und wo ihre Grenzen liegen. Jede Seite verbindet ein Ablaufdiagramm mit
 Codebelegen und einer datierten Betriebsmessung. Die Zahlen beschreiben eine
 einzelne Entwicklungsinstallation; sie belegen keinen allgemeinen Nutzen.
 
+Vier davon – Gates, Selbstverbesserung, Workflow-Memory und Agentische Budgets – sind gebaut, um je eine
+Forschungsfrage zu untersuchen. Gebaut heißt: sie laufen. Es heißt nicht, dass die Frage beantwortet ist.
+
 | Mechanismus | Leitfrage |
 |---|---|
 | [Gates](gates.md) | Wie wird aus einer Ausgabe ein maschinenlesbares Urteil? |

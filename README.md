@@ -39,7 +39,7 @@ which answer, and which approaches (loop engineering, spec-driven development or
 agents, for example) can be built from the same blocks, is shown in [Building blocks](docs/en/baukasten.md).
 
 After installation only the core is on (preset `core`); `research` and `full` switch on further
-modules — which ones is listed under [Research questions](#research-questions) and in [Building blocks](docs/en/baukasten.md).
+modules — which ones is listed under [Before you start it](#before-you-start-it) and in [Building blocks](docs/en/baukasten.md).
 
 ## Quickstart
 
@@ -106,27 +106,6 @@ For agents that call the REST API directly, [AGENTS.md](AGENTS.md) is the starti
 4. **Everything can be wired together:** diverse concepts, connect additional sources.
 5. **Provider-independent as far as possible:** provider and model can be selected per block. Encapsulating AI in the container has not yet been achieved.
 
-## Research questions
-
-Four mechanisms were built to investigate one question each. Built here means: they run.
-It does not mean that the question has been answered.
-
-| Question | Mechanism in the code |
-|---|---|
-| Can a system identify and work through its own need for improvement without anyone giving it the initial push? | **Self-Improvement Loop**: audit workflow → machine evaluation by a gate (last row of this table) → automatically created TODO → the `TodoTrigger` starts a fix workflow for it → verification. Three layers prevent the loop from chasing itself: a fix run is marked as such and may not create a TODO itself, the number of fix attempts is limited per TODO, and as long as one fix run is running, no second one starts. [Details](docs/en/architektur.md#todo-triggers--self-improvement-loop-v51v52) |
-| What does an agent need to know about a project, and where does that knowledge come from if nobody writes it down? | **Workflow Memory**: knowledge is extracted from completed runs and injected as context before the next run. |
-| How do you retain control over an agent that plans several steps by itself? | **Agentic blocks** separate Reason and Act — first one call decides what to do, a second executes it — and run against hard budgets: iterations, time, cumulative tokens, repetition detection. |
-| Can the quality of an AI output be evaluated by machine instead of by reading it? | **Gates**: blocks output `gate_status: GREEN\|YELLOW\|RED`. RED creates a high-priority TODO, YELLOW a medium-priority one. The evaluation lives in the workflow, not in the platform. |
-
-Not all of this is enabled after installation. Peripheral functions are modules that are fixed at
-startup. The `core` preset (default) contains the core — workflows, blocks, schedules, TODOs.
-`research` adds the mechanisms from this section and their interfaces: chains (several workflows as
-one chain), the chat assistant, learning (analyses of completed runs — metrics and recommendations),
-workflow memory (knowledge from runs that is injected into later runs), the Audit Center (the page
-where the findings from audit workflows are tracked over time), and BPMN export. `full` enables
-everything — including integrations, webhooks, and remote access. The installer asks for this; the
-complete list with all modules is in [Architecture](docs/en/architektur.md#module-system-startup-configuration).
-
 ## Maturity level and known debt
 
 Known hard limits:
@@ -148,6 +127,15 @@ default), and some endpoints do not need an API key. MySuricates
 is built for local operation by a trusted person — for remote access, put a VPN in front of it,
 not an open port. Full details:
 [Trust model and network exposure](docs/en/deployment.md#trust-model-and-network-exposure).
+
+Not everything is enabled after installation. Peripheral functions are modules that are fixed at
+startup. The `core` preset (default) contains the core — workflows, blocks, schedules, TODOs.
+`research` adds: chains (several workflows as
+one chain), the chat assistant, learning (analyses of completed runs — metrics and recommendations),
+workflow memory (knowledge from runs that is injected into later runs), the Audit Center (the page
+where the findings from audit workflows are tracked over time), and BPMN export. `full` enables
+everything — including integrations, webhooks, and remote access. The installer asks for this; the
+complete list with all modules is in [Architecture](docs/en/architektur.md#module-system-startup-configuration).
 
 ## Tech stack
 

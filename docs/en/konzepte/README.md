@@ -7,6 +7,9 @@ cost, and where their limits are. Each page combines a flow diagram with code
 evidence and a dated operational measurement. The numbers describe a single
 development installation; they do not prove any general benefit.
 
+Four of them – gates, self-improvement, workflow memory and agentic budgets – were built to investigate
+one research question each. Built means: they run. It does not mean the question has been answered.
+
 | Mechanism | Guiding question |
 |---|---|
 | [Gates](gates.md) | How does output become a machine-readable judgment? |

@@ -40,7 +40,7 @@ welche Ansätze (etwa Loop-Engineering, Spec-Driven Development oder Agenten orc
 denselben Bausteinen bauen lassen, zeigt der [Baukasten](docs/baukasten.md).
 
 Nach der Installation ist nur der Kern an (Preset `core`); `research` und `full` schalten weitere
-Module zu — welche, steht unter [Forschungsfragen](#forschungsfragen) und im [Baukasten](docs/baukasten.md).
+Module zu — welche, steht unter [Bevor du es startest](#bevor-du-es-startest) und im [Baukasten](docs/baukasten.md).
 
 ## Schnellstart
 
@@ -107,28 +107,6 @@ Fuer Agenten, die die REST-API direkt ansprechen, ist [AGENTS.md](AGENTS.md) der
 4. **Alles lässt sich zusammenstöpseln:** diverse Konzepte, weitere Quellen anbinden.
 5. **Unabhängig vom Anbieter, so weit wie möglich:** Anbieter und Modell je Block wählbar. Die Kapselung der KI im Container ist noch nicht erreicht.
 
-## Forschungsfragen
-
-Vier Mechanismen sind gebaut, um jeweils eine Frage zu untersuchen. Gebaut heisst hier: sie laufen.
-Es heisst nicht, dass die Frage beantwortet ist.
-
-| Frage | Mechanismus im Code |
-|---|---|
-| Kann ein System den eigenen Verbesserungsbedarf feststellen und abarbeiten, ohne dass jemand den Anstoss gibt? | **Self-Improvement-Loop**: Audit-Workflow → maschinelle Bewertung durch ein Gate (letzte Zeile dieser Tabelle) → automatisch erzeugtes TODO → der `TodoTrigger` startet dazu einen Fix-Workflow → Verifikation. Drei Schichten verhindern, dass der Loop sich selbst nachlaeuft: ein Fix-Run ist als solcher markiert und darf selbst kein TODO erzeugen, je TODO ist die Zahl der Fix-Versuche begrenzt, und solange ein Fix-Run laeuft, startet kein zweiter. [Details](docs/architektur.md#todo-triggers--self-improvement-loop-v51v52) |
-| Was muss ein Agent ueber ein Projekt wissen, und woher kommt dieses Wissen, wenn niemand es aufschreibt? | **Workflow-Memory**: aus abgeschlossenen Runs wird Wissen extrahiert und vor dem naechsten Lauf als Kontext eingespielt. |
-| Wie behaelt man die Kontrolle ueber einen Agenten, der mehrere Schritte selbst plant? | **Agentische Bloecke** trennen Reason und Act — erst entscheidet ein Aufruf, was zu tun ist, ein zweiter fuehrt es aus — und laufen gegen harte Budgets: Iterationen, Zeit, kumulierte Tokens, Wiederholungserkennung. |
-| Kann man die Qualitaet einer KI-Ausgabe maschinell bewerten, statt sie zu lesen? | **Gates**: Bloecke geben `gate_status: GREEN\|YELLOW\|RED` aus. RED erzeugt ein TODO mit hoher, YELLOW eines mit mittlerer Prioritaet. Die Bewertung steckt im Workflow, nicht in der Plattform. |
-
-Nicht alles davon ist nach der Installation eingeschaltet. Randfunktionen sind Module, die beim
-Start festgelegt werden. Das Preset `core` (Standard) enthaelt den Kern — Workflows, Bloecke,
-Zeitplaene, TODOs. `research` ergaenzt die Mechanismen dieses Abschnitts und ihre Oberflaechen:
-Chains (mehrere Workflows als eine Kette), den Chat-Assistenten, Learning (Auswertungen ueber
-abgelaufene Runs — Kennzahlen und Empfehlungen), Workflow-Memory (Wissen aus Runs, das in spaetere
-Runs eingespielt wird), das Audit Center (die Seite, auf der die Befunde der Audit-Workflows ueber
-die Zeit gefuehrt werden) und BPMN-Export. `full` schaltet alles frei — darunter Integrationen,
-Webhooks und Fernzugriff. Der Installer fragt danach; die vollstaendige Liste mit allen Modulen
-steht in [Architektur](docs/architektur.md#module-system-startkonfiguration).
-
 ## Reifegrad und bekannte Schulden
 
 Bekannte harte Grenzen:
@@ -151,6 +129,16 @@ keinen API-Key. MySuricates
 ist fuer den lokalen Betrieb durch eine vertrauenswuerdige Person gebaut — fuer Fernzugriff gehoert
 ein VPN davor, kein offener Port. Vollstaendig:
 [Vertrauensmodell und Netzwerk-Exposition](docs/deployment.md#vertrauensmodell-und-netzwerk-exposition).
+
+Nicht alles ist nach der Installation eingeschaltet. Randfunktionen sind Module, die beim
+Start festgelegt werden. Das Preset `core` (Standard) enthaelt den Kern — Workflows, Bloecke,
+Zeitplaene, TODOs. `research` ergaenzt:
+Chains (mehrere Workflows als eine Kette), den Chat-Assistenten, Learning (Auswertungen ueber
+abgelaufene Runs — Kennzahlen und Empfehlungen), Workflow-Memory (Wissen aus Runs, das in spaetere
+Runs eingespielt wird), das Audit Center (die Seite, auf der die Befunde der Audit-Workflows ueber
+die Zeit gefuehrt werden) und BPMN-Export. `full` schaltet alles frei — darunter Integrationen,
+Webhooks und Fernzugriff. Der Installer fragt danach; die vollstaendige Liste mit allen Modulen
+steht in [Architektur](docs/architektur.md#module-system-startkonfiguration).
 
 ## Tech-Stack
 
