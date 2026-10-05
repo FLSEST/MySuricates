@@ -455,7 +455,8 @@ A **goal** (`entity/Goal`, `/api/v1/goals`) collects TODOs from several projects
 ## Notification System (V40)
 
 Notification configurations (webhook or desktop) for workflow events are managed by
-`NotificationService` under `/api/v1/notifications`.
+`NotificationService` under `/api/v1/notifications`. A webhook target counts as an own service: targets in
+the local network are refused only with the hardening switch `private-network-guard-own-services` (off by default).
 
 ## Assistant System (V41+V42)
 
@@ -570,7 +571,7 @@ Claude Code sessions can also serve as templates for workflows:
 - **54 built-in templates** are seeded at startup by `WorkflowTemplateSeeder` (idempotent, inserts missing ones, updates on version bump). Built-in rows whose file no longer ships (moved to the pool, renamed, left-overs with a random id) it removes first; the file names decide (`BuiltInTemplateLoader.shippedIds`), so a file that fails to parse does not lose its row. Verifications go along via `ON DELETE CASCADE`, workflows made from such templates stay and only lose the back-reference (`ON DELETE SET NULL`). User templates are left alone
 - Template definitions are stored as individual JSON files in `src/main/resources/templates/builtin/` (one file per template, loaded by `BuiltInTemplateLoader`)
 - Name and description are i18n JSON maps: `{"de":"...","en":"..."}` — stored via `JsonStringMapConverter`
-- Built-in templates (`builtIn=true`) cannot be deleted; only `sortOrder` and `category` are updatable
+- Built-in templates (`builtIn=true`) cannot be deleted (409). Fields changed via PUT stay until a release ships a higher `version` – then `WorkflowTemplateSeeder` overwrites them at startup. A PUT with `blocks` or `instructions` makes the template single-language (the second language variant is dropped)
 - Users can create custom templates via API or by saving an existing workflow
 - `workflow.templateId` — optional back-reference to the source template
 - Frontend resolves localized template names via `resolveTemplateName()` in `utils/templateUtils.ts`
@@ -694,7 +695,7 @@ Response (DTO) → React Query Cache → UI Update
 ## WebSocket (Live Logs + Status)
 
 - **Protocol:** STOMP over SockJS
-- **Endpoint:** `/ws` (SockJS handshake, authenticated by ticket — see [WebSocket Authentication](#websocket-authentication))
+- **Endpoint:** `/ws` (SockJS handshake, authenticated by ticket — see [WebSocket Authentication](#websocket-authentication)); the terminal uses `/ws/terminal/**`, at most three sessions per container (`TerminalWebSocketHandler`)
 - **Broker:** Simple Message Broker on `/topic`
 - **Topics:**
   - `/topic/executions/{runId}/logs` — Workflow execution logs

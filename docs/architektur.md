@@ -461,7 +461,8 @@ Ein **Ziel** (`entity/Goal`, `/api/v1/goals`, TODO dc0566f8) sammelt TODOs aus m
 ## Notification System (V40)
 
 Benachrichtigungs-Konfigurationen (Webhook oder Desktop) für Workflow-Ereignisse verwaltet
-`NotificationService` unter `/api/v1/notifications`.
+`NotificationService` unter `/api/v1/notifications`. Ein Webhook-Ziel gilt als eigener Dienst: Ziele im
+lokalen Netz lehnt erst der Härtungsschalter `private-network-guard-own-services` ab (Standard aus).
 
 ## Assistant System (V41+V42)
 
@@ -576,7 +577,7 @@ Claude-Code-Sessions können ebenfalls als Vorlage für Workflows dienen:
 - **54 Built-in Templates** werden beim Start durch `WorkflowTemplateSeeder` eingespielt (idempotent, fügt fehlende ein, aktualisiert bei Version-Bump). Built-in-Zeilen, deren Datei nicht mehr ausgeliefert wird (in den Pool verschoben, umbenannt, Altlasten mit Zufalls-ID), entfernt er vorher; maßgeblich sind die Dateinamen (`BuiltInTemplateLoader.shippedIds`), damit eine Datei, die nicht parst, ihre Zeile nicht verliert. Verifikationen fallen per `ON DELETE CASCADE` mit, Workflows aus solchen Vorlagen bleiben und verlieren nur den Rückverweis (`ON DELETE SET NULL`). Nutzer-Vorlagen bleiben unberührt
 - Template-Definitionen liegen als einzelne JSON-Dateien in `src/main/resources/templates/builtin/` (eine Datei pro Template, geladen durch `BuiltInTemplateLoader`)
 - Name und Beschreibung sind i18n JSON-Maps: `{"de":"...","en":"..."}` — gespeichert via `JsonStringMapConverter`
-- Built-in Templates (`builtIn=true`) können nicht gelöscht werden; nur `sortOrder` und `category` sind aktualisierbar
+- Built-in Templates (`builtIn=true`) können nicht gelöscht werden (409). Per PUT geänderte Felder bleiben, bis ein Release eine höhere `version` mitbringt – dann überschreibt `WorkflowTemplateSeeder` sie beim Start. Ein PUT mit `blocks` oder `instructions` macht die Vorlage einsprachig (die zweite Sprachfassung entfällt)
 - Nutzer können eigene Templates via API oder durch Speichern eines bestehenden Workflows anlegen
 - `workflow.templateId` — optionale Back-Referenz auf das Quell-Template
 - Frontend löst lokalisierte Template-Namen via `resolveTemplateName()` in `utils/templateUtils.ts` auf
@@ -700,7 +701,7 @@ Response (DTO) → React Query Cache → UI-Update
 ## WebSocket (Live-Logs + Status)
 
 - **Protokoll:** STOMP über SockJS
-- **Endpunkt:** `/ws` (SockJS Handshake, Authentifizierung per Ticket — siehe [WebSocket-Authentifizierung](#websocket-authentifizierung))
+- **Endpunkt:** `/ws` (SockJS Handshake, Authentifizierung per Ticket — siehe [WebSocket-Authentifizierung](#websocket-authentifizierung)); das Terminal nutzt `/ws/terminal/**`, höchstens drei Sitzungen je Container (`TerminalWebSocketHandler`)
 - **Broker:** Simple Message Broker auf `/topic`
 - **Topics:**
   - `/topic/executions/{runId}/logs` — Workflow-Ausführungs-Logs
