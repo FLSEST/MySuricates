@@ -45,14 +45,8 @@ an existing task system instead of the built-in TODOs, for example. Which buildi
 which answer, and which approaches (loop engineering, spec-driven development, orchestrating agents)
 can be built from the same blocks, is shown in [Building blocks](docs/en/baukasten.md).
 
-Not all of this is enabled after installation. Peripheral functions are modules that are fixed at
-startup. The `core` preset (default) contains the core — workflows, blocks, schedules, TODOs.
-`research` adds the mechanisms of the [research questions](#research-questions) and their interfaces: chains (several workflows as
-one chain), the chat assistant, learning (analyses of completed runs — metrics and recommendations),
-workflow memory (knowledge from runs that is injected into later runs), the Audit Center (the page
-where the findings from audit workflows are tracked over time), and BPMN export. `full` enables
-everything — including integrations, webhooks, and remote access. The installer asks for this; the
-complete list with all modules is in [Architecture](docs/en/architektur.md#module-system-startup-configuration).
+After installation only the core is on (preset `core`); `research` and `full` switch on further
+modules — which ones is listed under [Research questions](#research-questions) and in [Building blocks](docs/en/baukasten.md).
 
 ## Quickstart
 
@@ -138,6 +132,15 @@ and those guardrails are the real outcome. A gate that merely asks a language mo
 is good reliably delivers findings — including fabricated ones. Deterministic measurement before AI
 evaluation is the recurring lesson. The mechanisms individually, each with a flow diagram, code
 evidence, and limits: [Concepts](docs/en/konzepte/README.md).
+
+Not all of this is enabled after installation. Peripheral functions are modules that are fixed at
+startup. The `core` preset (default) contains the core — workflows, blocks, schedules, TODOs.
+`research` adds the mechanisms from this section and their interfaces: chains (several workflows as
+one chain), the chat assistant, learning (analyses of completed runs — metrics and recommendations),
+workflow memory (knowledge from runs that is injected into later runs), the Audit Center (the page
+where the findings from audit workflows are tracked over time), and BPMN export. `full` enables
+everything — including integrations, webhooks, and remote access. The installer asks for this; the
+complete list with all modules is in [Architecture](docs/en/architektur.md#module-system-startup-configuration).
 
 ## What is in there
 

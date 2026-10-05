@@ -45,15 +45,8 @@ ein vorhandenes Aufgabensystem statt der eigenen TODOs. Welcher Baustein zu welc
 welche Ansätze (Loop-Engineering, Spec-Driven Development, Agenten orchestrieren) sich aus denselben
 Bausteinen bauen lassen, zeigt der [Baukasten](docs/baukasten.md).
 
-Nicht alles davon ist nach der Installation eingeschaltet. Randfunktionen sind Module, die beim
-Start festgelegt werden. Das Preset `core` (Standard) enthaelt den Kern — Workflows, Bloecke,
-Zeitplaene, TODOs. `research` ergaenzt die Mechanismen der [Forschungsfragen](#forschungsfragen) und ihre Oberflaechen:
-Chains (mehrere Workflows als eine Kette), den Chat-Assistenten, Learning (Auswertungen ueber
-abgelaufene Runs — Kennzahlen und Empfehlungen), Workflow-Memory (Wissen aus Runs, das in spaetere
-Runs eingespielt wird), das Audit Center (die Seite, auf der die Befunde der Audit-Workflows ueber
-die Zeit gefuehrt werden) und BPMN-Export. `full` schaltet alles frei — darunter Integrationen,
-Webhooks und Fernzugriff. Der Installer fragt danach; die vollstaendige Liste mit allen Modulen
-steht in [Architektur](docs/architektur.md#module-system-startkonfiguration).
+Nach der Installation ist nur der Kern an (Preset `core`); `research` und `full` schalten weitere
+Module zu — welche, steht unter [Forschungsfragen](#forschungsfragen) und im [Baukasten](docs/baukasten.md).
 
 ## Schnellstart
 
@@ -139,6 +132,16 @@ und die Leitplanken sind der eigentliche Ertrag. Ein Gate, das nur ein Sprachmod
 gut ist, liefert zuverlaessig Befunde — auch erfundene. Deterministische Messung vor KI-Bewertung ist
 die wiederkehrende Lehre. Die Mechanismen einzeln, je mit Ablaufdiagramm, Codebelegen und Grenzen:
 [Konzepte](docs/konzepte/README.md).
+
+Nicht alles davon ist nach der Installation eingeschaltet. Randfunktionen sind Module, die beim
+Start festgelegt werden. Das Preset `core` (Standard) enthaelt den Kern — Workflows, Bloecke,
+Zeitplaene, TODOs. `research` ergaenzt die Mechanismen dieses Abschnitts und ihre Oberflaechen:
+Chains (mehrere Workflows als eine Kette), den Chat-Assistenten, Learning (Auswertungen ueber
+abgelaufene Runs — Kennzahlen und Empfehlungen), Workflow-Memory (Wissen aus Runs, das in spaetere
+Runs eingespielt wird), das Audit Center (die Seite, auf der die Befunde der Audit-Workflows ueber
+die Zeit gefuehrt werden) und BPMN-Export. `full` schaltet alles frei — darunter Integrationen,
+Webhooks und Fernzugriff. Der Installer fragt danach; die vollstaendige Liste mit allen Modulen
+steht in [Architektur](docs/architektur.md#module-system-startkonfiguration).
 
 ## Was da steht
 
