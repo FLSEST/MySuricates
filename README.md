@@ -212,4 +212,4 @@ Please do **not** report security vulnerabilities as public issues; use the repo
 
 > 🌍 **README.de.md is the source, `README.md` the translation.** Content changes belong in the German file. The author generates the English version from it in their MySuricates instance using the "README DE↔EN Sync" workflow; the repository holds only the result, not the workflow. So if you contribute from outside, change the German source and adjust `README.md` by hand in the same commit — or change only the German one and note in the pull request that the translation still needs to follow.
 
-<!-- synced-from: 9655205750aa sha256:a2a033380d790b015d4bdf0d49336a3bf22d23614ed1ec14fa31e8b55b63abab -->
+<!-- synced-from: 3c2b1c3d2e37 sha256:74a5cd2db1bec3b059aa4f469789d96db02dc3fe5dcfa00ac55c1185299cb985 -->
