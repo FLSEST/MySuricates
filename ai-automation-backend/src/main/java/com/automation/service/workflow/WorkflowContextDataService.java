@@ -57,8 +57,8 @@ public class WorkflowContextDataService {
      * ({@link #GAP_FORMAT}) and says so out loud in the activity log. A shared
      * {@code catch (Exception)} around all injections hid exactly this for months: {@code request_metrics}
      * was never set, six tests stayed green because the two variables set before it still looked
-     * right, and a gate block reading the empty value passed as GREEN. TODO 62d186b8,
-     * {@code docs/belege.md} → „Sechs grüne Tests über einer Variable, die nie gesetzt wurde".
+     * right, and a gate block reading the empty value passed as GREEN. TODO 62d186b8 (the case was written
+     * up as „Sechs grüne Tests über einer Variable, die nie gesetzt wurde" in docs/belege.md until 2026-10).
      *
      * <p>{@code workflowMeta} decides about {@code audit_findings} (TODO 3643beac): only a workflow with
      * a valid {@code metadata.audit} gets it, through the same error path as the others.

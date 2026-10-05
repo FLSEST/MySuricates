@@ -14,10 +14,6 @@ A research project on the question of how software development and other work ch
 and how that work can be put together in different ways from repeatable, as traceable as possible
 building blocks — and a working system in which this can be observed.
 
-**What this is not:** not a product, not a service, no support, no promise of stability. The
-architectural debt is known and is tracked within the system itself as audit findings — see
-[Maturity level](#maturity-level-and-known-debt).
-
 ## Questions that come up along the way
 
 There are already very different answers to these questions today.
@@ -39,8 +35,8 @@ There are already very different answers to these questions today.
 
 The answers are building blocks, and you don't need all of them. What you already have, you connect —
 an existing task system instead of the built-in TODOs, for example. Which building block belongs to
-which answer, and which approaches (spec-driven development or orchestrating agents, for example)
-can be built from the same blocks, is shown in [Building blocks](docs/en/baukasten.md).
+which answer, and which approaches (loop engineering, spec-driven development or orchestrating
+agents, for example) can be built from the same blocks, is shown in [Building blocks](docs/en/baukasten.md).
 
 After installation only the core is on (preset `core`); `research` and `full` switch on further
 modules — which ones is listed under [Research questions](#research-questions) and in [Building blocks](docs/en/baukasten.md).
@@ -81,7 +77,6 @@ Ordered by depth: the overview first, then the individual building blocks, then 
 | [Integrations](docs/en/integrations.md) | Plugin system, OAuth, provider reference |
 | [Audit Protocol](docs/en/audit-workflow-protocol.md) | How findings are created, gate status, TODO linking |
 | [Assistant](docs/en/assistant-system.md) | Chat assistant, sessions, suggestions |
-| [Evidence](docs/en/belege.md) | Cases where a mechanism found something the normal process had missed — with run ID and number |
 | [Diagrams](docs/en/diagramme.md) | Nine pages of flow and architecture diagrams (engine, control and status, scheduler, skills, memory, request path, frontend, deployment, logging, and monitoring) |
 
 **Reference**
@@ -131,29 +126,6 @@ workflow memory (knowledge from runs that is injected into later runs), the Audi
 where the findings from audit workflows are tracked over time), and BPMN export. `full` enables
 everything — including integrations, webhooks, and remote access. The installer asks for this; the
 complete list with all modules is in [Architecture](docs/en/architektur.md#module-system-startup-configuration).
-
-## What is in there
-
-As of 2026-09-30, after release v0.7.7. Commit counters and lines from the working tree on that
-day (lines via `wc -l`, including blank and comment lines; backend `src/main/java`, frontend `src`
-including tests). The commit counter applies only in the working repository (the release handover
-condenses the history in the public repository to one commit per release); the other numbers apply
-in both, because the handover carries over the release tag's code tree unchanged. Test numbers from
-the most recently documented CI run, with their own date in the table:
-
-| | |
-|---|---|
-| Created since | 2026-02-15, around 2,630 commits in the working repository, one author <!-- doc-facts-check: ignore --> |
-| Backend | Java 21 / Spring Boot 3.5, around 73,000 lines, 54 REST controllers, 97 Flyway migrations |
-| Frontend | React 19 / TypeScript, around 77,000 lines |
-| Tests | Backend 10,476, frontend 1,580 (192 files) — 0 failures, 0 skipped, CI run 35777382298 from 2026-09-22 |
-| Building blocks | 20 block types, 54 workflow templates, 33 blueprints (basic scaffolds to fill in), 19 built-in skills, 18 integration providers |
-
-The test numbers come from the CI run named in the table and are therefore verifiable. The
-CI definition (`.github/workflows/ci.yml`) has run both suites on every push since 2026-09-12,
-in addition to the hygiene gate and secret scan; since 2026-09-21 on Ubuntu 26.04. Since
-2026-09-29 a suite is skipped when the change demonstrably does not touch it (pure documentation,
-for example); once a week both run without the filter.
 
 ## Maturity level and known debt
 
@@ -236,6 +208,10 @@ See [Development](docs/en/entwicklung.md).
 <!-- ![Dashboard](docs/screenshots/dashboard.png) -->
 
 ## Contributions and support
+
+**What this is not:** not a product, not a service, no support, no promise of stability. The
+architectural debt is known and is tracked within the system itself as audit findings — see
+[Maturity level](#maturity-level-and-known-debt).
 
 Issues remain open — but this repository is a research project by a single developer, not a
 maintained product: no support, no commitment to response times, not even for pull requests.

@@ -14,10 +14,6 @@ Ein Forschungsprojekt zur Frage, wie sich Softwareentwicklung und andere Arbeit 
 und wie sich diese Arbeit aus wiederholbaren, möglichst nachvollziehbaren Bausteinen unterschiedlich
 zusammensetzen lässt — und ein lauffähiges System, an dem sich das beobachten lässt.
 
-**Was das nicht ist:** kein Produkt, kein Dienst, kein Support, keine Stabilitaetszusage. Die
-Architekturschulden sind bekannt und werden im System selbst als Audit-Befunde gefuehrt — siehe
-[Reifegrad](#reifegrad-und-bekannte-schulden).
-
 ## Fragen, die dabei entstehen
 
 Auf diese Fragen gibt es heute schon sehr unterschiedliche Antworten.
@@ -40,8 +36,8 @@ Auf diese Fragen gibt es heute schon sehr unterschiedliche Antworten.
 
 Die Antworten sind Bausteine, und man braucht nicht alle. Was man schon hat, schließt man an — etwa
 ein vorhandenes Aufgabensystem statt der eigenen TODOs. Welcher Baustein zu welcher Antwort gehört und
-welche Ansätze (etwa Spec-Driven Development oder Agenten orchestrieren) sich aus denselben Bausteinen
-bauen lassen, zeigt der [Baukasten](docs/baukasten.md).
+welche Ansätze (etwa Loop-Engineering, Spec-Driven Development oder Agenten orchestrieren) sich aus
+denselben Bausteinen bauen lassen, zeigt der [Baukasten](docs/baukasten.md).
 
 Nach der Installation ist nur der Kern an (Preset `core`); `research` und `full` schalten weitere
 Module zu — welche, steht unter [Forschungsfragen](#forschungsfragen) und im [Baukasten](docs/baukasten.md).
@@ -82,7 +78,6 @@ Geordnet nach Tiefe: erst der Überblick, dann die einzelnen Bausteine, dann das
 | [Integrations](docs/integrations.md) | Plugin-System, OAuth, Provider-Referenz |
 | [Audit-Protokoll](docs/audit-workflow-protocol.md) | Wie Befunde entstehen, Gate-Status, TODO-Verknuepfung |
 | [Assistant](docs/assistant-system.md) | Chat-Assistent, Sessions, Suggestions |
-| [Belege](docs/belege.md) | Faelle, in denen ein Mechanismus etwas fand, das der normale Prozess uebersah — mit Run-Id und Zahl |
 | [Diagramme](docs/diagramme.md) | Neun Seiten Ablauf- und Architekturdiagramme (Engine, Steuerung und Status, Scheduler, Skills, Memory, Request-Pfad, Frontend, Deployment, Logging und Monitoring) |
 
 **Nachschlagen**
@@ -133,29 +128,6 @@ Runs eingespielt wird), das Audit Center (die Seite, auf der die Befunde der Aud
 die Zeit gefuehrt werden) und BPMN-Export. `full` schaltet alles frei — darunter Integrationen,
 Webhooks und Fernzugriff. Der Installer fragt danach; die vollstaendige Liste mit allen Modulen
 steht in [Architektur](docs/architektur.md#module-system-startkonfiguration).
-
-## Was da steht
-
-Stand 2026-09-30, nach Release v0.7.7. Commit-Zaehler und Zeilen aus dem Arbeitsbaum an diesem
-Tag (Zeilen per `wc -l`, inkl. Leer- und Kommentarzeilen; Backend `src/main/java`, Frontend `src`
-inkl. Tests). Der Commit-Zaehler gilt nur im Arbeits-Repo (die Release-Uebergabe fasst die
-Historie im oeffentlichen Repo je Release zu einem Commit zusammen); die uebrigen Zahlen gelten
-in beiden, weil die Uebergabe den Codebaum des Release-Tags unveraendert mitgibt. Testzahlen aus
-dem zuletzt dokumentierten CI-Lauf, mit eigenem Datum in der Tabelle:
-
-| | |
-|---|---|
-| Entstanden seit | 2026-02-15, rund 2 630 Commits im Arbeits-Repo, ein Autor <!-- doc-facts-check: ignore --> |
-| Backend | Java 21 / Spring Boot 3.5, rund 73 000 Zeilen, 54 REST-Controller, 97 Flyway-Migrationen |
-| Frontend | React 19 / TypeScript, rund 77 000 Zeilen |
-| Tests | Backend 10 476, Frontend 1 580 (192 Dateien) — 0 Fehler, 0 uebersprungen, CI-Lauf 35777382298 vom 2026-09-22 |
-| Bausteine | 20 Block-Typen, 54 Workflow-Templates, 33 Blaupausen (Grundgerueste zum Ausfuellen), 19 Built-in Skills, 18 Integrations-Provider |
-
-Die Testzahlen stammen aus dem in der Tabelle genannten CI-Lauf und sind damit nachpruefbar. Die
-CI-Definition (`.github/workflows/ci.yml`) faehrt seit dem 2026-09-12 beide Suiten bei jedem Push,
-zusaetzlich zu Hygiene-Gate und Secret-Scan; seit dem 2026-09-21 auf Ubuntu 26.04. Seit dem
-2026-09-29 entfaellt eine Suite, wenn die Aenderung sie nachweislich nicht beruehrt (etwa reine
-Doku); einmal pro Woche laufen beide ohne Filter.
 
 ## Reifegrad und bekannte Schulden
 
@@ -241,6 +213,10 @@ zweite Instanz. Siehe [Entwicklung](docs/entwicklung.md).
 <!-- ![Dashboard](docs/screenshots/dashboard.png) -->
 
 ## Beiträge und Support
+
+**Was das nicht ist:** kein Produkt, kein Dienst, kein Support, keine Stabilitaetszusage. Die
+Architekturschulden sind bekannt und werden im System selbst als Audit-Befunde gefuehrt — siehe
+[Reifegrad](#reifegrad-und-bekannte-schulden).
 
 Issues bleiben offen — aber dieses Repository ist ein Forschungsprojekt eines
 einzelnen Entwicklers, kein betreutes Produkt: kein Support, keine Zusage zu

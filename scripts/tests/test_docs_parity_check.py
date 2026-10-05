@@ -342,7 +342,6 @@ class StockPairingTest(unittest.TestCase):
         ("WORKFLOW-GUIDE.md", "### History-Komprimierung"),
         ("WORKFLOW-GUIDE.md", "#### Automatische Extraktion (Auto-Memory)"),
         ("architektur.md", "## WebSocket (Live-Logs + Status)"),
-        ("belege.md", "## 2026-09-19 · Das Gate fand den Fehler des Agenten, der es erweiterte"),
         ("entwicklung.md", "## Abhängigkeits-Meldungen (Frontend)"),
         ("workflow-memory-diagrams.md", "### workflow_memory"),
         ("konzepte/agentische-budgets.md", "## Wofür taugt das?"),
