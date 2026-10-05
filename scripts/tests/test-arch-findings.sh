@@ -334,10 +334,15 @@ out, pool, catalog, script = sys.argv[1:5]
 emitted = {line.split("\t")[0] for line in open(out) if line.startswith("arch.")}
 prompt = next(b for b in json.load(open(pool))["blocks"] if b.get("name") == "report")["config"]["command"]
 allowed = set(re.findall(r"^- ruleKey \"([a-z0-9.\-]+)\"", prompt, re.M))
-declared = set(re.search(r"RULE_KEYS = \((.*?)\)", open(script).read(), re.S).group(1).replace("\"", "").replace(" ", "").replace("\n", "").strip(",").split(","))
+def declared_keys(name):
+    body = re.search(r"^" + name + r" = \((.*?)\)", open(script).read(), re.S | re.M).group(1)
+    return set(body.replace("\"", "").replace(" ", "").replace("\n", "").strip(",").split(","))
+measured, judged = declared_keys("RULE_KEYS"), declared_keys("JUDGMENT_RULE_KEYS")
 keys = set(json.load(open(catalog))["mysuricates.architecture"])
-assert emitted and emitted <= declared, (emitted, declared)
-assert declared == allowed == keys, (declared, allowed, keys)
+# Die Einstufung vergibt nur Mess-Keys; die Urteils-Keys vergibt die KI, Prompt und Katalog kennen beide.
+assert emitted and emitted <= measured, (emitted, measured)
+assert not measured & judged, (measured, judged)
+assert measured | judged == allowed == keys, (measured, judged, allowed, keys)
 PY'
 check "evidence traegt die Einheiten der Verschlechterungspruefung (Zeilen, deps)" \
   'evidence "$TMP/out.txt" "$P/Band601Deps11.java" | grep -E "\(700 Zeilen\), 11 deps" >/dev/null'
@@ -440,6 +445,97 @@ check "Gegenprobe voller Klon: keine shallow_history, Groessen gemessen" \
      && ! summary "$TMP/full-findings.txt" not_measured | grep -E "(backend|frontend)_sizes" >/dev/null'
 check "Gegenprobe voller Klon: Aenderungen gezaehlt (3 je Datei)" \
   'grep -qE "^[0-9]+${TAB}[0-9]+${TAB}3${TAB}-${TAB}com/automation/x/X.java$" "$TMP/full-backend.txt"'
+
+echo "13) Kandidaten fuer das Urteil (## review_candidates, TODO e0e9495f)"
+# Eigene kleine Blaetter: je Datei ein Fall. Spalten von ## recent: aenderungen neu datei.
+C="com/automation/cand"
+{
+  echo "## files"
+  row 450 520 5 3 "$C/FindingFew.java"      # Befund (Hotspot, ueber 400), wenige Aenderungen
+  row 100 140 8 10 "$C/CoupledHot.java"     # Befund arch.high-coupling, mehr Aenderungen
+  row 300 360 20 3 "$C/ObsMany.java"        # Beobachtung, Hotspot mit vielen Aenderungen
+  row 300 360 4 3 "$C/ObsStable.java"       # Beobachtung, aber kein Hotspot
+  row 120 150 9 2 "$C/Plain.java"           # Hotspot ohne Befund und ohne Beobachtung
+  row 180 230 1 2 "$C/NewBig.java"          # neu, ab 100 NCLOC
+  row 90 120 1 2 "$C/NewSmall.java"         # neu, unter 100 NCLOC
+  row 260 320 6 2 "$C/NewHot.java"          # neu UND Hotspot-Beobachtung: nur einmal, als Hotspot
+  echo
+  echo "## recent"
+  echo "# aenderungen${TAB}neu${TAB}datei"
+  row 2 0 "$C/CoupledHot.java"
+  row 1 1 "$C/NewBig.java"
+  row 1 1 "$C/NewSmall.java"
+  row 3 1 "$C/NewHot.java"
+  echo
+  echo "## summary"
+  echo "cycles_state=ok"
+  echo
+  echo "## run"
+  echo "jdeps=ok"
+} > "$TMP/cand-backend.txt"
+{
+  echo "## files"
+  echo "# ncloc${TAB}zeilen${TAB}aenderungen${TAB}modul"
+  row 300 340 12 pages/HotPage.tsx
+  row 300 340 30 hooks/useThing.ts
+  row 250 300 2 components/NewPanel.tsx
+  row 200 240 1 components/NewHelper.ts
+  echo
+  echo "## recent"
+  row 4 0 pages/HotPage.tsx
+  row 2 1 components/NewPanel.tsx
+  row 1 1 components/NewHelper.ts
+  row 1 1 components/__tests__/NewPanel.test.tsx
+  echo
+  echo "## summary"
+  echo "cycles_state=ok"
+  echo "unresolved_imports=0"
+  echo
+  echo "## run"
+  echo "scan=ok"
+} > "$TMP/cand-frontend.txt"
+python3 "$FINDINGS" "$TMP/cand-backend.txt" "$TMP/cand-frontend.txt" > "$TMP/cand.txt" 2> "$TMP/cand.err"
+candidates() { section "$1" review_candidates | awk -F'\t' '{ print $1 " " $2 }'; }
+check "Abschnitt ## review_candidates steht zwischen ## observations und ## bands" \
+  '[ "$(grep -n "^## " "$TMP/cand.txt" | cut -d: -f2 | tr "\n" " ")" = "## findings ## observations ## review_candidates ## bands ## findings_summary " ]'
+check "Hotspots: Befunde zuerst (nach Aenderungen), dann Beobachtungen; neue nach NCLOC; .ts und Tests nie" \
+  '[ "$(candidates "$TMP/cand.txt" | tr "\n" "|")" = "hotspot $C/CoupledHot.java|hotspot $C/FindingFew.java|hotspot $C/ObsMany.java|hotspot frontend/src/pages/HotPage.tsx|hotspot $C/NewHot.java|neu frontend/src/components/NewPanel.tsx|neu $C/NewBig.java|" ]'
+check "aenderungen_7d aus ## recent, 0 ohne Eintrag" \
+  '[ "$(section "$TMP/cand.txt" review_candidates | awk -F"\t" "{ print \$3 }" | tr "\n" " ")" = "2 0 0 4 3 2 1 " ]'
+check "angaben = evidence der Einstufung plus Befund bzw. Beobachtung" \
+  'section "$TMP/cand.txt" review_candidates | grep -qx "hotspot${TAB}$C/CoupledHot.java${TAB}2${TAB}100 NCLOC (140 Zeilen), 10 deps, 8 Aenderungen in 90 Tagen (Hotspot ab 5); befund arch.high-coupling MEDIUM"'
+check "findings_summary zaehlt die Kandidaten" '[ "$(summary "$TMP/cand.txt" review_candidates)" = 7 ]'
+check "kein Kandidat ist ein Hotspot ohne Befund oder Beobachtung, keiner stabil" \
+  '! section "$TMP/cand.txt" review_candidates | grep -E "Plain.java|ObsStable.java|NewSmall.java" >/dev/null'
+# Obergrenzen: 8 Hotspot-Beobachtungen und 5 neue Dateien -> 6 und 3.
+{
+  echo "## files"
+  for i in 1 2 3 4 5 6 7 8; do row 300 360 $((10 + i)) 3 "$C/Hot$i.java"; done
+  for i in 1 2 3 4 5; do row $((100 + i)) 150 1 2 "$C/New$i.java"; done
+  echo
+  echo "## recent"
+  for i in 1 2 3 4 5; do row 1 1 "$C/New$i.java"; done
+  echo
+  echo "## summary"
+  echo "cycles_state=ok"
+  echo
+  echo "## run"
+  echo "jdeps=ok"
+} > "$TMP/cap-backend.txt"
+python3 "$FINDINGS" "$TMP/cap-backend.txt" "$TMP/cand-frontend.txt" > "$TMP/cap.txt"
+check "hoechstens 6 Hotspots, die mit den meisten Aenderungen" \
+  '[ "$(candidates "$TMP/cap.txt" | grep -c "^hotspot $C/Hot")" -eq 6 ] && ! candidates "$TMP/cap.txt" | grep -qE "Hot[12]\.java"'
+check "hoechstens 3 neue Dateien, die groessten" \
+  '[ "$(candidates "$TMP/cap.txt" | grep -c "^neu")" -eq 3 ] && [ "$(candidates "$TMP/cap.txt" | grep "^neu" | head -1)" = "neu frontend/src/components/NewPanel.tsx" ]'
+# Ohne ## recent (aelteres Blatt) gibt es keine neuen Dateien, und der Abschnitt sagt das.
+awk '/^## recent$/ { skip = 1; next } /^## / { skip = 0 } !skip' "$TMP/cand-backend.txt" > "$TMP/cand-norecent.txt"
+python3 "$FINDINGS" "$TMP/cand-norecent.txt" "$TMP/cand-frontend.txt" > "$TMP/norecent.txt"
+check "ohne ## recent: Hinweis und keine neuen Backend-Dateien" \
+  'grep -q "^# ## recent fehlt (backend)" "$TMP/norecent.txt" && ! candidates "$TMP/norecent.txt" | grep -q "^neu $C/"'
+check "ohne ## recent: Hotspots bleiben" 'candidates "$TMP/norecent.txt" | grep -qx "hotspot $C/CoupledHot.java"'
+python3 "$FINDINGS" "$TMP/leer.txt" "$TMP/leer.txt" > "$TMP/leer-cand.out"
+check "nichts gemessen: (keine Kandidaten) mit Hinweis" \
+  'section "$TMP/leer-cand.out" review_candidates | grep -qx "(keine Kandidaten)" && grep -q "^# Groessen nicht gemessen" "$TMP/leer-cand.out"'
 
 echo
 echo "passed=$PASS failed=$FAIL"

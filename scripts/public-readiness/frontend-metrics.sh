@@ -11,6 +11,8 @@
 #                Zone bei zirkulaeren ES-Modulen), nicht die auf Verzeichnisebene
 #   ## sizes     Zeilen je Datei (Top 30) und je Verzeichnis (Top 15), plus Schwellenzaehler
 #   ## churn     geaenderte Frontend-Quelldateien der letzten 90 Tage aus git log
+#   ## recent    geaenderte Dateien der letzten 7 Tage, mit Kennzeichen "neu angelegt" — Eingabe der
+#                Kandidatenwahl fuer das Urteil im Review (arch-findings.py, TODO e0e9495f)
 #   ## coupling  ein-/ausgehende Abhaengigkeiten je Verzeichnis und je Modul (seit Review 4.6.0
 #                nur noch Trendzahl, kein Befund)
 #   ## files     je Produktionsmodul NCLOC (ncloc.py), Zeilen und Aenderungen in 90 Tagen —
@@ -98,6 +100,7 @@ note_error() { ERRORS="${ERRORS:+$ERRORS,}$1"; }
 : > "$TMP/diredges.tsv"
 : > "$TMP/cycles.tsv"
 : > "$TMP/churn.tsv"
+: > "$TMP/recent.tsv"
 
 # ---------------------------------------------------------------------------
 # Quelltext-Scan: ein python3-Aufruf liefert alle Rohdaten als TSV mit Typspalte.
@@ -364,6 +367,18 @@ if git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1; then
     | sort | uniq -c \
     | awk '{ print $1 "\t" $2 }' \
     | sort -k1,1rn -k2,2 > "$TMP/churn.tsv"
+  # Die letzten 7 Tage (ein Review-Takt) getrennt, wie in arch-metrics.sh: Aenderungen je Datei und ob
+  # sie im Fenster neu angelegt wurde. Mit Testdateien wie ## churn; die Kandidatenwahl nimmt nur Module
+  # aus ## files.
+  git -C "$ROOT" log --since=7.days --diff-filter=A --name-only --format= -- ai-automation-frontend/src 2>/dev/null \
+    | grep -v '^$' | sed 's#^ai-automation-frontend/src/##' | sort -u > "$TMP/added.txt"
+  git -C "$ROOT" log --since=7.days --name-only --format= -- ai-automation-frontend/src 2>/dev/null \
+    | grep -v '^$' \
+    | sed 's#^ai-automation-frontend/src/##' \
+    | sort | uniq -c \
+    | awk 'FILENAME == ARGV[1] { added[$1] = 1; next } { print $1 "\t" (($2 in added) ? 1 : 0) "\t" $2 }' \
+        "$TMP/added.txt" - \
+    | sort -t "$(printf '\t')" -k3,3 > "$TMP/recent.tsv"
 else
   note_error "no_git_repo"
 fi
@@ -464,6 +479,17 @@ printf '# Testdateien enthalten\n'
 printf '# aenderungen\tdatei\n'
 if [ -s "$TMP/churn.tsv" ]; then
   head -30 "$TMP/churn.tsv"
+else
+  printf '# keine Aenderungen gemessen\n'
+fi
+
+printf '\n## recent\n'
+printf '# geaenderte Dateien unter ai-automation-frontend/src der letzten 7 Tage (git log --since=7.days),\n'
+printf '# mit Testdateien; neu = im Fenster angelegt (--diff-filter=A). Vollstaendig fuer arch-findings.py;\n'
+printf '# der Workflow reicht den Abschnitt nicht an die KI.\n'
+printf '# aenderungen\tneu\tdatei\n'
+if [ -s "$TMP/recent.tsv" ]; then
+  cat "$TMP/recent.tsv"
 else
   printf '# keine Aenderungen gemessen\n'
 fi

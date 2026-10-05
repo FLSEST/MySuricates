@@ -14,6 +14,8 @@
 #                tatsaechlichen Zyklus nichts geaendert hat.
 #   ## sizes     Zeilen je Java-Datei, Top 30, plus Schwellenzaehler (300/500)
 #   ## churn     geaenderte Dateien der letzten 90 Tage aus git log
+#   ## recent    geaenderte Dateien der letzten 7 Tage, mit Kennzeichen "neu angelegt" — Eingabe der
+#                Kandidatenwahl fuer das Urteil im Review (arch-findings.py, TODO e0e9495f)
 #   ## coupling  ein-/ausgehende Paketabhaengigkeiten, Top 15 nach ausgehend (seit Review 4.6.0
 #                nur noch Trendzahl, kein Befund)
 #   ## files     je Datei NCLOC (ncloc.py), Zeilen, Aenderungen in 90 Tagen und Kollaborateure je
@@ -28,7 +30,7 @@
 # stabil sortiert und enthaelt keine Zeitstempel.
 #
 # Determinismus, genau: alles vor `## run` ist zwischen zwei Laeufen byte-identisch,
-# solange (a) HEAD derselbe ist, (b) beide Laeufe im selben 90-Tage-Churn-Fenster liegen
+# solange (a) HEAD derselbe ist, (b) beide Laeufe im selben 90- bzw. 7-Tage-Fenster liegen
 # (also kein Commit ueber die Grenze rutscht) und (c) das gemessene Kompilat zum selben
 # Quellstand gehoert. Der Laufzeit-Zustand steht deshalb unter `## run`: `compile=` wechselt
 # beim ersten Lauf in einem frischen Arbeitsverzeichnis von `compiled` auf `reused` bzw.
@@ -38,6 +40,10 @@
 # Usage:  scripts/public-readiness/arch-metrics.sh [repo-root]        (Default: .)
 # Env:    ARCH_METRICS_COMPILE=0   nie kompilieren, nur vorhandenes target/classes nutzen
 #         AUTOMATION_ARCH_CACHE    Kompilat-Cache (Default: ~/.cache/mysuricates/arch-classes)
+#         ARCH_METRICS_CLASSES_OUT Datei, in die der Pfad des gemessenen Kompilats geschrieben wird
+#                                  (target/classes oder Cache-Eintrag) — fuer arch-seams.py, das dann
+#                                  denselben Bytecode liest, ohne die Cache-Regeln nachzubauen. Nicht
+#                                  im Faktenblatt: das bleibt frei von absoluten Pfaden.
 # Exit:   0 = Faktenblatt geschrieben (auch mit error=-Markierungen), 2 = Wurzel unbrauchbar
 #
 # Zeitbudget: fehlt ai-automation-backend/target/classes, laeuft einmalig
@@ -97,6 +103,7 @@ note_error() { ERRORS="${ERRORS:+$ERRORS,}$1"; }
 : > "$TMP/cycles.tsv"
 : > "$TMP/sizes.tsv"
 : > "$TMP/churn.tsv"
+: > "$TMP/recent.tsv"
 
 # ---------------------------------------------------------------------------
 # Klassen bereitstellen (jdeps braucht Bytecode, kein Quelltext)
@@ -271,6 +278,17 @@ if git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1; then
     | sort | uniq -c \
     | awk '{ print $1 "\t" $2 }' \
     | sort -k1,1rn -k2,2 > "$TMP/churn.tsv"
+  # Die letzten 7 Tage (ein Review-Takt) getrennt: Aenderungen je Datei und ob sie im Fenster neu
+  # angelegt wurde. Die Kandidatenwahl fuer das Urteil (arch-findings.py) nimmt daraus neue Klassen.
+  git -C "$ROOT" log --since=7.days --diff-filter=A --name-only --format= -- ai-automation-backend/src/main/java 2>/dev/null \
+    | grep -v '^$' | sed 's#^ai-automation-backend/src/main/java/##' | sort -u > "$TMP/added.txt"
+  git -C "$ROOT" log --since=7.days --name-only --format= -- ai-automation-backend/src/main/java 2>/dev/null \
+    | grep -v '^$' \
+    | sed 's#^ai-automation-backend/src/main/java/##' \
+    | sort | uniq -c \
+    | awk 'FILENAME == ARGV[1] { added[$1] = 1; next } { print $1 "\t" (($2 in added) ? 1 : 0) "\t" $2 }' \
+        "$TMP/added.txt" - \
+    | sort -t "$(printf '\t')" -k3,3 > "$TMP/recent.tsv"
 else
   note_error "no_git_repo"
 fi
@@ -429,6 +447,16 @@ else
   printf '# keine Aenderungen gemessen\n'
 fi
 
+printf '\n## recent\n'
+printf '# geaenderte Java-Dateien der letzten 7 Tage (git log --since=7.days); neu = im Fenster angelegt\n'
+printf '# (--diff-filter=A). Vollstaendig fuer arch-findings.py; der Workflow reicht den Abschnitt nicht an die KI.\n'
+printf '# aenderungen\tneu\tdatei\n'
+if [ -s "$TMP/recent.tsv" ]; then
+  cat "$TMP/recent.tsv"
+else
+  printf '# keine Aenderungen gemessen\n'
+fi
+
 printf '\n## coupling\n'
 printf '# je Paket: ausgehende/eingehende Pakete und Klassenkanten, Top 15 nach ausgehend\n'
 printf '# paket\tausgehend\teingehend\tausgehende_kanten\teingehende_kanten\n'
@@ -492,4 +520,7 @@ printf '\n## run\n'
 printf '# Laufzeit-Zustand, nicht Teil des Determinismus-Vergleichs\n'
 printf 'compile=%s\n' "$COMPILE_STATE"
 printf 'jdeps=%s\n' "$JDEPS_STATE"
+if [ -n "${ARCH_METRICS_CLASSES_OUT:-}" ] && [ -d "$CLASSES" ]; then
+  printf '%s\n' "$CLASSES" > "$ARCH_METRICS_CLASSES_OUT" 2>/dev/null || true
+fi
 exit 0

@@ -191,7 +191,7 @@ Umgestellte Audits im `workflow-pool/`:
 
 | Workflow | Messung | Selbsttest |
 |---|---|---|
-| Architektur-Review | Block `arch_metrics` → `scripts/public-readiness/arch-metrics.sh` (jdeps, NCLOC, Churn, Kollaborateure) und `arch-findings.py` (Einstufung) | `scripts/tests/test-arch-metrics.sh`, `scripts/tests/test-arch-findings.sh` |
+| Architektur-Review | Block `arch_metrics` → `scripts/public-readiness/arch-metrics.sh` (jdeps, NCLOC, Churn, Kollaborateure), `arch-findings.py` (Einstufung, Kandidaten) und `arch-seams.py` (Seams je Kandidat, javap) | `scripts/tests/test-arch-metrics.sh`, `scripts/tests/test-arch-findings.sh`, Gate: `scripts/tests/test-audit-facts.sh` |
 | Architektur-Review (Frontend) | Block `frontend_metrics` → `scripts/public-readiness/frontend-metrics.sh` (Quelltext-Importe, Zeilen, Modul-Zyklen) | `scripts/tests/test-frontend-metrics.sh` |
 | Health-Check | Block `facts` (Surefire-Summen, Exit-Codes, Lint/tsc, Bundle, Code- und Doku-Größen) | `scripts/tests/test-audit-facts.sh` |
 | Performance-Audit | Block `facts` (Health-Sonde, Heap-Zahlen aus `/api/v1/system/jvm-memory`, DB- und Bundle-Dateien, Logzeilen, Quelltext-Muster) | `scripts/tests/test-audit-facts.sh` |
@@ -225,6 +225,32 @@ nach den alten Regeln bestanden, meldet der Report nicht mehr: Offene setzt die 
 nächsten Lauf auf `RESOLVED`. Eingeordnete (`ACCEPTED_RISK`, `DISMISSED`) erbt ein neuer Befund derselben
 Datei unter anderem ruleKey; die übrigen schließt die Plattform, sobald ihr ruleKey nicht mehr im Katalog
 steht oder drei gültige Läufe sie nicht mehr gemeldet haben (siehe Lebenszyklus).
+
+### Architektur-Review: Urteil über gemessene Kandidaten
+
+Seit 4.6.0 schrieb der Report nur die Einstufung ab, las keinen Quelltext und stand auf `GREEN`, sobald
+alle Messbefunde eingeordnet waren – ohne etwas beurteilt zu haben. Seit Version 4.7.0 (TODO `e0e9495f`)
+gilt: **Das Skript bestimmt, wo hingeschaut wird, die KI, was dort los ist.**
+
+- **Kandidaten** (`## review_candidates`, `arch-findings.py`): bis 6 Hotspots mit Datei-Befund oder
+  Beobachtung (Befunde zuerst, dann nach Änderungen) und bis 3 in 7 Tagen neu angelegte Dateien ab
+  100 NCLOC, nur `.java` und `.tsx`. Die Spalte `aenderungen_7d` stammt aus dem neuen Abschnitt
+  `## recent` beider Faktenblätter.
+- **Seams** (`## seams`, `arch-seams.py`): je Backend-Kandidat, welche Methode welche Kollaborateure
+  benutzt – aus dem Bytecode (`javap -c -l -p`), mit derselben Ausschlussliste wie die Kollaborateur-Zählung
+  in `arch-metrics.sh`. Methoden, die über gemeinsame Kollaborateure zusammenhängen, bilden eine Gruppe;
+  mehrere Gruppen sind ein Schnitt-Kandidat. `nur_konstruktor` nennt injizierte, nie gelesene Felder.
+  Ist der Quelltext jünger als das Kompilat, steht `stale_classes` statt einer Tabelle da.
+- **Urteil** (KI, Opus): liest den Quelltext jedes Kandidaten und urteilt `passt so`, `schneiden` oder
+  `verlagern`. Die beiden letzten ergeben Befunde `arch.mixed-responsibility` bzw. `arch.misplaced-logic` –
+  `subject` genau aus der Kandidatenliste, Schwere höchstens `MEDIUM`, Evidenz ohne Mengen mit Einheit
+  (sonst öffnete die Verschlechterungsprüfung eine Einordnung bei jeder Umformulierung).
+- **Weiterführen statt Sinneswandel**: Ein bekannter Urteilsbefund zu einer Datei, die kein Kandidat ist
+  oder sich in 7 Tagen nicht geändert hat, wird unverändert weitergeführt; neu geurteilt wird nur über
+  geänderte Kandidaten und über Wiedervorlagen (`AWAITING_VERIFICATION`).
+- **Gate**: Offene oder neue Urteilsbefunde heben auf `YELLOW`, nie auf `RED`. Zusätzlich prüft der
+  Gate-Block deterministisch, ob jeder Kandidat unter der Überschrift „Urteil“ des Reports steht; fehlt
+  einer, ist das Ergebnis höchstens `YELLOW` („Urteil unvollständig“).
 
 ### Test-Abdeckung: Envelope aus der Soll-Liste
 

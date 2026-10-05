@@ -110,9 +110,11 @@ echo "2) Skriptlauf gegen das Repository"
 bash "$SCRIPT" "$REPO" > "$TMP/run1.txt" 2> "$TMP/run1.err"; RC1=$?
 check "exit 0"                      '[ "$RC1" -eq 0 ]'
 check "Ausgabe nicht leer"          '[ -s "$TMP/run1.txt" ]'
-for s in packages cycles sizes churn coupling files ratchet summary run; do
+for s in packages cycles sizes churn recent coupling files ratchet summary run; do
   check "Abschnitt ## $s vorhanden" "grep -qx '## $s' '$TMP/run1.txt'"
 done
+check "recent liefert aenderungen/neu/Pfad (oder sagt, dass nichts geaendert wurde)" \
+  "sed -n '/^## recent\$/,/^## coupling\$/p' '$TMP/run1.txt' | grep -E '^([0-9]+${TAB}[01]${TAB}com/automation/.*\.java|# keine Aenderungen gemessen)\$' >/dev/null"
 for k in packages edges cycles files files_over_300 files_over_500 churn_files_90d; do
   check "summary-Schluessel $k" "sed -n '/^## summary\$/,/^## run\$/p' '$TMP/run1.txt' | grep -E '^$k=[0-9]+\$' >/dev/null"
 done
@@ -194,10 +196,24 @@ for gone in (">200 Zeilen", ">300 Zeilen", ">5 Abhaengigkeiten", ">7 Abhaengigke
              "arch.duplicated-logic"):
     assert gone not in prompt, "alte Regel steht noch im Prompt: " + gone
 assert "Paketkopplung" in prompt and "KEIN Befund mehr" in prompt, "Paketkopplung als Trend fehlt"
-assert "Regelwechsel 4.6.0:" in prompt, "einmalige Erklaerung des Regelwechsels fehlt"
+assert "Neu in 4.7.0:" in prompt, "einmalige Erklaerung der Urteilsschicht fehlt"
+assert "Regelwechsel 4.6.0" not in prompt, "die einmalige Erklaerung von 4.6.0 ist erledigt"
 assert "NCLOC" in prompt and "Hotspot" in prompt, "NCLOC-Baender und Hotspot-Regel fehlen"
 assert "nur Kollaborateure" in prompt, "Zahl meint Kollaborateure"
-assert wf["version"] == "4.6.1", wf["version"]
+assert wf["version"] == "4.7.0", wf["version"]
+# e0e9495f: das Skript waehlt Kandidaten, arch-seams.py misst ihre Schnittkanten, die KI urteilt.
+assert "ARCH_METRICS_CLASSES_OUT=" in command and "arch-seams.py" in command, "Seams fehlen im Metrik-Block"
+assert command.index("python3 scripts/public-readiness/arch-findings.py") < command.index("python3 scripts/public-readiness/arch-seams.py"), "Seams brauchen die Kandidaten der Einstufung"
+assert "\"## recent\"" in command, "## recent muss wie ## files aus dem Backend-Blatt gefiltert werden"
+frontend = next(b for b in blocks if b.get("name") == "frontend_metrics")["config"]["command"]
+assert "\"## recent\"" in frontend, "## recent muss aus dem Frontend-Blatt gefiltert werden"
+for marker in ("URTEIL UEBER DIE KANDIDATEN (VERBINDLICH):", "## review_candidates", "## seams", "### Urteil je Kandidat",
+               "\"passt so\"", "aenderungen_7d", "nie HIGH oder CRITICAL", "keine Mengen mit Einheit",
+               "Verantwortlichkeiten (Urteil)", "offener bzw. neuer Urteilsbefund", "ein Urteilsbefund allein macht nie RED"):
+    assert marker in prompt, "Urteilsschicht unvollstaendig: " + marker
+assert blocks[i_report]["config"].get("timeout_seconds", 0) >= 1200, "Lesen der Kandidaten braucht Zeit"
+gate = next(b for b in blocks if b["config"].get("label", "").startswith("Gate-Verdict"))["config"]["command"]
+assert "{{ block.arch_metrics.output }}" in gate and "review_candidates" in gate, "Gate prueft das Urteil nicht"
 delta = next(b for b in blocks if b.get("name") == "delta_scan")
 assert delta["config"].get("timeout_seconds", 0) >= 180, "Struktur-Scan braucht Luft fuer Last"
 # Die Kollaborateur-Zaehlung und die Ratchet-Listen leben seit 4.6.0 in arch-metrics.sh.
@@ -574,6 +590,123 @@ AUTOMATION_ARCH_CACHE="$TMP/cache-is-a-file" PATH="$TMP/bin" bash "$SCRIPT" "$TM
 RC=$?
 check "unbrauchbarer Cache-Pfad: exit 0"            '[ "$RC" -eq 0 ]'
 check "unbrauchbarer Cache-Pfad: trotzdem gemessen" 'grep -qx "cycles=1" "$TMP/cache5.txt"'
+
+echo "9) Seams je Kandidat aus dem Bytecode (arch-seams.py, TODO e0e9495f)"
+# Fixture mit bekannten Zugriffen: zwei Gruppen ueber gemeinsame Kollaborateure, eine dritte allein,
+# eine Ueberladung, ein Lambda, eine innere Klasse, ein nur im Konstruktor benutzter Kollaborateur und
+# zwei Felder, die keine Kollaborateure sind (Konfigurationswert, Zustand mit Initialisierer).
+SEAMS="$REPO/scripts/public-readiness/arch-seams.py"
+SEAM_SRC="$TMP/seams/src/main/java"; SEAM_CLASSES="$TMP/seams/classes"
+mkdir -p "$SEAM_SRC/com/automation/fix" "$SEAM_CLASSES"
+cat > "$SEAM_SRC/com/automation/fix/Seams.java" <<'JAVA'
+package com.automation.fix;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class Seams {
+    private static final int LIMIT = 3;
+    private final Alpha alpha;
+    private final Beta beta;
+    private final Gamma gamma;
+    private final Delta onlyCtor;
+    private final String name;
+    private final List<Alpha> everyAlpha;
+    private final List<String> cache = new ArrayList<>();
+
+    public Seams(Alpha alpha, Beta beta, Gamma gamma, Delta onlyCtor, String name, List<Alpha> everyAlpha) {
+        this.alpha = alpha;
+        this.beta = beta;
+        this.gamma = gamma;
+        this.onlyCtor = onlyCtor;
+        this.name = name;
+        this.everyAlpha = everyAlpha;
+        onlyCtor.go();
+    }
+
+    public void first() {
+        alpha.go();
+    }
+
+    public void second() {
+        alpha.go();
+        beta.go();
+    }
+
+    public void second(int times) {
+        for (int i = 0; i < times; i++) {
+            beta.go();
+        }
+    }
+
+    public Runnable later() {
+        return () -> gamma.go();
+    }
+
+    public int helper() {
+        return LIMIT + cache.size() + name.length();
+    }
+
+    public int count() {
+        return everyAlpha.size();
+    }
+
+    class Inner {
+        void run() {
+            gamma.go();
+        }
+    }
+}
+
+interface Alpha { void go(); }
+interface Beta { void go(); }
+interface Gamma { void go(); }
+interface Delta { void go(); }
+JAVA
+javac -nowarn -g -d "$SEAM_CLASSES" "$SEAM_SRC/com/automation/fix/Seams.java" 2> "$TMP/seams-javac.err"
+F=com/automation/fix/Seams.java
+python3 "$SEAMS" "$SEAM_SRC" "$SEAM_CLASSES" "$F" frontend/src/pages/X.tsx > "$TMP/seams.out" 2> "$TMP/seams.err"; RC=$?
+seam() {  # $1 = art, $2 = Schluessel im dritten Feld (oder leer) -> die Felder danach, tab-getrennt
+  awk -F'\t' -v a="$1" -v k="${2:-}" -v f="$F" '$1 == a && $2 == f && (k == "" || $3 == k) {
+    s = (k == "") ? 3 : 4; out = ""
+    for (i = s; i <= NF; i++) out = out (i > s ? "\t" : "") $i
+    print out }' "$TMP/seams.out"
+}
+check "Fixture kompiliert"                 '[ -f "$SEAM_CLASSES/com/automation/fix/Seams.class" ]'
+check "exit 0, stderr leer, state ok"      '[ "$RC" -eq 0 ] && [ ! -s "$TMP/seams.err" ] && grep -qx "state${TAB}ok" "$TMP/seams.out"'
+check "class-Zeile: 5 Kollaborateure, 6 Methoden, 5 mit Kollaborateur, 3 Gruppen" \
+  '[ "$(seam class)" = "kollaborateure=5${TAB}methoden=6${TAB}mit_kollaborateur=5${TAB}gruppen=3" ]'
+check "Konfigurationswert und Zustand mit Initialisierer sind keine Kollaborateure" \
+  '! cut -f5 "$TMP/seams.out" | tr "," "\n" | grep -xE "name|cache" >/dev/null'
+check "Ueberladungen zusammengefasst: second nutzt alpha und beta" '[ "$(seam method second | cut -f2)" = "alpha,beta" ]'
+check "Lambda zaehlt zur umschliessenden Methode"   '[ "$(seam method later | cut -f2)" = gamma ]'
+check "innere Klasse heisst <Innere>.<methode>"      '[ "$(seam method Inner.run | cut -f2)" = gamma ]'
+check "Bean-Sammlung ohne Initialisierer zaehlt"      '[ "$(seam method count | cut -f2)" = everyAlpha ]'
+check "zeilen = erste bis letzte Codezeile"          '[ "$(seam method first | cut -f1)" = "27-28" ]'
+check "Methode ohne Kollaborateur steht nicht als method-Zeile da" '[ -z "$(seam method helper)" ]'
+check "Konstruktor steht nicht als Methode da"       '! grep -q "${TAB}Seams${TAB}" "$TMP/seams.out"'
+check "Gruppe 1: first und second ueber alpha (mit beta)" '[ "$(seam group 1)" = "first,second${TAB}alpha,beta" ]'
+check "Gruppe 2: later und Inner.run ueber gamma"         '[ "$(seam group 2)" = "later,Inner.run${TAB}gamma" ]'
+check "Gruppe 3: count allein"                            '[ "$(seam group 3)" = "count${TAB}everyAlpha" ]'
+check "nur im Konstruktor benutzt: onlyCtor"              '[ "$(awk -F"\t" "\$1 == \"nur_konstruktor\" { print \$3 }" "$TMP/seams.out")" = onlyCtor ]'
+check "Frontend-Kandidat wird nicht gemessen und nicht gemeldet" '! grep -q "X.tsx" "$TMP/seams.out"'
+python3 "$SEAMS" "$SEAM_SRC" "$SEAM_CLASSES" "$F" > "$TMP/seams2.out" 2>/dev/null
+check "zwei Laeufe byte-identisch" 'diff -q <(grep -v "^#" "$TMP/seams.out" | grep -v X.tsx) <(grep -v "^#" "$TMP/seams2.out") >/dev/null'
+# Nicht Messbares steht mit Grund da, nie als leere Tabelle.
+touch -d '+1 minute' "$SEAM_SRC/$F"
+python3 "$SEAMS" "$SEAM_SRC" "$SEAM_CLASSES" "$F" > "$TMP/seams-stale.out" 2>/dev/null
+check "Quelltext juenger als Kompilat: missing stale_classes" 'grep -qx "missing${TAB}$F${TAB}stale_classes" "$TMP/seams-stale.out"'
+python3 "$SEAMS" "$SEAM_SRC" "$SEAM_CLASSES" com/automation/fix/Gibts.java > "$TMP/seams-missing.out" 2>/dev/null
+check "Klasse fehlt: missing class_missing" 'grep -qx "missing${TAB}com/automation/fix/Gibts.java${TAB}class_missing" "$TMP/seams-missing.out"'
+python3 "$SEAMS" "$SEAM_SRC" "$TMP/seams/gibts-nicht" "$F" > "$TMP/seams-noclasses.out" 2>/dev/null; RC=$?
+check "kein Kompilat: exit 0, state no_classes, Datei als missing" \
+  '[ "$RC" -eq 0 ] && grep -qx "state${TAB}no_classes" "$TMP/seams-noclasses.out" && grep -qx "missing${TAB}$F${TAB}no_classes" "$TMP/seams-noclasses.out"'
+python3 "$SEAMS" "$SEAM_SRC" > /dev/null 2>&1; RC=$?
+check "falscher Aufruf endet mit 2" '[ "$RC" -eq 2 ]'
+# arch-metrics.sh nennt das gemessene Kompilat nur auf Wunsch und nur in einer Datei, nie im Blatt.
+ARCH_METRICS_CLASSES_OUT="$TMP/classes-out" bash "$SCRIPT" "$REPO" > "$TMP/run-classes.txt" 2>/dev/null
+check "ARCH_METRICS_CLASSES_OUT bekommt ein vorhandenes Verzeichnis" '[ -d "$(cat "$TMP/classes-out" 2>/dev/null)" ]'
+check "der Pfad steht nicht im Faktenblatt" '! grep -qF "$(cat "$TMP/classes-out" 2>/dev/null)" "$TMP/run-classes.txt"'
 
 echo
 echo "passed=$PASS failed=$FAIL"

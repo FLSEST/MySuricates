@@ -1158,7 +1158,10 @@ printf '%s\n' '### Report' '**gate_status**: **RED**' > "$TMP/report-bold.txt"
 printf '%s\n' '### Report' "$TEMPLATE_LINE" 'gate_status: YELLOW' > "$TMP/report-template-then-valid.txt"
 printf '%s\n' '### Report' 'gate_status: RED' "$TEMPLATE_LINE" > "$TMP/report-valid-then-template.txt"
 run_gate() {  # $1 = definition, $2 = faktenblatt, $3 = report
-  render "$1" label:Gate-Verdict "$(json_values block.report.output="$3" block.facts.output="$2")" > "$TMP/gate.sh"
+  # Health und Performance lesen ihr Blatt aus block.facts, das Architektur-Review aus block.arch_metrics.
+  local key=block.facts.output
+  grep -q "block.arch_metrics.output" "$1" && key=block.arch_metrics.output
+  render "$1" label:Gate-Verdict "$(json_values block.report.output="$3" "$key=$2")" > "$TMP/gate.sh"
   bash "$TMP/gate.sh" > "$TMP/gate.out" 2> "$TMP/gate.err"
 }
 gate_verdict_cases() {  # $1 = Anzeigename, $2 = definition, $3 = vollstaendiges Faktenblatt, $4 = gate_category
@@ -1206,6 +1209,53 @@ PY
 )"
 check "VERDICT-Baustein in mindestens fuenf Audit-Gates" '[ "${VERDICT_VARIANTS%% *}" -ge 5 ]'
 check "VERDICT-Baustein in allen Audit-Gates identisch"  '[ "${VERDICT_VARIANTS##* }" -eq 1 ]'
+
+echo "7c) Architektur-Gate: jeder Kandidat aus ## review_candidates braucht ein Urteil (e0e9495f)"
+# Die KI liest seit Review 4.7.0 die Kandidaten und urteilt. Laesst sie einen still aus, ist das Review
+# nicht gruen: Das Gate zaehlt deterministisch, ob jedes subject unter der Ueberschrift "Urteil" steht.
+ARCH="$REPO/workflow-pool/mysuricates-architektur-review.json"
+TAB="$(printf '\t')"
+{
+  echo "## findings"
+  echo "(keine Befunde)"
+  echo
+  echo "## review_candidates"
+  echo "# art${TAB}subject${TAB}aenderungen_7d${TAB}angaben"
+  printf 'hotspot\tcom/automation/a/Big.java\t2\t300 NCLOC\n'
+  printf 'neu\tfrontend/src/pages/New.tsx\t1\t120 NCLOC\n'
+  echo
+  echo "## findings_summary"
+  echo "review_candidates=2"
+} > "$TMP/arch-facts.txt"
+: > "$TMP/arch-facts-empty.txt"
+arch_report() {  # $1 = Ziel, $2 = gate_status, weitere = Zeilen der Urteilstabelle
+  local target="$1" status="$2"; shift 2
+  { echo "### Architektur-Review"; echo "### Findings"; echo "| 1 | com/automation/a/Big.java | arch.high-coupling |"
+    echo "### Urteil je Kandidat"; printf '%s\n' "$@"; echo "### Naechste Schritte"; echo "1. frontend/src/pages/New.tsx"
+    echo "gate_status: $status"; } > "$target"
+}
+run_arch_gate() {  # $1 = faktenblatt, $2 = report
+  render "$ARCH" label:Gate-Verdict "$(json_values block.report.output="$2" block.arch_metrics.output="$1")" > "$TMP/arch-gate.sh"
+  bash "$TMP/arch-gate.sh" > "$TMP/arch-gate.out" 2> "$TMP/arch-gate.err"
+}
+arch_report "$TMP/arch-all.txt" GREEN '| com/automation/a/Big.java | hotspot | passt so |' '| frontend/src/pages/New.tsx | neu | verlagern |'
+run_arch_gate "$TMP/arch-facts.txt" "$TMP/arch-all.txt"
+check "alle Kandidaten beurteilt: GREEN durchgereicht" \
+  'grep -qx "gate_status: GREEN" "$TMP/arch-gate.out" && grep -qx "gate_category: architecture" "$TMP/arch-gate.out"'
+check "Architektur-Gate laeuft ohne stderr" '[ ! -s "$TMP/arch-gate.err" ]'
+# New.tsx steht nur unter Naechste Schritte, nicht im Urteil: das zaehlt nicht.
+arch_report "$TMP/arch-one.txt" GREEN '| com/automation/a/Big.java | hotspot | schneiden |'
+run_arch_gate "$TMP/arch-facts.txt" "$TMP/arch-one.txt"
+check "ein Kandidat ohne Urteil: YELLOW mit Zahl" \
+  'grep -qx "gate_status: YELLOW" "$TMP/arch-gate.out" \
+     && grep -qx "gate_description: Urteil unvollstaendig — 1 von 2 Kandidaten ohne Urteil im Report" "$TMP/arch-gate.out"'
+arch_report "$TMP/arch-one-red.txt" RED '| com/automation/a/Big.java | hotspot | schneiden |'
+run_arch_gate "$TMP/arch-facts.txt" "$TMP/arch-one-red.txt"
+check "fehlendes Urteil schwaecht RED nicht ab" 'grep -qx "gate_status: RED" "$TMP/arch-gate.out"'
+arch_report "$TMP/arch-none.txt" GREEN
+run_arch_gate "$TMP/arch-facts-empty.txt" "$TMP/arch-none.txt"
+check "ohne Kandidaten (Messung leer): Report entscheidet" 'grep -qx "gate_status: GREEN" "$TMP/arch-gate.out"'
+gate_verdict_cases "Architektur" "$ARCH" "$TMP/arch-facts-empty.txt" architecture
 
 echo "8) Performance-Audit: Report-Prompt bindet die KI ans Faktenblatt"
 check "Prompt nutzt das Faktenblatt"    'grep -q "block.facts.output" "$TMP/perf-prompt.txt"'

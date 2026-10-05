@@ -35,7 +35,9 @@
     "arch.god-component",
     "arch.high-coupling",
     "arch.cross-layer-violation",
-    "arch.package-cycle"
+    "arch.package-cycle",
+    "arch.mixed-responsibility",
+    "arch.misplaced-logic"
   ],
   "mysuricates.health": [
     {"key": "health.tests-failing", "subject": "backend_tests_failures"},

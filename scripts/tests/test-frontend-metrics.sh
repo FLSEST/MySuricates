@@ -96,7 +96,7 @@ echo "1) Fixture: Abschnitte und Grundzahlen"
 bash "$SCRIPT" "$TMP/fixture" > "$TMP/fix1.txt" 2> "$TMP/fix1.err"; RC=$?
 check "exit 0"           '[ "$RC" -eq 0 ]'
 check "Ausgabe nicht leer" '[ -s "$TMP/fix1.txt" ]'
-for s in packages cycles sizes churn coupling files summary run; do
+for s in packages cycles sizes churn recent coupling files summary run; do
   check "Abschnitt ## $s vorhanden" "grep -qx '## $s' '$TMP/fix1.txt'"
 done
 check "modules=9 (Testdateien und *.d.ts zaehlen nicht)" 'grep -qx "modules=9" "$TMP/fix1.txt"'

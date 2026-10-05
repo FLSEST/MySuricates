@@ -33,13 +33,25 @@ Backend-Dateien und 598 Frontend-Modulen; die Begruendung steht an jeder Konstan
   Schichtkanten (## packages): service -> controller CRITICAL, controller -> repository HIGH.
   Frontend-Import-Zyklen (## cycles, nur Laufzeitkanten): jede Komponente HIGH, > 3 Module CRITICAL.
 
+Kandidaten fuer das Urteil (TODO e0e9495f, Review 4.7.0): ## review_candidates nennt die Dateien,
+deren Quelltext die KI im Review liest und beurteilt (Verantwortlichkeiten, lohnt ein Schnitt, passt
+der Ort). Das Skript waehlt aus, die KI urteilt; Urteilsbefunde tragen die ruleKeys aus
+JUDGMENT_RULE_KEYS und als subject genau eine Zeile dieser Liste. Gewaehlt werden nur Backend-Klassen
+(.java) und Frontend-Komponenten (.tsx):
+    hotspot  bis REVIEW_HOTSPOTS Dateien mit mindestens HOTSPOT_MIN_CHANGES Aenderungen, die einen
+             Datei-Befund oder eine Beobachtung haben — Befunde zuerst, dann nach Aenderungen, NCLOC
+    neu      bis REVIEW_NEW Dateien, die in den letzten 7 Tagen angelegt wurden (## recent), ab
+             REVIEW_NEW_MIN_NCLOC NCLOC, nach NCLOC
+Die Spalte aenderungen_7d sagt dem Report, ob sich die Datei seit dem letzten Takt geaendert hat:
+Ein bekanntes Urteil zu einer unveraenderten Datei fuehrt er weiter, statt es neu zu faellen.
+
 Nicht gemessene Dimensionen (Blatt fehlt, jdeps/Scan gescheitert, cycles_state != ok,
 unaufgeloeste Importe, kein git oder flacher Klon, NCLOC- oder Kollaborateur-Zaehlung gescheitert) stehen als not_measured= in ## findings_summary; fuer sie gibt
 es keine Befunde, und der Report fuehrt bekannte Befunde dieser Dimension unveraendert weiter.
 
 Aufruf:  arch-findings.py <backend-faktenblatt> [<frontend-faktenblatt>]
          Eine fehlende oder leere Datei gilt als nicht gemessen, kein Abbruch.
-Ausgabe: ## findings, ## observations, ## bands, ## findings_summary — stabil sortiert.
+Ausgabe: ## findings, ## observations, ## review_candidates, ## bands, ## findings_summary — stabil sortiert.
 Exit:    0 immer (Faktenblatt fuer einen nachgelagerten Auswerter, kein Gate); 2 bei falschem Aufruf.
 """
 import os
@@ -66,6 +78,14 @@ DEPS_CRITICAL = 10   # darueber (also ab 11) zusammen mit > BAND_HIGH NCLOC: CRI
 
 FRONTEND_CYCLE_CRITICAL = 3  # Frontend-Import-Zyklus mit mehr Modulen: CRITICAL
 
+# Kandidaten fuer das Urteil. Am 2026-10-05 erfuellten 3 Backend-Dateien mit Befund und rund 10
+# Hotspot-Beobachtungen (.java/.tsx) die Hotspot-Regel, und in 7 Tagen kamen 136 Dateien neu dazu,
+# die meisten unter 100 NCLOC. Sechs Hotspots und drei neue Dateien halten das Lesen bei rund
+# 2500 Zeilen Quelltext je Lauf — genug fuer ein Urteil, ohne jede Woche alles zu lesen.
+REVIEW_HOTSPOTS = 6
+REVIEW_NEW = 3
+REVIEW_NEW_MIN_NCLOC = 100
+
 # Faktenblatt-Fehler, nach denen Groessen und Hotspots nicht gemessen sind. Ohne Git-Historie (kein
 # Repo, flacher Klon) fehlen die Aenderungen, also jeder Hotspot; ohne NCLOC bzw. Kollaborateur-
 # Zaehlung fehlen Groesse bzw. deps. Die Einstufung saehe sonst sauber aus, und bekannte Befunde
@@ -76,6 +96,9 @@ FRONTEND_SIZE_ERRORS = {"no_git_repo", "shallow_history", "ncloc_failed"}
 SEVERITY_RANK = {"MEDIUM": 1, "HIGH": 2, "CRITICAL": 3}
 RULE_KEYS = ("arch.god-class", "arch.god-component", "arch.high-coupling",
              "arch.cross-layer-violation", "arch.package-cycle")
+# Vergibt nicht das Skript, sondern das Urteil der KI ueber ## review_candidates (hoechstens MEDIUM).
+# Prompt und Katalog muessen beide Listen zusammen fuehren (test-arch-findings.sh, Abschnitt 10).
+JUDGMENT_RULE_KEYS = ("arch.mixed-responsibility", "arch.misplaced-logic")
 
 
 def read_sheet(path):
@@ -131,6 +154,9 @@ class Classifier:
         self.observations = []   # (art, subject, angaben)
         self.not_measured = []
         self.bands = []          # (seite, [zaehler je band])
+        self.files = {}          # subject -> (ncloc, aenderungen, art) mit art befund|beobachtung|None
+        self.recent = {}         # subject -> (aenderungen_7d, neu)
+        self.recent_missing = [] # Seiten ohne ## recent
 
     # ------------------------------------------------------------------ Dateien
     def classify_file(self, subject, ncloc, lines, changes, deps, frontend, ceiling):
@@ -167,7 +193,9 @@ class Classifier:
             else:
                 rule = "arch.god-component" if frontend else "arch.god-class"
             self.findings.append((rule, subject, severity, evidence))
+            self.files[subject] = (ncloc, changes, "befund %s %s" % (rule, severity), evidence)
             return
+        self.files[subject] = (ncloc, changes, None, evidence)
         if level >= 1 or coupled:
             if coupled and level >= 1:
                 kind = "groesse+kopplung"
@@ -178,6 +206,7 @@ class Classifier:
             else:
                 kind = "groesse"
             self.observations.append((kind, subject, evidence))
+            self.files[subject] = (ncloc, changes, "beobachtung " + kind, evidence)
 
     def classify_files(self, rows, frontend, ceilings):
         counts = [0, 0, 0, 0]
@@ -186,6 +215,17 @@ class Classifier:
             subject = "frontend/src/" + path if frontend else path
             self.classify_file(subject, ncloc, lines, changes, deps, frontend, ceilings.get(path))
         self.bands.append(("frontend" if frontend else "backend", counts))
+
+    def read_recent(self, lines, frontend):
+        if lines is None:
+            self.recent_missing.append("frontend" if frontend else "backend")
+            return
+        for line in lines:
+            fields = line.split("\t")
+            if len(fields) != 3 or not fields[0].isdigit():
+                continue
+            subject = "frontend/src/" + fields[2] if frontend else fields[2]
+            self.recent[subject] = (int(fields[0]), fields[1] == "1")
 
     # ------------------------------------------------------------------ Backend
     def backend(self, sheet):
@@ -202,6 +242,7 @@ class Classifier:
             self.not_measured.append("backend_sizes")
         else:
             self.classify_files(files, frontend=False, ceilings=ratchet["allowlist"])
+            self.read_recent(sheet.get("recent"), frontend=False)
 
         jdeps_ok = run.get("jdeps") in ("ok", "empty") and not errors & {
             "classes_missing", "jdeps_missing", "jdeps_failed", "jdeps_partial"}
@@ -304,6 +345,7 @@ class Classifier:
             self.not_measured.append("frontend_sizes")
         else:
             self.classify_files(files, frontend=True, ceilings={})
+            self.read_recent(sheet.get("recent"), frontend=True)
         unresolved = summary.get("unresolved_imports", "0")
         if summary.get("cycles_state") not in ("ok", "no_edges") or unresolved != "0" or errors - FRONTEND_SIZE_ERRORS:
             self.not_measured.append("frontend_cycles")
@@ -314,6 +356,28 @@ class Classifier:
             self.findings.append(("arch.package-cycle", "cycles/component/frontend/src/" + members[0], severity,
                                   "Import-Zyklus ueber %d Module, nur Laufzeitkanten (## cycles des Frontend-Blatts); "
                                   "%s" % (size, ",".join(members))))
+
+    # ------------------------------------------------------------------ Kandidaten
+    def candidates(self):
+        """[(art, subject, aenderungen_7d, angaben)]: erst Hotspots, dann neue Dateien."""
+        def reviewable(subject):
+            return subject.endswith(".java") or subject.endswith(".tsx")
+
+        hot = [s for s, (_, changes, kind, _) in self.files.items()
+               if reviewable(s) and kind and changes >= HOTSPOT_MIN_CHANGES]
+        hot.sort(key=lambda s: (not self.files[s][2].startswith("befund"), -self.files[s][1], -self.files[s][0], s))
+        hot = hot[:REVIEW_HOTSPOTS]
+        new = [s for s, (_, added) in self.recent.items()
+               if added and s in self.files and reviewable(s) and s not in hot
+               and self.files[s][0] >= REVIEW_NEW_MIN_NCLOC]
+        new.sort(key=lambda s: (-self.files[s][0], s))
+        rows = []
+        for art, subjects in (("hotspot", hot), ("neu", new[:REVIEW_NEW])):
+            for subject in subjects:
+                _, _, kind, evidence = self.files[subject]
+                details = evidence + ("; " + kind if kind else "")
+                rows.append((art, subject, str(self.recent.get(subject, (0, False))[0]), details))
+        return rows
 
     # ------------------------------------------------------------------ Ausgabe
     def render(self):
@@ -330,6 +394,20 @@ class Classifier:
                 "# art\tsubject\tangaben"]
         observations = sorted(set(self.observations), key=lambda o: (o[1].startswith("frontend/"), o[1]))
         out += ["\t".join(o) for o in observations] or ["(keine Beobachtungen)"]
+        candidates = self.candidates()
+        out += ["", "## review_candidates",
+                "# Dateien fuer das Urteil der KI: bis %d Hotspots (Datei-Befunde zuerst, dann Beobachtungen ab %d"
+                % (REVIEW_HOTSPOTS, HOTSPOT_MIN_CHANGES),
+                "# Aenderungen) und bis %d in 7 Tagen neu angelegte Dateien ab %d NCLOC; nur .java und .tsx."
+                % (REVIEW_NEW, REVIEW_NEW_MIN_NCLOC),
+                "# Urteilsbefunde (%s) nur mit einem subject dieser Liste." % ", ".join(JUDGMENT_RULE_KEYS)]
+        gaps = sorted(set(self.not_measured) & {"backend_sizes", "frontend_sizes"})
+        if gaps:
+            out.append("# Groessen nicht gemessen (%s): von dieser Seite keine Kandidaten" % ",".join(gaps))
+        if self.recent_missing:
+            out.append("# ## recent fehlt (%s): von dieser Seite keine neuen Dateien" % ",".join(sorted(self.recent_missing)))
+        out.append("# art\tsubject\taenderungen_7d\tangaben")
+        out += ["\t".join(c) for c in candidates] or ["(keine Kandidaten)"]
         out += ["", "## bands",
                 "# NCLOC-Verteilung je Seite (alle Dateien, Frontend ohne Tests)",
                 "# seite\tunter_%d\t%d_bis_%d\t%d_bis_%d\tueber_%d" % (
@@ -342,6 +420,7 @@ class Classifier:
                 "high=%d" % severities.count("HIGH"),
                 "medium=%d" % severities.count("MEDIUM"),
                 "observations=%d" % len(observations),
+                "review_candidates=%d" % len(candidates),
                 "band_observe=%d" % BAND_OBSERVE,
                 "band_finding=%d" % BAND_FINDING,
                 "band_high=%d" % BAND_HIGH,

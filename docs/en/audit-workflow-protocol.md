@@ -191,7 +191,7 @@ Converted audits in `workflow-pool/`:
 
 | Workflow | Measurement | Self-test |
 |---|---|---|
-| Architecture review | block `arch_metrics` → `scripts/public-readiness/arch-metrics.sh` (jdeps, NCLOC, churn, collaborators) and `arch-findings.py` (grading) | `scripts/tests/test-arch-metrics.sh`, `scripts/tests/test-arch-findings.sh` |
+| Architecture review | block `arch_metrics` → `scripts/public-readiness/arch-metrics.sh` (jdeps, NCLOC, churn, collaborators), `arch-findings.py` (grading, candidates) and `arch-seams.py` (seams per candidate, javap) | `scripts/tests/test-arch-metrics.sh`, `scripts/tests/test-arch-findings.sh`, gate: `scripts/tests/test-audit-facts.sh` |
 | Architecture review (frontend) | block `frontend_metrics` → `scripts/public-readiness/frontend-metrics.sh` (source imports, lines, module cycles) | `scripts/tests/test-frontend-metrics.sh` |
 | Health check | block `facts` (Surefire totals, exit codes, lint/tsc, bundle, code and docs sizes) | `scripts/tests/test-audit-facts.sh` |
 | Performance audit | block `facts` (health probe, heap numbers from `/api/v1/system/jvm-memory`, DB and bundle files, log lines, source patterns) | `scripts/tests/test-audit-facts.sh` |
@@ -224,6 +224,33 @@ Findings that only existed under the old rules are no longer reported: the platf
 to `RESOLVED` on the next run. A new finding for the same file under another ruleKey inherits a
 classification (`ACCEPTED_RISK`, `DISMISSED`); the platform resolves the remaining classified ones once
 their ruleKey has left the catalogue or three valid runs no longer reported them (see Lifecycle).
+
+### Architecture review: judgement on measured candidates
+
+From 4.6.0 the report only copied the grading, read no source code and turned `GREEN` as soon as all
+measured findings were classified – without having judged anything. Since version 4.7.0 (TODO
+`e0e9495f`): **the script decides where to look, the AI what is going on there.**
+
+- **Candidates** (`## review_candidates`, `arch-findings.py`): up to 6 hotspots with a file finding or
+  observation (findings first, then by changes) and up to 3 files created in the last 7 days with at
+  least 100 NCLOC, `.java` and `.tsx` only. The column `aenderungen_7d` comes from the new section
+  `## recent` of both fact sheets.
+- **Seams** (`## seams`, `arch-seams.py`): per backend candidate, which method uses which
+  collaborators – read from the bytecode (`javap -c -l -p`) with the same exclusion list as the
+  collaborator count in `arch-metrics.sh`. Methods connected through shared collaborators form a group;
+  several groups are a split candidate. `nur_konstruktor` names injected fields that are never read.
+  If the source is newer than the compiled classes, `stale_classes` appears instead of a table.
+- **Judgement** (AI, Opus): reads the source of each candidate and judges `passt so` (fine as is),
+  `schneiden` (split) or `verlagern` (move). The latter two become findings `arch.mixed-responsibility`
+  and `arch.misplaced-logic` – `subject` exactly from the candidate list, severity at most `MEDIUM`,
+  evidence without quantities with a unit (otherwise the degradation check would reopen a classification
+  whenever the wording changes).
+- **Carry over instead of a change of mind**: a known judgement finding for a file that is no candidate
+  or has not changed in 7 days is carried over unchanged; only changed candidates and re-checks
+  (`AWAITING_VERIFICATION`) are judged anew.
+- **Gate**: open or new judgement findings raise the result to `YELLOW`, never to `RED`. In addition the
+  gate block checks deterministically that every candidate appears under the report's "Urteil"
+  heading; if one is missing, the result is at most `YELLOW` ("Urteil unvollständig").
 
 ### Test coverage: envelope from the target list
 
