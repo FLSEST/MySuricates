@@ -533,7 +533,7 @@ cypress/
 - `before()` / `after()` hooks ensure clean test data via `cy.apiCleanup()`
 
 Clean up old workflow runs: one at a time via `DELETE /api/v1/executions/{id}` (see
-[API reference](api-referenz.md#delete-apiv1executionsid)), in bulk automatically via run retention
+[API reference](api-referenz.md#apiv1executions)), in bulk automatically via run retention
 (default 90 days) — see [architektur.md → Database maintenance](architektur.md#database-maintenance-sqlite-pool-size1)
 for retention and how to switch it off.
 
