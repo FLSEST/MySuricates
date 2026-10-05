@@ -284,7 +284,7 @@ Behaviour and configuration: [WORKFLOW-GUIDE.md](WORKFLOW-GUIDE.md) (section `su
 A quality gate is the verdict a checking workflow passes on its result (GREEN, YELLOW, RED), written
 as the markers `gate_status:`/`gate_category:`/`gate_description:` into a block output. The rules —
 which gate wins, a missing verdict (`gate-missing`), an unreadable one (`gate-invalid`),
-`checked_command` — are in [WORKFLOW-GUIDE.md](WORKFLOW-GUIDE.md) (section "Quality Gate Markers"), the
+`checked_command` — are in [WORKFLOW-GUIDE.md → Quality Gate Markers](WORKFLOW-GUIDE.md#quality-gate-markers), the
 idea behind it in [konzepte/gates.md](konzepte/gates.md). A gate does not change the run status; it is a
 finding about the result, not a failure of the execution.
 

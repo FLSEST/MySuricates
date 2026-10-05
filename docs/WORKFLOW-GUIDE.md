@@ -113,10 +113,10 @@ Führt einen Befehl auf dem Host aus, mit `container_image` in einem Container (
 **Platzhalter in Shell-Befehlen** – die Regeln, die man kennen muss:
 
 - Werte von außen (Webhook-Payload samt `git_*`) sowie `{{ previous_report }}` und `{{ open_todos }}` setzt die Plattform in Shell-Befehlen **immer** in Single-Quotes (in KI-Prompts nie). Ein Lauf, der solche Daten trägt, ist *getaintet*: Ab dann werden auch Block-Ausgaben (`{{ previous_output }}`, `{{ block.<name>.output }}`, `{{ step_N_output }}`, `foreach`-Items) gequotet, ebenso in Sub-Workflows und nach einem Resume. Gleiches gilt, sobald Plattform-Daten im Prompt eines KI-Blocks standen und dessen Ausgabe verbucht ist.
-- Solche Platzhalter deshalb **unquoted** schreiben und den Block mit `"shell_escape_variables": true` versehen. In eigenen Quotes ist das Escaping wirkungslos: `PREV='{{ previous_output }}'` wird beim Wert `x; id` zu `PREV=''x; id''` und führt `id` aus. Ohne die Option kommt der Wert in sauberen Läufen roh. Sichere Form: `set -- {{ previous_output }}` und danach `ANTWORT="${1:-}"` (für die ausgelieferten Definitionen erzwingen das `TemplateHygieneGateTest` und `PlatformPromptQuotingGateTest`).
+- Solche Platzhalter deshalb **unquoted** schreiben und den Block mit `"shell_escape_variables": true` versehen. In eigenen Quotes ist das Escaping wirkungslos: `PREV='{{ previous_output }}'` wird beim Wert `x; id` zu `PREV=''x; id''` und führt `id` aus. Ohne die Option bleiben Werte aus `defaultContext` und Systemvariablen roh, ebenso alle Block-Ausgaben in Läufen ohne Daten von außen (Zeitplan, manueller Start, TodoTrigger, Chain) – ein mehrzeiliger Wert zerlegt dann den Befehl. Sichere Form: `set -- {{ previous_output }}` und danach `ANTWORT="${1:-}"` (für die ausgelieferten Definitionen erzwingen das `TemplateHygieneGateTest` und `PlatformPromptQuotingGateTest`).
 - Eine unbelegte Variable bleibt wörtlich stehen: `set -- {{ source_dir }}; SOURCE_DIR="$*"`, erkennbar an `[ "$SOURCE_DIR" = "{{ source_dir }}" ]`.
 - In einem quoted Heredoc (`<<'PY'`) landet ein Platzhalter als Quelltext im Interpreter. Werte auf der Shell-Zeile übergeben (`PROJECT_ID={{ project_id }} python3 - <<'PY'`, im Skript `os.environ['PROJECT_ID']`); andere Umgebungsvariablen bekommen Shell-Blöcke nicht.
-- `scripts/lib/shell_placeholder_audit.py <definitionen.json>` ordnet jeden Output-Platzhalter in Shell-Feldern nach seiner Rolle ein und meldet nur, was eine Änderung braucht (Exit 1 = Befund).
+- `scripts/lib/shell_placeholder_audit.py <definitionen.json>` ordnet jeden Output-Platzhalter in Shell-Feldern nach seiner Rolle ein und meldet nur, was eine Änderung braucht (Exit 1 = Befund). Eingabe ist die Antwort von `GET /api/v1/workflows` oder eine Pool-Datei; das Skript ruft selbst nichts ab. Platzhalter im Rumpf eines Heredocs gelten dort als unkritisch und dürfen nicht escaped werden, sonst landen Anführungszeichen im Text.
 
 Vertrauensmodell: [deployment.md → Drei Vertrauensklassen](deployment.md#drei-vertrauensklassen-für-kontextwerte).
 
@@ -129,7 +129,7 @@ Autonome Schleife aus REASON und ACT je Iteration – der mächtigste und teuers
   "success_criteria": "index.html enthält alle Sektionen.", "max_iterations": 8, "timeout_seconds": 600 } }
 ```
 
-- `max_total_tokens` zählt je Iteration `inputTokens` + `outputTokens` von REASON und ACT, Cache-Tokens (`cacheReadInputTokens`, `cacheCreationInputTokens`) bewusst nicht – mitgezählt rissen übliche Budgets schon in der ersten Iteration. Codex und Pi melden keine echten Zahlen, dort zählt die Schätzung (Zeichen / 4, `estimated: true`). Geprüft wird nach jeder Iteration; liegt die Summe darüber, endet der Block mit `[TOKEN BUDGET EXCEEDED: …]`.
+- `max_total_tokens` zählt je Iteration `inputTokens` + `outputTokens` von REASON und ACT, Cache-Tokens (`cacheReadInputTokens`, `cacheCreationInputTokens`) bewusst nicht – mitgezählt rissen übliche Budgets schon in der ersten Iteration. Codex und Pi melden keine echten Zahlen, dort zählt die Schätzung (Zeichen / 4, `estimated: true`). Geprüft wird nach jeder Iteration; liegt die Summe darüber, endet der Block mit `[TOKEN BUDGET EXCEEDED: …]`. Die letzte Iteration läuft also zu Ende – das Budget kann um bis zu eine Iteration überschritten werden.
 - Zwei Timeouts: `timeout_seconds` je CLI-Aufruf, `iteration_timeout_seconds` je Iteration – siehe [Die Dual-Timeout-Falle](#die-dual-timeout-falle).
 
 ### `retry` — Wiederholung bei Fehler
@@ -161,6 +161,7 @@ Vergleicht den aufgelösten `expression` mit dem `value` jedes Case (Alternative
 ```
 
 - Verglichen wird ohne Leerraum am Anfang und Ende (eine KI-Antwort `GREEN` mit Zeilenumbruch trifft `GREEN`); Groß-/Kleinschreibung zählt.
+- Ohne Treffer und ohne `default` endet der Block still COMPLETED (Ausgabe `No matching case for: …`, Metadatum `matchedCase: "none"`) – wer einen unerwarteten Wert bemerken will, gibt `default` einen Block, der scheitert.
 - Verschachtelte Blöcke dürfen nur `shell` oder `simple` sein, andere Typen werden abgelehnt.
 - Die Blöcke eines Case schieben `{{ previous_output }}` weiter; wer den Stand vor dem switch braucht, benennt den Block davor. Ein `name` am Case-Block macht seine Ausgabe als `{{ block.<name>.output }}` verfügbar; die Ausgabe des switch ist die Verkettung aller ausgeführten Case-Blöcke.
 - `gate_status` taugt nicht als Ausdruck: Die Marker wertet der Run erst am Ende aus.
@@ -176,7 +177,7 @@ Führt `command` für jedes Item aus `items` oder aus den Zeilen von `items_comm
 ```
 
 - Item-Variablen: `{{ <variable_name> }}`, `{{ <variable_name>_index }}` (ab 0), bei einem JSON-Objekt die Felder der obersten Ebene als `{{ <variable_name>.<feld> }}`. Leere Zeilen werden verworfen; eine leere Liste ergibt null Iterationen (COMPLETED, `totalItems: 0`).
-- Fehler: Scheitert ein Item, scheitert der Block (die übrigen Items laufen trotzdem); mit `continue_on_error: true` endet er COMPLETED (`N/M items failed: …`). Nach `max_consecutive_failures` Fehlern **in Folge** (Standard 3, seit 2026-10) hört die Schleife auf und der Block scheitert, auch mit `continue_on_error`; `0` schaltet das ab, etwa für Erreichbarkeitsprüfungen über viele Hosts. `on_failure: "continue"` lässt dagegen nur den Workflow nach dem FAILED-Block weiterlaufen.
+- Fehler: Scheitert ein Item, scheitert der Block (die übrigen Items laufen trotzdem); mit `continue_on_error: true` endet er COMPLETED (`N/M items failed: …`). Nach `max_consecutive_failures` Fehlern **in Folge** (Standard 3, seit 2026-10) hört die Schleife auf und der Block scheitert, auch mit `continue_on_error` – der toleriert gescheiterte Items, nicht aber solche, die gar nicht liefen. Grund: Ein erschöpftes Kontingent lässt jedes weitere KI-Item genauso scheitern; ohne Abbruch verlor ein Lauf so 37 von 42 Items. Die Meldung nennt den Grund zuerst (`stopped after 3 consecutive failed items (max_consecutive_failures), 34 items not run`), darunter die gescheiterten Items. `0` schaltet den Abbruch ab, etwa für Erreichbarkeitsprüfungen über viele Hosts. `on_failure: "continue"` lässt dagegen nur den Workflow nach dem FAILED-Block weiterlaufen.
 - Die Fehlermeldung beginnt mit den gescheiterten Items (`Step 1 (foreach) failed: 1/37 items failed: erkner`); die Block-Ausgabe bleibt das Protokoll aller Items in ihrer Reihenfolge.
 - **Sub-Workflow je Item** (`workflow_id`): je Item ein eigener Lauf wie beim `sub-workflow`-Block (`SubWorkflowLauncher`, Zulassung als `SUB_WORKFLOW`). Der Kind-Lauf bekommt die Variablen dieses Laufs ohne Plattform-Daten, die Item-Variablen und die Werte aus `context`; der Taint reist mit. Ein Item scheitert, wenn sein Kind-Lauf nicht `COMPLETED` endet. Die Ausgabe `[item]: <letzte Ausgabe>` trägt `derivedOutput: true` – Marker zählen nur in den Kind-Läufen. `execution_mode`, `timeout_seconds` und die KI-Schlüssel wirken hier nicht.
 - Ein Platzhalter in `workflow_id` wird **einmal vor dem ersten Item** aufgelöst und nur aus vertrauenswürdigen Kontextvariablen – nicht aus Webhook-Daten oder Blockausgaben –, sonst scheitert der Block vor dem ersten Item. `context` darf keine reservierten Namen setzen (Schlüssel mit `__`, Plattform-Daten, Werte des Laufs, die Item-Variablen).
@@ -261,7 +262,7 @@ Legen TODOs direkt über den TodoService an, ändern oder schließen sie – kei
   { "type": "todo-close", "config": { "id": "{{ todo_id }}" } } ]
 ```
 
-- `todo-update` braucht genau eins: `id` (ein TODO; nur gesetzte, nicht leere Felder ändern sich) oder `updates`, eine JSON-Liste für bis zu 50 TODOs **des Lauf-Projekts**. `note` wird an die Beschreibung gehängt (`— <Datum> · <Workflow> (Lauf <id8>): <note>`, Datum in der Zeitzone der Instanz); Tags je höchstens 10. Kaputtes JSON, keine Liste oder ein unbekannter Schlüssel lassen den Schritt scheitern, bevor etwas geschrieben ist; ein unpassender Eintrag wird mit Grund übersprungen (`✓ N aktualisiert, M übersprungen`).
+- `todo-update` braucht genau eins: `id` (ein TODO; nur gesetzte, nicht leere Felder ändern sich) oder `updates`, eine JSON-Liste für bis zu 50 TODOs **des Lauf-Projekts**. `note` wird an die Beschreibung gehängt (`— <Datum> · <Workflow> (Lauf <id8>): <note>`, Datum in der Zeitzone der Instanz), einzeilig, auf 1000 Zeichen gekürzt und mit entschärften Markern (`UntrustedText.inline`); `add_tags`/`remove_tags`/`require_tags` je höchstens 10 Tags aus `[A-Za-z0-9_:.-]{1,60}` (`TodoBulkUpdates`), sonst wird der Eintrag übersprungen. Kaputtes JSON, keine Liste oder ein unbekannter Schlüssel lassen den Schritt scheitern, bevor etwas geschrieben ist; ein unpassender Eintrag wird mit Grund übersprungen (`✓ N aktualisiert, M übersprungen`).
 - Für **dynamisch viele** TODOs aus Analyse-Workflows `todo_item:`-Marker verwenden ([TODO-Marker](#todo-marker-todo_item)); Audit-Templates nutzen das Envelope `mysuricates:audit-result:v1`.
 
 ### `compress` / `compress-ai` — Ausgaben sichtbar verdichten
@@ -590,6 +591,12 @@ ein Follow-up-TODO. KI-Prompts, die keine Marker schreiben sollen, deshalb ohne 
 formulieren („keine Statuszeilen") und das Urteil im abschließenden Shell-Block setzen. Gesehen
 2026-09-20 bei der Doku-Durchsicht.
 
+**Ein unlesbares Urteil wird YELLOW.** Steht in den Lauf-Metadaten ein `gate_status`, der weder
+GREEN noch YELLOW noch RED ist, wird er geloggt und der Lauf YELLOW `gate-invalid`
+(`GateStatusResolver`). Der Wert darf das Urteil aus dem Laufstatus nur verschärfen, nie mildern: Ein
+`FAILED`-Lauf bleibt RED. Grund: Vorher fiel ein unlesbarer Wert stumm auf GREEN – ein Prüf-Workflow,
+dessen KI-Schritt still scheiterte, war nicht von einem Workflow ohne Gate zu unterscheiden.
+
 **Shell-Block-Beispiel** mit Gate-Emission:
 ```bash
 set -euo pipefail
@@ -661,7 +668,7 @@ todo_item: useWebSocket-Hook testen | MEDIUM | frontend,testing
 
 ### Dashboard-Marker (`dashboard_widget:`)
 
-Ein Workflow kann sein Dashboard-Ergebnis auch als Markerzeile in einer Blockausgabe melden. Der bewusst konfigurierte Weg ist der [`dashboard-report`-Block](#dashboard-report--dashboard-ergebnis-ohne-marker-melden); hat er geschrieben, wird kein Marker ausgewertet. Das JSON darf über mehrere Zeilen gehen:
+Ein Workflow kann sein Dashboard-Ergebnis auch als Markerzeile in einer Blockausgabe melden. Der bewusst konfigurierte Weg ist der [`dashboard-report`-Block](#dashboard-report--dashboard-ergebnis-ohne-marker-melden); hat er geschrieben, wird kein Marker ausgewertet – auch ein kaputter setzt dann kein `dashboard_widget_error`. Das JSON darf über mehrere Zeilen gehen:
 
 ```
 dashboard_widget: {"title": "Nightly QA", "status": "YELLOW",
@@ -670,8 +677,8 @@ dashboard_widget: {"title": "Nightly QA", "status": "YELLOW",
 ```
 
 - Felder und Grenzen wie beim `dashboard-report`-Block ([Block-Referenz](block-referenz.md#dashboard-report)): `status` ist Pflicht (`GREEN`, `YELLOW`, `RED`), KPI-`label` und -`value` je ≤ 40 Zeichen, `value` ist ein **String**, `trend` `UP`/`DOWN`/`FLAT`. Ein unbekanntes Feld – auch in einem KPI-Objekt – lehnt den ganzen Vertrag ab, ebenso ein leerer, zu langer oder nicht einzeiliger Text (Steuer-, Zero-Width-, Bidi-, Separator-, Private-Use-Zeichen). Geprüft wird beim Run-Ende und beim Lesen erneut.
-- Gelesen wird höchstens 8192 Zeichen weit. Melden mehrere Blöcke einen Marker, gewinnt der letzte; Ausgaben von Komprimierungs-Blöcken (`derivedOutput`) zählen nicht. **Zwei Marker in derselben Blockausgabe lehnen diese Ausgabe ab** (`resultState: INVALID`): Ein zitierter Marker darf das eigene Ergebnis nie überstimmen.
-- Den Marker am Zeilenanfang schreiben, das JSON direkt dahinter (ein Codeblock in der nächsten Zeile geht auch). Das Dashboard zeigt den Inhalt nur als Text – kein Markdown, HTML, Link oder Bild.
+- Gelesen wird höchstens 8192 Zeichen weit; schließt die Klammer bis dahin nicht, ist der Marker ungültig. Melden mehrere Blöcke einen Marker, gewinnt der letzte; Ausgaben von Komprimierungs-Blöcken (`derivedOutput`) zählen nicht. **Zwei Marker in derselben Blockausgabe lehnen diese Ausgabe ab** (`resultState: INVALID`): Ein zitierter Marker darf das eigene Ergebnis nie überstimmen.
+- Den Marker am Zeilenanfang schreiben, das JSON direkt dahinter (ein Codeblock in der nächsten Zeile geht auch). Grund: Steht er mitten in einer Zeile und trennt ihn eine Leerzeile von seinem JSON – oder trennt ein geschütztes Leerzeichen (U+00A0) oder ein NEL (U+0085) den Doppelpunkt vom JSON –, wird er nicht erkannt; dann kann ein aus fremdem Text zitierter Marker der einzige erkannte sein und gewinnen. Das Dashboard zeigt den Inhalt nur als Text – kein Markdown, HTML, Link oder Bild.
 - Lesen: `GET /api/v1/dashboard/workflow-results?workflowIds=…` liefert je Workflow den letzten Run und `resultState` (`VALID`, `INVALID` oder `MISSING`).
 
 ### `checked_command` / `check_category` — Gate automatisch aus dem Exit-Code
