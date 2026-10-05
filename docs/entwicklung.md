@@ -1191,6 +1191,36 @@ branch“, das würde ganz `docs/` samt `plans/` veröffentlichen) und die Repo-
 `PAGES_ENABLED=true` setzen (Settings → Secrets and variables → Actions → Variables). Ohne die Variable
 läuft nur der Bau samt `--check`, der Deploy-Job entfällt.
 
+## Erzeugte Referenzen
+
+Zwei Nachschlageseiten werden aus dem Code erzeugt statt gepflegt, je auf Deutsch und Englisch:
+
+| Seite | Quelle |
+|---|---|
+| [api-referenz.md](api-referenz.md) | REST-Controller unter `ai-automation-backend/src/main/java/com/automation/controller/`, `ErrorCode`, Modulnamen aus `ModuleCatalog` |
+| [block-referenz.md](block-referenz.md) | `ai-automation-frontend/src/data/blockConfigSchema.json` |
+
+```bash
+python3 scripts/docs-reference.py --write   # beide Seiten in beiden Sprachen neu schreiben
+python3 scripts/docs-reference.py --check   # nur vergleichen: Exit-Code 1 nennt jede veraltete Seite
+python3 -m unittest discover -s scripts/tests -p 'test_docs_parity_check.py'
+```
+
+Jede erzeugte Seite beginnt mit dem Kommentar `<!-- Erzeugt von scripts/docs-reference.py – nicht von
+Hand ändern -->` und einer von Hand gepflegten Einleitung aus `scripts/docs-reference/<seite>.<de|en>.md`;
+alles danach kommt aus der Quelle, eine Änderung von Hand hat keinen Bestand. Was in einer Tabelle fehlt,
+gehört in die Quelle: Den Zweck eines Endpunkts liefert der erste Satz des Javadoc seiner Handler-Methode
+(ohne Javadoc bleibt die Zelle leer), die Erklärung eines Config-Schlüssels sein `doc`-Text im Schema.
+
+`docs_parity_check.py` ruft `--check` auf und meldet eine veraltete Seite als Befund. Damit greift die
+Prüfung überall, wo das Doku-Gate läuft, auch im Pre-Push-Gate: Wer einen Endpunkt, sein Javadoc oder
+einen Config-Schlüssel ändert, erzeugt die Seiten im selben Commit neu. `api-endpoint-diff.sh` vergleicht
+die Endpunkte daneben weiter unabhängig mit beiden Fassungen der API-Referenz.
+
+[datenmodell.md](datenmodell.md) wird nicht erzeugt: Die JPA-Entities nennen Tabellen und Spalten, aber
+viele Fremdschlüssel (etwa die von `todos`) sind dort einfache Textfelder, und `NOT NULL`, Standardwerte
+und `ON DELETE` stehen nur in den Flyway-Migrationen.
+
 ## Abhängigkeits-Meldungen (Frontend)
 
 `npm audit` im Frontend meldet nach den Updates vom 2026-09-12 **0 Schwachstellen**.

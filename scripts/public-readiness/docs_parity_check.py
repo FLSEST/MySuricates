@@ -12,6 +12,10 @@ Drei Dinge, die eine Maschine besser prueft als ein Lesedurchgang:
    Ordner in `MIRRORED_SUBDIRS` (`docs/konzepte/x.md` <-> `docs/en/konzepte/x.md`). Weicht die
    Folge ab, paart `align_sections` die Abschnitte ueber ihren Inhalt und nennt genau die ohne
    Gegenstueck (TODO 2d553479).
+4. **Erzeugte Referenzen** — die Seiten, die `scripts/docs-reference.py` aus dem Code erzeugt
+   (API-Referenz, Block-Referenz), decken sich mit ihrer Quelle (`--check`, TODO 1ab3ad21). So
+   faellt ein neuer Endpunkt oder Config-Schluessel ohne neu erzeugte Seite ueberall auf, wo
+   dieses Gate laeuft — auch im Pre-Push.
 
 Was hier NICHT geprueft wird, weil es Urteil braucht: Aktualitaet gegenueber dem Code
 (dafuer doc-facts-check.sh) und Verstaendlichkeit fuer Fremde (dafuer der Workflow
@@ -20,6 +24,9 @@ Was hier NICHT geprueft wird, weil es Urteil braucht: Aktualitaet gegenueber dem
 Bekannte, ticketierte Luecken stehen in KNOWN_GAPS. Sie machen das Gate nicht rot — eine
 *neue* Luecke schon. Ohne diese Liste stuende das Gate dauerhaft auf YELLOW und waere als
 Signal wertlos; genau der Fehler, den docs-check.sh bis 2026-09-20 hatte.
+
+Generierte Seiten (Punkt 4) werden zusaetzlich wie jede andere Seite auf Links und DE/EN-Gleichstand
+geprueft; ihre Vorlagen unter scripts/docs-reference/ dagegen nicht (siehe TEMPLATE_PREFIXES).
 
 Run:  python3 scripts/public-readiness/docs_parity_check.py
       python3 scripts/public-readiness/docs_parity_check.py --root <dir>
@@ -50,6 +57,13 @@ MIRRORED_SUBDIRS: tuple[str, ...] = ("onboarding", "konzepte")
 # englisches Gegenstueck — erzeugt von scripts/docs-diagrams.py aus derselben Quelle.
 KNOWN_GAPS: dict[str, str] = {}
 
+# Vorlagen der erzeugten Referenzseiten (scripts/docs-reference/<seite>.<de|en>.md). Ihre relativen
+# Links gelten erst am Ziel unter docs/ bzw. docs/en/ und werden dort geprueft, nicht hier.
+TEMPLATE_PREFIXES: tuple[str, ...] = ("scripts/docs-reference/",)
+
+# Der Erzeuger der Referenzseiten; aufgerufen mit --root, damit Tests ihn auf Fixtures richten koennen.
+REFERENCE_SCRIPT = Path(__file__).resolve().parents[1] / "docs-reference.py"
+
 # Einzelne Abschnitte ohne Gegenstueck. Format: "datei::ueberschrift" -> TODO-Kennung.
 # Der Schluessel ist die Ueberschrift, die WIRKLICH fehlt: Bis TODO 2d553479 verglich die Pruefung
 # nur die Folge der Ebenen und schrieb eine Luecke dem letzten gleichrangigen Abschnitt zu. So
@@ -65,7 +79,7 @@ def check_links(root: Path, files: list[str]) -> tuple[list[str], int]:
     checked = 0
     for rel in files:
         path = root / rel
-        if not path.exists():
+        if not path.exists() or rel.startswith(TEMPLATE_PREFIXES):
             continue
         # Welche Links aktiv und relativ sind, entscheidet md_common.iter_links —
         # dieselbe Regel, die der Linkgraph in docs_orphan_scan.py benutzt.
@@ -80,6 +94,28 @@ def check_links(root: Path, files: list[str]) -> tuple[list[str], int]:
                 if frag.lower() not in {slug(h) for h in headings(target)}:
                     findings.append(f"toter-anker {rel}:{no} -> {href}")
     return findings, checked
+
+
+def check_generated(root: Path) -> list[str]:
+    """Erzeugte Referenzseiten, die nicht mehr zu ihrer Quelle passen (TODO 1ab3ad21).
+
+    Fragt `scripts/docs-reference.py --check`. Ein Repo ohne die Quellen und ohne die Seiten
+    (Fixtures) prueft der Erzeuger selbst nicht — er meldet dann nichts.
+    """
+    if not REFERENCE_SCRIPT.is_file():
+        return []
+    proc = subprocess.run([sys.executable, str(REFERENCE_SCRIPT), "--check", "--root", str(root)],
+                          capture_output=True, text=True, check=False)
+    if proc.returncode == 0:
+        return []
+    findings = [f"veraltet-erzeugt {line.partition(':')[2].strip()} (python3 scripts/docs-reference.py --write)"
+                for line in proc.stdout.splitlines() if line.startswith("veraltet:")]
+    findings += [f"referenz-fehler {line.partition(':')[2].strip()}"
+                 for line in proc.stderr.splitlines() if line.startswith("fehler:")]
+    if not findings:
+        detail = (proc.stderr or proc.stdout).strip().splitlines()
+        findings.append(f"referenz-pruefung exit {proc.returncode}: {detail[-1] if detail else 'ohne Ausgabe'}")
+    return findings
 
 
 def check_en_to_de(root: Path, files: list[str]) -> list[str]:
@@ -377,7 +413,8 @@ def main() -> int:
     link_findings, checked = check_links(root, files)
     parity_new, parity_known = check_parity(root)
     en_to_de = check_en_to_de(root, files)
-    findings = link_findings + parity_new
+    generated = check_generated(root)
+    findings = link_findings + parity_new + generated
 
     print("## Doku-Verweise und DE/EN-Gleichstand")
     print(f"markdown_files: {len(files)}")
@@ -398,13 +435,14 @@ def main() -> int:
     if findings:
         print("gate_status: YELLOW")
         print("gate_category: documentation-links")
-        print("gate_description: Tote Verweise oder neue DE/EN-Luecken in der Doku.")
-        print("todo_item: Tote Verweise oder DE/EN-Luecken in der Doku beheben | MEDIUM |"
+        print("gate_description: Tote Verweise, neue DE/EN-Luecken oder veraltete erzeugte Referenzen"
+              " in der Doku.")
+        print("todo_item: Tote Verweise, DE/EN-Luecken oder veraltete Referenzen in der Doku beheben | MEDIUM |"
               " documentation,release | docs_parity_check.py meldet neue Befunde.")
         return 1
     print("gate_status: GREEN")
     print("gate_category: documentation-links")
-    print("gate_description: Keine toten Verweise, keine neuen DE/EN-Luecken.")
+    print("gate_description: Keine toten Verweise, keine neuen DE/EN-Luecken, erzeugte Referenzen aktuell.")
     return 0
 
 

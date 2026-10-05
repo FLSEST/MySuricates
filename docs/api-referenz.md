@@ -1,33 +1,39 @@
+<!-- Erzeugt von scripts/docs-reference.py – nicht von Hand ändern -->
+
 # API-Referenz
 
-> **Scope:** Vollständige interne REST-API-Referenz für MySuricates. Die kuratierte Kurzreferenz für externe Agents ist [AGENTS.md](../AGENTS.md).
+> **Scope:** Die REST-API von MySuricates, ab „Fehlercodes“ erzeugt aus dem Code
+> (`python3 scripts/docs-reference.py --write`, siehe [Entwicklung → Erzeugte Referenzen](entwicklung.md#erzeugte-referenzen)).
+> Die kuratierte Kurzreferenz für externe Agents mit Beispielen ist [AGENTS.md](../AGENTS.md).
+
+Je Bereich (erstes Pfadsegment nach `/api/v1`) eine Tabelle: Methode und Pfad, als Zweck der erste Satz
+des Javadoc der Handler-Methode – ohne Javadoc bleibt die Zelle leer – und das Modul aus `@RequiresModule`
+(„Kern“ = immer an). Request- und Response-Felder stehen in den DTOs unter
+`ai-automation-backend/src/main/java/com/automation/dto/`, das Verhalten im Controller, den die Zeile
+„Quelle“ nennt.
 
 ## Allgemein
 
-- **Basis-URL:** `http://localhost:9090/api/v1`
-- **Content-Type:** `application/json`
+- **Basis-URL:** `http://localhost:9090/api/v1`, Content-Type `application/json`
 - **Authentifizierung:** Header `X-API-Key: <key>` (wenn `automation.security.enabled=true`)
 - **Proxy:** Aufrufe mit API-Key per `curl` immer mit `--noproxy '*'` – bei gesetztem `http_proxy`
   schickt curl auch Anfragen an `localhost` über den Proxy, samt Key. Das Doku-Gate
   `doc-facts-check.sh` prüft das an jedem Beispiel in `docs/` und `AGENTS.md`.
+- **Module:** Ist das Modul eines Endpunkts ausgeschaltet, antwortet er mit `404` und Code `MODULE_DISABLED`.
+- **Paginierung:** Seitenweise Listen nehmen `page` (ab 0) und `size` und liefern ein Seitenobjekt mit
+  `content` und `totalElements`.
 
 ### Fehlerformat
 
-Alle Fehler folgen diesem Format:
-
 ```json
-{
-  "code": "INTERNAL_ERROR",
-  "error": "Fehlermeldung",
-  "timestamp": "2025-01-15T10:30:00Z"
-}
+{ "code": "INTERNAL_ERROR", "error": "Fehlermeldung", "timestamp": "2025-01-15T10:30:00Z" }
 ```
 
-Das Feld `details` wird nur bei Bedarf mitgeliefert (`@JsonInclude(NON_NULL)`).
+`details` kommt nur bei Bedarf mit (`@JsonInclude(NON_NULL)`), Validierungsfehler (`VALIDATION_FAILED`)
+zusätzlich mit `fieldErrors` (Feld → Meldung).
 
 `params` (Objekt aus Zeichenketten) kommt nur mit, wenn Code und Parameter die Meldung vollständig
-beschreiben – etwa `{"code":"WORKFLOW_SEALED","params":{"name":"Nightly"}}` oder
-`{"code":"RESOURCE_NOT_FOUND","params":{"resource":"Workflow","id":"…"}}`, auch leer (`{}`) bei festem
+beschreiben – etwa `{"code":"WORKFLOW_SEALED","params":{"name":"Nightly"}}`, auch leer (`{}`) bei festem
 Text. Die Oberfläche zeigt dann ihre eigene Übersetzung des Codes; `error` bleibt der englische Text für
 Logs und API-Clients. Ohne `params` ist `error` Freitext der Wurfstelle und wird so angezeigt.
 
@@ -36,4286 +42,14 @@ Wo ein Code für viele Meldungen steht (`INVALID_ARGUMENT`, `STATE_CONFLICT`, �
 `{"code":"INVALID_ARGUMENT","messageKey":"INVALID_CRON","params":{"expression":"…"}}`. Die Oberfläche
 übersetzt dann den Schlüssel statt des Codes.
 
-**Error-Codes:**
-
-| Code | HTTP-Status |
-|---|---|
-| `RESOURCE_NOT_FOUND` | 404 |
-| `MODULE_DISABLED` | 404 |
-| `MODULES_NOT_EDITABLE` | 403 |
-| `VALIDATION_FAILED` | 400 |
-| `INVALID_ARGUMENT` | 400 |
-| `WORKFLOW_EXECUTION_FAILED` | 500 |
-| `CONTAINER_ERROR` | 500 |
-| `STAGING_ERROR` | 500 |
-| `STATE_CONFLICT` | 409 |
-| `WORKFLOW_SEALED` | 409 |
-| `WORKFLOW_TAMPERED` | 409 |
-| `SKILL_PINNED_BY_SEAL` | 409 |
-| `SEAL_IMMUTABLE` | 403 |
-| `UNATTENDED_REQUIRES_SEAL` | 403 |
-| `UNATTENDED_PLATFORM_ACCESS` | 403 |
-| `WEBHOOK_SIGNATURE_INVALID` | 401 |
-| `NO_TASK_TARGET` | 400 |
-| `PROVIDER_NOT_CONNECTED` | 409 |
-| `PROVIDER_NOT_TASK_CAPABLE` | 400 |
-| `SERVICE_UNAVAILABLE` | 503 |
-| `TOKEN_BUDGET_EXCEEDED` | 429 |
-| `RATE_LIMITED` | 429 |
-| `PAYLOAD_TOO_LARGE` | 413 |
-| `OPERATION_TIMEOUT` | 504 |
-| `METHOD_NOT_ALLOWED` | 405 |
-| `RUN_DELETION_DISABLED` | 403 |
-| `INTERNAL_ERROR` | 500 |
-
-Bei Validierungsfehlern (`VALIDATION_FAILED`, 400) zusätzlich:
-
-```json
-{
-  "code": "VALIDATION_FAILED",
-  "error": "Validation failed",
-  "timestamp": "2025-01-15T10:30:00Z",
-  "fieldErrors": {
-    "name": "must not be blank",
-    "type": "must not be null"
-  }
-}
-```
-
-### HTTP-Statuscodes
-
-| Code | Bedeutung |
-|---|---|
-| 200 | Erfolg |
-| 201 | Ressource erstellt |
-| 202 | Akzeptiert (asynchrone Verarbeitung) |
-| 204 | Gelöscht (kein Body) |
-| 400 | Validierungsfehler |
-| 404 | Ressource nicht gefunden |
-| 409 | Konflikt (ungültiger Zustand) |
-| 429 | Rate Limit überschritten |
-| 500 | Interner Serverfehler |
-| 503 | Service nicht verfügbar (z.B. Test-Instanz nicht gesund) |
-| 504 | Operation Timeout |
-
----
-
-## Projects
-
-### `GET /api/v1/projects`
-
-Alle Projekte auflisten.
-
-**Response:** `ProjectResponse[]`
-
-```json
-[
-  {
-    "id": "uuid",
-    "name": "Mein Projekt",
-    "subtitle": null,
-    "description": null,
-    "type": "CODE",
-    "path": "/workspace/projekt",
-    "config": {},
-    "aiContext": null,
-    "status": "STOPPED",
-    "container": null,
-    "archivedAt": null,
-    "createdAt": "2025-01-15T10:00:00Z",
-    "updatedAt": "2025-01-15T10:00:00Z",
-    "workflowCount": 3
-  }
-]
-```
-
-### `POST /api/v1/projects`
-
-Neues Projekt erstellen.
-
-**Request:**
-
-```json
-{
-  "name": "Mein Projekt",
-  "type": "CODE",
-  "path": "/workspace/projekt",
-  "config": {}
-}
-```
-
-| Feld | Typ | Pflicht | Werte |
-|---|---|---|---|
-| `name` | String | Ja | |
-| `subtitle` | String | Nein | |
-| `description` | String | Nein | |
-| `type` | Enum | Ja | `CODE`, `CONTENT`, `RESEARCH`, `BUSINESS`, `PERSONAL` |
-| `path` | String | Ja | Pfad im Container |
-| `config` | Object | Nein | Freies JSON |
-| `aiContext` | String | Nein | KI-Kontext für das Projekt |
-
-**Response:** `201` mit `ProjectResponse`
-
-### `POST /api/v1/projects/example`
-
-Das mitgelieferte Beispielprojekt anlegen, gedacht für eine frische Installation. Die Oberfläche bietet es an, solange es kein Projekt gibt.
-
-- **Verzeichnis:** Die Vorlage `classpath:examples/example-project/` wird nach `<automation.examples.directory>/example-project` kopiert. Standard ist `mysuricates-examples` unter dem Workspace-Root, ohne Workspace-Root `./data/examples` neben der Datenbank. Die Umgebungsvariable dafür ist `AUTOMATION_EXAMPLES_DIR`. Ein vorhandenes Verzeichnis wird nie überschrieben.
-- **Workflows:** je ein Workflow pro mitgelieferter Vorlage, die `ExampleProjectService.EXAMPLE_TEMPLATE_IDS` nennt (derzeit die Blaupausen `blueprint-approval`, `blueprint-if`, `blueprint-loop`, `blueprint-todo` und `blueprint-report`, alle ohne KI), mit `changeSource` `example-project`. Eine Vorlage, deren Blöcke ein ausgeschaltetes Modul brauchen (etwa `blueprint-report` ohne `dashboard-report`), wird ausgelassen und beim nächsten Aufruf mit eingeschaltetem Modul ergänzt.
-- **Idempotent:** Ein aktives Projekt, das schon auf das Verzeichnis zeigt, wird zurückgegeben, und fehlende Beispiel-Workflows werden ergänzt. Beschreibung und `README.md` einer älteren Kopie werden nur dann auf den aktuellen Text gebracht, wenn sie noch wortgleich dem Text einer früheren Version entsprechen; geänderte bleiben unangetastet.
-
-| Parameter | Typ | Pflicht | Werte |
-|---|---|---|---|
-| `locale` | Query | Nein | `de`, `en` (Default `en`): Sprache von Projektname und Beispiel-Workflows |
-
-**Response:** `201` mit `ProjectResponse`, wenn das Projekt neu angelegt wurde, sonst `200`.
-
-### `GET /api/v1/projects/{id}`
-
-Einzelnes Projekt abrufen.
-
-**Response:** `ProjectResponse`
-
-### `PUT /api/v1/projects/{id}`
-
-Projekt aktualisieren.
-
-**Request:**
-
-```json
-{
-  "name": "Neuer Name",
-  "subtitle": "Untertitel",
-  "description": "Beschreibung",
-  "type": "RESEARCH",
-  "path": "/workspace/neu",
-  "config": {},
-  "aiContext": "..."
-}
-```
-
-Alle Felder sind optional; nur übergebene Felder werden aktualisiert. Änderbar sind `cronExpression`
-(nur `CRON`), `scheduledAt` (nur `ONCE`), `description`, `inputContext`, `endDate` und `maxRuns` (nur
-`CRON`), `catchUpOnResume` und `conflictBehavior` (`SKIP`/`OVERLAP`, seit 2026-09-24; ein anderer Wert
-→ `400`). Ziel und Typ eines Zeitplans bleiben fest.
-
-**Response:** `ProjectResponse`
-
-### `DELETE /api/v1/projects/{id}`
-
-Projekt löschen (inkl. Container und Workflows).
-
-**Response:** `204 No Content`
-
-### `GET /api/v1/projects/archived`
-
-Archivierte Projekte auflisten.
-
-**Response:** `ProjectResponse[]`
-
-### `POST /api/v1/projects/{id}/restore`
-
-Archiviertes Projekt wiederherstellen.
-
-**Response:** `ProjectResponse`
-
-### `POST /api/v1/projects/{id}/start`
-
-Docker-Container für das Projekt starten.
-
-**Response:** `ProjectResponse` (Status wechselt zu `STARTING` → `RUNNING`)
-
-### `POST /api/v1/projects/{id}/stop`
-
-Docker-Container stoppen.
-
-**Response:** `ProjectResponse` (Status wechselt zu `STOPPED`)
-
-### `GET /api/v1/projects/{id}/workflows`
-
-Alle Workflows eines Projekts auflisten.
-
-**Response:** `WorkflowResponse[]`
-
-### `POST /api/v1/projects/{id}/generate-context`
-
-KI-Kontext für das Projekt generieren (analysiert das Projekt-Verzeichnis).
-
-**Response:** `{ "context": "..." }`
-
-### `GET /api/v1/projects/{id}/export`
-
-Das ganze Projekt als **Bündel** — eine JSON-Datei mit Stammdaten (ohne Pfad, Container, Status, IDs), allen
-Workflows, den Chains, deren Einträge nur Workflows dieses Projekts nennen (nur mit Modul `chains`, sonst
-weggelassen + Warnung), und den Zeitplänen darauf. Nicht enthalten: Läufe, TODOs, Memory, Webhooks,
-TODO-/Completion-Trigger, Siegel, Skills (nur per Name). Format und Pfad-Tokens: [architektur.md → Projekt-Bündel](architektur.md#projekt-bündel).
-
-**Response:** `200`, `Content-Disposition: attachment; filename="<projekt-slug>.mysuricates-bundle.json"`
-
-```json
-{ "format": "mysuricates-project-bundle", "formatVersion": 1, "exportedAt": "…", "appVersion": "…",
-  "project": { "name": "…", "subtitle": null, "description": "…", "type": "CODE", "aiContext": null, "config": {} },
-  "workflows": [ { "key": "tests", "definition": { "name": "Tests", "blocks": [ … ], "activatedSkillNames": [] } } ],
-  "chains": [ { "key": "nightly", "name": "Nightly", "entries": [ { "workflowKey": "tests", "sortOrder": 0 } ] } ],
-  "schedules": [ { "target": { "workflowKey": "tests" }, "cronExpression": "0 0 6 * * *", "scheduleType": "CRON" } ],
-  "paths": [ { "token": "@@path:1@@", "original": "/tmp/app-venv", "occurrences": 2, "hint": "Tests › blocks[0].config.command" } ],
-  "skillNames": [], "warnings": [] }
-```
-
-`404` bei unbekanntem oder archiviertem Projekt.
-
-### `POST /api/v1/projects/import/preview`
-
-Prüft ein Bündel und zeigt, was ein Import anlegen würde — schreibt nichts. Body höchstens 5 MB.
-
-**Request:** `{ "bundle": { … }, "targetProjectId": "<uuid, optional — füllt nameTakenInTarget>" }`
-
-**Response:**
-
-```json
-{ "project": { "name": "…", "nameTaken": true },
-  "workflows": [ { "key": "tests", "name": "Tests", "blockCount": 3, "blockTypes": ["shell", "simple"],
-                   "providers": ["CLAUDE"], "models": ["opus"], "shellCommands": ["erste 200 Zeichen je Shell-Feld"],
-                   "nameTakenInTarget": false } ],
-  "chains": [ { "key": "nightly", "name": "Nightly", "entries": 2 } ],
-  "schedules": [ { "target": "workflow:tests", "cronExpression": "0 0 6 * * *", "willBeDisabled": true } ],
-  "paths": [ { "token": "@@path:1@@", "original": "/tmp/app-venv", "occurrences": 2, "hint": "…" } ],
-  "warnings": [ "…" ] }
-```
-
-`400` mit allen Problemen auf einmal: falsches `format`, `formatVersion` ≠ 1, fehlende Pflichtfelder,
-doppelte Keys, `workflowKey`/`chainKey`/`@@workflow:key@@`/`@@path:N@@` ohne Ziel im Bündel, ungültiger Cron.
-
-### `POST /api/v1/projects/import`
-
-Legt das Bündel in **einer** Transaktion an: Projekt (Modus `new`) → Workflows über den regulären Schreibweg
-(`changeSource` `import`, ungesiegelt, je eine Versionszeile) → `@@workflow:key@@` auf die neuen IDs (zweite
-Versionszeile) → Chains → Zeitpläne, immer **deaktiviert**. Schlägt ein Schritt fehl, wird nichts angelegt.
-
-**Request:**
-
-```json
-{ "bundle": { … },
-  "project": { "mode": "new", "name": "App (Import)", "path": "/home/x/code/app" },
-  "pathMappings": { "@@path:1@@": "/home/x/.venvs/app" },
-  "onConflict": "skip" }
-```
-
-- `project`: `{"mode":"new","name","path"}` (`path` darf leer sein) oder `{"mode":"existing","projectId"}`.
-- `pathMappings`: Pflicht für jedes Token aus `paths` (Vorschlag: `original`); `{{ project_path }}` bleibt Platzhalter.
-- `onConflict` (nur bei `existing`): `skip` (Default; Verweise zeigen auf den vorhandenen gleichnamigen Workflow)
-  oder `rename` (`Name (Import)`, `Name (Import 2)`, …).
-
-**Response:** `201`
-
-```json
-{ "projectId": "…", "created": { "workflows": 8, "chains": 1, "schedules": 2 },
-  "skipped": [ { "kind": "workflow", "key": "tests", "reason": "name exists" } ],
-  "renamed": [ { "kind": "workflow", "key": "report", "from": "Report", "to": "Report (Import)" } ],
-  "warnings": [ "…" ] }
-```
-
-`400` bei fehlender Pfad-Zuordnung (mit Liste der Tokens), ungültigem Bündel oder Ziel; `404` bei unbekanntem
-Zielprojekt. Das Bündel bringt ausführbare Shell-Befehle mit — die Oberfläche zeigt sie in der Vorschau, bevor sie
-den Import anbietet; die API selbst verlangt die Vorschau nicht (API-Key wie jeder Schreibweg).
-
----
-
-## Workflows
-
-### `GET /api/v1/workflows`
-
-Alle Workflows auflisten.
-
-**Response:** `WorkflowResponse[]`
-
-```json
-[
-  {
-    "id": "uuid",
-    "projectId": "uuid",
-    "projectName": "Mein Projekt",
-    "projectSubtitle": null,
-    "projectDescription": null,
-    "name": "Code Review",
-    "description": "Automatisiertes Code Review",
-    "icon": "🔍",
-    "blocks": [
-      { "type": "simple", "config": { "command": "Review code" }, "requiredCapabilities": [], "skillIds": [] }
-    ],
-    "version": "1.0.0",
-    "metadata": {},
-    "activatedSkillIds": [],
-    "activatedSkillNames": [],
-    "runCount": 0,
-    "instructions": null,
-    "model": null,
-    "provider": null,
-    "templateId": null,
-    "defaultContext": {},
-    "testStatus": "UNTESTED",
-    "lastTestedAt": null,
-    "tags": [],
-    "category": null,
-    "tagsGeneratedAt": null,
-    "tagsUserEdited": false,
-    "createdAt": "2025-01-15T10:00:00Z",
-    "updatedAt": "2025-01-15T10:00:00Z",
-    "stableSyncedAt": null
-  }
-]
-```
-
-### `POST /api/v1/workflows`
-
-Neuen Workflow erstellen.
-
-**Request:**
-
-```json
-{
-  "projectId": "uuid",
-  "name": "Code Review",
-  "description": "Automatisiertes Code Review",
-  "icon": "🔍",
-  "blocks": [
-    { "type": "simple", "config": { "command": "Review code" }, "requiredCapabilities": [], "skillIds": [] }
-  ],
-  "activatedSkillIds": ["skill-uuid-1"]
-}
-```
-
-| Feld | Typ | Pflicht |
-|---|---|---|
-| `projectId` | String | Ja |
-| `name` | String | Ja |
-| `description` | String | Nein |
-| `icon` | String | Nein |
-| `blocks` | BlockDefinition[] | Ja |
-| `activatedSkillIds` | String[] | Nein |
-| `instructions` | String | Nein |
-| `model` | String | Nein |
-| `provider` | String | Nein |
-| `templateId` | String | Nein |
-| `metadata` | Object | Nein |
-| `defaultContext` | Object | Nein |
-| `version` | String | Nein |
-
-**BlockDefinition-Felder:**
-
-| Feld | Typ | Pflicht | Beschreibung |
-|---|---|---|---|
-| `type` | String | Ja | Block-Typ (simple, shell, agentic, ...) |
-| `name` | String | Nein | Menschenlesbarer Name für `{{ block.<name>.output }}`-Referenzen |
-| `config` | Object | Ja | Typ-spezifische Konfiguration |
-| `requiredCapabilities` | String[] | Nein | Benoetigte Capabilities |
-| `skillIds` | String[] | Nein | Skill-IDs die zusätzlich zu Workflow-Skills für diesen Block aktiviert werden (additiv) |
-
-**Response:** `201` mit `WorkflowResponse`
-
-### `GET /api/v1/workflows/{id}`
-
-Einzelnen Workflow abrufen.
-
-**Response:** `WorkflowResponse`
-
-### `PUT /api/v1/workflows/{id}`
-
-Workflow aktualisieren.
-
-**Request:**
-
-```json
-{
-  "name": "Neuer Name",
-  "description": "Neue Beschreibung",
-  "icon": "✨",
-  "blocks": [],
-  "version": "4.4.0"
-}
-```
-
-**Response:** `WorkflowResponse`
-
-Alle Felder sind optional; ein fehlendes Feld bleibt unverändert. `version` ist das Versions-Label (höchstens 255 Zeichen, leer → `400`), kein Teil der Definition: Es erzeugt keine neue Version und ändert keinen Hash. Die Pool-Neuinstallation setzt es auf die Version der Pool-Datei.
-
-Die Herkunft der Änderung (`changeSource` der neuen Version) bestimmt der Server. Versiegelte Workflows: Definitionsänderungen → `409 WORKFLOW_SEALED`, Umbenennen und `version` bleiben möglich.
-
-### `DELETE /api/v1/workflows/{id}`
-
-Workflow löschen.
-
-**Response:** `204 No Content`
-
-### `GET /api/v1/workflows/export/{id}`
-
-Workflow als portables JSON exportieren (ohne IDs, ohne Projekt-Zuordnung).
-
-**Response:** `ExportWorkflowResponse`
-
-```json
-{
-  "name": "Code Review",
-  "description": "Automatisiertes Code Review",
-  "icon": "🔍",
-  "blocks": [
-    { "type": "simple", "config": { "command": "Review code" }, "requiredCapabilities": [], "skillIds": [] }
-  ],
-  "instructions": null,
-  "model": null,
-  "version": "1.0.0",
-  "defaultContext": {},
-  "metadata": {},
-  "exportedAt": "2025-02-22T14:00:00Z",
-  "integrity": "sha256:9f2c…"
-}
-```
-
-`integrity` ist die Prüfsumme über alles, was der Import übernimmt (ohne `name` und `exportedAt`); `POST /api/v1/workflows/import` prüft sie. Details: [Kuratierung → Prüfsumme](workflow-pool-kuratierung.md#prüfsumme-integrity).
-
-### `GET /api/v1/workflows/{id}/export/bpmn`
-
-Workflow als BPMN 2.0 XML exportieren (Camunda-Modeler-kompatibel).
-
-**Response:** Datei-Download (`.bpmn`, `Content-Disposition: attachment`)
-
-### `POST /api/v1/workflows/import/bpmn`
-
-Workflow aus zuvor per `GET /api/v1/workflows/{id}/export/bpmn` exportiertem BPMN 2.0 XML als **neuen** Workflow importieren (Roundtrip). Akzeptiert nur MySuricates-eigene Exporte (BPMN-Extension `mysuricates:blockConfig`); fremdes BPMN, kaputtes XML oder zu große Eingaben liefern `400` — dann wird nichts angelegt.
-
-**Query-Parameter:** `projectId` (Pflicht) — Zielprojekt
-
-**Request:** `Content-Type: application/xml` oder `text/xml`, Body = BPMN-XML
-
-**Response:** `201` mit `WorkflowResponse`
-
-### `POST /api/v1/workflows/import`
-
-Workflow aus JSON importieren (exportiertes Format + Zielprojekt).
-
-**Request:**
-
-```json
-{
-  "projectId": "uuid",
-  "name": "Code Review",
-  "description": "Automatisiertes Code Review",
-  "icon": "🔍",
-  "blocks": [
-    { "type": "simple", "config": { "command": "Review code" }, "requiredCapabilities": [], "skillIds": [] }
-  ],
-  "instructions": null,
-  "model": null,
-  "updateIfExists": false
-}
-```
-
-| Feld | Typ | Pflicht |
-|---|---|---|
-| `projectId` | String | Nein (Fallback: "Sammlung"-Projekt) |
-| `name` | String | Ja |
-| `description` | String | Nein |
-| `icon` | String | Nein |
-| `blocks` | BlockDefinition[] | Nein |
-| `instructions` | String | Nein |
-| `model` | String | Nein |
-| `updateIfExists` | Boolean | Nein (Standard: `false`) |
-| `version` | String | Nein — Versions-Label des Exports (`4.4.0`); fehlt es oder ist es leer, bleibt es beim Standard `1.0.0` bzw. beim bisherigen Label |
-| `integrity` | String | Nein — Prüfsumme des Exports (`sha256:<hex>`). Passt sie nicht zum Inhalt: `400` mit `messageKey` `IMPORT_INTEGRITY_MISMATCH`, es wird nichts geschrieben. Fehlt sie: Import mit Warnung im Log |
-
-Wenn `updateIfExists=true` und ein Workflow gleichen Namens im Zielprojekt existiert, wird dieser aktualisiert statt neu erstellt – samt `version`, wie bei `PUT` und der Pool-Neuinstallation.
-
-#### Block-Config: `timeout_seconds`
-
-Alle Block-Typen unterstützen ein optionales `timeout_seconds`-Feld in der Block-Config.
-Damit wird das Claude-CLI-Timeout pro Block übersteuert (Default: globaler Wert aus `automation.host-claude.timeout-seconds`, Standard 300s).
-
-```json
-{
-  "type": "simple",
-  "config": {
-    "command": "Analysiere den Code in src/",
-    "timeout_seconds": 600
-  }
-}
-```
-
-| Block-Typ | Wirkung von `timeout_seconds` |
-|---|---|
-| `simple` | Claude-CLI-Timeout für den Step |
-| `retry` | Claude-CLI-Timeout pro Retry-Versuch (Shell: Shell-Timeout) |
-| `conditional` | Claude-CLI-Timeout für Condition-Auswertung und Branch-Ausführung |
-| `foreach` | Claude-CLI-Timeout pro Iteration (Shell: Shell-Timeout) |
-| `while` | Claude-CLI-Timeout für Condition und Body (Shell: Shell-Timeout) |
-| `skill-capability` | Claude-CLI-Timeout für Capability-Ausführung |
-| `agentic` | Claude-CLI-Timeout für REASON- und ACT-Phase pro Iteration |
-| `shell` | Shell-Prozess-Timeout (wie bisher) |
-
-Ohne `timeout_seconds` greift der globale Default (`automation.host-claude.timeout-seconds`).
-
-**Response:** `201` mit `WorkflowResponse`
-
-### `POST /api/v1/workflows/{id}/execute`
-
-Workflow ausführen.
-
-**Request (optional):**
-
-```json
-{
-  "context": {
-    "target": "src/main.py",
-    "mode": "strict"
-  }
-}
-```
-
-**Response:** `WorkflowRunResponse`
-
-```json
-{
-  "id": "run-uuid",
-  "workflowId": "workflow-uuid",
-  "workflowName": "Code Review",
-  "projectName": "Mein Projekt",
-  "projectPath": "/workspace/projekt",
-  "status": "RUNNING",
-  "steps": [],
-  "startedAt": "2025-01-15T10:00:00Z",
-  "completedAt": null,
-  "durationMs": null,
-  "userRating": null,
-  "error": {},
-  "metadata": {},
-  "inputContext": {},
-  "triggeredByScheduleId": null,
-  "triggerSource": "MANUAL",
-  "definitionHash": "3f1c…e9",
-  "definitionVersionId": "version-uuid",
-  "chainRunId": null,
-  "chainId": null
-}
-```
-
-`definitionHash`/`definitionVersionId` sind `null`, wenn `automation.hardening.provenance` aus ist. `chainRunId` nennt den Chain-Run, der den Lauf als Eintrag gestartet hat (`triggerSource: CHAIN`, nach einem Fortsetzen `RESUME`), sonst `null` — auch bei Retry und Sub-Workflows, die `{{ chain_run_id }}` nur mit dem Kontext erben; Läufe von vor V89 haben keinen. `chainId` nennt die Kette dieses Chain-Runs (für den Link `/chains?chain=<id>`, 3a35ced1), sonst `null` – auch wenn der Chain-Run gelöscht ist; nur die Detailantwort trägt das Feld, ältere Backends lassen es weg. Abgelehnte Starts erzeugen keinen Run: `409 WORKFLOW_TAMPERED` (versiegelte Definition verändert), `403 UNATTENDED_REQUIRES_SEAL` (nur bei unbeaufsichtigten Auslösern), `403 UNATTENDED_PLATFORM_ACCESS` (unbeaufsichtigter Auslöser, Definition mit `HIGH`-Befund `self-api-call`/`direct-db-access`).
-
-### `GET /api/v1/workflows/{id}/runs`
-
-Alle Runs eines Workflows (absteigend nach Startzeit, paginiert).
-
-**Query-Parameter:** `page` (Standard: 0), `size` (Standard: 50)
-
-**Response:** `PageResponse<WorkflowRunListItemResponse>` — **ohne Steps**, dieselben Listenzeilen wie
-`GET /api/v1/executions` (`stepCount`, `lastStepStatus`, `lastStepPreview`). Bis 2026-09-23 trug diese
-Route jeden Run mit allen Schritten. Die Schritte eines Runs liefert `GET /api/v1/workflows/{id}/runs/{runId}`.
-
-### `GET /api/v1/workflows/{id}/runs/{runId}`
-
-Einzelnen Run abrufen, mit allen Schritten.
-
-**Response:** `WorkflowRunResponse`
-
-### `POST /api/v1/workflows/{id}/optimize`
-
-Optimierungsvorschlag für einen Workflow generieren (KI-basiert).
-
-**Response:** `Map<String, Object>` mit Optimierungsvorschlag
-
-### `GET /api/v1/workflows/{id}/similar`
-
-Ähnliche Workflows finden.
-
-**Query-Parameter:** `limit` (Standard: 5, Max: 20)
-
-**Response:** `List<Map<String, Object>>`
-
-### `POST /api/v1/workflows/{id}/repair`
-
-Fehlgeschlagenen Workflow auf der Test-Instanz reparieren. Setzt voraus, dass der Workflow fehlgeschlagene Runs hat und die Test-Instanz gesund ist.
-
-**Response:** `202 Accepted` mit `{ "status": "repair_started", "workflowId": "...", "workflowName": "..." }` — versiegelte Workflows: `409 WORKFLOW_SEALED`, bevor die Reparatur startet
-
-### `GET /api/v1/workflows/{id}/analyze`
-
-Deterministische Baufehler-Prüfung einer Definition (kein KI-Aufruf) — meldet nur, verhindert nichts am Speicherweg.
-
-**Response:**
-
-```json
-{
-  "workflowId": "workflow-uuid",
-  "workflowName": "AutoPilot Backend Quality Gate",
-  "findingCount": 2,
-  "bySeverity": { "HIGH": 1, "MEDIUM": 1 },
-  "findings": [ { "rule": "self-api-call", "severity": "HIGH", "...": "..." } ]
-}
-```
-
-### `GET /api/v1/workflows/analyze`
-
-Bestandsprüfung über alle Definitionen — je Workflow nur Zahlen, dazu die Verteilung über die Regeln; die vollen Befunde holt man sich je Workflow über `GET /api/v1/workflows/{id}/analyze`.
-
-**Query-Parameter:** `minSeverity` (`HIGH` oder `MEDIUM`, optional — blendet leichtere Befunde aus)
-
-**Response:**
-
-```json
-{
-  "workflowsChecked": 42,
-  "workflowsAffected": 3,
-  "findingsTotal": 5,
-  "byRule": { "self-api-call": 2, "missing-timeout": 3 },
-  "workflows": [
-    { "workflowId": "workflow-uuid", "workflowName": "...", "findings": 2, "bySeverity": { "HIGH": 1, "MEDIUM": 1 } }
-  ]
-}
-```
-
-### `POST /api/v1/workflows/{id}/skills`
-
-Skills für einen Workflow aktivieren.
-
-**Request:**
-
-```json
-{
-  "skillIds": ["skill-uuid-1", "skill-uuid-2"]
-}
-```
-
-**Response:** `WorkflowResponse`
-
-### `DELETE /api/v1/workflows/{id}/skills/{skillId}`
-
-Skill von einem Workflow deaktivieren.
-
-**Response:** `WorkflowResponse`
-
-### `GET /api/v1/workflows/{id}/versions`
-
-Alle Versionen eines Workflows auflisten (paginiert).
-
-**Query-Parameter:** `page` (Standard: 0), `size` (Standard: 20)
-
-**Response:** `PageResponse<WorkflowVersionResponse>`
-
-```json
-{
-  "content": [
-    {
-      "id": "version-uuid",
-      "workflowId": "workflow-uuid",
-      "versionNumber": 3,
-      "snapshot": { ... },
-      "changeSource": "assistant",
-      "definitionHash": "3f1c…e9",
-      "changeMessage": "Prompt angepasst",
-      "createdAt": "2025-01-15T10:00:00Z"
-    }
-  ],
-  "page": 0,
-  "size": 20,
-  "totalElements": 3,
-  "totalPages": 1
-}
-```
-
-### `GET /api/v1/workflows/{id}/versions/{versionId}`
-
-Einzelne Version abrufen.
-
-**Response:** `WorkflowVersionResponse`
-
-### `POST /api/v1/workflows/{id}/versions/{versionId}/restore`
-
-Workflow auf eine frühere Version zurücksetzen.
-
-**Response:** `WorkflowResponse`
-
-### `POST /api/v1/workflows/{id}/seal`
-
-Workflow versiegeln (Schalter `automation.hardening.sealing`, sonst `404 MODULE_DISABLED`). Hält den aktuellen
-Definitions-Hash fest; danach lehnt der Workflow Definitionsänderungen und Löschen ab (`409 WORKFLOW_SEALED`) und startet
-nicht, wenn die Definition vom Siegel abweicht (`409 WORKFLOW_TAMPERED`). Idempotent; protokolliert einen
-`SECURITY`-Eintrag.
-
-**Response:** `WorkflowResponse` mit `sealed: true`, `sealedHash`, `sealedAt`
-
-### `POST /api/v1/workflows/{id}/unseal`
-
-Siegel lösen (gleicher Schalter). Protokolliert einen `SECURITY`-Eintrag mit dem bisherigen Hash.
-
-**Response:** `WorkflowResponse` mit `sealed: false`
-
-### `GET /api/v1/workflows/seal-status`
-
-Siegel-Status aller Workflows für die UI — ohne einen Lauf zu starten (derselbe Check wie `RunAdmission`). Gelistet wird jeder versiegelte Workflow sowie jeder Workflow mit abgelehnten Starts in den letzten sieben Tagen (ein abgelehnter Start hinterlässt keine Run-Zeile — hier wird er sichtbar). Nicht hinter dem `sealing`-Modul: Ein Siegel, das bei eingeschaltetem Schalter gesetzt wurde, bleibt auch nach dem Abschalten sichtbar.
-
-**Response:** `List<WorkflowSealStatusResponse>`
-
-```json
-[
-  {
-    "workflowId": "workflow-uuid",
-    "workflowName": "AutoPilot Backend Quality Gate",
-    "state": "INTACT",
-    "problem": "NONE",
-    "detail": null,
-    "changedSkills": [],
-    "skillsPinned": true,
-    "signed": true,
-    "pinnedSkillCount": 2,
-    "sealedAt": "2026-09-01T10:00:00Z",
-    "refusedStarts": 0,
-    "lastRefusedAt": null,
-    "lastRefusal": null
-  }
-]
-```
-
-`state`: `INTACT`, `VIOLATED` oder `NOT_SEALED`. `problem`: `NONE`, `DEFINITION_CHANGED`, `SKILLS_CHANGED` oder `UNVERIFIABLE`. `skillsPinned`: `false` bei Siegeln von vor V80.
-
-### `GET /api/v1/workflows/{id}/seal-events`
-
-Siegel-Historie eines Workflows (Versiegeln/Lösen), neueste zuerst — bleibt über die Aufbewahrung des Activity-Logs hinaus erhalten.
-
-**Response:** `List<WorkflowSealEventResponse>`
-
-```json
-[
-  {
-    "id": "event-uuid",
-    "workflowId": "workflow-uuid",
-    "workflowName": "AutoPilot Backend Quality Gate",
-    "action": "SEALED",
-    "occurredAt": "2026-09-01T10:00:00Z",
-    "definitionHash": "3f1c…e9",
-    "signed": true,
-    "chainIntact": true
-  }
-]
-```
-
-`chainIntact`: `false`, wenn der Hash dieses Eintrags oder seines Vorgängers nicht mehr passt — die Historie wurde außerhalb der Anwendung verändert.
-
----
-
-## Workflow Templates
-
-### `GET /api/v1/workflow-templates`
-
-Alle Workflow-Templates auflisten, sortiert nach Art und `sortOrder`. Das Feld `kind` unterscheidet Vorlagen (`TEMPLATE`) von Blaupausen (`BLUEPRINT`: leere Gerüste, die Block-Verknüpfungen zeigen, siehe [WORKFLOW-GUIDE → Blaupausen](WORKFLOW-GUIDE.md#blaupausen)).
-
-**Query:** `locale` (optional, `de`/`en`): Sprache der Schritte (`blocks`, `instructions`) zweisprachiger Templates. Ohne Angabe gilt Englisch. `name` und `description` bleiben Maps. Siehe [WORKFLOW-GUIDE → Zweisprachige Vorlagen](WORKFLOW-GUIDE.md#zweisprachige-vorlagen).
-
-**Response:** `WorkflowTemplateResponse[]`
-
-```json
-[
-  {
-    "id": "uuid",
-    "name": {"de": "Code-Qualität", "en": "Code Quality"},
-    "description": {"de": "Prüft Code-Qualität", "en": "Checks code quality"},
-    "icon": "🔍",
-    "category": "CODE",
-    "blocks": [
-      { "type": "simple", "config": { "command": "npm run lint" } }
-    ],
-    "instructions": null,
-    "model": null,
-    "builtIn": true,
-    "sortOrder": 0,
-    "qualityStatus": null,
-    "verifications": [],
-    "version": "1.0.0",
-    "createdAt": "2025-01-15T10:00:00Z",
-    "updatedAt": "2025-01-15T10:00:00Z",
-    "kind": "TEMPLATE",
-    "requiredModules": [],
-    "needsAi": true
-  }
-]
-```
-
-`verifications` enthält pro Projekt, in dem das Template verifiziert wurde, ein Objekt mit `projectId`, `projectName`, `lastRunId`, `verifiedAt`.
-
-`requiredModules` nennt die optionalen Module, die die Blöcke brauchen (etwa `skills` für `skill-capability`, `integrations` für `integration`; verschachtelte Blöcke eingeschlossen). Ist eines davon aus, verweigert der Lauf den Block, und die Vorlagen-Auswahl blendet das Template aus. `needsAi` sagt, ob ein Lauf ein KI-Modell rufen kann: Modell-Blöcke, `foreach`/`while`/`conditional`/`retry` ohne `execution_mode: shell`, ein `simple`-Block in einem `switch`-Zweig ohne Shell-Modus, und `sub-workflow`, weil der gestartete Workflow nicht Teil der Definition ist.
-
-### `GET /api/v1/workflow-templates/{id}`
-
-Einzelnes Template abrufen. Query `locale` wie bei der Liste.
-
-**Response:** `WorkflowTemplateResponse`
-
-### `POST /api/v1/workflow-templates`
-
-Neues User-Template erstellen (`builtIn` wird automatisch auf `false` gesetzt).
-
-**Request:**
-
-```json
-{
-  "name": {"de": "Mein Template", "en": "My Template"},
-  "description": {"de": "Beschreibung", "en": "Description"},
-  "icon": "⚡",
-  "category": "CODE",
-  "blocks": [
-    { "type": "simple", "config": { "command": "echo hello" } }
-  ],
-  "instructions": null,
-  "model": null
-}
-```
-
-| Feld | Typ | Pflicht |
-|---|---|---|
-| `name` | Map<String, String> | Ja |
-| `description` | Map<String, String> | Nein |
-| `icon` | String | Nein |
-| `category` | String | Nein |
-| `blocks` | BlockDefinition[] | Ja |
-| `instructions` | String | Nein |
-| `model` | String | Nein |
-
-**Response:** `201` mit `WorkflowTemplateResponse`
-
-### `PUT /api/v1/workflow-templates/{id}`
-
-Template aktualisieren. Bei Built-in Templates können nur `sortOrder` und `category` geändert werden.
-
-**Request:**
-
-```json
-{
-  "name": {"de": "Neuer Name", "en": "New Name"},
-  "description": {"de": "Neue Beschreibung", "en": "New Description"},
-  "sortOrder": 5
-}
-```
-
-Alle Felder sind optional; nur übergebene Felder werden aktualisiert.
-
-**Response:** `WorkflowTemplateResponse`
-
-### `DELETE /api/v1/workflow-templates/{id}`
-
-User-Template löschen. Built-in Templates können nicht gelöscht werden (→ `400`).
-
-**Response:** `204 No Content`
-
-### `POST /api/v1/workflow-templates/from-workflow/{workflowId}`
-
-Einen bestehenden Workflow als neues Template speichern (Name, Beschreibung, Blöcke, Instructions, Model werden übernommen).
-
-**Response:** `201` mit `WorkflowTemplateResponse`
-
-### `POST /api/v1/workflow-templates/{id}/install`
-
-Workflow aus einem Template im Projekt anlegen — samt den Blaupausen, die seine `sub-workflow`-Blöcke aufrufen
-(TODO 093d2f11). Ein Blaupausen-Paket nennt im `workflow_id` die aufgerufene Blaupause (`blueprint-…`); die
-Installation legt sie zuerst im selben Projekt an und trägt dann ihre neue ID ein. Ein Template ohne solchen Verweis
-entsteht wie mit `POST /workflows`. `changeSource` der Versionen: `template-install`.
-
-**Request:**
-
-```json
-{ "projectId": "uuid", "name": "Mein Paket", "description": "…", "locale": "de", "metadata": { "autoTodo": { "enabled": true } } }
-```
-
-| Feld | Typ | Pflicht |
-|---|---|---|
-| `projectId` | String | Ja |
-| `name`, `description` | String | Nein: leer → die des Templates in `locale` |
-| `locale` | String (`de`/`en`) | Nein: Sprache der Namen und der Schritte; ohne Angabe Englisch |
-| `metadata` | Object | Nein: wie bei `POST /workflows`, nur für den angelegten Workflow, nicht für die Teile |
-
-**Response:** `201` mit `{ "workflowId": "uuid", "workflowName": "…", "partWorkflowIds": ["uuid"] }`; eine unbekannte
-Blaupause im Verweis → `404`, ohne dass etwas angelegt wird.
-
----
-
-## Executions
-
-### `GET /api/v1/executions`
-
-Alle Ausführungen auflisten (paginiert, filterbar).
-
-**Query-Parameter:**
-
-| Parameter | Typ | Beschreibung |
-|---|---|---|
-| `page` | int | Seite (Standard: 0) |
-| `size` | int | Einträge pro Seite (Standard: 50) |
-| `status` | String | Filter nach Status: `PENDING`, `RUNNING`, `PAUSED`, `COMPLETED`, `COMPLETED_WITH_ERRORS`, `FAILED`, `CANCELLED`, `INTERRUPTED` |
-| `workflowId` | String | Filter nach Workflow |
-| `projectId` | String | Filter nach Projekt |
-| `search` | String | Volltextsuche |
-
-Bei `status` zählt die Groß- und Kleinschreibung nicht. Ein unbekannter Wert ergibt `400` (`INVALID_ARGUMENT`) mit den erlaubten Werten, etwa `status muss PENDING, RUNNING, … oder INTERRUPTED sein, nicht 'FOO'`.
-
-**Response:** `PageResponse<WorkflowRunListItemResponse>` — **ohne Steps.** Statt der Schritte
-trägt eine Listenzeile `stepCount`, `lastStepStatus` und `lastStepPreview` (Ausgabe des letzten
-Schritts, auf 500 Zeichen gekürzt — in der Datenbank abgeschnitten, die Step-Zeilen werden nicht geladen). Grund: Die Liste trug vorher jeden `step_results.output`
-(TEXT) mit — gemessen 3 061 816 Bytes bei 60 Runs, danach 51 716. Wer die Schritte braucht, holt
-den Run einzeln über `GET /api/v1/executions/{id}`; die Detail-Route liefert unverändert alles.
-Wie die Detail-Route trägt jede Zeile `chainRunId` (Chain-Run eines Ketteneintrags, sonst `null`; ältere Backends lassen das Feld weg).
-
-### `GET /api/v1/executions/pending-input`
-
-Alle Läufe, die gerade auf eine Antwort warten — Approvals und Human-Input, die ältesten zuerst (UI: Sidebar-Eintrag + `/approvals`).
-
-**Response:** `List<PendingInputResponse>`
-
-```json
-[
-  {
-    "runId": "run-uuid",
-    "workflowId": "workflow-uuid",
-    "workflowName": "AutoPilot Backend Quality Gate",
-    "type": "approval",
-    "blockId": "block-id",
-    "question": "Soll fortgefahren werden?",
-    "options": ["Yes", "No"],
-    "rejectOptions": ["No"],
-    "stepIndex": 2,
-    "requestedAt": "2026-09-30T10:00:00Z",
-    "timeoutAt": null
-  }
-]
-```
-
-`type`: `approval` oder `human-input`. `timeoutAt`: `null`, wenn der wartende Block keinen Timeout hat. Human-Input mit Formular
-trägt zusätzlich `fields` (wie bei `GET /executions/{id}/approval`); ohne Formular fehlt das Feld.
-
-### `GET /api/v1/executions/{id}`
-
-Execution-Status abrufen (inkl. Steps).
-
-**Response:** `WorkflowRunResponse`
-
-### `POST /api/v1/executions/{id}/pause`
-
-Laufende Ausführung pausieren.
-
-**Response:** `200 OK`
-
-### `POST /api/v1/executions/{id}/resume`
-
-Pausierte Ausführung fortsetzen.
-
-**Response:** `200 OK`
-
-### `POST /api/v1/executions/{id}/cancel`
-
-Ausführung abbrechen.
-
-**Response:** `200 OK`
-
-### `POST /api/v1/executions/{id}/retry`
-
-Fehlgeschlagene Ausführung erneut starten (erstellt einen neuen Run mit gleichem Input-Kontext).
-
-**Response:** `WorkflowRunResponse`
-
-### `POST /api/v1/executions/{id}/resume-from-step`
-
-Unterbrochene Ausführung ab dem fehlgeschlagenen Step fortsetzen.
-
-**Response:** `WorkflowRunResponse`
-
-### `PATCH /api/v1/executions/{id}/notes`
-
-Notizen einer Ausführung aktualisieren.
-
-**Request:**
-
-```json
-{
-  "notes": "Freitext-Notiz zum Run"
-}
-```
-
-**Response:** `WorkflowRunResponse`
-
-### `POST /api/v1/executions/{id}/approve`
-
-Approval-Gate oder Human-Input beantworten.
-
-**Request:**
-
-```json
-{
-  "answer": "Yes"
-}
-```
-
-| Feld | Typ | Pflicht |
-|---|---|---|
-| `answer` | String | Ja |
-
-**Hinweis:** Das Feld heißt `answer`, nicht `approved`.
-
-**Response:** `200 OK`
-
-### `GET /api/v1/executions/{id}/approval`
-
-Prüfen ob ein Approval oder Human-Input ansteht.
-
-**Response (kein Approval anstehend):**
-
-```json
-{
-  "pending": false
-}
-```
-
-**Response (Approval anstehend):**
-
-```json
-{
-  "pending": true,
-  "blockId": "block-id",
-  "question": "Soll fortgefahren werden?",
-  "options": ["Yes", "No"],
-  "stepIndex": 2,
-  "type": "approval"
-}
-```
-
-**Response (Human-Input anstehend):**
-
-```json
-{
-  "pending": true,
-  "blockId": "block-id",
-  "question": "Bitte Dateiname eingeben:",
-  "options": [],
-  "stepIndex": 3,
-  "type": "human-input",
-  "inputType": "text",
-  "defaultValue": "",
-  "variableName": "filename",
-  "required": true,
-  "validationPattern": null
-}
-```
-
-Hat der Block ein Formular mit mehreren Feldern (`fields`), kommt es als `fields` mit (je Feld `variable_name`,
-`label`, `input_type`, `required`, `default_value`, `options`, …) – wie im WebSocket-Ereignis `human_input_required`;
-ohne Formular fehlt das Feld.
-
-### `GET /api/v1/executions/{id}/live-log`
-
-Gepufferte Live-Zeilen eines Laufs für das Replay nach Reload oder spätem Öffnen (nur im Speicher, bis 10 Minuten nach
-Laufende). Query: `afterSeq` (Default `-1` = alles). Ohne Puffer `200` mit `available: false`.
-
-**Response:**
-
-```json
-{
-  "runId": "run-uuid",
-  "bufferId": "buffer-uuid",
-  "available": true,
-  "firstSeq": 0,
-  "lastSeq": 2,
-  "skipped": 0,
-  "stepNames": { "0": "Build" },
-  "lines": [
-    { "seq": 1, "stepIndex": 0, "kind": "tool", "text": "Bash: mvn test", "ts": 1757844005000 },
-    { "seq": 2, "stepIndex": 0, "kind": "tool_result", "text": "↳ 1.2 KB", "ts": 1757844009000 }
-  ]
-}
-```
-
-`kind`: `line` (Rohzeile), `text`, `tool`, `tool_result`, `tool_error`, `result`, `system`. `stepNames`: Blocknamen der Steps mit gepufferten Zeilen (Schlüssel = `stepIndex`).
-
-### `DELETE /api/v1/executions/{id}`
-
-Lauf samt Schritten und den losen Verweisen darauf löschen. `409`, wenn der Lauf noch aktiv ist oder ein Audit-Bericht an ihm hängt. TODOs und Audit-Daten werden nie mitgelöscht.
-
-`403 RUN_DELETION_DISABLED`, wenn die Instanz mit `automation.executions.allow-delete: false` (Env `AUTOMATION_EXECUTIONS_ALLOW_DELETE`, Default `true`) gestartet wurde — geprüft vor jedem Lookup, für jede ID. Nur Startkonfiguration, kein REST- oder Settings-Schalter. `GET /api/v1/system/capabilities` meldet den Stand als `runDeletionAllowed`; die UI blendet die Löschknöpfe dann aus. Die Run-Retention (`run-retention-days`) und das nächtliche Aufräumen von INTERRUPTED-Läufen gelten weiter — wer gar nichts verlieren will, setzt zusätzlich `run-retention-days` auf `0`. Solange die Löschung abgeschaltet ist, nimmt `PUT /api/v1/system/execution-config` für `run-retention-days` nur eine gleich lange oder längere Retention an (`0` gilt als längste), sonst `403 RUN_DELETION_DISABLED` — der ganze Aufruf wird dann nicht angewendet.
-
-**Response:** `204 No Content`
-
-### `POST /api/v1/executions/{id}/todos/approve`
-
-Auto-generierte TODOs eines Runs genehmigen oder ablehnen.
-
-**Request:**
-
-```json
-{
-  "approved": true
-}
-```
-
-**Response:** `200 OK`
-
-### `POST /api/v1/executions/{id}/command`
-
-Ad-hoc-Kommando im Kontext einer laufenden Ausführung senden.
-
-**Request:**
-
-```json
-{
-  "command": "ls -la"
-}
-```
-
-**Response:**
-
-```json
-{
-  "output": "..."
-}
-```
-
----
-
-## Skills
-
-### `GET /api/v1/skills`
-
-Alle Skills auflisten.
-
-**Response:** `SkillResponse[]`
-
-```json
-[
-  {
-    "id": "uuid",
-    "name": "Code Analysis",
-    "description": "Analysiert Quellcode",
-    "icon": "🔬",
-    "category": "CODE",
-    "aiContext": "You are a code analysis expert...",
-    "configSchema": {},
-    "builtin": true,
-    "version": "1.0.0",
-    "capabilities": [
-      {
-        "id": "uuid",
-        "name": "analyze",
-        "description": "Analysiert Code",
-        "inputSchema": {},
-        "outputSchema": {},
-        "async": false,
-        "writes": false
-      }
-    ],
-    "createdAt": "2025-01-15T10:00:00Z"
-  }
-]
-```
-
-### `GET /api/v1/skills/{id}`
-
-Einzelnen Skill abrufen.
-
-**Response:** `SkillResponse`
-
-### `GET /api/v1/skills/{id}/capabilities`
-
-Capabilities eines Skills auflisten.
-
-**Response:** `CapabilityResponse[]`
-
-### `GET /api/v1/skills/{id}/versions`
-
-Änderungsverlauf eines Skills, neueste zuerst — auch für gelöschte Skills.
-
-**Response:** `SkillVersionResponse[]` mit `id`, `skillId`, `versionNumber`, `operation` (`CREATE`/`UPDATE`/`DELETE`), `changeSource` (`user`/`import`/`builtin-seed`), `contentHash`, `createdAt`; der Snapshot selbst wird nicht ausgeliefert.
-
-### `GET /api/v1/skills/seal-pins`
-
-Ordnet jeder Skill-ID die Namen der versiegelten Workflows zu, die den Skill nutzen. Solche Skills lassen sich nicht ändern oder löschen.
-
-**Response:** `{"<skillId>": ["Workflow-Name", ...]}`
-
-### `POST /api/v1/skills`
-
-Neuen Skill erstellen.
-
-**Request:**
-
-```json
-{
-  "name": "Custom Skill",
-  "description": "Beschreibung",
-  "icon": "⚡",
-  "category": "CODE",
-  "aiContext": "System prompt...",
-  "configSchema": {}
-}
-```
-
-| Feld | Typ | Pflicht | Werte |
-|---|---|---|---|
-| `name` | String | Ja | |
-| `category` | Enum | Ja | `DOCUMENT`, `CODE`, `DATA`, `CONTENT`, `RESEARCH`, `BUSINESS`, `PRODUCTIVITY` |
-| `description` | String | Nein | |
-| `icon` | String | Nein | |
-| `aiContext` | String | Nein | |
-| `configSchema` | Object | Nein | |
-
-**Response:** `201` mit `SkillResponse`
-
-### `PUT /api/v1/skills/{id}`
-
-Eigenen Skill bearbeiten. Änderbar sind `name`, `description`, `icon`, `category` und `aiContext` (Pflichtfelder wie beim Anlegen); `configSchema`, Capabilities und das Versions-Etikett bleiben unverändert. Jede Änderung schreibt eine Zeile in `GET /api/v1/skills/{id}/versions` (Herkunft `user`).
-
-**Response:** `200` mit `SkillResponse` · `409 STATE_CONFLICT` bei einem Built-in-Skill (das nächste Release-Update würde die Änderung überschreiben) · `409 SKILL_PINNED_BY_SEAL`, solange ein versiegelter Workflow den Skill nutzt
-
-### `DELETE /api/v1/skills/{id}`
-
-Skill löschen.
-
-**Response:** `204 No Content` · `409 STATE_CONFLICT` bei einem Built-in-Skill · `409 SKILL_PINNED_BY_SEAL`, solange ein versiegelter Workflow den Skill nutzt
-
-### `GET /api/v1/skills/export/{id}`
-
-Skill als JSON exportieren (inkl. Capabilities).
-
-**Response:** `ExportSkillResponse`
-
-### `POST /api/v1/skills/import`
-
-Skill aus JSON importieren.
-
-**Request:** `ImportSkillRequest` (exportiertes Format); jede Capability braucht einen `name`, sonst `400`
-
-**Response:** `201` mit `SkillResponse`
-
----
-
-## Schedules
-
-### `GET /api/v1/schedules`
-
-Alle Schedules auflisten.
-
-**Response:** `ScheduledWorkflowResponse[]`
-
-```json
-[
-  {
-    "id": "uuid",
-    "workflowId": "uuid",
-    "workflowName": "Nightly Build",
-    "projectName": "Mein Projekt",
-    "chainId": null,
-    "chainName": null,
-    "targetType": "WORKFLOW",
-    "cronExpression": "0 0 2 * * ?",
-    "scheduleType": "CRON",
-    "scheduledAt": null,
-    "delayExpression": null,
-    "enabled": true,
-    "description": "Nächtlicher Build",
-    "inputContext": {},
-    "lastRunAt": null,
-    "lastRunStatus": null,
-    "nextRunAt": "2025-01-16T02:00:00Z",
-    "endDate": null,
-    "maxRuns": 0,
-    "runCount": 0,
-    "conflictBehavior": "SKIP",
-    "catchUpOnResume": false,
-    "pausedUntil": null,
-    "maintenance": false,
-    "createdAt": "2025-01-15T10:00:00Z"
-  }
-]
-```
-
-`nextRunAt` ist der nächste Lauf, den der Scheduler tatsächlich startet. Liegt der gespeicherte Termin
-in einer aktiven `skip-until`-Pause (`automation.scheduler.skip-until`), steht hier der erste Termin nach
-der Pause — bei einem einmaligen Zeitplan `null`, er verfällt — und `pausedUntil` nennt das Pausenende;
-sonst ist `pausedUntil` `null`. Der Tick spult den Termin erst weiter, wenn er fällig wird; ohne diese
-Umrechnung zeigten Liste, Kalender und Workflow-Seite bis dahin einen Lauf, der nie stattfindet (seit
-2026-09-24, TODO a776fd2a). Solange der Wartungsmodus an ist, startet der Scheduler nichts, und wann er
-wieder ausgeht, steht nirgends: Dann ist `nextRunAt` `null` und `maintenance` `true` (für jeden Zeitplan
-mit gespeichertem nächsten Termin; der gespeicherte Wert bleibt, TODO 7704b1e9). Dasselbe gilt für alle
-Routen, die `ScheduledWorkflowResponse` liefern.
-
-### `GET /api/v1/schedules/remaining-today`
-
-Verbleibende geplante Ausführungen für heute.
-
-**Query-Parameter:** `projectId` (optional) — nur Zeitpläne von Workflows dieses Projekts; Ketten gehören zu
-keinem Projekt und fallen dann heraus (Projektfilter der Dashboard-Ansicht).
-
-**Response:** `UpcomingScheduleResponse` (`count`, `schedules[]`, `pausedUntil`, `maintenance`). Termine in
-einer aktiven `skip-until`-Pause fehlen — der Tick überspringt sie —, `pausedUntil` nennt dann das Pausenende,
-sonst `null`. Im Wartungsmodus ist die Liste leer und `maintenance` `true`: Solange er an ist, startet nichts.
-
-### `GET /api/v1/schedules/remaining-this-week`
-
-Verbleibende geplante Ausführungen für diese Woche. `projectId` (optional) wie bei `remaining-today`.
-
-**Response:** `UpcomingScheduleResponse` (wie `remaining-today`, einschließlich `pausedUntil` und `maintenance`)
-
-### `GET /api/v1/schedules/{id}`
-
-Einzelnen Schedule abrufen.
-
-**Response:** `ScheduledWorkflowResponse`
-
-### `GET /api/v1/schedules/{id}/runs`
-
-Die neuesten Runs, die dieser Schedule ausgelöst hat — je Art höchstens `limit` (Query-Parameter,
-Default 50, 1–500), dazu die Gesamtzahl.
-
-**Response:**
-
-```json
-{
-  "workflowRuns": [...],
-  "chainRuns": [...],
-  "workflowRunsTotal": 26000,
-  "chainRunsTotal": 0
-}
-```
-
-Ist `workflowRunsTotal` größer als `workflowRuns.length`, hat das Limit gegriffen (bis 2026-09-26 kamen
-alle Runs, ohne Obergrenze).
-
-`workflowRuns` sind `WorkflowRunListItemResponse` — **ohne Steps**, dieselben Listenzeilen wie
-`GET /api/v1/executions` (`stepCount`, `lastStepStatus`, `lastStepPreview`). Bis 2026-09-23 trug diese
-Route jeden Run mit allen Schritten. Die Schritte eines Runs liefert `GET /api/v1/executions/{id}`.
-
-### `GET /api/v1/schedules/workflow/{workflowId}`
-
-Schedules eines bestimmten Workflows.
-
-**Response:** `ScheduledWorkflowResponse[]`
-
-### `GET /api/v1/schedules/chain/{chainId}`
-
-Schedules einer bestimmten Chain.
-
-**Response:** `ScheduledWorkflowResponse[]`
-
-### `GET /api/v1/schedules/calendar`
-
-Kalender-Daten: geplante Ausführungen und vergangene Runs in einem Zeitraum.
-
-**Query-Parameter:**
-
-| Parameter | Typ | Pflicht |
-|---|---|---|
-| `from` | Instant | Ja |
-| `to` | Instant | Ja |
-| `limit` | int | Nein (Default 1000, 1–5000) |
-
-**Response:** `CalendarDataResponse` mit `upcoming` (`ScheduledWorkflowResponse[]`, Zeitpläne, deren
-nächster tatsächlicher Lauf im Zeitraum liegt — während einer `skip-until`-Pause also nach der Pause) und `pastRuns` (`WorkflowRunListItemResponse[]` — **ohne Steps**, dieselben
-Listenzeilen wie `GET /api/v1/executions`; bis 2026-09-23 mit allen Schritten jedes Runs im Zeitraum).
-`pastRuns` sind die neuesten `limit` Runs des Zeitraums, `pastRunsTotal` zählt alle (bis 2026-09-26 ohne Obergrenze).
-
-### `POST /api/v1/schedules/preview`
-
-Vorschau der nächsten 5 Ausführungszeitpunkte für einen Cron-Ausdruck.
-
-**Request:**
-
-```json
-{
-  "cronExpression": "0 0 2 * * ?"
-}
-```
-
-**Response:** `{ "runs": ["2025-01-16T02:00:00Z", ...] }` — während einer aktiven `skip-until`-Pause
-beginnen die Termine nach der Pause, und die Antwort trägt zusätzlich `"pausedUntil"`.
-
-### `POST /api/v1/schedules`
-
-Neuen Schedule erstellen.
-
-**Request:**
-
-```json
-{
-  "workflowId": "uuid",
-  "cronExpression": "0 0 2 * * ?",
-  "description": "Nächtlicher Build",
-  "inputContext": {}
-}
-```
-
-| Feld | Typ | Pflicht |
-|---|---|---|
-| `workflowId` | String | Ja (wenn `targetType` = `WORKFLOW`) |
-| `chainId` | String | Ja (wenn `targetType` = `CHAIN`) |
-| `targetType` | String | Nein (Standard: `WORKFLOW`, Werte: `WORKFLOW`, `CHAIN`) |
-| `cronExpression` | String | Ja (Spring Cron, 6 Felder) |
-| `description` | String | Nein |
-| `inputContext` | Object | Nein |
-| `scheduleType` | String | Nein (Standard: `CRON`, Werte: `CRON`, `ONCE`, `DELAYED`) |
-| `scheduledAt` | Instant | Nein (für `ONCE`-Schedules) |
-| `delayExpression` | String | Nein (für `DELAYED`-Schedules, z.B. `"2h"`, `"30m"`) |
-| `endDate` | Instant | Nein (optionales Ende für `CRON`-Schedules) |
-| `maxRuns` | Integer | Nein (max. Starts, 0 = unbegrenzt — siehe unten) |
-| `conflictBehavior` | String | Nein (Standard: `SKIP`, Werte: `SKIP`, `OVERLAP` — siehe unten) |
-| `catchUpOnResume` | boolean | Nein (Standard: `false` — siehe unten) |
-
-`targetType`, `scheduleType` und `conflictBehavior` werden getrimmt und in beliebiger Schreibweise
-angenommen; ein anderer Wert → `400`, die Meldung nennt die erlaubten Werte.
-
-- **`conflictBehavior`:** Bei `SKIP` entfällt ein Termin, solange das Ziel noch einen Lauf in `RUNNING`
-  oder `PAUSED` hat: `nextRunAt` springt auf das nächste Vorkommen, ein einmaliger Zeitplan (`ONCE`,
-  `DELAYED`) verfällt, das Activity-Log vermerkt „Schedule skipped (previous run still in progress)“.
-  Ebenso, solange ein unterbrochener Lauf des Workflows auf seine automatische Fortsetzung wartet
-  („Schedule skipped (interrupted run is being resumed automatically)“, `reason: auto-resume-pending`).
-  `OVERLAP` startet trotzdem einen zweiten Lauf daneben.
-- **`maxRuns`:** zählt jeden Start des Zeitplans, auch einen fehlgeschlagenen oder abgewiesenen; ein per
-  `SKIP` entfallener Termin zählt nicht. Ist die Zahl erreicht, wird der Zeitplan deaktiviert.
-  Wiedereinschalten setzt `runCount` nicht zurück.
-- **Kein Termin mehr übrig → `400`** (seit 2026-10-03): Liegt der erste Termin eines `CRON`-Zeitplans am
-  oder nach `endDate`, weisen Anlegen, Ändern und Einschalten ihn ab (`messageKey`
-  `SCHEDULE_NEXT_RUN_AFTER_END_DATE`), ebenso `maxRuns` ≤ `runCount` (`SCHEDULE_MAX_RUNS_REACHED`) —
-  vorher wirkte er aktiv und endete erst beim Fälligwerden still bzw. startete nach gesenktem `maxRuns`
-  noch einmal. Ein ausgeschalteter Zeitplan hat keinen Termin und bleibt änderbar; geprüft wird beim
-  Einschalten. Ebenso `400`: ein Cron-Ausdruck ohne künftigen Termin (`SCHEDULE_NO_NEXT_RUN`) und ein
-  `ONCE`-Zeitpunkt mehr als 60 s in der Vergangenheit (`SCHEDULE_ONCE_IN_PAST`, beim Anlegen, Einschalten und
-  Verlegen). `PUT` prüft nur, wenn `cronExpression`, `scheduledAt`, `endDate` oder `maxRuns` mitkommen.
-- **`catchUpOnResume`:** holt Termine dieses Zeitplans nach, die in Standby oder einen Neustart fielen,
-  auch wenn die globale Einstellung `scheduler-catch-up-on-resume` aus ist. Die ist standardmäßig an —
-  dann wird ohnehin jeder Zeitplan nachgeholt, nacheinander über die Catch-up-Warteschlange.
-
-**Response:** `201` mit `ScheduledWorkflowResponse`
-
-### `PUT /api/v1/schedules/{id}`
-
-Schedule aktualisieren.
-
-**Request:**
-
-```json
-{
-  "cronExpression": "0 30 1 * * ?",
-  "description": "Neuer Zeitplan",
-  "inputContext": {},
-  "endDate": null,
-  "maxRuns": 10
-}
-```
-
-Alle Felder sind optional; nur übergebene Felder werden aktualisiert. Bleibt einem eingeschalteten
-`CRON`-Zeitplan danach kein Termin vor `endDate` oder sind seine `maxRuns` aufgebraucht → `400` (siehe
-oben).
-
-**Response:** `ScheduledWorkflowResponse`
-
-### `POST /api/v1/schedules/{id}/enable`
-
-Schedule aktivieren. Ein `CRON`-Zeitplan, dessen nächster Termin am oder nach `endDate` liegt, dessen
-`maxRuns` aufgebraucht sind oder dessen Cron-Ausdruck nicht mehr parst (`INVALID_CRON`) → `400`.
-
-**Response:** `ScheduledWorkflowResponse`
-
-### `POST /api/v1/schedules/{id}/disable`
-
-Schedule deaktivieren.
-
-**Response:** `ScheduledWorkflowResponse`
-
-### `DELETE /api/v1/schedules/{id}`
-
-Schedule löschen.
-
-**Response:** `204 No Content`
-
-### `GET /api/v1/schedules/catch-up`
-
-Sequenzielle Catch-up-Warteschlange abfragen: der gerade laufende nachgeholte Termin (nach Kaltstart/Resume) und die noch wartenden. Nicht persistiert — nach einem Neustart werden fällige Termine neu eingereiht.
-
-**Response:** `CatchUpQueue.Snapshot` (`active`, `pending[]`)
-
-### `GET /api/v1/schedules/maintenance`
-
-Wartungsmodus-Status abfragen, zusammen mit einer aktiven `skip-until`-Pause aus der Konfiguration.
-
-**Response:** `{ "enabled": false, "pausedUntil": null }` — `pausedUntil` ist das Ende der Pause, solange
-sie noch vor uns liegt, sonst `null`.
-
-### `POST /api/v1/schedules/maintenance`
-
-Wartungsmodus ein-/ausschalten. Im Wartungsmodus startet kein Zeitplan; der gespeicherte `nextRunAt`
-bleibt dabei stehen, die Ansichten zeigen solange keinen nächsten Lauf (`maintenance: true`, siehe oben).
-Beim Ausschalten startet jeder Zeitplan, dessen Termin in die Pause fiel, einmal sofort — alle
-gleichzeitig, ohne Catch-up-Warteschlange.
-
-**Request:**
-
-```json
-{
-  "enabled": true
-}
-```
-
-**Response:** `{ "enabled": true, "pausedUntil": null }`
-
----
-
-## Webhooks
-
-Der geheime Token wird nur direkt nach dem Erstellen (`POST /api/v1/webhooks`) oder Neu-Erzeugen
-(`POST /api/v1/webhooks/{id}/regenerate-token`) im Klartext zurückgegeben (`tokenVisible: true`).
-In jeder anderen Management-Response (List, Get, Enable, Disable) ist er maskiert: nur die ersten
-8 Zeichen plus `…` (U+2026), und `webhookUrl` verwendet denselben maskierten Token. Der volle Token
-muss beim Erstellen/Regenerieren sofort gesichert werden — er lässt sich danach nicht mehr abrufen.
-
-**Upgrade-Hinweis:** Bestehende Webhook-Tokens sind nach diesem Update nicht mehr im Klartext
-abrufbar. Wiederherstellung: `POST /api/v1/webhooks/{id}/regenerate-token` aufrufen und den neuen
-Token beim externen Aufrufer (z. B. GitHub-Webhook-Konfiguration) neu hinterlegen.
-
-### `GET /api/v1/webhooks`
-
-Alle Webhooks auflisten.
-
-**Response:** `WebhookTriggerResponse[]`
-
-```json
-[
-  {
-    "id": "uuid",
-    "workflowId": "uuid",
-    "workflowName": "Deploy Pipeline",
-    "secretToken": "abc123de…",
-    "tokenVisible": false,
-    "webhookUrl": "http://localhost:9090/api/v1/webhook/trigger/abc123de…",
-    "enabled": true,
-    "description": "GitHub Push Hook",
-    "defaultContext": {},
-    "lastTriggeredAt": null,
-    "triggerCount": 0,
-    "createdAt": "2025-01-15T10:00:00Z",
-    "signatureRequired": false
-  }
-]
-```
-
-### `GET /api/v1/webhooks/{id}`
-
-Einzelnen Webhook abrufen.
-
-**Response:** `WebhookTriggerResponse` (Token maskiert, `tokenVisible: false`)
-
-### `GET /api/v1/webhooks/workflow/{workflowId}`
-
-Webhooks eines bestimmten Workflows.
-
-**Response:** `WebhookTriggerResponse[]` (Token maskiert, `tokenVisible: false`)
-
-### `POST /api/v1/webhooks`
-
-Neuen Webhook erstellen (Token wird automatisch generiert).
-
-**Request:**
-
-```json
-{
-  "workflowId": "uuid",
-  "description": "GitHub Push Hook",
-  "defaultContext": {}
-}
-```
-
-| Feld | Typ | Pflicht |
-|---|---|---|
-| `workflowId` | String | Ja |
-| `description` | String | Nein |
-| `defaultContext` | Object | Nein |
-
-**Response:** `201` mit `WebhookTriggerResponse` — Token voll sichtbar, `tokenVisible: true`
-
-### `POST /api/v1/webhooks/{id}/enable`
-
-Webhook aktivieren.
-
-**Response:** `WebhookTriggerResponse` (Token maskiert, `tokenVisible: false`)
-
-### `POST /api/v1/webhooks/{id}/disable`
-
-Webhook deaktivieren.
-
-**Response:** `WebhookTriggerResponse` (Token maskiert, `tokenVisible: false`)
-
-### `POST /api/v1/webhooks/{id}/regenerate-token`
-
-Erzeugt einen neuen geheimen Token für den Webhook. Der bisherige Token wird sofort ungültig;
-`lastTriggeredAt` und `triggerCount` bleiben unverändert. Protokolliert einen `SECURITY`-Eintrag
-im ActivityLog.
-
-**Response:** `WebhookTriggerResponse` — neuer Token voll sichtbar, `tokenVisible: true`
-
-### `POST /api/v1/webhooks/{id}/secret`
-
-Signatur-Secret setzen oder erneuern (Schalter `automation.hardening.webhook-signatures`, sonst `404 MODULE_DISABLED`).
-Das Secret wird nur in dieser Response gezeigt und verschlüsselt gespeichert; ab jetzt brauchen Trigger-Aufrufe eine
-Signatur. Protokolliert einen `SECURITY`-Eintrag.
-
-**Response:** `{ "secret": "<64 hex>", "header": "X-Signature" }`
-
-### `DELETE /api/v1/webhooks/{id}/secret`
-
-Signatur-Secret entfernen (gleicher Schalter).
-
-**Response:** `204 No Content`
-
-### `DELETE /api/v1/webhooks/{id}`
-
-Webhook löschen.
-
-**Response:** `204 No Content`
-
-### `POST /api/v1/webhook/trigger/{token}` (Öffentlich)
-
-Webhook auslösen. **Kein API-Key nötig.**
-
-**Request (optional):**
-
-```json
-{
-  "branch": "main",
-  "commit": "abc123"
-}
-```
-
-Der Payload wird mit dem `defaultContext` des Webhooks gemergt und als Kontext an die Workflow-Ausführung übergeben.
-Er muss ein JSON-Objekt sein (sonst `400`); Schlüssel mit `__`-Präfix sind reserviert.
-
-**Signatur:** Hat der Webhook ein Signatur-Secret (`signatureRequired: true`), braucht der Aufruf den Header
-`X-Signature: sha256=<hex>` (alternativ `X-Hub-Signature-256`) mit dem HMAC-SHA256 der rohen Request-Bytes — sonst
-`401 WEBHOOK_SIGNATURE_INVALID`:
-
-```bash
-SIG=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$SECRET" | cut -d' ' -f2)
-curl -X POST "$URL" -H 'Content-Type: application/json' -H "X-Signature: sha256=$SIG" -d "$BODY"
-```
-
-Mit `automation.hardening.require-sealed-for-unattended` startet ein Webhook nur versiegelte Workflows (sonst
-`403 UNATTENDED_REQUIRES_SEAL`). Einen Workflow, der auf die eigene Plattform zugreift (`HIGH`-Befund `self-api-call`/`direct-db-access`), startet ein Webhook nie (`403 UNATTENDED_PLATFORM_ACCESS`).
-
-**Response:** `WorkflowRunResponse`
-
----
-
-## Completion Triggers
-
-Completion-Trigger lösen automatisch einen Ziel-Workflow aus, wenn ein Quell-Workflow abgeschlossen wird.
-
-### `GET /api/v1/completion-triggers`
-
-Alle Completion-Trigger auflisten.
-
-**Response:** `CompletionTriggerResponse[]`
-
-### `GET /api/v1/completion-triggers/{id}`
-
-Einzelnen Trigger abrufen.
-
-**Response:** `CompletionTriggerResponse`
-
-### `GET /api/v1/completion-triggers/workflow/{workflowId}/as-source`
-
-Trigger abrufen, bei denen der angegebene Workflow als Quelle fungiert.
-
-**Response:** `CompletionTriggerResponse[]`
-
-### `GET /api/v1/completion-triggers/workflow/{workflowId}/as-target`
-
-Trigger abrufen, bei denen der angegebene Workflow als Ziel fungiert.
-
-**Response:** `CompletionTriggerResponse[]`
-
-### `POST /api/v1/completion-triggers`
-
-Neuen Completion-Trigger erstellen.
-
-**Request:**
-
-```json
-{
-  "sourceWorkflowId": "uuid",
-  "targetWorkflowId": "uuid",
-  "triggerOnSuccess": true,
-  "triggerOnFailure": false,
-  "triggerAlways": false,
-  "description": "Nach erfolgreichem Build: Deployment starten",
-  "contextVariables": {}
-}
-```
-
-| Feld | Typ | Pflicht |
-|---|---|---|
-| `sourceWorkflowId` | String | Ja |
-| `targetWorkflowId` | String | Ja |
-| `triggerOnSuccess` | boolean | Nein |
-| `triggerOnFailure` | boolean | Nein |
-| `triggerAlways` | boolean | Nein |
-| `description` | String | Nein |
-| `contextVariables` | Object | Nein |
-
-**Response:** `201` mit `CompletionTriggerResponse`
-
-**CompletionTriggerResponse-Felder:** `id`, `sourceWorkflowId`, `sourceWorkflowName`, `targetWorkflowId`, `targetWorkflowName`, `enabled`, `triggerOnSuccess`, `triggerOnFailure`, `triggerAlways`, `description`, `contextVariables`, `lastTriggeredAt`, `triggerCount`, `createdAt`
-
-### `POST /api/v1/completion-triggers/{id}/enable`
-
-Trigger aktivieren.
-
-**Response:** `CompletionTriggerResponse`
-
-### `POST /api/v1/completion-triggers/{id}/disable`
-
-Trigger deaktivieren.
-
-**Response:** `CompletionTriggerResponse`
-
-### `DELETE /api/v1/completion-triggers/{id}`
-
-Trigger löschen.
-
-**Response:** `204 No Content`
-
----
-
-## Integrations (OAuth-Provider)
-
-Plugin-System für externe Dienste (Google Calendar, Gmail, Jira, Confluence, Trello). Jeder Provider wird automatisch erkannt und bietet OAuth-Verbindung + Actions.
-
-**Benannte Verbindungen:** Ein Provider kann mehrere Verbindungen haben (z.B. zwei Konten). Alle Endpunkte, die eine Verbindung betreffen (`connect`, `credentials`, `connection`, `actions`, `task-targets`), nehmen den optionalen Query-Parameter `connection=<name>` (1–40 Zeichen `[a-z0-9-]`, sonst `400`); ohne ihn gilt `default`. Details: [integrations.md](integrations.md#mehrere-verbindungen-je-anbieter).
-
-### `GET /api/v1/integrations`
-
-Liste aller Provider mit Verbindungsstatus, Actions und Account-Info.
-
-**Response:** `200 OK`
-```json
-[
-  {
-    "providerId": "google-calendar",
-    "displayName": "Google Calendar",
-    "icon": "calendar",
-    "description": "...",
-    "status": "CONNECTED",
-    "configured": true,
-    "requiresCredentials": true,
-    "accountEmail": "user@gmail.com",
-    "accountName": "Max Mustermann",
-    "connectedSince": "2026-04-01T10:00:00Z",
-    "scopes": "https://www.googleapis.com/auth/calendar",
-    "optionalScopes": [
-      { "scope": "https://www.googleapis.com/auth/calendar.events", "label": "Events verwalten", "granted": true }
-    ],
-    "supportsTaskExport": false,
-    "actions": [
-      { "name": "list_events", "description": "...", "inputSchema": {...}, "available": true }
-    ],
-    "requiresOAuthFlow": true,
-    "connections": [
-      { "name": "default", "status": "CONNECTED", "configured": true, "accountEmail": "user@gmail.com", "accountName": "Max Mustermann", "connectedSince": "2026-04-01T10:00:00Z", "scopes": "..." },
-      { "name": "arbeit", "status": "CONNECTED", "configured": true, "accountEmail": "max@firma.example", "accountName": null, "connectedSince": "2026-09-24T08:00:00Z", "scopes": "..." }
-    ]
-  }
-]
-```
-
-Die Felder auf oberster Ebene (`status`, `accountEmail`, …) beschreiben die `default`-Verbindung.
-
-### `GET /api/v1/integrations/{providerId}/connections`
-
-Alle gespeicherten Verbindungen eines Providers, `default` zuerst (Felder wie in `connections[]` oben).
-
-### `GET /api/v1/integrations/{providerId}`
-
-Einzelnen Provider mit Details abrufen.
-
-### `GET /api/v1/integrations/{providerId}/connect`
-
-OAuth-Autorisierungs-URL generieren.
-
-**Query-Parameter:** `scopes` (optional, Liste zusätzlicher OAuth-Scopes)
-
-**Response:** `200 OK`
-```json
-{ "authorizationUrl": "https://accounts.google.com/o/oauth2/v2/auth?..." }
-```
-
-### `GET /api/v1/integrations/{providerId}/callback`
-
-OAuth-Callback (öffentlich, kein API-Key). Tauscht Authorization-Code gegen Tokens und schließt das Popup-Fenster via `postMessage`.
-
-### `POST /api/v1/integrations/{providerId}/credentials`
-
-Client-Credentials (Client ID + Secret) speichern. Werden AES-256-GCM-verschlüsselt in der DB abgelegt.
-
-**Body:**
-```json
-{ "clientId": "...", "clientSecret": "..." }
-```
-
-**Response:** `IntegrationProviderResponse`
-
-### `DELETE /api/v1/integrations/{providerId}/connection`
-
-OAuth-Verbindung trennen. Löscht gespeicherte Tokens.
-
-**Response:** `204 No Content`
-
-### `DELETE /api/v1/integrations/{providerId}/credentials`
-
-Client-Credentials löschen.
-
-**Response:** `204 No Content`
-
-### `GET /api/v1/integrations/{providerId}/actions`
-
-Liste aller verfügbaren Actions des Providers. `available` ist `false` wenn benötigte OAuth-Scopes fehlen.
-
-### `POST /api/v1/integrations/{providerId}/actions/{action}`
-
-Action ausführen. Body enthält die Action-spezifischen Parameter.
-
-**Body (Beispiel Google Calendar `create_event`):**
-```json
-{
-  "summary": "Meeting",
-  "startDateTime": "2026-04-15T10:00:00+02:00",
-  "endDateTime": "2026-04-15T11:00:00+02:00"
-}
-```
-
-### `GET /api/v1/integrations/{providerId}/task-targets`
-
-Verfügbare Task-Export-Ziele (z.B. Jira-Boards, Trello-Listen) auflisten.
-
-**Response:** `List<TaskTarget>`
-
----
-
-## Onboarding-Profile
-
-AI-Kontext-Templates für Projekt-Onboarding. 5 Built-in-Profile (Developer, Research, Content, Ops, Base) + benutzerdefinierte Profile.
-
-### `GET /api/v1/projects/{id}/onboarding/status`
-
-Onboarding-Status eines Projekts prüfen (aktive Profile, generierte Datei).
-
-### `POST /api/v1/projects/{id}/onboarding/enable`
-
-Onboarding für ein Projekt aktivieren. Generiert die Onboarding-Datei aus den ausgewählten Profilen.
-
-**Body:**
-```json
-{ "format": "md", "profileIds": ["profile-uuid-1", "profile-uuid-2"] }
-```
-
-**Response:** `OnboardingStatusResponse`
-
-### `POST /api/v1/projects/{id}/onboarding/disable`
-
-Onboarding für ein Projekt deaktivieren.
-
-**Response:** `OnboardingStatusResponse`
-
-### `POST /api/v1/projects/{id}/onboarding/refresh`
-
-Onboarding-Datei neu generieren.
-
-**Response:** `OnboardingStatusResponse`
-
-### `GET /api/v1/projects/{id}/onboarding/preview`
-
-Vorschau der generierten Onboarding-Datei.
-
-**Response:** `{ "content": "..." }`
-
-### `GET /api/v1/onboarding-profiles`
-
-Alle Onboarding-Profile auflisten.
-
-**Response:** `OnboardingProfileResponse[]`
-
-### `GET /api/v1/onboarding-profiles/{id}`
-
-Einzelnes Profil abrufen.
-
-**Response:** `OnboardingProfileResponse`
-
-### `POST /api/v1/onboarding-profiles`
-
-Neues Profil erstellen.
-
-**Request:**
-
-```json
-{
-  "key": "my-profile",
-  "name": {"de": "Mein Profil", "en": "My Profile"},
-  "description": {"de": "...", "en": "..."},
-  "content": "Profilinhalt...",
-  "type": "PROFILE"
-}
-```
-
-| Feld | Typ | Pflicht | Werte |
-|---|---|---|---|
-| `key` | String | Ja | Pattern: `^[a-z0-9-]+$` |
-| `name` | Map<String, String> | Ja | |
-| `description` | Map<String, String> | Nein | |
-| `content` | String | Ja | |
-| `type` | Enum | Ja | `BASE`, `PROFILE` |
-
-**Response:** `201` mit `OnboardingProfileResponse`
-
-**OnboardingProfileResponse-Felder:** `id`, `key`, `name`, `description`, `content`, `type`, `builtIn`, `sortOrder`, `version`, `historyCount`, `createdAt`, `updatedAt`
-
-### `PUT /api/v1/onboarding-profiles/{id}`
-
-Profil-Content aktualisieren (erstellt automatisch einen History-Eintrag).
-
-**Response:** `OnboardingProfileResponse`
-
-### `DELETE /api/v1/onboarding-profiles/{id}`
-
-Profil löschen.
-
-**Response:** `204 No Content`
-
-### `POST /api/v1/onboarding-profiles/{id}/reset`
-
-Built-in-Profil auf die aktuelle mitgelieferte Fassung setzen; der bisherige Text landet im Verlauf, `customized` wird `false`.
-
-**Response:** `OnboardingProfileResponse` (enthält `customized` — von Hand geändert — und `updateAvailable` — es gibt eine neuere mitgelieferte Fassung als die, auf der das Profil beruht)
-
-### `GET /api/v1/onboarding-profiles/{id}/shipped`
-
-Aktuelle mitgelieferte Fassung eines Built-in-Profils, zum Vergleichen vor dem Übernehmen.
-
-**Response:** `{ "version": 4, "content": { "de": "...", "en": "..." } }` · 404 für eigene Profile
-
-### `GET /api/v1/onboarding-profiles/{id}/history`
-
-Änderungshistorie eines Profils abrufen.
-
-**Response:** `OnboardingProfileHistoryResponse[]`
-
----
-
-## Todo-Trigger (Self-Improvement Loop)
-
-Todo-Trigger starten automatisch Fix-Workflows wenn TODOs erstellt werden. Schliesst den Self-Improvement-Loop: Audit → TODO → Fix → Verify → Close.
-
-### `GET /api/v1/todo-triggers`
-
-Alle Todo-Trigger auflisten.
-
-**Response:** `TodoTriggerResponse[]`
-
-### `GET /api/v1/todo-triggers/{id}`
-
-Einzelnen Todo-Trigger abrufen.
-
-**Response:** `TodoTriggerResponse`
-
-### `GET /api/v1/todo-triggers/workflow/{workflowId}`
-
-Todo-Trigger abrufen, die den angegebenen Workflow als Ziel haben.
-
-**Response:** `TodoTriggerResponse[]`
-
-### `POST /api/v1/todo-triggers`
-
-Neuen Todo-Trigger erstellen.
-
-**Request:**
-
-```json
-{
-  "tagPattern": "backend,testing",
-  "targetWorkflowId": "<workflow-id>",
-  "projectId": null,
-  "sourceFilter": "WORKFLOW",
-  "minPriority": "HIGH",
-  "description": "Auto-Fix: fehlende Backend-Tests",
-  "maxAttempts": 3,
-  "autoClose": true,
-  "contextTemplate": { "extra_key": "extra_value" }
-}
-```
-
-| Feld | Pflicht | Beschreibung |
-|---|---|---|
-| `tagPattern` | Ja | Kommagetrennte Tags (AND-Logik). Alle Tags müssen im TODO vorhanden sein |
-| `targetWorkflowId` | Ja | ID des Fix-Workflows der gestartet wird |
-| `projectId` | Nein | Optional: nur TODOs in diesem Projekt matchen |
-| `sourceFilter` | Nein | Optional: `"USER"`, `"AI"` oder `"WORKFLOW"` |
-| `minPriority` | Nein | Optional: Minimum-Priorität (`"LOW"`, `"MEDIUM"`, `"HIGH"`, `"CRITICAL"`) |
-| `description` | Nein | Menschenlesbare Beschreibung |
-| `maxAttempts` | Nein | Max. Fix-Versuche pro TODO (Default: 3) |
-| `autoClose` | Nein | TODO bei GREEN Gate automatisch schliessen (Default: true) |
-| `processBacklog` | Nein | Bei Erstellung bestehende passende TODOs abarbeiten (Default: true) |
-| `contextTemplate` | Nein | Statische Context-Variablen, gemerged mit TODO-Daten |
-
-`sourceFilter` und `minPriority` werden in beliebiger Schreibweise angenommen und als Konstante
-gespeichert; ein anderer Wert → `400`, die Meldung nennt die erlaubten Werte.
-
-**Response:** `201` mit `TodoTriggerResponse`
-
-**TodoTriggerResponse-Felder:** `id`, `tagPattern`, `projectId`, `sourceFilter`, `minPriority`, `targetWorkflowId`, `targetWorkflowName`, `contextTemplate`, `enabled`, `maxAttempts`, `autoClose`, `processBacklog`, `description`, `lastTriggeredAt`, `triggerCount`, `createdAt`
-
-**Context-Variablen** die der Fix-Workflow automatisch erhält:
-
-| Variable | Beschreibung |
-|---|---|
-| `todo_id` | TODO-UUID |
-| `todo_title` | TODO-Titel |
-| `todo_description` | TODO-Beschreibung (Markdown) |
-| `todo_tags` | TODO-Tags als JSON-Array |
-| `todo_priority` | `LOW`, `MEDIUM`, `HIGH` oder `CRITICAL` |
-| `todo_project_id` | Projekt-UUID des TODOs |
-| `todo_source` | `USER`, `AI` oder `WORKFLOW` |
-| `todo_reference_type` | Referenz-Typ (z.B. `workflow_run`) |
-| `todo_reference_id` | Referenz-ID (z.B. Workflow-ID) |
-| `todo_trigger_id` | ID des auslösenden TodoTriggers |
-
-### `POST /api/v1/todo-triggers/{id}/enable`
-
-Trigger aktivieren.
-
-**Response:** `TodoTriggerResponse`
-
-### `POST /api/v1/todo-triggers/{id}/disable`
-
-Trigger deaktivieren.
-
-**Response:** `TodoTriggerResponse`
-
-### `DELETE /api/v1/todo-triggers/{id}`
-
-Trigger löschen.
-
-**Response:** `204 No Content`
-
-### Loop-Prevention
-
-Fix-Workflows die durch einen TodoTrigger gestartet werden, setzen `todoTriggerRun: true` in der Run-Metadata. Dies verhindert:
-- **AutoTodoService** überspringt TODO-Erstellung für diese Runs (kein Audit→TODO→Fix→TODO-Loop)
-- **Max-Attempts**: Nach `maxAttempts` Fehlversuchen wird der Trigger für dieses TODO nicht mehr ausgelöst
-- **Running-Check**: Wenn `lastFixRunId` noch RUNNING ist, wird kein zweiter Fix-Run gestartet
-
----
-
-## Audit Center
-
-Read-Only-Auswertung von Audit-Workflow-Ergebnissen (Gate-Status je Audit-Lauf) und der daraus abgeleiteten Findings, plus Promotion einzelner Findings zu TODOs. Modul `audit` (`automation.modules.audit`) — ist es deaktiviert, antworten alle folgenden Endpunkte mit `404 MODULE_DISABLED`.
-
-### `GET /api/v1/audits`
-
-Alle Audits (gruppiert nach Projekt + `auditKey`) mit dem jeweils neuesten gültigen Report auflisten. Optionale Filter: `projectId`, `category`, `gateStatus`.
-
-**Response:** `AuditSummary[]`
-
-### `GET /api/v1/audits/{auditKey}`
-
-Details eines Audits (Zusammenfassung + neuester Report). Pflicht-Parameter: `projectId`.
-
-**Response:** `AuditDetail`
-
-### `GET /api/v1/audits/{auditKey}/reports`
-
-Alle Reports eines Audits, paginiert (`page`, `size`). Pflicht-Parameter: `projectId`.
-
-**Response:** `PageResponse<AuditReportResponse>` — nur die Köpfe: `markdownContent` ist `null`. Den Text
-liefert `GET /api/v1/audit-reports/{id}` (bis 2026-09-26 trug jede Seite jeden Report im Volltext).
-
-### `GET /api/v1/audit-reports/{id}`
-
-Einzelnen Audit-Report abrufen.
-
-**Response:** `AuditReportResponse`
-
-Neben Inhalt, Gate und `findingCount` trägt jeder Report (auch in der Liste und in `AuditDetail.latestReport`) die Herkunft seines Laufs, jedes Feld `null`, wenn unbekannt:
-
-| Feld | Bedeutung |
-|---|---|
-| `workflowVersion` | Versions-Label des Workflows beim Speichern (z. B. die Pool-Version) |
-| `triggerSource` | Effektiver Auslöser; bei einem Ketteneintrag der Auslöser der Kette (`SCHEDULE`, `MANUAL`, …). Ein Kettenlauf von vor V89 bleibt `CHAIN`, ein Sub-Workflow-Lauf `SUB_WORKFLOW` |
-| `scheduleId` | Auslösender Zeitplan; bei einem Ketteneintrag der Zeitplan der Kette |
-| `chainRunId`, `chainId`, `chainName` | Chain-Run und Kette eines Ketteneintrags; `chainRunId` bleibt, wenn die Kette gelöscht ist |
-| `definitionVersionNumber` | Nummer der Definitionsversion, die der Lauf ausgeführt hat (leer ohne `automation.hardening.provenance`) |
-
-Die Liste löst Zählung und Herkunft für die ganze Seite mit je einer Abfrage auf, nicht je Report.
-
-### `GET /api/v1/audit-findings`
-
-Findings über alle Audits auflisten, paginiert (`page`, `size`). Optionale Filter: `projectId`, `auditKey`, `status`, `severity`.
-
-**Response:** `PageResponse<AuditFindingResponse>`
-
-### `GET /api/v1/audit-findings/{id}`
-
-Einzelnes Finding abrufen.
-
-**Response:** `AuditFindingResponse`
-
-### `PATCH /api/v1/audit-findings/{id}`
-
-Status oder Dispositions-Notiz eines Findings ändern.
-
-**Request:**
-
-| Feld | Typ | Pflicht |
-|---|---|---|
-| `status` | Enum (`AuditFindingStatus`) | Nein |
-| `dispositionNote` | String | Nein |
-
-**Response:** `AuditFindingResponse`
-
-### `POST /api/v1/audit-findings/{id}/todos`
-
-Ein von MySuricates verwaltetes TODO aus dem Finding erzeugen ("Managed TODO").
-
-**Response:** `AuditFindingResponse`
-
-### `POST /api/v1/audit-findings/{id}/todo-links`
-
-Ein bereits bestehendes TODO manuell mit dem Finding verknüpfen.
-
-**Request:** `{ "todoId": "uuid" }`
-
-**Response:** `AuditFindingResponse`
-
-### `DELETE /api/v1/audit-findings/{id}/todo-links/{todoId}`
-
-Verknüpfung zwischen Finding und TODO wieder lösen.
-
-**Response:** `204 No Content`
-
----
-
-## Notifications
-
-Benachrichtigungen bei Workflow-Abschluss (Webhook oder Desktop).
-
-### `GET /api/v1/notifications`
-
-Alle Benachrichtigungs-Konfigurationen auflisten.
-
-**Response:** `NotificationConfigResponse[]`
-
-### `GET /api/v1/notifications/{id}`
-
-Einzelne Benachrichtigungs-Konfiguration abrufen.
-
-**Response:** `NotificationConfigResponse`
-
-### `POST /api/v1/notifications`
-
-Neue Benachrichtigungs-Konfiguration erstellen.
-
-**Request:**
-
-```json
-{
-  "name": "Slack Deployment",
-  "channelType": "WEBHOOK",
-  "webhookUrl": "https://hooks.slack.com/...",
-  "workflowId": null,
-  "triggerOnSuccess": true,
-  "triggerOnFailure": true,
-  "triggerAlways": false,
-  "messageTemplate": "Workflow {{workflow_name}} {{status}} ({{duration}})"
-}
-```
-
-| Feld | Typ | Pflicht | Werte |
-|---|---|---|---|
-| `name` | String | Ja | |
-| `channelType` | Enum | Ja | `WEBHOOK`, `DESKTOP` |
-| `webhookUrl` | String | Nein (Pflicht bei `WEBHOOK`) | Slack/Discord/Teams Webhook-URL |
-| `workflowId` | String | Nein | `null` = global (alle Workflows) |
-| `triggerOnSuccess` | boolean | Nein | |
-| `triggerOnFailure` | boolean | Nein | |
-| `triggerAlways` | boolean | Nein | |
-| `messageTemplate` | String | Nein | Unterstützt `{{workflow_name}}`, `{{status}}`, `{{duration}}`, `{{error_message}}` |
-
-**Response:** `201` mit `NotificationConfigResponse`
-
-**NotificationConfigResponse-Felder:** `id`, `name`, `enabled`, `channelType`, `webhookUrl`, `workflowId`, `triggerOnSuccess`, `triggerOnFailure`, `triggerAlways`, `messageTemplate`, `createdAt`
-
-### `POST /api/v1/notifications/{id}/enable`
-
-Benachrichtigung aktivieren.
-
-**Response:** `NotificationConfigResponse`
-
-### `POST /api/v1/notifications/{id}/disable`
-
-Benachrichtigung deaktivieren.
-
-**Response:** `NotificationConfigResponse`
-
-### `DELETE /api/v1/notifications/{id}`
-
-Benachrichtigungs-Konfiguration löschen.
-
-**Response:** `204 No Content`
-
----
-
-## System
-
-### `GET /api/v1/system/health` (Öffentlich)
-
-Health-Check.
-
-**Response:**
-
-```json
-{
-  "status": "UP",
-  "timestamp": "2025-01-15T10:00:00Z",
-  "docker": "CONNECTED",
-  "components": {
-    "database": { "status": "UP", "responseTimeMs": 2 },
-    "docker": { "status": "UP" }
-  }
-}
-```
-
-`status` kann `UP`, `DEGRADED` (Docker nicht verfügbar) oder `DOWN` (Datenbank nicht verfügbar) sein.
-`docker` kann `CONNECTED` oder `UNAVAILABLE` sein.
-
-### `GET /api/v1/system/info` (Öffentlich)
-
-Systeminformationen.
-
-**Response:**
-
-```json
-{
-  "name": "MySuricates",
-  "version": "0.7.3",
-  "buildType": "SNAPSHOT",
-  "buildTimestamp": null,
-  "java": "21.0.1",
-  "tailscale": "DISABLED",
-  "environment": "Dev"
-}
-```
-
-### `GET /api/v1/system/auth-status`
-
-Authentifizierungsstatus abfragen.
-
-**Response:** `{ "securityEnabled": true }`
-
-### `GET /api/v1/system/jvm-memory` (Öffentlich)
-
-Heap-Belegung der JVM als genau drei Zahlen — für Shell-Blöcke wie den Performance-Audit, die keinen
-API-Key haben. Die übrige Metrik-Oberfläche unter `/actuator/metrics` verlangt den Key.
-
-**Response:**
-
-```json
-{
-  "jvm_memory_used_bytes": 268435456,
-  "jvm_memory_max_bytes": 1073741824,
-  "jvm_heap_used_percent": 25.0
-}
-```
-
-Die Werte beziehen sich auf den Heap (`MemoryMXBean`), der Anteil ist auf eine Nachkommastelle
-gerundet. Kennt die JVM kein Heap-Maximum, sind `jvm_memory_max_bytes` und `jvm_heap_used_percent`
-`null`.
-
-### `GET /api/v1/system/ai-providers`
-
-Verfügbare KI-Provider und Standard-Provider abfragen.
-
-**Response:**
-
-```json
-{
-  "providers": ["CLAUDE", "PI", "CODEX"],
-  "default": "CLAUDE"
-}
-```
-
-### `GET /api/v1/system/capabilities`
-
-System-Capabilities abrufen (API-Version, App-Version, verfügbare Routen und Block-Typen) sowie den beim Start festgelegten Modulstatus.
-
-**Response:** `SystemCapabilitiesResponse` — Auszug der Modul-Felder:
-
-```json
-{
-  "preset": "core",
-  "modulesUiEditable": false,
-  "modules": [
-    {
-      "name": "webhooks", "kind": "feature", "enabled": false,
-      "tier": "advanced", "maturity": "stable", "risks": ["network"], "requires": [],
-      "property": "automation.modules.webhooks", "envVar": "AUTOMATION_MODULES_WEBHOOKS",
-      "description": "Inbound webhook triggers that start workflows from outside.",
-      "configured": false, "overridden": false
-    }
-  ]
-}
-```
-
-Endpunkte deaktivierter Module antworten mit `404` und `{"code": "MODULE_DISABLED"}`. `configured` ist der Wert aus der Startkonfiguration, `overridden` zeigt einen Schalter aus den Settings.
-
-### `PUT /api/v1/system/modules/{name}`
-
-Funktionsmodul zur Laufzeit schalten — nur mit `automation.modules.ui-editable: true`, wirkt sofort und bleibt über Neustarts erhalten. Protokolliert einen `SECURITY`-Eintrag.
-
-**Request:** `{ "enabled": true }`
-
-**Response:** `{ "preset": "core", "uiEditable": true, "modules": [ … ] }` (Modul-Einträge wie oben)
-
-**Fehler:** `403 MODULES_NOT_EDITABLE` (Schalter aus), `400 INVALID_ARGUMENT` (Härtungs-Schalter — nur per Startkonfiguration), `409 STATE_CONFLICT` (Abhängigkeit, z. B. `wishes` braucht `chains`), `404` (unbekanntes Modul)
-
-### `DELETE /api/v1/system/modules/{name}/override`
-
-Schalter aus den Settings entfernen: Das Modul folgt wieder der Startkonfiguration. Gleiche Response und Fehler wie `PUT`.
-
-### `GET /api/v1/system/ai-providers/PI/catalog`
-
-Modell-Katalog des Pi-Providers abrufen.
-
-**Response:** `PiCatalog`
-
-### `GET /api/v1/system/ai-providers/{id}/models`
-
-Modelle, die dieser Provider auf diesem Host anbietet (Host-Discovery via CLI bzw. lokalem Cache, TTL-gecacht). Schlägt nie wegen fehlender CLI fehl — dann `available: false` mit `reason`.
-
-**Response:** `ModelCatalog` (`providerId`, `available`, `source`, `fetchedAt`, `reason`, `models[]`)
-
-### `POST /api/v1/system/ai-providers/{id}/models/refresh`
-
-Cache umgehen und den Host jetzt neu abfragen.
-
-**Response:** `ModelCatalog`
-
-### `GET /api/v1/system/ai-providers/status`
-
-Ob die KI-CLIs auf dem Rechner des Backends bereit sind: je Anbieter das Programm auf dem `PATH`, eine Anmeldung (Anmeldedatei oder Umgebungsvariable — dieselbe Regel wie der Installer, aus `AiProvider#setup()`) und die Befehle zum Installieren und Anmelden. Ruft keine CLI auf; die Antwort ist gecacht (`automation.ai-provider-status.ttl-seconds`, Standard 60). Sie nennt nur Namen und Befehle, nie einen Token oder Dateiinhalt. „Bereit“ heißt: Programm und Anmeldung gefunden — nicht, dass die Anmeldung noch gilt.
-
-**Response:**
-
-```json
-{
-  "container": false,
-  "loginCommand": null,
-  "checkedAt": "2026-09-24T10:00:00Z",
-  "providers": [
-    {
-      "id": "CLAUDE", "cli": "claude", "state": "READY",
-      "installed": true, "loggedIn": true, "loginVia": "ENVIRONMENT", "loginSource": "CLAUDE_CODE_OAUTH_TOKEN",
-      "install": "curl -fsSL https://claude.ai/install.sh | bash -s <version>   (or: npm install -g @anthropic-ai/claude-code@<version>)",
-      "login": "claude auth login", "defaultProvider": true, "loginNote": null
-    },
-    {
-      "id": "CODEX", "cli": "codex", "state": "LOGIN_MISSING",
-      "installed": true, "loggedIn": false, "loginVia": null, "loginSource": null,
-      "install": "npm install -g @openai/codex@<version>", "login": "codex login",
-      "defaultProvider": false, "loginNote": null
-    },
-    {
-      "id": "PI", "cli": "pi", "state": "LOGIN_MISSING",
-      "installed": true, "loggedIn": false, "loginVia": null, "loginSource": null,
-      "install": "npm install -g @earendil-works/pi-coding-agent@<version>", "login": "pi",
-      "defaultProvider": false, "loginNote": "pi_slash_login"
-    }
-  ]
-}
-```
-
-`state`: `READY` (Programm und Anmeldung gefunden), `LOGIN_MISSING` (Programm gefunden, keine Anmeldung), `NOT_INSTALLED` (Programm fehlt). `loginSource`: der Variablenname oder die Anmeldedatei als `~/…` — bzw. als `$VARIABLE/…`, wenn eine Container-Instanz das Verzeichnis umlenkt (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `PI_CODING_AGENT_DIR`). `container: true` heißt, das Backend läuft in einem Container: Es zählen Programme und Anmeldungen darin.
-`login` ist nur der Befehl; was danach zu tun ist, steht als Schlüssel in `loginNote` (`null`, wenn der Befehl alles
-sagt) — die Oberfläche übersetzt ihn (`aiProviderStatus.loginNotes`), der Installer ebenso (`M_login_note_<schlüssel>`).
-
-Felder ohne Wert kommen als `null`, sie fehlen nicht. `loginCommand` nennt im Container den festen Anmeldebefehl des Startwegs (etwa `scripts/tryout.sh login [claude|codex|pi]`), sonst `null`; `install` nennt die gepinnte Version der CLI ([entwicklung.md → Versionen der KI-CLIs](entwicklung.md#versionen-der-ki-clis-installer-und-tryout)).
-
-### `POST /api/v1/system/ai-providers/status/refresh`
-
-Cache umgehen und jetzt neu prüfen, etwa direkt nach einer Anmeldung.
-
-**Response:** wie `GET /api/v1/system/ai-providers/status`
-
-### `POST /api/v1/system/client-errors`
-
-Frontend-Fehler melden (für Logging).
-
-**Request:**
-
-```json
-{
-  "message": "TypeError: ...",
-  "stack": "...",
-  "source": "component",
-  "url": "/workflows",
-  "timestamp": "2025-01-15T10:00:00Z"
-}
-```
-
-**Response:** `202 Accepted`
-
-### `POST /api/v1/system/remote-access/enable`
-
-Tailscale Remote-Access aktivieren.
-
-**Response:** `RemoteAccessResponse`
-
-```json
-{
-  "enabled": true,
-  "ip": "100.64.0.1",
-  "hostname": "automation.tailnet.ts.net"
-}
-```
-
-### `POST /api/v1/system/remote-access/disable`
-
-Tailscale Remote-Access deaktivieren.
-
-**Response:** `200 OK`
-
-### `GET /api/v1/system/remote-access/status`
-
-Tailscale-Status abfragen.
-
-**Response:** `RemoteAccessResponse`
-
-### `POST /api/v1/system/vacuum`
-
-SQLite-Datenbank VACUUM ausführen.
-
-**Response:** `Map<String, Object>`
-
-### `GET /api/v1/system/backup`
-
-Datenbank-Backup herunterladen.
-
-**Response:** Datei-Download (SQLite-Backup)
-
-### `POST /api/v1/system/backup`
-
-Benanntes Backup erstellen.
-
-**Query-Parameter:** `reason` (optional, String)
-
-**Response:** `BackupMetadata` mit `filename`, `sizeBytes`, `createdAt`
-
-### `GET /api/v1/system/backups`
-
-Alle verfügbaren Backups auflisten.
-
-**Response:** `BackupInfo[]`
-
-### `GET /api/v1/system/backups/{filename}`
-
-Bestimmtes Backup herunterladen.
-
-**Response:** Datei-Download
-
-### `GET /api/v1/system/settings/{key}`
-
-Anwendungs-Einstellung abrufen.
-
-**Erlaubte Keys:** `auto-todo-default`, `auto-repair-default`, `auto-repair-mode`, `auto-repair-max-retries`, `auto-repair-timeout-seconds`, `default-ai-provider`, `assistant-thinking-phrases`, `assistant-model`, `suggestions-model`, `suggestions-enabled`, `backup-retain-count`, `github.repo-allowlist`
-
-**Response:** `{ "key": "...", "value": "..." }` — `value` ist leer, solange nichts gespeichert ist. Bei `backup-retain-count` kommt `"default"` dazu: der Wert aus `automation.backup.retain-count`, der dann gilt (z. B. `{ "key": "backup-retain-count", "value": "", "default": "30" }`).
-
-### `PUT /api/v1/system/settings/{key}`
-
-Anwendungs-Einstellung setzen.
-
-**Request:**
-
-```json
-{
-  "value": "true"
-}
-```
-
-**Response:** `200 OK`
-
-`backup-retain-count` nimmt 1–365; ein anderer Wert → `400`, gespeichert wird dann nichts. Der
-gespeicherte Wert gilt ab der nächsten Rotation und nach einem Neustart weiter (sonst
-`automation.backup.retain-count`).
-
-### `GET /api/v1/system/tray-config`
-
-Laufzeit-Einstellungen des Host-Tray-Icons abrufen.
-
-**Response:**
-
-```json
-{
-  "popupsEnabled": true,
-  "notifyApprovals": true,
-  "notifyFailures": true,
-  "notifySuccess": false,
-  "publicUrl": "https://mysuricates.example.com"
-}
-```
-
-### `PUT /api/v1/system/tray-config`
-
-Tray-Einstellungen aktualisieren. Teil-Updates sind erlaubt. Externe Browserziele müssen HTTPS verwenden; HTTP ist nur für Loopback-Adressen zulässig. Das Browserziel ist von den internen Healthcheck-URLs getrennt.
-
-**Request/Response:** dieselben Felder wie bei `GET`; die Response enthält den vollständigen validierten Stand.
-
-### `GET /api/v1/system/execution-config`
-
-Aktuelle Execution-Konfiguration abrufen (Timeouts, Token-Limits etc.). Enthält zusätzlich ein read-only-Feld `activeRuns` mit der Anzahl aktiver Runs.
-
-**Erlaubte Keys:**
-
-| Key | Bereich |
-|---|---|
-| `execution-max-concurrent` | 1–50 |
-| `claude-max-concurrent-calls` | 1–20 |
-| `claude-reserved-for-interactive` | 0–10 |
-| `claude-timeout-seconds` | 30–3600 |
-| `claude-inter-call-delay-ms` | 0–30000 |
-| `chain-workflow-timeout-minutes` | 5–1440 |
-| `rate-limit-enabled` | 0–1 |
-| `rate-limit-requests-per-minute` | 10–10000 |
-| `assistant-chat-timeout-seconds` | 30–900 |
-| `task-command-timeout-seconds` | 10–3600 |
-| `allow-extra-mounts` | 0–1 |
-| `todo-hygiene-enabled` | 0–1 |
-| `todo-stale-days` | 7–365 |
-| `todo-hygiene-max-per-run` | 10–2000 |
-| `todo-watchdog-enabled` | 0–1 |
-| `todo-watchdog-stale-hours` | 1–720 |
-| `assistant-max-actions-per-hour` | 1–500 |
-| `scheduler-catch-up-on-resume` | 0–1 |
-| `scheduler-resume-grace-minutes` | 1–60 |
-| `run-auto-resume-enabled` | 0–1 |
-| `run-auto-resume-delay-seconds` | 0–3600 |
-| `summarization-timeout-seconds` | 30–600 |
-| `factory-timeout-seconds` | 60–3600 |
-| `wish-total-timeout-minutes` | 5–1440 |
-| `wish-workflow-wait-minutes` | 1–120 |
-| `wish-default-shell-timeout-seconds` | 30–3600 |
-| `wish-default-agentic-total-timeout-seconds` | 60–86400 |
-| `run-retention-days` | 0–730 |
-| `run-retention-max-per-night` | 10–5000 |
-| `dashboard-layout-retention-count` | 1–1000 |
-| `model-catalog-ttl-seconds` | 30–86400 |
-| `compress-ai-max-input-chars` | 1000–400000 |
-| `todo-similarity-keyword-threshold` | 0.05–0.9 |
-| `dashboard-report-assist-enabled` | 0–1 |
-| `request-metrics-enabled` | 0–1 |
-| `request-metrics-retention-days` | 0–730 |
-| `request-metrics-slow-request-ms` | 0–600000 |
-| `request-metrics-drift-detection-enabled` | 0–1 |
-| `request-metrics-drift-factor` | 1.1–100.0 |
-| `request-metrics-drift-min-calls` | 1–100000 |
-| `request-metrics-baseline-days` | 1–365 |
-| `request-metrics-trend-min-daily-calls` | 1–100000 |
-
-Die Liste ist der Stand von `ExecutionSettingKeys.BOUNDS`. Ein Schlüssel ohne Grenzen dort ist
-über diesen Endpunkt **nicht** erreichbar, auch wenn ein Applier existiert — zwei Wächter-Tests
-in `ExecutionSettingsServiceTest` halten beide Seiten deckungsgleich (TODO fc0994d6).
-
-**Response:** `Map<String, Object>` mit aktuellen Einstellungen
-
-### `PUT /api/v1/system/execution-config`
-
-Execution-Konfiguration aktualisieren.
-
-**Request:** `Map<String, String>` mit den zu ändernden Einstellungen (Keys wie oben, auch in camelCase erlaubt)
-
-**Response:** `Map<String, Object>` mit aktualisierten Einstellungen
-
-### `POST /api/v1/system/repair-failed`
-
-Alle fehlgeschlagenen Workflows automatisch reparieren lassen. Setzt gesunde Test-Instanz voraus.
-
-**Query-Parameter:** `force` (boolean, Standard: `false`)
-
-**Response:** `202 Accepted` mit `{ "status": "repair_started", "workflowsQueued": 3, "force": false }`
-
-### `POST /api/v1/system/open-path`
-
-Datei oder Verzeichnis im nativen Dateimanager öffnen (Linux: `xdg-open`).
-
-**Request:**
-
-```json
-{
-  "path": "/home/user/projekt"
-}
-```
-
-**Response:** `{ "status": "ok" }`
-
-### `GET /api/v1/system/integration-snippet`
-
-Markdown-Integration-Snippet für ein Projekt rendern (für AGENTS.md o.ä.): Basis-Onboarding-Profil mit Adresse und Key-Befehl dieser Instanz, dazu die Workflows des Projekts.
-
-**Query-Parameter:** `projectPath` (optional), `locale` (`de`/`en`, optional; Standard `en`)
-
-**Response:** `String` (Content-Type: `text/markdown`)
-
-### `GET /api/v1/system/browse`
-
-Verzeichnisinhalt durchsuchen (nur Unterverzeichnisse, keine versteckten Ordner).
-
-**Query-Parameter:** `path` (String, optional, Standard: Home-Verzeichnis)
-
-**Response:**
-
-```json
-{
-  "current": "/home/user",
-  "parent": "/home",
-  "directories": [
-    { "name": "Documents", "path": "/home/user/Documents" }
-  ]
-}
-```
-
-### `GET /api/v1/system/request-metrics`
-
-Request-Kosten je Route seit dem letzten Tages-Snapshot (Live-Fenster aus dem Speicher), teuerste (p95) zuerst. Siehe [entwicklung.md → Backend-Tests](entwicklung.md#backend-tests) für die Messkette dahinter.
-
-**Response:** `List<RouteSnapshot>`
-
-```json
-[
-  {
-    "route": "GET /api/v1/todos/{id}",
-    "calls": 120,
-    "p50Ms": 8,
-    "p95Ms": 42,
-    "maxMs": 310,
-    "p95WaitMs": 3,
-    "waitShare": 0.07,
-    "maxSqlStatements": 4,
-    "avgSqlStatements": 2.1,
-    "maxResponseBytes": 4096,
-    "avgResponseBytes": 1024
-  }
-]
-```
-
-### `GET /api/v1/system/request-metrics/daily`
-
-Gespeicherte Tageszeilen — mit `route` die Historie einer Route (älteste zuerst, die Baseline eines Drift-Checks), ohne `route` die Zeilen eines einzelnen Tages.
-
-**Query-Parameter:** `route` (String, optional), `days` (int, Standard: 7 — nur mit `route`)
-
-**Response:** `List<RequestMetricDaily>` (gleiche Felder wie oben, zusätzlich `day`)
-
----
-
-## Learning / Dashboard
-
-### `GET /api/v1/learning/dashboard`
-
-Dashboard-Daten mit Statistiken.
-
-**Query-Parameter:** `days` (Standard: 30), `projectId` (optional). `projectId` schränkt alle Werte auf die
-Workflows und Läufe dieses Projekts ein — auch die Gesamtzahlen (`totalWorkflows`, `totalRuns`, `runsToday`,
-`successRate`, `topWorkflows`), die unabhängig von `days` über die gesamte Laufzeit zählen.
-
-**Response:**
-
-```json
-{
-  "totalWorkflows": 12,
-  "totalRuns": 156,
-  "runsToday": 5,
-  "successfulRuns": 140,
-  "failedRuns": 16,
-  "averageDurationMs": 45000,
-  "successRate": 89.7,
-  "totalCostUsd30d": 12.50,
-  "totalTokens30d": 250000,
-  "totalInputTokens": 180000,
-  "totalOutputTokens": 70000,
-  "topWorkflows": [
-    { "workflowId": "uuid", "workflowName": "Code Review", "runCount": 42 }
-  ],
-  "recentRuns": [
-    { "id": "uuid", "workflowId": "uuid", "workflowName": "Code Review", "projectName": "AutoPilot", "status": "COMPLETED", "startedAt": "2025-01-15T08:00:00Z", "completedAt": "2025-01-15T08:00:32Z", "durationMs": 32000 }
-  ],
-  "timeSeries": [
-    { "date": "2025-01-15", "count": 8, "successRate": 87.5, "failedCount": 1, "avgDurationMs": 32000, "totalCostUsd": 0.45, "totalTokens": 9500 }
-  ],
-  "providerStats": [
-    { "provider": "CLAUDE", "runCount": 150, "totalTokens": 240000, "totalCostUsd": 11.0, "successRate": 90.0 }
-  ],
-  "modelStats": [
-    { "requestedModel": "sonnet", "provider": "CLAUDE", "model": "claude-sonnet", "stepCount": 200, "totalTokens": 180000, "totalCostUsd": 8.5 }
-  ],
-  "gateStatusSummary": [
-    { "status": "GREEN", "count": 10 }
-  ],
-  "failureReasons": [
-    { "reason": "timeout", "count": 3 }
-  ],
-  "costByWorkflow": [
-    { "workflowId": "uuid", "workflowName": "Code Review", "totalCostUsd": 5.0, "runCount": 42 }
-  ],
-  "blockTypeUsage": [
-    { "blockType": "simple", "stepCount": 100, "failedCount": 2, "failureRate": 2.0 }
-  ],
-  "triggerDistribution": {
-    "manual": 50, "scheduled": 80, "webhook": 10, "completionTrigger": 5, "todoTrigger": 11
-  }
-}
-```
-
-`recentRuns` enthält die bis zu zehn neuesten Läufe im Zeitraum als schlanke Zeilen — nur die Felder
-oben, ohne Schritte, Metadaten und Eingabekontext. Den vollständigen Lauf liefert
-`GET /api/v1/executions/{id}`. Bis TODO 2ccb9e40 waren es ganze Läufe mit allen Schritten (rund 600 KB je
-Aufruf bei einem Abruf alle 30 s).
-
-`modelStats` gruppiert Schritte nach der Kombination aus `requestedModel` (angefordert),
-`provider` (KI-Anbieter) und `model` (gemeldet; wie bisher ohne Datums-Suffix).
-Fehlende oder leere Angaben bleiben `null`; das angeforderte Modell ersetzt nie das gemeldete.
-Auch Aufrufe ohne gemeldetes Modell und Werte wie `<synthetic>` bleiben sichtbar.
-Integrationsschritte zählen nicht zu dieser KI-Statistik.
-
-### `GET /api/v1/learning/platform-stats`
-
-Plattform-weite Statistiken.
-
-**Response:** `PlatformStatsResponse` mit `activeProjects`, `archivedProjects`, `totalWorkflows`, `workflowPoolSize`, `totalSkills`, `builtinSkills`, `customSkills`, `topSkillsByUsage`, `totalTemplates`, `builtinTemplates`, `customTemplates`, `activeSchedules`, `totalSchedules`, `activeWebhooks`, `totalWebhooks`, `chainStats`, `activeTodoTriggers`, `activeCompletionTriggers`, `activeMemoryEntries`, `todoStats`, `wishStats`, `assistantStats`
-
-### `GET /api/v1/learning/workflows/{workflowId}/stats`
-
-Statistiken eines einzelnen Workflows.
-
-**Response:**
-
-```json
-{
-  "workflowId": "uuid",
-  "totalRuns": 42,
-  "successfulRuns": 38,
-  "failedRuns": 4,
-  "averageDurationMs": 32000,
-  "successRate": 90.5
-}
-```
-
-### `GET /api/v1/learning/workflows/{workflowId}/step-analytics`
-
-Step-Level-Analyse eines Workflows.
-
-**Response:** `Array<Object>` mit Schritt-Statistiken
-
-### `GET /api/v1/learning/workflows/{workflowId}/suggestions`
-
-Optimierungsvorschläge basierend auf Run-Daten.
-
-**Response:** `Array<Object>` mit Verbesserungsvorschlägen
-
-### `GET /api/v1/learning/workflows/{workflowId}/similar`
-
-Ähnliche Workflows finden.
-
-**Response:** `Array<Object>` mit ähnlichen Workflows
-
-### `GET /api/v1/learning/workflows/{workflowId}/agentic-history`
-
-Agentic-Strategie-Verlauf eines Workflows (wie sich die KI-Strategie über Runs hinweg entwickelt hat).
-
-**Response:** `Array<Object>`
-
-### `GET /api/v1/learning/workflows/{workflowId}/agentic-analytics`
-
-Agentic-Block-Analyse: Iterationen, Token-Verbrauch, Erfolgsquote.
-
-**Response:** `Map<String, Object>`
-
-### `GET /api/v1/learning/workflows/{workflowId}/tool-patterns`
-
-Tool-Nutzungsmuster eines Workflows (welche Tools wie oft genutzt werden).
-
-**Response:** `Map<String, Object>`
-
-### `GET /api/v1/learning/workflows/{workflowId}/execution-insights`
-
-Ausführungs-Insights: Trends, Anomalien, Performance-Metriken.
-
-**Response:** `Map<String, Object>` — Summen über alle Läufe des Workflows, darunter `totalInputTokens`, `totalOutputTokens`, `totalCacheReadInputTokens`, `totalCacheCreationInputTokens` und `totalThinkingTokens` (Teil der Output-Tokens; die drei letzten seit TODO 20861200, `0`, wenn kein Schritt sie meldet).
-
-### `GET /api/v1/learning/runs/{runId}/insights`
-
-Detaillierte Insights für einen einzelnen Run.
-
-**Response:** `Map<String, Object>` — Summen wie oben, dazu `steps[]` mit den Zahlen je Schritt; `cacheReadInputTokens`, `cacheCreationInputTokens` und `thinkingTokens` nur bei Schritten, die sie melden (Claude).
-
-### `POST /api/v1/learning/runs/{runId}/rate?rating={1-5}`
-
-Einen Run bewerten (1-5 Sterne).
-
-| Parameter | Typ | Pflicht | Werte |
-|---|---|---|---|
-| `rating` | int (Query) | Ja | 1-5 |
-
-**Response:** `200 OK`
-
----
-
-## Dashboard-Layouts
-
-Verlauf des Dashboard-Layouts (alle Ansichten), geräteübergreifend. Das Frontend speichert beim Beenden der Bearbeitung einen Snapshot. Unbenannte Versionen werden auf die neuesten `dashboard-layout-retention-count` gekürzt (Default 100, siehe `/system/execution-config`), benannte bleiben.
-
-### `GET /api/v1/dashboard/layouts`
-
-Versionen, neueste zuerst, **ohne** Layout-Inhalt.
-
-**Query-Parameter:** `page` (Standard: 0), `size` (Standard: 20, höchstens 100)
-
-**Response:** `PageResponse<DashboardLayoutVersionSummary>`
-
-```json
-{
-  "content": [
-    { "id": "version-uuid", "createdAt": "2026-09-15T10:00:00Z", "deviceLabel": "Browser 3f2a",
-      "name": null, "formatVersion": 2, "viewCount": 1, "contentHash": "9b1c…" }
-  ],
-  "page": 0, "size": 20, "totalElements": 1, "totalPages": 1
-}
-```
-
-### `GET /api/v1/dashboard/layouts/{id}`
-
-Eine Version mit Inhalt: Felder wie oben plus `layout` (`{ "activeViewId": …, "views": [ … ] }`).
-
-### `POST /api/v1/dashboard/layouts`
-
-Speichert einen Snapshot. Body höchstens 256 KiB; unbekannte Felder → 400.
-
-```json
-{
-  "deviceLabel": "Browser 3f2a",
-  "formatVersion": 2,
-  "baseVersionId": "version-uuid",
-  "force": false,
-  "layout": { "activeViewId": "default",
-              "views": [ { "id": "default", "name": "", "widgets": [ { "instanceId": "todos", "type": "todos" } ] } ] }
-}
-```
-
-- **201** neue Version; **200** Inhalt identisch mit der neuesten Version (keine neue Zeile).
-- Der Dedupe-Hash (`contentHash`) lässt `activeViewId` aus: Die angezeigte Ansicht wählt jedes Gerät selbst, ein Snapshot, der sich nur darin unterscheidet, legt keine neue Version an (**200**). Gespeichert und geprüft (muss auf eine Ansicht zeigen) wird `activeViewId` weiterhin.
-- **409 `STATE_CONFLICT`**: Die neueste Version ist nicht `baseVersionId` — ein anderes Gerät hat gespeichert. `"force": true` speichert trotzdem.
-- **413**: Body größer als `automation.dashboard.layout.max-request-bytes` (Default 262144).
-- Grenzen wie im Frontend (`LAYOUT_LIMITS`): ≤ 20 Ansichten, ≤ 100 Widgets je Ansicht, IDs `^[a-z0-9][a-z0-9-]*$` mit ≤ 80 Zeichen, Ansichtsnamen ≤ 80 Unicode-Codepoints, `config` nur string (≤ 500) / Zahl / boolean mit ≤ 20 Keys `^[a-zA-Z][a-zA-Z0-9]{0,39}$`, `filter.days` 1–365.
-
-### `PATCH /api/v1/dashboard/layouts/{id}`
-
-Body `{ "name": "vor dem Umbau" }` benennt eine Version (1–80 Zeichen), `{ "name": null }` entfernt den Namen. Benannte Versionen werden nie automatisch gelöscht.
-
----
-
-## Dashboard-Workflow-Widgets
-
-Daten der Workflow-Widgets des Dashboards (Status-Widget und Ergebnis-Widget). Kern-Endpunkt, kein Modul-Gate.
-
-### `GET /api/v1/dashboard/workflow-results`
-
-Je angefragtem Workflow der **letzte Run** und das geprüfte Ergebnis — **ohne** Step-Ausgaben.
-
-**Query-Parameter:** `workflowIds` (mehrfach oder kommagetrennt, höchstens 50; jede ID muss `^[a-z0-9][a-z0-9-]{0,79}$` erfüllen, sonst **400**). Ohne Parameter: leere Liste.
-
-**Response:** ein Eintrag je angefragter ID, in Anfragereihenfolge.
-
-```json
-[
-  { "workflowId": "wf-a1", "workflowName": "Nightly QA", "available": true,
-    "run": { "runId": "run-1", "status": "COMPLETED", "startedAt": "2026-09-18T08:00:00Z",
-             "completedAt": "2026-09-18T08:02:00Z", "durationMs": 120000, "gateStatus": "GREEN" },
-    "resultState": "VALID",
-    "result": { "title": "Nightly QA", "status": "YELLOW",
-                "kpis": [{ "label": "Hunts", "value": "1361", "trend": "UP" }],
-                "items": ["3 Hunts ohne Route"], "summary": "Zwei Befunde." } }
-]
-```
-
-- `available: false` (soft-gelöschter oder unbekannter Workflow) ⇒ `workflowName`, `run` und `result` sind `null`, `resultState` ist `MISSING`.
-- `resultState`: `VALID` (Vertrag erfüllt), `INVALID` (Marker vorhanden, aber abgelehnt), `MISSING` (kein Marker). Nur bei `VALID` steht `result`.
-
-### Marker `dashboard_widget:` im Workflow
-
-> **Vorrang:** Hat ein `dashboard-report`-Block des Runs bereits ein geprüftes Ergebnis geschrieben, wird der Marker gar nicht ausgewertet — auch ein kaputter Marker setzt dann kein `dashboard_widget_error`. Der Block ist der bewusst konfigurierte Weg, der Marker der opportunistische.
-
-Ein Workflow meldet sein Dashboard-Ergebnis wie `gate_status:` als Markerzeile in der Blockausgabe; das JSON darf über mehrere Zeilen gehen:
-
-```
-dashboard_widget: {"title": "Nightly QA", "status": "YELLOW",
-  "kpis": [{"label": "Hunts", "value": "1361", "trend": "UP"}],
-  "items": ["3 Hunts ohne Route"], "summary": "Zwei Befunde."}
-```
-
-Vertrag (beim Run-Ende geprüft und in die Run-Metadaten geschrieben, beim Lesen erneut geprüft):
-
-| Feld | Pflicht | Regel |
-|---|---|---|
-| `status` | ja | `GREEN`, `YELLOW` oder `RED` |
-| `title` | nein | Text, ≤ 80 Zeichen |
-| `kpis` | nein | ≤ 6 Objekte mit `label` (≤ 40), `value` (≤ 40, **String**) und optional `trend` (`UP`/`DOWN`/`FLAT`) |
-| `items` | nein | ≤ 10 Texte, je ≤ 200 Zeichen |
-| `summary` | nein | Text, ≤ 500 Zeichen |
-
-- **Unbekannte Felder ⇒ der ganze Vertrag wird abgelehnt** (auch in einem KPI-Objekt).
-- Texte sind einzeilig: leer, zu lang oder mit Steuer-, Zero-Width-, Bidi-, Separator-, Private-Use-Zeichen oder einzelnen UTF-16-Surrogaten ⇒ abgelehnt.
-- KPI-Werte sind Strings; eine Zahl an einer String-Stelle ist ein Vertragsbruch.
-- Das JSON wird höchstens 8192 Zeichen weit gelesen; schließt die Klammer bis dahin nicht, gilt der Marker als ungültig.
-- Melden mehrere Blöcke einen Marker, gewinnt der **letzte**; Ausgaben von Komprimierungs-Blöcken (`derivedOutput`) werden übersprungen.
-- **Innerhalb *einer* Blockausgabe gilt das Gegenteil: zwei Marker lehnen diese Ausgabe komplett ab** (`resultState: INVALID`, kein Widget-Ergebnis). Blockausgaben zitieren häufig fremden Text, und ein zitierter Marker darf das eigene Ergebnis des Berichts nie überstimmen — im Zweifel lieber kein Ergebnis als ein falsches. Wer den Marker in einem Block zweimal ausgibt, sieht deshalb „kein gültiges Ergebnis".
-- Den eigenen Marker deshalb **am Zeilenanfang** schreiben, mit dem JSON direkt dahinter (ein Codeblock in der nächsten Zeile ist ebenfalls in Ordnung). Steht er mitten in einer Zeile *und* trennt ihn eine Leerzeile, ein geschütztes Leerzeichen (U+00A0) oder ein NEL (U+0085) von seinem JSON, wird er nicht erkannt — dann kann ein aus fremdem Text zitierter Marker der einzige erkannte sein.
-- Der Inhalt erscheint im Dashboard **ausschließlich als Text** — kein Markdown, kein HTML, keine Links, keine Bilder. Der Vertrag enthält bewusst kein ID- und kein URL-Feld.
-
-### WebSocket `/topic/dashboard/runs`
-
-Nach dem Speichern eines beendeten Runs: `{"type":"run_completed","runId":"run-1","workflowId":"wf-a1","status":"COMPLETED"}`. Nur IDs und Status — das Dashboard lädt daraufhin seine Workflow-Widgets neu.
-
-### `POST /api/v1/dashboard/report-assist`
-
-KI-Vorschlag für die Felder eines `dashboard-report`-Blocks, abgeleitet aus dem **letzten Run** des Workflows. Ein einziger werkzeugloser KI-Aufruf (Anbieter `CLAUDE`, kein Modell-Flag); die Antwort wird im Backend gegen denselben Vertrag geprüft wie ein Marker. Roh-Antwort und Run-Ausgabe verlassen den Server nie.
-
-Modul `dashboard-report`; zusätzlich muss die Einstellung `dashboard-report-assist-enabled` (siehe `/system/execution-config`) auf `1` stehen.
-
-**Body:** `{ "workflowId": "wf-a1" }`
-
-**Response:**
-
-```json
-{ "runId": "run-1", "runCompletedAt": "2026-09-18T08:02:00Z", "provider": "CLAUDE",
-  "proposal": { "title": "Nightly QA", "status": "YELLOW",
-                "kpis": [{ "label": "Hunts", "value": "1361", "trend": "UP" }],
-                "items": ["3 Hunts ohne Route"], "summary": "Ein Befund." } }
-```
-
-- **400**: `workflowId` fehlt oder ist leer.
-- **404**: Modul aus (`MODULE_DISABLED`) oder Workflow unbekannt/soft-gelöscht.
-- **409**: Einstellung aus, Claude-CLI auf diesem Host nicht verfügbar (geprüft über den Modellkatalog des Anbieters `CLAUDE`), kein Run oder keine Ausgabe im letzten Run, KI antwortet nicht oder nicht vertragskonform. Die Meldung ist fest — sie enthält nie einen Teil der Antwort.
-
-Der Vorschlag beschreibt normalerweise nur einen Lauf, ohne Variablen. Für dauerhafte Kennzahlen im Block `{{ variable }}` eintragen.
-
----
-
-## Chains
-
-### `GET /api/v1/chains`
-
-Alle Workflow-Chains auflisten.
-
-**Response:** `ChainResponse[]`
-
-### `POST /api/v1/chains`
-
-Neue Chain erstellen.
-
-**Request:**
-
-```json
-{
-  "name": "Deploy Pipeline",
-  "description": "Build, Test, Deploy",
-  "icon": "⛓",
-  "entries": [
-    { "workflowId": "uuid", "sortOrder": 0, "inputContext": {}, "stopOnFailure": true }
-  ],
-  "stopOnFailure": true,
-  "runCount": 0,
-  "metadata": {}
-}
-```
-
-`ChainEntryResponse` enthält zusätzlich: `workflowName`, `projectName`, `label`.
-
-**Response:** `201` mit `ChainResponse`
-
-### `GET /api/v1/chains/{id}`
-
-Chain abrufen.
-
-**Response:** `ChainResponse`
-
-### `PUT /api/v1/chains/{id}`
-
-Chain aktualisieren.
-
-**Response:** `ChainResponse`
-
-### `DELETE /api/v1/chains/{id}`
-
-Chain löschen.
-
-**Response:** `204 No Content`; `409` (`STATE_CONFLICT`, `messageKey: CHAIN_RUN_ACTIVE`), solange die Chain einen
-Lauf im Status `PENDING`, `RUNNING` oder `PAUSED` hat — der liefe sonst ohne Chain weiter und startete ihre
-Workflows. Erst abwarten oder `POST /api/v1/chains/runs/{runId}/cancel`, dann löschen.
-
-### `POST /api/v1/chains/{id}/execute`
-
-Chain ausführen.
-
-**Request (optional):** `{ "key": "value" }` (Input-Kontext)
-
-**Response:** `201` mit `ChainRunResponse`
-
-### `GET /api/v1/chains/runs`
-
-Alle Chain-Runs (paginiert).
-
-**Query-Parameter:** `page`, `size`, `status`, `search` — `status` wie bei `GET /api/v1/executions`: Groß- und Kleinschreibung egal, ein unbekannter Wert ergibt `400` mit den erlaubten Werten.
-
-**Response:** `PageResponse<ChainRunResponse>`
-
-### `GET /api/v1/chains/{id}/runs`
-
-Runs einer bestimmten Chain.
-
-**Response:** `ChainRunResponse[]`
-
-### `GET /api/v1/chains/{id}/runs/{runId}`
-
-Einzelnen Chain-Run abrufen.
-
-**Response:** `ChainRunResponse`
-
-`ChainRunResponse.triggerSource` nennt, was die Chain gestartet hat (`MANUAL`, `SCHEDULE`, `WISH`); `null` bei Chain-Runs von vor V96, die kein Zeitplan gestartet hat. Ältere Backends lassen das Feld weg.
-
-### `POST /api/v1/chains/runs/{runId}/cancel`
-
-Chain-Run abbrechen.
-
-**Response:** `200 OK`
-
----
-
-## Chain Templates
-
-Vordefinierte Chain-Vorlagen, die als Chains in ein Projekt installiert werden können.
-
-### `GET /api/v1/chain-templates`
-
-Alle Chain-Templates auflisten.
-
-**Response:** `ChainTemplateResponse[]`
-
-```json
-[
-  {
-    "id": "template-id",
-    "name": {"de": "CI/CD Pipeline", "en": "CI/CD Pipeline"},
-    "description": {"de": "Build, Test, Deploy Chain", "en": "Build, Test, Deploy Chain"},
-    "icon": "🔄",
-    "entries": [
-      { "templateId": "workflow-template-id", "label": {"de": "Build", "en": "Build"} }
-    ]
-  }
-]
-```
-
-### `GET /api/v1/chain-templates/{id}`
-
-Einzelnes Chain-Template abrufen.
-
-**Response:** `ChainTemplateResponse`
-
-### `POST /api/v1/chain-templates/{id}/install`
-
-Chain-Template in ein Projekt installieren (erstellt die Chain und alle referenzierten Workflows).
-
-**Request:**
-
-```json
-{
-  "projectId": "uuid",
-  "chainName": "Meine CI/CD Pipeline",
-  "locale": "de"
-}
-```
-
-| Feld | Typ | Pflicht |
-|---|---|---|
-| `projectId` | String | Ja |
-| `chainName` | String | Nein |
-| `locale` | String (`de`/`en`) | Nein: Sprache der Namen, Labels und der Schritte zweisprachiger Templates; ohne Angabe Deutsch |
-
-**Response:** `201` mit `ChainInstallResponse`
-
-```json
-{
-  "chainId": "uuid",
-  "chainName": "CI/CD Pipeline",
-  "workflowIds": ["uuid-1", "uuid-2"]
-}
-```
-
----
-
-## TODOs
-
-### `GET /api/v1/todos`
-
-TODOs auflisten (paginiert, filterbar).
-
-**Query-Parameter:**
-
-| Parameter | Typ | Beschreibung |
-|---|---|---|
-| `page` | int | Seite (Standard: 0) |
-| `size` | int | Einträge pro Seite (Standard: 50) |
-| `projectId` | String | Filter nach Projekt |
-| `status` | String[] | Filter nach Status: `OPEN`, `IN_PROGRESS`, `DONE`, `BACKLOG`, `ARCHIVED` |
-| `priority` | String | Filter nach Priorität: `CRITICAL`, `HIGH`, `MEDIUM`, `LOW` |
-| `source` | String | Filter nach Quelle: `USER`, `AI`, `WORKFLOW` |
-| `tag` | String | Filter nach Tag |
-| `q` | String | Volltextsuche |
-| `goalId` | String | Nur TODOs dieses Ziels (V85); `none` = nur TODOs ohne Ziel (Kandidaten der Relationskarte). Bei ausgeschaltetem Modul `goals` → 400 |
-
-Bei `status`, `priority` und `source` zählt die Groß- und Kleinschreibung nicht. Ein unbekannter Wert ergibt `400` (`INVALID_ARGUMENT`) mit den erlaubten Werten, etwa `status muss OPEN, IN_PROGRESS, DONE, BACKLOG oder ARCHIVED sein, nicht 'BLOCKED'`.
-
-**Response:** `PageResponse<TodoResponse>` – mit `planning` (Ziel, Rang, Einschätzung), sobald davon etwas gesetzt ist
-
-### `POST /api/v1/todos`
-
-Neues TODO erstellen.
-
-**Request:**
-
-```json
-{
-  "title": "Kurzer Titel im Imperativ",
-  "description": "Markdown mit Kontext",
-  "status": "OPEN",
-  "priority": "HIGH",
-  "tags": ["backend", "bug"],
-  "projectId": "uuid",
-  "linkedWorkflowId": null,
-  "source": "AI",
-  "sourceAgent": "claude-code",
-  "sessionId": "shell-session-id",
-  "agentSessionRef": "4fde1b91-2cce-4ab2-b7d0-fd2a138f9322",
-  "workflowRunId": null,
-  "referenceType": null,
-  "referenceId": null,
-  "dueDate": null
-}
-```
-
-| Feld | Typ | Pflicht |
-|---|---|---|
-| `title` | String | Ja |
-| `description` | String | Nein |
-| `status` | Enum | Nein (Standard: `OPEN`) |
-| `priority` | Enum | Nein |
-| `tags` | String[] | Nein |
-| `projectId` | String | Nein |
-| `linkedWorkflowId` | String | Nein |
-| `source` | Enum | Nein |
-| `sourceAgent` | String | Nein |
-| `sessionId` | String | Nein |
-| `agentSessionRef` | String | Nein — UUID der Agenten-Konversation (`claude --resume <uuid>`). Ein ganzer Befehl wird angenommen, die UUID daraus übernommen; was keine UUID ist, wird verworfen. |
-| `workflowRunId` | String | Nein |
-| `referenceType` | String | Nein |
-| `referenceId` | String | Nein |
-| `dueDate` | Instant | Nein |
-
-**Response:** `201` mit `TodoResponse`
-
-**TodoResponse-Felder:** `id`, `title`, `description`, `status`, `priority`, `tags`, `projectId`, `projectName`, `linkedWorkflowId`, `linkedWorkflowName`, `source`, `sourceAgent`, `sessionId`, `agentSessionRef`, `workflowRunId`, `referenceType`, `referenceId`, `exportedProvider`, `exportedRef`, `exportedUrl`, `fixAttempts`, `lastFixRunId`, `resolutionState` (`IDLE`, `RUNNING`, `FAILED`, `SUCCEEDED`), `dueDate`, `createdAt`, `updatedAt`
-
-### `GET /api/v1/todos/{id}`
-
-Einzelnes TODO abrufen.
-
-**Response:** `TodoResponse`
-
-### `PUT /api/v1/todos/{id}`
-
-TODO vollständig aktualisieren.
-
-**Response:** `TodoResponse`
-
-### `PATCH /api/v1/todos/{id}/status`
-
-Status eines TODOs ändern.
-
-**Request:**
-
-```json
-{
-  "status": "IN_PROGRESS",
-  "sessionId": "optional-session-id"
-}
-```
-
-**Response:** `TodoResponse`
-
-### `POST /api/v1/todos/{id}/resolve`
-
-TODO automatisch lösen (startet einen passenden Fix-Workflow).
-
-**Response:** `WorkflowRunResponse`
-
-### `POST /api/v1/todos/{id}/export`
-
-TODO in ein externes System exportieren (z.B. Jira, Trello).
-
-**Request (optional):**
-
-```json
-{
-  "provider": "jira",
-  "target": "board-id"
-}
-```
-
-**Response:** `TodoExportResponse` mit `referenceType`, `referenceId`, `url`
-
-### `DELETE /api/v1/todos/{id}`
-
-TODO löschen.
-
-**Response:** `204 No Content`
-
-### `GET /api/v1/todos/count`
-
-Anzahl TODOs nach Status. Optionaler Query-Parameter `projectId` zählt nur die TODOs dieses Projekts (Dashboard-Projektfilter).
-
-**Response:** `TodoCountResponse` mit `open`, `inProgress`, `done`, `backlog`, `archived`
-
-### `GET /api/v1/todos/overview`
-
-TODO-Übersicht mit Projekt-Rollups und "Needs You"-Items.
-
-**Response:** `TodoOverviewResponse` mit `projects` (List), `needsYou` (List), `generatedAt`, `staleThresholdDays`, `milestonesDue` (Termine aktiver Ziele, die Aufmerksamkeit brauchen – `kind` `MILESTONE`: Meilensteine mit `DUE_SOON`/`OVERDUE`, nicht erreicht, `total`/`done` = verknüpfte Arbeitspakete; `kind` `WORK_PACKAGE` (V92): Arbeitspakete, deren Ende vorbei ist und die noch offene TODOs haben, `dueDate` = Ende, `total`/`done` = TODOs; je `id`, `title`, `goalId`, `goalTitle`, `dueDate`, `state`, `total`, `done`, `kind`, nach Datum)
-
-### `POST /api/v1/todos/bulk-status`
-
-Status mehrerer TODOs gleichzeitig ändern.
-
-**Request:**
-
-```json
-{
-  "ids": ["uuid-1", "uuid-2"],
-  "status": "DONE"
-}
-```
-
-**Response:** `{ "updated": 2 }`
-
-### `POST /api/v1/todos/archive-stale`
-
-Veraltete TODOs archivieren.
-
-**Query-Parameter:** `projectId` (optional)
-
-**Response:** `{ "archived": 5 }`
-
-### `GET /api/v1/todos/similar`
-
-Ähnliche TODOs suchen (für Duplikat-Erkennung).
-
-**Query-Parameter:** `projectId` (Pflicht), `title` (Pflicht)
-
-**Response:** `SimilarTodoResponse[]` mit `id`, `title`, `priority`, `score`, `similarity`
-
-### `PATCH /api/v1/todos/{id}/planning`
-
-Ziel, Rang, Arbeitspaket und Einschätzung eines TODOs setzen (V85; `workPackageId` seit V92, vorher `milestoneId` – der alte Name wird weiter angenommen). `null` lässt ein Feld stehen, ein leerer Text leert es: `goalId: ""` löst das TODO vom Ziel, `workPackageId: ""` vom Arbeitspaket, `openQuestion: ""` markiert die Frage als geklärt. `workPackageId` muss ein Arbeitspaket des eigenen Ziels und des eigenen Projekts sein (sonst 400, unbekannt 404; `goalId` im selben Request zählt zuerst); wechselt oder verlässt das TODO sein Ziel, wird `workPackageId` geleert. Ist das Projekt des TODOs dem Ziel noch nicht zugeordnet, kommt es dazu. `planning` in der Antwort trägt `workPackageId`. `goalRank <= 0` nimmt den Rang zurück. Ohne `ratedBy` gilt die Einschätzung als menschlich (`USER`); `ratedAt` setzt der Server, sobald `complexity`, `suggestedEffort` oder `ratingNote` mitkommt.
-
-```json
-{
-  "goalId": "uuid",
-  "goalRank": 2,
-  "complexity": "M",
-  "suggestedEffort": "high",
-  "ratingNote": "Viele Dateien, aber klare Vorlage",
-  "openQuestion": "Welcher Video-Stil?",
-  "ratedBy": "AI",
-  "workPackageId": "uuid"
-}
-```
-
-`complexity`: `S`, `M`, `L`, `XL` · `suggestedEffort`: `low`, `medium`, `high`, `xhigh` · andere Werte → 400.
-
-**Entscheidung** (V93): `decision` hält fest, wie eine offene Frage entschieden wurde – nicht leer speichert den Text, `decidedAt = jetzt`, `decidedBy = ratedBy` (sonst `USER`) und leert `openQuestion`; `""` nimmt die Entscheidung zurück (Text, Zeit, wer). Eine nicht leere neue Frage und eine nicht leere Entscheidung im selben Request → 400. Eine spätere neue Frage lässt die Entscheidung stehen. `planning` in der Antwort trägt `decision`, `decidedAt`, `decidedBy` und `decisionState` (`QUESTION` = offene Frage, `DECIDED` = Entscheidung ohne offene Frage, sonst `NONE`).
-
-**Response:** `TodoResponse`
-
----
-
-## Ziele
-
-Ein Ziel sammelt TODOs projektübergreifend und zeigt den Fortschritt (V85). Alle Endpunkte dieses Abschnitts und `PATCH /todos/{id}/planning` gehören zum Standardmodul `goals`; ist es ausgeschaltet (`automation.modules.goals=false`), antworten sie mit 404 `MODULE_DISABLED`, TODO-Antworten tragen dann kein `planning` und `milestonesDue` ist leer – die Daten bleiben erhalten. Siehe [architektur.md](architektur.md#ziele--todos-projektübergreifend-einordnen-v85).
-
-### `GET /api/v1/goals`
-
-Ziele mit Fortschritt, neueste zuerst. **Query:** `status` (mehrfach; ohne Angabe `ACTIVE` und `DONE`, archivierte nur ausdrücklich), `projectId` (optional, V92: nur Ziele, denen dieses Projekt zugeordnet ist).
-
-**Response:** `GoalResponse[]` – `id`, `title`, `description`, `status`, `targetDate`, `createdAt`, `updatedAt`, `progress` (`total`, `open`, `inProgress`, `backlog`, `done`, `openQuestions`, `percentDone`, `decided`; `total` ohne ARCHIVED), `guard` (`enabled`, `workflowId`, `scheduleId`, `nextRunAt`; nie eingeschaltet = `enabled: false`, Rest `null`), `projects[]` (V92: `id`, `name` der zugeordneten Projekte in ihrer Reihenfolge; nie `null`), `nextMilestone` (V92: der nächste nicht erreichte Meilenstein nach Datum – `id`, `title`, `dueDate`, `state`; `null` = keiner; für alle Ziele der Liste aus einer Abfrage).
-
-### `POST /api/v1/goals`
-
-```json
-{ "title": "Open-Source-Launch", "description": "Repo öffentlich, README mit Video", "targetDate": "2026-10-15",
-  "projectIds": ["<project-id>", "…"] }
-```
-
-`targetDate` als Datum oder ISO-Zeitpunkt. `projectIds` optional (V92): die Projekte des Ziels in dieser Reihenfolge, ein unbekanntes → `404`. **Response:** `201` + `GoalResponse`
-
-### `GET /api/v1/goals/{id}`
-
-Ziel mit seinen TODOs in Arbeitsreihenfolge (Rang, dann Priorität, dann Alter) – ohne Beschreibungen – und Fortschritt je Projekt.
-
-**Response:** `GoalDetailResponse` – `goal`, `todos[]` (`id`, `title`, `status`, `priority`, `projectId`, `projectName`, `tags`, `goalRank`, `complexity`, `suggestedEffort`, `ratingNote`, `ratedBy`, `ratedAt`, `openQuestion`, `updatedAt`, `dueDate`, `workPackageId`, `decision`, `decidedAt`, `decidedBy`, `decisionState`), `byProject[]` (`projectId`, `projectName`, `total`, `done`; aus den TODOs abgeleitet, bleibt für bestehende Aufrufer), `projects[]` (V92: die zugeordneten Projekte nach `position` – `projectId`, `name`, `archived`, `position`, `total`, `done`, `openQuestions`, `decided` (V93), gezählt aus den nicht archivierten TODOs des Ziels in diesem Projekt), `workPackages[]` (V92: `GoalWorkPackageResponse`, nach Projekt-Position, dann `position`), `milestones[]` (V92: `GoalMilestoneResponse`, nach Datum, dann Titel). Erkennt das Lesen ein Arbeitspaket oder einen Meilenstein zum ersten Mal als abgeschlossen bzw. erreicht, speichert es `completedAt`/`reachedAt`.
-
-### `GET /api/v1/goals/{id}/relations`
-
-Relationskarte: je TODO des Ziels, woher es kommt, welcher Workflow es bearbeitet und was der letzte Fix-Lauf ergab. Ein Ziel ist mit Workflows nie direkt verknüpft – nur über diese Beziehungen seiner TODOs. **Query:** `include` – bis zu 20 TODO-IDs (kommagetrennt oder mehrfach), die noch keinem Ziel gehören; sie kommen als Kandidaten (`candidate: true`) hinter die TODOs des Ziels. IDs aus einem Ziel werden übergangen.
-
-**Response:** `GoalRelationsResponse` – `goalId`, `activeTriggers` (aktive TodoTrigger insgesamt), `todos[]` in Arbeitsreihenfolge mit `id`, `title`, `status`, `priority`, `projectId`, `projectName`, `tags`, `goalRank`, `candidate` und
-
-- `origin` – `kind` (`AUDIT` | `HEALTH` | `WORKFLOW_RUN` | `AGENT` | `USER`, in dieser Reihenfolge geprüft), `workflowId`/`workflowName` des erzeugenden Laufs (oder der `workflow_run`-Referenz), `runId`, `runStatus`, `findingIds` (Audit-Befunde aus `reference_id` und `audit_finding_todos`), `agent` (`sourceAgent`)
-- `workers[]` – `kind` `LINKED` (Fix-Workflow am TODO) oder `TRIGGER` (jeder aktive TodoTrigger, dessen Tags, Projekt, Quelle und Mindest-Priorität passen), `workflowId`, `workflowName`, `triggerId`, `triggerLabel`; gelöschte Workflows fallen weg
-- `result` – `runId` (letzter Fix-Lauf), `workflowId`, `runStatus`, `at` (Ende, solange er läuft der Start), `fixAttempts`, `resolutionState`; `null`, solange nie ein Fix-Lauf lief
-
-Gebündelt gelesen: eine Abfrage je Art, unabhängig von der Zahl der TODOs (`RequestCostRatchetTest`). Unbekanntes Ziel → `404`.
-
-### `PUT /api/v1/goals/{id}`
-
-Teiländerung: `title`, `description`, `status`, `targetDate` (`null` = unverändert, leer = leeren). **Response:** `GoalResponse`
-
-### `DELETE /api/v1/goals/{id}`
-
-Löscht das Ziel; seine TODOs bleiben und verlieren nur die Zuordnung (samt Arbeitspaket), seine Arbeitspakete und Meilensteine fallen weg, ein Ziel-Wächter pausiert (sein Workflow bleibt). **Response:** `204`
-
-### `POST /api/v1/goals/{id}/todos`
-
-TODOs zuordnen: `{ "todoIds": ["…"] }`. Ein TODO aus einem anderen Ziel wechselt hierher und verliert sein Arbeitspaket; neu Zugeordnete bekommen keinen Rang. Ist ihr Projekt dem Ziel noch nicht zugeordnet, kommt es ans Ende dazu (V92) – ebenso über `PATCH /todos/{id}/planning` (`goalId`) und beim Projektwechsel eines TODOs (`PUT /todos/{id}`, dort fällt zusätzlich ein Arbeitspaket des alten Projekts weg). **Response:** `GoalDetailResponse`
-
-### `PUT /api/v1/goals/{id}/order`
-
-Reihenfolge setzen: `{ "todoIds": ["…"] }` → Rang 1..n in dieser Folge, alle übrigen TODOs des Ziels verlieren den Rang. Jede ID muss schon zum Ziel gehören, sonst 400. **Response:** `GoalDetailResponse`
-
-### Projekte eines Ziels (V92)
-
-Ein Ziel ist ausdrücklich einem oder mehreren Projekten zugeordnet, in einer Reihenfolge (`goal_projects`).
-
-- `POST /api/v1/goals/{id}/projects` – `{ "projectId": "…" }` hängt das Projekt ans Ende; schon zugeordnet = unverändert (idempotent). Unbekanntes Ziel/Projekt → `404`. **Response:** `GoalDetailResponse`
-- `PUT /api/v1/goals/{id}/projects/order` – `{ "ids": ["<projectId>", …] }`: die genannten vorn in dieser Folge, die übrigen Zielprojekte in bisheriger Folge dahinter; ein nicht zugeordnetes Projekt → `400`. **Response:** `GoalDetailResponse`
-- `DELETE /api/v1/goals/{id}/projects/{projectId}?cascade=false` – hängen im Ziel noch Arbeitspakete oder TODOs an dem Projekt → `409` (`STATE_CONFLICT`, die Meldung nennt die Anzahlen). `cascade=true` löscht die Arbeitspakete des Projekts in diesem Ziel (Meilensteine verlieren die Verknüpfung) und löst seine TODOs vom Ziel (die TODOs bleiben). **Response:** `204`
-
-### Arbeitspakete (V92)
-
-Ein Arbeitspaket gehört genau einem Projekt des Ziels (`projectId`) und bündelt TODOs dieses Projekts; bis V92 hießen sie Meilensteine (V88). TODOs werden ihm über `PATCH /todos/{id}/planning` (`workPackageId`) zugeordnet – nur TODOs desselben Ziels und Projekts (sonst `400`; ein TODO ohne Projekt passt in kein Paket mit Projekt). Der Zeitraum ist optional: `startDate` und `endDate` gibt es nur zusammen, der Start liegt nie nach dem Ende (sonst `400`). Der Zustand wird beim Lesen aus dem Ende berechnet: `REACHED` (abgeschlossen: alle zugeordneten TODOs ohne ARCHIVED erledigt, mindestens eins), sonst `OVERDUE`, `DUE_SOON` (≤ 3 Tage) oder `OPEN` – ohne Zeitraum nur `OPEN` oder `REACHED`. `completedAt` hält das erste Erkennen fest und bleibt; ist das Paket danach wieder offen, steht `reopened: true`. `openQuestions` zählt die aktiven TODOs darin mit offener Frage.
-
-**`GoalWorkPackageResponse`:**
-
-```json
-{
-  "id": "b1f0…", "goalId": "6c2e…", "projectId": "3a9d…", "title": "Werbematerial",
-  "startDate": "2026-09-28T00:00:00Z", "endDate": "2026-10-01T23:59:59Z", "position": 0,
-  "state": "DUE_SOON", "total": 4, "done": 2, "openQuestions": 1, "decided": 1,
-  "completedAt": null, "reopened": false,
-  "createdAt": "2026-09-24T08:00:00Z", "updatedAt": "2026-09-24T08:00:00Z"
-}
-```
-
-- `GET /api/v1/goals/{id}/work-packages` – nach Projekt-Position, dann `position`. **Response:** `GoalWorkPackageResponse[]`
-- `POST /api/v1/goals/{id}/work-packages` – `{ "title": "Werbematerial", "projectId": "…", "startDate": "2026-09-28", "endDate": "2026-10-01" }`; Zeitraum optional, ISO-Zeitpunkt oder Datum (Start `2026-09-28` = ab 00:00:00 UTC, Ende `2026-10-01` = bis 23:59:59 UTC); `projectId` Pflicht, außer das Ziel hat genau ein Projekt (sonst `400`), ein dem Ziel noch fehlendes Projekt kommt dazu; das Paket rückt ans Ende seines Projekts; Titel höchstens 200 Zeichen. **Response:** `201` + `GoalWorkPackageResponse`
-- `PUT /api/v1/goals/{id}/work-packages/{workPackageId}` – Teiländerung `{ "title"?, "projectId"?, "startDate"?, "endDate"? }` (`null` = unverändert, `""` leert ein Datum). Das Ergebnis muss den Zeitraum vollständig haben oder gar nicht (sonst `400`). Ein Projektwechsel geht nur, solange dem Paket keine TODOs zugeordnet sind (sonst `400`); es rückt ans Ende des neuen Projekts. **Response:** `GoalWorkPackageResponse`
-- `PUT /api/v1/goals/{id}/work-packages/order` – `{ "ids": ["<workPackageId>", …] }`: Pakete EINES Projekts in neuer Folge, nicht genannte desselben Projekts dahinter; Pakete verschiedener Projekte → `400`, ein fremdes → `404`. **Response:** alle `GoalWorkPackageResponse` des Ziels
-- `DELETE /api/v1/goals/{id}/work-packages/{workPackageId}` – die TODOs bleiben im Ziel und verlieren nur die Zuordnung, Meilensteine verlieren die Verknüpfung. **Response:** `204`
-
-Unbekanntes Ziel oder ein Paket eines anderen Ziels → `404`.
-
-### Meilensteine (V92)
-
-Ein Meilenstein ist ein Termin fürs ganze Ziel – kein Projekt, das Datum ist Pflicht. Optional hängt er an Arbeitspaketen desselben Ziels (`workPackageIds`): dann ist er `REACHED`, sobald alle verknüpften Pakete abgeschlossen sind; `reachedAt` hält den ersten Zeitpunkt fest, sind die Pakete später nicht mehr alle abgeschlossen, steht `reopened: true`. Ohne Pakete markiert ihn ein Mensch (`reached`). Sonst entscheidet das Datum: `OVERDUE`, `DUE_SOON` (≤ 3 Tage) oder `OPEN`. Nicht zu verwechseln mit den Meilensteinen bis V92 – die heißen jetzt Arbeitspakete.
-
-**`GoalMilestoneResponse`:**
-
-```json
-{
-  "id": "7d21…", "goalId": "6c2e…", "title": "Launch", "dueDate": "2026-10-15T23:59:59Z",
-  "state": "OPEN", "workPackageIds": ["b1f0…", "c4e2…"], "packagesTotal": 2, "packagesDone": 1,
-  "reachedAt": null, "reopened": false,
-  "createdAt": "2026-09-24T08:00:00Z", "updatedAt": "2026-09-24T08:00:00Z"
-}
-```
-
-- `GET /api/v1/goals/{id}/milestones` – nach Datum, dann Titel. **Response:** `GoalMilestoneResponse[]`
-- `POST /api/v1/goals/{id}/milestones` – `{ "title": "Launch", "dueDate": "2026-10-15", "workPackageIds": ["…"] }`; `dueDate` Pflicht (Datum = bis 23:59:59 UTC); jedes Paket muss zum Ziel gehören (sonst `400`). **Response:** `201` + `GoalMilestoneResponse`
-- `PUT /api/v1/goals/{id}/milestones/{milestoneId}` – Teiländerung `{ "title"?, "dueDate"?, "workPackageIds"?, "reached"? }`; `workPackageIds` ersetzt die Verknüpfungen (`[]` löst alle), `reached: true` markiert von Hand als erreicht, `false` nimmt es zurück – nur ohne verknüpfte Pakete (nach dieser Änderung), sonst `400`. **Response:** `GoalMilestoneResponse`
-- `DELETE /api/v1/goals/{id}/milestones/{milestoneId}` – die Arbeitspakete bleiben. **Response:** `204`
-
-Unbekanntes Ziel oder ein Meilenstein eines anderen Ziels → `404`.
-
-### Workflows am Ziel (V94)
-
-Ein Workflow hängt am ganzen Ziel oder an einem seiner Arbeitspakete, mit Rolle `WORKER` („arbeitet daran“) oder `STATUS` („liefert den Stand“). Gestartet wird über `POST /api/v1/workflows/{workflowId}/execute` mit `{ "context": { "goal_id": "…", "work_package_id": "…"?, "goal_locale": "de" } }` (TriggerSource `MANUAL`; `goal_id` liefert `goal_status`/`goal_guard_*`), den letzten Stand liefert `GET /api/v1/dashboard/workflow-results?workflowIds=…`.
-
-**`GoalWorkflowResponse`:** `{ "id", "goalId", "workPackageId": "…"|null, "workflowId", "workflowName", "workflowProjectId": "…"|null, "role": "WORKER"|"STATUS", "guard": false, "createdAt" }`
-
-- `GET /api/v1/goals/{id}/workflows` – Ziel-Ebene zuerst, dann nach Paket-Reihenfolge, dann Name; weich gelöschte Workflows fehlen. Ist der Ziel-Wächter eingeschaltet, steht er als erster Eintrag `{ "id": "guard", "guard": true, "role": "STATUS", "workPackageId": null, … }` darin. **Response:** `GoalWorkflowResponse[]`
-- `POST /api/v1/goals/{id}/workflows` – `{ "workflowId": "…", "workPackageId": "…"?, "role": "WORKER"? }`; Paket nicht aus diesem Ziel → `400`, Workflow unbekannt oder gelöscht → `404`, dieselbe Zuordnung schon da → `409`. **Response:** `201` + `GoalWorkflowResponse`
-- `PATCH /api/v1/goals/{id}/workflows/{attachmentId}` – `{ "role": "STATUS" }`. **Response:** `GoalWorkflowResponse`
-- `DELETE /api/v1/goals/{id}/workflows/{attachmentId}` – löst die Zuordnung, der Workflow bleibt; `guard` → `400` (der Wächter hat seinen Schalter). **Response:** `204`
-
-Ein Arbeitspaket oder Ziel löschen nimmt seine Zuordnungen mit.
-
-### `GET /api/v1/goals/{id}/candidates`
-
-„Könnte dazugehören“: offene TODOs (OPEN, IN_PROGRESS, BACKLOG) ohne Ziel. **Query:** `q`, `tag`, `allProjects` (Standard `false`: nur TODOs aus den Projekten des Ziels; ein Ziel ohne Projekte liefert dann eine leere Seite; `true`: aus allen), `page` (0), `size` (20). **Response:** Seite wie `GET /api/v1/todos` (`content` = `TodoResponse[]`, `totalElements`, …). Unbekanntes Ziel → `404`.
-
-### `POST /api/v1/goals/{id}/guard`
-
-Ziel-Wächter ein- oder ausschalten (V88): `{ "enabled": true, "projectId": "…"?, "cron": "0 0 8 * * *"?, "locale": "de"? }`.
-
-- **Erstes Einschalten:** legt aus der mitgelieferten Vorlage `goal-guard` einen Workflow „Ziel-Wächter: <Titel>“ (`locale` `en`: „Goal guard: …“) mit `defaultContext` `{goal_id, goal_locale}` an (`changeSource` `goal-guard`) und dazu einen CRON-Zeitplan (Vorgabe täglich 08:00, `inputContext.goal_id`, Konflikt `SKIP`). Projekt: `projectId`, sonst das erste nicht archivierte Zielprojekt (V92), sonst das mit den meisten TODOs des Ziels, sonst das älteste aktive; ohne Projekt → 400.
-- **Wieder einschalten:** aktiviert den vorhandenen Zeitplan; ein gesetzter `cron` ersetzt den bisherigen. Ist der Workflow gelöscht, entsteht ein neuer.
-- **Ausschalten** (`enabled: false`): pausiert den Zeitplan, der Workflow bleibt. Löschen des Ziels pausiert ihn ebenso.
-
-Ungültiger `cron` → 400, Modul `dashboard-report` aus → 409, unbekanntes Ziel/Projekt → 404. **Response:** `GoalResponse` mit `guard`:
-
-```json
-{ "id": "6c2e…", "title": "Open-Source-Launch", "…": "…",
-  "guard": { "enabled": true, "workflowId": "9a4d…", "scheduleId": "e71b…", "nextRunAt": "2026-09-25T06:00:00Z" } }
-```
-
-Den Lauf „jetzt prüfen“ startet `POST /api/v1/workflows/{workflowId}/execute`; das Ergebnis erscheint als Dashboard-Kachel des Workflows.
-
----
-
-## Workflow Memory
-
-### `GET /api/v1/workflows/{workflowId}/memory`
-
-Alle Memory-Einträge eines Workflows.
-
-**Response:** `WorkflowMemoryResponse[]`
-
-### `POST /api/v1/workflows/{workflowId}/memory/extract`
-
-Wissen aus Runs extrahieren.
-
-**Request:**
-
-```json
-{
-  "runIds": ["run-uuid-1", "run-uuid-2"],
-  "provider": "CLAUDE"
-}
-```
-
-**Response:** `201` mit `WorkflowMemoryResponse`
-
-**WorkflowMemoryResponse-Felder:** `id`, `workflowId`, `title`, `content`, `tags`, `sourceRunIds`, `provider`, `active`, `createdAt`
-
-### `PUT /api/v1/workflows/{workflowId}/memory/{memoryId}`
-
-Memory-Eintrag aktualisieren.
-
-**Request:** `{ "title": "...", "content": "..." }`
-
-**Response:** `WorkflowMemoryResponse`
-
-### `PUT /api/v1/workflows/{workflowId}/memory/{memoryId}/activate`
-
-Memory-Eintrag aktivieren (wird in nachfolgende Runs injiziert).
-
-**Response:** `204 No Content`
-
-### `DELETE /api/v1/workflows/{workflowId}/memory/{memoryId}`
-
-Memory-Eintrag löschen.
-
-**Response:** `204 No Content`
-
----
-
-## Activity Log
-
-### `GET /api/v1/activity-log`
-
-Activity-Log auflisten (paginiert, filterbar).
-
-**Query-Parameter:** `page` (Standard: 0), `size` (Standard: 50), `level` (`DEBUG`, `INFO`, `WARN`, `ERROR`), `category` (`SYSTEM`, `EXECUTION`, `SCHEDULE`, `WEBHOOK`, `SECURITY`, `CONTAINER`, `PLUGIN`), `workflowId`
-
-Bei `level` und `category` zählt die Groß- und Kleinschreibung nicht. Ein unbekannter Wert ergibt `400` (`INVALID_ARGUMENT`) mit den erlaubten Werten, etwa `level muss DEBUG, INFO, WARN oder ERROR sein, nicht 'TRACE'`.
-
-**Response:** `PageResponse<ActivityLogResponse>`
-
-### `POST /api/v1/activity-log`
-
-Neuen Activity-Log-Eintrag erstellen.
-
-**Request:**
-
-```json
-{
-  "level": "INFO",
-  "message": "Manueller Eintrag",
-  "source": "plugin",
-  "referenceId": null,
-  "workflowId": null,
-  "metadata": {}
-}
-```
-
-**ActivityLogResponse-Felder:** `id`, `timestamp`, `level`, `category`, `message`, `source`, `referenceId`, `workflowId`, `metadata`, `createdAt`
-
-**Response:** `201` mit `ActivityLogResponse`
-
----
-
-## Assistant
-
-### `POST /api/v1/assistant/chat`
-
-Chat-Nachricht an den KI-Assistenten senden.
-
-**Request:**
-
-```json
-{
-  "message": "Wie erstelle ich einen Workflow für Code-Reviews?",
-  "history": [
-    { "role": "user", "content": "Hallo" },
-    { "role": "assistant", "content": "Hallo! Wie kann ich helfen?" }
-  ],
-  "context": {
-    "page": "workflows",
-    "entityId": "workflow-uuid",
-    "projectId": "project-uuid",
-    "workflowId": "workflow-uuid",
-    "runId": null,
-    "pathname": "/workflows/workflow-uuid"
-  },
-  "provider": "CLAUDE",
-  "language": "de",
-  "sessionId": "session-uuid",
-  "requestId": "request-uuid"
-}
-```
-
-| Feld | Typ | Pflicht |
-|---|---|---|
-| `message` | String | Ja |
-| `history` | MessageEntry[] | Nein |
-| `context` | PageContext | Nein |
-| `provider` | String | Nein |
-| `language` | String | Nein |
-| `sessionId` | String | Nein |
-| `requestId` | String | Nein |
-
-`MessageEntry` = `{role, content, toolResults?}`. `toolResults` (optional, nur an Assistenten-Einträgen) sind die
-Ergebnisse der in diesem Zug bestätigten Werkzeuge: `[{"type": "create_workflow", "success": true, "message": "✓ …"}]`.
-Der Server nimmt nur ausgeführte (kein `✗` am Anfang), aus den letzten 3 Assistenten-Zügen, höchstens 5 je Zug und
-je 600 Zeichen, und kennzeichnet sie im Prompt als Daten ([assistant-system.md](assistant-system.md) → „Werkzeug-Ergebnisse
-im Verlauf“). Ohne das Feld bleibt alles wie bisher.
-
-**Response:** `AssistantChatResponse`
-
-```json
-{
-  "message": "Hier ist eine Anleitung...",
-  "actions": [
-    {
-      "type": "run_workflow",
-      "id": "workflow-uuid",
-      "name": "Code Review",
-      "label": "Workflow starten",
-      "options": null,
-      "payload": null
-    }
-  ],
-  "model": "sonnet",
-  "provider": "CLAUDE",
-  "responseTimeMs": 1234,
-  "pendingTools": [
-    {
-      "id": "tool-uuid",
-      "type": "create_todo",
-      "description": "TODO erstellen: Unit-Tests ergänzen",
-      "expiresAt": "2025-01-15T10:30:00Z"
-    }
-  ]
-}
-```
-
-**Navigations-Typen:** `run_workflow`, `show_workflow`, `start_wish`, `show_run`, `ask_choice`
-
-**Mutating-Proposal-Typen** (werden serverseitig als `PendingTool` mit Confirm/Reject-UI behandelt): `propose_create_todo`, `propose_cancel_run`, `propose_rerun_workflow`, `propose_update_todo_status`
-
-### `GET /api/v1/assistant/sessions`
-
-Alle Chat-Sessions auflisten.
-
-**Response:** `AssistantSessionSummary[]` mit `id`, `preview`, `page`, `messageCount`, `startedAt`
-
-### `GET /api/v1/assistant/sessions/{id}`
-
-Einzelne Chat-Session mit Nachrichten abrufen.
-
-**Response:** `AssistantSessionDetail` mit `id`, `preview`, `page`, `entityId`, `messages`, `messageCount`, `startedAt`, `endedAt`
-
-### `DELETE /api/v1/assistant/sessions/{id}`
-
-Chat-Session löschen.
-
-**Response:** `200 OK`
-
-### `POST /api/v1/assistant/pending-tools/{id}/confirm`
-
-Pending Tool-Call bestätigen (z.B. Workflow-Start durch Assistenten).
-
-**Request (optional):**
-
-```json
-{
-  "sessionId": "session-uuid",
-  "language": "en"
-}
-```
-
-`language` (`de` | `en`, optional, Vorgabe deutsch): Sprache der Baufehler-Prüfung, die `create_workflow`/`update_workflow`
-an ihr Ergebnis hängen.
-
-**Response:** `ToolExecutionResult` (oder `410 Gone` wenn bereits verarbeitet/abgelaufen)
-
-### `POST /api/v1/assistant/pending-tools/{id}/reject`
-
-Pending Tool-Call ablehnen.
-
-**Request (optional):**
-
-```json
-{
-  "sessionId": "session-uuid",
-  "language": "en"
-}
-```
-
-**Response:** `ToolExecutionResult` (oder `410 Gone` wenn bereits verarbeitet/abgelaufen)
-
-### `GET /api/v1/assistant/suggestions`
-
-Kontext-bezogene Vorschläge für eine Seite abrufen.
-
-**Query-Parameter:** `page` (String, Pflicht), `locale` (`de` | `en`, Vorgabe `de` – Vorschläge gibt es je Sprache)
-
-**Response:** `String[]`
-
-### `POST /api/v1/assistant/suggestions/refresh`
-
-Vorschläge für eine Seite neu generieren.
-
-**Query-Parameter:** `page` (String, Pflicht), `locale` (`de` | `en`, Vorgabe `de`)
-
-**Response:** `String[]`
-
----
-
-## Dialog Import
-
-Analyse und Import von Claude-Code-Dialog-Sessions als Workflows.
-
-### `GET /api/v1/dialog/sessions/count`
-
-Anzahl Sessions pro Projekt-Verzeichnis zählen (schnell, kein File-Lesen).
-
-**Response:** `Map<String, Integer>`
-
-### `GET /api/v1/dialog/sessions`
-
-Sessions mit Metadaten auflisten.
-
-**Query-Parameter:**
-
-| Parameter | Typ | Beschreibung |
-|---|---|---|
-| `projectPath` | String | Nein (optional: Filter auf ein Projekt) |
-| `limit` | int | Standard: 50 (Max: 2000 mit projectPath, 500 ohne) |
-
-**Response:** `DialogSessionInfo[]`
-
-### `GET /api/v1/dialog/projects`
-
-Alle bekannten Projekt-Pfade auflisten (für Filter-Dropdown).
-
-**Response:** `String[]`
-
-### `POST /api/v1/dialog/sessions/analyze`
-
-Session mit KI analysieren und Workflow-Vorschlag generieren.
-
-**Request:**
-
-```json
-{
-  "filePath": "/home/user/.claude/projects/.../session.jsonl"
-}
-```
-
-**Response:** `DialogWorkflowSuggestion`
-
-### `POST /api/v1/dialog/sessions/create-workflow`
-
-Workflow aus einer Suggestion erstellen.
-
-**Request:**
-
-```json
-{
-  "projectId": "uuid",
-  "name": "Workflow-Name",
-  "suggestion": { ... }
-}
-```
-
-| Feld | Typ | Pflicht |
-|---|---|---|
-| `projectId` | String | Ja |
-| `name` | String | Nein |
-| `suggestion` | DialogWorkflowSuggestion | Ja |
-
-**Response:** `WorkflowResponse`
-
----
-
-## Staging (Stable-Umgebung)
-
-### `GET /api/v1/staging/status`
-
-Status der Stable-Umgebung.
-
-**Response:** `StagingStatusResponse` mit `containerRunning`, `healthy`, `promotePhase`, `promoteStep`, `promoteTotalSteps`, `lastSnapshot`, `error`, `stableVersion`, `stableBuildTimestamp`
-
-### `POST /api/v1/staging/start`
-
-Stable-Container starten.
-
-**Response:** `200 OK`
-
-### `POST /api/v1/staging/stop`
-
-Stable-Container stoppen.
-
-**Response:** `200 OK`
-
-### `POST /api/v1/staging/promote`
-
-Neuen Snapshot bauen und als Stable deployen.
-
-**Response:** `202 Accepted`
-
-### `POST /api/v1/staging/promote/cancel`
-
-Laufenden Promote-Vorgang abbrechen.
-
-**Response:** `200 OK`
-
-### `GET /api/v1/staging/sync-preview`
-
-Vorschau der Sync-Operationen (was würde von Dev nach Stable übertragen?).
-
-**Response:** `SyncPreview` mit `projects`, `workflows`, `skills`, `chains` (jeweils Liste von `SyncPreviewItem`)
-
-### `POST /api/v1/staging/sync-definitions`
-
-Definitionen von Dev nach Stable übertragen (Projekte, Workflows, Skills, Chains).
-
-**Request (optional):**
-
-```json
-{
-  "projectIds": ["uuid"],
-  "workflowIds": ["uuid"],
-  "skillIds": ["uuid"],
-  "chainIds": ["uuid"]
-}
-```
-
-Alle Felder optional; ohne Filter werden alle Definitionen synchronisiert.
-
-**Response:** `SyncResult` mit `projectsSynced`, `workflowsSynced`, `skillsSynced`, `chainsSynced`, `skipped`, `errors`, `preSyncBackup`
-
-### `GET /api/v1/staging/targets`
-
-Sync-Ziele des gestuften Betriebs (`scripts/setup.sh --mode staged`): Test und Prod, wie Dev sie aus der
-Startkonfiguration kennt (`automation.staging.targets.{test,prod}.url` / `.key-file`, vom Installer in
-`deploy/instances/dev.env` geschrieben). Nicht eingerichtete Ziele fehlen in der Liste.
-
-**Response:** Liste von `SyncTargetResponse` mit `name` (`test`/`prod`), `url`, `keyPresent` (Key-Datei vorhanden
-und nicht leer), `reachable`, `sealedOnly` (Prod: nur versiegelte Definitionen), `version`
-
-### `GET /api/v1/staging/targets/{target}/sync-preview`
-
-Vorschau Dev → `test` bzw. `prod`. Für Prod nur, was dorthin darf: Workflows mit intaktem Siegel, ihre Projekte und
-Skills, Chains nur aus solchen Workflows.
-
-**Response:** `SyncPreview`, für Prod mit `notes` (was in Dev bleibt, obwohl ein versiegelter Workflow es
-aufruft: unversiegelte Teil-Workflows, Chains mit unversiegelten Workflows); `409` (`STATE_CONFLICT`) mit `messageKey` `SYNC_TARGET_NOT_CONFIGURED`,
-`SYNC_TARGET_KEY_MISSING` oder `SYNC_TARGET_UNREACHABLE`
-
-### `POST /api/v1/staging/targets/{target}/sync-definitions`
-
-Definitionen von Dev nach `test` bzw. `prod` übertragen. Request wie bei `POST /api/v1/staging/sync-definitions`;
-für Prod wird die Auswahl auf versiegelte Definitionen eingeengt, nie erweitert. Den API-Key des Ziels liest Dev bei
-jedem Aufruf aus der Key-Datei (`scripts/instance.sh sync-keys --name dev`), nie aus der Datenbank des Ziels.
-
-**Response:** `SyncResult` (für Prod mit `notes` wie in der Vorschau, beschränkt auf die übertragenen Workflows); Fehler wie bei der Vorschau
-
----
-
-## Testing (Test-Instanz)
-
-### `GET /api/v1/testing/status`
-
-Status der Test-Instanz (Port 8090).
-
-**Response:** `TestingStatusResponse` mit `containerRunning`, `healthy`, `testVersion`, `testBuildTimestamp`
-
-### `POST /api/v1/testing/start`
-
-Test-Container starten.
-
-**Response:** `200 OK`
-
-### `POST /api/v1/testing/stop`
-
-Test-Container stoppen.
-
-**Response:** `200 OK`
-
-### `POST /api/v1/testing/reset`
-
-Datenbank der Test-Instanz zurücksetzen.
-
-**Response:** `200 OK`
-
-### `GET /api/v1/testing/sync-preview`
-
-Vorschau der Sync-Operationen (Dev → Test).
-
-**Response:** `SyncPreview`
-
-### `POST /api/v1/testing/sync-definitions`
-
-Definitionen von Dev nach Test übertragen. Request-Format wie bei `POST /api/v1/staging/sync-definitions`.
-
-**Response:** `SyncResult`
-
-### `POST /api/v1/testing/report-result`
-
-Test-Ergebnis von der Test-Instanz zurückmelden.
-
-**Request:** `{ "workflowName": "...", "projectName": "...", "status": "PASSED|FAILED" }`
-
-**Response:** `200 OK`
-
-### `POST /api/v1/testing/pull-changes`
-
-Änderungen von Dev in die Test-Instanz ziehen.
-
-**Response:** `SyncResult`
-
----
-
-## Conversions
-
-### `GET /api/v1/conversions/runs/{runId}/suggest`
-
-Konvertierungsvorschlag für einen Agentic-Run generieren.
-
-**Response:** `WorkflowSuggestion` (Workflow-Struktur als Vorschlag)
-
-### `POST /api/v1/conversions/runs/{runId}/create-workflow`
-
-Workflow aus einem Agentic-Run erstellen.
-
-**Request:**
-
-```json
-{
-  "projectId": "uuid",
-  "name": "Konvertierter Workflow",
-  "description": "Beschreibung aus der Vorschau",
-  "blocks": [{ "type": "shell", "config": { "command": "npm test" } }]
-}
-```
-
-`description` und `blocks` sind optional: der geprüfte Vorschlag aus `GET …/suggest`. Mit `blocks`
-werden genau diese Blöcke gespeichert, ohne den Vorschlag neu zu erzeugen (kein KI-Aufruf); `name`
-ist dann Pflicht (sonst `400`), der Lauf muss existieren (`404`) und abgeschlossen sein. Ohne
-`blocks` erzeugt der Server den Vorschlag neu (bisheriges Verhalten). Die Baufehler-Prüfung meldet
-Befunde des gespeicherten Workflows in beiden Fällen im Activity-Log.
-
-**Response:** `WorkflowResponse`
-
----
-
-## Workflow Pool
-
-### `GET /api/v1/pool`
-
-Alle verfügbaren Pool-Workflows auflisten. Query `locale` (optional): Sprache der Schritte zweisprachiger Pool-Dateien, ohne Angabe Englisch.
-
-**Response:** `PoolWorkflowEntry[]`
-
-### `GET /api/v1/pool/{id}`
-
-Einzelnen Pool-Workflow abrufen.
-
-**Response:** `PoolWorkflowEntry`
-
-### `POST /api/v1/pool/{id}/install`
-
-Pool-Workflow in ein Projekt installieren.
-
-**Request:**
-
-```json
-{
-  "projectId": "uuid",
-  "name": "Optionaler Name",
-  "forceCreate": false,
-  "locale": "de"
-}
-```
-
-| Feld | Typ | Pflicht |
-|---|---|---|
-| `projectId` | String | Ja |
-| `name` | String | Nein |
-| `forceCreate` | Boolean | Nein |
-| `locale` | String (`de`/`en`) | Nein: Sprache von Name, Beschreibung und Schritten; ohne Angabe Englisch. Ein früher in der anderen Sprache installierter Workflow wird aktualisiert, nicht dupliziert |
-
-**Response:** `{ "workflowId": "uuid", "workflowName": "...", "created": true, "integrity": "VERIFIED" }`
-
-`integrity`: `VERIFIED` (Prüfsumme der Pool-Datei passt) oder `MISSING` (Datei ohne Prüfsumme, mit Warnung installiert). Passt die Prüfsumme nicht, wird nicht installiert: `400` mit `messageKey` `POOL_INTEGRITY_MISMATCH`.
-
-### `POST /api/v1/pool/export/{workflowId}`
-
-Bestehenden Workflow in den Pool exportieren.
-
-**Query-Parameter:** `scope` = `repo` | `portable` (optional, Default `portable`) — Pool-Metadatum, das repo-gebundene von portablen Einträgen trennt. Ein unbekannter Wert ergibt `400`. Regelwerk: [workflow-pool-kuratierung.md](workflow-pool-kuratierung.md).
-
-Der Export schreibt keine Instanz-Bindungen mit: `projectId`, `workflowId`, `runId`, `scheduleId`, `chainId`, `executionId` mit konkretem Wert und UUID-Werte fallen weg, eine UUID innerhalb eines Textes wird durch `REDACTED-UUID` ersetzt.
-
-**Request (optional):**
-
-```json
-{
-  "nameEn": "English Name",
-  "nameDe": "Deutscher Name",
-  "descriptionEn": "...",
-  "descriptionDe": "...",
-  "category": "CODE",
-  "tags": ["review"],
-  "author": "..."
-}
-```
-
-**Response:** `201` mit `ExportToPoolResponse` (`poolId`, `filename`, `sanitizedPaths`). `sanitizedPaths` nennt die bereinigten Stellen mit Pfad — bei einem `sub-workflow`-Block steht dort `blocks[N].config.workflowId`, und der Eintrag ist erst nach dem Nachtragen dieser Referenz installierbar.
-
----
-
-## Workflow Factory
-
-### `GET /api/v1/factory/topics`
-
-Verfügbare Topic-Kategorien abrufen.
-
-**Response:** `Array<{ "id": "...", "label": "..." }>`
-
-### `POST /api/v1/factory/generate`
-
-Workflow aus Topic generieren (Vorschau, ohne Test-Ausführung).
-
-**Request:**
-
-```json
-{
-  "topic": "code-review",
-  "description": "Automatisiertes Code-Review",
-  "category": "CODE",
-  "projectId": "uuid",
-  "testInputs": {},
-  "autoPromote": false,
-  "autoFix": false,
-  "maxRetries": 2,
-  "provider": "CLAUDE"
-}
-```
-
-| Feld | Typ | Pflicht |
-|---|---|---|
-| `topic` | String | Ja |
-| `description` | String | Nein |
-| `category` | String | Nein |
-| `projectId` | String | Nein |
-| `testInputs` | Object | Nein |
-| `autoPromote` | boolean | Nein |
-| `autoFix` | boolean | Nein |
-| `maxRetries` | int | Nein (Standard: 2) |
-| `provider` | String | Nein |
-
-**Response:** `201` mit `WorkflowResponse`
-
-### `POST /api/v1/factory/run`
-
-Vollständige Factory-Pipeline: Generieren → Test-Instanz → Verifizieren → optional Promoten.
-
-**Request:** `WorkflowFactoryRequest` (wie oben)
-
-**Response:** `WorkflowFactoryResult` mit `workflowId`, `workflowName`, `status`, `testRunId`, `testStatus`, `testError`, `promotedAsTemplate`, `durationMs`, `retryErrors`
-
-### `POST /api/v1/factory/verify/{id}`
-
-Bestehenden Workflow auf der Test-Instanz verifizieren.
-
-**Response:** `WorkflowFactoryResult`
-
-### `POST /api/v1/factory/promote/{id}`
-
-Verifizierten Workflow als Template promoten.
-
-**Response:** `WorkflowFactoryResult`
-
----
-
-## Wishes
-
-### `GET /api/v1/wishes`
-
-Alle Wishes auflisten.
-
-**Response:** `WishResponse[]`
-
-### `POST /api/v1/wishes`
-
-Neuen Wunsch erstellen und asynchron erfüllen.
-
-**Request:**
-
-```json
-{
-  "text": "Erstelle einen Workflow, der täglich die neuesten KI-News zusammenfasst",
-  "projectId": "uuid",
-  "maxIterations": 5,
-  "referenceWorkflowIds": ["uuid"]
-}
-```
-
-| Feld | Typ | Pflicht |
-|---|---|---|
-| `text` | String | Ja |
-| `projectId` | String | Ja |
-| `maxIterations` | Integer | Nein |
-| `referenceWorkflowIds` | String[] | Nein |
-| `autoRefine` | boolean | Nein (Standard: `false`) |
-
-**Response:** `201` mit `WishResponse`
-
-**WishResponse-Felder:** `id`, `originalText`, `status`, `projectId`, `projectName`, `decomposition`, `generatedWorkflowIds`, `generatedWorkflowNames`, `referenceWorkflowIds`, `referenceWorkflowNames`, `generatedChainId`, `iterationCount`, `maxIterations`, `currentRunId`, `resultSummary`, `error`, `iterationHistory`, `metadata`, `autoRefine`, `stoppedPhase` (Phase, in der ein `FAILED`/`CANCELLED`-Wunsch stehen blieb, sonst `null`; V97), `createdAt`, `updatedAt`
-
-**WishStatus-Werte:** `RECEIVED`, `DECOMPOSING`, `AWAITING_DECOMPOSE_APPROVAL`, `EXECUTING`, `EVALUATING`, `REFINING`, `AWAITING_CLARIFICATION`, `AWAITING_APPROVAL`, `COMPLETED`, `FAILED`, `CANCELLED`
-
-### `GET /api/v1/wishes/{id}`
-
-Einzelnen Wish abrufen.
-
-**Response:** `WishResponse`
-
-### `POST /api/v1/wishes/{id}/cancel`
-
-Wish abbrechen.
-
-**Response:** `200 OK`
-
-### `POST /api/v1/wishes/{id}/respond`
-
-Feedback zur aktuellen Iteration geben.
-
-**Request:**
-
-```json
-{
-  "action": "ACCEPT",
-  "feedback": "Optional: Anpassungswünsche"
-}
-```
-
-| Feld | Typ | Pflicht | Werte |
-|---|---|---|---|
-| `action` | Enum | Ja | `ACCEPT`, `REFINE`, `CANCEL`, `CLARIFY`, `RETRY` |
-| `feedback` | String | Nein | |
-
-**Response:** `WishResponse`
-
-### `POST /api/v1/wishes/{id}/crystallize`
-
-Erfolgreichen Wish als Template kristallisieren.
-
-**Response:** `{ "templateId": "uuid" }`
-
-### `DELETE /api/v1/wishes/{id}`
-
-Wish löschen.
-
-**Response:** `204 No Content`
-
----
-
-## Docs
-
-### `GET /api/v1/docs`
-
-Verfügbare Dokumentationsdateien auflisten.
-
-**Response:** `Array<{ "name": "architektur.md", "label": "Architektur", "lang": "de" }>`
-
-### `GET /api/v1/docs/{name}`
-
-Inhalt einer Dokumentationsdatei abrufen (nur `.md`-Dateien).
-
-**Query-Parameter:** `lang` (Standard: `"de"`, Werte: `"de"`, `"en"`)
-
-**Response:** `{ "content": "# Architektur\n..." }`
-
----
-
-## Search
-
-### `GET /api/v1/search`
-
-Aggregierte Suche über Workflows (Substring/Fuzzy-Ranking).
-
-**Query-Parameter:**
-
-| Parameter | Typ | Beschreibung |
-|---|---|---|
-| `q` | String | Suchbegriff |
-| `types` | String | Zu durchsuchende Typen (Standard: `"workflow"`) |
-| `limit` | int | Max. Ergebnisse (Standard: 20, Max: 50) |
-
-**Response:**
-
-```json
-{
-  "workflows": [...]
-}
-```
-
-### `POST /api/v1/search/workflows/semantic`
-
-Semantische Workflow-Suche via KI-Modell. Gibt `204 No Content` zurück wenn semantische Suche nicht aktiviert ist.
-
-**Request:**
-
-```json
-{
-  "query": "Code-Qualität prüfen",
-  "limit": 5
-}
-```
-
-**Response:** `SemanticSearchResult[]` mit `workflowId`, `workflowName`, `reason`, `score`
-
----
-
-## Reports
-
-### `GET /api/v1/reports`
-
-Verfügbare Report-Dateien auflisten (`.md`-Dateien im konfigurierten Reports-Verzeichnis, sortiert nach Datum absteigend).
-
-**Response:** `Array<{ "name": "report-2025-01.md", "label": "Report 2025 01" }>`
-
-### `GET /api/v1/reports/{name}`
-
-Inhalt einer Report-Datei abrufen (nur `.md`-Dateien, Path-Traversal-Schutz).
-
-**Response:** `{ "content": "# Report\n..." }`
-
----
-
-## Dead Letter Queue
-
-Fehlgeschlagene Workflow-Runs werden automatisch in der DLQ erfasst und können dort verwaltet werden.
-
-### `GET /api/v1/dlq`
-
-DLQ-Einträge auflisten (paginiert).
-
-**Query-Parameter:**
-
-| Parameter | Typ | Beschreibung |
-|---|---|---|
-| `status` | String | Filter: `OPEN`, `RETRIED`, `DISCARDED` |
-| `page` | int | Seite (Standard: 0) |
-| `size` | int | Einträge pro Seite (Standard: 20) |
-
-**Response:** `Page<DeadLetterEntry>` mit `id`, `workflowRunId`, `workflowId`, `workflowName`, `errorMessage`, `failedStepIndex`, `retryCount`, `lastFailureAt`, `status`, `createdAt`, `updatedAt`
-
-### `GET /api/v1/dlq/{id}`
-
-Einzelnen DLQ-Eintrag abrufen.
-
-**Response:** `DeadLetterEntry`
-
-### `POST /api/v1/dlq/{id}/retry`
-
-DLQ-Eintrag erneut ausführen (startet eine frische Workflow-Ausführung mit dem Original-Input-Kontext).
-
-**Response:** `DeadLetterEntry` (Status wechselt zu `RETRIED`)
-
-### `DELETE /api/v1/dlq/{id}`
-
-DLQ-Eintrag verwerfen.
-
-**Response:** `204 No Content`
-
----
-
-## Debug
-
-### `GET /api/v1/debug/failed-workflows`
-
-Workflows deren letzter Run fehlgeschlagen ist (`FAILED` / `COMPLETED_WITH_ERRORS`), sortiert nach letztem Fehler absteigend.
-
-**Response:** `BrokenWorkflowResponse[]`
-
----
-
 ## WebSocket
 
-### Verbindung
+STOMP über SockJS auf `ws://localhost:9090/ws`. Der Handshake braucht ein kurzlebiges Einmal-Ticket aus
+`POST /api/v1/ws-ticket` (API-Key im Header, Antwort `{ "ticket": "kxJ9…", "expiresInSeconds": 30 }`) –
+genau einmal einlösbar, für jeden Verbindungsversuch (auch jeden Reconnect) ein frisches. Ein
+`apiKey`-Query-Parameter wird abgelehnt.
 
-```
-Endpunkt: ws://localhost:9090/ws (SockJS)
-Protokoll: STOMP
-```
-
-### Topics
-
-| Topic | Beschreibung |
+| Topic | Inhalt |
 |---|---|
 | `/topic/executions/{runId}/logs` | Workflow-Ausführungs-Logs (Steps, Status, Approval-Prompts) |
 | `/topic/chains/{chainRunId}/status` | Chain-Ausführungs-Status-Updates |
@@ -4323,50 +57,676 @@ Protokoll: STOMP
 | `/topic/assistant/{sessionId}/events` | Assistent-Push-Events (erstellte Items, Suggestions) |
 | `/topic/wishes/{wishId}/status` | Wish-Iterations-Status |
 | `/topic/activity-log` | Globale Activity-Log-Events |
+| `/topic/dashboard/runs` | Nach dem Speichern eines beendeten Runs `{"type":"run_completed","runId":…,"workflowId":…,"status":…}` – nur IDs und Status |
 
-### Nachrichtenformat (Execution-Logs)
+Execution-Logs sind JSON-Objekte, unterschieden über `type`; Step-Nachrichten haben keins. Weitere Typen:
+`status`, `approval_required`/`approval_resolved`, `human_input_required`/`human_input_resolved`,
+`agentic_*`, `foreach_item_started`/`foreach_item_completed`,
+`container_starting`/`container_started`/`container_skipped`, `command` und `live_output` – Ausgabe
+laufender Blöcke, gebündelt höchstens alle 250 ms, mit `seq` lückenlos je `bufferId` (Lücken =
+übersprungene Zeilen; Nachladen über `GET /api/v1/executions/{id}/live-log`).
 
-JSON-Objekte, unterschieden über `type`. Step-Nachrichten (Placeholder beim Start und fertiger Step) haben kein `type`:
+Das Terminal (`ws://localhost:9090/ws/terminal/{runId}?ticket=...`) ist ein roher WebSocket ohne
+SockJS/STOMP, ebenfalls mit einem frischen Ticket, höchstens 3 Sessions je Container.
 
-```json
-{ "stepIndex": 1, "status": "COMPLETED", "input": "...", "output": "...", "durationMs": 4200, "blockType": "shell", "blockName": "Build" }
-```
+## Fehlercodes
 
-Weitere Typen: `status`, `approval_required`/`approval_resolved`, `human_input_required`/`human_input_resolved`,
-`agentic_*`, `foreach_item_started`/`foreach_item_completed`, `container_starting`/`container_started`/`container_skipped`,
-`command` und `live_output` — Ausgabe laufender Blöcke, gebündelt höchstens alle 250 ms:
+Aus `ErrorCode` (`ai-automation-backend/src/main/java/com/automation/exception/ErrorCode.java`). Nennt die Wurfstelle keinen eigenen Text, steht der Standardtext im Feld `error`.
 
-```json
-{
-  "type": "live_output",
-  "runId": "run-uuid",
-  "bufferId": "buffer-uuid",
-  "lines": [{ "seq": 41, "stepIndex": 1, "kind": "line", "text": "[INFO] BUILD SUCCESS", "ts": 1757844005000 }],
-  "skipped": 0
-}
-```
+| Code | HTTP-Status | Standardtext |
+|---|---|---|
+| `RESOURCE_NOT_FOUND` | 404 | Resource not found |
+| `MODULE_DISABLED` | 404 | Module disabled |
+| `MODULES_NOT_EDITABLE` | 403 | Modules cannot be switched at runtime |
+| `VALIDATION_FAILED` | 400 | Validation failed |
+| `INVALID_ARGUMENT` | 400 | Invalid argument |
+| `WORKFLOW_EXECUTION_FAILED` | 500 | Workflow execution failed |
+| `CONTAINER_ERROR` | 500 | Container error |
+| `STAGING_ERROR` | 500 | Staging error |
+| `STATE_CONFLICT` | 409 | State conflict |
+| `WORKFLOW_SEALED` | 409 | Workflow is sealed |
+| `WORKFLOW_TAMPERED` | 409 | Sealed workflow definition was modified |
+| `SKILL_PINNED_BY_SEAL` | 409 | Skill is used by a sealed workflow |
+| `SEAL_IMMUTABLE` | 403 | Unsealing is disabled in the startup configuration |
+| `UNATTENDED_REQUIRES_SEAL` | 403 | Unattended runs require a sealed workflow |
+| `UNATTENDED_PLATFORM_ACCESS` | 403 | Unattended runs of workflows that access the platform directly are refused |
+| `WEBHOOK_SIGNATURE_INVALID` | 401 | Missing or invalid webhook signature |
+| `NO_TASK_TARGET` | 400 | No task export target configured |
+| `PROVIDER_NOT_CONNECTED` | 409 | Integration provider not connected |
+| `PROVIDER_NOT_TASK_CAPABLE` | 400 | Integration provider cannot receive tasks |
+| `SERVICE_UNAVAILABLE` | 503 | Service unavailable |
+| `TOKEN_BUDGET_EXCEEDED` | 429 | Token budget exceeded |
+| `RATE_LIMITED` | 429 | Rate limit exceeded |
+| `PAYLOAD_TOO_LARGE` | 413 | Payload too large |
+| `OPERATION_TIMEOUT` | 504 | Operation timed out |
+| `METHOD_NOT_ALLOWED` | 405 | Method not allowed |
+| `RUN_DELETION_DISABLED` | 403 | Deleting runs is disabled |
+| `INTERNAL_ERROR` | 500 | Internal server error |
 
-`seq` ist pro `bufferId` lückenlos; Lücken bedeuten übersprungene Zeilen. Nachladen: `GET /api/v1/executions/{id}/live-log`.
+## /api/v1/activity-log
 
-### Terminal-WebSocket
+Quelle: `ActivityLogController`
 
-```
-Endpunkt: ws://localhost:9090/ws/terminal/{runId}?ticket=...
-```
+| Endpunkt | Zweck | Modul |
+|---|---|---|
+| `GET /api/v1/activity-log` |  | Kern |
+| `POST /api/v1/activity-log` |  | Kern |
 
-Für Echtzeit-Container-Zugriff (interaktive Shell). Raw WebSocket (kein SockJS/STOMP). Max. 3 Sessions pro Container. Authentifizierung über ein kurzlebiges Einmal-Ticket aus `POST /api/v1/ws-ticket` (API-Key im Header) — ein `apiKey`-Query-Parameter wird abgelehnt. Gleiches gilt für den STOMP/SockJS-Handshake auf `/ws`.
+## /api/v1/assistant
 
-### Handshake-Ticket
+Quellen:
 
-```
-POST /api/v1/ws-ticket
-Header: X-API-Key: <key>
-```
+- `AssistantController`
+- `PageSuggestionController`
 
-Antwort:
+| Endpunkt | Zweck | Modul |
+|---|---|---|
+| `POST /api/v1/assistant/chat` |  | `assistant` |
+| `POST /api/v1/assistant/pending-tools/{id}/confirm` | Executes a previously proposed tool after explicit user confirmation. | `assistant` |
+| `POST /api/v1/assistant/pending-tools/{id}/reject` |  | `assistant` |
+| `GET /api/v1/assistant/sessions` |  | `assistant` |
+| `GET /api/v1/assistant/sessions/{id}` |  | `assistant` |
+| `DELETE /api/v1/assistant/sessions/{id}` |  | `assistant` |
+| `GET /api/v1/assistant/suggestions` |  | `assistant` |
+| `POST /api/v1/assistant/suggestions/refresh` |  | `assistant` |
 
-```json
-{ "ticket": "kxJ9…", "expiresInSeconds": 30 }
-```
+## /api/v1/audit-findings
 
-Genau einmal einlösbar, danach ungültig; nach Ablauf ebenso. Für jeden Verbindungsversuch (auch jeden Reconnect) ein frisches Ticket holen.
+Quelle: `AuditController`
+
+| Endpunkt | Zweck | Modul |
+|---|---|---|
+| `GET /api/v1/audit-findings` |  | `audit` |
+| `GET /api/v1/audit-findings/{id}` |  | `audit` |
+| `PATCH /api/v1/audit-findings/{id}` |  | `audit` |
+| `POST /api/v1/audit-findings/{id}/todo-links` |  | `audit` |
+| `DELETE /api/v1/audit-findings/{id}/todo-links/{todoId}` |  | `audit` |
+| `POST /api/v1/audit-findings/{id}/todos` |  | `audit` |
+
+## /api/v1/audit-reports
+
+Quelle: `AuditController`
+
+| Endpunkt | Zweck | Modul |
+|---|---|---|
+| `GET /api/v1/audit-reports/{id}` |  | `audit` |
+
+## /api/v1/audits
+
+Quelle: `AuditController`
+
+| Endpunkt | Zweck | Modul |
+|---|---|---|
+| `GET /api/v1/audits` |  | `audit` |
+| `GET /api/v1/audits/{auditKey}` |  | `audit` |
+| `GET /api/v1/audits/{auditKey}/reports` |  | `audit` |
+
+## /api/v1/chain-templates
+
+Quelle: `ChainTemplateController`
+
+| Endpunkt | Zweck | Modul |
+|---|---|---|
+| `GET /api/v1/chain-templates` |  | `chains` |
+| `GET /api/v1/chain-templates/{id}` |  | `chains` |
+| `POST /api/v1/chain-templates/{id}/install` |  | `chains` |
+
+## /api/v1/chains
+
+Quelle: `ChainController`
+
+| Endpunkt | Zweck | Modul |
+|---|---|---|
+| `GET /api/v1/chains` |  | `chains` |
+| `POST /api/v1/chains` |  | `chains` |
+| `GET /api/v1/chains/runs` |  | `chains` |
+| `POST /api/v1/chains/runs/{runId}/cancel` |  | `chains` |
+| `GET /api/v1/chains/{id}` |  | `chains` |
+| `PUT /api/v1/chains/{id}` |  | `chains` |
+| `DELETE /api/v1/chains/{id}` |  | `chains` |
+| `POST /api/v1/chains/{id}/execute` |  | `chains` |
+| `GET /api/v1/chains/{id}/runs` |  | `chains` |
+| `GET /api/v1/chains/{id}/runs/{runId}` |  | `chains` |
+
+## /api/v1/completion-triggers
+
+Quelle: `CompletionTriggerController`
+
+| Endpunkt | Zweck | Modul |
+|---|---|---|
+| `GET /api/v1/completion-triggers` |  | Kern |
+| `POST /api/v1/completion-triggers` |  | Kern |
+| `GET /api/v1/completion-triggers/workflow/{workflowId}/as-source` |  | Kern |
+| `GET /api/v1/completion-triggers/workflow/{workflowId}/as-target` |  | Kern |
+| `GET /api/v1/completion-triggers/{id}` |  | Kern |
+| `DELETE /api/v1/completion-triggers/{id}` |  | Kern |
+| `POST /api/v1/completion-triggers/{id}/disable` |  | Kern |
+| `POST /api/v1/completion-triggers/{id}/enable` |  | Kern |
+
+## /api/v1/conversions
+
+Quelle: `ConversionController`
+
+| Endpunkt | Zweck | Modul |
+|---|---|---|
+| `POST /api/v1/conversions/runs/{runId}/create-workflow` |  | `conversion` |
+| `GET /api/v1/conversions/runs/{runId}/suggest` |  | `conversion` |
+
+## /api/v1/dashboard
+
+Quellen:
+
+- `DashboardLayoutController` – Version history of the dashboard layout.
+- `DashboardReportAssistController` – The editor's AI proposal for a `dashboard-report` block.
+- `DashboardWorkflowController` – Data of the dashboard's workflow widgets (spec E3).
+
+| Endpunkt | Zweck | Modul |
+|---|---|---|
+| `GET /api/v1/dashboard/layouts` |  | Kern |
+| `POST /api/v1/dashboard/layouts` | The body is validated field by field in DashboardLayoutValidator (unknown fields → 400). | Kern |
+| `GET /api/v1/dashboard/layouts/{id}` |  | Kern |
+| `PATCH /api/v1/dashboard/layouts/{id}` |  | Kern |
+| `POST /api/v1/dashboard/report-assist` | 400 for a missing id, 404 for an unknown workflow, 409 when the setting is off, the provider is missing, there is no usable run, or the answer did not match the contract. | `dashboard-report` |
+| `GET /api/v1/dashboard/workflow-results` | Ids outside the allowed shape or more than DashboardWorkflowService.MAX_WORKFLOWS of them → 400. | Kern |
+
+## /api/v1/debug
+
+Quelle: `WorkflowDebugController` – Workflow-Debug endpoints — back the /debug "what is currently broken" page.
+
+| Endpunkt | Zweck | Modul |
+|---|---|---|
+| `GET /api/v1/debug/failed-workflows` | Workflows whose most recent run failed (FAILED / COMPLETED_WITH_ERRORS), latest first. | `debug` |
+
+## /api/v1/dialog
+
+Quelle: `DialogController`
+
+| Endpunkt | Zweck | Modul |
+|---|---|---|
+| `GET /api/v1/dialog/projects` | Gibt alle bekannten Projekt-Pfade zurück (für Filter-Dropdown). | `dialog-import` |
+| `GET /api/v1/dialog/sessions` | Listet Sessions mit Metadaten. | `dialog-import` |
+| `POST /api/v1/dialog/sessions/analyze` | Analysiert eine Session mit KI und liefert eine Workflow-Suggestion. | `dialog-import` |
+| `GET /api/v1/dialog/sessions/count` | Zählt Sessions pro Projekt-Verzeichnis (schnell, kein File-Lesen). | `dialog-import` |
+| `POST /api/v1/dialog/sessions/create-workflow` | Erstellt einen Workflow aus einer Suggestion (mit optionalen User-Anpassungen). | `dialog-import` |
+
+## /api/v1/dlq
+
+Quelle: `DeadLetterController`
+
+| Endpunkt | Zweck | Modul |
+|---|---|---|
+| `GET /api/v1/dlq` |  | Kern |
+| `GET /api/v1/dlq/{id}` |  | Kern |
+| `DELETE /api/v1/dlq/{id}` |  | Kern |
+| `POST /api/v1/dlq/{id}/retry` |  | Kern |
+
+## /api/v1/docs
+
+Quelle: `DocsController`
+
+| Endpunkt | Zweck | Modul |
+|---|---|---|
+| `GET /api/v1/docs` |  | Kern |
+| `GET /api/v1/docs/{name}` |  | Kern |
+
+## /api/v1/executions
+
+Quelle: `ExecutionController`
+
+| Endpunkt | Zweck | Modul |
+|---|---|---|
+| `GET /api/v1/executions` |  | Kern |
+| `GET /api/v1/executions/pending-input` | Alle Läufe, die gerade auf eine Antwort warten — Approvals und Human-Input, die ältesten zuerst. | Kern |
+| `GET /api/v1/executions/{id}` |  | Kern |
+| `DELETE /api/v1/executions/{id}` | Loescht einen Lauf samt Schritten und den losen Verweisen darauf. | Kern |
+| `GET /api/v1/executions/{id}/approval` |  | Kern |
+| `POST /api/v1/executions/{id}/approve` | Beantwortet die offene Frage des Laufs. | Kern |
+| `POST /api/v1/executions/{id}/cancel` |  | Kern |
+| `POST /api/v1/executions/{id}/command` |  | Kern |
+| `GET /api/v1/executions/{id}/live-log` | Gepufferte Live-Zeilen eines Laufs (nur im Speicher, bis ~10 min nach Laufende) fuer das Replay nach einem Reload. | Kern |
+| `PATCH /api/v1/executions/{id}/notes` |  | Kern |
+| `POST /api/v1/executions/{id}/pause` |  | Kern |
+| `POST /api/v1/executions/{id}/resume` |  | Kern |
+| `POST /api/v1/executions/{id}/resume-from-step` |  | Kern |
+| `POST /api/v1/executions/{id}/retry` |  | Kern |
+| `POST /api/v1/executions/{id}/todos/approve` |  | Kern |
+
+## /api/v1/factory
+
+Quelle: `WorkflowFactoryController`
+
+| Endpunkt | Zweck | Modul |
+|---|---|---|
+| `POST /api/v1/factory/generate` | Generate a workflow from a topic (preview only, no testing). | `factory` |
+| `POST /api/v1/factory/promote/{id}` | Promote a verified workflow as a template. | `factory` |
+| `POST /api/v1/factory/run` | Full factory pipeline: generate → deploy to test → verify → optionally promote. | `factory` |
+| `GET /api/v1/factory/topics` | Get available topic categories for the factory. | `factory` |
+| `POST /api/v1/factory/verify/{id}` | Verify an existing workflow on the test instance. | `factory` |
+
+## /api/v1/goals
+
+Quellen:
+
+- `GoalController` – Ziele: TODOs projektuebergreifend auf ein Ergebnis hin sammeln, ordnen und den Fortschritt zeigen.
+- `GoalWorkflowController` – Workflows am Ziel oder an einem Arbeitspaket: anzeigen, anhaengen, Rolle aendern, loesen.
+
+| Endpunkt | Zweck | Modul |
+|---|---|---|
+| `GET /api/v1/goals` | Ohne `status`: aktive und erledigte Ziele, neueste zuerst. | `goals` |
+| `POST /api/v1/goals` |  | `goals` |
+| `GET /api/v1/goals/{goalId}/workflows` |  | `goals` |
+| `POST /api/v1/goals/{goalId}/workflows` |  | `goals` |
+| `PATCH /api/v1/goals/{goalId}/workflows/{attachmentId}` |  | `goals` |
+| `DELETE /api/v1/goals/{goalId}/workflows/{attachmentId}` | Loest die Zuordnung, der Workflow bleibt; `guard` → 400 (der Waechter hat seinen Schalter). | `goals` |
+| `GET /api/v1/goals/{id}` |  | `goals` |
+| `PUT /api/v1/goals/{id}` |  | `goals` |
+| `DELETE /api/v1/goals/{id}` | Loescht das Ziel; seine TODOs bleiben und verlieren nur die Zuordnung, ein Waechter pausiert. | `goals` |
+| `GET /api/v1/goals/{id}/candidates` | „Könnte dazugehören“: offene TODOs ohne Ziel, standardmaessig nur aus den Projekten des Ziels (`allProjects=true`: aus allen). | `goals` |
+| `POST /api/v1/goals/{id}/guard` | Ziel-Waechter ein- oder ausschalten: beim ersten Einschalten Workflow aus der Vorlage `goal-guard` plus taeglicher Zeitplan, danach nur noch Zeitplan an/aus. | `goals` |
+| `GET /api/v1/goals/{id}/milestones` | Meilensteine des Ziels nach Datum, dann Titel, mit Zustand und Paket-Zaehlern. | `goals` |
+| `POST /api/v1/goals/{id}/milestones` |  | `goals` |
+| `PUT /api/v1/goals/{id}/milestones/{milestoneId}` | `workPackageIds` ersetzt die Verknuepfungen; `reached` nur ohne verknuepfte Pakete. | `goals` |
+| `DELETE /api/v1/goals/{id}/milestones/{milestoneId}` | Loescht den Meilenstein; die verknuepften Arbeitspakete bleiben. | `goals` |
+| `PUT /api/v1/goals/{id}/order` | Reihenfolge: die genannten TODOs bekommen Rang 1..n, alle uebrigen des Ziels keinen. | `goals` |
+| `POST /api/v1/goals/{id}/projects` | Projekt ans Ende der Zielprojekte haengen; schon zugeordnet = unveraendert (idempotent). | `goals` |
+| `PUT /api/v1/goals/{id}/projects/order` | Zielprojekte neu ordnen: die genannten vorn, die uebrigen in bisheriger Folge dahinter. | `goals` |
+| `DELETE /api/v1/goals/{id}/projects/{projectId}` | Projekt vom Ziel loesen. | `goals` |
+| `GET /api/v1/goals/{id}/relations` | Relationskarte: je TODO Herkunft, Bearbeitung (Fix-Workflow, passende TodoTrigger) und Ergebnis. | `goals` |
+| `POST /api/v1/goals/{id}/todos` | Ordnet TODOs dem Ziel zu (ohne Rang – sie stehen hinter den eingeordneten). | `goals` |
+| `GET /api/v1/goals/{id}/work-packages` | Arbeitspakete des Ziels nach Projekt-Position und Position im Projekt, mit Zustand (OPEN/DUE_SOON/OVERDUE/REACHED auf Basis des Endes; ohne Zeitraum nur OPEN/REACHED) und Zaehlern. | `goals` |
+| `POST /api/v1/goals/{id}/work-packages` |  | `goals` |
+| `PUT /api/v1/goals/{id}/work-packages/order` | Arbeitspakete EINES Projekts neu ordnen; Antwort: alle Arbeitspakete des Ziels. | `goals` |
+| `PUT /api/v1/goals/{id}/work-packages/{workPackageId}` |  | `goals` |
+| `DELETE /api/v1/goals/{id}/work-packages/{workPackageId}` | Loescht das Arbeitspaket; seine TODOs bleiben im Ziel, Meilensteine verlieren die Verknuepfung. | `goals` |
+
+## /api/v1/integrations
+
+Quelle: `IntegrationController` – Integration providers and their connections.
+
+| Endpunkt | Zweck | Modul |
+|---|---|---|
+| `GET /api/v1/integrations` |  | `integrations` |
+| `GET /api/v1/integrations/{providerId}` |  | `integrations` |
+| `GET /api/v1/integrations/{providerId}/actions` |  | `integrations` |
+| `POST /api/v1/integrations/{providerId}/actions/{action}` |  | `integrations` |
+| `GET /api/v1/integrations/{providerId}/callback` | OAuth2 callback endpoint — public (no API key required). | `integrations` |
+| `GET /api/v1/integrations/{providerId}/connect` |  | `integrations` |
+| `DELETE /api/v1/integrations/{providerId}/connection` |  | `integrations` |
+| `GET /api/v1/integrations/{providerId}/connections` | Every stored connection of a provider, `default` first. | `integrations` |
+| `POST /api/v1/integrations/{providerId}/credentials` |  | `integrations` |
+| `DELETE /api/v1/integrations/{providerId}/credentials` |  | `integrations` |
+| `GET /api/v1/integrations/{providerId}/task-targets` |  | `integrations` |
+
+## /api/v1/learning
+
+Quelle: `LearningController` – Dashboard, platform stats and run rating are core; analytics belong to the learning module.
+
+| Endpunkt | Zweck | Modul |
+|---|---|---|
+| `GET /api/v1/learning/dashboard` |  | Kern |
+| `GET /api/v1/learning/platform-stats` |  | Kern |
+| `GET /api/v1/learning/runs/{runId}/insights` |  | `learning` |
+| `POST /api/v1/learning/runs/{runId}/rate` |  | Kern |
+| `GET /api/v1/learning/workflows/{workflowId}/agentic-analytics` |  | `learning` |
+| `GET /api/v1/learning/workflows/{workflowId}/agentic-history` |  | `learning` |
+| `GET /api/v1/learning/workflows/{workflowId}/execution-insights` |  | `learning` |
+| `GET /api/v1/learning/workflows/{workflowId}/similar` |  | `learning` |
+| `GET /api/v1/learning/workflows/{workflowId}/stats` |  | `learning` |
+| `GET /api/v1/learning/workflows/{workflowId}/step-analytics` |  | `learning` |
+| `GET /api/v1/learning/workflows/{workflowId}/suggestions` |  | `learning` |
+| `GET /api/v1/learning/workflows/{workflowId}/tool-patterns` |  | `learning` |
+
+## /api/v1/notifications
+
+Quelle: `NotificationController`
+
+| Endpunkt | Zweck | Modul |
+|---|---|---|
+| `GET /api/v1/notifications` |  | Kern |
+| `POST /api/v1/notifications` |  | Kern |
+| `GET /api/v1/notifications/{id}` |  | Kern |
+| `DELETE /api/v1/notifications/{id}` |  | Kern |
+| `POST /api/v1/notifications/{id}/disable` |  | Kern |
+| `POST /api/v1/notifications/{id}/enable` |  | Kern |
+
+## /api/v1/onboarding-profiles
+
+Quelle: `OnboardingProfileController`
+
+| Endpunkt | Zweck | Modul |
+|---|---|---|
+| `GET /api/v1/onboarding-profiles` |  | `onboarding-profiles` |
+| `POST /api/v1/onboarding-profiles` |  | `onboarding-profiles` |
+| `GET /api/v1/onboarding-profiles/{id}` |  | `onboarding-profiles` |
+| `PUT /api/v1/onboarding-profiles/{id}` |  | `onboarding-profiles` |
+| `DELETE /api/v1/onboarding-profiles/{id}` |  | `onboarding-profiles` |
+| `GET /api/v1/onboarding-profiles/{id}/history` |  | `onboarding-profiles` |
+| `POST /api/v1/onboarding-profiles/{id}/reset` |  | `onboarding-profiles` |
+| `GET /api/v1/onboarding-profiles/{id}/shipped` | The current shipped text of a built-in profile, to compare with an edited one before taking it over. | `onboarding-profiles` |
+
+## /api/v1/pool
+
+Quelle: `WorkflowPoolController`
+
+| Endpunkt | Zweck | Modul |
+|---|---|---|
+| `GET /api/v1/pool` |  | Kern |
+| `POST /api/v1/pool/export/{workflowId}` |  | Kern |
+| `GET /api/v1/pool/{id}` |  | Kern |
+| `POST /api/v1/pool/{id}/install` |  | Kern |
+
+## /api/v1/projects
+
+Quellen:
+
+- `ProjectBundleController` – A whole project as one file: export, preview of an import, import.
+- `ProjectController`
+
+| Endpunkt | Zweck | Modul |
+|---|---|---|
+| `GET /api/v1/projects` |  | Kern |
+| `POST /api/v1/projects` |  | Kern |
+| `GET /api/v1/projects/archived` |  | Kern |
+| `POST /api/v1/projects/example` | The bundled example project for a fresh installation: created on the first call (201), returned on every further call (200) — with any example workflow it lacks added. | Kern |
+| `POST /api/v1/projects/import` |  | Kern |
+| `POST /api/v1/projects/import/preview` |  | Kern |
+| `GET /api/v1/projects/{id}` |  | Kern |
+| `PUT /api/v1/projects/{id}` |  | Kern |
+| `DELETE /api/v1/projects/{id}` |  | Kern |
+| `GET /api/v1/projects/{id}/export` |  | Kern |
+| `POST /api/v1/projects/{id}/generate-context` |  | Kern |
+| `POST /api/v1/projects/{id}/onboarding/disable` |  | `onboarding-profiles` |
+| `POST /api/v1/projects/{id}/onboarding/enable` |  | `onboarding-profiles` |
+| `GET /api/v1/projects/{id}/onboarding/preview` |  | `onboarding-profiles` |
+| `POST /api/v1/projects/{id}/onboarding/refresh` |  | `onboarding-profiles` |
+| `GET /api/v1/projects/{id}/onboarding/status` |  | `onboarding-profiles` |
+| `POST /api/v1/projects/{id}/restore` |  | Kern |
+| `POST /api/v1/projects/{id}/start` |  | Kern |
+| `POST /api/v1/projects/{id}/stop` |  | Kern |
+| `GET /api/v1/projects/{id}/workflows` |  | Kern |
+
+## /api/v1/reports
+
+Quelle: `ReportsController`
+
+| Endpunkt | Zweck | Modul |
+|---|---|---|
+| `GET /api/v1/reports` |  | `audit` |
+| `GET /api/v1/reports/{name}` |  | `audit` |
+
+## /api/v1/schedules
+
+Quelle: `ScheduleController`
+
+| Endpunkt | Zweck | Modul |
+|---|---|---|
+| `GET /api/v1/schedules` |  | Kern |
+| `POST /api/v1/schedules` |  | Kern |
+| `GET /api/v1/schedules/calendar` | Upcoming = schedules whose next real run lies in the period (behind a skip-until pause). | Kern |
+| `GET /api/v1/schedules/catch-up` | Sequential catch-up queue: the missed occurrence currently running and the ones waiting. | Kern |
+| `GET /api/v1/schedules/chain/{chainId}` |  | Kern |
+| `GET /api/v1/schedules/maintenance` | Both pauses: the maintenance switch and an active skip-until window from the configuration. | Kern |
+| `POST /api/v1/schedules/maintenance` |  | Kern |
+| `POST /api/v1/schedules/preview` |  | Kern |
+| `GET /api/v1/schedules/remaining-this-week` |  | Kern |
+| `GET /api/v1/schedules/remaining-today` | `projectId` (optional): only the schedules of that project's workflows — the dashboard filter. | Kern |
+| `GET /api/v1/schedules/workflow/{workflowId}` |  | Kern |
+| `GET /api/v1/schedules/{id}` |  | Kern |
+| `PUT /api/v1/schedules/{id}` |  | Kern |
+| `DELETE /api/v1/schedules/{id}` |  | Kern |
+| `POST /api/v1/schedules/{id}/disable` |  | Kern |
+| `POST /api/v1/schedules/{id}/enable` |  | Kern |
+| `GET /api/v1/schedules/{id}/runs` | Die neuesten Runs eines Zeitplans als Listenzeilen: Anzahl und Vorschau des letzten Schritts statt aller Schritte — die Detail-Route eines Runs liefert den Volltext. | Kern |
+
+## /api/v1/search
+
+Quelle: `SearchController` – Aggregates search across workflows (and later runs/skills/integrations).
+
+| Endpunkt | Zweck | Modul |
+|---|---|---|
+| `GET /api/v1/search` |  | Kern |
+| `POST /api/v1/search/workflows/semantic` |  | Kern |
+
+## /api/v1/skills
+
+Quelle: `SkillController`
+
+| Endpunkt | Zweck | Modul |
+|---|---|---|
+| `GET /api/v1/skills` |  | `skills` |
+| `POST /api/v1/skills` |  | `skills` |
+| `GET /api/v1/skills/export/{id}` |  | `skills` |
+| `POST /api/v1/skills/import` |  | `skills` |
+| `GET /api/v1/skills/seal-pins` | skill id → names of the sealed workflows that use it; such skills cannot be changed or deleted. | `skills` |
+| `GET /api/v1/skills/{id}` |  | `skills` |
+| `PUT /api/v1/skills/{id}` | Custom skills only (built-in → 409); a skill used by a sealed workflow → 409 SKILL_PINNED_BY_SEAL. | `skills` |
+| `DELETE /api/v1/skills/{id}` |  | `skills` |
+| `GET /api/v1/skills/{id}/capabilities` |  | `skills` |
+| `GET /api/v1/skills/{id}/versions` |  | `skills` |
+
+## /api/v1/staging
+
+Quellen:
+
+- `StagedSyncController` – Definition sync of the staged setup: Dev → Test / Prod.
+- `StagingController`
+
+| Endpunkt | Zweck | Modul |
+|---|---|---|
+| `POST /api/v1/staging/promote` |  | `staging` |
+| `POST /api/v1/staging/promote/cancel` |  | `staging` |
+| `POST /api/v1/staging/start` |  | `staging` |
+| `GET /api/v1/staging/status` |  | `staging` |
+| `POST /api/v1/staging/stop` |  | `staging` |
+| `POST /api/v1/staging/sync-definitions` |  | `staging` |
+| `GET /api/v1/staging/sync-preview` |  | `staging` |
+| `GET /api/v1/staging/targets` |  | `staging` |
+| `POST /api/v1/staging/targets/{target}/sync-definitions` |  | `staging` |
+| `GET /api/v1/staging/targets/{target}/sync-preview` |  | `staging` |
+
+## /api/v1/system
+
+Quellen:
+
+- `SystemAccessController` – Zugriffs-Oberfläche unter /api/v1/system: Remote Access (Tailscale) und lokales Dateisystem.
+- `SystemAiProviderController` – AI-Provider- und Capability-Auskunft unter /api/v1/system.
+- `SystemController` – Kern-Auskunft unter /api/v1/system: Health, Plattform-Info, Auth-Status, Heap-Belegung und Client-Fehler-Meldungen.
+- `SystemMaintenanceController` – Wartung unter /api/v1/system: Auto-Repair, VACUUM, Datenbank-Backups.
+- `SystemModulesController` – Runtime module switches for the settings UI.
+- `SystemRequestMetricsController` – Request costs per route: the live window from memory and the stored daily history.
+- `SystemSettingsController` – Laufzeit-Settings unter /api/v1/system: App-Settings und Execution-Config.
+
+| Endpunkt | Zweck | Modul |
+|---|---|---|
+| `GET /api/v1/system/ai-providers` |  | Kern |
+| `GET /api/v1/system/ai-providers/PI/catalog` | Returns the pi runtime catalog read from `~/.pi/agent`: which backend providers are authenticated, which are custom-defined in models.json, and what pi's own default-provider/-model is set to. | Kern |
+| `GET /api/v1/system/ai-providers/status` | Per provider: program on the PATH, login found (file or environment variable), and the commands for what is missing — for the start page and the settings. | Kern |
+| `POST /api/v1/system/ai-providers/status/refresh` | Looks at the machine again now, e.g. right after logging in. | Kern |
+| `GET /api/v1/system/ai-providers/{id}/models` | Models the provider offers on this host, discovered from the CLI / its local caches and served from a TTL cache. | Kern |
+| `POST /api/v1/system/ai-providers/{id}/models/refresh` | Bypasses the cache and probes the host now. | Kern |
+| `GET /api/v1/system/auth-status` |  | Kern |
+| `GET /api/v1/system/backup` |  | Kern |
+| `POST /api/v1/system/backup` |  | Kern |
+| `GET /api/v1/system/backups` |  | Kern |
+| `GET /api/v1/system/backups/{filename}` |  | Kern |
+| `GET /api/v1/system/browse` |  | Kern |
+| `GET /api/v1/system/capabilities` |  | Kern |
+| `POST /api/v1/system/client-errors` |  | Kern |
+| `GET /api/v1/system/execution-config` |  | Kern |
+| `PUT /api/v1/system/execution-config` |  | Kern |
+| `GET /api/v1/system/health` |  | Kern |
+| `GET /api/v1/system/info` |  | Kern |
+| `GET /api/v1/system/integration-snippet` |  | `onboarding-profiles` |
+| `GET /api/v1/system/jvm-memory` | Heap-Belegung als genau drei Zahlen, ohne API-Key: der Performance-Audit misst damit den Speicher, ohne dass die ganze Metrik-Oberfläche unter `/actuator/metrics` frei wird — die verrät Routen und Lastprofil und bleibt hinter dem Key. | Kern |
+| `PUT /api/v1/system/modules/{name}` |  | Kern |
+| `DELETE /api/v1/system/modules/{name}/override` |  | Kern |
+| `POST /api/v1/system/open-path` |  | Kern |
+| `POST /api/v1/system/remote-access/disable` |  | `remote-access` |
+| `POST /api/v1/system/remote-access/enable` |  | `remote-access` |
+| `GET /api/v1/system/remote-access/status` |  | `remote-access` |
+| `POST /api/v1/system/repair-failed` |  | `factory` |
+| `GET /api/v1/system/request-metrics` | Routes measured since the last daily snapshot, most expensive (p95) first. | Kern |
+| `GET /api/v1/system/request-metrics/daily` | Stored daily rows for one route, oldest first — the baseline a drift check compares against. | Kern |
+| `GET /api/v1/system/settings/{key}` | `value` is the stored value or empty; `default`, only for a setting whose default comes from the startup configuration (`backup-retain-count`), is what applies while nothing is stored. | Kern |
+| `PUT /api/v1/system/settings/{key}` |  | Kern |
+| `GET /api/v1/system/tray-config` |  | Kern |
+| `PUT /api/v1/system/tray-config` |  | Kern |
+| `POST /api/v1/system/vacuum` |  | Kern |
+
+## /api/v1/testing
+
+Quelle: `TestingController`
+
+| Endpunkt | Zweck | Modul |
+|---|---|---|
+| `POST /api/v1/testing/pull-changes` |  | `staging` |
+| `POST /api/v1/testing/report-result` |  | `staging` |
+| `POST /api/v1/testing/reset` |  | `staging` |
+| `POST /api/v1/testing/start` |  | `staging` |
+| `GET /api/v1/testing/status` |  | `staging` |
+| `POST /api/v1/testing/stop` |  | `staging` |
+| `POST /api/v1/testing/sync-definitions` |  | `staging` |
+| `GET /api/v1/testing/sync-preview` |  | `staging` |
+
+## /api/v1/todo-triggers
+
+Quelle: `TodoTriggerController`
+
+| Endpunkt | Zweck | Modul |
+|---|---|---|
+| `GET /api/v1/todo-triggers` |  | Kern |
+| `POST /api/v1/todo-triggers` |  | Kern |
+| `GET /api/v1/todo-triggers/workflow/{workflowId}` |  | Kern |
+| `GET /api/v1/todo-triggers/{id}` |  | Kern |
+| `DELETE /api/v1/todo-triggers/{id}` |  | Kern |
+| `POST /api/v1/todo-triggers/{id}/disable` |  | Kern |
+| `POST /api/v1/todo-triggers/{id}/enable` |  | Kern |
+
+## /api/v1/todos
+
+Quelle: `TodoController`
+
+| Endpunkt | Zweck | Modul |
+|---|---|---|
+| `GET /api/v1/todos` |  | Kern |
+| `POST /api/v1/todos` |  | Kern |
+| `POST /api/v1/todos/archive-stale` | Archive stale auto-todos now (cockpit "Verstaubtes archivieren"). | Kern |
+| `POST /api/v1/todos/bulk-status` | Bulk status change (e.g. archive selected todos). | Kern |
+| `GET /api/v1/todos/count` |  | Kern |
+| `GET /api/v1/todos/overview` | Cross-project cockpit overview: per-project rollups + a global "Braucht dich" lane. | Kern |
+| `GET /api/v1/todos/similar` | Check for similar TODOs before creating a new one. | Kern |
+| `GET /api/v1/todos/{id}` |  | Kern |
+| `PUT /api/v1/todos/{id}` |  | Kern |
+| `DELETE /api/v1/todos/{id}` |  | Kern |
+| `POST /api/v1/todos/{id}/export` |  | `integrations` |
+| `PATCH /api/v1/todos/{id}/planning` | Ziel, Rang und Einschaetzung (Komplexitaet, Effort, Begruendung, offene Frage). | `goals` |
+| `POST /api/v1/todos/{id}/resolve` |  | Kern |
+| `PATCH /api/v1/todos/{id}/status` |  | Kern |
+
+## /api/v1/webhook
+
+Quelle: `WebhookController`
+
+| Endpunkt | Zweck | Modul |
+|---|---|---|
+| `POST /api/v1/webhook/trigger/{token}` |  | `webhooks` |
+
+## /api/v1/webhooks
+
+Quelle: `WebhookController`
+
+| Endpunkt | Zweck | Modul |
+|---|---|---|
+| `GET /api/v1/webhooks` |  | `webhooks` |
+| `POST /api/v1/webhooks` |  | `webhooks` |
+| `GET /api/v1/webhooks/workflow/{workflowId}` |  | `webhooks` |
+| `GET /api/v1/webhooks/{id}` |  | `webhooks` |
+| `DELETE /api/v1/webhooks/{id}` |  | `webhooks` |
+| `POST /api/v1/webhooks/{id}/disable` |  | `webhooks` |
+| `POST /api/v1/webhooks/{id}/enable` |  | `webhooks` |
+| `POST /api/v1/webhooks/{id}/regenerate-token` | Rotates a webhook's secret token. | `webhooks` |
+| `POST /api/v1/webhooks/{id}/secret` | Creates or rotates the signing secret; the response is the only place it is ever shown. | `webhook-signatures` |
+| `DELETE /api/v1/webhooks/{id}/secret` |  | `webhook-signatures` |
+
+## /api/v1/wishes
+
+Quelle: `WishController`
+
+| Endpunkt | Zweck | Modul |
+|---|---|---|
+| `GET /api/v1/wishes` |  | `wishes` |
+| `POST /api/v1/wishes` |  | `wishes` |
+| `GET /api/v1/wishes/{id}` |  | `wishes` |
+| `DELETE /api/v1/wishes/{id}` |  | `wishes` |
+| `POST /api/v1/wishes/{id}/cancel` |  | `wishes` |
+| `POST /api/v1/wishes/{id}/crystallize` |  | `wishes` |
+| `POST /api/v1/wishes/{id}/respond` |  | `wishes` |
+
+## /api/v1/workflow-templates
+
+Quelle: `WorkflowTemplateController`
+
+| Endpunkt | Zweck | Modul |
+|---|---|---|
+| `GET /api/v1/workflow-templates` |  | Kern |
+| `POST /api/v1/workflow-templates` |  | Kern |
+| `POST /api/v1/workflow-templates/from-workflow/{workflowId}` |  | Kern |
+| `GET /api/v1/workflow-templates/{id}` |  | Kern |
+| `PUT /api/v1/workflow-templates/{id}` |  | Kern |
+| `DELETE /api/v1/workflow-templates/{id}` |  | Kern |
+| `POST /api/v1/workflow-templates/{id}/install` | Creates a workflow from the template in a project, plus the blueprints its sub-workflow blocks call, wired to their new ids. | Kern |
+
+## /api/v1/workflows
+
+Quellen:
+
+- `WorkflowAnalyzerController` – Deterministische Baufehler-Prüfung von Workflow-Definitionen — auf Abruf, nie blockierend.
+- `WorkflowAssistController` – Hilfen rund um einen bestehenden Workflow: Optimierungsvorschlag, ähnliche Workflows, Reparatur nach fehlgeschlagenen Runs.
+- `WorkflowController`
+- `WorkflowImportController` – Import externer Prozessformate als NEUER Workflow (Roundtrip zum Export in `WorkflowController`).
+- `WorkflowMemoryController`
+- `WorkflowSealController` – Seal / unseal a workflow.
+- `WorkflowSealStatusController` – Read-only seal status for the UI.
+- `WorkflowVersionController` – Versionsgeschichte eines Workflows: auflisten, einzeln abrufen, wiederherstellen.
+
+| Endpunkt | Zweck | Modul |
+|---|---|---|
+| `GET /api/v1/workflows` |  | Kern |
+| `POST /api/v1/workflows` |  | Kern |
+| `GET /api/v1/workflows/analyze` | Bestandsprüfung über alle Definitionen in aktiven Projekten. | Kern |
+| `GET /api/v1/workflows/export/{id}` |  | Kern |
+| `POST /api/v1/workflows/import` |  | Kern |
+| `POST /api/v1/workflows/import/bpmn` | Importiert einen zuvor exportierten BPMN-Prozess (mit `mysuricates:blockConfig`) als neuen Workflow im Projekt. | `bpmn` |
+| `GET /api/v1/workflows/seal-status` | Every sealed workflow plus every workflow with refused starts in the last seven days. | Kern |
+| `GET /api/v1/workflows/{id}` |  | Kern |
+| `PUT /api/v1/workflows/{id}` |  | Kern |
+| `DELETE /api/v1/workflows/{id}` |  | Kern |
+| `GET /api/v1/workflows/{id}/analyze` | Befunde einer Definition. | Kern |
+| `POST /api/v1/workflows/{id}/execute` |  | Kern |
+| `GET /api/v1/workflows/{id}/export/bpmn` | Exportiert den Workflow als BPMN 2.0 XML (Spec: docs/plans/2026-07-09-bpmn-integration-design.md). | `bpmn` |
+| `POST /api/v1/workflows/{id}/optimize` |  | Kern |
+| `POST /api/v1/workflows/{id}/repair` |  | `factory` |
+| `GET /api/v1/workflows/{id}/runs` |  | Kern |
+| `GET /api/v1/workflows/{id}/runs/{runId}` |  | Kern |
+| `POST /api/v1/workflows/{id}/seal` |  | `sealing` |
+| `GET /api/v1/workflows/{id}/seal-events` | Sealing and unsealing of one workflow, newest first — kept beyond the activity log's retention. | Kern |
+| `GET /api/v1/workflows/{id}/similar` |  | Kern |
+| `POST /api/v1/workflows/{id}/skills` |  | `skills` |
+| `DELETE /api/v1/workflows/{id}/skills/{skillId}` |  | `skills` |
+| `POST /api/v1/workflows/{id}/unseal` |  | `sealing` |
+| `GET /api/v1/workflows/{id}/versions` |  | Kern |
+| `GET /api/v1/workflows/{id}/versions/{versionId}` |  | Kern |
+| `POST /api/v1/workflows/{id}/versions/{versionId}/restore` |  | Kern |
+| `GET /api/v1/workflows/{workflowId}/memory` |  | `memory` |
+| `POST /api/v1/workflows/{workflowId}/memory/extract` |  | `memory` |
+| `PUT /api/v1/workflows/{workflowId}/memory/{memoryId}` |  | `memory` |
+| `DELETE /api/v1/workflows/{workflowId}/memory/{memoryId}` |  | `memory` |
+| `PUT /api/v1/workflows/{workflowId}/memory/{memoryId}/activate` |  | `memory` |
+
+## /api/v1/ws-ticket
+
+Quelle: `WebSocketTicketController` – Hands out short-lived, single-use tickets for the WebSocket handshake.
+
+| Endpunkt | Zweck | Modul |
+|---|---|---|
+| `POST /api/v1/ws-ticket` |  | Kern |
