@@ -88,20 +88,83 @@ npm run dev
 ```
 
 Der Vite-Dev-Server proxied automatisch `/api/*` und `/ws/*` an `localhost:9090`.
+`scripts/start-mysuricates-dev.sh` startet ihn schon mit; `npm run dev` von Hand braucht es nur ohne den
+Starter. Öffnen: `http://localhost:3000`
 
-### Beide parallel starten
+## Einstieg in den Code
 
-Terminal 1 (Backend):
-```bash
-scripts/start-mysuricates-dev.sh
-```
+Das Repository enthält zwei Anwendungen und die Werkzeuge drumherum: `ai-automation-backend/` ist das
+Spring-Boot-Backend (Java 21), `ai-automation-frontend/` die React-Oberfläche (TypeScript, Vite).
+`scripts/` hält Starter, Installer, Staging und die Gates, `workflow-pool/` die mitgelieferten
+Workflow-Definitionen, `deploy/` den Weg als Container. Den inneren Aufbau beschreibt
+[architektur.md](architektur.md), Tabellen und Felder [datenmodell.md](datenmodell.md), die Endpunkte
+[api-referenz.md](api-referenz.md). Welche Bibliotheken in welcher Version gelten, steht in `pom.xml` und
+`package.json`.
 
-Terminal 2 (Frontend):
-```bash
-cd ai-automation-frontend && npm run dev
-```
+**Lesereihenfolge Backend** (unter `com.automation`; die Schichten Controller → Service → Repository
+hält `LayerRuleTest` fest):
 
-Öffnen: `http://localhost:3000`
+1. `service/workflow/WorkflowExecutor` — nimmt einen Start an, lässt ihn von `RunAdmission` prüfen und
+   führt die Blöcke auf einem virtuellen Thread aus; `BlockStepRunner` legt je Block den Schritt an.
+2. `executor/ExecutionContext` — der Laufzustand, den jeder Block bekommt: Variablen, Ausgabe des
+   Vorgängers, Pause und Abbruch, Freigaben; dort werden die Platzhalter `{{ … }}` aufgelöst.
+3. `executor/BlockExecutor` und die Executoren unter `executor/blocks/` — einer je Blocktyp;
+   `AgenticBlockExecutor` zeigt die REASON/ACT-Schleife.
+4. `service/cli/CommandExecutorService` und `service/ai/HostClaudeService` — wie ein KI-Aufruf als
+   Prozess auf dem Host entsteht (Prompt über stdin, Anbieter über `AiProviderRegistry`).
+5. `service/workflow/WorkflowService` → `WorkflowMutationGateway` — der einzige Schreibweg für
+   Definitionen (Versionen, Siegel).
+
+**Lesereihenfolge Frontend** (unter `ai-automation-frontend/src/`):
+
+1. `App.tsx` — alle Routen, jede Seite per `lazy()`, Seiten optionaler Module in `ModuleRoute`.
+2. `api/client.ts` — der einzige HTTP-Client `api`, der den API-Key aus dem `settingsStore` mitschickt.
+3. `hooks/useWorkflows.ts` — das Muster aller Hooks: `useQuery` zum Lesen, `useMutation` mit
+   Invalidierung zum Schreiben.
+4. `types/index.ts` und `stores/` — gemeinsame Typen (darunter `BLOCK_TYPES`) und der Client-Zustand.
+
+**Neuer Blocktyp.** Eine `@Component`, die `BlockExecutor` implementiert; `supportedTypes()` ist die
+einzige Quelle dafür, welche Typen es gibt (`BlockTypeRegistry` sammelt sie, ein unbekannter Typ wird
+beim Speichern abgelehnt). Dazu den Typ in `BLOCK_TYPES` (`src/types/index.ts`),
+`BlockTypesIndexSection` und `AssistantToolValidator.KNOWN_BLOCK_TYPES` eintragen —
+`BlockTypeListsGuardTest` und `types/__tests__/blockTypes.test.ts` halten die Listen mit den Executoren
+gleich —, eine Spezifikation in `BlockSpecs` anlegen (`BlockSpecConfigKeysGateTest` prüft jeden dort
+genannten Schlüssel gegen den Executor) und für den Editor Startkonfiguration und Schlüssel in
+`src/data/blockDefaultConfig.json` und `src/data/blockConfigSchema.json` ergänzen
+(`blockConfigSchema.test.ts`). Gehört der Typ zu einem Modul, kommt er nach `executor/BlockTypeModules`.
+
+**Neue Tabelle.** Flyway-Migration `V{N}__beschreibung.sql` unter `src/main/resources/db/migration/` —
+die nächste Nummer frisch ermitteln (`ls ai-automation-backend/src/main/resources/db/migration | sort -V | tail -1`),
+nie schätzen —, dann Entity, Repository und Service. Lazy-Beziehungen lädt eine `@Transactional`-Methode
+im Service: Open Session In View ist aus.
+
+**Neuer Controller.** Mit `@RequiresModule(…)` einem Modul zuordnen oder bewusst als Kern in
+`CORE_CONTROLLERS` von `ControllerModuleGateTest` eintragen.
+
+**Neue Seite.** Datei unter `src/pages/`, Route in `App.tsx` per `lazy()`, Menüeintrag in
+`utils/navItems.ts` mit dem Pflichtfeld `hint`: `navHints.test.ts` prüft, dass die Seite ihren Hinweis
+rendert. Sichtbare Texte nur über `de.ts` und `en.ts`.
+
+**Modul-Katalog geändert.** `scripts/lib/module-catalog.generated.sh` wird nicht von Hand gepflegt,
+sondern aus `modules/ModuleCatalog` und den Anzeigetexten (`src/data/modules.<lang>.json`) erzeugt:
+`cd ai-automation-backend && ./mvnw test -Dtest=ModuleCatalogTextsTest -Dmodule.catalog.write=true`.
+Ohne das schlägt der Test fehl. `scripts/lib/module-preset.sh` liest die Datei vor jedem Build, bewusst
+ohne Backend oder `jq`.
+
+**Soft-Delete.** Workflows blendet `@SQLRestriction("deleted_at IS NULL")` aus jeder Abfrage aus.
+Projekte werden über `archived_at` und Repository-Methoden gefiltert, nicht per `@SQLRestriction` — das
+bräche das eager geladene `Workflow.project`.
+
+Häufige Fehlerbilder beim Einrichten:
+
+| Fehlerbild | Abhilfe |
+|---|---|
+| Port 9090 belegt | anderen Prozess beenden oder `AUTOMATION_PORT` setzen |
+| `SQLITE_BUSY` | nur eine Backend-Instanz je Datenbankdatei |
+| `claude` wird im Lauf nicht gefunden | die KI-CLIs laufen auf dem Host, also muss `claude` im `PATH` des Backends liegen |
+| `permission denied` am Docker-Socket | Benutzer in die Gruppe `docker` aufnehmen |
+| CORS-Fehler (403 `Invalid CORS request`) | Adresse samt der localhost-Einträge in `AUTOMATION_CORS_ORIGINS` aufnehmen — Security abzuschalten ändert an CORS nichts |
+| `mvn: command not found` | den Wrapper `./mvnw` nehmen |
 
 ## Build
 
@@ -119,7 +182,7 @@ mvn clean package -DskipTests
 # JAR bauen (mit Tests)
 mvn clean package
 
-# Ergebnis: target/ai-automation-backend-0.7.3-SNAPSHOT.jar
+# Ergebnis: target/ai-automation-backend-<version>.jar
 ```
 
 **Docs im Classpath:** `src/main/resources/docs/` (architektur, WORKFLOW-GUIDE, audit-workflow-protocol,
@@ -149,15 +212,11 @@ npm run build
 
 ### Docker-Images
 
-```bash
-cd ai-automation-backend
-
-# Agent-Images (ein neuer AGENT_APT_REFRESH holt gh- und Docker-Repo und die pip-Pakete frisch, 97e1529d, 8b7a39b9)
-AGENT_APT_REFRESH=$(date +%Y-%m) docker compose --profile build-only build
-```
-
-Ein eigenständiges Backend-Image über diese Compose-Datei gibt es nicht mehr — für eine Instanz im
-Container siehe [deployment.md → deploy/](deployment.md#eine-instanz-im-container-deploy).
+Die Agent-Images für Shell-Blöcke mit `container_image` baut
+`docker compose --profile build-only build` in `ai-automation-backend/`; wann man sie braucht und wie
+man ihre Fremd-Repos auffrischt, steht in [deployment.md → Docker Compose](deployment.md#docker-compose).
+Ein Image für eine laufende Instanz gibt es nur über
+[deploy/](deployment.md#eine-instanz-im-container-deploy).
 
 ## Builds neben dem laufenden Dev-Backend
 
@@ -283,7 +342,7 @@ weil der Workflow `mysuricates-health-check` `target/surefire-reports/*.txt` nac
 
 **Klassengrößen-Ratchet:** `architecture/SourceSizeRatchetTest` zählt die Zeilen aller Dateien unter `src/main/java` und schlägt fehl, sobald eine Datei über 300 Zeilen liegt, die nicht in der Allowlist des Tests steht — oder eine gelistete Datei über ihre eingetragene Obergrenze wächst. Die Liste kennt nur eine Richtung: Wer eine gelistete Klasse verkleinert, senkt ihre Obergrenze; fällt sie auf ≤300 Zeilen, fliegt der Eintrag raus. Neue Dateien über 300 Zeilen werden gesplittet, nicht eingetragen (Audit-TODO 1e248ab9). Keine externe Dependency, reiner JUnit-Test.
 
-**Request-Kosten-Ratchet:** `architecture/RequestCostRatchetTest` misst für die Routen, die die UI bei jedem Seitenaufruf trifft (`/todos`, `/workflows`, `/projects`, `/executions`, `/workflows/{id}/runs`, `/learning/dashboard`, `/search`, `/schedules`, `/schedules/{id}/runs`, `/schedules/calendar`, `/goals` mit Detail, Relationen, Arbeitspaketen und Meilensteinen, `/wishes`, `/audits` mit der Report-Historie eines Audits), zwei **deterministische** Kosten und vergleicht sie mit der `BASELINE`-Map im Test: die Zahl der SQL-Statements und die Antwortgröße in Bytes. Keine Millisekunden — Wanduhrzeit hängt auf einem Entwicklerrechner von Hostlast, JIT und davon ab, wer gerade die einzige SQLite-Connection hält, und würde flackern. Die beiden gepinnten Kosten sind dagegen reproduzierbar und genau die, die in der Vergangenheit ausgerissen sind: ein N+1 macht aus 3 Statements 33 (`1e465a9e perf(api)`), ein mitgeladener TEXT-Blob aus einer kleinen Antwort eine riesige (`443fa57e perf(dashboard)`). Gezählt wird über einen Hibernate-`StatementInspector` (`metrics/CountingStatementInspector` → `metrics/SqlStatementCounter`, ThreadLocal, in `config/StatementInspectorConfig` registriert). Gemessen wird ohne umschließende Transaktion, so wie der Betrieb die Route bedient (OSIV ist aus): Die Saat wird committet, jede Anfrage öffnet ihre eigenen Transaktionen oder keine, und nach jedem Test räumt der Test die gesäten Tabellen wieder ab. In der Testtransaktion hatte der Request deren Persistence-Context mitbenutzt — ein Dienst ohne eigene Transaktion sah dort so billig aus wie einer mit, `/learning/dashboard` maß 10 statt 52 Statements (TODO 5c56b3d1). Der Test misst gegen eine eigene, frisch migrierte Datenbankdatei statt gegen die gemeinsame der Test-JVM: Zeilen, die ein anderer Integrationstest ohne Rollback hinterlässt, verschöben sonst jede Obergrenze — in einer `-Dtest`-Auswahl reichten zwei Projekte und drei Workflows für einen roten Lauf (TODO 5695d482); vor jeder Saat prüft er, dass die gesäten Tabellen leer sind. Wie beim Klassengrößen-Ratchet kennt die Liste nur eine Richtung: Obergrenzen sinken, wenn eine Route billiger wird (der Hinweis-Test nennt die neue Zahl). **Eine Obergrenze darf vorübergehend einen bekannten Mangel festschreiben, kein Ziel** — der erste Lauf fand drei N+1-Muster und eine unbegrenzt wachsende Antwort (TODOs 13d1e2a2, 9db34f3b, a05c9504); sie waren gepinnt, damit das Gate grün blieb und nichts *schlimmer* wurde, und sind inzwischen alle behoben. Seit 13d1e2a2 gilt für jede gemessene Route zusätzlich das Wachstums-Kriterium: Ihre Statement-Zahl darf bei doppelter Saat nicht steigen. Wer eine Obergrenze anhebt, begründet das in der Commit-Message.
+**Request-Kosten-Ratchet:** `architecture/RequestCostRatchetTest` misst für die Routen, die die UI bei jedem Seitenaufruf trifft (welche das sind, steht in der `BASELINE`-Map des Tests), zwei **deterministische** Kosten und vergleicht sie mit den Obergrenzen dort: die Zahl der SQL-Statements und die Antwortgröße in Bytes. Keine Millisekunden — Wanduhrzeit hängt auf einem Entwicklerrechner von Hostlast, JIT und davon ab, wer gerade die einzige SQLite-Connection hält, und würde flackern. Die beiden gepinnten Kosten sind dagegen reproduzierbar und genau die, die in der Vergangenheit ausgerissen sind: ein N+1 macht aus 3 Statements 33 (`1e465a9e perf(api)`), ein mitgeladener TEXT-Blob aus einer kleinen Antwort eine riesige (`443fa57e perf(dashboard)`). Gezählt wird über einen Hibernate-`StatementInspector` (`metrics/CountingStatementInspector` → `metrics/SqlStatementCounter`, ThreadLocal, in `config/StatementInspectorConfig` registriert). Gemessen wird ohne umschließende Transaktion, so wie der Betrieb die Route bedient (OSIV ist aus): Die Saat wird committet, jede Anfrage öffnet ihre eigenen Transaktionen oder keine, und nach jedem Test räumt der Test die gesäten Tabellen wieder ab. In der Testtransaktion hatte der Request deren Persistence-Context mitbenutzt — ein Dienst ohne eigene Transaktion sah dort so billig aus wie einer mit, `/learning/dashboard` maß 10 statt 52 Statements (TODO 5c56b3d1). Der Test misst gegen eine eigene, frisch migrierte Datenbankdatei statt gegen die gemeinsame der Test-JVM: Zeilen, die ein anderer Integrationstest ohne Rollback hinterlässt, verschöben sonst jede Obergrenze — in einer `-Dtest`-Auswahl reichten zwei Projekte und drei Workflows für einen roten Lauf (TODO 5695d482); vor jeder Saat prüft er, dass die gesäten Tabellen leer sind. Wie beim Klassengrößen-Ratchet kennt die Liste nur eine Richtung: Obergrenzen sinken, wenn eine Route billiger wird (der Hinweis-Test nennt die neue Zahl). **Eine Obergrenze darf vorübergehend einen bekannten Mangel festschreiben, kein Ziel** — der erste Lauf fand drei N+1-Muster und eine unbegrenzt wachsende Antwort (TODOs 13d1e2a2, 9db34f3b, a05c9504); sie waren gepinnt, damit das Gate grün blieb und nichts *schlimmer* wurde, und sind inzwischen alle behoben. Seit 13d1e2a2 gilt für jede gemessene Route zusätzlich das Wachstums-Kriterium: Ihre Statement-Zahl darf bei doppelter Saat nicht steigen. Wer eine Obergrenze anhebt, begründet das in der Commit-Message.
 
 **Kein KI-Aufruf in einer Transaktion:** `architecture/SlowCallInTransactionRatchetTest` liest den kompilierten Bytecode (mit dem ASM aus spring-core, ohne neue Abhängigkeit) und schlägt fehl, sobald eine Transaktion einen Aufruf umschließt, der einen Prozess startet: jedes `execute*` von `CommandExecutorService` (KI-CLI, Shell, Container), die CLI-Wrapper `HostClaudeService`/`HostCodexService`/`HostPiService`, `ShellCommandService`/`ContainerShellService` sowie `AiProvider.reason`/`executeAction` – auch über eine implementierende Klasse oder einen Provider aus der `AiProviderRegistry`. Ebenso jeder HTTP-Aufruf, der auf einen fremden Server wartet: `HttpClient.send`/`sendAsync` sowie Öffnen, Streams und Lesen der Antwort bei `URLConnection`, `HttpURLConnection` und `HttpsURLConnection` (`connect`, `getInputStream`, `getOutputStream`, `getResponseCode`, `getHeaderField`, `getErrorStream` …; der Scan vergleicht den deklarierten Typ, deshalb steht jeder einzeln in `HTTP_CALLS`) – ein Webhook-Ziel, das in sein Timeout läuft, hielte die Connection genauso lange fest. Als Transaktion zählen `@Transactional`-Methoden (auch über die Klassen-Annotation, nicht bei `NOT_SUPPORTED`/`NEVER`) und die Callbacks von `TransactionTemplate.execute`; verfolgt werden alle Aufrufe am selben Objekt – private Helfer, Lambdas, Methodenreferenzen. Bei pool-size 1 hielte so ein Aufruf die einzige Connection für seine ganze Dauer fest. Aufrufe in andere Beans sieht der Scan nicht: Er hält die direkte Form fest und ist kein Beweis über den ganzen Aufrufgraphen. Die Ausnahmeliste `KNOWN_EXCEPTIONS` ist leer und wird nur kürzer. Die Lösung hat immer dieselbe Form – kurzer Lese-Abschnitt per `TransactionTemplate`, KI-Aufruf ohne Transaktion, kurzer Schreib-Abschnitt (`WorkflowMemoryService#extractKnowledge`, `PageSuggestionService#refreshSuggestions`). Unit-Tests prüfen die Grenze mit `testsupport/FakeTransactions`: ein Transaktionsmanager ohne Datenbank und ein Proxy, der `@Transactional` wie der Anwendungskontext anwendet; im gemockten Aufruf fragt `FakeTransactions.active()`, ob gerade eine Transaktion offen ist.
 
@@ -508,35 +567,7 @@ AUTOMATION_RATE_LIMIT_RPM=6000 AUTOMATION_DISCOVERY_AUTO_TAGGING_ENABLED=false \
   und Projekt löschen) — nicht über Docker direkt
 - Für die Test-Instanz kann zusätzlich `POST /api/v1/testing/reset` verwendet werden, wenn ein kompletter Reset gewünscht ist
 
-**Teststruktur:**
-
-```
-cypress/
-  support/
-    e2e.ts          ← API-Key per cy.env(); vor jedem Laden Key, englische Locale und gesehene Begrüßungstour
-    target.ts       ← E2E-Ziel: API-Adresse (Cypress.expose) und der geladene API-Key
-    commands.ts     ← Custom Commands (apiCreateProject, shouldShowToast, navTo, ...)
-    api.ts          ← HTTP-Helpers für Testdaten-Setup (CRUD gegen Backend-API)
-  e2e/
-    activity-log.cy.ts       ← Activity-Log-Ansicht
-    assistant-panel.cy.ts    ← Assistent-Panel
-    chains.cy.ts             ← Chains CRUD und Ausführung
-    dashboard.cy.ts          ← Stat-Cards, Charts, Quick Actions
-    navigation.cy.ts         ← Sidebar-Navigation, Routing, Collapse/Expand
-    project-detail.cy.ts     ← Projekt-Detailseite
-    projects.cy.ts           ← Projekte CRUD (Create, Search, Detail, Delete)
-    responsive-layout.cy.ts  ← Responsive Layout
-    runs.cy.ts               ← Workflow-Runs-Ansicht
-    schedules.cy.ts          ← Schedules CRUD, Toggle, Tabelle
-    settings.cy.ts           ← Theme, Sprache, API-Key, System Health
-    skills.cy.ts             ← Skill-Katalog, Filter, Detail-Slide-Over
-    staging.cy.ts            ← Staging-Management
-    todos.cy.ts              ← Todos CRUD
-    webhooks.cy.ts           ← Webhooks CRUD, Toggle, Copy-Button
-    wishes.cy.ts             ← Wishes
-    workflow-execution.cy.ts ← Workflow-Ausführung
-    workflows.cy.ts          ← Workflows CRUD, Template-Auswahl, Detail, Blocks, Skills
-```
+Specs liegen unter `cypress/e2e/`, die Helfer (API-Key, Ziel, Custom Commands, Testdaten über die API) unter `cypress/support/`.
 
 **Konventionen:**
 - Englische Locale und die gesehene Begrüßungstour werden per `localStorage` vor jedem Laden gesetzt (sonst deckt die Tour jede Seite ab)
@@ -695,26 +726,22 @@ scripts/load-test.sh --ref v0.7.8    # einen anderen Stand; --jar PATH spart den
 
 Aus der Oberfläche läuft er als Pool-Workflow **Lasttest vor dem Release** (`workflow-pool/mysuricates-load-test.json`, Variable `ref`): Das Skript kommt aus dem geprüften Stand, Opus erklärt das Faktenblatt (Engpässe, Vergleich, Empfehlungen), das Gate folgt `FAKT load_verdict`, nie der KI. **Test:** `python3 -m unittest discover -s scripts/tests -p 'test_load_test_*.py'` (Auswertung, Verdict, Baseline, Treiber gegen einen Test-Server); die Rückfrage deckt `test-release.sh` ab.
 
-**Push:** `git push origin main "vX.Y.Z"` (oder `git push --follow-tags`, das nimmt nur annotierte
-Tags mit) — **nicht** `git push --tags`: `staging.sh promote` legt bei jedem Promote ein
-leichtgewichtiges `stable-*`-Tag an (Deployment-Zeitstempel, siehe unten), und `--tags` schöbe alle
-davon mit auf GitHub, wo sie sich unter die Releases mischen würden.
-
 ### Zusammenspiel mit Staging
 
-Die Stable-Umgebung ist ein Docker-Container auf Port 9091 mit einem eingefrorenen Stand des Codes für den Alltagsbetrieb, neben der Dev-Instanz aus dem Quellcode; `scripts/staging.sh` baut und verwaltet ihn ([deployment.md → Drei-Umgebungs-Setup](deployment.md#drei-umgebungs-setup)). Nach einem Release kann `./scripts/staging.sh promote` ausgeführt werden, um die neue Version in die Stable-Umgebung zu deployen. Die Settings-Seite zeigt dann einen Versionsvergleich (Dev vs. Stable) und empfiehlt ein Promote, wenn die Versionen abweichen.
+Nach einem Release bringt `./scripts/staging.sh promote` die neue Version in die Stable-Umgebung,
+einen Docker-Container auf Port 9091 neben der Dev-Instanz. Versionsvergleich und Promote-Empfehlung in
+den Einstellungen: [deployment.md → Versionsanzeige](deployment.md#versionsanzeige).
 
 ### Git-Tags
-
-Es gibt zwei Arten von Git-Tags:
 
 | Tag-Format | Erstellt durch | Art | Zweck |
 |---|---|---|---|
 | `v0.1.1` | `release.sh` | annotiert (`git tag -a`) | Semver-Release-Markierung, löst `release.yml` aus |
 | `stable-20250225-143022` | `staging.sh promote` | leichtgewichtig | Deployment-Zeitstempel, bleibt lokal |
 
-Deshalb `git push --follow-tags` statt `git push --tags`: `--follow-tags` nimmt nur annotierte
-Tags mit, `--tags` schöbe auch jedes lokale `stable-*` nach GitHub.
+**Push:** `git push origin main "vX.Y.Z"` oder `git push --follow-tags` — beide nehmen nur das
+annotierte Tag mit. **Nicht** `git push --tags`: Das schöbe jedes lokale `stable-*` mit auf GitHub, wo
+es sich unter die Releases mischte.
 
 ### GitHub-Release bei jedem Tag
 
@@ -935,74 +962,6 @@ Das Backend nutzt drei Annotation-Prozessoren, die in der Compiler-Konfiguration
 2. **MapStruct** — Generiert Mapper-Implementierungen
 3. **lombok-mapstruct-binding** — Brücke zwischen Lombok und MapStruct
 
-## Architektur-Notizen für Entwickler
-
-### Backend-Struktur
-
-Das Backend umfasst **54 REST-Controller** und **20 Block-Typen**:
-
-**Controller:** ActivityLog, Assistant, Audit, Chain, ChainTemplate, CompletionTrigger, Conversion, DashboardLayout, DashboardReportAssist, DashboardWorkflow, DeadLetter, Dialog, Docs, Execution, Goal, GoalWorkflow, Integration, Learning, Notification, OnboardingProfile, PageSuggestion, Project, ProjectBundle, Reports, Schedule, Search, Skill, StagedSync, Staging, System, SystemAccess, SystemAiProvider, SystemMaintenance, SystemModules, SystemRequestMetrics, SystemSettings, Testing, Todo, TodoTrigger, Webhook, WebSocketTicket, Wish, Workflow, WorkflowAnalyzer, WorkflowAssist, WorkflowDebug, WorkflowFactory, WorkflowImport, WorkflowMemory, WorkflowPool, WorkflowSeal, WorkflowSealStatus, WorkflowTemplate, WorkflowVersion
-
-**Block-Typen:** `simple`, `shell`, `retry`, `conditional`, `foreach`, `while`, `switch`, `agentic`, `approval`, `sub-workflow`, `skill-capability`, `human-input`, `document`, `integration`, `todo-create`, `todo-update`, `todo-close`, `compress`, `compress-ai`, `dashboard-report`
-
-**Flyway-Migrationen:** V1–V97 (SQLite)
-
-### Gate Status System
-
-Workflow-Blöcke können Quality-Gate-Marker ausgeben:
-```
-gate_status: GREEN|YELLOW|RED
-gate_category: <kategorie>
-gate_description: <beschreibung>
-```
-- Das Gate ändert den Run-Status nicht; `COMPLETED_WITH_ERRORS` entsteht nur durch einen fehlgeschlagenen `checked_command`-Schritt
-- Mit AutoTodo am Workflow: RED → TODO mit HIGH-, YELLOW → mit MEDIUM-Priorität (`AutoTodoService`)
-- `GateStatusOutputParser` parst die Marker aus Block-Ausgaben
-
-### Chains
-
-Chains verketten mehrere Workflows sequenziell:
-- `ChainService` / `ChainExecutor` für CRUD und Ausführung
-- Cross-Project: Chain gehört keinem Projekt
-- `previous_chain_output` als Context-Variable zwischen Entries
-- WebSocket-Status-Broadcasts an `/topic/chains/{chainRunId}/status`
-
-### Workflow Memory
-
-Workflows können Wissen über Runs hinweg akkumulieren:
-- `WorkflowMemoryService.extractKnowledge()` — AI-basierte Extraktion via `KnowledgeSummarizer`
-- Aktive Einträge werden in nachfolgende Runs injiziert
-- Extraktion nur mit `CLAUDE` (Standard) oder `CODEX` (`WorkflowMemoryService.getSummarizer`) — anders als
-  bei Workflow-Blöcken ist Pi hier nicht angebunden
-
-### Soft-Delete Pattern
-
-- **Workflows:** `@SQLRestriction("deleted_at IS NULL")` auf der Entity-Klasse — automatisch aus allen Queries ausgeblendet
-- **Projekte:** `archived_at IS NOT NULL` = archiviert — Filterung via Repository-Methoden (kein `@SQLRestriction`, da sonst eager-loaded `Workflow.project`-Assoziationen brechen würden)
-
-### Seeder
-
-- **SkillSeeder:** Legt 19 Built-in-Skills beim Start an (idempotent, Update bei Version-Bump) und registriert sie im `SkillRegistry`
-- Skill-Definitionen als JSON + Prompt-`.md` unter `src/main/resources/skills/builtin/`
-- **WorkflowTemplateSeeder:** Legt 54 Built-in-Templates beim Start an (idempotent, Update bei Version-Bump) und entfernt Built-in-Zeilen, deren Datei nicht mehr ausgeliefert wird
-- Template-Definitionen als JSON unter `src/main/resources/templates/builtin/`
-
-### Modul-Katalog
-
-Wer ein Modul zu `modules/ModuleCatalog` hinzufügt oder ändert, muss `scripts/lib/module-catalog.generated.sh`
-neu erzeugen — die Datei wird nicht von Hand gepflegt, sondern von `ModuleCatalogTextsTest` aus dem
-Katalog und den Anzeigetexten (`ai-automation-frontend/src/data/modules.<lang>.json`) abgeleitet:
-
-```bash
-cd ai-automation-backend && ./mvnw test -Dtest=ModuleCatalogTextsTest -Dmodule.catalog.write=true
-```
-
-Ohne Regenerierung schlägt der Test rot fehl, sobald die generierte Datei nicht mehr zum Katalog
-passt. `scripts/lib/module-preset.sh` liest die generierte Datei vor jedem Build ein — bewusst ohne
-Backend oder `jq` vorauszusetzen. `scripts/setup.sh --lang de|en` wählt nur die Anzeigesprache der
-Modultexte im Terminal (Default: `$LANG`-Präfix, sonst `en`); das Ergebnis (welche Module aktiv
-sind) ändert sich dadurch nicht. Details zum Katalog selbst: [architektur.md](architektur.md#module-system-startkonfiguration).
-
 ## Hygiene-Gate
 
 `scripts/ci/public-hygiene.sh` prüft, was in ein öffentliches Repository geriete. Die Regeln —
@@ -1193,27 +1152,11 @@ läuft nur der Bau samt `--check`, der Deploy-Job entfällt.
 
 ## Abhängigkeits-Meldungen (Frontend)
 
-`npm audit` im Frontend meldet nach den Updates vom 2026-09-12 **0 Schwachstellen**.
-Nach einer ersten Reduktion von zwanzig auf sieben wurden auch die beiden notwendigen
-Major-Upgrades durchgeführt.
-
-**Abgetragen:** die Laufzeit-Kette zuerst. `dompurify` kam über
-`@monaco-editor/react` → `monaco-editor` und stand auf 3.4.12, dem oberen Rand des
-verwundbaren Bereichs (GHSA-55q2-fjhq-7xh7, XSS über einen abgehängten Teilbaum). Ein blankes
-Update bewegt es nicht, weil ein `overrides`-Eintrag die Version pinnt — der Eintrag steht jetzt
-auf `^3.4.13`, installiert ist 3.4.15. Danach `npm audit fix` ohne `--force` für alles Weitere
-in Range.
-
-**Weitere Updates:**
-
-| Paket | Aktualisierung |
-|---|---|
-| `cypress` und seine Transitiven | Cypress 15.21.1 ersetzt die verwundbaren Abhängigkeiten von Cypress 13; auch `qs` ist aktualisiert. |
-| `react-router-dom` / `react-router` | Version 7.18.3 behebt die gemeldeten Router-Befunde. Der bestehende Schutz `isInternalAppPath()` gegen protokollrelative und Backslash-Pfade bleibt bestehen. |
-
-Nachprüfen mit `npm audit`, `npm test` und `npm run build` (einschliesslich TypeScript-Prüfung).
-Für Cypress 15 gelten Node.js 20/22/24+ und unter Linux glibc >= 2.31;
-siehe [Cypress-Migrationshinweise](https://www.cypress.io/blog/cypress-15-made-simple-upgrade-paths-from-13-and-14).
+`npm audit` im Frontend ist die Quelle für den aktuellen Stand. Eine Falle beim Beheben: Steht ein Paket
+über einen `overrides`-Eintrag in `package.json` fest — wie `dompurify`, das über `@monaco-editor/react` →
+`monaco-editor` kommt —, bewegt ein blankes Update es nicht. Erst den Eintrag anheben, dann
+`npm audit fix` ohne `--force` für alles Weitere in Range. Nachprüfen mit `npm audit`, `npm test` und
+`npm run build` (einschliesslich TypeScript-Prüfung).
 
 ## Bekannte Einschränkungen
 
@@ -1234,16 +1177,15 @@ siehe [Cypress-Migrationshinweise](https://www.cypress.io/blog/cypress-15-made-s
 
 ### Docker-Abhängigkeit
 
-- Das Backend bootet auch ohne laufenden Docker-Daemon (der Docker-Client wird lazy aufgebaut).
-- Ohne Docker können keine Container-Execution-Blöcke in Workflows ausgeführt werden.
-- Agent-Images müssen vorher gebaut sein (`docker compose --profile build-only build`).
+- Ohne Docker laufen keine Shell-Blöcke mit `container_image`; ihre Agent-Images müssen vorher gebaut sein
+  (`docker compose --profile build-only build`).
 - **KI-CLIs (Claude, Codex, Pi) laufen in Workflow-Blöcken immer auf dem Host**, nicht im Projekt-Container; dafür braucht es kein Docker. Den Projekt-Container nutzen nur Ad-hoc-Befehle während eines Runs (`claude` per `docker exec`) und das Terminal.
 
 ### Sicherheit
 
-- Der Docker-Socket-Mount gibt dem Backend Host-Level Docker-Zugriff. In Produktionsumgebungen sollte mindestens API-Key-Auth aktiviert sein.
-- CORS lässt per Default nur die Dev-Server auf `localhost` (3000/5173) zu, mit `remote-access` zusätzlich die eigene Tailscale-Adresse; weitere Ursprünge über `AUTOMATION_CORS_ORIGINS` ([Wo gelauscht wird](deployment.md#wo-gelauscht-wird)).
-- Rate Limiting ist standardmäßig aktiv (120 req/min). Konfigurierbar zur Laufzeit in Settings → Execution.
+Aus dem Quellcode gestartet lauscht die Instanz auf allen Interfaces. Was daraus folgt — API-Key,
+Docker-Socket, CORS, Rate-Limit —, steht in
+[deployment.md → Vertrauensmodell und Netzwerk-Exposition](deployment.md#vertrauensmodell-und-netzwerk-exposition).
 
 ### Frontend
 
