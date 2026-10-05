@@ -89,9 +89,9 @@ class DocsFetchHandlerTest {
 
     @Test
     void sectionOnDocWithoutSectionMap_returnsWholeDoc() {
-        String out = handler.formatDocsSection("vision/anything");
+        String out = handler.formatDocsSection("architektur/anything");
 
-        assertThat(out).startsWith("**Documentation: vision**\n\n");
+        assertThat(out).startsWith("**Documentation: architektur**\n\n");
     }
 
     @Test

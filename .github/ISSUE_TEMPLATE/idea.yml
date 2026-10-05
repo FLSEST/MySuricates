@@ -7,9 +7,9 @@ body:
     attributes:
       value: |
         Short and to the point is fine. Please check
-        [docs/en/vision.md](docs/en/vision.md) first — if the idea is already
-        the stated direction, say so and skip re-explaining it; if it goes
-        against it, explain why it should change.
+        [docs/en/baukasten.md](docs/en/baukasten.md) first — if the idea is
+        already a building block or an approach there, say so and skip
+        re-explaining it; if it goes against them, explain why they should change.
 
         Per [CONTRIBUTING.md](CONTRIBUTING.md), this is the place to discuss an
         idea before opening a pull request — a PR without a prior issue is

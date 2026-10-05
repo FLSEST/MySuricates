@@ -158,7 +158,7 @@ Die Typen und ihre Kürzungsgrenzen stehen in den Handlern unter `service/assist
 Rückfrage nachgeladen werden, legt `AssistantFetchPolicy.AUTO_FETCH_TYPES` fest. Zwei Regeln stehen nur hier:
 
 - `block-spec` liefert die Spezifikation eines Blocktyps aus `BlockSpecs` (eine für jeden Typ der Registry; `BlockTypeListsGuardTest` hält sie vollständig). Die Prompts von Factory, Wishes, Dialog-Import, Run-Konvertierung und Workflow-Optimierung rendern dieselben Texte mit `BlockSpecs.reference`, und `BlockSpecConfigKeysGateTest` prüft jeden dort genannten Config-Schlüssel gegen den Quelltext des Executors.
-- `docs` lädt nur drei Dateien (`DocsFetchHandler`): `workflow-guide` → `docs/WORKFLOW-GUIDE.md`, `architektur` → `docs/architektur.md`, `vision` → `docs/vision.md`. Ohne Abschnitt kommt das Inhaltsverzeichnis der `## `-Überschriften; einzelne Abschnitte gibt es nur im Workflow-Guide, sonst den Anfang der Datei.
+- `docs` lädt nur zwei Dateien (`DocsFetchHandler`): `workflow-guide` → `docs/WORKFLOW-GUIDE.md`, `architektur` → `docs/architektur.md`. Ohne Abschnitt kommt das Inhaltsverzeichnis der `## `-Überschriften; einzelne Abschnitte gibt es nur im Workflow-Guide, sonst den Anfang der Datei.
 
 ## Kontext-Injektion
 

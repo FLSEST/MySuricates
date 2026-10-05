@@ -154,7 +154,7 @@ The types and their truncation limits live in the handlers under `service/assist
 are loaded without asking is set by `AssistantFetchPolicy.AUTO_FETCH_TYPES`. Two rules are only stated here:
 
 - `block-spec` returns the spec of a block type from `BlockSpecs` (one for every type in the registry; `BlockTypeListsGuardTest` keeps them complete). The prompts of factory, wishes, dialog import, run conversion and workflow optimization render the same texts with `BlockSpecs.reference`, and `BlockSpecConfigKeysGateTest` checks every config key named there against the executor's source.
-- `docs` loads only three files (`DocsFetchHandler`): `workflow-guide` → `docs/WORKFLOW-GUIDE.md`, `architektur` → `docs/architektur.md`, `vision` → `docs/vision.md`. Without a section it returns the table of contents of the `## ` headings; single sections exist only for the workflow guide, otherwise it returns the start of the file.
+- `docs` loads only two files (`DocsFetchHandler`): `workflow-guide` → `docs/WORKFLOW-GUIDE.md`, `architektur` → `docs/architektur.md`. Without a section it returns the table of contents of the `## ` headings; single sections exist only for the workflow guide, otherwise it returns the start of the file.
 
 ## Context Injection
 

@@ -217,4 +217,3 @@ Vollständige Dokumentation (Auto-Start, Definition-Sync, Key-Files): [docs/depl
 | Integration/Plugin-System: Provider, OAuth, Kalender-Adapter | [docs/integrations.md](docs/integrations.md) |
 | Deployment, Docker, Staging, Test-Instanz | [docs/deployment.md](docs/deployment.md) |
 | REST API Reference für externe Agents | [AGENTS.md](AGENTS.md) |
-| Vision und Roadmap | [VISION.md](VISION.md) |

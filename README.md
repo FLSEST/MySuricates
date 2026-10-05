@@ -10,25 +10,20 @@
 
 # MySuricates
 
-A research project on the question of how far software development can be run in a controlled
-way with AI agents — and a working system in which this can be observed.
-
-MySuricates is a local workflow platform: workflows consist of blocks that are either
-deterministic (shell, branch, loop) or call an AI. From this mix, a control loop has emerged that
-produces findings about its own codebase, turns them into TODOs, triggers fix workflows, and then
-verifies the result again. The code was created largely in AI sessions, from 2,630 commits in the
-working repository (as of 2026-09-30). <!-- doc-facts-check: ignore — the commit count applies only
-in the working repository; the release handover condenses the history in the public repository to one
-commit per release --> Of these, 2,442 carry at least one AI trailer — 2,155 Claude's, 343 the control
-loop's own (`Generated-By: MySuricates`), 56 both.
+A research project on the question of how software development and other work change with AI agents,
+and how that work can be put together in different ways from repeatable, as traceable as possible
+building blocks — and a working system in which this can be observed.
 
 **What this is not:** not a product, not a service, no support, no promise of stability. The
 architectural debt is known and is tracked within the system itself as audit findings — see
 [Maturity level](#maturity-level-and-known-debt).
 
-## The question behind it
+## Questions that come up along the way
 
-> **How do I work with strong LLMs so that I can put my own limited abilities to use as well?**
+There are already very different answers to these questions today.
+
+> **How do I work with strong LLMs if I don't just want to hand agent systems more tasks on demand
+> or simply let them run free?**
 
 1. Tasks and side threads that come out of a piece of work **do not disappear into the void** — TODO
    system, history. MySuricates knows the project, the project knows MySuricates. On top of that,
@@ -37,12 +32,14 @@ architectural debt is known and is tracked within the system itself as audit fin
    **visible** (versions, runs, process steps)? And from there: what different kinds of steps does
    that take?
 3. How do I make the whole thing **independent of providers**?
-4. From this, **many additional ideas** emerged: how to get there, how to connect it, how to make it
+4. How do I build **loops (loop engineering)** like the audit system that make a run comparable with
+   earlier ones, find questions that were already asked, and let **people evaluate** the result?
+5. From this, **many additional ideas** emerged: how to get there, how to connect it, how to make it
    visible.
 
 The answers are building blocks, and you don't need all of them. What you already have, you connect —
 an existing task system instead of the built-in TODOs, for example. Which building block belongs to
-which answer, and which approaches (loop engineering, spec-driven development, orchestrating agents)
+which answer, and which approaches (spec-driven development or orchestrating agents, for example)
 can be built from the same blocks, is shown in [Building blocks](docs/en/baukasten.md).
 
 After installation only the core is on (preset `core`); `research` and `full` switch on further
@@ -74,7 +71,6 @@ Ordered by depth: the overview first, then the individual building blocks, then 
 |---|---|
 | [Building blocks](docs/en/baukasten.md) | The question behind it and its four answers as building blocks: what belongs to the core, what is switched on, what you have yourself or connect — and approaches such as loop engineering or spec-driven development built from the same blocks |
 | [Getting Started](docs/en/GETTING-STARTED.md) | Try it out without installation (tryout image) and first installation with the guided installer (container, machine, or dev · test · prod) |
-| [Vision](docs/en/vision.md) | Product vision and roadmap |
 
 **Building blocks in depth**
 
@@ -127,12 +123,6 @@ It does not mean that the question has been answered.
 | How do you retain control over an agent that plans several steps by itself? | **Agentic blocks** separate Reason and Act — first one call decides what to do, a second executes it — and run against hard budgets: iterations, time, cumulative tokens, repetition detection. |
 | Can the quality of an AI output be evaluated by machine instead of by reading it? | **Gates**: blocks output `gate_status: GREEN\|YELLOW\|RED`. RED creates a high-priority TODO, YELLOW a medium-priority one. The evaluation lives in the workflow, not in the platform. |
 
-The most honest answer after seven months: the mechanisms hold up, but they need guardrails,
-and those guardrails are the real outcome. A gate that merely asks a language model whether something
-is good reliably delivers findings — including fabricated ones. Deterministic measurement before AI
-evaluation is the recurring lesson. The mechanisms individually, each with a flow diagram, code
-evidence, and limits: [Concepts](docs/en/konzepte/README.md).
-
 Not all of this is enabled after installation. Peripheral functions are modules that are fixed at
 startup. The `core` preset (default) contains the core — workflows, blocks, schedules, TODOs.
 `research` adds the mechanisms from this section and their interfaces: chains (several workflows as
@@ -166,19 +156,6 @@ in addition to the hygiene gate and secret scan; since 2026-09-21 on Ubuntu 26.0
 for example); once a week both run without the filter.
 
 ## Maturity level and known debt
-
-Experimental. The system runs daily on the author's machine and had completed around 2,400 runs by
-2026-09-12 — so far it has not been operated under load, with multiple users, or outside a trusted
-network (self-reported).
-
-The debt is not hidden, but counted. The Audit Center — a page in the application where findings
-from audit workflows are tracked over time — counted **322 findings** for MySuricates itself as of
-2026-09-22 since 2026-07-19: 29 open (including 1 critical, 4 high), 7 waiting for counter-check,
-267 fixed, 18 accepted as risk, 1 discarded. On that day, the open findings mainly concerned three
-areas: structure (an overly large central execution class, tightly coupled services, controllers with
-direct repository access), performance and storage (database size without a vacuum strategy, N+1
-candidates, bundle size), and readiness for publication. How these findings are created and what the
-statuses mean is described in the [Audit Workflow Protocol](docs/en/audit-workflow-protocol.md).
 
 Known hard limits:
 

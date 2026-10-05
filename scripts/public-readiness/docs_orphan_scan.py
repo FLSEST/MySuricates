@@ -62,7 +62,7 @@ OVERLAP_THRESHOLD = 0.40         # Anteil an der kleineren Menge
 #: Einstiege. Von hier laeuft die Erreichbarkeitssuche los; nie selbst verwaist.
 ROOTS = (
     "README.md", "README.de.md", "CLAUDE.md", "AGENTS.md",
-    "CONTRIBUTING.md", "SECURITY.md", "VISION.md",
+    "CONTRIBUTING.md", "SECURITY.md",
 )
 
 #: Bewusst nicht verlinkte Dokumente. Format: Pfad -> Begruendung mit TODO-Kennung,

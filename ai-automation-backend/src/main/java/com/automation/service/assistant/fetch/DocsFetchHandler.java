@@ -18,8 +18,7 @@ public class DocsFetchHandler {
 
     private static final Map<String, String> DOC_FILES = Map.of(
             "workflow-guide", "docs/WORKFLOW-GUIDE.md",
-            "architektur",    "docs/architektur.md",
-            "vision",         "docs/vision.md"
+            "architektur",    "docs/architektur.md"
     );
 
     private static final Map<String, String> WF_GUIDE_SECTIONS = Map.ofEntries(

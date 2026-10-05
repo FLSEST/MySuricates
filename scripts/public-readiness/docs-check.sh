@@ -8,7 +8,7 @@ section "Documentation readiness check"
 # docs/use-cases.md), die es nie gab: die Doku heisst docs/architektur.md und liegt
 # zweisprachig unter docs/ und docs/en/. Das Gate stand dadurch dauerhaft auf YELLOW.
 for f in README.md README.de.md LICENSE NOTICE SECURITY.md CONTRIBUTING.md \
-         docs/GETTING-STARTED.md docs/architektur.md docs/vision.md \
+         docs/GETTING-STARTED.md docs/architektur.md docs/baukasten.md \
          docs/workflow-pool-kuratierung.md; do
   [ -e "$f" ] && echo "present: $f" || echo "missing: $f"
 done
@@ -63,7 +63,7 @@ done
 
 section "Gate status"
 missing=0
-for f in LICENSE SECURITY.md CONTRIBUTING.md docs/GETTING-STARTED.md docs/vision.md; do [ -e "$f" ] || missing=$((missing+1)); done
+for f in LICENSE SECURITY.md CONTRIBUTING.md docs/GETTING-STARTED.md docs/baukasten.md; do [ -e "$f" ] || missing=$((missing+1)); done
 if [ "$missing" -eq 0 ] && [ $((entry_findings + maintainer_findings)) -gt 0 ]; then
   echo "gate_status: YELLOW"
   echo "gate_category: documentation-gaps"
@@ -72,7 +72,7 @@ elif [ "$missing" -gt 0 ]; then
   echo "gate_status: YELLOW"
   echo "gate_category: documentation-gaps"
   echo "gate_description: Public-facing documentation gaps exist; create reviewed docs before launch."
-  echo "todo_item: Fehlende oeffentliche Dokumente ergaenzen | MEDIUM | documentation,release | Eines der Pflichtdokumente fehlt: LICENSE, SECURITY.md, CONTRIBUTING.md, docs/GETTING-STARTED.md oder docs/vision.md."
+  echo "todo_item: Fehlende oeffentliche Dokumente ergaenzen | MEDIUM | documentation,release | Eines der Pflichtdokumente fehlt: LICENSE, SECURITY.md, CONTRIBUTING.md, docs/GETTING-STARTED.md oder docs/baukasten.md."
 else
   echo "gate_status: GREEN"
   echo "gate_category: documentation-gaps"

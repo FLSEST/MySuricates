@@ -10,25 +10,20 @@
 
 # MySuricates
 
-Ein Forschungsprojekt zur Frage, wie weit sich Softwareentwicklung mit KI-Agenten kontrolliert
-betreiben laesst — und ein lauffaehiges System, an dem sich das beobachten laesst.
-
-MySuricates ist eine lokale Workflow-Plattform: Workflows bestehen aus Bloecken, die entweder
-deterministisch sind (Shell, Verzweigung, Schleife) oder eine KI aufrufen. Aus dieser Mischung ist
-ein Regelkreis entstanden, der Befunde ueber die eigene Codebasis erzeugt, daraus TODOs macht,
-Fix-Workflows anstoesst und das Ergebnis wieder prueft. Der Code ist weitgehend in KI-Sitzungen
-entstanden, aus 2 630 Commits im Arbeits-Repo (Stand 2026-09-30). <!-- doc-facts-check: ignore —
-Commit-Zahl gilt nur im Arbeits-Repo, die Release-Uebergabe fasst die Historie im oeffentlichen
-Repo je Release zu einem Commit zusammen --> Davon tragen 2 442 mindestens einen KI-Trailer —
-2 155 den von Claude, 343 den des Regelkreises selbst (`Generated-By: MySuricates`), 56 beide.
+Ein Forschungsprojekt zur Frage, wie sich Softwareentwicklung und andere Arbeit mit KI-Agenten verändern
+und wie sich diese Arbeit aus wiederholbaren, möglichst nachvollziehbaren Bausteinen unterschiedlich
+zusammensetzen lässt — und ein lauffähiges System, an dem sich das beobachten lässt.
 
 **Was das nicht ist:** kein Produkt, kein Dienst, kein Support, keine Stabilitaetszusage. Die
 Architekturschulden sind bekannt und werden im System selbst als Audit-Befunde gefuehrt — siehe
 [Reifegrad](#reifegrad-und-bekannte-schulden).
 
-## Die Frage dahinter
+## Fragen, die dabei entstehen
 
-> **Wie arbeite ich mit starken LLMs, um auch meine beschränkten Fähigkeiten nutzen zu können?**
+Auf diese Fragen gibt es heute schon sehr unterschiedliche Antworten.
+
+> **Wie arbeite ich mit starken LLMs, wenn ich Agentensystemen nicht nur auf Zuruf weitere Aufgaben geben
+> oder sie einfach frei laufen lassen will?**
 
 1. Aufgaben und Nebenstränge, die aus einer Arbeit entstehen, **verschwinden nicht im Leeren** —
    TODO-System, Historie. MySuricates kennt das Projekt, das Projekt kennt MySuricates. Dazu Workflows,
@@ -37,13 +32,16 @@ Architekturschulden sind bekannt und werden im System selbst als Audit-Befunde g
    ich das **sichtbar** (Versionen, Läufe, Prozessschritte)? Daraus dann: was braucht es da alles für
    unterschiedliche Schritte?
 3. Wie mache ich das Ganze **unabhängig von Anbietern**?
-4. Daraus sind **viele zusätzliche Ideen** entstanden: wie man dahin kommt, wie man es verknüpft, wie
+4. Wie baue ich **Schleifen (Loop-Engineering)** wie das Audit-System, die einen Lauf mit früheren
+   vergleichbar machen, schon einmal gestellte Fragen wiederfinden und das Ergebnis von **Menschen
+   bewerten** lassen?
+5. Daraus sind **viele zusätzliche Ideen** entstanden: wie man dahin kommt, wie man es verknüpft, wie
    man es sichtbar macht.
 
 Die Antworten sind Bausteine, und man braucht nicht alle. Was man schon hat, schließt man an — etwa
 ein vorhandenes Aufgabensystem statt der eigenen TODOs. Welcher Baustein zu welcher Antwort gehört und
-welche Ansätze (Loop-Engineering, Spec-Driven Development, Agenten orchestrieren) sich aus denselben
-Bausteinen bauen lassen, zeigt der [Baukasten](docs/baukasten.md).
+welche Ansätze (etwa Spec-Driven Development oder Agenten orchestrieren) sich aus denselben Bausteinen
+bauen lassen, zeigt der [Baukasten](docs/baukasten.md).
 
 Nach der Installation ist nur der Kern an (Preset `core`); `research` und `full` schalten weitere
 Module zu — welche, steht unter [Forschungsfragen](#forschungsfragen) und im [Baukasten](docs/baukasten.md).
@@ -74,7 +72,6 @@ Geordnet nach Tiefe: erst der Überblick, dann die einzelnen Bausteine, dann das
 |---|---|
 | [Baukasten](docs/baukasten.md) | Die Frage dahinter und ihre vier Antworten als Bausteine: was zum Kern gehoert, was zugeschaltet wird, was man selbst hat oder anschliesst — und Ansaetze wie Loop-Engineering oder Spec-Driven Development aus denselben Bausteinen |
 | [Getting Started](docs/GETTING-STARTED.md) | Ausprobieren ohne Installation (Tryout-Image) und Erstinstallation mit dem gefuehrten Installer (Container, Rechner oder Dev · Test · Prod) |
-| [Vision](docs/vision.md) | Produktvision und Roadmap |
 
 **Bausteine vertiefen**
 
@@ -127,12 +124,6 @@ Es heisst nicht, dass die Frage beantwortet ist.
 | Wie behaelt man die Kontrolle ueber einen Agenten, der mehrere Schritte selbst plant? | **Agentische Bloecke** trennen Reason und Act — erst entscheidet ein Aufruf, was zu tun ist, ein zweiter fuehrt es aus — und laufen gegen harte Budgets: Iterationen, Zeit, kumulierte Tokens, Wiederholungserkennung. |
 | Kann man die Qualitaet einer KI-Ausgabe maschinell bewerten, statt sie zu lesen? | **Gates**: Bloecke geben `gate_status: GREEN\|YELLOW\|RED` aus. RED erzeugt ein TODO mit hoher, YELLOW eines mit mittlerer Prioritaet. Die Bewertung steckt im Workflow, nicht in der Plattform. |
 
-Die ehrlichste Antwort nach sieben Monaten: die Mechanismen tragen, aber sie brauchen Leitplanken,
-und die Leitplanken sind der eigentliche Ertrag. Ein Gate, das nur ein Sprachmodell fragt, ob etwas
-gut ist, liefert zuverlaessig Befunde — auch erfundene. Deterministische Messung vor KI-Bewertung ist
-die wiederkehrende Lehre. Die Mechanismen einzeln, je mit Ablaufdiagramm, Codebelegen und Grenzen:
-[Konzepte](docs/konzepte/README.md).
-
 Nicht alles davon ist nach der Installation eingeschaltet. Randfunktionen sind Module, die beim
 Start festgelegt werden. Das Preset `core` (Standard) enthaelt den Kern — Workflows, Bloecke,
 Zeitplaene, TODOs. `research` ergaenzt die Mechanismen dieses Abschnitts und ihre Oberflaechen:
@@ -167,20 +158,6 @@ zusaetzlich zu Hygiene-Gate und Secret-Scan; seit dem 2026-09-21 auf Ubuntu 26.0
 Doku); einmal pro Woche laufen beide ohne Filter.
 
 ## Reifegrad und bekannte Schulden
-
-Experimentell. Das System laeuft beim Autor taeglich auf einem Rechner und hatte am 2026-09-12
-rund 2 400 Runs hinter sich — es ist bisher nicht unter Last, nicht mit mehreren Benutzern und
-nicht ausserhalb eines vertrauenswuerdigen Netzes betrieben worden (Eigenangabe).
-
-Die Schulden sind nicht versteckt, sondern gezaehlt. Das Audit Center — eine Seite der Anwendung,
-in der die Befunde der Audit-Workflows ueber die Zeit gefuehrt werden — zaehlte am 2026-09-22 fuer
-MySuricates selbst **322 Befunde** seit dem 2026-07-19: 29 offen (davon 1 kritisch, 4 hoch),
-7 warten auf Gegenpruefung, 267 sind behoben, 18 als Risiko akzeptiert, 1 verworfen. Die offenen
-betrafen an diesem Tag vor allem drei Felder: Struktur (eine zu grosse zentrale Ausfuehrungsklasse, stark
-gekoppelte Services, Controller mit direktem Repository-Zugriff), Performance und Speicher
-(Datenbankgroesse ohne Vacuum-Strategie, N+1-Kandidaten, Bundle-Groesse) und die Reife fuer eine
-Veroeffentlichung. Wie diese Befunde entstehen und was die Statusse bedeuten, steht im
-[Audit-Workflow-Protokoll](docs/audit-workflow-protocol.md).
 
 Bekannte harte Grenzen:
 
