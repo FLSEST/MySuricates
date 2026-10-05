@@ -45,7 +45,7 @@ Ordered by depth: the overview first, then the individual building blocks, then 
 
 | Document | Content |
 |---|---|
-| [Concepts](docs/en/konzepte/README.md) | Eight mechanisms to adopt — gates, self-improvement, hardening, and more — each with a flow diagram, code evidence, and dated measurement |
+| [Concepts](docs/en/konzepte/README.md) | Eight mechanisms to adopt — gates, self-improvement, hardening, and more — each with a flow diagram, limits, and code evidence |
 | [Workflow Guide](docs/en/WORKFLOW-GUIDE.md) | Block types, patterns, timeouts |
 | [Integrations](docs/en/integrations.md) | Plugin system, OAuth, provider reference |
 | [Audit Protocol](docs/en/audit-workflow-protocol.md) | How findings are created, gate status, TODO linking |

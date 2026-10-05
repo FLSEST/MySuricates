@@ -45,7 +45,7 @@ Geordnet nach Tiefe: erst der Überblick, dann die einzelnen Bausteine, dann das
 
 | Dokument | Inhalt |
 |---|---|
-| [Konzepte](docs/konzepte/README.md) | Acht Mechanismen zum Uebernehmen — Gates, Selbstverbesserung, Haertung u. a. —, je mit Ablaufdiagramm, Codebelegen und datierter Messung |
+| [Konzepte](docs/konzepte/README.md) | Acht Mechanismen zum Uebernehmen — Gates, Selbstverbesserung, Haertung u. a. —, je mit Ablaufdiagramm, Grenzen und Codebelegen |
 | [Workflow-Guide](docs/WORKFLOW-GUIDE.md) | Block-Typen, Patterns, Timeouts |
 | [Integrations](docs/integrations.md) | Plugin-System, OAuth, Provider-Referenz |
 | [Audit-Protokoll](docs/audit-workflow-protocol.md) | Wie Befunde entstehen, Gate-Status, TODO-Verknuepfung |
