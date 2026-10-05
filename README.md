@@ -26,6 +26,34 @@ loop's own (`Generated-By: MySuricates`), 56 both.
 architectural debt is known and is tracked within the system itself as audit findings — see
 [Maturity level](#maturity-level-and-known-debt).
 
+## The question behind it
+
+> **How do I work with strong LLMs so that I can put my own limited abilities to use as well?**
+
+1. Tasks and side threads that come out of a piece of work **do not disappear into the void** — TODO
+   system, history. MySuricates knows the project, the project knows MySuricates. On top of that,
+   workflows that **think of the things that were forgotten during the session**.
+2. How do I build flows that **combine deterministic and non-deterministic** — and how do I make that
+   **visible** (versions, runs, process steps)? And from there: what different kinds of steps does
+   that take?
+3. How do I make the whole thing **independent of providers**?
+4. From this, **many additional ideas** emerged: how to get there, how to connect it, how to make it
+   visible.
+
+The answers are building blocks, and you don't need all of them. What you already have, you connect —
+an existing task system instead of the built-in TODOs, for example. Which building block belongs to
+which answer, and which approaches (loop engineering, spec-driven development, orchestrating agents)
+can be built from the same blocks, is shown in [Building blocks](docs/en/baukasten.md).
+
+Not all of this is enabled after installation. Peripheral functions are modules that are fixed at
+startup. The `core` preset (default) contains the core — workflows, blocks, schedules, TODOs.
+`research` adds the mechanisms of the [research questions](#research-questions) and their interfaces: chains (several workflows as
+one chain), the chat assistant, learning (analyses of completed runs — metrics and recommendations),
+workflow memory (knowledge from runs that is injected into later runs), the Audit Center (the page
+where the findings from audit workflows are tracked over time), and BPMN export. `full` enables
+everything — including integrations, webhooks, and remote access. The installer asks for this; the
+complete list with all modules is in [Architecture](docs/en/architektur.md#module-system-startup-configuration).
+
 ## Quickstart
 
 Just trying it out — all you need is Docker:
@@ -44,25 +72,44 @@ Docker volume. Permanent setup: [Installation](#installation) below or step by s
 
 ## Documentation
 
+Ordered by depth: the overview first, then the individual building blocks, then the reference.
+
+**Getting started**
+
 | Document | Content |
 |---|---|
 | [Building blocks](docs/en/baukasten.md) | The question behind it and its four answers as building blocks: what belongs to the core, what is switched on, what you have yourself or connect — and approaches such as loop engineering or spec-driven development built from the same blocks |
 | [Getting Started](docs/en/GETTING-STARTED.md) | Try it out without installation (tryout image) and first installation with the guided installer (container, machine, or dev · test · prod) |
+| [Vision](docs/en/vision.md) | Product vision and roadmap |
+
+**Building blocks in depth**
+
+| Document | Content |
+|---|---|
 | [Concepts](docs/en/konzepte/README.md) | Eight mechanisms to adopt — gates, self-improvement, hardening, and more — each with a flow diagram, code evidence, and dated measurement |
 | [Workflow Guide](docs/en/WORKFLOW-GUIDE.md) | Block types, patterns, timeouts |
-| [Architecture](docs/en/architektur.md) | System overview, layers, data flow, security |
+| [Integrations](docs/en/integrations.md) | Plugin system, OAuth, provider reference |
+| [Audit Protocol](docs/en/audit-workflow-protocol.md) | How findings are created, gate status, TODO linking |
+| [Assistant](docs/en/assistant-system.md) | Chat assistant, sessions, suggestions |
+| [Evidence](docs/en/belege.md) | Cases where a mechanism found something the normal process had missed — with run ID and number |
 | [Diagrams](docs/en/diagramme.md) | Nine pages of flow and architecture diagrams (engine, control and status, scheduler, skills, memory, request path, frontend, deployment, logging, and monitoring) |
+
+**Reference**
+
+| Document | Content |
+|---|---|
 | [API Reference](docs/en/api-referenz.md) | REST endpoints with request/response |
 | [Data Model](docs/en/datenmodell.md) | Entities, DB schema, migrations |
-| [Frontend](docs/en/frontend.md) | Pages, components, hooks, design system |
+
+**Operation and development**
+
+| Document | Content |
+|---|---|
 | [Deployment](docs/en/deployment.md) | Docker, configuration, environment variables, trust model |
+| [Architecture](docs/en/architektur.md) | System overview, layers, data flow, security |
 | [Development](docs/en/entwicklung.md) | Local setup, build, tests, conventions |
+| [Frontend](docs/en/frontend.md) | Pages, components, hooks, design system |
 | [Developer Onboarding](docs/en/onboarding/README.md) | Getting into the code: architecture, code walkthrough, glossary, FAQ |
-| [Integrations](docs/en/integrations.md) | Plugin system, OAuth, provider reference |
-| [Assistant](docs/en/assistant-system.md) | Chat assistant, sessions, suggestions |
-| [Audit Protocol](docs/en/audit-workflow-protocol.md) | How findings are created, gate status, TODO linking |
-| [Evidence](docs/en/belege.md) | Cases where a mechanism found something the normal process had missed — with run ID and number |
-| [Vision](docs/en/vision.md) | Product vision and roadmap |
 
 For agents that call the REST API directly, [AGENTS.md](AGENTS.md) is the starting point.
 
@@ -74,7 +121,7 @@ For agents that call the REST API directly, [AGENTS.md](AGENTS.md) is the starti
 4. **Everything can be wired together:** diverse concepts, connect additional sources.
 5. **Provider-independent as far as possible:** provider and model can be selected per block. Encapsulating AI in the container has not yet been achieved.
 
-## The questions behind it
+## Research questions
 
 Four mechanisms were built to investigate one question each. Built here means: they run.
 It does not mean that the question has been answered.
@@ -91,15 +138,6 @@ and those guardrails are the real outcome. A gate that merely asks a language mo
 is good reliably delivers findings — including fabricated ones. Deterministic measurement before AI
 evaluation is the recurring lesson. The mechanisms individually, each with a flow diagram, code
 evidence, and limits: [Concepts](docs/en/konzepte/README.md).
-
-Not all of this is enabled after installation. Peripheral functions are modules that are fixed at
-startup. The `core` preset (default) contains the core — workflows, blocks, schedules, TODOs.
-`research` adds the mechanisms from this section and their interfaces: chains (several workflows as
-one chain), the chat assistant, learning (analyses of completed runs — metrics and recommendations),
-workflow memory (knowledge from runs that is injected into later runs), the Audit Center (the page
-where the findings from audit workflows are tracked over time), and BPMN export. `full` enables
-everything — including integrations, webhooks, and remote access. The installer asks for this; the
-complete list with all modules is in [Architecture](docs/en/architektur.md#module-system-startup-configuration).
 
 ## What is in there
 

@@ -26,6 +26,35 @@ Repo je Release zu einem Commit zusammen --> Davon tragen 2 442 mindestens einen
 Architekturschulden sind bekannt und werden im System selbst als Audit-Befunde gefuehrt — siehe
 [Reifegrad](#reifegrad-und-bekannte-schulden).
 
+## Die Frage dahinter
+
+> **Wie arbeite ich mit starken LLMs, um auch meine beschränkten Fähigkeiten nutzen zu können?**
+
+1. Aufgaben und Nebenstränge, die aus einer Arbeit entstehen, **verschwinden nicht im Leeren** —
+   TODO-System, Historie. MySuricates kennt das Projekt, das Projekt kennt MySuricates. Dazu Workflows,
+   die **an Sachen denken, die in der Sitzung vergessen gingen**.
+2. Wie baue ich Abläufe, die **deterministisch und nicht-deterministisch kombinieren** — und wie mache
+   ich das **sichtbar** (Versionen, Läufe, Prozessschritte)? Daraus dann: was braucht es da alles für
+   unterschiedliche Schritte?
+3. Wie mache ich das Ganze **unabhängig von Anbietern**?
+4. Daraus sind **viele zusätzliche Ideen** entstanden: wie man dahin kommt, wie man es verknüpft, wie
+   man es sichtbar macht.
+
+Die Antworten sind Bausteine, und man braucht nicht alle. Was man schon hat, schließt man an — etwa
+ein vorhandenes Aufgabensystem statt der eigenen TODOs. Welcher Baustein zu welcher Antwort gehört und
+welche Ansätze (Loop-Engineering, Spec-Driven Development, Agenten orchestrieren) sich aus denselben
+Bausteinen bauen lassen, zeigt der [Baukasten](docs/baukasten.md).
+
+Nicht alles davon ist nach der Installation eingeschaltet. Randfunktionen sind Module, die beim
+Start festgelegt werden. Das Preset `core` (Standard) enthaelt den Kern — Workflows, Bloecke,
+Zeitplaene, TODOs. `research` ergaenzt die Mechanismen der [Forschungsfragen](#forschungsfragen) und ihre Oberflaechen:
+Chains (mehrere Workflows als eine Kette), den Chat-Assistenten, Learning (Auswertungen ueber
+abgelaufene Runs — Kennzahlen und Empfehlungen), Workflow-Memory (Wissen aus Runs, das in spaetere
+Runs eingespielt wird), das Audit Center (die Seite, auf der die Befunde der Audit-Workflows ueber
+die Zeit gefuehrt werden) und BPMN-Export. `full` schaltet alles frei — darunter Integrationen,
+Webhooks und Fernzugriff. Der Installer fragt danach; die vollstaendige Liste mit allen Modulen
+steht in [Architektur](docs/architektur.md#module-system-startkonfiguration).
+
 ## Schnellstart
 
 Nur ausprobieren — dafuer braucht es nur Docker:
@@ -44,25 +73,44 @@ oder Schritt fuer Schritt in [Getting Started](docs/GETTING-STARTED.md).
 
 ## Dokumentation
 
+Geordnet nach Tiefe: erst der Überblick, dann die einzelnen Bausteine, dann das Nachschlagewerk.
+
+**Einstieg**
+
 | Dokument | Inhalt |
 |---|---|
 | [Baukasten](docs/baukasten.md) | Die Frage dahinter und ihre vier Antworten als Bausteine: was zum Kern gehoert, was zugeschaltet wird, was man selbst hat oder anschliesst — und Ansaetze wie Loop-Engineering oder Spec-Driven Development aus denselben Bausteinen |
 | [Getting Started](docs/GETTING-STARTED.md) | Ausprobieren ohne Installation (Tryout-Image) und Erstinstallation mit dem gefuehrten Installer (Container, Rechner oder Dev · Test · Prod) |
+| [Vision](docs/vision.md) | Produktvision und Roadmap |
+
+**Bausteine vertiefen**
+
+| Dokument | Inhalt |
+|---|---|
 | [Konzepte](docs/konzepte/README.md) | Acht Mechanismen zum Uebernehmen — Gates, Selbstverbesserung, Haertung u. a. —, je mit Ablaufdiagramm, Codebelegen und datierter Messung |
 | [Workflow-Guide](docs/WORKFLOW-GUIDE.md) | Block-Typen, Patterns, Timeouts |
-| [Architektur](docs/architektur.md) | Systemuebersicht, Schichten, Datenfluss, Sicherheit |
+| [Integrations](docs/integrations.md) | Plugin-System, OAuth, Provider-Referenz |
+| [Audit-Protokoll](docs/audit-workflow-protocol.md) | Wie Befunde entstehen, Gate-Status, TODO-Verknuepfung |
+| [Assistant](docs/assistant-system.md) | Chat-Assistent, Sessions, Suggestions |
+| [Belege](docs/belege.md) | Faelle, in denen ein Mechanismus etwas fand, das der normale Prozess uebersah — mit Run-Id und Zahl |
 | [Diagramme](docs/diagramme.md) | Neun Seiten Ablauf- und Architekturdiagramme (Engine, Steuerung und Status, Scheduler, Skills, Memory, Request-Pfad, Frontend, Deployment, Logging und Monitoring) |
+
+**Nachschlagen**
+
+| Dokument | Inhalt |
+|---|---|
 | [API-Referenz](docs/api-referenz.md) | REST-Endpunkte mit Request/Response |
 | [Datenmodell](docs/datenmodell.md) | Entities, DB-Schema, Migrationen |
-| [Frontend](docs/frontend.md) | Seiten, Komponenten, Hooks, Design-System |
+
+**Betrieb und Entwicklung**
+
+| Dokument | Inhalt |
+|---|---|
 | [Deployment](docs/deployment.md) | Docker, Konfiguration, Umgebungsvariablen, Vertrauensmodell |
+| [Architektur](docs/architektur.md) | Systemuebersicht, Schichten, Datenfluss, Sicherheit |
 | [Entwicklung](docs/entwicklung.md) | Lokales Setup, Build, Tests, Konventionen |
+| [Frontend](docs/frontend.md) | Seiten, Komponenten, Hooks, Design-System |
 | [Entwickler-Onboarding](docs/onboarding/README.md) | Einstieg in den Code: Architektur, Code-Rundgang, Glossar, FAQ |
-| [Integrations](docs/integrations.md) | Plugin-System, OAuth, Provider-Referenz |
-| [Assistant](docs/assistant-system.md) | Chat-Assistent, Sessions, Suggestions |
-| [Audit-Protokoll](docs/audit-workflow-protocol.md) | Wie Befunde entstehen, Gate-Status, TODO-Verknuepfung |
-| [Belege](docs/belege.md) | Faelle, in denen ein Mechanismus etwas fand, das der normale Prozess uebersah — mit Run-Id und Zahl |
-| [Vision](docs/vision.md) | Produktvision und Roadmap |
 
 Fuer Agenten, die die REST-API direkt ansprechen, ist [AGENTS.md](AGENTS.md) der Einstieg.
 
@@ -74,7 +122,7 @@ Fuer Agenten, die die REST-API direkt ansprechen, ist [AGENTS.md](AGENTS.md) der
 4. **Alles lässt sich zusammenstöpseln:** diverse Konzepte, weitere Quellen anbinden.
 5. **Unabhängig vom Anbieter, so weit wie möglich:** Anbieter und Modell je Block wählbar. Die Kapselung der KI im Container ist noch nicht erreicht.
 
-## Die Fragen dahinter
+## Forschungsfragen
 
 Vier Mechanismen sind gebaut, um jeweils eine Frage zu untersuchen. Gebaut heisst hier: sie laufen.
 Es heisst nicht, dass die Frage beantwortet ist.
@@ -91,16 +139,6 @@ und die Leitplanken sind der eigentliche Ertrag. Ein Gate, das nur ein Sprachmod
 gut ist, liefert zuverlaessig Befunde — auch erfundene. Deterministische Messung vor KI-Bewertung ist
 die wiederkehrende Lehre. Die Mechanismen einzeln, je mit Ablaufdiagramm, Codebelegen und Grenzen:
 [Konzepte](docs/konzepte/README.md).
-
-Nicht alles davon ist nach der Installation eingeschaltet. Randfunktionen sind Module, die beim
-Start festgelegt werden. Das Preset `core` (Standard) enthaelt den Kern — Workflows, Bloecke,
-Zeitplaene, TODOs. `research` ergaenzt die Mechanismen dieses Abschnitts und ihre Oberflaechen:
-Chains (mehrere Workflows als eine Kette), den Chat-Assistenten, Learning (Auswertungen ueber
-abgelaufene Runs — Kennzahlen und Empfehlungen), Workflow-Memory (Wissen aus Runs, das in spaetere
-Runs eingespielt wird), das Audit Center (die Seite, auf der die Befunde der Audit-Workflows ueber
-die Zeit gefuehrt werden) und BPMN-Export. `full` schaltet alles frei — darunter Integrationen,
-Webhooks und Fernzugriff. Der Installer fragt danach; die vollstaendige Liste mit allen Modulen
-steht in [Architektur](docs/architektur.md#module-system-startkonfiguration).
 
 ## Was da steht
 
