@@ -539,6 +539,18 @@ class ShellBlockExecutorTest {
         verifyNoInteractions(shellService, containerShellService);
     }
 
+    /** Review I2: the editor's default shell config carries command "" — that counts as unset, as in the analyzer. */
+    @Test
+    void toolMode_withBlankCommandFromTheEditorDefault_runsTheTool() {
+        BlockDefinition block = BlockDefinition.builder().type("shell").name("trivy")
+                .config(new HashMap<>(Map.of("command", "", "container_image", "img:1", "container_args", List.of("fs"))))
+                .build();
+        StepResult expected = new StepResult();
+        when(containerToolStep.execute(eq(block), isA(ContainerToolSpec.class), eq(context))).thenReturn(expected);
+
+        assertThat(executor.execute(block, context)).isSameAs(expected);
+    }
+
     @Test
     void toolMode_withCommand_isRefused() {
         BlockDefinition block = BlockDefinition.builder().type("shell")

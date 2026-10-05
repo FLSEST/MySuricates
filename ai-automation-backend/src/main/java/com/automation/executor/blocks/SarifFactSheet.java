@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.MissingNode;
 
 import java.io.IOException;
-import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
@@ -18,6 +17,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /**
@@ -34,7 +34,8 @@ final class SarifFactSheet {
     static final long MAX_TOTAL_BYTES = 50L * 1024 * 1024;
     private static final int RAW_TAIL_LINES = 40;
     private static final List<String> SEVERITIES = List.of("CRITICAL", "HIGH", "MEDIUM", "LOW");
-    private static final String WORKSPACE = "/workspace/";
+    /** Tool output that carries a SARIF/JSON report instead of a log ({@code "runs"}, {@code "snippet"}, {@code "$schema"}). */
+    private static final Pattern SARIF_LIKE = Pattern.compile("\"(?:runs|snippet|\\$schema)\"\\s*:");
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     /** The sheet, whether it rests on readable SARIF, and the number of unsuppressed results. */
@@ -45,6 +46,8 @@ final class SarifFactSheet {
     private SarifFactSheet() {}
 
     static Result read(Path hostDir, String containerDir, String prefix, int exitCode, String rawOutput) {
+        String aborted = abortReason(exitCode);
+        if (aborted != null) return notMeasured(prefix, aborted, exitCode, rawOutput);
         List<Path> files;
         try {
             files = sarifFiles(hostDir);
@@ -69,9 +72,17 @@ final class SarifFactSheet {
                 if (!runs.isArray()) {
                     return notMeasured(prefix, file.getFileName() + " ist kein SARIF (runs fehlt)", exitCode, rawOutput);
                 }
+                if (runs.isEmpty()) {
+                    return notMeasured(prefix, file.getFileName() + " enthält keinen Lauf", exitCode, rawOutput);
+                }
                 for (JsonNode run : runs) {
                     if (failedInvocation(run)) {
                         return notMeasured(prefix, "Werkzeug meldet executionSuccessful=false", exitCode, rawOutput);
+                    }
+                    // SARIF: results fehlt oder ist null = keine Analyse; [] = analysiert, nichts gefunden
+                    if (!run.path("results").isArray()) {
+                        return notMeasured(prefix, file.getFileName() + ": ein Lauf ohne results (keine Analyse)",
+                                exitCode, rawOutput);
                     }
                     tools.add(toolLabel(run));
                     suppressed += collect(run, hits);
@@ -126,7 +137,7 @@ final class SarifFactSheet {
             JsonNode rule = rule(result, rules, byId.get(ruleId));
             String message = result.path("message").path("text").asText("");
             if (message.isBlank()) message = rule.path("shortDescription").path("text").asText("");
-            hits.add(new Hit(severity(result, rule), location(result), ruleId, message));
+            hits.add(new Hit(severity(result, rule), SarifLocation.of(result, run.path("originalUriBaseIds")), ruleId, message));
         }
         return suppressed;
     }
@@ -168,23 +179,19 @@ final class SarifFactSheet {
         }
     }
 
-    /** First physical location as a repo-relative {@code path[:line]}; {@code /workspace/} is the container mount. */
-    static String location(JsonNode result) {
-        JsonNode physical = result.path("locations").path(0).path("physicalLocation");
-        String uri = physical.path("artifactLocation").path("uri").asText("");
-        if (uri.isBlank()) return "(ohne Ort)";
-        String path = uri;
-        if (uri.startsWith("file:")) {
-            try {
-                path = URI.create(uri).getPath();
-            } catch (IllegalArgumentException e) {
-                path = uri.substring("file:".length()).replaceFirst("^/+", "/");
-            }
-        }
-        if (path == null) path = uri;
-        if (path.startsWith(WORKSPACE)) path = path.substring(WORKSPACE.length());
-        int line = physical.path("region").path("startLine").asInt(0);
-        return line > 0 ? path + ":" + line : path;
+    /**
+     * Exit codes that mean the tool did not run to its end — timeout, cancel, killed (OOM), or the container never
+     * started. Whatever SARIF lies in the directory then is partial at best (review of d3a7f5e2).
+     */
+    private static String abortReason(int exitCode) {
+        return switch (exitCode) {
+            case 124 -> "Timeout - Werkzeug abgebrochen (Exit 124)";
+            case 125 -> "Container nicht gestartet (Exit 125: Image nicht erlaubt oder docker run gescheitert)";
+            case 126, 127 -> "Einstiegsbefehl nicht ausführbar oder nicht gefunden (Exit " + exitCode + ")";
+            case 130 -> "Lauf abgebrochen (Exit 130)";
+            case 137 -> "Container beendet (Exit 137, etwa Speichergrenze)";
+            default -> null;
+        };
     }
 
     private static String sheet(String prefix, Set<String> tools, int fileCount, List<Hit> hits, int suppressed,
@@ -226,17 +233,17 @@ final class SarifFactSheet {
                 .append("NICHT GEMESSEN: ").append(prefix).append("_findings (")
                 .append(UntrustedText.inline(reason, 300)).append(")\n")
                 .append("FAKT ").append(prefix).append("_exit_code: ").append(exitCode).append('\n');
-        String tail = tail(rawOutput);
-        if (!tail.isBlank()) {
-            out.append("## WERKZEUG-LOG (letzte ").append(RAW_TAIL_LINES).append(" Zeilen)\n")
-                    .append(UntrustedText.defuseLines(tail));
+        if (rawOutput != null && SARIF_LIKE.matcher(rawOutput).find()) {
+            // a report on stdout would bring its snippets (secrets) into the step output
+            out.append("## WERKZEUG-LOG: enthält SARIF/JSON-Daten und wird nicht gezeigt - den Bericht in den "
+                    + "Ausgabeordner schreiben\n");
+        } else if (rawOutput != null && !rawOutput.isBlank()) {
+            out.append("## WERKZEUG-LOG (letzte ").append(RAW_TAIL_LINES).append(" Zeilen)\n");
+            List<String> lines = UntrustedText.defuseLines(rawOutput).lines().toList();
+            // "| " vor jeder Zeile: eine Logzeile "FAKT x: 0" darf nie als gemessener Fakt gelten
+            lines.subList(Math.max(0, lines.size() - RAW_TAIL_LINES), lines.size())
+                    .forEach(line -> out.append("| ").append(line).append('\n'));
         }
         return new Result(out.toString().stripTrailing(), false, 0);
-    }
-
-    private static String tail(String raw) {
-        if (raw == null || raw.isBlank()) return "";
-        List<String> lines = raw.lines().toList();
-        return String.join("\n", lines.subList(Math.max(0, lines.size() - RAW_TAIL_LINES), lines.size()));
     }
 }

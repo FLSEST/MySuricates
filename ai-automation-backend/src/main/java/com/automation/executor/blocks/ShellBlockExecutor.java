@@ -33,7 +33,8 @@ public class ShellBlockExecutor implements BlockExecutor {
         Map<String, Object> config = block.getConfig();
         Object rawCommand = config.get("command");
         if (config.containsKey("container_args")) {
-            if (rawCommand != null) {
+            // a blank command (editor default) counts as unset, as in the analyzer's requiredOneOf
+            if (rawCommand != null && !rawCommand.toString().isBlank()) {
                 throw new WorkflowExecutionException("Shell block takes either 'command' or 'container_args', not both");
             }
             return containerToolStep.execute(block, ContainerToolSpec.from(config, block.getName()), context);

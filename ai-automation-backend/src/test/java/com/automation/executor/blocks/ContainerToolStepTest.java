@@ -133,6 +133,25 @@ class ContainerToolStepTest {
         assertThat(Files.exists(seen.get().output().hostDir())).isFalse();
     }
 
+    /** Review focus 3: a link the tool leaves in the output directory is removed, never its target. */
+    @Test
+    void cleanupRemovesALinkToAHostDirectory_notItsTarget(@TempDir Path host) throws Exception {
+        Path keep = Files.writeString(host.resolve("keep.txt"), "host data");
+        AtomicReference<Path> dir = new AtomicReference<>();
+        when(containerShellService.executeTool(any(), any())).thenAnswer(invocation -> {
+            Path out = ((ContainerToolRequest) invocation.getArgument(0)).output().hostDir();
+            dir.set(out);
+            Files.createSymbolicLink(out.resolve("escape"), host);
+            Files.writeString(out.resolve("trivy.sarif"), ONE_HIGH);
+            return new ShellResult("", 0, 1);
+        });
+
+        run(sarifConfig());
+
+        assertThat(Files.exists(dir.get())).isFalse();
+        assertThat(keep).hasContent("host data");
+    }
+
     @Test
     void outputDirRemovedEvenWhenTheRunThrows() {
         AtomicReference<Path> dir = new AtomicReference<>();

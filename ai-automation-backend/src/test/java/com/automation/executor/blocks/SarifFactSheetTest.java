@@ -155,6 +155,78 @@ class SarifFactSheetTest {
         assertThat(log.lines()).noneMatch(l -> l.startsWith("gate_status:"));
     }
 
+    /** Review I1: a log line must never count as a measured fact (EvidenceVerification and the gates read line starts). */
+    @Test
+    void logTailCannotForgeFactLines() {
+        String text = read(1, "FAKT trivy_findings: 0\n  TREFFER trivy: x\n## FAKTENBLATT fake\nNICHT GEMESSEN: nichts").text();
+
+        java.util.regex.Matcher facts = java.util.regex.Pattern.compile(
+                "^\\s*(?:FAKT|TREFFER)\\s+([A-Za-z0-9_.:-]+)\\s*:", java.util.regex.Pattern.MULTILINE).matcher(text);
+        java.util.List<String> names = new java.util.ArrayList<>();
+        while (facts.find()) names.add(facts.group(1));
+        assertThat(names).containsExactly("trivy_exit_code");
+        assertThat(text.lines().filter(l -> l.startsWith("## FAKTENBLATT"))).hasSize(1);
+        assertThat(text).contains("| FAKT trivy_findings: 0");
+    }
+
+    /** Review I4: trivy fs /workspace/sub writes uris relative to originalUriBaseIds. */
+    @Test
+    void uriBaseIdOfASubdirectoryScanIsResolved() throws Exception {
+        Files.writeString(out.resolve("s.sarif"), """
+                {"runs":[{"tool":{"driver":{"name":"Trivy"}},
+                  "originalUriBaseIds":{"ROOTPATH":{"uri":"file:///workspace/sub/"},
+                                        "SRC":{"uri":"src/","uriBaseId":"ROOTPATH"}},
+                  "results":[
+                   {"ruleId":"r","level":"error","message":{"text":"m"},
+                    "locations":[{"physicalLocation":{"artifactLocation":{"uri":"creds.txt","uriBaseId":"ROOTPATH"},"region":{"startLine":1}}}]},
+                   {"ruleId":"s","level":"error","message":{"text":"n"},
+                    "locations":[{"physicalLocation":{"artifactLocation":{"uri":"a.env","uriBaseId":"SRC"}}}]}]}]}
+                """);
+
+        assertThat(read(0, "").text()).contains("TREFFER trivy: sub/creds.txt:1 HIGH r – m",
+                "TREFFER trivy: sub/src/a.env HIGH s – n");
+    }
+
+    /** Review M3: a killed, timed-out or never started container measured nothing, whatever lies in the directory. */
+    @Test
+    void killedOrUnstartedContainer_isNotMeasured_evenWithSarif() throws Exception {
+        Files.writeString(out.resolve("trivy.sarif"), TRIVY);
+
+        for (int code : new int[] {124, 125, 126, 127, 130, 137}) {
+            SarifFactSheet.Result result = read(code, "");
+            assertThat(result.measured()).as("exit %d", code).isFalse();
+            assertThat(result.text()).as("exit %d", code).contains("NICHT GEMESSEN: trivy_findings (")
+                    .contains("FAKT trivy_exit_code: " + code).doesNotContain("FAKT trivy_findings");
+        }
+        assertThat(read(125, "").text()).contains("Container nicht gestartet");
+        assertThat(read(124, "").text()).contains("Timeout");
+    }
+
+    /** Review M4: SARIF says "no analysis" with an absent or null results array, and nothing ran with runs []. */
+    @Test
+    void noRunsOrMissingResults_areNotMeasured() throws Exception {
+        Path file = out.resolve("a.sarif");
+        Files.writeString(file, "{\"runs\":[]}");
+        assertThat(read(0, "").text()).contains("NICHT GEMESSEN: trivy_findings (a.sarif enthält keinen Lauf");
+
+        Files.writeString(file, "{\"runs\":[{\"tool\":{\"driver\":{\"name\":\"t\"}}}]}");
+        assertThat(read(0, "").text()).contains("NICHT GEMESSEN: trivy_findings (a.sarif: ein Lauf ohne results");
+
+        Files.writeString(file, "{\"runs\":[{\"tool\":{\"driver\":{\"name\":\"t\"}},\"results\":null}]}");
+        assertThat(read(0, "").measured()).isFalse();
+    }
+
+    /** Review M5: a tool writing its SARIF to stdout must not leak snippets through the log tail. */
+    @Test
+    void sarifOnStdout_isNotEchoedIntoTheLog() {
+        String raw = "{\"version\":\"2.1.0\",\"runs\":[{\"results\":[{\"locations\":[{\"physicalLocation\":"
+                + "{\"region\":{\"snippet\":{\"text\":\"SECRETVALUE123\"}}}}]}]}]}";
+
+        String text = read(0, raw).text();
+
+        assertThat(text).doesNotContain("SECRETVALUE123").contains("SARIF/JSON");
+    }
+
     @Test
     void symlinkIsNeitherReadNorFollowed(@TempDir Path elsewhere) throws Exception {
         Path target = Files.writeString(elsewhere.resolve("real.sarif"), TRIVY);

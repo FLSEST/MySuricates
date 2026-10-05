@@ -1493,6 +1493,9 @@ Mit `output_format: sarif` ist die Schrittausgabe ein Faktenblatt nach dem
 (höchstens 200). Die Schwere kommt aus `security-severity`, sonst aus dem SARIF-`level`. Code-Ausschnitte gibt der
 Block nie aus. Lesbares SARIF heißt `COMPLETED`, auch bei Exit-Code ≠ 0; fehlt es, steht
 `NICHT GEMESSEN: <prefix>_findings (…)` da und der Schritt ist `FAILED` (für Audits: `on_failure: continue`).
+Ebenso nicht gemessen: ein Lauf ohne Ergebnisliste (`results` fehlt) und ein abgebrochener Container (Timeout,
+Abbruch, Exit 125–127 oder 137), auch wenn schon eine SARIF-Datei daliegt. Das Werkzeug-Log darunter steht mit
+`| ` vor jeder Zeile, damit keine Logzeile als `FAKT` gilt.
 
 ```json
 {
@@ -1511,8 +1514,11 @@ Block nie aus. Lesbares SARIF heißt `COMPLETED`, auch bei Exit-Code ≠ 0; fehl
 ```
 
 Grenzen: kein Host-Netz (ein Scan der laufenden Instanz geht so nicht), keine Umgebungsvariablen, feste Grenzen
-2 GB / 100 Prozesse, nur auf oberster Ebene (nicht in foreach/retry & Co.), und wie `container_image` nur dort, wo
-die Pfade des Backends Host-Pfade sind (Dev, Host-Installation).
+2 GB / 100 Prozesse, nur auf oberster Ebene (nicht in foreach/retry & Co.; Editor und Analyzer melden es dort), und
+wie `container_image` nur dort, wo die Pfade des Backends Host-Pfade sind (Dev, Host-Installation). Fehlt der
+Projektordner, startet der Container nicht, statt ein leeres Verzeichnis zu prüfen. Git-Werkzeuge sehen in einem
+Git-Worktree keine Historie: `.git` ist dort eine Datei mit einem Pfad außerhalb des Containers, und manche
+Werkzeuge (etwa `gitleaks git`) melden dann ohne Fehler 0 Befunde.
 
 ---
 

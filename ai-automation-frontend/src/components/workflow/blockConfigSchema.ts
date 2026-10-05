@@ -33,6 +33,8 @@ interface Field {
   legacyFor?: string;
   /** The executor reads the key only when these other keys have these values (e.g. `execution_mode: shell`; `"*"` = the key is set). */
   onlyWith?: Record<string, string>;
+  /** Works only on a top-level block (shell tool mode): not offered inside nested blocks. */
+  topLevelOnly?: boolean;
 }
 
 /** A field, or `"#name"` for an entry of `sharedFields`. */
@@ -124,7 +126,7 @@ function fieldSchema(field: Field, locale: SchemaLocale): JsonSchema {
   return schema;
 }
 
-function propertiesFor(type: string, locale: SchemaLocale): Record<string, JsonSchema> {
+function propertiesFor(type: string, locale: SchemaLocale, nested = false): Record<string, JsonSchema> {
   const spec = SPECS[type];
   const fields: Record<string, Field> = { ...(spec?.fields ?? {}) };
   if (acceptsAiOverride(type)) {
@@ -132,7 +134,17 @@ function propertiesFor(type: string, locale: SchemaLocale): Record<string, JsonS
   }
   for (const [key, field] of Object.entries(COMMON_FIELDS)) fields[key] ??= field;
   fields.on_failure = ON_FAILURE;
-  return Object.fromEntries(Object.entries(fields).map(([k, f]) => [k, fieldSchema(f, locale)]));
+  return Object.fromEntries(Object.entries(fields)
+    .filter(([, f]) => !(nested && f.topLevelOnly))
+    .map(([k, f]) => [k, fieldSchema(f, locale)]));
+}
+
+/** Required keys of a nested block: top-level-only keys drop out of requiredOneOf, a single remaining one is required. */
+function nestedRequiredConfigKeys(type: string): string[] {
+  const oneOf = requiredOneOfConfigKeys(type);
+  const usable = oneOf.filter((key) => !SPECS[type]?.fields[key]?.topLevelOnly);
+  const [only] = usable;
+  return usable.length === 1 && oneOf.length > 1 && only ? [...requiredConfigKeys(type), only] : requiredConfigKeys(type);
 }
 
 /** Config keys a block type knows (type-specific, AI override where it applies, `on_failure`). */
@@ -222,8 +234,8 @@ export function buildBlockConfigSchema(type: string, locale: SchemaLocale): Json
             properties: {
               config: {
                 type: 'object',
-                properties: propertiesFor(t, locale),
-                required: requiredConfigKeys(t),
+                properties: propertiesFor(t, locale, true),
+                required: nestedRequiredConfigKeys(t),
                 additionalProperties: false,
               },
             },

@@ -1468,6 +1468,9 @@ With `output_format: sarif` the step output is a fact sheet following the
 (at most 200). The severity comes from `security-severity`, otherwise from the SARIF `level`. The block never prints
 code snippets. Readable SARIF means `COMPLETED`, even with an exit code ≠ 0; without it the sheet says
 `NICHT GEMESSEN: <prefix>_findings (…)` and the step is `FAILED` (for audits: `on_failure: continue`).
+Also not measured: a run without a result list (`results` missing) and an aborted container (timeout, cancel, exit
+125–127 or 137), even if a SARIF file is already there. The tool log below carries `| ` in front of every line, so
+that no log line counts as a `FAKT`.
 
 ```json
 {
@@ -1486,8 +1489,11 @@ code snippets. Readable SARIF means `COMPLETED`, even with an exit code ≠ 0; w
 ```
 
 Limits: no host network (scanning the running instance does not work this way), no environment variables, fixed
-limits of 2 GB / 100 processes, top level only (not inside foreach/retry and the like), and like `container_image`
-only where the backend's paths are host paths (dev, host installation).
+limits of 2 GB / 100 processes, top level only (not inside foreach/retry and the like; editor and analyzer flag it
+there), and like `container_image` only where the backend's paths are host paths (dev, host installation). If the
+project directory is missing, the container does not start instead of scanning an empty directory. Git tools see no
+history in a git worktree: `.git` is a file there with a path outside the container, and some tools (such as
+`gitleaks git`) then report 0 findings without an error.
 
 ---
 

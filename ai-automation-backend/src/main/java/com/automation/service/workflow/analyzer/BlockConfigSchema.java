@@ -37,9 +37,16 @@ public final class BlockConfigSchema {
      * @param legacyFor  alter Name eines anderen Schlüssels, den der Executor weiter liest, sonst {@code null}
      * @param onlyWith   der Executor liest den Schlüssel nur, wenn diese Schlüssel diese Werte haben
      *                   (z. B. {@code container_image} eines retry-Blocks nur mit {@code execution_mode: shell})
+     * @param topLevelOnly der Schlüssel wirkt nur auf oberster Ebene, nicht in verschachtelten Blöcken
+     *                   (Werkzeug-Modus des Shell-Blocks, d3a7f5e2)
      */
     public record Field(String key, List<String> values, String legacy, boolean ignoreCase, String legacyFor,
-                        Map<String, String> onlyWith) {
+                        Map<String, String> onlyWith, boolean topLevelOnly) {
+
+        public Field(String key, List<String> values, String legacy, boolean ignoreCase, String legacyFor,
+                     Map<String, String> onlyWith) {
+            this(key, values, legacy, ignoreCase, legacyFor, onlyWith, false);
+        }
 
         /** Ob der Wert zu den erlaubten gehört; ohne feste Werte immer. */
         public boolean allows(String value) {
@@ -188,7 +195,7 @@ public final class BlockConfigSchema {
         node.path("onlyWith").properties().forEach(e -> onlyWith.put(e.getKey(), e.getValue().asText()));
         return new Field(key, List.copyOf(values), textOrNull(node.path("legacy")),
                 node.path("ignoreCase").asBoolean(false), textOrNull(node.path("legacyFor")),
-                Collections.unmodifiableMap(onlyWith));
+                Collections.unmodifiableMap(onlyWith), node.path("topLevelOnly").asBoolean(false));
     }
 
     private static String textOrNull(JsonNode node) {

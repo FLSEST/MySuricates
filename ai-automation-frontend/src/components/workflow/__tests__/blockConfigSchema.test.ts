@@ -161,6 +161,16 @@ describe('blockConfigSchema', () => {
     expect(buildBlockConfigSchema('approval', 'en')).not.toHaveProperty('oneOf');
   });
 
+  // Review of d3a7f5e2: tool mode runs only at the top level — nested shell blocks keep command as required key
+  it('keeps tool mode out of nested shell blocks, where command stays required', () => {
+    const rules = (buildBlockConfigSchema('switch', 'en') as any).definitions.nestedBlock.allOf;
+    const shell = rules.find((rule: any) => rule.if.properties.type.const === 'shell').then.properties.config;
+    expect(shell.required).toEqual(['command']);
+    expect(Object.keys(shell.properties)).toContain('container_image');
+    expect(Object.keys(shell.properties)).not.toContain('container_args');
+    expect(Object.keys(shell.properties)).not.toContain('output_format');
+  });
+
   // d3a7f5e2: a shell block runs either a command or, in tool mode, an image with container_args
   it('requires exactly one of command and container_args for shell', () => {
     expect(requiredOneOfConfigKeys('shell')).toEqual(['command', 'container_args']);
