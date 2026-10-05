@@ -354,9 +354,6 @@ ai-automation-frontend/src/
 │   └── CLAUDE.md                         ← copy of claude-summarizer.md
 └── codex/
     └── AGENTS.md                         ← copy of codex-summarizer.md
-
-docs/
-└── workflow-memory-architecture.md
 ```
 
 ## API Endpoints — */api/v1/workflows/{id}/memory*

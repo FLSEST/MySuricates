@@ -69,6 +69,15 @@ class DocsControllerTest {
     }
 
     @Test
+    void listDocs_namesTheGeneratedBlockReferenceWithItsHyphen() throws Exception {
+        Files.writeString(tempDir.resolve("block-referenz.md"), "# Block-Referenz");
+
+        mockMvc.perform(get("/api/v1/docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.name == 'block-referenz.md')].label").value("Block-Referenz"));
+    }
+
+    @Test
     void listDocs_emptyDirectory_returnsEmptyList() throws Exception {
         Path emptyDir = tempDir.resolve("empty");
         Files.createDirectories(emptyDir);

@@ -575,7 +575,7 @@ Specs liegen unter `cypress/e2e/`, die Helfer (API-Key, Ziel, Custom Commands, T
 - `before()` / `after()` Hooks sorgen für saubere Testdaten via `cy.apiCleanup()`
 
 Alte Workflow-Runs aufräumen: einzeln über `DELETE /api/v1/executions/{id}` (siehe
-[API-Referenz](api-referenz.md#delete-apiv1executionsid)), im Bestand automatisch über die
+[API-Referenz](api-referenz.md#apiv1executions)), im Bestand automatisch über die
 Run-Retention (Default 90 Tage) — siehe
 [architektur.md → Datenbank-Wartung](architektur.md#datenbank-wartung-sqlite-pool-size1)
 für Details zu Aufbewahrung und Abschaltbarkeit.

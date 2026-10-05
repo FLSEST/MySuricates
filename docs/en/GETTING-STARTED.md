@@ -311,5 +311,5 @@ in the repo — SSL off with the default password remains allowed.
 
 - [Development](entwicklung.md) — Build, tests, conventions
 - [Deployment](deployment.md) — Docker, environment variables, staging
-- [Architecture](architektur.md) — System overview, block types
+- [Architecture](architektur.md) — System overview, layers, security
 - [Workflow Guide](WORKFLOW-GUIDE.md) — Building workflows

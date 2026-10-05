@@ -2,7 +2,7 @@
   "id": "todo-details-drive-bulk-update",
   "title": "todo_details liefert gefilterte TODOs mit Beschreibung; todo-update updates schreibt nur, wo die Bedingung passt; run_if überspringt ohne KI",
   "derivedFrom": {
-    "spec": "docs/WORKFLOW-GUIDE.md → todo_details (System-injizierte Variablen), todo-update mit updates, run_if (Allgemeine Block-Eigenschaften)",
+    "spec": "docs/WORKFLOW-GUIDE.md → todo_details (System-injizierte Variablen), todo-update mit updates, run_if (Felder am Block)",
     "incidents": [
       "cc0eb3ba (Batch-Kette bauen: TODOs einordnen, nacheinander in einem Arbeitsstand abarbeiten, Review und Freigabe)",
       "4a2edda6 (todo-update: leere Vorgaben aus dem Editor überschreiben Titel und Beschreibung)"

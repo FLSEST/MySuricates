@@ -99,8 +99,9 @@ Geordnet nach Tiefe: erst der Überblick, dann die einzelnen Bausteine, dann das
 
 | Dokument | Inhalt |
 |---|---|
-| [API-Referenz](docs/api-referenz.md) | REST-Endpunkte mit Request/Response |
-| [Datenmodell](docs/datenmodell.md) | Entities, DB-Schema, Migrationen |
+| [API-Referenz](docs/api-referenz.md) | REST-Endpunkte je Bereich mit Zweck und Modul, erzeugt aus den Controllern |
+| [Block-Referenz](docs/block-referenz.md) | Alle Config-Schlüssel je Block-Typ, erzeugt aus dem Schema des Editors |
+| [Datenmodell](docs/datenmodell.md) | Tabellen, Beziehungen, Enums, SQLite-Besonderheiten |
 
 **Betrieb und Entwicklung**
 
@@ -108,9 +109,8 @@ Geordnet nach Tiefe: erst der Überblick, dann die einzelnen Bausteine, dann das
 |---|---|
 | [Deployment](docs/deployment.md) | Docker, Konfiguration, Umgebungsvariablen, Vertrauensmodell |
 | [Architektur](docs/architektur.md) | Systemuebersicht, Schichten, Datenfluss, Sicherheit |
-| [Entwicklung](docs/entwicklung.md) | Lokales Setup, Build, Tests, Konventionen |
-| [Frontend](docs/frontend.md) | Seiten, Komponenten, Hooks, Design-System |
-| [Entwickler-Onboarding](docs/onboarding/README.md) | Einstieg in den Code: Architektur, Code-Rundgang, Glossar, FAQ |
+| [Entwicklung](docs/entwicklung.md) | Lokales Setup, Einstieg in den Code, Build, Tests, Konventionen |
+| [Frontend](docs/frontend.md) | Aufbau und Regeln: State, API-Client, i18n, Design-System und Themes |
 
 Fuer Agenten, die die REST-API direkt ansprechen, ist [AGENTS.md](AGENTS.md) der Einstieg.
 

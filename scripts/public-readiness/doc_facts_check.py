@@ -209,9 +209,9 @@ README_SOURCE = "README.de.md"
 # ---------------------------------------------------------------------------
 # Technologietabelle: "| **React** | 19.2 | UI-Framework |"
 #
-# Gilt fuer JEDE gepruefte Datei, nicht nur fuers Onboarding — heute stehen
-# solche Tabellen nur in docs/onboarding/README.md (DE/EN), eine kuenftige
-# anderswo soll aber genauso mitlaufen. Die Doku kuerzt, deshalb gilt die
+# Gilt fuer JEDE gepruefte Datei — die einzige solche Tabelle stand in
+# docs/onboarding/README.md (entfallen im Doku-Umbau, TODO 1ab3ad21), eine
+# kuenftige soll aber genauso mitlaufen. Die Doku kuerzt, deshalb gilt die
 # genannte Version als richtig, wenn sie ein komponentenweises Praefix der
 # echten ist (19.2 zu 19.2.4 ja, 19.21 zu 19.2.4 nein).
 # ---------------------------------------------------------------------------

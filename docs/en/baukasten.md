@@ -33,7 +33,7 @@ remember the things that were forgotten during a session.
 
 | Building block | | What for |
 |---|---|---|
-| Workflow made of steps | Core | Fixed steps (shell, branch, loop), AI steps and human steps (approval, input) in one flow. → [Workflow guide](WORKFLOW-GUIDE.md) · To try: blueprints “If – then – else”, “Working through a list”, “Approval before acting”, “Form and its use”. |
+| Workflow made of steps | Core | Fixed steps (shell, branch, loop), AI steps and human steps (approval, input) in one flow. → [Workflow guide](WORKFLOW-GUIDE.md), every setting per step in the [block reference](block-referenz.md) · To try: blueprints “If – then – else”, “Working through a list”, “Approval before acting”, “Form and its use”. |
 | Step kind in the run | Core | Each step shows whether an AI, a fixed rule or a person acted. |
 | Traffic light | Core | A step outputs `GREEN`, `YELLOW` or `RED` – a verdict further steps can depend on. → [Gates](konzepte/gates.md) · To try: blueprint “Traffic light”. |
 | Agent step with a budget | Core | An open-ended AI task runs against fixed limits: iterations, time, tokens. → [Agentic budgets](konzepte/agentische-budgets.md) · To try: blueprint “Agent with approval (expensive)”. |
@@ -135,4 +135,5 @@ blueprints in the user interface, the [concepts](konzepte/README.md) to adopt, a
 diagram. Hints appear where you need them.
 
 For reference: [Architecture](architektur.md), [API reference](api-referenz.md),
+[Block reference](block-referenz.md),
 [Data model](datenmodell.md), [Deployment](deployment.md), [Development](entwicklung.md).

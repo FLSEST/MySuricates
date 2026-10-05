@@ -26,6 +26,8 @@ public class DocsController {
             Map.entry("WORKFLOW-GUIDE.md", "Workflow Guide"),
             Map.entry("architektur.md", "Architektur"),
             Map.entry("api-referenz.md", "API-Referenz"),
+            Map.entry("baukasten.md", "Baukasten"),
+            Map.entry("block-referenz.md", "Block-Referenz"),
             Map.entry("assistant-system.md", "Assistant System"),
             Map.entry("datenmodell.md", "Datenmodell"),
             Map.entry("deployment.md", "Deployment"),

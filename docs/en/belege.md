@@ -126,8 +126,9 @@ highest number was right.
 **Missed by:** the check that should have found it, and the agent who was extending it at that
 very moment.
 
-**Verify:** commit `adf6b90d`; remove a V row from `docs/datenmodell.md` and run
-`doc-facts-check.sh` — reported as `migration-table-luecke`.
+**Verify:** at commit `adf6b90d`, remove a V row from `docs/datenmodell.md` and run
+`doc-facts-check.sh` — reported as `migration-table-luecke` (since the documentation rework in October
+2026 the docs no longer carry a migration table).
 
 ---
 

@@ -129,8 +129,9 @@ Nummer blieb grün, weil die höchste Nummer stimmte.
 **Übersehen hatte das:** die Prüfung, die es hätte finden sollen, und der Agent, der sie
 gerade erweiterte.
 
-**Nachprüfbar:** Commit `adf6b90d`; eine V-Zeile aus `docs/datenmodell.md` entfernen und
-`doc-facts-check.sh` laufen lassen — Meldung `migration-table-luecke`.
+**Nachprüfbar:** im Stand von Commit `adf6b90d` eine V-Zeile aus `docs/datenmodell.md` entfernen und
+`doc-facts-check.sh` laufen lassen — Meldung `migration-table-luecke` (seit dem Doku-Umbau im Oktober
+2026 führt die Doku keine Migrationstabelle mehr).
 
 ---
 

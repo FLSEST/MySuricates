@@ -33,7 +33,7 @@ Workflows, die an Dinge denken, die in einer Sitzung vergessen gingen.
 
 | Baustein | | Wozu |
 |---|---|---|
-| Workflow aus Schritten | Kern | Feste Schritte (Shell, Verzweigung, Schleife), KI-Schritte und Mensch-Schritte (Freigabe, Eingabe) in einem Ablauf. → [Workflow-Guide](WORKFLOW-GUIDE.md) · Zum Ausprobieren: Blaupausen „Wenn – dann – sonst“, „Liste abarbeiten“, „Freigabe vor dem Handeln“, „Formular und Verwendung“. |
+| Workflow aus Schritten | Kern | Feste Schritte (Shell, Verzweigung, Schleife), KI-Schritte und Mensch-Schritte (Freigabe, Eingabe) in einem Ablauf. → [Workflow-Guide](WORKFLOW-GUIDE.md), alle Einstellungen je Schritt in der [Block-Referenz](block-referenz.md) · Zum Ausprobieren: Blaupausen „Wenn – dann – sonst“, „Liste abarbeiten“, „Freigabe vor dem Handeln“, „Formular und Verwendung“. |
 | Schrittart im Lauf | Kern | Bei jedem Schritt ist zu sehen, ob eine KI, eine feste Regel oder ein Mensch gehandelt hat. |
 | Ampel | Kern | Ein Schritt gibt `GREEN`, `YELLOW` oder `RED` aus – ein Urteil, an dem weitere Schritte hängen können. → [Gates](konzepte/gates.md) · Zum Ausprobieren: Blaupause „Ampel“. |
 | Agent-Schritt mit Budget | Kern | Eine offene KI-Aufgabe läuft gegen feste Grenzen: Durchgänge, Zeit, Tokens. → [Agentische Budgets](konzepte/agentische-budgets.md) · Zum Ausprobieren: Blaupause „Agent mit Freigabe (teuer)“. |
@@ -135,4 +135,5 @@ Seite „Freigaben“ mit allem, was auf eine Entscheidung wartet, und die Laufa
 Diagramm. Hinweise erscheinen dort, wo man sie braucht.
 
 Zum Nachschlagen: [Architektur](architektur.md), [API-Referenz](api-referenz.md),
+[Block-Referenz](block-referenz.md),
 [Datenmodell](datenmodell.md), [Deployment](deployment.md), [Entwicklung](entwicklung.md).

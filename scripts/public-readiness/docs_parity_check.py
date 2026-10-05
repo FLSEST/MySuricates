@@ -50,7 +50,7 @@ from md_common import FENCE, headings, iter_links, slug, tracked_markdown  # noq
 # Unterordner von docs/, die wie docs/ selbst eins zu eins unter docs/en/ gespiegelt werden.
 # Bewusst eine Liste statt "was es unter docs/en/ gibt": sonst bliebe ein Ordner, dessen
 # englische Fassung ganz fehlt, unsichtbar — so blieb docs/konzepte/ unbemerkt (TODO b94beaed).
-MIRRORED_SUBDIRS: tuple[str, ...] = ("onboarding", "konzepte")
+MIRRORED_SUBDIRS: tuple[str, ...] = ("konzepte",)  # docs/onboarding/ entfiel im Doku-Umbau (TODO 1ab3ad21)
 
 # Bekannte, ticketierte Luecken. Format: Pfad -> Begruendung mit TODO-Kennung.
 # Zurzeit leer: die zehn Diagramm-Seiten, die hier standen, haben seit TODO 47bd4d27 ein

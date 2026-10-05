@@ -98,8 +98,9 @@ Ordered by depth: the overview first, then the individual building blocks, then 
 
 | Document | Content |
 |---|---|
-| [API Reference](docs/en/api-referenz.md) | REST endpoints with request/response |
-| [Data Model](docs/en/datenmodell.md) | Entities, DB schema, migrations |
+| [API Reference](docs/en/api-referenz.md) | REST endpoints per area with purpose and module, generated from the controllers |
+| [Block Reference](docs/en/block-referenz.md) | Every config key per block type, generated from the editor's schema |
+| [Data Model](docs/en/datenmodell.md) | Tables, relations, enums, SQLite specifics |
 
 **Operation and development**
 
@@ -107,9 +108,8 @@ Ordered by depth: the overview first, then the individual building blocks, then 
 |---|---|
 | [Deployment](docs/en/deployment.md) | Docker, configuration, environment variables, trust model |
 | [Architecture](docs/en/architektur.md) | System overview, layers, data flow, security |
-| [Development](docs/en/entwicklung.md) | Local setup, build, tests, conventions |
-| [Frontend](docs/en/frontend.md) | Pages, components, hooks, design system |
-| [Developer Onboarding](docs/en/onboarding/README.md) | Getting into the code: architecture, code walkthrough, glossary, FAQ |
+| [Development](docs/en/entwicklung.md) | Local setup, getting into the code, build, tests, conventions |
+| [Frontend](docs/en/frontend.md) | Structure and rules: state, API client, i18n, design system and themes |
 
 For agents that call the REST API directly, [AGENTS.md](AGENTS.md) is the starting point.
 

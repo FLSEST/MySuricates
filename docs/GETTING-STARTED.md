@@ -314,5 +314,5 @@ Passwort — SSL aus mit dem Default bleibt weiterhin erlaubt.
 
 - [Entwicklung](entwicklung.md) — Build, Tests, Konventionen
 - [Deployment](deployment.md) — Docker, Umgebungsvariablen, Staging
-- [Architektur](architektur.md) — Systemübersicht, Block-Typen
+- [Architektur](architektur.md) — Systemübersicht, Schichten, Sicherheit
 - [Workflow-Guide](WORKFLOW-GUIDE.md) — Workflows bauen
