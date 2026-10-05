@@ -446,35 +446,35 @@ Sources:
 
 ## /api/v1/reports
 
-Source: `ReportsController`
+Source: `ReportsController` – Lists and reads the Markdown reports in the configured reports directory (`automation.reports.directory`).
 
 | Endpoint | Purpose | Module |
 |---|---|---|
-| `GET /api/v1/reports` |  | `audit` |
-| `GET /api/v1/reports/{name}` |  | `audit` |
+| `GET /api/v1/reports` | Lists the `.md` files of the reports directory as `name` and `label`, newest date in the name first. | `audit` |
+| `GET /api/v1/reports/{name}` | Returns the content of one report as `content`. | `audit` |
 
 ## /api/v1/schedules
 
-Source: `ScheduleController`
+Source: `ScheduleController` – Time-based starts of workflows and chains: cron, one-off and delayed schedules, calendar and the scheduler pauses.
 
 | Endpoint | Purpose | Module |
 |---|---|---|
-| `GET /api/v1/schedules` |  | core |
-| `POST /api/v1/schedules` |  | core |
-| `GET /api/v1/schedules/calendar` | Upcoming = schedules whose next real run lies in the period (behind a skip-until pause). | core |
+| `GET /api/v1/schedules` | Lists all schedules. | core |
+| `POST /api/v1/schedules` | Creates a schedule for a workflow (`workflowId`) or a chain (`targetType: CHAIN`, `chainId`) and answers 201. | core |
+| `GET /api/v1/schedules/calendar` | Returns the calendar data between `from` and `to`: upcoming schedules and past runs. | core |
 | `GET /api/v1/schedules/catch-up` | Sequential catch-up queue: the missed occurrence currently running and the ones waiting. | core |
-| `GET /api/v1/schedules/chain/{chainId}` |  | core |
+| `GET /api/v1/schedules/chain/{chainId}` | Lists the schedules of one chain. | core |
 | `GET /api/v1/schedules/maintenance` | Both pauses: the maintenance switch and an active skip-until window from the configuration. | core |
-| `POST /api/v1/schedules/maintenance` |  | core |
-| `POST /api/v1/schedules/preview` |  | core |
-| `GET /api/v1/schedules/remaining-this-week` |  | core |
-| `GET /api/v1/schedules/remaining-today` | `projectId` (optional): only the schedules of that project's workflows — the dashboard filter. | core |
-| `GET /api/v1/schedules/workflow/{workflowId}` |  | core |
-| `GET /api/v1/schedules/{id}` |  | core |
-| `PUT /api/v1/schedules/{id}` |  | core |
-| `DELETE /api/v1/schedules/{id}` |  | core |
-| `POST /api/v1/schedules/{id}/disable` |  | core |
-| `POST /api/v1/schedules/{id}/enable` |  | core |
+| `POST /api/v1/schedules/maintenance` | Switches the scheduler maintenance mode on or off with `enabled`; while it is on, no schedule starts. | core |
+| `POST /api/v1/schedules/preview` | Previews the next run times of the cron expression in `cronExpression`. | core |
+| `GET /api/v1/schedules/remaining-this-week` | Lists the runs still due this week; `projectId` (optional) filters like `remaining-today`. | core |
+| `GET /api/v1/schedules/remaining-today` | Lists the runs still due today. | core |
+| `GET /api/v1/schedules/workflow/{workflowId}` | Lists the schedules of one workflow. | core |
+| `GET /api/v1/schedules/{id}` | Returns one schedule; unknown id is 404. | core |
+| `PUT /api/v1/schedules/{id}` | Updates a schedule; only the fields sent are changed. | core |
+| `DELETE /api/v1/schedules/{id}` | Deletes a schedule (204). | core |
+| `POST /api/v1/schedules/{id}/disable` | Disables a schedule and clears its next run. | core |
+| `POST /api/v1/schedules/{id}/enable` | Enables a schedule and computes its next run. | core |
 | `GET /api/v1/schedules/{id}/runs` | Die neuesten Runs eines Zeitplans als Listenzeilen: Anzahl und Vorschau des letzten Schritts statt aller Schritte — die Detail-Route eines Runs liefert den Volltext. | core |
 
 ## /api/v1/search
@@ -483,45 +483,45 @@ Source: `SearchController` – Aggregates search across workflows (and later run
 
 | Endpoint | Purpose | Module |
 |---|---|---|
-| `GET /api/v1/search` |  | core |
-| `POST /api/v1/search/workflows/semantic` |  | core |
+| `GET /api/v1/search` | Searches workflows by name, description, tags and category for `q` and returns the best matches. | core |
+| `POST /api/v1/search/workflows/semantic` | Ranks workflows against a natural-language `query` with the AI suggestions model, each with a match reason. | core |
 
 ## /api/v1/skills
 
-Source: `SkillController`
+Source: `SkillController` – Skills and their capabilities: list, create, edit, delete, version history and JSON import/export.
 
 | Endpoint | Purpose | Module |
 |---|---|---|
-| `GET /api/v1/skills` |  | `skills` |
-| `POST /api/v1/skills` |  | `skills` |
-| `GET /api/v1/skills/export/{id}` |  | `skills` |
-| `POST /api/v1/skills/import` |  | `skills` |
+| `GET /api/v1/skills` | Lists all skills, built-in and custom, with their capabilities. | `skills` |
+| `POST /api/v1/skills` | Creates a custom skill and answers 201; `name` and `category` are required. | `skills` |
+| `GET /api/v1/skills/export/{id}` | Exports a skill with its capabilities as JSON in the format the import accepts. | `skills` |
+| `POST /api/v1/skills/import` | Imports a skill from its exported JSON as a new custom skill and answers 201; every capability needs a `name`. | `skills` |
 | `GET /api/v1/skills/seal-pins` | skill id → names of the sealed workflows that use it; such skills cannot be changed or deleted. | `skills` |
-| `GET /api/v1/skills/{id}` |  | `skills` |
-| `PUT /api/v1/skills/{id}` | Custom skills only (built-in → 409); a skill used by a sealed workflow → 409 SKILL_PINNED_BY_SEAL. | `skills` |
-| `DELETE /api/v1/skills/{id}` |  | `skills` |
-| `GET /api/v1/skills/{id}/capabilities` |  | `skills` |
-| `GET /api/v1/skills/{id}/versions` |  | `skills` |
+| `GET /api/v1/skills/{id}` | Returns one skill with its capabilities; unknown id is 404. | `skills` |
+| `PUT /api/v1/skills/{id}` | Updates a custom skill. | `skills` |
+| `DELETE /api/v1/skills/{id}` | Deletes a custom skill (204). | `skills` |
+| `GET /api/v1/skills/{id}/capabilities` | Lists the capabilities of one skill. | `skills` |
+| `GET /api/v1/skills/{id}/versions` | Returns the change history of a skill, newest first, also for a skill deleted since; the snapshots are not included. | `skills` |
 
 ## /api/v1/staging
 
 Sources:
 
 - `StagedSyncController` – Definition sync of the staged setup: Dev → Test / Prod.
-- `StagingController`
+- `StagingController` – The local Stable environment (Docker container): status, start/stop, promote and definition sync from this instance.
 
 | Endpoint | Purpose | Module |
 |---|---|---|
-| `POST /api/v1/staging/promote` |  | `staging` |
-| `POST /api/v1/staging/promote/cancel` |  | `staging` |
-| `POST /api/v1/staging/start` |  | `staging` |
-| `GET /api/v1/staging/status` |  | `staging` |
-| `POST /api/v1/staging/stop` |  | `staging` |
-| `POST /api/v1/staging/sync-definitions` |  | `staging` |
-| `GET /api/v1/staging/sync-preview` |  | `staging` |
-| `GET /api/v1/staging/targets` |  | `staging` |
-| `POST /api/v1/staging/targets/{target}/sync-definitions` |  | `staging` |
-| `GET /api/v1/staging/targets/{target}/sync-preview` |  | `staging` |
+| `POST /api/v1/staging/promote` | Starts a promote in the background (202): stop Stable, build backend, frontend and image, start it again. | `staging` |
+| `POST /api/v1/staging/promote/cancel` | Cancels a running promote and kills its current build step. | `staging` |
+| `POST /api/v1/staging/start` | Starts the Stable container and waits until it is healthy. | `staging` |
+| `GET /api/v1/staging/status` | Returns whether the Stable container runs and is healthy, the promote progress and the Stable version. | `staging` |
+| `POST /api/v1/staging/stop` | Stops the Stable container. | `staging` |
+| `POST /api/v1/staging/sync-definitions` | Transfers projects, workflows, skills and chains from this instance to Stable; an optional body narrows the selection by ids. | `staging` |
+| `GET /api/v1/staging/sync-preview` | Previews which projects, workflows, skills and chains a sync to Stable would transfer; 409 while Stable is not healthy. | `staging` |
+| `GET /api/v1/staging/targets` | Lists the configured sync targets (`test`, `prod`) with URL, key presence and reachability. | `staging` |
+| `POST /api/v1/staging/targets/{target}/sync-definitions` | Transfers projects, workflows, skills and chains to `test` or `prod`; an optional body narrows the selection by ids. | `staging` |
+| `GET /api/v1/staging/targets/{target}/sync-preview` | Previews what a sync from this instance to `test` or `prod` would transfer; for `prod` only sealed definitions. | `staging` |
 
 ## /api/v1/system
 
@@ -537,40 +537,40 @@ Sources:
 
 | Endpoint | Purpose | Module |
 |---|---|---|
-| `GET /api/v1/system/ai-providers` |  | core |
+| `GET /api/v1/system/ai-providers` | Lists the registered AI providers, the default provider and each provider's declared capabilities. | core |
 | `GET /api/v1/system/ai-providers/PI/catalog` | Returns the pi runtime catalog read from `~/.pi/agent`: which backend providers are authenticated, which are custom-defined in models.json, and what pi's own default-provider/-model is set to. | core |
 | `GET /api/v1/system/ai-providers/status` | Per provider: program on the PATH, login found (file or environment variable), and the commands for what is missing — for the start page and the settings. | core |
 | `POST /api/v1/system/ai-providers/status/refresh` | Looks at the machine again now, e.g. right after logging in. | core |
 | `GET /api/v1/system/ai-providers/{id}/models` | Models the provider offers on this host, discovered from the CLI / its local caches and served from a TTL cache. | core |
 | `POST /api/v1/system/ai-providers/{id}/models/refresh` | Bypasses the cache and probes the host now. | core |
-| `GET /api/v1/system/auth-status` |  | core |
-| `GET /api/v1/system/backup` |  | core |
-| `POST /api/v1/system/backup` |  | core |
-| `GET /api/v1/system/backups` |  | core |
-| `GET /api/v1/system/backups/{filename}` |  | core |
-| `GET /api/v1/system/browse` |  | core |
-| `GET /api/v1/system/capabilities` |  | core |
-| `POST /api/v1/system/client-errors` |  | core |
-| `GET /api/v1/system/execution-config` |  | core |
-| `PUT /api/v1/system/execution-config` |  | core |
-| `GET /api/v1/system/health` |  | core |
-| `GET /api/v1/system/info` |  | core |
-| `GET /api/v1/system/integration-snippet` |  | `onboarding-profiles` |
+| `GET /api/v1/system/auth-status` | Tells whether API-key security is switched on (`securityEnabled`); reachable without a key. | core |
+| `GET /api/v1/system/backup` | Creates a backup of the database now and returns it as a file download. | core |
+| `POST /api/v1/system/backup` | Creates a backup of the database and returns its file name, size and time. | core |
+| `GET /api/v1/system/backups` | Lists the backup files with name, size and creation time, newest first. | core |
+| `GET /api/v1/system/backups/{filename}` | Downloads one backup file; an unknown name or one with a path in it is 404. | core |
+| `GET /api/v1/system/browse` | Lists the subdirectories of `path` (default: the home directory) without hidden ones, plus the parent path. | core |
+| `GET /api/v1/system/capabilities` | Describes what this instance offers: API and app version, all API routes, the block types usable now and the module state. | core |
+| `POST /api/v1/system/client-errors` | Accepts an error report from the browser client and writes it to the backend log (202). | core |
+| `GET /api/v1/system/execution-config` | Returns the current execution settings (concurrency, timeouts, rate limit and more) plus the read-only `activeRuns`. | core |
+| `PUT /api/v1/system/execution-config` | Changes execution settings with immediate effect and returns the full current set. | core |
+| `GET /api/v1/system/health` | Health check without a key: `UP`, `DEGRADED` (Docker expected but not answering) or `DOWN` (database unreachable). | core |
+| `GET /api/v1/system/info` | Returns name, version, build, Java version, runtime mode, environment and the rate-limit figures; reachable without a key. | core |
+| `GET /api/v1/system/integration-snippet` | Renders the base onboarding text as a Markdown snippet to paste into a project, e.g. into an `AGENTS.md`. | `onboarding-profiles` |
 | `GET /api/v1/system/jvm-memory` | Heap-Belegung als genau drei Zahlen, ohne API-Key: der Performance-Audit misst damit den Speicher, ohne dass die ganze Metrik-Oberfläche unter `/actuator/metrics` frei wird — die verrät Routen und Lastprofil und bleibt hinter dem Key. | core |
-| `PUT /api/v1/system/modules/{name}` |  | core |
-| `DELETE /api/v1/system/modules/{name}/override` |  | core |
-| `POST /api/v1/system/open-path` |  | core |
-| `POST /api/v1/system/remote-access/disable` |  | `remote-access` |
-| `POST /api/v1/system/remote-access/enable` |  | `remote-access` |
-| `GET /api/v1/system/remote-access/status` |  | `remote-access` |
-| `POST /api/v1/system/repair-failed` |  | `factory` |
+| `PUT /api/v1/system/modules/{name}` | Switches a feature module on or off (`enabled`) with immediate effect and returns the state of all modules. | core |
+| `DELETE /api/v1/system/modules/{name}/override` | Drops the settings override of a module so it follows the startup configuration again; returns the state of all modules. | core |
+| `POST /api/v1/system/open-path` | Opens a file or directory (`path`) in the desktop's file manager on the host. | core |
+| `POST /api/v1/system/remote-access/disable` | Takes Tailscale down on the host; a failing command or a container instance is 503. | `remote-access` |
+| `POST /api/v1/system/remote-access/enable` | Brings Tailscale up on the host and returns the Tailscale IP and hostname. | `remote-access` |
+| `GET /api/v1/system/remote-access/status` | Returns whether Tailscale is up, with IP and hostname, and whether this instance runs in a container. | `remote-access` |
+| `POST /api/v1/system/repair-failed` | Queues a repair for every workflow with a failed run and answers 202 with the number queued. | `factory` |
 | `GET /api/v1/system/request-metrics` | Routes measured since the last daily snapshot, most expensive (p95) first. | core |
 | `GET /api/v1/system/request-metrics/daily` | Stored daily rows for one route, oldest first — the baseline a drift check compares against. | core |
-| `GET /api/v1/system/settings/{key}` | `value` is the stored value or empty; `default`, only for a setting whose default comes from the startup configuration (`backup-retain-count`), is what applies while nothing is stored. | core |
-| `PUT /api/v1/system/settings/{key}` |  | core |
-| `GET /api/v1/system/tray-config` |  | core |
-| `PUT /api/v1/system/tray-config` |  | core |
-| `POST /api/v1/system/vacuum` |  | core |
+| `GET /api/v1/system/settings/{key}` | Returns one application setting; a key that is not allowed answers `400`. | core |
+| `PUT /api/v1/system/settings/{key}` | Stores an application setting from `value` in the body. | core |
+| `GET /api/v1/system/tray-config` | Returns the settings of the host tray icon: popups, which events notify, and the public URL the browser opens. | core |
+| `PUT /api/v1/system/tray-config` | Updates the tray settings; only the fields sent change, and the answer is the full state. | core |
+| `POST /api/v1/system/vacuum` | Runs a full SQLite VACUUM and reports its duration; a failed VACUUM is 500. | core |
 
 ## /api/v1/testing
 

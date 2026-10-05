@@ -40,6 +40,10 @@ public class SearchController {
             double score
     ) {}
 
+    /**
+     * Searches workflows by name, description, tags and category for {@code q} and returns the best matches.
+     * An empty {@code q} yields an empty list; {@code limit} is capped at 50.
+     */
     @GetMapping
     public SearchResponse search(
             @RequestParam(required = false) String q,
@@ -56,6 +60,10 @@ public class SearchController {
         return new SearchResponse(workflows);
     }
 
+    /**
+     * Ranks workflows against a natural-language {@code query} with the AI suggestions model, each with a match reason.
+     * Answers 204 when semantic search is switched off ({@code automation.discovery.semantic-enabled}).
+     */
     @PostMapping("/workflows/semantic")
     public ResponseEntity<List<SemanticSearchResult>> semantic(@RequestBody SemanticSearchRequest request) {
         if (!semanticSearchService.isEnabled()) {

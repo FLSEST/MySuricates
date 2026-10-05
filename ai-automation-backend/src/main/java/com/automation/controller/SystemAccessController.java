@@ -29,6 +29,10 @@ public class SystemAccessController {
     private final FileBrowserService fileBrowserService;
     private final IntegrationSnippetService integrationSnippetService;
 
+    /**
+     * Brings Tailscale up on the host and returns the Tailscale IP and hostname.
+     * A failing Tailscale command, or an instance running in a container, is 503.
+     */
     @PostMapping("/remote-access/enable")
     @RequiresModule(ModuleCatalog.REMOTE_ACCESS)
     public ResponseEntity<RemoteAccessResponse> enableRemoteAccess() {
@@ -36,6 +40,7 @@ public class SystemAccessController {
         return ResponseEntity.ok(response);
     }
 
+    /** Takes Tailscale down on the host; a failing command or a container instance is 503. */
     @PostMapping("/remote-access/disable")
     @RequiresModule(ModuleCatalog.REMOTE_ACCESS)
     public ResponseEntity<Void> disableRemoteAccess() {
@@ -43,6 +48,7 @@ public class SystemAccessController {
         return ResponseEntity.ok().build();
     }
 
+    /** Returns whether Tailscale is up, with IP and hostname, and whether this instance runs in a container. */
     @GetMapping("/remote-access/status")
     @RequiresModule(ModuleCatalog.REMOTE_ACCESS)
     public ResponseEntity<RemoteAccessResponse> remoteAccessStatus() {
@@ -52,6 +58,10 @@ public class SystemAccessController {
 
     record OpenPathRequest(String path) {}
 
+    /**
+     * Opens a file or directory ({@code path}) in the desktop's file manager on the host.
+     * An empty, missing or system path ({@code /etc}, {@code /proc}, ...) is 400.
+     */
     @PostMapping("/open-path")
     public ResponseEntity<?> openPath(@RequestBody OpenPathRequest request) {
         try {
@@ -69,6 +79,10 @@ public class SystemAccessController {
         }
     }
 
+    /**
+     * Renders the base onboarding text as a Markdown snippet to paste into a project, e.g. into an {@code AGENTS.md}.
+     * With a {@code projectPath} of a known project it uses that project's id and lists its workflows; {@code locale} picks the language.
+     */
     @RequiresModule(ModuleCatalog.ONBOARDING_PROFILES)
     @GetMapping(value = "/integration-snippet", produces = "text/markdown")
     public ResponseEntity<String> integrationSnippet(
@@ -77,6 +91,10 @@ public class SystemAccessController {
         return ResponseEntity.ok(integrationSnippetService.render(projectPath, locale));
     }
 
+    /**
+     * Lists the subdirectories of {@code path} (default: the home directory) without hidden ones, plus the parent path.
+     * The root and system directories are refused with 400, as is a path that is no readable directory.
+     */
     @GetMapping("/browse")
     public ResponseEntity<?> browseDirectory(
             @RequestParam(required = false) String path) {
