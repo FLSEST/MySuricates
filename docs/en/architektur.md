@@ -11,7 +11,8 @@ This page describes its internal structure. For getting started see
 > MySuricates instance. They record when and why something came about — from the
 > outside, only the commit can be looked up. Numbers such as `(V39)` in headings, in
 > contrast, name the database migration (Flyway script `V39__….sql`) that brought a
-> feature — list under [Database Migrations](#database-migrations-flyway).
+> feature — the scripts live under `ai-automation-backend/src/main/resources/db/migration/`, tables and
+> fields in [datenmodell.md](datenmodell.md).
 
 > The flows on this page also exist as diagrams: [docs/en/diagramme.md](diagramme.md)
 > — engine, scheduler, skills, memory, request path, frontend, deployment.
@@ -61,13 +62,9 @@ Stable (:9091) and Test (:8090) run as separate Docker containers.
 
 ## Three Environments
 
-| Environment | Port | Description |
-|---|---|---|
-| **Dev** | 3000 (Frontend) / 9090 (Backend) | Development server, from source code |
-| **Stable** | 9091 | Docker container, backend + embedded frontend |
-| **Test** | 8090 | Docker container, dedicated test instance |
-
-Dev automatically starts Stable and Test on boot if a snapshot is available (configurable via `automation.staging.auto-start` and `automation.staging.test-auto-start`).
+Next to the dev instance running from source (frontend 3000, backend 9090), **Stable** (9091) and
+**Test** (8090) run as Docker containers when needed; neither starts on its own. Setup, start and
+definition sync: [deployment.md → Three-Environment Setup](deployment.md#three-environment-setup).
 
 ## Module System (startup configuration)
 
@@ -97,17 +94,9 @@ Environment form: `AUTOMATION_MODULES_PRESET`, `AUTOMATION_MODULES_<NAME>`, `AUT
 | `advanced` (low use) | `conversion`, `dialog-import` (requires conversion), `onboarding-profiles`, `skills`, `debug`, `factory` (incl. auto-repair), `wishes` (requires chains) | legacy / experimental |
 | `hardening` | `provenance` (on by default), `sealing`, `require-sealed-for-unattended`, `webhook-signatures`, `private-network-guard` (on by default), `private-network-guard-http-api`, `private-network-guard-own-services` | experimental |
 
-The catalog is additionally exported as plain bash arrays to `scripts/lib/module-catalog.generated.sh`
-— read by `scripts/lib/module-preset.sh`, which runs before every build and therefore must not
-require a backend or `jq`. The file is not hand-maintained: after a change to the catalog or to the
-display texts (`ai-automation-frontend/src/data/modules.<lang>.json`), regenerate it with:
-
-```bash
-cd ai-automation-backend && ./mvnw test -Dtest=ModuleCatalogTextsTest -Dmodule.catalog.write=true
-```
-
-Without regeneration, `ModuleCatalogTextsTest` fails red as soon as the generated file no longer
-matches the catalog — whoever adds a module finds out at the latest there.
+The catalog is additionally exported as plain bash arrays to `scripts/lib/module-catalog.generated.sh`, so
+that the scripts need no backend — generated, not maintained, see
+[entwicklung.md → Getting into the code](entwicklung.md#getting-into-the-code).
 
 **Enforcement**
 
@@ -168,7 +157,7 @@ If `byRule` lists `self-api-call` or `direct-db-access`, those workflows no long
 
 **Signature and history of a seal** — `sealed_hash` sits in the same SQLite file as the definition it protects; whoever writes that file changes both and passes. `WorkflowSealSigner` therefore signs every seal with HMAC-SHA256 over workflow id, definition hash and skill pins, using a key **outside** the database (`automation.seal.key-file`, env `AUTOMATION_SEAL_KEY`, otherwise a 0600 file created on first start; never `app_settings`). A signature that is present is always verified (`SIGNATURE_INVALID`); whether a seal **without** one may run is what `automation.hardening.require-signed-seal` decides (`SIGNATURE_MISSING`), so existing seals do not lose their runs overnight. Without a readable key the instance still starts and seals stay unsigned. `automation.hardening.seal-immutable` takes `POST …/unseal` out of the REST API (**403 `SEAL_IMMUTABLE`**): releasing a seal then needs the startup configuration, and a leaked API key (or an agent holding it) is no longer enough. Every sealing and unsealing is kept with its timestamp in `workflow_seal_events` (`GET /api/v1/workflows/{id}/seal-events`) — the activity log is pruned after 30 days and `sealed_at` disappears on unsealing. Entries are chained across all workflows (`prev_event_hash`); a row changed or deleted afterwards is reported as `chainIntact: false`. Refusals (of a run or of an unseal) write their SECURITY entry through `ActivityLogService.logRefusal` after the caller's transaction has ended, otherwise the rollback takes it along.
 
-**Seals made visible** — `WorkflowSealVerifier` is the one check that `RunAdmission` runs before a start and `GET /api/v1/workflows/seal-status` runs without a run (`INTACT`, `VIOLATED` with reason `DEFINITION_CHANGED`/`SKILLS_CHANGED`/`UNVERIFIABLE` and the affected skills, `NOT_SEALED`). The response also carries the starts refused in the last 7 days from the activity log, because a refused start creates no run row. The endpoint is core, not part of the `sealing` module: a seal stays in force when the switch is off, so it must stay visible. `GET /api/v1/skills/seal-pins` maps every skill to the sealed workflows that use it. Every run records at start whether it ran sealed and verified (`workflow_runs.sealed`, `sealed_skill_pins`); this is never derived from the workflow's current state. The UI shows both states, not only the sealed one: a badge next to the name on the detail page and the list panel (lock "Sealed", open lock "Not sealed", red for a broken seal), a banner on the detail page, a labelled "Seal"/"Unseal" button, an "All / Sealed / Not sealed" filter with counts in the list, a filled lock or grey open lock in workflow rows, the run list, run detail and chain entries (runs from before the record show a dash "Seal state not recorded", never a value guessed from today's state), a lock on skill cards, and a "Starts refused" notice above the run list. The SECURITY entry of a refused start is written after the caller's transaction (webhook, schedule, chain) has ended, on its own virtual thread — otherwise the refusal would roll it back, and `REQUIRES_NEW` would block itself with pool size 1.
+**Seals made visible** — `WorkflowSealVerifier` is the one check that `RunAdmission` runs before a start and `GET /api/v1/workflows/seal-status` runs without a run (`INTACT`, `VIOLATED` with reason `DEFINITION_CHANGED`/`SKILLS_CHANGED`/`UNVERIFIABLE` and the affected skills, `NOT_SEALED`). The response also carries the starts refused in the last 7 days from the activity log, because a refused start creates no run row. The endpoint is core, not part of the `sealing` module: a seal stays in force when the switch is off, so it must stay visible. `GET /api/v1/skills/seal-pins` maps every skill to the sealed workflows that use it. Every run records at start whether it ran sealed and verified (`workflow_runs.sealed`, `sealed_skill_pins`); this is never derived from the workflow's current state. The UI shows both states, not only the sealed one — on workflow, run, chain entry and skill; runs from before the record show "Seal state not recorded", never a value guessed from today's state. The SECURITY entry of a refused start is written after the caller's transaction (webhook, schedule, chain) has ended, on its own virtual thread — otherwise the refusal would roll it back, and `REQUIRES_NEW` would block itself with pool size 1.
 
 **Unattended runs** — `TriggerSource` classifies triggers:
 
@@ -205,7 +194,7 @@ Chains and sub-workflows pass their starter's origin on in the reserved context 
 ### Layer Model
 
 ```
-Controller (REST API, 54 Controllers)
+Controller (REST API)
     ↓ DTO (Request/Response Records)
 Service (Business Logic)
     ↓ Entity (JPA)
@@ -213,6 +202,8 @@ Repository (Spring Data JPA)
     ↓ SQL
 SQLite (File: data/automation.db)
 ```
+
+`LayerRuleTest` pins the allowed edges between the layers, see [Architecture Gates](#architecture-gates).
 
 ### Database Maintenance (SQLite, pool-size=1)
 
@@ -223,128 +214,14 @@ SQLite (File: data/automation.db)
 
 ### Packages
 
-```
-com.automation
-├── controller/          54 REST Controllers
-├── service/
-│   ├── project/         ProjectService, ProjectStatusReconciler, ContainerService (+ DockerContainerGateway, DockerOrphanReconciler), ProjectContextService, PathValidator, OnboardingProfileService (+ OnboardingProfileSeeder), ProjectOnboardingService
-│   ├── workflow/        WorkflowExecutor (+ ExecutionContextFactory, BlockSkillContext, BlockStepRunner, RunCompletionHandler, RunFinalizer, WorkflowContextDataService + PlatformVariableSource beans), RunControlService, WorkflowService (+ WorkflowRequestFields), ExecutionBroadcaster, TemplateVerificationService, WorkflowOptimizationService (+ WorkflowOptimizationPrompt), GhostRunWatchdogService, RunCleanupService, AgentInstructionsService, WorkflowTemplateService, BlockOutputValidator, WorkflowExecutionRegistry, IdleContainerReaper, WorkflowTaggingService, WorkflowVersionService, WorkflowContentChangedEvent
-│   ├── skill/           SkillService, SkillImportExportService, SkillRegistry, CapabilityRegistry
-│   ├── scheduler/       SchedulerService (+ SchedulerTick, SchedulerMaintenanceMode, UpcomingRunsCalculator, ScheduleSkipPolicy, SchedulerPause, ScheduleDefinitionParser, CatchUpQueue), ScheduledWorkflowExecutor, SuspendState
-│   ├── webhook/         WebhookService, GitWebhookPayloadParser
-│   ├── learning/        LearningService, AgenticLearningService, ExecutionInsightsService, WorkflowStatsService, WorkflowSimilarityService, BlockTypesBackfillService, MetadataExtractor, PlatformStatsService
-│   ├── system/          ApiKeyService, DatabaseBackupService, ExecutionSettingsService (+ ExecutionSettingKeys; setters per topic in `settings/`: ExecutionCapacitySettings, AccessLimitSettings, HousekeepingSettings, FeatureSettings, RequestMetricsSettings), SystemIdentityService, TailscaleService, FileBrowserService, IntegrationSnippetService, SystemSettingsService (+ AppSettingChangedEvent: services with a cached setting re-read it on this event instead of being called directly)
-│   ├── ai/              HostClaudeService, HostCodexService, HostPiService, AiProviderRegistry, AiProvider, AiProviderCapabilities, AiResponseMetadata, ClaudeAiProvider, CodexAiProvider, PiAiProvider, PiCatalogService
-│   ├── cli/             CommandExecutorService (+ HostRequestAiMetadata), CliSessionManager, CliSession, HostExecutionRequest, ShellCommandService, ContainerShellService, TaskCommandService
-│   │   └── claude/      ClaudeOutputParser, ClaudeJsonResponse, ClaudeStreamEventFormatter — read the Claude CLI's output (a leaf package for ai/ and cli/, so ai/ does not point back to cli/)
-│   ├── chain/           ChainService, ChainExecutor (+ ChainRunWaiter, ChainZombieRunCleaner), ChainTemplateService, BuiltInChainTemplate
-│   ├── memory/          WorkflowMemoryService, ClaudeSummarizer, CodexSummarizer, KnowledgeSummarizer, ConversationPreprocessor, SummarizationSetupService, AutoMemoryExtractionListener
-│   ├── staging/         StagingService, TestingService, InstanceSyncHelper (+ InstanceHttpClient, SyncPreviewService), DockerContainerManager
-│   ├── todo/            TodoService (+ TodoSpecifications, TodoTrackerExportService, TodoResolutionService, TodoResponseAssembler), AutoTodoService (+ AutoTodoTextBuilder, PendingTodoApprovalService, GranularTodoService), GateStatusResolver, ProjectPathResolver, TodoHygieneService, TodoOverviewService, TodoResolutionListener, TodoSimilarityService
-│   ├── runoutput/       GateStatusOutputParser, GateExpectation, TodoOutputParser — read markers from block outputs (a leaf package for workflow/ and executor/, so workflow/ does not point back to todo/)
-│   ├── conversion/      WorkflowConversionService (+ WorkflowConversionPrompt), WorkflowSuggestion, DialogWorkflowSuggestion
-│   ├── dialog/          DialogSessionScanner, DialogConversionService (+ DialogConversionPrompt), ClaudeJsonlParser
-│   ├── factory/         WorkflowFactoryService (+ FactoryPromptBuilder, FactoryResponseParser, FactoryTopicCatalog, FactoryGeneratorResolver), FactoryVerificationService, ClaudeWorkflowGenerator, CodexWorkflowGenerator, WorkflowTextGenerator, FactorySetupService
-│   ├── pool/            WorkflowPoolService
-│   ├── wish/            WishService (+ WishFulfillmentLoop, WishEvaluationService), WishWatchdogService, WishDecomposeService, WishDecomposePromptBuilder (+ WishSystemPrompt), WishExecutionService, WishEvaluatePromptBuilder, WishPromptBuilder, WishPromptHelper, WishJsonUtil, WishStatusHelper, WishStringUtil
-│   ├── notification/    NotificationService
-│   ├── trigger/         CompletionTriggerService, TodoTriggerService, TodoFeedbackListener
-│   ├── health/          HealthAutoTodoService
-│   ├── audit/           AuditResultParser, AuditIngestionService (+ AuditSnapshotApplier), AuditIngestionListener, AuditCenterService (+ AuditFindingTodoLinker)
-│   ├── integration/     IntegrationRegistry, IntegrationOAuthService, IntegrationEncryptionService, IntegrationProvider, OAuthConfig, TaskExportCapable
-│   ├── integration/providers/ 18 Providers in 17 subdirectories — google/ holds two, Calendar and Gmail (caldav/, confluence/, feed/, gitea/, github/, gitlab/, google/, httpapi/, icalfeed/, jira/, ntfy/, openmeteo/, slack/, taskwarrior/, telegram/, todoist/, trello/; shared: ical/)
-│   ├── assistant/       AssistantContextBuilder (+ PageContextRenderer, ProjectFileListing), AssistantChatCaller, AssistantChatBroadcaster, AssistantFetchService, AssistantToolExecutor (+ AssistantTodoTools, AssistantWorkflowTools, AssistantChainTools, AssistantToolPayloads), AssistantActionSuggestionService, AssistantErrorClassifier, AssistantFetchPolicy, AssistantMutationGate, AssistantActionMerger, AssistantResponseParser, PendingToolRegistry, ToolExecutionResult
-│   ├── assistant/context/ AssistantContextSection, BlockTypesIndexSection, ChainsIndexSection, FailedWorkflowsContextSection, IntegrationsIndexSection, RunsContextSection, SchedulesContextSection, SkillsIndexSection, TodosContextSection, WishesContextSection
-│   ├── assistant/format/  AssistantFormatUtils (formatting helpers for prompt parts; a leaf package of its own, so context/ and fetch/ do not point back to assistant/)
-│   ├── execution/       ExecutionQueryService (reads + DTO mapping), ExecutionCommandService (retry, resume, notes), WorkflowDebugService
-│   ├── dlq/             DeadLetterService, DeadLetterRetryService
-│   ├── document/        DocumentExtractionService, DocumentExtractionException
-│   ├── export/bpmn/     BpmnModelBuilder (chain/single task/loop) + BpmnNodeFactory (ids, placement, edges, command tasks), BpmnGatewayBuilder (conditional/switch: split/rows/merge), BpmnEdgeRouter (right-angle waypoint routing), DataFlowReferenceScanner (placeholder scan for `block.x.output`/`previous_output`/`step_N_output`/compress `source`) + DataFlowConfigStrings (level rule: direct vs. nested config values) + BpmnBranchBlocks (blocks and id paths of the switch branches) + BpmnDataFlowBuilder (data objects and associations below the task row, the endpoint is always a task — for references from a branch the branch task, never the gateway; the import skips them), BpmnBlockText (labels, docs, config helpers), BpmnSegment (sub-graph), BpmnXmlRenderer, BpmnExportAdapter, BpmnModel, BpmnNames
-│   ├── search/          SemanticWorkflowSearchService
-│   ├── watchdog/        ConnectionPoolWatchdogService
-│   ├── repair/          AutoRepairService
-│   ├── tray/            SystemTrayService
-│   ├── activitylog/     ActivityLogService, ActivityLogLifecycleListener
-│   ├── AssistantService.java        Chat assistant (orchestration; CLI call in assistant/AssistantChatCaller)
-│   ├── AssistantSessionService.java Session persistence
-│   ├── AssistantSettingsListener.java keeps the assistant's cached settings current (only while the module is on)
-│   └── PageSuggestionService.java   Context-sensitive UI suggestions
-├── entity/              JPA Entities + Enums
-├── dto/                 assistant DTOs directly in the package (AssistantChatRequest/-Response, PendingTool, …)
-│   ├── request/         Request Records
-│   └── response/        Response Records
-├── repository/          Spring Data Repositories
-├── mapper/              MapStruct Mappers (Entity ↔ DTO)
-├── executor/            Workflow Execution Engine
-│   └── blocks/          20 Block Executors + Agentic helper classes (AgenticBlockConfig, AgenticPlan, AgenticSafetyGuard, AgenticTokenTracker, AgenticPromptBuilder, AgenticEventBroadcaster, AgenticApprovalGate, AgenticActionRunner, AgenticStopRules)
-├── concurrency/         DynamicSemaphore
-├── config/              Configuration classes, Seeders (Skill, Template)
-├── security/            ApiKeyAuthFilter, RateLimitFilter (+ RateLimitConfig), ActivityLogSizeLimitFilter, WebhookRateLimiter, WebSocketAuthInterceptor, WebSocketTicketService
-├── skills/handlers/     CapabilityHandler, LintHandler, SecurityScanHandler, FactCheckHandler, GrammarCheckHandler, OCRHandler
-├── exception/           GlobalExceptionHandler, ErrorCode + Exception classes
-├── websocket/           LogWebSocketHandler, TerminalWebSocketHandler, TerminalSession (+ TerminalStdinStream), Message DTOs
-├── event/               WorkflowRunCompletedEvent, AssistantSessionUpdatedEvent, TodoCreatedEvent, ProjectWorkflowsChangedEvent
-└── util/                JPA Converters (JSON, BlockDefinitions), RuntimeClasspathGuard (refuses a start from `target/classes`)
-```
-
-### All 54 REST Controllers
-
-| Controller | Base Path | Description |
-|---|---|---|
-| `ProjectController` | `/api/v1/projects` | CRUD, archiving, container lifecycle, context generation |
-| `ProjectBundleController` | `/api/v1/projects` | Project bundle: `/{id}/export` (file download), `/import/preview`, `/import` — see "Project bundle" (core; chains inside only with module `chains`) |
-| `WorkflowController` | `/api/v1/workflows` | CRUD, execution, runs, export/import, skills |
-| `WorkflowVersionController` | `/api/v1/workflows` | `/{id}/versions` — version list, single version, restore |
-| `WorkflowAssistController` | `/api/v1/workflows` | `/{id}/optimize`, `/{id}/similar`, `/{id}/repair` (repair only with module `factory`) |
-| `WorkflowAnalyzerController` | `/api/v1/workflows` | `/{id}/analyze` and `/analyze` — deterministic build-error check of one definition or the whole stock. Reports only, touches no write path (182bd224); AI-generated definitions are additionally checked by `GeneratedWorkflowCheck` (see Workflow Factory) |
-| `WorkflowImportController` | `/api/v1/workflows/import` | BPMN import (`POST /bpmn?projectId=…`, body = BPMN XML) → new workflow (201); foreign BPMN/broken XML/too large → 400 |
-| `ExecutionController` | `/api/v1/executions` | List, detail, pause, resume, resume-from-step, cancel, retry, approve, approval-check, todos-approve, notes, command |
-| `SkillController` | `/api/v1/skills` | CRUD, capabilities, export/import |
-| `ScheduleController` | `/api/v1/schedules` | CRUD, enable/disable, runs, calendar, preview, remaining-stats, chain-schedules, maintenance |
-| `WebhookController` | `/api/v1/webhooks` | CRUD, enable/disable; trigger via `/api/v1/webhook/trigger/{token}` (public, token-only — payload fields are flagged as `__untrusted_keys` and always escaped in shell blocks; block outputs of such runs inherit the taint via `__untrusted_outputs`, including sub-workflows and resume, see `ExecutionContext.recordOutput`/`resolveShellTemplate`) |
-| `ChainController` | `/api/v1/chains` | CRUD, execution, runs, cancel |
-| `ChainTemplateController` | `/api/v1/chain-templates` | List, get, install as chain |
-| `WorkflowTemplateController` | `/api/v1/workflow-templates` | CRUD, create from workflow |
-| `WorkflowMemoryController` | `/api/v1/workflows/{id}/memory` | CRUD, extract, activate |
-| `WorkflowFactoryController` | `/api/v1/factory` | Generate, run, verify, promote, topics |
-| `WorkflowPoolController` | `/api/v1/pool` | List, get, install, export |
-| `ConversionController` | `/api/v1/conversions` | Suggest, create workflow from run |
-| `DialogController` | `/api/v1/dialog` | Sessions, projects, Claude session analysis, workflow creation |
-| `LearningController` | `/api/v1/learning` | Dashboard, stats, step-analytics, suggestions, similar, agentic-history, agentic-analytics, tool-patterns, execution-insights, run-insights, rate |
-| `TodoController` | `/api/v1/todos` | CRUD, status-patch, resolve, export, count, overview (cockpit), bulk-status, archive-stale, similar |
-| `GoalController` | `/api/v1/goals` | Goals: CRUD, assign and order TODOs, relation map, candidates, projects, work packages, milestones, guard |
-| `GoalWorkflowController` | `/api/v1/goals/{id}/workflows` | Workflows on a goal or work package: list (with the guard entry), attach, role, detach |
-| `ActivityLogController` | `/api/v1/activity-log` | List, create |
-| `AssistantController` | `/api/v1/assistant` | Chat (`POST /chat`), sessions, pending-tool confirmation/rejection |
-| `PageSuggestionController` | `/api/v1/assistant` | Suggestions per page (get/refresh) |
-| `DeadLetterController` | `/api/v1/dlq` | Dead letter queue: list, retry, delete |
-| `SearchController` | `/api/v1/search` | Aggregated search across workflows (substring/fuzzy + semantic ranking) |
-| `WorkflowDebugController` | `/api/v1/debug` | Debug page: workflows with failed last run |
-| `CompletionTriggerController` | `/api/v1/completion-triggers` | CRUD, enable/disable, filter by workflow |
-| `TodoTriggerController` | `/api/v1/todo-triggers` | CRUD, enable/disable, filter by target workflow |
-| `NotificationController` | `/api/v1/notifications` | CRUD, enable/disable |
-| `WishController` | `/api/v1/wishes` | CRUD, cancel, respond, crystallize |
-| `StagingController` | `/api/v1/staging` | Status, start, stop, promote, promote-cancel, sync-preview, sync-definitions |
-| `StagedSyncController` | `/api/v1/staging/targets` | Staged setup: sync targets Test/Prod from the startup configuration, per target sync-preview and sync-definitions (to Prod only sealed ones) |
-| `TestingController` | `/api/v1/testing` | Status, start, stop, reset, sync-preview, sync-definitions, report-result, pull-changes |
-| `SystemController` | `/api/v1/system` | Health, auth-status, info, jvm-memory, settings, execution-config, AI-providers, AI-provider-catalog, capabilities, backup, backups, remote-access, vacuum, browse, open-path, repair, client-errors, integration-snippet |
-| `IntegrationController` | `/api/v1/integrations` | OAuth flow, credentials, actions, provider list, task export targets |
-| `OnboardingProfileController` | `/api/v1/onboarding-profiles` | Onboarding profiles CRUD, reset, history |
-| `ReportsController` | `/api/v1/reports` | Report generation and retrieval |
-| `AuditController` | `/api/v1/audits`, `/api/v1/audit-*` | Audit overview, report history, findings and TODO links |
-| `DocsController` | `/api/v1/docs` | Read Markdown documentation |
-| `SystemSettingsController` | `/api/v1/system` | Runtime settings: app settings (`GET`/`PUT /settings/{key}`), execution config |
-| `SystemAiProviderController` | `/api/v1/system` | AI provider and capability information: provider list, capabilities, Pi catalog, models per provider (+ refresh) |
-| `SystemModulesController` | `/api/v1/system/modules` | Runtime module switches for the settings UI (only when `automation.modules.ui-editable=true`; hardening switches never switchable) |
-| `SystemAccessController` | `/api/v1/system` | Access surface: remote access (Tailscale) enable/disable/status, local filesystem (browse, open-path, integration snippet) |
-| `SystemMaintenanceController` | `/api/v1/system` | Maintenance: auto-repair, VACUUM, database backups (list, create, download) |
-| `DashboardLayoutController` | `/api/v1/dashboard/layouts` | Version history of the dashboard layout (core feature, no module gate) |
-| `DashboardWorkflowController` | `/api/v1/dashboard/workflow-results` | Returns the results of all workflow widgets of a view in **one** request (marker `dashboard_widget`), so the dashboard does not load per widget |
-| `DashboardReportAssistController` | `/api/v1/dashboard/report-assist` | Proposes a `dashboard-report` configuration from an existing run via AI, for the editor (module `dashboard-report`; `POST`, because the call costs tokens and no browser may prefetch it) |
-| `SystemRequestMetricsController` | `/api/v1/system/request-metrics` | Measured cost per route: the running snapshot (`GET`) and daily values (`GET /daily`, optionally per route) |
-| `WorkflowSealController` | `/api/v1/workflows/{id}` | Seal/unseal a workflow (only when `automation.hardening.sealing=true`; existing seals stay effective even if the switch is turned off) |
-| `WorkflowSealStatusController` | `/api/v1/workflows/seal-status` | Seal state of every sealed workflow and starts refused in the last 7 days (read-only, core — also with `sealing` off) |
-| `WebSocketTicketController` | `/api/v1/ws-ticket` | Issues short-lived, single-use tickets for the WebSocket handshake (no module gate, ordinary API rate limit applies) |
+The packages under `com.automation` follow the layers: `controller/`, `service/` (split into
+sub-packages per domain), `repository/`, `entity/`, `dto/` and `mapper/`; plus, among others,
+`executor/` (engine and block executors), `security/`, `websocket/`, `modules/`, `metrics/`, `config/`,
+`event/` and `util/`. Which class lives
+where is shown by the directory itself. Mutual dependencies between packages and forbidden layer edges
+are caught by the [Architecture Gates](#architecture-gates); a few leaf packages
+(`service/runoutput/`, `service/cli/claude/`, `service/assistant/format/`) exist only so that no cycle
+arises.
 
 ### Workflow Execution
 
@@ -379,139 +256,52 @@ The same pattern applies to `WorkflowMemoryService.extractKnowledge`/`extractAnd
 
 ### Block Types
 
-Complete list; the authoritative source is the registry `BlockTypesIndexSection.BLOCK_TYPES`, against which `BlockTypeListsGuardTest` pins the existing executor classes.
-
-| Type | Executor | Description |
-|---|---|---|
-| `simple` | `SimpleBlockExecutor` | Single Claude CLI call with prompt |
-| `shell` | `ShellBlockExecutor` | Shell script, optionally via Docker container |
-| `retry` | `RetryBlockExecutor` | Prompt with configurable retry attempts |
-| `conditional` | `ConditionalBlockExecutor` | If/else branching based on condition |
-| `foreach` | `ForEachBlockExecutor` | Iteration over a list of elements |
-| `while` | `WhileBlockExecutor` | Repetition with exit condition and max iterations |
-| `switch` | `SwitchBlockExecutor` | Multi-way branching per expression with cases |
-| `agentic` | `AgenticBlockExecutor` | Goal→Reason→Act→Observe loop, up to 10 iterations |
-| `approval` | `ApprovalBlockExecutor` | Pauses execution, waits for user confirmation |
-| `sub-workflow` | `SubWorkflowBlockExecutor` | Executes another workflow as a subprocess |
-| `skill-capability` | `SkillCapabilityBlockExecutor` | Invokes a named skill capability |
-| `human-input` | `HumanInputBlockExecutor` | Collects user input via WebSocket, stores as context variable |
-| `integration` | `IntegrationBlockExecutor` | Executes an action on an external integration provider |
-| `document` | `DocumentBlockExecutor` | Extracts text from PDF/DOCX/XLSX/HTML/TXT via Apache Tika |
-| `compress` | `CompressBlockExecutor` | Rule-based compression of an earlier block output (stage chain, 0 tokens) |
-| `compress-ai` | `CompressAiBlockExecutor` | Tool-less AI compression of an earlier block output with input/output limits |
-| `todo-create` | `TodoCreateBlockExecutor` | Creates a todo, directly via the service rather than the REST API |
-| `todo-update` | `TodoUpdateBlockExecutor` | Updates an existing todo |
-| `todo-close` | `TodoCloseBlockExecutor` | Sets a todo to DONE |
-| `dashboard-report` | `DashboardReportBlockExecutor` | Writes a run's counts and status as a dashboard widget |
-
-**Template variables** (`{{ variable }}`, `${varName}`) are resolved at runtime in the `ExecutionContext`. `{{ previous_output }}` contains the output of the previous block.
+Which block types exist is decided by the executor registry: `BlockTypeRegistry` collects
+`supportedTypes()` of every `BlockExecutor` bean, and `BlockTypeListsGuardTest` keeps the other lists
+(frontend, assistant) in step. Configuration and behaviour per type are in
+[WORKFLOW-GUIDE.md](WORKFLOW-GUIDE.md) (section "Block Type Reference"). Placeholders (`{{ variable }}`,
+`${varName}`) are resolved at runtime by the `ExecutionContext`; `{{ previous_output }}` contains the
+output of the previous block.
 
 ### Agentic Block (Goal→Reason→Act→Observe)
 
-The agentic block implements an autonomous execution loop:
-
-1. **REASON:** Claude analyzes the goal and previous observations → returns structured JSON action
-2. **ACT:** Action is executed (shell or Claude CLI)
-3. **OBSERVE:** Output is collected and added to the history
-4. Loop runs until `done: true` or abort conditions are met
-
-**Safety Mechanisms:**
-
-| Config | Default | Description |
-|---|---|---|
-| `max_iterations` | 10 | Maximum number of iterations |
-| `iteration_timeout_seconds` | 300 | Wall-clock timeout per iteration |
-| `total_timeout_seconds` | 1800 | Total block timeout (30 min.) |
-| `max_total_tokens` | 200000 | Token budget (input+output, all phases) |
-| `max_repeated_actions` | 3 | Abort after N identical actions |
-| `require_approval` | false | Approval gate before each action |
-
-Additionally: history compression after 7 turns, action compression at >100,000 characters, token tracking warnings in the log. All 6 safety fields are pre-populated as defaults in the frontend "Add Block" dialog. Helper classes: `AgenticBlockConfig`, `AgenticSafetyGuard`, `AgenticTokenTracker`, `AgenticPlan`.
-
-### Switch Block
-
-The switch block evaluates an expression against multiple cases:
-- Supports `${varName}` and `{{ varName }}` for variable interpolation
-- Cases are checked in order — first match wins
-- Pipe-separated alternatives: `"error|critical"` matches both
-- `default` case when no other case matches
-- Each case contains a list of nested blocks (shell or claude)
-- Returns `COMPLETED` with `matchedCase: "none"` if no match and no default
+The REASON → ACT → OBSERVE loop with its safety limits (iterations, timeouts, token budget, repeated
+actions, approval) and its pitfalls is described in [WORKFLOW-GUIDE.md](WORKFLOW-GUIDE.md) (section
+"Agentic Block Deep Dive"), why the budgets are set as they are in
+[konzepte/agentische-budgets.md](konzepte/agentische-budgets.md). In the code: `AgenticBlockExecutor` with
+`AgenticBlockConfig`, `AgenticSafetyGuard`, `AgenticTokenTracker` and `AgenticPlan`.
 
 ### Sub-Workflow Block
 
-- Executes another workflow as a nested block
-- Circular references are detected via `__parent_workflow_ids`
-- Maximum nesting depth: 5 levels
-- Polling-based completion, 30-minute timeout; a cancelled parent run cancels the child run via `RunControlService.cancelExecution`
-- Start, guards and waiting live in `SubWorkflowLauncher`; `foreach` with `workflow_id` takes the same path per item (TODO a5c9fbbf). `workflow_id` may be a placeholder from a trusted context variable, never from webhook data or block outputs
+Behaviour and configuration: [WORKFLOW-GUIDE.md](WORKFLOW-GUIDE.md) (section `sub-workflow`). In the code:
+
+- Start, guards (circular references via `__parent_workflow_ids`, nesting depth) and waiting live in `SubWorkflowLauncher`; `foreach` with `workflow_id` takes the same path per item (TODO a5c9fbbf). `workflow_id` may be a placeholder from a trusted context variable, never from webhook data or block outputs
+- A cancelled parent run cancels the child run via `RunControlService.cancelExecution`
 - `@Lazy` injection on `WorkflowExecutor` only where a caller starts runs itself (sub-workflow, chains, triggers); pure status queries (active runs, container ids, approvals) go straight to `WorkflowExecutionRegistry`, controlling a running run goes to `RunControlService`, which does not need `WorkflowExecutor`
-
-### Human-Input Block
-
-- Pauses workflow execution and waits for user input
-- Sends `human_input_required` event via WebSocket to `/topic/executions/{runId}/logs`
-- User response is stored as a context variable (`variable_name`)
-- Supports text and select inputs, validation patterns, timeout with optional default
-- Uses the `ApprovalRequest` mechanism of the approval block
 
 ## Gate Status System
 
-A quality gate is the verdict a checking workflow (audit, test, review) passes on its result:
-GREEN = fine, YELLOW = non-blocking findings, RED = critical. The platform evaluates it: RED (in
-mode `auto` also YELLOW) creates a TODO when auto-TODO is on for the workflow (off by default), and
-after a repair run a GREEN closes the TODO that triggered it
+A quality gate is the verdict a checking workflow passes on its result (GREEN, YELLOW, RED), written
+as the markers `gate_status:`/`gate_category:`/`gate_description:` into a block output. The rules —
+which gate wins, a missing verdict (`gate-missing`), an unreadable one (`gate-invalid`),
+`checked_command` — are in [WORKFLOW-GUIDE.md](WORKFLOW-GUIDE.md) (section "Quality Gate Markers"), the
+idea behind it in [konzepte/gates.md](konzepte/gates.md). A gate does not change the run status; it is a
+finding about the result, not a failure of the execution.
+
+In the code: `GateStatusOutputParser` reads the markers, `RunCompletionHandler` evaluates all block
+outputs after the run and writes the verdict into `WorkflowRun.metadata`, `GateExpectation` recognises
+whether the definition orders a verdict, and `GateStatusResolver` derives one from the run status when no
+marker came. With auto-TODO switched on, `AutoTodoService` creates a TODO from RED (in mode `auto` also
+from YELLOW); after a repair run a GREEN closes the TODO that triggered it
 (`TodoFeedbackListener`, see [Todo Triggers](#todo-triggers--self-improvement-loop-v51v52)).
-To do so, workflow blocks write markers into their output:
-
-```
-gate_status: GREEN|YELLOW|RED
-gate_category: <category>
-gate_description: <description>
-```
-
-**Processing:**
-- `GateStatusOutputParser` — parses markers from block outputs (tolerant of Markdown formatting)
-- `RunCompletionHandler` scans all block outputs — highest severity wins (GREEN < YELLOW < RED); on a tie RED/YELLOW keep the first gate (the cause, the auto-TODO's category), GREEN the last (the closing verdict; a synthetic `Command exit N` or a GREEN without description does not replace a description, and without a category of its own the current one stays, TODO 2aa9ddd5)
-- Gate status is stored in `WorkflowRun.metadata` (`gate_status`, `gate_category`, `gate_description`)
-
-**A gate does not change the run status.** Neither YELLOW nor RED: the gate is a finding about
-the result, not a failure of the execution. RED and YELLOW write a warning to the activity log
-(`RunCompletionHandler`). When auto-TODO is on for the workflow (workflow metadata
-`autoTodo.enabled`, otherwise the setting `auto-todo-default`, off by default), `AutoTodoService`
-creates a TODO with priority HIGH on RED and, in mode `auto`, one with MEDIUM on YELLOW — the run
-stays `COMPLETED`.
-
-The run status is decided by something independent: `RunCompletionHandler` sets
-`COMPLETED_WITH_ERRORS` when a step carrying `checkedCommand` metadata has failed, and
-`COMPLETED` otherwise. Both can coincide — `RunCompletionHandlerTest` pins exactly that case: a
-failed `checked_command` yields `COMPLETED_WITH_ERRORS` **and** `gate_status: RED`.
-
-The direction that does exist is the reverse one: `GateStatusResolver` derives a gate verdict
-from the run status when no marker was written (`FAILED` → RED, `COMPLETED` → GREEN,
-`COMPLETED_WITH_ERRORS` → YELLOW).
-
-A shell block does not have to write these markers itself: `checked_command`/`check_category`
-derive the gate automatically from the exit code, giving precedence to the script's own marker when
-it is at least as severe — details and examples:
-[WORKFLOW-GUIDE.md → `checked_command` / `check_category`](WORKFLOW-GUIDE.md#checked_command--check_category--gate-derived-automatically-from-the-exit-code).
-
-**AutoTodoService:**
-- Reacts to `WorkflowRunCompletedEvent`
-- RED gate → TODO with `HIGH` priority
-- YELLOW gate → TODO with `MEDIUM` priority
-- Source: `WORKFLOW`, linked to the run
 
 ## Workflow Chains
 
-Chains group multiple workflows for sequential execution:
-
-- **Cross-project:** A chain belongs to no project and can reference workflows from different projects
-- **Sequential:** `ChainExecutor` executes entries in `sortOrder` order (virtual threads, polling every 2s, 180-min. timeout)
-- **Context propagation:** Each entry receives chain-level context + entry-level context + `previous_chain_output` from the last completed workflow
-- **Stop-on-Failure:** Flag at chain and entry level — chain stops only when both are `true`
-- **Cancellation:** Via `ConcurrentHashMap<String, AtomicBoolean>`
-- **WebSocket:** Status broadcasts to `/topic/chains/{chainRunId}/status`
+Chains run several workflows one after another, across projects too; every entry receives the
+`{{ previous_chain_output }}` of the last completed workflow. Properties, structure and limits:
+[WORKFLOW-GUIDE.md](WORKFLOW-GUIDE.md) (section "Chains"). In the code, `ChainExecutor` runs the entries on
+virtual threads and polls their status; the status goes out over WebSocket to
+`/topic/chains/{chainRunId}/status`.
 
 ### Chain Templates
 
@@ -547,53 +337,29 @@ Further rules of the tick:
 
 ## Completion Triggers (V39)
 
-Automatic workflow chaining based on completion events:
-- `CompletionTriggerService` — manages trigger definitions
-- `CompletionTriggerController` — `/api/v1/completion-triggers`
-- Triggers link a source workflow (trigger) with a target workflow (started after completion)
-- API: List, Get, Create, Enable/Disable, Delete; Filter by source or target workflow ID
+A completion trigger starts a target workflow when a source workflow completes
+(`CompletionTriggerService`, `/api/v1/completion-triggers`, endpoints in the
+[API reference](api-referenz.md)).
 
 ## Audit Center — Findings, Acceptance and Expiry (V68/V69)
 
-Audit workflows (metadata `audit.enabled=true`, `key`, `category`, `reportBlock`) emit an envelope `<!-- mysuricates:audit-result:v1 {…} -->` in their report block, which `AuditResultParser` takes apart (with several, the last one counts, so a quoted earlier run does not; TODO 1cf996df). `AuditIngestionService.ingest` (called by `AuditIngestionListener` on `WorkflowRunCompletedEvent`) checks and stores one `AuditReport` per run (VALID/INVALID); `AuditSnapshotApplier` matches the findings of a valid report in the same transaction by fingerprint (SHA-256 over projectId/auditKey/ruleKey/**normalised** subject):
-
-- **Normalisation** (`AuditSubjectNormalizer`): if a lower-case kind word stands before the first `:` (`package:…`, `keyword:…`, `safe-inventory:…`), `<kind>:<value>` stays whole — it is the identity. Otherwise everything from the first `:` and a lower-case method suffix behind a class name are dropped (`ContainerShellService.execute` → `ContainerShellService`, `application.yml:key-store-password` → `application.yml`). Class name and Java path are the same identity (TODO 87a1dac0): a path to a `.java` file starting with an upper-case letter and a fully qualified class name become the class name (`com/automation/service/AssistantService.java`, `com.automation.service.AssistantService` → `AssistantService`). Frontend modules (`.ts`/`.tsx`) stay paths, even without a directory – otherwise `ActivityLog.tsx` would merge with the Java class `ActivityLog`; only `ai-automation-frontend/src/…` and `src/…` are aligned to `frontend/src/…`. Other paths with `/` and file names without a class prefix stay whole. Metric rules (one finding per measured value) carry the FACT name as their fixed `subject` in the ruleKey catalogue (`perf.db.size` → `database_bytes`, `health.type-errors` → `frontend_tsc_errors`). Otherwise the model-generated `subject` drifts between runs and creates revenants (old finding `RESOLVED`, new one `OPEN`, managed TODO wrongly `DONE`). The stored `subject` is a display attribute only: on a match the newest value wins. `AuditFingerprintMigrationJob` (startup, idempotent) recomputes old rows and merges revenants into the oldest finding through `AuditFindingMerger` (counters added up, TODO links and occurrences move along). A human disposition (`ACCEPTED_RISK`, `DISMISSED`) always wins — whether it sits on the target or on the revenant; status and disposition (`dispositionNote`/`-Evidence`/`-At`, `resolvedAt`) move together, and a finding is only reopened through `AuditAcceptancePolicy` (proven deterioration). Every merge is logged before the delete with both IDs, both raw subjects and the `ruleKey`; a failing scope is logged and blocks neither the others nor the startup. If two findings of the **same** report yield the same identity, only the first is taken; the ingestion reports the others with their subjects in the activity log (they used to vanish silently, TODO 94fda6ef).
-
-- **New** → `OPEN`; **back again** after `RESOLVED` → `OPEN` + `regressionCount`; `AWAITING_VERIFICATION` → `OPEN`; **no longer in the snapshot** → `RESOLVED` (only OPEN/AWAITING_VERIFICATION). Classified findings (`ACCEPTED_RISK`, `DISMISSED`) are not resolved by a single absence (`AuditDispositionLifecycle`, TODOs b2e3da6a/276ac76f): if the same run reports the file anew under another ruleKey, the new finding inherits the classification and the old one becomes `RESOLVED` ("Ersetzt durch …"); if the ruleKey is no longer in the catalogue, it becomes `RESOLVED` ("Regel nicht mehr im Katalog"); otherwise after three consecutive valid runs without a sighting ("Nicht mehr gemessen/ersetzt").
-- **Managed TODOs** (`ManagedTodoWriter`): only for `CRITICAL`/`HIGH` findings in status `OPEN` whose evidence names a measurement of the run (`ensureAll`, one query per report for links and TODOs; tag `audit`, `auto:workflow`, `TodoCreatedEvent` → TodoTrigger). Accepted/dismissed risks, re-reviews and unverified findings start no fix loop. After every ingest, `ManagedTodoWriter.reconcile` closes the TODO as soon as all linked findings are terminal and reopens it when one comes back; `ManagedTodoReconciler` does the same after a disposition change in the Audit Center and after a merge. A TODO on demand (`POST /api/v1/audit-findings/{id}/todos`, `AuditFindingTodoLinker`) takes the same path (`ManagedTodoWriter.create`). If none of the open linked findings is above the threshold any more (say after changed criteria HIGH → MEDIUM), the TODO is released: link removed, status `ARCHIVED` (not `DONE` — nothing was fixed); an `IN_PROGRESS` TODO stays untouched (TODO ba0dcb3a).
-- **Gate status** comes from the workflow's run metadata (`gate_status`), not from the findings; `AuditSummary.openFindingsBySeverity` counts only non-terminal findings, `findingsByStatus` returns accepted ones separately (Audit Center: "open X · accepted Y"; the findings tab filters on open ones by default).
-
-**Risk acceptance** (`PATCH /api/v1/audit-findings/{id}` with `status=ACCEPTED_RISK`, `dispositionNote`) — rules in `AuditAcceptancePolicy`, number parser `EvidenceMetrics`:
-
-| Rule | Behaviour |
-|---|---|
-| Evidence snapshot | On acceptance, `AuditCenterService.updateFinding` freezes the current `evidence` text as `disposition_evidence` and the time as `disposition_at` (V69). Both stay through later status changes for traceability; accepting again sets both anew. |
-| Deterioration | If the finding shows up again, the ingestion compares measurable values of the new evidence with the snapshot — `EvidenceMetrics.parse` recognises `number + unit` (`LOC`/`lines`/`Zeilen`, `NCLOC` as a unit of its own, never as `LOC`, `deps`, `KB`/`MB`/`GB`, `ms`, `%`, `files`, `classes`, `methods`, `tests`, `warnings`, `errors`, `issues`, `vulnerabilities`; synonyms are merged, per unit the largest value counts) and named counts from fact lines (`FAKT <name>_count: <number>`, the name is the key). If a shared key lies > 10 % above the snapshot, the finding goes back to `OPEN` and the note gains `Verschlechtert: 320 LOC → 400 LOC`; the snapshot stays. The change rate (`6 Aenderungen in 90 Tagen (Hotspot ab 5)`, `Backend churn: 30`) fluctuates and is not compared by percentage: it reopens only if it was below the hotspot threshold in the snapshot and reaches it now (threshold from `Hotspot ab N` in the current evidence, otherwise 5 as in `arch-findings.py`; note `Verschlechtert: 0 Änderungen → 6 Änderungen (Hotspot ab 5)`). Without comparable numbers (one-sided or none at all) there is no reopening. |
-| Expiry | If the acceptance is older than 180 days when the finding reappears (`disposition_at`, fallback `resolved_at` for old acceptances), the finding goes to `AWAITING_VERIFICATION` with the note `Wiedervorlage nach 180 Tagen` — without a managed TODO. This happens exactly once: afterwards the normal rules apply (next ingest: present → `OPEN`, gone → `RESOLVED`); only a new acceptance starts a new period. Deterioration takes precedence over expiry. |
-
-Per finding, the Audit Center shows the acceptance date, the re-review date (+180 days), the disposition note and the snapshot (expandable). Tests: `AuditAcceptancePolicyTest`, `EvidenceMetricsTest`, `AuditIngestionServiceTest`, `AuditSnapshotApplierTest`, `AuditControllerTest`, frontend `AuditCenter.test.tsx`.
-
-**Context variable `audit_findings`** (TODO 3643beac): on every run, an audit workflow receives the known findings of its audit (`OPEN`, `AWAITING_VERIFICATION`, `ACCEPTED_RISK`, `DISMISSED`; without `RESOLVED` and without `ruleKey`s the catalogue does not know, marked or not). `WorkflowContextDataService` fetches them through the interface `AuditContextSource`, implemented by `service.audit.AuditFindingsContext` (so that `service.workflow` does not depend on `service.audit`), from a lean projection without TEXT blobs – marked as data and sanitised like `open_todos`, with the same gap path. The block has at most 250 lines and 60,000 bytes (a shell command is a single `bash -c` argument); when space runs short, the triaged findings stay ahead of the open ones. `ExecutionContextFactory` discards a passed-in value (sub-workflows inherit all variables), so the variable always describes the running workflow. That lets a report prompt carry triaged findings forward with the same identity, and deterioration and expiry take effect. Details: [audit-workflow-protocol.md](audit-workflow-protocol.md) → "Known findings in the prompt".
+Audit workflows (`metadata.audit`) deliver an envelope with the complete snapshot of findings in their
+report block. `AuditIngestionService` (called by `AuditIngestionListener` on `WorkflowRunCompletedEvent`)
+stores one `AuditReport` per run and reconciles the findings by fingerprint (`AuditSnapshotApplier`).
+Format, identity of a finding, lifecycle, managed TODOs, risk acceptance and the context variable
+`audit_findings`: [audit-workflow-protocol.md](audit-workflow-protocol.md).
 
 ## Todo Triggers — Self-Improvement Loop (V51/V52)
 
-Automatic execution of fix workflows when TODOs are created — closes the self-improvement loop:
+A TodoTrigger starts a fix workflow as soon as a matching TODO is created, closing the
+self-improvement loop. Setup, filters, context variables and the three layers of loop prevention:
+[WORKFLOW-GUIDE.md](WORKFLOW-GUIDE.md) (section "TodoTrigger — Self-Improvement Loop"), the idea behind
+it: [konzepte/selbstverbesserung.md](konzepte/selbstverbesserung.md).
 
-```
-Audit Workflow → AutoTodoService → TODO (OPEN)
-                                     ↓ TodoCreatedEvent
-                             TodoTriggerService → Fix Workflow
-                                                     ↓ WorkflowRunCompletedEvent
-                                             TodoFeedbackListener → TODO (DONE)
-```
-
-- `TodoTriggerService` — `@TransactionalEventListener` on `TodoCreatedEvent`, matches TODOs against configured triggers (tag pattern AND semantics, priority filter, project filter), starts fix workflow with TODO data as context variables
-- `TodoFeedbackListener` — `@EventListener` on `WorkflowRunCompletedEvent`, closes TODO on GREEN gate (when `autoClose=true`), logs escalation when fix attempts are exhausted
-- `TodoTriggerController` — `/api/v1/todo-triggers`
-- API: List, Get, Create, Enable/Disable, Delete
-- **Loop Prevention**: 3 layers — metadata flag (`todoTriggerRun`), max attempts counter (`todo.fixAttempts`), running check (`todo.lastFixRunId`)
-- **Context variables** for fix workflow: `todo_id`, `todo_title`, `todo_description`, `todo_tags`, `todo_priority`, `todo_project_id`, `todo_trigger_id`
+- `TodoTriggerService` — `@TransactionalEventListener` on `TodoCreatedEvent`, matches TODOs against the configured triggers (tag pattern with AND semantics, priority, project) and starts the fix workflow with the TODO data as context variables
+- `TodoFeedbackListener` — `@EventListener` on `WorkflowRunCompletedEvent`, closes the TODO on GREEN (when `autoClose=true`), logs an escalation when fix attempts are exhausted
 - **Distinction — manual todo-workflow link**: The `TodoTrigger` starts workflows rule-based and automatically. Separately, a single todo can optionally be linked to a **resolver workflow** (`linkedWorkflowId`, set in the todo view) — the workflow meant to complete this one todo. The link is not global and starts nothing by itself: only the manual `Resolve` action starts the run, the todo then moves to `IN_PROGRESS` with `resolutionState=RUNNING`, is set to `DONE` automatically on success, and falls back to its previous status on a failed run (`resolutionState=FAILED`).
+- **Pause** (`automation.todo-trigger.skip-until`, ISO instant, empty = off): stops the whole mechanism until that time — backlog poll **and** event path. It applies from the first tick after startup, so setting it needs no running backend. Together with `automation.scheduler.skip-until` (+ `catch-up-on-resume: false`) a few config lines pause every trigger, e.g. in the git-ignored `ai-automation-backend/config/application.yml`. Deliberately a date rather than a flag: it expires on its own, whereas a forgotten `enabled=false` on the individual triggers silently stops the loop (no error, no red status — the TODOs just pile up). An unparseable value ⇒ fail open (ERROR log, triggers fire normally). An active pause is logged as a WARNING at startup.
 
 ## TODO batch — work through at night, approve in the morning
 
@@ -677,52 +443,37 @@ A **goal** (`entity/Goal`, `/api/v1/goals`) collects TODOs from several projects
 - **Who plans:** interactively the plugin skill `/mysuricates:plan-goal`, which sees the repository; unattended a workflow later. A person can override any AI assessment in the TODO dialog.
 - **Relation map** (`GET /goals/{id}/relations`, `GoalRelationsService`): a goal has no link of its own to workflows, only through its TODOs. For every TODO the endpoint returns the **origin** (`source`, creating run `workflow_run_id`, reference `workflow_run`/`audit_finding`/`health_check`, `audit_finding_todos`), the **processing** (fix workflow `linked_workflow_id` and every matching active TodoTrigger) and the **result** (`last_fix_run_id`, `fix_attempts`, `resolution_state`). It shares the trigger matching with `TodoTriggerService` (`service/trigger/TodoTriggerMatcher`, pure). Everything is batched: one lean projection of the TODOs, then one query per kind. `include` brings up to 20 candidates without a goal along (`GET /todos?goalId=none` finds them).
 - **"Might belong here"** (`GET /goals/{id}/candidates`, `GoalCandidateService`, TODO c60bf914): open TODOs (OPEN, IN_PROGRESS, BACKLOG) without a goal, by default only from the goal's projects (a sub-query on `goal_projects`, `TodoSpecifications.inProjectsOfGoal`), with `allProjects=true` from all of them; a page like `GET /todos` (order, batched names). A goal without projects has no candidates unless `allProjects` is set.
-- **UI:** menu entry "Goals" with the overview `/goals` (active · done · archived), compact goal cards there and in the cockpit (`components/goal/GoalCard`, `GoalsSection`) naming the next milestone, goal view `/goals/:goalId` with an outline | list | timeline | workflow map switch (outline by default, the browser remembers the choice; the stored value `map` stays valid): the list (up next · open questions with "Decide" and a collapsible "Decided" section · done · per project; due date and work package as chips), the map as SVG in four columns origin · TODOs · processing · result (`goalRelationLayout.ts`, `GoalRelationMap`) – the same workflow is one node, and a dotted stub marks where no workflow docks on yet; rows are grouped per project by work package (in the goal's order), then "No work package". **Assigning workflows by dragging** (52bc1e8c, `WorkflowMapDnd`, `WorkflowMapPanel`, `workflowMap.ts`): on the right a workflow panel with the same dock/width/window mechanics as the side panel (`SidePanelFrame`, its own storage key in `panelGeometry`), listing the workflows of the goal's projects with search and "Show all workflows"; each can be dragged with the mouse or the keyboard (Space picks up, arrows jump from target to target, Enter drops, Escape cancels). Onto a TODO → `PUT /todos/{id}` with only `linkedWorkflowId` (the server applies only fields that are set), shown in the map at once; an existing fix workflow is only replaced after confirmation. Onto a work package or the goal band → `POST /goals/{id}/workflows` with role `WORKER`; an assignment that already exists sends nothing and shows a hint. Only fitting targets light up, a line under the dragged workflow says where it goes (a workflow from another project on a TODO is allowed, the line names the project; candidates accept nothing), every assignment offers "Undo" in its toast. A backend without `/goals/{id}/workflows` (404) only links TODOs. Below 1024 px there is no panel (a modal sheet cannot be dragged out of onto the map). Below, "Might belong here" (`GoalCandidates`) assigns with one click, by default only from the goal's projects (`GET /goals/{id}/candidates`; the "Show all projects" switch marks TODOs from other projects; a backend without the endpoint answers 404, then `/todos?goalId=none` as before, without the switch); the candidates shown appear dashed in the map. **Adding with a work package** (85889063, `hooks/useGoalAddTodo.ts`): when a candidate's project has packages in the goal, "+" opens a menu "No work package" plus the packages in their order; one click is one step (`PATCH /todos/{id}/planning` with `goalId` and `workPackageId`, the backend links the project to the goal; without a package `POST /goals/{id}/todos` as before). "+ TODO" sits right at the package (outline row, side panel; `PackageTodoAdder`): a search over the candidates, narrowed to the package's project, and "Create new: <title>" (`POST /todos` with `projectId`, then `planning`); Enter takes the first hit or creates – while the search is still loading, only titles containing what was typed count. Every addition reports "Added: project · package" with "Show" and "Undo" (`planning` with `goalId: ''`; a TODO just created is also archived via `PUT /todos/{id}`, never deleted – even if a TodoTrigger ran in the meantime); toasts carry several buttons for this (`toastStore`: `actions`, "Show" with `keepOpen` leaves the toast open so it can still be undone afterwards). "Show" (`goalReveal.ts`, a store because the toast outlives the page) switches from the list and the workflow map to the outline; outline and timeline open whatever hides the TODO, scroll to it (`data-todo-id`) and light it up for about two seconds (`[data-goal-revealed]` in `index.css`, without gliding or pulsing under reduced motion). Planning section in a TODO's edit dialog (`TodoPlanningPanel`, state in `useTodoPlanningForm`): the dialog's one "Save" stores it – first the TODO (`PUT /todos/{id}`), then only the changed fields via `PATCH /todos/{id}/planning`; the dialog closes only once both succeeded and then reports “Todo updated”; if the planning fails, an error toast says “Todo saved, but not its planning” and the dialog stays open with the edits (the form only re-derives when the TODO changes) (bbee09e6). Its "Work package" field only offers packages from the TODO's project, and the "Decision" field appears once the backend knows decisions (a new question and a decision at once are already refused by the form).
 - **Work packages** (V92, `entity/GoalWorkPackage`, `GoalWorkPackageService`, TODO c60bf914; until V92 the milestones of TODO 259f4f66): structure a goal per project (`/goals/{id}/work-packages`). A package belongs to exactly one project of the goal (`project_id`), has an optional period (`start_date`/`end_date` only together, start ≤ end, else 400) and an order per project (`position`, `PUT /goals/{id}/work-packages/order`, only within one project). TODOs are assigned via `PATCH /todos/{id}/planning` with `workPackageId` (alias `milestoneId`) – only packages of the TODO's own goal and project (400 on write, legacy data is still read); a TODO that changes or leaves its goal loses its package, and a TODO changing its project leaves a package of the old project. A package changes its project only while it is empty. The **state is computed on read** (`GoalDueState`, based on the end): `REACHED` (completed) once all assigned TODOs (without ARCHIVED, at least one) are done, else `OVERDUE`, `DUE_SOON` (at most 3 days) or `OPEN`; without a period only `OPEN`/`REACHED`. `completed_at` keeps the first detection and stays; if an open TODO joins later, the response says `reopened: true`. A bare date means "from the start" for a start and "until the end of that day" for an end (UTC). The package list loads goal and packages with their project positions in **one** query (`GoalRepository.findWithWorkPackages`) and counts from the `GoalTodoRow` rows – two statements (`RequestCostRatchetTest`). V92 took over the old milestones (date → start and end) and split mixed packages per minority project.
 - **Milestones** (V92, `entity/GoalMilestone`, `GoalMilestoneService`, TODO c60bf914): dates of the whole goal (`/goals/{id}/milestones`), no project, date required, optionally linked to work packages of the same goal (`goal_milestone_work_packages`, `workPackageIds`). With packages a milestone is reached once all of them are completed (`MilestoneProgress`; `reached_at` = first detection, then `reopened`), without packages a person marks it (`reached`; with packages that is a 400); otherwise the date decides. Milestones and their links are read in **one** query per goal (`GoalMilestoneRepository.findWithLinks`), their state comes from the package states computed anyway. The goal list names each goal's next milestone not yet reached (`GoalResponse.nextMilestone`) – for all goals from one query that counts linked and completed packages in sub-queries (`findSummaries`). The goal view (`GoalDetailAssembler`) reads goal with packages, TODO rows, goal projects and milestones with links – four statements.
 - **"Needs you":** `GET /todos/overview` also returns `milestonesDue` – with `kind` `MILESTONE` the milestones of active goals that are `DUE_SOON` or `OVERDUE` (not reached), with `kind` `WORK_PACKAGE` the work packages whose end has passed while they still have open TODOs; each with `goalId`/`goalTitle` for the link, by date. The cockpit lists them ahead of the TODOs, each row leading to the goal page (`components/goal/MilestoneDueRow`).
 - **Decided** (V93, TODO 68a5e24e): besides the open question a TODO keeps the decision that answered it (`decision`, `decided_at`, `decided_by` USER/AI) – written via `PATCH /todos/{id}/planning` (`decision`; clears `openQuestion`, `""` takes it back, a new question and a decision at once → 400). The state `decisionState` (`QUESTION`/`DECIDED`/`NONE`) is computed on read: a later new question leaves the decision in place, the state is then `QUESTION`. `decided` counts the non-archived TODOs with `DECIDED` in the goal's progress (from the GROUP BY that runs anyway), per goal project and per work package (from the `GoalTodoRow` rows read anyway) – no extra statement.
 - **Workflows on the goal** (V94, `entity/GoalWorkflow`, `GoalWorkflowService`, `GoalWorkflowController`, TODO 52bc1e8c): a workflow hangs on the whole goal or on a work package, role `WORKER` ("works on it") or `STATUS` ("reports the status"); `GET/POST/PATCH/DELETE /goals/{id}/workflows`. The list reads attachments with workflow name, project and package order in one query; soft-deleted workflows drop out; an enabled goal guard is a synthetic first entry `guard` (cannot be detached, 400). Starting goes through the existing `POST /workflows/{id}/execute` with `goal_id` (optionally `work_package_id`, `goal_locale`) in the context – `TriggerSource` MANUAL, `goal_id` provides `goal_status`/`goal_guard_*`; the status comes from `GET /dashboard/workflow-results`. The goal view carries no workflows, its cost stays.
-- **Outline** (default view of the goal page, TODO c60bf914; `components/goal/GoalOutline`, pure logic in `goalOutline.ts`): at the top the "Milestones" block (date, state, "2/3 packages"; add, edit, delete), below it, for each project of the goal in the goal's order, its work packages with their time span or "no time span" and progress, holding their TODOs. "No work package" and "No project" only appear when needed; a project that only TODOs come from shows as "not assigned" with a button to add it. Projects and packages can be moved (`PUT /goals/{id}/projects/order`, `PUT /goals/{id}/work-packages/order`); removing a project asks with counters and offers `?cascade=true`. The rows form a tree (↑/↓ change the row, →/← expand and collapse); the browser remembers per goal what is expanded.
-- **Timeline** (fourth view of the goal page, TODO e192df18, rebuilt with c60bf914; `components/goal/GoalTimeline`, pure logic in `timelineLayout.ts`, `timelineDrag.ts` and `dragLabel.ts`): at the top the axis with "today" and a flag for the target date, spanning work packages, milestones, due TODOs and the target date (with no date at all: today plus four weeks), the grid by day, week or month depending on the width. Below it the **Milestones** row: a diamond per milestone (colour by state) whose guide line runs through all bands; at the right edge the title folds to the left of its diamond. While a diamond is dragged, every row with days lights up. A click into the row opens a title field there (Enter adds it, `POST /goals/{id}/milestones`), dragging a diamond changes the date (`PUT /goals/{id}/milestones/{mid}`), and a click on it opens the milestone in the side panel (see below). Then **one band per project**: every work package with a time span is a bar in a row of its own (fill = done/total, frame = state), with its due TODOs as chips below and undated ones behind a clear button "4 TODOs without a date ▾" – up to five stand open, more are folded; at the top of the timeline "TODOs without a date: show all / collapse" opens or folds them all, remembered per goal (`timelineUndated.ts`, 85889063); a "No work package" row only when TODOs of the project have none. Packages without a time span wait in the band's "No time span" tray. Dragging (`@dnd-kit/core`): a bar moves the time span, its handles change start or end (`PUT /goals/{id}/work-packages/{wid}`); dragged from the tray onto the axis, a package starts on that day and ends six days later, and a bar dropped into the tray loses its time span. A TODO dropped on a day gets the due date (`PUT /todos/{id}`, 23:59:59 local time as in the TODO dialog), in another package row or on a package in the tray it gets the package (`PATCH /todos/{id}/planning` with `workPackageId`), and on the "without a date" counter it loses the date – all only within its own project. While dragging, a second line under the dragged item shows the outcome: for a TODO the package and day ("→ Repo clean · Mon, 10/12", else "No work package" or "no date"), for a bar the time span ("10/12 – 10/18", also at a handle), for a diamond the day, and over another project the refusal; formatted with `Intl` in the UI language (`utils/localeFormat`). A click into a band's header row opens a title field for a one-week package starting that day, "+ Work package" adds one without a time span. Keyboard: bars and diamonds ←/→ by one day (Shift+←/→ changes a bar's end, Alt+←/→ its start), Enter opens the side panel; the click areas are sliders (arrow keys pick the day, Enter adds); Space lifts a TODO. A click (or Enter) on a TODO opens its dialog – not the click that ends a drag –, and its menu (⋯ or a right click) plans without dragging. Menus and the "New milestone" card float in a portal (`floating.ts`); a bar, row label or tray entry opens the package in the side panel.
-- **Side panel of the goal page** (TODO c60bf914; `components/goal/GoalSidePanel`, `SidePanelFrame`, pure logic in `panelGeometry.ts` and `goalSelection.ts`): a milestone (diamond, line in the "Milestones" block) or a work package (bar, tray, row label, title in the outline) opens its details on the right – for a milestone date, state, "2/3 packages", "Reached" and, per linked package by project, progress, TODOs and workflows; for a package project, time span, progress, TODOs, workflows with "Assign workflow" and its milestones; plus edit and delete. The selection is in the URL (`?item=milestone:<id>` or `workpackage:<id>`), the open item is highlighted, × and Escape close and give the focus back to what opened it. From 1024 px docked: it pushes the content aside, sticks at the top while scrolling, always reaches the bottom of the view and scrolls within itself; a handle on its left edge changes the width (mouse, ←/→, `role="separator"`). "Detach as a window" turns it into a floating window – moved by its title bar (also with the arrow keys), resized at edges and corner, always inside the view; the browser remembers mode, width, place and size. Below that a sheet over the content. Every TODO – outline, list, side panel, timeline – opens the TODO dialog. If a backend from before c60bf914 answers without `workPackages`, `normalizeGoalDetail` (`hooks/useGoals.ts`) turns its milestones into one-day work packages, reads `milestoneId` as the package and hides the milestones behind a hint.
-- **"Guard" switch** in the header of the goal page (`components/goal/GoalGuardControl`): the first time it is switched on, a dialog asks for the project (preset: the one with the most TODOs of the goal) and the time of day; after that the line shows the next run, the workflow and "Check now" (`POST /workflows/{id}/execute`). Switching on puts the guard workflow's result tile on the dashboard view shown, unless some view already shows it – the same path as "add widget" in the catalog (`components/dashboard/workflowResultTile.ts`), saved with the next version of the layout. Switching off leaves the tile in place. With the `dashboard-report` module off, the switch is only offered for a guard that already exists. An info symbol next to it (`InfoTip`, by mouse, keyboard focus and tap) explains what it checks and that it changes nothing, without AI; switched on, "Last result" links the last run with its traffic light (from `/dashboard/workflow-results`).
-- **Deciding and workflows on the goal page** (TODO 68a5e24e, 52bc1e8c; `components/goal/DecisionMark`, `decision.ts`, `GoalWorkflowsProvider`, `GoalWorkflowChip`): ❓ (`text-human`) and ✔ (`text-success`) sit on every TODO in the outline, the list and the timeline chips; the tooltip gives wording, date and who. On the goal page ❓ opens the "Decide" card (`PATCH /todos/{id}/planning` with `decision`, the question closes), ✔ "Change" and "Remove" (`decision: ""`); the display follows at once and goes back on an error. Counters ❓ n · ✔ m per work package, project, in the progress and on the goal card (`DecisionCounts`). Workflows: in the header next to the guard those on the whole goal (the switched-on guard first), compact at every work package in the outline, the timeline row and the package card – role, dot of the last run (for "reports the state" the traffic light), time, and ▶ starts via `POST /workflows/{id}/execute` with `goal_id`, at a package `work_package_id`, and `goal_locale`; the toast leads to the run. A workflow's card shows the result for "reports the state" (`WorkflowResultContent`), switches the role and removes it (the guard only via its switch). "Assign workflow" offers the goal's projects' workflows first. The last run comes from `/dashboard/workflow-results`, every 5 s while one runs. If the backend does not know this yet (no `decided`, 404 on `/workflows`), the marks stay a display and only the switched-on guard shows.
 - **Goal guard** (`service/goal/guard/GoalGuardService`, `POST /goals/{id}/guard`): one workflow per goal from the shipped template `goal-guard`, named "Goal guard: <title>" (German: "Ziel-Wächter: …"), `defaultContext.goal_id` and `goal_locale`, created through `WorkflowService` → `WorkflowMutationGateway` with `ChangeSource` `goal-guard`; plus a CRON schedule (default daily 08:00, `inputContext.goal_id`, conflict `SKIP`). Project: the given one, else the first non-archived goal project (V92), else the one with most of the goal's TODOs, else the oldest active one. `goals.guard_workflow_id` remembers the workflow. Switching on again only re-enables the schedule (a new `cron` replaces the old one); switching off and deleting the goal pause it – the workflow stays. If the workflow was deleted, the next switch-on creates a new one. Needs the module `dashboard-report`, else 409. `GoalResponse.guard` = `{enabled, workflowId, scheduleId, nextRunAt}` from one batched query (`GoalGuardLookup`). Why one workflow per goal: the dashboard tile is kept per workflow (latest run with `dashboard_widget`).
 - **Context variables `goal_status` and `goal_guard_*`:** when a run's merged context carries `goal_id`, `WorkflowContextDataService` injects the goal's state through the interface `GoalContextSource` (implemented by `service.goal.GoalStatusContext`, so `service.workflow` does not depend on `service.goal`) – milestones and work packages listed separately, marked as data, sanitised like `open_todos`. Without `goal_id` they do not exist; an unknown id sets each of them to the `NICHT GEMESSEN` gap and warns in the activity log. Details: [WORKFLOW-GUIDE.md](WORKFLOW-GUIDE.md) → "Goal context".
+- **UI:** The goal page — outline, list, timeline and workflow mapping, side panel, "Guard" switch, deciding — lives under `components/goal/`; its pure logic (`goalOutline.ts`, `timelineLayout.ts`, `goalRelationLayout.ts`, `panelGeometry.ts` …) is tested there.
 
 ## Notification System (V40)
 
-Notification configurations for workflow events:
-- `NotificationService` — CRUD for notification configurations
-- `NotificationController` — `/api/v1/notifications`
-- API: List, Get, Create, Enable/Disable, Delete
+Notification configurations (webhook or desktop) for workflow events are managed by
+`NotificationService` under `/api/v1/notifications`.
 
 ## Assistant System (V41+V42)
 
-Context-sensitive chat assistant for the platform. See also: [assistant-system.md](assistant-system.md)
-
-- `AssistantService` — Chat logic and context preparation; `AssistantChatCaller` makes the Claude CLI call and holds the chat model and the base instructions
-- `AssistantSessionService` — Session persistence in DB (V41 migration: `assistant_sessions`, V58: `preview` column). Endpoints: `GET /sessions` (top 50), `GET /sessions/{id}` (detail), `DELETE /sessions/{id}`
-- `AssistantContextBuilder` — injects last 5 sessions (user message + response) and up to 8 active workflow memories into the system prompt — on **all** pages
-- `PageSuggestionService` — generates and caches context-sensitive UI suggestions per page and language (`page_suggestions`, V42; unique over `page` + `locale` since V91)
-- `AssistantController` — `POST /api/v1/assistant/chat`, `GET /sessions`, `GET /sessions/{id}`, `DELETE /sessions/{id}`, `POST /pending-tools/{id}/confirm`, `POST /pending-tools/{id}/reject`
-- `PageSuggestionController` — `GET /api/v1/assistant/suggestions?page=...&locale=de|en`, `POST /api/v1/assistant/suggestions/refresh?page=...&locale=...`
-- Sessions are persisted after each chat call; `AssistantSessionUpdatedEvent` triggers page suggestion refresh
-- Default model: `sonnet` (CLI alias, newest Sonnet)
+Context-sensitive chat assistant of the UI (module `assistant`): chat, sessions, page suggestions and
+tools that need confirmation. Structure, limits and context injection:
+[assistant-system.md](assistant-system.md).
 
 ## Workflow Memory
 
-Workflows can accumulate knowledge across runs:
-- `WorkflowMemoryService` — extracts knowledge from completed runs
-- `ClaudeSummarizer` / `CodexSummarizer` — AI-based summarization
-- `KnowledgeSummarizer` — Interface for summarization backends
-- `HostCodexService` — runs OpenAI Codex CLI on the host (analogous to `HostClaudeService`)
-- `SummarizationSetupService` — Configuration and setup of summarization backends
-- `ConversationPreprocessor` — Preprocessing of conversation data for summarization
-- Active memory entries are injected as context into subsequent runs
-- `AutoMemoryExtractionListener` — automatic extraction after successful runs, configurable per workflow metadata (`autoMemoryExtraction.enabled`, `autoMemoryExtraction.interval`)
-- `WorkflowMemory` entity (V16 migration)
+Workflows accumulate knowledge across runs (module `memory`). Usage and API:
+[WORKFLOW-GUIDE.md](WORKFLOW-GUIDE.md) (section "Workflow Memory"), the flows as diagrams:
+[workflow-memory-diagrams.md](workflow-memory-diagrams.md), purpose and limits:
+[konzepte/workflow-memory.md](konzepte/workflow-memory.md).
+
+- **Extracting:** `WorkflowMemoryService.extractKnowledge()` reads the selected runs or the last 10, `ConversationPreprocessor` condenses their steps, and a `KnowledgeSummarizer` (`ClaudeSummarizer` or `CodexSummarizer`, chosen in `getSummarizer`) summarises them. `POST …/memory/extract` only answers after the AI call, with `201` and a memory that is not active yet (without `provider`: `CLAUDE`). The AI call runs outside any transaction, between a short read and a short write.
+- **Summarizers:** Both start their CLI on the host in a working directory of their own under `automation.summarization.base-dir` (`…/summarization/claude` or `/codex`), whose `CLAUDE.md` or `AGENTS.md` `SummarizationSetupService` copies from `src/main/resources/summarization/` at every start. Claude follows `automation.host-claude.timeout-seconds`, Codex `automation.summarization.timeout-seconds` (at runtime `summarization-timeout-seconds`). Unlike workflow blocks, Pi is not wired up here.
+- **Using it:** Before the first block, `writeActiveMemoryToProject` writes the active memory to `.claude/rules/project-memory.md` and deletes an old file when none is active; Codex and Pi get it appended to the system prompt through `RunContextFiles`. At most one memory per workflow is active.
+- **Automatically:** `AutoMemoryExtractionListener` (`@Async`, only with the module switched on) counts, after every `COMPLETED` run, the successful runs since the last extraction and calls `extractAndActivate` once `metadata.autoMemoryExtraction.interval` is reached (default 5; `autoMemoryExtraction: true` is enough) — always with Claude. If the CLI call fails, no memory is created: the previously active one stays active, `project-memory.md` stays unchanged, the error is in the log.
 
 ## Agent Instructions System
 
@@ -868,17 +619,14 @@ Automatic generation and verification of workflows from a topic. The block schem
 - Uses the test instance (port 8090) for safe execution
 - Flow of `POST /run` ("Create & Test"): generate on DEV (including the build check, see above) → `syncDefinitions()` → test run on the Test instance (polling) → on `FAILED` with `autoFix`, AI repair on DEV from the error message (new version), sync and test again, up to `maxRetries` → record the test result on DEV → with `autoPromote` and a passed test, save a template. `POST /generate` ("Create Workflow") runs the first step only.
 - **Build check after every auto-fix repair** (`FactoryVerificationService.autoFixWorkflow`; used by `/run`, by `verifyAndFix` for wishes and auto-repair, and by the local auto-repair): before a repair is saved, `GeneratedWorkflowCheck.reviewRepair` applies the same rules as to the correction round — without another AI call. If the repair changes the structure (a different block count, a different top-level type at a position, a different number of nested blocks in a container) or has more HIGH findings than the current version, it is discarded with a WARN and the workflow stays unchanged; an omitted `name`, `skillIds` or `requiredCapabilities` is taken from the current version. In `/run`, `verifyAndFix` and the local auto-repair a discarded attempt counts as a failed attempt without another run of the unchanged workflow; `/run` names the reason in `retryErrors`, the auto-repair in its failure message in the activity log. The factory, the correction round, wishes, dialog import and run conversion read AI-generated blocks through the same mapping (`util/BlockJsonReader`), so `name`, `skillIds` and `requiredCapabilities` are kept and `{{ block.<name>.output }}` references resolve.
-- The UI explains this with an animated flow diagram (`components/factory/FactoryFlowDiagram`, geometry and states in `factoryFlow.ts`). It follows the auto-fix/auto-promote switches (also switchable right in the card, same state as the form), shows the one-step flow ending in "End · no test" for "Create Workflow", highlights the current station and its step in the list (play/pause; under `prefers-reduced-motion` only on click, a single pass) and is an explanation, not live progress: `/run` is one blocking call without intermediate events.
+- The flow diagram on the factory page (`components/factory/FactoryFlowDiagram`) is an explanation, not a live display: `/run` is a blocking call without intermediate events.
 
 ## Workflow Pool
 
-Pre-built workflow definitions from the `workflow-pool/` directory:
-- `WorkflowPoolService` — reads JSON files from the configured pool directory
-- `WorkflowPoolController` — `/api/v1/pool` with endpoints:
-  - `GET /` — list all pool workflows
-  - `GET /{id}` — get a single pool workflow
-  - `POST /{id}/install` — import workflow from pool into target project
-  - `POST /export/{workflowId}` — export workflow to the pool
+The pool is the set of shipped workflow definitions under `workflow-pool/` that can be installed into
+any instance. `WorkflowPoolService` reads them, `WorkflowPoolController` (`/api/v1/pool`) lists, installs
+and exports. What belongs in the pool and how it is checked:
+[workflow-pool-kuratierung.md](workflow-pool-kuratierung.md).
 
 ## Wishes (Wish System)
 
@@ -894,15 +642,10 @@ Natural language wishes are automatically converted into workflows/chains:
 
 ## Integration System (V55/V56)
 
-Plugin framework for external services:
-- `IntegrationRegistry` — auto-discovery of all `IntegrationProvider` beans
-- `IntegrationOAuthService` — OAuth2 flow (Authorization Code Grant)
-- `IntegrationEncryptionService` — credential encryption (AES-GCM)
-- `IntegrationConnection` entity — connection status (CONNECTED, DISCONNECTED, EXPIRED)
-- `IntegrationController` — `/api/v1/integrations` with OAuth callback, credentials, actions
-- 18 providers in subdirectories: CalDav, Confluence, Feed, Gitea, GitHub, GitLab, GoogleCalendar, GoogleGmail, HttpApi, ICalFeed, Jira, Ntfy, OpenMeteo, Slack, Taskwarrior, Telegram, Todoist, Trello
-- `IntegrationBlockExecutor` — executes provider actions as workflow blocks
-- `TaskExportCapable` — interface for providers that support TODO export
+External services are providers: one `IntegrationProvider` bean each, found by `IntegrationRegistry`,
+with an OAuth or token flow (`IntegrationOAuthService`), encrypted credentials
+(`IntegrationEncryptionService`, AES-GCM) and actions the `integration` block runs. Providers, target
+kinds and how to add a new one: [integrations.md](integrations.md).
 
 ## Dead Letter Queue (V63)
 
@@ -924,106 +667,9 @@ Backend reads Markdown documentation files and serves them as an API:
 - Path traversal protection built in
 - Frontend displays docs in split layout with Markdown rendering
 
-## Entities
-
-All JPA entities and enums in the `com.automation.entity` package:
-
-| Entity | Table | Description |
-|---|---|---|
-| `ActivityLog` | `activity_log` | System/execution log entries with level, category, metadata |
-| `AssistantSession` | `assistant_sessions` | Persisted chat sessions of the assistant |
-| `BlockDefinition` | *(embedded)* | Block definition with type, config, required capabilities (value object) |
-| `Capability` | `capabilities` | Skill capabilities with schema and handler reference |
-| `ChainEntry` | *(embedded)* | Entry in a chain with workflow reference and context (value object) |
-| `ChainRun` | `chain_runs` | Execution instance of a chain with entry runs |
-| `ChainRunEntry` | *(embedded)* | Status of a single chain entry during execution (value object) |
-| `CompletionTrigger` | `completion_triggers` | Source→target workflow link on completion |
-| `DeadLetterEntry` | `dead_letter_entries` | Failed messages in the dead letter queue |
-| `IntegrationConnection` | `integration_connections` | Connection to external service (OAuth, credentials) |
-| `TodoTrigger` | `todo_triggers` | Automatic fix workflow execution on TODO creation (self-improvement loop) |
-| `Container` | `containers` | Docker container per project with status and mounts |
-| `NotificationConfig` | `notification_configs` | Notification configuration (webhook/desktop) |
-| `OnboardingProfile` | `onboarding_profiles` | Onboarding profile with type (BASE/PROFILE) |
-| `OnboardingProfileHistory` | `onboarding_profile_history` | Change history of an onboarding profile |
-| `PageSuggestion` | `page_suggestions` | Cached UI suggestions per page |
-| `Project` | `projects` | Project with type, path, status, AI context |
-| `ScheduledWorkflow` | `scheduled_workflows` | Cron/once/delayed schedule for workflows and chains |
-| `Skill` | `skills` | Skill with category, capabilities, configuration schema |
-| `StepResult` | `step_results` | Result of a single workflow step with context delta |
-| `TemplateVerification` | `template_verifications` | Quality status of a template per project |
-| `Todo` | `todos` | Task with status, priority, source, tags |
-| `WebhookTrigger` | `webhook_triggers` | Webhook trigger for workflows with secret token |
-| `Wish` | `wishes` | Natural language wish with decomposition and iteration history |
-| `Workflow` | `workflows` | Workflow with blocks, instructions, model, provider (soft delete) |
-| `WorkflowChain` | `workflow_chains` | Chain with sorted entries and stop-on-failure |
-| `WorkflowMemory` | `workflow_memory` | Extracted knowledge from workflow runs |
-| `WorkflowRun` | `workflow_runs` | Execution instance of a workflow with steps and metadata |
-| `WorkflowTemplate` | `workflow_templates` | Template with i18n name/description and blocks |
-| `WorkflowVersion` | `workflow_versions` | Versioned workflow snapshots |
-
-**Enums:**
-
-| Enum | Values |
-|---|---|
-| `ContainerStatus` | CREATED, RUNNING, STOPPED, ERROR |
-| `GateStatus` | GREEN, YELLOW, RED |
-| `ProjectStatus` | STOPPED, STARTING, RUNNING, ERROR |
-| `ProjectType` | CODE, CONTENT, RESEARCH, BUSINESS, PERSONAL |
-| `RunStatus` | PENDING, RUNNING, PAUSED, COMPLETED, COMPLETED_WITH_ERRORS, FAILED, CANCELLED, INTERRUPTED |
-| `SkillCategory` | DOCUMENT, CODE, DATA, CONTENT, RESEARCH, BUSINESS, PRODUCTIVITY |
-| `StepStatus` | PENDING, RUNNING, COMPLETED, FAILED, SKIPPED, WAITING_APPROVAL |
-| `WishStatus` | RECEIVED, DECOMPOSING, AWAITING_DECOMPOSE_APPROVAL, EXECUTING, EVALUATING, REFINING, AWAITING_CLARIFICATION, AWAITING_APPROVAL, COMPLETED, FAILED, CANCELLED |
-| `Todo.Status` | OPEN, IN_PROGRESS, DONE, BACKLOG, ARCHIVED (ARCHIVED = "out of sight" — hidden from the default list, dedicated archive tab; target of hygiene/bulk archiving) |
-| `Todo.Priority` | LOW, MEDIUM, HIGH, CRITICAL |
-| `Todo.Source` | USER, AI, WORKFLOW |
-| `ActivityLog.LogLevel` | DEBUG, INFO, WARN, ERROR |
-| `ActivityLog.LogCategory` | SYSTEM, EXECUTION, SCHEDULE, WEBHOOK, SECURITY, CONTAINER, PLUGIN |
-| `ScheduledWorkflow.ScheduleType` | CRON, ONCE, DELAYED |
-| `ScheduledWorkflow.TargetType` | WORKFLOW, CHAIN |
-| `ScheduledWorkflow.ConflictBehavior` | SKIP, OVERLAP |
-| `NotificationConfig.ChannelType` | WEBHOOK, DESKTOP |
-| `OnboardingProfileType` | BASE, PROFILE |
-| `Todo.ResolutionState` | IDLE, RUNNING, FAILED, SUCCEEDED |
-| `IntegrationConnection.ConnectionStatus` | CONNECTED, DISCONNECTED, EXPIRED |
-| `DeadLetterEntry.Status` | OPEN, RETRIED, DISCARDED |
-
 ## Frontend Architecture
 
-### Component Structure
-
-```
-App.tsx (Router)
-├── Layout
-│   ├── Sidebar (Navigation, Collapse)
-│   └── Header (Language, Theme)
-│
-├── Pages (one page per route in App.tsx; in Simple Mode — the simplified UI, switchable in
-│   │   the settings — nine routes swap their page for a Simple* variant)
-│   ├── Dashboard, Projects, ProjectDetail, ProjectCockpit
-│   ├── Workflows, WorkflowDetail, WorkflowExecution, WorkflowDebug, WorkflowFactory
-│   ├── Skills, Schedules, Calendar, Webhooks, Integrations, Settings
-│   ├── Runs, Approvals, ActivityLog, Todos, DeadLetterQueue, AuditCenter
-│   ├── Goals, GoalDetail, Chains, ChainExecution
-│   ├── Wishes, Docs, Reports, Insights, OnboardingProfiles, DialogImport
-│   ├── Simple* variants (SimpleHome, SimpleWorkflows, etc.)
-│
-├── Hooks (TanStack Query + Custom, 40+)
-│   ├── useProjects, useWorkflows, useSkills, useSchedules, ...
-│   ├── useChains, useChainTemplates, useTodos, useTodoTriggers, useTodoOverview
-│   ├── useActivityLog, useWorkflowMemory, useWishes, useWorkflowFactory
-│   ├── useStaging, useTesting, usePool, useDocs, useReports, useInsights
-│   ├── useIntegrations, useDeadLetters, useCompletionTriggers, useWorkflowVersions
-│   ├── useAssistant, useAssistantWebSocket, useCalendarAggregated
-│   ├── useWebSocket, useToast
-│   └── calendar-adapters/ (Google, Runs, Schedules, Taskwarrior, Trello)
-│
-├── Stores (Zustand)
-│   ├── sidebarStore, themeStore
-│   ├── settingsStore, toastStore, assistantStore
-│
-└── API Client
-    └── /api/v1/* → Vite Proxy → Backend :9090
-```
+Structure and rules of the UI: [frontend.md](frontend.md).
 
 ### Data Flow
 
@@ -1092,16 +738,7 @@ Response (DTO) → React Query Cache → UI Update
 
 ### Public Endpoints (no API key required)
 
-- `GET /api/v1/system/health`
-- `GET /api/v1/system/info`
-- `GET /api/v1/system/auth-status`
-- `GET /api/v1/system/jvm-memory` (only the three heap numbers; `/actuator/metrics` requires the key)
-- `POST /api/v1/webhook/trigger/{token}`
-- `/api/v1/integrations/*/callback` (OAuth2 Callbacks)
-- `/ws/**` (WebSocket)
-- `/actuator/health`
-
-The list lives once in `security/PublicPaths` (exact paths, patterns, the protected areas `/api/**` and `/actuator/**`); `SecurityConfig` builds its rules from it, and `ApiKeyAuthFilter` uses the same matchers to decide whether a missing key is logged as a SECURITY warning — only where the chain also rejects it. Exact paths match only themselves (no `/health/`, no `/health/extra`); everything outside the protected areas (the shipped frontend) is open.
+Which paths are reachable without a key lives once in `security/PublicPaths` (exact paths, patterns, the protected areas `/api/**` and `/actuator/**`); the list with the purpose of each path: [deployment.md → What is reachable without an API key](deployment.md#what-is-reachable-without-an-api-key). `SecurityConfig` builds its rules from it, and `ApiKeyAuthFilter` uses the same matchers to decide whether a missing key is logged as a SECURITY warning — only where the chain also rejects it. Exact paths match only themselves (no `/health/`, no `/health/extra`); everything outside the protected areas (the shipped frontend) is open.
 
 ### Rate Limiting
 
@@ -1197,173 +834,8 @@ Neither SockJS nor a raw browser WebSocket can send its own headers during the h
 - All HTTP methods (GET, POST, PUT, PATCH, DELETE, OPTIONS)
 - No credentials (auth via `X-API-Key`, no cookies)
 
-## Database Migrations (Flyway)
-
-The DB migrations (`src/main/resources/db/migration/`) document the feature timeline:
-
-| Migration | Feature |
-|---|---|
-| V1–V9 | Base tables: Projects, Containers, Skills, Capabilities, Workflows, Runs, Schedules, Webhooks, Timestamps |
-| V10–V11 | Performance indexes, container last activity |
-| V12 | App settings |
-| V13 | Workflow model + instructions |
-| V14 | Schedule types + scheduled-at |
-| V15 | Activity log table |
-| V16 | Workflow memory table |
-| V17 | Todos table |
-| V18 | Project subtitle + description |
-| V19 | Workflow templates table |
-| V20 | Input context in workflow runs |
-| V21 | Workflow chains |
-| V22 | Template quality status |
-| V23 | Default context in workflows |
-| V24 | Activity log composite index |
-| V25 | Workflow test status |
-| V26 | Block types column |
-| V27 | Chain support for schedules |
-| V28–V29 | Wishes + wish reference workflow IDs |
-| V30 | Project AI context |
-| V31 | Workflow ID in activity log |
-| V32 | Workflow soft delete (deleted_at) |
-| V33 | Wish iteration history |
-| V34 | Workflow provider |
-| V35 | Project archiving (archived_at) |
-| V36 | Todo session ID |
-| V37 | Delayed schedule type |
-| V38 | Scheduled workflow ID nullable |
-| V39 | Completion triggers table |
-| V40 | Notification configs table |
-| V41 | Assistant sessions table |
-| V42 | Page suggestions table |
-| V43 | Triggered-by schedule ID |
-| V44 | Schedule end conditions |
-| V45 | Schedule conflict behavior |
-| V46 | Stable synced-at |
-| V47 | Context delta in step results |
-| V48 | Related todo ID |
-| V49 | Onboarding profiles |
-| V50 | Workflow versions |
-| V51 | Todo triggers table |
-| V52 | Fix attempts + last fix run ID on TODOs |
-| V53 | Process backlog flag on todo triggers |
-| V54 | Composite indexes on todos |
-| V55 | Integration connections table |
-| V56 | Client credentials on connections |
-| V57 | Due date on todos |
-| V58 | Assistant session preview column |
-| V59 | Linked workflow on todos |
-| V60 | Workflow name in runs |
-| V61 | Workflow tags and category |
-| V62 | Auto-refine on wishes |
-| V63 | Dead letter entries table |
-| V64 | Writes flag on capabilities |
-| V65 | Catch-up-on-resume on schedules |
-| V66 | Todo export link |
-| V67 | Reasoning effort on workflows |
-| V68 | Audit reports, findings, occurrences and TODO links |
-| V69 | Evidence snapshot and acceptance timestamp on audit findings (`disposition_evidence`, `disposition_at`) |
-| V70 | Run provenance: definition hash on versions and runs, version reference and `trigger_source` |
-| V71 | Workflow sealing: `sealed`, `sealed_hash`, `sealed_at` on workflows |
-| V72 | Encrypted HMAC signing secret on webhook triggers |
-| V73 | Versioned dashboard layout snapshots (`dashboard_layout_versions`) |
-| V74 | Daily aggregate of the measured request cost per route (`request_metrics_daily`) |
-| V75 | Marker for findings whose ruleKey is outside the catalog (`unknown_rule_key`) |
-| V76 | Agent session provenance on the todo (`agent_session_ref`) |
-| V77 | Evidence check on the audit finding (`unverified_evidence`) |
-| V78 | Bilingual steps in templates (`workflow_templates.i18n_source`) |
-| V79 | Blueprints as a kind of their own next to templates (`workflow_templates.kind`) |
-| V80 | Skills under the seal: `workflows.sealed_skill_hashes`, change history `skill_versions` |
-| V81 | Bilingual onboarding profiles: content as a `{de, en}` map |
-| V82 | Seal state on runs: `workflow_runs.sealed`, `sealed_skill_pins` |
-| V83 | Edited onboarding profiles: `customized`, `shipped_version` |
-| V84 | Seal signature and seal history: `workflows.sealed_signature`, `workflow_seal_events` |
-| V85 | Goals: table `goals`, ranking and rating on `todos` |
-| V86 | Several named connections per integration provider: `integration_connections.connection_name` |
-| V87 | Indexes for runs per schedule (`workflow_runs`, `chain_runs`) and TODOs per run (`todos.last_fix_run_id`, `todos.workflow_run_id`) |
-| V88 | Goals: table `goal_milestones`, `todos.milestone_id`, `goals.guard_workflow_id` (goal guard) |
-| V89 | A run's chain: `workflow_runs.chain_run_id` + index |
-| V90 | Language-neutral account names for RSS/Atom and Open-Meteo (`integration_connections.account_info`, existing rows updated) |
-| V91 | Assistant page suggestions per page and language: `page_suggestions.locale`, `UNIQUE(page, locale)` (table rebuild) |
-| V92 | Goals stage 1: table `goal_projects`; the former milestones become `goal_work_packages` (project, position, period, mixed packages split, `todos.milestone_id` → `work_package_id`); new `goal_milestones` (dates of the goal) and `goal_milestone_work_packages` |
-| V93 | Goals stage 2: decision on the TODO (`todos.decision`, `decided_at`, `decided_by`) |
-| V94 | Goals stage 3: table `goal_workflows` (workflows on a goal or work package) |
-| V95 | Indexes for derived queries on hot paths (`workflows.project_id`, `scheduled_workflows.workflow_id`/`chain_id`, triggers per workflow, `capabilities.skill_id`, `dead_letter_entries.workflow_run_id`, `workflow_memory(active, created_at)`) |
-| V96 | What started a chain: `chain_runs.trigger_source` |
-| V97 | Where a wish stopped: `wishes.stopped_phase` |
-
 ## Architecture Gates
 
 Two JUnit tests in package `com.automation.architecture` pin the measured structure, without any new dependency. Their base measurement is the same jdeps package edges as in `scripts/public-readiness/arch-metrics.sh` (section `## packages`); `LayerRuleTest` additionally checks a second view (see below). `PackageCycleRatchetTest` pins today's mutually dependent package pairs as an allowlist — a new pair fails the build, a resolved one is only reported as a hint. Because pairs alone do not see every cycle (a single edge `service.workflow → service.goal` once grew the large cycle component from 17 to 24 packages unnoticed), it also caps the strongly connected components, i.e. the `cycle` lines of `arch-metrics.sh`: the largest at `MAX_CYCLE_COMPONENT_SIZE` (17 packages as of 2026-09-25), and every component with more than two packages is pinned with its members in `CYCLE_COMPONENTS` — a package newly pulled in fails the build, and the message names the edges that tie it in; when a component shrinks, the test fails as well until both values are lowered in the same commit. `LayerRuleTest` forbids the edge classes `service.* → controller.*`, `controller.* → repository.*` and `repository.* → service.*` (allowlist empty today). What gets measured is always the build directory the tests themselves were loaded from (`target/`, or `target-ide/` under the IDE profile), never a stale one sitting next to it; if it or jdeps is missing, both tests are skipped with a clear message instead of passing silently.
 
 The blind spot of the bytecode measurement is a dependency that only appears as a generic type argument and is erased from the bytecode. `LayerRuleTest` therefore checks the same three rules from a **second view**: `SourceImportEdges` reads the `import` lines of the sources under `src/main/java` (column 0, so comments and string literals never count) and evaluates them against the same rules, with its own allowlist (empty today as well). The views do not overlap — the bytecode view sees inheritance, static references and generated code, the source view sees the erased type arguments — and the test additionally asserts that the scan read any classes at all: an empty measurement would otherwise report every rule as kept. **One gap survives both**: a fully qualified name inside a generic type argument (`Page<com.automation.repository.Foo>` written without an import) is erased in the bytecode and has no import line. For projections that travel from the repository up into the controller this means: they belong in `com.automation.dto.response`, not in the repository package.
-
-## Directory Structure
-
-```
-MySuricates/
-├── CLAUDE.md                          ← Project instructions for Claude Code
-├── VISION.md                          ← Pointer to docs/vision.md
-├── docs/                              ← These documentation files
-├── workflow-pool/                     ← Pre-built workflow definitions (JSON)
-├── scripts/
-│   ├── release.sh                     ← Version bump + git tag
-│   ├── staging.sh                     ← Manage stable/test environment
-│   └── start-mysuricates-dev.sh       ← Start dev environment
-│
-├── ai-automation-backend/
-│   ├── pom.xml
-│   ├── docker-compose.yml
-│   ├── docker-compose.stable.yml      ← Stable container
-│   ├── docker-compose.test.yml        ← Test container
-│   ├── docker/
-│   │   ├── Dockerfile.stable          ← Ubuntu-based (glibc for Claude CLI)
-│   │   ├── Dockerfile.agent-node
-│   │   ├── Dockerfile.agent-python
-│   │   ├── Dockerfile.agent-devops
-│   │   └── Dockerfile.agent-java
-│   ├── data/                          ← SQLite DB (gitignored)
-│   └── src/main/
-│       ├── java/com/automation/       ← Java source files
-│       └── resources/
-│           ├── application.yml
-│           ├── application-stable.yml ← Stable profile
-│           ├── application-prod.yml   ← Production profile
-│           ├── application-test.yml   ← Test profile
-│           ├── application-dev.yml    ← Dev profile
-│           ├── agent-instructions.md  ← Base agent instructions
-│           ├── templates/builtin/     ← Built-in template JSON files
-│           └── db/migration/          ← 97 Flyway migrations (V1–V97)
-│
-└── ai-automation-frontend/
-    ├── package.json
-    ├── vite.config.ts
-    ├── eslint.config.js               ← Flat config (ESLint 9+)
-    ├── index.html
-    └── src/
-        ├── App.tsx                    ← Router
-        ├── main.tsx                   ← Entry point
-        ├── index.css                  ← Global styles + Tailwind 4 configuration (@theme inline)
-        ├── api/client.ts              ← HTTP client (singleton)
-        ├── types/index.ts             ← TypeScript types
-        ├── pages/                     ← all pages incl. simple mode variants
-        ├── components/
-        │   ├── ui/                    ← Base UI primitives
-        │   ├── layout/                ← App shell, sidebar, navigation
-        │   ├── shared/                ← StatusBadge, LogViewer, etc.
-        │   ├── dashboard/             ← Dashboard widgets
-        │   ├── workflow/              ← Block editor, templates
-        │   ├── assistant/             ← AI assistant panel
-        │   ├── calendar/              ← Calendar view
-        │   ├── factory/               ← Workflow factory builder
-        │   ├── insights/              ← Analytics/insights
-        │   ├── simple/                ← Simple mode components
-        │   ├── todo/                  ← TODO management
-        │   └── wishes/ etc.           ← Additional feature components
-        ├── hooks/                     ← TanStack Query hooks
-        ├── stores/                    ← Zustand stores
-        ├── i18n/                      ← DE/EN translations
-        ├── theme/                     ← Theme tokens
-        ├── data/                      ← Skill constants
-        ├── utils/                     ← Utility functions
-        └── test/                      ← MSW handlers, test setup
-```

@@ -30,8 +30,7 @@ public class DocsController {
             Map.entry("datenmodell.md", "Datenmodell"),
             Map.entry("deployment.md", "Deployment"),
             Map.entry("entwicklung.md", "Entwicklung"),
-            Map.entry("frontend.md", "Frontend"),
-            Map.entry("workflow-memory-architecture.md", "Workflow Memory")
+            Map.entry("frontend.md", "Frontend")
     );
 
     private final DocsConfig docsConfig;
