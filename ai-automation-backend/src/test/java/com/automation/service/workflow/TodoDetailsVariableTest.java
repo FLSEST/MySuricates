@@ -92,7 +92,7 @@ class TodoDetailsVariableTest {
         assertThat(rows).extracting(r -> r.path("id").asText()).containsExactly("tagged", "high", "old-low", "new-low");
     }
 
-    /** d6c0afe6: TODOs mit {@code first_tags} kommen zusätzlich – sie verdrängen bei kleinem Limit keine regulären. */
+    /** d6c0afe6: TODOs with {@code first_tags} are added on top – with a small limit they do not displace regular ones. */
     @Test
     void value_firstTagTodosDoNotCountAgainstTheLimit() throws Exception {
         when(todoRepository.findByProjectIdAndStatusIn(eq("proj-1"), anyList())).thenReturn(List.of(

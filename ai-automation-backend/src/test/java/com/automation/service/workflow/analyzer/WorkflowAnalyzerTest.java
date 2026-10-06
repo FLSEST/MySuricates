@@ -10,7 +10,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 
-/** Jede Regel einmal ausgeloest und einmal bewusst nicht (TODO 182bd224). */
+/** Every rule triggered once and deliberately not triggered once (TODO 182bd224). */
 class WorkflowAnalyzerTest {
 
     private final WorkflowAnalyzer analyzer = new WorkflowAnalyzer();
@@ -60,8 +60,8 @@ class WorkflowAnalyzerTest {
     }
 
     /**
-     * TODO 6db47bc2: gemeldet wird nur, was eine Chain tatsächlich setzt. {@code chain_step_output} setzt
-     * niemand — die Meldung „nur innerhalb einer Chain belegt“ hätte dort in die Irre geführt.
+     * TODO 6db47bc2: only what a chain actually sets is reported. {@code chain_step_output} is set by
+     * nobody — the message "nur innerhalb einer Chain belegt" would have been misleading there.
      */
     @Test
     void nurVonDerChainGesetzteVariablenSindChainVariablen() {
@@ -73,7 +73,7 @@ class WorkflowAnalyzerTest {
         assertThat(WiringRules.CHAIN_ONLY).containsExactlyInAnyOrder("previous_chain_output", "chain_run_id");
     }
 
-    /** TODO 5ae9bd32: {@code audit_findings} gibt es nur in einem Audit-Workflow – die Metadaten entscheiden. */
+    /** TODO 5ae9bd32: {@code audit_findings} exists only in an audit workflow – the metadata decide. */
     @Test
     void auditBefundeOhneAuditWorkflowSindEinBefund_mitGueltigemAuditBlockNicht() {
         var blocks = List.of(block("simple", "bericht", Map.of("command", "Bekannte Befunde: {{ audit_findings }}")));
@@ -89,7 +89,7 @@ class WorkflowAnalyzerTest {
                 .as("ohne Metadaten: kein Audit-Workflow").contains("audit-only-placeholder");
     }
 
-    /** Der REST-Weg analysiert die Entity: deren Metadaten muessen ankommen, sonst meldete er jeden Audit-Workflow. */
+    /** The REST path analyzes the entity: its metadata must arrive, otherwise it would report every audit workflow. */
     @Test
     void analyseDerEntityLiestDerenMetadaten() {
         var blocks = List.of(block("simple", "bericht", Map.of("command", "Bekannte Befunde: {{ audit_findings }}")));
@@ -115,7 +115,7 @@ class WorkflowAnalyzerTest {
         });
     }
 
-    /** Step-Indizes sind 0-basiert: {@code step_0_output} ist der erste Block (TODO fb4f2ccf). */
+    /** Step indices are 0-based: {@code step_0_output} is the first block (TODO fb4f2ccf). */
     @Test
     void ausgabeUeberNullBasiertenStepIndexGiltAlsGelesen() {
         var blocks = List.of(
@@ -140,8 +140,8 @@ class WorkflowAnalyzerTest {
     }
 
     /**
-     * Ein Shell-Block, dessen Ausgabe niemand ueber einen Platzhalter liest, schreibt meist eine
-     * Datei, die der naechste Block wieder einliest — das ist legitim und darf nicht melden.
+     * A shell block whose output nobody reads via a placeholder usually writes a
+     * file that the next block reads in again — that is legitimate and must not report.
      */
     @Test
     void ungeleseneShellAusgabeIstKeinBefund() {
@@ -283,7 +283,7 @@ class WorkflowAnalyzerTest {
         });
     }
 
-    // --- TODO 2f01ab01: items_command ohne items_source "command" läuft nie ---
+    // --- TODO 2f01ab01: items_command without items_source "command" never runs ---
 
     @Test
     void itemsCommandOhneItemsSourceIstEinBefund() {
@@ -311,7 +311,7 @@ class WorkflowAnalyzerTest {
         assertThat(rules(blocks, null)).doesNotContain("items-command-without-source");
     }
 
-    // --- TODO d0348479: Live-Definitionen rufen die eigene API/DB nicht auf ---
+    // --- TODO d0348479: live definitions do not call their own API/DB ---
 
     @Test
     void eigeneApiUndPlattformDbSindSchwereBefunde() {

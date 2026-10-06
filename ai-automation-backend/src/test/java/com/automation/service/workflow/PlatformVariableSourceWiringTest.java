@@ -10,8 +10,8 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Der echte Spring-Kontext liefert dem Einsammler alle sechs Quellen, in der dokumentierten
- * {@code @Order} (TODO 441a4c46). Eine neue Quelle gehoert hier dazu.
+ * The real Spring context supplies the collector with all six sources, in the documented
+ * {@code @Order} (TODO 441a4c46). A new source belongs here.
  */
 @SpringBootTest
 @ActiveProfiles("integration")
@@ -28,8 +28,8 @@ class PlatformVariableSourceWiringTest {
     }
 
     /**
-     * Die reservierten Namen (TODO 2a0695ff) – die Tests der Fabrik und des Sub-Workflow-Blocks schreiben sie ab;
-     * waechst hier eine Quelle, muessen sie mitwachsen. Jeder bleibt ausserdem aus dem Step-Delta.
+     * The reserved names (TODO 2a0695ff) – the tests of the factory and the sub-workflow block copy them;
+     * if a source grows here, they must grow too. Each also stays out of the step delta.
      */
     @Test
     void theCollectorReservesEveryNameOfEverySource() {

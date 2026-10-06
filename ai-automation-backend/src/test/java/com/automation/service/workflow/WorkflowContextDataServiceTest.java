@@ -57,7 +57,7 @@ class WorkflowContextDataServiceTest {
                 new AuditFindingsVariable(auditContextSource)), activityLogService);
     }
 
-    /** Eine Quelle, deren Lader wirft — wie ein Ausfall mitten in der Abfrage. */
+    /** A source whose loader throws — like a failure in the middle of the query. */
     private static PlatformVariableSource failing(String name) {
         return new PlatformVariableSource() {
             @Override public List<String> allNames() { return List.of(name); }
@@ -87,8 +87,8 @@ class WorkflowContextDataServiceTest {
     }
 
     /**
-     * TODO 2a0695ff: Eine Quelle setzt nur, was sie angemeldet hat. Ein fremder Name – hier ein Systemwert – wird
-     * verworfen und laut gemeldet, statt als Plattform-Daten an den reservierten Namen vorbei gesetzt zu werden.
+     * TODO 2a0695ff: A source sets only what it has registered. A foreign name – here a system value – is
+     * discarded and reported loudly, instead of being set past the reserved name as platform data.
      */
     @Test
     void injectPlatformData_aValueTheSourceDidNotAnnounce_isDroppedAndReported() {
@@ -177,10 +177,10 @@ class WorkflowContextDataServiceTest {
 
     // --- injectPlatformData: request_metrics (TODO 843be7a5) ----------------------------
     //
-    // Geprueft wurde die Kontextvariable bisher nur ueber die Vorlage: test-audit-facts.sh
-    // rendert den Shell-Block mit einem Fixture-Wert. Das belegt die Vorlage, nicht die
-    // Injektion -- und in genau dieser Luecke blieb am 2026-09-18 unbemerkt, dass der
-    // Live-Workflow die Aenderung nie bekommen hatte (Run cd335b5c).
+    // So far the context variable was only checked via the template: test-audit-facts.sh
+    // renders the shell block with a fixture value. That proves the template, not the
+    // injection -- and in exactly this gap it went unnoticed on 2026-09-18 that the
+    // live workflow had never received the change (run cd335b5c).
 
     /** Kontext ohne Vorgeschichte: die beiden anderen Lader liefern ihre Platzhalter. */
     private ExecutionContext injectWithoutHistory() {
@@ -245,13 +245,13 @@ class WorkflowContextDataServiceTest {
 
     // --- injectPlatformData: jede Injektion mit eigenem Fehlerpfad (TODO 62d186b8) ------
     //
-    // Der gemeinsame catch(Exception) um alle drei Injektionen hat den Ausfall von
-    // request_metrics monatelang verdeckt: die Variable blieb abwesend, der Shell-Block sah
-    // den rohen Platzhalter, und ein Gate-Block wertete den leeren Wert als GREEN. Die drei
-    // Tests hier halten fest, dass kein Ausfall mehr einen anderen mitreisst -- und dass die
-    // ausgefallene Variable dasteht statt zu fehlen.
+    // The shared catch(Exception) around all three injections hid the failure of
+    // request_metrics for months: the variable stayed absent, the shell block saw
+    // the raw placeholder, and a gate block rated the empty value as GREEN. The three
+    // tests here pin that no failure drags another one down any more -- and that the
+    // failed variable is present instead of missing.
 
-    /** Die beiden je anderen Lader liefern ihre Platzhalter -- jeder Ausfall muss sie unberuehrt lassen. */
+    /** The two other loaders each deliver their placeholders -- every failure must leave them untouched. */
     private void assertUntouched(ExecutionContext ctx, String... names) {
         for (String name : names) {
             assertThat((String) ctx.getVariable(name))
@@ -308,7 +308,7 @@ class WorkflowContextDataServiceTest {
 
     @Test
     void injectPlatformData_failingAssignment_doesNotCostTheOtherTwoVariables() {
-        // Selbst wenn das Setzen selbst scheitert, duerfen die beiden anderen Injektionen laufen.
+        // Even if setting itself fails, the two other injections may run.
         ExecutionContext ctx = mock(ExecutionContext.class);
         doThrow(new IllegalStateException("kaputt"))
                 .when(ctx).setUntrustedPlatformVariable(eq("previous_report"), any());
@@ -326,7 +326,7 @@ class WorkflowContextDataServiceTest {
 
     @Test
     void injectPlatformData_failingActivityLog_doesNotCostTheOtherTwoVariables() {
-        // Das Melden der Luecke darf nicht zu der Ausnahme werden, die die naechste Injektion frisst.
+        // Reporting the gap must not become the exception that swallows the next injection.
         when(requestMetricsFactSheet.render()).thenThrow(new IllegalStateException("kaputt"));
         doThrow(new RuntimeException("activity log down")).when(activityLogService)
                 .warn(any(), anyString(), anyString(), any(), any());
@@ -437,7 +437,7 @@ class WorkflowContextDataServiceTest {
     private static final java.util.Map<String, Object> AUDIT_META = java.util.Map.of("audit", java.util.Map.of(
             "enabled", true, "key", "project.security", "category", "security", "reportBlock", "report"));
 
-    /** Kontext ohne Vorgeschichte, die Metadaten werden als Audit-Workflow erkannt. */
+    /** Context without history, the metadata is recognized as an audit workflow. */
     private ExecutionContext auditContext() {
         when(runRepository.findTop5ByWorkflowIdOrderByStartedAtDesc("wf-1")).thenReturn(List.of());
         when(todoRepository.findByProjectIdAndStatusIn(eq("proj-1"), anyList())).thenReturn(List.of());
@@ -455,7 +455,7 @@ class WorkflowContextDataServiceTest {
 
         assertThat((String) ctx.getVariable("audit_findings")).startsWith("<audit_findings>");
         assertThat(ctx.isUntrusted("audit_findings")).isTrue();
-        // Wie open_todos: gesetzt faerbt die Variable den Lauf noch nicht, erst ihre Verwendung
+        // Like open_todos: when set, the variable does not taint the run yet, only its use does
         assertThat(ctx.hasUntrustedInput()).isFalse();
         assertThat(ctx.resolveShellTemplate("echo {{ audit_findings }}", false))
                 .isEqualTo("echo '<audit_findings>\nOPEN | HIGH | shell.injection | Foo $(id) | Titel\n</audit_findings>'");

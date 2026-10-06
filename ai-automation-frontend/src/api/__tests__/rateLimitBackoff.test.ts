@@ -1,4 +1,4 @@
-/** Unit tests für den 429-Backoff des API-Clients (d89b2cc1, b6feccbc). */
+/** Unit tests for the 429 backoff of the API client (d89b2cc1, b6feccbc). */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   api,
@@ -19,7 +19,7 @@ const NOW = Date.parse('2026-09-14T12:00:00.000Z');
 const UUID_A = '11111111-2222-3333-4444-555555555555';
 const UUID_B = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
 
-/** Die globale Kurzsperre nach dem ersten 429 (b6feccbc). */
+/** The global short block after the first 429 (b6feccbc). */
 const GLOBAL_LOCK_MS = 2_000;
 
 function jsonResponse(status: number, body: unknown, headers: Record<string, string> = {}): Response {
@@ -39,11 +39,11 @@ describe('parseRetryAfter', () => {
     expect(parseRetryAfter('Mon, 14 Sep 2026 12:00:07 GMT', NOW)).toBe(7);
   });
 
-  it('gibt 0 für ein Datum in der Vergangenheit', () => {
+  it('gives 0 for a date in the past', () => {
     expect(parseRetryAfter('Mon, 14 Sep 2026 11:59:50 GMT', NOW)).toBe(0);
   });
 
-  it('nimmt 10 s, wenn der Header fehlt oder unlesbar ist', () => {
+  it('takes 10 s if the header is missing or unreadable', () => {
     expect(parseRetryAfter(null, NOW)).toBe(10);
     expect(parseRetryAfter(undefined, NOW)).toBe(10);
     expect(parseRetryAfter('', NOW)).toBe(10);
@@ -68,7 +68,7 @@ describe('429-Backoff im API-Client', () => {
     resetRateLimitBackoff();
   });
 
-  it('sperrt den Pfad nach einem 429 und weist Folgeaufrufe ohne Netzanfrage ab', async () => {
+  it('blocks the path after a 429 and rejects follow-up calls without a network request', async () => {
     await expect(api.get('/system/capabilities')).rejects.toMatchObject({ status: 429, code: 'RATE_LIMITED' });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(rateLimitRemainingSeconds('/system/capabilities')).toBe(5);
@@ -77,15 +77,15 @@ describe('429-Backoff im API-Client', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('sperrt pro Pfad ohne Query — Query-Varianten teilen sich die Sperre', async () => {
+  it('blocks per path without query — query variants share the block', async () => {
     await expect(api.get('/assistant/suggestions?page=workflows')).rejects.toMatchObject({ status: 429 });
     await expect(api.get('/assistant/suggestions?page=runs')).rejects.toMatchObject({ status: 429 });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('lässt andere Pfade nach der globalen Kurzsperre durch', async () => {
+  it('lets other paths through after the global short block', async () => {
     await expect(api.get('/system/capabilities')).rejects.toMatchObject({ status: 429 });
-    // Direkt nach dem ersten 429 greift die globale Kurzsperre (b6feccbc).
+    // Directly after the first 429 the global short block applies (b6feccbc).
     await expect(api.get('/workflows')).rejects.toMatchObject({ status: 429 });
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
@@ -94,7 +94,7 @@ describe('429-Backoff im API-Client', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it('erlaubt nach Ablauf der Sperre genau eine neue Anfrage', async () => {
+  it('allows exactly one new request after the block expires', async () => {
     await expect(api.get('/system/capabilities')).rejects.toMatchObject({ status: 429 });
     vi.setSystemTime(NOW + 5_000);
     expect(rateLimitRemainingSeconds('/system/capabilities')).toBe(0);
@@ -109,13 +109,13 @@ describe('429-Backoff im API-Client', () => {
     expect(rateLimitRemainingSeconds('/system/info')).toBe(10);
   });
 
-  it('liefert für abgewiesene Aufrufe eine verständliche Meldung über apiErrorMessage', async () => {
+  it('delivers an understandable message for rejected calls via apiErrorMessage', async () => {
     await api.get('/system/capabilities').catch(() => undefined);
     const err = await api.get('/system/capabilities').catch((e: unknown) => e);
     expect(apiErrorMessage(err, 'Fallback')).toContain('Too many requests');
   });
 
-  it('lässt Nicht-429-Fehler unverändert und sperrt nichts', async () => {
+  it('leaves non-429 errors unchanged and blocks nothing', async () => {
     fetchMock.mockImplementation(async () => jsonResponse(500, { error: 'boom', timestamp: 'x' }));
     await expect(api.get('/system/capabilities')).rejects.toMatchObject({ status: 500, error: 'boom' });
     expect(rateLimitRemainingSeconds('/system/capabilities')).toBe(0);
@@ -141,17 +141,17 @@ describe('Sperre je Endpoint-Muster (b6feccbc)', () => {
     resetRateLimitBackoff();
   });
 
-  it('sperrt nach 429 auf /executions/<uuid1> auch /executions/<uuid2>', async () => {
+  it('blocks /executions/<uuid2> as well after a 429 on /executions/<uuid1>', async () => {
     await expect(api.get(`/executions/${UUID_A}`)).rejects.toMatchObject({ status: 429 });
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
-    // Ohne Muster-Normalisierung wäre das eine eigene Sperre — und damit eine weitere Anfrage.
+    // Without pattern normalization this would be a separate block — and thus another request.
     await expect(api.get(`/executions/${UUID_B}`)).rejects.toMatchObject({ status: 429 });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(rateLimitRemainingSeconds(`/executions/${UUID_B}`)).toBe(5);
   });
 
-  it('hält verschiedene Endpoint-Muster auseinander (nach der globalen Kurzsperre)', async () => {
+  it('keeps different endpoint patterns apart (after the global short block)', async () => {
     await expect(api.get(`/executions/${UUID_A}`)).rejects.toMatchObject({ status: 429 });
     vi.setSystemTime(NOW + GLOBAL_LOCK_MS);
 
@@ -160,14 +160,14 @@ describe('Sperre je Endpoint-Muster (b6feccbc)', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it('setzt bei Retry-After: 0 überhaupt keine Sperre', async () => {
+  it('sets no block at all on Retry-After: 0', async () => {
     fetchMock.mockImplementation(async () => jsonResponse(429, { error: 'nope', timestamp: 'x' }, { 'Retry-After': '0' }));
 
     await expect(api.get('/system/capabilities')).rejects.toMatchObject({ status: 429, retryAfterSeconds: 0 });
     expect(isRateLimitBackoffActive()).toBe(false);
     expect(rateLimitRemainingSeconds('/system/capabilities')).toBe(0);
 
-    // Weder der eigene Pfad noch ein fremder ist gesperrt.
+    // Neither the own path nor a foreign one is blocked.
     await expect(api.get('/workflows')).rejects.toMatchObject({ status: 429 });
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
@@ -190,12 +190,12 @@ describe('Ausnahmen von der globalen Kurzsperre (b6feccbc)', () => {
     resetRateLimitBackoff();
   });
 
-  it('lässt /ws-ticket und /system/auth-status trotz fremder 429 durch', async () => {
+  it('lets /ws-ticket and /system/auth-status through despite a foreign 429', async () => {
     await expect(api.get('/system/capabilities')).rejects.toMatchObject({ status: 429 });
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
-    // Ein blockiertes Ticket kostet den WebSocket einen Reconnect-Versuch, ein blockierter
-    // auth-status lässt den ApiKeyGuard nichts rendern — beide dürfen hier nicht hängen.
+    // A blocked ticket costs the WebSocket one reconnect attempt, a blocked
+    // auth-status lets the ApiKeyGuard render nothing — neither may hang here.
     await expect(api.fetchWsTicket()).rejects.toMatchObject({ status: 429 });
     await expect(api.get('/system/auth-status')).rejects.toMatchObject({ status: 429 });
     expect(fetchMock).toHaveBeenCalledTimes(3);
@@ -213,7 +213,7 @@ describe('Ausnahmen von der globalen Kurzsperre (b6feccbc)', () => {
   });
 });
 
-describe('Rohe Aufrufe laufen über den Backoff (b6feccbc)', () => {
+describe('Raw calls go through the backoff (b6feccbc)', () => {
   let fetchMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
@@ -244,13 +244,13 @@ describe('Rohe Aufrufe laufen über den Backoff (b6feccbc)', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('Key-Prüfung: im Fenster ohne Netzanfrage', async () => {
+  it('key check: no network request within the window', async () => {
     await expect(api.get('/projects')).rejects.toMatchObject({ status: 429 });
     await expect(validateApiKey('typed-key')).rejects.toMatchObject({ status: 429 });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('BPMN-Export liefert den Antworttext, kein JSON', async () => {
+  it('BPMN export delivers the response text, not JSON', async () => {
     fetchMock.mockImplementation(async () => new Response('<definitions/>', {
       status: 200, headers: { 'Content-Type': 'application/xml' },
     }));
@@ -266,7 +266,7 @@ describe('Rohe Aufrufe laufen über den Backoff (b6feccbc)', () => {
     expect((init.headers as Record<string, string>)['Content-Type']).toBe('application/xml');
   });
 
-  it('Key-Prüfung schickt den eingegebenen Key im Header', async () => {
+  it('key check sends the entered key in the header', async () => {
     fetchMock.mockImplementation(async () => jsonResponse(200, []));
     await validateApiKey('typed-key');
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
@@ -295,12 +295,12 @@ describe('Backoff-Parameter vom Server (37b98c97)', () => {
     expect(parseRetryAfter(null, NOW)).toBe(10);
 
     await expect(api.get('/system/capabilities')).rejects.toMatchObject({ retryAfterSeconds: 10 });
-    // Die globale Kurzsperre bleibt bei 2 s, obwohl die Pfad-Sperre 10 s steht.
+    // The global short block stays at 2 s although the path block stands at 10 s.
     vi.setSystemTime(NOW + 2_000);
     expect(rateLimitRemainingSeconds('/workflows')).toBe(0);
   });
 
-  it('übernimmt die Werte der Instanz aus /system/info', async () => {
+  it('adopts the instance values from /system/info', async () => {
     applyServerRateLimitConfig({ globalBackoffSeconds: 5, defaultRetryAfterSeconds: 30 });
 
     expect(parseRetryAfter(null, NOW)).toBe(30);
@@ -315,7 +315,7 @@ describe('Backoff-Parameter vom Server (37b98c97)', () => {
     expect(rateLimitRemainingSeconds('/workflows')).toBe(0);
   });
 
-  it('ignoriert fehlende, unbrauchbare oder nicht-positive Serverwerte', async () => {
+  it('ignores missing, unusable or non-positive server values', async () => {
     applyServerRateLimitConfig(undefined);
     expect(parseRetryAfter(null, NOW)).toBe(10);
 
@@ -325,7 +325,7 @@ describe('Backoff-Parameter vom Server (37b98c97)', () => {
     applyServerRateLimitConfig({ defaultRetryAfterSeconds: Number.NaN } as never);
     expect(parseRetryAfter(null, NOW)).toBe(10);
 
-    // Nur der brauchbare Teil wird übernommen.
+    // Only the usable part is adopted.
     applyServerRateLimitConfig({ globalBackoffSeconds: 4 });
     expect(parseRetryAfter(null, NOW)).toBe(10);
     await expect(api.get('/system/capabilities')).rejects.toMatchObject({ retryAfterSeconds: 10 });
@@ -342,7 +342,7 @@ describe('Backoff-Parameter vom Server (37b98c97)', () => {
   });
 });
 
-describe('Backoff-Zustand für UI und Query-Defaults (c168293d, f3fb193f)', () => {
+describe('Backoff state for UI and query defaults (c168293d, f3fb193f)', () => {
   let fetchMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
@@ -359,7 +359,7 @@ describe('Backoff-Zustand für UI und Query-Defaults (c168293d, f3fb193f)', () =
     resetRateLimitBackoff();
   });
 
-  it('meldet den aktiven Backoff und sein Ende', async () => {
+  it('reports the active backoff and its end', async () => {
     expect(isRateLimitBackoffActive()).toBe(false);
     expect(rateLimitBackoffUntil()).toBe(0);
 
@@ -373,7 +373,7 @@ describe('Backoff-Zustand für UI und Query-Defaults (c168293d, f3fb193f)', () =
     expect(rateLimitBackoffUntil()).toBe(0);
   });
 
-  it('benachrichtigt Abonnenten, wenn eine Sperre beginnt', async () => {
+  it('notifies subscribers when a block begins', async () => {
     const listener = vi.fn();
     const unsubscribe = subscribeRateLimitBackoff(listener);
 
@@ -387,7 +387,7 @@ describe('Backoff-Zustand für UI und Query-Defaults (c168293d, f3fb193f)', () =
     expect(listener).not.toHaveBeenCalled();
   });
 
-  it('meldet auch den Ablauf der letzten Sperre, ohne dass jemand pollt', async () => {
+  it('also reports the expiry of the last block, without anyone polling', async () => {
     const listener = vi.fn();
     const unsubscribe = subscribeRateLimitBackoff(listener);
     await expect(api.get('/system/capabilities')).rejects.toMatchObject({ status: 429 });

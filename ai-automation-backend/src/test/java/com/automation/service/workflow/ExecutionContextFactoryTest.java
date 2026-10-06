@@ -356,8 +356,8 @@ class ExecutionContextFactoryTest {
     }
 
     /**
-     * TODO cadfc423: faerbt ein Lauf, weil Plattform-Daten in einer Shell-Kommandozeile gelandet
-     * sind, ueberlebt das Flag Export und Import — auch ohne verbuchte Ausgabe dazwischen.
+     * TODO cadfc423: if a run is tainted because platform data ended up in a shell command line,
+     * the flag survives export and import — even without a recorded output in between.
      */
     @Test
     void create_platformDataUsedInShell_roundTripsWithoutAnyRecordedOutput() {

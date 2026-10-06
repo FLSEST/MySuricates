@@ -15,7 +15,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
-/** {@code open_todos} (TODO 441a4c46: aus WorkflowContextDataServiceTest hierher gezogen, wie der Lader). */
+/** {@code open_todos} (TODO 441a4c46: moved here from WorkflowContextDataServiceTest, like the loader). */
 @ExtendWith(MockitoExtension.class)
 class OpenTodosVariableTest {
 

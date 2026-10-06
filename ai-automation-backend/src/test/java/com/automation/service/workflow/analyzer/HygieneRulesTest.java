@@ -10,7 +10,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Hygieneregeln direkt: Grenzen der Muster und Schwellwerte. */
+/** Hygiene rules directly: limits of the patterns and thresholds. */
 class HygieneRulesTest {
 
     private static final String PARAGRAPH =
@@ -132,7 +132,7 @@ class HygieneRulesTest {
         assertThat(apply(PARAGRAPH, block("simple", "s", Map.of()))).isEmpty();
     }
 
-    /** TODO c52eba8f: agentic führt seinen Auftrag in goal — die Regel sah ihn nicht. */
+    /** TODO c52eba8f: agentic carries its task in goal — the rule did not see it. */
     @Test
     void agenticZielMitWoertlichemAbsatzIstDoppelt() {
         assertThat(apply(PARAGRAPH, block("agentic", "plan", Map.of("goal", "Plane.\n" + PARAGRAPH))))
@@ -153,7 +153,7 @@ class HygieneRulesTest {
         assertThat(out).extracting(AnalyzerFinding::blockName).containsExactly("a", "c", "e");
     }
 
-    /** Ein Shell-Befehl, die Frage an einen Menschen und ein Schlüssel, den kein Executor liest, gehen nicht an die KI. */
+    /** A shell command, the question to a human and a key that no executor reads do not go to the AI. */
     @Test
     void shellBefehlFrageAnMenschenUndUngelesenerSchluesselSindKeinDoppelterAuftrag() {
         assertThat(apply(PARAGRAPH,
@@ -163,8 +163,8 @@ class HygieneRulesTest {
     }
 
     /**
-     * TODO ce4abac1: ein simple-Block in einem switch-Case bekommt workflow.instructions genauso als
-     * Systemprompt — die Regel las nur die direkten Werte des switch-Blocks.
+     * TODO ce4abac1: a simple block in a switch case gets workflow.instructions just the same as
+     * system prompt — the rule only read the direct values of the switch block.
      */
     @Test
     void kiAuftragEinesVerschachteltenBlocksIstDoppeltUndNenntIhn() {
@@ -181,7 +181,7 @@ class HygieneRulesTest {
         });
     }
 
-    /** Verschachtelt gilt dasselbe wie oben: Shell geht nicht an die KI — auch simple mit execution_mode "shell". */
+    /** The same applies nested as above: shell does not go to the AI — also simple with execution_mode "shell". */
     @Test
     void verschachtelteShellBefehleSindKeinDoppelterAuftrag() {
         Map<String, Object> config = Map.of("expression", "x",

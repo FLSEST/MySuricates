@@ -72,7 +72,7 @@ class SelfAccessRulesTest {
         assertThat(shell("curl http://127.0.0.1:8090/api/v1/executions/{{ workflow_run_id }}")).hasSize(1);
     }
 
-    /** Review m2: die Basis-URL steht in einer Variable, der Endpunkt nie am Stück. */
+    /** Review m2: the base URL is in a variable, the endpoint never in one piece. */
     @Test
     void basisUrlInEinerVariableIstHigh() {
         assertThat(shell("API=http://127.0.0.1:9090/api/v1; curl $API/todos")).singleElement().satisfies(f -> {
@@ -85,7 +85,7 @@ class SelfAccessRulesTest {
         assertThat(shell("python3 - <<'PY'\nbase = 'http://localhost:9090/api/v1'\nPY")).hasSize(1);
     }
 
-    /** TODO 2a0c9420: hinter dem Präfix steht eine Variable statt eines Segments, wie in pool-neutrality.sh. */
+    /** TODO 2a0c9420: behind the prefix is a variable instead of a segment, as in pool-neutrality.sh. */
     @Test
     void praefixMitVariableStattSegmentIstHigh() {
         assertThat(shell("for E in todos executions; do\n  curl -s \"http://localhost:9090/api/v1/$E\"\ndone"))
@@ -99,7 +99,7 @@ class SelfAccessRulesTest {
         assertThat(shell("echo '# Request-Kosten der /api/v1-Routen'")).isEmpty();
     }
 
-    /** TODO 7721d8cb: unter /actuator/ ist nur health schlüsselfrei — /actuator/metrics lieferte still 403. */
+    /** TODO 7721d8cb: under /actuator/ only health is key-free — /actuator/metrics silently returned 403. */
     @Test
     void actuatorAusserHealthIstHigh() {
         assertThat(shell("for metric in jvm.memory.used; do\n"
@@ -116,7 +116,7 @@ class SelfAccessRulesTest {
         assertThat(shell("HEALTH=http://localhost:9090/actuator/health\ncurl -sf \"$HEALTH\"")).isEmpty();
     }
 
-    /** Basis-URL ohne Pfad in einer Variable, der Actuator-Endpunkt entsteht erst am Aufruf (7721d8cb). */
+    /** Base URL without path in a variable, the actuator endpoint only arises at the call (7721d8cb). */
     @Test
     void basisUrlMitSpaeteremActuatorSuffixIstHighAusserHealth() {
         assertThat(shell("HOST=http://localhost:9090; curl \"$HOST/actuator/metrics\"")).singleElement()
@@ -126,7 +126,7 @@ class SelfAccessRulesTest {
                 });
         assertThat(shell("HOST=http://127.0.0.1:9090\ncurl -s ${HOST}/actuator/env")).hasSize(1);
         assertThat(shell("HOST=http://localhost:9090\ncurl -sf \"$HOST/actuator/health\"")).isEmpty();
-        // Die Basis allein (ohne Endpunkt dahinter) bleibt erlaubt, wie bei /api/v1
+        // The base alone (without an endpoint behind it) stays allowed, as with /api/v1
         assertThat(shell("HOST=http://localhost:9090\necho \"$HOST/actuator\"")).isEmpty();
     }
 
@@ -136,7 +136,7 @@ class SelfAccessRulesTest {
         assertThat(shell("API=https://api.example.com/api/v1; curl $API/items")).isEmpty();
     }
 
-    /** Folge-TODO 54c698f6: Basis-URL ohne /v1 in der Variable, der Endpunkt entsteht erst am Aufruf. */
+    /** Follow-up TODO 54c698f6: base URL without /v1 in the variable, the endpoint only arises at the call. */
     @Test
     void basisUrlOhneApiV1PfadMitSpaeteremSuffixIstHigh() {
         assertThat(shell("API=http://localhost:9090/api; curl $API/v1/todos")).singleElement().satisfies(f -> {
@@ -153,7 +153,7 @@ class SelfAccessRulesTest {
 
     @Test
     void basisUrlOhneApiV1PfadOhneSpaeterenAufrufIstKeinBefund() {
-        // Zuweisung allein: eine lokale URL ohne API-Pfad ist oft legitim (Health, Vite, fremder Dienst)
+        // Assignment alone: a local URL without an API path is often legitimate (health, Vite, foreign service)
         assertThat(shell("API=http://localhost:9090/api\necho \"$API\"")).isEmpty();
         assertThat(shell("HOST=http://127.0.0.1:9090\ncurl -sf \"$HOST/health\"")).isEmpty();
     }
@@ -165,7 +165,7 @@ class SelfAccessRulesTest {
 
     @Test
     void basisUrlOhneApiV1PfadAufFremdemHostIstKeinBefund() {
-        // Fremder Host: die Variablenzuweisung selbst matcht keine der lokalen Host-Formen, also kein Fund
+        // Foreign host: the variable assignment itself matches none of the local host forms, so no finding
         assertThat(shell("API=https://api.example.com/api\ncurl \"$API/v1/todos\"")).isEmpty();
     }
 
@@ -183,7 +183,7 @@ class SelfAccessRulesTest {
 
     @Test
     void nacktesPraefixAlsSuchmusterUndKommentarzeilenSindKeinBefund() {
-        // mocking-gap-audit: '/api/v1/' in einer Liste von Netzwerk-Kennzeichen, kein Endpunkt
+        // mocking-gap-audit: '/api/v1/' in a list of network markers, not an endpoint
         assertThat(shell("python3 - <<'PY'\nCONTENT_HINTS = {'network': ['fetch(', 'axios.', '/api/v1/']}\nPY"))
                 .isEmpty();
         assertThat(shell("# Kein curl gegen /api/v1/todos — Shell-Bloecke rufen die REST-API nicht auf\nls"))
@@ -227,7 +227,7 @@ class SelfAccessRulesTest {
     void kiAuftragDerDieApiNurBeschreibtIstKeinBefund() {
         assertThat(apply(block("simple", "d", Map.of("command",
                 "Aktualisiere die Doku zu POST /api/v1/workflows/{id}/execute und GET /api/v1/todos")))).isEmpty();
-        // Ein simple-Block ist kein Shell-Code: der Pfad allein ohne Aufrufer zählt nicht
+        // A simple block is not shell code: the path alone without a caller does not count
         assertThat(apply(block("simple", "e", Map.of("command", "Erkläre http://localhost:9090/api/v1/todos"))))
                 .isEmpty();
     }
@@ -264,7 +264,7 @@ class SelfAccessRulesTest {
         assertThat(shell("# kein sqlite3 hier\nls")).isEmpty();
     }
 
-    /** TODO ee8bb93d: wer die Schlüsseldatei liest, hält den Key im Klartext — auch ohne curl danach. */
+    /** TODO ee8bb93d: whoever reads the key file holds the key in plain text — even without curl afterwards. */
     @Test
     void schluesseldateiLesenImShellCodeIstHighAuchOhneCurl() {
         assertThat(shell("KEY=$(cat ~/.mysuricates/api-key)\necho \"key ok\"")).singleElement().satisfies(f -> {
@@ -295,7 +295,7 @@ class SelfAccessRulesTest {
         assertThat(shell("cat ~/.mysuricates/api-keys.txt")).isEmpty();
     }
 
-    /** Review w8: Kopien der Schlüsseldatei enthalten denselben Schlüssel — sie treffen bewusst mit. */
+    /** Review w8: copies of the key file contain the same key — they deliberately match too. */
     @Test
     void kopienDerSchluesseldateiSindEbenfallsHigh() {
         assertThat(shell("cp ~/.mysuricates/api-key.bak /tmp/k")).singleElement()
@@ -321,16 +321,16 @@ class SelfAccessRulesTest {
                 .map(m -> m.group(1)).collect(Collectors.toSet());
     }
 
-    /** Dieselben Ausnahmen wie die Pool-Regel SELF-API: beide Listen dürfen nicht auseinanderlaufen. */
+    /** The same exceptions as the pool rule SELF-API: both lists must not drift apart. */
     @Test
     void sondenListeStimmtMitPoolNeutralitaetUeberein() throws IOException {
         assertThat(SelfAccessRules.KEY_FREE_PROBES).isEqualTo(poolAllowedProbes());
     }
 
     /**
-     * Jede erlaubte Sonde ist wirklich ohne Key erreichbar: ein exakter öffentlicher Pfad in
-     * {@link PublicPaths}, den weder Filterkette noch ApiKeyAuthFilter als geschützt behandeln.
-     * Sonst verlangte die Regel von Workflows eine Sonde, die nur mit Key antwortet.
+     * Every allowed probe is really reachable without a key: an exact public path in
+     * {@link PublicPaths} that neither the filter chain nor ApiKeyAuthFilter treats as protected.
+     * Otherwise the rule would demand a probe from workflows that only answers with a key.
      */
     @Test
     void jedeErlaubteSondeIstOhneKeyErreichbar() throws IOException {

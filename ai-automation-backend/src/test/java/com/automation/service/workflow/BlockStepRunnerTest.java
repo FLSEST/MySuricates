@@ -516,19 +516,19 @@ class BlockStepRunnerTest {
 
         runner.runStep(step, switchBlock, new SwitchBlockExecutor(commandExecutor), context, run, null);
 
-        // während der Ausführung stand "aus dem Kind" unter dem Namen; danach gewinnt das Aggregat
+        // during execution "from the child" stood under the name; afterwards the aggregate wins
         assertThat(step.getOutput()).isEqualTo("aus dem Kind\nund noch was");
         assertThat(context.getBlockOutput("router")).isEqualTo("aus dem Kind\nund noch was");
     }
 
     /**
-     * Seit 2718c20e trägt {@code SwitchBlockExecutor} seine benannten Case-Schritte selbst in den
-     * Quellen-Index ein — und setzt damit auch dessen {@code last()}. Dass die Komprimierungs-Quelle
-     * {@code "previous"} danach trotzdem den <em>switch</em> meint und nicht den letzten Case-Schritt,
-     * hängt allein an der Reihenfolge in {@link BlockStepRunner#runStep}: der eigene Schritt des
-     * Blocks wird NACH dessen Ausführung eingetragen und überschreibt den Case-Eintrag. Ein Umbau,
-     * der das Eintragen vorzieht, bräche die Semantik von {@code "previous"} still — deshalb hier
-     * festgehalten.
+     * Since 2718c20e {@code SwitchBlockExecutor} enters its named case steps into the
+     * source index itself — and thereby also sets its {@code last()}. That the compression source
+     * {@code "previous"} nevertheless means the <em>switch</em> and not the last case step
+     * depends solely on the order in {@link BlockStepRunner#runStep}: the block's own step
+     * is entered AFTER its execution and overwrites the case entry. A refactoring
+     * that moves the entry earlier would silently break the semantics of {@code "previous"} — hence
+     * pinned here.
      */
     @Test
     void runStep_previousQuelleMeintDenSwitch_nichtDenLetztenCaseSchritt() {
@@ -547,9 +547,9 @@ class BlockStepRunnerTest {
 
         runner.runStep(step, switchBlock, new SwitchBlockExecutor(commandExecutor), context, run, null);
 
-        // Der Case-Schritt ist unter seinem Namen ansprechbar …
+        // The case step is addressable under its name …
         assertThat(context.getSourceSteps().find("befund")).isPresent();
-        // … "previous" meint aber den switch: sein Schritt wurde zuletzt eingetragen.
+        // … but "previous" means the switch: its step was entered last.
         CompressionSources.Resolved previous = CompressionSources.resolve(context, "previous");
         assertThat(previous.origin().blockName()).isEqualTo("verteiler");
         assertThat(previous.label()).isEqualTo("verteiler");

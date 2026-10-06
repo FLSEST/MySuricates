@@ -14,7 +14,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/** {@code audit_findings} gibt es nur fuer einen Audit-Workflow (TODO 441a4c46, 3643beac). */
+/** {@code audit_findings} exists only for an audit workflow (TODO 441a4c46, 3643beac). */
 @ExtendWith(MockitoExtension.class)
 class AuditFindingsVariableTest {
 

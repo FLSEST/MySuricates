@@ -14,8 +14,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 
 /**
- * Was an einem Block steht, aber nie läuft: {@code config.blocks} (5536c5aa) und Felder neben {@code config}
- * (d3aa0b28) — beides fiel beim Speichern nicht auf, der Lauf tat still etwas anderes.
+ * What sits on a block but never runs: {@code config.blocks} (5536c5aa) and fields next to {@code config}
+ * (d3aa0b28) — neither was noticed on saving, the run silently did something else.
  */
 class BlockShapeRulesTest {
 

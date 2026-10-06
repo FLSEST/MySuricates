@@ -11,7 +11,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 
-/** Verdrahtungsregeln direkt, ohne Sortierung/Hygiene des WorkflowAnalyzer. */
+/** Wiring rules directly, without sorting/hygiene of the WorkflowAnalyzer. */
 class WiringRulesTest {
 
     private static BlockDefinition block(String type, String name, Map<String, Object> config) {
@@ -103,7 +103,7 @@ class WiringRulesTest {
                 .extracting(AnalyzerFinding::rule).doesNotContain("audit-only-placeholder");
     }
 
-    /** Entschieden wie zur Laufzeit: ein abgeschalteter oder unvollstaendiger Audit-Block bringt die Variable nicht. */
+    /** Decided as at runtime: a switched-off or incomplete audit block does not bring the variable. */
     @Test
     void auditBefundeMitAbgeschaltetemOderUnvollstaendigemAuditBlockSindEinBefund() {
         Map<String, Object> disabled = Map.of("audit", Map.of(

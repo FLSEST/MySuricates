@@ -80,7 +80,7 @@ class BlockJsonReaderTest {
         assertThat(BlockJsonReader.fromMapList(null)).isEmpty();
     }
 
-    // --- d3aa0b28: Felder neben config bleiben erhalten, der Analyzer meldet sie ---
+    // --- d3aa0b28: fields next to config are preserved, the analyzer reports them ---
 
     @Test
     void toBlock_keepsFieldsBesideConfig() throws Exception {

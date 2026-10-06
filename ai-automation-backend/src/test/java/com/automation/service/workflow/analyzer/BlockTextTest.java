@@ -58,7 +58,7 @@ class BlockTextTest {
         for (int i = 0; i < 12; i++) {
             zuTief = List.of(zuTief);
         }
-        // + 1 Ebene für die Config-Map selbst
+        // + 1 level for the config map itself
         assertThat(BlockText.allStrings(block(Map.of("a", erlaubt)))).containsExactly("ok");
         assertThat(BlockText.allStrings(block(Map.of("a", zuTief)))).isEmpty();
     }
@@ -79,7 +79,7 @@ class BlockTextTest {
         assertThat(BlockText.directValue(b, "fehlt")).isNull();
     }
 
-    /** TODO c52eba8f: je Typ der Schlüssel, den der Executor liest — nicht prompt vor command, bei agentic goal. */
+    /** TODO c52eba8f: per type the key the executor reads — not prompt before command, for agentic goal. */
     @Test
     void instructionsLesenJeTypDenSchluesselDesExecutors() {
         assertThat(BlockText.instructions(block(Map.of("prompt", "p", "command", "c")))).containsExactly("c");
@@ -94,7 +94,7 @@ class BlockTextTest {
                 "execution_mode", "ai")))).containsExactly("Fasse {{ item }} zusammen");
     }
 
-    /** Was als Shell läuft oder einen Menschen fragt, geht nicht mit workflow.instructions an die KI. */
+    /** What runs as shell or asks a human does not go to the AI with workflow.instructions. */
     @Test
     void shellBefehleUndFragenAnMenschenSindKeinKiAuftrag() {
         assertThat(BlockText.instructions(block("shell", Map.of("command", "ls")))).isEmpty();
@@ -107,8 +107,8 @@ class BlockTextTest {
     }
 
     /**
-     * TODO ce4abac1: die Aufträge verschachtelter Blöcke, über denselben Walker wie die Typ- und
-     * execution_mode-Prüfung (switch-Cases, default, eine blocks-Liste) — je Blockname, sonst Typ.
+     * TODO ce4abac1: the tasks of nested blocks, via the same walker as the type and
+     * execution_mode check (switch cases, default, a blocks list) — per block name, otherwise type.
      */
     @Test
     void nestedInstructionsLesenVerschachtelteBloeckeJeTyp() {
@@ -129,7 +129,7 @@ class BlockTextTest {
         assertThat(BlockText.nestedInstructions(block("simple", Map.of("command", "x")))).isEmpty();
     }
 
-    /** Die Schlüssel stehen in der Spezifikation ihres Typs; die hält BlockSpecConfigKeysGateTest am Executor. */
+    /** The keys are in the specification of their type; BlockSpecConfigKeysGateTest holds that against the executor. */
     @Test
     void promptSchluesselSindDieDerBlockSpezifikation() {
         BlockText.PROMPT_KEYS.forEach((type, keys) -> {

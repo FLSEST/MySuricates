@@ -17,7 +17,7 @@ class AnalyzerFindingTest {
         assertThat(f).isEqualTo(new AnalyzerFinding("r", Severity.LOW, -1, null, "d", "e"));
     }
 
-    /** Controller und WorkflowAnalyzer filtern/sortieren über die Ordinalzahl: HIGH ist die schwerste. */
+    /** Controller and WorkflowAnalyzer filter/sort by ordinal: HIGH is the most severe. */
     @Test
     void severityReihenfolgeVonSchwerNachLeicht() {
         assertThat(Severity.values()).containsExactly(Severity.HIGH, Severity.MEDIUM, Severity.LOW);

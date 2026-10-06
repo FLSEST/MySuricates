@@ -16,15 +16,15 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
- * Wann die Ziel-Variablen gelten und was an {@link GoalContextSource} geht (TODO 441a4c46). Die Luecke in
- * jeder Variable bei unbekanntem Ziel setzt der Einsammler, siehe {@link WorkflowContextDataServiceTest}.
+ * When the goal variables apply and what goes to {@link GoalContextSource} (TODO 441a4c46). The gap in
+ * every variable for an unknown goal is set by the collector, see {@link WorkflowContextDataServiceTest}.
  */
 @ExtendWith(MockitoExtension.class)
 class GoalVariablesTest {
 
     @Mock private GoalContextSource goalContextSource;
 
-    /** Modul goals an; einzelne Tests schalten es aus (TODO c60bf914). */
+    /** Module goals on; individual tests switch it off (TODO c60bf914). */
     @org.mockito.Spy private com.automation.modules.ModuleRegistry modules = com.automation.modules.ModuleRegistry.allEnabled();
 
     @InjectMocks private GoalVariables goalVariables;
@@ -62,7 +62,7 @@ class GoalVariablesTest {
         assertThatThrownBy(() -> goalVariables.load(run("missing", null))).isInstanceOf(ResourceNotFoundException.class);
     }
 
-    /** Modul goals aus (TODO c60bf914): keine Zielvariablen, keine Abfrage, keine Luecken-Warnung. */
+    /** Module goals off (TODO c60bf914): no goal variables, no query, no gap warning. */
     @Test
     void names_whileGoalsIsOff_areNone() {
         org.mockito.Mockito.doReturn(false).when(modules).isEnabled(com.automation.modules.ModuleCatalog.GOALS);
