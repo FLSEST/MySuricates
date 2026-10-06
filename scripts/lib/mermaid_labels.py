@@ -1,47 +1,47 @@
 #!/usr/bin/env python3
-"""Beschriftungen in Mermaid-Quelltext finden (TODO 47bd4d27).
+"""Find labels in Mermaid source text (TODO 47bd4d27).
 
-scripts/docs-diagrams.py erzeugt die englischen Diagramm-Seiten aus den deutschen, ohne
-den Aufbau eines Diagramms anzufassen: ersetzt wird nur, was dieses Modul als Beschriftung
-meldet. Knoten-IDs, Pfeile, Stile, Klassen- und Tabellenruempfe bleiben Zeichen fuer
-Zeichen gleich — deshalb kann das Skript nach dem Uebersetzen pruefen, dass das Geruest
-(`skeleton`) beider Fassungen identisch ist.
+scripts/docs-diagrams.py produces the English diagram pages from the German ones without
+touching the structure of a diagram: only what this module reports as a label is replaced.
+Node IDs, arrows, styles, class and table bodies stay character for
+character the same — so after translating, the script can check that the skeleton
+(`skeleton`) of both versions is identical.
 
-Was als Beschriftung zaehlt
----------------------------
-    flowchart/graph  Knotentexte ID["..."], ID[...], ID(...), ID{...}, ID[(...)] usw.,
-                     Kantenlabels |...|, -- Text -->, -. Text .->, == Text ==>,
-                     subgraph-Titel subgraph ID["..."]
-    sequenceDiagram  participant/actor X as <Text>, Nachrichten A->>B: <Text>,
-                     Note over/left of/right of X: <Text>,
-                     alt/else/opt/loop/par/and/critical/option/break <Text>
-    stateDiagram     Uebergaenge A --> B : <Text>, Beschreibungen X : <Text>,
-                     state "<Text>" as X, note left of/right of X : <Text> (auch mehrzeilig)
-    classDiagram     Beziehungslabels A --> B : <Text>, note "<Text>", class X["<Text>"];
-                     der Klassenrumpf ist Code
-    erDiagram        Beziehungslabels A ||--o{ B : "<Text>", Attribut-Kommentare "<Text>"
+What counts as a label
+----------------------
+    flowchart/graph  node texts ID["..."], ID[...], ID(...), ID{...}, ID[(...)] etc.,
+                     edge labels |...|, -- text -->, -. text .->, == text ==>,
+                     subgraph titles subgraph ID["..."]
+    sequenceDiagram  participant/actor X as <text>, messages A->>B: <text>,
+                     Note over/left of/right of X: <text>,
+                     alt/else/opt/loop/par/and/critical/option/break <text>
+    stateDiagram     transitions A --> B : <text>, descriptions X : <text>,
+                     state "<text>" as X, note left of/right of X : <text> (also multi-line)
+    classDiagram     relation labels A --> B : <text>, note "<text>", class X["<text>"];
+                     the class body is code
+    erDiagram        relation labels A ||--o{ B : "<text>", attribute comments "<text>"
 
-IDs werden nie uebersetzt, auch wenn Mermaid sie anzeigt (`PENDING --> RUNNING`,
-`subgraph Compose`, `participant Client`): was in beiden Sprachen verschieden heissen soll,
-braucht eine Beschriftung.
+IDs are never translated, even if Mermaid displays them (`PENDING --> RUNNING`,
+`subgraph Compose`, `participant Client`): what is supposed to be named differently in both languages
+needs a label.
 
-Unbekanntes schlaegt fehl, statt durchzurutschen: ein Diagrammtyp ohne Regeln oder eine
-Sequenz-, Zustands- bzw. ER-Zeile, die keine Regel kennt, ergibt MermaidError. Sonst liefe
-deutscher Text unbemerkt in die englische Seite.
+Unknown input fails instead of slipping through: a diagram type without rules or a
+sequence, state or ER line that no rule knows results in MermaidError. Otherwise
+German text would run unnoticed into the English page.
 """
 import re
 
 
 class MermaidError(ValueError):
-    """Diagrammtyp oder Zeile, fuer die es keine Beschriftungsregel gibt."""
+    """Diagram type or line for which there is no label rule."""
 
 
 # ---------------------------------------------------------------------------
 # flowchart / graph
 # ---------------------------------------------------------------------------
 FLOW_SKIP = re.compile(r"^\s*(?:$|%%|end\s*$|(?:style|classDef|class|linkStyle|click|direction)\s)")
-# Ein Durchlauf von links nach rechts; was ein Token verbraucht, wird nicht noch einmal
-# betrachtet — so zaehlt `run(x)` in einem Label nicht als Knoten `run` mit Text `x`.
+# One pass from left to right; what a token consumes is not considered again —
+# so `run(x)` in a label does not count as node `run` with text `x`.
 FLOW_TOKEN = re.compile(r"""
     "(?P<quoted>[^"]*)"
   | \|(?P<pipe>[^|"]*)\|
@@ -50,7 +50,7 @@ FLOW_TOKEN = re.compile(r"""
   | (?<![-<=.])==(?![=>])\s*(?P<thick>[^="|>\s][^="|>]*?)\s*(?:==>|===)
   | (?<![\w])(?P<node>[A-Za-z0-9_]+)(?=[\[({>])
 """, re.VERBOSE)
-# Knotenformen, laengste Oeffnung zuerst.
+# Node shapes, longest opening first.
 SHAPES = (("(((", ")))"), ("[[", "]]"), ("[(", ")]"), ("([", "])"), ("((", "))"), ("{{", "}}"),
           ("[/", "/]"), ("[\\", "\\]"), ("[/", "\\]"), ("[\\", "/]"),
           ("[", "]"), ("(", ")"), ("{", "}"), (">", "]"))
@@ -74,7 +74,7 @@ def _flow_line(line):
                 continue
             start = pos + len(opener)
             if line.startswith('"', start):
-                pos = start                          # der Text in Anfuehrungszeichen folgt als Token
+                pos = start                          # the text in quotes follows as a token
             else:
                 end = line.find(closer, start)
                 if end < 0:
@@ -111,7 +111,7 @@ STATE_NOTE_START = re.compile(r"^\s*note\s+(?:left|right)\s+of\s+\S+\s*$")
 STATE_NOTE_END = re.compile(r"^\s*end\s+note\s*$")
 
 # ---------------------------------------------------------------------------
-# classDiagram — alles ausser Beziehungslabels und Notizen ist Code
+# classDiagram — everything except relation labels and notes is code
 # ---------------------------------------------------------------------------
 CLASS_RULES = (
     re.compile(r'^\s*\S+\s*(?:"[^"]*"\s*)?(?:<\|--|--\|>|\*--|--\*|o--|--o|<--|-->|<\.\.|\.\.>'
@@ -140,11 +140,11 @@ def _first_rule(rules, line, kind):
 
 
 class _Scanner:
-    """Zeilenweise, mit dem wenigen Zustand, den Rumpf-Bloecke und mehrzeilige Notizen brauchen."""
+    """Line by line, with the little state that body blocks and multi-line notes need."""
 
     def __init__(self, kind):
         self.kind = kind
-        self.block = False          # in einem Klassen- oder Entitaetsrumpf / einer mehrzeiligen Notiz
+        self.block = False          # inside a class or entity body / a multi-line note
 
     def line(self, line):
         handler = getattr(self, "_" + self.kind)
@@ -214,7 +214,7 @@ TYPES = {"flowchart": "flowchart", "graph": "flowchart", "sequenceDiagram": "seq
 
 
 def spans(code):
-    """(Anfang, Ende) jeder Beschriftung in `code`, in Lesereihenfolge; leere fallen weg."""
+    """(start, end) of every label in `code`, in reading order; empty ones are dropped."""
     result, offset, scanner = [], 0, None
     for line in code.split("\n"):
         stripped = line.strip()
@@ -239,7 +239,7 @@ def labels(code):
 
 
 def translate(code, fn):
-    """Jede Beschriftung durch fn(beschriftung) ersetzen, alles andere unveraendert lassen."""
+    """Replace every label by fn(label), leave everything else unchanged."""
     out, pos = [], 0
     for start, end in spans(code):
         out.append(code[pos:start])
@@ -250,5 +250,5 @@ def translate(code, fn):
 
 
 def skeleton(code):
-    """Der Quelltext ohne Beschriftungen — muss fuer Deutsch und Englisch identisch sein."""
+    """The source text without labels — must be identical for German and English."""
     return translate(code, lambda _: "\x00")

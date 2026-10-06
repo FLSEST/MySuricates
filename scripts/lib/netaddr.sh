@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Netzadresse einer Instanz fuer die Abschlussmeldung (b8aa3866): Wer mit --bind 0.0.0.0 bindet, will
-# von einem anderen Rechner zugreifen — "http://localhost:PORT" hilft dort nicht weiter.
+# Network address of an instance for the final message (b8aa3866): whoever binds with --bind 0.0.0.0 wants
+# to reach it from another machine — "http://localhost:PORT" does not help there.
 #
-# Nur lokale Abfragen, kein Netzverkehr: Linux `hostname -I`, macOS `ipconfig getifaddr enN`. Laesst
-# sich nichts ermitteln, bleibt die Liste leer und der Aufrufer nennt einen Platzhalter.
-# bash 3.2 (macOS), keine Linux-only-Pflicht: fehlt ein Kommando, wird das naechste versucht.
+# Local queries only, no network traffic: Linux `hostname -I`, macOS `ipconfig getifaddr enN`. If nothing
+# can be determined, the list stays empty and the caller names a placeholder.
+# bash 3.2 (macOS), no Linux-only requirement: if a command is missing, the next one is tried.
 
-# netaddr_is_local BIND — nur von diesem Rechner erreichbar (Loopback)?
+# netaddr_is_local BIND — reachable from this machine only (loopback)?
 netaddr_is_local() {
   case "${1:-}" in
     ""|localhost|::1|127.*) return 0 ;;
@@ -14,14 +14,14 @@ netaddr_is_local() {
   esac
 }
 
-# netaddr_is_wildcard BIND — lauscht auf allen Schnittstellen?
+# netaddr_is_wildcard BIND — listening on all interfaces?
 netaddr_is_wildcard() {
   case "${1:-}" in 0.0.0.0|::|"[::]") return 0 ;; *) return 1 ;; esac
 }
 
-# netaddr_local_url BIND PORT — die Adresse fuer diesen Rechner: localhost, wenn die Instanz dort lauscht
-# (127.0.0.1 oder alle Schnittstellen); bei einer anderen Loopback-Adresse wie 127.0.0.2 oder ::1 diese —
-# unter localhost antwortet die Instanz dann nicht (065144ee)
+# netaddr_local_url BIND PORT — the address for this machine: localhost if the instance listens there
+# (127.0.0.1 or all interfaces); for another loopback address such as 127.0.0.2 or ::1 that one —
+# the instance does not answer on localhost then (065144ee)
 netaddr_local_url() {
   local a="${1:-}"
   a="${a#\[}"; a="${a%\]}"
@@ -32,27 +32,27 @@ netaddr_local_url() {
   esac
 }
 
-# IPv4-Adressen dieses Rechners ohne Loopback, eine je Zeile, ohne Dubletten
+# IPv4 addresses of this machine without loopback, one per line, without duplicates
 netaddr_host_addresses() {
   local out="" ifc a
   out="$(hostname -I 2>/dev/null)" || out=""
   if [ -z "$out" ] && command -v ipconfig >/dev/null 2>&1; then
-    # macOS: en0 ist meist WLAN/Ethernet; weitere Schnittstellen der Reihe nach
+    # macOS: en0 is usually WiFi/Ethernet; further interfaces in order
     for ifc in en0 en1 en2 en3 en4 en5; do
       a="$(ipconfig getifaddr "$ifc" 2>/dev/null)" && out="$out $a"
     done
   fi
   for a in $out; do
     case "$a" in
-      127.*|*:*) continue ;;                       # Loopback und IPv6 nicht nennen
+      127.*|*:*) continue ;;                       # do not list loopback and IPv6
       *[!0-9.]*) continue ;;
       *.*.*.*) printf '%s\n' "$a" ;;
     esac
   done | awk '!seen[$0]++'
 }
 
-# netaddr_urls BIND PORT — URLs, unter denen andere Rechner die Instanz erreichen; leer, wenn die
-# Instanz nur lokal lauscht oder sich keine Adresse ermitteln laesst
+# netaddr_urls BIND PORT — URLs under which other machines reach the instance; empty if the
+# instance listens locally only or no address can be determined
 netaddr_urls() {
   local bind="${1:-}" port="${2:-}" a
   netaddr_is_local "$bind" && return 0
@@ -63,9 +63,9 @@ netaddr_urls() {
   fi
 }
 
-# netaddr_lines BIND PORT — die Adresszeilen der Abschlussmeldung (setzt i18n.sh voraus):
-# localhost bzw. die Loopback-Adresse, sofern die Instanz dort lauscht; bei Bind ins Netz zusaetzlich die
-# Netzadresse(n) bzw. ein Platzhalter und der VPN-Hinweis aus --help.
+# netaddr_lines BIND PORT — the address lines of the final message (requires i18n.sh):
+# localhost or the loopback address, if the instance listens there; when bound to the network additionally the
+# network address(es) or a placeholder and the VPN note from --help.
 netaddr_lines() {
   local bind="${1:-}" port="${2:-}" urls u
   if netaddr_is_local "$bind" || netaddr_is_wildcard "$bind"; then

@@ -1,27 +1,27 @@
 #!/usr/bin/env bash
 #
-# load-test.sh — Lasttest eines Stands auf einer Wegwerf-Instanz, vor jedem Release (TODO 1a6058dc).
+# load-test.sh — load test of a revision on a throwaway instance, before every release (TODO 1a6058dc).
 #
 #   scripts/load-test.sh [--ref REF] [--repo DIR] [--jar PATH] [--scenario FILE] [--keep]
 #
-# 1. Baut das Backend-JAR aus genau dem Commit REF (Default HEAD, per git archive — Uncommittetes zaehlt
-#    nicht) oder nimmt --jar. Gebaute JARs liegen je Commit im Cache und werden wiederverwendet.
-# 2. Startet eine Wegwerf-Instanz: eigener Port, eigenes -Duser.home/HOME/XDG_CONFIG_HOME, eigene DB,
-#    eigener API-Key, kein Docker (Socket-Pfad ins Leere), kein Backup, kein Tray, kein Rate-Limit,
-#    kein Auto-Tagging. claude/codex/pi sind Attrappen im PATH, die jeden Aufruf protokollieren: ein
-#    KI-Aufruf kostet hier keine Tokens, macht den Lauf aber RED.
-# 3. driver.py: synthetischer Seed aus load-test/scenario.json, dann Last wie echte Benutzer (Leser,
-#    Lauf-Starter, TODO-Schreiber), jede Anfrage mit Client-Zeit und Server-Timing der Instanz.
-# 4. report.py: Kennzahlen je Route, Verdict (GREEN/YELLOW/RED), Vergleich mit dem letzten Lauf auf einem
-#    frueheren Stand (getaggte Releases zuerst).
+# 1. Builds the backend JAR from exactly the commit REF (default HEAD, via git archive — uncommitted changes do
+#    not count) or takes --jar. Built JARs are cached per commit and reused.
+# 2. Starts a throwaway instance: own port, own -Duser.home/HOME/XDG_CONFIG_HOME, own DB,
+#    own API key, no Docker (socket path pointing nowhere), no backup, no tray, no rate limit,
+#    no auto-tagging. claude/codex/pi are dummies on the PATH that log every call: an
+#    AI call costs no tokens here, but turns the run RED.
+# 3. driver.py: synthetic seed from load-test/scenario.json, then load like real users (readers,
+#    run starters, TODO writers), every request with client time and server timing of the instance.
+# 4. report.py: key figures per route, verdict (GREEN/YELLOW/RED), comparison with the last run on an
+#    earlier revision (tagged releases first).
 #
-# Ergebnis: ${MYSURICATES_LOAD_TEST_DIR:-${XDG_STATE_HOME:-~/.local/state}/mysuricates/load-test}/
-#           <zeitstempel>-<sha12>/ mit facts.txt, result.json, summary.txt, raw.json, instance.log.
-# release.sh liest summary.txt des getaggten Stands. Zum Schluss stehen facts.txt und die
-# gate_status-Zeilen auf stdout — so liest sie auch der Pool-Workflow „Lasttest vor dem Release“.
+# Result: ${MYSURICATES_LOAD_TEST_DIR:-${XDG_STATE_HOME:-~/.local/state}/mysuricates/load-test}/
+#         <timestamp>-<sha12>/ with facts.txt, result.json, summary.txt, raw.json, instance.log.
+# release.sh reads summary.txt of the tagged revision. At the end facts.txt and the
+# gate_status lines go to stdout — which is also how the pool workflow "Lasttest vor dem Release" reads them.
 #
-# Exit: 0 GREEN/YELLOW, 3 RED, 2 Lauf nicht moeglich (Build, Start, Seed).
-# Voraussetzungen: git, java (21+), mvn (nur ohne --jar und ohne Cache-Treffer), python3, curl.
+# Exit: 0 GREEN/YELLOW, 3 RED, 2 run not possible (build, start, seed).
+# Prerequisites: git, java (21+), mvn (only without --jar and without cache hit), python3, curl.
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -46,7 +46,7 @@ while [ $# -gt 0 ]; do
 done
 
 log() { echo "[load-test] $*"; }
-fail() {  # Lauf nicht moeglich: klare Gate-Zeilen, damit ein Workflow nicht stillschweigend gruen bleibt
+fail() {  # run not possible: clear gate lines so a workflow does not silently stay green
   echo "[load-test] FEHLER: $*" >&2
   echo "gate_status: RED"
   echo "gate_category: load-test"
@@ -94,13 +94,13 @@ if [ -z "$JAR" ]; then
     [ -n "$BUILT" ] || fail "Kein Fat-JAR im Build"
     cp "$BUILT" "$JAR.tmp" && mv "$JAR.tmp" "$JAR"
     rm -rf "$WORK/src"
-    # Cache begrenzen: die fuenf juengsten JARs reichen fuer Release und Baseline.
+    # Limit the cache: the five most recent JARs are enough for release and baseline.
     ls -1t "$CACHE_DIR/jars"/*.jar 2>/dev/null | tail -n +6 | xargs -r rm -f --
   fi
 fi
 [ -f "$JAR" ] || fail "JAR fehlt: $JAR"
 
-# --- 2. Wegwerf-Instanz ------------------------------------------------------------------------------
+# --- 2. Throwaway instance ------------------------------------------------------------------------------
 mkdir -p "$WORK/home/.config" "$WORK/data" "$WORK/backups" "$WORK/project" "$WORK/bin" "$RESULT_DIR"
 : > "$WORK/ai-calls.log"
 for cli in claude codex pi; do
@@ -113,8 +113,8 @@ read -r XMX MAX_RUNS < <(python3 -c 'import json,sys; i=json.load(open(sys.argv[
 JAVA="$(command -v java)"
 
 log "Starte Instanz auf 127.0.0.1:$PORT (Heap $XMX, $MAX_RUNS parallele Laeufe) ..."
-# env -i: nichts aus der Shell des Aufrufers (SPRING_PROFILES_ACTIVE, AUTOMATION_* der Dev-Instanz …)
-# erreicht die Wegwerf-Instanz. -Duser.home ist Pflicht — Java liest user.home nicht aus $HOME.
+# env -i: nothing from the caller's shell (SPRING_PROFILES_ACTIVE, AUTOMATION_* of the dev instance …)
+# reaches the throwaway instance. -Duser.home is mandatory — Java does not read user.home from $HOME.
 (cd "$WORK" && exec env -i \
   PATH="$WORK/bin:/usr/local/bin:/usr/bin:/bin" HOME="$WORK/home" XDG_CONFIG_HOME="$WORK/home/.config" \
   LANG="${LANG:-C.UTF-8}" TMPDIR="$WORK" \
@@ -136,7 +136,7 @@ done
 local_curl -sf -m 2 "http://127.0.0.1:$PORT/actuator/health" >/dev/null || fail "Instanz nach 180 s nicht erreichbar"
 log "Instanz bereit (PID $JVM_PID)"
 
-# --- 3. Seed und Last --------------------------------------------------------------------------------
+# --- 3. Seed and load --------------------------------------------------------------------------------
 python3 "$SCRIPT_DIR/load-test/driver.py" --base "http://127.0.0.1:$PORT/api/v1" --key "$KEY" \
   --scenario "$SCENARIO" --project-dir "$WORK/project" --commit "$COMMIT" \
   --out "$RESULT_DIR/raw.json" --ai-log "$WORK/ai-calls.log"
@@ -145,7 +145,7 @@ cp "$WORK/instance.log" "$RESULT_DIR/instance.log"
 [ -s "$WORK/ai-calls.log" ] && cp "$WORK/ai-calls.log" "$RESULT_DIR/ai-calls.log"
 [ "$DRIVER_RC" -eq 0 ] || fail "Treiber brach ab (Exit $DRIVER_RC, Log: $RESULT_DIR/instance.log)"
 
-# --- 4. Auswertung -----------------------------------------------------------------------------------
+# --- 4. Evaluation -----------------------------------------------------------------------------------
 python3 "$SCRIPT_DIR/load-test/report.py" "$RESULT_DIR/raw.json" "$RESULT_DIR" \
   --results-root "$STATE_ROOT" --repo "$REPO"
 REPORT_RC=$?

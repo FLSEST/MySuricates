@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Terminal-Oberflaeche des Installers (504e5038): Kopf, Schrittleiste, gerahmte Panels, Menues,
-# Befehle mit Fortschrittszeile. Aufbau „A+B“ der Spec: die Ausgabe laeuft nach unten, nur das
-# aktive Panel wird an seiner Stelle neu gezeichnet — kein Vollbild, Logs bleiben stehen.
+# Terminal UI of the installer (504e5038): header, step rail, framed panels, menus,
+# commands with a progress line. Layout "A+B" of the spec: output runs downwards, only the
+# active panel is redrawn in place — no full screen, logs stay put.
 #
-# Ohne Terminal (Pipe, CI, Installer-Probe ohne PTY): keine Farben, keine Abfragen — jede Abfrage
-# nimmt ihren Default. Ohne UTF-8-Locale: ASCII-Rahmen, weil bash dann Bytes statt Zeichen zaehlt.
-# bash 3.2 (macOS): kein declare -A, read -t nur ganze Sekunden, sed ohne \x-Escapes.
+# Without a terminal (pipe, CI, installer probe without PTY): no colors, no prompts — every prompt
+# takes its default. Without a UTF-8 locale: ASCII frames, because bash then counts bytes instead of characters.
+# bash 3.2 (macOS): no declare -A, read -t whole seconds only, sed without \x escapes.
 
 _TUI_LIB_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 _TUI_ESC="$(printf '\033')"
@@ -48,15 +48,15 @@ tui_init() {
   esac
 }
 
-# --- Hilfen -----------------------------------------------------------------------------------------
+# --- Helpers -----------------------------------------------------------------------------------------
 
 _tui_plain() { printf '%s' "$1" | sed "s/${_TUI_ESC}\[[0-9;?]*[A-Za-z]//g"; }
 _tui_len() { local s; s="$(_tui_plain "$1")"; printf '%s' "${#s}"; }
 _tui_repeat() { local s="" i=0; while [ "$i" -lt "$2" ]; do s="$s$1"; i=$((i + 1)); done; printf '%s' "$s"; }
-# TEXT auf BREITE Zeichen auffuellen — printf '%-Ns' zaehlt Bytes, „ä“ verschoebe die Spalte
+# Pad TEXT to WIDTH characters — printf '%-Ns' counts bytes, "ä" would shift the column
 _tui_pad() { local n; n="$(_tui_len "$1")"; printf '%s' "$1"; [ "$n" -lt "$2" ] && _tui_repeat ' ' $(($2 - n)); return 0; }
 
-# Text aus den Sprachdateien, falls geladen (scripts/lib/i18n.sh), sonst der englische Default
+# Text from the language files if loaded (scripts/lib/i18n.sh), otherwise the English default
 _tui_msg() {
   local key="$1" def="$2" name
   shift 2
@@ -69,12 +69,12 @@ _tui_msg() {
 
 _tui_cursor() { [ "$TUI_TTY" = 1 ] && { [ "$1" = off ] && printf '\033[?25l' || printf '\033[?25h'; }; return 0; }
 
-# Loescht die letzten N gezeichneten Zeilen (fuer das Neuzeichnen an Ort und Stelle)
+# Deletes the last N drawn lines (for redrawing in place)
 tui_clear_lines() { [ "$TUI_TTY" = 1 ] && [ "${1:-0}" -gt 0 ] && printf '\033[%dA\033[J' "$1"; return 0; }
 
-# --- Bausteine --------------------------------------------------------------------------------------
+# --- Building blocks --------------------------------------------------------------------------------------
 
-# tui_box TITEL [ZEILE…] — Rahmen in fester Breite; zu lange Zeilen werden gekuerzt, nicht umbrochen
+# tui_box TITLE [LINE…] — frame of fixed width; lines that are too long are truncated, not wrapped
 tui_box() {
   local title="$1" inner=$((TUI_WIDTH - 4)) len line fill
   shift
@@ -95,7 +95,7 @@ tui_box() {
   TUI_LAST_DRAWN=$(( $# + 2 ))
 }
 
-# tui_rail AKTUELL NAME… — Schrittleiste; zu breit ⇒ erledigte Schritte nur noch als ✓
+# tui_rail CURRENT NAME… — step rail; too wide ⇒ completed steps only as ✓
 tui_rail() {
   local cur="$1" out mode
   shift
@@ -123,13 +123,13 @@ _tui_rail_build() {
   printf '%s' "$out"
 }
 
-# tui_done LABEL DETAIL [DAUER] — ein erledigter Schritt als Einzeiler
+# tui_done LABEL DETAIL [DURATION] — a completed step as a one-liner
 tui_done() {
   printf '  %s%s%s %s%s%s %s%s%s%s\n' "$C_GREEN" "$T_OK" "$C_RESET" "$C_TEXT" "$(_tui_pad "$1" 10)" "$C_RESET" \
     "$C_GREY" "${2:-}" "${3:+   $3}" "$C_RESET"
 }
 
-# tui_header INFOZEILE… — Erdmaennchen links, Infoblock rechts (ab Zeile 4), darunter der Schriftzug
+# tui_header INFOLINE… — meerkat on the left, info block on the right (from line 4), the lettering below
 tui_header() {
   local name i=0 row info
   # shellcheck source=art.generated.sh
@@ -148,9 +148,9 @@ tui_header() {
   printf '\n'
 }
 
-# --- Abfragen ---------------------------------------------------------------------------------------
+# --- Prompts ---------------------------------------------------------------------------------------
 
-# tui_select VAR TITEL DEFAULT "Text|Hinweis"… — Rueckgabe: 0 gewaehlt (Index in VAR), 2 zurueck, 3 beenden
+# tui_select VAR TITLE DEFAULT "text|hint"… — return: 0 chosen (index in VAR), 2 back, 3 quit
 tui_select() {
   local var="$1" title="$2" sel="$3" n key rest opt label hint i width w lines
   shift 3
@@ -194,7 +194,7 @@ tui_select() {
       q) _tui_cursor on; return 3 ;;
     esac
   done
-  # Das Panel verschwindet; den erledigten Schritt schreibt der Aufrufer als Einzeiler (tui_done)
+  # The panel disappears; the caller writes the completed step as a one-liner (tui_done)
   tui_clear_lines "$TUI_LAST_DRAWN"
   TUI_LAST_DRAWN=0
   _tui_cursor on
@@ -202,8 +202,8 @@ tui_select() {
   return 0
 }
 
-# tui_checklist VAR TITEL "on|off:schluessel:Text[:Hinweis]"… — VAR = eingeschaltete Schluessel,
-# durch Leerzeichen getrennt. Rueckgabe wie tui_select.
+# tui_checklist VAR TITLE "on|off:key:text[:hint]"… — VAR = enabled keys,
+# separated by spaces. Return like tui_select.
 tui_checklist() {
   local var="$1" title="$2" n cur=0 key rest item i state lines keyname label hint result mark
   shift 2
@@ -268,7 +268,7 @@ _tui_toggle() {
   printf '%s' "$out"
 }
 
-# tui_confirm FRAGE y|n — 0 = ja, 1 = nein; ohne Terminal der Default
+# tui_confirm QUESTION y|n — 0 = yes, 1 = no; without a terminal the default
 tui_confirm() {
   local question="$1" def="${2:-y}" answer hint
   if [ "$def" = y ]; then hint="$(_tui_msg confirm_default_yes '[Y/n]')"; else hint="$(_tui_msg confirm_default_no '[y/N]')"; fi
@@ -285,7 +285,7 @@ tui_confirm() {
   esac
 }
 
-# tui_input VAR FRAGE DEFAULT — freie Eingabe; leer oder ohne Terminal ⇒ Default
+# tui_input VAR QUESTION DEFAULT — free input; empty or without a terminal ⇒ default
 tui_input() {
   local var="$1" question="$2" def="$3" answer=""
   if [ "$TUI_TTY" = 1 ]; then
@@ -297,7 +297,7 @@ tui_input() {
   printf -v "$var" '%s' "${answer:-$def}"
 }
 
-# tui_secret VAR FRAGE — verdeckte Eingabe (etwa ein Token); ohne Terminal leer
+# tui_secret VAR QUESTION — hidden input (e.g. a token); empty without a terminal
 tui_secret() {
   local var="$1" question="$2" answer=""
   if [ "$TUI_TTY" = 1 ]; then
@@ -308,14 +308,14 @@ tui_secret() {
   printf -v "$var" '%s' "$answer"
 }
 
-# --- Befehle ----------------------------------------------------------------------------------------
+# --- Commands ----------------------------------------------------------------------------------------
 
-# tui_run TITEL LOGDATEI BEFEHL… — Ausgabe ins Log; im Terminal Spinner, Dauer und die jeweils
-# letzte Log-Zeile gedimmt. Bei Fehler: die letzten 15 Zeilen und der Pfad zum Log. Rueckgabe = Exit.
+# tui_run TITLE LOGFILE COMMAND… — output into the log; in a terminal spinner, duration and the most recent
+# log line dimmed. On error: the last 15 lines and the path to the log. Return = exit code.
 tui_run() {
   local title="$1" log="$2" start=$SECONDS rc pid i=0 last frame nframes dur room
   shift 2
-  room=$((TUI_WIDTH - 16 - ${#title})); [ "$room" -lt 0 ] && room=0   # ${x:0:-n} bricht bash ab
+  room=$((TUI_WIDTH - 16 - ${#title})); [ "$room" -lt 0 ] && room=0   # ${x:0:-n} aborts bash
   : > "$log"
   if [ "$TUI_TTY" = 1 ]; then
     "$@" > "$log" 2>&1 < /dev/null &

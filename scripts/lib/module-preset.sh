@@ -52,9 +52,9 @@ module_catalog_get() {
   printf '%s' "${!name-}"
 }
 
-# Application-Property in ihren Umgebungsvariablennamen: automation.modules.remote-access →
-# AUTOMATION_MODULES_REMOTEACCESS. Von setup.sh (Modulwahl) und setup-kept.sh (load_existing,
-# Haertungs-Schalter) genutzt.
+# Application property in its environment variable name: automation.modules.remote-access →
+# AUTOMATION_MODULES_REMOTEACCESS. Used by setup.sh (module choice) and setup-kept.sh (load_existing,
+# hardening switch).
 prop_env() { printf '%s' "$1" | tr 'a-z.' 'A-Z_' | tr -d '-'; }
 
 # Display text of a module. $1 = field (NAME, DESC), $2 = language, $3 = key.
@@ -164,7 +164,7 @@ module_preset_write() {
 # Everything else (comments, order, other values, indentation, the trailing comment of the
 # preset line itself) stays byte-identical; nothing is regenerated.
 #
-# $1 = file, $2 = preset. Returns 0 on success, 1 = die Datei ist nicht schreibbar, 2 = unknown
+# $1 = file, $2 = preset. Returns 0 on success, 1 = the file is not writable, 2 = unknown
 # preset, 4 = file does not exist (that is module_preset_write's job), 5 = the place is not
 # unambiguous — the file is then left untouched and a reason goes to stderr. Deliberately no YAML
 # parser: the awk below tracks the key path by indentation and refuses to guess whenever the file
@@ -179,8 +179,8 @@ module_preset_update() {
   fi
   tmp="$(mktemp)" || return 1
   awk -v preset="$preset" '
-    # Einrueckung ohne printf-Breite per Stern (%*s): busybox-awk und aeltere BSD-awks (macOS)
-    # kennen sie nicht.
+    # Indentation without printf width via star (%*s): busybox awk and older BSD awks (macOS)
+    # do not know it.
     function spaces(k,   out) { out = ""; while (k-- > 0) out = out " "; return out }
     function fail(msg) { print "module_preset_update: " msg > "/dev/stderr"; failed = 1; exit 1 }
     { lines[NR] = $0 }
@@ -190,18 +190,18 @@ module_preset_update() {
       depth = 0
       targets = 0; target = 0
       content = 0; keys = 0
-      eol = (n > 0 && lines[1] ~ /\r$/) ? "\r" : ""   # eingefuegte Zeilen folgen den Zeilenenden der Datei
+      eol = (n > 0 && lines[1] ~ /\r$/) ? "\r" : ""   # inserted lines follow the line endings of the file
       autom = 0; autom_n = 0; autom_ind = -1; autom_child = -1; autom_scalar = 0
       mods = 0; mods_n = 0; mods_ind = -1; mods_child = -1; mods_scalar = 0
       for (i = 1; i <= n; i++) {
-        # Analyse immer auf der Zeile ohne CR — sonst scheitert jedes Schluessel-Muster an dem
-        # \r hinter dem Doppelpunkt und eine CRLF-Datei sieht aus wie eine ohne Schluessel.
-        # Ausgegeben und ersetzt wird die Originalzeile, die Zeilenenden bleiben also, wie sie sind.
+        # Always analyze the line without CR — otherwise every key pattern fails on the
+        # \r after the colon and a CRLF file looks like one without keys.
+        # The original line is printed and replaced, so the line endings stay as they are.
         line = lines[i]; sub(/\r$/, "", line)
         if (line ~ /^[ \t]*($|#)/) continue
         content++
         if (line ~ /\t/) fail("Tabulatoren in " FILENAME " — Preset-Zeile bitte von Hand aendern")
-        if (line !~ /^ *[A-Za-z0-9_.-]+:([ ]|$)/) continue   # Listen, Blockskalare: ignorieren
+        if (line !~ /^ *[A-Za-z0-9_.-]+:([ ]|$)/) continue   # lists, block scalars: ignore
         keys++
         ind = match(line, /[^ ]/) - 1
         key = line; sub(/^ */, "", key); sub(/:.*$/, "", key)
@@ -226,9 +226,9 @@ module_preset_update() {
       if (autom_n > 1) fail("mehrere automation:-Bloecke — bitte von Hand aendern")
       if (mods_n > 1) fail("mehrere automation.modules:-Bloecke — bitte von Hand aendern")
       if (autom_scalar || mods_scalar) fail("automation(.modules) ist kein Block — bitte von Hand aendern")
-      # Inhalt, aber kein einziger erkannter Schluessel: die Datei ist nicht das, wofuer wir sie
-      # halten. Dann darf vor allem der Anhaenge-Zweig nicht greifen — ein zweiter
-      # automation:-Block laesst Spring (allowDuplicateKeys(false)) gar nicht mehr starten.
+      # Content, but not a single recognized key: the file is not what we take it
+      # for. Then above all the append branch must not apply — a second
+      # automation: block keeps Spring (allowDuplicateKeys(false)) from starting at all.
       if (content > 0 && keys == 0) fail(FILENAME " enthaelt keine erkennbare key: value-Zeile — bitte von Hand aendern")
 
       if (targets == 1) {
@@ -236,9 +236,9 @@ module_preset_update() {
         match(line, /^ *(automation\.modules\.)?preset:[ ]*/)
         head = substr(line, 1, RLENGTH)
         rest = substr(line, RLENGTH + 1)
-        sub(/^[^ #\r]+/, "", rest)          # nur den alten Wert ersetzen, Kommentar bleibt
-        # Fehlt der Wert ganz (`preset:` von Hand geleert), fehlt auch das Leerzeichen dahinter —
-        # ohne es entstuende `preset:full`, was YAML als Skalar liest.
+        sub(/^[^ #\r]+/, "", rest)          # replace only the old value, the comment stays
+        # If the value is missing entirely (`preset:` emptied by hand), the space after it is missing too —
+        # without it `preset:full` would result, which YAML reads as a scalar.
         if (head !~ / $/) head = head " "
         if (rest != "" && rest !~ /^[ \r]/) rest = " " rest
         lines[target] = head preset rest
@@ -263,7 +263,7 @@ module_preset_update() {
   ' "$file" > "$tmp"
   rc=$?
   if [ "$rc" -ne 0 ]; then rm -f "$tmp"; return 5; fi
-  # cat, nicht mv: Rechte und Inode der Nutzerdatei bleiben.
+  # cat, not mv: permissions and inode of the user's file stay.
   if ! cat "$tmp" > "$file" 2>/dev/null; then
     rm -f "$tmp"
     echo "module_preset_update: $file konnte nicht geschrieben werden" >&2
