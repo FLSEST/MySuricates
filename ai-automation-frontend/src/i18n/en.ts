@@ -2395,6 +2395,8 @@ export const en = {
       base: 'From the base image',
       apt: 'Installed with apt, not pinned',
       pip: 'Installed with pip, not pinned',
+      npm: 'Installed with npm from a lockfile, pinned',
+      'pip-hash': 'Installed with pip, pinned by hash',
     },
   },
   activityLog: {

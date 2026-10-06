@@ -96,6 +96,12 @@ class AgentImageCatalogGateTest {
                     case "release" -> assertThat(dockerfile).as(what)
                             .containsPattern("(?m)^ARG " + Pattern.quote(tool.arg()) + "=" + Pattern.quote(tool.version()) + "\\s*$");
                     case "base" -> assertThat(image.base()).as(what).contains(tool.version());
+                    // Pinned packages (c608cdda): arg names the pin file; the version must stand there.
+                    case "npm" -> assertThat(Files.readString(backendDir().resolve(tool.arg()))).as(what)
+                            .contains("\"" + tool.name() + "\": \"" + tool.version() + "\"");
+                    case "pip-hash" -> assertThat(Files.readString(backendDir().resolve(tool.arg()))).as(what)
+                            .containsPattern("(?m)^" + Pattern.quote(tool.name()) + "==" + Pattern.quote(tool.version())
+                                    + " \\\\\\n\\s+--hash=sha256:[0-9a-f]{64}");
                     case "apt", "pip" -> {
                         assertThat(tool.version()).as(what + " is unpinned, so no version").isNull();
                         assertThat(dockerfile).as(what).containsPattern("(?<![\\w-])" + Pattern.quote(tool.name()) + "(?![\\w-])");

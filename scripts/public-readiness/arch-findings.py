@@ -51,13 +51,15 @@ Nicht gemessene Dimensionen (Blatt fehlt, jdeps/Scan gescheitert, cycles_state !
 unaufgeloeste Importe, kein git oder flacher Klon, NCLOC- oder Kollaborateur-Zaehlung gescheitert) stehen als not_measured= in ## findings_summary; fuer sie gibt
 es keine Befunde, und der Report fuehrt bekannte Befunde dieser Dimension unveraendert weiter.
 
-Werkzeuge (optional, TODO 67128699, siehe arch_tools.py): --cpd <sprache>=<datei> (CSV von pmd cpd, je
-Sprache einmal) und --pmd <datei> (SARIF-Faktenblatt von pmd check). Daraus ## duplicates (die groessten
+Werkzeuge (optional, TODO 67128699 und c608cdda, siehe arch_tools.py): --cpd <sprache>=<datei> (CSV von
+pmd cpd, je Sprache einmal), --pmd <datei> (SARIF-Faktenblatt von pmd check), --jscpd <datei> (SARIF-
+Faktenblatt von jscpd: Frontend samt .tsx, das CPD nicht lesen kann) und --lizard <datei> (Warnungen von
+lizard -w: Komplexitaet je Funktion im Frontend). Daraus ## duplicates (die groessten
 dateiuebergreifenden Duplikate) und ## complexity (Komplexitaet je Methode, nur fuer Kandidaten). Beides sind
 Fakten fuers Urteil, keine Befunde. Ohne die Eingabe steht der Abschnitt als nicht gemessen da.
 
 Aufruf:  arch-findings.py <backend-faktenblatt> [<frontend-faktenblatt>] [--cpd java=<datei>]
-                          [--cpd typescript=<datei>] [--pmd <datei>]
+                          [--cpd typescript=<datei>] [--pmd <datei>] [--jscpd <datei>] [--lizard <datei>]
          Eine fehlende oder leere Datei gilt als nicht gemessen, kein Abbruch.
 Ausgabe: ## findings, ## observations, ## review_candidates, ## duplicates, ## complexity, ## bands,
          ## findings_summary — stabil sortiert.
@@ -96,10 +98,11 @@ FRONTEND_CYCLE_CRITICAL = 3  # Frontend-Import-Zyklus mit mehr Modulen: CRITICAL
 REVIEW_HOTSPOTS = 6
 REVIEW_NEW = 3
 REVIEW_NEW_MIN_NCLOC = 100
-# CPD fand am 2026-10-06 ab 100 Tokens 22 dateiuebergreifende Java-Duplikate und 19 in .ts-Modulen; die
-# drei groessten werden beurteilt, fuenfzehn stehen als Fakt im Bericht.
+# Am 2026-10-06 fanden CPD (Java, ab 100 Tokens) 22 und jscpd (Frontend samt .tsx, ab 70 Tokens) 49
+# dateiuebergreifende Duplikate. Die Token-Zaehlung der beiden ist nicht gleich, deshalb kommt jede Seite fuer
+# sich zu Wort: je Seite zehn als Fakt, und die Kandidaten wechseln zwischen Backend und Frontend ab.
 REVIEW_DUPLICATES = 3
-DUPLICATES_LISTED = 15
+DUPLICATES_LISTED = 10
 CPD_LANGUAGES = ("java", "typescript")
 
 # Faktenblatt-Fehler, nach denen Groessen und Hotspots nicht gemessen sind. Ohne Git-Historie (kein
@@ -177,12 +180,18 @@ class Classifier:
         self.duplicates = []       # (zeilen, tokens, [(subject, zeile)]) ueber Dateigrenzen
         self.duplicates_within = 0
         self.pmd_state = "not_given"
+        self.lizard_state = "not_given"
+        self.tsx_measured = False
         self.complexity = {}       # subject -> [(zeile, regel, text)]
 
-    def tools(self, cpd_texts, pmd_text):
-        """CPD-Ausgaben je Sprache und das pmd-Faktenblatt (TODO 67128699)."""
-        for language, text in cpd_texts.items():
-            measured, duplicates = arch_tools.parse_cpd(text)
+    def tools(self, cpd_texts, pmd_text, jscpd_text=None, lizard_text=None):
+        """CPD-Ausgaben je Sprache, jscpd (Frontend samt .tsx), pmd- und lizard-Ausgabe (67128699, c608cdda)."""
+        sources = [(language, arch_tools.parse_cpd(text)) for language, text in cpd_texts.items()]
+        if jscpd_text is not None:
+            measured, duplicates = arch_tools.parse_jscpd(jscpd_text)
+            self.tsx_measured = measured
+            sources.append(("typescript", (measured, duplicates)))
+        for language, (measured, duplicates) in sources:
             if not measured:
                 continue
             self.cpd_measured.add(language)
@@ -191,9 +200,15 @@ class Classifier:
                     self.duplicates.append((lines, tokens, sorted(places)))
                 else:
                     self.duplicates_within += 1
-        self.duplicates.sort(key=lambda d: (-d[0], -d[1], d[2]))
+        # Nach Tokens: jscpd nennt keine Zeilenzahl, beide Werkzeuge nennen Tokens.
+        self.duplicates.sort(key=lambda d: (-d[1], -d[0], d[2]))
         if pmd_text is not None:
             self.pmd_state, self.complexity = arch_tools.parse_pmd(pmd_text)
+        if lizard_text is not None:
+            measured, hits = arch_tools.parse_lizard(lizard_text)
+            self.lizard_state = "ok" if measured else "not_measured"
+            for subject, rows in hits.items():
+                self.complexity.setdefault(subject, []).extend(rows)
 
     # ------------------------------------------------------------------ Dateien
     def classify_file(self, subject, ncloc, lines, changes, deps, frontend, ceiling):
@@ -416,7 +431,7 @@ class Classifier:
                 rows.append((art, subject, str(self.recent.get(subject, (0, False))[0]), details))
         chosen = {row[1] for row in rows}
         picked = 0
-        for lines, tokens, places in self.duplicates:
+        for lines, tokens, places in self.alternating_duplicates():
             if picked >= REVIEW_DUPLICATES:
                 break
             # .ts zaehlt hier mit: eine doppelte Hook- oder Hilfsfunktion ist genau die Frage "verlagern".
@@ -425,11 +440,29 @@ class Classifier:
                 continue
             subject, line = free[0]
             others = ", ".join("%s:%d" % (s, l) for s, l in places if (s, l) != (subject, line))
+            size = "%d Zeilen (%d Tokens)" % (lines, tokens) if lines else "%d Tokens" % tokens
             rows.append(("dublette", subject, str(self.recent.get(subject, (0, False))[0]),
-                         "%d Zeilen (%d Tokens) doppelt, hier ab Zeile %d; ebenso in %s" % (lines, tokens, line, others)))
+                         "%s doppelt, hier ab Zeile %d; ebenso in %s" % (size, line, others)))
             chosen.add(subject)
             picked += 1
         return rows
+
+    @staticmethod
+    def frontend_side(duplicate):
+        return duplicate[2][0][0].startswith("frontend/")
+
+    def duplicates_by_side(self):
+        backend = [d for d in self.duplicates if not self.frontend_side(d)]
+        frontend = [d for d in self.duplicates if self.frontend_side(d)]
+        return backend, frontend
+
+    def alternating_duplicates(self):
+        """Backend, Frontend, Backend, … — each side in its own order (by tokens)."""
+        backend, frontend = self.duplicates_by_side()
+        merged = []
+        for i in range(max(len(backend), len(frontend))):
+            merged += backend[i:i + 1] + frontend[i:i + 1]
+        return merged
 
     # ------------------------------------------------------------------ Ausgabe
     def render(self):
@@ -463,18 +496,20 @@ class Classifier:
         out.append("# art\tsubject\taenderungen_7d\tangaben")
         out += ["\t".join(c) for c in candidates] or ["(keine Kandidaten)"]
         out += ["", "## duplicates",
-                "# Copy-Paste-Detector (pmd cpd, ab 100 Tokens), die %d groessten Duplikate ueber Dateigrenzen;"
+                "# Je Seite die %d groessten Duplikate ueber Dateigrenzen, nach Tokens: Backend pmd cpd ab 100 Tokens,"
                 % DUPLICATES_LISTED,
-                "# .tsx misst CPD nicht (keine TSX-Sprache), React-Komponenten sind also ungeprueft, nicht duplikatfrei.",
+                ("# Frontend samt .tsx jscpd ab 70 Tokens (zeilen \"-\": jscpd nennt keine Zeilenzahl)." if self.tsx_measured
+                 else "# .tsx ungeprueft (kein jscpd-Lauf, CPD kennt kein TSX), React-Komponenten sind also nicht duplikatfrei."),
                 "# zeilen\ttokens\tstellen (subject:zeile, ...)"]
         if missing_cpd:
             out.append("# nicht gemessen: %s" % ",".join(missing_cpd))
-        out += ["%d\t%d\t%s" % (lines, tokens, ", ".join("%s:%d" % p for p in places))
-                for lines, tokens, places in self.duplicates[:DUPLICATES_LISTED]] or ["(keine)"]
+        backend, frontend = self.duplicates_by_side()
+        out += ["%s\t%d\t%s" % (lines or "-", tokens, ", ".join("%s:%d" % p for p in places))
+                for lines, tokens, places in backend[:DUPLICATES_LISTED] + frontend[:DUPLICATES_LISTED]] or ["(keine)"]
         candidate_subjects = [c[1] for c in candidates]
         out += ["", "## complexity",
-                "# pmd check (scripts/public-readiness/pmd-architecture.xml): Methoden ueber der Schwelle, nur fuer",
-                "# Backend-Kandidaten. Fakten fuers Urteil, kein Befund. Zustand steht in ## findings_summary.",
+                "# Nur fuer Kandidaten: Backend pmd check (scripts/public-readiness/pmd-architecture.xml), Frontend lizard",
+                "# (Funktionen ab 15 CCN). Fakten fuers Urteil, kein Befund. Zustaende stehen in ## findings_summary.",
                 "# subject\tzeile\tregel\ttext"]
         rows = ["%s\t%d\t%s\t%s" % (s, line, rule, text)
                 for s in candidate_subjects for line, rule, text in self.complexity.get(s, [])]
@@ -496,6 +531,7 @@ class Classifier:
                 "duplicates_within_file=%d" % self.duplicates_within,
                 "duplicates_not_measured=%s" % ",".join(missing_cpd),
                 "complexity_state=%s" % self.pmd_state,
+                "frontend_complexity_state=%s" % self.lizard_state,
                 "band_observe=%d" % BAND_OBSERVE,
                 "band_finding=%d" % BAND_FINDING,
                 "band_high=%d" % BAND_HIGH,
@@ -535,7 +571,7 @@ def parse_cycles(lines):
 
 
 USAGE = ("Aufruf: arch-findings.py <backend-faktenblatt> [<frontend-faktenblatt>] [--cpd java=<datei>]"
-         " [--cpd typescript=<datei>] [--pmd <datei>]\n")
+         " [--cpd typescript=<datei>] [--pmd <datei>] [--jscpd <datei>] [--lizard <datei>]\n")
 
 
 def read_text(path):
@@ -547,11 +583,11 @@ def read_text(path):
 
 
 def main(argv):
-    sheets, cpd, pmd = [], {}, None
+    sheets, cpd, pmd, jscpd, lizard = [], {}, None, None, None
     args = list(argv[1:])
     while args:
         arg = args.pop(0)
-        if arg in ("--cpd", "--pmd") and not args:
+        if arg in ("--cpd", "--pmd", "--jscpd", "--lizard") and not args:
             sys.stderr.write(USAGE)
             return 2
         if arg == "--cpd":
@@ -562,6 +598,10 @@ def main(argv):
             cpd[language] = read_text(path)
         elif arg == "--pmd":
             pmd = read_text(args.pop(0))
+        elif arg == "--jscpd":
+            jscpd = read_text(args.pop(0))
+        elif arg == "--lizard":
+            lizard = read_text(args.pop(0))
         else:
             sheets.append(arg)
     if not 1 <= len(sheets) <= 2:
@@ -570,7 +610,7 @@ def main(argv):
     classifier = Classifier()
     classifier.backend(read_sheet(sheets[0]))
     classifier.frontend(read_sheet(sheets[1] if len(sheets) > 1 else None))
-    classifier.tools(cpd, pmd)
+    classifier.tools(cpd, pmd, jscpd, lizard)
     sys.stdout.write(classifier.render())
     return 0
 

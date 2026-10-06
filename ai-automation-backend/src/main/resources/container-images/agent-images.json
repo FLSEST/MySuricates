@@ -6,7 +6,7 @@
     "whose label differs as outdated. AgentImageCatalogGateTest keeps this file equal to the Dockerfiles:",
     "after changing a Dockerfile, put its new sha256 here (the test prints it) and adjust tools if needed.",
     "source: release = downloaded binary pinned by the ARG named in arg, base = comes with the base image,",
-    "apt / pip = package manager, unpinned."
+    "apt / pip = package manager, unpinned; npm / pip-hash = pinned in the file named by arg (lockfile, hashes)."
   ],
   "images": [
     {
@@ -160,11 +160,11 @@
       "image": "automation-agent-analysis:latest",
       "service": "agent-analysis",
       "dockerfile": "docker/Dockerfile.agent-analysis",
-      "dockerfileSha256": "1d3d17c2e5134960a507bd8f3e93f90a8be9c952541a5ee851cd5ad65d9c28fc",
+      "dockerfileSha256": "563e36062e7f91cfa073c686373a8ff08d23c7d11b07ad8d8780b71c4efa7e54",
       "base": "eclipse-temurin:21-jre-jammy",
       "purpose": {
-        "de": "Analyse-Werkzeuge für das Architektur-Review: PMD mit Copy-Paste-Detector (Java, TypeScript) und Designregeln (Komplexität je Methode). Läuft im Werkzeug-Modus des Shell-Blocks.",
-        "en": "Analysis tools for the architecture review: PMD with its copy-paste detector (Java, TypeScript) and design rules (complexity per method). Runs in the shell block's tool mode."
+        "de": "Analyse-Werkzeuge für das Architektur-Review: PMD (Copy-Paste-Detector für Java, Designregeln), jscpd (Duplikate in TypeScript samt .tsx) und Lizard (Komplexität je Funktion im Frontend). Läuft im Werkzeug-Modus des Shell-Blocks.",
+        "en": "Analysis tools for the architecture review: PMD (copy-paste detector for Java, design rules), jscpd (duplicates in TypeScript including .tsx) and Lizard (complexity per function in the frontend). Runs in the shell block's tool mode."
       },
       "tools": [
         {
@@ -172,6 +172,24 @@
           "version": "7.28.0",
           "source": "release",
           "arg": "PMD_VERSION"
+        },
+        {
+          "name": "jscpd",
+          "version": "5.4.0",
+          "source": "npm",
+          "arg": "docker/agent-analysis/package.json"
+        },
+        {
+          "name": "lizard",
+          "version": "1.24.1",
+          "source": "pip-hash",
+          "arg": "docker/agent-analysis/requirements.txt"
+        },
+        {
+          "name": "node",
+          "version": "24.21.0",
+          "source": "release",
+          "arg": "NODE_VERSION"
         },
         {
           "name": "JRE",

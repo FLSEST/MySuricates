@@ -26,7 +26,10 @@ public class AgentImageCatalog {
     public static final String RESOURCE = "container-images/agent-images.json";
     public static final String DOCKERFILE_LABEL = "org.mysuricates.dockerfile-sha256";
 
-    /** A tool inside an image; {@code version} is null for unpinned packages, {@code arg} only for releases. */
+    /**
+     * A tool inside an image; {@code version} is null for unpinned packages (apt, pip). {@code arg} is the
+     * pinning ARG for a release and the pin file (package.json, requirements.txt) for npm and pip-hash.
+     */
     public record Tool(String name, String version, String source, String arg) {}
 
     public record AgentImage(String image, String service, String dockerfile, String dockerfileSha256,

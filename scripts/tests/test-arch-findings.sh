@@ -572,7 +572,7 @@ check "duplicates: nur dateiuebergreifende, nach Zeilen sortiert, Testpfade entf
 check "Zaehler: 4 ueber Dateigrenzen, 1 innerhalb (Testzeile hat nur noch eine Stelle)" \
   '[ "$(summary "$TMP/tools.txt" duplicates_cross_file)" = 4 ] && [ "$(summary "$TMP/tools.txt" duplicates_within_file)" = 1 ] \
      && [ -z "$(summary "$TMP/tools.txt" duplicates_not_measured)" ]'
-check "duplicates: TSX ausdruecklich als ungeprueft benannt" 'grep -q "^# .tsx misst CPD nicht" "$TMP/tools.txt"'
+check "duplicates: ohne jscpd ist .tsx ausdruecklich als ungeprueft benannt" 'grep -q "^# .tsx ungeprueft" "$TMP/tools.txt"'
 check "complexity: nur Kandidaten, je Treffer eine Zeile, Zustand ok" \
   '[ "$(section "$TMP/tools.txt" complexity | cut -f1 | sort -u)" = "$C/CoupledHot.java" ] \
      && [ "$(section "$TMP/tools.txt" complexity | wc -l | tr -d " ")" -eq 2 ] && [ "$(summary "$TMP/tools.txt" complexity_state)" = ok ]'
@@ -591,6 +591,48 @@ check "ohne Werkzeug-Eingaben: complexity_state=not_given, beide Sprachen nicht 
   '[ "$(summary "$TMP/cand.txt" complexity_state)" = not_given ] && [ "$(summary "$TMP/cand.txt" duplicates_not_measured)" = "java,typescript" ]'
 python3 "$FINDINGS" "$TMP/cand-backend.txt" --cpd ruby="$TMP/cpd-ts.csv" > /dev/null 2>&1; RC=$?
 check "unbekannte CPD-Sprache: exit 2" '[ "$RC" -eq 2 ]'
+
+echo "15) Frontend-Werkzeuge: jscpd (samt .tsx) und lizard (TODO c608cdda)"
+F=/workspace/ai-automation-frontend/src
+{
+  echo "## FAKTENBLATT jscpd (jscpd 5.4.0, 1 SARIF-Datei)"
+  echo "FAKT jscpd_findings: 2"
+  echo "TREFFER jscpd: ai-automation-frontend/src/components/NewHelper.ts:24 MEDIUM jscpd/duplicate-code – Duplicated code block (300 tokens), duplicated at [pages/HotPage.tsx:28](0)"
+  echo "TREFFER jscpd: ai-automation-frontend/src/components/__tests__/X.test.tsx:1 MEDIUM jscpd/duplicate-code – Duplicated code block (90 tokens), duplicated at [components/Y.tsx:2](0)"
+} > "$TMP/jscpd.txt"
+{
+  echo "$F/pages/HotPage.tsx:30: warning: HotPage has 120 NLOC, 22 CCN, 600 token, 0 PARAM, 140 length, 0 ND"
+  echo "$F/components/Elsewhere.tsx:3: warning: Elsewhere has 50 NLOC, 16 CCN, 200 token, 1 PARAM, 60 length, 0 ND"
+} > "$TMP/lizard.txt"
+python3 "$FINDINGS" "$TMP/cand-backend.txt" "$TMP/cand-frontend.txt" --cpd java="$TMP/cpd-java.csv" \
+  --jscpd "$TMP/jscpd.txt" --lizard "$TMP/lizard.txt" > "$TMP/fe-tools.txt" 2> "$TMP/fe-tools.err"; RC=$?
+check "jscpd/lizard: exit 0, stderr leer" '[ "$RC" -eq 0 ] && [ ! -s "$TMP/fe-tools.err" ]'
+check "jscpd: .tsx-Duplikat steht in der Frontend-Liste, zeilen -, Testdatei faellt weg" \
+  'section "$TMP/fe-tools.txt" duplicates | grep -qx -- "-${TAB}300${TAB}frontend/src/components/NewHelper.ts:24, frontend/src/pages/HotPage.tsx:28" \
+     && ! grep -q "X.test.tsx" "$TMP/fe-tools.txt"'
+check "jscpd: Frontend gemessen, Hinweis nennt jscpd statt ungeprueft" \
+  '[ -z "$(summary "$TMP/fe-tools.txt" duplicates_not_measured)" ] && grep -q "^# Frontend samt .tsx jscpd" "$TMP/fe-tools.txt" && ! grep -q "^# .tsx ungeprueft" "$TMP/fe-tools.txt"'
+check "jscpd: dublette nennt Tokens ohne Zeilenzahl, schon gewaehlte Kandidaten bleiben aussen vor" \
+  'section "$TMP/fe-tools.txt" review_candidates | grep -q "^dublette${TAB}frontend/src/components/NewHelper.ts${TAB}1${TAB}300 Tokens doppelt, hier ab Zeile 24; ebenso in frontend/src/pages/HotPage.tsx:28$"'
+check "lizard: Komplexitaet nur fuer Frontend-Kandidaten, Zustand ok" \
+  '[ "$(section "$TMP/fe-tools.txt" complexity | cut -f1-3 | tr "\n" "|")" = "frontend/src/pages/HotPage.tsx${TAB}30${TAB}CCN|" ] \
+     && [ "$(summary "$TMP/fe-tools.txt" frontend_complexity_state)" = ok ]'
+printf 'docker: Error response from daemon: No such image\n' > "$TMP/lizard-broken.txt"
+printf '## FAKTENBLATT jscpd\nNICHT GEMESSEN: jscpd_findings (keine SARIF-Datei)\n' > "$TMP/jscpd-missing.txt"
+python3 "$FINDINGS" "$TMP/cand-backend.txt" "$TMP/cand-frontend.txt" --cpd java="$TMP/cpd-java.csv" \
+  --jscpd "$TMP/jscpd-missing.txt" --lizard "$TMP/lizard-broken.txt" > "$TMP/fe-gap.txt"
+check "Fehlermeldung statt Warnungen: lizard nicht gemessen, keine Frontend-Komplexitaet" \
+  '[ "$(summary "$TMP/fe-gap.txt" frontend_complexity_state)" = not_measured ] && ! section "$TMP/fe-gap.txt" complexity | grep -q "^frontend/"'
+check "jscpd NICHT GEMESSEN: Frontend-Duplikate nicht gemessen, .tsx als ungeprueft benannt" \
+  '[ "$(summary "$TMP/fe-gap.txt" duplicates_not_measured)" = typescript ] && grep -q "^# .tsx ungeprueft" "$TMP/fe-gap.txt"'
+printf '\n' > "$TMP/lizard-empty.txt"
+python3 "$FINDINGS" "$TMP/cand-backend.txt" --lizard "$TMP/lizard-empty.txt" > "$TMP/fe-empty.txt"
+check "lizard ohne Warnung: gemessen, nur nichts ueber der Schwelle" '[ "$(summary "$TMP/fe-empty.txt" frontend_complexity_state)" = ok ]'
+check "dublette wechselt zwischen Backend und Frontend (erst das groesste Backend-, dann das Frontend-Duplikat)" \
+  '[ "$(section "$TMP/fe-tools.txt" review_candidates | awk -F"\t" "\$1 == \"dublette\" { print \$2 }" | head -2 | tr "\n" "|")" = "$C/Plain.java|frontend/src/components/NewHelper.ts|" ]'
+check "duplicates: Backend-Liste vor der Frontend-Liste" \
+  'section "$TMP/fe-tools.txt" duplicates | sed -n 1p | grep -q "^40${TAB}250${TAB}$C/NewBig.java" \
+     && section "$TMP/fe-tools.txt" duplicates | tail -1 | grep -q "frontend/src/"'
 
 echo
 echo "passed=$PASS failed=$FAIL"

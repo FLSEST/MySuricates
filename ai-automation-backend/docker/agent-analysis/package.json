@@ -1,0 +1,8 @@
+{
+  "name": "mysuricates-agent-analysis",
+  "private": true,
+  "description": "Node tools of the agent-analysis image (TODO c608cdda); installed with npm ci from package-lock.json.",
+  "dependencies": {
+    "jscpd": "5.4.0"
+  }
+}

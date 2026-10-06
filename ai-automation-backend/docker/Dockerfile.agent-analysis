@@ -1,12 +1,14 @@
-# Analysis tools for the architecture review (TODO 67128699): PMD with its copy-paste detector (CPD,
-# Java and TypeScript) and the design rules (complexity per method). Only measurement tools, no
-# project toolchain — the workflow runs them in the shell block's tool mode against /workspace (read-only).
+# Analysis tools for the architecture review (TODO 67128699, c608cdda): PMD with its copy-paste detector
+# (CPD, Java) and the design rules (complexity per Java method), jscpd for duplicates in TypeScript including
+# .tsx (CPD cannot read TSX) and Lizard for complexity per function in TypeScript/TSX. Only measurement
+# tools, no project toolchain — the workflow runs them in the shell block's tool mode against /workspace
+# (read-only). Every download is pinned: release checksums, package-lock.json, pip --require-hashes.
 FROM eclipse-temurin:21-jre-jammy
 
 RUN useradd -m -u 1000 agent
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl unzip ca-certificates && \
+    curl unzip ca-certificates python3 python3-pip && \
     rm -rf /var/lib/apt/lists/*
 
 # Pinned release; the checksum is the digest GitHub lists for the release asset.
@@ -19,6 +21,35 @@ RUN set -eu; \
     unzip -q /tmp/pmd.zip -d /opt; \
     ln -s "/opt/pmd-bin-${PMD_VERSION}/bin/pmd" /usr/local/bin/pmd; \
     rm /tmp/pmd.zip
+
+# Node runtime for jscpd, the official release tarball with the checksum from SHASUMS256.txt.
+ARG NODE_VERSION=24.21.0
+ARG NODE_LINUX_X64_SHA256=6e1db87ef58b8819e5d5402eff1536491b18edd8eb7bee5ef7897876e88dc5ff
+ARG NODE_LINUX_ARM64_SHA256=724282c3b43aec998aa9527380465b45d229e021b58035f5f4f63095eabfe5d5
+RUN set -eu; \
+    ARCH=$(dpkg --print-architecture); \
+    case "$ARCH" in \
+      amd64) NODE_ARCH=x64; EXPECTED="$NODE_LINUX_X64_SHA256" ;; \
+      arm64) NODE_ARCH=arm64; EXPECTED="$NODE_LINUX_ARM64_SHA256" ;; \
+      *) echo "Unsupported architecture: $ARCH" >&2; exit 1 ;; \
+    esac; \
+    curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${NODE_ARCH}.tar.gz" \
+      -o /tmp/node.tar.gz; \
+    echo "${EXPECTED}  /tmp/node.tar.gz" | sha256sum -c -; \
+    tar -xzf /tmp/node.tar.gz -C /opt; \
+    ln -s "/opt/node-v${NODE_VERSION}-linux-${NODE_ARCH}/bin/node" /usr/local/bin/node; \
+    ln -s "/opt/node-v${NODE_VERSION}-linux-${NODE_ARCH}/bin/npm" /usr/local/bin/npm; \
+    rm /tmp/node.tar.gz
+
+# jscpd from package-lock.json (integrity hashes), no install scripts.
+COPY docker/agent-analysis/package.json docker/agent-analysis/package-lock.json /opt/analysis-node/
+RUN cd /opt/analysis-node && npm ci --omit=dev --ignore-scripts --no-audit --no-fund && \
+    ln -s /opt/analysis-node/node_modules/.bin/jscpd /usr/local/bin/jscpd && \
+    npm cache clean --force
+
+# Lizard and its dependencies, each wheel pinned by hash.
+COPY docker/agent-analysis/requirements.txt /opt/analysis-python/requirements.txt
+RUN pip3 install --no-cache-dir --require-hashes --no-deps -r /opt/analysis-python/requirements.txt
 
 RUN mkdir -p /home/agent/.cache && chown -R agent:agent /home/agent
 

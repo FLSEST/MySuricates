@@ -2392,6 +2392,8 @@ export const de: TranslationKeys = {
       base: 'Aus dem Basis-Image',
       apt: 'Mit apt installiert, nicht festgeschrieben',
       pip: 'Mit pip installiert, nicht festgeschrieben',
+      npm: 'Mit npm aus dem Lockfile installiert, festgeschrieben',
+      'pip-hash': 'Mit pip installiert, per Hash festgeschrieben',
     },
   },
   activityLog: {

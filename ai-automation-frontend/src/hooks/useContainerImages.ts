@@ -7,7 +7,7 @@ export interface ContainerTool {
   name: string;
   /** null for packages installed unpinned (apt, pip). */
   version: string | null;
-  source: 'release' | 'base' | 'apt' | 'pip';
+  source: 'release' | 'base' | 'apt' | 'pip' | 'npm' | 'pip-hash';
   arg: string | null;
 }
 

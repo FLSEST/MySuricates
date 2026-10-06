@@ -265,6 +265,12 @@ measured findings were classified – without having judged anything. Since vers
   `## complexity` names methods above the threshold, for backend candidates only. Both are facts for the
   judgement, never findings of their own. CPD has no TSX support – React components stay unchecked, and the
   report says so. Without the image, `duplicates_not_measured` and `complexity_state=not_measured` show it.
+- **Frontend (4.9.0, TODO `c608cdda`)**: since CPD cannot read TSX, `jscpd` (tool block `jscpd`, SARIF, from 70
+  tokens) measures duplicates in the frontend including `.tsx` and replaces CPD's TypeScript run; `lizard` (raw
+  output of `lizard -w`, CCN from 15) gives the complexity per frontend function for frontend candidates
+  (`frontend_complexity_state`). Duplicates are sorted by tokens, because jscpd gives no line count; since the two
+  tools count tokens differently, `## duplicates` lists the ten largest per side and the `dublette` candidates
+  alternate between backend and frontend.
 
 ### Test coverage: envelope from the target list
 

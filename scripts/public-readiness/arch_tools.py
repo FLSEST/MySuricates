@@ -9,7 +9,13 @@ The review runs PMD from the image automation-agent-analysis in the shell block'
   pmd   `pmd check` with scripts/public-readiness/pmd-architecture.xml, SARIF; the platform turns it into a
         fact sheet with "TREFFER <prefix>: <path>:<line> <SEVERITY> <rule> – <text>" lines (at most 200).
 
-Paths come as /workspace/<repo path> (CPD) or as repo paths (fact sheet). Both map to the subjects of the
+  jscpd duplicates in TypeScript including .tsx (TODO c608cdda), SARIF, so the fact sheet carries one
+        "TREFFER jscpd: <path>:<line> … – Duplicated code block (<n> tokens), duplicated at [<src path>:<line>](0)"
+        per clone; the other place is relative to the scanned source root (ai-automation-frontend/src).
+  lizard complexity per function in TypeScript/TSX, raw output of `lizard -w`: one clang-style warning
+        "<path>:<line>: warning: <function> has <n> NLOC, <n> CCN, ..." per function over the threshold.
+
+Paths come as /workspace/<repo path> (CPD, lizard) or as repo paths (fact sheet). Both map to the subjects of the
 architecture review: com/automation/... for the backend, frontend/src/... for the frontend; anything else
 (tests, scripts) has no subject and is dropped.
 """
@@ -21,6 +27,8 @@ FRONTEND_SRC = "ai-automation-frontend/src/"
 CPD_HEADER = "lines,tokens,occurrences"
 CPD_ROW = re.compile(r"^(\d+),(\d+),(\d+),(.+)$")
 HIT = re.compile(r"^TREFFER [\w.-]+: (\S+):(\d+) (\S+) (\S+) – (.*)$")
+JSCPD_MESSAGE = re.compile(r"\((\d+) tokens\), duplicated at \[([^\]:]+):(\d+)\]")
+LIZARD_WARNING = re.compile(r"^(\S+?):(\d+): warning: (.+)$")
 FRONTEND_TEST = re.compile(r"(^|/)(__tests__|__mocks__|test)/|\.(test|spec)\.[jt]sx?$")
 
 
@@ -81,3 +89,45 @@ def parse_pmd(text, prefix="pmd"):
     for subject in hits:
         hits[subject].sort()
     return state, hits
+
+
+def parse_jscpd(text, prefix="jscpd"):
+    """(measured, [(lines, tokens, [(subject, line), ...])]) from the SARIF fact sheet of the jscpd block.
+
+    lines is 0: the fact sheet keeps only the start line of a clone, jscpd's message names its tokens."""
+    text = text or ""
+    if ("NICHT GEMESSEN: %s_findings" % prefix) in text or ("FAKT %s_findings:" % prefix) not in text:
+        return False, []
+    duplicates = []
+    for raw in text.splitlines():
+        hit = HIT.match(raw.strip())
+        message = JSCPD_MESSAGE.search(raw)
+        if not hit or not message:
+            continue
+        first = subject_of(hit.group(1))
+        second = subject_of(FRONTEND_SRC + message.group(2))
+        if first and second:
+            duplicates.append((0, int(message.group(1)), [(first, int(hit.group(2))), (second, int(message.group(3)))]))
+    return True, duplicates
+
+
+def parse_lizard(text):
+    """(measured, {subject: [(line, "CCN", text)]}) from `lizard -w`. Measured only if every non-empty line is
+    a warning: an error message (image missing, crash) is a gap, not a clean result; no lines at all means
+    no function over the threshold."""
+    if text is None:
+        return False, {}
+    hits = {}
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        warning = LIZARD_WARNING.match(line)
+        if not warning:
+            return False, {}
+        subject = subject_of(warning.group(1))
+        if subject:
+            hits.setdefault(subject, []).append((int(warning.group(2)), "CCN", warning.group(3).strip()))
+    for subject in hits:
+        hits[subject].sort()
+    return True, hits

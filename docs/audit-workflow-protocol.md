@@ -264,6 +264,12 @@ gilt: **Das Skript bestimmt, wo hingeschaut wird, die KI, was dort los ist.**
   `dublette`; `## complexity` nennt Methoden über der Schwelle, nur für Backend-Kandidaten. Beides sind Fakten
   fürs Urteil, nie eigene Befunde. CPD kennt kein TSX – React-Komponenten bleiben ungeprüft, und der Bericht
   sagt das. Fehlt das Image, steht `duplicates_not_measured` bzw. `complexity_state=not_measured` da.
+- **Frontend (4.9.0, TODO `c608cdda`)**: Weil CPD kein TSX liest, misst `jscpd` (Werkzeug-Block `jscpd`, SARIF, ab 70
+  Tokens) die Duplikate im Frontend samt `.tsx` und ersetzt den TypeScript-Lauf von CPD; `lizard` (Rohausgabe von
+  `lizard -w`, CCN ab 15) liefert die Komplexität je Frontend-Funktion für Frontend-Kandidaten
+  (`frontend_complexity_state`). Duplikate werden nach Tokens sortiert, weil jscpd keine Zeilenzahl nennt; weil die
+  Token-Zählung der beiden Werkzeuge nicht gleich ist, nennt `## duplicates` je Seite die zehn größten, und die
+  Kandidaten der Art `dublette` wechseln zwischen Backend und Frontend ab.
 
 ### Test-Abdeckung: Envelope aus der Soll-Liste
 
