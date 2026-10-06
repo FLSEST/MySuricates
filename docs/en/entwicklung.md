@@ -918,7 +918,7 @@ Details on the three trust classes and taint propagation:
 | **Test descriptions** (`describe`/`it`/`test`, `@DisplayName`) | English |
 | **Technical names** (classes, paths, endpoints, enum constants, keys) | English |
 | **UI text** | through i18n (`de.ts`/`en.ts`), never in code |
-| **Commit messages** | English since 2026-10-06 (TODO 440473d4); the older history is translated when it is published (TODO 0bf5eed4) |
+| **Commit messages** | English since 2026-10-06 (TODO 440473d4); the older history is translated when it is published (TODO 0bf5eed4). The TODO goes into a trailer `Todo: <uuid> (<title>)` at the end, not into the subject (TODO ee4fc06a) – `scripts/todo-batch/batchlib.py` reads the same form |
 | **Log and error messages, docs, TODO titles** | unchanged, as before |
 
 The existing code has been translated (TODO 9468432d). What remains German are quoted UI texts, quotes and doc

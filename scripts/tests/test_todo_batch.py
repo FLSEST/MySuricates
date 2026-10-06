@@ -111,6 +111,13 @@ class BatchlibTest(unittest.TestCase):
     def test_trailers_only_whole_lines(self):
         self.assertEqual(b.trailers(f"feat: x\n\nTodo: {A.upper()}\nKein Todo: {B}"), [A])
 
+    def test_trailers_accept_a_bracketed_title(self):
+        message = f"feat: x\n\nTodo: {A} (Titel mit (Klammern) darin)\nTodo: {B}  \nCo-Authored-By: x"
+        self.assertEqual(b.trailers(message), [A, B])
+
+    def test_trailers_reject_text_after_the_uuid_without_brackets(self):
+        self.assertEqual(b.trailers(f"feat: x\n\nTodo: {A} Titel ohne Klammern"), [])
+
     def test_item_segments_and_last_marker(self):
         segments = b.item_segments(f"[{A}]: erste\nBATCH_SKIP: fehlt\n[{B}]: BATCH_DONE: abc")
         self.assertEqual(b.last_marker(segments[A], "BATCH_SKIP:"), "fehlt")

@@ -23,7 +23,8 @@ BATCH_PREFIX = "batch:"
 ISOLATED_MARKER = "isolated.ok"
 STALE_HOURS = 30
 
-_TRAILER = re.compile(r"^Todo:[ \t]*([0-9a-fA-F-]{36})[ \t]*$", re.MULTILINE)
+# `Todo: <uuid>`, optionally followed by the TODO title in brackets: `Todo: <uuid> (<title>)`.
+_TRAILER = re.compile(r"^Todo:[ \t]*([0-9a-fA-F-]{36})(?:[ \t]+\(.*\))?[ \t]*$", re.MULTILINE)
 _UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 _ITEM = re.compile(r"^\[([0-9a-fA-F-]{36})\]: ?(.*)$")
 _MARKER_WORDS = re.compile(r"(?i)(dashboard|gate|todo)[_-](widget|status|category|description|item)")
@@ -50,7 +51,7 @@ def is_uuid(value) -> bool:
 
 
 def trailers(message: str) -> list[str]:
-    """All `Todo: <uuid>` trailers of a commit message, lower-cased."""
+    """All `Todo: <uuid>` trailers of a commit message (a bracketed title may follow), lower-cased."""
     return [found.lower() for found in _TRAILER.findall(message or "")]
 
 

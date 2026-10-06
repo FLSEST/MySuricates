@@ -87,8 +87,9 @@ Further rules of the house:
 - **Never access the SQLite database directly.** Not from code, not from shell
   blocks, not from scripts. See [CLAUDE.md](CLAUDE.md) for why.
 - **Eight-character IDs** such as `TODO 1b84ecab` in commit messages, comments
-  and documentation point to the maintainer's own task tracker. They are not
-  issue numbers; the linked text usually says what the task was.
+  and documentation, and `Todo: <uuid> (<title>)` trailers at the end of commit
+  messages, point to the maintainer's own task tracker. They are not issue
+  numbers; the linked text usually says what the task was.
 
 [docs/entwicklung.md](docs/entwicklung.md) has the full build and test
 instructions.

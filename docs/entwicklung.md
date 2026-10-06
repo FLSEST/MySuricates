@@ -937,7 +937,7 @@ Details zu den drei Vertrauensklassen und zur Taint-Propagation:
 | **Testbeschreibungen** (`describe`/`it`/`test`, `@DisplayName`) | Englisch |
 | **Technische Namen** (Klassen, Pfade, Endpunkte, Enum-Konstanten, Schlüssel) | Englisch |
 | **UI-Texte** | über i18n (`de.ts`/`en.ts`), nie im Code |
-| **Commit-Nachrichten** | Englisch seit 2026-10-06 (TODO 440473d4); die ältere Historie wird bei der Veröffentlichung übersetzt (TODO 0bf5eed4) |
+| **Commit-Nachrichten** | Englisch seit 2026-10-06 (TODO 440473d4); die ältere Historie wird bei der Veröffentlichung übersetzt (TODO 0bf5eed4). Das TODO steht als Trailer `Todo: <uuid> (<Titel>)` am Ende, nicht im Betreff (TODO ee4fc06a) – `scripts/todo-batch/batchlib.py` liest dieselbe Form |
 | **Log- und Fehlermeldungen, Doku, TODO-Titel** | unverändert wie bisher |
 
 Der Bestand ist übersetzt (TODO 9468432d). Deutsch stehen geblieben sind zitierte UI-Texte, Zitate und
