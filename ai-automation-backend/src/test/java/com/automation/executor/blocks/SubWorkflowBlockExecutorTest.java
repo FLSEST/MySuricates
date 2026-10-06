@@ -553,6 +553,41 @@ class SubWorkflowBlockExecutorTest {
         }
     }
 
+    /** 802a516e: a paused child is still in motion — the parent keeps waiting instead of failing the block. */
+    @Test
+    void execute_childPausedWhileWaiting_keepsWaitingUntilItEnds() {
+        Workflow subWorkflow = childThatKeepsRunning();
+        StepResult childStep = StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).output("child-done").build();
+        when(runRepository.findById("sub-run-1")).thenReturn(
+                Optional.of(WorkflowRun.builder().id("sub-run-1").workflow(subWorkflow).status(RunStatus.RUNNING).build()),
+                Optional.of(WorkflowRun.builder().id("sub-run-1").workflow(subWorkflow).status(RunStatus.PAUSED).build()),
+                Optional.of(WorkflowRun.builder().id("sub-run-1").workflow(subWorkflow).status(RunStatus.RUNNING).build()),
+                Optional.of(WorkflowRun.builder().id("sub-run-1").workflow(subWorkflow).status(RunStatus.COMPLETED).build()));
+        when(stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc("sub-run-1")).thenReturn(List.of(childStep));
+
+        StepResult result = runSubWorkflowBlock();
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getMetadata()).containsEntry("subRunStatus", "COMPLETED");
+        assertThat(result.getOutput()).isEqualTo("child-done");
+        verify(runRepository, org.mockito.Mockito.times(4)).findById("sub-run-1");
+        org.mockito.Mockito.verifyNoInteractions(runControl);
+    }
+
+    /** INTERRUPTED stays an end of the wait, as before — only PAUSED changed (802a516e). */
+    @Test
+    void execute_childInterrupted_endsTheWait() {
+        Workflow subWorkflow = childThatKeepsRunning();
+        when(runRepository.findById("sub-run-1")).thenReturn(Optional.of(
+                WorkflowRun.builder().id("sub-run-1").workflow(subWorkflow).status(RunStatus.INTERRUPTED).build()));
+
+        StepResult result = runSubWorkflowBlock();
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(result.getMetadata()).containsEntry("subRunStatus", "INTERRUPTED");
+        org.mockito.Mockito.verifyNoInteractions(runControl);
+    }
+
     @Test
     void execute_unreadableParentIds_failsTheStepInsteadOfThrowing() {
         context.getVariables().put("__parent_workflow_ids", "not-a-list");

@@ -279,6 +279,7 @@ Behaviour and configuration: [WORKFLOW-GUIDE.md](WORKFLOW-GUIDE.md) (section `su
 
 - Start, guards (circular references via `__parent_workflow_ids`, nesting depth) and waiting live in `SubWorkflowLauncher`; `foreach` with `workflow_id` takes the same path per item (TODO a5c9fbbf). `workflow_id` may be a placeholder from a trusted context variable, never from webhook data or block outputs
 - A cancelled parent run cancels the child run via `RunControlService.cancelExecution`
+- Waiting goes through `RunCompletionWaiter`, the same loop as for chain entries (`ChainRunWaiter`): any status other than `PENDING`/`RUNNING`/`PAUSED` ends it – a paused child run is still waited for (TODO 802a516e)
 - `@Lazy` injection on `WorkflowExecutor` only where a caller starts runs itself (sub-workflow, chains, triggers); pure status queries (active runs, container ids, approvals) go straight to `WorkflowExecutionRegistry`, controlling a running run goes to `RunControlService`, which does not need `WorkflowExecutor`
 
 ## Gate Status System

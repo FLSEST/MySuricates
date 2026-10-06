@@ -279,6 +279,7 @@ Verhalten und Konfiguration: [WORKFLOW-GUIDE.md](WORKFLOW-GUIDE.md) (Abschnitt `
 
 - Start, Wächter (zirkuläre Referenzen über `__parent_workflow_ids`, Verschachtelungstiefe) und Warten liegen in `SubWorkflowLauncher`; denselben Weg nimmt `foreach` mit `workflow_id` je Item (TODO a5c9fbbf). `workflow_id` darf ein Platzhalter aus einer vertrauenswürdigen Kontextvariable sein, nie aus Webhook-Daten oder Blockausgaben
 - Ein abgebrochener Eltern-Lauf bricht den Kind-Lauf über `RunControlService.cancelExecution` ab
+- Gewartet wird über `RunCompletionWaiter`, dieselbe Schleife wie bei Ketten-Einträgen (`ChainRunWaiter`): Ende ist jeder Status außer `PENDING`/`RUNNING`/`PAUSED` – ein pausierter Kind-Lauf wird weiter abgewartet (TODO 802a516e)
 - `@Lazy`-Injection auf `WorkflowExecutor` nur dort, wo ein Aufrufer selbst Runs startet (Sub-Workflow, Chains, Trigger); reine Status-Abfragen (aktive Runs, Container-IDs, Approvals) gehen direkt an `WorkflowExecutionRegistry`, das Steuern eines laufenden Runs an `RunControlService`, der den `WorkflowExecutor` nicht braucht
 
 ## Gate Status System

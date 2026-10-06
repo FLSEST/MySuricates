@@ -10,6 +10,7 @@ import com.automation.executor.ExecutionContext;
 import com.automation.executor.PlaceholderSyntax;
 import com.automation.repository.StepResultRepository;
 import com.automation.repository.WorkflowRunRepository;
+import com.automation.service.workflow.RunCompletionWaiter;
 import com.automation.service.workflow.RunControlService;
 import com.automation.service.workflow.WorkflowContextDataService;
 import com.automation.service.workflow.WorkflowExecutor;
@@ -19,7 +20,6 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -194,42 +194,44 @@ public class SubWorkflowLauncher {
     }
 
     /**
-     * Polls the child until it ends. A cancelled parent cancels the child once and keeps waiting for its
-     * final status — otherwise the child ran on and the parent's thread waited up to {@link #MAX_WAIT}.
+     * Waits until the child ends ({@link RunCompletionWaiter}; a paused child is still waited for). A
+     * cancelled parent cancels the child once and keeps waiting for its final status — otherwise the
+     * child ran on and the parent's thread waited up to {@link #MAX_WAIT}. Giving up (timeout,
+     * interrupt) cancels the child too, or it would run on next to the following ones (foreach).
      */
     private WorkflowRun waitForCompletion(String runId, ExecutionContext parent) {
-        Instant deadline = Instant.now().plus(maxWait);
-        boolean childCancelled = false;
-        while (Instant.now().isBefore(deadline)) {
+        return RunCompletionWaiter.await(runRepository, runId, "Sub-workflow", maxWait, pollInterval,
+                new ChildWatch(runId, parent));
+    }
+
+    /** Ties the child's lifetime to the parent's while the parent waits for it. */
+    private final class ChildWatch implements RunCompletionWaiter.Listener {
+        private final String runId;
+        private final ExecutionContext parent;
+        private boolean childCancelled;
+
+        ChildWatch(String runId, ExecutionContext parent) {
+            this.runId = runId;
+            this.parent = parent;
+        }
+
+        @Override
+        public void beforePoll() {
             if (!childCancelled && parent.shouldStop()) {
                 log.info("Parent run {} cancelled — cancelling sub-workflow run {}", parent.getWorkflowRunId(), runId);
                 runControl.cancelExecution(runId);
                 childCancelled = true;
             }
-            WorkflowRun run = runRepository.findById(runId).orElseThrow(() ->
-                    new WorkflowExecutionException("Sub-workflow run " + runId + " disappeared while waiting"));
-            if (run.getStatus() != RunStatus.RUNNING && run.getStatus() != RunStatus.PENDING) {
-                return run;
-            }
-            try {
-                Thread.sleep(pollInterval.toMillis());
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                cancelOrphan(runId, childCancelled);
-                throw new WorkflowExecutionException("Interrupted while waiting for sub-workflow");
-            }
         }
-        // Giving up without cancelling would leave the child running next to the following ones (foreach)
-        cancelOrphan(runId, childCancelled);
-        throw new WorkflowExecutionException("Sub-workflow timed out after " + maxWait.toMinutes() + " minutes");
-    }
 
-    private void cancelOrphan(String runId, boolean alreadyCancelled) {
-        if (alreadyCancelled) return;
-        try {
-            runControl.cancelExecution(runId);
-        } catch (RuntimeException e) {
-            log.warn("Could not cancel sub-workflow run {} after giving up on it: {}", runId, e.getMessage());
+        @Override
+        public void onGiveUp() {
+            if (childCancelled) return;
+            try {
+                runControl.cancelExecution(runId);
+            } catch (RuntimeException e) {
+                log.warn("Could not cancel sub-workflow run {} after giving up on it: {}", runId, e.getMessage());
+            }
         }
     }
 
