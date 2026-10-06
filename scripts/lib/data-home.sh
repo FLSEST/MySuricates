@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Datenordner einer Instanz ausserhalb der DB (API-Key, Siegel- und Integrations-Schluessel,
-# Backups): <home>/.mysuricates. Installationen von vor der Umbenennung behalten <home>/.autotrigger,
-# solange es den Ordner gibt — dieselbe Regel wie config/DataHome.java im Backend. AUTOMATION_DATA_HOME
-# setzt ihn ausdruecklich (nur fuer das eigene HOME, nicht fuer das einer Instanz).
+# Data folder of an instance outside the DB (API key, seal and integration keys,
+# backups): <home>/.mysuricates. Installations from before the rename keep <home>/.autotrigger
+# as long as that folder exists — same rule as config/DataHome.java in the backend. AUTOMATION_DATA_HOME
+# sets it explicitly (only for one's own HOME, not for that of an instance).
 
-# data_home [HOME] — gibt den Datenordner fuer HOME (Standard: $HOME) aus.
+# data_home [HOME] — prints the data folder for HOME (default: $HOME).
 data_home() {
   local home="${1:-$HOME}"
   if [[ -z "${1:-}" && -n "${AUTOMATION_DATA_HOME:-}" ]]; then
@@ -16,7 +16,7 @@ data_home() {
   fi
 }
 
-# Dieselbe Regel als sh-Einzeiler fuer `docker exec … sh -c "$DATA_HOME_KEY_SH" sh <home>`:
-# gibt den API-Key aus dem Datenordner unter <home> im Container aus.
+# The same rule as an sh one-liner for `docker exec … sh -c "$DATA_HOME_KEY_SH" sh <home>`:
+# prints the API key from the data folder under <home> inside the container.
 # shellcheck disable=SC2016
 DATA_HOME_KEY_SH='if [ -d "$1/.autotrigger" ]; then cat "$1/.autotrigger/api-key"; else cat "$1/.mysuricates/api-key"; fi'

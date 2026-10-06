@@ -1,42 +1,42 @@
 #!/usr/bin/env bash
 #
-# instance.sh — MySuricates-Instanzen starten, stoppen, ansehen: im Container oder auf diesem Rechner.
+# instance.sh — start, stop, inspect MySuricates instances: in a container or on this machine.
 #
-#   scripts/instance.sh up     --name NAME [--no-wait] [--rebuild]   # (bauen und) starten
-#   scripts/instance.sh down   --name NAME                           # stoppen; Daten bleiben, laufende Runs brechen ab
+#   scripts/instance.sh up     --name NAME [--no-wait] [--rebuild]   # (build and) start
+#   scripts/instance.sh down   --name NAME                           # stop; data stays, running runs abort
 #   scripts/instance.sh status --name NAME
 #   scripts/instance.sh logs   --name NAME
-#   scripts/instance.sh key    --name NAME                           # API-Key fuer den Login
-#   scripts/instance.sh built  --name NAME                           # Host: Stand des Builds gegen den Klon
-#   scripts/instance.sh list                                          # alle Instanzen mit Port
-#   scripts/instance.sh login  --name NAME [claude|codex|pi]         # eigene Anmeldung (nur AI_FROM_HOST=programs)
-#   scripts/instance.sh sync-keys --name NAME                        # Keys der Sync-Ziele holen (gestuft: dev)
+#   scripts/instance.sh key    --name NAME                           # API key for the login
+#   scripts/instance.sh built  --name NAME                           # host: state of the build vs. the clone
+#   scripts/instance.sh list                                          # all instances with port
+#   scripts/instance.sh login  --name NAME [claude|codex|pi]         # own login (only AI_FROM_HOST=programs)
+#   scripts/instance.sh sync-keys --name NAME                        # fetch the keys of the sync targets (staged: dev)
 #
-# Jede Instanz ist eine Datei deploy/instances/NAME.env (git-ignoriert; der Installer schreibt sie).
+# Each instance is a file deploy/instances/NAME.env (git-ignored; the installer writes it).
 # Commands: up|down|status|logs|key|list|login|built|sync-keys
 #
-# Steuerung (MYSURICATES_*): RUNTIME container|host, PORT (Pflicht), BIND (127.0.0.1), PRESET
-# (core|research|full), LANG (de|en, Sprache der Adresszeilen; Default de), PROJECTS (Container: Ordner, der eingebunden wird; Default Ordner ueber dem
-# Klon, nie ganz $HOME), DOCKER_SOCKET 0|1 (volle Kontrolle ueber Docker!), AI_FROM_HOST
-# programs|login|all (was von den KI-Anbietern des Rechners in den Container kommt; Default login =
-# Programme + je Anbieter nur die Anmeldung), AI_PROVIDERS (Auswahl aus claude,codex,pi), HARDENING_SEALING,
-# HARDENING_REQUIRE_SEALED (true|false), ENVIRONMENT (Anzeigename), APT_REFRESH (Container: ein neuer
-# Wert, etwa der Monat, holt NodeSource- und Docker-Repo des Images frisch), PREFIX (Container: Vorsilbe
-# der Docker-Namen PREFIX-NAME und des Images PREFIX:local, Default mysuricates), NETWORK (Container: gemeinsames
-# Docker-Netz PREFIX-NETWORK, in dem die Instanz unter ihrem Namen erreichbar ist — gestuft: staged), SYNC_TARGETS
-# (Instanzen, deren API-Key sync-keys nach deploy/instances/NAME.sync-keys/ holt; im Container read-only unter
-# /app/sync-keys). Jede AUTOMATION_*-Zeile geht unveraendert an die Instanz (Einzelmodule, Haertung,
+# Control (MYSURICATES_*): RUNTIME container|host, PORT (required), BIND (127.0.0.1), PRESET
+# (core|research|full), LANG (de|en, language of the address lines; default de), PROJECTS (container: folder that gets mounted; default folder above the
+# clone, never all of $HOME), DOCKER_SOCKET 0|1 (full control over Docker!), AI_FROM_HOST
+# programs|login|all (what of the machine's AI providers goes into the container; default login =
+# programs + only the login per provider), AI_PROVIDERS (selection from claude,codex,pi), HARDENING_SEALING,
+# HARDENING_REQUIRE_SEALED (true|false), ENVIRONMENT (display name), APT_REFRESH (container: a new
+# value, e.g. the month, fetches the image's NodeSource and Docker repo fresh), PREFIX (container: prefix
+# of the Docker names PREFIX-NAME and of the image PREFIX:local, default mysuricates), NETWORK (container: shared
+# Docker network PREFIX-NETWORK in which the instance is reachable under its name — staged: staged), SYNC_TARGETS
+# (instances whose API key sync-keys fetches into deploy/instances/NAME.sync-keys/; read-only in the container under
+# /app/sync-keys). Every AUTOMATION_* line goes to the instance unchanged (single modules, hardening,
 # AUTOMATION_AI_DEFAULT_PROVIDER, AUTOMATION_SYNC_* …).
 #
-# Host: gebaut wird in eine Kopie unter ${XDG_STATE_HOME:-~/.local/state}/mysuricates/NAME/ (JAR +
-# Frontend), das Backend liefert das Frontend selbst aus — ein Prozess, ein Port. `up` baut neu, wenn
-# der Klon auf einem anderen Commit steht als beim letzten Bau (built-from daneben), mit --rebuild oder
-# wenn noch kein JAR liegt. Eine laufende Instanz baut `up` nicht um: es sagt, dass sie einen alten
-# Stand zeigt — uebernommen wird er mit down und up (1c016162). Container: `up` baut das Image jedes
-# Mal (unveraenderte Schichten aus dem Cache), und zwar nur aus den getrackten Dateien des Klons
-# (890e8e9c), und ersetzt einen laufenden Container, wenn sich das Image geaendert hat. `down` nennt
-# vorher die Workflow-Runs, die dabei abbrechen — gefragt wird die Instanz nur lesend (29820f58).
-# bash-3.2-tauglich (macOS).
+# Host: built into a copy under ${XDG_STATE_HOME:-~/.local/state}/mysuricates/NAME/ (JAR +
+# frontend), the backend serves the frontend itself — one process, one port. `up` rebuilds if
+# the clone is on a different commit than at the last build (built-from alongside), with --rebuild or
+# if no JAR exists yet. `up` does not rebuild a running instance: it says that it shows an old
+# state — it is picked up with down and up (1c016162). Container: `up` builds the image every
+# time (unchanged layers from the cache), and only from the tracked files of the clone
+# (890e8e9c), and replaces a running container if the image changed. `down` names
+# beforehand the workflow runs that abort — the instance is only queried read-only (29820f58).
+# bash-3.2 compatible (macOS).
 set -uo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
@@ -56,7 +56,7 @@ REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 . "${SCRIPT_DIR}/lib/data-home.sh"
 INSTANCES_DIR="${MYSURICATES_INSTANCES_DIR:-${REPO_ROOT}/deploy/instances}"
 COMPOSE_FILE="${REPO_ROOT}/deploy/compose.yml"
-# Werkzeuge aus dem Download des Installers (Java/Node ohne Paketmanager), falls vorhanden
+# Tools from the installer's download (Java/Node without a package manager), if present
 [ -r "${XDG_DATA_HOME:-$HOME/.local/share}/mysuricates/env.sh" ] && . "${XDG_DATA_HOME:-$HOME/.local/share}/mysuricates/env.sh"
 
 die() { echo "instance.sh: $*" >&2; exit 2; }
@@ -86,15 +86,15 @@ if [ "$CMD" = list ]; then
 fi
 
 [ -n "$NAME" ] || die "--name fehlt"
-# Nicht mit - am Anfang: der Name wird zu Docker-Namen und Argumenten (mysuricates--x, -x.env)
+# Not with - at the start: the name becomes Docker names and arguments (mysuricates--x, -x.env)
 case "$NAME" in *[!a-z0-9-]*|-*) die "Name nur aus a-z, 0-9 und - (nicht am Anfang)" ;; esac
-# mysuricates-tryout und seine Volumes gehoeren scripts/tryout.sh — nie eine Instanz darueberlegen
+# mysuricates-tryout and its volumes belong to scripts/tryout.sh — never put an instance on top of it
 [ "$NAME" != tryout ] || die "Der Name 'tryout' ist fuer scripts/tryout.sh reserviert"
 ENV_FILE="$INSTANCES_DIR/$NAME.env"
 [ -f "$ENV_FILE" ] || die "Keine Instanz '$NAME' ($ENV_FILE fehlt)"
 
-# Werte laden — nur KEY=VALUE, nichts wird ausgefuehrt. MYSURICATES_* steuern dieses Skript,
-# AUTOMATION_* gehen an die Instanz.
+# Load values — only KEY=VALUE, nothing is executed. MYSURICATES_* control this script,
+# AUTOMATION_* go to the instance.
 AUTOMATION_ENV=()
 while IFS='=' read -r k v || [ -n "$k" ]; do
   case "$k" in
@@ -106,9 +106,9 @@ done < "$ENV_FILE"
 RUNTIME="${MYSURICATES_RUNTIME:-container}"
 PORT="$MYSURICATES_PORT"
 BIND="${MYSURICATES_BIND:-127.0.0.1}"
-# Namen im Docker: Container und Compose-Projekt PREFIX-NAME, Volumes PREFIX-NAME-data/-secrets, Image
-# PREFIX:local. Die Vorsilbe (Default mysuricates) haelt etwa die Installer-Probe mit ihrem Docker im
-# Container von echten Instanzen desselben Rechners fern — gleiche Namen hiessen gleiche Volumes.
+# Names in Docker: container and compose project PREFIX-NAME, volumes PREFIX-NAME-data/-secrets, image
+# PREFIX:local. The prefix (default mysuricates) keeps e.g. the installer probe with its Docker in the
+# container away from real instances on the same machine — same names would mean same volumes.
 PREFIX="${MYSURICATES_PREFIX:-mysuricates}"
 case "$PREFIX" in *[!a-z0-9-]*|-*) die "MYSURICATES_PREFIX nur aus a-z, 0-9 und - (nicht am Anfang)" ;; esac
 CONTAINER="$PREFIX-$NAME"; IMAGE="$PREFIX:local"
@@ -118,27 +118,27 @@ export MYSURICATES_NAME="$NAME" MYSURICATES_ENV_FILE="$ENV_FILE" MYSURICATES_CON
 HOST_UID="$(id -u)"; HOST_GID="$(id -g)"; HOST_USER="$(id -un)"; HOST_HOME="$HOME"
 export HOST_UID HOST_GID HOST_USER HOST_HOME
 
-# "läuft"-Meldung: lokal eine Zeile wie bisher; bindet die Instanz ins Netz (--bind 0.0.0.0), dazu
-# die Netzadresse(n) dieses Rechners und der VPN-Hinweis (b8aa3866, scripts/lib/netaddr.sh)
-say_running() {  # WORT
+# "running" message: locally one line as before; if the instance binds to the network (--bind 0.0.0.0), in addition
+# the network address(es) of this machine and the VPN hint (b8aa3866, scripts/lib/netaddr.sh)
+say_running() {  # WORD
   if netaddr_is_local "$BIND"; then echo "$CONTAINER $1: $(netaddr_local_url "$BIND" "$PORT")"; return 0; fi
   i18n_load "${MYSURICATES_LANG:-de}"
   echo "$CONTAINER $1:"
   netaddr_lines "$BIND" "$PORT" | sed 's/^/  /'
 }
 
-# Dort, wo die Instanz lauscht — mit --bind auf eine Adresse nur dort, nicht auf 127.0.0.1 (3d002903) —,
-# und ohne Proxy aus der Umgebung (bb4f60a5): an beidem scheiterte die Pruefung, up wartete 300 s
+# Where the instance listens — with --bind to one address only there, not on 127.0.0.1 (3d002903) —,
+# and without a proxy from the environment (bb4f60a5): the check failed on both, up waited 300 s
 health_ok() { local_curl -fsS --max-time 3 "$(instance_api_base "$BIND" "$PORT")/api/v1/system/health" >/dev/null 2>&1; }
-# Laufende Workflow-Runs brechen beim Stoppen ab (29820f58): vorher sagen, wie viele. Nur eine Warnung,
-# down ist ein ausdruecklicher Befehl; antwortet die Instanz nicht oder fehlt der Key, still weiter.
+# Running workflow runs abort on stopping (29820f58): say beforehand how many. Only a warning,
+# down is an explicit command; if the instance does not answer or the key is missing, carry on silently.
 warn_running_runs() {  # KEY
   local n
   n="$(instance_running_runs "$(instance_api_base "$BIND" "$PORT")" "${1:-}")"
   [ -n "$n" ] && [ "$n" -gt 0 ] || return 0
   echo "$CONTAINER: $n Workflow-Run(s) laufen noch — sie brechen jetzt ab." >&2
 }
-# Belegt = irgendetwas nimmt auf der Adresse der Instanz Verbindungen an (nicht: antwortet wie MySuricates)
+# Taken = something accepts connections on the instance's address (not: answers like MySuricates)
 port_busy() { (exec 3<>"/dev/tcp/$(instance_connect_addr "$BIND")/$PORT") 2>/dev/null; }
 wait_health() {
   local i=0
@@ -150,19 +150,19 @@ wait_health() {
 }
 
 # ---------------------------------------------------------------------------------------------------
-# Gestufter Betrieb: Definition-Sync Dev → Test / Prod (84a78bb7)
+# Staged operation: definition sync Dev → Test / Prod (84a78bb7)
 # ---------------------------------------------------------------------------------------------------
-# Dev erreicht Test und Prod ueber ein gemeinsames Docker-Netz unter deren Instanznamen
-# (http://test:9090) — nicht ueber host.docker.internal: die Ports liegen nur auf 127.0.0.1 des
-# Rechners, und die erreicht ein Container unter Linux darueber nicht. Die API-Keys der Ziele holt
-# sync-keys ueber `key` (Datenordner der Ziel-Instanz, nie aus deren DB) in eine Datei je Ziel; Dev
-# liest sie read-only unter /app/sync-keys (AUTOMATION_SYNC_*_KEY_FILE).
+# Dev reaches Test and Prod over a shared Docker network under their instance names
+# (http://test:9090) — not via host.docker.internal: the ports are only on 127.0.0.1 of the
+# machine, and a container on Linux does not reach those that way. sync-keys fetches the targets' API keys
+# via `key` (data folder of the target instance, never from its DB) into one file per target; Dev
+# reads them read-only under /app/sync-keys (AUTOMATION_SYNC_*_KEY_FILE).
 staged_network() { [ -z "${MYSURICATES_NETWORK:-}" ] || printf '%s-%s' "$PREFIX" "$MYSURICATES_NETWORK"; }
 sync_keys_dir() { printf '%s/%s.sync-keys' "$INSTANCES_DIR" "$NAME"; }
 sync_targets() { printf '%s' "${MYSURICATES_SYNC_TARGETS:-}" | tr ',' ' '; }
 
-# Zusatz-Datei fuer docker compose: Netz (mit dem Instanznamen als Alias) und Key-Ordner. Rueckgabe 1 =
-# nichts davon eingestellt, keine Datei noetig.
+# Extra file for docker compose: network (with the instance name as alias) and key folder. Return 1 =
+# none of it configured, no file needed.
 staged_yaml() {
   local net
   net="$(staged_network)"
@@ -181,7 +181,7 @@ if [ "$CMD" = sync-keys ]; then
   rc=0
   for t in $(sync_targets); do
     [ "$t" != "$NAME" ] || continue
-    # Ohne die MYSURICATES_*-Werte dieser Instanz — das Ziel liest seine eigene Datei
+    # Without this instance's MYSURICATES_* values — the target reads its own file
     key="$(for v in $(compgen -e); do case "$v" in MYSURICATES_PREFIX|MYSURICATES_INSTANCES_DIR) ;; MYSURICATES_*) unset "$v" ;; esac; done
            bash "$SCRIPT_DIR/instance.sh" key --name "$t" 2>/dev/null | tr -d '\r\n')"
     if [ -n "$key" ] && (umask 077 && printf '%s\n' "$key" > "$dir/$t.key.tmp") && mv -f "$dir/$t.key.tmp" "$dir/$t.key"; then
@@ -198,11 +198,11 @@ fi
 # ---------------------------------------------------------------------------------------------------
 # Container
 # ---------------------------------------------------------------------------------------------------
-# Build-Kontext des Images: die getrackten Dateien des Klons, wie sie im Arbeitsbaum liegen (git
-# ls-files), nie der ganze Ordner. Nur per .git/info/exclude ausgeschlossene Pool-Definitionen oder
-# andere private Dateien kaemen sonst ins Image und in den Pool-Browser (890e8e9c); die Positivliste
-# in .dockerignore greift danach zusaetzlich. Geaenderte getrackte Dateien zaehlen mit, wie beim
-# Host-Build; geloeschte fehlen einfach. scripts/tryout.sh baut ebenso nur Getracktes (git archive).
+# Build context of the image: the tracked files of the clone as they are in the working tree (git
+# ls-files), never the whole folder. Pool definitions excluded only via .git/info/exclude or
+# other private files would otherwise end up in the image and in the pool browser (890e8e9c); the allowlist
+# in .dockerignore applies in addition afterwards. Changed tracked files count, as with the
+# host build; deleted ones are simply missing. scripts/tryout.sh likewise builds only tracked files (git archive).
 tracked_files_tar() {
   ( cd "$REPO_ROOT" || exit 1
     git ls-files -z | while IFS= read -r -d '' f; do
@@ -220,16 +220,16 @@ container_cmd() {
   build_image() {
     if is_git_clone; then
       echo "Baue Image $IMAGE aus den getrackten Dateien des Klons ..."
-      # APT_REFRESH wie in deploy/compose.yml: ein neuer Wert holt die Fremd-Repos frisch (8b7a39b9)
+      # APT_REFRESH as in deploy/compose.yml: a new value fetches the third-party repos fresh (8b7a39b9)
       tracked_files_tar | docker build -f deploy/Dockerfile --target runtime \
         --build-arg "APT_REFRESH=${MYSURICATES_APT_REFRESH:-}" -t "$IMAGE" -
     else
-      # Ohne git (etwa ein entpacktes Release-Archiv, das ohnehin nur Getracktes enthaelt): der Ordner
+      # Without git (e.g. an unpacked release archive, which contains only tracked files anyway): the folder
       compose build
     fi
   }
-  # Ein gleichnamiger Container aus einer anderen Einrichtung (z. B. docker-compose.test.yml →
-  # mysuricates-test) wird nie angefasst; down/logs bleiben ohnehin im eigenen Compose-Projekt.
+  # A container of the same name from another setup (e.g. docker-compose.test.yml →
+  # mysuricates-test) is never touched; down/logs stay in their own compose project anyway.
   case "$CMD" in down|logs) ;; *)
     if owner="$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' "$CONTAINER" 2>/dev/null)" \
        && [ "$owner" != "$CONTAINER" ]; then
@@ -238,9 +238,9 @@ container_cmd() {
   esac
   case "$CMD" in
     up)
-      # Was vom Host in den Container kommt, entscheiden die Schalter der Instanzdatei (262948a4)
-      # Nur im Modus programs meldet sich der Container selbst an — die Statuskarte zeigt dann den
-      # Befehl, der das tut (fester Text, nie ausgefuehrt).
+      # What comes from the host into the container is decided by the switches of the instance file (262948a4)
+      # Only in programs mode does the container log in itself — the status card then shows the
+      # command that does it (fixed text, never executed).
       login_command=""
       [ "${MYSURICATES_AI_FROM_HOST:-login}" = programs ] && login_command="scripts/instance.sh login"
       host_mounts_yaml app "${MYSURICATES_PROJECTS:-$(cd "$REPO_ROOT/.." && pwd)}" "${MYSURICATES_DOCKER_SOCKET:-0}" \
@@ -248,8 +248,8 @@ container_cmd() {
         || die "Ungültige KI-Schalter in $ENV_FILE (MYSURICATES_AI_FROM_HOST=programs|login|all, MYSURICATES_AI_PROVIDERS=claude,codex,pi)"
       missing="$(host_mounts_missing_text)"
       [ -z "$missing" ] || printf 'KI-Anbieter, die dieser Container nicht nutzen kann:\n%s\n' "$missing" >&2
-      # Gestufter Betrieb (84a78bb7): gemeinsames Netz und Key-Ordner — beides muss vor compose up da sein,
-      # sonst legt Docker den Ordner als root an
+      # Staged operation (84a78bb7): shared network and key folder — both must exist before compose up,
+      # otherwise Docker creates the folder as root
       net="$(staged_network)"
       if [ -n "$net" ] && ! docker network inspect "$net" >/dev/null 2>&1; then
         docker network create "$net" >/dev/null || die "Docker-Netz $net lässt sich nicht anlegen"
@@ -264,7 +264,7 @@ container_cmd() {
       if wait_health container_healthy; then say_running läuft; exit 0; fi
       echo "$CONTAINER wurde nicht rechtzeitig gesund — scripts/instance.sh logs --name $NAME" >&2; exit 1 ;;
     down)
-      # Key nur aus dem eigenen Container — einen gleichnamigen aus einer anderen Einrichtung fasst down nicht an
+      # Key only from the own container — down does not touch one of the same name from another setup
       if [ "$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' "$CONTAINER" 2>/dev/null)" = "$CONTAINER" ]; then
         warn_running_runs "$(docker exec -u "$HOST_UID" "$CONTAINER" sh -c "$DATA_HOME_KEY_SH" sh "$HOST_HOME" 2>/dev/null)"
       fi
@@ -273,8 +273,8 @@ container_cmd() {
     logs)   compose logs --tail 200 ;;
     key)    docker exec -u "$HOST_UID" "$CONTAINER" sh -c "$DATA_HOME_KEY_SH" sh "$HOST_HOME" ;;
     login)
-      # Im Modus login kommt die Anmeldung vom Rechner; eine zweite im Container ueberschriebe dort die
-      # eingebundene auth.json (Codex, Pi) oder liefe am Token vorbei (Claude).
+      # In login mode the login comes from the machine; a second one in the container would overwrite the
+      # mounted auth.json (Codex, Pi) or bypass the token (Claude).
       [ "${MYSURICATES_AI_FROM_HOST:-login}" = programs ] \
         || die "$CONTAINER nutzt die Anmeldung dieses Rechners (MYSURICATES_AI_FROM_HOST=${MYSURICATES_AI_FROM_HOST:-login}). Eigene Anmeldung nur mit MYSURICATES_AI_FROM_HOST=programs in $ENV_FILE"
       provider_login_argv "${TOOL:-claude}" || die "login kennt claude, codex, pi"
@@ -286,24 +286,24 @@ container_cmd() {
 container_healthy() { [ "$(docker inspect -f '{{.State.Health.Status}}' "$CONTAINER" 2>/dev/null)" = healthy ]; }
 
 # ---------------------------------------------------------------------------------------------------
-# Host — ein java-Prozess, gebautes Frontend, Zustand je Instanz
+# Host — one java process, built frontend, state per instance
 # ---------------------------------------------------------------------------------------------------
 STATE="${XDG_STATE_HOME:-$HOME/.local/state}/mysuricates/$NAME"
 PID_FILE="$STATE/instance.pid"
-BUILT_FROM="$STATE/built-from"   # Commit des Klons beim letzten Bau (1c016162)
+BUILT_FROM="$STATE/built-from"   # Commit of the clone at the last build (1c016162)
 
 host_running() { [ -s "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; }
 
-# Commit, auf dem der Klon steht — leer ohne git (dann bleibt es beim vorhandenen Build)
+# Commit the clone is on — empty without git (then the existing build stays)
 repo_head() { git -C "$REPO_ROOT" rev-parse --verify -q HEAD 2>/dev/null; }
 short_sha() { if [ "${1:--}" = - ]; then printf 'unbekannt'; else printf '%s' "${1:0:8}"; fi; }
 
-# Stand des Host-Builds gegen den Klon, eine Zeile (auch fuer scripts/setup.sh):
-#   none                 noch kein Build
-#   current SHA          gebaut aus dem Commit, auf dem der Klon steht
-#   outdated BUILT HEAD  aus einem anderen Commit gebaut; BUILT ist "-", wenn nicht vermerkt ist, woraus
-#                        (Bau vor dieser Buchfuehrung oder abgebrochen) — dann lieber einmal zu oft bauen
-#   unknown BUILT        Commit des Klons nicht ermittelbar (kein git) — kein Vergleich, kein Neubau
+# State of the host build vs. the clone, one line (also for scripts/setup.sh):
+#   none                 no build yet
+#   current SHA          built from the commit the clone is on
+#   outdated BUILT HEAD  built from another commit; BUILT is "-" if it is not recorded what from
+#                        (build before this bookkeeping or aborted) — then rather build once too often
+#   unknown BUILT        commit of the clone cannot be determined (no git) — no comparison, no rebuild
 host_build_state() {
   local built head
   [ -s "$STATE/app.jar" ] || { echo none; return 0; }
@@ -315,11 +315,11 @@ host_build_state() {
 
 host_build() {
   local jar count head
-  head="$(repo_head)"   # vor dem Bau: ein git pull waehrend der Minuten danach zaehlt nicht mit
+  head="$(repo_head)"   # before the build: a git pull during the minutes after does not count
   echo "Baue Backend (Maven) ..."
-  # clean: sonst bleibt das JAR der vorigen Version im target/ liegen und der find unten nimmt
-  # irgendeines davon. Beim Sprung der Demo-VM von 0.7.6 auf 0.7.7 (2026-09-23) kopierte er so
-  # das alte JAR zurueck — die Instanz lief nach dem „Upgrade" unbemerkt weiter auf 0.7.6.
+  # clean: otherwise the JAR of the previous version stays in target/ and the find below takes
+  # any of them. When the demo VM jumped from 0.7.6 to 0.7.7 (2026-09-23) it thus copied
+  # the old JAR back — the instance kept running on 0.7.6 unnoticed after the "upgrade".
   (cd "$REPO_ROOT/ai-automation-backend" && ./mvnw -q -B -DskipTests clean package) || return 1
   jar="$(find "$REPO_ROOT/ai-automation-backend/target" -maxdepth 1 -name 'ai-automation-backend-*.jar' ! -name '*.original')"
   count="$(printf '%s' "$jar" | grep -c .)"
@@ -333,8 +333,8 @@ host_build() {
   echo "Baue Frontend (npm ci, vite build) ..."
   (cd "$REPO_ROOT/ai-automation-frontend" && npm ci --no-audit --no-fund && npm run build) || return 1
   mkdir -p "$STATE"
-  # Erst den Vermerk loeschen: bricht das Kopieren ab, baut das naechste up neu, statt dem halben
-  # Stand den alten Commit zuzuschreiben.
+  # Delete the marker first: if copying aborts, the next up rebuilds instead of attributing the old commit
+  # to the half-copied state.
   rm -f "$BUILT_FROM"
   cp -f "$jar" "$STATE/app.jar" || return 1
   rm -rf "$STATE/frontend" && cp -R "$REPO_ROOT/ai-automation-frontend/dist" "$STATE/frontend" || return 1
@@ -350,8 +350,8 @@ $(host_build_state)
 EOF
       if host_running; then
         say_running "läuft bereits"
-        # Nie still auf dem alten Stand weiterlaufen (1c016162) — aber auch nicht ungefragt anhalten:
-        # das beendete laufende Workflow-Runs. Uebernommen wird der neue Stand mit down und up.
+        # Never silently keep running on the old state (1c016162) — but do not stop it unasked either:
+        # that ended running workflow runs. The new state is picked up with down and up.
         if [ "$st" = outdated ]; then
           echo "$CONTAINER läuft mit Stand $(short_sha "$built"), der Klon steht auf $(short_sha "$head") — nicht übernommen." >&2
           echo "  Übernehmen (baut neu): scripts/instance.sh down --name $NAME && scripts/instance.sh up --name $NAME" >&2
@@ -371,14 +371,14 @@ EOF
           else echo "Build vorhanden, nicht neu gebaut (Stand $(short_sha "$built"))"; fi ;;
       esac
       mkdir -p "$STATE/data/logs" "$STATE/home"
-      # Reihenfolge: erst die Werte aus MYSURICATES_*, dann die AUTOMATION_*-Zeilen der Datei —
-      # was dort steht, gewinnt.
+      # Order: first the values from MYSURICATES_*, then the AUTOMATION_* lines of the file —
+      # what is there wins.
       (
         cd "$STATE" || exit 1
-        # Eigenes user.home je Instanz: sonst teilte sie API-Key-Datei und Integrations-Schluessel
-        # (~/.mysuricates/) mit jeder anderen Instanz dieses Benutzers — etwa einer Dev-Instanz. Java
-        # liest user.home aus dem Konto, nicht aus $HOME. Die KI-CLIs erben weiter das echte $HOME;
-        # wo das Backend selbst nach ihnen sucht, zeigen die Properties darauf.
+        # Own user.home per instance: otherwise it would share the API key file and integration keys
+        # (~/.mysuricates/) with every other instance of this user — e.g. a dev instance. Java
+        # reads user.home from the account, not from $HOME. The AI CLIs keep inheriting the real $HOME;
+        # where the backend itself looks for them, the properties point to them.
         export AUTOMATION_HOST_HOME="$HOME" AUTOMATION_HOSTPI_CONFIGDIR="$HOME/.pi/agent" \
           AUTOMATION_MODELCATALOG_CODEXHOME="$HOME/.codex"
         export AUTOMATION_PORT="$PORT" SERVER_ADDRESS="$BIND" \
