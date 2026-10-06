@@ -27,7 +27,7 @@ class HostClaudeServiceTest {
         perms.setSkipPermissions(skipPermissions);
         perms.setAllowedTools(allowedTools);
 
-        return new HostClaudeService(config, perms);
+        return new HostClaudeService(config, perms, AiCliThrottles.defaults());
     }
 
     // --- buildReasonCommand ---
@@ -298,7 +298,7 @@ class HostClaudeServiceTest {
         perms.setAllowedTools(List.of());
 
         // Use a service that will execute a hanging process
-        HostClaudeService service = new HostClaudeService(config, perms) {
+        HostClaudeService service = new HostClaudeService(config, perms, AiCliThrottles.defaults()) {
             @Override
             List<String> buildReasonCommand(String prompt, String systemPrompt, String model, Integer maxTurns, String effort) {
                 // "sleep 60" will hang for 60s, well beyond 1s timeout
@@ -320,7 +320,7 @@ class HostClaudeServiceTest {
         perms.setSkipPermissions(false);
         perms.setAllowedTools(List.of());
 
-        HostClaudeService service = new HostClaudeService(config, perms) {
+        HostClaudeService service = new HostClaudeService(config, perms, AiCliThrottles.defaults()) {
             @Override
             List<String> buildActionCommand(String prompt, String model, String systemPrompt,
                                             List<String> callAllowedTools, List<String> callDisallowedTools,
@@ -403,7 +403,7 @@ class HostClaudeServiceTest {
         config.setTimeoutSeconds(30);
         List<String> script = List.of("/bin/sh", "-c",
                 "cat >/dev/null; printf '%s\\n' \"$1\"; exit " + exitCode, "sh", output);
-        return new HostClaudeService(config, new CliPermissionsConfig()) {
+        return new HostClaudeService(config, new CliPermissionsConfig(), AiCliThrottles.defaults()) {
             @Override
             List<String> buildActionCommand(String prompt, String model, String systemPrompt,
                                             List<String> callAllowedTools, List<String> callDisallowedTools,
@@ -424,7 +424,7 @@ class HostClaudeServiceTest {
         perms.setSkipPermissions(false);
         perms.setAllowedTools(List.of());
 
-        HostClaudeService service = new HostClaudeService(config, perms) {
+        HostClaudeService service = new HostClaudeService(config, perms, AiCliThrottles.defaults()) {
             @Override
             List<String> buildReasonCommand(String prompt, String systemPrompt, String model, Integer maxTurns, String effort) {
                 // "sleep 60" hangs for 60s, well beyond 2s override
@@ -447,7 +447,7 @@ class HostClaudeServiceTest {
         perms.setSkipPermissions(false);
         perms.setAllowedTools(List.of());
 
-        HostClaudeService service = new HostClaudeService(config, perms) {
+        HostClaudeService service = new HostClaudeService(config, perms, AiCliThrottles.defaults()) {
             @Override
             List<String> buildReasonCommand(String prompt, String systemPrompt, String model, Integer maxTurns, String effort) {
                 return List.of("sleep", "60");
@@ -469,7 +469,7 @@ class HostClaudeServiceTest {
         perms.setSkipPermissions(false);
         perms.setAllowedTools(List.of());
 
-        HostClaudeService service = new HostClaudeService(config, perms) {
+        HostClaudeService service = new HostClaudeService(config, perms, AiCliThrottles.defaults()) {
             @Override
             List<String> buildActionCommand(String prompt, String model, String systemPrompt,
                                             List<String> callAllowedTools, List<String> callDisallowedTools,
@@ -493,7 +493,7 @@ class HostClaudeServiceTest {
         perms.setSkipPermissions(false);
         perms.setAllowedTools(List.of());
 
-        HostClaudeService service = new HostClaudeService(config, perms) {
+        HostClaudeService service = new HostClaudeService(config, perms, AiCliThrottles.defaults()) {
             @Override
             List<String> buildActionCommand(String prompt, String model, String systemPrompt,
                                             List<String> callAllowedTools, List<String> callDisallowedTools,
@@ -506,56 +506,6 @@ class HostClaudeServiceTest {
         assertThatThrownBy(() -> service.executeAction("test", null, null, null, null))
                 .isInstanceOf(IOException.class)
                 .hasMessageContaining("timed out after 1 seconds");
-    }
-
-    // --- Two-Tier Semaphore ---
-
-    @Test
-    void constructor_initializesSemaphoresCorrectly() {
-        HostClaudeConfig config = new HostClaudeConfig();
-        config.setMaxConcurrentCalls(5);
-        config.setReservedForInteractive(1);
-        CliPermissionsConfig perms = new CliPermissionsConfig();
-        perms.setSkipPermissions(false);
-        perms.setAllowedTools(List.of());
-
-        HostClaudeService service = new HostClaudeService(config, perms);
-
-        // Background limit should be max - reserved = 5 - 1 = 4
-        // We can verify indirectly that the service was created without error
-        assertThat(service).isNotNull();
-    }
-
-    @Test
-    void updateMaxConcurrentCalls_adjustsBothSemaphores() {
-        HostClaudeService service = createService(null, false, List.of());
-
-        // Should not throw
-        service.updateMaxConcurrentCalls(10);
-    }
-
-    @Test
-    void updateReservedForInteractive_adjustsBackgroundSemaphore() {
-        HostClaudeService service = createService(null, false, List.of());
-
-        // Should not throw
-        service.updateReservedForInteractive(3);
-    }
-
-    @Test
-    void updateReservedForInteractive_atLeastOneBackgroundSlot() {
-        HostClaudeConfig config = new HostClaudeConfig();
-        config.setMaxConcurrentCalls(2);
-        config.setReservedForInteractive(0);
-        CliPermissionsConfig perms = new CliPermissionsConfig();
-        perms.setSkipPermissions(false);
-        perms.setAllowedTools(List.of());
-
-        HostClaudeService service = new HostClaudeService(config, perms);
-
-        // Set reserved higher than max — background should still have at least 1
-        service.updateReservedForInteractive(10);
-        // Should not throw — Math.max(1, ...) guarantees at least 1
     }
 
     // --- buildConversationPrompt ---
@@ -596,7 +546,7 @@ class HostClaudeServiceTest {
         perms.setAllowedTools(List.of());
         // Read the prompt from stdin first, otherwise writing it can fail with a broken pipe.
         List<String> replay = List.of("/bin/sh", "-c", "cat >/dev/null; cat \"$1\"" + trailingShell, "sh", streamJson.toString());
-        return new HostClaudeService(config, perms) {
+        return new HostClaudeService(config, perms, AiCliThrottles.defaults()) {
             @Override
             List<String> buildActionCommand(String prompt, String model, String systemPrompt,
                                             List<String> callAllowedTools, List<String> callDisallowedTools,

@@ -162,6 +162,12 @@ automation:
     reserved-for-interactive: ${AUTOMATION_HOST_PI_RESERVED_INTERACTIVE:1}
     default-backend-provider: ${AUTOMATION_HOST_PI_BACKEND:anthropic}
     default-thinking-level: ${AUTOMATION_HOST_PI_THINKING:medium}
+  ai-cli:                                                       # limit across all AI CLIs + the Codex limit (TODO bd5df8d7); runtime: ai-cli-*/codex-* settings
+    max-concurrent-calls: ${AUTOMATION_AI_CLI_MAX_CONCURRENT_CALLS:8}
+    reserved-for-interactive: ${AUTOMATION_AI_CLI_RESERVED_INTERACTIVE:1}
+    codex-max-concurrent-calls: ${AUTOMATION_CODEX_MAX_CONCURRENT_CALLS:5}
+    codex-reserved-for-interactive: ${AUTOMATION_CODEX_RESERVED_INTERACTIVE:1}
+    codex-inter-call-delay-ms: ${AUTOMATION_CODEX_INTER_CALL_DELAY_MS:0}
   model-catalog:
     ttl-seconds: ${AUTOMATION_MODEL_CATALOG_TTL:600}              # Cache für host-entdeckte Modell-Listen (pi/codex); Laufzeit-Setting model-catalog-ttl-seconds
     probe-timeout-seconds: ${AUTOMATION_MODEL_CATALOG_PROBE_TIMEOUT:15}

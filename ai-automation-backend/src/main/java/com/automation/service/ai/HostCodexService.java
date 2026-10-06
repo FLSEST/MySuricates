@@ -43,9 +43,11 @@ public class HostCodexService {
     private static final Pattern SANDBOX_FAILURE = Pattern.compile("^(?:bwrap:|(?:ERROR|exec failed)\\b.*: bwrap:)");
 
     private final SummarizationConfig config;
+    private final AiCliThrottles throttles;
 
-    public HostCodexService(SummarizationConfig config) {
+    public HostCodexService(SummarizationConfig config, AiCliThrottles throttles) {
         this.config = config;
+        this.throttles = throttles;
     }
 
     /**
@@ -77,6 +79,21 @@ public class HostCodexService {
      * A blank {@code model} lets codex pick its configured default (~/.codex/config.toml).
      */
     public String execute(String prompt, Path workingDirectory, int timeoutSeconds, boolean readOnly, String model) throws IOException {
+        return execute(prompt, workingDirectory, timeoutSeconds, readOnly, model, false);
+    }
+
+    /**
+     * Like {@link #execute(String, Path, int, boolean, String)}; {@code priority} marks an interactive call
+     * (assistant chat), which may use the slots the Codex limit keeps free for it (TODO bd5df8d7).
+     */
+    public String execute(String prompt, Path workingDirectory, int timeoutSeconds, boolean readOnly, String model,
+                          boolean priority) throws IOException {
+        try (var permit = throttles.acquire(AiCliThrottles.CODEX, priority)) {
+            return run(prompt, workingDirectory, timeoutSeconds, readOnly, model);
+        }
+    }
+
+    private String run(String prompt, Path workingDirectory, int timeoutSeconds, boolean readOnly, String model) throws IOException {
         Path outputFile = Files.createTempFile("codex-result-", ".txt");
 
         try {

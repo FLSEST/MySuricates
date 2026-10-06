@@ -207,7 +207,7 @@ A step with status FAILED ends the run unless `on_failure` is `"continue"`.
 
 `automation.host-claude.timeout-seconds`: timeout of one Claude CLI call (default 300); per block `timeout_seconds` applies
 
-`automation.host-claude.max-concurrent-calls` and `reserved-for-interactive`: concurrent Claude calls (5, of which 1 is kept free for the chat)
+`automation.host-claude.max-concurrent-calls` and `reserved-for-interactive`: concurrent Claude calls (5, of which 1 is kept free for the chat); likewise `automation.host-pi.*` for pi and `automation.ai-cli.codex-*` for Codex, plus `automation.ai-cli.max-concurrent-calls` across all AI CLIs together (8, 1 kept free). All of them can be changed at runtime in the settings
 
 `docker.container.idle-timeout-minutes`: stop idle project containers
 

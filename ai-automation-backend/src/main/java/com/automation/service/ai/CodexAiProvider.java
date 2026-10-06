@@ -63,7 +63,7 @@ public class CodexAiProvider implements AiProvider {
                 ? request.timeoutSeconds()
                 : summarizationConfig.getTimeoutSeconds();
 
-        String output = hostCodexService.execute(fullPrompt, workDir, timeout, true, request.model());
+        String output = hostCodexService.execute(fullPrompt, workDir, timeout, true, request.model(), false);
 
         return new ReasoningResult(
                 output,
@@ -89,7 +89,7 @@ public class CodexAiProvider implements AiProvider {
         }
 
         try {
-            String output = hostCodexService.execute(fullPrompt, workDir, timeout, readOnly, request.model());
+            String output = hostCodexService.execute(fullPrompt, workDir, timeout, readOnly, request.model(), request.priority());
             return new ActionResult(output, 0, AiResponseMetadata.estimated(fullPrompt, output));
         } catch (IOException e) {
             // Codex CLI exit code > 0 throws IOException — map to non-zero exit

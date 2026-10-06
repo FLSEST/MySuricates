@@ -21,7 +21,7 @@ class HostCodexServiceTest {
     void setUp() {
         SummarizationConfig config = new SummarizationConfig();
         config.setTimeoutSeconds(120);
-        service = new HostCodexService(config);
+        service = new HostCodexService(config, AiCliThrottles.defaults());
     }
 
     @Test
@@ -125,7 +125,7 @@ class HostCodexServiceTest {
     void execute_streamsProgressLinesIntoTheBoundLiveSink_resultStillFromOutputFile() {
         SummarizationConfig config = new SummarizationConfig();
         config.setTimeoutSeconds(30);
-        HostCodexService svc = new HostCodexService(config) {
+        HostCodexService svc = new HostCodexService(config, AiCliThrottles.defaults()) {
             @Override
             List<String> buildCommand(Path workingDirectory, Path outputFile, boolean readOnly, String model) {
                 return List.of("/bin/sh", "-c",

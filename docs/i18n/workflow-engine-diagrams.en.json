@@ -143,6 +143,8 @@
   "der Exit-Code nicht 0 ist": "the exit code is not 0",
   "`execution_mode`=ai/shell, `max_retries`, `delay`, `exponential_backoff`, `timeout_seconds`": "`execution_mode`=ai/shell, `max_retries`, `delay`, `exponential_backoff`, `timeout_seconds`",
   "alle Versuche scheitern": "all attempts fail",
+  "`execution_mode`=ai/shell, `items_source`=list/command, `continue_on_error`, `max_consecutive_failures`, `timeout_seconds`, `workflow_id` + `context` (je Item ein Kind-Lauf statt Befehl)": "`execution_mode`=ai/shell, `items_source`=list/command, `continue_on_error`, `max_consecutive_failures`, `timeout_seconds`, `workflow_id` + `context` (one child run per item instead of a command)",
+  "ein Item scheitert (außer mit `continue_on_error`); `max_consecutive_failures` Items in Folge scheitern (Standard 3, auch mit `continue_on_error`); mit `workflow_id`: ein Kind-Lauf endet nicht `COMPLETED`": "an item fails (unless `continue_on_error`); `max_consecutive_failures` items fail in a row (default 3, also with `continue_on_error`); with `workflow_id`: a child run does not end `COMPLETED`",
   "`execution_mode`=ai/shell, `condition_command`, `max_iterations`, `timeout_seconds`": "`execution_mode`=ai/shell, `condition_command`, `max_iterations`, `timeout_seconds`",
   "eine Iteration scheitert": "an iteration fails",
   "`execution_mode`=ai/shell, `then_command`, `else_command`, `timeout_seconds`": "`execution_mode`=ai/shell, `then_command`, `else_command`, `timeout_seconds`",
@@ -163,13 +165,11 @@
   "Execution Limits": "Execution Limits",
   "`automation.execution.max-concurrent`: parallele Runs (Standard 10)": "`automation.execution.max-concurrent`: parallel runs (default 10)",
   "`automation.host-claude.timeout-seconds`: Timeout eines Claude-CLI-Aufrufs (Standard 300); je Block gilt `timeout_seconds`": "`automation.host-claude.timeout-seconds`: timeout of one Claude CLI call (default 300); per block `timeout_seconds` applies",
-  "`automation.host-claude.max-concurrent-calls` und `reserved-for-interactive`: gleichzeitige Claude-Aufrufe (5, davon 1 für den Chat frei)": "`automation.host-claude.max-concurrent-calls` and `reserved-for-interactive`: concurrent Claude calls (5, of which 1 is kept free for the chat)",
+  "`automation.host-claude.max-concurrent-calls` und `reserved-for-interactive`: gleichzeitige Claude-Aufrufe (5, davon 1 für den Chat frei); ebenso `automation.host-pi.*` für pi und `automation.ai-cli.codex-*` für Codex, dazu `automation.ai-cli.max-concurrent-calls` über alle KI-CLIs zusammen (8, davon 1 frei). Alle Werte lassen sich zur Laufzeit in den Einstellungen ändern": "`automation.host-claude.max-concurrent-calls` and `reserved-for-interactive`: concurrent Claude calls (5, of which 1 is kept free for the chat); likewise `automation.host-pi.*` for pi and `automation.ai-cli.codex-*` for Codex, plus `automation.ai-cli.max-concurrent-calls` across all AI CLIs together (8, 1 kept free). All of them can be changed at runtime in the settings",
   "`docker.container.idle-timeout-minutes`: Projekt-Container im Leerlauf stoppen": "`docker.container.idle-timeout-minutes`: stop idle project containers",
   "Security": "Security",
   "`automation.security.rate-limit.*`: standardmäßig an, 120 Anfragen pro Minute": "`automation.security.rate-limit.*`: on by default, 120 requests per minute",
   "CORS: `automation.cors.allowed-origins`": "CORS: `automation.cors.allowed-origins`",
   "Dateistruktur": "File Structure",
-  "Kernklassen": "Core Classes",
-  "`execution_mode`=ai/shell, `items_source`=list/command, `continue_on_error`, `max_consecutive_failures`, `timeout_seconds`, `workflow_id` + `context` (je Item ein Kind-Lauf statt Befehl)": "`execution_mode`=ai/shell, `items_source`=list/command, `continue_on_error`, `max_consecutive_failures`, `timeout_seconds`, `workflow_id` + `context` (one child run per item instead of a command)",
-  "ein Item scheitert (außer mit `continue_on_error`); `max_consecutive_failures` Items in Folge scheitern (Standard 3, auch mit `continue_on_error`); mit `workflow_id`: ein Kind-Lauf endet nicht `COMPLETED`": "an item fails (unless `continue_on_error`); `max_consecutive_failures` items fail in a row (default 3, also with `continue_on_error`); with `workflow_id`: a child run does not end `COMPLETED`"
+  "Kernklassen": "Core Classes"
 }
