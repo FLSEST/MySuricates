@@ -26,6 +26,28 @@ describe('ExecutionStepCard', () => {
     expect(screen.getByText('Step 1')).toBeInTheDocument();
   });
 
+  // a7ddf199: next to "Deterministic" and "Shell Command" the header says the step ran in a container
+  it('shows the container and its image for a tool-mode step', () => {
+    render(<ExecutionStepCard step={step({ metadata: {
+      blockType: 'shell', blockName: 'trivy', executionMode: 'container-tool:automation-agent-devops:latest',
+    } })} />);
+    const badge = screen.getByText('Container · automation-agent-devops:latest');
+    expect(badge.closest('[title]')).toHaveAttribute('title', expect.stringContaining('own entrypoint'));
+    expect(screen.getByText('Deterministic')).toBeInTheDocument();
+    expect(screen.getByText('Shell Command')).toBeInTheDocument();
+  });
+
+  it('shows the container for a shell command that ran in one', () => {
+    render(<ExecutionStepCard step={step({ metadata: { blockType: 'shell', executionMode: 'container:node:22' } })} />);
+    expect(screen.getByText('Container · node:22').closest('[title]'))
+      .toHaveAttribute('title', expect.stringContaining('Shell command ran in the container node:22'));
+  });
+
+  it('shows no container badge for a shell step on the host', () => {
+    render(<ExecutionStepCard step={step({ metadata: { blockType: 'shell', executionMode: 'shell' } })} />);
+    expect(screen.queryByText(/^Container ·/)).not.toBeInTheDocument();
+  });
+
   it('marks a step with an AI call as AI and keeps the provider/model pills', () => {
     const { container } = render(<ExecutionStepCard step={step({
       blockType: 'simple', stepIndex: 1,

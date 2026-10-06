@@ -1067,6 +1067,11 @@ export const de: TranslationKeys = {
         unknown: 'Unklar',
         unknownHint: 'Noch nicht feststellbar, ob eine KI beteiligt war – Block läuft noch oder der Run ist älter als diese Aufzeichnung',
       },
+      container: {
+        badge: 'Container · {image}',
+        toolHint: 'Lief im Container {image} mit dessen eigenem Einstiegsbefehl (Werkzeug-Modus)',
+        shellHint: 'Shell-Befehl lief im Container {image}',
+      },
       noSteps: 'Keine Schritte aufgezeichnet',
       diagramTitle: 'Ablauf-Diagramm (live)',
       hideDiagram: 'Ausblenden',

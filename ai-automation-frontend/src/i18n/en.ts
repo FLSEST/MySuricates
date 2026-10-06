@@ -1061,6 +1061,11 @@ export const en = {
         unknown: 'Unknown',
         unknownHint: 'Cannot tell yet whether AI was involved – the block is still running or the run predates this recording',
       },
+      container: {
+        badge: 'Container · {image}',
+        toolHint: 'Ran in the container {image} with its own entrypoint (tool mode)',
+        shellHint: 'Shell command ran in the container {image}',
+      },
       waitingSteps: 'Waiting for steps...',
       waitingForLogs: 'Waiting for logs...',
       jumpToLatest: 'Jump to latest',

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   compressionFacts, formatMetadataValue, latestStepByBlock, persistedForEachItems, persistedTotalItems, stepBlockIndex,
-  stepMetadataSummary, wrapperFacts,
+  stepContainer, stepMetadataSummary, wrapperFacts,
 } from '../stepMetadata';
 import type { StepResult } from '../../../types';
 
@@ -120,5 +120,24 @@ describe('compressionFacts', () => {
       expect(stepBlockIndex(at(0, 'COMPLETED'))).toBeNull();
       expect(stepBlockIndex(at(7, 'COMPLETED', { blockIndex: 0 }))).toBe(0);
     });
+  });
+});
+
+// a7ddf199: the run view shows when a step ran in a container (backend writes metadata.executionMode)
+describe('stepContainer', () => {
+  it('reads the image of a tool-mode step', () => {
+    expect(stepContainer(step({ executionMode: 'container-tool:automation-agent-devops:latest' })))
+      .toEqual({ image: 'automation-agent-devops:latest', tool: true });
+  });
+
+  it('reads the image of a shell command that ran in a container', () => {
+    expect(stepContainer(step({ executionMode: 'container:node:22' }))).toEqual({ image: 'node:22', tool: false });
+  });
+
+  it('is null for host shell, integration, an empty image and no metadata', () => {
+    expect(stepContainer(step({ executionMode: 'shell' }))).toBeNull();
+    expect(stepContainer(step({ executionMode: 'integration' }))).toBeNull();
+    expect(stepContainer(step({ executionMode: 'container:' }))).toBeNull();
+    expect(stepContainer(step(undefined))).toBeNull();
   });
 });

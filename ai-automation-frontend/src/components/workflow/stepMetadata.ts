@@ -18,6 +18,18 @@ export function stepBlockNote(step: StepResult): string | null {
   return typeof note === 'string' && note.trim() ? note : null;
 }
 
+/**
+ * The container a shell step ran in, from `metadata.executionMode` (TODO a7ddf199): `container:<image>` for a
+ * shell command in a container, `container-tool:<image>` for tool mode (the image's own entrypoint, d3a7f5e2).
+ * Null on the host and for every other block.
+ */
+export function stepContainer(step: StepResult): { image: string; tool: boolean } | null {
+  const mode = step.metadata?.executionMode;
+  if (typeof mode !== 'string') return null;
+  const match = /^container(-tool)?:(.+)$/.exec(mode);
+  return match?.[2] ? { image: match[2], tool: match[1] !== undefined } : null;
+}
+
 /** Block name of a step: top-level field, else `metadata.blockName`; null for unnamed blocks. */
 export function stepBlockName(step: StepResult): string | null {
   if (step.blockName) return step.blockName;

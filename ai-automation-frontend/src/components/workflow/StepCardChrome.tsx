@@ -2,13 +2,13 @@ import type { ReactNode } from 'react';
 import {
   Clock, Terminal, Sparkles, Brain, Repeat, GitBranch, RefreshCw, ShieldCheck, Layers,
   MessageSquare, Route, RotateCcw, Wrench, Plug, FileText, ListPlus, SquarePen, ListChecks,
-  Bot, Cog, User, CircleHelp, Shrink, LayoutDashboard, Hand, CircleSlash,
+  Bot, Cog, User, CircleHelp, Shrink, LayoutDashboard, Hand, CircleSlash, Container,
 } from 'lucide-react';
 import { Badge } from '../ui';
 import { useI18nStore, useT } from '../../i18n';
 import { formatDuration } from '../../utils/formatTime';
 import { BLOCK_TYPES, type BlockType, type StepResult } from '../../types';
-import { stepBlockName, stepBlockNote, stepBlockType, stepKind, type StepKind } from './stepMetadata';
+import { stepBlockName, stepBlockNote, stepBlockType, stepContainer, stepKind, type StepKind } from './stepMetadata';
 import { useStepAnchor } from './stepAnchors';
 
 const ICON = 'w-3 h-3';
@@ -124,7 +124,23 @@ export function StepBlockTypeBadge({ step }: { step: StepResult }) {
   );
 }
 
-/** Header row shared by all step cards: number, kind chip, block badge (or `badge` override), block name, duration. */
+/** The container a shell step ran in (neutral like the block badge); the tooltip tells tool mode from shell (a7ddf199). */
+export function StepContainerBadge({ step }: { step: StepResult }) {
+  const labels = useT().workflows.execution.container;
+  const container = stepContainer(step);
+  if (!container) return null;
+  const hint = (container.tool ? labels.toolHint : labels.shellHint).replace('{image}', container.image);
+  return (
+    <Badge>
+      <span className="inline-flex items-center gap-1" title={hint}>
+        <Container className={ICON} />
+        {labels.badge.replace('{image}', container.image)}
+      </span>
+    </Badge>
+  );
+}
+
+/** Header row shared by all step cards: number, kind chip, block badge (or `badge` override), container, block name, duration. */
 export function StepCardHeader({ step, badge, className = 'mb-1' }: { step: StepResult; badge?: ReactNode; className?: string }) {
   const t = useT();
   const locale = useI18nStore((s) => s.locale);
@@ -137,7 +153,8 @@ export function StepCardHeader({ step, badge, className = 'mb-1' }: { step: Step
       </span>
       <StepKindChip kind={stepKind(step)} />
       {badge ?? <StepBlockTypeBadge step={step} />}
-      {blockName && <span className="text-xs text-text-secondary truncate">{blockName}</span>}
+      <StepContainerBadge step={step} />
+      {blockName &&<span className="text-xs text-text-secondary truncate">{blockName}</span>}
       {step.durationMs != null && (
         <span className="text-xs text-text-tertiary flex items-center gap-1">
           <Clock className="w-3 h-3" />
