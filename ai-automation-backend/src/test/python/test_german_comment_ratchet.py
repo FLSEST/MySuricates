@@ -32,6 +32,10 @@ class GermanCommentRatchetTest(unittest.TestCase):
         _, comments = german_comments.lex(Path('a.test.ts'), "it('zeigt den Fehler', () => expect(x).toBe('Fehler'))\n")
         self.assertEqual([(1, 'zeigt den Fehler')], comments)
 
+    def test_jsx_closing_tag_keeps_line_numbers(self):
+        _, comments = german_comments.lex(Path('a.tsx'), 'const a = <div>\n</div>;\n// dritte Zeile\n')
+        self.assertEqual([(3, ' dritte Zeile')], comments)
+
 
 if __name__ == '__main__':
     unittest.main()

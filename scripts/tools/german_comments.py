@@ -144,9 +144,13 @@ def lex_c_like(src, js=False):
                 elif src[j] == '/' and not in_class:
                     break
                 j += 1
-            code.append(src[i:j + 1])
+            if j >= n or src[j] == '\n':  # no closing slash: not a regex (e.g. JSX "</"), keep the line count
+                code.append(src[i:j])
+                i = j
+            else:
+                code.append(src[i:j + 1])
+                i = j + 1
             last_sig = '/'
-            i = j + 1
             continue
         if c == '\n':
             line += 1
@@ -362,7 +366,9 @@ const out = files.map(([name, text]) => {
   const kind = name.endsWith('.tsx') ? ts.ScriptKind.TSX : name.endsWith('.ts') ? ts.ScriptKind.TS : ts.ScriptKind.JS;
   const sf = ts.createSourceFile(name, text, ts.ScriptTarget.Latest, true, kind);
   const toks = [];
+  const isJsDoc = (node) => node.kind >= ts.SyntaxKind.FirstJSDocNode && node.kind <= ts.SyntaxKind.LastJSDocNode;
   const walk = (node) => {
+    if (isJsDoc(node)) return;  // JSDoc comments are children of declarations - comments, not code
     const kids = node.getChildren(sf);
     if (kids.length === 0) {
       const p = node.parent;

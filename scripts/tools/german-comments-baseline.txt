@@ -534,7 +534,7 @@
 3 ai-automation-frontend/src/components/workflow/WorkflowBlocksTab.tsx
 1 ai-automation-frontend/src/components/workflow/WorkflowBulkDeleteModal.tsx
 1 ai-automation-frontend/src/components/workflow/WorkflowViewModeTabs.tsx
-43 ai-automation-frontend/src/components/workflow/__tests__/BpmnDiagramView.test.tsx
+44 ai-automation-frontend/src/components/workflow/__tests__/BpmnDiagramView.test.tsx
 2 ai-automation-frontend/src/components/workflow/__tests__/BpmnImportButton.test.tsx
 7 ai-automation-frontend/src/components/workflow/__tests__/PoolBrowser.test.tsx
 3 ai-automation-frontend/src/components/workflow/__tests__/RunContainerPanel.test.tsx
