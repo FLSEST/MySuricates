@@ -34,7 +34,7 @@ public interface AuditFindingRepository extends JpaRepository<AuditFinding, Stri
      * in the catalog (TODO 1cf996df).
      */
     @Query("SELECT new com.automation.dto.projection.AuditFindingContextRow(f.id, f.status, f.severity, f.ruleKey, "
-            + "f.subject, f.title, f.dispositionNote) FROM AuditFinding f WHERE f.projectId = :projectId "
+            + "f.subject, f.title, f.evidence, f.dispositionNote) FROM AuditFinding f WHERE f.projectId = :projectId "
             + "AND f.auditKey = :auditKey AND f.status IN :statuses")
     List<AuditFindingContextRow> findContextRows(@Param("projectId") String projectId,
                                                  @Param("auditKey") String auditKey,

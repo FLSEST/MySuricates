@@ -186,14 +186,14 @@ class AuditSnapshotApplier {
     }
 
     /**
-     * {@code audit_findings} shows a {@code |} in ruleKey, subject and title as {@code ¦}, and a model carries
-     * the finding on exactly like that. What is stored – and shown in the Audit Center – is the {@code |} again
+     * {@code audit_findings} shows a {@code |} in ruleKey, subject, title and evidence as {@code ¦}, and a model
+     * carries the finding on exactly like that. What is stored – and shown in the Audit Center – is the {@code |} again
      * (TODO 90c4f7db); the identity is the same anyway ({@link #fingerprint}).
      */
     private static ParsedFinding unmasked(ParsedFinding item) {
         return new ParsedFinding(AuditFindingsContext.unmask(item.ruleKey()), AuditFindingsContext.unmask(item.subject()),
-                item.severity(), AuditFindingsContext.unmask(item.title()), item.description(), item.evidence(),
-                item.tags());
+                item.severity(), AuditFindingsContext.unmask(item.title()), item.description(),
+                AuditFindingsContext.unmask(item.evidence()), item.tags());
     }
 
     /**
