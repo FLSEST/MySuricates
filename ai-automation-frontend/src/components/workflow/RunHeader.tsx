@@ -7,6 +7,7 @@ import { StatusBadge } from '../shared/StatusBadge';
 import { GateStatusBadge } from '../shared/GateStatusBadge';
 import { ExecutionRerunButton } from './ExecutionRerunButton';
 import { OpenApprovalButton } from './OpenApprovalButton';
+import { AuditLabel } from './AuditLabel';
 import { DeleteRunModal } from '../runs/DeleteRunModal';
 import {
   usePauseExecution, useResumeExecution, useCancelExecution, useResumeFromStep, useDeleteRun,
@@ -96,6 +97,7 @@ export function RunHeader({ run, workflow, workflowId, connected, isRunning, onO
             </button>
           )}
         </p>
+        {workflow && <div className="mt-1.5 empty:hidden"><AuditLabel workflow={workflow} /></div>}
       </div>
       {onOpenApproval && <OpenApprovalButton onClick={onOpenApproval} />}
       {(run.status === 'INTERRUPTED' || run.status === 'FAILED') && (

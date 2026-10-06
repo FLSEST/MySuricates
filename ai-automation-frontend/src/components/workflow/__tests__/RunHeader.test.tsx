@@ -137,3 +137,26 @@ describe('RunHeader', () => {
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Delete run' })).not.toBeInTheDocument());
   });
 });
+
+// 5488ac8f: the page of a run says that it belongs to an audit, as the workflow pages do
+describe('RunHeader of an audit run', () => {
+  it('carries the audit label of its workflow', () => {
+    const audited = { ...workflow, metadata: { audit: { enabled: true, key: 'mysuricates.architecture', category: 'architecture', reportBlock: 'report' } } } as Workflow;
+    renderWithProviders(
+      <Routes>
+        <Route path="/workflows/:id/run/:runId" element={
+          <RunHeader run={run('COMPLETED')} workflow={audited} workflowId="wf-1" connected={false} isRunning={false} />
+        } />
+      </Routes>,
+      { route: '/workflows/wf-1/run/run-1' },
+    );
+
+    expect(screen.getByTestId('audit-label')).toHaveTextContent('mysuricates.architecture');
+  });
+
+  it('has no audit label for an ordinary workflow', () => {
+    renderHeader(run('COMPLETED'));
+
+    expect(screen.queryByTestId('audit-label')).not.toBeInTheDocument();
+  });
+});

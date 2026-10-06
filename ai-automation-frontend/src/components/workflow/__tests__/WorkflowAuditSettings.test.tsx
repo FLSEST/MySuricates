@@ -138,6 +138,15 @@ describe('AuditLabel', () => {
     expect(screen.getByTestId('audit-label')).toHaveTextContent('TODOs from High');
   });
 
+  it('checks the schema version like AuditConfig.from: missing or 1 is an audit, any other number is not', () => {
+    const { unmount } = renderWithProviders(<AuditLabel workflow={workflow({ audit: { ...AUDIT, schemaVersion: 1 } })} />);
+    expect(screen.getByTestId('audit-label')).toBeInTheDocument();
+    unmount();
+
+    renderWithProviders(<AuditLabel workflow={workflow({ audit: { ...AUDIT, schemaVersion: 2 } })} />);
+    expect(screen.queryByTestId('audit-label')).not.toBeInTheDocument();
+  });
+
   it('renders nothing for a workflow that is no audit', () => {
     const { container } = renderWithProviders(<AuditLabel workflow={workflow({ audit: { ...AUDIT, enabled: false } })} />);
 

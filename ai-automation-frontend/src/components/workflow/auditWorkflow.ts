@@ -7,11 +7,14 @@ const DEFAULT_THRESHOLD: AuditTodoThreshold = 'HIGH';
 
 /**
  * The audit block of a workflow – only when the backend would ingest it as well (`AuditConfig.from`): enabled
- * exactly `true`, key, category and report block present. Otherwise `null`: then it is no audit workflow.
+ * exactly `true`, key, category and report block present, schema version 1 (a missing or non-numeric one counts
+ * as 1, a number is cut to an integer like `intValue()`). Otherwise `null`: then it is no audit workflow.
  */
 export function auditConfigOf(metadata: WorkflowMetadata | undefined): (AuditWorkflowConfig & { key: string }) | null {
   const audit = metadata?.audit;
   if (!audit || audit.enabled !== true || !audit.key || !audit.category || !audit.reportBlock) return null;
+  const version = typeof audit.schemaVersion === 'number' ? Math.trunc(audit.schemaVersion) : 1;
+  if (version !== 1) return null;
   return { ...audit, key: audit.key };
 }
 
