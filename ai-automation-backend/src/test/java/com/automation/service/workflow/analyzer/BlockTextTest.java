@@ -1,7 +1,7 @@
 package com.automation.service.workflow.analyzer;
 
 import com.automation.entity.BlockDefinition;
-import com.automation.service.assistant.fetch.BlockSpecs;
+import com.automation.executor.spec.BlockSpecs;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;

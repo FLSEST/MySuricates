@@ -2,7 +2,7 @@ package com.automation.service.workflow;
 
 import com.automation.entity.BlockDefinition;
 import com.automation.entity.Workflow;
-import com.automation.service.assistant.fetch.BlockSpecs;
+import com.automation.executor.spec.BlockSpecs;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;

@@ -1,4 +1,4 @@
-package com.automation.service.assistant.fetch;
+package com.automation.executor.spec;
 
 import java.util.List;
 import java.util.Map;
@@ -290,7 +290,7 @@ public final class BlockSpecs {
         return sb.toString();
     }
 
-    static String format(String blockType) {
+    public static String format(String blockType) {
         String spec = SPECS.get(blockType);
         if (spec == null) {
             return "Unknown block type '" + blockType + "'. Available: " + SPECS.keySet() + "\n";

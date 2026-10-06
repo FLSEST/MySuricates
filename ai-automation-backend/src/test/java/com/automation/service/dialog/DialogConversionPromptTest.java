@@ -1,6 +1,6 @@
 package com.automation.service.dialog;
 
-import com.automation.service.assistant.fetch.BlockSpecs;
+import com.automation.executor.spec.BlockSpecs;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;

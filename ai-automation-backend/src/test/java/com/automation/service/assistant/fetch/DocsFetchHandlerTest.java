@@ -1,5 +1,6 @@
 package com.automation.service.assistant.fetch;
 
+import com.automation.executor.spec.BlockSpecs;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

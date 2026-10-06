@@ -1,7 +1,7 @@
 package com.automation.service.factory;
 
 import com.automation.dto.request.WorkflowFactoryRequest;
-import com.automation.service.assistant.fetch.BlockSpecs;
+import com.automation.executor.spec.BlockSpecs;
 import com.automation.service.workflow.AgentInstructionsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
