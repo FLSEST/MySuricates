@@ -1,27 +1,27 @@
 #!/usr/bin/env python3
-"""arch-seams.py — Schnittkanten je Backend-Kandidat fuer das Urteil im Architektur-Review (TODO e0e9495f).
+"""arch-seams.py — seams per backend candidate for the verdict in the architecture review (TODO e0e9495f).
 
-Das Review laesst die KI seit 4.7.0 die Dateien aus ## review_candidates lesen und beurteilen, ob sich
-ein Schnitt lohnt. Dieses Skript liefert dafuer die Fakten, die sie sonst schaetzen muesste: welche
-Methode welche Kollaborateure benutzt. Gemessen wird der Bytecode (javap -c -l -p), nicht der
-Quelltext — Feldzugriffe stehen dort als getfield, Quelltextzeilen in der LineNumberTable.
+Since 4.7.0 the review has the AI read the files from ## review_candidates and judge whether
+a cut is worthwhile. This script supplies the facts it would otherwise have to guess: which
+method uses which collaborators. The bytecode (javap -c -l -p) is measured, not the
+source — field accesses appear there as getfield, source lines in the LineNumberTable.
 
-  Kollaborateur  injiziertes Feld wie in ## files von arch-metrics.sh: "private final <Typ> <name>;"
-                 ohne Initialisierer, nicht static, Typ nicht in NON_COLLAB_RE. Die Ausschlussliste
-                 wird aus arch-metrics.sh gelesen, damit beide Zaehlungen nicht auseinanderlaufen.
-  Methode        je Name zusammengefasst (Ueberladungen), Lambdas (lambda$<methode>$N) zaehlen zur
-                 umschliessenden Methode, Methoden innerer Klassen heissen <Innere>.<methode>.
-                 Konstruktoren fehlen: Sie beruehren jedes injizierte Feld.
-  Gruppe         Methoden, die ueber gemeinsame Kollaborateure zusammenhaengen. Mehrere Gruppen sind
-                 ein Schnitt-Kandidat entlang der Kollaborateure; eine Gruppe heisst, ein Schnitt muesste
-                 anders begruendet werden. Methoden ohne Kollaborateur stehen nur als Zahl da.
-  nur_konstruktor  injiziert, aber ausserhalb des Konstruktors nie gelesen.
+  Collaborator   injected field as in ## files of arch-metrics.sh: "private final <type> <name>;"
+                 without initializer, not static, type not in NON_COLLAB_RE. The exclusion list
+                 is read from arch-metrics.sh so that both counts do not drift apart.
+  Method         merged per name (overloads), lambdas (lambda$<method>$N) count towards the
+                 enclosing method, methods of inner classes are called <Inner>.<method>.
+                 Constructors are missing: they touch every injected field.
+  Group          methods connected via shared collaborators. Several groups are
+                 a cut candidate along the collaborators; one group means a cut would have to be
+                 justified differently. Methods without a collaborator appear only as a number.
+  nur_konstruktor  injected, but never read outside the constructor.
 
-Aufruf:  arch-seams.py <src/main/java> <classes-dir> <subject>...
-         subject = Pfad ab com/automation/ inklusive .java, wie in ## review_candidates.
-Ausgabe: ## seams — stabil sortiert. Was nicht messbar ist, steht als missing-Zeile mit Grund da,
-         nie als leere Tabelle.
-Exit:    0 immer (Faktenblatt fuer einen nachgelagerten Auswerter); 2 bei falschem Aufruf.
+Call:    arch-seams.py <src/main/java> <classes-dir> <subject>...
+         subject = path from com/automation/ including .java, as in ## review_candidates.
+Output:  ## seams — stably sorted. What cannot be measured appears as a missing line with reason,
+         never as an empty table.
+Exit:    0 always (fact sheet for a downstream evaluator); 2 on a wrong call.
 """
 import glob
 import os
@@ -40,7 +40,7 @@ LAMBDA = re.compile(r"^lambda\$(.+)\$\d+$")
 
 
 def non_collab_pattern():
-    """NON_COLLAB_RE aus arch-metrics.sh — eine Ausschlussliste fuer beide Zaehlungen."""
+    """NON_COLLAB_RE from arch-metrics.sh — one exclusion list for both counts."""
     path = os.path.join(SCRIPT_DIR, "arch-metrics.sh")
     try:
         text = open(path, encoding="utf-8").read()
@@ -62,9 +62,9 @@ def javap(paths):
 
 
 def parse(text, outer_internal):
-    """{klassen-datei-block: ...} -> (felder der aeusseren Klasse, {methode: (zugriffe, zeilen)})."""
-    fields = {}       # name -> (mods, typ) nur aus der aeusseren Klasse
-    methods = {}      # (klasse, roher name) -> [set(outer-felder), [zeilen]]
+    """{class-file-block: ...} -> (fields of the outer class, {method: (accesses, lines)})."""
+    fields = {}       # name -> (mods, type) from the outer class only
+    methods = {}      # (class, raw name) -> [set(outer fields), [lines]]
     klass, current, in_lines = None, None, False
     outer_dotted = outer_internal.replace("/", ".")
     for line in text.splitlines():
@@ -105,14 +105,14 @@ def parse(text, outer_internal):
 
 
 def injected_without_initializer(source, name):
-    """True, wenn der Quelltext das Feld als 'private final <Typ> <name>;' ohne Initialisierer fuehrt."""
+    """True if the source declares the field as 'private final <type> <name>;' without initializer."""
     return re.search(r"^\s*private\s+final\s+[^;=]*?\b" + re.escape(name) + r"\s*;", source, re.M) is not None
 
 
 def label(klass, raw, outer_dotted):
-    """(Methodenname fuer die Ausgabe, ist_lambda): Lambdas zur umschliessenden Methode, innere Klassen
-    mit Praefix; None fuer Konstruktoren und Initialisierer (javac nennt ihre Lambdas lambda$new$N bzw.
-    lambda$static$N, javap den Konstruktor mit dem voll qualifizierten Klassennamen)."""
+    """(Method name for the output, is_lambda): lambdas to the enclosing method, inner classes
+    with prefix; None for constructors and initializers (javac names their lambdas lambda$new$N or
+    lambda$static$N, javap the constructor with the fully qualified class name)."""
     name, lambda_ = raw, False
     while True:
         match = LAMBDA.match(name)
@@ -127,12 +127,12 @@ def label(klass, raw, outer_dotted):
 
 
 def ranges(lines):
-    """[3, 4, 5, 9, 10] -> '3-10' als Spanne von erster bis letzter Codezeile."""
+    """[3, 4, 5, 9, 10] -> '3-10' as a span from first to last code line."""
     return "%d-%d" % (min(lines), max(lines)) if lines else "-"
 
 
 def measure(src, classes, subject, non_collab):
-    """Zeilen der Ausgabe fuer eine Datei, oder [('missing', grund)]."""
+    """Lines of the output for one file, or [('missing', reason)]."""
     if not subject.endswith(".java"):
         return [("missing", "kein Backend-Quelltext")]
     stem = subject[:-len(".java")]
@@ -143,7 +143,7 @@ def measure(src, classes, subject, non_collab):
     if not os.path.isfile(source_file):
         return [("missing", "source_missing")]
     if os.path.getmtime(source_file) > os.path.getmtime(class_file):
-        # Quelltext juenger als das Kompilat: Zeilen und Zugriffe gehoerten zu einem anderen Stand.
+        # Source newer than the build: lines and accesses would belong to a different state.
         return [("missing", "stale_classes")]
     inner = sorted(glob.glob(os.path.join(classes, glob.escape(stem) + "$*.class")))
     text = javap([class_file] + inner)
@@ -158,13 +158,13 @@ def measure(src, classes, subject, non_collab):
         if "static" not in mods.split() and "final" in mods.split() and "private" in mods.split()
         and not non_collab.match(simple_type(declared)) and injected_without_initializer(source, name))
 
-    merged = {}  # label -> [set(kollaborateure), [zeilen]]
+    merged = {}  # label -> [set(collaborators), [lines]]
     used_anywhere = set()
     for (klass, raw), (accessed, lines) in methods.items():
         name, lambda_ = label(klass, raw, outer_dotted)
         if name is None:
             if lambda_:
-                # Ein Lambda aus dem Konstruktor laeuft spaeter — sein Feld ist mehr als nur verdrahtet.
+                # A lambda from the constructor runs later — its field is more than just wired up.
                 used_anywhere |= accessed
             continue
         entry = merged.setdefault(name, [set(), []])
@@ -173,7 +173,7 @@ def measure(src, classes, subject, non_collab):
         used_anywhere |= accessed
     with_collab = {n: e for n, e in merged.items() if e[0]}
 
-    # Gruppen: Zusammenhangskomponenten ueber gemeinsame Kollaborateure (Union-Find).
+    # Groups: connected components over shared collaborators (union-find).
     parent = {n: n for n in with_collab}
 
     def find(n):

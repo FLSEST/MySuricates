@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
 #
-# Doku-Zahlen gegen den Code pruefen (TODO 3df2df73).
+# Check doc figures against the code (TODO 3df2df73).
 #
-# Die Groessen in docs/ und README.de.md driften bei jedem Release erneut:
-# Controller standen an vier Stellen falsch, der Migrationsstand an sechs,
-# die Blocktyp-Zahl an zwei. Fuer den Code gibt es Tests (BlockTypeListsGuardTest,
-# blockTypes.test.ts), fuer die Doku gab es nichts.
+# The figures in docs/ and README.de.md drift anew with every release:
+# controllers were wrong in four places, the migration state in six,
+# the block-type count in two. For the code there are tests (BlockTypeListsGuardTest,
+# blockTypes.test.ts), for the docs there was nothing.
 #
-# Dieses Skript erhebt die Zahlen deterministisch aus dem Code und meldet jede
-# Stelle in der Doku, die etwas anderes behauptet. Es aendert nichts.
+# This script collects the figures deterministically from the code and reports every
+# place in the docs that claims something else. It changes nothing.
 #
-# Usage:  scripts/public-readiness/doc-facts-check.sh [--root <verzeichnis>] [--facts] [pfad ...]
-#           --root   Repo-Wurzel (Default: git-Toplevel, sonst das Arbeitsverzeichnis)
-#           --facts  nur die erhobenen Zahlen ausgeben, nichts pruefen
-#           pfad     zu pruefende Dateien/Verzeichnisse
-#                    (Default: docs README.de.md workflow-pool/README.md AGENTS.md)
+# Usage:  scripts/public-readiness/doc-facts-check.sh [--root <directory>] [--facts] [path ...]
+#           --root   repo root (default: git toplevel, else the working directory)
+#           --facts  only print the collected figures, check nothing
+#           path     files/directories to check
+#                    (default: docs README.de.md workflow-pool/README.md AGENTS.md)
 #
-# Exit:   0 = keine Drift, 1 = Drift gefunden, 2 = Faktenquelle fehlt
+# Exit:   0 = no drift, 1 = drift found, 2 = fact source missing
 #
 set -uo pipefail
 
@@ -39,11 +39,11 @@ if [ -z "$ROOT" ]; then
   ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 fi
 ROOT="$(cd "$ROOT" 2>/dev/null && pwd)" || { echo "doc-facts-check: Wurzel nicht lesbar" >&2; exit 2; }
-# workflow-pool/README.md nennt die Zahl der Built-in-Templates und gehoert deshalb
-# in die Pruefung -- sonst waere sie eine eingefrorene Zahl ausserhalb der Reichweite
-# des Gates, genau die Sorte, die dieses Skript verhindern soll. AGENTS.md ist die
-# Kurzreferenz fuer externe Agents: Ihre curl-Beispiele werden woertlich kopiert und
-# gehoeren deshalb unter die --noproxy-Regel (TODO 2e3cf243).
+# workflow-pool/README.md names the number of built-in templates and therefore belongs
+# in the check -- otherwise it would be a frozen number outside the gate's reach,
+# exactly the kind this script is meant to prevent. AGENTS.md is the
+# short reference for external agents: its curl examples are copied verbatim and
+# therefore fall under the --noproxy rule (TODO 2e3cf243).
 [ ${#TARGETS[@]} -eq 0 ] && TARGETS=(docs README.de.md workflow-pool/README.md AGENTS.md)
 
 BACKEND="$ROOT/ai-automation-backend"
@@ -58,17 +58,17 @@ MIGRATIONS="$RES/db/migration"
 MISSING=()
 
 # ---------------------------------------------------------------------------
-# Zahlen erheben
+# Collect figures
 #
-# Jede Groesse hat genau eine Quelle. Ergibt eine Quelle 0, ist das ein harter
-# Fehler: ein leeres Ergebnis wuerde sonst jede Doku-Zahl als Drift melden oder,
-# schlimmer, stillschweigend nichts pruefen.
+# Every quantity has exactly one source. If a source yields 0, that is a hard
+# error: an empty result would otherwise report every doc figure as drift or,
+# worse, silently check nothing.
 # ---------------------------------------------------------------------------
 fact_block_types() {
   [ -f "$REGISTRY" ] || { MISSING+=("block-types: $REGISTRY fehlt"); echo 0; return; }
   grep -oE 'new BlockTypeEntry\("[a-z-]+"' "$REGISTRY" | sort -u | wc -l | tr -d ' '
 }
-# Die Namen selbst, fuer die Pruefung von "type"-Aufzaehlungen (TODO e36ca773).
+# The names themselves, for checking "type" enumerations (TODO e36ca773).
 fact_block_type_names() {
   [ -f "$REGISTRY" ] || { echo "[]"; return; }
   grep -oE 'new BlockTypeEntry\("[a-z-]+"' "$REGISTRY" | sed 's/.*("\([a-z-]*\)"/"\1"/' \
@@ -78,8 +78,8 @@ fact_controllers() {
   [ -d "$JAVA_SRC" ] || { MISSING+=("controllers: $JAVA_SRC fehlt"); echo 0; return; }
   find "$JAVA_SRC" -name '*Controller.java' | wc -l | tr -d ' '
 }
-# Die Namen selbst (ohne "Controller"), fuer die Aufzaehlung "**Controller:** A, B, …" in
-# docs/entwicklung.md: Die Zahl stimmte, die Liste darunter war zweimal abgedriftet (TODO 65eab274).
+# The names themselves (without "Controller"), for the enumeration "**Controller:** A, B, …" in
+# docs/entwicklung.md: the number was right, the list below it had drifted twice (TODO 65eab274).
 fact_controller_names() {
   [ -d "$JAVA_SRC" ] || { echo "[]"; return; }
   find "$JAVA_SRC" -name '*Controller.java' -printf '%f\n' | sed 's/Controller\.java$//' | sort -u \
@@ -94,10 +94,10 @@ fact_migrations() {
   [ -d "$MIGRATIONS" ] || { MISSING+=("migrations: $MIGRATIONS fehlt"); echo 0; return; }
   find "$MIGRATIONS" -maxdepth 1 -name 'V*.sql' | wc -l | tr -d ' '
 }
-# Alle vorhandenen Nummern, nicht nur Anzahl und Hoechststand: Die Vollstaendigkeitspruefung
-# der Migrationstabellen vergleicht gegen die WIRKLICH vorhandenen Dateien. Eine Reihe
-# anzunehmen waere falsch -- Nummern koennen uebersprungen worden sein, und eine nie
-# existierende V4 als fehlende Tabellenzeile zu melden waere ein Fehlalarm (TODO ffa6d846).
+# All existing numbers, not just count and maximum: the completeness check
+# of the migration tables compares against the files that ACTUALLY exist. Assuming a
+# sequence would be wrong -- numbers may have been skipped, and reporting a never
+# existing V4 as a missing table row would be a false alarm (TODO ffa6d846).
 fact_migration_numbers() {
   [ -d "$MIGRATIONS" ] || { echo "[]"; return; }
   find "$MIGRATIONS" -maxdepth 1 -name 'V*.sql' -printf '%f\n' 2>/dev/null \
@@ -116,16 +116,16 @@ fact_providers() {
   [ -d "$JAVA_SRC" ] || { MISSING+=("integration-providers: $JAVA_SRC fehlt"); echo 0; return; }
   grep -rl 'implements IntegrationProvider' "$JAVA_SRC" 2>/dev/null | wc -l | tr -d ' '
 }
-# Commit-Zahl der README-Kopftabelle. Zwei Faelle sind keine Messung und werden deshalb
-# nachweislich uebersprungen statt still durchgewunken:
+# Commit count of the README header table. Two cases are no measurement and are therefore
+# demonstrably skipped instead of silently waved through:
 #
-#   1. Kein Git-Repo (Fixture, entpacktes Archiv) — git antwortet nicht.
-#   2. Flacher Klon — git antwortet mit der geholten Tiefe statt mit der Wahrheit, also mit
-#      einer plausibel aussehenden falschen Zahl. Das ist der gefaehrlichere Fall: Am
-#      2026-09-19 checkte der Public-Hygiene-Job ohne `fetch-depth: 0` aus, `rev-list` zaehlte
-#      1, und das Gate meldete "commits sagt 1550, Code 1" — ein Fehlbefund, der die CI rot
-#      faerbte und nichts ueber die Doku aussagte. Ein Gate, das eine Zahl nicht messen kann,
-#      darf keine nennen.
+#   1. No git repo (fixture, unpacked archive) — git does not answer.
+#   2. Shallow clone — git answers with the fetched depth instead of the truth, i.e. with
+#      a plausible-looking wrong number. That is the more dangerous case: on
+#      2026-09-19 the public-hygiene job checked out without `fetch-depth: 0`, `rev-list` counted
+#      1, and the gate reported "commits says 1550, code 1" — a false finding that turned CI red
+#      and said nothing about the docs. A gate that cannot measure a number
+#      must not name one.
 fact_commits_shallow() {
   [ "$(git -C "$ROOT" rev-parse --is-shallow-repository 2>/dev/null)" = "true" ]
 }
@@ -154,14 +154,14 @@ COMMITS="$(fact_commits)"
 # doc_facts_check.py. If a source is missing, the run aborts: an empty version
 # would silently wave every table row through.
 # ---------------------------------------------------------------------------
-pom_property() {  # $1 = Name des Property-Tags
+pom_property() {  # $1 = name of the property tag
   sed -n "s|.*<$1>\([^<]*\)</$1>.*|\1|p" "$POM" 2>/dev/null | head -1
 }
 pom_parent_version() {
   grep -A4 'spring-boot-starter-parent' "$POM" 2>/dev/null \
     | sed -n 's|.*<version>\([^<]*\)</version>.*|\1|p' | head -1
 }
-pkg_version() {  # $1 = Paketname
+pkg_version() {  # $1 = package name
   sed -n "s|.*\"$1\"[[:space:]]*:[[:space:]]*\"[^0-9]*\([0-9][^\"]*\)\".*|\1|p" "$PKG" 2>/dev/null | head -1
 }
 
@@ -182,9 +182,9 @@ for i in "${!VERSION_LABELS[@]}"; do
   VERSIONS_JSON="${VERSIONS_JSON}${VERSIONS_JSON:+,}\"${VERSION_LABELS[$i]}\":\"${VERSION_VALUES[$i]}\""
 done
 
-# Dateinamen, die das Onboarding frueher nannte, obwohl es sie nicht gibt. Geprueft
-# wird jedes Mal neu, ob sie wirklich fehlen — taucht die Datei wieder auf, faellt
-# die Regel von selbst weg statt falschen Alarm zu schlagen.
+# File names the onboarding used to mention although they do not exist. Each time it is
+# re-checked whether they really are missing — if the file reappears, the rule
+# drops out by itself instead of raising a false alarm.
 ABSENT_CANDIDATES=(tailwind.config.ts BlockTypeSelector.tsx BuiltInTemplates.java)
 ABSENT_JSON=""
 for name in "${ABSENT_CANDIDATES[@]}"; do
@@ -208,11 +208,11 @@ else
        "die Commit-Zahl der README-Kopftabelle wird nicht geprueft." >&2
 fi
 
-# Stichtag-Commits der README-Kopftabelle ("Stand … Commit `d23a09ed`"): Dort gilt die Zahl des
-# Stichtags, nicht die von HEAD (TODO 65c6dedc). Ein Commit, den git nicht kennt (etwa nach einem
-# History-Rewrite), geht als null mit – der Checker meldet ihn, statt still an HEAD zu messen.
-# Dasselbe gilt fuer einen Commit ausserhalb der Historie von HEAD: Nach einem Rewrite kennt ihn
-# lokal noch ein Sicherungs-Branch, die CI nicht – lokal gruen, in der CI rot (2026-09-30).
+# Reference-date commits of the README header table ("Stand … Commit `d23a09ed`"): there the number of the
+# reference date applies, not that of HEAD (TODO 65c6dedc). A commit git does not know (e.g. after a
+# history rewrite) goes in as null — the checker reports it instead of silently measuring at HEAD.
+# The same holds for a commit outside the history of HEAD: after a rewrite a backup branch
+# still knows it locally, CI does not — green locally, red in CI (2026-09-30).
 COMMITS_AT_JSON=""
 if [ -n "$COMMITS_JSON" ] && [ -f "$ROOT/README.de.md" ]; then
   pairs=""
@@ -226,8 +226,8 @@ if [ -n "$COMMITS_JSON" ] && [ -f "$ROOT/README.de.md" ]; then
   [ -n "$pairs" ] && COMMITS_AT_JSON=",\"commits-at\":{$pairs}"
 fi
 
-# MISSING wird in Subshells nicht gefuellt (Kommandosubstitution) — deshalb hier
-# zusaetzlich gegen 0 pruefen. Das ist die eigentliche Absicherung.
+# MISSING is not filled in subshells (command substitution) — hence additionally
+# check against 0 here. That is the actual safeguard.
 for pair in "block-types:$BLOCK_TYPES" "controllers:$CONTROLLERS" \
             "migration-max:$MIGRATION_MAX" "migrations:$MIGRATION_COUNT" \
             "templates:$TEMPLATES" "skills:$SKILLS" \
@@ -262,7 +262,7 @@ if [ "$FACTS_ONLY" -eq 1 ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Dateien einsammeln (relativ zur Wurzel, damit die Meldungen kurz bleiben)
+# Collect files (relative to the root, so the messages stay short)
 # ---------------------------------------------------------------------------
 FILES=()
 for target in "${TARGETS[@]}"; do

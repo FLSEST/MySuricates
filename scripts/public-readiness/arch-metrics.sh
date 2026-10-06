@@ -1,87 +1,87 @@
 #!/usr/bin/env bash
 #
-# arch-metrics.sh — deterministische Architektur-Metriken fuer das Architektur-Review.
+# arch-metrics.sh — deterministic architecture metrics for the architecture review.
 #
-# Misst mit Bordmitteln (JDK/git/coreutils/python3, keine neuen Abhaengigkeiten):
-#   ## packages  Paketabhaengigkeiten aus `jdeps -verbose:class` (nur com.automation.*)
-#   ## cycles    Zyklen zwischen Paketen (Tarjan in arch_cycles.py) — dieselben Paar-Kandidaten
-#                stehen zusaetzlich in der Allowlist von PackageCycleRatchetTest.ALLOWED_PAIRS,
-#                die cycle-Komponenten mit mehr als zwei Paketen in dessen CYCLE_COMPONENTS (die
-#                Groesse der groessten in MAX_CYCLE_COMPONENT_SIZE), beides unter
-#                ai-automation-backend/src/test/java/com/automation/architecture/. Wer ein
-#                Paket umbenennt oder verschiebt, muss diese Listen im selben Commit mitziehen —
-#                sonst schlaegt der Ratchet beim naechsten vollen Testlauf fehl, obwohl sich am
-#                tatsaechlichen Zyklus nichts geaendert hat.
-#   ## sizes     Zeilen je Java-Datei, Top 30, plus Schwellenzaehler (300/500)
-#   ## churn     geaenderte Dateien der letzten 90 Tage aus git log
-#   ## recent    geaenderte Dateien der letzten 7 Tage, mit Kennzeichen "neu angelegt" — Eingabe der
-#                Kandidatenwahl fuer das Urteil im Review (arch-findings.py, TODO e0e9495f)
-#   ## coupling  ein-/ausgehende Paketabhaengigkeiten, Top 15 nach ausgehend (seit Review 4.6.0
-#                nur noch Trendzahl, kein Befund)
-#   ## files     je Datei NCLOC (ncloc.py), Zeilen, Aenderungen in 90 Tagen und Kollaborateure je
-#                Spring-Bean — vollstaendig, Eingabe fuer arch-findings.py (TODO b8c06b94)
-#   ## ratchet   ALLOWLIST von SourceSizeRatchetTest, ALLOWED_PAIRS und CYCLE_COMPONENTS von
-#                PackageCycleRatchetTest, maschinenlesbar
-#   ## summary   Kennzahlen als key=value
-#   ## run       Laufzeit-Zustand (compile=reused|cached|compiled|…, jdeps=) — bewusst NICHT
-#                deterministisch
+# Measures with built-in tools (JDK/git/coreutils/python3, no new dependencies):
+#   ## packages  package dependencies from `jdeps -verbose:class` (com.automation.* only)
+#   ## cycles    cycles between packages (Tarjan in arch_cycles.py) — the same pair candidates
+#                are also in the allowlist of PackageCycleRatchetTest.ALLOWED_PAIRS,
+#                the cycle components with more than two packages in its CYCLE_COMPONENTS (the
+#                size of the largest in MAX_CYCLE_COMPONENT_SIZE), both under
+#                ai-automation-backend/src/test/java/com/automation/architecture/. Whoever
+#                renames or moves a package must update these lists in the same commit —
+#                otherwise the ratchet fails on the next full test run although nothing about
+#                the actual cycle changed.
+#   ## sizes     lines per Java file, top 30, plus threshold counters (300/500)
+#   ## churn     files changed in the last 90 days from git log
+#   ## recent    files changed in the last 7 days, flagged "newly created" — input for the
+#                candidate selection for the review verdict (arch-findings.py, TODO e0e9495f)
+#   ## coupling  incoming/outgoing package dependencies, top 15 by outgoing (since review 4.6.0
+#                only a trend figure, not a finding)
+#   ## files     per file NCLOC (ncloc.py), lines, changes in 90 days and collaborators per
+#                Spring bean — complete, input for arch-findings.py (TODO b8c06b94)
+#   ## ratchet   ALLOWLIST of SourceSizeRatchetTest, ALLOWED_PAIRS and CYCLE_COMPONENTS of
+#                PackageCycleRatchetTest, machine-readable
+#   ## summary   key figures as key=value
+#   ## run       runtime state (compile=reused|cached|compiled|…, jdeps=) — deliberately NOT
+#                deterministic
 #
-# Die Ausgabe ist ein Faktenblatt fuer einen KI-Block, der nur interpretiert — sie ist
-# stabil sortiert und enthaelt keine Zeitstempel.
+# The output is a fact sheet for an AI block that only interprets — it is
+# stably sorted and contains no timestamps.
 #
-# Determinismus, genau: alles vor `## run` ist zwischen zwei Laeufen byte-identisch,
-# solange (a) HEAD derselbe ist, (b) beide Laeufe im selben 90- bzw. 7-Tage-Fenster liegen
-# (also kein Commit ueber die Grenze rutscht) und (c) das gemessene Kompilat zum selben
-# Quellstand gehoert. Der Laufzeit-Zustand steht deshalb unter `## run`: `compile=` wechselt
-# beim ersten Lauf in einem frischen Arbeitsverzeichnis von `compiled` auf `reused` bzw.
-# `cached`, das ist kein Messunterschied und darf keinen Determinismus-Vergleich roetlich
-# faerben.
+# Determinism, precisely: everything before `## run` is byte-identical between two runs,
+# as long as (a) HEAD is the same, (b) both runs fall into the same 90- or 7-day window
+# (i.e. no commit slips across the boundary) and (c) the measured build belongs to the same
+# source state. The runtime state is therefore under `## run`: `compile=` switches
+# on the first run in a fresh working directory from `compiled` to `reused` or
+# `cached`; that is no measurement difference and must not turn a determinism
+# comparison red.
 #
-# Usage:  scripts/public-readiness/arch-metrics.sh [repo-root]        (Default: .)
-# Env:    ARCH_METRICS_COMPILE=0   nie kompilieren, nur vorhandenes target/classes nutzen
-#         AUTOMATION_ARCH_CACHE    Kompilat-Cache (Default: ~/.cache/mysuricates/arch-classes)
-#         ARCH_METRICS_CLASSES_OUT Datei, in die der Pfad des gemessenen Kompilats geschrieben wird
-#                                  (target/classes oder Cache-Eintrag) — fuer arch-seams.py, das dann
-#                                  denselben Bytecode liest, ohne die Cache-Regeln nachzubauen. Nicht
-#                                  im Faktenblatt: das bleibt frei von absoluten Pfaden.
-# Exit:   0 = Faktenblatt geschrieben (auch mit error=-Markierungen), 2 = Wurzel unbrauchbar
+# Usage:  scripts/public-readiness/arch-metrics.sh [repo-root]        (default: .)
+# Env:    ARCH_METRICS_COMPILE=0   never compile, only use an existing target/classes
+#         AUTOMATION_ARCH_CACHE    build cache (default: ~/.cache/mysuricates/arch-classes)
+#         ARCH_METRICS_CLASSES_OUT file the path of the measured build is written to
+#                                  (target/classes or cache entry) — for arch-seams.py, which then
+#                                  reads the same bytecode without rebuilding the cache rules. Not
+#                                  in the fact sheet: that stays free of absolute paths.
+# Exit:   0 = fact sheet written (also with error= markers), 2 = root unusable
 #
-# Zeitbudget: fehlt ai-automation-backend/target/classes, laeuft einmalig
-# `./mvnw -q -DskipTests compile` (~1-2 Minuten auf dem Dev-Host); jdeps und die Zaehler
-# brauchen danach ~10-20 Sekunden. Im Workflow deshalb timeout_seconds: 600.
+# Time budget: if ai-automation-backend/target/classes is missing, a one-off
+# `./mvnw -q -DskipTests compile` runs (~1-2 minutes on the dev host); jdeps and the counters
+# then need ~10-20 seconds. Hence timeout_seconds: 600 in the workflow.
 #
-# Kompilat-Cache: ein Workspace-Klon (isolierter Run) hat nie ein target/classes und wuerde
-# jedes Mal neu kompilieren. Liegt unter $AUTOMATION_ARCH_CACHE/<commit-sha>/ schon ein
-# Kompilat des gemessenen Commits, wird direkt daraus gemessen (compile=cached); sonst wird
-# kompiliert und das Ergebnis dort abgelegt (compile=compiled). Schluessel ist `git rev-parse
-# HEAD`, und nur bei sauberem Arbeitsbaum — bei uncommitteten Aenderungen waere ein Treffer
-# eine falsche Messung. Es bleiben die juengsten drei Eintraege liegen. Jeder Fehlschlag am
-# Cache ist still: gemessen wird dann eben frisch.
+# Build cache: a workspace clone (isolated run) never has a target/classes and would
+# recompile every time. If $AUTOMATION_ARCH_CACHE/<commit-sha>/ already holds a
+# build of the measured commit, it is measured directly from there (compile=cached); otherwise
+# it is compiled and the result stored there (compile=compiled). The key is `git rev-parse
+# HEAD`, and only with a clean working tree — with uncommitted changes a hit would
+# be a wrong measurement. The three most recent entries are kept. Every failure of the
+# cache is silent: then it is simply measured fresh.
 #
-# Parallele Laeufe: ein benutzter Eintrag wird beim Treffer frisch gestempelt (mtime), damit
-# das Aufraeumen ihn nicht mitten in der jdeps-Messung wegzieht, und ein bereits gueltiger
-# Eintrag wird nie ersetzt. Zwei Laeufe desselben Commits kommen sich damit nicht in die
-# Quere; schlimmstenfalls verwirft einer sein frisch kopiertes Staging.
+# Parallel runs: a used entry is freshly stamped (mtime) on a hit, so that
+# cleanup does not pull it away in the middle of the jdeps measurement, and an already valid
+# entry is never replaced. Two runs of the same commit thus do not get in each
+# other's way; at worst one discards its freshly copied staging.
 #
-# Bekanntes Restrisiko (TODO 26b3da40): Das Aufraeumen haelt nur die juengsten CACHE_KEEP=3
-# Eintraege und sperrt keinen, der gerade gelesen wird. Messen VIER Laeufe gleichzeitig je
-# einen anderen Commit, kann der vierte den Eintrag eines aktiven Lesers verdraengen. Das
-# frische Stempeln beim Treffer macht den Fall unwahrscheinlich (der aktive Eintrag ist dann
-# der juengste), schliesst ihn aber nicht aus. Folge waere ein Messfehler, keine falsche
-# Zahl: jdeps findet die Klassen nicht mehr und der Lauf weist das als NICHT GEMESSEN aus.
-# Vier gleichzeitige Architektur-Messungen verschiedener Commits kommen im heutigen Betrieb
-# nicht vor (die Audits laufen nach Zeitplan hintereinander); tritt es auf, ist die Antwort
-# eine Sperrdatei je Eintrag, nicht ein groesseres CACHE_KEEP.
+# Known residual risk (TODO 26b3da40): cleanup only keeps the most recent CACHE_KEEP=3
+# entries and locks none that is currently being read. If FOUR runs measure a different
+# commit each at the same time, the fourth can evict the entry of an active reader. The
+# fresh stamping on a hit makes the case unlikely (the active entry is then the
+# most recent), but does not rule it out. The consequence would be a measurement failure, not a wrong
+# number: jdeps no longer finds the classes and the run reports that as NOT MEASURED.
+# Four simultaneous architecture measurements of different commits do not occur in today's
+# operation (the audits run one after another on a schedule); if it happens, the answer
+# is a lock file per entry, not a larger CACHE_KEEP.
 #
-# Bewusst ohne common.sh: dessen run_limited/MAX_LINES wuerde das Faktenblatt kuerzen und
-# cd_root die uebergebene Wurzel ignorieren.
+# Deliberately without common.sh: its run_limited/MAX_LINES would truncate the fact sheet and
+# cd_root would ignore the passed root.
 #
 set -uo pipefail
 export LC_ALL=C
 
-# Vor dem cd aufloesen: wurde das Skript ueber einen relativen Pfad aufgerufen, zeigt
-# dirname "$0" nach dem Wechsel in die gemessene Wurzel ins Leere — arch_cycles.py waere
-# dann nicht auffindbar und die Zyklen still "nicht gemessen".
+# Resolve before the cd: if the script was called via a relative path, dirname "$0"
+# points nowhere after changing into the measured root — arch_cycles.py would then
+# not be found and the cycles silently "not measured".
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 ROOT_ARG="${1:-.}"
@@ -106,14 +106,14 @@ note_error() { ERRORS="${ERRORS:+$ERRORS,}$1"; }
 : > "$TMP/recent.tsv"
 
 # ---------------------------------------------------------------------------
-# Klassen bereitstellen (jdeps braucht Bytecode, kein Quelltext)
+# Provide classes (jdeps needs bytecode, not source)
 # ---------------------------------------------------------------------------
 CACHE_ROOT="${AUTOMATION_ARCH_CACHE:-${HOME:-$TMP}/.cache/mysuricates/arch-classes}"
 CACHE_KEEP=3
 
-# Cache-Schluessel ist der gemessene Commit — und nur, wenn der Arbeitsstand ihm entspricht.
-# Bei uncommitteten Aenderungen waere ein Treffer eine falsche Messung: gemessen wuerde der
-# Commit, gemeldet der Arbeitsstand. Kein Repo, kein HEAD, schmutziger Baum ⇒ kein Cache.
+# The cache key is the measured commit — and only if the working state matches it.
+# With uncommitted changes a hit would be a wrong measurement: the commit would be measured,
+# the working state reported. No repo, no HEAD, dirty tree ⇒ no cache.
 cache_key() {
   git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1 || return 1
   local sha
@@ -125,9 +125,9 @@ cache_key() {
 
 has_classes() { [ -n "$(find "$1" -name '*.class' -print -quit 2>/dev/null)" ]; }
 
-# Nur die juengsten CACHE_KEEP Eintraege bleiben liegen; ein Kompilat je Commit waechst sonst
-# ueber die Monate zu einem stillen Gigabyte im Home-Verzeichnis heran. Punkt-Verzeichnisse
-# (Staging eines parallelen Laufs) zaehlen nicht mit und werden nicht angetastet.
+# Only the most recent CACHE_KEEP entries are kept; one build per commit would otherwise grow
+# over the months into a silent gigabyte in the home directory. Dot directories
+# (staging of a parallel run) do not count and are not touched.
 prune_cache() {
   find "$CACHE_ROOT" -mindepth 1 -maxdepth 1 -type d ! -name '.*' -printf '%T@\t%p\n' 2>/dev/null \
     | sort -rn \
@@ -137,19 +137,19 @@ prune_cache() {
       done
 }
 
-# Ein Treffer wird benutzt, also frisch gestempelt: jdeps liest 10-20 s daraus, und der
-# Keep-3-Rang geht nach mtime — ohne das koennte ein paralleler Lauf den Eintrag genau
-# waehrend der Messung wegraeumen und wir wuerden einen halben Klassenbaum messen.
+# A hit is used, so freshly stamped: jdeps reads from it for 10-20 s, and the
+# keep-3 ranking goes by mtime — without it a parallel run could clean the entry up right
+# during the measurement and we would measure half a class tree.
 touch_cache() { touch "$1" 2>/dev/null || true; }
 
-# Ablegen ist Kuer: jeder Fehlschlag (Rechte, volle Platte, unbrauchbarer Pfad) bleibt still,
-# das Faktenblatt ist davon unberuehrt.
-store_cache() {  # $1 = Schluessel, $2 = Quellverzeichnis
+# Storing is optional: every failure (permissions, full disk, unusable path) stays silent,
+# the fact sheet is unaffected.
+store_cache() {  # $1 = key, $2 = source directory
   [ -n "$1" ] || return 0
   has_classes "$2" || return 0
   local entry="$CACHE_ROOT/$1"
-  # Ein gueltiger Eintrag wird nie ersetzt — ein Treffer ist ein Treffer, und ein paralleler
-  # Lauf koennte gerade daraus messen. Nur ein halb geschriebener Rest wird aufgeraeumt.
+  # A valid entry is never replaced — a hit is a hit, and a parallel
+  # run might be measuring from it right now. Only a half-written remainder is cleaned up.
   if has_classes "$entry"; then
     touch_cache "$entry"
     prune_cache
@@ -168,9 +168,9 @@ COMPILE_STATE="reused"
 if [ ! -d "$CLASSES" ]; then
   CACHE_KEY="$(cache_key)" || CACHE_KEY=""
   if [ -n "$CACHE_KEY" ] && [ -d "$CACHE_ROOT/$CACHE_KEY" ] && has_classes "$CACHE_ROOT/$CACHE_KEY"; then
-    # Direkt aus dem Cache messen statt zurueckzukopieren: jdeps liest nur, und target/classes
-    # bleibt so das, was ein echter Build dort hinterlaesst. Vorher stempeln, damit der
-    # Eintrag waehrend der Messung nicht von einem parallelen Lauf weggeraeumt wird.
+    # Measure directly from the cache instead of copying back: jdeps only reads, and target/classes
+    # thus stays what a real build leaves there. Stamp first, so the
+    # entry is not cleaned up by a parallel run during the measurement.
     CLASSES="$CACHE_ROOT/$CACHE_KEY"
     touch_cache "$CLASSES"
     COMPILE_STATE="cached"
@@ -191,16 +191,16 @@ fi
 [ -d "$CLASSES" ] || note_error "classes_missing"
 
 # ---------------------------------------------------------------------------
-# Paketkanten aus jdeps: Klassenkanten werden auf Paketebene aggregiert,
-# Selbstkanten (Paket auf sich selbst) fallen weg.
+# Package edges from jdeps: class edges are aggregated at package level,
+# self edges (package onto itself) are dropped.
 # ---------------------------------------------------------------------------
 JDEPS_STATE="ok"
 if ! command -v jdeps >/dev/null 2>&1; then
   JDEPS_STATE="missing"
   note_error "jdeps_missing"
 elif [ -d "$CLASSES" ]; then
-  # Erst roh einsammeln, dann auswerten: in einer Pipe ginge der Rueckgabewert von jdeps
-  # verloren und ein Fehlschlag saehe aus wie "keine Abhaengigkeiten".
+  # Collect raw first, then evaluate: in a pipe the return value of jdeps would be
+  # lost and a failure would look like "no dependencies".
   jdeps -verbose:class -filter:none "$CLASSES" > "$TMP/jdeps.raw" 2>"$TMP/jdeps.err"
   JDEPS_RC=$?
   awk 'NF==4 && $2=="->" && $1 ~ /^com\.automation\./ && $3 ~ /^com\.automation\./ {
@@ -227,8 +227,8 @@ else
   JDEPS_STATE="no_classes"
 fi
 
-# Zyklen: ein Fehlschlag der Erkennung darf nicht als "keine Zyklen" durchgehen — das waere
-# falsch-gruen in genau der Dimension, fuer die das Faktenblatt gebaut wurde.
+# Cycles: a failure of the detection must not pass as "no cycles" — that would be
+# a false green in exactly the dimension the fact sheet was built for.
 CYCLES_STATE="no_edges"
 if [ -s "$TMP/edges.tsv" ]; then
   if cut -f1,2 "$TMP/edges.tsv" | python3 "$SCRIPT_DIR/arch_cycles.py" > "$TMP/cycles.tsv" 2>"$TMP/cycles.err"; then
@@ -241,10 +241,10 @@ if [ -s "$TMP/edges.tsv" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Dateigroessen — gleiche Zaehlweise wie SourceSizeRatchetTest
-# (Files.readAllLines(..).size(): awk zaehlt eine letzte Zeile ohne Zeilenumbruch mit).
-# Leere Dateien liefern awk keinen Satz und wuerden fehlen — sie kommen per find -empty
-# mit 0 Zeilen dazu, damit die Zeilenzahl der Liste zu files= passt.
+# File sizes — same counting as SourceSizeRatchetTest
+# (Files.readAllLines(..).size(): awk also counts a last line without a newline).
+# Empty files yield no record in awk and would be missing — they are added via find -empty
+# with 0 lines, so that the line count of the list matches files=.
 # ---------------------------------------------------------------------------
 FILES=0
 if [ -d "$SRC" ]; then
@@ -262,13 +262,13 @@ FILES_OVER_300=$(awk -F'\t' '$1 > 300' "$TMP/sizes.tsv" | wc -l | tr -d ' ')
 FILES_OVER_500=$(awk -F'\t' '$1 > 500' "$TMP/sizes.tsv" | wc -l | tr -d ' ')
 
 # ---------------------------------------------------------------------------
-# Git-Churn der letzten 90 Tage
+# Git churn of the last 90 days
 # ---------------------------------------------------------------------------
 COMMIT="unknown"
 if git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1; then
   COMMIT=$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)
-  # Ein flacher Klon (git clone --depth 1) kennt nur den letzten Commit: jede Datei haette dann
-  # 0 oder 1 Aenderung, und kein Hotspot waere eine Messluecke, die wie Sauberkeit aussieht.
+  # A shallow clone (git clone --depth 1) knows only the last commit: every file would then have
+  # 0 or 1 changes, and no hotspot would be a measurement gap that looks like cleanliness.
   if [ "$(git -C "$ROOT" rev-parse --is-shallow-repository 2>/dev/null)" = "true" ]; then
     note_error "shallow_history"
   fi
@@ -278,8 +278,8 @@ if git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1; then
     | sort | uniq -c \
     | awk '{ print $1 "\t" $2 }' \
     | sort -k1,1rn -k2,2 > "$TMP/churn.tsv"
-  # Die letzten 7 Tage (ein Review-Takt) getrennt: Aenderungen je Datei und ob sie im Fenster neu
-  # angelegt wurde. Die Kandidatenwahl fuer das Urteil (arch-findings.py) nimmt daraus neue Klassen.
+  # The last 7 days (one review cycle) separately: changes per file and whether it was newly
+  # created in the window. The candidate selection for the verdict (arch-findings.py) takes new classes from it.
   git -C "$ROOT" log --since=7.days --diff-filter=A --name-only --format= -- ai-automation-backend/src/main/java 2>/dev/null \
     | grep -v '^$' | sed 's#^ai-automation-backend/src/main/java/##' | sort -u > "$TMP/added.txt"
   git -C "$ROOT" log --since=7.days --name-only --format= -- ai-automation-backend/src/main/java 2>/dev/null \
@@ -295,8 +295,8 @@ fi
 CHURN_FILES=$(wc -l < "$TMP/churn.tsv" | tr -d ' ')
 
 # ---------------------------------------------------------------------------
-# Je Datei: NCLOC (ncloc.py), Kollaborateure je Spring-Bean, Aenderungen — die Grundlage
-# der deterministischen Einstufung (arch-findings.py, TODO b8c06b94).
+# Per file: NCLOC (ncloc.py), collaborators per Spring bean, changes — the basis
+# of the deterministic grading (arch-findings.py, TODO b8c06b94).
 # ---------------------------------------------------------------------------
 : > "$TMP/ncloc.tsv"
 : > "$TMP/deps.tsv"
@@ -306,15 +306,15 @@ if [ -d "$SRC" ]; then
     note_error "ncloc_failed"
     : > "$TMP/ncloc.tsv"
   fi
-  # Kollaborateure = injizierte Felder "private final <Typ> <name>;" (ohne Initialisierer, nicht
-  # static) der aeusseren Klasse einer Spring-Bean. Diese Typen sind keine Kollaborateure, sondern
-  # Werkzeug, Konfigurationswert oder Zustand — einzige Ausschlussliste. List, Map und Set stehen
-  # bewusst nicht darauf: ohne Initialisierer ist so ein Feld fast immer eine per Konstruktor
-  # injizierte Bean-Sammlung (List<BlockExecutor>), Zustand hat einen Initialisierer.
-  # Gezaehlt werden die Zeilen, die auf Klammertiefe 1 beginnen, im Rumpf des Top-Level-Typs; ein Feld
-  # einer inneren Klasse (WorkflowStatsService.RunStatistics.runs) ist Zustand eines Wertobjekts.
-  # Klammern in Kommentaren (auch hinter https:// im Javadoc), Literalen und Textbloecken zaehlen nicht.
-  # Bis 4.5.2 lief diese Zaehlung im Block delta_scan des Workflows; hier ist sie testbar.
+  # Collaborators = injected fields "private final <type> <name>;" (without initializer, not
+  # static) of the outer class of a Spring bean. These types are no collaborators but
+  # tool, configuration value or state — the only exclusion list. List, Map and Set are
+  # deliberately not on it: without an initializer such a field is almost always a bean collection
+  # injected via constructor (List<BlockExecutor>), state has an initializer.
+  # Counted are the lines starting at bracket depth 1, in the body of the top-level type; a field
+  # of an inner class (WorkflowStatsService.RunStatistics.runs) is state of a value object.
+  # Brackets in comments (also after https:// in Javadoc), literals and text blocks do not count.
+  # Up to 4.5.2 this counting ran in the delta_scan block of the workflow; here it is testable.
   BEAN_RE='^@(Service|Component|RestController|Controller|Configuration|Repository)\b'
   NON_COLLAB_RE='^(String|int|long|boolean|double|Integer|Long|Boolean|Path|Duration|Instant|Pattern|Clock|ObjectMapper|TransactionTemplate|SimpMessagingTemplate|MeterRegistry|Logger|ExecutorService|ScheduledExecutorService|[A-Za-z]*Supplier|UnaryOperator|Deque|Concurrent[A-Za-z]*|Atomic[A-Za-z]*|[A-Za-z]*Lock|[A-Za-z]*Config|[A-Za-z]*Properties)$'
   ( cd "$SRC" && [ -s "$TMP/java-files.txt" ] \
@@ -362,7 +362,7 @@ if [ -d "$SRC" ]; then
     END { if (file != "") print deps "\t" file }' ) > "$TMP/deps.tsv" 2>/dev/null || note_error "collaborators_failed"
   fi
 fi
-# Zusammenfuehren: ncloc, zeilen, aenderungen (90 Tage), deps ("-" = keine Spring-Bean), datei.
+# Merge: ncloc, lines, changes (90 days), deps ("-" = no Spring bean), file.
 awk -F'\t' 'FILENAME == ARGV[1] { deps[$2] = $1; next }
             FILENAME == ARGV[2] { churn[$2] = $1; next }
             { d = ($3 in deps) ? deps[$3] : "-"; c = ($3 in churn) ? churn[$3] : 0
@@ -371,9 +371,9 @@ awk -F'\t' 'FILENAME == ARGV[1] { deps[$2] = $1; next }
   | sort -t "$(printf '\t')" -k1,1rn -k5,5 > "$TMP/files.tsv"
 
 # ---------------------------------------------------------------------------
-# Grenzen der Architektur-Tests: SourceSizeRatchetTest.ALLOWLIST (Obergrenze je Datei),
-# PackageCycleRatchetTest.ALLOWED_PAIRS und .CYCLE_COMPONENTS. Die Einstufung stuft danach
-# bekannte, testueberwachte Zyklen herab und nennt Ratchet-Obergrenzen in der evidence.
+# Limits of the architecture tests: SourceSizeRatchetTest.ALLOWLIST (upper bound per file),
+# PackageCycleRatchetTest.ALLOWED_PAIRS and .CYCLE_COMPONENTS. The grading then downgrades
+# known, test-monitored cycles and names ratchet upper bounds in the evidence.
 # ---------------------------------------------------------------------------
 ARCH_TESTS="$BACKEND/src/test/java/com/automation/architecture"
 python3 - "$ARCH_TESTS" > "$TMP/ratchet.tsv" 2>/dev/null <<'PY' || printf 'state\tfailed\n' > "$TMP/ratchet.tsv"
@@ -408,7 +408,7 @@ PY
 RATCHET_STATE=$(awk -F'\t' '$1 == "state" { print $2; exit }' "$TMP/ratchet.tsv")
 
 # ---------------------------------------------------------------------------
-# Ausgabe
+# Output
 # ---------------------------------------------------------------------------
 printf '## packages\n'
 printf '# Paketabhaengigkeiten aus jdeps -verbose:class, nur com.automation.*, ohne Selbstkanten\n'
@@ -491,7 +491,7 @@ if [ -d "$CLASSES/com/automation" ]; then
   PACKAGES=$(find "$CLASSES/com/automation" -type f -name '*.class' | sed 's#/[^/]*$##' | sort -u | wc -l | tr -d ' ')
 fi
 EDGES=$(wc -l < "$TMP/edges.tsv" | tr -d ' ')
-# grep -c schreibt bei 0 Treffern "0" und endet mit 1 — kein "|| echo 0", das ergaebe zwei Zeilen.
+# grep -c prints "0" on 0 hits and exits with 1 — no "|| echo 0", that would yield two lines.
 CYCLES=$(grep -c '^cycle' "$TMP/cycles.tsv" 2>/dev/null); CYCLES=${CYCLES:-0}
 PAIRS=$(grep -c '^pair' "$TMP/cycles.tsv" 2>/dev/null); PAIRS=${PAIRS:-0}
 MAX_LINES=$(head -1 "$TMP/sizes.tsv" 2>/dev/null | cut -f1)
@@ -513,9 +513,9 @@ printf 'ratchet_state=%s\n' "${RATCHET_STATE:-failed}"
 printf 'commit=%s\n' "$COMMIT"
 [ -n "$ERRORS" ] && printf 'error=%s\n' "$ERRORS"
 
-# ## run steht bewusst am Ende und ausserhalb des Determinismus-Vergleichs: compile= haengt
-# davon ab, ob das Arbeitsverzeichnis (oder der Cache) schon ein Kompilat hatte, nicht vom
-# gemessenen Stand.
+# ## run is deliberately at the end and outside the determinism comparison: compile= depends
+# on whether the working directory (or the cache) already had a build, not on the
+# measured state.
 printf '\n## run\n'
 printf '# Laufzeit-Zustand, nicht Teil des Determinismus-Vergleichs\n'
 printf 'compile=%s\n' "$COMPILE_STATE"

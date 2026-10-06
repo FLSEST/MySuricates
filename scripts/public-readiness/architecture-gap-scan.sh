@@ -7,15 +7,15 @@ find ai-automation-backend/src/main -maxdepth 6 -type d 2>/dev/null | sed 's#^#d
 section "Frontend folder/component shape"
 find ai-automation-frontend/src -maxdepth 3 -type d 2>/dev/null | sed 's#^#dir: #' | head -180 | redact || true
 section "Layering markers count"
-# TODO/FIXME/HACK zaehlt hier nicht mehr: das Rohmuster traf auch jede TODO-ID in Kommentaren
-# und widersprach so dead-code-scan.sh, das die Marker-Inventur fuehrt (TODO 428ee1ec).
+# TODO/FIXME/HACK is no longer counted here: the raw pattern also matched every TODO id in comments
+# and so contradicted dead-code-scan.sh, which owns the marker inventory (TODO 428ee1ec).
 for pat in 'Controller' 'Service' 'Repository' 'Entity' 'Component' 'Provider' 'Store' 'Context'; do
   count=$(pgrep_count_total "$pat" ai-automation-backend/src ai-automation-frontend/src)
   printf '%s: %s\n' "$pat" "$count"
 done
-# Vorhandene Grenzpruefungen erkennen, statt pauschal "fuehrt ArchUnit ein" zu empfehlen
-# (TODO 428ee1ec): Das Backend misst Schichten, Paketzyklen und Modul-Zuordnung ueber eigene
-# Tests unter architecture/, das Frontend hat bislang keine deterministische Pruefung.
+# Detect existing boundary checks instead of blanket-recommending "introduce ArchUnit"
+# (TODO 428ee1ec): the backend measures layers, package cycles and module assignment via its own
+# tests under architecture/, the frontend has no deterministic check so far.
 section "Boundary checks present"
 backend_checks=$(find ai-automation-backend/src/test -type f \( -name '*LayerRule*Test.java' -o -name '*PackageCycle*Test.java' \
   -o -name '*PackageEdges*Test.java' -o -name '*ModuleGate*Test.java' -o -name '*Arch*Test.java' \) 2>/dev/null | sort)

@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
-"""Schwachstellen der Abhaengigkeiten als Zaehlung — ohne Fremdpakete (TODO 0f6d23b2).
+"""Dependency vulnerabilities as counts - no third-party packages (TODO 0f6d23b2).
 
     dep_vuln_check.py npm   <npm-audit.json>
     dep_vuln_check.py maven <mvn-dependency-list.txt>
 
-npm:   liest die Ausgabe von `npm audit --json` und gibt je Schweregrad eine Zahl
-       aus, dazu die Paketnamen mit high/critical.
-maven: liest die Ausgabe von `mvn dependency:list -DoutputFile=...`, fragt die
-       Koordinaten gesammelt bei der OSV.dev-Batch-API ab (nur oeffentliche
-       group:artifact:version, keine Inhalte) und holt fuer die Treffer den
-       Schweregrad. Mit OSV_FIXTURE=<datei> liest es stattdessen eine Antwort
-       {"batch": <querybatch-Antwort>, "vulns": {id: <vuln>}} — fuer Tests ohne Netz.
+npm:   reads the output of `npm audit --json` and prints one number per severity,
+       plus the package names with high/critical.
+maven: reads the output of `mvn dependency:list -DoutputFile=...`, queries the
+       coordinates in bulk at the OSV.dev batch API (only public
+       group:artifact:version, no contents) and fetches the severity for the
+       hits. With OSV_FIXTURE=<file> it reads a response instead:
+       {"batch": <querybatch response>, "vulns": {id: <vuln>}} - for tests without network.
 
-Ausgabe: `schluessel: wert`-Zeilen fuer den Report. Ist die Quelle nicht lesbar
-oder OSV nicht erreichbar, steht `<quelle>: unavailable (...)` da und der Exit-Code
-ist 2 — eine ausgefallene Pruefung darf nicht als sauber durchgehen.
+Output: `key: value` lines for the report. If the source is unreadable or OSV
+unreachable, `<source>: unavailable (...)` is printed and the exit code is 2 -
+a failed check must not pass as clean.
 """
 import json
 import os

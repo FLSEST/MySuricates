@@ -77,16 +77,7 @@
 1 scripts/lib/tui.sh
 3 scripts/load-test/report.py
 1 scripts/public-readiness/arch-findings.py
-81 scripts/public-readiness/arch-metrics.sh
-19 scripts/public-readiness/arch-seams.py
-8 scripts/public-readiness/arch_cycles.py
-5 scripts/public-readiness/architecture-gap-scan.sh
-5 scripts/public-readiness/dead-code-scan.sh
-8 scripts/public-readiness/dep_vuln_check.py
-3 scripts/public-readiness/dependency-risk-scan.sh
-33 scripts/public-readiness/doc-facts-check.sh
-144 scripts/public-readiness/doc_facts_check.py
-9 scripts/public-readiness/docs-check.sh
+3 scripts/public-readiness/doc_facts_check.py
 54 scripts/public-readiness/docs_orphan_scan.py
 64 scripts/public-readiness/docs_parity_check.py
 52 scripts/public-readiness/frontend-metrics.sh
