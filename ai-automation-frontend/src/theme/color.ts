@@ -1,7 +1,7 @@
 /**
- * Farbmathematik für die Theme-Ableitung: WCAG-Kontrast, Mischen, HLS-Helligkeit
- * (wie Pythons colorsys) und OKLCH für wahrnehmungsnahe Farbtöne/Abstände.
- * Alle Farben sind 6-stellige Hex-Strings.
+ * Color math for theme derivation: WCAG contrast, mixing, HLS lightness
+ * (like Python's colorsys) and OKLCH for perceptually uniform hues/distances.
+ * All colors are 6-digit hex strings.
  */
 
 type Rgb = [number, number, number]; // 0..1

@@ -46,7 +46,7 @@ export function SimpleTodos() {
     [openQ.data, inProgQ.data],
   );
 
-  // Einmal beim Mounten festgehalten: Date.now() im Render ist unrein (react-hooks 7.1).
+  // Captured once on mount: Date.now() in render is impure (react-hooks 7.1).
   const [now] = useState(() => Date.now());
   const isOverdue = (td: Todo) => !!td.dueDate && new Date(td.dueDate).getTime() < now;
   const isResolving = (td: Todo) => td.resolutionState === 'RUNNING' || (td.status === 'IN_PROGRESS' && !!td.lastFixRunId);

@@ -40,13 +40,13 @@ const GOAL_STATUSES: GoalStatus[] = ['ACTIVE', 'DONE', 'ARCHIVED'];
 
 type GoalView = 'outline' | 'list' | 'map' | 'timeline';
 /**
- * Neuer Schlüssel mit der Gliederung als Standard (c60bf914) – unter dem alten stünde bei allen, die
- * schon eine Ansicht gewählt hatten, weiter die alte, und die Gliederung bliebe unentdeckt.
+ * New key with the outline as default (c60bf914) – under the old one, everyone who had
+ * already picked a view would still get the old one, and the outline would stay undiscovered.
  */
 const VIEW_KEY = 'mysuricates-goal-view-v2';
-// Die Workflow-Zuordnung (Wert `map`) steht ganz rechts (52bc1e8c) – gespeichert bleibt `map` gültig
+// The workflow mapping (value `map`) sits far right (52bc1e8c) – a stored `map` stays valid
 const VIEWS: readonly GoalView[] = ['outline', 'list', 'timeline', 'map'];
-/** Immer als Tag-Vorschlag dabei: Ziele sind oft Releases. */
+ /** Always offered as a tag suggestion: goals are often releases. */
 const DEFAULT_TAG_SUGGESTION = 'release';
 
 function readView(): GoalView {
@@ -62,19 +62,19 @@ function storeView(view: GoalView) {
   try {
     localStorage.setItem(VIEW_KEY, view);
   } catch {
-    // privates Fenster oder gesperrter Speicher: die Wahl gilt dann nur bis zum Neuladen
+    // private window or blocked storage: the choice then only holds until reload
   }
 }
 
 // Stored as "true"/"false" – valid JSON, so usePersistedState reads the values written before it (8edfae0d)
 const WORKFLOW_PANEL_OPEN_KEY = 'mysuricates-goal-workflow-panel-open';
 
-/** Nur in der Workflow-Zuordnung umschließt das Ziehen Karte und Leiste; sonst bleibt alles, wie es ist. */
+ /** Only in the workflow mapping does dragging wrap the card and the bar; otherwise everything stays as is. */
 function WorkflowMapFrame({ on, children, ...props }: Omit<ComponentProps<typeof WorkflowMapDnd>, 'children'> & { on: boolean; children: ReactNode }) {
   return on ? <WorkflowMapDnd {...props}>{children}</WorkflowMapDnd> : <>{children}</>;
 }
 
-/** `release` und die häufigsten Tags der TODOs des Ziels. */
+ /** `release` and the most frequent tags of the goal's TODOs. */
 function tagSuggestions(todos: GoalTodoItem[]): string[] {
   const counts = new Map<string, number>();
   todos.flatMap((todo) => todo.tags).forEach((tag) => counts.set(tag, (counts.get(tag) ?? 0) + 1));
@@ -83,11 +83,11 @@ function tagSuggestions(todos: GoalTodoItem[]): string[] {
 }
 
 /**
- * Ein Ziel mit seinen TODOs (TODO dc0566f8): gegliedert in Meilensteine, Projekte und Arbeitspakete
- * (Standard, c60bf914), als Liste – was als Nächstes drankommt, offene Fragen, Erledigtes –, als
- * Relationskarte, woher die TODOs kommen und welche Workflows sie abarbeiten (TODO c6ea8f5c), oder als
- * Zeitstrahl mit Meilensteinen, Arbeitspaketen als Balken und Fälligkeiten (TODO e192df18). Im Kopf
- * der Schalter für den Ziel-Wächter, darunter Vorschläge, die zum Ziel passen könnten.
+ * One goal with its TODOs (TODO dc0566f8): outlined into milestones, projects and work packages
+ * (default, c60bf914), as a list – what comes next, open questions, done items –, as a
+ * relation map of where the TODOs come from and which workflows work them off (TODO c6ea8f5c), or as a
+ * timeline with milestones, work packages as bars and due dates (TODO e192df18). In the header
+ * the switch for the goal guard, below it suggestions that might fit the goal.
  */
 export function GoalDetail() {
   const { goalId } = useParams<{ goalId: string }>();
@@ -95,7 +95,7 @@ export function GoalDetail() {
   const locale = useI18nStore((s) => s.locale);
   const navigate = useNavigate();
   const [view, setView] = useState<GoalView>(readView);
-  // Workflow-Leiste der Workflow-Zuordnung (52bc1e8c): gemerkt, ob sie offen ist; auf dem Handy gibt es kein Ziehen
+  // Workflow bar of the workflow mapping (52bc1e8c): remembers whether it is open; no dragging on mobile
   const [workflowPanel, setWorkflowPanel] = usePersistedState(WORKFLOW_PANEL_OPEN_KEY, true);
   const mobile = useIsMobile();
   const [filter, setFilter] = useState<CandidateFilter>({ q: '', tag: '' });
@@ -121,7 +121,7 @@ export function GoalDetail() {
   const updateGoal = useUpdateGoal();
   const deleteGoal = useDeleteGoal();
   const add = useAddTodoToGoal(goalId ?? '');
-  // „Zeigen“ im Toast (85889063): Liste und Workflow-Zuordnung haben keinen Platz dafür – dann die Gliederung
+  // „Zeigen“ in the toast (85889063): list and workflow mapping have no room for it – then the outline
   useEffect(() => {
     const unsubscribe = useGoalReveal.subscribe((state) => {
       if (state.request?.goalId !== goalId) return;
@@ -138,10 +138,10 @@ export function GoalDetail() {
   }, [goalId]);
   const structure = useMemo(() => (data ? structureOf(data) : undefined), [data]);
   const decisionScope = useMemo(() => (goalId ? { goalId, enabled: !!data?.decisionsSupported } : null), [goalId, data?.decisionsSupported]);
-  // Seitenleiste (c60bf914): Auswahl in der URL, damit Zurück und Neuladen sie behalten
+  // Side panel (c60bf914): selection in the URL so Back and reload keep it
   const location = useLocation();
   const selectedParam = new URLSearchParams(location.search).get(SELECTION_PARAM);
-  /** Neue Suche mit geänderter Auswahl – lesbar (`item=milestone:<id>`), ohne `%3A`. */
+ /** New search with changed selection – readable (`item=milestone:<id>`), without `%3A`. */
   const withSelection = useCallback((value: string | null) => {
     const params = new URLSearchParams(location.search);
     if (value) params.set(SELECTION_PARAM, value);
@@ -152,10 +152,10 @@ export function GoalDetail() {
   const selected = useMemo(() => parseSelection(selectedParam), [selectedParam]);
   const selectionTrigger = useRef<HTMLElement | null>(null);
   const select = useCallback((next: GoalSelection, trigger?: HTMLElement | null) => {
-    // Aus der Leiste heraus (verknüpftes Paket, Meilenstein) bleibt der ursprüngliche Auslöser das Ziel des Fokus
+    // From the bar (linked package, milestone) the original trigger stays the goal of the focus
     if (trigger && !trigger.closest('[data-testid="goal-side-panel"]')) selectionTrigger.current = trigger;
-    // Ersetzen statt anhängen (Review c60bf914): Jedes Öffnen, Wechseln und Schließen neu im Verlauf
-    // hieße, sich mit Zurück durch die Auswahl zu klicken, statt die Seite zu verlassen
+    // Replace instead of append (review c60bf914): every open, switch and close as a new history entry
+    // would mean clicking Back through the selection instead of leaving the page
     navigate({ search: withSelection(selectionValue(next)) }, { replace: true });
   }, [navigate, withSelection]);
   const closeSelection = useCallback(() => {
@@ -183,7 +183,7 @@ export function GoalDetail() {
     setView(next);
     storeView(next);
   };
-  /** Pakete, in die ein Kandidat passt: die seines Projekts (und solche ohne Projekt), in ihrer Reihenfolge. */
+  /** Packages a candidate fits into: those of its project (and those without a project), in their order. */
   const packagesOf = (todo: Todo): PackageChoice[] => [...workPackages]
     .filter((item) => item.projectId === null || item.projectId === todo.projectId)
     .sort((a, b) => Number(a.projectId === null) - Number(b.projectId === null) || a.position - b.position)

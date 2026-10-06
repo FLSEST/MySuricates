@@ -21,7 +21,7 @@ export function SimpleRuns() {
 
   const ordered = useMemo(() => {
     const runs = [...(runsPage?.content ?? [])];
-    // Fehler zuerst, dann nach Startzeit absteigend.
+    // Failures first, then by start time descending.
     return runs.sort((a, b) => {
       const af = a.status === 'FAILED' ? 0 : 1;
       const bf = b.status === 'FAILED' ? 0 : 1;

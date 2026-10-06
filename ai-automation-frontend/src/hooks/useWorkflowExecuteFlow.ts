@@ -14,8 +14,8 @@ interface ExecuteDialogState {
 const CLOSED: ExecuteDialogState = { open: false, workflow: null, variables: [] };
 
 /**
- * Ausführen aus der Workflow-Liste: ohne Variablen sofort, mit Variablen erst über den Dialog
- * (Pflicht/optional, Beschreibungen und Platzhalter aus dem Kontext-Schema); danach zur Laufseite.
+ * Running from the workflow list: immediately without variables, with variables via the dialog first
+ * (required/optional, descriptions and placeholders from the context schema); then to the run page.
  */
 export function useWorkflowExecuteFlow() {
   const navigate = useNavigate();

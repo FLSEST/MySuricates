@@ -3,8 +3,8 @@ import { useImportWorkflow } from './useWorkflows';
 import type { WorkflowExportData } from '../types';
 
 /**
- * Import einer exportierten Workflow-Datei aus der Liste: die gelesene Datei öffnet den Dialog
- * (Name vorbelegt, Projekt leer), Importieren schließt ihn nach Erfolg.
+ * Import of an exported workflow file from the list: the file that was read opens the dialog
+ * (name prefilled, project empty), importing closes it on success.
  */
 export function useWorkflowImportFlow() {
   const importWorkflow = useImportWorkflow();

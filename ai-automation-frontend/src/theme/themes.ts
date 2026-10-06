@@ -1,10 +1,10 @@
 /**
  * Theme-Registry
  *
- * MySuricates Dark/Light sind das eigene Design (feste Werte). Alle weiteren Themes
- * werden aus der offiziellen Palette und den Rollen der Theme-Autoren abgeleitet
- * (palettes.ts → derive.ts). Die Mindestkontraste und die Farbregeln sichert
- * src/theme/__tests__/themes.test.ts für jedes Theme ab.
+ * MySuricates Dark/Light are the own design (fixed values). All other themes
+ * are derived from the official palette and the roles of the theme authors
+ * (palettes.ts → derive.ts). The minimum contrasts and the color rules are secured by
+ * src/theme/__tests__/themes.test.ts for every theme.
  */
 import { buildPaletteTheme, type HueFamily } from './derive';
 import { PALETTE_THEMES } from './palettes';
@@ -107,7 +107,7 @@ const suricateLight: ThemeDefinition = {
     '--color-text-secondary': '#5c4c3c',
     '--color-text-tertiary': '#857361',
     '--color-text-inverse': '#ffffff',
-    // Flächen in lebendigem Amber (≥ 3:1), Text in der dunklen, lesbaren Variante
+    // Surfaces in vivid amber (≥ 3:1), text in the dark, readable variant
     '--color-accent': '#bb7816',
     '--color-accent-text': '#a54c08',
     '--color-accent-hover': '#833c06',
@@ -116,7 +116,7 @@ const suricateLight: ThemeDefinition = {
     '--color-success': '#3b9a49',
     '--color-success-text': '#2c742e',
     '--color-success-subtle': '#e2e6d9',
-    // Vollflächen mit weißem Text/Icon: die dunkle Textvariante (≥ 4,5:1)
+    // Solid fills with white text/icon: the dark text variant (≥ 4.5:1)
     '--color-success-emphasis': '#2c742e',
     '--color-warning': '#b57c16',
     '--color-warning-text': '#925906',
@@ -153,7 +153,7 @@ export function findTheme(id: string): ThemeDefinition | undefined {
   return THEMES.find((theme) => theme.id === id);
 }
 
-/** Liefert das Theme zur ID, bei unbekannter ID das Standard-Dunkel-Theme. */
+/** Returns the theme for the ID, the default dark theme for an unknown ID. */
 export function getTheme(id: string): ThemeDefinition {
   return findTheme(id) ?? findTheme(DEFAULT_DARK_THEME_ID)!;
 }

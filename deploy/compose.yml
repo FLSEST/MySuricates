@@ -1,6 +1,6 @@
-# Genau eine MySuricates-Instanz. Nicht direkt benutzen: scripts/instance.sh setzt Namen (Container,
-# Volumes, Image aus MYSURICATES_PREFIX und dem Instanznamen), Port und Benutzer-ID und erzeugt daneben das Override mit den Mounts dieses Rechners
-# (scripts/lib/host-mounts.sh). Mehrere Instanzen (z. B. Dev · Test · Prod) = mehrere Namen.
+# Exactly one MySuricates instance. Do not use directly: scripts/instance.sh sets names (container,
+# volumes, image from MYSURICATES_PREFIX and the instance name), port and user ID and also generates the override with this machine's mounts
+# (scripts/lib/host-mounts.sh). Several instances (e.g. Dev · Test · Prod) = several names.
 name: ${MYSURICATES_CONTAINER:?}
 services:
   app:
@@ -9,14 +9,14 @@ services:
       dockerfile: deploy/Dockerfile
       target: runtime
       args:
-        # Neuer Wert (etwa der Monat) = NodeSource- und Docker-Repo frisch statt aus dem Layer-Cache (8b7a39b9)
+        # New value (e.g. the month) = NodeSource and Docker repo fresh instead of from the layer cache (8b7a39b9)
         APT_REFRESH: ${MYSURICATES_APT_REFRESH:-}
     image: ${MYSURICATES_IMAGE:?}
     container_name: ${MYSURICATES_CONTAINER:?}
     ports:
       - "${MYSURICATES_BIND:-127.0.0.1}:${MYSURICATES_PORT:?}:9090"
-    # Alle AUTOMATION_*-Zeilen der Instanz-Datei (Einzelmodule, Haertung, Standard-Anbieter …)
-    # gehen unveraendert an die Instanz; die Liste darunter setzt nur, was aus MYSURICATES_* folgt.
+    # All AUTOMATION_* lines of the instance file (individual modules, hardening, default provider …)
+    # go unchanged to the instance; the list below only sets what follows from MYSURICATES_*.
     env_file:
       - ${MYSURICATES_ENV_FILE:?}
     environment:
@@ -28,7 +28,7 @@ services:
       - AUTOMATION_MODULES_PRESET=${MYSURICATES_PRESET:-core}
       - AUTOMATION_ENVIRONMENT=${MYSURICATES_ENVIRONMENT:-}
       - AUTOMATION_CORS_ORIGINS=http://localhost:${MYSURICATES_PORT:?},http://127.0.0.1:${MYSURICATES_PORT:?}
-      # Innen lauscht das Backend auf 9090; den veröffentlichten Port kennt es nur hierüber (Onboarding-Texte).
+      # Inside, the backend listens on 9090; it only knows the published port through this (onboarding texts).
       - AUTOMATION_INSTANCE_URL=http://localhost:${MYSURICATES_PORT:?}
       - AUTOMATION_INSTANCE_CONTAINER=${MYSURICATES_CONTAINER:?}
       - AUTOMATION_HARDENING_SEALING=${MYSURICATES_HARDENING_SEALING:-false}

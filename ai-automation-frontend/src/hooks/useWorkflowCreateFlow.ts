@@ -10,10 +10,10 @@ import type { CreateStep } from '../components/workflow/WorkflowCreateFlow';
 import type { CreateWorkflowRequest, WorkflowTemplate, PoolWorkflowEntry } from '../types';
 
 /**
- * Anlegen eines Workflows aus der Liste: erst Vorlage, Pool-Eintrag oder leer wählen, dann
- * Details. Ein Pool-Eintrag mit Projekt wird über den Pool installiert, ein Blaupausen-Paket (ein
- * sub-workflow-Block nennt eine Blaupause) über den Server, der den Teil mit anlegt; alles andere wird
- * neu angelegt (mit Auto-TODO, wenn das die Voreinstellung ist); danach geht es zum neuen Workflow.
+ * Creating a workflow from the list: first pick template, pool entry or empty, then
+ * details. A pool entry with a project is installed via the pool, a blueprint package (a
+ * sub-workflow block names a blueprint) via the server, which creates the part too; everything else is
+ * created fresh (with auto-TODO if that is the default); afterwards it goes to the new workflow.
  */
 export function useWorkflowCreateFlow() {
   const navigate = useNavigate();

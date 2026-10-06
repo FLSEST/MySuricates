@@ -6,18 +6,18 @@ export interface LineRange {
 }
 
 /**
- * Kanonisches Definitions-Dokument: alle Blöcke als ein pretty-printed JSON-Array.
- * Referenz für die Zeilennummern, die das Diagramm je Kasten anzeigt.
+ * Canonical definition document: all blocks as one pretty-printed JSON array.
+ * Reference for the line numbers the diagram shows per box.
  */
 export function buildDefinitionText(blocks: BlockDefinition[]): string {
   return JSON.stringify(blocks, null, 2);
 }
 
 /**
- * Zeilenbereich (1-basiert) jedes Top-Level-Blocks im Definitions-Dokument von
- * {@link buildDefinitionText}. Deterministisch abgeleitet aus der Zeilenzahl der
- * einzelnen Blöcke: Zeile 1 ist `[`, danach folgt Block 0 usw. Ein an einen Block
- * angehängtes Komma verändert die Zeilenzahl nicht.
+ * Line range (1-based) of each top-level block in the definition document of
+ * {@link buildDefinitionText}. Deterministically derived from the line count of the
+ * individual blocks: line 1 is `[`, then block 0 follows, etc. A comma
+ * appended to a block does not change the line count.
  */
 export function blockLineRanges(blocks: BlockDefinition[]): Map<number, LineRange> {
   const ranges = new Map<number, LineRange>();

@@ -11,10 +11,10 @@ import { extractWorkflowVariables } from '../utils/extractWorkflowVariables';
 import type { OptimizeResult, UpdateWorkflowRequest, Workflow } from '../types';
 
 /**
- * Aktionen der Workflow-Detailseite mit ihren Dialogen: Bearbeiten (Name, Beschreibung, Icon),
- * Ausführen (mit Variablen erst über den Dialog, danach zur Laufseite), Klonen, Löschen,
- * Optimieren (Vorschlag prüfen, dann übernehmen), Reparieren, Anweisungen und Skills.
- * `workflow` darf noch fehlen (Laden); dann tun die Aktionen nichts.
+ * Actions of the workflow detail page with their dialogs: edit (name, description, icon),
+ * run (with variables via the dialog first, then to the run page), clone, delete,
+ * optimize (review the suggestion, then apply), repair, instructions and skills.
+ * `workflow` may still be missing (loading); then the actions do nothing.
  */
 export function useWorkflowDetailActions(workflow: Workflow | undefined) {
   const navigate = useNavigate();

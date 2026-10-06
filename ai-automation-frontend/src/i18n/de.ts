@@ -895,7 +895,7 @@ export const de: TranslationKeys = {
     viewDefinition: 'Definition ansehen',
     definitionHint: 'Vollständige Workflow-Definition (JSON). Die Zeilennummern im Diagramm beziehen sich auf dieses Dokument.',
     bpmnLabels: {
-      // Typ-Präfix namenloser Kästen (im Backend deutsch erzeugt, hier lokalisiert — Schlüssel = deutscher Wert)
+      // Type prefix of unnamed boxes (generated in German in the backend, localized here — key = German value)
       prefix: {
         'KI': 'KI', 'Shell': 'Shell', 'Agent': 'Agent', 'Skill': 'Skill', 'Integration': 'Integration',
         'Dokument': 'Dokument', 'Freigabe': 'Freigabe', 'Eingabe': 'Eingabe', 'Sub-Workflow': 'Sub-Workflow', 'Retry': 'Retry',
@@ -1148,7 +1148,7 @@ export const de: TranslationKeys = {
         result: 'Ergebnis',
         exitCode: 'Exit-Code',
       },
-      // TODO aus einem fehlgeschlagenen Lauf („Todo erstellen“ auf der Laufseite)
+      // TODO from a failed run („Todo erstellen“ on the run page)
       failedTodo: {
         title: '{workflow}: Run fehlgeschlagen',
         workflow: 'Workflow',
@@ -2334,7 +2334,7 @@ export const de: TranslationKeys = {
     result: 'Ergebnis',
     delete: 'Lauf löschen',
     deleteConfirm: 'Diesen Lauf endgültig löschen? Die Schritte und der zugehörige Dead-Letter-Eintrag verschwinden mit. Verknüpfte TODOs bleiben erhalten, verlieren aber den Verweis.',
-    // Statusfilter der Lauflisten (Workflow- und Ketten-Läufe)
+    // Status filter of the run lists (workflow and chain runs)
     statuses: {
       COMPLETED: 'Abgeschlossen',
       COMPLETED_WITH_ERRORS: 'Abgeschlossen (alt)',
@@ -3636,7 +3636,7 @@ export const de: TranslationKeys = {
     loginViaEnvironment: 'Anmeldung über {source}',
     install: 'Installieren',
     login: 'Anmelden',
-    // Was nach dem Anmeldebefehl zu tun ist — der Katalog des Backends nennt nur den Schlüssel (loginNote, eab43a8b)
+    // What to do after the login command — the backend catalog only names the key (loginNote, eab43a8b)
     loginNotes: {
       pi_slash_login: 'dann /login in pi — oder ein API-Schlüssel als Umgebungsvariable (siehe pi --help)',
     },

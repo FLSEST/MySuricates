@@ -46,10 +46,10 @@ function saveSelectedId(id: string | null) {
 }
 
 /**
- * Ansicht der Workflow-Liste: Suche und Siegel-Filter, die Gruppierung nach Projekt (nach Name
- * sortiert), eingeklappte Projekte, der gewählte Workflow (fällt auf den ersten Treffer zurück),
- * Zeilendetails und Ansichtsmodus. Eingeklappte Projekte, Auswahl, Zeilendetails und Modus
- * überdauern den Seitenwechsel in localStorage.
+ * View of the workflow list: search and seal filter, grouping by project (sorted by name),
+ * collapsed projects, the selected workflow (falls back to the first hit),
+ * row details and view mode. Collapsed projects, selection, row details and mode
+ * survive a page change in localStorage.
  */
 export function useWorkflowListView(workflows: Workflow[] | undefined) {
   const t = useT();

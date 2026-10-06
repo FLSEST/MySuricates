@@ -4,8 +4,8 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
-// Vendor-Pakete je eigenem Chunk. monaco-editor wird lazy aus components/shared/monacoSetup.ts
-// geladen — der Name monaco-* laesst die PWA ihn beim Precaching auslassen.
+// Vendor packages each in their own chunk. monaco-editor is loaded lazily from components/shared/monacoSetup.ts
+// — the name monaco-* makes the PWA skip it when precaching.
 const VENDOR_CHUNKS: Record<string, string[]> = {
   react: ['react', 'react-dom', 'react-router-dom', 'react-router', 'scheduler'],
   query: ['@tanstack/react-query', '@tanstack/query-core'],
@@ -43,15 +43,15 @@ export default defineConfig(() => {
     ...(process.env.VITE_CACHE_DIR?.trim() ? { cacheDir: path.resolve(process.env.VITE_CACHE_DIR.trim()) } : {}),
     define: {
       __BUILD_TIMESTAMP__: JSON.stringify(new Date().toISOString()),
-      // Die Frontend-Version steht sonst nirgends im Bundle. Die Kachel BuildInfoStat stellt sie
-      // neben die Backend-Version aus /system/info: weichen beide ab, laeuft ein neues Frontend
-      // gegen ein altes Backend-JAR — der Fall, der beim Test-Container 404er und haengende
-      // Seiten erzeugt (CLAUDE.md, Staging).
+      // The frontend version is otherwise nowhere in the bundle. The BuildInfoStat tile puts it
+      // next to the backend version from /system/info: if the two differ, a new frontend runs
+      // against an old backend JAR — the case that produces 404s and hanging
+      // pages in the test container (CLAUDE.md, Staging).
       __APP_VERSION__: JSON.stringify(
         JSON.parse(fs.readFileSync(path.resolve(import.meta.dirname, 'package.json'), 'utf-8')).version,
       ),
-      // Shim für sockjs-client, das bare `global` referenziert (siehe node_modules/sockjs-client/lib/*.js).
-      // Ersetzt das bisherige Inline-<script>var global = globalThis;</script> in index.html (CSP-Verstoß).
+      // Shim for sockjs-client, which references bare `global` (see node_modules/sockjs-client/lib/*.js).
+      // Replaces the former inline <script>var global = globalThis;</script> in index.html (CSP violation).
       global: 'globalThis',
     },
     plugins: [
@@ -114,14 +114,14 @@ export default defineConfig(() => {
       chunkSizeWarningLimit: 600,
       rolldownOptions: {
         output: {
-          // Eine Gruppe je Vendor-Chunk statt einer manualChunks-Funktion: Rolldown zieht die
-          // Abhaengigkeiten erfasster Module mit in die Gruppe (includeDependenciesRecursively).
-          // Bei einer einzigen Namensfunktion bekam ein geteiltes Modul die zuerst erfassende Gruppe —
-          // Vites Preload-Helper (\0vite/preload-helper.js, von jedem import() gebraucht) landete
-          // in monaco, React selbst in dnd; index lud so die 3,7 MB Monaco statisch mit.
-          // Die Prioritaet legt fest, wer ein geteiltes Modul bekommt: Preload-Helper vorn, dann
-          // die Vendor-Chunks in VENDOR_CHUNKS-Reihenfolge. scripts/check-lazy-chunks.mjs prueft
-          // nach jedem Build, dass kein Lazy-Chunk wieder am Einstieg haengt.
+          // One group per vendor chunk instead of one manualChunks function: Rolldown pulls the
+          // dependencies of captured modules into the group (includeDependenciesRecursively).
+          // With a single naming function, a shared module got the group that captured it first —
+          // Vite's preload helper (\0vite/preload-helper.js, needed by every import()) ended up
+          // in monaco, React itself in dnd; index thus loaded the 3.7 MB of Monaco statically.
+          // The priority decides who gets a shared module: preload helper first, then
+          // the vendor chunks in VENDOR_CHUNKS order. scripts/check-lazy-chunks.mjs checks
+          // after every build that no lazy chunk is attached to the entry again.
           codeSplitting: {
             groups: [
               { name: 'preload-helper', test: (id: string) => id.includes(PRELOAD_HELPER_ID), priority: 100 },

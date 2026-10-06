@@ -4,9 +4,9 @@ import { formatTimestamp } from './localeFormat';
 import { stepBlockType } from '../components/workflow/stepMetadata';
 
 /**
- * TODO für einen fehlgeschlagenen Lauf („Todo erstellen“ auf der Laufseite), in der App-Sprache:
- * Titel mit dem Workflow-Namen, Beschreibung mit Workflow, Link auf den Lauf, dem ersten
- * fehlgeschlagenen Step und den Fehlermeldungen. Priorität HIGH, Tag `failed-run`, Quelle WORKFLOW.
+ * TODO for a failed run („Todo erstellen“ on the run page), in the app language:
+ * title with the workflow name, description with workflow, link to the run, the first
+ * failed step and the error messages. Priority HIGH, tag `failed-run`, source WORKFLOW.
  */
 export function buildFailedRunTodo(
   run: WorkflowRun,

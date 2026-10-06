@@ -29,7 +29,7 @@ function item(overrides: Partial<GoalTodoItem>): GoalTodoItem {
   };
 }
 
-/** Ende des lokalen Tages – so speichert der TODO-Dialog eine Fälligkeit. */
+ /** End of the local day – this is how the TODO dialog stores a due date. */
 const endOf = (iso: string) => new Date(`${iso}T23:59:59`).toISOString();
 
 const detail: GoalDetailData = {
@@ -68,8 +68,8 @@ const detail: GoalDetailData = {
 };
 
 /**
- * Die Antwort eines Backends vor c60bf914: ohne `projects` und `workPackages`; seine „milestones“ sind
- * Arbeitspakete mit nur einer Fälligkeit, die TODOs zeigen per `milestoneId` darauf.
+ * The response of a backend before c60bf914: without `projects` and `workPackages`; its "milestones" are
+ * work packages with only a due date, the TODOs point to them via `milestoneId`.
  */
 function olderDetail(): Record<string, unknown> {
   const { projects: _projects, workPackages: _packages, milestones: _milestones, ...rest } = detail;
@@ -82,7 +82,7 @@ function olderDetail(): Record<string, unknown> {
   };
 }
 
-/** Die Liste als gewählte Ansicht – die Standardansicht ist seit c60bf914 die Gliederung. */
+ /** The list as the selected view – the default view has been the outline since c60bf914. */
 const chooseList = () => localStorage.setItem('mysuricates-goal-view-v2', 'list');
 
 function candidate(id: string, title: string, tags: string[] = []): Todo {
@@ -442,7 +442,7 @@ describe('GoalDetail', () => {
     expect(await screen.findByText('No project is assigned to this goal yet. “Show all projects” searches everywhere.')).toBeInTheDocument();
   });
 
-  // 68a5e24e: „Entschieden“ als sichtbarer Zustand – entscheiden aus der Liste, ändern und entfernen
+  // 68a5e24e: „Entschieden“ as a visible state – decide from the list, change and remove
   describe('decisions', () => {
     const decidedAt = '2026-09-27T10:00:00Z';
     const deciding: GoalDetailData = {
@@ -454,7 +454,7 @@ describe('GoalDetail', () => {
         ...(todo.id === 'c' ? { decision: 'Plain HTML', decidedAt, decidedBy: 'USER' as const, decisionState: 'DECIDED' as const } : {}),
       })),
     };
-    /** Das Ziel antwortet mit dem jeweils aktuellen Stand – wie der Server nach dem Entscheiden. */
+    /** The goal answers with the current state each time – like the server after deciding. */
     function serveDecisions() {
       const sent: { id: string; body: unknown }[] = [];
       let state = deciding;
@@ -566,7 +566,7 @@ describe('GoalDetail', () => {
     });
   });
 
-  // 52bc1e8c: Workflows am Ziel oder Arbeitspaket anzeigen, starten und als Stand nutzen
+  // 52bc1e8c: show and start workflows on the goal or work package and use them as status
   describe('workflows', () => {
     // The switched-on guard shows the time of its schedule
     beforeEach(() => {
