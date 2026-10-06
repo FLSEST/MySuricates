@@ -66,7 +66,7 @@ class WorkflowFixturesOrderGuardTest {
                 .isEmpty();
     }
 
-    /** Die Zusicherung selbst: ordered() haelt die Einfuegereihenfolge. */
+    /** The assertion itself: ordered() keeps the insertion order. */
     @Test
     void orderedKeepsInsertionOrder() {
         Map<String, Object> map = WorkflowFixtures.ordered(

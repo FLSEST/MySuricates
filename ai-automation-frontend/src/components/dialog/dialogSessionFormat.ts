@@ -17,7 +17,7 @@ export function formatSessionStart(iso: string | null, locale: Locale): string {
   return formatDate(iso, locale, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-/** Letztes Pfadsegment eines Projektpfads (der Ordnername). */
+/** Last path segment of a project path (the folder name). */
 export function projectShortName(path: string): string {
   if (!path) return '?';
   const parts = path.split('/');

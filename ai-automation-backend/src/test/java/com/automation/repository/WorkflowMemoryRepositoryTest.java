@@ -167,7 +167,7 @@ class WorkflowMemoryRepositoryTest {
                 .doesNotContain(inactive.getId(), foreign.getId());
     }
 
-    // --- findTop8ByActiveTrueOrderByCreatedAtDesc: Filter und Reihenfolge ---
+    // --- findTop8ByActiveTrueOrderByCreatedAtDesc: filter and order ---
     // The unbounded findByActiveTrueOrderByCreatedAtDesc is removed (7a8481e2); these tests
     // check the same properties on the query the assistant actually issues.
     // Timestamps far in the future so that leftovers of other tests do not move into the top 8.

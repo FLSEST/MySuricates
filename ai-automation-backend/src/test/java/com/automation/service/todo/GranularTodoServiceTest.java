@@ -345,7 +345,7 @@ class GranularTodoServiceTest {
         assertThat(created).containsExactlyInAnyOrder("Hunt rebuild: hornberg", "Hunt rebuild: wesel");
     }
 
-    /** @return die Titel der in diesem Lauf neu angelegten granularen TODOs */
+    /** @return the titles of the granular TODOs newly created in this run */
     private List<String> createdTitles(List<Map<String, Object>> items) {
         when(todoRepository.findOpenByCompositeKey(anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(Optional.empty());

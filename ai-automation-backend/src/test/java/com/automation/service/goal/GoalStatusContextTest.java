@@ -100,7 +100,7 @@ class GoalStatusContextTest {
                 .isEqualTo("Meilenstein bald fällig: Beta (2026-09-26)");
     }
 
-    /** TODO c60bf914: ueberfaellige und bald faellige Arbeitspakete zaehlen mit, eigene Texte. */
+    /** TODO c60bf914: overdue and soon-due work packages count too, with their own texts. */
     @Test
     void guard_reportsWorkPackages_besideMilestonesAndTodos() {
         Map<String, String> vars = render(snapshot("Launch", null,

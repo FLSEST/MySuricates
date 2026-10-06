@@ -49,7 +49,7 @@ class TodoTriggerServiceTest {
 
     @BeforeEach
     void setUp() {
-        config = new TodoTriggerConfig();   // skipUntil = "" → keine Pause
+        config = new TodoTriggerConfig();   // skipUntil = "" → no pause
         service = new TodoTriggerService(
                 repository, workflowRepository, todoRepository,
                 workflowRunRepository, workflowService, workflowExecutor, config);

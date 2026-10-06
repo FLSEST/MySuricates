@@ -97,7 +97,7 @@ class ConfigKeyRulesTest {
             });
         }
 
-        /** Auch verschachtelt, mit Pfad. */
+        /** Also nested, with path. */
         @Test
         void verschachtelterSubWorkflowMitAlterSchreibweise() {
             Map<String, Object> inner = new HashMap<>();

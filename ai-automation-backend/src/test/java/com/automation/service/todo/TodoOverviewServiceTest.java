@@ -122,7 +122,7 @@ class TodoOverviewServiceTest {
         assertThat(result.staleThresholdDays()).isEqualTo(30);
     }
 
-    // --- Meilensteine und Arbeitspakete in „Braucht dich“ (TODO 259f4f66, c60bf914) -----------
+    // --- Milestones and work packages in „Braucht dich“ (TODO 259f4f66, c60bf914) -----------
 
     @Test
     void getOverview_listsDueSoonAndOverdueMilestones_butNotReachedOnes_withTheirGoal() {

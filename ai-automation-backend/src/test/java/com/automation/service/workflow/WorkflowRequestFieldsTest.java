@@ -69,7 +69,7 @@ class WorkflowRequestFieldsTest {
         assertThat(workflow.getDefaultContext()).containsExactlyEntriesOf(Map.of("b", "2"));
     }
 
-    /** Von Hand gesetzte Tags oder Kategorie sperren die automatische Verschlagwortung. */
+    /** Manually set tags or category lock the automatic tagging. */
     @Test
     void apply_tagsOrCategory_lockTheAutoTagging() {
         Workflow tagged = workflow();

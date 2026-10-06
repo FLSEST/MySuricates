@@ -29,9 +29,9 @@ function sharedImportPatterns(depth) {
     `^${toShared}${up}${stop}(?!${oneOf(SHARED_ALLOWED_IN_COMPONENTS)})`,
     // ../../X → src/X
     `^${toShared}${up}${up}${stop}(?!${oneOf(SHARED_ALLOWED_IN_SRC)})`,
-    // ../../../ → ausserhalb von src
+    // ../../../ → outside src
     `^${toShared}${up}${up}${up}`,
-    // @/X → src/X (Pfad-Alias aus tsconfig.json)
+    // @/X → src/X (path alias from tsconfig.json)
     `^@/(?!${oneOf(SHARED_ALLOWED_IN_SRC)})`,
   ];
 }

@@ -19,7 +19,7 @@ export function MilestoneEditor({ goalId, milestone, workPackages, projects, day
   milestone?: GoalMilestone;
   workPackages: GoalWorkPackage[];
   projects: GoalProject[];
-  /** Vorbelegtes Datum beim Anlegen. */
+  /** Prefilled date on creation. */
   day?: number | null;
   onClose: () => void;
   onDelete?: (milestone: GoalMilestone) => void;

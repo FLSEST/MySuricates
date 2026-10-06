@@ -12,7 +12,7 @@ export interface GoalWorkflowsValue {
   /** The backend knows workflows at the goal; otherwise only the guard and no assigning. */
   supported: boolean;
   attachments: GoalWorkflow[];
-  /** Letzter Lauf und Ergebnis je Workflow-ID. */
+  /** Last run and result per workflow ID. */
   results: Map<string, WorkflowWidgetEntry>;
   /** Opens „Workflow zuordnen“, prefilled with the package (null = whole goal). */
   openAssign: (workPackageId: string | null) => void;

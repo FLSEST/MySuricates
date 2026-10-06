@@ -45,7 +45,7 @@ class UserPreferencesServiceTest {
         when(settings.getSetting(key)).thenReturn(Optional.of(value));
     }
 
-    // --- der Block selbst -------------------------------------------------------------
+    // --- the block itself -------------------------------------------------------------
 
     @Test
     void rendersTheThreeAllowedPreferences() {

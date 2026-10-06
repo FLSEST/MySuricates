@@ -72,7 +72,7 @@ class BlockShapeRulesTest {
 
     @Test
     void onFailureNebenConfig_istHigh_wieImWalkthroughWorkflow() throws Exception {
-        // so stand es in walkthrough-illustrationen.json (Block „sichtpruefung“), bevor bf71f6b1 es verschob
+        // this is how it stood in walkthrough-illustrationen.json (block „sichtpruefung“) before bf71f6b1 moved it
         List<BlockDefinition> blocks = new ObjectMapper().readValue("""
                 [{"type":"shell","name":"sichtpruefung","config":{"command":"set -euo pipefail\\nls"},
                   "on_failure":"continue"}]

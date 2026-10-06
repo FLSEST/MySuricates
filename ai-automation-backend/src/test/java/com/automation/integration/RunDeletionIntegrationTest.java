@@ -175,7 +175,7 @@ class RunDeletionIntegrationTest {
         assertThat(wishRepository.findById(wish.getId()).orElseThrow().getCurrentRunId()).isNull();
     }
 
-    // ── Waechter ──────────────────────────────────────────────────────────────
+    // ── Guard ──────────────────────────────────────────────────────────────
 
     @Test
     void delete_verweigertLaufendeRuns() {

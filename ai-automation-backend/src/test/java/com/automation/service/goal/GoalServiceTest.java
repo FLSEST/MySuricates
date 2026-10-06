@@ -14,7 +14,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** Reine Logik der Ziele (TODO dc0566f8): Arbeitsreihenfolge, Fortschritt, Eingaben. */
+/** Pure goal logic (TODO dc0566f8): work order, progress, inputs. */
 class GoalServiceTest {
 
     @Test

@@ -30,7 +30,7 @@ describe('BuildInfoStat', () => {
     expect(screen.getByText(`BE ${FE_VERSION}`)).toBeInTheDocument();
     expect(screen.getByText(`FE ${FE_VERSION}`)).toBeInTheDocument();
     expect(screen.getByText('RELEASE')).toBeInTheDocument();
-    // Gleiche Nummern: keine Warnung.
+    // Same numbers: no warning.
     expect(screen.queryByLabelText(/different builds/i)).not.toBeInTheDocument();
   });
 

@@ -21,7 +21,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/** Reihenfolge der TODOs eines Ziels (TODO dc0566f8) – gebuendelt geladen (TODO f83dcc48). */
+/** Order of the TODOs of a goal (TODO dc0566f8) – loaded in bulk (TODO f83dcc48). */
 @ExtendWith(MockitoExtension.class)
 class GoalMembershipServiceTest {
 

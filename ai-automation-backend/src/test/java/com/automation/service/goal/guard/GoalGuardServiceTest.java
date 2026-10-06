@@ -52,7 +52,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/** Ziel-Waechter: einmal anlegen, pausieren, wieder aufnehmen (TODO 259f4f66). */
+/** Goal guard: create once, pause, resume (TODO 259f4f66). */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class GoalGuardServiceTest {

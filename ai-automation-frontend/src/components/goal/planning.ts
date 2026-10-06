@@ -15,7 +15,7 @@ export interface PlanningForm {
   decision: string;
 }
 
-/** Formular ohne TODO (Dialog geschlossen). */
+/** Form without a TODO (dialog closed). */
 export const EMPTY_PLANNING: PlanningForm = {
   goalId: '', workPackageId: '', complexity: '', suggestedEffort: '', ratingNote: '', openQuestion: '', decision: '',
 };

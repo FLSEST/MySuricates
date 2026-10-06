@@ -404,7 +404,7 @@ class RunCompletionHandlerTest {
         assertThat(DashboardWidgetResultParser.fromMetadata(stored).result().title()).isEqualTo("from marker");
     }
 
-    /** Ein Block, dessen Prompt ein Gate-Urteil bestellt (TODO 63ecc124). */
+    /** A block whose prompt orders a gate verdict (TODO 63ecc124). */
     private static List<BlockDefinition> blocksOrderingAGate() {
         BlockDefinition block = new BlockDefinition();
         block.setType("simple");
