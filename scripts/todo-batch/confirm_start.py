@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""TODO-Batch, Abarbeiten (TODO d6c0afe6): das Ergebnis des Start-Updates auswerten – ohne KI.
+"""TODO batch, processing (TODO d6c0afe6): evaluate the result of the start update – without AI.
 
-Der `todo-update`-Block `starten` überspringt einen Eintrag, dessen Bedingung nicht mehr passt (etwa ein TODO, das
-inzwischen jemand anders in Arbeit hat), und meldet das nur in seiner Ausgabe: `✓ <id8>` je gestartetem TODO,
-`– <id8>: <grund>` je übersprungenem. Je TODO stehen zwei Einträge im Update (prepare.py): der Start und eine
-Bestätigung, die nur bei einem schon gestarteten Batch-TODO greift – ein `✓` genügt, damit es als gestartet gilt
-(auch bei Wiederaufnahme desselben Laufs). Liest diese Ausgabe aus `<state>/starten.txt`; nur bestätigt gestartete TODOs
-bleiben in `ids.txt` und werden abgearbeitet. Die übrigen – auch solche, die die Ausgabe gar nicht nennt, oder alle,
-wenn der Block scheiterte – stehen mit Grund in `not_started.json`; der Bericht nennt sie und wird gelb.
+The `todo-update` block `starten` skips an entry whose condition no longer holds (e.g. a TODO that
+someone else has meanwhile taken on), and reports that only in its output: `✓ <id8>` per started TODO,
+`– <id8>: <reason>` per skipped one. Each TODO has two entries in the update (prepare.py): the start and a
+confirmation that only applies to an already started batch TODO – one `✓` is enough for it to count as started
+(also when the same run is resumed). Reads that output from `<state>/starten.txt`; only TODOs confirmed as started
+stay in `ids.txt` and get processed. The rest – including ones the output does not mention at all, or all of them
+if the block failed – go into `not_started.json` with a reason; the report names them and turns yellow.
 """
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ NO_RESULT = "Start-Update ohne Ergebnis für dieses TODO"
 
 
 def confirm(ids: list[str], output: str) -> tuple[list[str], dict[str, str]]:
-    """(gestartete IDs in Batch-Reihenfolge, nicht gestartete ID → Grund)."""
+    """(started IDs in batch order, not-started ID → reason)."""
     by_short: dict[str, list[str]] = {}
     for todo_id in ids:
         by_short.setdefault(b.short(todo_id).lower(), []).append(todo_id)

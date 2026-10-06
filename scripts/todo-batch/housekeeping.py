@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""TODO-Batch, Einordnen 1 (TODO cc0eb3ba): gemergte Batch-TODOs schließen, verwaiste freigeben.
+"""TODO batch, triage 1 (TODO cc0eb3ba): close merged batch TODOs, release orphaned ones.
 
-Liest `<state>/details.txt` und das Quell-Repo nur lesend. Gemergt heißt: ein Commit mit dem Trailer
-`Todo: <uuid>` ist in `refs/heads/<ziel>`. Letzte Zeile der Ausgabe: die `updates`-Liste;
-`<state>/housekeeping.json` für den Bericht.
+Reads `<state>/details.txt` and the source repo read-only. Merged means: a commit with the trailer
+`Todo: <uuid>` is in `refs/heads/<target>`. Last line of the output: the `updates` list;
+`<state>/housekeeping.json` for the report.
 """
 from __future__ import annotations
 

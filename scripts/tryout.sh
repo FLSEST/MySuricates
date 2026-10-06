@@ -1,24 +1,24 @@
 #!/usr/bin/env bash
 #
-# tryout.sh — MySuricates ausprobieren, ohne es einzurichten: ein Container, der alles mitbringt.
+# tryout.sh — try MySuricates without setting it up: one container that brings everything.
 #
-#   scripts/tryout.sh build  [--ref REF]          # Image aus dem neuesten Release-Tag (oder REF) bauen
-#   scripts/tryout.sh start  [--port N] [--image IMG]  # starten (Default-Port 9095), Adresse + Key zeigen
-#   scripts/tryout.sh login  [claude|codex|pi]    # KI-Anmeldung im Container (Default claude)
-#   scripts/tryout.sh key                          # API-Key fuer die Anmeldung in der Oberflaeche
-#   scripts/tryout.sh shell                        # Shell im Container (als der Benutzer der Instanz)
+#   scripts/tryout.sh build  [--ref REF]          # build the image from the newest release tag (or REF)
+#   scripts/tryout.sh start  [--port N] [--image IMG]  # start (default port 9095), show address + key
+#   scripts/tryout.sh login  [claude|codex|pi]    # AI login inside the container (default claude)
+#   scripts/tryout.sh key                          # API key for logging in to the UI
+#   scripts/tryout.sh shell                        # shell in the container (as the instance's user)
 #   scripts/tryout.sh status | logs | stop
-#   scripts/tryout.sh remove [--data]              # Container weg; --data loescht auch Daten + Logins
-#   scripts/tryout.sh export [DATEI]               # Image als Datei fuer Tester (docker load < DATEI)
+#   scripts/tryout.sh remove [--data]              # remove the container; --data also deletes data + logins
+#   scripts/tryout.sh export [DATEI]               # image as a file for testers (docker load < FILE)
 # Commands: build|start|login|key|shell|status|logs|stop|remove|export
 #
-# Gebaut wird aus `git archive REF`, nie aus dem Arbeitsverzeichnis: das Image entspricht genau dem
-# Tag, Uncommittetes und lokale Konfiguration kommen nicht hinein. Getaggt als mysuricates:<VERSION>-tryout
-# und mysuricates:tryout (= zuletzt gebaut). Der Container bindet nichts vom Rechner ein — kein
-# Projektordner, kein Docker-Socket, keine Logins; alles liegt auf den Volumes
-# mysuricates-tryout-data/-secrets. Einrichten fuer die echte Arbeit: scripts/setup.sh.
-# MYSURICATES_APT_REFRESH=<neuer Wert, etwa der Monat> beim build holt NodeSource- und Docker-Repo
-# frisch statt aus dem Layer-Cache, und damit auch die KI-CLIs der Tryout-Stufe (8b7a39b9).
+# Built from `git archive REF`, never from the working directory: the image matches the tag
+# exactly, uncommitted changes and local configuration do not get in. Tagged as mysuricates:<VERSION>-tryout
+# and mysuricates:tryout (= most recently built). The container mounts nothing from the host — no
+# project folder, no Docker socket, no logins; everything lives on the volumes
+# mysuricates-tryout-data/-secrets. Setting up for real work: scripts/setup.sh.
+# MYSURICATES_APT_REFRESH=<new value, e.g. the month> on build fetches the NodeSource and Docker repos
+# fresh instead of from the layer cache, and with them the AI CLIs of the tryout stage (8b7a39b9).
 set -uo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/provider-login.sh
@@ -30,7 +30,7 @@ CONTAINER="mysuricates-tryout"
 DATA_VOLUME="mysuricates-tryout-data"
 SECRETS_VOLUME="mysuricates-tryout-secrets"
 IMAGE_REPO="mysuricates"
-TRYOUT_HOME="/app/data/home"   # = HOST_HOME der Tryout-Stufe in deploy/Dockerfile
+TRYOUT_HOME="/app/data/home"   # = HOST_HOME of the tryout stage in deploy/Dockerfile
 TRYOUT_UID=1000
 
 die() { echo "tryout.sh: $*" >&2; exit 2; }
@@ -54,16 +54,16 @@ while [ "$#" -gt 0 ]; do
 done
 case "$PORT" in ''|*[!0-9]*) die "--port braucht eine Zahl" ;; esac
 
-# Neuestes Release = hoechstes vX.Y.Z-Tag (nach Version sortiert, nicht nach Datum)
+# Newest release = highest vX.Y.Z tag (sorted by version, not by date)
 newest_tag() { git -C "$REPO_ROOT" tag --list 'v[0-9]*' --sort=-v:refname | head -n 1; }
 
 exists()  { docker container inspect "$CONTAINER" >/dev/null 2>&1; }
 running() { [ "$(docker container inspect -f '{{.State.Running}}' "$CONTAINER" 2>/dev/null)" = true ]; }
 healthy() { [ "$(docker container inspect -f '{{.State.Health.Status}}' "$CONTAINER" 2>/dev/null)" = healthy ]; }
-port_busy() { (exec 3<>"/dev/tcp/127.0.0.1/$PORT") 2>/dev/null; }   # nimmt schon jemand Verbindungen an?
+port_busy() { (exec 3<>"/dev/tcp/127.0.0.1/$PORT") 2>/dev/null; }   # is someone already accepting connections?
 need_running() { running || die "$CONTAINER laeuft nicht — scripts/tryout.sh start"; }
-as_user() { docker exec "$@"; }   # Aufrufe im Container immer als der Benutzer der Instanz, nie root
-# Release-Images von vor der Umbenennung schreiben den Key nach ~/.autotrigger — DATA_HOME_KEY_SH liest beide
+as_user() { docker exec "$@"; }   # calls in the container always as the instance's user, never root
+# Release images from before the rename write the key to ~/.autotrigger — DATA_HOME_KEY_SH reads both
 key() { as_user -u "$TRYOUT_UID" "$CONTAINER" sh -c "$DATA_HOME_KEY_SH" sh "$TRYOUT_HOME" 2>/dev/null; }
 
 cmd_build() {
@@ -71,7 +71,7 @@ cmd_build() {
   [ -n "$REF" ] || die "Kein Release-Tag gefunden — --ref angeben (z. B. --ref HEAD)"
   local sha version
   sha="$(git -C "$REPO_ROOT" rev-parse --verify --quiet "$REF^{commit}")" || die "Unbekannte Referenz: $REF"
-  # Das Dockerfile kommt aus REF selbst — aeltere Tags kennen die Tryout-Stufe noch nicht
+  # The Dockerfile comes from REF itself — older tags do not know the tryout stage yet
   git -C "$REPO_ROOT" show "$sha:deploy/Dockerfile" 2>/dev/null | grep -q '^FROM .* AS tryout$' \
     || die "$REF kennt die Tryout-Stufe noch nicht (deploy/Dockerfile ohne 'AS tryout') — neueres Tag oder --ref HEAD"
   version="$(git -C "$REPO_ROOT" describe --tags --exact-match "$sha" 2>/dev/null || git -C "$REPO_ROOT" describe --tags --always "$sha")"
@@ -103,7 +103,7 @@ cmd_start() {
       -e "AUTOMATION_CORS_ORIGINS=http://localhost:$PORT,http://127.0.0.1:$PORT" \
       -e "AUTOMATION_INSTANCE_URL=http://localhost:$PORT" -e "AUTOMATION_INSTANCE_CONTAINER=$CONTAINER" \
       -e "MYSURICATES_LOGIN_COMMAND=scripts/tryout.sh login [claude|codex|pi]" \
-      "$IMAGE" >/dev/null || { docker rm -f "$CONTAINER" >/dev/null 2>&1; die "Start fehlgeschlagen"; }  # kein halb angelegter Container
+      "$IMAGE" >/dev/null || { docker rm -f "$CONTAINER" >/dev/null 2>&1; die "Start fehlgeschlagen"; }  # no half-created container
   fi
   echo "Warte auf $CONTAINER …"
   local i=0
@@ -130,7 +130,7 @@ cmd_export() {
   version="$(docker image inspect -f '{{index .Config.Labels "org.opencontainers.image.version"}}' "$IMAGE")"
   file="${ARGS[0]:-mysuricates-${version:-unknown}-tryout.tar.gz}"
   echo "Schreibe $file …"
-  # Beide Namen mitgeben: nach `docker load` findet `start` ohne --image das Image unter :tryout
+  # Pass both names: after `docker load`, `start` without --image finds the image under :tryout
   local tags=("$IMAGE")
   [ -z "$version" ] || [ "$IMAGE" = "$IMAGE_REPO:$version-tryout" ] || tags[1]="$IMAGE_REPO:$version-tryout"
   docker save "${tags[@]}" | gzip > "$file" || die "Export fehlgeschlagen"

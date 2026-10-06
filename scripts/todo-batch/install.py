@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Installiert die Kette „TODO-Batch“ (TODO cc0eb3ba) in eine laufende Instanz – idempotent.
+"""Installs the "TODO-Batch" chain (TODO cc0eb3ba) into a running instance – idempotent.
 
-1. Beide Pool-Einträge installieren (`POST /pool/{id}/install`; eine vorhandene Installation wird an Ort und Stelle
-   aktualisiert). 2. Kette „TODO-Batch“ anlegen oder aktualisieren – „Abarbeiten“ darf bis zu 20 h auf die Freigabe
-   warten. 3. Zeitplan (täglich 01:30) anlegen; er bleibt aus, bis `--enable-schedule` gesetzt ist.
-API-Schlüssel: `MYSURICATES_API_KEY` oder `~/.mysuricates/api-key`.
+1. Install both pool entries (`POST /pool/{id}/install`; an existing installation is updated in place).
+   2. Create or update the chain "TODO-Batch" – "Abarbeiten" may wait up to 20 h for the approval.
+   3. Create the schedule (daily 01:30); it stays off until `--enable-schedule` is set.
+API key: `MYSURICATES_API_KEY` or `~/.mysuricates/api-key`.
 """
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-# Nie über einen Proxy aus der Umgebung (cf662c01): sonst bekäme der Proxy den X-API-Key.
+# Never through a proxy from the environment (cf662c01): otherwise the proxy would get the X-API-Key.
 LOCAL = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 POOL_IDS = ("mysuricates-todo-batch-einordnen", "mysuricates-todo-batch-abarbeiten")
 CHAIN_NAME = "TODO-Batch"

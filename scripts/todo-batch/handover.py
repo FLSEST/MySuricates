@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""TODO-Batch, Abarbeiten (TODO cc0eb3ba): Übergabe nach der Freigabe – Branch-Ref ins Quell-Repo, TODOs nachführen.
+"""TODO batch, processing (TODO cc0eb3ba): handover after approval – branch ref into the source repo, update the TODOs.
 
-„Übernehmen“ → `refs/heads/mysuricates/batch-<run8>` im Quell-Repo: nur ein neuer Ref; Arbeitsbaum, andere Refs
-und Remotes bleiben unberührt, ein vorhandener Ref wird nie überschrieben, nichts wird gepusht. Zeigt der Ref schon
-auf genau diesen Stand (Wiederaufnahme desselben Laufs), gilt die Übergabe als erledigt. Die Merge-Vorschau im
-Vermerk stammt vom Zeitpunkt der Übergabe, nicht aus dem Bericht. „Verwerfen“ → nichts übergeben, Ampel gelb.
-Keine Antwort (Frist abgelaufen) → `--on-timeout`. Fehlen die Prüfergebnisse (Lauf brach vorher ab),
-gehen alle TODOs des Batches mit `batch:failed` zurück. Räumt Build-Verzeichnisse im eigenen Klon weg.
-Letzte Zeile der Ausgabe: die `updates`-Liste.
+"Übernehmen" → `refs/heads/mysuricates/batch-<run8>` in the source repo: only a new ref; working tree, other refs
+and remotes stay untouched, an existing ref is never overwritten, nothing is pushed. If the ref already points
+to exactly this state (resumption of the same run), the handover counts as done. The merge preview in the
+note comes from the time of the handover, not from the report. "Verwerfen" → nothing handed over, traffic light yellow.
+No answer (deadline expired) → `--on-timeout`. If the check results are missing (run aborted earlier),
+all TODOs of the batch go back with `batch:failed`. Removes build directories in its own clone.
+Last line of the output: the `updates` list.
 """
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ INCOMPLETE = "Lauf unvollständig – keine Prüfergebnisse"
 
 
 def load_results(state: Path) -> dict:
-    """`results.json`, oder – wenn der Lauf vor der Prüfung abbrach – jedes TODO aus `ids.txt` als gescheitert."""
+    """`results.json`, or – if the run aborted before the check – every TODO from `ids.txt` as failed."""
     data = b.read_json(state / "results.json", None)
     if data is not None:
         return data
@@ -47,7 +47,7 @@ def export(project_path: str, run_id: str) -> str:
     ref = f"refs/heads/mysuricates/batch-{b.short(run_id)}"
     if b.git_ok("-C", project_path, "show-ref", "--verify", "--quiet", ref):
         if b.git("-C", project_path, "rev-parse", ref).strip() == b.git("rev-parse", "HEAD").strip():
-            return ref.removeprefix("refs/heads/")   # derselbe Lauf, schon übergeben
+            return ref.removeprefix("refs/heads/")   # same run, already handed over
         raise b.BatchError(f"{ref} gibt es schon – nichts überschrieben")
     root = b.git("rev-parse", "--show-toplevel").strip()
     b.git("-C", project_path, "fetch", "--no-tags", "--quiet", root, f"HEAD:{ref}")

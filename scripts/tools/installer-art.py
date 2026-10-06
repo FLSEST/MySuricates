@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""Kopf-Grafik des Installers: drei Erdmaennchen auf dem Huegel + Schriftzug "MySuricates".
+"""Header graphic of the installer: three meerkats on the mound + the lettering "MySuricates".
 
-Quelle ist die Pixelvorlage unten (Spec: docs/plans/2026-09-21-installer-gefuehrt-design.md,
-Anhang A). Das Skript laeuft nur zur Entwicklungszeit und schreibt scripts/lib/art.generated.sh —
-der Installer selbst braucht weder Python noch Schriften (Leitidee: keine Abhaengigkeiten).
+The source is the pixel template below (spec: docs/plans/2026-09-21-installer-gefuehrt-design.md,
+appendix A). The script only runs at development time and writes scripts/lib/art.generated.sh —
+the installer itself needs neither Python nor fonts (guiding idea: no dependencies).
 
-    python3 scripts/tools/installer-art.py           # schreiben
-    python3 scripts/tools/installer-art.py --check   # Exit 1, wenn die Datei veraltet ist (CI)
+    python3 scripts/tools/installer-art.py           # write
+    python3 scripts/tools/installer-art.py --check   # exit 1 if the file is outdated (CI)
 
-Zwei Pixel je Zeichen (▀ ▄ █). Drei Fassungen: 24-Bit-Farbe, 256 Farben (Terminal.app auf macOS
-kann keine 24 Bit) und einfarbig (ohne TTY). Nur Standardbibliothek.
+Two pixels per character (▀ ▄ █). Three variants: 24-bit colour, 256 colours (Terminal.app on macOS
+cannot do 24 bit) and monochrome (without TTY). Standard library only.
 """
 import sys
 from pathlib import Path
@@ -17,14 +17,14 @@ from pathlib import Path
 OUT = Path(__file__).resolve().parents[1] / "lib" / "art.generated.sh"
 
 PAL = {
-    "b": (196, 150, 96),   # Fell
-    "k": (160, 116, 70),   # Schatten
-    "l": (232, 204, 158),  # Bauch
-    "D": (52, 36, 24),     # Augenflecken, Ohren, Nase
-    "w": (245, 235, 215),  # Augenglanz
-    "a": (170, 124, 76),   # Arme
-    "h": (139, 105, 20),   # Huegel
-    "H": (107, 79, 16),    # Huegelfuss
+    "b": (196, 150, 96),   # fur
+    "k": (160, 116, 70),   # shadow
+    "l": (232, 204, 158),  # belly
+    "D": (52, 36, 24),     # eye patches, ears, nose
+    "w": (245, 235, 215),  # eye highlight
+    "a": (170, 124, 76),   # arms
+    "h": (139, 105, 20),   # mound
+    "H": (107, 79, 16),    # mound base
 }
 
 BIG = """\
@@ -67,7 +67,7 @@ SMALL = """\
 ..bb.bb...
 .bbb.bbkkk""".splitlines()
 
-# DejaVu Sans Bold 9 px, Buchstaben einzeln mit 1 px Abstand (ohne verschmelzen "r" und "i")
+# DejaVu Sans Bold 9 px, letters set individually with 1 px spacing (without it "r" and "i" merge)
 BANNER = [
     " ▄▄   ▄▄           ▄▄▄▄               ██",
     " ███ ███  ▄▄  ▄▄  ██  ▀  ▄▄ ▄▄  ▄▄▄▄  ▄▄   ▄▄▄  ▄▄▄▄   ██▄    ▄▄▄    ▄▄▄",
@@ -76,8 +76,8 @@ BANNER = [
     "           ▄█",
 ]
 
-# Die 256er-Palette hat fuer Sandbraun und Creme keinen guten Naechsten (algorithmisch: Lachs und
-# Gruenlich) — diese Toene sind von Hand gewaehlt, der Rest wird berechnet.
+# The 256-colour palette has no good nearest match for sand brown and cream (algorithmically: salmon and
+# greenish) — these tones are hand-picked, the rest is computed.
 PAL256 = {"b": 137, "k": 94, "a": 94, "l": 223}
 
 W, H = 44, 24
@@ -98,11 +98,11 @@ def canvas():
 
 
 def xterm256(rgb):
-    """Naechste Farbe aus Wuerfel (16-231) oder Graustufen (232-255)."""
+    """Nearest colour from the cube (16-231) or grayscale (232-255)."""
     levels = [0, 95, 135, 175, 215, 255]
     gray_i = max(0, min(23, round((sum(rgb) / 3 - 8) / 10)))
     gray_rgb = (8 + 10 * gray_i,) * 3
-    # "redmean": wahrnehmungsnaeher als der reine RGB-Abstand (der machte das Fell lachsfarben)
+    # "redmean": closer to perception than the plain RGB distance (which made the fur salmon-coloured)
     def dist(a, b):
         r = (a[0] + b[0]) / 2
         dr, dg, db = a[0] - b[0], a[1] - b[1], a[2] - b[2]

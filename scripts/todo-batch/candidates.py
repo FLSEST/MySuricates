@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""TODO-Batch, Einordnen 3 (TODO cc0eb3ba): Kandidaten für die Triage vorfiltern – ohne KI.
+"""TODO batch, triage 3 (TODO cc0eb3ba): pre-filter candidates for the triage – without AI.
 
-Kandidat: Status OPEN, kein `batch:*`-Tag, keine offene Frage. Läuft noch ein Batch (IN_PROGRESS mit
-`batch:selected` und `batch:started`, nicht hängend), gibt es keine; von Hand ausgewählte zählen gegen `--batch-max`. Nur mit Kandidaten entsteht `<state>/candidates.json` – daran hängt
-`run_if` der Triage. Ausgabe: die Kandidaten als eine JSON-Zeile für den Prompt.
+Candidate: status OPEN, no `batch:*` tag, no open question. While a batch is still running (IN_PROGRESS with
+`batch:selected` and `batch:started`, not stuck), there are none; manually selected ones count against `--batch-max`. `<state>/candidates.json` only exists with candidates – the triage's
+`run_if` depends on it. Output: the candidates as one JSON line for the prompt.
 
-Dazu `near_limit` (TODO 8bbc2368): Dateien, die höchstens `--size-margin` Zeilen unter ihrer Obergrenze stehen
-(oder darüber). `--size-limits <grenzdatei> <quellwurzel>`: Die Grenzen stehen in der Grenzdatei im Format von
-`SourceSizeRatchetTest` (`MAX_LINES = N` als Standard, `entry("<pfad>", N)` je Ausnahme, Pfade relativ zur
-Quellwurzel); gezählt werden die `.java`-Dateien unter der Quellwurzel. Ohne Grenzdatei bleibt die Liste leer – ein
-Repo ohne Größen-Ratchet lässt die beiden Werte im Kontext leer oder weg. Fehlt ein Kontext-Wert ganz, lässt die
-Plattform den Platzhalter wörtlich stehen (`{{ name }}` → drei Wörter); auch das gilt als „nicht gesetzt“.
+Plus `near_limit` (TODO 8bbc2368): files that are at most `--size-margin` lines below their ceiling
+(or above it). `--size-limits <limits file> <source root>`: the limits live in the limits file in the format of
+`SourceSizeRatchetTest` (`MAX_LINES = N` as default, `entry("<path>", N)` per exception, paths relative to the
+source root); the `.java` files under the source root are counted. Without a limits file the list stays empty – a
+repo without a size ratchet leaves the two values in the context empty or omits them. If a context value is missing entirely, the
+platform leaves the placeholder verbatim (`{{ name }}` → three words); that also counts as "not set".
 """
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ FIELDS = ("id", "priority", "tags", "title", "complexity", "suggestedEffort", "d
 
 def select(todos: list[dict], limit: int, batch_max: int | None = None, now=None,
            stale_hours: int = b.STALE_HOURS) -> tuple[bool, list[dict], int]:
-    """(Batch läuft?, Kandidaten, schon von Hand/früher ausgewählte, noch nicht gestartete TODOs)."""
+    """(batch running?, candidates, TODOs already selected by hand/earlier and not yet started)."""
     moment = b.now_utc(now)
     if any(b.active_batch(t, stale_hours, moment) for t in todos):
         return True, [], 0
@@ -48,14 +48,14 @@ def select(todos: list[dict], limit: int, batch_max: int | None = None, now=None
 
 
 def ceilings(ratchet_text: str) -> tuple[int, dict[str, int]]:
-    """(Standard-Obergrenze, Obergrenze je Datei relativ zur Quellwurzel) aus der Grenzdatei."""
+    """(default ceiling, ceiling per file relative to the source root) from the limits file."""
     found = _MAX_LINES.search(ratchet_text)
     return (int(found.group(1)) if found else DEFAULT_MAX_LINES,
             {path: int(limit) for path, limit in _ENTRY.findall(ratchet_text)})
 
 
 def near_limit(ratchet: Path, root: Path, margin: int, base: Path | None = None) -> list[dict]:
-    """Dateien, die die Triage meiden soll: Abstand zur Obergrenze unter `margin` Zeilen, knappste zuerst."""
+    """Files the triage should avoid: distance to the ceiling below `margin` lines, tightest first."""
     if not ratchet.is_file() or not root.is_dir():
         return []
     default, listed = ceilings(ratchet.read_text(encoding="utf-8", errors="replace"))
@@ -72,7 +72,7 @@ def near_limit(ratchet: Path, root: Path, margin: int, base: Path | None = None)
 
 
 def size_limits(tokens: list[str]) -> tuple[str, str]:
-    """(Grenzdatei, Quellwurzel) aus `--size-limits`; ein unaufgelöster Platzhalter `{{ … }}` zählt als leer."""
+    """(limits file, source root) from `--size-limits`; an unresolved placeholder `{{ … }}` counts as empty."""
     values, inside = [], False
     for token in tokens or []:
         if token == "{{" or (token.startswith("{{") and not token.endswith("}}")):

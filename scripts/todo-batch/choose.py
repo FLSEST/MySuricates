@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""TODO-Batch, Einordnen 5 (TODO cc0eb3ba): die Antwort der Triage prüfen und in Tags übersetzen – ohne KI.
+"""TODO batch, triage 5 (TODO cc0eb3ba): check the triage's answer and translate it into tags – without AI.
 
-Liest die letzte `TRIAGE:`-Zeile aus `<state>/triage.txt`; nur IDs aus `candidates.json`, höchstens `--max`,
-ein Bereich. Letzte Zeile der Ausgabe: die `updates`-Liste; `<state>/selection.json` für den Bericht.
+Reads the last `TRIAGE:` line from `<state>/triage.txt`; only IDs from `candidates.json`, at most `--max`,
+one area. Last line of the output: the `updates` list; `<state>/selection.json` for the report.
 """
 from __future__ import annotations
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""TODO-Batch, Einordnen 7 (TODO cc0eb3ba): Ampel und Dashboard-Kachel – ohne KI."""
+"""TODO batch, triage 7 (TODO cc0eb3ba): traffic light and dashboard tile – without AI."""
 from __future__ import annotations
 
 import argparse
