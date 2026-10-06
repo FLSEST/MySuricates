@@ -8,7 +8,7 @@ import com.automation.executor.ExecutionContext;
 import com.automation.executor.StepAiMetadata;
 import com.automation.service.ai.AiProvider;
 import com.automation.service.ai.AiProviderRegistry;
-import com.automation.service.ai.HostClaudeService.Turn;
+import com.automation.service.ai.ConversationPrompt.Turn;
 import com.automation.repository.WorkflowRunRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

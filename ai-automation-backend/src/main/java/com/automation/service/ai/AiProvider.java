@@ -45,10 +45,12 @@ public interface AiProvider {
     ActionResult executeAction(ActionRequest request) throws IOException;
 
     /**
-     * Builds a flat conversation prompt from system prompt + turn history.
-     * Providers that support native multi-turn can override this.
+     * Builds a flat conversation prompt from system prompt + turn history. By default the system prompt
+     * travels separately; a provider without a system prompt flag, or with native multi-turn, overrides it.
      */
-    String buildConversationPrompt(String systemPrompt, List<HostClaudeService.Turn> history);
+    default String buildConversationPrompt(String systemPrompt, List<ConversationPrompt.Turn> history) {
+        return ConversationPrompt.build(history);
+    }
 
     // --- Request records ---
 

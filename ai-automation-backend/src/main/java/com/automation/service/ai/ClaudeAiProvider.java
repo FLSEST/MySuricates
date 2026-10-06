@@ -86,9 +86,4 @@ public class ClaudeAiProvider implements AiProvider {
                 AiResponseMetadata.fromClaudeResponse(result.parsed())
         );
     }
-
-    @Override
-    public String buildConversationPrompt(String systemPrompt, List<HostClaudeService.Turn> history) {
-        return hostClaudeService.buildConversationPrompt(systemPrompt, history);
-    }
 }

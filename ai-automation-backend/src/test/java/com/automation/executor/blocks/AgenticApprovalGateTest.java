@@ -2,7 +2,7 @@ package com.automation.executor.blocks;
 
 import com.automation.executor.ApprovalRequest;
 import com.automation.executor.ExecutionContext;
-import com.automation.service.ai.HostClaudeService.Turn;
+import com.automation.service.ai.ConversationPrompt.Turn;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

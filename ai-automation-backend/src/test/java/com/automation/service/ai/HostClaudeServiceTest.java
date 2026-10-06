@@ -508,33 +508,6 @@ class HostClaudeServiceTest {
                 .hasMessageContaining("timed out after 1 seconds");
     }
 
-    // --- buildConversationPrompt ---
-
-    @Test
-    void buildConversationPrompt_emptyHistory() {
-        HostClaudeService service = createService(null, false, List.of());
-        String result = service.buildConversationPrompt("system", List.of());
-
-        assertThat(result).contains("=== YOUR RESPONSE ===");
-        assertThat(result).doesNotContain("CONVERSATION HISTORY");
-    }
-
-    @Test
-    void buildConversationPrompt_withHistory() {
-        HostClaudeService service = createService(null, false, List.of());
-        var history = List.of(
-                new HostClaudeService.Turn("user", "Hello"),
-                new HostClaudeService.Turn("assistant", "Hi there")
-        );
-        String result = service.buildConversationPrompt("system", history);
-
-        assertThat(result).contains("=== CONVERSATION HISTORY ===");
-        assertThat(result).contains("[USER]");
-        assertThat(result).contains("Hello");
-        assertThat(result).contains("[ASSISTANT]");
-        assertThat(result).contains("Hi there");
-    }
-
     // --- live output ---
 
     private static HostClaudeService serviceReplaying(Path streamJson, int timeoutSeconds, String trailingShell) {

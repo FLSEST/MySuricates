@@ -189,9 +189,9 @@ class CodexAiProviderTest {
 
     @Test
     void buildConversationPrompt_formatsCorrectly() {
-        List<HostClaudeService.Turn> history = List.of(
-                new HostClaudeService.Turn("user", "hello"),
-                new HostClaudeService.Turn("assistant", "hi"));
+        List<ConversationPrompt.Turn> history = List.of(
+                new ConversationPrompt.Turn("user", "hello"),
+                new ConversationPrompt.Turn("assistant", "hi"));
 
         String result = provider.buildConversationPrompt("system prompt", history);
 

@@ -22,8 +22,6 @@ import java.util.List;
 @Slf4j
 public class HostClaudeService {
 
-    public record Turn(String role, String content) {}
-
     public record ReasoningResult(String text, ClaudeJsonResponse parsed) {}
 
     public record ActionResult(String text, int exitCode, ClaudeJsonResponse parsed) {}
@@ -262,29 +260,6 @@ public class HostClaudeService {
         }
 
         return cmd;
-    }
-
-    /**
-     * Builds a conversation prompt from turn history (without system prompt).
-     * The system prompt should be passed via --system-prompt flag for proper separation.
-     */
-    public String buildConversationPrompt(String systemPrompt, List<Turn> history) {
-        StringBuilder sb = new StringBuilder();
-
-        if (!history.isEmpty()) {
-            sb.append("=== CONVERSATION HISTORY ===\n");
-            for (Turn turn : history) {
-                String label = "assistant".equals(turn.role()) ? "ASSISTANT" : "USER";
-                sb.append("[").append(label).append("]\n");
-                sb.append(turn.content());
-                sb.append("\n\n");
-            }
-        }
-
-        sb.append("=== YOUR RESPONSE ===\n");
-        sb.append("Respond following the format specified in the system instructions.");
-
-        return sb.toString();
     }
 
     /**

@@ -5,6 +5,7 @@ import com.automation.service.ai.AiProviderCapabilities;
 import com.automation.service.ai.AiResponseMetadata;
 import com.automation.service.ai.HostClaudeService;
 import com.automation.service.ai.ProviderSetup;
+import com.automation.service.ai.ConversationPrompt;
 
 import java.io.IOException;
 import java.util.List;
@@ -92,7 +93,7 @@ public class ScriptedAiProvider implements AiProvider {
     }
 
     @Override
-    public String buildConversationPrompt(String systemPrompt, List<HostClaudeService.Turn> history) {
+    public String buildConversationPrompt(String systemPrompt, List<ConversationPrompt.Turn> history) {
         return (systemPrompt == null ? "" : systemPrompt + "\n\n")
                 + history.stream().map(Object::toString).collect(Collectors.joining("\n"));
     }
