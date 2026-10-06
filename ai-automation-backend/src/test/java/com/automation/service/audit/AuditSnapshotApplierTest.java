@@ -147,10 +147,12 @@ class AuditSnapshotApplierTest {
         when(findingRepository.findByProjectIdAndAuditKey(PROJECT, AUDIT_KEY)).thenReturn(List.of(existing));
 
         apply(new ParsedFinding("shell.pipe¦curl", "scripts/a.sh ¦ sh", AuditSeverity.MEDIUM,
-                "curl ¦ sh im Installer", null, null, List.of()));
+                "curl ¦ sh im Installer", null, "install.sh L12 ¦ sh", List.of()));
 
         assertThat(existing.getSubject()).isEqualTo("scripts/a.sh | sh");
         assertThat(existing.getTitle()).isEqualTo("curl | sh im Installer");
+        // 5fc15f50: the block shows the evidence as well, and a prompt carries it on verbatim
+        assertThat(existing.getEvidence()).isEqualTo("install.sh L12 | sh");
         assertThat(existing.getOccurrenceCount()).as("derselbe Befund, kein Wiedergaenger").isEqualTo(2);
         assertThat(savedOccurrences()).singleElement()
                 .extracting(AuditFindingOccurrence::getTitle).isEqualTo("curl | sh im Installer");
