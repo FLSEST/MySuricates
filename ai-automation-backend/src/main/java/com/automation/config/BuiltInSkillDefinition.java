@@ -6,18 +6,18 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Deserialisierungsziel fuer die Built-in-Skill-JSONs unter
- * {@code classpath:skills/builtin/<id>.json}. Vom JPA-Entity entkoppelt, damit
- * Jackson und Hibernate sich nicht ins Gehege kommen (Vorbild
+ * Deserialization target for the built-in skill JSONs under
+ * {@code classpath:skills/builtin/<id>.json}. Decoupled from the JPA entity so that
+ * Jackson and Hibernate do not get in each other's way (modelled on
  * {@link BuiltInTemplateDefinition}).
  *
- * <p>Der Prompt-Text steht bewusst nicht in der JSON, sondern byte-genau in der
- * Schwesterdatei {@code <id>.md}.
+ * <p>The prompt text is deliberately not in the JSON but byte-exact in the
+ * sibling file {@code <id>.md}.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record BuiltInSkillDefinition(
         String id,
-        /** Pflichtfeld — {@code Integer}, damit ein fehlendes Feld nicht still als 0 durchgeht. */
+        /** Required field — {@code Integer}, so that a missing field does not silently pass as 0. */
         Integer sortOrder,
         String version,
         String name,

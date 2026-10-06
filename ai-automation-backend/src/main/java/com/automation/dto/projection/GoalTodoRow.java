@@ -5,8 +5,8 @@ import com.automation.entity.Todo;
 import java.time.Instant;
 
 /**
- * Schlanke Zeile eines TODOs in der Zielansicht (TODO dc0566f8): alles fuer Reihenfolge,
- * Einschaetzung und Fortschritt, aber ohne die Beschreibung – die kann 30 000 Zeichen lang sein.
+ * Lean row of a TODO in the goal view (TODO dc0566f8): everything for order,
+ * estimate and progress, but without the description – it can be 30,000 characters long.
  */
 public record GoalTodoRow(
         String id,
@@ -26,7 +26,7 @@ public record GoalTodoRow(
         Instant updatedAt,
         Instant dueDate,
         String workPackageId,
-        /** Entscheidung, die eine offene Frage beantwortet hat (TODO 68a5e24e); null = keine. */
+        /** Decision that answered an open question (TODO 68a5e24e); null = none. */
         String decision,
         Instant decidedAt,
         Todo.RatedBy decidedBy

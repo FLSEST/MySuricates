@@ -1,9 +1,9 @@
 package com.automation.dto.projection;
 
 /**
- * Zugeordnete (ohne ARCHIVED) und erledigte TODOs eines Arbeitspakets aus einem GROUP BY
- * (TODO 259f4f66, c60bf914); {@code openQuestions} zaehlt aktive TODOs mit offener Frage, {@code decided}
- * die mit Entscheidung und ohne offene Frage (TODO 68a5e24e).
+ * Assigned (excluding ARCHIVED) and completed TODOs of a work package from one GROUP BY
+ * (TODO 259f4f66, c60bf914); {@code openQuestions} counts active TODOs with an open question, {@code decided}
+ * those with a decision and without an open question (TODO 68a5e24e).
  */
 public record WorkPackageTodoCounts(String workPackageId, long total, long done, long openQuestions, long decided) {
 

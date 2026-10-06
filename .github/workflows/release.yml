@@ -17,8 +17,8 @@ jobs:
     name: GitHub-Release anlegen
     runs-on: ubuntu-26.04
     steps:
-      # fetch-depth: 0 — release-notes.sh braucht die volle Historie (Merge-Commits zwischen
-      # den Tags, das vorige Tag selbst).
+      # fetch-depth: 0 — release-notes.sh needs the full history (merge commits between
+      # the tags, the previous tag itself).
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
@@ -38,14 +38,14 @@ jobs:
         id: prev
         run: |
           TAG="${{ steps.tag.outputs.tag }}"
-          # Nach Semver sortiert: die Zeile direkt vor dem eigenen Tag ist der Vorgaenger — robuster
-          # als --merged, weil es nicht von der First-Parent-Topologie abhaengt.
+          # Sorted by semver: the line right before its own tag is the predecessor — more robust
+          # than --merged, because it does not depend on the first-parent topology.
           PREV="$(git tag --list 'v[0-9]*' --sort=v:refname | grep -B1 -x "$TAG" | head -1)"
           [ "$PREV" = "$TAG" ] && PREV=""
           echo "prev=${PREV}" >> "$GITHUB_OUTPUT"
-      # Eine mitgelieferte Notizdatei (aus dem Übergabe-Workflow, der einen geprüften Commit samt
-      # Tag ins öffentliche Repo bringt) hat Vorrang — release-notes.sh setzt dort an, wo die
-      # eigene Historie dieses Repos aufhört (siehe docs/entwicklung.md → „GitHub-Release bei
+      # A supplied notes file (from the handover workflow that brings a reviewed commit together with
+      # its tag into the public repo) takes precedence — release-notes.sh picks up where the
+      # own history of this repo ends (see docs/entwicklung.md → „GitHub-Release bei
       # jedem Tag").
       - name: Notizen bereitstellen
         run: |

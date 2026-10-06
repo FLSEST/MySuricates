@@ -24,10 +24,10 @@ public record CreateTodoRequest(
         String dueDate
 ) {
     /**
-     * Kurzform ohne {@code agentSessionRef} — fuer alle Aufrufer, die keine Agenten-Sitzung
-     * haben (Workflow-Bloecke, der Assistent, Test-Fixturen). Das Feld kam mit TODO 3497533c
-     * hinzu; ein zusaetzlicher Konstruktor ist hier die ehrlichere Loesung, als vierzig
-     * positionsgebundene Aufrufe um ein {@code null} zu erweitern, das sie nicht interessiert.
+     * Short form without {@code agentSessionRef} — for all callers that have no agent session
+     * (workflow blocks, the assistant, test fixtures). The field came with TODO 3497533c;
+     * an additional constructor is the more honest solution here than extending forty
+     * positional calls by a {@code null} that they are not interested in.
      */
     public CreateTodoRequest(String title, String description, Todo.Status status,
                              Todo.Priority priority, List<String> tags, String projectId,

@@ -1,8 +1,8 @@
 package com.automation.dto.projection;
 
 /**
- * Filter und Ziel-Workflow eines aktiven TodoTriggers (TODO c6ea8f5c) – ohne den Ziel-Workflow zu
- * laden, der ueber {@code TodoTrigger.targetWorkflow} (EAGER) samt Definition mitkaeme.
+ * Filter and target workflow of an active TodoTrigger (TODO c6ea8f5c) – without loading the target workflow,
+ * which would come along with its definition via {@code TodoTrigger.targetWorkflow} (EAGER).
  */
 public record TodoTriggerMatchRow(
         String id,

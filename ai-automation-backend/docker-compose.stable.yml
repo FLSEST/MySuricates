@@ -8,23 +8,23 @@ services:
         HOST_UID: ${UID:-1000}
         HOST_GID: ${GID:-1000}
         HOST_HOME: ${HOME}
-        # Neuer Wert (etwa der Monat) = NodeSource- und Docker-Repo frisch statt aus dem Layer-Cache (8b7a39b9)
+        # New value (e.g. the month) = NodeSource and Docker repo fresh instead of from the layer cache (8b7a39b9)
         APT_REFRESH: ${MYSURICATES_APT_REFRESH:-}
     container_name: mysuricates-stable
-    # Kein ports-Eintrag hier: Den Port veroeffentlicht die Override-Datei von scripts/staging.sh,
-    # standardmaessig nur auf 127.0.0.1 (STABLE_BIND in ~/.config/mysuricates/staging.env oeffnet ihn
-    # bewusst, etwa 0.0.0.0 fuers lokale Netz). Ohne Override veroeffentlicht er keinen Port.
+    # No ports entry here: the port is published by the override file of scripts/staging.sh,
+    # by default only on 127.0.0.1 (STABLE_BIND in ~/.config/mysuricates/staging.env opens it
+    # deliberately, e.g. 0.0.0.0 for the local network). Without the override it publishes no port.
     environment:
       - SPRING_PROFILES_ACTIVE=stable
-      # Onboarding-Texte: API-Key liegt nur im Container (Port innen = außen, Adresse stimmt ohne URL)
+      # Onboarding texts: API key lives only in the container (port inside = outside, address is right without a URL)
       - AUTOMATION_INSTANCE_CONTAINER=mysuricates-stable
       - HOME=${HOME}
       - LOG_DIR=/app/data/logs
       - PATH=/opt/java/openjdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${HOME}/.local/bin
       - AUTOMATION_API_KEY=${AUTOMATION_API_KEY:-}
-      # Schlüssel außerhalb der Container-Schicht (3fb2242c): Integrations- und Siegel-Schlüssel liegen
-      # auf einem eigenen Volume, getrennt von den Daten. In der Container-Schicht wären sie nach jedem
-      # `compose down` weg — und mit ihnen die verschlüsselten Integrations-Zugänge und die Siegel.
+      # Keys outside the container layer (3fb2242c): integration and seal keys live
+      # on a volume of their own, separate from the data. In the container layer they would be gone after every
+      # `compose down` — and with them the encrypted integration credentials and the seals.
       - AUTOMATION_INTEGRATION_KEY_FILE=/app/secrets/integration-encryption.key
       - AUTOMATION_SEAL_KEY_FILE=/app/secrets/seal-signing.key
     volumes:
@@ -32,16 +32,16 @@ services:
       - stable-secrets:/app/secrets
       - ./stable-frontend:/app/frontend:ro
       - ./docker/entrypoint.sh:/app/entrypoint.sh:ro
-      # KI-Anbieter, Docker-Socket und Port kommen aus der Override-Datei, die scripts/staging.sh (und
-      # das Backend beim Start aus der Oberflaeche) schreibt. Schalter: STABLE_AI_FROM_HOST,
-      # STABLE_AI_PROVIDERS, STABLE_DOCKER_SOCKET (Standard 0), STABLE_BIND (Standard 127.0.0.1) in
-      # ~/.config/mysuricates/staging.env (262948a4). Ohne die Override-Datei startet der Container
-      # ohne KI-Anbieter, ohne Socket und ohne veroeffentlichten Port.
+      # AI providers, Docker socket and port come from the override file that scripts/staging.sh (and
+      # the backend when started from the UI) writes. Switches: STABLE_AI_FROM_HOST,
+      # STABLE_AI_PROVIDERS, STABLE_DOCKER_SOCKET (default 0), STABLE_BIND (default 127.0.0.1) in
+      # ~/.config/mysuricates/staging.env (262948a4). Without the override file the container starts
+      # without AI providers, without socket and without a published port.
       - ${HOME}/Entwicklung:${HOME}/Entwicklung
       - ${HOME}/dokumente:${HOME}/dokumente
       - ${AUTOMATION_DATA_HOME:-${HOME}/.mysuricates}/backups/stable:/host-backups/stable
-    # Kein Auto-Start beim Boot — die Stable-Instanz wird bewusst per Desktop-Icon
-    # bzw. ./scripts/staging.sh start gestartet.
+    # No auto-start on boot — the Stable instance is deliberately started via desktop icon
+    # or ./scripts/staging.sh start.
     restart: "no"
 
 volumes:

@@ -109,7 +109,7 @@ public class GoalController {
      */
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteGoal(@PathVariable String id) {
-        guardService.pauseForDeletedGoal(id); // sein Waechter-Workflow bleibt, laeuft aber nicht mehr
+        guardService.pauseForDeletedGoal(id); // its guard workflow stays but no longer runs
         goalService.delete(id);
         return ResponseEntity.noContent().build();
     }

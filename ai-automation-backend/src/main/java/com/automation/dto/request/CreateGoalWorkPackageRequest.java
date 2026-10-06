@@ -3,14 +3,14 @@ package com.automation.dto.request;
 import jakarta.validation.constraints.NotBlank;
 
 /**
- * Neues Arbeitspaket (TODO c60bf914).
+ * New work package (TODO c60bf914).
  *
- * @param projectId Projekt des Pakets; Pflicht, ausser das Ziel hat genau ein Projekt – dann dieses.
- *                  Ein Projekt, das dem Ziel noch nicht zugeordnet ist, kommt dazu.
- * @param startDate optional, zusammen mit {@code endDate}; ISO-Zeitpunkt oder ISO-Datum
- *                  ({@code 2026-10-01} = Beginn dieses Tages in UTC)
- * @param endDate   optional, zusammen mit {@code startDate}; ISO-Zeitpunkt oder ISO-Datum
- *                  ({@code 2026-10-15} = Ende dieses Tages in UTC). Beide fehlen = ohne Zeitraum.
+ * @param projectId project of the package; mandatory, unless the goal has exactly one project – then that one.
+ *                  A project not yet assigned to the goal is added.
+ * @param startDate optional, together with {@code endDate}; ISO timestamp or ISO date
+ *                  ({@code 2026-10-01} = start of that day in UTC)
+ * @param endDate   optional, together with {@code startDate}; ISO timestamp or ISO date
+ *                  ({@code 2026-10-15} = end of that day in UTC). Both missing = no period.
  */
 public record CreateGoalWorkPackageRequest(
         @NotBlank String title,

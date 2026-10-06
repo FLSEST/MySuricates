@@ -4,9 +4,9 @@ import com.automation.entity.AuditFindingStatus;
 import com.automation.entity.AuditSeverity;
 
 /**
- * Ein bekannter Befund eines Audits fuer die Kontextvariable {@code audit_findings} (TODO 3643beac):
- * Identitaet, Stand und Einordnung, aber ohne Beschreibung, Beleg, Tags und Beweis-Snapshot – die
- * braucht der Prompt nicht, und jede dieser TEXT-Spalten kann Kilobytes lang sein.
+ * A known finding of an audit for the context variable {@code audit_findings} (TODO 3643beac):
+ * identity, state and classification, but without description, evidence, tags and proof snapshot – the
+ * prompt does not need them, and each of these TEXT columns can be kilobytes long.
  */
 public record AuditFindingContextRow(
         String id,

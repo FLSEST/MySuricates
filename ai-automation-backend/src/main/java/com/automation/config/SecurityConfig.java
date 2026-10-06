@@ -25,8 +25,8 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                // Welche Pfade ohne Key erreichbar sind, steht allein in PublicPaths — der
-                // ApiKeyAuthFilter liest dieselben Matcher, um fehlende Keys zu protokollieren.
+                // Which paths are reachable without a key is defined solely in PublicPaths — the
+                // ApiKeyAuthFilter reads the same matchers to log missing keys.
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(PublicPaths.publicMatchers()).permitAll()
                         .requestMatchers(PublicPaths.keyRequiredMatchers()).authenticated()

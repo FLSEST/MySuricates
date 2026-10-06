@@ -1,34 +1,34 @@
-# Dev-Backend im Container statt auf dem Host (TODO a1236a64).
+# Dev backend in a container instead of on the host (TODO a1236a64).
 #
-# Wird ueber `scripts/start-mysuricates-dev.sh --container` benutzt, nicht direkt. Der Starter
-# erzeugt daneben eine Override-Datei mit dem, was vom Host hineinkommt (scripts/lib/host-mounts.sh:
-# KI-Anbieter nach MYSURICATES_DEV_AI_FROM_HOST, Docker-Socket) — deshalb steht hier nichts davon
-# fest verdrahtet.
+# Used via `scripts/start-mysuricates-dev.sh --container`, not directly. The starter
+# also generates an override file with what comes in from the host (scripts/lib/host-mounts.sh:
+# AI providers per MYSURICATES_DEV_AI_FROM_HOST, Docker socket) — so none of that is
+# hard-wired here.
 #
-# Warum nicht docker-compose.yml? Die baut keinen Backend-Service mehr, nur noch die Agent-Images.
-# Ein reines JRE-Alpine-Image ohne Node reicht hier nicht: Claude ist ein natives glibc-Programm
-# (Alpine hat musl), Codex und Pi sind Node-Programme; in einem solchen Image kann keines davon
-# laufen. docker/Dockerfile.stable ist Ubuntu-basiert und bringt Node mit — deshalb baut diese
-# Datei daraus, wie es Test und Stable auch tun.
+# Why not docker-compose.yml? It no longer builds a backend service, only the agent images.
+# A plain JRE Alpine image without Node is not enough here: Claude is a native glibc program
+# (Alpine has musl), Codex and Pi are Node programs; in such an image none of them can
+# run. docker/Dockerfile.stable is Ubuntu-based and brings Node along — so this
+# file builds from it, as Test and Stable do too.
 services:
   backend:
     build:
       context: .
       dockerfile: docker/Dockerfile.stable
-      # Das Image legt einen Benutzer mit den IDs des Hosts an, damit die gemounteten
-      # Anmeldungen unter $HOME lesbar bleiben. Ohne diese Args scheitert der Build im
-      # `useradd` — der Starter setzt sie deshalb aus id(1).
+      # The image creates a user with the host's IDs so that the mounted
+      # logins under $HOME stay readable. Without these args the build fails in
+      # `useradd` — so the starter sets them from id(1).
       args:
         HOST_USER: ${MYSURICATES_DEV_HOST_USER:-${USER}}
         HOST_UID: ${MYSURICATES_DEV_HOST_UID:-1000}
         HOST_GID: ${MYSURICATES_DEV_HOST_GID:-1000}
         HOST_HOME: ${HOME}
-        # Neuer Wert (etwa der Monat) = NodeSource- und Docker-Repo frisch statt aus dem Layer-Cache (8b7a39b9)
+        # New value (e.g. the month) = NodeSource and Docker repo fresh instead of from the layer cache (8b7a39b9)
         APT_REFRESH: ${MYSURICATES_APT_REFRESH:-}
     image: ai-automation-backend-dev-container
     container_name: ${MYSURICATES_DEV_CONTAINER_NAME:-mysuricates-dev-container}
-    # Standardmaessig nur auf 127.0.0.1, wie deploy/ und Stable/Test; MYSURICATES_DEV_CONTAINER_BIND=0.0.0.0
-    # oeffnet den Port bewusst auch fuers lokale Netz.
+    # By default only on 127.0.0.1, like deploy/ and Stable/Test; MYSURICATES_DEV_CONTAINER_BIND=0.0.0.0
+    # deliberately opens the port to the local network too.
     ports:
       - target: 9090
         published: "${MYSURICATES_DEV_CONTAINER_PORT:-9090}"
@@ -36,23 +36,23 @@ services:
     volumes:
       - dev-container-data:/app/data
       - dev-container-secrets:/app/secrets
-      # Docker-Socket und KI-Anbieter kommen aus der Override-Datei des Starters
-      # (scripts/lib/host-mounts.sh): MYSURICATES_DEV_DOCKER_SOCKET (Default 0, 1 bewusst setzen),
-      # MYSURICATES_DEV_AI_FROM_HOST (Default login), MYSURICATES_DEV_AI_PROVIDERS (262948a4).
-      # Projektverzeichnisse: ohne sie sieht ein Workflow die Projekte nicht, auf die er
-      # laut Projektpfad zugreifen soll.
+      # Docker socket and AI providers come from the starter's override file
+      # (scripts/lib/host-mounts.sh): MYSURICATES_DEV_DOCKER_SOCKET (default 0, set 1 deliberately),
+      # MYSURICATES_DEV_AI_FROM_HOST (default login), MYSURICATES_DEV_AI_PROVIDERS (262948a4).
+      # Project directories: without them a workflow does not see the projects it is supposed to
+      # access according to the project path.
       - ${MYSURICATES_DEV_PROJECT_ROOT:-${HOME}/Entwicklung}:${MYSURICATES_DEV_PROJECT_ROOT:-${HOME}/Entwicklung}
     environment:
       - AUTOMATION_DB_PATH=/app/data/automation.db
-      # Onboarding-Texte: veröffentlichter Port und Container, in dem der API-Key liegt
+      # Onboarding texts: published port and container in which the API key lives
       - AUTOMATION_INSTANCE_URL=http://localhost:${MYSURICATES_DEV_CONTAINER_PORT:-9090}
       - AUTOMATION_INSTANCE_CONTAINER=${MYSURICATES_DEV_CONTAINER_NAME:-mysuricates-dev-container}
       - DOCKER_HOST=unix:///var/run/docker.sock
       - AUTOMATION_SECURITY_ENABLED=true
       - AUTOMATION_API_KEY=${AUTOMATION_API_KEY:-}
-      # Schlüssel außerhalb der Container-Schicht (3fb2242c): Integrations- und Siegel-Schlüssel liegen
-      # auf einem eigenen Volume, getrennt von den Daten. In der Container-Schicht wären sie nach jedem
-      # `compose down` weg — und mit ihnen die verschlüsselten Integrations-Zugänge und die Siegel.
+      # Keys outside the container layer (3fb2242c): integration and seal keys live
+      # on a volume of their own, separate from the data. In the container layer they would be gone after every
+      # `compose down` — and with them the encrypted integration credentials and the seals.
       - AUTOMATION_INTEGRATION_KEY_FILE=/app/secrets/integration-encryption.key
       - AUTOMATION_SEAL_KEY_FILE=/app/secrets/seal-signing.key
       # Dev laeuft mit allen Modulen — wie die Host-Instanz (config/application.yml: preset full).
@@ -60,8 +60,8 @@ services:
       - HOME=${HOME}
     restart: "no"
     healthcheck:
-      # --noproxy: Docker reicht Proxy-Variablen in den Container, curl schickt auch localhost
-      # ueber sie — der Container wurde nie gesund (cf662c01)
+      # --noproxy: Docker passes proxy variables into the container, curl also sends localhost
+      # through them — the container never became healthy (cf662c01)
       test: ["CMD", "curl", "--noproxy", "*", "-f", "http://localhost:9090/api/v1/system/health"]
       interval: 15s
       timeout: 5s

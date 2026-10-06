@@ -5,10 +5,10 @@ import jakarta.validation.constraints.NotBlank;
 import java.util.List;
 
 /**
- * Neues Ziel (TODO dc0566f8).
+ * New goal (TODO dc0566f8).
  *
- * @param targetDate optional, ISO-Datum ({@code 2026-10-15}) oder -Zeitpunkt
- * @param projectIds optional, die Projekte des Ziels in dieser Reihenfolge (TODO c60bf914)
+ * @param targetDate optional, ISO date ({@code 2026-10-15}) or timestamp
+ * @param projectIds optional, the goal's projects in this order (TODO c60bf914)
  */
 public record CreateGoalRequest(
         @NotBlank String title,
