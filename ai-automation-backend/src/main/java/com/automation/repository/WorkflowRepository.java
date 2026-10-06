@@ -38,6 +38,10 @@ public interface WorkflowRepository extends JpaRepository<Workflow, String> {
      * JPQL on purpose: {@code @SQLRestriction("deleted_at IS NULL")} applies, so soft-deleted
      * workflows do not count (a native query would count them).
      */
+    /** The workflow's live-log choice ({@code on}/{@code off}); empty when unset or the workflow is gone. */
+    @Query("SELECT w.liveLogPersist FROM Workflow w WHERE w.id = :id")
+    Optional<String> findLiveLogPersistById(@Param("id") String id);
+
     @Query("SELECT w.project.id, COUNT(w) FROM Workflow w GROUP BY w.project.id")
     List<Object[]> countWorkflowsGroupedByProject();
 

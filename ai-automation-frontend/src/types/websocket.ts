@@ -204,7 +204,12 @@ export interface LiveLogSnapshot {
   /** Block names of steps with buffered lines (keys are step indices). */
   stepNames?: Record<string, string>;
   lines: LiveLine[];
+  /** Served from the stored log after the in-memory buffer was evicted (missing on older backends). */
+  stored?: boolean;
 }
+
+/** Where the replayed live log came from: not asked yet, the in-memory buffer, the stored log, or nowhere. */
+export type LiveLogSource = 'pending' | 'memory' | 'stored' | 'none';
 
 export interface CommandMessage {
   type: 'command';

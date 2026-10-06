@@ -319,6 +319,8 @@ export interface Workflow {
   model: string | null;
   provider: string | null;
   effort: string | null;
+  /** Keep the run's live log after the run: 'on'/'off', null = system default (outside the definition, editable when sealed) */
+  liveLogPersist?: 'on' | 'off' | null;
   /** SHA-256 of the current definition (detail responses with provenance on) */
   definitionHash?: string | null;
   /** Sealed definitions reject changes and refuse to run if modified (automation.hardening.sealing) */
@@ -454,7 +456,11 @@ export interface UpdateWorkflowRequest {
   defaultContext?: Record<string, string>;
   tags?: string[];
   category?: string;
+  liveLogPersist?: LiveLogPersistChoice;
 }
+
+/** Request value for `liveLogPersist`; 'default' clears the workflow's own choice. */
+export type LiveLogPersistChoice = 'default' | 'on' | 'off';
 
 /**
  * All block types the backend registers (one per BlockExecutor). Guarded on both sides:

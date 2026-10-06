@@ -4,7 +4,7 @@ import { Client, ReconnectionTimeMode } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { api } from '../api/client';
 import type { AgenticState, HumanInputField, PendingHumanInput } from '../types';
-import type { WsMessage, ForEachState, PendingApproval, LiveLine, LiveLogSnapshot } from '../types/websocket';
+import type { WsMessage, ForEachState, PendingApproval, LiveLine, LiveLogSnapshot, LiveLogSource } from '../types/websocket';
 import {
   isStatusMessage, isApprovalRequired, isApprovalResolved,
   isHumanInputRequired, isHumanInputResolved, isAgenticMessage, isForEachMessage,
@@ -44,6 +44,7 @@ export function useExecutionWebSocket(runId: string | null, workflowId?: string,
   const [inputSignal, setInputSignal] = useState(0);
   const [agenticStates, setAgenticStates] = useState<Map<number, AgenticState>>(new Map());
   const [forEachStates, setForEachStates] = useState<Map<number, ForEachState>>(new Map());
+  const [liveLogSource, setLiveLogSource] = useState<LiveLogSource>('pending');
   const clientRef = useRef<Client | null>(null);
   const queryClient = useQueryClient();
 
@@ -175,7 +176,12 @@ export function useExecutionWebSocket(runId: string | null, workflowId?: string,
         if (liveOutput) {
           api.get<LiveLogSnapshot>(`/executions/${runId}/live-log?afterSeq=-1`)
             .then((snapshot) => {
-              if (disposed || !snapshot?.available || !snapshot.bufferId) return;
+              if (disposed) return;
+              if (!snapshot?.available || !snapshot.bufferId) {
+                setLiveLogSource('none');
+                return;
+              }
+              setLiveLogSource(snapshot.stored ? 'stored' : 'memory');
               // Steps whose start message was missed (reload, late open) still get their block name.
               for (const [index, name] of Object.entries(snapshot.stepNames ?? {})) {
                 if (!stepContext.labels.has(Number(index))) stepContext.labels.set(Number(index), name);
@@ -210,10 +216,11 @@ export function useExecutionWebSocket(runId: string | null, workflowId?: string,
       setPendingApproval(null);
       setPendingHumanInput(null);
       setConnected(false);
+      setLiveLogSource('pending');
     };
   }, [runId, liveOutput, appendEntries]);
 
   const clearLogs = useCallback(() => setLogs([]), []);
 
-  return { logs, connected, clearLogs, pendingApproval, pendingHumanInput, inputSignal, agenticStates, forEachStates };
+  return { logs, connected, clearLogs, pendingApproval, pendingHumanInput, inputSignal, agenticStates, forEachStates, liveLogSource };
 }

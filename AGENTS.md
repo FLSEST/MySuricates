@@ -386,7 +386,7 @@ Headers: X-API-Key: <key>
 | Genehmigen | `POST /api/v1/executions/{id}/approve` — Body: `{"answer": "Yes"}`; bei einem Approval nur eine der angebotenen `options`, sonst 400 |
 | Genehmigung prüfen | `GET /api/v1/executions/{id}/approval` — mit `rejectOptions` (die Optionen, die `on_no` auslösen) |
 | Alle wartenden Freigaben | `GET /api/v1/executions/pending-input` — Approvals und Human-Input über alle Läufe, die ältesten zuerst |
-| Live-Output nachladen | `GET /api/v1/executions/{id}/live-log?afterSeq=-1` — gepufferte Zeilen laufender/kürzlich beendeter Runs |
+| Live-Output nachladen | `GET /api/v1/executions/{id}/live-log?afterSeq=-1` — gepufferte Zeilen laufender/kürzlich beendeter Runs, danach der gespeicherte Mitschnitt (`stored: true`, je Workflow `liveLogPersist`) |
 
 ### 8. Workflow-Versionen
 

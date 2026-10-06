@@ -15,6 +15,7 @@ import com.automation.executor.ApprovalRequest;
 import com.automation.service.workflow.RunControlService;
 import com.automation.service.workflow.RunDeletionPolicy;
 import com.automation.service.workflow.RunDeletionService;
+import com.automation.service.workflow.RunLiveLogArchive;
 import com.automation.service.workflow.RunLiveLogService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -36,7 +37,7 @@ public class ExecutionController {
     private final PendingTodoApprovalService pendingTodoApprovalService;
     private final RunDeletionService runDeletionService;
     private final RunDeletionPolicy runDeletionPolicy;
-    private final RunLiveLogService runLiveLogService;
+    private final RunLiveLogArchive runLiveLogArchive;
     private final PendingInputService pendingInputService;
 
     /**
@@ -68,13 +69,13 @@ public class ExecutionController {
     }
 
     /**
-     * Returns a run's buffered live lines (in memory only, until ~10 min after the run ends) for the
-     * replay after a reload. {@code available=false} instead of 404 when nothing is buffered.
+     * Returns a run's live lines for the replay, from memory while the run is fresh and from the stored
+     * log afterwards (if the workflow keeps it). {@code available=false} instead of 404 when there is none.
      */
     @GetMapping("/{id}/live-log")
     public RunLiveLogService.Snapshot getLiveLog(@PathVariable String id,
                                                  @RequestParam(defaultValue = "-1") long afterSeq) {
-        return runLiveLogService.snapshot(id, afterSeq);
+        return runLiveLogArchive.snapshot(id, afterSeq);
     }
 
     /**

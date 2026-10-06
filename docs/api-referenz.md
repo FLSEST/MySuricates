@@ -364,7 +364,7 @@ Quelle: `ExecutionController` – Workflow runs: list and inspect them, control 
 | `POST /api/v1/executions/{id}/approve` | Answers the run's open question. | Kern |
 | `POST /api/v1/executions/{id}/cancel` | Cancels a running or queued run. | Kern |
 | `POST /api/v1/executions/{id}/command` | Sends an ad-hoc command to the Claude session in the container of a running run and returns its output. | Kern |
-| `GET /api/v1/executions/{id}/live-log` | Returns a run's buffered live lines (in memory only, until ~10 min after the run ends) for the replay after a reload. | Kern |
+| `GET /api/v1/executions/{id}/live-log` | Returns a run's live lines for the replay, from memory while the run is fresh and from the stored log afterwards (if the workflow keeps it). | Kern |
 | `PATCH /api/v1/executions/{id}/notes` | Stores a free-text note on the run; a blank `notes` removes it. | Kern |
 | `POST /api/v1/executions/{id}/pause` | Pauses a running run before its next block; answers 200 even if the run is not active. | Kern |
 | `POST /api/v1/executions/{id}/resume` | Resumes a paused run; answers 200 even if the run is not active. | Kern |
@@ -379,7 +379,7 @@ Hinweise:
 - `GET /api/v1/executions/{id}/approval` — Includes `options` and `rejectOptions`; human input adds its input fields.
 - `POST /api/v1/executions/{id}/approve` — 400 when an approval does not offer the answer as an option.
 - `POST /api/v1/executions/{id}/cancel` — A run still marked `RUNNING` without an active execution is set to `CANCELLED` directly.
-- `GET /api/v1/executions/{id}/live-log` — `available=false` instead of 404 when nothing is buffered.
+- `GET /api/v1/executions/{id}/live-log` — `available=false` instead of 404 when there is none.
 - `POST /api/v1/executions/{id}/resume-from-step` — Other statuses are refused.
 
 ## /api/v1/factory

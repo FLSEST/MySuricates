@@ -229,6 +229,8 @@ automation:
     max-chars-per-flush: 32000
     retention-minutes: 10
     max-buffered-runs: 20
+    # Keep a finished run's live log in the DB; per workflow overridable (liveLogPersist), runtime key live-log-persist-default
+    persist-default: ${AUTOMATION_LIVE_LOG_PERSIST_DEFAULT:true}
   summarization:
     base-dir: ${AUTOMATION_SUMMARIZATION_DIR:${automation.data-home}/summarization}
     timeout-seconds: ${AUTOMATION_SUMMARIZATION_TIMEOUT:120}

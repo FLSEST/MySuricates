@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { WorkflowDetailSidebar } from '../WorkflowDetailSidebar';
 import { useI18nStore } from '../../../i18n';
 import { useUpdateWorkflow, useWorkflowRuns } from '../../../hooks/useWorkflows';
-import { useAiProviders, usePiCatalog, useProviderModels, useRefreshProviderModels } from '../../../hooks/useSystem';
+import { useAiProviders, useExecutionConfig, usePiCatalog, useProviderModels, useRefreshProviderModels } from '../../../hooks/useSystem';
 import type { Workflow } from '../../../types';
 
 const mockMutate = vi.fn();
@@ -18,6 +18,7 @@ vi.mock('../../../hooks/useSystem', () => ({
   usePiCatalog: vi.fn(),
   useProviderModels: vi.fn(),
   useRefreshProviderModels: vi.fn(),
+  useExecutionConfig: vi.fn(),
 }));
 
 const mockRefresh = vi.fn();
@@ -74,6 +75,7 @@ describe('WorkflowDetailSidebar', () => {
       data: { content: [], totalElements: 0, totalPages: 0, number: 0, size: 50 },
       isLoading: false,
     } as any);
+    vi.mocked(useExecutionConfig).mockReturnValue({ data: { liveLogPersistDefault: 1 } } as any);
     vi.mocked(useAiProviders).mockReturnValue({
       data: { providers: ['CLAUDE', 'CODEX', 'PI'], default: 'CLAUDE' },
     } as any);
@@ -247,9 +249,26 @@ describe('WorkflowDetailSidebar', () => {
         workflow={buildWorkflow({ sealed: true, activatedSkillIds: ['s1'], activatedSkillNames: ['Skill'] })} />);
 
       expect(screen.getByRole('button', { name: /edit/i })).toBeDisabled();
-      screen.getAllByRole('combobox').forEach((select) => expect(select).toBeDisabled());
+      // The live-log choice is an operating setting outside the definition and stays editable.
+      expect(screen.getByRole('combobox', { name: 'Keep live log' })).toBeEnabled();
+      screen.getAllByRole('combobox')
+        .filter((select) => select.getAttribute('aria-label') !== 'Keep live log')
+        .forEach((select) => expect(select).toBeDisabled());
       expect(screen.getByRole('button', { name: /deactivate/i })).toBeDisabled();
       expect(screen.getByRole('switch', { name: 'Auto-Repair' })).toBeDisabled();
+    });
+
+    it('lets the live-log choice follow the system default and sends the picked value', () => {
+      vi.mocked(useExecutionConfig).mockReturnValue({ data: { liveLogPersistDefault: 0 } } as any);
+      render(<WorkflowDetailSidebar {...defaultProps} workflow={buildWorkflow({ liveLogPersist: null })} />);
+
+      const select = screen.getByRole('combobox', { name: 'Keep live log' });
+      expect(select).toHaveValue('default');
+      expect(screen.getByRole('option', { name: 'System default (off)' })).toBeInTheDocument();
+
+      fireEvent.change(select, { target: { value: 'on' } });
+
+      expect(mockMutate).toHaveBeenCalledWith({ id: 'wf-1', data: { liveLogPersist: 'on' } });
     });
 
     it('leaves the editors enabled for unsealed workflows', () => {

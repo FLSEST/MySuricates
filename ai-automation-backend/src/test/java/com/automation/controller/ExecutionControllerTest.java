@@ -18,6 +18,7 @@ import com.automation.service.system.ApiKeyService;
 import com.automation.service.workflow.RunControlService;
 import com.automation.service.workflow.RunDeletionPolicy;
 import com.automation.service.workflow.RunDeletionService;
+import com.automation.service.workflow.RunLiveLogArchive;
 import com.automation.service.workflow.RunLiveLogService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -67,7 +68,7 @@ class ExecutionControllerTest {
     @MockitoBean
     private RunDeletionPolicy runDeletionPolicy;
     @MockitoBean
-    private RunLiveLogService runLiveLogService;
+    private RunLiveLogArchive runLiveLogArchive;
     @MockitoBean
     private PendingInputService pendingInputService;
 
@@ -138,7 +139,7 @@ class ExecutionControllerTest {
 
     @Test
     void getLiveLog_returnsSnapshotOfBufferedLines() throws Exception {
-        when(runLiveLogService.snapshot("run-1", 4)).thenReturn(new RunLiveLogService.Snapshot(
+        when(runLiveLogArchive.snapshot("run-1", 4)).thenReturn(new RunLiveLogService.Snapshot(
                 "run-1", "buf-1", true, 3, 5, 0, Map.of(2, "Build"),
                 List.of(new RunLiveLogService.LiveLine(5, 2, "tool", "Bash: mvn test", 1_700_000_000_000L))));
 
@@ -153,12 +154,26 @@ class ExecutionControllerTest {
                 .andExpect(jsonPath("$.lines[0].stepIndex").value(2))
                 .andExpect(jsonPath("$.lines[0].kind").value("tool"))
                 .andExpect(jsonPath("$.lines[0].text").value("Bash: mvn test"))
-                .andExpect(jsonPath("$.lines[0].ts").value(1_700_000_000_000L));
+                .andExpect(jsonPath("$.lines[0].ts").value(1_700_000_000_000L))
+                .andExpect(jsonPath("$.stored").value(false));
+    }
+
+    @Test
+    void getLiveLog_afterEviction_servesTheStoredLog() throws Exception {
+        when(runLiveLogArchive.snapshot("run-3", -1)).thenReturn(new RunLiveLogService.Snapshot(
+                "run-3", "buf-3", true, 0, 0, 0, Map.of(0, "Build"),
+                List.of(new RunLiveLogService.LiveLine(0, 0, "stdout", "ok", 1L)), true));
+
+        mockMvc.perform(get("/api/v1/executions/run-3/live-log"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.available").value(true))
+                .andExpect(jsonPath("$.stored").value(true))
+                .andExpect(jsonPath("$.lines[0].text").value("ok"));
     }
 
     @Test
     void getLiveLog_withoutBuffer_returnsUnavailableInsteadOf404() throws Exception {
-        when(runLiveLogService.snapshot("run-9", -1)).thenReturn(
+        when(runLiveLogArchive.snapshot("run-9", -1)).thenReturn(
                 new RunLiveLogService.Snapshot("run-9", null, false, 0, -1, 0, Map.of(), List.of()));
 
         mockMvc.perform(get("/api/v1/executions/run-9/live-log"))

@@ -39,8 +39,15 @@ public class RunLiveLogService {
 
     public record LiveLine(long seq, int stepIndex, String kind, String text, long ts) {}
 
+    /** {@code stored}: served from {@code run_live_logs} after the buffer was evicted (see RunLiveLogArchive). */
     public record Snapshot(String runId, String bufferId, boolean available, long firstSeq, long lastSeq,
-                           long skipped, Map<Integer, String> stepNames, List<LiveLine> lines) {}
+                           long skipped, Map<Integer, String> stepNames, List<LiveLine> lines, boolean stored) {
+        /** In-memory snapshot. */
+        public Snapshot(String runId, String bufferId, boolean available, long firstSeq, long lastSeq,
+                        long skipped, Map<Integer, String> stepNames, List<LiveLine> lines) {
+            this(runId, bufferId, available, firstSeq, lastSeq, skipped, stepNames, lines, false);
+        }
+    }
 
     static final String MESSAGE_TYPE = "live_output";
     private static final long EVICTION_PERIOD_SECONDS = 60;

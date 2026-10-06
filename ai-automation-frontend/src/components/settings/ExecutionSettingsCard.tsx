@@ -6,7 +6,7 @@ import { Zap, Save, Loader2 } from 'lucide-react';
 import { Spinner } from '../ui';
 import { providerName } from '../shared/aiProviderStatus';
 
-type NumericFormKeys = Exclude<keyof FormState, 'rateLimitEnabled' | 'schedulerCatchUpOnResume' | 'runAutoResumeEnabled' | 'dashboardReportAssistEnabled'>;
+type NumericFormKeys = Exclude<keyof FormState, 'rateLimitEnabled' | 'schedulerCatchUpOnResume' | 'runAutoResumeEnabled' | 'dashboardReportAssistEnabled' | 'liveLogPersistDefault'>;
 
 interface FieldConfig {
   key: string;
@@ -41,6 +41,7 @@ interface FormState {
   factoryTimeoutSeconds: number;
   runRetentionDays: number;
   runRetentionMaxPerNight: number;
+  liveLogPersistDefault: boolean;
   dashboardLayoutRetentionCount: number;
   dashboardReportAssistEnabled: boolean;
 }
@@ -69,6 +70,7 @@ const DEFAULT_FORM: FormState = {
   factoryTimeoutSeconds: 600,
   runRetentionDays: 90,
   runRetentionMaxPerNight: 200,
+  liveLogPersistDefault: true,
   dashboardLayoutRetentionCount: 100,
   dashboardReportAssistEnabled: true,
 };
@@ -98,6 +100,7 @@ function toFormState(config: NonNullable<ReturnType<typeof useExecutionConfig>['
     factoryTimeoutSeconds: config.factoryTimeoutSeconds ?? 600,
     runRetentionDays: config.runRetentionDays ?? 90,
     runRetentionMaxPerNight: config.runRetentionMaxPerNight ?? 200,
+    liveLogPersistDefault: (config.liveLogPersistDefault ?? 1) === 1,
     dashboardLayoutRetentionCount: config.dashboardLayoutRetentionCount ?? 100,
     dashboardReportAssistEnabled: (config.dashboardReportAssistEnabled ?? 1) === 1,
   };
@@ -137,6 +140,7 @@ export function ExecutionSettingsCard() {
     form.factoryTimeoutSeconds !== (config.factoryTimeoutSeconds ?? 600) ||
     form.runRetentionDays !== (config.runRetentionDays ?? 90) ||
     form.runRetentionMaxPerNight !== (config.runRetentionMaxPerNight ?? 200) ||
+    form.liveLogPersistDefault !== ((config.liveLogPersistDefault ?? 1) === 1) ||
     form.dashboardLayoutRetentionCount !== (config.dashboardLayoutRetentionCount ?? 100) ||
     form.dashboardReportAssistEnabled !== ((config.dashboardReportAssistEnabled ?? 1) === 1)
   );
@@ -182,6 +186,7 @@ export function ExecutionSettingsCard() {
       factoryTimeoutSeconds: form.factoryTimeoutSeconds,
       runRetentionDays: form.runRetentionDays,
       runRetentionMaxPerNight: form.runRetentionMaxPerNight,
+      liveLogPersistDefault: form.liveLogPersistDefault ? 1 : 0,
       dashboardLayoutRetentionCount: form.dashboardLayoutRetentionCount,
       dashboardReportAssistEnabled: form.dashboardReportAssistEnabled ? 1 : 0,
     });
@@ -274,6 +279,19 @@ export function ExecutionSettingsCard() {
           <Toggle
             enabled={form.dashboardReportAssistEnabled}
             onChange={(v) => setForm(prev => ({ ...prev, dashboardReportAssistEnabled: v }))}
+          />
+        </div>
+
+        {/* Keep finished runs' live logs; workflows can override it (TODO bbbfcbf8) */}
+        <div className="flex items-center justify-between py-2">
+          <div>
+            <label className="block text-sm font-medium text-text">{t.settings.liveLogPersistDefault}</label>
+            <p className="text-xs text-text-tertiary mt-0.5">{t.settings.liveLogPersistDefaultHint}</p>
+          </div>
+          <Toggle
+            enabled={form.liveLogPersistDefault}
+            onChange={(v) => setForm(prev => ({ ...prev, liveLogPersistDefault: v }))}
+            ariaLabel={t.settings.liveLogPersistDefault}
           />
         </div>
 

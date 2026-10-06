@@ -28,6 +28,7 @@ interface WorkflowApiResponse {
   model: string | null;
   provider: string | null;
   effort: string | null;
+  liveLogPersist?: 'on' | 'off' | null;
   templateId: string | null;
   createdAt: string;
   updatedAt: string;
@@ -46,6 +47,7 @@ function mapWorkflow(raw: WorkflowApiResponse): Workflow {
     model: raw.model ?? null,
     provider: raw.provider ?? null,
     effort: raw.effort ?? null,
+    liveLogPersist: raw.liveLogPersist ?? null,
     metadata: raw.metadata ?? {},
   };
 }

@@ -318,6 +318,8 @@ export interface ExecutionConfig {
   factoryTimeoutSeconds: number;
   runRetentionDays?: number;
   runRetentionMaxPerNight?: number;
+  /** keep a finished run's live log unless the workflow says otherwise: 1 = on */
+  liveLogPersistDefault?: number;
   dashboardLayoutRetentionCount?: number;
   wishTotalTimeoutMinutes?: number;
   wishWorkflowWaitMinutes?: number;

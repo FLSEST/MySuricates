@@ -138,6 +138,10 @@ final class WorkflowRequestFields {
             // A label like the name: not in WorkflowSnapshot, so the gateway writes no version row for it.
             workflow.setVersion(normalizeVersion(request.version()));
         }
+        if (request.liveLogPersist() != null) {
+            // Operating setting outside WorkflowSnapshot: no version row, allowed on sealed workflows.
+            workflow.setLiveLogPersist(LiveLogPersistence.normalize(request.liveLogPersist()));
+        }
         return request.name() != null || request.description() != null || request.blocks() != null;
     }
 

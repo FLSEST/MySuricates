@@ -279,6 +279,33 @@ class WorkflowServiceTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
+    // --- live-log choice (TODO bbbfcbf8) ---
+
+    private static UpdateWorkflowRequest liveLogOnly(String value) {
+        return new UpdateWorkflowRequest(null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, value);
+    }
+
+    @Test
+    void update_setsAndClearsTheLiveLogChoice() {
+        when(workflowRepository.findByIdWithSkills("wf-1")).thenReturn(Optional.of(testWorkflow));
+        when(workflowRepository.save(any(Workflow.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        assertThat(workflowService.update("wf-1", liveLogOnly(" OFF "), ChangeSource.USER).getLiveLogPersist())
+                .isEqualTo("off");
+        assertThat(workflowService.update("wf-1", liveLogOnly("default"), ChangeSource.USER).getLiveLogPersist())
+                .isNull();
+    }
+
+    @Test
+    void update_unknownLiveLogChoice_isRejectedBeforeSaving() {
+        when(workflowRepository.findByIdWithSkills("wf-1")).thenReturn(Optional.of(testWorkflow));
+
+        assertThatThrownBy(() -> workflowService.update("wf-1", liveLogOnly("sometimes"), ChangeSource.USER))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("liveLogPersist");
+        verify(workflowRepository, never()).save(any());
+    }
+
     // --- version label (TODO a3b89355) ---
 
     private static UpdateWorkflowRequest versionOnly(String version) {

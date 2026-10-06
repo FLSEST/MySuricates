@@ -40,8 +40,55 @@ public record WorkflowResponse(
         String definitionHash,
         boolean sealed,
         String sealedHash,
-        Instant sealedAt
+        Instant sealedAt,
+        /** Keep the run's live log: {@code on}/{@code off}, null = system default. */
+        String liveLogPersist
 ) {
+    /** Backwards-compat constructor for call-sites written before the live-log choice existed. */
+    public WorkflowResponse(
+            String id,
+            String projectId,
+            String projectName,
+            String projectSubtitle,
+            String projectDescription,
+            String name,
+            String description,
+            String icon,
+            List<BlockDefinition> blocks,
+            String version,
+            Map<String, Object> metadata,
+            List<String> activatedSkillIds,
+            List<String> activatedSkillNames,
+            long runCount,
+            String instructions,
+            String model,
+            String provider,
+            String templateId,
+            Map<String, Object> defaultContext,
+            String testStatus,
+            Instant lastTestedAt,
+            Instant createdAt,
+            Instant updatedAt,
+            Instant stableSyncedAt,
+            List<String> tags,
+            String category,
+            Instant tagsGeneratedAt,
+            boolean tagsUserEdited,
+            String effort,
+            String definitionHash,
+            boolean sealed,
+            String sealedHash,
+            Instant sealedAt
+    ) {
+        this(id, projectId, projectName, projectSubtitle, projectDescription,
+                name, description, icon, blocks, version, metadata,
+                activatedSkillIds, activatedSkillNames, runCount,
+                instructions, model, provider, templateId, defaultContext,
+                testStatus, lastTestedAt, createdAt, updatedAt, stableSyncedAt,
+                tags, category, tagsGeneratedAt, tagsUserEdited, effort, definitionHash,
+                sealed, sealedHash, sealedAt, null);
+    }
+
     /** Backwards-compat constructor for call-sites written before sealing existed. */
     public WorkflowResponse(
             String id,
@@ -80,7 +127,7 @@ public record WorkflowResponse(
                 activatedSkillIds, activatedSkillNames, runCount,
                 instructions, model, provider, templateId, defaultContext,
                 testStatus, lastTestedAt, createdAt, updatedAt, stableSyncedAt,
-                tags, category, tagsGeneratedAt, tagsUserEdited, effort, definitionHash, false, null, null);
+                tags, category, tagsGeneratedAt, tagsUserEdited, effort, definitionHash, false, null, null, null);
     }
 
     /** Backwards-compat constructor for call-sites written before definition hashes existed. */

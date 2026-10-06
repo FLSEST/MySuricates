@@ -900,6 +900,9 @@ Abschluss-Zeile, Pi/Codex als Rohzeilen — auch für Blöcke innerhalb von `for
 - Programme, die ihre Ausgabe puffern (z. B. `python3` ohne `-u`), erscheinen erst beim Flush — für Live-Ausgabe
   `python3 -u` oder `PYTHONUNBUFFERED=1` verwenden.
 - Der Step-Output (`{{ block.<name>.output }}`, Step-Karte) ist davon unberührt und enthält wie bisher die komplette Ausgabe.
+- Nach dem Lauf bleibt der Mitschnitt (letzte 1000 Zeilen) gespeichert, solange der Workflow es nicht abschaltet:
+  Seitenleiste → „Live-Mitschnitt speichern“ (Systemstandard / immer / nie); der Systemstandard steht unter
+  Einstellungen → Ausführung. Er wird mit dem Lauf gelöscht.
 
 ### Container-Images
 

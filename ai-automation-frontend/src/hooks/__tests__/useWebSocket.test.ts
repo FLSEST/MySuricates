@@ -523,6 +523,24 @@ describe('useExecutionWebSocket', () => {
     expect(result.current.logs[0].stepLabel).toBe('Step 1 · Build');
   });
 
+  it('reports where the replayed log came from: memory, the stored log or nowhere', async () => {
+    mockApiGet.mockResolvedValueOnce({ runId: 'run-1', bufferId: 'buf-1', available: true, firstSeq: 0, lastSeq: 0, skipped: 0,
+      stored: true, lines: liveBatch('buf-1', [0], 0).lines });
+    const stored = renderHook(() => useExecutionWebSocket('run-1', 'wf-1'), { wrapper: createWrapper() });
+    expect(stored.result.current.liveLogSource).toBe('pending');
+    await waitFor(() => expect(stored.result.current.liveLogSource).toBe('stored'));
+    stored.unmount();
+
+    mockApiGet.mockResolvedValueOnce({ runId: 'run-2', bufferId: 'buf-2', available: true, firstSeq: 0, lastSeq: 0, skipped: 0,
+      lines: liveBatch('buf-2', [0], 0).lines });
+    const memory = renderHook(() => useExecutionWebSocket('run-2', 'wf-1'), { wrapper: createWrapper() });
+    await waitFor(() => expect(memory.result.current.liveLogSource).toBe('memory'));
+    memory.unmount();
+
+    const none = renderHook(() => useExecutionWebSocket('run-3', 'wf-1'), { wrapper: createWrapper() });
+    await waitFor(() => expect(none.result.current.liveLogSource).toBe('none'));
+  });
+
   it('keeps working when the replay request fails', async () => {
     mockApiGet.mockRejectedValue(new Error('offline'));
     const { result } = renderHook(() => useExecutionWebSocket('run-1', 'wf-1'), { wrapper: createWrapper() });

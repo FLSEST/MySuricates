@@ -38,7 +38,7 @@ export function WorkflowExecution() {
 
   const { data: workflow } = useWorkflow(id!);
   const { data: run, error: runError, refetch: refetchRun } = useWorkflowRun(id!, runId);
-  const { logs, connected, pendingApproval, pendingHumanInput, inputSignal, agenticStates, forEachStates } = useExecutionWebSocket(runId!, id);
+  const { logs, connected, pendingApproval, pendingHumanInput, inputSignal, agenticStates, forEachStates, liveLogSource } = useExecutionWebSocket(runId!, id);
   const learningModule = useModuleEnabled('learning');
   const conversionModule = useModuleEnabled('conversion');
   const rateRun = useRateRun();
@@ -158,8 +158,21 @@ export function WorkflowExecution() {
 
         {/* Live logs */}
         <Card>
-          <CardHeader title={t.workflows.execution.logs} />
-          <LogViewer logs={logs} maxHeight="500px" />
+          <CardHeader
+            title={t.workflows.execution.logs}
+            action={liveLogSource === 'stored'
+              ? <span className="text-xs text-text-tertiary">{t.workflows.execution.liveLogStored}</span>
+              : !isRunning && liveLogSource === 'none'
+                ? <span className="text-xs text-text-tertiary" title={t.workflows.execution.noLiveLogStored}>
+                    {t.workflows.execution.noLiveLogStoredShort}
+                  </span>
+                : undefined}
+          />
+          <LogViewer
+            logs={logs}
+            maxHeight="500px"
+            emptyText={!isRunning && liveLogSource === 'none' ? t.workflows.execution.noLiveLogStored : undefined}
+          />
         </Card>
       </div>
 

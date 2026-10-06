@@ -7,7 +7,8 @@ import org.springframework.context.annotation.Configuration;
 
 /**
  * Live output of running blocks (shell lines, AI tool calls) streamed into the run's WebSocket log
- * and kept in memory for replay after a page reload. Nothing is persisted; see RunLiveLogService.
+ * and kept in memory for replay after a page reload; when the run ends, RunLiveLogArchive stores the
+ * buffer if {@link #persistDefault} or the workflow's {@code liveLogPersist} says so.
  */
 @Configuration
 @ConfigurationProperties(prefix = "automation.live-log")
@@ -30,4 +31,6 @@ public class LiveLogConfig {
     private int retentionMinutes = 10;
     /** Hard cap on buffered runs; the oldest finished buffer is evicted first. */
     private int maxBufferedRuns = 20;
+    /** Keep a finished run's live log in the database unless the workflow says otherwise (runtime-changeable). */
+    private boolean persistDefault = true;
 }

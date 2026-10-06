@@ -888,6 +888,8 @@ also for blocks inside `foreach`/`while`/`retry` (under the index of the outer s
 - Programs that buffer their output (e.g. `python3` without `-u`) only show up when they flush — use `python3 -u` or
   `PYTHONUNBUFFERED=1` for live output.
 - The step output (`{{ block.<name>.output }}`, step card) is unaffected and still contains the complete output.
+- After the run the log (last 1000 lines) is kept unless the workflow turns it off: sidebar → "Keep live log"
+  (system default / always / never); the system default is under Settings → Execution. It is deleted with the run.
 
 ### Container Images
 

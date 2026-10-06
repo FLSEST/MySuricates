@@ -1,6 +1,7 @@
 package com.automation.service.system;
 
 import com.automation.concurrency.DynamicSemaphore;
+import com.automation.config.LiveLogConfig;
 import com.automation.config.ChainConfig;
 import com.automation.config.DashboardReportAssistConfig;
 import com.automation.config.CompressionConfig;
@@ -117,7 +118,7 @@ class ExecutionSettingsServiceTest {
                         chainConfig, taskCommandConfig, executionRegistry),
                 new AccessLimitSettings(rateLimitConfig, containerShellService, assistantGuardrailsConfig),
                 new HousekeepingSettings(todoHygieneConfig, runRetentionConfig, dashboardLayoutConfig,
-                        todoGhostWatchdogConfig, todoSimilarityConfig, runDeletionPolicy),
+                        todoGhostWatchdogConfig, todoSimilarityConfig, runDeletionPolicy, new LiveLogConfig()),
                 new FeatureSettings(schedulerConfig, summarizationConfig, factoryConfig, wishConfig,
                         modelCatalogService, compressionConfig, dashboardReportAssistConfig, autoResumeConfig),
                 new RequestMetricsSettings(requestMetricsConfig)));

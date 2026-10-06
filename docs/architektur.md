@@ -725,10 +725,19 @@ Response (DTO) → React Query Cache → UI-Update
     `result`, `system`. Pro Batch gelten Zeilen- und Zeichen-Caps (neueste Zeilen gewinnen, Rest zählt als `skipped`).
     `setPreservePublishOrder(true)` hält die Reihenfolge pro Session.
   - **Replay:** `GET /api/v1/executions/{id}/live-log?afterSeq=-1` liefert den Puffer; das Frontend lädt ihn beim
-    (Re-)Connect und dedupliziert über `bufferId` + `seq`. Puffer leben nur im Speicher und verfallen 10 Minuten nach
+    (Re-)Connect und dedupliziert über `bufferId` + `seq`. Puffer leben im Speicher und verfallen 10 Minuten nach
     Run-Ende (auch ohne Completion-Event über den Abgleich mit `WorkflowExecutionRegistry`), maximal 20 Runs.
+  - **Aufbewahrung:** Beim `WorkflowRunCompletedEvent` schreibt `RunLiveLogArchive` den Puffer als eine Zeile in
+    `run_live_logs` (gzip-JSON der Zeilen und Step-Namen, FK auf den Run mit `ON DELETE CASCADE` – Run-Retention und
+    `DELETE /executions/{id}` nehmen ihn mit). Ob, entscheidet `workflows.live_log_persist` (`on`/`off`, NULL =
+    Systemstandard `automation.live-log.persist-default`, Laufzeit-Schlüssel `live-log-persist-default`, Standard an).
+    Der Schalter liegt außerhalb von `WorkflowSnapshot`: kein Hash, keine Version, auch bei Siegel änderbar. Das Replay
+    liefert nach dem Verfall des Puffers die gespeicherte Zeile (`stored: true`, gleiche `bufferId`/`seq`). Ein
+    fortgesetzter Run aus einem neuen Puffer wird angehängt und neu nummeriert. Runs ohne Completion-Event
+    (Geister-Reaper, Zombie-Markierung beim Start) behalten keinen Mitschnitt.
   - **Konfiguration:** `automation.live-log.*` (`enabled`, `max-line-length`, `buffer-lines`, `flush-interval-ms`,
-    `max-lines-per-flush`, `max-chars-per-flush`, `retention-minutes`, `max-buffered-runs`); nur beim Start gelesen.
+    `max-lines-per-flush`, `max-chars-per-flush`, `retention-minutes`, `max-buffered-runs`); nur beim Start gelesen,
+    außer `persist-default`.
 - **Terminal-WebSocket:** `/ws/terminal/**` für Echtzeit-Container-Zugriff (Raw WebSocket via `RawWebSocketConfig`, Handler: `TerminalWebSocketHandler`)
 
 ## Sicherheit

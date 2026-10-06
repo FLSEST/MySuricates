@@ -723,10 +723,18 @@ Response (DTO) → React Query Cache → UI Update
     `system`. Line and character caps apply per batch (newest lines win, the rest counts as `skipped`).
     `setPreservePublishOrder(true)` keeps the order per session.
   - **Replay:** `GET /api/v1/executions/{id}/live-log?afterSeq=-1` returns the buffer; the frontend loads it on
-    (re)connect and de-duplicates by `bufferId` + `seq`. Buffers live in memory only and expire 10 minutes after the run
+    (re)connect and de-duplicates by `bufferId` + `seq`. Buffers live in memory and expire 10 minutes after the run
     ends (also without a completion event, via the check against `WorkflowExecutionRegistry`), at most 20 runs.
+  - **Keeping:** on `WorkflowRunCompletedEvent`, `RunLiveLogArchive` writes the buffer as one row into
+    `run_live_logs` (gzip JSON of the lines and step names, FK to the run with `ON DELETE CASCADE` – run retention and
+    `DELETE /executions/{id}` remove it). Whether it does is decided by `workflows.live_log_persist` (`on`/`off`, NULL =
+    system default `automation.live-log.persist-default`, runtime key `live-log-persist-default`, on by default).
+    The switch is outside `WorkflowSnapshot`: no hash, no version, changeable on sealed workflows. Once the buffer has
+    expired, the replay returns the stored row (`stored: true`, same `bufferId`/`seq`). A resumed run from a new buffer
+    is appended and renumbered. Runs without a completion event (ghost reaper, zombie marking at startup) keep no log.
   - **Configuration:** `automation.live-log.*` (`enabled`, `max-line-length`, `buffer-lines`, `flush-interval-ms`,
-    `max-lines-per-flush`, `max-chars-per-flush`, `retention-minutes`, `max-buffered-runs`); read at startup only.
+    `max-lines-per-flush`, `max-chars-per-flush`, `retention-minutes`, `max-buffered-runs`); read at startup only,
+    except `persist-default`.
 - **Terminal WebSocket:** `/ws/terminal/**` for real-time container access (raw WebSocket via `RawWebSocketConfig`, handler: `TerminalWebSocketHandler`)
 
 ## Security

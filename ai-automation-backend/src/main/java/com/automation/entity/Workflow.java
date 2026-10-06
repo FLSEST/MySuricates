@@ -83,6 +83,13 @@ public class Workflow {
     /** Reasoning-effort level (low/medium/high/xhigh); null = provider default. */
     private String effort;
 
+    /**
+     * Keep the run's live log after the run: {@code on}/{@code off}, null = system default
+     * ({@code LiveLogPersistence}). An operating setting outside {@code WorkflowSnapshot}: no hash, no seal.
+     */
+    @Column(name = "live_log_persist", length = 8)
+    private String liveLogPersist;
+
     private String templateId;
 
     @Column(name = "block_types")

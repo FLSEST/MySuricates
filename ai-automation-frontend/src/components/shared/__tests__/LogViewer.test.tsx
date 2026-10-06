@@ -25,6 +25,13 @@ describe('LogViewer', () => {
     expect(screen.getByText('Warte auf Logs...')).toBeInTheDocument();
   });
 
+  it('shows a still empty text instead of the waiting placeholder when nothing will arrive', () => {
+    render(<LogViewer logs={[]} emptyText="No live log kept" />);
+
+    expect(screen.getByText('No live log kept')).not.toHaveClass('animate-pulse-subtle');
+    expect(screen.queryByText('Waiting for logs...')).not.toBeInTheDocument();
+  });
+
   it('keeps row DOM nodes stable when lines are appended and old ones dropped', () => {
     const { rerender } = render(<LogViewer logs={[event('a', 'first'), event('b', 'second')]} />);
     const secondRow = screen.getByText('second').closest('[data-kind]');

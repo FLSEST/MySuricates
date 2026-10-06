@@ -1,6 +1,7 @@
 package com.automation.service.system.settings;
 
 import com.automation.config.DashboardLayoutConfig;
+import com.automation.config.LiveLogConfig;
 import com.automation.config.RunRetentionConfig;
 import com.automation.config.TodoGhostWatchdogConfig;
 import com.automation.config.TodoHygieneConfig;
@@ -25,8 +26,9 @@ class HousekeepingSettingsTest {
     private final TodoGhostWatchdogConfig watchdog = new TodoGhostWatchdogConfig();
     private final TodoSimilarityConfig similarity = new TodoSimilarityConfig();
     private final RunDeletionPolicy policy = mock(RunDeletionPolicy.class);
+    private final LiveLogConfig liveLog = new LiveLogConfig();
     private final HousekeepingSettings settings =
-            new HousekeepingSettings(hygiene, retention, layout, watchdog, similarity, policy);
+            new HousekeepingSettings(hygiene, retention, layout, watchdog, similarity, policy, liveLog);
 
     @Test
     void appliersSchreibenJedenWertInSeineConfig() {
@@ -39,6 +41,7 @@ class HousekeepingSettingsTest {
         apply(settings, "todo-watchdog-enabled", "0");
         apply(settings, "todo-watchdog-stale-hours", "5");
         apply(settings, "todo-similarity-keyword-threshold", "0.35");
+        apply(settings, "live-log-persist-default", "0");
 
         assertThat(hygiene.isEnabled()).isTrue();
         assertThat(hygiene.getStaleDays()).isEqualTo(12);
@@ -49,6 +52,7 @@ class HousekeepingSettingsTest {
         assertThat(watchdog.isEnabled()).isFalse();
         assertThat(watchdog.getStaleHours()).isEqualTo(5);
         assertThat(similarity.getKeywordThreshold()).isEqualTo(0.35);
+        assertThat(liveLog.isPersistDefault()).isFalse();
     }
 
     @Test
@@ -77,6 +81,7 @@ class HousekeepingSettingsTest {
         assertThat(v).containsEntry("todoHygieneEnabled", 1)
                 .containsEntry("todoWatchdogEnabled", 0)
                 .containsEntry("runRetentionDays", 60)
+                .containsEntry("liveLogPersistDefault", 1)
                 .containsEntry("todoSimilarityKeywordThreshold", 0.5)
                 .containsEntry("todoStaleDays", hygiene.getStaleDays())
                 .containsEntry("dashboardLayoutRetentionCount", layout.getRetentionCount())
@@ -85,8 +90,8 @@ class HousekeepingSettingsTest {
 
     @Test
     void jederApplierHatEinenWertImAnzeigeSchluesselraum() {
-        assertThat(settings.appliers()).hasSize(9);
-        assertThat(values(settings)).hasSize(9);
+        assertThat(settings.appliers()).hasSize(10);
+        assertThat(values(settings)).hasSize(10);
     }
 
     @Test

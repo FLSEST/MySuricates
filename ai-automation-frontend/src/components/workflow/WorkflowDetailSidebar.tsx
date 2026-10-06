@@ -4,6 +4,7 @@ import { Card, CardHeader, Button, Toggle } from '../ui';
 import { WorkflowMemoryPanel } from './WorkflowMemoryPanel';
 import { WorkflowAiSettingsCards } from './WorkflowAiSettingsCards';
 import { WorkflowAutoResumeCard } from './WorkflowAutoResumeCard';
+import { WorkflowLiveLogCard } from './WorkflowLiveLogCard';
 import { DefaultContextEditor } from './DefaultContextEditor';
 import { RECENT_RUNS_PAGE_SIZE, WorkflowRecentRuns } from './WorkflowRecentRuns';
 import { useUpdateWorkflow, useWorkflowRuns } from '../../hooks/useWorkflows';
@@ -222,6 +223,9 @@ export function WorkflowDetailSidebar({
           </Card>
         )}
       </fieldset>
+
+      {/* Outside the locking fieldsets: an operating setting, editable on sealed workflows too */}
+      <WorkflowLiveLogCard workflow={workflow} />
 
       <WorkflowRecentRuns
         variant="card"

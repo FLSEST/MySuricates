@@ -23,6 +23,8 @@ interface LogViewerProps {
   logs: LogEntry[];
   autoScroll?: boolean;
   maxHeight?: string;
+  /** Shown instead of the pulsing "waiting for logs" when nothing will arrive (e.g. a finished run without a kept log). */
+  emptyText?: string;
 }
 
 const levelColors: Record<string, string> = {
@@ -79,7 +81,7 @@ const LogRow = memo(function LogRow({ log, showStep, skippedText, locale }: {
   );
 });
 
-export function LogViewer({ logs, autoScroll = true, maxHeight = '400px' }: LogViewerProps) {
+export function LogViewer({ logs, autoScroll = true, maxHeight = '400px', emptyText }: LogViewerProps) {
   const t = useT();
   const locale = useI18nStore((s) => s.locale);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -120,8 +122,9 @@ export function LogViewer({ logs, autoScroll = true, maxHeight = '400px' }: LogV
         style={{ maxHeight }}
       >
         <div className="p-4 space-y-0.5">
-          {logs.length === 0 && (
-            <div className="text-gray-500 animate-pulse-subtle">{t.workflows.execution.waitingForLogs}</div>
+          {logs.length === 0 && (emptyText
+            ? <div className="text-gray-500">{emptyText}</div>
+            : <div className="text-gray-500 animate-pulse-subtle">{t.workflows.execution.waitingForLogs}</div>
           )}
           {logs.map((log, i) => (
             <LogRow

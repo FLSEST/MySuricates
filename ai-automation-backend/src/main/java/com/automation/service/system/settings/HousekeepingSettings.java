@@ -1,6 +1,7 @@
 package com.automation.service.system.settings;
 
 import com.automation.config.DashboardLayoutConfig;
+import com.automation.config.LiveLogConfig;
 import com.automation.config.RunRetentionConfig;
 import com.automation.config.TodoGhostWatchdogConfig;
 import com.automation.config.TodoHygieneConfig;
@@ -13,7 +14,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Consumer;
 
-/** Housekeeping and retention: TODO hygiene and watchdog, run retention, layout versions, duplicate threshold. */
+/** Housekeeping and retention: TODO hygiene and watchdog, run retention, kept live logs, layout versions, duplicate threshold. */
 @Component
 @Order(3)
 public class HousekeepingSettings implements RuntimeSettingsGroup {
@@ -26,16 +27,19 @@ public class HousekeepingSettings implements RuntimeSettingsGroup {
     private final TodoGhostWatchdogConfig todoGhostWatchdogConfig;
     private final TodoSimilarityConfig todoSimilarityConfig;
     private final RunDeletionPolicy runDeletionPolicy;
+    private final LiveLogConfig liveLogConfig;
 
     public HousekeepingSettings(TodoHygieneConfig todoHygieneConfig, RunRetentionConfig runRetentionConfig,
                                 DashboardLayoutConfig dashboardLayoutConfig, TodoGhostWatchdogConfig todoGhostWatchdogConfig,
-                                TodoSimilarityConfig todoSimilarityConfig, RunDeletionPolicy runDeletionPolicy) {
+                                TodoSimilarityConfig todoSimilarityConfig, RunDeletionPolicy runDeletionPolicy,
+                                LiveLogConfig liveLogConfig) {
         this.todoHygieneConfig = todoHygieneConfig;
         this.runRetentionConfig = runRetentionConfig;
         this.dashboardLayoutConfig = dashboardLayoutConfig;
         this.todoGhostWatchdogConfig = todoGhostWatchdogConfig;
         this.todoSimilarityConfig = todoSimilarityConfig;
         this.runDeletionPolicy = runDeletionPolicy;
+        this.liveLogConfig = liveLogConfig;
     }
 
     @Override
@@ -46,6 +50,7 @@ public class HousekeepingSettings implements RuntimeSettingsGroup {
         m.put("todo-hygiene-max-per-run", v -> todoHygieneConfig.setMaxPerRun(Integer.parseInt(v)));
         m.put(RUN_RETENTION_DAYS, v -> runRetentionConfig.setRetentionDays(Integer.parseInt(v)));
         m.put("run-retention-max-per-night", v -> runRetentionConfig.setMaxPerNight(Integer.parseInt(v)));
+        m.put("live-log-persist-default", v -> liveLogConfig.setPersistDefault(Integer.parseInt(v) == 1));
         m.put("dashboard-layout-retention-count", v -> dashboardLayoutConfig.setRetentionCount(Integer.parseInt(v)));
         m.put("todo-watchdog-enabled", v -> todoGhostWatchdogConfig.setEnabled(Integer.parseInt(v) == 1));
         m.put("todo-watchdog-stale-hours", v -> todoGhostWatchdogConfig.setStaleHours(Integer.parseInt(v)));
@@ -60,6 +65,7 @@ public class HousekeepingSettings implements RuntimeSettingsGroup {
         out.put("todoHygieneMaxPerRun", todoHygieneConfig.getMaxPerRun());
         out.put("runRetentionDays", runRetentionConfig.getRetentionDays());
         out.put("runRetentionMaxPerNight", runRetentionConfig.getMaxPerNight());
+        out.put("liveLogPersistDefault", liveLogConfig.isPersistDefault() ? 1 : 0);
         out.put("dashboardLayoutRetentionCount", dashboardLayoutConfig.getRetentionCount());
         out.put("todoWatchdogEnabled", todoGhostWatchdogConfig.isEnabled() ? 1 : 0);
         out.put("todoWatchdogStaleHours", todoGhostWatchdogConfig.getStaleHours());
