@@ -257,6 +257,13 @@ gilt: **Das Skript bestimmt, wo hingeschaut wird, die KI, was dort los ist.**
 - **Gate**: Offene oder neue Urteilsbefunde heben auf `YELLOW`, nie auf `RED`. Zusätzlich prüft der
   Gate-Block deterministisch, ob jeder Kandidat unter der Überschrift „Urteil“ des Reports steht; fehlt
   einer, ist das Ergebnis höchstens `YELLOW` („Urteil unvollständig“).
+- **Werkzeug-Fakten (4.8.0, TODO `67128699`)**: PMD aus dem Image `automation-agent-analysis` läuft in drei
+  Werkzeug-Blöcken – CPD je Sprache (`cpd_java`, `cpd_ts`, Rohausgabe CSV, ab 100 Tokens) und die Designregeln
+  aus `scripts/public-readiness/pmd-architecture.xml` (`pmd`, SARIF). `arch_tools.py` liest beides:
+  `## duplicates` nennt die größten Duplikate über Dateigrenzen, die drei größten werden Kandidaten der Art
+  `dublette`; `## complexity` nennt Methoden über der Schwelle, nur für Backend-Kandidaten. Beides sind Fakten
+  fürs Urteil, nie eigene Befunde. CPD kennt kein TSX – React-Komponenten bleiben ungeprüft, und der Bericht
+  sagt das. Fehlt das Image, steht `duplicates_not_measured` bzw. `complexity_state=not_measured` da.
 
 ### Test-Abdeckung: Envelope aus der Soll-Liste
 

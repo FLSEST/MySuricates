@@ -238,8 +238,9 @@ es aus einem anderen Dockerfile gebaut wurde; ein Bau mit `docker compose` direk
 | `agent-python` | `Dockerfile.agent-python` | Python 3.12 Agent-Container |
 | `agent-devops` | `Dockerfile.agent-devops` | Ubuntu 24.04 Agent-Container (gh, trivy, gitleaks, docker-cli) |
 | `agent-java` | `Dockerfile.agent-java` | Temurin 21 Agent-Container (maven, LibreOffice) |
+| `agent-analysis` | `Dockerfile.agent-analysis` | Temurin 21 JRE mit PMD (Copy-Paste-Detector, Designregeln) für das Architektur-Review |
 
-Die Agent-Images werden nur gebaut (`profiles: build-only`, alle vier mit dem Befehl oben),
+Die Agent-Images werden nur gebaut (`profiles: build-only`, alle mit dem Befehl oben),
 nicht direkt über Compose gestartet. Das Backend erstellt und verwaltet Agent-Container dynamisch über
 die Docker API. Gebraucht werden sie so:
 
@@ -250,6 +251,8 @@ die Docker API. Gebraucht werden sie so:
   anfordert — `agent-devops` etwa die mitgelieferten Vorlagen `secret-scanner`,
   `container-vuln-scan`, `docker-image-build-push` und `github-project-bootstrap`. Wer keine solchen
   Workflows hat, braucht sie nicht zu bauen.
+- `agent-analysis` braucht das Architektur-Review (Werkzeug-Blöcke `cpd_java`, `cpd_ts`, `pmd`); ohne das
+  Image meldet es Duplikate und Komplexität als nicht gemessen und läuft weiter.
 
 ## Dockerfiles
 

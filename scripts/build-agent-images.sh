@@ -10,7 +10,7 @@
 # works, it just leaves the label empty.
 #
 # Usage:  scripts/build-agent-images.sh [service...]
-#         services: agent-node agent-python agent-devops agent-java (default: all four)
+#         services: agent-node agent-python agent-devops agent-java agent-analysis (default: all)
 # Env:    AGENT_APT_REFRESH  passed through to compose, see ai-automation-backend/docker-compose.yml
 #                            (a new value refreshes the third-party APT layers and pip packages)
 # Exit:   exit code of docker compose; 2 for an unknown service
@@ -18,7 +18,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BACKEND="$ROOT/ai-automation-backend"
-SERVICES=(agent-node agent-python agent-devops agent-java)
+SERVICES=(agent-node agent-python agent-devops agent-java agent-analysis)
 if [ "$#" -gt 0 ]; then
   SERVICES=("$@")
 fi
@@ -34,8 +34,8 @@ sha256_of() {
 
 for service in "${SERVICES[@]}"; do
   case "$service" in
-    agent-node|agent-python|agent-devops|agent-java) ;;
-    *) echo "build-agent-images: unknown service '$service' (agent-node, agent-python, agent-devops, agent-java)" >&2
+    agent-node|agent-python|agent-devops|agent-java|agent-analysis) ;;
+    *) echo "build-agent-images: unknown service '$service' (agent-node, agent-python, agent-devops, agent-java, agent-analysis)" >&2
        exit 2 ;;
   esac
   name="$(printf '%s' "${service#agent-}" | tr '[:lower:]' '[:upper:]')"

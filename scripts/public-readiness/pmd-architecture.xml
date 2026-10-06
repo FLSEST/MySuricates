@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  PMD rules for the architecture review (TODO 67128699). They are facts for the AI's judgement on the
+  review candidates (complexity per method), never findings of their own: the review dropped hard
+  thresholds in 4.6.0 because they produced a splitting treadmill. The thresholds only keep the SARIF
+  list short enough for the fact sheet (at most 200 hits): 115 methods on 2026-10-06.
+-->
+<ruleset name="mysuricates-architecture"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+    <description>Complexity per method as facts for the architecture review.</description>
+    <rule ref="category/java/design.xml/CognitiveComplexity">
+        <properties>
+            <property name="reportLevel" value="18"/>
+        </properties>
+    </rule>
+    <rule ref="category/java/design.xml/NcssCount">
+        <properties>
+            <property name="methodReportLevel" value="60"/>
+            <property name="classReportLevel" value="100000"/>
+        </properties>
+    </rule>
+</ruleset>

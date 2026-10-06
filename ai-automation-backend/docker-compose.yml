@@ -40,6 +40,16 @@ services:
     profiles:
       - build-only
 
+  agent-analysis:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.agent-analysis
+      args:
+        DOCKERFILE_SHA256: ${AGENT_ANALYSIS_DOCKERFILE_SHA256:-}
+    image: automation-agent-analysis:latest
+    profiles:
+      - build-only
+
   agent-java:
     build:
       context: .

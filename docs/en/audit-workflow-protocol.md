@@ -258,6 +258,13 @@ measured findings were classified – without having judged anything. Since vers
 - **Gate**: open or new judgement findings raise the result to `YELLOW`, never to `RED`. In addition the
   gate block checks deterministically that every candidate appears under the report's "Urteil"
   heading; if one is missing, the result is at most `YELLOW` ("Urteil unvollständig").
+- **Tool facts (4.8.0, TODO `67128699`)**: PMD from the image `automation-agent-analysis` runs in three tool
+  blocks – CPD per language (`cpd_java`, `cpd_ts`, raw CSV output, from 100 tokens) and the design rules from
+  `scripts/public-readiness/pmd-architecture.xml` (`pmd`, SARIF). `arch_tools.py` reads both: `## duplicates`
+  names the largest duplicates across files, the three largest become candidates of kind `dublette`;
+  `## complexity` names methods above the threshold, for backend candidates only. Both are facts for the
+  judgement, never findings of their own. CPD has no TSX support – React components stay unchecked, and the
+  report says so. Without the image, `duplicates_not_measured` and `complexity_state=not_measured` show it.
 
 ### Test coverage: envelope from the target list
 

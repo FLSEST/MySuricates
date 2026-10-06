@@ -155,6 +155,30 @@
           "source": "apt"
         }
       ]
+    },
+    {
+      "image": "automation-agent-analysis:latest",
+      "service": "agent-analysis",
+      "dockerfile": "docker/Dockerfile.agent-analysis",
+      "dockerfileSha256": "1d3d17c2e5134960a507bd8f3e93f90a8be9c952541a5ee851cd5ad65d9c28fc",
+      "base": "eclipse-temurin:21-jre-jammy",
+      "purpose": {
+        "de": "Analyse-Werkzeuge für das Architektur-Review: PMD mit Copy-Paste-Detector (Java, TypeScript) und Designregeln (Komplexität je Methode). Läuft im Werkzeug-Modus des Shell-Blocks.",
+        "en": "Analysis tools for the architecture review: PMD with its copy-paste detector (Java, TypeScript) and design rules (complexity per method). Runs in the shell block's tool mode."
+      },
+      "tools": [
+        {
+          "name": "pmd",
+          "version": "7.28.0",
+          "source": "release",
+          "arg": "PMD_VERSION"
+        },
+        {
+          "name": "JRE",
+          "version": "21",
+          "source": "base"
+        }
+      ]
     }
   ]
 }

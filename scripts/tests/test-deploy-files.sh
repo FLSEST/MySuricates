@@ -110,7 +110,7 @@ echo "5d) agent images carry the sha256 of their Dockerfile (244e5de5)"
 # be the last instruction before CMD (a change above still reuses cached layers), compose must pass it
 # for every agent image, and scripts/build-agent-images.sh must compute it from the Dockerfile.
 BUILD="$R/scripts/build-agent-images.sh"
-for svc in agent-node agent-python agent-devops agent-java; do
+for svc in agent-node agent-python agent-devops agent-java agent-analysis; do
   f="$R/ai-automation-backend/docker/Dockerfile.$svc"
   check "$svc: label is the last instruction before CMD" \
     '[ "$(grep -vE "^[[:space:]]*(#|$)" "$f" | tail -3 | head -2 | tr "\n" "|")" = "ARG DOCKERFILE_SHA256=|LABEL org.mysuricates.dockerfile-sha256=\$DOCKERFILE_SHA256|" ]'
@@ -127,8 +127,8 @@ env | grep '_DOCKERFILE_SHA256=' | sort > "$BUILD_RECORD.env"
 SH
 chmod +x "$BTMP/bin/docker"
 BUILD_RECORD="$BTMP/all" PATH="$BTMP/bin:$PATH" bash "$BUILD" > /dev/null 2>&1; RC=$?
-check "build script: exit 0 with all four services" '[ "$RC" -eq 0 ] && grep -qx "compose --profile build-only build agent-node agent-python agent-devops agent-java" "$BTMP/all.args"'
-for svc in agent-node agent-python agent-devops agent-java; do
+check "build script: exit 0 with all services" '[ "$RC" -eq 0 ] && grep -qx "compose --profile build-only build agent-node agent-python agent-devops agent-java agent-analysis" "$BTMP/all.args"'
+for svc in agent-node agent-python agent-devops agent-java agent-analysis; do
   up="$(printf '%s' "${svc#agent-}" | tr '[:lower:]' '[:upper:]')"
   sum="$(python3 -c 'import hashlib, sys; print(hashlib.sha256(open(sys.argv[1], "rb").read()).hexdigest())' "$R/ai-automation-backend/docker/Dockerfile.$svc")"
   check "build script: $svc gets the sha256 of its Dockerfile" 'grep -qx "AGENT_${up}_DOCKERFILE_SHA256=$sum" "$BTMP/all.env"'

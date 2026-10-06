@@ -196,11 +196,28 @@ for gone in (">200 Zeilen", ">300 Zeilen", ">5 Abhaengigkeiten", ">7 Abhaengigke
              "arch.duplicated-logic"):
     assert gone not in prompt, "alte Regel steht noch im Prompt: " + gone
 assert "Paketkopplung" in prompt and "KEIN Befund mehr" in prompt, "Paketkopplung als Trend fehlt"
-assert "Neu in 4.7.0:" in prompt, "einmalige Erklaerung der Urteilsschicht fehlt"
+assert "Neu in 4.8.0:" in prompt, "einmalige Erklaerung der Werkzeug-Fakten fehlt"
+assert "Neu in 4.7.0:" not in prompt, "die einmalige Erklaerung von 4.7.0 ist erledigt"
 assert "Regelwechsel 4.6.0" not in prompt, "die einmalige Erklaerung von 4.6.0 ist erledigt"
 assert "NCLOC" in prompt and "Hotspot" in prompt, "NCLOC-Baender und Hotspot-Regel fehlen"
 assert "nur Kollaborateure" in prompt, "Zahl meint Kollaborateure"
-assert wf["version"] == "4.7.0", wf["version"]
+assert wf["version"] == "4.8.0", wf["version"]
+# 67128699: PMD aus automation-agent-analysis misst Duplikate (CPD je Sprache, CSV) und Komplexitaet (SARIF);
+# die Werkzeug-Bloecke laufen vor arch_metrics, das ihre Ausgaben an arch-findings.py reicht.
+tool_blocks = {b.get("name"): b for b in blocks if b["config"].get("container_args")}
+assert set(tool_blocks) == {"cpd_java", "cpd_ts", "pmd"}, set(tool_blocks)
+for tool in tool_blocks.values():
+    assert tool["config"]["container_image"] == "automation-agent-analysis:latest"
+    assert tool["config"].get("on_failure") == "continue", "ein fehlendes Image darf das Review nicht abbrechen"
+    assert blocks.index(tool) < i_metrics, "Werkzeug-Bloecke muessen vor arch_metrics laufen"
+assert "--no-fail-on-violation" in tool_blocks["cpd_java"]["config"]["container_args"]
+assert tool_blocks["pmd"]["config"].get("output_format") == "sarif"
+assert "/workspace/scripts/public-readiness/pmd-architecture.xml" in tool_blocks["pmd"]["config"]["container_args"]
+assert "--cpd java=" in command and "--cpd typescript=" in command and "--pmd " in command, "Werkzeug-Fakten fehlen in der Einstufung"
+for name in ("cpd_java", "cpd_ts", "pmd"):
+    assert "{{ block.%s.output }}" % name in command, name
+for marker in ("## duplicates", "## complexity", "art dublette", ".tsx misst CPD nicht", "nie ein eigener Befund"):
+    assert marker in prompt, "Werkzeug-Fakten im Prompt unvollstaendig: " + marker
 # e0e9495f: das Skript waehlt Kandidaten, arch-seams.py misst ihre Schnittkanten, die KI urteilt.
 assert "ARCH_METRICS_CLASSES_OUT=" in command and "arch-seams.py" in command, "Seams fehlen im Metrik-Block"
 assert command.index("python3 scripts/public-readiness/arch-findings.py") < command.index("python3 scripts/public-readiness/arch-seams.py"), "Seams brauchen die Kandidaten der Einstufung"

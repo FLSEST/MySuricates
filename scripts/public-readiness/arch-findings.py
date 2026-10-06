@@ -42,6 +42,8 @@ JUDGMENT_RULE_KEYS und als subject genau eine Zeile dieser Liste. Gewaehlt werde
              Datei-Befund oder eine Beobachtung haben — Befunde zuerst, dann nach Aenderungen, NCLOC
     neu      bis REVIEW_NEW Dateien, die in den letzten 7 Tagen angelegt wurden (## recent), ab
              REVIEW_NEW_MIN_NCLOC NCLOC, nach NCLOC
+    dublette bis REVIEW_DUPLICATES dateiuebergreifende Duplikate aus CPD (--cpd, TODO 67128699), nach
+             Zeilen; subject ist die erste noch nicht gewaehlte Datei, die anderen Stellen stehen in angaben
 Die Spalte aenderungen_7d sagt dem Report, ob sich die Datei seit dem letzten Takt geaendert hat:
 Ein bekanntes Urteil zu einer unveraenderten Datei fuehrt er weiter, statt es neu zu faellen.
 
@@ -49,13 +51,22 @@ Nicht gemessene Dimensionen (Blatt fehlt, jdeps/Scan gescheitert, cycles_state !
 unaufgeloeste Importe, kein git oder flacher Klon, NCLOC- oder Kollaborateur-Zaehlung gescheitert) stehen als not_measured= in ## findings_summary; fuer sie gibt
 es keine Befunde, und der Report fuehrt bekannte Befunde dieser Dimension unveraendert weiter.
 
-Aufruf:  arch-findings.py <backend-faktenblatt> [<frontend-faktenblatt>]
+Werkzeuge (optional, TODO 67128699, siehe arch_tools.py): --cpd <sprache>=<datei> (CSV von pmd cpd, je
+Sprache einmal) und --pmd <datei> (SARIF-Faktenblatt von pmd check). Daraus ## duplicates (die groessten
+dateiuebergreifenden Duplikate) und ## complexity (Komplexitaet je Methode, nur fuer Kandidaten). Beides sind
+Fakten fuers Urteil, keine Befunde. Ohne die Eingabe steht der Abschnitt als nicht gemessen da.
+
+Aufruf:  arch-findings.py <backend-faktenblatt> [<frontend-faktenblatt>] [--cpd java=<datei>]
+                          [--cpd typescript=<datei>] [--pmd <datei>]
          Eine fehlende oder leere Datei gilt als nicht gemessen, kein Abbruch.
-Ausgabe: ## findings, ## observations, ## review_candidates, ## bands, ## findings_summary — stabil sortiert.
+Ausgabe: ## findings, ## observations, ## review_candidates, ## duplicates, ## complexity, ## bands,
+         ## findings_summary — stabil sortiert.
 Exit:    0 immer (Faktenblatt fuer einen nachgelagerten Auswerter, kein Gate); 2 bei falschem Aufruf.
 """
 import os
 import sys
+
+import arch_tools
 
 # NCLOC-Baender. Heute (2026-09-26): Backend 13 Dateien ab 250, 7 ab 300, keine ueber 400 — der
 # Ratchet (300 rohe Zeilen, Obergrenzen bis 450) haelt das Backend unter dem Befundband. Frontend
@@ -85,6 +96,11 @@ FRONTEND_CYCLE_CRITICAL = 3  # Frontend-Import-Zyklus mit mehr Modulen: CRITICAL
 REVIEW_HOTSPOTS = 6
 REVIEW_NEW = 3
 REVIEW_NEW_MIN_NCLOC = 100
+# CPD fand am 2026-10-06 ab 100 Tokens 22 dateiuebergreifende Java-Duplikate und 19 in .ts-Modulen; die
+# drei groessten werden beurteilt, fuenfzehn stehen als Fakt im Bericht.
+REVIEW_DUPLICATES = 3
+DUPLICATES_LISTED = 15
+CPD_LANGUAGES = ("java", "typescript")
 
 # Faktenblatt-Fehler, nach denen Groessen und Hotspots nicht gemessen sind. Ohne Git-Historie (kein
 # Repo, flacher Klon) fehlen die Aenderungen, also jeder Hotspot; ohne NCLOC bzw. Kollaborateur-
@@ -157,6 +173,27 @@ class Classifier:
         self.files = {}          # subject -> (ncloc, aenderungen, art) mit art befund|beobachtung|None
         self.recent = {}         # subject -> (aenderungen_7d, neu)
         self.recent_missing = [] # Seiten ohne ## recent
+        self.cpd_measured = set()  # Sprachen mit lesbarer CPD-Ausgabe
+        self.duplicates = []       # (zeilen, tokens, [(subject, zeile)]) ueber Dateigrenzen
+        self.duplicates_within = 0
+        self.pmd_state = "not_given"
+        self.complexity = {}       # subject -> [(zeile, regel, text)]
+
+    def tools(self, cpd_texts, pmd_text):
+        """CPD-Ausgaben je Sprache und das pmd-Faktenblatt (TODO 67128699)."""
+        for language, text in cpd_texts.items():
+            measured, duplicates = arch_tools.parse_cpd(text)
+            if not measured:
+                continue
+            self.cpd_measured.add(language)
+            for lines, tokens, places in duplicates:
+                if len({subject for subject, _ in places}) > 1:
+                    self.duplicates.append((lines, tokens, sorted(places)))
+                else:
+                    self.duplicates_within += 1
+        self.duplicates.sort(key=lambda d: (-d[0], -d[1], d[2]))
+        if pmd_text is not None:
+            self.pmd_state, self.complexity = arch_tools.parse_pmd(pmd_text)
 
     # ------------------------------------------------------------------ Dateien
     def classify_file(self, subject, ncloc, lines, changes, deps, frontend, ceiling):
@@ -377,6 +414,21 @@ class Classifier:
                 _, _, kind, evidence = self.files[subject]
                 details = evidence + ("; " + kind if kind else "")
                 rows.append((art, subject, str(self.recent.get(subject, (0, False))[0]), details))
+        chosen = {row[1] for row in rows}
+        picked = 0
+        for lines, tokens, places in self.duplicates:
+            if picked >= REVIEW_DUPLICATES:
+                break
+            # .ts zaehlt hier mit: eine doppelte Hook- oder Hilfsfunktion ist genau die Frage "verlagern".
+            free = [(s, line) for s, line in places if s not in chosen and (s in self.files or s.endswith(".java"))]
+            if not free:
+                continue
+            subject, line = free[0]
+            others = ", ".join("%s:%d" % (s, l) for s, l in places if (s, l) != (subject, line))
+            rows.append(("dublette", subject, str(self.recent.get(subject, (0, False))[0]),
+                         "%d Zeilen (%d Tokens) doppelt, hier ab Zeile %d; ebenso in %s" % (lines, tokens, line, others)))
+            chosen.add(subject)
+            picked += 1
         return rows
 
     # ------------------------------------------------------------------ Ausgabe
@@ -398,16 +450,35 @@ class Classifier:
         out += ["", "## review_candidates",
                 "# Dateien fuer das Urteil der KI: bis %d Hotspots (Datei-Befunde zuerst, dann Beobachtungen ab %d"
                 % (REVIEW_HOTSPOTS, HOTSPOT_MIN_CHANGES),
-                "# Aenderungen) und bis %d in 7 Tagen neu angelegte Dateien ab %d NCLOC; nur .java und .tsx."
+                "# Aenderungen) und bis %d in 7 Tagen neu angelegte Dateien ab %d NCLOC, beide nur .java und .tsx;"
                 % (REVIEW_NEW, REVIEW_NEW_MIN_NCLOC),
+                "# dazu bis %d dateiuebergreifende Duplikate aus CPD (art dublette, auch .ts)." % REVIEW_DUPLICATES,
                 "# Urteilsbefunde (%s) nur mit einem subject dieser Liste." % ", ".join(JUDGMENT_RULE_KEYS)]
         gaps = sorted(set(self.not_measured) & {"backend_sizes", "frontend_sizes"})
+        missing_cpd = [lang for lang in CPD_LANGUAGES if lang not in self.cpd_measured]
         if gaps:
             out.append("# Groessen nicht gemessen (%s): von dieser Seite keine Kandidaten" % ",".join(gaps))
         if self.recent_missing:
             out.append("# ## recent fehlt (%s): von dieser Seite keine neuen Dateien" % ",".join(sorted(self.recent_missing)))
         out.append("# art\tsubject\taenderungen_7d\tangaben")
         out += ["\t".join(c) for c in candidates] or ["(keine Kandidaten)"]
+        out += ["", "## duplicates",
+                "# Copy-Paste-Detector (pmd cpd, ab 100 Tokens), die %d groessten Duplikate ueber Dateigrenzen;"
+                % DUPLICATES_LISTED,
+                "# .tsx misst CPD nicht (keine TSX-Sprache), React-Komponenten sind also ungeprueft, nicht duplikatfrei.",
+                "# zeilen\ttokens\tstellen (subject:zeile, ...)"]
+        if missing_cpd:
+            out.append("# nicht gemessen: %s" % ",".join(missing_cpd))
+        out += ["%d\t%d\t%s" % (lines, tokens, ", ".join("%s:%d" % p for p in places))
+                for lines, tokens, places in self.duplicates[:DUPLICATES_LISTED]] or ["(keine)"]
+        candidate_subjects = [c[1] for c in candidates]
+        out += ["", "## complexity",
+                "# pmd check (scripts/public-readiness/pmd-architecture.xml): Methoden ueber der Schwelle, nur fuer",
+                "# Backend-Kandidaten. Fakten fuers Urteil, kein Befund. Zustand steht in ## findings_summary.",
+                "# subject\tzeile\tregel\ttext"]
+        rows = ["%s\t%d\t%s\t%s" % (s, line, rule, text)
+                for s in candidate_subjects for line, rule, text in self.complexity.get(s, [])]
+        out += rows or ["(keine)"]
         out += ["", "## bands",
                 "# NCLOC-Verteilung je Seite (alle Dateien, Frontend ohne Tests)",
                 "# seite\tunter_%d\t%d_bis_%d\t%d_bis_%d\tueber_%d" % (
@@ -421,6 +492,10 @@ class Classifier:
                 "medium=%d" % severities.count("MEDIUM"),
                 "observations=%d" % len(observations),
                 "review_candidates=%d" % len(candidates),
+                "duplicates_cross_file=%d" % len(self.duplicates),
+                "duplicates_within_file=%d" % self.duplicates_within,
+                "duplicates_not_measured=%s" % ",".join(missing_cpd),
+                "complexity_state=%s" % self.pmd_state,
                 "band_observe=%d" % BAND_OBSERVE,
                 "band_finding=%d" % BAND_FINDING,
                 "band_high=%d" % BAND_HIGH,
@@ -459,13 +534,43 @@ def parse_cycles(lines):
     return components, pairs
 
 
+USAGE = ("Aufruf: arch-findings.py <backend-faktenblatt> [<frontend-faktenblatt>] [--cpd java=<datei>]"
+         " [--cpd typescript=<datei>] [--pmd <datei>]\n")
+
+
+def read_text(path):
+    """Inhalt einer Werkzeug-Ausgabe; eine fehlende Datei ist leer (= nicht gemessen)."""
+    if not path or not os.path.isfile(path):
+        return ""
+    with open(path, "r", encoding="utf-8", errors="replace") as handle:
+        return handle.read()
+
+
 def main(argv):
-    if len(argv) < 2 or len(argv) > 3:
-        sys.stderr.write("Aufruf: arch-findings.py <backend-faktenblatt> [<frontend-faktenblatt>]\n")
+    sheets, cpd, pmd = [], {}, None
+    args = list(argv[1:])
+    while args:
+        arg = args.pop(0)
+        if arg in ("--cpd", "--pmd") and not args:
+            sys.stderr.write(USAGE)
+            return 2
+        if arg == "--cpd":
+            language, _, path = args.pop(0).partition("=")
+            if language not in CPD_LANGUAGES or not path:
+                sys.stderr.write(USAGE)
+                return 2
+            cpd[language] = read_text(path)
+        elif arg == "--pmd":
+            pmd = read_text(args.pop(0))
+        else:
+            sheets.append(arg)
+    if not 1 <= len(sheets) <= 2:
+        sys.stderr.write(USAGE)
         return 2
     classifier = Classifier()
-    classifier.backend(read_sheet(argv[1]))
-    classifier.frontend(read_sheet(argv[2] if len(argv) > 2 else None))
+    classifier.backend(read_sheet(sheets[0]))
+    classifier.frontend(read_sheet(sheets[1] if len(sheets) > 1 else None))
+    classifier.tools(cpd, pmd)
     sys.stdout.write(classifier.render())
     return 0
 

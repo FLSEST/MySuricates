@@ -496,8 +496,8 @@ C="com/automation/cand"
 } > "$TMP/cand-frontend.txt"
 python3 "$FINDINGS" "$TMP/cand-backend.txt" "$TMP/cand-frontend.txt" > "$TMP/cand.txt" 2> "$TMP/cand.err"
 candidates() { section "$1" review_candidates | awk -F'\t' '{ print $1 " " $2 }'; }
-check "Abschnitt ## review_candidates steht zwischen ## observations und ## bands" \
-  '[ "$(grep -n "^## " "$TMP/cand.txt" | cut -d: -f2 | tr "\n" " ")" = "## findings ## observations ## review_candidates ## bands ## findings_summary " ]'
+check "Abschnitte in fester Reihenfolge, Werkzeug-Fakten zwischen Kandidaten und Baendern" \
+  '[ "$(grep -n "^## " "$TMP/cand.txt" | cut -d: -f2 | tr "\n" " ")" = "## findings ## observations ## review_candidates ## duplicates ## complexity ## bands ## findings_summary " ]'
 check "Hotspots: Befunde zuerst (nach Aenderungen), dann Beobachtungen; neue nach NCLOC; .ts und Tests nie" \
   '[ "$(candidates "$TMP/cand.txt" | tr "\n" "|")" = "hotspot $C/CoupledHot.java|hotspot $C/FindingFew.java|hotspot $C/ObsMany.java|hotspot frontend/src/pages/HotPage.tsx|hotspot $C/NewHot.java|neu frontend/src/components/NewPanel.tsx|neu $C/NewBig.java|" ]'
 check "aenderungen_7d aus ## recent, 0 ohne Eintrag" \
@@ -536,6 +536,61 @@ check "ohne ## recent: Hotspots bleiben" 'candidates "$TMP/norecent.txt" | grep 
 python3 "$FINDINGS" "$TMP/leer.txt" "$TMP/leer.txt" > "$TMP/leer-cand.out"
 check "nichts gemessen: (keine Kandidaten) mit Hinweis" \
   'section "$TMP/leer-cand.out" review_candidates | grep -qx "(keine Kandidaten)" && grep -q "^# Groessen nicht gemessen" "$TMP/leer-cand.out"'
+
+echo "14) Werkzeug-Fakten: CPD-Duplikate als Kandidaten, PMD-Komplexitaet je Kandidat (TODO 67128699)"
+W=/workspace/ai-automation-backend/src/main/java
+{
+  echo "lines,tokens,occurrences"
+  echo "40,250,2,10,$W/$C/NewBig.java,12,$W/$C/Plain.java"
+  echo "30,200,2,5,$W/$C/CoupledHot.java,7,$W/$C/ObsStable.java"
+  echo "20,150,2,5,$W/$C/Plain.java,90,$W/$C/Plain.java"
+  echo "18,120,2,3,/workspace/ai-automation-backend/src/test/java/com/automation/cand/PlainTest.java,4,$W/$C/ObsStable.java"
+  echo "15,110,3,1,$W/$C/Gamma.java,2,$W/$C/Delta.java,3,$W/$C/Epsilon.java"
+  echo "12,105,2,1,$W/$C/Zeta.java,2,$W/$C/Eta.java"
+} > "$TMP/cpd-java.csv"
+printf 'lines,tokens,occurrences\n' > "$TMP/cpd-ts.csv"
+{
+  echo "## FAKTENBLATT pmd (PMD 7.28.0, 1 SARIF-Datei)"
+  echo "FAKT pmd_findings: 3"
+  echo "TREFFER pmd: ai-automation-backend/src/main/java/$C/CoupledHot.java:40 MEDIUM CognitiveComplexity – The method 'run()' has a cognitive complexity of 30, current threshold is 18"
+  echo "TREFFER pmd: ai-automation-backend/src/main/java/$C/CoupledHot.java:12 MEDIUM NcssCount – The method 'init()' has a NCSS line count of 70."
+  echo "TREFFER pmd: ai-automation-backend/src/main/java/$C/Elsewhere.java:5 MEDIUM CognitiveComplexity – not a candidate"
+} > "$TMP/pmd.txt"
+python3 "$FINDINGS" "$TMP/cand-backend.txt" "$TMP/cand-frontend.txt" --cpd java="$TMP/cpd-java.csv" \
+  --cpd typescript="$TMP/cpd-ts.csv" --pmd "$TMP/pmd.txt" > "$TMP/tools.txt" 2> "$TMP/tools.err"; RC=$?
+check "mit Werkzeug-Eingaben: exit 0, stderr leer" '[ "$RC" -eq 0 ] && [ ! -s "$TMP/tools.err" ]'
+check "dublette: groesstes Duplikat, erste freie Datei, die anderen Stellen in angaben" \
+  'section "$TMP/tools.txt" review_candidates | grep -qx "dublette${TAB}$C/Plain.java${TAB}0${TAB}40 Zeilen (250 Tokens) doppelt, hier ab Zeile 12; ebenso in $C/NewBig.java:10"'
+check "dublette: schon gewaehlte Kandidaten werden nicht erneut subject (CoupledHot -> ObsStable)" \
+  'section "$TMP/tools.txt" review_candidates | grep -q "^dublette${TAB}$C/ObsStable.java${TAB}"'
+check "dublette: hoechstens 3, Duplikate innerhalb einer Datei und Testdateien zaehlen nicht" \
+  '[ "$(section "$TMP/tools.txt" review_candidates | grep -c "^dublette")" -eq 3 ] \
+     && ! section "$TMP/tools.txt" review_candidates | grep -q "PlainTest" && ! section "$TMP/tools.txt" review_candidates | grep -q "Zeta"'
+check "duplicates: nur dateiuebergreifende, nach Zeilen sortiert, Testpfade entfernt" \
+  '[ "$(section "$TMP/tools.txt" duplicates | sed -n 1p)" = "40${TAB}250${TAB}$C/NewBig.java:10, $C/Plain.java:12" ] \
+     && [ "$(section "$TMP/tools.txt" duplicates | wc -l | tr -d " ")" -eq 4 ]'
+check "Zaehler: 4 ueber Dateigrenzen, 1 innerhalb (Testzeile hat nur noch eine Stelle)" \
+  '[ "$(summary "$TMP/tools.txt" duplicates_cross_file)" = 4 ] && [ "$(summary "$TMP/tools.txt" duplicates_within_file)" = 1 ] \
+     && [ -z "$(summary "$TMP/tools.txt" duplicates_not_measured)" ]'
+check "duplicates: TSX ausdruecklich als ungeprueft benannt" 'grep -q "^# .tsx misst CPD nicht" "$TMP/tools.txt"'
+check "complexity: nur Kandidaten, je Treffer eine Zeile, Zustand ok" \
+  '[ "$(section "$TMP/tools.txt" complexity | cut -f1 | sort -u)" = "$C/CoupledHot.java" ] \
+     && [ "$(section "$TMP/tools.txt" complexity | wc -l | tr -d " ")" -eq 2 ] && [ "$(summary "$TMP/tools.txt" complexity_state)" = ok ]'
+# Nicht Gemessenes bleibt sichtbar: fehlende CPD-Ausgabe, NICHT GEMESSEN im Faktenblatt, abgeschnittene Liste.
+printf 'Error: something broke\n' > "$TMP/cpd-broken.csv"
+printf '## FAKTENBLATT pmd\nNICHT GEMESSEN: pmd_findings (keine SARIF-Datei)\n' > "$TMP/pmd-missing.txt"
+python3 "$FINDINGS" "$TMP/cand-backend.txt" "$TMP/cand-frontend.txt" --cpd java="$TMP/cpd-broken.csv" --pmd "$TMP/pmd-missing.txt" > "$TMP/tools-gap.txt"
+check "kaputte bzw. fehlende CPD-Ausgabe: beide Sprachen nicht gemessen, keine dublette" \
+  '[ "$(summary "$TMP/tools-gap.txt" duplicates_not_measured)" = "java,typescript" ] && ! grep -q "^dublette" "$TMP/tools-gap.txt" \
+     && grep -q "^# nicht gemessen: java,typescript" "$TMP/tools-gap.txt"'
+check "pmd NICHT GEMESSEN: complexity_state=not_measured" '[ "$(summary "$TMP/tools-gap.txt" complexity_state)" = not_measured ]'
+{ cat "$TMP/pmd.txt"; echo "TREFFER pmd: (+12 weitere, nicht einzeln aufgefuehrt)"; } > "$TMP/pmd-cut.txt"
+python3 "$FINDINGS" "$TMP/cand-backend.txt" --pmd "$TMP/pmd-cut.txt" > "$TMP/tools-cut.txt"
+check "abgeschnittene Trefferliste: complexity_state=truncated" '[ "$(summary "$TMP/tools-cut.txt" complexity_state)" = truncated ]'
+check "ohne Werkzeug-Eingaben: complexity_state=not_given, beide Sprachen nicht gemessen" \
+  '[ "$(summary "$TMP/cand.txt" complexity_state)" = not_given ] && [ "$(summary "$TMP/cand.txt" duplicates_not_measured)" = "java,typescript" ]'
+python3 "$FINDINGS" "$TMP/cand-backend.txt" --cpd ruby="$TMP/cpd-ts.csv" > /dev/null 2>&1; RC=$?
+check "unbekannte CPD-Sprache: exit 2" '[ "$RC" -eq 2 ]'
 
 echo
 echo "passed=$PASS failed=$FAIL"
