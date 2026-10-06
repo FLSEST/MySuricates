@@ -106,9 +106,9 @@ FRONTEND_CYCLE_CRITICAL = 3  # Frontend-Import-Zyklus mit mehr Modulen: CRITICAL
 REVIEW_HOTSPOTS = 6
 REVIEW_NEW = 3
 REVIEW_NEW_MIN_NCLOC = 100
-# Am 2026-10-06 fanden CPD (Java, ab 100 Tokens) 22 und jscpd (Frontend samt .tsx, ab 70 Tokens) 49
-# dateiuebergreifende Duplikate. Die Token-Zaehlung der beiden ist nicht gleich, deshalb kommt jede Seite fuer
-# sich zu Wort: je Seite zehn als Fakt, und die Kandidaten wechseln zwischen Backend und Frontend ab.
+# On 2026-10-06 CPD (Java, from 100 tokens) found 22 and jscpd (frontend incl. .tsx, from 70 tokens) 49
+# cross-file duplicates. The two tools count tokens differently, so each side speaks for itself:
+# ten facts per side, and the candidates alternate between backend and frontend.
 REVIEW_DUPLICATES = 3
 DUPLICATES_LISTED = 10
 CPD_LANGUAGES = ("java", "typescript")
@@ -193,7 +193,7 @@ class Classifier:
         self.complexity = {}       # subject -> [(zeile, regel, text)]
 
     def tools(self, cpd_texts, pmd_text, jscpd_text=None, lizard_text=None):
-        """CPD-Ausgaben je Sprache, jscpd (Frontend samt .tsx), pmd- und lizard-Ausgabe (67128699, c608cdda)."""
+        """CPD output per language, jscpd (frontend incl. .tsx), pmd and lizard output (67128699, c608cdda)."""
         sources = [(language, arch_tools.parse_cpd(text)) for language, text in cpd_texts.items()]
         if jscpd_text is not None:
             measured, duplicates = arch_tools.parse_jscpd(jscpd_text)
@@ -208,7 +208,7 @@ class Classifier:
                     self.duplicates.append((lines, tokens, sorted(places)))
                 else:
                     self.duplicates_within += 1
-        # Nach Tokens: jscpd nennt keine Zeilenzahl, beide Werkzeuge nennen Tokens.
+        # By tokens: jscpd reports no line count, both tools report tokens.
         self.duplicates.sort(key=lambda d: (-d[1], -d[0], d[2]))
         if pmd_text is not None:
             self.pmd_state, self.complexity = arch_tools.parse_pmd(pmd_text)
