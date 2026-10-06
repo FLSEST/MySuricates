@@ -8,9 +8,9 @@ import { WorkPackageMark } from './WorkPackageMark';
 import type { MilestoneAttentionItem } from '../../types';
 
 /**
- * Ein Termin in „Braucht dich“ (TODO e192df18, c60bf914): ein Meilenstein (Raute), bald fällig oder
- * überfällig, oder ein Arbeitspaket (Balken), dessen Ende vorbei ist – mit seinem Ziel, dem Stand
- * und dem Weg zur Zielseite. Ein älteres Backend schickt kein `kind`; seine Einträge sind Pakete.
+ * A due item in „Braucht dich“ (TODO e192df18, c60bf914): a milestone (diamond), due soon or
+ * overdue, or a work package (bar) whose end has passed — with its goal, the status
+ * and the way to the goal page. An older backend sends no `kind`; its entries are packages.
  */
 export function MilestoneDueRow({ item }: { item: MilestoneAttentionItem }) {
   const t = useT();

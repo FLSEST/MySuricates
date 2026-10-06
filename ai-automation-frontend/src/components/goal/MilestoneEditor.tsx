@@ -11,8 +11,8 @@ import {
 import type { GoalMilestone, GoalProject, GoalWorkPackage } from '../../types';
 
 /**
- * Meilenstein anlegen oder bearbeiten (c60bf914) – als Dialog der Gliederung: Titel, Datum,
- * verknüpfte Arbeitspakete; ohne Verknüpfung „erreicht“ von Hand. Löschen fragt der Aufrufer nach.
+ * Create or edit a milestone (c60bf914) — as a dialog of the outline: title, date,
+ * linked work packages; without a link „reached“ by hand. The caller asks before deleting.
  */
 export function MilestoneEditor({ goalId, milestone, workPackages, projects, day, onClose, onDelete }: {
   goalId: string;

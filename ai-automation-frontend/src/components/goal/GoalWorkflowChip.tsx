@@ -13,13 +13,13 @@ import type { GoalWorkflow, GoalWorkflowRole } from '../../types';
 const ROLE_ICON = { WORKER: Hammer, STATUS: Gauge } as const;
 const ROLES: GoalWorkflowRole[] = ['WORKER', 'STATUS'];
 
-/** Der Name, der am Chip steht: beim Wächter kurz „Wächter“, sonst der Name des Workflows. */
+/** The name shown on the chip: for the guard briefly „Wächter“, otherwise the workflow's name. */
 function useShownName(attachment: GoalWorkflow) {
   const tw = useT().goals.workflows;
   return attachment.guard ? tw.guard : attachment.workflowName;
 }
 
-/** Was der Chip über den Stand sagt: bei „liefert den Stand“ die Ampel (und ihr Titel), sonst der Lauf. */
+/** What the chip says about the state: for „liefert den Stand“ the traffic light (and its title), otherwise the run. */
 function useStatusText(attachment: GoalWorkflow, entry: WorkflowWidgetEntry | undefined) {
   const t = useT();
   const tone = shownTone(entry, attachment.role === 'STATUS');
@@ -30,9 +30,9 @@ function useStatusText(attachment: GoalWorkflow, entry: WorkflowWidgetEntry | un
 }
 
 /**
- * Ein Workflow am Ziel oder Arbeitspaket (52bc1e8c): Rolle (🔨 arbeitet daran, ⏲ liefert den Stand),
- * Punkt des letzten Laufs – bei „liefert den Stand“ die Ampel –, Name, wann, und ▶ zum Starten. Ein
- * Klick öffnet die Karte mit Ergebnis, Rolle und „Lösen“. `compact` steht an Arbeitspaketen.
+ * A workflow on the goal or work package (52bc1e8c): role (🔨 works on it, ⏲ delivers the status),
+ * dot of the last run — for „liefert den Stand“ the traffic light —, name, when, and ▶ to start. A
+ * click opens the card with result, role and „Lösen“. `compact` is used on work packages.
  */
 export function GoalWorkflowChip({ attachment, entry, compact = false }: {
   attachment: GoalWorkflow;
@@ -63,7 +63,7 @@ export function GoalWorkflowChip({ attachment, entry, compact = false }: {
         className="flex min-w-0 items-center gap-1.5 rounded-l-md px-2 hover:bg-surface-hover focus-ring">
         <RoleIcon className={`${compact ? 'h-3 w-3' : 'h-3.5 w-3.5'} shrink-0 text-text-tertiary`} aria-hidden="true" />
         <span className={`h-2 w-2 shrink-0 rounded-full ${TONE_DOT[status.tone]}`} aria-hidden="true" />
-        {/* Der Name bleibt lesbar; wird es eng, kürzen sich zuerst Stand und Kurzfassung dahinter */}
+        {/* The name stays readable; when space is tight, status and summary behind it shorten first */}
         <span className={`truncate text-text ${compact ? 'min-w-0 max-w-[8rem]' : 'max-w-[14rem] shrink-0'}`}>{name}</span>
         {!compact && (
           <span className="min-w-0 truncate text-text-tertiary" aria-hidden="true">
@@ -85,7 +85,7 @@ export function GoalWorkflowChip({ attachment, entry, compact = false }: {
   );
 }
 
-/** Die Karte eines Workflows am Ziel: letzter Lauf, bei „liefert den Stand“ das Ergebnis, Rolle, Starten und Lösen. */
+/** The card of a workflow on the goal: last run, for „liefert den Stand“ the result, role, start and detach. */
 function WorkflowCard({ attachment, entry, triggerRef, onClose, onStart, starting, blocked }: {
   attachment: GoalWorkflow;
   entry: WorkflowWidgetEntry | undefined;
@@ -93,7 +93,7 @@ function WorkflowCard({ attachment, entry, triggerRef, onClose, onStart, startin
   onClose: () => void;
   onStart: () => void;
   starting: boolean;
-  /** Startet gerade oder läuft noch – dann kein zweiter Start. */
+  /** Is starting right now or still running — then no second start. */
   blocked: boolean;
 }) {
   const t = useT();

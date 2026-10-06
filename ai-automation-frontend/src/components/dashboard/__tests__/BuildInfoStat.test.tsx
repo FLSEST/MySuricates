@@ -7,7 +7,7 @@ import { renderWithProviders } from '../../../test/utils';
 import { useI18nStore } from '../../../i18n';
 import { BuildInfoStat } from '../StatWidgets';
 
-// __APP_VERSION__ steht in vitest.config.ts auf 1.0.0-SNAPSHOT — angezeigt wird die nackte Nummer.
+// __APP_VERSION__ is 1.0.0-SNAPSHOT in vitest.config.ts — the bare number is displayed.
 const FE_VERSION = '1.0.0';
 
 function systemInfo(version: string, buildType = 'RELEASE') {

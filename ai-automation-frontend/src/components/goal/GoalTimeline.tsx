@@ -32,17 +32,17 @@ import { UndatedSwitch } from './UndatedToggle';
 import { useRevealInView } from './goalReveal';
 import type { Goal, GoalMilestone, GoalProject, GoalTodoItem, GoalWorkPackage } from '../../types';
 
-/** Was gerade als Karte offen ist: ein Paket, ein Meilenstein oder ein neuer Meilenstein. */
-/** Die kleine Karte am Zeitstrahl gibt es nur noch für einen neuen Meilenstein; bestehende öffnen die Seitenleiste. */
+/** What is currently open as a card: a package, a milestone or a new milestone. */
+/** The small card on the timeline only exists for a new milestone; existing ones open the side panel. */
 type Panel = { kind: 'newMilestone' };
 
-/** Wo gerade ein Titel eingetippt wird: ein neues Paket in einem Band oder ein neuer Meilenstein an einem Tag. */
+/** Where a title is currently being typed: a new package in a band or a new milestone on a day. */
 type Inline =
   | ({ scope: 'band'; band: string } & InlineAt)
   | { scope: 'milestones'; day: number; x: number };
 
 
-/** Wo das Gezogene gerade stünde: Fläche, Tag darunter und – bei einem Paket – der neue Zeitraum. */
+/** Where the dragged item would currently stand: area, day below it and — for a package — the new period. */
 interface Hover {
   target: DropTarget | null;
   day: number | null;
@@ -56,10 +56,10 @@ const sameHover = (a: Hover | null, b: Hover) =>
   !!a && a.day === b.day && sameTarget(a.target, b.target) && sameRange(a.range, b.range);
 
 /**
- * Beim Ziehen eines Chips oder einer Raute sitzt der Punkt, der das Datum trägt, unter dem
- * Mauszeiger – bei einem Chip sein Statuspunkt, bei einer Raute ihre Mitte. Ein Balken behält den
- * Griff, an dem er gepackt wurde. Per Tastatur gibt es keinen Zeiger: das Bild beginnt genau über
- * dem Gezogenen.
+ * When dragging a chip or a diamond, the point that carries the date sits under the
+ * mouse pointer — for a chip its status dot, for a diamond its centre. A bar keeps the
+ * grip at which it was grabbed. By keyboard there is no pointer: the image starts exactly above
+ * the dragged item.
  */
 const dotToCursor: Modifier = ({ activatorEvent, active, draggingNodeRect, transform }) => {
   const start = activatorEvent ? getEventCoordinates(activatorEvent) : null;
@@ -78,21 +78,21 @@ interface GoalTimelineProps {
   todos: GoalTodoItem[];
   workPackages: GoalWorkPackage[];
   milestones: GoalMilestone[];
-  /** Die Projekte des Ziels – je eins ein Band. */
+  /** The goal's projects — one band each. */
   projects: GoalProject[];
-  /** Backend vor c60bf914: keine Meilensteine, nur ein Hinweis in ihrer Zeile. */
+  /** Backend before c60bf914: no milestones, only a hint in their row. */
   legacyBackend?: boolean;
   onOpenTodo: (todoId: string) => void;
-  /** Für Tests: der Tag, der als „heute“ gilt. */
+  /** For tests: the day that counts as „today“. */
   now?: Date;
 }
 
 /**
- * Zeitstrahl eines Ziels (TODO e192df18, c60bf914): oben die Achse mit heute und dem Zieldatum, darunter
- * die Meilensteine als Rauten – ihre Linien laufen durch alle Bänder –, dann je Projekt ein Band mit
- * einer Zeile je Arbeitspaket: sein Balken von Beginn bis Ende, darunter nur bei Bedarf fällige TODOs,
- * die TODOs ohne Datum eingeklappt an der Beschriftung. Ziehen verschiebt Balken, Rauten und TODOs;
- * dabei steht unter dem Gezogenen, wo es landet. TODOs gehen nur in Pakete ihres Projekts.
+ * Timeline of a goal (TODO e192df18, c60bf914): on top the axis with today and the target date, below
+ * the milestones as diamonds — their lines run through all bands —, then per project a band with
+ * one row per work package: its bar from start to end, below it, only if needed, TODOs with due dates,
+ * TODOs without a date collapsed at the label. Dragging moves bars, diamonds and TODOs;
+ * while doing so the place where it lands is shown below the dragged item. TODOs only go into packages of their project.
  */
 export function GoalTimeline({ goal, todos, workPackages, milestones, projects, legacyBackend = false, onOpenTodo, now }: GoalTimelineProps) {
   const t = useT();
@@ -114,7 +114,7 @@ export function GoalTimeline({ goal, todos, workPackages, milestones, projects, 
     [todos, workPackages, projects, axis, width],
   );
   const { marks, lanes } = useMemo(() => milestoneMarks(milestones, axis, width), [milestones, axis, width]);
-  // TODOs ohne Datum (85889063): kleine Zeilen offen, Schalter oben, „Zeigen“ klappt auf
+  // TODOs without a date (85889063): small rows open, switch on top, „Zeigen“ expands
   const undated = useUndatedDisclosure(goal.id);
   const withUndated = useMemo(() => undatedRows(bands), [bands]);
   const undatedTotal = withUndated.reduce((sum, row) => sum + row.todoIds.length, 0);
@@ -140,7 +140,7 @@ export function GoalTimeline({ goal, todos, workPackages, milestones, projects, 
   const [face, setFace] = useState<DragFace>(NO_FACE);
   const [hover, setHover] = useState<Hover | null>(null);
   const [panel, setPanel] = useState<Panel | null>(null);
-  // Was die offene Karte geöffnet hat: dort steht sie, dorthin geht danach der Fokus
+  // What the open card opened: it stands there, focus goes there afterwards
   const panelTrigger = useRef<HTMLElement | null>(null);
   const [inline, setInline] = useState<Inline | null>(null);
   const [spoken, setSpoken] = useState('');
@@ -183,8 +183,8 @@ export function GoalTimeline({ goal, todos, workPackages, milestones, projects, 
   };
 
   /**
-   * Der Tag unter dem Mauszeiger in der Fläche, über der er steht – eingerastet auf ganze Tage. Per
-   * Tastatur (kein Zeiger) der Tag unter dem Punkt des Angehobenen.
+   * The day under the mouse pointer in the area above which it stands — snapped to whole days. By
+   * keyboard (no pointer) the day under the point of the lifted item.
    */
   const dropDay = (event: DragMoveEvent | DragEndEvent): number | null => {
     if (!event.over) return null;
@@ -194,7 +194,7 @@ export function GoalTimeline({ goal, todos, workPackages, milestones, projects, 
     return x === null ? null : dayAtX(axis, x - event.over.rect.left, width);
   };
 
-  /** Wo das Gezogene gerade stünde: Fläche, Tag und bei Paketen der neue Zeitraum (verschoben, eingeplant, gestreckt). */
+  /** Where the dragged item would currently stand: area, day and for packages the new period (moved, scheduled, stretched). */
   const evaluate = (event: DragMoveEvent | DragEndEvent, item: NonNullable<Dragged>): Hover => {
     const target = event.over ? dropTargetOf(String(event.over.id)) : null;
     const day = hasDays(target) ? dropDay(event) : null;
@@ -292,7 +292,7 @@ export function GoalTimeline({ goal, todos, workPackages, milestones, projects, 
     setPanel(next);
   };
   const panelAnchor = useCallback<FloatingAnchor>(() => panelTrigger.current?.getBoundingClientRect() ?? null, []);
-  // Meilensteine und Arbeitspakete öffnen die Seitenleiste der Zielseite (c60bf914)
+  // Milestones and work packages open the goal page's side panel (c60bf914)
   const selection = useGoalSelection();
   const openDetails = (kind: 'milestone' | 'workpackage', id: string, trigger: HTMLElement) => {
     setInline(null);
@@ -334,7 +334,7 @@ export function GoalTimeline({ goal, todos, workPackages, milestones, projects, 
         <UndatedContext.Provider value={undated.value}>
         <TimelineDragContext.Provider value={dragState}>
           <Card padding={false} className="p-3">
-            {/* Auf schmalen Bildschirmen scrollt der Zeitstrahl in sich, die Seite nicht */}
+            {/* On narrow screens the timeline scrolls within itself, not the page */}
             <div className="max-sm:-mx-3 max-sm:overflow-x-auto max-sm:px-3">
               <div className="relative max-sm:min-w-[36rem]">
                 <TimelineLines axis={axis} width={width} targetDay={targetDay} marks={legacyBackend ? [] : marks} preview={previewDays} />

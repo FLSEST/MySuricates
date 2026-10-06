@@ -150,13 +150,13 @@ export function BuildInfoStat() {
   const t = useT();
   const locale = useI18nStore((s) => s.locale);
   const { data: systemInfo } = useSystemInfo();
-  // Zwischen zwei Releases steht in beiden Dateien X.Y.Z-SNAPSHOT; das Backend liefert die Nummer
-  // schon ohne Suffix (SystemIdentityService), hier faellt es genauso weg.
+  // Between two releases both files carry X.Y.Z-SNAPSHOT; the backend delivers the number
+  // already without the suffix (SystemIdentityService), here it is dropped the same way.
   const feVersion = __APP_VERSION__.split('-')[0];
   const beVersion = systemInfo?.version;
-  // Erst vergleichen, wenn das Backend geantwortet hat — sonst meldete die Kachel beim Laden Drift.
-  // Weichen die Nummern ab, laeuft ein neues Frontend gegen ein altes Backend-JAR (Test-Container:
-  // neue Endpunkte liefern 404, die Seite haengt auf „loading").
+  // Compare only once the backend has answered — otherwise the tile reported drift while loading.
+  // If the numbers differ, a new frontend is running against an old backend JAR (test container:
+  // new endpoints return 404, the page hangs on „loading").
   const mismatch = Boolean(beVersion) && beVersion !== feVersion;
 
   return (

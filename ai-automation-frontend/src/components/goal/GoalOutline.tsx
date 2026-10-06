@@ -27,7 +27,7 @@ import type { GoalDetail, GoalMilestone, GoalWorkPackage } from '../../types';
 
 const COLLAPSE_KEY = 'mysuricates-goal-outline';
 
-/** Auf- und Zugeklapptes je Ziel; nur Abweichungen vom Standard stehen im Speicher. */
+/** Expanded and collapsed state per goal; only deviations from the default are kept in storage. */
 function readExpanded(goalId: string): Record<string, boolean> {
   try {
     const all = JSON.parse(localStorage.getItem(COLLAPSE_KEY) ?? '{}') as Record<string, Record<string, boolean>>;
@@ -42,31 +42,31 @@ function storeExpanded(goalId: string, state: Record<string, boolean>) {
     const all = JSON.parse(localStorage.getItem(COLLAPSE_KEY) ?? '{}') as Record<string, Record<string, boolean>>;
     localStorage.setItem(COLLAPSE_KEY, JSON.stringify({ ...all, [goalId]: state }));
   } catch {
-    // privates Fenster oder gesperrter Speicher: die Wahl gilt dann bis zum Neuladen
+    // private window or blocked storage: the choice then holds until reload
   }
 }
 
 const ICON_BUTTON = 'rounded p-1 text-text-tertiary hover:bg-surface-hover hover:text-text focus-ring disabled:opacity-30 disabled:pointer-events-none';
 
-/** Welcher Dialog offen ist: ein Arbeitspaket (neu oder bestehend) oder ein Meilenstein. */
+/** Which dialog is open: a work package (new or existing) or a milestone. */
 type EditorState =
   | { kind: 'package'; workPackage?: GoalWorkPackage; projectId?: string | null }
   | { kind: 'milestone'; milestone?: GoalMilestone }
   | null;
 
-/** Was nach der Rückfrage gelöscht wird. */
+/** What gets deleted after the confirmation. */
 type Removing = { kind: 'package'; item: GoalWorkPackage } | { kind: 'milestone'; item: GoalMilestone } | null;
 
 /**
- * Gliederung eines Ziels (c60bf914), die Standardansicht der Zielseite: oben die Meilensteine, dann
- * je Projekt eine Karte mit Balken und Zählern, darin die Arbeitspakete an einem Faden in ihrer
- * Reihenfolge – jedes mit Zeitraum –, darunter „Ohne Arbeitspaket“; am Ende „Ohne Projekt“.
- * Aufgeklappt stehen die TODOs mit Status, Fälligkeit und Einschätzung. Abgeschlossene Pakete sind
- * zugeklappt. Tastatur: ↑ ↓ wechseln die Zeile, → klappt auf, ← zu; Enter und Leertaste schalten um.
+ * Outline of a goal (c60bf914), the default view of the goal page: milestones on top, then
+ * one card per project with bar and counters, inside it the work packages on a thread in their
+ * order — each with its period —, below it „Ohne Arbeitspaket“; at the end „Ohne Projekt“.
+ * Expanded, the TODOs show with status, due date and estimate. Completed packages are
+ * collapsed. Keyboard: ↑ ↓ change the row, → expands, ← collapses; Enter and Space toggle.
  */
 export function GoalOutline({ detail, today, onOpenTodo }: {
   detail: GoalDetail;
-  /** Tag (`timelineLayout.dayOf`), gegen den „überfällig“ gilt. */
+  /** Day (`timelineLayout.dayOf`) against which „overdue“ is judged. */
   today: number;
   onOpenTodo: (todoId: string) => void;
 }) {
@@ -93,7 +93,7 @@ export function GoalOutline({ detail, today, onOpenTodo }: {
     });
   }, [goalId]);
 
-  // „Zeigen“ nach dem Hinzufügen (85889063): Projekt und Paket bzw. „Ohne Arbeitspaket“ aufklappen
+  // „Zeigen“ after adding (85889063): expand project and package or „Ohne Arbeitspaket“
   const rootRef = useRef<HTMLElement>(null);
   const todoIds = useMemo(() => new Set(detail.todos.map((todo) => todo.id)), [detail.todos]);
   useRevealInView(goalId, rootRef, (id) => todoIds.has(id), (todoId) => {
@@ -105,7 +105,7 @@ export function GoalOutline({ detail, today, onOpenTodo }: {
     else toggle(`loose:${projectKey}`, true, true);
   });
 
-  /** ↑ ↓ Home End wandern von Knopf zu Knopf, → ← klappen auf und zu. */
+  /** ↑ ↓ Home End move from button to button, → ← expand and collapse. */
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement;
     if (target.dataset.outlineToggle === undefined) return;
@@ -233,14 +233,14 @@ interface BodyProps {
   reordering: boolean;
   onMove: (index: number, delta: -1 | 1) => void;
   onEdit: (workPackage: GoalWorkPackage) => void;
-  /** Fehlt bei „Ohne Projekt“ und bei Projekten, die nicht zum Ziel gehören – dort lässt sich kein Paket anlegen. */
+  /** Missing for „Ohne Projekt“ and for projects that do not belong to the goal — no package can be created there. */
   onAdd?: () => void;
-  /** Nur bei einem Projekt, das bloß über TODOs hereinkommt: es dem Ziel zuordnen. */
+  /** Only for a project that comes in merely via TODOs: assign it to the goal. */
   onLink?: () => void;
   linking?: boolean;
 }
 
-/** Inhalt einer Projektkarte: die Arbeitspakete am Faden, „Ohne Arbeitspaket“, dann „+ Arbeitspaket“. */
+/** Content of a project card: the work packages on the thread, „Ohne Arbeitspaket“, then „+ Arbeitspaket“. */
 function ProjectBody({ goalId, group, today, isOpen, toggle, onOpenTodo, reordering, onMove, onEdit, onAdd, onLink, linking }: BodyProps) {
   const t = useT();
   const to = t.goals.outline;
@@ -261,7 +261,7 @@ function ProjectBody({ goalId, group, today, isOpen, toggle, onOpenTodo, reorder
       )}
       {empty && group.project && <p className="text-sm text-text-secondary">{to.noWorkPackages}</p>}
       {(group.packages.length > 0 || group.loose.length > 0) && (
-        // Der Faden: eine senkrechte Linie, auf der die Pakete der Reihe nach sitzen
+        // The thread: a vertical line on which the packages sit in order
         <ol className="relative space-y-0.5 before:absolute before:bottom-3 before:left-[7px] before:top-3 before:w-0.5 before:rounded-full before:bg-border">
           {group.packages.map((entry, index) => (
             <PackageRow key={entry.workPackage.id} goalId={goalId} projectName={group.project?.name ?? null} entry={entry} today={today}
@@ -294,7 +294,7 @@ function PackageRow({ goalId, projectName, entry, today, expanded, onToggle, onO
   entry: OutlinePackage;
   today: number;
   expanded: boolean;
-  /** Ohne Wert umschalten, mit Wert öffnen bzw. schließen. */
+  /** Without a value toggle, with a value open or close. */
   onToggle: (value?: boolean) => void;
   onOpenTodo: (todoId: string) => void;
   onEdit: () => void;
@@ -310,7 +310,7 @@ function PackageRow({ goalId, projectName, entry, today, expanded, onToggle, onO
   const selection = useGoalSelection();
   const selected = useIsSelected('workpackage', workPackage.id);
   const range = packageRange(workPackage);
-  // „+ TODO“ am Paket (85889063): Feld unter den TODOs, das Paket klappt dafür auf
+  // „+ TODO“ on the package (85889063): field below the TODOs, the package expands for it
   const [adding, setAdding] = useState(false);
   const addRef = useRef<HTMLButtonElement>(null);
   const addLabel = t.goals.add.todoIn.replace('{title}', () => workPackage.title);
@@ -324,7 +324,7 @@ function PackageRow({ goalId, projectName, entry, today, expanded, onToggle, onO
         <span className="relative z-10 flex w-4 shrink-0 justify-center bg-surface-raised py-0.5"><WorkPackageMark state={workPackage.state} /></span>
         <OutlineToggle nodeKey={`wp:${workPackage.id}`} expanded={expanded} controls={bodyId} onToggle={() => onToggle()} className="shrink-0"
           label={t.goals.outline.toggle.replace('{title}', workPackage.title)} />
-        {/* Der Titel öffnet die Seitenleiste mit TODOs und Workflows des Pakets (c60bf914) */}
+        {/* The title opens the side panel with the package's TODOs and workflows (c60bf914) */}
         <button type="button" onClick={(event) => selection?.select({ kind: 'workpackage', id: workPackage.id }, event.currentTarget)}
           aria-label={t.goals.panel.openPackage.replace('{title}', workPackage.title)} aria-current={selected || undefined}
           className={`min-w-0 flex-1 rounded-md px-1 py-0.5 text-left focus-ring hover:text-accent ${selected ? 'bg-accent-subtle' : ''}`}>
@@ -362,7 +362,7 @@ function PackageRow({ goalId, projectName, entry, today, expanded, onToggle, onO
           </button>
         </div>
       </div>
-      {/* Workflows am Paket (52bc1e8c); zugeordnet wird im Kopf („Workflow zuordnen“, Wofür) oder in der Paket-Karte am Zeitstrahl */}
+      {/* Workflows on the package (52bc1e8c); assigning happens in the header („Workflow zuordnen“, Wofür) or in the package card on the timeline */}
       <PackageWorkflows workPackageId={workPackage.id} className="pb-1 pl-6" />
       <div id={bodyId} hidden={!expanded} className="pb-1 pl-6">
         {todos.length === 0 && !adding
@@ -376,7 +376,7 @@ function PackageRow({ goalId, projectName, entry, today, expanded, onToggle, onO
   );
 }
 
-/** „Ohne Arbeitspaket“: die TODOs des Projekts, die noch in keinem Paket stehen. */
+/** „Ohne Arbeitspaket“: the project's TODOs that are not yet in any package. */
 function LooseRow({ nodeKey, todos, today, expanded, onToggle, onOpenTodo }: {
   nodeKey: string;
   todos: OutlineTodo[];
@@ -399,7 +399,7 @@ function LooseRow({ nodeKey, todos, today, expanded, onToggle, onOpenTodo }: {
         </OutlineToggle>
         <OutlineBar counts={counts} className="hidden h-1 w-14 shrink-0 sm:block" />
         <OutlineCountColumns counts={counts} />
-        {/* Platz der vier Knöpfe der Paket-Zeilen, damit die Zähler fluchten */}
+        {/* Room for the four buttons of the package rows so the counters line up */}
         <span aria-hidden="true" className="w-[88px] shrink-0" />
       </div>
       <div id={bodyId} hidden={!expanded} className="pb-1 pl-6">
@@ -409,7 +409,7 @@ function LooseRow({ nodeKey, todos, today, expanded, onToggle, onOpenTodo }: {
   );
 }
 
-/** TODO-Zeilen: Statuspunkt, Titel (öffnet den Dialog), Fälligkeit, Einschätzung, ❓/✔ (entscheiden, 68a5e24e) und ⚠ bei Altfällen. */
+/** TODO rows: status dot, title (opens the dialog), due date, estimate, ❓/✔ (decide, 68a5e24e) and ⚠ for legacy cases. */
 function TodoRows({ todos, today, onOpenTodo }: { todos: OutlineTodo[]; today: number; onOpenTodo: (todoId: string) => void }) {
   const t = useT();
   const to = t.goals.outline;
@@ -447,7 +447,7 @@ function TodoRows({ todos, today, onOpenTodo }: { todos: OutlineTodo[]; today: n
   );
 }
 
-/** Rückfrage vor dem Löschen eines Pakets oder Meilensteins. */
+/** Confirmation before deleting a package or milestone. */
 function RemoveDialog({ removing, pending, onClose, onConfirm }: {
   removing: Removing;
   pending: boolean;

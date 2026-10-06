@@ -9,9 +9,9 @@ import type { GoalProject, GoalWorkPackage, GoalWorkflow, GoalWorkflowRole } fro
 const ROLE_ICON = { WORKER: Hammer, STATUS: Gauge } as const;
 
 /**
- * „Workflow zuordnen“ (52bc1e8c): einen Workflow ans ganze Ziel oder an ein Arbeitspaket hängen, mit
- * Rolle. Zur Wahl stehen zuerst die Workflows aus den Projekten des Ziels; „Alle Workflows zeigen“
- * öffnet die übrigen. Was am gewählten Ziel schon hängt, ist ausgegraut.
+ * „Workflow zuordnen“ (52bc1e8c): attach a workflow to the whole goal or to a work package, with
+ * a role. The workflows from the goal's projects are offered first; „Alle Workflows zeigen“
+ * opens the rest. What is already attached to the chosen goal is greyed out.
  */
 export function AssignWorkflowDialog({ goalId, projects, workPackages, attachments, initialTarget, onClose }: {
   goalId: string;

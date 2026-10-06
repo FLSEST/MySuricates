@@ -7,7 +7,7 @@ import type { MapNode, Tone } from './goalRelationLayout';
 import type { PlanBadge } from './planDisplay';
 import { priorityFill } from '../todo/todoConstants';
 
-/** Farben nur aus Tokens (TODO c6ea8f5c): Status und Rollen, Workflows bleiben neutral. */
+/** Colours only from tokens (TODO c6ea8f5c): status and roles, workflows stay neutral. */
 const TONE_STROKE: Record<Tone, string> = {
   human: 'var(--color-human)',
   ai: 'var(--color-ai)',
@@ -31,10 +31,10 @@ const TONE_FILL: Record<Tone, string> = {
 };
 
 const ICON = 14;
-/** Fälligkeit und Meilenstein im TODO-Knoten: höchstens so viele Zeichen, der Rest steht im Tooltip. */
+/** Due date and milestone in the TODO node: at most this many characters, the rest is in the tooltip. */
 const BADGE_CHARS = 18;
 
-/** Symbol eines Knotens – dieselben Zeichen wie in `GoalBadges` und der Legende. */
+/** Symbol of a node — the same characters as in `GoalBadges` and the legend. */
 function nodeIcon(node: MapNode): ReactNode {
   const props = { x: node.x + 8, y: node.y + (node.h - ICON) / 2, width: ICON, height: ICON, 'aria-hidden': true };
   const style = { color: TONE_STROKE[node.tone] === TONE_STROKE.neutral ? 'var(--color-text-secondary)' : TONE_STROKE[node.tone] };
@@ -70,7 +70,7 @@ interface NodeProps {
   onActivate?: () => void;
   onAssign?: () => void;
   assignLabel: string;
-  /** Fälligkeit und Meilenstein eines TODOs (TODO e192df18). */
+  /** Due date and milestone of a TODO (TODO e192df18). */
   badge?: PlanBadge | null;
 }
 

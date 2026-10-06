@@ -2,7 +2,7 @@ import { Bot, UserRound } from 'lucide-react';
 import { useT } from '../../i18n';
 import type { RatedBy, ReasoningEffortLevel, TodoComplexity } from '../../types';
 
-/** Komplexität S–XL; neutral gefärbt, denn sie sagt nichts über Mensch oder KI. */
+/** Complexity S–XL; neutral colour, since it says nothing about human or AI. */
 export function ComplexityChip({ value }: { value: TodoComplexity | null }) {
   const t = useT();
   if (!value) return null;
@@ -16,7 +16,7 @@ export function ComplexityChip({ value }: { value: TodoComplexity | null }) {
   );
 }
 
-/** Empfohlener Effort – in der KI-Farbe, weil er beschreibt, wie ein Modell arbeiten soll. */
+/** Recommended effort — in the AI colour, because it describes how a model should work. */
 export function EffortChip({ value }: { value: ReasoningEffortLevel | null }) {
   const t = useT();
   if (!value) return null;
@@ -27,7 +27,7 @@ export function EffortChip({ value }: { value: ReasoningEffortLevel | null }) {
   );
 }
 
-/** Wer zuletzt eingeschätzt hat: KI oder Mensch. */
+/** Who estimated last: AI or human. */
 export function RatedByMark({ ratedBy }: { ratedBy: RatedBy | null }) {
   const t = useT();
   if (ratedBy === 'AI') {

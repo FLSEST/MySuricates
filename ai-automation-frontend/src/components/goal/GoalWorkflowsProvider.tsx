@@ -6,8 +6,8 @@ import { GoalWorkflowsContext, type GoalWorkflowsValue } from './goalWorkflowsCo
 import type { GoalDetail } from '../../types';
 
 /**
- * Lädt die Workflows des Ziels und ihren letzten Lauf einmal für die ganze Zielseite (52bc1e8c) und
- * hält den Dialog „Workflow zuordnen“ – Kopf, Gliederung und Zeitstrahl lesen aus dem Kontext.
+ * Loads the goal's workflows and their last run once for the whole goal page (52bc1e8c) and
+ * holds the dialog „Workflow zuordnen“ — header, outline and timeline read from the context.
  */
 export function GoalWorkflowsProvider({ detail, children }: { detail: GoalDetail; children: ReactNode }) {
   const t = useT();

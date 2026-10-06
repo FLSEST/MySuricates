@@ -8,9 +8,9 @@ import { useT } from '../../i18n';
 import { GoalCard } from './GoalCard';
 import { GoalCreateForm } from './GoalCreateForm';
 
-/** So viele aktive Ziele zeigt das Cockpit; alle stehen unter „Ziele“. */
+/** This many active goals are shown by the cockpit; all are under „Ziele“. */
 const COCKPIT_LIMIT = 4;
-/** Gewählter Projektfilter des Cockpits; leer = alle Projekte. */
+/** Chosen project filter of the cockpit; empty = all projects. */
 const FILTER_KEY = 'mysuricates-goals-project-filter';
 
 function readFilter(): string {
@@ -26,14 +26,14 @@ function storeFilter(projectId: string) {
     if (projectId) localStorage.setItem(FILTER_KEY, projectId);
     else localStorage.removeItem(FILTER_KEY);
   } catch {
-    // privates Fenster oder gesperrter Speicher: der Filter gilt dann bis zum Neuladen
+    // private window or blocked storage: the filter then holds until reload
   }
 }
 
 /**
- * Ziele im Cockpit (TODO dc0566f8), kompakt: die aktiven Ziele mit Fortschritt, Zieldatum und
- * offenen Fragen, dazu Anlegen und der Weg zur Übersicht aller Ziele (TODO c6ea8f5c). Ein
- * Projektfilter (gemerkt, Standard „Alle Projekte“) zeigt nur die Ziele eines Projekts (c60bf914).
+ * Goals in the cockpit (TODO dc0566f8), compact: the active goals with progress, target date and
+ * open questions, plus creating and the way to the overview of all goals (TODO c6ea8f5c). A
+ * project filter (remembered, default „Alle Projekte“) shows only the goals of one project (c60bf914).
  */
 export function GoalsSection() {
   const t = useT();
@@ -41,7 +41,7 @@ export function GoalsSection() {
   const [projectId, setProjectId] = useState(readFilter);
   const { data: projects = [] } = useProjects();
   const choices = projects.filter((project) => !project.archivedAt || project.id === projectId);
-  // Ein gemerktes Projekt, das es nicht mehr gibt, filtert nicht still alles weg
+  // A remembered project that no longer exists does not silently filter everything away
   const filter = projectId && (projects.length === 0 || choices.some((project) => project.id === projectId)) ? projectId : '';
   const { data: goals = [], isLoading } = useGoals(undefined, filter || undefined);
   const [creating, setCreating] = useState(false);

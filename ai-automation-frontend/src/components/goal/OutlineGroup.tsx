@@ -4,19 +4,19 @@ import { useT } from '../../i18n';
 import { percentDone, type OutlineCounts } from './goalOutline';
 
 /**
- * Bausteine der Gliederung (c60bf914) nach dem Muster von `workflow/ProjectGroup`: ein Knopf mit
- * `aria-expanded`/`aria-controls` klappt eine Gruppe auf und zu. Die Gliederung wandert per
- * Pfeiltasten von Knopf zu Knopf (`data-outline-toggle`, siehe `GoalOutline`).
+ * Building blocks of the outline (c60bf914) following the pattern of `workflow/ProjectGroup`: a button with
+ * `aria-expanded`/`aria-controls` expands and collapses a group. The outline moves via
+ * arrow keys from button to button (`data-outline-toggle`, see `GoalOutline`).
  */
 
 export function OutlineToggle({ nodeKey, expanded, controls, onToggle, className = 'flex-1', label, children }: {
   nodeKey: string;
   expanded: boolean;
-  /** ID des Bereichs, den der Knopf auf- und zuklappt. */
+  /** ID of the area that the button expands and collapses. */
   controls: string;
   onToggle: () => void;
   className?: string;
-  /** Name, wenn der Knopf nur den Pfeil zeigt (Paketzeile: der Titel daneben öffnet die Seitenleiste). */
+  /** Name when the button shows only the arrow (package row: the title next to it opens the side panel). */
   label?: string;
   children?: ReactNode;
 }) {
@@ -32,9 +32,9 @@ export function OutlineToggle({ nodeKey, expanded, controls, onToggle, className
 }
 
 /**
- * Zähler mit fester Breite, damit „erledigt/gesamt“, „❓ n“ (offen) und „✔ m“ (entschieden,
- * 68a5e24e) über alle Zeilen fluchten. Sichtbar steht die Kurzform, der Screenreader liest den ganzen
- * Satz. Eine leere Spalte hält trotzdem ihren Platz.
+ * Counter with fixed width so that „done/total“, „❓ n“ (open) and „✔ m“ (decided,
+ * 68a5e24e) line up across all rows. The short form is visible, the screen reader reads the whole
+ * sentence. An empty column still keeps its place.
  */
 export function OutlineCountColumns({ counts }: { counts: OutlineCounts }) {
   const t = useT();
@@ -70,7 +70,7 @@ export function OutlineCountColumns({ counts }: { counts: OutlineCounts }) {
   );
 }
 
-/** Fortschrittsbalken: erledigt in der Erfolgsfarbe auf neutralem Grund. Rein grafisch – die Zahl steht daneben. */
+/** Progress bar: done in the success colour on a neutral ground. Purely graphical — the number is next to it. */
 export function OutlineBar({ counts, className = '' }: { counts: OutlineCounts; className?: string }) {
   return (
     <span aria-hidden="true" className={`block overflow-hidden rounded-full bg-border ${className}`}>
@@ -81,8 +81,8 @@ export function OutlineBar({ counts, className = '' }: { counts: OutlineCounts; 
 }
 
 /**
- * Eine Projektkarte der Gliederung: Kopf mit Name, Zählern und Aktionen, darunter der Balken über
- * die ganze Breite, aufgeklappt die Arbeitspakete.
+ * A project card of the outline: header with name, counters and actions, below it the bar across
+ * the whole width, expanded the work packages.
  */
 export function OutlineGroup({ nodeKey, bodyId, title, badge, counts, expanded, onToggle, actions, children, testId }: {
   nodeKey: string;
@@ -104,11 +104,11 @@ export function OutlineGroup({ nodeKey, bodyId, title, badge, counts, expanded, 
           {badge}
         </OutlineToggle>
         <OutlineCountColumns counts={counts} />
-        {/* Feste Breite wie die drei Knöpfe der Paket-Zeilen – so fluchten die Zähler mit denen darunter */}
+        {/* Fixed width like the three buttons of the package rows — so the counters line up with those below */}
         <div className="flex w-[66px] shrink-0 items-center justify-end">{actions}</div>
       </div>
       <OutlineBar counts={counts} className="mx-3 mb-2.5 mt-1.5 h-1.5 sm:mx-4" />
-      {/* Zugeklappt bleibt der Bereich im DOM (versteckt) – so zeigt `aria-controls` immer auf etwas. */}
+      {/* When collapsed the area stays in the DOM (hidden) — so `aria-controls` always points at something. */}
       <div id={bodyId} hidden={!expanded} className="border-t border-border px-3 pb-3 pt-2 sm:px-4">
         {children}
       </div>

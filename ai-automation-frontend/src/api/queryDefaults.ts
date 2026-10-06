@@ -12,17 +12,17 @@ export function defaultQueryRetry(failureCount: number, error: unknown): boolean
 }
 
 /**
- * QueryClient-Defaults der App. Als eigenes Modul, damit Tests gegen genau die Defaults
- * laufen, die `main.tsx` verwendet.
+ * QueryClient defaults of the app. A module of its own so tests run against exactly the defaults
+ * that `main.tsx` uses.
  *
- * Zum Backoff (f3fb193f): Eine gescheiterte Query hat keine Daten und `dataUpdatedAt = 0` —
- * sie gilt damit trotz `staleTime` als stale und feuert bei jedem Mount erneut. TanStack
- * fragt dafür zwei verschiedene Schalter ab:
- *  - ohne Daten entscheidet `retryOnMount` (Boolean, beim Mergen der Defaults gelesen),
- *  - mit Daten (z. B. `initialData` aus dem Cache) entscheidet `refetchOnMount`.
- * Beide werden hier aus dem Backoff-Zustand abgeleitet. `retryOnMount` ist bewusst ein
- * Getter: `defaultQueryOptions()` spreadet die Defaults bei jedem Mount/Render neu, der
- * Wert wird also genau dann ausgewertet, wenn er gebraucht wird.
+ * On the backoff (f3fb193f): a failed query has no data and `dataUpdatedAt = 0` —
+ * so despite `staleTime` it counts as stale and fires again on every mount. TanStack
+ * checks two different switches for this:
+ *  - without data, `retryOnMount` decides (boolean, read when the defaults are merged),
+ *  - with data (e.g. `initialData` from the cache), `refetchOnMount` decides.
+ * Both are derived from the backoff state here. `retryOnMount` is deliberately a
+ * getter: `defaultQueryOptions()` spreads the defaults anew on every mount/render, so the
+ * value is evaluated exactly when it is needed.
  */
 export const appQueryDefaults: DefaultOptions = {
   queries: {
@@ -37,12 +37,12 @@ export const appQueryDefaults: DefaultOptions = {
 };
 
 /**
- * Holt die App nach Ablauf der Sperre von selbst wieder ein (f3fb193f). `refetchOnMount` und
- * `retryOnMount` greifen nur beim Mount — dauerhaft montierte Queries (Sidebar, Layout,
- * Dashboard) blieben sonst bis zum Reload im Fehlerzustand, weil `retry` für 429 aus ist.
- * Deshalb wird beim Übergang aktiv→inaktiv einmal alles Fehlgeschlagene invalidiert.
+ * Makes the app catch up by itself once the lock has expired (f3fb193f). `refetchOnMount` and
+ * `retryOnMount` only take effect on mount — permanently mounted queries (sidebar, layout,
+ * dashboard) would otherwise stay in the error state until reload, because `retry` is off for 429.
+ * So on the active→inactive transition everything that failed is invalidated once.
  *
- * Gibt die Abmeldung zurück (Tests; in der App läuft das Abo über die Lebenszeit der Seite).
+ * Returns the unsubscribe function (tests; in the app the subscription lives as long as the page).
  */
 export function installRateLimitRecovery(queryClient: QueryClient): () => void {
   let wasActive = isRateLimitBackoffActive();

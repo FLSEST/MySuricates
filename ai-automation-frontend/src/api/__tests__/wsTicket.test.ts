@@ -26,7 +26,7 @@ describe('api.fetchWsTicket', () => {
     useSettingsStore.setState({ apiKey: '' });
   });
 
-  it('holt das Ticket per POST mit dem Key im Header — nie in der URL', async () => {
+  it('fetches the ticket via POST with the key in the header — never in the URL', async () => {
     fetchMock.mockResolvedValue(fetchResponse(200, { ticket: 'tkt-42', expiresInSeconds: 30 }));
 
     await expect(api.fetchWsTicket()).resolves.toBe('tkt-42');
@@ -38,7 +38,7 @@ describe('api.fetchWsTicket', () => {
     expect(url).not.toContain('apiKey');
   });
 
-  it('reicht einen Fehler durch, statt ein leeres Ticket zu liefern', async () => {
+  it('passes an error through instead of returning an empty ticket', async () => {
     fetchMock.mockResolvedValue(fetchResponse(403, { error: 'Forbidden' }));
 
     await expect(api.fetchWsTicket()).rejects.toMatchObject({ status: 403 });

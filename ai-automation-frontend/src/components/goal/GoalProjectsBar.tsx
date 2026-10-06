@@ -7,15 +7,15 @@ import { useProjects } from '../../hooks/useProjects';
 import { useAddGoalProject, useRemoveGoalProject } from '../../hooks/useGoalProjects';
 import type { GoalProject, GoalWorkPackage } from '../../types';
 
-/** Der Text des Servers zu einem Fehler – bei 409 nennt er, was noch am Projekt hängt. */
+/** The server's text for an error — for 409 it names what still hangs on the project. */
 function serverText(err: unknown): string | null {
   const text = err && typeof err === 'object' && 'error' in err ? (err as { error: unknown }).error : null;
   return typeof text === 'string' && text ? text : null;
 }
 
 /**
- * Auswahl „Projekt hinzufügen“: alle nicht archivierten Projekte, die dem Ziel noch fehlen. Eine
- * Wahl ordnet sofort zu. Ohne weiteres Projekt verschwindet die Auswahl.
+ * Selection „Projekt hinzufügen“: all non-archived projects that the goal still lacks. A
+ * choice assigns immediately. Without another project the selection disappears.
  */
 export const AddProjectPicker = forwardRef<HTMLSelectElement, { goalId: string; linked: GoalProject[]; className?: string }>(
   function AddProjectPicker({ goalId, linked, className = '' }, ref) {
@@ -37,9 +37,9 @@ export const AddProjectPicker = forwardRef<HTMLSelectElement, { goalId: string; 
 );
 
 /**
- * Projekte eines Ziels (c60bf914) als Chips mit Stand, dazu „Projekt hinzufügen“. Entfernen fragt
- * nach und nennt vorher, was daran hängt (aus dem Detail). Antwortet der Server trotzdem mit 409,
- * bietet derselbe Dialog die Kaskade an: Arbeitspakete löschen, TODOs vom Ziel lösen.
+ * A goal's projects (c60bf914) as chips with status, plus „Projekt hinzufügen“. Removing asks
+ * for confirmation and first names what hangs on it (from the detail). If the server still answers with 409,
+ * the same dialog offers the cascade: delete work packages, detach TODOs from the goal.
  */
 export function GoalProjectsBar({ goalId, projects, workPackages }: {
   goalId: string;

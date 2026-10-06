@@ -2,7 +2,7 @@ import { Layers, GitBranch } from 'lucide-react';
 import { Badge } from '../ui';
 import type { DialogProjectGroup } from '../../hooks/useDialogImport';
 
-/** Panel 1 der Session-Übernahme: Projekte (und „Andere Sessions“) mit ihrer Session-Zahl. */
+/** Panel 1 of the session takeover: projects (and „Andere Sessions“) with their session count. */
 export function ProjectSidebar({
   groups, selectedId, onSelect,
 }: {

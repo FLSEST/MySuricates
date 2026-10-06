@@ -2,9 +2,9 @@ import { CheckCircle2, HelpCircle } from 'lucide-react';
 import { useT } from '../../i18n';
 
 /**
- * „n offen · m entschieden“ (68a5e24e): offene Fragen in `text-human`, Entscheidungen in
- * `text-success`. `icons` ist die Kurzform für enge Zeilen (❓ n ✔ m), `words` steht im Fortschritt.
- * Vorgelesen wird immer der ganze Satz; was null ist, fehlt.
+ * „n offen · m entschieden“ (68a5e24e): open questions in `text-human`, decisions in
+ * `text-success`. `icons` is the short form for narrow rows (❓ n ✔ m), `words` appears in the progress.
+ * The whole sentence is always read aloud; what is zero is left out.
  */
 export function DecisionCounts({ openQuestions, decided, variant = 'icons', className = '' }: {
   openQuestions: number;

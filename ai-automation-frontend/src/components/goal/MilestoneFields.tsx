@@ -9,9 +9,9 @@ import { WorkPackageMark } from './WorkPackageMark';
 import type { GoalProject, GoalWorkPackage } from '../../types';
 
 /**
- * Die Felder eines Meilensteins (c60bf914) – im Dialog der Gliederung und in der Karte am
- * Zeitstrahl: Titel, Datum und die verknüpften Arbeitspakete als Mehrfachauswahl, nach Projekt
- * gruppiert. Der Meilenstein ist erreicht, sobald alle verknüpften Pakete abgeschlossen sind.
+ * The fields of a milestone (c60bf914) — in the outline dialog and in the card on the
+ * timeline: title, date and the linked work packages as a multi-select, grouped by project.
+ * The milestone is reached as soon as all linked packages are completed.
  */
 export function MilestoneFields({ draft, onChange, workPackages, projects, autoFocus = false }: {
   draft: MilestoneDraft;
@@ -39,7 +39,7 @@ export function MilestoneFields({ draft, onChange, workPackages, projects, autoF
 
   return (
     <div className="space-y-3">
-      {/* Der Fokus springt bewusst hinein: Dialog und Karte öffnen sich auf einen Klick hin */}
+      {/* Focus deliberately jumps in: dialog and card open on a click */}
       <Input label={tm.titleLabel} value={draft.title} maxLength={MAX_TITLE} autoFocus={autoFocus}
         onChange={(event) => onChange({ ...draft, title: event.target.value })} />
       <Input label={tm.dateLabel} type="date" value={draft.date} required
