@@ -71,9 +71,12 @@
 100 scripts/lib/hygiene-rules.sh
 1 scripts/lib/pool-sanitizer.generated.sh
 1 scripts/lib/tui.sh
+57 scripts/public-readiness/arch-findings.py
 3 scripts/public-readiness/doc_facts_check.py
 1 scripts/public-readiness/docs_parity_check.py
 1 scripts/release-handover.sh
+1 scripts/tests/test-arch-findings.sh
+45 scripts/tests/test-arch-metrics.sh
 1 scripts/tests/test-pre-push-checks.sh
 1 scripts/tests/test-setup.sh
 2 scripts/tests/test_docs_parity_check.py
