@@ -7,10 +7,10 @@ server:
 
 automation:
   modules:
-    preset: ${AUTOMATION_MODULES_PRESET:full}   # Stable spiegelt die volle Dev-Nutzung; öffentlicher Default ist core
+    preset: ${AUTOMATION_MODULES_PRESET:full}   # Stable mirrors full dev usage; public default is core
   cors:
-    # Stable liefert die Oberfläche selbst aus (Same-Origin, CORS greift nicht). Die eigene Tailscale-
-    # Adresse kommt mit remote-access automatisch dazu, sofern `tailscale` im Container antwortet (a8056256).
+    # Stable serves the UI itself (same-origin, CORS does not apply). Its own Tailscale
+    # address is added automatically with remote-access, provided `tailscale` answers in the container (a8056256).
     allowed-origins: http://localhost:9091,https://localhost:9091
   staging:
     auto-start: false
@@ -22,6 +22,6 @@ automation:
   frontend-path: /app/frontend
   environment: Produktiv
   request-metrics:
-    # Der Header verraet interne Zeiten und die SQL-Zahl — in den nach aussen zeigenden
-    # Umgebungen aus. Startup-only, damit ein geleakter API-Key ihn nicht einschalten kann.
+    # The header reveals internal timings and the SQL count — off in the externally
+    # facing environments. Startup-only so that a leaked API key cannot turn it on.
     server-timing-enabled: false

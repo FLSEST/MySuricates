@@ -16,23 +16,23 @@ import java.util.regex.Pattern;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Hygiene-Gate fuer Workflow-Definitionen, die mit dem Repo ausgeliefert werden
- * (Built-in-Templates und workflow-pool/).
+ * Hygiene gate for workflow definitions that ship with the repo
+ * (built-in templates and workflow-pool/).
  *
  * <ol>
- * <li>Output-Platzhalter in Shell-Feldern duerfen nicht in Quotes stehen: in Taint-Runs wird der
- *     Wert bereits single-quoted, eigene Quotes heben das Escaping auf ({@code ''x; id''} fuehrt
- *     {@code id} aus). Korrekte Form: unquoted plus {@code "shell_escape_variables": true},
- *     sonst zerlegt ein mehrzeiliger Output in Runs ohne Taint den Befehl (TODO 1e77e717).
- *     Gleiches gilt fuer {@code previous_report} und {@code open_todos}: sie sind seit TODO c2634caa
- *     immer untrusted und werden in jedem Run single-quoted — ebenso {@code audit_findings} in
- *     Audit-Workflows (TODO 3643beac).</li>
- * <li>Keine datierten Claude-Modell-IDs: der Modell-Katalog liefert Aliase (opus/sonnet/haiku/fable),
- *     datierte IDs veralten und zeigen im UI "nicht im Katalog" (TODO 5770c88c).</li>
- * <li>Kein {@code $(grep -c … || echo 0)} in Shell-Feldern: grep schreibt bei null Treffern selbst
- *     "0" und endet mit 1, das {@code echo} haengt eine zweite Zeile an. Der Wert {@code "0\n0"} laesst
- *     jeden folgenden {@code [ … -gt … ]} scheitern — im Architektur-Review blieb so die Klassenkopplung
- *     hundertfach ungemessen (TODO 0c4b4eb5). Korrekt: {@code x=$(grep -c …); x=${x:-0}}.</li>
+ * <li>Output placeholders in shell fields must not be inside quotes: in taint runs the
+ *     value is already single-quoted, own quotes cancel the escaping ({@code ''x; id''} executes
+ *     {@code id}). Correct form: unquoted plus {@code "shell_escape_variables": true},
+ *     otherwise a multi-line output in runs without taint breaks the command (TODO 1e77e717).
+ *     The same applies to {@code previous_report} and {@code open_todos}: since TODO c2634caa they are
+ *     always untrusted and are single-quoted in every run — likewise {@code audit_findings} in
+ *     audit workflows (TODO 3643beac).</li>
+ * <li>No dated Claude model IDs: the model catalog delivers aliases (opus/sonnet/haiku/fable),
+ *     dated IDs go stale and show "nicht im Katalog" in the UI (TODO 5770c88c).</li>
+ * <li>No {@code $(grep -c … || echo 0)} in shell fields: with zero matches grep itself writes
+ *     "0" and exits with 1, the {@code echo} appends a second line. The value {@code "0\n0"} makes
+ *     every following {@code [ … -gt … ]} fail — in the architecture review this left class coupling
+ *     unmeasured hundreds of times (TODO 0c4b4eb5). Correct: {@code x=$(grep -c …); x=${x:-0}}.</li>
  * </ol>
  */
 class TemplateHygieneGateTest {
@@ -160,7 +160,7 @@ class TemplateHygieneGateTest {
         assertThat(GREP_COUNT_ECHO_FALLBACK.matcher("grep -rn 'x' . || echo '(keine)'").find()).isFalse();
     }
 
-    /** Ruft {@code visitor} fuer jedes Objekt mit "type" und "config" auf (Bloecke, auch verschachtelt). */
+    /** Calls {@code visitor} for every object with "type" and "config" (blocks, also nested). */
     private static void walkBlocks(JsonNode node, Consumer<JsonNode> visitor) {
         if (node.isObject()) {
             if (node.has("type") && node.has("config") && node.get("config").isObject()) {
@@ -172,7 +172,7 @@ class TemplateHygieneGateTest {
         }
     }
 
-    /** Built-in-Templates immer; workflow-pool/ nur, wenn das Repo-Verzeichnis erreichbar ist. */
+    /** Built-in templates always; workflow-pool/ only if the repo directory is reachable. */
     private static List<Path> definitionFiles() throws IOException {
         List<Path> files = new ArrayList<>(ShippedDefinitions.templateFiles());
         Path pool = ShippedDefinitions.poolDirectoryOrNull();

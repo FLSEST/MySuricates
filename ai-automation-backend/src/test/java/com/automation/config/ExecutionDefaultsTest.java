@@ -121,8 +121,8 @@ class ExecutionDefaultsTest {
         Constructor<ExecutionDefaults> ctor = ExecutionDefaults.class.getDeclaredConstructor();
         assertThat(Modifier.isPrivate(ctor.getModifiers())).isTrue();
         ctor.setAccessible(true);
-        // Konstruktor selbst wirft nicht, ist aber privat — Aufruf via Reflection moeglich,
-        // jedoch nur fuer Coverage. Pruefe: Aufruf liefert Instanz, aber Klasse hat keinerlei State.
+        // The constructor itself does not throw, but is private — call via reflection is possible,
+        // but only for coverage. Check: the call yields an instance, but the class has no state at all.
         ExecutionDefaults instance = ctor.newInstance();
         assertThat(instance).isNotNull();
     }
@@ -214,7 +214,7 @@ class ExecutionDefaultsTest {
 
     @Test
     void shellTimeout_alignsWithAgenticIterationTimeout() {
-        // Shell-Block in agentic iteration darf Iteration nicht sprengen.
+        // A shell block in an agentic iteration must not blow up the iteration.
         assertThat(ExecutionDefaults.SHELL_TIMEOUT_SECONDS)
                 .isLessThanOrEqualTo(ExecutionDefaults.AGENTIC_ITERATION_TIMEOUT_SECONDS);
     }

@@ -21,26 +21,26 @@ import java.util.TreeSet;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Was MySuricates ausliefert, darf die eigenen Baufehler nicht enthalten (TODO 182bd224).
+ * What MySuricates ships must not contain its own construction errors (TODO 182bd224).
  *
- * <p>Geprüft werden die Definitionen unter {@code workflow-pool/} und die Built-in-Templates mit
- * demselben deterministischen Regelsatz, den der REST-Endpunkt auf Abruf anwendet — seit f5153c47
- * samt den Config-Schlüsseln verschachtelter Blöcke (switch-Cases, {@code default}, {@code blocks}), seit
- * d3aa0b28 samt den Feldern neben {@code config} ({@code unknown-block-field}). Der
- * Analyzer misst, er bewertet nicht — deshalb ist dieser Test ein Gate und keine Empfehlung.
+ * <p>The definitions under {@code workflow-pool/} and the built-in templates are checked with
+ * the same deterministic rule set that the REST endpoint applies on demand — since f5153c47
+ * including the config keys of nested blocks (switch cases, {@code default}, {@code blocks}), since
+ * d3aa0b28 including the fields next to {@code config} ({@code unknown-block-field}). The
+ * analyzer measures, it does not judge — that is why this test is a gate and not a recommendation.
  *
- * <p>Die Schwelle steht bei {@code HIGH}: Ein Verweis auf einen Block, den es nicht gibt, und ein
- * Pfad mit Klarnamen sind Fehler, die auf einem fremden Rechner sofort auffallen. Leichtere
- * Befunde werden gezählt und ausgegeben, brechen den Build aber nicht — sonst wäre der Test beim
- * ersten Lauf rot und würde stillgelegt statt beachtet.
+ * <p>The threshold is at {@code HIGH}: a reference to a block that does not exist and a
+ * path with a real name are errors that are noticed immediately on someone else's machine. Lighter
+ * findings are counted and printed but do not break the build — otherwise the test would be red on its
+ * first run and be shut down instead of heeded.
  */
 class PoolAnalyzerGateTest {
 
     /**
-     * Schwere Befunde an Definitionen, deren Reparatur ein eigenes TODO trägt: {@code "<Datei> <Regel>"}
-     * → Grund. Nur zum Abbauen — tritt der Befund an der geprüften Datei nicht mehr auf, bricht der Test.
-     * Aktuell leer: {@code saas-feature-loop.json} trug hier zwei Einträge, bis foreach mit
-     * {@code workflow_id} einen Unter-Workflow je Eintrag starten konnte (a5c9fbbf).
+     * Severe findings on definitions whose repair has its own TODO: {@code "<file> <rule>"}
+     * → reason. Only for phasing out — if the finding no longer occurs on the checked file, the test breaks.
+     * Currently empty: {@code saas-feature-loop.json} had two entries here until foreach with
+     * {@code workflow_id} could start a sub-workflow per entry (a5c9fbbf).
      */
     private static final Map<String, String> KNOWN_SEVERE = Map.of();
 
@@ -89,7 +89,7 @@ class PoolAnalyzerGateTest {
                 .as("behoben — aus KNOWN_SEVERE streichen").isEmpty();
     }
 
-    /** Die Blöcke einer Pool- oder Template-Datei; beide Formate führen sie unter {@code blocks}. */
+    /** The blocks of a pool or template file; both formats keep them under {@code blocks}. */
     private List<BlockDefinition> blocksOf(JsonNode root) {
         JsonNode blocks = root.path("blocks");
         if (!blocks.isArray()) {
@@ -102,7 +102,7 @@ class PoolAnalyzerGateTest {
             block.setType(node.path("type").asText(null));
             block.setName(node.path("name").isTextual() ? node.path("name").asText() : null);
             block.setConfig(configOf(node.path("config")));
-            // Felder neben config behält BlockDefinition seit d3aa0b28 — der Gate sieht sie wie der Speicherweg
+            // Since d3aa0b28 BlockDefinition keeps fields next to config — the gate sees them like the save path
             node.properties().forEach(field -> {
                 if (!BlockDefinition.FIELDS.contains(field.getKey())) {
                     block.putUnknownField(field.getKey(), objectMapper.convertValue(field.getValue(), Object.class));
@@ -113,7 +113,7 @@ class PoolAnalyzerGateTest {
         return out;
     }
 
-    /** Die Metadaten der Definition: {@code metadata.audit} entscheidet, ob {@code audit_findings} belegt wird. */
+    /** The definition's metadata: {@code metadata.audit} decides whether {@code audit_findings} is set. */
     private Map<String, Object> metadataOf(JsonNode root) {
         JsonNode metadata = root.path("metadata");
         return configOf(metadata.isObject() ? metadata : root.path("definition").path("metadata"));
@@ -126,10 +126,10 @@ class PoolAnalyzerGateTest {
     }
 
     /**
-     * Was wirklich ausgeliefert wird: Built-in-Templates liegen im JAR, sind also immer dabei.
-     * Aus {@code workflow-pool/} zählen nur die <b>versionierten</b> Dateien — dort liegen daneben
-     * lokale Arbeitskopien, die nie veröffentlicht werden (22 von 45 sind getrackt). Ein Gate, das
-     * sie mitprüft, meldet Fehler an Dateien, die niemand bekommt.
+     * What is really shipped: built-in templates live in the JAR, so they are always included.
+     * From {@code workflow-pool/} only the <b>versioned</b> files count — next to them lie
+     * local working copies that are never published (22 of 45 are tracked). A gate that
+     * checks them too reports errors on files that nobody gets.
      */
     private static List<Path> definitionFiles() throws IOException {
         List<Path> files = new ArrayList<>();

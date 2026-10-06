@@ -13,31 +13,31 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Hygiene-Gate fuer den Weg <em>Plattform-Daten → KI-Prompt → Shell-Block</em> in den mitgelieferten
- * Definitionen (Built-in-Templates und {@code workflow-pool/}).
+ * Hygiene gate for the path <em>platform data → AI prompt → shell block</em> in the shipped
+ * definitions (built-in templates and {@code workflow-pool/}).
  *
- * <p>Seit TODO 22e6bec8 faerbt die Plattform die Ausgabe eines KI-Blocks, dessen Prompt
- * {@code previous_report}/{@code open_todos} enthielt — ein folgender Shell-Block bekommt
- * {@code {{ previous_output }}} also gequotet. Damit ausgelieferte Definitionen unter beiden
- * Regelwerken gleich laufen (und ein Nutzer, der sie als Vorlage kopiert, die sichere Form sieht),
- * verlangt dieses Gate an genau dieser Stelle das Opt-in {@code "shell_escape_variables": true}.
+ * <p>Since TODO 22e6bec8 the platform taints the output of an AI block whose prompt
+ * contained {@code previous_report}/{@code open_todos} — a following shell block therefore gets
+ * {@code {{ previous_output }}} quoted. So that shipped definitions run the same under both
+ * rule sets (and a user who copies them as a template sees the safe form),
+ * this gate demands the opt-in {@code "shell_escape_variables": true} at exactly this place.
  *
- * <p>Abgegrenzt von {@link TemplateHygieneGateTest} (quoted Platzhalter, datierte Modell-IDs), damit
- * beide Gates je eine Regel tragen.
+ * <p>Distinguished from {@link TemplateHygieneGateTest} (quoted placeholders, dated model IDs), so that
+ * both gates carry one rule each.
  */
 class PlatformPromptQuotingGateTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    /** Felder, die ein Block als Kommandozeile ausfuehrt (identisch zu {@link TemplateHygieneGateTest}). */
+    /** Fields that a block executes as a command line (identical to {@link TemplateHygieneGateTest}). */
     private static final List<String> SHELL_FIELDS =
             List.of("command", "condition", "then_command", "else_command", "items_command", "condition_command", "run_if");
 
-    /** Ausgabe-Platzhalter, die ein Shell-Block von einem Vorgaengerblock uebernimmt. */
+    /** Output placeholders that a shell block takes over from a predecessor block. */
     private static final java.util.regex.Pattern OUTPUT_PLACEHOLDER = java.util.regex.Pattern.compile(
             "\\{\\{\\s*(previous_output|step_\\d+_output|block\\.[A-Za-z0-9_-]+\\.output)\\s*}}");
 
-    /** Plattform-Daten, die den Prompt eines KI-Blocks faerben ({@code audit_findings}: TODO 3643beac). */
+    /** Platform data that taints the prompt of an AI block ({@code audit_findings}: TODO 3643beac). */
     private static final java.util.regex.Pattern PLATFORM_PLACEHOLDER =
             java.util.regex.Pattern.compile("\\{\\{\\s*(previous_report|open_todos|audit_findings|todo_details)\\s*}}");
 
@@ -61,7 +61,7 @@ class PlatformPromptQuotingGateTest {
                 .isEmpty();
     }
 
-    /** Synthetische Gegenprobe: ohne Opt-in schlaegt das Gate an, mit Opt-in nicht. */
+    /** Synthetic counter-check: without the opt-in the gate trips, with the opt-in it does not. */
     @Test
     void should_flagTheMissingOptIn_andAcceptItWhenPresent() throws IOException {
         String withoutOptIn = """
@@ -93,10 +93,10 @@ class PlatformPromptQuotingGateTest {
     }
 
     /**
-     * Laeuft die Definition in Ausfuehrungsreihenfolge ab und gibt zurueck, ob danach ein KI-Block
-     * mit Plattform-Daten im Prompt gesehen wurde. Das Flag wird in verschachtelte Bloecke
-     * (foreach/while/conditional/retry/switch) weitergereicht, weil deren Ausgaben in denselben Run
-     * verbucht werden.
+     * Walks the definition in execution order and returns whether an AI block
+     * with platform data in its prompt was seen afterwards. The flag is passed on into nested blocks
+     * (foreach/while/conditional/retry/switch) because their outputs are booked into the same
+     * run.
      */
     private static boolean scan(JsonNode node, boolean platformPromptSeen, String fileLabel,
                                 List<String> candidates, List<String> violations) {
@@ -132,7 +132,7 @@ class PlatformPromptQuotingGateTest {
         return node.has("type") && node.has("config") && node.get("config").isObject();
     }
 
-    /** Wie {@code ExecutionMode}: Typ {@code shell} oder {@code execution_mode: shell}. */
+    /** Like {@code ExecutionMode}: type {@code shell} or {@code execution_mode: shell}. */
     private static boolean runsAsShell(JsonNode node) {
         String type = node.path("type").asText(null);
         return "shell".equals(type)
@@ -140,7 +140,7 @@ class PlatformPromptQuotingGateTest {
                 || ("foreach".equals(type) && node.get("config").has("items_command"));
     }
 
-    /** Erstes Shell-Feld dieses Blocks, das einen Ausgabe-Platzhalter einsetzt, sonst {@code null}. */
+    /** First shell field of this block that inserts an output placeholder, otherwise {@code null}. */
     private static String shellFieldWithOutputPlaceholder(JsonNode node, JsonNode config) {
         for (String field : SHELL_FIELDS) {
             JsonNode value = config.get(field);
@@ -151,7 +151,7 @@ class PlatformPromptQuotingGateTest {
         return null;
     }
 
-    /** Built-in-Templates immer; {@code workflow-pool/} nur, wenn das Repo-Verzeichnis erreichbar ist. */
+    /** Built-in templates always; {@code workflow-pool/} only if the repo directory is reachable. */
     private static List<Path> definitionFiles() throws IOException {
         List<Path> files = new ArrayList<>(ShippedDefinitions.templateFiles());
         Path pool = ShippedDefinitions.poolDirectoryOrNull();

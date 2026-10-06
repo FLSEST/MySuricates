@@ -23,16 +23,16 @@ import java.util.regex.Pattern;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Drift-Wächter der Backend-Seite (TODO f5153c47): Jeder Config-Schlüssel, den ein Executor liest, muss im
- * Block-Config-Schema seines Blocktyps stehen — sonst meldet der Analyzer einen wirksamen Schlüssel als
- * unbekannt, und der Editor warnt davor. Der Frontend-Test {@code blockConfigSchema.test.ts} hält dasselbe
- * Schema gegen die ausgelieferten Definitionen, dieser hier gegen den Code.
+ * Drift guard of the backend side (TODO f5153c47): every config key that an executor reads must be in the
+ * block config schema of its block type — otherwise the analyzer reports an effective key as
+ * unknown, and the editor warns about it. The frontend test {@code blockConfigSchema.test.ts} checks the same
+ * schema against the shipped definitions, this one against the code.
  *
- * <p>Gemessen wird am Quelltext: {@code config.get("…")}, {@code getOrDefault}, {@code containsKey} auf
- * {@code config} oder {@code block.getConfig()} und Helfer mit der Config als erstem Argument
+ * <p>Measured on the source text: {@code config.get("…")}, {@code getOrDefault}, {@code containsKey} on
+ * {@code config} or {@code block.getConfig()} and helpers with the config as first argument
  * ({@code StageConfig.intValue(config, "…")}). Liest ein Executor
- * über einen geteilten Helfer, zählen dessen Schlüssel mit ({@link #DELEGATES}). Die Zuordnung Executor →
- * Blocktyp kommt aus {@link BlockExecutor#supportedTypes()}, wie beim {@code BlockTypeRegistry}.
+ * via a shared helper, its keys count too ({@link #DELEGATES}). The mapping executor →
+ * block type comes from {@link BlockExecutor#supportedTypes()}, as with the {@code BlockTypeRegistry}.
  */
 class ExecutorConfigKeyDriftTest {
 
@@ -47,10 +47,10 @@ class ExecutorConfigKeyDriftTest {
             "\\b[\\w.]+\\(\\s*" + RECEIVER + "\\s*,\\s*\"([A-Za-z_]+)\"");
 
     /**
-     * Geteilte Helfer, die Config-Schlüssel für den Executor lesen: Aufruf im Executor (mit der eigenen
-     * {@code config} als Argument) → Methode des Helfers, deren Schlüssel mitzählen. Nur der Rumpf dieser
-     * Methode zählt, nicht die ganze Datei. {@link #delegatesStillReadKeys()} hält fest, dass jede Methode
-     * noch Schlüssel liefert — zieht eine um, misst der Test sonst still weniger.
+     * Shared helpers that read config keys for the executor: call in the executor (with its own
+     * {@code config} as argument) → method of the helper whose keys count too. Only the body of this
+     * method counts, not the whole file. {@link #delegatesStillReadKeys()} ensures that every method
+     * still yields keys — if one moves, the test would otherwise silently measure less.
      */
     private record Delegate(String file, String method) {}
 
@@ -62,10 +62,10 @@ class ExecutorConfigKeyDriftTest {
             "ContainerToolSpec.from(config,",
             new Delegate("com/automation/executor/blocks/ContainerToolSpec.java", "from"));
 
-    /** {@code ExecutionMode} liest seinen Schlüssel über eine Konstante, nicht über ein Literal. */
+    /** {@code ExecutionMode} reads its key via a constant, not via a literal. */
     private static final String EXECUTION_MODE_CALL = "ExecutionMode.isShell(config";
 
-    /** Schlüssel, die ein Executor liest, die aber bewusst nicht ins Schema gehören — mit Grund. */
+    /** Keys that an executor reads but that deliberately do not belong in the schema — with a reason. */
     private static final Map<String, String> EXCEPTIONS = Map.of();
 
     @Test
@@ -106,7 +106,7 @@ class ExecutorConfigKeyDriftTest {
                 .contains("KEY = \"execution_mode\"");
     }
 
-    /** Blocktyp → gelesene Schlüssel, über alle Executoren im Klassenpfad. */
+    /** Block type → keys read, across all executors on the classpath. */
     private static Map<String, Set<String>> keysReadPerType() throws IOException {
         ClassPathScanningCandidateComponentProvider scanner = new ClassPathScanningCandidateComponentProvider(false);
         scanner.addIncludeFilter(new AssignableTypeFilter(BlockExecutor.class));
@@ -120,7 +120,7 @@ class ExecutorConfigKeyDriftTest {
             } catch (ClassNotFoundException e) {
                 throw new IllegalStateException(e);
             }
-            // Ohne Konstruktor erzeugt: supportedTypes() liefert eine Konstante und braucht keine Abhängigkeiten
+            // Created without a constructor: supportedTypes() returns a constant and needs no dependencies
             BlockExecutor executor = (BlockExecutor) objenesis.newInstance(type);
             String source = Files.readString(SOURCES.resolve(type.getName().replace('.', '/') + ".java"));
             Set<String> keys = keysIn(source);
@@ -140,7 +140,7 @@ class ExecutorConfigKeyDriftTest {
         return keys;
     }
 
-    /** Der Rumpf einer statischen Methode: von ihrer Deklaration bis zur schließenden Klammer auf Methodenebene. */
+    /** The body of a static method: from its declaration to the closing brace at method level. */
     private static String body(Delegate delegate) throws IOException {
         String source = Files.readString(SOURCES.resolve(delegate.file()));
         Matcher declaration = Pattern.compile("\\bstatic\\s+[\\w<>.,\\s]+\\s" + delegate.method() + "\\(").matcher(source);

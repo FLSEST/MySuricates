@@ -59,7 +59,7 @@ class CorsIntegrationTest {
 
     @Test
     void foreignTailnetOrigin_isRejected() throws Exception {
-        // traf frueher https://*.tail*.ts.net:* — also jedes Tailnet, auch per Funnel erreichbare
+        // used to match https://*.tail*.ts.net:* — i.e. every tailnet, including those reachable via funnel
         mockMvc.perform(get("/api/v1/system/health").header("Origin", "https://evil.tail0000.ts.net:3000"))
                 .andExpect(status().isForbidden())
                 .andExpect(header().doesNotExist(ALLOW_ORIGIN));
@@ -67,7 +67,7 @@ class CorsIntegrationTest {
 
     @Test
     void lookalikeHundredHost_isRejected() throws Exception {
-        // traf frueher http://100.*:3000 — der Stern deckt auch Punkte und Buchstaben ab
+        // used to match http://100.*:3000 — the star also covers dots and letters
         mockMvc.perform(get("/api/v1/system/health").header("Origin", "http://100.evil.example:3000"))
                 .andExpect(status().isForbidden())
                 .andExpect(header().doesNotExist(ALLOW_ORIGIN));
@@ -116,7 +116,7 @@ class CorsIntegrationTest {
 
     @Test
     void webSocketEndpoint_foreignOrigin_isRejected() throws Exception {
-        // Auch der SockJS-Einstieg unter /ws: eine fremde Herkunft kommt nicht bis zum Handshake.
+        // Also the SockJS entry under /ws: a foreign origin does not get as far as the handshake.
         mockMvc.perform(get("/ws/info").header("Origin", "https://evil.tail0000.ts.net:3000"))
                 .andExpect(status().isForbidden());
     }
@@ -130,9 +130,9 @@ class CorsIntegrationTest {
 
     @Test
     void liveUpdateHandshake_ownOrigin_passesEveryCheckUpToTheUpgrade() throws Exception {
-        // 400 heisst: beide Herkunftspruefungen (unsere und die von Spring) und das Ticket sind
-        // passiert, erst der fehlende Upgrade-Header von MockMvc stoppt. So bleiben die
-        // Live-Updates ueber den Vite-Dev-Server per Tailscale erhalten.
+        // 400 means: both origin checks (ours and Spring's) and the ticket have
+        // passed, only MockMvc's missing upgrade header stops it. That way the
+        // live updates via the Vite dev server over Tailscale are preserved.
         mockMvc.perform(get("/ws/000/abcdefgh/websocket").param("ticket", issueTicket()).header("Origin", OWN_NAME))
                 .andExpect(status().isBadRequest());
     }

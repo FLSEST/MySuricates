@@ -7,6 +7,6 @@ spring:
 
 automation:
   request-metrics:
-    # Der Header verraet interne Zeiten und die SQL-Zahl — in den nach aussen zeigenden
-    # Umgebungen aus. Startup-only, damit ein geleakter API-Key ihn nicht einschalten kann.
+    # The header reveals internal timings and the SQL count — off in the externally
+    # facing environments. Startup-only so that a leaked API key cannot turn it on.
     server-timing-enabled: false

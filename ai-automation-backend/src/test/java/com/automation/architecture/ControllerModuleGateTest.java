@@ -39,8 +39,8 @@ class ControllerModuleGateTest {
             "LearningController",
             "NotificationController",
             "ProjectController",
-            // Projekt-Bündel (Export/Vorschau/Import) gehört zu den Projekten; Chains im Bündel
-            // prüfen die Services selbst gegen das Modul chains (übersprungen + Warnung).
+            // Project bundle (export/preview/import) belongs to the projects; chains in the bundle
+            // are checked by the services themselves against the chains module (skipped + warning).
             "ProjectBundleController",
             "ScheduleController",
             "SearchController",
@@ -58,14 +58,14 @@ class ControllerModuleGateTest {
             // endpoint that authenticates them is core, even though the terminal itself is a module.
             "WebSocketTicketController",
             "WorkflowController",
-            // Wie schlechte Workflows gefunden werden — dasselbe Argument wie bei den
-            // Request-Metriken: ein Diagnosewerkzeug darf nicht mit einem Feature-Modul
-            // verschwinden. Er meldet nur und greift in keinen Schreibweg ein (182bd224).
+            // How bad workflows are found — the same argument as for the
+            // request metrics: a diagnostic tool must not disappear with a feature module.
+            // It only reports and does not intervene in any write path (182bd224).
             "WorkflowAnalyzerController",
-            // Aus WorkflowController herausgelöst (6c2a2ad7) — gleiche Einordnung wie dort
+            // Extracted from WorkflowController (6c2a2ad7) — same classification as there
             "WorkflowAssistController",
             "WorkflowPoolController",
-            // Siegelstatus lesen: ein Siegel bleibt wirksam, wenn der Schalter aus ist — also sichtbar
+            // Reading the seal status: a seal stays in force when the switch is off — so visible
             "WorkflowSealStatusController",
             "WorkflowTemplateController",
             "WorkflowVersionController");
@@ -73,7 +73,7 @@ class ControllerModuleGateTest {
     /** Method-level assignments inside core controllers — pinned so they cannot be dropped unnoticed. */
     private static final Map<String, ModuleCatalog> METHOD_MODULES = Map.ofEntries(
             Map.entry("TodoController#exportTodo", ModuleCatalog.INTEGRATIONS),
-            // Einordnung und Einschaetzung eines TODOs gehoeren zum Modul goals (TODO c60bf914).
+            // Classification and estimate of a TODO belong to the goals module (TODO c60bf914).
             Map.entry("TodoController#updateTodoPlanning", ModuleCatalog.GOALS),
             Map.entry("WorkflowController#exportWorkflowAsBpmn", ModuleCatalog.BPMN),
             Map.entry("WorkflowAssistController#repairWorkflow", ModuleCatalog.FACTORY),

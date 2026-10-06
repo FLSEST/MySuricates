@@ -13,28 +13,28 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Regeln zur <b>Verdrahtung</b> einer Definition: Wird erzeugte Ausgabe auch gelesen, und zeigt
- * jeder Verweis auf etwas, das es gibt?
+ * Rules for the <b>wiring</b> of a definition: is generated output also read, and does
+ * every reference point to something that exists?
  *
- * <p>Anlass war PRD-07 (TODO 45509fcb): Ein Shell-Block lieferte 31 KB, die kein Folgeblock
- * referenzierte, und drei von vier Blöcken trugen einen Platzhalter, der außerhalb einer Chain
- * nie belegt wird und deshalb als Literal im Prompt ankam.
+ * <p>The trigger was PRD-07 (TODO 45509fcb): a shell block delivered 31 KB that no following block
+ * referenced, and three of four blocks carried a placeholder that is never set outside a chain
+ * and therefore arrived as a literal in the prompt.
  */
 final class WiringRules {
 
     private WiringRules() {}
 
     /**
-     * Nur innerhalb einer Chain belegt — in einem einzeln laufenden Workflow bleibt er Literal. Genau die
-     * Schlüssel, die {@code ChainExecutor} jedem Eintrag setzt; {@code chain_step_output} stand hier, obwohl
-     * ihn nichts setzt, auch keine Chain — die Meldung führte dort in die Irre (TODO 6db47bc2).
+     * Only set inside a chain — in a workflow running on its own it stays a literal. Exactly the
+     * keys that {@code ChainExecutor} sets for every entry; {@code chain_step_output} used to be here although
+     * nothing sets it, not even a chain — the message was misleading there (TODO 6db47bc2).
      */
     static final Set<String> CHAIN_ONLY = Set.of("previous_chain_output", TriggerSource.CHAIN_RUN_CONTEXT_KEY);
 
-    /** Nur in einem Audit-Workflow belegt (gültiges {@code metadata.audit}) — sonst bleibt er Literal. */
+    /** Only set in an audit workflow (valid {@code metadata.audit}) — otherwise it stays a literal. */
     private static final String AUDIT_ONLY = "audit_findings";
 
-    /** @param metadata die Metadaten der Definition; leer für eine ohne — dann ist sie kein Audit-Workflow */
+    /** @param metadata the definition's metadata; empty for one without — then it is not an audit workflow */
     static void apply(List<BlockDefinition> blocks, Map<String, Object> metadata, List<AnalyzerFinding> out) {
         Set<String> names = blockNames(blocks);
         List<String> texts = new ArrayList<>();
@@ -49,9 +49,9 @@ final class WiringRules {
     }
 
     /**
-     * {@code block.<name>.output} auf einen Block, den die Definition nicht kennt. Der Resolver
-     * lässt so einen Platzhalter unverändert stehen — der Prompt erhält die Zeichenfolge selbst
-     * statt der Ausgabe, meist unbemerkt, weil der Lauf technisch durchläuft.
+     * {@code block.<name>.output} pointing to a block the definition does not know. The resolver
+     * leaves such a placeholder unchanged — the prompt receives the string itself
+     * instead of the output, mostly unnoticed because the run technically goes through.
      */
     private static void unknownBlockReference(List<BlockDefinition> blocks, Set<String> names,
                                               List<String> texts, List<AnalyzerFinding> out) {
@@ -69,7 +69,7 @@ final class WiringRules {
         }
     }
 
-    /** Chain-Variable in einer Definition, die selbst keine Chain-Stufe ist. */
+    /** Chain variable in a definition that is not itself a chain stage. */
     private static void chainOnlyPlaceholder(List<BlockDefinition> blocks, List<String> texts,
                                              List<AnalyzerFinding> out) {
         for (int i = 0; i < blocks.size(); i++) {
@@ -87,9 +87,9 @@ final class WiringRules {
     }
 
     /**
-     * {@code audit_findings} in einer Definition ohne gültiges {@code metadata.audit} (TODO 5ae9bd32). Die Variable
-     * gibt es nur für einen Audit-Workflow, entschieden wie zur Laufzeit ({@link AuditFindingsContext#appliesTo});
-     * sonst — auch als Sub-Workflow eines Audit-Workflows — steht die Zeichenfolge selbst im Prompt.
+     * {@code audit_findings} in a definition without valid {@code metadata.audit} (TODO 5ae9bd32). The variable
+     * exists only for an audit workflow, decided as at runtime ({@link AuditFindingsContext#appliesTo});
+     * otherwise — also as a sub-workflow of an audit workflow — the string itself is in the prompt.
      */
     private static void auditOnlyPlaceholder(List<BlockDefinition> blocks, List<String> texts,
                                              Map<String, Object> metadata, List<AnalyzerFinding> out) {
@@ -106,20 +106,20 @@ final class WiringRules {
     }
 
     /**
-     * Ein Block erzeugt Ausgabe, die niemand liest. Geprüft wird jeder Block außer dem letzten:
-     * Greift der unmittelbar folgende auf {@code previous_output} zu, oder nennt irgendein
-     * späterer Block ihn über {@code block.<name>.output} beziehungsweise {@code step_N_output}?
+     * A block produces output that nobody reads. Every block except the last is checked:
+     * does the immediately following one access {@code previous_output}, or does any
+     * later block name it via {@code block.<name>.output} or {@code step_N_output}?
      *
-     * <p>Geprüft werden nur <b>KI-Blöcke</b>. Ein Shell-Block, dessen Ausgabe niemand liest, hat
-     * oft genau dafür einen Grund — er schreibt eine Datei, die der nächste Block wieder einliest,
-     * und kommuniziert über das Dateisystem statt über Platzhalter. Bei einem KI-Block ist eine
-     * ungelesene Ausgabe dagegen bezahlter Text, den niemand bekommt. Ein erster Lauf über die
-     * ausgelieferten Definitionen zeigte den Unterschied deutlich: ohne diese Einschränkung meldete
-     * die Regel über hundert Treffer, von denen die meisten legitime Shell-Verkettungen waren —
-     * und eine Regel mit so viel Rauschen wird abgeschaltet statt beachtet.
+     * <p>Only <b>AI blocks</b> are checked. A shell block whose output nobody reads often
+     * has a reason for exactly that — it writes a file that the next block reads again,
+     * and communicates via the file system instead of placeholders. With an AI block, by contrast, an
+     * unread output is paid-for text that nobody gets. A first run over the
+     * shipped definitions showed the difference clearly: without this restriction the
+     * rule reported over a hundred hits, most of which were legitimate shell chains —
+     * and a rule with that much noise gets switched off instead of heeded.
      *
-     * <p>Wrapper-Blöcke (foreach, while, …) sind ebenfalls ausgenommen: Ihre inneren Blöcke reichen
-     * Ausgaben untereinander weiter, was von außen wie eine tote Ausgabe aussieht.
+     * <p>Wrapper blocks (foreach, while, …) are likewise excluded: their inner blocks pass
+     * outputs on to each other, which looks like a dead output from the outside.
      */
     private static void unwiredOutput(List<BlockDefinition> blocks, List<String> texts,
                                       List<AnalyzerFinding> out) {
@@ -150,7 +150,7 @@ final class WiringRules {
         }
     }
 
-    /** Nur hier kostet eine ungelesene Ausgabe Geld statt nur einen Dateizugriff. */
+    /** Only here an unread output costs money instead of just a file access. */
     private static boolean isAiBlock(BlockDefinition block) {
         String type = block.getType() == null ? "" : block.getType();
         return switch (type) {
@@ -159,7 +159,7 @@ final class WiringRules {
         };
     }
 
-    /** Container-Blöcke führen ihre eigene Verdrahtung — von außen nicht beurteilbar. */
+    /** Container blocks run their own wiring — cannot be judged from the outside. */
     private static boolean isWrapper(BlockDefinition block) {
         String type = block.getType() == null ? "" : block.getType();
         return switch (type) {
