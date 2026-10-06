@@ -53,12 +53,17 @@ Plus the [common fields](#common-fields).
 
 | Key | Type | Required | Default | Values | Meaning |
 |---|---|---|---|---|---|
-| `command` | string | yes |  |  | Shell command(s). Tip: start with `set -euo pipefail`. |
+| `command` | string | one of `command`, `container_args` |  |  | Shell command(s). Tip: start with `set -euo pipefail`. |
 | `timeout_seconds` | integer |  | `300` | ≥ 1 | Timeout in seconds (default 300). |
 | `shell_escape_variables` | boolean |  | `false` |  | Put every `{{ }}` placeholder in POSIX-safe single quotes. Then write placeholders **without** your own quotes. |
 | `container_image` | string |  |  |  | Docker image to run the command in. Unset ⇒ runs on the host. |
 | `mount_docker_socket` | boolean |  | `false` |  | Mount the Docker socket into the container (only with `container_image`). |
 | `mounts` | string[] |  |  |  | Extra volumes `host:container[:ro\|rw]` (only with `container_image`). |
+| `container_args` | string[] | one of `command`, `container_args` |  |  | Tool mode instead of `command`: arguments for the image's own entrypoint, no shell. The project is mounted read-only at /workspace. Untrusted placeholders (webhook input, platform data) are refused. Read only with `container_image`. |
+| `output_format` | string |  | `raw` | `raw`: The tool's output, the exit code decides (default). · `sarif`: Fact sheet from the SARIF files in the output directory (`FAKT`/`TREFFER`, otherwise `NICHT GEMESSEN`). | What counts as the step's output. Read only with `container_args`. |
+| `output_dir` | string |  | `/out` |  | Path in the container where the platform mounts an empty output directory per step; the tool writes its SARIF file there. Read only with `output_format: sarif`. |
+| `cache_dir` | string |  |  |  | Path in the container for a persistent cache per image (such as a vulnerability database). Read only with `container_args`. |
+| `fact_prefix` | string |  |  |  | Prefix of the FAKT/TREFFER names; defaults to the block name. Read only with `output_format: sarif`. |
 | `checked_command` | boolean |  | `false` |  | Derives a gate (`gate_status`) from the exit code and prepends `set -e -o pipefail`. |
 | `check_category` | string |  | `build-check` |  | Gate category for `checked_command` if the script prints no `gate_category` itself. |
 

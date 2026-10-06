@@ -53,12 +53,17 @@ Dazu die [gemeinsamen Felder](#gemeinsame-felder).
 
 | Schlüssel | Typ | Pflicht | Standard | Werte | Bedeutung |
 |---|---|---|---|---|---|
-| `command` | string | ja |  |  | Shell-Befehl(e). Tipp: mit `set -euo pipefail` beginnen. |
+| `command` | string | einer von `command`, `container_args` |  |  | Shell-Befehl(e). Tipp: mit `set -euo pipefail` beginnen. |
 | `timeout_seconds` | integer |  | `300` | ≥ 1 | Timeout in Sekunden (Standard 300). |
 | `shell_escape_variables` | boolean |  | `false` |  | Alle `{{ }}`-Platzhalter POSIX-sicher in Single-Quotes setzen. Platzhalter dann **ohne** eigene Quotes schreiben. |
 | `container_image` | string |  |  |  | Docker-Image, in dem der Befehl läuft. Ohne Angabe läuft er auf dem Host. |
 | `mount_docker_socket` | boolean |  | `false` |  | Docker-Socket in den Container mounten (nur mit `container_image`). |
 | `mounts` | string[] |  |  |  | Zusätzliche Volumes `host:container[:ro\|rw]` (nur mit `container_image`). |
+| `container_args` | string[] | einer von `command`, `container_args` |  |  | Werkzeug-Modus statt `command`: Argumente für den Einstiegsbefehl des Images, ohne Shell. Das Projekt liegt nur lesbar unter /workspace. Nicht vertrauenswürdige Platzhalter (Webhook-Daten, Plattformdaten) werden abgelehnt. Gelesen nur mit `container_image`. |
+| `output_format` | string |  | `raw` | `raw`: Ausgabe des Werkzeugs, Exit-Code entscheidet (Standard). · `sarif`: Faktenblatt aus den SARIF-Dateien im Ausgabeordner (`FAKT`/`TREFFER`, sonst `NICHT GEMESSEN`). | Was als Ausgabe des Schritts gilt. Gelesen nur mit `container_args`. |
+| `output_dir` | string |  | `/out` |  | Pfad im Container, an dem die Plattform je Schritt einen leeren Ausgabeordner einbindet; das Werkzeug schreibt seine SARIF-Datei dorthin. Gelesen nur mit `output_format: sarif`. |
+| `cache_dir` | string |  |  |  | Pfad im Container für einen dauerhaften Cache je Image (etwa eine Schwachstellen-Datenbank). Gelesen nur mit `container_args`. |
+| `fact_prefix` | string |  |  |  | Präfix der FAKT-/TREFFER-Namen; Standard ist der Block-Name. Gelesen nur mit `output_format: sarif`. |
 | `checked_command` | boolean |  | `false` |  | Leitet aus dem Exit-Code ein Gate ab (`gate_status`) und stellt `set -e -o pipefail` voran. |
 | `check_category` | string |  | `build-check` |  | Gate-Kategorie für `checked_command`, falls das Skript selbst keine `gate_category` ausgibt. |
 
