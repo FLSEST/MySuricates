@@ -63,7 +63,7 @@ public class CodexAiProvider implements AiProvider {
                 ? request.timeoutSeconds()
                 : summarizationConfig.getTimeoutSeconds();
 
-        String output = hostCodexService.execute(fullPrompt, workDir, timeout, true, request.model());
+        String output = hostCodexService.execute(fullPrompt, workDir, timeout, true, request.model(), false);
 
         return new ReasoningResult(
                 output,
@@ -89,7 +89,7 @@ public class CodexAiProvider implements AiProvider {
         }
 
         try {
-            String output = hostCodexService.execute(fullPrompt, workDir, timeout, readOnly, request.model());
+            String output = hostCodexService.execute(fullPrompt, workDir, timeout, readOnly, request.model(), request.priority());
             return new ActionResult(output, 0, AiResponseMetadata.estimated(fullPrompt, output));
         } catch (IOException e) {
             // Codex CLI exit code > 0 throws IOException — map to non-zero exit
@@ -99,30 +99,9 @@ public class CodexAiProvider implements AiProvider {
     }
 
     @Override
-    public String buildConversationPrompt(String systemPrompt, List<HostClaudeService.Turn> history) {
-        // Codex has no multi-turn: flatten everything into a single prompt
-        StringBuilder sb = new StringBuilder();
-
-        if (systemPrompt != null && !systemPrompt.isBlank()) {
-            sb.append("=== INSTRUCTIONS ===\n");
-            sb.append(systemPrompt);
-            sb.append("\n\n");
-        }
-
-        if (!history.isEmpty()) {
-            sb.append("=== CONVERSATION HISTORY ===\n");
-            for (HostClaudeService.Turn turn : history) {
-                String label = "assistant".equals(turn.role()) ? "ASSISTANT" : "USER";
-                sb.append("[").append(label).append("]\n");
-                sb.append(turn.content());
-                sb.append("\n\n");
-            }
-        }
-
-        sb.append("=== YOUR RESPONSE ===\n");
-        sb.append("Respond following the format specified in the instructions above.");
-
-        return sb.toString();
+    public String buildConversationPrompt(String systemPrompt, List<ConversationPrompt.Turn> history) {
+        // Codex has no multi-turn and no system prompt flag: everything goes into one prompt
+        return ConversationPrompt.withInstructions(systemPrompt, history);
     }
 
     private String mergeSystemPrompt(String systemPrompt, String userPrompt, boolean readOnly) {

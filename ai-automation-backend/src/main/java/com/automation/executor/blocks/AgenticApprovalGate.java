@@ -2,7 +2,7 @@ package com.automation.executor.blocks;
 
 import com.automation.executor.ApprovalRequest;
 import com.automation.executor.ExecutionContext;
-import com.automation.service.ai.HostClaudeService.Turn;
+import com.automation.service.ai.ConversationPrompt.Turn;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

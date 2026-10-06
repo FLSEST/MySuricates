@@ -155,9 +155,9 @@ For full architecture documentation: [docs/architektur.md](docs/architektur.md)
 
 ## CLI Concurrency & Chat Priority
 
-- **Two-tier semaphore**: `callSemaphore` (default: 5, total concurrent CLI processes) + `backgroundSemaphore` (default: 4, non-interactive calls). Chat calls only acquire `callSemaphore` → at least 1 slot reserved for interactive use.
-- `HostExecutionRequest.priority(true)` marks a call as interactive (used by the assistant chat, `AssistantChatCaller`)
-- Configurable at runtime via Settings UI or `ExecutionSettingsService`: `claude-max-concurrent-calls` (1–20), `claude-reserved-for-interactive` (0–10)
+- **Two-tier limit per provider and across all**: `AiCliThrottles` holds one `concurrency/CliCallThrottle` each for Claude, pi and Codex (default 5, of which 1 is kept for interactive calls) and one across all AI CLIs (default 8, 1 kept). A call takes a slot of its provider first, then one of the overall limit (fixed order ⇒ no deadlock); background calls may use all but the reserved slots, interactive ones also those. New spawn site of an AI CLI ⇒ `throttles.acquire(provider, priority)` in try-with-resources.
+- `HostExecutionRequest.priority(true)` marks a call as interactive (used by the assistant chat, `AssistantChatCaller`); the providers pass it on to all three CLIs
+- Configurable at runtime via Settings UI or `ExecutionSettingsService`: `claude-`/`pi-`/`codex-max-concurrent-calls` (1–20), `…-reserved-for-interactive` (0–10), overall `ai-cli-max-concurrent-calls` (1–50) and `ai-cli-reserved-for-interactive` (0–10); startup values in `automation.host-claude.*`, `automation.host-pi.*` and `automation.ai-cli.*`. The settings page reads the limits back from the throttles
 
 ## Integration / Plugin System
 

@@ -19,7 +19,7 @@ class HostPiServiceTest {
         config.setTimeoutSeconds(300);
         config.setDefaultBackendProvider(defaultBackend);
         config.setDefaultThinkingLevel(defaultThinking);
-        return new HostPiService(config);
+        return new HostPiService(config, AiCliThrottles.defaults());
     }
 
     private HostPiService createDefaultService() {
@@ -280,7 +280,7 @@ class HostPiServiceTest {
         config.setDefaultBackendProvider("anthropic");
         config.setDefaultThinkingLevel("medium");
 
-        HostPiService service = new HostPiService(config) {
+        HostPiService service = new HostPiService(config, AiCliThrottles.defaults()) {
             @Override
             List<String> buildActionCommand(String model, String systemPrompt,
                                              List<String> allowedTools, List<String> disallowedTools,
@@ -301,7 +301,7 @@ class HostPiServiceTest {
         config.setDefaultBackendProvider("anthropic");
         config.setDefaultThinkingLevel("medium");
 
-        HostPiService service = new HostPiService(config) {
+        HostPiService service = new HostPiService(config, AiCliThrottles.defaults()) {
             @Override
             List<String> buildReasonCommand(String systemPrompt, String model, Integer maxTurns, String effort) {
                 return List.of("sleep", "60");
@@ -340,7 +340,7 @@ class HostPiServiceTest {
         HostPiConfig config = new HostPiConfig();
         config.setDefaultBackendProvider("anthropic");
         config.setDefaultThinkingLevel("medium");
-        HostPiService service = new HostPiService(config) {
+        HostPiService service = new HostPiService(config, AiCliThrottles.defaults()) {
             @Override
             List<String> buildActionCommand(String model, String systemPrompt,
                                              List<String> allowedTools, List<String> disallowedTools,

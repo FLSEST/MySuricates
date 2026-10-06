@@ -205,7 +205,7 @@ Ohne KI und ohne Shell arbeiten `integration`, `document`, `todo-create`, `todo-
 
 `automation.host-claude.timeout-seconds`: Timeout eines Claude-CLI-Aufrufs (Standard 300); je Block gilt `timeout_seconds`
 
-`automation.host-claude.max-concurrent-calls` und `reserved-for-interactive`: gleichzeitige Claude-Aufrufe (5, davon 1 für den Chat frei)
+`automation.host-claude.max-concurrent-calls` und `reserved-for-interactive`: gleichzeitige Claude-Aufrufe (5, davon 1 für den Chat frei); ebenso `automation.host-pi.*` für pi und `automation.ai-cli.codex-*` für Codex, dazu `automation.ai-cli.max-concurrent-calls` über alle KI-CLIs zusammen (8, davon 1 frei). Alle Werte lassen sich zur Laufzeit in den Einstellungen ändern
 
 `docker.container.idle-timeout-minutes`: Projekt-Container im Leerlauf stoppen
 

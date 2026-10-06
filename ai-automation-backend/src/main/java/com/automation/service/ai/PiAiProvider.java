@@ -111,21 +111,4 @@ public class PiAiProvider implements AiProvider {
                 AiResponseMetadata.estimated(request.prompt(), result.text())
         );
     }
-
-    @Override
-    public String buildConversationPrompt(String systemPrompt, List<HostClaudeService.Turn> history) {
-        StringBuilder sb = new StringBuilder();
-        if (!history.isEmpty()) {
-            sb.append("=== CONVERSATION HISTORY ===\n");
-            for (HostClaudeService.Turn turn : history) {
-                String label = "assistant".equals(turn.role()) ? "ASSISTANT" : "USER";
-                sb.append("[").append(label).append("]\n")
-                  .append(turn.content())
-                  .append("\n\n");
-            }
-        }
-        sb.append("=== YOUR RESPONSE ===\n");
-        sb.append("Respond following the format specified in the system instructions.");
-        return sb.toString();
-    }
 }

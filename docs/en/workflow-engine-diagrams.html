@@ -377,7 +377,7 @@ flowchart LR
       <h3>Execution Limits</h3>
       <p><code>automation.execution.max-concurrent</code>: parallel runs (default 10)</p>
       <p><code>automation.host-claude.timeout-seconds</code>: timeout of one Claude CLI call (default 300); per block <code>timeout_seconds</code> applies</p>
-      <p><code>automation.host-claude.max-concurrent-calls</code> and <code>reserved-for-interactive</code>: concurrent Claude calls (5, of which 1 is kept free for the chat)</p>
+      <p><code>automation.host-claude.max-concurrent-calls</code> and <code>reserved-for-interactive</code>: concurrent Claude calls (5, of which 1 is kept free for the chat); likewise <code>automation.host-pi.*</code> for pi and <code>automation.ai-cli.codex-*</code> for Codex, plus <code>automation.ai-cli.max-concurrent-calls</code> across all AI CLIs together (8, 1 kept free). All of them can be changed at runtime in the settings</p>
       <p><code>docker.container.idle-timeout-minutes</code>: stop idle project containers</p>
     </div>
     <div class="card">

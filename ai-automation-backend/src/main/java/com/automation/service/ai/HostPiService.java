@@ -1,6 +1,5 @@
 package com.automation.service.ai;
 
-import com.automation.concurrency.DynamicSemaphore;
 import com.automation.config.HostPiConfig;
 import com.automation.service.live.LiveOutput;
 import com.automation.util.ChildProcessEnv;
@@ -13,7 +12,6 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Runs the `pi` coding agent (npm package `@earendil-works/pi-coding-agent`, formerly
@@ -46,31 +44,12 @@ public class HostPiService {
     public record BackendModel(String backend, String modelId) {}
 
     private final HostPiConfig config;
-    private final DynamicSemaphore callSemaphore;
-    private final DynamicSemaphore backgroundSemaphore;
-    private final AtomicLong lastCallTimestamp = new AtomicLong(0);
+    private final AiCliThrottles throttles;
 
-    public HostPiService(HostPiConfig config) {
+    public HostPiService(HostPiConfig config, AiCliThrottles throttles) {
         this.config = config;
-        int total = config.getMaxConcurrentCalls();
-        int reserved = config.getReservedForInteractive();
-        this.callSemaphore = new DynamicSemaphore(total);
-        this.backgroundSemaphore = new DynamicSemaphore(Math.max(1, total - reserved));
-        log.info("Pi CLI throttle: maxConcurrent={}, reservedForInteractive={}, backgroundLimit={}, defaultBackend={}",
-                total, reserved, total - reserved, config.getDefaultBackendProvider());
-    }
-
-    public void updateMaxConcurrentCalls(int newMax) {
-        callSemaphore.setMaxPermits(newMax);
-        int backgroundMax = Math.max(1, newMax - config.getReservedForInteractive());
-        backgroundSemaphore.setMaxPermits(backgroundMax);
-        log.info("Pi CLI max concurrent calls updated to {} (background limit: {})", newMax, backgroundMax);
-    }
-
-    public void updateReservedForInteractive(int reserved) {
-        int backgroundMax = Math.max(1, callSemaphore.getMaxPermits() - reserved);
-        backgroundSemaphore.setMaxPermits(backgroundMax);
-        log.info("Pi CLI reserved for interactive updated to {} (background limit: {})", reserved, backgroundMax);
+        this.throttles = throttles;
+        log.info("Pi CLI default backend: {}", config.getDefaultBackendProvider());
     }
 
     /**
@@ -226,8 +205,7 @@ public class HostPiService {
 
     private ProcessResult executeProcess(List<String> cmd, String prompt, String workingDirectory,
                                           Integer timeoutSeconds, String label, boolean priority) throws IOException {
-        acquireThrottle(priority);
-        try {
+        try (var permit = throttles.acquire(AiCliThrottles.PI, priority)) {
             ProcessBuilder pb = ChildProcessEnv.forAgent(cmd, workingDirectory);
 
             log.debug("{} (prompt length: {} chars, workDir: {})", label, prompt.length(), workingDirectory);
@@ -242,44 +220,7 @@ public class HostPiService {
                 log.warn("{} returned exit code {}: {}", label, exitCode, truncate(rawOutput, 500));
             }
             return new ProcessResult(rawOutput, exitCode);
-        } finally {
-            callSemaphore.release();
-            if (!priority) {
-                backgroundSemaphore.release();
-            }
         }
-    }
-
-    private void acquireThrottle(boolean priority) throws IOException {
-        try {
-            if (!priority) {
-                backgroundSemaphore.acquire();
-            }
-            callSemaphore.acquire();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            if (!priority) {
-                backgroundSemaphore.release();
-            }
-            throw new IOException("Interrupted while waiting for pi CLI throttle permit", e);
-        }
-        long delayMs = config.getInterCallDelayMs();
-        if (delayMs > 0) {
-            long remaining = delayMs - (System.currentTimeMillis() - lastCallTimestamp.get());
-            if (remaining > 0) {
-                try {
-                    Thread.sleep(remaining);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    callSemaphore.release();
-                    if (!priority) {
-                        backgroundSemaphore.release();
-                    }
-                    throw new IOException("Interrupted during pi CLI throttle delay", e);
-                }
-            }
-        }
-        lastCallTimestamp.set(System.currentTimeMillis());
     }
 
     private void writePromptToStdin(Process proc, String prompt) throws IOException {

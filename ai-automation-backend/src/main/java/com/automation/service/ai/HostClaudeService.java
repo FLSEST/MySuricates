@@ -1,6 +1,5 @@
 package com.automation.service.ai;
 
-import com.automation.concurrency.DynamicSemaphore;
 import com.automation.config.CliPermissionsConfig;
 import com.automation.config.HostClaudeConfig;
 import com.automation.service.cli.claude.ClaudeCliOutcome;
@@ -18,13 +17,10 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicLong;
 
 @Service
 @Slf4j
 public class HostClaudeService {
-
-    public record Turn(String role, String content) {}
 
     public record ReasoningResult(String text, ClaudeJsonResponse parsed) {}
 
@@ -32,32 +28,12 @@ public class HostClaudeService {
 
     private final HostClaudeConfig config;
     private final CliPermissionsConfig permissionsConfig;
-    private final DynamicSemaphore callSemaphore;
-    private final DynamicSemaphore backgroundSemaphore;
-    private final AtomicLong lastCallTimestamp = new AtomicLong(0);
+    private final AiCliThrottles throttles;
 
-    public HostClaudeService(HostClaudeConfig config, CliPermissionsConfig permissionsConfig) {
+    public HostClaudeService(HostClaudeConfig config, CliPermissionsConfig permissionsConfig, AiCliThrottles throttles) {
         this.config = config;
         this.permissionsConfig = permissionsConfig;
-        int total = config.getMaxConcurrentCalls();
-        int reserved = config.getReservedForInteractive();
-        this.callSemaphore = new DynamicSemaphore(total);
-        this.backgroundSemaphore = new DynamicSemaphore(Math.max(1, total - reserved));
-        log.info("Claude CLI throttle: maxConcurrent={}, reservedForInteractive={}, backgroundLimit={}, interCallDelay={}ms",
-                total, reserved, total - reserved, config.getInterCallDelayMs());
-    }
-
-    public void updateMaxConcurrentCalls(int newMax) {
-        callSemaphore.setMaxPermits(newMax);
-        int backgroundMax = Math.max(1, newMax - config.getReservedForInteractive());
-        backgroundSemaphore.setMaxPermits(backgroundMax);
-        log.info("Claude CLI max concurrent calls updated to {} (background limit: {})", newMax, backgroundMax);
-    }
-
-    public void updateReservedForInteractive(int reserved) {
-        int backgroundMax = Math.max(1, callSemaphore.getMaxPermits() - reserved);
-        backgroundSemaphore.setMaxPermits(backgroundMax);
-        log.info("Claude CLI reserved for interactive updated to {} (background limit: {})", reserved, backgroundMax);
+        this.throttles = throttles;
     }
 
     /**
@@ -165,8 +141,7 @@ public class HostClaudeService {
 
     private ProcessResult executeProcess(List<String> cmd, String prompt, String workingDirectory,
                                           Integer timeoutSeconds, String label, boolean priority) throws IOException {
-        acquireThrottle(priority);
-        try {
+        try (var permit = throttles.acquire(AiCliThrottles.CLAUDE, priority)) {
             // The agent may run prompts with foreign content unattended — it gets no
             // instance API key (TODO 62037bf2).
             ProcessBuilder pb = ChildProcessEnv.forAgent(cmd, workingDirectory);
@@ -187,11 +162,6 @@ public class HostClaudeService {
                 log.warn("{} returned exit code {}: {}", label, exitCode, truncate(outcome.text(), 500));
             }
             return new ProcessResult(outcome.text(), outcome.exitCode(), parsed);
-        } finally {
-            callSemaphore.release();
-            if (!priority) {
-                backgroundSemaphore.release();
-            }
         }
     }
 
@@ -290,66 +260,6 @@ public class HostClaudeService {
         }
 
         return cmd;
-    }
-
-    /**
-     * Builds a conversation prompt from turn history (without system prompt).
-     * The system prompt should be passed via --system-prompt flag for proper separation.
-     */
-    public String buildConversationPrompt(String systemPrompt, List<Turn> history) {
-        StringBuilder sb = new StringBuilder();
-
-        if (!history.isEmpty()) {
-            sb.append("=== CONVERSATION HISTORY ===\n");
-            for (Turn turn : history) {
-                String label = "assistant".equals(turn.role()) ? "ASSISTANT" : "USER";
-                sb.append("[").append(label).append("]\n");
-                sb.append(turn.content());
-                sb.append("\n\n");
-            }
-        }
-
-        sb.append("=== YOUR RESPONSE ===\n");
-        sb.append("Respond following the format specified in the system instructions.");
-
-        return sb.toString();
-    }
-
-    /**
-     * Acquires throttle permits: priority calls only need the global semaphore,
-     * background calls also need the background semaphore (reserving capacity for interactive use).
-     */
-    private void acquireThrottle(boolean priority) throws IOException {
-        try {
-            if (!priority) {
-                backgroundSemaphore.acquire();
-            }
-            callSemaphore.acquire();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            if (!priority) {
-                backgroundSemaphore.release();
-            }
-            throw new IOException("Interrupted while waiting for Claude CLI throttle permit", e);
-        }
-        long delayMs = config.getInterCallDelayMs();
-        if (delayMs > 0) {
-            long remaining = delayMs - (System.currentTimeMillis() - lastCallTimestamp.get());
-            if (remaining > 0) {
-                log.debug("Claude CLI throttle: waiting {}ms before next call", remaining);
-                try {
-                    Thread.sleep(remaining);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    callSemaphore.release();
-                    if (!priority) {
-                        backgroundSemaphore.release();
-                    }
-                    throw new IOException("Interrupted during Claude CLI throttle delay", e);
-                }
-            }
-        }
-        lastCallTimestamp.set(System.currentTimeMillis());
     }
 
     /**

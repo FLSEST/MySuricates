@@ -23,7 +23,7 @@ public final class ShellScriptCli {
         HostClaudeConfig config = new HostClaudeConfig();
         config.setTimeoutSeconds(30);
         List<String> script = command(output, exitCode);
-        return new HostClaudeService(config, new CliPermissionsConfig()) {
+        return new HostClaudeService(config, new CliPermissionsConfig(), AiCliThrottles.defaults()) {
             @Override
             List<String> buildReasonCommand(String prompt, String systemPrompt, String model,
                                             Integer maxTurns, String effort) {
@@ -44,7 +44,7 @@ public final class ShellScriptCli {
         HostPiConfig config = new HostPiConfig();
         config.setTimeoutSeconds(30);
         List<String> script = command(output, exitCode);
-        return new HostPiService(config) {
+        return new HostPiService(config, AiCliThrottles.defaults()) {
             @Override
             List<String> buildReasonCommand(String systemPrompt, String model, Integer maxTurns, String effort) {
                 return script;

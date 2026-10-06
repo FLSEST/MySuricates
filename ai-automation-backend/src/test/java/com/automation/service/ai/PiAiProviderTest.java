@@ -151,8 +151,8 @@ class PiAiProviderTest {
     @Test
     void buildConversationPrompt_withHistory_formatsTurnsCorrectly() {
         var history = List.of(
-                new HostClaudeService.Turn("user", "Hello"),
-                new HostClaudeService.Turn("assistant", "Hi there"));
+                new ConversationPrompt.Turn("user", "Hello"),
+                new ConversationPrompt.Turn("assistant", "Hi there"));
 
         String result = provider.buildConversationPrompt("system", history);
 

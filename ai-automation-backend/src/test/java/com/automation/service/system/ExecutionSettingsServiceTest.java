@@ -20,7 +20,10 @@ import com.automation.config.DashboardLayoutConfig;
 import com.automation.config.WishConfig;
 import com.automation.repository.AppSettingsRepository;
 import com.automation.security.RateLimitConfig;
-import com.automation.service.ai.HostClaudeService;
+import com.automation.concurrency.CliCallThrottle;
+import com.automation.config.AiCliConfig;
+import com.automation.config.HostPiConfig;
+import com.automation.service.ai.AiCliThrottles;
 import com.automation.service.cli.ContainerShellService;
 import com.automation.exception.HardeningException;
 import com.automation.service.system.settings.AccessLimitSettings;
@@ -52,13 +55,13 @@ import static org.mockito.Mockito.*;
 class ExecutionSettingsServiceTest {
 
     @Mock private AppSettingsRepository appSettingsRepository;
-    @Mock private HostClaudeService hostClaudeService;
     @Mock private WorkflowExecutionRegistry executionRegistry;
     @Mock private ContainerShellService containerShellService;
     @Mock private com.automation.service.ai.catalog.ModelCatalogService modelCatalogService;
 
     private DynamicSemaphore executionSemaphore;
     private HostClaudeConfig hostClaudeConfig;
+    private AiCliThrottles throttles;
     private ChainConfig chainConfig;
     private RateLimitConfig rateLimitConfig;
     private SchedulerConfig schedulerConfig;
@@ -82,6 +85,7 @@ class ExecutionSettingsServiceTest {
     void setUp() {
         executionSemaphore = new DynamicSemaphore(10);
         hostClaudeConfig = new HostClaudeConfig();
+        throttles = new AiCliThrottles(hostClaudeConfig, new HostPiConfig(), new AiCliConfig());
         chainConfig = new ChainConfig();
         rateLimitConfig = new RateLimitConfig();
         schedulerConfig = new SchedulerConfig();
@@ -102,10 +106,14 @@ class ExecutionSettingsServiceTest {
         service = newService(new RunDeletionPolicy(true));
     }
 
-    /** Die fuenf Themen-Gruppen so, wie Spring sie in @Order-Reihenfolge injiziert. */
     private ExecutionSettingsService newService(RunDeletionPolicy runDeletionPolicy) {
+        return newService(runDeletionPolicy, throttles);
+    }
+
+    /** Die fuenf Themen-Gruppen so, wie Spring sie in @Order-Reihenfolge injiziert. */
+    private ExecutionSettingsService newService(RunDeletionPolicy runDeletionPolicy, AiCliThrottles throttles) {
         return new ExecutionSettingsService(appSettingsRepository, List.of(
-                new ExecutionCapacitySettings(executionSemaphore, hostClaudeService, hostClaudeConfig,
+                new ExecutionCapacitySettings(executionSemaphore, throttles, hostClaudeConfig,
                         chainConfig, taskCommandConfig, executionRegistry),
                 new AccessLimitSettings(rateLimitConfig, containerShellService, assistantGuardrailsConfig),
                 new HousekeepingSettings(todoHygieneConfig, runRetentionConfig, dashboardLayoutConfig,
@@ -129,6 +137,7 @@ class ExecutionSettingsServiceTest {
 
     @Test
     void init_withDbOverrides_appliesThem() {
+        when(appSettingsRepository.get(anyString())).thenReturn(Optional.empty());
         when(appSettingsRepository.get("execution-max-concurrent")).thenReturn(Optional.of("5"));
         when(appSettingsRepository.get("claude-max-concurrent-calls")).thenReturn(Optional.of("2"));
         when(appSettingsRepository.get("claude-reserved-for-interactive")).thenReturn(Optional.empty());
@@ -139,7 +148,7 @@ class ExecutionSettingsServiceTest {
         service.init();
 
         assertThat(executionSemaphore.getMaxPermits()).isEqualTo(5);
-        verify(hostClaudeService).updateMaxConcurrentCalls(2);
+        assertThat(throttles.provider(AiCliThrottles.CLAUDE).maxConcurrent()).isEqualTo(2);
         assertThat(hostClaudeConfig.getTimeoutSeconds()).isEqualTo(600);
         assertThat(hostClaudeConfig.getInterCallDelayMs()).isEqualTo(100);
         assertThat(chainConfig.getWorkflowTimeoutMinutes()).isEqualTo(60);
@@ -262,7 +271,7 @@ class ExecutionSettingsServiceTest {
         service.validateAndApply("claude-reserved-for-interactive", "2");
 
         verify(appSettingsRepository).set("claude-reserved-for-interactive", "2");
-        verify(hostClaudeService).updateReservedForInteractive(2);
+        assertThat(throttles.provider(AiCliThrottles.CLAUDE).reservedForInteractive()).isEqualTo(2);
     }
 
     @Test
@@ -616,7 +625,15 @@ class ExecutionSettingsServiceTest {
         when(appSettingsRepository.get(anyString())).thenReturn(Optional.empty());
         when(appSettingsRepository.get("claude-max-concurrent-calls")).thenReturn(Optional.of("7"));
         when(appSettingsRepository.get("claude-timeout-seconds")).thenReturn(Optional.of("600"));
-        doThrow(new IllegalStateException("semaphore busy")).when(hostClaudeService).updateMaxConcurrentCalls(7);
+        CliCallThrottle busy = spy(new CliCallThrottle("Claude", 5, 1, () -> 0));
+        doThrow(new IllegalStateException("semaphore busy")).when(busy).setMaxConcurrent(7);
+        AiCliThrottles withBusyClaude = new AiCliThrottles(hostClaudeConfig, new HostPiConfig(), new AiCliConfig()) {
+            @Override
+            public CliCallThrottle provider(String provider) {
+                return CLAUDE.equals(provider) ? busy : super.provider(provider);
+            }
+        };
+        service = newService(new RunDeletionPolicy(true), withBusyClaude);
 
         assertThatCode(() -> service.init()).doesNotThrowAnyException();
 
@@ -646,6 +663,7 @@ class ExecutionSettingsServiceTest {
 
     @Test
     void init_ignoresOutOfBoundsDbValue() {
+        when(appSettingsRepository.get(anyString())).thenReturn(Optional.empty());
         when(appSettingsRepository.get("execution-max-concurrent")).thenReturn(Optional.of("999"));
         when(appSettingsRepository.get("claude-max-concurrent-calls")).thenReturn(Optional.empty());
         when(appSettingsRepository.get("claude-reserved-for-interactive")).thenReturn(Optional.empty());
@@ -712,7 +730,7 @@ class ExecutionSettingsServiceTest {
         };
 
         assertThatThrownBy(() -> new ExecutionSettingsService(appSettingsRepository, List.of(
-                new ExecutionCapacitySettings(executionSemaphore, hostClaudeService, hostClaudeConfig,
+                new ExecutionCapacitySettings(executionSemaphore, throttles, hostClaudeConfig,
                         chainConfig, taskCommandConfig, executionRegistry),
                 duplicate)))
                 .isInstanceOf(IllegalStateException.class)

@@ -110,13 +110,9 @@ class ClaudeAiProviderTest {
     }
 
     @Test
-    void buildConversationPrompt_delegatesToHostService() {
-        List<HostClaudeService.Turn> history = List.of(
-                new HostClaudeService.Turn("user", "hello"));
-        when(hostClaudeService.buildConversationPrompt("system", history)).thenReturn("formatted");
+    void buildConversationPrompt_usesTheSharedFormat() {
+        List<ConversationPrompt.Turn> history = List.of(new ConversationPrompt.Turn("user", "hello"));
 
-        String result = provider.buildConversationPrompt("system", history);
-
-        assertThat(result).isEqualTo("formatted");
+        assertThat(provider.buildConversationPrompt("system", history)).isEqualTo(ConversationPrompt.build(history));
     }
 }

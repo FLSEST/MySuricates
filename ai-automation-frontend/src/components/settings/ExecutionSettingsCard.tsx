@@ -4,6 +4,7 @@ import { useT } from '../../i18n';
 import { useExecutionConfig, useUpdateExecutionConfig } from '../../hooks/useSystem';
 import { Zap, Save, Loader2 } from 'lucide-react';
 import { Spinner } from '../ui';
+import { providerName } from '../shared/aiProviderStatus';
 
 type NumericFormKeys = Exclude<keyof FormState, 'rateLimitEnabled' | 'schedulerCatchUpOnResume' | 'runAutoResumeEnabled' | 'dashboardReportAssistEnabled'>;
 
@@ -20,6 +21,12 @@ interface FormState {
   executionMaxConcurrent: number;
   claudeMaxConcurrentCalls: number;
   claudeReservedForInteractive: number;
+  piMaxConcurrentCalls: number;
+  piReservedForInteractive: number;
+  codexMaxConcurrentCalls: number;
+  codexReservedForInteractive: number;
+  aiCliMaxConcurrentCalls: number;
+  aiCliReservedForInteractive: number;
   claudeTimeoutSeconds: number;
   claudeInterCallDelayMs: number;
   chainWorkflowTimeoutMinutes: number;
@@ -42,6 +49,12 @@ const DEFAULT_FORM: FormState = {
   executionMaxConcurrent: 10,
   claudeMaxConcurrentCalls: 5,
   claudeReservedForInteractive: 1,
+  piMaxConcurrentCalls: 5,
+  piReservedForInteractive: 1,
+  codexMaxConcurrentCalls: 5,
+  codexReservedForInteractive: 1,
+  aiCliMaxConcurrentCalls: 8,
+  aiCliReservedForInteractive: 1,
   claudeTimeoutSeconds: 300,
   claudeInterCallDelayMs: 0,
   chainWorkflowTimeoutMinutes: 180,
@@ -65,6 +78,12 @@ function toFormState(config: NonNullable<ReturnType<typeof useExecutionConfig>['
     executionMaxConcurrent: config.executionMaxConcurrent,
     claudeMaxConcurrentCalls: config.claudeMaxConcurrentCalls,
     claudeReservedForInteractive: config.claudeReservedForInteractive ?? 1,
+    piMaxConcurrentCalls: config.piMaxConcurrentCalls ?? 5,
+    piReservedForInteractive: config.piReservedForInteractive ?? 1,
+    codexMaxConcurrentCalls: config.codexMaxConcurrentCalls ?? 5,
+    codexReservedForInteractive: config.codexReservedForInteractive ?? 1,
+    aiCliMaxConcurrentCalls: config.aiCliMaxConcurrentCalls ?? 8,
+    aiCliReservedForInteractive: config.aiCliReservedForInteractive ?? 1,
     claudeTimeoutSeconds: config.claudeTimeoutSeconds,
     claudeInterCallDelayMs: config.claudeInterCallDelayMs,
     chainWorkflowTimeoutMinutes: config.chainWorkflowTimeoutMinutes,
@@ -98,6 +117,12 @@ export function ExecutionSettingsCard() {
     form.executionMaxConcurrent !== config.executionMaxConcurrent ||
     form.claudeMaxConcurrentCalls !== config.claudeMaxConcurrentCalls ||
     form.claudeReservedForInteractive !== (config.claudeReservedForInteractive ?? 1) ||
+    form.piMaxConcurrentCalls !== (config.piMaxConcurrentCalls ?? 5) ||
+    form.piReservedForInteractive !== (config.piReservedForInteractive ?? 1) ||
+    form.codexMaxConcurrentCalls !== (config.codexMaxConcurrentCalls ?? 5) ||
+    form.codexReservedForInteractive !== (config.codexReservedForInteractive ?? 1) ||
+    form.aiCliMaxConcurrentCalls !== (config.aiCliMaxConcurrentCalls ?? 8) ||
+    form.aiCliReservedForInteractive !== (config.aiCliReservedForInteractive ?? 1) ||
     form.claudeTimeoutSeconds !== config.claudeTimeoutSeconds ||
     form.claudeInterCallDelayMs !== config.claudeInterCallDelayMs ||
     form.chainWorkflowTimeoutMinutes !== config.chainWorkflowTimeoutMinutes ||
@@ -118,8 +143,6 @@ export function ExecutionSettingsCard() {
 
   const fields: FieldConfig[] = [
     { key: 'maxRuns', label: t.settings.executionMaxConcurrentRuns, hint: t.settings.executionMaxConcurrentRunsHint, min: 1, max: 50, configKey: 'executionMaxConcurrent' },
-    { key: 'maxCalls', label: t.settings.executionMaxConcurrentCalls, hint: t.settings.executionMaxConcurrentCallsHint, min: 1, max: 20, configKey: 'claudeMaxConcurrentCalls' },
-    { key: 'reserved', label: t.settings.executionReservedForInteractive, hint: t.settings.executionReservedForInteractiveHint, min: 0, max: 10, configKey: 'claudeReservedForInteractive' },
     { key: 'timeout', label: t.settings.executionCliTimeout, hint: t.settings.executionCliTimeoutHint, min: 30, max: 3600, configKey: 'claudeTimeoutSeconds' },
     { key: 'delay', label: t.settings.executionInterCallDelay, hint: t.settings.executionInterCallDelayHint, min: 0, max: 30000, configKey: 'claudeInterCallDelayMs' },
     { key: 'chain', label: t.settings.executionChainTimeout, hint: t.settings.executionChainTimeoutHint, min: 5, max: 1440, configKey: 'chainWorkflowTimeoutMinutes' },
@@ -139,6 +162,12 @@ export function ExecutionSettingsCard() {
       executionMaxConcurrent: form.executionMaxConcurrent,
       claudeMaxConcurrentCalls: form.claudeMaxConcurrentCalls,
       claudeReservedForInteractive: form.claudeReservedForInteractive,
+      piMaxConcurrentCalls: form.piMaxConcurrentCalls,
+      piReservedForInteractive: form.piReservedForInteractive,
+      codexMaxConcurrentCalls: form.codexMaxConcurrentCalls,
+      codexReservedForInteractive: form.codexReservedForInteractive,
+      aiCliMaxConcurrentCalls: form.aiCliMaxConcurrentCalls,
+      aiCliReservedForInteractive: form.aiCliReservedForInteractive,
       claudeTimeoutSeconds: form.claudeTimeoutSeconds,
       claudeInterCallDelayMs: form.claudeInterCallDelayMs,
       chainWorkflowTimeoutMinutes: form.chainWorkflowTimeoutMinutes,
@@ -248,6 +277,9 @@ export function ExecutionSettingsCard() {
           />
         </div>
 
+        {/* AI CLI limits per provider and across all of them (TODO bd5df8d7) */}
+        <CliLimitsTable form={form} onChange={(key, value) => setForm(prev => ({ ...prev, [key]: value }))} />
+
         {/* Settings grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {fields.map(({ key, label, hint, min, max, configKey }) => {
@@ -292,5 +324,76 @@ export function ExecutionSettingsCard() {
         </div>
       </div>
     </Card>
+  );
+}
+
+type CliLimitKey = Extract<NumericFormKeys, `${string}MaxConcurrentCalls` | `${string}ReservedForInteractive`>;
+
+/** One row per provider plus the overall limit; the bounds match ExecutionSettingKeys in the backend. */
+const CLI_LIMIT_ROWS: { id: string | null; max: CliLimitKey; reserved: CliLimitKey; maxLimit: number }[] = [
+  { id: 'CLAUDE', max: 'claudeMaxConcurrentCalls', reserved: 'claudeReservedForInteractive', maxLimit: 20 },
+  { id: 'PI', max: 'piMaxConcurrentCalls', reserved: 'piReservedForInteractive', maxLimit: 20 },
+  { id: 'CODEX', max: 'codexMaxConcurrentCalls', reserved: 'codexReservedForInteractive', maxLimit: 20 },
+  { id: null, max: 'aiCliMaxConcurrentCalls', reserved: 'aiCliReservedForInteractive', maxLimit: 50 },
+];
+
+/**
+ * How many AI CLI processes may run at once, per provider and across all providers, and how many of those
+ * slots stay free for the chat. A call needs a slot with its provider and one in the overall limit.
+ */
+function CliLimitsTable({ form, onChange }: { form: FormState; onChange: (key: CliLimitKey, value: number) => void }) {
+  const t = useT();
+  const ts = t.settings;
+  return (
+    <div>
+      <p className="text-sm font-medium text-text">{ts.aiCliLimits}</p>
+      <p className="text-xs text-text-tertiary mt-0.5">{ts.aiCliLimitsHint}</p>
+      <table className="mt-2 w-full text-sm" data-testid="ai-cli-limits">
+        <thead>
+          <tr className="text-xs text-text-secondary">
+            <th scope="col" className="py-1 pr-3 text-left font-medium">{ts.aiCliColumnProvider}</th>
+            <th scope="col" className="py-1 pr-3 text-left font-medium">{ts.executionMaxConcurrentCalls}</th>
+            <th scope="col" className="py-1 text-left font-medium">{ts.executionReservedForInteractive}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {CLI_LIMIT_ROWS.map((row) => {
+            const label = row.id ? providerName(row.id) : ts.aiCliAll;
+            return (
+              <tr key={row.max} className={row.id ? '' : 'border-t border-border'}>
+                <th scope="row" className="py-1 pr-3 text-left font-normal text-text">{label}</th>
+                <td className="py-1 pr-3">
+                  <LimitInput value={form[row.max]} min={1} max={row.maxLimit}
+                    label={ts.aiCliConcurrentFor.replace('{provider}', label)} onChange={(v) => onChange(row.max, v)} />
+                </td>
+                <td className="py-1">
+                  <LimitInput value={form[row.reserved]} min={0} max={10}
+                    label={ts.aiCliReservedFor.replace('{provider}', label)} onChange={(v) => onChange(row.reserved, v)} />
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function LimitInput({ value, min, max, label, onChange }: {
+  value: number; min: number; max: number; label: string; onChange: (value: number) => void;
+}) {
+  return (
+    <input
+      type="number"
+      min={min}
+      max={max}
+      value={value}
+      aria-label={label}
+      onChange={(e) => {
+        const val = parseInt(e.target.value, 10);
+        if (!isNaN(val)) onChange(val);
+      }}
+      className="w-full max-w-28 px-3 py-1.5 text-sm bg-surface-hover border border-border rounded-lg text-text focus:outline-none focus:ring-1 focus:ring-accent font-mono"
+    />
   );
 }

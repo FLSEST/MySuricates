@@ -1,7 +1,7 @@
 package com.automation.executor.blocks;
 
 import com.automation.service.ai.AiProvider;
-import com.automation.service.ai.HostClaudeService.Turn;
+import com.automation.service.ai.ConversationPrompt.Turn;
 import com.automation.service.learning.LearningService;
 import com.automation.service.system.SystemIdentityService;
 import lombok.RequiredArgsConstructor;
