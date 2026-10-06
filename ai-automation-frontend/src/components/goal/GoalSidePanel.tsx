@@ -31,7 +31,7 @@ const ACTION = 'inline-flex items-center gap-1 rounded-md border border-border p
  * und Workflows in der Ansicht rechts sein … Und man sollte auch besser zu den TODOs kommen“): zu
  * einem Meilenstein seine verknüpften Arbeitspakete je Projekt mit deren TODOs und Workflows, zu einem
  * Arbeitspaket seine TODOs, Workflows und Meilensteine. Jedes TODO öffnet seinen Dialog. Angedockt,
- * als Fenster oder (unter 1024 px) als Blatt – siehe `SidePanelFrame`. × und Escape schließen.
+ * als Fenster oder (unter 1024 px) als Blatt – siehe `SidePanelFrame`, der auch × und Escape bedient.
  */
 export function GoalSidePanel({ detail, selection, today, onClose, onSelect, onOpenTodo }: {
   detail: GoalDetail;
@@ -57,17 +57,6 @@ export function GoalSidePanel({ detail, selection, today, onClose, onSelect, onO
   useEffect(() => {
     headingRef.current?.focus({ preventScroll: true });
   }, [selection.kind, selection.id]);
-
-  // Escape schließt – außer ein Dialog darüber (TODO, Bearbeiten, Löschen) hat es schon für sich genutzt
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || event.defaultPrevented) return;
-      if (document.querySelector('[role="dialog"][aria-modal="true"]')) return;
-      onClose();
-    };
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [onClose]);
 
   if (!milestone && !workPackage) return null;
 

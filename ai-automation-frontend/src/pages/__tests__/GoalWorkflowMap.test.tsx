@@ -227,6 +227,23 @@ describe('Workflow map', () => {
     fireEvent.keyDown(document, { code: 'Escape', key: 'Escape' });
     await waitFor(() => expect(screen.queryByTestId('workflow-map-overlay')).not.toBeInTheDocument());
     expect(sent).toEqual([]);
+    // that Escape belonged to the drag; the next one closes the panel (d86f27b2: it had no Escape at all)
+    expect(screen.getByTestId('workflow-map-panel')).toBeInTheDocument();
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    expect(screen.queryByTestId('workflow-map-panel')).not.toBeInTheDocument();
+  });
+
+  // 8edfae0d: the page now remembers this through usePersistedState – values stored before still count
+  it('remembers whether the workflow panel is open, also from a value stored before', async () => {
+    localStorage.setItem('mysuricates-goal-workflow-panel-open', 'false');
+    serve();
+    renderGoal();
+
+    await screen.findByTestId('goal-relation-map');
+    expect(screen.queryByTestId('workflow-map-panel')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('workflow-map-open'));
+    expect(screen.getByTestId('workflow-map-panel')).toBeInTheDocument();
+    expect(localStorage.getItem('mysuricates-goal-workflow-panel-open')).toBe('true');
   });
 
   it('shows the link on the map before the server has answered', async () => {

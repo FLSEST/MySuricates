@@ -1,8 +1,9 @@
-import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { GripVertical, PanelRight, PictureInPicture2, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useT } from '../../i18n';
 import { useIsMobile } from '../../hooks/useIsMobile';
+import { hasOpenModalLayer, tabbables, useModalLayer } from '../ui/modalStack';
 import {
   DOCK_MAX, DOCK_MIN, clampRect, clampWidth, movedRect, readPanelPrefs, resizedRect, storePanelPrefs,
   type PanelPrefs, type ResizeEdge, type Viewport,
@@ -49,6 +50,22 @@ function useDrag() {
 }
 
 /**
+ * Escape closes the panel (d86f27b2) – unless something inside already used the key (an inline field,
+ * a keyboard drag: they prevent the default) or `covered()` reports a dialog above the panel. Listens on
+ * `window`, after the document-level listeners of dnd-kit, so cancelling a keyboard drag keeps it open.
+ */
+function useEscapeToClose(onClose: () => void, covered: () => boolean) {
+  useEffect(() => {
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented || covered()) return;
+      onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [onClose, covered]);
+}
+
+/**
  * Rahmen der Seitenleiste (c60bf914): ab 1024 px angedockt rechts neben dem Inhalt – so hoch wie der
  * Sichtbereich, mit eigener Scrollfläche, die Breite am linken Griff änderbar (Maus, ← →) – oder als
  * Fenster gelöst, an der Titelleiste verschiebbar (auch mit den Pfeiltasten), an Rändern und Ecke in
@@ -74,6 +91,8 @@ export function SidePanelFrame({ labelledBy, header, children, footer, onClose, 
   const drag = useDrag();
   const [prefs, setPrefs] = useState<PanelPrefs>(() => readPanelPrefs(viewport(), storageKey));
   useEffect(() => storePanelPrefs(prefs, storageKey), [prefs, storageKey]);
+  // Docked or floating the panel is not modal: any open dialog keeps Escape. The sheet asks itself.
+  useEscapeToClose(onClose, useCallback(() => mobile || hasOpenModalLayer(), [mobile]));
 
   // Wird das Browserfenster kleiner, kommt das Fenster zurück in den Sichtbereich
   useEffect(() => {
@@ -233,13 +252,14 @@ function DockedPanel({ labelledBy, testId, kind, width, children }: {
   );
 }
 
-const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
-
 /**
  * Unter 1024 px ein Blatt über dem Inhalt – dann modal (Review c60bf914): `role="dialog"` mit
  * `aria-modal`, per Portal an `document.body`, alles andere `inert` (für Maus, Tastatur und
  * Vorleser unerreichbar), Tab bleibt im Blatt. Angedockt und als Fenster bleibt die Leiste eine
  * gewöhnliche Region neben der Seite.
+ *
+ * The sheet joins the stack of modal layers of `Modal` (d86f27b2): a dialog opened from the sheet lies
+ * above it, so Escape and Tab belong to that dialog until it closes.
  */
 function SheetPanel({ labelledBy, testId, kind, onClose, children }: {
   labelledBy: string;
@@ -250,6 +270,8 @@ function SheetPanel({ labelledBy, testId, kind, onClose, children }: {
 }) {
   const ref = useRef<HTMLElement>(null);
   const [host] = useState(() => document.createElement('div'));
+  const isTop = useModalLayer();
+  useEscapeToClose(onClose, useCallback(() => !isTop(), [isTop]));
   useLayoutEffect(() => {
     document.body.appendChild(host);
     // Alles außer dem Blatt und den immer bedienbaren Portalen (`data-always-interactive`: Toasts)
@@ -281,8 +303,8 @@ function SheetPanel({ labelledBy, testId, kind, onClose, children }: {
   }, [host]);
 
   const trapTab = (event: KeyboardEvent) => {
-    if (event.key !== 'Tab' || !ref.current) return;
-    const focusable = [...ref.current.querySelectorAll<HTMLElement>(FOCUSABLE)];
+    if (event.key !== 'Tab' || !ref.current || !isTop()) return;
+    const focusable = tabbables(ref.current);
     const first = focusable[0];
     const last = focusable.at(-1);
     if (!first || !last) return;
