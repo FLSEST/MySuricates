@@ -101,7 +101,8 @@ export function Settings() {
         <p className="text-sm text-text-secondary mt-1">{t.settings.subtitle}</p>
       </div>
 
-      <div className="flex gap-8">
+      {/* Below md the nav is a chip row above the content – side by side it squeezed the content to 0 px (1a89e149) */}
+      <div className="flex flex-col gap-4 md:flex-row md:gap-8">
         <SettingsNav sections={sections} onNavigate={handleNavigate} />
 
         <div className="flex-1 min-w-0 space-y-10">
