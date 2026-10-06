@@ -5,13 +5,15 @@ import { type AuditSummary, useAuditFinding, useAudits } from './useAuditCenter'
  * The audits of the Audit Center and the one it has open. Only project and key are kept; the
  * summary comes from the current `/audits` list, so counts that change after a finding was filed
  * reach the open audit instead of a copy taken at the click (46a94a34). A deep link
- * (`?finding=<id>`) opens the audit of its finding.
+ * (`?finding=<id>`) opens the audit of its finding; `?audit=<key>&project=<id>` opens that audit (from the
+ * workflow list, d8607f77). A click in the overview wins over the audit link.
  */
-export function useActiveAudit(requestedFinding: string | null) {
+export function useActiveAudit(requestedFinding: string | null,
+                               requestedAudit: Pick<AuditSummary, 'projectId' | 'auditKey'> | null = null) {
   const { data: audits, isLoading } = useAudits();
   const linkedFinding = useAuditFinding(requestedFinding);
   const [selectedKey, setSelectedKey] = useState<Pick<AuditSummary, 'projectId' | 'auditKey'> | null>(null);
-  const key = requestedFinding ? linkedFinding.data ?? null : selectedKey;
+  const key = requestedFinding ? linkedFinding.data ?? null : selectedKey ?? requestedAudit;
   const activeAudit = (key && audits?.find((audit) => audit.projectId === key.projectId && audit.auditKey === key.auditKey)) ?? null;
   return {
     audits: audits ?? [],

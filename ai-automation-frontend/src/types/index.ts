@@ -275,7 +275,23 @@ export interface ContextVariableSpec {
   placeholder?: string;
 }
 
+/** From which severity an open audit finding gets a TODO by itself; `NONE` = only at the push of a button. */
+export type AuditTodoThreshold = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'NONE';
+
+/** `metadata.audit` of an audit workflow (docs/audit-workflow-protocol.md). */
+export interface AuditWorkflowConfig {
+  enabled?: boolean;
+  key?: string;
+  category?: string;
+  reportBlock?: string;
+  promptBlock?: string;
+  schemaVersion?: number;
+  /** Default `HIGH`; the backend reads it case-insensitively (TODO d8607f77). */
+  todoMinSeverity?: string;
+}
+
 export interface WorkflowMetadata {
+  audit?: AuditWorkflowConfig;
   autoTodo?: AutoTodoConfig;
   autoRepair?: AutoRepairConfig;
   autoMemoryExtraction?: AutoMemoryConfig;

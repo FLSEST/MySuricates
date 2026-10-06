@@ -155,6 +155,29 @@ describe('AuditCenter deep link while the audit list loads', () => {
   });
 });
 
+// d8607f77: the link from an audit workflow in the workflow list opens the findings of exactly that audit
+describe('AuditCenter link to an audit', () => {
+  it('opens the findings of the linked audit', async () => {
+    useAuditEndpoints();
+    const open: AuditFinding = { ...accepted, id: 'f-open', status: 'OPEN', title: 'Open finding',
+      dispositionNote: null, dispositionAt: null, dispositionEvidence: null };
+    server.use(http.get(`${BASE}/audit-findings`, findingsPage(() => [open, accepted])));
+    renderWithProviders(<AuditCenter />, { route: '/?audit=mysuricates.health&project=p1' });
+
+    expect(await screen.findByRole('heading', { name: 'Health Audit' })).toBeInTheDocument();
+    // the findings tab, not the report: only the open finding is listed until a chip says otherwise
+    expect(await screen.findByText('Open finding')).toBeInTheDocument();
+    expect(screen.queryByText('Big.java ist zu gross')).not.toBeInTheDocument();
+  });
+
+  it('says so when the audit has no report yet', async () => {
+    useAuditEndpoints();
+    renderWithProviders(<AuditCenter />, { route: '/?audit=mysuricates.unknown&project=p1' });
+
+    expect(await screen.findByText('This audit has no report yet.')).toBeInTheDocument();
+  });
+});
+
 // 6ff1c580: the deep link kept its audit open, was not scrolled to, and unverified evidence went unmentioned
 describe('AuditCenter deep link, audit switch and evidence marker', () => {
   const security: AuditSummary = {

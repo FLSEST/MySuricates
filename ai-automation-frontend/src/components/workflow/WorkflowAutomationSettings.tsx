@@ -2,6 +2,8 @@ import { Toggle } from '../ui';
 import { useUpdateWorkflow } from '../../hooks/useWorkflows';
 import { useT } from '../../i18n';
 import type { Workflow } from '../../types';
+import { auditConfigOf } from './auditWorkflow';
+import { WorkflowAuditSettings } from './WorkflowAuditSettings';
 
 function SwitchRow({ title, description, enabled, onChange }: {
   title: string;
@@ -24,7 +26,8 @@ function SwitchRow({ title, description, enabled, onChange }: {
  * Automations of a workflow in the panel of the workflow list: TODOs from findings (`autoTodo`),
  * repair after a failed run (`autoRepair`) and memory extraction every N runs
  * (`autoMemoryExtraction`). Each is a switch; its options show only while it is on. Rendered as
- * siblings (fragment), so the spacing of the panel applies to every row.
+ * siblings (fragment), so the spacing of the panel applies to every row. An audit workflow shows its audit part
+ * instead of Auto-Todo: the backend ignores `autoTodo` there, its TODOs come from the findings (d8607f77).
  */
 export function WorkflowAutomationSettings({ workflow }: { workflow: Workflow }) {
   const t = useT();
@@ -35,20 +38,26 @@ export function WorkflowAutomationSettings({ workflow }: { workflow: Workflow })
   const autoRepairMode = workflow.metadata?.autoRepair?.mode ?? 'auto';
   const autoMemoryEnabled = !!workflow.metadata?.autoMemoryExtraction?.enabled;
   const autoMemoryInterval = workflow.metadata?.autoMemoryExtraction?.interval ?? 5;
+  const audit = auditConfigOf(workflow.metadata);
 
   const saveMetadata = (metadata: Record<string, unknown>) =>
     updateWorkflow.mutate({ id: workflow.id, data: { metadata } });
 
   return (
     <>
-      <SwitchRow
+      {audit && (
+        <WorkflowAuditSettings projectId={workflow.projectId} audit={audit}
+          onChange={(next) => saveMetadata({ audit: next })} />
+      )}
+
+      {!audit && <SwitchRow
         title={t.workflows.autoTodo}
         description={t.workflows.autoTodoDescription}
         enabled={autoTodoEnabled}
         onChange={(enabled) => saveMetadata({ autoTodo: { ...workflow.metadata?.autoTodo, enabled } })}
-      />
+      />}
 
-      {autoTodoEnabled && (
+      {!audit && autoTodoEnabled && (
         <div className="px-3 py-2 rounded-lg bg-surface-raised border border-border space-y-1">
           <span className="text-xs font-medium text-text-secondary">{t.workflows.autoTodoMode}</span>
           <select
