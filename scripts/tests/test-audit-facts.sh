@@ -1692,6 +1692,10 @@ check "trivy_jar scannt den target-Ordner per rootfs" \
 check "trivy zaehlt Entwicklungs-Abhaengigkeiten mit (wie npm audit)" 'grep -qF "\"--include-dev-deps\"" "$SEC"'
 check "gitleaks: schwaerzt Secrets"                     'grep -qx "gitleaks sarif continue False True" "$TMP/sec-tools.txt"'
 check "trivy ueberspringt Playwright-Artefakte"         'grep -qF "\"**/playwright/results\"" "$SEC"'
+# Without a local Maven repository trivy fetches the pom's parent/BOM chain from Maven Central on every run;
+# a 429 there aborts the whole fs scan, npm included (run 694b1e5b, cccb0301)
+check "trivy resolves pom BOMs from the read-only host Maven repository" \
+  'grep -qF "\"{{ home_dir }}/.m2/repository:/home/agent/.m2/repository:ro\"" "$SEC"'
 check "gitleaks nur Branches, Tags, Remotes (kein Stash)" 'grep -qF "\"--log-opts=--branches --tags --remotes\"" "$SEC"'
 
 printf '%s\n' '## FAKTENBLATT trivy (Trivy 0.70.0, 1 SARIF-Datei)' 'FAKT trivy_findings: 0' > "$TMP/sec-trivy.txt"

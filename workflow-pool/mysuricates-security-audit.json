@@ -50,6 +50,9 @@
           "/out/trivy.sarif"
         ],
         "cache_dir": "/cache",
+        "mounts": [
+          "{{ home_dir }}/.m2/repository:/home/agent/.m2/repository:ro"
+        ],
         "output_format": "sarif",
         "timeout_seconds": 900,
         "on_failure": "continue"
@@ -135,7 +138,7 @@
       }
     }
   ],
-  "version": "4.3.1",
+  "version": "4.3.2",
   "author": "MySuricates",
   "metadata": {
     "audit": {
