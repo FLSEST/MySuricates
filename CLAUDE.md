@@ -109,6 +109,7 @@ See [AGENTS.md](AGENTS.md) for a complete REST API reference (workflow/chain CRU
 
 ## Key Conventions
 
+- **Language in code**: code comments (Javadoc, inline, shell/Python/YAML/SQL) and test descriptions (`describe`/`it`, `@DisplayName`) are written in **English** — also when the session runs in German. Technical names are English too; UI text goes through i18n, never into code; log and error messages, docs, TODO titles and commit messages stay as they are. The existing code is still mixed: write new or rewritten comments in English, but do not translate German comments in passing — that happens in dedicated slices (TODO 9468432d), otherwise open branches collide. Never edit an existing Flyway migration, not even its comments (they are part of the checksum). Details: [docs/entwicklung.md](docs/entwicklung.md) → Projektkonventionen
 - **Backend ORM**: Lombok for boilerplate, MapStruct for entity-DTO mapping
 - **Database**: SQLite with Flyway migrations. Naming: `V{N}__description.sql`
 - **NEVER access the SQLite database directly** (via `sqlite3` CLI or raw SQL) — not from code, not from workflow shell blocks, not from scripts. Direct DB access bypasses Hibernate's entity cache, causes lock contention (HikariCP pool-size=1), and can crash the backend. This applies to reading AND writing.

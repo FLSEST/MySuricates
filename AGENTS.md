@@ -28,6 +28,11 @@ sonst auch Anfragen an `localhost` über den Proxy – samt Key. Beim Kopieren d
 - Kein "fertig", "umgesetzt" oder "committed" behaupten, wenn noch kein TODO existiert oder die Arbeit nicht diesem TODO zugeordnet ist.
 - Commits werden anschliessend gemeinsam und bewusst gemacht, nicht stillschweigend.
 
+## Sprache im Code
+
+- **Code-Kommentare und Testbeschreibungen auf Englisch** (Javadoc, Inline, Shell/Python/YAML/SQL, `describe`/`it`, `@DisplayName`) – auch wenn die Aufgabe auf Deutsch gestellt ist. Technische Namen ebenfalls englisch, UI-Texte nur über i18n.
+- Deutsche Bestandskommentare nicht nebenbei übersetzen (eigene Scheiben, TODO 9468432d), bestehende Flyway-Migrationen nie ändern (Prüfsumme). Details: [docs/entwicklung.md](docs/entwicklung.md) → Projektkonventionen.
+
 ### TODO anlegen
 
 ```bash

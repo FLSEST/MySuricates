@@ -880,6 +880,20 @@ Details on the three trust classes and taint propagation:
 
 ## Project Conventions
 
+### Language in Code
+
+| What | Language |
+|---|---|
+| **Comments** (Javadoc, inline comments, comments in shell, Python, YAML and SQL files) | English, even when the session runs in German |
+| **Test descriptions** (`describe`/`it`/`test`, `@DisplayName`) | English |
+| **Technical names** (classes, paths, endpoints, enum constants, keys) | English |
+| **UI text** | through i18n (`de.ts`/`en.ts`), never in code |
+| **Log and error messages, docs, TODO titles, commit messages** | unchanged, as before |
+
+The existing code is still mixed. New or rewritten comments are in English, but existing German comments are not
+translated in passing: that happens in dedicated slices (TODO 9468432d), otherwise open branches collide. Existing
+Flyway migrations (`V*.sql`) stay untouched, including their comments – they are part of the checksum.
+
 ### Backend
 
 | Convention | Description |

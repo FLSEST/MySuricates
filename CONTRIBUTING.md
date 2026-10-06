@@ -78,6 +78,9 @@ Further rules of the house:
   file. Its last line, `<!-- synced-from: <commit> sha256:<hash> -->`, names the version of
   the German file it reflects; `scripts/readme-sync/readme_sync.py` translates
   only the blocks changed since then and leaves every other byte alone.
+- **Code comments and test descriptions are written in English.** Some older
+  comments are still German; they are translated in separate passes, so leave
+  them alone unless you rewrite the line anyway.
 - **Never access the SQLite database directly.** Not from code, not from shell
   blocks, not from scripts. See [CLAUDE.md](CLAUDE.md) for why.
 - **Eight-character IDs** such as `TODO 1b84ecab` in commit messages, comments
@@ -127,6 +130,8 @@ auf Pull Requests.
   zusätzlich `bash scripts/tests/arch-guard.sh`), `npx tsc --noEmit`,
   `npm run lint`, `bash scripts/ci/public-hygiene.sh --tracked`. Tests werden
   nicht abgeschaltet oder gelöscht, um eine Änderung grün zu bekommen.
+- **Code-Kommentare und Testbeschreibungen auf Englisch.** Ältere deutsche
+  Kommentare werden in eigenen Durchgängen übersetzt – nicht nebenbei.
 - **Deutsch und Englisch zusammen pflegen.** `README.md` wird aus
   `README.de.md` erzeugt — die deutsche Quelle bearbeiten, nie die erzeugte Datei.
   Ihre letzte Zeile, `<!-- synced-from: <commit> sha256:<hash> -->`, nennt den Stand der

@@ -898,6 +898,21 @@ Details zu den drei Vertrauensklassen und zur Taint-Propagation:
 
 ## Projektkonventionen
 
+### Sprache im Code
+
+| Was | Sprache |
+|---|---|
+| **Kommentare** (Javadoc, Inline-Kommentare, Kommentare in Shell-, Python-, YAML- und SQL-Dateien) | Englisch, auch wenn die Sitzung auf Deutsch läuft |
+| **Testbeschreibungen** (`describe`/`it`/`test`, `@DisplayName`) | Englisch |
+| **Technische Namen** (Klassen, Pfade, Endpunkte, Enum-Konstanten, Schlüssel) | Englisch |
+| **UI-Texte** | über i18n (`de.ts`/`en.ts`), nie im Code |
+| **Log- und Fehlermeldungen, Doku, TODO-Titel, Commit-Nachrichten** | unverändert wie bisher |
+
+Der Bestand ist noch gemischt. Neue oder umgeschriebene Kommentare sind englisch, deutsche Bestandskommentare
+werden aber nicht nebenbei übersetzt: Das geschieht in eigenen Scheiben (TODO 9468432d), sonst kollidieren offene
+Branches. Bestehende Flyway-Migrationen (`V*.sql`) bleiben unangetastet, auch ihre Kommentare – sie gehen in die
+Prüfsumme ein.
+
 ### Backend
 
 | Konvention | Beschreibung |
