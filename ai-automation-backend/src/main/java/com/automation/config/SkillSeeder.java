@@ -91,7 +91,7 @@ public class SkillSeeder implements ApplicationRunner {
         dbSkill.setAiContext(fresh.getAiContext());
         dbSkill.setVersion(fresh.getVersion());
 
-        // orphanRemoval=true: die vorhandene Collection mutieren, nicht ersetzen.
+        // orphanRemoval=true: mutate the existing collection, do not replace it.
         List<Capability> target = dbSkill.getCapabilities();
         target.clear();
         for (Capability c : fresh.getCapabilities()) {

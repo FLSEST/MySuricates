@@ -693,7 +693,7 @@ class ExecutionContextTest {
         context.resolvePromptTemplate("Bewerte: {{ previous_report }}");
         context.recordOutput("analyse", "a | b");
 
-        // zweiter Block, Prompt ohne Plattform-Daten
+        // second block, prompt without platform data
         context.resolvePromptTemplate("Fasse den Stand zusammen");
         context.recordOutput("zusammenfassung", "c | d");
         context.setDerivedVariable("step_1_output", "e | f");

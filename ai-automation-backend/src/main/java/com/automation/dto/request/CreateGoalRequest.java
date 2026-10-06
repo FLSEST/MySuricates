@@ -16,7 +16,7 @@ public record CreateGoalRequest(
         String targetDate,
         List<String> projectIds
 ) {
-    /** Form ohne Projekte – fuer Aufrufer von vorher. */
+    /** Form without projects – for callers from before. */
     public CreateGoalRequest(String title, String description, String targetDate) {
         this(title, description, targetDate, null);
     }

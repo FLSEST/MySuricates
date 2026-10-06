@@ -56,7 +56,7 @@ import java.util.stream.Collectors;
 public class GoalGuardService {
 
     public static final String TEMPLATE_ID = "goal-guard";
-    /** Taeglich 08:00 (Spring-CRON mit Sekunden). */
+    /** Daily at 08:00 (Spring CRON with seconds). */
     public static final String DEFAULT_CRON = "0 0 8 * * *";
     private static final Map<String, String> NAME_PREFIX = Map.of("de", "Ziel-Wächter: ", "en", "Goal guard: ");
     private static final int MAX_NAME = 200;

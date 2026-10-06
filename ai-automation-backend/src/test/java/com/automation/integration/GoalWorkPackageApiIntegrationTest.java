@@ -341,7 +341,7 @@ class GoalWorkPackageApiIntegrationTest {
         String a2 = createWorkPackage(goalId, "A2", null, projectA);
         String a3 = createWorkPackage(goalId, "A3", Instant.now().plus(1, ChronoUnit.DAYS), projectA);
         String b1 = createWorkPackage(goalId, "B1", null, projectB);
-        // zwei Zielprojekte: projectId ist Pflicht
+        // two goal projects: projectId is required
         perform(post("/api/v1/goals/" + goalId + "/work-packages"), Map.of("title", "Welches Projekt?"))
                 .andExpect(status().isBadRequest());
 

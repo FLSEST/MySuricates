@@ -16,7 +16,7 @@ public record CreateTodoRequest(
         Todo.Source source,
         String sourceAgent,
         String sessionId,
-        /** UUID hinter `claude --resume` — die Konversation, nicht die Shell-Session. */
+        /** UUID behind `claude --resume` — the conversation, not the shell session. */
         String agentSessionRef,
         String workflowRunId,
         String referenceType,

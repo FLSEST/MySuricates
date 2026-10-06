@@ -86,7 +86,7 @@ public class AuditCenterService {
     /**
      * The history as heads: {@code markdownContent} stays {@code null} (TODO cd50d011). A
      * page used to carry every report in full text although only the displayed one needs it – that one
-     * liefert {@link #getReport}.
+     * is served by {@link #getReport}.
      */
     @Transactional(readOnly = true)
     public PageResponse<AuditReportResponse> listReports(String projectId, String auditKey, int page, int size) {

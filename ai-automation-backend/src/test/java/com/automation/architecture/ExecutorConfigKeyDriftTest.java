@@ -30,7 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * <p>Measured on the source text: {@code config.get("…")}, {@code getOrDefault}, {@code containsKey} on
  * {@code config} or {@code block.getConfig()} and helpers with the config as first argument
- * ({@code StageConfig.intValue(config, "…")}). Liest ein Executor
+ * ({@code StageConfig.intValue(config, "…")}). If an executor reads
  * via a shared helper, its keys count too ({@link #DELEGATES}). The mapping executor →
  * block type comes from {@link BlockExecutor#supportedTypes()}, as with the {@code BlockTypeRegistry}.
  */

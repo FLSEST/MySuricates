@@ -156,7 +156,7 @@ public class GranularTodoService {
         return trimmed.endsWith("…") || trimmed.endsWith("...");
     }
 
-    /** Trim, Whitespace-Folgen zu einem Leerzeichen, Kleinschreibung, Kuerzungssuffix („…", „...") weg. */
+    /** Trim, collapse whitespace runs to one space, lowercase, drop the truncation suffix („…", „..."). */
     static String normalizeTitle(String title) {
         if (title == null) {
             return "";

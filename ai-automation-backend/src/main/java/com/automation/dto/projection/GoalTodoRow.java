@@ -31,7 +31,7 @@ public record GoalTodoRow(
         Instant decidedAt,
         Todo.RatedBy decidedBy
 ) {
-    /** Form ohne Entscheidung – fuer Aufrufer von vorher. */
+    /** Form without a decision – for callers from before. */
     public GoalTodoRow(String id, String title, Todo.Status status, Todo.Priority priority, String projectId, String tags,
                        Integer goalRank, Todo.Complexity complexity, String suggestedEffort, String ratingNote,
                        Todo.RatedBy ratedBy, Instant ratedAt, String openQuestion, Instant createdAt, Instant updatedAt,

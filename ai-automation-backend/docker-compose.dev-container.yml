@@ -55,7 +55,7 @@ services:
       # `compose down` — and with them the encrypted integration credentials and the seals.
       - AUTOMATION_INTEGRATION_KEY_FILE=/app/secrets/integration-encryption.key
       - AUTOMATION_SEAL_KEY_FILE=/app/secrets/seal-signing.key
-      # Dev laeuft mit allen Modulen — wie die Host-Instanz (config/application.yml: preset full).
+      # Dev runs with all modules — like the host instance (config/application.yml: preset full).
       - AUTOMATION_MODULES_PRESET=${MYSURICATES_DEV_PRESET:-full}
       - HOME=${HOME}
     restart: "no"

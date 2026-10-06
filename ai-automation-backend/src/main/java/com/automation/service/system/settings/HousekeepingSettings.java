@@ -13,7 +13,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Consumer;
 
-/** Aufraeumen und Aufbewahren: TODO-Hygiene und -Watchdog, Run-Retention, Layout-Versionen, Dubletten-Schwelle. */
+/** Housekeeping and retention: TODO hygiene and watchdog, run retention, layout versions, duplicate threshold. */
 @Component
 @Order(3)
 public class HousekeepingSettings implements RuntimeSettingsGroup {

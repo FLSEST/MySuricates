@@ -54,7 +54,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class GoalService {
 
-    /** Arbeitsreihenfolge innerhalb gleichen Rangs: dringend zuerst. */
+    /** Work order within the same rank: most urgent first. */
     private static final List<Todo.Priority> PRIORITY_ORDER = List.of(
             Todo.Priority.CRITICAL, Todo.Priority.HIGH, Todo.Priority.MEDIUM, Todo.Priority.LOW);
 

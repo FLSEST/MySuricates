@@ -50,7 +50,7 @@ final class GoalProjectSummaries {
         return projects.stream().map(p -> new GoalResponse.ProjectRef(p.projectId(), p.projectName())).toList();
     }
 
-    /** Ziel-ID → Projektverweise in Reihenfolge, fuer die Zielliste. */
+    /** Goal ID → project references in order, for the goal list. */
     static Map<String, List<GoalResponse.ProjectRef>> refsByGoal(List<GoalProjectRow> rows) {
         return rows.stream().collect(Collectors.groupingBy(GoalProjectRow::goalId, LinkedHashMap::new,
                 Collectors.mapping(p -> new GoalResponse.ProjectRef(p.projectId(), p.projectName()), Collectors.toList())));

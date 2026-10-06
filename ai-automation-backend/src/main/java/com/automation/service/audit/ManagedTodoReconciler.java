@@ -25,7 +25,6 @@ import java.util.stream.Collectors;
  * <p>Extracted from {@code AuditCenterService} so that the disposition change in the Audit Center
  * and the merge in {@link AuditFingerprintMigrationJob} use the same rule instead of two
  * diverging copies (audit TODO 53119eb8). Pure DB work, runs in the caller's transaction.
- * des Aufrufers.
  */
 @Slf4j
 @Component

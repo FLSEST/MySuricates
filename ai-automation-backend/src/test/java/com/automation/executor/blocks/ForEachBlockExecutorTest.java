@@ -812,7 +812,7 @@ class ForEachBlockExecutorTest {
 
         assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
         assertThat(capturedItems).containsExactly("alpha", "beta", "gamma");
-        // item N != item N-1 — jede Iteration ueberschreibt die Variable sauber
+        // item N != item N-1 — each iteration overwrites the variable cleanly
         assertThat(capturedItems.get(1)).isNotEqualTo(capturedItems.get(0));
         assertThat(capturedItems.get(2)).isNotEqualTo(capturedItems.get(1));
         verify(commandExecutor, times(3)).executeStepOnHost(any(HostExecutionRequest.class));

@@ -1,7 +1,7 @@
 package com.automation.config;
 
 /**
- * Semver-Vergleich fuer die Seeder mitgelieferter Definitionen
+ * Semver comparison for the seeders of shipped definitions
  * ({@link WorkflowTemplateSeeder}, {@link SkillSeeder}).
  */
 final class SeedVersions {

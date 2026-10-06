@@ -167,7 +167,7 @@ class GoalsModuleOffIntegrationTest {
         assertThat(goals.get("enabled").asBoolean()).isFalse();
         assertThat(goals.get("description").asText()).contains("work packages");
 
-        // wieder an: nichts ist verloren
+        // back on: nothing is lost
         modules.applyUiOverrides(Map.of(ModuleCatalog.GOALS, true));
         mockMvc.perform(get("/api/v1/goals/" + goalId)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.workPackages[0].title").value("Doku"))

@@ -329,7 +329,7 @@ class ApprovalBlockExecutorTest {
         assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
     }
 
-    // --- TODO 2a05c365: mode und auto_answer per Variable ---
+    // --- TODO 2a05c365: mode and auto_answer via variable ---
 
     @Test
     void execute_modeAndAutoAnswerFromVariables_autoApproves() {

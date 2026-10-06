@@ -83,7 +83,7 @@ public final class UntrustedText {
     public static String defuseLines(String raw) {
         if (raw == null) return "";
         StringJoiner lines = new StringJoiner("\n");
-        for (String line : raw.split("\n", -1)) {   // -1: auch leere Zeilen am Ende bleiben
+        for (String line : raw.split("\n", -1)) {   // -1: trailing empty lines are kept too
             lines.add(defuseLine(line));
         }
         return lines.toString();

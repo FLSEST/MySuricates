@@ -35,6 +35,6 @@ public class RequestMetricsSettings implements RuntimeSettingsGroup {
 
     @Override
     public void currentValues(Map<String, Object> out) {
-        // Bewusst leer: GET /system/settings lieferte die request-metrics-Werte nie mit.
+        // Intentionally empty: GET /system/settings never returned the request-metrics values.
     }
 }

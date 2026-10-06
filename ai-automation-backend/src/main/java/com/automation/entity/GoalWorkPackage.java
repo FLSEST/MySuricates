@@ -17,7 +17,7 @@ import java.time.Instant;
  * <p>The state is not stored but computed on read ({@link #stateOf}); only
  * {@link #completedAt} records when the package was first completed. The time
  * stays even if an open TODO is added later - the UI then shows it as
- * "wieder offen".
+ * "wieder offen" (reopened).
  */
 @Entity
 @Table(name = "goal_work_packages")
