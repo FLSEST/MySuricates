@@ -16,6 +16,7 @@ import com.automation.dto.projection.RunOriginRow;
 import com.automation.entity.Todo;
 import com.automation.event.TodoCreatedEvent;
 import com.automation.exception.ResourceNotFoundException;
+import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.audit.AuditCenterService.AuditDetail;
 import com.automation.service.audit.AuditCenterService.AuditFindingResponse;
 import com.automation.service.audit.AuditCenterService.AuditReportResponse;
@@ -74,6 +75,7 @@ class AuditCenterServiceTest {
     @Mock private AuditFindingTodoRepository findingTodoRepository;
     @Mock private TodoRepository todoRepository;
     @Mock private ApplicationEventPublisher eventPublisher;
+    @Mock private ActivityLogService activityLog;
     @Mock private WorkflowRunProjectionRepository runProjections;
     @Mock private ChainRunRepository chainRunRepository;
     @Mock private WorkflowVersionRepository versionRepository;
@@ -83,7 +85,7 @@ class AuditCenterServiceTest {
     @BeforeEach
     void setUp() {
         ManagedTodoWriter managedTodoWriter =
-                new ManagedTodoWriter(findingRepository, findingTodoRepository, todoRepository, eventPublisher);
+                new ManagedTodoWriter(findingRepository, findingTodoRepository, todoRepository, eventPublisher, activityLog);
         service = new AuditCenterService(reportRepository, findingRepository, occurrenceRepository,
                 new AuditAcceptancePolicy(),
                 new ManagedTodoReconciler(findingRepository, findingTodoRepository, todoRepository),
@@ -553,6 +555,7 @@ class AuditCenterServiceTest {
         ArgumentCaptor<AuditFindingTodo> link = ArgumentCaptor.forClass(AuditFindingTodo.class);
         verify(findingTodoRepository).save(link.capture());
         assertThat(link.getValue().isManaged()).isTrue();
+        assertThat(link.getValue().isManual()).as("created by hand, not by the threshold (f2ce6c50)").isTrue();
         verify(eventPublisher).publishEvent(any(TodoCreatedEvent.class));
     }
 

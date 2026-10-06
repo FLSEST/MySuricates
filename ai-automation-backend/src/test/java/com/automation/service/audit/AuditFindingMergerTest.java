@@ -164,7 +164,7 @@ class AuditFindingMergerTest {
         AuditFinding target = finding("target", AuditFindingStatus.OPEN, T0, T1, "rep-t", "run-t");
         AuditFinding duplicate = finding("dup", AuditFindingStatus.OPEN, T1, T1, "rep-d", "run-d");
         AuditFindingTodo moving = AuditFindingTodo.builder().findingId("dup").todoId("t-move").managed(false).build();
-        AuditFindingTodo colliding = AuditFindingTodo.builder().findingId("dup").todoId("t-both").managed(true).build();
+        AuditFindingTodo colliding = AuditFindingTodo.builder().findingId("dup").todoId("t-both").managed(true).manual(true).build();
         AuditFindingTodo targetLink = AuditFindingTodo.builder().findingId("target").todoId("t-both").managed(false).build();
         Todo managedTodo = Todo.builder().id("t-both").referenceType(ManagedTodoWriter.REFERENCE_TYPE).referenceId("dup").build();
         Todo foreignTodo = Todo.builder().id("t-move").referenceType("something-else").referenceId("dup").build();
@@ -182,6 +182,7 @@ class AuditFindingMergerTest {
         verify(findingTodoRepository, never()).findByFindingIdAndTodoId(any(), any());
         verify(todoRepository, never()).findById(any());
         assertThat(targetLink.isManaged()).as("verwaltete Dublette macht die Ziel-Verknuepfung verwaltet").isTrue();
+        assertThat(targetLink.isManual()).as("a TODO created by hand stays manual on the target (f2ce6c50)").isTrue();
         assertThat(managedTodo.getReferenceId()).isEqualTo("target");
         assertThat(foreignTodo.getReferenceId()).as("fremde Referenztypen bleiben unberuehrt").isEqualTo("dup");
     }

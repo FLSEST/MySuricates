@@ -1,5 +1,6 @@
 package com.automation.service.audit;
 
+import com.automation.entity.ActivityLog;
 import com.automation.entity.AuditFinding;
 import com.automation.entity.AuditFindingStatus;
 import com.automation.entity.AuditFindingTodo;
@@ -10,6 +11,7 @@ import com.automation.event.TodoCreatedEvent;
 import com.automation.repository.AuditFindingRepository;
 import com.automation.repository.AuditFindingTodoRepository;
 import com.automation.repository.TodoRepository;
+import com.automation.service.activitylog.ActivityLogService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -30,6 +32,8 @@ import java.util.stream.Collectors;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -47,9 +51,10 @@ class ManagedTodoWriterTest {
     @Mock private AuditFindingTodoRepository findingTodoRepository;
     @Mock private TodoRepository todoRepository;
     @Mock private ApplicationEventPublisher eventPublisher;
+    @Mock private ActivityLogService activityLog;
 
     private ManagedTodoWriter writer() {
-        return new ManagedTodoWriter(findingRepository, findingTodoRepository, todoRepository, eventPublisher);
+        return new ManagedTodoWriter(findingRepository, findingTodoRepository, todoRepository, eventPublisher, activityLog);
     }
 
     /** Das TODO, das {@code create} speicherte (save je neuem TODO), mit vergebener ID. */
@@ -110,6 +115,7 @@ class ManagedTodoWriterTest {
         assertThat(savedLink.getValue().getFindingId()).isEqualTo(FINDING_ID);
         assertThat(savedLink.getValue().getTodoId()).isEqualTo("t-new");
         assertThat(savedLink.getValue().isManaged()).isTrue();
+        assertThat(savedLink.getValue().isManual()).as("the ingest creates automatic TODOs").isFalse();
         ArgumentCaptor<TodoCreatedEvent> event = ArgumentCaptor.forClass(TodoCreatedEvent.class);
         verify(eventPublisher).publishEvent(event.capture());
         assertThat(event.getValue().getTodo()).isSameAs(created);
@@ -275,6 +281,7 @@ class ManagedTodoWriterTest {
         assertThat(todo.getReferenceId()).isNull();
         verify(findingTodoRepository).deleteAll(List.of(managedLink));
         verify(todoRepository).saveAll(List.of(todo));
+        verify(activityLog).info(eq(ActivityLog.LogCategory.EXECUTION), contains("Shell-Aufruf ohne Escaping"), any());
     }
 
     @Test
@@ -292,6 +299,57 @@ class ManagedTodoWriterTest {
 
         assertThat(todo.getStatus()).isEqualTo(Todo.Status.ARCHIVED);
         verify(findingTodoRepository).deleteAll(List.of(managedLink));
+    }
+
+    /** f2ce6c50: a TODO created by hand for a finding below HIGH was a deliberate decision, not the threshold's. */
+    @Test
+    void reconcile_reopensAManualTodoBelowHigh_whenItsFindingComesBack() {
+        AuditFinding back = finding(FINDING_ID, AuditFindingStatus.OPEN);
+        back.setSeverity(AuditSeverity.LOW);
+        back.setLastSeenRunId("run-back");
+        Todo todo = todo("t-1", Todo.Status.DONE);
+        AuditFindingTodo manualLink = manualLink("t-1");
+        when(findingTodoRepository.findByFindingIdIn(List.of(FINDING_ID))).thenReturn(List.of(manualLink));
+        when(todoRepository.findAllById(List.of("t-1"))).thenReturn(List.of(todo));
+        when(findingTodoRepository.findByTodoIdIn(Set.of("t-1"))).thenReturn(List.of(manualLink));
+        when(findingRepository.findAllById(any())).thenReturn(List.of(back));
+
+        writer().reconcile(List.of(back));
+
+        assertThat(todo.getStatus()).isEqualTo(Todo.Status.OPEN);
+        assertThat(todo.getWorkflowRunId()).isEqualTo("run-back");
+        verify(findingTodoRepository, never()).deleteAll(any());
+        verifyNoInteractions(activityLog);
+    }
+
+    @Test
+    void reconcile_keepsAManualTodoBelowHighLinked_whileItsFindingStaysOpen() {
+        AuditFinding medium = finding(FINDING_ID, AuditFindingStatus.OPEN);
+        medium.setSeverity(AuditSeverity.MEDIUM);
+        Todo todo = todo("t-1", Todo.Status.OPEN);
+        AuditFindingTodo manualLink = manualLink("t-1");
+        when(findingTodoRepository.findByFindingIdIn(List.of(FINDING_ID))).thenReturn(List.of(manualLink));
+        when(todoRepository.findAllById(List.of("t-1"))).thenReturn(List.of(todo));
+        when(findingTodoRepository.findByTodoIdIn(Set.of("t-1"))).thenReturn(List.of(manualLink));
+        when(findingRepository.findAllById(any())).thenReturn(List.of(medium));
+
+        writer().reconcile(List.of(medium));
+
+        assertThat(todo.getStatus()).isEqualTo(Todo.Status.OPEN);
+        verify(findingTodoRepository, never()).deleteAll(any());
+        verify(todoRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void create_marksTheLinkManual_whenTheTodoIsCreatedByHand() {
+        stubTodoSave("t-new");
+
+        writer().create(finding(FINDING_ID, AuditFindingStatus.OPEN), "Beschreibung", "run-1", true);
+
+        ArgumentCaptor<AuditFindingTodo> savedLink = ArgumentCaptor.forClass(AuditFindingTodo.class);
+        verify(findingTodoRepository).save(savedLink.capture());
+        assertThat(savedLink.getValue().isManaged()).isTrue();
+        assertThat(savedLink.getValue().isManual()).isTrue();
     }
 
     /** An einem IN_PROGRESS-TODO arbeitet jemand — das bleibt, wie es ist. */
@@ -440,6 +498,10 @@ class ManagedTodoWriterTest {
 
     private static AuditFindingTodo link(String todoId, boolean managed) {
         return AuditFindingTodo.builder().findingId(FINDING_ID).todoId(todoId).managed(managed).build();
+    }
+
+    private static AuditFindingTodo manualLink(String todoId) {
+        return AuditFindingTodo.builder().findingId(FINDING_ID).todoId(todoId).managed(true).manual(true).build();
     }
 
     private static Todo todo(String id, Todo.Status status) {

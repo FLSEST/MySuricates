@@ -42,7 +42,7 @@ class AuditFindingTodoLinker {
     /** Legt das verwaltete TODO an, solange das Finding noch keine verwaltete Verknüpfung hat. */
     void createManagedTodo(AuditFinding finding) {
         if (findingTodoRepository.findByFindingId(finding.getId()).stream().noneMatch(AuditFindingTodo::isManaged)) {
-            managedTodoWriter.create(finding, managedTodoDescription(finding), finding.getLastSeenRunId());
+            managedTodoWriter.create(finding, managedTodoDescription(finding), finding.getLastSeenRunId(), true);
         }
     }
 
