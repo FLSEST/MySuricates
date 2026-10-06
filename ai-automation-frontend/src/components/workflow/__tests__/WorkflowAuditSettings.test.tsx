@@ -16,6 +16,7 @@ vi.mock('../../../hooks/useWorkflows', () => ({
 
 import { WorkflowAutomationSettings } from '../WorkflowAutomationSettings';
 import { WorkflowRow } from '../WorkflowRow';
+import { AuditLabel } from '../AuditLabel';
 
 beforeAll(() => server.listen({ onUnhandledRequest: failOnUnhandledRequest }));
 afterEach(() => server.resetHandlers());
@@ -95,11 +96,61 @@ describe('WorkflowRow of an audit workflow', () => {
     row(workflow({ audit: AUDIT, autoTodo: { enabled: true } }));
 
     expect(screen.getByTestId('row-audit')).toHaveAttribute('title', 'Audit workflow: mysuricates.architecture');
+    // f529190a: a word, not only a symbol – the bare 12px shield went unnoticed
+    expect(screen.getByTestId('row-audit')).toHaveTextContent(/^Audit/);
+  });
+
+  it('keeps only the shield in a selected row, whose actions need the room', () => {
+    renderWithProviders(
+      <WorkflowRow workflow={workflow({ audit: AUDIT })} selected onSelect={vi.fn()} onExecute={vi.fn()} onDelete={vi.fn()}
+        navigate={vi.fn()} selectMode={false} isChecked={false} onToggleCheck={vi.fn()} />);
+
+    expect(screen.getByTestId('row-audit').querySelector('span.hidden')).toHaveTextContent('Audit');
   });
 
   it('has no audit mark otherwise', () => {
     row(workflow({ autoTodo: { enabled: true } }));
 
     expect(screen.queryByTestId('row-audit')).not.toBeInTheDocument();
+  });
+});
+
+// f529190a: the head of detail page and panel says plainly that this is an audit
+describe('AuditLabel', () => {
+  it('names the audit, its TODO threshold and links to its findings', () => {
+    renderWithProviders(<AuditLabel workflow={workflow({ audit: AUDIT })} />);
+
+    const label = screen.getByTestId('audit-label');
+    expect(label).toHaveTextContent('Audit·mysuricates.architecture·TODOs from High');
+    expect(label).toHaveAttribute('href', '/reports?audit=mysuricates.architecture&project=p1');
+  });
+
+  it('follows the threshold the backend applies, also Never and an unknown value', () => {
+    const { unmount } = renderWithProviders(<AuditLabel workflow={workflow({ audit: { ...AUDIT, todoMinSeverity: 'medium' } })} />);
+    expect(screen.getByTestId('audit-label')).toHaveTextContent('TODOs from Medium');
+    unmount();
+
+    const second = renderWithProviders(<AuditLabel workflow={workflow({ audit: { ...AUDIT, todoMinSeverity: 'NONE' } })} />);
+    expect(screen.getByTestId('audit-label')).toHaveTextContent('TODOs only by button');
+    second.unmount();
+
+    renderWithProviders(<AuditLabel workflow={workflow({ audit: { ...AUDIT, todoMinSeverity: 'sometimes' } })} />);
+    expect(screen.getByTestId('audit-label')).toHaveTextContent('TODOs from High');
+  });
+
+  it('renders nothing for a workflow that is no audit', () => {
+    const { container } = renderWithProviders(<AuditLabel workflow={workflow({ audit: { ...AUDIT, enabled: false } })} />);
+
+    expect(screen.queryByTestId('audit-label')).not.toBeInTheDocument();
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it('is plain text without a link while the audit module is off', async () => {
+    server.use(http.get('/api/v1/system/capabilities', () =>
+      HttpResponse.json({ apiVersion: 'v1', routes: [], blockTypes: [], ...modulesFixture('full', ['audit']) })));
+    renderWithProviders(<AuditLabel workflow={workflow({ audit: AUDIT })} />);
+
+    await vi.waitFor(() => expect(screen.getByTestId('audit-label').tagName).toBe('SPAN'));
+    expect(screen.getByTestId('audit-label')).toHaveTextContent('mysuricates.architecture');
   });
 });

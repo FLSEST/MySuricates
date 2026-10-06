@@ -7,6 +7,7 @@ import type { Workflow } from '../../types';
 import { exportWorkflow, useSealWorkflow } from '../../hooks/useWorkflows';
 import { useSealStatus } from '../../hooks/useSealStatus';
 import { SealBadge } from './SealStateIcon';
+import { AuditLabel } from './AuditLabel';
 import { SealConfirmModal } from './SealConfirmModal';
 import { apiErrorMessage, fetchWorkflowBpmn } from '../../api/client';
 import { downloadBlob } from '../../utils/downloadFile';
@@ -80,6 +81,7 @@ export function WorkflowDetailHeader({
           <h1 className="text-2xl font-bold text-text truncate">{workflow.name}</h1>
           <SealBadge sealed={sealed} status={sealStatus} />
         </div>
+        <div className="mt-1 empty:hidden"><AuditLabel workflow={workflow} /></div>
         {workflow.description && (
           <p className="text-sm text-text-secondary mt-0.5">{workflow.description}</p>
         )}

@@ -7,6 +7,7 @@ import { TagEditor } from './TagEditor';
 import { SealBadge } from './SealStateIcon';
 import { WorkflowBlockList } from './WorkflowBlockList';
 import { WorkflowAutomationSettings } from './WorkflowAutomationSettings';
+import { AuditLabel } from './AuditLabel';
 import { WorkflowRecentRuns } from './WorkflowRecentRuns';
 import { useSealStatus } from '../../hooks/useSealStatus';
 import { formatTimestamp } from '../../utils/localeFormat';
@@ -72,6 +73,7 @@ export function WorkflowDetailPanel({
               <span className="text-text-tertiary/60"> · {workflow.projectSubtitle}</span>
             )}
           </p>
+          <div className="mt-1.5 empty:hidden"><AuditLabel workflow={workflow} /></div>
         </div>
       </div>
 

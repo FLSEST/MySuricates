@@ -97,9 +97,11 @@ export function WorkflowRow({
         </span>
       )}
       {!selectMode && audit && (
-        <span className="inline-flex shrink-0" title={t.workflows.auditWorkflowBadge.replace('{key}', audit.key)}
-          data-testid="row-audit">
-          <ShieldCheck className="w-3 h-3 text-accent/70" aria-hidden="true" />
+        <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded-sm bg-accent/10 text-accent text-[9px] font-semibold shrink-0"
+          title={t.workflows.auditWorkflowBadge.replace('{key}', audit.key)} data-testid="row-audit">
+          <ShieldCheck className="w-2.5 h-2.5" aria-hidden="true" />
+          {/* The word gives way when the row shows its actions; the panel then names the audit in full. */}
+          <span className={selected ? 'hidden' : 'sm:group-hover:hidden'} aria-hidden="true">{t.workflows.auditLabel}</span>
           <span className="sr-only">{t.workflows.auditWorkflowBadge.replace('{key}', audit.key)}</span>
         </span>
       )}
