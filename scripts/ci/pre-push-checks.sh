@@ -7,7 +7,7 @@
 #   1. Commit-Metadaten des Push-Bereichs: Autor und Committer tragen nur die
 #      GitHub-noreply-Form; die Nachricht enthaelt keine verbotenen Literale, keine privaten
 #      Begriffe (schwache, Praefix low:, nur als Warnung) und keine Mailadresse ausserhalb
-#      eines Trailers.
+#      eines Trailers. The subject of new commits has at most 72 characters (TODO 7ce5c71a).
 #   2. Hygiene-Gate auf den Push-Bereich (public-hygiene.sh --range): was NEU dazukommt.
 #   3. Bestands-Gates der CI, die vom Code abhaengen: Doku-Zahlen, Doku-Verweise mit
 #      DE/EN-Gleichstand, Diagramm-Drift.
@@ -169,9 +169,22 @@ check_message() {  # $1 = label, $2 = nachricht (mehrzeilig)
   done 3<<<"$2" 4< <(printf '%s\n' "$2" | lower_stream)
 }
 
+# Subject = first line that is neither empty nor a comment of the commit template.
+check_subject() {  # $1 = label, $2 = message (multi-line)
+  local line subject=""
+  while IFS= read -r line; do
+    case "$line" in ''|'#'*) continue ;; esac
+    subject="$line"; break
+  done <<<"$2"
+  [ -z "$subject" ] && return 0
+  [[ "$subject" =~ $HYGIENE_SUBJECT_EXEMPT_REGEX ]] && return 0
+  [ "${#subject}" -le "$HYGIENE_SUBJECT_MAX" ] && return 0
+  fail "${1}: Betreff hat ${#subject} Zeichen (hoechstens ${HYGIENE_SUBJECT_MAX}) — das TODO gehoert als Trailer 'Todo: <uuid> (<Titel>)' ans Ende, Einzelheiten in den Body"
+}
+
 check_commits() {  # $@ = rev-list-Argumente
   KIND="meta"
-  local c short ae ce body n=0
+  local c short ae ce at body n=0
   while IFS= read -r c; do
     [ -z "$c" ] && continue
     n=$((n + 1))
@@ -179,9 +192,11 @@ check_commits() {  # $@ = rev-list-Argumente
     ae="$(git log -1 --format=%ae "$c")"
     ce="$(git log -1 --format=%ce "$c")"
     body="$(git log -1 --format=%B "$c")"
+    at="$(git log -1 --format=%at "$c")"
     check_email "commit ${short}" "Autor" "$ae"
     check_email "commit ${short}" "Committer" "$ce"
     check_message "commit ${short}" "$body"
+    [ "$at" -ge "$HYGIENE_SUBJECT_SINCE" ] && check_subject "commit ${short}" "$body"
   done < <(git rev-list "$@" 2>/dev/null)
   note "${n} Commit(s) geprueft"
 }
@@ -434,6 +449,7 @@ case "$MODE" in
     ident="$(git var GIT_AUTHOR_IDENT 2>/dev/null)"; ident="${ident#*<}"; check_email "dieser Commit" "Autor" "${ident%%>*}"
     ident="$(git var GIT_COMMITTER_IDENT 2>/dev/null)"; ident="${ident#*<}"; check_email "dieser Commit" "Committer" "${ident%%>*}"
     check_message "dieser Commit" "$(cat "$MSG_FILE")"
+    check_subject "dieser Commit" "$(cat "$MSG_FILE")"
     ;;
   tree)
     step "Bestands-Gates"

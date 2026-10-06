@@ -1057,7 +1057,12 @@ Checked per push range (remote state..local; for a new branch everything no remo
    (`<id>+<login>@users.noreply.github.com`, `HYGIENE_COMMIT_EMAIL_REGEX`); the message contains no
    forbidden literals, no private terms (weak ones, prefix `low:`, only as a warning) and no e-mail
    address outside a trailer (`Co-Authored-By`, `Generated-By`, `Signed-off-by`, …). The address
-   itself appears nowhere in the repository, only its form.
+   itself appears nowhere in the repository, only its form. The subject has at most 72 characters
+   (`HYGIENE_SUBJECT_MAX`, TODO 7ce5c71a); the TODO goes into a trailer `Todo: <uuid> (<title>)` at
+   the end. `commit-msg` always checks this, the push range and CI only for commits whose author
+   date is not before `HYGIENE_SUBJECT_SINCE` – older commits do not block, not even after a rebase,
+   which keeps the author date. Subjects Git writes itself (`Revert "…"`, `fixup!`, `squash!`,
+   `amend!`) are exempt.
 2. **Hygiene gate on the range** (`public-hygiene.sh --range`): what is newly added. Its warnings
    show up even when the range is clean.
 3. **CI tree gates that depend on the code:** documentation numbers, documentation links with DE/EN

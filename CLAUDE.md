@@ -34,7 +34,7 @@ BEVOR eine Änderung als fertig gilt oder committet wird, MÜSSEN alle relevante
      nebenan als „Flake“ und der Build als grün. Probe-Zahlen: [docs/entwicklung.md](docs/entwicklung.md).
    - Frontend: `npx tsc --noEmit` + `npm run lint`
    - E2E (falls betroffen): `npm run test:e2e`
-   - **Vor dem Push** prüft der `pre-push`-Hook (`scripts/ci/pre-push-checks.sh`) Commit-Nachrichten,
+   - **Vor dem Push** prüft der `pre-push`-Hook (`scripts/ci/pre-push-checks.sh`) Commit-Nachrichten (neue Betreffs ≤ 72 Zeichen),
      Autor-Adresse (nur GitHub-noreply, nie eine private Adresse), Hygiene des Push-Bereichs, die
      Doku-Gates und baut nach Scope (`changed-scopes.sh` wie die CI); `commit-msg` prüft Nachricht und
      Adresse schon beim Commit. Ändert der Push eine Ausnahmedatei (`.gitleaksignore`, Hygiene-Regeln,

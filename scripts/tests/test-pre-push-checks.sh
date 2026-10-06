@@ -296,6 +296,34 @@ check "CI: Warnung als Annotation"               'grep -q "::warning::Bereich HE
 check "CI: Job-Summary nennt die Datei"          'grep -q "^- \`.gitleaksignore\`" "$TMP/summary.md"'
 ( cd "$TMP/clean" && git reset -q --hard HEAD~1 )
 
+echo "20) Subject of new commits: at most 72 characters (TODO 7ce5c71a)"
+S72="feat: $(printf 'x%.0s' $(seq 1 66))"
+S73="${S72}y"
+NOREPLY_ENV="GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=1+t@users.noreply.github.com GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=1+t@users.noreply.github.com"
+OUT=$(cd "$TMP/clean" && printf 's\n' > s.txt && $NOREPLY add s.txt && $NOREPLY commit -q -m "$S73" 2>&1); RC=$?
+check "commit-msg: 73-character subject rejected" '[ "$RC" -ne 0 ] && grep -q "dieser Commit: Betreff hat 73 Zeichen (hoechstens 72)" <<<"$OUT"'
+OUT=$(cd "$TMP/clean" && $NOREPLY commit -q -m "$S72" 2>&1); RC=$?
+check "commit-msg: 72-character subject accepted" '[ "$RC" -eq 0 ]'
+( cd "$TMP/clean" && git reset -q --hard HEAD~1 )
+printf '\n# template comment\n%s\n\n%s\n' "$S73" "short body" > "$TMP/msg-long.txt"
+OUT=$(cd "$TMP/clean" && env $NOREPLY_ENV bash scripts/ci/pre-push-checks.sh --message-file "$TMP/msg-long.txt" 2>&1); RC=$?
+check "subject is the first line that is neither empty nor a comment" '[ "$RC" -eq 1 ] && grep -q "Betreff hat 73 Zeichen" <<<"$OUT"'
+printf '%s\n\n%s\n' "$S72" "$S73$S73" > "$TMP/msg-body.txt"
+OUT=$(cd "$TMP/clean" && env $NOREPLY_ENV bash scripts/ci/pre-push-checks.sh --message-file "$TMP/msg-body.txt" 2>&1); RC=$?
+check "long body lines are not limited"           '[ "$RC" -eq 0 ]'
+printf 'Revert "%s"\n' "$S73" > "$TMP/msg-revert.txt"
+OUT=$(cd "$TMP/clean" && env $NOREPLY_ENV bash scripts/ci/pre-push-checks.sh --message-file "$TMP/msg-revert.txt" 2>&1); RC=$?
+check "subject written by git revert is exempt"   '[ "$RC" -eq 0 ]'
+( cd "$TMP/clean" && printf 'o\n' > o.txt && $NOREPLY add o.txt \
+    && GIT_AUTHOR_DATE="2026-09-01T12:00:00+02:00" $NOREPLY commit -q --no-verify -m "$S73" )
+OUT=$(cd "$TMP/clean" && bash scripts/ci/pre-push-checks.sh --range HEAD~1..HEAD --skip-tree --skip-build 2>&1); RC=$?
+check "push range: commit authored before the rule passes" '[ "$RC" -eq 0 ]'
+( cd "$TMP/clean" && git reset -q --hard HEAD~1 )
+commit_file "$TMP/clean" n.txt "x" "$S73" $NOREPLY
+OUT=$(cd "$TMP/clean" && bash scripts/ci/pre-push-checks.sh --range HEAD~1..HEAD --skip-tree --skip-build 2>&1); RC=$?
+check "push range: new commit with a long subject is blocked" '[ "$RC" -eq 1 ] && grep -q "commit [0-9a-f]*: Betreff hat 73 Zeichen" <<<"$OUT"'
+( cd "$TMP/clean" && git reset -q --hard HEAD~1 )
+
 echo
 echo "passed=$PASS failed=$FAIL"
 [ "$FAIL" -eq 0 ]

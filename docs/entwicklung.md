@@ -1083,6 +1083,11 @@ Remote-Ref kennt):
    keine verbotenen Literale, keine privaten Begriffe (schwache, Präfix `low:`, nur als Warnung)
    und keine Mailadresse außerhalb eines Trailers (`Co-Authored-By`, `Generated-By`,
    `Signed-off-by`, …). Die Adresse selbst steht nirgends im Repository, nur ihre Form.
+   Der Betreff hat höchstens 72 Zeichen (`HYGIENE_SUBJECT_MAX`, TODO 7ce5c71a); das TODO gehört als
+   Trailer `Todo: <uuid> (<Titel>)` ans Ende. `commit-msg` prüft das immer, der Push-Bereich und die
+   CI nur bei Commits, deren Autor-Datum nicht vor `HYGIENE_SUBJECT_SINCE` liegt – ältere Commits
+   blockieren nicht, auch nicht nach einem Rebase, der das Autor-Datum behält. Betreffs, die Git
+   selbst schreibt (`Revert "…"`, `fixup!`, `squash!`, `amend!`), sind ausgenommen.
 2. **Hygiene-Gate auf den Bereich** (`public-hygiene.sh --range`): was neu dazukommt. Seine
    Warnungen erscheinen auch dann, wenn der Bereich sauber ist.
 3. **Bestands-Gates der CI, die vom Code abhängen:** Doku-Zahlen, Doku-Verweise mit

@@ -51,6 +51,13 @@ HYGIENE_COMMIT_EMAIL_REGEX='@users\.noreply\.github\.com$'
 # Trailer, deren Adressen in der Commit-Nachricht erlaubt sind (KI-Urheberschaft, Sign-off).
 # Alle anderen Zeilen einer Nachricht duerfen keine Mailadresse enthalten.
 HYGIENE_COMMIT_TRAILER_REGEX='^(Co-Authored-By|Co-authored-by|Generated-By|Signed-off-by|Reviewed-by): '
+# Subject line of new commits (TODO 7ce5c71a): at most HYGIENE_SUBJECT_MAX characters. The commit-msg hook
+# always checks; push range and CI only check commits whose author date is not before HYGIENE_SUBJECT_SINCE
+# (Unix time of the rule, 2026-10-06), so older commits are not blocked - rebased ones neither, a rebase keeps
+# the author date. Subjects Git writes itself (revert, autosquash) are exempt.
+HYGIENE_SUBJECT_MAX=72
+HYGIENE_SUBJECT_SINCE=1791316709
+HYGIENE_SUBJECT_EXEMPT_REGEX='^(Revert "|fixup! |squash! |amend! )'
 HYGIENE_EMAIL_REGEX='[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
 
 HYGIENE_BACKUP_GLOBS=(
