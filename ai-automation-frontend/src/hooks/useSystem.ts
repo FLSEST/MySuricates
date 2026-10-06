@@ -297,6 +297,13 @@ export interface ExecutionConfig {
   executionMaxConcurrent: number;
   claudeMaxConcurrentCalls: number;
   claudeReservedForInteractive: number;
+  /** AI CLI limits per provider and across all of them (TODO bd5df8d7); missing on older backends */
+  piMaxConcurrentCalls?: number;
+  piReservedForInteractive?: number;
+  codexMaxConcurrentCalls?: number;
+  codexReservedForInteractive?: number;
+  aiCliMaxConcurrentCalls?: number;
+  aiCliReservedForInteractive?: number;
   claudeTimeoutSeconds: number;
   claudeInterCallDelayMs: number;
   chainWorkflowTimeoutMinutes: number;
