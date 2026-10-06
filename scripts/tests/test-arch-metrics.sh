@@ -196,12 +196,12 @@ for gone in (">200 Zeilen", ">300 Zeilen", ">5 Abhaengigkeiten", ">7 Abhaengigke
              "arch.duplicated-logic"):
     assert gone not in prompt, "alte Regel steht noch im Prompt: " + gone
 assert "Paketkopplung" in prompt and "KEIN Befund mehr" in prompt, "Paketkopplung als Trend fehlt"
-assert "Neu in 4.10.0:" in prompt, "one-off explanation of the evidence anchors is missing"
-assert all("Neu in 4.%d.0:" % v not in prompt for v in (7, 8, 9)), "earlier one-off explanations are done"
+assert "Neu in 4.11.0:" in prompt, "one-off explanation of the known judgments is missing"
+assert all("Neu in 4.%d.0:" % v not in prompt for v in (7, 8, 9, 10)), "earlier one-off explanations are done"
 assert "Regelwechsel 4.6.0" not in prompt, "die einmalige Erklaerung von 4.6.0 ist erledigt"
 assert "NCLOC" in prompt and "Hotspot" in prompt, "NCLOC-Baender und Hotspot-Regel fehlen"
 assert "nur Kollaborateure" in prompt, "Zahl meint Kollaborateure"
-assert wf["version"] == "4.10.0", wf["version"]
+assert wf["version"] == "4.11.0", wf["version"]
 # 67128699: PMD aus automation-agent-analysis misst Duplikate (CPD je Sprache, CSV) und Komplexitaet (SARIF);
 # die Werkzeug-Bloecke laufen vor arch_metrics, das ihre Ausgaben an arch-findings.py reicht.
 tool_blocks = {b.get("name"): b for b in blocks if b["config"].get("container_args")}
@@ -224,6 +224,11 @@ for name in ("cpd_java", "jscpd", "pmd_design", "lizard"):
 # 2c07ce7e: evidence cites the FAKT lines of ## FAKTENBLATT arch, the report states the measurement scope.
 for marker in ("## FAKTENBLATT arch", "fakt-Namen der Kandidatenzeile", "**Messumfang**: <Wert von FAKT arch_scope", "nicht vergleichbar", "unbelegt"):
     assert marker in prompt, "evidence/scope rule missing in the prompt: " + marker
+# ebf6602e: arch-findings.py holds every known judgment against this run; a carried-forward judgment keeps its evidence.
+assert "{{ audit_findings }}" in command and "--known " in command, "known findings do not reach the classification"
+for marker in ("## known_judgments", "Text hinter \"Beleg: \"", "existiert \"nein\"", "\"ungeprueft\""):
+    assert marker in prompt, "known-judgment rule missing in the prompt: " + marker
+assert "sonst \"unveraendert seit dem letzten Urteil\"" not in prompt, "carried-forward judgments must keep their evidence"
 for marker in ("## duplicates", "## complexity", "art dublette", "frontend_complexity_state", "nie ein eigener Befund"):
     assert marker in prompt, "Werkzeug-Fakten im Prompt unvollstaendig: " + marker
 # e0e9495f: das Skript waehlt Kandidaten, arch-seams.py misst ihre Schnittkanten, die KI urteilt.

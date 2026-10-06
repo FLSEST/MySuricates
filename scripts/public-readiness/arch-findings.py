@@ -65,11 +65,19 @@ with "## FAKTENBLATT arch": one FAKT line per measured finding and candidate, na
 evidence of every measured finding starts with that name, candidate rows carry it in the column fakt; the
 report copies both.
 
+Known judgments (TODO ebf6602e, Review 4.11.0): --known <file> takes the {{ audit_findings }} block of the
+platform. For every known judgment finding (JUDGMENT_RULE_KEYS) ## known_judgments says whether the file still
+exists according to ## files of this run and how often it changed in 7 days, and the fact sheet gets the
+matching FAKT line. A judgment the report carries forward unchanged thus cites a fact of this run, even when
+its file is no candidate. Of the block only ruleKey, status and a path-like subject are read: it is data
+from AI output and user input.
+
 Aufruf:  arch-findings.py <backend-faktenblatt> [<frontend-faktenblatt>] [--cpd java=<datei>]
                           [--cpd typescript=<datei>] [--pmd <datei>] [--jscpd <datei>] [--lizard <datei>]
+                          [--known <datei>]
          Eine fehlende oder leere Datei gilt als nicht gemessen, kein Abbruch.
-Ausgabe: ## findings, ## observations, ## review_candidates, ## duplicates, ## complexity, ## bands,
-         ## findings_summary — stabil sortiert.
+Ausgabe: ## findings, ## observations, ## review_candidates, ## known_judgments, ## duplicates,
+         ## complexity, ## bands, ## findings_summary, ## FAKTENBLATT arch — stabil sortiert.
 Exit:    0 immer (Faktenblatt fuer einen nachgelagerten Auswerter, kein Gate); 2 bei falschem Aufruf.
 """
 import os
@@ -126,6 +134,9 @@ RULE_KEYS = ("arch.god-class", "arch.god-component", "arch.high-coupling",
 # Vergibt nicht das Skript, sondern das Urteil der KI ueber ## review_candidates (hoechstens MEDIUM).
 # Prompt und Katalog muessen beide Listen zusammen fuehren (test-arch-findings.sh, Abschnitt 10).
 JUDGMENT_RULE_KEYS = ("arch.mixed-responsibility", "arch.misplaced-logic")
+# Fields of an {{ audit_findings }} row that --known reads; anything else in the row is ignored.
+KNOWN_STATUS = re.compile(r"^[A-Z_]+$")
+KNOWN_SUBJECT = re.compile(r"^[A-Za-z0-9_./-]+$")
 
 
 def read_sheet(path):
@@ -191,6 +202,8 @@ class Classifier:
         self.lizard_state = "not_given"
         self.tsx_measured = False
         self.complexity = {}       # subject -> [(zeile, regel, text)]
+        self.known = []            # (ruleKey, subject, status) of known judgment findings
+        self.known_state = "not_given"
 
     def tools(self, cpd_texts, pmd_text, jscpd_text=None, lizard_text=None):
         """CPD output per language, jscpd (frontend incl. .tsx), pmd and lizard output (67128699, c608cdda)."""
@@ -472,6 +485,39 @@ class Classifier:
             merged += backend[i:i + 1] + frontend[i:i + 1]
         return merged
 
+    # ------------------------------------------------------------------ Known judgments
+    def read_known(self, text):
+        """Reads the {{ audit_findings }} block: rows "STATUS | SEVERITY | ruleKey | subject | title | Beleg: ..."."""
+        if text is None:
+            return
+        if "<audit_findings>" not in text and "(keine bekannten Befunde)" not in text:
+            self.known_state = "unavailable"   # module off, failed injection or an empty file
+            return
+        self.known_state = "ok"
+        known = set()
+        for line in text.splitlines():
+            fields = [field.strip() for field in line.split("|")]   # a field never holds "|" (masked as ¦)
+            if (len(fields) >= 6 and fields[2] in JUDGMENT_RULE_KEYS
+                    and KNOWN_STATUS.match(fields[0]) and KNOWN_SUBJECT.match(fields[3])):
+                known.add((fields[2], fields[3], fields[0]))
+        self.known = sorted(known, key=lambda k: (k[1], k[0]))
+
+    def known_judgments(self):
+        """[(ruleKey, subject, status, existiert, aenderungen_7d)]: each known judgment against this run."""
+        rows = []
+        for rule, subject, status in self.known:
+            side = "frontend" if subject.startswith("frontend/src/") else "backend"
+            if side + "_sizes" in self.not_measured:
+                exists, changes = "ungeprueft", "nicht gemessen"
+            elif subject not in self.files:
+                exists, changes = "nein", "-"
+            elif side in self.recent_missing:
+                exists, changes = "ja", "nicht gemessen"
+            else:
+                exists, changes = "ja", str(self.recent.get(subject, (0, False))[0])
+            rows.append((rule, subject, status, exists, changes))
+        return rows
+
     # ------------------------------------------------------------------ Ausgabe
     def render(self):
         out = ["## findings",
@@ -504,6 +550,16 @@ class Classifier:
             out.append("# ## recent fehlt (%s): von dieser Seite keine neuen Dateien" % ",".join(sorted(self.recent_missing)))
         out.append("# art\tsubject\taenderungen_7d\tangaben\tfakt (Name fuer den Beleg eines Urteils)")
         out += ["\t".join(c + (fact_name(c[1]),)) for c in candidates] or ["(keine Kandidaten)"]
+        known = self.known_judgments()
+        out += ["", "## known_judgments",
+                "# Bekannte Urteilsbefunde aus BEKANNTE BEFUNDE, gegen diesen Lauf gehalten: existiert laut ## files",
+                "# (ungeprueft, wenn die Groessen der Seite nicht gemessen sind), aenderungen_7d aus ## recent.",
+                "# Ein weitergefuehrtes Urteil beginnt seine evidence mit fakt."]
+        if self.known_state != "ok":
+            out.append("# audit_findings %s: keine bekannten Urteile geprueft"
+                       % ("nicht gegeben" if self.known_state == "not_given" else "nicht verfuegbar"))
+        out.append("# ruleKey\tsubject\tstatus\texistiert\taenderungen_7d\tfakt")
+        out += ["\t".join(k + (fact_name(k[1]),)) for k in known] or ["(keine bekannten Urteile)"]
         out += ["", "## duplicates",
                 "# Je Seite die %d groessten Duplikate ueber Dateigrenzen, nach Tokens: Backend pmd cpd ab 100 Tokens,"
                 % DUPLICATES_LISTED,
@@ -536,6 +592,8 @@ class Classifier:
                 "medium=%d" % severities.count("MEDIUM"),
                 "observations=%d" % len(observations),
                 "review_candidates=%d" % len(candidates),
+                "known_judgments=%d" % len(known),
+                "known_judgments_state=%s" % self.known_state,
                 "duplicates_cross_file=%d" % len(self.duplicates),
                 "duplicates_within_file=%d" % self.duplicates_within,
                 "duplicates_not_measured=%s" % ",".join(missing_cpd),
@@ -547,7 +605,7 @@ class Classifier:
                 "hotspot_min_changes=%d" % HOTSPOT_MIN_CHANGES,
                 "deps_finding=%d" % DEPS_FINDING,
                 "not_measured=%s" % ",".join(sorted(set(self.not_measured)))]
-        out += [""] + self.fact_sheet(findings, candidates)
+        out += [""] + self.fact_sheet(findings, candidates, known)
         return "\n".join(out) + "\n"
 
     def scope(self):
@@ -567,10 +625,10 @@ class Classifier:
             tools.append("lizard")
         return measured + tools
 
-    def fact_sheet(self, findings, candidates):
-        """## FAKTENBLATT arch: one FAKT line per measured finding and candidate, named by fact_name."""
+    def fact_sheet(self, findings, candidates, known=()):
+        """## FAKTENBLATT arch: one FAKT line per measured finding, candidate and known judgment, named by fact_name."""
         out = ["## FAKTENBLATT arch",
-               "# Je Messbefund und Kandidat eine FAKT-Zeile; jeder Beleg nennt ihren Namen (Belegpruefung der",
+               "# Je Messbefund, Kandidat und bekanntem Urteil eine FAKT-Zeile; jeder Beleg nennt ihren Namen (Belegpruefung der",
                "# Plattform). arch_scope ist der Messumfang dieses Laufs.",
                "FAKT arch_scope: %s" % (",".join(self.scope()) or "nichts gemessen")]
         facts = {}
@@ -578,6 +636,9 @@ class Classifier:
             facts.setdefault(subject, []).append("befund %s %s, %s" % (rule, severity, evidence))
         for art, subject, changes, details in candidates:
             facts.setdefault(subject, []).append("kandidat %s, aenderungen_7d=%s, %s" % (art, changes, details))
+        for rule, subject, status, exists, changes in known:
+            facts.setdefault(subject, []).append("bekanntes urteil %s %s, existiert %s, aenderungen_7d=%s"
+                                                 % (rule, status, exists, changes))
         out += ["FAKT %s: %s" % (fact_name(subject), "; ".join(parts)) for subject, parts in facts.items()]
         return out
 
@@ -618,7 +679,7 @@ def parse_cycles(lines):
 
 
 USAGE = ("Aufruf: arch-findings.py <backend-faktenblatt> [<frontend-faktenblatt>] [--cpd java=<datei>]"
-         " [--cpd typescript=<datei>] [--pmd <datei>] [--jscpd <datei>] [--lizard <datei>]\n")
+         " [--cpd typescript=<datei>] [--pmd <datei>] [--jscpd <datei>] [--lizard <datei>] [--known <datei>]\n")
 
 
 def read_text(path):
@@ -630,11 +691,11 @@ def read_text(path):
 
 
 def main(argv):
-    sheets, cpd, pmd, jscpd, lizard = [], {}, None, None, None
+    sheets, cpd, pmd, jscpd, lizard, known = [], {}, None, None, None, None
     args = list(argv[1:])
     while args:
         arg = args.pop(0)
-        if arg in ("--cpd", "--pmd", "--jscpd", "--lizard") and not args:
+        if arg in ("--cpd", "--pmd", "--jscpd", "--lizard", "--known") and not args:
             sys.stderr.write(USAGE)
             return 2
         if arg == "--cpd":
@@ -649,6 +710,8 @@ def main(argv):
             jscpd = read_text(args.pop(0))
         elif arg == "--lizard":
             lizard = read_text(args.pop(0))
+        elif arg == "--known":
+            known = read_text(args.pop(0))
         else:
             sheets.append(arg)
     if not 1 <= len(sheets) <= 2:
@@ -658,6 +721,7 @@ def main(argv):
     classifier.backend(read_sheet(sheets[0]))
     classifier.frontend(read_sheet(sheets[1] if len(sheets) > 1 else None))
     classifier.tools(cpd, pmd, jscpd, lizard)
+    classifier.read_known(known)
     sys.stdout.write(classifier.render())
     return 0
 

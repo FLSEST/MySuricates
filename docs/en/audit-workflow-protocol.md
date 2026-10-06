@@ -286,6 +286,14 @@ measured findings were classified – without having judged anything. Since vers
   measured finding starts with that name, candidate rows carry it in the column `fakt`, and judgement evidence cites
   it. `FAKT arch_scope` states the measurement scope; when it changes, the trend reads "nicht vergleichbar". The PMD
   block is called `pmd_design`, because the evidence check ignores names under 4 characters.
+- **Known judgements (4.11.0, TODO `ebf6602e`)**: judgements carried forward for files that are no candidate stayed
+  unsupported in 4.10 ("unveraendert seit dem letzten Urteil", no fact name). Since TODO `5fc15f50`
+  `{{ audit_findings }}` carries each finding's evidence. `arch_metrics` hands the block to `arch-findings.py --known`;
+  `## known_judgments` holds every known judgement against the run (exists according to `## files`,
+  `aenderungen_7d`), and the fact sheet gets one FAKT line per judgement. A judgement carried forward copies its old
+  evidence verbatim with that fact name in front, so it keeps its line ranges. Whether the file still exists is
+  decided by the measurement, not by a read attempt of the AI. Of the block the script reads only ruleKey, status
+  and a path-like subject, since the rest comes from AI output and user input.
 
 ### Test coverage: envelope from the target list
 

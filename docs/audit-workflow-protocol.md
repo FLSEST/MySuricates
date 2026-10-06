@@ -285,6 +285,14 @@ gilt: **Das Skript bestimmt, wo hingeschaut wird, die KI, was dort los ist.**
   Messbefunds beginnt mit diesem Namen, Kandidatenzeilen tragen ihn in der Spalte `fakt`, und Urteilsbelege zitieren
   ihn. `FAKT arch_scope` nennt den Messumfang; ändert er sich, lautet der Trend „nicht vergleichbar“. Der PMD-Block
   heißt `pmd_design`, weil die Belegprüfung Namen unter 4 Zeichen ignoriert.
+- **Bekannte Urteile (4.11.0, TODO `ebf6602e`)**: Weitergeführte Urteile zu Dateien, die kein Kandidat sind, blieben
+  in 4.10 unbelegt („unveraendert seit dem letzten Urteil“, ohne Faktnamen). Seit TODO `5fc15f50` liefert
+  `{{ audit_findings }}` je Befund den Beleg mit. `arch_metrics` reicht den Block an `arch-findings.py --known`;
+  `## known_judgments` hält jedes bekannte Urteil gegen den Lauf (existiert laut `## files`, `aenderungen_7d`), und das
+  Faktenblatt bekommt je Urteil eine FAKT-Zeile. Ein weitergeführtes Urteil übernimmt den alten Beleg wörtlich,
+  mit diesem Faktnamen vorn, und behält so seine Zeilenangaben. Ob die Datei noch existiert, entscheidet die
+  Messung, nicht ein Read-Versuch der KI. Aus dem Block liest das Skript nur ruleKey, Status und ein pfadförmiges
+  Subjekt, denn der Rest stammt aus KI-Ausgaben und Nutzereingaben.
 
 ### Test-Abdeckung: Envelope aus der Soll-Liste
 
