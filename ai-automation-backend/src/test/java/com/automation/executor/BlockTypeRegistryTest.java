@@ -2,6 +2,7 @@ package com.automation.executor;
 
 import com.automation.entity.BlockDefinition;
 import com.automation.entity.StepResult;
+import com.automation.exception.WorkflowExecutionException;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.config.BeanDefinition;
@@ -13,6 +14,7 @@ import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.withSettings;
 
@@ -55,6 +57,26 @@ class BlockTypeRegistryTest {
         BlockTypeRegistry registry = new BlockTypeRegistry(List.of(executorFor("shell")));
 
         assertThat(registry.knownTypes()).isUnmodifiable();
+    }
+
+    @Test
+    void executorFor_returnsTheExecutorSupportingTheType() {
+        BlockExecutor shell = executorFor("shell");
+        BlockExecutor simple = executorFor("simple");
+        BlockTypeRegistry registry = new BlockTypeRegistry(List.of(shell, simple));
+
+        assertThat(registry.executorFor("simple")).isSameAs(simple);
+        assertThat(registry.executorFor("shell")).isSameAs(shell);
+    }
+
+    @Test
+    void executorFor_unknownType_failsTheRunWithTheTypeInTheMessage() {
+        BlockTypeRegistry registry = new BlockTypeRegistry(List.of(executorFor("shell")));
+
+        assertThatThrownBy(() -> registry.executorFor("frobnicate"))
+                .isInstanceOf(WorkflowExecutionException.class)
+                .hasMessage("No executor found for block type: frobnicate");
+        assertThatThrownBy(() -> registry.executorFor(null)).isInstanceOf(WorkflowExecutionException.class);
     }
 
     /** Every executor on the classpath contributes exactly one type — no executor is unreachable. */
