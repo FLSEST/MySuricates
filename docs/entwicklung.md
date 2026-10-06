@@ -708,7 +708,7 @@ Das Script:
 2. Berechnet die neue Version (Segment hochzählen) und bricht ab, wenn es den Tag schon gibt
 3. Schreibt sie **ohne Suffix** in `pom.xml` sowie in `package.json` und `package-lock.json` (über `npm version`) — ein Lockfile auf der alten Version macht jeden frischen Klon nach dem ersten `npm install` dirty; `packageLock.guard.test.ts` hält beide synchron
 4. Erstellt Git-Commit `Release vX.Y.Z` und setzt ein **annotiertes** Git-Tag `vX.Y.Z` (`git tag -a`, trägt Datum/Autor/Nachricht) — Grundlage für das GitHub-Release, das bei jedem `v*`-Tag automatisch entsteht ([„GitHub-Release bei jedem Tag"](#github-release-bei-jedem-tag) unten)
-5. Setzt `pom.xml` **und** `package.json` auf die nächste Entwicklungsversion `X.Y.(Z+1)-SNAPSHOT` und committet `Weiter an vX.Y.(Z+1)` — sonst trüge jeder Commit nach dem Tag dieselbe Release-Nummer, und die Versions-Kachel meldete dauerhaft Drift
+5. Setzt `pom.xml` **und** `package.json` auf die nächste Entwicklungsversion `X.Y.(Z+1)-SNAPSHOT` und committet `Start development of vX.Y.(Z+1)` — sonst trüge jeder Commit nach dem Tag dieselbe Release-Nummer, und die Versions-Kachel meldete dauerhaft Drift
 
 **Voraussetzung:** Sauberer Working Tree (keine uncommitteten Änderungen).
 **Test:** `bash scripts/tests/test-release.sh` fährt den Ablauf in einem Wegwerf-Repo durch.
@@ -937,7 +937,8 @@ Details zu den drei Vertrauensklassen und zur Taint-Propagation:
 | **Testbeschreibungen** (`describe`/`it`/`test`, `@DisplayName`) | Englisch |
 | **Technische Namen** (Klassen, Pfade, Endpunkte, Enum-Konstanten, Schlüssel) | Englisch |
 | **UI-Texte** | über i18n (`de.ts`/`en.ts`), nie im Code |
-| **Log- und Fehlermeldungen, Doku, TODO-Titel, Commit-Nachrichten** | unverändert wie bisher |
+| **Commit-Nachrichten** | Englisch seit 2026-10-06 (TODO 440473d4); die ältere Historie wird bei der Veröffentlichung übersetzt (TODO 0bf5eed4) |
+| **Log- und Fehlermeldungen, Doku, TODO-Titel** | unverändert wie bisher |
 
 Der Bestand ist übersetzt (TODO 9468432d). Deutsch stehen geblieben sind zitierte UI-Texte, Zitate und
 Dokuüberschriften in sonst englischen Kommentaren, die Ausnahmedateien des Pre-Push-Gates und Kommentare in

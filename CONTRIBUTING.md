@@ -81,6 +81,9 @@ Further rules of the house:
 - **Code comments and test descriptions are written in English.** Some older
   comments are still German; they are translated in separate passes, so leave
   them alone unless you rewrite the line anyway.
+- **Commit messages are written in English**, in the
+  [Conventional Commits](https://www.conventionalcommits.org/) form
+  `type(scope): summary`; the body says why the change was made.
 - **Never access the SQLite database directly.** Not from code, not from shell
   blocks, not from scripts. See [CLAUDE.md](CLAUDE.md) for why.
 - **Eight-character IDs** such as `TODO 1b84ecab` in commit messages, comments

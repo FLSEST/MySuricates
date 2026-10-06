@@ -64,7 +64,7 @@ check "im Tag ohne -SNAPSHOT"                   '[ "$(at_tag v0.1.1)" = "0.1.1" 
 check "package.json im Tag auf 0.1.1"           '[ "$(git -C "$TMP" show v0.1.1:ai-automation-frontend/package.json | json_version)" = "0.1.1" ]'
 check "danach 0.1.2-SNAPSHOT in der pom.xml"    '[ "$(pom_version)" = "0.1.2-SNAPSHOT" ]'
 check "package.json zieht mit: 0.1.2-SNAPSHOT"  '[ "$(pkg_version)" = "0.1.2-SNAPSHOT" ]'
-check "zwei Commits: Release und Weiter an"     '[ "$(git -C "$TMP" log --format=%s -2 | tr "\\n" "|")" = "Weiter an v0.1.2|Release v0.1.1|" ]'
+check "two commits: Release and Start development"     '[ "$(git -C "$TMP" log --format=%s -2 | tr "\\n" "|")" = "Start development of v0.1.2|Release v0.1.1|" ]'
 check "Arbeitsbaum danach sauber"               '[ -z "$(git -C "$TMP" status --porcelain)" ]'
 
 echo "2) Minor-Release zaehlt vom letzten Tag, nicht von der Entwicklungsversion"

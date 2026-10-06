@@ -333,7 +333,7 @@ fi
 mkdir -p "$TARGET/release-notes"
 cp "$WORK/notes.md" "$TARGET/release-notes/${TAG}.md"
 git -C "$TARGET" add -f -- "release-notes/${TAG}.md" || die "Konnte die Notizdatei nicht stagen"
-if ! git -C "$TARGET" commit -q -m "Release ${TAG}" -m "Notizen: release-notes/${TAG}.md"; then
+if ! git -C "$TARGET" commit -q -m "Release ${TAG}" -m "Notes: release-notes/${TAG}.md"; then
     die "Commit im Ziel gescheitert (Hook? Ausgabe oben)"
 fi
 COMMITTED=1

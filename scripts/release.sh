@@ -194,7 +194,7 @@ log "Continuing on ${DEV}-SNAPSHOT"
 update_pom "$DEV" snapshot
 update_package_json "${DEV}-SNAPSHOT"
 git add "$POM_FILE" "$PACKAGE_JSON" "$PACKAGE_LOCK"
-git commit -m "Weiter an v${DEV}"
+git commit -m "Start development of v${DEV}"
 
 echo ""
 log "Done! Released ${NEXT}"

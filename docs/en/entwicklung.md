@@ -698,7 +698,7 @@ The script:
 2. Calculates the new version (increments the segment) and stops if that tag exists already
 3. Writes it **without a suffix** into `pom.xml` plus `package.json` and `package-lock.json` (via `npm version`) — a lockfile left at the old version makes every fresh clone dirty after its first `npm install`; `packageLock.guard.test.ts` keeps both in sync
 4. Creates the git commit `Release vX.Y.Z` and sets an **annotated** git tag `vX.Y.Z` (`git tag -a`, carries date/author/message) — the basis for the GitHub release that gets created automatically for every `v*` tag ([„GitHub release on every tag"](#github-release-on-every-tag) below)
-5. Sets `pom.xml` **and** `package.json` to the next development version `X.Y.(Z+1)-SNAPSHOT` and commits `Weiter an vX.Y.(Z+1)` — otherwise every commit after the tag would carry the release number and the version tile would report drift permanently
+5. Sets `pom.xml` **and** `package.json` to the next development version `X.Y.(Z+1)-SNAPSHOT` and commits `Start development of vX.Y.(Z+1)` — otherwise every commit after the tag would carry the release number and the version tile would report drift permanently
 
 **Prerequisite:** Clean working tree (no uncommitted changes).
 **Test:** `bash scripts/tests/test-release.sh` runs the flow in a throwaway repository.
@@ -918,7 +918,8 @@ Details on the three trust classes and taint propagation:
 | **Test descriptions** (`describe`/`it`/`test`, `@DisplayName`) | English |
 | **Technical names** (classes, paths, endpoints, enum constants, keys) | English |
 | **UI text** | through i18n (`de.ts`/`en.ts`), never in code |
-| **Log and error messages, docs, TODO titles, commit messages** | unchanged, as before |
+| **Commit messages** | English since 2026-10-06 (TODO 440473d4); the older history is translated when it is published (TODO 0bf5eed4) |
+| **Log and error messages, docs, TODO titles** | unchanged, as before |
 
 The existing code has been translated (TODO 9468432d). What remains German are quoted UI texts, quotes and doc
 headings inside otherwise English comments, the pre-push gate's rule files and comments inside embedded heredocs.
