@@ -25,7 +25,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Die schlanken Lauf-Projektionen gegen die echte SQLite-Datei (TODO 982abd1a). */
+/** The lean run projections against the real SQLite file (TODO 982abd1a). */
 @SpringBootTest
 @ActiveProfiles("integration")
 @Transactional
@@ -99,13 +99,13 @@ class WorkflowRunProjectionRepositoryTest {
     }
 
     /**
-     * Vom Kontext liest {@code findOriginColumns} nur den Eltern-Ausloeser, als Text (TODO a3b89355) — auch
-     * wenn die erste Zeile keinen hat. Fuer einen Ausdruck ohne deklarierten Typ nimmt sqlite-jdbc den Typ
-     * des Werts der aktuellen Zeile; ein NULL dort meldet NUMERIC. Die Zeilen kommen nach Id sortiert.
+     * From the context {@code findOriginColumns} reads only the parent trigger, as text (TODO a3b89355) — even
+     * if the first row has none. For an expression without a declared type sqlite-jdbc takes the type
+     * of the value in the current row; a NULL there reports NUMERIC. The rows come sorted by id.
      *
-     * <p>Die Ids erzeugt Hibernate zufaellig. Deshalb bekommt erst nach dem Anlegen der Lauf mit der
-     * groesseren Id den Eltern-Ausloeser — ohne Suchschleife, die bei einer sehr kleinen Eltern-Id
-     * aufgab (TODO 923e53d8).
+     * <p>Hibernate generates the ids randomly. Hence only after creation does the run with the
+     * larger id get the parent trigger — without a search loop, which gave up at a very small parent id
+     * (TODO 923e53d8).
      */
     @Test
     void findOriginColumns_readsTheParentSourceAsText_evenWhenTheFirstRowHasNone() {

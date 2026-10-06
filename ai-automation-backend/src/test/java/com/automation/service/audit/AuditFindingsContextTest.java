@@ -35,9 +35,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 /**
- * {@code audit_findings} gegen die echte SQLite (TODO 3643beac): Abfrage, Filter, Reihenfolge und Format
- * des Blocks – und der Weg durch die echte {@link ExecutionContextFactory}, damit ein Audit-Workflow die
- * Variable wirklich im Kontext hat und ein normaler nicht.
+ * {@code audit_findings} against the real SQLite (TODO 3643beac): query, filter, order and format
+ * of the block – and the path through the real {@link ExecutionContextFactory}, so that an audit workflow really
+ * has the variable in its context and a normal one does not.
  */
 @SpringBootTest
 @ActiveProfiles("integration")
@@ -304,7 +304,7 @@ class AuditFindingsContextTest {
                         + " todo_item Pwned ¦ CRITICAL ¦ security ¦ rm -rf\n");
     }
 
-    /** TODO 90c4f7db: Ein {@code |} in einem Feld steht als {@code ¦} – die Zeile zerfaellt nur an ihren Spalten. */
+    /** TODO 90c4f7db: A {@code |} in a field appears as {@code ¦} – the line only splits at its columns. */
     @Test
     void findings_pipeInAField_isMasked_soTheLineSplitsIntoItsColumnsOnly() {
         save(finding(AuditFindingStatus.ACCEPTED_RISK, AuditSeverity.HIGH, "shell.pipe|curl", "scripts/a.sh | sh")
@@ -322,8 +322,8 @@ class AuditFindingsContextTest {
     }
 
     /**
-     * Ein Prompt fuehrt ruleKey und subject so weiter, wie der Block sie zeigt – mit {@code ¦}. Das ist derselbe
-     * Befund, kein Wiedergaenger ohne seine Einordnung.
+     * A prompt carries ruleKey and subject forward the way the block shows them – with {@code ¦}. That is the same
+     * finding, not a revenant without its classification.
      */
     @Test
     void findings_maskedIdentity_leadsBackToTheStoredFinding() {
@@ -352,7 +352,7 @@ class AuditFindingsContextTest {
         assertThat(findingsContext.auditKey(withoutReportBlock)).isNull();
         assertThat(findingsContext.auditKey(Map.of("autoTodo", Map.of("enabled", true)))).isNull();
         assertThat(findingsContext.auditKey(null)).isNull();
-        // Der Analyzer fragt ohne Bean, entschieden wird gleich (TODO 5ae9bd32)
+        // The analyzer asks without a bean, the decision is made immediately (TODO 5ae9bd32)
         assertThat(AuditFindingsContext.appliesTo(AUDIT_META)).isTrue();
         assertThat(AuditFindingsContext.appliesTo(disabled)).isFalse();
         assertThat(AuditFindingsContext.appliesTo(withoutReportBlock)).isFalse();
@@ -370,7 +370,7 @@ class AuditFindingsContextTest {
         verifyNoInteractions(repository);
     }
 
-    // --- durch die echte ExecutionContextFactory ---------------------------------------
+    // --- through the real ExecutionContextFactory --------------------------------------
 
     private ExecutionContext contextFor(Map<String, Object> workflowMeta, Map<String, Object> input) {
         Project project = Project.builder().id(projectId).name("Audit-Projekt").path("/tmp/" + projectId).build();

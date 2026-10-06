@@ -136,7 +136,7 @@ class ChainRunRepositoryTest {
         assertThat(result.get(0).getStartedAt()).isAfterOrEqualTo(result.get(1).getStartedAt());
     }
 
-    /** Die Chain-Runs eines Zeitplans: die neuesten bis zum Limit, dazu ihre Gesamtzahl (TODO 86777fb4). */
+    /** The chain runs of a schedule: the newest up to the limit, plus their total count (TODO 86777fb4). */
     @Test
     void findByTriggeredByScheduleId_withLimit_returnsTheNewest_andTheCountAll() {
         WorkflowChain chain = saveChain("Scheduled Chain");
@@ -242,7 +242,7 @@ class ChainRunRepositoryTest {
 
     // --- findStatusesByScheduleIdNewestFirst ---
 
-    /** Nur die Status-Spalte, neuester zuerst, nur der eigene Zeitplan (TODO 86286572). */
+    /** Only the status column, newest first, only the schedule's own (TODO 86286572). */
     @Test
     void findStatusesByScheduleIdNewestFirst_returnsTheNewestStatusOfTheSchedule() {
         WorkflowChain chain = saveChain("Chain");
@@ -328,8 +328,8 @@ class ChainRunRepositoryTest {
     }
 
     /**
-     * Der JOIN FETCH der Laufliste braucht eine eigene Zaehlabfrage (TODO 44db05fd). Sie greift erst,
-     * wenn die Seite voll ist – und muss dann dieselben Filter anwenden wie die Liste.
+     * The JOIN FETCH of the run list needs its own count query (TODO 44db05fd). It only kicks in
+     * when the page is full – and must then apply the same filters as the list.
      */
     @Test
     void findFiltered_fullPage_countsWithTheSameFilters() {

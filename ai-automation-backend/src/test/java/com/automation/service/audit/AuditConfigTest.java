@@ -7,7 +7,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Die Audit-Abmachung wird ganz oder gar nicht verstanden. */
+/** The audit agreement is understood completely or not at all. */
 class AuditConfigTest {
 
     private static Map<String, Object> audit(Map<String, Object> block) {

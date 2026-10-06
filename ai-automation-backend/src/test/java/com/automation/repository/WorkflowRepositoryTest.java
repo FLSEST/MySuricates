@@ -144,11 +144,11 @@ class WorkflowRepositoryTest {
     }
 
     /**
-     * Die Liste hinter {@code /workflows} und {@code /search} holt den Container des Projekts in
-     * derselben Abfrage: {@code Project.container} ist eine nullable {@code @OneToOne(mappedBy)},
-     * die Hibernate sonst je Ergebniszeile mit einem eigenen {@code select containers} aufloest —
-     * auch fuer dasselbe Projekt, auch wenn es gar keinen Container hat (TODO 13d1e2a2). Geprueft
-     * mit und ohne Container, denn nur der vorhandene zeigt, dass der Join auch etwas liefert.
+     * The list behind {@code /workflows} and {@code /search} fetches the project's container in
+     * the same query: {@code Project.container} is a nullable {@code @OneToOne(mappedBy)},
+     * which Hibernate otherwise resolves per result row with its own {@code select containers} —
+     * even for the same project, even if it has no container at all (TODO 13d1e2a2). Checked
+     * with and without a container, because only an existing one shows that the join also returns something.
      */
     @Test
     void should_fetch_the_project_container_along_with_the_workflow_list() {
@@ -168,7 +168,7 @@ class WorkflowRepositoryTest {
             saveWorkflow("WithContainer-" + i + "-" + System.nanoTime(), activeProject);
             saveWorkflow("Bare-" + i + "-" + System.nanoTime(), bare);
         }
-        // Sonst faende die Abfrage die verwalteten Instanzen vor, und nichts wuerde nachgeladen.
+        // Otherwise the query would find the managed instances and nothing would be reloaded.
         entityManager.flush();
         entityManager.clear();
 
@@ -188,7 +188,7 @@ class WorkflowRepositoryTest {
 
     private record Counted<T>(T result, int statements) {}
 
-    /** Fuehrt die Abfrage aus und zaehlt die SQL-Statements, die sie absetzt. */
+    /** Runs the query and counts the SQL statements it issues. */
     private static <T> Counted<T> counted(Supplier<T> query) {
         SqlStatementCounter.start();
         try {
@@ -284,7 +284,7 @@ class WorkflowRepositoryTest {
         assertThat(readOnly).extracting(Workflow::getId).doesNotContain(id);
     }
 
-    /** 6299a860: ChainService prüft die Workflow-IDs aller Einträge mit dieser einen Abfrage. */
+    /** 6299a860: ChainService checks the workflow IDs of all entries with this one query. */
     @Test
     void should_find_existing_ids_excluding_unknown_and_soft_deleted() {
         Workflow alive = saveWorkflow("ExistingIds-" + System.nanoTime(), activeProject);

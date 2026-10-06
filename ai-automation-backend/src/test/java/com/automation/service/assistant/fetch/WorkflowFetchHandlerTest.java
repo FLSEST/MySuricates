@@ -53,7 +53,7 @@ class WorkflowFetchHandlerTest {
         assertThat(handler.formatWorkflowDetail("wf-1")).endsWith("\nBlocks (1):\n  1. [approval]\n");
     }
 
-    /** bf009b6f: drei Sub-Workflow-Blöcke, eine Namensabfrage — und findById nur für den Workflow selbst. */
+    /** bf009b6f: three sub-workflow blocks, one name query — and findById only for the workflow itself. */
     @Test
     void detail_subWorkflowNamesComeFromOneQuery() {
         Workflow wf = Workflow.builder().id("wf-1").name("Kette").blocks(List.of(

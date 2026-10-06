@@ -61,14 +61,14 @@ class RateLimitConfigTest {
 
     @Test
     void should_haveValidatedAnnotation_when_classIsInspected() {
-        // Ohne @Validated bliebe @Min beim Binden wirkungslos.
+        // Without @Validated, @Min would have no effect when binding.
         assertThat(RateLimitConfig.class.isAnnotationPresent(Validated.class)).isTrue();
     }
 
     @Test
     void should_rejectNonPositiveClientValues_when_theyAreBound() {
-        // Ein negativer Wert soll dort auffallen, wo er gesetzt wird (Start), nicht erst im
-        // Browser-Client — der wirft ihn weg und rät wieder (37b98c97).
+        // A negative value should be noticed where it is set (startup), not only in the
+        // browser client — which discards it and guesses again (37b98c97).
         assertThatThrownBy(() -> bind("client-global-backoff-seconds", "-1"))
                 .hasMessageContaining("Failed to bind properties")
                 .hasStackTraceContaining("clientGlobalBackoffSeconds");
@@ -81,10 +81,10 @@ class RateLimitConfigTest {
     void should_bindPositiveClientValues_when_theyAreConfigured() {
         RateLimitConfig bound = bind("client-global-backoff-seconds", "5");
         assertThat(bound.getClientGlobalBackoffSeconds()).isEqualTo(5);
-        assertThat(bound.getClientDefaultRetryAfterSeconds()).isEqualTo(10); // unveränderter Default
+        assertThat(bound.getClientDefaultRetryAfterSeconds()).isEqualTo(10); // unchanged default
     }
 
-    /** Bindet eine einzelne Property so, wie Spring Boot es beim Start täte — inklusive Validierung. */
+    /** Binds a single property the way Spring Boot would at startup — including validation. */
     private RateLimitConfig bind(String key, String value) {
         MapConfigurationPropertySource source = new MapConfigurationPropertySource(
                 Map.of("automation.security.rate-limit." + key, value));
@@ -99,8 +99,8 @@ class RateLimitConfigTest {
 
     @Test
     void should_return2_when_clientGlobalBackoffDefaultIsQueried() {
-        // Die heutigen Client-Konstanten sind der Default — ohne Konfiguration bleibt das
-        // Verhalten des Frontends unverändert (b6feccbc).
+        // Today's client constants are the default — without configuration the
+        // frontend's behavior stays unchanged (b6feccbc).
         assertThat(config.getClientGlobalBackoffSeconds()).isEqualTo(2);
     }
 

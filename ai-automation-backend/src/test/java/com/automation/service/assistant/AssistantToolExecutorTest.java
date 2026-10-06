@@ -632,7 +632,7 @@ class AssistantToolExecutorTest {
         assertThat(result.message()).contains("⚠").contains("db full");
     }
 
-    // --- Guardrails: Validierung, Rate-Limit, Audit-Trail (TODO 9f022277) ---
+    // --- Guardrails: validation, rate limit, audit trail (TODO 9f022277) ---
 
     @Test
     void executeConfirmed_invalidWorkflowBlocks_rejectedBeforeDbWrite() {

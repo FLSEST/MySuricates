@@ -97,7 +97,7 @@ class AuditFindingOccurrenceRepositoryTest {
         assertThat(occurrenceRepository.findFindingIdsByReportId(report2)).containsExactly(a);
     }
 
-    /** Eine GROUP-BY-Abfrage fuer eine ganze Report-Seite; ein Report ohne Findings fehlt (TODO a3b89355). */
+    /** One GROUP-BY query for a whole report page; a report without findings is missing (TODO a3b89355). */
     @Test
     void countByReportIds_countsPerReport_inOneQuery() {
         String a = saveFinding("fp-a");

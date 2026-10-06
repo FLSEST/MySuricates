@@ -29,7 +29,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-/** Die TODO-Verknüpfungen eines Findings: verwaltet anlegen, verknüpfen, lösen, warten, lesen. */
+/** The TODO links of a finding: create managed, link, unlink, maintain, read. */
 @ExtendWith(MockitoExtension.class)
 class AuditFindingTodoLinkerTest {
 
@@ -170,24 +170,24 @@ class AuditFindingTodoLinkerTest {
                 link("f-open", "t-1", true), link("f-fixed", "t-1", true), link("f-gone", "t-1", true)));
         when(findingTodoRepository.findByFindingIdIn(List.of("f-open", "f-fixed", "f-gone"))).thenReturn(List.of(
                 link("f-open", "t-1", true), link("f-fixed", "t-1", true), link("f-gone", "t-1", true)));
-        // "f-gone" ist geloescht: findAllById liefert es einfach nicht mit.
+        // "f-gone" is deleted: findAllById simply does not return it.
         when(findingRepository.findAllById(List.of("f-open", "f-fixed", "f-gone"))).thenReturn(List.of(open, fixed));
 
         linker().markAwaitingVerification("t-1");
 
         assertThat(open.getStatus()).isEqualTo(AuditFindingStatus.AWAITING_VERIFICATION);
         assertThat(fixed.getStatus()).isEqualTo(AuditFindingStatus.RESOLVED);
-        // e8ca26e9: gesammelt gespeichert, nur das umgestellte Finding, kein save je Finding.
+        // e8ca26e9: saved in bulk, only the changed finding, no save per finding.
         verify(findingRepository).saveAll(List.of(open));
         verify(findingRepository, never()).save(any());
-        // 5fb7b1e9: eine gebuendelte Abfrage ueber die Verknuepfungen, keine je Verknuepfung.
+        // 5fb7b1e9: one bundled query over the links, not one per link.
         verify(findingRepository, times(1)).findAllById(any());
         verify(findingRepository, never()).findById(any());
     }
 
     /**
-     * ab1ed481: Das manuell verknuepfte TODO ist erledigt, das verwaltete wurde freigegeben (ARCHIVED) —
-     * der Befund wartet jetzt ebenso auf den naechsten Audit-Lauf wie nach einem erledigten verwalteten TODO.
+     * ab1ed481: The manually linked TODO is done, the managed one was released (ARCHIVED) —
+     * the finding now waits for the next audit run just as after a completed managed TODO.
      */
     @Test
     void markAwaitingVerification_alsoForAManuallyLinkedTodo() {
@@ -206,7 +206,7 @@ class AuditFindingTodoLinkerTest {
         verify(findingRepository).saveAll(List.of(open));
     }
 
-    /** Solange ein anderes verknuepftes TODO noch offen ist, ist die Arbeit am Befund nicht erledigt. */
+    /** As long as another linked TODO is still open, the work on the finding is not done. */
     @Test
     void markAwaitingVerification_keepsAFindingOpenWhileAnotherLinkedTodoIsOpen() {
         AuditFinding waitsForOther = finding("f-1", "p-1");
@@ -231,8 +231,8 @@ class AuditFindingTodoLinkerTest {
     }
 
     /**
-     * Sammelschliessen (Review zu ab1ed481): mehrere TODOs werden zugleich DONE. Ein Befund, an dem nur
-     * diese TODOs haengen, wartet; einer mit einem weiteren offenen TODO bleibt OPEN. Je Stufe eine Abfrage.
+     * Bulk closing (review of ab1ed481): several TODOs become DONE at once. A finding to which only
+     * these TODOs are attached waits; one with a further open TODO stays OPEN. One query per stage.
      */
     @Test
     void markAwaitingVerification_forSeveralTodosAtOnce() {

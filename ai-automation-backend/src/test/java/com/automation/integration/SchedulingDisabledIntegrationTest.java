@@ -11,12 +11,12 @@ import org.springframework.test.context.ActiveProfiles;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Stellt sicher, dass im Profil "integration" kein Spring-Scheduling aktiv ist.
+ * Ensures that no Spring scheduling is active in the "integration" profile.
  *
- * <p>Hintergrund: Laufende {@code @Scheduled}-Jobs schreiben waehrend des Testlaufs in dieselbe
- * SQLite-Datei wie die Tests. {@code HealthAutoTodoService} legte so ein TODO an, sobald die
- * Stable-/Test-Instanz nicht erreichbar war, wodurch global zaehlende Assertions in
- * {@code TodoRepositoryIntegrationTest} kippten. Siehe {@code config.SchedulingConfig}.
+ * <p>Background: running {@code @Scheduled} jobs write to the same SQLite file as the tests during
+ * the test run. {@code HealthAutoTodoService} thus created a TODO as soon as the stable/test
+ * instance was unreachable, which broke globally counting assertions in
+ * {@code TodoRepositoryIntegrationTest}. See {@code config.SchedulingConfig}.
  */
 @SpringBootTest
 @ActiveProfiles("integration")

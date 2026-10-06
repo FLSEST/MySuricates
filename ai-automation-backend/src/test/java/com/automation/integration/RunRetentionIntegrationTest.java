@@ -25,8 +25,8 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Beweist gegen echtes SQLite, dass die Run-Retention nur abgeschlossene, alte Runs ohne
- * Audit-Report trifft — und dass die JPQL-Query ueberhaupt bootet (Subquery auf AuditReport).
+ * Proves against real SQLite that run retention only hits finished, old runs without
+ * an audit report — and that the JPQL query boots at all (subquery on AuditReport).
  */
 @SpringBootTest
 @ActiveProfiles("integration")
@@ -95,9 +95,9 @@ class RunRetentionIntegrationTest {
     void findTerminalRunIdsOlderThan_returnsOnlyOldFinishedRunsWithoutAuditReport_oldestFirst() {
         WorkflowRun oldest = run(RunStatus.FAILED, 200, 1);
         WorkflowRun old = run(RunStatus.COMPLETED, 100, 2);
-        run(RunStatus.COMPLETED, 1, 1);               // zu jung
-        run(RunStatus.RUNNING, 0, 0);                 // nicht terminal, kein completedAt
-        run(RunStatus.INTERRUPTED, 150, 1);           // eigene Regel, nicht Teil der Retention
+        run(RunStatus.COMPLETED, 1, 1);               // too young
+        run(RunStatus.RUNNING, 0, 0);                 // not terminal, no completedAt
+        run(RunStatus.INTERRUPTED, 150, 1);           // own rule, not part of retention
         WorkflowRun audited = run(RunStatus.COMPLETED, 120, 1);
         auditReportFor(audited);
 

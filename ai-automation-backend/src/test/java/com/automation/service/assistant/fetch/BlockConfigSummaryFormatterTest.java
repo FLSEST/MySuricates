@@ -115,7 +115,7 @@ class BlockConfigSummaryFormatterTest {
                 .isEqualTo("     source: previous\n     instruction: Kurz fassen\n");
     }
 
-    /** Die echten Typnamen sind kleingeschrieben bzw. mit Bindestrich (TODO f8d74d01); foreach führt einen Befehl je Item aus. */
+    /** The real type names are lowercase or hyphenated (TODO f8d74d01); foreach runs a command per item. */
     @Test
     void foreach_showsWhereItsItemsComeFromAndItsCommand() {
         assertThat(summary("foreach", Map.of("items_source", "command", "items_command", "ls docs",
@@ -135,7 +135,7 @@ class BlockConfigSummaryFormatterTest {
                 .isEqualTo("     sub-workflow: Nachtlauf\n");
     }
 
-    /** Unbekannte oder soft-gelöschte Workflows fehlen im Ergebnis — dann steht wie bisher die ID da. */
+    /** Unknown or soft-deleted workflows are missing from the result — then the ID is shown as before. */
     @Test
     void subWorkflow_unknownWorkflow_showsItsId() {
         when(workflowRepository.findIdAndNameByIdIn(Set.of("wf-gone"))).thenReturn(List.of());
@@ -144,7 +144,7 @@ class BlockConfigSummaryFormatterTest {
                 .isEqualTo("     sub-workflow: wf-gone\n");
     }
 
-    /** bf009b6f: die Namen aller Sub-Workflow-Blöcke kommen aus einer Abfrage, nicht aus einem findById je Block. */
+    /** bf009b6f: the names of all sub-workflow blocks come from one query, not from a findById per block. */
     @Test
     void subWorkflowNames_resolvesAllSubWorkflowBlocksInOneQuery() {
         List<BlockDefinition> blocks = List.of(

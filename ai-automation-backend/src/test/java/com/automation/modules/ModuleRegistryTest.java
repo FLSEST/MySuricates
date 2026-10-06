@@ -312,7 +312,7 @@ class ModuleRegistryTest {
         assertThat(ModuleCatalog.DASHBOARD_REPORT.property()).isEqualTo("automation.modules.dashboard-report");
     }
 
-    /** TODO c60bf914: Ziele sind ein Standardmodul – in jedem Preset an, beim Start abschaltbar. */
+    /** TODO c60bf914: goals are a standard module – on in every preset, can be switched off at startup. */
     @Test
     void goalsIsAStandardFeatureModule_onInEveryPreset_switchableOffAtStartup() {
         assertThat(ModuleCatalog.GOALS.kind()).isEqualTo(ModuleKind.FEATURE);

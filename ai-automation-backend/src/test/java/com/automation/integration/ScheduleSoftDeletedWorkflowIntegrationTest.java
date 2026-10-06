@@ -29,18 +29,18 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 /**
- * Was passiert, wenn ein Zeitplan auf einen soft-geloeschten Workflow zeigt?
+ * What happens when a schedule points to a soft-deleted workflow?
  *
- * <p>{@code Workflow} traegt {@code @SQLRestriction("deleted_at IS NULL")}, die Assoziation
- * {@code ScheduledWorkflow.workflow} ist {@code EAGER} und hatte lange kein {@code @NotFound}.
- * Hibernate hat die Assoziation dann Zeile fuer Zeile nachgeladen, die Restriction hat die Zeile
- * versteckt und der Ladevorgang ist mit {@code FetchNotFoundException} abgebrochen — die ganze
- * Liste, wegen eines einzigen verwaisten Zeitplans (TODO c9ec9844, gemessen 2026-09-19).
+ * <p>{@code Workflow} carries {@code @SQLRestriction("deleted_at IS NULL")}, the association
+ * {@code ScheduledWorkflow.workflow} is {@code EAGER} and for a long time had no {@code @NotFound}.
+ * Hibernate then reloaded the association row by row, the restriction hid the row
+ * and loading aborted with {@code FetchNotFoundException} — the whole
+ * list, because of a single orphaned schedule (TODO c9ec9844, measured 2026-09-19).
  *
- * <p>{@code ScheduleControllerTest} ist ein {@code @WebMvcTest} mit gemocktem Service und kann das
- * nicht zeigen: Die Frage entsteht erst im echten Persistenzkontext. Deshalb dieser
- * Integrationstest — er haelt das Verhalten fest, damit die Fetch-Strategie der Liste
- * (JOIN FETCH statt Query je Zeile) nicht im Dunkeln geaendert wird.
+ * <p>{@code ScheduleControllerTest} is a {@code @WebMvcTest} with a mocked service and cannot show
+ * this: the question only arises in the real persistence context. Hence this
+ * integration test — it pins the behavior so that the fetch strategy of the list
+ * (JOIN FETCH instead of a query per row) is not changed in the dark.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -48,7 +48,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 @Transactional
 class ScheduleSoftDeletedWorkflowIntegrationTest {
 
-    /** Naechster Termin der gesaeten Zeitplaene — ein aktiver Zeitplan hat im Betrieb immer einen. */
+    /** Next occurrence of the seeded schedules — an active schedule always has one in operation. */
     private static final Instant NEXT_RUN = Instant.parse("2026-09-07T06:00:00Z");
 
     @Autowired private MockMvc mockMvc;
@@ -87,9 +87,9 @@ class ScheduleSoftDeletedWorkflowIntegrationTest {
     }
 
     /**
-     * Das Ist-Verhalten, festgehalten: Ein Zeitplan, dessen Workflow soft-geloescht wurde, darf die
-     * Liste nicht zum Absturz bringen. Er bleibt sichtbar — ohne Workflow-Bezug, damit er in der UI
-     * ueberhaupt geloescht werden kann.
+     * The actual behavior, pinned: a schedule whose workflow was soft-deleted must not crash the
+     * list. It stays visible — without a workflow reference, so that it can be deleted in the UI
+     * at all.
      */
     @Test
     void listingSurvivesAScheduleWhoseWorkflowWasSoftDeleted() throws Exception {
@@ -137,11 +137,11 @@ class ScheduleSoftDeletedWorkflowIntegrationTest {
     }
 
     /**
-     * Der Kalender liest seine Termine ueber {@code findSchedulesInRange} — dieselbe Frage wie bei
-     * der Liste. Seit TODO 168e3d7f holt die Abfrage die Ziele per {@code LEFT JOIN FETCH} mit wie
-     * {@code findAllWithTargets()}, statt sie Zeile fuer Zeile nachzuladen. Das Verhalten fuer den
-     * verwaisten Zeitplan bleibt dabei dasselbe wie vorher (geprueft gegen die alte Abfrage): Der
-     * Termin erscheint ohne Ziel, und der Kalender antwortet.
+     * The calendar reads its entries via {@code findSchedulesInRange} — the same question as for
+     * the list. Since TODO 168e3d7f the query fetches the targets along via {@code LEFT JOIN FETCH} like
+     * {@code findAllWithTargets()}, instead of reloading them row by row. The behavior for the
+     * orphaned schedule stays the same as before (checked against the old query): the
+     * entry appears without a target, and the calendar responds.
      */
     @Test
     void calendarSurvivesAScheduleWhoseWorkflowWasSoftDeleted() throws Exception {
@@ -194,7 +194,7 @@ class ScheduleSoftDeletedWorkflowIntegrationTest {
         return null;
     }
 
-    /** Auch die Detail-Route eines verwaisten Zeitplans muss antworten statt zu werfen. */
+    /** The detail route of an orphaned schedule must also respond instead of throwing. */
     @Test
     void detailRouteSurvivesASoftDeletedWorkflow() throws Exception {
         Workflow doomed = seedWorkflowWithSchedule("detail");

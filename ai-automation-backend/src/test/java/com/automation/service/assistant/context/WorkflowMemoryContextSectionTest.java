@@ -85,7 +85,7 @@ class WorkflowMemoryContextSectionTest {
 
         assertThat(sb.toString()).contains("Memory 0").contains("Memory 7");
         verify(workflowMemoryRepository).findTop8ByActiveTrueOrderByCreatedAtDesc();
-        // Keine weitere Memory-Abfrage — insbesondere keine, die alle aktiven Memories laedt (7a8481e2).
+        // No further memory query — in particular none that loads all active memories (7a8481e2).
         verifyNoMoreInteractions(workflowMemoryRepository);
     }
 

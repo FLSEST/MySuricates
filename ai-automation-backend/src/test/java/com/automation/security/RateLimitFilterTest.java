@@ -109,15 +109,15 @@ class RateLimitFilterTest {
         filter.doFilterInternal(request, response, filterChain);
         filter.doFilterInternal(request, response, filterChain);
 
-        // Der Client richtet seine Sperre nach Retry-After; ohne den Header rät er 10 s. Ein
-        // frisches Fenster heißt: knapp 60 s (die exakte Rechnung prüft secondsUntilReset_*).
+        // The client bases its lockout on Retry-After; without the header it guesses 10 s. A
+        // fresh window means: just under 60 s (the exact calculation is checked by secondsUntilReset_*).
         ArgumentCaptor<String> retryAfter = ArgumentCaptor.forClass(String.class);
         verify(response).setHeader(eq("Retry-After"), retryAfter.capture());
         int seconds = Integer.parseInt(retryAfter.getValue());
         assertThat(seconds).isEqualTo(60);
 
         writer.flush();
-        // Derselbe Wert im Body — Header und JSON dürfen nicht auseinanderlaufen.
+        // The same value in the body — header and JSON must not diverge.
         assertThat(stringWriter.toString()).contains("\"retryAfterSeconds\": " + seconds);
     }
 
@@ -126,7 +126,7 @@ class RateLimitFilterTest {
         long start = 1_700_000_000_000L;
         RateLimitFilter.ClientBucket bucket = new RateLimitFilter.ClientBucket(start);
 
-        // Fester Zeitpunkt statt einer Spanne: eine hart verdrahtete 60 käme hier sonst durch.
+        // Fixed point in time instead of a span: a hard-wired 60 would otherwise slip through here.
         assertThat(bucket.secondsUntilReset(start)).isEqualTo(60);
         assertThat(bucket.secondsUntilReset(start + 30_000)).isEqualTo(30);
         assertThat(bucket.secondsUntilReset(start + 59_001)).isEqualTo(1);
@@ -138,7 +138,7 @@ class RateLimitFilterTest {
         long start = 1_700_000_000_000L;
         RateLimitFilter.ClientBucket bucket = new RateLimitFilter.ClientBucket(start);
 
-        // 0 hieße für den Client „keine Sperre" — er würde sofort wieder anfragen.
+        // 0 would mean "no lockout" to the client — it would immediately request again.
         assertThat(bucket.secondsUntilReset(start + 60_000)).isEqualTo(1);
         assertThat(bucket.secondsUntilReset(start + 120_000)).isEqualTo(1);
     }

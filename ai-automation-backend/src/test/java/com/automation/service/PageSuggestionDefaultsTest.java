@@ -13,11 +13,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class PageSuggestionDefaultsTest {
 
-    /** Seiten mit eigenen Vorschlägen; alle anderen (z. B. {@code dashboard}) bekommen die allgemeinen. */
+    /** Pages with their own suggestions; all others (e.g. {@code dashboard}) get the general ones. */
     private static final List<String> PAGES = List.of("run", "workflow", "workflows", "runs", "todos", "project",
             "projects", "schedules", "activity", "insights", "wishes", "factory", "chains");
 
-    /** Obergrenze, die {@link PageSuggestionService} auch für erzeugte Vorschläge setzt. */
+    /** Upper limit that {@link PageSuggestionService} also applies to generated suggestions. */
     private static final int MAX_SUGGESTIONS = 4;
 
     @Test
@@ -63,7 +63,7 @@ class PageSuggestionDefaultsTest {
     @NullSource
     @ValueSource(strings = {"de", "fr", "EN", "en-US"})
     void jedeAndereSpracheGiltAlsDeutsch(String lang) {
-        // Der Service normalisiert die Locale vorher auf en/de; was davon abweicht, bekommt Deutsch.
+        // The service normalizes the locale to en/de beforehand; anything deviating from that gets German.
         assertThat(PageSuggestionDefaults.forPage("todos", lang))
                 .containsExactly("Was ist dringend?", "Priorisiere meine Todos");
     }

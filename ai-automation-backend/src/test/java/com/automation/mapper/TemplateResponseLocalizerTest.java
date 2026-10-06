@@ -13,7 +13,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Zweisprachige Vorlagen kommen in der gewünschten Sprache zurück, einsprachige unverändert. */
+/** Bilingual templates come back in the requested language, monolingual ones unchanged. */
 class TemplateResponseLocalizerTest {
 
     private static final String SOURCE;

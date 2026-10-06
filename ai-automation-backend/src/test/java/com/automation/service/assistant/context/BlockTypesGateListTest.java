@@ -12,17 +12,17 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Koppelt die Blocktyp-Liste des Hygiene-Gates an die Registry im Backend (TODO bdc784e1).
+ * Couples the block type list of the hygiene gate to the registry in the backend (TODO bdc784e1).
  *
- * <p>{@code HYGIENE_POOL_BLOCK_TYPES} in {@code scripts/lib/hygiene-rules.sh} wurde von Hand
- * gepflegt und erst nachträglich von {@code scripts/tests/test-public-hygiene.sh} (Check 13) mit
- * {@link BlockTypesIndexSection#BLOCK_TYPES} verglichen. Ein neuer Blocktyp fiel damit erst auf,
- * wenn jemand die Hygiene-Tests laufen liess — die Reihenfolge war verkehrt: erst Drift, dann
- * Vergleich.
+ * <p>{@code HYGIENE_POOL_BLOCK_TYPES} in {@code scripts/lib/hygiene-rules.sh} was maintained by hand
+ * and only afterwards compared by {@code scripts/tests/test-public-hygiene.sh} (check 13) with
+ * {@link BlockTypesIndexSection#BLOCK_TYPES}. A new block type was thus only noticed
+ * when someone ran the hygiene tests — the order was wrong: first drift, then
+ * comparison.
  *
- * <p>Vorbild ist {@code PoolSanitizerKeysTest} mit {@code scripts/lib/pool-sanitizer.generated.sh}:
- * der Test erzeugt die Bash-Datei aus der einen Quelle, das Skript liest sie. Wer einen Blocktyp
- * hinzufügt, ohne neu zu erzeugen, macht diesen Test rot.
+ * <p>Modeled on {@code PoolSanitizerKeysTest} with {@code scripts/lib/pool-sanitizer.generated.sh}:
+ * the test generates the Bash file from the one source, the script reads it. Whoever adds a block type
+ * without regenerating turns this test red.
  */
 class BlockTypesGateListTest {
 
@@ -62,9 +62,9 @@ class BlockTypesGateListTest {
     // ── Rendering ────────────────────────────────────────────────────────────
 
     /**
-     * Sortiert, nicht in Registry-Reihenfolge: das Gate vergleicht sortiert, und eine sortierte
-     * Datei aendert sich nur, wenn wirklich ein Typ dazukommt oder wegfaellt — nicht schon, wenn
-     * jemand die Registry-Zeilen umstellt.
+     * Sorted, not in registry order: the gate compares sorted, and a sorted
+     * file only changes when a type really is added or removed — not already when
+     * someone reorders the registry lines.
      */
     private static String render() {
         StringBuilder out = new StringBuilder("""

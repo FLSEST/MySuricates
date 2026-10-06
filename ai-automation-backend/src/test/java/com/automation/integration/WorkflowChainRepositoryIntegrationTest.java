@@ -36,7 +36,7 @@ class WorkflowChainRepositoryIntegrationTest {
     @Autowired private ChainRunRepository chainRunRepository;
     @Autowired private EntityManager entityManager;
 
-    /** V96 (TODO 6db47bc2): der Starter der Kette liegt an der Chain-Run-Zeile, nicht nur im Kontext der Einträge. */
+    /** V96 (TODO 6db47bc2): the starter of the chain sits on the chain run row, not only in the context of the entries. */
     @Test
     void chainRun_triggerSource_roundTrip() {
         WorkflowChain chain = chainRepository.save(WorkflowChain.builder()

@@ -24,7 +24,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/** Zusammenfuehren zweier Findings derselben Identitaet: nichts geht verloren, Dispositionen gewinnen. */
+/** Merging two findings of the same identity: nothing is lost, dispositions win. */
 @ExtendWith(MockitoExtension.class)
 class AuditFindingMergerTest {
 
@@ -178,7 +178,7 @@ class AuditFindingMergerTest {
         assertThat(moving.getFindingId()).isEqualTo("target");
         verify(findingTodoRepository).deleteAll(List.of(colliding));
         verify(findingTodoRepository, never()).delete(any());
-        // d2500abd: Ziel-Verknuepfungen und TODOs je eine Abfrage, keine je Verknuepfung.
+        // d2500abd: goal links and TODOs one query each, not one per link.
         verify(findingTodoRepository, never()).findByFindingIdAndTodoId(any(), any());
         verify(todoRepository, never()).findById(any());
         assertThat(targetLink.isManaged()).as("verwaltete Dublette macht die Ziel-Verknuepfung verwaltet").isTrue();
@@ -203,7 +203,7 @@ class AuditFindingMergerTest {
         assertThat(clash.getFindingId()).isEqualTo("dup");
         verify(occurrenceRepository).deleteAll(List.of(clash));
         verify(occurrenceRepository, never()).delete(any());
-        // d2500abd: die Reports des Ziels aus einer Abfrage, kein exists je Vorkommen.
+        // d2500abd: the goal's reports from one query, no exists per occurrence.
         verify(occurrenceRepository, never()).existsByFindingIdAndReportId(any(), any());
     }
 

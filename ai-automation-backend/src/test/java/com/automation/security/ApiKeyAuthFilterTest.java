@@ -29,7 +29,7 @@ class ApiKeyAuthFilterTest {
     @Mock
     private ActivityLogService activityLogService;
 
-    /** Echter Request: der Filter matcht den Pfad mit denselben PathPattern-Matchern wie die Filterkette. */
+    /** Real request: the filter matches the path with the same PathPattern matchers as the filter chain. */
     private MockHttpServletRequest request;
 
     @Mock
@@ -178,8 +178,8 @@ class ApiKeyAuthFilterTest {
 
     @Test
     void securityEnabled_noKey_jvmMemoryPath_noSecurityLog() throws Exception {
-        // c2cda5ed: der Performance-Audit liest die Heap-Zahlen ohne Key — jeder Lauf waere
-        // sonst ein SECURITY-Eintrag "no API key provided".
+        // c2cda5ed: the performance audit reads the heap numbers without a key — every run would
+        // otherwise be a SECURITY entry "no API key provided".
         ReflectionTestUtils.setField(filter, "securityEnabled", true);
         when(apiKeyService.getEffectiveApiKey()).thenReturn("my-secret-key");
         request.setRequestURI("/api/v1/system/jvm-memory");
@@ -193,7 +193,7 @@ class ApiKeyAuthFilterTest {
 
     @Test
     void securityEnabled_noKey_otherSystemMetricsPath_stillLogsSecurityEvent() throws Exception {
-        // Die Ausnahme ist genau ein Pfad: der Nachbar mit den Request-Kosten bleibt geschuetzt.
+        // The exception is exactly one path: its neighbor with the request costs stays protected.
         ReflectionTestUtils.setField(filter, "securityEnabled", true);
         when(apiKeyService.getEffectiveApiKey()).thenReturn("my-secret-key");
         request.setRequestURI("/api/v1/system/request-metrics");
@@ -205,8 +205,8 @@ class ApiKeyAuthFilterTest {
 
     @Test
     void securityEnabled_noKey_oauthCallback_noSecurityLog() throws Exception {
-        // Der Anbieter ruft ohne Key zurück; die Filterkette lässt den Callback durch — früher hielt
-        // der Filter ihn trotzdem für geschützt und schrieb bei jedem OAuth-Login eine Warnung.
+        // The provider calls back without a key; the filter chain lets the callback through — the filter
+        // used to still consider it protected and wrote a warning on every OAuth login.
         ReflectionTestUtils.setField(filter, "securityEnabled", true);
         when(apiKeyService.getEffectiveApiKey()).thenReturn("my-secret-key");
         request.setRequestURI("/api/v1/integrations/github/callback");
@@ -229,8 +229,8 @@ class ApiKeyAuthFilterTest {
             "/api/v1/integrations/a/b/callback"
     })
     void securityEnabled_noKey_keyRequiredPath_logsSecurityEvent(String path) throws Exception {
-        // Was die Filterkette ohne Key abweist, protokolliert der Filter — auch unter /actuator/**
-        // und für die Nachbarn der öffentlichen Pfade.
+        // What the filter chain rejects without a key, the filter logs — also under /actuator/**
+        // and for the neighbors of the public paths.
         ReflectionTestUtils.setField(filter, "securityEnabled", true);
         when(apiKeyService.getEffectiveApiKey()).thenReturn("my-secret-key");
         request.setRequestURI(path);

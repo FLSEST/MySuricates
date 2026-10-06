@@ -250,14 +250,14 @@ class WorkflowMapperTest extends WorkflowMapper {
     }
 
     /**
-     * Die schlanke Listen-Antwort (TODO a05c9504, 7fd9f654).
+     * The lean list response (TODO a05c9504, 7fd9f654).
      *
-     * <p>Die Listen-Route trug jeden Step-Output mit: 3 061 816 Bytes bei 60 Runs, nach der
-     * Umstellung 51 716. Statt der Schritte kommen ihre Anzahl und die gekuerzte Ausgabe des
-     * letzten — seit 7fd9f654 aus einer Zusammenfassung, die die Datenbank liefert, ohne dass eine
-     * Step-Zeile geladen wird. {@link #summaryOf} baut sie hier so, wie die beiden Abfragen sie
-     * liefern: Anzahl, Status des letzten Schritts und dessen Ausgabe auf Vorschau + 1 Zeichen
-     * gekuerzt. Die Abfragen selbst prueft {@code RequestCostRatchetTest} gegen die echte Datenbank.
+     * <p>The list route used to carry every step output: 3 061 816 bytes for 60 runs, 51 716 after the
+     * change. Instead of the steps, their count and the truncated output of the
+     * last one come — since 7fd9f654 from a summary the database delivers, without loading a
+     * step row. {@link #summaryOf} builds it here the way the two queries
+     * deliver it: count, status of the last step and its output truncated to preview + 1 character.
+     * The queries themselves are checked by {@code RequestCostRatchetTest} against the real database.
      */
     @Nested
     class SchlankeListenAntwort {
@@ -293,7 +293,7 @@ class WorkflowMapperTest extends WorkflowMapper {
                     .endsWith(" […]");
         }
 
-        /** Genau Vorschau-Laenge ist nicht gekuerzt — das eine Zeichen mehr aus der Abfrage entscheidet. */
+        /** Exactly preview length is not truncated — the one extra character from the query decides. */
         @Test
         void ausgabeGenauInVorschauLaenge_bleibtOhneKuerzungsmarke() {
             String exact = "y".repeat(WorkflowRunListItemResponse.PREVIEW_LENGTH);
@@ -307,7 +307,7 @@ class WorkflowMapperTest extends WorkflowMapper {
             assertThat(itemFor(summaryOf("kurz")).lastStepPreview()).isEqualTo("kurz");
         }
 
-        /** Kein Wert bleibt null — sonst sieht "nichts ausgegeben" wie "leer ausgegeben" aus. */
+        /** No value stays null — otherwise "nothing output" looks like "empty output". */
         @Test
         void ausgabeNull_bleibtNull() {
             var item = itemFor(summaryOf((String) null));
@@ -316,7 +316,7 @@ class WorkflowMapperTest extends WorkflowMapper {
             assertThat(item.stepCount()).isEqualTo(1);
         }
 
-        /** TODO 6db47bc2: die Liste nennt den Chain-Run wie die Detail-Route — außerhalb einer Chain null. */
+        /** TODO 6db47bc2: the list names the chain run like the detail route — null outside a chain. */
         @Test
         void traegtDenChainRunDesLaufs() {
             WorkflowRun entry = WorkflowRun.builder().id("run-2").status(RunStatus.COMPLETED).chainRunId("chain-run-7").build();

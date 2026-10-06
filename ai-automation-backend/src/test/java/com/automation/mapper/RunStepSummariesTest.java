@@ -23,7 +23,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-/** Zusammenfassung je Lauf aus zwei Gruppenabfragen: Schrittzahl und Kopf des letzten Outputs. */
+/** Summary per run from two group queries: step count and head of the last output. */
 @ExtendWith(MockitoExtension.class)
 class RunStepSummariesTest {
 

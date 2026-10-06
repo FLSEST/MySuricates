@@ -316,8 +316,8 @@ class ScheduledWorkflowRepositoryTest {
     // --- findAllWithTargets ---
 
     /**
-     * Der Join darf nichts verschlucken: Ein Zeitplan ohne Workflow (Ketten-Ziel) und einer ohne
-     * Kette (Workflow-Ziel) muessen beide in der Liste stehen — {@code LEFT}, nicht {@code INNER}.
+     * The join must not swallow anything: a schedule without a workflow (chain target) and one without a
+     * chain (workflow target) must both be in the list — {@code LEFT}, not {@code INNER}.
      */
     @Test
     void findAllWithTargets_returnsWorkflowAndChainSchedules() {
@@ -334,7 +334,7 @@ class ScheduledWorkflowRepositoryTest {
                 .contains(forWorkflow.getId(), forChain.getId());
     }
 
-    /** Die Ziele kommen mitgeholt zurueck, sonst waere der Join sinnlos. */
+    /** The targets come back fetched along, otherwise the join would be pointless. */
     @Test
     void findAllWithTargets_fetchesWorkflowProjectAndChain() {
         Project project = saveProject("Project O");
@@ -356,7 +356,7 @@ class ScheduledWorkflowRepositoryTest {
                 .allSatisfy(s -> assertThat(s.getChain().getName()).isEqualTo("Chain O"));
     }
 
-    /** Ein Zeitplan darf nicht doppelt erscheinen, nur weil mehrere Assoziationen gejoint werden. */
+    /** A schedule must not appear twice just because several associations are joined. */
     @Test
     void findAllWithTargets_returnsEachScheduleOnce() {
         Project project = saveProject("Project P");

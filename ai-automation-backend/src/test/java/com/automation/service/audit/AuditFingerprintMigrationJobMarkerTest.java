@@ -34,9 +34,9 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
- * Der Aufraeumlauf ist einmalig: ein Marker in {@code app_settings} haelt fest, dass er
- * durchgelaufen ist — sonst scannte jeder Backend-Start alle Findings (Audit-TODO 763ff931).
- * Wird das AUDIT-Modul erst zur Laufzeit eingeschaltet, holt er den Lauf am Modul-Event nach.
+ * The cleanup run is a one-off: a marker in {@code app_settings} records that it
+ * has run — otherwise every backend start would scan all findings (audit TODO 763ff931).
+ * If the AUDIT module is only switched on at runtime, it catches up the run on the module event.
  */
 @ExtendWith(MockitoExtension.class)
 class AuditFingerprintMigrationJobMarkerTest {
@@ -74,7 +74,7 @@ class AuditFingerprintMigrationJobMarkerTest {
         verify(appSettings, never()).set(anyString(), anyString());
     }
 
-    /** Eine neue Job-Version raeumt noch einmal auf — der alte Marker haelt sie nicht auf. */
+    /** A new job version cleans up once more — the old marker does not stop it. */
     @Test
     void anOlderMarkerRunsTheScanAgain() {
         when(appSettings.get(MARKER)).thenReturn(Optional.of("1"));
