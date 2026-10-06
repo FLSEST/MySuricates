@@ -21,7 +21,8 @@ final class RunContainerPreparation {
         try {
             return containerService.getDockerContainerId(project);
         } catch (Exception e) {
-            log.warn("No running container for project {} ({}), attempting to start one...",
+            // Expected after IdleContainerReaper stopped an idle container, so not a warning (cbf57f21)
+            log.info("No running container for project {} ({}), attempting to start one...",
                     project.getName(), e.getMessage());
         }
 
