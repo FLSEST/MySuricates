@@ -15,9 +15,9 @@ import java.time.Instant;
 import java.util.*;
 
 /**
- * Nimmt den Report eines Audit-Laufs entgegen: prueft ihn und speichert ihn als {@link AuditReport}
- * (VALID/INVALID). Die Findings eines gueltigen Reports uebernimmt der {@link AuditSnapshotApplier} —
- * in derselben Transaktion wie das Speichern des Reports.
+  * Receives the report of an audit run: validates it and stores it as {@link AuditReport}
+  * (VALID/INVALID). The findings of a valid report are taken over by the {@link AuditSnapshotApplier} —
+  * in the same transaction as storing the report.
  */
 @Service
 @RequiredArgsConstructor
@@ -42,7 +42,7 @@ public class AuditIngestionService {
         }
 
         StepResult reportStep = step(run, config.reportBlock());
-        // Provider und Modell nennt der KI-Schritt; ein Shell-reportBlock hat keine (TODO fa66ea31).
+        // Provider and model are named by the AI step; a shell reportBlock has none (TODO fa66ea31).
         StepResult promptStep = step(run, config.promptBlock());
         String output = reportStep != null ? reportStep.getOutput() : "";
         ParseResult parsed = parser.parse(output);
@@ -77,9 +77,9 @@ public class AuditIngestionService {
 
         if (!valid) {
             log.warn("Stored invalid audit report for run {}: {}", event.getRunId(), error);
-            // Sichtbar machen, nicht nur ins Log: Ein ungueltiger Report laesst den kompletten
-            // Snapshot aus — kein Finding wird angelegt, keines auf RESOLVED gesetzt. Wer den
-            // Audit erwartet hat, soll sehen, warum nichts passiert ist (TODO e39379a9).
+            // Make it visible, not just in the log: an invalid report skips the entire
+            // snapshot — no finding is created, none set to RESOLVED. Whoever expected the
+            // audit should see why nothing happened (TODO e39379a9).
             activityLog.warn(ActivityLog.LogCategory.EXECUTION,
                     "Audit-Report verworfen (" + config.key() + "): " + firstNonBlank(error, "ungueltiger Snapshot")
                             + " — keine Findings uebernommen, keine aufgeloest",
@@ -87,8 +87,8 @@ public class AuditIngestionService {
             return;
         }
 
-        // Die Messwerte dieses Laufs — Vergleichsbasis fuer die Belegpruefung (TODO a94b56a0).
-        // Hier gelesen, wo die Steps ohnehin geladen sind; die Leseseite darf keine Step-Blobs holen.
+        // The measured values of this run — baseline for the evidence check (TODO a94b56a0).
+        // Read here, where the steps are loaded anyway; the read side must not fetch step blobs.
         Set<String> factNames = EvidenceVerification.factNames(
                 run.getSteps().stream().map(StepResult::getOutput).toList());
 
@@ -96,19 +96,19 @@ public class AuditIngestionService {
     }
 
     /**
-     * Ein ruleKey außerhalb des Katalogs macht den <b>ganzen</b> Report ungültig — sofern es für
-     * dieses Audit überhaupt einen Katalog gibt (TODO f57945e2).
+     * A ruleKey outside the catalog makes the <b>whole</b> report invalid — provided there is a catalog
+     * for this audit at all (TODO f57945e2).
      *
-     * <p>Zuvor wurde ein unbekannter Key nur als WARN gemeldet und das Finding trotzdem
-     * übernommen. Das ist bei einem Snapshot-Audit die teuerste Art, nachsichtig zu sein: Ein
-     * Envelope, dessen Keys einheitlich gedriftet sind, trägt die richtige <i>Anzahl</i> Findings
-     * und passiert damit den zählenden Gate-Block — die Ingestion legt aber lauter neue Identitäten
-     * an und schließt die komplette Vorgängergeneration als RESOLVED. Ergebnis: ebenso viele
-     * Wiedergänger, und die Arbeit an den echten Befunden beginnt von vorn.
+     * <p>Previously an unknown key was only reported as WARN and the finding was taken
+     * over anyway. For a snapshot audit that is the most expensive way to be lenient: an
+     * envelope whose keys have all drifted uniformly carries the right <i>number</i> of findings
+     * and thus passes the counting gate block — but the ingestion creates nothing but new identities
+     * and closes the entire previous generation as RESOLVED. Result: just as many
+     * revenants, and the work on the real findings starts over.
      *
-     * <p>Audits ohne Katalogeintrag bleiben unberührt — ihre Prompts vergeben die Keys frei.
+     * <p>Audits without a catalog entry stay untouched — their prompts assign the keys freely.
      *
-     * @return die Fehlermeldung, oder {@code null}, wenn alle Keys bekannt sind
+     * @return the error message, or {@code null} if all keys are known
      */
     private String unknownRuleKeyError(String auditKey, List<ParsedFinding> findings) {
         if (!ruleKeyCatalog.isChecked(auditKey)) {
@@ -127,7 +127,7 @@ public class AuditIngestionService {
                 + " — erlaubt sind " + ruleKeyCatalog.allowedKeys(auditKey);
     }
 
-    /** Delegat auf {@link AuditSnapshotApplier#fingerprint} — dort entsteht die Identitaet eines Findings. */
+    /** Delegate to {@link AuditSnapshotApplier#fingerprint} — that is where the identity of a finding is created. */
     static String fingerprint(String projectId, String auditKey, String ruleKey, String subject) {
         return AuditSnapshotApplier.fingerprint(projectId, auditKey, ruleKey, subject);
     }

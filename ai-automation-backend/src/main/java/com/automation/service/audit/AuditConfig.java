@@ -3,21 +3,21 @@ package com.automation.service.audit;
 import java.util.Map;
 
 /**
- * Die Audit-Abmachung eines Workflows, gelesen aus seinen Metadaten: unter welchem Schlüssel der
- * Audit läuft, in welcher Kategorie, und welcher Block den Ergebnis-Envelope schreibt.
+  * The audit agreement of a workflow, read from its metadata: under which key the
+  * audit runs, in which category, and which block writes the result envelope.
  *
- * <p>Umzug aus {@code AuditIngestionService} (TODO e39379a9) — ein eigenes Konzept, eine eigene
- * Datei; der Service stand sonst am Ratchet an.
+  * <p>Moved out of {@code AuditIngestionService} (TODO e39379a9) — a concept of its own, a file of its
+  * own; the service was otherwise at the ratchet limit.
  *
- * @param promptBlock   der KI-Block, dessen Schritt Provider und Modell des Reports nennt; ohne Angabe der
- *                      {@code reportBlock}. Eigens gesetzt, wenn ein Shell-Block den Envelope zusammensetzt
- *                      (Test-Abdeckung, TODO fa66ea31)
- * @param schemaVersion aktuell nur {@code 1}; eine unbekannte Version macht die Konfiguration
- *                      ungültig, statt sie halb zu verstehen
+  * @param promptBlock   the AI block whose step names the report's provider and model; without a value the
+  *                      {@code reportBlock}. Set explicitly when a shell block assembles the envelope
+  *                      (test coverage, TODO fa66ea31)
+  * @param schemaVersion currently only {@code 1}; an unknown version makes the configuration
+  *                      invalid instead of half-understanding it
  */
 record AuditConfig(String key, String category, String reportBlock, String promptBlock, int schemaVersion) {
 
-    /** @return {@code null}, wenn der Workflow keinen aktivierten, vollständigen Audit-Block trägt */
+    /** @return {@code null} if the workflow carries no enabled, complete audit block */
     static AuditConfig from(Map<String, Object> metadata) {
         Object value = metadata == null ? null : metadata.get("audit");
         if (!(value instanceof Map<?, ?> map) || !Boolean.TRUE.equals(map.get("enabled"))) return null;

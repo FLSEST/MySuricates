@@ -22,10 +22,10 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Die TODO-Verknüpfungen eines Audit-Findings im Audit Center: verwaltetes TODO auf Knopfdruck,
- * vorhandenes TODO verknüpfen oder lösen, Verknüpfungen lesen. Aus {@link AuditCenterService}
- * herausgelöst (a95c1c0e); läuft in dessen Transaktionen, das Anlegen selbst teilt sich den Weg
- * mit dem Ingest über {@link ManagedTodoWriter#create}.
+  * The TODO links of an audit finding in the Audit Center: managed TODO at the push of a button,
+  * link or unlink an existing TODO, read links. Split out of {@link AuditCenterService}
+  * (a95c1c0e); runs in its transactions, the creation itself shares its path
+  * with the ingest via {@link ManagedTodoWriter#create}.
  */
 @Service
 @RequiredArgsConstructor
@@ -36,10 +36,10 @@ class AuditFindingTodoLinker {
     private final TodoRepository todoRepository;
     private final ManagedTodoWriter managedTodoWriter;
 
-    /** Daran wird noch gearbeitet; DONE ist erledigt, ARCHIVED freigegeben. */
+    /** Still being worked on; DONE is completed, ARCHIVED released. */
     private static final Set<Todo.Status> STILL_OPEN = EnumSet.of(Todo.Status.OPEN, Todo.Status.IN_PROGRESS, Todo.Status.BACKLOG);
 
-    /** Legt das verwaltete TODO an, solange das Finding noch keine verwaltete Verknüpfung hat. */
+    /** Creates the managed TODO as long as the finding has no managed link yet. */
     void createManagedTodo(AuditFinding finding) {
         if (findingTodoRepository.findByFindingId(finding.getId()).stream().noneMatch(AuditFindingTodo::isManaged)) {
             managedTodoWriter.create(finding, managedTodoDescription(finding), finding.getLastSeenRunId(), true);
@@ -62,18 +62,18 @@ class AuditFindingTodoLinker {
     }
 
     /**
-     * Offene Findings, deren TODO erledigt gemeldet wird, warten auf den nächsten Audit-Lauf — ob das
-     * TODO verwaltet oder manuell verknüpft ist (ab1ed481: sonst blieb ein Befund OPEN, dessen
-     * verwaltetes TODO freigegeben und dessen manuelles erledigt war). Ist ein anderes verknüpftes TODO
-     * noch offen ({@link #STILL_OPEN}), ist die Arbeit am Befund nicht erledigt; er bleibt OPEN.
-     * Verknüpfungen, TODOs und Findings kommen aus je einer Abfrage, nicht aus einer je Verknüpfung
-     * (5fb7b1e9), gespeichert wird gesammelt (e8ca26e9).
+     * Open findings whose TODO is reported done wait for the next audit run — whether the
+     * TODO is managed or manually linked (ab1ed481: otherwise a finding stayed OPEN whose
+     * managed TODO was released and whose manual one was done). If another linked TODO
+     * is still open ({@link #STILL_OPEN}), the work on the finding is not done; it stays OPEN.
+     * Links, TODOs and findings come from one query each, not one per link
+     * (5fb7b1e9), saving is done collectively (e8ca26e9).
      */
     void markAwaitingVerification(String todoId) {
         markAwaitingVerification(List.of(todoId));
     }
 
-    /** Dasselbe fuer mehrere zugleich erledigte TODOs (Sammel-UPDATE); keines zaehlt fuer das andere als offen. */
+    /** The same for several TODOs completed at the same time (bulk UPDATE); none counts as open for the other. */
     void markAwaitingVerification(Collection<String> todoIds) {
         Set<String> completed = Set.copyOf(todoIds);
         if (completed.isEmpty()) return;
@@ -92,7 +92,7 @@ class AuditFindingTodoLinker {
         findingRepository.saveAll(awaiting);
     }
 
-    /** Findings, an denen außer den erledigten TODOs noch ein offenes hängt. */
+    /** Findings that, besides the completed TODOs, still have an open one attached. */
     private Set<String> findingsWithOtherOpenTodo(List<String> findingIds, Set<String> completed) {
         List<AuditFindingTodo> others = findingTodoRepository.findByFindingIdIn(findingIds).stream()
                 .filter(link -> !completed.contains(link.getTodoId()))
@@ -117,7 +117,7 @@ class AuditFindingTodoLinker {
                 }, Collectors.toList())));
     }
 
-    /** Sonst zeigt {@code todo.referenceId} (Deep-Link {@code /reports?finding=…}) auf ein Finding, das nicht mehr verknuepft ist. */
+    /** Otherwise {@code todo.referenceId} (deep link {@code /reports?finding=…}) points to a finding that is no longer linked. */
     private void clearAuditReference(String findingId, String todoId) {
         todoRepository.findById(todoId).ifPresent(todo -> {
             if (ManagedTodoWriter.REFERENCE_TYPE.equals(todo.getReferenceType())

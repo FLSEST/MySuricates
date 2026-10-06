@@ -14,20 +14,20 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Katalog der erlaubten {@code ruleKey}s je {@code auditKey} (Ressource
- * {@code audit/rule-keys.json}, erhoben aus den Audit-Prompts im {@code workflow-pool/}).
+  * Catalog of the allowed {@code ruleKey}s per {@code auditKey} (resource
+  * {@code audit/rule-keys.json}, collected from the audit prompts in {@code workflow-pool/}).
  *
- * <p>Die Identitaet eines Findings haengt an {@code ruleKey} + {@code subject}: driftet der
- * ruleKey zwischen zwei Runs ({@code god-classes-count} statt {@code god-class-count}), entsteht
- * ein Wiedergaenger-Finding samt Artefakt-Zahlen im Self-Improvement-Loop (Audit-TODO 8fc9a401).
- * Deshalb wird ein unbekannter Key erst {@link #normalize(String) normalisiert}; passt er dann
- * immer noch nicht, wird das Finding trotzdem uebernommen (kein Datenverlust) und der Fall
- * gemeldet. Ein auditKey ohne Katalogeintrag wird nicht geprueft.
+  * <p>The identity of a finding hangs on {@code ruleKey} + {@code subject}: if the
+  * ruleKey drifts between two runs ({@code god-classes-count} instead of {@code god-class-count}), a
+  * revenant finding arises including artifact counts in the self-improvement loop (audit TODO 8fc9a401).
+  * Therefore an unknown key is first {@link #normalize(String) normalized}; if it still does
+  * not fit then, the finding is taken over anyway (no data loss) and the case is
+  * reported. An auditKey without a catalog entry is not checked.
  *
- * <p>Ein Eintrag ist entweder der Key als String oder {@code {"key": …, "subject": …}}: Betrifft eine
- * Regel das Repository oder ein Modul als Ganzes, steht ihr subject fest ({@link #fixedSubject}), und die
- * Ingestion setzt es durch, statt sich auf die Bitte im Prompt zu verlassen (TODO 802f740a). Dateibezogene
- * Regeln haben keinen festen Wert; dort gilt die Pfadregel des Prompts.
+  * <p>An entry is either the key as a string or {@code {"key": …, "subject": …}}: if a
+  * rule concerns the repository or a module as a whole, its subject is fixed ({@link #fixedSubject}), and the
+  * ingestion enforces it instead of relying on the request in the prompt (TODO 802f740a). File-related
+  * rules have no fixed value; there the path rule of the prompt applies.
  */
 @Slf4j
 @Component
@@ -37,7 +37,7 @@ public class AuditRuleKeyCatalog {
     private static final String COUNT_SUFFIX = "-count";
 
     private final Map<String, Set<String>> allowed;
-    /** auditKey → ruleKey → festes subject, nur fuer Regeln mit festem Wert. */
+    /** auditKey → ruleKey → fixed subject, only for rules with a fixed value. */
     private final Map<String, Map<String, String>> fixedSubjects;
 
     public AuditRuleKeyCatalog(ObjectMapper objectMapper) {
@@ -47,9 +47,9 @@ public class AuditRuleKeyCatalog {
     }
 
     /**
-     * @param auditKey   Audit, in dessen Namensraum der Key gilt
-     * @param rawRuleKey ruleKey aus dem Envelope
-     * @return der zu verwendende Key und ob er unbekannt blieb
+     * @param auditKey   audit in whose namespace the key applies
+     * @param rawRuleKey ruleKey from the envelope
+     * @return the key to use and whether it remained unknown
      */
     public Resolution resolve(String auditKey, String rawRuleKey) {
         Set<String> known = allowed.get(auditKey);
@@ -63,29 +63,29 @@ public class AuditRuleKeyCatalog {
         return new Resolution(rawRuleKey, true);
     }
 
-    /** Wird dieser auditKey ueberhaupt geprueft? */
+    /** Is this auditKey checked at all? */
     public boolean isChecked(String auditKey) {
         return allowed.containsKey(auditKey);
     }
 
-    /** Erlaubte Keys eines Audits (leer, wenn der auditKey nicht im Katalog steht). */
+    /** Allowed keys of an audit (empty if the auditKey is not in the catalog). */
     public Set<String> allowedKeys(String auditKey) {
         return allowed.getOrDefault(auditKey, Set.of());
     }
 
     /**
-     * Das feste subject einer Regel, die das Repository oder ein Modul als Ganzes betrifft.
+     * The fixed subject of a rule that concerns the repository or a module as a whole.
      *
-     * @param ruleKey der schon aufgeloeste Key ({@link #resolve})
-     * @return der feste Wert oder {@code null}, wenn die Regel keinen hat (dateibezogen, unbekannt)
+     * @param ruleKey the already resolved key ({@link #resolve})
+     * @return the fixed value or {@code null} if the rule has none (file-related, unknown)
      */
     public String fixedSubject(String auditKey, String ruleKey) {
         return fixedSubjects.getOrDefault(auditKey, Map.of()).get(ruleKey);
     }
 
     /**
-     * Schreibweisen-Drift ausgleichen: Kleinschreibung, {@code _} → {@code -}, und ein Plural vor
-     * {@code -count} wird zum Singular ({@code god-classes-count} → {@code god-class-count}).
+     * Compensate spelling drift: lowercase, {@code _} → {@code -}, and a plural before
+     * {@code -count} becomes the singular ({@code god-classes-count} → {@code god-class-count}).
      */
     public static String normalize(String ruleKey) {
         if (ruleKey == null) {
@@ -94,7 +94,7 @@ public class AuditRuleKeyCatalog {
         return singularizeBeforeCount(ruleKey.trim().toLowerCase(Locale.ROOT).replace('_', '-'));
     }
 
-    /** Metrik-Keys driften zwischen Einzahl und Mehrzahl: {@code …-classes-count} → {@code …-class-count}. */
+    /** Metric keys drift between singular and plural: {@code …-classes-count} → {@code …-class-count}. */
     private static String singularizeBeforeCount(String ruleKey) {
         int cut = ruleKey.length() - COUNT_SUFFIX.length();
         if (cut <= 0 || !ruleKey.endsWith(COUNT_SUFFIX)) {
@@ -109,7 +109,7 @@ public class AuditRuleKeyCatalog {
         return stem + COUNT_SUFFIX;
     }
 
-    /** Nach Zisch- und S-Lauten lautet der Plural {@code -es} ({@code class → classes}). */
+    /** After sibilants and s-sounds the plural is {@code -es} ({@code class → classes}). */
     private static boolean endsSibilant(String stem) {
         return stem.endsWith("s") || stem.endsWith("x") || stem.endsWith("z")
                 || stem.endsWith("ch") || stem.endsWith("sh");
@@ -138,7 +138,7 @@ public class AuditRuleKeyCatalog {
             });
             return new Catalog(Map.copyOf(allowed), Map.copyOf(fixed));
         } catch (Exception e) {
-            // Ohne Katalog wird nicht geprueft — das darf den Start nie verhindern.
+            // Without a catalog nothing is checked — that must never prevent the start.
             log.error("Audit rule-key catalog {} could not be read, ruleKeys stay unchecked: {}", RESOURCE, e.toString());
             return new Catalog(Map.of(), Map.of());
         }
@@ -147,8 +147,8 @@ public class AuditRuleKeyCatalog {
     private record Catalog(Map<String, Set<String>> allowed, Map<String, Map<String, String>> fixedSubjects) {}
 
     /**
-     * @param ruleKey der zu verwendende Key (normalisiert, sonst der urspruengliche)
-     * @param unknown true, wenn der Key auch normalisiert nicht im Katalog steht
+     * @param ruleKey the key to use (normalized, otherwise the original)
+     * @param unknown true if the key is not in the catalog even normalized
      */
     public record Resolution(String ruleKey, boolean unknown) {}
 }

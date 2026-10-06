@@ -6,15 +6,15 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 /**
- * Ein TODO wurde {@code DONE}: seine offenen Befunde warten auf den naechsten Audit-Lauf
- * ({@link AuditFindingTodoLinker#markAwaitingVerification}). Das Ereignis meldet das TODO selbst beim
- * save/saveAll ({@link Todo.Completed}), damit kein Schreibpfad es vergisst — REST, TodoTrigger-Auto-Close,
- * verknuepfter Workflow, Sammelschliessen (Folgebefund zu ab1ed481).
+  * A TODO became {@code DONE}: its open findings wait for the next audit run
+  * ({@link AuditFindingTodoLinker#markAwaitingVerification}). The TODO itself reports the event on
+  * save/saveAll ({@link Todo.Completed}) so that no write path forgets it — REST, TodoTrigger auto-close,
+  * linked workflow, bulk close (follow-up finding to ab1ed481).
  *
- * <p>Synchron in der Transaktion des Speichernden, nicht AFTER_COMMIT: Es ist reine DB-Arbeit (kein
- * langsamer Aufruf), und rollt der Statuswechsel zurueck, soll auch der Befund nicht umgestellt sein. Wie der
- * fruehere direkte Aufruf aus {@code TodoService} laeuft das unabhaengig vom Modulschalter: Ohne Audit-Modul
- * gibt es keine Verknuepfungen, und Befunde aus der Zeit davor bleiben stimmig.
+  * <p>Synchronous in the saver's transaction, not AFTER_COMMIT: it is pure DB work (no
+  * slow call), and if the status change rolls back, the finding should not be switched either. Like the
+  * earlier direct call from {@code TodoService}, this runs independently of the module switch: without the audit module
+  * there are no links, and findings from the time before stay consistent.
  */
 @Component
 @RequiredArgsConstructor
@@ -30,7 +30,7 @@ class AuditTodoCompletionListener {
         }
     }
 
-    /** Sammel-UPDATE auf DONE: es laedt keine Entities, deshalb meldet der Service die IDs gesammelt. */
+    /** Bulk UPDATE to DONE: it loads no entities, therefore the service reports the IDs collectively. */
     @EventListener
     public void onTodosCompletedInBulk(Todo.CompletedInBulk event) {
         auditCenterService.markAwaitingVerification(event.todoIds());

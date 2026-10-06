@@ -5,54 +5,54 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
- * Normalisiert das modellgenerierte {@code subject} eines Audit-Findings, damit der Fingerprint
- * nicht bei jedem Run driftet (Audit-TODO 0e19648d). Beobachtete Drift: {@code ContainerShellService}
- * ↔ {@code ContainerShellService.execute}, {@code application.yml} ↔ {@code application.yml:key-store-password},
- * {@code AssistantService} ↔ {@code com/automation/service/AssistantService.java} (TODO 87a1dac0).
+  * Normalizes the model-generated {@code subject} of an audit finding so that the fingerprint
+  * does not drift on every run (audit TODO 0e19648d). Observed drift: {@code ContainerShellService}
+  * ↔ {@code ContainerShellService.execute}, {@code application.yml} ↔ {@code application.yml:key-store-password},
+  * {@code AssistantService} ↔ {@code com/automation/service/AssistantService.java} (TODO 87a1dac0).
  *
- * <p>Reine Funktion, bewusst konservativ:
+  * <p>Pure function, deliberately conservative:
  * <ul>
- *   <li>steht vor dem ersten {@code :} ein klein geschriebenes Art-Wort ({@code package},
- *       {@code keyword}, {@code safe-inventory}), ist {@code <art>:<wert>} die Identitaet und bleibt
- *       ganz — sonst fielen {@code package:a} und {@code package:b} zusammen und die Ingestion verwarf
- *       den zweiten Befund (TODO 94fda6ef),</li>
- *   <li>sonst (Datei, Klasse, Pfad vor dem {@code :}) faellt alles ab dem ersten {@code :} weg
- *       (Schluessel, Zeilennummer),</li>
- *   <li>ein Pfad auf eine Java-Klasse ({@code .java}, gross beginnend) wird zum Klassennamen:
- *       Klassenname und Pfad sind dieselbe Identitaet, egal ob {@code com/automation/…}, {@code service/…}
- *       oder ohne Pfad (TODO 87a1dac0). Im Backend ist jeder einfache Klassenname eindeutig,</li>
- *   <li>ein voll qualifizierter Klassenname ({@code com.automation.service.AssistantService}) wird
- *       ebenso zum einfachen Klassennamen,</li>
- *   <li>ein Frontend-Modul ({@code .ts}, {@code .tsx}) bleibt ein Pfad, auch ohne Verzeichnis — sonst fiele
- *       {@code ActivityLog.tsx} mit der Java-Klasse {@code ActivityLog} zusammen, und klein geschriebene Module
- *       wie {@code index.ts} gibt es mehrfach. Angeglichen werden nur die Praefix-Varianten:
- *       {@code ai-automation-frontend/src/…} und {@code src/…} werden zu {@code frontend/src/…},</li>
- *   <li>ein Suffix hinter dem letzten {@code .} faellt weg, wenn es klein beginnt (Methode) und das
- *       Segment davor gross beginnt (Klassenname) — {@code application.yml} bleibt also ganz,</li>
- *   <li>alle anderen Subjects mit {@code /} sind Pfade und bleiben unangetastet,</li>
- *   <li>Rand-Leerzeichen werden getrimmt, die Gross-/Kleinschreibung bleibt unveraendert.</li>
+  *   <li>if a lowercase kind word ({@code package},
+  *       {@code keyword}, {@code safe-inventory}) precedes the first {@code :}, {@code <art>:<wert>} is the identity and stays
+  *       intact — otherwise {@code package:a} and {@code package:b} would collapse and the ingestion discarded
+  *       the second finding (TODO 94fda6ef),</li>
+  *   <li>otherwise (file, class, path before the {@code :}) everything from the first {@code :} on is dropped
+  *       (key, line number),</li>
+  *   <li>a path to a Java class ({@code .java}, starting uppercase) becomes the class name:
+  *       class name and path are the same identity, whether {@code com/automation/…}, {@code service/…}
+  *       or without a path (TODO 87a1dac0). In the backend every simple class name is unique,</li>
+  *   <li>a fully qualified class name ({@code com.automation.service.AssistantService}) likewise
+  *       becomes the simple class name,</li>
+  *   <li>a frontend module ({@code .ts}, {@code .tsx}) stays a path, even without a directory — otherwise
+  *       {@code ActivityLog.tsx} would collapse with the Java class {@code ActivityLog}, and lowercase modules
+  *       like {@code index.ts} exist several times. Only the prefix variants are aligned:
+  *       {@code ai-automation-frontend/src/…} and {@code src/…} become {@code frontend/src/…},</li>
+  *   <li>a suffix after the last {@code .} is dropped if it starts lowercase (method) and the
+  *       segment before it starts uppercase (class name) — so {@code application.yml} stays intact,</li>
+  *   <li>all other subjects with {@code /} are paths and stay untouched,</li>
+  *   <li>edge whitespace is trimmed, the capitalization stays unchanged.</li>
  * </ul>
- * Die Funktion ist idempotent: {@code normalize(normalize(x)).equals(normalize(x))}.
+  * The function is idempotent: {@code normalize(normalize(x)).equals(normalize(x))}.
  *
- * <p>Kennzahl-Regeln (ein Befund je Messwert, subject = FAKT-Name) stabilisiert nicht diese Funktion,
- * sondern der feste Wert im ruleKey-Katalog ({@link AuditRuleKeyCatalog#fixedSubject}).
+  * <p>Metric rules (one finding per measured value, subject = FAKT name) are stabilized not by this function
+  * but by the fixed value in the ruleKey catalog ({@link AuditRuleKeyCatalog#fixedSubject}).
  */
 public final class AuditSubjectNormalizer {
 
-    /** Art-Wort vor dem Doppelpunkt: klein, ohne Punkt und Schraegstrich (also keine Datei, keine Klasse). */
+    /** Kind word before the colon: lowercase, without dot and slash (so no file, no class). */
     private static final Pattern KIND = Pattern.compile("[a-z][a-z0-9-]*");
-    /** Java-Quelldatei, deren Name der Klassenname ist: {@code AssistantService.java}. */
+    /** Java source file whose name is the class name: {@code AssistantService.java}. */
     private static final Pattern CLASS_FILE = Pattern.compile("([A-Z][A-Za-z0-9_]*)\\.java");
     private static final String FRONTEND = "frontend/";
     private static final String FRONTEND_MODULE_DIR = "ai-automation-frontend/";
     /**
-     * Voll qualifizierter Java-Klassenname: mindestens zwei klein geschriebene Paketsegmente, dann ein
-     * CamelCase-Name ({@code com.automation.Foo}). {@code pom.XML}, {@code docs.README} oder
-     * {@code service.Foo} sind keiner.
+     * Fully qualified Java class name: at least two lowercase package segments, then a
+     * CamelCase name ({@code com.automation.Foo}). {@code pom.XML}, {@code docs.README} or
+     * {@code service.Foo} are not.
      */
     private static final Pattern QUALIFIED_CLASS = Pattern.compile(
             "(?:[a-z_][a-z0-9_]*\\.){2,}([A-Z][A-Za-z0-9_]*[a-z][A-Za-z0-9_]*)");
-    /** Dateiendungen, die als letztes Segment nie ein Klassenname sind ({@code config.app.Yml}). */
+    /** File extensions that are never a class name as the last segment ({@code config.app.Yml}). */
     private static final Set<String> FILE_EXTENSIONS = Set.of("yml", "yaml", "xml", "json", "md", "properties",
             "java", "ts", "tsx", "js", "jsx", "sql", "sh", "txt", "html", "css", "toml", "gradle", "kt", "env");
 
@@ -89,7 +89,7 @@ public final class AuditSubjectNormalizer {
                 ? qualified.group(1) : withoutMethod;
     }
 
-    /** Einheitliches Praefix fuer Frontend-Module: {@code frontend/src/…}. */
+    /** Uniform prefix for frontend modules: {@code frontend/src/…}. */
     private static String frontendPath(String value) {
         if (value.startsWith(FRONTEND_MODULE_DIR)) {
             return FRONTEND + value.substring(FRONTEND_MODULE_DIR.length());
@@ -97,7 +97,7 @@ public final class AuditSubjectNormalizer {
         return value.startsWith("src/") ? FRONTEND + value : value;
     }
 
-    /** {@code Klasse.methode} → {@code Klasse}; {@code application.yml} und {@code Application.YML} bleiben. */
+    /** {@code Class.method} → {@code Class}; {@code application.yml} and {@code Application.YML} stay. */
     private static String withoutMethodSuffix(String value) {
         int lastDot = value.lastIndexOf('.');
         if (lastDot <= 0 || lastDot == value.length() - 1) {
