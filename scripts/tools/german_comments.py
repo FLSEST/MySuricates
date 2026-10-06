@@ -246,7 +246,7 @@ def lex_python(src):
     return ' '.join(code), comments
 
 
-TEST_DESC = re.compile(r"""\b(describe|it|test)((?:\.\w+)*)\(\s*(['"`])((?:\\.|(?!\3).)*)\3""")
+TEST_DESC = re.compile(r"""\b(describe|it|test)((?:\.\w+)*)(?:\([^()]*(?:\([^()]*\)[^()]*)*\))?\(\s*(['"`])((?:\\.|(?!\3).)*)\3""")
 DISPLAY_NAME = re.compile(r'@DisplayName\(\s*"((?:\\.|[^"\\])*)"')
 
 
@@ -366,6 +366,9 @@ const out = files.map(([name, text]) => {
   const kind = name.endsWith('.tsx') ? ts.ScriptKind.TSX : name.endsWith('.ts') ? ts.ScriptKind.TS : ts.ScriptKind.JS;
   const sf = ts.createSourceFile(name, text, ts.ScriptTarget.Latest, true, kind);
   const toks = [];
+  // describe(...), it.skip(...), and the curried it.each([...])(...) form
+  const isTestCallee = (callee) => DESC.test(callee.getText(sf))
+      || (ts.isCallExpression(callee) && DESC.test(callee.expression.getText(sf)));
   const isJsDoc = (node) => node.kind >= ts.SyntaxKind.FirstJSDocNode && node.kind <= ts.SyntaxKind.LastJSDocNode;
   const walk = (node) => {
     if (isJsDoc(node)) return;  // JSDoc comments are children of declarations - comments, not code
@@ -373,7 +376,7 @@ const out = files.map(([name, text]) => {
     if (kids.length === 0) {
       const p = node.parent;
       if ((ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) && p && ts.isCallExpression(p)
-          && p.arguments[0] === node && DESC.test(p.expression.getText(sf))) {
+          && p.arguments[0] === node && isTestCallee(p.expression)) {
         toks.push('<DESC>');
       } else if (node.kind === ts.SyntaxKind.JsxText) {
         const t = node.getText(sf).replace(/\s+/g, ' ').trim();
