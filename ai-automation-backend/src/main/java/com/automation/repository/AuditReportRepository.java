@@ -23,8 +23,8 @@ public interface AuditReportRepository extends JpaRepository<AuditReport, String
     List<AuditReport> findByProjectIdOrderByGeneratedAtDesc(String projectId);
 
     /**
-     * Zeitpunkte der gueltigen Reports eines Audits vor {@code before}, neueste zuerst — nur die Spalte, kein
-     * Markdown. Grundlage der Regel „eingeordnet, aber N Laeufe nicht mehr gesehen“ (TODO b2e3da6a).
+     * Timestamps of the valid reports of an audit before {@code before}, newest first — only the column, no
+     * Markdown. Basis of the rule "triaged, but not seen for N runs" (TODO b2e3da6a).
      */
     @Query("SELECT r.generatedAt FROM AuditReport r WHERE r.projectId = :projectId AND r.auditKey = :auditKey "
             + "AND r.ingestionStatus = com.automation.entity.AuditIngestionStatus.VALID AND r.generatedAt < :before "
@@ -36,13 +36,13 @@ public interface AuditReportRepository extends JpaRepository<AuditReport, String
             + "r.workflowId, r.workflowRunId, r.auditKey, r.category, r.title, r.gateStatus, r.gateDescription, "
             + "r.provider, r.model, r.workflowVersion, r.ingestionStatus, r.ingestionError, r.generatedAt) ";
 
-    /** Alle Reports ohne Markdown, neueste zuerst – fuer die Audit-Uebersicht (TODO 3d7e3987). */
+    /** All reports without Markdown, newest first – for the audit overview (TODO 3d7e3987). */
     @Query(SUMMARY_ROW + "FROM AuditReport r ORDER BY r.generatedAt DESC")
     List<AuditReportSummaryRow> findAllSummaryRows();
 
     /**
-     * Die Historie eines Audits, gueltige und ungueltige Versuche, neueste zuerst – ohne Markdown
-     * (TODO cd50d011): Die Historie zeigt nur Koepfe, den Text holt der angezeigte Bericht einzeln.
+     * The history of an audit, valid and invalid attempts, newest first – without Markdown
+     * (TODO cd50d011): the history shows only headers, the shown report fetches its text individually.
      */
     @Query(value = SUMMARY_ROW + "FROM AuditReport r WHERE r.projectId = :projectId AND r.auditKey = :auditKey "
             + "ORDER BY r.generatedAt DESC",

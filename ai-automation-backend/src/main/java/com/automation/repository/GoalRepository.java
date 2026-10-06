@@ -15,28 +15,28 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-/** Ziele (TODO dc0566f8); die Zugehoerigkeit der TODOs fragt {@link TodoRepository} ab. */
+/** Goals (TODO dc0566f8); the membership of the TODOs is queried by {@link TodoRepository}. */
 @Repository
 public interface GoalRepository extends JpaRepository<Goal, String> {
 
     List<Goal> findByStatusInOrderByCreatedAtDesc(Collection<Goal.Status> statuses);
 
-    /** Die Ziele, denen das Projekt ausdruecklich zugeordnet ist (TODO c60bf914), neueste zuerst. */
+    /** The goals to which the project is explicitly assigned (TODO c60bf914), newest first. */
     @Query("SELECT g FROM Goal g WHERE g.status IN :statuses AND EXISTS "
          + "(SELECT 1 FROM GoalProject gp WHERE gp.goalId = g.id AND gp.projectId = :projectId) "
          + "ORDER BY g.createdAt DESC")
     List<Goal> findForProject(@Param("statuses") Collection<Goal.Status> statuses, @Param("projectId") String projectId);
 
     /**
-     * Ziel samt Arbeitspaketen in einer Abfrage (TODO 259f4f66, c60bf914) – die Paket-Liste bleibt bei
-     * zwei Statements. Eine Zeile je Paket, ohne Paket eine mit {@code null}. Dazu die Position des
-     * Paket-Projekts im Ziel, damit die Sortierung keine Abfrage mehr braucht.
+     * Goal with work packages in one query (TODO 259f4f66, c60bf914) – the package list stays at
+     * two statements. One row per package, without a package one with {@code null}. Plus the position of the
+     * package's project in the goal, so that sorting needs no further query.
      */
     @Query("SELECT g, p, gp.position FROM Goal g LEFT JOIN GoalWorkPackage p ON p.goalId = g.id "
          + "LEFT JOIN GoalProject gp ON gp.goalId = p.goalId AND gp.projectId = p.projectId WHERE g.id = :id")
     List<Object[]> findWithWorkPackageRows(@Param("id") String id);
 
-    /** {@link #findWithWorkPackageRows} als Ziel plus Liste; leer, wenn es das Ziel nicht gibt. */
+    /** {@link #findWithWorkPackageRows} as goal plus list; empty if the goal does not exist. */
     default Optional<GoalWithWorkPackages> findWithWorkPackages(String id) {
         List<Object[]> rows = findWithWorkPackageRows(id);
         if (rows.isEmpty()) {

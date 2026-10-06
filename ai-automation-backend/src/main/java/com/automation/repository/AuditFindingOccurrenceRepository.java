@@ -12,17 +12,17 @@ public interface AuditFindingOccurrenceRepository extends JpaRepository<AuditFin
     boolean existsByFindingIdAndReportId(String findingId, String reportId);
     List<AuditFindingOccurrence> findByFindingId(String findingId);
 
-    /** Reports, in denen ein Finding schon ein Vorkommen hat — nur die IDs, ohne die TEXT-Spalten (d2500abd). */
+    /** Reports in which a finding already has an occurrence — only the IDs, without the TEXT columns (d2500abd). */
     @Query("SELECT o.reportId FROM AuditFindingOccurrence o WHERE o.findingId = :findingId")
     List<String> findReportIdsByFindingId(@Param("findingId") String findingId);
 
-    /** Findings, die in einem Report schon ein Vorkommen haben — nur die IDs (3deaee34). */
+    /** Findings that already have an occurrence in a report — only the IDs (3deaee34). */
     @Query("SELECT o.findingId FROM AuditFindingOccurrence o WHERE o.reportId = :reportId")
     List<String> findFindingIdsByReportId(@Param("reportId") String reportId);
 
     /**
-     * Findings je Report als {@code [reportId, count]} in EINER GROUP-BY-Abfrage (TODO a3b89355) —
-     * statt je Report alle Vorkommen zu laden und zu zaehlen. Reports ohne Findings fehlen im Ergebnis.
+     * Findings per report as {@code [reportId, count]} in ONE GROUP-BY query (TODO a3b89355) —
+     * instead of loading and counting all occurrences per report. Reports without findings are missing from the result.
      */
     @Query("SELECT o.reportId, COUNT(o) FROM AuditFindingOccurrence o WHERE o.reportId IN :reportIds GROUP BY o.reportId")
     List<Object[]> countByReportIds(@Param("reportIds") Collection<String> reportIds);

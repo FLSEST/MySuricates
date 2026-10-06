@@ -10,8 +10,8 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 
 /**
- * Workflows an Zielen und Arbeitspaketen (TODO 52bc1e8c). Gelesen wird in einer Abfrage mit Name und
- * Projekt des Workflows; weich geloeschte Workflows fallen dabei heraus, ihre Zuordnung bleibt stehen.
+ * Workflows on goals and work packages (TODO 52bc1e8c). Read in one query with the workflow's name and
+ * project; soft-deleted workflows drop out, their assignment stays.
  */
 @Repository
 public interface GoalWorkflowRepository extends JpaRepository<GoalWorkflow, String> {
@@ -24,7 +24,7 @@ public interface GoalWorkflowRepository extends JpaRepository<GoalWorkflow, Stri
          + "WHERE a.goalId = :goalId AND w.deletedAt IS NULL")
     List<GoalWorkflowRow> findRows(@Param("goalId") String goalId);
 
-    /** Gibt es diese Zuordnung schon? {@code workPackageId} null = am ganzen Ziel. */
+    /** Does this assignment exist already? {@code workPackageId} null = on the whole goal. */
     @Query("SELECT COUNT(a) > 0 FROM GoalWorkflow a WHERE a.goalId = :goalId AND a.workflowId = :workflowId "
          + "AND ((:workPackageId IS NULL AND a.workPackageId IS NULL) OR a.workPackageId = :workPackageId)")
     boolean existsAttachment(@Param("goalId") String goalId, @Param("workPackageId") String workPackageId,

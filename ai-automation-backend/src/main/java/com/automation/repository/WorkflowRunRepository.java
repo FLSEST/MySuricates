@@ -30,10 +30,10 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, String
     long countByWorkflowId(String workflowId);
 
     /**
-     * Run-Counts aller Workflows in EINER GROUP-BY-Query (statt {@code countByWorkflowId} pro
-     * Workflow). Für die /workflows-Liste — vermeidet N+1 (~285 Einzel-Counts). Nutzt
-     * {@code idx_workflow_runs_workflow_id} (V10). Workflows ohne Runs fehlen im Ergebnis
-     * (→ Mapper nutzt {@code getOrDefault(id, 0L)}).
+     * Run counts of all workflows in ONE GROUP-BY query (instead of {@code countByWorkflowId} per
+     * workflow). For the /workflows list — avoids N+1 (~285 single counts). Uses
+     * {@code idx_workflow_runs_workflow_id} (V10). Workflows without runs are missing from the result
+     * (→ mapper uses {@code getOrDefault(id, 0L)}).
      */
     @Query("SELECT wr.workflow.id, COUNT(wr) FROM WorkflowRun wr WHERE wr.workflow IS NOT NULL GROUP BY wr.workflow.id")
     List<Object[]> countRunsGroupedByWorkflow();
@@ -57,12 +57,12 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, String
     List<WorkflowRun> findByStartedAtAfterOrderByStartedAtDesc(Instant since);
 
     /**
-     * Dashboard-Fenster als Projektion (TODO 2ccb9e40): nur die Spalten, die {@code getDashboard}
-     * liest — kein input_context, aus metadata/error nur gate_status, todoTriggerRun und die
-     * Fehlermeldung, von SQLite extrahiert ({@code json_valid} zuerst, sonst wirft
-     * {@code json_extract}). Keine Entities, also auch kein {@code select containers} je Zeile
-     * (TODO 13d1e2a2). Inner JOIN auf workflow: Runs soft-geloeschter Workflows fallen heraus.
-     * {@code projectId} null = alle Projekte; sonst filtert die Abfrage, nicht Java.
+     * Dashboard window as a projection (TODO 2ccb9e40): only the columns that {@code getDashboard}
+     * reads — no input_context, from metadata/error only gate_status, todoTriggerRun and the
+     * error message, extracted by SQLite ({@code json_valid} first, otherwise
+     * {@code json_extract} throws). No entities, hence also no {@code select containers} per row
+     * (TODO 13d1e2a2). Inner JOIN on workflow: runs of soft-deleted workflows drop out.
+     * {@code projectId} null = all projects; otherwise the query filters, not Java.
      */
     @Query("SELECT new com.automation.dto.projection.DashboardRunRow(wr.id, wr.status, wr.startedAt, "
          + "wr.completedAt, wr.durationMs, wr.triggerSource, wr.triggeredByScheduleId, wr.workflowName, "
@@ -81,10 +81,10 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, String
     List<DashboardRunRow> findDashboardRows(@Param("since") Instant since, @Param("projectId") String projectId);
 
     /**
-     * Schlanke Per-Step-Projektion für die Dashboard-Aggregation: nur (runId, status, metadata),
-     * NICHT die großen input/output/context_delta-TEXT-Spalten. Sortiert nach Run + stepIndex,
-     * damit die Provider-Erkennung (erster Nicht-Integration-Step gewinnt) deterministisch bleibt.
-     * Gleiche Run-Auswahl wie {@link #findDashboardRows} (Projektfilter in der Abfrage).
+     * Lean per-step projection for the dashboard aggregation: only (runId, status, metadata),
+     * NOT the large input/output/context_delta TEXT columns. Sorted by run + stepIndex,
+     * so that provider detection (first non-integration step wins) stays deterministic.
+     * Same run selection as {@link #findDashboardRows} (project filter in the query).
      */
     @Query("SELECT wr.id, sr.status, sr.metadata FROM StepResult sr JOIN sr.workflowRun wr "
          + "JOIN wr.workflow w LEFT JOIN w.project p "
@@ -114,11 +114,11 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, String
          + "COALESCE(SUM(CASE WHEN wr.status = 'FAILED' THEN 1 ELSE 0 END), 0), "
          + "COALESCE(SUM(CASE WHEN wr.startedAt > :since THEN 1 ELSE 0 END), 0)) FROM WorkflowRun wr";
 
-    /** Die Run-Zaehler des Dashboards in einer Abfrage (TODO 2ccb9e40); COALESCE fuer die leere Tabelle. */
+    /** The dashboard's run counters in one query (TODO 2ccb9e40); COALESCE for the empty table. */
     @Query(OVERVIEW_COUNTS)
     RunOverviewCounts countOverview(@Param("since") Instant since);
 
-    /** {@link #countOverview} fuer die Runs der Workflows eines Projekts (Projektfilter des Dashboards). */
+    /** {@link #countOverview} for the runs of a project's workflows (project filter of the dashboard). */
     @Query(OVERVIEW_COUNTS + " WHERE wr.workflow.project.id = :projectId")
     RunOverviewCounts countOverviewByProject(@Param("projectId") String projectId, @Param("since") Instant since);
 
@@ -189,15 +189,15 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, String
     long countByTriggeredByScheduleId(String scheduleId);
 
     /**
-     * Status und Startzeit aller Runs, die von einem der genannten Zeitplaene ausgeloest wurden —
-     * absteigend, damit der erste Treffer je Zeitplan der juengste ist.
+     * Status and start time of all runs triggered by one of the given schedules —
+     * descending, so that the first hit per schedule is the most recent.
      *
-     * <p>Ersetzt eine Abfrage je Zeitplan im {@code ScheduleMapper}: Der las fuer jeden Zeitplan
-     * dessen komplette Run-Liste und verwarf alles ausser dem ersten Status. Bei 30 Zeitplaenen
-     * waren das 30 Abfragen und 30 vollstaendig materialisierte Run-Listen, nur um 30 Enum-Werte
-     * zu bekommen (TODO 172a6a67).
+     * <p>Replaces one query per schedule in the {@code ScheduleMapper}: it read each schedule's
+     * complete run list and discarded everything but the first status. With 30 schedules
+     * that was 30 queries and 30 fully materialized run lists, just to get 30 enum values
+     * (TODO 172a6a67).
      *
-     * <p>Projektion statt Entities: Es werden drei Spalten gelesen, keine Run-Objekte gebaut.
+     * <p>Projection instead of entities: three columns are read, no run objects are built.
      */
     @Query("SELECT r.triggeredByScheduleId, r.status, r.startedAt FROM WorkflowRun r "
            + "WHERE r.triggeredByScheduleId IN :scheduleIds "
@@ -205,11 +205,11 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, String
     List<Object[]> findStatusesByScheduleIds(@Param("scheduleIds") Collection<String> scheduleIds);
 
     /**
-     * Status der Runs eines Zeitplans, neuester zuerst — mit {@code PageRequest.of(0, 1)} der
-     * letzte Status fuer die Einzelansicht im {@code ScheduleMapper} (TODO 86286572).
+     * Status of the runs of a schedule, newest first — with {@code PageRequest.of(0, 1)} the
+     * last status for the single view in the {@code ScheduleMapper} (TODO 86286572).
      *
-     * <p>Projektion auf die Status-Spalte: Vorher lud der Mapper dafuer jede Run-Entitaet des
-     * Zeitplans samt Eingabe-Kontext und verwarf alles ausser dem ersten Status.
+     * <p>Projection onto the status column: previously the mapper loaded every run entity of the
+     * schedule including input context for this and discarded everything but the first status.
      */
     @Query("SELECT r.status FROM WorkflowRun r WHERE r.triggeredByScheduleId = :scheduleId "
            + "ORDER BY r.startedAt DESC")
@@ -253,17 +253,17 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, String
                                              @Param("cutoff") Instant cutoff, Pageable pageable);
 
     /**
-     * Neuester Run je Workflow für die Workflow-Widgets des Dashboards — schlanke Projektion
+     * Newest run per workflow for the workflow widgets of the dashboard — lean projection
      * {@code [workflowId, runId, status, startedAt, completedAt, durationMs, metadata]}.
      *
-     * <p>Bewusst KEINE Steps: {@code StepResult.input/output/context_delta} sind die großen
-     * TEXT-Spalten (volle CLI-Ausgaben); bei pool-size=1 hält ein solcher Fetch die einzige
-     * SQLite-Connection sekundenlang. Der Vertrag des Ergebnis-Widgets steht deshalb schon beim
-     * Run-Ende in {@code metadata} (RunCompletionHandler), genau wie {@code gate_status}.
+     * <p>Deliberately NO steps: {@code StepResult.input/output/context_delta} are the large
+     * TEXT columns (full CLI outputs); with pool-size=1 such a fetch holds the only
+     * SQLite connection for seconds. The contract of the result widget is therefore already in {@code metadata}
+     * at run end (RunCompletionHandler), just like {@code gate_status}.
      *
-     * <p>Die Unterabfrage wählt je Workflow den Run mit dem größten {@code startedAt} — dasselbe
-     * Muster wie {@link #findBrokenWorkflows}. Bei gleichem Zeitstempel können zwei Zeilen
-     * zurückkommen; die Sortierung macht die Auswahl deterministisch, der Aufrufer nimmt die erste.
+     * <p>The subquery picks per workflow the run with the largest {@code startedAt} — the same
+     * pattern as {@link #findBrokenWorkflows}. With equal timestamps two rows may
+     * come back; the sorting makes the selection deterministic, the caller takes the first.
      */
     @Query("SELECT wr.workflow.id, wr.id, wr.status, wr.startedAt, wr.completedAt, "
          + "wr.durationMs, wr.metadata FROM WorkflowRun wr "

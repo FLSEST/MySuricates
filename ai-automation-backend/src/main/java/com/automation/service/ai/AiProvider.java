@@ -24,8 +24,8 @@ public interface AiProvider {
     AiProviderCapabilities getCapabilities();
 
     /**
-     * How a person sets this provider up on their machine — program, install, login. Pflicht fuer
-     * jeden Anbieter: daraus erzeugt ProviderCatalogTest den Katalog des Installers (2255f2ee).
+     * How a person sets this provider up on their machine — program, install, login. Mandatory for
+     * every provider: ProviderCatalogTest generates the installer's catalog from it (2255f2ee).
      */
     ProviderSetup setup();
 

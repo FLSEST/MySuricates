@@ -80,8 +80,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
             response.setHeader("X-RateLimit-Remaining", String.valueOf(bucket.getRemaining(limit)));
             filterChain.doFilter(request, response);
         } else {
-            // Wartezeit bis zum nächsten freien Slot, nicht pauschal 60 s: der Client richtet
-            // seine Sperre nach Retry-After und würde ohne den Header 10 s raten (b6feccbc).
+            // Wait until the next free slot, not a flat 60 s: the client bases
+            // its block on Retry-After and without the header would guess 10 s (b6feccbc).
             int retryAfterSeconds = bucket.secondsUntilReset(System.currentTimeMillis());
             log.warn("Rate limit exceeded for client: {} (retry after {}s)", clientId, retryAfterSeconds);
             response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
@@ -96,7 +96,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
         }
     }
 
-    /** Package-private, damit {@code RateLimitFilterTest} das Fenster mit festen Zeitpunkten prüfen kann. */
+    /** Package-private so that {@code RateLimitFilterTest} can check the window with fixed points in time. */
     static class ClientBucket implements ClientBucketStore.Windowed {
         private final AtomicInteger count = new AtomicInteger(0);
         private volatile long windowStart;
@@ -127,8 +127,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
         }
 
         /**
-         * Sekunden bis das Minutenfenster umschlägt — mindestens 1, damit ein Client, der in der
-         * letzten Millisekunde des Fensters abgewiesen wird, nicht "0" (= keine Sperre) liest.
+         * Seconds until the minute window rolls over — at least 1, so that a client rejected in the
+         * last millisecond of the window does not read "0" (= no block).
          */
         int secondsUntilReset(long now) {
             long start;

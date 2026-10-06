@@ -51,8 +51,8 @@ public class ModuleOverrideService {
         activityLog.warn(LogCategory.SECURITY, message + " (" + (before ? "on" : "off") + " → "
                 + (status.enabled() ? "on" : "off") + ", startup configuration: " + (status.configured() ? "on" : "off")
                 + ")", "ModuleOverrideService");
-        // Nur bei echtem Wechsel: Hintergrundpfade des Moduls (Jobs, Listener) holen daran ihren
-        // sonst nur beim Start laufenden Teil nach.
+        // Only on a real change: background paths of the module (jobs, listeners) catch up on the
+        // part that otherwise runs only at startup.
         if (before != status.enabled()) {
             eventPublisher.publishEvent(new ModuleStateChangedEvent(this, module, status.enabled()));
         }

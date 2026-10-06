@@ -44,8 +44,8 @@ final class LinesHeadTailStage implements CompressionStage {
     @Override
     public StageResult apply(String input, Map<String, Object> config, RegexGuard guard) {
         int keep = StageConfig.intValue(config, "lines", null, 1, 1_000_000, StageConfig.where(op()));
-        // Ein abschließender Umbruch beendet die letzte Zeile, er beginnt keine neue — sonst zählte
-        // die leere Restzeile mit und lines.tail lieferte statt der letzten Zeile nur "".
+        // A trailing line break ends the last line, it does not start a new one — otherwise the
+        // empty remainder would count and lines.tail would return "" instead of the last line.
         boolean trailingNewline = input.endsWith("\n");
         String text = trailingNewline ? input.substring(0, input.length() - 1) : input;
         List<String> lines = Arrays.asList(text.split("\n", -1));

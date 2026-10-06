@@ -12,8 +12,8 @@ import java.util.Collection;
 import java.util.List;
 
 /**
- * Die ausdruecklich zugeordneten Projekte der Ziele (TODO c60bf914). Gelesen wird ueber die
- * schlanke Projektion {@link GoalProjectRow} – eine Abfrage je Ziel oder je Zielliste.
+ * The explicitly assigned projects of the goals (TODO c60bf914). Reading goes through the
+ * lean projection {@link GoalProjectRow} – one query per goal or per goal list.
  */
 @Repository
 public interface GoalProjectRepository extends JpaRepository<GoalProject, GoalProject.Key> {
@@ -22,11 +22,11 @@ public interface GoalProjectRepository extends JpaRepository<GoalProject, GoalPr
             + "gp.goalId, gp.projectId, p.name, p.archivedAt, gp.position) "
             + "FROM GoalProject gp JOIN Project p ON p.id = gp.projectId ";
 
-    /** Die Projekte eines Ziels in ihrer Reihenfolge. */
+    /** The projects of a goal in their order. */
     @Query(ROW + "WHERE gp.goalId = :goalId ORDER BY gp.position, gp.projectId")
     List<GoalProjectRow> findRows(@Param("goalId") String goalId);
 
-    /** Die Projekte mehrerer Ziele in einer Abfrage, je Ziel in seiner Reihenfolge. */
+    /** The projects of several goals in one query, per goal in its order. */
     @Query(ROW + "WHERE gp.goalId IN :goalIds ORDER BY gp.goalId, gp.position, gp.projectId")
     List<GoalProjectRow> findRowsForGoals(@Param("goalIds") Collection<String> goalIds);
 
@@ -38,9 +38,9 @@ public interface GoalProjectRepository extends JpaRepository<GoalProject, GoalPr
     Integer maxPosition(@Param("goalId") String goalId);
 
     /**
-     * Haengt das Projekt ans Ziel, falls es noch nicht dran ist – ans Ende (Position max + 1). Ein
-     * Statement, idempotent; gibt 1 zurueck, wenn es neu dazukam. Aufrufer muss @Transactional sein.
-     * Leert den Persistenzkontext bewusst nicht: Aufrufer halten gerade veraenderte TODOs darin.
+     * Attaches the project to the goal if it is not yet attached – at the end (position max + 1). One
+     * statement, idempotent; returns 1 if it was newly added. Caller must be @Transactional.
+     * Deliberately does not clear the persistence context: callers hold just-modified TODOs in it.
      */
     @Modifying(flushAutomatically = true)
     @Query(value = "INSERT OR IGNORE INTO goal_projects (goal_id, project_id, position) "
@@ -48,7 +48,7 @@ public interface GoalProjectRepository extends JpaRepository<GoalProject, GoalPr
             nativeQuery = true)
     int linkIfAbsent(@Param("goalId") String goalId, @Param("projectId") String projectId);
 
-    /** Loest das Projekt vom Ziel. Aufrufer muss @Transactional sein. */
+    /** Detaches the project from the goal. Caller must be @Transactional. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("DELETE FROM GoalProject gp WHERE gp.goalId = :goalId AND gp.projectId = :projectId")
     int unlink(@Param("goalId") String goalId, @Param("projectId") String projectId);

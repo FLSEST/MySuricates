@@ -43,10 +43,10 @@ public class ScheduleMapper {
     }
 
     /**
-     * Einzelner Zeitplan — fuer die Detail-Route, wo zwei Abfragen zwei Abfragen sind.
+     * A single schedule — for the detail route, where two queries are two queries.
      *
-     * <p>Fuer Listen {@link #toResponseList(List)} nehmen: Diese Methode loest den letzten
-     * Run-Status je Aufruf auf, und das ist in einer Liste ein N+1 (TODO 172a6a67).
+     * <p>For lists use {@link #toResponseList(List)}: this method resolves the last
+     * run status per call, which is an N+1 in a list (TODO 172a6a67).
      */
     public ScheduledWorkflowResponse toResponse(ScheduledWorkflow s) {
         return toResponse(s, null, activePause());
@@ -57,10 +57,10 @@ public class ScheduleMapper {
     }
 
     /**
-     * @param lastStatusByScheduleId vorab gesammelte Status je Zeitplan-Id, oder {@code null} fuer
-     *     die Einzelauflösung. Ein Zeitplan ohne Eintrag hatte keinen Run — das ist kein
-     *     fehlender Wert, sondern {@code null} als Status, genau wie vorher.
-     * @param pause Wartungsmodus und aktive skip-until-Pause, einmal je Aufruf ermittelt
+     * @param lastStatusByScheduleId statuses per schedule id collected up front, or {@code null} for
+     *     single resolution. A schedule without an entry had no run — that is not a
+     *     missing value but {@code null} as the status, exactly as before.
+     * @param pause maintenance mode and active skip-until pause, determined once per call
      */
     private ScheduledWorkflowResponse toResponse(ScheduledWorkflow s,
                                                  Map<String, RunStatus> lastStatusByScheduleId,
@@ -115,12 +115,12 @@ public class ScheduleMapper {
         );
     }
 
-    /** Nur der neueste Status — eine Zeile, eine Spalte (TODO 86286572). */
+    /** Only the newest status — one row, one column (TODO 86286572). */
     private static final Pageable NEWEST_ONLY = PageRequest.of(0, 1);
 
     /**
-     * Letzter Run-Status eines einzelnen Zeitplans. Liest je Run-Art hoechstens eine Status-Zeile,
-     * statt die komplette Run-Liste des Zeitplans als Entitaeten zu laden (TODO 86286572).
+     * Last run status of a single schedule. Reads at most one status row per run kind
+     * instead of loading the schedule's complete run list as entities (TODO 86286572).
      */
     private RunStatus resolveLastRunStatus(ScheduledWorkflow s) {
         List<RunStatus> workflowStatus = workflowRunRepository.findStatusesByScheduleIdNewestFirst(s.getId(), NEWEST_ONLY);
@@ -132,8 +132,8 @@ public class ScheduleMapper {
     }
 
     /**
-     * Liste mit gebuendelter Status-Auflösung: zwei Abfragen fuer alle Zeitplaene statt zwei je
-     * Zeitplan (TODO 172a6a67, Muster wie {@code WorkflowMapper.toResponseListWithRunCounts}).
+     * List with bundled status resolution: two queries for all schedules instead of two per
+     * schedule (TODO 172a6a67, pattern like {@code WorkflowMapper.toResponseListWithRunCounts}).
      */
     public List<ScheduledWorkflowResponse> toResponseList(List<ScheduledWorkflow> scheduled) {
         if (scheduled.isEmpty()) {
@@ -146,12 +146,12 @@ public class ScheduleMapper {
     }
 
     /**
-     * Letzter Run-Status je Zeitplan, aus zwei Abfragen.
+     * Last run status per schedule, from two queries.
      *
-     * <p>Die Reihenfolge der Abfragen ist absteigend nach Startzeit, deshalb gewinnt der erste
-     * Treffer je Zeitplan — {@code putIfAbsent} statt {@code put}. Workflow-Runs haben Vorrang vor
-     * Ketten-Runs, wie in {@link #resolveLastRunStatus}: Ein Zeitplan zielt auf das eine oder das
-     * andere, beides zugleich gibt es nicht.
+     * <p>The queries are ordered by start time descending, so the first
+     * hit per schedule wins — {@code putIfAbsent} instead of {@code put}. Workflow runs take precedence over
+     * chain runs, as in {@link #resolveLastRunStatus}: a schedule targets one or the
+     * other, never both at once.
      */
     private Map<String, RunStatus> lastRunStatusByScheduleId(List<String> scheduleIds) {
         Map<String, RunStatus> latest = new HashMap<>();

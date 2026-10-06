@@ -74,9 +74,9 @@ public class BlockConfigSummaryFormatter {
     }
 
     /**
-     * Namen aller Sub-Workflows, auf die die Blöcke zeigen ({@code workflow_id}), in einer Abfrage
-     * statt einem {@code findById} je Block (TODO bf009b6f). Soft-gelöschte und unbekannte IDs fehlen
-     * in der Map; die Zusammenfassung zeigt dann die ID.
+     * Names of all sub-workflows the blocks point to ({@code workflow_id}), in one query
+     * instead of one {@code findById} per block (TODO bf009b6f). Soft-deleted and unknown IDs are missing
+     * from the map; the summary then shows the ID.
      */
     public Map<String, String> subWorkflowNames(List<BlockDefinition> blocks) {
         Set<String> ids = new LinkedHashSet<>();
@@ -101,8 +101,8 @@ public class BlockConfigSummaryFormatter {
     }
 
     /**
-     * @param subWorkflowNames Namen aus {@link #subWorkflowNames(List)} — einmal je Workflow bzw.
-     *                         Pool-Eintrag ermitteln, nicht je Block
+     * @param subWorkflowNames names from {@link #subWorkflowNames(List)} — determine once per workflow or
+     *                         pool entry, not per block
      */
     public void appendBlockConfigSummary(StringBuilder sb, String type, Map<String, Object> cfg,
                                          Map<String, String> subWorkflowNames) {

@@ -23,11 +23,11 @@ import java.util.List;
 public class CodexAiProvider implements AiProvider {
 
     /**
-     * Die Codex-CLI-Version, die der Katalog des Installers nennt und das Tryout-Image installiert
-     * (38f30352, wie {@link PiAiProvider#PINNED_VERSION}): eine neue Version kann die Aufrufe von
-     * {@link HostCodexService} ({@code exec}, {@code -m}, Sandbox-Flags) brechen. Update-Weg:
-     * docs/entwicklung.md → „Versionen der KI-CLIs“; {@code ProviderCatalogTest} haelt
-     * {@code ARG CODEX_VERSION} in deploy/Dockerfile gleich.
+     * The Codex CLI version named by the installer's catalog and installed by the tryout image
+     * (38f30352, like {@link PiAiProvider#PINNED_VERSION}): a new version can break the calls of
+     * {@link HostCodexService} ({@code exec}, {@code -m}, sandbox flags). Update path:
+     * docs/entwicklung.md → "Versionen der KI-CLIs"; {@code ProviderCatalogTest} keeps
+     * {@code ARG CODEX_VERSION} in deploy/Dockerfile equal.
      */
     public static final String PINNED_VERSION = "0.154.0";
 

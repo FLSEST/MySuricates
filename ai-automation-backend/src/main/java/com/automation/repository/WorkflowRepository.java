@@ -56,11 +56,11 @@ public interface WorkflowRepository extends JpaRepository<Workflow, String> {
     List<Workflow> findAllWithActiveProject();
 
     /**
-     * Workflow- und Projektbezeichner für eine Menge von Workflows in EINER Query — für Run-Listen,
-     * die sonst je Zeile die Lazy-Assoziation {@code WorkflowRun.workflow} auflösen (N+1, TODO
-     * 9db34f3b). Soft-gelöschte Workflows fehlen im Ergebnis (`@SQLRestriction`); der Mapper fällt
-     * dann auf den Namens-Schnappschuss des Runs bzw. "(deleted)" zurück — dasselbe Verhalten wie
-     * beim Einzel-Mapping.
+     * Workflow and project labels for a set of workflows in ONE query — for run lists
+     * that otherwise resolve the lazy association {@code WorkflowRun.workflow} per row (N+1, TODO
+     * 9db34f3b). Soft-deleted workflows are missing from the result (`@SQLRestriction`); the mapper then
+     * falls back to the run's name snapshot or "(deleted)" — the same behavior as
+     * for single mapping.
      */
     @Query("SELECT w.id, w.name, w.project.name, w.project.path FROM Workflow w WHERE w.id IN :ids")
     List<Object[]> findRunOwnerData(@Param("ids") Collection<String> ids);
@@ -101,17 +101,17 @@ public interface WorkflowRepository extends JpaRepository<Workflow, String> {
     void updateStableSyncedAt(@Param("id") String id, @Param("syncedAt") String syncedAt);
 
     /**
-     * Nur {@code id} und {@code name} der (nicht soft-gelöschten) Workflows — für die
-     * Workflow-Widgets des Dashboards. Root-Query auf Workflow, also greift
-     * {@code @SQLRestriction("deleted_at IS NULL")}: ein gelöschter Workflow fehlt im Ergebnis und
-     * das Widget zeigt „nicht mehr vorhanden“.
+     * Only {@code id} and {@code name} of the (not soft-deleted) workflows — for the
+     * workflow widgets of the dashboard. Root query on Workflow, so
+     * {@code @SQLRestriction("deleted_at IS NULL")} applies: a deleted workflow is missing from the result and
+     * the widget shows "nicht mehr vorhanden".
      */
     @Query("SELECT w.id, w.name FROM Workflow w WHERE w.id IN :ids")
     List<Object[]> findIdAndNameByIdIn(@Param("ids") Collection<String> ids);
 
     /**
-     * Welche der IDs zu einem (nicht soft-gelöschten) Workflow gehören — eine Abfrage statt
-     * {@code existsById} je ID (TODO 6299a860). JPQL, also greift {@code @SQLRestriction}.
+     * Which of the IDs belong to a (not soft-deleted) workflow — one query instead of
+     * {@code existsById} per ID (TODO 6299a860). JPQL, so {@code @SQLRestriction} applies.
      */
     @Query("SELECT w.id FROM Workflow w WHERE w.id IN :ids")
     List<String> findExistingIdsIn(@Param("ids") Collection<String> ids);

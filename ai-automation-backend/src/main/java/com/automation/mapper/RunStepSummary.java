@@ -16,7 +16,7 @@ public record RunStepSummary(int count, StepStatus lastStatus, String lastOutput
     /** Characters of the last output a summary needs: the preview plus one to detect the cut. */
     public static final int HEAD_LENGTH = WorkflowRunListItemResponse.PREVIEW_LENGTH + 1;
 
-    /** Gekuerzte Vorschau; {@code null} bleibt {@code null}, damit "kein Wert" nicht wie "leer" aussieht. */
+    /** Shortened preview; {@code null} stays {@code null} so that "no value" does not look like "empty". */
     public String preview() {
         if (lastOutputHead == null) {
             return null;

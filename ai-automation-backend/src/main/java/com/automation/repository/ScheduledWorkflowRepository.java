@@ -33,23 +33,23 @@ public interface ScheduledWorkflowRepository extends JpaRepository<ScheduledWork
     Optional<ScheduledWorkflow> findByIdWithWorkflowSkills(@Param("id") String id);
 
     /**
-     * Alle Zeitplaene samt ihren Zielen in einer Abfrage — die Liste hinter
+     * All schedules together with their targets in one query — the list behind
      * {@code GET /api/v1/schedules}.
      *
-     * <p>{@code findAll()} laesst die beiden {@code EAGER}-Assoziationen
-     * {@code workflow} und {@code chain} offen und Hibernate loest sie danach Zeile fuer Zeile
-     * auf: bei 30 Zeitplaenen 30 zusaetzliche Abfragen, jede davon auf der einzigen
-     * SQLite-Connection (TODO c9ec9844). Der Join holt sie mit.
+     * <p>{@code findAll()} leaves the two {@code EAGER} associations
+     * {@code workflow} and {@code chain} open and Hibernate then resolves them row by row:
+     * for 30 schedules 30 additional queries, each of them on the only
+     * SQLite connection (TODO c9ec9844). The join fetches them along.
      *
-     * <p>{@code w.project} und {@code p.container} haengen an derselben Kette: Sie sind ihrerseits
-     * {@code EAGER} und wuerden sonst je Projekt eine weitere Abfrage kosten. Mitgeholt bleibt die
-     * Zahl der Abfragen konstant, unabhaengig von der Zahl der Zeitplaene.
+     * <p>{@code w.project} and {@code p.container} hang on the same chain: they are themselves
+     * {@code EAGER} and would otherwise cost one more query per project. Fetched along, the
+     * number of queries stays constant, independent of the number of schedules.
      *
-     * <p>{@code LEFT}, nicht {@code INNER}: Ein Zeitplan hat entweder einen Workflow oder eine
-     * Kette, nie beides — und ein Zeitplan, dessen Workflow soft-geloescht wurde
-     * ({@code Workflow} traegt {@code @SQLRestriction("deleted_at IS NULL")}), bleibt mit leerem
-     * Ziel sichtbar statt die ganze Liste mitzureissen. Genau dieses Verhalten haelt
-     * {@code ScheduleSoftDeletedWorkflowIntegrationTest} fest.
+     * <p>{@code LEFT}, not {@code INNER}: a schedule has either a workflow or a
+     * chain, never both — and a schedule whose workflow was soft-deleted
+     * ({@code Workflow} carries {@code @SQLRestriction("deleted_at IS NULL")}) stays visible with an empty
+     * target instead of dragging down the whole list. Exactly this behavior is pinned by
+     * {@code ScheduleSoftDeletedWorkflowIntegrationTest}.
      */
     @Query("SELECT s FROM ScheduledWorkflow s " +
            "LEFT JOIN FETCH s.workflow w " +
@@ -61,8 +61,8 @@ public interface ScheduledWorkflowRepository extends JpaRepository<ScheduledWork
     List<ScheduledWorkflow> findByWorkflowId(String workflowId);
 
     /**
-     * Zeitplaene der Ziel-Waechter (TODO 259f4f66) als schlanke Zeilen – eine Abfrage fuer die ganze
-     * Zielliste, ohne Workflow, Projekt und Container mitzuladen.
+     * Schedules of the goal guards (TODO 259f4f66) as lean rows – one query for the whole
+     * goal list, without loading workflow, project and container.
      */
     @Query("SELECT new com.automation.dto.projection.GuardScheduleRow("
          + "s.workflow.id, s.id, s.enabled, s.nextRunAt, s.createdAt) "
@@ -72,14 +72,14 @@ public interface ScheduledWorkflowRepository extends JpaRepository<ScheduledWork
     List<ScheduledWorkflow> findByChainId(String chainId);
 
     /**
-     * Aktive Zeitplaene, deren naechster Termin im Zeitraum liegt, samt ihren Zielen — die Termine
-     * des Kalenders ({@code GET /api/v1/schedules/calendar}) und der Assistent-Abschnitt fuer die
-     * naechsten 24 Stunden.
+     * Active schedules whose next occurrence lies in the period, together with their targets — the occurrences
+     * of the calendar ({@code GET /api/v1/schedules/calendar}) and the assistant section for the
+     * next 24 hours.
      *
-     * <p>Holt Workflow, Projekt, Container und Kette mit wie {@link #findAllWithTargets()}: Ohne
-     * den Join loest Hibernate die {@code EAGER}-Assoziationen Zeile fuer Zeile auf, 30 Abfragen
-     * fuer 30 Termine im RequestCostRatchetTest (TODO 168e3d7f). Ein Zeitplan auf einen
-     * soft-geloeschten Workflow erscheint weiterhin mit leerem Ziel — siehe
+     * <p>Fetches workflow, project, container and chain along like {@link #findAllWithTargets()}: without
+     * the join Hibernate resolves the {@code EAGER} associations row by row, 30 queries
+     * for 30 occurrences in the RequestCostRatchetTest (TODO 168e3d7f). A schedule on a
+     * soft-deleted workflow still appears with an empty target — see
      * {@code ScheduleSoftDeletedWorkflowIntegrationTest}.
      */
     @Query("SELECT s FROM ScheduledWorkflow s " +

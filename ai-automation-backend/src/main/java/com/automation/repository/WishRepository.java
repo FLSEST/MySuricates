@@ -16,6 +16,6 @@ public interface WishRepository extends JpaRepository<Wish, String> {
     long countByStatusIn(List<WishStatus> statuses);
     List<Wish> findByStatusInAndUpdatedAtBefore(List<WishStatus> statuses, Instant before);
 
-    /** Wuensche, die auf einen Run zeigen — loser Textverweis, beim Loeschen zu nullen. */
+    /** Wishes that point to a run — loose text reference, to be nulled on deletion. */
     List<Wish> findByCurrentRunId(String currentRunId);
 }

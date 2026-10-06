@@ -9,49 +9,49 @@ import java.util.List;
 import java.util.stream.Stream;
 
 /**
- * Die eine Liste, welche Pfade ohne API-Key erreichbar sind. {@code SecurityConfig} baut daraus die
- * Autorisierungsregeln, {@link ApiKeyAuthFilter} entscheidet damit, ob ein fehlender Key eine
- * SECURITY-Warnung wert ist — beide werten dieselben {@link RequestMatcher}-Objekte aus, damit Regel
- * und Protokoll nicht wieder auseinanderlaufen (früher galt der OAuth-Callback der Config als
- * öffentlich, dem Filter als geschützt).
+ * The one list of which paths are reachable without an API key. {@code SecurityConfig} builds the
+ * authorization rules from it, {@link ApiKeyAuthFilter} uses it to decide whether a missing key is worth a
+ * SECURITY warning — both evaluate the same {@link RequestMatcher} objects so that rule
+ * and log do not drift apart again (previously the config treated the OAuth callback as
+ * public, the filter as protected).
  *
- * <p>Reihenfolge der Auswertung, wie in der Filterkette: zuerst {@link #EXACT} und {@link #PATTERNS}
- * (frei), dann {@link #PROTECTED} (Key nötig), alles andere ist frei (das ausgelieferte Frontend).
+ * <p>Order of evaluation, as in the filter chain: first {@link #EXACT} and {@link #PATTERNS}
+ * (open), then {@link #PROTECTED} (key required), everything else is open (the served frontend).
  *
- * <p>Gematcht wird mit {@link PathPatternRequestMatcher} (Spring-{@code PathPattern} auf dem Pfad ohne
- * Context-Path): exakte Pfade treffen nur sich selbst — kein angehängter Schrägstrich, kein
- * Unterpfad, Groß-/Kleinschreibung zählt —, {@code *} steht für genau ein Segment, {@code /**} für
- * null oder mehr Segmente.
+ * <p>Matching uses {@link PathPatternRequestMatcher} (Spring {@code PathPattern} on the path without
+ * context path): exact paths match only themselves — no trailing slash, no
+ * subpath, case matters —, {@code *} stands for exactly one segment, {@code /**} for
+ * zero or more segments.
  */
 public final class PublicPaths {
 
     private PublicPaths() {}
 
     /**
-     * Schlüsselfreie Sonden: exakte Pfade ohne Platzhalter. Die Lebenszeichen- und Heap-Sonden, die
-     * Workflows ohne Key rufen dürfen ({@code SelfAccessRules.KEY_FREE_PROBES},
-     * {@code HYGIENE_POOL_API_ALLOWED}), müssen hier stehen.
+     * Key-free probes: exact paths without wildcards. The liveness and heap probes that
+     * workflows may call without a key ({@code SelfAccessRules.KEY_FREE_PROBES},
+     * {@code HYGIENE_POOL_API_ALLOWED}) must be listed here.
      */
     public static final List<String> EXACT = List.of(
             "/api/v1/system/health",
             "/api/v1/system/info",
             "/api/v1/system/auth-status",
-            // Genau drei Heap-Zahlen für den Performance-Audit; die Metrik-Oberfläche unter
-            // /actuator/metrics bleibt hinter dem Key.
+            // Exactly three heap numbers for the performance audit; the metrics surface under
+            // /actuator/metrics stays behind the key.
             "/api/v1/system/jvm-memory",
             "/actuator/health");
 
     /**
-     * Öffentliche Muster: der WebSocket-Handshake (prüft sein Ticket selbst), der Webhook-Eingang
-     * (prüft Token und Signatur selbst) und die OAuth-Rückrufe der Integrationen (der Anbieter ruft
-     * ohne Key zurück, geprüft wird der {@code state}).
+     * Public patterns: the WebSocket handshake (checks its ticket itself), the webhook intake
+     * (checks token and signature itself) and the OAuth callbacks of the integrations (the provider calls
+     * back without a key, the {@code state} is checked).
      */
     public static final List<String> PATTERNS = List.of(
             "/ws/**",
             "/api/v1/webhook/trigger/**",
             "/api/v1/integrations/*/callback");
 
-    /** Bereiche, in denen alles außerhalb von {@link #EXACT} und {@link #PATTERNS} den Key braucht. */
+    /** Areas in which everything outside {@link #EXACT} and {@link #PATTERNS} needs the key. */
     public static final List<String> PROTECTED = List.of(
             "/actuator/**",
             "/api/**");
@@ -60,17 +60,17 @@ public final class PublicPaths {
             matchers(Stream.concat(EXACT.stream(), PATTERNS.stream()).toList());
     private static final RequestMatcher[] KEY_REQUIRED = matchers(PROTECTED);
 
-    /** Ohne Key erreichbar — in der Filterkette vor {@link #keyRequiredMatchers()} ausgewertet. */
+    /** Reachable without a key — evaluated in the filter chain before {@link #keyRequiredMatchers()}. */
     public static RequestMatcher[] publicMatchers() {
         return PUBLIC.clone();
     }
 
-    /** Braucht den Key, sofern nicht schon {@link #publicMatchers()} gegriffen hat. */
+    /** Needs the key, unless {@link #publicMatchers()} has already applied. */
     public static RequestMatcher[] keyRequiredMatchers() {
         return KEY_REQUIRED.clone();
     }
 
-    /** Ob der Pfad des Requests ohne gültigen Key abgewiesen wird — dieselbe Auswertung wie die Filterkette. */
+    /** Whether the request's path is rejected without a valid key — the same evaluation as the filter chain. */
     public static boolean requiresKey(HttpServletRequest request) {
         return !anyMatches(PUBLIC, request) && anyMatches(KEY_REQUIRED, request);
     }
