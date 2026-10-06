@@ -46,7 +46,7 @@ class AuditSnapshotApplier {
      * The rules per finding have stayed the same.
      */
     void apply(WorkflowRunCompletedEvent event, AuditReport report,
-               List<ParsedFinding> parsedFindings, Set<String> factNames) {
+               List<ParsedFinding> parsedFindings, Set<String> factNames, AuditTodoThreshold todoThreshold) {
         Instant observedAt = report.getGeneratedAt();
         List<AuditFinding> known = findingRepository.findByProjectIdAndAuditKey(event.getProjectId(), report.getAuditKey());
         Map<String, AuditFinding> knownByFingerprint = new HashMap<>();
@@ -92,12 +92,12 @@ class AuditSnapshotApplier {
         List<AuditFinding> saved = applied.isEmpty() ? List.of() : findingRepository.saveAll(applied);
         List<AuditFinding> touched = new ArrayList<>(saved);
         recordOccurrences(saved, appliedItems, report, observedAt);
-        // Only open findings get a managed TODO: accepted/dismissed risks and
-        // resubmissions (AWAITING_VERIFICATION after expiry) trigger no fix loop.
+        // Only open findings at or above the workflow's threshold get a managed TODO (d8607f77): accepted/dismissed
+        // risks and resubmissions (AWAITING_VERIFICATION after expiry) trigger no fix loop.
         // An unsubstantiated finding neither — it stays visible but no longer costs
         // working time until its evidence holds (TODO a94b56a0).
         managedTodoWriter.ensureAll(saved.stream()
-                .filter(finding -> ManagedTodoWriter.needsTodo(finding.getSeverity())
+                .filter(finding -> todoThreshold.admits(finding.getSeverity())
                         && finding.getStatus() == AuditFindingStatus.OPEN
                         && !finding.isUnverifiedEvidence())
                 .toList(), report);
@@ -117,7 +117,7 @@ class AuditSnapshotApplier {
         // several runs without a re-sighting (b2e3da6a, 276ac76f).
         resolved.addAll(dispositionLifecycle.retireAbsent(absent, report, factNames, observedAt));
         if (!resolved.isEmpty()) touched.addAll(findingRepository.saveAll(resolved));
-        managedTodoWriter.reconcile(touched);
+        managedTodoWriter.reconcile(touched, todoThreshold);
     }
 
     /** A known finding reappears: back to open, re-evaluate acceptance. */

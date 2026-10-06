@@ -27,7 +27,8 @@ class AuditConfigTest {
     void from_readsACompleteEnabledBlock_schemaVersionDefaultsToOne() {
         AuditConfig config = AuditConfig.from(audit(complete()));
 
-        assertThat(config).isEqualTo(new AuditConfig("mysuricates.health", "health", "report", "report", 1));
+        assertThat(config).isEqualTo(new AuditConfig("mysuricates.health", "health", "report", "report", 1,
+                AuditTodoThreshold.HIGH, null));
     }
 
     @Test
@@ -91,6 +92,32 @@ class AuditConfigTest {
         block.put("reportBlock", 3);
 
         assertThat(AuditConfig.from(audit(block))).extracting(AuditConfig::reportBlock).isEqualTo("3");
+    }
+
+    @Test
+    void from_readsTheTodoThreshold_caseInsensitively_defaultingToHigh() {
+        Map<String, Object> block = complete();
+        assertThat(AuditConfig.from(audit(block)).todoThreshold()).isEqualTo(AuditTodoThreshold.HIGH);
+
+        block.put("todoMinSeverity", "medium");
+        assertThat(AuditConfig.from(audit(block)).todoThreshold()).isEqualTo(AuditTodoThreshold.MEDIUM);
+
+        block.put("todoMinSeverity", "NONE");
+        assertThat(AuditConfig.from(audit(block)).todoThreshold()).isEqualTo(AuditTodoThreshold.NONE);
+    }
+
+    /** An optional field must not stop the ingestion: the default applies, the raw value is kept for the report. */
+    @Test
+    void from_keepsAnUnknownThresholdAsWritten_andAppliesTheDefault() {
+        Map<String, Object> block = complete();
+        block.put("todoMinSeverity", "sometimes");
+
+        AuditConfig config = AuditConfig.from(audit(block));
+
+        assertThat(config).isNotNull();
+        assertThat(config.todoThreshold()).isEqualTo(AuditTodoThreshold.HIGH);
+        assertThat(config.invalidTodoMinSeverity()).isEqualTo("sometimes");
+        assertThat(AuditConfig.from(audit(complete())).invalidTodoMinSeverity()).isNull();
     }
 
     @Test

@@ -89,8 +89,15 @@ class AuditIngestionServiceTest {
     }
 
     private WorkflowRunCompletedEvent event(String runId, String auditKey) {
-        Map<String, Object> workflowMetadata = Map.of("audit", Map.of(
+        return event(runId, auditKey, Map.of());
+    }
+
+    /** {@code extra}: further fields of the audit block, such as {@code todoMinSeverity}. */
+    private WorkflowRunCompletedEvent event(String runId, String auditKey, Map<String, Object> extra) {
+        Map<String, Object> audit = new HashMap<>(Map.of(
                 "enabled", true, "key", auditKey, "category", "quality", "reportBlock", "report"));
+        audit.putAll(extra);
+        Map<String, Object> workflowMetadata = Map.of("audit", audit);
         return new WorkflowRunCompletedEvent(this, runId, "wf-1", "Health Audit", PROJECT, "/tmp/p",
                 RunStatus.COMPLETED, Map.of(), workflowMetadata, null);
     }
@@ -121,6 +128,46 @@ class AuditIngestionServiceTest {
         WorkflowRun run = WorkflowRun.builder().id(runId).workflow(Workflow.builder().name("Health Audit").build())
                 .status(RunStatus.COMPLETED).completedAt(ACCEPTED_AT).steps(new ArrayList<>(List.of(step))).build();
         when(runRepository.findByIdWithSteps(runId)).thenReturn(Optional.of(run));
+    }
+
+    // --- d8607f77: TODO threshold from the workflow metadata (audit.todoMinSeverity) ----------------
+
+    private void stubTodoSave() {
+        when(todoRepository.save(any())).thenAnswer(inv -> {
+            Todo todo = inv.getArgument(0);
+            todo.setId("todo-new");
+            return todo;
+        });
+    }
+
+    @Test
+    void mediumFinding_getsAManagedTodo_whenTheWorkflowSetsTheThresholdToMedium() {
+        stubRunWithSubjects("run-1", "Foo.java");
+        stubTodoSave();
+
+        service.ingest(event("run-1", AUDIT_KEY, Map.of("todoMinSeverity", "medium")));
+
+        verify(todoRepository).save(any());
+    }
+
+    @Test
+    void mediumFinding_getsNoTodo_withoutAThreshold() {
+        stubRunWithSubjects("run-1", "Foo.java");
+
+        service.ingest(event("run-1"));
+
+        verify(todoRepository, never()).save(any());
+    }
+
+    @Test
+    void unknownThreshold_isReported_andTheDefaultApplies() {
+        stubRunWithSubjects("run-1", "Foo.java");
+
+        service.ingest(event("run-1", AUDIT_KEY, Map.of("todoMinSeverity", "sometimes")));
+
+        verify(todoRepository, never()).save(any());
+        verify(activityLog).warn(eq(ActivityLog.LogCategory.EXECUTION), contains("todoMinSeverity 'sometimes'"),
+                eq("AuditIngestionService"), eq("run-1"), eq("wf-1"));
     }
 
     /** 94fda6ef: same identity in the same report — the second finding is dropped, but no longer silently. */
@@ -537,7 +584,7 @@ class AuditIngestionServiceTest {
             assertThat(stored.getValue().getIngestionStatus()).isEqualTo(AuditIngestionStatus.VALID);
             verify(applier).apply(eq(event), eq(stored.getValue()),
                     argThat(findings -> findings.size() == 1 && "Big.java".equals(findings.getFirst().subject())),
-                    eq(Set.of("files_over_300")));
+                    eq(Set.of("files_over_300")), eq(AuditTodoThreshold.HIGH));
         }
 
         @Test

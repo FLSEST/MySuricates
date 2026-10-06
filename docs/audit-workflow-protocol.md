@@ -14,7 +14,8 @@ stellt nur ein opt-in Protokoll für versionierte Reports, stabile Findings und 
       "key": "project.security",
       "category": "security",
       "reportBlock": "report",
-      "schemaVersion": 1
+      "schemaVersion": 1,
+      "todoMinSeverity": "HIGH"
     }
   }
 }
@@ -28,6 +29,13 @@ Reports (sonst aus dem `reportBlock`, dann vom Workflow); die Selbsttests der Pr
 Kategorien sind frei wählbar; das Backend kennt keine projektspezifischen Keys oder Regeln.
 Ein Audit-Workflow verwendet nicht gleichzeitig `metadata.autoTodo`: TODOs werden aus den
 strukturierten Findings verwaltet.
+
+`todoMinSeverity` (optional) legt fest, ab welcher Schwere ein offenes Finding von selbst ein verwaltetes
+TODO bekommt: `CRITICAL`, `HIGH` (Standard), `MEDIUM`, `LOW` oder `NONE` (nie von selbst, nur per Knopf im
+Audit Center; TODO d8607f77). Groß-/Kleinschreibung ist egal. Ein unbekannter Wert macht die Konfiguration
+nicht ungültig: Es gilt `HIGH`, und die Ingestion meldet ihn im Activity-Log. Die Workflow-Liste zeigt die
+Schwelle im Panel eines Audit-Workflows und lässt sie dort ändern; wie jede Metadaten-Änderung ist das eine
+neue Workflow-Version (Teil des Definitions-Hashs, bei versiegelten Workflows abgelehnt).
 
 ## Ergebnisformat v1
 
@@ -430,8 +438,8 @@ nur als Markdown im `previous_report`. Das prüft Abschnitt 10b desselben Tests.
   Identität weiter, **solange der Befund noch besteht**: Ein weggelassenes akzeptiertes Finding
   wird nie wieder geprüft. Ein behobenes führt er nicht weiter – ein erneut gemeldetes
   `AWAITING_VERIFICATION`-Finding wird wieder `OPEN`.
-- `CRITICAL` und `HIGH` erzeugen verwaltete TODOs (siehe [Verwaltete TODOs](#verwaltete-todos)). `MEDIUM` kann im
-  Audit Center bestätigt werden; `LOW` bleibt zunächst ein Finding.
+- Findings ab der Schwelle des Workflows (`todoMinSeverity`, Standard `HIGH`) erzeugen verwaltete TODOs (siehe
+  [Verwaltete TODOs](#verwaltete-todos)); leichtere bekommen ihr TODO im Audit Center per Knopf.
 - Ein auf `DONE` gesetztes verknüpftes TODO – verwaltet oder manuell verknüpft – versetzt ein
   offenes Finding in `AWAITING_VERIFICATION`, sofern kein anderes damit verknüpftes TODO noch
   offen ist (`OPEN`, `IN_PROGRESS`, `BACKLOG`; TODO `ab1ed481`). Das gilt für jeden Schreibpfad –
@@ -452,7 +460,7 @@ Den Envelope zerlegt `AuditResultParser`. `AuditIngestionService.ingest` (vom `A
 
 ### Verwaltete TODOs
 
-**Verwaltete TODOs** (`ManagedTodoWriter`): nur für `CRITICAL`/`HIGH`-Findings im Status `OPEN`, deren Beleg einen Messwert des Laufs nennt (`ensureAll`, je Report eine Abfrage für Verknüpfungen und TODOs; Tag `audit`, `auto:workflow`, `TodoCreatedEvent` → TodoTrigger). Akzeptierte/verworfene Risiken, Wiedervorlagen und unbelegte Findings lösen keinen Fix-Loop aus. Nach jedem Ingest schließt `ManagedTodoWriter.reconcile` das TODO, sobald alle verknüpften Findings terminal sind, und öffnet es beim Wiederauftauchen; denselben Abgleich nach einem Dispositionswechsel im Audit Center und nach einer Zusammenführung macht `ManagedTodoReconciler`. Ein TODO auf Knopfdruck (`POST /api/v1/audit-findings/{id}/todos`, `AuditFindingTodoLinker`) entsteht auf demselben Weg (`ManagedTodoWriter.create`), seine Verknüpfung trägt aber `manual`. Liegt keines der offenen verknüpften Findings mehr über der Schwelle (etwa nach geänderten Kriterien HIGH → MEDIUM), wird ein automatisch angelegtes TODO freigegeben: Verknüpfung gelöst, Status `ARCHIVED` (nicht `DONE` — behoben ist nichts), Eintrag im Activity-Log; ein `IN_PROGRESS`-TODO bleibt unangetastet (TODO ba0dcb3a). Ein TODO auf Knopfdruck wird nie freigegeben, es folgt seinen Findings wie ein HIGH-TODO: `DONE`, wenn alle terminal sind, wieder `OPEN`, wenn eines zurückkommt (TODO f2ce6c50).
+**Verwaltete TODOs** (`ManagedTodoWriter`): nur für Findings ab der Schwelle des Workflows (`AuditTodoThreshold` aus `todoMinSeverity`, Standard `CRITICAL`/`HIGH`) im Status `OPEN`, deren Beleg einen Messwert des Laufs nennt (`ensureAll`, je Report eine Abfrage für Verknüpfungen und TODOs; Tag `audit`, `auto:workflow`, `TodoCreatedEvent` → TodoTrigger). Akzeptierte/verworfene Risiken, Wiedervorlagen und unbelegte Findings lösen keinen Fix-Loop aus. Nach jedem Ingest schließt `ManagedTodoWriter.reconcile` das TODO, sobald alle verknüpften Findings terminal sind, und öffnet es beim Wiederauftauchen; denselben Abgleich nach einem Dispositionswechsel im Audit Center und nach einer Zusammenführung macht `ManagedTodoReconciler`. Ein TODO auf Knopfdruck (`POST /api/v1/audit-findings/{id}/todos`, `AuditFindingTodoLinker`) entsteht auf demselben Weg (`ManagedTodoWriter.create`), seine Verknüpfung trägt aber `manual`. Erreicht keines der offenen verknüpften Findings mehr die Schwelle (etwa nach geänderten Kriterien HIGH → MEDIUM oder einer gesenkten Schwelle bis `NONE`), wird ein automatisch angelegtes TODO freigegeben: Verknüpfung gelöst, Status `ARCHIVED` (nicht `DONE` — behoben ist nichts), Eintrag im Activity-Log; ein `IN_PROGRESS`-TODO bleibt unangetastet (TODO ba0dcb3a). Ein TODO auf Knopfdruck wird nie freigegeben, es folgt seinen Findings wie eines über der Schwelle: `DONE`, wenn alle terminal sind, wieder `OPEN`, wenn eines zurückkommt (TODO f2ce6c50).
 
 **Gate-Status** kommt aus den Run-Metadaten des Workflows (`gate_status`), nicht aus den Findings; `AuditSummary.openFindingsBySeverity` zählt nur nicht-terminale Findings, `findingsByStatus` liefert Akzeptierte getrennt (Audit Center: „offen X · akzeptiert Y“; der Findings-Reiter filtert standardmäßig auf offene).
 

@@ -185,7 +185,7 @@ class ManagedTodoWriterTest {
 
     @Test
     void reconcile_withoutTouchedFindings_doesNothing() {
-        writer().reconcile(List.of());
+        writer().reconcile(List.of(), AuditTodoThreshold.HIGH);
 
         verifyNoInteractions(findingTodoRepository, todoRepository, findingRepository);
     }
@@ -202,7 +202,7 @@ class ManagedTodoWriterTest {
                 AuditFindingTodo.builder().findingId("f-2").todoId("t-1").build()));
         when(findingRepository.findAllById(any())).thenReturn(List.of(resolved, dismissed));
 
-        writer().reconcile(List.of(resolved, resolved));
+        writer().reconcile(List.of(resolved, resolved), AuditTodoThreshold.HIGH);
 
         assertThat(todo.getStatus()).isEqualTo(Todo.Status.DONE);
         verify(todoRepository).saveAll(List.of(todo));
@@ -220,7 +220,7 @@ class ManagedTodoWriterTest {
                 AuditFindingTodo.builder().findingId("f-2").todoId("t-1").build()));
         when(findingRepository.findAllById(any())).thenReturn(List.of(resolved, open));
 
-        writer().reconcile(List.of(resolved));
+        writer().reconcile(List.of(resolved), AuditTodoThreshold.HIGH);
 
         assertThat(todo.getStatus()).isEqualTo(Todo.Status.OPEN);
         verify(todoRepository, never()).save(any());
@@ -238,7 +238,7 @@ class ManagedTodoWriterTest {
         when(findingTodoRepository.findByTodoIdIn(Set.of("t-1"))).thenReturn(List.of(link("t-1", true)));
         when(findingRepository.findAllById(any())).thenReturn(List.of(back));
 
-        writer().reconcile(List.of(back));
+        writer().reconcile(List.of(back), AuditTodoThreshold.HIGH);
 
         assertThat(todo.getStatus()).isEqualTo(Todo.Status.OPEN);
         assertThat(todo.getWorkflowRunId()).isEqualTo("run-back");
@@ -252,7 +252,7 @@ class ManagedTodoWriterTest {
                 .thenReturn(List.of(link("t-manual", false), link("t-gone", true)));
         when(todoRepository.findAllById(List.of("t-gone"))).thenReturn(List.of());
 
-        writer().reconcile(List.of(resolved));
+        writer().reconcile(List.of(resolved), AuditTodoThreshold.HIGH);
 
         verify(todoRepository).findAllById(List.of("t-gone")); // the manual link is not loaded
         verifyNoInteractions(findingRepository);
@@ -274,7 +274,7 @@ class ManagedTodoWriterTest {
         when(findingTodoRepository.findByTodoIdIn(Set.of("t-1"))).thenReturn(List.of(managedLink));
         when(findingRepository.findAllById(any())).thenReturn(List.of(medium));
 
-        writer().reconcile(List.of(medium));
+        writer().reconcile(List.of(medium), AuditTodoThreshold.HIGH);
 
         assertThat(todo.getStatus()).isEqualTo(Todo.Status.ARCHIVED);
         assertThat(todo.getReferenceType()).isNull();
@@ -282,6 +282,42 @@ class ManagedTodoWriterTest {
         verify(findingTodoRepository).deleteAll(List.of(managedLink));
         verify(todoRepository).saveAll(List.of(todo));
         verify(activityLog).info(eq(ActivityLog.LogCategory.EXECUTION), contains("Shell-Aufruf ohne Escaping"), any());
+    }
+
+    /** d8607f77: with the workflow's threshold at MEDIUM, a MEDIUM finding keeps its TODO. */
+    @Test
+    void reconcile_keepsTheTodo_whenTheWorkflowThresholdAdmitsItsMediumFinding() {
+        AuditFinding medium = finding(FINDING_ID, AuditFindingStatus.OPEN);
+        medium.setSeverity(AuditSeverity.MEDIUM);
+        Todo todo = todo("t-1", Todo.Status.OPEN);
+        AuditFindingTodo managedLink = link("t-1", true);
+        when(findingTodoRepository.findByFindingIdIn(List.of(FINDING_ID))).thenReturn(List.of(managedLink));
+        when(todoRepository.findAllById(List.of("t-1"))).thenReturn(List.of(todo));
+        when(findingTodoRepository.findByTodoIdIn(Set.of("t-1"))).thenReturn(List.of(managedLink));
+        when(findingRepository.findAllById(any())).thenReturn(List.of(medium));
+
+        writer().reconcile(List.of(medium), AuditTodoThreshold.MEDIUM);
+
+        assertThat(todo.getStatus()).isEqualTo(Todo.Status.OPEN);
+        verify(findingTodoRepository, never()).deleteAll(any());
+    }
+
+    /** d8607f77: NONE takes automatic TODOs away altogether – also from a HIGH finding; the log names the threshold. */
+    @Test
+    void reconcile_releasesEvenAHighFindingsTodo_whenTheWorkflowThresholdIsNone() {
+        AuditFinding high = finding(FINDING_ID, AuditFindingStatus.OPEN);
+        high.setSeverity(AuditSeverity.HIGH);
+        Todo todo = todo("t-1", Todo.Status.OPEN);
+        AuditFindingTodo managedLink = link("t-1", true);
+        when(findingTodoRepository.findByFindingIdIn(List.of(FINDING_ID))).thenReturn(List.of(managedLink));
+        when(todoRepository.findAllById(List.of("t-1"))).thenReturn(List.of(todo));
+        when(findingTodoRepository.findByTodoIdIn(Set.of("t-1"))).thenReturn(List.of(managedLink));
+        when(findingRepository.findAllById(any())).thenReturn(List.of(high));
+
+        writer().reconcile(List.of(high), AuditTodoThreshold.NONE);
+
+        assertThat(todo.getStatus()).isEqualTo(Todo.Status.ARCHIVED);
+        verify(activityLog).info(eq(ActivityLog.LogCategory.EXECUTION), contains("TODO-Schwelle NONE"), any());
     }
 
     @Test
@@ -295,7 +331,7 @@ class ManagedTodoWriterTest {
         when(findingTodoRepository.findByTodoIdIn(Set.of("t-1"))).thenReturn(List.of(managedLink));
         when(findingRepository.findAllById(any())).thenReturn(List.of(back));
 
-        writer().reconcile(List.of(back));
+        writer().reconcile(List.of(back), AuditTodoThreshold.HIGH);
 
         assertThat(todo.getStatus()).isEqualTo(Todo.Status.ARCHIVED);
         verify(findingTodoRepository).deleteAll(List.of(managedLink));
@@ -314,7 +350,7 @@ class ManagedTodoWriterTest {
         when(findingTodoRepository.findByTodoIdIn(Set.of("t-1"))).thenReturn(List.of(manualLink));
         when(findingRepository.findAllById(any())).thenReturn(List.of(back));
 
-        writer().reconcile(List.of(back));
+        writer().reconcile(List.of(back), AuditTodoThreshold.HIGH);
 
         assertThat(todo.getStatus()).isEqualTo(Todo.Status.OPEN);
         assertThat(todo.getWorkflowRunId()).isEqualTo("run-back");
@@ -333,7 +369,7 @@ class ManagedTodoWriterTest {
         when(findingTodoRepository.findByTodoIdIn(Set.of("t-1"))).thenReturn(List.of(manualLink));
         when(findingRepository.findAllById(any())).thenReturn(List.of(medium));
 
-        writer().reconcile(List.of(medium));
+        writer().reconcile(List.of(medium), AuditTodoThreshold.HIGH);
 
         assertThat(todo.getStatus()).isEqualTo(Todo.Status.OPEN);
         verify(findingTodoRepository, never()).deleteAll(any());
@@ -364,7 +400,7 @@ class ManagedTodoWriterTest {
         when(findingTodoRepository.findByTodoIdIn(Set.of("t-1"))).thenReturn(List.of(managedLink));
         when(findingRepository.findAllById(any())).thenReturn(List.of(medium));
 
-        writer().reconcile(List.of(medium));
+        writer().reconcile(List.of(medium), AuditTodoThreshold.HIGH);
 
         assertThat(todo.getStatus()).isEqualTo(Todo.Status.IN_PROGRESS);
         verify(findingTodoRepository, never()).deleteAll(any());
@@ -386,7 +422,7 @@ class ManagedTodoWriterTest {
                 AuditFindingTodo.builder().findingId("f-2").todoId("t-1").managed(true).build()));
         when(findingRepository.findAllById(any())).thenReturn(List.of(medium, high));
 
-        writer().reconcile(List.of(medium));
+        writer().reconcile(List.of(medium), AuditTodoThreshold.HIGH);
 
         assertThat(todo.getStatus()).isEqualTo(Todo.Status.OPEN);
         verify(findingTodoRepository, never()).deleteAll(any());
@@ -416,7 +452,7 @@ class ManagedTodoWriterTest {
         AuditFindingTodo l3 = AuditFindingTodo.builder().findingId("f-3").todoId("t-1").managed(false).build();
         List<AuditFindingTodo> links = storedLinks(todo, List.of(l1, l2, l3), f1, f2, f3);
 
-        writer().reconcile(List.of(f1, f2));
+        writer().reconcile(List.of(f1, f2), AuditTodoThreshold.HIGH);
 
         assertThat(todo.getStatus()).isEqualTo(Todo.Status.ARCHIVED);
         verify(todoRepository, times(1)).saveAll(List.of(todo));
@@ -480,7 +516,7 @@ class ManagedTodoWriterTest {
         when(findingTodoRepository.findByTodoIdIn(Set.of("t-ab", "t-c"))).thenReturn(List.of(linkA, linkB, linkC));
         when(findingRepository.findAllById(any())).thenReturn(List.of(a, b, c));
 
-        writer().reconcile(List.of(a, b, c));
+        writer().reconcile(List.of(a, b, c), AuditTodoThreshold.HIGH);
 
         assertThat(todoAb.getStatus()).as("beide Findings terminal").isEqualTo(Todo.Status.DONE);
         assertThat(todoC.getStatus()).as("Finding kam zurück").isEqualTo(Todo.Status.OPEN);

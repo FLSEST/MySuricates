@@ -92,7 +92,14 @@ public class AuditIngestionService {
         Set<String> factNames = EvidenceVerification.factNames(
                 run.getSteps().stream().map(StepResult::getOutput).toList());
 
-        snapshotApplier.apply(event, report, parsed.findings(), factNames);
+        if (config.invalidTodoMinSeverity() != null) {
+            activityLog.warn(ActivityLog.LogCategory.EXECUTION,
+                    "Audit-Konfiguration (" + config.key() + "): todoMinSeverity '" + config.invalidTodoMinSeverity()
+                            + "' ist unbekannt – es gilt " + config.todoThreshold()
+                            + " (erlaubt: CRITICAL, HIGH, MEDIUM, LOW, NONE)",
+                    "AuditIngestionService", event.getRunId(), event.getWorkflowId());
+        }
+        snapshotApplier.apply(event, report, parsed.findings(), factNames, config.todoThreshold());
     }
 
     /**
