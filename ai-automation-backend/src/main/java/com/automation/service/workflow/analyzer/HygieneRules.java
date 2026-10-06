@@ -3,6 +3,7 @@ package com.automation.service.workflow.analyzer;
 import com.automation.entity.BlockDefinition;
 import com.automation.service.workflow.analyzer.AnalyzerFinding.Severity;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,12 +31,29 @@ final class HygieneRules {
         for (int i = 0; i < blocks.size(); i++) {
             BlockDefinition block = blocks.get(i);
             String name = block.getName();
-            String all = BlockText.joined(block);
 
-            shellRules(block, i, name, all, out);
+            shellRules(block, i, name, hostPathText(block), out);
             duplicatedInstructions(block, workflowInstructions, i, name, out);
             datedModel(block, i, name, out);
         }
+    }
+
+    /**
+     * The block's text for the home-path check. A {@code mounts} entry ({@code host:container[:mode]})
+     * counts with its host side only: the container side is a path inside the image, such as the
+     * image user's home, and the same on every machine (cccb0301).
+     */
+    private static String hostPathText(BlockDefinition block) {
+        List<String> texts = new ArrayList<>(BlockText.allStrings(block));
+        if (block.getConfig() != null && block.getConfig().get("mounts") instanceof List<?> mounts) {
+            for (Object mount : mounts) {
+                if (mount instanceof String entry && texts.remove(entry)) {
+                    int colon = entry.indexOf(':');
+                    texts.add(colon < 0 ? entry : entry.substring(0, colon));
+                }
+            }
+        }
+        return String.join("\n", texts);
     }
 
     private static void shellRules(BlockDefinition block, int i, String name, String all,

@@ -54,6 +54,26 @@ class HygieneRulesTest {
                 Map.of("command", "/home/a/x /home/b/y")))).hasSize(1);
     }
 
+    /** cccb0301: the container side of a mount is a path inside the image, the same on every machine. */
+    @Test
+    void mountTargetInsideTheImageIsNoHomePath() {
+        assertThat(apply(null, block("shell", "trivy", Map.of(
+                "container_args", List.of("trivy", "fs", "/workspace"),
+                "mounts", List.of("{{ home_dir }}/.m2/repository:/home/agent/.m2/repository:ro")))))
+                .noneMatch(f -> f.rule().equals("absolute-home-path"));
+    }
+
+    @Test
+    void mountSourceUnderAHomeDirectoryIsStillReported() {
+        assertThat(apply(null, block("shell", "s", Map.of(
+                "container_args", List.of("tool"),
+                "mounts", List.of("/home/anna/data:/data:ro")))))
+                .singleElement().satisfies(f -> {
+                    assertThat(f.rule()).isEqualTo("absolute-home-path");
+                    assertThat(f.detail()).contains("/home/anna");
+                });
+    }
+
     @Test
     void shellMitSetEOderErrexitIstStrikt() {
         assertThat(apply(null,
