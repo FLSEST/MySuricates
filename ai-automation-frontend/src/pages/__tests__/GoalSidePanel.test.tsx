@@ -11,7 +11,9 @@ import { useI18nStore } from '../../i18n';
 import { GoalDetail } from '../GoalDetail';
 import { ToastContainer } from '../../components/ui/ToastContainer';
 import { ApprovalDialog } from '../../components/workflow/ApprovalDialog';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { flushSync } from 'react-dom';
+import { useModalLayer } from '../../components/ui/modalStack';
 import { useToastStore } from '../../stores/toastStore';
 import type { GoalDetail as GoalDetailData, GoalTodoItem } from '../../types';
 
@@ -390,6 +392,42 @@ describe('GoalSidePanel – history, modal sheet, clean-up', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(document.body.style.overflow).toBe('');
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    expect(screen.queryByTestId('goal-side-panel')).not.toBeInTheDocument();
+  });
+
+  // Browser check: a dialog whose Escape listener runs first and closes it at once (the browser lets React
+  // re-render between two listeners; flushSync does the same here) must still count as lying above the panel
+  it('keeps the panel open when the dialog above it is gone before the panel sees the key', async () => {
+    function EarlyLayer() {
+      useModalLayer();
+      return <div role="dialog" aria-modal="true" aria-label="Early layer" />;
+    }
+    function EarlyClosingDialog() {
+      const [open, setOpen] = useState(true);
+      useEffect(() => {
+        const onKey = (event: KeyboardEvent) => {
+          if (event.key === 'Escape') flushSync(() => setOpen(false));
+        };
+        window.addEventListener('keydown', onKey);   // registered before the panel's listener
+        return () => window.removeEventListener('keydown', onKey);
+      }, []);
+      return open ? <EarlyLayer /> : null;
+    }
+    serveGoal();
+    renderWithProviders(
+      <>
+        <EarlyClosingDialog />
+        <Routes><Route path="/goals/:goalId" element={<GoalDetail />} /></Routes>
+      </>,
+      { route: '/goals/g1?item=workpackage:w1' },
+    );
+    await screen.findByTestId('goal-side-panel');
+
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: 'Early layer' })).not.toBeInTheDocument();
+    expect(screen.getByTestId('goal-side-panel')).toBeInTheDocument();
+
     fireEvent.keyDown(document.body, { key: 'Escape' });
     expect(screen.queryByTestId('goal-side-panel')).not.toBeInTheDocument();
   });

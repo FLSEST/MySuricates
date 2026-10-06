@@ -51,17 +51,30 @@ function useDrag() {
 
 /**
  * Escape closes the panel (d86f27b2) – unless something inside already used the key (an inline field,
- * a keyboard drag: they prevent the default) or `covered()` reports a dialog above the panel. Listens on
- * `window`, after the document-level listeners of dnd-kit, so cancelling a keyboard drag keeps it open.
+ * a keyboard drag: they prevent the default) or `covered()` reports a dialog above the panel.
+ *
+ * Two listeners on `window`: the capture one runs before any other listener and notes whether a dialog
+ * lies above the panel – the dialog's own Escape handler may close it before the panel's turn, and the
+ * browser lets React re-render between two listeners, so asking later would find the dialog already gone.
+ * The bubble one runs after the document-level listeners of dnd-kit and the inline fields, so it sees
+ * whether they used the key.
  */
 function useEscapeToClose(onClose: () => void, covered: () => boolean) {
   useEffect(() => {
+    let coveredWhenPressed = false;
+    const notePressed = (event: globalThis.KeyboardEvent) => {
+      if (event.key === 'Escape') coveredWhenPressed = covered();
+    };
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
-      if (event.key !== 'Escape' || event.defaultPrevented || covered()) return;
+      if (event.key !== 'Escape' || event.defaultPrevented || coveredWhenPressed) return;
       onClose();
     };
+    window.addEventListener('keydown', notePressed, true);
     window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('keydown', notePressed, true);
+      window.removeEventListener('keydown', onKeyDown);
+    };
   }, [onClose, covered]);
 }
 
