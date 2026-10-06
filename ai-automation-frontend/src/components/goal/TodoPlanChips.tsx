@@ -22,7 +22,7 @@ export function DueChip({ todo, today }: { todo: Pick<GoalTodoItem, 'dueDate' | 
   );
 }
 
-/** Arbeitspaket eines TODOs, mit dem Balken-Zeichen in seiner Zustandsfarbe. */
+/** Work package of a TODO, with the bar symbol in its state colour. */
 export function WorkPackageChip({ workPackage }: { workPackage: GoalWorkPackage | undefined }) {
   const t = useT();
   if (!workPackage) return null;

@@ -22,7 +22,7 @@ describe('blockLineRanges', () => {
     for (let i = 0; i < blocks.length; i++) {
       const r = ranges.get(i)!;
       expect(lines[r.start - 1]!.trim()).toBe('{');
-      expect(lines[r.end - 1]!.trim()).toMatch(/^\}/); // "}" oder "},"
+      expect(lines[r.end - 1]!.trim()).toMatch(/^\}/); // "}" or "},"
     }
 
     // Ranges are ascending and touch each other (no overlap/gap)

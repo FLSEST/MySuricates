@@ -32,13 +32,13 @@ public record UpdateTodoPlanningRequest(
         @JsonAlias("milestoneId") String workPackageId,
         String decision
 ) {
-    /** Form ohne {@code workPackageId} – fuer Aufrufer von vorher. */
+    /** Form without {@code workPackageId} - for earlier callers. */
     public UpdateTodoPlanningRequest(String goalId, Integer goalRank, String complexity, String suggestedEffort,
                                      String ratingNote, String openQuestion, Todo.RatedBy ratedBy) {
         this(goalId, goalRank, complexity, suggestedEffort, ratingNote, openQuestion, ratedBy, null, null);
     }
 
-    /** Form ohne {@code decision} – fuer Aufrufer von vorher. */
+    /** Form without {@code decision} - for earlier callers. */
     public UpdateTodoPlanningRequest(String goalId, Integer goalRank, String complexity, String suggestedEffort,
                                      String ratingNote, String openQuestion, Todo.RatedBy ratedBy, String workPackageId) {
         this(goalId, goalRank, complexity, suggestedEffort, ratingNote, openQuestion, ratedBy, workPackageId, null);

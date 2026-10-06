@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-// @ts-expect-error — Node-Skript ohne Typdeklaration, laeuft am Ende von `npm run build`
+// @ts-expect-error — Node script without type declaration, runs at the end of `npm run build`
 import { checkLazyChunks } from '../../scripts/check-lazy-chunks.mjs';
 
 // The build check itself against small fake builds: it must find Monaco at the entry —

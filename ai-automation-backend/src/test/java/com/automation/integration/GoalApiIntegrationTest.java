@@ -77,7 +77,7 @@ class GoalApiIntegrationTest {
 
         JsonNode assigned = json(perform(post("/api/v1/goals/" + goalId + "/todos"),
                 Map.of("todoIds", List.of(low.getId(), high.getId(), site.getId()))).andExpect(status().isOk()));
-        // Ohne Rang: Prioritaet entscheidet (HIGH, MEDIUM, LOW).
+        // Without rank: priority decides (HIGH, MEDIUM, LOW).
         assertThat(ids(assigned)).containsExactly(high.getId(), site.getId(), low.getId());
         assertThat(assigned.at("/goal/progress/total").asInt()).isEqualTo(3);
         assertThat(assigned.at("/goal/targetDate").asText()).startsWith("2026-10-15T00:00");

@@ -249,7 +249,7 @@ class AuditIngestionServiceTest {
         assertThat(message.getValue()).contains("coverage.mystery").contains(COVERAGE_KEY);
     }
 
-    /** Derselbe unbekannte Key in mehreren Findings eines Runs meldet sich genau einmal. */
+    /** The same unknown key in several findings of a run is reported exactly once. */
     @Test
     void unknownRuleKey_isReportedOncePerRunAndKey() {
         stubCoverageRun("run-1", "coverage.mystery", "coverage.mystery", "coverage.other");

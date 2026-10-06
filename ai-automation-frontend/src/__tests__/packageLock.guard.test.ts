@@ -22,7 +22,7 @@ describe('package-lock.json guard', () => {
     expect(root.version).toBe(manifest.version);
   });
 
-  it('spiegelt engines aus package.json', () => {
+  it('mirrors engines from package.json', () => {
     expect(root.engines).toEqual(manifest.engines);
   });
 

@@ -37,8 +37,8 @@ final class GoalRelationAssembler {
             GoalRelationRow::goalRank, GoalRelationRow::priority, GoalRelationRow::createdAt);
 
     /**
-     * @param findingIds Audit-Befunde je TODO-ID aus {@code audit_finding_todos}
-     * @param triggers   alle aktiven Trigger
+     * @param findingIds audit findings per TODO id from {@code audit_finding_todos}
+     * @param triggers   all active triggers
      */
     record Lookups(Map<String, String> projectNames, Map<String, String> workflowNames, Map<String, RunStateRow> runs,
                    Map<String, List<String>> findingIds, List<TodoTriggerMatchRow> triggers) {}

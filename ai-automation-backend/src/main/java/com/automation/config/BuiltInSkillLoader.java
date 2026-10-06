@@ -55,7 +55,7 @@ public class BuiltInSkillLoader {
         this(objectMapper, DEFAULT_BASE_PATH);
     }
 
-    /** Nur fuer Tests: abweichendes Ressourcen-Verzeichnis. */
+    /** Tests only: alternative resource directory. */
     BuiltInSkillLoader(ObjectMapper objectMapper, String basePath) {
         this.objectMapper = objectMapper;
         this.basePath = basePath;
@@ -122,7 +122,7 @@ public class BuiltInSkillLoader {
         return def;
     }
 
-    /** Prompt byte-genau aus {@code <id>.md}. */
+    /** Prompt byte-exact from {@code <id>.md}. */
     private String readPrompt(String id) {
         String path = basePath + "/" + id + ".md";
         ClassPathResource md = new ClassPathResource(path);

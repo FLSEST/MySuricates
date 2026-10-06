@@ -156,7 +156,7 @@ export function TerminalPanel({ runId }: TerminalPanelProps) {
       }
     });
 
-    // Connect WebSocket (asynchron: holt zuerst ein Handshake-Ticket)
+    // Connect WebSocket (asynchronous: first fetches a handshake ticket)
     void connect();
 
     // Handle resize

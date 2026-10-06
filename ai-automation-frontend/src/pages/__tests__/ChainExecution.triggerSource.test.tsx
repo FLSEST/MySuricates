@@ -29,7 +29,7 @@ function renderRun(run: ChainRun) {
   );
 }
 
-describe('ChainExecution — Starter der Kette', () => {
+describe('ChainExecution — chain starter', () => {
   it('names what started the chain', async () => {
     renderRun({ ...oldShape, triggerSource: 'SCHEDULE' });
 

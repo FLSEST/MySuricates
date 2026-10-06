@@ -151,7 +151,7 @@ class SecurityConfigIntegrationTest {
 
     @Test
     void nonApiPath_accessibleWithoutAuth() throws Exception {
-        // anyRequest().permitAll(): die ausgelieferte Oberflaeche selbst braucht keinen Key.
+        // anyRequest().permitAll(): the served UI itself needs no key.
         mockMvc.perform(get("/"))
                 .andExpect(status().is(not(403)));
     }
@@ -327,7 +327,7 @@ class SecurityConfigIntegrationTest {
 
     @Test
     void headers_cspAndFrameOptionsAlsoOnNonApiPaths() throws Exception {
-        // Die Oberflaeche liegt ausserhalb von /api — dort zaehlt die CSP.
+        // The UI lives outside /api - the CSP applies there.
         mockMvc.perform(get("/"))
                 .andExpect(header().string("Content-Security-Policy",
                         org.hamcrest.Matchers.startsWith("default-src 'self'; script-src 'self';")))

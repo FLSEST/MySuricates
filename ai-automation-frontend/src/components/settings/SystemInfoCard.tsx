@@ -30,8 +30,8 @@ export function SystemInfoCard() {
             {Object.entries(sysInfo)
               // Primitives only: `SystemInfo` grows elsewhere, and a nested field as
               // React child crashes the whole page ("Objects are not valid as a React
-              // child") — so geschehen, als `rateLimit` als Objekt dazukam (0d1d27a1). Die
-              // Rate-Limit-Werte stehen ohnehin einstellbar in der Ausfuehrungs-Karte.
+              // child") — that happened when `rateLimit` was added as an object (0d1d27a1). The
+              // rate-limit values are editable in the execution card anyway.
               .filter(([, value]) => value !== null && typeof value !== 'object')
               .map(([key, value]) => (
                 <div key={key} className="flex justify-between">

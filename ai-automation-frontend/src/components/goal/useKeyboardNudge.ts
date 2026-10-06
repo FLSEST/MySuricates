@@ -35,7 +35,7 @@ export function useKeyboardNudge<T>(committed: T, same: (a: T, b: T) => boolean,
     latest.current = { draft, committed, same, commit };
   });
 
-  /** Speichert einen offenen Entwurf jetzt. */
+  /** Saves an open draft now. */
   const flush = useCallback(() => {
     stopTimer(timer);
     saveDraft(latest);

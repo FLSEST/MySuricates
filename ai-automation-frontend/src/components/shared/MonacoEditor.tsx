@@ -46,7 +46,7 @@ interface MonacoEditorProps {
   lineNumbers?: 'on' | 'off';
 }
 
-// Monaco-Editor-Instanz (locker typisiert, um keine monaco-Typen zu importieren)
+// Monaco editor instance (loosely typed, to avoid importing monaco types)
 type MonacoEditorInstance = {
   getValue: () => string;
   setValue: (value: string) => void;

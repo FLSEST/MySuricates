@@ -28,7 +28,7 @@ function storeMode(goalId: string, mode: UndatedMode) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...readModes(), [goalId]: mode }));
   } catch {
-    // privates Fenster: gilt bis zum Neuladen
+    // private window: only lasts until reload
   }
 }
 

@@ -32,7 +32,7 @@ function offenders(file: string, source: string): string[] {
   });
 }
 
-describe('Datums- und Zahlenformat', () => {
+describe('Date and number format', () => {
   it('finds the source files and the helper', () => {
     expect(Object.keys(SOURCES).length).toBeGreaterThan(200);
     expect(SOURCES[GATEWAY]).toBeDefined();

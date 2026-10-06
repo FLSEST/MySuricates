@@ -35,7 +35,7 @@ services:
       - AUTOMATION_HARDENING_REQUIRESEALEDFORUNATTENDED=${MYSURICATES_HARDENING_REQUIRE_SEALED:-false}
     volumes:
       - data:/app/data
-      # Integrations-Schluessel getrennt von der DB (IntegrationEncryptionService, 3fb2242c)
+      # Integration keys kept apart from the DB (IntegrationEncryptionService, 3fb2242c)
       - secrets:/app/secrets
     restart: unless-stopped
 volumes:

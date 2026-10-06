@@ -1,6 +1,6 @@
 import { DATA_LABEL_W, localizeName, wrapLabel, type BpmnLabelMaps, type RunStatus, type Shape } from './bpmnLayout';
 
-/** BPMN-Standard-Marker: macht den Block-Typ am Kasten erkennbar. */
+/** BPMN standard marker: makes the block type recognizable on the box. */
 function TaskMarker({ s }: { s: Shape }) {
   const x = s.x + 7;
   const y = s.y + 7;

@@ -127,7 +127,7 @@ class GoalWorkflowApiIntegrationTest {
         perform(post("/api/v1/goals/" + goalId + "/workflows"), Map.of("workflowId", builder))
                 .andExpect(status().isCreated());
 
-        // Duplikat 409, fremdes Paket 400, unbekannter Workflow 404, ungueltige Rolle 400
+        // Duplicate 409, foreign package 400, unknown workflow 404, invalid role 400
         perform(post("/api/v1/goals/" + goalId + "/workflows"), Map.of("workflowId", builder, "workPackageId", site))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("STATE_CONFLICT"));
         perform(post("/api/v1/goals/" + goalId + "/workflows"), Map.of("workflowId", report))
@@ -170,7 +170,7 @@ class GoalWorkflowApiIntegrationTest {
         perform(post("/api/v1/goals/" + goalId + "/workflows"), Map.of("workflowId", alpha, "workPackageId", site))
                 .andExpect(status().isNotFound());
 
-        // Kaskaden: Paket loeschen nimmt seine Zuordnungen mit, Ziel loeschen alle
+        // Cascades: deleting a package takes its assignments along, deleting the goal takes all
         mockMvc.perform(delete("/api/v1/goals/" + goalId + "/work-packages/" + docs)).andExpect(status().isNoContent());
         assertThat(count("SELECT COUNT(*) FROM goal_workflows WHERE work_package_id = ?", docs)).isZero();
         assertThat(count("SELECT COUNT(*) FROM goal_workflows WHERE goal_id = ?", goalId)).isEqualTo(2);

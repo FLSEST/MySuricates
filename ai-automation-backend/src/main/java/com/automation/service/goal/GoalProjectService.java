@@ -68,9 +68,9 @@ public class GoalProjectService {
         if (cascade) {
             Instant now = clock.instant();
             for (String workPackageId : workPackageRepository.findIdsByGoalAndProject(goal.getId(), projectId)) {
-                todoRepository.detachFromWorkPackage(workPackageId, now); // auch TODOs anderer Projekte darin (Altdaten)
+                todoRepository.detachFromWorkPackage(workPackageId, now); // also TODOs of other projects inside them (legacy data)
             }
-            // die Meilenstein-Verknuepfungen der Pakete fallen per ON DELETE CASCADE mit
+            // the packages' milestone links go along via ON DELETE CASCADE
             workPackageRepository.deleteByGoalAndProject(goal.getId(), projectId);
             todoRepository.detachProjectFromGoal(goal.getId(), projectId, now);
         }

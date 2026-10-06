@@ -36,7 +36,7 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class GoalWorkflowService {
 
-    /** ID des synthetischen Waechter-Eintrags. */
+    /** ID of the synthetic guard entry. */
     public static final String GUARD_ID = "guard";
 
     private static final Comparator<GoalWorkflowRow> ORDER = Comparator
@@ -141,7 +141,7 @@ public class GoalWorkflowService {
                 w.getProject() != null ? w.getProject().getId() : null, a.getRole(), false, a.getCreatedAt());
     }
 
-    /** {@code WORKER}/{@code STATUS}; leer = {@code fallback} (null = Pflicht, dann 400). */
+    /** {@code WORKER}/{@code STATUS}; empty = {@code fallback} (null = required, then 400). */
     private static GoalWorkflow.Role role(String value, GoalWorkflow.Role fallback) {
         GoalWorkflow.Role role = EnumParameter.parseOptional(GoalWorkflow.Role.class, "role", value);
         if (role == null && fallback == null) {

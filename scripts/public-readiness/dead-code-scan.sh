@@ -18,7 +18,7 @@ section "Dead code and unused surface scan"
 # name the markers they search for (TODO 16e172a2).
 MARKER_PREFIX='(//|#|/\*|\*|<!--)[[:space:]]*'
 TODO_ID='TODO[[:space:]:(]*[0-9a-f]{8}([^0-9a-zA-Z]|$)'
-marker_hits() {  # $1 = ERE hinter dem Kommentarpraefix
+marker_hits() {  # $1 = ERE after the comment prefix
   pgrep -n --exclude-dir=public-readiness --exclude='*.md' "${MARKER_PREFIX}$1" .
 }
 

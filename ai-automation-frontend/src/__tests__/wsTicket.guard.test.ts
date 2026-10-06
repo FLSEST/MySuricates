@@ -6,7 +6,7 @@ import path from 'node:path';
 // Guard: the API key must never end up in a URL again (browser history, proxy logs).
 // WebSocket handshakes have authenticated via a short-lived one-time ticket since 05b759f6
 // (POST /api/v1/ws-ticket, key in the header) — see WebSocketAuthInterceptor in the backend.
-describe('kein apiKey im Query-String', () => {
+describe('no apiKey in the query string', () => {
   const currentDir = path.dirname(fileURLToPath(import.meta.url));
   const srcDir = path.resolve(currentDir, '..');
 

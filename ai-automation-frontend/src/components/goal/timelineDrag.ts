@@ -8,7 +8,7 @@ import type { GoalMilestone, GoalTodoItem, GoalWorkPackage } from '../../types';
 /**
  * What is currently being dragged on the timeline: a TODO chip, a work package - moved as a bar
  * (`move`), scheduled from the strip (`schedule`) or dragged at one end (`start`/`end`) - or
- * ein Meilenstein.
+ * a milestone.
  */
 export type Dragged =
   | { kind: 'todo'; todo: GoalTodoItem }
