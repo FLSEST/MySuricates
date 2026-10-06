@@ -5,13 +5,14 @@ import com.automation.entity.ActivityLog.LogCategory;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.exception.WorkflowExecutionException;
 import com.automation.executor.BlockExecutor;
+import com.automation.executor.BlockTypeRegistry;
 import com.automation.executor.ExecutionContext;
 import com.automation.executor.StepFailureSummary;
-import com.automation.repository.SkillRepository;
 import com.automation.repository.StepResultRepository;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.project.ContainerService;
+import com.automation.service.workflow.WorkflowSnapshotLoader.WorkflowSnapshot;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -23,22 +24,20 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import com.automation.concurrency.DynamicSemaphore;
 
 import java.util.concurrent.ExecutorService;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class WorkflowExecutor {
 
-    private final List<BlockExecutor> blockExecutors;
+    private final BlockTypeRegistry blockTypes;
     private final ContainerService containerService;
     private final WorkflowRunRepository runRepository;
     private final StepResultRepository stepResultRepository;
-    private final SkillRepository skillRepository;
+    private final WorkflowSnapshotLoader snapshotLoader;
     private final ExecutionBroadcaster broadcaster;
     private final ExecutorService virtualThreadExecutor;
     private final DynamicSemaphore executionSemaphore;
@@ -55,39 +54,6 @@ public class WorkflowExecutor {
 
     // Active execution tracking is delegated to WorkflowExecutionRegistry; controlling a run that
     // already exists (pause/resume/cancel/approval, ad-hoc commands) to RunControlService.
-
-    /** Detached copy of everything the async loop needs — taken while the JPA session is open. */
-    private record WorkflowSnapshot(Project project, List<BlockDefinition> blocks, List<Skill> skills,
-                                    String instructions, String model, String provider, String effort,
-                                    Map<String, Object> workflowMeta, String templateId,
-                                    Map<String, Skill> blockSkillLookup) {}
-
-    /**
-     * Eagerly copies the lazy workflow graph and pre-resolves per-block skill IDs to entities (one
-     * DB query). Must run while the JPA session is open; callers catch so a failure fails the run.
-     */
-    private WorkflowSnapshot snapshot(Workflow workflow) {
-        List<BlockDefinition> blocks = List.copyOf(workflow.getBlocks());
-        List<Skill> skills = List.copyOf(workflow.getActivatedSkills());
-        Set<String> workflowSkillIds = skills.stream().map(Skill::getId).collect(Collectors.toSet());
-        Set<String> blockSkillIds = blocks.stream()
-                .filter(b -> b.getSkillIds() != null)
-                .flatMap(b -> b.getSkillIds().stream())
-                .filter(id -> !workflowSkillIds.contains(id))
-                .collect(Collectors.toSet());
-        Map<String, Skill> blockSkillLookup = blockSkillIds.isEmpty()
-                ? Map.of()
-                : skillRepository.findAllById(blockSkillIds).stream()
-                        .collect(Collectors.toMap(Skill::getId, s -> s));
-        if (!blockSkillIds.isEmpty() && blockSkillLookup.size() < blockSkillIds.size()) {
-            Set<String> missing = new java.util.HashSet<>(blockSkillIds);
-            missing.removeAll(blockSkillLookup.keySet());
-            log.warn("Per-block skill IDs not found (deleted?): {}", missing);
-        }
-        return new WorkflowSnapshot(workflow.getProject(), blocks, skills, workflow.getInstructions(),
-                workflow.getModel(), workflow.getProvider(), workflow.getEffort(),
-                RunWorkspaceService.policy(workflow.getMetadata(), blocks), workflow.getTemplateId(), blockSkillLookup);
-    }
 
     public WorkflowRun execute(Workflow workflow, Map<String, Object> inputContext, TriggerSource triggerSource) {
         return execute(workflow, inputContext, null, null, triggerSource);
@@ -117,7 +83,7 @@ public class WorkflowExecutor {
         final WorkflowSnapshot wf;
         final Map<String, Object> contextVars;
         try {
-            wf = snapshot(workflow);
+            wf = snapshotLoader.load(workflow);
 
             Map<String, Object> mergedContext = new HashMap<>(workflow.getDefaultContext());
             if (inputContext != null) {
@@ -229,7 +195,7 @@ public class WorkflowExecutor {
                 // Per-block skill context: merge block-level skills with workflow-level skills
                 boolean hasBlockSkills = skillContext.applyForBlock(block, executionProject, skills, blockSkillLookup);
 
-                BlockExecutor executor = findExecutor(block.getType());
+                BlockExecutor executor = blockTypes.executorFor(block.getType());
 
                 // Pre-create RUNNING placeholder so UI shows the step immediately
                 int stepIndex = context.preAllocateStepIndex();
@@ -410,7 +376,7 @@ public class WorkflowExecutor {
         ResumeContext context = ResumeContext.rebuild(run.getInputContext(), completedSteps);
         final WorkflowSnapshot wf;
         try {
-            wf = snapshot(workflow);
+            wf = snapshotLoader.load(workflow);
         } catch (Exception e) {
             throw new WorkflowExecutionException("Failed to load workflow data for resume: " + e.getMessage(), e);
         }
@@ -427,14 +393,6 @@ public class WorkflowExecutor {
         runRepository.save(run);
         executionRegistry.registerProvisional(runId); // controllable as soon as it is RUNNING
         return new ResumeStart(run, wf, plan, context, null, null);
-    }
-
-    private BlockExecutor findExecutor(String blockType) {
-        return blockExecutors.stream()
-                .filter(e -> e.supports(blockType))
-                .findFirst()
-                .orElseThrow(() -> new WorkflowExecutionException(
-                        "No executor found for block type: " + blockType));
     }
 
 }

@@ -3,7 +3,7 @@ package com.automation.service.assistant;
 import com.automation.executor.BlockExecutor;
 import com.automation.executor.BlockTypeRegistry;
 import com.automation.service.assistant.context.BlockTypesIndexSection;
-import com.automation.service.assistant.fetch.BlockSpecs;
+import com.automation.executor.spec.BlockSpecs;
 import com.automation.service.assistant.fetch.DocsFetchHandler;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;

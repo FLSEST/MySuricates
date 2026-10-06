@@ -1,6 +1,6 @@
 package com.automation.service.conversion;
 
-import com.automation.service.assistant.fetch.BlockSpecs;
+import com.automation.executor.spec.BlockSpecs;
 
 import java.util.List;
 
