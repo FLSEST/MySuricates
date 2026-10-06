@@ -68,6 +68,8 @@
 45 scripts/ci/pre-push-checks.sh
 71 scripts/ci/public-hygiene.sh
 2 scripts/installer-probe.sh
+1 scripts/lib/art.generated.sh
+2 scripts/lib/block-types.generated.sh
 100 scripts/lib/hygiene-rules.sh
 5 scripts/lib/module-catalog.generated.sh
 5 scripts/lib/pool-sanitizer.generated.sh

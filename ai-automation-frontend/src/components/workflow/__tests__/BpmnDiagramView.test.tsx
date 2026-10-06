@@ -116,7 +116,7 @@ describe('BpmnDiagramView loop subprocess', () => {
   const inside = (inner: ReturnType<typeof box>, outer: ReturnType<typeof box>) =>
     inner.x >= outer.x && inner.y >= outer.y && inner.x + inner.w <= outer.x + outer.w && inner.y + inner.h <= outer.y + outer.h;
 
-  it.each(['horizontal', 'vertical'] as const)('legt Start, Inhalt und Ende der Schleife in ihren Kasten (%s)', (orientation) => {
+  it.each(['horizontal', 'vertical'] as const)('places start, body and end of the loop inside its box (%s)', (orientation) => {
     const { container } = render(<BpmnDiagramView xml={FOREACH_XML} orientation={orientation} />);
     const frame = box(container.querySelector('rect[rx="12"]')!);
     const circles = Array.from(container.querySelectorAll('circle')).map(box);
