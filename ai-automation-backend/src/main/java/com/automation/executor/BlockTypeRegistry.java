@@ -1,5 +1,6 @@
 package com.automation.executor;
 
+import com.automation.exception.WorkflowExecutionException;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
@@ -14,7 +15,8 @@ import java.util.TreeSet;
  * beans — never a hand-maintained list.
  *
  * <p>Used by {@code BlockTypeValidator} to refuse unknown types when a workflow definition is
- * saved (TODO 89dd9e34), so a typo fails at save time instead of mid-run.
+ * saved (TODO 89dd9e34), so a typo fails at save time instead of mid-run, and by the run loop to
+ * find the executor of a block ({@link #executorFor}).
  */
 @Component
 public class BlockTypeRegistry {
@@ -55,6 +57,19 @@ public class BlockTypeRegistry {
             }
         }
         return snapshot;
+    }
+
+    /**
+     * The executor that runs blocks of {@code blockType}.
+     *
+     * @throws WorkflowExecutionException when no registered executor supports the type
+     */
+    public BlockExecutor executorFor(String blockType) {
+        return executors.stream()
+                .filter(e -> e.supports(blockType))
+                .findFirst()
+                .orElseThrow(() -> new WorkflowExecutionException(
+                        "No executor found for block type: " + blockType));
     }
 
     /** The known types for error messages: {@code "agentic, approval, …"}. */

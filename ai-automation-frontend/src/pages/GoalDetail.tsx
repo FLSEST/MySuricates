@@ -21,6 +21,8 @@ import { WorkflowMapDnd } from '../components/goal/WorkflowMapDnd';
 import { WorkflowMapPanel } from '../components/goal/WorkflowMapPanel';
 import { structureOf } from '../components/goal/workflowMap';
 import { useIsMobile } from '../hooks/useIsMobile';
+import { useDebounced } from '../hooks/useDebounced';
+import { usePersistedState } from '../hooks/usePersistedState';
 import {
   GoalSelectionContext, SELECTION_PARAM, parseSelection, selectionValue, type GoalSelection, type GoalSelectionValue,
 } from '../components/goal/goalSelection';
@@ -64,23 +66,8 @@ function storeView(view: GoalView) {
   }
 }
 
+// Stored as "true"/"false" – valid JSON, so usePersistedState reads the values written before it (8edfae0d)
 const WORKFLOW_PANEL_OPEN_KEY = 'mysuricates-goal-workflow-panel-open';
-
-function readWorkflowPanel(): boolean {
-  try {
-    return localStorage.getItem(WORKFLOW_PANEL_OPEN_KEY) !== 'false';
-  } catch {
-    return true;
-  }
-}
-
-function storeWorkflowPanel(open: boolean) {
-  try {
-    localStorage.setItem(WORKFLOW_PANEL_OPEN_KEY, String(open));
-  } catch {
-    // privates Fenster: gilt bis zum Neuladen
-  }
-}
 
 /** Nur in der Workflow-Zuordnung umschließt das Ziehen Karte und Leiste; sonst bleibt alles, wie es ist. */
 function WorkflowMapFrame({ on, children, ...props }: Omit<ComponentProps<typeof WorkflowMapDnd>, 'children'> & { on: boolean; children: ReactNode }) {
@@ -93,16 +80,6 @@ function tagSuggestions(todos: GoalTodoItem[]): string[] {
   todos.flatMap((todo) => todo.tags).forEach((tag) => counts.set(tag, (counts.get(tag) ?? 0) + 1));
   const frequent = [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([tag]) => tag);
   return [...new Set([DEFAULT_TAG_SUGGESTION, ...frequent])].slice(0, 5);
-}
-
-/** Filter der Kandidaten, die Suche verzögert – nicht jeder Tastendruck ist eine Abfrage. */
-function useDebounced<T>(value: T, ms: number): T {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const timer = window.setTimeout(() => setDebounced(value), ms);
-    return () => window.clearTimeout(timer);
-  }, [value, ms]);
-  return debounced;
 }
 
 /**
@@ -119,16 +96,13 @@ export function GoalDetail() {
   const navigate = useNavigate();
   const [view, setView] = useState<GoalView>(readView);
   // Workflow-Leiste der Workflow-Zuordnung (52bc1e8c): gemerkt, ob sie offen ist; auf dem Handy gibt es kein Ziehen
-  const [workflowPanel, setWorkflowPanelState] = useState(readWorkflowPanel);
-  const setWorkflowPanel = (open: boolean) => {
-    setWorkflowPanelState(open);
-    storeWorkflowPanel(open);
-  };
+  const [workflowPanel, setWorkflowPanel] = usePersistedState(WORKFLOW_PANEL_OPEN_KEY, true);
   const mobile = useIsMobile();
   const [filter, setFilter] = useState<CandidateFilter>({ q: '', tag: '' });
   const [allProjects, setAllProjects] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
+  // The candidate search waits – not every keystroke is a query
   const appliedFilter = useDebounced(filter, 300);
   const { data, isLoading, error, refetch } = useGoal(goalId);
   const candidatesPage = useGoalCandidates(goalId, appliedFilter, allProjects, !!data);

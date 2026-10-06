@@ -1,7 +1,7 @@
 package com.automation.service.wish;
 
 import com.automation.config.WishConfig;
-import com.automation.service.assistant.fetch.BlockSpecs;
+import com.automation.executor.spec.BlockSpecs;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;

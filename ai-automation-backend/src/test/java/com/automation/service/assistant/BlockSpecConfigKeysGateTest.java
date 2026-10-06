@@ -2,7 +2,7 @@ package com.automation.service.assistant;
 
 import com.automation.service.assistant.context.BlockTypesIndexSection;
 import com.automation.service.assistant.fetch.BlockConfigSummaryFormatter;
-import com.automation.service.assistant.fetch.BlockSpecs;
+import com.automation.executor.spec.BlockSpecs;
 import com.automation.service.assistant.fetch.DocsFetchHandler;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;

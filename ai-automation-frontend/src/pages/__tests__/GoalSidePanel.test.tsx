@@ -332,6 +332,50 @@ describe('GoalSidePanel – history, modal sheet, clean-up', () => {
     }
   });
 
+  // d86f27b2: the sheet is a modal dialog itself, so the old check "is a dialog on top?" always found it and
+  // Escape did nothing below 1024 px
+  it('closes the small-screen sheet with Escape – a dialog on top of it first – and unlocks the page scroll', async () => {
+    const original = window.matchMedia;
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: query.includes('max-width: 1023px'), media: query, onchange: null,
+      addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn(),
+    }));
+    try {
+      renderGoal('/goals/g1?item=workpackage:w1');
+      const sheet = await screen.findByTestId('goal-side-panel');
+      expect(document.body.style.overflow).toBe('hidden');
+
+      fireEvent.click(within(sheet).getByRole('button', { name: 'Open TODO: Privacy findings (Open)' }));
+      expect(await screen.findByDisplayValue('Full text')).toBeInTheDocument();
+      fireEvent.keyDown(screen.getByDisplayValue('Full text'), { key: 'Escape' });
+      await waitFor(() => expect(screen.queryByDisplayValue('Full text')).not.toBeInTheDocument());
+      // only the dialog closed; the sheet keeps the page locked
+      expect(screen.getByTestId('goal-side-panel')).toBeInTheDocument();
+      expect(document.body.style.overflow).toBe('hidden');
+
+      fireEvent.keyDown(document.body, { key: 'Escape' });
+      expect(screen.queryByTestId('goal-side-panel')).not.toBeInTheDocument();
+      expect(screen.getByTestId('location')).toHaveTextContent(/^$/);
+      expect(document.body.style.overflow).toBe('');
+    } finally {
+      window.matchMedia = original;
+    }
+  });
+
+  it('stays open when something inside already used Escape – an inline field, a keyboard drag', async () => {
+    renderGoal('/goals/g1?item=workpackage:w1');
+    await screen.findByTestId('goal-side-panel');
+    // dnd-kit cancels a keyboard drag in a document listener and prevents the default
+    const usedByDrag = (event: KeyboardEvent) => event.preventDefault();
+    document.addEventListener('keydown', usedByDrag);
+    try {
+      fireEvent.keyDown(document.body, { key: 'Escape' });
+    } finally {
+      document.removeEventListener('keydown', usedByDrag);
+    }
+    expect(screen.getByTestId('goal-side-panel')).toBeInTheDocument();
+  });
+
   // Review c60bf914: toasts are a portal of their own – under the modal sheet their buttons stay usable
   it('keeps toasts clickable while the sheet is open', async () => {
     const original = window.matchMedia;

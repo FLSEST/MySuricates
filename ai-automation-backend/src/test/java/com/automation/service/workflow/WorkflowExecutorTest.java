@@ -5,6 +5,7 @@ import com.automation.event.WorkflowRunCompletedEvent;
 import com.automation.exception.ContainerException;
 import com.automation.exception.WorkflowExecutionException;
 import com.automation.executor.BlockExecutor;
+import com.automation.executor.BlockTypeRegistry;
 import com.automation.executor.ExecutionContext;
 import com.automation.executor.StepFailureSummary;
 import com.automation.modules.ModuleRegistry;
@@ -177,11 +178,11 @@ class WorkflowExecutorTest {
     /** The executor under test; a test that needs a real block executor passes its own list. */
     private WorkflowExecutor newExecutor(List<BlockExecutor> blockExecutors) {
         return new WorkflowExecutor(
-                blockExecutors,
+                new BlockTypeRegistry(blockExecutors),
                 containerService,
                 runRepository,
                 stepResultRepository,
-                skillRepository,
+                new WorkflowSnapshotLoader(skillRepository),
                 broadcaster,
                 virtualThreadExecutor,
                 new DynamicSemaphore(10),
@@ -1355,11 +1356,11 @@ class WorkflowExecutorTest {
                                            WorkflowExecutionRegistry executionRegistry,
                                            ExecutorService threads) {
         return new WorkflowExecutor(
-                executors,
+                new BlockTypeRegistry(executors),
                 containerService,
                 runRepository,
                 stepResultRepository,
-                skillRepository,
+                new WorkflowSnapshotLoader(skillRepository),
                 broadcaster,
                 threads,
                 semaphore,

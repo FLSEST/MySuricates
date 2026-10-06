@@ -1,4 +1,4 @@
-package com.automation.service.assistant.fetch;
+package com.automation.executor.spec;
 
 import com.automation.service.assistant.ExecutorConfigReads;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -104,21 +104,6 @@ class BlockSpecsTest {
         }
 
         assertThat(problems).isEmpty();
-    }
-
-    /**
-     * Every key the one-glance summary shows ({@link BlockConfigSummaryFormatter}) must be named in
-     * the spec of its type, so the assistant can look up what it sees.
-     */
-    @Test
-    void everyKeyTheSummaryShowsIsNamedInTheSpec() {
-        BlockConfigSummaryFormatter.shownKeys().forEach((type, keys) -> {
-            assertThat(BlockSpecs.types()).as("summary type %s has a spec", type).contains(type);
-            String spec = BlockSpecs.format(type);
-            for (String key : keys) {
-                assertThat(spec).as("spec of %s names `%s`", type, key).contains("`" + key + "`");
-            }
-        });
     }
 
     @Test

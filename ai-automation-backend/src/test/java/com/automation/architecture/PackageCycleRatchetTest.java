@@ -66,9 +66,11 @@ class PackageCycleRatchetTest {
      * Size of the largest strongly connected component – the first {@code cycle} line of
      * arch-metrics.sh. 17 on 2026-09-25 (commit c0d5666c): the audit series (TODO fc149510) had
      * brought it down to 17, the edge {@code service.workflow -> service.goal} then grew it to 24
-     * unnoticed, and d2844a58 took that edge out again.
+     * unnoticed, and d2844a58 took that edge out again. 2026-10-06: BlockSpecs left
+     * service.assistant.fetch for the leaf package executor.spec, so service.workflow no longer reaches
+     * the fetch package, and service.pool, which only came back through it, left as well – 15 (TODO b7c56046).
      */
-    static final int MAX_CYCLE_COMPONENT_SIZE = 17;
+    static final int MAX_CYCLE_COMPONENT_SIZE = 15;
 
     /**
      * The members of every strongly connected component with more than two packages, largest first,
@@ -86,12 +88,10 @@ class PackageCycleRatchetTest {
                     "com.automation.security",
                     "com.automation.service.ai",
                     "com.automation.service.ai.catalog",
-                    "com.automation.service.assistant.fetch",
                     "com.automation.service.cli",
                     "com.automation.service.dashboard",
                     "com.automation.service.memory",
                     "com.automation.service.metrics",
-                    "com.automation.service.pool",
                     "com.automation.service.project",
                     "com.automation.service.system",
                     "com.automation.service.system.settings",
