@@ -5,7 +5,7 @@ import { useT } from '../../i18n';
 import type { WorkflowRunListItem } from '../../types';
 import { DeleteRunModal } from './DeleteRunModal';
 
-/** Aktive Läufe lehnt das Backend mit 409 ab — der Knopf bleibt hier gleich gesperrt. */
+/** The backend rejects active runs with 409 - the button is disabled right away here. */
 const AKTIVE_STATUS = ['RUNNING', 'PENDING', 'PAUSED'];
 
 export function DeleteRunButton({ run }: { run: WorkflowRunListItem }) {
@@ -31,7 +31,7 @@ export function DeleteRunButton({ run }: { run: WorkflowRunListItem }) {
         <Trash2 className="w-4 h-4" />
       </button>
       {confirming && (
-        // Der Dialog hängt in der Tabellenzeile: seine Klicks dürfen den Lauf nicht öffnen.
+        // The dialog hangs in the table row: its clicks must not open the run.
         <div onClick={(e) => e.stopPropagation()}>
           <DeleteRunModal
             open

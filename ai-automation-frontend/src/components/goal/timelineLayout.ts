@@ -1,61 +1,61 @@
 import type { GoalMilestone, GoalTodoItem, GoalWorkPackage, TodoStatus } from '../../types';
 
 /**
- * Layout des Zeitstrahls eines Ziels (TODO e192df18, c60bf914), rein und testbar: Achse, Raster,
- * x ↔ Datum, oben die Meilensteine, je Projekt ein Band mit einer Zeile je Arbeitspaket (Balken von
- * Beginn bis Ende, fällige TODOs darunter), gestapelte TODO-Chips und was wohin abgelegt werden darf.
+ * Layout of a goal's timeline (TODO e192df18, c60bf914), pure and testable: axis, grid,
+ * x ↔ date, milestones on top, one band per project with one row per work package (bar from
+ * start to end, due TODOs below), stacked TODO chips and what may be dropped where.
  *
- * Gerechnet wird in ganzen **Tagen** des lokalen Kalenders (`dayOf`), nicht in Millisekunden – so
- * verschiebt der Wechsel auf Sommer- oder Winterzeit nichts. Eine Fälligkeit und das Ende eines
- * Pakets gelten bis 23:59:59 Ortszeit (`dueDateOfDay`), ein Beginn ab 00:00 (`startDateOfDay`).
+ * Calculation is in whole **days** of the local calendar (`dayOf`), not in milliseconds - so
+ * the switch to summer or winter time shifts nothing. A due date and the end of a
+ * package count until 23:59:59 local time (`dueDateOfDay`), a start from 00:00 (`startDateOfDay`).
  */
 
 export const DAY_MS = 86_400_000;
-/** Breite eines TODO-Chips in px; das Stapeln rechnet damit. */
+/** Width of a TODO chip in px; the stacking calculates with it. */
 export const CHIP_WIDTH = 152;
-/** Abstand vom Rand eines Chips zur Mitte seines Statuspunkts – der Punkt sitzt auf dem Datum. */
+/** Distance from a chip's edge to the center of its status dot - the dot sits on the date. */
 export const CHIP_ANCHOR = 12;
-/** Höhe einer Spur für TODO-Chips (schmaler Chip plus Abstand). */
+/** Height of a lane for TODO chips (narrow chip plus gap). */
 export const LANE_HEIGHT = 28;
-/** Breite, solange keine gemessen ist (erster Render, Tests). */
+/** Width as long as none is measured (first render, tests). */
 export const FALLBACK_WIDTH = 960;
-/** Schlüssel der Zeile „ohne Arbeitspaket“ in einem Band. */
+/** Key of the "without work package" row in a band. */
 export const NO_PACKAGE = 'none';
-/** Schlüssel des Bands „ohne Projekt“ – Projekt-IDs sind UUIDs, das kollidiert nicht. */
+/** Key of the "without project" band - project IDs are UUIDs, so this does not collide. */
 export const NO_PROJECT_BAND = 'none';
-/** Halbe Breite einer ziehbaren Raute: so weit liegt ihre Mitte (das Datum) vom linken Rand. */
+/** Half the width of a draggable diamond: that is how far its center (the date) is from the left edge. */
 export const DIAMOND_ANCHOR = 10;
-/** Ein neues oder auf die Achse gezogenes Paket bekommt eine Woche: Beginn plus sechs Tage. */
+/** A new package or one dragged onto the axis gets a week: start plus six days. */
 export const WEEK_DAYS = 7;
-/** Balken eines Pakets: Abstand oben und Höhe in px; darunter beginnen die Spuren der TODO-Chips. */
+/** Bar of a package: offset from the top and height in px; below it begin the lanes of the TODO chips. */
 export const BAR_TOP = 9;
 export const BAR_HEIGHT = 22;
 export const BAR_ZONE = BAR_TOP + BAR_HEIGHT + 6;
 
 const CHIP_GAP = 6;
 const MIN_SPAN_DAYS = 14;
-/** Ohne jedes Datum: heute bis in vier Wochen. */
+/** Without any date: today until four weeks from now. */
 const EMPTY_SPAN_DAYS = 28;
-/** Kleinster Abstand zweier Rasterlinien in px, der noch lesbar beschriftet werden kann. */
+/** Smallest distance between two grid lines in px that can still be labeled legibly. */
 const MIN_DAY_PX = 24;
 const MIN_WEEK_PX = 36;
 
 export type TimelineScale = 'day' | 'week' | 'month';
 
 export interface TimelineAxis {
-  /** Erster und letzter gezeigter Tag (einschließlich). */
+  /** First and last shown day (inclusive). */
   startDay: number;
   endDay: number;
   days: number;
   today: number;
   scale: TimelineScale;
-  /** Tage mit Rasterlinie und Beschriftung: jeder Tag, jeder Montag oder jeder Monatserste. */
+  /** Days with a grid line and label: every day, every Monday or every first of the month. */
   ticks: number[];
-  /** Beginn der Abschnitte der oberen Beschriftung: Monate über Tag/Woche, Jahre über Monat. */
+  /** Start of the sections of the upper labeling: months above day/week, years above month. */
   bands: number[];
 }
 
-/** Ein Zeitraum in ganzen Tagen, beide einschließlich. */
+/** A period in whole days, both inclusive. */
 export interface DayRange {
   start: number;
   end: number;
@@ -65,9 +65,9 @@ export interface ChipSlot {
   id: string;
   left: number;
   lane: number;
-  /** Chip steht links vom Datum, Punkt am rechten Rand – sonst liefe er rechts aus dem Zeitstrahl. */
+  /** Chip sits left of the date, dot at the right edge - otherwise it would run out of the timeline on the right. */
   flipped: boolean;
-  /** Abstand vom linken Rand des Chips zum Datum (Mitte des Statuspunkts). */
+  /** Distance from the left edge of the chip to the date (center of the status dot). */
   anchor: number;
 }
 
@@ -76,62 +76,62 @@ export interface PlacedTodo extends ChipSlot {
   day: number;
 }
 
-/** Eine Zeile im Band: ein Arbeitspaket (oder „ohne Arbeitspaket“) mit Balken und seinen TODOs. */
+/** A row in the band: a work package (or "without work package") with bar and its TODOs. */
 export interface PackageRow {
-  /** ID des Pakets oder {@link NO_PACKAGE}. */
+  /** ID of the package or {@link NO_PACKAGE}. */
   key: string;
-  /** Band (Projekt), zu dem die Zeile gehört. */
+  /** Band (project) the row belongs to. */
   band: string;
   workPackage: GoalWorkPackage | null;
-  /** Zeitraum des Balkens; null ohne Zeitraum. */
+  /** Period of the bar; null without a period. */
   range: DayRange | null;
-  /** Fällige TODOs, unter dem Balken gestapelt. */
+  /** Due TODOs, stacked under the bar. */
   items: PlacedTodo[];
-  /** Spuren für die Chips; 0 ohne fällige TODOs – dann bleibt die Zeile flach. */
+  /** Lanes for the chips; 0 without due TODOs - then the row stays flat. */
   lanes: number;
-  /** TODOs ohne Fälligkeit – eingeklappt als Zähler an der Beschriftung. */
+  /** TODOs without a due date - collapsed as a counter on the label. */
   undated: GoalTodoItem[];
 }
 
-/** Ein Paket ohne Zeitraum in der Leiste – mit seinen TODOs ohne Datum, die sich dort aufklappen lassen. */
+/** A package without a period in the strip - with its TODOs without a date, which can be expanded there. */
 export interface UnscheduledPackage {
   workPackage: GoalWorkPackage;
   undated: GoalTodoItem[];
 }
 
-/** Ein Projektband: Kopfzeile, eine Zeile je Arbeitspaket, „ohne Arbeitspaket“ und die Leiste „ohne Zeitraum“. */
+/** A project band: header row, one row per work package, "without work package" and the "without period" strip. */
 export interface TimelineBand {
   /** Projekt-ID oder {@link NO_PROJECT_BAND}. */
   key: string;
   /** Projektname; null = ohne Projekt. */
   name: string | null;
-  /** Gehört zu den Projekten des Ziels – nur dann lassen sich darin Pakete anlegen. */
+  /** Belongs to the goal's projects - only then can packages be created in it. */
   linked: boolean;
-  /** Pakete mit Zeitraum in ihrer Reihenfolge – dazu eins ohne Zeitraum nur, wenn schon eins seiner TODOs fällig ist. */
+  /** Packages with a period in their order - plus one without a period only if one of its TODOs is already due. */
   rows: PackageRow[];
-  /** TODOs des Projekts ohne Paket – die Zeile erscheint nur, wenn hier etwas steht (oder beim Ziehen). */
+  /** TODOs of the project without a package - the row appears only if something is in it (or while dragging). */
   noPackage: PackageRow;
   /** Pakete ohne Zeitraum, in ihrer Reihenfolge: die Leiste „ohne Zeitraum“. */
   unscheduled: UnscheduledPackage[];
 }
 
-/** Eine Raute in der Meilenstein-Zeile mit ihrem Titel daneben, in Spuren, damit nichts überlappt. */
+/** A diamond in the milestone row with its title next to it, in lanes so that nothing overlaps. */
 export interface MilestoneMark {
   milestone: GoalMilestone;
   day: number;
   x: number;
   lane: number;
-  /** Platz für den Titel neben der Raute. */
+  /** Space for the title next to the diamond. */
   labelWidth: number;
-  /** Der Titel steht links der Raute – rechts am Rand wäre er abgeschnitten. */
+  /** The title sits left of the diamond - on the right edge it would be cut off. */
   flipped: boolean;
 }
 
 /**
- * Wohin etwas fallen kann: auf die Achse einer Paket-Zeile (Tag und Paket), in ihre Beschriftung
- * (nur TODOs: Paket, Datum weg), in die Kopfzeile eines Bands (Tag), in die Leiste „ohne Zeitraum“
- * (nur Balken: Zeitraum weg), auf ein Paket dieser Leiste (nur TODOs: das Paket, der Tag bleibt) oder
- * in die Meilenstein-Zeile (nur Meilensteine).
+ * Where something can fall: onto the axis of a package row (day and package), into its label
+ * (TODOs only: package, date removed), into a band's header row (day), into the "without period" strip
+ * (bars only: period removed), onto a package of this strip (TODOs only: the package, the day stays) or
+ * into the milestone row (milestones only).
  */
 export type DropTarget =
   | { kind: 'row'; band: string; workPackageId: string | null }
@@ -141,7 +141,7 @@ export type DropTarget =
   | { kind: 'pill'; band: string; workPackageId: string }
   | { kind: 'milestones' };
 
-/** Was ein Ablegen an einem TODO ändert: `dueDate` als ISO-Zeitpunkt (`''` leert), `workPackageId` (`''` nimmt es weg). */
+/** What a drop changes on a TODO: `dueDate` as ISO timestamp (`''` clears), `workPackageId` (`''` removes it). */
 export interface PlanChanges {
   dueDate?: string;
   workPackageId?: string;
@@ -172,7 +172,7 @@ export function dayOfIsoDate(value: string): number | null {
   return Math.round(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])) / DAY_MS);
 }
 
-/** Fälligkeit bzw. Ende eines Pakets: Ende des Tages, 23:59:59 Ortszeit, als ISO-Zeitpunkt. */
+/** Due date or end of a package: end of the day, 23:59:59 local time, as ISO timestamp. */
 export function dueDateOfDay(day: number): string {
   const date = dateOfDay(day);
   date.setHours(23, 59, 59, 0);
@@ -184,12 +184,12 @@ export function startDateOfDay(day: number): string {
   return dateOfDay(day).toISOString();
 }
 
-/** Fällig vor heute und weder erledigt noch archiviert. */
+/** Due before today and neither done nor archived. */
 export function isOverdue(todo: { dueDate: string | null; status: TodoStatus }, today: number): boolean {
   return !!todo.dueDate && todo.status !== 'DONE' && todo.status !== 'ARCHIVED' && dayOf(todo.dueDate) < today;
 }
 
-/** Zeitraum eines Pakets in Tagen – nur mit Beginn und Ende; ein verdrehter wird geordnet. */
+/** Period of a package in days - only with start and end; a reversed one is put in order. */
 export function packageRange(item: Pick<GoalWorkPackage, 'startDate' | 'endDate'>): DayRange | null {
   if (!item.startDate || !item.endDate) return null;
   const start = dayOf(item.startDate);
@@ -229,9 +229,9 @@ function bandsFor(start: number, end: number, scale: TimelineScale): number[] {
 }
 
 /**
- * Von min(heute, frühestes Datum) bis max(Zieldatum, spätestes Datum), mindestens zwei Wochen, plus
- * Rand. Ist gar nichts datiert, heute bis in vier Wochen. Das Raster richtet sich nach der Spanne je
- * Pixel: Tage, solange ein Tag breit genug für seine Zahl ist, sonst Wochen, sonst Monate.
+ * From min(today, earliest date) to max(goal date, latest date), at least two weeks, plus
+ * margin. If nothing is dated, today until four weeks from now. The grid depends on the span per
+ * pixel: days as long as a day is wide enough for its number, otherwise weeks, otherwise months.
  */
 export function buildAxis(input: { today: number; days: number[]; target: number | null }, width: number): TimelineAxis {
   const nothingDated = input.days.length === 0 && input.target === null;
@@ -253,8 +253,8 @@ export function buildAxis(input: { today: number; days: number[]; target: number
 const shownOnTimeline = (todo: GoalTodoItem) => todo.status !== 'ARCHIVED';
 
 /**
- * Die Achse für ein Ziel: heute, Beginn und Ende seiner Pakete, seine Meilensteine, die
- * Fälligkeiten seiner TODOs und das Zieldatum.
+ * The axis for a goal: today, start and end of its packages, its milestones, the
+ * due dates of its TODOs and the goal date.
  */
 export function axisFor(input: {
   todos: GoalTodoItem[];
@@ -274,31 +274,31 @@ export function axisFor(input: {
   return buildAxis({ today: input.today, days, target: input.targetDate ? dayOf(input.targetDate) : null }, width);
 }
 
-/** Mitte der Spalte eines Tages, in px vom linken Rand der Zeitachse. */
+/** Center of a day's column, in px from the left edge of the time axis. */
 export function xOfDay(axis: TimelineAxis, day: number, width: number): number {
   return (day - axis.startDay + 0.5) * (width / axis.days);
 }
 
-/** Der Tag unter `x` – eingerastet auf ganze Tage, außerhalb der Achse ihr erster bzw. letzter Tag. */
+/** The day under `x` - snapped to whole days, outside the axis its first or last day. */
 export function dayAtX(axis: TimelineAxis, x: number, width: number): number {
   const index = Math.floor(x / (width / axis.days));
   return axis.startDay + Math.min(axis.days - 1, Math.max(0, index));
 }
 
-/** Um wie viele ganze Tage eine Bewegung um `deltaX` px verschiebt. */
+/** By how many whole days a movement by `deltaX` px shifts. */
 export function dayShift(axis: TimelineAxis, deltaX: number, width: number): number {
   return Math.round(deltaX / (width / axis.days));
 }
 
-/** Balken eines Zeitraums: vom Anfang der Spalte des ersten bis zum Ende der Spalte des letzten Tages. */
+/** Bar of a period: from the start of the first day's column to the end of the last day's column. */
 export function barBox(axis: TimelineAxis, range: DayRange, width: number): { left: number; width: number } {
   const perDay = width / axis.days;
   return { left: (range.start - axis.startDay) * perDay, width: (range.end - range.start + 1) * perDay };
 }
 
 /**
- * Was in den Balken passt – grob geschätzt (11 px Schrift): Titel und Stand, nur der Titel oder
- * nichts (dann steht der Titel daneben).
+ * What fits in the bar - roughly estimated (11 px font): title and status, only the title or
+ * nothing (then the title sits next to it).
  */
 export function barLabelFit(title: string, barWidth: number): 'full' | 'title' | 'none' {
   const text = title.length * 6.2;
@@ -306,19 +306,19 @@ export function barLabelFit(title: string, barWidth: number): 'full' | 'title' |
   return text + 16 <= barWidth ? 'title' : 'none';
 }
 
-/** Wo das Etikett „heute“ steht: mittig über dem Tag, rechts oder links daneben, oder eine Zeile höher. */
+/** Where the "heute" label sits: centered above the day, to the right or left of it, or one row higher. */
 export type TodayLabelPlacement = 'center' | 'right' | 'left' | 'raised';
 
-/** Breite des Etiketts „heute“ (Text 10 px, Rand) und halbe Breite einer Raute oder der Zielfahne, in px. */
+/** Width of the "heute" label (text 10 px, margin) and half width of a diamond or the goal flag, in px. */
 export const TODAY_LABEL_WIDTH = 44;
 const MARK_HALF_WIDTH = 10;
-/** So weit reicht ein seitlich stehendes Etikett noch über die Linie von heute. */
+/** A label standing at the side still reaches this far beyond today's line. */
 export const TODAY_LABEL_OVERLAP = 3;
 
 /**
- * Das Etikett „heute“ weicht den Rauten und der Zielfahne aus (TODO ff6f08fd – bei 768 px lag es auf
- * der Raute des Nachbartags): mittig, wenn dort frei ist, sonst rechts oder links an der Linie von
- * heute, sonst eine Zeile höher bei den Tageszahlen. Es bleibt innerhalb der Achse.
+ * The "heute" label avoids the diamonds and the goal flag (TODO ff6f08fd - at 768 px it lay on
+ * the neighboring day's diamond): centered if it is free there, otherwise right or left of today's
+ * line, otherwise one row higher at the day numbers. It stays within the axis.
  */
 export function todayLabelPlacement(todayX: number, marks: number[], width: number): TodayLabelPlacement {
   const free = (from: number, to: number) => from >= 0 && to <= width
@@ -331,13 +331,13 @@ export function todayLabelPlacement(todayX: number, marks: number[], width: numb
 
 // ── Meilensteine ──────────────────────────────────────────────────────────────
 
-/** Höchstens so breit steht der Titel neben seiner Raute; längere werden gekürzt (mit Tooltip). */
+/** The title sits at most this wide next to its diamond; longer ones are shortened (with tooltip). */
 const MILESTONE_LABEL_MAX = 150;
 
 /**
- * Rauten der Meilensteine mit ihrem Titel rechts daneben, von links nach rechts in die erste Spur
- * gelegt, in der sie nichts überdecken. Passt der Titel rechts am Rand nicht und ist links mehr
- * Platz, klappt er nach links (`flipped`, c60bf914) – statt abgeschnitten zu werden.
+ * Diamonds of the milestones with their title to the right, placed from left to right in the first lane
+ * where they cover nothing. If the title does not fit at the right edge and there is more room on the left,
+ * it flips to the left (`flipped`, c60bf914) - instead of being cut off.
  */
 export function milestoneMarks(milestones: GoalMilestone[], axis: TimelineAxis, width: number): { marks: MilestoneMark[]; lanes: number } {
   const laneEnds: number[] = [];
@@ -367,8 +367,8 @@ export function milestoneMarks(milestones: GoalMilestone[], axis: TimelineAxis, 
 // ── Zeilen ────────────────────────────────────────────────────────────────────
 
 /**
- * Chips einer Zeile, von links nach rechts in die erste freie Spur gelegt. Der Statuspunkt sitzt auf
- * dem Datum; am rechten Rand steht der Chip links davon (`flipped`).
+ * Chips of a row, placed from left to right in the first free lane. The status dot sits on
+ * the date; at the right edge the chip sits left of it (`flipped`).
  */
 export function stackChips(items: { id: string; x: number }[], width: number): { slots: ChipSlot[]; lanes: number } {
   const laneEnds: number[] = [];
@@ -387,7 +387,7 @@ export function stackChips(items: { id: string; x: number }[], width: number): {
   return { slots, lanes: Math.max(1, laneEnds.length) };
 }
 
-/** Band eines TODOs bzw. Pakets: sein Projekt, sonst „ohne Projekt“. */
+/** Band of a TODO or package: its project, otherwise "without project". */
 export const bandOfTodo = (todo: Pick<GoalTodoItem, 'projectId'>) => todo.projectId ?? NO_PROJECT_BAND;
 export const bandOfPackage = (item: Pick<GoalWorkPackage, 'projectId'>) => item.projectId ?? NO_PROJECT_BAND;
 
@@ -411,13 +411,13 @@ function placeRow(
 }
 
 /**
- * Die Bänder des Zeitstrahls (c60bf914): je Projekt des Ziels eins in dessen Reihenfolge, dahinter
- * Projekte, die nur über ein TODO oder Paket hereinkommen (Altdaten), zuletzt „ohne Projekt“, wenn
- * dort etwas steht. Je Paket mit Zeitraum eine Zeile, in der Reihenfolge der Pakete; Pakete ohne
- * Zeitraum warten in der Leiste (mit ihren TODOs ohne Datum) – eine Zeile bekommen sie nur, wenn
- * schon eins ihrer TODOs fällig ist. Ein TODO steht bei seinem Paket, sonst in „ohne Arbeitspaket“
- * seines Projekts – fällige unter dem Balken, die ohne Datum als Zähler an der Beschriftung.
- * Archivierte stehen nicht auf dem Zeitstrahl.
+ * The timeline's bands (c60bf914): one per project of the goal in its order, after that
+ * projects that come in only via a TODO or package (legacy data), last "without project" if
+ * something is in it. One row per package with a period, in the order of the packages; packages without a
+ * period wait in the strip (with their TODOs without a date) - they get a row only if
+ * one of their TODOs is already due. A TODO sits at its package, otherwise in "without work package"
+ * of its project - due ones under the bar, those without a date as a counter on the label.
+ * Archived ones are not on the timeline.
  */
 export function buildBands(
   todos: GoalTodoItem[], workPackages: GoalWorkPackage[], projects: { projectId: string; name: string }[],
@@ -465,7 +465,7 @@ export function buildBands(
       unscheduled: own.filter((item) => packageRange(item) === null)
         .map((workPackage) => ({
           workPackage,
-          // Hat das Paket schon eine Zeile, stehen seine TODOs ohne Datum dort – nicht doppelt
+          // If the package already has a row, its TODOs without a date are there - not twice
           undated: hasRow.has(workPackage.id) ? [] : inRow(workPackage.id).filter((todo) => !todo.dueDate),
         })),
     };
@@ -482,7 +482,7 @@ export const pillDropId = (band: string, workPackageId: string) => `pill:${band}
 export const MILESTONES_DROP_ID = 'milestones';
 
 /**
- * Ziel eines Ablegens aus der ID der Drop-Fläche: `row:<Band>:<Paket|none>`,
+ * Target of a drop from the ID of the drop surface: `row:<band>:<package|none>`,
  * `undated:<Band>:<Paket|none>`, `strip:<Band>`, `tray:<Band>`, `pill:<Band>:<Paket>` oder `milestones`.
  */
 export function dropTargetOf(id: string): DropTarget | null {
@@ -497,20 +497,20 @@ export function dropTargetOf(id: string): DropTarget | null {
   return null;
 }
 
-/** Flächen mit Tagen: Paket-Zeilen, Kopfzeilen der Bänder, die Meilenstein-Zeile. */
+/** Surfaces with days: package rows, band header rows, the milestone row. */
 export function hasDays(target: DropTarget | null): boolean {
   return target?.kind === 'row' || target?.kind === 'strip' || target?.kind === 'milestones';
 }
 
-/** Das Band einer Fläche; null für die Meilenstein-Zeile, die dem ganzen Ziel gehört. */
+/** The band of a surface; null for the milestone row, which belongs to the whole goal. */
 export function bandOfTarget(target: DropTarget): string | null {
   return target.kind === 'milestones' ? null : target.band;
 }
 
 /**
- * Darf ein TODO hier landen? In Zeilen und auf Pakete nur seines eigenen Projekts – der Server wiese
- * alles andere ab. Ein Altfall (TODO in einem Paket eines anderen Projekts) darf in seinem Paket
- * bleiben und dort den Tag wechseln oder das Datum abgeben.
+ * May a TODO land here? In rows and on packages only of its own project - the server would reject
+ * anything else. A legacy case (TODO in a package of another project) may stay in its package
+ * and there change the day or give up the date.
  */
 export function todoAccepts(todo: Pick<GoalTodoItem, 'projectId' | 'workPackageId'>, target: DropTarget): boolean {
   if (target.kind !== 'row' && target.kind !== 'pill' && target.kind !== 'undated') return false;
@@ -518,23 +518,23 @@ export function todoAccepts(todo: Pick<GoalTodoItem, 'projectId' | 'workPackageI
 }
 
 /**
- * Ein Balken bleibt in seinem Band: auf einen Tag in einer Zeile oder der Kopfzeile verschoben bzw.
- * eingeplant, in die Leiste „ohne Zeitraum“ gezogen verliert er den Zeitraum.
+ * A bar stays in its band: moved or scheduled to a day in a row or the header row,
+ * dragged into the "without period" strip it loses the period.
  */
 export function packageAccepts(item: Pick<GoalWorkPackage, 'projectId'>, target: DropTarget): boolean {
   if (target.kind !== 'row' && target.kind !== 'strip' && target.kind !== 'tray') return false;
   return target.band === bandOfPackage(item);
 }
 
-/** Meilensteine gehören dem ganzen Ziel: Jede Fläche mit Tagen nimmt sie – der Tag zählt, nicht die Zeile. */
+/** Milestones belong to the whole goal: every surface with days accepts them - the day counts, not the row. */
 export function milestoneAccepts(target: DropTarget): boolean {
   return hasDays(target);
 }
 
 /**
- * Was sich an einem TODO ändert, wenn es an `day` in `target` landet: ein anderer Tag setzt die
- * Fälligkeit, eine andere Zeile das Paket; ein Paket der Leiste nur das Paket; die Beschriftung einer
- * Zeile nimmt das Datum weg und setzt das Paket der Zeile.
+ * What changes on a TODO when it lands on `day` in `target`: another day sets the
+ * due date, another row the package; a package of the strip only the package; the label of a
+ * row removes the date and sets the row's package.
  */
 export function planChanges(
   todo: { dueDate: string | null; workPackageId: string | null }, target: DropTarget, day: number | null,
@@ -558,19 +558,19 @@ export function movedRange(range: DayRange, shift: number): DayRange {
   return { start: range.start + shift, end: range.end + shift };
 }
 
-/** Beginn oder Ende um `shift` Tage verschoben; nie über das andere Ende hinaus (mindestens ein Tag). */
+/** Start or end shifted by `shift` days; never beyond the other end (at least one day). */
 export function resizedRange(range: DayRange, edge: 'start' | 'end', shift: number): DayRange {
   return edge === 'start'
     ? { start: Math.min(range.end, range.start + shift), end: range.end }
     : { start: range.start, end: Math.max(range.start, range.end + shift) };
 }
 
-/** Ein Paket ohne Zeitraum, an `day` auf die Achse gelegt: eine Woche ab diesem Tag. */
+/** A package without a period, placed on the axis at `day`: a week from that day. */
 export function weekFrom(day: number): DayRange {
   return { start: day, end: day + WEEK_DAYS - 1 };
 }
 
-/** Beginn und Ende für den Server; ohne Zeitraum beide leer. */
+/** Start and end for the server; without a period both empty. */
 export function rangeRequest(range: DayRange | null): { startDate: string; endDate: string } {
   return range ? { startDate: startDateOfDay(range.start), endDate: dueDateOfDay(range.end) } : { startDate: '', endDate: '' };
 }
@@ -578,7 +578,7 @@ export function rangeRequest(range: DayRange | null): { startDate: string; endDa
 export const sameRange = (a: DayRange | null, b: DayRange | null) =>
   a === b || (!!a && !!b && a.start === b.start && a.end === b.end);
 
-/** Die Änderungen in den TODO-Zeilen eines Ziels – für die optimistische Anzeige nach dem Ablegen. */
+/** The changes in a goal's TODO rows - for the optimistic display after dropping. */
 export function applyPlan(todos: GoalTodoItem[], todoId: string, changes: PlanChanges): GoalTodoItem[] {
   return todos.map((todo) => {
     if (todo.id !== todoId) return todo;

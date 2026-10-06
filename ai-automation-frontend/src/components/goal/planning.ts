@@ -5,13 +5,13 @@ export const EFFORTS = ['low', 'medium', 'high', 'xhigh'] as const;
 
 export interface PlanningForm {
   goalId: string;
-  /** Arbeitspaket im gewählten Ziel; leer = keins. */
+  /** Work package in the chosen goal; empty = none. */
   workPackageId: string;
   complexity: string;
   suggestedEffort: string;
   ratingNote: string;
   openQuestion: string;
-  /** Entscheidung zur offenen Frage (68a5e24e); leer = keine. */
+  /** Decision on the open question (68a5e24e); empty = none. */
   decision: string;
 }
 
@@ -24,7 +24,7 @@ export function formOf(todo: Todo): PlanningForm {
   const p = todo.planning;
   return {
     goalId: p?.goalId ?? '',
-    // Ein älteres Backend nennt das Arbeitspaket noch `milestoneId`
+    // An older backend still calls the work package `milestoneId`
     workPackageId: p?.workPackageId ?? p?.milestoneId ?? '',
     complexity: p?.complexity ?? '',
     suggestedEffort: p?.suggestedEffort ?? '',
@@ -34,7 +34,7 @@ export function formOf(todo: Todo): PlanningForm {
   };
 }
 
-/** Nur geänderte Felder – sonst würde ein Speichern ohne Änderung die KI-Einschätzung als menschlich markieren. */
+/** Only changed fields - otherwise saving without changes would mark the AI estimate as human. */
 export function planningChanges(before: PlanningForm, after: PlanningForm): UpdateTodoPlanningRequest {
   const data: UpdateTodoPlanningRequest = {};
   if (after.goalId !== before.goalId) data.goalId = after.goalId;
@@ -50,30 +50,30 @@ export function planningChanges(before: PlanningForm, after: PlanningForm): Upda
 }
 
 /**
- * Eine neue Frage und eine Entscheidung im selben Aufruf weist der Server ab (68a5e24e): Die
- * Entscheidung schließt die Frage. Erst entscheiden, dann neu fragen.
+ * The server rejects a new question and a decision in the same call (68a5e24e): the
+ * decision closes the question. Decide first, then ask anew.
  */
 export function planningConflict(changes: UpdateTodoPlanningRequest): boolean {
   return !!changes.openQuestion && !!changes.decision;
 }
 
 
-/** Ein anderes Ziel nimmt das Arbeitspaket weg – es gehört zum alten Ziel. */
+/** Another goal takes the work package away - it belongs to the old goal. */
 export function withGoal(form: PlanningForm, goalId: string): PlanningForm {
   return goalId === form.goalId ? form : { ...form, goalId, workPackageId: '' };
 }
 
 /**
- * Arbeitspakete, die für ein TODO in Frage kommen (c60bf914): nur die seines Projekts – ein TODO ohne
- * Projekt nur solche ohne Projekt. Das bisherige bleibt wählbar, auch wenn es nicht (mehr) passt.
+ * Work packages that qualify for a TODO (c60bf914): only those of its project - a TODO without a
+ * project only those without a project. The current one stays selectable even if it no longer fits.
  */
 export function packageOptions(workPackages: GoalWorkPackage[], projectId: string | null, current: string): GoalWorkPackage[] {
   return workPackages.filter((item) => (item.projectId ?? null) === (projectId ?? null) || item.id === current);
 }
 
 /**
- * Das Arbeitspaket im Aufruf: bei einem Backend vor c60bf914 noch unter seinem alten Namen
- * `milestoneId` – das neue Feld würde es stillschweigend übergehen.
+ * The work package in the call: for a backend before c60bf914 still under its old name
+ * `milestoneId` - the new field would silently ignore it.
  */
 export function forBackend(changes: UpdateTodoPlanningRequest, legacyBackend: boolean | undefined): UpdateTodoPlanningRequest {
   if (!legacyBackend || changes.workPackageId === undefined) return changes;

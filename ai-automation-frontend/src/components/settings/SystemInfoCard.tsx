@@ -28,8 +28,8 @@ export function SystemInfoCard() {
         {sysInfo && (
           <div className="space-y-2 text-sm">
             {Object.entries(sysInfo)
-              // Nur Primitive: `SystemInfo` waechst anderswo, und ein verschachteltes Feld als
-              // React-Kind laesst die ganze Seite abstuerzen ("Objects are not valid as a React
+              // Primitives only: `SystemInfo` grows elsewhere, and a nested field as
+              // React child crashes the whole page ("Objects are not valid as a React
               // child") — so geschehen, als `rateLimit` als Objekt dazukam (0d1d27a1). Die
               // Rate-Limit-Werte stehen ohnehin einstellbar in der Ausfuehrungs-Karte.
               .filter(([, value]) => value !== null && typeof value !== 'object')
@@ -46,7 +46,7 @@ export function SystemInfoCard() {
           <div className="space-y-2 text-sm pt-3 border-t border-border mt-3">
             <div className="flex justify-between">
               <span className="text-text-secondary">Docker</span>
-              {/* Nicht eingerichtet ist neutral, kein Fehler (a0e85182) */}
+              {/* Not set up is neutral, not an error (a0e85182) */}
               <StatusBadge
                 status={health.docker === 'CONNECTED' ? 'RUNNING' : health.docker === 'NOT_CONFIGURED' ? 'STOPPED' : 'ERROR'}
                 label={health.docker === 'NOT_CONFIGURED' ? t.health.dockerNotConfigured : health.docker}

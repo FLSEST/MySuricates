@@ -1,19 +1,19 @@
 /**
- * Reproduktion zu d89b2cc1: Nach einem 429 hält die geöffnete App das Rate-Limit selbst voll.
+ * Reproduction for d89b2cc1: after a 429, the open app fills the rate limit itself.
  *
- * Die App-Hülle (ApiKeyGuard + SecurityBanner + eine Seite mit useSystemModules und
- * useAssistantSuggestions) wird mit einem fetch gerendert, das 429 mit `Retry-After: 5`
- * beantwortet. Gezählt werden echte Netzanfragen pro Pfad (ohne Query) über ein Fenster
+ * The app shell (ApiKeyGuard + SecurityBanner + a page with useSystemModules and
+ * useAssistantSuggestions) is rendered with a fetch that answers 429 with `Retry-After: 5`.
+ * Real network requests are counted per path (without query) over a window
  * von 2 s Fake-Zeit.
  *
- * Erwartung nach dem Fix: höchstens eine Netzanfrage pro Endpoint im Backoff-Fenster,
- * nach Ablauf des Fensters genau eine neue.
+ * Expectation after the fix: at most one network request per endpoint in the backoff window,
+ * after the window expires exactly one new one.
  *
- * Zwei Szenarien, weil `/system/auth-status` die Hülle steuert:
- *  - `all-429`: auch auth-status ist limitiert. Der Guard bleibt unentschieden und zeigt
- *    nichts — es darf trotzdem nur eine auth-status-Anfrage geben (zwei Guards + StrictMode).
+ * Two scenarios, because `/system/auth-status` controls the shell:
+ *  - `all-429`: auth-status is limited too. The guard stays undecided and shows
+ *    nothing - there must still be only one auth-status request (two guards + StrictMode).
  *  - `security-off`: auth-status antwortet 200, alles andere 429. So ist die App montiert
- *    wie im beobachteten Vorfall und die Query-Endpunkte sind messbar.
+ *    as in the observed incident and the query endpoints are measurable.
  */
 import React from 'react';
 import { render, act, fireEvent } from '@testing-library/react';
@@ -57,7 +57,7 @@ function jsonResponse(body: unknown): Response {
   return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
 }
 
-/** Installiert den zählenden fetch-Mock. `authStatus` steuert nur /system/auth-status. */
+/** Installs the counting fetch mock. `authStatus` controls only /system/auth-status. */
 function stubFetch(authStatus: 'rate-limited' | 'security-off') {
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
     const path = pathOf(input);
@@ -71,7 +71,7 @@ function stubFetch(authStatus: 'rate-limited' | 'security-off') {
 
 let recoveryDisposers: Array<() => void> = [];
 
-/** Query-Client genau wie in main.tsx: Defaults + Erholung nach Ablauf der Sperre. */
+/** Query client exactly as in main.tsx: defaults + recovery after the lockout expires. */
 function createAppQueryClient() {
   const queryClient = new QueryClient({ defaultOptions: appQueryDefaults });
   recoveryDisposers.push(installRateLimitRecovery(queryClient));
@@ -93,8 +93,8 @@ function Shell() {
   );
 }
 
-// StrictMode wie in main.tsx: das Doppelmount des Dev-Servers gehört zum reproduzierten
-// Verhalten und darf die Anfragezahl nicht verdoppeln.
+// StrictMode as in main.tsx: the dev server's double mount is part of the reproduced
+// behavior and must not double the request count.
 function renderShell(queryClient: QueryClient) {
   return render(
     <React.StrictMode>
@@ -138,15 +138,15 @@ describe('429 storm reproduction (d89b2cc1)', () => {
 
   afterEach(teardown);
 
-  it('feuert im Backoff-Fenster höchstens eine Netzanfrage pro Endpoint', async () => {
+  it('fires at most one network request per endpoint in the backoff window', async () => {
     const queryClient = createAppQueryClient();
     const view = renderShell(queryClient);
 
-    // Zwei Sekunden Fake-Zeit: darin darf jeder Endpoint höchstens einmal angefragt werden.
+    // Two seconds of fake time: within it each endpoint may be requested at most once.
     await advance(2000);
 
-    // Zusätzliche Remounts der Hülle (im echten Betrieb: Navigation, Panels, Guard-Rerender)
-    // dürfen im Sperrfenster keine weiteren Netzanfragen erzeugen.
+    // Additional remounts of the shell (in real operation: navigation, panels, guard rerenders)
+    // must not produce further network requests in the lockout window.
     view.unmount();
     renderShell(queryClient);
     await advance(500);
@@ -160,18 +160,18 @@ describe('429 storm reproduction (d89b2cc1)', () => {
     expect(counts['/assistant/suggestions']).toBe(1);
   });
 
-  it('lässt nach Ablauf des Retry-After-Fensters genau eine neue Anfrage pro Endpoint zu', async () => {
+  it('allows exactly one new request per endpoint after the Retry-After window expires', async () => {
     const queryClient = createAppQueryClient();
     const view = renderShell(queryClient);
     await advance(2000);
     const before = countsByPath();
 
-    // Vor Ablauf abmelden: gemessen wird hier der Neuaufbau (Reload), nicht die Erholung
-    // montierter Queries — die hat ihren eigenen Test.
+    // Sign out before expiry: what is measured here is the rebuild (reload), not the recovery
+    // of mounted queries - that has its own test.
     view.unmount();
     await advance(RETRY_AFTER_SECONDS * 1000 + 100);
     queryClient.clear();
-    resetAuthStatusCache(); // ein Reload würde den App-weiten Cache ebenfalls verlieren
+    resetAuthStatusCache(); // a reload would lose the app-wide cache as well
     renderShell(queryClient);
     await advance(500);
 
@@ -190,21 +190,21 @@ describe('429 auf /system/auth-status (d89b2cc1)', () => {
 
   afterEach(teardown);
 
-  it('fragt auth-status trotz zweier Guards und StrictMode nur einmal an', async () => {
+  it('requests auth-status only once despite two guards and StrictMode', async () => {
     renderShell(createAppQueryClient());
     await advance(2000);
 
     expect(countsByPath()['/system/auth-status']).toBe(1);
   });
 
-  it('unterstellt bei 429 nicht „Security aus" und zeigt die App nicht ohne Key', async () => {
+  it('does not assume "Security off" on 429 and does not show the app without a key', async () => {
     const view = renderShell(createAppQueryClient());
     await advance(2000);
 
-    // Guard bleibt unentschieden: weder Kinder noch das Key-Formular.
+    // Guard stays undecided: neither children nor the key form.
     expect(view.queryByTestId('page')).toBeNull();
     expect(view.container.textContent).toBe('');
-    // …und ohne montierte Kinder gibt es auch keine Query-Anfragen.
+    // ...and without mounted children there are no query requests either.
     const counts = countsByPath();
     expect(counts['/system/capabilities']).toBeUndefined();
     expect(counts['/assistant/suggestions']).toBeUndefined();
@@ -220,8 +220,8 @@ describe('ApiKeyGuard mountet die App nicht erneut (d89b2cc1)', () => {
     return <div>page</div>;
   }
 
-  // Bewusst ohne StrictMode: dessen Doppelmount würde jede Zahl verdoppeln und damit
-  // verdecken, ob der Guard selbst ein zweites Mal mountet. Gemessen wird genau das.
+  // Deliberately without StrictMode: its double mount would double every number and thereby
+  // hide whether the guard itself mounts a second time. That is exactly what is measured.
   function renderGuard(queryClient: QueryClient) {
     return render(
       <QueryClientProvider client={queryClient}>
@@ -240,30 +240,30 @@ describe('ApiKeyGuard mountet die App nicht erneut (d89b2cc1)', () => {
       const path = pathOf(input);
       requests.push(path);
       if (path === '/system/auth-status') return jsonResponse({ securityEnabled: true });
-      // Alles andere ist rate-limited — wie im beobachteten Vorfall.
+      // Everything else is rate-limited - as in the observed incident.
       return rateLimitedResponse();
     }));
   });
 
   afterEach(teardown);
 
-  it('mountet die Kinder genau einmal, obwohl der gespeicherte Key geprüft wird', async () => {
+  it('mounts the children exactly once although the stored key is checked', async () => {
     renderGuard(createAppQueryClient());
     await advance(2000);
 
     expect(mounts, `Kinder wurden ${mounts}× gemountet`).toBe(1);
-    // Keine einzige Anfrage: der 429 auf /projects (Stored-Key-Prüfung) setzt seit b6feccbc
-    // die globale Kurzsperre, die Kinder mounten direkt danach — capabilities scheitert am
-    // Client, ohne ans Netz zu gehen.
+    // Not a single request: the 429 on /projects (stored-key check) has set the global short lockout since b6feccbc,
+    // the children mount right after - capabilities fails in the
+    // client without going to the network.
     expect(countsByPath()['/system/capabilities'] ?? 0).toBe(0);
 
-    // Nach Ablauf der /projects-Sperre holt die Erholung die Query genau einmal nach
-    // (f3fb193f) — ohne sie bliebe die montierte Seite bis zum Reload leer.
+    // After the /projects lockout expires, the recovery fetches the query exactly once afterwards
+    // (f3fb193f) - without it the mounted page would stay empty until reload.
     await advance(RETRY_AFTER_SECONDS * 1000 + 100);
     expect(countsByPath()['/system/capabilities']).toBe(1);
   });
 
-  it('behält den gespeicherten Key, wenn die Prüfung 429 bekommt', async () => {
+  it('keeps the stored key when the check gets a 429', async () => {
     renderGuard(createAppQueryClient());
     await advance(2000);
 
@@ -271,7 +271,7 @@ describe('ApiKeyGuard mountet die App nicht erneut (d89b2cc1)', () => {
   });
 });
 
-describe('Key-Eingabe läuft über den Backoff (b6feccbc)', () => {
+describe('Key entry goes through the backoff (b6feccbc)', () => {
   beforeEach(() => {
     prepare();
     useI18nStore.setState({ locale: 'de' });
@@ -296,7 +296,7 @@ describe('Key-Eingabe läuft über den Backoff (b6feccbc)', () => {
     await advance(50);
   }
 
-  it('fragt /projects im Sperrfenster nur einmal an und meldet das Rate-Limit', async () => {
+  it('requests /projects only once in the lockout window and reports the rate limit', async () => {
     const view = render(
       <QueryClientProvider client={createAppQueryClient()}>
         <MemoryRouter>

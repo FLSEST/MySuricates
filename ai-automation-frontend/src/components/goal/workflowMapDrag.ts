@@ -6,14 +6,14 @@ import { getEventCoordinates } from '@dnd-kit/utilities';
 import { parseTarget, type DraggedWorkflow, type MapContext, type Verdict } from './workflowMap';
 
 /**
- * Laufender Zug der Workflow-Zuordnung (52bc1e8c): was gezogen wird, worüber, und was die Karte über
- * ihre Ziele weiß – damit nur passende Ziele aufleuchten.
+ * Current drag of the workflow assignment (52bc1e8c): what is dragged, over what, and what the map knows about
+ * its targets - so that only fitting targets light up.
  */
 export interface WorkflowMapDragValue {
   dragged: DraggedWorkflow | null;
   overId: string | null;
   context: MapContext;
-  /** Urteil für ein Ziel beim laufenden Zug; `null`, solange nichts gezogen wird. */
+  /** Verdict for a target during the current drag; `null` while nothing is dragged. */
   judge: (targetId: string) => Verdict | null;
 }
 
@@ -22,8 +22,8 @@ export const WorkflowMapDragContext = createContext<WorkflowMapDragValue | null>
 export const useWorkflowMapDrag = () => useContext(WorkflowMapDragContext);
 
 /**
- * Welches Ziel gilt: mit der Maus das, über dem der Zeiger steht – ein TODO vor seinem Paket, das
- * es umschließt; mit der Tastatur (ohne Zeiger) das nächstgelegene.
+ * Which target applies: with the mouse the one under the pointer - a TODO before its package, which
+ * encloses it; with the keyboard (without a pointer) the nearest one.
  */
 export const workflowMapCollision: CollisionDetection = (args) => {
   if (!args.pointerCoordinates) return closestCenter(args);
@@ -35,7 +35,7 @@ export const workflowMapCollision: CollisionDetection = (args) => {
   return [...hits].sort((a, b) => rank(a.id) - rank(b.id));
 };
 
-/** Klassen einer Ablagefläche beim Ziehen: passend getönt, darüber kräftiger, ungeeignet blass. */
+/** Classes of a drop surface while dragging: fitting tinted, above it stronger, unsuitable faded. */
 export function dropToneOf(verdict: Verdict | null, over: boolean): { fill: string; stroke: string; opacity: number } | null {
   if (verdict === null) return null;
   if (verdict !== 'ok') return { fill: 'transparent', stroke: 'transparent', opacity: over ? 0.5 : 0.45 };
@@ -44,13 +44,13 @@ export function dropToneOf(verdict: Verdict | null, over: boolean): { fill: stri
     : { fill: 'transparent', stroke: 'var(--color-accent)', opacity: 1 };
 }
 
-/** Abstand der gezogenen Karte zum Zeiger: rechts unterhalb, damit das Ziel darunter sichtbar bleibt. */
+/** Offset of the dragged card from the pointer: below right, so the target underneath stays visible. */
 export const CURSOR_GAP = { x: 16, y: 14 };
 
 /**
- * Setzt die gezogene Karte samt Zeile „wohin“ neben den Zeiger statt dorthin, wo sie gegriffen wurde –
- * sonst deckt sie genau das TODO ab, über dem sie steht. Nur für das Bild (`DragOverlay`); welches Ziel
- * gilt, entscheidet weiter der Zeiger. Mit der Tastatur (kein Zeiger) bleibt es beim Versatz des Zuges.
+ * Places the dragged card with its "where to" row next to the pointer instead of where it was grabbed -
+ * otherwise it covers exactly the TODO it is over. Only for the image (`DragOverlay`); which target
+ * applies is still decided by the pointer. With the keyboard (no pointer) it stays at the drag's offset.
  */
 export const besideCursor: Modifier = ({ activatorEvent, draggingNodeRect, transform }) => {
   const at = activatorEvent ? getEventCoordinates(activatorEvent) : null;

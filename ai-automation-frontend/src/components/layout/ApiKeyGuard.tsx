@@ -65,7 +65,7 @@ export function ApiKeyGuard({ children }: { children: React.ReactNode }) {
     setError('');
 
     try {
-      // Über den Client, damit der 429-Backoff auch für die Key-Prüfung gilt (b6feccbc).
+      // Via the client, so the 429 backoff also applies to the key check (b6feccbc).
       await validateApiKey(inputKey.trim());
       // Just validated: the app shows at once while the effect checks the key once more
       setStoredKeyChecked(true);

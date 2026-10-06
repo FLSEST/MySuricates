@@ -2,18 +2,18 @@ import { createContext, useCallback, useContext, useMemo, useState } from 'react
 import type { TimelineBand } from './timelineLayout';
 
 /**
- * TODOs ohne Datum im Zeitstrahl (85889063, Flo: „Diese 8 ohne Datum, die sind ziemlich versteckt
- * so“). Je Zeile ein deutlicher Knopf mit Zähler; Zeilen mit höchstens fünf solchen TODOs stehen
- * offen, größere eingeklappt. Oben am Zeitstrahl klappt ein Schalter alle auf oder zu – das merkt
- * sich der Browser je Ziel. Einzelne Zeilen lassen sich danach wieder für sich umschalten.
+ * TODOs without a date on the timeline (85889063, Flo: "These 8 without a date, they are pretty hidden
+ * like this"). Each row gets a clear button with a counter; rows with at most five such TODOs are
+ * open, larger ones collapsed. At the top of the timeline a switch opens or closes all - the browser
+ * remembers that per goal. Individual rows can then be toggled again on their own.
  */
 
-/** Bis zu so vielen TODOs ohne Datum steht eine Zeile von selbst offen. */
+/** Up to this many TODOs without a date, a row is open by itself. */
 export const UNDATED_OPEN_MAX = 5;
 
 const STORAGE_KEY = 'mysuricates-goal-undated';
 
-/** `all`: alle offen, `none`: alle zu; ohne Eintrag gilt die Regel „höchstens fünf“. */
+/** `all`: all open, `none`: all closed; without an entry the rule "at most five" applies. */
 export type UndatedMode = 'all' | 'none';
 
 function readModes(): Record<string, UndatedMode> {
@@ -36,17 +36,17 @@ const defaultOpen = (mode: UndatedMode | null, count: number) =>
   mode === 'all' ? true : mode === 'none' ? false : count <= UNDATED_OPEN_MAX;
 
 export interface UndatedValue {
-  /** Ist die Liste der Zeile offen? `rowId`: `<band>:<zeile>`. */
+  /** Is the row's list open? `rowId`: `<band>:<row>`. */
   isOpen: (rowId: string, count: number) => boolean;
   setOpen: (rowId: string, open: boolean) => void;
-  /** Welches Paket der Leiste „Ohne Zeitraum“ seine TODOs ohne Datum zeigt (je Band eins). */
+  /** Which package of the "Ohne Zeitraum" strip shows its TODOs without a date (one per band). */
   pill: (band: string) => string | null;
   setPill: (band: string, workPackageId: string | null) => void;
 }
 
 export const UndatedContext = createContext<UndatedValue | null>(null);
 
-/** Zustand des Zeitstrahls: Modus je Ziel (gespeichert), Abweichungen einzelner Zeilen (nur bis zum Verlassen). */
+/** State of the timeline: mode per goal (stored), deviations of individual rows (only until leaving). */
 export function useUndatedDisclosure(goalId: string) {
   const [mode, setModeState] = useState<UndatedMode | null>(() => readModes()[goalId] ?? null);
   const [rows, setRows] = useState<Record<string, boolean>>({});
@@ -65,7 +65,7 @@ export function useUndatedDisclosure(goalId: string) {
   return { value, setMode };
 }
 
-/** Offen/zu einer Zeile – aus dem Zeitstrahl, ohne ihn (einzeln gerendert) nach der Regel „höchstens fünf“. */
+/** Open/closed of a row - from the timeline; without it (rendered individually) by the rule "at most five". */
 export function useUndatedRow(rowId: string, count: number): [boolean, (open: boolean) => void] {
   const shared = useContext(UndatedContext);
   const [local, setLocal] = useState<boolean | null>(null);
@@ -73,10 +73,10 @@ export function useUndatedRow(rowId: string, count: number): [boolean, (open: bo
   return [local ?? defaultOpen(null, count), setLocal];
 }
 
-/** Kennung einer Zeile für den Zustand: Band und Zeile. */
+/** Identifier of a row for the state: band and row. */
 export const undatedRowId = (band: string, row: string) => `${band}:${row}`;
 
-/** Alle Zeilen mit TODOs ohne Datum – für den Schalter oben und für „Zeigen“. */
+/** All rows with TODOs without a date - for the switch at the top and for "Zeigen". */
 export function undatedRows(bands: TimelineBand[]): { rowId: string; todoIds: string[] }[] {
   return bands.flatMap((band) => [...band.rows, band.noPackage]
     .filter((row) => row.undated.length > 0)

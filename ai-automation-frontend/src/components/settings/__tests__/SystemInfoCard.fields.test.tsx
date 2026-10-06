@@ -1,9 +1,9 @@
 /**
- * `SystemInfo` waechst dort, wo der Backoff, der Laufzeitmodus oder das naechste Feld gebraucht
- * wird — nicht hier. Die Karte listet die Felder generisch auf, und genau das liess die ganze
- * Einstellungsseite abstuerzen, als `rateLimit` am 2026-09-18 als verschachteltes Objekt dazukam
- * (0d1d27a1): „Objects are not valid as a React child". Typkorrekt, drei Tage unbemerkt, von
- * keinem Test gefangen. Diese Tests fangen den naechsten Fall.
+ * `SystemInfo` grows where the backoff, the runtime mode or the next field is needed
+ * - not here. The card lists the fields generically, and exactly that crashed the whole
+ * settings page when `rateLimit` was added as a nested object on 2026-09-18
+ * (0d1d27a1): "Objects are not valid as a React child". Type-correct, unnoticed for three days, caught by
+ * no test. These tests catch the next case.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, render, screen } from '@testing-library/react';

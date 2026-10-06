@@ -81,8 +81,8 @@ function getBlockLabel(block: { type: string; config: Record<string, unknown> })
 export function WorkflowBlockList({ workflowId, blocks }: { workflowId: string; blocks: BlockDefinition[] }) {
   const t = useT();
   const bpmnEnabled = useModuleEnabled('bpmn');
-  // Querverweis: Klick im Diagramm lässt den Listeneintrag blinken und umgekehrt
-  // (an die Workflow-ID gebunden, damit ein Wechsel der Auswahl nichts nachblinken lässt)
+  // Cross-reference: a click in the diagram makes the list entry blink and vice versa
+  // (bound to the workflow ID, so that switching the selection makes nothing blink afterwards)
   const [flash, setFlash] = useState<{ workflowId: string; target: 'list' | 'diagram'; index: number; nonce: number } | null>(null);
   const current = flash?.workflowId === workflowId ? flash : null;
   const listFlash: BlockFlash = current?.target === 'list' ? current : null;

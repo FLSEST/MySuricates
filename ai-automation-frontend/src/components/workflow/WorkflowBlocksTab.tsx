@@ -30,10 +30,10 @@ export function WorkflowBlocksTab({
 }: WorkflowBlocksTabProps) {
   const t = useT();
   const bpmnModule = useModuleEnabled('bpmn');
-  // Querverweis per Hover: Maus über einem Listen-Block lässt seinen Kasten im Diagramm blinken und
-  // umgekehrt (Klick öffnet hier den Editor, deshalb Hover statt Klick wie in der Workflow-Liste)
+  // Cross-reference via hover: mouse over a list block makes its box in the diagram blink and
+  // vice versa (a click opens the editor here, hence hover instead of click as in the workflow list)
   const [hoverFlash, setHoverFlash] = useState<(BlockFlash & { target: 'list' | 'diagram' }) | null>(null);
-  // Günstig (JSON.stringify der Blöcke) — daher ohne useMemo
+  // Cheap (JSON.stringify of the blocks) - hence without useMemo
   const definitionText = buildDefinitionText(workflow.blocks);
   const definitionLineRanges = blockLineRanges(workflow.blocks);
 

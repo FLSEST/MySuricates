@@ -32,7 +32,7 @@ export function TodoTriggerSection() {
   const deleteTrigger = useDeleteTodoTrigger();
 
   const [showCreate, setShowCreate] = useState(false);
-  // Sprungziel „TodoTrigger verwalten“ aus der Relationskarte eines Ziels (TODO c6ea8f5c)
+  // Jump target "TodoTrigger verwalten" from a goal's relation map (TODO c6ea8f5c)
   const location = useLocation();
   const anchorRef = useRef<HTMLDivElement>(null);
   useEffect(() => {

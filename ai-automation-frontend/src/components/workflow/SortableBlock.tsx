@@ -40,7 +40,7 @@ interface SortableBlockProps {
   onEdit: (index: number) => void;
   onRemove: (index: number) => void;
   allBlocks?: BlockDefinition[];
-  /** Gesetzt: der Block blitzt kurz auf; ein neuer Wert blitzt erneut. */
+  /** Set: the block flashes briefly; a new value flashes again. */
   flashNonce?: number;
   onHover?: (index: number) => void;
 }

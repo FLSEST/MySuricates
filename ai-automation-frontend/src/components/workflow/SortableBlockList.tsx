@@ -27,9 +27,9 @@ interface SortableBlockListProps {
   onRemoveBlock: (index: number) => void;
   /** Sealed workflows: blocks cannot be reordered */
   locked?: boolean;
-  /** Lässt diesen Block kurz aufblitzen (Querverweis aus dem Diagramm). */
+  /** Makes this block flash briefly (cross-reference from the diagram). */
   flashBlock?: BlockFlash | null;
-  /** Maus über einem Block — fürs Gegenstück im Diagramm. */
+  /** Mouse over a block - for the counterpart in the diagram. */
   onHoverBlock?: (index: number) => void;
 }
 

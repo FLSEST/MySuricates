@@ -6,7 +6,7 @@ import { useT } from '../../i18n';
 import type { TodoQuickAddForm } from '../../hooks/useTodoQuickAdd';
 import type { Project, TodoPriority } from '../../types';
 
-/** Quick-Add-Leiste der TODO-Seite; Zustand und Kürzel `n` kommen aus `useTodoQuickAdd`. */
+/** Quick-add bar of the TODO page; state and the `n` shortcut come from `useTodoQuickAdd`. */
 export function TodoQuickAdd({ form, inputRef, projects, allTags }: {
   form: TodoQuickAddForm;
   inputRef: RefObject<HTMLInputElement | null>;

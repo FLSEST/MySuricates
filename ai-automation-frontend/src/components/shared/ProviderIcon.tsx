@@ -8,7 +8,7 @@ const ICON_MAP: Record<string, ComponentType<{ className?: string }>> = {
   TicketCheck,
   Mail,
   ListTodo,
-  // lucide-react 1.x fuehrt keine Markenlogos mehr; der Provider meldet weiter "Github".
+  // lucide-react 1.x no longer ships brand logos; the provider keeps reporting "Github".
   Github: GitBranch,
   GitMerge,
   GitPullRequest,

@@ -7,7 +7,7 @@ import { useT } from '../../i18n';
 
 const TerminalPanel = lazy(() => import('../shared/TerminalPanel').then(m => ({ default: m.TerminalPanel })));
 
-/** Eingriff in einen laufenden Run: einzelnes Kommando senden oder (Modul `terminal`) interaktives Terminal. */
+/** Intervention in a running run: send a single command or (module `terminal`) interactive terminal. */
 export function RunContainerPanel({ runId }: { runId: string }) {
   const t = useT();
   const terminalModule = useModuleEnabled('terminal');

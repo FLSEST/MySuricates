@@ -7,8 +7,8 @@ import { useT } from '../../i18n';
 import { useModuleName } from '../../i18n/modules';
 import type { ModuleInfo } from '../../types';
 
-// --force, weil auf einer laufenden Instanz config/application.yml immer schon existiert: ohne
-// das Flag schreibt setup.sh dort nichts (729ceb19).
+// --force, because on a running instance config/application.yml always already exists: without
+// the flag setup.sh writes nothing there (729ceb19).
 const SETUP_COMMAND = './scripts/setup.sh --preset <core|research|full> --force';
 
 /**

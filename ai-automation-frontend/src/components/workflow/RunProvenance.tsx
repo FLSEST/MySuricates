@@ -7,8 +7,8 @@ import { useT } from '../../i18n';
 import type { WorkflowRun } from '../../types';
 
 /**
- * Herkunft eines Runs: Siegel-Zustand, was ihn gestartet hat und welche Definition er ausführte.
- * Immer sichtbar — der Siegel-Chip deckt jeden Zustand ab, auch Runs von vor der Aufzeichnung.
+ * Provenance of a run: seal state, what started it and which definition it executed.
+ * Always visible - the seal chip covers every state, including runs from before the recording.
  */
 export function RunProvenance({ run }: { run: WorkflowRun }) {
   const t = useT();

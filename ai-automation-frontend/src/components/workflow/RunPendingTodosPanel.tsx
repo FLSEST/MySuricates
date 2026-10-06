@@ -4,7 +4,7 @@ import { useApproveTodos } from '../../hooks/useWorkflows';
 import { useT } from '../../i18n';
 import type { PendingTodoItem } from '../../types';
 
-/** Vom Run vorgeschlagene TODOs, die erst nach Freigabe angelegt werden. */
+/** TODOs proposed by the run that are created only after approval. */
 export function RunPendingTodosPanel({ runId, pendingTodos }: { runId: string; pendingTodos: PendingTodoItem[] | undefined }) {
   const t = useT();
   const approveTodos = useApproveTodos();

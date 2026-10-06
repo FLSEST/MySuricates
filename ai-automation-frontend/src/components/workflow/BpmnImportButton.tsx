@@ -8,7 +8,7 @@ import { useToast } from '../../hooks/useToast';
 import { apiErrorMessage } from '../../api/client';
 import { useT } from '../../i18n';
 
-/** Eigenständiger BPMN-Import: Datei wählen → (bei mehreren Projekten) Projekt → neuer Workflow. */
+/** Standalone BPMN import: choose file → (with several projects) project → new workflow. */
 export function BpmnImportButton() {
   const t = useT();
   const navigate = useNavigate();
@@ -38,7 +38,7 @@ export function BpmnImportButton() {
     const xml = await file.text();
     const list = projects ?? [];
     if (list.length <= 1) {
-      runImport(xml, list[0]?.id ?? ''); // ein/kein Projekt → direkt importieren
+      runImport(xml, list[0]?.id ?? ''); // one/no project → import directly
     } else {
       setProjectId(list[0]!.id);
       setPendingXml(xml); // mehrere Projekte → Auswahl-Dialog

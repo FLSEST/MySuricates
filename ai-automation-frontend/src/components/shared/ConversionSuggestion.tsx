@@ -23,9 +23,9 @@ export function ConversionSuggestion({ runId }: { runId: string }) {
   const handleCreate = () => {
     if (!selectedProjectId) return;
 
-    // Den angezeigten Vorschlag mitschicken: Gespeichert wird genau das Geprüfte,
-    // ohne den Vorschlag serverseitig neu (und mit KI-Aufruf) zu erzeugen (TODO 935af6d3).
-    // Der Server verlangt dazu einen Namen; ohne jeden Namen bleibt es beim alten Weg.
+    // Send the displayed suggestion along: exactly what was checked is saved,
+    // without regenerating the suggestion server-side (and with an AI call) (TODO 935af6d3).
+    // The server requires a name for this; without any name it stays with the old path.
     const name = customName || suggestion.suggestedName || undefined;
     createWorkflow.mutate(
       {

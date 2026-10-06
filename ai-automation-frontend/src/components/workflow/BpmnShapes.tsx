@@ -100,8 +100,8 @@ export function ShapeSvg({ s, status, maps }: { s: Shape; status?: RunStatus; ma
       // BPMN-Datenobjekt: Rechteck mit umgeknickter Ecke, Beschriftung darunter
       const fold = 10;
       const right = s.x + s.w;
-      // Die Beschriftung steht unter dem (schmalen) Symbol und darf breiter sein als dieses;
-      // der volle Name bleibt im Tooltip der Gruppe erhalten.
+      // The label sits below the (narrow) symbol and may be wider than it;
+      // the full name is kept in the group's tooltip.
       const lines = wrapLabel(label, DATA_LABEL_W);
       return (
         <g>
