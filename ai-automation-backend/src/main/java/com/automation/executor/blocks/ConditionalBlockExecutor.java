@@ -31,8 +31,8 @@ public class ConditionalBlockExecutor implements BlockExecutor {
     public StepResult execute(BlockDefinition block, ExecutionContext context) {
         Map<String, Object> config = block.getConfig();
         boolean isShell = ExecutionMode.isShell(config);
-        // Shell-Modus: gleiche Regel wie Shell/While/Retry — untrusted Werte immer single-quoted,
-        // alle Werte bei shell_escape_variables. Claude-Modus bleibt roh (Prompt, keine Shell).
+        // Shell mode: same rule as shell/while/retry - untrusted values always single-quoted,
+        // all values with shell_escape_variables. Claude mode stays raw (prompt, no shell).
         boolean escapeVariables = Boolean.TRUE.equals(config.get("shell_escape_variables"));
         String condition = isShell
                 ? context.resolveShellTemplate((String) config.get("condition"), escapeVariables)

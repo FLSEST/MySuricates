@@ -8,16 +8,16 @@ import org.springframework.data.annotation.LastModifiedDate;
 import java.time.Instant;
 
 /**
- * Ein Arbeitspaket eines Ziels (TODO c60bf914): gehoert genau einem Projekt des Ziels
- * ({@link #projectId}), buendelt TODOs dieses Projekts ({@code Todo.workPackageId}) und hat einen
- * optionalen Zeitraum – {@link #startDate} und {@link #endDate} gibt es nur zusammen, Start nie nach
- * dem Ende. Die Reihenfolge innerhalb des Projekts steht in {@link #position}. {@code projectId} ist
- * nur bei Altdaten eines Ziels ohne Projekte null. Bis V92 hiessen sie Meilensteine (TODO 259f4f66).
+ * A work package of a goal (TODO c60bf914): belongs to exactly one project of the goal
+ * ({@link #projectId}), bundles TODOs of this project ({@code Todo.workPackageId}) and has an
+ * optional period - {@link #startDate} and {@link #endDate} exist only together, start never after
+ * the end. The order within the project is in {@link #position}. {@code projectId} is
+ * null only for legacy data of a goal without projects. Until V92 they were called milestones (TODO 259f4f66).
  *
- * <p>Der Zustand wird nicht gespeichert, sondern beim Lesen berechnet ({@link #stateOf}); nur
- * {@link #completedAt} haelt fest, wann das Paket zum ersten Mal abgeschlossen war. Der Zeitpunkt
- * bleibt, auch wenn spaeter wieder ein offenes TODO dazukommt – die Oberflaeche zeigt es dann als
- * „wieder offen“.
+ * <p>The state is not stored but computed on read ({@link #stateOf}); only
+ * {@link #completedAt} records when the package was first completed. The time
+ * stays even if an open TODO is added later - the UI then shows it as
+ * "wieder offen".
  */
 @Entity
 @Table(name = "goal_work_packages")
@@ -36,26 +36,26 @@ public class GoalWorkPackage {
     @Column(name = "goal_id", nullable = false)
     private String goalId;
 
-    /** Projekt des Pakets; null nur bei Altdaten eines Ziels ohne Projekte (V92). */
+    /** Project of the package; null only for legacy data of a goal without projects (V92). */
     @Column(name = "project_id")
     private String projectId;
 
     @Column(nullable = false)
     private String title;
 
-    /** Beginn des Zeitraums; null = ohne Zeitraum (dann auch kein Ende). */
+    /** Start of the period; null = no period (then no end either). */
     @Column(name = "start_date")
     private Instant startDate;
 
-    /** Ende des Zeitraums – die Basis fuer „bald faellig“/„ueberfaellig“; null = ohne Zeitraum. */
+    /** End of the period - the basis for "due soon"/"overdue"; null = no period. */
     @Column(name = "end_date")
     private Instant endDate;
 
-    /** Reihenfolge innerhalb seines Projekts im Ziel, ab 0. */
+    /** Order within its project in the goal, from 0. */
     @Column(nullable = false)
     private int position;
 
-    /** Erstes Erkennen „alle zugeordneten TODOs erledigt“; null = noch nie abgeschlossen. */
+    /** First detection of "all assigned TODOs done"; null = never completed. */
     @Column(name = "completed_at")
     private Instant completedAt;
 
@@ -68,14 +68,14 @@ public class GoalWorkPackage {
     private Instant updatedAt;
 
     /**
-     * Zustand aus dem Ende und den zugeordneten TODOs. {@code total}/{@code done} zaehlen ohne
-     * ARCHIVED. REACHED (abgeschlossen) braucht mindestens ein TODO – ein leeres Paket ist nicht fertig.
+     * State from the end and the assigned TODOs. {@code total}/{@code done} count without
+     * ARCHIVED. REACHED (completed) needs at least one TODO - an empty package is not done.
      */
     public static GoalDueState stateOf(Instant endDate, long total, long done, Instant now) {
         return GoalDueState.of(endDate, isComplete(total, done), now);
     }
 
-    /** Abgeschlossen: mindestens ein TODO, alle (ohne ARCHIVED) erledigt. */
+    /** Completed: at least one TODO, all (without ARCHIVED) done. */
     public static boolean isComplete(long total, long done) {
         return total > 0 && done >= total;
     }

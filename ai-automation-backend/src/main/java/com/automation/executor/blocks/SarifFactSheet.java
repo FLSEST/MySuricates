@@ -79,7 +79,7 @@ final class SarifFactSheet {
                     if (failedInvocation(run)) {
                         return notMeasured(prefix, "Werkzeug meldet executionSuccessful=false", exitCode, rawOutput);
                     }
-                    // SARIF: results fehlt oder ist null = keine Analyse; [] = analysiert, nichts gefunden
+                    // SARIF: results missing or null = no analysis; [] = analysed, nothing found
                     if (!run.path("results").isArray()) {
                         return notMeasured(prefix, file.getFileName() + ": ein Lauf ohne results (keine Analyse)",
                                 exitCode, rawOutput);
@@ -240,7 +240,7 @@ final class SarifFactSheet {
         } else if (rawOutput != null && !rawOutput.isBlank()) {
             out.append("## WERKZEUG-LOG (letzte ").append(RAW_TAIL_LINES).append(" Zeilen)\n");
             List<String> lines = UntrustedText.defuseLines(rawOutput).lines().toList();
-            // "| " vor jeder Zeile: eine Logzeile "FAKT x: 0" darf nie als gemessener Fakt gelten
+            // "| " before every line: a log line "FAKT x: 0" must never count as a measured fact
             lines.subList(Math.max(0, lines.size() - RAW_TAIL_LINES), lines.size())
                     .forEach(line -> out.append("| ").append(line).append('\n'));
         }

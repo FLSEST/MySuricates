@@ -7,14 +7,14 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * Relationskarte eines Ziels (TODO c6ea8f5c): je TODO, woher es kommt, welcher Workflow es
- * bearbeitet oder bearbeiten wuerde, und was der letzte Fix-Lauf ergab. Ein Ziel ist mit Workflows
- * nie direkt verknuepft – nur ueber diese drei Beziehungen seiner TODOs.
+ * Relation map of a goal (TODO c6ea8f5c): for each TODO, where it comes from, which workflow
+ * processes it or would process it, and what the last fix run produced. A goal is never
+ * directly linked to workflows - only via these three relations of its TODOs.
  *
- * @param activeTriggers Zahl der aktiven TodoTrigger insgesamt; 0 heisst, kein TODO kann per
- *                       Trigger andocken
- * @param todos          die TODOs des Ziels in Arbeitsreihenfolge, danach die angefragten
- *                       Kandidaten ({@code candidate = true}) in Anfragereihenfolge
+ * @param activeTriggers total number of active TodoTriggers; 0 means no TODO can dock on via
+ *                       trigger
+ * @param todos          the goal's TODOs in working order, followed by the requested
+ *                       candidates ({@code candidate = true}) in request order
  */
 public record GoalRelationsResponse(String goalId, int activeTriggers, List<TodoRelation> todos) {
 
@@ -33,15 +33,15 @@ public record GoalRelationsResponse(String goalId, int activeTriggers, List<Todo
             Result result
     ) {}
 
-    /** Woher ein TODO kommt – in dieser Reihenfolge geprueft, der erste Treffer zaehlt. */
+    /** Where a TODO comes from - checked in this order, the first match counts. */
     public enum OriginKind { AUDIT, HEALTH, WORKFLOW_RUN, AGENT, USER }
 
     /**
-     * @param workflowId   Workflow des erzeugenden Laufs (bei Audit: der Audit-Workflow), sonst null
-     * @param workflowName aktueller Name, sonst der beim Lauf festgehaltene
-     * @param runStatus    Status des erzeugenden Laufs; null, wenn der Lauf nicht mehr existiert
-     * @param findingIds   Audit-Befunde, die auf das TODO zeigen (nur bei {@link OriginKind#AUDIT})
-     * @param agent        {@code sourceAgent}, etwa {@code claude-code}
+     * @param workflowId   workflow of the creating run (for audit: the audit workflow), else null
+     * @param workflowName current name, otherwise the one recorded at the run
+     * @param runStatus    status of the creating run; null if the run no longer exists
+     * @param findingIds   audit findings pointing at the TODO (only for {@link OriginKind#AUDIT})
+     * @param agent        {@code sourceAgent}, e.g. {@code claude-code}
      */
     public record Origin(
             OriginKind kind,
@@ -53,7 +53,7 @@ public record GoalRelationsResponse(String goalId, int activeTriggers, List<Todo
             String agent
     ) {}
 
-    /** {@code LINKED}: Fix-Workflow am TODO; {@code TRIGGER}: ein aktiver TodoTrigger passt. */
+    /** {@code LINKED}: fix workflow on the TODO; {@code TRIGGER}: an active TodoTrigger matches. */
     public enum WorkerKind { LINKED, TRIGGER }
 
     public record Worker(
@@ -65,10 +65,10 @@ public record GoalRelationsResponse(String goalId, int activeTriggers, List<Todo
     ) {}
 
     /**
-     * Ergebnis der Bearbeitung; fehlt ganz, solange nie ein Fix-Lauf gestartet wurde.
+     * Result of the processing; absent entirely as long as no fix run was ever started.
      *
-     * @param workflowId Workflow des Fix-Laufs – die Karte zieht die Linie von dessen Bearbeitungs-Knoten
-     * @param at         Ende des Laufs, solange er laeuft sein Start
+     * @param workflowId workflow of the fix run - the map draws the line from its processing node
+     * @param at         end of the run, while it is running its start
      */
     public record Result(
             String runId,

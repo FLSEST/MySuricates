@@ -8,11 +8,11 @@ import org.springframework.data.annotation.LastModifiedDate;
 import java.time.Instant;
 
 /**
- * Ein Ergebnis, auf das TODOs einzahlen – etwa „Open-Source-Launch“ (TODO dc0566f8).
+ * An outcome that TODOs contribute to - e.g. "Open-Source-Launch" (TODO dc0566f8).
  *
- * <p>Projektuebergreifend: Die Zugehoerigkeit steht am TODO ({@code Todo.goalId}), nicht hier.
- * Ein Ziel kennt deshalb keine Liste seiner TODOs; Fortschritt und Reihenfolge rechnet
- * {@code GoalService} aus den TODOs zusammen.
+ * <p>Cross-project: membership is on the TODO ({@code Todo.goalId}), not here.
+ * A goal therefore knows no list of its TODOs; progress and order are computed by
+ * {@code GoalService} from the TODOs.
  */
 @Entity
 @Table(name = "goals")
@@ -33,7 +33,7 @@ public class Goal {
     @Column(nullable = false)
     private String title;
 
-    /** Was „fertig“ heisst – Markdown. */
+    /** What "done" means - Markdown. */
     @Column(columnDefinition = "text")
     private String description;
 
@@ -46,8 +46,8 @@ public class Goal {
     private Instant targetDate;
 
     /**
-     * Workflow des Ziel-Waechters (Vorlage {@code goal-guard}, TODO 259f4f66); null = nie
-     * eingeschaltet. Ob er gerade laeuft, sagt sein Zeitplan, nicht dieses Feld.
+     * Workflow of the goal guard (template {@code goal-guard}, TODO 259f4f66); null = never
+     * enabled. Whether it is currently running is told by its schedule, not by this field.
      */
     @Column(name = "guard_workflow_id")
     private String guardWorkflowId;

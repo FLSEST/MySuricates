@@ -3,13 +3,13 @@ package com.automation.dto.response;
 import java.util.List;
 
 /**
- * Ein Ziel mit seinen TODOs in Arbeitsreihenfolge (Rang, dann Prioritaet, dann Alter), dem
- * Fortschritt je Projekt, seinen Arbeitspaketen und Meilensteinen (TODO 259f4f66, c60bf914).
+ * A goal with its TODOs in working order (rank, then priority, then age), the
+ * progress per project, its work packages and milestones (TODO 259f4f66, c60bf914).
  *
- * <p>{@code byProject} leitet die Projekte aus den TODOs ab und bleibt fuer bestehende Aufrufer.
- * {@code projects} sind die ausdruecklich zugeordneten Projekte in ihrer Reihenfolge, gezaehlt aus
- * den nicht archivierten TODOs des Ziels in diesem Projekt. {@code workPackages} stehen nach
- * Projekt-Position, dann nach ihrer eigenen Position; {@code milestones} nach Datum, dann Titel.
+ * <p>{@code byProject} derives the projects from the TODOs and stays for existing callers.
+ * {@code projects} are the explicitly assigned projects in their order, counted from
+ * the goal's non-archived TODOs in this project. {@code workPackages} are sorted by
+ * project position, then by their own position; {@code milestones} by date, then title.
  */
 public record GoalDetailResponse(
         GoalResponse goal,
@@ -22,9 +22,9 @@ public record GoalDetailResponse(
     public record ProjectProgress(String projectId, String projectName, long total, long done) {}
 
     /**
-     * Ein Zielprojekt: {@code total}/{@code done} ohne ARCHIVED, {@code openQuestions} zaehlt aktive
-     * TODOs (OPEN/IN_PROGRESS/BACKLOG) mit offener Frage, {@code decided} die nicht archivierten mit
-     * Entscheidung und ohne offene Frage (TODO 68a5e24e).
+     * A goal project: {@code total}/{@code done} without ARCHIVED, {@code openQuestions} counts active
+     * TODOs (OPEN/IN_PROGRESS/BACKLOG) with an open question, {@code decided} the non-archived ones with
+     * a decision and without an open question (TODO 68a5e24e).
      */
     public record ProjectSummary(String projectId, String name, boolean archived, int position,
                                  long total, long done, long openQuestions, long decided) {}

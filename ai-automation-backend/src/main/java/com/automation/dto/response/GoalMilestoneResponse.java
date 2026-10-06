@@ -6,11 +6,11 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * Ein Meilenstein – ein Termin fuers ganze Ziel – mit berechnetem Zustand (TODO c60bf914).
- * Mit verknuepften Arbeitspaketen ({@code workPackageIds}) ist er REACHED, sobald alle abgeschlossen
- * sind ({@code packagesDone == packagesTotal}); ohne Pakete, wenn er von Hand markiert wurde.
- * {@code reopened}: war schon einmal erreicht ({@code reachedAt} gesetzt), die Pakete sind es jetzt
- * aber nicht mehr.
+ * A milestone - a deadline for the whole goal - with computed state (TODO c60bf914).
+ * With linked work packages ({@code workPackageIds}) it is REACHED once all are completed
+ * ({@code packagesDone == packagesTotal}); without packages, when it was marked by hand.
+ * {@code reopened}: was reached once ({@code reachedAt} set), but the packages no longer are
+ * now.
  */
 public record GoalMilestoneResponse(
         String id,

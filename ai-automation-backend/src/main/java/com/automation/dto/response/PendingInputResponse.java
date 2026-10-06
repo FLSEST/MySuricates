@@ -7,15 +7,15 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Ein Lauf, der auf eine Antwort wartet — für den Freigaben-Eingang der UI.
+ * A run waiting for an answer - for the UI's approvals inbox.
  *
- * @param type          {@code approval} oder {@code human-input}
- * @param question      die aufgelöste Frage bzw. der Prompt (Markdown)
- * @param rejectOptions die {@code options}, die eine Ablehnung sind
- * @param timeoutAt     wann der wartende Block aufgibt; {@code null}, wenn unbekannt
- * @param workflowName  der beim Start des Laufs festgehaltene Name
- * @param fields        die Felder eines Human-Input-Formulars (wie im WebSocket-Ereignis); fehlt in der
- *                      Antwort ohne Formular (TODO ec913801)
+ * @param type          {@code approval} or {@code human-input}
+ * @param question      the resolved question or prompt (Markdown)
+ * @param rejectOptions the {@code options} that are a rejection
+ * @param timeoutAt     when the waiting block gives up; {@code null} if unknown
+ * @param workflowName  the name recorded when the run started
+ * @param fields        the fields of a human-input form (as in the WebSocket event); absent from the
+ *                      response without a form (TODO ec913801)
  */
 public record PendingInputResponse(
         String runId,
@@ -31,7 +31,7 @@ public record PendingInputResponse(
         Instant timeoutAt,
         @JsonInclude(JsonInclude.Include.NON_EMPTY) List<Map<String, Object>> fields
 ) {
-    /** Ohne Formularfelder – Approvals und einfacher Human-Input. */
+    /** Without form fields - approvals and simple human input. */
     public PendingInputResponse(String runId, String workflowId, String workflowName, String type, String blockId,
                                 String question, List<String> options, List<String> rejectOptions, int stepIndex,
                                 Instant requestedAt, Instant timeoutAt) {

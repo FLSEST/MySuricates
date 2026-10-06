@@ -3,10 +3,10 @@ package com.automation.dto.response;
 import java.util.List;
 
 /**
- * @param sanitizedPaths Stellen, die der Export als Instanz-Bindung entfernt oder ersetzt hat
- *                       (z. B. {@code blocks[0].config.workflowId} eines sub-workflow-Blocks).
- *                       Leer, wenn nichts zu bereinigen war. Sichtbar statt nur im Log, weil eine
- *                       entfernte Referenz den Eintrag unvollständig machen kann — siehe
+ * @param sanitizedPaths places the export removed or replaced as instance bindings
+ *                       (e.g. {@code blocks[0].config.workflowId} of a sub-workflow block).
+ *                       Empty if nothing needed cleaning. Visible instead of only in the log, because a
+ *                       removed reference can make the entry incomplete - see
  *                       {@code docs/workflow-pool-kuratierung.md}.
  */
 public record ExportToPoolResponse(

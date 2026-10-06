@@ -11,12 +11,12 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 /**
- * Der Wartezustand eines Laufs an einem Approval: die offene Zusage, die Frage, auf die gerade
- * gewartet wird, und die Antworten, die der Lauf sich gemerkt hat.
+ * The waiting state of a run at an approval: the open promise, the question currently
+ * being waited on, and the answers the run has remembered.
  *
- * <p>Reiner Umzug aus {@link ExecutionContext} (TODO 7473fdcb) — dieselbe Mechanik, nur an einem
- * Ort statt über drei Felder und fünf Methoden verteilt. Dem Vorbild von
- * {@link ExecutionContextTaint} folgend: ein Zustand, eine Klasse.
+ * <p>Pure move out of {@link ExecutionContext} (TODO 7473fdcb) - the same mechanics, just in one
+ * place instead of spread over three fields and five methods. Following the example of
+ * {@link ExecutionContextTaint}: one state, one class.
  */
 class ApprovalGate {
 
@@ -24,8 +24,8 @@ class ApprovalGate {
     private final AtomicReference<ApprovalRequest> currentRequest = new AtomicReference<>();
     private final Map<String, String> memory = new ConcurrentHashMap<>();
     /**
-     * Wer den wartenden Schritt anzeigt (TODO 4eea7a87): {@code true}, sobald eine Frage offen ist,
-     * {@code false}, wenn das Warten endet — beides im Thread des Laufs, nie in dem, der antwortet.
+     * Who displays the waiting step (TODO 4eea7a87): {@code true} as soon as a question is open,
+     * {@code false} when the waiting ends - both on the run's thread, never on the one that answers.
      */
     private volatile Consumer<Boolean> waitListener;
 
@@ -45,7 +45,7 @@ class ApprovalGate {
         return future;
     }
 
-    /** Wartet auf die Antwort; danach zeigt der Schritt wieder, dass er läuft — auch bei Timeout oder Abbruch. */
+    /** Waits for the answer; afterwards the step shows again that it is running - also on timeout or cancel. */
     String await(CompletableFuture<String> future, long timeout, TimeUnit unit)
             throws InterruptedException, ExecutionException, TimeoutException {
         try {
@@ -68,7 +68,7 @@ class ApprovalGate {
         }
     }
 
-    /** Bricht eine offene Zusage ab — der wartende Block läuft in die CancellationException. */
+    /** Cancels an open promise - the waiting block runs into the CancellationException. */
     void cancel() {
         CompletableFuture<String> future = pending.getAndSet(null);
         if (future != null) {

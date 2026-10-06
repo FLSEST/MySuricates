@@ -3,8 +3,8 @@ package com.automation.dto.response;
 import java.time.Instant;
 
 /**
- * Zustand des Ziel-Waechters (TODO 259f4f66). {@code enabled} heisst: sein Zeitplan ist aktiv.
- * Ausgeschaltet bleibt der Workflow bestehen ({@code workflowId}), nur der Zeitplan pausiert.
+ * State of the goal guard (TODO 259f4f66). {@code enabled} means its schedule is active.
+ * When switched off the workflow remains ({@code workflowId}); only the schedule is paused.
  */
 public record GoalGuardResponse(
         boolean enabled,

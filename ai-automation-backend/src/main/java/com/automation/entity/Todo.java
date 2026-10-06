@@ -25,14 +25,14 @@ public class Todo {
     public enum Priority { LOW, MEDIUM, HIGH, CRITICAL }
     public enum Source { USER, AI, WORKFLOW }
     public enum ResolutionState { IDLE, RUNNING, FAILED, SUCCEEDED }
-    /** Umfang und Unsicherheit einer Aufgabe – grob, damit Mensch und KI dieselbe Skala nutzen. */
+    /** Scope and uncertainty of a task - coarse, so that humans and AI use the same scale. */
     public enum Complexity { S, M, L, XL }
-    /** Wer die Einschaetzung zuletzt gesetzt hat; ein Mensch ueberschreibt die KI. */
+    /** Who set the estimate last; a human overrides the AI. */
     public enum RatedBy { USER, AI }
 
     /**
-     * Stand einer Frage am TODO (TODO 68a5e24e): QUESTION, solange eine Frage offen ist – auch wenn
-     * es schon eine fruehere Entscheidung gibt –, DECIDED mit Entscheidung und ohne offene Frage, sonst NONE.
+     * State of a question on the TODO (TODO 68a5e24e): QUESTION as long as a question is open - even if
+     * there is an earlier decision -, DECIDED with a decision and without an open question, otherwise NONE.
      */
     public enum DecisionState {
         QUESTION, DECIDED, NONE;
@@ -61,8 +61,8 @@ public class Todo {
     private Status status = Status.OPEN;
 
     /**
-     * Ereignisse, die Spring Data beim naechsten save/saveAll veroeffentlicht ({@link #domainEvents()}).
-     * Nicht persistiert; der Builder setzt das Feld nicht.
+     * Events that Spring Data publishes on the next save/saveAll ({@link #domainEvents()}).
+     * Not persisted; the builder does not set the field.
      */
     @Transient
     @Getter(AccessLevel.NONE)
@@ -94,15 +94,15 @@ public class Todo {
     private String sessionId;
 
     /**
-     * Konversation der Agenten-Sitzung, aus der dieses TODO stammt — die UUID hinter
+     * Conversation of the agent session this TODO comes from - the UUID behind
      * {@code claude --resume}.
      *
-     * <p>Nicht dasselbe wie {@link #sessionId}: das traegt die Shell-Session
-     * ({@code $SHELL_SESSION_ID}) und reicht nicht, um eine Sitzung wiederherzustellen. Vorher
-     * stand der Resume-Befehl nur im Fliesstext der Beschreibung, weil ein Agent ihn dort
-     * hinschrieb — prompt-enforced statt backend-enforced, und entsprechend luckenhaft
-     * (63 % der Claude-Code-TODOs, Messung 2026-09-16). V76 traegt die vorhandenen Werte
-     * einmalig aus den Beschreibungen nach (TODO 3497533c).
+     * <p>Not the same as {@link #sessionId}: that carries the shell session
+     * ({@code $SHELL_SESSION_ID}) and is not enough to restore a session. Previously
+     * the resume command stood only in the prose of the description, because an agent wrote it
+     * there - prompt-enforced instead of backend-enforced, and accordingly patchy
+     * (63 % of Claude Code TODOs, measured 2026-09-16). V76 carries the existing values over
+     * once from the descriptions (TODO 3497533c).
      */
     @Column(name = "agent_session_ref")
     private String agentSessionRef;
@@ -143,19 +143,19 @@ public class Todo {
     @Column(name = "resolution_state")
     private ResolutionState resolutionState;
 
-    // ── Einordnung in ein Ziel (TODO dc0566f8) ────────────────────────────────
+    // ── Assignment to a goal (TODO dc0566f8) ──────────────────────────────────
 
-    /** Ziel, auf das dieses TODO einzahlt; hoechstens eins. */
+    /** Goal this TODO contributes to; at most one. */
     @Column(name = "goal_id")
     private String goalId;
 
-    /** Position im Ziel, 1 = zuerst; null = noch nicht eingeordnet (steht am Ende). */
+    /** Position in the goal, 1 = first; null = not yet ranked (goes last). */
     @Column(name = "goal_rank")
     private Integer goalRank;
 
     /**
-     * Arbeitspaket des Ziels, in dem dieses TODO steht (TODO c60bf914, bis V92 „Meilenstein“); nur
-     * innerhalb von {@link #goalId} und – beim Schreiben geprueft – desselben Projekts.
+     * Work package of the goal this TODO is in (TODO c60bf914, until V92 "milestone"); only
+     * within {@link #goalId} and - checked on write - the same project.
      */
     @Column(name = "work_package_id")
     private String workPackageId;
@@ -165,14 +165,14 @@ public class Todo {
     private Complexity complexity;
 
     /**
-     * Empfohlener Reasoning-Effort ({@code low|medium|high|xhigh}), als Text wie
-     * {@code Workflow.effort} – die Entity haengt nicht vom Service-Paket ab; geprueft wird
-     * gegen {@code ReasoningEffort} beim Schreiben.
+     * Recommended reasoning effort ({@code low|medium|high|xhigh}), as text like
+     * {@code Workflow.effort} - the entity does not depend on the service package; it is checked
+     * against {@code ReasoningEffort} on write.
      */
     @Column(name = "suggested_effort")
     private String suggestedEffort;
 
-    /** Ein bis zwei Saetze, warum Komplexitaet und Effort so eingeschaetzt sind. */
+    /** One to two sentences on why complexity and effort are estimated this way. */
     @Column(name = "rating_note", columnDefinition = "text")
     private String ratingNote;
 
@@ -183,13 +183,13 @@ public class Todo {
     @Column(name = "rated_at")
     private Instant ratedAt;
 
-    /** Frage, die vor der Arbeit geklaert sein muss; null = nichts offen. */
+    /** Question that must be clarified before the work; null = nothing open. */
     @Column(name = "open_question", columnDefinition = "text")
     private String openQuestion;
 
     /**
-     * Entscheidung, die eine offene Frage beantwortet hat (TODO 68a5e24e); null = keine. Eine
-     * Entscheidung leert die offene Frage, eine spaetere neue Frage laesst sie stehen.
+     * Decision that answered an open question (TODO 68a5e24e); null = none. A
+     * decision clears the open question, a later new question leaves it standing.
      */
     @Column(name = "decision", columnDefinition = "text")
     private String decision;
@@ -201,7 +201,7 @@ public class Todo {
     @Column(name = "decided_by")
     private RatedBy decidedBy;
 
-    /** Zustand aus offener Frage und Entscheidung – nie gespeichert (TODO 68a5e24e). */
+    /** State from open question and decision - never stored (TODO 68a5e24e). */
     public DecisionState getDecisionState() {
         return DecisionState.of(openQuestion, decision);
     }
@@ -214,26 +214,26 @@ public class Todo {
     private Instant updatedAt;
 
     /**
-     * Ein TODO ist eben auf {@code DONE} gewechselt. Spring Data veroeffentlicht das Ereignis beim
-     * naechsten save/saveAll synchron in der Transaktion des Aufrufers; die Folge — etwa ein Audit-Befund auf
-     * AWAITING_VERIFICATION — haengt so an keinem einzelnen Schreibpfad. Hier statt in {@code event}, weil
-     * {@code event} schon von {@code entity} abhaengt (kein Paketzyklus).
+     * A TODO has just changed to {@code DONE}. Spring Data publishes the event on the next
+     * save/saveAll synchronously in the caller's transaction; the consequence - e.g. an audit finding to
+     * AWAITING_VERIFICATION - thus hangs on no single write path. Here instead of in {@code event}, because
+     * {@code event} already depends on {@code entity} (no package cycle).
      */
     public record Completed(Todo todo) {
     }
 
     /**
-     * Mehrere TODOs sind per Sammel-UPDATE ({@code TodoRepository.bulkSetStatus}) auf {@code DONE} gewechselt.
-     * Das UPDATE laedt keine Entities, also meldet sich keines selbst ({@link Completed}); der Aufrufer
-     * veroeffentlicht die IDs der tatsaechlich wechselnden TODOs gesammelt.
+     * Several TODOs changed to {@code DONE} via bulk UPDATE ({@code TodoRepository.bulkSetStatus}).
+     * The UPDATE loads no entities, so none reports itself ({@link Completed}); the caller
+     * publishes the IDs of the TODOs that actually changed collectively.
      */
     public record CompletedInBulk(java.util.List<String> todoIds) {
     }
 
     /**
-     * Ein Wechsel auf {@code DONE} meldet sich als {@link Completed} — einmal je Wechsel, nicht
-     * bei DONE → DONE (Folgebefund zu ab1ed481). Hibernate laedt per Feldzugriff, das Laden loest also
-     * nichts aus.
+     * A change to {@code DONE} reports itself as {@link Completed} - once per change, not
+     * on DONE -> DONE (follow-up finding to ab1ed481). Hibernate loads via field access, so loading triggers
+     * nothing.
      */
     public void setStatus(Status status) {
         if (status == Status.DONE && this.status != Status.DONE) {
@@ -242,7 +242,7 @@ public class Todo {
         this.status = status;
     }
 
-    /** Fuer Spring Data: beim save/saveAll dieses TODOs veroeffentlicht. */
+    /** For Spring Data: published on this TODO's save/saveAll. */
     @DomainEvents
     public List<Object> domainEvents() {
         return List.copyOf(domainEvents);

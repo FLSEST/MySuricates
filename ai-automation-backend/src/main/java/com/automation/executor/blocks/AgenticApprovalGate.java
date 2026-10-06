@@ -38,8 +38,8 @@ public class AgenticApprovalGate {
 
     public Decision ask(ExecutionContext context, int stepIndex, int iteration, AgenticPlan plan,
                         Map<String, Object> iterData, StringBuilder fullOutput, List<Turn> history) {
-        // Erst die Frage hinterlegen, dann melden: Die Laufseite fragt auf dieses Ereignis hin
-        // GET /executions/{id}/approval ab (TODO 5b08cf33) und muss die Frage dort schon finden.
+        // Store the question first, then report: the run page queries
+        // GET /executions/{id}/approval on this event (TODO 5b08cf33) and must already find the question there.
         CompletableFuture<String> future = context.requestApproval(
                 ApprovalRequest.builder()
                         .blockId("agentic-" + stepIndex + "-iter-" + iteration)

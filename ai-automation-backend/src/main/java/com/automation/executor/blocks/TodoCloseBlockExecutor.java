@@ -16,10 +16,10 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Native todo-close block (TODO 9f6d7f14): setzt ein TODO auf DONE — direkt über
- * den TodoService, ersetzt REST-Self-Calls (PATCH /api/v1/todos/{id}/status).
+ * Native todo-close block (TODO 9f6d7f14): sets a TODO to DONE - directly via
+ * the TodoService, replaces REST self-calls (PATCH /api/v1/todos/{id}/status).
  *
- * Config: id (Pflicht, Template-fähig — typisch {{ todo_id }} aus todo-create).
+ * Config: id (required, template-capable - typically {{ todo_id }} from todo-create).
  */
 @Component
 @RequiredArgsConstructor

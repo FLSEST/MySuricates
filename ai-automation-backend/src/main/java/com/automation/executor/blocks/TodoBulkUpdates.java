@@ -18,13 +18,13 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
- * {@code todo-update} mit {@code updates} (TODO cc0eb3ba): viele TODOs des Lauf-Projekts in einem Schritt – Status,
- * Tags hinzu/weg, Vermerk, mit Bedingungen. Die Liste kommt meist aus einem Shell-Schritt
- * ({@code {{ block.<name>.output }}}); ist dessen ganze Ausgabe kein JSON, gilt ihre letzte nicht-leere Zeile.
+ * {@code todo-update} with {@code updates} (TODO cc0eb3ba): many TODOs of the run's project in one step - status,
+ * tags added/removed, note, with conditions. The list mostly comes from a shell step
+ * ({@code {{ block.<name>.output }}}); if its whole output is not JSON, its last non-empty line applies.
  *
- * <p>Struktur-Fehler – kein JSON, keine Liste, unbekannter Schlüssel, mehr als {@value #MAX_ENTRIES} Einträge –
- * lassen den Schritt scheitern, bevor etwas geschrieben ist. Ein Eintrag, der nicht passt (ungültige ID oder
- * Werte, fremdes Projekt, Bedingung nicht erfüllt), wird mit Grund übersprungen.
+ * <p>Structure errors - no JSON, no list, unknown key, more than {@value #MAX_ENTRIES} entries -
+ * make the step fail before anything is written. An entry that does not fit (invalid ID or
+ * values, foreign project, condition not met) is skipped with a reason.
  */
 final class TodoBulkUpdates {
 
@@ -52,7 +52,7 @@ final class TodoBulkUpdates {
         }
     }
 
-    /** Eine Liste direkt aus der Config (statt String) als JSON-Text. */
+    /** A list directly from the config (instead of a string) as JSON text. */
     static String toJson(Object raw) {
         try {
             return JSON.writeValueAsString(raw);
@@ -61,7 +61,7 @@ final class TodoBulkUpdates {
         }
     }
 
-    /** Liest die Liste; {@link IllegalArgumentException} bei Struktur-Fehlern. */
+    /** Reads the list; {@link IllegalArgumentException} on structure errors. */
     static List<JsonNode> parse(String raw) {
         String text = raw == null ? "" : raw.strip();
         JsonNode root = read(text);

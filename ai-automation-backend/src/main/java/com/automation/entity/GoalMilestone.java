@@ -8,13 +8,13 @@ import org.springframework.data.annotation.LastModifiedDate;
 import java.time.Instant;
 
 /**
- * Ein Meilenstein eines Ziels (TODO c60bf914): ein Termin fuers ganze Ziel – kein Projekt, immer
- * mit Datum. Optional mit Arbeitspaketen verknuepft ({@link GoalMilestoneWorkPackage}): dann ist er
- * erreicht, wenn alle verknuepften Pakete abgeschlossen sind, und {@link #reachedAt} haelt den ersten
- * Zeitpunkt fest. Ohne verknuepfte Pakete wird er von Hand als erreicht markiert. Der Zustand wird
- * beim Lesen berechnet ({@code MilestoneProgress}).
+ * A milestone of a goal (TODO c60bf914): a deadline for the whole goal - not a project, always
+ * with a date. Optionally linked to work packages ({@link GoalMilestoneWorkPackage}): then it is
+ * reached when all linked packages are completed, and {@link #reachedAt} records the first
+ * time. Without linked packages it is marked as reached by hand. The state is
+ * computed on read ({@code MilestoneProgress}).
  *
- * <p>Nicht zu verwechseln mit den Meilensteinen bis V92 – die heissen seitdem Arbeitspakete
+ * <p>Not to be confused with the milestones until V92 - those have since been called work packages
  * ({@link GoalWorkPackage}).
  */
 @Entity
@@ -40,7 +40,7 @@ public class GoalMilestone {
     @Column(name = "due_date", nullable = false)
     private Instant dueDate;
 
-    /** Erreicht seit; mit Paketen das erste Erkennen, ohne Pakete von Hand gesetzt. null = nicht erreicht. */
+    /** Reached since; with packages the first detection, without packages set by hand. null = not reached. */
     @Column(name = "reached_at")
     private Instant reachedAt;
 

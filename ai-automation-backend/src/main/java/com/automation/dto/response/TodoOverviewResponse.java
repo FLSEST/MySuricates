@@ -14,12 +14,12 @@ public record TodoOverviewResponse(
         Instant generatedAt,
         int staleThresholdDays,
         /**
-         * Termine aktiver Ziele, die Aufmerksamkeit brauchen (TODO 259f4f66, c60bf914): bald faellige oder
-         * ueberfaellige Meilensteine und ueberfaellige Arbeitspakete mit offenen TODOs, je mit {@code kind}.
+         * Appointments of active goals that need attention (TODO 259f4f66, c60bf914): milestones due soon or
+         * overdue and overdue work packages with open TODOs, each with {@code kind}.
          */
         List<MilestoneAttentionItem> milestonesDue
 ) {
-    /** Form ohne {@code milestonesDue} – fuer Aufrufer und Test-Fixturen von vorher. */
+    /** Form without {@code milestonesDue} - for callers and test fixtures from before. */
     public TodoOverviewResponse(List<ProjectRollup> projects, List<NeedsYouItem> needsYou, Instant generatedAt,
                                 int staleThresholdDays) {
         this(projects, needsYou, generatedAt, staleThresholdDays, List.of());

@@ -24,10 +24,10 @@ public record ChainResponse(
             int sortOrder,
             boolean stopOnFailure,
             Map<String, Object> inputContext,
-            /** Wartezeit der Kette auf diesen Eintrag in Minuten; null = globale Vorgabe (TODO cc0eb3ba). */
+            /** The chain's wait time for this entry in minutes; null = global default (TODO cc0eb3ba). */
             Integer timeoutMinutes
     ) {
-        /** Aufrufe von vor {@code timeoutMinutes} (TODO cc0eb3ba). */
+        /** Calls from before {@code timeoutMinutes} (TODO cc0eb3ba). */
         public ChainEntryResponse(String workflowId, String workflowName, String projectName, String label,
                                   int sortOrder, boolean stopOnFailure, Map<String, Object> inputContext) {
             this(workflowId, workflowName, projectName, label, sortOrder, stopOnFailure, inputContext, null);

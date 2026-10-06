@@ -29,7 +29,7 @@ public class ExecutionContext {
     @Setter
     private String projectPath;
 
-    /** taint-neutral — für Block-Ergebnisse {@link #recordOutput}, für aus Output abgeleitete Variablen {@link #setDerivedVariable} verwenden; nur für Resume-Seeding/Tests. */
+    /** taint-neutral - use {@link #recordOutput} for block results, {@link #setDerivedVariable} for variables derived from output; only for resume seeding/tests. */
     @Setter
     private String previousOutput;
 
@@ -85,8 +85,8 @@ public class ExecutionContext {
 
     @Builder.Default private final AtomicBoolean cancelled = new AtomicBoolean(false);
 
-    /** Offene Zusage, laufende Frage und gemerkte Antworten. Nur über die Methoden unten — ein
-     * generierter Getter würde den Zustand am Gate vorbei erreichbar machen. Siehe {@link ApprovalGate}. */
+    /** Open promise, running question and remembered answers. Only via the methods below - a
+     * generated getter would make the state reachable around the gate. See {@link ApprovalGate}. */
     @Getter(AccessLevel.NONE)
     @Builder.Default private final ApprovalGate approvals = new ApprovalGate();
 
@@ -191,7 +191,7 @@ public class ExecutionContext {
         return BlockAiSettings.effortFor(block, effort);
     }
 
-    /** Stores a block's output under its declared name for {{ block.<name>.output }} resolution. Taint-neutral — für Block-Ergebnisse {@link #recordOutput}, für aus Output abgeleitete Variablen {@link #setDerivedVariable} verwenden; nur für Resume-Seeding/Tests. */
+    /** Stores a block's output under its declared name for {{ block.<name>.output }} resolution. Taint-neutral - use {@link #recordOutput} for block results, {@link #setDerivedVariable} for variables derived from output; only for resume seeding/tests. */
     public void setBlockOutput(String blockName, String output) {
         if (blockName == null || blockName.isBlank()) return;
         blockOutputs.put(blockName, output == null ? "" : output);
@@ -275,21 +275,21 @@ public class ExecutionContext {
         };
     }
 
-    /** Die Frage, auf die dieser Lauf gerade wartet — {@code null} im Ref, wenn keine offen ist. */
+    /** The question this run is currently waiting on - {@code null} in the ref if none is open. */
     public AtomicReference<ApprovalRequest> getCurrentApprovalRequest() { return approvals.currentRequest(); }
 
     public CompletableFuture<String> requestApproval(ApprovalRequest request) { return approvals.request(request); }
 
     /**
-     * Wartet auf die Antwort zu {@link #requestApproval} — statt {@code future.get}, damit der Schritt
-     * nach dem Warten wieder als laufend gilt (siehe {@link #onApprovalWait}).
+     * Waits for the answer to {@link #requestApproval} - instead of {@code future.get}, so that the step
+     * counts as running again after waiting (see {@link #onApprovalWait}).
      */
     public String awaitApproval(CompletableFuture<String> future, long timeout, TimeUnit unit)
             throws InterruptedException, ExecutionException, TimeoutException {
         return approvals.await(future, timeout, unit);
     }
 
-    /** Meldet, wann der laufende Schritt auf eine Freigabe oder Eingabe wartet ({@code null} = niemand). */
+    /** Reports when the running step is waiting for an approval or input ({@code null} = nobody). */
     public void onApprovalWait(Consumer<Boolean> listener) { approvals.onWait(listener); }
 
     public void resolveApproval(String answer) { approvals.resolve(answer); }

@@ -32,10 +32,10 @@ public record TodoResponse(
         Instant dueDate,
         Instant createdAt,
         Instant updatedAt,
-        /** Ziel und Einschaetzung (TODO dc0566f8); null, solange nichts davon gesetzt ist. */
+        /** Goal and estimate (TODO dc0566f8); null as long as none of it is set. */
         TodoPlanningResponse planning
 ) {
-    /** Form ohne {@code planning} (TODO dc0566f8) — fuer Aufrufer und Test-Fixturen von vorher. */
+    /** Form without {@code planning} (TODO dc0566f8) - for callers and test fixtures from before. */
     public TodoResponse(String id, String title, String description, Todo.Status status,
                         Todo.Priority priority, List<String> tags, String projectId,
                         String projectName, String linkedWorkflowId, String linkedWorkflowName,
@@ -52,7 +52,7 @@ public record TodoResponse(
                 createdAt, updatedAt, null);
     }
 
-    /** Kurzform ohne {@code agentSessionRef} (TODO 3497533c) — fuer Test-Fixturen. */
+    /** Short form without {@code agentSessionRef} (TODO 3497533c) - for test fixtures. */
     public TodoResponse(String id, String title, String description, Todo.Status status,
                         Todo.Priority priority, List<String> tags, String projectId,
                         String projectName, String linkedWorkflowId, String linkedWorkflowName,

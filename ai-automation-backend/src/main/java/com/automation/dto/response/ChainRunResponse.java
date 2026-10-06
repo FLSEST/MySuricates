@@ -25,7 +25,7 @@ public record ChainRunResponse(
         String triggeredByScheduleId,
         TriggerSource triggerSource
 ) {
-    /** Kompatibilitäts-Konstruktor für Aufrufer von vor der Starter-Aufzeichnung an der Chain (V96). */
+    /** Compatibility constructor for callers from before the starter was recorded on the chain (V96). */
     public ChainRunResponse(String id, String chainId, String chainName, RunStatus status,
                             List<ChainRunEntryResponse> entryRuns, Map<String, Object> inputContext,
                             Instant startedAt, Instant completedAt, Long durationMs, String error,

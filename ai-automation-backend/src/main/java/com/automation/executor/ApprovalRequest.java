@@ -15,15 +15,15 @@ public class ApprovalRequest {
     private final List<String> options;
     private final int stepIndex;
 
-    /** Die {@link #options}, die eine Ablehnung sind (siehe {@link ApprovalRejection}) — für die UI. */
+    /** The {@link #options} that are a rejection (see {@link ApprovalRejection}) - for the UI. */
     @Builder.Default
     private final List<String> rejectOptions = List.of();
 
-    /** Seit wann der Lauf wartet — der Request entsteht unmittelbar vor dem Warten. */
+    /** Since when the run has been waiting - the request is created immediately before waiting. */
     @Builder.Default
     private final Instant requestedAt = Instant.now();
 
-    /** Nach wie vielen Minuten der wartende Block aufgibt; {@code null}, wenn unbekannt. */
+    /** After how many minutes the waiting block gives up; {@code null} if unknown. */
     private final Integer timeoutMinutes;
 
     // Human-input specific fields
@@ -46,12 +46,12 @@ public class ApprovalRequest {
     private final List<Map<String, Object>> fields;
 
     /**
-     * Die Antwort so, wie der wartende Block sie bekommt. Ein Approval nimmt nur eine seiner Optionen
-     * an — ohne Groß-/Kleinschreibung verglichen, weitergereicht in der Schreibweise der Option. Ohne
-     * diese Prüfung wurde jeder Freitext stillschweigend zur Freigabe (TODO 50c7b5d5). Human-Input
-     * bleibt frei: Er erwartet Text, Zahlen oder ein JSON-Formular.
+     * The answer as the waiting block receives it. An approval accepts only one of its options
+     * - compared case-insensitively, passed on in the option's spelling. Without
+     * this check any free text silently became an approval (TODO 50c7b5d5). Human input
+     * stays free: it expects text, numbers or a JSON form.
      *
-     * @throws IllegalArgumentException wenn ein Approval die Antwort nicht anbietet
+     * @throws IllegalArgumentException if an approval does not offer the answer
      */
     public String acceptedAnswer(String answer) {
         if (!"approval".equals(type) || options == null || options.isEmpty() || answer == null) {

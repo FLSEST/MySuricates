@@ -8,36 +8,36 @@ import java.time.Instant;
 import java.util.Map;
 
 /**
- * Eine Run-Zeile für Listen — wie {@link WorkflowRunResponse}, aber ohne die Schritte.
+ * A run row for lists - like {@link WorkflowRunResponse}, but without the steps.
  *
- * <p><b>Warum ein eigener Typ.</b> Die Listen-Route benutzte dasselbe DTO wie die Detail-Route und
- * trug damit jeden {@code step_results.output} (TEXT) in die Antwort: bei 60 Runs mit je drei
- * 20-KB-Schritten <b>3 061 816 Bytes</b>, gemessen von {@code RequestCostRatchetTest} am
- * 2026-09-18 (TODO a05c9504). Produktiv ist es größer — Quality-Gate-Ausgaben liegen im hohen KB-
- * bis MB-Bereich, bei 50 Runs je Seite also zweistellige MB pro Seitenaufruf.
+ * <p><b>Why a separate type.</b> The list route used the same DTO as the detail route and
+ * thereby carried every {@code step_results.output} (TEXT) in the response: with 60 runs of three
+ * 20 KB steps each <b>3 061 816 bytes</b>, measured by {@code RequestCostRatchetTest} on
+ * 2026-09-18 (TODO a05c9504). In production it is larger - quality-gate outputs are in the high KB
+ * to MB range, so with 50 runs per page that is double-digit MB per page request.
  *
- * <p>Dasselbe DTO mit teils gefüllten, teils leeren Schritten wäre die stillere, aber
- * schlechtere Lösung gewesen: Dann bedeutet {@code steps} in der Liste etwas anderes als im
- * Detail, und der nächste Leser erfährt es nur, wenn er es ausprobiert. Ein eigener Typ sagt es.
+ * <p>The same DTO with partly filled, partly empty steps would have been the quieter but
+ * worse solution: then {@code steps} in the list means something different than in the
+ * detail, and the next reader only finds out by trying. A separate type says it.
  *
- * <p>Was die Liste vom letzten Schritt braucht, ist erhoben und nicht geraten: {@code Runs.tsx}
- * zeigt die <b>Anzahl</b> der Schritte und die Ausgabe des <b>letzten</b> Schritts, gekürzt auf
- * 300&nbsp;px mit Volltext im Tooltip. Die übrigen fünf Verbraucher der Route rühren die Schritte
- * nicht an.
+ * <p>What the list needs from the last step is measured, not guessed: {@code Runs.tsx}
+ * shows the <b>number</b> of steps and the output of the <b>last</b> step, truncated to
+ * 300&nbsp;px with the full text in the tooltip. The other five consumers of the route do not touch the steps
+ * at all.
  *
- * <p>Einen Fehlertext je Schritt gibt es nicht: {@code Runs.tsx} liest {@code lastStep.error},
- * aber {@link StepResultResponse} hat kein solches Feld — der Wert war immer {@code undefined}.
- * Der Fehler eines Runs steht in {@link #error}, und dabei bleibt es; ein Feld zu erfinden, das
- * nichts füllt, hätte die Liste nur wieder undurchsichtig gemacht.
+ * <p>There is no per-step error text: {@code Runs.tsx} reads {@code lastStep.error},
+ * but {@link StepResultResponse} has no such field - the value was always {@code undefined}.
+ * A run's error is in {@link #error}, and that is how it stays; inventing a field that
+ * nothing fills would only have made the list opaque again.
  *
- * @param stepCount       Anzahl der Schritte — die Liste zeigt sie, lädt sie aber nicht einzeln
- * @param lastStepStatus  Status des letzten Schritts, {@code null} wenn es keinen gibt
- * @param lastStepPreview Ausgabe des letzten Schritts, gekürzt auf {@value #PREVIEW_LENGTH}
- *                        Zeichen; der Volltext steht in der Detail-Route
- * @param sealed          Siegelstand beim Start (true = versiegelt und geprüft, false = nicht
- *                        versiegelt, null = Run von vor der Aufzeichnung)
- * @param chainRunId      Chain-Run, der den Lauf als Eintrag gestartet hat; null außerhalb einer Chain
- *                        und für Läufe von vor V89 (wie {@link WorkflowRunResponse#chainRunId()})
+ * @param stepCount       number of steps - the list shows it but does not load them individually
+ * @param lastStepStatus  status of the last step, {@code null} if there is none
+ * @param lastStepPreview output of the last step, truncated to {@value #PREVIEW_LENGTH}
+ *                        characters; the full text is in the detail route
+ * @param sealed          seal state at start (true = sealed and verified, false = not
+ *                        sealed, null = run from before the recording)
+ * @param chainRunId      chain run that started the run as an entry; null outside a chain
+ *                        and for runs from before V89 (like {@link WorkflowRunResponse#chainRunId()})
  */
 public record WorkflowRunListItemResponse(
         String id,
@@ -63,7 +63,7 @@ public record WorkflowRunListItemResponse(
         Boolean sealed,
         String chainRunId
 ) {
-    /** Kompatibilitäts-Konstruktor für Aufrufer von vor der Siegel-Aufzeichnung am Run. */
+    /** Compatibility constructor for callers from before the seal was recorded on the run. */
     public WorkflowRunListItemResponse(String id, String workflowId, String workflowName, String projectName,
                                        String projectPath, RunStatus status, Instant startedAt, Instant completedAt,
                                        Long durationMs, Integer userRating, Map<String, Object> error,
@@ -76,7 +76,7 @@ public record WorkflowRunListItemResponse(
                 triggerSource, stepCount, lastStepStatus, lastStepPreview, null, null);
     }
 
-    /** Kompatibilitäts-Konstruktor für Aufrufer von vor dem Kettenbezug in der Liste (TODO 6db47bc2). */
+    /** Compatibility constructor for callers from before the chain reference in the list (TODO 6db47bc2). */
     public WorkflowRunListItemResponse(String id, String workflowId, String workflowName, String projectName,
                                        String projectPath, RunStatus status, Instant startedAt, Instant completedAt,
                                        Long durationMs, Integer userRating, Map<String, Object> error,
@@ -90,9 +90,9 @@ public record WorkflowRunListItemResponse(
     }
 
     /**
-     * Länge der Vorschau. 500 Zeichen, weil die Liste den Wert ohnehin auf 300&nbsp;px kürzt und
-     * der Tooltip damit noch einen Satz mehr zeigt als die Zeile — mehr wäre wieder das Problem,
-     * das dieses DTO löst.
+     * Length of the preview. 500 characters, because the list truncates the value to 300&nbsp;px anyway and
+     * the tooltip thus still shows one sentence more than the row - more would again be the problem
+     * this DTO solves.
      */
     public static final int PREVIEW_LENGTH = 500;
 }
