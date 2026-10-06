@@ -227,6 +227,40 @@ class IntegrationOAuthServiceNamedConnectionsTest {
         assertThat(defaultRow.getAccessTokenEncrypted()).as("default row untouched").isNull();
     }
 
+    @Test
+    void connectionsByProvider_groupsEveryRowWithOneQuery_inListConnectionsOrder() {
+        when(connectionRepository.findAll()).thenReturn(List.of(
+                row("google-calendar", "work"), row("trello", "default"), row("google-calendar", "default")));
+
+        Map<String, List<IntegrationConnection>> grouped = newService().connectionsByProvider();
+
+        assertThat(grouped).containsOnlyKeys("google-calendar", "trello");
+        assertThat(grouped.get("google-calendar")).extracting(IntegrationConnection::getConnectionName)
+                .containsExactly("default", "work");
+        verify(connectionRepository, never()).findAllByProviderId(any());
+    }
+
+    @Test
+    void isDefaultConfigured_readsTheLoadedDefaultRow_withoutAQuery() {
+        IntegrationConnection defaultRow = row("google-calendar", "default");
+        defaultRow.setClientIdEncrypted("enc-cid");
+        defaultRow.setClientSecretEncrypted("enc-csec");
+        IntegrationConnection work = row("google-calendar", "work");
+        work.setClientIdEncrypted("enc-work-cid");
+        work.setClientSecretEncrypted("enc-work-csec");
+        when(registry.getProvider("google-calendar")).thenReturn(provider);
+        when(provider.getOAuthConfig()).thenReturn(new OAuthConfig("https://auth.example/authorize",
+                "https://auth.example/token", List.of(), "MYSURICATES_NONEXISTENT_ID", "MYSURICATES_NONEXISTENT_SECRET"));
+        IntegrationOAuthService service = newService();
+
+        assertThat(service.isDefaultConfigured("google-calendar", List.of(defaultRow, work))).isTrue();
+        // only the default row counts, as in isProviderConfigured(providerId)
+        assertThat(service.isDefaultConfigured("google-calendar", List.of(work))).isFalse();
+        assertThat(service.isDefaultConfigured("google-calendar", List.of(row("google-calendar", "default"))))
+                .as("default row without client credentials").isFalse();
+        verify(connectionRepository, never()).findByProviderIdAndConnectionName(any(), any());
+    }
+
     private static String stateOf(String url) {
         for (String pair : URI.create(url).getRawQuery().split("&")) {
             String[] kv = pair.split("=", 2);

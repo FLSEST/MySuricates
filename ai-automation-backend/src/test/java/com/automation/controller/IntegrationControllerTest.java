@@ -66,8 +66,8 @@ class IntegrationControllerTest {
                 .build();
 
         when(registry.getAllProviders()).thenReturn(List.of(provider));
-        when(oAuthService.listConnections("google-calendar")).thenReturn(List.of(connection));
-        when(oAuthService.isProviderConfigured("google-calendar")).thenReturn(true);
+        when(oAuthService.connectionsByProvider()).thenReturn(Map.of("google-calendar", List.of(connection)));
+        when(oAuthService.isDefaultConfigured("google-calendar", List.of(connection))).thenReturn(true);
 
         mockMvc.perform(get("/api/v1/integrations"))
                 .andExpect(status().isOk())
@@ -92,7 +92,6 @@ class IntegrationControllerTest {
         when(feed.connectionOptional()).thenReturn(true);
         IntegrationProvider calendar = provider("google-calendar");
         when(registry.getAllProviders()).thenReturn(List.of(feed, calendar));
-        when(oAuthService.listConnections(any())).thenReturn(List.of());
 
         mockMvc.perform(get("/api/v1/integrations"))
                 .andExpect(status().isOk())
@@ -107,7 +106,6 @@ class IntegrationControllerTest {
         when(provider.getVerification()).thenReturn(IntegrationVerification.VERIFIED);
         when(provider.getVerifiedAgainst()).thenReturn("Google Calendar API");
         when(registry.getAllProviders()).thenReturn(List.of(provider));
-        when(oAuthService.listConnections("google-calendar")).thenReturn(List.of());
 
         mockMvc.perform(get("/api/v1/integrations"))
                 .andExpect(status().isOk())
@@ -202,7 +200,7 @@ class IntegrationControllerTest {
         when(provider.requiresCredentials()).thenReturn(false);
         when(registry.getProvider("taskwarrior")).thenReturn(provider);
         when(oAuthService.listConnections("taskwarrior")).thenReturn(List.of());
-        when(oAuthService.isProviderConfigured("taskwarrior")).thenReturn(true);
+        when(oAuthService.isDefaultConfigured("taskwarrior", List.of())).thenReturn(true);
 
         mockMvc.perform(post("/api/v1/integrations/taskwarrior/credentials")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -236,7 +234,7 @@ class IntegrationControllerTest {
         IntegrationProvider provider = provider("google-calendar");
         when(registry.getProvider("google-calendar")).thenReturn(provider);
         when(oAuthService.listConnections("google-calendar")).thenReturn(List.of());
-        when(oAuthService.isProviderConfigured("google-calendar")).thenReturn(false);
+        when(oAuthService.isDefaultConfigured("google-calendar", List.of())).thenReturn(false);
 
         mockMvc.perform(post("/api/v1/integrations/google-calendar/credentials")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -323,10 +321,11 @@ class IntegrationControllerTest {
         IntegrationProvider provider = provider("google-calendar");
         when(provider.requiresOAuthFlow()).thenReturn(true);
         when(registry.getAllProviders()).thenReturn(List.of(provider));
-        when(oAuthService.listConnections("google-calendar")).thenReturn(List.of(
+        List<IntegrationConnection> connections = List.of(
                 named("default", IntegrationConnection.ConnectionStatus.DISCONNECTED, null),
-                named("work", IntegrationConnection.ConnectionStatus.CONNECTED, "{\"email\":\"me@work.example\"}")));
-        when(oAuthService.isProviderConfigured("google-calendar")).thenReturn(true);
+                named("work", IntegrationConnection.ConnectionStatus.CONNECTED, "{\"email\":\"me@work.example\"}"));
+        when(oAuthService.connectionsByProvider()).thenReturn(Map.of("google-calendar", connections));
+        when(oAuthService.isDefaultConfigured("google-calendar", connections)).thenReturn(true);
 
         mockMvc.perform(get("/api/v1/integrations"))
                 .andExpect(status().isOk())

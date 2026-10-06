@@ -14,7 +14,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * Credentials, OAuth flow and tokens of the integration connections. A provider may have several
@@ -26,6 +28,8 @@ import java.util.Optional;
 public class IntegrationOAuthService {
 
     private static final String DEFAULT = IntegrationConnectionNames.DEFAULT;
+    private static final Comparator<IntegrationConnection> BY_NAME =
+            Comparator.comparing(IntegrationConnection::getConnectionName, IntegrationConnectionNames.ORDER);
 
     private final IntegrationConnectionRepository connectionRepository;
     private final IntegrationEncryptionService encryptionService;
@@ -35,6 +39,7 @@ public class IntegrationOAuthService {
     private final TransactionTemplate transactionTemplate;
     private final IntegrationOAuthConnectFlow connectFlow;
     private final IntegrationTokenRefresher tokenRefresher;
+    private final IntegrationCredentialCheck credentialCheck;
 
     public IntegrationOAuthService(IntegrationConnectionRepository connectionRepository,
                                    IntegrationEncryptionService encryptionService,
@@ -52,6 +57,7 @@ public class IntegrationOAuthService {
                 connectionRepository, encryptionService, registry, tokenClient, this.transactionTemplate);
         this.tokenRefresher = new IntegrationTokenRefresher(
                 connectionRepository, encryptionService, registry, tokenClient, connectFlow);
+        this.credentialCheck = new IntegrationCredentialCheck(connectionRepository, registry);
     }
 
     /**
@@ -73,29 +79,14 @@ public class IntegrationOAuthService {
         return isProviderConfigured(providerId, DEFAULT);
     }
 
-    /**
-     * Whether a connection has credentials: its own row, for an OAuth provider also the app
-     * credentials of the {@code default} row or the env vars (a second account signs in through
-     * the same OAuth app).
-     */
+    /** See {@link IntegrationCredentialCheck#isConfigured}. */
     public boolean isProviderConfigured(String providerId, String connectionName) {
-        IntegrationProvider provider = registry.getProvider(providerId);
-        OAuthConfig config = provider.getOAuthConfig();
-        String name = name(connectionName);
-        if (hasStoredCredentials(providerId, name)) return true;
-        if (!IntegrationConnectionNames.isDefault(name)) {
-            if (!provider.requiresOAuthFlow()) return false;
-            if (hasStoredCredentials(providerId, DEFAULT)) return true;
-        }
-
-        return System.getenv(config.clientIdEnvVar()) != null
-                && System.getenv(config.clientSecretEnvVar()) != null;
+        return credentialCheck.isConfigured(providerId, name(connectionName));
     }
 
-    private boolean hasStoredCredentials(String providerId, String connectionName) {
-        return connectionRepository.findByProviderIdAndConnectionName(providerId, connectionName)
-                .filter(c -> c.getClientIdEncrypted() != null && c.getClientSecretEncrypted() != null)
-                .isPresent();
+    /** See {@link IntegrationCredentialCheck#isDefaultConfigured}. */
+    public boolean isDefaultConfigured(String providerId, List<IntegrationConnection> connections) {
+        return credentialCheck.isDefaultConfigured(providerId, connections);
     }
 
     /** Generate an OAuth2 authorization URL for the given provider. */
@@ -243,8 +234,18 @@ public class IntegrationOAuthService {
     /** Every stored connection of a provider, {@code default} first, the others by name. */
     public List<IntegrationConnection> listConnections(String providerId) {
         return connectionRepository.findAllByProviderId(providerId).stream()
-                .sorted(Comparator.comparing(IntegrationConnection::getConnectionName, IntegrationConnectionNames.ORDER))
+                .sorted(BY_NAME)
                 .toList();
+    }
+
+    /**
+     * Every stored connection grouped by provider, each group ordered like {@link #listConnections}:
+     * one query for the provider list instead of two per provider (TODO 942722f5).
+     */
+    public Map<String, List<IntegrationConnection>> connectionsByProvider() {
+        return connectionRepository.findAll().stream()
+                .sorted(BY_NAME)
+                .collect(Collectors.groupingBy(IntegrationConnection::getProviderId));
     }
 
     /**

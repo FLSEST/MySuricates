@@ -396,6 +396,12 @@ class RequestCostRatchetTest {
      *       statements for one seed batch (three chains), 7 for two. The query now fetches the chain
      *       along and counts in a separate count query: 1 statement while the page is not full
      *       (Spring skips the count then), measured 3 815 bytes for six runs.</li>
+     *   <li>{@code /integrations}: added with TODO 942722f5. The provider list asked twice per
+     *       registered provider (its connections, then its {@code default} row once more for
+     *       "configured") — 36 statements on the dev database with 18 providers, independent of any
+     *       seeded row, so the row-growth check could not see it. It now loads every connection in
+     *       one query and derives "configured" from it: measured 1 statement; the 45 285 bytes are
+     *       the provider catalogue (actions, scopes, setup), not data.</li>
      * </ul>
      */
     static final Map<String, Cost> BASELINE = new TreeMap<>(Map.ofEntries(
@@ -421,6 +427,7 @@ class RequestCostRatchetTest {
             Map.entry("/api/v1/goals/{goal}/candidates", new Cost(3, 5_000)),
             Map.entry("/api/v1/wishes", new Cost(3, 9_000)),
             Map.entry("/api/v1/audits", new Cost(2, 4_000)),
+            Map.entry("/api/v1/integrations", new Cost(1, 48_000)),
             Map.entry(AUDIT_HISTORY, new Cost(3, 2_000)),
             Map.entry(CALENDAR, new Cost(7, 95_000)),
             Map.entry(BUSY_CALENDAR, new Cost(6, 600_000))));

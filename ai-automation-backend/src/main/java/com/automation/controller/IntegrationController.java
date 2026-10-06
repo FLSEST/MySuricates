@@ -50,8 +50,9 @@ public class IntegrationController {
     /** Lists all providers with connection status, actions and account info; top-level fields describe {@code default}. */
     @GetMapping
     public List<IntegrationProviderResponse> listProviders() {
+        Map<String, List<IntegrationConnection>> connections = oAuthService.connectionsByProvider();
         return registry.getAllProviders().stream()
-                .map(this::toProviderResponse)
+                .map(p -> toProviderResponse(p, connections.getOrDefault(p.getProviderId(), List.of())))
                 .toList();
     }
 
@@ -65,8 +66,9 @@ public class IntegrationController {
     @GetMapping("/{providerId}/connections")
     public List<IntegrationConnectionResponse> listConnections(@PathVariable String providerId) {
         IntegrationProvider provider = registry.getProvider(providerId);
-        boolean defaultConfigured = oAuthService.isProviderConfigured(providerId);
-        return oAuthService.listConnections(providerId).stream()
+        List<IntegrationConnection> connections = oAuthService.listConnections(providerId);
+        boolean defaultConfigured = oAuthService.isDefaultConfigured(providerId, connections);
+        return connections.stream()
                 .map(c -> responses.connection(provider, c, defaultConfigured))
                 .toList();
     }
@@ -193,9 +195,13 @@ public class IntegrationController {
     }
 
     private IntegrationProviderResponse toProviderResponse(IntegrationProvider provider) {
-        String providerId = provider.getProviderId();
-        return responses.provider(provider, oAuthService.listConnections(providerId),
-                oAuthService.isProviderConfigured(providerId));
+        return toProviderResponse(provider, oAuthService.listConnections(provider.getProviderId()));
+    }
+
+    private IntegrationProviderResponse toProviderResponse(IntegrationProvider provider,
+                                                           List<IntegrationConnection> connections) {
+        return responses.provider(provider, connections,
+                oAuthService.isDefaultConfigured(provider.getProviderId(), connections));
     }
 
     /**
