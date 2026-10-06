@@ -242,6 +242,18 @@ Hinweise:
 
 - `POST /api/v1/completion-triggers` — Both workflows must exist (404); a trigger that would start its own source or close a cycle is rejected with 400.
 
+## /api/v1/container-images
+
+Quelle: `ContainerImageController` – Container images workflows can run in — shipped agent images and any image a workflow names, with tools, build state and usage.
+
+| Endpunkt | Zweck | Modul |
+|---|---|---|
+| `GET /api/v1/container-images` | Lists the shipped agent images and every image a workflow names, with tools, build state, allowlist verdict and usage. | Kern |
+
+Hinweise:
+
+- `GET /api/v1/container-images` — Status per image: CURRENT/OUTDATED compare the label `org.mysuricates.dockerfile-sha256` with the catalog, UNLABELED means built without `scripts/build-agent-images.sh`, MISSING not present, UNKNOWN not checkable (Docker unreachable or a placeholder reference). Read-only; rebuilding stays a command on the host.
+
 ## /api/v1/conversions
 
 Quelle: `ConversionController` – Turns the successful agentic steps of a run into a reusable workflow.

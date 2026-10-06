@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, FolderKanban, GitBranch, History, Zap, Sparkles, Factory,
   Calendar, CalendarDays, Webhook, Plug, ScrollText, CheckSquare, Link2, BookOpen, BookMarked, BarChart2,
-  MessageCircle, ClipboardList, LayoutGrid, Bug, Target,
+  MessageCircle, ClipboardList, LayoutGrid, Bug, Target, Boxes,
 } from 'lucide-react';
 import type { SidebarEntry } from './sidebarLayout';
 import type { TranslationKeys } from '../i18n/en';
@@ -37,6 +37,7 @@ export const navItems: NavItemDef[] = [
   { to: '/schedules', icon: Calendar, labelKey: 'schedules', hint: 'schedules-timing' },
   { to: '/webhooks', icon: Webhook, labelKey: 'webhooks', module: 'webhooks', hint: 'webhooks-trigger' },
   { to: '/integrations', icon: Plug, labelKey: 'integrations', module: 'integrations', hint: 'integrations-connect' },
+  { to: '/containers', icon: Boxes, labelKey: 'containers', hint: 'containers-overview' },
   { to: '/onboarding-profiles', icon: BookMarked, labelKey: 'onboardingProfiles', module: 'onboarding-profiles', hint: 'onboarding-profiles' },
   { to: '/wishes', icon: Sparkles, labelKey: 'wishes', module: 'wishes', hint: 'wishes-loop' },
   { to: '/factory', icon: Factory, labelKey: 'factory', module: 'factory', hint: 'factory-create' },

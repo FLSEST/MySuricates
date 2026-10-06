@@ -82,4 +82,9 @@ ENV HOME="/home/agent"
 USER agent
 WORKDIR /workspace
 
+# Identity of this Dockerfile for the container overview (TODO 244e5de5): scripts/build-agent-images.sh
+# passes its sha256, the backend compares it with its catalog (agent-images.json). Last, so a change
+# above still reuses the cached layers; a plain `docker compose build` leaves it empty (shown as unlabeled).
+ARG DOCKERFILE_SHA256=
+LABEL org.mysuricates.dockerfile-sha256=$DOCKERFILE_SHA256
 CMD ["tail", "-f", "/dev/null"]

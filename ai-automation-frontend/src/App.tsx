@@ -100,6 +100,7 @@ const ProjectCockpit = lazy(() => import('./pages/ProjectCockpit').then(m => ({ 
 const Goals = lazy(() => import('./pages/Goals').then(m => ({ default: m.Goals })));
 const GoalDetail = lazy(() => import('./pages/GoalDetail').then(m => ({ default: m.GoalDetail })));
 const ActivityLog = lazy(() => import('./pages/ActivityLog').then(m => ({ default: m.ActivityLog })));
+const Containers = lazy(() => import('./pages/Containers').then(m => ({ default: m.Containers })));
 const DeadLetterQueue = lazy(() => import('./pages/DeadLetterQueue').then(m => ({ default: m.DeadLetterQueue })));
 const WorkflowDebug = lazy(() => import('./pages/WorkflowDebug').then(m => ({ default: m.WorkflowDebug })));
 const WorkflowFactory = lazy(() => import('./pages/WorkflowFactory').then(m => ({ default: m.WorkflowFactory })));
@@ -135,6 +136,7 @@ const router = createBrowserRouter([
       { path: 'calendar', element: <CalendarPage /> },
       { path: 'webhooks', element: <ModuleRoute module="webhooks"><Webhooks /></ModuleRoute> },
       { path: 'integrations', element: <ModuleRoute module="integrations"><Integrations /></ModuleRoute> },
+      { path: 'containers', element: <Containers /> },
       { path: 'cockpit', element: <ProjectCockpit /> },
       { path: 'goals', element: <ModuleRoute module="goals"><Goals /></ModuleRoute> },
       { path: 'goals/:goalId', element: <ModuleRoute module="goals"><GoalDetail /></ModuleRoute> },

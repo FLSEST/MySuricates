@@ -308,5 +308,13 @@
       "Before every run the active memory is placed in the project as .claude/rules/project-memory.md, and AI steps read it",
       "Auto-memory extracts by itself after a set number of successful runs"
     ]
+  },
+  "containers-overview": {
+    "title": "Which containers workflows can use",
+    "points": [
+      "A shell block runs its command inside an image with container_image; with container_args it starts the image as a tool (trivy, gitleaks) and reads its SARIF report",
+      "Outdated means: built from another Dockerfile than this version ships — rebuild it on the host with scripts/build-agent-images.sh",
+      "There is no build button on purpose: building downloads from the network and runs on the host"
+    ]
   }
 }

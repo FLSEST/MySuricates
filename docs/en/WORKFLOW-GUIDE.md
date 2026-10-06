@@ -984,6 +984,13 @@ project directory is missing, the container does not start instead of scanning a
 history in a git worktree: `.git` is a file there with a path outside the container, and some tools (such as
 `gitleaks git`) then report 0 findings without an error.
 
+The menu entry **Containers** (`GET /api/v1/container-images`) shows which images exist: for each shipped agent
+image its tools with pinned versions, whether the local build matches this version (current, outdated,
+unlabeled, missing), whether it is allowed, and which workflows and project containers use it; plus every other
+image a workflow names. Rebuilding happens on the host with `scripts/build-agent-images.sh` – there is deliberately
+no build button. A changed Dockerfile needs its new checksum in `container-images/agent-images.json`, otherwise
+`AgentImageCatalogGateTest` fails.
+
 ---
 
 ## 8. Agentic Block Deep Dive

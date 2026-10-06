@@ -1,7 +1,8 @@
 services:
   # Agent images - build only, not run via compose. Used by the deploy/ instance (backend creates
   # and manages agent containers via the Docker API) and by the source-based dev instance.
-  # Build all: AGENT_APT_REFRESH=$(date +%Y-%m) docker compose --profile build-only build
+  # Build all: ../scripts/build-agent-images.sh (passes each Dockerfile's sha256 as DOCKERFILE_SHA256, which
+  # the container overview compares with its catalog); AGENT_APT_REFRESH=$(date +%Y-%m) in front of it
   # (a new value rebuilds the third-party APT layers of agent-devops instead of reusing old keyrings,
   # and the unpinned pip packages of agent-python instead of keeping those of the first build)
   #
@@ -11,6 +12,8 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.agent-node
+      args:
+        DOCKERFILE_SHA256: ${AGENT_NODE_DOCKERFILE_SHA256:-}
     image: automation-agent-node:latest
     profiles:
       - build-only
@@ -21,6 +24,7 @@ services:
       dockerfile: docker/Dockerfile.agent-python
       args:
         PIP_REFRESH: ${AGENT_APT_REFRESH:-}
+        DOCKERFILE_SHA256: ${AGENT_PYTHON_DOCKERFILE_SHA256:-}
     image: automation-agent-python:latest
     profiles:
       - build-only
@@ -31,6 +35,7 @@ services:
       dockerfile: docker/Dockerfile.agent-devops
       args:
         APT_REFRESH: ${AGENT_APT_REFRESH:-}
+        DOCKERFILE_SHA256: ${AGENT_DEVOPS_DOCKERFILE_SHA256:-}
     image: automation-agent-devops:latest
     profiles:
       - build-only
@@ -39,6 +44,8 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.agent-java
+      args:
+        DOCKERFILE_SHA256: ${AGENT_JAVA_DOCKERFILE_SHA256:-}
     image: automation-agent-java:latest
     profiles:
       - build-only

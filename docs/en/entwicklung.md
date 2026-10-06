@@ -210,8 +210,8 @@ npm run build
 
 ### Docker Images
 
-The agent images for shell blocks with `container_image` are built by
-`docker compose --profile build-only build` in `ai-automation-backend/`; when they are needed and how to
+The agent images for shell blocks with `container_image` are built by `scripts/build-agent-images.sh` (with the
+checksum of the Dockerfile as a label that the **Containers** menu entry compares); when they are needed and how to
 refresh their third-party repos is in [deployment.md → Docker Compose](deployment.md#docker-compose).
 An image for a running instance exists only through
 [deploy/](deployment.md#one-instance-in-a-container-deploy).
@@ -1204,7 +1204,7 @@ pinned through an `overrides` entry in `package.json` — like `dompurify`, whic
 ### Docker Dependency
 
 - Without Docker, shell blocks with `container_image` cannot run; their agent images must be built
-  beforehand (`docker compose --profile build-only build`).
+  beforehand (`scripts/build-agent-images.sh`; the **Containers** menu entry shows whether they are current).
 - **AI CLIs (Claude, Codex, Pi) in workflow blocks always run on the host**, not in the project container, so they need no Docker. Only ad-hoc commands during a run (`claude` via `docker exec`) and the terminal use the project container.
 
 ### Security

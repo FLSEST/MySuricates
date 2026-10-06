@@ -221,11 +221,14 @@ Instanz. Der einzige Docker-Weg für eine laufende Instanz mit Oberfläche und K
 ### Agent-Images bauen
 
 ```bash
-cd ai-automation-backend
-
-# der Monat im Wert frischt die Fremd-Repos von agent-devops auf
-AGENT_APT_REFRESH=$(date +%Y-%m) docker compose --profile build-only build
+# der Monat im Wert frischt die Fremd-Repos von agent-devops auf; ohne Argument alle vier Images
+AGENT_APT_REFRESH=$(date +%Y-%m) scripts/build-agent-images.sh
 ```
+
+Das Skript ruft `docker compose --profile build-only build` in `ai-automation-backend/` auf und gibt jedem
+Image die Prüfsumme seines Dockerfiles als Kennung mit (`org.mysuricates.dockerfile-sha256`). Die Seite
+**Container** vergleicht sie mit dem Katalog der laufenden Version und zeigt ein Image als veraltet, wenn
+es aus einem anderen Dockerfile gebaut wurde; ein Bau mit `docker compose` direkt bleibt „ohne Kennung“.
 
 ### Services
 

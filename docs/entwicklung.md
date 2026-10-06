@@ -216,8 +216,8 @@ npm run build
 
 ### Docker-Images
 
-Die Agent-Images für Shell-Blöcke mit `container_image` baut
-`docker compose --profile build-only build` in `ai-automation-backend/`; wann man sie braucht und wie
+Die Agent-Images für Shell-Blöcke mit `container_image` baut `scripts/build-agent-images.sh` (mit der
+Prüfsumme des Dockerfiles als Kennung, die der Menüpunkt **Container** vergleicht); wann man sie braucht und wie
 man ihre Fremd-Repos auffrischt, steht in [deployment.md → Docker Compose](deployment.md#docker-compose).
 Ein Image für eine laufende Instanz gibt es nur über
 [deploy/](deployment.md#eine-instanz-im-container-deploy).
@@ -1230,7 +1230,7 @@ und `ON DELETE` stehen nur in den Flyway-Migrationen.
 ### Docker-Abhängigkeit
 
 - Ohne Docker laufen keine Shell-Blöcke mit `container_image`; ihre Agent-Images müssen vorher gebaut sein
-  (`docker compose --profile build-only build`).
+  (`scripts/build-agent-images.sh`; ob sie aktuell sind, zeigt der Menüpunkt **Container**).
 - **KI-CLIs (Claude, Codex, Pi) laufen in Workflow-Blöcken immer auf dem Host**, nicht im Projekt-Container; dafür braucht es kein Docker. Den Projekt-Container nutzen nur Ad-hoc-Befehle während eines Runs (`claude` per `docker exec`) und das Terminal.
 
 ### Sicherheit

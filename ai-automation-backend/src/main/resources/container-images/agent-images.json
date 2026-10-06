@@ -1,0 +1,160 @@
+{
+  "_comment": [
+    "Agent images the platform ships (TODO 244e5de5), shown under the menu entry Container.",
+    "dockerfileSha256 is the sha256 of ai-automation-backend/<dockerfile>; scripts/build-agent-images.sh writes",
+    "the same value into the image label org.mysuricates.dockerfile-sha256, and the overview reports an image",
+    "whose label differs as outdated. AgentImageCatalogGateTest keeps this file equal to the Dockerfiles:",
+    "after changing a Dockerfile, put its new sha256 here (the test prints it) and adjust tools if needed.",
+    "source: release = downloaded binary pinned by the ARG named in arg, base = comes with the base image,",
+    "apt / pip = package manager, unpinned."
+  ],
+  "images": [
+    {
+      "image": "automation-agent-devops:latest",
+      "service": "agent-devops",
+      "dockerfile": "docker/Dockerfile.agent-devops",
+      "dockerfileSha256": "a32b9d1884f5bfbad17e500dab274a66b233f05cce63a2233cf0bab414d5bf28",
+      "base": "ubuntu:24.04",
+      "purpose": {
+        "de": "Werkzeuge für Sicherheit und Betrieb: Schwachstellen-Scan, Secret-Suche, GitHub- und Docker-CLI. Läuft vor allem im Werkzeug-Modus des Shell-Blocks.",
+        "en": "Security and operations tools: vulnerability scan, secret search, GitHub and Docker CLI. Mostly used in the shell block's tool mode."
+      },
+      "tools": [
+        {
+          "name": "trivy",
+          "version": "0.74.0",
+          "source": "release",
+          "arg": "TRIVY_VERSION"
+        },
+        {
+          "name": "gitleaks",
+          "version": "8.30.1",
+          "source": "release",
+          "arg": "GITLEAKS_VERSION"
+        },
+        {
+          "name": "gh",
+          "source": "apt"
+        },
+        {
+          "name": "docker-ce-cli",
+          "source": "apt"
+        },
+        {
+          "name": "git",
+          "source": "apt"
+        },
+        {
+          "name": "jq",
+          "source": "apt"
+        },
+        {
+          "name": "python3",
+          "source": "apt"
+        }
+      ]
+    },
+    {
+      "image": "automation-agent-java:latest",
+      "service": "agent-java",
+      "dockerfile": "docker/Dockerfile.agent-java",
+      "dockerfileSha256": "04a2c816e6152090214258f1aee5e65217832aa7cad0b28c49ecf381808079be",
+      "base": "eclipse-temurin:21-jdk-jammy",
+      "purpose": {
+        "de": "Java-Umgebung mit JDK und Maven, dazu LibreOffice zum Umwandeln von Dokumenten.",
+        "en": "Java environment with JDK and Maven, plus LibreOffice for converting documents."
+      },
+      "tools": [
+        {
+          "name": "JDK",
+          "version": "21",
+          "source": "base"
+        },
+        {
+          "name": "maven",
+          "source": "apt"
+        },
+        {
+          "name": "libreoffice-writer",
+          "source": "apt"
+        },
+        {
+          "name": "git",
+          "source": "apt"
+        },
+        {
+          "name": "python3",
+          "source": "apt"
+        }
+      ]
+    },
+    {
+      "image": "automation-agent-node:latest",
+      "service": "agent-node",
+      "dockerfile": "docker/Dockerfile.agent-node",
+      "dockerfileSha256": "19abe45eb8bd0d081407b2b35cfe6a37b2d38515599190814bb9c24cc6370822",
+      "base": "node:22-slim",
+      "purpose": {
+        "de": "Node-Umgebung; Projekt-Container für Code- und persönliche Projekte.",
+        "en": "Node environment; project container for code and personal projects."
+      },
+      "tools": [
+        {
+          "name": "node",
+          "version": "22",
+          "source": "base"
+        },
+        {
+          "name": "git",
+          "source": "apt"
+        },
+        {
+          "name": "jq",
+          "source": "apt"
+        }
+      ]
+    },
+    {
+      "image": "automation-agent-python:latest",
+      "service": "agent-python",
+      "dockerfile": "docker/Dockerfile.agent-python",
+      "dockerfileSha256": "abcd1f3b8db0eee01e039d047033fa7aa6d80365c3b2fcb8be3207238a8fd17a",
+      "base": "python:3.12-slim",
+      "purpose": {
+        "de": "Python mit Datenpaketen; Projekt-Container für Recherche-, Inhalts- und Business-Projekte.",
+        "en": "Python with data packages; project container for research, content and business projects."
+      },
+      "tools": [
+        {
+          "name": "python",
+          "version": "3.12",
+          "source": "base"
+        },
+        {
+          "name": "pandas",
+          "source": "pip"
+        },
+        {
+          "name": "numpy",
+          "source": "pip"
+        },
+        {
+          "name": "requests",
+          "source": "pip"
+        },
+        {
+          "name": "beautifulsoup4",
+          "source": "pip"
+        },
+        {
+          "name": "anthropic",
+          "source": "pip"
+        },
+        {
+          "name": "git",
+          "source": "apt"
+        }
+      ]
+    }
+  ]
+}

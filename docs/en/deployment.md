@@ -218,11 +218,14 @@ instance. The only Docker way to run an instance with UI and AI providers is
 ### Building the agent images
 
 ```bash
-cd ai-automation-backend
-
-# the month in the value refreshes the third-party repos of agent-devops
-AGENT_APT_REFRESH=$(date +%Y-%m) docker compose --profile build-only build
+# the month in the value refreshes the third-party repos of agent-devops; without arguments all four images
+AGENT_APT_REFRESH=$(date +%Y-%m) scripts/build-agent-images.sh
 ```
+
+The script runs `docker compose --profile build-only build` in `ai-automation-backend/` and gives each
+image the sha256 of its Dockerfile as a label (`org.mysuricates.dockerfile-sha256`). The **Containers**
+page compares it with the catalog of the running version and shows an image as outdated when it was
+built from another Dockerfile; building with `docker compose` directly leaves it "unlabeled".
 
 ### Services
 

@@ -308,5 +308,13 @@
       "Vor jedem Lauf landet das aktive Memory als .claude/rules/project-memory.md im Projekt, KI-Schritte lesen es mit",
       "Auto-Memory extrahiert nach jeder festgelegten Zahl erfolgreicher Läufe von selbst"
     ]
+  },
+  "containers-overview": {
+    "title": "Welche Container Workflows nutzen können",
+    "points": [
+      "Ein Shell-Block führt seinen Befehl mit container_image in einem Image aus; mit container_args startet er das Image als Werkzeug (trivy, gitleaks) und liest dessen SARIF-Bericht",
+      "Veraltet heißt: aus einem anderen Dockerfile gebaut, als diese Version mitbringt – auf dem Host mit scripts/build-agent-images.sh neu bauen",
+      "Einen Bau-Knopf gibt es bewusst nicht: Ein Bau lädt aus dem Netz und läuft auf dem Host"
+    ]
   }
 }

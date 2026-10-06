@@ -997,6 +997,13 @@ Projektordner, startet der Container nicht, statt ein leeres Verzeichnis zu prü
 Git-Worktree keine Historie: `.git` ist dort eine Datei mit einem Pfad außerhalb des Containers, und manche
 Werkzeuge (etwa `gitleaks git`) melden dann ohne Fehler 0 Befunde.
 
+Welche Images es gibt, zeigt der Menüpunkt **Container** (`GET /api/v1/container-images`): je mitgeliefertem
+Agent-Image die Werkzeuge mit festgeschriebener Version, ob der lokale Bau zu dieser Version passt (aktuell,
+veraltet, ohne Kennung, fehlt), ob es erlaubt ist, und welche Workflows und Projekt-Container es nutzen; dazu jedes
+andere Image, das ein Workflow nennt. Neu gebaut wird auf dem Host mit `scripts/build-agent-images.sh` – einen
+Bau-Knopf gibt es bewusst nicht. Ein geändertes Dockerfile braucht die neue Prüfsumme in
+`container-images/agent-images.json`, sonst wird `AgentImageCatalogGateTest` rot.
+
 ---
 
 ## 8. Agentic Block Deep Dive

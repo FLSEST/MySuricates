@@ -28,6 +28,9 @@ class ControllerModuleGateTest {
     private static final Set<String> CORE_CONTROLLERS = Set.of(
             "ActivityLogController",
             "CompletionTriggerController",
+            // Which container images workflows can run in: container_image itself is core, and the page only
+            // reads (no build endpoint, TODO 244e5de5).
+            "ContainerImageController",
             "DashboardLayoutController",
             "DashboardWorkflowController",
             "DeadLetterController",

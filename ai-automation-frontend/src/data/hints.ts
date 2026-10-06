@@ -60,6 +60,7 @@ export const HINTS = {
   'integrations-connect': { version: 2, blueprint: 'blueprint-integration' },
   'debug-failing': { version: 1 },
   'audit-findings': { version: 1 },
+  'containers-overview': { version: 1 },
   'insights-numbers': { version: 1 },
   'onboarding-profiles': { version: 1 },
   'dialogs-sessions': { version: 1 },

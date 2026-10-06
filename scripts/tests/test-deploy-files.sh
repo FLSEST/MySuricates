@@ -105,6 +105,40 @@ check "staging.sh: port on 127.0.0.1 unless STABLE_/TEST_BIND" 'grep -q "staging
 check "staging.sh: socket off unless switched on"             'grep -q "staging_setting \"\$env\" DOCKER_SOCKET 0" "$R/scripts/staging.sh"'
 check "dev starter: socket off unless switched on"            'grep -q "MYSURICATES_DEV_DOCKER_SOCKET:-0" "$R/scripts/start-mysuricates-dev.sh"'
 
+echo "5d) agent images carry the sha256 of their Dockerfile (244e5de5)"
+# The container overview calls an image outdated when its label differs from the catalog. The label must
+# be the last instruction before CMD (a change above still reuses cached layers), compose must pass it
+# for every agent image, and scripts/build-agent-images.sh must compute it from the Dockerfile.
+BUILD="$R/scripts/build-agent-images.sh"
+for svc in agent-node agent-python agent-devops agent-java; do
+  f="$R/ai-automation-backend/docker/Dockerfile.$svc"
+  check "$svc: label is the last instruction before CMD" \
+    '[ "$(grep -vE "^[[:space:]]*(#|$)" "$f" | tail -3 | head -2 | tr "\n" "|")" = "ARG DOCKERFILE_SHA256=|LABEL org.mysuricates.dockerfile-sha256=\$DOCKERFILE_SHA256|" ]'
+  up="$(printf '%s' "${svc#agent-}" | tr '[:lower:]' '[:upper:]')"
+  check "$svc: compose passes AGENT_${up}_DOCKERFILE_SHA256" 'grep -q "DOCKERFILE_SHA256: \${AGENT_${up}_DOCKERFILE_SHA256:-}" "$DC"'
+done
+BTMP="$(mktemp -d)"
+mkdir -p "$BTMP/bin"
+# Docker double: records its arguments and the identity variables compose would receive.
+cat > "$BTMP/bin/docker" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$*" > "$BUILD_RECORD.args"
+env | grep '_DOCKERFILE_SHA256=' | sort > "$BUILD_RECORD.env"
+SH
+chmod +x "$BTMP/bin/docker"
+BUILD_RECORD="$BTMP/all" PATH="$BTMP/bin:$PATH" bash "$BUILD" > /dev/null 2>&1; RC=$?
+check "build script: exit 0 with all four services" '[ "$RC" -eq 0 ] && grep -qx "compose --profile build-only build agent-node agent-python agent-devops agent-java" "$BTMP/all.args"'
+for svc in agent-node agent-python agent-devops agent-java; do
+  up="$(printf '%s' "${svc#agent-}" | tr '[:lower:]' '[:upper:]')"
+  sum="$(python3 -c 'import hashlib, sys; print(hashlib.sha256(open(sys.argv[1], "rb").read()).hexdigest())' "$R/ai-automation-backend/docker/Dockerfile.$svc")"
+  check "build script: $svc gets the sha256 of its Dockerfile" 'grep -qx "AGENT_${up}_DOCKERFILE_SHA256=$sum" "$BTMP/all.env"'
+done
+BUILD_RECORD="$BTMP/one" PATH="$BTMP/bin:$PATH" bash "$BUILD" agent-devops > /dev/null 2>&1
+check "build script: a single service builds only that one" 'grep -qx "compose --profile build-only build agent-devops" "$BTMP/one.args"'
+BUILD_RECORD="$BTMP/bad" PATH="$BTMP/bin:$PATH" bash "$BUILD" agent-unknown > /dev/null 2>&1; RC=$?
+check "build script: unknown service is exit 2, docker never called" '[ "$RC" -eq 2 ] && [ ! -e "$BTMP/bad.args" ]'
+rm -rf "$BTMP"
+
 echo "6) health checks ask the own instance directly, never through a proxy (cf662c01)"
 # Docker reicht Proxy-Variablen in den Container (~/.docker/config.json, „proxies“), und curl 8.5 schickt
 # auch localhost ueber sie: die Pruefung scheiterte am Proxy, der Container wurde nie gesund, up wartete
