@@ -1,31 +1,31 @@
 #!/usr/bin/env python3
-"""ncloc.py — Zeilen ohne Leer-, Kommentar- und Importzeilen (NCLOC) je Quelldatei.
+"""ncloc.py — lines without blank, comment and import lines (NCLOC) per source file.
 
-Das Architektur-Review (TODO b8c06b94) misst Groesse nicht mehr in rohen Zeilen: rund ein
-Drittel einer typischen Backend-Datei sind Leerzeilen, Javadoc und Importe, und jede
-Erweiterung schob Dateien ueber eine harte Zeilenkante. Gezaehlt wird hier, was Logik traegt.
+The architecture review (TODO b8c06b94) no longer measures size in raw lines: about a
+third of a typical backend file is blank lines, Javadoc and imports, and every
+extension pushed files over a hard line limit. What is counted here is what carries logic.
 
-Regeln (Java, TS, TSX):
-  - Leerzeile: nur Leerraum                                  -> zaehlt nicht
-  - Kommentarzeile: ausserhalb von Kommentaren kein Zeichen  -> zaehlt nicht
-    (//, /* ... */, Javadoc, in TSX auch {/* ... */} allein auf der Zeile;
-    Code mit Kommentar dahinter zaehlt)
-  - Importzeile: Java `import …;` (auch static), TS/TSX eine Anweisung `import … from '…'`
-    bzw. `import '…'` am Zeilenanfang, bei mehrzeiligen Importlisten alle ihre Zeilen
-                                                             -> zaehlt nicht
-  - alles andere zaehlt, auch `package`, Annotationen und schliessende Klammern.
+Rules (Java, TS, TSX):
+  - blank line: whitespace only                              -> does not count
+  - comment line: no character outside of comments           -> does not count
+    (//, /* ... */, Javadoc, in TSX also {/* ... */} alone on the line;
+    code with a trailing comment counts)
+  - import line: Java `import …;` (also static), TS/TSX a statement `import … from '…'`
+    or `import '…'` at the start of the line, for multi-line import lists all their lines
+                                                             -> does not count
+  - everything else counts, also `package`, annotations and closing braces.
 
-Strings, Zeichenliterale, Java-Textbloecke und TS-Template-Strings (mit ${…}) werden
-uebersprungen, damit ein "//" in einer URL keinen Kommentar beginnt. In TS/TSX gilt ein "/"
-nach einem Operator, einer oeffnenden Klammer, einem Komma oder return/typeof/… als Beginn eines
-Regex-Literals (wie im JS-Tokenizer); dessen Inhalt — etwa ein Backtick in /[#*_`>]/g — oeffnet
-weder String noch Kommentar. Bekannte Grenzen: ein Regex-Literal ueber mehrere Zeilen gibt es in
-JS nicht; ein JSX-Text, der mit "//" oder "/*" beginnt, wird als Kommentar gelesen, ebenso ein
-Regex direkt nach ")" (etwa `if (x) /re/.test(y)`), der als Division gilt. Solche Stellen
-verschieben die Zahl hoechstens um die betroffenen Zeilen.
+Strings, character literals, Java text blocks and TS template strings (with ${…}) are
+skipped so that a "//" in a URL does not begin a comment. In TS/TSX a "/"
+after an operator, an opening bracket, a comma or return/typeof/… counts as the start of a
+regex literal (as in the JS tokenizer); its content — e.g. a backtick in /[#*_`>]/g — opens
+neither string nor comment. Known limits: a regex literal across several lines does not exist in
+JS; a JSX text that begins with "//" or "/*" is read as a comment, as is a
+regex directly after ")" (e.g. `if (x) /re/.test(y)`), which counts as a division. Such places
+shift the number by at most the affected lines.
 
-Aufruf:  ncloc.py <basisverzeichnis>   liest Pfade (relativ zur Basis) zeilenweise von stdin
-Ausgabe: ncloc<TAB>zeilen<TAB>pfad je Datei, in Eingabereihenfolge. zeilen zaehlt wie
+Usage:  ncloc.py <base directory>   reads paths (relative to the base) line by line from stdin
+Output: ncloc<TAB>lines<TAB>path per file, in input order. lines counts like
          SourceSizeRatchetTest (Files.readAllLines(..).size() == len(text.splitlines())).
 """
 import os
@@ -33,7 +33,7 @@ import re
 import sys
 
 JAVA_IMPORT = re.compile(r"^\s*import\s+(static\s+)?[\w.]+(\.\*)?\s*;")
-# Ein JSX-Kommentar {/* … */} allein auf der Zeile: die Klammern sind Syntax, die Zeile ein Kommentar.
+# A JSX comment {/* … */} alone on the line: the braces are syntax, the line a comment.
 JSX_COMMENT_LINE = re.compile(r"^\s*\{\s*/\*.*\*/\s*\}\s*$")
 TS_IMPORT_START = re.compile(r"""^\s*import(\s+type)?(\s|\{|\*|['"])""")
 
@@ -43,11 +43,11 @@ REGEX_AFTER_WORD = re.compile(r"(?:^|[^\w$])(return|typeof|case|do|else|in|of|vo
 
 
 def regex_allowed(recent):
-    """True, wenn an dieser Stelle ein '/' ein Regex-Literal beginnt und keine Division ist.
+    """True if a '/' at this position begins a regex literal and is not a division.
 
-    Entscheidet wie ein JS-Tokenizer nach dem letzten bedeutsamen Zeichen: nach einem Operator,
-    einer oeffnenden Klammer, einem Komma oder einem Schluesselwort wie return steht ein
-    Ausdruck, also ein Regex; nach einem Bezeichner, einer Zahl, ')' oder ']' eine Division.
+    Decides like a JS tokenizer after the last significant character: after an operator,
+    an opening bracket, a comma or a keyword like return comes an
+    expression, i.e. a regex; after an identifier, a number, ')' or ']' a division.
     """
     tail = recent.rstrip()
     if not tail:
@@ -56,7 +56,7 @@ def regex_allowed(recent):
 
 
 def skip_regex(line, start):
-    """Index hinter dem Regex-Literal ab line[start] == '/'; None, wenn es in der Zeile nicht endet."""
+    """Index after the regex literal starting at line[start] == '/'; None if it does not end in the line."""
     i, in_class = start + 1, False
     while i < len(line):
         ch = line[i]
@@ -77,14 +77,14 @@ def skip_regex(line, start):
 
 
 def code_mask(text, template_strings):
-    """Je Zeile True, wenn sie ausserhalb von Kommentaren ein Nicht-Leerzeichen hat."""
+    """Per line True if it has a non-whitespace character outside of comments."""
     lines = text.split("\n")
     mask = [False] * len(lines)
     state = "code"          # code | block | string
-    quote = ""              # aktiver Stringbegrenzer: ' " ` oder """
-    brace_stack = []        # je offenem ${ in Template-Strings die Klammertiefe
+    quote = ""              # active string delimiter: ' " ` or """
+    brace_stack = []        # per open ${ in template strings the brace depth
     depth = 0
-    recent = ""             # zuletzt gesehener Code (Strings als "), fuer Regex gegen Division
+    recent = ""             # last seen code (strings as "), for regex versus division
     for index, line in enumerate(lines):
         i, n = 0, len(line)
         has_code = state == "string" and bool(line.strip())
@@ -149,8 +149,8 @@ def code_mask(text, template_strings):
                     state, quote = "string", "`"
             recent = (recent + ch)[-40:]
             i += 1
-        # Ein einfacher String endet spaetestens am Zeilenende (Java/TS kennen keine
-        # mehrzeiligen '…'/"…"); nur Textbloecke und Template-Strings laufen weiter.
+        # A simple string ends at the latest at the end of the line (Java/TS have no
+        # multi-line '…'/"…"); only text blocks and template strings continue.
         if state == "string" and quote in ("'", '"'):
             state = "code"
         recent = (recent + " ")[-40:]
@@ -159,7 +159,7 @@ def code_mask(text, template_strings):
 
 
 def import_lines(lines, kind):
-    """Indizes der Zeilen, die zu einer Import-Anweisung gehoeren."""
+    """Indices of the lines that belong to an import statement."""
     found = set()
     if kind == "java":
         for index, line in enumerate(lines):
@@ -170,10 +170,10 @@ def import_lines(lines, kind):
     while index < len(lines):
         if TS_IMPORT_START.match(lines[index]) and not lines[index].lstrip().startswith("import("):
             start = index
-            # Eine Import-Anweisung endet an der Zeile mit dem Modul-Spezifizierer ('…' / "…").
+            # An import statement ends at the line with the module specifier ('…' / "…").
             while index < len(lines) and not re.search(r"""(from\s*|^\s*import\s*)['"][^'"]+['"]""", lines[index]):
                 index += 1
-                if index - start > 200:  # kein Spezifizierer: kein Import, sondern etwas anderes
+                if index - start > 200:  # no specifier: not an import but something else
                     index = start
                     break
             if index >= len(lines):

@@ -14,7 +14,7 @@ installGlobalErrorHandlers();
 
 // Initialize TanStack Query client (defaults incl. 429-Backoff-Ableitung: api/queryDefaults)
 const queryClient = new QueryClient({ defaultOptions: appQueryDefaults });
-// Nach Ablauf einer 429-Sperre gescheiterte Queries einmal nachholen (f3fb193f)
+// Retry queries that failed during a 429 lockout once after it ends (f3fb193f)
 installRateLimitRecovery(queryClient);
 
 // Apply persisted theme on load

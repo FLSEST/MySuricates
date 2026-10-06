@@ -244,7 +244,7 @@ class WorkflowRunRepositoryTest {
         assertThat(top.size()).isLessThanOrEqualTo(5);
     }
 
-    /** Der Kalender: die neuesten Runs des Zeitraums bis zum Limit, dazu ihre Gesamtzahl (TODO 86777fb4). */
+    /** The calendar: the newest runs of the period up to the limit, plus their total count (TODO 86777fb4). */
     @Test
     void should_find_the_newest_runs_started_between_two_instants_and_count_them_all() {
         Instant now = Instant.now();
@@ -381,8 +381,8 @@ class WorkflowRunRepositoryTest {
     }
 
     /**
-     * Der letzte Status eines Zeitplans fuer die Einzelansicht: nur die Status-Spalte, neuester
-     * zuerst, bei {@code PageRequest.of(0, 1)} genau eine Zeile (TODO 86286572).
+     * The last status of a schedule for the single view: only the status column, newest
+     * first, with {@code PageRequest.of(0, 1)} exactly one row (TODO 86286572).
      */
     @Test
     void should_find_only_the_newest_status_of_a_schedule() {
@@ -391,7 +391,7 @@ class WorkflowRunRepositoryTest {
         scheduledRun(scheduleId, RunStatus.COMPLETED, now.minusSeconds(120));
         scheduledRun(scheduleId, RunStatus.FAILED, now);
         scheduledRun(scheduleId, RunStatus.CANCELLED, now.minusSeconds(60));
-        run(workflowA, RunStatus.RUNNING, now.plusSeconds(60)); // anderer bzw. kein Zeitplan
+        run(workflowA, RunStatus.RUNNING, now.plusSeconds(60)); // another or no schedule
 
         assertThat(runRepository.findStatusesByScheduleIdNewestFirst(scheduleId, PageRequest.of(0, 10)))
                 .containsExactly(RunStatus.FAILED, RunStatus.CANCELLED, RunStatus.COMPLETED);
@@ -406,7 +406,7 @@ class WorkflowRunRepositoryTest {
         runRepository.save(scheduled);
     }
 
-    /** Die Run-Liste eines Zeitplans: die neuesten bis zum Limit, dazu ihre Gesamtzahl (TODO 86777fb4). */
+    /** The run list of a schedule: the newest up to the limit, plus their total count (TODO 86777fb4). */
     @Test
     void should_find_the_newest_runs_of_a_schedule_up_to_the_limit_and_count_them_all() {
         String scheduleId = "schedule-" + java.util.UUID.randomUUID();
@@ -486,13 +486,13 @@ class WorkflowRunRepositoryTest {
         assertThat(window).allSatisfy(r -> assertThat(r.workflowId()).isNotEqualTo(workflowB.getId()));
     }
 
-    // --- Dashboard-Fenster als Projektion (TODO 2ccb9e40) ---
+    // --- Dashboard window as a projection (TODO 2ccb9e40) ---
 
     /**
-     * Das Dashboard-Fenster ist eine Projektion: eine Abfrage, keine Entities — also auch kein
-     * {@code select containers} je Zeile (TODO 13d1e2a2) und kein Eingabekontext. Aus metadata und
-     * error kommen nur die drei Werte, die das Dashboard liest, und nur, wenn sie Text sind (bzw.
-     * todoTriggerRun ein JSON-true) — wie zuvor die Pruefungen in Java.
+     * The dashboard window is a projection: one query, no entities — hence also no
+     * {@code select containers} per row (TODO 13d1e2a2) and no input context. From metadata and
+     * error come only the three values the dashboard reads, and only if they are text (or
+     * todoTriggerRun a JSON true) — like the checks in Java before.
      */
     @Test
     void should_project_the_dashboard_window_with_only_the_values_the_dashboard_reads() {
@@ -526,7 +526,7 @@ class WorkflowRunRepositoryTest {
         assertThat(window.result()).extracting(DashboardRunRow::id).containsSubsequence(odd.getId(), failed.getId());
     }
 
-    /** Der Projektfilter des Dashboards sitzt in beiden Abfragen statt in Java (TODO 2ccb9e40). */
+    /** The dashboard's project filter sits in both queries instead of in Java (TODO 2ccb9e40). */
     @Test
     void should_filter_the_dashboard_window_and_its_steps_by_project_in_the_query() {
         Instant now = Instant.now();
@@ -553,10 +553,10 @@ class WorkflowRunRepositoryTest {
     }
 
     /**
-     * Die Run-Zaehler des Dashboards kommen aus einer Abfrage statt aus fuenf (TODO 2ccb9e40):
-     * Erfolg zaehlt COMPLETED und COMPLETED_WITH_ERRORS, „heute" nur Runs nach dem Stichtag. Ohne
-     * Projekt zaehlt die Abfrage die ganze Tabelle — die teilt sich diese JVM mit anderen Tests,
-     * deshalb wird dort die Differenz geprueft; mit Projekt zaehlt sie nur dessen Runs.
+     * The dashboard's run counters come from one query instead of five (TODO 2ccb9e40):
+     * success counts COMPLETED and COMPLETED_WITH_ERRORS, "today" only runs after the cutoff. Without a
+     * project the query counts the whole table — which this JVM shares with other tests,
+     * so the difference is checked there; with a project it counts only its runs.
      */
     @Test
     void should_count_the_dashboard_overview_in_one_query() {
@@ -585,7 +585,7 @@ class WorkflowRunRepositoryTest {
 
     private record Counted<T>(T result, int statements) {}
 
-    /** Fuehrt die Abfrage aus und zaehlt die SQL-Statements, die sie absetzt. */
+    /** Runs the query and counts the SQL statements it issues. */
     private static <T> Counted<T> counted(Supplier<T> query) {
         SqlStatementCounter.start();
         try {

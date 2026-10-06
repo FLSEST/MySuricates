@@ -18,9 +18,9 @@ interface MonacoEditorProps {
   language?: string;
   height?: string;
   readOnly?: boolean;
-  /** Text, der beim Öffnen/Ändern angesprungen, markiert und kurz hervorgehoben wird. */
+  /** Text that is jumped to, selected and briefly highlighted on opening/changing. */
   revealText?: string;
-  /** Erhöhen, um dasselbe revealText erneut anzuspringen (z. B. wiederholter Klick). */
+  /** Increase to jump to the same revealText again (e.g. repeated click). */
   revealNonce?: number;
   /**
    * JSON schema for the content: Monaco then suggests keys and values (Ctrl+Space), explains them on
@@ -46,7 +46,7 @@ interface MonacoEditorProps {
   lineNumbers?: 'on' | 'off';
 }
 
-// Monaco-Editor-Instanz (locker typisiert, um keine monaco-Typen zu importieren)
+// Monaco editor instance (loosely typed, to avoid importing monaco types)
 type MonacoEditorInstance = {
   getValue: () => string;
   setValue: (value: string) => void;
@@ -225,7 +225,7 @@ export function MonacoEditor({
     }
   }, [value, mounted, readOnly]);
 
-  // Beim erneuten Anspringen (revealNonce) oder geändertem Ziel neu hervorheben
+  // Highlight again on repeated jumping (revealNonce) or a changed target
   useEffect(() => {
     doReveal();
     // eslint-disable-next-line react-hooks/exhaustive-deps

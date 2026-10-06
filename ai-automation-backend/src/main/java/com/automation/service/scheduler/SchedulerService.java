@@ -47,10 +47,10 @@ public class SchedulerService {
     private final ScheduleDefinitionParser definitionParser;
 
     /**
-     * Die Liste fuer {@code GET /api/v1/schedules} — mit mitgeholten Zielen.
+     * The list for {@code GET /api/v1/schedules} - with the targets fetched along.
      *
-     * <p>Bewusst nicht {@code findAll()}: Das wuerde die {@code EAGER}-Assoziationen je Zeile
-     * einzeln nachladen (TODO c9ec9844).
+     * <p>Deliberately not {@code findAll()}: that would reload the {@code EAGER} associations per row
+     * one by one (TODO c9ec9844).
      */
     @Transactional(readOnly = true)
     public List<ScheduledWorkflow> findAll() {

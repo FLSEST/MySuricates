@@ -199,7 +199,7 @@ class FeedProviderTest {
         assertThat(provider.getProviderId()).isEqualTo("feed");
         assertThat(provider.requiresCredentials()).isFalse();
         assertThat(provider.requiresOAuthFlow()).isFalse();
-        // Kontoname ohne Sprache wie beim iCal-Feed – die Oberfläche zeigt ihn unverändert, auch auf Englisch (6e1e87c2)
+        // Account name without language as in the iCal feed – the UI shows it unchanged, even in English (6e1e87c2)
         assertThat(provider.fetchAccountInfo("|")).isEqualTo("{\"name\":\"RSS/Atom\"}");
     }
 

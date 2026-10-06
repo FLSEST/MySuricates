@@ -74,8 +74,8 @@ final class PoolFileParser {
         List<BlockDefinition> blocks = fields.blocks(objectMapper);
         String icon = fields.string("icon");
         String category = fields.string("category");
-        // Bewusst ohne Default und ohne Typprüfung: ein Eintrag ohne 'scope' soll im Pool-Browser als
-        // "nicht deklariert" erkennbar sein, nicht als portabel durchgehen.
+        // Deliberately without default and without type check: an entry without 'scope' should be recognisable in the pool browser as
+        // "not declared", not pass as portable.
         String scope = raw.get("scope") instanceof String s ? s : null;
         List<String> tags = fields.stringList("tags");
         String instructions = fields.string("instructions");

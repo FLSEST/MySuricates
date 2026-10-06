@@ -3,7 +3,7 @@ import { formatDate } from '../../utils/localeFormat';
 import { isOverdue } from './timelineLayout';
 import type { GoalTodoItem, GoalWorkPackage, TodoStatus } from '../../types';
 
-/** Statuspunkt eines TODOs – am Zeitstrahl und in der Gliederung. */
+/** Status dot of a TODO - on the timeline and in the outline. */
 export const STATUS_DOT: Record<TodoStatus, string> = {
   OPEN: 'bg-text-tertiary',
   BACKLOG: 'bg-border-strong',
@@ -12,10 +12,10 @@ export const STATUS_DOT: Record<TodoStatus, string> = {
   ARCHIVED: 'bg-border',
 };
 
-/** Kurzes Datum für Chips und Achse: „3. Okt.“ / „Oct 3“. */
+/** Short date for chips and axis: „3. Okt.“ / „Oct 3“. */
 export const SHORT_DATE = { month: 'short', day: 'numeric' } as const;
 
-/** Tooltip einer Fälligkeit: „Fällig 3.10.2026“, überfällig „Überfällig seit …“. */
+/** Tooltip of a due date: „Fällig 3.10.2026“, overdue „Überfällig seit …“. */
 export function dueTitle(dueDate: string, overdue: boolean, locale: Locale, t: TranslationKeys): string {
   return (overdue ? t.goals.timeline.overdue : t.goals.timeline.due).replace('{date}', formatDate(dueDate, locale));
 }
@@ -27,8 +27,8 @@ export interface PlanBadge {
 }
 
 /**
- * Fälligkeit und Arbeitspaket eines TODOs als ein Stück Text („3. Okt. · Beta“) – für die Knoten der
- * Relationskarte, die keine HTML-Chips tragen können. Null, wenn beides fehlt.
+ * Due date and work package of a TODO as one piece of text („3. Okt. · Beta“) - for the nodes of the
+ * relation card, which cannot carry HTML chips. Null if both are missing.
  */
 export function planBadge(
   todo: Pick<GoalTodoItem, 'dueDate' | 'status'>, workPackage: GoalWorkPackage | undefined, today: number,

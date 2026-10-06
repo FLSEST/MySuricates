@@ -20,13 +20,13 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Seedet die mitgelieferten Built-in-Skills aus {@code classpath:skills/builtin/*.json}
- * (siehe {@link BuiltInSkillLoader}).
+ * Seeds the shipped built-in skills from {@code classpath:skills/builtin/*.json}
+ * (see {@link BuiltInSkillLoader}).
  *
- * <p>Versionsbasiert wie {@link WorkflowTemplateSeeder}: fehlende Skills werden angelegt,
- * vorhandene nur bei hoeherer Ressourcen-Version aktualisiert. Nutzer-Skills
- * ({@code builtin=false}) werden nie angefasst; Built-ins, die es in den Ressourcen nicht
- * mehr gibt, bleiben erhalten und werden lediglich registriert.
+ * <p>Version-based like {@link WorkflowTemplateSeeder}: missing skills are created,
+ * existing ones are only updated on a higher resource version. User skills
+ * ({@code builtin=false}) are never touched; built-ins that no longer exist in the
+ * resources are kept and merely registered.
  */
 @Component
 @RequiredArgsConstructor
@@ -67,8 +67,8 @@ public class SkillSeeder implements ApplicationRunner {
             }
         }
 
-        // Built-ins in der DB, die es in den Ressourcen nicht (mehr) gibt: unangetastet lassen,
-        // aber weiterhin registrieren, damit ihre Capabilities aufrufbar bleiben.
+        // Built-ins in the DB that do not (or no longer) exist in the resources: leave untouched,
+        // but keep registering them so that their capabilities stay callable.
         for (Skill skill : existing) {
             if (!handled.contains(skill.getId())) {
                 skillRegistry.register(skill);
@@ -82,7 +82,7 @@ public class SkillSeeder implements ApplicationRunner {
         }
     }
 
-    /** Uebertraegt den Ressourcen-Stand auf den DB-Skill, inklusive Capabilities. */
+    /** Transfers the resource state to the DB skill, including capabilities. */
     private void applyResourceState(Skill dbSkill, Skill fresh) {
         dbSkill.setName(fresh.getName());
         dbSkill.setIcon(fresh.getIcon());
@@ -91,7 +91,7 @@ public class SkillSeeder implements ApplicationRunner {
         dbSkill.setAiContext(fresh.getAiContext());
         dbSkill.setVersion(fresh.getVersion());
 
-        // orphanRemoval=true: die vorhandene Collection mutieren, nicht ersetzen.
+        // orphanRemoval=true: mutate the existing collection, do not replace it.
         List<Capability> target = dbSkill.getCapabilities();
         target.clear();
         for (Capability c : fresh.getCapabilities()) {

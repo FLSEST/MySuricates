@@ -57,14 +57,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Das Modul {@code goals} ausgeschaltet (TODO c60bf914 Ziele Stufe 1: Ziel → Projekte → Arbeitspakete →
- * TODOs, Meilensteine, Gliederung und Zeitstrahl): Ziel-Endpunkte und Planung gesperrt, TODO-Liste,
- * -Detail und Cockpit ohne Ziel-Daten und ohne Fehler, der {@code goalId}-Filter ein 400, ein
- * zielgebundener Zeitplan (der Ziel-Waechter) ueberspringt, ein Lauf mit {@code goal_id} laeuft ohne
- * Zielvariablen durch, Loeschen geht weiter – und wieder eingeschaltet ist alles da.
+ * The module {@code goals} switched off (TODO c60bf914 goals stage 1: goal → projects → work packages →
+ * TODOs, milestones, outline and timeline): goal endpoints and planning blocked, TODO list,
+ * detail and cockpit without goal data and without errors, the {@code goalId} filter a 400, a
+ * goal-bound schedule (the goal guard) skips, a run with {@code goal_id} runs through without
+ * goal variables, deleting continues to work – and switched on again everything is there.
  *
- * <p>Ohne Testtransaktion, weil Zeitplan und Lauf eigene Transaktionen und Threads haben;
- * {@link #tearDown} raeumt ab.
+ * <p>Without a test transaction, because schedule and run have their own transactions and threads;
+ * {@link #tearDown} cleans up.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -167,7 +167,7 @@ class GoalsModuleOffIntegrationTest {
         assertThat(goals.get("enabled").asBoolean()).isFalse();
         assertThat(goals.get("description").asText()).contains("work packages");
 
-        // wieder an: nichts ist verloren
+        // back on: nothing is lost
         modules.applyUiOverrides(Map.of(ModuleCatalog.GOALS, true));
         mockMvc.perform(get("/api/v1/goals/" + goalId)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.workPackages[0].title").value("Doku"))

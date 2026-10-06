@@ -3,8 +3,8 @@ package com.automation.dto.projection;
 import java.time.Instant;
 
 /**
- * Ein ausdruecklich zugeordnetes Projekt eines Ziels mit Name und Archivzeitpunkt, aus einer
- * Abfrage ueber {@code goal_projects} und {@code projects} (TODO c60bf914).
+ * An explicitly assigned project of a goal with name and archive timestamp, from a
+ * query over {@code goal_projects} and {@code projects} (TODO c60bf914).
  */
 public record GoalProjectRow(
         String goalId,

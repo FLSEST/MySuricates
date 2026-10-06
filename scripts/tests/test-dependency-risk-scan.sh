@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Tests fuer scripts/public-readiness/dependency-risk-scan.sh --with-tools und
-# dep_vuln_check.py (TODO 0f6d23b2) — ohne Netz: Fixtures statt npm/mvn/OSV.
-# Run: bash scripts/tests/test-dependency-risk-scan.sh   (exit 0 = alle Checks ok)
+# Tests for scripts/public-readiness/dependency-risk-scan.sh --with-tools and
+# dep_vuln_check.py (TODO 0f6d23b2) - without network: fixtures instead of npm/mvn/OSV.
+# Run: bash scripts/tests/test-dependency-risk-scan.sh   (exit 0 = all checks ok)
 set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -21,10 +21,10 @@ npm_json() {  # $1 = high count
 npm_json 0 > "$TMP/npm-clean.json"
 npm_json 1 > "$TMP/npm-high.json"
 
-# Format von mvn dependency:list -DoutputFile (mit Farbcodes und Modulzusatz)
+# Format of mvn dependency:list -DoutputFile (with color codes and module suffix)
 printf '\nThe following files have been resolved:\n   org.example:lib-a:jar:1.0:compile\033[36m -- module lib.a\033[0;1m [auto]\033[m\n   org.example:lib-b:jar:tests:2.0:runtime\n' > "$TMP/deps.txt"
 
-osv() {  # $1 = severity der Treffer auf lib-a oder "none"
+osv() {  # $1 = severity of the hits on lib-a or "none"
   if [ "$1" = none ]; then
     printf '{"batch":{"results":[{},{}]},"vulns":{}}\n'
   else

@@ -214,9 +214,9 @@ class ChainServiceTest {
     }
 
     /**
-     * Ein laufender oder pausierter Ketten-Lauf startet nach dem Loeschen weiter Workflows (und
-     * deren Projekt-Container) — Loeschen wird deshalb abgewiesen (409), bis der Lauf vorbei oder
-     * abgebrochen ist (Befund aus chains.cy.ts, TODO 413b9f62).
+     * A running or paused chain run keeps starting workflows (and
+     * their project containers) after deletion — deletion is therefore rejected (409) until the run is over or
+     * cancelled (finding from chains.cy.ts, TODO 413b9f62).
      */
     @Test
     void delete_chainWithActiveRun_isRefusedWithoutDeleting() {
@@ -440,7 +440,7 @@ class ChainServiceTest {
 
         assertThat(saved.getEntries().get(0).getTimeoutMinutes()).isEqualTo(1200);
     }
-    /** 6299a860: alle Workflow-IDs in einer Abfrage, gemeldet wird die erste fehlende in Eintragsreihenfolge. */
+    /** 6299a860: all workflow IDs in one query, the first missing one in entry order is reported. */
     @Test
     void create_checksAllWorkflowIdsInOneQuery_andNamesTheFirstMissingInEntryOrder() {
         when(workflowRepository.findExistingIdsIn(any())).thenReturn(List.of("wf-1"));

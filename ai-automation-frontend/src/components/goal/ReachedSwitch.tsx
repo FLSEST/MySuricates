@@ -4,8 +4,8 @@ import { reachedByHand } from './milestoneForm';
 import type { GoalMilestone } from '../../types';
 
 /**
- * „Erreicht“ von Hand (c60bf914) – nur für Meilensteine ohne verknüpfte Arbeitspakete; mit
- * Verknüpfung entscheiden die Pakete, dann steht hier der Stand „2/3 Pakete“. Schaltet sofort.
+ * „Erreicht“ by hand (c60bf914) — only for milestones without linked work packages; with
+ * a link the packages decide, then the status „2/3 Pakete“ is shown here. Switches immediately.
  */
 export function ReachedSwitch({ goalId, milestone, className = '' }: { goalId: string; milestone: GoalMilestone; className?: string }) {
   const tm = useT().goals.milestones;

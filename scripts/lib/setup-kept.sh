@@ -1,34 +1,34 @@
 #!/usr/bin/env bash
-# Teil von scripts/setup.sh: eine Instanz-Datei deploy/instances/<name>.env, die bleibt, wie sie ist
-# (fd4eb89f). Ohne --reconfigure schreibt write_instance eine vorhandene Datei nicht neu. Frueher
-# zeigten die Schritte trotzdem Vorgaben, die nie in die Datei kamen — „Port 9090 belegt, nehme 9091“,
-# weil die eigene laufende Instanz 9090 belegt, oder einen neuen Standard-Anbieter. Jetzt gelten die
-# Werte der Datei, auch gegen Flags, und die Schritte sagen, woher sie kommen; nicht wirkende Flags
-# nennt eine Zeile. Dazu load_existing: die Werte einer Datei als Ausgangspunkt, wenn sie neu geschrieben
-# wird („Einstellungen aendern“, --reconfigure). Liest und setzt die Variablen des Installers — fuer sich allein nicht
-# nutzbar. bash 3.2 (macOS).
+# Part of scripts/setup.sh: an instance file deploy/instances/<name>.env that stays as it is
+# (fd4eb89f). Without --reconfigure write_instance does not rewrite an existing file. The steps used to
+# show defaults nevertheless that never made it into the file — "Port 9090 busy, taking 9091",
+# because the own running instance occupies 9090, or a new default provider. Now the
+# values of the file apply, even against flags, and the steps say where they come from; flags that have no effect
+# are named in one line. Plus load_existing: the values of a file as starting point when it
+# is rewritten ("Einstellungen aendern", --reconfigure). Reads and sets the variables of the installer — not usable on its own.
+# bash 3.2 (macOS).
 
-KEPT=0          # 1 = jede Datei dieses Laufs bleibt (die eine Instanz, oder Dev, Test und Prod)
-KEPT_NAMES=""   # die Instanzen, deren Datei bleibt: "main" bzw. "dev, prod"
-KEPT_IGNORED="" # Flags, die gegen die Datei nicht wirken
-AI_LABEL=""     # KI-Zeile, wenn die behaltenen Dateien verschiedene Anbieter nennen
+KEPT=0          # 1 = every file of this run stays (the one instance, or dev, test and prod)
+KEPT_NAMES=""   # the instances whose file stays: "main" or "dev, prod"
+KEPT_IGNORED="" # flags that have no effect against the file
+AI_LABEL=""     # AI line if the kept files name different providers
 
-# kept_value NAME SCHLUESSEL — wie instance.sh liest: die letzte Zeile gewinnt; leer, wenn nicht da
+# kept_value NAME KEY — how instance.sh reads: the last line wins; empty if not there
 kept_value() { grep "^$2=" "$INSTANCES_DIR/$1.env" 2>/dev/null | tail -n 1 | cut -d= -f2-; }
-kept_or() { local v; v="$(kept_value "$1" "$2")"; printf '%s' "${v:-$3}"; }   # NAME SCHLUESSEL VORGABE
-# kept_provider NAME — Standard-Anbieter der Datei; ohne Zeile die Vorgabe des Backends (claude)
+kept_or() { local v; v="$(kept_value "$1" "$2")"; printf '%s' "${v:-$3}"; }   # NAME KEY DEFAULT
+# kept_provider NAME — default provider of the file; without a line the backend's default (claude)
 kept_provider() { kept_or "$1" AUTOMATION_AI_DEFAULT_PROVIDER CLAUDE | tr 'A-Z' 'a-z'; }
-# is_kept NAME — bleibt die Datei? (wie write_instance: vorhanden und kein --reconfigure)
+# is_kept NAME — does the file stay? (like write_instance: present and no --reconfigure)
 is_kept() { [ "$RECONF" = 0 ] && [ -f "$INSTANCES_DIR/$1.env" ]; }
 
-# kept_load — nach der Wahl des Modus: bleibt die Datei, uebernimmt der Lauf ihre Werte
+# kept_load — after the mode choice: if the file stays, the run adopts its values
 kept_load() {
   local n rt port preset prov bind proj="" afh="" aprov="" sock=0 provs=""
   KEPT=0; KEPT_NAMES=""; KEPT_IGNORED=""; AI_LABEL=""
   if [ "$MODE" = staged ]; then
     for n in dev test prod; do is_kept "$n" && KEPT_NAMES="$KEPT_NAMES${KEPT_NAMES:+, }$n"; done
     [ "$KEPT_NAMES" = "dev, test, prod" ] || return 0
-    # Alle drei bleiben: die Fragen nach Anbieter und KI-Zugang entfallen, gezeigt wird, was drinsteht
+    # All three stay: the questions about provider and AI access are dropped, what is in the file is shown
     KEPT=1
     for n in dev test prod; do provs="$provs${provs:+ · }$n $(kept_provider "$n")"; done
     _kept_flag --port "$PORT" "$(kept_value dev MYSURICATES_PORT)"
@@ -49,7 +49,7 @@ kept_load() {
   preset="$(kept_or "$NAME" MYSURICATES_PRESET core)"
   prov="$(kept_provider "$NAME")"
   bind="$(kept_or "$NAME" MYSURICATES_BIND 127.0.0.1)"
-  if [ "$rt" = container ]; then   # Vorgaben wie in instance.sh
+  if [ "$rt" = container ]; then   # defaults as in instance.sh
     proj="$(kept_or "$NAME" MYSURICATES_PROJECTS "$(cd "$REPO_ROOT/.." && pwd)")"
     afh="$(kept_or "$NAME" MYSURICATES_AI_FROM_HOST login)"
     aprov="$(kept_value "$NAME" MYSURICATES_AI_PROVIDERS)"
@@ -57,9 +57,9 @@ kept_load() {
   fi
   _kept_flag --runtime "$RUNTIME" "$rt"
   _kept_flag --port "$PORT" "$port"
-  [ "$FORCE" = 1 ] || _kept_flag --preset "$PRESET" "$preset"   # --force traegt das Preset ein
+  [ "$FORCE" = 1 ] || _kept_flag --preset "$PRESET" "$preset"   # --force writes the preset
   _kept_flag --provider "$PROVIDER" "$prov"
-  [ "$BIND" = 127.0.0.1 ] || _kept_flag --bind "$BIND" "$bind"   # 127.0.0.1 ist die Vorgabe von --bind
+  [ "$BIND" = 127.0.0.1 ] || _kept_flag --bind "$BIND" "$bind"   # 127.0.0.1 is the default of --bind
   _kept_flag --projects "$PROJECTS" "$proj"
   _kept_flag --ai-from-host "$AI_FROM_HOST" "$afh"
   _kept_flag --ai-providers "$AI_PROVIDERS" "$aprov"
@@ -71,12 +71,12 @@ kept_load() {
   [ -z "$KEPT_IGNORED" ] || printf '  %s\n' "$(msg kept_ignored "deploy/instances/$NAME.env" "$KEPT_IGNORED")"
   return 0
 }
-_kept_flag() {  # FLAG GEGEBEN AUS_DER_DATEI — per Flag gegeben, aber anders als in der Datei?
+_kept_flag() {  # FLAG GIVEN FROM_THE_FILE — given as a flag, but different from the file?
   [ -n "$2" ] && [ "$2" != "$3" ] && KEPT_IGNORED="$KEPT_IGNORED${KEPT_IGNORED:+, }$1 $2"
   return 0
 }
 
-# kept_mark [modules] — Kennzeichen hinter der Zeile eines Schritts: woher der Wert kommt
+# kept_mark [modules] — marker after the line of a step: where the value comes from
 kept_mark() {
   [ -n "$KEPT_NAMES" ] || return 0
   if [ "$MODE" = staged ]; then printf ' · %s' "$(msg kept_files "$KEPT_NAMES")"
@@ -84,17 +84,17 @@ kept_mark() {
   else printf ' · %s' "$(msg kept_from "deploy/instances/$NAME.env")"; fi
 }
 
-# kept_port NAME BASIS [VERGEBEN…] — Port im Modus Dev · Test · Prod: aus der Datei, die bleibt, sonst
-# der erste freie ab BASIS, der nicht schon vergeben ist; den der laufenden Instanz NAME zaehlt er als frei
+# kept_port NAME BASE [TAKEN…] — port in mode dev · test · prod: from the file that stays, otherwise
+# the first free one from BASE that is not already taken; it counts the one of the running instance NAME as free
 kept_port() { if is_kept "$1"; then kept_value "$1" MYSURICATES_PORT; else free_port "$2" "${3:-}" "$1"; fi; }
 
-# load_existing NAME — die Werte einer vorhandenen Instanz als Ausgangspunkt fuer „Einstellungen aendern“
-# und fuer --reconfigure, auch ohne Terminal (ca902719): Flags gehen vor, alles andere bleibt, wie es in
-# der Datei steht. Wie kept_value: je Schluessel ein Wert, die letzte Zeile gewinnt (0e5b82b7).
-# Nimmt auch BIND, AI_FROM_HOST, AI_PROVIDERS, den Docker-Socket (fbb1c61e), Umgebung und Siegel-Schalter
-# mit, dazu jede AUTOMATION_*-Zeile (Haertung, Module, von Hand ergaenzt) — sonst schreibt ein Reconfigure
-# ohne die passenden Flags stillschweigend die Vorgaben (127.0.0.1, kein Socket, keine Haertung) in die
-# Datei. Setzt LOADED_LINES (fuer step_modules) und PORT_LOADED=1, wenn der Port aus der Datei kommt.
+# load_existing NAME — the values of an existing instance as starting point for "Einstellungen aendern"
+# and for --reconfigure, even without a terminal (ca902719): flags come first, everything else stays as it is in
+# the file. Like kept_value: one value per key, the last line wins (0e5b82b7).
+# Also takes BIND, AI_FROM_HOST, AI_PROVIDERS, the Docker socket (fbb1c61e), environment and seal switches
+# along, plus every AUTOMATION_* line (hardening, modules, added by hand) — otherwise a reconfigure
+# without the matching flags silently writes the defaults (127.0.0.1, no socket, no hardening) into the
+# file. Sets LOADED_LINES (for step_modules) and PORT_LOADED=1 if the port comes from the file.
 load_existing() {
   local p0="${PORT:-}" line
   NAME="$1"; MODE=one
@@ -104,19 +104,19 @@ load_existing() {
   PRESET="${PRESET:-$(kept_value "$1" MYSURICATES_PRESET)}"
   PROVIDER="${PROVIDER:-$(kept_value "$1" AUTOMATION_AI_DEFAULT_PROVIDER | tr 'A-Z' 'a-z')}"
   PROJECTS="${PROJECTS:-$(kept_value "$1" MYSURICATES_PROJECTS)}"
-  # BIND traegt "127.0.0.1" schon als Vorgabe (kein leerer String) — wie kept_load erkennen wir ein
-  # gegebenes --bind daran, dass es davon abweicht.
+  # BIND already carries "127.0.0.1" as default (no empty string) — as in kept_load we recognize a
+  # given --bind by it differing from that.
   [ "${BIND:-127.0.0.1}" != 127.0.0.1 ] || BIND="$(kept_or "$1" MYSURICATES_BIND 127.0.0.1)"
   AI_FROM_HOST="${AI_FROM_HOST:-$(kept_value "$1" MYSURICATES_AI_FROM_HOST)}"
   AI_PROVIDERS="${AI_PROVIDERS:-$(kept_value "$1" MYSURICATES_AI_PROVIDERS)}"
-  # SOCKET traegt zu diesem Zeitpunkt schon SOCKET_FLAG (0 ohne --docker-socket) — wie bei kept_load
-  # zaehlt nur ein gegebenes --docker-socket als Flag, kein "aus".
+  # SOCKET already carries SOCKET_FLAG at this point (0 without --docker-socket) — as in kept_load
+  # only a given --docker-socket counts as a flag, not an "off".
   [ "${SOCKET_FLAG:-0}" = 1 ] || SOCKET="$(kept_or "$1" MYSURICATES_DOCKER_SOCKET 0)"
   LOADED_ENVIRONMENT="$(kept_value "$1" MYSURICATES_ENVIRONMENT)"
   LOADED_SEALING="$(kept_or "$1" MYSURICATES_HARDENING_SEALING false)"
   LOADED_REQUIRE_SEALED="$(kept_or "$1" MYSURICATES_HARDENING_REQUIRE_SEALED false)"
-  # AUTOMATION_*-Zeilen in ihrer Reihenfolge (die letzte gewinnt weiter); den Standard-Anbieter schreibt
-  # write_instance selbst
+  # AUTOMATION_* lines in their order (the last one keeps winning); the default provider is written by
+  # write_instance itself
   LOADED_LINES=""
   while IFS= read -r line || [ -n "$line" ]; do
     case "$line" in AUTOMATION_AI_DEFAULT_PROVIDER=*) ;; AUTOMATION_*=*) LOADED_LINES="$LOADED_LINES$line

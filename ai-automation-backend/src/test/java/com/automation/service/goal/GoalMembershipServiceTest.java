@@ -21,7 +21,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/** Reihenfolge der TODOs eines Ziels (TODO dc0566f8) – gebuendelt geladen (TODO f83dcc48). */
+/** Order of the TODOs of a goal (TODO dc0566f8) – loaded in bulk (TODO f83dcc48). */
 @ExtendWith(MockitoExtension.class)
 class GoalMembershipServiceTest {
 
@@ -42,8 +42,8 @@ class GoalMembershipServiceTest {
     }
 
     /**
-     * Die genannten TODOs bekommen Rang 1..n, die uebrigen verlieren ihren Rang. Die TODOs, deren Rang
-     * wegfaellt, kommen in einer Abfrage – vorher lud reorder jedes einzeln per findById.
+     * The named TODOs get rank 1..n, the others lose their rank. The TODOs whose rank
+     * is dropped are fetched in one query — before, reorder loaded each one separately via findById.
      */
     @Test
     void reorder_ranksTheNamed_clearsTheRest_andLoadsTheDroppedInOneQuery() {
@@ -98,7 +98,7 @@ class GoalMembershipServiceTest {
         verify(todoRepository, never()).save(any());
     }
 
-    /** Ein TODO aus einem neuen Projekt bringt sein Projekt mit, einmal je Projekt (TODO c60bf914). */
+    /** A TODO from a new project brings its project along, once per project (TODO c60bf914). */
     @Test
     void assign_linksTheProjectsOfTheTodos_onceEach_andClearsAForeignWorkPackage() {
         Todo fromA = Todo.builder().id("t-1").title("A").projectId("pA").goalId("g-other").workPackageId("m-old").build();
@@ -124,7 +124,7 @@ class GoalMembershipServiceTest {
                 .priority(Todo.Priority.MEDIUM).goalId(GOAL_ID).goalRank(rank).build();
     }
 
-    /** Die schlanke Zeile, wie {@code findGoalRows} sie liefert – hier zaehlen nur Id und Rang. */
+    /** The slim row as {@code findGoalRows} returns it – only id and rank count here. */
     private static GoalTodoRow row(Todo todo) {
         return new GoalTodoRow(todo.getId(), todo.getTitle(), todo.getStatus(), todo.getPriority(), null, null,
                 todo.getGoalRank(), null, null, null, null, null, null, null, null, null, null);

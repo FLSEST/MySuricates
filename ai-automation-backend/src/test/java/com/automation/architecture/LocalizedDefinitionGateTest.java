@@ -92,7 +92,7 @@ class LocalizedDefinitionGateTest {
         assertThat(problems).isEmpty();
     }
 
-    // --- Fixtures: das Gate darf nicht leer grün sein ---
+    // --- Fixtures: the gate must not be green when empty ---
 
     private static final String GOOD = """
             {"i18n": ["de", "en"],
@@ -188,7 +188,7 @@ class LocalizedDefinitionGateTest {
         assertThat(problems(MAPPER.readTree(json), "bad.json")).anyMatch(p -> p.contains("ohne zweisprachigen Inhalt"));
     }
 
-    // --- Prüflogik ---
+    // --- Check logic ---
 
     static List<String> problems(JsonNode root, String label) {
         List<String> locales = LocalizedJson.declaredLocales(root);

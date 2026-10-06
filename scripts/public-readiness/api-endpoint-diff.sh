@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
-# Deterministischer Abgleich: Backend-Controller-Endpunkte vs. docs/api-referenz.md (DE) + docs/en/api-referenz.md (EN).
+# Deterministic comparison: backend controller endpoints vs. docs/api-referenz.md (DE) + docs/en/api-referenz.md (EN).
 # TODO 2cbc00a7.
 #
 # Usage: api-endpoint-diff.sh [controller_dir] [doc_de] [doc_en]
-#   Ohne Argumente: Repo-Defaults (ai-automation-backend/.../controller, docs/api-referenz.md, docs/en/api-referenz.md).
-#   Mit Argumenten (fuer den Selbsttest): explizite Fixture-Pfade.
+#   Without arguments: repo defaults (ai-automation-backend/.../controller, docs/api-referenz.md, docs/en/api-referenz.md).
+#   With arguments (for the self-test): explicit fixture paths.
 #
-# Extrahiert aus jeder *.java-Datei im Controller-Verzeichnis die Klassen-@RequestMapping-Basis
-# plus alle Methoden-Mappings (@Get/Post/Put/Patch/DeleteMapping, @RequestMapping(method=...)),
-# normalisiert Pfadvariablen auf {id} und vergleicht das Ergebnis mit allen "METHODE /api/v1/..."-
-# Vorkommen in den beiden Doku-Dateien (Ueberschriften wie Fliesstext-Erwaehnungen), ebenso normalisiert.
+# Extracts from every *.java file in the controller directory the class @RequestMapping base
+# plus all method mappings (@Get/Post/Put/Patch/DeleteMapping, @RequestMapping(method=...)),
+# normalizes path variables to {id} and compares the result with all "METHODE /api/v1/..."
+# occurrences in the two doc files (headings as well as running-text mentions), likewise normalized.
 #
-# Ausgabe:
-#   FEHLT_IN_DOC <sprache> <METHODE> <pfad>   -- Endpunkt existiert im Code, aber nicht in dieser Doku
-#   NUR_IN_DOC   <sprache> <METHODE> <pfad>   -- Endpunkt steht in der Doku, aber es gibt ihn im Code nicht (mehr)
-# Exit 0: keine Luecken. Exit 1: mindestens eine Zeile Output. Exit 2: harter Fehler (Pfad fehlt).
+# Output:
+#   FEHLT_IN_DOC <sprache> <METHODE> <pfad>   -- endpoint exists in the code but not in this doc
+#   NUR_IN_DOC   <sprache> <METHODE> <pfad>   -- endpoint is in the doc but does not (any longer) exist in the code
+# Exit 0: no gaps. Exit 1: at least one line of output. Exit 2: hard error (path missing).
 set -uo pipefail
 
 ROOT="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel 2>/dev/null || pwd)"

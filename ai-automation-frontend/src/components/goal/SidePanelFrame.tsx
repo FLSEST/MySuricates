@@ -10,14 +10,14 @@ import {
 } from './panelGeometry';
 
 const STEP = 16;
-/** Abstand der angedockten Leiste zum oberen und unteren Rand, wenn sie klebt. */
+/** Distance of the docked bar from the top and bottom edge when it sticks. */
 const STICKY_TOP = 16;
 const BIG_STEP = 64;
 const viewport = (): Viewport => ({ width: window.innerWidth, height: window.innerHeight });
 
 /**
- * Zieht mit der Maus (Zeiger): `onMove` bekommt den Weg seit dem Drücken, bis losgelassen wird. Gibt
- * die Aufräumfunktion zurück – schließt die Leiste mitten im Ziehen, hängen keine Listener nach.
+ * Drags with the mouse (pointer): `onMove` receives the distance since the press until release. Returns
+ * the cleanup function - if the bar closes mid-drag, no listeners are left behind.
  */
 function dragFrom(event: ReactPointerEvent, onMove: (dx: number, dy: number) => void): (() => void) | null {
   if (event.button !== 0) return null;
@@ -37,8 +37,8 @@ function dragFrom(event: ReactPointerEvent, onMove: (dx: number, dy: number) => 
 }
 
 /**
- * Hält den gerade laufenden Zug: ein neuer beendet den alten, das Aushängen der Leiste beendet ihn
- * auch (Review c60bf914).
+ * Holds the drag currently in progress: a new one ends the old one, and unmounting the bar ends it
+ * too (review c60bf914).
  */
 function useDrag() {
   const stop = useRef<(() => void) | null>(null);
@@ -79,11 +79,11 @@ function useEscapeToClose(onClose: () => void, covered: () => boolean) {
 }
 
 /**
- * Rahmen der Seitenleiste (c60bf914): ab 1024 px angedockt rechts neben dem Inhalt – so hoch wie der
- * Sichtbereich, mit eigener Scrollfläche, die Breite am linken Griff änderbar (Maus, ← →) – oder als
- * Fenster gelöst, an der Titelleiste verschiebbar (auch mit den Pfeiltasten), an Rändern und Ecke in
- * der Größe änderbar, immer ganz im Sichtbereich. Breite, Lage, Größe und Art bleiben gemerkt. Darunter
- * ein Blatt über dem Inhalt.
+ * Frame of the side bar (c60bf914): from 1024 px docked on the right next to the content - as tall as the
+ * viewport, with its own scroll area, width adjustable at the left handle (mouse, ← →) - or released as a
+ * window, movable by the title bar (also with the arrow keys), resizable at the edges and corner,
+ * always fully within the viewport. Width, position, size and mode are remembered. Below that,
+ * a sheet over the content.
  */
 export function SidePanelFrame({ labelledBy, header, children, footer, onClose, testId, kind, storageKey, closeLabel }: {
   labelledBy: string;
@@ -93,9 +93,9 @@ export function SidePanelFrame({ labelledBy, header, children, footer, onClose, 
   onClose: () => void;
   testId: string;
   kind: string;
-  /** Wo Breite, Art und Fensterlage gemerkt werden – je Leiste eigener Schlüssel. */
+  /** Where width, mode and window position are remembered - each bar has its own key. */
   storageKey?: string;
-  /** Name des ×; ohne der der Seitenleiste. */
+  /** Name of the ×; without it, that of the side bar. */
   closeLabel?: string;
 }) {
   const t = useT();
@@ -107,7 +107,7 @@ export function SidePanelFrame({ labelledBy, header, children, footer, onClose, 
   // Docked or floating the panel is not modal: any open dialog keeps Escape. The sheet asks itself.
   useEscapeToClose(onClose, useCallback(() => mobile || hasOpenModalLayer(), [mobile]));
 
-  // Wird das Browserfenster kleiner, kommt das Fenster zurück in den Sichtbereich
+  // When the browser window shrinks, the window comes back into the viewport
   useEffect(() => {
     const onResize = () => setPrefs((current) => ({
       ...current, width: clampWidth(current.width, viewport()), rect: clampRect(current.rect, viewport()),
@@ -230,9 +230,9 @@ export function SidePanelFrame({ labelledBy, header, children, footer, onClose, 
 }
 
 /**
- * Angedockt steht die Leiste neben dem Inhalt und bleibt beim Scrollen oben stehen (sticky). Ihre Höhe
- * reicht immer genau bis zum unteren Rand des Sichtbereichs – auch bevor sie klebt, solange der Kopf der
- * Seite noch darüber steht –, damit nie etwas unten abgeschnitten ist; den Rest scrollt sie in sich.
+ * Docked, the bar stands next to the content and stays at the top while scrolling (sticky). Its height
+ * always reaches exactly to the bottom edge of the viewport - even before it sticks, while the page
+ * header is still above it -, so nothing is ever cut off at the bottom; it scrolls the rest internally.
  */
 function DockedPanel({ labelledBy, testId, kind, width, children }: {
   labelledBy: string;
@@ -266,10 +266,10 @@ function DockedPanel({ labelledBy, testId, kind, width, children }: {
 }
 
 /**
- * Unter 1024 px ein Blatt über dem Inhalt – dann modal (Review c60bf914): `role="dialog"` mit
- * `aria-modal`, per Portal an `document.body`, alles andere `inert` (für Maus, Tastatur und
- * Vorleser unerreichbar), Tab bleibt im Blatt. Angedockt und als Fenster bleibt die Leiste eine
- * gewöhnliche Region neben der Seite.
+ * Below 1024 px a sheet over the content - then modal (review c60bf914): `role="dialog"` with
+ * `aria-modal`, via portal on `document.body`, everything else `inert` (unreachable for mouse, keyboard and
+ * screen reader), Tab stays in the sheet. Docked and as a window, the bar remains an
+ * ordinary region next to the page.
  *
  * The sheet joins the stack of modal layers of `Modal` (d86f27b2): a dialog opened from the sheet lies
  * above it, so Escape and Tab belong to that dialog until it closes.
@@ -287,14 +287,14 @@ function SheetPanel({ labelledBy, testId, kind, onClose, children }: {
   useEscapeToClose(onClose, useCallback(() => !isTop(), [isTop]));
   useLayoutEffect(() => {
     document.body.appendChild(host);
-    // Alles außer dem Blatt und den immer bedienbaren Portalen (`data-always-interactive`: Toasts)
-    // tritt zurück. Öffnet das Blatt selbst einen modalen Dialog (TODO,
-    // Bearbeiten, Löschen – sie stehen im Seitenbaum), gilt solange dieser: dann ist nichts inert.
+    // Everything except the sheet and the always-operable portals (`data-always-interactive`: toasts)
+    // steps back. If the sheet itself opens a modal dialog (TODO,
+    // edit, delete - they are in the page tree), that one rules while it is open: then nothing is inert.
     const marked = new Set<Element>();
     const apply = () => {
       const otherModal = [...document.querySelectorAll('[aria-modal="true"]')].some((element) => !host.contains(element));
       for (const element of [...document.body.children]) {
-        // Toasts („Rückgängig“) bleiben bedienbar – Review c60bf914
+        // Toasts („Rückgängig“) stay operable - review c60bf914
         if (element === host || element.hasAttribute('data-always-interactive')) continue;
         if (!otherModal && !element.hasAttribute('inert')) {
           element.setAttribute('inert', '');

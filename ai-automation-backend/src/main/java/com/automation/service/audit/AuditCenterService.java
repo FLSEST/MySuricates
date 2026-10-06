@@ -33,8 +33,8 @@ public class AuditCenterService {
     private final AuditReportOrigins reportOrigins;
 
     /**
-     * Eine Report-Projektion ohne Markdown und eine GROUP-BY-Zaehlung der Findings – statt alle
-     * Reports samt Markdown zu laden und je Audit die Findings einzeln abzufragen (TODO 3d7e3987).
+     * A report projection without Markdown and a GROUP-BY count of the findings – instead of loading all
+     * reports including Markdown and querying the findings per audit one by one (TODO 3d7e3987).
      */
     @Transactional(readOnly = true)
     public List<AuditSummary> listAudits(String projectId, String category, GateStatus gateStatus) {
@@ -84,9 +84,9 @@ public class AuditCenterService {
     }
 
     /**
-     * Die Historie als Koepfe: {@code markdownContent} bleibt {@code null} (TODO cd50d011). Eine
-     * Seite trug vorher jeden Bericht im Volltext mit, obwohl nur der angezeigte ihn braucht – den
-     * liefert {@link #getReport}.
+     * The history as heads: {@code markdownContent} stays {@code null} (TODO cd50d011). A
+     * page used to carry every report in full text although only the displayed one needs it – that one
+     * is served by {@link #getReport}.
      */
     @Transactional(readOnly = true)
     public PageResponse<AuditReportResponse> listReports(String projectId, String auditKey, int page, int size) {
@@ -116,7 +116,7 @@ public class AuditCenterService {
             if (auditKey != null) predicates.add(cb.equal(root.get("auditKey"), auditKey));
             if (status != null) predicates.add(cb.equal(root.get("status"), status));
             if (severity != null) predicates.add(cb.equal(root.get("severity"), severity));
-            // Severity steht als Text in der DB; alphabetisch käme LOW vor MEDIUM (TODO f4ddc836).
+            // Severity is stored as text in the DB; alphabetically LOW would come before MEDIUM (TODO f4ddc836).
             if (query != null && !Long.class.equals(query.getResultType())) {
                 query.orderBy(cb.asc(cb.selectCase(root.get("severity"))
                                 .when(AuditSeverity.CRITICAL, 0).when(AuditSeverity.HIGH, 1)
@@ -173,7 +173,7 @@ public class AuditCenterService {
         todoLinker.markAwaitingVerification(todoId);
     }
 
-    /** Fuer mehrere zugleich erledigte TODOs (Sammel-UPDATE), eine Abfrage je Stufe. */
+    /** For several TODOs completed at the same time (bulk UPDATE), one query per level. */
     @Transactional
     public void markAwaitingVerification(java.util.Collection<String> todoIds) {
         todoLinker.markAwaitingVerification(todoIds);

@@ -4,18 +4,18 @@ import java.time.Duration;
 import java.time.Instant;
 
 /**
- * Zustand eines Termins im Ziel – eines Arbeitspakets (Basis: sein Ende) oder eines Meilensteins
- * (Basis: sein Datum), TODO 259f4f66 / c60bf914. Nie gespeichert, immer beim Lesen berechnet.
+ * State of an appointment in the goal - a work package (basis: its end) or a milestone
+ * (basis: its date), TODO 259f4f66 / c60bf914. Never stored, always computed on read.
  */
 public enum GoalDueState {
     OPEN, DUE_SOON, OVERDUE, REACHED;
 
-    /** Ab hier heisst ein offener Termin „bald faellig“. */
+    /** From here an open appointment is called "due soon". */
     public static final Duration DUE_SOON_WINDOW = Duration.ofDays(3);
 
     /**
-     * Erreicht schlaegt jedes Datum; ohne Datum bleibt es bei OPEN – nie „bald faellig“ oder
-     * „ueberfaellig“.
+     * Reached beats any date; without a date it stays OPEN - never "due soon" or
+     * "overdue".
      */
     public static GoalDueState of(Instant due, boolean reached, Instant now) {
         if (reached) {

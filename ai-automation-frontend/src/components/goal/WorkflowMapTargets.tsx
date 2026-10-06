@@ -5,11 +5,11 @@ import { GOAL_TARGET_ID, packageTargetId, todoTargetId } from './workflowMap';
 import { dropToneOf, useWorkflowMapDrag } from './workflowMapDrag';
 
 /**
- * Ablageflächen der Workflow-Zuordnung (52bc1e8c) in der Karte: jedes TODO und jede Gruppe eines
- * Arbeitspakets. Beim Ziehen leuchten nur die passenden auf; ohne laufenden Zug sieht man nichts davon.
+ * Drop surfaces of the workflow assignment (52bc1e8c) in the card: every TODO and every group of a
+ * work package. While dragging only the matching ones light up; without a drag in progress none of it is visible.
  */
 
-/** Ein TODO als Ablagefläche – umschließt seinen Knoten. */
+/** A TODO as a drop surface - wraps its node. */
 export function TodoDropTarget({ node, children }: { node: MapNode; children: ReactNode }) {
   const drag = useWorkflowMapDrag();
   const id = todoTargetId(node.todoIds[0]!);
@@ -29,8 +29,8 @@ export function TodoDropTarget({ node, children }: { node: MapNode; children: Re
 }
 
 /**
- * Die Gruppe eines Arbeitspakets (Kopfzeile samt Zeilen) als Ablagefläche. Kennt das Backend keine
- * Workflows am Ziel (404), gibt es sie gar nicht – wie das Zielband; dann bleiben nur die TODOs.
+ * The group of a work package (header row with its rows) as a drop surface. If the backend knows no
+ * workflows at the goal (404), they do not exist at all - like the goal band; then only the TODOs remain.
  */
 export function PackageDropTarget({ group, workPackageId }: { group: MapGroup; workPackageId: string }) {
   const drag = useWorkflowMapDrag();
@@ -48,7 +48,7 @@ export function PackageDropTarget({ group, workPackageId }: { group: MapGroup; w
   );
 }
 
-/** Die Kopfzeile „Ganzes Ziel“ über der Karte: ein Workflow hierher wird dem ganzen Ziel zugeordnet. */
+/** The header row „Ganzes Ziel“ above the card: a workflow dropped here is assigned to the whole goal. */
 export function GoalDropTarget({ label, hint }: { label: string; hint: string }) {
   const drag = useWorkflowMapDrag();
   const { setNodeRef, isOver } = useDroppable({ id: GOAL_TARGET_ID, disabled: !drag?.context.attachSupported });

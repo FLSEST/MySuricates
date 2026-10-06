@@ -57,8 +57,8 @@ export function ContainerAccessSection() {
         {!container && <Note testId="container-access-host-note">{c.hostNote}</Note>}
         {container && access.switchPrefix && (
           <div className="max-w-md space-y-1.5">
-            {/* Der Ort steht als eigene Zeile: das Label des Snippets ist in Versalien gesetzt, und ein
-                Pfad in Versalien waere ein anderer Pfad */}
+            {/* The location is its own row: the snippet's label is set in capitals, and a
+                path in capitals would be a different path */}
             <p className="text-xs text-text-secondary" data-testid="container-access-change-in">
               {changeInBefore}
               <code className="font-mono text-text break-words">{access.switchSource}</code>

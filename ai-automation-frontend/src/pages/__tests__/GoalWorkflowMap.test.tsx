@@ -17,8 +17,8 @@ import type { GoalDetail as GoalDetailData, GoalRelations, GoalTodoItem, GoalTod
 
 // 52bc1e8c (Flo): „Ist ja das Map ein map to workflow, oder? Das sollte dann so heißen und auch ganz rechts stehen …
 // dass man den Workflow auch ziehen kann, dass der auf der rechten Seite ziehbar wäre?“ – „ja passt“.
-// Ziehen lässt sich in jsdom nicht echt ausführen: der Test greift die Handler des DndContext ab und löst
-// Beginn, Bewegung und Ende so aus, wie dnd-kit sie meldet; das Bild unter dem Zeiger steht immer.
+// Dragging cannot really be executed in jsdom: the test grabs the handlers of the DndContext and triggers
+// start, move and end the way dnd-kit reports them; the image under the pointer is always shown.
 const dnd = vi.hoisted(() => ({ props: null as DndContextProps | null }));
 vi.mock('@dnd-kit/core', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@dnd-kit/core')>();
@@ -89,13 +89,13 @@ const relations: GoalRelations = {
 
 interface Sent { method: string; path: string; body: unknown }
 
-/** Schranken, die der Test zur Laufzeit setzt: hält das Nachladen der Karte bzw. das PUT des Rückgängig an. */
+/** Gates the test sets at runtime: hold back the map reload or the PUT of the undo. */
 interface Gates { relations: Promise<void> | null; undo: Promise<void> | null }
 
 function serve({ workflowsEndpoint = true, attachments = [] as unknown[], hold = null as Promise<void> | null,
   gates = { relations: null, undo: null } as Gates } = {}) {
   const sent: Sent[] = [];
-  // der Server merkt sich die Verknüpfung, damit das Nachladen nach dem Ablegen sie auch zeigt
+  // the server remembers the link so that the reload after dropping shows it too
   const linked = new Map<string, string>();
   const names: Record<string, string> = { 'wf-fix': 'Fix bot', 'wf-site': 'Site build' };
   const current = (): GoalRelations => ({
@@ -121,7 +121,7 @@ function serve({ workflowsEndpoint = true, attachments = [] as unknown[], hold =
   server.use(
     http.get('/api/v1/goals/g1', () => HttpResponse.json(detail)),
     http.get('/api/v1/goals/g1/relations', async () => {
-      // Stand zum Zeitpunkt der Anfrage – kommt die Antwort spät, ist er womöglich schon überholt
+      // state at the time of the request – if the answer arrives late, it may already be outdated
       const state = current();
       if (gates.relations) await gates.relations;
       return HttpResponse.json(state);
@@ -222,7 +222,7 @@ describe('Workflow map', () => {
     item.focus();
     fireEvent.keyDown(item, { code: 'Space', key: ' ' });
     expect(await screen.findByTestId('workflow-map-overlay')).toHaveTextContent('Fix bot');
-    // unterwegs ist das TODO als passendes Ziel markiert
+    // while dragging, the TODO is marked as a matching target
     expect(document.querySelector('[data-drop-target="wm-todo:a"]')).toHaveAttribute('data-accepts', 'true');
     fireEvent.keyDown(document, { code: 'Escape', key: 'Escape' });
     await waitFor(() => expect(screen.queryByTestId('workflow-map-overlay')).not.toBeInTheDocument());
@@ -271,7 +271,7 @@ describe('Workflow map', () => {
     await screen.findByRole('button', { name: 'Drag workflow Fix bot' });
     const worker = () => document.querySelector('[data-node="worker:wf-fix"]');
 
-    // das Nachladen nach dem Verknüpfen bleibt hängen und liefert später den Stand „verknüpft“
+    // the reload after linking hangs and later delivers the "linked" state
     gates.relations = new Promise<void>((resolve) => { openRelations = resolve; });
     gates.undo = new Promise<void>((resolve) => { openUndo = resolve; });
     startDrag('wf-fix');
@@ -281,7 +281,7 @@ describe('Workflow map', () => {
 
     fireEvent.click(within(toast.closest('[data-testid="toast"]') as HTMLElement).getByRole('button', { name: 'Undo' }));
     await waitFor(() => expect(worker()).not.toBeInTheDocument());
-    // die überholte Antwort trifft ein, während das Rückgängig noch unterwegs ist: die Karte bleibt ohne Verknüpfung
+    // the outdated response arrives while the undo is still in flight: the map stays without the link
     gates.relations = null;
     await act(async () => {
       openRelations();
@@ -355,7 +355,7 @@ describe('Workflow map', () => {
     startDrag('wf-fix');
     expect(document.querySelector('[data-drop-target^="wm-pkg:"]')).not.toBeInTheDocument();
     expect(document.querySelector('[data-drop-target="wm-todo:c"]')).toHaveAttribute('data-accepts', 'true');
-    // käme ein Ablegen auf einem Paket doch an (etwa per Tastatur-Altstand), sendet es nichts
+    // if a drop on a package did arrive (e.g. via a stale keyboard state), it sends nothing
     moveOver('wf-fix', 'wm-pkg:w1');
     expect(screen.getByTestId('workflow-map-live')).toHaveAttribute('data-refused', 'true');
     drop('wf-fix', 'wm-pkg:w1');

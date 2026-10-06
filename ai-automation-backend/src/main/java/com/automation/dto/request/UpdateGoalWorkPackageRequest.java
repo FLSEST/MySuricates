@@ -1,10 +1,10 @@
 package com.automation.dto.request;
 
 /**
- * Teilaenderung eines Arbeitspakets (TODO c60bf914): {@code null} laesst ein Feld stehen, {@code ""}
- * leert {@code startDate}/{@code endDate}. Das Ergebnis muss beide Daten haben oder keins, Start nie
- * nach dem Ende – sonst 400. {@code projectId} wechselt das Projekt, nur solange dem Paket keine TODOs
- * zugeordnet sind.
+ * Partial update of a work package (TODO c60bf914): {@code null} leaves a field as it is, {@code ""}
+ * clears {@code startDate}/{@code endDate}. The result must have both dates or neither, start never
+ * after the end – otherwise 400. {@code projectId} changes the project, only as long as no TODOs are
+ * assigned to the package.
  */
 public record UpdateGoalWorkPackageRequest(
         String title,

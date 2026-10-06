@@ -1,12 +1,12 @@
 import { useT } from '../../i18n';
 import type { MapNode } from './goalRelationLayout';
 
-/** Kürzt einen Text für einen Kartenknoten; der volle Text steht im Tooltip. */
+/** Shortens a text for a map node; the full text is in the tooltip. */
 export function truncate(text: string, max: number): string {
   return text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
 }
 
-/** Beschriftung eines Knotens; ohne Text aus den Daten nach Art. */
+/** Label of a node; without text, derived from the data by kind. */
 export function useNodeText() {
   const t = useT();
   const m = t.goals.map;

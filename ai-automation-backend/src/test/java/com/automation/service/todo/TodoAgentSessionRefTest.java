@@ -5,13 +5,13 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Die Annahme der Agenten-Sitzungskennung (TODO 3497533c).
+ * Acceptance of the agent session identifier (TODO 3497533c).
  *
- * <p>Warum ueberhaupt normalisiert wird: Das Feld ersetzt die Fliesstext-Konvention, den Befehl
- * {@code claude --resume <uuid>} in die Beschreibung zu schreiben. Ein Agent schickt deshalb
- * erfahrungsgemaess genau das — den ganzen Befehl, in Backticks, in einer Markdown-Zeile. Ein
- * Feld, dessen Inhalt man erst reinigen muss, ist so unzuverlaessig wie die Konvention, die es
- * ersetzt; also nimmt der Service die UUID heraus und verwirft, was keine ist.
+ * <p>Why normalize at all: The field replaces the running-text convention of writing the command
+ * {@code claude --resume <uuid>} into the description. An agent therefore sends
+ * by experience exactly that — the whole command, in backticks, in a Markdown line. A
+ * field whose content has to be cleaned first is as unreliable as the convention it
+ * replaces; so the service extracts the UUID and discards whatever is not one.
  */
 class TodoAgentSessionRefTest {
 

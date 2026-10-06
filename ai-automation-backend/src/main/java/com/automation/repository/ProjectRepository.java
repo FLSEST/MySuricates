@@ -20,15 +20,15 @@ public interface ProjectRepository extends JpaRepository<Project, String> {
     long countByArchivedAtIsNotNull();
 
     /**
-     * Die nicht archivierten Projekte samt Container — die Liste hinter
+     * The non-archived projects together with their container — the list behind
      * {@code GET /api/v1/projects}.
      *
-     * <p>{@code Project.container} ist eine nullable {@code @OneToOne(mappedBy = "project")}. Eine
-     * solche Assoziation kann Hibernate nicht als Proxy anlegen (ob es eine Zeile gibt, weiss erst
-     * die Abfrage), also loest sie {@code findByArchivedAtIsNull()} je materialisiertem Projekt
-     * einzeln auf. Bei drei Projekten faellt das nicht auf, auf der Dev-Datenbank waren es
-     * 37 Statements fuer eine Liste (TODO 6d0ab09f). Der Join holt den Container mit; die Zahl der
-     * Abfragen bleibt konstant, unabhaengig von der Zahl der Projekte.
+     * <p>{@code Project.container} is a nullable {@code @OneToOne(mappedBy = "project")}. Hibernate
+     * cannot create such an association as a proxy (only the query knows whether a row exists), so it resolves
+     * {@code findByArchivedAtIsNull()} individually per materialized project. With three projects this goes
+     * unnoticed, on the dev database it was
+     * 37 statements for one list (TODO 6d0ab09f). The join fetches the container along; the number of
+     * queries stays constant, independent of the number of projects.
      */
     @Query("SELECT p FROM Project p LEFT JOIN FETCH p.container WHERE p.archivedAt IS NULL")
     List<Project> findActiveWithContainer();
@@ -36,8 +36,8 @@ public interface ProjectRepository extends JpaRepository<Project, String> {
     List<Project> findByArchivedAtIsNotNull();
 
     /**
-     * Id und Name je Projekt in einer Abfrage, ohne Entity – und damit ohne das
-     * {@code select containers} je Projekt, das {@code findAllById} ausloest (TODO c6ea8f5c).
+     * Id and name per project in one query, without an entity — and thus without the
+     * {@code select containers} per project that {@code findAllById} triggers (TODO c6ea8f5c).
      */
     @Query("SELECT p.id, p.name FROM Project p WHERE p.id IN :ids")
     List<Object[]> findIdAndNameByIdIn(@org.springframework.data.repository.query.Param("ids") Collection<String> ids);

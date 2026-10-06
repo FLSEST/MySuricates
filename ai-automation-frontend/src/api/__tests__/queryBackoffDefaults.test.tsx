@@ -1,10 +1,10 @@
 /**
- * f3fb193f: Eine fehlgeschlagene Query hat keine Daten und `dataUpdatedAt = 0` — sie gilt
- * damit trotz `staleTime` als stale und feuert bei jedem Mount erneut. Solange ein
- * 429-Backoff läuft, darf das nicht passieren: weder als Netzanfrage noch als Aufruf der
- * queryFn. Umgekehrt muss sich die App nach Ablauf der Sperre von selbst erholen — `retry`
- * ist für 429 aus und `refetchOnMount` greift nur beim Mount, dauerhaft montierte Queries
- * blieben sonst bis zum Reload im Fehlerzustand.
+ * f3fb193f: A failed query has no data and `dataUpdatedAt = 0` — it therefore counts
+ * as stale despite `staleTime` and fires again on every mount. While a
+ * 429 backoff is running, that must not happen: neither as a network request nor as a call of
+ * the queryFn. Conversely, the app must recover on its own once the block expires — `retry`
+ * is off for 429 and `refetchOnMount` only applies on mount, permanently mounted queries
+ * would otherwise stay in the error state until reload.
  */
 import React from 'react';
 import { render, act } from '@testing-library/react';
@@ -14,7 +14,7 @@ import { appQueryDefaults, installRateLimitRecovery } from '../queryDefaults';
 import { api, resetRateLimitBackoff } from '../client';
 
 const NOW = Date.parse('2026-09-14T12:00:00.000Z');
-/** Retry-After des Mocks. */
+/** Retry-After of the mock. */
 const LOCK_MS = 5_000;
 
 let queryFnCalls = 0;
@@ -38,7 +38,7 @@ function Probe() {
   return <div>probe</div>;
 }
 
-/** Query-Client wie in main.tsx: Defaults + Erholung nach Ablauf der Sperre. */
+/** Query client as in main.tsx: defaults + recovery after the block expires. */
 function createClient() {
   const queryClient = new QueryClient({ defaultOptions: appQueryDefaults });
   disposers.push(installRateLimitRecovery(queryClient));
@@ -75,7 +75,7 @@ describe('QueryClient-Defaults im 429-Backoff (f3fb193f)', () => {
     resetRateLimitBackoff();
   });
 
-  it('feuert eine gescheiterte Query im Sperrfenster bei Remount nicht erneut', async () => {
+  it('does not re-fire a failed query in the block window on remount', async () => {
     const queryClient = createClient();
     const view = renderProbe(queryClient);
     await advance(100);
@@ -87,29 +87,29 @@ describe('QueryClient-Defaults im 429-Backoff (f3fb193f)', () => {
     expect(queryFnCalls, 'Remount im Backoff-Fenster hat die queryFn erneut aufgerufen').toBe(1);
   });
 
-  it('holt eine montierte Fehler-Query nach Ablauf der Sperre genau einmal nach', async () => {
+  it('re-fetches a mounted error query exactly once after the block expires', async () => {
     const queryClient = createClient();
     renderProbe(queryClient);
     await advance(100);
     expect(queryFnCalls).toBe(1);
 
-    // Ohne Erholung bliebe die Query bis zum Reload im Fehlerzustand: retry ist für 429 aus
-    // und refetchOnMount greift ohne Remount nicht.
+    // Without recovery the query would stay in the error state until reload: retry is off for 429
+    // and refetchOnMount does not apply without a remount.
     await advance(LOCK_MS);
     expect(queryFnCalls, 'nach Ablauf der Sperre wurde nicht nachgeholt').toBe(2);
 
-    // …und genau einmal, nicht in einer Schleife.
+    // …and exactly once, not in a loop.
     await advance(1_000);
     expect(queryFnCalls).toBe(2);
   });
 
-  it('lässt nach Ablauf der Sperre einen Remount wieder zu', async () => {
+  it('allows a remount again after the block expires', async () => {
     const queryClient = createClient();
     const view = renderProbe(queryClient);
     await advance(100);
     expect(queryFnCalls).toBe(1);
 
-    // Vor Ablauf abmelden, damit hier nur der Remount zählt und nicht die Erholung.
+    // Unsubscribe before expiry, so that only the remount counts here and not the recovery.
     view.unmount();
     await advance(LOCK_MS + 100);
     expect(queryFnCalls).toBe(1);
@@ -119,7 +119,7 @@ describe('QueryClient-Defaults im 429-Backoff (f3fb193f)', () => {
     expect(queryFnCalls).toBe(2);
   });
 
-  it('wiederholt 429 nicht (Bestandsverhalten)', async () => {
+  it('does not retry 429 (existing behaviour)', async () => {
     const queryClient = createClient();
     renderProbe(queryClient);
     await advance(LOCK_MS - 1_000);

@@ -26,9 +26,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 
 /**
- * Datenfluss-Export: aus den Platzhaltern der Block-Configs entstehen Datenobjekte
- * ({@code dataObject} + {@code dataObjectReference}) und Datenassoziationen am erzeugenden
- * bzw. konsumierenden Task.
+ * Data-flow export: the placeholders of the block configs produce data objects
+ * ({@code dataObject} + {@code dataObjectReference}) and data associations on the producing
+ * or consuming task.
  */
 class BpmnDataFlowExportTest {
 
@@ -62,7 +62,7 @@ class BpmnDataFlowExportTest {
     @Test
     void assoziationenHaengenAmRichtigenTask() throws Exception {
         Document doc = export(WorkflowFixtures.dataFlow());
-        // tests erzeugt, compress konsumiert + erzeugt, report konsumiert
+        // tests produces, compress consumes + produces, report consumes
         assertThat(ownerIdsOf(doc, "dataOutputAssociation")).allSatisfy(id ->
                 assertThat(id).matches("b_0_tests|b_1_compress"));
         assertThat(ownerIdsOf(doc, "dataInputAssociation")).allSatisfy(id ->
@@ -80,7 +80,7 @@ class BpmnDataFlowExportTest {
         }
         for (Element in : elements(doc, "dataInputAssociation")) {
             assertThat(refIds).contains(childText(in, "sourceRef"));
-            // targetRef muss auf eine existierende ID zeigen (IDREF) — das property-Platzhalter-Element
+            // targetRef must point to an existing ID (IDREF) — the property placeholder element
             assertThat(childText(in, "targetRef")).isNotBlank();
         }
     }
@@ -145,7 +145,7 @@ class BpmnDataFlowExportTest {
                 .doesNotThrowAnyException();
     }
 
-    /** Datenassoziationen dürfen an keinem Block-Typ das Schema brechen (auch Schleifen/Sub-Prozesse). */
+    /** Data associations must not break the schema on any block type (including loops/sub-processes). */
     @Test
     void ganzerFixtureKatalogBleibtSchemaValide() throws Exception {
         Validator validator = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI)
@@ -183,14 +183,14 @@ class BpmnDataFlowExportTest {
     }
 
     /**
-     * 7557b928: Der Datenfluss endet an den Zweig-Tasks der Verzweigung, nicht am Gateway —
-     * BPMN erlaubt an Gateways keine Datenassoziationen.
+     * 7557b928: the data flow ends at the branch tasks of the branching, not at the gateway —
+     * BPMN allows no data associations on gateways.
      */
     @Test
     void zweigTasksSindDieEndpunkteDerAssoziationen() throws Exception {
         Document doc = export(WorkflowFixtures.branching());
 
-        // tests → analyse (in den Case hinein), analyse → report (aus dem Case heraus)
+        // tests → analyse (into the case), analyse → report (out of the case)
         assertThat(ownerIdsOf(doc, "dataOutputAssociation"))
                 .containsExactlyInAnyOrder("b_0_tests", "b_1_c0_0_analyse");
         assertThat(ownerIdsOf(doc, "dataInputAssociation"))
@@ -198,7 +198,7 @@ class BpmnDataFlowExportTest {
         assertThat(elements(doc, "dataObjectReference")).hasSize(2);
     }
 
-    /** Kein Gateway-Knoten trägt eine Datenassoziation (XSD-Grenze der Notation). */
+    /** No gateway node carries a data association (XSD limit of the notation). */
     @Test
     void keinGatewayTraegtEineDatenassoziation() throws Exception {
         Document doc = export(WorkflowFixtures.branching());
@@ -220,12 +220,12 @@ class BpmnDataFlowExportTest {
     }
 
     /**
-     * Der Gateway-Knoten selbst trägt nie eine Assoziation — BPMN erlaubt das an Gateways nicht.
+     * The gateway node itself never carries an association — BPMN does not allow that on gateways.
      *
-     * <p>Das ist die bleibende Notationsgrenze und keine Lücke: Die Referenz steht hier in
-     * {@code condition}, also im Gateway-Ausdruck selbst, und dort gibt es keinen Knoten, an den
-     * eine Assoziation gehören könnte. Für die ZWEIGE gilt das seit TODO 7557b928 nicht mehr —
-     * siehe {@link #zweigKommandosEinesConditionalTragenAssoziationen()}.
+     * <p>This is the lasting notation limit and not a gap: the reference sits here in
+     * {@code condition}, i.e. in the gateway expression itself, and there is no node there to which
+     * an association could belong. For the BRANCHES this no longer holds since TODO 7557b928 —
+     * see {@link #zweigKommandosEinesConditionalTragenAssoziationen()}.
      */
     @Test
     void gatewayBloeckeBekommenKeineAssoziation() throws Exception {
@@ -241,12 +241,12 @@ class BpmnDataFlowExportTest {
     }
 
     /**
-     * Zweig-Kommandos eines {@code conditional} tragen ihre Assoziation am eigenen Task.
+     * Branch commands of a {@code conditional} carry their association on their own task.
      *
-     * <p>Vor TODO 7557b928 landete die Referenz beim conditional-Block selbst — also am Gateway —
-     * und wurde verworfen: Der Datenfluss brach an jeder Verzweigung ab, obwohl die Tasks
-     * {@code _then}/{@code _else} längst existierten. Sie waren nur nicht als Endpunkte
-     * eingetragen.
+     * <p>Before TODO 7557b928 the reference ended up at the conditional block itself — i.e. at the gateway —
+     * and was discarded: the data flow broke off at every branching although the tasks
+     * {@code _then}/{@code _else} long existed. They just were not registered as
+     * endpoints.
      */
     @Test
     void zweigKommandosEinesConditionalTragenAssoziationen() throws Exception {
@@ -270,7 +270,7 @@ class BpmnDataFlowExportTest {
         assertThat(elements(doc, "dataObjectReference")).isNotEmpty();
     }
 
-    /** Ohne else_command gibt es nur den then-Task — und nur dort eine Assoziation. */
+    /** Without else_command there is only the then task — and only there an association. */
     @Test
     void ohneElseZweigTraegtNurDerThenTaskDieAssoziation() throws Exception {
         Workflow wf = WorkflowFixtures.workflow("Gate", List.of(

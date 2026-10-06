@@ -104,15 +104,15 @@ class RunCompletionHandlerTest {
 
     // --- Gleichstand (TODO 2aa9ddd5) -------------------------------------------------------
 
-    /** Der Kopf, den CheckedCommandGate einem erfolgreichen checked_command voranstellt. */
+    /** The header that CheckedCommandGate prepends to a successful checked_command. */
     private static String checkedCommandOutput(String category, int exitCode, String output) {
         return "gate_status: " + (exitCode == 0 ? "GREEN" : "RED") + "\ngate_category: " + category
                 + "\ngate_description: Command exit " + exitCode + "\n\n" + output;
     }
 
     /**
-     * Der Health-Check vom 25.09.: alle Schritte GREEN, der erste ein checked_command. Sein synthetisches
-     * „Command exit 0“ stand seit dem 14.09. in jedem Report statt des Urteils am Ende.
+     * The health check of 25.09.: all steps GREEN, the first one a checked_command. Its synthetic
+     * "Command exit 0" had been in every report since 14.09. instead of the verdict at the end.
      */
     @Test
     @SuppressWarnings("unchecked")
@@ -141,9 +141,9 @@ class RunCompletionHandlerTest {
     }
 
     /**
-     * Bei RED und YELLOW bleibt der erste: die Ursache. Nach seiner Kategorie heisst und findet sich das
-     * AutoTodo-Incident ({@code GateStatusResolver} liest genau diese Metadaten) – ein abschliessendes Urteil
-     * darf es nicht umbenennen.
+     * With RED and YELLOW the first one stays: the cause. The AutoTodo incident is named and found
+     * after its category ({@code GateStatusResolver} reads exactly this metadata) – a final verdict
+     * must not rename it.
      */
     @Test
     void complete_equalRedOrYellow_theFirstGateKeepsItsCategory_forTheIncident() {
@@ -181,7 +181,7 @@ class RunCompletionHandlerTest {
                 .containsEntry("gate_description", "200 Tests gruen");
     }
 
-    /** Das synthetische „Command exit 0“ sagt nur, dass der Befehl lief – auch hinter dem Urteil verdraengt es das nicht. */
+    /** The synthetic "Command exit 0" only says that the command ran – even behind the verdict it does not displace it. */
     @Test
     void complete_aChecksCommandExitAfterTheVerdict_doesNotReplaceIt() {
         WorkflowRun run = run(RunStatus.RUNNING,
@@ -198,8 +198,8 @@ class RunCompletionHandlerTest {
     }
 
     /**
-     * Ein spaeteres Urteil ohne eigene Kategorie behaelt die bisherige – sonst setzte GateStatusResolver „success“
-     * und benennte ein track-TODO samt {@code category:}-Tag um.
+     * A later verdict without its own category keeps the previous one – otherwise GateStatusResolver would set "success"
+     * and rename a track TODO including its {@code category:} tag.
      */
     @Test
     void complete_laterGreenWithoutCategory_keepsTheCategorySoFar() {
@@ -404,7 +404,7 @@ class RunCompletionHandlerTest {
         assertThat(DashboardWidgetResultParser.fromMetadata(stored).result().title()).isEqualTo("from marker");
     }
 
-    /** Ein Block, dessen Prompt ein Gate-Urteil bestellt (TODO 63ecc124). */
+    /** A block whose prompt orders a gate verdict (TODO 63ecc124). */
     private static List<BlockDefinition> blocksOrderingAGate() {
         BlockDefinition block = new BlockDefinition();
         block.setType("simple");
@@ -451,7 +451,7 @@ class RunCompletionHandlerTest {
                 eq("WorkflowExecutor"), eq("run-1"), eq("wf-1"));
     }
 
-    /** Ein gescheiterter Lauf trägt sein Urteil über den Laufstatus — nicht zusätzlich gelb färben. */
+    /** A failed run carries its verdict via the run status — do not additionally color it yellow. */
     @Test
     void gescheiterterLaufBekommtKeinGateMissing() {
         WorkflowRun run = run(RunStatus.FAILED, "abgebrochen");

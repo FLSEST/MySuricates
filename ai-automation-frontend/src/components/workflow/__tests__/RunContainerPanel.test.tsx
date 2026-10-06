@@ -14,7 +14,7 @@ afterAll(() => server.close());
 beforeEach(() => useI18nStore.setState({ locale: 'en' }));
 
 describe('RunContainerPanel', () => {
-  it('sendet das Kommando per Enter und per Knopf und leert das Feld', async () => {
+  it('sends the command via Enter and via button and clears the field', async () => {
     const sent: unknown[] = [];
     server.use(http.post('/api/v1/executions/:runId/command', async ({ request, params }) => {
       sent.push({ runId: params.runId, ...(await request.json() as object) });
@@ -31,7 +31,7 @@ describe('RunContainerPanel', () => {
     await waitFor(() => expect(sent).toHaveLength(1));
 
     fireEvent.change(input, { target: { value: 'pwd' } });
-    // Während ein Kommando läuft, ist der Knopf im Ladezustand gesperrt.
+    // While a command is running, the button is disabled in its loading state.
     await waitFor(() => expect(send).not.toBeDisabled());
     fireEvent.click(send);
     expect(input).toHaveValue('');
@@ -42,7 +42,7 @@ describe('RunContainerPanel', () => {
     ]));
   });
 
-  it('blendet den Terminal-Reiter aus, sobald das Modul terminal als aus gemeldet ist', async () => {
+  it('hides the terminal tab as soon as the terminal module is reported as off', async () => {
     server.use(http.get('/api/v1/system/capabilities', () =>
       HttpResponse.json({ apiVersion: 'v1', routes: [], blockTypes: [], ...modulesFixture('full', ['terminal']) })));
     renderWithProviders(<RunContainerPanel runId="run-1" />);

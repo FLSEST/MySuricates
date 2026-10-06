@@ -69,8 +69,8 @@ class SearchControllerTest {
     void search_returnsWorkflows_whenQueryMatches() throws Exception {
         Workflow w1 = Workflow.builder().id("w-1").name("Build Pipeline").description("ci/cd").build();
         when(workflowService.findAll()).thenReturn(List.of(w1));
-        // Die Suche mappt seit TODO 13d1e2a2 gebuendelt (eine GROUP-BY-Abfrage fuer die
-        // Run-Zahlen statt einer je Treffer) — deshalb hier die Listen-Variante stubben.
+        // Since TODO 13d1e2a2 the search maps in bulk (one GROUP BY query for the
+        // run counts instead of one per hit) — so stub the list variant here.
         when(workflowMapper.toResponseListWithRunCounts(anyList())).thenAnswer(inv -> {
             List<Workflow> workflows = inv.getArgument(0);
             return workflows.stream().map(w -> minimalResponse(w.getId(), w.getName())).toList();

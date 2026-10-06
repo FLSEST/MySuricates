@@ -36,7 +36,7 @@ import java.util.Map;
 @Slf4j
 public class RunCompletionHandler {
 
-    /** Kategorie und Text für ein bestelltes, aber ausgebliebenes Gate-Urteil (TODO 63ecc124). */
+    /** Category and text for an ordered but missing gate verdict (TODO 63ecc124). */
     public static final String GATE_MISSING_CATEGORY = "gate-missing";
     static final String GATE_MISSING_DESCRIPTION =
             "Die Definition bestellt ein Gate-Urteil, der Lauf hat keines geliefert";
@@ -150,10 +150,10 @@ public class RunCompletionHandler {
         boolean runSucceeded = run.getStatus() == RunStatus.COMPLETED
                 || run.getStatus() == RunStatus.COMPLETED_WITH_ERRORS;
 
-        // Bestelltes, aber ausgebliebenes Urteil ist kein Erfolg (TODO 63ecc124): ein Prüf-Workflow,
-        // dessen KI-Schritt still fehlschlägt, läuft technisch durch und wäre sonst von einem
-        // Workflow ohne Gate nicht zu unterscheiden. Nur bei erfolgreichem Lauf — ein FAILED trägt
-        // über den Laufstatus bereits sein eigenes Urteil.
+        // An ordered but missing verdict is not a success (TODO 63ecc124): a check workflow
+        // whose AI step fails silently runs through technically and could otherwise not be told apart
+        // from a workflow without a gate. Only for a successful run - a FAILED one already carries
+        // its own verdict via the run status.
         if (highestGate == null && runSucceeded && GateExpectation.isExpected(blocks)) {
             highestGate = GateStatus.YELLOW;
             gateCategory = GATE_MISSING_CATEGORY;
@@ -187,8 +187,8 @@ public class RunCompletionHandler {
                         "WorkflowExecutor", run.getId(), workflowId);
             }
         } else if (run.getStatus() == RunStatus.FAILED) {
-            // Den DLQ-Eintrag legt DeadLetterService per WorkflowRunCompletedEvent an — so haengt
-            // service.workflow nicht an service.dlq (Paketzyklus, TODO d55c55de).
+            // DeadLetterService creates the DLQ entry via WorkflowRunCompletedEvent - so
+            // service.workflow does not depend on service.dlq (package cycle, TODO d55c55de).
             activityLogService.error(LogCategory.EXECUTION,
                     "Workflow execution failed: " + run.getId(),
                     "WorkflowExecutor", run.getId(), workflowId);

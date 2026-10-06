@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# Abhaengigkeiten des Installers (504e5038): welche Werkzeuge ein Weg braucht, ob die vorhandenen
-# reichen, wie der Paketmanager sie installiert — und wo er es nicht kann, ein geprueftes Download.
+# Dependencies of the installer (504e5038): which tools a path needs, whether the existing ones
+# suffice, how the package manager installs them — and where it cannot, a verified download.
 #
-# Quelle fuer Java/Node „gemischt“ (Spec, Abschnitt 6): Paketmanager, wenn dessen Version passt;
-# sonst das offizielle Archiv mit fest eingetragener SHA-256 nach ~/.local/share/mysuricates/, ohne
-# sudo, auf Linux und macOS gleich. Befehle werden hier nur zusammengesetzt — ausgefuehrt und vorher
-# angezeigt werden sie in setup.sh. bash 3.2 (macOS): keine assoziativen Arrays.
+# Source for Java/Node "mixed" (spec, section 6): package manager if its version fits;
+# otherwise the official archive with a hard-coded SHA-256 into ~/.local/share/mysuricates/, without
+# sudo, the same on Linux and macOS. Commands are only assembled here — executed and shown beforehand
+# in setup.sh. bash 3.2 (macOS): no associative arrays.
 
 DEPS_DATA="${XDG_DATA_HOME:-$HOME/.local/share}/mysuricates"
 
-# Fest eingetragene Downloads — beim Anheben Version, URL-Muster und alle vier Pruefsummen tauschen
-# (Quellen: nodejs.org/dist/v<version>/SHASUMS256.txt, api.adoptium.net/v3/assets/latest/21/hotspot).
+# Hard-coded downloads — when bumping, swap version, URL pattern and all four checksums
+# (sources: nodejs.org/dist/v<version>/SHASUMS256.txt, api.adoptium.net/v3/assets/latest/21/hotspot).
 DEPS_NODE_VERSION="24.21.0"
 DEPS_NODE_SHA256_linux_x64="6e1db87ef58b8819e5d5402eff1536491b18edd8eb7bee5ef7897876e88dc5ff"
 DEPS_NODE_SHA256_linux_arm64="724282c3b43aec998aa9527380465b45d229e021b58035f5f4f63095eabfe5d5"
@@ -37,7 +37,7 @@ deps_pm() {
   else echo none; fi
 }
 
-# --- Versionen --------------------------------------------------------------------------------------
+# --- Versions --------------------------------------------------------------------------------------
 
 deps_version() {
   case "$1" in
@@ -51,7 +51,7 @@ deps_version() {
   esac
 }
 
-# Node: 20.19+, 22.12+ oder ab 24 (Vite 7/jsdom); 21 und 23 sind ausgeschlossen
+# Node: 20.19+, 22.12+ or from 24 (Vite 7/jsdom); 21 and 23 are excluded
 deps_node_ok() {
   local major minor
   major="${1%%.*}"; minor="${1#*.}"; minor="${minor%%.*}"
@@ -75,8 +75,8 @@ deps_check() {
 }
 
 # running | no-permission | not-running | missing
-# Ein RHEL-Nachbau (Rocky, AlmaLinux, Oracle Linux …)? RHEL, CentOS und Fedora selbst nicht — die
-# bedient get.docker.com. Test-Override: DEPS_OS_RELEASE (Default /etc/os-release).
+# A RHEL clone (Rocky, AlmaLinux, Oracle Linux …)? Not RHEL, CentOS and Fedora themselves — get.docker.com
+# serves those. Test override: DEPS_OS_RELEASE (default /etc/os-release).
 deps_rhel_clone() {
   local f="${DEPS_OS_RELEASE:-/etc/os-release}" id like
   [ -r "$f" ] || return 1
@@ -102,9 +102,9 @@ deps_required() {
   esac
 }
 
-# --- Paketmanager -----------------------------------------------------------------------------------
+# --- Package manager -----------------------------------------------------------------------------------
 
-deps_pkg() {  # WERKZEUG MANAGER → Paketname(n)
+deps_pkg() {  # TOOL MANAGER → package name(s)
   case "$1:$2" in
     git:*) echo git ;;
     curl:*) echo curl ;;
@@ -121,7 +121,7 @@ deps_pkg() {  # WERKZEUG MANAGER → Paketname(n)
   esac
 }
 
-deps_install_cmd() {  # MANAGER PAKET… → Befehl
+deps_install_cmd() {  # MANAGER PACKAGE… → command
   local pm="$1"; shift
   case "$pm" in
     apt)    echo "sudo apt-get install -y $*" ;;
@@ -132,8 +132,8 @@ deps_install_cmd() {  # MANAGER PAKET… → Befehl
   esac
 }
 
-# Version, die der Paketmanager installieren wuerde (leer = keine / unbekannt)
-deps_candidate() {  # PAKET MANAGER
+# Version the package manager would install (empty = none / unknown)
+deps_candidate() {  # PACKAGE MANAGER
   case "$2" in
     apt)    apt-cache policy "$1" 2>/dev/null | awk '/Candidate:/{print $2; exit}' | grep -v '(none)' ;;
     dnf)    dnf -q info "$1" 2>/dev/null | awk -F': *' '/^Version/{print $2; exit}' ;;
@@ -143,14 +143,14 @@ deps_candidate() {  # PAKET MANAGER
   esac | sed 's/^[0-9]*://'
 }
 
-# Docker-Dienst starten — nur mit systemd. Ohne (ein Container) laeuft kein Dienst, dort steht der
-# Docker-Socket von aussen bereit; ein Fehlschlag bricht die Installation nicht ab, docker_ready meldet
-# ihn danach. Als Befehlstext, weil setup.sh den Plan per `bash -c` ausfuehrt (ohne deps.sh).
+# Start the Docker service — only with systemd. Without (a container) no service runs, there the
+# Docker socket is provided from outside; a failure does not abort the installation, docker_ready reports
+# it afterwards. As command text, because setup.sh runs the plan via `bash -c` (without deps.sh).
 deps_docker_service_cmd() {
   echo '{ ! command -v systemctl >/dev/null 2>&1 || sudo systemctl enable --now docker || true; }'
 }
 
-# Wie kommt WERKZEUG auf diesen Rechner? → "pm BEFEHL" | "download BESCHREIBUNG" | "manual HINWEIS"
+# How does TOOL get onto this machine? → "pm COMMAND" | "download DESCRIPTION" | "manual HINT"
 deps_method() {
   local tool="$1" pm os cand pkg
   pm="$(deps_pm)"; os="$(deps_os)"
@@ -158,9 +158,9 @@ deps_method() {
     docker)
       if [ "$os" = darwin ]; then echo "manual brew install --cask docker   (then start Docker Desktop)"; return; fi
       if [ "$pm" = dnf ] && deps_rhel_clone; then
-        # Docker's eigenes Repo fuer Rocky enthaelt (Stand 2026-10) nur die Plugins, kein docker-ce, und
-        # AlmaLinux/Oracle kennt get.docker.com gar nicht (24515f13). Deren Pakete sind die von CentOS —
-        # der offizielle Weg aus docs.docker.com/engine/install/centos, Repo-Datei per curl (dnf 4 und 5).
+        # Docker's own repo for Rocky contains (as of 2026-10) only the plugins, no docker-ce, and
+        # AlmaLinux/Oracle are not known to get.docker.com at all (24515f13). Their packages are those of CentOS —
+        # the official way from docs.docker.com/engine/install/centos, repo file via curl (dnf 4 and 5).
         echo "pm sudo curl -fsSL -o /etc/yum.repos.d/docker-ce.repo https://download.docker.com/linux/centos/docker-ce.repo && sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin && $(deps_docker_service_cmd) && sudo usermod -aG docker $(id -un)"
         return
       fi
@@ -186,7 +186,7 @@ deps_method() {
   if [ -n "$pkg" ] && [ "$pm" != none ]; then echo "pm $(deps_install_cmd "$pm" "$pkg")"; else echo "manual install $tool"; fi
 }
 
-# deps_plan MODUS → je fehlendem/zu altem Werkzeug eine Zeile "werkzeug methode befehl"
+# deps_plan MODE → one line "tool method command" per missing/too-old tool
 deps_plan() {
   local tool state method node_download=0
   for tool in $(deps_required "$1"); do
@@ -197,19 +197,19 @@ deps_plan() {
       [ "${state%% *}" = ok ] && continue
     fi
     method="$(deps_method "$tool")"
-    # npm kommt mit Node — kein eigener Eintrag, wenn Node ohnehin installiert wird
+    # npm comes with Node — no entry of its own if Node is being installed anyway
     if [ "$tool" = node ]; then node_download=1; fi
     if [ "$tool" = npm ] && [ "$node_download" = 1 ]; then continue; fi
     printf '%-7s %-8s %s\n' "$tool" "${method%% *}" "${method#* }"
   done
 }
 
-# --- Geprueftes Download ----------------------------------------------------------------------------
+# --- Verified download ----------------------------------------------------------------------------
 
 _deps_sha256() { if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" | cut -d' ' -f1; else shasum -a 256 "$1" | cut -d' ' -f1; fi; }
 
-# deps_download node|java — laedt, prueft die SHA-256, entpackt nach $DEPS_DATA/<node|jdk>, schreibt
-# env.sh. Test-Overrides: DEPS_NODE_URL/DEPS_NODE_SHA256, DEPS_JDK_URL/DEPS_JDK_SHA256.
+# deps_download node|java — downloads, verifies the SHA-256, unpacks to $DEPS_DATA/<node|jdk>, writes
+# env.sh. Test overrides: DEPS_NODE_URL/DEPS_NODE_SHA256, DEPS_JDK_URL/DEPS_JDK_SHA256.
 deps_download() {
   local tool="$1" os arch url sum name dir tmp file got
   os="$(deps_os)"; arch="$(deps_arch)"
@@ -242,7 +242,7 @@ deps_download() {
   deps_write_env
 }
 
-# env.sh: bringt heruntergeladene Werkzeuge auf den PATH (setup.sh und instance.sh lesen sie)
+# env.sh: puts downloaded tools on the PATH (setup.sh and instance.sh read it)
 deps_write_env() {
   local out="$DEPS_DATA/env.sh" home=""
   {
@@ -253,15 +253,15 @@ deps_write_env() {
   } > "$out"
 }
 
-# --- Shell des Nutzers (2605ed1f) -------------------------------------------------------------------
-# setup.sh und instance.sh laden env.sh selbst, die Shell des Nutzers nicht: ohne Eintrag im Profil
-# fehlen dort das heruntergeladene node/npm und alles, was npm -g dorthin legt (codex, pi). Eingetragen
-# wird in das Profil, das eine Login-Shell wirklich liest — bash nimmt ~/.bash_profile, wenn es die
-# gibt (Rocky, Fedora), und ignoriert dann ~/.profile; zsh (macOS) liest ~/.zprofile.
+# --- The user's shell (2605ed1f) -------------------------------------------------------------------
+# setup.sh and instance.sh load env.sh themselves, the user's shell does not: without an entry in the profile
+# the downloaded node/npm and everything npm -g puts there (codex, pi) are missing there. The entry
+# goes into the profile a login shell actually reads — bash takes ~/.bash_profile if it
+# exists (Rocky, Fedora), and then ignores ~/.profile; zsh (macOS) reads ~/.zprofile.
 
 deps_tilde() { case "$1" in "$HOME"/*) printf '~%s' "${1#"$HOME"}" ;; *) printf '%s' "$1" ;; esac; }
 
-# Hat der Download etwas auf den PATH gelegt? (env.sh ohne export-Zeile bringt nichts)
+# Did the download put something on the PATH? (env.sh without an export line does nothing)
 deps_env_active() { grep -q '^export PATH=' "$DEPS_DATA/env.sh" 2>/dev/null; }
 
 deps_login_shell() {
@@ -281,11 +281,11 @@ deps_profile_file() {
   esac
 }
 
-# Laedt das Profil env.sh schon — in welcher Form auch immer?
+# Does the profile already load env.sh — in whatever form?
 deps_profile_has_env() { grep -qF "mysuricates/env.sh" "${1:-$(deps_profile_file)}" 2>/dev/null; }
 
-# Die Zeile zum Abschreiben, und die, die der Installer eintraegt: sie bricht die Anmeldung nicht, wenn
-# ~/.local/share/mysuricates spaeter geloescht wird.
+# The line to copy, and the one the installer adds: it does not break the login if
+# ~/.local/share/mysuricates is deleted later.
 deps_profile_hint() { printf '. %s' "$(deps_tilde "$DEPS_DATA/env.sh")"; }
 deps_profile_line() {
   local f="$DEPS_DATA/env.sh"
@@ -293,12 +293,12 @@ deps_profile_line() {
   printf '[ -r "%s" ] && . "%s"' "$f" "$f"
 }
 
-# deps_profile_add [PROFIL] — traegt die Zeile ein, wenn das Profil env.sh noch nicht laedt (idempotent)
+# deps_profile_add [PROFILE] — adds the line if the profile does not load env.sh yet (idempotent)
 deps_profile_add() {
   local p="${1:-$(deps_profile_file)}"
   deps_profile_has_env "$p" && return 0
   {
-    if [ -s "$p" ] && [ -n "$(tail -c 1 "$p")" ]; then echo; fi   # letzte Zeile ohne Zeilenende
+    if [ -s "$p" ] && [ -n "$(tail -c 1 "$p")" ]; then echo; fi   # last line without a line ending
     echo
     echo "# MySuricates: vom Installer heruntergeladene Werkzeuge (Node, npm, Java) und npm-Programme wie pi"
     deps_profile_line; echo
@@ -307,14 +307,14 @@ deps_profile_add() {
 
 # --- npm -g -----------------------------------------------------------------------------------------
 
-_deps_can_write() {  # VERZEICHNIS — schreibbar, oder im naechsten vorhandenen Elternordner anlegbar
+_deps_can_write() {  # DIRECTORY — writable, or creatable in the nearest existing parent folder
   local d="$1"
   while [ -n "$d" ] && [ "$d" != / ] && [ ! -e "$d" ]; do d="$(dirname "$d")"; done
   [ -d "$d" ] && [ -w "$d" ]
 }
 
-# Braucht `npm install -g` sudo? Nein beim heruntergeladenen Node ($DEPS_DATA/node) und bei Homebrew,
-# ja beim Node aus apt/dnf — dessen globales Verzeichnis gehoert root (0a078449).
+# Does `npm install -g` need sudo? No with the downloaded Node ($DEPS_DATA/node) and with Homebrew,
+# yes with Node from apt/dnf — its global directory belongs to root (0a078449).
 deps_npm_needs_sudo() {
   local prefix
   prefix="$(npm prefix -g 2>/dev/null)"

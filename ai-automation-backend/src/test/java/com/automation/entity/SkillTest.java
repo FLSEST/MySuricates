@@ -78,7 +78,7 @@ class SkillTest {
         assertThat(skill.getId()).isNull();
         assertThat(skill.getName()).isNull();
         assertThat(skill.getCategory()).isNull();
-        // Felder ohne @Builder.Default werden vom NoArgsConstructor nicht initialisiert
+        // Fields without @Builder.Default are not initialised by the NoArgsConstructor
         assertThat(skill.isBuiltin()).isFalse();
     }
 

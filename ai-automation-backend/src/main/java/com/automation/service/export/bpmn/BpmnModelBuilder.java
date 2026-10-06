@@ -17,24 +17,24 @@ import static com.automation.service.export.bpmn.BpmnModel.Kind.TASK;
 import static com.automation.service.export.bpmn.BpmnModel.Kind.USER_TASK;
 
 /**
- * Baut aus einem Workflow das interne BPMN-Modell inkl. Koordinaten.
- * Deterministisch, kein AI-Call (Spec §3). Eine Instanz pro build()-Aufruf.
+ * Builds the internal BPMN model including coordinates from a workflow.
+ * Deterministic, no AI call (spec §3). One instance per build() call.
  */
 class BpmnModelBuilder implements BpmnGatewayBuilder.ChainBuilder {
 
-    // Layout-Konstanten (Spec §5)
+    // Layout constants (spec §5)
     static final double TASK_W = 100, TASK_H = 80, EVT = 36, GW = 50;
     static final double GAP = 150, MAIN_Y = 200, ROW_STEP = 150, SUB_PAD = 40;
 
-    /** Id-Präfix der Top-Level-Blockkette; Zweig-Blöcke hängen ihren Pfad daran (BpmnBranchBlocks). */
+    /** Id prefix of the top-level block chain; branch blocks append their path to it (BpmnBranchBlocks). */
     static final String ROOT_PREFIX = "b";
 
     private final BpmnNodeFactory f;
     private final BpmnGatewayBuilder gateways;
     /**
-     * Id-Basis → Aktivitäts-Knoten, für Top-Level- wie Zweig-Blöcke. Nur Blöcke, die zu genau einem
-     * Task/Sub-Prozess werden, tragen sich ein; conditional/switch (Gateways) bleiben leer.
-     * Grundlage der Datenassoziationen.
+     * Id base → activity node, for top-level as well as branch blocks. Only blocks that become exactly one
+     * task/sub-process register themselves; conditional/switch (gateways) stay empty.
+     * Basis of the data associations.
      */
     private final Map<String, String> activityIdByBase = new HashMap<>();
 
@@ -74,7 +74,7 @@ class BpmnModelBuilder implements BpmnGatewayBuilder.ChainBuilder {
         BpmnEdgeRouter router = new BpmnEdgeRouter(f.nodeIndex());
         model.edges.forEach(router::route);
         router.routeChildEdges(model.nodes);
-        // Datenfluss zuletzt: er braucht die endgültigen Koordinaten der Task-Reihe.
+        // Data flow last: it needs the final coordinates of the task row.
         BpmnDataFlowBuilder.apply(model, blocks, activityIdByBase, ROOT_PREFIX);
         return model;
     }
@@ -84,7 +84,7 @@ class BpmnModelBuilder implements BpmnGatewayBuilder.ChainBuilder {
         activityIdByBase.put(idBase, nodeId);
     }
 
-    /** Horizontale Kette aus Blöcken; Koordinaten relativ (Zeilenmitte y=0, Beginn x=0). */
+    /** Horizontal chain of blocks; coordinates relative (row center y=0, start x=0). */
     @Override
     public BpmnSegment buildChain(List<BlockDefinition> blocks, String idPrefix) {
         BpmnSegment seg = new BpmnSegment();
@@ -114,7 +114,7 @@ class BpmnModelBuilder implements BpmnGatewayBuilder.ChainBuilder {
         return switch (type) {
             case "conditional" -> gateways.buildConditional(block, idBase);
             case "switch" -> gateways.buildSwitch(block, idBase);
-            // foreach mit workflow_id ruft je Item einen Workflow auf: Aufrufaktivität mit Multi-Instance (a5c9fbbf)
+            // foreach with workflow_id calls a workflow per item: call activity with multi-instance (a5c9fbbf)
             case "foreach" -> BpmnBlockText.str(block.getConfig(), "workflow_id").isBlank()
                     ? buildLoop(block, idBase) : singleTask(block, idBase);
             case "while" -> buildLoop(block, idBase);
@@ -122,7 +122,7 @@ class BpmnModelBuilder implements BpmnGatewayBuilder.ChainBuilder {
         };
     }
 
-    /** Einzelner Block -> ein Task-Knoten. */
+    /** Single block -> one task node. */
     private BpmnSegment singleTask(BlockDefinition block, String idBase) {
         String type = block.getType() == null ? "" : block.getType();
         Map<String, Object> config = block.getConfig();

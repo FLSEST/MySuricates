@@ -10,14 +10,14 @@ import {
 /** Mindestabstand zweier beschrifteter Rasterlinien in px; dazwischen bleiben Linien unbeschriftet. */
 const MIN_LABEL_PX = 30;
 /**
- * Platz einer Monats- bzw. Jahresbeschriftung: Am Anfang der Achse entfällt sie, wenn der nächste Monat
- * (bzw. das nächste Jahr) so nah folgt, am Ende, wenn bis zum Rand nicht so viel Platz bleibt.
+ * Space of a month or year label: at the start of the axis it is omitted if the next month
+ * (or the next year) follows that closely, at the end if not that much space remains to the edge.
  */
 const MIN_BAND_PX = 70;
 const TICK_DAYS = { day: 1, week: 7, month: 30.4 } as const;
-/** Platz, den eine linksbündige Tick-Beschriftung („28.10.“, „Nov.“) rechts braucht; weniger am Achsenende → keine. */
+/** Space a left-aligned tick label („28.10.“, „Nov.“) needs on the right; less at the axis end → none. */
 const TICK_LABEL_PX = 36;
-/** Lage des Etiketts „heute“ je Ausweichrichtung; seitlich reicht es ein Stück über die Linie von heute. */
+/** Position of the „heute“ label per evasion direction; sideways it reaches a bit past today's line. */
 const TODAY_LABEL: Record<TodayLabelPlacement, { className: string; offset: number }> = {
   center: { className: 'bottom-1 -translate-x-1/2', offset: 0 },
   right: { className: 'bottom-1', offset: -TODAY_LABEL_OVERLAP },
@@ -29,15 +29,15 @@ interface TimelineAxisViewProps {
   axis: TimelineAxis;
   width: number;
   targetDay: number | null;
-  /** Die Achse wird gemessen – ihre Breite ist die aller Zeilen. */
+  /** The axis is measured - its width is that of all rows. */
   measureRef: RefObject<HTMLDivElement | null>;
   onCreateAt: (day: number, x: number) => void;
 }
 
 /**
- * Die Achse des Zeitstrahls (TODO e192df18): Monate bzw. Jahre, darunter das Raster, die Fahne des
- * Zieldatums und „heute“. Ein Klick legt an diesem Tag einen Meilenstein an (c60bf914) – wie ein
- * Klick in die Meilenstein-Zeile direkt darunter.
+ * The axis of the timeline (TODO e192df18): months or years, below them the grid, the flag of the
+ * goal date and „heute“. A click creates a milestone on that day (c60bf914) - like a
+ * click in the milestone row directly below.
  */
 export function TimelineAxisView({
   axis, width, targetDay, measureRef, onCreateAt,
@@ -49,7 +49,7 @@ export function TimelineAxisView({
   const labelEvery = Math.max(1, Math.ceil(MIN_LABEL_PX / (perDay * TICK_DAYS[axis.scale])));
   const x = (day: number) => xOfDay(axis, day, width);
   const start = (day: number) => (day - axis.startDay) * perDay;
-  /** Am rechten Ende ragte eine Beschriftung über die Karte hinaus – dann lieber keine. */
+  /** At the right end a label stuck out past the card - then better none. */
   const fitsTick = (day: number) => (axis.scale === 'day' ? width - x(day) >= 8 : width - start(day) >= TICK_LABEL_PX);
 
   const tickLabel = (day: number) => {

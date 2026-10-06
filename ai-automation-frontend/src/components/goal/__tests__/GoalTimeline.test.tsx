@@ -20,10 +20,10 @@ import {
 } from '../timelineLayout';
 import type { Goal, GoalDetail, GoalMilestone, GoalProject, GoalTodoItem, GoalWorkPackage } from '../../../types';
 
-// Ziehen lässt sich in jsdom nicht echt ausführen (keine Layout-Maße). Der Test greift deshalb die
-// Handler des DndContext ab und löst Beginn, Bewegung und Ende eines Zugs so aus, wie dnd-kit sie
-// melden würde. Das Bild unter dem Zeiger (DragOverlay) zeigt dnd-kit nur bei einem echten Zug – hier
-// steht es immer, damit die Live-Zeile zu sehen ist, sobald der Zeitstrahl einen Zug kennt.
+// Dragging cannot really be executed in jsdom (no layout measurements). The test therefore intercepts the
+// handlers of the DndContext and triggers start, movement and end of a drag the way dnd-kit would
+// report them. dnd-kit shows the image under the pointer (DragOverlay) only during a real drag - here
+// it is always there so the live line is visible as soon as the timeline knows a drag.
 const dnd = vi.hoisted(() => ({ props: null as DndContextProps | null }));
 vi.mock('@dnd-kit/core', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@dnd-kit/core')>();
@@ -52,7 +52,7 @@ beforeEach(() => {
 const NOW = new Date(2026, 8, 24, 10, 0, 0);
 const endOf = (iso: string) => new Date(`${iso}T23:59:59`).toISOString();
 const startOf = (iso: string) => new Date(`${iso}T00:00:00`).toISOString();
-/** Leerzeichen, wie ICU sie in englische Zeiträume setzt, als gewöhnliche. */
+/** Spaces, as ICU puts them in English periods, as ordinary ones. */
 const plain = (text: string | null | undefined) => (text ?? '').replace(/\s/g, ' ');
 
 function item(overrides: Partial<GoalTodoItem>): GoalTodoItem {
@@ -115,7 +115,7 @@ const todos: GoalTodoItem[] = [
 
 interface Sent { method: string; path: string; body: unknown }
 
-/** Nimmt alle schreibenden Aufrufe des Zeitstrahls entgegen. */
+/** Accepts all writing calls of the timeline. */
 function recordWrites(): Sent[] {
   const sent: Sent[] = [];
   const record = async ({ request }: { request: Request }) => {
@@ -139,7 +139,7 @@ function recordWrites(): Sent[] {
   return sent;
 }
 
-/** Die Seitenleiste der Zielseite (c60bf914): der Zeitstrahl meldet, was geöffnet werden soll. */
+/** The side bar of the goal page (c60bf914): the timeline reports what should be opened. */
 const selection = { select: vi.fn(), close: vi.fn() };
 
 function renderTimeline(
@@ -158,7 +158,7 @@ function renderTimeline(
   return onOpenTodo;
 }
 
-/** Dieselbe Achse, die der Zeitstrahl ohne gemessene Breite zeichnet. */
+/** The same axis that the timeline draws without a measured width. */
 const axis = axisFor({ todos, workPackages, milestones, targetDate: goal.targetDate, today: dayOf(NOW) }, FALLBACK_WIDTH);
 const PER_DAY = FALLBACK_WIDTH / axis.days;
 /** Wo der Tag im Zeitstrahl liegt. */
@@ -166,8 +166,8 @@ const xFor = (iso: string) => xOfDay(axis, dayOfIsoDate(iso)!, FALLBACK_WIDTH);
 
 const ROW_LEFT = 180;
 /**
- * Ein Zug, wie dnd-kit ihn meldet: `active` (etwa `todo:a`, `wp:w-repo`, `wp-end:w-repo`, `ms:m-freeze`)
- * über `over`, der Zeiger `x` Pixel rechts vom Anfang der Fläche, um `deltaX` bewegt.
+ * A drag as dnd-kit reports it: `active` (e.g. `todo:a`, `wp:w-repo`, `wp-end:w-repo`, `ms:m-freeze`)
+ * over `over`, the pointer `x` pixels right of the start of the surface, moved by `deltaX`.
  */
 function dragEvent(active: string, over: string | null, x = 0, deltaX = 40) {
   return {
@@ -187,7 +187,7 @@ const moveDrag = (active: string, over: string | null, x = 0, deltaX = 40) =>
 const dropOn = (active: string, over: string | null, x = 0, deltaX = 40) =>
   act(() => dnd.props!.onDragEnd!(dragEvent(active, over, x, deltaX) as unknown as DragEndEvent));
 
-/** Das Ende eines Zugs per Tastatur: kein Zeiger, der Tag steht unter dem Statuspunkt des angehobenen Chips. */
+/** The end of a drag by keyboard: no pointer, the day is under the status dot of the lifted chip. */
 function keyboardDropOn(todoId: string, overId: string, dotX: number) {
   const left = ROW_LEFT + dotX - CHIP_ANCHOR;
   const event = {
@@ -860,7 +860,7 @@ const detailOfFixtures = {
   goal, todos, workPackages, milestones, projects, byProject: [], decisionsSupported: true,
 } as unknown as GoalDetail;
 
-/** Zeitstrahl und Seitenleiste des Pakets „Repo sauber“ nebeneinander, wie auf der Zielseite. */
+/** Timeline and side bar of the package „Repo sauber“ side by side, as on the goal page. */
 function renderWithPanel(results: Map<string, never>, openAssign = vi.fn()) {
   renderWithProviders(
     <GoalWorkflowsContext.Provider value={{ goalId: 'g1', supported: true, attachments: [attachment], results, openAssign }}>

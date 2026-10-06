@@ -28,8 +28,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 /**
- * Der Startup-Job darf den Backend-Start nie verhindern: ein kaputter Scope (Constraint,
- * SQLITE_BUSY) wird protokolliert, die uebrigen Scopes laufen trotzdem.
+ * The startup job must never prevent the backend from starting: a broken scope (constraint,
+ * SQLITE_BUSY) is logged, the remaining scopes still run.
  */
 @ExtendWith(MockitoExtension.class)
 class AuditFingerprintMigrationJobResilienceTest {

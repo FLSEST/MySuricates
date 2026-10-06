@@ -20,11 +20,11 @@ export function sidebarEntryId(entry: SidebarEntry<{ to: string }>): string {
 }
 
 /**
- * Reihenfolge, Unterteiler und ausgeblendete Seiten der Sidebar. `visibleEntries` ist das Menü:
- * in Pro die gespeicherte (oder Standard-)Reihenfolge ohne ausgeblendete Seiten und ohne
- * Unterteiler, die nichts mehr trennen; in Simple nur die Simple-Seiten unter ihren Simple-Titeln,
- * ohne Unterteiler. `editModeEntries` zeigt jeden gespeicherten Unterteiler, `hiddenNavItems` die
- * ausgeblendeten Seiten. Seiten abgeschalteter Module fehlen überall, behalten aber ihren Platz.
+ * Order, dividers and hidden pages of the sidebar. `visibleEntries` is the menu:
+ * in Pro the stored (or default) order without hidden pages and without
+ * dividers that no longer separate anything; in Simple only the Simple pages under their Simple titles,
+ * without dividers. `editModeEntries` shows every stored divider, `hiddenNavItems` the
+ * hidden pages. Pages of disabled modules are missing everywhere but keep their place.
  */
 export function useSidebarOrder() {
   const {

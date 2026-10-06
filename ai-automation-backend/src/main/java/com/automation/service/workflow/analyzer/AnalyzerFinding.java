@@ -1,33 +1,33 @@
 package com.automation.service.workflow.analyzer;
 
 /**
- * Ein Baufehler-Befund an einer Workflow-Definition.
+ * A construction-error finding on a workflow definition.
  *
- * <p><b>Zweisprachig</b> (TODO 81773d7b): {@code detail} bleibt deutsch — so lesen ihn ältere Clients, das
- * Activity-Log und {@code PoolAnalyzerGateTest} —, {@code detailEn} trägt denselben Satz auf Englisch. Jede Regel
- * liefert beide; {@link #of} verlangt sie, und {@code AnalyzerFindingLanguagesTest} löst jede Regel aus und prüft
- * beide Texte. Die Oberfläche wählt nach ihrer Sprache, der Assistent nach {@code language} der Anfrage
+ * <p><b>Bilingual</b> (TODO 81773d7b): {@code detail} stays German - that is how older clients, the
+ * activity log and {@code PoolAnalyzerGateTest} read it -, {@code detailEn} carries the same sentence in English. Every rule
+ * supplies both; {@link #of} requires them, and {@code AnalyzerFindingLanguagesTest} triggers every rule and checks
+ * both texts. The UI chooses by its language, the assistant by the request's {@code language}
  * ({@link #detail(String)}).
  *
- * @param rule      stabiler Schlüssel der Regel, für Filter und spätere TODO-Promotion
- * @param severity  {@code HIGH} kostet Geld oder bricht den Lauf, {@code MEDIUM} kostet Laufzeit
- *                  oder Kontext, {@code LOW} ist Hygiene
- * @param blockIndex 0-basierter Index des betroffenen Blocks, {@code -1} für die Definition als Ganzes
- * @param blockName  Name des Blocks, falls gesetzt — sonst {@code null}
- * @param detail    was konkret gefunden wurde, in einem Satz und mit dem Fundstück — deutsch
- * @param detailEn  derselbe Satz auf Englisch; {@code null} nur bei Befunden, die nicht aus einer Regel stammen
+ * @param rule      stable key of the rule, for filters and later TODO promotion
+ * @param severity  {@code HIGH} costs money or breaks the run, {@code MEDIUM} costs runtime
+ *                  or context, {@code LOW} is hygiene
+ * @param blockIndex 0-based index of the affected block, {@code -1} for the definition as a whole
+ * @param blockName  name of the block if set - otherwise {@code null}
+ * @param detail    what exactly was found, in one sentence and with the evidence - German
+ * @param detailEn  the same sentence in English; {@code null} only for findings that do not come from a rule
  */
 public record AnalyzerFinding(String rule, Severity severity, int blockIndex, String blockName, String detail,
                               String detailEn) {
 
     public enum Severity { HIGH, MEDIUM, LOW }
 
-    /** Ohne englischen Text — für Befunde von außerhalb der Regeln (Tests, Fixtures); die Regeln nutzen {@link #of}. */
+    /** Without English text - for findings from outside the rules (tests, fixtures); the rules use {@link #of}. */
     public AnalyzerFinding(String rule, Severity severity, int blockIndex, String blockName, String detail) {
         this(rule, severity, blockIndex, blockName, detail, null);
     }
 
-    /** Der Weg jeder Regel: beide Sprachen, keine davon leer. */
+    /** The path of every rule: both languages, neither of them empty. */
     static AnalyzerFinding of(String rule, Severity severity, int index, String name, String detail, String detailEn) {
         if (detail == null || detail.isBlank() || detailEn == null || detailEn.isBlank()) {
             throw new IllegalArgumentException("Befund " + rule + " braucht detail und detailEn");
@@ -35,7 +35,7 @@ public record AnalyzerFinding(String rule, Severity severity, int blockIndex, St
         return new AnalyzerFinding(rule, severity, index, name, detail, detailEn);
     }
 
-    /** Der Text in {@code language} ({@code "en"}, sonst deutsch); fehlt der englische, der deutsche. */
+    /** The text in {@code language} ({@code "en"}, otherwise German); if the English one is missing, the German one. */
     public String detail(String language) {
         return "en".equalsIgnoreCase(language) && detailEn != null && !detailEn.isBlank() ? detailEn : detail;
     }

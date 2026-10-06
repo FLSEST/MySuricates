@@ -14,7 +14,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Vertrag des Export-Adapters, geprüft an der einzigen Implementierung (BPMN). */
+/** Contract of the export adapter, checked against the only implementation (BPMN). */
 class ProcessFormatAdapterTest {
 
     private final ProcessFormatAdapter adapter = new BpmnExportAdapter(new ObjectMapper());

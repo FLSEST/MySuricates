@@ -50,7 +50,7 @@ public class AssistantTodoTools {
             var request = new CreateTodoRequest(
                     title, description, Todo.Status.OPEN, priority, tags,
                     projectId, null, Todo.Source.AI, "assistant", null,
-                    null,   // agentSessionRef: der Assistent laeuft nicht in einer CLI-Sitzung
+                    null,   // agentSessionRef: the assistant does not run in a CLI session
                     null, null, null, null
             );
             Todo created = todoService.create(request);

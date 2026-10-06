@@ -14,7 +14,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** Vertrag des Importers: Gegenstück zum Exporter mit gleichem Format-Schlüssel, Roundtrip, Ablehnung. */
+/** Contract of the importer: counterpart to the exporter with the same format key, roundtrip, rejection. */
 class ProcessFormatImporterTest {
 
     private final ObjectMapper mapper = new ObjectMapper();

@@ -77,9 +77,9 @@ export function TerminalPanel({ runId }: TerminalPanelProps) {
 
   // Opens the socket for the current runId; the caller is responsible for the 'connecting' status
   // (initial/reset state on mount, explicit set in handleReconnect).
-  // Ein rohes Browser-WebSocket kann beim Handshake keine Header senden — statt des API-Keys
-  // (der so in History und Proxy-Logs landen würde) holt jeder Verbindungsversuch ein frisches
-  // Einmal-Ticket.
+  // A raw browser WebSocket cannot send headers during the handshake - instead of the API key
+  // (which would end up in history and proxy logs) each connection attempt fetches a fresh
+  // one-time ticket.
   const connect = useCallback(async () => {
     if (!termRef.current) return;
 
@@ -90,7 +90,7 @@ export function TerminalPanel({ runId }: TerminalPanelProps) {
       setStatus('error');
       return;
     }
-    // Während des Ticket-Abrufs kann das Terminal längst unmountet sein (cleanup nullt termRef).
+    // During the ticket fetch the terminal may long since be unmounted (cleanup nulls termRef).
     if (!termRef.current) return;
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -156,7 +156,7 @@ export function TerminalPanel({ runId }: TerminalPanelProps) {
       }
     });
 
-    // Connect WebSocket (asynchron: holt zuerst ein Handshake-Ticket)
+    // Connect WebSocket (asynchronous: first fetches a handshake ticket)
     void connect();
 
     // Handle resize

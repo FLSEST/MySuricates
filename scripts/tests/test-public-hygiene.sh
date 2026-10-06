@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# Tests fuer scripts/ci/public-hygiene.sh und scripts/git-hooks/pre-commit (TODOs 5dbabe7c, 3fcc2cfe).
-# Run: bash scripts/tests/test-public-hygiene.sh   (exit 0 = alle Checks ok)
+# Tests for scripts/ci/public-hygiene.sh and scripts/git-hooks/pre-commit (TODOs 5dbabe7c, 3fcc2cfe).
+# Run: bash scripts/tests/test-public-hygiene.sh   (exit 0 = all checks ok)
 set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 PASS=0; FAIL=0
-# Die Ausweichorte der Privatliste (hygiene_private_list_path) liegen ausserhalb
-# des Repos. Ohne diese Isolation faende das Gate die echte Liste des Rechners.
-# GITHUB_ACTIONS gehoert mit dazu: annotate() schreibt dort '::error file=x,line=1::'
-# statt 'x:1 — ', und Zusicherungen auf 'Datei:Zeile' fallen dann nur in der CI
-# (Lauf 35910938266). Wie in test-pre-push-checks.sh.
+# The fallback locations of the private list (hygiene_private_list_path) lie outside
+# the repo. Without this isolation the gate would find the machine's real list.
+# GITHUB_ACTIONS has to be included: annotate() writes '::error file=x,line=1::' there
+# instead of 'x:1 — ', and assertions on 'file:line' then fail only in CI
+# (run 35910938266). As in test-pre-push-checks.sh.
 export XDG_CONFIG_HOME="$TMP/xdg"
 unset HYGIENE_PRIVATE_LIST HYGIENE_PRIVATE_TERMS GITHUB_ACTIONS
 
@@ -19,18 +19,18 @@ check() {  # $1 = label, $2 = shell condition
   if eval "$2"; then echo "  ok   $1"; PASS=$((PASS + 1)); else echo "  FAIL $1"; FAIL=$((FAIL + 1)); fi
 }
 
-# Das verbotene Literal zur Laufzeit zusammensetzen, damit diese Datei selbst sauber bleibt.
+# Assemble the forbidden literal at runtime so that this file itself stays clean.
 FORBIDDEN="$(printf '%s%s' '/home/' 'flo')"
-# noreply-Form, weil der commit-msg-Hook (Pre-Push-Gate) private Adressen ablehnt.
+# noreply form, because the commit-msg hook (pre-push gate) rejects private addresses.
 GIT="git -c user.name=t -c user.email=1+t@users.noreply.github.com"
 
-# Frisches Repo mit den Gate-Dateien, Hook via core.hooksPath (wie scripts/install-hooks.sh).
-make_repo() {  # $1 = pfad
+# Fresh repo with the gate files, hook via core.hooksPath (like scripts/install-hooks.sh).
+make_repo() {  # $1 = path
   git init -q "$1"
   mkdir -p "$1/scripts"
   cp -r "$REPO/scripts/ci" "$REPO/scripts/lib" "$REPO/scripts/git-hooks" "$1/scripts/"
-  # Die private Ausschlussliste ist untrackt und liegt nur lokal — sie darf nicht
-  # mit in die Testrepos wandern, sonst haengt das Ergebnis am Rechner.
+  # The private exclusion list is untracked and exists only locally — it must not
+  # wander into the test repos, otherwise the result depends on the machine.
   rm -f "$1/scripts/ci/hygiene-private.txt" "$1/scripts/ci/hygiene-private-terms.txt"
   ( cd "$1" && $GIT add . && $GIT commit -q -m init && git config core.hooksPath scripts/git-hooks )
 }
@@ -176,8 +176,8 @@ write_pool ctx-projectid <<'JSON'
  "blocks": [{"type": "shell", "config": {"command": "ls"}}]}
 JSON
 
-# Schreibweise, die in der generierten Schluesselliste NICHT wortwoertlich steht: der Export
-# (PoolExportSanitizer) normalisiert vor dem Vergleich, das Gate muss dasselbe tun (TODO 96640e6f).
+# Spelling that does NOT appear verbatim in the generated key list: the export
+# (PoolExportSanitizer) normalizes before the comparison, the gate has to do the same (TODO 96640e6f).
 write_pool ctx-kebab-projectid <<'JSON'
 {"name": {"de": "Kebab", "en": "Kebab"},
  "description": {"de": "Text.", "en": "Text."}, "scope": "portable", "tags": ["quality"],
@@ -216,14 +216,14 @@ write_pool unknown-blocktype <<'JSON'
  "blocks": [{"type": "magic", "config": {}}]}
 JSON
 
-# Ein Block ohne "config" ist gueltiges JSON und laeuft im Backend (config ist optional).
+# A block without "config" is valid JSON and runs in the backend (config is optional).
 write_pool blocktype-ohne-config <<'JSON'
 {"name": {"de": "Ohne Config", "en": "No config"},
  "description": {"de": "Text.", "en": "Text."}, "scope": "portable", "tags": ["quality"],
  "blocks": [{"type": "alchemy"}]}
 JSON
 
-# Die einzigen echten Verschachtelungsorte sind switch -> cases[].blocks und default
+# The only real nesting places are switch -> cases[].blocks and default
 # (SwitchBlockExecutor.java:37-38,59,67; ExecutionMode.java:68-76).
 write_pool nested-blocktype <<'JSON'
 {"name": {"de": "Verschachtelt", "en": "Nested"},
@@ -247,7 +247,7 @@ write_pool portable-repo-dep <<'JSON'
  "blocks": [{"type": "shell", "config": {"command": "bash scripts/ci/public-hygiene.sh"}}]}
 JSON
 
-# UUIDs schreibt nicht jeder Erzeuger klein — der Sanitizer im Backend prueft beide Schreibweisen.
+# Not every producer writes UUIDs in lowercase — the sanitizer in the backend checks both spellings.
 write_pool uppercase-uuid <<'JSON'
 {"name": {"de": "Grossbuchstaben", "en": "Uppercase"},
  "description": {"de": "Text.", "en": "Text."}, "scope": "portable", "tags": ["quality"],
@@ -260,7 +260,7 @@ write_pool dot-home-path <<'JSON'
  "blocks": [{"type": "shell", "config": {"command": "ls ~/.mysuricates/quarantine"}}]}
 JSON
 
-# --- Kriterium "ruft die eigene REST-API oder liest Zugangsdaten" (TODO 1ccdc6d5) ---
+# --- Criterion "calls the own REST API or reads credentials" (TODO 1ccdc6d5) ---
 write_pool self-api-curl <<'JSON'
 {"name": {"de": "Self-Call", "en": "Self call"},
  "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
@@ -309,43 +309,43 @@ write_pool db-sqlite <<'JSON'
  "blocks": [{"type": "shell", "config": {"command": "sqlite3 data/automation.db 'SELECT count(*) FROM todos'"}}]}
 JSON
 
-# Erlaubt: Dateigroesse ansehen ist kein Datenbankzugriff (mysuricates-performance-audit).
+# Allowed: looking at a file size is no database access (mysuricates-performance-audit).
 write_pool db-filesize-ok <<'JSON'
 {"name": {"de": "Groesse", "en": "Size"},
  "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
  "blocks": [{"type": "shell", "config": {"command": "stat -c %s ai-automation-backend/data/automation.db"}}]}
 JSON
 
-# Erlaubt: die auth-freie Health-Sonde.
+# Allowed: the auth-free health probe.
 write_pool api-health-ok <<'JSON'
 {"name": {"de": "Sonde", "en": "Probe"},
  "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
  "blocks": [{"type": "shell", "config": {"command": "curl -s -o /dev/null -w '%{time_total}' http://localhost:9090/api/v1/system/health"}}]}
 JSON
 
-# Erlaubt: die drei Heap-Zahlen ohne Key (c2cda5ed) — der Performance-Audit liest sie dort.
+# Allowed: the three heap numbers without key (c2cda5ed) — the performance audit reads them there.
 write_pool api-jvm-memory-ok <<'JSON'
 {"name": {"de": "Heap", "en": "Heap"},
  "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
  "blocks": [{"type": "shell", "config": {"command": "curl -s -m 5 http://localhost:9090/api/v1/system/jvm-memory"}}]}
 JSON
 
-# Nicht erlaubt: der Nachbar unter /system verlangt den Key — die Ausnahme gilt nur dem Heap-Pfad.
+# Not allowed: the neighbor under /system requires the key — the exception applies only to the heap path.
 write_pool self-api-request-metrics <<'JSON'
 {"name": {"de": "Kosten", "en": "Costs"},
  "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
  "blocks": [{"type": "shell", "config": {"command": "curl -s http://localhost:9090/api/v1/system/request-metrics"}}]}
 JSON
 
-# Erlaubt: das Praefix als Suchmuster in einer Liste, ohne Aufruf (mocking-gap-audit).
+# Allowed: the prefix as a search pattern in a list, without a call (mocking-gap-audit).
 write_pool api-prefix-as-marker-ok <<'JSON'
 {"name": {"de": "Marker", "en": "Marker"},
  "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
  "blocks": [{"type": "shell", "config": {"command": "python3 -c \"MARKERS = ['resttemplate', 'webclient', '/api/v1/', 'wiremock']\""}}]}
 JSON
 
-# --- Im Shell-Code zaehlt jeder Endpunkt ausser den schluesselfreien Sonden, gleich wie weit der
-# Aufruf steht (TODO 28007626): der Pfad in der Schleifenvariable lag mehr als 200 Zeichen vor curl. ---
+# --- In shell code every endpoint counts except the key-free probes, no matter how far the
+# call is away (TODO 28007626): the path in the loop variable lay more than 200 characters before curl. ---
 PAD="$(printf '%0240d' 0 | tr 0 x)"
 write_pool self-api-loopvar <<JSON
 {"name": {"de": "Schleife", "en": "Loop"},
@@ -359,8 +359,8 @@ write_pool self-api-variable <<JSON
  "blocks": [{"type": "shell", "config": {"command": "ROUTE=/api/v1/executions\n# $PAD\nwget -qO- \"http://localhost:9090\$ROUTE\""}}]}
 JSON
 
-# Shell-Code steckt auch in Bloecken mit execution_mode shell (hier im switch-Case) und im
-# items_command von foreach.
+# Shell code also lives in blocks with execution_mode shell (here in the switch case) and in the
+# items_command of foreach.
 write_pool self-api-nested-shell <<'JSON'
 {"name": {"de": "Verschachtelt", "en": "Nested"},
  "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
@@ -376,23 +376,23 @@ write_pool self-api-items-command <<'JSON'
    "command": "Fasse {{ item }} zusammen."}}]}
 JSON
 
-# Der Umweg ueber eine Sonde ist kein schluesselfreier Pfad: verglichen wird exakt, wie im ApiKeyAuthFilter.
+# The detour via a probe is not a key-free path: comparison is exact, as in the ApiKeyAuthFilter.
 write_pool self-api-probe-detour <<'JSON'
 {"name": {"de": "Umweg", "en": "Detour"},
  "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
  "blocks": [{"type": "shell", "config": {"command": "curl -s http://localhost:9090/api/v1/system/jvm-memory/../request-metrics"}}]}
 JSON
 
-# Gegenproben: die schluesselfreien Sonden in einer Schleife (wie im Performance-Audit) und ein Pfad im
-# Prompt ohne Aufruf bleiben erlaubt — die neue Regel gilt dem Shell-Code.
+# Counter-samples: the key-free probes in a loop (as in the performance audit) and a path in the
+# prompt without a call stay allowed — the new rule applies to shell code.
 write_pool api-keyfree-loop-ok <<JSON
 {"name": {"de": "Sonden", "en": "Probes"},
  "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
  "blocks": [{"type": "shell", "config": {"command": "for E in /actuator/health /api/v1/system/jvm-memory; do\n  # $PAD\n  curl -s -m 5 http://localhost:9090\$E\ndone"}}]}
 JSON
 
-# Ein Satzpunkt gehoert nicht zum Pfad: die Sonde am Satzende bleibt erlaubt, der Schluessel-Endpunkt am
-# Satzende wird ohne Punkt gemeldet.
+# A sentence period does not belong to the path: the probe at the end of the sentence stays allowed, the key endpoint at the
+# end of the sentence is reported without the period.
 write_pool api-probe-sentence-ok <<'JSON'
 {"name": {"de": "Satz", "en": "Sentence"},
  "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
@@ -411,8 +411,8 @@ write_pool api-path-in-prompt-ok <<'JSON'
  "blocks": [{"type": "simple", "config": {"command": "Die Route /api/v1/todos war laut Faktenblatt die langsamste."}}]}
 JSON
 
-# --- Zusammengesetzte Pfade (TODO 2a0c9420): der Endpunkt steht nie am Stueck im Shell-Code, sondern
-# entsteht erst aus Praefix und Variable bzw. aus einer Basis-URL in einer Variable. ---
+# --- Composed paths (TODO 2a0c9420): the endpoint never stands in one piece in the shell code, but
+# arises only from prefix and variable or from a base URL in a variable. ---
 write_pool self-api-composed-loop <<'JSON'
 {"name": {"de": "Zusammengesetzt", "en": "Composed"},
  "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
@@ -437,15 +437,15 @@ write_pool self-api-base-var-python <<'JSON'
  "blocks": [{"type": "shell", "config": {"command": "python3 - <<'PY'\nbase = 'http://localhost:9090/api/v1/'\nPY"}}]}
 JSON
 
-# Gegenprobe: das Praefix in einem Ausgabetext ist kein Aufruf (mysuricates-performance-audit).
+# Counter-sample: the prefix in an output text is no call (mysuricates-performance-audit).
 write_pool api-prefix-in-echo-ok <<'JSON'
 {"name": {"de": "Ausgabe", "en": "Output"},
  "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
  "blocks": [{"type": "shell", "config": {"command": "echo '# Request-Kosten der /api/v1-Routen'"}}]}
 JSON
 
-# --- Actuator (TODO 7721d8cb): ausser /actuator/health verlangt alles darunter den Key — /actuator/metrics
-# lieferte system-performance-analysis still 403 und je Lauf SECURITY-Warnungen. ---
+# --- Actuator (TODO 7721d8cb): except /actuator/health everything below requires the key — /actuator/metrics
+# silently returned 403 to system-performance-analysis and SECURITY warnings per run. ---
 write_pool self-api-actuator-metrics <<'JSON'
 {"name": {"de": "Metriken", "en": "Metrics"},
  "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
@@ -470,8 +470,8 @@ write_pool api-actuator-health-ok <<'JSON'
  "blocks": [{"type": "shell", "config": {"command": "curl -s -m 5 http://localhost:9090/actuator/health"}}]}
 JSON
 
-# --- Basis-URL ohne Pfad oder nur mit /api in einer Variable, der Endpunkt entsteht am Aufruf — dieselben
-# Formen wie BaseUrlVariables im Analyzer (Gleichlauf). Die Sonden bleiben erlaubt. ---
+# --- Base URL without path or only with /api in a variable, the endpoint arises at the call — the same
+# forms as BaseUrlVariables in the analyzer (parity). The probes stay allowed. ---
 write_pool self-api-short-base-actuator <<'JSON'
 {"name": {"de": "Basis kurz", "en": "Short base"},
  "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
@@ -561,10 +561,10 @@ check "Basis mit /api im f-String erkannt"       'grep -q "self-api-short-base-f
 check "Sonden ueber eine Basis-Variable erlaubt" '! grep -q "api-short-base-probes-ok" <<<"$OUT"'
 
 echo "13) Blocktyp-Drift: die erzeugte Gate-Liste deckt sich mit der Registry im Backend"
-# Seit TODO bdc784e1 ist HYGIENE_POOL_BLOCK_TYPES nicht mehr handgepflegt, sondern
-# wird von BlockTypesGateListTest aus BlockTypesIndexSection.BLOCK_TYPES erzeugt.
-# Dieser Check ist damit der Drift-Test ohne Maven: rot, wenn eine Seite geaendert
-# wurde, ohne die Datei neu zu erzeugen.
+# Since TODO bdc784e1 HYGIENE_POOL_BLOCK_TYPES is no longer maintained by hand, but
+# is generated by BlockTypesGateListTest from BlockTypesIndexSection.BLOCK_TYPES.
+# This check is thus the drift test without Maven: red if one side was changed
+# without regenerating the file.
 REGISTRY="$REPO/ai-automation-backend/src/main/java/com/automation/service/assistant/context/BlockTypesIndexSection.java"
 GENERATED_TYPES="$REPO/scripts/lib/block-types.generated.sh"
 JAVA_TYPES="$(grep -oE 'new BlockTypeEntry\("[a-z-]+"' "$REGISTRY" | sed 's/.*("//;s/"//' | sort | tr '\n' ' ')"
@@ -573,7 +573,7 @@ JAVA_TYPES="$(grep -oE 'new BlockTypeEntry\("[a-z-]+"' "$REGISTRY" | sed 's/.*("
 GATE_TYPES="$(printf '%s\n' "${HYGIENE_POOL_BLOCK_TYPES[@]:-}" | sort | tr '\n' ' ')"
 check "erzeugte Blocktyp-Datei vorhanden"      '[ -f "$GENERATED_TYPES" ]'
 check "Datei als erzeugt gekennzeichnet" \
-  'grep -q "generiert von BlockTypesGateListTest" "$GENERATED_TYPES"'
+  'grep -q "generated by BlockTypesGateListTest" "$GENERATED_TYPES"'
 check "Liste kommt aus der erzeugten Datei, nicht aus hygiene-rules.sh" \
   '! grep -qE "^HYGIENE_POOL_BLOCK_TYPES=\(" "$REPO/scripts/lib/hygiene-rules.sh"'
 check "Registry-Liste nicht leer"              '[ -n "$JAVA_TYPES" ]'
@@ -616,7 +616,7 @@ check ".gitignore ignoriert TODO-TESTS.md" \
   'grep -qxF "ai-automation-frontend/cypress/TODO-TESTS.md" "$REPO/.gitignore"'
 
 echo "20) Die in der Doku genannten Zahlen decken sich mit dem Code (TODO 3df2df73)"
-# Laeuft in ~0,4 s und braucht kein Netz — deshalb hier und nicht nur als eigener Test.
+# Runs in ~0.4 s and needs no network — hence here and not only as its own test.
 OUT=$(cd "$REPO" && bash scripts/public-readiness/doc-facts-check.sh 2>&1); RC=$?
 check "keine Zahlen-Drift in docs/ und README.de.md (exit 0)" '[ "$RC" -eq 0 ]'
 [ "$RC" -eq 0 ] || printf '%s\n' "$OUT" | sed 's/^/     /'
@@ -637,8 +637,8 @@ make_repo "$TMP/pool-crash"
 OUT=$(cd "$TMP/pool-crash" && bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
 check "Ausgangslage ohne Pool-Definitionen ist sauber (exit 0)" '[ "$RC" -eq 0 ]'
 
-# Das echte Unterskript, aber ohne ../lib daneben: es bricht mit exit 2 ab ("Regeldatei fehlt")
-# und gibt keine einzige Befundzeile aus. Genau dieser Fall fiel frueher lautlos weg.
+# The real sub-script, but without ../lib next to it: it aborts with exit 2 ("Regeldatei fehlt")
+# and prints not a single finding line. Exactly this case used to drop out silently.
 mkdir -p "$TMP/pool-orphan"
 cp "$REPO/scripts/ci/pool-neutrality.sh" "$TMP/pool-orphan/"
 printf '#!/usr/bin/env bash\nexec bash "%s/pool-neutrality.sh" "$@"\n' "$TMP/pool-orphan" \
@@ -660,7 +660,7 @@ check "kein zusaetzlicher Abbruch-Fehler"           '! grep -q "Pool-Neutralitae
 
 echo "24) Die Instanz-Schluesselliste des Gates stammt aus dem PoolExportSanitizer (TODO 96640e6f)"
 SANITIZER="$REPO/ai-automation-backend/src/main/java/com/automation/service/pool/PoolExportSanitizer.java"
-# Die camelCase-Liste aus INSTANCE_REFERENCE_KEYS, plus die snake_case-Schreibweise jedes Schluessels
+# The camelCase list from INSTANCE_REFERENCE_KEYS, plus the snake_case spelling of every key
 JAVA_KEYS="$(sed -n '/INSTANCE_REFERENCE_KEYS = List.of(/,/);/p' "$SANITIZER" \
   | grep -oE '"[a-zA-Z]+"' | tr -d '"' \
   | sed -E 'p; s/([a-z0-9])([A-Z])/\1_\2/g' | tr 'A-Z' 'a-z' | sort -u | tr '\n' ' ')"
@@ -712,8 +712,8 @@ check "hygiene-private.txt.example getrackt" \
   '[ -n "$(cd "$REPO" && git ls-files scripts/ci/hygiene-private.txt.example)" ]'
 
 echo "30) Letzte Zeile ohne Zeilenumbruch zaehlt mit"
-# Eine einzeilige Liste ohne abschliessendes \n war frueher ein lautloser No-op:
-# read gibt bei EOF ohne Umbruch false zurueck, die Schleife lief kein einziges Mal.
+# A one-line list without a trailing \n used to be a silent no-op:
+# read returns false at EOF without a line break, the loop never ran.
 printf 'workflow-pool/persoenlich-*.json' > "$TMP/priv/scripts/ci/hygiene-private.txt"
 OUT=$(cd "$TMP/priv" && bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
 check "Treffer trotz fehlendem Zeilenumbruch (exit 1)" '[ "$RC" -eq 1 ]'
@@ -786,8 +786,8 @@ mkdir -p "$XDG_CONFIG_HOME/mysuricates"
 cp "$TMP/terms-liste.txt" "$XDG_CONFIG_HOME/mysuricates/hygiene-private-terms.txt"
 OUT=$(cd "$TMP/terms" && bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
 check "XDG-Begriffsliste greift (exit 1)"                '[ "$RC" -eq 1 ]'
-# Seit dem Pre-Push-Gate (7030f362) prueft --staged die hinzugefuegten Zeilen
-# (check_private_terms_diff), den Bestand weiterhin nicht: notiz.md bleibt ungenannt.
+# Since the pre-push gate (7030f362) --staged checks the added lines
+# (check_private_terms_diff), the existing content still not: notiz.md stays unnamed.
 OUT=$(cd "$TMP/terms" && printf 'zebrafink\n' > neu.md && git add neu.md && bash scripts/ci/public-hygiene.sh --staged 2>&1); RC=$?
 check "--staged prueft den Bestand nicht"                '! grep -q "privater Begriff" <<<"$OUT" && ! grep -q "notiz.md" <<<"$OUT"'
 check "--staged prueft die neue Zeile (exit 1)"          '[ "$RC" -eq 1 ] && grep -q "neu.md:1 — neue Zeile enthaelt einen privaten Begriff (Zeile 3" <<<"$OUT"'

@@ -34,10 +34,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
- * Meilensteine – Termine des ganzen Ziels, optional an Arbeitspakete geknuepft – ueber die echte API
- * gegen die echte Datenbank (TODO c60bf914 Ziele Stufe 1: Ziel → Projekte → Arbeitspakete → TODOs,
- * Meilensteine, Gliederung und Zeitstrahl): Zustand aus den Paketen, von Hand erreichen, der naechste
- * Meilenstein in Zielliste und Detail, „Braucht dich“.
+ * Milestones – dates of the whole goal, optionally tied to work packages – via the real API
+ * against the real database (TODO c60bf914 goals stage 1: goal → projects → work packages → TODOs,
+ * milestones, outline and timeline): state from the packages, reach by hand, the next
+ * milestone in goal list and detail, „Braucht dich“.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -88,7 +88,7 @@ class GoalMilestoneApiIntegrationTest {
         assertThat(beta.get("state").asText()).isEqualTo("DUE_SOON");
         assertThat(beta.get("workPackageIds")).isEmpty();
 
-        // Datum ist Pflicht, Pakete muessen zum Ziel gehoeren, das Ziel muss es geben
+        // Date is mandatory, packages must belong to the goal, the goal must exist
         perform(post("/api/v1/goals/" + goalId + "/milestones"), Map.of("title", "Ohne Datum")).andExpect(status().isBadRequest());
         String otherGoal = createGoal("Anderes");
         String foreign = createWorkPackage(otherGoal, "Fremd");
@@ -119,14 +119,14 @@ class GoalMilestoneApiIntegrationTest {
         assertThat(milestoneRepository.findById(launchId).orElseThrow().getReachedAt()).as("beim ersten Erkennen gespeichert").isNotNull();
         assertThat(workPackageRepository.findById(site).orElseThrow().getCompletedAt()).isNotNull();
 
-        // Ein neues offenes TODO im Paket: der Meilenstein ist wieder offen, reachedAt bleibt
+        // A new open TODO in the package: the milestone is open again, reachedAt stays
         todoIn(goalId, site, "Nachzuegler");
         detail = json(mockMvc.perform(get("/api/v1/goals/" + goalId)));
         assertThat(milestone(detail, launchId).get("state").asText()).isEqualTo("OPEN");
         assertThat(milestone(detail, launchId).get("reopened").asBoolean()).isTrue();
         assertThat(milestone(detail, launchId).get("reachedAt").asText()).isEqualTo(reachedAt);
 
-        // Von Hand erreichen: nur ohne Pakete
+        // Reach by hand: only without packages
         perform(put("/api/v1/goals/" + goalId + "/milestones/" + launchId), Map.of("reached", true))
                 .andExpect(status().isBadRequest());
         perform(put("/api/v1/goals/" + goalId + "/milestones/" + betaId), Map.of("reached", true))
@@ -147,7 +147,7 @@ class GoalMilestoneApiIntegrationTest {
                 .andExpect(jsonPath("$.state").value("DUE_SOON"))
                 .andExpect(jsonPath("$.reachedAt").doesNotExist());
 
-        // Verknuepfungen ersetzen: nur noch das fertige Paket – erreicht
+        // Replace links: only the finished package left – reached
         perform(put("/api/v1/goals/" + goalId + "/milestones/" + launchId), Map.of("workPackageIds", List.of(docs)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.packagesTotal").value(1))
@@ -201,7 +201,7 @@ class GoalMilestoneApiIntegrationTest {
                 .andExpect(status().isCreated())).get("id").asText();
     }
 
-    /** Ein TODO im Projekt, dem Ziel und dem Paket zugeordnet. */
+    /** A TODO in the project, assigned to the goal and the package. */
     private Todo todoIn(String goalId, String workPackageId, String title) throws Exception {
         Todo todo = todoRepository.save(Todo.builder().title(title).priority(Todo.Priority.MEDIUM).projectId(project.getId()).build());
         perform(patch("/api/v1/todos/" + todo.getId() + "/planning"), Map.of("goalId", goalId, "workPackageId", workPackageId))

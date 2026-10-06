@@ -23,8 +23,8 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * goal_status und goal_guard_*: Inhalt, Ampel und Sanierung gegen gefaelschte Marker (TODO 259f4f66);
- * Meilensteine und Arbeitspakete getrennt (TODO c60bf914).
+ * goal_status and goal_guard_*: content, traffic light and sanitizing against forged markers (TODO 259f4f66);
+ * milestones and work packages separate (TODO c60bf914).
  */
 class GoalStatusContextTest {
 
@@ -56,7 +56,7 @@ class GoalStatusContextTest {
         assertThat(block).doesNotContain("Ohne Datum");
     }
 
-    /** Ein Arbeitspaket ohne Zeitraum (TODO c60bf914): „ohne Zeitraum“ statt einer leeren Stelle, nie faellig. */
+    /** A work package without a period (TODO c60bf914): "ohne Zeitraum" instead of an empty spot, never due. */
     @Test
     void workPackageWithoutPeriod_isListedAsSuch_andKeepsTheGuardGreen() {
         GoalSnapshot snapshot = snapshot("Launch", null,
@@ -100,7 +100,7 @@ class GoalStatusContextTest {
                 .isEqualTo("Meilenstein bald fällig: Beta (2026-09-26)");
     }
 
-    /** TODO c60bf914: ueberfaellige und bald faellige Arbeitspakete zaehlen mit, eigene Texte. */
+    /** TODO c60bf914: overdue and soon-due work packages count too, with their own texts. */
     @Test
     void guard_reportsWorkPackages_besideMilestonesAndTodos() {
         Map<String, String> vars = render(snapshot("Launch", null,

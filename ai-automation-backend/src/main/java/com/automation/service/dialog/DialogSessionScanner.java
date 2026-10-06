@@ -14,8 +14,8 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * Scannt ~/.claude/projects/ nach JSONL-Session-Dateien und liefert
- * Metadaten ohne KI-Aufruf. Nutzt history.jsonl als Titel-Quelle.
+ * Scans ~/.claude/projects/ for JSONL session files and returns
+ * metadata without an AI call. Uses history.jsonl as title source.
  */
 @Component
 @Slf4j
@@ -44,8 +44,8 @@ public class DialogSessionScanner {
     ) {}
 
     /**
-     * Zählt .jsonl-Dateien pro Projekt-Verzeichnis (schnell, kein File-Lesen).
-     * @return Map von absolutem Projekt-Pfad → Anzahl Sessions
+     * Counts .jsonl files per project directory (fast, no file reading).
+     * @return map of absolute project path → number of sessions
      */
     public Map<String, Integer> countPerProject() {
         Map<String, Integer> counts = new LinkedHashMap<>();
@@ -73,7 +73,7 @@ public class DialogSessionScanner {
     }
 
     /**
-     * Listet Sessions für einen bestimmten Projekt-Pfad.
+     * Lists sessions for a specific project path.
      */
     public List<DialogSessionInfo> scanSessions(String projectPathFilter, int limit) {
         if (!Files.exists(CLAUDE_PROJECTS_BASE)) {
@@ -85,21 +85,21 @@ public class DialogSessionScanner {
                 ? CLAUDE_PROJECTS_BASE.resolve(encodeProjectPath(projectPathFilter))
                 : CLAUDE_PROJECTS_BASE;
 
-        // History-Titel einmal laden (kostet ~50ms für 2 MB)
+        // Load history titles once (costs ~50ms for 2 MB)
         Map<String, String> historyTitles = loadHistoryTitles();
 
         return collectJsonlFiles(targetDir, limit, historyTitles);
     }
 
     /**
-     * Listet alle Sessions über alle Projekte hinweg.
+     * Lists all sessions across all projects.
      */
     public List<DialogSessionInfo> scanAllSessions(int limit) {
         return scanSessions(null, limit);
     }
 
     /**
-     * Gibt alle bekannten Projekt-Pfade aus den gescannten Sessions zurück.
+     * Returns all known project paths from the scanned sessions.
      */
     public List<String> listProjectPaths() {
         if (!Files.exists(CLAUDE_PROJECTS_BASE)) return List.of();
@@ -117,12 +117,12 @@ public class DialogSessionScanner {
         return new ArrayList<>(paths);
     }
 
-    // ── History-Titel ──────────────────────────────────────
+    // ── History titles ──────────────────────────────────────
 
     /**
-     * Lädt Session-Titel aus ~/.claude/history.jsonl.
-     * Pro sessionId wird die erste substanzielle Nachricht (display > 15 Zeichen) gespeichert.
-     * Kosten: einmaliger Parse von ~2 MB.
+     * Loads session titles from ~/.claude/history.jsonl.
+     * The first substantial message (display > 15 characters) is stored per sessionId.
+     * Cost: a one-time parse of ~2 MB.
      */
     private Map<String, String> loadHistoryTitles() {
         Map<String, String> titles = new HashMap<>();
@@ -142,7 +142,7 @@ public class DialogSessionScanner {
                         titles.put(sessionId, truncate(display.strip(), 150));
                     }
                 } catch (Exception e) {
-                    // Einzelne Zeilen ignorieren
+                    // Ignore individual lines
                 }
             }
         } catch (IOException e) {
@@ -152,7 +152,7 @@ public class DialogSessionScanner {
         return titles;
     }
 
-    // ── Session-Scan ───────────────────────────────────────
+    // ── Session scan ───────────────────────────────────────
 
     private List<DialogSessionInfo> collectJsonlFiles(Path searchRoot, int limit,
                                                        Map<String, String> historyTitles) {
@@ -166,7 +166,7 @@ public class DialogSessionScanner {
             log.debug("Error scanning for JSONL files: {}", e.getMessage());
         }
 
-        // Nach letzter Änderung sortieren (neueste zuerst)
+        // Sort by last modification (newest first)
         jsonlFiles.sort((a, b) -> {
             try {
                 return Files.getLastModifiedTime(b).compareTo(Files.getLastModifiedTime(a));
@@ -243,7 +243,7 @@ public class DialogSessionScanner {
 
                 Object contentObj = msg.get("content");
 
-                // Erste substanzielle User-Nachricht (>25 Zeichen, kein System-Wrapper)
+                // First substantial user message (>25 characters, no system wrapper)
                 if ("user".equals(type) && firstSubstantialMessage == null) {
                     String text = extractFirstText(contentObj);
                     if (text != null && text.length() > 25 && !isSystemWrapper(text)) {
@@ -251,7 +251,7 @@ public class DialogSessionScanner {
                     }
                 }
 
-                // Tool-Calls zählen
+                // Count tool calls
                 if ("assistant".equals(type) && contentObj instanceof List<?> blocks) {
                     for (Object block : blocks) {
                         if (block instanceof Map<?, ?> b && "tool_use".equals(b.get("type"))) {
@@ -265,7 +265,7 @@ public class DialogSessionScanner {
                 }
             }
 
-            // Top-3 Tools
+            // Top 3 tools
             List<String> dominantTools = toolFreq.entrySet().stream()
                     .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
                     .limit(3)
@@ -274,7 +274,7 @@ public class DialogSessionScanner {
 
             boolean substantial = toolCallCount >= SUBSTANTIAL_TOOL_CALLS && turnCount >= SUBSTANTIAL_TURNS;
 
-            // Titel-Auswahl: 1. history.jsonl 2. Erste substanzielle JSONL-Nachricht 3. sessionId
+            // Title choice: 1. history.jsonl 2. first substantial JSONL message 3. sessionId
             String effectiveId = sessionId != null
                     ? sessionId
                     : jsonlFile.getFileName().toString().replace(".jsonl", "");
@@ -314,7 +314,7 @@ public class DialogSessionScanner {
     }
 
     /**
-     * Erkennt System-injizierte Nachrichten die als Titel unbrauchbar sind.
+     * Detects system-injected messages that are unusable as titles.
      */
     private boolean isSystemWrapper(String text) {
         return text.startsWith("<local-command-caveat>")

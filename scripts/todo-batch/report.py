@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""TODO-Batch, Abarbeiten (TODO cc0eb3ba): Bericht, Merge-Vorschau, Ampel und Dashboard-Kachel – ohne KI.
+"""TODO batch, processing (TODO cc0eb3ba): report, merge preview, traffic light and dashboard tile – without AI.
 
-Prüft zuerst, dass seit der Prüfung niemand den Branch verändert hat (Review und Gesamt-Review dürfen nur lesen);
-sonst zurück auf `head.sha`. Ein angenommenes TODO ohne lesbares Review oder ohne echtes Urteil (`ok`/`findings`, nicht etwa
-`not_reviewed`) gilt als „mit Hinweis“, nicht als sauber. Schreibt `approval.md` (die Frage der Freigabe), `merge.json` und `widget.json`.
+First checks that nobody has changed the branch since the check (review and overall review may only read);
+otherwise back to `head.sha`. An accepted TODO without a readable review or without a real verdict (`ok`/`findings`, not e.g.
+`not_reviewed`) counts as "with remarks", not as clean. Writes `approval.md` (the approval question), `merge.json` and `widget.json`.
 """
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ def start_skips(not_started: dict, titles: dict) -> str:
 
 
 def warning(review: dict) -> str:
-    """Warum ein angenommenes TODO nur „mit Hinweis“ gilt: kein echtes Review-Urteil und/oder wichtige Befunde."""
+    """Why an accepted TODO only counts as "with remarks": no real review verdict and/or important findings."""
     parts = []
     if not review:
         parts.append("kein Review (fehlt oder nicht lesbar)")

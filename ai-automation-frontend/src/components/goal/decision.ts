@@ -1,12 +1,12 @@
 import type { GoalDetail, GoalTodoItem, RatedBy } from '../../types';
 
 /**
- * „Entschieden“ als Zustand am TODO (68a5e24e), rein und testbar. Eine Entscheidung beantwortet die
- * offene Frage: Sie schließt sie (der Server leert `openQuestion`), bleibt aber stehen, wenn später
- * eine neue Frage kommt – dann ist das TODO wieder QUESTION und zeigt die frühere Entscheidung mit.
+ * „Entschieden“ as a state on the TODO (68a5e24e), pure and testable. A decision answers the
+ * open question: it closes it (the server clears `openQuestion`), but stays if later
+ * a new question comes - then the TODO is QUESTION again and shows the earlier decision too.
  */
 
-/** Wie ein TODO nach einer Entscheidung aussieht – für die sofortige Anzeige, bevor der Server antwortet. */
+/** What a TODO looks like after a decision - for immediate display, before the server answers. */
 export function applyDecision(todo: GoalTodoItem, decision: string, now: string, by: RatedBy = 'USER'): GoalTodoItem {
   const text = decision.trim();
   if (!text) {
@@ -18,7 +18,7 @@ export function applyDecision(todo: GoalTodoItem, decision: string, now: string,
   return { ...todo, decision: text, decidedAt: now, decidedBy: by, openQuestion: null, decisionState: 'DECIDED' };
 }
 
-/** Das Ziel nach einer Entscheidung: das TODO geändert, die Zähler von Ziel, Projekt und Paket nachgezogen. */
+/** The goal after a decision: the TODO changed, the counters of goal, project and package updated. */
 export function applyDecisionToDetail(detail: GoalDetail, todoId: string, decision: string, now: string): GoalDetail {
   const before = detail.todos.find((todo) => todo.id === todoId);
   if (!before) return detail;
@@ -47,7 +47,7 @@ export function applyDecisionToDetail(detail: GoalDetail, todoId: string, decisi
   };
 }
 
-/** Offene Fragen und Entscheidungen einer Menge TODOs, gezählt wie beim Server. */
+/** Open questions and decisions of a set of TODOs, counted like on the server. */
 export function decisionCounts(todos: GoalTodoItem[]): { openQuestions: number; decided: number } {
   const counted = todos.filter((todo) => todo.status !== 'ARCHIVED');
   return {

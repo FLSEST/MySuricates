@@ -13,9 +13,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Welches Anfrage-Feld wohin geht (TODO 5c419baa). Was ueber den Service laeuft – Pruefung vor dem
- * Speichern, Versionseintrag, Events – steht in {@link WorkflowServiceTest}; hier die Regeln der
- * Felduebernahme selbst.
+ * Which request field goes where (TODO 5c419baa). What runs through the service – validation before
+ * saving, version entry, events – is in {@link WorkflowServiceTest}; here the rules of
+ * the field transfer itself.
  */
 class WorkflowRequestFieldsTest {
 
@@ -34,7 +34,7 @@ class WorkflowRequestFieldsTest {
         return new UpdateWorkflowRequest(name, null, icon, null, instructions, null, null, null, null);
     }
 
-    /** Nur Name, Beschreibung und Bloecke sind Inhalt, den WorkflowContentChangedEvent ankuendigt. */
+    /** Only name, description and blocks are content that WorkflowContentChangedEvent announces. */
     @Test
     void apply_reportsContentChange_onlyForNameDescriptionOrBlocks() {
         assertThat(WorkflowRequestFields.apply(workflow(), request(null, "star", "neu"))).isFalse();
@@ -57,7 +57,7 @@ class WorkflowRequestFieldsTest {
         assertThat(workflow.getVersion()).isEqualTo("1.0.0");
     }
 
-    /** Metadaten werden gemischt, der Standard-Kontext ersetzt. */
+    /** Metadata is merged, the default context replaced. */
     @Test
     void apply_mergesMetadata_butReplacesTheDefaultContext() {
         Workflow workflow = workflow();
@@ -69,7 +69,7 @@ class WorkflowRequestFieldsTest {
         assertThat(workflow.getDefaultContext()).containsExactlyEntriesOf(Map.of("b", "2"));
     }
 
-    /** Von Hand gesetzte Tags oder Kategorie sperren die automatische Verschlagwortung. */
+    /** Manually set tags or category lock the automatic tagging. */
     @Test
     void apply_tagsOrCategory_lockTheAutoTagging() {
         Workflow tagged = workflow();
@@ -86,7 +86,7 @@ class WorkflowRequestFieldsTest {
         assertThat(categorized.isTagsUserEdited()).isTrue();
     }
 
-    /** Eine Wiederherstellung ersetzt jedes versionierte Feld, auch mit null, statt zu mischen. */
+    /** A restore replaces every versioned field, even with null, instead of merging. */
     @Test
     void restore_replacesEveryVersionedField_nullIncluded() {
         Workflow workflow = workflow();

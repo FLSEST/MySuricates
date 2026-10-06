@@ -7,8 +7,8 @@ import { invalidatePlanning, patchGoalDetail } from './useGoalTimeline';
 import type { CreateGoalMilestoneRequest, GoalMilestone, UpdateGoalMilestoneRequest } from '../types';
 
 /**
- * Meilensteine eines Ziels (c60bf914): Termine fürs ganze Ziel, optional mit Arbeitspaketen verknüpft –
- * erreicht, wenn die verknüpften Pakete abgeschlossen sind, ohne Verknüpfung von Hand.
+ * Milestones of a goal (c60bf914): dates for the whole goal, optionally linked to work packages –
+ * reached when the linked packages are completed, without a link by hand.
  */
 export function useCreateMilestone(goalId: string) {
   const qc = useQueryClient();
@@ -24,7 +24,7 @@ export function useCreateMilestone(goalId: string) {
   });
 }
 
-/** Die Änderung im gespeicherten Meilenstein – Datum und Verknüpfungen sofort sichtbar. */
+/** The change in the stored milestone – date and links visible immediately. */
 function applyToMilestone(item: GoalMilestone, data: UpdateGoalMilestoneRequest): GoalMilestone {
   return {
     ...item,
@@ -36,8 +36,8 @@ function applyToMilestone(item: GoalMilestone, data: UpdateGoalMilestoneRequest)
 }
 
 /**
- * Ändert einen Meilenstein; die Raute springt sofort (optimistisch), scheitert der Aufruf, geht sie
- * zurück. `quiet`: ohne Erfolgsmeldung – beim Ziehen sieht man, dass es geklappt hat.
+ * Changes a milestone; the diamond jumps immediately (optimistic), if the call fails, it goes
+ * back. `quiet`: without a success message – when dragging you can see that it worked.
  */
 export function useUpdateMilestone(goalId: string) {
   const qc = useQueryClient();

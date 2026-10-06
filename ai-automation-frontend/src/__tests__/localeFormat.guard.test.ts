@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-// Wächter (e86f6544): Datums- und Zahlentexte folgen der App-Sprache, nicht der des Browsers.
-// Ein toLocaleString() ohne Locale nimmt die Browser-Sprache — die Dashboard-Uhr stand so im
-// englischen UI auf „Donnerstag, 24.09.2026“. Deshalb spricht nur utils/localeFormat.ts mit Intl
-// und den toLocale…String-Methoden; alle anderen Dateien rufen dessen Helfer mit der i18n-Sprache.
+// Guard (e86f6544): date and number texts follow the app language, not the browser's.
+// A toLocaleString() without locale takes the browser language — the dashboard clock thus showed
+// "Donnerstag, 24.09.2026" in the English UI. Therefore only utils/localeFormat.ts talks to Intl
+// and the toLocale…String methods; all other files call its helpers with the i18n language.
 const SOURCES = import.meta.glob<string>(
   ['../**/*.{ts,tsx}', '!../**/__tests__/**', '!../**/*.test.{ts,tsx}', '!../test/**'],
   { query: '?raw', import: 'default', eager: true },
@@ -32,15 +32,15 @@ function offenders(file: string, source: string): string[] {
   });
 }
 
-describe('Datums- und Zahlenformat', () => {
-  it('findet die Quelldateien und den Helfer', () => {
+describe('Date and number format', () => {
+  it('finds the source files and the helper', () => {
     expect(Object.keys(SOURCES).length).toBeGreaterThan(200);
     expect(SOURCES[GATEWAY]).toBeDefined();
-    // Gegenprobe: die Muster erkennen, was der Helfer selbst tut
+    // Counter-check: the patterns recognize what the helper itself does
     expect(offenders(GATEWAY, SOURCES[GATEWAY]!).length).toBeGreaterThan(0);
   });
 
-  it('läuft nur über utils/localeFormat mit der Sprache der App', () => {
+  it('goes only through utils/localeFormat with the app language', () => {
     const found = Object.entries(SOURCES)
       .filter(([file]) => file !== GATEWAY)
       .flatMap(([file, source]) => offenders(file, source));
@@ -48,7 +48,7 @@ describe('Datums- und Zahlenformat', () => {
     expect(found).toEqual([]);
   });
 
-  it('übersieht keinen Aufruf und keinen Kommentar-Trick', () => {
+  it('misses no call and no comment trick', () => {
     expect(offenders('x.tsx', 'const a = d.toLocaleString();')).toHaveLength(1);
     expect(offenders('x.tsx', "const a = d.toLocaleDateString(undefined, { month: 'short' });")).toHaveLength(1);
     expect(offenders('x.tsx', 'const a = new Intl.NumberFormat().format(n);')).toHaveLength(1);

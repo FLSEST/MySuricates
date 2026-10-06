@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Tests fuer scripts/public-readiness/frontend-metrics.sh (TODO 72c57e66).
-# Run: bash scripts/tests/test-frontend-metrics.sh   (exit 0 = alle Checks ok)
+# Tests for scripts/public-readiness/frontend-metrics.sh (TODO 72c57e66).
+# Run: bash scripts/tests/test-frontend-metrics.sh   (exit 0 = all checks ok)
 #
-# Zeitbudget: reines Lesen, kein npm und kein node_modules — der volle Lauf dauert Sekunden.
-# Die Fixture kennt ihre Zahlen genau (Zeilen je Datei, ein Zyklus A -> B -> A), damit die
-# Checks etwas belegen und nicht nur "irgendeine Ausgabe" abnicken.
+# Time budget: read-only, no npm and no node_modules - the full run takes seconds.
+# The fixture knows its numbers exactly (lines per file, one cycle A -> B -> A), so that the
+# checks prove something and do not just nod through "some output".
 set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -19,7 +19,7 @@ check() {  # $1 = label, $2 = shell condition
   if eval "$2"; then echo "  ok   $1"; PASS=$((PASS + 1)); else echo "  FAIL $1"; FAIL=$((FAIL + 1)); fi
 }
 
-# Alles vor "## run" ist der gemessene, deterministische Teil.
+# Everything before "## run" is the measured, deterministic part.
 measured() { sed '/^## run$/,$d' "$1"; }
 
 echo "0) Dateien vorhanden"
@@ -32,19 +32,19 @@ if [ ! -f "$SCRIPT" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Fixture: ein Mini-Frontend mit bekannten Zahlen.
-#   a.ts (4 Zeilen)  -> b.ts        \ wechselseitig, beides Wert-Importe:
-#   b.ts (4 Zeilen)  -> a.ts        /  das ist der EINE echte Zyklus
-#   t1.ts (2) <-> t2.ts (2)   nur `import type` — darf KEINEN Zyklus ergeben, tsc loescht es
-#   mixed.ts (7) -> t1 (nur { type T1 }: Typkante), -> a ({ type A, useB }: Wertkante),
-#                  -> t2 (Typ-Query import('./t2').T2), -> lib (typeof import('./lib')),
-#                  -> lazy (import('./lazy').then(…) — Promise-Methode, also echt dynamisch)
-#   deep/c.tsx (12) -> ../a (mehrzeilig), ../lib (Barrel), '@/a' (tsconfig-Alias),
-#                      'react' (extern), './fehlt' (unaufloesbar), './style.css' (Asset),
-#                      import('../lazy') (dynamisch)
-#   lib/index.ts (3) reexportiert a  -> export-from erzeugt eine Kante
-#   lazy.ts (1), leer.ts (0 Zeilen)
-#   a.test.ts, __tests__/x.ts, vite-env.d.ts zaehlen nicht mit
+# Fixture: a mini frontend with known numbers.
+#   a.ts (4 lines)  -> b.ts        \ mutual, both value imports:
+#   b.ts (4 lines)  -> a.ts        /  that is the ONE real cycle
+#   t1.ts (2) <-> t2.ts (2)   only `import type` - must yield NO cycle, tsc erases it
+#   mixed.ts (7) -> t1 (only { type T1 }: type edge), -> a ({ type A, useB }: value edge),
+#                  -> t2 (type query import('./t2').T2), -> lib (typeof import('./lib')),
+#                  -> lazy (import('./lazy').then(…) - promise method, so really dynamic)
+#   deep/c.tsx (12) -> ../a (multi-line), ../lib (barrel), '@/a' (tsconfig alias),
+#                      'react' (external), './fehlt' (unresolvable), './style.css' (asset),
+#                      import('../lazy') (dynamic)
+#   lib/index.ts (3) re-exports a  -> export-from creates an edge
+#   lazy.ts (1), leer.ts (0 lines)
+#   a.test.ts, __tests__/x.ts, vite-env.d.ts do not count
 # ---------------------------------------------------------------------------
 FE="$TMP/fixture/ai-automation-frontend"
 make_fixture() {
@@ -54,10 +54,10 @@ make_fixture() {
   printf "import { a } from './a';\nexport const b = 2;\nexport type B = typeof b;\nexport const useA = () => a;\n" > "$FE/src/b.ts"
   printf "import type { T2 } from './t2';\nexport type T1 = { t?: T2 };\n" > "$FE/src/t1.ts"
   printf "import type { T1 } from './t1';\nexport type T2 = { t?: T1 };\n" > "$FE/src/t2.ts"
-  # mixed.ts traegt zusaetzlich die drei Formen aus TODO 26b3da40:
-  #   Zeile 5: `import('./t2').T2`         -> Typ-Query, Typkante nach t2
-  #   Zeile 6: `typeof import('./lib')`    -> Typ-Query, Typkante nach lib
-  #   Zeile 7: `import('./lazy').then(…)`  -> Promise-Methode, also echt dynamisch
+  # mixed.ts additionally carries the three forms from TODO 26b3da40:
+  #   line 5: `import('./t2').T2`         -> type query, type edge to t2
+  #   line 6: `typeof import('./lib')`    -> type query, type edge to lib
+  #   line 7: `import('./lazy').then(…)`  -> promise method, so really dynamic
   cat > "$FE/src/mixed.ts" <<'EOF'
 import { type T1 } from './t1';
 import { type A, useB } from './a';
@@ -111,8 +111,8 @@ check "deep/c.tsx hat 12 Zeilen"   "grep -qx '12${TAB}deep/c.tsx' '$TMP/fix1.txt
 check "leere Datei mit 0 Zeilen"   "grep -qx '0${TAB}leer.ts' '$TMP/fix1.txt'"
 check "max_file_lines=12"          'grep -qx "max_file_lines=12" "$TMP/fix1.txt"'
 check "Verzeichnissumme deep=12"   "grep -qx '12${TAB}1${TAB}deep' '$TMP/fix1.txt'"
-# ## files (b8c06b94): NCLOC ohne die zehn Importzeilen (auch mehrzeilig und Seiteneffekt), Zeilen, Aenderungen
-# (kein git in der Fixture: 0) — Eingabe der Einstufung arch-findings.py.
+# ## files (b8c06b94): NCLOC without the ten import lines (also multi-line and side-effect), lines, changes
+# (no git in the fixture: 0) - input of the rating arch-findings.py.
 check "## files: deep/c.tsx mit 2 NCLOC von 12 Zeilen" \
   "sed -n '/^## files\$/,/^## summary\$/p' '$TMP/fix1.txt' | grep -x '2${TAB}12${TAB}0${TAB}deep/c.tsx' >/dev/null"
 check "## files: eine Zeile je Produktionsmodul" \
@@ -143,12 +143,12 @@ check "dynamischer Import zaehlt als Verzeichniskante deep -> (src)" \
   "grep -qx 'deep${TAB}(src)${TAB}2' '$TMP/fix1.txt'"
 check "lazy.ts hat zwei eingehende Importe (deep/c.tsx direkt, mixed.ts via .then)"  \
   "sed -n '/^## coupling\$/,/^## summary\$/p' '$TMP/fix1.txt' | grep -E '^lazy\.ts${TAB}0${TAB}2\$' >/dev/null"
-# Die Einordnung selbst ist in der Fixture oben schon gepinnt (type_edges=5 gegen
-# dynamic_edges=2; waeren die beiden Typ-Queries dynamisch gezaehlt, stuende dort 3 zu 4).
-# Weil die einzelnen edge-Saetze nur in der Zwischendatei stehen und nicht im Faktenblatt,
-# belegt eine eigene Mini-Fixture die drei Formen einzeln und ohne Nebenkanten.
+# The classification itself is already pinned in the fixture above (type_edges=5 against
+# dynamic_edges=2; had the two type queries been counted as dynamic, it would read 3 to 4).
+# Because the individual edge sentences only stand in the intermediate file and not in the fact sheet,
+# a separate mini fixture proves the three forms individually and without side edges.
 echo "3c) Typ-Query gegen echten dynamischen Import (TODO 26b3da40)"
-type_query_case() {   # $1 = Inhalt von q.ts, danach: $TMP/tq.txt
+type_query_case() {   # $1 = content of q.ts, afterwards: $TMP/tq.txt
   rm -rf "$TMP/tq"
   mkdir -p "$TMP/tq/ai-automation-frontend/src"
   printf 'export const ziel = 1;\nexport type Ziel = typeof ziel;\n' \
@@ -193,9 +193,9 @@ check "Seiteneffekt-Import erzeugt keine Kante (nur 1 Asset)" \
   'grep -qx "asset_imports=1" "$TMP/fix1.txt"'
 
 echo "4a) Relativer Aufrufpfad findet arch_cycles.py trotzdem"
-# Der Aufruf im Pool-Workflow lautet `bash scripts/public-readiness/frontend-metrics.sh "$BASE"`.
-# Wird SCRIPT_DIR erst nach dem cd in die gemessene Wurzel aufgeloest, zeigt der relative
-# Pfad ins Leere und die Zyklen gelten still als nicht gemessen.
+# The call in the pool workflow is `bash scripts/public-readiness/frontend-metrics.sh "$BASE"`.
+# If SCRIPT_DIR is only resolved after the cd into the measured root, the relative
+# path points nowhere and the cycles silently count as not measured.
 ( cd "$REPO" && bash scripts/public-readiness/frontend-metrics.sh "$TMP/fixture" ) \
   > "$TMP/relpath.txt" 2>/dev/null
 check "relativer Skriptpfad: cycles_state=ok" 'grep -qx "cycles_state=ok" "$TMP/relpath.txt"'
@@ -271,7 +271,7 @@ check "Pool-Vertrag (Reihenfolge, Name, Prompt)" 'python3 - "$POOL" <<'"'"'PY'"'
 import json, sys
 wf = json.load(open(sys.argv[1]))
 blocks = wf["blocks"]
-# Nach Namen: seit b8c06b94 ruft auch der Block arch_metrics frontend-metrics.sh auf (fuer die Einstufung).
+# By name: since b8c06b94 the arch_metrics block also calls frontend-metrics.sh (for the rating).
 i_metrics = next(i for i, b in enumerate(blocks) if b.get("name") == "frontend_metrics")
 assert "frontend-metrics.sh" in blocks[i_metrics]["config"].get("command", ""), "Block frontend_metrics ruft frontend-metrics.sh nicht auf"
 i_report = next(i for i, b in enumerate(blocks) if b.get("name") == "report")

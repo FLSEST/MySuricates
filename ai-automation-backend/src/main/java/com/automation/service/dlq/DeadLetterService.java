@@ -24,13 +24,13 @@ public class DeadLetterService {
     private final DeadLetterRepository repository;
 
     /**
-     * Legt fuer jeden gescheiterten Run einen DLQ-Eintrag an. Der Eintrag entsteht ueber das
-     * Abschluss-Event statt ueber einen Aufruf aus {@code RunCompletionHandler}, damit
-     * service.workflow nicht an service.dlq haengt (Paketzyklus). Das Event feuert fuer jeden
-     * terminalen Run — also auch fuer Laeufe, die an einer Ausnahme statt an einem Schritt scheitern.
+     * Creates a DLQ entry for every failed run. The entry arises via the
+     * completion event instead of a call from {@code RunCompletionHandler}, so that
+     * service.workflow does not depend on service.dlq (package cycle). The event fires for every
+     * terminal run — so also for runs that fail on an exception instead of on a step.
      *
-     * <p>Synchroner Listener: ein Fehler hier wird geschluckt, sonst schnitte er die folgenden
-     * Listener desselben Events ab.
+     * <p>Synchronous listener: an error here is swallowed, otherwise it would cut off the following
+     * listeners of the same event.
      */
     @EventListener
     public void onWorkflowRunCompleted(WorkflowRunCompletedEvent event) {
@@ -46,7 +46,7 @@ public class DeadLetterService {
 
     @Transactional
     public DeadLetterEntry recordFailure(WorkflowRunCompletedEvent run) {
-        // WorkflowExecutor schreibt den stoppenden Schritt als "step" in den Run-Fehler.
+        // WorkflowExecutor writes the stopping step as "step" into the run error.
         Map<String, Object> error = run.getError();
         Integer failedStepIndex = error.get("step") instanceof Number step ? step.intValue() : null;
         String message = error.get("message") != null ? error.get("message").toString() : null;

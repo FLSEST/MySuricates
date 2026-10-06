@@ -10,8 +10,8 @@ import type { WorkflowWidgetEntry } from '../components/dashboard/workflowWidget
 import type { GoalGuard, GoalWorkflow, GoalWorkflowRole, WorkflowRun } from '../types';
 
 /**
- * Workflows am Ziel oder Arbeitspaket (52bc1e8c): zuordnen, Rolle ändern, lösen, starten. Der letzte
- * Lauf kommt aus dem vorhandenen Lesepfad `/dashboard/workflow-results`.
+ * Workflows on the goal or work package (52bc1e8c): assign, change role, detach, start. The last
+ * run comes from the existing read path `/dashboard/workflow-results`.
  */
 export const goalWorkflowKeys = {
   list: (goalId: string) => ['goals', 'workflows', goalId] as const,
@@ -19,13 +19,13 @@ export const goalWorkflowKeys = {
 
 export interface GoalWorkflowList {
   attachments: GoalWorkflow[];
-  /** Das Backend kennt Workflows am Ziel. Ein älteres antwortet mit 404 – dann steht nur der Wächter da. */
+  /** The backend knows workflows on the goal. An older one answers with 404 – then only the guard is shown. */
   supported: boolean;
 }
 
 /**
- * Der Wächter, wie ihn ein älteres Backend nur über `goal.guard` kennt – wie beim neuen nur, solange
- * er eingeschaltet ist.
+ * The guard as an older backend knows it only via `goal.guard` – as with the new one, only as long as
+ * it is switched on.
  */
 function guardEntry(goalId: string, guard: GoalGuard, name: string): GoalWorkflow[] {
   return guard.enabled && guard.workflowId ? [{
@@ -35,8 +35,8 @@ function guardEntry(goalId: string, guard: GoalGuard, name: string): GoalWorkflo
 }
 
 /**
- * Die Workflows eines Ziels. Ohne Endpunkt (404, Backend vor 52bc1e8c) nicht wiederholen: Es bleibt
- * bei dem Wächter aus `goal.guard`, Zuordnen ist erst nach dem Neustart möglich.
+ * The workflows of a goal. Without the endpoint (404, backend before 52bc1e8c) do not retry: it stays
+ * with the guard from `goal.guard`, assigning is only possible after the restart.
  */
 export function useGoalWorkflows(goalId: string | undefined, guard: GoalGuard | undefined, guardName: string) {
   const goalsModule = useModuleEnabled('goals');
@@ -58,8 +58,8 @@ export function useGoalWorkflows(goalId: string | undefined, guard: GoalGuard | 
 const ACTIVE_RUN = new Set(['RUNNING', 'PENDING', 'PAUSED']);
 
 /**
- * Letzter Lauf und Ergebnis der Workflows am Ziel – derselbe Aufruf wie die Dashboard-Kacheln, im
- * selben Cache. Läuft einer gerade, wird alle 5 s nachgesehen, sonst jede Minute.
+ * Last run and result of the workflows on the goal – the same call as the dashboard tiles, in the
+ * same cache. If one is running right now, it is checked every 5 s, otherwise every minute.
  */
 export function useGoalWorkflowResults(workflowIds: readonly string[]) {
   const ids = [...new Set(workflowIds)].sort();
@@ -119,7 +119,7 @@ export function useDetachGoalWorkflow(goalId: string) {
   });
 }
 
-/** Schlüssel aller Starts an einem Ziel – daran erkennt jeder ▶, dass derselbe Workflow schon startet. */
+/** Key of all starts on a goal – by it every ▶ recognizes that the same workflow is already starting. */
 const startKey = (goalId: string) => ['goals', goalId, 'start-workflow'] as const;
 
 interface StartVariables {
@@ -129,13 +129,13 @@ interface StartVariables {
 }
 
 /**
- * Startet einen Workflow des Ziels über den vorhandenen Weg `POST /workflows/{id}/execute` – mit
- * `goal_id` (daraus kommen `goal_status` und `goal_guard_*`), am Paket auch `work_package_id`, und
- * der Sprache der Oberfläche. Der Toast führt zum Lauf.
+ * Starts a workflow of the goal via the existing path `POST /workflows/{id}/execute` – with
+ * `goal_id` (which yields `goal_status` and `goal_guard_*`), on the package also `work_package_id`, and
+ * the UI language. The toast leads to the run.
  *
- * Gegen Doppelstarts (Review 52bc1e8c): Alle ▶ eines Ziels teilen sich über `mutationKey` einen Stand.
- * Solange ein Start desselben Workflows unterwegs ist, startet `start` nichts – geprüft im Cache der
- * Mutationen, der den neuen Start sofort kennt, also auch beim schnellen Doppelklick auf zwei Knöpfe.
+ * Against double starts (review 52bc1e8c): All ▶ of a goal share one state via `mutationKey`.
+ * As long as a start of the same workflow is in flight, `start` does nothing – checked in the cache of
+ * the mutations, which knows the new start immediately, so also on a quick double click on two buttons.
  */
 export function useStartGoalWorkflow(goalId: string) {
   const qc = useQueryClient();
@@ -166,7 +166,7 @@ export function useStartGoalWorkflow(goalId: string) {
   return { start };
 }
 
-/** Startet dieser Workflow gerade (irgendein ▶ des Ziels)? */
+/** Is this workflow starting right now (any ▶ of the goal)? */
 export function useWorkflowStarting(goalId: string, workflowId: string): boolean {
   const starting = useMutationState({
     filters: { mutationKey: startKey(goalId), status: 'pending' },
@@ -176,8 +176,8 @@ export function useWorkflowStarting(goalId: string, workflowId: string): boolean
 }
 
 /**
- * Ein ▶ für einen Workflow des Ziels: gesperrt, solange derselbe Workflow gerade gestartet wird oder
- * sein letzter Lauf noch läuft – so entsteht aus zwei Knöpfen (Chip und Paket-Karte) nie ein zweiter Lauf.
+ * A ▶ for a workflow of the goal: disabled as long as the same workflow is being started or
+ * its last run is still running – so two buttons (chip and package card) never produce a second run.
  */
 export function useGoalWorkflowStart(goalId: string, workflowId: string, workPackageId: string | null, name: string,
   entry: WorkflowWidgetEntry | null | undefined) {

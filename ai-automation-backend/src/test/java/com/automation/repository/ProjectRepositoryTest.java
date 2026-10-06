@@ -285,7 +285,7 @@ class ProjectRepositoryTest {
 
     // --- findActiveWithContainer ---
 
-    /** Gleiche Auswahl wie findByArchivedAtIsNull — der Join darf nichts filtern. */
+    /** Same selection as findByArchivedAtIsNull — the join must not filter anything. */
     @Test
     void findActiveWithContainer_returnsOnlyNonArchivedProjects() {
         Project live = repository.save(project("Join Live", "/tmp/proj-join-live", ProjectStatus.RUNNING));
@@ -298,8 +298,8 @@ class ProjectRepositoryTest {
     }
 
     /**
-     * {@code LEFT}, nicht {@code INNER}: Die meisten Projekte haben keinen Container, und die
-     * duerfen der Liste nicht fehlen.
+     * {@code LEFT}, not {@code INNER}: most projects have no container, and they
+     * must not be missing from the list.
      */
     @Test
     void findActiveWithContainer_keepsProjectsWithoutContainer() {
@@ -312,7 +312,7 @@ class ProjectRepositoryTest {
                 .allSatisfy(p -> assertThat(p.getContainer()).isNull());
     }
 
-    /** Und der Container kommt mitgeholt zurueck, sonst waere der Join sinnlos. */
+    /** And the container comes back fetched along, otherwise the join would be pointless. */
     @Test
     void findActiveWithContainer_fetchesTheContainer() {
         Project withContainer = repository.save(
@@ -324,9 +324,9 @@ class ProjectRepositoryTest {
                 .status(ContainerStatus.RUNNING)
                 .build());
 
-        // Ohne das Leeren des Persistenzkontexts liefert die Abfrage die bereits verwaltete
-        // Project-Instanz zurueck, deren container-Feld noch null ist — der Join waere dann
-        // gar nicht gemessen.
+        // Without clearing the persistence context the query returns the already managed
+        // Project instance whose container field is still null — the join would then not
+        // be measured at all.
         entityManager.flush();
         entityManager.clear();
 
@@ -338,7 +338,7 @@ class ProjectRepositoryTest {
                         .isEqualTo("docker-join-container"));
     }
 
-    /** Ein Projekt darf nicht doppelt erscheinen, nur weil gejoint wird. */
+    /** A project must not appear twice just because of the join. */
     @Test
     void findActiveWithContainer_returnsEachProjectOnce() {
         Project saved = repository.save(project("Join Once", "/tmp/proj-join-once", ProjectStatus.STOPPED));

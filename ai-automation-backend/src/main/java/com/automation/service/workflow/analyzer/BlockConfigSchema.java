@@ -15,13 +15,13 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Die Config-Schlüssel jedes Blocktyps — dieselbe Datei, aus der der Monaco-Config-Editor sein Schema baut
- * (TODO f5153c47). Quelle ist {@code ai-automation-frontend/src/data/blockConfigSchema.json}; der
- * Maven-Build kopiert sie nach {@code classpath:schema/} (siehe {@code pom.xml}, {@code deploy/Dockerfile}).
- * Eine zweite, handgepflegte Liste im Backend wäre genau die Drift, die dieser Weg verhindert.
+ * The config keys of every block type - the same file the Monaco config editor builds its schema from
+ * (TODO f5153c47). The source is {@code ai-automation-frontend/src/data/blockConfigSchema.json}; the
+ * Maven build copies it to {@code classpath:schema/} (see {@code pom.xml}, {@code deploy/Dockerfile}).
+ * A second, hand-maintained list in the backend would be exactly the drift this approach prevents.
  *
- * <p>Die Zusammenstellung folgt dem Editor ({@code propertiesFor} in {@code blockConfigSchema.ts}): die
- * Schlüssel des Typs, dann die KI-Schlüssel (nur bei KI-Blocktypen), dann die gemeinsamen, zuletzt
+ * <p>The assembly follows the editor ({@code propertiesFor} in {@code blockConfigSchema.ts}): the
+ * keys of the type, then the AI keys (only for AI block types), then the common ones, finally
  * {@code on_failure}.
  */
 public final class BlockConfigSchema {
@@ -29,16 +29,16 @@ public final class BlockConfigSchema {
     static final String RESOURCE = "schema/blockConfigSchema.json";
 
     /**
-     * Ein Config-Schlüssel.
+     * A config key.
      *
-     * @param values     erlaubte Werte, leer = freier Wert
-     * @param legacy     alter Wert, der weiter gilt (z. B. {@code execution_mode: claude}), sonst {@code null}
-     * @param ignoreCase der Executor vergleicht ohne Groß-/Kleinschreibung
-     * @param legacyFor  alter Name eines anderen Schlüssels, den der Executor weiter liest, sonst {@code null}
-     * @param onlyWith   der Executor liest den Schlüssel nur, wenn diese Schlüssel diese Werte haben
-     *                   (z. B. {@code container_image} eines retry-Blocks nur mit {@code execution_mode: shell})
-     * @param topLevelOnly der Schlüssel wirkt nur auf oberster Ebene, nicht in verschachtelten Blöcken
-     *                   (Werkzeug-Modus des Shell-Blocks, d3a7f5e2)
+     * @param values     allowed values, empty = free value
+     * @param legacy     old value that remains valid (e.g. {@code execution_mode: claude}), otherwise {@code null}
+     * @param ignoreCase the executor compares case-insensitively
+     * @param legacyFor  old name of another key that the executor still reads, otherwise {@code null}
+     * @param onlyWith   the executor only reads the key if these keys have these values
+     *                   (e.g. {@code container_image} of a retry block only with {@code execution_mode: shell})
+     * @param topLevelOnly the key only takes effect at the top level, not in nested blocks
+     *                   (tool mode of the shell block, d3a7f5e2)
      */
     public record Field(String key, List<String> values, String legacy, boolean ignoreCase, String legacyFor,
                         Map<String, String> onlyWith, boolean topLevelOnly) {
@@ -48,7 +48,7 @@ public final class BlockConfigSchema {
             this(key, values, legacy, ignoreCase, legacyFor, onlyWith, false);
         }
 
-        /** Ob der Wert zu den erlaubten gehört; ohne feste Werte immer. */
+        /** Whether the value is one of the allowed ones; always true without fixed values. */
         public boolean allows(String value) {
             if (values.isEmpty()) return true;
             for (String allowed : allowedValues()) {
@@ -57,7 +57,7 @@ public final class BlockConfigSchema {
             return false;
         }
 
-        /** Erlaubte Werte samt Legacy-Wert — wie {@code allowedConfigValues} im Editor. */
+        /** Allowed values including the legacy value - like {@code allowedConfigValues} in the editor. */
         public List<String> allowedValues() {
             if (legacy == null) return values;
             List<String> all = new ArrayList<>(values);
@@ -104,7 +104,7 @@ public final class BlockConfigSchema {
         this.blockTypes = Collections.unmodifiableMap(types);
     }
 
-    /** Das Schema vom Classpath, einmal geladen. Fehlt die Datei, ist der Build kaputt — das soll laut scheitern. */
+    /** The schema from the classpath, loaded once. If the file is missing the build is broken - that should fail loudly. */
     public static BlockConfigSchema get() {
         return Holder.INSTANCE;
     }
@@ -125,7 +125,7 @@ public final class BlockConfigSchema {
         }
     }
 
-    /** Ob es für den Blocktyp ein Schema gibt. Für andere Typen prüft der Analyzer keine Schlüssel. */
+    /** Whether a schema exists for the block type. For other types the analyzer checks no keys. */
     public boolean knowsType(String type) {
         return type != null && blockTypes.containsKey(type);
     }
@@ -134,7 +134,7 @@ public final class BlockConfigSchema {
         return blockTypes.keySet();
     }
 
-    /** Alle Schlüssel, die der Typ kennt, in der Reihenfolge des Editors; leer für unbekannte Typen. */
+    /** All keys the type knows, in the editor's order; empty for unknown types. */
     public Map<String, Field> fieldsFor(String type) {
         Spec spec = type == null ? null : blockTypes.get(type);
         if (spec == null) return Map.of();
@@ -145,7 +145,7 @@ public final class BlockConfigSchema {
         return all;
     }
 
-    /** Die Schlüssel des Typs selbst, ohne KI-, gemeinsame Schlüssel und {@code on_failure}. */
+    /** The keys of the type itself, without AI keys, common keys and {@code on_failure}. */
     public Set<String> ownKeys(String type) {
         Spec spec = type == null ? null : blockTypes.get(type);
         return spec == null ? Set.of() : spec.fields().keySet();
@@ -156,7 +156,7 @@ public final class BlockConfigSchema {
         return spec == null ? List.of() : spec.required();
     }
 
-    /** Schlüssel, von denen genau einer gesetzt sein muss (todo-update: {@code id} oder {@code updates}); sonst leer. */
+    /** Keys of which exactly one must be set (todo-update: {@code id} or {@code updates}); otherwise empty. */
     public List<String> requiredOneOfKeys(String type) {
         Spec spec = type == null ? null : blockTypes.get(type);
         return spec == null ? List.of() : spec.requiredOneOf();
@@ -180,7 +180,7 @@ public final class BlockConfigSchema {
         return Collections.unmodifiableMap(out);
     }
 
-    /** Ein Feld; der Text {@code "#name"} verweist auf {@code sharedFields.name}. */
+    /** A field; the text {@code "#name"} refers to {@code sharedFields.name}. */
     private static Field field(String key, JsonNode node, Map<String, JsonNode> shared) {
         if (node.isTextual() && node.asText().startsWith("#")) {
             JsonNode resolved = shared.get(node.asText().substring(1));

@@ -5,20 +5,20 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Die platzhalterverdächtigen String-Werte einer Block-Config, getrennt nach Ebene — die
- * Ebenen-Regel des {@link DataFlowReferenceScanner} in einer eigenen Klasse.
+ * The placeholder-suspect string values of a block config, separated by level — the
+ * level rule of the {@link DataFlowReferenceScanner} in a class of its own.
  *
- * <p>{@code direct} sind die unmittelbaren Werte der Config-Map (die oberste Ebene des Blocks),
- * {@code nested} alles darunter: Switch-Cases, Conditional-Zweiglisten, verschachtelte
- * Blocklisten, aber auch Wertemaps wie {@code integration.params}. Nur auf der obersten Ebene
- * meinen positionsbezogene Platzhalter ({@code previous_output}, {@code step_N_output}) die
- * Top-Level-Blockliste.
+ * <p>{@code direct} are the immediate values of the config map (the top level of the block),
+ * {@code nested} everything below: switch cases, conditional branch lists, nested
+ * block lists, but also value maps such as {@code integration.params}. Only on the top level
+ * do position-based placeholders ({@code previous_output}, {@code step_N_output}) mean the
+ * top-level block list.
  */
 record DataFlowConfigStrings(List<String> direct, List<String> nested) {
 
     private static final int MAX_DEPTH = 20;
 
-    /** Rekursiv über Maps und Listen; nur Strings mit einer geschweiften Klammer sind interessant. */
+    /** Recursive over maps and lists; only strings with a curly brace are of interest. */
     static DataFlowConfigStrings of(Object config) {
         List<String> direct = new ArrayList<>();
         List<String> nested = new ArrayList<>();

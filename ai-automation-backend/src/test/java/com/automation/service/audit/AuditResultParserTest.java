@@ -89,7 +89,7 @@ class AuditResultParserTest {
                 + ",\"findings\":[" + findings + "]}\n-->";
     }
 
-    /** Ein gekuerzter Snapshot loeste zuvor alle nicht gelieferten Findings auf (TODO e39379a9). */
+    /** A truncated snapshot previously resolved all findings that were not delivered (TODO e39379a9). */
     @Test
     void rejectsEnvelopeThatDeliversFewerFindingsThanPromised() {
         var result = parser.parse(envelope(",\"expectedFindings\":5", 2));
@@ -115,7 +115,7 @@ class AuditResultParserTest {
         assertThat(result.error()).contains("expectedFindings must be a number");
     }
 
-    /** Rueckwaertskompatibel: ohne das Feld bleibt alles wie bisher. */
+    /** Backward compatible: without the field everything stays as before. */
     @Test
     void envelopeWithoutPromiseStaysValid() {
         var result = parser.parse(envelope("", 2));
@@ -138,9 +138,9 @@ class AuditResultParserTest {
     }
 
     /**
-     * previous_report sind die ersten 3000 Zeichen des Vorlaufs, bei kurzen Reports samt Envelope. Gibt das
-     * Modell ihn wieder, bevor es seinen eigenen schreibt, zaehlte mit dem ersten Envelope der alte Snapshot
-     * (TODO 1cf996df). Der eigene steht laut Prompt am Ende.
+     * previous_report is the first 3000 characters of the previous run, for short reports including the envelope. If the
+     * model repeats it before writing its own, the old snapshot would count with the first envelope
+     * (TODO 1cf996df). Its own one comes last according to the prompt.
      */
     @Test
     void twoEnvelopes_theLastOneCounts_andNeitherStaysInTheMarkdown() {
@@ -156,7 +156,7 @@ class AuditResultParserTest {
                 .doesNotContain("mysuricates:audit-result");
     }
 
-    /** Ein Envelope: wie bisher, auch der Text dahinter bleibt im Markdown. */
+    /** One envelope: as before, the text after it also stays in the markdown. */
     @Test
     void oneEnvelope_behavesAsBefore_withTextOnBothSides() {
         var result = parser.parse("Einleitung\n" + envelopeWith("size.class", "A.java") + "\nNachsatz");
@@ -167,7 +167,7 @@ class AuditResultParserTest {
         assertThat(result.markdown()).isEqualTo("Einleitung\n\nNachsatz");
     }
 
-    /** Der wiedergegebene Vorlauf ist bei 3000 Zeichen abgeschnitten, sein Envelope also offen. */
+    /** The repeated previous run is cut off at 3000 characters, so its envelope is open. */
     @Test
     void truncatedEchoBeforeTheOwnEnvelope_doesNotSpoilIt() {
         String echo = "<!-- mysuricates:audit-result:v1\n{\"snapshotComplete\":true,\"findings\":[{\"ruleKey\":"
@@ -179,7 +179,7 @@ class AuditResultParserTest {
                 .satisfies(finding -> assertThat(finding.subject()).isEqualTo("New.java"));
     }
 
-    /** Ist die eigene Antwort abgeschnitten, gilt kein Envelope – schon gar nicht der wiedergegebene alte. */
+    /** If the own answer is truncated, no envelope applies – least of all the repeated old one. */
     @Test
     void cutOffOwnEnvelope_doesNotFallBackToAnEarlierOne() {
         String output = envelopeWith("size.class", "Old.java") + "\n\n# Neuer Report\n"
@@ -192,7 +192,7 @@ class AuditResultParserTest {
         assertThat(result.findings()).isEmpty();
     }
 
-    /** Ein Envelope-Anfang im Text eines Findings ist kein eigener Envelope. */
+    /** An envelope start in the text of a finding is not an envelope of its own. */
     @Test
     void envelopeStartInsideAFinding_isNoEnvelopeOfItsOwn() {
         String output = "# Report\n<!-- mysuricates:audit-result:v1\n{\"snapshotComplete\":true,\"findings\":[{"
@@ -215,8 +215,8 @@ class AuditResultParserTest {
     }
 
     /**
-     * Zitiert das Modell den Anfang samt JSON-Beginn im Text eines Findings, reicht dieser Kandidat bis zum
-     * Ende des eigenen Envelopes, ist aber kein JSON (auch nicht mit leeren Klammern): Es gilt der umschliessende.
+     * If the model quotes the start including the JSON beginning in the text of a finding, this candidate extends to the
+     * end of the own envelope, but is not JSON (not even with empty braces): the enclosing one applies.
      */
     @Test
     void quotedStartWithJsonInsideAFinding_keepsTheEnclosingEnvelope() {
@@ -230,7 +230,7 @@ class AuditResultParserTest {
         }
     }
 
-    /** Ein Nachsatz, der den Marker ohne JSON zitiert, beginnt keinen Envelope: gueltig wie vorher. */
+    /** A trailing sentence that quotes the marker without JSON does not start an envelope: valid as before. */
     @Test
     void quotedMarkerAfterTheEnvelope_withoutJson_isNoEnvelope() {
         var result = parser.parse(envelopeWith("size.class", "A.java")
@@ -242,7 +242,7 @@ class AuditResultParserTest {
         assertThat(result.markdown()).isEqualTo("Der Envelope beginnt mit `<!-- mysuricates:audit-result:v1`.");
     }
 
-    /** Marker und JSON-Beginn hinter dem letzten vollstaendigen Envelope: ein offener Envelope, kein Rueckgriff. */
+    /** Marker and JSON beginning after the last complete envelope: an open envelope, no fallback. */
     @Test
     void startWithJsonAfterTheLastCompleteEnvelope_makesTheReportInvalid() {
         var result = parser.parse(envelopeWith("size.class", "A.java")
@@ -252,7 +252,7 @@ class AuditResultParserTest {
         assertThat(result.error()).isEqualTo("The last audit result envelope v1 is incomplete or unreadable");
     }
 
-    /** Unlesbares JSON im einzigen Envelope: ungueltig, und der Grund des JSON-Parsers bleibt sichtbar. */
+    /** Unreadable JSON in the only envelope: invalid, and the JSON parser's reason stays visible. */
     @Test
     void unreadableJson_isInvalid_andNamesTheParserReason() {
         var result = parser.parse("<!-- mysuricates:audit-result:v1\n{\"snapshotComplete\":true,\"findings\":[],}\n-->");

@@ -6,9 +6,9 @@ import {
 import type { GoalMilestone, GoalTodoItem, GoalWorkPackage } from '../../types';
 
 /**
- * Was gerade am Zeitstrahl gezogen wird: ein TODO-Chip, ein Arbeitspaket – als Balken verschoben
- * (`move`), aus der Leiste eingeplant (`schedule`) oder an einem Ende gezogen (`start`/`end`) – oder
- * ein Meilenstein.
+ * What is currently being dragged on the timeline: a TODO chip, a work package - moved as a bar
+ * (`move`), scheduled from the strip (`schedule`) or dragged at one end (`start`/`end`) - or
+ * a milestone.
  */
 export type Dragged =
   | { kind: 'todo'; todo: GoalTodoItem }
@@ -16,32 +16,32 @@ export type Dragged =
   | { kind: 'milestone'; milestone: GoalMilestone }
   | null;
 
-/** Die Zeile unter dem Gezogenen: Text und ob es hier landen darf (sonst sagt der Text, warum nicht). */
+/** The row below the dragged item: text and whether it may land here (otherwise the text says why not). */
 export interface LiveLine {
   text: string;
   refused: boolean;
-  /** Mit Pfeil davor: wohin es geht („→ Repo sauber · …“) – bei Zeiträumen und Tagen nicht. */
+  /** With an arrow in front: where it goes ("→ Repo sauber · …") - not for periods and days. */
   arrow?: boolean;
 }
 
-/** Was die Flächen beim Ziehen wissen müssen: das Gezogene, wohin ein Paket gerade käme, die Live-Zeile. */
+/** What the surfaces need to know while dragging: the dragged item, where a package would currently land, the live row. */
 export interface DragState {
   dragged: Dragged;
-  /** Vorschau des Zeitraums eines gezogenen Pakets (verschieben, einplanen, Größe ändern). */
+  /** Preview of the period of a dragged package (move, schedule, resize). */
   preview: { workPackageId: string; range: DayRange | null } | null;
   live: LiveLine | null;
 }
 
 export const IDLE: DragState = { dragged: null, preview: null, live: null };
 
-/** Die Flächen fragen hier, ob sie das Gezogene annehmen – die leuchten auf, die übrigen werden blass. */
+/** The surfaces ask here whether they accept the dragged item - those light up, the others fade. */
 export const TimelineDragContext = createContext<DragState>(IDLE);
 
 export function useDragState(): DragState {
   return useContext(TimelineDragContext);
 }
 
-/** Ob `target` das Gezogene annimmt. Ein Balken, der an einem Ende gezogen wird, braucht keine Fläche. */
+/** Whether `target` accepts the dragged item. A bar dragged at one end needs no surface. */
 export function acceptsTarget(dragged: NonNullable<Dragged>, target: DropTarget): boolean {
   switch (dragged.kind) {
     case 'todo': return todoAccepts(dragged.todo, target);
@@ -50,18 +50,18 @@ export function acceptsTarget(dragged: NonNullable<Dragged>, target: DropTarget)
   }
 }
 
-/** Welche Flächen für das Gezogene zählen – nur die leuchten auf oder werden blass, die übrigen bleiben ruhig. */
+/** Which surfaces count for the dragged item - only those light up or fade, the others stay calm. */
 const RELEVANT: Record<'todo' | 'package' | 'milestone', DropTarget['kind'][]> = {
   todo: ['row', 'undated', 'pill'],
   package: ['row', 'strip', 'tray'],
-  // Eine Raute darf auf jeden Tag – in ihrer Zeile, in jeder Paket-Zeile und in jeder Kopfzeile (c60bf914)
+  // A diamond may go on any day - in its row, in every package row and in every header row (c60bf914)
   milestone: ['milestones', 'row', 'strip'],
 };
 
 /**
- * Wie eine Fläche beim Ziehen aussieht: `true` nimmt an (getönt), `false` weist ab (blass), `null`
- * bleibt ruhig – solange nichts gezogen wird, für Flächen, die für das Gezogene keine Rolle spielen,
- * und beim Ziehen an einem Balkenende (das braucht keine Fläche).
+ * How a surface looks while dragging: `true` accepts (tinted), `false` rejects (faded), `null`
+ * stays calm - while nothing is dragged, for surfaces that play no role for the dragged item,
+ * and when dragging at a bar end (that needs no surface).
  */
 export function acceptsDrop(dragged: Dragged, dropId: string): boolean | null {
   if (!dragged) return null;
@@ -71,20 +71,20 @@ export function acceptsDrop(dragged: Dragged, dropId: string): boolean | null {
   return acceptsTarget(dragged, target);
 }
 
-/** Das Band, in das das Gezogene gehört; null bei Meilensteinen (sie gehören dem ganzen Ziel). */
+/** The band the dragged item belongs to; null for milestones (they belong to the whole goal). */
 export function bandOfDragged(dragged: Dragged): string | null {
   if (!dragged || dragged.kind === 'milestone') return null;
   return dragged.kind === 'todo' ? bandOfTodo(dragged.todo) : bandOfPackage(dragged.workPackage);
 }
 
-/** Tailwind-Klassen einer Fläche beim Ziehen: annehmend zart getönt (darüber kräftiger), abweisend blass. */
+/** Tailwind classes of a surface while dragging: accepting lightly tinted (stronger above it), rejecting faded. */
 export function dropTone(accepts: boolean | null, isOver: boolean): string {
   if (accepts === null) return '';
   if (!accepts) return isOver ? 'opacity-60 bg-danger/10' : 'opacity-50';
   return isOver ? 'bg-accent/15' : 'bg-accent/5';
 }
 
-/** Nur die Zeiger-Auslöser von dnd-kit: Balken, Griffe und Rauten bewegt die Tastatur direkt, nicht per Anheben. */
+/** Only the pointer activators of dnd-kit: bars, handles and diamonds are moved directly by the keyboard, not by lifting. */
 export function pointerOnly(listeners: DraggableSyntheticListeners): DraggableSyntheticListeners {
   if (!listeners) return listeners;
   const { onKeyDown: _keyboard, ...pointer } = listeners;

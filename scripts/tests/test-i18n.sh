@@ -8,8 +8,8 @@ LIB="$HERE/../lib"; DIR="$LIB/i18n"
 PASS=0; FAIL=0
 check() { if eval "$2"; then echo "  ok   $1"; PASS=$((PASS + 1)); else echo "  FAIL $1"; FAIL=$((FAIL + 1)); fi; }
 keys() { grep -oE '^M_[a-z0-9_]+=' "$1" | sed 's/=$//' | sort -u; }
-# Nur Kommentare und M_name="Wert"; ein Wert darf ueber mehrere Zeilen gehen (Hilfe-Text), enthaelt
-# aber nie ", $ oder ` — die Datei wird per source geladen, ein $(…) darin liefe mit.
+# Only comments and M_name="value"; a value may span several lines (help text), but never contains
+# ", $ or ` - the file is loaded via source, a $(…) in it would run along.
 wellformed() {
   awk '
     !/^#/ && /[$`]/ { bad = 1 }
@@ -44,7 +44,7 @@ check "English by default"                     '[ "$(run "i18n_load; msg step_mo
 check "German with --lang de"                  '[ "$(run "i18n_load de; msg step_mode")" = "Modus" ]'
 check "unknown language falls back to English" '[ "$(run "i18n_load xx; msg step_mode")" = "Mode" ] && [ "$(run "i18n_load xx; echo \$I18N_LANG")" = en ]'
 check "odd language names are ignored"         '[ "$(run "i18n_load ../en; echo \$I18N_LANG")" = en ]'
-# Eine Test-Sprache, die nur einen Schluessel kennt: alles andere muss englisch bleiben
+# A test language that knows only one key: everything else must stay English
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 cp "$DIR/en.sh" "$TMP/en.sh"; printf 'M_step_mode="Moda"\n' > "$TMP/xy.sh"
 check "missing key in a language -> English"   '[ "$(I18N_DIR="$TMP" run "i18n_load xy; msg step_mode; msg step_ai")" = "ModaAI" ]'

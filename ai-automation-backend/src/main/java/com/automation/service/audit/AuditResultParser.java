@@ -20,8 +20,8 @@ public class AuditResultParser {
     private static final Pattern ENVELOPE = Pattern.compile(
             "<!--\\s*mysuricates:audit-result:v1\\s*(\\{.*?})\\s*-->", Pattern.DOTALL);
     /**
-     * So beginnt ein Envelope, auch einer, der nie geschlossen wird: Marker und JSON-Beginn. Ein Marker ohne
-     * JSON dahinter, etwa in einem Nachsatz zitiert, ist kein Anfang.
+     * This is how an envelope begins, even one that is never closed: marker and JSON start. A marker without
+     * JSON behind it, e.g. quoted in a postscript, is not a beginning.
      */
     private static final Pattern ENVELOPE_START = Pattern.compile("<!--\\s*mysuricates:audit-result:v1\\s*\\{");
     private static final String MISSING = "Audit result envelope v1 is missing";
@@ -71,11 +71,11 @@ public class AuditResultParser {
                 findings.add(new ParsedFinding(ruleKey, subject, severity, title,
                         optionalText(node, "description"), optionalText(node, "evidence"), List.copyOf(tags)));
             }
-            // Optionales Vollstaendigkeits-Versprechen (TODO e39379a9): Nennt der Envelope eine
-            // erwartete Zahl, muss sie stimmen. Der Gate-Block prueft das im Workflow und meldet
-            // RED — die Ingestion lief davon unbeeindruckt weiter und hat bei einem gekuerzten
-            // Snapshot alle nicht gelieferten Findings auf RESOLVED gesetzt: genau das Fehlerbild,
-            // das der Snapshot-Modus verhindern soll. Fehlt das Feld, bleibt alles wie bisher.
+            // Optional completeness promise (TODO e39379a9): if the envelope names an
+            // expected count, it must match. The gate block checks that in the workflow and reports
+            // RED — the ingestion carried on unimpressed and, for a truncated
+            // snapshot, set all findings not delivered to RESOLVED: exactly the failure pattern
+            // that snapshot mode is meant to prevent. If the field is missing, everything stays as before.
             JsonNode expected = root.get("expectedFindings");
             if (expected != null && !expected.isNull()) {
                 if (!expected.isInt() && !expected.canConvertToInt()) {
@@ -93,15 +93,15 @@ public class AuditResultParser {
     }
 
     /**
-     * Der letzte lesbare Envelope. Der eigene schliesst laut Prompt die Antwort ab; davor kann ein
-     * wiedergegebener Vorlauf stehen: {@code previous_report} sind die ersten 3000 Zeichen des letzten
-     * Reports, bei kurzen Reports samt Envelope, auch abgeschnitten. Mit dem ersten Envelope zaehlte der
-     * alte Snapshot.
+     * The last readable envelope. Its own one closes the answer according to the prompt; before it there may be a
+     * replayed lead-in: {@code previous_report} is the first 3000 characters of the last
+     * report, for short reports including the envelope, also truncated. With the first envelope the
+     * old snapshot counted.
      *
-     * <p>Gesucht wird deshalb von hinten, und ein Kandidat zaehlt nur mit lesbarem JSON ohne Rest: Ein
-     * zitierter Envelope-Anfang im Text eines Findings reicht bis zum Ende des eigenen Envelopes, ergibt aber
-     * kein JSON – dann gilt der umschliessende. Beginnt hinter dem gefundenen noch ein Envelope, ist die
-     * Antwort abgeschnitten oder unlesbar: dann gilt keiner, statt auf einen alten zurueckzufallen.
+     * <p>The search therefore goes from the back, and a candidate only counts with readable JSON without remainder: a
+     * quoted envelope start in the text of a finding extends to the end of the own envelope but yields
+     * no JSON – then the enclosing one applies. If another envelope begins after the one found, the
+     * answer is truncated or unreadable: then none applies, instead of falling back to an old one.
      */
     private Envelope lastEnvelope(String source) {
         List<Integer> starts = new ArrayList<>();
@@ -127,21 +127,21 @@ public class AuditResultParser {
                 continue;
             }
             if (starts.get(starts.size() - 1) >= envelope.end()) {
-                break;   // dahinter beginnt noch einer, der nicht lesbar endet
+                break;   // another one begins after it that does not end readably
             }
             return new Envelope(envelope, root, null);
         }
         return Envelope.failed(unreadable != null ? INCOMPLETE + ": " + unreadable : INCOMPLETE);
     }
 
-    /** Der gefundene Envelope samt JSON, oder der Grund, warum es keinen gibt. */
+    /** The envelope found including JSON, or the reason why there is none. */
     private record Envelope(Matcher matcher, JsonNode root, String error) {
         static Envelope failed(String error) {
             return new Envelope(null, null, error);
         }
     }
 
-    /** Der Text ohne vollstaendige Envelopes – auch ohne einen wiedergegebenen alten. */
+    /** The text without complete envelopes – also without a replayed old one. */
     private static String withoutEnvelopes(String text) {
         return ENVELOPE.matcher(text).replaceAll("");
     }

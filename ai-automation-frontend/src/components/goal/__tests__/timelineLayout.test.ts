@@ -9,9 +9,9 @@ import {
 import type { GoalMilestone, GoalTodoItem, GoalWorkPackage } from '../../../types';
 
 const day = (iso: string) => dayOfIsoDate(iso)!;
-/** Ende des lokalen Tages – so speichert der TODO-Dialog eine Fälligkeit, so endet ein Paket. */
+/** End of the local day - this is how the TODO dialog stores a due date, this is how a package ends. */
 const endOf = (iso: string) => new Date(`${iso}T23:59:59`).toISOString();
-/** Anfang des lokalen Tages – so beginnt ein Paket. */
+/** Start of the local day - this is how a package begins. */
 const startOf = (iso: string) => new Date(`${iso}T00:00:00`).toISOString();
 const W = FALLBACK_WIDTH;
 
@@ -23,7 +23,7 @@ function todo(id: string, overrides: Partial<GoalTodoItem> = {}): GoalTodoItem {
   };
 }
 
-/** Ein Arbeitspaket; `from`/`to` als `YYYY-MM-DD`, ohne = ohne Zeitraum. */
+/** A work package; `from`/`to` as `YYYY-MM-DD`, without = without a period. */
 function wp(id: string, title: string, from: string | null, to: string | null, overrides: Partial<GoalWorkPackage> = {}): GoalWorkPackage {
   return {
     id, goalId: 'g1', projectId: 'p1', title, startDate: from ? startOf(from) : null, endDate: to ? endOf(to) : null,
@@ -131,7 +131,7 @@ describe('buildAxis', () => {
     }, W);
     expect(axis.startDay).toBeLessThan(day('2026-09-05'));
     expect(axis.endDay).toBeGreaterThan(day('2026-11-20'));
-    // archivierte TODOs stehen nicht auf dem Zeitstrahl und ziehen ihn nicht in die Länge
+    // archived TODOs are not on the timeline and do not stretch it
     expect(axis.endDay).toBeLessThan(day('2027-02-01'));
   });
 

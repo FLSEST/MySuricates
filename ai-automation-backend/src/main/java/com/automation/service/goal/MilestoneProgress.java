@@ -14,14 +14,14 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Zustand der Meilensteine eines Ziels (TODO c60bf914) – ohne eigene Abfrage, aus den verknuepften
- * Arbeitspaketen, deren Zustand die Zielansicht ohnehin schon berechnet hat.
+ * State of the milestones of a goal (TODO c60bf914) - without a query of its own, from the linked
+ * work packages, whose state the goal view has already computed anyway.
  *
- * <p>Mit verknuepften Paketen ist ein Meilenstein erreicht, wenn alle abgeschlossen sind; beim ersten
- * Erkennen setzt {@link #evaluate} {@code reachedAt} an der (verwalteten) Entity, und sind die Pakete
- * spaeter nicht mehr alle abgeschlossen, heisst er „wieder offen“. Ohne Pakete ist er erreicht, solange
- * {@code reachedAt} von Hand gesetzt ist. Sonst entscheidet das Datum (OPEN/DUE_SOON/OVERDUE).
- * Reihenfolge: nach Datum, dann Titel.
+ * <p>With linked packages a milestone is reached when all are completed; on first
+ * recognition {@link #evaluate} sets {@code reachedAt} on the (managed) entity, and if the packages
+ * are later no longer all completed, it is "reopened". Without packages it is reached as long as
+ * {@code reachedAt} is set by hand. Otherwise the date decides (OPEN/DUE_SOON/OVERDUE).
+ * Order: by date, then title.
  */
 final class MilestoneProgress {
 
@@ -33,7 +33,7 @@ final class MilestoneProgress {
     private MilestoneProgress() {
     }
 
-    /** @param completedPackages die IDs der Arbeitspakete des Ziels, die gerade abgeschlossen sind */
+    /** @param completedPackages the IDs of the goal's work packages that are currently completed */
     static List<GoalMilestoneResponse> evaluate(List<GoalMilestoneLinks> milestones, Set<String> completedPackages,
                                                 Instant now) {
         if (milestones == null || milestones.isEmpty()) {
@@ -65,7 +65,7 @@ final class MilestoneProgress {
                 m.getReachedAt(), reopened, m.getCreatedAt(), m.getUpdatedAt());
     }
 
-    /** Der naechste nicht erreichte Meilenstein nach Datum, dann Titel; null = keiner. */
+    /** The next unreached milestone by date, then title; null = none. */
     static GoalResponse.NextMilestone next(List<GoalMilestoneResponse> milestones) {
         return milestones.stream()
                 .filter(m -> m.state() != GoalDueState.REACHED)
@@ -74,7 +74,7 @@ final class MilestoneProgress {
                 .orElse(null);
     }
 
-    /** Wie {@link #next}, aber aus den Zusammenfassungen einer Zielliste – ohne Pakete zu laden. */
+    /** Like {@link #next}, but from the summaries of a goal list - without loading packages. */
     static GoalResponse.NextMilestone nextOf(Collection<GoalMilestoneSummaryRow> rows, Instant now) {
         return rows.stream()
                 .filter(row -> !row.reached())

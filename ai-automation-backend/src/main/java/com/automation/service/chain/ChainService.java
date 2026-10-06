@@ -97,7 +97,7 @@ public class ChainService {
         chainRepository.delete(chain);
     }
 
-    // --- Chain-Runs (Repository-Zugriff bleibt in der Service-Schicht) ---
+    // --- Chain runs (repository access stays in the service layer) ---
 
     public Page<ChainRun> findRunsFiltered(RunStatus status, String search, Pageable pageable) {
         return chainRunRepository.findFiltered(status, search, pageable);
@@ -114,8 +114,8 @@ public class ChainService {
     }
 
     /**
-     * Alle Workflow-IDs der Einträge in einer Abfrage prüfen statt {@code existsById} je Eintrag
-     * (TODO 6299a860); gemeldet wird wie bisher die erste fehlende ID in Eintragsreihenfolge.
+     * Check all workflow IDs of the entries in one query instead of {@code existsById} per entry
+     * (TODO 6299a860); the first missing ID in entry order is reported as before.
      */
     private void validateWorkflowIds(List<ChainEntryRequest> entries) {
         if (entries.isEmpty()) return;
@@ -146,7 +146,7 @@ public class ChainService {
     static final int MIN_ENTRY_TIMEOUT_MINUTES = 5;
     static final int MAX_ENTRY_TIMEOUT_MINUTES = 1440;
 
-    /** Wartezeit je Eintrag (TODO cc0eb3ba): null = globale Vorgabe, sonst 5–1440 Minuten. */
+    /** Wait time per entry (TODO cc0eb3ba): null = global default, otherwise 5–1440 minutes. */
     private static Integer entryTimeout(Integer minutes) {
         if (minutes == null) return null;
         if (minutes < MIN_ENTRY_TIMEOUT_MINUTES || minutes > MAX_ENTRY_TIMEOUT_MINUTES) {

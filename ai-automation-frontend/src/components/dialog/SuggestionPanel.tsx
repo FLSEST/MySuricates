@@ -24,9 +24,9 @@ function ConfidenceBadge({ confidence }: { confidence: number }) {
 }
 
 /**
- * Panel 3 der Session-Übernahme: der Workflow-Vorschlag aus einer Session — Sicherheit, Muster,
- * Baufehler, Blöcke (Konfiguration je Block im JSON-Editor änderbar) und das Anlegen mit Name
- * und Projekt.
+ * Panel 3 of the session takeover: the workflow suggestion from a session — safety, patterns,
+ * build errors, blocks (configuration per block editable in the JSON editor) and creating it with name
+ * and project.
  */
 export function SuggestionPanel({
   suggestion, projects, onCreateWorkflow, isCreating,
@@ -106,7 +106,7 @@ export function SuggestionPanel({
         <p className="text-xs text-text-secondary leading-relaxed">{suggestion.suggestedDescription}</p>
       )}
 
-      {/* Blöcke — klickbar + editierbar */}
+      {/* Blocks — clickable + editable */}
       <div>
         <p className="text-xs font-medium text-text-secondary uppercase tracking-wide mb-1.5">{t.dialog.blocks}</p>
         <div className="flex flex-col gap-1">

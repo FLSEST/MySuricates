@@ -5,9 +5,9 @@ import com.automation.entity.GoalDueState;
 import java.time.Instant;
 
 /**
- * Ein Meilenstein ohne seine Verknuepfungen, dafuer mit Paket-Zaehlern aus Unterabfragen
- * (TODO c60bf914): {@code packagesTotal} verknuepfte Arbeitspakete, {@code packagesDone} davon
- * abgeschlossen. Genug fuer den Zustand – fuer die Zielliste und „Braucht dich“.
+ * A milestone without its links, but with package counters from subqueries
+ * (TODO c60bf914): {@code packagesTotal} linked work packages, {@code packagesDone} of them
+ * completed. Enough for the state – for the goal list and „Braucht dich“.
  */
 public record GoalMilestoneSummaryRow(
         String id,
@@ -18,7 +18,7 @@ public record GoalMilestoneSummaryRow(
         long packagesTotal,
         long packagesDone
 ) {
-    /** Mit Paketen erreicht, wenn alle abgeschlossen sind; ohne Pakete, wenn von Hand markiert. */
+    /** Reached with packages when all are completed; without packages when marked by hand. */
     public boolean reached() {
         return packagesTotal > 0 ? packagesDone >= packagesTotal : reachedAt != null;
     }

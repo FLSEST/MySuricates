@@ -19,8 +19,8 @@ public interface WorkflowMemoryRepository extends JpaRepository<WorkflowMemory, 
     Optional<WorkflowMemory> findByWorkflowIdAndActiveTrue(String workflowId);
 
     /**
-     * Die aktiven Memories mehrerer Workflows in einer Abfrage — fuer den Wunsch-Prompt, der sonst
-     * je Workflow des Projekts einzeln fragte (TODO 5fb7b1e9). Reihenfolge ist nicht festgelegt.
+     * The active memories of several workflows in one query — for the wish prompt, which otherwise asked
+     * individually per workflow of the project (TODO 5fb7b1e9). Order is not defined.
      */
     List<WorkflowMemory> findByWorkflowIdInAndActiveTrue(Collection<String> workflowIds);
 

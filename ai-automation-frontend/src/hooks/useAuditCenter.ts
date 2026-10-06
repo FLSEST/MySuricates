@@ -86,9 +86,9 @@ export interface AuditFinding {
   dispositionNote: string | null;
   dispositionEvidence: string | null;
   dispositionAt: string | null;
-  /** ruleKey ausserhalb von audit/rule-keys.json — die Regel-Identitaet ist ungeprueft. */
+  /** ruleKey outside audit/rule-keys.json — the rule identity is unchecked. */
   unknownRuleKey: boolean;
-  /** Evidence nennt keinen Messwert des eigenen Laufs — Finding bleibt sichtbar, bekommt aber kein verwaltetes TODO. */
+  /** Evidence names no measured value of its own run — the finding stays visible but gets no managed TODO. */
   unverifiedEvidence: boolean;
   todos: Array<{ id: string; title: string; status: string; managed: boolean }>;
 }

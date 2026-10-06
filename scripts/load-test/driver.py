@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
-"""Seed und Last gegen eine Wegwerf-Instanz — nur Python-Standardbibliothek.
+"""Seed and load against a throwaway instance — Python standard library only.
 
   driver.py --base URL --key KEY --scenario scenario.json --project-dir DIR --commit SHA --out raw.json
             [--ai-log FILE]
 
-1. Seed (synthetisch, aus scenario.json): ein Projekt, N Shell-Workflows (davon einige mit grossem
-   Step-Output, wie ihn step_results in echten Instanzen tragen), M abgeschlossene Laeufe, K TODOs.
-   Kein KI-Aufruf: nur Shell-Bloecke.
-2. Last wie echte Benutzer: Leser rufen die Seiten der Oberflaeche mit genau deren API-Aufrufen ab
-   (Dashboard, Workflows, Laeufe, TODOs, Lauf-Detail, Projekte, dazu das Layout-Polling),
-   Lauf-Starter starten Workflows und pollen die Lauf-Seite bis zum Ende, ein TODO-Schreiber legt an
-   und schaltet Status. Erst eine Aufwaermphase, dann die gemessene Phase.
-3. Jede Anfrage mit Route (Template, nie die ID), Status, Client-Zeit und dem Server-Timing-Header
-   der Instanz (Wartezeit auf die DB-Connection, Arbeitszeit, SQL-Statements) nach raw.json.
+1. Seed (synthetic, from scenario.json): one project, N shell workflows (some of them with large
+   step output, as step_results carry in real instances), M completed runs, K TODOs.
+   No AI call: shell blocks only.
+2. Load like real users: readers fetch the UI pages with exactly their API calls
+   (dashboard, workflows, runs, TODOs, run detail, projects, plus the layout polling),
+   run starters start workflows and poll the run page until the end, a TODO writer creates
+   and switches status. First a warm-up phase, then the measured phase.
+3. Every request with route (template, never the ID), status, client time and the Server-Timing header
+   of the instance (wait for the DB connection, work time, SQL statements) into raw.json.
 
-Die Auswertung macht report.py. Der Treiber misst nur, er urteilt nicht.
+The evaluation is done by report.py. The driver only measures, it does not judge.
 """
 import argparse
 import http.client
@@ -32,8 +32,8 @@ TERMINAL = {"COMPLETED", "COMPLETED_WITH_ERRORS", "FAILED", "CANCELLED", "INTERR
 TIMING = re.compile(r"(wait|work|total);dur=(\d+)")
 SQL = re.compile(r'sql;desc="n=(\d+)"')
 
-# Seiten der Oberflaeche mit den API-Aufrufen, die sie beim Oeffnen absetzt (Hooks im Frontend),
-# und ihrem Gewicht in der Mischung. {wf} und {run} setzt der Leser aus dem Seed ein.
+# Pages of the UI with the API calls they make on opening (hooks in the frontend),
+# and their weight in the mix. {wf} and {run} are filled in by the reader from the seed.
 PAGES = {
     "dashboard": (2, ["/learning/dashboard", "/dashboard/layouts?page=0&size=1"]),
     "workflows": (3, ["/workflows", "/projects"]),
@@ -50,7 +50,7 @@ def now_iso():
 
 
 def template(path):
-    """Route-Template aus einem Pfad: IDs werden zu Platzhaltern, die Query faellt weg."""
+    """Route template from a path: IDs become placeholders, the query is dropped."""
     parts = urllib.parse.urlsplit(path).path.split("/")
     out = []
     for i, part in enumerate(parts):
@@ -62,7 +62,7 @@ def template(path):
 
 
 class Client:
-    """Eine Keep-Alive-Verbindung je Thread, wie ein Browser-Tab."""
+    """One keep-alive connection per thread, like a browser tab."""
 
     def __init__(self, base, key, recorder):
         url = urllib.parse.urlsplit(base)
@@ -267,15 +267,15 @@ def load(client_factory, scenario, seeded, recorder, log):
     load_end = time.time()
     recorder.phase = "drain"
     stop.set()
-    # Lauf-Starter pollen ihren letzten Lauf zu Ende; laenger als das Lauf-Limit wartet niemand.
+    # Run starters poll their last run to the end; nobody waits longer than the run limit.
     for t in threads:
         t.join(timeout=330)
     return load_start, load_end, runs, heap, host_load
 
 
 def sample_host_load():
-    """1-Minuten-Load des Rechners. Mit Instanz und Treiber, denn die laufen hier mit — gesucht ist,
-    ob ausserdem etwas anderes (ein Build, ein zweiter Test) den Rechner belegt hat."""
+    """1-minute load of the machine. With instance and driver, since they run along here — what is sought is
+    whether something else (a build, a second test) has also loaded the machine."""
     try:
         return round(os.getloadavg()[0], 2)
     except (AttributeError, OSError):

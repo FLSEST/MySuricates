@@ -7,44 +7,44 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Prüft, ob ein Audit-Finding sich auf eine Messung <b>dieses</b> Laufs beruft.
+ * Checks whether an audit finding relies on a measurement of <b>this</b> run.
  *
- * <p>Der Audit-Prompt bindet jedes Finding an eine Belegzeile („Jedes Finding nennt in
- * {@code evidence} die FAKT- oder TREFFER-Zeile, auf der es beruht"). Geprüft hat das niemand:
- * ein Finding mit erfundenem oder aus dem letzten Report recyceltem Beleg wurde unverändert zu
- * einem TODO — bei {@code severity: HIGH} zu einem, das oben in der Liste steht (TODO a94b56a0).
+ * <p>The audit prompt ties every finding to an evidence line („Jedes Finding nennt in
+ * {@code evidence} die FAKT- oder TREFFER-Zeile, auf der es beruht"). Nobody checked that:
+ * a finding with an invented evidence or one recycled from the last report became a TODO
+ * unchanged — with {@code severity: HIGH} one that sits at the top of the list (TODO a94b56a0).
  *
- * <p>Die Prüfung ist deterministisch und arbeitet ohne KI: Aus dem Faktenblatt des Runs werden
- * die Namen aller {@code FAKT <name>:}- und {@code TREFFER <name>:}-Zeilen gesammelt; eine
- * {@code evidence}, die keinen davon nennt, gilt als unbelegt.
+ * <p>The check is deterministic and works without AI: the names of all {@code FAKT <name>:} and
+ * {@code TREFFER <name>:} lines are collected from the run's fact sheet; an
+ * {@code evidence} that names none of them counts as unsupported.
  *
- * <p><b>Was sie leistet und was nicht.</b> Sie fängt Belege, die es in diesem Lauf nicht gibt —
- * erfundene Namen und solche aus einem früheren Report. Sie kann <i>nicht</i> beurteilen, ob ein
- * tatsächlich vorhandener Messwert die Schlussfolgerung trägt: Wer {@code FAKT
- * non_main_runtime_timeout_lines} zitiert und daraus eine unbelegte Aussage über eine ganz andere
- * Stelle ableitet, kommt weiterhin durch. Das ist die Grenze einer mechanischen Prüfung; sie
- * verschiebt die Messregel aber vom Prompt ins Backend, wo sie sich nicht wegformulieren lässt.
+ * <p><b>What it does and what it does not.</b> It catches evidence that does not exist in this run —
+ * invented names and ones from an earlier report. It <i>cannot</i> judge whether a measurement that
+ * actually exists supports the conclusion: anyone who cites {@code FAKT
+ * non_main_runtime_timeout_lines} and derives an unsupported claim about a completely different
+ * place from it still gets through. That is the limit of a mechanical check; it does move the
+ * measurement rule from the prompt into the backend, though, where it cannot be worded away.
  */
 final class EvidenceVerification {
 
     private EvidenceVerification() {}
 
-    /** Kopfzeile, an der ein Messblock-Output als Faktenblatt erkannt wird. */
+    /** Header line by which a measurement block's output is recognized as a fact sheet. */
     private static final String FACT_SHEET_MARKER = "## FAKTENBLATT";
 
-    /** {@code FAKT <name>: <wert>} und {@code TREFFER <name>: <datei>:<zeile>} — nur der Name zählt. */
+    /** {@code FAKT <name>: <value>} and {@code TREFFER <name>: <file>:<line>} — only the name counts. */
     private static final Pattern FACT_NAME = Pattern.compile(
             "^\\s*(?:FAKT|TREFFER)\\s+([A-Za-z0-9_.:-]+)\\s*:", Pattern.MULTILINE);
 
-    /** Kürzer als das hier ist kein Name, nach dem sich in einer Evidence suchen lässt. */
+    /** Anything shorter is not a name that can be searched for in an evidence. */
     private static final int MIN_NAME_LENGTH = 4;
 
     /**
-     * Sammelt die Namen aller Messwerte aus den Ausgaben der Faktenblatt-Blöcke eines Runs.
+     * Collects the names of all measurements from the outputs of a run's fact-sheet blocks.
      *
-     * @param stepOutputs Ausgaben aller Schritte, in beliebiger Reihenfolge
-     * @return gefundene Namen; <b>leer</b>, wenn der Run kein Faktenblatt hat — dann ist nichts
-     *         zu prüfen, und {@link #isSupported} lässt jedes Finding durch
+     * @param stepOutputs outputs of all steps, in any order
+     * @return names found; <b>empty</b> if the run has no fact sheet — then there is nothing
+     *         to check, and {@link #isSupported} lets every finding through
      */
     static Set<String> factNames(List<String> stepOutputs) {
         Set<String> names = new LinkedHashSet<>();
@@ -61,8 +61,8 @@ final class EvidenceVerification {
     }
 
     /**
-     * @return {@code true}, wenn die Evidence mindestens einen Messwert dieses Laufs nennt — oder
-     *         wenn der Run gar kein Faktenblatt hat (nichts zu prüfen, kein Verdacht)
+     * @return {@code true} if the evidence names at least one measurement of this run — or
+     *         if the run has no fact sheet at all (nothing to check, no suspicion)
      */
     static boolean isSupported(String evidence, Set<String> factNames) {
         if (factNames.isEmpty()) return true;

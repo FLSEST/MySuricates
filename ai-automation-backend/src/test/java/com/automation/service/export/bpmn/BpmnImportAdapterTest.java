@@ -7,7 +7,7 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** Ablehnung und Härtung des BPMN-Imports (Spec §4): Fremd-BPMN, kaputtes XML, XXE, Größe. */
+/** Rejection and hardening of the BPMN import (spec §4): foreign BPMN, broken XML, XXE, size. */
 class BpmnImportAdapterTest {
 
     private static final String NS = "http://www.omg.org/spec/BPMN/20100524/MODEL";
@@ -28,10 +28,10 @@ class BpmnImportAdapterTest {
     }
 
     /**
-     * Das Formatmerkmal ist kein Herkunftsbeleg: Eine fremde Datei, die {@code exporter} und
-     * Namespace einfach mitschreibt, wird angenommen. Dieser Test hält den Ist-Zustand fest,
-     * damit die Doku ihn nicht überzeichnet — eine echte Herkunftsprüfung bräuchte eine
-     * Prüfsumme über den Export (TODO b18939a6).
+     * The format marker is not proof of origin: a foreign file that simply writes {@code exporter} and
+     * namespace along is accepted. This test records the current state
+     * so the docs do not overstate it — a real origin check would need a
+     * checksum over the export (TODO b18939a6).
      */
     @Test
     void gefaelschtesFormatmerkmalWirdNichtErkannt() {
@@ -111,7 +111,7 @@ class BpmnImportAdapterTest {
 
     @Test
     void blockConfigWirdNurAusDirektenKindernDesProzessesGelesen() {
-        // Ein blockConfig tief in einem SubProcess-Kind gehört zu keinem Top-Level-Block.
+        // A blockConfig deep inside a SubProcess child belongs to no top-level block.
         String xml = """
                 <definitions xmlns="%s" xmlns:mysuricates="%s" exporter="MySuricates">
                   <process id="p" name="X">

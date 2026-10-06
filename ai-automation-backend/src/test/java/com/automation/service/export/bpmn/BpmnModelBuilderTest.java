@@ -29,7 +29,7 @@ class BpmnModelBuilderTest {
         assertThat(model.nodes.get(2).kind).isEqualTo(BpmnModel.Kind.SERVICE_TASK);
         assertThat(model.nodes.get(3).kind).isEqualTo(BpmnModel.Kind.USER_TASK);
         assertThat(model.nodes.get(4).kind).isEqualTo(BpmnModel.Kind.END_EVENT);
-        assertThat(model.edges).hasSize(4); // lückenlose Kette
+        assertThat(model.edges).hasSize(4); // gapless chain
         assertThat(model.nodes.get(1).configJson).contains("git log");
     }
 
@@ -58,14 +58,14 @@ class BpmnModelBuilderTest {
         BpmnModel model = build(WorkflowFixtures.linear());
 
         for (BpmnModel.Node n : model.nodes) {
-            // Alle Knoten eines linearen Workflows sind auf y=200 zentriert
+            // All nodes of a linear workflow are centered on y=200
             assertThat(n.y + n.h / 2).isEqualTo(200.0);
         }
-        // X-Positionen streng aufsteigend
+        // X positions strictly ascending
         for (int i = 1; i < model.nodes.size(); i++) {
             assertThat(model.nodes.get(i).x).isGreaterThan(model.nodes.get(i - 1).x);
         }
-        // Jede Kante hat nach dem Routing mindestens 2 Waypoints
+        // Every edge has at least 2 waypoints after routing
         for (BpmnModel.Edge e : model.edges) {
             assertThat(e.waypoints.size()).isGreaterThanOrEqualTo(2);
         }
@@ -85,11 +85,11 @@ class BpmnModelBuilderTest {
         BpmnModel.Node split = gateways.get(0);
         assertThat(split.name).isEqualTo("Tests fehlgeschlagen?");
         assertThat(split.defaultFlowId).isNotNull();
-        // Default-Flow (kein else_command) geht direkt zum Merge-Gateway
+        // Default flow (no else_command) goes directly to the merge gateway
         BpmnModel.Edge defaultFlow = model.edges.stream()
                 .filter(e -> e.id.equals(split.defaultFlowId)).findFirst().orElseThrow();
         assertThat(defaultFlow.targetRef).isEqualTo(gateways.get(1).id);
-        // Then-Zweig liegt unterhalb der Hauptachse
+        // Then branch lies below the main axis
         BpmnModel.Node thenTask = model.nodes.stream()
                 .filter(n -> n.kind == BpmnModel.Kind.SERVICE_TASK).findFirst().orElseThrow();
         assertThat(thenTask.y + thenTask.h / 2).isEqualTo(350.0); // 200 + ROW_STEP
@@ -111,21 +111,21 @@ class BpmnModelBuilderTest {
                 .filter(n -> n.kind == BpmnModel.Kind.EXCLUSIVE_GATEWAY).toList();
         assertThat(gateways).hasSize(2);
         assertThat(gateways.get(0).name).isEqualTo("{{ status }}");
-        // RED-Case: scriptTask; leerer GREEN-Case: Direktkante mit Namen "GREEN"
+        // RED case: scriptTask; empty GREEN case: direct edge with name "GREEN"
         assertThat(model.nodes.stream().anyMatch(n -> n.kind == BpmnModel.Kind.SCRIPT_TASK
                 && "echo alarm".equals(n.script))).isTrue();
         assertThat(model.edges.stream().anyMatch(e -> "GREEN".equals(e.name))).isTrue();
-        // Default-Zweig existiert als serviceTask und ist der Default-Flow des Splits
+        // Default branch exists as a serviceTask and is the default flow of the split
         assertThat(gateways.get(0).defaultFlowId).isNotNull();
         assertThat(model.nodes.stream().anyMatch(n -> n.kind == BpmnModel.Kind.SERVICE_TASK)).isTrue();
     }
 
     @Test
     void switchRowsUeberlappenNichtBeiVerschachteltemKontrollfluss() {
-        // Finding 2 des Branch-Reviews: Case A enthält einen verschachtelten conditional-Block
-        // (then-Zweig bei +ROW_STEP), Case B einen einfachen Shell-Task. Bei einem naiven
-        // rowIndex * ROW_STEP würde Case B (Achse bei 2 * ROW_STEP) mit Case As then-Zweig
-        // (bei 1 * ROW_STEP + ROW_STEP) kollidieren; das höhenbewusste Layout muss das verhindern.
+        // Finding 2 of the branch review: case A contains a nested conditional block
+        // (then branch at +ROW_STEP), case B a simple shell task. With a naive
+        // rowIndex * ROW_STEP case B (axis at 2 * ROW_STEP) would collide with case A's then branch
+        // (at 1 * ROW_STEP + ROW_STEP); the height-aware layout must prevent that.
         BpmnModel model = build(WorkflowFixtures.workflow("SwitchNested", List.of(
                 WorkflowFixtures.block("switch", null, Map.of(
                         "expression", "{{ status }}",
@@ -146,16 +146,16 @@ class BpmnModelBuilderTest {
                 .filter(n -> "echo case-b".equals(n.script)).findFirst().orElseThrow();
 
         double maxExtentCaseA = Math.max(splitA.y + splitA.h, thenA.y + thenA.h);
-        // Case Bs Task-Mitte liegt unterhalb der maximalen Ausdehnung von Case A -> keine Überlappung.
+        // Case B's task center lies below the maximum extent of case A -> no overlap.
         assertThat(taskB.y + taskB.h / 2).isGreaterThan(maxExtentCaseA);
     }
 
     @Test
     void switchMitZweiForeachsUeberlappenNicht() {
-        // Fix für Findings 2: Zwei foreach-Blöcke in verschiedenen Switch-Cases
-        // (case 0 und case 1) dürfen sich nicht vertikal überlappen. Jeder foreach wird
-        // zu einem SubProcess mit Halbhöhe SUB_PAD*2 = 80. Die attachRow-Puffergröße muss
-        // diesen Überhang abdecken.
+        // Fix for finding 2: two foreach blocks in different switch cases
+        // (case 0 and case 1) must not overlap vertically. Each foreach becomes
+        // a SubProcess with half height SUB_PAD*2 = 80. The attachRow buffer size must
+        // cover this overhang.
         BpmnModel model = build(WorkflowFixtures.workflow("SwitchForeachLoop", List.of(
                 WorkflowFixtures.block("switch", null, Map.of(
                         "expression", "{{ mode }}",
@@ -180,7 +180,7 @@ class BpmnModelBuilderTest {
         BpmnModel.Node upper = subProcesses.get(0);
         BpmnModel.Node lower = subProcesses.get(1);
 
-        // Lower SubProcess muss unterhalb der Upper SubProcess liegen (keine Überlappung)
+        // Lower SubProcess must lie below the upper SubProcess (no overlap)
         assertThat(lower.y).isGreaterThanOrEqualTo(upper.y + upper.h);
     }
 
@@ -201,7 +201,7 @@ class BpmnModelBuilderTest {
         assertThat(sub.children.get(1).kind).isEqualTo(BpmnModel.Kind.SERVICE_TASK);
         assertThat(sub.children.get(2).kind).isEqualTo(BpmnModel.Kind.END_EVENT);
         assertThat(sub.childEdges).hasSize(2);
-        // Kinder liegen innerhalb der SubProcess-Bounds
+        // Children lie within the SubProcess bounds
         for (BpmnModel.Node child : sub.children) {
             assertThat(child.x).isGreaterThanOrEqualTo(sub.x);
             assertThat(child.x + child.w).isLessThanOrEqualTo(sub.x + sub.w);
@@ -210,7 +210,7 @@ class BpmnModelBuilderTest {
         }
     }
 
-    /** a5c9fbbf: foreach mit workflow_id ruft je Item einen Workflow auf — CallActivity mit Multi-Instance. */
+    /** a5c9fbbf: foreach with workflow_id calls a workflow per item — CallActivity with multi-instance. */
     @Test
     void foreachMitWorkflowIdWirdZuCallActivityMitMultiInstance() {
         BpmnModel model = build(WorkflowFixtures.workflow("LoopWf", List.of(

@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# Erzeugt Release-Notes fuer ein v*-Tag deterministisch aus der Git-Historie — ohne KI, damit die
-# GitHub-Action (release.yml) keinen Modellaufruf braucht (TODO 3c75962d). Schreibt nach stdout.
+# Generates release notes for a v* tag deterministically from the Git history -- without AI, so the
+# GitHub action (release.yml) needs no model call (TODO 3c75962d). Writes to stdout.
 #
 # Usage: scripts/release-notes.sh <prev-tag> <tag>
-#   <prev-tag>  Vorgaenger-Tag, oder "" beim allerersten Release (keine Zahlen/Vergleich davor)
-#   <tag>       das zu veroeffentlichende Tag (muss existieren)
+#   <prev-tag>  predecessor tag, or "" for the very first release (no numbers/comparison before it)
+#   <tag>       the tag to publish (must exist)
 #
-# Muss in BEIDEN Repos laufen (privates Arbeits-Repo + kuratiertes oeffentliches Repo): das
-# oeffentliche Repo hat keine Merge-Commits aus dem Arbeits-Repo und ggf. keine docs/entwicklung.md
-# mit denselben Eintraegen — betroffene Abschnitte entfallen dann einfach, statt einen Fehler zu
-# werfen. Siehe docs/entwicklung.md -> "GitHub-Release bei jedem Tag".
+# Must run in BOTH repos (private working repo + curated public repo): the
+# public repo has no merge commits from the working repo and possibly no docs/entwicklung.md
+# with the same entries -- affected sections are then simply omitted instead of throwing an error.
+# See docs/entwicklung.md -> "GitHub-Release bei jedem Tag".
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -41,11 +41,11 @@ fi
 RANGE="${TAG}"
 [ -n "$PREV" ] && RANGE="${PREV}..${TAG}"
 
-# GitHub-Slug fuer die Links (Vergleich, Verhaltensaenderungen). RELEASE_NOTES_REPO_SLUG setzt ihn
-# von aussen — die Uebergabe (scripts/release-handover.sh) erzeugt die Notizen im Arbeits-Repo, die
-# Links muessen aber ins oeffentliche Repo zeigen. Gesetzt und leer: keine Links. Ohne Variable gilt
-# origin, aber nur eine GitHub-Adresse: ein lokaler Pfad als origin ergaebe sonst
-# "https://github.com//pfad/…".
+# GitHub slug for the links (comparison, behavior changes). RELEASE_NOTES_REPO_SLUG sets it
+# from outside -- the handover (scripts/release-handover.sh) generates the notes in the working repo, but the
+# links must point to the public repo. Set and empty: no links. Without the variable,
+# origin applies, but only a GitHub address: a local path as origin would otherwise yield
+# "https://github.com//path/…".
 if [ -n "${RELEASE_NOTES_REPO_SLUG+x}" ]; then
     REPO_SLUG="$RELEASE_NOTES_REPO_SLUG"
 else
@@ -58,11 +58,11 @@ else
     esac
 fi
 
-# ── TODO-Kuerzel-Klammern entfernen: intern (repo-lokale Kurz-IDs), nichts fuer oeffentliche Notizen.
-# Zwei Formen (scripts/lib/strip-todo-brackets.py): eine abschliessende Klammer, deren Inhalt mit
-# einem 8-Hex-Kuerzel beginnt (Titel/Kommas/verschachtelte Klammern danach egal), und eine Klammer
-# irgendwo im Betreff, die nur aus Kuerzeln besteht ("(TODO 2738fda0)", "(a4644103, e8a4ebb4)").
-# Batch-Verarbeitung (ein Python-Aufruf je Abschnitt statt einer pro Zeile).
+# ── Strip TODO abbreviation brackets: internal (repo-local short IDs), nothing for public notes.
+# Two forms (scripts/lib/strip-todo-brackets.py): a trailing bracket whose content starts with
+# an 8-hex abbreviation (title/commas/nested brackets after it do not matter), and a bracket
+# anywhere in the subject that consists only of abbreviations ("(TODO 2738fda0)", "(a4644103, e8a4ebb4)").
+# Batch processing (one Python call per section instead of one per line).
 strip_todo_brackets() {
     python3 "$SCRIPT_DIR/lib/strip-todo-brackets.py"
 }
@@ -70,7 +70,7 @@ strip_todo_brackets() {
 echo "# ${TAG}"
 echo
 
-# ── Ueberblick: Betreffzeilen der Merge-Commits im First-Parent-Verlauf ─────────────────────────
+# ── Overview: subject lines of the merge commits in the first-parent history ─────────────────────
 MERGE_SUBJECTS="$(git log --first-parent --merges --format='%s' "$RANGE" -- 2>/dev/null | strip_todo_brackets)"
 if [ -n "$MERGE_SUBJECTS" ]; then
     echo "## Überblick"
@@ -82,7 +82,7 @@ if [ -n "$MERGE_SUBJECTS" ]; then
     echo
 fi
 
-# ── Änderungen nach Typ: Nicht-Merge-Commits, gruppiert nach Conventional-Praefix ───────────────
+# ── Changes by type: non-merge commits, grouped by Conventional prefix ──────────────────────────
 NONMERGE_SUBJECTS="$(git log --no-merges --format='%s' "$RANGE" -- 2>/dev/null | strip_todo_brackets)"
 
 declare -A TYPE_LABEL=(
@@ -120,13 +120,13 @@ if [ -n "$NONMERGE_SUBJECTS" ]; then
     fi
 fi
 
-# ── Verhaltensänderungen: Eintraege aus docs/entwicklung.md, datiert nach dem Vorgaenger-Tag ────
+# ── Behavior changes: entries from docs/entwicklung.md, dated after the predecessor tag ────────
 DOCS_FILE="$PROJECT_ROOT/docs/entwicklung.md"
 if [ -f "$DOCS_FILE" ]; then
     PREV_DATE=""
     if [ -n "$PREV" ]; then
-        # Annotiertes Tag: %ai des Tag-Objekts selbst; leichtgewichtiges Tag hat keins, dann der
-        # Commit, auf den es zeigt.
+        # Annotated tag: %ai of the tag object itself; a lightweight tag has none, then the
+        # commit it points to.
         PREV_DATE="$(git for-each-ref --format='%(creatordate:short)' "refs/tags/${PREV}" 2>/dev/null)"
         [ -n "$PREV_DATE" ] || PREV_DATE="$(git log -1 --format=%ad --date=short "$PREV" 2>/dev/null)"
     fi
@@ -157,7 +157,7 @@ if [ -f "$DOCS_FILE" ]; then
     fi
 fi
 
-# ── Vergleich: Link auf den Compare-View, entfaellt beim ersten Release ────────────────────────
+# ── Comparison: link to the compare view, omitted for the first release ──────────────────────────
 if [ -n "$PREV" ] && [ -n "$REPO_SLUG" ]; then
     echo "## Vergleich"
     echo

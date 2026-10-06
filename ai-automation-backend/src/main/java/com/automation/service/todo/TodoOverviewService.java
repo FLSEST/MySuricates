@@ -117,15 +117,15 @@ public class TodoOverviewService {
     }
 
     /**
-     * Termine aktiver Ziele, die Aufmerksamkeit brauchen (TODO 259f4f66, c60bf914): Meilensteine, die in
-     * hoechstens drei Tagen faellig oder schon ueberfaellig und nicht erreicht sind, und ueberfaellige
-     * Arbeitspakete mit noch offenen TODOs ({@code kind}). Der Zustand kommt aus derselben Regel wie in
-     * der Zielansicht ({@link GoalDueState}); ein Paket ohne Zeitraum ist nie faellig. Ohne Kandidaten
-     * bleibt es bei zwei Abfragen; nach Datum, bei Gleichstand der Meilenstein zuerst.
+     * Dates of active goals that need attention (TODO 259f4f66, c60bf914): milestones that are due in
+     * at most three days or already overdue and not reached, and overdue
+     * work packages with still open TODOs ({@code kind}). The state comes from the same rule as in
+     * the goal view ({@link GoalDueState}); a package without a period is never due. Without candidates
+     * it stays at two queries; by date, on a tie the milestone first.
      */
     private List<MilestoneAttentionItem> milestonesDue(Instant now) {
         if (!modules.isEnabled(ModuleCatalog.GOALS)) {
-            return List.of(); // Termine gehoeren zum Modul goals (TODO c60bf914): aus = keine Abfrage, keine Eintraege
+            return List.of(); // Dates belong to module goals (TODO c60bf914): off = no query, no entries
         }
         PageRequest page = PageRequest.of(0, NEEDS_YOU_LIMIT);
         List<GoalMilestoneSummaryRow> milestones = milestoneRepository.findDueForActiveGoals(

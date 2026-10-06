@@ -17,7 +17,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Provider-Karte und Verbindungseinträge: Status der default-Verbindung, Konfiguriert-Regel, Scopes, Konto. */
+/** Provider card and connection entries: status of the default connection, configured rule, scopes, account. */
 class IntegrationProviderResponsesTest {
 
     private final IntegrationProviderResponses responses = new IntegrationProviderResponses(new ObjectMapper());

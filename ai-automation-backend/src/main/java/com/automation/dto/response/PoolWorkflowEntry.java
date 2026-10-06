@@ -12,13 +12,13 @@ public record PoolWorkflowEntry(
         Map<String, String> description,
         String icon,
         String category,
-        /** {@code repo} | {@code portable}; {@code null}, wenn der Eintrag es nicht deklariert. */
+        /** {@code repo} | {@code portable}; {@code null} if the entry does not declare it. */
         String scope,
         List<String> tags,
         List<BlockDefinition> blocks,
         String instructions,
         String model,
-        /** Reasoning-Effort (low/medium/high/xhigh); {@code null}, wenn der Eintrag keinen nennt. */
+        /** Reasoning effort (low/medium/high/xhigh); {@code null} if the entry names none. */
         String effort,
         String version,
         String author,

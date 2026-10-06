@@ -364,7 +364,7 @@ class ForEachBlockExecutorTest {
     @Test
     @SuppressWarnings("unchecked")
     void execute_itemsCommand_emptyOutput_iteratesZeroTimes() {
-        // Leere items_command-Ausgabe = null Items, nicht ein leeres Item (das waere ein KI-Call umsonst)
+        // Empty items_command output = zero items, not one empty item (that would be a pointless AI call)
         when(commandExecutor.executeShellCommandOnHost("/test/project", "cat topics.txt", 300))
                 .thenReturn(new CliSession.CommandResult("", 0));
 
@@ -413,7 +413,7 @@ class ForEachBlockExecutorTest {
     @Test
     @SuppressWarnings("unchecked")
     void execute_itemsCommand_blankLinesAreDropped() {
-        // Leerzeilen zwischendrin und am Ende sind keine Items
+        // Blank lines in between and at the end are not items
         when(commandExecutor.executeShellCommandOnHost("/test/project", "ls", 300))
                 .thenReturn(new CliSession.CommandResult("a.txt\n\n   \nb.txt\n", 0));
         StepResult stepResult = StepResult.builder()
@@ -782,8 +782,8 @@ class ForEachBlockExecutorTest {
 
     @Test
     void execute_eachIteration_seesIsolatedItemVariable() {
-        // Kontext-Isolation: Jede Iteration darf nur ihr eigenes Item sehen,
-        // niemals das aus der vorherigen Iteration. (item N != item N-1)
+        // Context isolation: each iteration may only see its own item,
+        // never the one from the previous iteration. (item N != item N-1)
         ArrayList<String> capturedItems = new ArrayList<>();
 
         when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
@@ -812,7 +812,7 @@ class ForEachBlockExecutorTest {
 
         assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
         assertThat(capturedItems).containsExactly("alpha", "beta", "gamma");
-        // item N != item N-1 — jede Iteration ueberschreibt die Variable sauber
+        // item N != item N-1 — each iteration overwrites the variable cleanly
         assertThat(capturedItems.get(1)).isNotEqualTo(capturedItems.get(0));
         assertThat(capturedItems.get(2)).isNotEqualTo(capturedItems.get(1));
         verify(commandExecutor, times(3)).executeStepOnHost(any(HostExecutionRequest.class));

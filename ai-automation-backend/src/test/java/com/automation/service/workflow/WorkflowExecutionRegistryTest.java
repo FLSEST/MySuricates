@@ -319,7 +319,7 @@ class WorkflowExecutionRegistryTest {
         assertThat(real.shouldStop()).isTrue();
     }
 
-    // --- TODO 50c7b5d5: ein Approval nimmt nur seine Optionen an ---
+    // --- TODO 50c7b5d5: an approval accepts only its options ---
 
     @Test
     void resolveApproval_answerNotOffered_isRefusedAndKeepsWaiting() {
@@ -360,7 +360,7 @@ class WorkflowExecutionRegistryTest {
         assertThat(future.get()).isEqualTo("{\"env\": \"staging\"}");
     }
 
-    // --- TODO 52d946cc: wartende Eingaben über alle Läufe ---
+    // --- TODO 52d946cc: waiting inputs across all runs ---
 
     @Test
     void listPendingInputs_onlyWaitingRuns_oldestFirst() {

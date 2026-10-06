@@ -5,7 +5,7 @@ import com.automation.entity.Todo;
 import java.time.Instant;
 import java.util.List;
 
-/** Ein TODO in der Zielansicht – ohne Beschreibung (TODO dc0566f8). */
+/** A TODO in the goal view - without description (TODO dc0566f8). */
 public record GoalTodoItem(
         String id,
         String title,
@@ -22,14 +22,14 @@ public record GoalTodoItem(
         Instant ratedAt,
         String openQuestion,
         Instant updatedAt,
-        /** Faelligkeit des TODOs (TODO 259f4f66); null = ungeplant. */
+        /** Due date of the TODO (TODO 259f4f66); null = unplanned. */
         Instant dueDate,
-        /** Arbeitspaket des Ziels, dem das TODO zugeordnet ist (TODO c60bf914); null = keins. */
+        /** Work package of the goal the TODO is assigned to (TODO c60bf914); null = none. */
         String workPackageId,
-        /** Entscheidung, wann und von wem (TODO 68a5e24e); null = keine. */
+        /** Decision, when and by whom (TODO 68a5e24e); null = none. */
         String decision,
         Instant decidedAt,
         Todo.RatedBy decidedBy,
-        /** QUESTION (offene Frage), DECIDED (Entscheidung, keine offene Frage) oder NONE. */
+        /** QUESTION (open question), DECIDED (decision, no open question) or NONE. */
         Todo.DecisionState decisionState
 ) {}

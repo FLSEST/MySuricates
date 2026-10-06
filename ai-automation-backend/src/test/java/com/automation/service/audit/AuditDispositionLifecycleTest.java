@@ -36,17 +36,17 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Eingeordnete Befunde, die ein gueltiger Snapshot nicht mehr meldet (TODOs b2e3da6a, 276ac76f): Regelwechsel je
- * Datei vererbt die Einordnung, eine ausgemusterte Regel schliesst sofort, sonst schliessen drei Laeufe ohne
- * Wiedersehen. Durch den {@link AuditSnapshotApplier}, damit Speichern und TODO-Abgleich mitgeprueft sind.
+ * Classified findings that a valid snapshot no longer reports (TODOs b2e3da6a, 276ac76f): a rule change per
+ * file inherits the classification, a retired rule closes immediately, otherwise three runs without
+ * a sighting close it. Through the {@link AuditSnapshotApplier}, so that saving and TODO reconciliation are checked too.
  */
 @ExtendWith(MockitoExtension.class)
 class AuditDispositionLifecycleTest {
 
     private static final String PROJECT = "proj-1";
-    /** Mit Katalog: god-class (ohne arch.-Praefix) ist dort ausgemustert. */
+    /** With catalog: god-class (without arch. prefix) is retired there. */
     private static final String ARCHITECTURE = "mysuricates.architecture";
-    /** Ohne Katalog: jeder ruleKey gilt, nur die Drei-Laeufe-Regel greift. */
+    /** Without catalog: every ruleKey is valid, only the three-run rule applies. */
     private static final String UNCHECKED = "test.audit-ohne-katalog";
     private static final Instant NOW = Instant.parse("2026-10-03T10:00:00Z");
     private static final Instant ACCEPTED_AT = Instant.parse("2026-09-01T10:00:00Z");
@@ -75,9 +75,9 @@ class AuditDispositionLifecycleTest {
         });
     }
 
-    // --- Ausgemusterte Regel ----------------------------------------------------------------------
+    // --- Retired rule -----------------------------------------------------------------------------
 
-    /** 276ac76f: god-class steht nicht mehr im Katalog — kein Report kann den Befund noch melden. */
+    /** 276ac76f: god-class is no longer in the catalog — no report can still report the finding. */
     @Test
     void acceptedFindingOfARetiredRule_isResolvedWithANote() {
         AuditFinding legacy = disposed("f-legacy", ARCHITECTURE, "god-class", "HostClaudeService",
@@ -95,7 +95,7 @@ class AuditDispositionLifecycleTest {
         verify(reportRepository, never()).findValidGeneratedAtBefore(any(), any(), any(), any());
     }
 
-    /** Auch eine verworfene Einordnung (DISMISSED) haengt sonst ewig in den Zaehlern. */
+    /** A dismissed classification (DISMISSED) would otherwise also hang in the counters forever. */
     @Test
     void dismissedFindingOfARetiredRule_isResolvedAsWell() {
         AuditFinding legacy = disposed("f-legacy", ARCHITECTURE, "frontend-complexity", "frontend/src/pages/Old.tsx",
@@ -108,11 +108,11 @@ class AuditDispositionLifecycleTest {
         assertThat(legacy.getDispositionNote()).endsWith(AuditDispositionLifecycle.NOTE_RULE_RETIRED);
     }
 
-    // --- Regelwechsel je Datei ----------------------------------------------------------------------
+    // --- Rule change per file -----------------------------------------------------------------------
 
     /**
-     * b2e3da6a: WorkflowExecutor war unter god-class verworfen, der naechste Lauf meldet die Datei unter
-     * arch.high-coupling. Der neue Befund erbt die Einordnung (kein verwaltetes TODO), der alte ist ersetzt.
+     * b2e3da6a: WorkflowExecutor was dismissed under god-class, the next run reports the file under
+     * arch.high-coupling. The new finding inherits the classification (no managed TODO), the old one is replaced.
      */
     @Test
     void newFindingForTheSameFileUnderAnotherRule_inheritsTheDisposition() {
@@ -135,8 +135,8 @@ class AuditDispositionLifecycleTest {
     }
 
     /**
-     * Eine geerbte Akzeptanz behaelt ihre Frist, vergleicht eine Verschlechterung aber mit der Evidence der neuen
-     * Regel — die Zahlen der alten messen etwas anderes.
+     * An inherited acceptance keeps its deadline, but compares a degradation with the evidence of the new
+     * rule — the numbers of the old one measure something else.
      */
     @Test
     void inheritedAcceptance_keepsItsDate_andTakesTheNewEvidenceAsSnapshot() {
@@ -153,7 +153,7 @@ class AuditDispositionLifecycleTest {
         assertThat(successor.getDispositionEvidence()).isEqualTo("FAKT ncloc: 420");
     }
 
-    /** Wird der alte Befund im selben Lauf noch gemeldet, sind es zwei Regeln — nichts wird vererbt. */
+    /** If the old finding is still reported in the same run, there are two rules — nothing is inherited. */
     @Test
     void stillReportedPredecessor_passesNothingOn() {
         AuditFinding accepted = disposed("f-acc", UNCHECKED, "rule.a", "Foo.java", AuditFindingStatus.ACCEPTED_RISK, NOW);
@@ -167,7 +167,7 @@ class AuditDispositionLifecycleTest {
         assertThat(accepted.getStatus()).isEqualTo(AuditFindingStatus.ACCEPTED_RISK);
     }
 
-    /** {@code repository} bezeichnet bei jeder Regel etwas anderes: keine Vererbung ueber Nicht-Datei-subjects. */
+    /** {@code repository} means something different for each rule: no inheritance across non-file subjects. */
     @Test
     void subjectThatNamesNoFile_passesNothingOn() {
         AuditFinding accepted = disposed("f-acc", UNCHECKED, "rule.a", "repository", AuditFindingStatus.ACCEPTED_RISK, NOW);
@@ -179,7 +179,7 @@ class AuditDispositionLifecycleTest {
         assertThat(accepted.getStatus()).isEqualTo(AuditFindingStatus.ACCEPTED_RISK);
     }
 
-    /** Zwei Vorgaenger, zwei Nachfolger derselben Datei: jeder Vorgaenger vererbt hoechstens einmal. */
+    /** Two predecessors, two successors of the same file: each predecessor inherits at most once. */
     @Test
     void eachPredecessorPassesItsDispositionOnAtMostOnce() {
         AuditFinding accepted = disposed("f-acc", UNCHECKED, "rule.a", "Foo.java", AuditFindingStatus.ACCEPTED_RISK, NOW);
@@ -196,7 +196,7 @@ class AuditDispositionLifecycleTest {
         assertThat(dismissed.getDispositionNote()).endsWith(AuditDispositionLifecycle.NOTE_SUPERSEDED + "rule.d (Regelwechsel)");
     }
 
-    /** Ein schwererer Nachfolger (HIGH statt LOW) erbt keine Einordnung — er ist neu zu bewerten. */
+    /** A more severe successor (HIGH instead of LOW) inherits no classification — it must be reassessed. */
     @Test
     void moreSevereSuccessor_inheritsNothing() {
         AuditFinding dismissed = disposed("f-dis", ARCHITECTURE, "god-class", "WorkflowExecutor",
@@ -211,7 +211,7 @@ class AuditDispositionLifecycleTest {
         assertThat(dismissed.getDispositionNote()).doesNotContain(AuditDispositionLifecycle.NOTE_SUPERSEDED);
     }
 
-    /** Nur Pfade oder CamelCase-Klassen sind Dateien: ein einzelnes Wort oder eine Route vererbt nichts. */
+    /** Only paths or CamelCase classes are files: a single word or a route inherits nothing. */
     @Test
     void subjectsThatAreNoPathOrCamelCaseClass_passNothingOn() {
         AuditFinding word = disposed("f-word", UNCHECKED, "rule.a", "Scheduler", AuditFindingStatus.ACCEPTED_RISK, NOW);
@@ -225,9 +225,9 @@ class AuditDispositionLifecycleTest {
                 .containsOnly(AuditFindingStatus.OPEN);
     }
 
-    // --- Teil-Messung: Kennzahl ohne Messwert in diesem Lauf --------------------------------------
+    // --- Partial measurement: metric without a measured value in this run ------------------------
 
-    /** Steht der FAKT einer Kennzahl-Regel nicht im Faktenblatt, zaehlt der Lauf fuer ihren Befund nicht als Abwesenheit. */
+    /** If the FACT of a metric rule is not in the fact sheet, the run does not count as absence for its finding. */
     @Test
     void metricFindingWhoseFactWasNotMeasured_isNotRetired() {
         String performance = "mysuricates.performance";
@@ -242,7 +242,7 @@ class AuditDispositionLifecycleTest {
         assertThat(accepted.getStatus()).isEqualTo(AuditFindingStatus.ACCEPTED_RISK);
     }
 
-    /** Gegenprobe: gemessen und drei Laeufe nicht gemeldet — dann schliesst er. */
+    /** Counter-check: measured and not reported for three runs — then it closes. */
     @Test
     void metricFindingWhoseFactWasMeasured_isRetiredAfterThreeRuns() {
         String performance = "mysuricates.performance";
@@ -257,11 +257,11 @@ class AuditDispositionLifecycleTest {
         assertThat(accepted.getStatus()).isEqualTo(AuditFindingStatus.RESOLVED);
     }
 
-    // --- Drei Laeufe ohne Wiedersehen -------------------------------------------------------------
+    // --- Three runs without a sighting ------------------------------------------------------------
 
     /**
-     * Zwei gueltige Vorlaeufe vor diesem: wer zuletzt vor dem aelteren gesehen wurde, fehlt jetzt zum dritten Mal.
-     * Wer im aelteren noch dabei war, fehlt erst zum zweiten Mal und bleibt eingeordnet.
+     * Two valid predecessors before this one: whoever was last seen before the older one is now missing for the third time.
+     * Whoever was still present in the older one is only missing for the second time and stays classified.
      */
     @Test
     void disposedFindingAbsentForThreeRuns_isResolved_twoRunsAreNotEnough() {
@@ -284,7 +284,7 @@ class AuditDispositionLifecycleTest {
         assertThat(twoRuns.getDispositionNote()).isEqualTo("Bewusst so");
     }
 
-    /** Solange es keine zwei gueltigen Vorlaeufe gibt, schliesst die Abwesenheit nichts Eingeordnetes. */
+    /** As long as there are no two valid predecessors, absence closes nothing classified. */
     @Test
     void withoutEnoughValidRuns_disposedFindingsStay() {
         AuditFinding accepted = disposed("f-acc", UNCHECKED, "rule.a", "Alt.java", AuditFindingStatus.ACCEPTED_RISK,
@@ -298,7 +298,7 @@ class AuditDispositionLifecycleTest {
         assertThat(accepted.getStatus()).isEqualTo(AuditFindingStatus.ACCEPTED_RISK);
     }
 
-    // --- Hilfen ------------------------------------------------------------------------------------
+    // --- Helpers -----------------------------------------------------------------------------------
 
     private AuditFinding disposed(String id, String auditKey, String ruleKey, String subject, AuditFindingStatus status,
                                   Instant lastSeenAt) {

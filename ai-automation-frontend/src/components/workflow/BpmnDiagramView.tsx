@@ -11,7 +11,7 @@ export type { DiagramSelection, RunStatus } from './bpmnLayout';
 
 export type DiagramOrientation = 'horizontal' | 'vertical';
 
-/** Kurzes Aufblitzen eines Blocks (Querverweis Liste ↔ Diagramm); ein neuer `nonce` blitzt erneut. */
+/** Brief flash of a block (cross-reference list ↔ diagram); a new `nonce` flashes again. */
 export type BlockFlash = { index: number; nonce: number; scroll?: boolean };
 
 export default function BpmnDiagramView({
@@ -25,15 +25,15 @@ export default function BpmnDiagramView({
 }: {
   xml: string;
   onSelectBlock?: (selection: DiagramSelection) => void;
-  /** Live-Status je Top-Level-Block-Index (färbt den zugehörigen Kasten). */
+  /** Live status per top-level block index (colors the matching box). */
   statusByBlock?: Map<number, RunStatus>;
-  /** Zeilenbereich je Block-Index — eingeschaltet zeigt jeder Kasten „#N · Z.a–b". */
+  /** Line range per block index — when switched on, each box shows „#N · Z.a–b". */
   infoByBlock?: Map<number, { start: number; end: number }>;
-  /** Fluss-Richtung: links→rechts (Standard) oder oben→unten. */
+  /** Flow direction: left→right (default) or top→bottom. */
   orientation?: DiagramOrientation;
-  /** Lässt den Kasten dieses Top-Level-Blocks kurz aufblitzen; ein neuer `nonce` blitzt erneut. */
+  /** Makes the box of this top-level block flash briefly; a new `nonce` flashes again. */
   flashBlock?: BlockFlash | null;
-  /** Maus über einem Kasten — meldet den Top-Level-Block-Index (verschachtelte Kästen: ihren Eltern-Block). */
+  /** Mouse over a box - reports the top-level block index (nested boxes: their parent block). */
   onHoverBlock?: (blockIndex: number) => void;
 }) {
   const t = useT();
@@ -45,7 +45,7 @@ export default function BpmnDiagramView({
   const scrollRef = useRef<HTMLDivElement>(null);
   const flashIndex = flashBlock?.index;
   const flashNonce = flashBlock?.nonce;
-  // Per Hover ausgelöst wird nicht gescrollt — sonst springt die Seite unter der Maus weg
+  // Hover-triggered does not scroll - otherwise the page jumps away under the mouse
   const flashScroll = flashBlock?.scroll !== false;
   useEffect(() => {
     if (flashIndex === undefined || !flashScroll) return;
@@ -61,10 +61,10 @@ export default function BpmnDiagramView({
   }
   const { minX, minY, width, height } = bounds;
 
-  // Eingepasst, horizontal: breitenfüllend (fit-to-width), horizontal scrollbar.
-  // Eingepasst, vertikal: native Größe (schmal, hoch) mit begrenzter Höhe + vertikalem Scrollen —
-  // sonst streckt der Container die schmal-hohe viewBox und das Diagramm wird riesig.
-  // Gezoomt: feste Größe in beide Richtungen, verschoben wird per Scrollen.
+  // Fitted, horizontal: fills the width (fit-to-width), horizontally scrollable.
+  // Fitted, vertical: native size (narrow, tall) with limited height + vertical scrolling -
+  // otherwise the container stretches the narrow-tall viewBox and the diagram becomes huge.
+  // Zoomed: fixed size in both directions, panning is done by scrolling.
   const { scale } = zoom;
   const fixedSize = scale !== null ? { width: width * scale, height: height * scale } : isVertical ? { width, height } : null;
 

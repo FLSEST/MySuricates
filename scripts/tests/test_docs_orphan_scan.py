@@ -1,19 +1,19 @@
-"""Tests fuer scripts/public-readiness/docs_orphan_scan.py (TODO 05f633c2).
+"""Tests for scripts/public-readiness/docs_orphan_scan.py (TODO 05f633c2).
 
-Jeder Fall haelt einen Fehlalarm fest, der beim Bau dieses Skripts wirklich auftrat —
-gemessen am echten Bestand, nicht ausgedacht:
+Each case pins a false alarm that actually occurred while building this script —
+measured on the real inventory, not made up:
 
-* `test_wave_commit_is_not_maintenance` — eine Datei, die 15-mal von Sync-Wellen
-  angefasst und einmal inhaltlich gepflegt wurde, galt als frisch. Genau der Fall
-  `docs/onboarding/GLOSSARY.md`.
-* `test_small_edit_is_not_maintenance`  — ohne Substanzschwelle faerbte ein einziger
-  Dreizeiler die Datei jung; das Pflegesignal fand daraufhin **niemanden**.
-* `test_container_consumer_downgrades`  — `docs/workflow-memory-architecture.md` ist vom
-  README nicht erreichbar, wird aber vom DocsController ausgeliefert. Ein reiner
-  Linkgraph meldet es faelschlich als verwaist.
-* `test_mirror_is_not_a_second_finding` — ohne die DE/EN-Faltung zaehlt jeder Befund doppelt.
-* `test_template_pages_do_not_overlap`  — vorlagenerzeugte Seiten teilen per Konstruktion
-  ihre Ueberschriften; roh gemessen ergab das Dutzende Falschpaare.
+* `test_wave_commit_is_not_maintenance` — a file touched 15 times by sync waves
+    and maintained once in substance counted as fresh. Exactly the case
+    `docs/onboarding/GLOSSARY.md`.
+* `test_small_edit_is_not_maintenance`  — without a substance threshold a single
+    three-liner made the file young; the maintenance signal then found **nobody**.
+* `test_container_consumer_downgrades`  — `docs/workflow-memory-architecture.md` is not
+    reachable from the README, but is served by the DocsController. A pure
+    link graph wrongly reports it as orphaned.
+* `test_mirror_is_not_a_second_finding` — without the DE/EN folding every finding counts twice.
+* `test_template_pages_do_not_overlap`  — template-generated pages share their headings
+    by construction; measured raw this yielded dozens of false pairs.
 
 Run: python3 -m unittest discover -s scripts/tests -p 'test_docs_orphan_scan.py'
 """
@@ -71,8 +71,8 @@ class ZoneTest(unittest.TestCase):
         ])
         self.assertIn("docs/architektur.md", scope)
         self.assertIn("README.md", scope)
-        # Ressourcen laedt der Code per Pfad — sie gehoeren in keinen Doku-Index und
-        # duerfen nie als verwaist gelten.
+        # Resources are loaded by the code via path — they belong in no docs index and
+        # must never count as orphaned.
         self.assertIn("ai-automation-backend/src/main/resources/skills/builtin/x.md", code_owned)
 
 
@@ -83,7 +83,7 @@ class MaintenanceTest(unittest.TestCase):
             target = root / "docs" / "glossar.md"
             target.write_text("# Glossar\n" + "\n".join(f"Begriff {i}" for i in range(60)))
             commit(root, "init", "2026-01-01T10:00:00")
-            # Welle: 12 Dokumente im selben Commit, an dieser Datei nur zwei Zeilen.
+            # Wave: 12 documents in the same commit, only two lines in this file.
             for i in range(12):
                 (root / "docs" / f"w{i}.md").write_text(f"# W{i}\nText\n")
             target.write_text(target.read_text() + "\nNachtrag\n")
@@ -100,7 +100,7 @@ class MaintenanceTest(unittest.TestCase):
             target = root / "docs" / "a.md"
             target.write_text("# A\n" + "\n".join(f"Zeile {i}" for i in range(50)))
             commit(root, "init", "2026-01-01T10:00:00")
-            # Schmaler Commit, aber nur drei Zeilen: ein Tippfehler ist keine Pflege.
+            # Narrow commit, but only three lines: a typo is no maintenance.
             target.write_text(target.read_text() + "\nTippfehler behoben\n")
             commit(root, "typo", "2026-08-01T10:00:00")
 
@@ -117,7 +117,7 @@ class MaintenanceTest(unittest.TestCase):
             commit(root, "init", "2026-01-01T10:00:00")
             for i in range(12):
                 (root / "docs" / f"w{i}.md").write_text(f"# W{i}\nText\n")
-            # Breiter Commit, aber an dieser Datei 60 neue Zeilen: echte Ueberarbeitung.
+            # Wide commit, but 60 new lines in this file: real revision.
             target.write_text(target.read_text() + "\n".join(f"Absatz {i}" for i in range(60)))
             commit(root, "breite Ueberarbeitung", "2026-06-01T10:00:00")
 
@@ -127,10 +127,10 @@ class MaintenanceTest(unittest.TestCase):
                             "eine grosse Aenderung darf nicht als Welle verschwinden")
 
     def test_small_document_never_counts_as_neglected(self):
-        """Eine Datei, die nie gross genug geaendert wurde, hat kein Pflegedatum.
+        """A file that was never changed substantially has no maintenance date.
 
-        Gewollt konservativ: ein Zehnzeiler, der seit jeher so dasteht, ist fertig und
-        nicht vernachlaessigt. Ohne diese Grenze meldete das Signal jede kleine Datei.
+        Deliberately conservative: a ten-liner that has always stood like this is finished and
+        not neglected. Without this limit the signal reported every small file.
         """
         with tempfile.TemporaryDirectory() as tmp:
             root = make_repo(Path(tmp))
@@ -146,8 +146,8 @@ class OverlapTest(unittest.TestCase):
     def test_template_pages_do_not_overlap(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = make_repo(Path(tmp))
-            # Acht vorlagenerzeugte Seiten mit identischen Abschnitten. Ohne den
-            # Haeufigkeitsfilter ergaebe das 28 Falschpaare.
+            # Eight template-generated pages with identical sections. Without the
+            # frequency filter this would give 28 false pairs.
             body = "\n".join(["## Problem", "x", "## Loesung", "y", "## Vorteile", "z",
                               "## Nachteile", "w", "## Grenzen", "v", "## Belege", "u"])
             for i in range(8):
@@ -205,8 +205,8 @@ class ScriptRunTest(unittest.TestCase):
 
             code, out = run_script(root)
             self.assertEqual(code, 0)
-            # Kein DocsController im Fixture: das MUSS auffallen, sonst sieht ein
-            # umbenannter Konsument wie "keine Kante" aus und erzeugt Falschbefunde.
+            # No DocsController in the fixture: this MUST stand out, otherwise a
+            # renamed consumer looks like "no edge" and produces false findings.
             self.assertIn("NICHT GEMESSEN: container_edge", out)
             self.assertIn("FAKT docs_container_consumers_verified: 0", out)
 
@@ -295,7 +295,7 @@ class ExitCodeTest(unittest.TestCase):
             commit(root, "init", "2026-01-01T10:00:00")
 
             code, _ = run_script(root)
-            # "nichts gemessen" und "nichts gefunden" duerfen nicht gleich aussehen.
+            # "nothing measured" and "nothing found" must not look alike.
             self.assertEqual(code, 2)
 
 

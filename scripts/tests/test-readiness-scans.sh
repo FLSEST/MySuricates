@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# Tests fuer drei Scan-Skripte der Evidenz-Stufe (TODO 428ee1ec): public-surface-scan.sh,
-# architecture-gap-scan.sh, safe-inventory.sh. Jeder Fall haelt einen Fehler fest, der im
-# Evidenz-Lauf vom 2026-09-23 als Audit-Befund aufgetaucht ist, obwohl er im Skript lag:
+# Tests for three scan scripts of the evidence stage (TODO 428ee1ec): public-surface-scan.sh,
+# architecture-gap-scan.sh, safe-inventory.sh. Each case pins an error that showed up as an audit finding in the
+# evidence run of 2026-09-23 although it lay in the script:
 #
-# * public-surface-scan.sh schrieb bei null Treffern eine zweite, unbeschriftete Zeile "0"
-#   ("grep -c ... || echo 0") und verlangte eine .env.example in der Wurzel, die es nie gab.
-# * architecture-gap-scan.sh empfahl pauschal ArchUnit, obwohl Grenztests existieren, und
-#   gab dazu jedes Mal ein todo_item aus.
-# * safe-inventory.sh liess den Git-Status bei sauberem Baum leer (nicht von "keine Ausgabe"
-#   zu unterscheiden) und zaehlte Testdateien anders als test-map.sh.
+# * public-surface-scan.sh wrote a second, unlabeled line "0" on zero hits
+#   ("grep -c ... || echo 0") and demanded an .env.example in the root that never existed.
+# * architecture-gap-scan.sh recommended ArchUnit across the board although boundary tests exist, and
+#   emitted a todo_item every time.
+# * safe-inventory.sh left the git status empty on a clean tree (indistinguishable from "no output")
+#   and counted test files differently from test-map.sh.
 #
-# Run: bash scripts/tests/test-readiness-scans.sh   (exit 0 = alle Checks ok)
+# Run: bash scripts/tests/test-readiness-scans.sh   (exit 0 = all checks ok)
 set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

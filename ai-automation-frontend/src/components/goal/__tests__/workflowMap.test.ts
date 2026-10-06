@@ -7,7 +7,7 @@ import { layoutRelations } from '../goalRelationLayout';
 import { besideCursor, CURSOR_GAP } from '../workflowMapDrag';
 import type { GoalDetail, GoalTodoRelation } from '../../../types';
 
-// 52bc1e8c (Flo): „dass man den Workflow auch ziehen kann“ – Ziele, Urteile, Live-Zeile, Gliederung, Tastatur
+// 52bc1e8c (Flo): „dass man den Workflow auch ziehen kann“ - targets, verdicts, live line, outline, keyboard
 
 const texts = {
   todo: '→ works on: {title}', todoOtherProject: '→ works on: {title} (workflow from {project})', package: '→ work package {title}',
@@ -127,7 +127,7 @@ describe('the dragged workflow sits beside the pointer', () => {
   });
 
   it('puts its corner just right of and below the pointer, so the target stays visible', () => {
-    // gegriffen bei (1230, 120): die Karte beginnt 16/14 px rechts unterhalb des Zeigers, der 500 px nach links gewandert ist
+    // grabbed at (1230, 120): the card starts 16/14 px to the right and below the pointer, which has moved 500 px to the left
     const moved = besideCursor(args(new MouseEvent('pointerdown', { clientX: 1230, clientY: 120 })) as never);
     expect(moved).toMatchObject({ x: -500 + 130 + CURSOR_GAP.x, y: 200 + 20 + CURSOR_GAP.y });
   });

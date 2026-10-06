@@ -83,8 +83,8 @@ class ExecutionControllerTest {
     private RateLimitConfig rateLimitConfig;
 
     /**
-     * Listen-Routen antworten seit TODO a05c9504 mit {@link WorkflowRunListItemResponse} — ohne
-     * Schritte. Die Detail-Route liefert weiter {@link WorkflowRunResponse} mit allem.
+     * List routes have answered with {@link WorkflowRunListItemResponse} since TODO a05c9504 - without
+     * steps. The detail route still returns {@link WorkflowRunResponse} with everything.
      */
     private static PageResponse<WorkflowRunListItemResponse> emptyPage(int page, int size) {
         return new PageResponse<>(List.of(), page, size, 0L, 0);
@@ -485,7 +485,7 @@ class ExecutionControllerTest {
                 .andExpect(jsonPath("$.required").value(true));
     }
 
-    /** Ein Formular mit mehreren Feldern kommt wie im WebSocket-Ereignis mit seinen fields (ec913801). */
+    /** A form with several fields arrives with its fields, as in the WebSocket event (ec913801). */
     @Test
     void getPendingApproval_humanInput_carriesFormFields() throws Exception {
         var approval = ApprovalRequest.builder()

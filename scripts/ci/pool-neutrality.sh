@@ -1,27 +1,27 @@
 #!/usr/bin/env bash
 #
-# Pool-Neutralität: prüft die getrackten Definitionen unter workflow-pool/ auf
-# Dinge, die nicht in ein öffentliches Repository gehören.
+# Pool neutrality: checks the tracked definitions under workflow-pool/ for
+# things that do not belong in a public repository.
 #
-# Der Pool ist keine Ablage, sondern eine Funktionsfläche: AUTOMATION_POOL_DIR
-# zeigt per Default darauf, und über GET /pool plus POST /pool/{id}/install
-# übernimmt jeder Leser einen Eintrag in seine Instanz. Was hier steht, wird also
-# mitgeliefert und ausgeführt.
+# The pool is not a storage place but a functional surface: AUTOMATION_POOL_DIR
+# points to it by default, and via GET /pool plus POST /pool/{id}/install
+# every reader takes an entry into their instance. So whatever is in here is
+# shipped and executed.
 #
-# Dieses Skript ist die einzige Quelle des Musterkatalogs. Das Built-in-Template
-# "pool-neutrality-audit" ruft es auf, statt die Muster ein zweites Mal in einem
-# JSON-Feld zu führen, wo sie weder testbar noch aus der CI aufrufbar wären.
+# This script is the only source of the pattern catalog. The built-in template
+# "pool-neutrality-audit" calls it instead of keeping the patterns a second time in a
+# JSON field, where they would be neither testable nor callable from CI.
 #
-# Usage:  scripts/ci/pool-neutrality.sh [--all] [verzeichnis]
-#           ohne --all: nur getrackte Definitionen (das ist die Release-Frage)
-#           mit  --all: jede .json im Verzeichnis, auch ignorierte — so prueft das
-#                       Built-in-Template den Pool einer laufenden Instanz
-# Exit:   0 = sauber, 1 = Befunde
+# Usage:  scripts/ci/pool-neutrality.sh [--all] [directory]
+#           without --all: only tracked definitions (that is the release question)
+#           with    --all: every .json in the directory, ignored ones too — this is how the
+#                       built-in template checks the pool of a running instance
+# Exit:   0 = clean, 1 = findings
 #
 set -uo pipefail
 
-# Regelbasis wie in public-hygiene.sh aus dem Skriptpfad, nicht aus git: das Skript
-# wird auch mit fremdem Arbeitsverzeichnis aufgerufen (Built-in-Template).
+# Rule base as in public-hygiene.sh from the script path, not from git: the script
+# is also called with a foreign working directory (built-in template).
 POOL_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 POOL_RULES_FILE="$POOL_SCRIPT_DIR/../lib/hygiene-rules.sh"
 if [ ! -f "$POOL_RULES_FILE" ]; then
@@ -45,17 +45,17 @@ report() {
 }
 
 # ---------------------------------------------------------------------------
-# Musterkatalog
+# Pattern catalog
 #
-# Zwei der ursprünglichen Muster waren unbrauchbar und sind korrigiert:
+# Two of the original patterns were unusable and have been corrected:
 #
-#   PATH-WIN  war  [A-Z]:\\[a-zA-Z]  und traf in JSON jedes deutsche
-#             "METRIKEN:\n" im Prompt — 9 von 18 Dateien, alle falsch positiv.
-#             Jetzt wird ein echter Laufwerksbuchstabe am Wortanfang verlangt.
+#   PATH-WIN  was  [A-Z]:\\[a-zA-Z]  and in JSON hit every German
+#             "METRIKEN:\n" in the prompt — 9 of 18 files, all false positives.
+#             Now a real drive letter at the start of a word is required.
 #
-#   BINARY    traf "#!/usr/bin/env python3", den portabel korrekten Shebang.
-#             /usr/bin/env ist jetzt ausgenommen; gemeint sind fest verdrahtete
-#             Werkzeugpfade wie /usr/bin/dot.
+#   BINARY    hit "#!/usr/bin/env python3", the portably correct shebang.
+#             /usr/bin/env is now exempt; what is meant are hard-wired
+#             tool paths like /usr/bin/dot.
 # ---------------------------------------------------------------------------
 scan_file() {
   local f="$1" m
@@ -66,7 +66,7 @@ scan_file() {
   m=$(grep -noE '(^|[^A-Za-z0-9])[A-Z]:\\\\[A-Za-z]' "$f" | head -1) \
     && [ -n "$m" ] && report "$f" "PATH-WIN" "Windows-Pfad: ${m#*:}"
 
-  # Punkt mit drin: ~/.mysuricates ist genauso ein Home-Pfad wie ~/projekt.
+  # Dot included: ~/.mysuricates is just as much a home path as ~/projekt.
   m=$(grep -noE '~/[A-Za-z.]' "$f" | head -1) \
     && [ -n "$m" ] && report "$f" "PATH-HOME" "Home-relativer Pfad: ${m#*:}"
 
@@ -76,22 +76,22 @@ scan_file() {
   m=$(grep -noE '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' "$f" | head -1) \
     && [ -n "$m" ] && report "$f" "EMAIL" "Mailadresse: ${m#*:}"
 
-  # Beide Schreibweisen, wie der Sanitizer im Backend (PoolExportSanitizer).
+  # Both spellings, like the sanitizer in the backend (PoolExportSanitizer).
   m=$(grep -noE '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}' "$f" | head -1) \
     && [ -n "$m" ] && report "$f" "UUID" "Instanz-UUID: ${m#*:}"
 
-  # Fest verdrahtete Werkzeugpfade — /usr/bin/env ist der portable Shebang und zählt nicht.
+  # Hard-wired tool paths — /usr/bin/env is the portable shebang and does not count.
   m=$(grep -noE '(/usr/local/bin/[a-zA-Z]+|/usr/bin/[a-zA-Z]+)' "$f" \
         | grep -v '/usr/bin/env' | head -1) \
     && [ -n "$m" ] && report "$f" "BINARY" "fester Werkzeugpfad: ${m#*:}"
 }
 
 # ---------------------------------------------------------------------------
-# Personenbezogene Feldnamen im Default-Kontext
+# Personal field names in the default context
 #
-# Der Schlüssel ist das Signal, nicht der Wert: ein defaultContext mit "wohnort"
-# oder "kinder_alter" ist auch dann ein Befund, wenn gerade ein Platzhalter
-# darin steht — beim nächsten Export steht wieder ein echter Wert drin.
+# The key is the signal, not the value: a defaultContext with "wohnort"
+# or "kinder_alter" is a finding even if a placeholder happens to be
+# in it — the next export will have a real value in it again.
 # ---------------------------------------------------------------------------
 scan_context_keys() {
   python3 - "$@" <<'PY'
@@ -145,23 +145,23 @@ PY
 }
 
 # ---------------------------------------------------------------------------
-# Eigene REST-API, Zugangsdaten, direkter Datenbankzugriff (TODO 1ccdc6d5)
+# Own REST API, credentials, direct database access (TODO 1ccdc6d5)
 #
-# Die Hausregel steht in CLAUDE.md: Workflow-Bloecke rufen weder die eigene
-# REST-API noch die Datenbank auf. In einer mitveroeffentlichten Definition ist
-# ein Prompt, der den API-Key aus app_settings holen laesst, zusaetzlich eine
-# Anleitung zum Auslesen von Zugangsdaten.
+# The house rule is in CLAUDE.md: workflow blocks call neither the own
+# REST API nor the database. In a co-published definition, a prompt
+# that has the API key fetched from app_settings is additionally an
+# instruction for reading out credentials.
 #
-# Die Muster sind absichtlich zweistufig: "/api/v1/" allein ist kein Befund
-# (mocking-gap-audit fuehrt es als Suchmuster in einer Liste), "automation.db"
-# allein auch nicht (mysuricates-performance-audit sieht nur die Dateigroesse an).
-# Gemeldet wird erst die Kombination mit einem Aufruf bzw. einem Lesezugriff.
+# The patterns are deliberately two-stage: "/api/v1/" alone is not a finding
+# (mocking-gap-audit lists it as a search pattern in a list), "automation.db"
+# alone neither (mysuricates-performance-audit only looks at the file size).
+# Only the combination with a call or a read access is reported.
 #
-# Im Shell-Code eines Blocks genuegt dagegen ein konkreter Endpunkt, der nicht auf
-# der Liste schluesselfreier Sonden steht: der Aufruf kann beliebig weit entfernt
-# stehen, etwa ueber eine Schleifenvariable (for E in /api/v1/...; do curl ...$E,
-# TODO 28007626). Verglichen wird exakt, wie im ApiKeyAuthFilter. Neben /api/v1/ zaehlt /actuator/:
-# dort antwortet nur /actuator/health ohne Key (HYGIENE_POOL_API_PREFIXES, TODO 7721d8cb).
+# In the shell code of a block, by contrast, a concrete endpoint that is not on
+# the list of key-free probes suffices: the call can be arbitrarily far away,
+# e.g. via a loop variable (for E in /api/v1/...; do curl ...$E,
+# TODO 28007626). Compared exactly, as in the ApiKeyAuthFilter. Besides /api/v1/, /actuator/ counts:
+# there only /actuator/health answers without a key (HYGIENE_POOL_API_PREFIXES, TODO 7721d8cb).
 # ---------------------------------------------------------------------------
 scan_api_and_credentials() {
   POOL_CREDENTIAL_MARKERS="$(printf '%s\n' "${HYGIENE_POOL_CREDENTIAL_MARKERS[@]}")" \
@@ -336,15 +336,15 @@ PY
 }
 
 # ---------------------------------------------------------------------------
-# Kuratierungsregeln (docs/workflow-pool-kuratierung.md, Abschnitt 3)
+# Curation rules (docs/workflow-pool-kuratierung.md, section 3)
 #
-# Die Muster oben fragen "steht hier etwas Privates drin?". Hier geht es um die
-# zweite Frage: "ist das ein brauchbarer Eintrag?" — deklarierter scope, keine
-# Instanz-Bindung, Beschreibung und Tags vorhanden, Blocktypen aus der Registry,
-# und bei scope: portable keine Abhängigkeit auf dieses Repository.
+# The patterns above ask "is there anything private in here?". This is about the
+# second question: "is this a usable entry?" — declared scope, no
+# instance binding, description and tags present, block types from the registry,
+# and for scope: portable no dependency on this repository.
 #
-# Die Listen kommen aus scripts/lib/hygiene-rules.sh und werden als Umgebungs-
-# variablen durchgereicht, damit argv den Dateien gehört.
+# The lists come from scripts/lib/hygiene-rules.sh and are passed through as environment
+# variables so that argv belongs to the files.
 # ---------------------------------------------------------------------------
 scan_definition_rules() {
   POOL_SCOPES="$(printf '%s\n' "${HYGIENE_POOL_SCOPES[@]}")" \
@@ -480,7 +480,7 @@ PY
 }
 
 # ---------------------------------------------------------------------------
-# Lauf
+# Run
 # ---------------------------------------------------------------------------
 if [ "$SCAN_ALL" -eq 1 ]; then
   mapfile -t FILES < <(find "$DIR" -maxdepth 1 -name '*.json' | sort)

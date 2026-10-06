@@ -30,12 +30,12 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * Relationskarte eines Ziels (TODO c6ea8f5c): je TODO Herkunft, Bearbeitung und Ergebnis.
+ * Relation map of a goal (TODO c6ea8f5c): per TODO origin, processing and result.
  *
- * <p>Alles gebuendelt: die TODOs (und angefragten Kandidaten) als schlanke Projektion, dann je Art
- * eine Abfrage – Projektnamen, Laeufe, Workflow-Namen, aktive Trigger, Audit-Verknuepfungen. Die
- * Zahl der Statements haengt nicht von der Zahl der TODOs ab ({@code RequestCostRatchetTest}).
- * Nur Lesezugriffe in der Transaktion; die Zuordnung selbst ist reine Rechnung
+ * <p>Everything bundled: the TODOs (and requested candidates) as a slim projection, then one
+ * query per kind - project names, runs, workflow names, active triggers, audit links. The
+ * number of statements does not depend on the number of TODOs ({@code RequestCostRatchetTest}).
+ * Only read access in the transaction; the mapping itself is pure computation
  * ({@link GoalRelationAssembler}).
  */
 @Service
@@ -54,8 +54,8 @@ public class GoalRelationsService {
     private final AuditFindingTodoRepository findingTodoRepository;
 
     /**
-     * @param include IDs noch nicht zugeordneter TODOs, die als Kandidaten mitkommen sollen;
-     *                TODOs eines Ziels (auch dieses) werden dabei uebergangen
+     * @param include IDs of not yet assigned TODOs that should come along as candidates;
+     *                TODOs of a goal (including this one) are skipped
      */
     @Transactional(readOnly = true)
     public GoalRelationsResponse relations(String goalId, List<String> include) {
@@ -83,7 +83,7 @@ public class GoalRelationsService {
         return new GoalRelationsResponse(goalId, triggers.size(), todos);
     }
 
-    /** Angefragte Kandidaten in Anfragereihenfolge, ohne Leerwerte und eigene TODOs, gedeckelt. */
+    /** Requested candidates in request order, without blanks and own TODOs, capped. */
     private List<GoalRelationRow> candidates(List<String> include, List<GoalRelationRow> members) {
         if (include == null || include.isEmpty()) {
             return List.of();
@@ -111,7 +111,7 @@ public class GoalRelationsService {
                 .collect(Collectors.toMap(RunStateRow::id, Function.identity(), (a, b) -> a));
     }
 
-    /** Workflows der Laeufe, der Workflow-Referenzen, der Fix-Workflows und der Trigger-Ziele. */
+    /** Workflows of the runs, the workflow references, the fix workflows and the trigger targets. */
     private static Set<String> workflowIds(List<GoalRelationRow> rows, Collection<RunStateRow> runs,
                                            List<TodoTriggerMatchRow> triggers) {
         Set<String> ids = new LinkedHashSet<>(ids(rows, GoalRelationRow::linkedWorkflowId));
@@ -127,7 +127,7 @@ public class GoalRelationsService {
                         Collectors.mapping(AuditFindingTodo::getFindingId, Collectors.toList())));
     }
 
-    /** Id → Name aus einer {@code SELECT id, name}-Abfrage; ohne IDs keine Abfrage. */
+    /** Id → name from a {@code SELECT id, name} query; no query without IDs. */
     private static Map<String, String> names(Set<String> ids, Function<Collection<String>, List<Object[]>> query) {
         Map<String, String> names = new HashMap<>();
         if (!ids.isEmpty()) {

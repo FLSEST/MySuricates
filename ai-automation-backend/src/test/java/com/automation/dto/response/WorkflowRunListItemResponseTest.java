@@ -67,7 +67,7 @@ class WorkflowRunListItemResponseTest {
         assertThat(back).isEqualTo(sample());
     }
 
-    /** TODO 6db47bc2: die Liste nennt den Chain-Run; ältere Aufrufer (ohne das Feld) bekommen null. */
+    /** TODO 6db47bc2: the list names the chain run; older callers (without the field) get null. */
     @Test
     void serializes_the_chain_run_and_defaults_it_to_null() {
         WorkflowRunListItemResponse entry = new WorkflowRunListItemResponse(

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Tests fuer scripts/release-notes.sh (TODO 3c75962d). Laeuft in einem Wegwerf-Repo mit echten
-# Merge-Commits, damit die Ueberblick-Zeilen und die Typ-Abschnitte gegen echtes Git-Verhalten
-# geprueft werden, nicht gegen eine Attrappe.
+# Tests for scripts/release-notes.sh (TODO 3c75962d). Runs in a throwaway repo with real
+# merge commits so that the overview lines and the type sections are checked against real git behavior,
+# not against a dummy.
 #
-# Run: bash scripts/tests/test-release-notes.sh   (exit 0 = alle Checks ok)
+# Run: bash scripts/tests/test-release-notes.sh   (exit 0 = all checks ok)
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
@@ -27,7 +27,7 @@ git -C "$TMP" add -A
 git -C "$TMP" commit -qm "Start"
 git -C "$TMP" tag -a v0.1.0 -m "Release v0.1.0"
 
-# --- v0.1.0 -> v0.2.0: zwei Feature-Branches gemergt, dazwischen ein direkter Fix-Commit --------
+# --- v0.1.0 -> v0.2.0: two feature branches merged, with a direct fix commit in between ----
 git -C "$TMP" checkout -q -b feat/a
 echo "a" >> "$TMP/README.md"
 git -C "$TMP" commit -qam "feat(a): Feature A einbauen (11111111 Feature A)"
@@ -103,23 +103,23 @@ check "alter Eintrag (vor v0.2.0) fehlt"                '! grep -q "Alter Eintra
 check "neuer Eintrag (nach v0.2.0) gelistet"            'grep -q "Neuer Eintrag nach v0.2.0" <<< "$OUT7"'
 
 echo "8) Mehrere Kuerzel, verschachtelte Klammer im Titel, normale Klammer bleibt"
-# Reine Kuerzelliste ohne Titel (Serien-Merge-Format, z.B. "series/w3-…: … (id, id, id, id)")
+# Pure short-id list without title (series merge format, e.g. "series/w3-…: … (id, id, id, id)")
 git -C "$TMP" checkout -q -b feat/series
 echo "series" >> "$TMP/README.md"
 git -C "$TMP" commit -qam "feat(series): Themenbuendel A, B, C, D"
 git -C "$TMP" checkout -q main
 git -C "$TMP" merge --no-ff -q -m "Merge series/w3-x: Themenbuendel A, B, C (66666666, 77777777, 88888888)" feat/series
 
-# Titel, der selbst eine Klammer enthaelt (z.B. "(448 statt hoechstens 435 Zeilen)")
+# Title that itself contains a parenthesis (e.g. "(448 statt hoechstens 435 Zeilen)")
 echo "nested" >> "$TMP/README.md"
 git -C "$TMP" commit -qam "refactor(x): Modellstatistik verschoben (99999999 Titel mit (Klammer) drin)"
 
-# Normale Klammer ohne Kuerzel bleibt stehen (Typ muss in TYPE_ORDER liegen, sonst faellt der
-# Commit komplett aus den Typ-Abschnitten heraus statt nur ungestrippt zu bleiben)
+# Normal parenthesis without short id stays (type must be in TYPE_ORDER, otherwise the
+# commit drops out of the type sections completely instead of merely staying unstripped)
 echo "normal" >> "$TMP/README.md"
 git -C "$TMP" commit -qam "fix(x): Abhaengigkeit aktualisiert (kein Kuerzel)"
 
-# Kuerzel am Ende einer Klammer mit Fliesstext davor (z.B. "(Stand 2026-09-22, 8f28fad0)")
+# Short id at the end of a parenthesis with running text before it (e.g. "(Stand 2026-09-22, 8f28fad0)")
 echo "trailing" >> "$TMP/README.md"
 git -C "$TMP" commit -qam "docs(readme): Sync nachgezogen (Stand 2026-09-22, aaaaaaaa)"
 
@@ -131,9 +131,9 @@ check "Serien-Merge-Betreff ohne Kuerzelliste"            'grep -qF -- "Merge se
 check "verschachtelte Klammer im Titel komplett entfernt" 'grep -qF -- "- Modellstatistik verschoben" <<< "$OUT8" && ! grep -qF -- "99999999" <<< "$OUT8" && ! grep -qF -- "Klammer" <<< "$OUT8"'
 check "normale Klammer ohne Kuerzel bleibt stehen"        'grep -qF -- "- Abhaengigkeit aktualisiert (kein Kuerzel)" <<< "$OUT8"'
 check "Kuerzel am Ende mit Fliesstext davor entfernt"     'grep -qF -- "- Sync nachgezogen" <<< "$OUT8" && ! grep -qF -- "aaaaaaaa" <<< "$OUT8" && ! grep -qF -- "Stand 2026-09-22" <<< "$OUT8"'
-# Verhaltensaenderungen-Eintraege stammen aus docs/entwicklung.md und zitieren ihren Commit-/
-# TODO-Hash bewusst (siehe dortige Konvention) — die einzigen erlaubten Fundstellen ausserhalb
-# davon sind der Compare-Link (Tag-Namen ohne Hex) selbst.
+# Behavior-change entries come from docs/entwicklung.md and deliberately quote their commit/
+# TODO hash (see the convention there) — the only allowed places outside
+# that are the compare link (tag names without hex) itself.
 check "kein 8-Hex-Kuerzel mehr ausserhalb Vergleichslink/Verhaltensaenderungen" \
   '[ -z "$(grep -E "[0-9a-f]{8}" <<< "$OUT8" | grep -v "compare/" | grep -v "^- \*\*Seit ")" ]'
 

@@ -37,7 +37,7 @@ function todoWith(planning: Record<string, unknown>): Todo {
   } as unknown as Todo;
 }
 
-/** `legacy`: das Ziel antwortet wie ein Backend vor c60bf914 – ohne `workPackages`, die Pakete heißen „milestones“. */
+/** `legacy`: the goal answers like a backend before c60bf914 - without `workPackages`, the packages are called „milestones“. */
 function serve(sent: unknown[], legacy = false) {
   const packages = [wp('w-legal', 'Legal', 'p1', ['2026-10-12', '2026-10-15']), wp('w-promo', 'Promotion', 'p2'), wp('w-docs', 'Handbook', 'p1')];
   server.use(

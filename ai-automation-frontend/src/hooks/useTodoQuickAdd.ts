@@ -3,9 +3,9 @@ import { useCreateTodo } from './useTodos';
 import type { CreateTodoRequest, TodoPriority } from '../types';
 
 /**
- * Zustand der Quick-Add-Leiste auf der TODO-Seite. Liegt in der Seite (nicht in `TodoQuickAdd`),
- * damit Eingaben einen Lade-Spinner beim Filterwechsel überstehen und das Kürzel `n` ab dem
- * Seitenaufruf greift: außerhalb von Eingabefeldern fokussiert es den Titel.
+ * State of the quick-add bar on the TODO page. Lives in the page (not in `TodoQuickAdd`),
+ * so input survives a loading spinner on filter change and the `n` shortcut works from the
+ * first page load: outside input fields it focuses the title.
  */
 export function useTodoQuickAdd() {
   const createTodo = useCreateTodo();

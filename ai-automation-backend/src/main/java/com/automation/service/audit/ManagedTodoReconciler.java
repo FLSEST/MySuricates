@@ -18,14 +18,13 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Haelt verwaltete TODOs im Takt ihrer Findings: ein managed TODO ist genau dann {@code DONE},
- * wenn jedes damit verknuepfte Finding terminal ist (RESOLVED / ACCEPTED_RISK / DISMISSED), sonst
- * {@code OPEN}. Manuell verknuepfte TODOs bleiben unberuehrt.
+ * Keeps managed TODOs in step with their findings: a managed TODO is {@code DONE} exactly when
+ * every finding linked to it is terminal (RESOLVED / ACCEPTED_RISK / DISMISSED), otherwise
+ * {@code OPEN}. Manually linked TODOs are left untouched.
  *
- * <p>Aus {@code AuditCenterService} herausgeloest, damit der Dispositionswechsel im Audit Center
- * und der Merge in {@link AuditFingerprintMigrationJob} dieselbe Regel benutzen statt zweier
- * auseinanderlaufender Kopien (Audit-TODO 53119eb8). Reine DB-Arbeit, laeuft in der Transaktion
- * des Aufrufers.
+ * <p>Extracted from {@code AuditCenterService} so that the disposition change in the Audit Center
+ * and the merge in {@link AuditFingerprintMigrationJob} use the same rule instead of two
+ * diverging copies (audit TODO 53119eb8). Pure DB work, runs in the caller's transaction.
  */
 @Slf4j
 @Component
@@ -36,14 +35,14 @@ public class ManagedTodoReconciler {
     private final AuditFindingTodoRepository findingTodoRepository;
     private final TodoRepository todoRepository;
 
-    /** Gleicht die verwalteten TODOs eines Findings ab. */
+    /** Reconciles the managed TODOs of one finding. */
     public int reconcileFinding(String findingId) {
         return reconcile(findingTodoRepository.findByFindingId(findingId));
     }
 
     /**
-     * @param links Verknuepfungen, deren verwaltete TODOs neu bewertet werden
-     * @return Anzahl der TODOs, deren Status sich dadurch geaendert hat
+     * @param links links whose managed TODOs are re-evaluated
+     * @return number of TODOs whose status changed as a result
      */
     public int reconcile(List<AuditFindingTodo> links) {
         List<String> todoIds = links.stream().filter(AuditFindingTodo::isManaged)
@@ -51,8 +50,8 @@ public class ManagedTodoReconciler {
         if (todoIds.isEmpty()) {
             return 0;
         }
-        // Je Stufe eine Abfrage statt drei je Verknuepfung (TODO 8c791a45, wie ManagedTodoWriter):
-        // TODOs, ihre Verknuepfungen und deren Findings werden gebuendelt geladen.
+        // One query per level instead of three per link (TODO 8c791a45, like ManagedTodoWriter):
+        // TODOs, their links and their findings are loaded in bulk.
         Map<String, Todo> todos = todoRepository.findAllById(todoIds).stream()
                 .collect(Collectors.toMap(Todo::getId, Function.identity()));
         if (todos.isEmpty()) {
@@ -65,7 +64,7 @@ public class ManagedTodoReconciler {
         Map<String, AuditFinding> findings = findingIds.isEmpty() ? Map.of()
                 : findingRepository.findAllById(findingIds).stream()
                         .collect(Collectors.toMap(AuditFinding::getId, Function.identity()));
-        // Geaenderte TODOs werden gesammelt und mit einem saveAll geschrieben (e41531e0).
+        // Changed TODOs are collected and written with one saveAll (e41531e0).
         List<Todo> changed = new ArrayList<>();
         for (String todoId : todoIds) {
             Todo todo = todos.get(todoId);
@@ -88,11 +87,11 @@ public class ManagedTodoReconciler {
     }
 
     /**
-     * Sind alle Findings terminal, wird geschlossen. Zurueck ins Offene geht nur, was der Abgleich
-     * selbst geschlossen hat: ein {@code IN_PROGRESS}- oder {@code ARCHIVED}-TODO ist eine
-     * menschliche Entscheidung und wird nicht ueberschrieben.
+     * If all findings are terminal, the TODO is closed. Only what the reconciliation itself closed
+     * goes back to open: an {@code IN_PROGRESS} or {@code ARCHIVED} TODO is a human decision and
+     * is not overwritten.
      *
-     * @return Zielstatus oder {@code null}, wenn nichts zu tun ist
+     * @return target status, or {@code null} if there is nothing to do
      */
     private static Todo.Status nextStatus(Todo todo, boolean allTerminal) {
         if (allTerminal) {
@@ -101,7 +100,7 @@ public class ManagedTodoReconciler {
         return todo.getStatus() == Todo.Status.DONE ? Todo.Status.OPEN : null;
     }
 
-    /** Alle Verknuepfungen des TODOs, ob verwaltet oder nicht; ein geloeschtes Finding zaehlt nicht. */
+    /** All links of the TODO, managed or not; a deleted finding does not count. */
     private static boolean allTerminal(List<AuditFindingTodo> todoLinks, Map<String, AuditFinding> findings) {
         return todoLinks.stream()
                 .map(link -> findings.get(link.getFindingId()))
@@ -109,7 +108,7 @@ public class ManagedTodoReconciler {
                 .allMatch(finding -> finding.getStatus().isTerminal());
     }
 
-    /** Ist das Finding terminal? Kurzform fuer Aufrufer, die nur den Status in der Hand haben. */
+    /** Is the finding terminal? Short form for callers that only hold the status. */
     public static boolean isTerminal(AuditFinding finding) {
         return finding.getStatus() != null && finding.getStatus().isTerminal();
     }

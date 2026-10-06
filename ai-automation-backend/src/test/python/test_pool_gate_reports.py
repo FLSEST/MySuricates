@@ -10,7 +10,7 @@ COMPLETE_FACTS = '\n'.join('FAKT %s: 0' % f for f in
 
 
 class PoolGateReportTest(unittest.TestCase):
-    """Die Gate-Blöcke der kombinierten Pool-Workflows werten einen fehlenden oder unbekannten Bericht als YELLOW."""
+    """The gate blocks of the combined pool workflows rate a missing or unknown report as YELLOW."""
 
     def test_unknown_report_remains_yellow_in_combined_pool_gates(self):
         for name in ['build-gate', 'health-check', 'i18n-sync', 'release-readiness', 'test-sync']:
@@ -18,8 +18,8 @@ class PoolGateReportTest(unittest.TestCase):
             command = workflow['blocks'][-1]['config']['command']
             for report, status in [('', 'YELLOW'), ('gate_status: UNKNOWN', 'YELLOW'),
                                    ('gate_status: RED', 'RED'), ('gate_status: GREEN', 'GREEN')]:
-                # Die Gates lesen den Bericht als {{ previous_output }} oder {{ block.report.output }}; der
-                # Health-Check prüft vorher sein Faktenblatt – hier vollständig, damit das Urteil zählt.
+                # The gates read the report as {{ previous_output }} or {{ block.report.output }}; the
+                # health check checks its fact sheet beforehand – complete here, so that the verdict counts.
                 rendered = (command.replace('{{ previous_output }}', shlex.quote(report))
                             .replace('{{ block.report.output }}', shlex.quote(report))
                             .replace('{{ block.facts.output }}', shlex.quote(COMPLETE_FACTS)))

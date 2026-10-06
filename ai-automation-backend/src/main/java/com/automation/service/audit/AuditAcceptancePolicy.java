@@ -13,22 +13,22 @@ import java.util.Optional;
 import java.util.OptionalInt;
 
 /**
- * Regeln fuer akzeptierte Audit-Risiken (ACCEPTED_RISK).
+ * Rules for accepted audit risks (ACCEPTED_RISK).
  * <ul>
- *   <li><b>Beweis-Snapshot:</b> Beim Akzeptieren wird der aktuelle Evidence-Text samt Zeitpunkt am
- *       Finding eingefroren ({@link #accept}).</li>
- *   <li><b>Verschlechterung:</b> Taucht das Finding erneut auf und liegt ein messbarer Wert der neuen
- *       Evidence mehr als {@value #DEGRADATION_THRESHOLD_PERCENT} % ueber dem Snapshot (je gemeinsamer Einheit
- *       oder benannter Zaehlung, siehe {@link EvidenceMetrics#parse}), wird es wieder OPEN; die Notiz bekommt
- *       einen "Verschlechtert"-Hinweis, der Snapshot bleibt erhalten. Die Aenderungsrate (Churn) schwankt und
- *       zaehlt deshalb nicht prozentual: Sie verschlechtert nur, wenn sie im Snapshot unter der Hotspot-Schwelle
- *       lag und sie jetzt erreicht (Schwelle aus "Hotspot ab N" der aktuellen Evidence, sonst
- *       {@value #HOTSPOT_MIN_CHANGES} wie HOTSPOT_MIN_CHANGES in scripts/public-readiness/arch-findings.py).</li>
- *   <li><b>Verfall:</b> Ist die Akzeptanz aelter als {@link #REVIEW_INTERVAL}, geht das Finding beim
- *       naechsten Auftauchen auf AWAITING_VERIFICATION ("Wiedervorlage"). Danach gelten die normalen
- *       Ingestion-Regeln; ein erneutes Akzeptieren setzt Snapshot und Frist neu.</li>
+ *   <li><b>Evidence snapshot:</b> On acceptance, the current evidence text including the timestamp is frozen on the
+ *       finding ({@link #accept}).</li>
+ *   <li><b>Degradation:</b> If the finding reappears and a measurable value of the new
+ *       evidence is more than {@value #DEGRADATION_THRESHOLD_PERCENT} % above the snapshot (per common unit
+ *       or named count, see {@link EvidenceMetrics#parse}), it becomes OPEN again; the note gets
+ *       a "Verschlechtert" hint, the snapshot is kept. The rate of change (churn) fluctuates and
+ *       therefore does not count as a percentage: it only degrades if it was below the hotspot threshold in the snapshot
+ *       and now reaches it (threshold from "Hotspot ab N" of the current evidence, otherwise
+ *       {@value #HOTSPOT_MIN_CHANGES} like HOTSPOT_MIN_CHANGES in scripts/public-readiness/arch-findings.py).</li>
+ *   <li><b>Expiry:</b> If the acceptance is older than {@link #REVIEW_INTERVAL}, the finding goes to
+ *       AWAITING_VERIFICATION ("Wiedervorlage") the next time it appears. After that the normal
+ *       ingestion rules apply; accepting again resets snapshot and deadline.</li>
  * </ul>
- * Ohne vergleichbare Zahlen findet keine Wiedereroeffnung statt.
+ * Without comparable numbers there is no reopening.
  */
 @Component
 public class AuditAcceptancePolicy {
@@ -40,15 +40,15 @@ public class AuditAcceptancePolicy {
 
     public enum Outcome { UNCHANGED, REOPENED, REVIEW_DUE }
 
-    /** Friert Evidence und Zeitpunkt der Akzeptanz am Finding ein. */
+    /** Freezes evidence and time of acceptance on the finding. */
     public void accept(AuditFinding finding, Instant acceptedAt) {
         finding.setDispositionEvidence(finding.getEvidence());
         finding.setDispositionAt(acceptedAt);
     }
 
     /**
-     * Bewertet ein erneut aufgetauchtes Finding gegen seinen Snapshot. Mutiert Status und Notiz,
-     * ist fuer alle Status ausser ACCEPTED_RISK ein No-op.
+     * Evaluates a reappeared finding against its snapshot. Mutates status and note,
+     * is a no-op for all statuses except ACCEPTED_RISK.
      */
     public Outcome reassess(AuditFinding finding, String currentEvidence, Instant observedAt) {
         if (finding.getStatus() != AuditFindingStatus.ACCEPTED_RISK) return Outcome.UNCHANGED;
@@ -73,8 +73,8 @@ public class AuditAcceptancePolicy {
     }
 
     /**
-     * @return "alt → neu" je gemeinsamer Einheit bzw. Zaehlung, deren Wert um mehr als den Schwellwert gestiegen
-     *         ist, dazu die Aenderungsrate, wenn sie die Hotspot-Schwelle neu erreicht hat.
+     * @return "old → new" per common unit or count whose value rose by more than the threshold,
+     *         plus the rate of change if it newly reached the hotspot threshold.
      */
     static List<String> degradations(String snapshotEvidence, String currentEvidence) {
         Map<String, Double> before = EvidenceMetrics.parse(snapshotEvidence);

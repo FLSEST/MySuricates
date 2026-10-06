@@ -21,8 +21,8 @@ function createWrapper() {
 }
 
 /**
- * TODO a42969a6: beide Hooks lesen denselben (grossen) Endpunkt. Auf einer Instanz mit
- * Rate-Limit zaehlt jeder doppelte Abruf, also teilen sie sich einen Query.
+ * TODO a42969a6: both hooks read the same (large) endpoint. On an instance with
+ * a rate limit every duplicate request counts, so they share one query.
  */
 describe('system capabilities', () => {
   it('serves useSystemModules and useBlockTypes from a single request', async () => {

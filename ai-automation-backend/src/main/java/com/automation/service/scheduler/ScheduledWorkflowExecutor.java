@@ -114,8 +114,8 @@ public class ScheduledWorkflowExecutor {
             }
             if (scheduled.getInputContext() != null && scheduled.getInputContext().get("goal_id") != null
                     && !modules.isEnabled(ModuleCatalog.GOALS)) {
-                // Zielgebundener Zeitplan (z. B. der Ziel-Waechter) bei Modul goals aus: ueberspringen statt
-                // ohne Zieldaten scheitern (TODO c60bf914); der finally-Block rueckt nextRunAt weiter.
+                // Goal-bound schedule (e.g. the goal guard) with module goals off: skip instead of
+                // failing without goal data (TODO c60bf914); the finally block advances nextRunAt.
                 log.info("Schedule {} skipped — {}", scheduleId,
                         ModuleCatalog.GOALS.disabledMessage("Goal schedule '" + scheduled.getTargetName() + "'"));
                 return Optional.empty();

@@ -10,12 +10,12 @@ import {
   type ThemeAppearance,
 } from '../theme/themes';
 
-/** Eigene Farbanpassungen, je Theme-ID getrennt. */
+/** Own colour adjustments, kept apart per theme ID. */
 export type ThemeOverrides = Record<string, Partial<ThemeTokens>>;
 
 interface PersistedThemeState {
   themeId: string;
-  /** Zuletzt genutztes helles/dunkles Theme — Ziel des Hell/Dunkel-Umschalters. */
+  /** Last used light/dark theme — target of the light/dark switch. */
   lastLightThemeId: string;
   lastDarkThemeId: string;
   overrides: ThemeOverrides;
@@ -37,9 +37,9 @@ const DEFAULT_STATE: PersistedThemeState = {
 };
 
 /**
- * Persist-Version 0 kannte nur `mode: 'light' | 'dark'` und globale Overrides.
- * Der Modus wird auf das entsprechende MySuricates-Theme abgebildet, die Overrides
- * wandern zu diesem Theme.
+ * Persist version 0 only knew `mode: 'light' | 'dark'` and global overrides.
+ * The mode is mapped to the corresponding MySuricates theme, the overrides
+ * move to that theme.
  */
 export function migrateThemeState(persisted: unknown, version: number): PersistedThemeState {
   if (version >= 1) return persisted as PersistedThemeState;
@@ -117,7 +117,7 @@ export const useThemeStore = create<ThemeState>()(
   )
 );
 
-/** Hell/Dunkel des aktiven Themes — für Komponenten mit eigenem Theme-System (Monaco, xterm). */
+/** Light/dark of the active theme — for components with their own theme system (Monaco, xterm). */
 export function useThemeAppearance(): ThemeAppearance {
   return useThemeStore((state) => getTheme(state.themeId).appearance);
 }

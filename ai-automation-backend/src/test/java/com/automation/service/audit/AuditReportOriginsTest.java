@@ -25,9 +25,9 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 /**
- * Herkunft der Audit-Reports, direkt am Baustein (TODO b37a6646). Die Faelle ueber die Report-Seite
- * stehen in {@link AuditCenterServiceTest}; hier die Regeln, die dort nicht vorkommen: welche Laeufe
- * den Ausloeser ihrer Kette nicht erben und wie die Abfragen gebuendelt werden.
+ * Origin of the audit reports, directly at the block (TODO b37a6646). The cases via the report page
+ * are in {@link AuditCenterServiceTest}; here the rules that do not appear there: which runs
+ * do not inherit the trigger of their chain and how the queries are bundled.
  */
 @ExtendWith(MockitoExtension.class)
 class AuditReportOriginsTest {
@@ -43,7 +43,7 @@ class AuditReportOriginsTest {
         origins = new AuditReportOrigins(runProjections, chainRunRepository, versionRepository);
     }
 
-    /** Doppelte und fehlende Run-IDs einer Seite ergeben genau eine Abfrage; ein geloeschter Lauf fehlt in der Map. */
+    /** Duplicate and missing run IDs of a page result in exactly one query; a deleted run is missing from the map. */
     @Test
     void byRunId_asksOnceWithDistinctIds_andLeavesAGoneRunOut() {
         when(runProjections.findOriginRows(List.of("run-1", "run-gone"))).thenReturn(List.of(
@@ -67,9 +67,9 @@ class AuditReportOriginsTest {
     }
 
     /**
-     * Ein fortgesetzter Ketteneintrag behaelt im Kontext den Ausloeser der Kette, wurde aber von einer
-     * Person fortgesetzt: RESUME, ohne Kette (die Spalte setzt nur ein CHAIN-Start). Die Versionsnummer
-     * kommt aus der nativen Abfrage als beliebige Zahl.
+     * A resumed chain entry keeps the chain's trigger in its context, but was resumed by a
+     * person: RESUME, without a chain (the column is only set by a CHAIN start). The version number
+     * comes from the native query as an arbitrary number.
      */
     @Test
     void resumedChainEntry_saysResume_notTheChainStarter() {
@@ -83,7 +83,7 @@ class AuditReportOriginsTest {
         verifyNoInteractions(chainRunRepository);
     }
 
-    /** Ohne Verweis auf den Eltern-Lauf wuerde dessen Ausloeser als eigener gelesen: SUB_WORKFLOW bleibt SUB_WORKFLOW. */
+    /** Without a reference to the parent run its trigger would be read as its own: SUB_WORKFLOW stays SUB_WORKFLOW. */
     @Test
     void subWorkflowRun_staysSubWorkflow_evenWithAReadableParent() {
         when(runProjections.findOriginRows(List.of("run-1"))).thenReturn(List.of(
@@ -95,7 +95,7 @@ class AuditReportOriginsTest {
         verifyNoInteractions(chainRunRepository, versionRepository);
     }
 
-    /** Ein direkt geplanter Lauf nennt seinen eigenen Zeitplan, ein Ketteneintrag den der Kette. */
+    /** A directly scheduled run names its own schedule, a chain entry that of the chain. */
     @Test
     void scheduleId_isTheRunsOwn_orForAChainEntryTheChains() {
         when(runProjections.findOriginRows(List.of("run-direct", "run-chain"))).thenReturn(List.of(

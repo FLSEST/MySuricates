@@ -24,10 +24,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-/** Die gemeinsame Baufehler-Prüfung KI-erzeugter Definitionen (TODO 326d5987). */
+/** The shared build-error check of AI-generated definitions (TODO 326d5987). */
 class GeneratedWorkflowCheckTest {
 
-    /** simple-Block mit {@code prompt} statt {@code command}: HIGH (Pflichtschlüssel fehlt) plus MEDIUM (unbekannter Schlüssel). */
+    /** simple block with {@code prompt} instead of {@code command}: HIGH (required key missing) plus MEDIUM (unknown key). */
     static final String BAD_BLOCKS = "[{\"type\":\"simple\",\"config\":{\"prompt\":\"Fasse zusammen\"}}]";
     static final String GOOD_BLOCKS = "[{\"type\":\"simple\",\"config\":{\"command\":\"Fasse zusammen\"}}]";
     static final String WORSE_BLOCKS = "[{\"type\":\"simple\",\"config\":{\"prompt\":\"a\"}},"
@@ -56,7 +56,7 @@ class GeneratedWorkflowCheckTest {
     @Test
     void findingsLassenLowWegUndStellenHighNachVorn() {
         var blocks = List.of(
-                block("shell", "messung", Map.of("command", "echo ok")),              // nur LOW: missing-strict-mode
+                block("shell", "messung", Map.of("command", "echo ok")),              // LOW only: missing-strict-mode
                 block("simple", "report", Map.of("prompt", "Fasse {{ previous_output }} zusammen")));
 
         var findings = check.findings(blocks, null);
@@ -82,7 +82,7 @@ class GeneratedWorkflowCheckTest {
         assertThat(GeneratedWorkflowCheck.format(List.of())).isEmpty();
     }
 
-    /** TODO 81773d7b: dieselben Zeilen auf Englisch — Detail aus detailEn, englische Anführungszeichen und Schlusszeile. */
+    /** TODO 81773d7b: the same lines in English — detail from detailEn, English quotation marks and closing line. */
     @Test
     void formatAufEnglischNimmtDetailEn_undFaelltSonstAufDeutschZurueck() {
         var f = new AnalyzerFinding("missing-required-config-key", AnalyzerFinding.Severity.HIGH, 1, "report",
@@ -96,7 +96,7 @@ class GeneratedWorkflowCheckTest {
                 .isEqualTo("- HIGH missing-required-config-key — Block 2 \"report\": required key command is missing");
         assertThat(GeneratedWorkflowCheck.format(List.of(f), "de")).isEqualTo(GeneratedWorkflowCheck.format(List.of(f)));
         assertThat(GeneratedWorkflowCheck.summaryLines(many, "en")).last().isEqualTo("… and 2 more");
-        assertThat(GeneratedWorkflowCheck.summaryLines(many, "en").get(0)).endsWith(": Detail 0");   // ohne detailEn
+        assertThat(GeneratedWorkflowCheck.summaryLines(many, "en").get(0)).endsWith(": Detail 0");   // without detailEn
     }
 
     @Test
@@ -118,7 +118,7 @@ class GeneratedWorkflowCheckTest {
     @Test
     void ohneHighKeinKorrekturaufruf() {
         AtomicInteger calls = new AtomicInteger();
-        // Nur MEDIUM (unbekannter Schlüssel neben dem Pflichtschlüssel): Kostenregel, kein Aufruf
+        // Only MEDIUM (unknown key next to the required key): cost rule, no call
         var blocks = List.of(block("simple", null, Map.of("command", "x", "promt", "y")));
 
         var result = check.correctOnce(blocks, null, p -> {
@@ -203,7 +203,7 @@ class GeneratedWorkflowCheckTest {
         assertThat(result.blocks()).isSameAs(original);
     }
 
-    /** Kaputter Block plus gesunder Block danach. */
+    /** Broken block plus a healthy block after it. */
     private static List<BlockDefinition> badAndHealthy() {
         return new ArrayList<>(List.of(
                 block("simple", "zusammenfassung", Map.of("prompt", "Fasse zusammen")),
@@ -214,7 +214,7 @@ class GeneratedWorkflowCheckTest {
     void korrekturOhneDenGesundenBlockLaesstDasOriginal() {
         var original = badAndHealthy();
 
-        // typischer Fehler: nur der reparierte Block kommt zurück — weniger HIGH, aber ein Block fehlt
+        // typical error: only the repaired block comes back — fewer HIGH, but a block is missing
         var result = check.correctOnce(original, null, p -> GOOD_BLOCKS);
 
         assertThat(result.attempted()).isTrue();
@@ -252,7 +252,7 @@ class GeneratedWorkflowCheckTest {
 
     @Test
     void reviewRepairWendetDieRegelnOhneKiAufrufAn() {
-        // Factory-Auto-Fix (TODO 99a9dfb0): die Reparatur holt der Aufrufer selbst, geprüft wird wie in correctOnce.
+        // Factory auto-fix (TODO 99a9dfb0): the caller fetches the repair itself, checked as in correctOnce.
         var original = badAndHealthy();
         original.get(0).setSkillIds(new ArrayList<>(List.of("skill-1")));
 
@@ -313,6 +313,6 @@ class GeneratedWorkflowCheckTest {
         when(activityLog.warn(any(), anyString(), anyString(), any(), anyString())).thenThrow(new IllegalStateException("db"));
 
         check.reportRemaining("wf-1", "Bericht", "Factory", check.findings(badBlocks(), null));
-        // kein Wurf: die Prüfung bricht keinen Speicherweg ab
+        // no throw: the check does not abort a save path
     }
 }

@@ -49,16 +49,16 @@ public class ExecutionContextFactory {
                               String containerId, Map<String, Object> inputContext, String instructions,
                               String model, String provider, String effort, String resumePreviousOutput,
                               String definitionHash, TriggerSource triggerSource,
-                              /** metadata.userPreferences des Workflows (TODO d49fbde0). */
+                              /** metadata.userPreferences of the workflow (TODO d49fbde0). */
                               boolean userPreferences,
-                              /** Metadaten des Workflows: metadata.audit bringt audit_findings (TODO 3643beac). */
+                              /** Metadata of the workflow: metadata.audit brings audit_findings (TODO 3643beac). */
                               Map<String, Object> workflowMeta) {
 
         public ContextSeed {
             workflowMeta = workflowMeta != null ? workflowMeta : Map.of();
         }
 
-        /** Kurzform ohne Arbeitspräferenzen und Metadaten — der Weg fuer alles, was sie nicht anfordert. */
+        /** Short form without work preferences and metadata - the path for everything that does not request them. */
         public ContextSeed(String runId, String workflowId, String workflowName, Project project,
                            String containerId, Map<String, Object> inputContext, String instructions,
                            String model, String provider, String effort, String resumePreviousOutput,
@@ -178,10 +178,10 @@ public class ExecutionContextFactory {
         contextDataService.injectPlatformData(context, workflowId, project.getId(), seed.workflowMeta());
 
         // Set instruction prefix and model from workflow
-        // Der Standardweg ruft weiter die einparametrige Methode: Ein Workflow ohne Opt-in soll
-        // nicht nur denselben Prompt bekommen, sondern denselben AUFRUF ausloesen. Sonst haengt
-        // jeder vorhandene Test und Aufrufer an einer Signatur, die sich seinetwegen geaendert hat
-        // -- genau daran sind beim ersten Versuch 74 Tests in WorkflowExecutorTest gescheitert.
+        // The default path keeps calling the single-parameter method: a workflow without opt-in should
+        // not only get the same prompt but trigger the same CALL. Otherwise every existing test and
+        // caller depends on a signature that changed because of it
+        // -- that is exactly what made 74 tests in WorkflowExecutorTest fail on the first attempt.
         String instructionPrefix = seed.userPreferences()
                 ? agentInstructionsService.buildInstructionPrefix(instructions, true)
                 : agentInstructionsService.buildInstructionPrefix(instructions);

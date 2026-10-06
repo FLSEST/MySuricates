@@ -44,13 +44,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Workflows am Ziel oder Arbeitspaket ueber die echte API gegen die echte Datenbank (TODO 52bc1e8c Ziele
- * Stufe 3: Workflows am Ziel oder Teilziel anzeigen, starten und als Stand nutzen): anhaengen, Rolle
- * aendern, loesen, 400/404/409, weich geloeschte Workflows, Kaskaden, der Waechter als erster Eintrag und
- * der Start ueber den vorhandenen Weg mit {@code goal_id} im Kontext – ohne KI, ein Shell-Block.
+ * Workflows on a goal or work package via the real API against the real database (TODO 52bc1e8c goals
+ * stage 3: show, start and use workflows on a goal or sub-goal as a status): attach, change
+ * role, detach, 400/404/409, soft-deleted workflows, cascades, the guard as first entry and
+ * the start via the existing path with {@code goal_id} in the context – without AI, one shell block.
  *
- * <p>Ohne Testtransaktion: der Lauf laeuft in einem eigenen Thread und muss die Daten sehen. Deshalb
- * raeumt {@link #tearDown} selbst ab.
+ * <p>Without a test transaction: the run runs in its own thread and must see the data. Therefore
+ * {@link #tearDown} cleans up itself.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -123,11 +123,11 @@ class GoalWorkflowApiIntegrationTest {
                 .andExpect(status().isCreated());
         perform(post("/api/v1/goals/" + goalId + "/workflows"), Map.of("workflowId", builder, "workPackageId", docs))
                 .andExpect(status().isCreated());
-        // derselbe Workflow am Ziel ist eine eigene Zuordnung
+        // the same workflow on the goal is a separate assignment
         perform(post("/api/v1/goals/" + goalId + "/workflows"), Map.of("workflowId", builder))
                 .andExpect(status().isCreated());
 
-        // Duplikat 409, fremdes Paket 400, unbekannter Workflow 404, ungueltige Rolle 400
+        // Duplicate 409, foreign package 400, unknown workflow 404, invalid role 400
         perform(post("/api/v1/goals/" + goalId + "/workflows"), Map.of("workflowId", builder, "workPackageId", site))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("STATE_CONFLICT"));
         perform(post("/api/v1/goals/" + goalId + "/workflows"), Map.of("workflowId", report))
@@ -161,16 +161,16 @@ class GoalWorkflowApiIntegrationTest {
         mockMvc.perform(delete("/api/v1/goals/" + goalId + "/workflows/" + siteAttachment)).andExpect(status().isNotFound());
         assertThat(workflowRepository.findById(builder)).as("der Workflow bleibt").isPresent();
 
-        // weich geloeschter Workflow: unsichtbar, die Zuordnung bleibt in der Tabelle
+        // soft-deleted workflow: invisible, the assignment stays in the table
         mockMvc.perform(delete("/api/v1/workflows/" + alpha)).andExpect(status().isNoContent());
         list = json(mockMvc.perform(get("/api/v1/goals/" + goalId + "/workflows")));
         assertThat(list.findValuesAsText("workflowId")).doesNotContain(alpha);
         assertThat(count("SELECT COUNT(*) FROM goal_workflows WHERE workflow_id = ?", alpha)).isEqualTo(1);
-        // ein geloeschter Workflow ist unbekannt
+        // a deleted workflow is unknown
         perform(post("/api/v1/goals/" + goalId + "/workflows"), Map.of("workflowId", alpha, "workPackageId", site))
                 .andExpect(status().isNotFound());
 
-        // Kaskaden: Paket loeschen nimmt seine Zuordnungen mit, Ziel loeschen alle
+        // Cascades: deleting a package takes its assignments along, deleting the goal takes all
         mockMvc.perform(delete("/api/v1/goals/" + goalId + "/work-packages/" + docs)).andExpect(status().isNoContent());
         assertThat(count("SELECT COUNT(*) FROM goal_workflows WHERE work_package_id = ?", docs)).isZero();
         assertThat(count("SELECT COUNT(*) FROM goal_workflows WHERE goal_id = ?", goalId)).isEqualTo(2);
@@ -200,7 +200,7 @@ class GoalWorkflowApiIntegrationTest {
         assertThat(json(mockMvc.perform(get("/api/v1/goals/" + goalId + "/workflows"))).findValuesAsText("id"))
                 .as("ausgeschaltet: kein Eintrag").doesNotContain("guard");
 
-        // Start ueber den vorhandenen Weg, mit dem Ziel im Kontext
+        // Start via the existing path, with the goal in the context
         String runId = json(perform(post("/api/v1/workflows/" + worker + "/execute"),
                 Map.of("context", Map.of("goal_id", goalId, "goal_locale", "de"))).andExpect(status().isOk()))
                 .get("id").asText();

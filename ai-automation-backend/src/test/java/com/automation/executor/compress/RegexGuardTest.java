@@ -13,18 +13,18 @@ import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 class RegexGuardTest {
 
     /**
-     * Die Zeile muss zwischen zwei Grenzen liegen, sonst prueft der Test nichts mehr.
+     * The line must lie between two bounds, otherwise the test checks nothing anymore.
      *
-     * <p>Nach unten: Der Aufwand waechst quadratisch (gemessen am 2026-09-22 mit
-     * {@code ^(a+)+$} — 2 500 Zeichen 69 ms, 5 000 Zeichen 233 ms, 9 000 Zeichen 797 ms).
-     * Mit den frueheren 5 000 Zeichen lag die Suche nur 17 % ueber der Frist; auf einem
-     * schnelleren Rechner war sie vorher fertig, keine Ausnahme, Test rot (CI-Lauf
-     * 35779550906: 193 ms gegen 200 ms Frist). 9 000 Zeichen geben rund das Vierfache
-     * der Frist und halten auch einen doppelt so schnellen Rechner aus.
+     * <p>Lower bound: the effort grows quadratically (measured on 2026-09-22 with
+     * {@code ^(a+)+$} — 2 500 characters 69 ms, 5 000 characters 233 ms, 9 000 characters 797 ms).
+     * With the earlier 5 000 characters the search was only 17 % over the deadline; on a
+     * faster machine it finished earlier, no exception, test red (CI run
+     * 35779550906: 193 ms against a 200 ms deadline). 9 000 characters give roughly four times
+     * the deadline and also tolerate a machine twice as fast.
      *
-     * <p>Nach oben: Ab einer Zeile ueber {@link RegexGuard#MAX_MATCH_CHARS} schneidet der
-     * Waechter das abschliessende {@code !} weg — dann passt das Muster sofort, die Suche
-     * ist in 0 ms durch und es kann nie eine Frist greifen.
+     * <p>Upper bound: from a line above {@link RegexGuard#MAX_MATCH_CHARS} the
+     * guard cuts off the trailing {@code !} — then the pattern matches immediately, the search
+     * is done in 0 ms and no deadline can ever apply.
      */
     @Test
     void catastrophicPattern_hitsDeadline() {

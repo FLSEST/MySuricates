@@ -25,7 +25,7 @@ esac
 exit 0
 STUB
 chmod +x "$TMP/bin/docker"
-# XDG_CONFIG_HOME mit: host-mounts.sh liest ai.env von dort und legt daneben die Kopie der Instanz an
+# XDG_CONFIG_HOME too: host-mounts.sh reads ai.env from there and puts the instance's copy next to it
 export DOCKER_LOG="$TMP/docker.log" PATH="$TMP/bin:$PATH" HOME="$TMP/home" MYSURICATES_INSTANCES_DIR="$TMP/inst" \
        XDG_CONFIG_HOME="$TMP/config" HOST_MOUNTS_NODE_MODULES="$TMP/nm"
 cat > "$TMP/inst/demo.env" <<'ENV'
@@ -73,8 +73,8 @@ check "down stays inside its compose project"   'OWNER=ai-automation-backend bas
 
 echo "1b2) MYSURICATES_PREFIX: own docker names, e.g. for the installer probe"
 : > "$DOCKER_LOG"
-# Kein Docker-Name mit der Default-Vorsilbe — weder als Argument (Pfade wie $TMPDIR oder der Checkout duerfen
-# "mysuricates" enthalten, Namen stehen als eigenes Wort) noch in der Umgebung fuer compose (427be563)
+# No Docker name with the default prefix — neither as an argument (paths like $TMPDIR or the checkout may
+# contain "mysuricates", names stand as their own word) nor in the environment for compose (427be563)
 export DOCKER_ENV_LOG="$TMP/docker-env.log"; : > "$DOCKER_ENV_LOG"
 check "prefix: up builds its own image and project" 'MYSURICATES_PREFIX=probe-x OWNER=probe-x-demo INSTANCE_HEALTH_TIMEOUT=0 bash "$SCRIPT" up --name demo --no-wait >/dev/null 2>&1 && grep -q -- "-t probe-x:local -$" "$DOCKER_LOG" && grep -q -- "-p probe-x-demo " "$DOCKER_LOG" && ! grep -Eq "(^| )mysuricates[-:]" "$DOCKER_LOG" && grep -qx "probe-x-demo probe-x:local" "$DOCKER_ENV_LOG" && ! grep -q "mysuricates" "$DOCKER_ENV_LOG"'
 check "prefix: key reads from its own container" 'MYSURICATES_PREFIX=probe-x OWNER=probe-x-demo CONTAINER_KEY=k bash "$SCRIPT" key --name demo >/dev/null 2>&1; tail -1 "$DOCKER_LOG" | grep " probe-x-demo sh -c .*api-key.* sh " >/dev/null'
@@ -95,8 +95,8 @@ echo "2) AUTOMATION_* lines reach the instance"
 check "compose passes the instance file as env_file" 'grep -q "env_file:" "$HERE/../../deploy/compose.yml" && grep -q "MYSURICATES_ENV_FILE" "$HERE/../../deploy/compose.yml"'
 
 echo "3) host runtime (java stub, no real build)"
-# Eine Kopie des Skripts in einem Wegwerf-Repo: `up` baut, wenn der vorhandene Build nicht zum Klon
-# passt (1c016162) — gegen das echte Repo liefe dann ein echter Maven-Bau. Hier scheitert er laut.
+# A copy of the script in a throwaway repo: `up` builds when the existing build does not match the clone
+# (1c016162) — against the real repo a real Maven build would run. Here it fails loudly.
 HOSTREPO="$TMP/hostrepo"
 mkdir -p "$HOSTREPO/scripts" "$HOSTREPO/ai-automation-backend"
 cp "$SCRIPT" "$HOSTREPO/scripts/instance.sh"; ln -s "$HERE/../lib" "$HOSTREPO/scripts/lib"
@@ -127,10 +127,10 @@ AUTOMATION_AI_DEFAULT_PROVIDER=PI
 ENV
 export JAVA_ENV_OUT="$TMP/java.env" XDG_STATE_HOME="$TMP/state"
 PATH="$TMP/hostbin:$PATH" INSTANCE_HEALTH_TIMEOUT=10 GIT_CEILING_DIRECTORIES="$TMP" bash "$HSCRIPT" up --name hostdemo >"$TMP/host-up.out" 2>&1
-# Der java-Stub schreibt seine Umgebung erst, wenn er laeuft; `up` kehrt vorher zurueck, weil
-# der curl-Stub sofort "UP" meldet. Die .args-Datei entsteht nach der env-Datei und belegt, dass
-# beide vollstaendig sind. Ohne dieses Warten verlor am 2026-09-22 auf dem CI-Runner die erste
-# Pruefung das Rennen ("java started with the port"), die Millisekunden spaeteren nicht mehr.
+# The java stub writes its environment only once it runs; `up` returns before that because
+# the curl stub reports "UP" immediately. The .args file is created after the env file and proves that
+# both are complete. Without this wait, on 2026-09-22 on the CI runner the first
+# check lost the race ("java started with the port"), the ones milliseconds later did not.
 for _ in $(seq 1 100); do [ -s "$JAVA_ENV_OUT.args" ] && break; sleep 0.05; done
 check "host up reports the address"           'grep "localhost:19401" "$TMP/host-up.out" >/dev/null'
 check "java started with the port"            'grep -x "AUTOMATION_PORT=19401" "$JAVA_ENV_OUT" >/dev/null'
@@ -149,9 +149,9 @@ check "down stops the process"                '! kill -0 "$PID" 2>/dev/null'
 check "list shows the runtime"                'bash "$HSCRIPT" list | grep "hostdemo.*19401.*host" >/dev/null'
 
 echo "4) host build takes the JAR it just built, not one left over from an older version"
-# Eigenes Wegwerf-Repo: instance.sh leitet REPO_ROOT aus seinem eigenen Ort ab, und gebaut wird
-# mit Stubs (kein Maven, kein npm). Der Fall stammt aus der Demo-VM: nach dem Sprung auf 0.7.7 lag
-# das 0.7.6-JAR noch im target/, und kopiert wurde das alte (2026-09-23).
+# Own throwaway repo: instance.sh derives REPO_ROOT from its own location, and builds
+# are done with stubs (no Maven, no npm). The case comes from the demo VM: after the jump to 0.7.7 the
+# 0.7.6 JAR still lay in target/, and the old one was copied (2026-09-23).
 REPO="$TMP/repo"
 mkdir -p "$REPO/scripts" "$REPO/ai-automation-backend/target" "$REPO/ai-automation-frontend"
 cp "$SCRIPT" "$REPO/scripts/instance.sh"
@@ -179,8 +179,8 @@ check "app.jar is the fresh build"            '[ "$(cat "$STATE2/app.jar" 2>/dev
 check "built frontend copied"                 '[ -s "$STATE2/frontend/index.html" ]'
 PATH="$TMP/hostbin:$PATH" bash "$REPO/scripts/instance.sh" down --name buildtest >/dev/null 2>&1
 
-# Zweiter Fall: ein Bau, der das target/ nicht raeumt, hinterlaesst zwei JARs — dann darf das
-# Skript nicht raten, sondern muss abbrechen.
+# Second case: a build that does not clean target/ leaves two JARs — then the
+# script must not guess but abort.
 cat > "$REPO/ai-automation-backend/mvnw" <<'STUB'
 #!/bin/sh
 mkdir -p target && echo neu > target/ai-automation-backend-9.9.9.jar
@@ -193,8 +193,8 @@ check "two JARs: stops instead of guessing"   '[ "$RC_BUILD" -ne 0 ] && grep -q 
 check "names both files in the message"       'grep -q "0.0.1-SNAPSHOT.jar" "$TMP/build2.out" && grep -q "9.9.9.jar" "$TMP/build2.out"'
 
 echo "5) after a git pull, up builds anew — and says what it did (1c016162)"
-# Die Demo-VM lief nach `git pull` + setup.sh still mit dem alten Build weiter: up baute nur mit
-# --rebuild oder ohne JAR. Eigenes Git-Repo mit Stubs; das JAR enthaelt den Commit, aus dem es stammt.
+# The demo VM kept running silently with the old build after `git pull` + setup.sh: up built only with
+# --rebuild or without a JAR. Own git repo with stubs; the JAR contains the commit it comes from.
 REPO2="$TMP/repo2"
 mkdir -p "$REPO2/scripts" "$REPO2/ai-automation-backend" "$REPO2/ai-automation-frontend"
 cp "$SCRIPT" "$REPO2/scripts/instance.sh"
@@ -238,7 +238,7 @@ check "stopped, current: starts without building, names the commit" '[ "$(builds
 OUT="$(inst up --rebuild 2>&1)"
 check "running, current: --rebuild names the way" 'printf "%s" "$OUT" | grep -- "--rebuild wirkt erst" >/dev/null && [ "$(builds)" = 0 ]'
 inst down >/dev/null 2>&1
-rm -f "$STATE3/built-from"   # Build aus der Zeit vor dem Vermerk
+rm -f "$STATE3/built-from"   # build from the time before the marker
 check "no note: outdated, build unknown"       '[ "$(inst built)" = "outdated - $NEW" ]'
 : > "$MVN_LOG"; inst up >/dev/null 2>&1
 check "no note: builds once, then notes"       '[ "$(builds)" = 1 ] && [ "$(cat "$STATE3/built-from")" = "$NEW" ]'
@@ -254,8 +254,8 @@ check "built is host-only (container: exit 2)" 'bash "$SCRIPT" built --name demo
 check "container up always builds the image"   'grep -q "^build -f deploy/Dockerfile --target runtime --build-arg APT_REFRESH= -t mysuricates:local -$" "$DOCKER_LOG" && grep -q "up -d --no-build" "$DOCKER_LOG"'
 
 echo "6) the image gets only tracked files — nothing kept out by .git/info/exclude (890e8e9c)"
-# Auf dem Rechner des Autors lagen private Pool-Definitionen, nur per .git/info/exclude
-# ausgeschlossen; der Build aus dem Arbeitsbaum nahm sie mit ins Image und in den Pool-Browser.
+# On the author's machine private pool definitions lay around, excluded only via .git/info/exclude;
+# the build from the working tree took them into the image and the pool browser.
 CREPO="$TMP/crepo"
 mkdir -p "$CREPO/scripts" "$CREPO/deploy" "$CREPO/workflow-pool" "$CREPO/docs"
 cp "$SCRIPT" "$CREPO/scripts/instance.sh"; ln -s "$HERE/../lib" "$CREPO/scripts/lib"
@@ -264,9 +264,9 @@ echo '{"id":"shared"}' > "$CREPO/workflow-pool/shared.json"; echo '{"id":"gone"}
 echo alt > "$CREPO/docs/page.md"
 git -C "$CREPO" init -q && git -C "$CREPO" add -A && git -C "$CREPO" -c user.name=t -c user.email=t@t commit -qm eins
 echo '{"id":"private"}' > "$CREPO/workflow-pool/private.json"; echo "/workflow-pool/private.json" >> "$CREPO/.git/info/exclude"
-echo '{"id":"loose"}' > "$CREPO/workflow-pool/loose.json"   # neu, nie hinzugefuegt
-echo neu > "$CREPO/docs/page.md"                             # geaendert, nicht committet
-rm "$CREPO/workflow-pool/gone.json"                           # geloescht, nicht committet
+echo '{"id":"loose"}' > "$CREPO/workflow-pool/loose.json"   # new, never added
+echo neu > "$CREPO/docs/page.md"                             # changed, not committed
+rm "$CREPO/workflow-pool/gone.json"                           # deleted, not committed
 printf 'MYSURICATES_PORT=19406\n' > "$TMP/inst/ctx.env"
 export DOCKER_CTX="$TMP/ctx.tar"; : > "$DOCKER_LOG"
 INSTANCE_HEALTH_TIMEOUT=0 bash "$CREPO/scripts/instance.sh" up --name ctx --no-wait > "$TMP/ctx.out" 2>&1; RC=$?
@@ -278,7 +278,7 @@ check "context: untracked file stays out"       '! grep -q "loose.json" <<<"$LIS
 check "context: a changed tracked file as it is" '[ "$(tar -xOf "$DOCKER_CTX" docs/page.md 2>/dev/null)" = neu ]'
 check "context: a deleted tracked file is left out" '! grep -q "gone.json" <<<"$LIST"'
 check "image first, then up without compose build" '[ "$(grep -n "^build " "$DOCKER_LOG" | cut -d: -f1)" -lt "$(grep -n "up -d --no-build" "$DOCKER_LOG" | cut -d: -f1)" ] && ! grep -q -e "--build$" -e "compose.* build$" "$DOCKER_LOG"'
-# Ein neuer Wert holt die Fremd-Repos des Images frisch (8b7a39b9) — aus der Instanz-Datei oder der Umgebung
+# A new value fetches the image's foreign repos fresh (8b7a39b9) — from the instance file or the environment
 printf 'MYSURICATES_APT_REFRESH=2026-10\n' >> "$TMP/inst/ctx.env"; : > "$DOCKER_LOG"
 INSTANCE_HEALTH_TIMEOUT=0 bash "$CREPO/scripts/instance.sh" up --name ctx --no-wait >/dev/null 2>&1
 check "APT_REFRESH from the instance file goes to the build" 'grep -q "^build .*--build-arg APT_REFRESH=2026-10 -t mysuricates:local -$" "$DOCKER_LOG"'
@@ -291,9 +291,9 @@ check "without git: compose builds from the folder" 'grep -q "compose .* build$"
 mv "$CREPO/.git-weg" "$CREPO/.git"
 
 echo "7) running workflow runs: asked read-only, named before down stops them (29820f58)"
-# Die Instanz-API spielt ein kleiner Server aus der Python-Standardbibliothek (fake_instance.py) —
-# echte HTTP-Antworten fuer das echte curl. Er zaehlt nur mit dem richtigen Key; ein Workflow-Name,
-# der wie das Feld aussieht, darf die Zahl nicht verfaelschen.
+# The instance API is played by a small server from the Python standard library (fake_instance.py) —
+# real HTTP answers for the real curl. It counts only with the right key; a workflow name
+# that looks like the field must not falsify the count.
 LIBRUNS="$HERE/../lib/instance-runs.sh"
 FAKE="$HERE/fake_instance.py"
 check "lib: bash -n"                           'bash -n "$LIBRUNS"'
@@ -305,9 +305,9 @@ check "address before a rewrite: the first per name counts" '( . "$LIBRUNS"; ins
 if command -v python3 >/dev/null 2>&1 && command -v curl >/dev/null 2>&1; then
   freeport() { local p="$1"; while (exec 3<>"/dev/tcp/127.0.0.1/$p") 2>/dev/null; do p=$((p + 1)); done; echo "$p"; }
   APID=""
-  # Losgeloest gestartet (kein Kind dieser Shell): beendet ihn down, bleibt kein Zombie zurueck, den
-  # kill -0 noch fuer lebendig hielte. stopapi wartet, bis er weg ist — der naechste nimmt denselben Port.
-  fakeapi() {  # PORT KEY RUNS — startet die Fake-API und wartet, bis sie antwortet
+  # Started detached (not a child of this shell): down ends it, no zombie remains that
+  # kill -0 would still consider alive. stopapi waits until it is gone — the next one takes the same port.
+  fakeapi() {  # PORT KEY RUNS — starts the fake API and waits until it answers
     APID="$( (python3 "$FAKE" api "$1" "$2" "$3" > /dev/null 2>&1 & echo $!) )"
     for _ in $(seq 1 100); do (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null && return 0; sleep 0.05; done
     return 1
@@ -331,7 +331,7 @@ if command -v python3 >/dev/null 2>&1 && command -v curl >/dev/null 2>&1; then
   check "lib: a proxy from the environment is not used" '[ "$(http_proxy=http://127.0.0.1:9 HTTP_PROXY=http://127.0.0.1:9 all_proxy=http://127.0.0.1:9 runs "http://127.0.0.1:$RPORT" "$RKEY")" = 2 ]'
   stopapi
   check "lib: instance not answering → unknown"  '[ -z "$(runs "http://127.0.0.1:$RPORT" "$RKEY")" ]'
-  # Host: die Fake-API ist der Prozess der Instanz — down meldet die Runs und beendet ihn dann
+  # Host: the fake API is the instance's process — down reports the runs and then ends it
   printf 'MYSURICATES_RUNTIME=host\nMYSURICATES_PORT=%s\n' "$RPORT" > "$TMP/inst/runs.env"
   RSTATE="$TMP/state/mysuricates/runs"; mkdir -p "$RSTATE/home/.mysuricates"
   printf '%s\n' "$RKEY" > "$RSTATE/home/.mysuricates/api-key"
@@ -348,7 +348,7 @@ if command -v python3 >/dev/null 2>&1 && command -v curl >/dev/null 2>&1; then
   OUT="$(bash "$SCRIPT" down --name runs 2>&1)"
   check "host down: not checkable → stops anyway"  '! printf "%s" "$OUT" | grep "Workflow-Run" >/dev/null && printf "%s" "$OUT" | grep "gestoppt" >/dev/null && ! kill -0 "$APID" 2>/dev/null'
   stopapi
-  # Container: Key aus dem Container (docker exec), Port aus der Instanz-Datei
+  # Container: key from the container (docker exec), port from the instance file
   printf 'MYSURICATES_PORT=%s\n' "$RPORT" > "$TMP/inst/cruns.env"
   fakeapi "$RPORT" "$RKEY" 1; : > "$DOCKER_LOG"
   OUT="$(OWNER=mysuricates-cruns CONTAINER_KEY="$RKEY" bash "$SCRIPT" down --name cruns 2>&1)"
@@ -364,9 +364,9 @@ else
 fi
 
 echo "8) a proxy from the environment never gets a request meant for the own instance (bb4f60a5)"
-# curl 8.5 schickt auch 127.0.0.1 ueber http_proxy/all_proxy: hinter einem Proxy scheiterte health_ok —
-# up wartete 300 s und meldete „nicht gesund“ —, und ein Key ginge an ihn mit. Der Fake-Proxy schreibt
-# alles auf, was bei ihm ankommt, und antwortet 502: er darf nichts bekommen.
+# curl 8.5 also sends 127.0.0.1 via http_proxy/all_proxy: behind a proxy health_ok failed —
+# up waited 300 s and reported „nicht gesund“ —, and a key would go to it as well. The fake proxy writes
+# down everything that reaches it and answers 502: it must receive nothing.
 LIBCURL="$HERE/../lib/local-curl.sh"
 check "lib local-curl: bash -n"                'bash -n "$LIBCURL"'
 if command -v python3 >/dev/null 2>&1 && command -v curl >/dev/null 2>&1; then
@@ -378,9 +378,9 @@ if command -v python3 >/dev/null 2>&1 && command -v curl >/dev/null 2>&1; then
   UPSTATE="$TMP/state/mysuricates/pxup"
   trap 'stopapi; kill "$PXPID" $(cat "$UPSTATE/instance.pid" 2>/dev/null) 2>/dev/null; rm -rf "$TMP"' EXIT
   PX="http://127.0.0.1:$PXPORT"
-  # proxied BEFEHL… — mit dem Fake-Proxy in jeder Variablen, die curl liest; der Log beginnt leer
+  # proxied COMMAND… — with the fake proxy in every variable curl reads; the log starts empty
   proxied() { : > "$PXLOG"; env -u no_proxy -u NO_PROXY http_proxy="$PX" https_proxy="$PX" all_proxy="$PX" HTTP_PROXY="$PX" HTTPS_PROXY="$PX" ALL_PROXY="$PX" "$@"; }
-  untouched() { [ ! -s "$PXLOG" ]; }   # der Proxy hat seit dem letzten proxied nichts bekommen
+  untouched() { [ ! -s "$PXLOG" ]; }   # the proxy has received nothing since the last proxied
   proxied curl -s --max-time 3 "http://127.0.0.1:$RPORT/api/v1/system/health" >/dev/null
   check "control: a plain curl goes through the fake proxy" '! untouched'
   lib() { proxied env PATH="$TMP/curlspy:$PATH" bash -c ". '$LIBCURL'; $1"; }
@@ -390,16 +390,16 @@ if command -v python3 >/dev/null 2>&1 && command -v curl >/dev/null 2>&1; then
   check "lib: local_curl_key — the key reaches the instance" 'lib "local_curl_key $RKEY -fsS --max-time 3 \"$RUNS_URL\"" | grep "\"totalElements\": 2" >/dev/null && untouched'
   check "... never curl's arguments"             '[ -s "$TMP/curlspy.log" ] && ! grep -qF "$RKEY" "$TMP/curlspy.log"'
   check "lib: empty key → no header (401)"       '[ "$(lib "local_curl_key \"\" -s -o /dev/null -w %{http_code} \"$RUNS_URL\"")" = 401 ] && untouched'
-  # Host: die Fake-API ist der Prozess der Instanz
+  # Host: the fake API is the instance's process
   printf 'MYSURICATES_RUNTIME=host\nMYSURICATES_PORT=%s\n' "$RPORT" > "$TMP/inst/px.env"
-  # Instanz von vor der Umbenennung: ihr Key liegt noch in ~/.autotrigger (lib/data-home.sh)
+  # Instance from before the rename: its key still lies in ~/.autotrigger (lib/data-home.sh)
   PXSTATE="$TMP/state/mysuricates/px"; mkdir -p "$PXSTATE/home/.autotrigger" "$PXSTATE/home/.mysuricates"
   printf '%s\n' "$RKEY" > "$PXSTATE/home/.autotrigger/api-key"; echo "$APID" > "$PXSTATE/instance.pid"
   check "host status: healthy although a proxy is set" '[ "$(proxied bash "$SCRIPT" status --name px)" = "running healthy" ] && untouched'
   OUT="$(proxied bash "$SCRIPT" down --name px 2>&1)"
   check "host down: runs asked directly, then stopped" 'printf "%s" "$OUT" | grep -F "mysuricates-px: 2 Workflow-Run(s) laufen noch" >/dev/null && printf "%s" "$OUT" | grep gestoppt >/dev/null && untouched'
   stopapi
-  # up wartet auf Health — der java-Stub startet die Fake-API auf dem Port der Instanz
+  # up waits for health — the java stub starts the fake API on the instance's port
   mkdir -p "$TMP/pxbin" "$UPSTATE/frontend"; echo jar > "$UPSTATE/app.jar"
   printf '#!/bin/sh\nexec python3 "%s" api "$AUTOMATION_PORT" "%s" 0\n' "$FAKE" "$RKEY" > "$TMP/pxbin/java"; chmod +x "$TMP/pxbin/java"
   printf 'MYSURICATES_RUNTIME=host\nMYSURICATES_PORT=%s\n' "$RPORT" > "$TMP/inst/pxup.env"
@@ -411,29 +411,29 @@ if command -v python3 >/dev/null 2>&1 && command -v curl >/dev/null 2>&1; then
 else
   echo "  skip (no python3 or curl)"
 fi
-# Jeder Aufruf gegen die eigene Instanz geht ueber lib/local-curl.sh — ein neues nacktes curl faellt hier
-# auf. Ausgenommen: Downloads aus dem Netz (lib/deps.sh, sie brauchen den Proxy), Installationshinweise
-# als Text (lib/provider-catalog.generated.sh) und die Tests mit ihren Stubs. git grep --untracked: auch
-# neue Dateien, aber keine ignorierten wie die private Kopie scripts/seed-workflows.sh. Der Aufruf im
-# Helfer selbst muss gefunden werden — sonst hat die Suche nichts gesehen.
+# Every call against the own instance goes through lib/local-curl.sh — a new bare curl is noticed here.
+# Excluded: downloads from the network (lib/deps.sh, they need the proxy), installation hints
+# as text (lib/provider-catalog.generated.sh) and the tests with their stubs. git grep --untracked: also
+# new files, but no ignored ones like the private copy scripts/seed-workflows.sh. The call in the
+# helper itself must be found — otherwise the search saw nothing.
 CURLS="$(cd "$HERE/.." && git grep --untracked -nIE "(^|[^[:alnum:]_-])curl[[:space:]]+(-|\"|'|\\\$|http|\\\\)" -- . 2>/dev/null)"
 NAKED="$(printf '%s\n' "$CURLS" | grep -vE '^(tests/|lib/local-curl\.sh:|lib/deps\.sh:|lib/provider-catalog\.generated\.sh:)' \
   | grep -vE '^[^:]+:[0-9]+:[[:space:]]*#')"
 check "every curl to the own instance goes through lib/local-curl.sh" 'printf "%s" "$CURLS" | grep "^lib/local-curl.sh:" >/dev/null && { [ -z "$NAKED" ] || { printf "%s\n" "$NAKED" | sed "s/^/         /"; false; }; }'
 
 echo "9) bound to one address: health, port and runs asked there, not on 127.0.0.1 (3d002903)"
-# Mit --bind auf eine Adresse (LAN, Tailscale) lauscht die Instanz nur dort. health_ok fragte 127.0.0.1 —
-# up wartete 300 s und meldete „nicht gesund“ —, port_busy sah einen belegten Port dort nicht, und
-# instance_api_base nahm jede 127.*-Adresse fuer 127.0.0.1. Eine zweite Loopback-Adresse spielt die
-# gebundene; der java-Stub startet die Fake-API wie Spring auf SERVER_ADDRESS. Auf 127.0.0.1 lauscht
-# derweil jemand anderes auf demselben Port und antwortet 502: dort darf nichts als gesund gelten.
+# With --bind to an address (LAN, Tailscale) the instance listens only there. health_ok asked 127.0.0.1 —
+# up waited 300 s and reported „nicht gesund“ —, port_busy did not see an occupied port there, and
+# instance_api_base took every 127.* address for 127.0.0.1. A second loopback address plays the
+# bound one; the java stub starts the fake API like Spring on SERVER_ADDRESS. On 127.0.0.1 someone
+# else meanwhile listens on the same port and answers 502: nothing must count as healthy there.
 check "address: another loopback address as it is" '[ "$(base 127.0.0.2)" = http://127.0.0.2:19999 ] && [ "$(base localhost)" = http://127.0.0.1:19999 ] && [ "$(base "[::1]")" = "http://[::1]:19999" ] && [ "$(base "[::]")" = http://127.0.0.1:19999 ]'
 BADDR=127.0.0.2
 if command -v python3 >/dev/null 2>&1 && command -v curl >/dev/null 2>&1 \
    && python3 -c "import socket; socket.socket().bind(('$BADDR', 0))" 2>/dev/null; then
-  # frei auf beiden Adressen
+  # free on both addresses
   bfree() { local p="$1"; while (exec 3<>"/dev/tcp/127.0.0.1/$p") 2>/dev/null || (exec 3<>"/dev/tcp/$BADDR/$p") 2>/dev/null; do p=$((p + 1)); done; echo "$p"; }
-  listen() {  # HOST MODUS PORT … — fake_instance.py auf HOST, losgeloest; gibt die PID aus, sobald er annimmt
+  listen() {  # HOST MODE PORT … — fake_instance.py on HOST, detached; prints the PID as soon as it accepts
     local host="$1" pid; shift
     pid="$( (FAKE_INSTANCE_HOST="$host" python3 "$FAKE" "$@" > /dev/null 2>&1 & echo $!) )"
     for _ in $(seq 1 100); do (exec 3<>"/dev/tcp/$host/$2") 2>/dev/null && break; sleep 0.05; done
@@ -455,7 +455,7 @@ if command -v python3 >/dev/null 2>&1 && command -v curl >/dev/null 2>&1 \
   OUT="$(binst down)"
   check "down: the runs asked at the bound address" 'printf "%s" "$OUT" | grep -F "mysuricates-bound: 1 Workflow-Run(s) laufen noch" >/dev/null && printf "%s" "$OUT" | grep gestoppt >/dev/null'
   gone "$OTHER"; OTHER=""
-  # Jemand anderes auf der gebundenen Adresse: up lehnt ab, bevor es etwas startet
+  # Someone else on the bound address: up refuses before it starts anything
   FOREIGN="$(listen "$BADDR" api "$BPORT" x 0)"
   OUT="$(binst up)"; RC=$?
   check "up: port taken on the bound address → refused, nothing started" '[ "$RC" = 2 ] && printf "%s" "$OUT" | grep -F "Port $BPORT ist schon belegt" >/dev/null && [ ! -s "$BSTATE/instance.pid" ]'

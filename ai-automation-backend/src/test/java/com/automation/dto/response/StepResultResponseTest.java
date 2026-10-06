@@ -119,7 +119,7 @@ class StepResultResponseTest {
             for (StepStatus s : StepStatus.values()) {
                 if (s != a.status()) { other = s; break; }
             }
-            if (other == null) return; // Enum hat nur einen Wert
+            if (other == null) return; // enum has only one value
             StepResultResponse b = new StepResultResponse(
                     a.id(), a.stepIndex(), a.input(), a.output(), other,
                     a.startedAt(), a.completedAt(), a.durationMs(), a.metadata(), a.blockType(), a.blockName());

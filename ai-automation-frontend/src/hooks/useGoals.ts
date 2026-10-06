@@ -9,7 +9,7 @@ import type {
   GoalWorkPackage, MilestoneState, PageResponse, Todo, UpdateGoalRequest, UpdateTodoPlanningRequest,
 } from '../types';
 
-/** Ziele (TODO dc0566f8): TODOs projektübergreifend sammeln, ordnen und einschätzen. */
+/** Goals (TODO dc0566f8): collect, order and assess TODOs across projects. */
 export const goalKeys = {
   all: ['goals'] as const,
   list: (statuses?: GoalStatus[], projectId?: string) =>
@@ -19,9 +19,9 @@ export const goalKeys = {
 };
 
 /**
- * Ohne Filter liefert der Server aktive und erledigte Ziele, neueste zuerst. `projectId` lässt nur
- * Ziele übrig, denen dieses Projekt zugeordnet ist (c60bf914); ein älteres Backend kennt den Filter
- * nicht und liefert alle – die kennen dann auch ihre Projekte nicht und bleiben stehen.
+ * Without a filter the server returns active and completed goals, newest first. `projectId` leaves only
+ * goals to which this project is assigned (c60bf914); an older backend does not know the filter
+ * and returns all – those then do not know their projects either and stay.
  */
 export function useGoals(statuses?: GoalStatus[], projectId?: string) {
   const params = [
@@ -42,14 +42,14 @@ export function useGoals(statuses?: GoalStatus[], projectId?: string) {
 const NO_GUARD: GoalGuard = { enabled: false, workflowId: null, scheduleId: null, nextRunAt: null };
 
 const asksQuestion = (todo: GoalTodoItem) => todo.status !== 'ARCHIVED' && todo.status !== 'DONE' && !!todo.openQuestion;
-/** Entschieden zählt wie beim Backend: nicht archiviert, Zustand DECIDED (68a5e24e). */
+/** Decided counts as in the backend: not archived, state DECIDED (68a5e24e). */
 const isDecided = (todo: GoalTodoItem) => todo.status !== 'ARCHIVED' && todo.decisionState === 'DECIDED';
 
 type DecisionFields = 'decision' | 'decidedAt' | 'decidedBy' | 'decisionState';
 
 /**
- * Ein TODO, wie es auch ein älteres Backend liefert: das Arbeitspaket noch als `milestoneId`,
- * Fälligkeit fehlt vor 259f4f66, Entscheidungen vor 68a5e24e.
+ * A TODO as an older backend also delivers it: the work package still as `milestoneId`,
+ * due date missing before 259f4f66, decisions before 68a5e24e.
  */
 type RawTodo = Omit<GoalTodoItem, 'workPackageId' | 'dueDate' | DecisionFields> & Partial<Pick<GoalTodoItem, DecisionFields>> & {
   workPackageId?: string | null;
@@ -57,7 +57,7 @@ type RawTodo = Omit<GoalTodoItem, 'workPackageId' | 'dueDate' | DecisionFields> 
   dueDate?: string | null;
 };
 
-/** Zustand der Klärung, wenn das Backend ihn nicht mitschickt: eine offene Frage ist QUESTION. */
+/** State of the clarification when the backend does not send it: an open question is QUESTION. */
 function decisionStateOf(todo: RawTodo): DecisionState {
   if (todo.decisionState) return todo.decisionState;
   if (todo.openQuestion) return 'QUESTION';
@@ -65,8 +65,8 @@ function decisionStateOf(todo: RawTodo): DecisionState {
 }
 
 /**
- * Ein Arbeitspaket, wie es ein Backend vor c60bf914 als „milestone“ liefert: nur eine Fälligkeit,
- * Projekt, Position und offene Fragen erst ab Stufe 1.
+ * A work package as a backend before c60bf914 delivers it as "milestone": only a due date,
+ * project, position and open questions only from stage 1.
  */
 interface LegacyPackage {
   id: string;
@@ -85,7 +85,7 @@ interface LegacyPackage {
   updatedAt: string;
 }
 
-/** Die Antwort von `GET /goals/{id}` – aktuell oder von einem älteren Backend. */
+/** The answer of `GET /goals/{id}` – current or from an older backend. */
 type RawGoalDetail = Omit<GoalDetail, 'todos' | 'projects' | 'workPackages' | 'milestones' | 'legacyBackend' | 'goal'> & {
   goal: Omit<Goal, 'guard'> & { guard?: GoalGuard };
   todos: RawTodo[];
@@ -96,8 +96,8 @@ type RawGoalDetail = Omit<GoalDetail, 'todos' | 'projects' | 'workPackages' | 'm
 };
 
 /**
- * Projekte eines älteren Backends: die aus `byProject` (die Projekte der TODOs), in dessen Reihenfolge.
- * „Ohne Projekt“ ist kein Projekt des Ziels.
+ * Projects of an older backend: those from `byProject` (the projects of the TODOs), in its order.
+ * "Ohne Projekt" is not a project of the goal.
  */
 function projectsFromByProject(detail: RawGoalDetail, todos: GoalTodoItem[]): GoalProject[] {
   return detail.byProject.flatMap((entry, position) => (entry.projectId === null ? [] : [{
@@ -112,7 +112,7 @@ function projectsFromByProject(detail: RawGoalDetail, todos: GoalTodoItem[]): Go
   }]));
 }
 
-/** Projekt eines Pakets ohne `projectId`: das mit den meisten seiner TODOs, sonst das einzige des Ziels – wie V92. */
+/** Project of a package without `projectId`: the one with most of its TODOs, otherwise the only one of the goal – like V92. */
 function inferredProject(packageId: string, todos: GoalTodoItem[], projects: GoalProject[]): string | null {
   const counts = new Map<string, number>();
   todos.filter((todo) => todo.workPackageId === packageId && todo.projectId)
@@ -121,7 +121,7 @@ function inferredProject(packageId: string, todos: GoalTodoItem[], projects: Goa
   return busiest?.[0] ?? (projects.length === 1 ? projects[0]!.projectId : null);
 }
 
-/** Die „milestones“ eines älteren Backends sind Arbeitspakete mit nur einer Fälligkeit: ein Ein-Tages-Paket. */
+/** The "milestones" of an older backend are work packages with only one due date: a one-day package. */
 function packagesFromLegacy(legacy: LegacyPackage[], todos: GoalTodoItem[], projects: GoalProject[]): GoalWorkPackage[] {
   return legacy.map((item, index) => ({
     id: item.id,
@@ -144,12 +144,12 @@ function packagesFromLegacy(legacy: LegacyPackage[], todos: GoalTodoItem[], proj
 }
 
 /**
- * Die Zielseite kommt mit jedem Backend-Stand zurecht (c60bf914 geht mit dem Merge live, das Backend
- * erst nach einem Neustart). Fehlt `workPackages`, ist das Backend älter: Seine „milestones“ sind
- * Arbeitspakete (nur `dueDate` → Beginn = Ende), die TODOs zeigen per `milestoneId` darauf, echte
- * Meilensteine gibt es noch nicht (`legacyBackend`). Vor TODO 259f4f66 fehlen außerdem Wächter,
- * Pakete und Fälligkeiten, vor Stufe 1 die Projekte des Ziels – abgeleitet wird, was sich ableiten
- * lässt, statt an einem fehlenden Feld zu scheitern.
+ * The goal page copes with every backend state (c60bf914 goes live with the merge, the backend
+ * only after a restart). If `workPackages` is missing, the backend is older: its "milestones" are
+ * work packages (only `dueDate` → start = end), the TODOs point to them via `milestoneId`, real
+ * milestones do not exist yet (`legacyBackend`). Before TODO 259f4f66 guard,
+ * packages and due dates are also missing, before stage 1 the goal's projects – whatever can be derived
+ * is derived, instead of failing on a missing field.
  */
 export function normalizeGoalDetail(raw: GoalDetail | RawGoalDetail): GoalDetail {
   const detail = raw as RawGoalDetail;
@@ -211,17 +211,17 @@ export function useGoal(id: string | undefined) {
 }
 
 /**
- * Ein 404 auf `/relations` heißt: Das Backend ist älter als die Karte (TODO 49080447). Das bleibt so
- * bis zum Neustart – nicht wiederholen, die Zielseite zeigt dann einen Hinweis statt eines Fehlers.
+ * A 404 on `/relations` means: the backend is older than the map (TODO 49080447). That stays so
+ * until the restart – do not retry, the goal page then shows a hint instead of an error.
  */
 export function goalRelationsRetry(failureCount: number, error: unknown): boolean {
   return apiErrorStatus(error) !== 404 && defaultQueryRetry(failureCount, error);
 }
 
 /**
- * Relationskarte (TODO c6ea8f5c): je TODO Herkunft, Bearbeitung und Ergebnis. `include` sind die
- * gerade gezeigten Kandidaten; sie kommen gestrichelt mit in die Karte. Beim Wechsel der Kandidaten
- * bleibt die alte Karte stehen, bis die neue da ist.
+ * Relation map (TODO c6ea8f5c): per TODO origin, processing and result. `include` are the
+ * candidates currently shown; they come into the map dashed. When the candidates change
+ * the old map stays until the new one is there.
  */
 export function useGoalRelations(id: string | undefined, include: string[], enabled = true) {
   const goalsModule = useModuleEnabled('goals');
@@ -236,19 +236,19 @@ export function useGoalRelations(id: string | undefined, include: string[], enab
   });
 }
 
-/** Status, in denen ein TODO noch zu einem Ziel passen kann. */
+/** Statuses in which a TODO can still fit a goal. */
 const CANDIDATE_STATUSES = ['OPEN', 'IN_PROGRESS', 'BACKLOG'];
-/** Höchstens so viele Kandidaten – genau so viele nimmt die Relationskarte mit. */
+/** At most this many candidates – exactly this many the relation map takes along. */
 export const CANDIDATE_LIMIT = 20;
 
-/** Eine Seite Kandidaten; `scoped` sagt, ob der Server nach den Projekten des Ziels filtern kann. */
+/** One page of candidates; `scoped` says whether the server can filter by the goal's projects. */
 export type CandidatePage = PageResponse<Todo> & { scoped: boolean };
 
 /**
- * Kandidaten (TODO c6ea8f5c): offene TODOs ohne Ziel, gefiltert nach Tag und Suche. Seit c60bf914
- * nur aus den Projekten des Ziels (`/goals/{id}/candidates`), `allProjects` sucht überall. Ein
- * älteres Backend kennt den Endpunkt nicht (404) – dann wie früher über `/todos?goalId=none`, und
- * die Seite sagt `scoped: false`, damit der Schalter nicht etwas verspricht, das keiner einlöst.
+ * Candidates (TODO c6ea8f5c): open TODOs without a goal, filtered by tag and search. Since c60bf914
+ * only from the goal's projects (`/goals/{id}/candidates`), `allProjects` searches everywhere. An
+ * older backend does not know the endpoint (404) – then as before via `/todos?goalId=none`, and
+ * the page says `scoped: false`, so the switch does not promise something nobody fulfills.
  */
 export function useGoalCandidates(goalId: string | undefined, filter: { q: string; tag: string }, allProjects: boolean, enabled = true) {
   const goalsModule = useModuleEnabled('goals');
@@ -313,7 +313,7 @@ export function useDeleteGoal() {
   });
 }
 
-/** Neue Reihenfolge: die genannten TODOs bekommen Rang 1..n, alle übrigen des Ziels keinen. */
+/** New order: the named TODOs get rank 1..n, all others of the goal none. */
 export function useReorderGoal() {
   const qc = useQueryClient();
   const toast = useToast();
@@ -329,7 +329,7 @@ export function useReorderGoal() {
   });
 }
 
-/** Ziel, Rang und Einschätzung eines TODOs; ohne `ratedBy` gilt die Änderung als menschlich. */
+/** Goal, rank and assessment of a TODO; without `ratedBy` the change counts as human. */
 export function useUpdateTodoPlanning() {
   const qc = useQueryClient();
   return useMutation({
@@ -339,6 +339,6 @@ export function useUpdateTodoPlanning() {
       qc.invalidateQueries({ queryKey: goalKeys.all });
       qc.invalidateQueries({ queryKey: ['todos'] });
     },
-    // Keine eigenen Toasts: gespeichert wird mit dem TODO-Dialog, der Erfolg und Fehlschlag meldet (bbee09e6)
+    // No toasts of its own: saving happens with the TODO dialog, which reports success and failure (bbee09e6)
   });
 }

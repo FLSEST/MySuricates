@@ -89,7 +89,7 @@ final class TrayMenuBuilder {
         menu.addSeparator();
     }
 
-    // Beschriftungen ohne AWT-Objekte, damit sie auch headless prüfbar sind.
+    // Labels without AWT objects, so they can also be checked headless.
 
     static String headerText(String version) {
         return "MySuricates v" + version;

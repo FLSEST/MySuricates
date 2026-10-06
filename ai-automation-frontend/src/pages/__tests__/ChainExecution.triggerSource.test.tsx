@@ -14,7 +14,7 @@ afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 beforeEach(() => useI18nStore.setState({ locale: 'de' }));
 
-/** Antwortform älterer Backends: ohne triggerSource (vor V96, MySuricates-TODO 6db47bc2). */
+ /** Response shape of older backends: without triggerSource (before V96, MySuricates-TODO 6db47bc2). */
 const oldShape: ChainRun = {
   id: 'cr-1', chainId: 'c-1', chainName: 'Release', status: 'COMPLETED', inputContext: {}, metadata: {},
   startedAt: '2026-09-14T10:00:00Z', completedAt: '2026-09-14T10:01:00Z', durationMs: 60000, error: null,
@@ -29,25 +29,25 @@ function renderRun(run: ChainRun) {
   );
 }
 
-describe('ChainExecution — Starter der Kette', () => {
-  it('nennt, was die Kette gestartet hat', async () => {
+describe('ChainExecution — chain starter', () => {
+  it('names what started the chain', async () => {
     renderRun({ ...oldShape, triggerSource: 'SCHEDULE' });
 
     const chip = await screen.findByTestId('trigger-source');
     expect(chip).toHaveTextContent('Gestartet durch');
-    // ohne Zeitplan-ID kein Link
+    // no link without a schedule ID
     expect(chip.tagName).toBe('SPAN');
   });
 
-  // 3a35ced1: Kette und Zeitplan der Herkunft sind verlinkt
-  it('verlinkt die Kette auf die Kettenseite und den Starter auf seinen Zeitplan', async () => {
+  // 3a35ced1: chain and schedule of origin are linked
+  it('links the chain to the chain page and the starter to its schedule', async () => {
     renderRun({ ...oldShape, triggerSource: 'SCHEDULE', triggeredByScheduleId: 's-9' });
 
     expect(await screen.findByTestId('trigger-source')).toHaveAttribute('href', '/schedules?schedule=s-9');
     expect(screen.getByRole('link', { name: 'Release' })).toHaveAttribute('href', '/chains?chain=c-1');
   });
 
-  it('zeigt bei älteren Backends ohne das Feld keinen Starter, die Seite bleibt vollständig', async () => {
+  it('shows no starter for older backends without the field, the page stays complete', async () => {
     renderRun(oldShape);
 
     expect(await screen.findByText('Release')).toBeInTheDocument();

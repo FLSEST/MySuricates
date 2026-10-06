@@ -10,16 +10,16 @@ import type { GoalTodoItem } from '../../types';
 
 type Decidable = Pick<GoalTodoItem, 'id' | 'title' | 'status' | 'openQuestion' | 'decision' | 'decidedAt' | 'decidedBy' | 'decisionState'>;
 
-/** Zeigt das TODO eine Markierung? ❓ nur, solange es nicht erledigt ist; ✔ immer. */
+/** Does the TODO show a mark? ❓ only while it is not done; ✔ always. */
 function markOf(todo: Decidable): 'QUESTION' | 'DECIDED' | null {
-  // Ohne Zustand (Daten ohne Normalisierung) gilt eine offene Frage als QUESTION
+  // Without a state (data without normalization) an open question counts as QUESTION
   const state = todo.decisionState ?? (todo.openQuestion ? 'QUESTION' : 'NONE');
   if (state === 'DECIDED') return 'DECIDED';
   if (state === 'QUESTION' && todo.openQuestion && todo.status !== 'DONE') return 'QUESTION';
   return null;
 }
 
-/** Der Wortlaut für Tooltip und Vorlesen: Frage bzw. Entscheidung mit Datum und wer. */
+/** The wording for tooltip and screen reader: question or decision with date and who. */
 function useMarkText(todo: Decidable) {
   const t = useT();
   const td = t.goals.decision;
@@ -35,9 +35,9 @@ function useMarkText(todo: Decidable) {
 const ICON = { sm: 'h-3 w-3', md: 'h-3.5 w-3.5' } as const;
 
 /**
- * ❓ oder ✔ an einem TODO (68a5e24e): ❓ `text-human` = eine Frage muss ein Mensch klären, ✔
- * `text-success` = entschieden. Auf der Zielseite (mit `DecisionContext`) öffnet ein Klick die Karte
- * „Entscheiden“ bzw. „Entscheidung ändern/entfernen“; sonst ist sie reine Anzeige mit Tooltip.
+ * ❓ or ✔ on a TODO (68a5e24e): ❓ `text-human` = a person must clarify a question, ✔
+ * `text-success` = decided. On the goal page (with `DecisionContext`) a click opens the card
+ * „Entscheiden“ or „Entscheidung ändern/entfernen“; otherwise it is display only with a tooltip.
  */
 export function DecisionMark({ todo, size = 'md', interactive = true }: { todo: Decidable; size?: 'sm' | 'md'; interactive?: boolean }) {
   const t = useT();
@@ -77,8 +77,8 @@ export function DecisionMark({ todo, size = 'md', interactive = true }: { todo: 
 }
 
 /**
- * Die Karte zum Entscheiden: bei einer offenen Frage die Frage und ein Feld für die Antwort; bei einer
- * Entscheidung ihr Wortlaut mit Datum und wer, dazu „Ändern“ und „Entfernen“.
+ * The card for deciding: for an open question the question and a field for the answer; for a
+ * decision its wording with date and who, plus „Ändern“ and „Entfernen“.
  */
 export function DecisionCard({ todo, goalId, triggerRef, onClose }: {
   todo: Decidable;

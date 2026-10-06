@@ -35,7 +35,7 @@ public class ChainRunWaiter {
         return waitForCompletion(runId, cancelled, null);
     }
 
-    /** Wie oben, mit eigener Obergrenze für diesen Ketten-Eintrag (TODO cc0eb3ba); null = globale Vorgabe. */
+    /** As above, with its own upper limit for this chain entry (TODO cc0eb3ba); null = global default. */
     public WorkflowRun waitForCompletion(String runId, AtomicBoolean cancelled, Integer timeoutMinutes) {
         Duration maxWait = Duration.ofMinutes(timeoutMinutes != null ? timeoutMinutes : chainConfig.getWorkflowTimeoutMinutes());
         Instant deadline = Instant.now().plus(maxWait);

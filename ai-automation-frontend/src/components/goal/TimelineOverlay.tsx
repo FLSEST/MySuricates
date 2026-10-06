@@ -5,7 +5,7 @@ import { MilestoneDiamond } from './MilestoneDiamond';
 import { WorkPackageMark } from './WorkPackageMark';
 import type { Dragged, LiveLine } from './timelineDrag';
 
-/** Größe des Gezogenen beim Anheben – das Bild unter dem Zeiger bleibt genauso groß. */
+/** Size of the dragged item when lifted - the image under the pointer stays exactly as large. */
 export interface DragFace {
   width: number | null;
   flipped: boolean;
@@ -13,10 +13,10 @@ export interface DragFace {
 }
 
 /**
- * Das Bild unter dem Zeiger beim Ziehen (c60bf914): der Eintrag so groß wie er am Zeitstrahl stand
- * – Chip, Balken, Eintrag der Leiste oder Raute –, darunter die Live-Zeile, wohin er gerade käme
- * (Flo: „beim Reinziehen … unten drunter Arbeitspaket und Datum“). Wo er nicht hin darf, sagt sie
- * das, in der Warnfarbe.
+ * The image under the pointer while dragging (c60bf914): the entry as large as it stood on the timeline
+ * - chip, bar, bar entry or diamond -, below it the live line where it would land right now
+ * (Flo: „beim Reinziehen … unten drunter Arbeitspaket und Datum“). Where it must not go, it says
+ * so, in the warning colour.
  */
 export function TimelineOverlay({ dragged, face, live, today }: {
   dragged: NonNullable<Dragged>;

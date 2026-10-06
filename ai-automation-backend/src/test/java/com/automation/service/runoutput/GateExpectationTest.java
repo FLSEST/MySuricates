@@ -8,7 +8,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Gates bleiben freiwillig — erwartet wird ein Urteil nur, wo die Definition danach fragt (63ecc124). */
+/** Gates stay voluntary — a verdict is expected only where the definition asks for it (63ecc124). */
 class GateExpectationTest {
 
     private static BlockDefinition block(Map<String, Object> config) {

@@ -13,7 +13,7 @@ import { RelationMapLegend } from './RelationMapLegend';
 import type { PlanBadge } from './planDisplay';
 import type { GoalRelations } from '../../types';
 
-/** Wohin ein Klick auf einen Knoten führt; TODOs öffnet die Zielseite selbst. */
+/** Where a click on a node leads; the goal page opens TODOs itself. */
 function hrefOf(target: NodeTarget): string | null {
   switch (target.type) {
     case 'workflow': return `/workflows/${target.id}`;
@@ -24,12 +24,12 @@ function hrefOf(target: NodeTarget): string | null {
   }
 }
 
-/** Überschrift von „Könnte dazugehören“ (`GoalCandidates`) – dorthin führt der leere Zustand. */
+/** Heading of „Könnte dazugehören“ (`GoalCandidates`) — the empty state leads there. */
 const CANDIDATES_ANCHOR = 'goal-candidates';
 
 /**
- * Das Backend kennt `/relations` noch nicht (404, TODO 49080447): Hinweis statt Fehlerkarte, die
- * Liste funktioniert weiter.
+ * The backend does not know `/relations` yet (404, TODO 49080447): a hint instead of an error card, the
+ * list keeps working.
  */
 export function GoalMapOutdatedBackend({ onShowList }: { onShowList: () => void }) {
   const t = useT();
@@ -44,7 +44,7 @@ export function GoalMapOutdatedBackend({ onShowList }: { onShowList: () => void 
   );
 }
 
-/** Ziel ohne TODOs und ohne gezeigte Kandidaten: kein leeres SVG, sondern der Weg zu den Vorschlägen. */
+/** Goal without TODOs and without shown candidates: no empty SVG, but the way to the suggestions. */
 function EmptyGoalMap() {
   const t = useT();
   const scrollToCandidates = () =>
@@ -61,20 +61,20 @@ function EmptyGoalMap() {
 }
 
 /**
- * Relationskarte eines Ziels (TODO c6ea8f5c): Herkunft → TODOs → Bearbeitung → Ergebnis, als SVG
- * mit Zoom. Hover hebt den ganzen Pfad eines TODOs hervor; Workflows, Läufe und Befunde sind
- * Links, ein TODO öffnet den Bearbeiten-Dialog, ein Kandidat lässt sich zuordnen.
+ * Relation map of a goal (TODO c6ea8f5c): origin → TODOs → processing → result, as SVG
+ * with zoom. Hover highlights the whole path of a TODO; workflows, runs and findings are
+ * links, a TODO opens the edit dialog, a candidate can be assigned.
  */
 export function GoalRelationMap({ relations, onOpenTodo, onAssign, badges, structure, goalTitle, onOpenWorkflows }: {
   relations: GoalRelations;
   onOpenTodo: (todoId: string) => void;
   onAssign: (todoId: string) => void;
-  /** Fälligkeit und Meilenstein je TODO des Ziels (TODO e192df18); Kandidaten haben keine. */
+  /** Due date and milestone per TODO of the goal (TODO e192df18); candidates have none. */
   badges?: ReadonlyMap<string, PlanBadge>;
-  /** Gliederung nach Projekt → Arbeitspaket (52bc1e8c); ohne nur nach Projekt. */
+  /** Outline by project → work package (52bc1e8c); without it only by project. */
   structure?: MapStructure;
   goalTitle?: string;
-  /** Öffnet die Workflow-Leiste, wenn sie zu ist. */
+  /** Opens the workflow bar if it is closed. */
   onOpenWorkflows?: () => void;
 }) {
   const t = useT();
@@ -191,7 +191,7 @@ export function GoalRelationMap({ relations, onOpenTodo, onAssign, badges, struc
                 badge={node.kind === 'todo' && !node.candidate ? badges?.get(node.todoIds[0]!) : undefined}
               />
               );
-              // In der Workflow-Zuordnung ist jedes TODO des Ziels eine Ablagefläche (52bc1e8c)
+              // In the workflow assignment every TODO of the goal is a drop target (52bc1e8c)
               return drag && node.kind === 'todo' && !node.candidate
                 ? <TodoDropTarget key={node.id} node={node}>{view}</TodoDropTarget> : view;
             })}

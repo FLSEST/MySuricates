@@ -21,34 +21,34 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
- * Was aus eingeordneten Befunden ({@code ACCEPTED_RISK}, {@code DISMISSED}) wird, die ein gueltiger,
- * vollstaendiger Snapshot nicht mehr meldet (TODOs b2e3da6a, 276ac76f). Offene Befunde fallen in dem Fall
- * sofort auf {@code RESOLVED}; eingeordnete blieben bisher fuer immer stehen — in den Akzeptiert-Zaehlern
- * und ohne 180-Tage-Wiedervorlage, weil {@link AuditAcceptancePolicy} nur bei einem Wiedersehen bewertet.
+  * What becomes of triaged findings ({@code ACCEPTED_RISK}, {@code DISMISSED}) that a valid,
+  * complete snapshot no longer reports (TODOs b2e3da6a, 276ac76f). Open findings fall to {@code RESOLVED}
+  * immediately in that case; triaged ones used to stay forever — in the accepted counters
+  * and without the 180-day resubmission, because {@link AuditAcceptancePolicy} only evaluates on a re-sighting.
  *
  * <ul>
- *   <li><b>Regelwechsel je Datei:</b> Meldet derselbe Lauf fuer dasselbe (normalisierte) Datei-subject
- *       einen neuen Befund unter einem anderen ruleKey, erbt der neue die Einordnung samt Notiz, der alte
- *       wird {@code RESOLVED} („Ersetzt durch …“). Jeder Vorgaenger vererbt hoechstens einmal; ein
- *       Nachfolger mit hoeherer Schwere (CRITICAL/HIGH) erbt nichts und wird neu bewertet. Nur fuer subjects, die eine Datei oder Klasse nennen —
- *       {@code repository} oder ein FAKT-Name bezeichnen bei jeder Regel etwas anderes.</li>
- *   <li><b>Regel ausgemustert:</b> Steht der ruleKey nicht mehr im Katalog des Audits, kann ihn kein
- *       gueltiger Report mehr melden — {@code RESOLVED} mit {@value #NOTE_RULE_RETIRED}.</li>
- *   <li><b>Nicht mehr gesehen:</b> Fehlt der Befund in {@value #ABSENT_RUNS} gueltigen Laeufen in Folge
- *       (dieser eingeschlossen), wird er {@code RESOLVED} mit {@link #NOTE_NOT_SEEN} — bei einer Kennzahl-Regel
- *       nur in einem Lauf, der ihren FAKT gemessen hat. Die Prompts fuehren
- *       eingeordnete Befunde im Envelope weiter, solange sie bestehen; ein einzelner Lauf, der einen
- *       vergisst, schliesst ihn also noch nicht.</li>
+  *   <li><b>Rule change per file:</b> If the same run reports a new finding for the same (normalized) file subject
+  *       under a different ruleKey, the new one inherits the triage including the note, the old one
+  *       becomes {@code RESOLVED} („Ersetzt durch …“). Each predecessor passes its triage on at most once; a
+  *       successor with higher severity (CRITICAL/HIGH) inherits nothing and is evaluated anew. Only for subjects that name a file or class —
+  *       {@code repository} or a FAKT name mean something different for every rule.</li>
+  *   <li><b>Rule retired:</b> If the ruleKey is no longer in the audit's catalog, no
+  *       valid report can report it any more — {@code RESOLVED} with {@value #NOTE_RULE_RETIRED}.</li>
+  *   <li><b>No longer seen:</b> If the finding is missing in {@value #ABSENT_RUNS} valid runs in a row
+  *       (this one included), it becomes {@code RESOLVED} with {@link #NOTE_NOT_SEEN} — for a metric rule
+  *       only in a run that measured its FAKT. The prompts carry
+  *       triaged findings on in the envelope as long as they exist; a single run that
+  *       forgets one therefore does not close it yet.</li>
  * </ul>
- * Reine DB-Arbeit in der Transaktion von {@link AuditIngestionService#ingest}; Speichern und das Schliessen
- * verwalteter TODOs bleiben beim {@link AuditSnapshotApplier}.
+  * Pure DB work in the transaction of {@link AuditIngestionService#ingest}; saving and closing
+  * managed TODOs stay with the {@link AuditSnapshotApplier}.
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 class AuditDispositionLifecycle {
 
-    /** So viele gueltige Laeufe in Folge ohne Wiedersehen, dann gilt ein eingeordneter Befund als erledigt. */
+    /** This many valid runs in a row without a re-sighting, then a triaged finding counts as done. */
     static final int ABSENT_RUNS = 3;
     static final String NOTE_RULE_RETIRED = "Regel nicht mehr im Katalog";
     static final String NOTE_NOT_SEEN = "Nicht mehr gemessen/ersetzt: " + ABSENT_RUNS + " Läufe ohne Wiedersehen";
@@ -57,12 +57,12 @@ class AuditDispositionLifecycle {
     private static final String RULE_CHANGE = " (Regelwechsel)";
 
     /**
-     * Datei-subject: ein Pfad (mit {@code /} oder Endung) oder ein CamelCase-Klassenname mit mindestens zwei
-     * Grossbuchstaben ({@code WorkflowExecutor}). Ein einzelnes Wort ({@code Scheduler}), eine Route mit
-     * Leerzeichen oder ein {@code <art>:<wert>} bezeichnen bei jeder Regel etwas anderes.
+     * File subject: a path (with {@code /} or an extension) or a CamelCase class name with at least two
+     * capital letters ({@code WorkflowExecutor}). A single word ({@code Scheduler}), a route with
+     * spaces or an {@code <art>:<wert>} mean something different for every rule.
      */
     private static final Pattern PATH = Pattern.compile("[^\\s:]*/[^\\s:]*|[^\\s:/]+\\.[A-Za-z0-9]+");
-    /** Form eines FAKT-Namens: klein, mit Unterstrich ({@code database_bytes}, {@code frontend_tsc_errors}). */
+    /** Form of a FAKT name: lowercase, with underscore ({@code database_bytes}, {@code frontend_tsc_errors}). */
     private static final Pattern FACT_NAME = Pattern.compile("[a-z][a-z0-9]*(?:_[a-z0-9]+)+");
     private static final Pattern CAMEL_CASE_CLASS = Pattern.compile("[A-Z][a-z0-9_]+[A-Z][A-Za-z0-9_]*");
 
@@ -74,12 +74,12 @@ class AuditDispositionLifecycle {
     private final AuditReportRepository reportRepository;
 
     /**
-     * Neue Befunde dieses Laufs erben die Einordnung eines nicht mehr gemeldeten Vorgaengers mit demselben
-     * Datei-subject und anderem ruleKey.
+     * New findings of this run inherit the triage of a predecessor that is no longer reported and has the same
+     * file subject and a different ruleKey.
      *
-     * @param created  in diesem Lauf neu angelegte Befunde (Felder schon gesetzt, noch ungespeichert)
-     * @param absent   bekannte Befunde, die dieser Lauf nicht gemeldet hat
-     * @return die abgeloesten Vorgaenger, jetzt {@code RESOLVED}
+     * @param created  findings newly created in this run (fields already set, not yet saved)
+     * @param absent   known findings that this run did not report
+     * @return the superseded predecessors, now {@code RESOLVED}
      */
     List<AuditFinding> inheritOnRuleChange(List<AuditFinding> created, List<AuditFinding> absent, Instant observedAt) {
         List<AuditFinding> predecessors = new ArrayList<>(absent.stream()
@@ -89,12 +89,12 @@ class AuditDispositionLifecycle {
         if (predecessors.isEmpty() || created.isEmpty()) {
             return List.of();
         }
-        // Vorgaenger → ruleKeys seiner Nachfolger (AuditFinding vergleicht per Identitaet)
+        // predecessor → ruleKeys of its successors (AuditFinding compares by identity)
         Map<AuditFinding, Set<String>> superseded = new LinkedHashMap<>();
         for (AuditFinding successor : created) {
             String subject = fileSubject(successor);
             if (subject == null) continue;
-            // 1:1 — ein Vorgaenger vererbt hoechstens einmal, danach ist er aus dem Pool.
+            // 1:1 — a predecessor passes its triage on at most once, after that it is out of the pool.
             predecessors.stream()
                     .filter(predecessor -> subject.equals(fileSubject(predecessor))
                             && !predecessor.getRuleKey().equals(successor.getRuleKey())
@@ -112,13 +112,13 @@ class AuditDispositionLifecycle {
     }
 
     /**
-     * Schliesst eingeordnete Befunde, die dieser gueltige Snapshot nicht gemeldet hat: ausgemusterte Regel
-     * sofort, sonst nach {@value #ABSENT_RUNS} Laeufen ohne Wiedersehen.
+     * Closes triaged findings that this valid snapshot did not report: retired rule
+     * immediately, otherwise after {@value #ABSENT_RUNS} runs without a re-sighting.
      *
-     * @param absent    bekannte Befunde, die dieser Lauf nicht gemeldet hat (nicht eingeordnete werden uebergangen)
-     * @param factNames die FAKT-Namen dieses Laufs: eine Kennzahl-Regel, deren FAKT fehlt, war nicht messbar —
-     *                  ihr Befund bleibt (Teil-Messung)
-     * @return die jetzt auf {@code RESOLVED} gesetzten Befunde
+     * @param absent    known findings that this run did not report (non-triaged ones are skipped)
+     * @param factNames the FAKT names of this run: a metric rule whose FAKT is missing was not measurable —
+     *                  its finding stays (partial measurement)
+     * @return the findings now set to {@code RESOLVED}
      */
     List<AuditFinding> retireAbsent(List<AuditFinding> absent, AuditReport report, Set<String> factNames,
                                     Instant observedAt) {
@@ -153,9 +153,9 @@ class AuditDispositionLifecycle {
     }
 
     /**
-     * Wer zuletzt vor diesem Zeitpunkt gesehen wurde, fehlt im aktuellen und den {@value #ABSENT_RUNS} − 1
-     * gueltigen Laeufen davor: der Zeitpunkt des aeltesten dieser Vorlaeufe. {@code null}, solange es so viele
-     * Vorlaeufe noch nicht gibt.
+     * Whoever was last seen before this point in time is missing from the current run and the {@value #ABSENT_RUNS} − 1
+     * valid runs before it: the point in time of the oldest of those earlier runs. {@code null} as long as there are not that many
+     * earlier runs yet.
      */
     private Instant absenceCutoff(AuditReport report) {
         if (report.getGeneratedAt() == null) {
@@ -167,8 +167,8 @@ class AuditDispositionLifecycle {
     }
 
     /**
-     * Ein Nachfolger mit hoher Schwere (CRITICAL/HIGH), die ueber der des Vorgaengers liegt, erbt nichts: Die
-     * Einordnung galt einem leichteren Befund, der neue ist neu zu bewerten.
+     * A successor with high severity (CRITICAL/HIGH) that is above the predecessor's inherits nothing: the
+     * triage applied to a lighter finding, the new one has to be evaluated anew.
      */
     private static boolean escalates(AuditFinding predecessor, AuditFinding successor) {
         AuditSeverity after = successor.getSeverity();
@@ -180,8 +180,8 @@ class AuditDispositionLifecycle {
         successor.setStatus(predecessor.getStatus());
         successor.setResolvedAt(predecessor.getResolvedAt());
         successor.setDispositionAt(dispositionTime(predecessor));
-        // Vergleichsbasis der Verschlechterungsregel: die Evidence der neuen Regel, nicht die der alten —
-        // deren Zahlen messen etwas anderes. Die Frist der Akzeptanz laeuft weiter.
+        // Baseline of the worsening rule: the evidence of the new rule, not that of the old one —
+        // its numbers measure something different. The acceptance deadline keeps running.
         successor.setDispositionEvidence(predecessor.getStatus() == AuditFindingStatus.ACCEPTED_RISK
                 ? successor.getEvidence() : predecessor.getDispositionEvidence());
         successor.setDispositionNote(appendNote(predecessor.getDispositionNote(),
@@ -200,16 +200,16 @@ class AuditDispositionLifecycle {
     }
 
     /**
-     * Kennzahl-Regel (festes subject in FAKT-Form, {@code database_bytes}), deren FAKT im Faktenblatt dieses Laufs
-     * fehlt: Der Lauf hat sie nicht gemessen, sein Schweigen ist keine Abwesenheit. Feste subjects wie
-     * {@code repository} oder {@code LICENSE} sind keine FAKT-Namen und bleiben unberuehrt.
+     * Metric rule (fixed subject in FAKT form, {@code database_bytes}) whose FAKT is missing from this run's fact sheet:
+     * The run did not measure it, its silence is not an absence. Fixed subjects like
+     * {@code repository} or {@code LICENSE} are not FAKT names and stay untouched.
      */
     private boolean isUnmeasuredMetric(AuditFinding finding, Set<String> factNames) {
         String fixed = ruleKeyCatalog.fixedSubject(finding.getAuditKey(), finding.getRuleKey());
         return fixed != null && FACT_NAME.matcher(fixed).matches() && !factNames.contains(fixed);
     }
 
-    /** Das normalisierte subject, wenn es eine Datei oder Klasse nennt und die Regel keinen festen Wert hat. */
+    /** The normalized subject, if it names a file or class and the rule has no fixed value. */
     private String fileSubject(AuditFinding finding) {
         if (ruleKeyCatalog.fixedSubject(finding.getAuditKey(), finding.getRuleKey()) != null) {
             return null;
@@ -218,7 +218,7 @@ class AuditDispositionLifecycle {
         if (subject.indexOf(':') >= 0) {
             return null; // <art>:<wert>
         }
-        // Pfad oder Endung zaehlen in der gemeldeten Form: der Normalizer macht aus Foo.java den Klassennamen Foo.
+        // Path or extension count in the reported form: the normalizer turns Foo.java into the class name Foo.
         String raw = AuditFindingsContext.unmask(finding.getSubject()).trim();
         int colon = raw.indexOf(':');
         String reported = colon >= 0 ? raw.substring(0, colon).trim() : raw;

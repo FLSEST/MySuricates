@@ -2,20 +2,20 @@ import { dayOfIsoDate, isoDateOfDay, packageRange, rangeRequest } from './timeli
 import type { CreateGoalWorkPackageRequest, GoalWorkPackage, UpdateGoalWorkPackageRequest } from '../../types';
 
 /**
- * Formular eines Arbeitspakets (c60bf914) – im Dialog der Gliederung und in der Karte am Zeitstrahl
- * dasselbe: Titel, Projekt, Zeitraum optional (Beginn und Ende nur zusammen). Der Beginn gilt ab
- * 00:00, das Ende bis 23:59:59 Ortszeit.
+ * Form of a work package (c60bf914) - the same in the outline dialog and in the card on the
+ * timeline: title, project, period optional (start and end only together). The start counts from
+ * 00:00, the end until 23:59:59 local time.
  */
 export interface WorkPackageDraft {
   title: string;
   projectId: string;
-  /** `YYYY-MM-DD` oder leer. */
+  /** `YYYY-MM-DD` or empty. */
   start: string;
-  /** `YYYY-MM-DD` oder leer. */
+  /** `YYYY-MM-DD` or empty. */
   end: string;
 }
 
-/** Titel höchstens so lang, wie das Backend annimmt. */
+/** Title at most as long as the backend accepts. */
 export const MAX_TITLE = 200;
 
 export function packageDraftOf(
@@ -38,7 +38,7 @@ export function packageDraftOf(
   };
 }
 
-/** Was am Zeitraum nicht stimmt: nur eins von beiden, ein halb getipptes Datum oder das Ende vor dem Beginn. */
+/** What is wrong with the period: only one of the two, a half-typed date or the end before the start. */
 export type RangeProblem = 'incomplete' | 'order' | null;
 
 export function rangeProblem(draft: Pick<WorkPackageDraft, 'start' | 'end'>): RangeProblem {
@@ -59,7 +59,7 @@ export function isPackageDraftValid(draft: WorkPackageDraft): boolean {
   return draft.title.trim() !== '' && draft.projectId !== '' && rangeProblem(draft) === null;
 }
 
-/** Anlegen: ohne Zeitraum fehlen Beginn und Ende ganz. null, solange das Formular nicht stimmt. */
+/** Create: without a period, start and end are missing entirely. null as long as the form is invalid. */
 export function createPackageRequest(draft: WorkPackageDraft): CreateGoalWorkPackageRequest | null {
   if (!isPackageDraftValid(draft)) return null;
   const range = draftRange(draft);
@@ -67,8 +67,8 @@ export function createPackageRequest(draft: WorkPackageDraft): CreateGoalWorkPac
 }
 
 /**
- * Bearbeiten: nur, was sich geändert hat – ein geleerter Zeitraum schickt Beginn und Ende leer, ein
- * geänderter beide neu (der Server prüft sie zusammen). null, solange das Formular nicht stimmt.
+ * Edit: only what has changed - a cleared period sends start and end empty, a
+ * changed one sends both anew (the server checks them together). null as long as the form is invalid.
  */
 export function updatePackageRequest(item: GoalWorkPackage, draft: WorkPackageDraft): UpdateGoalWorkPackageRequest | null {
   if (!isPackageDraftValid(draft)) return null;
@@ -82,7 +82,7 @@ export function updatePackageRequest(item: GoalWorkPackage, draft: WorkPackageDr
   return data;
 }
 
-/** Das Projekt eines Pakets wechselt nur, solange ihm kein TODO zugeordnet ist. */
+/** The project of a package changes only as long as no TODO is assigned to it. */
 export function projectLocked(item: GoalWorkPackage | undefined): boolean {
   return !!item && item.total > 0;
 }

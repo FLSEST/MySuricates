@@ -39,8 +39,8 @@ describe('walkthrough copy', () => {
     }
   });
 
-  // Ohne Szene im Bildkonzept bekaeme ein Panel nie eine Illustration — und das faellt sonst
-  // erst auf, wenn der Bild-Workflow durchgelaufen ist.
+  // Without a scene in the image concept a panel would never get an illustration — and that would otherwise
+  // only be noticed once the image workflow has run.
   it('has an image concept for every panel', () => {
     expect(Object.keys(prompts.szenen).sort()).toEqual(WALKTHROUGH_PANELS.map((p) => p.id).sort());
     for (const [id, szene] of Object.entries(prompts.szenen)) {

@@ -5,21 +5,21 @@ import java.util.Locale;
 import java.util.stream.Collectors;
 
 /**
- * Kategorie eines Pool-Eintrags — das Unterscheidungsmerkmal, an dem ein fremder Leser vor dem
- * Installieren erkennt, ob ein Eintrag für sein Projekt gedacht ist.
+ * Category of a pool entry - the distinguishing feature by which a foreign reader recognises before
+ * installing whether an entry is meant for their project.
  *
  * <ul>
- *   <li>{@link #REPO} — greift auf die Struktur dieses Repositories zu
- *       ({@code ai-automation-backend}, {@code mvnw}, {@code scripts/}). Läuft anderswo ins Leere.</li>
- *   <li>{@link #PORTABLE} — über {@code project_path} (bzw. eigene Kontextvariablen) parametrisiert
- *       und damit in jedem Projekt lauffähig.</li>
- *   <li>{@link #EXTERNAL} — braucht ein Werkzeug außerhalb dieses Repositories und des gewählten
- *       Projekts; die Voraussetzung steht in der Beschreibung (TODO 7ddacd1d, etwa die SaaS-Factory).</li>
+ *   <li>{@link #REPO} - accesses the structure of this repository
+ *       ({@code ai-automation-backend}, {@code mvnw}, {@code scripts/}). Leads nowhere elsewhere.</li>
+ *   <li>{@link #PORTABLE} - parametrised via {@code project_path} (or own context variables)
+ *       and thus runnable in every project.</li>
+ *   <li>{@link #EXTERNAL} - needs a tool outside this repository and the chosen
+ *       project; the prerequisite is in the description (TODO 7ddacd1d, e.g. the SaaS factory).</li>
  * </ul>
  *
- * <p>Der Wert ist ein Pool-Metadatum, kein Feld der Workflow-Definition: er entsteht beim Export
- * ({@code POST /api/v1/pool/export/{workflowId}?scope=repo|portable|external}) und wird im Pool-Browser
- * angezeigt. Regelwerk: {@code docs/workflow-pool-kuratierung.md}.
+ * <p>The value is pool metadata, not a field of the workflow definition: it is created on export
+ * ({@code POST /api/v1/pool/export/{workflowId}?scope=repo|portable|external}) and shown in the pool browser.
+ * Rules: {@code docs/workflow-pool-kuratierung.md}.
  */
 public enum PoolScope {
 
@@ -27,16 +27,16 @@ public enum PoolScope {
     PORTABLE,
     EXTERNAL;
 
-    /** Der Wert, wie er in der Pool-JSON steht. */
+    /** The value as it appears in the pool JSON. */
     public String jsonValue() {
         return name().toLowerCase(Locale.ROOT);
     }
 
     /**
-     * Löst den Query-Parameter auf. Ohne Angabe gilt {@link #PORTABLE}: der Default ist die
-     * schwächere Zusage, ein repo-gebundener Eintrag muss bewusst so gekennzeichnet werden.
+     * Resolves the query parameter. Without a value {@link #PORTABLE} applies: the default is the
+     * weaker promise, a repo-bound entry must be marked as such deliberately.
      *
-     * @throws IllegalArgumentException bei einem unbekannten Wert
+     * @throws IllegalArgumentException for an unknown value
      */
     public static PoolScope fromParam(String value) {
         if (value == null || value.isBlank()) {
@@ -50,7 +50,7 @@ public enum PoolScope {
                         "Unbekannter scope: '" + value + "' — erlaubt sind " + allowedValues()));
     }
 
-    /** Die erlaubten Werte für Fehlermeldungen, etwa {@code 'repo', 'portable', 'external'}. */
+    /** The allowed values for error messages, e.g. {@code 'repo', 'portable', 'external'}. */
     public static String allowedValues() {
         return Arrays.stream(values()).map(s -> "'" + s.jsonValue() + "'").collect(Collectors.joining(", "));
     }

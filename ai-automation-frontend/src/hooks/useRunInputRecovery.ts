@@ -51,11 +51,11 @@ function toRecovered(runId: string, data: PendingInputResponse): Recovered {
 }
 
 /**
- * Stellt eine wartende Freigabe bzw. Eingabe wieder her (`GET /executions/{runId}/approval`) — nach Laden/Neuladen
- * der Laufseite ist die WebSocket-Meldung dazu schon vorbei. Ändert sich `refreshKey`, fragt der Hook erneut
- * (78af069c: beginnt die Freigabe nach der ersten Abfrage, aber bevor der WebSocket abonniert ist, verpasst die
- * Seite sonst beide Wege). Es zählt nur die Antwort der jüngsten Abfrage; `pending: false` räumt auf, Fehler
- * ändern nichts. Ohne wartenden Schritt bleiben beide Werte `null`, ein anderer Lauf erbt nichts.
+ * Restores a waiting approval or input (`GET /executions/{runId}/approval`) — after loading/reloading
+ * the run page the WebSocket message for it is already gone. If `refreshKey` changes, the hook asks again
+ * (78af069c: if the approval begins after the first query but before the WebSocket is subscribed, the
+ * page would otherwise miss both paths). Only the answer of the latest query counts; `pending: false` cleans up, errors
+ * change nothing. Without a waiting step both values stay `null`, another run inherits nothing.
  */
 export function useRunInputRecovery(runId: string | undefined, refreshKey?: string) {
   const [recovered, setRecovered] = useState<Recovered | null>(null);

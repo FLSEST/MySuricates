@@ -64,30 +64,30 @@ public class AuditFinding {
     @Builder.Default
     private int regressionCount = 0;
     /**
-     * Liegt der {@code ruleKey} ausserhalb des Katalogs ({@code audit/rule-keys.json})?
+     * Is the {@code ruleKey} outside the catalog ({@code audit/rule-keys.json})?
      *
-     * <p>Dann ist die Regel-Identitaet dieses Findings ungeprueft: Sein Fingerprint haengt an einer
-     * Schreibweise, die kein Katalog bestaetigt, und beim naechsten Lauf mit anderer Schreibweise
-     * entsteht ein Wiedergaenger statt eines Wiedersehens. Die Ingestion setzt das Flag bei jedem
-     * Ingest neu — auch zurueck auf {@code false}, sobald der Katalog den Key kennt (TODO ffa6d846).
+     * <p>Then the rule identity of this finding is unchecked: its fingerprint hangs on a
+     * spelling that no catalog confirms, and on the next run with a different spelling
+     * a revenant arises instead of a recurrence. Ingestion sets the flag anew on every
+     * ingest - also back to {@code false} once the catalog knows the key (TODO ffa6d846).
      */
     /**
-     * <b>Historisch.</b> Seit TODO f57945e2 wird ein Report mit unbekanntem {@code ruleKey}
-     * komplett verworfen, sofern für sein Audit ein Katalog existiert — und nur dann kann ein Key
-     * überhaupt als unbekannt gelten. Neue Findings mit diesem Flag entstehen also nicht mehr; das
-     * Feld trägt weiter die Markierungen aus der Zeit, als ein gedrifteter Key übernommen und nur
-     * angezeigt wurde (V75, TODO ffa6d846). Das Audit Center zeigt sie unverändert an.
+     * <b>Historical.</b> Since TODO f57945e2 a report with an unknown {@code ruleKey}
+     * is discarded entirely if a catalog exists for its audit - and only then can a key
+     * count as unknown at all. New findings with this flag therefore no longer arise; the
+     * field still carries the markers from the time when a drifted key was adopted and only
+     * displayed (V75, TODO ffa6d846). The Audit Center shows them unchanged.
      */
     @Column(name = "unknown_rule_key", nullable = false)
     @Builder.Default
     private boolean unknownRuleKey = false;
     /**
-     * Gesetzt, wenn die {@code evidence} dieses Findings keinen Messwert des Laufs nennt, aus dem
-     * es stammt — erfundener oder aus einem frueheren Report recycelter Beleg.
+     * Set when the {@code evidence} of this finding names no measured value of the run it
+     * comes from - an invented piece of evidence or one recycled from an earlier report.
      *
-     * <p>Solche Findings werden gespeichert und bleiben sichtbar, erzeugen aber <b>kein</b>
-     * verwaltetes TODO: Der Prompt verlangt einen Beleg, geprueft hat ihn bis dahin niemand
-     * (TODO a94b56a0). Wie {@link #unknownRuleKey} bei jedem Ingest neu gesetzt, auch zurueck.
+     * <p>Such findings are stored and stay visible, but produce <b>no</b>
+     * managed TODO: the prompt demands evidence, nobody has checked it so far
+     * (TODO a94b56a0). Like {@link #unknownRuleKey} set anew on every ingest, also back.
      */
     @Column(name = "unverified_evidence", nullable = false)
     @Builder.Default
@@ -96,10 +96,10 @@ public class AuditFinding {
     private Instant resolvedAt;
     @Column(name = "disposition_note", columnDefinition = "text")
     private String dispositionNote;
-    /** Evidence-Text zum Zeitpunkt der Risiko-Akzeptanz — Vergleichsbasis der Verschlechterungsregel. */
+    /** Evidence text at the time of risk acceptance - comparison basis of the worsening rule. */
     @Column(name = "disposition_evidence", columnDefinition = "text")
     private String dispositionEvidence;
-    /** Zeitpunkt der Risiko-Akzeptanz — Basis des 180-Tage-Verfalls. */
+    /** Time of risk acceptance - basis of the 180-day expiry. */
     @Column(name = "disposition_at")
     private Instant dispositionAt;
     @CreatedDate

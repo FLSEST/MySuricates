@@ -8,9 +8,9 @@ import { applyDecisionToDetail } from '../components/goal/decision';
 import type { Todo } from '../types';
 
 /**
- * Entscheidet die offene Frage eines TODOs oder nimmt die Entscheidung weg (68a5e24e):
- * `PATCH /todos/{id}/planning` mit `decision` – Text schließt die Frage, `''` entfernt die
- * Entscheidung. Die Zielseite zeigt das sofort; scheitert der Aufruf, geht es zurück.
+ * Decides the open question of a TODO or removes the decision (68a5e24e):
+ * `PATCH /todos/{id}/planning` with `decision` – text closes the question, `''` removes the
+ * decision. The goal page shows this immediately; if the call fails, it is rolled back.
  */
 export function useDecideTodo(goalId: string) {
   const qc = useQueryClient();

@@ -96,7 +96,7 @@ public class DocsFetchHandler {
         String[] lines = content.split("\n");
         var sb = new StringBuilder();
         boolean inSection = false;
-        boolean inFence = false; // "## …" in einem Codeblock ist Beispieltext, keine Überschrift
+        boolean inFence = false; // "## …" in a code block is example text, not a heading
         for (String line : lines) {
             if (line.startsWith("```")) {
                 inFence = !inFence;

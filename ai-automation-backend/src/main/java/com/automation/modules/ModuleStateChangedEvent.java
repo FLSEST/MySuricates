@@ -4,11 +4,11 @@ import lombok.Getter;
 import org.springframework.context.ApplicationEvent;
 
 /**
- * Ein Feature-Modul wurde zur Laufzeit umgeschaltet (Settings → Module, nur bei
- * {@code automation.modules.ui-editable=true}). Hintergrundpfade eines Moduls, die sonst nur beim
- * Start laufen, koennen sich hier einhaengen und ihren Lauf nachholen.
+ * A feature module was switched at runtime (Settings → Module, only with
+ * {@code automation.modules.ui-editable=true}). Background paths of a module that otherwise run only at
+ * startup can hook in here and catch up on their run.
  *
- * <p>Wird nur veroeffentlicht, wenn sich der <em>effektive</em> Zustand geaendert hat.
+ * <p>Published only when the <em>effective</em> state has changed.
  */
 @Getter
 public class ModuleStateChangedEvent extends ApplicationEvent {

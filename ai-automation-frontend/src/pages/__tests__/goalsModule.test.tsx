@@ -18,7 +18,7 @@ import type { Todo } from '../../types';
 
 // c60bf914 (Flo): „Wird auch sauber durchgetestet, wie die TODO-Seite aussieht, wenn GOALS deaktiviert ist?“ –
 // „Ja, das war damals der Plan, dass es ein richtiges Modul ist.“ Jede Fläche mit Ziel-Anteil wird mit dem
-// Modul an UND aus geprüft; aus darf kein Aufruf auf /goals/** und keine Planung mehr stattfinden.
+// module ON and OFF; when off, there must be no call to /goals/** and no planning anymore.
 
 const BASE = '/api/v1';
 
@@ -42,9 +42,9 @@ const todo: Todo = {
 } as Todo;
 
 /**
- * Das Modul an oder aus – wie der Server es meldet und wie es der Browser vom letzten Laden kennt.
- * Jeder Aufruf auf /goals/** und auf die Planung wird mitgeschrieben; ist das Modul aus, antwortet der
- * Server wie der echte mit 404 MODULE_DISABLED.
+ * The module on or off – as the server reports it and as the browser knows it from the last load.
+ * Every call to /goals/** and to planning is recorded; if the module is off, the server answers
+ * like the real one with 404 MODULE_DISABLED.
  */
 function serveModule(on: boolean) {
   const modules = modulesFixture('full', on ? [] : ['goals']);
@@ -64,12 +64,12 @@ function serveModule(on: boolean) {
       projects: [], generatedAt: '2026-09-24T08:00:00Z', staleThresholdDays: 30,
       needsYou: [{ id: 't1', title: 'Licence files', projectId: 'p1', projectName: 'AutoPilot', priority: 'HIGH', dueDate: null,
         source: 'USER', createdAt: '2026-09-01T00:00:00Z', updatedAt: '2026-09-01T00:00:00Z', ageDays: 30, overdue: false }],
-      // ein Server mit Modul aus liefert keine; ein veralteter Zwischenstand darf trotzdem nichts zeigen
+      // a server with the module off delivers none; a stale intermediate state must still show nothing
       milestonesDue: [{ id: 'm1', kind: 'MILESTONE', title: 'Code freeze', goalId: 'g1', goalTitle: 'Release',
         dueDate: '2026-09-22T21:59:59Z', state: 'OVERDUE', total: 2, done: 1 }],
     })),
     http.get(`${BASE}/todos/count`, () => HttpResponse.json({ open: 1, inProgress: 0, done: 0, backlog: 0, archived: 0 })),
-    // aus liefert der Server keine Planung mehr (planning: null)
+    // when off, the server no longer delivers planning (planning: null)
     http.get(`${BASE}/todos/:id`, () => HttpResponse.json({
       ...todo,
       planning: on ? {

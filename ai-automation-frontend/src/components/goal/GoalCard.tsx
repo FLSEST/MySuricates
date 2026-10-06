@@ -7,12 +7,12 @@ import { DecisionCounts } from './DecisionCounts';
 import { MilestoneDiamond } from './MilestoneDiamond';
 import type { Goal } from '../../types';
 
-/** So viele Projekt-Chips trägt eine Karte, der Rest steht als „+n“. */
+/** A card carries this many project chips, the rest appears as „+n“. */
 const PROJECT_CHIPS = 3;
 
 /**
- * Ein Ziel als Karte: Projekte, der nächste Meilenstein (c60bf914), Fortschritt, Zieldatum, offene
- * Fragen; ein Klick öffnet die Zielansicht.
+ * A goal as a card: projects, the next milestone (c60bf914), progress, target date, open
+ * questions; a click opens the goal view.
  */
 export function GoalCard({ goal, onOpen }: { goal: Goal; onOpen: () => void }) {
   const t = useT();

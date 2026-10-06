@@ -1,24 +1,24 @@
 #!/usr/bin/env python3
-"""Zyklen zwischen Paketen aus einer Kantenliste — deterministisch, ohne Fremdpakete.
+"""Cycles between packages from an edge list - deterministic, no third-party packages.
 
-Eingabe (stdin oder Datei als erstes Argument): TSV-Zeilen
+Input (stdin or a file as first argument): TSV lines
 
-    von<TAB>nach[<TAB>anzahl]
+    from<TAB>to[<TAB>count]
 
-Leerzeilen und Zeilen, die mit '#' beginnen, werden ignoriert; weitere Spalten
-werden nicht ausgewertet.
+Blank lines and lines starting with '#' are ignored; further columns
+are not evaluated.
 
-Ausgabe (stabil sortiert, leer wenn es keine Zyklen gibt):
+Output (stably sorted, empty if there are no cycles):
 
-    cycle<TAB><groesse><TAB><paket1,paket2,...>   je stark zusammenhaengender Komponente
-                                                  (Groesse > 1 oder Selbstkante)
-    pair<TAB><a><TAB><b>                          je wechselseitig abhaengigem Paar, a < b
+    cycle<TAB><size><TAB><package1,package2,...>  per strongly connected component
+                                                  (size > 1 or self edge)
+    pair<TAB><a><TAB><b>                          per mutually dependent pair, a < b
 
-Die Zyklen kommen zuerst (groesste zuerst, bei gleicher Groesse alphabetisch nach
-dem ersten Mitglied), danach die Paare. Der Exit-Code ist immer 0: die Ausgabe ist
-ein Faktenblatt fuer einen nachgelagerten Auswerter, kein Gate.
+The cycles come first (largest first, ties alphabetically by the first member),
+then the pairs. The exit code is always 0: the output is a fact sheet for a
+downstream evaluator, not a gate.
 
-Verwendet von scripts/public-readiness/arch-metrics.sh, getestet von
+Used by scripts/public-readiness/arch-metrics.sh, tested by
 scripts/tests/test-arch-metrics.sh.
 """
 
@@ -28,7 +28,7 @@ import sys
 
 
 def read_edges(lines):
-    """Kantenliste -> sortierte, doppelfreie Liste von (von, nach)-Paaren."""
+    """Edge list -> sorted, duplicate-free list of (from, to) pairs."""
     edges = set()
     for raw in lines:
         line = raw.rstrip("\n").rstrip("\r")
@@ -46,7 +46,7 @@ def read_edges(lines):
 
 
 def build_graph(edges):
-    """(Knoten sortiert, Adjazenz mit sortierten Zielen)."""
+    """(Sorted nodes, adjacency with sorted targets)."""
     adjacency = {}
     nodes = set()
     for source, target in edges:
@@ -57,7 +57,7 @@ def build_graph(edges):
 
 
 def strongly_connected_components(nodes, adjacency):
-    """Tarjan, iterativ (keine Rekursionsgrenze). Komponenten intern sortiert."""
+    """Tarjan, iterative (no recursion limit). Components sorted internally."""
     index = {}
     lowlink = {}
     on_stack = set()
@@ -106,7 +106,7 @@ def strongly_connected_components(nodes, adjacency):
 
 
 def find_cycles(edges):
-    """(Zyklen, wechselseitige Paare) aus einer Kantenliste."""
+    """(Cycles, mutual pairs) from an edge list."""
     nodes, adjacency = build_graph(edges)
     edge_set = set(edges)
     cycles = [

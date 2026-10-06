@@ -2,11 +2,11 @@
 set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; source "$SCRIPT_DIR/common.sh"; cd_root
 section "Documentation readiness check"
-# Die Liste nennt die oeffentlichen Dokumente, die dieses Repo tatsaechlich fuehrt.
-# Vorher standen hier fuenf englische Dateinamen (docs/architecture.md,
+# The list names the public documents this repo actually keeps.
+# Before, it held five English file names (docs/architecture.md,
 # docs/agentic-development.md, docs/public-readiness.md, docs/security.md,
-# docs/use-cases.md), die es nie gab: die Doku heisst docs/architektur.md und liegt
-# zweisprachig unter docs/ und docs/en/. Das Gate stand dadurch dauerhaft auf YELLOW.
+# docs/use-cases.md) that never existed: the docs are called docs/architektur.md and live
+# bilingually under docs/ and docs/en/. The gate was therefore permanently YELLOW.
 for f in README.md README.de.md LICENSE NOTICE SECURITY.md CONTRIBUTING.md \
          docs/GETTING-STARTED.md docs/architektur.md docs/baukasten.md \
          docs/workflow-pool-kuratierung.md; do
@@ -19,10 +19,10 @@ for pat in 'agentic|agentisch' 'human[- ]in[- ]the[- ]loop|human review|mensch' 
   count=$(pgrep_count_total -i "$pat" README.md docs AGENTS.md CLAUDE.md)
   printf '%s: %s\n' "$pat" "$count"
 done
-# Einstieg: Wie viel liest ein Besucher, bevor er erfaehrt, wie man es ausprobiert?
-# Gezaehlt werden die Woerter vor der ersten Ueberschrift, die nach Ausprobieren
-# klingt; HTML-Kommentare zaehlen nicht. Ohne solche Ueberschrift ist das ein Befund
-# fuer sich. Kein todo_item: der Befund laeuft ueber das Audit (TODO 1b84ecab).
+# Entry: how much does a visitor read before learning how to try it out?
+# Counted are the words before the first heading that sounds like trying it out;
+# HTML comments do not count. Without such a heading that is a finding in its
+# own right. No todo_item: the finding goes through the audit (TODO 1b84ecab).
 QUICKSTART_MAX_WORDS="${PUBLIC_READINESS_QUICKSTART_MAX_WORDS:-500}"
 QUICKSTART_HEADING='^#{1,3}[[:space:]]+.*(quickstart|quick start|schnellstart|ausprobieren|try it|getting started|installation)'
 section "README entry (words before the quickstart heading, limit ${QUICKSTART_MAX_WORDS})"
@@ -44,9 +44,9 @@ for f in README.md README.de.md; do
   fi
 done
 
-# Agenten-Anweisungen, die nur der Maintainer befolgen kann: Verweise auf seine
-# Shell-Session und seine Claude-Code-Sitzungen. Eine Beispiel-Nutzlast mit
-# "sourceAgent" in der API-Doku zaehlt bewusst nicht.
+# Agent instructions only the maintainer can follow: references to his
+# shell session and his Claude Code sessions. An example payload with
+# "sourceAgent" in the API docs deliberately does not count.
 section "Agent instructions written for the maintainer only"
 maintainer_findings=0
 for f in CLAUDE.md AGENTS.md; do

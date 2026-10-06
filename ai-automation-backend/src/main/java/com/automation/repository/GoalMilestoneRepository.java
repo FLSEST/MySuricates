@@ -17,17 +17,17 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Meilensteine der Ziele (TODO c60bf914) – gelesen mit ihren verknuepften Arbeitspaketen in EINER
- * Abfrage je Ziel ({@link #findWithLinks}) oder als Zusammenfassung mit Paket-Zaehlern fuer viele
- * Ziele auf einmal ({@link #findSummaries}).
+ * Milestones of the goals (TODO c60bf914) – read with their linked work packages in ONE
+ * query per goal ({@link #findWithLinks}) or as a summary with package counters for many
+ * goals at once ({@link #findSummaries}).
  */
 @Repository
 public interface GoalMilestoneRepository extends JpaRepository<GoalMilestone, String> {
 
     /**
-     * Zusammenfassung je Meilenstein in einer Abfrage: verknuepfte Pakete gesamt und davon
-     * abgeschlossen (mindestens ein TODO ohne ARCHIVED, keins mehr offen) – als Unterabfragen,
-     * damit weder Pakete noch TODOs geladen werden.
+     * Summary per milestone in one query: linked packages in total and of those
+     * completed (at least one TODO other than ARCHIVED, none open any more) – as subqueries,
+     * so that neither packages nor TODOs are loaded.
      */
     String SUMMARY = "SELECT new com.automation.dto.projection.GoalMilestoneSummaryRow("
             + "m.id, m.goalId, m.title, m.dueDate, m.reachedAt, "
@@ -37,12 +37,12 @@ public interface GoalMilestoneRepository extends JpaRepository<GoalMilestone, St
             + "AND NOT EXISTS (SELECT 1 FROM Todo o WHERE o.workPackageId = c.workPackageId "
             + "AND o.status IN ('OPEN','IN_PROGRESS','BACKLOG')))) ";
 
-    /** Eine Zeile je (Meilenstein, verknuepftes Paket); ein Meilenstein ohne Pakete mit {@code null}. */
+    /** One row per (milestone, linked package); a milestone without packages with {@code null}. */
     @Query("SELECT m, l.workPackageId FROM GoalMilestone m LEFT JOIN GoalMilestoneWorkPackage l ON l.milestoneId = m.id "
          + "WHERE m.goalId = :goalId")
     List<Object[]> findLinkRows(@Param("goalId") String goalId);
 
-    /** Die Meilensteine eines Ziels mit den IDs ihrer Pakete – eine Abfrage. */
+    /** The milestones of a goal with the IDs of their packages – one query. */
     default List<GoalMilestoneLinks> findWithLinks(String goalId) {
         Map<String, GoalMilestone> milestones = new LinkedHashMap<>();
         Map<String, List<String>> links = new LinkedHashMap<>();
@@ -59,13 +59,13 @@ public interface GoalMilestoneRepository extends JpaRepository<GoalMilestone, St
                 .toList();
     }
 
-    /** Zusammenfassungen fuer eine Zielliste – eine Abfrage fuer alle Ziele. */
+    /** Summaries for a goal list – one query for all goals. */
     @Query(SUMMARY + "FROM GoalMilestone m WHERE m.goalId IN :goalIds")
     List<GoalMilestoneSummaryRow> findSummaries(@Param("goalIds") Collection<String> goalIds);
 
     /**
-     * Meilensteine aktiver Ziele, die bis {@code until} faellig sind – die Kandidaten fuer „Braucht
-     * dich“. Ob einer inzwischen erreicht ist, entscheiden die Zaehler und {@code reachedAt}.
+     * Milestones of active goals that are due by {@code until} – the candidates for "Braucht
+     * dich". Whether one has been reached in the meantime is decided by the counters and {@code reachedAt}.
      */
     @Query(SUMMARY + "FROM GoalMilestone m, Goal g WHERE g.id = m.goalId AND g.status = 'ACTIVE' "
          + "AND m.dueDate <= :until ORDER BY m.dueDate ASC")

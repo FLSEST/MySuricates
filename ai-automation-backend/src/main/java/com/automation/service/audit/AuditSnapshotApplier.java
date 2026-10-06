@@ -17,16 +17,16 @@ import java.time.Instant;
 import java.util.*;
 
 /**
- * Uebernimmt die Findings eines gueltigen Audit-Reports in den Bestand: gleicht jedes Finding per
- * Fingerprint ab, oeffnet oder bewertet bekannte neu, haelt Vorkommen und verwaltete TODOs nach und
- * setzt auf RESOLVED, was der Snapshot nicht mehr enthaelt — eingeordnete Befunde nach den Regeln von
- * {@link AuditDispositionLifecycle}.
+  * Takes over the findings of a valid audit report into the stock: matches each finding by
+  * fingerprint, reopens or re-evaluates known ones, maintains occurrences and managed TODOs, and
+  * sets to RESOLVED whatever the snapshot no longer contains — triaged findings according to the rules of
+  * {@link AuditDispositionLifecycle}.
  *
- * <p>Umzug aus {@code AuditIngestionService} (Audit-TODO aac5fbf7): Der Service prueft und speichert
- * den Report, hier wird er angewendet — innerhalb der Transaktion von
- * {@link AuditIngestionService#ingest}, eigene Transaktionsgrenzen gibt es hier bewusst nicht.
- * Rumpf von {@code ingestSnapshot} (hier {@link #apply}) und Activity-Log-Texte unveraendert, samt
- * Quelle {@code "AuditIngestionService"}.
+  * <p>Moved out of {@code AuditIngestionService} (audit TODO aac5fbf7): the service validates and stores
+  * the report, here it is applied — within the transaction of
+  * {@link AuditIngestionService#ingest}, there are deliberately no transaction boundaries of their own here.
+  * Body of {@code ingestSnapshot} (here {@link #apply}) and activity log texts unchanged, including
+  * source {@code "AuditIngestionService"}.
  */
 @Slf4j
 @Service
@@ -41,9 +41,9 @@ class AuditSnapshotApplier {
     private final AuditDispositionLifecycle dispositionLifecycle;
 
     /**
-     * Bestand und Vorkommen dieses Reports werden einmal geladen, Findings und Vorkommen gesammelt
-     * gespeichert (3deaee34) — vorher je Finding eine Fingerprint-Suche, ein exists und zwei save.
-     * Die Regeln je Finding sind dieselben geblieben.
+     * Stock and occurrences of this report are loaded once, findings and occurrences are saved
+     * collectively (3deaee34) — previously per finding a fingerprint lookup, an exists and two saves.
+     * The rules per finding have stayed the same.
      */
     void apply(WorkflowRunCompletedEvent event, AuditReport report,
                List<ParsedFinding> parsedFindings, Set<String> factNames) {
@@ -86,16 +86,16 @@ class AuditSnapshotApplier {
 
         List<AuditFinding> absent = known.stream()
                 .filter(finding -> !seenFingerprints.contains(finding.getFingerprint())).toList();
-        // Vor dem Speichern und vor ensureAll: ein Nachfolger, der eine Einordnung erbt, bekommt kein TODO.
+        // Before saving and before ensureAll: a successor that inherits a triage gets no TODO.
         List<AuditFinding> superseded = dispositionLifecycle.inheritOnRuleChange(created, absent, observedAt);
 
         List<AuditFinding> saved = applied.isEmpty() ? List.of() : findingRepository.saveAll(applied);
         List<AuditFinding> touched = new ArrayList<>(saved);
         recordOccurrences(saved, appliedItems, report, observedAt);
-        // Nur offene Findings bekommen ein verwaltetes TODO: akzeptierte/verworfene Risiken und
-        // Wiedervorlagen (AWAITING_VERIFICATION nach Verfall) loesen keinen Fix-Loop aus.
-        // Ein unbelegtes Finding ebenfalls nicht — es bleibt sichtbar, kostet aber keine
-        // Arbeitszeit mehr, bis sein Beleg stimmt (TODO a94b56a0).
+        // Only open findings get a managed TODO: accepted/dismissed risks and
+        // resubmissions (AWAITING_VERIFICATION after expiry) trigger no fix loop.
+        // An unsubstantiated finding neither — it stays visible but no longer costs
+        // working time until its evidence holds (TODO a94b56a0).
         managedTodoWriter.ensureAll(saved.stream()
                 .filter(finding -> ManagedTodoWriter.needsTodo(finding.getSeverity())
                         && finding.getStatus() == AuditFindingStatus.OPEN
@@ -113,14 +113,14 @@ class AuditSnapshotApplier {
                 resolved.add(finding);
             }
         }
-        // Eingeordnete schliesst die Abwesenheit nicht sofort: nur bei ausgemusterter Regel oder nach
-        // mehreren Laeufen ohne Wiedersehen (b2e3da6a, 276ac76f).
+        // Absence does not close triaged ones immediately: only for a retired rule or after
+        // several runs without a re-sighting (b2e3da6a, 276ac76f).
         resolved.addAll(dispositionLifecycle.retireAbsent(absent, report, factNames, observedAt));
         if (!resolved.isEmpty()) touched.addAll(findingRepository.saveAll(resolved));
         managedTodoWriter.reconcile(touched);
     }
 
-    /** Ein bekanntes Finding taucht wieder auf: zurueck ins Offene, Akzeptanz neu bewerten. */
+    /** A known finding reappears: back to open, re-evaluate acceptance. */
     private void reopen(AuditFinding finding, ParsedFinding item, Instant observedAt) {
         if (finding.getStatus() == AuditFindingStatus.RESOLVED) {
             finding.setRegressionCount(finding.getRegressionCount() + 1);
@@ -136,17 +136,17 @@ class AuditSnapshotApplier {
         }
     }
 
-    /** Die Felder, die jeder Ingest neu setzt. */
+    /** The fields that every ingest sets anew. */
     private void update(AuditFinding finding, ParsedFinding item, AuditRuleKeyCatalog.Resolution resolution,
                         WorkflowRunCompletedEvent event, AuditReport report, Set<String> factNames,
                         Instant observedAt) {
-        // subject ist reines Anzeigeattribut — der neueste Wert gewinnt, der Fingerprint haengt
-        // an seiner normalisierten Form und bleibt dadurch ueber Drift hinweg stabil.
+        // subject is a pure display attribute — the newest value wins, the fingerprint hangs
+        // on its normalized form and thereby stays stable across drift.
         finding.setSubject(item.subject());
-        // Bei jedem Ingest neu gesetzt, in beide Richtungen: ergaenzt der Katalog den Key,
-        // faellt die Markierung beim naechsten Lauf von selbst weg (TODO ffa6d846).
+        // Set anew on every ingest, in both directions: if the catalog adds the key,
+        // the marker drops by itself on the next run (TODO ffa6d846).
         finding.setUnknownRuleKey(resolution.unknown());
-        // Ebenso bei jedem Ingest neu: nennt der Beleg einen Messwert dieses Laufs? (a94b56a0)
+        // Likewise anew on every ingest: does the evidence name a measured value of this run? (a94b56a0)
         boolean unverified = !EvidenceVerification.isSupported(item.evidence(), factNames);
         if (unverified && !finding.isUnverifiedEvidence()) {
             activityLog.warn(ActivityLog.LogCategory.EXECUTION,
@@ -166,7 +166,7 @@ class AuditSnapshotApplier {
         finding.setOccurrenceCount(finding.getOccurrenceCount() + 1);
     }
 
-    /** Ein Vorkommen je Finding und Report; was der Report schon hat, bleibt (eine Abfrage, ein saveAll). */
+    /** One occurrence per finding and report; what the report already has stays (one query, one saveAll). */
     private void recordOccurrences(List<AuditFinding> saved, List<ParsedFinding> items, AuditReport report,
                                    Instant observedAt) {
         if (saved.isEmpty()) return;
@@ -186,9 +186,9 @@ class AuditSnapshotApplier {
     }
 
     /**
-     * {@code audit_findings} zeigt ein {@code |} in ruleKey, subject und Titel als {@code ¦}, und ein Modell fuehrt
-     * den Befund genau so weiter. Gespeichert – und im Audit Center gezeigt – wird wieder das {@code |}
-     * (TODO 90c4f7db); die Identitaet ist ohnehin dieselbe ({@link #fingerprint}).
+     * {@code audit_findings} shows a {@code |} in ruleKey, subject and title as {@code ¦}, and a model carries
+     * the finding on exactly like that. What is stored – and shown in the Audit Center – is the {@code |} again
+     * (TODO 90c4f7db); the identity is the same anyway ({@link #fingerprint}).
      */
     private static ParsedFinding unmasked(ParsedFinding item) {
         return new ParsedFinding(AuditFindingsContext.unmask(item.ruleKey()), AuditFindingsContext.unmask(item.subject()),
@@ -197,10 +197,10 @@ class AuditSnapshotApplier {
     }
 
     /**
-     * Regeln, die das Repository oder ein Modul als Ganzes betreffen, haben im Katalog ein festes subject;
-     * das gilt, egal was das Modell schickt (TODO 802f740a). Vorher stand es nur als Bitte im Prompt, und
-     * ein abweichendes subject kam als Wiedergaenger ohne die Disposition des alten Befunds zurueck. Der
-     * feste Wert ist der, den der Prompt verlangt — ein Befund, der sich daran hielt, behaelt seine Identitaet.
+     * Rules that concern the repository or a module as a whole have a fixed subject in the catalog;
+     * it applies no matter what the model sends (TODO 802f740a). Previously it was only a request in the prompt, and
+     * a deviating subject came back as a revenant without the disposition of the old finding. The
+     * fixed value is the one the prompt demands — a finding that adhered to it keeps its identity.
      */
     private ParsedFinding withFixedSubject(AuditReport report, String ruleKey, ParsedFinding item) {
         String fixed = ruleKeyCatalog.fixedSubject(report.getAuditKey(), ruleKey);
@@ -214,9 +214,9 @@ class AuditSnapshotApplier {
     }
 
     /**
-     * Zwei Befunde eines Reports mit gleichem ruleKey und gleichem normalisierten subject haben eine
-     * Identitaet; nur der erste wird uebernommen. Das geschah frueher still — beim Architektur-Review
-     * fehlten so drei Findings, ohne dass es jemand merkte (TODO 94fda6ef).
+     * Two findings of a report with the same ruleKey and the same normalized subject have one
+     * identity; only the first is taken over. This used to happen silently — in the architecture review
+     * three findings were missing this way without anyone noticing (TODO 94fda6ef).
      */
     private void reportCollisions(WorkflowRunCompletedEvent event, AuditReport report, List<String> collisions) {
         if (collisions.isEmpty()) return;
@@ -229,10 +229,10 @@ class AuditSnapshotApplier {
     }
 
     /**
-     * Haelt die Regel-Identitaet stabil: ein gedrifteter {@code ruleKey} wird auf den Katalogeintrag
-     * normalisiert, ein unbekannter bleibt stehen (kein Datenverlust) und wird einmal je Run und Key
-     * im Activity-Log gemeldet — sonst faellt die Drift erst an den Wiedergaenger-Findings auf
-     * (Audit-TODO 8fc9a401).
+     * Keeps the rule identity stable: a drifted {@code ruleKey} is normalized to the catalog entry,
+     * an unknown one stays (no data loss) and is reported once per run and key
+     * in the activity log — otherwise the drift is only noticed on the revenant findings
+     * (audit TODO 8fc9a401).
      */
     private AuditRuleKeyCatalog.Resolution resolveRuleKey(WorkflowRunCompletedEvent event, AuditReport report,
                                                           ParsedFinding item, Set<String> reportedRuleKeys) {
@@ -248,11 +248,11 @@ class AuditSnapshotApplier {
     }
 
     /**
-     * Identitaet eines Findings: Projekt, Audit, Regel und das <em>normalisierte</em> subject
-     * ({@link AuditSubjectNormalizer}) — modellgenerierte Suffix-Drift im subject erzeugt damit
-     * keinen neuen Fingerprint mehr (Audit-TODO 0e19648d). Ein {@code ¦} in Regel oder subject zaehlt
-     * wie {@code |}: So zeigt {@code audit_findings} ein {@code |} in einem Feld, und ein Modell, das den
-     * Befund von dort weiterfuehrt, gibt es so wieder (TODO 90c4f7db).
+     * Identity of a finding: project, audit, rule and the <em>normalized</em> subject
+     * ({@link AuditSubjectNormalizer}) — model-generated suffix drift in the subject thus no longer creates
+     * a new fingerprint (audit TODO 0e19648d). A {@code ¦} in rule or subject counts
+     * like {@code |}: this is how {@code audit_findings} shows a {@code |} in a field, and a model that carries the
+     * finding on from there returns it that way (TODO 90c4f7db).
      */
     static String fingerprint(String projectId, String auditKey, String ruleKey, String subject) {
         try {

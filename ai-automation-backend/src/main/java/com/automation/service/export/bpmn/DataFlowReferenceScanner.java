@@ -16,48 +16,48 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Leitet deterministisch aus den Block-Configs ab, welche Block-Ausgabe in welchen Block fließt —
- * ohne Run, ohne KI. Grundlage des Datenfluss-Exports (Datenobjekte/-assoziationen).
+ * Derives deterministically from the block configs which block output flows into which block —
+ * without a run, without AI. Basis of the data flow export (data objects/associations).
  *
- * <p>Erkannte Formen (dieselbe Platzhalter-Schreibweise wie zur Laufzeit,
+ * <p>Recognized forms (same placeholder notation as at runtime,
  * {@link PlaceholderSyntax#PLACEHOLDER}):
  * <ul>
- *   <li>{@code {{ block.&lt;name&gt;.output }}} — Quelle ist der Block mit diesem Namen</li>
- *   <li>{@code {{ previous_output }}} — Quelle ist der unmittelbar vorhergehende Block</li>
- *   <li>{@code {{ step_&lt;N&gt;_output }}} — Quelle ist der Block mit Index N. <b>0-basiert</b>, wie
- *       {@code StepIndexCounter} die Step-Indizes vergibt und {@code BlockStepRunner} die Variable
- *       {@code step_&lt;stepIndex&gt;_output} setzt. N ist allerdings ein <em>Laufzeit</em>-Step-Index:
- *       Wrapper-Blöcke (foreach, while, retry) ziehen je Item/Iteration einen weiteren Index, danach
- *       stimmt die Zuordnung Step-Index → Blocklisten-Index nicht mehr. Steht einer dieser Typen
- *       in {@code blocks[0..N]}, wird die Referenz verworfen — lieber keine Kante als eine falsche.</li>
- *   <li>{@code source} der Komprimierungs-Blöcke ({@code compress}, {@code compress-ai}):
- *       Blockname oder {@code "previous"} (siehe {@code CompressionSources})</li>
+ *   <li>{@code {{ block.&lt;name&gt;.output }}} — source is the block with this name</li>
+ *   <li>{@code {{ previous_output }}} — source is the immediately preceding block</li>
+ *   <li>{@code {{ step_&lt;N&gt;_output }}} — source is the block with index N. <b>0-based</b>, as
+ *       {@code StepIndexCounter} assigns the step indices and {@code BlockStepRunner} sets the variable
+ *       {@code step_&lt;stepIndex&gt;_output}. N is, however, a <em>runtime</em> step index:
+ *       wrapper blocks (foreach, while, retry) draw a further index per item/iteration, after which
+ *       the mapping step index → block list index no longer holds. If one of these types is
+ *       in {@code blocks[0..N]}, the reference is discarded — better no edge than a wrong one.</li>
+ *   <li>{@code source} of the compression blocks ({@code compress}, {@code compress-ai}):
+ *       block name or {@code "previous"} (see {@code CompressionSources})</li>
  * </ul>
  *
- * <p>Ebenen: Gescannt werden alle String-Werte einer Block-Config rekursiv. Positionsbezogene
- * Platzhalter ({@code previous_output}, {@code step_N_output}) gelten nur für die <b>oberste
- * Ebene</b> — die unmittelbaren Werte der Config-Map. Weiter unten (Switch-Cases, verschachtelte
- * Blocklisten) meinen sie zur Laufzeit die innere Ebene, nicht die Top-Level-Blockliste; dort wird
- * deshalb ausschließlich {@code block.&lt;name&gt;.output} ausgewertet, dessen Namensraum flach ist.
+ * <p>Levels: all string values of a block config are scanned recursively. Position-based
+ * placeholders ({@code previous_output}, {@code step_N_output}) apply only to the <b>top
+ * level</b> — the immediate values of the config map. Further down (switch cases, nested
+ * block lists) they mean the inner level at runtime, not the top-level block list; there
+ * only {@code block.&lt;name&gt;.output} is therefore evaluated, whose namespace is flat.
  *
- * <p>Zweige (7557b928): Eine so gefundene Referenz zählt für den <em>Zweig-Block</em>, in dem sie
- * steht, nicht für den Switch — der wird zu einem Gateway, und BPMN erlaubt an Gateways keine
- * Datenassoziationen. Endpunkt ist deshalb der Task des Zweig-Blocks ({@link Endpoint#branchPath()},
- * Schreibweise in {@link BpmnBranchBlocks}). Umgekehrt ist ein benannter Case-Block auch eine
- * <em>Quelle</em>: seine Ausgabe ist zur Laufzeit als {@code block.&lt;name&gt;.output} ansprechbar
+ * <p>Branches (7557b928): a reference found this way counts for the <em>branch block</em> it
+ * is in, not for the switch — that becomes a gateway, and BPMN allows no data
+ * associations on gateways. The endpoint is therefore the task of the branch block ({@link Endpoint#branchPath()},
+ * notation in {@link BpmnBranchBlocks}). Conversely a named case block is also a
+ * <em>source</em>: its output is addressable at runtime as {@code block.&lt;name&gt;.output}
  * (12a3b244).
  *
- * <p>Weitere Grenzen (bewusst): Quellen müssen im Workflow <em>vor</em> dem konsumierenden
- * Top-Level-Block stehen — innerhalb desselben Switch entsteht also keine Kante, denn zur Laufzeit
- * läuft nur ein Zweig. Mehrdeutige (mehrfach vergebene) Blocknamen werden übersprungen, weil zur
- * Laufzeit nicht bestimmbar ist, welcher Block gemeint ist.
+ * <p>Further limits (deliberate): sources must be in the workflow <em>before</em> the consuming
+ * top-level block — within the same switch no edge arises, because at runtime
+ * only one branch runs. Ambiguous (multiply assigned) block names are skipped, because at
+ * runtime it cannot be determined which block is meant.
  */
 final class DataFlowReferenceScanner {
 
     /**
-     * Endpunkt einer Referenz: der Top-Level-Block {@code blockIndex} oder, für einen Block in
-     * einem seiner Zweige, dieser Zweig-Block. {@code branchPath} ist leer für den Block selbst und
-     * sonst der Id-Pfad relativ zum Top-Level-Block (z. B. {@code _c0_1}, {@code _default_0}).
+     * Endpoint of a reference: the top-level block {@code blockIndex} or, for a block in
+     * one of its branches, this branch block. {@code branchPath} is empty for the block itself and
+     * otherwise the id path relative to the top-level block (e.g. {@code _c0_1}, {@code _default_0}).
      */
     record Endpoint(int blockIndex, String branchPath) {
 
@@ -65,13 +65,13 @@ final class DataFlowReferenceScanner {
             return new Endpoint(blockIndex, "");
         }
 
-        /** Id-Basis des zugehörigen Knotens; {@code rootPrefix} ist das Präfix der Top-Level-Kette. */
+        /** Id base of the associated node; {@code rootPrefix} is the prefix of the top-level chain. */
         String idBase(String rootPrefix) {
             return BpmnBranchBlocks.member(rootPrefix, blockIndex) + branchPath;
         }
     }
 
-    /** Die Ausgabe von {@code source} fließt in {@code target}. */
+    /** The output of {@code source} flows into {@code target}. */
     record Reference(Endpoint source, Endpoint target) {
 
         Reference(int sourceIndex, int targetIndex) {
@@ -90,7 +90,7 @@ final class DataFlowReferenceScanner {
     private static final Pattern STEP_OUTPUT = Pattern.compile("step_(\\d{1,6})_output");
     private static final String BLOCK_PREFIX = "block.";
     private static final String OUTPUT_SUFFIX = ".output";
-    /** Block-Typen, die zur Laufzeit mehr als einen Step-Index verbrauchen. */
+    /** Block types that consume more than one step index at runtime. */
     private static final Set<String> WRAPPER_TYPES = Set.of("foreach", "while", "retry");
 
     private DataFlowReferenceScanner() {
@@ -107,8 +107,8 @@ final class DataFlowReferenceScanner {
             Endpoint self = Endpoint.topLevel(target);
             DataFlowConfigStrings texts = DataFlowConfigStrings.of(block.getConfig());
             for (String text : texts.direct()) {
-                // Ein Zweig-Kommando eines conditional endet an SEINEM Task, nicht am Gateway --
-                // dort erlaubt BPMN keine Datenassoziation, die Kante fiel weg (TODO 7557b928).
+                // A branch command of a conditional ends at ITS task, not at the gateway --
+                // BPMN allows no data association there, the edge was dropped (TODO 7557b928).
                 Endpoint endpoint = conditionalBranchEndpoint(block, text, target).orElse(self);
                 for (String key : PlaceholderSyntax.keysIn(text)) {
                     add(found, sourceOf(key, target, byName, blocks), endpoint);
@@ -116,7 +116,7 @@ final class DataFlowReferenceScanner {
             }
             List<BpmnBranchBlocks.Branch> branches = BpmnBranchBlocks.of(block);
             if (branches.isEmpty()) {
-                // Verschachtelte Werte ohne eigene Blöcke (z. B. integration-params) zählen für den Block.
+                // Nested values without blocks of their own (e.g. integration params) count for the block.
                 for (String text : texts.nested()) {
                     for (String key : PlaceholderSyntax.keysIn(text)) {
                         add(found, namedSource(key, byName), self);
@@ -136,19 +136,19 @@ final class DataFlowReferenceScanner {
     }
 
     /**
-     * Endet dieser Config-Text am Zweig-Task eines {@code conditional}?
+     * Does this config text end at the branch task of a {@code conditional}?
      *
-     * <p>{@code conditional} traegt seine Zweige als Kommandos, nicht als Blöcke
-     * ({@code then_command}/{@code else_command}), und der Export macht daraus die Tasks
-     * {@code _then} und {@code _else}. Eine Referenz darin gehoert an diesen Task; ohne die
-     * Unterscheidung landete sie beim conditional-Block selbst, also am Gateway, und wurde
-     * verworfen (TODO 7557b928). Andere direkte Werte des Blocks — vor allem {@code condition} —
-     * bleiben beim Block und damit weiter ohne Assoziation: Das ist die Notationsgrenze, keine
-     * Luecke.
+     * <p>{@code conditional} carries its branches as commands, not as blocks
+     * ({@code then_command}/{@code else_command}), and the export turns them into the tasks
+     * {@code _then} and {@code _else}. A reference in there belongs to this task; without the
+     * distinction it would land at the conditional block itself, i.e. at the gateway, and be
+     * discarded (TODO 7557b928). Other direct values of the block — above all {@code condition} —
+     * stay with the block and thus remain without association: that is the notation limit, not a
+     * gap.
      *
-     * <p>Die Ebenen-Semantik bleibt die des Blocks: Ein Zweig-Kommando ist ein direkter
-     * Config-Wert, also zaehlen dort auch {@code previous_output} und {@code step_N_output} —
-     * anders als in den verschachtelten Blocklisten eines Switch.
+     * <p>The level semantics stay those of the block: a branch command is a direct
+     * config value, so {@code previous_output} and {@code step_N_output} count there too —
+     * unlike in the nested block lists of a switch.
      */
     private static Optional<Endpoint> conditionalBranchEndpoint(BlockDefinition block, String text,
                                                                 int target) {
@@ -164,14 +164,14 @@ final class DataFlowReferenceScanner {
         return Optional.empty();
     }
 
-    /** Config-Schluessel des Zweig-Kommandos -> Id-Suffix seines Tasks (siehe BpmnGatewayBuilder). */
+    /** Config key of the branch command -> id suffix of its task (see BpmnGatewayBuilder). */
     private static final Map<String, String> CONDITIONAL_BRANCHES =
             Map.of("then_command", "_then", "else_command", "_else");
 
     /**
-     * Zweig-Blöcke eines Switch: jede Referenz endet am Task des Zweig-Blocks. Innerhalb eines
-     * Zweigs gilt durchgehend die Ebenen-Semantik — nur {@code block.<name>.output} und der
-     * Blockname als Komprimierungs-Quelle, nie positionsbezogene Platzhalter.
+     * Branch blocks of a switch: every reference ends at the task of the branch block. Within a
+     * branch the level semantics apply throughout — only {@code block.<name>.output} and the
+     * block name as compression source, never position-based placeholders.
      */
     private static void scanBranches(Set<Reference> found, List<BpmnBranchBlocks.Branch> branches,
                                      int target, Map<String, Endpoint> byName) {
@@ -179,8 +179,8 @@ final class DataFlowReferenceScanner {
             Endpoint self = new Endpoint(target, branch.path());
             DataFlowConfigStrings texts = DataFlowConfigStrings.of(branch.block().getConfig());
             List<String> own = new ArrayList<>(texts.direct());
-            // Ist der Zweig-Block selbst eine Verzweigung, stehen seine tieferen Werte schon als
-            // eigene Zweig-Blöcke in dieser Liste — sonst zählte dieselbe Referenz zweimal.
+            // If the branch block is itself a branching, its deeper values are already in this list
+            // as branch blocks of their own — otherwise the same reference would count twice.
             if (BpmnBranchBlocks.of(branch.block()).isEmpty()) {
                 own.addAll(texts.nested());
             }
@@ -194,16 +194,16 @@ final class DataFlowReferenceScanner {
     }
 
     private static void add(Set<Reference> found, Endpoint source, Endpoint target) {
-        // Nur Rückwärts-Referenzen: eine Quelle nach dem Ziel (oder im selben Top-Level-Block)
-        // liefert zur Laufzeit nichts, der Platzhalter bliebe literal stehen.
+        // Backward references only: a source after the target (or in the same top-level block)
+        // yields nothing at runtime, the placeholder would stay literal.
         if (source != null && source.blockIndex() >= 0 && source.blockIndex() < target.blockIndex()) {
             found.add(new Reference(source, target));
         }
     }
 
     /**
-     * Quelle eines Platzhalters auf der obersten Ebene (direkter Config-Wert des Blocks).
-     * {@code null}, wenn der Schlüssel keine Block-Ausgabe bezeichnet oder die Quelle nicht eindeutig ist.
+     * Source of a placeholder on the top level (direct config value of the block).
+     * {@code null} if the key does not designate a block output or the source is not unambiguous.
      */
     private static Endpoint sourceOf(String key, int target, Map<String, Endpoint> byName, List<BlockDefinition> blocks) {
         if ("previous_output".equals(key)) {
@@ -218,13 +218,13 @@ final class DataFlowReferenceScanner {
             return null;
         }
         int index = Integer.parseInt(step.group(1));
-        // step_N ist ein LAUFZEIT-Step-Index, kein Blocklisten-Index: Wrapper-Blöcke ziehen je Item
-        // bzw. Iteration einen weiteren Index (StepIndexCounter), danach zeigt N auf einen anderen
-        // Schritt als auf Block N. Statisch nicht auflösbar ⇒ lieber keine Kante als eine falsche.
+        // step_N is a RUNTIME step index, not a block list index: wrapper blocks draw a further index per item
+        // or iteration (StepIndexCounter), after which N points to a different
+        // step than block N. Not statically resolvable ⇒ better no edge than a wrong one.
         return hasWrapperUpTo(blocks, index) ? null : Endpoint.topLevel(index);
     }
 
-    /** Nur {@code block.<name>.output} — der einzige Platzhalter mit ebenen-unabhängigem Namensraum. */
+    /** Only {@code block.<name>.output} — the only placeholder with a level-independent namespace. */
     private static Endpoint namedSource(String key, Map<String, Endpoint> byName) {
         if (key.startsWith(BLOCK_PREFIX) && key.endsWith(OUTPUT_SUFFIX)
                 && key.length() > BLOCK_PREFIX.length() + OUTPUT_SUFFIX.length()) {
@@ -242,7 +242,7 @@ final class DataFlowReferenceScanner {
         return false;
     }
 
-    /** {@code source} von compress/compress-ai: Blockname oder {@code "previous"}. */
+    /** {@code source} of compress/compress-ai: block name or {@code "previous"}. */
     private static Endpoint compressionSource(BlockDefinition block, int target, Map<String, Endpoint> byName) {
         String value = compressionSourceValue(block);
         if (value == null) {
@@ -251,7 +251,7 @@ final class DataFlowReferenceScanner {
         return "previous".equals(value) ? Endpoint.topLevel(target - 1) : byName.get(value);
     }
 
-    /** Wie {@link #compressionSource}, aber ohne {@code "previous"} — das meint in einem Zweig die innere Ebene. */
+    /** Like {@link #compressionSource}, but without {@code "previous"} — in a branch that means the inner level. */
     private static Endpoint namedCompressionSource(BlockDefinition block, Map<String, Endpoint> byName) {
         String value = compressionSourceValue(block);
         return value == null || "previous".equals(value) ? null : byName.get(value);
@@ -267,9 +267,9 @@ final class DataFlowReferenceScanner {
     }
 
     /**
-     * Blockname → Endpunkt, über Top-Level-Blöcke <em>und</em> deren Zweig-Blöcke: der Namensraum
-     * von {@code block.<name>.output} ist zur Laufzeit flach (12a3b244). Mehrfach vergebene Namen
-     * fallen heraus (zur Laufzeit mehrdeutig).
+     * Block name → endpoint, over top-level blocks <em>and</em> their branch blocks: the namespace
+     * of {@code block.<name>.output} is flat at runtime (12a3b244). Multiply assigned names
+     * drop out (ambiguous at runtime).
      */
     private static Map<String, Endpoint> uniqueNameIndex(List<BlockDefinition> blocks) {
         Map<String, Endpoint> byName = new HashMap<>();

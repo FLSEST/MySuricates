@@ -17,13 +17,13 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Native todo-create block (TODO 9f6d7f14): legt ein TODO direkt über den
- * TodoService an — ersetzt die REST-Self-Calls (POST /api/v1/todos) aus
- * shell-Blöcken der Audit-Templates (Anti-Pattern: Pool-Block-Risiko).
+ * Native todo-create block (TODO 9f6d7f14): creates a TODO directly via the
+ * TodoService — replaces the REST self-calls (POST /api/v1/todos) from
+ * shell blocks of the audit templates (anti-pattern: pool block risk).
  *
- * Config: title (Pflicht, Template-fähig), description, priority (Default MEDIUM),
- * tags, project_id (Default: Kontext-Variable project_id), source (Default WORKFLOW),
- * source_agent, variable_name (Default todo_id — erhält die neue TODO-ID).
+ * Config: title (required, template-capable), description, priority (default MEDIUM),
+ * tags, project_id (default: context variable project_id), source (default WORKFLOW),
+ * source_agent, variable_name (default todo_id — receives the new TODO id).
  */
 @Component
 @RequiredArgsConstructor
@@ -42,7 +42,7 @@ public class TodoCreateBlockExecutor implements BlockExecutor {
                 throw new IllegalArgumentException("todo-create requires 'title' in config");
             }
             String description = TodoBlockSupport.resolved(context, config.get("description"));
-            // Template-fähig wie title: eine Verzweigung kann die Priorität liefern (Blaupause intake)
+            // Template-capable like title: a branch can supply the priority (blueprint intake)
             Todo.Priority priority = TodoBlockSupport.parsePriority(
                     TodoBlockSupport.resolved(context, config.get("priority")), Todo.Priority.MEDIUM);
             List<String> tags = TodoBlockSupport.parseTags(config.get("tags"));
@@ -57,7 +57,7 @@ public class TodoCreateBlockExecutor implements BlockExecutor {
             Todo created = todoService.create(new CreateTodoRequest(
                     title, description, Todo.Status.OPEN, priority, tags,
                     projectId, null, source, sourceAgent, null,
-                    null,   // agentSessionRef: ein Workflow-Block hat keine Agenten-Konversation
+                    null,   // agentSessionRef: a workflow block has no agent conversation
                     context.getWorkflowRunId(), null, null, null));
 
             String variableName = String.valueOf(config.getOrDefault("variable_name", "todo_id"));

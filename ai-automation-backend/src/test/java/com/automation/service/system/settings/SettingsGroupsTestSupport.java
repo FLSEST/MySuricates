@@ -4,7 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Consumer;
 
-/** Kleine Helfer für die Tests der RuntimeSettingsGroup-Klassen. */
+/** Small helpers for the tests of the RuntimeSettingsGroup classes. */
 final class SettingsGroupsTestSupport {
 
     private SettingsGroupsTestSupport() {}

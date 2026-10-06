@@ -74,18 +74,18 @@ app:
   build-timestamp: @maven.build.timestamp@
 
 automation:
-  # Wie Agenten auf diesem Rechner die Instanz erreichen — landet in den Texten, die MySuricates in
-  # Projekte schreibt (Onboarding-Profile). Der Installer setzt beides aus deploy/instances/<name>.env
-  # (scripts/instance.sh, deploy/compose.yml). Leer: http://localhost:<server.port>, Key-Datei direkt.
+  # How agents on this machine reach the instance — ends up in the texts that MySuricates writes into
+  # projects (onboarding profiles). The installer sets both from deploy/instances/<name>.env
+  # (scripts/instance.sh, deploy/compose.yml). Empty: http://localhost:<server.port>, key file directly.
   instance:
     url: ${AUTOMATION_INSTANCE_URL:}
-    # Name des Containers, in dem das Backend läuft — die Key-Datei gibt es dann nur darin.
+    # Name of the container the backend runs in — the key file then exists only there.
     container: ${AUTOMATION_INSTANCE_CONTAINER:}
-  # Optionale Module — nur beim Start gelesen, bewusst nicht per REST umschaltbar.
-  # preset: core (nur Kern) | research (+ chains, assistant, learning, memory, audit, bpmn) | full (alles)
-  # Einzel-Override schlägt das Preset: automation.modules.<name>: true|false
-  #   (Env: AUTOMATION_MODULES_<NAME>, z. B. AUTOMATION_MODULES_REMOTE_ACCESS=true)
-  # Katalog und Abhängigkeiten: com.automation.modules.ModuleCatalog, Settings → "Module & Härtung"
+  # Optional modules — read only at startup, deliberately not switchable via REST.
+  # preset: core (core only) | research (+ chains, assistant, learning, memory, audit, bpmn) | full (everything)
+  # An individual override beats the preset: automation.modules.<name>: true|false
+  #   (env: AUTOMATION_MODULES_<NAME>, e.g. AUTOMATION_MODULES_REMOTE_ACCESS=true)
+  # Catalog and dependencies: com.automation.modules.ModuleCatalog, Settings → "Module & Härtung"
   modules:
     preset: ${AUTOMATION_MODULES_PRESET:core}
     # true = feature modules can also be switched under Settings → Modules & hardening; applies
@@ -94,52 +94,52 @@ automation:
     # (tokens), remote access or the run terminal (host access). Keep it off on publicly reachable
     # instances. Templates: config-examples/application-minimal.yml / application-maximal.yml
     ui-editable: ${AUTOMATION_MODULES_UI_EDITABLE:false}
-  # Optionale Workflow-Härtung — unabhängig vom Preset, gleiche Regeln (nur Startkonfig).
-  # provenance (Default true) · sealing · require-sealed-for-unattended · require-signed-seal · webhook-signatures
-  # · private-network-guard (Default true: iCal/RSS-Feed rufen keine lokalen/privaten Adressen ab)
-  # · private-network-guard-http-api (Default false: dieselbe Sperre für http-api, das eigene Netz bleibt sonst erreichbar)
-  # · private-network-guard-own-services (Default false: dieselbe Sperre für CalDAV, Gitea, GitLab, ntfy, Webhook-Benachrichtigungen)
+  # Optional workflow hardening — independent of the preset, same rules (startup config only).
+  # provenance (default true) · sealing · require-sealed-for-unattended · require-signed-seal · webhook-signatures
+  # · private-network-guard (default true: iCal/RSS feeds do not fetch local/private addresses)
+  # · private-network-guard-http-api (default false: the same block for http-api, the own network stays reachable otherwise)
+  # · private-network-guard-own-services (default false: the same block for CalDAV, Gitea, GitLab, ntfy, webhook notifications)
   # hardening:
   #   sealing: true
-  #   require-signed-seal: true    # Siegel ohne gültige Signatur lehnen ihre Runs ab
+  #   require-signed-seal: true    # Seals without a valid signature make their runs get refused
   seal:
-    key-file: ${AUTOMATION_SEAL_KEY_FILE:${automation.data-home}/seal-signing.key}    # HMAC-Key für Siegel — nie in der DB neben dem Siegelwert
+    key-file: ${AUTOMATION_SEAL_KEY_FILE:${automation.data-home}/seal-signing.key}    # HMAC key for seals — never in the DB next to the seal value
   discovery:
     auto-tagging-enabled: ${AUTOMATION_DISCOVERY_AUTO_TAGGING_ENABLED:true}
     semantic-enabled: ${AUTOMATION_DISCOVERY_SEMANTIC_ENABLED:true}
   integration:
-    key-file: ${AUTOMATION_INTEGRATION_KEY_FILE:${automation.data-home}/integration-encryption.key}    # AES-Key für Integration-Credentials — nie in der DB neben dem Ciphertext
+    key-file: ${AUTOMATION_INTEGRATION_KEY_FILE:${automation.data-home}/integration-encryption.key}    # AES key for integration credentials — never in the DB next to the ciphertext
   autopilot:
-    project-id: ${AUTOMATION_AUTOPILOT_PROJECT_ID:}    # Optional: UUID des Autopilot-Projekts für Health-Auto-Todos (leer = kein Project-Bezug)
+    project-id: ${AUTOMATION_AUTOPILOT_PROJECT_ID:}    # Optional: UUID of the Autopilot project for health auto-todos (empty = no project reference)
   cli:
     host-home: ${AUTOMATION_HOST_HOME:}    # Default: System.getProperty("user.home")
     host-uid: ${AUTOMATION_HOST_UID:}      # Default: detected via 'id -u'
     skip-permissions: ${AUTOMATION_CLI_SKIP_PERMISSIONS:true}
     allowed-tools: ${AUTOMATION_CLI_ALLOWED_TOOLS:}
   cors:
-    # Nur die Dev-Server auf diesem Rechner. Mit dem Modul remote-access kommen die eigene
-    # Tailscale-IP und der eigene MagicDNS-Name automatisch dazu (a8056256) — fremde Tailnets nicht.
+    # Only the dev servers on this machine. With the remote-access module, the own
+    # Tailscale IP and the own MagicDNS name are added automatically (a8056256) — foreign tailnets are not.
     allowed-origins: ${AUTOMATION_CORS_ORIGINS:http://localhost:3000,http://localhost:5173,https://localhost:3000,https://localhost:5173}
   workspace:
     root: ${AUTOMATION_WORKSPACE_ROOT:}
-  # Isolierte Run-Checkouts (Workflow-Option workspace.mode: isolated, RunWorkspaceService). Leer:
-  # ~/.mysuricates/workspaces wie bisher (auch bei ~/.autotrigger als Datenordner), dort räumt
-  # scripts/tools/prune-workspaces.py auf. Ein fortgesetzter Lauf bleibt unter der Wurzel, unter der er begann.
+  # Isolated run checkouts (workflow option workspace.mode: isolated, RunWorkspaceService). Empty:
+  # ~/.mysuricates/workspaces as before (also with ~/.autotrigger as data folder), where
+  # scripts/tools/prune-workspaces.py cleans up. A resumed run stays under the root under which it began.
   run-workspace:
     root: ${AUTOMATION_RUN_WORKSPACE_ROOT:}
   security:
     enabled: ${AUTOMATION_SECURITY_ENABLED:true}
     api-key: ${AUTOMATION_API_KEY:}
-    # Hierhin schreibt das Backend den (erzeugten) Key; die Installer-Skripte lesen ihn dort
-    # (scripts/lib/data-home.sh). Nur Tests lenken ihn um (application-integration.yml).
+    # The backend writes the (generated) key here; the installer scripts read it there
+    # (scripts/lib/data-home.sh). Only tests redirect it (application-integration.yml).
     api-key-file: ${automation.data-home}/api-key
     trusted-proxies: ${AUTOMATION_TRUSTED_PROXIES:127.0.0.1,::1}
     rate-limit:
       enabled: ${AUTOMATION_RATE_LIMIT_ENABLED:true}
       requests-per-minute: ${AUTOMATION_RATE_LIMIT_RPM:120}
-      # Backoff-Budget des Browser-Clients. Geht über GET /api/v1/system/info an ihn; ohne diese
-      # Werte nimmt er seine eingebauten Konstanten (2 s / 10 s) — auf einer Instanz mit anderem
-      # Limit wären die geraten (37b98c97).
+      # Backoff budget of the browser client. Goes to it via GET /api/v1/system/info; without these
+      # values it uses its built-in constants (2 s / 10 s) — on an instance with a different
+      # limit those would be guesses (37b98c97).
       client-global-backoff-seconds: ${AUTOMATION_RATE_LIMIT_CLIENT_GLOBAL_BACKOFF_SECONDS:2}
       client-default-retry-after-seconds: ${AUTOMATION_RATE_LIMIT_CLIENT_DEFAULT_RETRY_AFTER_SECONDS:10}
   websocket:
@@ -169,17 +169,17 @@ automation:
     codex-reserved-for-interactive: ${AUTOMATION_CODEX_RESERVED_INTERACTIVE:1}
     codex-inter-call-delay-ms: ${AUTOMATION_CODEX_INTER_CALL_DELAY_MS:0}
   model-catalog:
-    ttl-seconds: ${AUTOMATION_MODEL_CATALOG_TTL:600}              # Cache für host-entdeckte Modell-Listen (pi/codex); Laufzeit-Setting model-catalog-ttl-seconds
+    ttl-seconds: ${AUTOMATION_MODEL_CATALOG_TTL:600}              # Cache for host-discovered model lists (pi/codex); runtime setting model-catalog-ttl-seconds
     probe-timeout-seconds: ${AUTOMATION_MODEL_CATALOG_PROBE_TIMEOUT:15}
   task-command:
-    timeout-seconds: ${AUTOMATION_TASK_COMMAND_TIMEOUT:60}    # Timeout für einen `task`-CLI-Aufruf (Taskwarrior-Integration)
+    timeout-seconds: ${AUTOMATION_TASK_COMMAND_TIMEOUT:60}    # Timeout for one `task` CLI call (Taskwarrior integration)
   todo-trigger:
     poll-interval-ms: ${AUTOMATION_TODO_TRIGGER_POLL_MS:300000}
-    # Pausiert den TodoTrigger-Mechanismus (Backlog-Poll UND Event-Pfad) bis zu diesem
-    # ISO-Instant — das Gegenstueck zu automation.scheduler.skip-until, mit dem zusammen
-    # eine komplette Trigger-Pause aus zwei Zeilen besteht. Bewusst ein Datum statt eines
-    # Flags: es laeuft von selbst aus, waehrend ein vergessenes enabled=false den
-    # Self-Improvement-Loop stumm stillstehen laesst. Leer = keine Pause.
+    # Pauses the TodoTrigger mechanism (backlog poll AND event path) until this
+    # ISO instant — the counterpart of automation.scheduler.skip-until, which together with it
+    # makes up a complete trigger pause in two lines. Deliberately a date instead of a
+    # flag: it expires on its own, whereas a forgotten enabled=false lets the
+    # self-improvement loop stand silently still. Empty = no pause.
     skip-until: ${AUTOMATION_TODO_TRIGGER_SKIP_UNTIL:}
   scheduler:
     skip-until: ${AUTOMATION_SCHEDULER_SKIP_UNTIL:}
@@ -205,12 +205,12 @@ automation:
     # has no tag, against the image's bare name or any of its tags.
     # Example: "automation-agent-devops:latest,automation-agent-python,ghcr.io/myorg/"
     allowed-container-images: ${AUTOMATION_ALLOWED_CONTAINER_IMAGES:}
-    # Ghost-Run-Watchdog: maximal tolerierte Zeit zwischen save(RUNNING) und register().
-    # Muss laenger sein als der laengste legitime Semaphore-Wait + Container-Init.
+    # Ghost-run watchdog: maximum tolerated time between save(RUNNING) and register().
+    # Must be longer than the longest legitimate semaphore wait + container init.
     ghost-watchdog-stale-minutes: ${AUTOMATION_GHOST_WATCHDOG_STALE:30}
-    # Unterbrochene Runs nach Neustart/Standby automatisch fortsetzen – nur Workflows mit
-    # metadata.autoResume.enabled, hoechstens einmal je Run, nacheinander mit delay-seconds Abstand.
-    # Zur Laufzeit ueber die Einstellungen (run-auto-resume-enabled / run-auto-resume-delay-seconds).
+    # Resume interrupted runs automatically after restart/standby – only workflows with
+    # metadata.autoResume.enabled, at most once per run, one after another with a delay-seconds gap.
+    # At runtime via the settings (run-auto-resume-enabled / run-auto-resume-delay-seconds).
     auto-resume:
       enabled: ${AUTOMATION_AUTO_RESUME_ENABLED:true}
       delay-seconds: ${AUTOMATION_AUTO_RESUME_DELAY_SECONDS:30}
@@ -219,7 +219,7 @@ automation:
     # delete buttons. Startup-only (no REST/settings switch). Retention/cleanup jobs are not affected
     # (set automation.run.retention.retention-days to 0 to keep every finished run).
     allow-delete: ${AUTOMATION_EXECUTIONS_ALLOW_DELETE:true}
-  # Live-Output laufender Blöcke (Shell-Zeilen, KI-Tool-Aufrufe) im Run-Log; nur im Speicher (LiveLogConfig)
+  # Live output of running blocks (shell lines, AI tool calls) in the run log; in memory only (LiveLogConfig)
   live-log:
     enabled: ${AUTOMATION_LIVE_LOG_ENABLED:true}
     max-line-length: 2000
@@ -247,13 +247,13 @@ automation:
     test-compose-file: ${AUTOMATION_TEST_COMPOSE:docker-compose.test.yml}
     test-container-name: ${AUTOMATION_TEST_CONTAINER:mysuricates-test}
     test-health-url: ${AUTOMATION_TEST_HEALTH_URL:http://localhost:8090/api/v1/system/health}
-    # Stable/Test werden nicht mehr automatisch mit dem Dev-Backend hochgefahren,
-    # sondern bewusst per Desktop-Icon bzw. ./scripts/staging.sh gestartet.
-    # Zum Reaktivieren: AUTOMATION_STAGING_AUTO_START / AUTOMATION_TEST_AUTO_START=true.
+    # Stable/Test are no longer started automatically with the dev backend,
+    # but deliberately via desktop icon or ./scripts/staging.sh.
+    # To reactivate: AUTOMATION_STAGING_AUTO_START / AUTOMATION_TEST_AUTO_START=true.
     auto-start: ${AUTOMATION_STAGING_AUTO_START:false}
     test-auto-start: ${AUTOMATION_TEST_AUTO_START:false}
-    # Gestufter Betrieb (setup.sh --mode staged, TODO 84a78bb7): Dev kennt Test und Prod über URL und
-    # Key-Datei; beides schreibt der Installer in deploy/instances/dev.env. Leer = kein Ziel.
+    # Staged operation (setup.sh --mode staged, TODO 84a78bb7): dev knows test and prod via URL and
+    # key file; the installer writes both into deploy/instances/dev.env. Empty = no target.
     targets:
       test:
         url: ${AUTOMATION_SYNC_TEST_URL:}

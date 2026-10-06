@@ -60,8 +60,8 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 /**
- * Das Audit Center: Uebersicht, Historie, Findings und ihre TODO-Verknuepfungen. Loesen einer
- * Verknuepfung laesst keinen Verweis zurueck.
+ * The Audit Center: overview, history, findings and their TODO links. Unlinking a
+ * link leaves no reference behind.
  */
 @ExtendWith(MockitoExtension.class)
 class AuditCenterServiceTest {
@@ -193,7 +193,7 @@ class AuditCenterServiceTest {
         assertThat(summary.trend()).isEqualTo("REGRESSED");
     }
 
-    /** Die Uebersicht laedt weder Report-Markdown noch Findings je Audit (TODO 3d7e3987). */
+    /** The overview loads neither report Markdown nor findings per audit (TODO 3d7e3987). */
     @Test
     void listAudits_usesOneReportProjectionAndOneFindingCount_forAnyNumberOfAudits() {
         Instant now = Instant.now();
@@ -267,7 +267,7 @@ class AuditCenterServiceTest {
         verify(reportRepository, never()).findById(any());
     }
 
-    /** Den Text liefert der einzelne Bericht, samt Provider, Modell und Version aus dem Kopf. */
+    /** The text is delivered by the single report, including provider, model and version from the head. */
     @Test
     void getReport_returnsTheReportWithItsTextOr404() {
         AuditReport stored = report("r-1", "p-1", "a.health", GateStatus.GREEN, AuditIngestionStatus.VALID, Instant.now());
@@ -289,8 +289,8 @@ class AuditCenterServiceTest {
     }
 
     /**
-     * Herkunft je Report (TODO a3b89355): Ketteneintrag mit Kette und Zeitplan der Kette, direkter Lauf,
-     * Kettenlauf von vor V89, geloeschter Lauf — fuer die ganze Seite je eine Abfrage, nicht je Report.
+     * Origin per report (TODO a3b89355): chain entry with chain and the chain's schedule, direct run,
+     * chain run from before V89, deleted run — one query for the whole page, not one per report.
      */
     @Test
     void listReports_resolvesTheOriginOfEveryReport_withOneQueryPerKind() {
@@ -354,7 +354,7 @@ class AuditCenterServiceTest {
         verifyNoMoreInteractions(occurrenceRepository, runProjections, chainRunRepository, versionRepository);
     }
 
-    /** Die Kette ist geloescht (samt Chain-Runs): der Lauf behaelt seinen chainRunId, Name und Zeitplan fehlen. */
+    /** The chain is deleted (with its chain runs): the run keeps its chainRunId, name and schedule are missing. */
     @Test
     void getReport_chainGone_keepsTheChainRunIdAndTheStarterButNamesNothing() {
         when(reportRepository.findById("r-1")).thenReturn(Optional.of(
@@ -374,8 +374,8 @@ class AuditCenterServiceTest {
     }
 
     /**
-     * Kein lesbarer Eltern-Ausloeser — der Kontext war kein gueltiges JSON oder nannte keinen bekannten
-     * Ausloeser: der Ketteneintrag bleibt CHAIN, samt Kette und deren Zeitplan.
+     * No readable parent trigger — the context was not valid JSON or named no known
+     * trigger: the chain entry stays CHAIN, with chain and its schedule.
      */
     @Test
     void getReport_unreadableParentSource_fallsBackToChain() {
@@ -393,7 +393,7 @@ class AuditCenterServiceTest {
         assertThat(report.scheduleId()).isEqualTo("sched-chain");
     }
 
-    /** Ohne Ketten und Versionen auf der Seite fragt die Aufloesung dort gar nicht erst nach. */
+    /** Without chains and versions on the page the resolution does not even query there. */
     @Test
     void listReports_withoutChainsOrVersions_asksNeitherChainRunsNorVersions() {
         AuditReport manual = report("r-1", "p-1", "a.health", GateStatus.GREEN, AuditIngestionStatus.VALID, Instant.now());
@@ -462,8 +462,8 @@ class AuditCenterServiceTest {
         assertThat(page.content().getFirst().todos()).isEmpty();
         ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
         verify(findingRepository).findAll(any(Specification.class), pageable.capture());
-        // Nicht per Sort.by("severity"): das sortiert den Enum-Text alphabetisch (LOW vor MEDIUM).
-        // Die Rangfolge steht in der Specification; belegt gegen SQLite in
+        // Not via Sort.by("severity"): that sorts the enum text alphabetically (LOW before MEDIUM).
+        // The ranking is in the Specification; proven against SQLite in
         // AuditFindingSeverityOrderIntegrationTest (TODO f4ddc836).
         assertThat(pageable.getValue().getSort().isUnsorted()).isTrue();
     }
@@ -476,11 +476,11 @@ class AuditCenterServiceTest {
         when(findingRepository.findById(FINDING_ID)).thenReturn(Optional.of(finding));
         when(findingRepository.save(finding)).thenReturn(finding);
         when(findingTodoRepository.findByFindingId(FINDING_ID)).thenReturn(List.of(link));
-        // Der Abgleich laedt TODOs, Verknuepfungen und Findings gebuendelt (8c791a45) ...
+        // The reconciliation loads TODOs, links and findings in bulk (8c791a45) ...
         when(todoRepository.findAllById(List.of(TODO_ID))).thenReturn(List.of(todo));
         when(findingTodoRepository.findByTodoIdIn(Set.of(TODO_ID))).thenReturn(List.of(link));
         when(findingRepository.findAllById(List.of(FINDING_ID))).thenReturn(List.of(finding));
-        // ... die Antwort danach die Verknuepfungen fuer die Anzeige.
+        // ... the response afterwards the links for display.
         when(findingTodoRepository.findByFindingIdIn(List.of(FINDING_ID))).thenReturn(List.of());
         when(todoRepository.findAllById(List.of())).thenReturn(List.of());
 
@@ -525,7 +525,7 @@ class AuditCenterServiceTest {
         assertThat(response.dispositionNote()).isEqualTo("nur eine Notiz");
     }
 
-    // --- TODO-Verknuepfungen ---
+    // --- TODO links ---
 
     @Test
     void createManagedTodo_createsTodoLinkAndEvent() {
@@ -639,7 +639,7 @@ class AuditCenterServiceTest {
         verify(findingRepository, never()).findById(any());
     }
 
-    /** {@code [reportId, count]}-Zeilen wie aus {@code countByReportIds}: abwechselnd Id und Anzahl. */
+    /** {@code [reportId, count]} rows as from {@code countByReportIds}: alternating id and count. */
     private static List<Object[]> countRows(Object... idsAndCounts) {
         List<Object[]> rows = new java.util.ArrayList<>();
         for (int i = 0; i < idsAndCounts.length; i += 2) {

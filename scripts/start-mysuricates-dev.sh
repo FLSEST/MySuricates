@@ -1,39 +1,39 @@
 #!/usr/bin/env bash
-# start-mysuricates-dev.sh — startet/stoppt das Dev-Backend (:9090) und den Vite-Dev-Server (:3000).
+# start-mysuricates-dev.sh — starts/stops the dev backend (:9090) and the Vite dev server (:3000).
 #
-#   scripts/start-mysuricates-dev.sh [start] [--rebuild] [--show-key]   # idempotent, Default
-#   scripts/start-mysuricates-dev.sh stop                                # nur Backend
-#   scripts/start-mysuricates-dev.sh restart [--force]                   # Backend: stop -> JAR bauen -> start;
-#                                                                        # Frontend nur, falls es nicht laeuft
-#   scripts/start-mysuricates-dev.sh build                               # nur Runtime-JAR bauen (setup.sh), startet nichts
-#   scripts/start-mysuricates-dev.sh [start|stop|restart|build] --container  # Backend im Docker-Container
+#   scripts/start-mysuricates-dev.sh [start] [--rebuild] [--show-key]   # idempotent, default
+#   scripts/start-mysuricates-dev.sh stop                                # backend only
+#   scripts/start-mysuricates-dev.sh restart [--force]                   # backend: stop -> build JAR -> start;
+#                                                                        # frontend only if it is not running
+#   scripts/start-mysuricates-dev.sh build                               # only build the runtime JAR (setup.sh), starts nothing
+#   scripts/start-mysuricates-dev.sh [start|stop|restart|build] --container  # backend in the Docker container
 #
-# --container: Dockerfile.stable kompiliert nichts, es kopiert das JAR aus target/. restart baut es
-# deshalb vorher immer (mvn clean package), start nur mit --rebuild oder wenn keins liegt, build nur das.
+# --container: Dockerfile.stable compiles nothing, it copies the JAR from target/. restart therefore
+# always builds it beforehand (mvn clean package), start only with --rebuild or if none exists, build only that.
 #
-# Das Backend laeuft NICHT aus target/classes (mvn spring-boot:run), sondern aus einer JAR-Kopie unter
-# ${STATE_DIR}/runtime/current.jar. Grund: Eine JVM mit -cp target/classes liest Klassen lebenslang lazy
-# von Platte; jeder Maven-Lauf im Haupt-Checkout und jeder IDE-Build (VS Code Java / Eclipse-Compiler)
-# schreibt das Verzeichnis um und toetet die laufende JVM spaeter mit NoClassDefFoundError
-# (Vorfaelle 2026-07-27 und 2026-09-13). Aus der Kopie kann kein Build mehr etwas wegziehen.
-# `restart` prueft vorher ueber die API, ob Workflow-Runs laufen (CLAUDE.md-Regel), und bricht dann ab.
+# The backend does NOT run from target/classes (mvn spring-boot:run), but from a JAR copy under
+# ${STATE_DIR}/runtime/current.jar. Reason: a JVM with -cp target/classes reads classes lazily
+# from disk for its whole life; every Maven run in the main checkout and every IDE build (VS Code Java / Eclipse compiler)
+# rewrites the directory and later kills the running JVM with NoClassDefFoundError
+# (incidents 2026-07-27 and 2026-09-13). From the copy no build can pull anything away anymore.
+# `restart` first checks via the API whether workflow runs are running (CLAUDE.md rule), and aborts then.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
-# Mounts fuer den Dev-Container: nur, was es auf diesem Rechner gibt (gemeinsam mit deploy/).
+# Mounts for the dev container: only what exists on this machine (shared with deploy/).
 # shellcheck source=lib/host-mounts.sh
 . "${SCRIPT_DIR}/lib/host-mounts.sh"
-# Backend und Vite fragen: nie ueber einen Proxy aus der Umgebung, der Key nur ueber stdin (bb4f60a5).
+# Query backend and Vite: never via a proxy from the environment, the key only via stdin (bb4f60a5).
 # shellcheck source=lib/local-curl.sh
 . "${SCRIPT_DIR}/lib/local-curl.sh"
-# api_key(): Env -> Key-Datei, nie die DB (fff23a6c).
+# api_key(): env -> key file, never the DB (fff23a6c).
 # shellcheck source=lib/api-key.sh
 . "${SCRIPT_DIR}/lib/api-key.sh"
 
 COMMAND="start"
-# Betriebsart des Backends: host (Default, java -jar) oder container (docker compose).
-# Der Host-Weg bleibt unveraendert; der Container-Weg ist additiv (TODO a1236a64).
+# Operating mode of the backend: host (default, java -jar) or container (docker compose).
+# The host path stays unchanged; the container path is additive (TODO a1236a64).
 RUNTIME_MODE="${MYSURICATES_DEV_RUNTIME:-host}"
 SHOW_KEY=0
 FORCE=0
@@ -41,21 +41,21 @@ REBUILD=0
 for arg in "$@"; do
   case "$arg" in
     start|stop|restart|build) COMMAND="$arg" ;;
-    --show-key) SHOW_KEY=1 ;;   # API-Key voll anzeigen (Default: maskiert, nur letzte 4 Zeichen)
-    --force) FORCE=1 ;;         # restart trotz laufender Workflow-Runs
-    --rebuild) REBUILD=1 ;;     # start: JAR neu bauen, auch wenn schon eins liegt
-    --container) RUNTIME_MODE=container ;;  # Backend im Container statt als java -jar (TODO a1236a64)
+    --show-key) SHOW_KEY=1 ;;   # show the API key in full (default: masked, last 4 characters only)
+    --force) FORCE=1 ;;         # restart despite running workflow runs
+    --rebuild) REBUILD=1 ;;     # start: rebuild the JAR even if one already exists
+    --container) RUNTIME_MODE=container ;;  # backend in the container instead of as java -jar (TODO a1236a64)
     --host) RUNTIME_MODE=host ;;
     -h|--help) sed -n '2,18p' "${BASH_SOURCE[0]}"; exit 0 ;;
-    *) ;; # andere Argumente ignorieren
+    *) ;; # ignore other arguments
   esac
 done
 
 STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/mysuricates-dev"
-# Einmaliger Umzug vom Namen vor der Umbenennung: PID-Dateien und Runtime-JARs bleiben gueltig
-# (ein laufendes Backend haelt sein JAR offen, das Umbenennen des Ordners stoert es nicht);
+# One-time move from the name before the rename: PID files and runtime JARs stay valid
+# (a running backend keeps its JAR open, renaming the folder does not disturb it);
 LEGACY_STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/autotrigger-dev"
-# current.jar ist ein absoluter Link und wird auf den neuen Ordner umgebogen.
+# current.jar is an absolute link and is repointed to the new folder.
 if [[ ! -e "${STATE_DIR}" && -d "${LEGACY_STATE_DIR}" ]]; then
   mv "${LEGACY_STATE_DIR}" "${STATE_DIR}"
   if [[ -L "${STATE_DIR}/runtime/current.jar" ]]; then
@@ -70,7 +70,7 @@ mkdir -p "${STATE_DIR}"
 BACKEND_DIR="${REPO_ROOT}/ai-automation-backend"
 FRONTEND_DIR="${REPO_ROOT}/ai-automation-frontend"
 
-# Maven-Wrapper bevorzugen (lädt Maven selbst), sonst System-Maven.
+# Prefer the Maven wrapper (downloads Maven itself), otherwise system Maven.
 if [[ -x "${BACKEND_DIR}/mvnw" ]]; then
   MVN_CMD="${BACKEND_DIR}/mvnw"
 else
@@ -83,15 +83,15 @@ BACKEND_LOG="${STATE_DIR}/backend.log"
 FRONTEND_LOG="${STATE_DIR}/frontend.log"
 CURRENT_JAR="${RUNTIME_DIR}/current.jar"
 
-# Kommandozeilen-Muster, an denen eine PID-Datei als "gehoert wirklich uns" erkannt
-# wird — Backend ist `java -jar .../current.jar` (aeltere PID-Dateien zeigen noch auf
-# einen Maven-Launcher), Frontend `npm run dev` (spaeter node/vite).
+# Command-line patterns by which a PID file is recognized as "really ours"
+# — backend is `java -jar .../current.jar` (older PID files still point to
+# a Maven launcher), frontend `npm run dev` (later node/vite).
 BACKEND_PROCESS_PATTERN='(mvn|maven|spring-boot|java)'
 FRONTEND_PROCESS_PATTERN='(npm|node|vite)'
 
 BACKEND_PORT=9090
-# Im Container antwortet das Backend auf dem Port, den Compose veroeffentlicht: laeuft-schon-Pruefung,
-# Bereitschaft und Run-Check vor restart folgen ihm — eine Probe neben dem Host-Backend (3bfa4e10).
+# In the container the backend answers on the port that Compose publishes: already-running check,
+# readiness and run check before restart follow it — a probe next to the host backend (3bfa4e10).
 if [[ "${RUNTIME_MODE}" == "container" ]]; then BACKEND_PORT="${MYSURICATES_DEV_CONTAINER_PORT:-9090}"; fi
 API_BASE="${MYSURICATES_API_BASE:-http://localhost:${BACKEND_PORT}/api/v1}"
 BACKEND_READY_URL="${API_BASE}/system/info"
@@ -100,7 +100,7 @@ BACKEND_READY_URL="${API_BASE}/system/info"
 FRONTEND_HTTPS_URL="https://localhost:3000"
 FRONTEND_HTTP_URL="http://localhost:3000"
 
-# JVM-Flags wie frueher im spring-boot-maven-plugin (pom.xml), plus Tiered-Stop fuer schnellen Start.
+# JVM flags as before in the spring-boot-maven-plugin (pom.xml), plus tiered stop for fast start.
 BACKEND_JVM_OPTS=(
   -XX:TieredStopAtLevel=1
   -XX:+HeapDumpOnOutOfMemoryError
@@ -123,7 +123,7 @@ read_pid() {
   fi
 }
 
-# Kommandozeile eines Prozesses lesen: /proc auf Linux, sonst ps.
+# Read a process's command line: /proc on Linux, otherwise ps.
 process_cmdline() {
   local pid="$1"
 
@@ -135,11 +135,11 @@ process_cmdline() {
   ps -p "${pid}" -o args= 2>/dev/null || true
 }
 
-# `kill -0` allein reicht nicht: nach einem Crash bleibt die PID-Datei liegen und
-# das OS vergibt die PID irgendwann neu (2026-08-04 an einen snapd-Helper). Der
-# Starter hielt das Backend dann fuer laufend und startete es nie — Frontend lief,
-# alle /api-Proxy-Requests liefen in ECONNREFUSED. Deshalb zusaetzlich pruefen, ob
-# die Kommandozeile ueberhaupt zum erwarteten Dienst passt.
+# `kill -0` alone is not enough: after a crash the PID file stays and
+# the OS reassigns the PID at some point (2026-08-04 to a snapd helper). The
+# starter then thought the backend was running and never started it — frontend ran,
+# all /api proxy requests ran into ECONNREFUSED. Therefore additionally check whether
+# the command line fits the expected service at all.
 pid_belongs_to_service() {
   local pid_file="$1"
   local pattern="$2"
@@ -156,14 +156,14 @@ pid_belongs_to_service() {
 
   cmdline="$(process_cmdline "${pid}")"
   if [[ -z "${cmdline}" ]]; then
-    return 1   # Kommandozeile nicht lesbar -> PID nicht vertrauenswuerdig
+    return 1   # command line unreadable -> PID not trustworthy
   fi
 
   [[ "${cmdline}" =~ ${pattern} ]]
 }
 
-# PID-Datei verwerfen, die auf einen toten oder fremden Prozess zeigt. Damit
-# entscheidet danach allein der Readiness-Endpoint, ob neu gestartet wird.
+# Discard a PID file that points to a dead or foreign process. Thereby
+# the readiness endpoint alone decides afterwards whether to restart.
 discard_stale_pid_file() {
   local pid_file="$1"
   local pattern="$2"
@@ -231,10 +231,10 @@ wait_for_frontend() {
 }
 
 # ---------------------------------------------------------------------------
-# Run-Waechter: laufende Workflow-Runs vor einem Neustart erkennen.
+# Run guard: detect running workflow runs before a restart.
 # ---------------------------------------------------------------------------
 
-# Anzahl laufender Runs; leer, wenn nicht ermittelbar (Backend down, kein Key).
+# Number of running runs; empty if not determinable (backend down, no key).
 running_runs_count() {
   local key body
   key="$(api_key)"
@@ -257,7 +257,7 @@ else:
 print(int(n))' <<< "${body}"
 }
 
-# Exit 3, wenn Runs laufen und --force fehlt. Unbekannt (Backend down) => weiter.
+# Exit 3 if runs are running and --force is missing. Unknown (backend down) => continue.
 refuse_restart_if_runs_active() {
   local count
   count="$(running_runs_count)"
@@ -277,10 +277,10 @@ refuse_restart_if_runs_active() {
 }
 
 # ---------------------------------------------------------------------------
-# JAR-Runtime: bauen, in den State-Ordner kopieren, rotieren.
+# JAR runtime: build, copy into the state folder, rotate.
 # ---------------------------------------------------------------------------
 
-# "<YYYYmmdd-HHMMSS>-<shortsha>[-dirty]" — dirty = uncommittete Aenderungen an getrackten Dateien.
+# "<YYYYmmdd-HHMMSS>-<shortsha>[-dirty]" — dirty = uncommitted changes to tracked files.
 runtime_jar_label() {
   local sha="nogit" dirty=""
   if git -C "${REPO_ROOT}" rev-parse --short HEAD >/dev/null 2>&1; then
@@ -292,7 +292,7 @@ runtime_jar_label() {
   echo "$(date +%Y%m%d-%H%M%S)-${sha}${dirty}"
 }
 
-# Kopiert ein gebautes JAR nach RUNTIME_DIR, setzt current.jar und behaelt KEEP_JARS Stueck.
+# Copies a built JAR to RUNTIME_DIR, sets current.jar and keeps KEEP_JARS pieces.
 install_runtime_jar() {
   local jar="$1" target
   [[ -f "${jar}" ]] || { echo "JAR nicht gefunden: ${jar}" >&2; return 1; }
@@ -300,18 +300,18 @@ install_runtime_jar() {
   target="${RUNTIME_DIR}/backend-$(runtime_jar_label).jar"
   cp -f "${jar}" "${target}"
   ln -sfn "${target}" "${CURRENT_JAR}"
-  # Rotation: neueste KEEP_JARS behalten (current.jar zeigt auf die neueste).
+  # Rotation: keep the newest KEEP_JARS (current.jar points to the newest).
   ls -1t "${RUNTIME_DIR}"/backend-*.jar 2>/dev/null | tail -n +"$((KEEP_JARS + 1))" | xargs -r rm -f --
   echo "${target}"
 }
 
-# Fat-JAR in target/ — leer, wenn keins liegt.
+# Fat JAR in target/ — empty if none exists.
 target_jar() {
   find "${BACKEND_DIR}/target" -maxdepth 1 -name 'ai-automation-backend-*.jar' ! -name '*.original' 2>/dev/null | head -1 || true
 }
 
-# Fat-JAR im Backend-Verzeichnis bauen (clean: heilt auch ein von IDE-Builds korrumpiertes target/).
-# Setzt BUILT_JAR. Der Host-Weg kopiert es danach nach runtime/, der Container-Weg ins Image.
+# Build the fat JAR in the backend directory (clean: also heals a target/ corrupted by IDE builds).
+# Sets BUILT_JAR. The host path then copies it to runtime/, the container path into the image.
 compile_backend_jar() {
   echo "Baue Backend-JAR (mvn clean package -DskipTests) ..."
   (cd "${BACKEND_DIR}" && "${MVN_CMD}" -q clean package -DskipTests) || return 1
@@ -328,35 +328,35 @@ build_backend_jar() {
 # Backend / Frontend
 # ---------------------------------------------------------------------------
 
-# ── Container-Betrieb (--container) ──────────────────────────────────────────────
-# Additiv zum Host-Weg: dieselben Kommandos, nur startet statt `java -jar` ein
-# `docker compose`. Der Vite-Dev-Server bleibt davon unberuehrt — er proxied nach
-# :9090, unabhaengig davon, wer dort antwortet (TODO a1236a64).
+# ── Container operation (--container) ──────────────────────────────────────────────
+# Additive to the host path: same commands, only `docker compose` starts instead of
+# `java -jar`. The Vite dev server is unaffected by it — it proxies to
+# :9090, regardless of who answers there (TODO a1236a64).
 
 COMPOSE_FILE="${BACKEND_DIR}/docker-compose.dev-container.yml"
 COMPOSE_OVERRIDE="${STATE_DIR}/dev-container.override.yml"
 COMPOSE_PROJECT="${MYSURICATES_DEV_COMPOSE_PROJECT:-mysuricates-dev}"
 
 compose_cmd() {
-  # Das Image legt einen Benutzer mit den Host-IDs an (Dockerfile.stable), damit die
-  # gemounteten Anmeldungen lesbar bleiben. $UID/$GID sind in Bash nicht exportiert,
-  # deshalb hier ausdruecklich aus id(1) — ohne sie scheitert der Build im useradd.
+  # The image creates a user with the host IDs (Dockerfile.stable) so that the
+  # mounted logins stay readable. $UID/$GID are not exported in Bash,
+  # therefore explicitly from id(1) here — without them the build fails in useradd.
   MYSURICATES_DEV_HOST_USER="${MYSURICATES_DEV_HOST_USER:-$(id -un)}" \
   MYSURICATES_DEV_HOST_UID="${MYSURICATES_DEV_HOST_UID:-$(id -u)}" \
   MYSURICATES_DEV_HOST_GID="${MYSURICATES_DEV_HOST_GID:-$(id -g)}" \
   docker compose -p "${COMPOSE_PROJECT}" -f "${COMPOSE_FILE}" -f "${COMPOSE_OVERRIDE}" "$@"
 }
 
-# Override mit dem, was vom Host in den Container kommt (scripts/lib/host-mounts.sh, 262948a4):
-#   MYSURICATES_DEV_AI_FROM_HOST  programs | login (Default) | all
-#   MYSURICATES_DEV_AI_PROVIDERS  Auswahl aus claude,codex,pi (Default: alle)
-#   MYSURICATES_DEV_DOCKER_SOCKET 0 (Default) | 1 = volle Kontrolle ueber Docker auf dem Rechner
-#                                 (Projekt-Container, Terminal, container_image) — bewusst setzen
-#   MYSURICATES_DEV_CONTAINER_BIND Adresse fuer den Port, Default 127.0.0.1; 0.0.0.0 = auch lokales Netz
-#                                 (liest docker-compose.dev-container.yml selbst, hier nur geprueft)
-# Die Projektwurzel bindet docker-compose.dev-container.yml selbst ein.
+# Override with what comes from the host into the container (scripts/lib/host-mounts.sh, 262948a4):
+#   MYSURICATES_DEV_AI_FROM_HOST  programs | login (default) | all
+#   MYSURICATES_DEV_AI_PROVIDERS  selection from claude,codex,pi (default: all)
+#   MYSURICATES_DEV_DOCKER_SOCKET 0 (default) | 1 = full control over Docker on the machine
+#                                 (project container, terminal, container_image) — set deliberately
+#   MYSURICATES_DEV_CONTAINER_BIND address for the port, default 127.0.0.1; 0.0.0.0 = also local network
+#                                 (docker-compose.dev-container.yml reads it itself, only checked here)
+# The project root includes docker-compose.dev-container.yml itself.
 write_compose_override() {
-  local HOST_MOUNTS_NODE_MODULES="${MYSURICATES_DEV_NODE_MODULES:-}"   # leer: npm root -g
+  local HOST_MOUNTS_NODE_MODULES="${MYSURICATES_DEV_NODE_MODULES:-}"   # empty: npm root -g
   local missing
   case "${MYSURICATES_DEV_CONTAINER_BIND:-127.0.0.1}" in
     *[!0-9a-fA-F.:]*) echo "Ungueltiges MYSURICATES_DEV_CONTAINER_BIND '${MYSURICATES_DEV_CONTAINER_BIND}' (eine IP-Adresse, z. B. 127.0.0.1 oder 0.0.0.0)." >&2
@@ -373,9 +373,9 @@ write_compose_override() {
   fi
 }
 
-# Das JAR, das Dockerfile.stable ins Image kopiert (COPY target/…jar). Ohne diesen Schritt lief nach
-# einer Code-Aenderung still das zuletzt auf dem Host gebaute JAR, ohne JAR scheiterte der Build (3bfa4e10).
-#   $1 = always (restart, build) | missing (start: nur mit --rebuild oder ohne JAR) | built (eben gebaut)
+# The JAR that Dockerfile.stable copies into the image (COPY target/…jar). Without this step, after
+# a code change the JAR last built on the host silently ran, without a JAR the build failed (3bfa4e10).
+#   $1 = always (restart, build) | missing (start: only with --rebuild or without JAR) | built (just built)
 ensure_container_jar() {
   local jar
   [[ "${1:-missing}" == "built" ]] && return 0
@@ -389,7 +389,7 @@ ensure_container_jar() {
   fi
 }
 
-start_backend_container() {  # $1 = always|missing|built, siehe ensure_container_jar
+start_backend_container() {  # $1 = always|missing|built, see ensure_container_jar
   require_command docker
   if endpoint_is_ready "${BACKEND_READY_URL}"; then
     echo "Auf :${BACKEND_PORT} antwortet bereits ein Backend — erst stoppen." >&2
@@ -426,14 +426,14 @@ start_backend() {
   rm -f "${BACKEND_PID_FILE}"
   echo "Starte Backend (java -jar) ..."
   (
-    cd "${BACKEND_DIR}"   # cwd bleibt das Backend-Verzeichnis: ./data/automation.db, user.dir-Nutzer
+    cd "${BACKEND_DIR}"   # cwd stays the backend directory: ./data/automation.db, user.dir users
     nohup java "${BACKEND_JVM_OPTS[@]}" ${MYSURICATES_DEV_JVM_OPTS:-} -jar "${CURRENT_JAR}" \
       > "${BACKEND_LOG}" 2>&1 &
     echo "$!" > "${BACKEND_PID_FILE}"
   )
 }
 
-# Stoppt das Backend aus der PID-Datei (inkl. Kind-JVM eines alten Maven-Launchers).
+# Stops the backend from the PID file (incl. child JVM of an old Maven launcher).
 stop_backend() {
   local pid kids
   discard_stale_pid_file "${BACKEND_PID_FILE}" "${BACKEND_PROCESS_PATTERN}" "Backend"
@@ -487,20 +487,20 @@ start_frontend() {
   echo "Starte Frontend ..."
   (
     cd "${FRONTEND_DIR}"
-    # Eigene Sitzung statt nur nohup: Node setzt beim Start alle Signal-Dispositionen zurueck und hebt
-    # damit das SIG_IGN von nohup auf — schloss man das Terminal, beendete SIGHUP den Vite-Server,
-    # waehrend das Backend (Java respektiert SIG_IGN) weiterlief (454f8ac5, gefunden von
-    # scripts/installer-probe.sh). python3 statt setsid, weil setsid nur unter Linux dabei ist;
-    # execvp behaelt die PID, die PID-Datei zeigt also weiter auf npm.
+    # Own session instead of just nohup: Node resets all signal dispositions at start and thereby lifts
+    # the SIG_IGN of nohup — when the terminal was closed, SIGHUP ended the Vite server,
+    # while the backend (Java respects SIG_IGN) kept running (454f8ac5, found by
+    # scripts/installer-probe.sh). python3 instead of setsid, because setsid exists only on Linux;
+    # execvp keeps the PID, so the PID file still points to npm.
     nohup python3 -c 'import os, sys; os.setsid(); os.execvp(sys.argv[1], sys.argv[1:])' npm run dev \
       > "${FRONTEND_LOG}" 2>&1 &
     echo "$!" > "${FRONTEND_PID_FILE}"
   )
 }
 
-# Nach einem restart: Vite nachstarten, falls er fehlt (etwa weil das Terminal abgestuerzt ist und
-# ihn mitgenommen hat). start_frontend laesst einen laufenden Server in Ruhe. Scheitert der Start,
-# bleibt es bei einer Warnung — restart gilt dem Backend, und das laeuft da schon.
+# After a restart: start Vite afterwards if it is missing (e.g. because the terminal crashed and
+# took it along). start_frontend leaves a running server alone. If the start fails,
+# it stays with a warning — restart is about the backend, and that is already running.
 ensure_frontend_after_restart() {
   if ! command -v npm >/dev/null 2>&1; then
     echo "Hinweis: npm nicht gefunden, Frontend nicht gestartet." >&2
@@ -518,9 +518,9 @@ print_logs_hint() {
   echo "  Frontend: ${FRONTEND_LOG}"
 }
 
-# Zeigt den API-Key, den der neue User im Browser-Login eingeben muss.
-# Drei Fälle: Security aus / eigener Key via Env / auto-generierter Key (Datei).
-# Default maskiert (nur letzte 4 Zeichen) — mit --show-key voll. Sicher für CI/Screen-Sharing.
+# Shows the API key the new user has to enter in the browser login.
+# Three cases: security off / own key via env / auto-generated key (file).
+# Masked by default (last 4 characters only) — with --show-key in full. Safe for CI/screen sharing.
 print_api_key() {
   local key_file
   key_file="$(data_home)/api-key"
@@ -580,9 +580,9 @@ main() {
 
   case "${COMMAND}" in
     build)
-      # Baut das JAR, das ein spaeteres `start` ohne weiteren Build verwendet — so kompiliert
-      # scripts/setup.sh das Backend nur einmal statt test-compile + clean package (0ab376d3).
-      # Im Container-Betrieb dasselbe JAR in target/, aus dem start/restart das Image bauen (3bfa4e10).
+      # Builds the JAR that a later `start` uses without a further build — so
+      # scripts/setup.sh compiles the backend only once instead of test-compile + clean package (0ab376d3).
+      # In container operation the same JAR in target/, from which start/restart build the image (3bfa4e10).
       if [[ "${RUNTIME_MODE}" == "container" ]]; then
         ensure_container_jar always || exit 1
       else
@@ -596,7 +596,7 @@ main() {
     restart)
       refuse_restart_if_runs_active
       if [[ "${RUNTIME_MODE}" == "container" ]]; then
-        # Erst bauen, dann anhalten: scheitert Maven, laeuft der alte Container weiter
+        # First build, then stop: if Maven fails, the old container keeps running
         ensure_container_jar always || exit 1
         stop_backend_container
         start_backend_container built || exit 1

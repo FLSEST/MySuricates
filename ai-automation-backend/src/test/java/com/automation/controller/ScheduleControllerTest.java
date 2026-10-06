@@ -293,7 +293,7 @@ class ScheduleControllerTest {
                 .andExpect(jsonPath("$.schedules").isArray());
     }
 
-    /** Listenzeile eines Runs, wie {@code WorkflowMapper.toRunListItemsWithOwners} sie liefert. */
+    /** List row of a run, as {@code WorkflowMapper.toRunListItemsWithOwners} delivers it. */
     private static WorkflowRunListItemResponse listItem(String id) {
         return new WorkflowRunListItemResponse(
                 id, "wf-1", "Nightly", "Project", "/tmp/project", RunStatus.COMPLETED,
@@ -302,8 +302,8 @@ class ScheduleControllerTest {
     }
 
     /**
-     * Workflow-Runs eines Zeitplans kommen als Listenzeilen: Anzahl und Vorschau des letzten
-     * Schritts, keine Schritte (TODO 168e3d7f).
+     * Workflow runs of a schedule arrive as list rows: count and preview of the last
+     * step, no steps (TODO 168e3d7f).
      */
     @Test
     void getScheduleRuns_returnsBothWorkflowAndChainRuns() throws Exception {
@@ -323,7 +323,7 @@ class ScheduleControllerTest {
                 .andExpect(jsonPath("$.chainRunsTotal").value(0));
     }
 
-    /** Hoechstens {@code limit} je Art, begrenzt auf 1..500; die Gesamtzahl nennt, was fehlt (TODO 86777fb4). */
+    /** At most {@code limit} per kind, capped to 1..500; the total says what is missing (TODO 86777fb4). */
     @Test
     void getScheduleRuns_clampsTheLimit_andReportsTheTotals() throws Exception {
         when(schedulerService.findWorkflowRunsByScheduleId(eq("sched-1"), anyInt())).thenReturn(new NewestRuns<>(List.of(), 26_000));
@@ -422,7 +422,7 @@ class ScheduleControllerTest {
                 .andExpect(status().isNotFound());
     }
 
-    /** Die vergangenen Runs des Kalenders sind Listenzeilen ohne Schritte (TODO 168e3d7f). */
+    /** The past runs of the calendar are list rows without steps (TODO 168e3d7f). */
     @Test
     void getCalendarData_returnsUpcomingAndPastRuns() throws Exception {
         when(upcomingRunsCalculator.findWithNextRunBetween(any(), any())).thenReturn(List.of(testScheduled));
@@ -441,7 +441,7 @@ class ScheduleControllerTest {
                 .andExpect(jsonPath("$.pastRunsTotal").value(1));
     }
 
-    /** Der Kalender nennt alle Runs des Zeitraums, auch wenn er nur die neuesten schickt (TODO 86777fb4). */
+    /** The calendar names all runs of the period, even if it only sends the newest (TODO 86777fb4). */
     @Test
     void getCalendarData_limitsThePastRuns_andReportsTheirTotal() throws Exception {
         when(upcomingRunsCalculator.findWithNextRunBetween(any(), any())).thenReturn(List.of());

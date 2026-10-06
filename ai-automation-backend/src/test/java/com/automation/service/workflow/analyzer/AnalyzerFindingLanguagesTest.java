@@ -19,16 +19,16 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Jede Analyzer-Regel liefert ihren Befund zweisprachig (TODO 81773d7b): {@code detail} deutsch, {@code detailEn}
- * englisch. Der Test löst jede Regel aus — auch die Varianten mit eigenem Textbaustein (Vorschlag, Blockebene,
- * „wirkt nur mit“, verschachtelter Pfad) — und prüft beide Texte. Welche Regeln es gibt, liest er aus den Quellen
- * ({@code AnalyzerFinding.of("…"}); eine neue Regel ohne Fixture hier macht ihn rot.
+ * Every analyzer rule delivers its finding bilingually (TODO 81773d7b): {@code detail} German, {@code detailEn}
+ * English. The test triggers every rule — including the variants with their own text module (suggestion, block level,
+ * "wirkt nur mit", nested path) — and checks both texts. Which rules exist it reads from the sources
+ * ({@code AnalyzerFinding.of("…"}); a new rule without a fixture here turns it red.
  */
 class AnalyzerFindingLanguagesTest {
 
     private static final Path RULES_DIR = Path.of("src/main/java/com/automation/service/workflow/analyzer");
     private static final Pattern RULE_KEY = Pattern.compile("AnalyzerFinding\\.of\\(\\s*\"([a-z-]+)\"");
-    /** Deutsch im englischen Text: Umlaute, deutsche Anführungszeichen, häufige Funktionswörter. */
+    /** German in the English text: umlauts, German quotation marks, common function words. */
     private static final Pattern GERMAN = Pattern.compile("[äöüÄÖÜß„“]|\\b(der|die|das|nicht|und|wird|kein|keine|ist)\\b");
 
     private final WorkflowAnalyzer analyzer = new WorkflowAnalyzer();
@@ -44,7 +44,7 @@ class AnalyzerFindingLanguagesTest {
     private static final String PARAGRAPH = "Always keep the answer short, name the file and the line, and never "
             + "invent a finding that the log does not show.";
 
-    /** Fixtures, zusammen jede Regel und jeden Textbaustein mindestens einmal. */
+    /** Fixtures, together every rule and every text module at least once. */
     private List<AnalyzerFinding> allFindings() {
         List<AnalyzerFinding> out = new ArrayList<>();
         // Verdrahtung: unknown-block-reference, chain-only-placeholder, audit-only-placeholder, unwired-output
@@ -60,14 +60,14 @@ class AnalyzerFindingLanguagesTest {
                 block("switch", "branch", Map.of("expression", "x", "cases", List.of(Map.of("value", "a", "blocks",
                         List.of(Map.of("type", "simple", "name", "inner", "config", Map.of("command", PARAGRAPH)))))))),
                 "Intro\n\n" + PARAGRAPH));
-        // Approval, foreach (beide Varianten)
+        // Approval, foreach (both variants)
         out.addAll(analyzer.analyze(List.of(
                 block("approval", "gate", Map.of("message", "Go?", "on_no", "fail", "options", List.of("Yes", "Ok"))),
                 block("foreach", "each", Map.of("items_command", "ls", "command", "echo {{ item }}")),
                 block("foreach", "each2", Map.of("items_command", "ls", "items", List.of("a"), "items_source", "list",
                         "command", "echo {{ item }}"))), null));
-        // Schlüssel: unbekannt mit Vorschlag / Blockebene / ohne Hinweis, „wirkt nur mit“, Pflicht fehlt (mit
-        // „gesetzt ist“), ungültiger Wert, verschachtelter Pfad mit Namen
+        // Key: unknown with suggestion / block level / without hint, "wirkt nur mit", required missing (with
+        // "gesetzt ist"), invalid value, nested path with names
         Map<String, Object> nested = new HashMap<>();
         nested.put("type", "simple");
         nested.put("name", "report");
@@ -78,17 +78,17 @@ class AnalyzerFindingLanguagesTest {
                 block("foreach", "f", Map.of("items", List.of("a"), "comand", "echo")),
                 block("switch", "w", Map.of("expression", "{{ previous_output }}",
                         "cases", List.of(Map.of("value", "GREEN", "blocks", List.of(nested))))),
-                // Alter Schlüsselname: allein (umbenennen) und neben dem neuen (entfernen)
+                // Old key name: alone (rename) and next to the new one (remove)
                 block("sub-workflow", "old", Map.of("workflowId", "abc")),
                 block("sub-workflow", "both", Map.of("workflow_id", "abc", "workflowId", "abc"))), null));
-        // Eigene Plattform: self-api-call (Shell und Auftrag), direct-db-access (app_settings, Plattform-DB, sqlite3)
+        // Own platform: self-api-call (shell and task), direct-db-access (app_settings, platform DB, sqlite3)
         out.addAll(analyzer.analyze(List.of(
                 block("shell", "api", Map.of("command", "set -euo pipefail\ncurl http://localhost:9090/api/v1/todos")),
                 block("simple", "ask", Map.of("command", "Run curl http://localhost:9090/api/v1/workflows and summarise")),
                 block("shell", "settings", Map.of("command", "set -euo pipefail\necho app_settings")),
                 block("shell", "db", Map.of("command", "set -euo pipefail\nsqlite3 data/automation.db 'SELECT 1'")),
                 block("shell", "lite", Map.of("command", "set -euo pipefail\nsqlite3 project.db .dump"))), null));
-        // Form: dead-nested-blocks, unknown-block-field (Config-Schlüssel, nahe Schreibweise, sonst; verschachtelt)
+        // Shape: dead-nested-blocks, unknown-block-field (config key, near spelling, otherwise; nested)
         BlockDefinition loose = block("shell", "loose", Map.of("command", "set -euo pipefail\nls"));
         loose.putUnknownField("on_failure", "continue");
         loose.putUnknownField("skill_ids", List.of("s"));

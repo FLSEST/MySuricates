@@ -21,13 +21,13 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Schreibt einen Workflow als Pool-Definition auf Platte.
+ * Writes a workflow to disk as a pool definition.
  *
- * <p>Eigene Klasse, weil hier zwei Dinge zusammenkommen, die der {@link WorkflowPoolService}
- * sonst mit dem Lesen des Pools vermischt: die kanonische Feldreihenfolge der Pool-JSON und
- * die Bereinigung um Instanz-Bindungen ({@link PoolExportSanitizer}).
+ * <p>Own class, because two things come together here that the {@link WorkflowPoolService}
+ * would otherwise mix with reading the pool: the canonical field order of the pool JSON and
+ * the cleanup of instance bindings ({@link PoolExportSanitizer}).
  *
- * <p>Regelwerk: {@code docs/workflow-pool-kuratierung.md}.
+ * <p>Rules: {@code docs/workflow-pool-kuratierung.md}.
  */
 @Component
 @RequiredArgsConstructor
@@ -40,8 +40,8 @@ public class PoolExportWriter {
     private final ObjectMapper objectMapper;
 
     /**
-     * @param poolDir Zielverzeichnis; wird angelegt, wenn es fehlt. Ein bestehender Dateiname
-     *                wird nicht überschrieben, sondern durchnummeriert.
+     * @param poolDir target directory; created if missing. An existing file name
+     *                is not overwritten but numbered.
      */
     public ExportToPoolResponse write(Workflow workflow, ExportToPoolRequest request,
                                       PoolScope scope, Path poolDir) throws IOException {
@@ -52,8 +52,8 @@ public class PoolExportWriter {
         String nameEn = req.nameEn() != null ? req.nameEn() : workflow.getName();
         Map<String, Object> poolJson = buildPoolJson(workflow, req, scope, nameEn);
 
-        // Instanz-Bindungen entfernen, bevor etwas auf Platte landet. Erst in eine generische
-        // Struktur wandeln: die Blöcke sind sonst POJOs, in die der Sanitizer nicht hineinsieht.
+        // Remove instance bindings before anything lands on disk. Convert to a generic
+        // structure first: the blocks are otherwise POJOs the sanitizer does not look into.
         Map<String, Object> generic = objectMapper.convertValue(poolJson, new TypeReference<>() {});
         PoolExportSanitizer sanitizer = new PoolExportSanitizer();
         @SuppressWarnings("unchecked")
@@ -78,7 +78,7 @@ public class PoolExportWriter {
                 filename.replace(".json", ""), filename, sanitizer.removedPaths());
     }
 
-    /** Kanonische Feldreihenfolge — so lesen sich alle Pool-Dateien gleich. */
+    /** Canonical field order - so all pool files read the same. */
     private Map<String, Object> buildPoolJson(Workflow workflow, ExportToPoolRequest req,
                                               PoolScope scope, String nameEn) {
         String nameDe = req.nameDe() != null ? req.nameDe() : workflow.getName();
@@ -124,7 +124,7 @@ public class PoolExportWriter {
         return poolJson;
     }
 
-    /** Aus dem Request, sonst aus den Fabrik-Metadaten, sonst {@code CUSTOM}. */
+    /** From the request, otherwise from the factory metadata, otherwise {@code CUSTOM}. */
     private String resolveCategory(Workflow workflow, ExportToPoolRequest req) {
         if (req.category() != null) {
             return req.category();

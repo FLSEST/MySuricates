@@ -15,7 +15,7 @@ function Item({ icon, children }: { icon: ReactNode; children: ReactNode }) {
   return <span className="inline-flex items-center gap-1.5">{icon}{children}</span>;
 }
 
-/** Legende der Relationskarte: Symbole der Herkunft und Bearbeitung, Linienarten, Ergebnisfarben. */
+/** Legend of the relation map: symbols of origin and processing, line types, result colours. */
 export function RelationMapLegend() {
   const t = useT();
   const m = t.goals.map;

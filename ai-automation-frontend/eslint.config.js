@@ -4,23 +4,23 @@ import tseslint from 'typescript-eslint';
 import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
 
-// components/shared importiert keine Fachordner (workflow, goal, hints, todo, settings …), nur
-// ui und die fachfreien Ordner unter src (docs/frontend.md → Shared-Komponenten). Die Regel prueft
-// den Importpfad als Text, deshalb je Verzeichnistiefe unter shared eigene Muster: `depth` ist die
-// Zahl der Ordner zwischen shared und der Datei (0 = shared/X.tsx, 1 = shared/__tests__/X.test.tsx).
+// components/shared imports no domain folders (workflow, goal, hints, todo, settings …), only
+// ui and the domain-free folders under src (docs/frontend.md → Shared-Komponenten). The rule checks
+// the import path as text, hence separate patterns per directory depth under shared: `depth` is the
+// number of folders between shared and the file (0 = shared/X.tsx, 1 = shared/__tests__/X.test.tsx).
 const SHARED_ALLOWED_IN_COMPONENTS = ['ui', 'shared'];
 const SHARED_ALLOWED_IN_SRC = ['api', 'hooks', 'utils', 'types', 'stores', 'i18n', 'test', 'components/ui', 'components/shared'];
 const SHARED_IMPORT_MESSAGE =
   'components/shared importiert keine Fachordner, nur ui, api, hooks, utils, types, stores und i18n '
   + '(docs/frontend.md → Shared-Komponenten). Die Komponente gehoert in den Fachordner oder der Helfer nach src/utils.';
 
-// Die Tiefen, fuer die es Muster gibt; tiefer liegt unter shared heute nichts (nur __tests__).
+// The depths for which patterns exist; deeper, nothing lies under shared today (only __tests__).
 const SHARED_DEPTHS = [0, 1, 2, 3, 4];
 
 function sharedImportPatterns(depth) {
-  // Ein Schritt nach oben, auch mit eingestreutem `./` (`./../x`, `.././x`)
+  // One step up, also with an interspersed `./` (`./../x`, `.././x`)
   const up = '(?:\\./)*\\.\\./';
-  // Ende der Aufwaerts-Schritte: danach weder `.` noch `..`
+  // End of the upward steps: afterwards neither `.` nor `..`
   const stop = '(?:\\./)*(?!\\.\\.?(?:/|$))';
   const toShared = up.repeat(depth);
   const oneOf = (dirs) => `(?:${dirs.join('|')})(?:/|$)`;
@@ -29,9 +29,9 @@ function sharedImportPatterns(depth) {
     `^${toShared}${up}${stop}(?!${oneOf(SHARED_ALLOWED_IN_COMPONENTS)})`,
     // ../../X → src/X
     `^${toShared}${up}${up}${stop}(?!${oneOf(SHARED_ALLOWED_IN_SRC)})`,
-    // ../../../ → ausserhalb von src
+    // ../../../ → outside src
     `^${toShared}${up}${up}${up}`,
-    // @/X → src/X (Pfad-Alias aus tsconfig.json)
+    // @/X → src/X (path alias from tsconfig.json)
     `^@/(?!${oneOf(SHARED_ALLOWED_IN_SRC)})`,
   ];
 }
@@ -42,7 +42,7 @@ function sharedImportRules(depth) {
     'no-restricted-imports': ['error', {
       patterns: patterns.map((regex) => ({ regex, message: SHARED_IMPORT_MESSAGE })),
     }],
-    // Dynamisches import() prueft no-restricted-imports nicht. esquery-Regexe duerfen kein `/` enthalten.
+    // Dynamic import() is not checked by no-restricted-imports. esquery regexes must not contain `/`.
     'no-restricted-syntax': ['error', ...patterns.map((regex) => ({
       selector: `ImportExpression[source.value=/${regex.replaceAll('/', '\\x2F')}/]`,
       message: SHARED_IMPORT_MESSAGE,

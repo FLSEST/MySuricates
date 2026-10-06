@@ -62,8 +62,8 @@ class WebSocketAuthInterceptorTest {
         interceptor = new WebSocketAuthInterceptor(apiKeyService, ticketService);
         // Security enabled by default — use reflection to set the field
         setSecurityEnabled(true);
-        // Beide Stubs gelten für fast alle Tests; die zwei Ausnahmen (Security aus / kein Key
-        // konfiguriert) kehren vorher um — deshalb lenient nur hier statt klassenweit.
+        // Both stubs apply to almost all tests; the two exceptions (security off / no key
+        // configured) reverse them beforehand — hence lenient only here instead of class-wide.
         lenient().when(apiKeyService.getEffectiveApiKey()).thenReturn("test-key-123");
         lenient().when(request.getServletRequest()).thenReturn(servletRequest);
     }
@@ -158,8 +158,8 @@ class WebSocketAuthInterceptorTest {
 
     @Test
     void aMissingTicketIsOnlyLoggedAtDebug() {
-        // Browser, Health-Checks und Crawler klopfen ohne Parameter an — das ist kein Sicherheitsvorfall
-        // und darf das WARN-Log nicht fluten.
+        // Browsers, health checks and crawlers knock without parameters — that is not a security incident
+        // and must not flood the WARN log.
         List<ILoggingEvent> events = captureLogs(() ->
                 interceptor.beforeHandshake(request, response, handler, new HashMap<>()));
 
@@ -169,8 +169,8 @@ class WebSocketAuthInterceptorTest {
 
     @Test
     void blankTicketIsOnlyLoggedAtDebug() {
-        // Der bewusste Client-Fallback bei fehlgeschlagenem Ticket-Abruf (useWebSocket.ts) haengt
-        // ?ticket= leer an — das ist kein Faelschungsversuch und darf kein WARN "forged" erzeugen.
+        // The deliberate client fallback on a failed ticket fetch (useWebSocket.ts) appends
+        // ?ticket= empty — that is not a forgery attempt and must not produce a WARN "forged".
         when(servletRequest.getParameter("ticket")).thenReturn("");
 
         List<ILoggingEvent> events = captureLogs(() ->

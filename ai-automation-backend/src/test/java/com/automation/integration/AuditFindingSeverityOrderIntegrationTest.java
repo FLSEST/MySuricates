@@ -20,8 +20,8 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Die Findings-Liste sortiert nach Schwere, nicht nach dem Alphabet der gespeicherten Enum-Namen —
- * sonst stünde LOW vor MEDIUM (TODO f4ddc836). Gegen echtes SQLite, weil genau dort sortiert wird.
+ * The findings list sorts by severity, not by the alphabet of the stored enum names —
+ * otherwise LOW would come before MEDIUM (TODO f4ddc836). Against real SQLite, because that is where the sorting happens.
  */
 @SpringBootTest
 @ActiveProfiles("integration")

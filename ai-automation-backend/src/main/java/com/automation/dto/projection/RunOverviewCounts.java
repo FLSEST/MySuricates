@@ -1,8 +1,8 @@
 package com.automation.dto.projection;
 
 /**
- * Die Run-Zaehler oben im Dashboard aus EINER Abfrage (SUM/CASE) statt aus fuenf einzelnen
- * {@code count}-Aufrufen (TODO 2ccb9e40). {@code succeeded} zaehlt COMPLETED und
- * COMPLETED_WITH_ERRORS, {@code startedSince} die Runs ab dem uebergebenen Zeitpunkt (Tagesbeginn).
+ * The run counters at the top of the dashboard from ONE query (SUM/CASE) instead of five separate
+ * {@code count} calls (TODO 2ccb9e40). {@code succeeded} counts COMPLETED and
+ * COMPLETED_WITH_ERRORS, {@code startedSince} the runs from the given point in time (start of day).
  */
 public record RunOverviewCounts(long total, long succeeded, long failed, long startedSince) {}

@@ -22,7 +22,7 @@ export function ProjectCockpit() {
   const navigate = useNavigate();
   const { data, isLoading, error, refetch } = useTodoOverview();
   const archiveStale = useArchiveStale();
-  // Ziele sind ein Modul: aus, gibt es weder fällige Meilensteine noch die Zielkarten (c60bf914)
+  // Goals are a module: when off, there are neither due milestones nor the goal cards (c60bf914)
   const goalsModule = useModuleEnabled('goals');
 
   if (isLoading) {
@@ -37,7 +37,7 @@ export function ProjectCockpit() {
   }
 
   const needsYou = data?.needsYou ?? [];
-  // Meilensteine, die bald fällig oder überfällig sind (TODO e192df18); ein älteres Backend liefert sie nicht.
+  // Milestones that are due soon or overdue (TODO e192df18); an older backend does not deliver them.
   const milestonesDue = goalsModule ? data?.milestonesDue ?? [] : [];
   const attention = needsYou.length + milestonesDue.length;
   const projects = data?.projects ?? [];

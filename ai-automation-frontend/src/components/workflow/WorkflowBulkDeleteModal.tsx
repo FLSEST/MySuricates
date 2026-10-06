@@ -3,7 +3,7 @@ import { ConfirmModal } from '../ui';
 import type { TranslationKeys } from '../../i18n';
 import type { WorkflowDeleteConfirm } from '../../hooks/useWorkflowBulkSelection';
 
-/** Bestätigung vor dem Löschen eines oder mehrerer Workflows aus der Liste, mit ihren Namen. */
+/** Confirmation before deleting one or several workflows from the list, with their names. */
 export function WorkflowBulkDeleteModal({ t, confirm, deleting, onClose, onConfirm }: {
   t: TranslationKeys;
   confirm: WorkflowDeleteConfirm;

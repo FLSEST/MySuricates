@@ -27,14 +27,14 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * Baut die Zielansicht zusammen (TODO dc0566f8, 259f4f66, c60bf914): TODOs in Arbeitsreihenfolge,
- * Fortschritt je Projekt, die Zielprojekte, Arbeitspakete und Meilensteine mit Zustand. Aus
- * {@link GoalService} herausgezogen, damit der bei Anlegen, Aendern und Lesen der Ziele bleibt.
+ * Assembles the goal view (TODO dc0566f8, 259f4f66, c60bf914): TODOs in working order,
+ * progress per project, the goal projects, work packages and milestones with state. Extracted from
+ * {@link GoalService} so that it stays at creating, changing and reading goals.
  *
- * <p>Drei Abfragen neben den Paketen: TODO-Zeilen, Zielprojekte, Meilensteine samt Verknuepfungen –
- * Projektnamen nur fuer TODOs aus Projekten, die dem Ziel nicht zugeordnet sind (Altdaten), in einer
- * weiteren. Muss in einer Schreib-Transaktion laufen: erkennt es ein Paket oder einen Meilenstein zum
- * ersten Mal als abgeschlossen bzw. erreicht, setzt es den Zeitpunkt an der Entity.
+ * <p>Three queries besides the packages: TODO rows, goal projects, milestones including links –
+ * project names only for TODOs from projects not assigned to the goal (legacy data), in one
+ * further one. Must run in a write transaction: if it recognizes a package or a milestone as completed
+ * or reached for the first time, it sets the timestamp on the entity.
  */
 @Component
 @RequiredArgsConstructor
@@ -64,14 +64,14 @@ class GoalDetailAssembler {
                 GoalProjectSummaries.projects(projects, rows), packages, milestones);
     }
 
-    /** Projekt-ID → Name; eine HashMap, weil TODOs ohne Projekt mit {@code null} nachschlagen. */
+    /** Project ID → name; a HashMap because TODOs without a project look up with {@code null}. */
     private Map<String, String> projectNames(List<GoalTodoRow> rows, List<GoalProjectRow> projects) {
         Map<String, String> names = new HashMap<>();
         projects.forEach(p -> names.put(p.projectId(), p.projectName()));
         Set<String> ids = rows.stream().map(GoalTodoRow::projectId).filter(Objects::nonNull)
                 .filter(id -> !names.containsKey(id)).collect(Collectors.toSet());
         if (!ids.isEmpty()) {
-            // Nur ID und Name – findAllById kostete je Projekt ein select containers (TODO 08224ed6)
+            // Only ID and name – findAllById cost one select containers per project (TODO 08224ed6)
             projectRepository.findIdAndNameByIdIn(ids).forEach(row -> names.put((String) row[0], (String) row[1]));
         }
         return names;

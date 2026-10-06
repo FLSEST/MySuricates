@@ -76,7 +76,7 @@ public class ContainerService {
     // browser-side "Failed to fetch" the user reported. Instead we run the
     // Docker work outside any transaction and use TransactionTemplate for the
     // short DB bursts (find existing row / upsert it).
-    /** Ob Docker hier eingerichtet ist; ohne Docker versucht ein Run keinen Projekt-Container (a0e85182). */
+    /** Whether Docker is set up here; without Docker a run does not attempt a project container (a0e85182). */
     public boolean isDockerConfigured() {
         return dockerExpectation.isConfigured();
     }

@@ -4,5 +4,5 @@ import com.automation.entity.GoalMilestone;
 
 import java.util.List;
 
-/** Ein Meilenstein mit den IDs seiner verknuepften Arbeitspakete, aus einer Abfrage (TODO c60bf914). */
+/** A milestone with the IDs of its linked work packages, from one query (TODO c60bf914). */
 public record GoalMilestoneLinks(GoalMilestone milestone, List<String> workPackageIds) {}

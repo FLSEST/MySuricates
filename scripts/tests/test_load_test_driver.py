@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tests fuer scripts/load-test/driver.py — Routen-Templates, Server-Timing und das Lauf-Polling.
+"""Tests for scripts/load-test/driver.py — route templates, Server-Timing and the run polling.
 
 Run: python3 -m unittest discover -s scripts/tests -p 'test_load_test_driver.py'
 """
@@ -61,7 +61,7 @@ class HostLoadSampleTest(unittest.TestCase):
 
 
 class FakeApi(http.server.BaseHTTPRequestHandler):
-    """execute liefert RUNNING, der zweite Abruf des Laufs COMPLETED; ohne Key 401."""
+    """execute returns RUNNING, the second poll of the run COMPLETED; without a key 401."""
     polls = 0
 
     def log_message(self, *args):

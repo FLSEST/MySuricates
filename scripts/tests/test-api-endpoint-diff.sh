@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Tests fuer scripts/public-readiness/api-endpoint-diff.sh (TODO 2cbc00a7).
-# Baut ein Fixture-Controller-Verzeichnis + Fixture-Docs in einem Temp-Verzeichnis und
-# prueft, dass das Diff-Skript fehlende/veraltete Endpunkte deterministisch meldet.
-# Run: bash scripts/tests/test-api-endpoint-diff.sh   (exit 0 = alle Checks ok)
+# Tests for scripts/public-readiness/api-endpoint-diff.sh (TODO 2cbc00a7).
+# Builds a fixture controller directory + fixture docs in a temp directory and
+# checks that the diff script reports missing/outdated endpoints deterministically.
+# Run: bash scripts/tests/test-api-endpoint-diff.sh   (exit 0 = all checks ok)
 set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -25,8 +25,8 @@ fi
 CTRL="$TMP/controller"
 mkdir -p "$CTRL"
 
-# Fixture-Controller: Klassen-Basis-Pfad + bare @GetMapping + Pfadvariable + 2 Methoden auf
-# demselben Sub-Pfad + ein Endpunkt, der absichtlich in KEINEM Doc steht.
+# Fixture controller: class base path + bare @GetMapping + path variable + 2 methods on
+# the same sub-path + one endpoint that is deliberately in NO doc.
 cat > "$CTRL/WidgetController.java" <<'JAVA'
 package com.automation.controller;
 
@@ -53,7 +53,7 @@ public class WidgetController {
 }
 JAVA
 
-# Zweiter Controller ohne Klassen-Basis-Pfad (voller Pfad direkt an der Methode), wie WebhookController.
+# Second controller without class base path (full path directly on the method), like WebhookController.
 cat > "$CTRL/GadgetController.java" <<'JAVA'
 package com.automation.controller;
 
@@ -70,8 +70,8 @@ JAVA
 DOC_DE="$TMP/api-referenz.de.md"
 DOC_EN="$TMP/api-referenz.en.md"
 
-# DE-Doc: deckt list/create/get/delete ab, NICHT "activate" (-> FEHLT_IN_DOC).
-# Zusaetzlich ein Endpunkt, den es im Code nicht gibt (-> NUR_IN_DOC).
+# DE doc: covers list/create/get/delete, NOT "activate" (-> FEHLT_IN_DOC).
+# Additionally an endpoint that does not exist in the code (-> NUR_IN_DOC).
 cat > "$DOC_DE" <<'MD'
 ## Widgets
 
@@ -100,7 +100,7 @@ Liste.
 Diesen Endpunkt gibt es im Code nicht (mehr).
 MD
 
-# EN-Doc: deckt zusaetzlich "activate" ab (nur DE fehlt es), damit der Sprachunterschied testbar ist.
+# EN doc: additionally covers "activate" (only DE lacks it), so the language difference is testable.
 cat > "$DOC_EN" <<'MD'
 ## Widgets
 
@@ -144,14 +144,14 @@ check "kein Treffer fuer GET /api/v1/gadgets (in beiden Docs + Code vorhanden)" 
 echo "2) Normalisierung: Pfadvariablen-Namen werden ignoriert ({id} vs. {widgetId})"
 DOC_DE2="$TMP/api-referenz.de2.md"
 cp "$DOC_DE" "$DOC_DE2"
-# Ersetze {id} durch einen anderen Variablennamen -> muss weiterhin als deckungsgleich gelten.
+# Replace {id} with another variable name -> must still count as matching.
 sed -i 's/{id}/{widgetId}/g' "$DOC_DE2"
 OUT2=$(bash "$SCRIPT" "$CTRL" "$DOC_DE2" "$DOC_EN" 2>&1)
 check "{widgetId} im Doc matcht {id} im Code (kein FEHLT_IN_DOC fuer /{id})" \
   '! grep -qE "FEHLT_IN_DOC de (GET|DELETE) /api/v1/widgets/\{id\}$" <<<"$OUT2"'
 
 echo "3) GREEN-Fixture: vollstaendige, deckungsgleiche Docs -> Exit 0, keine Ausgabe"
-# DOC_EN deckt bereits alle 5 Code-Endpunkte 1:1 ab (kein archive-Extra) -> als DE- und EN-Doc verwenden.
+# DOC_EN already covers all 5 code endpoints 1:1 (no archive extra) -> use as DE and EN doc.
 OUT3=$(bash "$SCRIPT" "$CTRL" "$DOC_EN" "$DOC_EN" 2>&1); RC3=$?
 check "Exit-Code 0 wenn beide Docs vollstaendig sind" '[ "$RC3" -eq 0 ]'
 check "keine Ausgabe im GREEN-Fall"                   '[ -z "$OUT3" ]'
@@ -169,12 +169,12 @@ echo "6) Regressions-Fixture: produces/consumes duerfen keinen Zusatz-Pfad erzeu
 CTRL2="$TMP/controller2"
 mkdir -p "$CTRL2"
 
-# IMPORTANT-Fix (Review 2cbc00a7): @GetMapping(value=..., produces="text/markdown") und
-# @PostMapping(value=..., consumes=..., produces=...) duerfen NUR den value/path-Pfad liefern,
-# nicht jeden Anfuehrungszeichen-String in der Annotation (der urspruengliche Bug las
-# "text/markdown"/"application/xml"/"application/json" faelschlich als weitere Endpunkte).
-# MINOR-Fix: bare @RequestMapping(method = RequestMethod.X, path = "...") statt @XMapping
-# muss denselben Zweig in extract_controllers() durchlaufen wie @PutMapping("...").
+# IMPORTANT fix (review 2cbc00a7): @GetMapping(value=..., produces="text/markdown") and
+# @PostMapping(value=..., consumes=..., produces=...) must ONLY yield the value/path path,
+# not every quoted string in the annotation (the original bug read
+# "text/markdown"/"application/xml"/"application/json" wrongly as further endpoints).
+# MINOR fix: bare @RequestMapping(method = RequestMethod.X, path = "...") instead of @XMapping
+# must go through the same branch in extract_controllers() as @PutMapping("...").
 cat > "$CTRL2/MiscMappingController.java" <<'JAVA'
 package com.automation.controller;
 

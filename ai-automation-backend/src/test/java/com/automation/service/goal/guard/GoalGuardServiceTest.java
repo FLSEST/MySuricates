@@ -52,7 +52,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/** Ziel-Waechter: einmal anlegen, pausieren, wieder aufnehmen (TODO 259f4f66). */
+/** Goal guard: create once, pause, resume (TODO 259f4f66). */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class GoalGuardServiceTest {
@@ -127,7 +127,7 @@ class GoalGuardServiceTest {
                 anyMap(), eq("CRON"), isNull(), isNull(), isNull(), isNull(), eq("SKIP"), eq(false));
     }
 
-    /** TODO c60bf914: das erste nicht archivierte Zielprojekt schlaegt das Projekt mit den meisten TODOs. */
+    /** TODO c60bf914: the first non-archived goal project beats the project with the most TODOs. */
     @Test
     void firstSwitchOn_prefersTheFirstActiveGoalProject() {
         when(goalProjectRepository.findRows("g1")).thenReturn(List.of(

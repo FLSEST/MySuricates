@@ -40,7 +40,7 @@ class BpmnExportAdapterTest {
         assertGolden("linear", adapter.export(WorkflowFixtures.linear()));
     }
 
-    /** Verzweigter Datenfluss (7557b928): Assoziationen an den Zweig-Tasks, nicht am Gateway. */
+    /** Branched data flow (7557b928): associations on the branch tasks, not on the gateway. */
     @Test
     void goldenFileBranchingBleibtStabil() throws Exception {
         assertGolden("branching", adapter.export(WorkflowFixtures.branching()));

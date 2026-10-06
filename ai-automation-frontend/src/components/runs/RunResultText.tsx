@@ -1,8 +1,8 @@
 import type { WorkflowRunListItem } from '../../types';
 
 export function RunResultText({ run }: { run: WorkflowRunListItem }) {
-  // Die Liste liefert keine Schritte mehr, sondern die gekuerzte Ausgabe des letzten
-  // (MySuricates-TODO a05c9504) — der Volltext steht in der Run-Detailansicht.
+  // The list no longer delivers steps, but the shortened output of the last one
+  // (MySuricates TODO a05c9504) - the full text is in the run detail view.
   const isError = !!run.error?.message;
   const text = run.error?.message || run.lastStepPreview || '-';
 

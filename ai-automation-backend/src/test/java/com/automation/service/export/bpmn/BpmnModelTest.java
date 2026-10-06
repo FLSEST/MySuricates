@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Das interne Modell: Grundzustand der Knoten/Kanten und Befüllung durch den Builder. */
+/** The internal model: initial state of nodes/edges and population by the builder. */
 class BpmnModelTest {
 
     @Test
@@ -55,7 +55,7 @@ class BpmnModelTest {
         assertThat(model.nodes).last().extracting(n -> n.kind).isEqualTo(BpmnModel.Kind.END_EVENT);
         assertThat(model.nodes).hasSize(5);
         assertThat(model.edges).hasSize(4);
-        // Block 1 liest previous_output → genau ein Datenobjekt mit Aus- und Eingabe
+        // Block 1 reads previous_output → exactly one data object with output and input
         assertThat(model.dataObjects).hasSize(1);
         assertThat(model.dataAssociations).extracting(a -> a.input).containsExactly(false, true);
     }

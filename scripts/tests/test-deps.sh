@@ -71,9 +71,9 @@ osr fedora "";                       check "fedora stays on get.docker.com" 'dme
 osr rhel "fedora";                   check "rhel stays on get.docker.com"   'dmethod | grep -F get.docker.com >/dev/null'
 osr centos "rhel fedora";            check "centos stays on get.docker.com" 'dmethod | grep -F get.docker.com >/dev/null'
 rm -f "$TMP/os-release";             check "no os-release: get.docker.com"  'dmethod | grep -F get.docker.com >/dev/null'
-# Den Befehl wirklich ausfuehren, alle Werkzeuge gestubbt; $2=1 mit systemctl, 0 ohne (ein Container)
+# Really execute the command, all tools stubbed; $2=1 with systemctl, 0 without (a container)
 BASH_BIN="$(command -v bash)"
-runcmd() {  # BEFEHL MIT_SYSTEMCTL → setzt RC, Aufrufe in $TMP/calls
+runcmd() {  # COMMAND WITH_SYSTEMCTL → sets RC, calls in $TMP/calls
   rm -rf "$TMP/cmdbin"; mkdir -p "$TMP/cmdbin"; : > "$TMP/calls"
   for t in curl dnf pacman zypper usermod systemctl; do printf '#!/bin/sh\necho "%s $*" >> "%s/calls"\n' "$t" "$TMP" > "$TMP/cmdbin/$t"; chmod +x "$TMP/cmdbin/$t"; done
   printf '#!/bin/sh\n"$@"\n' > "$TMP/cmdbin/sudo"; chmod +x "$TMP/cmdbin/sudo"
@@ -127,7 +127,7 @@ check "env.sh with PATH export is active"          'run deps_env_active'
 check "hint: the line to copy"                     '[ "$(run deps_profile_hint)" = ". $D/env.sh" ]'
 EXP_LINE='[ -r "$HOME/.local/share/mysuricates/env.sh" ] && . "$HOME/.local/share/mysuricates/env.sh"'
 check "line: \$HOME kept for the usual place"      '[ "$(run "DEPS_DATA=\$HOME/.local/share/mysuricates; deps_profile_line")" = "$EXP_LINE" ]'
-printf 'export FOO=1' > "$H/.profile"                       # letzte Zeile ohne Zeilenende
+printf 'export FOO=1' > "$H/.profile"                       # last line without line ending
 run 'deps_profile_add "$HOME/.profile"'; run 'deps_profile_add "$HOME/.profile"'
 check "added once, even when called twice"         '[ "$(grep -c "mysuricates/env.sh" "$H/.profile")" = 1 ]'
 check "existing content stays on its own line"     '[ "$(head -n 1 "$H/.profile")" = "export FOO=1" ]'

@@ -8,7 +8,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Consumer;
 
-/** Request-Metriken und Drift-Erkennung (TODO fc0994d6). Ihre Werte zeigt die Einstellungsseite bisher nicht. */
+/** Request metrics and drift detection (TODO fc0994d6). The settings page does not show their values yet. */
 @Component
 @Order(5)
 public class RequestMetricsSettings implements RuntimeSettingsGroup {
@@ -35,6 +35,6 @@ public class RequestMetricsSettings implements RuntimeSettingsGroup {
 
     @Override
     public void currentValues(Map<String, Object> out) {
-        // Bewusst leer: GET /system/settings lieferte die request-metrics-Werte nie mit.
+        // Intentionally empty: GET /system/settings never returned the request-metrics values.
     }
 }

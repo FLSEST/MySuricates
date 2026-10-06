@@ -17,11 +17,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
 /**
- * Arbeitspräferenzen im System-Prompt (TODO d49fbde0).
+ * Work preferences in the system prompt (TODO d49fbde0).
  *
- * <p>Die Entscheidung vom 2026-09-15 zieht eine Grenze: Nur Arbeitspräferenzen dürfen in einen
- * KI-Prompt, keine Namen, Kontaktdaten oder Berufsprofile. Diese Tests halten beide Hälften fest —
- * dass die drei erlaubten Werte ankommen, und dass ohne Opt-in nichts am Prompt anders ist.
+ * <p>The decision of 2026-09-15 draws a line: only work preferences may go into an
+ * AI prompt, no names, contact data or professional profiles. These tests pin both halves —
+ * that the three allowed values arrive, and that without opt-in nothing about the prompt differs.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -45,7 +45,7 @@ class UserPreferencesServiceTest {
         when(settings.getSetting(key)).thenReturn(Optional.of(value));
     }
 
-    // --- der Block selbst -------------------------------------------------------------
+    // --- the block itself -------------------------------------------------------------
 
     @Test
     void rendersTheThreeAllowedPreferences() {
@@ -105,8 +105,8 @@ class UserPreferencesServiceTest {
     }
 
     /**
-     * Die Grenze der Entscheidung: Es gibt keinen Weg, etwas anderes als die drei Schlüssel
-     * hineinzubekommen. Ein Berufsprofil in einem beliebigen anderen Setting bleibt draußen.
+     * The boundary of the decision: there is no way to get anything other than the three keys
+     * in. A professional profile in any other setting stays out.
      */
     @Test
     void anySettingOutsideTheThreeKeysNeverReachesThePrompt() {

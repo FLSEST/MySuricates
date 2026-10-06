@@ -13,73 +13,73 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Regeln gegen den Zugriff eines Blocks auf die <b>eigene Plattform</b>: REST-API der Instanz und
- * SQLite-Datenbank (TODO d0348479, Schritt 4).
+ * Rules against a block's access to the <b>platform itself</b>: the instance's REST API and its own
+ * SQLite database (TODO d0348479, step 4).
  *
- * <p>CLAUDE.md verbietet beides: Was ein Workflow von der Plattform braucht, injiziert der
- * WorkflowExecutor als Kontextvariable ({@code {{ open_todos }}}, {@code {{ previous_report }}} …),
- * TODOs entstehen über die Blöcke {@code todo-create}/{@code todo-update}/{@code todo-close}. Ein Block,
- * der stattdessen {@code curl …/api/v1/todos} ruft, braucht einen API-Key im Klartext; einer, der
- * {@code sqlite3} auf die Datenbank loslässt, geht an Hibernate und der einzigen Connection vorbei.
- * {@code scripts/ci/pool-neutrality.sh} (Regeln {@code SELF-API}, {@code DB-DIRECT}) prüft das nur
- * für die ausgelieferten Pool-Dateien; diese Regeln sehen auch die Live-Definitionen einer Instanz.
+ * <p>CLAUDE.md forbids both: whatever a workflow needs from the platform is injected by the
+ * WorkflowExecutor as a context variable ({@code {{ open_todos }}}, {@code {{ previous_report }}} …),
+ * TODOs are created via the blocks {@code todo-create}/{@code todo-update}/{@code todo-close}. A block
+ * that calls {@code curl …/api/v1/todos} instead needs an API key in plain text; one that unleashes
+ * {@code sqlite3} on the database bypasses Hibernate and the single connection.
+ * {@code scripts/ci/pool-neutrality.sh} (rules {@code SELF-API}, {@code DB-DIRECT}) checks this only
+ * for the shipped pool files; these rules also see the live definitions of an instance.
  *
- * <p><b>Abstimmung mit pool-neutrality.sh</b> — gleiche Ausnahmen, bewusste Unterschiede:
+ * <p><b>Alignment with pool-neutrality.sh</b> — same exceptions, deliberate differences:
  * <ul>
- *   <li>Erlaubt sind dieselben schlüsselfreien Sonden wie dort ({@link #KEY_FREE_PROBES}, jede ein
- *       öffentlicher Pfad aus {@code security.PublicPaths}); geprüft werden {@code /api/v1/} und
- *       {@code /actuator/}, unter dem nur {@code health} ohne Key antwortet (TODO 7721d8cb).</li>
- *   <li>Im Shell-Code genügt wie dort ein konkreter Endpunkt ({@code /api/v1/<segment>}), der Aufruf
- *       darf weit entfernt stehen (Schleifenvariable). Das nackte Präfix ist ein Suchmuster, kein
- *       Aufruf (mocking-gap-audit). <i>Anders als dort</i> zählen ganze Kommentarzeilen nicht und ein
- *       Endpunkt mit ausdrücklich fremdem Host ({@code https://api.example.com/api/v1/…}) auch nicht:
- *       Live-Workflows rufen fremde Dienste, der Pool prüft nur seine eigenen Dateien.</li>
- *   <li>Außerhalb des Shell-Codes (KI-Auftrag) meldet die Regel nur einen lokalen Endpunkt mit Aufrufer
- *       in der Nähe, und nur als {@code MEDIUM} „prüfen": Ob die KI den Aufruf wirklich ausführt, lässt
- *       sich am Text nicht entscheiden.</li>
- *   <li>Die Schlüsseldatei der Instanz ({@code ~/.mysuricates/api-key}, {@code ~/.autotrigger/api-key},
- *       {@code $AUTOMATION_DATA_HOME/api-key}, {@code $(data_home …)/api-key}) im Shell-Code ist
- *       {@code HIGH} — auch ohne {@code curl} danach (TODO ee8bb93d): Wer den Schlüssel liest, hält ihn
- *       im Klartext, egal wohin er ihn weiterreicht. Im KI-Auftrag nur {@code MEDIUM} „prüfen". Der
- *       Pool meldet dieselben Pfade als Zugangsdaten ({@code HYGIENE_POOL_CREDENTIAL_MARKERS}).</li>
- *   <li>{@code sqlite3} allein ist dort schon ein Befund, hier nur {@code MEDIUM} „prüfen": Ein
- *       Live-Workflow darf mit der SQLite-Datei seines Projekts arbeiten. {@code HIGH} wird es erst mit
- *       dem Namen der Plattform-DB ({@code automation.db}, {@code automation-dev.db}) oder der
- *       Tabelle {@code app_settings} (als ganzes Wort — {@code lernapp_settings} war ein Fehlbefund).</li>
+ *   <li>The same key-free probes are allowed as there ({@link #KEY_FREE_PROBES}, each a
+ *       public path from {@code security.PublicPaths}); {@code /api/v1/} and
+ *       {@code /actuator/} are checked, where only {@code health} answers without a key (TODO 7721d8cb).</li>
+ *   <li>In shell code a concrete endpoint ({@code /api/v1/<segment>}) suffices, as there; the call
+ *       may be far away (loop variable). The bare prefix is a search pattern, not a
+ *       call (mocking-gap-audit). <i>Unlike there</i>, whole comment lines do not count and neither does an
+ *       endpoint with an explicitly foreign host ({@code https://api.example.com/api/v1/…}):
+ *       live workflows call foreign services, the pool only checks its own files.</li>
+ *   <li>Outside shell code (AI task) the rule reports only a local endpoint with a caller
+ *       nearby, and only as {@code MEDIUM} "prüfen": whether the AI really executes the call cannot
+ *       be decided from the text.</li>
+ *   <li>The instance's key file ({@code ~/.mysuricates/api-key}, {@code ~/.autotrigger/api-key},
+ *       {@code $AUTOMATION_DATA_HOME/api-key}, {@code $(data_home …)/api-key}) in shell code is
+ *       {@code HIGH} — even without a {@code curl} afterwards (TODO ee8bb93d): whoever reads the key holds it
+ *       in plain text, no matter where it is passed on. In the AI task only {@code MEDIUM} "prüfen". The
+ *       pool reports the same paths as credentials ({@code HYGIENE_POOL_CREDENTIAL_MARKERS}).</li>
+ *   <li>{@code sqlite3} alone is a finding there, here only {@code MEDIUM} "prüfen": a
+ *       live workflow may work with its project's SQLite file. It only becomes {@code HIGH} with
+ *       the name of the platform DB ({@code automation.db}, {@code automation-dev.db}) or the
+ *       table {@code app_settings} (as a whole word — {@code lernapp_settings} was a false positive).</li>
  * </ul>
  */
 final class SelfAccessRules {
 
     private SelfAccessRules() {}
 
-    /** Ohne API-Key erreichbar (Teilmenge von PublicPaths.EXACT) — dieselbe Liste wie HYGIENE_POOL_API_ALLOWED. */
+    /** Reachable without an API key (subset of PublicPaths.EXACT) — same list as HYGIENE_POOL_API_ALLOWED. */
     static final Set<String> KEY_FREE_PROBES = Set.of(
             "/api/v1/system/health", "/api/v1/system/info", "/api/v1/system/auth-status",
             "/api/v1/system/jvm-memory", "/actuator/health");
 
-    /** Konkreter Endpunkt: nach dem Präfix muss ein Pfadsegment folgen, wie PATH_AT im Skript. */
+    /** Concrete endpoint: a path segment must follow the prefix, like PATH_AT in the script. */
     private static final Pattern ENDPOINT = Pattern.compile("(?:/api/v1|/actuator)/[A-Za-z0-9_][A-Za-z0-9/_.{}<>-]*");
 
-    /** Präfix, dahinter eine Variable statt eines Segments ({@code curl …/api/v1/$E}, TODO 2a0c9420). */
+    /** Prefix followed by a variable instead of a segment ({@code curl …/api/v1/$E}, TODO 2a0c9420). */
     private static final Pattern COMPOSED = Pattern.compile("(?:/api/v1|/actuator)/?[\"']?\\$\\{?[A-Za-z_][A-Za-z0-9_]*}?");
 
-    /** Schema und Host direkt vor dem Endpunkt, etwa {@code http://localhost:9090}. */
+    /** Scheme and host directly before the endpoint, e.g. {@code http://localhost:9090}. */
     private static final Pattern HOST_BEFORE = Pattern.compile("[a-zA-Z][a-zA-Z0-9+.-]*://((?:\\{\\{[^}]*}}|[^/\\s\"'`])+)$");
 
-    /** Hosts, die die eigene Instanz meinen; ein Platzhalter oder eine Variable kann sie meinen. */
+    /** Hosts that mean the instance itself; a placeholder or a variable may mean it. */
     private static final Pattern LOCAL_HOST = Pattern.compile(
             "(?i)(localhost|127\\.0\\.0\\.1|0\\.0\\.0\\.0|\\[::1]|host\\.docker\\.internal)(:\\d+)?|.*(\\{\\{|}}|\\$).*");
 
-    /** Aufrufer wie HYGIENE_POOL_API_CALLERS. */
+    /** Callers like HYGIENE_POOL_API_CALLERS. */
     private static final List<String> CALLERS = List.of("curl", "wget", "requests.", "urllib", "fetch(", "http.client");
 
-    /** Wie im Skript: gut eine Befehlszeile um die Fundstelle. */
+    /** As in the script: a good command line around the match. */
     private static final int WINDOW = 200;
 
     /**
-     * Die Schlüsseldatei der Instanz im Datenordner (DataHome, InstanceAddress.apiKeyFile). Die Grenze
-     * {@code \b} hinter {@code api-key} lässt Kopien wie {@code api-key.bak}/{@code api-key-backup} bewusst
-     * mittreffen (derselbe Schlüssel), andere Dateien wie {@code api-keys.txt} nicht.
+     * The instance's key file in the data folder (DataHome, InstanceAddress.apiKeyFile). The boundary
+     * {@code \b} after {@code api-key} deliberately also matches copies like {@code api-key.bak}/{@code api-key-backup}
+     * (same key), but not other files like {@code api-keys.txt}.
      */
     private static final Pattern KEY_FILE = Pattern.compile(
             "(?:\\.mysuricates|\\.autotrigger|AUTOMATION_DATA_HOME}?|\\bdata_home\\b[^\\n]{0,60}?)/api-key\\b");
@@ -90,11 +90,11 @@ final class SelfAccessRules {
     private static final Pattern DB_ACCESS = Pattern.compile(
             "(?i)\\bsqlite3\\b|\\bSELECT\\s|\\bINSERT\\s+INTO\\b|\\bUPDATE\\s|\\bDELETE\\s+FROM\\b|\\.tables\\b|\\.schema\\b");
 
-    /** Schlüssel, deren Wert bei einem Shell-Block bzw. {@code execution_mode: shell} als Shell läuft. */
+    /** Keys whose value runs as shell in a shell block or with {@code execution_mode: shell}. */
     private static final List<String> SHELL_KEYS =
             List.of("command", "condition", "condition_command", "then_command", "else_command");
 
-    /** Schlüssel, die immer in der Shell laufen: foreach-Liste und der Vorab-Test {@code run_if}. */
+    /** Keys that always run in the shell: the foreach list and the pre-test {@code run_if}. */
     private static final List<String> ALWAYS_SHELL_KEYS = List.of("items_command", "run_if");
 
     private static final String ALTERNATIVE = " — Plattformdaten kommen als Kontextvariable (etwa {{ open_todos }},"
@@ -167,7 +167,7 @@ final class SelfAccessRules {
         }
     }
 
-    /** {@link #COMPOSED} ohne ausdrücklich fremden Host davor, ohne Anführungszeichen, oder {@code null}. */
+    /** {@link #COMPOSED} without an explicitly foreign host before it, without quotation marks, or {@code null}. */
     private static String firstComposedEndpoint(String code) {
         Matcher composed = COMPOSED.matcher(code);
         while (composed.find()) {
@@ -181,9 +181,9 @@ final class SelfAccessRules {
     }
 
     /**
-     * Der erste Endpunkt der eigenen API, der keine schlüsselfreie Sonde ist, oder {@code null}. Ein
-     * ausdrücklich fremder Host zählt nie. Mit {@code needsCaller} (Text außerhalb der Shell) nur ein
-     * Endpunkt mit lokalem oder variablem Host und einem Aufrufer in der Nähe.
+     * The first endpoint of the platform's own API that is not a key-free probe, or {@code null}. An
+     * explicitly foreign host never counts. With {@code needsCaller} (text outside the shell) only an
+     * endpoint with a local or variable host and a caller nearby.
      */
     private static String firstSelfEndpoint(String text, boolean needsCaller) {
         Matcher endpoint = ENDPOINT.matcher(text);
@@ -239,7 +239,7 @@ final class SelfAccessRules {
         }
     }
 
-    /** Der Shell-Code eines Blocks samt verschachtelter Blöcke, in Definitionsreihenfolge. */
+    /** The shell code of a block including nested blocks, in definition order. */
     static List<String> shellCode(BlockDefinition block) {
         List<String> out = new ArrayList<>();
         if (block == null) return out;
@@ -264,7 +264,7 @@ final class SelfAccessRules {
         if (value instanceof String text && !text.isBlank()) out.add(text);
     }
 
-    /** Ganze Kommentarzeilen ({@code # …}) sagen, was der Block tut oder nicht tut — sie rufen nichts auf. */
+    /** Whole comment lines ({@code # …}) say what the block does or does not do — they call nothing. */
     private static String withoutCommentLines(String code) {
         StringBuilder kept = new StringBuilder();
         for (String line : code.split("\n", -1)) {

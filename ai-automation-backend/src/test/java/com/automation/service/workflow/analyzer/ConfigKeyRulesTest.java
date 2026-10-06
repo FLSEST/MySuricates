@@ -14,8 +14,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 
 /**
- * Die Schlüssel-Regeln an den echten Fällen aus dem Bestand der Dev-Instanz (TODO f5153c47): Keiner davon
- * fiel beim Speichern auf, jeder lief still ohne die gemeinte Wirkung.
+ * The key rules on the real cases from the dev instance's inventory (TODO f5153c47): none of them
+ * was noticed on saving, each ran silently without the intended effect.
  */
 class ConfigKeyRulesTest {
 
@@ -29,7 +29,7 @@ class ConfigKeyRulesTest {
         return b;
     }
 
-    /** Nur die Befunde der drei Schlüssel-Regeln — die übrigen Regeln sind hier nicht Gegenstand. */
+    /** Only the findings of the three key rules — the other rules are not the subject here. */
     private List<AnalyzerFinding> keyFindings(BlockDefinition... blocks) {
         return analyzer.analyze(List.of(blocks), null).stream()
                 .filter(f -> f.rule().endsWith("config-key") || f.rule().equals("invalid-config-value"))
@@ -70,8 +70,8 @@ class ConfigKeyRulesTest {
         }
 
         /**
-         * Der Executor liest die alte Schreibweise weiter — sie ist weder unbekannt noch fehlt workflow_id. Sie läuft
-         * aber aus (5ee07e94): ein LOW-Hinweis mit dem neuen Namen.
+         * The executor keeps reading the old spelling — it is neither unknown nor is workflow_id missing. It is being
+         * phased out (5ee07e94): a LOW hint with the new name.
          */
         @Test
         void subWorkflowMitAlterSchreibweiseWorkflowIdIstNurEinHinweis() {
@@ -85,7 +85,7 @@ class ConfigKeyRulesTest {
             assertThat(findings.get(0).detailEn()).endsWith("rename the key to workflow_id");
         }
 
-        /** Stehen beide da, gilt workflow_id; der Hinweis sagt, dass der alte Schlüssel weg kann. */
+        /** If both are present, workflow_id applies; the hint says that the old key can go. */
         @Test
         void subWorkflowMitBeidenSchreibweisenRaetZumEntfernen() {
             var findings = keyFindings(block("sub-workflow", "beide", Map.of("workflow_id", "neu", "workflowId", "alt")));
@@ -97,7 +97,7 @@ class ConfigKeyRulesTest {
             });
         }
 
-        /** Auch verschachtelt, mit Pfad. */
+        /** Also nested, with path. */
         @Test
         void verschachtelterSubWorkflowMitAlterSchreibweise() {
             Map<String, Object> inner = new HashMap<>();
@@ -164,7 +164,7 @@ class ConfigKeyRulesTest {
             assertThat(findings.get(0).detail()).contains("gesetzt ist comand");
         }
 
-        /** foreach läuft mit command oder workflow_id (a5c9fbbf); context wirkt nur mit workflow_id. */
+        /** foreach runs with command or workflow_id (a5c9fbbf); context only takes effect with workflow_id. */
         @Test
         void foreachBrauchtGenauEinenVonCommandUndWorkflowId() {
             assertThat(keyFindings(block("foreach", "f", Map.of("items", List.of("a"), "command", "echo")))).isEmpty();
@@ -178,7 +178,7 @@ class ConfigKeyRulesTest {
                     .satisfies(f -> assertThat(f.detail()).contains("context wirkt nur mit workflow_id"));
         }
 
-        /** todo-update läuft mit id oder updates – mit keinem oder beiden bricht er ab (d6c0afe6). */
+        /** todo-update runs with id or updates – with neither or both it aborts (d6c0afe6). */
         @Test
         void todoUpdateBrauchtGenauEinenVonIdUndUpdates() {
             assertThat(keyFindings(block("todo-update", "u", Map.of("id", "{{ todo_id }}")))).isEmpty();
@@ -188,7 +188,7 @@ class ConfigKeyRulesTest {
                         assertThat(f.rule()).isEqualTo("missing-required-config-key");
                         assertThat(f.detail()).contains("id oder updates");
                     });
-            // Ein leerer Text gilt wie im Executor als nicht gesetzt
+            // An empty text counts as not set, as in the executor
             assertThat(keyFindings(block("todo-update", "u", Map.of("id", "", "updates", "[]")))).isEmpty();
             assertThat(keyFindings(block("todo-update", "u", Map.of("id", " "))))
                     .singleElement().extracting(AnalyzerFinding::detail).asString().contains("id oder updates");
@@ -199,7 +199,7 @@ class ConfigKeyRulesTest {
                     });
         }
 
-        /** Werkzeug-Modus gibt es nur auf oberster Ebene: verschachtelt meldet der Analyzer ihn, command bleibt Pflicht. */
+        /** Tool mode exists only at top level: nested, the analyzer reports it, command stays mandatory. */
         @Test
         void werkzeugModusInVerschachteltenBloeckenWirdGemeldet() {
             Map<String, Object> inner = new HashMap<>();
@@ -218,7 +218,7 @@ class ConfigKeyRulesTest {
             });
         }
 
-        /** Shell läuft mit command oder im Werkzeug-Modus mit container_args – nie mit beiden (d3a7f5e2). */
+        /** Shell runs with command or, in tool mode, with container_args – never with both (d3a7f5e2). */
         @Test
         void shellBrauchtGenauEinenVonCommandUndContainerArgs() {
             assertThat(keyFindings(block("shell", "s", Map.of("container_image", "img:1",
@@ -235,7 +235,7 @@ class ConfigKeyRulesTest {
             assertThat(ConfigKeyRules.suggestion("prompt", java.util.Set.of("command", "provider"))).isNull();
         }
 
-        /** retry, foreach, while, conditional reichen container_image nur im Shell-Modus an den Shell-Lauf weiter. */
+        /** retry, foreach, while, conditional pass container_image on to the shell run only in shell mode. */
         @Test
         void retryMitContainerImageWirktNurImShellModus() {
             var ai = keyFindings(block("retry", "r", Map.of("command", "npm test", "container_image", "node:24")));
@@ -249,7 +249,7 @@ class ConfigKeyRulesTest {
             assertThat(shell).isEmpty();
         }
 
-        /** RunIfGate quotet die Platzhalter der run_if-Bedingung mit shell_escape_variables — bei jedem Blocktyp. */
+        /** RunIfGate quotes the placeholders of the run_if condition with shell_escape_variables — for every block type. */
         @Test
         void shellEscapeVariablesWirktBeiJedemBlockMitRunIf() {
             assertThat(keyFindings(block("simple", "s", Map.of("command", "Fasse zusammen",
@@ -343,7 +343,7 @@ class ConfigKeyRulesTest {
                     .singleElement().extracting(AnalyzerFinding::detail).asString().contains("on_failure: false");
         }
 
-        /** Den falschen items_source neben items_command meldet items-command-without-source — nicht doppelt. */
+        /** The wrong items_source next to items_command is reported by items-command-without-source — not twice. */
         @Test
         void foreachItemsSourceNebenItemsCommandMeldetNurDieForEachRegel() {
             var findings = analyzer.analyze(List.of(block("foreach", "f",

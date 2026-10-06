@@ -175,7 +175,7 @@ final class BundleBlocks {
             if (("shell".equals(type) || ExecutionMode.isShell(config)) && config.get("command") instanceof String c) {
                 commands.add(shorten(c));
             }
-            // Werkzeug-Modus (d3a7f5e2): ein Image mit Argumenten läuft genauso wie ein Befehl
+            // Tool mode (d3a7f5e2): an image with arguments runs just like a command
             if ("shell".equals(type) && config.get("container_args") instanceof List<?> args) {
                 commands.add(shorten(config.get("container_image") + " "
                         + String.join(" ", args.stream().map(String::valueOf).toList())));

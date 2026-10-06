@@ -6,13 +6,13 @@ import { goalWorkflowKeys } from './useGoalWorkflows';
 import type { GoalRelations, GoalWorkflow, Todo } from '../types';
 
 /**
- * Ablegen in der Workflow-Zuordnung (52bc1e8c). Jede Zuordnung zeigt sich sofort und bietet im Toast
- * „Rückgängig“ an – das läuft auch, wenn die Karte schon verlassen ist (nur Client und Cache).
+ * Dropping in the workflow assignment (52bc1e8c). Every assignment shows immediately and offers
+ * "Rückgängig" in the toast – this also works when the map has already been left (client and cache only).
  */
 
 const relationsKey = (goalId: string) => ['goals', 'relations', goalId] as const;
 
-/** Setzt den Fix-Workflow (LINKED) eines TODOs in allen gespeicherten Karten des Ziels. */
+/** Sets the fix workflow (LINKED) of a TODO in all stored maps of the goal. */
 function patchRelations(qc: QueryClient, goalId: string, todoId: string, workflow: { id: string; name: string } | null) {
   qc.setQueriesData<GoalRelations>({ queryKey: relationsKey(goalId) }, (data) => data && {
     ...data,
@@ -27,9 +27,9 @@ function patchRelations(qc: QueryClient, goalId: string, todoId: string, workflo
 }
 
 /**
- * Ein TODO bekommt seinen Fix-Workflow: `PUT /todos/{id}` nur mit `linkedWorkflowId` – der Server
- * übernimmt ausschließlich gesetzte Felder (`TodoService.update`), die übrigen bleiben, wie sie sind;
- * `''` nimmt die Verknüpfung weg.
+ * A TODO gets its fix workflow: `PUT /todos/{id}` with only `linkedWorkflowId` – the server
+ * takes over only fields that are set (`TodoService.update`), the others stay as they are;
+ * `''` removes the link.
  */
 export function useLinkTodoWorkflow(goalId: string) {
   const qc = useQueryClient();
@@ -58,8 +58,8 @@ export function useLinkTodoWorkflow(goalId: string) {
       toast.success(tm.linked.replace('{workflow}', workflow.name).replace('{todo}', todoTitle), {
         label: tm.undo,
         onClick: async () => {
-          // wie in onMutate: ein noch laufendes Nachladen (onSettled der Verknüpfung) brächte sonst den
-          // überholten Stand „verknüpft“ zurück, bevor das Rückgängig beim Server angekommen ist
+          // as in onMutate: a refetch still running (onSettled of the link) would otherwise bring back the
+          // outdated state "linked" before the undo has reached the server
           await qc.cancelQueries({ queryKey: relationsKey(goalId) });
           patchRelations(qc, goalId, todoId, previous);
           try {
@@ -78,8 +78,8 @@ export function useLinkTodoWorkflow(goalId: string) {
 }
 
 /**
- * Ein Workflow ans Paket oder ans ganze Ziel – wie „Workflow zuordnen“ (Rolle WORKER); Rückgängig
- * löst die neue Zuordnung wieder.
+ * A workflow to the package or to the whole goal – like "Workflow zuordnen" (role WORKER); undo
+ * removes the new assignment again.
  */
 export function useAttachDroppedWorkflow(goalId: string) {
   const qc = useQueryClient();

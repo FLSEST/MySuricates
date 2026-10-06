@@ -156,8 +156,8 @@ class WorkflowExecutorTest {
                 .activatedSkills(new ArrayList<>())
                 .build();
 
-        // Diese Tests bilden den Weg mit Docker ab; ohne Docker versucht ein Run keinen Container
-        // (a0e85182, abgedeckt in RunContainerPreparationTest).
+        // These tests model the path with Docker; without Docker a run does not try a container
+        // (a0e85182, covered in RunContainerPreparationTest).
         lenient().when(containerService.isDockerConfigured()).thenReturn(true);
         lenient().when(containerService.getDockerContainerId(any())).thenReturn("docker-container-1");
         lenient().when(agentInstructionsService.buildInstructionPrefix(any())).thenReturn("");

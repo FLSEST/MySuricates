@@ -12,7 +12,7 @@ import { useI18nStore } from '../i18n';
 
 beforeAll(() => {
   server.listen({ onUnhandledRequest: failOnUnhandledRequest });
-  // jsdom kennt kein scrollIntoView – der Assistent der ganzen App ruft es beim Öffnen
+  // jsdom has no scrollIntoView – the assistant of the whole app calls it on opening
   Element.prototype.scrollIntoView = vi.fn();
 });
 afterEach(() => {

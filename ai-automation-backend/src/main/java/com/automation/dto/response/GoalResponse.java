@@ -15,16 +15,16 @@ public record GoalResponse(
         Instant createdAt,
         Instant updatedAt,
         GoalProgressResponse progress,
-        /** Ziel-Waechter (TODO 259f4f66); nie null – {@code enabled=false} ohne Workflow, solange nie eingeschaltet. */
+        /** Goal guard (TODO 259f4f66); never null - {@code enabled=false} without workflow as long as it was never enabled. */
         GoalGuardResponse guard,
-        /** Die ausdruecklich zugeordneten Projekte in ihrer Reihenfolge (TODO c60bf914); nie null. */
+        /** The explicitly assigned projects in their order (TODO c60bf914); never null. */
         List<ProjectRef> projects,
-        /** Der naechste noch nicht erreichte Meilenstein nach Datum (TODO c60bf914); null = keiner. */
+        /** The next milestone not yet reached, by date (TODO c60bf914); null = none. */
         NextMilestone nextMilestone
 ) {
-    /** Ein Zielprojekt in der Zielliste: nur ID und Name. */
+    /** A goal project in the goal list: only ID and name. */
     public record ProjectRef(String id, String name) {}
 
-    /** Der naechste Meilenstein fuer die Zielkarte. */
+    /** The next milestone for the goal card. */
     public record NextMilestone(String id, String title, Instant dueDate, GoalDueState state) {}
 }

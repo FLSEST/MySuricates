@@ -7,7 +7,7 @@ server:
 
 automation:
   modules:
-    preset: ${AUTOMATION_MODULES_PRESET:full}   # Test-Instanz prüft alle Features; öffentlicher Default ist core
+    preset: ${AUTOMATION_MODULES_PRESET:full}   # Test instance checks all features; public default is core
   cors:
     allowed-origins: http://localhost:8090
   tray:
@@ -20,5 +20,5 @@ automation:
   frontend-path: /app/frontend
   environment: Test
   request-metrics:
-    # Wie stable/prod: der Header bleibt auf die Entwicklungsinstanz beschraenkt.
+    # Like stable/prod: the header stays restricted to the development instance.
     server-timing-enabled: false

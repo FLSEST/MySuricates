@@ -6,7 +6,7 @@ import { SHORT_DATE, dueTitle } from './planDisplay';
 import { WorkPackageMark } from './WorkPackageMark';
 import type { GoalTodoItem, GoalWorkPackage } from '../../types';
 
-/** Fälligkeit eines TODOs; überfällig in der Fehlerfarbe. */
+/** Due date of a TODO; overdue in the error colour. */
 export function DueChip({ todo, today }: { todo: Pick<GoalTodoItem, 'dueDate' | 'status'>; today: number }) {
   const t = useT();
   const locale = useI18nStore((s) => s.locale);
@@ -22,7 +22,7 @@ export function DueChip({ todo, today }: { todo: Pick<GoalTodoItem, 'dueDate' | 
   );
 }
 
-/** Arbeitspaket eines TODOs, mit dem Balken-Zeichen in seiner Zustandsfarbe. */
+/** Work package of a TODO, with the bar symbol in its state colour. */
 export function WorkPackageChip({ workPackage }: { workPackage: GoalWorkPackage | undefined }) {
   const t = useT();
   if (!workPackage) return null;

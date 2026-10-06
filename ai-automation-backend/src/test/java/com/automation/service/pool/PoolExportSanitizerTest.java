@@ -10,8 +10,8 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Der Export in den oeffentlichen Pool darf keine Instanz-Bindungen mitschreiben.
- * Kriterien: docs/workflow-pool-kuratierung.md, Abschnitt "Kriterien je Eintrag".
+ * The export to the public pool must not write instance bindings.
+ * Criteria: docs/workflow-pool-kuratierung.md, section "Kriterien je Eintrag".
  */
 class PoolExportSanitizerTest {
 

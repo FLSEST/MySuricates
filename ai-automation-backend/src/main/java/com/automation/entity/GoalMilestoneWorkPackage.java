@@ -14,8 +14,8 @@ import lombok.Setter;
 import java.io.Serializable;
 
 /**
- * Ein Arbeitspaket, von dem ein Meilenstein abhaengt (TODO c60bf914). Beide Seiten gehoeren zum
- * selben Ziel; geloescht wird die Verknuepfung mit dem Meilenstein oder dem Paket (Kaskade).
+ * A work package a milestone depends on (TODO c60bf914). Both sides belong to the
+ * same goal; the link is deleted with the milestone or the package (cascade).
  */
 @Entity
 @Table(name = "goal_milestone_work_packages")
@@ -34,7 +34,7 @@ public class GoalMilestoneWorkPackage {
     @Column(name = "work_package_id")
     private String workPackageId;
 
-    /** Zusammengesetzter Schluessel (milestone_id, work_package_id). */
+    /** Composite key (milestone_id, work_package_id). */
     @Getter
     @Setter
     @NoArgsConstructor

@@ -1,37 +1,37 @@
 #!/usr/bin/env python3
-"""Faktenblatt zur Frage, ob jedes Dokument noch sein Gewicht traegt (TODO 05f633c2).
+"""Fact sheet on whether every document still carries its weight (TODO 05f633c2).
 
-Die Shell misst, die KI urteilt. Dieses Skript entscheidet **nicht**, ob ein Dokument
-weg kann — es legt die Signale nebeneinander, aus denen sich das beurteilen laesst.
+The shell measures, the AI judges. This script does **not** decide whether a document
+can go — it lays out side by side the signals from which that can be judged.
 
-Warum die naheliegenden Signale allein nicht reichen (am Bestand gemessen, 2026-09-23):
+Why the obvious signals alone are not enough (measured on the stock, 2026-09-23):
 
-* „kein eingehender Link" trifft 3 von 69 Doku-Dateien — und alle drei sind Fehlalarme:
-  `DocsController` liefert sie in der Anwendung aus, `workflow-pool/README.md` zeigt
-  GitHub selbst an. Ein reiner md->md-Graph meldet zusaetzlich alle 40+ Ressourcen-
-  Dokumente des Backends als verwaist, die der Code per Pfad laedt.
-* „lange nicht geaendert" trifft **niemanden**: das Median-Alter liegt bei einem Tag,
-  weil Sync- und Formatierungswellen staendig alles anfassen.
+* "no inbound link" hits 3 of 69 doc files — and all three are false alarms:
+  `DocsController` serves them in the application, `workflow-pool/README.md` is shown
+  by GitHub itself. A pure md->md graph additionally reports all 40+ resource
+  documents of the backend as orphaned, which the code loads by path.
+* "not changed for a long time" hits **nobody**: the median age is one day,
+  because sync and formatting waves constantly touch everything.
 
-Deshalb drei Zonen, drei Kantenarten und ein Pflegesignal, das Wellen herausrechnet:
+Hence three zones, three edge kinds and a maintenance signal that factors out waves:
 
-Zonen
-  ROOTS       Einstiege (README, CLAUDE.md, ...) — nie verwaist, Wurzeln der Erreichbarkeit
-  SCOPE       docs/** — der Gegenstand der Pruefung
-  CODE_OWNED  Ressourcen, die der Code per Pfad laedt — gezaehlt, nie gemeldet
+Zones
+  ROOTS       entry points (README, CLAUDE.md, ...) — never orphaned, roots of reachability
+  SCOPE       docs/** — the subject of the check
+  CODE_OWNED  resources the code loads by path — counted, never reported
 
-Kanten
-  link        [..](pfad) aus einer getrackten .md, fence-bewusst
-  mention     Pfad als Zeichenkette in getracktem Nicht-Markdown (Java, TS, Shell, JSON)
-  container   ein Konsument zaehlt ein ganzes Verzeichnis auf (DocsController, Generatoren)
+Edges
+  link        [..](path) from a tracked .md, fence-aware
+  mention     path as a string in tracked non-Markdown (Java, TS, shell, JSON)
+  container   a consumer enumerates a whole directory (DocsController, generators)
 
-`container` unterdrueckt „verwaist" nicht stillschweigend, sondern stuft es zu
-„nicht vom Index erreichbar" herab und nennt den Konsumenten als Beleg — ob ein
-Eintrag in einem UI-Dropdown echte Erreichbarkeit ist, entscheidet der Mensch.
+`container` does not silently suppress "orphaned" but downgrades it to
+"not reachable from the index" and names the consumer as evidence — whether an
+entry in a UI dropdown is real reachability is for a human to decide.
 
 Run:  python3 scripts/public-readiness/docs_orphan_scan.py [--root <dir>]
-Exit: 0 = Faktenblatt geschrieben (auch mit NICHT-GEMESSEN-Zeilen)
-      2 = gar nicht gemessen (kein Git-Repo, keine Dateien, Wurzel unbrauchbar)
+Exit: 0 = fact sheet written (even with NOT-MEASURED lines)
+      2 = not measured at all (no Git repo, no files, unusable root)
 """
 from __future__ import annotations
 
@@ -47,36 +47,36 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from md_common import headings, iter_links, slug, to_de_path, tracked_markdown  # noqa: E402
 
 # ---------------------------------------------------------------------------
-# Kalibrierung. Jede Schwelle steht auch als FAKT-Zeile im Blatt, damit die KI
-# sieht, worauf die Zahlen geeicht sind, statt es zu raten.
+# Calibration. Every threshold is also a FAKT line in the sheet, so the AI
+# sees what the numbers are calibrated to instead of guessing.
 # ---------------------------------------------------------------------------
-STALE_WINDOW_DAYS = 180          # Fenster fuer "keine inhaltliche Aenderung"
-SUBSTANTIAL_MIN_LINES = 20       # ab so vielen geaenderten Zeilen zaehlt eine Aenderung als inhaltlich
-WAVE_MIN_MD_FILES = 10           # ab so vielen .md im selben Commit: Verdacht auf Welle
-WAVE_MAX_FILE_LINES = 20         # ... aber nur, wenn an DIESER Datei wenig passierte
-RARE_SLUG_MAX_DF = 2             # Ueberschrift gilt als thematisch, wenn sie in <= 2 Dateien steht
-OVERLAP_MIN_RARE = 5             # Mindestzahl seltener Ueberschriften je Dokument
-OVERLAP_MIN_SHARED = 3           # Mindestzahl geteilter seltener Ueberschriften
-OVERLAP_THRESHOLD = 0.40         # Anteil an der kleineren Menge
+STALE_WINDOW_DAYS = 180          # window for "no substantive change"
+SUBSTANTIAL_MIN_LINES = 20       # from this many changed lines a change counts as substantive
+WAVE_MIN_MD_FILES = 10           # from this many .md in the same commit: suspected wave
+WAVE_MAX_FILE_LINES = 20         # ... but only if little happened to THIS file
+RARE_SLUG_MAX_DF = 2             # a heading counts as topical if it appears in <= 2 files
+OVERLAP_MIN_RARE = 5             # minimum number of rare headings per document
+OVERLAP_MIN_SHARED = 3           # minimum number of shared rare headings
+OVERLAP_THRESHOLD = 0.40         # share of the smaller set
 
-#: Einstiege. Von hier laeuft die Erreichbarkeitssuche los; nie selbst verwaist.
+#: Entry points. The reachability search starts here; never orphaned themselves.
 ROOTS = (
     "README.md", "README.de.md", "CLAUDE.md", "AGENTS.md",
     "CONTRIBUTING.md", "SECURITY.md",
 )
 
-#: Bewusst nicht verlinkte Dokumente. Format: Pfad -> Begruendung mit TODO-Kennung,
-#: nach dem Muster von docs_parity_check.KNOWN_GAPS. Ein Eintrag hier erzeugt keinen
-#: Befund; ohne die Liste stuende das Gate dauerhaft auf einem bekannten Zustand.
+#: Deliberately unlinked documents. Format: path -> reason with TODO id,
+#: following the pattern of docs_parity_check.KNOWN_GAPS. An entry here produces no
+#: finding; without the list the gate would permanently sit on a known state.
 KNOWN_UNLINKED: dict[str, str] = {
-    # Verzeichnis-README, das GitHub beim Oeffnen des Ordners selbst anzeigt.
+    # Directory README that GitHub itself shows when opening the folder.
     "workflow-pool/README.md": "kein Doku-Index noetig, GitHub rendert es im Ordner",
 }
 
-#: Verzeichnis-Konsumenten: wer zaehlt ganze Ordner auf, ohne einzeln zu verlinken.
-#: Je Eintrag (Praefix, Konsument, Literal, das dort stehen muss). Fehlt das Literal,
-#: gibt es eine NICHT-GEMESSEN-Zeile statt stillschweigend "keine Kante" — sonst
-#: erzeugte ein umbenannter Controller einen Schwall falscher Verwaistheit.
+#: Directory consumers: who enumerates whole folders without linking individually.
+#: Per entry (prefix, consumer, literal that must be there). If the literal is missing,
+#: there is a NICHT-GEMESSEN line instead of silently "no edge" — otherwise
+#: a renamed controller would produce a flood of false orphan reports.
 CONTAINER_CONSUMERS = (
     ("docs/", "ai-automation-backend/src/main/java/com/automation/controller/DocsController.java",
      "/api/v1/docs", "DocsController"),
@@ -84,7 +84,7 @@ CONTAINER_CONSUMERS = (
     ("docs/en/konzepte/", "scripts/concepts/pages.py", "konzepte", "Konzeptseiten-Generator"),
 )
 
-#: Dateiendungen, in denen ein Pfad als blosse Erwaehnung stehen kann.
+#: File extensions in which a path can appear as a mere mention.
 MENTION_SUFFIXES = (".java", ".ts", ".tsx", ".js", ".sh", ".py", ".json", ".xml", ".yml", ".yaml")
 
 
@@ -111,12 +111,12 @@ def tracked_files(root: Path) -> list[str]:
 
 
 def zones(md_files: list[str]) -> tuple[list[str], list[str]]:
-    """Teilt die Markdown-Dateien in (SCOPE, CODE_OWNED).
+    """Splits the Markdown files into (SCOPE, CODE_OWNED).
 
-    CODE_OWNED sind Ressourcen, die der Code per Pfad laedt — Skill-Beschreibungen,
-    Prompt-Vorlagen, Onboarding-Texte. Sie gehoeren nicht in einen Doku-Index und
-    duerfen nie als verwaist gelten; ohne die Trennung waere das Blatt zu neun
-    Zehnteln Rauschen.
+    CODE_OWNED are resources the code loads by path — skill descriptions,
+    prompt templates, onboarding texts. They do not belong in a docs index and
+    must never count as orphaned; without the separation the sheet would be nine
+    tenths noise.
     """
     scope, code_owned = [], []
     for rel in md_files:
@@ -130,7 +130,7 @@ def zones(md_files: list[str]) -> tuple[list[str], list[str]]:
 
 
 def build_link_graph(root: Path, md_files: list[str]) -> dict[str, set[tuple[str, int]]]:
-    """Rueckwaertsgraph der echten Markdown-Links: Ziel -> {(Quelle, Zeile)}."""
+    """Reverse graph of the real Markdown links: target -> {(source, line)}."""
     inbound: dict[str, set[tuple[str, int]]] = defaultdict(set)
     for rel in md_files:
         path = root / rel
@@ -150,10 +150,10 @@ def build_link_graph(root: Path, md_files: list[str]) -> dict[str, set[tuple[str
 
 
 def build_mentions(root: Path, md_files: list[str], all_files: list[str]) -> dict[str, set[str]]:
-    """Pfad-Erwaehnungen in getracktem Nicht-Markdown: Ziel -> {Quelldatei}.
+    """Path mentions in tracked non-Markdown: target -> {source file}.
 
-    Gesucht wird der **volle Pfad**, nicht der Basename: `architektur.md` steht in zu
-    vielen Zusammenhaengen, `docs/architektur.md` ist eindeutig.
+    The **full path** is searched, not the basename: `architektur.md` appears in too
+    many contexts, `docs/architektur.md` is unambiguous.
     """
     mentions: dict[str, set[str]] = defaultdict(set)
     sources = [f for f in all_files if f.endswith(MENTION_SUFFIXES)]
@@ -173,7 +173,7 @@ def build_mentions(root: Path, md_files: list[str], all_files: list[str]) -> dic
 
 
 def container_edges(root: Path, md_files: list[str]) -> tuple[dict[str, str], int, list[str]]:
-    """Verzeichnis-Kanten: Ziel -> Konsument. Liefert auch ungeprueft gebliebene."""
+    """Directory edges: target -> consumer. Also returns the ones left unchecked."""
     edges: dict[str, str] = {}
     verified = 0
     broken: list[str] = []
@@ -193,18 +193,18 @@ def container_edges(root: Path, md_files: list[str]) -> tuple[dict[str, str], in
         verified += 1
         depth_of_prefix = prefix.count("/")
         for rel in md_files:
-            # Nur die Ebene direkt unter dem Praefix, nicht rekursiv: DocsController
-            # listet docs/*.md, nicht docs/onboarding/*.md.
+            # Only the level directly under the prefix, not recursive: DocsController
+            # lists docs/*.md, not docs/onboarding/*.md.
             if rel.startswith(prefix) and rel.count("/") == depth_of_prefix:
                 edges.setdefault(rel, f"{label}:{consumer}")
     return edges, verified, broken
 
 
 def reachable(md_files: list[str], root_files: list[str], inbound) -> set[str]:
-    """Transitive Huelle ab den Einstiegen, ausschliesslich ueber echte Links.
+    """Transitive closure from the entry points, exclusively over real links.
 
-    Nur „hat irgendeinen eingehenden Link" zu fragen, uebersieht die Insel: zwei
-    verwaiste Dokumente, die sich gegenseitig verlinken, gelten sonst als erreichbar.
+    Merely asking "has any inbound link" overlooks the island: two orphaned
+    documents linking each other would otherwise count as reachable.
     """
     outbound: dict[str, set[str]] = defaultdict(set)
     for target, sources in inbound.items():
@@ -229,18 +229,18 @@ def line_count(path: Path) -> int:
 
 
 def maintenance(root: Path, rel: str) -> tuple[str | None, int, int]:
-    """(Datum der letzten inhaltlichen Aenderung, inhaltliche Edits, Wellen-Edits).
+    """(Date of the last substantive change, substantive edits, wave edits).
 
-    Zwei Filter hintereinander, beide am Bestand geeicht:
+    Two filters in sequence, both calibrated on the stock:
 
-    1. Eine Welle ist ein Commit, der viele Dokumente gleichzeitig anfasst und an *dieser*
-       Datei wenig aendert — i18n-Sync, Umlaut-Korrektur, Kopfzeilen-Stempel. Beide
-       Bedingungen sind noetig: ein breiter Commit, der an einer Datei 70 Zeilen aendert,
-       ist eine echte Ueberarbeitung und darf nicht als Welle verschwinden.
-    2. Auch ausserhalb einer Welle ist eine Dreizeilen-Korrektur keine Pflege. Ohne die
-       Substanzschwelle sieht jedes Dokument frisch aus: gemessen am 2026-09-23 faerbte
-       ein einziger Tippfehler-Commit die Datei jung, und das Signal fand **niemanden**
-       — obwohl `docs/onboarding/GLOSSARY.md` seit 210 Tagen inhaltlich unberuehrt ist.
+    1. A wave is a commit that touches many documents at once and changes little in *this*
+       file — i18n sync, umlaut fix, header stamp. Both conditions are
+       needed: a broad commit that changes 70 lines in a file is a real
+       rework and must not vanish as a wave.
+    2. Even outside a wave a three-line fix is not maintenance. Without the
+       substance threshold every document looks fresh: measured on 2026-09-23 a
+       single typo commit colored the file young, and the signal found **nobody**
+       — although `docs/onboarding/GLOSSARY.md` has been substantively untouched for 210 days.
     """
     log = git(root, "log", "--follow", "-w", "-M", "-C", "--numstat",
               "--format=%H %at", "--", rel)
@@ -260,7 +260,7 @@ def maintenance(root: Path, rel: str) -> tuple[str | None, int, int]:
         try:
             changed = int(fields[0]) + int(fields[1])
         except ValueError:
-            continue  # Binaerdatei ("-")
+            continue  # binary file ("-")
         breadth = commit_md_breadth(root, line_commit_hash(log, line))
         is_wave = breadth >= WAVE_MIN_MD_FILES and changed <= WAVE_MAX_FILE_LINES
         if is_wave or changed <= SUBSTANTIAL_MIN_LINES:
@@ -277,7 +277,7 @@ _COMMIT_OF_LINE: dict[str, str] = {}
 
 
 def line_commit_hash(log: str, target_line: str) -> str:
-    """Commit-Hash zur numstat-Zeile — der zuletzt gesehene Hash im Log."""
+    """Commit hash for the numstat line — the last hash seen in the log."""
     if not _COMMIT_OF_LINE or log not in _COMMIT_OF_LINE.get("__log__", ""):
         _COMMIT_OF_LINE.clear()
         _COMMIT_OF_LINE["__log__"] = log
@@ -292,7 +292,7 @@ def line_commit_hash(log: str, target_line: str) -> str:
 
 
 def commit_md_breadth(root: Path, commit: str) -> int:
-    """Wie viele .md-Dateien beruehrt dieser Commit?"""
+    """How many .md files does this commit touch?"""
     if not commit:
         return 0
     if commit not in _BREADTH_CACHE:
@@ -302,12 +302,12 @@ def commit_md_breadth(root: Path, commit: str) -> int:
 
 
 def rare_slug_overlap(root: Path, docs: list[str]) -> list[tuple[str, str, float, int]]:
-    """Dokumentpaare mit auffaellig vielen gemeinsamen *thematischen* Ueberschriften.
+    """Document pairs with a conspicuous number of shared *topical* headings.
 
-    Ohne den Haeufigkeitsfilter ist das Signal unbrauchbar: die acht Konzeptseiten sind
-    aus einer Vorlage erzeugt und teilen per Konstruktion dieselben Abschnitte — roh
-    gemessen ergibt das Dutzende Falschpaare. Nur Ueberschriften, die im ganzen Korpus
-    selten sind, tragen ueberhaupt Thema.
+    Without the frequency filter the signal is useless: the eight concept pages are
+    generated from a template and share the same sections by construction — measured
+    raw that yields dozens of false pairs. Only headings that are rare in the whole corpus
+    carry a topic at all.
     """
     slugs: dict[str, set[str]] = {}
     df: dict[str, int] = defaultdict(int)
@@ -432,11 +432,11 @@ def main() -> int:
     print()
     print("# Kandidaten — je Zeile alle Achsen nebeneinander")
     raw = set(unreachable) | set(stale) | {r for r in scope if not inbound.get(r)}
-    # Einstiege sind nie Kandidaten: auf README, CLAUDE.md und Geschwister verweist
-    # niemand aus dem Repo heraus, sie sind der Anfang und nicht das Ende einer Kette.
+    # Entry points are never candidates: nobody from outside the repo points at README, CLAUDE.md
+    # and siblings, they are the beginning and not the end of a chain.
     raw -= set(root_files)
-    # Die englische Spiegelung ist kein eigenes Dokument. Gibt es die deutsche Fassung,
-    # faellt der Spiegel weg — sonst zaehlt jeder Befund doppelt.
+    # The English mirror is not a document of its own. If the German version exists,
+    # the mirror is dropped — otherwise every finding counts twice.
     scope_set = set(scope)
     raw = {r for r in raw if not (r.startswith("docs/en/") and to_de_path(r) in scope_set)}
     candidates = sorted(raw, key=lambda r: (-lines.get(r, 0), r))

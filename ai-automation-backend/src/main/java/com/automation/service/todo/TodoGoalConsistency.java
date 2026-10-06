@@ -7,11 +7,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 /**
- * Haelt ein TODO nach einem Projektwechsel mit seinem Ziel stimmig (TODO c60bf914): Das neue Projekt
- * kommt zum Ziel dazu, und ein Arbeitspaket eines anderen Projekts verliert das TODO.
+ * Keeps a TODO consistent with its goal after a project change (TODO c60bf914): the new project
+ * is added to the goal, and a work package of another project loses the TODO.
  *
- * <p>Nutzt nur Repositories, keine Klasse aus {@code service.goal}: Das Paket haengt schon von
- * {@code service.todo} ab, der umgekehrte Import waere ein Paketzyklus.
+ * <p>Uses only repositories, no class from {@code service.goal}: that package already depends on
+ * {@code service.todo}, the reverse import would be a package cycle.
  */
 @Component
 @RequiredArgsConstructor
@@ -21,11 +21,11 @@ public class TodoGoalConsistency {
     private final GoalWorkPackageRepository workPackageRepository;
 
     /**
-     * Nach dem Setzen des neuen Projekts, vor dem Speichern; aendert hoechstens {@code workPackageId}.
+     * After setting the new project, before saving; changes at most {@code workPackageId}.
      *
-     * <p>Laeuft bewusst auch bei ausgeschaltetem Modul {@code goals}: Die Ziel-Daten bleiben erhalten und
-     * sollen nach dem Wiedereinschalten stimmen – ein TODO, das inzwischen das Projekt gewechselt hat, darf
-     * dann nicht in einem Arbeitspaket des alten Projekts haengen.
+     * <p>Deliberately also runs with module {@code goals} switched off: the goal data is kept and
+     * should be consistent after switching back on - a TODO that has meanwhile changed project must
+     * not then hang in a work package of the old project.
      */
     public void afterProjectChange(Todo todo) {
         if (todo.getGoalId() == null) {

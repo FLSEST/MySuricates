@@ -1,14 +1,14 @@
 /**
- * Theme-Ableitung aus offizieller Palette + Rollen der Theme-Autoren.
+ * Theme derivation from the official palette + roles of the theme authors.
  *
- * Regeln (Ergebnis einer Blindbewertung, siehe docs/frontend.md → Themes):
- * - Flächen, Rahmen und Text sind die Farben, die der Autor für diese Rolle vorsieht;
- *   reicht der Kontrast nicht, wird minimal Richtung Haupttext gemischt.
- * - Akzent/Status/Rollen: Fläche = Originalton (Grafik ≥ 3:1), Text = nur so weit
- *   aufgehellt/abgedunkelt wie für 4,5:1 nötig.
- * - Statusfarben sind funktional: liegt der Palettenton nicht im erkennbaren
- *   Farbtonbereich (z. B. olivgrünes „Erfolg“), wird nur der Farbton gedreht.
- * - Tailwind-Farbklassen (blue-500 …) werden pro Theme auf die Palette umgelenkt.
+ * Rules (result of a blind evaluation, see docs/frontend.md → Themes):
+ * - Surfaces, borders and text are the colors the author provides for that role;
+ *   if the contrast is not enough, they are mixed minimally toward the main text.
+ * - Accent/status/roles: surface = original tone (graphics ≥ 3:1), text = only lightened/darkened
+ *   as far as needed for 4.5:1.
+ * - Status colors are functional: if the palette tone is not in the recognizable
+ *   hue range (e.g. an olive-green "success"), only the hue is rotated.
+ * - Tailwind color classes (blue-500 …) are redirected to the palette per theme.
  */
 import {
   contrast,
@@ -211,7 +211,7 @@ export function buildPaletteTheme(spec: PaletteThemeSpec): ThemeDefinition {
   return { id: spec.id, name: spec.name, appearance: spec.appearance, tokens: tokens as ThemeTokens, hues };
 }
 
-// ── Tailwind-Farbklassen auf die Palette umlenken ─────────
+// ── Redirect Tailwind colour classes to the palette ─────────
 
 const TAILWIND_FAMILIES: Record<HueFamily, string[]> = {
   red: ['red'],

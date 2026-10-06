@@ -7,13 +7,13 @@ import type { StepResult } from '../../types';
 const STEP_HIGHLIGHT_MS = 1800;
 
 /**
- * Verbindet Ablauf-Diagramm und Schrittliste der Laufseite: `statusByBlock` färbt die Kästen
- * (laufend, fertig, fehlgeschlagen), `selectStep` scrollt beim Klick auf einen Kasten zum Step des
- * Blocks und hebt ihn kurz hervor (`stepHighlight`). Ein Block, der noch nicht lief, bleibt stumm.
+ * Connects the flow diagram and the step list of the run page: `statusByBlock` colors the boxes
+ * (running, done, failed), `selectStep` scrolls to the step of the block when a box is clicked
+ * and briefly highlights it (`stepHighlight`). A block that has not run yet stays silent.
  */
 export function useRunDiagramSync(steps: StepResult[] | undefined, runActive = true) {
-  // Diagramm-Kästen sind nach Block-Position nummeriert, Steps nach stepIndex — der läuft nach jedem
-  // Wrapper-Block (foreach, while, …) voraus, deshalb die Zuordnung über latestStepByBlock.
+  // Diagram boxes are numbered by block position, steps by stepIndex — which runs ahead after every
+  // wrapper block (foreach, while, …), hence the mapping via latestStepByBlock.
   const stepByBlock = useMemo(() => latestStepByBlock(steps ?? []), [steps]);
   const statusByBlock = useMemo(() => {
     const map = new Map<number, RunStatus>();
@@ -25,11 +25,11 @@ export function useRunDiagramSync(steps: StepResult[] | undefined, runActive = t
     return map;
   }, [stepByBlock, runActive]);
 
-  // Klick im Diagramm scrollt zum Step des Blocks und hebt ihn kurz hervor
+  // Click in the diagram scrolls to the step of the block and briefly highlights it
   const [stepHighlight, setStepHighlight] = useState<{ index: number; nonce: number } | null>(null);
   const selectStep = (sel: DiagramSelection) => {
     const step = stepByBlock.get(sel.blockIndex);
-    if (!step) return; // Block ist (noch) nicht gelaufen
+    if (!step) return; // block has not run (yet)
     document.getElementById(`exec-step-${step.stepIndex}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     setStepHighlight((prev) => ({ index: step.stepIndex, nonce: (prev?.nonce ?? 0) + 1 }));
     window.setTimeout(() => setStepHighlight(null), STEP_HIGHLIGHT_MS);

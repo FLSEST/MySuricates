@@ -14,8 +14,8 @@ class AuditSeverityTest {
 
     @Test
     void everySeverity_mapsOntoATodoPriorityOfTheSameName() {
-        // ManagedTodoWriter/AuditCenterService bilden per Todo.Priority.valueOf(severity.name()) ab —
-        // ein Severity-Wert ohne gleichnamige Priority liesse das Anlegen des TODOs scheitern.
+        // ManagedTodoWriter/AuditCenterService map via Todo.Priority.valueOf(severity.name()) —
+        // a severity value without a priority of the same name would make creating the TODO fail.
         for (AuditSeverity severity : AuditSeverity.values()) {
             assertThat(Todo.Priority.valueOf(severity.name()).name()).isEqualTo(severity.name());
         }

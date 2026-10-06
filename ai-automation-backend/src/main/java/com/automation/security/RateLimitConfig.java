@@ -17,18 +17,18 @@ public class RateLimitConfig {
     private int requestsPerMinute = 120;
 
     /**
-     * Sekunden, die der Browser-Client nach einem 429 <em>alle</em> übrigen Pfade kurz sperrt
-     * (gedeckelt durch {@code Retry-After}). Geht über {@code /api/v1/system/info} an den Client;
-     * der Default entspricht dessen eingebauter Konstante {@code GLOBAL_BACKOFF_SECONDS}.
-     * {@code @Min(1)}, damit ein negativer Wert beim Start auffällt statt still im Client zu
-     * landen (der ihn dann verwerfen und wieder raten müsste).
+     * Seconds for which the browser client briefly blocks <em>all</em> other paths after a 429
+     * (capped by {@code Retry-After}). Goes to the client via {@code /api/v1/system/info};
+     * the default matches its built-in constant {@code GLOBAL_BACKOFF_SECONDS}.
+     * {@code @Min(1)}, so that a negative value is noticed at startup instead of silently ending up in the
+     * client (which would then have to discard it and guess again).
      */
     @Min(1)
     private int clientGlobalBackoffSeconds = 2;
 
     /**
-     * Sekunden, die der Client annimmt, wenn eine 429-Antwort keinen brauchbaren
-     * {@code Retry-After}-Header trägt. Entspricht dessen {@code DEFAULT_RETRY_AFTER_SECONDS}.
+     * Seconds the client assumes when a 429 response carries no usable
+     * {@code Retry-After} header. Matches its {@code DEFAULT_RETRY_AFTER_SECONDS}.
      */
     @Min(1)
     private int clientDefaultRetryAfterSeconds = 10;

@@ -42,7 +42,7 @@ public class HumanInputBlockExecutor implements BlockExecutor {
         Instant start = Instant.now();
         Map<String, Object> config = block.getConfig();
 
-        // Aufgelöst wie die Approval-Frage: {{ block.X.output }} soll im Dialog stehen, nicht wörtlich (TODO e2efb393)
+        // Resolved like the approval question: {{ block.X.output }} should appear in the dialog, not literally (TODO e2efb393)
         String prompt = context.resolveTemplate((String) config.getOrDefault("prompt", "Please provide input:"));
         String inputType = (String) config.getOrDefault("input_type", "text");
         String variableName = (String) config.getOrDefault("variable_name", "user_input");

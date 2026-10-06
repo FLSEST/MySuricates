@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Tests fuer scripts/release.sh (TODO dd82775b). Das Skript laeuft dabei wirklich — in einem
-# Wegwerf-Repo mit einer Mini-pom.xml und einer Mini-package.json, damit die Pruefungen nicht
-# mitwandern, wenn die echte Version steigt.
+# Tests for scripts/release.sh (TODO dd82775b). The script really runs here — in a
+# throwaway repo with a mini pom.xml and a mini package.json so that the checks do not
+# move along when the real version rises.
 #
-# Kern der Sache: Der getaggte Commit traegt die Version OHNE -SNAPSHOT (sonst meldet jede
-# Installation eines Releases SNAPSHOT, SystemIdentityService), und danach geht es auf der
-# naechsten -SNAPSHOT weiter.
+# Core of the matter: the tagged commit carries the version WITHOUT -SNAPSHOT (otherwise every
+# installation of a release reports SNAPSHOT, SystemIdentityService), and afterwards it continues on the
+# next -SNAPSHOT.
 #
-# Run: bash scripts/tests/test-release.sh   (exit 0 = alle Checks ok)
+# Run: bash scripts/tests/test-release.sh   (exit 0 = all checks ok)
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
@@ -19,7 +19,7 @@ command -v npm >/dev/null || { echo "npm fehlt — Test kann das Release nicht f
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
-# --- Wegwerf-Repo: so viel Projekt, wie release.sh anfasst ------------------------------------------
+# --- Throwaway repo: as much project as release.sh touches ------------------------------------------
 mkdir -p "$TMP/scripts" "$TMP/ai-automation-backend" "$TMP/ai-automation-frontend"
 cp "$REPO/scripts/release.sh" "$TMP/scripts/release.sh"
 cat > "$TMP/ai-automation-backend/pom.xml" <<'POM'
@@ -45,12 +45,12 @@ git -C "$TMP" add -A
 git -C "$TMP" commit -qm "Start"
 git -C "$TMP" tag v0.1.0
 
-# Lasttest-Ergebnisse (scripts/load-test.sh) liegen nie im echten Zustandsverzeichnis des Rechners
+# Load test results (scripts/load-test.sh) never lie in the machine's real state directory
 export MYSURICATES_LOAD_TEST_DIR="$TMP/load-test"
 unset RELEASE_SKIP_LOAD_TEST
 
 pom_version() { sed -n '/<\/parent>/,$ { s/.*<version>\(.*\)<\/version>.*/\1/p; }' "$TMP/ai-automation-backend/pom.xml" | sed -n 1p; }
-# npm version schreibt die Datei einzeilig zurueck — deshalb nicht zeilenweise schneiden
+# npm version writes the file back on one line — hence do not cut line by line
 json_version() { sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | sed -n 1p; }
 pkg_version() { json_version < "$TMP/ai-automation-frontend/package.json"; }
 at_tag() { git -C "$TMP" show "$1:ai-automation-backend/pom.xml" | sed -n '/<\/parent>/,$ { s/.*<version>\(.*\)<\/version>.*/\1/p; }' | sed -n 1p; }
@@ -84,8 +84,8 @@ check "kein Tag v0.2.1"                         '! git -C "$TMP" rev-parse -q --
 
 git -C "$TMP" checkout -q -- ai-automation-frontend/package.json
 
-# --- Lasttest vor dem Tag (TODO 1a6058dc) -------------------------------------------------------------
-# Ergebnisverzeichnis wie von scripts/load-test.sh: <zeitstempel>-<sha12>/summary.txt
+# --- Load test before the tag (TODO 1a6058dc) -------------------------------------------------------------
+# Result directory as from scripts/load-test.sh: <timestamp>-<sha12>/summary.txt
 lt_result() {  # NAME VERDICT [COMMIT]
   local commit="${3:-$(git -C "$TMP" rev-parse HEAD)}"
   mkdir -p "$MYSURICATES_LOAD_TEST_DIR/$1"

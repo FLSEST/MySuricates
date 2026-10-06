@@ -54,8 +54,8 @@ export function Todos() {
   // Server-side filtering — todos already filtered by API params
   const filtered = todos ?? [];
 
-  // Tags aus den aktuellen Ergebnissen (ein zweiter API-Aufruf ohne Tag-Filter lohnt nicht).
-  // Ohne useMemo: todos entsteht in jedem Render neu, das Memo hielte nie (react-hooks 7.1).
+  // Tags from the current results (a second API call without tag filter is not worth it).
+  // Without useMemo: todos is rebuilt on every render, so the memo would never hit (react-hooks 7.1).
   const allTags = Array.from(new Set((todos ?? []).flatMap((todo) => todo.tags))).sort();
 
   // Counts from dedicated count API (accurate across all pages)

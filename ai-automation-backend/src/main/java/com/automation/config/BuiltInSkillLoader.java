@@ -24,19 +24,19 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * Laedt die Built-in-Skills aus {@code classpath:skills/builtin/*.json} (Metadaten inkl.
- * {@code sortOrder}, {@code writes}) plus die Schwesterdatei {@code <id>.md} mit dem
- * Prompt-Text. Vorbild: {@link BuiltInTemplateLoader}.
+ * Loads the built-in skills from {@code classpath:skills/builtin/*.json} (metadata incl.
+ * {@code sortOrder}, {@code writes}) plus the sibling file {@code <id>.md} with the
+ * prompt text. Modelled on {@link BuiltInTemplateLoader}.
  *
- * <p><b>Prompt-Fidelitaet:</b> Die {@code .md}-Datei wird byte-genau uebernommen — kein Trim,
- * kein angehaengter Zeilenumbruch. Die heutigen Prompts enden bewusst <em>ohne</em>
- * abschliessenden Zeilenumbruch; ein Editor, der einen anhaengt, aendert den Prompt.
- * {@code BuiltInSkillsSnapshotTest} schlaegt in dem Fall fehl.
+ * <p><b>Prompt fidelity:</b> The {@code .md} file is taken over byte-exact — no trim,
+ * no appended line break. Today's prompts deliberately end <em>without</em> a
+ * trailing line break; an editor that appends one changes the prompt.
+ * {@code BuiltInSkillsSnapshotTest} fails in that case.
  *
- * <p>Anders als beim Template-Loader sind Fehler hier hart: eine fehlende {@code .md}, ein
- * Dateiname der nicht zur {@code id} passt, fehlender {@code sortOrder}, ein doppelter
- * {@code sortOrder}, eine fehlende/unbekannte {@code category} oder ein leeres Verzeichnis
- * brechen den Start ab, statt ein unvollstaendiges Skill-Set zu seeden.
+ * <p>Unlike with the template loader, errors here are hard: a missing {@code .md}, a
+ * file name that does not match the {@code id}, a missing {@code sortOrder}, a duplicate
+ * {@code sortOrder}, a missing/unknown {@code category} or an empty directory
+ * abort startup instead of seeding an incomplete skill set.
  */
 @Component
 @Slf4j
@@ -55,18 +55,18 @@ public class BuiltInSkillLoader {
         this(objectMapper, DEFAULT_BASE_PATH);
     }
 
-    /** Nur fuer Tests: abweichendes Ressourcen-Verzeichnis. */
+    /** Tests only: alternative resource directory. */
     BuiltInSkillLoader(ObjectMapper objectMapper, String basePath) {
         this.objectMapper = objectMapper;
         this.basePath = basePath;
     }
 
-    /** Alle Built-in-Skills als Entities, sortiert nach {@code sortOrder}. */
+    /** All built-in skills as entities, sorted by {@code sortOrder}. */
     public List<Skill> loadAll() {
         return loadAllDefinitions().stream().map(this::toEntity).toList();
     }
 
-    /** Die rohen Metadaten ohne Prompt, sortiert nach {@code sortOrder}. */
+    /** The raw metadata without prompt, sorted by {@code sortOrder}. */
     public List<BuiltInSkillDefinition> loadAllDefinitions() {
         List<BuiltInSkillDefinition> definitions = new ArrayList<>();
 
@@ -104,7 +104,7 @@ public class BuiltInSkillLoader {
         if (def.id() == null || def.id().isBlank()) {
             throw new IllegalStateException("Built-in-Skill " + filename + " hat keine id");
         }
-        // Die Prompt-Datei wird ueber die id aufgeloest — Dateiname und id muessen deshalb passen.
+        // The prompt file is resolved via the id — file name and id must therefore match.
         if (!(def.id() + ".json").equals(filename)) {
             throw new IllegalStateException(
                     "Built-in-Skill " + filename + " heisst nicht wie seine id: erwartet " + def.id() + ".json");
@@ -122,7 +122,7 @@ public class BuiltInSkillLoader {
         return def;
     }
 
-    /** Prompt byte-genau aus {@code <id>.md}. */
+    /** Prompt byte-exact from {@code <id>.md}. */
     private String readPrompt(String id) {
         String path = basePath + "/" + id + ".md";
         ClassPathResource md = new ClassPathResource(path);

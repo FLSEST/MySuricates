@@ -100,9 +100,9 @@ public class SearchController {
                 .limit(limit)
                 .map(s -> s.workflow)
                 .toList();
-        // Gebuendelt mappen, nicht je Treffer: Der Einzelpfad loest die Run-Zahl pro Workflow
-        // auf und ergab bei 20 Treffern 20 zusaetzliche select workflow_runs. /workflows nutzt
-        // die gebuendelte Variante seit 1e465a9e, die Suche war aussen vor (TODO 13d1e2a2).
+        // Map in bulk, not per hit: the single path resolves the run count per workflow
+        // and produced 20 additional select workflow_runs for 20 hits. /workflows has used
+        // the bulk variant since 1e465a9e, the search was left out (TODO 13d1e2a2).
         return workflowMapper.toResponseListWithRunCounts(ranked);
     }
 

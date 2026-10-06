@@ -18,9 +18,9 @@ interface TodoBoardInput {
 }
 
 /**
- * Daten der TODO-Seite: die Liste als eine Seite (`useTodos`), das Board mit einer Abfrage je
- * sichtbarer Spalte. Der Statusfilter bestimmt die Spalten; nur die Abfragen der aktiven Ansicht
- * laufen. Liefert die sichtbaren TODOs, Laden, Fehler und `refetch` der aktiven Ansicht.
+ * Data of the TODO page: the list as one page (`useTodos`), the board with one query per
+ * visible column. The status filter determines the columns; only the queries of the active view
+ * run. Returns the visible TODOs, loading, error and `refetch` of the active view.
  */
 export function useTodoBoard({ viewMode, statusFilter, filterParams, apiParams, page }: TodoBoardInput) {
   // Pagination — sizes are user settings, not constants (see TodoSettingsCard)

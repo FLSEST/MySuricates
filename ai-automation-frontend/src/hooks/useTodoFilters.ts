@@ -5,9 +5,9 @@ import { ACTIVE_STATUSES, SEARCH_DEBOUNCE_MS, type TodoStatusFilter, type ViewMo
 import type { TodoSource } from '../types';
 
 /**
- * Filter-, Ansichts- und Seitenzustand der TODO-Seite (persistiert, Suche entprellt) und die
- * daraus gebauten Server-Parameter: `filterParams` ohne Status (das Board ergänzt ihn je Spalte),
- * `apiParams` mit Status für die Liste. Ein `?projectId=` in der URL setzt den Projektfilter.
+ * Filter, view and page state of the TODO page (persisted, search debounced) and the
+ * server parameters built from it: `filterParams` without status (the board adds it per column),
+ * `apiParams` with status for the list. A `?projectId=` in the URL sets the project filter.
  */
 export function useTodoFilters() {
   // Default: what is actually being worked on. With a 90 %-DONE backlog, ALL is a long,

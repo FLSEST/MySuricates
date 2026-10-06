@@ -44,9 +44,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Meilensteine – Termine des ganzen Ziels, optional an Arbeitspakete geknuepft (TODO c60bf914 Ziele
- * Stufe 1: Ziel → Projekte → Arbeitspakete → TODOs, Meilensteine, Gliederung und Zeitstrahl): anlegen,
- * Verknuepfungen ersetzen, von Hand erreichen, die 400-Faelle und der Zustand in der Liste.
+ * Milestones – dates of the whole goal, optionally tied to work packages (TODO c60bf914 Goals
+ * stage 1: goal → projects → work packages → TODOs, milestones, outline and timeline): create,
+ * replace links, reach by hand, the 400 cases and the state in the list.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -143,7 +143,7 @@ class GoalMilestoneServiceTest {
         order.verify(linkRepository).link("m", "wp3");
     }
 
-    /** Ohne verknuepfte Pakete markiert ein Mensch den Meilenstein; mit Paketen ist {@code reached} ein 400. */
+    /** Without linked packages a human marks the milestone; with packages {@code reached} is a 400. */
     @Test
     void update_reachedByHand_onlyWithoutPackages() {
         GoalMilestone manual = milestone("manual", NOW.minus(Duration.ofDays(1)), null);
@@ -203,7 +203,7 @@ class GoalMilestoneServiceTest {
         order.verify(milestoneRepository).deleteById("m");
     }
 
-    /** Die Liste rechnet Pakete und Meilensteine aus denselben TODO-Zeilen – drei Abfragen, keine je Paket. */
+    /** The list computes packages and milestones from the same TODO rows – three queries, none per package. */
     @Test
     void list_and_snapshot_takeThePackageStatesFromTheTodoRows() {
         Goal goal = Goal.builder().id("g1").title("Release").build();

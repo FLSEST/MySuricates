@@ -8,16 +8,16 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Deterministischer Mini-Parser fuer messbare Werte im Evidence-Text eines Audit-Findings.
+  * Deterministic mini parser for measurable values in the evidence text of an audit finding.
  * <ul>
- *   <li>{@link #parse}: Zahlen mit einer bekannten Einheit ("340 LOC", "531 NCLOC", "12 deps", "3,5 MB",
- *       "80 %") und benannte Zaehlungen aus Faktenzeilen ("FAKT unindexed_findby_columns_count: 9", Schluessel
- *       ist der Name). NCLOC ist eine eigene Einheit, nie LOC. Pro Schluessel zaehlt der groesste Wert.</li>
- *   <li>{@link #churn} / {@link #hotspotThreshold}: Aenderungsrate ("6 Aenderungen in 90 Tagen (Hotspot ab 5)",
- *       "Backend churn: 30") getrennt davon, weil sie schwankt und nicht prozentual verglichen wird.</li>
+  *   <li>{@link #parse}: numbers with a known unit ("340 LOC", "531 NCLOC", "12 deps", "3,5 MB",
+  *       "80 %") and named counts from fact lines ("FAKT unindexed_findby_columns_count: 9", the key
+  *       is the name). NCLOC is a unit of its own, never LOC. Per key the largest value counts.</li>
+  *   <li>{@link #churn} / {@link #hotspotThreshold}: rate of change ("6 Aenderungen in 90 Tagen (Hotspot ab 5)",
+  *       "Backend churn: 30") separate from it because it fluctuates and is not compared by percentage.</li>
  * </ul>
- * Grundlage der Verschlechterungsregel fuer akzeptierte Risiken ({@link AuditAcceptancePolicy});
- * alles Nicht-Erkannte wird ignoriert.
+  * Basis of the worsening rule for accepted risks ({@link AuditAcceptancePolicy});
+  * everything unrecognized is ignored.
  */
 public final class EvidenceMetrics {
     private static final Map<String, String> CANONICAL = Map.ofEntries(
@@ -40,7 +40,7 @@ public final class EvidenceMetrics {
                     .filter(k -> !k.equals("%")).map(Pattern::quote).toList()) + ")\\b)",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 
-    /** Benannte Zaehlung einer Faktenzeile, bewusst eng: klein geschriebener Bezeichner mit "_count", Doppelpunkt, Zahl. */
+    /** Named count of a fact line, deliberately narrow: lowercase identifier with "_count", colon, number. */
     private static final Pattern NAMED_COUNT = Pattern.compile("(?<![A-Za-z0-9_])([a-z0-9_]+_count):\\s*(\\d+)\\b(?![.,]\\d)");
 
     private static final Pattern CHURN = Pattern.compile(
@@ -51,7 +51,7 @@ public final class EvidenceMetrics {
 
     private EvidenceMetrics() {}
 
-    /** @return kanonische Einheit bzw. Zaehlungsname → groesster Wert; leer, wenn der Text keine messbaren Werte enthaelt. */
+    /** @return canonical unit or count name → largest value; empty if the text contains no measurable values. */
     public static Map<String, Double> parse(String evidence) {
         Map<String, Double> metrics = new TreeMap<>();
         if (evidence == null || evidence.isBlank()) return metrics;
@@ -68,7 +68,7 @@ public final class EvidenceMetrics {
         return metrics;
     }
 
-    /** @return groesste genannte Aenderungsrate ("6 Aenderungen", "churn: 30"); leer, wenn keine genannt ist. */
+    /** @return largest rate of change mentioned ("6 Aenderungen", "churn: 30"); empty if none is mentioned. */
     public static OptionalInt churn(String evidence) {
         if (evidence == null || evidence.isBlank()) return OptionalInt.empty();
         Matcher matcher = CHURN.matcher(evidence);
@@ -80,14 +80,14 @@ public final class EvidenceMetrics {
         return result;
     }
 
-    /** @return die im Text genannte Hotspot-Schwelle ("Hotspot ab 5"); leer, wenn keine genannt ist. */
+    /** @return the hotspot threshold mentioned in the text ("Hotspot ab 5"); empty if none is mentioned. */
     public static OptionalInt hotspotThreshold(String evidence) {
         if (evidence == null) return OptionalInt.empty();
         Matcher matcher = HOTSPOT_THRESHOLD.matcher(evidence);
         return matcher.find() ? OptionalInt.of(Integer.parseInt(matcher.group(1))) : OptionalInt.empty();
     }
 
-    /** Formatiert einen Wert samt Einheit fuer Notizen, z. B. "320 LOC" oder "3.5 MB". */
+    /** Formats a value including unit for notes, e.g. "320 LOC" or "3.5 MB". */
     public static String format(double value, String unit) {
         String number = value == Math.rint(value) ? String.valueOf((long) value) : String.valueOf(value);
         return number + (unit.equals("%") ? " %" : " " + unit);

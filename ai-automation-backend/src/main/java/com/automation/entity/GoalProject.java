@@ -15,9 +15,9 @@ import lombok.Setter;
 import java.io.Serializable;
 
 /**
- * Ein Projekt, dem ein Ziel ausdruecklich zugeordnet ist, mit seiner Reihenfolge im Ziel
- * (TODO c60bf914). Ein Ziel kann mehrere Projekte haben, ein Projekt mehrere Ziele. Wird ein TODO
- * aus einem noch nicht zugeordneten Projekt ins Ziel geholt, kommt das Projekt automatisch dazu
+ * A project a goal is explicitly assigned to, with its order in the goal
+ * (TODO c60bf914). A goal can have several projects, a project several goals. If a TODO
+ * from a not yet assigned project is pulled into the goal, the project is added automatically
  * ({@code GoalProjectRepository#linkIfAbsent}).
  */
 @Entity
@@ -38,11 +38,11 @@ public class GoalProject {
     @Column(name = "project_id")
     private String projectId;
 
-    /** Reihenfolge im Ziel, ab 0; die Gliederung und die Arbeitspakete folgen ihr. */
+    /** Order in the goal, from 0; the outline and the work packages follow it. */
     @Column(nullable = false)
     private int position;
 
-    /** Zusammengesetzter Schluessel (goal_id, project_id). */
+    /** Composite key (goal_id, project_id). */
     @Getter
     @Setter
     @NoArgsConstructor

@@ -39,7 +39,7 @@ class TodoOverviewServiceTest {
     @Mock private com.automation.repository.GoalWorkPackageRepository workPackageRepository;
     @Mock private com.automation.repository.GoalRepository goalRepository;
 
-    /** Modul goals an; einzelne Tests schalten es aus (TODO c60bf914). */
+    /** Module goals on; individual tests turn it off (TODO c60bf914). */
     @org.mockito.Spy private com.automation.modules.ModuleRegistry modules = com.automation.modules.ModuleRegistry.allEnabled();
 
     @InjectMocks private TodoOverviewService service;
@@ -122,7 +122,7 @@ class TodoOverviewServiceTest {
         assertThat(result.staleThresholdDays()).isEqualTo(30);
     }
 
-    // --- Meilensteine und Arbeitspakete in „Braucht dich“ (TODO 259f4f66, c60bf914) -----------
+    // --- Milestones and work packages in „Braucht dich“ (TODO 259f4f66, c60bf914) -----------
 
     @Test
     void getOverview_listsDueSoonAndOverdueMilestones_butNotReachedOnes_withTheirGoal() {
@@ -149,7 +149,7 @@ class TodoOverviewServiceTest {
         org.mockito.Mockito.verify(todoRepository, org.mockito.Mockito.never()).countByWorkPackage(any());
     }
 
-    /** Ein ueberfaelliges Arbeitspaket mit offenen TODOs steht dabei – nach Datum einsortiert. */
+    /** An overdue work package with open TODOs is included – sorted by date. */
     @Test
     void getOverview_listsOverdueWorkPackages_withTheirTodoCounts_sortedByDate() {
         Instant now = Instant.now();
@@ -196,7 +196,7 @@ class TodoOverviewServiceTest {
         when(todoRepository.findNeedsYou(any(), any())).thenReturn(List.of());
     }
 
-    /** Modul goals aus (TODO c60bf914): milestonesDue leer, ohne eine einzige Ziel-Abfrage. */
+    /** Module goals off (TODO c60bf914): milestonesDue empty, without a single goal query. */
     @Test
     void getOverview_whileGoalsIsOff_hasNoMilestonesDue_andAsksNothing() {
         org.mockito.Mockito.doReturn(false).when(modules).isEnabled(com.automation.modules.ModuleCatalog.GOALS);

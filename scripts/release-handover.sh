@@ -1,41 +1,41 @@
 #!/usr/bin/env bash
-# Release-Übergabe: bringt den Baum eines Release-Tags aus dem Arbeits-Repo als EINEN geprüften
-# Commit samt annotiertem Tag in einen vorhandenen Klon des öffentlichen Repositorys.
+# Release handover: brings the tree of a release tag from the working repo as ONE checked
+# commit with an annotated tag into an existing clone of the public repository.
 #
-# Das öffentliche Repository bekommt keine Arbeits-Historie, sondern je Release einen
-# zusammengefassten Commit — was dort ankommt, ist immer ein geprüfter Stand. Ablauf:
-#   1. Vorbedingungen: Tag im Arbeits-Repo, Ziel-Klon sauber, auf einem Branch, nicht hinter
-#      seinem Upstream, Tag dort noch frei, Autor/Committer in noreply-Form, private Listen da.
-#   2. Export: `git archive <tag>` ohne die Pfade aus scripts/release-handover.exclude (Fassung
-#      aus dem Tag). Im Ziel wird der getrackte Inhalt ersetzt — `.git` und `release-notes/`
-#      (die Notizen früherer Releases) bleiben, ignorierte Dateien (Build-Caches) auch.
-#   3. Keine Änderung gegenüber dem Ziel-Stand: sauber abbrechen (Exit 3), nichts bleibt zurück.
-#   4. Notizen aus scripts/release-notes.sh nach release-notes/<tag>.md (die Release-Action im
-#      öffentlichen Repo nimmt diese Datei), Commit "Release <tag>".
-#   5. Gates auf genau diesem Commit: public-hygiene --tracked (mit privaten Listen),
-#      pool-neutrality, README-Sync-Stand (README.md gibt die README.de.md des Tags wieder),
-#      gitleaks (falls installiert), Doku-Gates (pre-push-checks.sh --tree),
-#      mit --with-build zusätzlich mvn test, tsc und lint im Ziel.
-#      Ein Befund nimmt den Commit zurück — das Ziel steht danach wie vorher.
-#   6. Annotiertes Tag. KEIN Push: Das Skript endet mit dem Push-Befehl.
+# The public repository gets no working history, but one squashed commit per release --
+# what arrives there is always a checked state. Flow:
+#   1. Preconditions: tag in the working repo, target clone clean, on a branch, not behind
+#      its upstream, tag still free there, author/committer in noreply form, private lists present.
+#   2. Export: `git archive <tag>` without the paths from scripts/release-handover.exclude (version
+#      from the tag). In the target the tracked content is replaced -- `.git` and `release-notes/`
+#      (the notes of earlier releases) stay, ignored files (build caches) too.
+#   3. No change compared to the target state: abort cleanly (exit 3), nothing is left behind.
+#   4. Notes from scripts/release-notes.sh to release-notes/<tag>.md (the release action in the
+#      public repo takes this file), commit "Release <tag>".
+#   5. Gates on exactly this commit: public-hygiene --tracked (with private lists),
+#      pool-neutrality, README sync state (README.md reproduces the README.de.md of the tag),
+#      gitleaks (if installed), doc gates (pre-push-checks.sh --tree),
+#      with --with-build additionally mvn test, tsc and lint in the target.
+#      A finding reverts the commit -- the target is left as it was before.
+#   6. Annotated tag. NO push: the script ends with the push command.
 #
-# Usage: scripts/release-handover.sh [Optionen] <tag> <ziel-klon>
-#        scripts/release-handover.sh --discard <tag> <ziel-klon>
-#   --discard                     eine nicht gepushte Übergabe zurücknehmen (Commit + Tag im Ziel)
-#   --with-build                  zusätzlich Backend-Tests und Frontend-Typprüfung/Lint im Ziel
-#   --prev <tag>                  Vorgänger für die Notizen ("" = erstes Release); Standard: das
-#                                 zuletzt übergebene Release (höchstes v*-Tag davor, das auch im
-#                                 Ziel liegt), bei der ersten Übergabe das Tag direkt davor
-#   --source <repo>               Arbeits-Repo (Standard: das Repo dieses Skripts)
-#   --allow-missing-private-lists ohne private Hygiene-Listen weiter (nur für Proben)
-# Exit: 0 = bereit zum Push (bzw. verworfen), 1 = abgebrochen (Befund oder Vorbedingung), 2 = Aufruffehler,
-#       3 = nichts zu übergeben
+# Usage: scripts/release-handover.sh [options] <tag> <target-clone>
+#        scripts/release-handover.sh --discard <tag> <target-clone>
+#   --discard                     revert an unpushed handover (commit + tag in the target)
+#   --with-build                  additionally backend tests and frontend type check/lint in the target
+#   --prev <tag>                  predecessor for the notes ("" = first release); default: the
+#                                 most recently handed-over release (highest v* tag before it that
+#                                 also exists in the target), for the first handover the tag right before it
+#   --source <repo>               working repo (default: the repo of this script)
+#   --allow-missing-private-lists continue without private hygiene lists (for trial runs only)
+# Exit: 0 = ready to push (or discarded), 1 = aborted (finding or precondition), 2 = usage error,
+#       3 = nothing to hand over
 #
-# Beschreibung und Workflow dazu: docs/entwicklung.md → „Übergabe ins öffentliche Repo".
+# Description and workflow: docs/entwicklung.md → „Übergabe ins öffentliche Repo".
 set -uo pipefail
 
-# Zwei Repos, beide über -C angesprochen: ein geerbtes GIT_DIR (etwa aus einem Hook) lenkte sonst
-# jeden Aufruf in dasselbe Repo.
+# Two repos, both addressed via -C: an inherited GIT_DIR (e.g. from a hook) would otherwise steer
+# every call into the same repo.
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -65,7 +65,7 @@ while [ $# -gt 0 ]; do
         --prev)   [ $# -ge 2 ] || usage_die "--prev braucht einen Wert"; PREV="$2"; PREV_SET=1; shift ;;
         --source) [ $# -ge 2 ] || usage_die "--source braucht einen Wert"; SOURCE="$2"; shift ;;
         -h|--help) usage; exit 0 ;;
-        # Ein leeres Argument (etwa eine unbelegte Workflow-Variable) ist kein Wert.
+        # An empty argument (e.g. an unset workflow variable) is not a value.
         "") ;;
         -*) usage_die "Unbekannte Option: $1" ;;
         *) POSITIONAL+=("$1") ;;
@@ -76,8 +76,8 @@ done
 TAG="${POSITIONAL[0]}"
 TARGET_IN="${POSITIONAL[1]}"
 
-# ── 1. Vorbedingungen ─────────────────────────────────────────────────────────────────────────────
-# Das Tag wird Dateiname (release-notes/<tag>.md) und Ref im Ziel — nur die Release-Form.
+# ── 1. Preconditions ───────────────────────────────────────────────────────────────────────────────
+# The tag becomes a file name (release-notes/<tag>.md) and a ref in the target -- release form only.
 [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]] \
     || usage_die "Kein Release-Tag der Form vX.Y.Z: '$TAG'"
 
@@ -88,9 +88,9 @@ TOP="$(git -C "$TARGET" rev-parse --show-toplevel 2>/dev/null)" || die "Ziel ist
 BRANCH="$(git -C "$TARGET" symbolic-ref -q --short HEAD)" || die "Ziel steht auf keinem Branch (detached HEAD)"
 OLD="$(git -C "$TARGET" rev-parse -q --verify HEAD || true)"
 
-# ── --discard: eine freigegebene, aber nicht gepushte Übergabe zurücknehmen ─────────────────────────
-# Für die Ablehnung in der Freigabe: Ohne das bliebe Commit + Tag im Klon liegen, und der nächste
-# Lauf für dasselbe Tag bräche ab. Genommen wird nur, was eindeutig von der Übergabe stammt.
+# ── --discard: revert an approved but unpushed handover ─────────────────────────────────────────────
+# For rejection in the approval: without it, commit + tag would stay in the clone and the next
+# run for the same tag would abort. Only what clearly stems from the handover is taken back.
 if [ "$DISCARD" -eq 1 ]; then
     git -C "$TARGET" rev-parse -q --verify "refs/tags/${TAG}" >/dev/null || die "Tag ${TAG} gibt es im Ziel nicht — nichts zu verwerfen"
     [ -n "$OLD" ] && [ "$(git -C "$TARGET" rev-parse "${TAG}^{commit}")" = "$OLD" ] \
@@ -98,7 +98,7 @@ if [ "$DISCARD" -eq 1 ]; then
     [ "$(git -C "$TARGET" log -1 --format=%s "$OLD")" = "Release ${TAG}" ] \
         || die "HEAD ist nicht der Commit \"Release ${TAG}\" — von Hand prüfen"
     [ -z "$(git -C "$TARGET" status --porcelain 2>/dev/null)" ] || die "Ziel-Klon nicht sauber — von Hand prüfen"
-    # Gepusht ist, was ein Remote-Tracking-Ref schon enthält (ohne Netz: Stand des letzten fetch/push).
+    # A push is what a remote-tracking ref already contains (offline: state of the last fetch/push).
     if [ -n "$(git -C "$TARGET" for-each-ref --contains "$OLD" refs/remotes 2>/dev/null)" ]; then
         die "Commit ist bereits auf einem Remote — nicht mehr verwerfbar"
     fi
@@ -106,7 +106,7 @@ if [ "$DISCARD" -eq 1 ]; then
     if git -C "$TARGET" rev-parse -q --verify "${OLD}~1" >/dev/null; then
         git -C "$TARGET" reset -q --hard "${OLD}~1" || die "Zurücksetzen gescheitert"
     else
-        # Erste Übergabe in ein leeres Repo: zurück zum ungeborenen Branch, Dateien des Commits weg.
+        # First handover into an empty repo: back to the unborn branch, drop the files of the commit.
         (cd "$TARGET" && git ls-files -z | xargs -0 rm -f -- && git update-ref -d "refs/heads/${BRANCH}" \
             && git read-tree --empty && git clean -fdq) || die "Zurücksetzen gescheitert"
     fi
@@ -134,7 +134,7 @@ if [ -n "$OLD" ] && git -C "$TARGET" rev-parse -q --verify '@{u}' >/dev/null 2>&
     [ "$BEHIND" = "0" ] || die "Ziel liegt ${BEHIND} Commit(s) hinter seinem Upstream — erst git pull in $TARGET"
 fi
 
-# Autor und Committer nur in GitHub-noreply-Form, wie das Pre-Push-Gate im Arbeits-Repo verlangt.
+# Author and committer only in GitHub noreply form, as the pre-push gate in the working repo requires.
 ident_email() {  # $1 = GIT_AUTHOR_IDENT | GIT_COMMITTER_IDENT
     local ident
     ident="$(git -C "$TARGET" var "$1" 2>/dev/null)" || return 1
@@ -147,15 +147,15 @@ for role in GIT_AUTHOR_IDENT GIT_COMMITTER_IDENT; do
         || die "${role} im Ziel ist keine GitHub-noreply-Adresse — git -C $TARGET config user.email '<id>+<login>@users.noreply.github.com'"
 done
 
-# Private Hygiene-Listen: im Ziel gibt es die untrackten Repo-Kopien nicht. Liegen sie im
-# Arbeits-Repo, reichen wir sie über dieselben Variablen durch, die das Gate selbst kennt.
+# Private hygiene lists: the target has no untracked repo copies of them. If they exist in the
+# working repo, we pass them through via the same variables the gate itself knows.
 if [ -z "${HYGIENE_PRIVATE_LIST:-}" ] && [ -f "$SOURCE/scripts/ci/hygiene-private.txt" ]; then
     export HYGIENE_PRIVATE_LIST="$SOURCE/scripts/ci/hygiene-private.txt"
 fi
 if [ -z "${HYGIENE_PRIVATE_TERMS:-}" ] && [ -f "$SOURCE/scripts/ci/hygiene-private-terms.txt" ]; then
     export HYGIENE_PRIVATE_TERMS="$SOURCE/scripts/ci/hygiene-private-terms.txt"
 fi
-private_list_found() {  # $1 = Wert der Variablen, $2 = Dateiname unter ~/.config/mysuricates
+private_list_found() {  # $1 = value of the variable, $2 = file name under ~/.config/mysuricates
     [ -n "$1" ] && [ -f "$1" ] && return 0
     [ -f "${XDG_CONFIG_HOME:-${HOME:-}/.config}/mysuricates/$2" ]
 }
@@ -187,7 +187,7 @@ on_exit() {
 trap on_exit EXIT
 trap 'exit 130' INT TERM
 
-# Ausschlussliste: die Fassung aus dem Tag, sonst (älteres Tag) die aus dem Arbeitsbaum.
+# Exclude list: the version from the tag, otherwise (older tag) the one from the working tree.
 if git -C "$SOURCE" cat-file -e "${TAG}:${EXCLUDE_PATH}" 2>/dev/null; then
     git -C "$SOURCE" show "${TAG}:${EXCLUDE_PATH}" > "$WORK/exclude"
     EXCLUDE_ORIGIN="${TAG}:${EXCLUDE_PATH}"
@@ -208,10 +208,10 @@ while IFS= read -r line || [ -n "$line" ]; do
     PATHSPECS+=(":(exclude,glob)${line}")
 done < "$WORK/exclude"
 
-# Reihenfolge nach Semver aus dem Arbeits-Repo (dort gibt es jedes Tag). Das zuletzt übergebene
-# Release ist das höchste Tag davor, das auch im Ziel liegt — nicht einfach das Tag direkt davor:
-# Scheiterte eine Übergabe, stünden deren Änderungen sonst in keinen öffentlichen Notizen.
-# Ein Tag danach, das schon im Ziel liegt, heißt: Es wurde bereits Neueres übergeben.
+# Order by semver from the working repo (it has every tag). The most recently handed-over
+# release is the highest tag before it that also exists in the target -- not simply the tag right before it:
+# if a handover failed, its changes would otherwise appear in no public notes.
+# A later tag that already exists in the target means: something newer was already handed over.
 PUBLISHED_PREV=""
 SEMVER_PREV=""
 SEEN_TAG=0
@@ -228,13 +228,13 @@ while IFS= read -r t; do
     fi
 done < <(git -C "$SOURCE" tag --list 'v[0-9]*' --sort=v:refname)
 
-# Vorgänger für die Notizen: das zuletzt übergebene Release, ohne eines (erste Übergabe) das Tag
-# direkt davor im Arbeits-Repo.
+# Predecessor for the notes: the most recently handed-over release, without one (first handover) the tag
+# right before it in the working repo.
 if [ "$PREV_SET" -eq 0 ]; then
     PREV="${PUBLISHED_PREV:-$SEMVER_PREV}"
 fi
 
-# Links der Notizen zeigen ins öffentliche Repo, nicht ins Arbeits-Repo.
+# Links in the notes point to the public repo, not to the working repo.
 TARGET_URL="$(git -C "$TARGET" config --get remote.origin.url 2>/dev/null || true)"
 case "$TARGET_URL" in
     git@github.com:*|https://github.com/*|ssh://git@github.com/*)
@@ -257,7 +257,7 @@ log "Ausschluss:    ${EXCLUDE_ORIGIN}, ${#PATHSPECS[@]} Muster"
 git -C "$SOURCE" archive --format=tar -o "$WORK/tree.tar" "$TAG" -- . "${PATHSPECS[@]}" \
     || die "git archive ist gescheitert (Muster in ${EXCLUDE_PATH} prüfen)"
 git -C "$SOURCE" ls-tree -r -z --name-only "$TAG" > "$WORK/all.nul"
-# Dateiliste des Exports (NUL-getrennt, exakt wie im Archiv) und die ausgeschlossenen Pfade.
+# File list of the export (NUL-separated, exactly as in the archive) and the excluded paths.
 python3 - "$WORK/tree.tar" "$WORK/all.nul" "$WORK/files.nul" "$WORK/excluded.txt" <<'PY' \
     || die "Archiv nicht lesbar"
 import sys, tarfile
@@ -284,12 +284,12 @@ if [ "$EXCLUDED_COUNT" -gt 0 ]; then
     [ "$EXCLUDED_COUNT" -gt 50 ] && echo "                 … und $((EXCLUDED_COUNT - 50)) weitere"
 fi
 
-# Notizen vor jeder Änderung am Ziel: scheitert das Skript, bleibt das Ziel unberührt.
+# Notes before any change to the target: if the script fails, the target stays untouched.
 RELEASE_NOTES_REPO_SLUG="$TARGET_SLUG" bash "$SOURCE/scripts/release-notes.sh" "$PREV" "$TAG" > "$WORK/notes.md" \
     || die "scripts/release-notes.sh ist gescheitert"
 
-# rollback — nimmt alles zurück, was dieser Lauf im Ziel verändert hat: die geschriebenen Dateien,
-# den Commit und den Index. Ignorierte Dateien (Build-Caches) bleiben, wie sie waren.
+# rollback -- reverts everything this run changed in the target: the written files,
+# the commit and the index. Ignored files (build caches) stay as they were.
 rollback() {
     ROLLBACK=0
     (
@@ -312,16 +312,16 @@ if [ -n "$OLD" ]; then
         || die "Konnte den bisherigen Inhalt des Ziels nicht entfernen"
 fi
 tar -xf "$WORK/tree.tar" -C "$TARGET" || die "Entpacken ins Ziel gescheitert"
-# -f: Auch Dateien, die unter eine Ignore-Regel fallen, aber im Tag getrackt sind (etwa die
-# Tray-Icons unter *.png), gehören in den Commit — der Baum soll dem Tag gleichen. Gestaged wird
-# genau die Liste aus dem Archiv, nie ein pauschales "git add -A": das nähme Build-Caches mit.
-# core.autocrlf=false: Eine globale Einstellung "input" wandelte sonst CRLF-Dateien (mvnw.cmd,
-# XSD-Vorlagen) beim Stagen um — der öffentliche Stand wiche still vom Tag ab.
+# -f: also files that fall under an ignore rule but are tracked in the tag (e.g. the
+# tray icons under *.png) belong in the commit -- the tree should equal the tag. Staged is
+# exactly the list from the archive, never a blanket "git add -A": that would pick up build caches.
+# core.autocrlf=false: a global setting "input" would otherwise convert CRLF files (mvnw.cmd,
+# XSD templates) when staging -- the public state would silently deviate from the tag.
 GIT_LITERAL_PATHSPECS=1 git -C "$TARGET" -c core.autocrlf=false -c core.safecrlf=false \
     add -f --pathspec-from-file="$WORK/files.nul" --pathspec-file-nul \
     || die "Konnte den Export im Ziel nicht stagen"
 
-# ── 3. Keine Änderung → sauber abbrechen ─────────────────────────────────────────────────────────
+# ── 3. No change → abort cleanly ──────────────────────────────────────────────────────────────
 if [ -n "$OLD" ] && git -C "$TARGET" diff --cached --quiet "$OLD" -- . ':(exclude)release-notes'; then
     rollback
     log "Nichts zu übergeben: ${TAG} ergibt im Ziel denselben Stand wie ${OLD_LABEL}."
@@ -329,7 +329,7 @@ if [ -n "$OLD" ] && git -C "$TARGET" diff --cached --quiet "$OLD" -- . ':(exclud
     exit 3
 fi
 
-# ── 4. Notizen + Commit ───────────────────────────────────────────────────────────────────────────
+# ── 4. Notes + commit ────────────────────────────────────────────────────────────────────────────
 mkdir -p "$TARGET/release-notes"
 cp "$WORK/notes.md" "$TARGET/release-notes/${TAG}.md"
 git -C "$TARGET" add -f -- "release-notes/${TAG}.md" || die "Konnte die Notizdatei nicht stagen"
@@ -340,9 +340,9 @@ COMMITTED=1
 NEW="$(git -C "$TARGET" rev-parse HEAD)"
 BASE="${OLD:-$EMPTY_TREE}"
 
-# Treue: Jede übertragene Datei hat im Commit denselben Blob und Modus wie im Tag, und außer
-# release-notes/ ist nichts dazugekommen. Fängt ab, was Git beim Stagen still verändern könnte
-# (Zeilenenden, Filter aus .gitattributes, ein vergessener Pfad).
+# Fidelity: every transferred file has the same blob and mode in the commit as in the tag, and apart from
+# release-notes/ nothing was added. Catches what Git might silently change when staging
+# (line endings, filters from .gitattributes, a forgotten path).
 git -C "$SOURCE" ls-tree -r -z --full-tree "$TAG" > "$WORK/src-tree.nul"
 git -C "$TARGET" ls-tree -r -z --full-tree "$NEW" > "$WORK/tgt-tree.nul"
 if ! python3 - "$WORK/src-tree.nul" "$WORK/tgt-tree.nul" "$WORK/files.nul" <<'PY'
@@ -372,10 +372,10 @@ then
 fi
 log "Treue:         ${FILE_COUNT} Datei(en) mit Blob und Modus wie im Tag"
 
-# ── 5. Gates auf dem Commit ───────────────────────────────────────────────────────────────────────
+# ── 5. Gates on the commit ─────────────────────────────────────────────────────────────────────
 GATE_FAIL=0
 GATE_SUMMARY=()
-run_gate() {  # $1 = Name, dann der Befehl (läuft im Ziel)
+run_gate() {  # $1 = name, then the command (runs in the target)
     local name="$1" out="$WORK/gate.out" rc warns
     shift
     echo "▶ ${name}"
@@ -396,14 +396,14 @@ run_gate() {  # $1 = Name, dann der Befehl (läuft im Ziel)
         GATE_FAIL=1
     fi
 }
-missing_gate() {  # $1 = Name, $2 = Pfad
+missing_gate() {  # $1 = name, $2 = path
     echo "▶ ${1}"
     echo "    ${2} fehlt im übertragenen Stand — ein Gate, das nicht misst, ist nicht grün"
     GATE_SUMMARY+=("${1}: FEHLER (${2} fehlt)")
     GATE_FAIL=1
 }
 
-gate_script() {  # $1 = Name, $2 = Skriptpfad im Ziel, Rest = Argumente
+gate_script() {  # $1 = name, $2 = script path in the target, rest = arguments
     local name="$1" script="$2"
     shift 2
     if [ -f "$TARGET/$script" ]; then
@@ -415,9 +415,9 @@ gate_script() {  # $1 = Name, $2 = Skriptpfad im Ziel, Rest = Argumente
 
 gate_script "Public-Hygiene (--tracked)" scripts/ci/public-hygiene.sh --tracked
 gate_script "Pool-Neutralität" scripts/ci/pool-neutrality.sh
-# README-Sync (c13a942b): README.md muss die README.de.md des Releases wiedergeben. Im Ziel gibt es
-# den Commit aus dem Sync-Stand nicht — aufloesbar bleibt er dort nur ueber den Inhalts-Hash, und
-# der passt nur, wenn vor dem Tag synchronisiert wurde. Tags vor dem Skript haben es noch nicht.
+# README sync (c13a942b): README.md must reproduce the README.de.md of the release. In the target there is
+# no commit from the sync state -- it stays resolvable there only via the content hash, and
+# that matches only if the sync happened before the tag. Tags before the script do not have it yet.
 if [ -f "$TARGET/scripts/readme-sync/readme_sync.py" ]; then
     run_gate "README-Sync-Stand" python3 scripts/readme-sync/readme_sync.py --root . check --current
 else
@@ -432,7 +432,7 @@ if command -v gitleaks >/dev/null 2>&1; then
     gitleaks_scan() {
         local rc
         gitleaks git --no-banner --redact --verbose --no-color --log-opts="$1" . ; rc=$?
-        # 8.19+ heißt der Unterbefehl "git", ältere Versionen kennen nur "detect".
+        # 8.19+ the subcommand is called "git", older versions only know "detect".
         if [ "$rc" -gt 1 ]; then
             gitleaks detect --no-banner --redact --verbose --no-color --source . --log-opts="$1"; rc=$?
         fi
@@ -455,8 +455,8 @@ if [ "$WITH_BUILD" -eq 1 ]; then
     build_frontend() {
         command -v npm >/dev/null 2>&1 || { echo "npm fehlt im PATH"; return 2; }
         cd ai-automation-frontend || return 2
-        # Frischer Klon: Abhängigkeiten genau nach Lockfile. Ein vorhandenes node_modules (aus
-        # einem früheren Lauf, ignoriert und deshalb nicht angefasst) wird weiterverwendet.
+        # Fresh clone: dependencies exactly per lockfile. An existing node_modules (from
+        # an earlier run, ignored and therefore not touched) is reused.
         if [ ! -d node_modules ]; then
             npm ci --no-audit --no-fund || return 1
         fi

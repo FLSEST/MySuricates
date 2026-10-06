@@ -1,8 +1,8 @@
 import { createContext, useContext } from 'react';
 
 /**
- * Wo auf der Zielseite entschieden werden darf (68a5e24e): das Ziel und ob das Backend Entscheidungen
- * kennt. Ohne Anbieter bleiben die Markierungen reine Anzeige.
+ * Where decisions may be made on the goal page (68a5e24e): the goal and whether the backend knows
+ * decisions. Without a provider, the markers remain pure display.
  */
 export interface DecisionScope {
   goalId: string;

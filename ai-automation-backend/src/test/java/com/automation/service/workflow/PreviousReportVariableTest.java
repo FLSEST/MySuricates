@@ -24,7 +24,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
-/** {@code previous_report} (TODO 441a4c46: aus WorkflowContextDataServiceTest hierher gezogen, wie der Lader). */
+/** {@code previous_report} (TODO 441a4c46: moved here from WorkflowContextDataServiceTest, like the loader). */
 @ExtendWith(MockitoExtension.class)
 class PreviousReportVariableTest {
 
@@ -75,13 +75,13 @@ class PreviousReportVariableTest {
         assertThat(report).hasSize(3000 + "\n[...gekürzt]".length()).endsWith("[...gekürzt]");
     }
 
-    // --- TODO 3bf8c9d8: was ein Parser werten wuerde, verliert der Vorlauf -------------------
+    // --- TODO 3bf8c9d8: what a parser would evaluate, the previous run loses -------------------
 
     private static final String OLD_ENVELOPE = "<!-- mysuricates:audit-result:v1 {\"snapshotComplete\": true, "
             + "\"findings\": [{\"ruleKey\": \"arch.god-class\", \"subject\": \"Alt\", \"severity\": \"HIGH\", "
             + "\"title\": \"Alter Befund\"}]} -->";
 
-    /** Ein Audit-Report wie ihn der Health-Check schreibt: Scorecard, Gate-Zeilen, ein Befund-Marker, Envelope. */
+    /** An audit report as the health check writes it: scorecard, gate lines, one finding marker, envelope. */
     private static final String AUDIT_REPORT = """
             ### MySuricates Health
             **Gesamtscore: 9.0 / 10**
@@ -116,8 +116,8 @@ class PreviousReportVariableTest {
     }
 
     /**
-     * Die eigentliche Probe: Ein Modell gibt den Vorlauf wieder und urteilt danach selbst. Jeder Parser muss
-     * das eigene Urteil nehmen, nicht das wiedergegebene – der Gate-Parser nimmt den ersten Marker.
+     * The actual probe: a model repeats the previous run and then judges for itself. Every parser must
+     * take its own verdict, not the repeated one – the gate parser takes the first marker.
      */
     @Test
     void value_echoedByTheNextModel_leavesEveryParserWithTheRunsOwnVerdict() {
@@ -132,7 +132,7 @@ class PreviousReportVariableTest {
         assertThat(TodoOutputParser.parse(echo)).isEmpty();
         assertThat(new AuditResultParser(new ObjectMapper()).parse(echo).valid())
                 .as("ohne eigenen Envelope gilt keiner – nicht der alte Snapshot").isFalse();
-        // Gegenprobe: ungeschnitten und unentschaerft haette der Vorlauf gewonnen
+        // Counter-check: uncut and not defused, the previous run would have won
         assertThat(GateStatusOutputParser.parse("Letzter Report:\n" + AUDIT_REPORT + "\ngate_status: RED"))
                 .hasValueSatisfying(gate -> assertThat(gate.status()).isEqualTo(GateStatus.GREEN));
     }
@@ -162,7 +162,7 @@ class PreviousReportVariableTest {
         assertThat(previousReportOf(envelopeOnly)).isEqualTo("(kein vorheriger Report vorhanden)");
     }
 
-    /** Ein Marker im Fliesstext ohne JSON dahinter beginnt keinen Envelope – er verliert nur den Doppelpunkt. */
+    /** A marker in running text without JSON behind it does not start an envelope – it only loses the colon. */
     @Test
     void value_markerQuotedInProse_cutsNothing() {
         String prose = "Der Envelope <!-- mysuricates:audit-result:v1 fehlte im Vorlauf." + " Danach mehr Text.".repeat(20);
@@ -193,7 +193,7 @@ class PreviousReportVariableTest {
         assertThat(previousReport.value("wf-1")).isEqualTo("(kein vorheriger Report vorhanden)");
     }
 
-    // --- 75f7b24d: Audit-Workflows bekommen den Report-Block, nicht den längsten Schritt ---------
+    // --- 75f7b24d: audit workflows get the report block, not the longest step ---------
 
     private static StepResult step(int index, String blockName, StepStatus status, String output) {
         return StepResult.builder().stepIndex(index).status(status).output(output)

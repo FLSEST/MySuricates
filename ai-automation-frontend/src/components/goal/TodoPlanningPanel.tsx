@@ -11,10 +11,10 @@ import { COMPLEXITIES, EFFORTS, packageOptions, withGoal } from './planning';
 import type { TodoPlanningForm } from './useTodoPlanningForm';
 
 /**
- * Einordnung eines TODOs im Bearbeiten-Dialog (TODO dc0566f8): Ziel, Arbeitspaket (nur solche des
- * TODO-Projekts, c60bf914), Komplexität, empfohlener Effort, Begründung, offene Frage und
- * Entscheidung (68a5e24e). Den Zustand hält der Dialog (`useTodoPlanningForm`); gespeichert wird mit
- * seinem „Speichern“ (bbee09e6), einen eigenen Knopf gibt es nicht mehr.
+ * Planning of a TODO in the edit dialog (TODO dc0566f8): goal, work package (only those of the
+ * TODO's project, c60bf914), complexity, recommended effort, reasoning, open question and
+ * decision (68a5e24e). The dialog holds the state (`useTodoPlanningForm`); it is saved with
+ * its „Speichern“ (bbee09e6), there is no separate button any more.
  */
 export function TodoPlanningPanel({ todo, planning }: { todo: Todo; planning: TodoPlanningForm }) {
   const t = useT();
@@ -22,7 +22,7 @@ export function TodoPlanningPanel({ todo, planning }: { todo: Todo; planning: To
   const { data: goals = [] } = useGoals();
   const { form, setForm, conflict, loaded } = planning;
   const decisionId = useId();
-  // Entscheidungen kennt erst ein Backend ab 68a5e24e – ein älteres ließe das Feld stillschweigend fallen
+  // Only a backend from 68a5e24e on knows decisions - an older one would silently drop the field
   const decisions = todo.planning?.decisionState !== undefined;
   const packages = loaded ? packageOptions(loaded.workPackages, todo.projectId, form.workPackageId) : [];
   const packageLabel = (item: (typeof packages)[number]) => {
@@ -53,7 +53,7 @@ export function TodoPlanningPanel({ todo, planning }: { todo: Todo; planning: To
           options={[
             { value: '', label: t.goals.timeline.noWorkPackageOption },
             ...packages.map((item) => ({ value: item.id, label: packageLabel(item) })),
-            // Solange das Ziel lädt, bleibt das bisherige Paket gewählt statt scheinbar „keins“
+            // While the goal loads, the previous package stays selected instead of seemingly „none“
             ...(form.workPackageId && !packages.some((item) => item.id === form.workPackageId)
               ? [{ value: form.workPackageId, label: t.common.loading }] : []),
           ]}

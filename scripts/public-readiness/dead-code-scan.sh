@@ -11,14 +11,14 @@ done
 
 section "Dead code and unused surface scan"
 
-# "TODO" ist in diesem Repository auch die Fachentitaet (TodoService, "TODO anlegen"),
-# und Kommentare verweisen per "TODO <8-hex-id>" auf ein erfasstes TODO. Gezaehlt
-# werden deshalb nur Kommentar-Marker ("// TODO:", "# FIXME", "<!-- HACK"), getrennt
-# nach "mit TODO-ID" (verfolgt) und "blank" (unverfolgt). Das eigene Verzeichnis
-# faellt heraus: die Scanner nennen die Marker, nach denen sie suchen (TODO 16e172a2).
+# "TODO" is also the domain entity in this repository (TodoService, "TODO anlegen"),
+# and comments refer to a tracked TODO via "TODO <8-hex-id>". Therefore only comment
+# markers are counted ("// TODO:", "# FIXME", "<!-- HACK"), split into "with TODO id"
+# (tracked) and "bare" (untracked). The own directory is excluded: the scanners
+# name the markers they search for (TODO 16e172a2).
 MARKER_PREFIX='(//|#|/\*|\*|<!--)[[:space:]]*'
 TODO_ID='TODO[[:space:]:(]*[0-9a-f]{8}([^0-9a-zA-Z]|$)'
-marker_hits() {  # $1 = ERE hinter dem Kommentarpraefix
+marker_hits() {  # $1 = ERE after the comment prefix
   pgrep -n --exclude-dir=public-readiness --exclude='*.md' "${MARKER_PREFIX}$1" .
 }
 

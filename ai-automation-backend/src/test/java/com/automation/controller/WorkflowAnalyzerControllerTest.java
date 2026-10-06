@@ -75,7 +75,7 @@ class WorkflowAnalyzerControllerTest {
                 .andExpect(jsonPath("$.findings[0].severity").value("HIGH"));
     }
 
-    /** TODO 81773d7b: jeder Befund trägt den Text deutsch ({@code detail}, wie bisher) und englisch ({@code detailEn}). */
+    /** TODO 81773d7b: every finding carries its text in German ({@code detail}, as before) and in English ({@code detailEn}). */
     @Test
     void analyzeLiefertDetailDeutschUndEnglisch() throws Exception {
         Workflow w = wf("wf-3", "Zweisprachig");

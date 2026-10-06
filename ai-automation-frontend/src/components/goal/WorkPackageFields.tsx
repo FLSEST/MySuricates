@@ -4,21 +4,21 @@ import { MAX_TITLE, rangeProblem, type WorkPackageDraft } from './workPackageFor
 import type { GoalProject } from '../../types';
 
 /**
- * Die Felder eines Arbeitspakets (c60bf914) – im Dialog der Gliederung und in der Karte am
- * Zeitstrahl: Titel, Projekt (gesperrt, sobald TODOs daran hängen), Beginn und Ende. Ein
- * unvollständiger oder verdrehter Zeitraum steht als Fehler am Ende-Feld.
+ * The fields of a work package (c60bf914) - in the dialog of the outline and in the card on the
+ * timeline: title, project (locked once TODOs are attached to it), start and end. An
+ * incomplete or reversed period appears as an error at the end field.
  */
 export function WorkPackageFields({ draft, onChange, projects, locked, autoFocus = false }: {
   draft: WorkPackageDraft;
   onChange: (draft: WorkPackageDraft) => void;
   projects: GoalProject[];
-  /** Das Projekt lässt sich nicht mehr wechseln. */
+  /** The project can no longer be changed. */
   locked: boolean;
   autoFocus?: boolean;
 }) {
   const tw = useT().goals.workPackages;
   const options = projects.map((project) => ({ value: project.projectId, label: project.name }));
-  // Ein Paket, dessen Projekt nicht mehr zum Ziel gehört, behält es als Auswahl
+  // A package whose project no longer belongs to the goal keeps it as its selection
   if (draft.projectId && !options.some((option) => option.value === draft.projectId)) {
     options.push({ value: draft.projectId, label: draft.projectId });
   }
@@ -27,7 +27,7 @@ export function WorkPackageFields({ draft, onChange, projects, locked, autoFocus
 
   return (
     <div className="space-y-3">
-      {/* Der Fokus springt bewusst hinein: Dialog und Karte öffnen sich auf einen Klick hin */}
+      {/* The focus jumps in on purpose: dialog and card open on a click */}
       <Input label={tw.titleLabel} value={draft.title} maxLength={MAX_TITLE} autoFocus={autoFocus}
         onChange={(event) => onChange({ ...draft, title: event.target.value })} />
       {options.length === 0 ? (

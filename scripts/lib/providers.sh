@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# KI-Anbieter fuer den Installer — gleichrangig, aus dem generierten Katalog des Backends
-# (provider-catalog.generated.sh, ProviderCatalogTest). Kein Anbieter ist fest verdrahtet (2255f2ee).
+# AI providers for the installer — equal-ranking, from the backend's generated catalog
+# (provider-catalog.generated.sh, ProviderCatalogTest). No provider is hard-wired (2255f2ee).
 #
-# Erkennung ohne Netz und ohne die CLIs zu starten: vorhanden = auf dem PATH, angemeldet = eine der
-# Anmeldedateien unter $HOME ist nicht leer (bzw. enthaelt das Muster bei "datei:muster") oder eine
-# der Anmelde-Umgebungsvariablen (login_env, z. B. CLAUDE_CODE_OAUTH_TOKEN) ist gesetzt und nicht leer
-# (0b1a3ae7). Den Wert gibt hier nichts aus.
-# bash 3.2 (macOS): Skalare statt assoziativer Arrays.
+# Detection without network and without starting the CLIs: present = on the PATH, logged in = one of the
+# login files under $HOME is not empty (or contains the pattern for "file:pattern") or one
+# of the login environment variables (login_env, e.g. CLAUDE_CODE_OAUTH_TOKEN) is set and not empty
+# (0b1a3ae7). Nothing here prints the value.
+# bash 3.2 (macOS): scalars instead of associative arrays.
 
 _PROVIDERS_LIB_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROVIDER_IDS=()
@@ -15,7 +15,7 @@ PROVIDER_IDS=()
 
 providers_ids() { local id; for id in "${PROVIDER_IDS[@]}"; do printf '%s\n' "$id"; done; }
 
-# provider_get ID FELD  (cli, install, login, login_note, login_files, login_env)
+# provider_get ID FIELD  (cli, install, login, login_note, login_files, login_env)
 provider_get() {
   local name="PROVIDER__$(printf '%s' "${1:-}" | tr -c 'a-z0-9_' '_')__${2:-}"
   printf '%s' "${!name-}"
@@ -23,7 +23,7 @@ provider_get() {
 
 provider_present() { command -v "$(provider_get "${1:-}" cli)" >/dev/null 2>&1; }
 
-# Namen der gesetzten, nicht leeren Anmelde-Variablen, durch Leerzeichen getrennt — nie ihre Werte
+# Names of the set, non-empty login variables, separated by spaces — never their values
 provider_login_env_names() {
   local var out=""
   for var in $(provider_get "${1:-}" login_env); do
@@ -33,8 +33,8 @@ provider_login_env_names() {
   printf '%s' "$out"
 }
 
-# Angemeldet per Datei unter $HOME — die bindet scripts/lib/host-mounts.sh ein. Eine Anmeldung nur per
-# Umgebungsvariable kommt nur ueber ~/.config/mysuricates/ai.env in einen Container (setup.sh fragt)
+# Logged in via a file under $HOME — scripts/lib/host-mounts.sh mounts it. A login only via
+# environment variable reaches a container only through ~/.config/mysuricates/ai.env (setup.sh asks)
 provider_login_file() {
   local entry file pattern
   for entry in $(provider_get "${1:-}" login_files); do
@@ -48,7 +48,7 @@ provider_login_file() {
 
 provider_logged_in() { [ -n "$(provider_login_env_names "${1:-}")" ] || provider_login_file "${1:-}"; }
 
-# Eine Zeile je Anbieter: "<id> present|missing logged-in|logged-out"
+# One line per provider: "<id> present|missing logged-in|logged-out"
 providers_status() {
   local id p l
   for id in "${PROVIDER_IDS[@]}"; do

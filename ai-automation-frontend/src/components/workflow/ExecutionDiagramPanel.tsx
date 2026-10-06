@@ -10,7 +10,7 @@ interface ExecutionDiagramPanelProps {
   onSelectBlock: (sel: DiagramSelection) => void;
 }
 
-/** Ablauf-Diagramm mit Live-Status je Block; Sichtbarkeit und Ausrichtung sind lokaler State. */
+/** Flow diagram with live status per block; visibility and orientation are local state. */
 export function ExecutionDiagramPanel({ xml, statusByBlock, onSelectBlock }: ExecutionDiagramPanelProps) {
   const t = useT();
   const [showFlow, setShowFlow] = useState(true);

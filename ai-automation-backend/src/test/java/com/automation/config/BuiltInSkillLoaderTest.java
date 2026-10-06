@@ -48,7 +48,7 @@ class BuiltInSkillLoaderTest {
             assertThat(skill.getVersion()).as("version for " + skill.getId()).isEqualTo("1.0.0");
             assertThat(skill.isBuiltin()).as("builtin for " + skill.getId()).isTrue();
             assertThat(skill.getAiContext()).as("prompt for " + skill.getId()).isNotBlank();
-            // Der Prompt wird byte-genau uebernommen — kein Trim, kein angehaengter Zeilenumbruch.
+            // The prompt is taken over byte-exactly — no trim, no appended line break.
             assertThat(skill.getAiContext())
                     .as("prompt for " + skill.getId() + " darf nicht getrimmt/ergaenzt werden")
                     .doesNotEndWith("\n")

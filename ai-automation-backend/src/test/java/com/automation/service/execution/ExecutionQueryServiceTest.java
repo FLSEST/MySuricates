@@ -52,8 +52,8 @@ class ExecutionQueryServiceTest {
     }
 
     /**
-     * Listen-Routen antworten seit TODO a05c9504 ohne Schritte — stattdessen Anzahl und die
-     * gekuerzte Ausgabe des letzten Schritts.
+     * List routes have answered without steps since TODO a05c9504 — instead the count and the
+     * truncated output of the last step.
      */
     private static WorkflowRunListItemResponse sampleListItem(String id) {
         return new WorkflowRunListItemResponse(
@@ -281,7 +281,7 @@ class ExecutionQueryServiceTest {
         WorkflowRun run = new WorkflowRun();
         Page<WorkflowRun> page = new PageImpl<>(List.of(run), PageRequest.of(1, 20), 21);
         when(runRepository.findByWorkflowIdOrderByStartedAtDesc("wf-1", PageRequest.of(1, 20))).thenReturn(page);
-        // /workflows/{id}/runs antwortet wie /executions ohne Schritte (TODO 7fd9f654)
+        // /workflows/{id}/runs answers like /executions without steps (TODO 7fd9f654)
         when(workflowMapper.toRunListItemsWithOwners(List.of(run))).thenReturn(List.of(sampleListItem("run-1")));
 
         PageResponse<WorkflowRunListItemResponse> result = service.listRunsForWorkflow("wf-1", 1, 20);

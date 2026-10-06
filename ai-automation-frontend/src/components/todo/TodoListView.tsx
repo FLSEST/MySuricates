@@ -88,9 +88,9 @@ export const TodoListItem = memo(function TodoListItem({ todo, onEdit, onStatusC
               </Badge>
             )}
 
-            {/* Agenten-Sitzung: Resume-Befehl kopierbar statt als Fliesstext in der Beschreibung.
-                Vorher hing die Rueckverfolgbarkeit daran, dass ein Agent `claude --resume <uuid>`
-                freiwillig hineinschrieb — prompt-enforced, und entsprechend luckenhaft
+            {/* Agent session: resume command copyable instead of as running text in the description.
+                Before, traceability depended on an agent voluntarily writing `claude --resume <uuid>`
+                into it - prompt-enforced, and accordingly patchy
                 (TODO 3497533c). */}
             {todo.agentSessionRef && (
               <button

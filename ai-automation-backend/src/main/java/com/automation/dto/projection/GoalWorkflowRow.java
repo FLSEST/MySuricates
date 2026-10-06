@@ -5,8 +5,8 @@ import com.automation.entity.GoalWorkflow;
 import java.time.Instant;
 
 /**
- * Eine Workflow-Zuordnung eines Ziels mit Name und Projekt des Workflows und der Position des
- * Arbeitspakets (und seines Projekts im Ziel) fuer die Sortierung – aus einer Abfrage (TODO 52bc1e8c).
+ * A workflow assignment of a goal with name and project of the workflow and the position of the
+ * work package (and its project in the goal) for sorting – from one query (TODO 52bc1e8c).
  */
 public record GoalWorkflowRow(
         String id,

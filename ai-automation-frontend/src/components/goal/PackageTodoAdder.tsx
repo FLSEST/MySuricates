@@ -7,17 +7,17 @@ import { useGoalCandidates } from '../../hooks/useGoals';
 import { useAddTodoToGoal } from '../../hooks/useGoalAddTodo';
 import type { GoalWorkPackage, Todo } from '../../types';
 
-/** So viele Treffer zeigt die Suche höchstens. */
+/** The search shows at most this many hits. */
 const MAX_HITS = 6;
 
 type Option = { kind: 'hit'; todo: Todo } | { kind: 'new'; title: string };
 
 /**
- * „+ TODO“ direkt am Arbeitspaket (85889063): ein Feld, das TODOs ohne Ziel aus dem Projekt des
- * Pakets findet (`/goals/{id}/candidates`, hier aufs Projekt eingegrenzt), und darunter „Neu anlegen:
- * <Titel>“. Enter nimmt den ersten Treffer – oder legt an, wenn keiner passt –, die Pfeiltasten
- * wählen, Escape schließt. Treffer zählen nur, wenn sie zum Getippten passen: Solange die Suche
- * nachlädt, bleiben nur Titel stehen, die das Getippte enthalten, damit Enter nie etwas Fremdes nimmt.
+ * „+ TODO“ directly on the work package (85889063): a field that finds TODOs without a goal from the package's
+ * project (`/goals/{id}/candidates`, narrowed to the project here), and below it „Neu anlegen:
+ * <Titel>“. Enter takes the first hit — or creates if none fits —, the arrow keys
+ * choose, Escape closes. Hits only count if they match what was typed: while the search
+ * reloads, only titles that contain what was typed stay, so Enter never takes something unrelated.
  */
 export function PackageTodoAdder({ goalId, workPackage, projectName, onClose }: {
   goalId: string;
@@ -44,7 +44,7 @@ export function PackageTodoAdder({ goalId, workPackage, projectName, onClose }: 
     .filter((todo) => fresh || !needle || todo.title.toLowerCase().includes(needle))
     .slice(0, MAX_HITS);
   const options: Option[] = [...hits.map((todo): Option => ({ kind: 'hit', todo })), ...(typed ? [{ kind: 'new', title: typed } as const] : [])];
-  // Ohne Getipptes ist nichts vorgewählt – Enter nimmt dann nur, was per Pfeil gewählt ist
+  // Without typed text nothing is preselected — Enter then only takes what was chosen by arrow
   const active = picked !== null ? Math.min(picked, options.length - 1) : typed ? 0 : -1;
   const place = { id: workPackage.id, title: workPackage.title };
 
@@ -99,7 +99,7 @@ export function PackageTodoAdder({ goalId, workPackage, projectName, onClose }: 
         className="mt-1 space-y-px">
         {options.map((option, index) => (
           <li key={option.kind === 'hit' ? option.todo.id : 'new'} id={optionId(index)} role="option" aria-selected={index === active}
-            // Maus: wählen, ohne dem Feld den Fokus zu nehmen
+            // Mouse: choose without taking focus from the field
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => choose(option)}
             className={`flex cursor-pointer items-center gap-1.5 rounded px-1.5 py-1 text-sm ${

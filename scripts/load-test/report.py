@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
-"""Auswertung eines Lasttests: Rohdaten rein, Kennzahlen, Verdict und Baseline-Vergleich raus.
+"""Evaluation of a load test: raw data in, key figures, verdict and baseline comparison out.
 
   report.py RAW_JSON OUT_DIR [--results-root DIR] [--repo DIR]
 
-Liest die Rohdaten von driver.py (jede Anfrage mit Route, Status, Client-Zeit und Server-Timing),
-schreibt nach OUT_DIR:
-  result.json  maschinenlesbar: Kennzahlen je Route, Gesamtzahlen, Verdict, Baseline
-  facts.txt    dasselbe im Audit-Format ("FAKT name: wert" / "NICHT GEMESSEN: name (grund)") —
-               das liest der Pool-Workflow "Lasttest-Auswertung", die KI deutet nur
-  summary.txt  eine Zeile "commit=<sha> verdict=<GREEN|YELLOW|RED> scenario=<version>" fuer release.sh
+Reads the raw data of driver.py (every request with route, status, client time and server timing),
+writes to OUT_DIR:
+  result.json  machine-readable: key figures per route, totals, verdict, baseline
+  facts.txt    the same in audit format ("FAKT name: wert" / "NICHT GEMESSEN: name (grund)") —
+               read by the pool workflow "Lasttest-Auswertung", the AI only interprets
+  summary.txt  one line "commit=<sha> verdict=<GREEN|YELLOW|RED> scenario=<version>" for release.sh
 
-Die Baseline ist der juengste fruehere Lauf desselben Szenarios auf einem Vorfahren-Commit, ein
-getaggter Release-Stand vor allen anderen — damit vergleicht der Lasttest vor v0.8.0 gegen den vor
-v0.7.8 und nicht gegen einen Zwischenlauf von gestern.
+The baseline is the most recent earlier run of the same scenario on an ancestor commit, a
+tagged release revision before all others — so the load test before v0.8.0 compares against the one before
+v0.7.8 and not against an intermediate run from yesterday.
 
-Nur Python-Standardbibliothek. Perzentile nach Nearest-Rank wie RequestMetricsCollector.
-Exit 0 bei GREEN/YELLOW, 3 bei RED, 2 bei kaputten Eingaben.
+Python standard library only. Percentiles by nearest rank like RequestMetricsCollector.
+Exit 0 on GREEN/YELLOW, 3 on RED, 2 on broken input.
 """
 import argparse
 import json
@@ -24,22 +24,22 @@ import os
 import subprocess
 import sys
 
-# Schwellen des Verdicts. Absichtlich wenige und grobe: Der Lasttest soll Einbrueche zeigen,
-# keine Millisekunden-Schwankungen zwischen zwei Laeufen.
-RED_ERROR_RATE = 0.01          # mehr als 1 % fehlgeschlagene Anfragen
-RED_P95_MS = 5000              # eine Route braucht im p95 mehr als 5 s
-YELLOW_P95_MS = 1000           # eine Leseroute braucht im p95 mehr als 1 s
-# Der Wartezeit-Anteil auf die einzige DB-Connection ist unter Last bei pool-size 1 immer hoch (im
-# ersten Lauf 50-79 % auf fast jeder Route, bei p95 unter 450 ms) — das ist die Bauart, kein Befund.
-# Er erklaert deshalb nur eine Route, die ohnehin zu langsam ist, und steht als Gesamtwert im Blatt.
+# Thresholds of the verdict. Deliberately few and coarse: the load test is meant to show collapses,
+# not millisecond fluctuations between two runs.
+RED_ERROR_RATE = 0.01          # more than 1 % failed requests
+RED_P95_MS = 5000              # a route needs more than 5 s at p95
+YELLOW_P95_MS = 1000           # a read route needs more than 1 s at p95
+# The share of waiting time for the single DB connection is always high under load with pool-size 1 (in the
+# first run 50-79 % on almost every route, with p95 under 450 ms) — that is the design, not a finding.
+# It therefore only explains a route that is too slow anyway, and appears as an overall value in the sheet.
 YELLOW_HEAP_PERCENT = 85.0
-REGRESSION_FACTOR = 1.5        # p95 einer Route gegen die Baseline
-# Rechnerlast je CPU (1-Minuten-Load, Median der Lastphase), ab der die Messung nicht belastbar ist.
-# Ein Probelauf neben parallelen Builds war 5- bis 20-mal langsamer als der echte Lauf kurz danach —
-# eine Regression gegen die Baseline waere dann ein Fehlalarm (TODO b8e1de5e).
+REGRESSION_FACTOR = 1.5        # p95 of a route against the baseline
+# Machine load per CPU (1-minute load, median of the load phase) from which the measurement is not reliable.
+# A trial run next to parallel builds was 5 to 20 times slower than the real run shortly after —
+# a regression against the baseline would then be a false alarm (TODO b8e1de5e).
 HOST_BUSY_PER_CPU = 1.0
-MIN_SAMPLES = 30               # darunter ist ein p95 kein Befund
-MIN_MEANINGFUL_MS = 25         # 3 ms gegen 1 ms ist Faktor drei und bedeutet nichts
+MIN_SAMPLES = 30               # below that a p95 is not a finding
+MIN_MEANINGFUL_MS = 25         # 3 ms vs 1 ms is a factor of three and means nothing
 
 
 def percentile(sorted_values, pct):
@@ -50,7 +50,7 @@ def percentile(sorted_values, pct):
 
 
 def route_stats(requests):
-    """Kennzahlen je Route. requests: Liste von dicts mit route, status, ms, srv_total, srv_wait, sql, bytes, kind."""
+    """Key figures per route. requests: list of dicts mit route, status, ms, srv_total, srv_wait, sql, bytes, kind."""
     by_route = {}
     for req in requests:
         by_route.setdefault(req["route"], []).append(req)
@@ -91,7 +91,7 @@ def run_stats(runs):
 
 
 def host_load(raw):
-    """Median und Maximum der Rechnerlast je CPU waehrend der Lastphase, oder None."""
+    """Median and maximum of the machine load per CPU during the load phase, or None."""
     samples = sorted(x for x in raw.get("host_load") or [] if x is not None)
     cpus = raw.get("cpus") or 0
     if not samples or cpus <= 0:
@@ -102,7 +102,7 @@ def host_load(raw):
 
 
 def verdict(stats, runs, heap_max, total, errors, regressions, host=None):
-    """(Verdict, Gruende). RED: kaputt oder unbenutzbar langsam, YELLOW: auffaellig, sonst GREEN."""
+    """(verdict, reasons). RED: broken or unusably slow, YELLOW: conspicuous, otherwise GREEN."""
     red, yellow = [], []
     host_busy = host is not None and host["median_per_cpu"] > HOST_BUSY_PER_CPU
     if host_busy:
@@ -146,7 +146,7 @@ def is_ancestor(repo, older, newer):
 
 
 def find_baseline(results_root, current, repo):
-    """Juengster frueherer Lauf desselben Szenarios auf einem Vorfahren; getaggte Staende zuerst."""
+    """Most recent earlier run of the same scenario on an ancestor; tagged revisions first."""
     if not results_root or not os.path.isdir(results_root):
         return None
     candidates = []
@@ -236,7 +236,7 @@ def build_result(raw, results_root=None, repo=None):
     result["regressions"] = regressions
     result["verdict"], result["reasons"] = verdict(stats, runs, heap_max, total, errors, regressions, result["host_load"])
     if raw.get("ai_cli_calls"):
-        # Ein KI-Aufruf im Lasttest kostet Tokens und verfaelscht die Messung — der Stand ist nicht vergleichbar.
+        # An AI call in the load test costs tokens and distorts the measurement — the revision is not comparable.
         result["verdict"] = "RED"
         result["reasons"].insert(0, "%d KI-CLI-Aufruf(e) waehrend des Tests" % raw["ai_cli_calls"])
     return result

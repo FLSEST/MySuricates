@@ -7,10 +7,10 @@ import com.automation.entity.GateStatus;
 import java.time.Instant;
 
 /**
- * Der Kopf eines Audit-Reports, ohne {@code markdown_content}. {@code GET /audits} lud vorher jeden
- * Report samt Markdown, nur um Status und Zeitpunkte zu lesen (TODO 3d7e3987); die Historie
- * {@code GET /audits/{key}/reports} liest seit TODO cd50d011 dieselben Koepfe – den Text braucht nur
- * der angezeigte Bericht, und den liefert {@code GET /audit-reports/{id}}.
+ * The head of an audit report, without {@code markdown_content}. {@code GET /audits} used to load every
+ * report including Markdown, just to read status and timestamps (TODO 3d7e3987); the history
+ * {@code GET /audits/{key}/reports} has read the same heads since TODO cd50d011 – only the displayed
+ * report needs the text, and {@code GET /audit-reports/{id}} delivers it.
  */
 public record AuditReportSummaryRow(
         String id,
@@ -29,7 +29,7 @@ public record AuditReportSummaryRow(
         String ingestionError,
         Instant generatedAt
 ) {
-    /** Der Kopf eines schon geladenen Reports. */
+    /** The head of an already loaded report. */
     public static AuditReportSummaryRow of(AuditReport report) {
         return new AuditReportSummaryRow(report.getId(), report.getProjectId(), report.getWorkflowId(),
                 report.getWorkflowRunId(), report.getAuditKey(), report.getCategory(), report.getTitle(),

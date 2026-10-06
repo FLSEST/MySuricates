@@ -7,7 +7,7 @@ import java.io.IOException;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** Nur ein CLI-Ende mit Exit-Code 0 gilt als Antwort; sonst wandert die (gekürzte) Meldung in die Exception. */
+/** Only a CLI end with exit code 0 counts as an answer; otherwise the (truncated) message goes into the exception. */
 class CliExitTest {
 
     @Test

@@ -7,14 +7,14 @@ import java.util.Collection;
 import java.util.List;
 
 /**
- * Regeln für {@code foreach}-Blöcke.
+ * Rules for {@code foreach} blocks.
  *
- * <p>{@code items-command-without-source}: Ein Block setzt {@code items_command}, aber
- * {@code items_source} ist nicht {@code "command"}. {@code ForEachBlockExecutor} führt den Befehl
- * nur mit dieser Quelle aus und nimmt sonst {@code items} — fehlt die Liste, läuft der Block mit
- * null Items und endet trotzdem COMPLETED. Genau das setzte der Editor-Standard für neue
- * foreach-Blöcke (TODO 2f01ab01). {@code HIGH}, wenn dadurch nichts läuft; {@code MEDIUM}, wenn
- * {@code items} einspringt und nur der Befehl tot ist.
+ * <p>{@code items-command-without-source}: a block sets {@code items_command}, but
+ * {@code items_source} is not {@code "command"}. {@code ForEachBlockExecutor} only runs the command
+ * with that source and otherwise takes {@code items} - if the list is missing, the block runs with
+ * zero items and still ends COMPLETED. That is exactly what the editor default set for new
+ * foreach blocks (TODO 2f01ab01). {@code HIGH} if nothing runs as a result; {@code MEDIUM} if
+ * {@code items} steps in and only the command is dead.
  */
 final class ForEachRules {
 
@@ -43,7 +43,7 @@ final class ForEachRules {
         }
     }
 
-    /** Wie der Executor: eine Liste mit Einträgen oder ein Text mit mindestens einer Zeile. */
+    /** Like the executor: a list with entries or a text with at least one line. */
     private static boolean hasItems(Object items) {
         if (items instanceof Collection<?> list) {
             return list.stream().anyMatch(item -> item != null && !item.toString().isBlank());

@@ -32,7 +32,7 @@ final class DialogTextRules {
 
     static boolean isInternalCommand(String cmd) {
         if (cmd == null || cmd.isBlank()) return true;
-        // Typische interne/explorative Commands die keinen Wert als Workflow-Block haben
+        // Typical internal/exploratory commands that have no value as a workflow block
         return cmd.startsWith("ls ") || cmd.equals("ls") || cmd.startsWith("cat ")
                 || cmd.startsWith("echo ") || cmd.startsWith("pwd")
                 || cmd.contains("| head ") || cmd.contains("| tail ");

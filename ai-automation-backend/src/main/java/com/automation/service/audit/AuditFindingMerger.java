@@ -21,13 +21,13 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Fuehrt zwei Findings derselben Identitaet zusammen: Zaehler, Anzeigeattribute, Status samt
- * Disposition, TODO-Verknuepfungen und Vorkommen wandern auf das Ziel. Das Loeschen der Dublette
- * bleibt beim Aufrufer.
+  * Merges two findings of the same identity: counters, display attributes, status including
+  * disposition, TODO links and occurrences move to the target. Deleting the duplicate
+  * stays with the caller.
  *
- * <p>Aus {@link AuditFingerprintMigrationJob} herausgeloest, damit der Job nur noch Scopes,
- * Gruppierung und Marker verantwortet (Groessen-Ratchet). Reine DB-Arbeit in der Transaktion des
- * Aufrufers.
+  * <p>Split out of {@link AuditFingerprintMigrationJob} so the job is only responsible for scopes,
+  * grouping and markers (size ratchet). Pure DB work in the caller's
+  * transaction.
  */
 @Component
 @RequiredArgsConstructor
@@ -37,7 +37,7 @@ public class AuditFindingMerger {
     private final AuditFindingOccurrenceRepository occurrenceRepository;
     private final TodoRepository todoRepository;
 
-    /** Uebernimmt alles aus {@code duplicate} in {@code target}; {@code duplicate} ist danach leer. */
+    /** Takes everything from {@code duplicate} into {@code target}; {@code duplicate} is empty afterwards. */
     public void merge(AuditFinding target, AuditFinding duplicate) {
         mergeAttributes(target, duplicate);
         relinkTodos(target, duplicate);
@@ -67,14 +67,14 @@ public class AuditFindingMerger {
     }
 
     /**
-     * Status und Disposition wandern immer <em>zusammen</em>: eine menschliche Disposition
-     * ({@code ACCEPTED_RISK}, {@code DISMISSED}) schlaegt, egal auf welcher Seite sie steht — beim
-     * wahrscheinlichsten Drift-Verlauf ist das aeltere Finding auto-resolved und der juengere
-     * Wiedergaenger der akzeptierte. Genau diese Wiedergaenger haben die Akzeptanzen bisher
-     * unterlaufen; wiedereroeffnet wird ein akzeptiertes Risiko allein ueber
-     * {@link AuditAcceptancePolicy} (belegte Verschlechterung). Ohne Disposition im Spiel zieht ein
-     * offener oder wiedervorgelegter Wiedergaenger das Ziel aus {@code RESOLVED} heraus — dann darf
-     * kein Behebungsdatum stehen bleiben.
+     * Status and disposition always move <em>together</em>: a human disposition
+     * ({@code ACCEPTED_RISK}, {@code DISMISSED}) wins, no matter which side it is on — in the
+     * most likely drift scenario the older finding is auto-resolved and the younger
+     * revenant is the accepted one. These very revenants have so far undermined the acceptances;
+     * an accepted risk is reopened solely via
+     * {@link AuditAcceptancePolicy} (documented worsening). Without a disposition in play, an
+     * open or resubmitted revenant pulls the target out of {@code RESOLVED} — then
+     * no fix date may remain.
      */
     private static void applyStatusAndDisposition(AuditFinding target, AuditFinding duplicate) {
         if (isDisposed(target.getStatus())) {
@@ -102,10 +102,10 @@ public class AuditFindingMerger {
     }
 
     /**
-     * Verknuepfungen der Dublette wandern aufs Ziel; hat das Ziel dasselbe TODO schon, faellt die
-     * Dubletten-Verknuepfung weg (eine verwaltete macht die Ziel-Verknuepfung verwaltet). Die
-     * Ziel-Verknuepfungen und die TODOs kommen aus je einer Abfrage statt einer je Verknuepfung,
-     * geloescht wird gesammelt (d2500abd).
+     * Links of the duplicate move to the target; if the target already has the same TODO, the
+     * duplicate's link is dropped (a managed one makes the target's link managed). The
+     * target's links and the TODOs come from one query each instead of one per link,
+     * deletion is done collectively (d2500abd).
      */
     private void relinkTodos(AuditFinding target, AuditFinding duplicate) {
         List<AuditFindingTodo> links = findingTodoRepository.findByFindingId(duplicate.getId());
@@ -132,7 +132,7 @@ public class AuditFindingMerger {
         if (!dropped.isEmpty()) findingTodoRepository.deleteAll(dropped);
     }
 
-    /** Sonst zeigen der Deep-Link {@code /reports?finding=…} und {@code todo_reference_id} ins Leere. */
+    /** Otherwise the deep link {@code /reports?finding=…} and {@code todo_reference_id} point nowhere. */
     private static void repointTodoReference(AuditFinding target, AuditFinding duplicate, Todo todo) {
         if (todo != null && ManagedTodoWriter.REFERENCE_TYPE.equals(todo.getReferenceType())
                 && duplicate.getId().equals(todo.getReferenceId())) {
@@ -140,7 +140,7 @@ public class AuditFindingMerger {
         }
     }
 
-    /** Ein Vorkommen je Report: was das Ziel schon hat, faellt weg; die Report-IDs des Ziels kommen aus einer Abfrage. */
+    /** One occurrence per report: what the target already has is dropped; the target's report IDs come from one query. */
     private void relinkOccurrences(AuditFinding target, AuditFinding duplicate) {
         List<AuditFindingOccurrence> occurrences = occurrenceRepository.findByFindingId(duplicate.getId());
         if (occurrences.isEmpty()) return;

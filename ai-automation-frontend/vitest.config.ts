@@ -6,7 +6,7 @@ export default defineConfig({
   // Build-time constants from vite.config.ts, fixed for deterministic tests.
   define: {
     __BUILD_TIMESTAMP__: JSON.stringify('2026-01-01T00:00:00.000Z'),
-    // Mit Suffix, wie zwischen zwei Releases — die Kachel muss ihn abschneiden.
+    // With a suffix, as between two releases — the tile has to cut it off.
     __APP_VERSION__: JSON.stringify('1.0.0-SNAPSHOT'),
   },
   test: {

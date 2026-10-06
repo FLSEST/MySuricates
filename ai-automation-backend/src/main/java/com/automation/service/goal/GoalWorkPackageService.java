@@ -30,14 +30,14 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Arbeitspakete eines Ziels anlegen, aendern, ordnen, loeschen und mit Zustand lesen (TODO c60bf914,
- * bis V92 „Meilensteine“, TODO 259f4f66). Zugeordnet werden TODOs ueber
+ * Create, change, order, delete and read the work packages of a goal with their state (TODO c60bf914,
+ * until V92 "milestones", TODO 259f4f66). TODOs are assigned via
  * {@code PATCH /todos/{id}/planning} ({@link TodoPlanningService}).
  *
- * <p>Jedes Paket gehoert genau einem Projekt des Ziels; der Zeitraum ist optional – Start und Ende
- * gibt es nur zusammen, der Start liegt nie nach dem Ende. Die Reihenfolge innerhalb des Projekts
- * steht in {@code position}. Lesen ist schreibend transaktional: erkennt es ein Paket zum ersten Mal
- * als abgeschlossen, speichert es {@code completedAt} ({@link WorkPackageProgress}).
+ * <p>Each package belongs to exactly one project of the goal; the period is optional - start and end
+ * exist only together, the start is never after the end. The order within the project
+ * is kept in {@code position}. Reading is a transactional write: if it recognises a package as completed
+ * for the first time, it stores {@code completedAt} ({@link WorkPackageProgress}).
  */
 @Service
 @RequiredArgsConstructor
@@ -54,8 +54,8 @@ public class GoalWorkPackageService {
     private final Clock clock;
 
     /**
-     * Nach Projekt-Position, dann Position im Projekt; Ziel samt Paketen in einer Abfrage, die Zaehler
-     * aus den TODO-Zeilen.
+     * By project position, then position in the project; goal with packages in one query, the counters
+     * from the TODO rows.
      */
     @Transactional
     public List<GoalWorkPackageResponse> list(String goalId) {
@@ -66,8 +66,8 @@ public class GoalWorkPackageService {
     }
 
     /**
-     * Neues Paket ans Ende seines Projekts. Ohne {@code projectId} nur, wenn das Ziel genau ein Projekt
-     * hat; ein genanntes Projekt, das dem Ziel noch fehlt, kommt dazu. Zeitraum optional.
+     * New package at the end of its project. Without {@code projectId} only if the goal has exactly one project;
+     * a named project that is still missing from the goal is added. Period optional.
      */
     @Transactional
     public GoalWorkPackageResponse create(String goalId, CreateGoalWorkPackageRequest request) {
@@ -96,9 +96,9 @@ public class GoalWorkPackageService {
     }
 
     /**
-     * {@code ""} leert Start oder Ende; das Ergebnis muss beide haben oder keins, Start nie nach dem Ende.
-     * Ein Projektwechsel geht nur, solange dem Paket keine TODOs zugeordnet sind (sonst 400); es rueckt
-     * ans Ende des neuen Projekts.
+     * {@code ""} clears start or end; the result must have both or neither, start never after the end.
+     * A project change is only possible while no TODOs are assigned to the package (otherwise 400); it moves
+     * to the end of the new project.
      */
     @Transactional
     public GoalWorkPackageResponse update(String goalId, String workPackageId, UpdateGoalWorkPackageRequest request) {
@@ -135,9 +135,9 @@ public class GoalWorkPackageService {
     }
 
     /**
-     * Neue Reihenfolge der Pakete EINES Projekts: die genannten in dieser Folge vorn, nicht genannte
-     * desselben Projekts in ihrer bisherigen Folge dahinter. Pakete verschiedener Projekte in einer
-     * Liste sind ein 400, ein fremdes oder unbekanntes ein 404. Antwort: alle Pakete des Ziels.
+     * New order of the packages of ONE project: the named ones first in that sequence, unnamed ones
+     * of the same project behind them in their previous sequence. Packages of different projects in one
+     * list are a 400, a foreign or unknown one a 404. Response: all packages of the goal.
      */
     @Transactional
     public List<GoalWorkPackageResponse> reorder(String goalId, List<String> workPackageIds) {
@@ -170,8 +170,8 @@ public class GoalWorkPackageService {
     }
 
     /**
-     * Loescht das Paket; seine TODOs bleiben im Ziel und verlieren nur die Zuordnung, Meilensteine
-     * verlieren die Verknuepfung.
+     * Deletes the package; its TODOs stay in the goal and only lose the assignment, milestones
+     * lose the link.
      */
     @Transactional
     public void delete(String goalId, String workPackageId) {
@@ -181,14 +181,14 @@ public class GoalWorkPackageService {
         workPackageRepository.deleteById(workPackage.getId());
     }
 
-    /** Ein Paket eines anderen Ziels ist hier so unbekannt wie ein fehlendes: 404. */
+    /** A package of another goal is as unknown here as a missing one: 404. */
     private GoalWorkPackage find(String goalId, String workPackageId) {
         return workPackageRepository.findById(workPackageId)
                 .filter(p -> p.getGoalId().equals(goalId))
                 .orElseThrow(() -> new ResourceNotFoundException("GoalWorkPackage", workPackageId));
     }
 
-    /** Zeitraum: beide Daten oder keins, der Start nie nach dem Ende. */
+    /** Period: both dates or neither, the start never after the end. */
     static void requireValidPeriod(Instant start, Instant end) {
         if ((start == null) != (end == null)) {
             throw new IllegalArgumentException("Ein Zeitraum braucht Start und Ende – oder keins von beiden");

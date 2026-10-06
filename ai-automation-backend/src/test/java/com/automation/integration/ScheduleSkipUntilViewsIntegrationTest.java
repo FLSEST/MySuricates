@@ -36,10 +36,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 /**
- * Mit gesetztem {@code skip-until} zeigt keine Ansicht einen Termin im Pausenfenster als naechsten
- * Lauf (TODO a776fd2a) — Liste, Workflow-Seite, Kalender, Dashboard-Projektion und Pausenstatus,
- * gegen die echte Datenbank. Der Tick spult einen Termin erst hinter die Pause, wenn er faellig
- * wird; bis dahin rechnen die Lesepfade um. Scheduling ist unter dem Profil "integration" aus.
+ * With {@code skip-until} set, no view shows a fire time inside the pause window as the next
+ * run (TODO a776fd2a) — list, workflow page, calendar, dashboard projection and pause status,
+ * against the real database. The tick only winds a fire time past the pause when it becomes
+ * due; until then the read paths recompute. Scheduling is off under the profile "integration".
  */
 @SpringBootTest(properties = "automation.scheduler.skip-until=2026-04-28T12:00:00Z")
 @AutoConfigureMockMvc

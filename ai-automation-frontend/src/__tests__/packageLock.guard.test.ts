@@ -3,12 +3,12 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
-// Lockfile-Wächter: package-lock.json spiegelt im Wurzeleintrag das Manifest. Weicht er ab
-// (Version, engines, Abhängigkeitslisten), schreibt das erste `npm install` eines frischen
-// Klons den Lockfile um — der Nutzer hat nach scripts/setup.sh eine Änderung im Baum, die er
-// nie gemacht hat, und das Runtime-JAR heißt "-dirty". Gefunden vom Installer-Probelauf
-// (TODO 453c01b1). Behebung bei Abweichung: `npm install` im Frontend-Ordner, Lockfile committen;
-// Versionssprünge macht scripts/release.sh über `npm version`, das beide Dateien zieht.
+// Lockfile guard: package-lock.json mirrors the manifest in its root entry. If it deviates
+// (version, engines, dependency lists), the first `npm install` of a fresh
+// clone rewrites the lockfile — after scripts/setup.sh the user has a change in the tree that they
+// never made, and the runtime JAR is called "-dirty". Found by the installer probe run
+// (TODO 453c01b1). Fix on deviation: `npm install` in the frontend folder, commit the lockfile;
+// version bumps are made by scripts/release.sh via `npm version`, which updates both files.
 describe('package-lock.json guard', () => {
   const currentDir = path.dirname(fileURLToPath(import.meta.url));
   const read = (name: string) =>
@@ -17,16 +17,16 @@ describe('package-lock.json guard', () => {
   const lock = read('package-lock.json');
   const root = lock.packages?.[''] ?? {};
 
-  it('trägt die Version aus package.json (oben und im Wurzeleintrag)', () => {
+  it('carries the version from package.json (top level and in the root entry)', () => {
     expect(lock.version).toBe(manifest.version);
     expect(root.version).toBe(manifest.version);
   });
 
-  it('spiegelt engines aus package.json', () => {
+  it('mirrors engines from package.json', () => {
     expect(root.engines).toEqual(manifest.engines);
   });
 
-  it('spiegelt dependencies und devDependencies aus package.json', () => {
+  it('mirrors dependencies and devDependencies from package.json', () => {
     expect(root.dependencies ?? {}).toEqual(manifest.dependencies ?? {});
     expect(root.devDependencies ?? {}).toEqual(manifest.devDependencies ?? {});
   });

@@ -1,7 +1,7 @@
 import type { Locale } from '../../i18n';
 import { formatDate } from '../../utils/localeFormat';
 
-/** Dauer einer Session für die Karte: „<1 min“, „12 min“, „1h 5min“; fehlt ein Zeitpunkt: „?“. */
+/** Duration of a session for the card: „<1 min“, „12 min“, „1h 5min“; if a timestamp is missing: „?“. */
 export function formatDuration(start: string | null, end: string | null): string {
   if (!start || !end) return '?';
   const ms = new Date(end).getTime() - new Date(start).getTime();
@@ -11,13 +11,13 @@ export function formatDuration(start: string | null, end: string | null): string
   return `${Math.floor(mins / 60)}h ${mins % 60}min`;
 }
 
-/** Startzeit einer Session kurz in der App-Sprache (Monat, Tag, Uhrzeit). */
+/** Start time of a session, short, in the app language (month, day, time). */
 export function formatSessionStart(iso: string | null, locale: Locale): string {
   if (!iso) return '?';
   return formatDate(iso, locale, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-/** Letztes Pfadsegment eines Projektpfads (der Ordnername). */
+/** Last path segment of a project path (the folder name). */
 export function projectShortName(path: string): string {
   if (!path) return '?';
   const parts = path.split('/');

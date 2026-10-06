@@ -1,7 +1,7 @@
 /**
  * c168293d: `errors.rateLimited` erschien bisher nur in `onError`-Toasts. Seiten, die
- * Queries ohne Toast rendern, zeigten im Backoff-Fenster nur leere Zustände. Der Hinweis
- * gehört an eine zentrale, unaufdringliche Stelle — solange eine Sperre aktiv ist.
+ * queries without a toast showed only empty states in the backoff window. The hint
+ * belongs in one central, unobtrusive place - as long as a lockout is active.
  */
 import { render, act } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -22,7 +22,7 @@ async function advance(ms: number) {
   await act(async () => { await vi.advanceTimersByTimeAsync(ms); });
 }
 
-/** Löst einen 429 aus, damit eine Sperre aktiv ist. */
+/** Triggers a 429 so that a lockout is active. */
 async function triggerBackoff() {
   await act(async () => { await api.get('/system/capabilities').catch(() => undefined); });
 }
@@ -43,23 +43,23 @@ describe('RateLimitBanner (c168293d)', () => {
     useI18nStore.setState({ locale: 'en' });
   });
 
-  it('zeigt nichts, solange keine Sperre aktiv ist', () => {
+  it('shows nothing as long as no lockout is active', () => {
     const view = render(<RateLimitBanner />);
     expect(view.container.textContent).toBe('');
   });
 
-  it('zeigt den Hinweis mit der Uhrzeit, bis zu der pausiert wird', async () => {
+  it('shows the hint with the time until which requests are paused', async () => {
     await triggerBackoff();
     const view = render(<RateLimitBanner />);
     await advance(0);
 
     const banner = view.getByRole('status');
     expect(banner.textContent).toContain('Zu viele Anfragen');
-    // App-Sprache, nicht Browser-Locale.
+    // App language, not browser locale.
     expect(banner.textContent).toContain(new Date(NOW + 5_000).toLocaleTimeString('de-DE'));
   });
 
-  it('nutzt Warn-Token statt fester Tailwind-Farben', async () => {
+  it('uses the warning token instead of fixed Tailwind colours', async () => {
     await triggerBackoff();
     const view = render(<RateLimitBanner />);
     await advance(0);
@@ -69,7 +69,7 @@ describe('RateLimitBanner (c168293d)', () => {
     expect(banner.className).toContain('text-warning');
   });
 
-  it('verschwindet, sobald die Sperre abgelaufen ist', async () => {
+  it('disappears as soon as the lock has expired', async () => {
     await triggerBackoff();
     const view = render(<RateLimitBanner />);
     await advance(0);
@@ -79,7 +79,7 @@ describe('RateLimitBanner (c168293d)', () => {
     expect(view.queryByRole('status')).toBeNull();
   });
 
-  it('erscheint auch, wenn die Sperre erst nach dem Mount beginnt', async () => {
+  it('also appears when the lockout begins only after the mount', async () => {
     const view = render(<RateLimitBanner />);
     expect(view.queryByRole('status')).toBeNull();
 
@@ -88,7 +88,7 @@ describe('RateLimitBanner (c168293d)', () => {
     expect(view.queryByRole('status')).not.toBeNull();
   });
 
-  it('übersetzt den Hinweis ins Englische', async () => {
+  it('translates the hint into English', async () => {
     useI18nStore.setState({ locale: 'en' });
     await triggerBackoff();
     const view = render(<RateLimitBanner />);
@@ -101,13 +101,13 @@ describe('RateLimitBanner (c168293d)', () => {
     expect(banner.textContent).not.toMatch(/\d\s[AP]M/);
   });
 
-  it('verschwindet ohne eigenen Takt — der Client meldet den Ablauf', async () => {
+  it('disappears without its own timer - the client reports the expiry', async () => {
     await triggerBackoff();
     const view = render(<RateLimitBanner />);
     await advance(0);
     expect(view.queryByRole('status')).not.toBeNull();
 
-    // Genau auf die Deadline: ohne die Ablauf-Flanke aus dem Client bliebe das Banner stehen.
+    // Exactly at the deadline: without the expiry edge from the client the banner would stay.
     await advance(5_000);
     expect(view.queryByRole('status')).toBeNull();
   });

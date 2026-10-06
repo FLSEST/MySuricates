@@ -5,11 +5,11 @@ import com.automation.entity.GoalDueState;
 import java.time.Instant;
 
 /**
- * Ein Arbeitspaket mit berechnetem Zustand (TODO c60bf914, bis V92 „Meilenstein“). {@code state} auf
- * Basis von {@code endDate}; ohne Zeitraum nur OPEN oder REACHED (in der Oberflaeche „abgeschlossen“).
- * {@code total}/{@code done} zaehlen die zugeordneten TODOs ohne ARCHIVED, {@code openQuestions} die
- * aktiven darin mit offener Frage. {@code reopened}: war schon einmal abgeschlossen
- * ({@code completedAt} gesetzt), ist es jetzt aber nicht mehr – etwa weil ein neues TODO dazukam.
+ * A work package with computed state (TODO c60bf914, until V92 "milestone"). {@code state} based
+ * on {@code endDate}; without a period only OPEN or REACHED (in the UI "abgeschlossen").
+ * {@code total}/{@code done} count the assigned TODOs without ARCHIVED, {@code openQuestions} the
+ * active ones in it with an open question. {@code reopened}: was completed once
+ * ({@code completedAt} set), but no longer is - e.g. because a new TODO was added.
  */
 public record GoalWorkPackageResponse(
         String id,
@@ -27,6 +27,6 @@ public record GoalWorkPackageResponse(
         boolean reopened,
         Instant createdAt,
         Instant updatedAt,
-        /** Nicht archivierte TODOs darin mit Entscheidung und ohne offene Frage (TODO 68a5e24e). */
+        /** Non-archived TODOs in it with a decision and without an open question (TODO 68a5e24e). */
         long decided
 ) {}

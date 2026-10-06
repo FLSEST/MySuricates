@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# Tests fuer scripts/ci/pre-push-checks.sh, scripts/git-hooks/pre-push und
+# Tests for scripts/ci/pre-push-checks.sh, scripts/git-hooks/pre-push and
 # scripts/git-hooks/commit-msg (TODO 7030f362).
-# Run: bash scripts/tests/test-pre-push-checks.sh   (exit 0 = alle Checks ok)
+# Run: bash scripts/tests/test-pre-push-checks.sh   (exit 0 = all checks ok)
 set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 PASS=0; FAIL=0
-# Die Ausweichorte der Privatlisten liegen ausserhalb des Repos — ohne Isolation faende
-# das Gate die echte Liste des Rechners (siehe test-public-hygiene.sh).
+# The fallback locations of the private lists lie outside the repo — without isolation the gate would find
+# the machine's real list (see test-public-hygiene.sh).
 export XDG_CONFIG_HOME="$TMP/xdg"
 unset HYGIENE_PRIVATE_LIST HYGIENE_PRIVATE_TERMS MYSURICATES_PREPUSH_SKIP MYSURICATES_PREPUSH_ALLOW_RULES \
       GITHUB_ACTIONS GITHUB_STEP_SUMMARY
@@ -18,16 +18,16 @@ check() {  # $1 = label, $2 = shell condition
   if eval "$2"; then echo "  ok   $1"; PASS=$((PASS + 1)); else echo "  FAIL $1"; FAIL=$((FAIL + 1)); fi
 }
 
-# Verbotenes Literal zur Laufzeit zusammensetzen, damit diese Datei selbst sauber bleibt.
+# Assemble the forbidden literal at runtime so that this file itself stays clean.
 FORBIDDEN="$(printf '%s%s' '/home/' 'flo')"
 NOREPLY="git -c user.name=t -c user.email=1+t@users.noreply.github.com"
 PRIVATE="git -c user.name=t -c user.email=t@example.invalid"
-# In den Testrepos gibt es keine Bestands-Gates und keinen Build — beides wird
-# ausdruecklich uebersprungen und muss als uebersprungen gemeldet werden (Fall 12).
+# In the test repos there are no existing-state gates and no build — both are
+# explicitly skipped and must be reported as skipped (case 12).
 SKIP="MYSURICATES_PREPUSH_SKIP=tree,build"
 
-# Frisches Repo mit Gate-Dateien, Hooks via core.hooksPath, dazu ein Bare-Remote "origin".
-make_repo() {  # $1 = pfad
+# Fresh repo with gate files, hooks via core.hooksPath, plus a bare remote "origin".
+make_repo() {  # $1 = path
   git init -q -b main "$1"
   mkdir -p "$1/scripts"
   cp -r "$REPO/scripts/ci" "$REPO/scripts/lib" "$REPO/scripts/git-hooks" "$1/scripts/"
@@ -37,7 +37,7 @@ make_repo() {  # $1 = pfad
       && git config core.hooksPath scripts/git-hooks && git remote add origin "$1.remote" \
       && env $SKIP MYSURICATES_PREPUSH_ALLOW_RULES="$(git rev-parse HEAD)" git push -q origin main 2>/dev/null )
 }
-commit_file() {  # $1 = repo, $2 = datei, $3 = inhalt, $4 = nachricht, $5.. = git-Praefix
+commit_file() {  # $1 = repo, $2 = file, $3 = content, $4 = message, $5.. = git prefix
   local repo="$1" f="$2" content="$3" msg="$4"; shift 4
   ( cd "$repo" && printf '%s\n' "$content" > "$f" && "$@" add "$f" && "$@" commit -q --no-verify -m "$msg" )
 }
@@ -105,8 +105,8 @@ commit_file "$TMP/clean" g.txt "x" "docs: Notiz zur SCHNECKE" $NOREPLY
 OUT=$(cd "$TMP/clean" && HYGIENE_PRIVATE_TERMS="$TMP/terms.txt" bash scripts/ci/pre-push-checks.sh --range HEAD~1..HEAD --skip-tree --skip-build 2>&1); RC=$?
 check "Grossschreibung in der Nachricht wird gefaltet" \
   '[ "$RC" -eq 1 ] && grep -q "privaten Begriff (Zeile 2" <<<"$OUT"'
-# Umlaute: "MÜLLER" muss "Müller" treffen — mawk und BSD-awk falten nur ASCII, deshalb ab Bash 4
-# die Parameter-Expansion. Locale ausdruecklich UTF-8, wie auf den CI-Runnern.
+# Umlauts: "MÜLLER" must match "Müller" — mawk and BSD awk fold only ASCII, hence from Bash 4 on
+# the parameter expansion. Locale explicitly UTF-8, as on the CI runners.
 printf 'Müller\n' > "$TMP/umlaut-terms.txt"
 ( cd "$TMP/clean" && git reset -q --hard HEAD~1 )
 commit_file "$TMP/clean" g.txt "x" "docs: Notiz von MÜLLER" $NOREPLY
@@ -137,7 +137,7 @@ OUT=$(cd "$TMP/clean" && printf 'refs/heads/x 0000000000000000000000000000000000
 check "Loeschung: exit 0"                        '[ "$RC" -eq 0 ]'
 check "Loeschung gemeldet"                       'grep -q "Loeschung — nichts zu pruefen" <<<"$OUT"'
 OUT=$(cd "$TMP/clean" && env $SKIP git push origin main 2>&1); RC=$?
-# git ruft den Hook auch ohne neue Refs auf — mit leerem stdin. Das muss ein hoerbares Nichts sein.
+# git calls the hook even without new refs — with empty stdin. That must be an audible nothing.
 check "nichts Neues: Hook meldet nichts zu pruefen (exit 0)" '[ "$RC" -eq 0 ] && grep -q "Pre-Push-Gate OK — nichts zu pruefen" <<<"$OUT"'
 
 echo "11) Neuer Branch ohne Remote-Stand: alle Commits bis zum letzten Remote-Ref"
@@ -175,7 +175,7 @@ check "Frontend ohne node_modules: exit 2"       '[ "$RC" -eq 2 ]'
 check "verlangt npm ci"                          'grep -q "node_modules fehlt — erst npm ci" <<<"$OUT"'
 
 echo "14b) Bau-Scope wie in der CI: changed-scopes.sh entscheidet (TODO c60eb0e2)"
-# Ein mvn-Ersatz protokolliert den Aufruf; npm/tsc werden nie erreicht, weil node_modules fehlt.
+# A mvn replacement logs the call; npm/tsc are never reached because node_modules is missing.
 mkdir -p "$TMP/fakemvn"
 printf '#!/usr/bin/env bash\necho "mvn $*" >> "%s/mvn.log"; exit 0\n' "$TMP" > "$TMP/fakemvn/mvn"; chmod +x "$TMP/fakemvn/mvn"
 ( cd "$TMP/clean" && mkdir -p docs ai-automation-backend )
@@ -281,8 +281,8 @@ OUT=$(cd "$TMP/clean" && bash scripts/ci/pre-push-checks.sh --range HEAD~1..HEAD
 check "Gegenprobe: gewoehnliche Datei — unveraendert gemeldet" \
   '[ "$RC" -eq 0 ] && grep -q "Ausnahmedateien: im Bereich HEAD~1..HEAD unveraendert" <<<"$OUT"'
 ( cd "$TMP/clean" && git reset -q --hard HEAD~1 )
-# Scheitert git diff, ist das kein "unveraendert": exit 2, kein OK (Ersatz-git scheitert nur am
-# Aufruf des Gates mit --no-renames --name-only, alles andere reicht er an das echte git durch).
+# If git diff fails, that is no "unchanged": exit 2, no OK (the replacement git fails only on the
+# call of the gate with --no-renames --name-only, everything else it passes to the real git).
 mkdir -p "$TMP/failgit"
 printf '#!/usr/bin/env bash\nfor a in "$@"; do [ "$a" = "--no-renames" ] && nr=1; [ "$a" = "--name-only" ] && no=1; done\n[ -n "${nr:-}" ] && [ -n "${no:-}" ] && exit 128\nexec %s "$@"\n' "$(command -v git)" > "$TMP/failgit/git"
 chmod +x "$TMP/failgit/git"

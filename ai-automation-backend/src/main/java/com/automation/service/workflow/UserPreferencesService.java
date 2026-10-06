@@ -8,28 +8,28 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Arbeitspräferenzen für KI-Prompts — und nur die (TODO d49fbde0).
+ * Work preferences for AI prompts - and only those (TODO d49fbde0).
  *
- * <p><b>Was hier hinein darf und was nicht.</b> Entscheidung des Maintainers (2026-09-15,
- * TODO d49fbde0): In einen KI-Prompt dürfen ausschließlich <em>Arbeits</em>präferenzen —
- * Antwortsprache, Antwortstil, Tech-Stack und Werkzeuge. Ausdrücklich nicht: Namen, Kontaktdaten,
- * Lebenslauf, Berufsprofil. Deshalb gibt es hier eine feste Liste von drei Schlüsseln und kein
- * freies Profil-Objekt: Was nicht vorgesehen ist, kann auch nicht versehentlich mitgeschickt
- * werden. Ein zusätzlicher Schlüssel ist eine bewusste Code-Änderung, keine Konfigurationsfrage.
+ * <p><b>What may go in here and what may not.</b> Maintainer decision (2026-09-15,
+ * TODO d49fbde0): only <em>work</em> preferences may go into an AI prompt -
+ * answer language, answer style, tech stack and tools. Explicitly not: names, contact data,
+ * CV, professional profile. That is why there is a fixed list of three keys here and no
+ * free profile object: what is not provided for cannot be sent along by accident.
+ * An additional key is a deliberate code change, not a configuration question.
  *
- * <p><b>Opt-in pro Workflow.</b> Der Block entsteht nur, wenn ein Workflow ihn über
- * {@code metadata.userPreferences = true} anfordert — siehe
- * {@link AgentInstructionsService#buildInstructionPrefix}. Ohne das Flag ist die Ausgabe
- * byte-identisch zu vorher.
+ * <p><b>Opt-in per workflow.</b> The block only appears if a workflow requests it via
+ * {@code metadata.userPreferences = true} - see
+ * {@link AgentInstructionsService#buildInstructionPrefix}. Without the flag the output is
+ * byte-identical to before.
  *
- * <p>Die Werte liegen als Laufzeit-Settings in {@code app_settings} und brauchen daher keine
- * Migration; sie sind über {@code PUT /api/v1/system/settings/{key}} pflegbar.
+ * <p>The values live as runtime settings in {@code app_settings} and therefore need no
+ * migration; they can be maintained via {@code PUT /api/v1/system/settings/{key}}.
  */
 @Service
 @RequiredArgsConstructor
 public class UserPreferencesService {
 
-    /** Setting-Schlüssel -> Beschriftung im Prompt. Die Reihenfolge ist die der Ausgabe. */
+    /** Setting key -> label in the prompt. The order is the order of the output. */
     static final Map<String, String> KEYS = new LinkedHashMap<>(Map.of());
 
     static {
@@ -38,17 +38,17 @@ public class UserPreferencesService {
         KEYS.put("user-pref-stack", "Tech-Stack und Werkzeuge");
     }
 
-    /** Ein einzelner Wert darf den Prompt nicht dominieren. */
+    /** A single value must not dominate the prompt. */
     private static final int MAX_VALUE_LENGTH = 300;
 
     private final SystemSettingsService settings;
 
     /**
-     * Fordert dieser Workflow die Arbeitspräferenzen an? {@code metadata.userPreferences: true}.
+     * Does this workflow request the work preferences? {@code metadata.userPreferences: true}.
      *
-     * <p>Opt-in und nicht Voreinstellung, weil ein Präferenz-Block die Ausgabe eines Workflows
-     * verändern kann — bei einem Prüf- oder Messworkflow ist das unerwünscht, dort soll das
-     * Ergebnis nur von den Fakten abhängen.
+     * <p>Opt-in and not the default because a preference block can change the output of a workflow
+     * - for a check or measurement workflow that is undesirable, there the
+     * result should depend on the facts only.
      */
     public static boolean requestedBy(Map<String, Object> workflowMetadata) {
         if (workflowMetadata == null) {
@@ -58,18 +58,18 @@ public class UserPreferencesService {
         if (flag instanceof Boolean bool) {
             return bool;
         }
-        if (flag instanceof Map<?, ?> map) {   // {"enabled": true} wie bei autoTodo/audit
+        if (flag instanceof Map<?, ?> map) {   // {"enabled": true} as with autoTodo/audit
             return Boolean.parseBoolean(String.valueOf(map.get("enabled")));
         }
         return Boolean.parseBoolean(String.valueOf(flag));
     }
 
     /**
-     * Der Präferenz-Block für den System-Prompt, oder ein leerer String, wenn nichts gesetzt ist.
+     * The preference block for the system prompt, or an empty string if nothing is set.
      *
-     * <p>Leer heißt wirklich leer: Ein Abschnitt mit der Überschrift und nichts darunter würde das
-     * Modell zu Rückfragen verleiten, und ein Platzhalter wie „keine Angabe" ist eine Aussage, die
-     * niemand getroffen hat.
+     * <p>Empty really means empty: a section with the heading and nothing below it would tempt the
+     * model to ask follow-up questions, and a placeholder like "no information" is a statement nobody
+     * made.
      */
     public String block() {
         StringBuilder out = new StringBuilder();

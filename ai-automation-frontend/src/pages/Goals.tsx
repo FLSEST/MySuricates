@@ -14,8 +14,8 @@ import type { GoalStatus } from '../types';
 const TABS: GoalStatus[] = ['ACTIVE', 'DONE', 'ARCHIVED'];
 
 /**
- * Alle Ziele (TODO c6ea8f5c): aktive, erreichte und archivierte getrennt, dazu Anlegen. Ein Ziel
- * sammelt TODOs aus mehreren Projekten; die Zielansicht zeigt Reihenfolge und Relationskarte.
+ * All goals (TODO c6ea8f5c): active, reached and archived kept apart, plus creating. A goal
+ * collects TODOs from several projects; the goal view shows order and relation map.
  */
 export function Goals() {
   const t = useT();

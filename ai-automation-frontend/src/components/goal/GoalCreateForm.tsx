@@ -6,9 +6,9 @@ import { useT } from '../../i18n';
 import type { Goal } from '../../types';
 
 /**
- * Ein neues Ziel mit Titel, Zieldatum, „fertig heißt …“ (TODO dc0566f8) und optional gleich einem
- * Projekt (c60bf914; weitere auf der Zielseite) – im Cockpit und auf der Zielübersicht dasselbe
- * Formular. `projectId` belegt das Projekt vor, etwa aus dem Projektfilter des Cockpits.
+ * A new goal with title, target date, „fertig heißt …“ (TODO dc0566f8) and optionally a
+ * project right away (c60bf914; more on the goal page) — the same form in the cockpit and on the goal overview.
+ * `projectId` presets the project, e.g. from the cockpit's project filter.
  */
 export function GoalCreateForm({ onCancel, onCreated, projectId: initialProject }: {
   onCancel: () => void;

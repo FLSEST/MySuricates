@@ -51,7 +51,7 @@ public class TodoSimilarityService {
     public List<SimilarTodo> findSimilar(String projectId, String title, String excludeId) {
         Set<String> titleKeywords = extractKeywords(title);
         if (titleKeywords.isEmpty()) return List.of();
-        // Pro Aufruf gelesen: die Schwelle ist zur Laufzeit in den Einstellungen aenderbar.
+        // Read per call: the threshold can be changed at runtime in the settings.
         double threshold = config.getKeywordThreshold();
 
         // Stage 1: Keyword filter against all open TODOs in the project

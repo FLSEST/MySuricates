@@ -31,7 +31,7 @@ sonst auch Anfragen an `localhost` über den Proxy – samt Key. Beim Kopieren d
 ## Sprache im Code
 
 - **Code-Kommentare und Testbeschreibungen auf Englisch** (Javadoc, Inline, Shell/Python/YAML/SQL, `describe`/`it`, `@DisplayName`) – auch wenn die Aufgabe auf Deutsch gestellt ist. Technische Namen ebenfalls englisch, UI-Texte nur über i18n.
-- Deutsche Bestandskommentare nicht nebenbei übersetzen (eigene Scheiben, TODO 9468432d), bestehende Flyway-Migrationen nie ändern (Prüfsumme). Details: [docs/entwicklung.md](docs/entwicklung.md) → Projektkonventionen.
+- Der Bestand ist übersetzt (TODO 9468432d); `scripts/tools/german_comments.py ratchet` lässt deutsche Kommentarzeilen je Datei nur sinken. Bestehende Flyway-Migrationen nie ändern (Prüfsumme). Details: [docs/entwicklung.md](docs/entwicklung.md) → Projektkonventionen.
 
 ### TODO anlegen
 

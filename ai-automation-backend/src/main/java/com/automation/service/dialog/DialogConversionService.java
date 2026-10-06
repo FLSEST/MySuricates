@@ -30,8 +30,8 @@ import static com.automation.service.dialog.DialogTextRules.isMetaCommentary;
 import static com.automation.service.dialog.DialogTextRules.truncate;
 
 /**
- * Analysiert Claude-Code-JSONL-Sessions und wandelt sie in Workflow-Suggestions um.
- * Nutzt KI-Analyse mit rule-based Fallback.
+ * Analyzes Claude Code JSONL sessions and turns them into workflow suggestions.
+ * Uses AI analysis with a rule-based fallback.
  */
 @Service
 @RequiredArgsConstructor
@@ -46,13 +46,13 @@ public class DialogConversionService {
     private final WorkflowMapper workflowMapper;
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    // ConversationPreprocessor ist StepResult-basiert, wir brauchen nur processOutput
+    // ConversationPreprocessor is StepResult-based, we only need processOutput
     private final ConversationPreprocessor conversationPreprocessor;
     private final GeneratedWorkflowCheck buildCheck;
 
     /**
-     * Analysiert eine JSONL-Session und liefert eine Workflow-Suggestion.
-     * Fällt auf rule-based zurück wenn KI-Analyse fehlschlägt.
+     * Analyzes a JSONL session and returns a workflow suggestion.
+     * Falls back to rule-based if the AI analysis fails.
      */
     public DialogWorkflowSuggestion suggestFromSession(String absoluteJsonlPath) throws IOException {
         ClaudeJsonlParser.ParsedSession session = parser.parse(Path.of(absoluteJsonlPath));
@@ -75,7 +75,7 @@ public class DialogConversionService {
     }
 
     /**
-     * Erstellt einen Workflow aus einer bestätigten Suggestion.
+     * Creates a workflow from a confirmed suggestion.
      */
     public WorkflowResponse createFromSuggestion(DialogWorkflowSuggestion suggestion,
                                                    String projectId, String name) {
@@ -102,7 +102,7 @@ public class DialogConversionService {
         );
 
         var created = workflowService.create(request, com.automation.entity.ChangeSource.DIALOG);
-        // Der Vorschlag kommt vom Client zurück und kann bearbeitet sein: die gespeicherte Fassung prüfen.
+        // The suggestion comes back from the client and may have been edited: check the saved version.
         buildCheck.reportRemaining(created.getId(), created.getName(), "Dialog-Import", buildCheck.findings(created));
         return workflowMapper.toResponse(created);
     }
@@ -133,8 +133,8 @@ public class DialogConversionService {
             return suggestRuleBased(session, filePath);
         }
 
-        // Baufehler-Prüfung (TODO 326d5987): bei HIGH genau eine Korrekturrunde mit demselben Provider und
-        // System-Prompt; verbliebene Befunde stehen im Vorschlag, den der Nutzer vor dem Anlegen sieht.
+        // Build-error check (TODO 326d5987): for HIGH exactly one correction round with the same provider and
+        // system prompt; remaining findings are part of the suggestion the user sees before creating.
         GeneratedWorkflowCheck.Correction check = buildCheck.correctOnce(blocks, null,
                 correctionPrompt -> provider.reason(new AiProvider.ReasoningRequest(correctionPrompt, systemPrompt)).text());
 
@@ -164,10 +164,10 @@ public class DialogConversionService {
 
                 toolCallsAnalyzed++;
 
-                // Bash-Calls → shell-Block
+                // Bash calls → shell block
                 if ("Bash".equals(toolName)) {
                     String cmd = msg.toolInput() != null ? msg.toolInput() : "";
-                    // Interne Hilfs-Commands überspringen
+                    // Skip internal helper commands
                     if (isInternalCommand(cmd)) continue;
 
                     Map<String, Object> config = new LinkedHashMap<>();
@@ -176,7 +176,7 @@ public class DialogConversionService {
                     config.put("on_failure", "stop");
                     blocks.add(BlockDefinition.builder().type("shell").config(config).build());
                 }
-                // Andere bedeutende Tool-Calls → simple-Block als Platzhalter
+                // Other significant tool calls → simple block as placeholder
                 else if ("Write".equals(toolName) || "Edit".equals(toolName)) {
                     Map<String, Object> config = new LinkedHashMap<>();
                     config.put("command", "Bearbeite Datei: " + (msg.toolInput() != null ? msg.toolInput() : ""));
@@ -190,11 +190,11 @@ public class DialogConversionService {
             return DialogWorkflowSuggestion.notAvailable("Keine automatisierbaren Aktionen gefunden");
         }
 
-        // Duplikate entfernen (identische aufeinanderfolgende Blöcke)
+        // Remove duplicates (identical consecutive blocks)
         blocks = deduplicate(blocks);
 
         String name = "Dialog: " + truncate(session.projectPath(), 50);
-        // Regelbasiert gibt es keine KI, die korrigieren könnte: nur melden.
+        // Rule-based there is no AI that could correct: only report.
         var findings = buildCheck.findings(blocks, null);
         return new DialogWorkflowSuggestion(
                 name, "Aus Claude-Code-Session generiert (rule-based)", blocks,
@@ -206,11 +206,11 @@ public class DialogConversionService {
     }
 
     /**
-     * Erstellt einen komprimierten Transkript-String aus der Session für den KI-Prompt.
+     * Creates a compressed transcript string from the session for the AI prompt.
      */
     private String buildCompressedTranscript(ClaudeJsonlParser.ParsedSession session) {
         StringBuilder sb = new StringBuilder();
-        int maxLength = 8000; // Tokens-Budget für Kontext
+        int maxLength = 8000; // token budget for context
 
         for (ClaudeJsonlParser.DialogTurn turn : session.turns()) {
             if (sb.length() > maxLength) {
@@ -225,7 +225,7 @@ public class DialogConversionService {
                 switch (msg.type()) {
                     case "text" -> {
                         String text = truncate(msg.text(), 300);
-                        // Meta-Commentary überspringen
+                        // Skip meta commentary
                         if (!isMetaCommentary(text)) {
                             sb.append(text).append("\n");
                         }

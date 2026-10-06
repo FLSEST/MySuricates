@@ -8,13 +8,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 /**
- * Ob Docker auf diesem Rechner eingerichtet ist — und ob er antwortet.
+ * Whether Docker is set up on this machine - and whether it responds.
  *
- * <p>Eine Installation ohne Docker ist ein Normalzustand: Shell-Bloecke und KI-Aufrufe laufen auf dem
- * Host, nur Container-Shell-Bloecke, Run-Terminal und Stable/Test brauchen Docker. Ohne diese
- * Unterscheidung meldete jede frische Instanz ohne Docker „gestoert“ und jeder Run einen ERROR
- * (a0e85182). Eingerichtet heisst: ein TCP-Ziel ist konfiguriert, oder der Unix-Socket existiert.
- * Existiert er, antwortet aber nicht, ist das weiterhin ein Fehler ({@link State#DOWN}).
+ * <p>An installation without Docker is a normal state: shell blocks and AI calls run on the
+ * host, only container shell blocks, run terminal and stable/test need Docker. Without this
+ * distinction every fresh instance without Docker reported "disturbed" and every run an ERROR
+ * (a0e85182). Set up means: a TCP target is configured, or the Unix socket exists.
+ * If it exists but does not respond, that is still an error ({@link State#DOWN}).
  */
 @Component
 public class DockerExpectation {
@@ -38,7 +38,7 @@ public class DockerExpectation {
         return true;
     }
 
-    /** Pingt Docker; ein Fehlschlag ist nur dann {@link State#DOWN}, wenn Docker eingerichtet ist. */
+    /** Pings Docker; a failure is only {@link State#DOWN} if Docker is set up. */
     public State probe() {
         try {
             dockerClient.pingCmd().exec();

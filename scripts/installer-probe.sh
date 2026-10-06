@@ -1,57 +1,57 @@
 #!/usr/bin/env bash
 #
-# installer-probe.sh — prüft scripts/setup.sh so, wie ein neuer Nutzer ihn erlebt: auf einer frischen
-# Linux-Maschine (Container; apt- oder dnf-Image, Default ubuntu:24.04), auf der nur git, sudo und
-# tzdata liegen.
+# installer-probe.sh — checks scripts/setup.sh the way a new user experiences it: on a fresh
+# Linux machine (container; apt or dnf image, default ubuntu:24.04) that has only git, sudo and
+# tzdata.
 #
-#   scripts/installer-probe.sh                   # HEAD dieses Checkouts prüfen, Report schreiben
-#   scripts/installer-probe.sh --ref main        # anderen Stand prüfen (Branch, Tag oder SHA)
-#   scripts/installer-probe.sh --interactive     # dieselbe frische Maschine als Shell — selbst durchklicken;
-#                                                # teilt das Netz des Rechners: die Adresse, die setup.sh am
-#                                                # Ende nennt, geht direkt im Browser
-#   scripts/installer-probe.sh --keep            # Container nach dem Lauf stehen lassen, Instanz ansehen
-#   scripts/installer-probe.sh --way container   # Standardweg: die Instanz im Container (Docker des Rechners)
-#   scripts/installer-probe.sh --way staged      # Dev · Test · Prod, drei Container
-#   scripts/installer-probe.sh --cleanup <name>  # Reste eines Laufs mit --keep wegräumen (Name aus der Ausgabe)
+#   scripts/installer-probe.sh                   # check HEAD of this checkout, write report
+#   scripts/installer-probe.sh --ref main        # check another state (branch, tag or SHA)
+#   scripts/installer-probe.sh --interactive     # the same fresh machine as a shell — click through yourself;
+#                                                # shares the machine's network: the address setup.sh names at the
+#                                                # end works directly in the browser
+#   scripts/installer-probe.sh --keep            # leave the container standing after the run, look at the instance
+#   scripts/installer-probe.sh --way container   # default way: the instance in a container (the machine's Docker)
+#   scripts/installer-probe.sh --way staged      # Dev · Test · Prod, three containers
+#   scripts/installer-probe.sh --cleanup <name>  # clear away leftovers of a run with --keep (name from the output)
 #
-#   Weitere Optionen: --repo <pfad>   Repo, aus dem der Stand kommt (Default: dieses)
-#                     --image <image> apt- oder dnf-Image (Default ubuntu:24.04; z. B. rockylinux:9)
-#                     --out <dir>     Report-Verzeichnis (Default: ~/.local/state/mysuricates/installer-probe/<zeit>-<sha>)
-#                     --port <n>      Port auf 127.0.0.1 (Default: automatisch; nur automatischer Lauf;
-#                                     bei --way staged der erste von dreien)
-#                     --setup-flags "<flags>"  zusaetzliche Flags fuer Phase 2, z. B. "--with-pi" (c3a4cbf6)
+#   More options: --repo <path>   repo the state comes from (default: this one)
+#                     --image <image> apt or dnf image (default ubuntu:24.04; e.g. rockylinux:9)
+#                     --out <dir>     report directory (default: ~/.local/state/mysuricates/installer-probe/<time>-<sha>)
+#                     --port <n>      port on 127.0.0.1 (default: automatic; automatic run only;
+#                                     with --way staged the first of three)
+#                     --setup-flags "<flags>"  additional flags for phase 2, e.g. "--with-pi" (c3a4cbf6)
 #                     --no-screenshots
 #
-# Automatischer Lauf in zwei Phasen: 1-pruefen `setup.sh --check`, 2-einrichten `setup.sh --yes …` —
-# ein Durchgang bis zur laufenden Instanz. Jede Phase läuft unter einem Pseudo-Terminal, der Mitschnitt
-# zeigt also Farben und Kopf wie am Bildschirm. Die Wege (--way):
-#   host       „eine Instanz auf diesem Rechner“ (Default): `--runtime host --bind 0.0.0.0`
-#   container  „eine Instanz im Container“, der Standardweg: `setup.sh --yes --port <p>`
-#   staged     „Dev · Test · Prod“: `setup.sh --yes --mode staged --port <p>`
-# Harte Prüfungen: Phase 1 nennt die fehlenden Werkzeuge, Phase 2 endet mit Exit 0, Health UP (auf dem
-# Rechner ohne Docker kein Fehler), Oberfläche 200 auf demselben Port, Login mit dem erzeugten Key klappt
-# (falls Playwright da ist), der Key steht in keinem Log und keinem Mitschnitt, der Klon ist danach
-# unverändert. Auf dem Rechner zusätzlich: das Backend wird genau einmal gebaut. Im Container: jede
-# Instanz nur auf 127.0.0.1 veröffentlicht und ohne Docker-Socket (die Vorgaben). Gestuft: drei
-# gesunde Instanzen auf verschiedenen Ports, Prod mit Siegelpflicht. Ergebnis: <out>/report.html —
-# eine Datei, Screenshots eingebettet — und am Ende gate_status: GREEN|RED für den MySuricates-Workflow.
+# Automatic run in two phases: 1-check `setup.sh --check`, 2-set up `setup.sh --yes …` —
+# one pass up to the running instance. Each phase runs under a pseudo-terminal, so the recording
+# shows colours and header as on the screen. The ways (--way):
+#   host       "eine Instanz auf diesem Rechner" (default): `--runtime host --bind 0.0.0.0`
+#   container  "eine Instanz im Container", the default way: `setup.sh --yes --port <p>`
+#   staged     "Dev · Test · Prod": `setup.sh --yes --mode staged --port <p>`
+# Hard checks: phase 1 names the missing tools, phase 2 ends with exit 0, health UP (on a
+# machine without Docker no error), UI 200 on the same port, login with the generated key works
+# (if Playwright is present), the key appears in no log and no recording, the clone is unchanged
+# afterwards. On the machine additionally: the backend is built exactly once. In the container: each
+# instance published only on 127.0.0.1 and without a Docker socket (the defaults). Staged: three
+# healthy instances on different ports, Prod with seal requirement. Result: <out>/report.html —
+# one file, screenshots embedded — and at the end gate_status: GREEN|RED for the MySuricates workflow.
 #
-# Container-Wege: Die Probe-Maschine bekommt den Docker-Socket des Rechners (Gruppe docker mit dessen
-# Gruppen-ID, Docker selbst installiert setup.sh) und das Netz des Rechners — Ports, die dort belegt
-# sind, sieht setup.sh so selbst, und die Instanzen bleiben auf 127.0.0.1 wie bei jedem Nutzer. Der
-# Klon liegt in einem Ordner des Rechners unter demselben Pfad (die Bind-Mounts des inneren Compose
-# löst der Docker-Dienst des Rechners auf). Alle Docker-Namen tragen die Vorsilbe des Laufs
-# (mysuricates-installer-probe-<zeit>-…, über MYSURICATES_PREFIX an instance.sh); aufgeräumt wird
-# am Ende — auch nach Abbruch — genau das, jeder Name vorher gegen die Vorsilbe geprüft. Laufende
-# Instanzen des Rechners bleiben unberührt; die automatischen Ports meiden 8090, 9090, 9091 und 9095.
+# Container ways: the probe machine gets the machine's Docker socket (group docker with its
+# group ID, setup.sh installs Docker itself) and the machine's network — ports that are taken
+# there, setup.sh sees for itself, and the instances stay on 127.0.0.1 as for any user. The
+# clone lies in a folder of the machine under the same path (the machine's Docker service resolves
+# the bind mounts of the inner compose). All Docker names carry the run's prefix
+# (mysuricates-installer-probe-<time>-…, via MYSURICATES_PREFIX to instance.sh); at the end exactly that
+# is cleaned up — also after an abort, each name checked against the prefix beforehand. Running
+# instances of the machine stay untouched; the automatic ports avoid 8090, 9090, 9091 and 9095.
 #
-# Geprüft wird immer der committete Stand; uncommittete Änderungen sind nicht dabei (wie bei einem
-# echten Klon). Ports nur auf 127.0.0.1. Greift nie auf DB oder REST-API der Dev-Instanz zu.
-# Exit: 0 grün, 1 rot, 2 Aufruf-/Umgebungsfehler.
+# What is checked is always the committed state; uncommitted changes are not included (as with a
+# real clone). Ports only on 127.0.0.1. Never accesses the DB or REST API of the dev instance.
+# Exit: 0 green, 1 red, 2 usage/environment error.
 set -uo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-# Die Probe-Instanz nie ueber einen Proxy aus der Umgebung fragen (bb4f60a5)
+# Never query the probe instance through a proxy from the environment (bb4f60a5)
 # shellcheck source=lib/local-curl.sh
 . "${SCRIPT_DIR}/lib/local-curl.sh"
 REPO="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
@@ -95,15 +95,15 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 
-# Alles, was ein Container-Weg im Docker des Rechners anlegt, heisst <vorsilbe>-… bzw. <vorsilbe>:local.
-# Nur Namen mit genau dieser Form raeumt die Probe weg — nie etwas anderes.
+# Everything a container way creates in the machine's Docker is named <prefix>-… or <prefix>:local.
+# Only names of exactly this form does the probe clear away — never anything else.
 PREFIX_RE='^mysuricates-installer-probe-[0-9]{8}-[0-9]{6}$'
-probe_owned() {  # NAME — gehoert NAME zu diesem Lauf?
+probe_owned() {  # NAME — does NAME belong to this run?
   [[ "$PREFIX" =~ $PREFIX_RE ]] || return 1
   case "$1" in "$PREFIX"-?*|"$PREFIX:local") return 0 ;; esac
   return 1
 }
-# Die Instanzen (Container, Volumes, Compose-Netz, Image) — nicht die Probe-Maschine selbst
+# The instances (containers, volumes, compose network, image) — not the probe machine itself
 remove_probe_docker() {
   local n removed=""
   for n in $(docker ps -a --format '{{.Names}}' 2>/dev/null); do
@@ -141,7 +141,7 @@ fi
 if [ "$INTERACTIVE" = 1 ] && [ -n "$FRONTEND_PORT" ]; then
   die "--port gilt nur für den automatischen Lauf — interaktiv nennt setup.sh den Port selbst"
 fi
-# Die Flags landen in bash -c '…' im Container: nur Flag-Zeichen, kein Quote, keine Shell-Syntax
+# The flags end up in bash -c '…' in the container: only flag characters, no quote, no shell syntax
 case "$SETUP_FLAGS" in *[!A-Za-z0-9\ =,._/:-]*) die "--setup-flags: nur Flags wie --with-pi oder --preset research, ohne Anführungszeichen und Shell-Zeichen" ;; esac
 if [ "$INTERACTIVE" = 1 ] && [ -n "$SETUP_FLAGS" ]; then
   die "--setup-flags gilt nur für den automatischen Lauf — interaktiv tippt man sie selbst"
@@ -162,7 +162,7 @@ fi
 command -v docker >/dev/null 2>&1 || die "docker fehlt — die Probe braucht einen Docker-Daemon"
 docker info >/dev/null 2>&1 || die "Docker-Daemon nicht erreichbar (läuft er? Rechte?)"
 
-# Container-Wege: Socket und Benutzer-ID des Rechners, freie Ports
+# Container ways: socket and user ID of the machine, free ports
 if [ "$WAY" != host ]; then
   case "${DOCKER_HOST:-}" in ""|unix://*) ;; *) die "--way $WAY braucht einen lokalen Docker-Socket (DOCKER_HOST=${DOCKER_HOST})" ;; esac
   SOCK="${DOCKER_HOST:-unix:///var/run/docker.sock}"; SOCK="${SOCK#unix://}"
@@ -171,8 +171,8 @@ if [ "$WAY" != host ]; then
   HOST_UID="$(id -u)"
   [ "$HOST_UID" != 0 ] || die "--way $WAY nicht als root starten: der Klon liegt in einem Ordner des Rechners und gehört dem Probe-Benutzer mit deiner Benutzer-ID"
   [ -n "$SOCK_GID" ] && [ "$SOCK_GID" != 0 ] || die "Der Docker-Socket $SOCK gehört keiner eigenen Gruppe (GID ${SOCK_GID:-?}) — die Probe braucht eine Gruppe wie docker"
-  # Belegt oder fest vergeben (Dev 9090, Test 8090, Stable 9091, Tryout 9095 — auch wenn sie gerade
-  # nicht laufen): dort legt die Probe nie eine Instanz hin
+  # Taken or fixed (Dev 9090, Test 8090, Stable 9091, Tryout 9095 — even if they are not currently
+  # running): the probe never puts an instance there
   RESERVED=" 8090 9090 9091 9095 "
   port_ok() { case "$RESERVED" in *" $1 "*) return 1 ;; esac; ! (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null; }
   N_PORTS=1; [ "$WAY" = staged ] && N_PORTS=3
@@ -194,10 +194,10 @@ fi
 
 STAMP="$(date +%Y%m%d-%H%M%S)"
 NAME="mysuricates-installer-probe-${STAMP}"
-PREFIX="$NAME"   # Docker-Namen der Instanzen eines Container-Wegs: <PREFIX>-main, <PREFIX>-dev …
+PREFIX="$NAME"   # Docker names of the instances of a container way: <PREFIX>-main, <PREFIX>-dev …
 WORK="$(mktemp -d)"
 USER_HOME="/home/probe"
-# Container-Wege: der Klon in einem Ordner des Rechners, im Container unter demselben Pfad
+# Container ways: the clone in a folder of the machine, in the container under the same path
 if [ "$WAY" = host ]; then CLONE_PARENT="$USER_HOME"; else CLONE_PARENT="$WORK/machine"; mkdir -p "$CLONE_PARENT"; fi
 CLONE="${CLONE_PARENT}/mysuricates"
 EXEC_ENV=()
@@ -207,37 +207,37 @@ PHASE_TIMEOUT="${INSTALLER_PROBE_PHASE_TIMEOUT:-$([ "$WAY" = staged ] && echo 36
 
 cleanup() {
   if [ "$KEEP" = 1 ]; then
-    [ "$WAY" = host ] && rm -rf "$WORK"   # im Container-Weg liegt dort der Klon der stehenden Instanz
+    [ "$WAY" = host ] && rm -rf "$WORK"   # in the container way the clone of the standing instance lies there
     return 0
   fi
-  # Erst die Maschine: das beendet setup.sh und die docker-Aufrufe darin, danach legt niemand mehr an
+  # The machine first: that ends setup.sh and the docker calls in it, after that nobody creates anything any more
   docker rm -f "$NAME" >/dev/null 2>&1
   [ "$WAY" = host ] || remove_probe_docker
   rm -rf "$WORK" 2>/dev/null || echo "installer-probe: $WORK ließ sich nicht ganz löschen" >&2
 }
 PHASE_PID=""
 trap cleanup EXIT
-# Eine Phase laeuft im Hintergrund, die Probe wartet mit wait darauf: nur so greift ein TERM sofort
-# (auf einen Vordergrund-Prozess wartete bash bis zu dessen Ende, bis zu PHASE_TIMEOUT) und das
-# Aufraeumen kommt, bevor ein halb eingerichteter Container stehen bleibt
+# A phase runs in the background, the probe waits for it with wait: only that way does a TERM take effect immediately
+# (a foreground process bash waited for until its end, up to PHASE_TIMEOUT) and the
+# cleanup comes before a half set-up container stays standing
 trap '[ -z "$PHASE_PID" ] || kill "$PHASE_PID" 2>/dev/null; exit 130' INT TERM
 
-# --- Frische Maschine ------------------------------------------------------------------------------
-# Ein Bundle trägt den Stand in den Container, unabhängig davon, ob $REPO ein Worktree, ein Klon mit
-# Alternates oder ein normales Repo ist. Eine nackte SHA lässt sich nicht bündeln (kein Ref) → --all.
+# --- Fresh machine ------------------------------------------------------------------------------
+# A bundle carries the state into the container, regardless of whether $REPO is a worktree, a clone with
+# alternates or a normal repo. A bare SHA cannot be bundled (no ref) → --all.
 if ! git -C "$REPO" bundle create -q "$WORK/repo.bundle" "$REF" 2>/dev/null; then
   git -C "$REPO" bundle create -q "$WORK/repo.bundle" --all 2>/dev/null || die "git bundle fehlgeschlagen"
 fi
 
-# Ein Port: die Instanz liefert die Oberfläche selbst aus (setup.sh, Weg „auf dem Rechner“).
-# Automatisch: Container-Port 9090 auf einen freien Port des Rechners. Interaktiv: das Netz des
-# Rechners teilen — der Port, den setup.sh wählt (oder den man eintippt), ist dann direkt
-# localhost:<port>, belegte Ports des Rechners sieht setup.sh selbst. Ein fest veröffentlichter Port
-# ließ jede andere Wahl ins Leere laufen (6abc7fca). Die Instanz bleibt auf 127.0.0.1.
+# One port: the instance serves the UI itself (setup.sh, way "auf dem Rechner").
+# Automatic: container port 9090 to a free port of the machine. Interactive: share the network of the
+# machine — the port setup.sh chooses (or one types in) is then directly
+# localhost:<port>, taken ports of the machine setup.sh sees itself. A fixed published port
+# sent every other choice into the void (6abc7fca). The instance stays on 127.0.0.1.
 #
-# Container-Wege: das Netz des Rechners (Begründung oben im Kopf) und der Docker-Socket. Wer den Socket
-# hat, steuert den Docker des Rechners — die Maschine ist ein Wegwerf-Container mit dem committeten
-# Stand; aufgeräumt wird nur, was die Vorsilbe dieses Laufs trägt.
+# Container ways: the machine's network (rationale at the top of the header) and the Docker socket. Whoever has the socket
+# controls the machine's Docker — the machine is a throwaway container with the committed
+# state; only what carries this run's prefix is cleaned up.
 if [ "$WAY" != host ]; then PORT_ARGS=(--network host -v "$SOCK:/var/run/docker.sock" -v "$CLONE_PARENT:$CLONE_PARENT")
 elif [ "$INTERACTIVE" = 1 ]; then PORT_ARGS=(--network host)
 elif [ -n "$FRONTEND_PORT" ]; then PORT_ARGS=(-p "127.0.0.1:${FRONTEND_PORT}:9090")
@@ -252,9 +252,9 @@ echo "Installer-Probe: ${REF} (${SHORT}) auf ${IMAGE}, Weg: ${WAY_LABEL}"
 docker run -d --name "$NAME" "${PORT_ARGS[@]}" "$IMAGE" sleep infinity >/dev/null \
   || die "Container konnte nicht starten (Image ${IMAGE}? Port belegt?)"
 
-# Was ein Mensch nach `git clone` mindestens hat — und sonst nichts. tzdata gehört auf jedem echten
-# Rechner dazu (sonst fragt apt beim JDK nach der Zeitzone); der animierte apt-Fortschrittsbalken ist
-# abgeschaltet, weil er im Mitschnitt nur Steuerzeichen-Salat hinterlässt.
+# What a human has at least after `git clone` — and nothing else. tzdata belongs on every real
+# machine (otherwise apt asks for the time zone at the JDK); the animated apt progress bar is
+# switched off because in the recording it leaves only control-character salad.
 PREP='if command -v apt-get >/dev/null; then
   export DEBIAN_FRONTEND=noninteractive
   apt-get update -qq && apt-get install -y -qq git sudo tzdata >/dev/null 2>&1 || exit 1
@@ -265,9 +265,9 @@ else
   echo "nur apt- oder dnf-Images werden unterstützt" >&2; exit 3
 fi
 if [ -n "${PROBE_UID:-}" ]; then
-  # Container-Weg: der Benutzer mit der ID des Rechners (der Klon liegt in dessen Ordner), die Gruppe
-  # docker mit der ID des Sockets — wie auf einem Rechner, dessen Docker-Dienst ihn anlegt. Docker
-  # selbst installiert setup.sh; in die Gruppe nimmt es den Benutzer dabei auf.
+  # Container way: the user with the ID of the machine (the clone lies in its folder), the group
+  # docker with the ID of the socket — as on a machine whose Docker service creates it. Docker
+  # itself is installed by setup.sh; it adds the user to the group in the process.
   u="$(getent passwd "$PROBE_UID" | cut -d: -f1)"
   if [ -n "$u" ] && [ "$u" != probe ]; then userdel -r "$u" >/dev/null 2>&1 || exit 1; fi
   g="$(getent group "$PROBE_SOCK_GID" | cut -d: -f1)"
@@ -290,9 +290,9 @@ host_port() { docker port "$NAME" "$1/tcp" 2>/dev/null | head -n1 | sed 's/.*://
 BPORT="$(host_port 9090)"
 FPORT="$BPORT"
 
-# --- Interaktiv: Shell in der frischen Maschine ----------------------------------------------------
+# --- Interactive: shell in the fresh machine ----------------------------------------------------
 if [ "$INTERACTIVE" = 1 ]; then
-  # Die Maschine hat nur C.UTF-8; die Sprache der Modultexte wählt setup.sh dann über --lang.
+  # The machine has only C.UTF-8; setup.sh then chooses the language of the module texts via --lang.
   L=""; case "${LANG:-}" in de*) L=" --lang de" ;; esac
   HINTS="
   Frische Maschine: ${IMAGE}, Stand ${REF} (${SHORT}), Benutzer probe mit sudo.
@@ -310,13 +310,13 @@ if [ "$INTERACTIVE" = 1 ]; then
   API-Key für den Login:  scripts/instance.sh key --name main
   exit beendet die Probe und räumt den Container weg.
 "
-  # Eigene Eingabeaufforderung: mit dem Netz des Rechners hiesse die Maschine wie der Rechner selbst
+  # Own prompt: with the machine's network the machine would be named like the machine itself
   docker exec -i -u probe "$NAME" bash -c 'cat > ~/.probe-hints && printf "%s\n" "cat ~/.probe-hints" "PS1='"'"'probe@frische-maschine:\\w\\$ '"'"'" >> ~/.bashrc' <<<"$HINTS"
   docker exec -it -u probe -w "$CLONE" -e TERM="${TERM:-xterm-256color}" -e LANG=C.UTF-8 "$NAME" bash
   exit 0
 fi
 
-# --- Automatischer Lauf ----------------------------------------------------------------------------
+# --- Automatic run ----------------------------------------------------------------------------
 OUT="${OUT:-${XDG_STATE_HOME:-$HOME/.local/state}/mysuricates/installer-probe/${STAMP}-${SHORT}}"
 mkdir -p "$OUT/logs" "$OUT/screens" || die "Report-Verzeichnis nicht anlegbar: $OUT"
 : > "$OUT/phases.tsv"
@@ -329,8 +329,8 @@ check() {  # label, ok|fail|skip, detail
   printf '  %-4s %s%s\n' "$2" "$1" "${3:+ — $3}"
 }
 
-# Eine Phase unter einem Pseudo-Terminal (script), 120 Spalten, Eingabe per Pipe; -echo, damit die
-# vorab gepufferte Antwort nicht als Zeile am Anfang des Mitschnitts steht.
+# A phase under a pseudo-terminal (script), 120 columns, input via pipe; -echo so that the
+# previously buffered answer does not appear as a line at the start of the recording.
 run_phase() {  # name, command, input
   local name="$1" cmd="$2" input="$3" t0=$SECONDS rc
   (
@@ -343,7 +343,7 @@ run_phase() {  # name, command, input
   PHASE_PID=$!
   wait "$PHASE_PID"; rc=$?
   PHASE_PID=""
-  # Der Exit-Code der Phase selbst — über script/docker exec ging ein Abbruch schon als 0 durch
+  # The phase's own exit code — through script/docker exec an abort already passed as 0
   local inner
   inner="$(docker exec "$NAME" cat /tmp/phase.rc 2>/dev/null)" && [ -n "$inner" ] && rc="$inner"
   printf '%s\t%s\t%s\t%s\n' "$name" "$cmd" "$rc" "$((SECONDS - t0))" >> "$OUT/phases.tsv"
@@ -356,9 +356,9 @@ case "$WAY" in
     CMD1="./scripts/setup.sh --check --runtime host --lang de"
     CMD2="./scripts/setup.sh --yes --runtime host --bind 0.0.0.0 --lang de" ;;
   container)
-    # Die Vorgaben eines Nutzers (im Container, 127.0.0.1, kein Socket); nur der Port ist gesetzt —
-    # 9090 und die folgenden gehören auf diesem Rechner oft schon echten Instanzen
-    # --runtime container auch im Prüflauf: ohne Weg fragt setup.sh im Terminal danach
+    # A user's defaults (in the container, 127.0.0.1, no socket); only the port is set —
+    # 9090 and the following often already belong to real instances on this machine
+    # --runtime container also in the check run: without a way setup.sh asks for it in the terminal
     CMD1="./scripts/setup.sh --check --runtime container --lang de"
     CMD2="./scripts/setup.sh --yes --port ${BASE_PORT} --lang de" ;;
   staged)
@@ -381,10 +381,10 @@ if [ "$RC2" = 0 ]; then check "Phase 2: ein Durchgang bis zur laufenden Instanz 
 else check "Phase 2: ein Durchgang bis zur laufenden Instanz (Exit 0)" fail "Exit ${RC2}"; fi
 
 SETUP_LOGS="${USER_HOME}/.local/state/mysuricates/setup-logs"
-# Ein Befehl in der Probe-Maschine als der Nutzer, im Klon — mit der Vorsilbe der Container-Wege
+# A command in the probe machine as the user, in the clone — with the container ways' prefix
 in_machine() { docker exec -u probe -w "$CLONE" ${EXEC_ENV[@]+"${EXEC_ENV[@]}"} "$NAME" "$@"; }
 instance_key() { in_machine bash scripts/instance.sh key --name "$1" 2>/dev/null | tr -d '[:space:]'; }
-# Port einer Instanz aus ihrer Datei — der Klon eines Container-Wegs liegt auch auf dem Rechner
+# Port of an instance from its file — the clone of a container way is also on the machine
 inst_port() { grep '^MYSURICATES_PORT=' "$CLONE/deploy/instances/$1.env" 2>/dev/null | tail -n 1 | cut -d= -f2; }
 
 if [ "$WAY" = host ]; then
@@ -398,8 +398,8 @@ if [ "$WAY" = host ]; then
   if [ "$BUILDS" = 1 ]; then check "Backend genau einmal gebaut" ok ""; else check "Backend genau einmal gebaut" fail "${BUILDS}× gebaut"; fi
   LOGIN_HTTP="$HTTP"
 else
-  # Je Instanz: Health, Oberfläche, und dass sie mit den Vorgaben läuft — nur auf 127.0.0.1
-  # veröffentlicht, ohne Docker-Socket (seit der Standard so ist, kein Schalter der Probe)
+  # Per instance: health, UI, and that it runs with the defaults — only published on 127.0.0.1,
+  # without Docker socket (since the default is that way, no switch of the probe)
   FPORT=""; LOGIN_HTTP=""
   for n in $INSTS; do
     p="$(inst_port "$n")"; c="$PREFIX-$n"; sfx=""; [ "$WAY" = staged ] && sfx=" ($n)"
@@ -434,7 +434,7 @@ if [ "$WAY" = staged ]; then
   else
     check "Drei Instanzen gesund, jede auf eigenem Port" fail "$DETAIL"
   fi
-  # Prod aus ihrer eigenen Sicht: Umgebung Prod, Siegel und Siegelpflicht fuer unbeaufsichtigte Runs an
+  # Prod from its own view: environment Prod, seal and seal requirement for unattended runs on
   CAPS="$(local_curl_key "$(instance_key prod)" -s --max-time 10 "http://127.0.0.1:$(inst_port prod)/api/v1/system/capabilities" 2>/dev/null)"
   SEAL="$(python3 -c '
 import json, sys
@@ -456,8 +456,8 @@ else
   check "Klon nach dem Setup unverändert (git status leer)" fail "$(tr '\n' ' ' <<<"$DIRTY")"
 fi
 
-# Alles, was ein Nutzer oder Support zu sehen bekommt: Mitschnitte, Setup-Logs, im Container dazu
-# die Ausgabe und die Log-Dateien jeder Instanz
+# Everything a user or support gets to see: recordings, setup logs, in the container in addition
+# the output and the log files of each instance
 all_logs() {
   local n
   cat "$OUT"/logs/*.log
@@ -503,9 +503,9 @@ else
     timeout 180 node "$SCRIPT_DIR/lib/installer_probe_screens.mjs" "http://127.0.0.1:${FPORT}/" "$OUT/screens" 2>&1)"
   SHOTS_RC=$?
   if [ "$SHOTS_RC" = 3 ]; then
-    # Browser zur installierten Playwright-Version fehlt (nach einem Update, 65164c57). Rot statt
-    # skip, weil der Login dann ungeprueft ist und GREEN "bis Login durch" behaupten wuerde — aber mit
-    # der Abhilfe statt eines Stacktraces. Nachladen ist Flos Entscheidung, die Probe laedt nichts.
+    # Browser for the installed Playwright version is missing (after an update, 65164c57). Red instead of
+    # skip, because the login is then unchecked and GREEN would claim "bis Login durch" — but with
+    # the remedy instead of a stack trace. Reloading is the maintainer's decision, the probe loads nothing.
     check "$LOGIN_LABEL" fail "Browser fehlt — im Frontend \`npm run pw:install\` ausführen ($(grep -o '^browser missing: [^ ]*' <<<"$SHOTS" | head -n1 | sed 's/^browser missing: //'))"
   elif [ "$SHOTS_RC" = 0 ]; then
     check "$LOGIN_LABEL" ok "$(grep -o 'console-errors [0-9]*' <<<"$SHOTS" | sed 's/console-errors /Konsolenfehler: /')$(grep '^console-error ' <<<"$SHOTS" | sed 's/^console-error / · /' | tr -d '\n')"

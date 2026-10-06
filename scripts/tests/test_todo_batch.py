@@ -1,4 +1,4 @@
-"""Tests der TODO-Batch-Skripte (TODO cc0eb3ba): echte Git-Repos in Wegwerf-Ordnern, keine Instanz, keine KI.
+"""Tests of the TODO batch scripts (TODO cc0eb3ba): real git repos in throwaway folders, no instance, no AI.
 
 Run: python3 -m unittest discover -s scripts/tests -p 'test_todo_batch.py'
 """
@@ -16,7 +16,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[2]
 SCRIPTS = REPO / "scripts" / "todo-batch"
 sys.path.insert(0, str(SCRIPTS))
-# Fremde Git-Konfiguration (Hooks, Signieren) bleibt draußen – auch für die Git-Aufrufe der Skripte.
+# Foreign git configuration (hooks, signing) stays out – also for the scripts' git calls.
 os.environ["GIT_CONFIG_NOSYSTEM"] = "1"
 os.environ["GIT_CONFIG_GLOBAL"] = os.devnull
 
@@ -59,7 +59,7 @@ def last_json(output):
 
 
 class RepoCase(unittest.TestCase):
-    """Quell-Repo auf main und ein Klon wie im isolierten Lauf; das Arbeitsverzeichnis ist der Klon."""
+    """Source repo on main and a clone as in the isolated run; the working directory is the clone."""
 
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
@@ -143,7 +143,7 @@ class HousekeepingTest(RepoCase):
         write(self.state / "details.txt", details(todo(A, "IN_PROGRESS", [b.HANDED_OVER]), todo(B, "OPEN", [b.HANDED_OVER])))
         code, out = call(housekeeping.main, "--state", str(self.state), "--project-path", str(self.source))
         self.assertEqual(code, 0)
-        self.assertEqual([(u["id"], u.get("status")) for u in last_json(out)], [(A, "DONE")])   # B wartet im Branch
+        self.assertEqual([(u["id"], u.get("status")) for u in last_json(out)], [(A, "DONE")])   # B waits in the branch
         self.assertEqual(run_git(self.source, "status", "--porcelain"), "")
 
 
@@ -173,7 +173,7 @@ class CandidatesTest(unittest.TestCase):
 
 
 class SizeRatchetTest(unittest.TestCase):
-    """8bbc2368: Dateien an ihrer Größen-Obergrenze gehen als Liste an die Triage."""
+    """8bbc2368: files at their size ceiling go to triage as a list."""
 
     RATCHET = """class SourceSizeRatchetTest {
     static final int MAX_LINES = 300;
@@ -246,7 +246,7 @@ class SizeRatchetTest(unittest.TestCase):
 
     @staticmethod
     def resolve_like_the_engine(command, variables):
-        """Wie TemplateResolver mit shell_escape_variables: bekannte Werte single-quoted, unbekannte bleiben stehen."""
+        """Like TemplateResolver with shell_escape_variables: known values single-quoted, unknown ones stay."""
         import re
 
         def one(match):
@@ -257,7 +257,7 @@ class SizeRatchetTest(unittest.TestCase):
         return re.sub(r"\{\{\s*([\w.]+)\s*\}\}", one, command)
 
     def run_pool_candidates(self, **size):
-        """Der Block `kandidaten` aus dem Pool, aufgelöst wie zur Laufzeit, gegen eine Kopie der Skripte."""
+        """The block `kandidaten` from the pool, resolved as at runtime, against a copy of the scripts."""
         definition = json.loads((REPO / "workflow-pool" / "mysuricates-todo-batch-einordnen.json").read_text())
         command = {block["name"]: block["config"] for block in definition["blocks"]}["kandidaten"]["command"]
         with tempfile.TemporaryDirectory() as tmp:
@@ -271,7 +271,7 @@ class SizeRatchetTest(unittest.TestCase):
         return result.returncode, result.stdout + result.stderr
 
     def test_pool_command_survives_missing_or_empty_ratchet_variables(self):
-        code, out = self.run_pool_candidates()   # Repo ohne die beiden Schlüssel: Platzhalter bleiben stehen
+        code, out = self.run_pool_candidates()   # repo without the two keys: placeholders stay
         self.assertEqual(code, 0, out)
         self.assertEqual(json.loads(out.splitlines()[-1])["near_limit"], [])
         code, out = self.run_pool_candidates(size_ratchet_file="", size_ratchet_root="")
@@ -516,7 +516,7 @@ class ReportAndHandoverTest(RepoCase):
                     "--run", "run12345-x", *extra)
 
     def test_report_gate_widget_and_approval_text(self):
-        self.run_verify()   # B ohne Commit → übersprungen
+        self.run_verify()   # B without commit → skipped
         _, out = self.report()
         lines = out.splitlines()
         self.assertEqual(lines[0], "gate_status: YELLOW")
@@ -579,7 +579,7 @@ class ReportAndHandoverTest(RepoCase):
 
 
 class ReviewFixesTest(RepoCase):
-    """Befunde aus dem Abschluss-Review (C1, I2–I6)."""
+    """Findings from the final review (C1, I2–I6)."""
 
     def gate_args(self, backend="true"):
         return ["--backend-cmd", backend, "--frontend-cmd", "true", "--common-cmd", "true",
@@ -590,12 +590,12 @@ class ReviewFixesTest(RepoCase):
         (self.state / "ids.txt").write_text("".join(f"{i}\n" for i in ids))
         b.write_json(self.state / "titles.json", {i: f"Titel {i[:4]}" for i in ids})
 
-    # C1 – geprüft wird der Commit, nicht der Arbeitsbaum
+    # C1 – the commit is checked, not the working tree
     def test_uncommitted_leftovers_are_discarded_before_the_gate(self):
         import verify
         self.base_state([A])
         self.commit(self.clone, "ai-automation-backend/App.java", "class App { Needed n; }\n", A)
-        write(self.clone / "ai-automation-backend" / "Needed.java", "class Needed {}\n")   # vergessen zu committen
+        write(self.clone / "ai-automation-backend" / "Needed.java", "class Needed {}\n")   # forgot to commit
         call(verify.main, "--state", str(self.state), *self.gate_args(backend="test -f Needed.java"))
         data = json.loads((self.state / "results.json").read_text())
         self.assertEqual(data["todos"][A]["status"], "dropped")
@@ -610,7 +610,7 @@ class ReviewFixesTest(RepoCase):
         call(verify.main, "--state", str(self.state), *self.gate_args(backend="test ! -f BAD"))
         self.assertEqual(run_git(self.clone, "status", "--porcelain", "--untracked-files=all"), "")
 
-    # I2 – ein Abbruch darf die TODOs nicht festhalten
+    # I2 – an abort must not hold on to the TODOs
     def test_handover_without_results_returns_every_todo(self):
         import handover
         (self.state / "ids.txt").write_text(f"{A}\n")
@@ -647,7 +647,7 @@ class ReviewFixesTest(RepoCase):
         self.assertTrue(candidates.select([stale, todo(C)], 40, now=now)[0] is False)
         self.assertTrue(candidates.select([fresh, todo(C)], 40, now=now)[0] is True)
 
-    # I3 – von Hand gesetztes batch:selected überlebt das Aufräumen
+    # I3 – batch:selected set by hand survives the cleanup
     def test_hand_tagged_selection_is_kept_and_counts_against_batch_max(self):
         import candidates, choose, housekeeping
         hand = todo(A, "OPEN", [b.SELECTED])
@@ -675,7 +675,7 @@ class ReviewFixesTest(RepoCase):
         self.assertEqual(last_json(out)[0]["add_tags"], [b.STARTED])
         self.assertTrue((self.state / "isolated.ok").exists())
 
-    # I4 – ein fehlendes Review ist kein sauberes
+    # I4 – a missing review is not a clean one
     def test_accepted_without_review_is_a_warning(self):
         import report, verify
         self.base_state([A])
@@ -686,7 +686,7 @@ class ReviewFixesTest(RepoCase):
         self.assertEqual(out.splitlines()[0], "gate_status: YELLOW")
         self.assertIn("kein Review", (self.state / "approval.md").read_text())
 
-    # I6 – nie im echten Checkout
+    # I6 – never in the real checkout
     def test_scripts_refuse_to_work_outside_an_isolated_clone(self):
         import handover, prepare, verify
         write(self.state / "details.txt", details(todo(A, tags=[b.SELECTED])))
@@ -701,7 +701,7 @@ class ReviewFixesTest(RepoCase):
 
 
 class ReviewVerdictTest(RepoCase):
-    """e402140b: ein Review ohne echtes Urteil (not_reviewed) ist kein sauberes."""
+    """e402140b: a review without a real verdict (not_reviewed) is not a clean one."""
 
     def test_not_reviewed_is_a_warning_with_the_reason(self):
         import report, verify
@@ -744,7 +744,7 @@ class ReviewVerdictTest(RepoCase):
 
 
 class FinalReviewFollowUpTest(RepoCase):
-    """d6c0afe6: Nacharbeiten aus dem Abschluss-Review der Batch-Kette."""
+    """d6c0afe6: follow-ups from the final review of the batch chain."""
 
     MAVEN_TAIL = ("[INFO] Running com.x.SourceSizeRatchetTest\n"
                   "[ERROR] Tests run: 2, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.1 s <<< FAILURE!\n"
@@ -784,7 +784,7 @@ class FinalReviewFollowUpTest(RepoCase):
         self.verify()
         b.write_json(self.state / "reviews.json", {A: {"verdict": "ok", "blocker": [], "major": [], "minor": []}})
 
-    # handover: Übergabe wiederholbar (Resume desselben Laufs)
+    # handover: handover repeatable (resume of the same run)
     def test_handover_can_be_repeated_for_the_same_run(self):
         self.accepted_a()
         self.report()
@@ -794,19 +794,19 @@ class FinalReviewFollowUpTest(RepoCase):
         self.assertNotIn("gate_status: RED", out)
         self.assertEqual(last_json(out)[0]["add_tags"], [b.HANDED_OVER])
 
-    # batchlib.plain(): unsichtbare Formatzeichen
+    # batchlib.plain(): invisible format characters
     def test_plain_drops_invisible_format_characters(self):
         self.assertEqual(b.plain("gate​_status⁠: RED﻿ x­y"), "gate status: RED xy")
         self.assertEqual(b.plain("todo_‍item: x"), "todo item: x")
 
-    # housekeeping: „wieder frei“ heißt OPEN
+    # housekeeping: „wieder frei“ means OPEN
     def test_released_handed_over_todo_is_open_again(self):
         import housekeeping
         updates, summary = housekeeping.plan([todo(B, "IN_PROGRESS", [b.HANDED_OVER])], merged=set(), in_branches=set())
         self.assertEqual(summary["released"], [B])
         self.assertEqual((updates[0]["status"], updates[0]["remove_tags"]), ("OPEN", [b.HANDED_OVER]))
 
-    # handover: Merge-Vorschau zum Zeitpunkt der Übergabe
+    # handover: merge preview at the time of the handover
     def test_handover_note_has_the_merge_preview_of_its_own_time(self):
         self.accepted_a()
         self.report()
@@ -815,7 +815,7 @@ class FinalReviewFollowUpTest(RepoCase):
         _, out = self.handover("Übernehmen")
         self.assertIn("Merge-Vorschau: Konflikt", last_json(out)[0]["note"])
 
-    # prepare: ein leerer Batch bricht auch auf fremdem Branch nicht ab
+    # prepare: an empty batch does not abort on a foreign branch either
     def test_empty_batch_on_a_foreign_branch_is_no_error(self):
         import prepare
         run_git(self.source, "checkout", "-q", "-b", "feature")
@@ -825,7 +825,7 @@ class FinalReviewFollowUpTest(RepoCase):
         self.assertEqual(last_json(out), [])
         self.assertEqual((self.state / "ids.txt").read_text(), "")
 
-    # Abarbeiten: übersprungene Start-Updates fallen auf
+    # processing: skipped start updates stand out
     def test_todos_whose_start_was_skipped_leave_the_batch_and_show_in_the_report(self):
         import confirm_start
         self.base_state([A, B, C])
@@ -854,7 +854,7 @@ class FinalReviewFollowUpTest(RepoCase):
         check = [u for u in last_json(out) if u["id"] == A][1]
         self.assertEqual((check.get("status"), check["require_status"], check["require_tags"]),
                          (None, "IN_PROGRESS", [b.SELECTED, b.STARTED]))
-        # Wiederaufnahme: A ist schon vom selben Batch gestartet, B hat jemand anders in Arbeit genommen
+        # Resumption: A was already started by the same batch, B was taken in hand by someone else
         (self.state / "starten.txt").write_text(
             f"✓ 1 aktualisiert, 3 übersprungen\n– {A[:8]}: Status ist IN_PROGRESS\n✓ {A[:8]}\n"
             f"– {B[:8]}: Status ist IN_PROGRESS\n– {B[:8]}: Tag fehlt: batch:started\n")
@@ -872,7 +872,7 @@ class FinalReviewFollowUpTest(RepoCase):
         self.assertEqual(out.splitlines()[0], "gate_status: YELLOW")
         self.assertIn("nicht gestartet", out)
 
-    # verify: leere Commits kommen nicht in den Branch
+    # verify: empty commits do not get into the branch
     def test_empty_commits_are_not_taken_over(self):
         self.base_state([A, B])
         base = (self.state / "base.sha").read_text()
@@ -891,7 +891,7 @@ class FinalReviewFollowUpTest(RepoCase):
         self.commit(self.clone, "docs/x.md", "1\n", A)
         run_git(self.clone, "rm", "-q", "docs/x.md")
         run_git(self.clone, "commit", "-q", "-m", "chore: fremd, ohne Trailer")
-        self.commit(self.clone, "docs/x.md", "1\n", B)   # dieselbe Änderung wie A – nach dem Neuaufbau leer
+        self.commit(self.clone, "docs/x.md", "1\n", B)   # same change as A – empty after the rebuild
         self.verify()
         results = json.loads((self.state / "results.json").read_text())["todos"]
         self.assertEqual(results[A]["status"], "accepted")
@@ -902,7 +902,7 @@ class FinalReviewFollowUpTest(RepoCase):
         self.assertEqual(len(run_git(self.clone, "rev-list", f"{(self.state / 'base.sha').read_text()}..HEAD").split()), 1)
         self.assertEqual(run_git(self.clone, "status", "--porcelain"), "")
 
-    # report: ein Fehler von git merge-tree ist kein Konflikt
+    # report: an error from git merge-tree is no conflict
     def test_merge_tree_error_is_unknown_not_conflict(self):
         real = subprocess.run
 
@@ -914,7 +914,7 @@ class FinalReviewFollowUpTest(RepoCase):
         with unittest.mock.patch.object(b.subprocess, "run", side_effect=fake):
             self.assertEqual(b.merge_preview("main")["state"], "unbekannt")
 
-    # report/handover: „Verwerfen“ macht die Ampel gelb
+    # report/handover: „Verwerfen“ turns the traffic light yellow
     def test_discard_turns_the_gate_yellow(self):
         self.accepted_a()
         self.report()
@@ -923,7 +923,7 @@ class FinalReviewFollowUpTest(RepoCase):
         _, out = self.handover("", "--on-timeout", "discard")
         self.assertIn("gate_status: YELLOW", out)
 
-    # Gates: grün erst im zweiten Versuch → gelb
+    # Gates: green only on the second attempt → yellow
     def test_green_only_on_the_second_attempt_turns_the_report_yellow(self):
         mark = self.state / "flaky.mark"
         self.accepted_a_with(f"if [ -f {mark} ]; then exit 0; else touch {mark}; exit 1; fi")
@@ -940,7 +940,7 @@ class FinalReviewFollowUpTest(RepoCase):
         self.verify(backend)
         b.write_json(self.state / "reviews.json", {A: {"verdict": "ok", "blocker": [], "major": [], "minor": []}})
 
-    # verify/handover: der Vermerk nennt den Grund des roten Gates
+    # verify/handover: the note names the reason of the red gate
     def test_red_gate_reason_names_the_first_meaningful_error_line(self):
         log = self.state / "maven.txt"
         log.write_text(self.MAVEN_TAIL)
@@ -961,7 +961,7 @@ class FinalReviewFollowUpTest(RepoCase):
                          "FAIL src/x.test.ts > macht y")
         self.assertEqual(gates.first_error("nur Text\nnoch mehr"), "noch mehr")
         self.assertEqual(gates.first_error(""), "")
-        # Maven färbt auch in eine Logdatei (Jansi): die Escape-Folgen dürfen den Präfix nicht verdecken
+        # Maven colors even into a log file (Jansi): the escape sequences must not hide the prefix
         self.assertEqual(gates.first_error("[\x1b[1;31mERROR\x1b[m] \x1b[1mA.java:[3,1] cannot find symbol\x1b[m"),
                          "A.java:[3,1] cannot find symbol")
 
@@ -975,7 +975,7 @@ class FinalReviewFollowUpTest(RepoCase):
 
 
 class PoolDefinitionTest(unittest.TestCase):
-    """Die Pool-Workflows rufen die Skripte mit Argumenten auf, die diese kennen – und aus der Kopie vom Basis-Commit (I5)."""
+    """The pool workflows call the scripts with arguments that these know – and from the copy at the base commit (I5)."""
 
     FILES = ("mysuricates-todo-batch-einordnen.json", "mysuricates-todo-batch-abarbeiten.json")
 
@@ -1002,7 +1002,7 @@ class PoolDefinitionTest(unittest.TestCase):
             self.assertNotIn("python3 scripts/todo-batch", text, f"{name}/{block.get('name')} ruft den Baum auf")
 
     def test_gates_never_rerun_failing_tests(self):
-        # CLAUDE.md: Surefire-Reruns werten einen roten Test mit grünem Namensvetter als Flake – das Gate wäre grün
+        # CLAUDE.md: Surefire reruns count a red test with a green namesake as a flake – the gate would be green
         context = json.loads((REPO / "workflow-pool" / self.FILES[1]).read_text())["defaultContext"]
         for key in ("gate_backend", "gate_frontend", "gate_common"):
             self.assertNotIn("rerunFailingTestsCount", context[key], key)
@@ -1022,8 +1022,8 @@ class PoolDefinitionTest(unittest.TestCase):
         self.assertLess(names.index(check["name"]), names.index("umsetzen"))
 
     def test_gates_never_create_auto_todos(self):
-        # Die Kette führt ihre TODOs selbst (Tags, Vermerke); „Verwerfen“ ist eine bewusste Entscheidung. Ohne
-        # ausdrückliches autoTodo.enabled=false griffe die globale Vorgabe und machte aus YELLOW/RED ein Auto-TODO.
+        # The chain manages its TODOs itself (tags, notes); „Verwerfen“ is a deliberate decision. Without
+        # an explicit autoTodo.enabled=false the global default would apply and turn YELLOW/RED into an auto-TODO.
         for name in self.FILES:
             metadata = json.loads((REPO / "workflow-pool" / name).read_text())["metadata"]
             self.assertIs(metadata.get("autoTodo", {}).get("enabled"), False, name)

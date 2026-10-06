@@ -499,10 +499,10 @@ export interface PoolWorkflowEntry {
   icon: string;
   category: string | null;
   /**
-   * Kategorie des Eintrags: `repo` greift auf die Struktur dieses Repositories zu,
-   * `portable` ist über `project_path` parametrisiert, `external` braucht ein Werkzeug außerhalb
-   * von Repo und Projekt (steht in der Beschreibung). `null` = nicht deklariert.
-   * Regelwerk: docs/workflow-pool-kuratierung.md
+   * Category of the entry: `repo` accesses the structure of this repository,
+   * `portable` is parameterized via `project_path`, `external` needs a tool outside
+   * of repo and project (stated in the description). `null` = not declared.
+   * Rules: docs/workflow-pool-kuratierung.md
    */
   scope: PoolScope | null;
   tags: string[];
@@ -615,18 +615,18 @@ export interface WorkflowSealStatus {
 }
 
 /**
- * Eine Run-Zeile aus einer Listen-Route (`/executions`, `/workflows/{id}/runs`, `/schedules/{id}/runs`,
- * `/schedules/calendar`) — ohne die Schritte.
+ * A run row from a list route (`/executions`, `/workflows/{id}/runs`, `/schedules/{id}/runs`,
+ * `/schedules/calendar`) — without the steps.
  *
- * Die Liste trug vorher jeden Step-Output mit: 3 MB Antwort bei 60 Runs, gemessen vom
- * RequestCostRatchetTest (MySuricates-TODO a05c9504). Statt der Schritte kommen jetzt ihre Anzahl
- * und die gekürzte Ausgabe des letzten. Wer den Volltext braucht, lädt den Run einzeln —
- * `/executions/{id}` liefert weiter alles.
+ * The list used to carry every step output: 3 MB response for 60 runs, measured by the
+ * RequestCostRatchetTest (MySuricates-TODO a05c9504). Instead of the steps, their count now comes
+ * along with the truncated output of the last one. Whoever needs the full text loads the run individually —
+ * `/executions/{id}` still returns everything.
  */
 export interface WorkflowRunListItem extends Omit<WorkflowRun, 'steps'> {
   stepCount: number;
   lastStepStatus: StepStatus | null;
-  /** Auf 500 Zeichen gekürzt; der Volltext steht in der Detail-Route. */
+  /** Truncated to 500 characters; the full text is in the detail route. */
   lastStepPreview: string | null;
 }
 
@@ -818,11 +818,11 @@ export interface CalendarEvent {
 
 export interface CalendarDataResponse {
   upcoming: ScheduledWorkflow[];
-  /** Listenzeilen ohne Schritte (MySuricates-TODO 168e3d7f). */
+  /** List rows without steps (MySuricates-TODO 168e3d7f). */
   pastRuns: WorkflowRunListItem[];
   /**
-   * Alle Runs des Zeitraums; `pastRuns` sind die neuesten bis zum Limit (86777fb4). Fehlt bei älteren
-   * Backends, die alle schicken.
+   * All runs of the period; `pastRuns` are the newest up to the limit (86777fb4). Missing for older
+   * backends, which send all of them.
    */
   pastRunsTotal?: number;
 }
@@ -1484,7 +1484,7 @@ export interface Todo {
   source: TodoSource;
   sourceAgent: string | null;
   sessionId: string | null;
-  /** UUID der Agenten-Konversation (`claude --resume <uuid>`) — nicht die Shell-Session. */
+  /** UUID of the agent conversation (`claude --resume <uuid>`) — not the shell session. */
   agentSessionRef: string | null;
   workflowRunId: string | null;
   referenceType: string | null;
@@ -1498,7 +1498,7 @@ export interface Todo {
   dueDate: string | null;
   createdAt: string;
   updatedAt: string;
-  /** Ziel und Einschätzung (TODO dc0566f8); null/fehlt, solange nichts davon gesetzt ist. */
+  /** Goal and assessment (TODO dc0566f8); null/missing as long as none of it is set. */
   planning?: TodoPlanning | null;
 }
 
@@ -1519,11 +1519,11 @@ export interface TodoPlanning {
   ratedBy: RatedBy | null;
   ratedAt: string | null;
   openQuestion: string | null;
-  /** Arbeitspaket im Ziel (c60bf914); null = keins. Fehlt bei einem älteren Backend. */
+  /** Work package in the goal (c60bf914); null = none. Missing for an older backend. */
   workPackageId?: string | null;
-  /** Dasselbe unter dem Namen eines älteren Backends (vor c60bf914 hieß das Arbeitspaket „milestone“). */
+  /** The same under the name of an older backend (before c60bf914 the work package was called „milestone“). */
   milestoneId?: string | null;
-  /** Entscheidung zur offenen Frage (68a5e24e). Fehlen die Felder, ist das Backend älter. */
+  /** Decision on the open question (68a5e24e). If the fields are missing, the backend is older. */
   decision?: string | null;
   decidedAt?: string | null;
   decidedBy?: RatedBy | null;
@@ -1531,12 +1531,12 @@ export interface TodoPlanning {
 }
 
 /**
- * Zustand der Klärung eines TODOs (68a5e24e): QUESTION = eine offene Frage steht an (auch, wenn es
- * schon eine frühere Entscheidung gibt), DECIDED = entschieden und keine neue Frage, NONE = nichts.
+ * State of the clarification of a TODO (68a5e24e): QUESTION = an open question is pending (even if there
+ * is already an earlier decision), DECIDED = decided and no new question, NONE = nothing.
  */
 export type DecisionState = 'QUESTION' | 'DECIDED' | 'NONE';
 
-/** `null`/fehlt = unverändert, leerer Text = leeren (`goalId: ''` löst das TODO vom Ziel). */
+/** `null`/missing = unchanged, empty text = clear (`goalId: ''` detaches the TODO from the goal). */
 export interface UpdateTodoPlanningRequest {
   goalId?: string;
   goalRank?: number;
@@ -1545,11 +1545,11 @@ export interface UpdateTodoPlanningRequest {
   ratingNote?: string;
   openQuestion?: string;
   ratedBy?: RatedBy;
-  /** Arbeitspaket desselben Ziels; `''` nimmt es weg. */
+  /** Work package of the same goal; `''` removes it. */
   workPackageId?: string;
-  /** Nur für ein älteres Backend (vor c60bf914): dort heißt das Feld noch so. */
+  /** Only for an older backend (before c60bf914): there the field is still called that. */
   milestoneId?: string;
-  /** Entscheidung (68a5e24e): Text leert die offene Frage, `''` nimmt die Entscheidung weg. */
+  /** Decision (68a5e24e): text clears the open question, `''` removes the decision. */
   decision?: string;
 }
 
@@ -1560,14 +1560,14 @@ export interface GoalProgress {
   backlog: number;
   done: number;
   openQuestions: number;
-  /** Entschiedene TODOs ohne neue Frage (68a5e24e). Fehlt bei einem älteren Backend. */
+  /** Decided TODOs without a new question (68a5e24e). Missing for an older backend. */
   decided?: number;
   percentDone: number;
 }
 
 /**
- * Ziel-Wächter (TODO 259f4f66): ein Workflow aus der Vorlage `goal-guard` mit täglichem Zeitplan.
- * `enabled` = der Zeitplan läuft; ausgeschaltet bleibt der Workflow (`workflowId`), nur pausiert.
+ * Goal guard (TODO 259f4f66): a workflow from the `goal-guard` template with a daily schedule.
+ * `enabled` = the schedule runs; when switched off, the workflow (`workflowId`) stays, just paused.
  */
 export interface GoalGuard {
   enabled: boolean;
@@ -1585,15 +1585,15 @@ export interface Goal {
   createdAt: string;
   updatedAt: string;
   progress: GoalProgress;
-  /** Nie null; `useGoal` ergänzt ihn für ein älteres Backend. */
+  /** Never null; `useGoal` adds it for an older backend. */
   guard: GoalGuard;
-  /** Ausdrücklich zugeordnete Projekte, nach Position (c60bf914). Fehlt bei einem älteren Backend. */
+  /** Explicitly assigned projects, by position (c60bf914). Missing for an older backend. */
   projects?: GoalProjectRef[];
-  /** Nächster nicht erreichter Meilenstein – für die Zielkarte. Fehlt bei einem älteren Backend. */
+  /** Next milestone not yet reached – for the goal card. Missing for an older backend. */
   nextMilestone?: GoalMilestoneRef | null;
 }
 
-/** Ein Meilenstein in der Zielliste: das Nötigste für die Karte. */
+/** A milestone in the goal list: the bare minimum for the card. */
 export interface GoalMilestoneRef {
   id: string;
   title: string;
@@ -1601,13 +1601,13 @@ export interface GoalMilestoneRef {
   state: MilestoneState;
 }
 
-/** Projekt eines Ziels in der Zielliste: nur Name und ID. */
+/** A project of a goal in the goal list: only name and ID. */
 export interface GoalProjectRef {
   id: string;
   name: string;
 }
 
-/** Projekt eines Ziels im Detail (c60bf914), mit Zählern aus den nicht archivierten TODOs des Ziels darin. */
+/** A project of a goal in detail (c60bf914), with counts from the goal's non-archived TODOs in it. */
 export interface GoalProject {
   projectId: string;
   name: string;
@@ -1616,76 +1616,76 @@ export interface GoalProject {
   total: number;
   done: number;
   openQuestions: number;
-  /** Entschiedene TODOs (68a5e24e); `useGoal` ergänzt 0 bei einem älteren Backend. */
+  /** Decided TODOs (68a5e24e); `useGoal` adds 0 for an older backend. */
   decided: number;
 }
 
 /**
- * Zustand eines Arbeitspakets bzw. Meilensteins, beim Lesen berechnet: bald fällig = in höchstens
- * 3 Tagen. Ein Arbeitspaket ohne Zeitraum ist nur OPEN oder REACHED (Oberfläche: „abgeschlossen“).
+ * State of a work package or milestone, computed on read: due soon = in at most
+ * 3 days. A work package without a period is only OPEN or REACHED (UI: „abgeschlossen“).
  */
 export type MilestoneState = 'OPEN' | 'DUE_SOON' | 'OVERDUE' | 'REACHED';
 export type WorkPackageState = MilestoneState;
 
 /**
- * Arbeitspaket eines Ziels (c60bf914): gehört genau einem Projekt des Ziels und bündelt dessen
- * TODOs; Reihenfolge im Projekt über `position`. Mit Zeitraum (`startDate` und `endDate`, beide oder
- * keins) steht es als Balken auf dem Zeitstrahl. Abgeschlossen, wenn alle seine TODOs erledigt sind.
+ * Work package of a goal (c60bf914): belongs to exactly one project of the goal and bundles its
+ * TODOs; order within the project via `position`. With a period (`startDate` and `endDate`, both or
+ * neither) it appears as a bar on the timeline. Completed when all its TODOs are done.
  */
 export interface GoalWorkPackage {
   id: string;
   goalId: string;
-  /** null nur bei Altdaten oder wenn das Projekt gelöscht wurde. */
+  /** null only for legacy data or if the project was deleted. */
   projectId: string | null;
   title: string;
-  /** Beginn (lokaler Tagesbeginn); null = ohne Zeitraum. */
+  /** Start (local start of day); null = no period. */
   startDate: string | null;
-  /** Ende (lokales Tagesende); null = ohne Zeitraum. */
+  /** End (local end of day); null = no period. */
   endDate: string | null;
-  /** Reihenfolge innerhalb des Projekts. */
+  /** Order within the project. */
   position: number;
-  /** Basis ist das Ende: bald fällig, überfällig, abgeschlossen. */
+  /** Basis is the end: due soon, overdue, completed. */
   state: WorkPackageState;
-  /** Zugeordnete TODOs ohne ARCHIVED. */
+  /** Assigned TODOs without ARCHIVED. */
   total: number;
   done: number;
-  /** Nicht erledigte TODOs mit offener Frage. */
+  /** Unfinished TODOs with an open question. */
   openQuestions: number;
   /** Entschiedene TODOs (68a5e24e). */
   decided: number;
-  /** Erster Abschluss; bleibt stehen. */
+  /** First completion; stays. */
   completedAt: string | null;
-  /** War schon abgeschlossen, ist es wegen eines neuen TODOs nicht mehr. */
+  /** Was already completed, is no longer because of a new TODO. */
   reopened: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
-/** Ein Arbeitspaket mit Zeitraum – nur solche stehen als Balken auf dem Zeitstrahl. */
+/** A work package with a period – only those appear as bars on the timeline. */
 export type ScheduledWorkPackage = GoalWorkPackage & { startDate: string; endDate: string };
 
 /**
- * Meilenstein eines Ziels (c60bf914): ein Termin fürs ganze Ziel (kein Projekt), als Raute oben im
- * Zeitstrahl. Mit verknüpften Arbeitspaketen erreicht, wenn alle abgeschlossen sind; ohne von Hand.
+ * Milestone of a goal (c60bf914): a date for the whole goal (no project), as a diamond at the top of the
+ * timeline. With linked work packages reached when all are completed; without, by hand.
  */
 export interface GoalMilestone {
   id: string;
   goalId: string;
   title: string;
-  /** Fälligkeit (lokales Tagesende). */
+  /** Due date (local end of day). */
   dueDate: string;
   state: MilestoneState;
   workPackageIds: string[];
   packagesTotal: number;
   packagesDone: number;
-  /** Erstes Erreichen; bleibt stehen. */
+  /** First reached; stays. */
   reachedAt: string | null;
   reopened: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
-/** Zeitraum `startDate`/`endDate` als ISO-Zeitpunkt; ohne beide = ohne Zeitraum. `projectId` Pflicht, außer das Ziel hat genau ein Projekt. */
+/** Period `startDate`/`endDate` as ISO timestamp; without both = without period. `projectId` required unless the goal has exactly one project. */
 export interface CreateGoalWorkPackageRequest {
   title: string;
   projectId?: string;
@@ -1693,7 +1693,7 @@ export interface CreateGoalWorkPackageRequest {
   endDate?: string;
 }
 
-/** Fehlendes Feld = unverändert, `''` leert (Beginn und Ende nur zusammen); `projectId` nur ohne TODOs. */
+/** Missing field = unchanged, `''` clears (start and end only together); `projectId` only without TODOs. */
 export interface UpdateGoalWorkPackageRequest {
   title?: string;
   projectId?: string;
@@ -1707,7 +1707,7 @@ export interface CreateGoalMilestoneRequest {
   workPackageIds?: string[];
 }
 
-/** Fehlendes Feld = unverändert; `workPackageIds` ersetzt die Menge; `reached` nur ohne verknüpfte Pakete. */
+/** Missing field = unchanged; `workPackageIds` replaces the set; `reached` only without linked packages. */
 export interface UpdateGoalMilestoneRequest {
   title?: string;
   dueDate?: string;
@@ -1715,7 +1715,7 @@ export interface UpdateGoalMilestoneRequest {
   reached?: boolean;
 }
 
-/** `POST /goals/{id}/guard`; Projekt, Zeitplan und Sprache zählen nur beim ersten Einschalten. */
+/** `POST /goals/{id}/guard`; project, schedule and language only count on first switch-on. */
 export interface GoalGuardRequest {
   enabled: boolean;
   projectId?: string;
@@ -1740,11 +1740,11 @@ export interface GoalTodoItem {
   ratedAt: string | null;
   openQuestion: string | null;
   updatedAt: string;
-  /** Fälligkeit (TODO 259f4f66); null = ungeplant. */
+  /** Due date (TODO 259f4f66); null = unplanned. */
   dueDate: string | null;
-  /** Arbeitspaket des Ziels (c60bf914); null = keins. */
+  /** Work package of the goal (c60bf914); null = none. */
   workPackageId: string | null;
-  /** Entscheidung zur (früheren) offenen Frage (68a5e24e). */
+  /** Decision on the (earlier) open question (68a5e24e). */
   decision: string | null;
   decidedAt: string | null;
   decidedBy: RatedBy | null;
@@ -1760,37 +1760,37 @@ export interface GoalProjectProgress {
 
 export interface GoalDetail {
   goal: Goal;
-  /** Arbeitsreihenfolge: Rang, dann Priorität, dann Alter. */
+  /** Work order: rank, then priority, then age. */
   todos: GoalTodoItem[];
   byProject: GoalProjectProgress[];
-  /** Ausdrücklich zugeordnete Projekte nach Position; `normalizeGoalDetail` leitet sie bei einem älteren Backend aus `byProject` ab. */
+  /** Explicitly assigned projects by position; `normalizeGoalDetail` derives them from `byProject` for an older backend. */
   projects: GoalProject[];
-  /** Nach Projekt-Position, dann Paket-Position. */
+  /** By project position, then package position. */
   workPackages: GoalWorkPackage[];
-  /** Nach Fälligkeit, dann Titel. */
+  /** By due date, then title. */
   milestones: GoalMilestone[];
   /**
-   * Gesetzt von `normalizeGoalDetail`: Die Antwort kam von einem Backend vor c60bf914 (ohne
-   * `workPackages`). Meilensteine gibt es dort noch nicht, die Oberfläche blendet sie aus.
+   * Set by `normalizeGoalDetail`: the response came from a backend before c60bf914 (without
+   * `workPackages`). Milestones do not exist there yet, the UI hides them.
    */
   legacyBackend?: boolean;
   /**
-   * Gesetzt von `normalizeGoalDetail`: Das Backend kennt Entscheidungen (68a5e24e). Ohne sie gibt es
-   * kein „Entscheiden“ – ein älteres Backend ließe das Feld stillschweigend fallen.
+   * Set by `normalizeGoalDetail`: the backend knows decisions (68a5e24e). Without it there is
+   * no „Entscheiden“ – an older backend would silently drop the field.
    */
   decisionsSupported?: boolean;
 }
 
 /**
- * Rolle eines Workflows am Ziel (52bc1e8c): WORKER „arbeitet daran“, STATUS „liefert den Stand“
- * (sein Ergebnis ist eine Ampel mit Kennzahlen). Anzeigen und Starten gehen bei beiden.
+ * Role of a workflow on the goal (52bc1e8c): WORKER „arbeitet daran“, STATUS „liefert den Stand“
+ * (its result is a traffic light with metrics). Showing and starting work for both.
  */
 export type GoalWorkflowRole = 'WORKER' | 'STATUS';
 
 /**
- * Ein Workflow am Ziel oder an einem Arbeitspaket (52bc1e8c, `GET /goals/{id}/workflows`). Der
- * Wächter steht als erster Eintrag mit `id: "guard"` und `guard: true` darin – lösen lässt er sich
- * nur über seinen Schalter.
+ * A workflow on the goal or on a work package (52bc1e8c, `GET /goals/{id}/workflows`). The
+ * guard is in it as the first entry with `id: "guard"` and `guard: true` – it can only be detached
+ * via its switch.
  */
 export interface GoalWorkflow {
   id: string;
@@ -1819,7 +1819,7 @@ export interface GoalTodoOrigin {
 }
 
 export interface GoalTodoWorker {
-  /** `LINKED`: Fix-Workflow am TODO; `TRIGGER`: ein aktiver TodoTrigger passt. */
+  /** `LINKED`: fix workflow on the TODO; `TRIGGER`: an active TodoTrigger matches. */
   kind: 'LINKED' | 'TRIGGER';
   workflowId: string;
   workflowName: string;
@@ -1831,7 +1831,7 @@ export interface GoalTodoResult {
   runId: string | null;
   workflowId: string | null;
   runStatus: RunStatus | null;
-  /** Ende des Laufs, solange er läuft sein Start. */
+  /** End of the run, its start while it is running. */
   at: string | null;
   fixAttempts: number;
   resolutionState: TodoResolutionState | null;
@@ -1846,28 +1846,28 @@ export interface GoalTodoRelation {
   projectName: string | null;
   tags: string[];
   goalRank: number | null;
-  /** Noch keinem Ziel zugeordnet, nur als Vorschlag in der Karte. */
+  /** Not yet assigned to a goal, only a suggestion in the card. */
   candidate: boolean;
   origin: GoalTodoOrigin;
   workers: GoalTodoWorker[];
-  /** Fehlt, solange nie ein Fix-Lauf gestartet wurde. */
+  /** Missing as long as no fix run has ever been started. */
   result: GoalTodoResult | null;
 }
 
 export interface GoalRelations {
   goalId: string;
-  /** Aktive TodoTrigger insgesamt; 0 heißt, kein TODO kann per Trigger andocken. */
+  /** Active TodoTriggers in total; 0 means no TODO can attach via a trigger. */
   activeTriggers: number;
-  /** TODOs des Ziels in Arbeitsreihenfolge, danach die Kandidaten. */
+  /** The goal's TODOs in working order, then the candidates. */
   todos: GoalTodoRelation[];
 }
 
 export interface CreateGoalRequest {
   title: string;
   description?: string;
-  /** `YYYY-MM-DD` oder ISO-Zeitpunkt. */
+  /** `YYYY-MM-DD` or ISO timestamp. */
   targetDate?: string;
-  /** Projekte, denen das Ziel gleich zugeordnet wird. */
+  /** Projects the goal is assigned to right away. */
   projectIds?: string[];
 }
 
@@ -1942,9 +1942,9 @@ export interface ProjectRollup {
 }
 
 /**
- * Ein Termin in „Braucht dich“ (Feldname `milestonesDue` bleibt): ein Meilenstein, bald fällig oder
- * überfällig, oder ein Arbeitspaket, dessen Ende vorbei ist – mit dem Ziel für den Link. `kind`
- * fehlt bei einem älteren Backend; dessen Einträge sind Arbeitspakete.
+ * A date in „Braucht dich“ (field name `milestonesDue` stays): a milestone, due soon or
+ * overdue, or a work package whose end has passed – with the goal for the link. `kind`
+ * is missing for an older backend; its entries are work packages.
  */
 export interface MilestoneAttentionItem {
   id: string;
@@ -1963,7 +1963,7 @@ export interface TodoOverviewResponse {
   needsYou: NeedsYouItem[];
   generatedAt: string;
   staleThresholdDays: number;
-  /** Meilensteine aktiver Ziele, bald fällig oder überfällig (TODO 259f4f66); fehlt bei einem älteren Backend. */
+  /** Milestones of active goals, due soon or overdue (TODO 259f4f66); missing for an older backend. */
   milestonesDue?: MilestoneAttentionItem[];
 }
 
@@ -2036,10 +2036,10 @@ export interface ChainRun {
 }
 
 export interface ScheduleRunsResponse {
-  /** Listenzeilen ohne Schritte (MySuricates-TODO 168e3d7f). */
+  /** List rows without steps (MySuricates-TODO 168e3d7f). */
   workflowRuns: WorkflowRunListItem[];
   chainRuns: ChainRun[];
-  /** Alle Runs des Zeitplans; die Listen sind die neuesten bis zum Limit (86777fb4). Fehlen bei älteren Backends. */
+  /** All runs of the schedule; the lists are the newest up to the limit (86777fb4). Missing for older backends. */
   workflowRunsTotal?: number;
   chainRunsTotal?: number;
 }
@@ -2180,8 +2180,8 @@ export interface ExportToPoolResponse {
   poolId: string;
   filename: string;
   /**
-   * Stellen, die der Export als Instanz-Bindung entfernt hat (z. B. die `workflowId` eines
-   * sub-workflow-Blocks). Leer, wenn nichts zu bereinigen war.
+   * Places the export removed as instance binding (e.g. the `workflowId` of a
+   * sub-workflow block). Empty if nothing needed cleaning.
    */
   sanitizedPaths: string[];
 }

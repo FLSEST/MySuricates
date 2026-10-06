@@ -12,13 +12,13 @@ export interface CandidateFilter {
 }
 
 /**
- * „Könnte dazugehören“ (TODO c6ea8f5c): offene TODOs ohne Ziel, per Suche und Tag eingegrenzt,
- * mit einem Klick zuordnen. Die gezeigten Kandidaten gehen als `include` in die Relationskarte und
- * erscheinen dort gestrichelt. Filter und Daten hält die Zielseite. Seit c60bf914 nur aus den
- * Projekten des Ziels; „Alle Projekte zeigen“ sucht überall und kennzeichnet TODOs aus fremden
- * Projekten. Kann der Server nicht nach Projekten filtern (`scoped` falsch), fehlt der Schalter.
- * Seit 85889063 fragt „+“ gleich nach dem Arbeitspaket, sobald das Projekt des TODOs im Ziel Pakete
- * hat: ein kleines Menü „Ohne Arbeitspaket“ und die Pakete in ihrer Reihenfolge, ein Klick genügt.
+ * „Könnte dazugehören“ (TODO c6ea8f5c): open TODOs without a goal, narrowed by search and tag,
+ * assign with one click. The candidates shown go into the relation map as `include` and
+ * appear there dashed. The goal page holds filter and data. Since c60bf914 only from the
+ * goal's projects; „Alle Projekte zeigen“ searches everywhere and marks TODOs from foreign
+ * projects. If the server cannot filter by project (`scoped` false), the switch is missing.
+ * Since 85889063 „+“ asks for the work package right away as soon as the TODO's project has packages
+ * in the goal: a small menu „Ohne Arbeitspaket“ and the packages in their order, one click suffices.
  */
 export function GoalCandidates({
   filter, onFilterChange, candidates, isLoading, suggestions, onAssign, packagesOf = () => [], assigning,
@@ -28,17 +28,17 @@ export function GoalCandidates({
   onFilterChange: (filter: CandidateFilter) => void;
   candidates: Todo[];
   isLoading: boolean;
-  /** Tag-Vorschläge, etwa `release` und die häufigsten Tags des Ziels. */
+  /** Tag suggestions, e.g. `release` and the goal's most frequent tags. */
   suggestions: string[];
   onAssign: (todo: Todo, workPackage: PackageChoice | null) => void;
-  /** Pakete, in die das TODO passt (sein Projekt), in ihrer Reihenfolge; leer heißt: „+“ ordnet sofort zu. */
+  /** Packages the TODO fits into (its project), in their order; empty means: „+“ assigns immediately. */
   packagesOf?: (todo: Todo) => PackageChoice[];
   assigning: boolean;
-  /** Der Server kennt `/goals/{id}/candidates` und filtert nach den Projekten des Ziels. */
+  /** The server knows `/goals/{id}/candidates` and filters by the goal's projects. */
   scoped?: boolean;
   allProjects?: boolean;
   onAllProjectsChange?: (all: boolean) => void;
-  /** Die Projekte des Ziels – leer heißt: ohne „Alle Projekte“ kann es keine Kandidaten geben. */
+  /** The goal's projects — empty means: without „Alle Projekte“ there can be no candidates. */
   goalProjectIds?: string[];
 }) {
   const t = useT();
@@ -116,7 +116,7 @@ export function GoalCandidates({
 
 const NO_PACKAGE = '__none__';
 
-/** „+ Zuordnen“: ohne passende Pakete ein Knopf, sonst ein Menü mit „Ohne Arbeitspaket“ und den Paketen. */
+/** „+ Zuordnen“: without matching packages a button, otherwise a menu with „Ohne Arbeitspaket“ and the packages. */
 function AssignButton({ todo, packages, disabled, onAssign }: {
   todo: Todo;
   packages: PackageChoice[];

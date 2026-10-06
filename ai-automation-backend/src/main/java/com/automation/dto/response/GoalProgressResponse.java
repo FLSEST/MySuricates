@@ -1,9 +1,9 @@
 package com.automation.dto.response;
 
 /**
- * Fortschritt eines Ziels. {@code total} zaehlt ohne ARCHIVED (Dubletten, Verworfenes);
- * {@code percentDone} ist {@code done / total}, gerundet. {@code decided} zaehlt die nicht
- * archivierten TODOs mit Entscheidung und ohne offene Frage (TODO 68a5e24e).
+ * Progress of a goal. {@code total} counts without ARCHIVED (duplicates, discarded);
+ * {@code percentDone} is {@code done / total}, rounded. {@code decided} counts the non-
+ * archived TODOs with a decision and without an open question (TODO 68a5e24e).
  */
 public record GoalProgressResponse(
         long total,

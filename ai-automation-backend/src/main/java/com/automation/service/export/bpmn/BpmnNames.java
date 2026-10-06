@@ -9,7 +9,7 @@ final class BpmnNames {
     private BpmnNames() {
     }
 
-    /** Task-Name: block.name falls gesetzt, sonst Typ-Label + erste Command-Zeile (max. 60 Zeichen). */
+    /** Task name: block.name if set, otherwise type label + first command line (max. 60 characters). */
     static String taskName(String blockName, String typeLabel, String command) {
         if (blockName != null && !blockName.isBlank()) {
             return blockName.strip();
@@ -24,7 +24,7 @@ final class BpmnNames {
         return typeLabel + ": " + firstLine;
     }
 
-    /** Stabile, sprechende XML-ID: base + Slug aus dem Namen ([a-z0-9_], max. 30 Slug-Zeichen). */
+    /** Stable, descriptive XML id: base + slug from the name ([a-z0-9_], max. 30 slug characters). */
     static String elementId(String base, String name) {
         if (name == null || name.isBlank()) {
             return base;

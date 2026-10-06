@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
-"""Strip internal TODO-Kurzel-Klammern aus Commit-Betreffzeilen fuer oeffentliche Release-Notizen
+"""Strip internal TODO short-ID brackets from commit subject lines for public release notes
 (scripts/release-notes.sh, TODO 3c75962d).
 
-Drei Formen kommen in diesem Repo vor:
-  1. Eine abschliessende Klammer, deren Inhalt mit einem 8-stelligen Hex-Kuerzel beginnt — egal ob
-     danach ein Titel, ein Komma, weitere Kuerzel oder sogar verschachtelte Klammern folgen (ein
-     Titel darf selbst Klammern enthalten, z.B. "(94950fbc LearningService … (448 statt … Zeilen))").
-     Diese Klammer wird komplett entfernt, balanciert von aussen nach innen gezaehlt.
-  2. Eine abschliessende Klammer, deren letztes (durch Komma auf oberster Ebene getrenntes) Element
-     ein reines Kuerzel ist, auch wenn davor Fliesstext steht — z.B. "(Stand 2026-09-22, 8f28fad0)".
-  3. Eine Klammer *irgendwo* im Betreff, deren Inhalt NUR aus Kuerzeln besteht (optional mit
-     fuehrendem Wort "TODO"), z.B. "(TODO 2738fda0)" oder "(a4644103, e8a4ebb4)" — auch wenn danach
-     noch Text im Betreff folgt (Merge-Betreffe wie "Merge fix/x (5bdf5332) — Text").
-Eine normale Klammer ohne Kuerzel (kein 8-Hex-Token als erstes/letztes/einziges Element) bleibt stehen.
+Three forms occur in this repo:
+  1. A trailing bracket whose content starts with an 8-digit hex short ID — no matter whether
+     a title, a comma, further short IDs or even nested brackets follow (a
+     title may itself contain brackets, e.g. "(94950fbc LearningService … (448 instead of … lines))").
+     This bracket is removed completely, counted balanced from the outside in.
+  2. A trailing bracket whose last element (separated by a top-level comma)
+     is a pure short ID, even if running text precedes it — e.g. "(Stand 2026-09-22, 8f28fad0)".
+  3. A bracket *anywhere* in the subject whose content consists ONLY of short IDs (optionally with
+     a leading word "TODO"), e.g. "(TODO 2738fda0)" or "(a4644103, e8a4ebb4)" — even if
+     text follows in the subject (merge subjects like "Merge fix/x (5bdf5332) — Text").
+A normal bracket without a short ID (no 8-hex token as first/last/only element) stays.
 
-Usage: liest Zeilen von stdin, schreibt die bereinigten Zeilen nach stdout (Reihenfolge erhalten).
+Usage: reads lines from stdin, writes the cleaned lines to stdout (order preserved).
 """
 from __future__ import annotations
 
@@ -22,15 +22,15 @@ import re
 import sys
 
 HEX8 = r"[0-9a-f]{8}"
-# Faengt eine Klammer, deren Inhalt mit einem 8-Hex-Kuerzel beginnt (optional "TODO " davor),
-# unabhaengig davon, was danach kommt.
+# Catches a bracket whose content starts with an 8-hex short ID (optionally preceded by "TODO "),
+# regardless of what follows.
 _TRAILING_START_RE = re.compile(rf"^(TODO\s+)?{HEX8}(?![0-9a-f])")
-# Ein einzelnes Kuerzel-Token, optional mit "TODO "-Praefix, fuer die reine Kuerzelliste.
+# A single short-ID token, optionally with a "TODO " prefix, for the pure short-ID list.
 _CODE_TOKEN_RE = re.compile(rf"^(TODO\s+)?{HEX8}$")
 
 
 def _find_matching_open(s: str, close_idx: int) -> int | None:
-    """Index der zu s[close_idx] (==')') gehoerenden oeffnenden Klammer, oder None."""
+    """Index of the opening bracket belonging to s[close_idx] (==')'), or None."""
     depth = 0
     for i in range(close_idx, -1, -1):
         c = s[i]
@@ -44,7 +44,7 @@ def _find_matching_open(s: str, close_idx: int) -> int | None:
 
 
 def _split_top_level_commas(s: str) -> list[str]:
-    """Wie str.split(','), aber Kommas innerhalb verschachtelter Klammern zaehlen nicht."""
+    """Like str.split(','), but commas inside nested brackets do not count."""
     parts: list[str] = []
     depth = 0
     current: list[str] = []
@@ -65,9 +65,9 @@ def _split_top_level_commas(s: str) -> list[str]:
 
 
 def _ends_with_code_token(inner: str) -> bool:
-    """True, wenn das letzte (oberste-Ebene-Komma-getrennte) Element ein reines Kuerzel ist —
-    z.B. "Stand 2026-09-22, 8f28fad0": Fliesstext vor dem Kuerzel ist hier egal, nur das letzte
-    Element muss ein Kuerzel sein."""
+    """True if the last (top-level comma-separated) element is a pure short ID —
+    e.g. "Stand 2026-09-22, 8f28fad0": running text before the short ID does not matter here, only the last
+    element must be a short ID."""
     parts = _split_top_level_commas(inner)
     if not parts:
         return False
@@ -75,9 +75,9 @@ def _ends_with_code_token(inner: str) -> bool:
 
 
 def _strip_trailing_code_bracket(s: str) -> str:
-    """Entfernt eine abschliessende, balanciert geklammerte Gruppe, wenn ihr Inhalt mit einem
-    8-Hex-Kuerzel beginnt (Titel/Kommas/verschachtelte Klammern danach sind egal) oder wenn ihr
-    letztes Komma-Element auf oberster Ebene ein reines Kuerzel ist."""
+    """Removes a trailing, balanced bracketed group if its content starts with an
+    8-hex short ID (title/commas/nested brackets after it do not matter) or if its
+    last top-level comma element is a pure short ID."""
     s = s.rstrip()
     if not s.endswith(")"):
         return s
@@ -91,8 +91,8 @@ def _strip_trailing_code_bracket(s: str) -> str:
 
 
 def _is_pure_code_list(inner: str) -> bool:
-    """True, wenn eine (nicht verschachtelte) Klammer nur aus Kuerzeln besteht — z.B.
-    "TODO 2738fda0" oder "cc0eb3ba, 4a2edda6, 46e394e0"."""
+    """True if a (non-nested) bracket consists only of short IDs — e.g.
+    "TODO 2738fda0" or "cc0eb3ba, 4a2edda6, 46e394e0"."""
     parts = [p.strip() for p in inner.split(",")]
     if not parts or not all(parts):
         return False
@@ -100,8 +100,8 @@ def _is_pure_code_list(inner: str) -> bool:
 
 
 def _strip_inline_code_brackets(s: str) -> str:
-    """Entfernt reine Kuerzel-Klammern irgendwo im Betreff (nicht verschachtelt — fuer den
-    Titel-Fall sorgt bereits _strip_trailing_code_bracket)."""
+    """Removes pure short-ID brackets anywhere in the subject (not nested — the
+    title case is already handled by _strip_trailing_code_bracket)."""
 
     def repl(m: re.Match) -> str:
         return "" if _is_pure_code_list(m.group(1)) else m.group(0)
@@ -112,7 +112,7 @@ def _strip_inline_code_brackets(s: str) -> str:
 def clean_subject(subject: str) -> str:
     s = _strip_trailing_code_bracket(subject)
     s = _strip_inline_code_brackets(s)
-    # Doppelte/Rand-Leerzeichen, die durchs Entfernen entstehen (z.B. vor " — Text" oder am Ende).
+    # Double/edge spaces that arise from the removal (e.g. before " — Text" or at the end).
     s = re.sub(r"[ \t]+", " ", s)
     s = re.sub(r"[ \t]+([,.;:])", r"\1", s)
     return s.strip()

@@ -118,12 +118,12 @@ public final class TodoSpecifications {
         };
     }
 
-    /** Wert von {@code goalId}, der TODOs ohne Ziel waehlt – die Kandidaten der Relationskarte (TODO c6ea8f5c). */
+    /** Value of {@code goalId} that selects TODOs without a goal - the candidates of the relation map (TODO c6ea8f5c). */
     public static final String NO_GOAL = "none";
 
     /**
-     * Nur TODOs dieses Ziels (TODO dc0566f8); {@value #NO_GOAL} waehlt die TODOs ohne Ziel, ohne ID
-     * gibt es keine Einschraenkung.
+     * Only TODOs of this goal (TODO dc0566f8); {@value #NO_GOAL} selects the TODOs without a goal, without ID
+     * there is no restriction.
      */
     public static Specification<Todo> inGoal(String goalId) {
         return (root, query, cb) -> {
@@ -135,8 +135,8 @@ public final class TodoSpecifications {
     }
 
     /**
-     * Nur TODOs aus Projekten, die dem Ziel zugeordnet sind (TODO c60bf914) – als Unterabfrage auf
-     * {@code goal_projects}, ohne die Projekte vorher zu laden. Ein Ziel ohne Projekte waehlt nichts.
+     * Only TODOs from projects assigned to the goal (TODO c60bf914) - as a subquery on
+     * {@code goal_projects}, without loading the projects beforehand. A goal without projects selects nothing.
      */
     public static Specification<Todo> inProjectsOfGoal(String goalId) {
         return (root, query, cb) -> {

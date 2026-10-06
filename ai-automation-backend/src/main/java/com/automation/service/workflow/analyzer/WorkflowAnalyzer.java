@@ -11,85 +11,85 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Prüft eine Workflow-Definition deterministisch auf bekannte Baufehler — ohne KI-Aufruf.
+ * Checks a workflow definition deterministically for known construction errors — without an AI call.
  *
- * <p>Anlass: Die Analyse von PRD-07 (TODO 45509fcb) förderte sieben Mängel zutage, die <b>alle</b>
- * maschinell erkennbar waren. Keiner war ein inhaltlicher Fehler; es waren Baufehler, die seit
- * Monaten unbemerkt Geld und Laufzeit kosteten. Das ist die eigene Projektlehre — messen, bevor
- * eine KI bewertet — angewandt auf die eigenen Workflows.
+ * <p>Trigger: the analysis of PRD-07 (TODO 45509fcb) uncovered seven defects that were <b>all</b>
+ * machine-detectable. None was an error of content; they were construction errors that had been costing
+ * money and runtime unnoticed for months. That is the project's own lesson — measure before
+ * an AI judges — applied to its own workflows.
  *
- * <p><b>Wirkungsort</b> (Entscheidung vom 2026-09-19): auf Abruf über die REST-API und als Test
- * über die ausgelieferten Pool-Definitionen. Der Speicherweg bleibt unangetastet — der Analyzer
- * meldet, er blockiert nicht — auch Felder, die neben {@code config} stehen ({@code unknown-block-field}),
- * speichert der Weg mit, statt sie zu verwerfen; die Detailseite zeigt den Befund nach jedem Speichern und
- * Pool-Install ({@code useWorkflowAnalysis}). Seit TODO 326d5987 läuft er außerdem nach jeder KI-Erzeugung einer Definition
- * ({@link GeneratedWorkflowCheck}): Befunde gehen an die KI zurück oder in das Ergebnis, nie in den Speicherweg.
- * Einzige Sperre (TODO e7e93fba): {@code RunAdmission} verweigert unbeaufsichtigte Starts bei
- * {@link #UNATTENDED_REFUSAL_RULES} mit {@code HIGH} — gespeichert und von Hand gestartet wird weiter.
+ * <p><b>Place of effect</b> (decision of 2026-09-19): on demand via the REST API and as a test
+ * over the shipped pool definitions. The save path stays untouched — the analyzer
+ * reports, it does not block — also fields that sit next to {@code config} ({@code unknown-block-field})
+ * are saved by that path instead of being discarded; the detail page shows the finding after every save and
+ * pool install ({@code useWorkflowAnalysis}). Since TODO 326d5987 it also runs after every AI generation of a definition
+ * ({@link GeneratedWorkflowCheck}): findings go back to the AI or into the result, never into the save path.
+ * Only lock (TODO e7e93fba): {@code RunAdmission} refuses unattended starts on
+ * {@link #UNATTENDED_REFUSAL_RULES} with {@code HIGH} — saving and manual starts continue to work.
  *
- * <p><b>Was er heute prüft</b> — siebzehn Regeln, jede am Text entscheidbar, eine davon am Text samt
- * den Metadaten der Definition, vier am Block-Config-Schema, das auch der Editor nutzt:
+ * <p><b>What it checks today</b> — seventeen rules, each decidable from the text, one of them from the text plus
+ * the definition's metadata, four against the block config schema that the editor also uses:
  * <ul>
- *   <li>{@code unknown-block-reference} — Verweis auf einen Block, den es nicht gibt</li>
- *   <li>{@code chain-only-placeholder} — Chain-Variable in einem einzeln laufenden Workflow</li>
- *   <li>{@code audit-only-placeholder} — {@code {{ audit_findings }}} in einem Workflow ohne gültiges
- *       {@code metadata.audit}: die Variable gibt es dort nicht</li>
- *   <li>{@code unwired-output} — erzeugte Ausgabe, die kein späterer Block liest</li>
- *   <li>{@code absolute-home-path} — Pfad mit Klarnamen unter {@code /home/…}</li>
- *   <li>{@code missing-strict-mode} — Shell-Block ohne {@code set -euo pipefail}</li>
- *   <li>{@code duplicated-instructions} — KI-Auftrag des Blocks ({@code command}, {@code goal},
- *       {@code input} … je Typ) oder eines verschachtelten Blocks (switch-Case) wiederholt
+ *   <li>{@code unknown-block-reference} — reference to a block that does not exist</li>
+ *   <li>{@code chain-only-placeholder} — chain variable in a workflow running on its own</li>
+ *   <li>{@code audit-only-placeholder} — {@code {{ audit_findings }}} in a workflow without valid
+ *       {@code metadata.audit}: the variable does not exist there</li>
+ *   <li>{@code unwired-output} — generated output that no later block reads</li>
+ *   <li>{@code absolute-home-path} — path with a real name under {@code /home/…}</li>
+ *   <li>{@code missing-strict-mode} — shell block without {@code set -euo pipefail}</li>
+ *   <li>{@code duplicated-instructions} — the block's AI task ({@code command}, {@code goal},
+ *       {@code input} … depending on type) or a nested block's (switch case) repeats
  *       {@code workflow.instructions}</li>
- *   <li>{@code dated-model-id} — datierte Modell-ID statt Alias</li>
- *   <li>{@code on-no-without-reject-option} — Approval mit {@code on_no}, aber ohne Option, die ablehnt</li>
- *   <li>{@code items-command-without-source} — foreach mit {@code items_command}, aber ohne
- *       {@code items_source: "command"}: der Befehl läuft nie</li>
- *   <li>{@code unknown-config-key} — Config-Schlüssel, den kein Executor liest (auch in verschachtelten Blöcken)</li>
- *   <li>{@code missing-required-config-key} — Pflichtschlüssel des Blocktyps fehlt (bei „genau einer von“ auch: mehrere gesetzt)</li>
- *   <li>{@code invalid-config-value} — Wert außerhalb der festen Werte, etwa {@code on_failure: "fail"}</li>
- *   <li>{@code legacy-config-key} — alter Schlüsselname, der noch wirkt, aber ausläuft ({@code workflowId} am
+ *   <li>{@code dated-model-id} — dated model ID instead of alias</li>
+ *   <li>{@code on-no-without-reject-option} — approval with {@code on_no} but without an option that rejects</li>
+ *   <li>{@code items-command-without-source} — foreach with {@code items_command} but without
+ *       {@code items_source: "command"}: the command never runs</li>
+ *   <li>{@code unknown-config-key} — config key that no executor reads (also in nested blocks)</li>
+ *   <li>{@code missing-required-config-key} — required key of the block type is missing (for "exactly one of" also: several set)</li>
+ *   <li>{@code invalid-config-value} — value outside the fixed values, e.g. {@code on_failure: "fail"}</li>
+ *   <li>{@code legacy-config-key} — old key name that still works but is being phased out ({@code workflowId} on
  *       sub-workflow) — LOW</li>
- *   <li>{@code dead-nested-blocks} — {@code config.blocks}: kein Executor führt eine blocks-Liste aus, die
- *       Blöcke darin laufen nie — HIGH ({@link BlockShapeRules})</li>
- *   <li>{@code unknown-block-field} — Feld neben {@code type}/{@code name}/{@code config}/
- *       {@code requiredCapabilities}/{@code skillIds}, das kein Lauf liest; HIGH, wenn es ein Config-Schlüssel
- *       ist ({@code on_failure} neben statt in {@code config})</li>
- *   <li>{@code self-api-call} — Block ruft die REST-API der eigenen Instanz auf (außer den schlüsselfreien
- *       Sonden); im Shell-Code HIGH, im KI-Auftrag MEDIUM zum Prüfen ({@link SelfAccessRules})</li>
- *   <li>{@code direct-db-access} — Block liest die Plattform-Datenbank ({@code app_settings},
- *       {@code automation.db} mit Lesezugriff) — HIGH; {@code sqlite3} allein MEDIUM zum Prüfen</li>
+ *   <li>{@code dead-nested-blocks} — {@code config.blocks}: no executor runs a blocks list, the
+ *       blocks in it never run — HIGH ({@link BlockShapeRules})</li>
+ *   <li>{@code unknown-block-field} — field next to {@code type}/{@code name}/{@code config}/
+ *       {@code requiredCapabilities}/{@code skillIds} that no run reads; HIGH if it is a config key
+ *       ({@code on_failure} next to instead of inside {@code config})</li>
+ *   <li>{@code self-api-call} — block calls the REST API of its own instance (except the key-free
+ *       probes); in shell code HIGH, in the AI task MEDIUM for review ({@link SelfAccessRules})</li>
+ *   <li>{@code direct-db-access} — block reads the platform database ({@code app_settings},
+ *       {@code automation.db} with read access) — HIGH; {@code sqlite3} alone MEDIUM for review</li>
  * </ul>
  *
- * <p><b>Was er bewusst nicht prüft.</b> Drei Regeln des Tickets brauchen mehr als den Text und
- * sind deshalb nicht enthalten: redundante KI-Aufrufe (verlangt ein Ähnlichkeitsurteil über zwei
- * Aufträge), die Sparsamkeits-Leiter („hier hätte ein Shell-Block gereicht" ist eine Bewertung,
- * keine Messung) und zu knappe Timeouts (braucht Laufzeitdaten aus {@code step_results}). Eine
- * Regel, die raten muss, erzeugt Rauschen — und ein Prüfwerkzeug, dem man nicht glaubt, wird
- * abgeschaltet.
+ * <p><b>What it deliberately does not check.</b> Three rules of the ticket need more than the text and
+ * are therefore not included: redundant AI calls (requires a similarity judgment over two
+ * tasks), the frugality ladder ("a shell block would have been enough here" is an assessment,
+ * not a measurement) and timeouts that are too tight (needs runtime data from {@code step_results}). A
+ * rule that has to guess produces noise — and a checking tool that nobody believes gets
+ * switched off.
  *
- * <p><b>Eine vierte Regel ist daran gescheitert</b> und wieder entfernt worden (TODO 8e5d13a9):
- * {@code gate-order-without-format} sollte Prompts finden, die einen {@code gate_status}-Marker
- * bestellen, ohne zu sagen, dass er am Zeilenanfang stehen muss. Der Bestandslauf ergab 22 Treffer
- * in 15 ausgelieferten Definitionen — und bei der Durchsicht war <b>kein einziger</b> echt: 18 waren
- * Shell-Blöcke, die den Marker selbst schreiben ({@code echo "gate_status: GREEN"}), die übrigen
- * Prompts <i>erwähnten</i> ihn bloß. Einer sagte sogar ausdrücklich „Gib KEINEN gate_status aus".
- * Die Unterscheidung zwischen „bestellt einen Marker" und „redet über Marker" verlangt
- * Textverständnis, nicht Mustersuche. Wer sie wieder aufnimmt, braucht dafür einen anderen Weg —
- * etwa ein Feld in der Definition, das den Gate-Auftrag ausdrücklich macht.
+ * <p><b>A fourth rule failed on this</b> and was removed again (TODO 8e5d13a9):
+ * {@code gate-order-without-format} was meant to find prompts that order a {@code gate_status} marker
+ * without saying that it has to be at the start of a line. The inventory run yielded 22 hits
+ * in 15 shipped definitions — and on review <b>not a single one</b> was real: 18 were
+ * shell blocks that write the marker themselves ({@code echo "gate_status: GREEN"}), the other
+ * prompts merely <i>mentioned</i> it. One even said explicitly "Gib KEINEN gate_status aus".
+ * Distinguishing "orders a marker" from "talks about markers" requires
+ * text understanding, not pattern search. Whoever takes it up again needs a different way —
+ * such as a field in the definition that makes the gate order explicit.
  */
 @Service
 public class WorkflowAnalyzer implements PlatformAccessCheck {
 
     /**
-     * Regeln, deren {@code HIGH}-Befund einen unbeaufsichtigten Start verweigert ({@code RunAdmission},
-     * TODO e7e93fba): Speichern bleibt erlaubt, der Analyzer meldet dort nur.
+     * Rules whose {@code HIGH} finding refuses an unattended start ({@code RunAdmission},
+     * TODO e7e93fba): saving stays allowed, the analyzer only reports there.
      */
     public static final Set<String> UNATTENDED_REFUSAL_RULES = Set.of("self-api-call", "direct-db-access");
 
     /**
-     * Die {@code HIGH}-Befunde der {@link #UNATTENDED_REFUSAL_RULES}, in Blockreihenfolge — nur die
-     * Plattformzugriffs-Regeln, reine Mustersuche ohne KI und ohne Datenbank, billig genug für jeden
-     * Laufstart.
+     * The {@code HIGH} findings of the {@link #UNATTENDED_REFUSAL_RULES}, in block order — only the
+     * platform access rules, pure pattern search without AI and without a database, cheap enough for every
+     * run start.
      */
     @Override
     public List<Violation> unattendedViolations(List<BlockDefinition> blocks) {
@@ -104,7 +104,7 @@ public class WorkflowAnalyzer implements PlatformAccessCheck {
                 .toList();
     }
 
-    /** Befunde einer Definition, schwerste zuerst und innerhalb gleicher Schwere in Blockreihenfolge. */
+    /** Findings of a definition, most severe first and within equal severity in block order. */
     public List<AnalyzerFinding> analyze(Workflow workflow) {
         if (workflow == null || workflow.getBlocks() == null || workflow.getBlocks().isEmpty()) {
             return List.of();
@@ -112,14 +112,14 @@ public class WorkflowAnalyzer implements PlatformAccessCheck {
         return analyze(workflow.getBlocks(), workflow.getInstructions(), workflow.getMetadata());
     }
 
-    /** Wie {@link #analyze(Workflow)}, aber auf einer losen Blockliste ohne Metadaten — also kein Audit-Workflow. */
+    /** Like {@link #analyze(Workflow)}, but on a loose block list without metadata — so not an audit workflow. */
     public List<AnalyzerFinding> analyze(List<BlockDefinition> blocks, String instructions) {
         return analyze(blocks, instructions, Map.of());
     }
 
     /**
-     * Wie {@link #analyze(Workflow)}, auf einer losen Blockliste samt den Metadaten der Definition — für
-     * Pool-Dateien und Tests. {@code metadata.audit} entscheidet, ob {@code {{ audit_findings }}} belegt wird.
+     * Like {@link #analyze(Workflow)}, on a loose block list including the definition's metadata — for
+     * pool files and tests. {@code metadata.audit} decides whether {@code {{ audit_findings }}} is set.
      */
     public List<AnalyzerFinding> analyze(List<BlockDefinition> blocks, String instructions,
                                          Map<String, Object> metadata) {

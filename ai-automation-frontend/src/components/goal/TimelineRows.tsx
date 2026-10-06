@@ -16,14 +16,14 @@ import { UndatedToggle } from './UndatedToggle';
 import { undatedRowId, useUndatedRow } from './timelineUndated';
 import type { GoalWorkPackage, MilestoneState } from '../../types';
 
-/** Abstand der Chips zum oberen Rand einer Zeile ohne Balken. */
+/** Distance of the chips from the top edge of a row without a bar. */
 const ROW_PADDING = 8;
 
-/** Breite der Beschriftungsspalte – Zeilen, Achse und Linien müssen dieselbe nehmen. */
+/** Width of the label column - rows, axis and lines must all use the same. */
 export const LABEL_COLUMN = 'w-28 shrink-0 sm:w-44 lg:w-52 xl:w-56';
 const LINES_LEFT = 'left-28 sm:left-44 lg:left-52 xl:left-56';
 
-/** Führungslinien der Meilensteine: gestrichelt durch alle Bänder, Farbe nach Zustand. */
+/** Guide lines of the milestones: dashed through all bands, colour by state. */
 const GUIDE: Record<MilestoneState, string> = {
   OPEN: 'border-text-tertiary/60',
   DUE_SOON: 'border-warning/80',
@@ -32,9 +32,9 @@ const GUIDE: Record<MilestoneState, string> = {
 };
 
 /**
- * Senkrechte Linien über Achse und Zeilen: Raster, heute, das Zieldatum, die Meilensteine (von ihrer
- * Raute durch alle Bänder – so sieht man, welche Balken vor dem Termin enden) und beim Ziehen die
- * Tage, auf denen es landen würde. Liegt unter Balken und Chips und nimmt keine Klicks an.
+ * Vertical lines over axis and rows: grid, today, the goal date, the milestones (from their
+ * diamond through all bands - so one sees which bars end before the deadline) and, while dragging, the
+ * days on which it would land. Lies under bars and chips and accepts no clicks.
  */
 export function TimelineLines({ axis, width, targetDay, marks, preview }: {
   axis: TimelineAxis;
@@ -74,17 +74,17 @@ interface RowProps {
   barHelpId: string;
   onPlan: (todoId: string, changes: PlanChanges) => void;
   onOpenTodo: (todoId: string) => void;
-  /** `trigger`: was geklickt wurde – die Karte steht dort und gibt ihm danach den Fokus zurück. */
+  /** `trigger`: what was clicked - the card stands there and gives it the focus back afterwards. */
   onOpenPackage: (id: string, trigger: HTMLElement) => void;
   onReschedule: (workPackage: GoalWorkPackage, range: DayRange | null) => void;
   announce: (text: string) => void;
 }
 
 /**
- * Eine Zeile im Band (c60bf914): links Name, Zeitraum, Stand und – eingeklappt – die TODOs ohne
- * Datum; rechts der Balken des Pakets, darunter nur bei Bedarf seine fälligen TODOs. Auf der Achse
- * abgelegt setzt ein TODO Tag und Paket, links abgelegt verliert es das Datum. Beim Ziehen nimmt die
- * Zeile nur an, was zu ihrem Projekt passt; die übrigen werden blass.
+ * A row in the band (c60bf914): on the left name, period, status and - folded - the undated
+ * TODOs; on the right the bar of the package, below it only when needed its due TODOs. Dropped
+ * on the axis, a TODO gets day and package, dropped on the left it loses the date. While dragging, the
+ * row accepts only what fits its project; the others fade.
  */
 export function PackageRowView({
   row, axis, width, today, workPackages, barHelpId, onPlan, onOpenTodo, onOpenPackage, onReschedule, announce,
@@ -104,7 +104,7 @@ export function PackageRowView({
   const { workPackage, range } = row;
   const selected = useIsSelected('workpackage', workPackage?.id ?? '');
   const chipsTop = range ? BAR_ZONE : ROW_PADDING;
-  // Wohin ein gezogener Balken dieses Pakets käme: gestrichelt an seinem neuen Platz
+  // Where a dragged bar of this package would land: dashed at its new place
   const ghost = workPackage && dragged?.kind === 'package' && dragged.workPackage.id === workPackage.id
     && (dragged.mode === 'move' || dragged.mode === 'schedule') && preview?.workPackageId === workPackage.id ? preview.range : null;
   const ghostBox = ghost ? barBox(axis, ghost, width) : null;

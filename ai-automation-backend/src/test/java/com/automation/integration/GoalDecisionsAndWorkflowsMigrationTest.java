@@ -17,10 +17,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * V93 haelt Entscheidungen am TODO fest (TODO 68a5e24e Ziele Stufe 2: „Entschieden“ als sichtbarer
- * Zustand am TODO), V94 haengt Workflows an Ziele und Arbeitspakete (TODO 52bc1e8c Ziele Stufe 3:
- * Workflows am Ziel oder Teilziel anzeigen, starten und als Stand nutzen). Gegen eine eigene
- * SQLite-Datei mit {@code foreign_keys=true}: bis V92 migrieren, Bestand anlegen, dann V94.
+ * V93 records decisions on the TODO (TODO 68a5e24e goals stage 2: „Entschieden“ as a visible
+ * state on the TODO), V94 attaches workflows to goals and work packages (TODO 52bc1e8c goals stage 3:
+ * show, start and use workflows on a goal or sub-goal as a status). Against its own
+ * SQLite file with {@code foreign_keys=true}: migrate to V92, create existing data, then V94.
  */
 class GoalDecisionsAndWorkflowsMigrationTest {
 
@@ -108,7 +108,7 @@ class GoalDecisionsAndWorkflowsMigrationTest {
         return Flyway.configure()
                 .dataSource(dataSource)
                 .locations("classpath:db/migration")
-                .mixed(true)   // wie in application.yml: aeltere Migrationen mischen PRAGMA und DDL
+                .mixed(true)   // as in application.yml: older migrations mix PRAGMA and DDL
                 .target(target)
                 .load();
     }

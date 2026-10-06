@@ -19,8 +19,8 @@ public interface ChainRunRepository extends JpaRepository<ChainRun, String> {
     long countByChainId(String chainId);
 
     /**
-     * Run-Counts aller Chains in EINER GROUP-BY-Query (statt {@code countByChainId} pro Chain).
-     * Für die /chains-Liste — vermeidet N+1. Nutzt {@code idx_chain_runs_chain_id} (V21).
+     * Run counts of all chains in ONE GROUP-BY query (instead of {@code countByChainId} per chain).
+     * For the /chains list — avoids N+1. Uses {@code idx_chain_runs_chain_id} (V21).
      */
     @Query("SELECT cr.chain.id, COUNT(cr) FROM ChainRun cr WHERE cr.chain IS NOT NULL GROUP BY cr.chain.id")
     List<Object[]> countRunsGroupedByChain();
@@ -46,35 +46,35 @@ public interface ChainRunRepository extends JpaRepository<ChainRun, String> {
     long countByTriggeredByScheduleId(String scheduleId);
 
     /**
-     * Chain-Runs samt Id und Name ihrer Chain in EINER Abfrage, ohne entry_runs und input_context —
-     * fuer die Herkunft der Audit-Reports (TODO a3b89355).
+     * Chain runs with id and name of their chain in ONE query, without entry_runs and input_context —
+     * for the origin of the audit reports (TODO a3b89355).
      */
     @Query("SELECT new com.automation.dto.projection.ChainRunOriginRow(cr.id, c.id, c.name, cr.triggeredByScheduleId) "
            + "FROM ChainRun cr JOIN cr.chain c WHERE cr.id IN :ids")
     List<com.automation.dto.projection.ChainRunOriginRow> findOriginRows(@Param("ids") Collection<String> ids);
 
     /**
-     * Die Kette eines Ketten-Runs, ohne den Run zu laden – für den Link der Run-Herkunft auf
-     * {@code /chains?chain=<id>} (3a35ced1). Leer, wenn der Ketten-Run gelöscht ist.
+     * The chain of a chain run, without loading the run – for the link of the run origin to
+     * {@code /chains?chain=<id>} (3a35ced1). Empty if the chain run is deleted.
      */
     @Query("SELECT cr.chain.id FROM ChainRun cr WHERE cr.id = :id")
     java.util.Optional<String> findChainIdById(@Param("id") String id);
 
-    /** Wie {@code WorkflowRunRepository.findStatusesByScheduleIds}, fuer Ketten-Runs (TODO 172a6a67). */
+    /** Like {@code WorkflowRunRepository.findStatusesByScheduleIds}, for chain runs (TODO 172a6a67). */
     @Query("SELECT r.triggeredByScheduleId, r.status, r.startedAt FROM ChainRun r "
            + "WHERE r.triggeredByScheduleId IN :scheduleIds "
            + "ORDER BY r.startedAt DESC")
     List<Object[]> findStatusesByScheduleIds(@Param("scheduleIds") Collection<String> scheduleIds);
 
-    /** Wie {@code WorkflowRunRepository.findStatusesByScheduleIdNewestFirst}, fuer Ketten-Runs (TODO 86286572). */
+    /** Like {@code WorkflowRunRepository.findStatusesByScheduleIdNewestFirst}, for chain runs (TODO 86286572). */
     @Query("SELECT r.status FROM ChainRun r WHERE r.triggeredByScheduleId = :scheduleId "
            + "ORDER BY r.startedAt DESC")
     List<RunStatus> findStatusesByScheduleIdNewestFirst(@Param("scheduleId") String scheduleId, Pageable pageable);
 
     /**
-     * Die Laufliste holt die Kette in derselben Abfrage mit: {@code ChainRun.chain} ist EAGER, ein
-     * blosser JOIN laedt sie danach je Kette der Seite einzeln nach (TODO 44db05fd). Der JOIN FETCH
-     * braucht eine eigene Zaehlabfrage.
+     * The run list fetches the chain in the same query: {@code ChainRun.chain} is EAGER, a
+     * plain JOIN would afterwards load it once per chain of the page (TODO 44db05fd). The JOIN FETCH
+     * needs its own count query.
      */
     @Query(value = "SELECT cr FROM ChainRun cr LEFT JOIN FETCH cr.chain c " +
            "WHERE (:status IS NULL OR cr.status = :status) " +

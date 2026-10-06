@@ -24,7 +24,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
-/** Der Onboarding-Text: Schichten, Sprache, Platzhalter, Modulabschnitte und die Workflow-Tabelle. */
+/** The onboarding text: layers, language, placeholders, module sections and the workflow table. */
 @ExtendWith(MockitoExtension.class)
 class OnboardingRendererTest {
 

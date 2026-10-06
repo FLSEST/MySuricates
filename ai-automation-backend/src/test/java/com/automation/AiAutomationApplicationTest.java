@@ -38,9 +38,9 @@ class AiAutomationApplicationTest {
     }
 
     /**
-     * Scheduling wird nicht mehr an der Application-Klasse aktiviert, sondern in
-     * {@link com.automation.config.SchedulingConfig} — dort profil-gebunden, damit im
-     * Integrationstest-Profil keine Hintergrund-Jobs in die Test-DB schreiben.
+     * Scheduling is no longer enabled on the application class but in
+     * {@link com.automation.config.SchedulingConfig} — there it is profile-bound, so that in the
+     * integration test profile no background jobs write into the test DB.
      */
     @Test
     void should_enableSchedulingInProfileBoundConfig_when_classIsInspected() {
@@ -69,11 +69,11 @@ class AiAutomationApplicationTest {
             SpringApplication mockApp = mock(SpringApplication.class);
             when(mockApp.run(any(String[].class))).thenReturn(mockContext);
 
-            // Wir koennen new SpringApplication(...) nicht trivial mocken,
-            // daher verifizieren wir nur, dass main() ohne Exception eine SpringApplication
-            // konstruieren und dass das Setzen der Property korrekt erfolgt.
+            // We cannot trivially mock new SpringApplication(...),
+            // so we only verify that main() constructs a SpringApplication without an exception
+            // and that the property is set correctly.
             assertThatCode(() -> {
-                // Keine echte App starten — nur die Property-Logik exercise
+                // Do not start a real app — only exercise the property logic
                 System.setProperty("java.awt.headless", "false");
             }).doesNotThrowAnyException();
 
@@ -86,7 +86,7 @@ class AiAutomationApplicationTest {
         // Reset
         System.clearProperty("java.awt.headless");
 
-        // Manuelle Simulation der main()-Logik: Property-Setzung pruefen
+        // Manual simulation of the main() logic: check the property setting
         System.setProperty("java.awt.headless", "false");
 
         assertThat(System.getProperty("java.awt.headless")).isEqualTo("false");

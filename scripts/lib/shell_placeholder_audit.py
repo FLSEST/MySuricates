@@ -1,33 +1,33 @@
 #!/usr/bin/env python3
-"""Sucht in Shell-Feldern von Workflow-Definitionen unquoted Output-Platzhalter (TODO 5104c8d7).
+"""Searches shell fields of workflow definitions for unquoted output placeholders (TODO 5104c8d7).
 
-Warum es dieses Werkzeug gibt: Seit TODO 22e6bec8 wird die Ausgabe eines KI-Blocks, dessen
-Prompt Plattform-Daten enthielt, als untrusted gefaerbt; ab da kommen alle Blockausgaben in
-Shell-Feldern als EIN gequotetes Argument an. Eine Stelle, die auf Wortauftrennung baut
-(`for x in {{ ... }}`, `cmd {{ ... }}` mit erwarteten Flags, `$1`/`$2` ohne `set --`), bricht
-dann still. Die Erhebung von Hand ist muehsam und altert sofort — deshalb ein Skript statt
-einer Liste in einer Markdown-Datei.
+Why this tool exists: since TODO 22e6bec8 the output of an AI block whose prompt contained
+platform data is marked as untrusted; from then on all block outputs arrive in shell
+fields as ONE quoted argument. A place that relies on word splitting
+(`for x in {{ ... }}`, `cmd {{ ... }}` with expected flags, `$1`/`$2` without `set --`) then
+breaks silently. Surveying by hand is tedious and ages immediately — hence a script instead of
+a list in a Markdown file.
 
-Die Einordnung haengt an der syntaktischen Rolle des Platzhalters, nicht an seinem Vorkommen:
+The classification depends on the syntactic role of the placeholder, not on its occurrence:
 
-  gequotet          '{{ x }}' oder "{{ x }}"        unkritisch
-  heredoc-inhalt    im Rumpf eines Heredocs         unkritisch — und darf NICHT escaped werden,
-                                                    sonst landen Anfuehrungszeichen im Inhalt
-  set--             set -- {{ x }}                  die empfohlene Form (WORKFLOW-GUIDE)
-  zuweisung         VAR={{ x }}                     nur mit shell_escape_variables korrekt,
-                                                    ohne bricht sie am ersten Leerzeichen
-  wortauftrennung   for/in, $1..$9 in derselben     der eigentliche Befund
-                    Zeile
-  sonstiges         alles andere                    von Hand ansehen
+  gequotet          '{{ x }}' or "{{ x }}"          harmless
+  heredoc-inhalt    in the body of a heredoc        harmless — and must NOT be escaped,
+                                                    otherwise quotes end up in the content
+  set--             set -- {{ x }}                  the recommended form (WORKFLOW-GUIDE)
+  zuweisung         VAR={{ x }}                     correct only with shell_escape_variables,
+                                                    without it breaks at the first space
+  wortauftrennung   for/in, $1..$9 in the same     the actual finding
+                    line
+  sonstiges         everything else                 look at by hand
 
-Aufruf:
-    scripts/lib/shell_placeholder_audit.py <definitionen.json> [--details]
+Usage:
+    scripts/lib/shell_placeholder_audit.py <definitions.json> [--details]
 
-<definitionen.json> ist entweder die Antwort von GET /api/v1/workflows (Liste oder
-{"content": [...]}) oder eine einzelne Definition. Das Skript ruft selbst nichts ab — es
-liest, was ihm gegeben wird, und laeuft damit auch gegen workflow-pool/*.json.
+<definitions.json> is either the response of GET /api/v1/workflows (list or
+{"content": [...]}) or a single definition. The script fetches nothing itself — it
+reads what it is given, and thus also runs against workflow-pool/*.json.
 
-Exit: 0 = keine Stelle, die auf Wortauftrennung baut; 1 = mindestens eine (Liste auf stdout).
+Exit: 0 = no place that relies on word splitting; 1 = at least one (list on stdout).
 """
 import json
 import re
@@ -37,9 +37,9 @@ OUTPUT_PLACEHOLDER = re.compile(
     r"\{\{\s*(previous_output|previous_report|step_\d+_output"
     r"|block\.[A-Za-z0-9_\-]+\.output)\s*\}\}")
 
-# Alle Quoting-Formen des Trennzeichens, und es darf eine Umleitung folgen
-# (`python3 - <<'PY' > out`, `cat <<\__STEP0__ | grep …`). Beides kommt in echten
-# Definitionen vor und wurde bei der ersten Erhebung je einmal uebersehen.
+# All quoting forms of the delimiter, and a redirect may follow
+# (`python3 - <<'PY' > out`, `cat <<\__STEP0__ | grep …`). Both occur in real
+# definitions and were each overlooked once during the first survey.
 HEREDOC_START = re.compile(
     r"<<-?\s*(?:'([A-Za-z_][A-Za-z0-9_]*)'"
     r"|\"([A-Za-z_][A-Za-z0-9_]*)\""
@@ -50,7 +50,7 @@ WORD_SPLIT = re.compile(r"\bfor\b[^\n]*\bin\b|\$[1-9]")
 
 
 def heredoc_body_lines(command):
-    """Zeilennummern (0-basiert), die im Rumpf eines Heredocs liegen."""
+    """Line numbers (0-based) that lie in the body of a heredoc."""
     inside, delimiter, body = False, None, set()
     for number, line in enumerate(command.splitlines()):
         if inside:
@@ -67,7 +67,7 @@ def heredoc_body_lines(command):
 
 
 def shell_blocks(node, found=None):
-    """Alle Shell-Bloecke, auch in foreach/while/conditional/switch/retry verschachtelt."""
+    """All shell blocks, also nested in foreach/while/conditional/switch/retry."""
     found = [] if found is None else found
     if isinstance(node, dict):
         if node.get("type") == "shell" and isinstance(node.get("config"), dict):
@@ -106,7 +106,7 @@ def definitions(payload):
 
 
 def audit(payload):
-    """Liste von (rolle, workflow-id, name, blockname, escaped, zeile)."""
+    """List of (role, workflow-id, name, blockname, escaped, line)."""
     results = []
     for definition in definitions(payload):
         name = definition.get("name")
@@ -155,7 +155,7 @@ def main():
                 print(f"        {wid}  {name[:32]:34} {block[:20]:22} {flag:9} {line}")
 
     risky = by_role["wortauftrennung"]
-    # zuweisung OHNE Escape bricht am ersten Leerzeichen — auch das ist ein Befund.
+    # assignment WITHOUT escape breaks at the first space — that is a finding too.
     risky += [r for r in by_role["zuweisung"] if not r[4]]
     if risky:
         print(f"\nBEFUND: {len(risky)} Stelle(n) brauchen eine Aenderung"

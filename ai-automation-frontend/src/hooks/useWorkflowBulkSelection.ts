@@ -11,10 +11,10 @@ export interface WorkflowDeleteConfirm {
 const CLOSED: WorkflowDeleteConfirm = { open: false, ids: [], names: [] };
 
 /**
- * Auswahlmodus der Workflow-Liste und das Löschen: einzelne Workflows oder ganze Projekte
- * markieren, Auto-TODO für die Markierten schalten, Löschen (einzeln oder die Markierten) erst
- * nach Bestätigung und nacheinander. Während gelöscht wird, lässt sich die Bestätigung nicht
- * schließen. `onDeleted` bekommt die gelöschten IDs, damit die Seite eine Auswahl darunter vergisst.
+ * Selection mode of the workflow list and deletion: mark single workflows or whole projects,
+ * toggle auto-TODO for the marked ones, delete (one or the marked ones) only
+ * after confirmation and one after another. While deleting, the confirmation cannot be
+ * closed. `onDeleted` receives the deleted IDs so the page can drop a selection below them.
  */
 export function useWorkflowBulkSelection(
   filtered: Workflow[],

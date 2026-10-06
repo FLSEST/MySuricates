@@ -27,10 +27,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Einordnung eines TODOs ueber {@code PATCH /todos/{id}/planning} (TODO dc0566f8, 259f4f66) – mit
- * den Regeln von TODO c60bf914 (Ziele Stufe 1: Ziel → Projekte → Arbeitspakete → TODOs, Meilensteine,
- * Gliederung und Zeitstrahl): Das Projekt des TODOs kommt ans Ziel, ein Arbeitspaket muss zum Projekt
- * des TODOs passen.
+ * Planning of a TODO via {@code PATCH /todos/{id}/planning} (TODO dc0566f8, 259f4f66) – with
+ * the rules of TODO c60bf914 (Goals stage 1: goal → projects → work packages → TODOs, milestones,
+ * outline and timeline): the TODO's project joins the goal, a work package must match the project
+ * of the TODO.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -129,7 +129,7 @@ class TodoPlanningServiceTest {
         verify(goalProjectRepository).linkIfAbsent("g1", "pA");
     }
 
-    /** Bis V92 hiess das Feld {@code milestoneId}; Aufrufer von vorher (Plugin, Skripte) schicken es weiter. */
+    /** Until V92 the field was called {@code milestoneId}; callers from before (plugin, scripts) keep sending it. */
     @Test
     void request_acceptsTheOldFieldNameAsAlias() throws Exception {
         var mapper = new com.fasterxml.jackson.databind.ObjectMapper();

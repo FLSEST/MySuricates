@@ -228,7 +228,7 @@ class ApprovalBlockExecutorTest {
         assertThat(context.getVariable("user_choice")).isEqualTo("Yes");
     }
 
-    // --- TODO e2efb393: die Frage wird aufgelöst, bevor sie jemand sieht ---
+    // --- TODO e2efb393: the question is resolved before anyone sees it ---
 
     @Test
     @SuppressWarnings("unchecked")
@@ -266,7 +266,7 @@ class ApprovalBlockExecutorTest {
         assertThat(broadcast.get()).containsEntry("rejectOptions", List.of("Nein"));
     }
 
-    // --- TODO 50c7b5d5: Ablehnung nicht nur am englischen „No“ ---
+    // --- TODO 50c7b5d5: rejection not only on the English „No“ ---
 
     @Test
     void execute_askMode_germanNein_onNoFail_failsTheStep() {
@@ -329,7 +329,7 @@ class ApprovalBlockExecutorTest {
         assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
     }
 
-    // --- TODO 2a05c365: mode und auto_answer per Variable ---
+    // --- TODO 2a05c365: mode and auto_answer via variable ---
 
     @Test
     void execute_modeAndAutoAnswerFromVariables_autoApproves() {

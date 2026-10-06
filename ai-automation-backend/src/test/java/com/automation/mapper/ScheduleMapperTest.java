@@ -42,7 +42,7 @@ class ScheduleMapperTest {
     @Mock private ActivityLogService activityLogService;
     @Mock private SchedulerMaintenanceMode maintenanceMode;
 
-    /** Die Einzelauflösung fragt nur die neueste Zeile ab (TODO 86286572). */
+    /** The single resolution queries only the newest row (TODO 86286572). */
     private static final Pageable NEWEST = PageRequest.of(0, 1);
 
     private static final Instant NOW = LocalDateTime.of(2026, 9, 24, 10, 0).atZone(ZoneId.systemDefault()).toInstant();
@@ -64,8 +64,8 @@ class ScheduleMapperTest {
     }
 
     /**
-     * Mit aktiver skip-until-Pause zeigt kein Zeitplan einen Termin in der Pause als naechsten Lauf
-     * (TODO a776fd2a): der Tick ueberspringt ihn erst, wenn er faellig wird.
+     * With an active skip-until pause no schedule shows a fire time inside the pause as its next run
+     * (TODO a776fd2a): the tick only skips it when it becomes due.
      */
     @Nested
     class SkipUntilPause {
@@ -127,8 +127,8 @@ class ScheduleMapperTest {
     }
 
     /**
-     * Im Wartungsmodus zeigt kein Zeitplan einen naechsten Lauf (TODO 7704b1e9): Der Tick startet
-     * nichts, solange der Schalter an ist, und wann er ausgeht, weiss niemand.
+     * In maintenance mode no schedule shows a next run (TODO 7704b1e9): the tick starts
+     * nothing while the switch is on, and nobody knows when it goes off.
      */
     @Nested
     class MaintenanceSwitch {
@@ -282,8 +282,8 @@ class ScheduleMapperTest {
         ScheduledWorkflow s2 = ScheduledWorkflow.builder()
                 .id("s-2").workflow(wf).targetType(ScheduledWorkflow.TargetType.WORKFLOW)
                 .cronExpression("* *").scheduleType(ScheduledWorkflow.ScheduleType.CRON).build();
-        // Die Liste loest den Status seit TODO 172a6a67 gebuendelt auf — zwei Abfragen fuer alle
-        // Zeitplaene statt zwei je Zeitplan. Deshalb hier die Batch-Methoden stubben.
+        // Since TODO 172a6a67 the list resolves the status in bulk — two queries for all
+        // schedules instead of two per schedule. Hence stub the batch methods here.
         when(workflowRunRepository.findStatusesByScheduleIds(List.of("s-1", "s-2"))).thenReturn(List.of());
         when(chainRunRepository.findStatusesByScheduleIds(List.of("s-1", "s-2"))).thenReturn(List.of());
 
@@ -308,11 +308,11 @@ class ScheduleMapperTest {
     }
 
     /**
-     * Die Listen-Variante loest den letzten Run-Status gebuendelt auf (TODO 172a6a67).
+     * The list variant resolves the last run status in bulk (TODO 172a6a67).
      *
-     * <p>Vorher rief {@code toResponse} je Zeitplan zwei Repository-Methoden und lud dafuer
-     * dessen komplette Run-Liste, um nur den ersten Status zu behalten: 60 Abfragen bei 30
-     * Zeitplaenen, gemessen als 91 von 33 Statements auf {@code GET /api/v1/schedules}.
+     * <p>Before, {@code toResponse} called two repository methods per schedule and loaded
+     * its complete run list for that, only to keep the first status: 60 queries for 30
+     * schedules, measured as 91 of 33 statements on {@code GET /api/v1/schedules}.
      */
     @Nested
     class ListeMitGebuendelterStatusAufloesung {
@@ -341,12 +341,12 @@ class ScheduleMapperTest {
 
             assertThat(responses).extracting(ScheduledWorkflowResponse::lastRunStatus)
                     .containsExactly(RunStatus.COMPLETED, RunStatus.FAILED, null);
-            // Die Einzelauflösung darf in der Liste nicht mehr vorkommen.
+            // The single resolution must no longer occur in the list.
             verify(workflowRunRepository, never()).findStatusesByScheduleIdNewestFirst(anyString(), any());
             verify(chainRunRepository, never()).findStatusesByScheduleIdNewestFirst(anyString(), any());
         }
 
-        /** Die Abfrage liefert absteigend nach Startzeit — der erste Treffer je Zeitplan gewinnt. */
+        /** The query returns descending by start time — the first hit per schedule wins. */
         @Test
         void derJuengsteRunGewinnt() {
             when(workflowRunRepository.findStatusesByScheduleIds(List.of("s1")))
@@ -361,7 +361,7 @@ class ScheduleMapperTest {
                     .isEqualTo(RunStatus.RUNNING);
         }
 
-        /** Ohne Workflow-Run zaehlt der Ketten-Run — dieselbe Rangfolge wie in der Einzelauflösung. */
+        /** Without a workflow run the chain run counts — same ranking as in the single resolution. */
         @Test
         void ohneWorkflowRunZaehltDerKettenRun() {
             when(workflowRunRepository.findStatusesByScheduleIds(List.of("s1"))).thenReturn(List.of());
@@ -375,7 +375,7 @@ class ScheduleMapperTest {
                     .isEqualTo(RunStatus.COMPLETED);
         }
 
-        /** Ein Workflow-Run hat Vorrang, auch wenn ein Ketten-Run juenger ist. */
+        /** A workflow run takes precedence, even if a chain run is newer. */
         @Test
         void workflowRunHatVorrangVorKettenRun() {
             when(workflowRunRepository.findStatusesByScheduleIds(List.of("s1")))
@@ -391,7 +391,7 @@ class ScheduleMapperTest {
                     .isEqualTo(RunStatus.FAILED);
         }
 
-        /** Leere Liste fragt gar nicht — sonst liefe ein IN () gegen die Datenbank. */
+        /** An empty list does not query at all — otherwise an IN () would run against the database. */
         @Test
         void leereListeFragtNicht() {
             assertThat(mapper.toResponseList(List.of())).isEmpty();
@@ -399,9 +399,9 @@ class ScheduleMapperTest {
         }
 
         /**
-         * Die Detail-Route behaelt die Einzelauflösung — liest aber nur noch den neuesten Status
-         * (eine Zeile, {@code PageRequest.of(0, 1)}), keine Run-Liste als Entitaeten (TODO 86286572).
-         * Hat der Zeitplan einen Workflow-Run, wird nach Ketten-Runs gar nicht erst gefragt.
+         * The detail route keeps the single resolution — but now reads only the newest status
+         * (one row, {@code PageRequest.of(0, 1)}), no run list as entities (TODO 86286572).
+         * If the schedule has a workflow run, chain runs are not even queried.
          */
         @Test
         void einzelneAntwortLiestNurDenNeuestenStatus() {

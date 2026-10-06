@@ -45,7 +45,7 @@ final class BpmnNodeFactory {
         return candidate;
     }
 
-    /** Setzt x und zentriert den Knoten vertikal auf rowCenterY. */
+    /** Sets x and centers the node vertically on rowCenterY. */
     void place(BpmnModel.Node n, double x, double rowCenterY) {
         n.x = x;
         n.y = rowCenterY - n.h / 2;
@@ -57,7 +57,7 @@ final class BpmnNodeFactory {
         return e;
     }
 
-    /** Task für einen flachen Command-String (conditional-Zweige, Schleifen-Body). */
+    /** Task for a flat command string (conditional branches, loop body). */
     BpmnModel.Node commandTask(String id, String command, boolean shellMode) {
         BpmnModel.Node n = node(id, shellMode ? SCRIPT_TASK : SERVICE_TASK, null, TASK_W, TASK_H);
         n.name = BpmnNames.taskName(null, shellMode ? "Shell" : "KI", command);

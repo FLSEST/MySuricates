@@ -9,31 +9,31 @@ const blocks: BlockDefinition[] = [
 ];
 
 describe('blockLineRanges', () => {
-  it('deckt jeden Block lückenlos ab und stimmt mit dem Dokument überein', () => {
+  it('covers every block without gaps and matches the document', () => {
     const text = buildDefinitionText(blocks);
     const lines = text.split('\n');
     const ranges = blockLineRanges(blocks);
 
-    // Zeile 1 ist die öffnende Klammer, die letzte die schließende
+    // Line 1 is the opening bracket, the last one the closing bracket
     expect(lines[0]).toBe('[');
     expect(lines[lines.length - 1]).toBe(']');
 
-    // Jeder Block beginnt mit "{" und die berechnete Startzeile trifft das zu
+    // Every block starts with "{" and the computed start line matches that
     for (let i = 0; i < blocks.length; i++) {
       const r = ranges.get(i)!;
       expect(lines[r.start - 1]!.trim()).toBe('{');
-      expect(lines[r.end - 1]!.trim()).toMatch(/^\}/); // "}" oder "},"
+      expect(lines[r.end - 1]!.trim()).toMatch(/^\}/); // "}" or "},"
     }
 
-    // Bereiche sind aufsteigend und berühren sich (kein Überlappen/Loch)
+    // Ranges are ascending and touch each other (no overlap/gap)
     expect(ranges.get(0)!.start).toBe(2);
     expect(ranges.get(1)!.start).toBe(ranges.get(0)!.end + 1);
     expect(ranges.get(2)!.start).toBe(ranges.get(1)!.end + 1);
-    // Letzter Block endet genau vor der schließenden Klammer
+    // Last block ends exactly before the closing bracket
     expect(ranges.get(2)!.end).toBe(lines.length - 1);
   });
 
-  it('liefert für einen leeren Workflow keine Bereiche', () => {
+  it('returns no ranges for an empty workflow', () => {
     expect(blockLineRanges([]).size).toBe(0);
   });
 });

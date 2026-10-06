@@ -55,8 +55,8 @@ check "unreachable daemon exits 2 with a reason"        '[ "$(probe --ref HEAD)"
 check "it asked docker info, nothing else"              '[ "$(cat "$DOCKER_CALLS")" = info ]'
 
 echo "4) interactive: the machine shares the host network (6abc7fca)"
-# Der Port, den setup.sh in der Probe waehlt, muss draussen unter localhost:<port> antworten — ein
-# fest veroeffentlichter Port (frueher 9090 → 23000) laesst jede andere Wahl ins Leere laufen.
+# The port that setup.sh chooses in the probe must answer outside under localhost:<port> - a
+# fixed published port (formerly 9090 → 23000) makes every other choice run into nothing.
 if command -v script >/dev/null 2>&1 && script -qec true /dev/null >/dev/null 2>&1; then
   mkdir -p "$TMP/bin2"
   printf '#!/usr/bin/env bash\necho "$*" >> "$DOCKER_CALLS"\ncase "$1" in info) exit 0 ;; *) exit 1 ;; esac\n' > "$TMP/bin2/docker"
@@ -71,7 +71,7 @@ fi
 echo "5) screenshot helper: a missing browser is named, not a stack trace (65164c57)"
 if command -v node >/dev/null 2>&1; then
   SCREENS="$HERE/../lib/installer_probe_screens.mjs"
-  # Fake-Playwright: launch() wirft, wie Playwright es nach einem Update ohne Browser-Download tut
+  # Fake Playwright: launch() throws, as Playwright does after an update without a browser download
   cat > "$TMP/pw-missing.mjs" <<'MJS'
 export const chromium = { launch: async () => { throw new Error("browserType.launch: Executable doesn't exist at /pw/chromium_headless_shell-9999/chrome-headless-shell\n╔══╗\n║ Looks like Playwright was just installed or updated. ║\n║ Please run the following command to download new browsers: npx playwright install ║"); } };
 MJS
@@ -90,8 +90,8 @@ else
 fi
 
 echo "6) extra setup flags reach phase 2 only (c3a4cbf6)"
-# Etwa --with-pi: die Probe soll auch den Weg mit pi fahren koennen. docker nimmt hier alles an und tut
-# nichts — die Probe laeuft durch (rot, es gibt keine Instanz), die Phasen stehen in phases.tsv.
+# E.g. --with-pi: the probe should also be able to run the path with pi. docker accepts everything here and does
+# nothing - the probe runs through (red, there is no instance), the phases stand in phases.tsv.
 mkdir -p "$TMP/bin3"
 printf '#!/usr/bin/env bash\necho "$*" >> "$DOCKER_CALLS"\nexit 0\n' > "$TMP/bin3/docker"; chmod +x "$TMP/bin3/docker"
 : > "$DOCKER_CALLS"
@@ -102,8 +102,8 @@ check "phase 2 carries the flags"                       'phase_cmd 2-einrichten 
 check "phase 1 (check only) does not"                   'phase_cmd 1-pruefen | grep -F -- "--lang de" >/dev/null && ! phase_cmd 1-pruefen | grep -F -- "--with-pi" >/dev/null'
 
 echo "7) container ways: host socket, same path, own names — and only those cleaned up"
-# docker nimmt alles an; ps/volume/network ls listen Namen dieses Laufs (Vorsilbe aus `run --name`)
-# neben fremden. Aufgeraeumt werden duerfen nur die mit der Vorsilbe.
+# docker accepts everything; ps/volume/network ls list names of this run (prefix from `run --name`)
+# next to foreign ones. Only those with the prefix may be cleaned up.
 if [ "$(id -u)" = 0 ]; then
   echo "  skip (running as root — the container ways refuse root)"
 else
@@ -152,8 +152,8 @@ STUB
 fi
 
 echo "8) TERM during a phase: cleanup right away, not after the phase"
-# docker exec der Phase haengt (wie setup.sh an einer Rueckfrage); ein TERM an die Probe muss trotzdem
-# sofort aufraeumen — auf einen Vordergrund-Prozess wartete bash bis zum Ende der Phase
+# docker exec of the phase hangs (like setup.sh at a prompt); a TERM to the probe must still
+# clean up immediately - on a foreground process bash waited until the end of the phase
 mkdir -p "$TMP/bin5"
 cat > "$TMP/bin5/docker" <<'STUB'
 #!/usr/bin/env bash

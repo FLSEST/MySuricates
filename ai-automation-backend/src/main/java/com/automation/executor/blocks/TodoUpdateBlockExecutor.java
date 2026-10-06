@@ -21,14 +21,14 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * Native todo-update block (TODO 9f6d7f14): aktualisiert ein TODO direkt über
- * den TodoService — ersetzt REST-Self-Calls (PUT /api/v1/todos/{id}).
+ * Native todo-update block (TODO 9f6d7f14): updates a TODO directly via
+ * the TodoService — replaces REST self-calls (PUT /api/v1/todos/{id}).
  *
- * Config: id (Pflicht, Template-fähig), optional title/description/priority/tags —
- * nur gesetzte, nicht leere Felder werden geändert (Null-Semantik von TodoService.update, 4a2edda6).
- * Statt id: updates – viele TODOs des Lauf-Projekts auf einmal, siehe {@link TodoBulkUpdates} (TODO cc0eb3ba).
- * Das Datum der Vermerke ist der Tag in der Zeitzone der Instanz ({@link Clock}-Bean), nicht UTC – ein
- * nächtlicher Lauf um 01:30 trüge sonst das Datum des Vortags (d6c0afe6).
+ * Config: id (required, template-capable), optional title/description/priority/tags —
+ * only fields that are set and non-empty are changed (null semantics of TodoService.update, 4a2edda6).
+ * Instead of id: updates – many TODOs of the run's project at once, see {@link TodoBulkUpdates} (TODO cc0eb3ba).
+ * The date of the notes is the day in the instance's time zone ({@link Clock} bean), not UTC – a
+ * nightly run at 01:30 would otherwise carry the previous day's date (d6c0afe6).
  */
 @Component
 @RequiredArgsConstructor
@@ -43,7 +43,7 @@ public class TodoUpdateBlockExecutor implements BlockExecutor {
         Map<String, Object> config = block.getConfig();
         StepResult result = TodoBlockSupport.startResult(context);
         try {
-            // Leere Texte gelten als nicht gesetzt – wie im Analyzer (requiredOneOf in blockConfigSchema.json)
+            // Empty texts count as unset – as in the analyzer (requiredOneOf in blockConfigSchema.json)
             if (isSet(config.get("updates"))) {
                 if (isSet(config.get("id"))) {
                     throw new IllegalArgumentException("todo-update: entweder 'id' oder 'updates', nicht beides");
@@ -77,7 +77,7 @@ public class TodoUpdateBlockExecutor implements BlockExecutor {
                             : null,
                     TodoBlockSupport.parseTags(config.get("tags")),
                     null, null, null, null,
-                    null,   // agentSessionRef: ein Workflow-Block hat keine Agenten-Konversation
+                    null,   // agentSessionRef: a workflow block has no agent conversation
                     null);
 
             Todo updated = todoService.update(id, request);
@@ -102,7 +102,7 @@ public class TodoUpdateBlockExecutor implements BlockExecutor {
         return value != null && !(value instanceof String text && text.isBlank());
     }
 
-    /** Leer oder nur Leerraum heißt „nicht ändern“ – der Editor legt den Block mit leeren Feldern an (4a2edda6). */
+    /** Empty or whitespace only means "do not change" – the editor creates the block with empty fields (4a2edda6). */
     private static String unlessBlank(String value) {
         return value == null || value.isBlank() ? null : value;
     }

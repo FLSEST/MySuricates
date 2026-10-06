@@ -11,9 +11,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class TodoTest {
 
     /**
-     * Folgebefund zu ab1ed481: Wird ein TODO DONE, meldet es das beim naechsten save/saveAll selbst
-     * (Spring-Data-Domainereignis). So kann kein Pfad — REST, TodoTrigger-Auto-Close, verknuepfter
-     * Workflow — vergessen, den Audit-Befund auf AWAITING_VERIFICATION zu setzen.
+     * Follow-up finding to ab1ed481: When a TODO becomes DONE, it reports that itself on the next save/saveAll
+     * (Spring Data domain event). So no path — REST, TodoTrigger auto-close, linked
+     * workflow — can forget to set the audit finding to AWAITING_VERIFICATION.
      */
     @Nested
     class CompletionEvent {

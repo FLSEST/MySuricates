@@ -70,8 +70,8 @@ public class SystemController {
         }
         dbResponseTimeMs = (System.nanoTime() - start) / 1_000_000;
 
-        // Kein Docker eingerichtet ist ein Normalzustand, kein gestoerter Betrieb (a0e85182);
-        // DEGRADED nur, wenn Docker da sein sollte und nicht antwortet.
+        // No Docker set up is a normal state, not a disturbed operation (a0e85182);
+        // DEGRADED only if Docker should be there and does not respond.
         String status;
         if (!dbAvailable) {
             status = "DOWN";
@@ -116,7 +116,7 @@ public class SystemController {
         return jvmMemory(ManagementFactory.getMemoryMXBean().getHeapMemoryUsage());
     }
 
-    /** Ohne bekanntes Maximum ({@code -1}) bleiben Maximum und Anteil leer statt erfunden. */
+    /** Without a known maximum ({@code -1}) maximum and share stay empty instead of invented. */
     static Map<String, Object> jvmMemory(MemoryUsage heap) {
         long used = heap.getUsed();
         Long max = heap.getMax() > 0 ? heap.getMax() : null;
@@ -154,9 +154,9 @@ public class SystemController {
     }
 
     /**
-     * Rate-Limit-Kennzahlen dieser Instanz für den Browser-Client: sein 429-Backoff soll die
-     * Zahlen nicht raten, sondern von der Instanz beziehen, gegen die er läuft (37b98c97).
-     * Der Endpunkt ist bewusst öffentlich — hier steht nichts, was ein 429 nicht ohnehin verrät.
+     * Rate-limit figures of this instance for the browser client: its 429 backoff should not
+     * guess the numbers but obtain them from the instance it runs against (37b98c97).
+     * The endpoint is deliberately public — nothing here that a 429 does not reveal anyway.
      */
     private Map<String, Object> rateLimitInfo() {
         Map<String, Object> rateLimit = new LinkedHashMap<>();

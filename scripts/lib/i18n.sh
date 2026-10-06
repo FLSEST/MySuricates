@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
-# Sprachen des Installers. Eine Sprache = eine Datei scripts/lib/i18n/<lang>.sh aus Zeilen
-# M_<schluessel>="Text" (printf-Format: %s fuer Werte, %% fuer ein Prozentzeichen). Englisch ist die
-# vollstaendige Basis und wird immer zuerst geladen; eine andere Sprache ueberschreibt nur, was sie
-# kennt — ein fehlender Schluessel bleibt englisch statt leer (145d1f30). Standard ist Englisch;
-# Deutsch nur mit --lang de. bash 3.2 (macOS): Skalare, ${!var}.
+# Installer languages. One language = one file scripts/lib/i18n/<lang>.sh of lines
+# M_<key>="text" (printf format: %s for values, %% for a percent sign). English is the
+# complete base and is always loaded first; another language overrides only what it
+# knows — a missing key stays English instead of empty (145d1f30). Default is English;
+# German only with --lang de. bash 3.2 (macOS): scalars, ${!var}.
 
 I18N_DIR="${I18N_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/i18n}"
 I18N_LANG=en
 
-# Vorhandene Sprachen, eine je Zeile
+# Available languages, one per line
 i18n_languages() {
   local f
   for f in "$I18N_DIR"/*.sh; do [ -f "$f" ] && basename "$f" .sh; done
 }
 
-# i18n_load [LANG] — Englisch, darueber LANG (nur Kleinbuchstaben, sonst ignoriert)
+# i18n_load [LANG] — English, with LANG on top (lowercase letters only, otherwise ignored)
 i18n_load() {
   local lang="${1:-en}"
   # shellcheck source=i18n/en.sh
@@ -28,7 +28,7 @@ i18n_load() {
   fi
 }
 
-# msg SCHLUESSEL [WERTE…] — Text der geladenen Sprache; unbekannter Schluessel ⇒ der Schluessel selbst
+# msg KEY [VALUES…] — text of the loaded language; unknown key ⇒ the key itself
 msg() {
   local name="M_${1:-}" fmt
   shift

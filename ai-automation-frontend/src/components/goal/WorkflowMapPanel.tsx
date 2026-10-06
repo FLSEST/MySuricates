@@ -11,10 +11,10 @@ import { useWorkflowMapDrag } from './workflowMapDrag';
 import type { GoalProject } from '../../types';
 
 /**
- * Die Workflow-Leiste der Workflow-Zuordnung (52bc1e8c, Flo: „dass der auf der rechten Seite
- * ziehbar wäre“): dieselbe Leiste wie die Seitenleiste (`SidePanelFrame`: andocken, Breite, als
- * Fenster lösen), darin die Workflows der Zielprojekte – mit Suche und „Alle Workflows zeigen“ –, jeder
- * ziehbar auf die Karte, mit Maus oder Tastatur.
+ * The workflow bar of the workflow assignment (52bc1e8c, Flo: „dass der auf der rechten Seite
+ * ziehbar wäre“): the same bar as the side bar (`SidePanelFrame`: dock, width, release as a
+ * window), in it the workflows of the goal projects - with search and „Alle Workflows zeigen“ -, each
+ * draggable onto the card, with mouse or keyboard.
  */
 export function WorkflowMapPanel({ projects, onClose }: { projects: GoalProject[]; onClose: () => void }) {
   const t = useT();
@@ -71,7 +71,7 @@ export function WorkflowMapPanel({ projects, onClose }: { projects: GoalProject[
   );
 }
 
-/** Ein Workflow zum Ziehen: Griff, Name, Projekt. Leertaste nimmt ihn auf (dnd-kit), Pfeile springen von Ziel zu Ziel. */
+/** A workflow to drag: handle, name, project. Space picks it up (dnd-kit), arrows jump from target to target. */
 function DraggableWorkflow({ workflow }: { workflow: DraggedWorkflow }) {
   const tm = useT().goals.workflowMap;
   const drag = useWorkflowMapDrag();

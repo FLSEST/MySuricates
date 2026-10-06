@@ -33,7 +33,7 @@ const SAMPLE_XML = `<?xml version="1.0" encoding="UTF-8"?>
   </bpmndi:BPMNDiagram>
 </definitions>`;
 
-/** Ausschnitt eines echten Exports: „report" verarbeitet {{ block.tests.output }}. */
+/** Excerpt of a real export: "report" processes {{ block.tests.output }}. */
 const DATA_FLOW_XML = `<?xml version="1.0" encoding="UTF-8"?>
 <definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
              xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
@@ -67,7 +67,7 @@ const DATA_FLOW_XML = `<?xml version="1.0" encoding="UTF-8"?>
   </bpmndi:BPMNDiagram>
 </definitions>`;
 
-/** foreach-Schleife mit der Geometrie des Backend-Exports (BpmnModelBuilder: SUB_PAD 40, GAP 150). */
+/** foreach loop with the geometry of the backend export (BpmnModelBuilder: SUB_PAD 40, GAP 150). */
 const FOREACH_XML = `<?xml version="1.0" encoding="UTF-8"?>
 <definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
              xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
@@ -104,7 +104,7 @@ const FOREACH_XML = `<?xml version="1.0" encoding="UTF-8"?>
   </bpmndi:BPMNDiagram>
 </definitions>`;
 
-describe('BpmnDiagramView Schleifen-Subprozess', () => {
+describe('BpmnDiagramView loop subprocess', () => {
   const box = (el: Element) => {
     if (el.tagName === 'circle') {
       const [cx, cy, r] = ['cx', 'cy', 'r'].map((a) => Number(el.getAttribute(a)));
@@ -116,36 +116,36 @@ describe('BpmnDiagramView Schleifen-Subprozess', () => {
   const inside = (inner: ReturnType<typeof box>, outer: ReturnType<typeof box>) =>
     inner.x >= outer.x && inner.y >= outer.y && inner.x + inner.w <= outer.x + outer.w && inner.y + inner.h <= outer.y + outer.h;
 
-  it.each(['horizontal', 'vertical'] as const)('legt Start, Inhalt und Ende der Schleife in ihren Kasten (%s)', (orientation) => {
+  it.each(['horizontal', 'vertical'] as const)('places start, body and end of the loop inside its box (%s)', (orientation) => {
     const { container } = render(<BpmnDiagramView xml={FOREACH_XML} orientation={orientation} />);
     const frame = box(container.querySelector('rect[rx="12"]')!);
     const circles = Array.from(container.querySelectorAll('circle')).map(box);
     const task = box(container.querySelector('rect[rx="10"]')!);
 
-    // Innen: Start und Ende der Schleife plus deren Rumpf; außen: Start und Ende des Workflows.
+    // Inside: start and end of the loop plus its body; outside: start and end of the workflow.
     expect(circles.filter((c) => inside(c, frame))).toHaveLength(2);
     expect(circles.filter((c) => !inside(c, frame))).toHaveLength(2);
     expect(inside(task, frame)).toBe(true);
   });
 
-  it('läuft im vertikalen Layout oben in den Kasten hinein und unten heraus', () => {
+  it('enters the box at the top and leaves it at the bottom in the vertical layout', () => {
     const { container } = render(<BpmnDiagramView xml={FOREACH_XML} orientation="vertical" />);
     const frame = box(container.querySelector('rect[rx="12"]')!);
     const circles = Array.from(container.querySelectorAll('circle')).map(box).sort((a, b) => a.y - b.y);
-    // Reihenfolge von oben nach unten: Start, [Schleifen-Start, Schleifen-Ende], Ende.
+    // Order from top to bottom: start, [loop start, loop end], end.
     expect(circles[0]!.y + circles[0]!.h).toBeLessThanOrEqual(frame.y);
     expect(circles[3]!.y).toBeGreaterThanOrEqual(frame.y + frame.h);
   });
 });
 
-describe('BpmnDiagramView Datenfluss', () => {
-  it('zeichnet das Datenobjekt und zwei gestrichelte Assoziationen', () => {
+describe('BpmnDiagramView data flow', () => {
+  it('draws the data object and two dashed associations', () => {
     useI18nStore.setState({ locale: 'de' });
     const { container } = render(<BpmnDiagramView xml={DATA_FLOW_XML} />);
-    // Datenobjekt: Rechteck mit umgeknickter Ecke
+    // Data object: rectangle with a folded corner
     expect(container.querySelectorAll('path[data-bpmn="data-object"]')).toHaveLength(1);
     expect(screen.getByText('Ausgabe: tests')).toBeInTheDocument();
-    // Assoziationen gestrichelt, Kontrollfluss durchgezogen
+    // Associations dashed, control flow solid
     const dashed = Array.from(container.querySelectorAll('polyline')).filter((p) =>
       p.hasAttribute('stroke-dasharray'),
     );
@@ -153,13 +153,13 @@ describe('BpmnDiagramView Datenfluss', () => {
     expect(container.querySelectorAll('polyline')).toHaveLength(3);
   });
 
-  it('lokalisiert die Datenobjekt-Beschriftung (EN)', () => {
+  it('localizes the data object label (EN)', () => {
     useI18nStore.setState({ locale: 'en' });
     render(<BpmnDiagramView xml={DATA_FLOW_XML} />);
     expect(screen.getByText('Output: tests')).toBeInTheDocument();
   });
 
-  it('bricht lange Datenobjekt-Namen um und kürzt sie wie Task-Labels', () => {
+  it('wraps long data object names and truncates them like task labels', () => {
     useI18nStore.setState({ locale: 'de' });
     const langer = DATA_FLOW_XML.replace(
       'name="Ausgabe: tests"',
@@ -171,48 +171,48 @@ describe('BpmnDiagramView Datenfluss', () => {
     expect(tspans.length).toBeGreaterThan(1);
     expect(tspans.length).toBeLessThanOrEqual(3);
     expect(tspans.some((t) => t.textContent?.endsWith('…'))).toBe(true);
-    // voller Name bleibt im Tooltip der Gruppe
+    // full name stays in the group's tooltip
     const titles = Array.from(container.querySelectorAll('title')).map((t) => t.textContent);
     expect(titles.some((t) => t?.includes('Abdeckungsbericht und Fehleranalyse'))).toBe(true);
   });
 
-  it('macht das Datenobjekt nicht anklickbar', () => {
+  it('does not make the data object clickable', () => {
     const onSelectBlock = vi.fn();
     const { container } = render(<BpmnDiagramView xml={DATA_FLOW_XML} onSelectBlock={onSelectBlock} />);
-    // nur die beiden Tasks tragen eine Block-ID (b_<i>_…), das Datenobjekt nicht
+    // only the two tasks carry a block ID (b_<i>_…), the data object does not
     expect(container.querySelectorAll('g[role="button"]')).toHaveLength(2);
   });
 
-  it('routet die Assoziationen auch im vertikalen Layout an die beteiligten Kästen', () => {
+  it('routes the associations to the boxes involved in the vertical layout too', () => {
     const { container } = render(<BpmnDiagramView xml={DATA_FLOW_XML} orientation="vertical" />);
     const dashed = Array.from(container.querySelectorAll('polyline')).filter((p) =>
       p.hasAttribute('stroke-dasharray'),
     );
     expect(dashed).toHaveLength(2);
-    // Neu-Routing statt gespiegelter Alt-Punkte: keine Kante behält die Original-Koordinaten
+    // Re-routing instead of mirrored old points: no edge keeps the original coordinates
     expect(dashed.some((p) => (p.getAttribute('points') || '').includes('336,240'))).toBe(false);
   });
 
-  it('legt das Datenobjekt im vertikalen Layout unter den Erzeuger, nicht daneben', () => {
+  it('places the data object below its producer in the vertical layout, not beside it', () => {
     const { container } = render(<BpmnDiagramView xml={DATA_FLOW_XML} orientation="vertical" />);
-    // Erzeuger ist der erste Task (b_0_tests), das Datenobjekt das Symbol mit umgeknickter Ecke
+    // Producer is the first task (b_0_tests), the data object is the symbol with the folded corner
     const erzeuger = container.querySelectorAll('rect')[0]!;
     const oben = Number(erzeuger.getAttribute('y'));
     const unten = oben + Number(erzeuger.getAttribute('height'));
     const d = container.querySelector('path[data-bpmn="data-object"]')!.getAttribute('d')!;
     const [dataX, dataY] = d.slice(2).split(' ').map(Number) as [number, number];
-    // unterhalb (im Fluss nach unten), nicht auf gleicher Höhe rechts daneben
+    // below (downwards in the flow), not at the same height to the right
     expect(dataY).toBeGreaterThanOrEqual(unten);
-    // seitlich versetzt, damit es die Fluss-Spalte nicht blockiert
+    // offset sideways so that it does not block the flow column
     expect(dataX).toBeGreaterThan(Number(erzeuger.getAttribute('x')));
   });
 
-  it('routet die Ausgabe-Assoziation im vertikalen Layout ohne Haken', () => {
+  it('routes the output association without a hook in the vertical layout', () => {
     const { container } = render(<BpmnDiagramView xml={DATA_FLOW_XML} orientation="vertical" />);
     const dashed = Array.from(container.querySelectorAll('polyline')).filter((p) =>
       p.hasAttribute('stroke-dasharray'),
     );
-    // Beide Assoziationen laufen monoton in Fluss-Richtung (y nie rückwärts) — kein Haken
+    // Both associations run monotonically in flow direction (y never backwards) — no hook
     for (const kante of dashed) {
       const ys = (kante.getAttribute('points') || '').trim().split(/\s+/).map((pt) => Number(pt.split(',')[1]));
       for (let i = 1; i < ys.length; i++) {
@@ -223,71 +223,71 @@ describe('BpmnDiagramView Datenfluss', () => {
 });
 
 describe('BpmnDiagramView', () => {
-  it('rendert alle Shapes und Kanten aus dem BPMN-DI', () => {
+  it('renders all shapes and edges from the BPMN DI', () => {
     const { container } = render(<BpmnDiagramView xml={SAMPLE_XML} />);
     expect(container.querySelectorAll('svg')).toHaveLength(1);
-    expect(container.querySelectorAll('circle')).toHaveLength(2); // Start + Ende
+    expect(container.querySelectorAll('circle')).toHaveLength(2); // start + end
     expect(container.querySelectorAll('rect')).toHaveLength(1); // Task
     expect(container.querySelectorAll('polygon')).toHaveLength(1); // Gateway
-    expect(container.querySelectorAll('polyline')).toHaveLength(3); // Kanten
+    expect(container.querySelectorAll('polyline')).toHaveLength(3); // edges
     expect(screen.getByText('Maven Tests ausführen')).toBeInTheDocument();
-    expect(screen.getByText('ja')).toBeInTheDocument(); // Kanten-Label
+    expect(screen.getByText('ja')).toBeInTheDocument(); // edge label
   });
 
-  it('zeigt eine Meldung bei ungültigem XML', () => {
+  it('shows a message for invalid XML', () => {
     render(<BpmnDiagramView xml="kein xml" />);
     expect(screen.getByRole('alert')).toBeInTheDocument();
   });
 
-  it('zeigt eine eigene Meldung für wohlgeformtes BPMN ohne Layout-Daten', () => {
+  it('shows its own message for well-formed BPMN without layout data', () => {
     const noDi = `<?xml version="1.0"?><definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL">
       <process id="p"><startEvent id="s"/></process></definitions>`;
     render(<BpmnDiagramView xml={noDi} />);
-    // andere Meldung als bei kaputtem XML
+    // different message than for broken XML
     expect(screen.getByRole('alert')).toHaveTextContent(/kein Diagramm|no diagram/i);
   });
 
-  it('transponiert das Layout bei vertikaler Ausrichtung', () => {
+  it('transposes the layout for vertical orientation', () => {
     const { container, rerender } = render(<BpmnDiagramView xml={SAMPLE_XML} orientation="horizontal" />);
     const h = container.querySelector('svg')!.getAttribute('viewBox')!.split(' ').map(Number);
     rerender(<BpmnDiagramView xml={SAMPLE_XML} orientation="vertical" />);
     const v = container.querySelector('svg')!.getAttribute('viewBox')!.split(' ').map(Number);
-    expect(h[2]!).toBeGreaterThan(h[3]!); // horizontal: breiter als hoch
-    expect(v[3]!).toBeGreaterThan(v[2]!); // vertikal: höher als breit
-    // Stauchung: die vertikale Höhe ist deutlich kleiner als die horizontale Breite
-    // (ohne Kompaktierung wäre sie ~gleich, weil transponiert). 0.85 lässt Padding-Spielraum.
+    expect(h[2]!).toBeGreaterThan(h[3]!); // horizontal: wider than tall
+    expect(v[3]!).toBeGreaterThan(v[2]!); // vertical: taller than wide
+    // Compression: the vertical height is clearly smaller than the horizontal width
+    // (without compaction it would be ~equal because of the transposition). 0.85 leaves room for padding.
     expect(v[3]!).toBeLessThan(h[2]! * 0.85);
   });
 
-  it('dockt Pfeile im vertikalen Layout an den Kasten-Mitten an', () => {
+  it('attaches arrows to the box centers in the vertical layout', () => {
     const { container } = render(<BpmnDiagramView xml={SAMPLE_XML} orientation="vertical" />);
-    const rect = container.querySelector('rect')!; // Task-Box
+    const rect = container.querySelector('rect')!; // task box
     const cx = Number(rect.getAttribute('x')) + Number(rect.getAttribute('width')) / 2;
     const polyXs = Array.from(container.querySelectorAll('polyline')).flatMap((p) =>
       (p.getAttribute('points') || '').trim().split(/\s+/).map((pt) => Number(pt.split(',')[0])),
     );
-    // Neu-Routing: mindestens eine Kante dockt exakt an der Task-Mitte an (früher ~10px daneben)
+    // Re-routing: at least one edge attaches exactly to the task center (previously ~10px off)
     expect(polyXs.some((x) => Math.abs(x - cx) < 0.5)).toBe(true);
   });
 
-  it('lokalisiert das deutsche Typ-Präfix namenloser Kästen (EN)', () => {
+  it('localizes the German type prefix of unnamed boxes (EN)', () => {
     useI18nStore.setState({ locale: 'en' });
     const nameless = SAMPLE_XML.replace('name="Maven Tests ausführen"', 'name="KI: git status"');
     render(<BpmnDiagramView xml={nameless} />);
-    // Präfix "KI:" wird zu "AI:", der Befehl "git status" bleibt unverändert
+    // Prefix "KI:" becomes "AI:", the command "git status" stays unchanged
     expect(screen.getByText('AI: git status')).toBeInTheDocument();
     expect(screen.queryByText('KI: git status')).toBeNull();
   });
 
-  it('lässt Block-Namen unübersetzt (nur Präfixe werden lokalisiert)', () => {
+  it('leaves block names untranslated (only prefixes are localized)', () => {
     useI18nStore.setState({ locale: 'en' });
     render(<BpmnDiagramView xml={SAMPLE_XML} />);
-    // "Maven Tests ausführen" ist ein Nutzer-Name ohne Typ-Präfix → unverändert in EN
+    // "Maven Tests ausführen" is a user name without a type prefix → unchanged in EN
     expect(screen.getByText('Maven Tests ausführen')).toBeInTheDocument();
   });
 
-  it('meldet den Block-Index beim Klick auf einen Kasten', () => {
-    // scriptTask-ID trägt den Block-Index (b_2_…) wie im echten Export
+  it('reports the block index when a box is clicked', () => {
+    // scriptTask ID carries the block index (b_2_…) as in the real export
     const clickableXml = SAMPLE_XML.replace('id="t1"', 'id="b_2_maven"').replace('bpmnElement="t1"', 'bpmnElement="b_2_maven"');
     const onSelectBlock = vi.fn();
     const { container } = render(<BpmnDiagramView xml={clickableXml} onSelectBlock={onSelectBlock} />);
@@ -297,8 +297,8 @@ describe('BpmnDiagramView', () => {
     expect(onSelectBlock).toHaveBeenCalledWith({ blockIndex: 2 });
   });
 
-  it('meldet Block- und Case-Index bei einem verschachtelten Switch-Case-Kasten', () => {
-    // Switch-Case-Kind trägt den Pfad in der ID: b_<block>_c<case>_…
+  it('reports block and case index for a nested switch-case box', () => {
+    // Switch case child carries the path in the ID: b_<block>_c<case>_…
     const caseXml = SAMPLE_XML.replace('id="t1"', 'id="b_3_c1_0_alarm"').replace('bpmnElement="t1"', 'bpmnElement="b_3_c1_0_alarm"');
     const onSelectBlock = vi.fn();
     const { container } = render(<BpmnDiagramView xml={caseXml} onSelectBlock={onSelectBlock} />);
@@ -306,22 +306,22 @@ describe('BpmnDiagramView', () => {
     expect(onSelectBlock).toHaveBeenCalledWith({ blockIndex: 3, sub: { kind: 'case', caseIndex: 1 } });
   });
 
-  it('kürzt zu lange Labels mit Ellipsis und hält sie in der Box', () => {
+  it('truncates labels that are too long with an ellipsis and keeps them in the box', () => {
     const longXml = SAMPLE_XML.replace(
       'name="Maven Tests ausführen"',
       'name="Vollautomatische Integrationstestsuite mit ausführlicher Fehleranalyse und Reporting"',
     );
     const { container } = render(<BpmnDiagramView xml={longXml} />);
     const tspans = Array.from(container.querySelectorAll('tspan'));
-    // max. 3 Zeilen, letzte endet mit Ellipsis
+    // max. 3 lines, the last one ends with an ellipsis
     expect(tspans.length).toBeLessThanOrEqual(3);
     expect(tspans.some((t) => t.textContent?.endsWith('…'))).toBe(true);
-    // voller Name bleibt als Tooltip erhalten
+    // full name is kept as a tooltip
     const titles = Array.from(container.querySelectorAll('title')).map((t) => t.textContent);
     expect(titles).toContain('Vollautomatische Integrationstestsuite mit ausführlicher Fehleranalyse und Reporting');
   });
 
-  it('lässt nur den Kasten des angefragten Blocks aufblitzen und scrollt ihn ins Bild', () => {
+  it('flashes only the box of the requested block and scrolls it into view', () => {
     const flashXml = SAMPLE_XML.replace('id="t1"', 'id="b_2_maven"').replace('bpmnElement="t1"', 'bpmnElement="b_2_maven"');
     const scrollIntoView = vi.fn();
     Element.prototype.scrollIntoView = scrollIntoView;
@@ -335,7 +335,7 @@ describe('BpmnDiagramView', () => {
     expect(scrollIntoView).toHaveBeenCalledTimes(1);
   });
 
-  it('scrollt nicht, wenn der Blitz per Hover kommt', () => {
+  it('does not scroll when the flash comes from hover', () => {
     const flashXml = SAMPLE_XML.replace('id="t1"', 'id="b_2_maven"').replace('bpmnElement="t1"', 'bpmnElement="b_2_maven"');
     const scrollIntoView = vi.fn();
     Element.prototype.scrollIntoView = scrollIntoView;
@@ -344,7 +344,7 @@ describe('BpmnDiagramView', () => {
     expect(scrollIntoView).not.toHaveBeenCalled();
   });
 
-  it('meldet den Block-Index beim Überfahren eines Kastens', () => {
+  it('reports the block index when hovering over a box', () => {
     const hoverXml = SAMPLE_XML.replace('id="t1"', 'id="b_2_maven"').replace('bpmnElement="t1"', 'bpmnElement="b_2_maven"');
     const onHoverBlock = vi.fn();
     const { container } = render(<BpmnDiagramView xml={hoverXml} onHoverBlock={onHoverBlock} />);
@@ -352,14 +352,14 @@ describe('BpmnDiagramView', () => {
     expect(onHoverBlock).toHaveBeenCalledWith(2);
   });
 
-  it('zeigt Block-Nummer und Zeilenbereich, wenn infoByBlock gesetzt ist', () => {
+  it('shows block number and line range when infoByBlock is set', () => {
     const infoXml = SAMPLE_XML.replace('id="t1"', 'id="b_2_maven"').replace('bpmnElement="t1"', 'bpmnElement="b_2_maven"');
     render(<BpmnDiagramView xml={infoXml} infoByBlock={new Map([[2, { start: 8, end: 12 }]])} />);
-    // Block-Index wird 1-basiert angezeigt (#3), Zeilenbereich aus der Definition
+    // Block index is shown 1-based (#3), line range from the definition
     expect(screen.getByText('#3 · Z.8–12')).toBeInTheDocument();
   });
 
-  it('färbt einen Kasten nach Live-Run-Status', () => {
+  it('colors a box by live run status', () => {
     const statusXml = SAMPLE_XML.replace('id="t1"', 'id="b_2_maven"').replace('bpmnElement="t1"', 'bpmnElement="b_2_maven"');
     const { container } = render(
       <BpmnDiagramView xml={statusXml} statusByBlock={new Map([[2, 'running']])} />,
@@ -369,20 +369,20 @@ describe('BpmnDiagramView', () => {
     expect(rect?.getAttribute('class')).toContain('animate-pulse');
   });
 
-  it('zeigt Typ-Marker und Tooltip am Task', () => {
+  it('shows type marker and tooltip on the task', () => {
     const { container } = render(<BpmnDiagramView xml={SAMPLE_XML} />);
-    // scriptTask: SVG-<title>-Tooltip mit Typ-Label
+    // scriptTask: SVG <title> tooltip with type label
     const titles = Array.from(container.querySelectorAll('title')).map((t) => t.textContent);
     expect(titles).toContain('Shell-Kommando');
-    // Skript-Marker: drei Linien oben links im Kasten
+    // Script marker: three lines at the top left of the box
     expect(container.querySelectorAll('g.stroke-text-secondary line').length).toBeGreaterThanOrEqual(3);
   });
 
   describe('Zoom', () => {
-    // SAMPLE_XML: viewBox 752 × 180; jsdom misst keine Breite, eingepasst gilt daher Maßstab 1
+    // SAMPLE_XML: viewBox 752 × 180; jsdom measures no width, so fitted means scale 1
     const svgOf = (container: HTMLElement) => container.querySelector('svg[role="img"]')!;
 
-    it('vergrößert per Knopf auf feste Größe und passt wieder ein', () => {
+    it('zooms in to a fixed size via button and fits again', () => {
       const { container } = render(<BpmnDiagramView xml={SAMPLE_XML} />);
       expect(svgOf(container).getAttribute('width')).toBeNull();
 
@@ -395,7 +395,7 @@ describe('BpmnDiagramView', () => {
       expect(svgOf(container).getAttribute('width')).toBeNull();
     });
 
-    it('zoomt mit Strg + Mausrad, ohne Strg bleibt das Mausrad Scrollen', () => {
+    it('zooms with Ctrl + mouse wheel, without Ctrl the wheel keeps scrolling', () => {
       const { container } = render(<BpmnDiagramView xml={SAMPLE_XML} />);
       const scroller = svgOf(container).parentElement!;
 
@@ -403,14 +403,14 @@ describe('BpmnDiagramView', () => {
       expect(svgOf(container).getAttribute('width')).toBeNull();
 
       const zoomed = fireEvent.wheel(scroller, { deltaY: -100, ctrlKey: true });
-      expect(zoomed).toBe(false); // preventDefault: kein Browser-Seitenzoom
+      expect(zoomed).toBe(false); // preventDefault: no browser page zoom
       expect(svgOf(container).getAttribute('width')).toBe('940');
 
       fireEvent.wheel(scroller, { deltaY: 100, ctrlKey: true });
       expect(svgOf(container).getAttribute('width')).toBe('752');
     });
 
-    it('begrenzt den Zoom und sperrt den Knopf an der Grenze', () => {
+    it('limits the zoom and disables the button at the limit', () => {
       render(<BpmnDiagramView xml={SAMPLE_XML} />);
       const zoomOut = screen.getByRole('button', { name: 'Verkleinern' });
       for (let i = 0; i < 10; i++) fireEvent.click(zoomOut);
@@ -418,11 +418,11 @@ describe('BpmnDiagramView', () => {
       expect(zoomOut).toBeDisabled();
     });
 
-    it('passt nach einem Wechsel der Ausrichtung wieder ein', () => {
+    it('fits again after a change of orientation', () => {
       const { container, rerender } = render(<BpmnDiagramView xml={SAMPLE_XML} />);
       fireEvent.click(screen.getByRole('button', { name: 'Vergrößern' }));
       rerender(<BpmnDiagramView xml={SAMPLE_XML} orientation="vertical" />);
-      // vertikal eingepasst = native Größe, kein übernommener Zoom
+      // vertically fitted = native size, no carried-over zoom
       expect(screen.getByRole('button', { name: 'Einpassen' })).toBeDisabled();
       rerender(<BpmnDiagramView xml={SAMPLE_XML} />);
       expect(svgOf(container).getAttribute('width')).toBeNull();

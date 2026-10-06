@@ -32,12 +32,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Im Wartungsmodus zeigt keine Ansicht einen naechsten Lauf (TODO 7704b1e9): Der Tick startet nichts,
- * solange der Schalter an ist, und wann er wieder ausgeht, weiss niemand. Liste, Workflow-Seite,
- * Kalender und Dashboard-Projektion folgen derselben Regel wie bei der skip-until-Pause
- * ({@code ScheduleSkipPolicy.effectiveNextRun}) — gegen die echte Datenbank. Der Schalter wird ueber
- * die REST-Route gesetzt und mit der Testtransaktion zurueckgerollt; der Tick ist unter dem Profil
- * "integration" aus.
+ * In maintenance mode no view shows a next run (TODO 7704b1e9): the tick starts nothing
+ * while the switch is on, and nobody knows when it goes off again. List, workflow page,
+ * calendar and dashboard projection follow the same rule as for the skip-until pause
+ * ({@code ScheduleSkipPolicy.effectiveNextRun}) — against the real database. The switch is set via
+ * the REST route and rolled back with the test transaction; the tick is off under the profile
+ * "integration".
  */
 @SpringBootTest
 @AutoConfigureMockMvc

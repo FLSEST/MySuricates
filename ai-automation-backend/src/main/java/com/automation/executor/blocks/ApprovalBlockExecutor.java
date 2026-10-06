@@ -39,7 +39,7 @@ public class ApprovalBlockExecutor implements BlockExecutor {
         Instant start = Instant.now();
         Map<String, Object> config = block.getConfig();
 
-        // Aufgelöst, damit wer freigibt die Grundlage sieht statt {{ block.X.output }} (TODO e2efb393)
+        // Resolved, so that whoever approves sees the basis instead of {{ block.X.output }} (TODO e2efb393)
         String question = context.resolveTemplate(
                 (String) config.getOrDefault("question", "Approval required"));
         List<String> options = config.containsKey("options")
@@ -163,18 +163,18 @@ public class ApprovalBlockExecutor implements BlockExecutor {
     }
 
     /**
-     * {@code mode} und {@code auto_answer} dürfen per Variable gesetzt werden (z. B.
-     * {@code {{ approval_mode }}} aus dem defaultContext), damit ein Workflow ohne Handänderung
-     * zwischen interaktiv und unbeaufsichtigt wechselt (TODO 2a05c365). Ausnahme: Trägt der Lauf
-     * fremde Eingaben, bleibt ein Platzhalter unaufgelöst — sonst könnte ein Webhook-Payload die
-     * Freigabe selbst erteilen. Dann gilt „ask“ bzw. keine Automatik-Antwort.
+     * {@code mode} and {@code auto_answer} may be set via variable (e.g.
+     * {@code {{ approval_mode }}} from the defaultContext), so that a workflow switches without manual edit
+     * between interactive and unattended (TODO 2a05c365). Exception: if the run carries
+     * foreign input, a placeholder stays unresolved - otherwise a webhook payload could grant the
+     * approval itself. Then "ask" or no automatic answer applies.
      */
     private static String resolveSwitch(Object raw, ExecutionContext context) {
         if (!(raw instanceof String value)) return null;
         if (value.contains("{{")) {
             if (context.hasUntrustedInput()) return null;
             value = context.resolveTemplate(value);
-            if (value.contains("{{")) return null; // Variable fehlt — nie einen Platzhalter als Antwort nehmen
+            if (value.contains("{{")) return null; // Variable missing - never take a placeholder as the answer
         }
         value = value.trim();
         return value.isEmpty() ? null : value;

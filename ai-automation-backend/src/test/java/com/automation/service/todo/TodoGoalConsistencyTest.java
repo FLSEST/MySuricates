@@ -20,9 +20,9 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
- * Projektwechsel eines TODOs im Ziel (TODO c60bf914 Ziele Stufe 1: Ziel → Projekte → Arbeitspakete →
- * TODOs, Meilensteine, Gliederung und Zeitstrahl): das neue Projekt kommt ans Ziel, ein Arbeitspaket eines
- * anderen Projekts faellt weg.
+ * Project change of a TODO in the goal (TODO c60bf914 Goals stage 1: goal → projects → work packages →
+ * TODOs, milestones, outline and timeline): the new project joins the goal, a work package of a
+ * different project is dropped.
  */
 @ExtendWith(MockitoExtension.class)
 class TodoGoalConsistencyTest {

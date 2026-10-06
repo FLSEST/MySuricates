@@ -17,24 +17,24 @@ const isActive = (todo: GoalTodoItem) =>
   todo.status === 'OPEN' || todo.status === 'IN_PROGRESS' || todo.status === 'BACKLOG';
 
 /**
- * Die TODOs eines Ziels als Liste (TODO dc0566f8): was als Nächstes drankommt (verschiebbar),
- * welche Fragen vorher zu klären sind – mit „Entscheiden“ an jeder (68a5e24e) und dem aufklappbaren
- * Bereich „Entschieden“ –, was schon erledigt ist. Fälligkeit und Arbeitspaket stehen als Chips an
- * jedem TODO (TODO e192df18).
+ * A goal's TODOs as a list (TODO dc0566f8): what comes next (movable),
+ * which questions need clarifying beforehand — with „Entscheiden“ on each (68a5e24e) and the collapsible
+ * area „Entschieden“ —, what is already done. Due date and work package appear as chips on
+ * each TODO (TODO e192df18).
  */
 export function GoalTodoList({ goalId, todos, workPackages, today, onOpenTodo }: {
   goalId: string;
   todos: GoalTodoItem[];
   workPackages: GoalWorkPackage[];
-  /** Tag (`timelineLayout.dayOf`), gegen den „überfällig“ gilt. */
+  /** Day (`timelineLayout.dayOf`) against which „overdue“ is judged. */
   today: number;
-  /** Öffnet den TODO-Dialog (c60bf914); ohne führt der Titel auf die TODO-Seite. */
+  /** Opens the TODO dialog (c60bf914); without it the title leads to the TODO page. */
   onOpenTodo?: (todoId: string) => void;
 }) {
   const t = useT();
   const scope = useDecisionScope();
-  // Die Karte „Entscheiden“ hängt an der Liste, nicht an der Zeile: Die Zeile verschwindet beim
-  // Entscheiden sofort, scheitert es, soll der eingetippte Text noch da sein (c60bf914)
+  // The „Entscheiden“ card hangs on the list, not on the row: the row disappears immediately on
+  // deciding; if that fails, the typed text should still be there (c60bf914)
   const [deciding, setDeciding] = useState<GoalTodoItem | null>(null);
   const decidingTrigger = useRef<HTMLElement | null>(null);
   const decide = (todo: GoalTodoItem, trigger: HTMLElement) => {
@@ -154,8 +154,8 @@ export function GoalTodoList({ goalId, todos, workPackages, today, onOpenTodo }:
 }
 
 /**
- * Titel eines TODOs: öffnet den TODO-Dialog der Zielseite (c60bf914, Flo: „besser zu den TODOs
- * kommen … anklickbar“), per Maus und mit Enter; ohne Dialog ein Link auf die TODO-Seite.
+ * Title of a TODO: opens the goal page's TODO dialog (c60bf914, Flo: „besser zu den TODOs
+ * kommen … anklickbar“), by mouse and with Enter; without a dialog a link to the TODO page.
  */
 function TodoTitle({ todo, onOpenTodo, className = '', title }: {
   todo: GoalTodoItem;
@@ -176,7 +176,7 @@ function TodoTitle({ todo, onOpenTodo, className = '', title }: {
   );
 }
 
-/** Eine offene Frage: TODO, Wortlaut, „Entscheiden“ öffnet die Karte (68a5e24e) – die Karte hält die Liste. */
+/** An open question: TODO, wording, „Entscheiden“ opens the card (68a5e24e) — the card holds the list. */
 function QuestionRow({ todo, onOpenTodo, open, onDecide }: {
   todo: GoalTodoItem;
   onOpenTodo?: (todoId: string) => void;
@@ -203,7 +203,7 @@ function QuestionRow({ todo, onOpenTodo, open, onDecide }: {
   );
 }
 
-/** Ein entschiedenes TODO: Wortlaut der Entscheidung, wann und wer; ✔ öffnet „Ändern/Entfernen“. */
+/** A decided TODO: wording of the decision, when and who; ✔ opens „Ändern/Entfernen“. */
 function DecidedRow({ todo, onOpenTodo }: { todo: GoalTodoItem; onOpenTodo?: (todoId: string) => void }) {
   const t = useT();
   const td = t.goals.decision;

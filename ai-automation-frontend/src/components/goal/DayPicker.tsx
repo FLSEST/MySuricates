@@ -4,17 +4,17 @@ import { formatDate } from '../../utils/localeFormat';
 import { dateOfDay, dayAtX, xOfDay, type TimelineAxis } from './timelineLayout';
 
 /**
- * Tageswähler über einer Zeile des Zeitstrahls (c60bf914) – in der Meilenstein-Zeile und in der
- * Kopfzeile eines Projektbands: Ein Klick legt am Tag darunter an. Per Tastatur (Rolle „slider“)
- * wählen ← → (Bild ↑ ↓ je Woche, Pos1/Ende) den Tag, Enter oder Leertaste legt an. Der gewählte Tag
- * steht als Strich, solange der Wähler den Fokus hat; er bleibt gewählt, wenn der Fokus kurz in ein
- * Eingabefeld wandert und zurückkommt.
+ * Day picker above a row of the timeline (c60bf914) — in the milestone row and in the
+ * header row of a project band: a click creates at the day below. By keyboard (role „slider“)
+ * ← → (Page ↑ ↓ per week, Home/End) choose the day, Enter or Space creates. The chosen day
+ * shows as a line while the picker has focus; it stays chosen when focus briefly moves into an
+ * input field and comes back.
  */
 export function DayPicker({ axis, width, label, title, pickerRef, testId, onPick }: {
   axis: TimelineAxis;
   width: number;
   label: string;
-  /** Tooltip für die Maus. */
+  /** Tooltip for the mouse. */
   title: string;
   pickerRef: RefObject<HTMLDivElement | null>;
   testId: string;

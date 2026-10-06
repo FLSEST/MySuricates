@@ -1,82 +1,82 @@
 #!/usr/bin/env bash
 #
-# frontend-metrics.sh — deterministische Architektur-Metriken fuer das Frontend.
+# frontend-metrics.sh — deterministic architecture metrics for the frontend.
 #
-# Schwesterskript von arch-metrics.sh: gleiche Abschnittsnamen, gleiche Lesart, andere
-# Messgrundlage. jdeps deckt nur die JVM ab; hier wird der Quelltext gelesen.
+# Sister script of arch-metrics.sh: same section names, same reading, different
+# measurement basis. jdeps covers only the JVM; here the source text is read.
 #
-#   ## packages  Verzeichnisabhaengigkeiten, aus ALLEN Modulkanten aggregiert
-#   ## cycles    Import-Zyklen auf MODULEBENE (Datei) ueber arch_cycles.py, nur aus den
-#                statischen Laufzeitkanten — im Frontend beissen genau die (Temporal Dead
-#                Zone bei zirkulaeren ES-Modulen), nicht die auf Verzeichnisebene
-#   ## sizes     Zeilen je Datei (Top 30) und je Verzeichnis (Top 15), plus Schwellenzaehler
-#   ## churn     geaenderte Frontend-Quelldateien der letzten 90 Tage aus git log
-#   ## recent    geaenderte Dateien der letzten 7 Tage, mit Kennzeichen "neu angelegt" — Eingabe der
-#                Kandidatenwahl fuer das Urteil im Review (arch-findings.py, TODO e0e9495f)
-#   ## coupling  ein-/ausgehende Abhaengigkeiten je Verzeichnis und je Modul (seit Review 4.6.0
-#                nur noch Trendzahl, kein Befund)
-#   ## files     je Produktionsmodul NCLOC (ncloc.py), Zeilen und Aenderungen in 90 Tagen —
-#                vollstaendig, Eingabe fuer arch-findings.py (TODO b8c06b94)
-#   ## summary   Kennzahlen als key=value
-#   ## run       Laufzeit-Zustand (scan=, aliases=) — bewusst NICHT deterministisch
+#   ## packages  directory dependencies, aggregated from ALL module edges
+#   ## cycles    import cycles at MODULE level (file) via arch_cycles.py, only from the
+#                static runtime edges — in the frontend exactly those bite (temporal dead
+#                zone with circular ES modules), not those at directory level
+#   ## sizes     lines per file (top 30) and per directory (top 15), plus threshold counters
+#   ## churn     changed frontend source files of the last 90 days from git log
+#   ## recent    changed files of the last 7 days, with a "newly created" flag — input of the
+#                candidate selection for the verdict in the review (arch-findings.py, TODO e0e9495f)
+#   ## coupling  incoming/outgoing dependencies per directory and per module (since review 4.6.0
+#                only a trend number, no finding)
+#   ## files     per production module NCLOC (ncloc.py), lines and changes in 90 days —
+#                complete, input for arch-findings.py (TODO b8c06b94)
+#   ## summary   key figures as key=value
+#   ## run       runtime state (scan=, aliases=) — deliberately NOT deterministic
 #
-# ACHTUNG, zwei verschiedene Grundgesamtheiten: ## sizes, ## packages, ## cycles und
-# ## coupling messen den Produktionscode OHNE Testdateien; ## churn zaehlt jede Datei unter
-# ai-automation-frontend/src, also MIT Tests (git log kennt die Filter nicht). Eine Datei aus
-# ## churn muss deshalb nicht in ## sizes stehen.
+# NOTE, two different populations: ## sizes, ## packages, ## cycles and
+# ## coupling measure the production code WITHOUT test files; ## churn counts every file under
+# ai-automation-frontend/src, i.e. WITH tests (git log does not know the filters). A file from
+# ## churn therefore need not appear in ## sizes.
 #
-# Gemessen wird der Produktionscode unter ai-automation-frontend/src: *.ts und *.tsx ohne
-# Testdateien (*.test.*, *.spec.*, __tests__/, __mocks__/, src/test/) und ohne *.d.ts —
-# dieselbe Trennung wie im Backend, wo nur src/main/java gemessen wird. Die Zahl der
-# ausgeschlossenen Testdateien steht als test_files in ## summary, damit der Ausschluss
-# sichtbar bleibt statt zu verschwinden.
+# What is measured is the production code under ai-automation-frontend/src: *.ts and *.tsx without
+# test files (*.test.*, *.spec.*, __tests__/, __mocks__/, src/test/) and without *.d.ts —
+# the same separation as in the backend, where only src/main/java is measured. The number of
+# excluded test files appears as test_files in ## summary, so the exclusion
+# stays visible instead of disappearing.
 #
-# Kanten kommen aus `import … from '…'`, `export … from '…'` (beides erzeugt eine echte
-# Abhaengigkeit, Barrel-Dateien bestehen nur daraus) und `import('…')`, mehrzeilige
-# Import-Listen eingeschlossen. Reine Seiteneffekt-Importe (`import './x.css'`) haben kein
-# from und sind keine Modulkante.
+# Edges come from `import … from '…'`, `export … from '…'` (both create a real
+# dependency, barrel files consist only of those) and `import('…')`, multi-line
+# import lists included. Pure side-effect imports (`import './x.css'`) have no
+# from and are not a module edge.
 #
-# Jede Kante traegt eine Art, denn nicht jede Abhaengigkeit existiert zur Laufzeit:
-#   runtime  statischer Wert-Import — bindet beim Laden, kann einen TDZ-Zyklus bauen
-#   type     `import type` / `export type` / nur `{ type X }`-Spezifizierer — tsc loescht
-#            das restlos; ein Zyklus aus Typkanten ist keiner. Zaehler: type_edges
-#   dynamic  `import('…')` (Router-Lazy-Loading) — aufgeschoben, deshalb ebenfalls kein
-#            TDZ-Zyklus, aber eine echte Bundling-Abhaengigkeit. Zaehler: dynamic_edges,
-#            dynamic_imports (Aufrufe)
-# Trifft dasselbe Modulpaar in mehreren Formen zu, gewinnt die staerkste Bindung.
-# ## packages und ## coupling zaehlen ALLE Arten, ## cycles nur runtime.
+# Every edge carries a kind, because not every dependency exists at runtime:
+#   runtime  static value import — binds on load, can build a TDZ cycle
+#   type     `import type` / `export type` / only `{ type X }` specifiers — tsc deletes
+#            it entirely; a cycle of type edges is none. Counter: type_edges
+#   dynamic  `import('…')` (router lazy loading) — deferred, therefore likewise no
+#            TDZ cycle, but a real bundling dependency. Counters: dynamic_edges,
+#            dynamic_imports (calls)
+# If the same module pair matches in several forms, the strongest binding wins.
+# ## packages and ## coupling count ALL kinds, ## cycles only runtime.
 #
-# Relative Angaben werden auf Modulpfade aufgeloest (.ts/.tsx/index.ts/index.tsx), Aliase aus
-# tsconfig.json (compilerOptions.paths) beachtet. Alles, was ausserhalb von src landet oder
-# ein Paket ist, zaehlt als external; ein relativer Pfad ohne Datei als unresolved — beide
-# stehen in ## summary, damit eine kaputte Aufloesung nicht als Kantenfreiheit durchgeht.
+# Relative specifiers are resolved to module paths (.ts/.tsx/index.ts/index.tsx), aliases from
+# tsconfig.json (compilerOptions.paths) are respected. Everything that lands outside src or
+# is a package counts as external; a relative path without a file as unresolved — both
+# appear in ## summary, so a broken resolution does not pass as freedom from edges.
 #
-# Typpositionen mit import(): `typeof import('m')` und `import('m').Typ` zaehlen als Typkante,
-# nicht als dynamischer Import — tsc loescht beides (TODO 26b3da40). Abgegrenzt wird am
-# Folgezeichen: eine Promise-Methode (.then/.catch/.finally) ist ein Laufzeit-Import.
+# Type positions with import(): `typeof import('m')` and `import('m').Typ` count as a type edge,
+# not as a dynamic import — tsc deletes both (TODO 26b3da40). The boundary is drawn at the
+# following character: a Promise method (.then/.catch/.finally) is a runtime import.
 #
-# Bekannte Grenze: ein nicht-literaler Spezifizierer (`import(variable)`, aus Strings
-# zusammengesetzte Pfade) wird nicht erfasst — er hat keinen Pfad, den man ohne Bundler
-# aufloesen koennte. Im heutigen Frontend kommt das nicht vor; sollte es auftreten, fehlt die
-# Kante lautlos. Gleiches gilt fuer `require()` und fuer Importe in Kommentaren/Strings, die
-# zufaellig in Spalte 0 beginnen.
+# Known limit: a non-literal specifier (`import(variable)`, paths assembled from strings)
+# is not captured — it has no path that could be resolved without a bundler.
+# The current frontend has none; should one appear, the edge is silently
+# missing. The same holds for `require()` and for imports in comments/strings that
+# happen to begin in column 0.
 #
-# Fehlerpfade werden als "NICHT GEMESSEN" ausgewiesen, nie als sauberes Ergebnis.
+# Error paths are reported as "NICHT GEMESSEN", never as a clean result.
 #
-# Usage:  scripts/public-readiness/frontend-metrics.sh [repo-root]     (Default: .)
-# Exit:   0 = Faktenblatt geschrieben (auch mit error=-Markierungen), 2 = Wurzel unbrauchbar
+# Usage:  scripts/public-readiness/frontend-metrics.sh [repo-root]     (default: .)
+# Exit:   0 = fact sheet written (even with error= markers), 2 = root unusable
 #
-# Zeitbudget: reines Lesen, keine Kompilierung — wenige Sekunden. Kein npm, kein node_modules.
+# Time budget: pure reading, no compilation — a few seconds. No npm, no node_modules.
 #
-# Bewusst ohne common.sh: dessen run_limited/MAX_LINES wuerde das Faktenblatt kuerzen und
-# cd_root die uebergebene Wurzel ignorieren.
+# Deliberately without common.sh: its run_limited/MAX_LINES would truncate the fact sheet and
+# cd_root would ignore the given root.
 #
 set -uo pipefail
 export LC_ALL=C
 
-# Vor dem cd aufloesen: wurde das Skript ueber einen relativen Pfad aufgerufen, zeigt
-# dirname "$0" nach dem Wechsel in die gemessene Wurzel ins Leere — arch_cycles.py waere
-# dann nicht auffindbar und die Zyklen still "nicht gemessen".
+# Resolve before the cd: if the script was called via a relative path, dirname "$0"
+# points nowhere after switching into the measured root — arch_cycles.py would then not
+# be found and the cycles silently "not measured".
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 ROOT_ARG="${1:-.}"
@@ -103,16 +103,16 @@ note_error() { ERRORS="${ERRORS:+$ERRORS,}$1"; }
 : > "$TMP/recent.tsv"
 
 # ---------------------------------------------------------------------------
-# Quelltext-Scan: ein python3-Aufruf liefert alle Rohdaten als TSV mit Typspalte.
-#   module<TAB>pfad<TAB>zeilen<TAB>verzeichnis
-#   edge<TAB>von-modul<TAB>nach-modul<TAB>art  (dedupliziert; art = runtime|dynamic|type)
-#   external<TAB>von-modul<TAB>spezifizierer<TAB>art   (Paket oder ausserhalb von src)
-#   asset<TAB>von-modul<TAB>spezifizierer<TAB>art      (aufgeloest, aber kein ts/tsx-Modul)
-#   unresolved<TAB>von-modul<TAB>spezifizierer<TAB>art (relativ, zeigt auf nichts)
-#   dyncall<TAB>von-modul<TAB>spezifizierer    (je dynamischer import()-Aufruf)
-#   alias<TAB>praefix<TAB>ziel
-#   testfile<TAB>pfad
-#   note<TAB>marke                             (z. B. vite_alias_unparsed)
+# Source scan: one python3 call delivers all raw data as TSV with a type column.
+#   module<TAB>path<TAB>lines<TAB>directory
+#   edge<TAB>from-module<TAB>to-module<TAB>kind  (deduplicated; kind = runtime|dynamic|type)
+#   external<TAB>from-module<TAB>specifier<TAB>kind   (package or outside src)
+#   asset<TAB>from-module<TAB>specifier<TAB>kind      (resolved, but not a ts/tsx module)
+#   unresolved<TAB>from-module<TAB>specifier<TAB>kind (relative, points to nothing)
+#   dyncall<TAB>from-module<TAB>specifier    (per dynamic import() call)
+#   alias<TAB>prefix<TAB>target
+#   testfile<TAB>path
+#   note<TAB>marker                            (e.g. vite_alias_unparsed)
 # ---------------------------------------------------------------------------
 SCAN_STATE="ok"
 if [ ! -d "$SRC" ]; then
@@ -325,20 +325,20 @@ fi
 awk -F'\t' '$1=="module" { print $3 "\t" $2 "\t" $4 }' "$TMP/scan.tsv" \
   | sort -k1,1rn -k2,2 > "$TMP/modules.tsv"
 awk -F'\t' '$1=="edge" { print $2 "\t" $3 "\t" $4 }' "$TMP/scan.tsv" | sort > "$TMP/edges.tsv"
-# Zyklengraph: nur statische Laufzeitkanten. Typkanten loescht tsc, dynamische Importe sind
-# aufgeschoben — beide koennen die Temporal Dead Zone nicht ausloesen, um die es hier geht.
+# Cycle graph: only static runtime edges. tsc deletes type edges, dynamic imports are
+# deferred — neither can trigger the temporal dead zone this is about.
 awk -F'\t' '$3=="runtime" { print $1 "\t" $2 }' "$TMP/edges.tsv" > "$TMP/runtime-edges.tsv"
 
-# Verzeichniskanten: alle Modulkanten (auch Typ- und dynamische) auf ihr Verzeichnis
-# aggregiert, Selbstkanten fallen weg — gleiche Lesart wie ## packages in arch-metrics.sh.
+# Directory edges: all module edges (also type and dynamic) aggregated onto their directory,
+# self-edges are dropped — same reading as ## packages in arch-metrics.sh.
 awk -F'\t' '$1=="module" { dir[$2]=$4 }
             $1=="edge"   { from=dir[$2]; to=dir[$3];
                            if (from != "" && to != "" && from != to) print from "\t" to }' \
     "$TMP/scan.tsv" \
   | sort | uniq -c | awk '{ print $2 "\t" $3 "\t" $1 }' | sort -k1,1 -k2,2 > "$TMP/diredges.tsv"
 
-# Zyklen: ein Fehlschlag der Erkennung darf nicht als "keine Zyklen" durchgehen — das waere
-# falsch-gruen in genau der Dimension, fuer die das Faktenblatt gebaut wurde.
+# Cycles: a failure of the detection must not pass as "no cycles" — that would be
+# false green in exactly the dimension the fact sheet was built for.
 CYCLES_STATE="no_edges"
 if [ -s "$TMP/runtime-edges.tsv" ]; then
   if python3 "$SCRIPT_DIR/arch_cycles.py" < "$TMP/runtime-edges.tsv" > "$TMP/cycles.tsv" 2>"$TMP/cycles.err"; then
@@ -351,13 +351,13 @@ if [ -s "$TMP/runtime-edges.tsv" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Git-Churn der letzten 90 Tage
+# Git churn of the last 90 days
 # ---------------------------------------------------------------------------
 COMMIT="unknown"
 if git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1; then
   COMMIT=$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)
-  # Ein flacher Klon (git clone --depth 1) kennt nur den letzten Commit: jede Datei haette dann
-  # 0 oder 1 Aenderung, und kein Hotspot waere eine Messluecke, die wie Sauberkeit aussieht.
+  # A shallow clone (git clone --depth 1) knows only the last commit: every file would then have
+  # 0 or 1 changes, and no hotspot would be a measurement gap that looks like cleanliness.
   if [ "$(git -C "$ROOT" rev-parse --is-shallow-repository 2>/dev/null)" = "true" ]; then
     note_error "shallow_history"
   fi
@@ -367,9 +367,9 @@ if git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1; then
     | sort | uniq -c \
     | awk '{ print $1 "\t" $2 }' \
     | sort -k1,1rn -k2,2 > "$TMP/churn.tsv"
-  # Die letzten 7 Tage (ein Review-Takt) getrennt, wie in arch-metrics.sh: Aenderungen je Datei und ob
-  # sie im Fenster neu angelegt wurde. Mit Testdateien wie ## churn; die Kandidatenwahl nimmt nur Module
-  # aus ## files.
+  # The last 7 days (one review cadence) separately, as in arch-metrics.sh: changes per file and whether
+  # it was newly created in the window. With test files like ## churn; the candidate selection takes only modules
+  # from ## files.
   git -C "$ROOT" log --since=7.days --diff-filter=A --name-only --format= -- ai-automation-frontend/src 2>/dev/null \
     | grep -v '^$' | sed 's#^ai-automation-frontend/src/##' | sort -u > "$TMP/added.txt"
   git -C "$ROOT" log --since=7.days --name-only --format= -- ai-automation-frontend/src 2>/dev/null \
@@ -384,9 +384,9 @@ else
 fi
 CHURN_FILES=$(wc -l < "$TMP/churn.tsv" | tr -d ' ')
 
-# Je Modul: NCLOC (ncloc.py), Zeilen, Aenderungen der letzten 90 Tage — die Grundlage der
-# deterministischen Einstufung (arch-findings.py, TODO b8c06b94). Nur Produktionsmodule wie
-# ## sizes; die Aenderungen stammen aus ## churn.
+# Per module: NCLOC (ncloc.py), lines, changes of the last 90 days — the basis of the
+# deterministic grading (arch-findings.py, TODO b8c06b94). Only production modules like
+# ## sizes; the changes come from ## churn.
 : > "$TMP/files.tsv"
 if [ -s "$TMP/modules.tsv" ]; then
   cut -f2 "$TMP/modules.tsv" | sort > "$TMP/module-list.txt"
@@ -421,8 +421,8 @@ CYCLES=$(grep -c '^cycle' "$TMP/cycles.tsv" 2>/dev/null); CYCLES=${CYCLES:-0}
 PAIRS=$(grep -c '^pair' "$TMP/cycles.tsv" 2>/dev/null); PAIRS=${PAIRS:-0}
 DIRECTORIES=$(cut -f3 "$TMP/modules.tsv" | sort -u | wc -l | tr -d ' ')
 [ "$UNRESOLVED" -gt 0 ] && note_error "unresolved_imports"
-# Ein nicht gelesener Alias (tsconfig kaputt, resolve.alias in vite.config.ts) faelscht die
-# Aufloesung still — deshalb wandert er als eigene Marke in error=.
+# An unread alias (broken tsconfig, resolve.alias in vite.config.ts) silently falsifies
+# the resolution — therefore it travels as its own marker in error=.
 NOTES=$(awk -F'\t' '$1=="note" { print $2 }' "$TMP/scan.tsv" | sort -u | tr '\n' ',' | sed 's/,$//')
 [ -n "$NOTES" ] && note_error "$NOTES"
 
@@ -550,7 +550,7 @@ printf 'churn_files_90d=%s\n' "$CHURN_FILES"
 printf 'commit=%s\n' "$COMMIT"
 [ -n "$ERRORS" ] && printf 'error=%s\n' "$ERRORS"
 
-# ## run steht bewusst am Ende und ausserhalb des Determinismus-Vergleichs.
+# ## run is deliberately at the end and outside the determinism comparison.
 printf '\n## run\n'
 printf '# Laufzeit-Zustand, nicht Teil des Determinismus-Vergleichs\n'
 printf 'scan=%s\n' "$SCAN_STATE"

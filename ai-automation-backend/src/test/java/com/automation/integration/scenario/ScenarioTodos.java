@@ -9,7 +9,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Szenario-Schlüssel {@code todos}: TODOs im Szenario-Projekt vor dem Lauf (TODO cc0eb3ba). Aufräumen macht der Runner. */
+/** Scenario key {@code todos}: TODOs in the scenario project before the run (TODO cc0eb3ba). The runner cleans up. */
 final class ScenarioTodos {
 
     private ScenarioTodos() {

@@ -15,7 +15,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Die Antwort der Korrekturrunde: lesen, Struktur vergleichen, weggelassene Felder ergänzen. */
+/** The answer of the correction round: read, compare structure, fill in omitted fields. */
 class CorrectionAnswerTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();

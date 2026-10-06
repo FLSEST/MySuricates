@@ -33,7 +33,7 @@ class TodoUpdateBlockExecutorTest {
 
     @Mock private TodoService todoService;
 
-    /** 01:30 in Berlin ist 23:30 UTC am Vortag – der Vermerk soll den Tag der Instanz tragen (d6c0afe6). */
+    /** 01:30 in Berlin is 23:30 UTC the day before – the note should carry the day of the instance (d6c0afe6). */
     private static final Clock BERLIN_NIGHT =
             Clock.fixed(Instant.parse("2026-09-30T23:30:00Z"), ZoneId.of("Europe/Berlin"));
 
@@ -165,7 +165,7 @@ class TodoUpdateBlockExecutorTest {
                 request.description().contains("— 2026-10-01 · Batch (Lauf run-1): gestartet")));
     }
 
-    /** Ein leeres {@code id} (Editor-Vorgabe geleert) gilt als nicht gesetzt – wie im Analyzer (requiredOneOf). */
+    /** An empty {@code id} (editor default cleared) counts as not set – as in the analyzer (requiredOneOf). */
     @Test
     void execute_blankIdNextToUpdates_runsTheUpdates() {
         ExecutionContext ctx = buildContext();

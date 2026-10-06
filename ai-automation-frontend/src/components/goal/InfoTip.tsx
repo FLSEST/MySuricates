@@ -4,14 +4,14 @@ import { Info } from 'lucide-react';
 import { FLOATING_STYLE, useFloating, type FloatingAnchor } from './floating';
 
 /**
- * Ein Info-Symbol mit Erklärung (c60bf914, Flo: „Wächter muss erklärt werden, vielleicht ein Info zum
- * Drüberfahren“). Die Erklärung erscheint beim Drüberfahren, beim Fokus per Tastatur und beim Tippen;
- * ein Klick heftet sie an, bis erneut geklickt, daneben geklickt, der Fokus verlassen oder Escape
- * gedrückt wird (daneben zählt eigens: Safari fokussiert Knöpfe beim Klick nicht, dort kommt kein blur). Sie
- * schwebt per Portal (`floating.ts`) und ist über `aria-describedby` auch vorgelesen.
+ * An info icon with an explanation (c60bf914, Flo: „Wächter muss erklärt werden, vielleicht ein Info zum
+ * Drüberfahren“). The explanation appears on hover, on keyboard focus and on tap;
+ * a click pins it until clicked again, clicked elsewhere, focus is left or Escape is
+ * pressed (clicking elsewhere is handled separately: Safari does not focus buttons on click, so no blur occurs there). It
+ * floats via portal (`floating.ts`) and is also read aloud via `aria-describedby`.
  */
 export function InfoTip({ label, children, testId }: {
-  /** Name des Symbols, etwa „Was macht der Wächter?“. */
+  /** Name of the icon, e.g. „Was macht der Wächter?“. */
   label: string;
   children: ReactNode;
   testId?: string;
@@ -27,7 +27,7 @@ export function InfoTip({ label, children, testId }: {
     setPinned(false);
   };
 
-  // Ein Klick daneben schließt – wie bei TimelinePopover
+  // A click elsewhere closes — as with TimelinePopover
   useEffect(() => {
     if (!open) return;
     const closeOnOutsideClick = (event: MouseEvent) => {

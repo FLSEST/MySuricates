@@ -18,10 +18,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 /**
- * „Könnte dazugehören“ (TODO c60bf914): offene TODOs ohne Ziel, die zu einem Ziel passen koennten –
- * standardmaessig nur aus den Projekten des Ziels, auf Wunsch aus allen. Eine Seite wie
- * {@code GET /todos}, in derselben Reihenfolge (Prioritaet, dann neueste) und mit denselben
- * gebuendelten Namen; die Projekte des Ziels filtert eine Unterabfrage, nichts wird vorher geladen.
+ * „Könnte dazugehören“ (TODO c60bf914): open TODOs without a goal that might fit a goal –
+ * by default only from the goal's projects, on request from all. A page like
+ * {@code GET /todos}, in the same order (priority, then newest) and with the same
+ * bundled names; the goal's projects are filtered by a subquery, nothing is loaded beforehand.
  */
 @Service
 @RequiredArgsConstructor
@@ -33,7 +33,7 @@ public class GoalCandidateService {
     private final TodoRepository todoRepository;
     private final TodoResponseAssembler responseAssembler;
 
-    /** Hat das Ziel keine Projekte, ist die Seite ohne {@code allProjects} leer; unbekanntes Ziel = 404. */
+    /** If the goal has no projects, the page is empty without {@code allProjects}; unknown goal = 404. */
     @Transactional(readOnly = true)
     public PageResponse<TodoResponse> candidates(String goalId, String q, String tag, boolean allProjects, int page, int size) {
         if (!goalRepository.existsById(goalId)) {
@@ -44,7 +44,7 @@ public class GoalCandidateService {
         if (!allProjects) {
             spec = spec.and(TodoSpecifications.inProjectsOfGoal(goalId));
         }
-        // unsortiert: die Reihenfolge steckt in der Specification (aa434aee)
+        // unsorted: the order lives in the specification (aa434aee)
         Page<Todo> result = todoRepository.findAll(spec, PageRequest.of(page, size));
         return new PageResponse<>(responseAssembler.toResponses(result.getContent()), result.getNumber(), result.getSize(),
                 result.getTotalElements(), result.getTotalPages());

@@ -1,14 +1,14 @@
 package com.automation.config;
 
 /**
- * Semver-Vergleich fuer die Seeder mitgelieferter Definitionen
+ * Semver comparison for the seeders of shipped definitions
  * ({@link WorkflowTemplateSeeder}, {@link SkillSeeder}).
  */
 final class SeedVersions {
 
     private SeedVersions() {}
 
-    /** {@code true}, wenn {@code newVersion} groesser ist als {@code oldVersion}. */
+    /** {@code true} if {@code newVersion} is greater than {@code oldVersion}. */
     static boolean isNewer(String newVersion, String oldVersion) {
         if (oldVersion == null || oldVersion.isBlank()) return true;
         if (newVersion == null || newVersion.isBlank()) return false;

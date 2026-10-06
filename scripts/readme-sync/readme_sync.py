@@ -1,47 +1,47 @@
 #!/usr/bin/env python3
-"""README-Sync DE->EN nur fuer geaenderte Abschnitte (TODO c13a942b).
+"""README sync DE->EN for changed sections only (TODO c13a942b).
 
-`README.de.md` ist die Quelle, `README.md` die Uebersetzung. Bis 2026-09-30 uebersetzte der
-Workflow "README DE<->EN Sync" bei jeder Aenderung die ganze Datei neu und aenderte dabei
-festgelegten Wortlaut ("suricates" -> "meerkats"). Dieses Skript macht alles Deterministische
-an dem Workflow; die KI uebersetzt nur noch die Abschnitte, die sich geaendert haben.
+`README.de.md` is the source, `README.md` the translation. Until 2026-09-30 the workflow
+"README DE<->EN Sync" translated the whole file anew on every change and thereby altered
+fixed wording ("suricates" -> "meerkats"). This script does everything deterministic
+about that workflow; the AI only translates the sections that have changed.
 
-Sync-Stand: die letzte Zeile von README.md, `<!-- synced-from: <commit> sha256:<hash> -->`.
-Sie nennt den Commit, dessen README.de.md die englische Fassung wiedergibt, und den
-SHA-256 dieses Inhalts. Den Commit gibt es nach einem History-Rewrite oder im oeffentlichen
-Repo (Release-Uebergabe: ein Commit je Release) nicht mehr — dann sucht `plan` den Stand von
-README.de.md mit diesem Hash in der Historie. Findet sich keiner: von Hand angleichen, `mark`.
+Sync state: the last line of README.md, `<!-- synced-from: <commit> sha256:<hash> -->`.
+It names the commit whose README.de.md the English version reproduces, and the
+SHA-256 of that content. The commit no longer exists after a history rewrite or in the public
+repo (release handover: one commit per release) — then `plan` looks for the state of
+README.de.md with this hash in the history. If none is found: align by hand, `mark`.
 
-Abschnitt: ein durch Leerzeilen begrenzter Block (Absatz, Ueberschrift, Tabelle, Liste,
-Code-Block samt seiner Leerzeilen, Zitat). Beide READMEs fuehren dieselbe Folge von Bloecken;
-Block i der englischen Datei ist die Uebersetzung von Block i der deutschen am Sync-Stand.
-`plan` vergleicht README.de.md am Sync-Stand mit HEAD Block fuer Block (Zeilenumbrueche
-zaehlen nicht, in Code-Bloecken zaehlt jedes Zeichen):
-- unveraenderte und nur verschobene Bloecke: die englische Fassung bleibt Byte fuer Byte,
-- geloeschte Bloecke: fallen weg,
-- neue oder geaenderte Bloecke: gehen an die KI, mit der bisherigen englischen Fassung des
-  aehnlichsten weggefallenen Blocks als Vorlage.
-Gibt es nichts zu uebersetzen (nur Loeschen/Verschieben), entsteht kein Auftrag; `apply`
-schreibt das Ergebnis ohne KI und rueckt den Sync-Stand vor.
+Section: a block delimited by blank lines (paragraph, heading, table, list,
+code block including its blank lines, quote). Both READMEs carry the same sequence of blocks;
+block i of the English file is the translation of block i of the German one at the sync state.
+`plan` compares README.de.md at the sync state with HEAD block by block (line breaks
+do not count, in code blocks every character counts):
+- unchanged and merely moved blocks: the English version stays byte for byte,
+- deleted blocks: dropped,
+- new or changed blocks: go to the AI, with the previous English version of the
+  most similar dropped block as a template.
+If there is nothing to translate (only deleting/moving), no job is created; `apply`
+writes the result without AI and advances the sync state.
 
-Feste Bausteine (Sprachumschalter, Banner, Fussnote) uebersetzt keine KI: Sie bleiben in
-README.md wie sie sind. Aendert sich einer davon in der deutschen Datei, meldet `apply` das als
-Warnung — von Hand nachziehen.
+Fixed building blocks (language switcher, banner, footnote) are not translated by any AI: they stay in
+README.md as they are. If one of them changes in the German file, `apply` reports that as a
+warning — follow up by hand.
 
-Gate: `apply` setzt die Uebersetzungen ein, schreibt Doku-Links deterministisch auf die
-englische Fassung um und prueft danach, dass jeder nicht uebersetzte Block Byte fuer Byte dem
-Stand vor dem Lauf entspricht.
+Gate: `apply` inserts the translations, deterministically rewrites docs links to the
+English version and then checks that every untranslated block matches, byte for byte, the
+state before the run.
 
-Befehle (Zustand unter `$(git rev-parse --git-path readme-sync)`, liegt in .git, nie committet):
-    plan                      Auftrag fuer die KI auf stdout, Zustand ablegen
-    has-work                  Exit 0, wenn es etwas zu uebersetzen gibt (fuer run_if)
-    apply --translations F    Antwort der KI einsetzen, Gate-Zeilen ausgeben (F = Datei oder -)
-    check [--current]         Gleichlauf zum Sync-Stand pruefen; --current: und der Sync-Stand
-                              ist die aktuelle README.de.md (Gate der Release-Uebergabe)
-    mark [--commit C]         Sync-Stand setzen (nach einer Uebersetzung von Hand)
+Commands (state under `$(git rev-parse --git-path readme-sync)`, lives in .git, never committed):
+    plan                      job for the AI on stdout, store state
+    has-work                  exit 0 if there is something to translate (for run_if)
+    apply --translations F    insert the AI's answer, print gate lines (F = file or -)
+    check [--current]         check parity with the sync state; --current: and the sync state
+                              is the current README.de.md (gate of the release handover)
+    mark [--commit C]         set the sync state (after a translation by hand)
 
-Exit: 0 = ok (auch YELLOW), 1 = Gate RED / check fehlgeschlagen, 2 = Vorbedingung verletzt
-(nichts geschrieben). Nur Standardbibliothek.
+Exit: 0 = ok (also YELLOW), 1 = gate RED / check failed, 2 = precondition violated
+(nothing written). Standard library only.
 """
 from __future__ import annotations
 
@@ -64,17 +64,17 @@ SOURCE = "README.de.md"
 TARGET = "README.md"
 MARKER_RE = re.compile(r"^<!-- synced-from: ([0-9a-f]{7,40})(?: sha256:([0-9a-f]{64}))? -->$")
 GATE_CATEGORY = "readme-sync"
-#: Mindestaehnlichkeit, ab der ein weggefallener Block als Vorlage fuer einen neuen gilt.
+#: Minimum similarity from which a dropped block counts as a template for a new one.
 TEMPLATE_MIN_RATIO = 0.5
 
-#: Feste Bausteine: Name -> Erkennung am ersten Block-Inhalt. Sie werden nie uebersetzt.
+#: Fixed building blocks: name -> detection by the first block content. They are never translated.
 FIXED = {
     "switcher": re.compile(r"^(\*\*Deutsch\*\*|\[Deutsch\]\(README\.de\.md\))\s*\|"),
     "banner": re.compile(r"readme-banner-"),
     "footer": re.compile(r"^>\s*🌍"),
 }
 
-#: Festgelegter Wortlaut des Autors, gilt fuer jede Uebersetzung.
+#: Fixed wording of the author, valid for every translation.
 GLOSSARY = {
     "Erdmännchen": "suricates (never \"meerkats\")",
     "Regelkreis": "control loop",
@@ -90,16 +90,16 @@ MARK_HINT = "README.md von Hand angleichen und `readme_sync.py mark` ausfuehren"
 
 
 class PreconditionError(Exception):
-    """Vorbedingung verletzt — es wird nichts geschrieben (Exit 2)."""
+    """Precondition violated — nothing is written (exit 2)."""
 
 
-# --------------------------------------------------------------------------- Bloecke
+# --------------------------------------------------------------------------- Blocks
 
 
 @dataclass
 class Chunk:
-    body: str  # Inhaltszeilen samt Zeilenenden
-    gap: str  # die Leerzeilen danach
+    body: str  # content lines including line endings
+    gap: str  # the blank lines after it
 
     @property
     def raw(self) -> str:
@@ -116,9 +116,9 @@ class Doc:
 
 
 def parse(text: str) -> Doc:
-    """Zerlegt Markdown verlustfrei in Bloecke: `parse(t).render() == t` fuer jedes t.
+    """Losslessly splits Markdown into blocks: `parse(t).render() == t` for every t.
 
-    Leerzeilen in einem Code-Block gehoeren zum Block, sonst trennen sie Bloecke.
+    Blank lines inside a code block belong to the block, otherwise they separate blocks.
     """
     prefix = ""
     chunks: list[Chunk] = []
@@ -139,7 +139,7 @@ def parse(text: str) -> Doc:
 
 
 def norm(body: str) -> str:
-    """Vergleichsschluessel: Zeilenumbrueche und Leerraum zaehlen nicht."""
+    """Comparison key: line breaks and whitespace do not count."""
     return " ".join(body.split())
 
 
@@ -166,17 +166,17 @@ def kind(body: str) -> str:
 
 
 def key(body: str) -> str:
-    """Vergleichsschluessel eines Blocks: feste Bausteine nach Namen, Code exakt, sonst norm()."""
+    """Comparison key of a block: fixed building blocks by name, code exactly, otherwise norm()."""
     name = fixed_name(body)
     if name:
         return "\0fixed:" + name
     if kind(body) == "code":
-        return "\0code:" + body  # Einrueckung ist in Code Inhalt
+        return "\0code:" + body  # indentation is content in code
     return norm(body)
 
 
 def table_shape(body: str) -> list[int]:
-    """Spaltenzahl je Tabellenzeile (escapte `\\|` zaehlen nicht)."""
+    """Column count per table row (escaped `\\|` do not count)."""
     return [len(re.findall(r"(?<!\\)\|", line)) for line in body.strip("\n").split("\n")]
 
 
@@ -196,7 +196,7 @@ def sha256(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-# --------------------------------------------------------------------------- Sync-Stand
+# --------------------------------------------------------------------------- Sync state
 
 
 @dataclass
@@ -209,7 +209,7 @@ class Marker:
 
 
 def split_marker(doc: Doc) -> tuple[Doc, Marker | None]:
-    """Trennt den Sync-Stand (letzter Block) ab; liefert (Rumpf, Marker oder None)."""
+    """Splits off the sync state (last block); returns (body, marker or None)."""
     if doc.chunks:
         m = MARKER_RE.match(doc.chunks[-1].body.strip())
         if m:
@@ -261,11 +261,11 @@ def short(root: Path, commit: str) -> str:
 
 
 def resolve_synced_source(root: Path, marker: Marker) -> tuple[str, str]:
-    """README.de.md am Sync-Stand als (Commit, Text).
+    """README.de.md at the sync state as (commit, text).
 
-    Erst ueber den Commit; gibt es ihn nicht (History-Rewrite, Release-Uebergabe), ueber den
-    Inhalts-Hash in der Historie von README.de.md. Widersprechen sich Commit und Hash oder
-    passt nichts, ist der Sync-Stand nicht belastbar — Exit 2.
+    First via the commit; if it does not exist (history rewrite, release handover), via the
+    content hash in the history of README.de.md. If commit and hash contradict each other or
+    nothing matches, the sync state is not reliable — exit 2.
     """
     text = show_source(root, marker.commit)
     if text is not None:
@@ -314,8 +314,8 @@ def repo_root(explicit: str | None) -> Path:
 
 
 def build_items(old_de: Doc, new_de: Doc) -> list[dict]:
-    """Je Block der neuen deutschen Fassung: {"keep": i} (englischer Block i bleibt Byte fuer
-    Byte) oder {"translate": True, "template": i | None} (Vorlage: bisherige Fassung von i)."""
+    """Per block of the new German version: {"keep": i} (English block i stays byte for
+    byte) or {"translate": True, "template": i | None} (template: previous version of i)."""
     old_keys = [key(c.body) for c in old_de.chunks]
     new_keys = [key(c.body) for c in new_de.chunks]
     items: list[dict | None] = [None] * len(new_keys)
@@ -330,7 +330,7 @@ def build_items(old_de: Doc, new_de: Doc) -> list[dict]:
         unmatched_old.extend(range(i1, i2))
         for j in range(j1, j2):
             region_of[j] = list(range(i1, i2))
-    # Verschiebung: geloescht und unter gleichem Schluessel anderswo wieder eingefuegt
+    # Move: deleted and re-inserted elsewhere under the same key
     for j in sorted(region_of):
         match = next((i for i in unmatched_old if old_keys[i] == new_keys[j]), None)
         if match is not None:
@@ -349,8 +349,8 @@ def build_items(old_de: Doc, new_de: Doc) -> list[dict]:
 
 
 def best_template(j: int, region: list[int], unmatched_old: list[int], old_de: Doc, new_de: Doc) -> int | None:
-    """Aehnlichster weggefallener Block: im eigenen Ersetzungsbereich ohne Schwelle, sonst ab
-    TEMPLATE_MIN_RATIO (ein verschobener und dabei geaenderter Block)."""
+    """Most similar dropped block: in its own replacement region without threshold, otherwise from
+    TEMPLATE_MIN_RATIO (a block that was moved and changed at the same time)."""
     target = norm(new_de.chunks[j].body)
 
     def ratio(i: int) -> float:
@@ -466,7 +466,7 @@ def cmd_has_work(state: Path) -> int:
 
 
 def parse_translations(text: str) -> dict[int, str]:
-    """`=== EN n ===`-Bloecke bis zur naechsten Marke oder `=== END ===`; Rest ignoriert."""
+    """`=== EN n ===` blocks up to the next marker or `=== END ===`; rest ignored."""
     found: dict[int, list[str]] = {}
     dupes: list[int] = []
     current: int | None = None
@@ -493,7 +493,7 @@ def parse_translations(text: str) -> dict[int, str]:
             lines.pop()
         if (len(lines) >= 2 and re.match(r"^\s*```(markdown|md)?\s*$", lines[0])
                 and re.match(r"^\s*```\s*$", lines[-1])):
-            lines = lines[1:-1]  # die ganze Antwort in einen Markdown-Fence gepackt
+            lines = lines[1:-1]  # the whole answer wrapped in a Markdown fence
         out[n] = "\n".join(lines)
     return out
 
@@ -528,11 +528,11 @@ def validate(translations: dict[int, str], expected: list[int], new_de: Doc) -> 
 
 
 def rewrite_links(text: str, root: Path, warnings: list[str]) -> str:
-    """Doku-Links auf die englische Fassung: `docs/x.md` -> `docs/en/x.md`, `VISION.md` ->
-    `docs/en/vision.md` — nur wenn die Zieldatei existiert. Ein Anker wird ueber die Position
-    der Ueberschrift uebertragen (docs_parity_check haelt die Ueberschriftenfolge gleich);
-    laesst er sich nicht zuordnen, faellt er weg — oben auf der richtigen Seite ist besser
-    als nirgends."""
+    """Docs links to the English version: `docs/x.md` -> `docs/en/x.md`, `VISION.md` ->
+    `docs/en/vision.md` — only if the target file exists. An anchor is carried over via the position
+    of the heading (docs_parity_check keeps the heading sequence equal);
+    if it cannot be mapped, it is dropped — the top of the right page is better
+    than nowhere."""
 
     def english(path: str) -> str | None:
         if path == "VISION.md":
@@ -578,7 +578,7 @@ def rewrite_links(text: str, root: Path, warnings: list[str]) -> str:
 
 
 def verify(snapshot: Doc, items: list[dict], new_de: Doc, final_text: str, marker: Marker) -> list[str]:
-    """Gate: jeder nicht uebersetzte Block Byte fuer Byte wie vorher; Sync-Stand gesetzt."""
+    """Gate: every untranslated block byte for byte as before; sync state set."""
     final, found = split_marker(parse(final_text))
     if found != marker:
         return [f"Sync-Stand in {TARGET} ist {found.line() if found else None!r}, erwartet {marker.line()!r}"]

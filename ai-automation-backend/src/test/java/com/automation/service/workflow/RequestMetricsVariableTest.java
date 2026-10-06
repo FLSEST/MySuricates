@@ -12,8 +12,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
 /**
- * {@code request_metrics} ist nie leer (TODO 441a4c46, 843be7a5). Dass die Variable wirklich im Kontext
- * landet, pruefen die request_metrics-Faelle in {@link WorkflowContextDataServiceTest}.
+ * {@code request_metrics} is never empty (TODO 441a4c46, 843be7a5). That the variable really ends up in the context
+ * is checked by the request_metrics cases in {@link WorkflowContextDataServiceTest}.
  */
 @ExtendWith(MockitoExtension.class)
 class RequestMetricsVariableTest {

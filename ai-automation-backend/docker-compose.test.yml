@@ -8,29 +8,29 @@ services:
         HOST_UID: ${UID:-1000}
         HOST_GID: ${GID:-1000}
         HOST_HOME: ${HOME}
-        # Neuer Wert (etwa der Monat) = NodeSource- und Docker-Repo frisch statt aus dem Layer-Cache (8b7a39b9)
+        # New value (e.g. the month) = NodeSource and Docker repo fresh instead of from the layer cache (8b7a39b9)
         APT_REFRESH: ${MYSURICATES_APT_REFRESH:-}
     image: ai-automation-backend-test
     container_name: mysuricates-test
-    # Kein ports-Eintrag hier: Den Port veroeffentlicht die Override-Datei von scripts/staging.sh,
-    # standardmaessig nur auf 127.0.0.1 (TEST_BIND in ~/.config/mysuricates/staging.env oeffnet ihn
-    # bewusst, etwa 0.0.0.0 fuers lokale Netz). Ohne Override veroeffentlicht er keinen Port.
+    # No ports entry here: the port is published by the override file of scripts/staging.sh,
+    # by default only on 127.0.0.1 (TEST_BIND in ~/.config/mysuricates/staging.env opens it
+    # deliberately, e.g. 0.0.0.0 for the local network). Without the override it publishes no port.
     environment:
       - SPRING_PROFILES_ACTIVE=test
-      # Onboarding-Texte: API-Key liegt nur im Container (Port innen = außen, Adresse stimmt ohne URL)
+      # Onboarding texts: API key lives only in the container (port inside = outside, address is right without a URL)
       - AUTOMATION_INSTANCE_CONTAINER=mysuricates-test
       - HOME=${HOME}
       - LOG_DIR=/app/data/logs
       - PATH=/opt/java/openjdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${HOME}/.local/bin
       - AUTOMATION_API_KEY=${AUTOMATION_API_KEY:-}
-      # Schlüssel außerhalb der Container-Schicht (3fb2242c): Integrations- und Siegel-Schlüssel liegen
-      # auf einem eigenen Volume, getrennt von den Daten. In der Container-Schicht wären sie nach jedem
-      # `compose down` weg — und mit ihnen die verschlüsselten Integrations-Zugänge und die Siegel.
+      # Keys outside the container layer (3fb2242c): integration and seal keys live
+      # on a volume of their own, separate from the data. In the container layer they would be gone after every
+      # `compose down` — and with them the encrypted integration credentials and the seals.
       - AUTOMATION_INTEGRATION_KEY_FILE=/app/secrets/integration-encryption.key
       - AUTOMATION_SEAL_KEY_FILE=/app/secrets/seal-signing.key
-      # Kein KI-Tagging im Hintergrund (5d008bba): Sonst startet jeder angelegte oder geaenderte
-      # Workflow — auch die, die Cypress mit CYPRESS_TARGET=test hier anlegt — einen KI-Aufruf mit der
-      # Anmeldung des Containers. Wie die Integrationstests und die E2E-Nebeninstanz.
+      # No AI tagging in the background (5d008bba): otherwise every created or changed
+      # workflow — including those Cypress creates here with CYPRESS_TARGET=test — starts an AI call with the
+      # container's login. Like the integration tests and the E2E side instance.
       - AUTOMATION_DISCOVERY_AUTO_TAGGING_ENABLED=false
     volumes:
       - test-data:/app/data
@@ -38,22 +38,22 @@ services:
       - ./stable-frontend:/app/frontend:ro
       - ./src/main/resources/application-test.yml:/app/config/application-test.yml:ro
       - ./docker/entrypoint.sh:/app/entrypoint.sh:ro
-      # KI-Anbieter, Docker-Socket und Port kommen aus der Override-Datei, die scripts/staging.sh (und
-      # das Backend beim Start aus der Oberflaeche) schreibt. Schalter: TEST_AI_FROM_HOST,
-      # TEST_AI_PROVIDERS, TEST_DOCKER_SOCKET (Standard 0), TEST_BIND (Standard 127.0.0.1) in
-      # ~/.config/mysuricates/staging.env (262948a4). Ohne die Override-Datei startet der Container
-      # ohne KI-Anbieter, ohne Socket und ohne veroeffentlichten Port.
+      # AI providers, Docker socket and port come from the override file that scripts/staging.sh (and
+      # the backend when started from the UI) writes. Switches: TEST_AI_FROM_HOST,
+      # TEST_AI_PROVIDERS, TEST_DOCKER_SOCKET (default 0), TEST_BIND (default 127.0.0.1) in
+      # ~/.config/mysuricates/staging.env (262948a4). Without the override file the container starts
+      # without AI providers, without socket and without a published port.
       - ${HOME}/Entwicklung:${HOME}/Entwicklung
       - ${AUTOMATION_DATA_HOME:-${HOME}/.mysuricates}/backups/test:/host-backups/test
     healthcheck:
-      # --noproxy: Docker reicht Proxy-Variablen in den Container, curl schickt auch localhost
-      # ueber sie — der Container wurde nie gesund (cf662c01)
+      # --noproxy: Docker passes proxy variables into the container, curl also sends localhost
+      # through them — the container never became healthy (cf662c01)
       test: ["CMD", "curl", "--noproxy", "*", "-f", "http://localhost:8090/api/v1/system/health"]
       interval: 30s
       timeout: 5s
       retries: 3
-    # Kein Auto-Start beim Boot — die Test-Instanz wird bewusst per Desktop-Icon
-    # bzw. ./scripts/staging.sh test-start gestartet.
+    # No auto-start on boot — the Test instance is deliberately started via desktop icon
+    # or ./scripts/staging.sh test-start.
     restart: "no"
 
 volumes:

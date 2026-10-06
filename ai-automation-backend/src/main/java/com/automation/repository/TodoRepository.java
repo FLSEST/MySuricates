@@ -131,12 +131,12 @@ public interface TodoRepository extends JpaRepository<Todo, String>, JpaSpecific
     Optional<Todo> findByLastFixRunId(String lastFixRunId);
 
     /**
-     * TODOs, die auf einen Run zeigen — als Ausloeser oder als Reparaturlauf.
+     * TODOs that point to a run — as trigger or as repair run.
      *
-     * <p>Beide Spalten sind lose Textverweise ohne Fremdschluessel. Wird ein Run
-     * geloescht, muessen sie genullt werden: sonst zeigt der „Run →"-Link ins
-     * Leere, und {@code isFixRunStillRunning} kann einen haengenden
-     * Reparaturlauf nicht mehr aufloesen.
+     * <p>Both columns are loose text references without a foreign key. When a run is
+     * deleted, they must be nulled: otherwise the "Run →" link points
+     * nowhere, and {@code isFixRunStillRunning} can no longer resolve a hanging
+     * repair run.
      */
     List<Todo> findByWorkflowRunIdOrLastFixRunId(String workflowRunId, String lastFixRunId);
 
@@ -181,12 +181,12 @@ public interface TodoRepository extends JpaRepository<Todo, String>, JpaSpecific
          + "CASE WHEN t.dueDate IS NULL THEN 1 ELSE 0 END, t.dueDate ASC, t.createdAt DESC")
     List<NeedsYouRow> findNeedsYou(@Param("now") Instant now, Pageable pageable);
 
-    // ── Ziele (TODO dc0566f8): schlanke Projektionen, keine Beschreibungen ─────────
+    // ── Goals (TODO dc0566f8): lean projections, no descriptions ─────────────────
 
-    /** Zustand DECIDED (TODO 68a5e24e): Entscheidung, keine offene Frage, nicht archiviert. */
+    /** State DECIDED (TODO 68a5e24e): decision, no open question, not archived. */
     String DECIDED = "t.decision IS NOT NULL AND t.openQuestion IS NULL AND t.status <> 'ARCHIVED'";
 
-    /** Status-Zaehler je Ziel in einem GROUP BY; Ziele ohne TODOs fehlen in der Liste. */
+    /** Status counters per goal in one GROUP BY; goals without TODOs are missing from the list. */
     @Query("SELECT new com.automation.dto.projection.GoalStatusCounts("
          + "t.goalId, "
          + "SUM(CASE WHEN t.status = 'OPEN' THEN 1 ELSE 0 END), "
@@ -206,17 +206,17 @@ public interface TodoRepository extends JpaRepository<Todo, String>, JpaSpecific
          + ") FROM Todo t WHERE t.goalId = :goalId")
     List<GoalTodoRow> findGoalRows(@Param("goalId") String goalId);
 
-    /** Spalten von {@link GoalRelationRow} in Konstruktor-Reihenfolge. */
+    /** Columns of {@link GoalRelationRow} in constructor order. */
     String GOAL_RELATION_COLUMNS = "t.id, t.title, t.status, t.priority, t.projectId, t.tags, t.goalRank, t.createdAt, "
          + "t.source, t.sourceAgent, t.workflowRunId, t.referenceType, t.referenceId, t.linkedWorkflowId, "
          + "t.lastFixRunId, t.fixAttempts, t.resolutionState";
 
-    /** Relationskarte (TODO c6ea8f5c): Herkunft, Bearbeitung und Ergebnis der TODOs eines Ziels. */
+    /** Relation map (TODO c6ea8f5c): origin, processing and result of the TODOs of a goal. */
     @Query("SELECT new com.automation.dto.projection.GoalRelationRow("
          + GOAL_RELATION_COLUMNS + ") FROM Todo t WHERE t.goalId = :goalId")
     List<GoalRelationRow> findGoalRelationRows(@Param("goalId") String goalId);
 
-    /** Kandidaten fuer die Relationskarte: nur TODOs, die noch keinem Ziel gehoeren. */
+    /** Candidates for the relation map: only TODOs that do not yet belong to a goal. */
     @Query("SELECT new com.automation.dto.projection.GoalRelationRow("
          + GOAL_RELATION_COLUMNS + ") FROM Todo t WHERE t.id IN :ids AND t.goalId IS NULL")
     List<GoalRelationRow> findUnassignedRelationRows(@Param("ids") Collection<String> ids);
@@ -224,15 +224,15 @@ public interface TodoRepository extends JpaRepository<Todo, String>, JpaSpecific
     @Query("SELECT MAX(t.goalRank) FROM Todo t WHERE t.goalId = :goalId")
     Integer maxGoalRank(@Param("goalId") String goalId);
 
-    /** Loest alle TODOs vom Ziel; die TODOs selbst bleiben. Aufrufer muss @Transactional sein. */
+    /** Detaches all TODOs from the goal; the TODOs themselves remain. Caller must be @Transactional. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("UPDATE Todo t SET t.goalId = NULL, t.goalRank = NULL, t.workPackageId = NULL, t.updatedAt = :now "
          + "WHERE t.goalId = :goalId")
     int detachFromGoal(@Param("goalId") String goalId, @Param("now") Instant now);
 
     /**
-     * Zugeordnete und erledigte TODOs je Arbeitspaket (TODO 259f4f66, c60bf914), ohne ARCHIVED – ein
-     * verworfenes TODO haelt kein Paket auf. Pakete ohne TODOs fehlen in der Liste.
+     * Assigned and completed TODOs per work package (TODO 259f4f66, c60bf914), without ARCHIVED – a
+     * discarded TODO does not hold up a package. Packages without TODOs are missing from the list.
      */
     @Query("SELECT new com.automation.dto.projection.WorkPackageTodoCounts(t.workPackageId, COUNT(t), "
          + "SUM(CASE WHEN t.status = 'DONE' THEN 1 ELSE 0 END), SUM(CASE WHEN t.openQuestion IS NOT NULL "
@@ -240,7 +240,7 @@ public interface TodoRepository extends JpaRepository<Todo, String>, JpaSpecific
          + " THEN 1 ELSE 0 END)) FROM Todo t WHERE t.workPackageId IN :workPackageIds AND t.status <> 'ARCHIVED' GROUP BY t.workPackageId")
     List<WorkPackageTodoCounts> countByWorkPackage(@Param("workPackageIds") Collection<String> workPackageIds);
 
-    /** Loest alle TODOs von einem Arbeitspaket; sie bleiben im Ziel. Aufrufer muss @Transactional sein. */
+    /** Detaches all TODOs from a work package; they stay in the goal. Caller must be @Transactional. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("UPDATE Todo t SET t.workPackageId = NULL, t.updatedAt = :now WHERE t.workPackageId = :workPackageId")
     int detachFromWorkPackage(@Param("workPackageId") String workPackageId, @Param("now") Instant now);
@@ -249,7 +249,7 @@ public interface TodoRepository extends JpaRepository<Todo, String>, JpaSpecific
 
     long countByGoalIdAndProjectId(String goalId, String projectId);
 
-    /** Loest die TODOs eines Projekts vom Ziel (TODO c60bf914). Aufrufer muss @Transactional sein. */
+    /** Detaches the TODOs of a project from the goal (TODO c60bf914). Caller must be @Transactional. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("UPDATE Todo t SET t.goalId = NULL, t.goalRank = NULL, t.workPackageId = NULL, t.updatedAt = :now "
          + "WHERE t.goalId = :goalId AND t.projectId = :projectId")
@@ -290,7 +290,7 @@ public interface TodoRepository extends JpaRepository<Todo, String>, JpaSpecific
      * Bulk status change without loading entities. Sets updatedAt explicitly because
      * bulk JPQL bypasses @LastModifiedDate auditing. Caller must be @Transactional.
      */
-    /** IDs unter {@code ids}, die noch nicht {@code status} haben — wer beim Sammel-UPDATE wirklich wechselt. */
+    /** IDs among {@code ids} that do not yet have {@code status} — who actually changes in the bulk UPDATE. */
     @Query("SELECT t.id FROM Todo t WHERE t.id IN :ids AND t.status <> :status")
     List<String> findIdsNotInStatus(@Param("ids") List<String> ids, @Param("status") Todo.Status status);
 

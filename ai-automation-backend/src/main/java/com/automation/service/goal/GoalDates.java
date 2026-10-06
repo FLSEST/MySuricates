@@ -11,10 +11,10 @@ import java.time.format.DateTimeParseException;
 import java.util.Map;
 
 /**
- * Datumsangaben von Arbeitspaketen und Meilensteinen (TODO 259f4f66, c60bf914): ein ISO-Zeitpunkt
- * wie gesendet; ein reines Datum ({@code 2026-10-15}) heisst beim Beginn „ab Anfang dieses Tages“
- * (00:00:00 UTC), beim Ende und bei der Faelligkeit „bis Ende dieses Tages“ (23:59:59 UTC) –
- * ueberfaellig wird es erst am Tag danach. Leer = kein Datum.
+ * Dates of work packages and milestones (TODO 259f4f66, c60bf914): an ISO timestamp
+ * as sent; a plain date ({@code 2026-10-15}) means, for the start, "from the beginning of that day"
+ * (00:00:00 UTC), for the end and the due date "until the end of that day" (23:59:59 UTC) –
+ * it only becomes overdue the day after. Empty = no date.
  */
 final class GoalDates {
 
@@ -43,7 +43,7 @@ final class GoalDates {
         }
     }
 
-    /** Titel eines Pakets oder Meilensteins: getrimmt, nicht leer, hoechstens {@code max} Zeichen. */
+    /** Title of a package or milestone: trimmed, not empty, at most {@code max} characters. */
     static String title(String raw, int max, String what) {
         String title = raw == null ? "" : raw.trim();
         if (title.isEmpty()) {

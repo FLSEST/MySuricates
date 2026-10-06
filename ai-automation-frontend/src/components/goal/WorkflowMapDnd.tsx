@@ -26,10 +26,10 @@ interface Replacing {
 }
 
 /**
- * Ziehen und Ablegen der Workflow-Zuordnung (52bc1e8c): umschließt Karte und Workflow-Leiste. Ein
- * Workflow auf einem TODO bearbeitet es (ein vorhandener Fix-Workflow wird nur nach Rückfrage
- * ersetzt), auf einem Paket oder der Kopfzeile des Ziels wird er dort zugeordnet. Unter dem
- * gezogenen Workflow steht, wohin er wirkt; jede Zuordnung lässt sich im Toast zurücknehmen.
+ * Drag and drop of the workflow assignment (52bc1e8c): wraps card and workflow bar. A
+ * workflow on a TODO processes it (an existing fix workflow is replaced only after asking),
+ * on a package or the header row of the goal it is assigned there. Below the
+ * dragged workflow it says where it takes effect; every assignment can be undone in the toast.
  */
 export function WorkflowMapDnd({ goalId, goalTitle, relations, workPackages, children }: {
   goalId: string;

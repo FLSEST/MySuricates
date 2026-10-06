@@ -2,8 +2,8 @@ import { dayOf, dayOfIsoDate, dueDateOfDay, isoDateOfDay } from './timelineLayou
 import type { CreateGoalMilestoneRequest, GoalMilestone, UpdateGoalMilestoneRequest } from '../../types';
 
 /**
- * Formular eines Meilensteins (c60bf914) – im Dialog der Gliederung und in der Karte am Zeitstrahl
- * dasselbe: Titel, Datum (Pflicht, gilt bis 23:59:59 Ortszeit) und die verknüpften Arbeitspakete.
+ * Form of a milestone (c60bf914) - the same in the outline dialog and in the card on the timeline:
+ * title, date (required, valid until 23:59:59 local time) and the linked work packages.
  */
 export interface MilestoneDraft {
   title: string;
@@ -33,7 +33,7 @@ export function createMilestoneRequest(draft: MilestoneDraft): CreateGoalMilesto
 
 const sameSet = (a: string[], b: string[]) => a.length === b.length && a.every((id) => b.includes(id));
 
-/** Bearbeiten: nur, was sich geändert hat; die Verknüpfungen gehen als ganze Menge. */
+/** Editing: only what has changed; the links go as a whole set. */
 export function updateMilestoneRequest(item: GoalMilestone, draft: MilestoneDraft): UpdateGoalMilestoneRequest | null {
   const day = dayOfIsoDate(draft.date);
   if (!isMilestoneDraftValid(draft) || day === null) return null;
@@ -45,7 +45,7 @@ export function updateMilestoneRequest(item: GoalMilestone, draft: MilestoneDraf
   return data;
 }
 
-/** Nimmt ein Paket in die Auswahl auf oder wieder heraus. */
+/** Adds a package to the selection or removes it again. */
 export function togglePackage(draft: MilestoneDraft, id: string): MilestoneDraft {
   return {
     ...draft,
@@ -53,5 +53,5 @@ export function togglePackage(draft: MilestoneDraft, id: string): MilestoneDraft
   };
 }
 
-/** „Erreicht“ von Hand gibt es nur ohne verknüpfte Pakete – sonst entscheiden die Pakete. */
+/** „Erreicht“ by hand exists only without linked packages - otherwise the packages decide. */
 export const reachedByHand = (item: Pick<GoalMilestone, 'workPackageIds'>) => item.workPackageIds.length === 0;

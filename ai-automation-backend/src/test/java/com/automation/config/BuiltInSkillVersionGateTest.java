@@ -29,29 +29,29 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Versions-Waechter fuer die Built-in-Skill-Ressourcen (TODO 36f47bff).
+ * Version guard for the built-in skill resources (TODO 36f47bff).
  *
- * <p>{@link SkillSeeder} aktualisiert einen bereits vorhandenen Built-in-Skill nur, wenn die
- * Ressourcen-{@code version} hoeher ist als die in der Datenbank. Ein geaenderter Prompt ohne
- * Versions-Bump erreicht bestehende Instanzen deshalb nie — und zwar still. Dieser Test macht
- * das laut: Er hasht je Skill die {@code <id>.json} (kanonisch, damit reine Formatierung nicht
- * anschlaegt) zusammen mit der Prompt-Datei {@code <id>.md} (byte-genau) und vergleicht das
- * Ergebnis mit der eingecheckten Liste {@code src/test/resources/skills/builtin-versions.json}
- * im Format <code>{"&lt;id&gt;": {"version": "1.0.0", "hash": "…"}}</code>.
+ * <p>{@link SkillSeeder} updates an already existing built-in skill only if the
+ * resource {@code version} is higher than the one in the database. A changed prompt without
+ * a version bump therefore never reaches existing instances — and does so silently. This test makes
+ * that loud: it hashes, per skill, the {@code <id>.json} (canonical, so that pure formatting does not
+ * trip it) together with the prompt file {@code <id>.md} (byte-exact) and compares the
+ * result with the checked-in list {@code src/test/resources/skills/builtin-versions.json}
+ * in the format <code>{"&lt;id&gt;": {"version": "1.0.0", "hash": "…"}}</code>.
  *
- * <p>Zwei Zusicherungen:
+ * <p>Two assertions:
  * <ol>
- *   <li>{@link #resourceChange_requiresVersionBump()} — das eigentliche Gate: aenderte sich der
- *       Hash eines bekannten Skills, muss seine {@code version} hoeher sein als die
- *       eingetragene.</li>
- *   <li>{@link #versionLedger_matchesResources()} — die Liste selbst muss den aktuellen Stand
- *       abbilden. Ohne diese zweite Zusicherung bliebe eine veraltete Liste zurueck und ein
- *       spaeterer Bump-loser Prompt-Wechsel kaeme durch, weil er mit einer laengst
- *       ueberholten Version verglichen wuerde.</li>
+ *   <li>{@link #resourceChange_requiresVersionBump()} — the actual gate: if the
+ *       hash of a known skill changed, its {@code version} must be higher than the
+ *       recorded one.</li>
+ *   <li>{@link #versionLedger_matchesResources()} — the list itself must reflect the current state.
+ *       Without this second assertion an outdated list would remain and a
+ *       later prompt change without a bump would get through, because it would be compared with a long-
+ *       outdated version.</li>
  * </ol>
  *
- * <p>Ablauf bei einer gewollten Aenderung: {@code version} in der {@code <id>.json} erhoehen,
- * dann die Liste neu schreiben und mitcommitten:
+ * <p>Procedure for an intended change: raise {@code version} in the {@code <id>.json},
+ * then rewrite the list and commit it along:
  * {@code ./mvnw test -Dtest=BuiltInSkillVersionGateTest -Dskills.versions.write=true}
  */
 class BuiltInSkillVersionGateTest {
@@ -61,7 +61,7 @@ class BuiltInSkillVersionGateTest {
     private static final String WRITE_HINT =
             "./mvnw test -Dtest=BuiltInSkillVersionGateTest -Dskills.versions.write=true";
 
-    /** Ein Eintrag der Hash-Liste: die deklarierte Version und der Hash ueber JSON + Prompt. */
+    /** One entry of the hash list: the declared version and the hash over JSON + prompt. */
     record SkillFingerprint(String version, String hash) {}
 
     @BeforeAll
@@ -82,7 +82,7 @@ class BuiltInSkillVersionGateTest {
         List<String> violations = new ArrayList<>();
         for (Map.Entry<String, SkillFingerprint> entry : current.entrySet()) {
             SkillFingerprint before = recorded.get(entry.getKey());
-            // Unbekannte id = neuer Skill: es gibt keine bestehende Version, die zu ueberholen waere.
+            // Unknown id = new skill: there is no existing version that would have to be surpassed.
             if (before == null || before.hash().equals(entry.getValue().hash())) {
                 continue;
             }
@@ -136,9 +136,9 @@ class BuiltInSkillVersionGateTest {
         return hash.length() > 19 ? hash.substring(0, 19) + "…" : hash;
     }
 
-    // ── Fingerabdruecke der Ressourcen ────────────────────────
+    // ── Fingerprints of the resources ────────────────────────
 
-    /** Je Skill-id die deklarierte Version und den Hash ueber {@code <id>.json} + {@code <id>.md}. */
+    /** Per skill id the declared version and the hash over {@code <id>.json} + {@code <id>.md}. */
     static Map<String, SkillFingerprint> currentFingerprints() throws IOException {
         Path dir = moduleRoot().resolve(RESOURCES_RELATIVE);
         assertThat(Files.isDirectory(dir))
@@ -165,8 +165,8 @@ class BuiltInSkillVersionGateTest {
             Map<String, Object> metadata = new ObjectMapper()
                     .readValue(Files.readAllBytes(json), new TypeReference<Map<String, Object>>() {});
             byte[] promptBytes = Files.readAllBytes(prompt);
-            // Kanonische Form der Metadaten: alle Map-Schluessel rekursiv sortiert, damit eine reine
-            // Umformatierung der JSON kein Gate ausloest — eine inhaltliche Aenderung dagegen schon.
+            // Canonical form of the metadata: all map keys sorted recursively, so that a pure
+            // reformatting of the JSON does not trigger the gate — a change in content does.
             String canonicalJson = canonicalWriter().writeValueAsString(metadata);
             return new SkillFingerprint(declaredVersion(metadata, id), hash(canonicalJson, promptBytes));
         } catch (IOException e) {
@@ -174,7 +174,7 @@ class BuiltInSkillVersionGateTest {
         }
     }
 
-    /** Wie {@link BuiltInSkillLoader}: fehlende {@code version} bedeutet {@code 1.0.0}. */
+    /** Like {@link BuiltInSkillLoader}: a missing {@code version} means {@code 1.0.0}. */
     private static String declaredVersion(Map<String, Object> metadata, String id) throws IOException {
         Object version = metadata.get("version");
         if (version == null || version.toString().isBlank()) {
@@ -186,12 +186,12 @@ class BuiltInSkillVersionGateTest {
         return text;
     }
 
-    /** Prompt-Bytes ungefiltert — auch ein angehaengter Zeilenumbruch ist eine Aenderung. */
+    /** Prompt bytes unfiltered — an appended line break is a change too. */
     private static String hash(String canonicalJson, byte[] promptBytes) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             digest.update(canonicalJson.getBytes(StandardCharsets.UTF_8));
-            digest.update((byte) 0); // Trenner: JSON-Ende und Prompt-Anfang bleiben unterscheidbar
+            digest.update((byte) 0); // separator: JSON end and prompt start stay distinguishable
             digest.update(promptBytes);
             return "sha256:" + HexFormat.of().formatHex(digest.digest());
         } catch (NoSuchAlgorithmException e) {
@@ -199,7 +199,7 @@ class BuiltInSkillVersionGateTest {
         }
     }
 
-    // ── Eingecheckte Liste ────────────────────────────────────
+    // ── Checked-in list ────────────────────────────────────
 
     private static Map<String, SkillFingerprint> readVersions() throws IOException {
         Path file = versionsPath();
@@ -230,7 +230,7 @@ class BuiltInSkillVersionGateTest {
         return moduleRoot().resolve(VERSIONS_RELATIVE);
     }
 
-    /** Laeuft sowohl mit dem Backend-Modul als auch mit dem Repo-Wurzelverzeichnis als CWD. */
+    /** Works with both the backend module and the repo root directory as CWD. */
     private static Path moduleRoot() {
         return Files.isDirectory(Paths.get("src/test/resources"))
                 ? Paths.get("")

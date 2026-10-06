@@ -5,9 +5,9 @@ import type { WorkflowWidgetEntry } from '../dashboard/workflowWidgetContract';
 import { TONE_DOT, ago, lastRunAt, lightOf, runPath, shownTone } from './goalWorkflowStatus';
 
 /**
- * „Letztes Ergebnis“ des Wächters (c60bf914): Ampel des letzten Laufs und wann er war, als Link auf
- * den Lauf. Der Wächter meldet immer eine Ampel; läuft er gerade oder scheiterte er, zeigt der Punkt
- * das statt einer alten Ampel.
+ * „Letztes Ergebnis“ of the guard (c60bf914): traffic light of the last run and when it was, as a link to
+ * the run. The guard always reports a traffic light; if it is running right now or failed, the dot shows
+ * that instead of an old traffic light.
  */
 export function GuardLastResult({ workflowId, entry }: { workflowId: string; entry: WorkflowWidgetEntry }) {
   const t = useT();

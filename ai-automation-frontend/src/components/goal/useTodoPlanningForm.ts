@@ -4,15 +4,15 @@ import type { Todo } from '../../types';
 import { EMPTY_PLANNING, forBackend, formOf, planningChanges, planningConflict, type PlanningForm } from './planning';
 
 /**
- * Einordnung eines TODOs im Bearbeiten-Dialog als Formularzustand des Dialogs (bbee09e6): Es gibt
- * nur noch das eine „Speichern“ – es schickt erst das TODO (PUT), danach mit `save` die geänderten
- * Felder der Einordnung (PATCH /todos/{id}/planning). Vorher verwarf „Speichern“ eine nicht
- * eigens gespeicherte Einordnung still. `todo` null = Dialog zu oder Modul „Ziele“ aus.
+ * Planning of a TODO in the edit dialog as the dialog's form state (bbee09e6): there is
+ * only the one "Speichern" - it first sends the TODO (PUT), then with `save` the changed
+ * planning fields (PATCH /todos/{id}/planning). Before, "Speichern" silently discarded a planning
+ * that was not saved separately. `todo` null = dialog closed or module "Ziele" off.
  */
 export function useTodoPlanningForm(todo: Todo | null) {
   const update = useUpdateTodoPlanning();
-  // Neu abgeleitet nur beim Wechsel des TODOs (Öffnen, anderes TODO), nicht bei jedem neuen Objekt: Der
-  // Refetch nach dem PUT hätte sonst bei gescheitertem PATCH die Eingaben verworfen (bbee09e6, Review)
+  // Re-derived only when the TODO changes (opening, another TODO), not on every new object: the
+  // refetch after the PUT would otherwise have discarded the input if the PATCH failed (bbee09e6, review)
   const [form, setForm] = useSyncedState<PlanningForm, string | null>(
     todo?.id ?? null, (id, prev) => (id && todo ? formOf(todo) : prev ?? EMPTY_PLANNING),
   );
@@ -23,8 +23,8 @@ export function useTodoPlanningForm(todo: Todo | null) {
   const loaded = goal && goal.goal.id === form.goalId ? goal : undefined;
 
   /**
-   * Speichert nur geänderte Felder (sonst gälte eine unveränderte KI-Einschätzung als menschlich);
-   * ohne Änderung kein Aufruf. Scheitert der Aufruf, weist das Promise ab – der Dialog bleibt offen.
+   * Saves only changed fields (otherwise an unchanged AI estimate would count as human);
+   * no call without changes. If the call fails, the promise rejects - the dialog stays open.
    */
   const save = async (): Promise<void> => {
     if (!todo || !dirty) return;

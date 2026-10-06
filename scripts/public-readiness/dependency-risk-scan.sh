@@ -38,11 +38,11 @@ else
   echo "backend_pom_xml: absent"
 fi
 
-# Schwachstellenpruefung (TODO 0f6d23b2): nur Zaehlungen und Paketnamen, keine
-# Rohausgabe. npm audit fuer das Frontend, OSV.dev fuer die Maven-Koordinaten
-# (dep_vuln_check.py, nur Python-Stdlib). Eine ausgefallene Pruefung zaehlt als
-# offen, nie als sauber. Fuer Tests ohne Netz: NPM_AUDIT_JSON_FILE,
-# MVN_DEPS_FILE und OSV_FIXTURE ersetzen die Werkzeugaufrufe.
+# Vulnerability check (TODO 0f6d23b2): only counts and package names, no raw
+# output. npm audit for the frontend, OSV.dev for the Maven coordinates
+# (dep_vuln_check.py, Python stdlib only). A failed check counts as open, never
+# as clean. For tests without network: NPM_AUDIT_JSON_FILE,
+# MVN_DEPS_FILE and OSV_FIXTURE replace the tool calls.
 VULN_OPEN=""
 if [ "$WITH_TOOLS" -eq 1 ]; then
   TMPD="$(mktemp -d)"; trap 'rm -rf "$TMPD"' EXIT

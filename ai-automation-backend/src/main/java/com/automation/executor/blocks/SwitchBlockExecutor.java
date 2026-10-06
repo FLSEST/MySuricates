@@ -191,8 +191,8 @@ public class SwitchBlockExecutor implements BlockExecutor {
      */
     private StepResult executeNestedBlock(BlockDefinition nestedBlock, ExecutionContext context) {
         String type = nestedBlock.getType();
-        // Auch ein fehlender/leerer Typ wird abgelehnt: sonst fiele er unten in den KI-Zweig und
-        // liefe als stiller Prompt aus config.command (89dd9e34).
+        // A missing/empty type is rejected too: otherwise it would fall into the AI branch below and
+        // run as a silent prompt from config.command (89dd9e34).
         if (!"shell".equals(type) && !"simple".equals(type)) {
             Instant now = Instant.now();
             String typeLabel = type == null || type.isBlank() ? "(kein Typ)" : type;
@@ -212,7 +212,7 @@ public class SwitchBlockExecutor implements BlockExecutor {
                 ? ((Number) nestedConfig.get("timeout_seconds")).intValue()
                 : null;
 
-        // Shell-Bloecke: Taint-Escaping wie im ShellBlockExecutor (untrusted immer, alles bei Option)
+        // Shell blocks: taint escaping as in ShellBlockExecutor (untrusted always, everything with the option)
         boolean escapeVariables = Boolean.TRUE.equals(nestedConfig.get("shell_escape_variables"));
         String command = isShell
                 ? context.resolveShellTemplate((String) nestedConfig.get("command"), escapeVariables)

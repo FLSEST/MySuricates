@@ -7,8 +7,8 @@ import { invalidatePlanning, patchGoalDetail } from './useGoalTimeline';
 import type { CreateGoalWorkPackageRequest, GoalDetail, GoalWorkPackage, UpdateGoalWorkPackageRequest } from '../types';
 
 /**
- * Arbeitspakete eines Ziels (c60bf914): je ein Projekt, TODOs darunter, optional ein Zeitraum
- * (`startDate`/`endDate`, beide oder keins) – als Balken auf dem Zeitstrahl.
+ * Work packages of a goal (c60bf914): one project each, TODOs below, optionally a period
+ * (`startDate`/`endDate`, both or neither) – as a bar on the timeline.
  */
 export function useCreateWorkPackage(goalId: string) {
   const qc = useQueryClient();
@@ -24,7 +24,7 @@ export function useCreateWorkPackage(goalId: string) {
   });
 }
 
-/** Die Änderung im gespeicherten Paket – `''` leert ein Datum, wie beim Server. */
+/** The change in the stored package – `''` clears a date, as on the server. */
 function applyToPackage(item: GoalWorkPackage, data: UpdateGoalWorkPackageRequest): GoalWorkPackage {
   return {
     ...item,
@@ -36,8 +36,8 @@ function applyToPackage(item: GoalWorkPackage, data: UpdateGoalWorkPackageReques
 }
 
 /**
- * Ändert ein Paket. Der Balken springt sofort an die neue Stelle (optimistisch); scheitert der
- * Aufruf, geht er zurück. `quiet`: ohne Erfolgsmeldung – beim Ziehen sieht man, dass es geklappt hat.
+ * Changes a package. The bar jumps immediately to the new place (optimistic); if the
+ * call fails, it goes back. `quiet`: without a success message – when dragging you can see that it worked.
  */
 export function useUpdateWorkPackage(goalId: string) {
   const qc = useQueryClient();
@@ -61,7 +61,7 @@ export function useUpdateWorkPackage(goalId: string) {
   });
 }
 
-/** Die TODOs bleiben im Ziel, nur ohne Paket; Meilensteine verlieren die Verknüpfung. */
+/** The TODOs stay in the goal, just without a package; milestones lose the link. */
 export function useDeleteWorkPackage(goalId: string) {
   const qc = useQueryClient();
   const toast = useToast();
@@ -77,8 +77,8 @@ export function useDeleteWorkPackage(goalId: string) {
 }
 
 /**
- * Neue Reihenfolge der Pakete eines Projekts (`ids`: alle Pakete genau eines Projekts). Die Antwort
- * sind alle Pakete des Ziels; sie ersetzen die im Detail gleich, der Rest lädt nach.
+ * New order of the packages of a project (`ids`: all packages of exactly one project). The answer
+ * is all packages of the goal; they replace those in the detail directly, the rest reloads.
  */
 export function useReorderWorkPackages(goalId: string) {
   const qc = useQueryClient();

@@ -22,26 +22,26 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Fidelity-Waechter fuer die Built-in-Skills (TODO 9fcb8ecf).
+ * Fidelity guard for the built-in skills (TODO 9fcb8ecf).
  *
- * <p>Serialisiert alle Built-in-Skills in eine kanonische JSON-Struktur (alle Map-Schluessel
- * rekursiv alphabetisch sortiert, damit {@code Map.of(...)} keine JVM-abhaengige Reihenfolge
- * einschleppt) und vergleicht sie byte-genau mit
+ * <p>Serializes all built-in skills into a canonical JSON structure (all map keys
+ * sorted alphabetically and recursively, so that {@code Map.of(...)} does not introduce a JVM-dependent
+ * order) and compares it byte-exactly with
  * {@code src/test/resources/skills/builtin-snapshot.json}.
  *
- * <p>Der Snapshot wurde aus den fruehreren Java-Definitionen ({@code config/BuiltIn*Skills})
- * erzeugt. Seit der Auslagerung nach {@code classpath:skills/builtin/*.json} + {@code *.md}
- * speist ihn {@link BuiltInSkillLoader} — dass der Snapshot dabei unveraendert blieb, belegt
- * die byte-genaue Prompt- und Metadaten-Fidelitaet.
+ * <p>The snapshot was generated from the earlier Java definitions ({@code config/BuiltIn*Skills}).
+ * Since the move to {@code classpath:skills/builtin/*.json} + {@code *.md}
+ * {@link BuiltInSkillLoader} feeds it — that the snapshot stayed unchanged proves
+ * the byte-exact prompt and metadata fidelity.
  *
- * <p>Snapshot bewusst neu schreiben (nur bei einer gewollten inhaltlichen Aenderung):
+ * <p>Deliberately rewrite the snapshot (only for an intended change of content):
  * {@code ./mvnw test -Dtest=BuiltInSkillsSnapshotTest -Dskills.snapshot.write=true}
  */
 class BuiltInSkillsSnapshotTest {
 
     private static final String SNAPSHOT_RELATIVE = "src/test/resources/skills/builtin-snapshot.json";
 
-    /** Einzige Quelle der Skills — bei einem Umbau nur hier umstellen. */
+    /** Single source of the skills — when restructuring, switch only here. */
     private static String canonicalJson() {
         BuiltInSkillLoader loader = new BuiltInSkillLoader(new ObjectMapper());
         return canonicalJson(loader.loadAll(), loader.loadAllDefinitions());
@@ -79,13 +79,13 @@ class BuiltInSkillsSnapshotTest {
         assertThat(canonicalJson()).isEqualTo(canonicalJson());
     }
 
-    // ── Kanonische Serialisierung ─────────────────────────────
+    // ── Canonical serialization ─────────────────────────────
 
     /**
-     * {@code skills} und {@code definitions} kommen beide nach {@code sortOrder} sortiert aus
-     * demselben Loader-Lauf. Der Snapshot haelt den <em>deklarierten</em> {@code sortOrder} aus
-     * der JSON fest (nicht die Listenposition), damit auch eine Verschiebung aller Werte —
-     * etwa 1..19 → 10..28 — als Abweichung auffaellt.
+     * {@code skills} and {@code definitions} both come sorted by {@code sortOrder} from
+     * the same loader run. The snapshot pins the <em>declared</em> {@code sortOrder} from
+     * the JSON (not the list position), so that a shift of all values —
+     * e.g. 1..19 → 10..28 — also stands out as a deviation.
      */
     static String canonicalJson(List<Skill> skills, List<BuiltInSkillDefinition> definitions) {
         if (skills.size() != definitions.size()) {

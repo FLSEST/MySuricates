@@ -36,12 +36,12 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/** {@link AuditSnapshotApplier} direkt: was aus einem Report gespeichert wird und woran ein Befund haengt. */
+/** {@link AuditSnapshotApplier} directly: what is stored from a report and what a finding hangs on. */
 @ExtendWith(MockitoExtension.class)
 class AuditSnapshotApplierTest {
 
     private static final String PROJECT = "proj-1";
-    /** Ohne Katalogeintrag: jeder ruleKey wird genommen, wie er kommt. */
+    /** Without a catalog entry: every ruleKey is taken as it comes. */
     private static final String AUDIT_KEY = "test.audit-ohne-katalog";
     private static final Instant NOW = Instant.parse("2026-09-25T10:00:00Z");
 
@@ -70,7 +70,7 @@ class AuditSnapshotApplierTest {
         });
     }
 
-    /** Alle Findings, die {@code saveAll} bekam, in Aufrufreihenfolge. */
+    /** All findings that {@code saveAll} received, in call order. */
     @SuppressWarnings("unchecked")
     private List<AuditFinding> savedFindings() {
         ArgumentCaptor<Iterable<AuditFinding>> captor = ArgumentCaptor.forClass(Iterable.class);
@@ -80,7 +80,7 @@ class AuditSnapshotApplierTest {
         return all;
     }
 
-    /** Alle Vorkommen, die {@code saveAll} bekam. */
+    /** All occurrences that {@code saveAll} received. */
     @SuppressWarnings("unchecked")
     private List<AuditFindingOccurrence> savedOccurrences() {
         ArgumentCaptor<Iterable<AuditFindingOccurrence>> captor = ArgumentCaptor.forClass(Iterable.class);
@@ -102,9 +102,9 @@ class AuditSnapshotApplierTest {
         applier.apply(event, report, List.of(findings), Set.of());
     }
 
-    // --- TODO 90c4f7db: was audit_findings mit ¦ zeigt, wird mit | gespeichert -------------------
+    // --- TODO 90c4f7db: what audit_findings shows with ¦ is stored with | -------------------
 
-    /** Ein Prompt fuehrt den Befund so weiter, wie der Block ihn zeigt – das Audit Center zeigt ihn wie zuvor. */
+    /** A prompt carries the finding on the way the block shows it – the Audit Center shows it as before. */
     @Test
     void apply_echoedMaskedFields_areStoredWithThePipe_onTheSameFinding() {
         AuditFinding existing = AuditFinding.builder().id("f-1").projectId(PROJECT).auditKey(AUDIT_KEY)
@@ -123,11 +123,11 @@ class AuditSnapshotApplierTest {
                 .extracting(AuditFindingOccurrence::getTitle).isEqualTo("curl | sh im Installer");
     }
 
-    // --- Fingerprint mit festen Werten: ohne ¦ wie vor 90c4f7db --------------------------------
+    // --- Fingerprint with fixed values: without ¦ as before 90c4f7db --------------------------------
     //
-    // Die Werte sind unabhaengig berechnet: SHA-256 ueber "projectId\nauditKey\nruleKey\nsubject" (subject hier ohne
-    // Normalisierungsbedarf). Aendert ein Umbau die Identitaet eines Befunds ohne ¦, wird jeder gespeicherte Befund
-    // beim naechsten Report zum Wiedergaenger – das soll hier rot werden, nicht erst im Audit Center.
+    // The values are computed independently: SHA-256 over "projectId\nauditKey\nruleKey\nsubject" (subject here without
+    // need for normalization). If a refactoring changes the identity of a finding without ¦, every stored finding
+    // becomes a recurrence at the next report – that should turn red here, not only in the Audit Center.
 
     @Test
     void fingerprint_ofAFindingWithoutTheMaskedSeparator_isPinned() {
@@ -157,7 +157,7 @@ class AuditSnapshotApplierTest {
                 .isEqualTo(AuditSnapshotApplier.fingerprint(PROJECT, AUDIT_KEY, "shell.pipe|curl", "b|c"));
     }
 
-    // --- TODO 3deaee34: Bestand einmal laden, gesammelt speichern ---------------------------------
+    // --- TODO 3deaee34: load existing data once, save in bulk ---------------------------------
 
     private AuditFinding known(String id, String ruleKey, String subject, AuditFindingStatus status) {
         return AuditFinding.builder().id(id).projectId(PROJECT).auditKey(AUDIT_KEY)
@@ -171,9 +171,9 @@ class AuditSnapshotApplierTest {
     }
 
     /**
-     * Drei Befunde: einer bekannt, zwei neu, ein bekannter fehlt. Der Bestand kommt aus einer Abfrage, die
-     * Vorkommen des Reports aus einer, gespeichert wird je Art einmal — vorher je Befund eine Suche, ein
-     * exists und zwei save.
+     * Three findings: one known, two new, one known missing. The existing data comes from one query, the
+     * occurrences of the report from one, and saving happens once per kind — before, per finding a search, an
+     * exists and two saves.
      */
     @Test
     void apply_loadsTheStockOnce_andSavesFindingsAndOccurrencesInBatches() {
@@ -205,7 +205,7 @@ class AuditSnapshotApplierTest {
         verify(managedTodoWriter).reconcile(argThat(touched -> touched.size() == 4));
     }
 
-    /** Ein Vorkommen je Finding und Report: was der Report schon hat, wird nicht noch einmal angelegt. */
+    /** One occurrence per finding and report: what the report already has is not created again. */
     @Test
     void apply_skipsAnOccurrenceTheReportAlreadyHas() {
         AuditFinding seen = known("f-seen", "rule.a", "A.java", AuditFindingStatus.OPEN);
@@ -217,7 +217,7 @@ class AuditSnapshotApplierTest {
         assertThat(savedOccurrences()).extracting(AuditFindingOccurrence::getFindingId).containsExactly("f-new");
     }
 
-    /** Ein leerer Snapshot speichert keine Findings, loest aber den Bestand auf. */
+    /** An empty snapshot stores no findings, but resolves the existing data. */
     @Test
     void apply_emptySnapshot_onlyResolvesTheStock() {
         AuditFinding gone = known("f-gone", "rule.a", "Gone.java", AuditFindingStatus.AWAITING_VERIFICATION);
@@ -231,11 +231,11 @@ class AuditSnapshotApplierTest {
         verify(occurrenceRepository, never()).findFindingIdsByReportId(any());
     }
 
-    // --- TODO 802f740a: festes subject je ruleKey aus dem Katalog ---------------------------------
+    // --- TODO 802f740a: fixed subject per ruleKey from the catalog ---------------------------------
 
     private static final String PUBLIC_READINESS = "project.public-readiness";
 
-    /** Das Modell weicht vom vorgegebenen subject ab — gespeichert und identifiziert wird der feste Wert. */
+    /** The model deviates from the prescribed subject — the fixed value is stored and identified. */
     @Test
     void apply_aDriftedSubjectOfARuleWithAFixedSubject_isReplacedByTheCatalogValue() {
         AuditFinding existing = AuditFinding.builder().id("f-keywords").projectId(PROJECT).auditKey(PUBLIC_READINESS)
@@ -255,8 +255,8 @@ class AuditSnapshotApplierTest {
     }
 
     /**
-     * Wer sich an den Prompt hielt, behaelt seine Identitaet: der Fingerprint des vorgegebenen subjects ist
-     * derselbe wie vor dem Durchsetzen (hier fest gepinnt).
+     * Whoever stuck to the prompt keeps their identity: the fingerprint of the prescribed subject is
+     * the same as before the enforcement (pinned here).
      */
     @Test
     void apply_aPromptCompliantSubject_keepsItsFingerprint() {
@@ -269,7 +269,7 @@ class AuditSnapshotApplierTest {
                 "public.docs.missing-license", "LICENSE"));
     }
 
-    /** Dateibezogene Regeln haben keinen festen Wert: dort bleibt das subject des Modells. */
+    /** File-related rules have no fixed value: there the model's subject stays. */
     @Test
     void apply_aPathRule_keepsTheSubjectOfTheModel() {
         applyTo(PUBLIC_READINESS, new ParsedFinding("public.privacy.private-terms", "docs/notes.md", AuditSeverity.LOW,
@@ -278,7 +278,7 @@ class AuditSnapshotApplierTest {
         assertThat(savedFindings().getFirst().getSubject()).isEqualTo("docs/notes.md");
     }
 
-    /** Zwei abweichende subjects derselben festen Regel sind ein Befund; gemeldet wird, was das Modell schickte. */
+    /** Two deviating subjects of the same fixed rule are one finding; what the model sent is reported. */
     @Test
     void apply_twoSubjectsOfAFixedRule_collapseIntoOneFinding_andTheRawSubjectIsReported() {
         applyTo(PUBLIC_READINESS,
@@ -290,7 +290,7 @@ class AuditSnapshotApplierTest {
                 any(), any());
     }
 
-    /** 87a1dac0: ActivityLog gibt es als Java-Klasse und als Frontend-Seite — zwei Befunde, keine Kollision. */
+    /** 87a1dac0: ActivityLog exists as a Java class and as a frontend page — two findings, no collision. */
     @Test
     void apply_backendClassAndFrontendModuleOfTheSameName_areTwoFindings() {
         apply(low("rule.a", "com/automation/entity/ActivityLog.java"), low("rule.a", "frontend/src/pages/ActivityLog.tsx"));

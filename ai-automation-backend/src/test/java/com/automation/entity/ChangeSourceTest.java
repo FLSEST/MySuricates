@@ -29,7 +29,7 @@ class ChangeSourceTest {
 
     @Test
     void keys_neverCollideWithLegacyValues() {
-        // Aeltere Zeilen tragen noch "ai" bzw. "api" aus der Zeit vor dem Enum.
+        // Older rows still carry "ai" or "api" from the time before the enum.
         assertThat(Arrays.stream(ChangeSource.values()).map(ChangeSource::key)).doesNotContain("ai", "api");
     }
 }

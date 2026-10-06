@@ -84,25 +84,25 @@ export function useExecutionWebSocket(runId: string | null, workflowId?: string,
       appendEntries(entries);
     };
 
-    // Der API-Key darf nicht in die Handshake-URL (Browser-History, Proxy-Logs): stompjs wartet
-    // vor JEDEM Verbindungsversuch — auch vor jedem Reconnect — auf beforeConnect, dort holen wir
-    // ein frisches Einmal-Ticket. Schlägt das fehl, geht der Handshake ohne Ticket raus, wird
-    // abgelehnt und stompjs plant den nächsten Versuch (statt einer offenen Promise-Ablehnung).
+    // The API key must not go into the handshake URL (browser history, proxy logs): stompjs waits
+    // before EVERY connection attempt — also before every reconnect — for beforeConnect, there we fetch
+    // a fresh one-time ticket. If that fails, the handshake goes out without a ticket, is
+    // rejected and stompjs schedules the next attempt (instead of an open promise rejection).
     let wsTicket = '';
 
     const client = new Client({
       beforeConnect: async () => {
         wsTicket = await api.fetchWsTicket().catch(() => '');
       },
-      // Nur der WebSocket-Transport: SockJS legt für jeden Fallback-Versuch (xhr-streaming …) eine
-      // neue Session an und bräuchte dafür ein zweites Ticket — das erste ist da schon verbraucht.
-      // Die Instanz muss also einen WebSocket-fähigen Pfad haben; es gibt keinen SockJS-Fallback.
+      // WebSocket transport only: SockJS opens a new session for every fallback attempt (xhr-streaming …)
+      // and would need a second ticket for it — the first one is already used up by then.
+      // So the instance must have a WebSocket-capable path; there is no SockJS fallback.
       webSocketFactory: () =>
         new SockJS(`${window.location.origin}/ws?ticket=${encodeURIComponent(wsTicket)}`, null, {
           transports: ['websocket'],
         }),
       reconnectDelay: 5000,
-      // Jeder Versuch kostet einen POST /ws-ticket — bei totem Backend nicht ewig im 5s-Takt klopfen
+      // Every attempt costs a POST /ws-ticket — with a dead backend, don't keep knocking every 5s forever
       reconnectTimeMode: ReconnectionTimeMode.EXPONENTIAL,
       maxReconnectDelay: 60_000,
       onConnect: () => {

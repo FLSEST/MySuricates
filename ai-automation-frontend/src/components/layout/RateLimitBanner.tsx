@@ -4,9 +4,9 @@ import { useRateLimitBackoffUntil } from '../../hooks/useRateLimitBackoff';
 import { formatTimeOfDay } from '../../utils/localeFormat';
 
 /**
- * Unaufdringliche Statuszeile, solange ein 429-Backoff läuft (c168293d). `errors.rateLimited`
- * erscheint sonst nur in `onError`-Toasts — Seiten, die Queries ohne Toast rendern, zeigten im
- * Sperrfenster nur leere Zustände, ohne Hinweis worauf man wartet.
+ * Unobtrusive status line while a 429 backoff is running (c168293d). `errors.rateLimited`
+ * otherwise appears only in `onError` toasts - pages that render queries without a toast showed, during the
+ * lockout window, only empty states, with no hint what they are waiting for.
  */
 export function RateLimitBanner() {
   const t = useT();
@@ -15,7 +15,7 @@ export function RateLimitBanner() {
 
   if (until <= 0) return null;
 
-  // Uhrzeit-Format der App-Sprache, nicht der Browser-Locale.
+  // Time format of the app language, not of the browser locale.
   const time = formatTimeOfDay(until, locale);
 
   return (

@@ -281,9 +281,9 @@ export function useResumeFromStep() {
 }
 
 /**
- * Löscht einen Lauf endgültig — samt Schritten und Dead-Letter-Einträgen.
- * Referenzierende TODOs bleiben erhalten, sie verlieren nur den Verweis.
- * Das Backend antwortet mit 409, solange der Lauf noch aktiv ist.
+ * Deletes a run permanently — including steps and dead-letter entries.
+ * Referencing TODOs are kept, they only lose the reference.
+ * The backend answers with 409 while the run is still active.
  */
 export function useDeleteRun() {
   const qc = useQueryClient();

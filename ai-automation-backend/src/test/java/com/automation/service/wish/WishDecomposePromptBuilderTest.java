@@ -181,8 +181,8 @@ class WishDecomposePromptBuilderTest {
         }
 
         /**
-         * 5fb7b1e9: die aktiven Memories aller Projekt-Workflows kommen aus einer Abfrage, nicht aus
-         * einer je Workflow — und stehen trotzdem in der Workflow-Reihenfolge im Prompt.
+         * 5fb7b1e9: the active memories of all project workflows come from one query, not from
+         * one per workflow — and still appear in the prompt in workflow order.
          */
         @Test
         void projectMemories_comeFromOneBatchedQuery_inWorkflowOrder() {
@@ -203,7 +203,7 @@ class WishDecomposePromptBuilderTest {
                 workflows.add(wf);
             }
             when(workflowRepository.findByProjectId("proj-1")).thenReturn(workflows);
-            // Die Datenbank liefert in beliebiger Reihenfolge — hier bewusst umgekehrt.
+            // The database returns in arbitrary order — deliberately reversed here.
             when(memoryRepository.findByWorkflowIdInAndActiveTrue(List.of("wf-1", "wf-2", "wf-3"))).thenReturn(List.of(
                     WorkflowMemory.builder().workflowId("wf-3").title("Third").content("C").active(true).build(),
                     WorkflowMemory.builder().workflowId("wf-1").title("First").content("A").active(true).build()));
@@ -214,12 +214,12 @@ class WishDecomposePromptBuilderTest {
             assertThat(result.indexOf("### First")).isPositive().isLessThan(result.indexOf("### Third"));
             verify(memoryRepository, times(1)).findByWorkflowIdInAndActiveTrue(anyCollection());
             verify(memoryRepository, never()).findByWorkflowIdAndActiveTrue(anyString());
-            // Memories, Projektliste und Execution Intelligence teilen sich eine Abfrage
-            // (5fb7b1e9, 73036bbd: buildExecutionIntelligence lud sie ein zweites Mal).
+            // Memories, project list and execution intelligence share one query
+            // (5fb7b1e9, 73036bbd: buildExecutionIntelligence used to load them a second time).
             verify(workflowRepository, times(1)).findByProjectId("proj-1");
         }
 
-        /** Ohne Workflows im Projekt wird nach Memories gar nicht gefragt (kein {@code IN ()}). */
+        /** Without workflows in the project, memories are not queried at all (no {@code IN ()}). */
         @Test
         void projectWithoutWorkflows_queriesNoMemories() {
             stubDefaults();
@@ -257,8 +257,8 @@ class WishDecomposePromptBuilderTest {
         }
 
         /**
-         * 51ee8709: alle Referenz-Workflows aus einer Abfrage, in der Reihenfolge der Auswahl;
-         * eine unbekannte ID fällt wie vorher stillschweigend weg.
+         * 51ee8709: all reference workflows from one query, in selection order;
+         * an unknown ID is silently dropped as before.
          */
         @Test
         void referenceWorkflows_comeFromOneQuery_inSelectionOrder() {
@@ -283,7 +283,7 @@ class WishDecomposePromptBuilderTest {
             verify(workflowRepository, never()).findById(anyString());
         }
 
-        /** 73036bbd: die Execution Intelligence bekommt die schon gelesenen Projekt-Workflows. */
+        /** 73036bbd: the Execution Intelligence gets the project workflows already read. */
         @Test
         void executionIntelligence_usesTheProjectWorkflowsReadOnce() {
             stubDefaults();

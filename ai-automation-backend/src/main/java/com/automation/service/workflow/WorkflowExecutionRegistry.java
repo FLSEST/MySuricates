@@ -187,10 +187,10 @@ public class WorkflowExecutionRegistry {
     }
 
     /**
-     * Beantwortet die offene Frage eines Laufs. Ein Approval nimmt nur eine seiner Optionen an
-     * ({@link ApprovalRequest#acceptedAnswer}); ohne offene Frage bleibt der Aufruf wirkungslos.
+     * Answers the open question of a run. An approval only accepts one of its options
+     * ({@link ApprovalRequest#acceptedAnswer}); without an open question the call has no effect.
      *
-     * @throws IllegalArgumentException wenn das offene Approval die Antwort nicht anbietet
+     * @throws IllegalArgumentException if the open approval does not offer the answer
      */
     public void resolveApproval(String runId, String answer) {
         ExecutionContext context = activeExecutions.get(runId);
@@ -208,7 +208,7 @@ public class WorkflowExecutionRegistry {
                 .count();
     }
 
-    /** Alle Läufe, die gerade auf eine Antwort warten (Approval oder Human-Input), die ältesten zuerst. */
+    /** All runs currently waiting for an answer (approval or human input), oldest first. */
     public List<PendingInput> listPendingInputs() {
         return activeExecutions.entrySet().stream()
                 .map(e -> {
@@ -220,7 +220,7 @@ public class WorkflowExecutionRegistry {
                 .toList();
     }
 
-    /** Ein wartender Lauf und die Frage, auf die er wartet. */
+    /** A waiting run and the question it is waiting for. */
     public record PendingInput(String runId, ApprovalRequest request) {}
 
     public ApprovalRequest getPendingApproval(String runId) {

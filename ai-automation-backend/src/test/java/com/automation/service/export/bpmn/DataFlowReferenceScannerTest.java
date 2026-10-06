@@ -10,9 +10,9 @@ import static com.automation.service.export.bpmn.WorkflowFixtures.block;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Platzhalter-Scan: welche Block-Ausgabe fließt in welchen Block. Deterministisch, ohne Run —
- * die vier Formen {@code block.x.output}, {@code previous_output}, {@code step_N_output} und
- * die {@code source}-Angabe der Komprimierungs-Blöcke.
+ * Placeholder scan: which block output flows into which block. Deterministic, without a run —
+ * the four forms {@code block.x.output}, {@code previous_output}, {@code step_N_output} and
+ * the {@code source} specification of the compression blocks.
  */
 class DataFlowReferenceScannerTest {
 
@@ -52,7 +52,7 @@ class DataFlowReferenceScannerTest {
 
     @Test
     void stepIndexIstNullBasiertWieDerStepIndexCounter() {
-        // ExecutionContext setzt step_<StepResult.stepIndex>_output, und StepIndexCounter zählt ab 0.
+        // ExecutionContext sets step_<StepResult.stepIndex>_output, and StepIndexCounter counts from 0.
         assertThat(scan(
                 block("shell", "a", Map.of("command", "x")),
                 block("shell", "b", Map.of("command", "y")),
@@ -69,15 +69,15 @@ class DataFlowReferenceScannerTest {
     }
 
     /**
-     * Wrapper-Blöcke ziehen zur Laufzeit je Item/Iteration einen weiteren Step-Index
-     * ({@code StepIndexCounter}), also stimmt die Zuordnung Step-Index → Blocklisten-Index
-     * dahinter nicht mehr. Lieber keine Kante als eine falsche.
+     * Wrapper blocks draw a further step index per item/iteration at runtime
+     * ({@code StepIndexCounter}), so the mapping step index → block list index
+     * behind it is no longer correct. Better no edge than a wrong one.
      */
     @Test
     void stepIndexHinterEinemWrapperBlockWirdVerworfen() {
         for (String wrapper : List.of("foreach", "while", "retry")) {
-            // Der Wrapper steht VOR dem referenzierten Block: zur Laufzeit ist step_1 die erste
-            // Iteration des Wrappers, nicht der Block an Listenposition 1.
+            // The wrapper comes BEFORE the referenced block: at runtime step_1 is the first
+            // iteration of the wrapper, not the block at list position 1.
             assertThat(scan(
                     block(wrapper, "schleife", Map.of("command", "x", "variable_name", "i")),
                     block("shell", "a", Map.of("command", "ls")),
@@ -87,7 +87,7 @@ class DataFlowReferenceScannerTest {
         }
     }
 
-    /** Ein Wrapper ZWISCHEN Quelle und Verbraucher verschiebt den Index der Quelle nicht. */
+    /** A wrapper BETWEEN source and consumer does not shift the source's index. */
     @Test
     void wrapperZwischenQuelleUndVerbraucherLaesstDieKanteBestehen() {
         assertThat(scan(
@@ -105,7 +105,7 @@ class DataFlowReferenceScannerTest {
                 .isEmpty();
     }
 
-    /** Ein Wrapper HINTER der Referenz verschiebt nichts — die Kante bleibt. */
+    /** A wrapper BEHIND the reference shifts nothing — the edge stays. */
     @Test
     void wrapperNachDerReferenzLaesstDieKanteBestehen() {
         assertThat(scan(
@@ -116,9 +116,9 @@ class DataFlowReferenceScannerTest {
     }
 
     /**
-     * Positionsbezogene Platzhalter meinen die Ebene, auf der sie stehen. In einem
-     * verschachtelten Block (Switch-Case) ist das nicht die Top-Level-Blockliste — dort wird
-     * nur der flache Namensraum {@code block.<name>.output} ausgewertet.
+     * Position-based placeholders mean the level they stand on. In a
+     * nested block (switch case) that is not the top-level block list — there only
+     * the flat namespace {@code block.<name>.output} is evaluated.
      */
     @Test
     void previousOutputInVerschachteltemBlockWirdVerworfen() {
@@ -145,12 +145,12 @@ class DataFlowReferenceScannerTest {
 
     @Test
     void previousOutputAlsDirekterConfigWertBleibtEineTopLevelReferenz() {
-        // then_command/else_command sind eigene Config-Werte des conditional-Blocks, keine
-        // verschachtelte Blockliste — previous_output meint dort den Block davor. Genau das haelt
-        // dieser Test fest: die QUELLE bleibt der Top-Level-Block 0.
+        // then_command/else_command are own config values of the conditional block, not a
+        // nested block list — previous_output there means the block before it. This is exactly what
+        // this test records: the SOURCE stays the top-level block 0.
         //
-        // Das ZIEL ist seit TODO 7557b928 der Zweig-Task (_then), nicht mehr der conditional-Block
-        // selbst: Am Gateway erlaubt BPMN keine Datenassoziation, dort fiel die Kante weg.
+        // Since TODO 7557b928 the TARGET is the branch task (_then), no longer the conditional block
+        // itself: BPMN allows no data association on the gateway, the edge was dropped there.
         assertThat(scan(
                 block("shell", "tests", Map.of("command", "mvn test")),
                 block("conditional", "pruefung", Map.of(
@@ -180,8 +180,8 @@ class DataFlowReferenceScannerTest {
     }
 
     /**
-     * 7557b928: ein Platzhalter in einem Switch-Case zeigt auf den Zweig-Block, nicht auf den
-     * Switch selbst — der ist ein Gateway und trägt im BPMN keine Datenassoziation.
+     * 7557b928: a placeholder in a switch case points to the branch block, not to the
+     * switch itself — that is a gateway and carries no data association in BPMN.
      */
     @Test
     void platzhalterInVerschachteltenBloeckenZeigenAufDenZweigBlock() {
@@ -211,7 +211,7 @@ class DataFlowReferenceScannerTest {
                         new DataFlowReferenceScanner.Endpoint(1, "_default_0")));
     }
 
-    /** Ein benannter Case-Block ist zur Laufzeit als {@code block.<name>.output} ansprechbar (12a3b244). */
+    /** A named case block is addressable at runtime as {@code block.<name>.output} (12a3b244). */
     @Test
     void benannterCaseBlockIstQuelleFuerSpaetereBloecke() {
         assertThat(scan(
@@ -225,7 +225,7 @@ class DataFlowReferenceScannerTest {
                         DataFlowReferenceScanner.Endpoint.topLevel(1)));
     }
 
-    /** Auch tiefer verschachtelt bleibt der Pfad eindeutig (Switch im Switch). */
+    /** Even nested deeper the path stays unambiguous (switch in switch). */
     @Test
     void zweifachVerschachtelterCaseBlockBehaeltSeinenPfad() {
         assertThat(scan(
@@ -243,7 +243,7 @@ class DataFlowReferenceScannerTest {
                         new DataFlowReferenceScanner.Endpoint(1, "_c0_0_c0_0")));
     }
 
-    /** Innerhalb desselben Switch-Blocks entsteht keine Kante: zur Laufzeit läuft nur ein Zweig. */
+    /** Within the same switch block no edge arises: at runtime only one branch runs. */
     @Test
     void referenzZwischenZweiCaseBloeckenDesselbenSwitchWirdVerworfen() {
         assertThat(scan(
@@ -270,7 +270,7 @@ class DataFlowReferenceScannerTest {
                 .isEmpty();
     }
 
-    /** Die Ebenen-Semantik bleibt: {@code source: "previous"} im Zweig meint die innere Ebene. */
+    /** The level semantics remain: {@code source: "previous"} in the branch means the inner level. */
     @Test
     void komprimierungsQuellePreviousInEinemZweigWirdVerworfen() {
         assertThat(scan(
@@ -282,7 +282,7 @@ class DataFlowReferenceScannerTest {
                 .isEmpty();
     }
 
-    /** …aber ein Blockname als {@code source} im Zweig zeigt auf den Zweig-Block. */
+    /** … but a block name as {@code source} in the branch points to the branch block. */
     @Test
     void komprimierungsQuelleMitBlocknamenInEinemZweigWirdErkannt() {
         assertThat(scan(

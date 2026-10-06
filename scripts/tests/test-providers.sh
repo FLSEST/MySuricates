@@ -7,15 +7,15 @@ TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 PASS=0; FAIL=0
 check() { if eval "$2"; then echo "  ok   $1"; PASS=$((PASS + 1)); else echo "  FAIL $1"; FAIL=$((FAIL + 1)); fi; }
 mkdir -p "$TMP/home" "$TMP/bin" "$TMP/tools"
-# Eigener PATH ohne echte KI-CLIs: nur die Werkzeuge, die providers.sh braucht (auf dem Host liegen
-# codex/pi evtl. in /usr/bin und wuerden "present" vortaeuschen).
+# Own PATH without real AI CLIs: only the tools providers.sh needs (on the host
+# codex/pi may lie in /usr/bin and would feign "present").
 for t in dirname tr grep cat; do ln -s "$(command -v "$t")" "$TMP/tools/$t"; done
-# Anmelde-Variablen des Hosts (z. B. ANTHROPIC_API_KEY) duerfen die Tests nicht beeinflussen.
+# Login variables of the host (e.g. ANTHROPIC_API_KEY) must not influence the tests.
 run() { ( HOME="$TMP/home" PATH="$TMP/bin:$TMP/tools"; export HOME PATH; . "$HERE/../lib/providers.sh"
   for _id in "${PROVIDER_IDS[@]}"; do for _v in $(provider_get "$_id" login_env); do unset "$_v"; done; done
   eval "$1" ); }
-# grep ohne -q: -q beendet sich beim ersten Treffer, der Schreiber bekommt SIGPIPE, und
-# pipefail wertet die Pipeline dann als Fehler.
+# grep without -q: -q exits at the first hit, the writer gets SIGPIPE, and
+# pipefail then counts the pipeline as an error.
 has() { run "providers_status" | grep -x -- "$1" >/dev/null; }
 
 echo "1) catalog"

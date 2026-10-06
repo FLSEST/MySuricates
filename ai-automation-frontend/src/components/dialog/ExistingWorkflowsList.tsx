@@ -5,7 +5,7 @@ import type { Workflow } from '../../types';
 
 const MAX_VISIBLE = 5;
 
-/** Panel 3 der Session-Übernahme: die ersten Workflows des gewählten Projekts, Rest als Zahl. */
+/** Panel 3 of the session takeover: the first workflows of the chosen project, the rest as a count. */
 export function ExistingWorkflowsList({ workflows }: { workflows: Workflow[] }) {
   const t = useT();
   const navigate = useNavigate();

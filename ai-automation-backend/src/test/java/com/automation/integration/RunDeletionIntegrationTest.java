@@ -24,14 +24,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Beweist gegen echtes SQLite, dass ein geloeschter Run nichts zurueck laesst —
- * und nichts Fremdes mitreisst.
+ * Proves against real SQLite that a deleted run leaves nothing behind —
+ * and does not drag anything foreign along.
  *
- * <p>Die losen Verweise ({@code dead_letter_entries.workflow_run_id},
+ * <p>The loose references ({@code dead_letter_entries.workflow_run_id},
  * {@code todos.workflow_run_id}, {@code todos.last_fix_run_id},
- * {@code wishes.current_run_id}) haben keinen Fremdschluessel. Ohne
- * {@link RunDeletionService} bleiben sie als tote Zeiger stehen; ein
- * DLQ-Eintrag wuerde dann einen Retry-Knopf anbieten, der nichts mehr tut.
+ * {@code wishes.current_run_id}) have no foreign key. Without
+ * {@link RunDeletionService} they remain as dead pointers; a
+ * DLQ entry would then offer a retry button that does nothing anymore.
  */
 @SpringBootTest
 @ActiveProfiles("integration")
@@ -72,13 +72,13 @@ class RunDeletionIntegrationTest {
         return run;
     }
 
-    /** Zwingt Hibernate, das SQL wirklich abzusetzen — sonst prueft der Test nur den Cache. */
+    /** Forces Hibernate to actually issue the SQL — otherwise the test only checks the cache. */
     private void flush() {
         entityManager.flush();
         entityManager.clear();
     }
 
-    // ── der Kern: nichts bleibt zurueck ────────────────────────────────────────
+    // ── the core: nothing stays behind ────────────────────────────────────────
 
     @Test
     void delete_entferntRunUndSeineSchritte() {
@@ -125,7 +125,7 @@ class RunDeletionIntegrationTest {
         assertThat(deadLetterRepository.findById(fremd.getId())).isPresent();
     }
 
-    // ── fremde Daten werden entkoppelt, nicht geloescht ───────────────────────
+    // ── foreign data is decoupled, not deleted ───────────────────────
 
     @Test
     void delete_nulltDenTodoVerweisAberBehaeltDasTodo() {
@@ -175,7 +175,7 @@ class RunDeletionIntegrationTest {
         assertThat(wishRepository.findById(wish.getId()).orElseThrow().getCurrentRunId()).isNull();
     }
 
-    // ── Waechter ──────────────────────────────────────────────────────────────
+    // ── Guard ──────────────────────────────────────────────────────────────
 
     @Test
     void delete_verweigertLaufendeRuns() {

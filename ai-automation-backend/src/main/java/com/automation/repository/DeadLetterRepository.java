@@ -13,14 +13,14 @@ public interface DeadLetterRepository extends JpaRepository<DeadLetterEntry, Str
     Page<DeadLetterEntry> findAllByOrderByLastFailureAtDesc(Pageable pageable);
 
     /**
-     * Raeumt die Eintraege eines geloeschten Runs weg.
+     * Removes the entries of a deleted run.
      *
-     * <p>{@code workflow_run_id} ist nur eine Textspalte ohne Fremdschluessel.
-     * Bliebe der Eintrag stehen, wuerde sein Retry-Knopf zur Attrappe:
-     * {@code DeadLetterController.retry} findet den Originallauf nicht mehr,
-     * markiert den Eintrag aber trotzdem als RETRIED.
+     * <p>{@code workflow_run_id} is only a text column without a foreign key.
+     * If the entry stayed, its retry button would become a dummy:
+     * {@code DeadLetterController.retry} no longer finds the original run,
+     * but still marks the entry as RETRIED.
      *
-     * @return Anzahl geloeschter Eintraege
+     * @return number of deleted entries
      */
     @Modifying
     int deleteByWorkflowRunId(String workflowRunId);

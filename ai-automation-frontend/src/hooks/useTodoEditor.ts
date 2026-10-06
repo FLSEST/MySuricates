@@ -8,9 +8,9 @@ import type { useTodoFilters } from './useTodoFilters';
 import type { Todo, UpdateTodoRequest } from '../types';
 
 /**
- * Nach dem PUT des TODO-Dialogs (mit `useUpdateTodo({ quietSuccess: true })`): `afterSave` (die Einordnung)
- * abwarten, dann „TODO aktualisiert“ melden und schließen. Scheitert es, sagt ein Fehler-Toast, dass das TODO
- * gespeichert ist, die Einordnung nicht; der Dialog bleibt offen, ein erneutes „Speichern“ holt es nach (bbee09e6).
+ * After the PUT of the TODO dialog (with `useUpdateTodo({ quietSuccess: true })`): wait for `afterSave` (the planning),
+ * then report "TODO aktualisiert" and close. If it fails, an error toast says that the TODO is
+ * saved, the planning is not; the dialog stays open, another "Speichern" catches up (bbee09e6).
  */
 export function useCloseAfterSave() {
   const toast = useToast();
@@ -29,10 +29,10 @@ export function useCloseAfterSave() {
 type TodoFilters = ReturnType<typeof useTodoFilters>;
 
 /**
- * Bearbeiten-Dialog der TODO-Seite samt Deep-Link `?todoId=`: Das verlinkte TODO wird per ID
- * geladen (unabhängig von Filtern und Seite) und einmal geöffnet; Filter, die es verbergen
- * würden, werden gelockert. Seine Zeile bleibt hervorgehoben, bis kurz nach dem Schließen, und
- * wird dann in den sichtbaren Bereich geholt. Dazu Speichern und Export in einen Tracker.
+ * Edit dialog of the TODO page including deep link `?todoId=`: the linked TODO is loaded
+ * by ID (independent of filters and page) and opened once; filters that would hide it
+ * are relaxed. Its row stays highlighted until shortly after closing, and
+ * is then scrolled into view. Plus saving and export to a tracker.
  */
 export function useTodoEditor(filters: Pick<TodoFilters,
   'searchParams' | 'statusFilter' | 'setStatusFilter' | 'tagFilter' | 'setTagFilter' | 'setProjectFilter'>) {
@@ -98,7 +98,7 @@ export function useTodoEditor(filters: Pick<TodoFilters,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [linkedTodo]);
 
-  /** PUT, dann `afterSave` (die Einordnung, bbee09e6); schließt erst, wenn beides gespeichert ist. */
+  /** PUT, then `afterSave` (the planning, bbee09e6); closes only when both are saved. */
   const save = (afterSave?: () => Promise<void>) => {
     if (!editTodo) return;
     const data: UpdateTodoRequest = {

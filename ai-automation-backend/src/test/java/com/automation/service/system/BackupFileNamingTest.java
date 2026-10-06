@@ -39,7 +39,7 @@ class BackupFileNamingTest {
     @Test
     void praefixIstTeilDesSchemas() {
         assertThat(BackupFileNaming.filenameFor(LocalDateTime.now())).startsWith(BackupFileNaming.PREFIX);
-        // Der Punkt im Muster ist quotiert/escaped — kein beliebiges Zeichen vor "db"
+        // The dot in the pattern is quoted/escaped — not an arbitrary character before "db"
         assertThat(BackupFileNaming.isOwnBackupFile(Path.of("mysuricates-backup-2026-03-04_05-06-07xdb"))).isFalse();
     }
 }

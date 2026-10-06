@@ -54,7 +54,7 @@ export function WorkflowExecution() {
 
   const isRunning = run?.status === 'RUNNING' || run?.status === 'PAUSED';
 
-  // BPMN-Diagramm nur laden, wenn es einen Run mit Schritten gibt (Ablauf-Visualisierung)
+  // Only load the BPMN diagram when there is a run with steps (flow visualization)
   const { data: bpmnXml } = useWorkflowBpmn(id!, (run?.steps?.length ?? 0) > 0);
   const { statusByBlock, stepHighlight, selectStep } = useRunDiagramSync(run?.steps, isRunning);
 

@@ -44,9 +44,9 @@ public class ChainMapper {
     }
 
     /**
-     * Batch-Variante: holt die Run-Counts in EINER GROUP-BY-Query und alle referenzierten
-     * Workflows in EINEM {@code findAllById} (statt {@code countByChainId} pro Chain und
-     * {@code findById} pro Chain-Eintrag — vermeidet ~200–300 Einzelqueries / N+1).
+     * Batch variant: fetches the run counts in ONE GROUP-BY query and all referenced
+     * workflows in ONE {@code findAllById} (instead of {@code countByChainId} per chain and
+     * {@code findById} per chain entry — avoids ~200–300 single queries / N+1).
      */
     public List<ChainResponse> toResponseList(List<WorkflowChain> chains) {
         Map<String, Long> runCounts = chainRunRepository.countRunsGroupedByChain().stream()

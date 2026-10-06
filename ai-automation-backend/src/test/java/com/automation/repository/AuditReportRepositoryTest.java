@@ -104,7 +104,7 @@ class AuditReportRepositoryTest {
         assertThat(first.getTotalPages()).isEqualTo(2);
     }
 
-    /** Die Koepfe der Historie tragen Provider, Modell und Version an der richtigen Stelle, aber kein Markdown (TODO cd50d011). */
+    /** The history heads carry provider, model and version in the right place, but no Markdown (TODO cd50d011). */
     @Test
     void summaryRows_carryEveryHeadField() {
         AuditReport stored = save(projectId, AUDIT_KEY, T1, AuditIngestionStatus.VALID);
@@ -135,13 +135,13 @@ class AuditReportRepositoryTest {
                 .extracting(AuditReport::getId).containsExactly(b.getId(), a.getId());
     }
 
-    /** Die Zeitpunkte gueltiger Vorlaeufe — Grundlage der Drei-Laeufe-Regel fuer eingeordnete Befunde (b2e3da6a). */
+    /** The timestamps of valid predecessors — basis of the three-run rule for classified findings (b2e3da6a). */
     @Test
     void findValidGeneratedAtBefore_listsOnlyValidEarlierReportsOfTheScope_newestFirst() {
         Instant now = Instant.parse("2026-10-03T10:00:00Z");
-        save(projectId, AUDIT_KEY, now, AuditIngestionStatus.VALID);                              // der aktuelle selbst
+        save(projectId, AUDIT_KEY, now, AuditIngestionStatus.VALID);                              // the current one itself
         save(projectId, AUDIT_KEY, now.minus(Duration.ofDays(1)), AuditIngestionStatus.VALID);
-        save(projectId, AUDIT_KEY, now.minus(Duration.ofDays(2)), AuditIngestionStatus.INVALID);  // zaehlt nicht als Lauf
+        save(projectId, AUDIT_KEY, now.minus(Duration.ofDays(2)), AuditIngestionStatus.INVALID);  // does not count as a run
         save(projectId, AUDIT_KEY, now.minus(Duration.ofDays(3)), AuditIngestionStatus.VALID);
         save(projectId, AUDIT_KEY, now.minus(Duration.ofDays(4)), AuditIngestionStatus.VALID);
         save(projectId, "test.other-key", now.minus(Duration.ofHours(1)), AuditIngestionStatus.VALID);

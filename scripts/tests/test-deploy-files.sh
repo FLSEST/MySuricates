@@ -56,7 +56,7 @@ for f in docker-compose.stable.yml docker-compose.test.yml docker-compose.dev-co
   check "$f: both key files on /app/secrets" 'grep -q "AUTOMATION_INTEGRATION_KEY_FILE=/app/secrets/" "$C" && grep -q "AUTOMATION_SEAL_KEY_FILE=/app/secrets/" "$C"'
   check "$f: own secrets volume, declared"   'grep -qE "^      - [a-z-]+-secrets:/app/secrets$" "$C" && grep -qE "^  [a-z-]+-secrets:$" "$C"'
 done
-# Die Test-Instanz (:8090) taggt Workflows nicht per KI (5d008bba) — Cypress legt dort Workflows an
+# The test instance (:8090) does not tag workflows via AI (5d008bba) - Cypress creates workflows there
 check "docker-compose.test.yml: no AI auto-tagging" 'grep -qx "      - AUTOMATION_DISCOVERY_AUTO_TAGGING_ENABLED=false" "$R/ai-automation-backend/docker-compose.test.yml"'
 check "Dockerfile.stable prepares /app/secrets"  'grep -q "/app/secrets" "$R/ai-automation-backend/docker/Dockerfile.stable"'
 check "backend entrypoint hands /app/secrets to the app user" 'grep -q "chown .*/app/secrets" "$BEP" && grep -q "chmod 700 /app/secrets" "$BEP"'
@@ -71,10 +71,10 @@ check "compose passes AGENT_APT_REFRESH"          'grep -q "APT_REFRESH: \${AGEN
 check "pinned checksums are 64 hex chars"         '[ "$(grep -cE "^ARG (GITLEAKS|TRIVY)_LINUX_(X64|ARM64)_SHA256=[0-9a-f]{64}$" "$ADF")" -eq 4 ]'
 
 echo "5b) the same in every image: third-party repos and unpinned packages refreshable (8b7a39b9)"
-# deploy/Dockerfile und Dockerfile.stable holen NodeSource und Docker aus Fremd-Repos, agent-python
-# ungepinnte pip-Pakete — alles blieb beim ersten Bau stehen. Jedes getrackte Dockerfile mit einem
-# Fremd-Repo braucht das ARG davor, auch ein kuenftiges.
-lof() { grep -n "$2" "$1" | sed -n 1p | cut -d: -f1; }   # DATEI MUSTER — Nummer der ersten Zeile
+# deploy/Dockerfile and Dockerfile.stable fetch NodeSource and Docker from foreign repos, agent-python
+# unpinned pip packages - everything stalled at the first build. Every tracked Dockerfile with a
+# foreign repo needs the ARG before it, a future one too.
+lof() { grep -n "$2" "$1" | sed -n 1p | cut -d: -f1; }   # FILE PATTERN - number of the first line
 SDF="$R/ai-automation-backend/docker/Dockerfile.stable"; PDF="$R/ai-automation-backend/docker/Dockerfile.agent-python"
 DFS="$(cd "$R" && git ls-files '*Dockerfile*' 2>/dev/null)"
 check "Dockerfiles found (deploy, stable, agent-devops)" 'printf "%s\n" "$DFS" | grep -x deploy/Dockerfile >/dev/null && printf "%s\n" "$DFS" | grep -x ai-automation-backend/docker/Dockerfile.stable >/dev/null && printf "%s\n" "$DFS" | grep -x ai-automation-backend/docker/Dockerfile.agent-devops >/dev/null'
@@ -93,10 +93,10 @@ check "agent-python: pip packages behind PIP_REFRESH" '[ -n "$(lof "$PDF" "^ARG 
 check "compose: the same AGENT_APT_REFRESH for agent-python" 'grep -q "PIP_REFRESH: \${AGENT_APT_REFRESH:-}" "$DC"'
 
 echo "5c) instance ports only on 127.0.0.1 unless switched on purpose"
-# Ein Portmapping ohne Adresse ("9091:9091") oeffnet Docker auf allen Schnittstellen, an der
-# Host-Firewall vorbei. Jede Instanz-Compose-Datei nennt deshalb eine Adresse mit Standard 127.0.0.1
-# oder veroeffentlicht selbst gar nichts (Stable/Test: das tut die Override-Datei von staging.sh).
-# docker-compose.yml (Agent-Images, Altlast) ist davon ausgenommen.
+# A port mapping without an address ("9091:9091") opens Docker on all interfaces, past the
+# host firewall. Every instance compose file therefore names an address with default 127.0.0.1
+# or publishes nothing itself (Stable/Test: the override file of staging.sh does that).
+# docker-compose.yml (agent images, legacy) is exempt.
 for c in deploy/compose.yml ai-automation-backend/docker-compose.stable.yml ai-automation-backend/docker-compose.test.yml ai-automation-backend/docker-compose.dev-container.yml; do
   check "$c: no port on all addresses"   '! grep -qE "^[[:space:]]+- \"?(\\\$\{[A-Za-z_]+(:-[0-9]+)?\}|[0-9]+):[0-9]+\"?[[:space:]]*$" "$R/$c"'
   check "$c: an address, default 127.0.0.1, or no port" '! grep -qE "^[[:space:]]+ports:" "$R/$c" || grep -qE "(_BIND:-127\.0\.0\.1\}:|host_ip: \"\\\$\{[A-Z_]+_BIND:-127\.0\.0\.1\}\")" "$R/$c"'
@@ -140,12 +140,12 @@ check "build script: unknown service is exit 2, docker never called" '[ "$RC" -e
 rm -rf "$BTMP"
 
 echo "6) health checks ask the own instance directly, never through a proxy (cf662c01)"
-# Docker reicht Proxy-Variablen in den Container (~/.docker/config.json, „proxies“), und curl 8.5 schickt
-# auch localhost ueber sie: die Pruefung scheiterte am Proxy, der Container wurde nie gesund, up wartete
-# 300 s. Jede Health-Pruefung — HEALTHCHECK im Dockerfile, healthcheck.test in einer Compose-Datei, die
-# ihn ersetzt — traegt deshalb --noproxy '*' wie scripts/lib/local-curl.sh. Gesucht in allen getrackten Dateien.
-# hc_lines — je Pruefung DATEI<TAB>BEFEHL: die CMD einer HEALTHCHECK-Anweisung (Shell-Form, Fortsetzungs-
-# zeilen verbunden) oder die test-Liste einer Compose-Datei, wie sie dasteht
+# Docker passes proxy variables into the container (~/.docker/config.json, "proxies"), and curl 8.5 sends
+# localhost through them too: the check failed at the proxy, the container never became healthy, up waited
+# 300 s. Every health check - HEALTHCHECK in the Dockerfile, healthcheck.test in a compose file that
+# replaces it - therefore carries --noproxy '*' like scripts/lib/local-curl.sh. Searched in all tracked files.
+# hc_lines - per check FILE<TAB>COMMAND: the CMD of a HEALTHCHECK instruction (shell form, continuation
+# lines joined) or the test list of a compose file, as it stands
 hc_lines() {
   local files f
   files="$(git -C "$R" ls-files)"
@@ -162,13 +162,13 @@ HC="$(hc_lines)"; T="$(printf '\t')"
 check "found: HEALTHCHECK and compose healthcheck"   'printf "%s\n" "$HC" | grep "^deploy/Dockerfile${T}curl " >/dev/null && printf "%s\n" "$HC" | grep "^ai-automation-backend/docker-compose.test.yml${T}\[\"CMD\", \"curl\"" >/dev/null'
 NAKED_HC="$(printf '%s\n' "$HC" | grep curl | grep -vF -e "${T}curl --noproxy '*' " -e '["CMD", "curl", "--noproxy", "*", ')"
 check "every health check curl carries --noproxy '*'" '[ -z "$NAKED_HC" ] || { printf "%s\n" "$NAKED_HC" | sed "s/^/         /"; false; }'
-# Und so, wie Docker sie ausfuehrt — Shell-Form ueber sh -c, im Verzeichnis mit Dateien (ein ungequotetes *
-# wuerde zu ihren Namen), gegen eine Fake-Instanz auf dem Port der Pruefung, den Fake-Proxy in jeder
-# Variablen, die curl liest. Der Proxy schreibt auf, was bei ihm ankommt: er darf nichts bekommen.
+# And the way Docker runs them - shell form via sh -c, in the directory with files (an unquoted *
+# would become their names), against a fake instance on the check's port, the fake proxy in every
+# variable curl reads. The proxy records what arrives at it: it must get nothing.
 if command -v python3 >/dev/null 2>&1 && command -v curl >/dev/null 2>&1; then
   TMP="$(mktemp -d)"; FAKE="$HERE/fake_instance.py"; PXLOG="$TMP/proxy.log"; : > "$PXLOG"
   freeport() { local p="$1"; while (exec 3<>"/dev/tcp/127.0.0.1/$p") 2>/dev/null; do p=$((p + 1)); done; echo "$p"; }
-  serve() {  # MODUS PORT … — fake_instance.py losgeloest starten; gibt die PID aus, sobald der Port antwortet
+  serve() {  # MODE PORT … - start fake_instance.py detached; prints the PID as soon as the port answers
     local pid
     pid="$( (python3 "$FAKE" "$@" > /dev/null 2>&1 & echo $!) )"
     for _ in $(seq 1 100); do (exec 3<>"/dev/tcp/127.0.0.1/$2") 2>/dev/null && break; sleep 0.05; done
@@ -179,7 +179,7 @@ if command -v python3 >/dev/null 2>&1 && command -v curl >/dev/null 2>&1; then
   trap 'kill "$API_PID" "$PX_PID" 2>/dev/null; rm -rf "$TMP"' EXIT
   mkdir -p "$TMP/app"; touch "$TMP/app/app.jar" "$TMP/app/entrypoint.sh"
   PX="http://127.0.0.1:$PXPORT"
-  # proxied BEFEHL — sh -c BEFEHL mit dem Fake-Proxy in jeder Variablen; der Proxy-Log beginnt leer
+  # proxied COMMAND - sh -c COMMAND with the fake proxy in every variable; the proxy log starts empty
   proxied() { : > "$PXLOG"; ( cd "$TMP/app" && env -u no_proxy -u NO_PROXY http_proxy="$PX" https_proxy="$PX" all_proxy="$PX" HTTP_PROXY="$PX" HTTPS_PROXY="$PX" ALL_PROXY="$PX" sh -c "$1" ) >/dev/null 2>&1; }
   untouched() { [ ! -s "$PXLOG" ]; }
   proxied "curl -fsS http://localhost:$APORT/api/v1/system/health"

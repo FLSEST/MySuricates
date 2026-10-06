@@ -14,19 +14,19 @@ import java.util.regex.Pattern;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Gate fuer das Audit-Center-Protokoll (docs/audit-workflow-protocol.md) in ausgelieferten
- * Workflow-Definitionen (workflow-pool/).
+ * Gate for the audit center protocol (docs/audit-workflow-protocol.md) in shipped
+ * workflow definitions (workflow-pool/).
  *
- * <p>Ein Workflow mit {@code metadata.audit} liefert seine Findings ueber den Envelope
- * {@code mysuricates:audit-result:v1} des Report-Blocks. Deshalb gilt:
+ * <p>A workflow with {@code metadata.audit} delivers its findings via the envelope
+ * {@code mysuricates:audit-result:v1} of the report block. Therefore:
  * <ol>
- * <li>Kein gleichzeitiges {@code metadata.autoTodo} — TODOs werden aus den strukturierten
- *     Findings verwaltet, nicht aus Marker-Zeilen (sonst zaehlen beide Pfade doppelt).</li>
- * <li>Der in {@code reportBlock} genannte Block existiert genau einmal mit diesem {@code name};
- *     {@code AuditIngestionService} findet den Report-Block ueber das Step-Metadatum
+ * <li>No simultaneous {@code metadata.autoTodo} — TODOs are managed from the structured
+ *     findings, not from marker lines (otherwise both paths count twice).</li>
+ * <li>The block named in {@code reportBlock} exists exactly once with this {@code name};
+ *     {@code AuditIngestionService} finds the report block via the step metadatum
  *     {@code blockName}.</li>
- * <li>Der Report-Block-Prompt fordert den Envelope an.</li>
- * <li>Keine {@code todo_item:}-Anweisung in irgendeinem Block des Audit-Workflows.</li>
+ * <li>The report block prompt requests the envelope.</li>
+ * <li>No {@code todo_item:} instruction in any block of the audit workflow.</li>
  * </ol>
  */
 class AuditWorkflowContractGateTest {
@@ -117,7 +117,7 @@ class AuditWorkflowContractGateTest {
         }
     }
 
-    /** Pool-Definitionen mit {@code metadata.audit.enabled == true}. */
+    /** Pool definitions with {@code metadata.audit.enabled == true}. */
     /** Every language variant of every shipped audit definition ({@link ShippedDefinitions}). */
     private static List<ShippedDefinitions.Variant> auditVariants() throws IOException {
         List<ShippedDefinitions.Variant> variants = new ArrayList<>();

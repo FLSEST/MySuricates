@@ -1,109 +1,109 @@
 #!/usr/bin/env python3
-"""Erzeugt die Diagramm-Seiten in docs/ aus ihrer Markdown-Quelle (TODO f54bb95d),
-dazu ihre englische Fassung in docs/en/ (TODO 47bd4d27).
+"""Generates the diagram pages in docs/ from their Markdown source (TODO f54bb95d),
+plus their English version in docs/en/ (TODO 47bd4d27).
 
-Warum es das gibt
------------------
-Die Diagramm-Dokumente lagen nur als HTML vor. GitHub rendert HTML-Dateien im
-Repository nicht — ein Besucher sah dort Quelltext statt Diagramme. Mermaid in
-```mermaid-Zaeunen rendert GitHub dagegen nativ.
+Why this exists
+---------------
+The diagram documents existed only as HTML. GitHub does not render HTML files in the
+repository — a visitor saw source text there instead of diagrams. Mermaid in
+```mermaid fences, on the other hand, GitHub renders natively.
 
-Deshalb ist die **Markdown-Datei die Quelle** (`docs/<name>-diagrams.md`) und die
-HTML-Fassung das **Erzeugnis** (`docs/<name>-diagrams.html`, fuer GitHub Pages).
-Nicht nur die Diagramme, sondern die ganze Seite wird erzeugt: Prosa, Tabellen,
-Karten, Dateibaeume. Nur so bleibt es bei einer Quelle. Wuerde das Skript bloss
-die Diagramme umkopieren, waere der Rest der HTML-Seite eine zweite, von Hand
-gepflegte Fassung — genau das, was vermieden werden soll.
+Therefore the **Markdown file is the source** (`docs/<name>-diagrams.md`) and the
+HTML version is the **product** (`docs/<name>-diagrams.html`, for GitHub Pages).
+Not only the diagrams but the whole page is generated: prose, tables,
+cards, file trees. Only that way does it stay at one source. If the script merely
+copied the diagrams over, the rest of the HTML page would be a second, hand-maintained
+version — exactly what is to be avoided.
 
-Die Huelle (Farben, Layout, Mermaid-Einbindung, Navigation) steckt als Vorlage
-unten in dieser Datei und ist fuer alle Seiten dieselbe; vorher stand sie neunmal
-fast wortgleich in den HTML-Dateien.
+The shell (colours, layout, Mermaid embedding, navigation) lives as a template
+further down in this file and is the same for all pages; before, it stood nine times
+almost verbatim in the HTML files.
 
-Zusaetzlich entsteht `docs/diagramme.md` als Inhaltsverzeichnis — ebenfalls
-erzeugt, nicht gepflegt.
+In addition `docs/diagramme.md` is generated as a table of contents — likewise
+generated, not maintained.
 
-Englische Fassung: dieselbe Quelle plus eine Uebersetzungstabelle je Seite
--------------------------------------------------------------------------
-Die deutsche Seite bleibt die Quelle fuer den Aufbau *und* den deutschen Text. Die
-englische entsteht aus ihr und einer Tabelle je Seite, nach dem Muster von de.ts/en.ts
-der Oberflaeche:
+English version: the same source plus a translation table per page
+------------------------------------------------------------------
+The German page remains the source for the structure *and* the German text. The
+English one is generated from it and a table per page, following the pattern of de.ts/en.ts
+of the UI:
 
-    docs/i18n/<name>-diagrams.en.json    {"deutsches Textstueck": "English text", ...}
+    docs/i18n/<name>-diagrams.en.json    {"German text piece": "English text", ...}
 
-Erzeugt werden docs/en/<name>-diagrams.md und .html sowie docs/en/diagramme.md, mit
-denselben Dateinamen wie deutsch, damit die DE/EN-Paritaetspruefung sie paart. Eine
-zweite, von Hand gepflegte englische Fassung gibt es nicht.
+Generated are docs/en/<name>-diagrams.md and .html as well as docs/en/diagramme.md, with
+the same file names as German, so that the DE/EN parity check pairs them. There is no
+second, hand-maintained English version.
 
-Textstuecke (= Schluessel) sind Titel, Untertitel, Ueberschriften samt Beiwort,
-Absaetze, Listenpunkte, Tabellenzellen und die Mermaid-Beschriftungen — welche das je
-Diagrammtyp sind, steht in scripts/lib/mermaid_labels.py — dazu in Dateibaeumen und
-Codebloecken der Kommentar hinter "←" (ohne Marke, 08e6fa4d). Unveraendert bleiben
-Knoten-IDs, Pfeile und der Rest der Codebloecke; die Marken [NEU]/[ENTFERNT] heissen
-englisch [NEW]/[REMOVED] (TREE_MARKERS_EN), ohne Tabelle. Ein Textstueck ohne Buchstaben
-ausserhalb von Inline-Code (`mvn test`, "9090", "—") braucht keinen Eintrag; ein Wert
-gleich dem Schluessel ist erlaubt (Klassennamen, schon englische Beschriftungen).
+Text pieces (= keys) are titles, subtitles, headings including the epithet,
+paragraphs, list items, table cells and the Mermaid labels — which these are per
+diagram type is in scripts/lib/mermaid_labels.py — plus, in file trees and
+code blocks, the comment after "←" (without marker, 08e6fa4d). Unchanged remain
+node IDs, arrows and the rest of the code blocks; the markers [NEU]/[ENTFERNT] are called
+[NEW]/[REMOVED] in English (TREE_MARKERS_EN), without a table. A text piece without letters
+outside inline code (`mvn test`, "9090", "—") needs no entry; a value
+equal to the key is allowed (class names, already English labels).
 
-Die Tabellen haben keine Lesereihenfolge-Pflicht; --add-missing schreibt sie aber in
-der Reihenfolge der Seite, mit leerem Wert fuer jeden neuen Schluessel.
+The tables have no reading-order requirement; --add-missing writes them in
+the order of the page, though, with an empty value for each new key.
 
-Markdown-Konventionen (mehr kann die Vorlage nicht, mehr braucht sie nicht)
---------------------------------------------------------------------------
-    # Titel                     -> Kopfzeile der Seite
-    <Absatz danach>             -> Untertitel der Kopfzeile
-    ## Abschnitt — *Beiwort*    -> <section> mit <h2>; das kursive Beiwort hinter
-                                   dem Gedankenstrich wird zur kleinen Beischrift
-                                   (weglassbar). Die Navigation entsteht aus den
-                                   Abschnittsueberschriften.
-    ### Unterabschnitt          -> <h3>; zwei oder mehr aufeinanderfolgende, die
-                                   nur Absaetze/Listen enthalten, werden zum
-                                   zweispaltigen Kartenraster.
+Markdown conventions (the template can do no more, and needs no more)
+--------------------------------------------------------------------
+    # Title                     -> header line of the page
+    <paragraph after it>        -> subtitle of the header
+    ## Section — *epithet*      -> <section> with <h2>; the italic epithet after
+                                   the dash becomes the small caption
+                                   (may be omitted). The navigation is built from the
+                                   section headings.
+    ### Subsection              -> <h3>; two or more consecutive ones that
+                                   contain only paragraphs/lists become a
+                                   two-column card grid.
     ```mermaid                  -> <pre class="mermaid">
-    ``` (jede andere Sprache)   -> <pre class="tree"> (Dateibaeume, Konsolen)
-    Tabellen, Listen, `Code`, **fett**, *kursiv*, [Text](Ziel)
+    ``` (any other language)    -> <pre class="tree"> (file trees, consoles)
+    Tables, lists, `code`, **bold**, *italic*, [text](target)
 
-Pruefen
--------
---check vergleicht alle Erzeugnisse beider Sprachen mit dem, was jetzt entstuende, und
-meldet Erzeugnisse ohne Quelle. Rot ist es ausserdem, wenn ein Textstueck keine
-Uebersetzung hat (Schluessel fehlt oder Wert leer), wenn ein Schluessel verwaist ist,
-wenn ein Wert Inline-Code oder Zahlen anders nennt als das Original, oder wenn die
-Uebersetzung den Seitenaufbau oder das Geruest eines Diagramms veraendert. So kann die
-deutsche Seite nicht still weiterlaufen, ohne dass die englische nachzieht. Die
-englischen Dateien einer Seite werden nur aus einer stimmigen Tabelle geschrieben.
+Checking
+--------
+--check compares all products of both languages with what would be generated now, and
+reports products without a source. It is also red if a text piece has no
+translation (key missing or value empty), if a key is orphaned,
+if a value names inline code or numbers differently from the original, or if the
+translation changes the page structure or the skeleton of a diagram. That way the
+German page cannot silently carry on without the English one following. The
+English files of a page are written only from a consistent table.
 
 GitHub Pages (--site DIR, TODO ee5a4a04)
 ----------------------------------------
-Schreibt die Seiten fuer GitHub Pages in ein leeres oder neues Verzeichnis, gebaut aus
-der Markdown-Quelle (nicht aus den HTML-Dateien im Repo) — docs/ bleibt unberuehrt:
+Writes the pages for GitHub Pages into an empty or new directory, built from
+the Markdown source (not from the HTML files in the repo) — docs/ stays untouched:
 
-    DIR/index.html                  Verzeichnis deutsch (dieselbe Tabelle wie diagramme.md)
-    DIR/de/<name>-diagrams.html     deutsche Seiten
-    DIR/en/index.html               Verzeichnis englisch
-    DIR/en/<name>-diagrams.html     englische Seiten
+    DIR/index.html                  index in German (same table as diagramme.md)
+    DIR/de/<name>-diagrams.html     German pages
+    DIR/en/index.html               index in English
+    DIR/en/<name>-diagrams.html     English pages
 
-Jede Seite bekommt in der Navigation einen Link zum Verzeichnis und zur anderen Sprache.
-Ist eine Uebersetzung offen, entsteht nichts (Exit 1): Pages zeigt entweder beide Sprachen
-vollstaendig oder bleibt beim letzten Stand. Benutzt von .github/workflows/pages.yml.
+Each page gets in its navigation a link to the index and to the other language.
+If a translation is open, nothing is generated (exit 1): Pages shows either both languages
+completely or stays at the last state. Used by .github/workflows/pages.yml.
 
-Aufruf
-------
-    python3 scripts/docs-diagrams.py                # HTML, englische Seiten, Verzeichnisse
-    python3 scripts/docs-diagrams.py --check        # nur pruefen, nichts schreiben
-    python3 scripts/docs-diagrams.py --add-missing  # fehlende Schluessel leer eintragen
-    python3 scripts/docs-diagrams.py --site DIR     # Seiten fuer GitHub Pages nach DIR
-    python3 scripts/docs-diagrams.py --root DIR     # andere Repo-Wurzel
+Usage
+-----
+    python3 scripts/docs-diagrams.py                # HTML, English pages, indexes
+    python3 scripts/docs-diagrams.py --check        # only check, write nothing
+    python3 scripts/docs-diagrams.py --add-missing  # enter missing keys empty
+    python3 scripts/docs-diagrams.py --site DIR     # pages for GitHub Pages into DIR
+    python3 scripts/docs-diagrams.py --root DIR     # different repo root
 
-Exit: 0 = alles deckungsgleich, 1 = Drift (--check) oder offene Uebersetzung,
-      2 = Quelle fehlt/kaputt, Tabelle kaputt, Mermaid-Syntax ohne Regel oder
-          --site-Verzeichnis nicht leer
+Exit: 0 = everything congruent, 1 = drift (--check) or open translation,
+      2 = source missing/broken, table broken, Mermaid syntax without rule or
+          --site directory not empty
 """
 import json
 import os
 import re
 import sys
 
-# mermaid_labels liegt in scripts/lib; Tests laden dieses Skript ueber
-# spec_from_file_location, dabei liegt kein Skriptverzeichnis auf sys.path.
+# mermaid_labels lives in scripts/lib; tests load this script via
+# spec_from_file_location, in which case no script directory is on sys.path.
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib"))
 import mermaid_labels  # noqa: E402
 
@@ -120,7 +120,7 @@ GENERATED_NOTE = ("Erzeugt aus {source} von scripts/docs-diagrams.py — "
 GENERATED_NOTE_EN = ("Generated from {source} and {table} by scripts/docs-diagrams.py — "
                      "do not edit by hand.")
 
-# Die Huelle des Verzeichnisses je Sprache; die Zeilen darin kommen aus den Seiten.
+# The index shell per language; the lines in it come from the pages.
 INDEX_TEXT = {
     "de": {
         "note": ("Erzeugt aus docs/*-diagrams.md von scripts/docs-diagrams.py — "
@@ -161,7 +161,7 @@ INDEX_TEXT = {
     },
 }
 
-# Texte der Pages-Fassung (--site) je Sprache; Tabellenkopf und Summe kommen aus INDEX_TEXT.
+# Texts of the Pages version (--site) per language; table header and sum come from INDEX_TEXT.
 SITE_TEXT = {
     "de": {
         "intro": ("Ablauf- und Architekturdiagramme, bei jedem Deploy frisch erzeugt aus den"
@@ -181,11 +181,11 @@ SITE_TEXT = {
 SITE_NOTE = "Erzeugt von scripts/docs-diagrams.py --site aus docs/*-diagrams.md — nicht von Hand bearbeiten."
 
 # ---------------------------------------------------------------------------
-# HTML-Huelle
+# HTML shell
 #
-# Sammelt die Stile aller neun frueheren Einzelseiten (die sich nur darin
-# unterschieden, welche Klassen die jeweilige Seite gerade brauchte). Die
-# Mermaid-Einbindung und die themeVariables sind unveraendert uebernommen.
+# Collects the styles of all nine former single pages (which differed only in
+# which classes the respective page happened to need). The
+# Mermaid embedding and the themeVariables are taken over unchanged.
 # ---------------------------------------------------------------------------
 TEMPLATE = """<!DOCTYPE html>
 <!-- @@NOTE@@ -->
@@ -378,24 +378,24 @@ TEMPLATE = """<!DOCTYPE html>
 
 
 class DocError(Exception):
-    """Die Markdown-Quelle haelt die Konventionen nicht ein."""
+    """The Markdown source does not follow the conventions."""
 
 
 # ---------------------------------------------------------------------------
-# Lesen
+# Reading
 # ---------------------------------------------------------------------------
 FENCE = re.compile(r"^```(\w*)\s*$")
 HEADING2 = re.compile(r"^##\s+(.*)$")
 HEADING3 = re.compile(r"^###\s+(.*)$")
-# "Abschnitt — *Beiwort*": nur ein kursiver Zusatz am Zeilenende zaehlt, damit ein
-# Gedankenstrich mitten im Titel nichts abschneidet.
+# "Abschnitt — *Beiwort*": only an italic suffix at the end of the line counts, so that a
+# dash in the middle of the title cuts nothing off.
 BADGE = re.compile(r"^(.*?)\s+[—–-]\s+\*([^*]+)\*$")
 BULLET = re.compile(r"^-\s+(.*)$")
 TABLE_DIVIDER = re.compile(r"^\|[\s:|-]+\|$")
 
 
 def slugify(text, taken):
-    """Anker aus der Ueberschrift — dieselbe Regel wie bei GitHub, ohne Zweitquelle."""
+    """Anchor from the heading — the same rule as on GitHub, without a second source."""
     slug = re.sub(r"[^\w\s-]", "", text.lower(), flags=re.UNICODE)
     slug = re.sub(r"[\s_]+", "-", slug).strip("-") or "abschnitt"
     candidate, n = slug, 1
@@ -407,7 +407,7 @@ def slugify(text, taken):
 
 
 def split_row(line):
-    """Tabellenzeile in Zellen zerlegen; '\\|' ist ein Balken, kein Trenner."""
+    """Split a table row into cells; '\\|' is a bar, not a separator."""
     inner = line.strip()
     if inner.startswith("|"):
         inner = inner[1:]
@@ -418,11 +418,11 @@ def split_row(line):
 
 
 def parse_blocks(lines, start, stop_at):
-    """Bloecke bis zur naechsten Ueberschrift aus stop_at lesen.
+    """Read blocks up to the next heading from stop_at.
 
-    Ein Block ist (Art, Inhalt): paragraph -> Text, list -> [Punkte],
-    table -> ([Kopfzeile, Zeilen...], [Trennzellen]), mermaid -> Quelltext,
-    code -> (Sprache, Text). Trennzellen und Sprache braucht nur die Markdown-Ausgabe.
+    A block is (kind, content): paragraph -> text, list -> [items],
+    table -> ([header row, rows...], [separator cells]), mermaid -> source text,
+    code -> (language, text). Separator cells and language are needed only by the Markdown output.
     """
     blocks, i = [], start
     while i < len(lines):
@@ -471,7 +471,7 @@ def parse_blocks(lines, start, stop_at):
 
 
 def parse(text):
-    """Markdown-Quelle -> {title, subtitle, sections}."""
+    """Markdown source -> {title, subtitle, sections}."""
     lines = text.replace("\r\n", "\n").split("\n")
     i = 0
     while i < len(lines) and not lines[i].strip():
@@ -517,14 +517,14 @@ def parse(text):
 
 
 # ---------------------------------------------------------------------------
-# Schreiben
+# Writing
 # ---------------------------------------------------------------------------
 def esc(text):
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
 def inline(text):
-    """Inline-Markdown -> HTML. Code zuerst, damit darin nichts weiter ausgewertet wird."""
+    """Inline Markdown -> HTML. Code first, so that nothing else is evaluated inside it."""
     stash = []
 
     def keep(html):
@@ -542,40 +542,40 @@ def inline(text):
     return text
 
 
-# Die einzigen Tags, die Mermaid in Beschriftungen selbst auswertet. Sie bleiben
-# echtes Markup, alles andere wird maskiert (siehe mermaid_body).
+# The only tags Mermaid itself evaluates in labels. They stay
+# real markup, everything else is masked (see mermaid_body).
 MERMAID_MARKUP = re.compile(r"&lt;(/?)(br\s*/?|i|b)&gt;")
 
 
 def mermaid_body(code):
-    """Mermaid-Quelltext fuer <pre> absichern.
+    """Make Mermaid source safe for <pre>.
 
-    Maskieren ist noetig: In den frueheren HTML-Dateien stand `List<WorkflowRun>`
-    unmaskiert im <pre> — der Browser hielt das fuer ein Tag und verschluckte es,
-    die Beschriftung war weg. Wo es darauf ankam, war es schon von Hand maskiert
-    (`&lt;&lt;interface&gt;&gt;`), nur eben nicht ueberall.
+    Masking is necessary: in the former HTML files `List<WorkflowRun>`
+    stood unmasked in the <pre> — the browser took it for a tag and swallowed it,
+    the label was gone. Where it mattered, it was already masked by hand
+    (`&lt;&lt;interface&gt;&gt;`), just not everywhere.
 
-    Ausgenommen bleiben die Tags, die Mermaid in Beschriftungen selbst auswertet:
-    `<br/>` fuer den Zeilenumbruch, `<i>`/`<b>` fuer die Auszeichnung. Fuer die
-    Pfeile (`-->`) ist beides gleichwertig: der Browser gibt ueber innerHTML
-    ohnehin `--&gt;` zurueck, egal wie es in der Datei steht.
+    Excluded are the tags Mermaid itself evaluates in labels:
+    `<br/>` for the line break, `<i>`/`<b>` for the markup. For the
+    arrows (`-->`) both are equivalent: the browser returns `--&gt;` via innerHTML
+    anyway, no matter how it stands in the file.
     """
     return MERMAID_MARKUP.sub(lambda m: f"<{m.group(1)}{m.group(2)}>", esc(code))
 
 
 TREE_BADGES = (("[NEU]", "green"), ("[ENTFERNT]", "red"), ("[NEW]", "green"), ("[REMOVED]", "red"))
-# Marken je Sprache (08e6fa4d): die deutsche Quelle schreibt [NEU]/[ENTFERNT], die englische Seite
-# bekommt [NEW]/[REMOVED] — feste Woerter, keine Eintraege in der Uebersetzungstabelle.
+# Markers per language (08e6fa4d): the German source writes [NEU]/[ENTFERNT], the English page
+# gets [NEW]/[REMOVED] — fixed words, no entries in the translation table.
 TREE_MARKERS_EN = {"[NEU]": "[NEW]", "[ENTFERNT]": "[REMOVED]"}
 TREE_MARKER = re.compile(r"\s*\[(?:NEU|ENTFERNT|NEW|REMOVED)\]")
 TREE_COMMENT = re.compile(r"^(\s*)(.*?)(\s*)$")
 
 
 def tree_text(code, fn, markers=None):
-    """Codeblock mit uebersetzten Kommentaren hinter "←" und Marken nach markers (08e6fa4d).
+    """Code block with translated comments after "←" and markers after markers (08e6fa4d).
 
-    fn(kommentar) bekommt den Kommentar ohne Marken und ohne Leerraum am Rand; die Marken
-    stehen danach wieder hinter dem Kommentar. Pfad und Baumstriche bleiben, wie sie sind.
+    fn(comment) gets the comment without markers and without whitespace at the edge; the markers
+    stand after the comment again. Path and tree lines stay as they are.
     """
     markers = markers or {}
     out = []
@@ -593,7 +593,7 @@ TREE_DIR = re.compile(r"(?<![\w./~-])([\w.~@-]+(?:/[\w.~@-]+)*/)(?=\s|$)")
 
 
 def tree_body(code):
-    """Dateibaum einfaerben: Verzeichnisse, Kommentare hinter dem Pfeil, Marken."""
+    """Colour a file tree: directories, comments after the arrow, markers."""
     out = []
     for line in esc(code).split("\n"):
         badges = ""
@@ -644,12 +644,12 @@ def render_blocks(blocks, indent):
 
 
 def is_card(sub):
-    """Nur Absaetze und Listen passen in eine Karte — Tabellen und Diagramme nicht."""
+    """Only paragraphs and lists fit into a card — tables and diagrams do not."""
     return bool(sub[1]) and all(kind in ("paragraph", "list") for kind, _ in sub[1])
 
 
 def render_subs(subs):
-    """Aufeinanderfolgende Karten-Unterabschnitte buendeln, den Rest als <h3>."""
+    """Bundle consecutive card subsections, the rest as <h3>."""
     html, i = [], 0
     while i < len(subs):
         run = i
@@ -708,7 +708,7 @@ def shared_prefix(titles):
 
 
 def render_index(entries, lang):
-    """Inhaltsverzeichnis aus den Quellen — damit auch der Index keine Zweitquelle ist."""
+    """Table of contents from the sources — so that the index, too, is not a second source."""
     text = INDEX_TEXT[lang]
     prefix = shared_prefix([doc["title"] for _, doc, _ in entries])
     lines = [f"<!-- {text['note']} -->",
@@ -736,10 +736,10 @@ def render_index(entries, lang):
 
 
 def render_markdown(doc, note=None):
-    """Struktur -> Markdown in der Form der deutschen Quellen.
+    """Structure -> Markdown in the form of the German sources.
 
-    Fuer eine Quelle in dieser Form ist das Ergebnis deckungsgleich mit ihr; die englische
-    Seite hat damit Zeile fuer Zeile denselben Aufbau wie die deutsche.
+    For a source in this form the result is congruent with it; the English
+    page thereby has the same structure as the German one, line for line.
     """
     lines = [f"<!-- {note} -->", ""] if note else []
     lines += [f"# {doc['title']}", "", doc["subtitle"], ""]
@@ -777,7 +777,7 @@ def markdown_blocks(blocks):
 
 
 # ---------------------------------------------------------------------------
-# Englische Fassung
+# English version
 # ---------------------------------------------------------------------------
 LETTER = re.compile(r"[^\W\d_]")
 CODE_SPAN = re.compile(r"`[^`]*`")
@@ -785,21 +785,21 @@ DIGITS = re.compile(r"\d+")
 
 
 def needs_translation(text, markdown=True):
-    """Hat das Textstueck etwas zu uebersetzen? Buchstaben zaehlen, Inline-Code nicht.
+    """Does the text piece have anything to translate? Count letters, not inline code.
 
-    Mermaid-Beschriftungen kennen keinen Inline-Code (Backticks bedeuten dort etwas
-    anderes), dort zaehlt jeder Buchstabe.
+    Mermaid labels know no inline code (backticks mean something different
+    there), there every letter counts.
     """
     return bool(LETTER.search(CODE_SPAN.sub("", text) if markdown else text))
 
 
 def map_text(doc, fn, markers=None):
-    """Neue Seite, in der jedes Textstueck durch fn(text, markdown) ersetzt ist.
+    """New page in which every text piece is replaced by fn(text, markdown).
 
-    Die Reihenfolge ist die Lesereihenfolge. segments() und translate() gehen beide diesen
-    Weg — so kennt die Tabelle genau die Stellen, die die Seite hat, nicht mehr und nicht
-    weniger. Diagramme bekommen nur neue Beschriftungen, Codebloecke nur neue Kommentare
-    hinter "←" und die Marken nach markers (tree_text).
+    The order is the reading order. segments() and translate() both go this
+    way — so the table knows exactly the places the page has, no more and no
+    fewer. Diagrams get only new labels, code blocks only new comments
+    after "←" and the markers after markers (tree_text).
     """
     def blocks(items):
         out = []
@@ -834,7 +834,7 @@ def map_text(doc, fn, markers=None):
 
 
 def segments(doc):
-    """Die Textstuecke einer Seite, die einen Eintrag in ihrer Tabelle brauchen (ohne Dubletten)."""
+    """The text pieces of a page that need an entry in its table (without duplicates)."""
     found = {}
 
     def record(text, markdown):
@@ -847,7 +847,7 @@ def segments(doc):
 
 
 def value_problem(key, value):
-    """Warum ein Wert nicht zu seinem Schluessel passt — oder None."""
+    """Why a value does not match its key — or None."""
     if "\n" in value or "\r" in value:
         return "Zeilenumbruch im Wert"
     if value != value.strip():
@@ -860,10 +860,10 @@ def value_problem(key, value):
 
 
 def translate(doc, table):
-    """Englische Seite aus deutscher Seite und Tabelle.
+    """English page from German page and table.
 
-    Liefert (seite, fehlend, ungueltig, verwaist). Fehlt ein Wert, steht an seiner Stelle
-    der deutsche Text — geschrieben wird eine solche Seite nicht, siehe plan().
+    Returns (page, missing, invalid, orphaned). If a value is missing, the German text stands in its place
+    — such a page is not written, see plan().
     """
     missing, invalid, used = [], [], set()
 
@@ -887,11 +887,11 @@ def translate(doc, table):
 
 
 def shape(doc):
-    """Aufbau einer Seite ohne ihre Texte — fuer Deutsch und Englisch identisch.
+    """Structure of a page without its texts — identical for German and English.
 
-    Codebloecke gehen woertlich ein bis auf die Kommentare hinter "←" und die Sprache der
-    Marken, Diagramme als Geruest ohne Beschriftungen, Listen und Tabellen mit ihrer Groesse,
-    Absaetze nur als Art.
+    Code blocks go in verbatim except for the comments after "←" and the language of the
+    markers, diagrams as a skeleton without labels, lists and tables with their size,
+    paragraphs only as a kind.
     """
     neutral = {other: german for german, other in TREE_MARKERS_EN.items()}
 
@@ -924,11 +924,11 @@ def mermaid_blocks(doc):
 
 
 def structure_problem(german, english):
-    """Veraendert die Uebersetzung den Aufbau? Beschreibung der ersten Stelle oder None.
+    """Does the translation change the structure? Description of the first place or None.
 
-    Zwei Stufen: jedes Diagramm fuer sich (dann laesst sich die Zeile nennen), danach die
-    ganze Seite so, wie sie als Markdown geschrieben und wieder gelesen wuerde — ein Wert,
-    der mit "## " beginnt, eroeffnete dort sonst still einen neuen Abschnitt.
+    Two stages: each diagram on its own (then the line can be named), after that the
+    whole page as it would be written as Markdown and read again — a value
+    that starts with "## " would otherwise silently open a new section there.
     """
     for (heading, de_code), (_, en_code) in zip(mermaid_blocks(german), mermaid_blocks(english)):
         try:
@@ -953,12 +953,12 @@ def structure_problem(german, english):
 
 
 def quote(text):
-    """Schluessel so ausgeben, wie er in der JSON-Tabelle steht."""
+    """Output the key as it stands in the JSON table."""
     return json.dumps(text, ensure_ascii=False)
 
 
 def load_table(path, rel):
-    """Tabelle lesen; None, wenn es sie nicht gibt. Kaputtes JSON ist ein harter Fehler."""
+    """Read the table; None if there is none. Broken JSON is a hard error."""
     if not os.path.exists(path):
         return None
 
@@ -985,7 +985,7 @@ def dump_table(table):
 
 
 # ---------------------------------------------------------------------------
-# Ablauf
+# Flow
 # ---------------------------------------------------------------------------
 def collect(docs_dir):
     stems = sorted(name[:-len(SOURCE_SUFFIX)] for name in os.listdir(docs_dir)
@@ -997,8 +997,8 @@ def collect(docs_dir):
             text = fh.read()
         try:
             doc = parse(text)
-            # Liest jedes Diagramm einmal mit den Beschriftungsregeln: unbekannte
-            # Mermaid-Syntax faellt hier auf, mit Seitenname, nicht erst beim Uebersetzen.
+            # Reads each diagram once with the label rules: unknown
+            # Mermaid syntax is noticed here, with the page name, not only when translating.
             segments(doc)
         except (DocError, mermaid_labels.MermaidError) as exc:
             raise DocError(f"{stem}{SOURCE_SUFFIX}: {exc}") from exc
@@ -1011,7 +1011,7 @@ def collect(docs_dir):
 
 
 def stale_outputs(docs_dir, en_dir, stems):
-    """Erzeugnisse, deren deutsche Quelle es nicht mehr gibt."""
+    """Products whose German source no longer exists."""
     stale = []
     for folder, suffixes in ((docs_dir, (TARGET_SUFFIX,)), (en_dir, (SOURCE_SUFFIX, TARGET_SUFFIX))):
         if not os.path.isdir(folder):
@@ -1024,11 +1024,11 @@ def stale_outputs(docs_dir, en_dir, stems):
 
 
 def plan(root):
-    """(Pfad -> erwarteter Inhalt, verwaiste Erzeugnisse, Uebersetzungsbefunde).
+    """(path -> expected content, orphaned products, translation findings).
 
-    Fuer beide Modi dieselbe Berechnung. Die englischen Dateien einer Seite stehen nur
-    darin, wenn ihre Tabelle stimmig ist; das englische Verzeichnis nur, wenn das fuer
-    alle Seiten gilt.
+    The same computation for both modes. The English files of a page are in it only
+    if their table is consistent; the English index only if that holds for
+    all pages.
     """
     docs_dir = os.path.join(root, DOCS_DIRNAME)
     en_dir = os.path.join(docs_dir, EN_DIRNAME)
@@ -1116,7 +1116,7 @@ def run(root, check):
 
     for line in problems + drift:
         print(line)
-    sys.stdout.flush()      # Zusammenfassung (stderr) nach der Liste, auch in 2>&1-Mitschnitten
+    sys.stdout.flush()      # summary (stderr) after the list, also in 2>&1 recordings
     if problems:
         print(f"docs-diagrams: {len(problems)} Uebersetzungsbefund(e) — die betroffenen englischen"
               " Seiten werden nicht geschrieben. Tabellen unter docs/i18n/ nachziehen;"
@@ -1137,11 +1137,11 @@ def run(root, check):
 
 
 def add_missing(root):
-    """Jede Tabelle auf den Stand ihrer Seite bringen, ohne einen Wert zu erfinden.
+    """Bring every table up to the state of its page without inventing a value.
 
-    Neue Schluessel bekommen einen leeren Wert (bleibt rot, bis jemand uebersetzt),
-    vorhandene Werte bleiben, verwaiste Schluessel wandern ans Ende statt zu verschwinden —
-    oft ist ihr Text die Uebersetzung des neuen Schluessels, nur leicht veraendert.
+    New keys get an empty value (stays red until someone translates),
+    existing values stay, orphaned keys move to the end instead of disappearing —
+    often their text is the translation of the new key, only slightly changed.
     """
     docs_dir = os.path.join(root, DOCS_DIRNAME)
     i18n_dir = os.path.join(docs_dir, I18N_DIRNAME)
@@ -1173,9 +1173,9 @@ def add_missing(root):
 
 
 def site_page(html, links):
-    """Pages-Fassung einer Seite: Verzeichnis und andere Sprache vorn in die Navigation.
+    """Pages version of a page: index and other language at the front of the navigation.
 
-    Nur fuer --site; die HTML-Dateien im Repo bleiben, wie sie sind.
+    Only for --site; the HTML files in the repo stay as they are.
     """
     extra = "".join(f'  <a href="{href}">{esc(label)}</a>\n' for href, label in links)
     if html.count("<nav>\n") != 1:                          # pragma: no cover
@@ -1184,7 +1184,7 @@ def site_page(html, links):
 
 
 def render_site_index(entries, lang, page_dir, other_index):
-    """Verzeichnis als HTML-Seite, aus denselben Eintraegen wie diagramme.md."""
+    """Index as an HTML page, from the same entries as diagramme.md."""
     text, site_text = INDEX_TEXT[lang], SITE_TEXT[lang]
     prefix = shared_prefix([doc["title"] for _, doc, _ in entries])
     rows = [split_row(text["head"])]
@@ -1202,7 +1202,7 @@ def render_site_index(entries, lang, page_dir, other_index):
 
 
 def site(root, out_dir):
-    """Seiten fuer GitHub Pages nach out_dir — nur aus einer stimmigen Quelle (siehe Kopf)."""
+    """Pages for GitHub Pages into out_dir — only from a consistent source (see header)."""
     docs_dir = os.path.join(root, DOCS_DIRNAME)
     if not os.path.isdir(docs_dir):
         print(f"docs-diagrams: {docs_dir} fehlt", file=sys.stderr)

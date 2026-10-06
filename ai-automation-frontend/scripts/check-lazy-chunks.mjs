@@ -1,32 +1,32 @@
 #!/usr/bin/env node
-// Build-Pruefung: Lazy gedachte Chunks duerfen nicht am Einstieg haengen.
+// Build check: chunks meant to be lazy must not hang off the entry point.
 //
-// Monaco (3,7 MB) wurde auf jeder Seite geladen, weil Rolldown Vites Preload-Helper in den
-// monaco-Chunk gelegt hatte: index.html trug einen modulepreload-Link darauf und index-*.js
-// importierte ihn statisch (TODO 2a552d8a). Das Skript liest dist/index.html, folgt von den
-// Einstiegs-Skripten allen statischen Importen und scheitert, wenn ein Chunk aus LAZY_CHUNKS
-// per modulepreload oder statischem Import erreicht wird. Dynamische import()-Aufrufe zaehlen
-// nicht — ueber die sollen diese Chunks kommen.
+// Monaco (3.7 MB) was loaded on every page because Rolldown had put Vite's preload helper into the
+// monaco chunk: index.html carried a modulepreload link to it and index-*.js
+// imported it statically (TODO 2a552d8a). The script reads dist/index.html, follows all static imports
+// from the entry scripts and fails if a chunk from LAZY_CHUNKS
+// is reached via modulepreload or static import. Dynamic import() calls do not count
+// — these chunks are supposed to arrive through them.
 //
-// Aufruf: node scripts/check-lazy-chunks.mjs [distDir]   (laeuft am Ende von `npm run build`)
+// Usage: node scripts/check-lazy-chunks.mjs [distDir]   (runs at the end of `npm run build`)
 import { existsSync, readFileSync, readdirSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// Chunk-Namen (Teil vor dem Hash), die nur ueber import() nachgeladen werden duerfen.
-// Fehlt einer im Build, scheitert die Pruefung ebenfalls: sonst bliebe sie nach einer
-// Umbenennung stumm gruen.
+// Chunk names (part before the hash) that may only be loaded later via import().
+// If one is missing from the build, the check fails as well: otherwise it would stay
+// silently green after a rename.
 export const LAZY_CHUNKS = [
-  'monaco', // monaco-editor, Vendor-Chunk aus vite.config.ts
-  'editor.worker', // Monaco-Worker
+  'monaco', // monaco-editor, vendor chunk from vite.config.ts
+  'editor.worker', // Monaco worker
   'json.worker',
   'TerminalPanel', // @xterm/xterm, lazy in RunContainerPanel
-  'BpmnDiagramView', // lazy in WorkflowBlockList (Panel der Workflow-Liste)
+  'BpmnDiagramView', // lazy in WorkflowBlockList (panel of the workflow list)
 ];
 
-// Statische Importe/Re-Exporte in minifiziertem ESM: import"x", import{a}from"x",
+// Static imports/re-exports in minified ESM: import"x", import{a}from"x",
 // import a,{b}from"x", import*as a from"x", export{a}from"x", export*from"x".
-// import("x") passt nicht, weil nach `import` direkt die Klammer folgt.
+// import("x") does not match because the parenthesis follows `import` directly.
 const STATIC_IMPORT =
   /(?:^|[^\w$.])(?:import|export)\s*(?:[\w$]+\s*,?\s*)?(?:\{[^}]*\}|\*\s*(?:as\s+[\w$]+)?)?\s*(?:from\s*)?["']([^"']+)["']/g;
 
@@ -54,7 +54,7 @@ function staticImports(file) {
 }
 
 /**
- * Prueft einen Build-Ordner. Liefert die Liste der Verstoesse als lesbare Saetze (leer = ok).
+ * Checks a build folder. Returns the list of violations as readable sentences (empty = ok).
  * @param {string} distDir
  * @param {string[]} [lazyChunks]
  * @returns {{ violations: string[], entries: string[], preloads: string[] }}
@@ -90,7 +90,7 @@ export function checkLazyChunks(distDir, lazyChunks = LAZY_CHUNKS) {
     }
   }
 
-  // Breitensuche ueber statische Importe ab den Einstiegs-Skripten, mit Rueckweg fuer die Meldung.
+  // Breadth-first search over static imports from the entry scripts, with the path back for the message.
   const parent = new Map();
   const queue = [];
   for (const src of entries) {
@@ -120,9 +120,9 @@ export function checkLazyChunks(distDir, lazyChunks = LAZY_CHUNKS) {
   return { violations, entries, preloads };
 }
 
-// Direkt aufgerufen? Beide Seiten real aufloesen: Node setzt import.meta.url auf den echten Pfad,
-// process.argv[1] behaelt einen Symlink-Pfad. Ohne realpath endete ein Aufruf ueber einen
-// Symlink still mit Exit 0 — auch bei kaputtem Build.
+// Called directly? Resolve both sides for real: Node sets import.meta.url to the real path,
+// process.argv[1] keeps a symlink path. Without realpath a call via a
+// symlink ended silently with exit 0 — even with a broken build.
 function realPath(file) {
   try {
     return realpathSync(file);

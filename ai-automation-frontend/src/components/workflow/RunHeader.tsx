@@ -138,7 +138,7 @@ export function RunHeader({ run, workflow, workflowId, connected, isRunning, onO
         onClose={() => setConfirmDelete(false)}
         deleting={deleteRun.isPending}
         onDelete={() => deleteRun.mutate(run.id, {
-          // Der Lauf existiert gleich nicht mehr — weg von seiner Detailseite.
+          // The run will no longer exist in a moment - away from its detail page.
           onSuccess: () => navigate(`/workflows/${workflowId}`),
           onSettled: () => setConfirmDelete(false),
         })}

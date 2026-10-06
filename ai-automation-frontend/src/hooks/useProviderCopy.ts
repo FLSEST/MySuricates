@@ -3,8 +3,8 @@ import { useT } from '../i18n';
 type ProviderCopy = Record<string, { displayName?: string; description?: string; actions?: Record<string, string> }>;
 
 /**
- * Anzeigetexte je Integrations-Anbieter in der App-Sprache (`t.integrations.providers`, DE/EN):
- * Name, Beschreibung und Beschreibung je Aktion. Ohne Übersetzung gilt der Text des Backends.
+ * Display texts per integration provider in the app language (`t.integrations.providers`, DE/EN):
+ * name, description and description per action. Without a translation the backend's text applies.
  */
 export function useProviderCopy() {
   const t = useT();

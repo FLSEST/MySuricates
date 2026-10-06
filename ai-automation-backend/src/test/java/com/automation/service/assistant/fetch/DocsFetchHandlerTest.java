@@ -62,14 +62,14 @@ class DocsFetchHandlerTest {
         assertThat(out).contains("## 1. Schnellstart").doesNotContain("## 10.").doesNotContain("## 2.");
     }
 
-    /** Die Überschrift heißt „## Anhang: Template-Kurzreferenz“, nicht „## Appendix“ (TODO f8d74d01). */
+    /** The heading is "## Anhang: Template-Kurzreferenz", not "## Appendix" (TODO f8d74d01). */
     @Test
     void appendixSection_isFound() {
         assertThat(handler.formatDocsSection("workflow-guide/appendix"))
                 .startsWith("**workflow-guide / appendix:**\n\n## Anhang");
     }
 
-    /** Ein „## …“ in einem Codeblock ist Beispielausgabe, keine Überschrift (TODO f8d74d01). */
+    /** A "## ..." inside a code block is example output, not a heading (TODO f8d74d01). */
     @Test
     void headingInsideCodeFence_isNeitherTocEntryNorSectionEnd() {
         assertThat(handler.formatDocsSection("workflow-guide")).doesNotContain("## backend_tests");

@@ -920,9 +920,16 @@ Details on the three trust classes and taint propagation:
 | **UI text** | through i18n (`de.ts`/`en.ts`), never in code |
 | **Log and error messages, docs, TODO titles, commit messages** | unchanged, as before |
 
-The existing code is still mixed. New or rewritten comments are in English, but existing German comments are not
-translated in passing: that happens in dedicated slices (TODO 9468432d), otherwise open branches collide. Existing
-Flyway migrations (`V*.sql`) stay untouched, including their comments – they are part of the checksum.
+The existing code has been translated (TODO 9468432d). What remains German are quoted UI texts, quotes and doc
+headings inside otherwise English comments, the pre-push gate's rule files and comments inside embedded heredocs.
+Existing Flyway migrations (`V*.sql`) stay untouched, including their comments – they are part of the checksum.
+
+`scripts/tools/german_comments.py` keeps it that way: `ratchet` fails when a file has more German comment lines
+than its ceiling in `scripts/tools/german-comments-baseline.txt` (new files: 0); the Python test
+`test_german_comment_ratchet.py` runs in the CI's discover step. Detection is a heuristic (an umlaut or two German
+function words) and does not catch every German sentence. When translating comments, lower the ceilings with
+`ratchet --update` and verify with `check-diff [BASE] [PATHS]` that only comments, test descriptions and Python
+docstrings changed (TS/TSX exactly via the TypeScript parser).
 
 ### Backend
 

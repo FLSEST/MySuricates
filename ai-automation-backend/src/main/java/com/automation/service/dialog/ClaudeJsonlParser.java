@@ -12,8 +12,8 @@ import java.time.Instant;
 import java.util.*;
 
 /**
- * Parst Claude Code .jsonl-Dateien in strukturierte ParsedSession-Objekte.
- * Kein AI-Aufruf — reine I/O-Verarbeitung.
+ * Parses Claude Code .jsonl files into structured ParsedSession objects.
+ * No AI call — pure I/O processing.
  */
 @Component
 @Slf4j
@@ -47,7 +47,7 @@ public class ClaudeJsonlParser {
     ) {}
 
     /**
-     * Liest eine .jsonl-Datei und gibt eine strukturierte ParsedSession zurück.
+     * Reads a .jsonl file and returns a structured ParsedSession.
      */
     public ParsedSession parse(Path jsonlFile) throws IOException {
         List<DialogTurn> turns = new ArrayList<>();

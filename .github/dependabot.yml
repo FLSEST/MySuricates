@@ -1,10 +1,10 @@
-# Version-Updates fuer GitHub Actions (monatlich, gruppiert) und Sicherheits-Updates fuer
-# npm/Maven. Versions-PRs fuer npm/Maven macht bewusst der Pool-Workflow
-# "npm-dependency-update" bzw. von Hand (Workflow-First) - hier laufen dafuer
-# open-pull-requests-limit: 0, das stellt nur die Versions-Updates ab. Sicherheits-PRs haben
-# ein eigenes, internes Limit und laufen unabhaengig davon weiter, sobald in den
-# Repo-Einstellungen (Code security -> Dependabot alerts + Dependabot security updates)
-# eingeschaltet - das ist keine Einstellung in dieser Datei.
+# Version updates for GitHub Actions (monthly, grouped) and security updates for
+# npm/Maven. Version PRs for npm/Maven are deliberately handled by the pool workflow
+# "npm-dependency-update" or by hand (workflow first) - so open-pull-requests-limit: 0 applies
+# here, which only switches off the version updates. Security PRs have
+# their own internal limit and keep running independently of it, as soon as they are switched on
+# in the repo settings (Code security -> Dependabot alerts + Dependabot security updates) -
+# that is not a setting in this file.
 version: 2
 updates:
   - package-ecosystem: github-actions

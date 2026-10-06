@@ -3,7 +3,7 @@ import type { WorkflowViewMode } from '../../hooks/useWorkflowListView';
 
 const MODES: WorkflowViewMode[] = ['classic', 'discovery'];
 
-/** Umschalter der Workflow-Liste zwischen klassischer Projektliste und Entdecken-Ansicht. */
+/** Switch of the workflow list between the classic project list and the discover view. */
 export function WorkflowViewModeTabs({ t, value, onChange }: {
   t: TranslationKeys;
   value: WorkflowViewMode;

@@ -19,7 +19,7 @@ import type { Goal, GoalProjectProgress } from '../../types';
 
 const DEFAULT_TIME = '08:00';
 
-/** Vorschlag für das Projekt des Wächters: das mit den meisten TODOs des Ziels – so wählt auch das Backend. */
+/** Suggestion for the guard's project: the one with the most of the goal's TODOs — the backend chooses the same way. */
 function busiestProject(byProject: GoalProjectProgress[]): string | null {
   let best: GoalProjectProgress | null = null;
   for (const entry of byProject) {
@@ -29,12 +29,12 @@ function busiestProject(byProject: GoalProjectProgress[]): string | null {
 }
 
 /**
- * Schalter „Wächter“ im Kopf der Zielseite (TODO e192df18): ein Workflow aus der Vorlage „Ziel-Wächter“
- * prüft das Ziel täglich und meldet eine Ampel als Dashboard-Kachel. Beim ersten Einschalten fragt ein
- * kleiner Dialog nach Projekt und Uhrzeit, danach zeigt die Zeile den nächsten Lauf, den Workflow,
- * „Uhrzeit ändern“ (TODO ff6f08fd) und „Jetzt prüfen“. Ausschalten pausiert nur den Zeitplan. Ohne das
- * Modul `dashboard-report` gibt es den Schalter nicht – außer ein Wächter besteht schon und soll sich
- * abschalten lassen.
+ * „Wächter“ switch in the header of the goal page (TODO e192df18): a workflow from the template „Ziel-Wächter“
+ * checks the goal daily and reports a traffic light as a dashboard tile. On first switch-on a
+ * small dialog asks for project and time, afterwards the row shows the next run, the workflow,
+ * „Uhrzeit ändern“ (TODO ff6f08fd) and „Jetzt prüfen“. Switching off only pauses the schedule. Without the
+ * module `dashboard-report` the switch does not exist — unless a guard already exists and is to be
+ * switched off.
  */
 export function GoalGuardControl({ goal, byProject }: { goal: Goal; byProject: GoalProjectProgress[] }) {
   const t = useT();
@@ -47,7 +47,7 @@ export function GoalGuardControl({ goal, byProject }: { goal: Goal; byProject: G
   const [asking, setAsking] = useState(false);
   const [editingTime, setEditingTime] = useState(false);
   const { guard } = goal;
-  // Uhrzeit nur, wenn der Zeitplan eine feste hat; wer ihn unter „Zeitpläne“ anders gestellt hat, ändert ihn dort
+  // Time only if the schedule has a fixed one; whoever set it differently under „Zeitpläne“ changes it there
   const { data: schedule } = useSchedule(guard.scheduleId);
   const { data: results } = useWorkflowWidgetResults(guard.workflowId ? [guard.workflowId] : [], { polling: false });
   const last = results?.find((entry) => entry.workflowId === guard.workflowId) ?? null;
@@ -112,7 +112,7 @@ export function GoalGuardControl({ goal, byProject }: { goal: Goal; byProject: G
   );
 }
 
-/** Uhrzeit des Wächters ändern: nur die Uhrzeit seines Zeitplans, Tage und Wochentage bleiben. */
+/** Change the guard's time: only the time of its schedule, days and weekdays stay. */
 function GuardTimeDialog({ cron, pending, onCancel, onSave }: {
   cron: string;
   pending: boolean;
@@ -141,7 +141,7 @@ function GuardTimeDialog({ cron, pending, onCancel, onSave }: {
   );
 }
 
-/** Erstes Einschalten: Projekt (vorbelegt) und Uhrzeit des täglichen Laufs. */
+/** First switch-on: project (preset) and time of the daily run. */
 function GuardDialog({ byProject, pending, onCancel, onConfirm }: {
   byProject: GoalProjectProgress[];
   pending: boolean;

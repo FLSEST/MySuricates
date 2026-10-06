@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""Vergleicht die in der Doku genannten Groessen mit den Zahlen aus dem Code.
+"""Compares the figures named in the docs with the numbers from the code.
 
-Aufruf ueber scripts/public-readiness/doc-facts-check.sh — dort werden die
-Zahlen deterministisch erhoben und hier als JSON in DOC_FACTS uebergeben.
-argv sind die zu pruefenden Markdown-Dateien, relativ zum Repo-Wurzelpfad.
+Called via scripts/public-readiness/doc-facts-check.sh — there the
+numbers are collected deterministically and passed here as JSON in DOC_FACTS.
+argv are the Markdown files to check, relative to the repo root path.
 
-Ausgabe je Befund:
+Output per finding:
     DRIFT <datei>:<zeile> <groesse> sagt N, Code M | <Zeilenauszug>
 
-Warum Regex und keine Freitext-Pruefung: die Zahlen driften bei jedem Release
-(TODO 3df2df73). Ein Muster je Groesse ist absichtlich eng — lieber eine
-Formulierung nicht erfassen als bei jedem Satz mit einer Zahl Alarm schlagen.
+Why regex and no free-text check: the numbers drift with every release
+(TODO 3df2df73). One pattern per quantity is deliberately narrow — better to miss a
+phrasing than to raise an alarm on every sentence containing a number.
 """
 import json
 import os
@@ -18,59 +18,59 @@ import re
 import sys
 
 # ---------------------------------------------------------------------------
-# Dateien, die bewusst alte Zahlen enthalten
+# Files that deliberately contain old numbers
 #
-# docs/analysis.md ist eine datierte Gap-Analyse ("Historische Momentaufnahme"):
-# ihre Zahlen SIND der Befund von damals, sie duerfen nicht mitwandern.
-# README.md steht nicht im Pruefumfang — es wird aus README.de.md erzeugt.
+# docs/analysis.md is a dated gap analysis ("Historische Momentaufnahme"):
+# its numbers ARE the finding of back then, they must not move along.
+# README.md is not in the check scope — it is generated from README.de.md.
 # ---------------------------------------------------------------------------
-# docs/analysis.md, docs/plans/ und docs/specs/ sind seit 089473cd/72900609 aus dem
-# getrackten Bestand genommen und ignoriert. In einer Arbeitskopie liegen sie oft
-# trotzdem herum — sie sollen die Release-Frage nicht beeinflussen.
+# docs/analysis.md, docs/plans/ and docs/specs/ have been taken out of the tracked set since 089473cd/72900609
+# and ignored. In a working copy they often lie around anyway —
+# they must not influence the release question.
 EXCLUDED_FILES = {"docs/analysis.md", "docs/en/analysis.md", "README.md"}
 EXCLUDED_PREFIXES = ("docs/plans/", "docs/specs/")
 
-# Zeilen mit diesem Marker werden uebersprungen (bewusst alte Zahl im Fliesstext).
+# Lines with this marker are skipped (deliberately old number in running text).
 IGNORE_MARKER = "doc-facts-check: ignore"
 
-# Bindestrich und die Gedankenstriche, die in der Doku als Spannen-Trenner vorkommen.
+# Hyphen and the dashes that appear in the docs as range separators.
 DASH = r"[-‐-―]"
 
 # ---------------------------------------------------------------------------
-# Muster je Groesse
+# Pattern per quantity
 #
-# Alle Muster verlangen die Zahl unmittelbar vor dem Substantiv (hoechstens ein
-# erlaubtes Beiwort dazwischen). Damit faellt "4 audit templates" heraus — eine
-# Teilmenge ist keine Gesamtzahl — und "OAuth2 providers" ebenfalls, weil \b
-# zwischen "h" und "2" keine Wortgrenze ist.
+# All patterns require the number immediately before the noun (at most one
+# allowed adjective in between). That excludes "4 audit templates" — a
+# subset is not a total — and "OAuth2 providers" as well, because \b
+# between "h" and "2" is not a word boundary.
 #
-# Schluessel = Name der Groesse (identisch mit der Ausgabe von --facts).
+# Key = name of the quantity (identical to the output of --facts).
 # ---------------------------------------------------------------------------
 PATTERNS = {
-    # Blocktypen: Quelle ist die Registry BlockTypesIndexSection.BLOCK_TYPES.
-    # Bewusst NICHT erfasst: "(N Typen)" hinter einem Block-Wort. docs/assistant-system.md
-    # nannte dort die Zahl der Block-Spezifikationen des Assistenten — eine Teilmenge der
-    # Blocktypen, die gegen die Gesamtzahl gemessen einen Fehlalarm ergaebe (TODO e36ca773).
+    # Block types: source is the registry BlockTypesIndexSection.BLOCK_TYPES.
+    # Deliberately NOT captured: "(N Typen)" after a block word. docs/assistant-system.md
+    # used it there for the number of the assistant's block specifications — a subset of the
+    # block types that, measured against the total, would yield a false alarm (TODO e36ca773).
     "block-types": [
         r"\b(\d+)\s+[Bb]lock-?[Tt]ypen\b",
         r"\b(\d+)\s+block[- ]types?\b",
     ],
-    # Controller: optionales Beiwort REST bzw. REST-.
-    # (?:s|n) faengt englischen Plural und deutschen Dativ ("43 REST-Controllern").
+    # Controllers: optional adjective REST or REST-.
+    # (?:s|n) catches the English plural and the German dative ("43 REST-Controllern").
     "controllers": [
         r"\b(\d+)\s+(?:REST[- ])?[Cc]ontroller(?:s|n)?\b",
     ],
-    # Hoechste Migrationsnummer: nur die Spanne ab V1 ist eine Standangabe.
-    # Tabellenzeilen sind ausgenommen, dort stehen echte Teilspannen (| V1-V9 |).
-    # "hoechste (vorhandene) Migration: V73" und "V73 als hoechste Migration" nennen den
-    # Stand ebenso — so stand er undatiert in docs/onboarding/FAQ.md (TODO e36ca773).
+    # Highest migration number: only the range from V1 is a state statement.
+    # Table rows are exempt, they hold real sub-ranges (| V1-V9 |).
+    # "hoechste (vorhandene) Migration: V73" and "V73 als hoechste Migration" state the
+    # status just the same — that is how it stood undated in docs/onboarding/FAQ.md (TODO e36ca773).
     "migration-max": [
         r"\bV1\s*" + DASH + r"\s*V(\d+)\b",
         r"\b(?:h(?:ö|oe)chste|highest|latest)\s+(?:vorhandene\s+|existing\s+)?[Mm]igration"
         r"(?:snummer)?\s*:?\s*`?V(\d+)\b",
         r"\bV(\d+)`?\s+(?:als|as the)\s+(?:h(?:ö|oe)chste|highest)\s+[Mm]igration",
     ],
-    # Anzahl der Migrationsdateien, auch als "(N)" hinter dem Quellpfad.
+    # Number of migration files, also as "(N)" after the source path.
     "migrations": [
         r"\b(\d+)\s+(?:Flyway-)?Migrationen\b",
         r"\b(\d+)\s+(?:Flyway )?migrations\b",
@@ -82,30 +82,30 @@ PATTERNS = {
         r"(?:Workflow-)?(?:Templates?|Vorlagen)\b",
         r"\b(\d+)\s+(?:built-?in|workflow|pre-?built|pre-?defined)[- ]"
         r"(?:workflow )?templates?\b",
-        # "unter *Templates* liegen 67 fertige Workflows" (docs/GETTING-STARTED.md): die Zahl
-        # gehoert zu den Templates, weil der Satz sie unmittelbar davor nennt. Ohne diesen
-        # Bezug waeren "N fertige Workflows" auch Pool-Eintraege — die zaehlt keine Quelle hier.
+        # "unter *Templates* liegen 67 fertige Workflows" (docs/GETTING-STARTED.md): the number
+        # belongs to the templates because the sentence names them immediately before. Without this
+        # link "N fertige Workflows" would also be pool entries — no source here counts those.
         r"\bTemplates\b\*?[^.\n]{0,40}?\b(\d+)\s+(?:fertige|ready-?made)\s+[Ww]orkflows\b",
-        # "(N)" hinter dem Quellpfad, z. B. in docs/workflow-pool-kuratierung.md.
+        # "(N)" after the source path, e.g. in docs/workflow-pool-kuratierung.md.
         r"templates/builtin/?(?:\*\.json)?`?\s*\((\d+)\)",
     ],
-    # Built-in-Skills. Der optionale "+ <Wort>"-Einschub fängt die Glossar-Formel
+    # Built-in skills. The optional "+ <word>" insertion catches the glossary formula
     # „19 Built-in + benutzerdefinierte Skills" / „19 built-in + user-defined skills":
-    # die Zahl gilt dort nur dem ersten Teil, der Zusatz steht bloß dazwischen.
+    # the number there applies only to the first part, the addition just sits in between.
     "skills": [
         r"\b(\d+)\s+(?:Built-?in|eingebaute|vordefinierte)(?:\s*\+\s*\S+)?[- ][Ss]kills?\b",
         r"\b(\d+)\s+(?:built-?in|predefined|pre-?defined)(?:\s*\+\s*\S+)?[- ]skills?\b",
         r"skills/builtin/?(?:\*\.json)?`?\s*\((\d+)\)",
     ],
-    # Integrations-Provider. "KI-Provider" (Claude/Codex/Pi) ist etwas anderes
-    # und faellt heraus, weil nur "Integrations-" als Beiwort erlaubt ist.
+    # Integration providers. "KI-Provider" (Claude/Codex/Pi) is something different
+    # and drops out because only "Integrations-" is allowed as an adjective.
     "integration-providers": [
         r"\b(\d+)\s+(?:Integrations-)?Provider(?:s|n)?\b",
         r"\b(\d+)\s+(?:integration )?providers?\b",
     ],
 }
 
-# Groessen, deren Muster in Markdown-Tabellenzeilen nicht gelten.
+# Quantities whose patterns do not apply in Markdown table rows.
 TABLE_EXEMPT = {"migration-max"}
 
 COMPILED = {name: [re.compile(p) for p in pats] for name, pats in PATTERNS.items()}
@@ -115,7 +115,7 @@ def is_excluded(rel):
     return rel in EXCLUDED_FILES or rel.startswith(EXCLUDED_PREFIXES)
 
 
-# Kennzeichnungen, mit denen sich eine Spanne selbst als Auszug ausweist.
+# Markers with which a range identifies itself as an excerpt.
 EXCERPT_MARKERS = re.compile(
     r"Grundschema|Basisschema|Teilspanne|Auszug|base schema|core schema|excerpt|subset",
     re.IGNORECASE)
@@ -124,27 +124,27 @@ _CONTINUATION = {}
 
 
 def span_is_declared_excerpt(line, match, expected):
-    """Weist sich GENAU DIESE Spanne als Auszug aus?
+    """Does THIS VERY range identify itself as an excerpt?
 
-    Die Ausnahme deckt eine Formulierung ab, die es in der Doku wirklich gibt
+    The exception covers a phrasing that really exists in the docs
     (docs/onboarding/ARCHITECTURE.md):
 
         "Die folgende Tabelle beschreibt das Grundschema (V1-V19). V20-V73
          ergaenzen ueberwiegend Spalten und Indizes."
 
-    Zwei Belege muessen zusammenkommen:
+    Two pieces of evidence must come together:
 
-    1. eine Auszugs-Kennzeichnung unmittelbar vor der Spanne (im selben Satzteil);
-    2. dahinter — nur im Rest der Zeile, nicht davor — eine Fortsetzungsspanne,
-       die luekenlos anschliesst (V<n+1>) und bis zur aktuellen Hoechstnummer
-       laeuft.
+    1. an excerpt marker immediately before the range (in the same clause);
+    2. after it — only in the rest of the line, not before — a continuation range
+       that connects without a gap (V<n+1>) and runs up to the current
+       highest number.
 
-    Eine blosse Standangabe im Nebensatz reicht nicht (frueher schaltete jedes
-    "V73" irgendwo in der Zeile die ganze Zeile ab, sodass "Das Grundschema
-    (V1-V50). Aktueller Stand ist V73." unbemerkt blieb), und eine Fortsetzung,
-    die gar nicht anschliesst ("V1-V50. V20-V73"), belegt die Grenze der
-    Teilspanne ebenso wenig. Geprueft wird jede Spanne fuer sich; andere Zahlen
-    derselben Zeile laufen weiter durch die Pruefung.
+    A mere state statement in a subordinate clause is not enough (formerly any
+    "V73" anywhere in the line switched off the whole line, so that "Das Grundschema
+    (V1-V50). Aktueller Stand ist V73." went unnoticed), and a continuation
+    that does not connect at all ("V1-V50. V20-V73") proves the boundary of the
+    sub-range just as little. Each range is checked on its own; other numbers
+    of the same line continue through the check.
     """
     segment = re.split(r"[.;:|]", line[:match.start()])[-1]
     if not EXCERPT_MARKERS.search(segment):
@@ -161,43 +161,43 @@ def span_is_declared_excerpt(line, match, expected):
 
 
 # ---------------------------------------------------------------------------
-# Migrationstabellen
+# Migration tables
 #
-# Die Tabellen in docs/datenmodell.md und docs/architektur.md listen je Migration
-# eine Zeile "| V66 | ... |". Massgeblich ist die hoechste genannte Nummer: bleibt
-# sie hinter dem Code zurueck, fehlen Zeilen. Ausgenommen sind Tabellen, die sich
-# im Fliesstext als Auszug ausweisen, indem sie den aktuellen Stand daneben nennen
-# (docs/onboarding/ARCHITECTURE.md listet V1-V19 und schreibt V73 in den Text).
+# The tables in docs/datenmodell.md and docs/architektur.md list one row
+# "| V66 | ... |" per migration. The highest named number is decisive: if
+# it lags behind the code, rows are missing. Exempt are tables that identify
+# themselves in running text as an excerpt by naming the current state next to them
+# (docs/onboarding/ARCHITECTURE.md lists V1-V19 and writes V73 in the text).
 #
-# Zwei bewusste Grenzen:
-# - Das Muster haengt an der schlichten Zelle "| V66 |" bzw. "| `V66` |". Eine
-#   Tabelle, die die Nummer auszeichnet ("| **V66** |"), faellt heraus; kommt so
-#   eine Schreibweise auf, gehoert sie hier ergaenzt.
-# - Die Ausnahme wirkt dateiweit: nennt IRGENDEINE Fliesstext-Zeile der Datei die
-#   Hoechstnummer, gelten ALLE Tabellen darin als ausgewiesener Auszug. Das ist
-#   grob, aber vom Auftrag so gewollt — die eine Formulierung in
-#   docs/onboarding/ARCHITECTURE.md ist der ganze Anwendungsfall.
+# Two deliberate limits:
+# - The pattern hangs on the plain cell "| V66 |" or "| `V66` |". A
+#   table that marks up the number ("| **V66** |") drops out; if such
+#   a notation appears, it belongs added here.
+# - The exception works file-wide: if ANY running-text line of the file names the
+#   highest number, ALL tables in it count as an identified excerpt. That is
+#   coarse, but intended by the task — the one phrasing in
+#   docs/onboarding/ARCHITECTURE.md is the whole use case.
 # ---------------------------------------------------------------------------
-# Eine Zeile darf eine Nummer ODER eine Spanne tragen: docs/architektur.md fasst zwei
-# Migrationen zu "| V28–V29 | Wishes + Wish-Reference-Workflow-IDs |" zusammen. Ohne die
-# Spanne haelt die Vollstaendigkeitspruefung das fuer ein Loch (sie tat es beim ersten Lauf).
+# A row may carry a number OR a range: docs/architektur.md merges two
+# migrations into "| V28–V29 | Wishes + Wish-Reference-Workflow-IDs |". Without the
+# range the completeness check takes that for a hole (it did so on the first run).
 TABLE_MIGRATION_ROW = re.compile(rf"^\|\s*`?V(\d+)`?(?:\s*{DASH}\s*`?V(\d+)`?)?\s*\|")
 
-# Kopftabelle von README.de.md: "rund 1 420 Commits" — der Text sagt "rund",
-# deshalb mit Toleranz. Tausendertrenner koennen Leer-, Schmal- oder Punktzeichen sein.
+# Header table of README.de.md: "rund 1 420 Commits" — the text says "rund",
+# hence with tolerance. Thousands separators can be space, narrow space or dot characters.
 COMMITS_CLAIM = re.compile(r"\b([0-9][0-9.   ' ]*)\s*Commits\b")
 COMMITS_TOLERANCE = 0.05
 
-# Stichtag eines Abschnitts: "Stand 2026-09-22 (Commit `d23a09ed`, …)". Eine datierte Zahl ist
-# am Stichtag wahr, nicht an HEAD – sonst wird das Gate mit jedem Commit roter, obwohl der Text
-# stimmt (TODO 65c6dedc). Gilt fuer den ganzen Abschnitt (Ueberschrift bis Ueberschrift), weil
-# die Angabe mal vor der Tabelle und mal hinter dem Satz steht.
+# Reference date of a section: "Stand 2026-09-22 (Commit `d23a09ed`, …)". A dated number is
+# true on the reference date, not at HEAD — otherwise the gate gets redder with every commit although the text
+# is right (TODO 65c6dedc). Applies to the whole section (heading to heading), because
+# the statement is sometimes before the table and sometimes after the sentence.
 STICHTAG = re.compile(r"\bStand\b[^\n`]*?Commit\s+`([0-9a-f]{7,40})`")
 HEADING = re.compile(r"^#{1,6}\s")
 
-# Testzahlen altern schneller als alles andere. Sie duerfen stehen bleiben, solange
-# sie datiert sind ("Stand 2026-09-18: 715 Testklassen") — eine undatierte Testzahl
-# behauptet Aktualitaet, die niemand geprueft hat.
+# Test counts age faster than anything else. They may stay as long as
+# they are dated ("Stand 2026-09-18: 715 Testklassen") — an undated test count
+# claims currency that nobody has verified.
 TEST_CLAIM = re.compile(
     r"\b\d[\d.    ]*\s*(?:Testklassen|Testdateien|Vitest-Dateien|Cypress-Specs"
     r"|test classes|test files|Vitest files|Cypress specs)\b"
@@ -219,41 +219,41 @@ VERSION_ROW = re.compile(r"^\|\s*\*\*([^*|]+)\*\*\s*\|([^|]*)\|")
 VERSION_NUMBER = re.compile(r"\d+(?:\.\d+)+")
 
 # ---------------------------------------------------------------------------
-# Verbotene Muster, fehlende Dateien, undatierte Testzahlen: gelten ueberall
+# Forbidden patterns, missing files, undated test counts: apply everywhere
 #
-# Die drei Regeln kamen am 2026-09-18 mit der Handpruefung des Onboarding-Pakets
-# (TODO 8c75f1dd) und galten zunaechst nur dort — nicht aus einem inhaltlichen
-# Grund, sondern weil je eine Fundstelle ausserhalb erst umformuliert werden
-# musste. Seit TODO c9c9f3eb ist das erledigt und die Regeln laufen ueber alle
-# geprueften Dateien:
+# The three rules came on 2026-09-18 with the manual check of the onboarding package
+# (TODO 8c75f1dd) and at first applied only there — not for a reason of
+# content, but because one occurrence each outside had to be reworded first.
+# Since TODO c9c9f3eb that is done and the rules run over all
+# checked files:
 #
-# - Kommando-Muster: docs/entwicklung.md nannte `mvn spring-boot:run` als
-#   Gegen-Hinweis im Fliesstext; der Hinweis steht jetzt als Blockquote und ist
-#   damit von der Regel ausgenommen (check_forbidden_patterns laesst "> " durch).
-# - Dateinamen-Muster: die Nennung von tailwind.config.ts in docs/architektur.md
-#   ist entfallen. Die verbliebenen Tailwind-Stellen sprechen von
-#   `tailwind.config.js`/`.*` und sagen ausdruecklich, dass es die Datei NICHT
-#   gibt — ein anderer Name, den die Regel nicht trifft.
-# - Testzahl-Datierung: die undatierten Testzahlen in docs/ wurden datiert.
+# - Command pattern: docs/entwicklung.md named `mvn spring-boot:run` as a
+#   counter-hint in running text; the hint is now a blockquote and is
+#   thereby exempt from the rule (check_forbidden_patterns lets "> " through).
+# - File name pattern: the mention of tailwind.config.ts in docs/architektur.md
+#   is gone. The remaining Tailwind places speak of
+#   `tailwind.config.js`/`.*` and explicitly say that the file does NOT
+#   exist — a different name that the rule does not hit.
+# - Test count dating: the undated test counts in docs/ were dated.
 #
-# Wer eine dieser Muster-Arten legitim braucht, schreibt sie als Blockquote
-# (Kommandos) oder setzt den IGNORE_MARKER in die Zeile.
+# Whoever legitimately needs one of these pattern kinds writes it as a blockquote
+# (commands) or puts the IGNORE_MARKER in the line.
 # ---------------------------------------------------------------------------
 
-# Verbotene Muster. Blockquote-Zeilen sind ausgenommen: dort steht das Muster
-# als Warnung ("Nicht `mvn spring-boot:run` verwenden"), nicht als Anleitung.
+# Forbidden patterns. Blockquote lines are exempt: there the pattern stands
+# as a warning ("Nicht `mvn spring-boot:run` verwenden"), not as instructions.
 FORBIDDEN_PATTERNS = [
     (re.compile(r"mvn\s+spring-boot:run"),
      "mvn spring-boot:run — der RuntimeClasspathGuard bricht den Start ab"),
     (re.compile(r"React Router v[1-6]\b"),
      "veraltete React-Router-Version (package.json fuehrt v7)"),
-    # Dauerhaft gueltig: Modell-IDs mit Versions- oder Datumsstand veralten von
-    # selbst, in der Doku gelten die Aliase opus/sonnet/haiku/fable.
+    # Permanently valid: model IDs with a version or date stamp go stale
+    # by themselves, in the docs the aliases opus/sonnet/haiku/fable apply.
     #
-    # Mindestens ZWEI Zahlengruppen verlangt: `claude-opus-4-6` und
-    # `claude-haiku-4-5-20251001` veralten, `claude-opus-5` nicht — eine
-    # einsegmentige ID ist laut CLAUDE.md eine erlaubte konkrete Angabe, und
-    # docs/architektur.md nennt sie genau so als Beispiel.
+    # At least TWO number groups required: `claude-opus-4-6` and
+    # `claude-haiku-4-5-20251001` go stale, `claude-opus-5` does not — a
+    # single-segment ID is an allowed concrete value according to CLAUDE.md, and
+    # docs/architektur.md names it exactly so as an example.
     (re.compile(r"claude-(?:opus|sonnet|haiku|fable)-\d+-\d"),
      "datierte Modell-ID — in der Doku gelten die Aliase opus/sonnet/haiku/fable"),
     # The product is called MySuricates. "AutoPilot" is only the name of the project under which
@@ -265,39 +265,39 @@ FORBIDDEN_PATTERNS = [
 ]
 
 # ---------------------------------------------------------------------------
-# Feste Zahlen ueber die ausgelieferten Definitionen (TODO 4846ccca)
+# Fixed numbers about the shipped definitions (TODO 4846ccca)
 #
-# docs/architektur.md schrieb: "In den mitgelieferten Definitionen kommt diese Form
-# achtmal vor (sieben Pool-Workflows, ein Built-in-Template)". Die Zahl war schon beim
-# Schreiben falsch, wurde nachgezaehlt und korrigiert (sechsmal, kein Built-in) — und
-# waere mit dem naechsten Pool-Eintrag wieder falsch gewesen. Die DE- und die
-# EN-Fassung widersprachen sich dabei zeitweise sogar gegenseitig.
+# docs/architektur.md wrote: "In den mitgelieferten Definitionen kommt diese Form
+# achtmal vor (sieben Pool-Workflows, ein Built-in-Template)". The number was already wrong
+# when written, was recounted and corrected (sechsmal, kein Built-in) — and
+# would have been wrong again with the next pool entry. The DE and the
+# EN version even contradicted each other at times.
 #
-# Nachzaehlen tut in der Doku niemand; die Gates tun es bei jedem Lauf
-# (PlatformPromptQuotingGateTest zaehlt seine Kandidaten selbst und schlaegt fehl,
-# wenn es keine mehr findet; TemplateHygieneGateTest prueft die Quoting-Form). In die
-# Prosa gehoert deshalb der Verweis auf das pruefende Gate, nicht die Zahl.
+# Nobody recounts in the docs; the gates do it on every run
+# (PlatformPromptQuotingGateTest counts its candidates itself and fails
+# if it finds none; TemplateHygieneGateTest checks the quoting form). The prose
+# therefore should hold the pointer to the checking gate, not the number.
 #
-# Eng gefasst wie alle Muster hier: Es braucht BEIDES — eine Zahl, die ein Vorkommen
-# zaehlt ("achtmal", "eight times", "sieben Pool-Workflows", "ein Built-in"), UND im
-# Umfeld von einer Zeile (die Doku bricht bei ~100 Zeichen um) die Rede von den
-# ausgelieferten Definitionen. Gesamtzahlen wie "66 Built-in-Templates" treffen die
-# Regel nicht: Ihr Satz spricht nicht von den ausgelieferten Definitionen, und sie haben
-# mit `templates` ohnehin ihre eigene, gegen den Code gemessene Pruefung.
+# Narrowly drawn like all patterns here: it needs BOTH — a number that counts an occurrence
+# ("achtmal", "eight times", "sieben Pool-Workflows", "ein Built-in"), AND in the
+# vicinity of one line (the docs wrap at ~100 characters) talk of the
+# shipped definitions. Totals like "66 Built-in-Templates" do not hit the
+# rule: their sentence does not speak of the shipped definitions, and they have
+# their own check measured against the code anyway, with `templates`.
 #
-# "einmal"/"once" zaehlt absichtlich nicht mit — das ist im Deutschen ein gewoehnliches
-# Wort ("zeigt es genau einmal") und keine Bestandsangabe.
+# "einmal"/"once" deliberately does not count — in German that is an ordinary
+# word ("zeigt es genau einmal") and not a stock statement.
 # ---------------------------------------------------------------------------
 _NUMBER_WORDS = (r"zwei|drei|vier|fuenf|fünf|sechs|sieben|acht|neun|zehn"
                  r"|two|three|four|five|six|seven|eight|nine|ten")
 _COUNTS = rf"\d+|ein|eine|einem|einen|one|{_NUMBER_WORDS}"
 
-# Umfeld, in dem eine Zahl eine Bestandsangabe ueber die Auslieferung waere.
+# Vicinity in which a number would be a stock statement about the shipped definitions.
 SHIPPED_DEFINITIONS = re.compile(
     r"(?:aus|mit)gelieferten\s+(?:Definitionen|Templates)"
     r"|(?:shipped|bundled)\s+(?:definitions|templates)", re.IGNORECASE)
 
-# Die Zahl selbst: als Vorkommens-Adverb oder unmittelbar vor der gezaehlten Sache.
+# The number itself: as an occurrence adverb or immediately before the counted thing.
 DEFINITION_COUNT = re.compile(
     rf"\b(?:\d+|{_NUMBER_WORDS})\s*mal\b"
     rf"|\b(?:\d+|{_NUMBER_WORDS})\s+times\b"
@@ -340,23 +340,23 @@ def check_migration_table(rel, lines, expected, numbers, findings):
 
 
 def check_migration_table_complete(rel, seen, best, best_no, numbers, findings):
-    """Keine Luecke zwischen der kleinsten und der groessten gelisteten Nummer.
+    """No gap between the smallest and the largest listed number.
 
-    Die Pruefung auf die HOECHSTE Nummer allein hat eine blinde Stelle, und sie ist beim
-    Nachtragen von V75 (TODO ffa6d846) aufgefallen: Ein fehlerhafter Einschub hat die
-    V74-Zeile zerschnitten, die Tabelle sprang von V73 auf V75 — und das Gate blieb gruen,
-    weil die Hoechstnummer stimmte. Eine Tabelle mit Loch ist als Nachschlagewerk aber genau
-    dort falsch, wo jemand nachsieht.
+    Checking the HIGHEST number alone has a blind spot, and it was noticed when
+    adding V75 (TODO ffa6d846): a faulty insertion cut the
+    V74 row apart, the table jumped from V73 to V75 — and the gate stayed green
+    because the highest number was right. A table with a hole is wrong as a reference
+    exactly where someone looks things up.
 
-    Geprueft wird nur, wenn die Tabelle bis zur aktuellen Hoechstnummer reicht — dann
-    behauptet sie Vollstaendigkeit, und ein Loch ist ein Befund. Bleibt sie darunter, meldet
-    das schon die Standpruefung, und ein ausgewiesener Auszug (docs/onboarding) soll nicht
-    zusaetzlich wegen fehlender Zeilen anschlagen. Die Spanne beginnt bei der kleinsten
-    gelisteten Nummer: Eine Tabelle, die bewusst erst bei V20 anfaengt, ist kein Befund.
+    Checked only if the table reaches up to the current highest number — then
+    it claims completeness, and a hole is a finding. If it stays below, the
+    state check already reports that, and an identified excerpt (docs/onboarding) should not
+    additionally trigger because of missing rows. The range starts at the smallest
+    listed number: a table that deliberately starts only at V20 is no finding.
 
-    Verglichen wird gegen die WIRKLICH vorhandenen Migrationsdateien (migration-numbers),
-    nicht gegen eine durchgezaehlte Reihe. Sonst waere eine nie existierende Nummer ein
-    Fehlalarm — Migrationsnummern koennen uebersprungen werden.
+    Compared against the migration files that ACTUALLY exist (migration-numbers),
+    not against a counted-through sequence. Otherwise a never-existing number would be a
+    false alarm — migration numbers can be skipped.
     """
     if best is None or not numbers:
         return
@@ -369,7 +369,7 @@ def check_migration_table_complete(rel, seen, best, best_no, numbers, findings):
 
 
 def section_stichtage(lines):
-    """Je Zeile der Stichtag-Commit ihres Abschnitts (oder None); Codebloecke trennen nicht."""
+    """Per line the reference-date commit of its section (or None); code blocks do not separate."""
     result, start, fenced = [None] * len(lines), 0, False
 
     def assign(first, end):
@@ -388,7 +388,7 @@ def section_stichtage(lines):
 
 
 def check_readme_head(rel, no, line, facts, findings, stichtag=None):
-    """Kopftabelle von README.de.md: Commit-Zahl (am Stichtag des Abschnitts, sonst an HEAD)."""
+    """Header table of README.de.md: commit count (at the reference date of the section, else at HEAD)."""
     expected, basis = facts.get("commits"), "Code"
     if stichtag is not None and COMMITS_CLAIM.search(line):
         known = facts.get("commits-at", {})
@@ -406,7 +406,7 @@ def check_readme_head(rel, no, line, facts, findings, stichtag=None):
 
 
 def check_version_row(rel, no, line, versions, findings):
-    """Technologietabelle gegen pom.xml / package.json."""
+    """Technology table against pom.xml / package.json."""
     if not versions:
         return
     match = VERSION_ROW.match(line.strip())
@@ -435,22 +435,22 @@ def check_forbidden_patterns(rel, no, line, findings):
 
 
 def check_definition_count(rel, no, lines, findings):
-    """Feste Vorkommens-Zahl ueber die ausgelieferten Definitionen (siehe oben).
+    """Fixed occurrence count about the shipped definitions (see above).
 
-    Gemeldet wird an der Zeile, in der die Zahl steht; die Nachbarzeilen liefern nur
-    den Beleg, dass von der Auslieferung die Rede ist — und zwar nur, wenn der Satz
-    dort wirklich weiterlaeuft (sentence_continues, dieselbe Pruefung wie bei der
-    Testzahl-Datierung). Ohne diese Bedingung wuerde jede beliebige Nachbarzeile, die
-    das Wort "ausgelieferte Definitionen" enthaelt, die naechste Zahl einfaerben —
-    zum Beispiel die Gesamtzahl der Built-in-Templates im Satz darunter.
+    Reported at the line where the number stands; the neighbouring lines only supply
+    the evidence that the shipment is being discussed — and only if the sentence
+    really continues there (sentence_continues, the same check as for the
+    test count dating). Without this condition any neighbouring line containing
+    the words "ausgelieferte Definitionen" would colour the next number —
+    for example the total of built-in templates in the sentence below.
     """
     line = lines[no - 1]
     match = DEFINITION_COUNT.search(line)
     if not match:
         return
-    # In Lesereihenfolge zusammensetzen: "mitgelieferten" am Zeilenende und
-    # "Definitionen" am Anfang der naechsten Zeile ist genau der Fall, den die
-    # Fensterpruefung fangen soll — umgekehrt zusammengesetzt faende sie ihn nie.
+    # Join in reading order: "mitgelieferten" at the line end and
+    # "Definitionen" at the start of the next line is exactly the case the
+    # window check is meant to catch — joined the other way round it would never find it.
     previous = lines[no - 2] if no >= 2 else ""
     window = [previous] if sentence_continues(previous) else []
     window.append(line)
@@ -465,13 +465,13 @@ def check_definition_count(rel, no, lines, findings):
 
 
 # ---------------------------------------------------------------------------
-# Aufzaehlung der Blocktypen: "type": "simple | shell | ... | integration"
+# Enumeration of the block types: "type": "simple | shell | ... | integration"
 #
-# docs/datenmodell.md zeigte die BlockDefinition mit 14 Typen, als es 20 gab
-# (TODO e36ca773). Keine Zahl, die ein Muster fassen koennte — die Luecke steckt in
-# der Liste selbst. Als Aufzaehlung der Blocktypen gilt eine "type"-Liste erst, wenn sie
-# mehr als die Haelfte aller Blocktypen nennt — dann behauptet sie, die Liste zu sein.
-# Andere Typ-Felder ("type": "stop | continue") und kurze Beispiele bleiben aussen vor.
+# docs/datenmodell.md showed the BlockDefinition with 14 types when there were 20
+# (TODO e36ca773). No number a pattern could catch — the gap sits in
+# the list itself. A "type" list counts as an enumeration of the block types only if it
+# names more than half of all block types — then it claims to be the list.
+# Other type fields ("type": "stop | continue") and short examples stay out.
 # ---------------------------------------------------------------------------
 TYPE_ENUM = re.compile(r'"type"\s*:\s*"([a-z][a-z-]*(?:\s*\|\s*[a-z][a-z-]*)+)"')
 
@@ -498,14 +498,14 @@ def check_block_type_enum(rel, no, line, names, findings):
 
 
 # ---------------------------------------------------------------------------
-# Controller-Aufzaehlung (TODO 65eab274)
+# Controller enumeration (TODO 65eab274)
 #
-# docs/entwicklung.md (DE/EN) zaehlt unter der Controller-Zahl jeden Controller beim Namen
-# auf ("**Controller:** ActivityLog, Assistant, …"). Die Zahl prueft check_sizes, die Liste
-# driftete trotzdem zweimal ab (51 genannt, 47 aufgezaehlt). Verglichen werden beide
-# Richtungen: jeder *Controller.java unter src/main/java muss genannt sein, jeder genannte
-# Name muss als Klasse existieren. Namen ohne das Suffix "Controller"; steht es doch dabei
-# (oder in Backticks), wird es abgestreift.
+# docs/entwicklung.md (DE/EN) lists every controller by name under the controller count
+# ("**Controller:** ActivityLog, Assistant, …"). check_sizes checks the number, the list
+# drifted anyway twice (51 named, 47 listed). Both directions are compared:
+# every *Controller.java under src/main/java must be named, every named
+# name must exist as a class. Names without the suffix "Controller"; if it is there anyway
+# (or in backticks), it is stripped off.
 # ---------------------------------------------------------------------------
 CONTROLLER_ENUM = re.compile(r"^\s*\*\*Controllers?:\*\*\s*(.+?)\s*$")
 
@@ -538,37 +538,37 @@ def check_controller_enum(rel, no, line, names, findings):
 
 
 # ---------------------------------------------------------------------------
-# curl mit API-Key ohne --noproxy (TODO 2e3cf243)
+# curl with API key without --noproxy (TODO 2e3cf243)
 #
-# Mit gesetztem http_proxy schickt curl auch Aufrufe an localhost ueber den Proxy -- samt
-# X-API-Key-Header. Das CLAUDE.md-Snippet traegt deshalb seit 6d54a5bf `--noproxy '*'`, die
-# Beispiele in AGENTS.md und docs/ taten es nicht. Jedes Beispiel wird kopiert; ein einziges
-# ohne die Option genuegt, damit der Key beim naechsten Leser beim Proxy landet.
+# With http_proxy set, curl also sends calls to localhost through the proxy -- including the
+# X-API-Key header. The CLAUDE.md snippet therefore has carried `--noproxy '*'` since 6d54a5bf, the
+# examples in AGENTS.md and docs/ did not. Every example gets copied; a single one
+# without the option is enough for the key to end up at the proxy with the next reader.
 #
-# Geprueft wird der ganze Aufruf samt Fortsetzungszeilen ("\" am Zeilenende), gemeldet an
-# der Zeile mit `curl`. Ausgenommen ist nur ein Aufruf, dessen Ziel ausdruecklich eine
-# entfernte Instanz ist (https://instanz.example …): Dort kann der Proxy gewollt sein.
-# Variablen wie $BASE oder $MS gelten als lokal -- die Beispiele meinen die eigene Instanz.
+# The whole call including continuation lines ("\" at the line end) is checked, reported at
+# the line with `curl`. Exempt is only a call whose target is explicitly a
+# remote instance (https://instanz.example …): there the proxy may be intended.
+# Variables like $BASE or $MS count as local -- the examples mean one's own instance.
 # ---------------------------------------------------------------------------
 CURL_CALL = re.compile(r"(?:^|[\s;|&(`$])curl\s")
-# Der Key als Header-Argument, nicht das blosse Wort: "per curl mit X-API-Key" in der Prosa
-# ist kein Aufruf.
+# The key as a header argument, not the bare word: "per curl mit X-API-Key" in prose
+# is no call.
 API_KEY_HEADER = re.compile(r"(?:-H|--header)\s*[\"']?X-API-Key", re.IGNORECASE)
 URL_HOST = re.compile(r"https?://(\[[^\]]*\]|[^/\s\"'`:]+)", re.IGNORECASE)
 LOCAL_HOSTS = {"localhost", "127.0.0.1", "0.0.0.0", "[::1]"}
-# Was curl sendet, ist kein Ziel: eine URL im Body (-d '{"url":"https://hooks.example.com"}')
-# machte den Aufruf sonst "entfernt", ein localhost im Body einen entfernten Aufruf "lokal".
+# What curl sends is no target: a URL in the body (-d '{"url":"https://hooks.example.com"}')
+# would otherwise make the call "entfernt", a localhost in the body make a remote call "lokal".
 BODY_ARGUMENT = re.compile(
     r"(?<!\S)(?:-d|-F|--data(?:-raw|-binary|-urlencode|-ascii)?|--json|--form(?:-string)?)(?:=|\s*)"
     r"(?:'[^']*'|\"(?:\\.|[^\"\\])*\"|\S+)")
-# --noproxy mit nichtleerem Wert; "--noproxy ''" wirkt nicht.
+# --noproxy with a non-empty value; "--noproxy ''" has no effect.
 NOPROXY_OPTION = re.compile(r"--noproxy(?:=|\s+)(?:'([^']+)'|\"([^\"]+)\"|([^\s'\"]+))")
-# Dieselbe Wirkung als Umgebungsvariable vor dem Aufruf: NO_PROXY='*' curl …
+# The same effect as an environment variable before the call: NO_PROXY='*' curl …
 NOPROXY_ENV = re.compile(r"\b(?:NO_PROXY|no_proxy)=(?:'\*'|\"\*\"|\*)(?:\s|$)")
 
 
 def curl_command(lines, no):
-    """Die Zeile no samt ihren Fortsetzungszeilen, zu einer Zeile verbunden."""
+    """The line no including its continuation lines, joined into one line."""
     parts = [lines[no - 1].rstrip("\n").rstrip()]
     k = no
     while parts[-1].endswith("\\") and k < len(lines):
@@ -580,14 +580,14 @@ def curl_command(lines, no):
 
 def check_curl_noproxy(rel, no, lines, findings):
     line = lines[no - 1]
-    # Eine Fortsetzungszeile gehoert zum Befehl der Zeile davor; der wird dort geprueft und
-    # gemeldet -- ein zweites curl darin sonst doppelt.
+    # A continuation line belongs to the command of the line before; that one is checked and
+    # reported there -- a second curl in it would otherwise count twice.
     if no >= 2 and lines[no - 2].rstrip().endswith("\\"):
         return
     command = curl_command(lines, no)
     if not CURL_CALL.search(command):
         return
-    # Je curl-Aufruf fuer sich: "curl … --noproxy '*' …; curl …" darf den zweiten nicht decken.
+    # Per curl call on its own: "curl … --noproxy '*' …; curl …" must not cover the second.
     matches = list(CURL_CALL.finditer(command))
     for k, match in enumerate(matches):
         call = command[match.end():matches[k + 1].start() if k + 1 < len(matches) else len(command)]
@@ -611,17 +611,17 @@ def check_absent_files(rel, no, line, absent, findings):
 
 
 def sentence_continues(line):
-    """Laeuft der Satz dieser Zeile in die naechste weiter?
+    """Does the sentence of this line continue into the next?
 
-    Zwei Belege, beide aus der echten Doku:
-    - eine offene Klammer (die Quellen- und Standangabe steht darin:
+    Two pieces of evidence, both from the real docs:
+    - an open parenthesis (the source and state statement stands in it:
       "73 test classes in the repo (as of\\n2026-09-18, `grep ...`)");
-    - oder die Zeile endet ohne Satzzeichen, also mitten im Satz.
+    - or the line ends without punctuation, i.e. mid-sentence.
 
-    Ohne diese Pruefung wuerde eine beliebige datierte Nachbarzeile eine
-    undatierte Testzahl stumm stellen — genau das hat der Fixture-Fall
-    "Unter src/test/java liegen 715 Testklassen." aufgedeckt: Der Satz ist mit
-    dem Punkt zu Ende, das Datum der Folgezeile gehoert zu einer anderen Aussage.
+    Without this check any dated neighbouring line would silence an
+    undated test count — exactly what the fixture case
+    "Unter src/test/java liegen 715 Testklassen." uncovered: the sentence ends
+    with the full stop, the date of the following line belongs to a different statement.
     """
     stripped = line.rstrip()
     if stripped.count("(") > stripped.count(")"):
@@ -630,12 +630,12 @@ def sentence_continues(line):
 
 
 def check_test_claim_dated(rel, no, line, next_line, findings):
-    """Testzahl braucht ein Datum — auch eines, das hinter dem Umbruch steht.
+    """A test count needs a date — also one that stands after the line break.
 
-    Die Doku bricht Zeilen bei ~100 Zeichen um; die Datierung landet dabei
-    regelmaessig in der Folgezeile. Sie ist dann vorhanden, nur nicht in
-    derselben Zeile — deshalb zaehlt sie mit, aber nur wenn der Satz dort
-    tatsaechlich weiterlaeuft (siehe sentence_continues).
+    The docs wrap lines at ~100 characters; the dating regularly ends up
+    in the following line. It is then present, just not in
+    the same line — so it counts, but only if the sentence actually
+    continues there (see sentence_continues).
     """
     dated_next = sentence_continues(line) and ISO_DATE.search(next_line or "")
     if TEST_CLAIM.search(line.strip()) and not ISO_DATE.search(line) and not dated_next:
@@ -644,11 +644,11 @@ def check_test_claim_dated(rel, no, line, next_line, findings):
 
 
 def check_sizes(rel, no, line, text, boundary, facts, findings):
-    """Groessen-Muster auf text; gemeldet wird an Zeile no.
+    """Quantity patterns on text; reported at line no.
 
-    boundary 0: der Zeilenlauf, jeder Treffer zaehlt. Sonst ist text die Zeile plus
-    Folgezeile, und es zaehlen nur Treffer, deren Zahl vor und deren Ende hinter der
-    Grenze liegt — so wird kein Treffer doppelt gemeldet.
+    boundary 0: the line pass, every hit counts. Otherwise text is the line plus
+    the following line, and only hits count whose number lies before and whose end lies after the
+    boundary — so no hit is reported twice.
     """
     is_table = line.lstrip().startswith("|")
     for name, regexes in COMPILED.items():
@@ -680,15 +680,15 @@ def scan(root, rel, facts, findings):
         return
     stichtage = section_stichtage(lines) if rel == README_SOURCE else None
     for no, line in enumerate(lines, 1):
-        # Codebloecke werden bewusst MIT geprueft: die Verzeichnisbaeume in
-        # docs/architektur.md ("├── controller/   43 REST-Controller") stehen in
-        # ```-Bloecken und sind genau die Stellen, die am haeufigsten driften.
+        # Code blocks are deliberately checked TOO: the directory trees in
+        # docs/architektur.md ("├── controller/   43 REST-Controller") stand in
+        # ```-blocks and are exactly the places that drift most often.
         if IGNORE_MARKER in line:
             continue
         check_sizes(rel, no, line, line, 0, facts, findings)
-        # Zwei-Zeilen-Fenster (TODO 880a17ea): "... the 66 built-in" / "templates ..." —
-        # die Zahl steht am Zeilenende, das Substantiv in der Folgezeile. Geprueft werden
-        # hier nur Treffer, die ueber die Grenze reichen; alles andere findet der Zeilenlauf.
+        # Two-line window (TODO 880a17ea): "... the 66 built-in" / "templates ..." —
+        # the number stands at the line end, the noun in the following line. Only hits that reach
+        # across the boundary are checked here; everything else the line pass finds.
         next_line = lines[no] if no < len(lines) else ""
         if next_line and IGNORE_MARKER not in next_line and sentence_continues(line):
             first = line.rstrip("\n").rstrip()

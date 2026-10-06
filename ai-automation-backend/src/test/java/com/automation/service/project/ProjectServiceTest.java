@@ -70,8 +70,8 @@ class ProjectServiceTest {
     }
 
     /**
-     * Die Liste laeuft ueber {@code findActiveWithContainer()}: Nur die Join-Fetch-Variante holt
-     * den Container mit, statt ihn je Projekt nachzuladen (TODO 6d0ab09f).
+     * The list goes via {@code findActiveWithContainer()}: only the join-fetch variant fetches
+     * the container along, instead of reloading it per project (TODO 6d0ab09f).
      */
     @Test
     void findAll_returnsAllProjects() {
@@ -188,10 +188,10 @@ class ProjectServiceTest {
     }
 
     /**
-     * Ein Workflow-Lauf startet den Projekt-Container selbst (RunContainerPreparation), ohne den
-     * Projektstatus auf RUNNING zu setzen. Das Löschen muss diesen Container trotzdem stoppen —
-     * sonst lief er weiter, und der Orphan-Reconciler sah ihn wegen der RUNNING-Zeile nie als
-     * verwaist an (Befund aus chains.cy.ts, TODO 413b9f62).
+     * A workflow run starts the project container itself (RunContainerPreparation), without setting the
+     * project status to RUNNING. Deleting must still stop this container —
+     * otherwise it kept running, and the orphan reconciler never saw it as
+     * orphaned because of the RUNNING row (finding from chains.cy.ts, TODO 413b9f62).
      */
     @Test
     void delete_stoppedProjectWithRunningContainer_stopsContainer() {

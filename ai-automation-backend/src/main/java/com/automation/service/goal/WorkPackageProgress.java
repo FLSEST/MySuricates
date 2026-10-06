@@ -14,14 +14,14 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Zustand der Arbeitspakete eines Ziels aus seinen TODO-Zeilen (TODO 259f4f66, c60bf914) – ohne
- * eigene Abfrage: die Zeilen hat die Zielansicht ohnehin schon geladen.
+ * State of the work packages of a goal from its TODO rows (TODO 259f4f66, c60bf914) - without a
+ * query of its own: the goal view has already loaded the rows anyway.
  *
- * <p>Erkennt {@link #evaluate} ein Paket zum ersten Mal als abgeschlossen, setzt es
- * {@code completedAt} an der (verwalteten) Entity; die umgebende Schreib-Transaktion speichert es.
+ * <p>If {@link #evaluate} recognises a package as completed for the first time, it sets
+ * {@code completedAt} on the (managed) entity; the surrounding write transaction stores it.
  *
- * <p>Reihenfolge: nach der Position des Projekts im Ziel (Pakete ohne zugeordnetes Projekt zuletzt),
- * dann nach der Position im Projekt; bei Gleichstand nach Ende (ohne Zeitraum zuletzt) und Anlage.
+ * <p>Order: by the position of the project in the goal (packages without an assigned project last),
+ * then by position in the project; on a tie by end (without period last) and creation.
  */
 final class WorkPackageProgress {
 
@@ -61,15 +61,15 @@ final class WorkPackageProgress {
     }
 
     /**
-     * Zustand eines Pakets; beim ersten Erkennen „abgeschlossen“ wird {@code completedAt} gesetzt und
-     * bleibt danach, auch wenn das Paket wieder offen ist ({@code reopened}). Ohne Zeitraum ist es nur
-     * OPEN oder REACHED.
+     * State of a package; on first recognition as "completed" {@code completedAt} is set and
+     * stays afterwards, even if the package is open again ({@code reopened}). Without a period it is only
+     * OPEN or REACHED.
      */
     static GoalWorkPackageResponse toResponse(GoalWorkPackage p, long total, long done, long openQuestions, Instant now) {
         return toResponse(p, total, done, openQuestions, 0, now);
     }
 
-    /** @param decided nicht archivierte TODOs mit Entscheidung und ohne offene Frage (TODO 68a5e24e) */
+    /** @param decided non-archived TODOs with a decision and without an open question (TODO 68a5e24e) */
     static GoalWorkPackageResponse toResponse(GoalWorkPackage p, long total, long done, long openQuestions, long decided,
                                               Instant now) {
         GoalDueState state = GoalWorkPackage.stateOf(p.getEndDate(), total, done, now);

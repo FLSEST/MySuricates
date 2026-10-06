@@ -41,7 +41,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-/** Das verwaltete TODO eines Findings: einmal anlegen, danach am Status der Findings ausrichten. */
+/** The managed TODO of a finding: create once, afterwards align with the status of the findings. */
 @ExtendWith(MockitoExtension.class)
 class ManagedTodoWriterTest {
 
@@ -57,7 +57,7 @@ class ManagedTodoWriterTest {
         return new ManagedTodoWriter(findingRepository, findingTodoRepository, todoRepository, eventPublisher, activityLog);
     }
 
-    /** Das TODO, das {@code create} speicherte (save je neuem TODO), mit vergebener ID. */
+    /** The TODO that {@code create} saved (save per new TODO), with assigned ID. */
     private void stubTodoSave(String id) {
         when(todoRepository.save(any(Todo.class))).thenAnswer(inv -> {
             Todo t = inv.getArgument(0);
@@ -150,8 +150,8 @@ class ManagedTodoWriterTest {
     }
 
     /**
-     * Folgebefund zu b2d65a20: Verknuepfungen und vorhandene TODOs aller Findings eines Reports kommen aus je
-     * einer Abfrage, nicht aus findByFindingId und findById je Finding. Angelegt wird nur, was fehlt.
+     * Follow-up finding to b2d65a20: links and existing TODOs of all findings of a report come from one
+     * query each, not from findByFindingId and findById per finding. Only what is missing is created.
      */
     @Test
     void ensureAll_loadsLinksAndTodosOnceForAllFindings() {
@@ -254,13 +254,13 @@ class ManagedTodoWriterTest {
 
         writer().reconcile(List.of(resolved));
 
-        verify(todoRepository).findAllById(List.of("t-gone")); // die manuelle Verknüpfung wird nicht geladen
+        verify(todoRepository).findAllById(List.of("t-gone")); // the manual link is not loaded
         verifyNoInteractions(findingRepository);
         verify(todoRepository, never()).save(any());
         verify(todoRepository, never()).saveAll(any());
     }
 
-    /** ba0dcb3a: ein Finding unter der TODO-Schwelle gibt sein TODO frei — archiviert, nicht DONE. */
+    /** ba0dcb3a: a finding below the TODO threshold releases its TODO — archived, not DONE. */
     @Test
     void reconcile_releasesTheTodo_whenItsOpenFindingFellBelowHigh() {
         AuditFinding medium = finding(FINDING_ID, AuditFindingStatus.OPEN);
@@ -352,7 +352,7 @@ class ManagedTodoWriterTest {
         assertThat(savedLink.getValue().isManual()).isTrue();
     }
 
-    /** An einem IN_PROGRESS-TODO arbeitet jemand — das bleibt, wie es ist. */
+    /** Someone is working on an IN_PROGRESS TODO — that stays as it is. */
     @Test
     void reconcile_leavesAnInProgressTodoAlone_evenBelowHigh() {
         AuditFinding medium = finding(FINDING_ID, AuditFindingStatus.OPEN);
@@ -395,14 +395,14 @@ class ManagedTodoWriterTest {
     }
 
     /**
-     * Ein TODO mit mehreren verwalteten Verknüpfungen wird einmal abgeglichen (be14db43). Vorher lief
-     * der Abgleich je Verknüpfung: der erste Durchlauf gab das TODO frei (ARCHIVED, verwaltete
-     * Verknüpfungen gelöscht), der zweite sah nur noch die manuelle Verknüpfung auf ein erledigtes
-     * Finding und setzte das TODO auf DONE, als wäre etwas behoben.
+     * A TODO with several managed links is reconciled once (be14db43). Before, the
+     * reconciliation ran per link: the first pass released the TODO (ARCHIVED, managed
+     * links deleted), the second saw only the manual link to a completed
+     * finding and set the TODO to DONE, as if something had been fixed.
      *
-     * <p>Die Verknüpfungen liegen in einem Speicher, den {@code delete} wirklich ändert und aus dem
-     * die einzelnen wie die gebündelten Abfragen lesen. So hält der Test das Verhalten fest; die
-     * Zahl der Abfragen prüft {@link #reconcile_loadsTodosLinksAndFindingsInOneQueryEach}.
+     * <p>The links live in a store that {@code delete} really changes and from which
+     * the individual and the bundled queries read. That is how the test pins the behavior; the
+     * number of queries is checked by {@link #reconcile_loadsTodosLinksAndFindingsInOneQueryEach}.
      */
     @Test
     void reconcile_releasesATodoWithSeveralManagedLinksOnce_andKeepsTheManualLink() {
@@ -424,7 +424,7 @@ class ManagedTodoWriterTest {
         assertThat(links).containsExactly(l3);
     }
 
-    /** Verknüpfungen, TODO und Findings in einem Speicher: beide Abfrageformen lesen daraus, delete ändert ihn. */
+    /** Links, TODO and findings in one store: both query forms read from it, delete changes it. */
     private List<AuditFindingTodo> storedLinks(Todo todo, List<AuditFindingTodo> initial, AuditFinding... findings) {
         List<AuditFindingTodo> links = new ArrayList<>(initial);
         Map<String, AuditFinding> findingsById = Arrays.stream(findings)
@@ -463,7 +463,7 @@ class ManagedTodoWriterTest {
         return links;
     }
 
-    /** be14db43: je Stufe eine Abfrage, egal wie viele Findings und TODOs der Ingest berührt. */
+    /** be14db43: one query per stage, no matter how many findings and TODOs the ingest touches. */
     @Test
     void reconcile_loadsTodosLinksAndFindingsInOneQueryEach() {
         AuditFinding a = finding(FINDING_ID, AuditFindingStatus.RESOLVED);
@@ -491,7 +491,7 @@ class ManagedTodoWriterTest {
         verify(todoRepository, never()).findById(any());
         verify(findingRepository, never()).findById(any());
         verify(findingTodoRepository, never()).findByTodoId(any());
-        // b2d65a20: beide geaenderten TODOs in einem saveAll, kein save je TODO.
+        // e41531e0: both changed TODOs in one saveAll, no save per TODO.
         verify(todoRepository, times(1)).saveAll(List.of(todoAb, todoC));
         verify(todoRepository, never()).save(any());
     }

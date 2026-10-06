@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
-# Installiert die im Repo versionierten Git-Hooks via core.hooksPath.
-# Einmal pro Klon ausführen.
+# Installs the git hooks versioned in the repo via core.hooksPath.
+# Run once per clone.
 #
 set -euo pipefail
 

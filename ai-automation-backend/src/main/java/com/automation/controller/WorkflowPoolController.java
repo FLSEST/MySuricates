@@ -65,8 +65,8 @@ public class WorkflowPoolController {
      * and UUID values are dropped, placeholders like {@code {{ project_id }}} stay, and a UUID inside a text becomes
      * {@code REDACTED-UUID}. An unknown {@code scope} is 400.
      *
-     * @param scope {@code repo}, {@code portable} oder {@code external} — Pool-Metadatum, ohne Angabe {@code portable}.
-     *              Regelwerk: {@code docs/workflow-pool-kuratierung.md}.
+     * @param scope {@code repo}, {@code portable} or {@code external} — pool metadatum, {@code portable} if omitted.
+     *              Rule set: {@code docs/workflow-pool-kuratierung.md}.
      */
     @PostMapping("/export/{workflowId}")
     public ResponseEntity<ExportToPoolResponse> exportToPool(

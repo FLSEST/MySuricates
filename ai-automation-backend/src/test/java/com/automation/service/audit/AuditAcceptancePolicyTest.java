@@ -87,7 +87,7 @@ class AuditAcceptancePolicyTest {
 
     @Test
     void reassess_switchFromLocToNcloc_comparesOnlyCommonUnits() {
-        // Snapshot vor der NCLOC-Messung: 629 LOC; heute 531 NCLOC bei 635 Zeilen -> LOC +1 %, NCLOC ohne Vergleich.
+        // Snapshot before the NCLOC measurement: 629 LOC; today 531 NCLOC at 635 lines -> LOC +1 %, NCLOC without comparison.
         assertThat(policy.reassess(accepted("Struktur-Scan FRONTEND: 629 LOC | pages/DialogImport.tsx", ACCEPTED_AT),
                 "531 NCLOC (635 Zeilen)", ACCEPTED_AT.plus(Duration.ofDays(7)))).isEqualTo(Outcome.UNCHANGED);
         assertThat(policy.reassess(accepted("Big.java: 300 LOC", ACCEPTED_AT), "Big.java: 900 NCLOC",

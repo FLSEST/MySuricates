@@ -12,14 +12,14 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** Schema-Zuordnung je Blocktyp aus der mit dem Editor geteilten Datei. */
+/** Schema mapping per block type from the file shared with the editor. */
 class BlockConfigSchemaTest {
 
     private static BlockConfigSchema parse(String json) throws IOException {
         return BlockConfigSchema.parse(new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8)));
     }
 
-    /** Kleines Schema: ein KI-Typ, ein Nicht-KI-Typ, ein gemeinsamer und ein geteilter Schlüssel. */
+    /** Small schema: one AI type, one non-AI type, one common and one shared key. */
     private static final String MINI = """
             {
               "onFailure": {"values": [{"value": "stop"}, {"value": "continue"}]},
@@ -78,7 +78,7 @@ class BlockConfigSchemaTest {
 
         @Test
         void pflichtschluesselJeTyp() {
-            // Werkzeug-Modus (d3a7f5e2): genau einer von command und container_args
+            // Tool mode (d3a7f5e2): exactly one of command and container_args
             assertThat(schema.requiredKeys("shell")).isEmpty();
             assertThat(schema.requiredOneOfKeys("shell")).containsExactly("command", "container_args");
             assertThat(schema.requiredKeys("switch")).containsExactly("expression", "cases");
@@ -157,7 +157,7 @@ class BlockConfigSchemaTest {
         void stelltSchluesselInEditorReihenfolgeZusammen() throws IOException {
             var schema = parse(MINI);
 
-            // eigene Schlüssel, dann KI-Schlüssel, dann gemeinsame, zuletzt on_failure; Doppelte behält die erste Quelle
+            // own keys, then AI keys, then common ones, last on_failure; the first source keeps duplicates
             assertThat(schema.fieldsFor("simple")).containsOnlyKeys("command", "model", "provider", "label", "on_failure");
             assertThat(List.copyOf(schema.fieldsFor("simple").keySet()))
                     .containsExactly("command", "model", "provider", "label", "on_failure");

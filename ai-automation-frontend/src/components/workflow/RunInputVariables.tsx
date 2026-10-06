@@ -3,7 +3,7 @@ import { useToast } from '../../hooks/useToast';
 import { useT } from '../../i18n';
 import { openPath } from '../../api/client';
 
-/** Eingabevariablen eines Runs als Chips; Werte, die wie ein absoluter Pfad aussehen, lassen sich öffnen. */
+/** Input variables of a run as chips; values that look like an absolute path can be opened. */
 export function RunInputVariables({ inputContext }: { inputContext: Record<string, unknown> }) {
   const t = useT();
   const toast = useToast();

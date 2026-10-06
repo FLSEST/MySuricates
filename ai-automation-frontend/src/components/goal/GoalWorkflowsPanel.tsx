@@ -4,9 +4,9 @@ import { GoalWorkflowChip } from './GoalWorkflowChip';
 import { attachmentsAt, useGoalWorkflowsScope } from './goalWorkflowsContext';
 
 /**
- * Die Workflows am ganzen Ziel (52bc1e8c), im Kopf der Zielseite neben dem Wächter: der Wächter
- * zuerst, dann die zugeordneten Workflows als Chips mit Stand und ▶, dahinter „Workflow zuordnen“.
- * Kennt das Backend das noch nicht, steht nur der Wächter da und ein Hinweis statt des Knopfs.
+ * The workflows on the whole goal (52bc1e8c), in the header of the goal page next to the guard: the guard
+ * first, then the assigned workflows as chips with status and ▶, behind them „Workflow zuordnen“.
+ * If the backend does not know this yet, only the guard is shown, and a hint instead of the button.
  */
 export function GoalWorkflowsPanel() {
   const tw = useT().goals.workflows;
@@ -37,8 +37,8 @@ export function GoalWorkflowsPanel() {
 }
 
 /**
- * Workflows an einem Arbeitspaket (52bc1e8c), klein – in der Gliederung und in der Zeilenbeschriftung
- * des Zeitstrahls. Ohne Workflows bleibt es leer; zugeordnet wird im Kopf oder in der Paket-Karte.
+ * Workflows on a work package (52bc1e8c), small — in the outline and in the row label
+ * of the timeline. Without workflows it stays empty; assigning happens in the header or in the package card.
  */
 export function PackageWorkflows({ workPackageId, className = '' }: { workPackageId: string; className?: string }) {
   const scope = useGoalWorkflowsScope();

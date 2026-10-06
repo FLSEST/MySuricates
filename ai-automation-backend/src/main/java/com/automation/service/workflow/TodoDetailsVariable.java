@@ -23,11 +23,11 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
- * {@code todo_details} (TODO cc0eb3ba): TODOs des Lauf-Projekts mit Beschreibung, als JSON-Liste in einem
- * {@code <todo_details>}-Block – für Workflows, die TODOs selbst beurteilen oder abarbeiten (TODO-Batch).
- * Nur für Läufe, deren Kontext {@code todo_details_tags} oder {@code todo_details_exclude_tags} setzt; alle
- * anderen bekommen die Variable nicht. Texte sind fremde Daten: Titel geglättet, Beschreibungen zeilenweise
- * entschärft ({@link UntrustedText#block}).
+ * {@code todo_details} (TODO cc0eb3ba): TODOs of the run's project with description, as a JSON list in a
+ * {@code <todo_details>} block - for workflows that assess or work off TODOs themselves (TODO batch).
+ * Only for runs whose context sets {@code todo_details_tags} or {@code todo_details_exclude_tags}; all
+ * others do not get the variable. Texts are foreign data: titles smoothed, descriptions defused
+ * line by line ({@link UntrustedText#block}).
  */
 @Component
 @Order(60)
@@ -47,8 +47,8 @@ class TodoDetailsVariable implements PlatformVariableSource {
     static final int DEFAULT_CHARS = 1500;
     static final int MAX_CHARS = 8000;
     /**
-     * Obergrenze der JSON-Liste in UTF-8-Bytes: Ein Shell-Block übergibt seinen ganzen Befehl als ein Argument an
-     * {@code bash -c}, und Linux nimmt höchstens 128 KiB je Argument (TODO cc0eb3ba).
+     * Upper limit of the JSON list in UTF-8 bytes: a shell block passes its whole command as one argument to
+     * {@code bash -c}, and Linux accepts at most 128 KiB per argument (TODO cc0eb3ba).
      */
     static final int MAX_TOTAL_BYTES = 100_000;
     static final int MAX_TAG_CHARS = 60;
@@ -64,7 +64,7 @@ class TodoDetailsVariable implements PlatformVariableSource {
 
     private final TodoRepository todoRepository;
 
-    /** Was ein Lauf erfragt; nachsichtig gelesen – unbekannte Status fallen weg, Zahlen werden begrenzt. */
+    /** What a run asks for; read leniently - unknown statuses are dropped, numbers are clamped. */
     record Params(Set<Todo.Status> statuses, List<String> tags, List<String> excludeTags, List<String> firstTags,
                   int limit, int chars) {
 
@@ -79,7 +79,7 @@ class TodoDetailsVariable implements PlatformVariableSource {
                     Todo.Status status = Todo.Status.valueOf(raw.toUpperCase(Locale.ROOT));
                     if (ALLOWED_STATUS.contains(status)) statuses.add(status);
                 } catch (IllegalArgumentException ignored) {
-                    // unbekannter Status: fällt weg, der Rest filtert weiter
+                    // unknown status: dropped, the rest keeps filtering
                 }
             }
             if (statuses.isEmpty()) statuses.add(Todo.Status.OPEN);
@@ -131,7 +131,7 @@ class TodoDetailsVariable implements PlatformVariableSource {
         int total = 2;   // [ ]
         int regular = 0;
         for (Todo todo : matching) {
-            // first_tags kommen zusätzlich: sie verdrängen bei kleinem Limit keine regulären TODOs (d6c0afe6)
+            // first_tags come on top: with a small limit they do not displace regular TODOs (d6c0afe6)
             boolean first = isFirst(todo, params);
             if (!first && regular == params.limit()) break;
             Map<String, Object> entry = entry(todo, params.chars());
@@ -154,7 +154,7 @@ class TodoDetailsVariable implements PlatformVariableSource {
         return true;
     }
 
-    /** Genau dieses Tag – oder, endet das Muster auf {@code *}, jedes Tag mit diesem Anfang ({@code batch:*}). */
+    /** Exactly this tag - or, if the pattern ends in {@code *}, every tag with this beginning ({@code batch:*}). */
     static boolean tagMatches(String pattern, String tag) {
         if (tag == null) return false;
         return pattern.endsWith("*") ? tag.startsWith(pattern.substring(0, pattern.length() - 1)) : tag.equals(pattern);
@@ -190,8 +190,8 @@ class TodoDetailsVariable implements PlatformVariableSource {
     }
 
     /**
-     * Die Tags eines TODOs aus der JSON-Spalte – leer bei fehlendem oder kaputtem Wert, wie {@code TodoMapper.jsonToList}.
-     * Eigene Zeilen statt des Mappers: {@code service.workflow → mapper} schlösse einen Paketzyklus (PackageCycleRatchetTest).
+     * The tags of a TODO from the JSON column - empty on a missing or broken value, like {@code TodoMapper.jsonToList}.
+     * Own lines instead of the mapper: {@code service.workflow → mapper} would close a package cycle (PackageCycleRatchetTest).
      */
     static List<String> tagsOf(String json) {
         if (json == null || json.isBlank()) return List.of();

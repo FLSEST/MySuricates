@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# Laufende Workflow-Runs einer Instanz (29820f58). Ein Neustart bricht sie ab, danach stehen sie als
-# Ghost-Runs im Verlauf. Bevor scripts/setup.sh eine laufende Instanz neu startet und bevor
-# scripts/instance.sh sie stoppt, fragen beide deshalb nach — nur lesend:
-# GET /api/v1/executions?status=RUNNING, die Zahl steht als totalElements in der Seite.
+# Running workflow runs of an instance (29820f58). A restart aborts them, afterwards they show up as
+# ghost runs in the history. Before scripts/setup.sh restarts a running instance and before
+# scripts/instance.sh stops it, both therefore ask — read-only:
+# GET /api/v1/executions?status=RUNNING, the count is in the page as totalElements.
 #
-# Gefragt wird ueber lib/local-curl.sh: nie ueber einen Proxy aus der Umgebung, der Key ueber stdin statt
-# in den Argumenten (bb4f60a5). Ohne python und jq, bash 3.2 (macOS).
+# Asked via lib/local-curl.sh: never through a proxy from the environment, the key via stdin instead of
+# in the arguments (bb4f60a5). Without python and jq, bash 3.2 (macOS).
 # shellcheck source=local-curl.sh
 . "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/local-curl.sh"
 
-# instance_connect_addr BIND — wo dieser Rechner die Instanz erreicht: lauscht sie auf 127.0.0.1 oder allen
-# Schnittstellen, dort; sonst unter der gebundenen Adresse, auch einer anderen Loopback-Adresse — auf
-# 127.0.0.1 lauscht sie dann nicht (3d002903). IPv6 ohne Klammern, fuer /dev/tcp.
+# instance_connect_addr BIND — where this machine reaches the instance: if it listens on 127.0.0.1 or all
+# interfaces, there; otherwise at the bound address, also another loopback address — it then does not
+# listen on 127.0.0.1 (3d002903). IPv6 without brackets, for /dev/tcp.
 instance_connect_addr() {
   local a="${1:-}"
   a="${a#\[}"; a="${a%\]}"
@@ -21,7 +21,7 @@ instance_connect_addr() {
   esac
 }
 
-# instance_api_base BIND PORT — dasselbe als Basis-URL fuer curl
+# instance_api_base BIND PORT — the same as a base URL for curl
 instance_api_base() {
   local a
   a="$(instance_connect_addr "${1:-}")"
@@ -31,8 +31,8 @@ instance_api_base() {
   esac
 }
 
-# instance_running_runs BASIS KEY — Zahl der laufenden Runs; leer, wenn sie sich nicht ermitteln laesst
-# (kein Key, keine Antwort, abgelehnt, Antwort ohne Zahl). Was „unbekannt“ heisst, entscheidet der Aufrufer.
+# instance_running_runs BASE KEY — number of running runs; empty if it cannot be determined
+# (no key, no answer, rejected, answer without a number). What "unknown" means is up to the caller.
 instance_running_runs() {
   local base="${1:-}" key body
   key="$(printf '%s' "${2:-}" | tr -d '[:space:]')"
@@ -40,19 +40,19 @@ instance_running_runs() {
   command -v curl >/dev/null 2>&1 || return 0
   body="$(local_curl_key "$key" -fsS --max-time "${INSTANCE_RUNS_TIMEOUT:-5}" \
         "$base/api/v1/executions?status=RUNNING&size=1" 2>/dev/null)" || return 0
-  # Das letzte Vorkommen: die Seite endet mit totalElements und totalPages; ein Name in content, der
-  # so aussieht, steht dort mit maskierten Anfuehrungszeichen und passt nicht
+  # The last occurrence: the page ends with totalElements and totalPages; a name in content that
+  # looks like that is there with escaped quotation marks and does not match
   printf '%s' "$body" | tr -d '\r\n' | sed -n 's/.*"totalElements"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p'
 }
 
-# instance_file_addr DATEI — „PORT,BIND“ aus einer Instanz-Datei (BIND leer = 127.0.0.1)
+# instance_file_addr FILE — "PORT,BIND" from an instance file (empty BIND = 127.0.0.1)
 instance_file_addr() {
   printf '%s,%s' "$(grep '^MYSURICATES_PORT=' "$1" 2>/dev/null | tail -n 1 | cut -d= -f2)" \
     "$(grep '^MYSURICATES_BIND=' "$1" 2>/dev/null | tail -n 1 | cut -d= -f2)"
 }
 
-# Fuer scripts/setup.sh: die Adresse merken, bevor es die Datei neu schreibt — bis zum Neustart lauscht
-# die Instanz dort, auch nach --reconfigure mit anderem Port. Erster Stand je Name zaehlt.
+# For scripts/setup.sh: remember the address before it rewrites the file — until the restart the
+# instance listens there, even after --reconfigure with another port. First state per name counts.
 INSTANCE_PREV_ADDRS=""
 instance_remember_addr() {  # NAME DATEI
   case " $INSTANCE_PREV_ADDRS " in *" $1="*) return 0 ;; esac

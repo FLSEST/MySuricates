@@ -5,10 +5,10 @@ import {
 import { CHIP_ANCHOR, xOfDay, type TimelineAxis } from './timelineLayout';
 
 /**
- * Ziehen per Tastatur am Zeitstrahl (TODO ff6f08fd): Leertaste hebt ein TODO an – Enter bleibt beim
- * Menü –, ← → schieben um einen Tag, ↑ ↓ in die Zeile darüber oder darunter, Leertaste oder Enter
- * legt ab, Escape und Tab brechen ab. Flächen fremder Projekte nehmen es nicht an; die Live-Zeile
- * sagt das. Balken und Rauten (c60bf914) verschieben die Pfeiltasten direkt, ohne Anheben.
+ * Dragging by keyboard on the timeline (TODO ff6f08fd): Space lifts a TODO - Enter stays with the
+ * menu -, ← → move by one day, ↑ ↓ to the row above or below, Space or Enter
+ * drops, Escape and Tab cancel. Surfaces of other projects do not accept it; the live row
+ * says so. Bars and diamonds (c60bf914) are moved directly by the arrow keys, without lifting.
  */
 export const TIMELINE_KEYBOARD_CODES: KeyboardCodes = {
   start: ['Space'],
@@ -17,14 +17,14 @@ export const TIMELINE_KEYBOARD_CODES: KeyboardCodes = {
 };
 
 /**
- * Was ein Chip oder eine Raute beim Anheben mitgibt: wo der Punkt sitzt, der das Datum trägt (px vom
- * linken Rand), ob der Chip gespiegelt steht und was gezogen wird.
+ * What a chip or diamond carries when lifted: where the point that holds the date sits (px from the
+ * left edge), whether the chip is mirrored and what is being dragged.
  */
 export interface ChipDragData {
   anchor: number;
   flipped: boolean;
   kind: 'todo' | 'milestone' | 'package';
-  /** Ein schmaler Chip aus der Beschriftung einer Zeile – das Bild beim Ziehen bleibt so schmal. */
+  /** A narrow chip made from a row label - so the drag image stays narrow. */
   compact?: boolean;
 }
 
@@ -36,14 +36,14 @@ export function chipDragData(active: Pick<Active, 'data'> | null | undefined): C
   };
 }
 
-/** Flächen mit Tagen: Paket-Zeilen, die Kopfzeilen der Bänder und die Meilenstein-Zeile. */
+/** Surfaces with days: package rows, the band header rows and the milestone row. */
 const isRow = (id: UniqueIdentifier) =>
   String(id).startsWith('row:') || String(id).startsWith('strip:') || String(id) === 'milestones';
 const middleOf = (rect: ClientRect) => rect.top + rect.height / 2;
 
 /**
- * Mit der Maus gilt die Zeile unter dem Zeiger. Per Tastatur gibt es keinen Zeiger: dann die Zeile,
- * in der der Statuspunkt des angehobenen Chips steht.
+ * With the mouse the row under the pointer counts. By keyboard there is no pointer: then the row
+ * in which the status dot of the lifted chip sits.
  */
 export const timelineCollision: CollisionDetection = (args) => {
   if (args.pointerCoordinates) return pointerWithin(args);
@@ -53,9 +53,9 @@ export const timelineCollision: CollisionDetection = (args) => {
 };
 
 /**
- * Wohin die Pfeiltasten den angehobenen Chip schieben: ← → genau einen Tag, nicht über die Achse
- * hinaus und nur in einer Zeile; ↑ ↓ mitten in die nächste Fläche. Wer aus einer Fläche ohne Tage
- * (etwa der Beschriftung einer Zeile) in eine Zeile wechselt, landet auf heute.
+ * Where the arrow keys move the lifted chip: ← → exactly one day, not beyond the axis
+ * and only within one row; ↑ ↓ into the middle of the next surface. Whoever switches from a surface without days
+ * (such as a row label) into a row lands on today.
  */
 export function timelineKeyboardCoordinates(axis: TimelineAxis, width: number): KeyboardCoordinateGetter {
   return (event, { context }) => {

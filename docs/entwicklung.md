@@ -939,10 +939,17 @@ Details zu den drei Vertrauensklassen und zur Taint-Propagation:
 | **UI-Texte** | über i18n (`de.ts`/`en.ts`), nie im Code |
 | **Log- und Fehlermeldungen, Doku, TODO-Titel, Commit-Nachrichten** | unverändert wie bisher |
 
-Der Bestand ist noch gemischt. Neue oder umgeschriebene Kommentare sind englisch, deutsche Bestandskommentare
-werden aber nicht nebenbei übersetzt: Das geschieht in eigenen Scheiben (TODO 9468432d), sonst kollidieren offene
-Branches. Bestehende Flyway-Migrationen (`V*.sql`) bleiben unangetastet, auch ihre Kommentare – sie gehen in die
-Prüfsumme ein.
+Der Bestand ist übersetzt (TODO 9468432d). Deutsch stehen geblieben sind zitierte UI-Texte, Zitate und
+Dokuüberschriften in sonst englischen Kommentaren, die Ausnahmedateien des Pre-Push-Gates und Kommentare in
+eingebetteten Heredocs. Bestehende Flyway-Migrationen (`V*.sql`) bleiben unangetastet, auch ihre Kommentare – sie
+gehen in die Prüfsumme ein.
+
+`scripts/tools/german_comments.py` hält das fest: `ratchet` scheitert, wenn eine Datei mehr deutsche
+Kommentarzeilen hat als ihre Obergrenze in `scripts/tools/german-comments-baseline.txt` (neue Dateien: 0); der
+Python-Test `test_german_comment_ratchet.py` läuft im discover-Schritt der CI mit. Die Erkennung ist eine
+Heuristik (Umlaut oder zwei deutsche Funktionswörter), sie fängt nicht jeden deutschen Satz. Wer Kommentare
+übersetzt, senkt die Grenzen mit `ratchet --update` und prüft mit `check-diff [BASIS] [PFADE]`, dass sich nur
+Kommentare, Testbeschreibungen und Python-Docstrings geändert haben (TS/TSX exakt über den TypeScript-Parser).
 
 ### Backend
 

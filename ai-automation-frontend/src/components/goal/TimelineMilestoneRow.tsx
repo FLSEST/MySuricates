@@ -16,16 +16,16 @@ import { useIsSelected } from './goalSelection';
 import type { FloatingAnchor } from './floating';
 import type { GoalMilestone } from '../../types';
 
-/** Höhe einer Spur der Meilenstein-Zeile (Raute mit Titel). */
+/** Height of a lane of the milestone row (diamond with title). */
 export const MILESTONE_LANE = 24;
 const DRAG_DATA: ChipDragData = { anchor: DIAMOND_ANCHOR, flipped: false, kind: 'milestone' };
 const ICON_BUTTON = 'inline-flex shrink-0 items-center rounded p-1 text-text-secondary hover:bg-surface-hover hover:text-accent focus-ring';
 
 /**
- * Die Meilenstein-Zeile oben im Zeitstrahl (c60bf914): Rauten an ihrem Datum, Farbe nach Zustand,
- * der Titel daneben. Ein Klick in die Zeile (oder Tag per Tastatur wählen, Enter) legt an diesem Tag
- * einen Meilenstein an – nur der Titel fehlt; „+“ öffnet das Formular. Rauten lassen sich ziehen
- * (neues Datum) und per Tastatur verschieben; Klick oder Enter öffnet ihre Karte.
+ * The milestone row at the top of the timeline (c60bf914): diamonds at their date, colour by state,
+ * the title next to it. A click into the row (or picking a day by keyboard, Enter) creates a milestone on that day
+ * - only the title is missing; „+“ opens the form. Diamonds can be dragged
+ * (new date) and moved by keyboard; click or Enter opens their card.
  */
 export function TimelineMilestoneRow({
   marks, lanes, axis, width, inline, creating, helpId, onPick, onCreate, onCancel, onAdd, onOpen, onMove, announce,
@@ -34,10 +34,10 @@ export function TimelineMilestoneRow({
   lanes: number;
   axis: TimelineAxis;
   width: number;
-  /** Ein neuer Meilenstein, der gerade eingetippt wird: sein Tag und wo das Feld steht. */
+  /** A new milestone that is being typed right now: its day and where the field stands. */
   inline: { day: number; x: number } | null;
   creating: boolean;
-  /** ID des Hilfetexts zur Tastatur an den Rauten. */
+  /** ID of the help text on the keyboard at the diamonds. */
   helpId: string;
   onPick: (day: number, x: number) => void;
   onCreate: (title: string, day: number) => void;
@@ -93,7 +93,7 @@ export function TimelineMilestoneRow({
   );
 }
 
-/** Eine Raute mit ihrem Titel: ziehbar mit der Maus, ← → verschieben um einen Tag, Enter öffnet die Karte. */
+/** A diamond with its title: draggable with the mouse, ← → move by one day, Enter opens the card. */
 function MilestoneMarkButton({ mark, axis, width, helpId, onOpen, onMove, onNudge }: {
   mark: MilestoneMark;
   axis: TimelineAxis;

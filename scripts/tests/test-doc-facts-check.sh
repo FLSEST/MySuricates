@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Tests fuer scripts/public-readiness/doc-facts-check.sh (TODO 3df2df73).
+# Tests for scripts/public-readiness/doc-facts-check.sh (TODO 3df2df73).
 #
-# Das Skript prueft die in der Doku genannten Groessen (Blocktypen, Controller,
-# Migrationen, Templates, Skills, Integrations-Provider) gegen den Code. Die
-# Tests arbeiten auf einem Miniatur-Repository mit bekannten Zahlen, damit sie
-# nicht mitwandern, wenn das echte Repo waechst.
+# The script checks the sizes named in the docs (block types, controllers,
+# migrations, templates, skills, integration providers) against the code. The
+# tests work on a miniature repository with known numbers so that they do
+# not move along when the real repo grows.
 #
-# Run: bash scripts/tests/test-doc-facts-check.sh   (exit 0 = alle Checks ok)
+# Run: bash scripts/tests/test-doc-facts-check.sh   (exit 0 = all checks ok)
 set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -21,9 +21,9 @@ check() {  # $1 = label, $2 = shell condition
 }
 
 # ---------------------------------------------------------------------------
-# Miniatur-Repository mit bekannten Groessen:
-#   4 Blocktypen, 2 Controller, Migrationen V1/V2/V5 (Hoechste 5, Anzahl 3),
-#   6 Templates, 3 Skills, 2 Integrations-Provider
+# Miniature repository with known sizes:
+#   4 block types, 2 controllers, migrations V1/V2/V5 (highest 5, count 3),
+#   6 templates, 3 skills, 2 integration providers
 # ---------------------------------------------------------------------------
 FAKE="$TMP/fake"
 JAVA="$FAKE/ai-automation-backend/src/main/java/com/automation"
@@ -50,7 +50,7 @@ for n in 1 2 3; do echo '{}' > "$RES/skills/builtin/s$n.json"; done
 echo 'class OneProvider implements IntegrationProvider {}' > "$JAVA/service/integration/providers/OneProvider.java"
 echo 'class TwoProvider implements IntegrationProvider {}' > "$JAVA/service/integration/providers/TwoProvider.java"
 
-# Versionsquellen mit unverwechselbaren Zahlen (nichts davon kommt im echten Repo vor).
+# Version sources with unmistakable numbers (none of them occurs in the real repo).
 cat > "$FAKE/ai-automation-backend/pom.xml" <<'POM_EOF'
 <project>
     <parent>
@@ -151,10 +151,10 @@ check "Teilmengen/KI-Provider/Tabellen ohne Befund" '! grep -q "docs/noise.md" <
 check "ohne Drift wieder exit 0"                    '[ "$RC" -eq 0 ]'
 rm "$FAKE/docs/noise.md"
 
-# Spannen-Zeilen und Loecher (TODO ffa6d846 / c9c9f3eb): docs/architektur.md fasst zwei
-# Migrationen zu "| V28-V29 | ... |" zusammen. Wer die Spanne nicht liest, haelt das fuer ein
-# Loch. Wer nur die Hoechstnummer prueft, uebersieht ein echtes -- genau so ist beim Nachtragen
-# von V75 die V74-Zeile verschwunden, ohne dass das Gate etwas sagte.
+# Range lines and holes (TODO ffa6d846 / c9c9f3eb): docs/architektur.md folds two
+# migrations into "| V28-V29 | ... |". Whoever does not read the range takes it for a
+# hole. Whoever only checks the highest number overlooks a real one -- that is exactly how the V74 line
+# disappeared when V75 was added, without the gate saying anything.
 echo "4h) Migrationstabelle: Spannen zaehlen, Loecher fallen auf"
 cat > "$FAKE/docs/tabelle-spanne.md" <<'MD_EOF'
 # Vollstaendig ueber Spannen
@@ -214,9 +214,9 @@ check "echte Standangabe weiter gemeldet" 'grep -qE "^DRIFT docs/grundschema.md:
 rm "$FAKE/docs/grundschema.md"
 
 echo "4g) Die Ausnahme gilt der Spanne, nicht der ganzen Zeile"
-# Eine Teilspanne ist nur dann belegt, wenn die Zeile auch sagt, wie es weitergeht
-# (Fortsetzungsspanne bis zur Hoechstnummer). Eine blosse Standangabe im Nebensatz
-# reicht nicht — sonst deckt jedes "aktuell V5" jede falsche Spanne derselben Zeile.
+# A partial range is only backed if the line also says how it continues
+# (continuation range up to the highest number). A mere status note in a subordinate clause
+# is not enough - otherwise every "aktuell V5" covers every wrong range of the same line.
 cat > "$FAKE/docs/teilspanne.md" <<'MD_EOF'
 # Migrationen
 Das Grundschema (V1-V3). Aktueller Stand ist V5 in der Produktion.
@@ -345,8 +345,8 @@ cat > "$FAKE/docs/tabelle-aktuell.md" <<'MD_EOF'
 | V2 | `V2__step.sql` | Zwischenschritt |
 | V5 | `V5__step.sql` | Letzter Stand |
 MD_EOF
-# Dieselbe Tabelle ohne die V2-Zeile: Hoechststand stimmt, eine vorhandene Migration fehlt
-# trotzdem. Genau diese Luecke ist beim Nachtragen von V75 unbemerkt entstanden.
+# The same table without the V2 line: the highest state is right, an existing migration is
+# missing nevertheless. Exactly this gap arose unnoticed when V75 was added.
 cat > "$FAKE/docs/tabelle-loch-real.md" <<'MD_EOF'
 # Schema mit fehlender Zeile
 | Migration | Datei | Wirkung |
@@ -393,9 +393,9 @@ check "passende Commit-Zahl und datierte Testzahl: exit 0" '[ "$RC" -eq 0 ]'
 check "README.de.md ohne Befund" '! grep -q "README.de.md" <<<"$OUT"'
 rm "$FAKE/README.de.md"
 
-# Der Fall, der am 2026-09-19 die CI rot faerbte: im flachen Klon zaehlt
-# `git rev-list --count HEAD` nur die geholte Tiefe. Das Gate verglich die README-Angabe
-# gegen diese 1 und meldete Drift — eine Zahl, die es nicht gemessen hatte.
+# The case that turned CI red on 2026-09-19: in a shallow clone
+# `git rev-list --count HEAD` counts only the fetched depth. The gate compared the README figure
+# against this 1 and reported drift - a number it had not measured.
 echo "11b) Flacher Klon: die Commit-Zahl wird uebersprungen, nicht falsch gemeldet"
 SHALLOW="$TMP/shallow"
 git clone -q --depth 1 "file://$FAKE" "$SHALLOW"
@@ -415,12 +415,12 @@ check "Meldung nennt die Abhilfe"      'grep -q "fetch-depth: 0" <<<"$OUT"'
 check "keine erfundene Commit-Drift"   '! grep -q "commits sagt" <<<"$OUT"'
 rm -rf "$SHALLOW"
 
-# Eine datierte Zahl ist am Stichtag wahr, nicht an HEAD (TODO 65c6dedc): Die Kopftabelle sagt
-# "Stand … (Commit `<sha>`)" – nach 1 000 weiteren Commits war das Gate trotzdem rot.
+# A dated number is true on the cut-off date, not at HEAD (TODO 65c6dedc): the header table says
+# "Stand … (Commit `<sha>`)" - after 1 000 further commits the gate was red anyway.
 echo "11c) Stichtag-Commit: datierte Commit-Zahl wird am Stichtag gemessen"
 DATED="$TMP/dated"
 mkdir -p "$DATED"
-# Dieselben Faktenquellen wie im Fake-Repo, aber eine eigene Historie mit 30 Commits
+# The same fact sources as in the fake repo, but a history of its own with 30 commits
 ( cd "$FAKE" && tar --exclude=.git -cf - . ) | ( cd "$DATED" && tar -xf - )
 rm -f "$DATED/README.de.md"
 ( cd "$DATED" && git init -q . && $GIT add -A && $GIT commit -q -m c1 \
@@ -448,9 +448,9 @@ sed -i "s/Commit \`$TENTH\`/Commit \`deadbeef\`/g" "$DATED/README.de.md"
 OUT=$(bash "$SCRIPT" --root "$DATED" 2>&1); RC=$?
 check "unbekannter Stichtag-Commit ist ein Befund"   'grep -q "stichtag-commit deadbeef unbekannt" <<<"$OUT"'
 check "unbekannter Stichtag: exit 1"                  '[ "$RC" -eq 1 ]'
-# Nach einem History-Rewrite kennt git den alten Hash lokal noch (Sicherungs-Branch), die CI nicht:
-# Ein Stichtag zaehlt nur, wenn er in der Historie von HEAD liegt. Der Seitenzweig hat mit Absicht
-# ebenfalls 10 Commits, damit nur die Vorfahren-Pruefung ihn faengt.
+# After a history rewrite git still knows the old hash locally (backup branch), CI does not:
+# a cut-off date only counts if it lies in the history of HEAD. The side branch deliberately has
+# 10 commits as well, so that only the ancestor check catches it.
 SIDE="$(cd "$DATED" && git checkout -q -b seite HEAD~21 && $GIT commit -q --allow-empty -m seite \
           && git rev-parse --short=8 HEAD && git checkout -q -)"
 sed -i "s/deadbeef/$SIDE/g" "$DATED/README.de.md"
@@ -463,12 +463,12 @@ OUT=$(bash "$SCRIPT" --root "$DATED" 2>&1); RC=$?
 check "ohne Stichtag gilt HEAD: Drift gemeldet"      'grep -qE "commits sagt 10, Code 30" <<<"$OUT"'
 rm -rf "$DATED"
 
-# TODO 44b1ba55: Die README-Kopftabelle nennt seither keinen Commit-Hash des Arbeits-Repos mehr
-# (Entscheidung Flo, 2026-09-30) — ein per scripts/release-handover.sh erzeugtes oeffentliches Repo
-# kennt diesen Hash nicht und hatte die Stichtag-Pruefung oben dauerhaft rot gefaerbt ("stichtag-commit
-# unbekannt"). Die Commit-Zahl selbst ist ein Arbeits-Repo-Fakt (die Uebergabe fasst die Historie je
-# Release zu einem Commit zusammen) und steht deshalb hinter dem IGNORE_MARKER; alle anderen Zahlen
-# der Tabelle bleiben live gegen den Codebaum geprueft — den gibt die Uebergabe unveraendert mit.
+# TODO 44b1ba55: The README header table no longer names a commit hash of the working repo
+# (decision Flo, 2026-09-30) - a public repo created via scripts/release-handover.sh
+# does not know this hash and had permanently turned the cut-off-date check above red ("stichtag-commit
+# unbekannt"). The commit count itself is a working-repo fact (the handover folds the history per
+# release into one commit) and therefore stands behind the IGNORE_MARKER; all other numbers
+# of the table stay checked live against the code tree - the handover carries it along unchanged.
 echo "11d) Kein Commit-Hash-Stichtag mehr: gruen unabhaengig von der tatsaechlichen Commit-Zahl"
 PUBLIC="$TMP/public"
 mkdir -p "$PUBLIC"
@@ -548,8 +548,8 @@ check "meldet kein OK"             '! grep -q "Doku-Zahlen OK" <<<"$OUT"'
 mv "$TMP/package.bak" "$FAKE/ai-automation-frontend/package.json"
 
 echo "14) Verbotene Muster, fehlende Dateien und Testzahl-Datierung gelten in ganz docs/ (TODO c9c9f3eb)"
-# Bewusst KEINE Onboarding-Datei: vor c9c9f3eb galten diese drei Regeln nur unter
-# docs/onboarding, hier wird die Ausweitung selbst geprueft.
+# Deliberately NO onboarding file: before c9c9f3eb these three rules applied only under
+# docs/onboarding, here the extension itself is checked.
 cat > "$FAKE/docs/regeln.md" <<'MD_EOF'
 # Regeln
 Starte das Backend mit `mvn spring-boot:run`.
@@ -575,9 +575,9 @@ check "undatierte Testzahl auch ausserhalb gemeldet" \
 check "Datierung hinter dem Zeilenumbruch zaehlt"    '! grep -q "regeln.md:8" <<<"$OUT"'
 rm "$FAKE/docs/regeln.md"
 
-# Gegenprobe zur Umbruch-Toleranz: ein Datum in der Folgezeile darf eine
-# abgeschlossene Aussage NICHT stumm stellen (sonst deckt jede datierte
-# Nachbarzeile eine undatierte Testzahl).
+# Counter-check to the wrap tolerance: a date in the following line must NOT silently
+# neutralize a completed statement (otherwise every dated
+# neighbor line covers an undated test number).
 cat > "$FAKE/docs/regeln.md" <<'MD_EOF'
 # Regeln
 Unter `src/test/java` liegen 715 Testklassen.
@@ -589,10 +589,10 @@ check "abgeschlossener Satz wird von datierter Nachbarzeile nicht gedeckt" \
 rm "$FAKE/docs/regeln.md"
 
 echo "15) Feste Zahlen ueber die ausgelieferten Definitionen (TODO 4846ccca)"
-# Zeile 2-4 sind die Formulierungen, die wirklich in docs/architektur.md standen
-# (DE und EN, zeitweise mit unterschiedlichen Zahlen). Zeile 5-8 sind die
-# Gegenproben: der Verweis aufs Gate, eine Gesamtzahl mit eigener Pruefung,
-# "einmal" als gewoehnliches Wort und eine Zahl ohne Auslieferungs-Bezug.
+# Lines 2-4 are the wordings that really stood in docs/architektur.md
+# (DE and EN, at times with different numbers). Lines 5-8 are the
+# counter-checks: the reference to the gate, a total with its own check,
+# "einmal" as an ordinary word and a number without delivery reference.
 cat > "$FAKE/docs/zahlen.md" <<'MD_EOF'
 # Zahlen
 In den mitgelieferten Definitionen kommt diese Form achtmal vor (sieben Pool-Workflows).
@@ -617,8 +617,8 @@ check "Gesamtzahl der Templates bleibt frei" '! grep -q "zahlen.md:6" <<<"$OUT"'
 check "'einmal' ist keine Bestandsangabe"    '! grep -q "zahlen.md:7" <<<"$OUT"'
 check "Zahl ohne Auslieferungs-Bezug bleibt frei" '! grep -q "zahlen.md:8" <<<"$OUT"'
 
-# Umbruch: Die Doku bricht bei ~100 Zeichen um — Zahl und Bezug landen dann in
-# verschiedenen Zeilen. Gemeldet wird an der Zeile mit der Zahl, und nur einmal.
+# Wrap: the docs wrap at ~100 characters - number and reference then land in
+# different lines. Reported at the line with the number, and only once.
 cat > "$FAKE/docs/zahlen.md" <<'MD_EOF'
 # Zahlen
 In den ausgelieferten Definitionen kommt diese Form
@@ -630,9 +630,9 @@ check "Zahl hinter dem Zeilenumbruch gemeldet" \
 check "kein Doppelbefund fuer denselben Satz" \
   '[ "$(grep -c "zahl-ueber-ausgelieferte-definitionen" <<<"$OUT")" -eq 1 ]'
 
-# Der Umbruch mitten im Bezug ist der echte Fall: docs/deployment.md brach genau
-# zwischen "mitgelieferten" und "Definitionen" um. Das Fenster muss in
-# Lesereihenfolge zusammengesetzt werden, sonst findet es die Wendung nie.
+# The wrap in the middle of the reference is the real case: docs/deployment.md wrapped exactly
+# between "mitgelieferten" and "Definitionen". The window must be assembled in
+# reading order, otherwise it never finds the phrase.
 cat > "$FAKE/docs/zahlen.md" <<'MD_EOF'
 # Zahlen
 Ein folgender Shell-Block setzt den Platzhalter roh ein. In den mitgelieferten
@@ -652,9 +652,9 @@ check "IGNORE_MARKER nimmt die Zeile aus" '! grep -q "zahlen.md" <<<"$OUT"'
 rm "$FAKE/docs/zahlen.md"
 
 echo "N) Zahlen im Fliesstext, die frueher durchs Muster fielen (TODO e36ca773)"
-# Die sechs Stellen der Doku-Durchsicht 2026-09-22: je Formulierung ein Fall, dazu die
-# bewusst ausgenommenen. Das Mini-Repo hat 4 Blocktypen (simple, shell, retry,
-# todo-create), 6 Templates, 3 Skills, Migrationen V1/V2/V5.
+# The six places of the 2026-09-22 docs review: one case per wording, plus the
+# deliberately exempt ones. The mini repo has 4 block types (simple, shell, retry,
+# todo-create), 6 templates, 3 skills, migrations V1/V2/V5.
 cat > "$FAKE/docs/fliesstext.md" <<'MD_EOF'
 # Fliesstext
 2. **Eine Vorlage uebernehmen** — unter *Templates* liegen 67 fertige Workflows. Eine waehlen.
@@ -681,10 +681,10 @@ check "'highest existing migration: VN' erkannt" \
 check "unvollstaendige type-Aufzaehlung erkannt (fehlt todo-create, unbekannt conditional)" \
   'grep -qE "^DRIFT docs/fliesstext.md:8 block-type-enum nennt 3 von 4 .*es fehlen todo-create; unbekannt conditional" <<<"$OUT"'
 
-# Nicht gemeint: eine type-Liste eines anderen Feldes, ein Beispiel mit der Haelfte der
-# Blocktypen, eine vollstaendige Aufzaehlung,
-# "N fertige Workflows" ohne Templates-Bezug (Pool), die datierte Klassenzahl des
-# Onboardings und die Zahl der Block-Spezifikationen des Assistenten (eine Teilmenge).
+# Not meant: a type list of another field, an example with half of the
+# block types, a complete enumeration,
+# "N fertige Workflows" without template reference (pool), the dated class count of the
+# onboarding and the number of block specifications of the assistant (a subset).
 cat > "$FAKE/docs/fliesstext.md" <<'MD_EOF'
 # Fliesstext ohne Befund
   "type": "stop | continue",
@@ -702,8 +702,8 @@ check "Abgrenzungen und richtige Zahlen: exit 0"       '[ "$RC" -eq 0 ]'
 rm "$FAKE/docs/fliesstext.md"
 
 echo "16) Produktname im Seitentitel (TODO e3101cd6)"
-# Bis e3101cd6 hiessen alle Diagramm-Seiten "AutoPilot — …". AutoPilot ist nur der Name des
-# Projekts, unter dem MySuricates seine TODOs fuehrt; im Fliesstext darf er stehen bleiben.
+# Until e3101cd6 all diagram pages were called "AutoPilot — …". AutoPilot is only the name of the
+# project under which MySuricates keeps its TODOs; it may stay in running text.
 cat > "$FAKE/docs/titel-diagrams.md" <<'MD_EOF'
 # AutoPilot — Workflow Engine
 ## AutoPilot - Workflow Memory
@@ -720,9 +720,9 @@ check "Titel mit MySuricates bleibt frei"      '! grep -q "titel-diagrams.md:4" 
 rm "$FAKE/docs/titel-diagrams.md"
 
 echo "17) curl mit API-Key braucht --noproxy (TODO 2e3cf243)"
-# Mit gesetztem http_proxy schickt curl auch localhost-Aufrufe samt X-API-Key ueber den
-# Proxy. Der Header steht oft erst in einer Fortsetzungszeile -- gemeldet wird an der
-# Zeile mit curl, geprueft der ganze Aufruf.
+# With http_proxy set curl also sends localhost calls including the X-API-Key through the
+# proxy. The header often only stands in a continuation line -- reported at the
+# line with curl, the whole call is checked.
 cat > "$FAKE/docs/curl.md" <<'MD_EOF'
 # curl
 curl -s http://localhost:9090/api/v1/todos -H "X-API-Key: $DEV_KEY"
@@ -745,9 +745,9 @@ check "zweiter Aufruf in derselben Zeile wird nicht vom ersten gedeckt" \
   'grep -qE "^DRIFT docs/curl.md:7 curl-ohne-noproxy" <<<"$OUT"'
 check "Meldung nennt die Option"              'grep -q "ohne --noproxy" <<<"$OUT"'
 
-# Gegenprobe: dieselben Aufrufe mit --noproxy, Aufrufe ohne Key, eine ausdruecklich
-# entfernte Instanz (dort kann der Proxy gewollt sein), Prosa mit dem Wort curl und die
-# Escape-Hatch.
+# Counter-check: the same calls with --noproxy, calls without a key, an explicitly
+# remote instance (the proxy may be intended there), prose with the word curl and the
+# escape hatch.
 cat > "$FAKE/docs/curl.md" <<'MD_EOF'
 # curl
 curl -s --noproxy '*' http://localhost:9090/api/v1/todos -H "X-API-Key: $DEV_KEY"
@@ -764,8 +764,8 @@ check "Gegenprobe: kein curl-Befund"          '! grep -q "curl-ohne-noproxy" <<<
 check "Gegenprobe: exit 0"                    '[ "$RC" -eq 0 ]'
 rm "$FAKE/docs/curl.md"
 
-# Nachbesserung: Der Body ist kein Ziel, "--noproxy ''" wirkt nicht, NO_PROXY='*' vor dem Aufruf
-# wirkt, und ein zweites curl in einer Fortsetzungszeile wird nicht doppelt gemeldet.
+# Follow-up fix: the body is not a target, "--noproxy ''" has no effect, NO_PROXY='*' before the call
+# works, and a second curl in a continuation line is not reported twice.
 cat > "$FAKE/docs/curl.md" <<'MD_EOF'
 # curl
 curl -s "$BASE/webhooks" -H "X-API-Key: $K" -d '{"url":"https://hooks.example.com"}'
@@ -793,14 +793,14 @@ check "Gegenprobe: NO_PROXY='*' / no_proxy=* vor curl gilt als erfuellt" \
 check "Gegenprobe: exit 0"                    '[ "$RC" -eq 0 ]'
 rm "$FAKE/docs/curl.md"
 
-# AGENTS.md steht im Default-Umfang: ihre Beispiele werden woertlich kopiert.
+# AGENTS.md is in the default scope: its examples are copied verbatim.
 printf '# Agents\ncurl -s http://localhost:9090/api/v1/todos -H "X-API-Key: $DEV_KEY"\n' > "$FAKE/AGENTS.md"
 OUT=$(bash "$SCRIPT" --root "$FAKE" 2>&1); RC=$?
 check "AGENTS.md wird ohne Pfadangabe geprueft" 'grep -qE "^DRIFT AGENTS.md:2 curl-ohne-noproxy" <<<"$OUT"'
 rm "$FAKE/AGENTS.md"
 
 echo "18) Controller-Aufzaehlung gegen die *Controller.java-Dateien (TODO 65eab274)"
-# Miniatur-Repo: Alpha und Beta. Die Zahl davor prueft schon Fall 2 — hier geht es um die Namen.
+# Miniature repo: Alpha and Beta. The number before them is already checked by case 2 - here it is about the names.
 cat > "$FAKE/docs/controller.md" <<'MD_EOF'
 # Controller
 **Controller:** Alpha, Gamma
@@ -812,8 +812,8 @@ check "fehlender und unbekannter Name gemeldet" \
   'grep -qE "^DRIFT docs/controller.md:2 controller-names nennt 1 von 2 Controllern \(es fehlen Beta; unbekannt Gamma\)" <<<"$OUT"'
 check "englische Ueberschrift: fehlender Name gemeldet" \
   'grep -qE "^DRIFT docs/controller.md:3 controller-names nennt 1 von 2 Controllern \(es fehlen Beta\)" <<<"$OUT"'
-# Gegenprobe: vollstaendige Liste in anderer Reihenfolge, mit Suffix, Backticks und Schlusspunkt;
-# eine Zeile, die nur das Wort Controller erwaehnt, ist keine Aufzaehlung.
+# Counter-check: complete list in another order, with suffix, backticks and final period;
+# a line that merely mentions the word Controller is not an enumeration.
 cat > "$FAKE/docs/controller.md" <<'MD_EOF'
 # Controller
 **Controller:** Beta, Alpha

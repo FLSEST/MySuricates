@@ -26,7 +26,7 @@ class RunContainerPreparationTest {
 
     @Test
     void withoutDocker_noContainerIsAttempted_andNothingIsBroadcast() {
-        // a0e85182: ohne eingerichtetes Docker kein Versuch — sonst je Run ein Activity-Log-ERROR
+        // a0e85182: without a set-up Docker no attempt — otherwise an Activity-Log ERROR per run
         when(containers.isDockerConfigured()).thenReturn(false);
 
         assertThat(RunContainerPreparation.ensureRunning(project, "run", containers, broadcaster)).isNull();

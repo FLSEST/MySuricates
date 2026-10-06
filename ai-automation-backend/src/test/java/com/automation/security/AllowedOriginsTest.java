@@ -46,13 +46,13 @@ class AllowedOriginsTest {
 
     @ParameterizedTest
     @ValueSource(strings = {
-            "https://evil.tail0000.ts.net:3000",            // fremdes Tailnet (traf *.tail*.ts.net:*)
-            "https://peer.tail1234.ts.net:3000",            // fremder Host im eigenen Tailnet
-            "http://100.64.0.8:3000",                       // fremde Tailscale-IP (traf 100.*:3000)
-            "http://100.evil.example:3000",                 // traf http://100.*:3000
-            "https://mine.tail1234.ts.net.evil.example",    // eigener Name als Praefix
+            "https://evil.tail0000.ts.net:3000",            // foreign tailnet (matched *.tail*.ts.net:*)
+            "https://peer.tail1234.ts.net:3000",            // foreign host in our own tailnet
+            "http://100.64.0.8:3000",                       // foreign Tailscale IP (matched 100.*:3000)
+            "http://100.evil.example:3000",                 // matched http://100.*:3000
+            "https://mine.tail1234.ts.net.evil.example",    // own name as prefix
             "https://evilmine.tail1234.ts.net",
-            "https://mine.tail1234.ts.net@evil.example",    // Userinfo: der Host ist evil.example
+            "https://mine.tail1234.ts.net@evil.example",    // userinfo: the host is evil.example
             "https://100.64.0.7:3000/path", "https://100.64.0.7:3000?x=1", "https://100.64.0.7:3000#x",
             "ws://100.64.0.7:3000", "null", "*", "", "http://localhost:8080"})
     void foreignOrLookalikeOrigins_areRejected(String origin) {

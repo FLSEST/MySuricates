@@ -1,11 +1,11 @@
 /**
- * True nur fuer app-interne Pfade, die gefahrlos an react-routers navigate() gehen duerfen.
+ * True only for app-internal paths that may safely go to react-router's navigate().
  *
- * Ein Pfad, der mit "//" oder "/\\" beginnt, ist protokollrelativ bzw. wird von Browsern und
- * aelteren react-router-Versionen als externes Ziel aufgeloest — "/\\evil.example" landet also
- * ausserhalb der App (GHSA open redirect, react-router <= 7.17.0). Assistenten-Antworten und
- * gerendertes Markdown sind LLM-Text und koennen untrusted Inhalte aus Workflow-Ausgaben oder
- * Webhooks enthalten, deshalb wird hier geprueft statt vertraut.
+ * A path starting with "//" or "/\\" is protocol-relative or is resolved by browsers and
+ * older react-router versions as an external target — "/\\evil.example" thus ends up
+ * outside the app (GHSA open redirect, react-router <= 7.17.0). Assistant answers and
+ * rendered Markdown are LLM text and may contain untrusted content from workflow outputs or
+ * webhooks, so it is checked here instead of trusted.
  */
 export function isInternalAppPath(href: string | undefined): href is string {
   if (!href || !href.startsWith('/')) return false;

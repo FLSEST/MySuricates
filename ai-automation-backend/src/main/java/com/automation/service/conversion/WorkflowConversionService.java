@@ -76,7 +76,7 @@ public class WorkflowConversionService {
             log.debug("AI-assisted conversion failed, falling back to rule-based: {}", e.getMessage());
         }
 
-        // Regelbasiert gibt es keine KI, die korrigieren könnte: nur melden.
+        // Rule-based there is no AI that could correct: only report.
         WorkflowSuggestion ruleBased = RuleBasedConversion.suggest(agenticSteps);
         if (!ruleBased.available()) return ruleBased;
         var findings = buildCheck.findings(ruleBased.blocks(), null);
@@ -153,8 +153,8 @@ public class WorkflowConversionService {
             return WorkflowSuggestion.notAvailable();
         }
 
-        // Baufehler-Prüfung (TODO 326d5987): bei HIGH genau eine Korrekturrunde mit demselben Provider und
-        // System-Prompt; verbliebene Befunde stehen im Vorschlag.
+        // Build-error check (TODO 326d5987): for HIGH exactly one correction round with the same provider and
+        // system prompt; remaining findings are part of the suggestion.
         GeneratedWorkflowCheck.Correction check = buildCheck.correctOnce(blocks, null,
                 correctionPrompt -> provider.reason(new AiProvider.ReasoningRequest(correctionPrompt, systemPrompt)).text());
 
@@ -164,23 +164,23 @@ public class WorkflowConversionService {
     }
 
     /**
-     * Ohne mitgegebenen Vorschlag — der alte Weg für Clients, die nur Projekt und Name schicken:
-     * der Vorschlag wird hier neu erzeugt (mit KI-Aufruf).
+     * Without a supplied suggestion — the old way for clients that only send project and name:
+     * the suggestion is generated anew here (with an AI call).
      */
     public WorkflowResponse createWorkflowFromSuggestion(String runId, String projectId, String name) {
         return createWorkflowFromSuggestion(runId, projectId, name, null, null);
     }
 
     /**
-     * Legt den Workflow aus dem Vorschlag an.
+     * Creates the workflow from the suggestion.
      *
-     * <p>Sind {@code reviewedBlocks} mitgegeben, ist das der Vorschlag, den der Nutzer in der Vorschau
-     * gesehen und geprüft hat: Genau diese Blöcke (und {@code reviewedDescription}) werden gespeichert,
-     * ohne den Vorschlag neu zu erzeugen — sonst könnte etwas anderes gespeichert werden als angezeigt,
-     * und Vorschau plus Anlegen kosteten mit Korrekturrunde bis zu vier statt zwei KI-Aufrufe
-     * (TODO 935af6d3). Der Lauf wird dann nur billig geprüft (existiert, abgeschlossen) — mit demselben
-     * Fehlerbild wie {@link #suggestWorkflow}. Ohne Blöcke: bisheriges Verhalten, der Vorschlag wird
-     * neu erzeugt.
+     * <p>If {@code reviewedBlocks} are supplied, that is the suggestion the user saw and checked in the
+     * preview: exactly these blocks (and {@code reviewedDescription}) are saved,
+     * without regenerating the suggestion — otherwise something other than what was shown could be saved,
+     * and preview plus creation would cost up to four instead of two AI calls with the correction round
+     * (TODO 935af6d3). The run is then only checked cheaply (exists, completed) — with the same
+     * error pattern as {@link #suggestWorkflow}. Without blocks: previous behavior, the suggestion is
+     * regenerated.
      *
      * <p>Not {@code @Transactional} either, for the model call inside {@link #suggestWorkflow}: only
      * creating the workflow and mapping the response share one transaction, after that call.
@@ -227,7 +227,7 @@ public class WorkflowConversionService {
 
         WorkflowResponse created = transactionTemplate.execute(status ->
                 workflowMapper.toResponse(workflowService.create(request, ChangeSource.CONVERSION)));
-        // Nach der Transaktion: das Activity-Log gehört nicht in den Speicher-Burst.
+        // After the transaction: the activity log does not belong in the save burst.
         if (created != null) {
             buildCheck.reportRemaining(created.id(), created.name(), "Konvertierung",
                     buildCheck.findings(blocks, null));
@@ -236,8 +236,8 @@ public class WorkflowConversionService {
     }
 
     /**
-     * Billige Prüfung für den mitgegebenen Vorschlag: gleiches Fehlerbild wie {@link #suggestWorkflow}
-     * (unbekannter Lauf → 404, nicht abgeschlossener → kein Vorschlag), ohne die Schritte zu laden.
+     * Cheap check for the supplied suggestion: same error pattern as {@link #suggestWorkflow}
+     * (unknown run → 404, not completed → no suggestion), without loading the steps.
      */
     private void requireCompletedRun(String runId) {
         WorkflowRun run = runRepository.findById(runId)

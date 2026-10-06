@@ -22,7 +22,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Welche TODOs zu einem Ziel gehoeren und in welcher Reihenfolge sie drankommen (TODO dc0566f8).
+ * Which TODOs belong to a goal and in which order they come up (TODO dc0566f8).
  */
 @Service
 @RequiredArgsConstructor
@@ -33,10 +33,10 @@ public class GoalMembershipService {
     private final GoalProjectRepository goalProjectRepository;
 
     /**
-     * Ordnet TODOs dem Ziel zu. Ein TODO aus einem anderen Ziel wechselt hierher (ein TODO gehoert
-     * hoechstens einem Ziel). Neu zugeordnete TODOs bekommen keinen Rang – sie stehen hinter den
-     * eingeordneten, bis jemand die Reihenfolge setzt. Ist ihr Projekt dem Ziel noch nicht
-     * zugeordnet, kommt es dazu (TODO c60bf914).
+     * Assigns TODOs to the goal. A TODO from another goal moves here (a TODO belongs to
+     * at most one goal). Newly assigned TODOs get no rank – they stand behind the
+     * ranked ones until someone sets the order. If their project is not yet assigned
+     * to the goal, it is added (TODO c60bf914).
      */
     @Transactional
     public GoalDetailResponse assign(String goalId, List<String> todoIds) {
@@ -46,7 +46,7 @@ public class GoalMembershipService {
             if (!goal.getId().equals(todo.getGoalId())) {
                 todo.setGoalId(goal.getId());
                 todo.setGoalRank(null);
-                todo.setWorkPackageId(null); // ein Arbeitspaket gilt nur im alten Ziel (TODO 259f4f66, c60bf914)
+                todo.setWorkPackageId(null); // a work package only applies in the old goal (TODO 259f4f66, c60bf914)
                 todoRepository.save(todo);
             }
             if (todo.getProjectId() != null) {
@@ -58,9 +58,9 @@ public class GoalMembershipService {
     }
 
     /**
-     * Setzt die Reihenfolge: die genannten TODOs bekommen Rang 1..n in dieser Folge, alle anderen
-     * TODOs des Ziels verlieren ihren Rang und stehen dahinter. Jede genannte ID muss schon zum
-     * Ziel gehoeren – Zuordnen ist {@link #assign}.
+     * Sets the order: the named TODOs get rank 1..n in this sequence, all other
+     * TODOs of the goal lose their rank and stand behind them. Every named ID must already belong
+     * to the goal – assigning is {@link #assign}.
      */
     @Transactional
     public GoalDetailResponse reorder(String goalId, List<String> todoIds) {
@@ -80,7 +80,7 @@ public class GoalMembershipService {
         List<GoalTodoRow> changed = todoRepository.findGoalRows(goal.getId()).stream()
                 .filter(row -> !Objects.equals(rankOf.get(row.id()), row.goalRank()))
                 .toList();
-        // Die TODOs, deren Rang wegfaellt, in einer Abfrage nachladen statt je TODO ein findById (TODO f83dcc48)
+        // Reload the TODOs whose rank is dropped in one query instead of one findById per TODO (TODO f83dcc48)
         List<String> dropped = changed.stream().map(GoalTodoRow::id).filter(id -> !byId.containsKey(id)).toList();
         if (!dropped.isEmpty()) {
             todoRepository.findAllById(dropped).forEach(todo -> byId.put(todo.getId(), todo));

@@ -17,9 +17,9 @@ import java.util.stream.Collectors;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Arbeitspaket-Zustand direkt aus den TODO-Zeilen, ohne Service drumherum (TODO c8a11b7a, c60bf914):
- * Zaehlung, Reihenfolge, Feldabbildung und die completedAt-/reopened-Regel. Die Zustandsgrenzen selbst
- * prueft {@code GoalWorkPackageServiceTest} ueber {@code list}.
+ * Work package state directly from the TODO rows, without a service around it (TODO c8a11b7a, c60bf914):
+ * counting, order, field mapping and the completedAt/reopened rule. The state boundaries themselves
+ * are tested by {@code GoalWorkPackageServiceTest} via {@code list}.
  */
 class WorkPackageProgressTest {
 
@@ -171,7 +171,7 @@ class WorkPackageProgressTest {
         assertThat(reopened.completedAt()).isEqualTo(NOW.minus(Duration.ofDays(1)));
     }
 
-    /** Ein Paket mit Ende {@code end} (Start = Ende) oder ohne Zeitraum ({@code end} null). */
+    /** A package with end {@code end} (start = end) or without a period ({@code end} null). */
     private static GoalWorkPackage workPackage(String id, Instant end, Instant completedAt, Instant createdAt) {
         return GoalWorkPackage.builder().id(id).goalId("g1").title(id).startDate(end).endDate(end).completedAt(completedAt)
                 .createdAt(createdAt).build();
@@ -182,7 +182,7 @@ class WorkPackageProgressTest {
                 .startDate(end).endDate(end).createdAt(OLD).build();
     }
 
-    /** TODO 68a5e24e: entschiedene TODOs je Paket, ohne ARCHIVED und ohne solche mit neuer Frage. */
+    /** TODO 68a5e24e: decided TODOs per package, without ARCHIVED and without those with a new question. */
     @Test
     void evaluate_countsDecidedTodosPerWorkPackage() {
         GoalWorkPackage p = workPackage("p1", null, null, OLD);

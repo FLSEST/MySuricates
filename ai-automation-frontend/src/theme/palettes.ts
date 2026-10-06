@@ -1,9 +1,9 @@
 /**
- * Offizielle Paletten und Rollen der Theme-Autoren (Stand 2026-09-14).
+ * Official palettes and roles of the theme authors (as of 2026-09-14).
  *
- * Quellen je Theme: Style Guide/Spezifikation des Autors, sonst das offizielle
- * VS-Code-Theme (bei Tokyo Night colors.lua). Abweichungen sind kommentiert.
- * Die eigentlichen Tokens entstehen in derive.ts.
+ * Sources per theme: the author's style guide/specification, otherwise the official
+ * VS Code theme (for Tokyo Night colors.lua). Deviations are commented.
+ * The actual tokens are produced in derive.ts.
  */
 import { mix } from './color';
 import type { PaletteThemeSpec } from './derive';
@@ -15,7 +15,7 @@ const nord = {
 };
 const nordHues = { red: nord.n11, orange: nord.n12, yellow: nord.n13, green: nord.n14, teal: nord.n7, blue: nord.n9, purple: nord.n15, pink: nord.n15 };
 
-// ── Catppuccin ── style-guide.md: base Fläche, mantle/crust Nebenflächen, surface0-2 Elemente; VS Code: Buttons mauve, Links blue
+// ── Catppuccin ── style-guide.md: base surface, mantle/crust secondary surfaces, surface0-2 elements; VS Code: buttons mauve, links blue
 const mocha = {
   pink: '#f5c2e7', mauve: '#cba6f7', red: '#f38ba8', peach: '#fab387', yellow: '#f9e2af', green: '#a6e3a1', teal: '#94e2d5', blue: '#89b4fa',
   lavender: '#b4befe', text: '#cdd6f4', sub0: '#a6adc8', ov1: '#7f849c', s2: '#585b70', s1: '#45475a', s0: '#313244',
@@ -34,11 +34,11 @@ const sol = {
   sidebarDark: '#00212b', borderLight: '#ddd6c1', // Microsofts VS-Code-Theme (Sidebar dunkel / Rahmen hell)
 };
 const solHues = { red: sol.red, orange: sol.orange, yellow: sol.yellow, green: sol.green, teal: sol.cyan, blue: sol.blue, purple: sol.violet, pink: sol.magenta };
-// Solarized-Text: base1 ist für App-Text zu dunkel, halb Richtung base2 gemischt (bleibt auf der Palettenstrecke)
+// Solarized text: base1 is too dark for app text, mixed halfway toward base2 (stays on the palette path)
 const solTextDark = mix(sol.b1, sol.b2, 0.55);
 const solTextLight = mix(sol.b01, sol.b02, 0.5);
 
-// ── Gruvbox ── morhetz/gruvbox (vim): bg0, bg2 Popups, bg3 Trenner, Blau für Links; VS-Code-Port: bg0 überall + bg1-Rahmen
+// ── Gruvbox ── morhetz/gruvbox (vim): bg0, bg2 popups, bg3 dividers, blue for links; VS Code port: bg0 everywhere + bg1 borders
 const gd = {
   bg0: '#282828', bg0s: '#32302f', bg1: '#3c3836', bg2: '#504945', bg3: '#665c54', gray: '#928374', fg1: '#ebdbb2', fg4: '#a89984',
   red: '#fb4934', green: '#b8bb26', yellow: '#fabd2f', blue: '#83a598', purple: '#d3869b', aqua: '#8ec07c', orange: '#fe8019',
@@ -58,13 +58,13 @@ const dawn = {
   rose: '#d7827e', pine: '#286983', foam: '#56949f', iris: '#907aa9', hm: '#dfdad9', hh: '#cecacd',
 };
 
-// ── Dracula ── draculatheme.com/spec: bg, bg_dark Sidebars, #343746 schwebende Elemente, #44475a Auswahl, comment für dezente Rahmen
+// ── Dracula ── draculatheme.com/spec: bg, bg_dark sidebars, #343746 floating elements, #44475a selection, comment for subtle borders
 const dr = {
   bg: '#282a36', fg: '#f8f8f2', sel: '#44475a', comment: '#6272a4', red: '#ff5555', orange: '#ffb86c', yellow: '#f1fa8c', green: '#50fa7b',
   cyan: '#8be9fd', purple: '#bd93f9', pink: '#ff79c6', floating: '#343746', dark: '#21222c', darker: '#191a21',
 };
 
-// ── Everforest ── sainnhe/everforest palette.md: bg_dim gedimmt, bg0 Standard, bg1 Cursorzeile, bg2 Popups, grey1 UI-Rahmen, Grün für Links/Buttons
+// ── Everforest ── sainnhe/everforest palette.md: bg_dim dimmed, bg0 default, bg1 cursor line, bg2 popups, grey1 UI borders, green for links/buttons
 const ed = {
   dim: '#232a2e', bg0: '#2d353b', bg1: '#343f44', bg2: '#3d484d', bg3: '#475258', fg: '#d3c6aa', red: '#e67e80', orange: '#e69875',
   yellow: '#dbbc7f', green: '#a7c080', aqua: '#83c092', blue: '#7fbbb3', purple: '#d699b6', grey0: '#7a8478', grey1: '#859289', grey2: '#9da9a0',
@@ -73,10 +73,10 @@ const el = {
   dim: '#efebd4', bg0: '#fdf6e3', bg1: '#f4f0d9', bg2: '#efebd4', bg3: '#e6e2cc', bg4: '#e0dcc7', bg5: '#bdc3af', fg: '#5c6a72', red: '#f85552',
   orange: '#f57d26', yellow: '#dfa000', green: '#8da101', aqua: '#35a77c', blue: '#3a94c5', purple: '#df69ba', grey1: '#939f91', grey2: '#829181',
 };
-// Everforest-Light-Text ist für App-Text zu schwach: 25 % Richtung Everforest-Dark bg0 (einzige Abweichung von der Palette)
+// Everforest light text is too weak for app text: 25 % toward Everforest dark bg0 (only deviation from the palette)
 const elText = mix(el.fg, ed.bg0, 0.75);
 
-// ── Tokyo Night ── folke/tokyonight.nvim colors.lua + extras/opencode: bg, bg_dark Sidebars, bg_highlight Elemente, blue primär
+// ── Tokyo Night ── folke/tokyonight.nvim colors.lua + extras/opencode: bg, bg_dark sidebars, bg_highlight elements, blue primary
 const tn = {
   bg: '#1a1b26', dark: '#16161e', hl: '#292e42', fg: '#c0caf5', fgd: '#a9b1d6', gutter: '#3b4261', dark3: '#545c7e', dark5: '#737aa2',
   blue: '#7aa2f7', cyan: '#7dcfff', magenta: '#bb9af7', orange: '#ff9e64', yellow: '#e0af68', green: '#9ece6a', teal: '#1abc9c',
@@ -95,7 +95,7 @@ export const PALETTE_THEMES: readonly PaletteThemeSpec[] = [
     },
   },
   {
-    // Nord „bright ambiance“; es gibt kein offizielles VS-Code-Light-Theme
+    // Nord "bright ambiance"; there is no official VS Code light theme
     id: 'nord-light', name: 'Nord Light', appearance: 'light', cardBorders: true,
     hues: { ...nordHues, blue: nord.n10 },
     roles: {
@@ -118,7 +118,7 @@ export const PALETTE_THEMES: readonly PaletteThemeSpec[] = [
     },
   },
   {
-    // Karten (base) heben sich auf mantle kaum ab -> dezente Rahmen trotz Flächen-Trennung
+    // Cards (base) barely stand out against mantle -> subtle borders despite surface separation
     id: 'catppuccin-latte', name: 'Catppuccin Latte', appearance: 'light', cardBorders: true,
     hues: { red: latte.red, orange: latte.peach, yellow: latte.yellow, green: latte.green, teal: latte.teal, blue: latte.blue, purple: latte.mauve, pink: latte.pink },
     roles: {
@@ -229,7 +229,7 @@ export const PALETTE_THEMES: readonly PaletteThemeSpec[] = [
     },
   },
   {
-    // Primer-Tokens aus dem offiziellen VS-Code-Theme 6.3.5
+    // Primer tokens from the official VS Code theme 6.3.5
     id: 'github-dark', name: 'GitHub Dark', appearance: 'dark', cardBorders: true,
     hues: { red: '#f85149', orange: '#db6d28', yellow: '#d29922', green: '#3fb950', teal: '#179b9b', blue: '#2f81f7', purple: '#a371f7', pink: '#d34591' },
     roles: {
@@ -238,7 +238,7 @@ export const PALETTE_THEMES: readonly PaletteThemeSpec[] = [
       accent: '#2f81f7', accentHover: '#58a6ff', success: '#3fb950', warning: '#d29922', danger: '#f85149',
       sidebar: '#010409', sidebarBorder: '#21262d', sidebarHover: '#161b22', sidebarActive: mix('#6e7681', '#010409', 0.3),
       sidebarText: '#e6edf3', sidebarMuted: '#7d8590',
-      // Button-Text dunkel statt Primer-Weiß: weiß schließt einen lesbaren hellblauen Hover-Text aus
+      // Button text dark instead of Primer white: white rules out a readable light-blue hover text
       assistant: '#010409', assistantRaised: '#0d1117', assistantBorder: '#30363d',
     },
   },

@@ -3,10 +3,10 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
-// Wächter: Der API-Key darf nie wieder in einer URL landen (Browser-History, Proxy-Logs).
-// WebSocket-Handshakes authentifizieren sich seit 05b759f6 über ein kurzlebiges Einmal-Ticket
-// (POST /api/v1/ws-ticket, Key im Header) — siehe WebSocketAuthInterceptor im Backend.
-describe('kein apiKey im Query-String', () => {
+// Guard: the API key must never end up in a URL again (browser history, proxy logs).
+// WebSocket handshakes have authenticated via a short-lived one-time ticket since 05b759f6
+// (POST /api/v1/ws-ticket, key in the header) — see WebSocketAuthInterceptor in the backend.
+describe('no apiKey in the query string', () => {
   const currentDir = path.dirname(fileURLToPath(import.meta.url));
   const srcDir = path.resolve(currentDir, '..');
 
@@ -15,17 +15,17 @@ describe('kein apiKey im Query-String', () => {
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) return entry.name === 'node_modules' ? [] : sourceFiles(full);
       if (!/\.tsx?$/.test(entry.name)) return [];
-      // Testdateien dürfen das Verbot benennen, um es zu prüfen
+      // Test files may name the prohibition in order to check it
       if (/\.test\.tsx?$/.test(entry.name) || full.includes(`${path.sep}__tests__${path.sep}`)) return [];
       return [full];
     });
   }
 
-  it('findet Quelldateien zum Prüfen', () => {
+  it('finds source files to check', () => {
     expect(sourceFiles(srcDir).length).toBeGreaterThan(100);
   });
 
-  it('kein Produktivcode hängt apiKey= an eine URL', () => {
+  it('no production code appends apiKey= to a URL', () => {
     const offenders = sourceFiles(srcDir).filter((file) => readFileSync(file, 'utf-8').includes('apiKey='));
 
     expect(offenders.map((f) => path.relative(srcDir, f))).toEqual([]);

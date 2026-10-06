@@ -129,8 +129,8 @@ public class WishPromptHelper {
     }
 
     /**
-     * @param projectWorkflows die Workflows des Zielprojekts, wie der Aufrufer sie schon gelesen hat
-     *                         (leer ohne Projekt) — hier nicht ein zweites Mal laden (TODO 73036bbd)
+     * @param projectWorkflows the workflows of the target project as the caller already read them
+     *                         (empty without a project) - do not load them a second time here (TODO 73036bbd)
      */
     @SuppressWarnings("unchecked")
     public String buildExecutionIntelligence(List<Workflow> projectWorkflows) {

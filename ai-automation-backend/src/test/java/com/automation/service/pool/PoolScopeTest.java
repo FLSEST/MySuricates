@@ -6,7 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * {@code scope} ist das Pool-Metadatum, das repo-gebundene von portablen Eintraegen trennt
+ * {@code scope} is the pool metadatum that separates repo-bound from portable entries
  * (docs/workflow-pool-kuratierung.md).
  */
 class PoolScopeTest {

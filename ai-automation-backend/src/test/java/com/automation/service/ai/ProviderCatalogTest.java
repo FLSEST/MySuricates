@@ -20,12 +20,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
 /**
- * Der Installer liest die KI-Anbieter aus {@code scripts/lib/provider-catalog.generated.sh}, statt
- * einen fest verdrahteten Claude-Abschnitt zu haben (2255f2ee). Quelle ist {@link AiProvider#setup()}
- * jedes Anbieters: ein neuer Anbieter erscheint im Installer, ohne dass jemand das Skript anfasst.
+ * The installer reads the AI providers from {@code scripts/lib/provider-catalog.generated.sh} instead of
+ * having a hard-wired Claude section (2255f2ee). The source is {@link AiProvider#setup()}
+ * of each provider: a new provider appears in the installer without anyone touching the script.
  *
- * <p>Vorbild ist {@code ModuleCatalogTextsTest}: der Test rendert die Bash-Datei, ein Byte-Vergleich
- * macht Drift sichtbar. Skalare statt assoziativer Arrays, weil macOS bash 3.2 mitbringt.
+ * <p>Modeled on {@code ModuleCatalogTextsTest}: the test renders the Bash file, a byte comparison
+ * makes drift visible. Scalars instead of associative arrays, because macOS ships bash 3.2.
  */
 class ProviderCatalogTest {
 
@@ -49,17 +49,17 @@ class ProviderCatalogTest {
             assertThat(setup.cli()).as(provider.getId() + ": cli").matches("[a-z][a-z0-9-]*");
             assertThat(setup.install()).as(provider.getId() + ": install").isNotBlank();
             assertThat(setup.login()).as(provider.getId() + ": login").isNotBlank();
-            // Ein Schluessel, kein Satz: er wird Teil eines Bash-Variablennamens und eines i18n-Schluessels
+            // A key, not a sentence: it becomes part of a Bash variable name and an i18n key
             if (setup.loginNote() != null) {
                 assertThat(setup.loginNote()).as(provider.getId() + ": loginNote").matches("[a-z][a-z0-9_]*");
             }
             assertThat(setup.loginFiles()).as(provider.getId() + ": loginFiles").isNotEmpty()
                     .allSatisfy(f -> assertThat(f).as("relativ zu $HOME").doesNotStartWith("/").doesNotStartWith("~"));
-            // Namen landen unquotiert in ${!name} des Installers — nur Grossbuchstaben, Ziffern, _
+            // Names end up unquoted in the installer's ${!name} — only uppercase letters, digits, _
             assertThat(setup.loginEnv()).as(provider.getId() + ": loginEnv")
                     .allSatisfy(v -> assertThat(v).matches("[A-Z][A-Z0-9_]*"));
-            // Umlenkbares Anmeldeverzeichnis (Statusanzeige, f5a273ae): beides oder keins, und es lenkt
-            // mindestens eine Anmeldedatei um — sonst schaute die Anzeige im Container am falschen Ort
+            // Redirectable login directory (status display, f5a273ae): both or neither, and it redirects
+            // at least one login file — otherwise the display in the container would look in the wrong place
             assertThat(setup.loginDir() == null).as(provider.getId() + ": loginDir nur mit loginDirEnv")
                     .isEqualTo(setup.loginDirEnv() == null);
             if (setup.loginDirEnv() != null) {
@@ -86,9 +86,9 @@ class ProviderCatalogTest {
     }
 
     /**
-     * Die KI-CLIs kommen in einer festen Version, im Installer wie im Tryout-Image (pi c3a4cbf6, Claude
-     * und Codex 38f30352): eine neue Version kann Flags oder Ausgabeformat brechen, ohne dass es
-     * auffaellt. Beide Wege nennen dieselbe Version — das Tryout-Image traegt sie als {@code ARG}.
+     * The AI CLIs come in a pinned version, in the installer as in the tryout image (pi c3a4cbf6, Claude
+     * and Codex 38f30352): a new version can break flags or output format without anyone
+     * noticing. Both paths name the same version — the tryout image carries it as {@code ARG}.
      */
     @Test
     void piIsPinnedAlikeInInstallerAndTryoutImage() throws Exception {
@@ -103,7 +103,7 @@ class ProviderCatalogTest {
     void claudeIsPinnedAlikeInInstallerAndTryoutImage() throws Exception {
         assertThat(ClaudeAiProvider.PINNED_VERSION).as("Claude-Version").matches("\\d+\\.\\d+\\.\\d+");
         ProviderSetup claude = new ClaudeAiProvider(mock(HostClaudeService.class)).setup();
-        // Beide Wege des Katalogs in derselben Version: der native Installer nimmt sie als Argument
+        // Both paths of the catalog in the same version: the native installer takes it as an argument
         assertThat(claude.install()).as("Installer-Katalog (claude)")
                 .isEqualTo("curl -fsSL https://claude.ai/install.sh | bash -s " + ClaudeAiProvider.PINNED_VERSION
                         + "   (or: npm install -g @anthropic-ai/claude-code@" + ClaudeAiProvider.PINNED_VERSION + ")");
@@ -120,7 +120,7 @@ class ProviderCatalogTest {
         assertPinnedInTryoutImage("CODEX_VERSION", CodexAiProvider.PINNED_VERSION, "@openai/codex");
     }
 
-    /** {@code ARG <arg>=<version>} in der Tryout-Stufe, das Paket nur mit {@code @${<arg>}}, nie ohne Version. */
+    /** {@code ARG <arg>=<version>} in the tryout stage, the package only with {@code @${<arg>}}, never without a version. */
     private static void assertPinnedInTryoutImage(String arg, String version, String pkg) throws IOException {
         List<String> dockerfile = Files.readAllLines(DOCKERFILE);
         assertThat(dockerfile).as(DOCKERFILE + ": ARG " + arg + " wie PINNED_VERSION")
@@ -132,9 +132,9 @@ class ProviderCatalogTest {
     }
 
     /**
-     * Der Hinweis nach dem Anmeldebefehl ist ein Schluessel (eab43a8b) — ein englischer Satz erschien
-     * auch in der deutschen Oberflaeche. Jeder Schluessel braucht einen Text in beiden Sprachen, im
-     * Installer wie in der Oberflaeche; sonst zeigte eine Seite gar nichts.
+     * The hint after the login command is a key (eab43a8b) — an English sentence also appeared
+     * in the German UI. Every key needs a text in both languages, in the
+     * installer as in the UI; otherwise one side would show nothing at all.
      */
     @Test
     void everyLoginNoteIsTranslatedForInstallerAndInterface() throws Exception {
@@ -153,13 +153,13 @@ class ProviderCatalogTest {
         }
     }
 
-    // ── Anbieter finden, ohne Spring-Kontext ─────────────────────────────────
+    // ── Finding providers, without a Spring context ──────────────────────────
 
     /**
-     * Alle ausgelieferten AiProvider unter com.automation, jede mit Mocks fuer ihre Konstruktor-Parameter.
-     * Ausgeliefert heisst: eine Spring-Komponente. Der Test-Provider der Szenario-Tests
-     * ({@code ScriptedAiProvider}, TODO fdf79a86) liegt im selben Paketbaum, gehoert aber nicht in
-     * den Katalog des Installers.
+     * All shipped AiProviders under com.automation, each with mocks for its constructor parameters.
+     * Shipped means: a Spring component. The test provider of the scenario tests
+     * ({@code ScriptedAiProvider}, TODO fdf79a86) sits in the same package tree, but does not belong in
+     * the installer's catalog.
      */
     private static List<AiProvider> providers() throws Exception {
         ClassPathScanningCandidateComponentProvider scanner = new ClassPathScanningCandidateComponentProvider(false);
@@ -184,21 +184,21 @@ class ProviderCatalogTest {
     private static String render(List<AiProvider> providers) throws IOException {
         StringBuilder out = new StringBuilder("""
                 #!/usr/bin/env bash
-                # generiert von ProviderCatalogTest — nicht von Hand ändern
+                # generated by ProviderCatalogTest — do not edit by hand
                 #
-                # Quelle: AiProvider#setup() jedes KI-Anbieters im Backend. Der Installer nennt damit alle
-                # Anbieter gleichrangig, ohne einen davon fest zu verdrahten (2255f2ee).
-                # Neu erzeugen:
+                # Source: AiProvider#setup() of every AI provider in the backend. This lets the installer list all
+                # providers as equals without hard-wiring any of them (2255f2ee).
+                # Regenerate:
                 #   cd ai-automation-backend && ./mvnw test -Dtest=ProviderCatalogTest -Dprovider.catalog.write=true
                 #
-                # Reine Daten, keine Funktionen; Skalare statt assoziativer Arrays (bash 3.2, macOS).
-                # login_files: relativ zu $HOME, durch Leerzeichen getrennt; "datei:muster" heisst, die Datei
-                # muss das Muster enthalten. Die erste zutreffende zaehlt als angemeldet.
-                # login_env: Umgebungsvariablen, durch Leerzeichen getrennt; eine gesetzte, nicht leere
-                # zaehlt ebenfalls als angemeldet (der Wert wird nie ausgegeben).
-                # login: nur der Befehl. login_note: was danach zu tun ist, als Schluessel — den Text dazu
-                # liefert scripts/lib/i18n/<sprache>.sh (M_login_note_<schluessel>); leer, wenn der Befehl
-                # alles sagt (eab43a8b).
+                # Pure data, no functions; scalars instead of associative arrays (bash 3.2, macOS).
+                # login_files: relative to $HOME, space-separated; "file:pattern" means the file
+                # must contain the pattern. The first match counts as logged in.
+                # login_env: environment variables, space-separated; one that is set and not empty
+                # counts as logged in too (the value is never printed).
+                # login: just the command. login_note: what to do afterwards, as a key — the text for it
+                # comes from scripts/lib/i18n/<language>.sh (M_login_note_<key>); empty when the command
+                # says it all (eab43a8b).
 
                 PROVIDER_IDS=(
                 """);

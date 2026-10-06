@@ -89,7 +89,7 @@ function ToastItem({ toast }: { toast: Toast }) {
     >
       <div className="shrink-0 mt-0.5">{icons[toast.type]}</div>
       {actions.length > 1 ? (
-        // Mehrere Knöpfe („Zeigen“, „Rückgängig“) passen nicht neben den Text: sie stehen darunter
+        // Several buttons ("Zeigen", "Rückgängig") do not fit next to the text: they sit below it
         <div className="min-w-0 flex-1">
           <p className="text-sm text-text leading-snug">{toast.message}</p>
           <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1">
@@ -139,7 +139,7 @@ export function ToastContainer() {
   const toasts = useToastStore((s) => s.toasts);
 
   return createPortal(
-    // Immer bedienbar – auch unter einem modalen Blatt, das den Rest der Seite inert macht (SidePanelFrame)
+    // Always operable - even under a modal sheet that makes the rest of the page inert (SidePanelFrame)
     <div className="fixed top-4 right-4 z-50 flex flex-col gap-2" aria-live="polite" data-always-interactive="">
       {toasts.map((toast) => (
         <ToastItem key={toast.id} toast={toast} />

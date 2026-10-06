@@ -22,17 +22,17 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Zweisprachige Schritte in Vorlagen- und Pool-Dateien (TODO a129a661).
+ * Bilingual steps in template and pool files (TODO a129a661).
  *
- * <p>Name und Beschreibung einer Vorlage sind schon lange {@code {"de": …, "en": …}}. Eine Datei mit
- * dem Marker {@code "i18n": ["de", "en"]} darf dieselbe Form auch in {@code blocks} und
- * {@code instructions} verwenden: Jedes Objekt, dessen Schlüssel genau die deklarierten Sprachen
- * sind und dessen Werte Strings sind, ist ein lokalisierter Text. Beim Anlegen eines Workflows wird
- * eine Sprache gewählt, danach ist der Workflow einsprachig. Rückfall: gewünschte Sprache, dann
- * {@code en}, dann {@code de}.
+ * <p>The name and description of a template have long been {@code {"de": …, "en": …}}. A file with
+ * the marker {@code "i18n": ["de", "en"]} may use the same form in {@code blocks} and
+ * {@code instructions} too: every object whose keys are exactly the declared languages
+ * and whose values are strings is a localized text. When a workflow is created,
+ * a language is chosen, after that the workflow is monolingual. Fallback: requested language, then
+ * {@code en}, then {@code de}.
  *
- * <p>Ohne Marker wird nichts angefasst. Sonst könnte eine echte Daten-Map mit den Schlüsseln
- * {@code de}/{@code en} (etwa in einem exportierten Workflow) still zu einem String werden.
+ * <p>Without the marker nothing is touched. Otherwise a real data map with the keys
+ * {@code de}/{@code en} (for example in an exported workflow) would silently become a string.
  */
 public final class LocalizedJson {
 

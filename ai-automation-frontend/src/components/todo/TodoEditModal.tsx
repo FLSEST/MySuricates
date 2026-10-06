@@ -11,8 +11,8 @@ const STATUSES: TodoStatus[] = ['OPEN', 'IN_PROGRESS', 'DONE', 'BACKLOG', 'ARCHI
 const PRIORITIES: TodoPriority[] = ['LOW', 'MEDIUM', 'HIGH'];
 
 /**
- * Was nach dem gespeicherten TODO (PUT) noch zu speichern ist – die Einordnung (bbee09e6). Der Aufrufer
- * schließt den Dialog erst, wenn es erfüllt ist; weist es ab, bleibt er offen.
+ * What still has to be saved after the saved TODO (PUT) - the planning (bbee09e6). The caller
+ * closes the dialog only when it is fulfilled; if it rejects, the dialog stays open.
  */
 export type AfterTodoSave = () => Promise<void>;
 
@@ -27,7 +27,7 @@ interface TodoEditModalProps {
   onClose: () => void;
   onFormChange: (form: UpdateTodoRequest) => void;
   onTagsChange: (tags: string[]) => void;
-  /** PUT des TODOs, dann `afterSave` abwarten, dann schließen. */
+  /** PUT of the TODO, then await `afterSave`, then close. */
   onSave: (afterSave: AfterTodoSave) => void;
   integrations: IntegrationProviderInfo[];
   onExport: (provider: string, target: string) => void;
@@ -53,7 +53,7 @@ export function TodoEditModal({
   const t = useT();
   const goalsModule = useModuleEnabled('goals');
   const integrationsModule = useModuleEnabled('integrations');
-  // Einordnung gehört zum Modul „Ziele“ (c60bf914) – aus, gibt es sie nicht
+  // Planning belongs to the module "Ziele" (c60bf914) - if off, it does not exist
   const planning = useTodoPlanningForm(goalsModule ? editTodo : null);
 
   return (

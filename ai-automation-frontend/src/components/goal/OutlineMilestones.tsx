@@ -7,9 +7,9 @@ import { useGoalSelection, useIsSelected } from './goalSelection';
 import type { GoalDetail, GoalMilestone } from '../../types';
 
 /**
- * Die Meilensteine oben in der Gliederung (c60bf914): Termine fürs ganze Ziel, nach Datum – Raute,
- * Titel, Datum, Zustand und „2/3 Pakete“; ein Klick öffnet die Seitenleiste, ✎ bearbeitet, „+ Meilenstein“ legt an. Bei einem
- * Backend vor c60bf914 steht hier nur, dass es sie nach dem Neustart gibt.
+ * The milestones at the top of the outline (c60bf914): dates for the whole goal, by date — diamond,
+ * title, date, state and „2/3 Pakete“; a click opens the side panel, ✎ edits, „+ Meilenstein“ creates. With a
+ * backend before c60bf914 this only says that they exist after the restart.
  */
 export function OutlineMilestones({ detail, onAdd, onEdit }: {
   detail: GoalDetail;
@@ -54,7 +54,7 @@ function MilestoneLine({ milestone, onEdit }: { milestone: GoalMilestone; onEdit
   const selected = useIsSelected('milestone', milestone.id);
   const reached = milestone.state === 'REACHED';
   const editLabel = t.goals.outline.editMilestone.replace('{title}', milestone.title);
-  // Auf der Zielseite öffnet der Titel die Seitenleiste (c60bf914), ✎ bearbeitet; ohne Seitenleiste bearbeitet der Titel
+  // On the goal page the title opens the side panel (c60bf914), ✎ edits; without a side panel the title edits
   const label = selection ? t.goals.panel.openMilestone.replace('{title}', milestone.title) : editLabel;
   return (
     <li className={`-mx-1.5 flex items-center gap-2.5 rounded-md px-1.5 py-1.5 ${selected ? 'bg-accent-subtle' : ''}`}
@@ -80,7 +80,7 @@ function MilestoneLine({ milestone, onEdit }: { milestone: GoalMilestone; onEdit
           </>
         ) : reached && <Check className="ml-auto h-3.5 w-3.5 text-success" role="img" aria-label={tm.states.REACHED} />}
       </span>
-      {/* Mit Seitenleiste ein eigener Knopf zum Bearbeiten; ohne ist der Titel davor schon dieser Knopf */}
+      {/* With a side panel a separate button for editing; without it the title before it is already that button */}
       <button type="button" onClick={onEdit} aria-label={selection ? editLabel : undefined} aria-hidden={selection ? undefined : true}
         tabIndex={selection ? undefined : -1} title={tm.edit}
         className="rounded p-1 text-text-tertiary hover:bg-surface-hover hover:text-text focus-ring">

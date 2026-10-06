@@ -13,11 +13,11 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * {@code run_if} (TODO cc0eb3ba): ein Shell-Test vor einem Block der obersten Ebene. Exit 0 → der Block läuft;
- * sonst wird er mit {@link StepStatus#SKIPPED} und festem Text übersprungen – sein Executor wird nicht gerufen,
- * also auch kein KI-Aufruf, keine Freigabe, kein Schreiben. Platzhalter wie in jedem Shell-Feld: fremde Werte
- * immer gequotet, mit {@code shell_escape_variables} alle. Läuft im Arbeitsverzeichnis des Laufs (bei Isolation
- * im Klon), höchstens {@value #TIMEOUT_SECONDS} s. Verschachtelte Blöcke kennen den Schlüssel nicht.
+ * {@code run_if} (TODO cc0eb3ba): a shell test before a top-level block. Exit 0 → the block runs;
+ * otherwise it is skipped with {@link StepStatus#SKIPPED} and a fixed text - its executor is not called,
+ * so no AI call, no approval, no writing either. Placeholders as in every shell field: foreign values
+ * always quoted, with {@code shell_escape_variables} all of them. Runs in the run's working directory (in the clone
+ * with isolation), at most {@value #TIMEOUT_SECONDS} s. Nested blocks do not know the key.
  */
 @Component
 @RequiredArgsConstructor
@@ -28,7 +28,7 @@ public class RunIfGate {
 
     private final CommandExecutorService commandExecutor;
 
-    /** Das Ergebnis eines übersprungenen Blocks – leer, wenn er laufen soll. */
+    /** The result of a skipped block - empty if it should run. */
     public Optional<StepResult> skipIfUnmet(BlockDefinition block, ExecutionContext context) {
         Map<String, Object> config = block.getConfig();
         Object raw = config == null ? null : config.get(KEY);

@@ -7,14 +7,14 @@ import { useGoalReveal } from '../components/goal/goalReveal';
 import type { GoalDetail, Todo } from '../types';
 
 /**
- * TODOs zum Ziel hinzufügen (85889063, Flo: „sollte man dort ja einem Arbeitspaket zuordnen können“).
- * Jedes Hinzufügen sagt im Toast, wo das TODO gelandet ist („Hinzugefügt: Projekt · Paket“), mit
- * „Zeigen“ (springt in der Gliederung bzw. im Zeitstrahl hin, der Toast bleibt offen) und „Rückgängig“
- * (ein eben angelegtes TODO wird archiviert, nie gelöscht). Das läuft auch, wenn
- * die Zielseite schon verlassen ist: nur Client und Stores.
+ * Add TODOs to the goal (85889063, Flo: "sollte man dort ja einem Arbeitspaket zuordnen können").
+ * Every add says in the toast where the TODO landed ("Hinzugefügt: Projekt · Paket"), with
+ * "Zeigen" (jumps there in the outline or the timeline, the toast stays open) and "Rückgängig"
+ * (a just-created TODO is archived, never deleted). This also works when
+ * the goal page has already been left: only client and stores.
  */
 
-/** Wohin es geht: ein Paket (mit Titel für den Toast) oder keins. */
+/** Where it goes: a package (with title for the toast) or none. */
 export interface PackageChoice {
   id: string;
   title: string;
@@ -33,7 +33,7 @@ export interface AddNew {
   workPackage: PackageChoice | null;
 }
 
-/** Angelegt, aber die Zuordnung zum Ziel scheiterte – das TODO gibt es, nur nicht im Ziel. */
+/** Created, but the assignment to the goal failed – the TODO exists, just not in the goal. */
 class CreatedButNotPlaced extends Error {
   constructor(readonly todo: Todo, readonly cause: unknown) {
     super('created but not placed');
@@ -50,7 +50,7 @@ export function useAddTodoToGoal(goalId: string) {
     void qc.invalidateQueries({ queryKey: goalKeys.all });
     void qc.invalidateQueries({ queryKey: ['todos'] });
   };
-  /** `planning` mit `goalId` und Paket: ein Schritt – das Backend hängt das Projekt ans Ziel. */
+  /** `planning` with `goalId` and package: one step – the backend attaches the project to the goal. */
   const place = (todoId: string, workPackage: PackageChoice | null) =>
     api.patch<Todo>(`/todos/${todoId}/planning`, { goalId, ...(workPackage ? { workPackageId: workPackage.id } : {}) });
 
@@ -58,7 +58,7 @@ export function useAddTodoToGoal(goalId: string) {
     undone: string) => {
     const where = `${projectName ?? t.goals.outline.noProject} · ${workPackage?.title ?? t.goals.outline.noWorkPackage}`;
     toast.success(ta.placed.replace('{where}', () => where), [
-      // „Zeigen“ lässt den Toast offen: erst hinschauen, dann noch zurücknehmen können
+      // "Zeigen" leaves the toast open: look first, then still be able to undo
       { label: ta.show, onClick: () => reveal(goalId, todoId), keepOpen: true },
       {
         label: t.goals.undoAssign,
@@ -71,7 +71,7 @@ export function useAddTodoToGoal(goalId: string) {
       },
     ]);
   };
-  // `goalId: ''` löst die Zuordnung samt Rang und Paket; das Projekt bleibt am Ziel
+  // `goalId: ''` removes the assignment including rank and package; the project stays on the goal
   const unassign = (todoId: string) => api.patch<Todo>(`/todos/${todoId}/planning`, { goalId: '' });
 
   const existing = useMutation({
@@ -97,8 +97,8 @@ export function useAddTodoToGoal(goalId: string) {
     },
     onSuccess: (todo, { projectName, workPackage }) => {
       refresh();
-      // Rückgängig löscht nicht: vom Ziel lösen und archivieren – nichts geht verloren, auch wenn
-      // inzwischen ein TodoTrigger lief oder jemand es bearbeitet hat (`PUT` übernimmt nur `status`)
+      // Undo does not delete: detach from the goal and archive – nothing is lost, even if
+      // a TodoTrigger has run in the meantime or someone has edited it (`PUT` only takes `status`)
       announce(todo.id, projectName, workPackage, async () => {
         await unassign(todo.id);
         await api.put<Todo>(`/todos/${todo.id}`, { status: 'ARCHIVED' });

@@ -51,8 +51,8 @@ public abstract class WorkflowMapper {
     protected ChainRunRepository chainRunRepository;
 
     /**
-     * Die Kette des Ketten-Runs, aus dem der Run stammt (3a35ced1) – eine Abfrage nur auf die
-     * Fremdschlüsselspalte, kein Lazy-Zugriff (OSIV ist aus). Nur die Detailantwort trägt sie.
+     * The chain of the chain run the run comes from (3a35ced1) – one query on the
+     * foreign key column only, no lazy access (OSIV is off). Only the detail response carries it.
      */
     protected String chainIdOf(WorkflowRun run) {
         if (run.getChainRunId() == null || chainRunRepository == null) {
@@ -99,8 +99,8 @@ public abstract class WorkflowMapper {
     public abstract List<WorkflowResponse> toResponseList(List<Workflow> workflows, @Context Map<String, Long> runCounts);
 
     /**
-     * Liste mit Run-Counts aus EINER GROUP-BY-Query (statt {@code countByWorkflowId} pro Workflow).
-     * Für die /workflows- und Projekt-Workflow-Listen. {@code runCount}-Werte identisch zum Einzelpfad.
+     * List with run counts from ONE GROUP-BY query (instead of {@code countByWorkflowId} per workflow).
+     * For the /workflows and project workflow lists. {@code runCount} values identical to the single path.
      */
     public List<WorkflowResponse> toResponseListWithRunCounts(List<Workflow> workflows) {
         Map<String, Long> runCounts = workflowRunRepository.countRunsGroupedByWorkflow().stream()
@@ -117,18 +117,18 @@ public abstract class WorkflowMapper {
     @Named("runSingle")
     public abstract WorkflowRunResponse toRunResponse(WorkflowRun run);
 
-    // Bewusst ohne Listenvariante: chainIdOf fragt je Run einmal – Run-Listen gehen über die
-    // WorkflowRunListItemResponse-Zeilen unten, die keine Kette nachschlagen (3a35ced1, kein N+1).
+    // Deliberately without a list variant: chainIdOf queries once per run – run lists go through the
+    // WorkflowRunListItemResponse rows below, which do not look up a chain (3a35ced1, no N+1).
 
     // --- Run lists: workflow/project labels from ONE query (avoids the per-run lazy-load of
     // WorkflowRun.workflow, TODO 9db34f3b) ---
 
-    /** Die Bezeichner, die eine Run-Zeile vom zugehörigen Workflow braucht. */
+    /** The labels a run row needs from its workflow. */
     public record RunOwner(String workflowName, String projectName, String projectPath) {}
 
     private static final RunOwner UNKNOWN_OWNER = new RunOwner(null, null, null);
 
-    /** Workflow- und Projektnamen aller Runs aus EINER Query (TODO 9db34f3b). */
+    /** Workflow and project names of all runs from ONE query (TODO 9db34f3b). */
     private Map<String, RunOwner> ownersFor(List<WorkflowRun> runs) {
         Set<String> workflowIds = runs.stream()
                 .map(this::safeWorkflowId)
@@ -144,17 +144,17 @@ public abstract class WorkflowMapper {
     // --- Lean list variant: no steps in the response (TODO a05c9504) ---
 
     /**
-     * Run-Liste fuer Listen-Routen ({@code /executions}, {@code /workflows/{id}/runs},
-     * {@code /schedules/{id}/runs}, {@code /schedules/calendar}): Workflow- und Projektnamen aus
-     * EINER Query, statt der Schritte ihre Anzahl und die gekuerzte Ausgabe des letzten. Namen wie
-     * im Einzelpfad: Vorrang hat der Namens-Schnappschuss des Runs, dann der Workflow, sonst
+     * Run list for list routes ({@code /executions}, {@code /workflows/{id}/runs},
+     * {@code /schedules/{id}/runs}, {@code /schedules/calendar}): workflow and project names from
+     * ONE query, instead of the steps their count and the shortened output of the last one. Names as
+     * in the single path: the run's name snapshot takes precedence, then the workflow, otherwise
      * "(deleted)".
      *
-     * <p>Die Listen-Route trug jeden {@code step_results.output} (TEXT) in die Antwort — gemessen
-     * 3 061 816 Bytes bei 60 Runs (TODO a05c9504). Statt der Schritte liefert sie deren Anzahl und
-     * die gekuerzte Ausgabe des letzten; den Volltext hat die Detail-Route. Seit TODO 7fd9f654
-     * werden die Schritte dafuer auch nicht mehr geladen: zwei Abfragen fuer die ganze Seite
-     * zaehlen sie und schneiden die letzte Ausgabe in der Datenbank ab.
+     * <p>The list route used to carry every {@code step_results.output} (TEXT) in the response — measured
+     * 3,061,816 bytes for 60 runs (TODO a05c9504). Instead of the steps it returns their count and
+     * the shortened output of the last one; the full text is in the detail route. Since TODO 7fd9f654
+     * the steps are no longer loaded for this either: two queries for the whole page
+     * count them and cut off the last output in the database.
      */
     public List<WorkflowRunListItemResponse> toRunListItemsWithOwners(List<WorkflowRun> runs) {
         return toRunListItems(runs, ownersFor(runs), runStepSummaries.of(runs));

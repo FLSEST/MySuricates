@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""TODO-Batch (TODO cc0eb3ba): Gates nach Bereich – Backend, Frontend, gemeinsam – mit einer Wiederholung bei Rot.
+"""TODO batch (TODO cc0eb3ba): gates by area – backend, frontend, common – with one retry on red.
 
-Die Befehle sind Anpassungspunkte des Workflows (`defaultContext`). `{range}` im gemeinsamen Befehl wird durch
-den geprüften Commit-Bereich ersetzt. Die Ausgabe jedes Gates geht in eine Logdatei; zurück kommen nur Name,
-Ergebnis und bei Rot die letzten Zeilen ohne Stacktrace-Zeilen. `first_error` holt daraus die erste
-aussagekräftige Fehlerzeile für den Vermerk am TODO; `flaky` nennt die Gates, die erst im zweiten Versuch grün wurden.
+The commands are customization points of the workflow (`defaultContext`). `{range}` in the common command is replaced by
+the checked commit range. The output of each gate goes to a log file; only name,
+result and, on red, the last lines without stacktrace lines come back. `first_error` extracts the first
+meaningful error line from that for the note on the TODO; `flaky` names the gates that only turned green on the second attempt.
 """
 from __future__ import annotations
 
@@ -23,12 +23,12 @@ import batchlib as b
 LOCKFILES = ("package-lock.json", "yarn.lock", "pnpm-lock.yaml")
 _SEQUENCE = count(1)
 RETRIED = "im zweiten Versuch"
-# Sammel- und Abschlusszeilen der Werkzeuge: sagen „rot“, aber nicht warum
+# Summary and closing lines of the tools: they say "red" but not why
 _NOISE = re.compile(r"(?i)^(failures:|errors:|tests run:|build failure|failed to execute goal|-> \[help|"
                     r"re-run maven|to see the full stack trace|for more information about the errors|please refer to|"
                     r"\[help \d+\]|npm err!|error: process completed with exit code|error: command failed)")
 _ERRORISH = re.compile(r"(?i)(error|fail|assert|expected|exception|fehler|✗|×|zeitüberschreitung)")
-_ANSI = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")   # Farbfolgen (Maven färbt auch in eine Datei)
+_ANSI = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")   # colour sequences (Maven colours even when writing to a file)
 _LEVEL = re.compile(r"^\s*\[(ERROR|WARNING|WARN|INFO)\]\s*")
 
 
@@ -77,7 +77,7 @@ def _run(name: str, command: str, cwd: str, cfg: GateConfig, label: str) -> tupl
     cfg.logs.mkdir(parents=True, exist_ok=True)
     log = cfg.logs / f"{label}-{name}-{next(_SEQUENCE)}.log"
     with log.open("w", encoding="utf-8") as out:
-        # eigene Prozessgruppe: bei Zeitüberschreitung stirbt auch die JVM/der Node-Prozess unter bash
+        # own process group: on timeout the JVM/node process under bash dies too
         process = subprocess.Popen(["bash", "-c", command], cwd=cwd, stdout=out, stderr=subprocess.STDOUT,
                                    start_new_session=True)
         try:
@@ -94,7 +94,7 @@ def _run(name: str, command: str, cwd: str, cfg: GateConfig, label: str) -> tupl
 
 
 def first_error(tail: str) -> str:
-    """Die erste aussagekräftige Fehlerzeile der Gate-Ausgabe, ohne `[ERROR]`-Präfix; sonst die letzte Zeile."""
+    """The first meaningful error line of the gate output, without `[ERROR]` prefix; otherwise the last line."""
     fallback = ""
     for raw in _ANSI.sub("", tail or "").splitlines():
         line = _LEVEL.sub("", raw).strip()
@@ -107,7 +107,7 @@ def first_error(tail: str) -> str:
 
 
 def red_reasons(lines: list[str]) -> list[str]:
-    """Je rotem Gate `<name>: <erste Fehlerzeile>` aus den Zeilen von `run_gates`."""
+    """Per red gate `<name>: <first error line>` from the lines of `run_gates`."""
     reasons = []
     for entry in lines:
         head, _, tail = entry.partition("\n")
@@ -118,12 +118,12 @@ def red_reasons(lines: list[str]) -> list[str]:
 
 
 def flaky(lines: list[str]) -> list[str]:
-    """Die Gates, die erst im zweiten Versuch grün wurden."""
+    """The gates that only turned green on the second attempt."""
     return [entry.split(":", 1)[0] for entry in lines if RETRIED in entry.split("\n", 1)[0]]
 
 
 def run_gates(scope: list[str], rng: str, cfg: GateConfig, label: str) -> tuple[bool, list[str]]:
-    """Alle Gates des Bereichs; ein rotes läuft einmal nach (instabile Tests). Rückgabe: grün?, Zeilen."""
+    """All gates of the area; a red one is rerun once (unstable tests). Returns: green?, lines."""
     commands = {"backend": (cfg.backend_cmd, cfg.backend_dir), "frontend": (cfg.frontend_cmd, cfg.frontend_dir),
                 "common": (cfg.common_cmd.replace("{range}", rng), ".")}
     ok_all, lines = True, []

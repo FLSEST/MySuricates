@@ -29,8 +29,8 @@ public final class TodoOutputParser {
 
     public record ParsedTodoItem(String title, String priority, List<String> tags, String description) {}
 
-    // foreach stellt jeder Iterationsausgabe "[<item>]: " voran (ForEachBlockExecutor) — ein
-    // Marker in der ersten Zeile einer Iteration stuende sonst nicht am Zeilenanfang (TODO 8671d03b).
+    // foreach prefixes every iteration output with "[<item>]: " (ForEachBlockExecutor) - a
+    // marker in the first line of an iteration would otherwise not be at the start of the line (TODO 8671d03b).
     private static final String FOREACH_PREFIX = "(?:\\[[^\\]\\n]*\\]:\\s*)?";
 
     // Line-anchored pattern with optional 4th description field:

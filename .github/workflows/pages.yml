@@ -1,12 +1,12 @@
 name: Pages
 
-# Die Diagramm-Seiten auf GitHub Pages (TODO ee5a4a04). Gebaut wird bei jedem Deploy frisch aus
-# der Markdown-Quelle (docs/*-diagrams.md + docs/i18n/), nicht aus den HTML-Dateien im Repo —
-# Pages kann so nicht hinter der Quelle zurueckbleiben. Voraussetzung, nur in den
-# Repo-Einstellungen: Settings -> Pages -> Source "GitHub Actions" (nicht "Deploy from branch":
-# das veroeffentlichte ganz docs/ samt plans/ und schickte Markdown durch Jekyll) und die
-# Repo-Variable PAGES_ENABLED=true. Ohne sie laeuft nur der Bau (samt --check), der Deploy
-# entfaellt — sonst waere jeder passende Push auf main rot, solange Pages aus ist.
+# The diagram pages on GitHub Pages (TODO ee5a4a04). Built fresh on every deploy from
+# the Markdown source (docs/*-diagrams.md + docs/i18n/), not from the HTML files in the repo —
+# so Pages cannot lag behind the source. Prerequisite, only in the
+# repo settings: Settings -> Pages -> Source "GitHub Actions" (not "Deploy from branch":
+# that published all of docs/ including plans/ and ran Markdown through Jekyll) and the
+# repo variable PAGES_ENABLED=true. Without it only the build runs (incl. --check), the deploy
+# is skipped — otherwise every matching push to main would be red while Pages is off.
 on:
   push:
     branches: [main]
@@ -18,8 +18,8 @@ on:
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
-# Ein Deploy nach dem anderen; ein laufender wird nicht abgebrochen, damit Pages nie halb
-# veroeffentlicht bleibt.
+# One deploy at a time; a running one is not cancelled so that Pages is never left half
+# published.
 concurrency:
   group: pages
   cancel-in-progress: false
@@ -33,7 +33,7 @@ jobs:
     runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      # Bricht bei Drift oder offener Uebersetzung ab: Was die CI rot meldet, geht nicht online.
+      # Fails on drift or an open translation: what CI reports red does not go online.
       - name: Diagramm-Seiten gegen die Quelle pruefen
         run: python3 scripts/docs-diagrams.py --check
       - name: Seiten erzeugen
@@ -47,8 +47,8 @@ jobs:
     needs: build
     if: vars.PAGES_ENABLED == 'true'
     runs-on: ubuntu-26.04
-    # Nur dieser Job darf Pages schreiben; id-token braucht deploy-pages fuer den Nachweis
-    # gegenueber Pages (OIDC), nicht fuer Fremddienste.
+    # Only this job may write Pages; id-token is needed by deploy-pages for the proof
+    # towards Pages (OIDC), not for third-party services.
     permissions:
       pages: write
       id-token: write

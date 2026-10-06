@@ -10,7 +10,7 @@ import org.springframework.http.ResponseEntity;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
-/** Vertrag: Import-Fehler sind IllegalArgumentExceptions und landen damit als HTTP 400 beim Client. */
+/** Contract: import errors are IllegalArgumentExceptions and thus reach the client as HTTP 400. */
 class BpmnImportExceptionTest {
 
     @Test

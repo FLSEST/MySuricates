@@ -27,11 +27,11 @@ const SECTION_TITLE = 'text-xs font-semibold text-text-secondary';
 const ACTION = 'inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1 text-xs text-text-secondary hover:border-border-strong hover:text-text focus-ring';
 
 /**
- * Die Seitenleiste der Zielseite (c60bf914, Flo: „Beim Anklicken eines Milestones sollten die TODOs
- * und Workflows in der Ansicht rechts sein … Und man sollte auch besser zu den TODOs kommen“): zu
- * einem Meilenstein seine verknüpften Arbeitspakete je Projekt mit deren TODOs und Workflows, zu einem
- * Arbeitspaket seine TODOs, Workflows und Meilensteine. Jedes TODO öffnet seinen Dialog. Angedockt,
- * als Fenster oder (unter 1024 px) als Blatt – siehe `SidePanelFrame`, der auch × und Escape bedient.
+ * The side panel of the goal page (c60bf914, Flo: „Beim Anklicken eines Milestones sollten die TODOs
+ * und Workflows in der Ansicht rechts sein … Und man sollte auch besser zu den TODOs kommen“): for
+ * a milestone its linked work packages per project with their TODOs and workflows, for a
+ * work package its TODOs, workflows and milestones. Each TODO opens its dialog. Docked,
+ * as a window or (below 1024 px) as a sheet — see `SidePanelFrame`, which also handles × and Escape.
  */
 export function GoalSidePanel({ detail, selection, today, onClose, onSelect, onOpenTodo }: {
   detail: GoalDetail;
@@ -53,7 +53,7 @@ export function GoalSidePanel({ detail, selection, today, onClose, onSelect, onO
   const workPackage = selection.kind === 'workpackage' ? detail.workPackages.find((item) => item.id === selection.id) : undefined;
   const title = milestone?.title ?? workPackage?.title ?? '';
 
-  // Beim Öffnen und bei jedem Wechsel des Eintrags steht der Fokus auf der Überschrift
+  // On opening and on every change of the entry, focus is on the heading
   useEffect(() => {
     headingRef.current?.focus({ preventScroll: true });
   }, [selection.kind, selection.id]);
@@ -266,13 +266,13 @@ function PackageBody({ detail, workPackage, today, onSelect, onOpenTodo }: {
   );
 }
 
-/** „+ TODO“ in der Seitenleiste eines Pakets (85889063): vorhandenes TODO ohne Ziel suchen oder neu anlegen. */
+/** „+ TODO“ in a package's side panel (85889063): search an existing TODO without a goal or create a new one. */
 function PackageTodoAdd({ goalId, workPackage, projectName }: { goalId: string; workPackage: GoalWorkPackage; projectName: string | null }) {
   const ta = useT().goals.add;
   const [adding, setAdding] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const refocus = useRef(false);
-  // Nach dem Schließen zurück auf „+ TODO“ – sobald er wieder gerendert ist
+  // After closing, back to „+ TODO“ — as soon as it is rendered again
   useEffect(() => {
     if (adding || !refocus.current) return;
     refocus.current = false;
@@ -302,7 +302,7 @@ function PackageRange({ item }: { item: GoalWorkPackage }) {
   return <span className="shrink-0 text-xs tabular-nums text-text-tertiary">{range ? rangeText(range, locale) : t.goals.workPackages.noRange}</span>;
 }
 
-/** Die TODOs eines Pakets: ein Klick (oder Enter) öffnet den TODO-Dialog; ❓/✔ entscheidet daneben. */
+/** A package's TODOs: a click (or Enter) opens the TODO dialog; ❓/✔ decides next to it. */
 function PackageTodos({ todos, workPackageId, today, onOpenTodo, empty = false }: {
   todos: GoalTodoItem[];
   workPackageId: string;
@@ -335,7 +335,7 @@ function PackageTodos({ todos, workPackageId, today, onOpenTodo, empty = false }
   );
 }
 
-/** Workflows eines Pakets als Chips mit ▶ – dieselbe Sperre gegen Doppelstarts wie überall. */
+/** A package's workflows as chips with ▶ — the same lock against double starts as everywhere. */
 function PackageWorkflowChips({ workPackageId, empty = false }: { workPackageId: string; empty?: boolean }) {
   const t = useT();
   const scope = useGoalWorkflowsScope();

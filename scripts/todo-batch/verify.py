@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""TODO-Batch, Abarbeiten (TODO cc0eb3ba): Commits den TODOs zuordnen, Wächter, Gates, lineare Nachprüfung.
+"""TODO batch, processing (TODO cc0eb3ba): assign commits to TODOs, guards, gates, linear re-check.
 
-Geprüft wird nur, was committet ist: Nicht-Committetes im Klon wird vorher verworfen und in `results.json`
-unter `discarded` genannt. Läuft nur in einem Klon, den prepare als isoliert bestätigt hat (sonst Exit 2).
-Nach dem Umsetzen: Zuordnung über den Trailer `Todo: <uuid>` (Commits ohne gültigen Trailer fallen heraus),
-Wächter je TODO (verbotene Pfade, Zeilen-Obergrenze), dann die Gates auf dem ganzen Bereich. Rot → vom
-Basis-Commit aus je TODO übernehmen und prüfen; rote TODOs fallen heraus (Vermerk mit der ersten Fehlerzeile des
-Gates), die übrigen bauen auf dem geprüften Stand weiter. Leere Commits kommen nicht in den Branch; ein Gate, das erst
-im zweiten Versuch grün wird, steht unter `flaky`. `--after-review`: TODOs mit Blocker aus dem Review fallen heraus, der Rest wird neu geprüft.
-Ergebnis: `results.json`, `accepted.txt`, `head.sha`; nach dem Review auch `reviews.json`, `report-draft.md`.
+Only what is committed gets checked: uncommitted changes in the clone are discarded first and listed in `results.json`
+under `discarded`. Only runs in a clone that prepare has confirmed as isolated (otherwise exit 2).
+After implementation: assignment via the trailer `Todo: <uuid>` (commits without a valid trailer are dropped),
+guards per TODO (forbidden paths, line ceiling), then the gates on the whole range. Red → pick from the
+base commit per TODO and check; red TODOs drop out (note with the first error line of the
+gate), the others continue on the checked state. Empty commits do not enter the branch; a gate that only
+turns green on the second attempt is listed under `flaky`. `--after-review`: TODOs with a blocker from the review drop out, the rest is re-checked.
+Result: `results.json`, `accepted.txt`, `head.sha`; after the review also `reviews.json`, `report-draft.md`.
 """
 from __future__ import annotations
 
@@ -64,9 +64,9 @@ ALREADY_CONTAINED = "Änderung schon enthalten (Commit beim Übernehmen leer)"
 
 
 def pick(shas: list[str]) -> str:
-    """Übernimmt die Commits einzeln: `ok`, `empty` (jede Änderung steckt schon im Stand) oder `conflict`.
+    """Picks the commits one by one: `ok`, `empty` (every change is already in the state) or `conflict`.
 
-    Ein Commit, der beim Übernehmen leer wird, kommt nicht in den Branch; die übrigen schon."""
+    A commit that becomes empty when picked does not enter the branch; the others do."""
     applied = 0
     for sha in shas:
         if b.git_ok("cherry-pick", sha):
@@ -80,7 +80,7 @@ def pick(shas: list[str]) -> str:
 
 
 def take(todo_id: str, shas: list[str], before: str, results: dict) -> bool:
-    """Übernimmt die Commits eines TODOs; sonst zurück auf `before` und Grund am TODO."""
+    """Picks the commits of a TODO; otherwise back to `before` and the reason on the TODO."""
     outcome = pick(shas)
     if outcome == "ok":
         return True
@@ -93,13 +93,13 @@ def take(todo_id: str, shas: list[str], before: str, results: dict) -> bool:
 
 
 def reset_to(sha: str) -> None:
-    """Harter Rücksprung samt unversionierter Reste, damit kein herausgefallenes TODO im Baum weiterlebt."""
+    """Hard reset including unversioned leftovers, so no dropped TODO lives on in the tree."""
     b.git("reset", "-q", "--hard", sha)
     b.git("clean", "-fdq")
 
 
 def rebuild(base: str, ordered: list[tuple[str, list[str]]], results: dict) -> list[str]:
-    """Baut den Branch vom Basis-Commit aus nur aus diesen TODOs neu auf; Konflikt → TODO fällt heraus."""
+    """Rebuilds the branch from the base commit using only these TODOs; conflict → TODO drops out."""
     reset_to(base)
     kept = []
     for todo_id, shas in ordered:
@@ -110,9 +110,9 @@ def rebuild(base: str, ordered: list[tuple[str, list[str]]], results: dict) -> l
 
 
 def linear(base: str, ordered: list[tuple[str, list[str]]], cfg: GateConfig, results: dict) -> list[str]:
-    """Je TODO übernehmen und prüfen; rot → zurück, die übrigen bauen auf dem geprüften Stand weiter.
+    """Pick and check per TODO; red → back, the others continue on the checked state.
 
-    Rückgabe: die Gates, die dabei erst im zweiten Versuch grün wurden."""
+    Returns: the gates that only turned green on the second attempt."""
     reset_to(base)
     retried: list[str] = []
     for todo_id, shas in ordered:
@@ -174,7 +174,7 @@ def initial(state: Path, cfg: GateConfig, forbidden: list[str], max_lines: int) 
             "discarded": discarded, "flaky": retried}
 
 
-# Was ein Modell aus der Formatvorlage abschreibt, statt einen Befund zu nennen
+# What a model copies from the format template instead of naming a finding
 PLACEHOLDERS = {"", "…", "...", "-", "–", "keine", "keiner", "nichts", "none", "n/a", "na", "null"}
 
 
@@ -185,10 +185,10 @@ def findings(values) -> list[str]:
 
 
 def parse_reviews(text: str) -> dict[str, dict]:
-    """Je TODO die letzte REVIEW-Zeile in dessen eigenem foreach-Abschnitt, die auch dessen ID nennt.
+    """Per TODO the last REVIEW line in its own foreach section that also names its ID.
 
-    `reason`: die Zeile davor (oder der Text vor `REVIEW:` in derselben Zeile) – dort nennt ein Review ohne
-    Urteil seinen Grund."""
+    `reason`: the line before it (or the text before `REVIEW:` in the same line) – that is where a review without
+    a verdict gives its reason."""
     reviews = {}
     for todo_id, segment in b.item_segments(text).items():
         chosen, reason, previous = None, "", ""

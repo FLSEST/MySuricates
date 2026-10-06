@@ -26,8 +26,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Der Abgleich schliesst ein verwaltetes TODO, wenn jedes verknuepfte Finding terminal ist — und
- * oeffnet nur wieder, was er selbst geschlossen hat.
+ * The reconciliation closes a managed TODO when every linked finding is terminal — and
+ * only reopens what it closed itself.
  */
 @ExtendWith(MockitoExtension.class)
 class ManagedTodoReconcilerTest {
@@ -64,7 +64,7 @@ class ManagedTodoReconcilerTest {
         assertThat(todo.getStatus()).isEqualTo(Todo.Status.OPEN);
     }
 
-    /** Jemand arbeitet daran — ein wieder offenes Finding darf das nicht auf OPEN zuruecksetzen. */
+    /** Someone is working on it — a reopened finding must not reset it to OPEN. */
     @Test
     void leavesAnInProgressTodoAlone() {
         Todo todo = todo(Todo.Status.IN_PROGRESS);
@@ -77,7 +77,7 @@ class ManagedTodoReconcilerTest {
         verify(todoRepository, never()).saveAll(any());
     }
 
-    /** Archiviert ist eine menschliche Entscheidung und bleibt sie. */
+    /** Archived is a human decision and stays one. */
     @Test
     void leavesAnArchivedTodoAlone() {
         Todo todo = todo(Todo.Status.ARCHIVED);
@@ -90,7 +90,7 @@ class ManagedTodoReconcilerTest {
         verify(todoRepository, never()).saveAll(any());
     }
 
-    /** Ein archiviertes TODO wird dagegen geschlossen, wenn alles terminal ist — das ist kein Rueckschritt. */
+    /** An archived TODO, by contrast, is closed when everything is terminal — that is not a step backwards. */
     @Test
     void stillClosesAnArchivedTodoWhenEverythingIsTerminal() {
         Todo todo = todo(Todo.Status.ARCHIVED);
@@ -113,8 +113,8 @@ class ManagedTodoReconcilerTest {
     }
 
     /**
-     * 8c791a45: je Stufe eine Abfrage, egal wie viele Verknuepfungen abgeglichen werden – vorher je
-     * verwaltetem TODO ein findById und ein findByTodoId, dazu je Verknuepfung ein findById des Findings.
+     * 8c791a45: one query per stage, no matter how many links are reconciled – before, per
+     * managed TODO a findById and a findByTodoId, plus per link a findById of the finding.
      */
     @Test
     void loadsTodosLinksAndFindingsInOneQueryEach() {
@@ -144,12 +144,12 @@ class ManagedTodoReconcilerTest {
         verify(todoRepository, never()).findById(any());
         verify(findingTodoRepository, never()).findByTodoId(any());
         verify(findingRepository, never()).findById(any());
-        // e41531e0: beide geaenderten TODOs in einem saveAll, kein save je TODO.
+        // e41531e0: both changed TODOs in one saveAll, no save per TODO.
         verify(todoRepository, times(1)).saveAll(List.of(todoA, todoB));
         verify(todoRepository, never()).save(any());
     }
 
-    /** Ein verwaltetes TODO, das es nicht mehr gibt, wird uebersprungen – ohne weitere Abfrage. */
+    /** A managed TODO that no longer exists is skipped – without a further query. */
     @Test
     void skipsAManagedLinkWhoseTodoIsGone() {
         when(findingTodoRepository.findByFindingId(FINDING_ID)).thenReturn(List.of(link(FINDING_ID, TODO_ID, true)));
@@ -163,7 +163,7 @@ class ManagedTodoReconcilerTest {
         verify(findingRepository, never()).findAllById(any());
     }
 
-    /** Ein geloeschtes Finding zaehlt nicht mit: sind die uebrigen terminal, wird geschlossen. */
+    /** A deleted finding does not count: if the rest are terminal, it is closed. */
     @Test
     void ignoresADeletedFinding_andClosesWhenTheRestIsTerminal() {
         Todo todo = todo(Todo.Status.OPEN);
@@ -181,7 +181,7 @@ class ManagedTodoReconcilerTest {
         verify(todoRepository).saveAll(List.of(todo));
     }
 
-    /** Dasselbe mit einem noch offenen Finding daneben: das geloeschte macht das TODO nicht erledigt. */
+    /** The same with a still open finding next to it: the deleted one does not make the TODO done. */
     @Test
     void aDeletedFindingDoesNotCloseATodoWithAnOpenOne() {
         Todo todo = todo(Todo.Status.OPEN);

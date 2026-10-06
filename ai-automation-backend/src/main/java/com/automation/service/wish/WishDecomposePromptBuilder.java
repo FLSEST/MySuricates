@@ -174,7 +174,7 @@ public class WishDecomposePromptBuilder {
         appendMatchingTemplatesAndPool(sb, keywords);
 
         // Execution Intelligence from past runs
-        // Die Projekt-Workflows sind oben schon gelesen — kein zweites findByProjectId (TODO 73036bbd)
+        // The project workflows were already read above - no second findByProjectId (TODO 73036bbd)
         sb.append(helper.buildExecutionIntelligence(projectWorkflows));
 
         // Add available skills
@@ -184,8 +184,8 @@ public class WishDecomposePromptBuilder {
     }
 
     /**
-     * Aktive Memories der Projekt-Workflows aus einer Abfrage statt einer je Workflow (TODO 5fb7b1e9),
-     * in der Reihenfolge der Workflows — so wie die Einzelabfragen sie aneinanderreihten.
+     * Active memories of the project workflows from one query instead of one per workflow (TODO 5fb7b1e9),
+     * in the order of the workflows - as the individual queries would have strung them together.
      */
     private List<WorkflowMemory> activeMemoriesInWorkflowOrder(List<Workflow> workflows) {
         if (workflows.isEmpty()) return List.of();
@@ -201,8 +201,8 @@ public class WishDecomposePromptBuilder {
     }
 
     /**
-     * Die vom Nutzer gewählten Referenz-Workflows aus einer Abfrage statt {@code findById} je ID
-     * (TODO 51ee8709) — in der Reihenfolge der Auswahl; unbekannte oder gelöschte IDs fallen weg.
+     * The reference workflows chosen by the user from one query instead of {@code findById} per ID
+     * (TODO 51ee8709) - in the order of the selection; unknown or deleted IDs are dropped.
      */
     private List<Workflow> referencedWorkflows(List<String> referenceIds) {
         Map<String, Workflow> byId = new HashMap<>();

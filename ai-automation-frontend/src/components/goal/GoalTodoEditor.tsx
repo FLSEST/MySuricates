@@ -24,9 +24,9 @@ function formOf(todo: Todo): UpdateTodoRequest {
 }
 
 /**
- * Bearbeiten-Dialog eines TODOs direkt auf der Zielseite (TODO c6ea8f5c) – derselbe
- * `TodoEditModal` wie auf der TODO-Seite. Lädt das TODO samt Beschreibung erst beim Öffnen; die
- * Zielansicht selbst kennt nur schlanke Zeilen.
+ * Edit dialog of a TODO directly on the goal page (TODO c6ea8f5c) — the same
+ * `TodoEditModal` as on the TODO page. Loads the TODO with its description only on opening; the
+ * goal view itself only knows slim rows.
  */
 export function GoalTodoEditor({ todoId, onClose }: { todoId: string; onClose: () => void }) {
   const qc = useQueryClient();
@@ -37,7 +37,7 @@ export function GoalTodoEditor({ todoId, onClose }: { todoId: string; onClose: (
   const updateTodo = useUpdateTodo({ quietSuccess: true });
   const closeAfter = useCloseAfterSave();
   const exportTodo = useExportTodo();
-  // Formular erst füllen, wenn das TODO da ist – und nur einmal je TODO
+  // Fill the form only once the TODO is there — and only once per TODO
   const [edit, setEdit] = useState<{ id: string; form: UpdateTodoRequest; tags: string[] } | null>(null);
   if (todo && edit?.id !== todo.id) setEdit({ id: todo.id, form: formOf(todo), tags: [...todo.tags] });
 

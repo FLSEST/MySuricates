@@ -12,32 +12,32 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Liest die Texte einer Block-Konfiguration — flach und rekursiv.
+ * Reads the texts of a block configuration - flat and recursive.
  *
- * <p>Die Analyse muss verschachtelte Blöcke (foreach, switch, retry, while, conditional) mitsehen:
- * Ein absoluter Pfad oder ein nie belegter Platzhalter ist dort genauso ein Fehler wie oben.
- * Gleichzeitig braucht ein Teil der Regeln nur die direkten Werte eines Blocks — deshalb beides.
+ * <p>The analysis has to see nested blocks (foreach, switch, retry, while, conditional) too:
+ * an absolute path or a never-assigned placeholder is just as much an error there as at the top level.
+ * At the same time some of the rules only need the direct values of a block - hence both.
  */
 final class BlockText {
 
     private BlockText() {}
 
-    /** Schutz vor pathologisch tiefen Configs; echte Definitionen bleiben weit darunter. */
+    /** Protection against pathologically deep configs; real definitions stay far below it. */
     private static final int MAX_DEPTH = 12;
 
-    /** Alle Zeichenketten der Config, verschachtelte eingeschlossen. */
+    /** All strings of the config, nested ones included. */
     static List<String> allStrings(BlockDefinition block) {
         List<String> out = new ArrayList<>();
         collect(block == null ? null : block.getConfig(), out, 0);
         return out;
     }
 
-    /** Der zusammengefasste Text eines Blocks — für Suchen, bei denen die Struktur egal ist. */
+    /** The combined text of a block - for searches where the structure does not matter. */
     static String joined(BlockDefinition block) {
         return String.join("\n", allStrings(block));
     }
 
-    /** Der Wert eines direkten Config-Schlüssels als Text, oder {@code null}. */
+    /** The value of a direct config key as text, or {@code null}. */
     static String directValue(BlockDefinition block, String key) {
         if (block == null || block.getConfig() == null) return null;
         Object value = block.getConfig().get(key);
@@ -45,10 +45,10 @@ final class BlockText {
     }
 
     /**
-     * Wo ein Block seinen Auftrag an die KI führt: je Typ die Schlüssel, die sein Executor liest
-     * (dieselben wie in {@code BlockSpecs}). Nur Aufrufe, die {@code workflow.instructions} als
-     * Systemprompt mitbekommen, also nicht die Bedingung von conditional und nicht compress-ai.
-     * Gelesen wurde früher {@code prompt} vor {@code command} und {@code goal} nie (TODO c52eba8f).
+     * Where a block passes its task to the AI: per type the keys its executor reads
+     * (the same as in {@code BlockSpecs}). Only calls that receive {@code workflow.instructions} as
+     * system prompt, so not the condition of conditional and not compress-ai.
+     * Previously {@code prompt} was read before {@code command} and {@code goal} never (TODO c52eba8f).
      */
     static final Map<String, List<String>> PROMPT_KEYS = Map.of(
             "simple", List.of("command"),
@@ -59,13 +59,13 @@ final class BlockText {
             "while", List.of("command"),
             "conditional", List.of("then_command", "else_command"));
 
-    /** Typen, deren Befehl mit {@code execution_mode: "shell"} als Shell läuft statt als KI-Auftrag. */
+    /** Types whose command runs as a shell with {@code execution_mode: "shell"} instead of as an AI task. */
     private static final Set<String> SHELL_SWITCHABLE = Set.of("retry", "foreach", "while", "conditional");
 
     /**
-     * Die Auftragstexte, die ein Block zusammen mit {@code workflow.instructions} an die KI schickt,
-     * in der Reihenfolge von {@link #PROMPT_KEYS}. Leer für Shell-Befehle, Fragen an Menschen
-     * (approval, human-input) und Blöcke ohne KI-Aufruf.
+     * The task texts a block sends to the AI together with {@code workflow.instructions},
+     * in the order of {@link #PROMPT_KEYS}. Empty for shell commands, questions to humans
+     * (approval, human-input) and blocks without an AI call.
      */
     static List<String> instructions(BlockDefinition block) {
         if (block == null || block.getType() == null || block.getConfig() == null) return List.of();
@@ -74,12 +74,12 @@ final class BlockText {
     }
 
     /**
-     * Die Auftragstexte der verschachtelten Blöcke je Blockname (ohne Namen: Typ), in
-     * Definitionsreihenfolge. Gelaufen wird über denselben Walker wie die Typ- und
-     * {@code execution_mode}-Prüfung ({@link NestedBlocks}: switch-Cases, {@code default}, eine
-     * {@code blocks}-Liste). Ein simple-Block im switch-Case bekommt {@code workflow.instructions}
-     * genauso als Systemprompt, mit {@code execution_mode: "shell"} läuft er als Shell
-     * ({@code SwitchBlockExecutor}); gelesen wurden bis TODO ce4abac1 nur die direkten Werte.
+     * The task texts of the nested blocks per block name (without a name: type), in
+     * definition order. Walking uses the same walker as the type and
+     * {@code execution_mode} check ({@link NestedBlocks}: switch cases, {@code default}, a
+     * {@code blocks} list). A simple block in a switch case gets {@code workflow.instructions}
+     * as system prompt just the same, with {@code execution_mode: "shell"} it runs as a shell
+     * ({@code SwitchBlockExecutor}); until TODO ce4abac1 only the direct values were read.
      */
     static Map<String, List<String>> nestedInstructions(BlockDefinition block) {
         Map<String, List<String>> texts = new LinkedHashMap<>();

@@ -80,8 +80,8 @@ describe('gated module queries', () => {
     expect(chainRequests).toBe(0);
   });
 
-  // b13509f3: placeholderData greift in v5 nur bei status === 'pending'. Nach einem 429 galt
-  // deshalb jedes Modul wieder als „an" und Navigation/Widgets flackerten.
+  // b13509f3: placeholderData only applies in v5 when status === 'pending'. After a 429 every
+  // module counted as "on" again and navigation/widgets flickered.
   it('keep the cached module state when the request fails with 429', async () => {
     localStorage.setItem('mysuricates-modules', JSON.stringify(modulesFixture('core', ['chains'])));
     server.use(http.get('/api/v1/system/capabilities', () => HttpResponse.json(

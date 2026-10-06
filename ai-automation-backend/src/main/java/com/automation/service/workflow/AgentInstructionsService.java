@@ -33,16 +33,16 @@ public class AgentInstructionsService {
         }
     }
 
-    /** Ohne Arbeitspräferenzen — der Weg für alles, was sie nicht anfordert. */
+    /** Without work preferences - the path for everything that does not request them. */
     public String buildInstructionPrefix(String workflowInstructions) {
         return buildInstructionPrefix(workflowInstructions, false);
     }
 
     /**
-     * @param includeUserPreferences Arbeitspräferenzen mitschicken? Opt-in pro Workflow über
-     *     {@code metadata.userPreferences} (TODO d49fbde0). Bei {@code false} ist das Ergebnis
-     *     byte-identisch zum Stand vor der Einführung — ein Workflow, der nichts anfordert, sieht
-     *     keinen geänderten Prompt.
+     * @param includeUserPreferences include work preferences? Opt-in per workflow via
+     *     {@code metadata.userPreferences} (TODO d49fbde0). With {@code false} the result is
+     *     byte-identical to the state before the introduction - a workflow that requests nothing sees
+     *     no changed prompt.
      */
     public String buildInstructionPrefix(String workflowInstructions, boolean includeUserPreferences) {
         StringBuilder sb = new StringBuilder();

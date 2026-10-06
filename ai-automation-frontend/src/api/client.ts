@@ -312,9 +312,9 @@ class ApiClient {
   }
 
   /**
-   * Holt ein kurzlebiges Einmal-Ticket für den WebSocket-Handshake. Der API-Key reist dabei im
-   * Header (wie überall); nur das Ticket landet in der Handshake-URL — weder SockJS noch ein rohes
-   * Browser-WebSocket können beim Handshake eigene Header setzen.
+   * Fetches a short-lived one-time ticket for the WebSocket handshake. The API key travels in the
+   * header (as everywhere); only the ticket ends up in the handshake URL — neither SockJS nor a raw
+   * browser WebSocket can set custom headers during the handshake.
    */
   async fetchWsTicket(): Promise<string> {
     const response = await this.post<{ ticket: string; expiresInSeconds: number }>('/ws-ticket');
@@ -375,8 +375,8 @@ export function apiErrorMessage(err: unknown, fallback: string): string {
 }
 
 /**
- * Importiert einen BPMN-Prozess als neuen Workflow (Body = XML, kein JSON). Läuft über den
- * Client und damit über den 429-Backoff — ein roher `fetch` würde die Sperre umgehen (b6feccbc).
+ * Imports a BPMN process as a new workflow (body = XML, not JSON). Goes through the
+ * client and thus through the 429 backoff — a raw `fetch` would bypass the lock (b6feccbc).
  */
 export function importWorkflowBpmn(xml: string, projectId: string): Promise<{ id: string }> {
   return api.postRaw<{ id: string }>(
@@ -386,14 +386,14 @@ export function importWorkflowBpmn(xml: string, projectId: string): Promise<{ id
   );
 }
 
-/** Lädt den BPMN-2.0-Export eines Workflows als XML-String (kein JSON, aber über den Backoff). */
+/** Downloads the BPMN 2.0 export of a workflow as an XML string (not JSON, but through the backoff). */
 export function fetchWorkflowBpmn(id: string): Promise<string> {
   return api.getText(`/workflows/${id}/export/bpmn`);
 }
 
 /**
- * Prüft einen eingegebenen API-Key gegen `/projects`. Der getippte Key ersetzt für diesen
- * einen Aufruf den gespeicherten; der 429-Backoff gilt wie überall (b6feccbc).
+ * Checks an entered API key against `/projects`. The typed key replaces the stored one for this
+ * single call; the 429 backoff applies as everywhere (b6feccbc).
  */
 export function validateApiKey(key: string): Promise<unknown> {
   return api.get('/projects', { headers: { 'X-API-Key': key } });

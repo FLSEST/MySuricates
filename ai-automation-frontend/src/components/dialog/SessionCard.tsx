@@ -4,7 +4,7 @@ import { useI18nStore, useT } from '../../i18n';
 import type { DialogSessionInfo } from '../../types';
 import { formatDuration, formatSessionStart } from './dialogSessionFormat';
 
-/** Panel 2 der Session-Übernahme: eine Session mit erster Nachricht, Werkzeugen, Start und Dauer. */
+/** Panel 2 of the session takeover: a session with first message, tools, start and duration. */
 export function SessionCard({
   session, selected, onClick,
 }: {

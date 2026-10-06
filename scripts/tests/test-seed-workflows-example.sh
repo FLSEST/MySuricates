@@ -13,9 +13,9 @@ echo "1) syntax"
 check "bash -n"                                'bash -n "$SCRIPT"'
 
 echo "2) a seed run from start to end (cad7d821)"
-# Die EXIT-Trap griff auf main()s lokales tmp zu: beim Beenden war es weg, und unter set -u endete das
-# Skript mit „tmp: unbound variable“ (bash nannte dafuer lib/local-curl.sh:1) — Exit 1, die
-# Temp-Datei blieb liegen. Der curl-Stub schreibt je Aufruf "METHODE URL" und, was ueber stdin kam.
+# The EXIT trap accessed main()'s local tmp: on exit it was gone, and under set -u the
+# script ended with „tmp: unbound variable“ (bash named lib/local-curl.sh:1 for it) — exit 1, the
+# temp file stayed behind. The curl stub writes "METHOD URL" per call and what came via stdin.
 if command -v jq >/dev/null 2>&1; then
   mkdir -p "$TMP/bin" "$TMP/tmp"
   cat > "$TMP/bin/curl" <<'STUB'

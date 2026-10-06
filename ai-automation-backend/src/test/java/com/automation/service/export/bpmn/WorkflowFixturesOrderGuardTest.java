@@ -12,20 +12,20 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Haelt fest, dass die BPMN-Fixtures keine Map mit JVM-zufaelliger Reihenfolge bauen (TODO df5c689d).
+ * Pins that the BPMN fixtures never build a map with JVM-random iteration order (TODO df5c689d).
  *
- * <p>Die Falle: {@code Map.of} iteriert pro JVM in zufaelliger Reihenfolge
- * ({@code ImmutableCollections.SALT}). Bei einer Block-Config faellt das nicht auf — {@link
- * WorkflowFixtures#block} kopiert sie in eine {@code LinkedHashMap} um. Eine verschachtelte Map in
- * einer Liste (Switch-Cases, Branch-Bloecke) geht dagegen unveraendert ins serialisierte Config-JSON
- * und damit ins Golden-File. Der Fehler zeigt sich dann nicht hier, sondern als sporadisch rotes
- * Golden-File auf einer anderen JVM — der teuerste Fehlertyp, den es gibt.
+ * <p>The trap: {@code Map.of} iterates in random order per JVM
+ * ({@code ImmutableCollections.SALT}). A block config does not show this — {@link
+ * WorkflowFixtures#block} copies it into a {@code LinkedHashMap}. A nested map in
+ * a list (switch cases, branch blocks), however, goes unchanged into the serialized config JSON
+ * and thus into the golden file. The failure then shows up not here but as a sporadically red
+ * golden file on another JVM — the most expensive kind of failure there is.
  *
- * <p>Warum eine Quelltext-Pruefung und kein zweiter JVM-Lauf: Ein zweiter Lauf beweist die
- * Stabilitaet nur fuer die beiden gezogenen SALT-Werte und kostet jedes Mal eine Fork-Laufzeit.
- * Diese Pruefung schliesst die Ursache aus, laeuft in Millisekunden und braucht keine neue
- * Abhaengigkeit. Wer eine Map braucht, nimmt {@link WorkflowFixtures#ordered} — auch fuer einen
- * einzigen Eintrag, damit die Regel keine Ausnahme kennt, ueber die man nachdenken muss.
+ * <p>Why a source check and no second JVM run: A second run proves
+ * stability only for the two drawn SALT values and costs a fork's runtime every time.
+ * This check rules out the cause, runs in milliseconds and needs no new
+ * dependency. Whoever needs a map uses {@link WorkflowFixtures#ordered} — even for a
+ * single entry, so the rule has no exception one has to think about.
  */
 class WorkflowFixturesOrderGuardTest {
 
@@ -33,7 +33,7 @@ class WorkflowFixturesOrderGuardTest {
             Path.of("src", "test", "java", "com", "automation", "service", "export", "bpmn",
                     "WorkflowFixtures.java");
 
-    /** Map-Quellen ohne zugesicherte Reihenfolge, je Muster der Grund. */
+    /** Map sources without a guaranteed order, with the reason per pattern. */
     private static final Map<String, String> FORBIDDEN = Map.of(
             "Map.of(", "iteriert pro JVM zufaellig (ImmutableCollections.SALT)",
             "Map.ofEntries(", "iteriert pro JVM zufaellig (ImmutableCollections.SALT)",
@@ -49,7 +49,7 @@ class WorkflowFixturesOrderGuardTest {
         for (int i = 0; i < lines.size(); i++) {
             String line = lines.get(i);
             if (line.stripLeading().startsWith("*") || line.stripLeading().startsWith("//")) {
-                continue;   // Erklaerungen duerfen die Muster nennen, dieser Test tut es selbst.
+                continue;   // Explanations may name the patterns, this test does so itself.
             }
             int lineNumber = i + 1;
             for (Map.Entry<String, String> rule : FORBIDDEN.entrySet()) {
@@ -66,7 +66,7 @@ class WorkflowFixturesOrderGuardTest {
                 .isEmpty();
     }
 
-    /** Die Zusicherung selbst: ordered() haelt die Einfuegereihenfolge. */
+    /** The assertion itself: ordered() keeps the insertion order. */
     @Test
     void orderedKeepsInsertionOrder() {
         Map<String, Object> map = WorkflowFixtures.ordered(
@@ -75,7 +75,7 @@ class WorkflowFixturesOrderGuardTest {
         assertThat(map.keySet()).containsExactly("zulu", "alpha", "mike", "bravo");
     }
 
-    /** Und sie ueberlebt den Weg durch block(), der die Config umkopiert. */
+    /** And it survives the trip through block(), which copies the config. */
     @Test
     void blockKeepsConfigOrder() {
         var block = WorkflowFixtures.block("shell", "test", WorkflowFixtures.ordered(

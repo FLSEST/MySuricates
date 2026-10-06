@@ -10,7 +10,7 @@ public record ChainEntryRequest(
         int sortOrder,
         Boolean stopOnFailure,
         Map<String, Object> inputContext,
-        /** Wartezeit der Kette auf diesen Eintrag in Minuten (5–1440); ohne Angabe die globale Vorgabe. */
+        /** Wait time of the chain for this entry in minutes (5–1440); without a value the global default. */
         Integer timeoutMinutes
 ) {
     /** Aufrufe von vor {@code timeoutMinutes} (TODO cc0eb3ba). */

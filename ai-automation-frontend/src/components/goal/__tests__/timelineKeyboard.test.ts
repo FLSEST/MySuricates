@@ -5,21 +5,21 @@ import { chipDragData, timelineCollision, timelineKeyboardCoordinates } from '..
 
 const W = 600;
 const today = dayOfIsoDate('2026-09-24')!;
-// 30 Tage à 20 px: heute ist Tag 3 der Achse
+// 30 days of 20 px: today is day 3 of the axis
 const axis = { ...buildAxis({ today, days: [today + 20], target: null }, W), startDay: today - 3, endDay: today + 26, days: 30 };
 const DAY = W / axis.days;
 
 const rect = (left: number, top: number, width: number, height: number): ClientRect =>
   ({ left, top, width, height, right: left + width, bottom: top + height });
 
-/** Zeilen ab x = 180 (rechts der Beschriftung), darunter die Leiste „ungeplant“ über die ganze Breite. */
+/** Rows from x = 180 (right of the label), below them the bar „ungeplant“ across the whole width. */
 const rows = new Map<UniqueIdentifier, ClientRect>([
   ['row:m1', rect(180, 100, W, 48)],
   ['row:none', rect(180, 148, W, 48)],
   ['unplanned', rect(60, 220, W + 120, 80)],
 ]);
 
-/** Der angehobene Chip: Punkt `anchor` px von seinem linken Rand, Mitte senkrecht bei `middle`. */
+/** The lifted chip: dot `anchor` px from its left edge, middle vertically at `middle`. */
 function context(dotX: number, middle: number, over: UniqueIdentifier | null, anchor = CHIP_ANCHOR): SensorContext {
   return {
     active: { id: 'todo:a', data: { current: { anchor, flipped: false } }, rect: { current: { initial: null, translated: null } } },

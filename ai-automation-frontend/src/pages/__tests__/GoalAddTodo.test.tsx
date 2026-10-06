@@ -62,8 +62,8 @@ const base: GoalDetailData = {
     { projectId: 'p1', name: 'AutoPilot', archived: false, position: 0, total: 2, done: 0, openQuestions: 0, decided: 0 },
     { projectId: 'p2', name: 'Site', archived: false, position: 1, total: 0, done: 0, openQuestions: 0, decided: 0 },
   ],
-  // absichtlich nicht in Reihenfolge: das Menü ordnet nach `position`
-  // w1 mit Zeitraum (eine Zeile im Zeitstrahl), w2 ohne (in der Leiste „Ohne Zeitraum“)
+  // deliberately not in order: the menu sorts by `position`
+  // w1 with a period (one row in the timeline), w2 without (in the „Ohne Zeitraum“ bar)
   workPackages: [
     pkg('w2', 'Getting started', 'p1', 1),
     { ...pkg('w1', 'Repo clean', 'p1', 0), startDate: new Date('2030-10-01T00:00:00').toISOString(), endDate: new Date('2030-10-07T23:59:59').toISOString() },
@@ -74,13 +74,13 @@ const base: GoalDetailData = {
 
 const pool = [
   todo('c1', 'Release notes', 'p1', 'AutoPilot'), todo('c2', 'Favicon', 'p2', 'Site'), todo('c3', 'Relaunch site', 'p2', 'Site'),
-  // aus einem Projekt ohne Arbeitspakete im Ziel
+  // from a project without work packages in the goal
   todo('c4', 'Backup rotation', 'p9', 'Homelab'),
 ];
 
 interface Sent { method: string; path: string; body: unknown }
 
-/** Ein kleines Backend mit Gedächtnis: was zugeordnet oder angelegt wird, steht danach im Ziel. */
+ /** A small backend with memory: what is assigned or created is afterwards in the goal. */
 function serve() {
   const sent: Sent[] = [];
   const todos = [...base.todos];
@@ -195,8 +195,8 @@ describe('“Show” after adding', () => {
     expect(scrolled).toHaveBeenCalledWith({ block: 'center', inline: 'center', behavior: 'smooth' });
     expect(useGoalReveal.getState().request).toBeNull();
 
-    // „Zeigen“ lässt den Toast stehen: nach dem Hinschauen lässt es sich noch zurücknehmen
-    // (länger warten, als ein schließender Toast zum Ausblenden braucht)
+    // „Zeigen“ leaves the toast in place: after looking, it can still be undone
+    // (wait longer than a closing toast needs to fade out)
     await act(() => new Promise((resolve) => setTimeout(resolve, 400)));
     fireEvent.click(await toastButton('Added: AutoPilot · Repo clean', 'Undo'));
     expect(await screen.findByText('Removed from the goal again')).toBeInTheDocument();
@@ -263,7 +263,7 @@ describe('“+ TODO” at a work package', () => {
     const input = adder.getByRole('combobox', { name: 'Find a TODO without a goal or type a new one' });
     expect(input).toHaveFocus();
     fireEvent.change(input, { target: { value: 'Rel' } });
-    // „Relaunch site“ gehört zu Site – nicht zum Projekt des Pakets
+    // „Relaunch site“ belongs to Site – not to the package's project
     await waitFor(() => expect(adder.getAllByRole('option').map((option) => option.textContent))
       .toEqual(['Release notes', 'Create new: “Rel”']));
     expect(adder.getByRole('option', { name: 'Release notes' })).toHaveAttribute('aria-selected', 'true');
@@ -277,7 +277,7 @@ describe('“+ TODO” at a work package', () => {
     expect(screen.getByRole('button', { name: 'Add a TODO to “Repo clean”' })).toHaveFocus();
   });
 
-  // Review 85889063: Rückgängig löscht nie – vom Ziel lösen und archivieren, auch wenn inzwischen ein Trigger lief
+  // Review 85889063: Undo never deletes – detach from the goal and archive, even if a trigger has run in the meantime
   it('creates a new TODO in the package\'s project when nothing matches; Undo archives it instead of deleting', async () => {
     const sent = serve();
     renderGoal();

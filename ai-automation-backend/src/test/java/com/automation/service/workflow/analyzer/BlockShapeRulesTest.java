@@ -14,8 +14,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 
 /**
- * Was an einem Block steht, aber nie läuft: {@code config.blocks} (5536c5aa) und Felder neben {@code config}
- * (d3aa0b28) — beides fiel beim Speichern nicht auf, der Lauf tat still etwas anderes.
+ * What sits on a block but never runs: {@code config.blocks} (5536c5aa) and fields next to {@code config}
+ * (d3aa0b28) — neither was noticed on saving, the run silently did something else.
  */
 class BlockShapeRulesTest {
 
@@ -72,7 +72,7 @@ class BlockShapeRulesTest {
 
     @Test
     void onFailureNebenConfig_istHigh_wieImWalkthroughWorkflow() throws Exception {
-        // so stand es in walkthrough-illustrationen.json (Block „sichtpruefung“), bevor bf71f6b1 es verschob
+        // this is how it stood in walkthrough-illustrationen.json (block „sichtpruefung“) before bf71f6b1 moved it
         List<BlockDefinition> blocks = new ObjectMapper().readValue("""
                 [{"type":"shell","name":"sichtpruefung","config":{"command":"set -euo pipefail\\nls"},
                   "on_failure":"continue"}]

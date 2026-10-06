@@ -34,7 +34,7 @@ public record WishResponse(
         boolean autoRefine,
         WishStatus stoppedPhase
 ) {
-    /** Kompatibilitäts-Konstruktor für Aufrufer von vor der gespeicherten Endphase (V97). */
+    /** Compatibility constructor for callers from before the stored end phase (V97). */
     public WishResponse(String id, String originalText, WishStatus status, String projectId, String projectName,
                         Map<String, Object> decomposition, List<String> generatedWorkflowIds,
                         List<String> generatedWorkflowNames, List<String> referenceWorkflowIds,

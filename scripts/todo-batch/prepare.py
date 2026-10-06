@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""TODO-Batch, Abarbeiten 1 (TODO cc0eb3ba): Aufträge schreiben, Basis festhalten, TODOs starten.
+"""TODO batch, processing 1 (TODO cc0eb3ba): write the briefs, record the base, start the TODOs.
 
-Bricht mit Exit 3 ab, wenn das Arbeitsverzeichnis der echte Checkout ist (Workflow ohne Isolation) oder der
-Quell-Checkout nicht auf dem Ziel-Branch steht: Der Klon trägt dessen HEAD, ein Batch auf einem fremden Branch
-wäre falsch. Ein leerer Batch ist nie ein Fehler – auch nicht auf einem fremden Branch. Schreibt `<state>/todos/<id>.md`, `ids.txt`, `base.sha`, `titles.json` und `isolated.ok`, das die
-späteren Schritte verlangen. Letzte Zeile der Ausgabe: die `updates`-Liste – je TODO der Start (IN_PROGRESS +
-`batch:started`, nur aus OPEN) und eine Bestätigung ohne Änderung, die nur greift, wenn das TODO schon von einem
-Batch gestartet ist: So meldet auch ein wiederholtes Start-Update (Wiederaufnahme) das eigene TODO als gestartet,
-ein fremd in Arbeit genommenes aber nicht (confirm_start.py).
+Aborts with exit 3 if the working directory is the real checkout (workflow without isolation) or the
+source checkout is not on the target branch: the clone carries its HEAD, a batch on a foreign branch
+would be wrong. An empty batch is never an error – not even on a foreign branch. Writes `<state>/todos/<id>.md`, `ids.txt`, `base.sha`, `titles.json` and `isolated.ok`, which the
+later steps require. Last line of the output: the `updates` list – per TODO the start (IN_PROGRESS +
+`batch:started`, only from OPEN) and a confirmation without changes that only applies if the TODO is already started by a
+batch: this way a repeated start update (resumption) reports the own TODO as started,
+but not one taken on by someone else (confirm_start.py).
 """
 from __future__ import annotations
 
