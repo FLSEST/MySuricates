@@ -79,14 +79,7 @@
 1 scripts/public-readiness/arch-findings.py
 3 scripts/public-readiness/doc_facts_check.py
 1 scripts/public-readiness/docs_parity_check.py
-64 scripts/release-handover.sh
-17 scripts/release-notes.sh
-85 scripts/setup.sh
-18 scripts/staging.sh
-60 scripts/start-mysuricates-dev.sh
-6 scripts/tests/arch-guard.sh
-11 scripts/tests/test-api-endpoint-diff.sh
-17 scripts/tests/test-arch-findings.sh
+1 scripts/release-handover.sh
 44 scripts/tests/test-arch-metrics.sh
 130 scripts/tests/test-audit-facts.sh
 40 scripts/tests/test-coverage-snapshot.sh

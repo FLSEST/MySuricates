@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
-# staging.sh — Stable (:9091) und Test (:8090) als Docker-Container. Befehle: siehe usage unten.
+# staging.sh — Stable (:9091) and Test (:8090) as Docker containers. Commands: see usage below.
 #
-# Was vom Rechner in die Container kommt, entscheidet scripts/lib/host-mounts.sh — dieselbe Stelle wie
-# fuer instance.sh und den Dev-Container (262948a4). Die Schalter stehen in
-# ~/.config/mysuricates/staging.env (zeilenweise KEY=VALUE, wird nie ausgefuehrt); eine gleichnamige
-# Umgebungsvariable gewinnt:
-#   STABLE_AI_FROM_HOST / TEST_AI_FROM_HOST    programs | login (Default) | all
-#   STABLE_AI_PROVIDERS / TEST_AI_PROVIDERS    Auswahl aus claude,codex,pi (Default: alle)
-#   STABLE_DOCKER_SOCKET / TEST_DOCKER_SOCKET  0 (Default) | 1 = volle Kontrolle ueber Docker auf dem
-#                                              Rechner (Projekt-Container, Terminal, container_image) — bewusst setzen
-#   STABLE_BIND / TEST_BIND                    Adresse fuer den Port, Default 127.0.0.1 (nur dieser Rechner);
-#                                              0.0.0.0 = auch aus dem lokalen Netz — bewusst setzen
-# Jeder Compose-Aufruf nimmt die daraus erzeugte Override-Datei mit — auch die aus dem Backend
-# (StagingService/TestingService holen sie ueber `staging.sh write-override`).
+# What comes from the machine into the containers is decided by scripts/lib/host-mounts.sh — the same place
+# as for instance.sh and the dev container (262948a4). The switches are in
+# ~/.config/mysuricates/staging.env (line by line KEY=VALUE, never executed); an environment
+# variable of the same name wins:
+#   STABLE_AI_FROM_HOST / TEST_AI_FROM_HOST    programs | login (default) | all
+#   STABLE_AI_PROVIDERS / TEST_AI_PROVIDERS    selection from claude,codex,pi (default: all)
+#   STABLE_DOCKER_SOCKET / TEST_DOCKER_SOCKET  0 (default) | 1 = full control over Docker on the
+#                                              machine (project container, terminal, container_image) — set deliberately
+#   STABLE_BIND / TEST_BIND                    address for the port, default 127.0.0.1 (this machine only);
+#                                              0.0.0.0 = also from the local network — set deliberately
+# Every compose call takes the override file generated from this with it — also the ones from the backend
+# (StagingService/TestingService fetch it via `staging.sh write-override`).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -22,11 +22,11 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 # shellcheck source=lib/provider-login.sh
 . "$SCRIPT_DIR/lib/provider-login.sh"
 # shellcheck source=lib/local-curl.sh
-. "$SCRIPT_DIR/lib/local-curl.sh"   # Health ohne Proxy aus der Umgebung (bb4f60a5)
+. "$SCRIPT_DIR/lib/local-curl.sh"   # health without the proxy from the environment (bb4f60a5)
 # shellcheck source=lib/data-home.sh
 . "$SCRIPT_DIR/lib/data-home.sh"
-# Host-Backups von Stable/Test liegen im Datenordner (die Compose-Dateien lesen AUTOMATION_DATA_HOME,
-# StagingService/TestingService setzen ihn beim Start aus der Oberflaeche ebenso).
+# Host backups of stable/test live in the data folder (the compose files read AUTOMATION_DATA_HOME,
+# StagingService/TestingService set it likewise when started from the UI).
 AUTOMATION_DATA_HOME="$(data_home)"; export AUTOMATION_DATA_HOME
 BACKEND_DIR="$PROJECT_ROOT/ai-automation-backend"
 FRONTEND_DIR="$PROJECT_ROOT/ai-automation-frontend"
@@ -48,8 +48,8 @@ err()  { echo -e "${RED}[staging]${NC} $*" >&2; }
 STAGING_ENV="${MYSURICATES_STAGING_ENV:-${XDG_CONFIG_HOME:-$HOME/.config}/mysuricates/staging.env}"
 OVERRIDE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/mysuricates/staging"
 
-# staging_setting stable|test KEY DEFAULT — STABLE_KEY / TEST_KEY aus der Umgebung, sonst aus
-# staging.env, sonst DEFAULT.
+# staging_setting stable|test KEY DEFAULT — STABLE_KEY / TEST_KEY from the environment, otherwise from
+# staging.env, otherwise DEFAULT.
 staging_setting() {
     local prefix v
     case "$1" in stable) prefix=STABLE_ ;; *) prefix=TEST_ ;; esac
@@ -60,10 +60,10 @@ staging_setting() {
     printf '%s' "${v:-$3}"
 }
 
-# staging_ports_yaml PORT BIND — der ports-Block der Override-Datei (Service-Ebene). Standard ist
-# 127.0.0.1: nur dieser Rechner erreicht die Instanz, wie bei deploy/ (MYSURICATES_BIND). Bei jeder
-# anderen Adresse ausser 0.0.0.0 (schliesst 127.0.0.1 ein) kommt 127.0.0.1 dazu, damit Health-Pruefung
-# und Oberflaeche die Instanz weiter ueber localhost erreichen.
+# staging_ports_yaml PORT BIND — the ports block of the override file (service level). Default is
+# 127.0.0.1: only this machine reaches the instance, as with deploy/ (MYSURICATES_BIND). For every
+# other address except 0.0.0.0 (includes 127.0.0.1) 127.0.0.1 is added, so that health check
+# and UI keep reaching the instance via localhost.
 staging_ports_yaml() {
     local port="$1" addrs="$2" a
     case "$2" in 127.0.0.1|0.0.0.0) ;; *) addrs="$2 127.0.0.1" ;; esac
@@ -73,8 +73,8 @@ staging_ports_yaml() {
     done
 }
 
-# write_override stable|test — schreibt die Override-Datei und gibt ihren Pfad aus (nur den: das
-# Backend liest ihn). Hinweise zu fehlenden Anbietern gehen nach stderr.
+# write_override stable|test — writes the override file and prints its path (only that: the
+# backend reads it). Hints about missing providers go to stderr.
 write_override() {
     local env="$1" service prefix port bind file missing login_command=""
     case "$env" in
@@ -89,8 +89,8 @@ write_override() {
     esac
     mkdir -p "$OVERRIDE_DIR"
     file="$OVERRIDE_DIR/$env.override.yml"
-    # Nur im Modus programs meldet sich der Container selbst an (cmd_login) — die Statuskarte zeigt
-    # dann den Befehl, der das tut (fester Text, nie ausgefuehrt).
+    # Only in programs mode the container logs in itself (cmd_login) — the status card then shows
+    # the command that does so (fixed text, never executed).
     [ "$(staging_setting "$env" AI_FROM_HOST login)" = programs ] && login_command="scripts/staging.sh login $env"
     if ! host_mounts_yaml "$service" "" "$(staging_setting "$env" DOCKER_SOCKET 0)" \
             "$(staging_setting "$env" AI_FROM_HOST login)" "$(staging_setting "$env" AI_PROVIDERS "")" \
@@ -421,9 +421,9 @@ cmd_test_promote() {
     log "Test promotion complete!"
 }
 
-# login stable|test [claude|codex|pi] — eigene Anmeldung im Container. Nur mit AI_FROM_HOST=programs:
-# im Modus login kommt die Anmeldung vom Rechner, eine zweite im Container ueberschriebe dort die
-# eingebundene auth.json (Codex, Pi) oder liefe am Token vorbei (Claude).
+# login stable|test [claude|codex|pi] — own login in the container. Only with AI_FROM_HOST=programs:
+# in login mode the login comes from the machine, a second one in the container would overwrite the
+# mounted auth.json (Codex, Pi) or bypass the token (Claude).
 cmd_login() {
     local env="${1:-}" tool="${2:-claude}" container prefix mode user
     case "$env" in

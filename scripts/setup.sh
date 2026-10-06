@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 #
-# MySuricates — Installer. Fuehrt in einem Durchgang von der nackten Maschine bis zum Login.
-# Flags und Beispiele: ./scripts/setup.sh --help (Text in scripts/lib/i18n/<sprache>.sh, M_help).
+# MySuricates — Installer. Takes you in one pass from the bare machine to the login.
+# Flags and examples: ./scripts/setup.sh --help (text in scripts/lib/i18n/<language>.sh, M_help).
 #
-# Ohne Terminal und ohne --yes/--install/--start wird nur geprueft. Jede Instanz landet als Datei
-# in deploy/instances/<name>.env; starten, stoppen und ansehen danach mit scripts/instance.sh.
-# Greift nie auf die Datenbank einer Instanz zu; ihre REST-API fragt er nur lesend, ob Workflow-Runs
-# laufen, bevor er sie neu startet (29820f58). bash-3.2-tauglich (macOS).
+# Without a terminal and without --yes/--install/--start it only checks. Every instance ends up as a file
+# in deploy/instances/<name>.env; start, stop and inspect it afterwards with scripts/instance.sh.
+# Never touches an instance's database; it queries its REST API only read-only, whether workflow runs
+# are running, before restarting it (29820f58). bash-3.2 compatible (macOS).
 set -uo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -28,11 +28,11 @@ INSTANCES_DIR="${MYSURICATES_INSTANCES_DIR:-$REPO_ROOT/deploy/instances}"
 # shellcheck source=lib/instance-runs.sh
 . "$LIB/instance-runs.sh"
 # shellcheck source=lib/setup-kept.sh
-. "$LIB/setup-kept.sh"    # eine vorhandene Instanz-Datei, die bleibt: ihre Werte gelten (fd4eb89f)
+. "$LIB/setup-kept.sh"    # an existing instance file that stays: its values apply (fd4eb89f)
 # shellcheck source=lib/setup-ports.sh
-. "$LIB/setup-ports.sh"   # freie Ports; den der laufenden eigenen Instanz zaehlt er als frei (0e5b82b7)
+. "$LIB/setup-ports.sh"   # free ports; the one of the running own instance counts as free (0e5b82b7)
 # shellcheck source=lib/host-mounts.sh
-. "$LIB/host-mounts.sh"   # ai_env_value / claude_token_plausible — dieselbe Regel wie beim Start
+. "$LIB/host-mounts.sh"   # ai_env_value / claude_token_plausible — same rule as at start
 [ -r "$DEPS_DATA/env.sh" ] && . "$DEPS_DATA/env.sh"
 
 # --- Flags ------------------------------------------------------------------------------------------
@@ -101,16 +101,16 @@ for m in $(printf '%s' "$MODULES" | tr ',' ' '); do
   printf '%s\n' "${MODULE_CATALOG_FEATURE_KEYS[@]}" | grep -x "$m" >/dev/null || die "$(msg err_module "$m")"
 done
 
-# Was per Flag kam — im Terminal fragt „Einstellungen aendern“ die uebrigen Werte mit dem Wert der
-# Datei als Vorgabe ab, die per Flag gegebenen nicht (ca902719)
+# What came via flag — in the terminal "change settings" asks for the remaining values with the file's value
+# as default, not the ones given via flag (ca902719)
 F_MODE="$MODE"; F_RUNTIME="$RUNTIME"; F_PRESET="$PRESET"; F_PROVIDER="$PROVIDER"; F_PROJECTS="$PROJECTS"
 F_AI_FROM_HOST="$AI_FROM_HOST"; F_AI_PROVIDERS="$AI_PROVIDERS"; FRESH=0
-# from_file FLAGWERT — im Terminal, Werte aus der Datei geladen und der Wert kam nicht per Flag: fragen
+# from_file FLAGVALUE — in the terminal, values loaded from the file and the value did not come via flag: ask
 from_file() { [ "$INTERACTIVE" = 1 ] && [ -n "$CHANGE_NAME" ] && [ -z "$1" ]; }
 
 tui_init
 INTERACTIVE=0; [ "$TUI_TTY" = 1 ] && [ "$YES" = 0 ] && INTERACTIVE=1
-# Ohne Terminal und ohne Auftrag: nur pruefen — kein unbeabsichtigtes Installieren aus Pipes und CI
+# Without a terminal and without a request: only check — no unintended installing from pipes and CI
 if [ "$INTERACTIVE" = 0 ] && [ "$YES" = 0 ] && [ "$INSTALL" = 0 ] && [ "$START" = 0 ] && [ "$DRY" = 0 ]; then CHECK=1; fi
 DO_INSTALL=0; { [ "$YES" = 1 ] || [ "$INSTALL" = 1 ]; } && DO_INSTALL=1
 DO_START=0; { [ "$YES" = 1 ] || [ "$START" = 1 ]; } && DO_START=1
@@ -118,18 +118,18 @@ DO_START=0; { [ "$YES" = 1 ] || [ "$START" = 1 ]; } && DO_START=1
 STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/mysuricates"
 LOG_DIR="$STATE_DIR/setup-logs"
 mkdir -p "$LOG_DIR" 2>/dev/null
-DOCKER_SG=0   # 1 = Docker fuer diesen Durchgang ueber 'sg docker' (frisch in die Gruppe aufgenommen)
+DOCKER_SG=0   # 1 = Docker for this pass via 'sg docker' (freshly added to the group)
 
 STEPS=("$(msg step_welcome)" "$(msg step_mode)" "$(msg step_checks)" "$(msg step_modules)" "$(msg step_ai)" "$(msg step_ports)" "$(msg step_build)" "$(msg step_done)")
 
 version() { sed -n '/<\/parent>/,$ s/.*<version>\(.*\)<\/version>.*/\1/p' "$REPO_ROOT/ai-automation-backend/pom.xml" | head -n 1 | sed 's/-SNAPSHOT$//'; }
-section() {  # Schrittleiste vor jedem Schritt (nur im Terminal; sonst eine schlichte Ueberschrift)
+section() {  # step bar before every step (terminal only; otherwise a plain heading)
   if [ "$TUI_TTY" = 1 ]; then printf '\n'; tui_rail "$1" "${STEPS[@]}"; printf '\n'
   else printf '\n== %s ==\n' "${STEPS[$1]}"; fi
 }
 existing_instances() { local f; for f in "$INSTANCES_DIR"/*.env; do [ -f "$f" ] && basename "$f" .env; done; }
 
-# --- Schritt 1: Willkommen --------------------------------------------------------------------------
+# --- Step 1: Welcome -------------------------------------------------------------------------- -----
 step_welcome() {
   local ai="" id st l_lang l_ai l_time w=0 l
   for id in $(providers_ids); do
@@ -140,7 +140,7 @@ step_welcome() {
       *) ai="$ai${C_GREY}$id $T_BAD${C_RESET}  " ;;
     esac
   done
-  # Beschriftungen auf gleiche Breite — die Laenge haengt von der Sprache ab
+  # Labels to equal width — the length depends on the language
   l_lang="$(msg header_language)"; l_ai="$(msg header_ai)"; l_time="$(msg header_time)"
   for l in "$l_lang" "$l_ai" "$l_time"; do [ "${#l}" -gt "$w" ] && w=${#l}; done
   if [ "$TUI_TTY" = 1 ]; then
@@ -156,7 +156,7 @@ step_welcome() {
   return 0
 }
 
-# --- Schritt 2: Modus (bei vorhandener Einrichtung: aendern oder neu) --------------------------------
+# --- Step 2: Mode (with an existing setup: change or new) -------------------------------------- -----
 step_mode() {
   local choice rc names def
   section 1
@@ -168,13 +168,13 @@ step_mode() {
     rc=$?; [ "$rc" = 0 ] || return "$rc"
     case "$choice" in
       0) CHANGE_NAME="$(existing_instances | head -n 1)"; load_existing "$CHANGE_NAME"; RECONF=1 ;;
-      1) RECONF=1; FRESH=1 ;;   # neu einrichten: die Werte der Datei gelten nicht
+      1) RECONF=1; FRESH=1 ;;   # set up anew: the values of the file do not apply
       2) return 3 ;;
     esac
   fi
-  # --reconfigure, auch ohne Terminal: von den Werten der Datei ausgehen und nur die gegebenen Flags
-  # aendern (ca902719) — frueher galten frische Vorgaben: aus einer Instanz auf dem Rechner wurde ohne
-  # --runtime eine im Container, das Preset fiel auf core, der Anbieter auf den ersten angemeldeten
+  # --reconfigure, also without a terminal: start from the values of the file and change only the given flags
+  # (ca902719) — previously fresh defaults applied: an instance on the machine became one in the container without
+  # --runtime, the preset fell back to core, the provider to the first logged-in one
   if [ "$RECONF" = 1 ] && [ "$FRESH" = 0 ] && [ -z "$CHANGE_NAME" ] && [ "$MODE" != staged ] && [ -f "$INSTANCES_DIR/$NAME.env" ]; then
     CHANGE_NAME="$NAME"; load_existing "$NAME"
   fi
@@ -197,7 +197,7 @@ step_mode() {
   return 0
 }
 
-# --- Schritt 3: Pruefen und installieren ------------------------------------------------------------
+# --- Step 3: Check and install ---------------------------------------------------------------- -----
 step_checks() {
   local need tool state lines plan missing="" rc
   section 2
@@ -265,14 +265,14 @@ install_plan() {
 $1
 EOF
   [ "$DRY" = 1 ] && return 0
-  # Nachpruefen: was jetzt noch fehlt, bleibt fehlend
+  # Re-check: what is still missing stays missing
   local still
   still="$(deps_plan "$( [ "$RUNTIME" = host ] && echo host || echo container )" | awk 'NF{print $1}' | tr '\n' ' ')"
   if [ -n "$still" ]; then printf '  %s\n' "$(msg checks_still_missing "$still")"; return 1; fi
   return 0
 }
 
-# Docker muss fuer Container-Wege laufen und benutzbar sein; frisch in der Gruppe ⇒ 'sg docker'
+# Docker must run and be usable for container paths; freshly in the group ⇒ 'sg docker'
 docker_ready() {
   [ "$RUNTIME" = container ] || return 0
   [ "$DRY" = 1 ] && return 0
@@ -287,10 +287,10 @@ docker_ready() {
   esac
 }
 
-# --- Schritt 4: Module ------------------------------------------------------------------------------
-# Zeilen einer Datei, die neu geschrieben wird, bleiben (ca902719) — aber nie doppelt: custom_set ersetzt
-# eine Zeile mit demselben Schluessel, statt eine zweite anzuhaengen.
-custom_set() {  # SCHLUESSEL=WERT
+# --- Step 4: Modules --------------------------------------------------------------------------- ----
+# Lines of a file that is rewritten stay (ca902719) — but never twice: custom_set replaces
+# a line with the same key instead of appending a second one.
+custom_set() {  # KEY=VALUE
   local key="${1%%=*}" line out=""
   while IFS= read -r line; do
     [ -n "$line" ] && [ "${line%%=*}" != "$key" ] && out="$out$line
@@ -301,9 +301,9 @@ EOF
   CUSTOM_LINES="$out$1
 "
 }
-# custom_drop_modules [all] — die Modul-Ueberschreibungen der Datei verwerfen: wer ein Preset (neu) waehlt,
-# bekommt das Preset, nicht still die Auswahl von frueher. AUTOMATION_MODULES_UIEDITABLE ist kein
-# Modul und bleibt — ausser mit all (die eigene Auswahl fragt es neu ab). Haertungs-Zeilen bleiben immer.
+# custom_drop_modules [all] — discard the module overrides of the file: whoever chooses a preset (anew)
+# gets the preset, not silently the earlier selection. AUTOMATION_MODULES_UIEDITABLE is not a
+# module and stays — except with all (the own selection asks for it again). Hardening lines always stay.
 custom_drop_modules() {
   local line out=""
   while IFS= read -r line; do
@@ -323,8 +323,8 @@ step_modules() {
   local choice rc items key tier on sel hard label="" def
   section 3
   if [ "$MODE" = staged ]; then tui_done "$(msg step_modules)" "$(msg modules_staged)$(kept_mark)"; return 0; fi
-  CUSTOM_LINES="$LOADED_LINES"   # Zeilen einer Datei, die neu geschrieben wird, bleiben (ca902719)
-  [ -z "$F_PRESET" ] || custom_drop_modules   # --preset: das Preset gilt, keine alten Ueberschreibungen
+  CUSTOM_LINES="$LOADED_LINES"   # lines of a file that is rewritten stay (ca902719)
+  [ -z "$F_PRESET" ] || custom_drop_modules   # --preset: the preset applies, no old overrides
   if [ "$INTERACTIVE" = 1 ] && { [ -z "$PRESET" ] || from_file "$F_PRESET"; }; then
     case "$PRESET" in research) def=1 ;; full) def=2 ;; *) def=0 ;; esac
     tui_select choice "$(msg step_of 4 ${#STEPS[@]}) · $(msg modules_title)" "$def" \
@@ -370,7 +370,7 @@ step_modules() {
   return 0
 }
 
-# --- Schritt 5: KI-Anbieter -------------------------------------------------------------------------
+# --- Step 5: AI providers --------------------------------------------------------------------- -----
 step_ai() {
   local id p l lines choice rc opts default=0 i=0 present="" hints="" ask
   section 4
@@ -393,14 +393,14 @@ EOF
 "; done
   fi
   tui_box "$(msg step_of 5 ${#STEPS[@]}) · $(msg ai_title)" "${lines[@]}"
-  # Die Befehle unter dem Kasten, nicht darin: der kuerzt lange Zeilen, und ein halber Befehl hilft nicht
+  # The commands below the box, not inside it: it truncates long lines, and half a command does not help
   printf '%s' "$hints"
   offer_pi
   offer_profile
-  present="$(providers_status | awk '$2=="present"{print $1}' | tr '\n' ' ')"   # pi kann dazugekommen sein
+  present="$(providers_status | awk '$2=="present"{print $1}' | tr '\n' ' ')"   # pi may have been added
   ask=0; from_file "$F_PROVIDER" && ask=1
   if [ -z "$PROVIDER" ]; then
-    # Default: der erste angemeldete, sonst der erste vorhandene, sonst der erste bekannte
+    # Default: the first logged-in one, otherwise the first present one, otherwise the first known one
     PROVIDER="$(providers_status | awk '$2=="present" && $3=="logged-in"{print $1; exit}')"
     [ -n "$PROVIDER" ] || PROVIDER="$(printf '%s\n' $present | head -n 1)"
     [ -n "$PROVIDER" ] || PROVIDER="$(providers_ids | head -n 1)"
@@ -408,7 +408,7 @@ EOF
   fi
   if [ "$ask" = 1 ]; then
     set -- $present
-    # Der Anbieter aus der Datei bleibt waehlbar, auch wenn er hier fehlt — Enter aendert nichts
+    # The provider from the file stays selectable even if it is missing here — Enter changes nothing
     case " $present " in *" $PROVIDER "*) ;; *) [ -n "$CHANGE_NAME" ] && set -- "$PROVIDER" "$@" ;; esac
     if [ "$INTERACTIVE" = 1 ] && [ "$#" -gt 1 ]; then
       opts=(); i=0
@@ -421,14 +421,14 @@ EOF
   ai_container
 }
 
-# Container: was von den KI-Anbietern dieses Rechners hineinkommt (262948a4) — die Zugangsart, die
-# Auswahl und bei `login` fuer Claude der Token (Claude ersetzt seine Anmeldedatei bei jedem Erneuern,
-# eine eingebundene Datei ginge im Container veraltet).
+# Container: what comes in from this machine's AI providers (262948a4) — the access mode, the
+# selection and with `login` for Claude the token (Claude replaces its login file on every renewal,
+# a mounted file would go stale in the container).
 ai_container() {
   local choice rc sel id items present all_present def on
   [ "$RUNTIME" = container ] || return 0
   if [ -z "$AI_FROM_HOST" ] || from_file "$F_AI_FROM_HOST"; then
-    # Erst nach der Auswahl setzen: wer hier zurueckgeht, bekommt die Frage beim naechsten Mal wieder
+    # Set only after the selection: whoever goes back here gets the question again next time
     if [ "$INTERACTIVE" = 1 ]; then
       case "$AI_FROM_HOST" in programs) def=1 ;; all) def=2 ;; *) def=0 ;; esac
       tui_select choice "$(msg ai_access_q)" "$def" "$(msg ai_access_login)" "$(msg ai_access_programs)" "$(msg ai_access_all)"
@@ -443,11 +443,11 @@ ai_container() {
   if { [ -z "$AI_PROVIDERS" ] || from_file "$F_AI_PROVIDERS"; } && [ "$KEPT" = 0 ] && [ "$INTERACTIVE" = 1 ] && [ "$(printf '%s\n' $present | grep -c .)" -gt 1 ]; then
     items=()
     for id in $present; do
-      on=on; case ",${AI_PROVIDERS:-$id}," in *",$id,"*) ;; *) on=off ;; esac   # vorbelegt wie in der Datei
+      on=on; case ",${AI_PROVIDERS:-$id}," in *",$id,"*) ;; *) on=off ;; esac   # preselected as in the file
       items[${#items[@]}]="$on:$id:$id"
     done
     tui_checklist sel "$(msg ai_providers_q)" "${items[@]}"; rc=$?; [ "$rc" = 0 ] || return "$rc"
-    # Alle abgewaehlt ist fast immer ein Versehen — dann bleiben alle
+    # All deselected is almost always a mistake — then all stay
     if [ -n "$sel" ] && [ "$sel" != "$all_present" ]; then AI_PROVIDERS="$(printf '%s' "$sel" | tr ' ' ',')"; else AI_PROVIDERS=""; fi
   fi
   ai_claude_token
@@ -456,13 +456,13 @@ ai_container() {
   return 0
 }
 
-# Angemeldet nur per Umgebungsvariable (90b4422c): Schritt 5 zaehlt das als „angemeldet“, von selbst
-# kommt die Variable aber nicht in den Container. Im Modus login reicht host-mounts.sh die Anmelde-
-# Variablen der gewaehlten Anbieter aus ai.env durch — dorthin kommen sie nur mit ausdruecklicher
-# Zustimmung: im Terminal gefragt (Vorgabe nein), sonst nur mit --store-ai-env, auch mit --yes nicht
-# von selbst. Bei all kommen ganze Verzeichnisse, keine Variablen (nur der Hinweis); bei programs meldet
-# sich jede Instanz selbst an. Claude laeuft im Modus login ueber den Token (ai_claude_token).
-# Ausgegeben werden Namen der Variablen, nie ihre Werte.
+# Logged in only via environment variable (90b4422c): step 5 counts that as "logged in", but by itself
+# the variable does not get into the container. In login mode host-mounts.sh passes the login
+# variables of the chosen providers through from ai.env — they get there only with explicit
+# consent: asked in the terminal (default no), otherwise only with --store-ai-env, not by itself even with --yes.
+# With all, whole directories come, no variables (only the hint); with programs
+# each instance logs in itself. Claude runs in login mode via the token (ai_claude_token).
+# Names of the variables are printed, never their values.
 ai_env_only_hints() {
   local id vars v names covered
   [ "$AI_FROM_HOST" = programs ] && return 0
@@ -476,7 +476,7 @@ ai_env_only_hints() {
     if [ "$AI_FROM_HOST" != login ]; then
       printf '  %s\n' "$(msg ai_env_only "$id" "$names" "$(provider_login_line "$id")")"; continue
     fi
-    # Schon in ai.env (auch eben fuer einen anderen Anbieter uebernommen, z. B. OPENAI_API_KEY): fertig
+    # Already in ai.env (also just taken over for another provider, e.g. OPENAI_API_KEY): done
     covered=0
     for v in $(provider_get "$id" login_env); do [ -n "$(ai_env_value "$AI_ENV" "$v")" ] && covered=1; done
     [ "$covered" = 1 ] && continue
@@ -484,7 +484,7 @@ ai_env_only_hints() {
       for v in $vars; do
         if ai_env_put "$v" "${!v}"; then
           printf '  %s\n' "$(msg ai_env_stored "$v" "$AI_ENV")"
-          # Geteilt mit Claude (ANTHROPIC_API_KEY): claude nimmt den Schluessel dann vor seinem Token
+          # Shared with Claude (ANTHROPIC_API_KEY): claude then takes the key before its token
           case ",${AI_PROVIDERS:-claude}, $(provider_get claude login_env) " in
             *,claude,*" $v "*) [ "$id" = claude ] || printf '  %s\n' "$(msg ai_env_shared_claude "$v")" ;;
           esac
@@ -497,9 +497,9 @@ ai_env_only_hints() {
   return 0
 }
 
-# ai_env_put VAR WERT — VAR=WERT nach ai.env: Datei 600, Verzeichnis 700, andere Eintraege bleiben,
-# eine alte Zeile derselben Variable geht. Der Wert wird nirgends ausgegeben. Einer mit Zeilenumbruch
-# passt in keine env-Datei und wird abgelehnt (Rueckgabe 1).
+# ai_env_put VAR VALUE — VAR=VALUE into ai.env: file 600, directory 700, other entries stay,
+# an old line of the same variable goes. The value is printed nowhere. One with a line break
+# fits no env file and is rejected (return 1).
 ai_env_put() {
   local dir
   case "$2" in ''|*"
@@ -518,10 +518,10 @@ ai_claude_token() {
   provider_present claude || return 0
   have="$(claude_token_from_file "$AI_ENV")"
   claude_token_plausible "$have" && return 0
-  # Ein Platzhalter aus einer Anleitung zaehlt nicht als Anmeldung (9bef7e8c)
+  # A placeholder from a guide does not count as a login (9bef7e8c)
   [ -n "$have" ] && printf '  %s\n' "$(msg ai_token_implausible "$AI_ENV")"
   if [ "$INTERACTIVE" = 1 ] && [ "$DRY" = 0 ] && tui_confirm "$(msg ai_token_q)" y; then
-    claude setup-token || true   # Browser-Anmeldung; zeigt den Token nur an
+    claude setup-token || true   # browser login; only displays the token
     tui_secret token "$(msg ai_token_paste)"
     token="$(printf '%s' "$token" | tr -d '[:space:]')"
     if [ -n "$token" ] && ! claude_token_plausible "$token"; then
@@ -532,10 +532,10 @@ ai_claude_token() {
   ai_env_put CLAUDE_CODE_OAUTH_TOKEN "$token" && printf '  %s\n' "$(msg ai_token_saved "$AI_ENV")"
 }
 
-# pi mitinstallieren (0a078449): nur auf Wunsch — im Terminal gefragt, sonst mit --with-pi; Default
-# nein, auch mit --yes: kein ungefragtes globales npm-Paket. Der Befehl kommt aus dem Anbieter-Katalog,
-# mit sudo nur, wo npm -g nicht selbst schreiben darf (Node aus apt/dnf). Beim heruntergeladenen Node
-# landet pi unter ~/.local/share/mysuricates/node/bin — instance.sh findet es ueber env.sh.
+# Install pi as well (0a078449): only on request — asked in the terminal, otherwise with --with-pi; default
+# no, even with --yes: no unasked global npm package. The command comes from the provider catalog,
+# with sudo only where npm -g cannot write by itself (Node from apt/dnf). With a downloaded Node
+# pi ends up under ~/.local/share/mysuricates/node/bin — instance.sh finds it via env.sh.
 pi_install_cmd() {
   local cmd
   cmd="$(provider_get pi install)"
@@ -557,15 +557,15 @@ offer_pi() {
   fi
   if [ "$DRY" = 1 ]; then printf '  %s\n' "$(msg dry_run "$cmd")"; return 0; fi
   if ! tui_run "$(msg ai_pi_run)" "$LOG_DIR/install-pi.log" bash -c "$cmd"; then
-    printf '  %s\n' "$(msg ai_pi_failed "$cmd")"; return 0   # ohne pi geht es weiter
+    printf '  %s\n' "$(msg ai_pi_failed "$cmd")"; return 0   # continue without pi
   fi
   provider_present pi || printf '  %s\n' "$(msg ai_pi_not_found "$(npm prefix -g 2>/dev/null)/bin")"
   return 0
 }
 
-# Heruntergeladenes Node — und damit npm, codex, pi — gibt es in der Shell des Nutzers erst mit env.sh
-# im Profil (2605ed1f). Im gefuehrten Ablauf auf Nachfrage eintragen (Default nein), mit --yes oder im
-# Probelauf nur die Zeile zeigen.
+# A downloaded Node — and thereby npm, codex, pi — exists in the user's shell only with env.sh
+# in the profile (2605ed1f). In the guided flow add on request (default no), with --yes or in a
+# dry run only show the line.
 offer_profile() {
   local profile
   deps_env_active || return 0
@@ -579,8 +579,8 @@ offer_profile() {
   printf '  %s\n' "$(msg profile_hint "$(deps_tilde "$profile")" "$(deps_profile_hint)")"
 }
 
-# Der Anmeldebefehl eines Anbieters, dazu was danach zu tun ist — in der Sprache des Installers: der
-# Katalog nennt dafuer nur einen Schluessel (login_note, eab43a8b), der Text steht in lib/i18n
+# A provider's login command, plus what to do afterwards — in the installer's language: the
+# catalog names only a key for it (login_note, eab43a8b), the text is in lib/i18n
 provider_login_line() {  # ID
   local note
   note="$(provider_get "$1" login_note)"
@@ -588,8 +588,8 @@ provider_login_line() {  # ID
   [ -z "$note" ] || printf ', %s' "$(msg "login_note_$note")"
 }
 
-# Ein Befehl eines Anbieters so, wie er in der Shell des Nutzers laeuft (2605ed1f): Kommt das Programm —
-# oder npm, mit dem es erst kommt — aus dem Download und laedt das Profil env.sh nicht, steht env.sh davor.
+# A provider command as it runs in the user's shell (2605ed1f): if the program —
+# or npm, with which it first comes — comes from the download and does not load the profile env.sh, env.sh precedes it.
 provider_shell_cmd() {  # ID install|login
   local cmd prog where
   cmd="$(provider_get "$1" "$2")"
@@ -602,14 +602,14 @@ provider_shell_cmd() {  # ID install|login
   case "$where" in "$DEPS_DATA"/*) printf '%s && %s' "$(deps_profile_hint)" "$cmd" ;; *) printf '%s' "$cmd" ;; esac
 }
 
-# --- Schritt 6: Ports und Ordner --------------------------------------------------------------------
+# --- Step 6: Ports and folders ---------------------------------------------------------------- -----
 step_ports() {
   local p
   section 5
   if [ "$MODE" = staged ]; then
-    # Ports behaltener Dateien stehen fest — die uebrigen weichen ihnen aus (fd4eb89f). Mit --port N
-    # beginnt Dev bei N, Test und Prod bei N+1 und N+2 — fuer einen Rechner, auf dem 9090, 8090 und
-    # 9091 schon anderen gehoeren (etwa die Installer-Probe neben laufenden Instanzen)
+    # Ports of kept files are fixed — the others yield to them (fd4eb89f). With --port N
+    # dev starts at N, test and prod at N+1 and N+2 — for a machine on which 9090, 8090 and
+    # 9091 already belong to others (e.g. the installer probe next to running instances)
     local bd=9090 bt=8090 bp=9091
     [ -z "$PORT" ] || { bd="$PORT"; bt=$((PORT + 1)); bp=$((PORT + 2)); }
     p="$(for n in dev test prod; do is_kept "$n" && kept_value "$n" MYSURICATES_PORT; done | tr '\n' ' ')"
@@ -622,11 +622,11 @@ step_ports() {
     [ "$PORT" = 9090 ] || printf '  %s\n' "$(msg ports_busy 9090 "$PORT")"
     [ "$INTERACTIVE" = 1 ] && tui_input PORT "$(msg ports_q "$NAME")" "$PORT"
   elif [ "$PORT_LOADED" = 1 ]; then
-    # Port aus der Datei, die neu geschrieben wird: bleibt — ausser ein anderer belegt ihn inzwischen
-    # (die laufende eigene Instanz zaehlt als frei, 0e5b82b7)
+    # Port from the file that is rewritten: stays — unless another one occupies it meanwhile
+    # (the running own instance counts as free, 0e5b82b7)
     p="$(free_port "$PORT" "" "$NAME")"
     [ "$p" = "$PORT" ] || { printf '  %s\n' "$(msg ports_busy "$PORT" "$p")"; PORT="$p"; }
-    [ "$INTERACTIVE" = 1 ] && tui_input PORT "$(msg ports_q "$NAME")" "$PORT"   # Wert der Datei als Vorgabe
+    [ "$INTERACTIVE" = 1 ] && tui_input PORT "$(msg ports_q "$NAME")" "$PORT"   # value of the file as default
   fi
   if [ "$RUNTIME" = container ] && { [ -z "$PROJECTS" ] || from_file "$F_PROJECTS"; }; then
     PROJECTS="${PROJECTS:-$(cd "$REPO_ROOT/.." && pwd)}"
@@ -636,7 +636,7 @@ step_ports() {
   return 0
 }
 
-# --- Schritt 7: Instanz-Dateien schreiben, bauen, starten -------------------------------------------
+# --- Step 7: Write instance files, build, start ----------------------------------------------- -----
 write_instance() {  # NAME RUNTIME PORT PRESET ENVIRONMENT SEALING REQUIRE_SEALED
   local f="$INSTANCES_DIR/$1.env"
   mkdir -p "$INSTANCES_DIR"
@@ -656,7 +656,7 @@ write_instance() {  # NAME RUNTIME PORT PRESET ENVIRONMENT SEALING REQUIRE_SEALE
     [ -n "$5" ] && printf 'MYSURICATES_ENVIRONMENT=%s\n' "$5"
     if [ "$2" = container ]; then
       printf 'MYSURICATES_PROJECTS=%s\nMYSURICATES_DOCKER_SOCKET=%s\n' "${PROJECTS:-$(cd "$REPO_ROOT/.." && pwd)}" "${SOCKET:-0}"
-      # Was von den KI-Anbietern des Rechners in den Container kommt (262948a4)
+      # What from the machine's AI providers comes into the container (262948a4)
       printf 'MYSURICATES_AI_FROM_HOST=%s\n' "${AI_FROM_HOST:-login}"
       [ -n "$AI_PROVIDERS" ] && printf 'MYSURICATES_AI_PROVIDERS=%s\n' "$AI_PROVIDERS"
     fi
@@ -666,12 +666,12 @@ write_instance() {  # NAME RUNTIME PORT PRESET ENVIRONMENT SEALING REQUIRE_SEALE
   } > "$f"
 }
 
-# Auf dem Rechner baut `instance.sh up` nur, wenn der Build nicht zum Klon passt (instance.sh built,
-# 1c016162). Der Schritt sagt deshalb vorher, ob gebaut wird — statt „✓ bauen 0:00“ nach einem
-# git pull. Eine laufende Instanz haelt `up` nie selbst an; mit altem Stand oder neuen Einstellungen
-# startet sie der Installer neu, denn dazu wurde er aufgerufen. Im Container baut docker compose und
-# ersetzt einen laufenden Container, sobald sich Image oder Einstellungen geaendert haben — vorher
-# nicht zu sehen. Beides bricht laufende Workflow-Runs ab; vorher fragt restart_ok (29820f58).
+# On the machine `instance.sh up` builds only if the build does not match the clone (instance.sh built,
+# 1c016162). The step therefore says beforehand whether it builds — instead of "✓ bauen 0:00" after a
+# git pull. A running instance is never stopped by `up` itself; with an old state or new settings
+# the installer restarts it, because that is what it was called for. In the container docker compose builds and
+# replaces a running container as soon as image or settings have changed — not
+# visible beforehand. Both abort running workflow runs; restart_ok asks first (29820f58).
 start_instance() {  # NAME
   local inst="bash '$SCRIPT_DIR/instance.sh'" cmd title st="" built="" head="" running=0
   cmd="$inst up --name $1"; title="$(msg build_run "$1")"
@@ -703,12 +703,12 @@ EOF
   tui_run "$title" "$LOG_DIR/start-$1.log" bash -c "$cmd" || { printf '  %s\n' "$(msg build_failed "$1" "$LOG_DIR/start-$1.log")"; return 1; }
 }
 
-# Vor dem Neustart einer laufenden Instanz ihre laufenden Workflow-Runs (29820f58) — nur lesend, Key
-# aus `instance.sh key`, Port und Adresse aus der Instanz-Datei, wie sie beim Start der Instanz war.
-# Laufen welche: im Terminal fragen (Vorgabe nein), sonst — auch mit --yes — nicht anhalten, nur den
-# Befehl fuer spaeter nennen. Antwortet die Instanz nicht oder fehlt der Key: wie bisher, mit Hinweis.
-KEPT_RUNNING=""   # nicht neu gestartet: " NAME … "
-restart_ok() {  # NAME → 0 = neu starten
+# Before restarting a running instance, its running workflow runs (29820f58) — read-only, key
+# from `instance.sh key`, port and address from the instance file, as it was when the instance started.
+# If any are running: ask in the terminal (default no), otherwise — even with --yes — do not stop, only name the
+# command for later. If the instance does not answer or the key is missing: as before, with a hint.
+KEPT_RUNNING=""   # not restarted: " NAME … "
+restart_ok() {  # NAME → 0 = restart
   local a key n
   a="$(instance_prev_addr "$1")"; [ -n "$a" ] || a="$(instance_file_addr "$INSTANCES_DIR/$1.env")"
   key="$(bash "$SCRIPT_DIR/instance.sh" key --name "$1" 2>/dev/null)"
@@ -723,11 +723,11 @@ restart_ok() {  # NAME → 0 = neu starten
 }
 short_sha() { if [ "${1:--}" = - ]; then msg build_state_unknown; else printf '%s' "${1:0:8}"; fi; }
 
-# Gestufter Betrieb (84a78bb7): Dev kennt Test und Prod — alle drei im gemeinsamen Docker-Netz, dort
-# unter ihrem Instanznamen erreichbar (nicht ueber host.docker.internal: die Ports liegen nur auf
-# 127.0.0.1); Dev liest die Keys der Ziele aus Dateien, die `instance.sh sync-keys` holt. Fehlende
-# Zeilen kommen auch in behaltene Dateien — was dort schon steht, bleibt.
-ensure_line() {  # NAME SCHLUESSEL WERT
+# Staged operation (84a78bb7): dev knows test and prod — all three in the shared Docker network, reachable there
+# under their instance name (not via host.docker.internal: the ports are only on
+# 127.0.0.1); dev reads the keys of the targets from files that `instance.sh sync-keys` fetches. Missing
+# lines also go into kept files — what is already there stays.
+ensure_line() {  # NAME KEY VALUE
   local f="$INSTANCES_DIR/$1.env"
   grep "^$2=" "$f" >/dev/null 2>&1 || printf '%s=%s\n' "$2" "$3" >> "$f"
 }
@@ -742,9 +742,9 @@ staged_sync_lines() {
   ensure_line dev AUTOMATION_SYNC_PROD_URL http://prod:9090
   ensure_line dev AUTOMATION_SYNC_PROD_KEY_FILE /app/sync-keys/prod.key
 }
-# Nach Prod gehen nur versiegelte Definitionen (84a78bb7). Eine Dev-Datei von vor dem Sync versiegelt
-# nicht — bleibt sie, sagt der Installer, wie es geht; schreibt --reconfigure sie neu, dass Dev jetzt siegelt.
-sealing_hint() {  # VORHER (Wert von MYSURICATES_HARDENING_SEALING vor dem Schreiben)
+# Only sealed definitions go to prod (84a78bb7). A dev file from before the sync does not
+# seal — if it stays, the installer says how; if --reconfigure rewrites it, that dev now seals.
+sealing_hint() {  # BEFORE (value of MYSURICATES_HARDENING_SEALING before writing)
   local now
   now="$(kept_value dev MYSURICATES_HARDENING_SEALING)"
   if [ "$now" != true ]; then
@@ -753,8 +753,8 @@ sealing_hint() {  # VORHER (Wert von MYSURICATES_HARDENING_SEALING vor dem Schre
     printf '  %s\n' "$(msg sealing_dev_now)"
   fi
 }
-# Nach dem Start: die Keys von Test und Prod fuer Dev holen. Laeuft ein Ziel nicht, nennt der
-# Installer den Befehl fuer spaeter.
+# After the start: fetch the keys of test and prod for dev. If a target is not running, the
+# installer names the command for later.
 fetch_sync_keys() {
   local cmd="scripts/instance.sh sync-keys --name dev" run="bash '$SCRIPT_DIR/instance.sh' sync-keys --name dev"
   if [ "$DRY" = 1 ]; then printf '  %s\n' "$(msg dry_run "$cmd")"; return 0; fi
@@ -767,7 +767,7 @@ fetch_sync_keys() {
 step_build() {
   section 6
   if [ "$MODE" = staged ]; then
-    # Dev versiegelt (ohne Pflicht fuer unbeaufsichtigte Runs): nach Prod gehen nur versiegelte Definitionen
+    # Dev seals (without obligation for unattended runs): only sealed definitions go to prod
     local sealing_before
     sealing_before="$(kept_value dev MYSURICATES_HARDENING_SEALING)"
     write_instance dev container "$P_DEV" full Dev true false
@@ -792,16 +792,16 @@ step_build() {
   return 0
 }
 
-# --- Schritt 8: Fertig ------------------------------------------------------------------------------
+# --- Step 8: Done ----------------------------------------------------------------------------- -----
 step_done() {
   local n port bind key lines l_key l_manage l_change l_update w l first addr
   section 7
   lines=()
   for n in $INSTANCES; do
     port="$(kept_value "$n" MYSURICATES_PORT)"
-    # Aus der Datei, nicht aus --bind: eine behaltene Instanz-Datei kann anders binden (b8aa3866)
+    # From the file, not from --bind: a kept instance file may bind differently (b8aa3866)
     bind="$(kept_value "$n" MYSURICATES_BIND)"
-    # Nicht neu gestartet (29820f58): sie lauscht noch, wo sie vor dem Schreiben der Datei lauschte
+    # Not restarted (29820f58): it still listens where it listened before the file was written
     case "$KEPT_RUNNING" in *" $n "*) l="$(instance_prev_addr "$n")"; [ -z "$l" ] || { port="${l%%,*}"; bind="${l#*,}"; } ;; esac
     if [ "$STARTED" = 1 ] && [ "$DRY" = 0 ]; then
       first=1
@@ -825,27 +825,27 @@ ADDR
   done
   n="$(printf '%s' "$INSTANCES" | cut -d' ' -f1)"
   lines[${#lines[@]}]=""
-  # Beschriftungen auf gleiche Breite — die Laenge haengt von der Sprache ab, nie in der Uebersetzung auffuellen
+  # Labels to equal width, the length depends on the language, never pad in the translation
   l_key="$(msg done_key_cmd)"; l_manage="$(msg done_manage)"; l_change="$(msg done_change)"; l_update="$(msg done_update)"; w=0
   for l in "$l_key" "$l_manage" "$l_change" "$l_update"; do [ "${#l}" -gt "$w" ] && w=${#l}; done
   lines[${#lines[@]}]="${l_key}$(_tui_repeat ' ' $((w - ${#l_key} + 2)))${C_BOLD}scripts/instance.sh key --name $n${C_RESET}"
   lines[${#lines[@]}]="${l_manage}$(_tui_repeat ' ' $((w - ${#l_manage} + 2)))${C_BOLD}scripts/instance.sh up|down|status --name $n${C_RESET}"
   lines[${#lines[@]}]="${l_change}$(_tui_repeat ' ' $((w - ${#l_change} + 2)))${C_BOLD}scripts/setup.sh${C_RESET} · deploy/instances/$n.env"
-  # Nach git pull: down und up — up baut neu, wenn sich der Stand geaendert hat (1c016162)
+  # After git pull: down and up — up rebuilds if the state has changed (1c016162)
   lines[${#lines[@]}]="${l_update}$(_tui_repeat ' ' $((w - ${#l_update} + 2)))${C_BOLD}git pull && scripts/instance.sh down --name $n${C_RESET}"
   lines[${#lines[@]}]="$(_tui_repeat ' ' $((w + 2)))${C_BOLD}scripts/instance.sh up --name $n${C_RESET}"
   tui_box "$(msg step_of 8 ${#STEPS[@]}) · $(msg step_done)" "${lines[@]}"
-  # Ehrlich sagen, was nach einem Neustart des Rechners passiert (f9e2a033): ein Container kommt mit
-  # dem Docker-Dienst zurueck (restart: unless-stopped), eine Instanz auf dem Rechner nicht — ein
-  # Autostart dafuer ist ein eigener Schritt (f52c1fff).
+  # Honestly say what happens after a restart of the machine (f9e2a033): a container comes back with
+  # the Docker service (restart: unless-stopped), an instance on the machine does not — an
+  # autostart for that is a separate step (f52c1fff).
   [ "$RUNTIME" = host ] && printf '  %s\n' "$(msg done_no_autostart "$n" "scripts/instance.sh up --name $n")"
-  # Unter dem Kasten: der kuerzte den Befehl, und mit env.sh davor wird er lang (2605ed1f)
+  # Under the box: it would truncate the command, and with env.sh in front it gets long (2605ed1f)
   logged="$(providers_status | awk -v i="$PROVIDER" '$1==i{print $3}')"
   [ "$logged" = logged-in ] || printf '  %s%s%s\n' "$C_AMBER" "$(msg ai_login_hint "$PROVIDER" "$(provider_login_line "$PROVIDER")")" "$C_RESET"
   return 0
 }
 
-# --- Quellcode-Weg fuer Mitwirkende -----------------------------------------------------------------
+# --- Source-code path for contributors --------------------------------------------------------- ----
 from_source() {
   local plan cfg="$REPO_ROOT/ai-automation-backend/config/application.yml" rc
   RUNTIME=host
@@ -865,12 +865,12 @@ from_source() {
   else
     module_preset_write "$cfg" "${PRESET:-core}" "$I18N_LANG"
   fi
-  offer_profile   # sonst findet ein spaeterer Aufruf aus der eigenen Shell das heruntergeladene npm nicht
+  offer_profile   # otherwise a later call from the own shell does not find the downloaded npm
   [ "$DO_START" = 1 ] || { printf '  ./scripts/start-mysuricates-dev.sh\n'; exit 0; }
   exec bash "$SCRIPT_DIR/start-mysuricates-dev.sh" $([ "$SHOW_KEY" = 1 ] && echo --show-key)
 }
 
-# --- Ablauf -----------------------------------------------------------------------------------------
+# --- Flow ------------------------------------------------------------------------------------- -----
 PRESET_FLAG="$PRESET"
 [ "$FROM_SOURCE" = 1 ] && from_source
 SOCKET="$SOCKET_FLAG"; CUSTOM_LINES=""
@@ -881,10 +881,10 @@ while [ "$i" -lt "${#FLOW[@]}" ]; do
   "${FLOW[$i]}"; rc=$?
   case "$rc" in
     0) i=$((i + 1)) ;;
-    2) [ "$i" -gt 0 ] && i=$((i - 1)) ;;      # b = zurueck
+    2) [ "$i" -gt 0 ] && i=$((i - 1)) ;;      # b = back
     3) printf '\n  %s\n' "$(msg quit)"; exit 1 ;;
-    4) exit 1 ;;                              # --check: etwas fehlt
-    5) exit 0 ;;                              # --check: alles da
+    4) exit 1 ;;                              # --check: something is missing
+    5) exit 0 ;;                              # --check: everything present
     *) exit 1 ;;
   esac
 done

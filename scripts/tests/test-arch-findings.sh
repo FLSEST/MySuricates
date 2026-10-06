@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Tests fuer scripts/public-readiness/arch-findings.py und ncloc.py (TODO b8c06b94).
-# Run: bash scripts/tests/test-arch-findings.sh   (exit 0 = alle Checks ok)
+# Tests for scripts/public-readiness/arch-findings.py and ncloc.py (TODO b8c06b94).
+# Run: bash scripts/tests/test-arch-findings.sh   (exit 0 = all checks ok)
 #
-# Zeitbudget: Sekunden. Die Einstufung liest nur Faktenblaetter; die Fixtures hier sind kleine
-# Faktenblaetter mit bekannten Zahlen, je Regel eine Befund- und eine Gegenprobe (Bandgrenzen,
-# Hotspot ja/nein, Ratchet-Datei, Kollaborateure 9/10, Paketkopplung ohne Befund, Zyklen,
-# Schichtkanten, Frontend, nicht Gemessenes). Kein jdeps, kein Maven, kein Netz.
+# Time budget: seconds. The rating only reads fact sheets; the fixtures here are small
+# fact sheets with known numbers, per rule one finding and one counter-check (band limits,
+# hotspot yes/no, ratchet file, collaborators 9/10, package coupling without finding, cycles,
+# layer edges, frontend, not measured). No jdeps, no Maven, no network.
 set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -22,19 +22,19 @@ check() {  # $1 = label, $2 = shell condition
   if eval "$2"; then echo "  ok   $1"; PASS=$((PASS + 1)); else echo "  FAIL $1"; FAIL=$((FAIL + 1)); fi
 }
 row() { local IFS="$TAB"; printf '%s\n' "$*"; }
-section() {  # $1 = Ausgabe, $2 = Abschnitt -> Zeilen ohne Kopf und Kommentare
+section() {  # $1 = output, $2 = section -> lines without header and comments
   awk -v s="## $2" '/^## / { on = ($0 == s); next } on && NF && !/^#/' "$1"
 }
-finding() {  # $1 = Ausgabe, $2 = subject -> "ruleKey<TAB>severity" oder leer
+finding() {  # $1 = output, $2 = subject -> "ruleKey<TAB>severity" or empty
   section "$1" findings | awk -F'\t' -v s="$2" '$2 == s { print $1 "\t" $3 }'
 }
-observed() {  # $1 = Ausgabe, $2 = subject -> art oder leer
+observed() {  # $1 = output, $2 = subject -> kind or empty
   section "$1" observations | awk -F'\t' -v s="$2" '$2 == s { print $1 }'
 }
-evidence() {  # $1 = Ausgabe, $2 = subject
+evidence() {  # $1 = output, $2 = subject
   section "$1" findings | awk -F'\t' -v s="$2" '$2 == s { print $4 }'
 }
-summary() {  # $1 = Ausgabe, $2 = Schluessel
+summary() {  # $1 = output, $2 = key
   section "$1" findings_summary | sed -n "s/^$2=//p"
 }
 
@@ -49,11 +49,11 @@ if [ ! -f "$FINDINGS" ] || [ ! -f "$NCLOC" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Fixture: Backend-Faktenblatt. Spalten von ## files: ncloc zeilen aenderungen deps datei.
-# Jede Datei steht fuer genau einen Fall; die Namen sagen, welchen.
+# Fixture: backend fact sheet. Columns of ## files: ncloc lines changes deps file.
+# Each file stands for exactly one case; the names say which.
 # ---------------------------------------------------------------------------
 P="com/automation/service"
-backend_sheet() {  # $1 = Ziel, $2 = jdeps-Zustand (Standard ok), $3 = mit Ratchet (1/0)
+backend_sheet() {  # $1 = target, $2 = jdeps state (default ok), $3 = with ratchet (1/0)
   local jdeps="${2:-ok}" ratchet="${3:-1}"
   {
     echo "## packages"
@@ -126,7 +126,7 @@ backend_sheet() {  # $1 = Ziel, $2 = jdeps-Zustand (Standard ok), $3 = mit Ratch
   } > "$1"
 }
 
-frontend_sheet() {  # $1 = Ziel, $2 = unresolved_imports (Standard 0)
+frontend_sheet() {  # $1 = target, $2 = unresolved_imports (default 0)
   {
     echo "## cycles"
     row cycle 2 a.ts,b.ts
@@ -183,7 +183,7 @@ check "400 NCLOC: noch Beobachtung"           '[ "$(observed "$TMP/out.txt" "$P/
 check "401 NCLOC: Befund MEDIUM"              '[ "$(finding "$TMP/out.txt" "$P/Band401.java")" = "arch.god-class${TAB}MEDIUM" ]'
 check "600 NCLOC: noch MEDIUM"                '[ "$(finding "$TMP/out.txt" "$P/Band600.java")" = "arch.god-class${TAB}MEDIUM" ]'
 check "601 NCLOC: HIGH"                       '[ "$(finding "$TMP/out.txt" "$P/Band601.java")" = "arch.god-class${TAB}HIGH" ]'
-# Wechselgrenze wie bis 4.5.2: ein Groessenbefund wird erst ab 11 Kollaborateuren zu arch.high-coupling.
+# Switching limit as up to 4.5.2: a size finding becomes arch.high-coupling only from 11 collaborators.
 check "601 NCLOC + 10 deps: HIGH, kein CRITICAL, bleibt arch.god-class (Identitaet stabil)" \
   '[ "$(finding "$TMP/out.txt" "$P/Band601Deps10.java")" = "arch.god-class${TAB}HIGH" ]'
 check "601 NCLOC + 11 deps: CRITICAL, ein Befund als arch.high-coupling" \
@@ -285,7 +285,7 @@ check "jdeps gescheitert: keine Zyklen- oder Schichtbefunde" \
   '! section "$TMP/nojdeps.txt" findings | grep -E "^arch\.(package-cycle|cross-layer-violation)${TAB}(cycles/component/com|cycles/pair|layer)" >/dev/null'
 check "jdeps gescheitert: Groessenbefunde bleiben (Quelltext gemessen)" \
   '[ "$(finding "$TMP/nojdeps.txt" "$P/HotBig.java")" = "arch.god-class${TAB}MEDIUM" ]'
-with_error() {  # $1 = Blatt, $2 = Fehlermarke, $3 = Ziel — haengt error=<marke> an ## summary
+with_error() {  # $1 = sheet, $2 = error marker, $3 = target — appends error=<marker> to ## summary
   awk -v e="$2" '{ print } $0 == "## summary" { print "error=" e }' "$1" > "$3"
 }
 for MARK in collaborators_failed ncloc_failed shallow_history no_git_repo; do
@@ -339,7 +339,7 @@ def declared_keys(name):
     return set(body.replace("\"", "").replace(" ", "").replace("\n", "").strip(",").split(","))
 measured, judged = declared_keys("RULE_KEYS"), declared_keys("JUDGMENT_RULE_KEYS")
 keys = set(json.load(open(catalog))["mysuricates.architecture"])
-# Die Einstufung vergibt nur Mess-Keys; die Urteils-Keys vergibt die KI, Prompt und Katalog kennen beide.
+# The rating only assigns measurement keys; the judgment keys are assigned by the AI, prompt and catalog know both.
 assert emitted and emitted <= measured, (emitted, measured)
 assert not measured & judged, (measured, judged)
 assert measured | judged == allowed == keys, (measured, judged, allowed, keys)
@@ -369,7 +369,7 @@ public class Sample {
     int f() { return 1; } /* dahinter */
 }
 JAVA
-# Zaehlbar: package, class, url, BLOCK, zwei Textblockzeilen, f(), } = 8 von 18 Zeilen.
+# Countable: package, class, url, BLOCK, two text block lines, f(), } = 8 of 18 lines.
 cat > "$TMP/nc/sample.tsx" <<'TSX'
 import {
   a,
@@ -385,7 +385,7 @@ const lazy = () =>
   import('./lazy');
 /* Block */ export const X = (p: T) => <div>{url}{lazy}</div>;
 TSX
-# Zaehlbar: export-from, url, const lazy, import('./lazy'), export const X = 5 von 13 Zeilen.
+# Countable: export-from, url, const lazy, import('./lazy'), export const X = 5 of 13 lines.
 cat > "$TMP/nc/tricky.tsx" <<'TSX'
 const a = '/* kein Kommentar';
 const clean = (s: string) => s.replace(/[#*_`>]/g, '');
@@ -398,9 +398,9 @@ export const V = () => (
 );
 const b = `ende`;
 TSX
-# Zaehlbar: alle Zeilen ausser {/* JSX-Kommentar */} = 9 von 10. Der String mit /* oeffnet keinen
-# Kommentar, der Backtick im Regex keinen Template-String (sonst fiele alles bis zum naechsten
-# Backtick als String durch), und a.length / 2 ist eine Division, kein Regex.
+# Countable: all lines except {/* JSX-Kommentar */} = 9 of 10. The string with /* does not open a
+# comment, the backtick in the regex no template string (otherwise everything up to the next
+# backtick would fall through as a string), and a.length / 2 is a division, not a regex.
 printf '' > "$TMP/nc/Empty.java"
 printf 'Sample.java\nsample.tsx\ntricky.tsx\nEmpty.java\n' | python3 "$NCLOC" "$TMP/nc" > "$TMP/nc.out" 2> "$TMP/nc.err"; RC_NC=$?
 check "ncloc.py exit 0, stderr leer" '[ "$RC_NC" -eq 0 ] && [ ! -s "$TMP/nc.err" ]'
@@ -414,9 +414,9 @@ check "leere Datei: 0 und 0" 'grep -qx "0${TAB}0${TAB}Empty.java" "$TMP/nc.out"'
 check "Reihenfolge wie die Eingabe" '[ "$(cut -f3 "$TMP/nc.out" | tr "\n" " ")" = "Sample.java sample.tsx tricky.tsx Empty.java " ]'
 
 echo "12) Flacher Klon: fehlende Historie ist eine Messluecke, keine Sauberkeit"
-# git clone --depth 1 kennt nur den letzten Commit: jede Datei haette 0 oder 1 Aenderung, kein Hotspot
-# waere messbar, und alle Groessen-/Kopplungsbefunde liefen still aus. Beide Messskripte markieren das
-# als error=shallow_history, die Einstufung meldet die Groessen dann als nicht gemessen.
+# git clone --depth 1 knows only the last commit: every file would have 0 or 1 change, no hotspot
+# would be measurable, and all size/coupling findings would silently expire. Both measuring scripts mark this
+# as error=shallow_history, the rating then reports the sizes as not measured.
 ORIGIN="$TMP/origin"
 mkdir -p "$ORIGIN/ai-automation-backend/src/main/java/com/automation/x" "$ORIGIN/ai-automation-frontend/src"
 g() { git -C "$ORIGIN" -c user.name=test -c user.email=test@example.invalid -c core.hooksPath=/dev/null -c commit.gpgsign=false "$@"; }
@@ -447,18 +447,18 @@ check "Gegenprobe voller Klon: Aenderungen gezaehlt (3 je Datei)" \
   'grep -qE "^[0-9]+${TAB}[0-9]+${TAB}3${TAB}-${TAB}com/automation/x/X.java$" "$TMP/full-backend.txt"'
 
 echo "13) Kandidaten fuer das Urteil (## review_candidates, TODO e0e9495f)"
-# Eigene kleine Blaetter: je Datei ein Fall. Spalten von ## recent: aenderungen neu datei.
+# Own small sheets: one case per file. Columns of ## recent: changes new file.
 C="com/automation/cand"
 {
   echo "## files"
-  row 450 520 5 3 "$C/FindingFew.java"      # Befund (Hotspot, ueber 400), wenige Aenderungen
-  row 100 140 8 10 "$C/CoupledHot.java"     # Befund arch.high-coupling, mehr Aenderungen
-  row 300 360 20 3 "$C/ObsMany.java"        # Beobachtung, Hotspot mit vielen Aenderungen
-  row 300 360 4 3 "$C/ObsStable.java"       # Beobachtung, aber kein Hotspot
-  row 120 150 9 2 "$C/Plain.java"           # Hotspot ohne Befund und ohne Beobachtung
-  row 180 230 1 2 "$C/NewBig.java"          # neu, ab 100 NCLOC
-  row 90 120 1 2 "$C/NewSmall.java"         # neu, unter 100 NCLOC
-  row 260 320 6 2 "$C/NewHot.java"          # neu UND Hotspot-Beobachtung: nur einmal, als Hotspot
+  row 450 520 5 3 "$C/FindingFew.java"      # finding (hotspot, over 400), few changes
+  row 100 140 8 10 "$C/CoupledHot.java"     # finding arch.high-coupling, more changes
+  row 300 360 20 3 "$C/ObsMany.java"        # observation, hotspot with many changes
+  row 300 360 4 3 "$C/ObsStable.java"       # observation, but no hotspot
+  row 120 150 9 2 "$C/Plain.java"           # hotspot without finding and without observation
+  row 180 230 1 2 "$C/NewBig.java"          # new, from 100 NCLOC
+  row 90 120 1 2 "$C/NewSmall.java"         # new, under 100 NCLOC
+  row 260 320 6 2 "$C/NewHot.java"          # new AND hotspot observation: only once, as hotspot
   echo
   echo "## recent"
   echo "# aenderungen${TAB}neu${TAB}datei"
@@ -507,7 +507,7 @@ check "angaben = evidence der Einstufung plus Befund bzw. Beobachtung" \
 check "findings_summary zaehlt die Kandidaten" '[ "$(summary "$TMP/cand.txt" review_candidates)" = 7 ]'
 check "kein Kandidat ist ein Hotspot ohne Befund oder Beobachtung, keiner stabil" \
   '! section "$TMP/cand.txt" review_candidates | grep -E "Plain.java|ObsStable.java|NewSmall.java" >/dev/null'
-# Obergrenzen: 8 Hotspot-Beobachtungen und 5 neue Dateien -> 6 und 3.
+# Upper limits: 8 hotspot observations and 5 new files -> 6 and 3.
 {
   echo "## files"
   for i in 1 2 3 4 5 6 7 8; do row 300 360 $((10 + i)) 3 "$C/Hot$i.java"; done
@@ -527,7 +527,7 @@ check "hoechstens 6 Hotspots, die mit den meisten Aenderungen" \
   '[ "$(candidates "$TMP/cap.txt" | grep -c "^hotspot $C/Hot")" -eq 6 ] && ! candidates "$TMP/cap.txt" | grep -qE "Hot[12]\.java"'
 check "hoechstens 3 neue Dateien, die groessten" \
   '[ "$(candidates "$TMP/cap.txt" | grep -c "^neu")" -eq 3 ] && [ "$(candidates "$TMP/cap.txt" | grep "^neu" | head -1)" = "neu frontend/src/components/NewPanel.tsx" ]'
-# Ohne ## recent (aelteres Blatt) gibt es keine neuen Dateien, und der Abschnitt sagt das.
+# Without ## recent (older sheet) there are no new files, and the section says so.
 awk '/^## recent$/ { skip = 1; next } /^## / { skip = 0 } !skip' "$TMP/cand-backend.txt" > "$TMP/cand-norecent.txt"
 python3 "$FINDINGS" "$TMP/cand-norecent.txt" "$TMP/cand-frontend.txt" > "$TMP/norecent.txt"
 check "ohne ## recent: Hinweis und keine neuen Backend-Dateien" \
