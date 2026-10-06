@@ -16,7 +16,8 @@ only provides an opt-in protocol for versioned reports, stable findings, and TOD
       "key": "project.security",
       "category": "security",
       "reportBlock": "report",
-      "schemaVersion": 1
+      "schemaVersion": 1,
+      "todoMinSeverity": "HIGH"
     }
   }
 }
@@ -30,6 +31,13 @@ named as `promptBlock` as well. The ingestion takes the report's provider and mo
 categories are freely selectable; the backend does not know any project-specific keys or rules.
 An audit workflow does not use `metadata.autoTodo` at the same time: TODOs are managed
 from the structured findings.
+
+`todoMinSeverity` (optional) sets from which severity an open finding gets a managed TODO by itself:
+`CRITICAL`, `HIGH` (default), `MEDIUM`, `LOW` or `NONE` (never by itself, only at the push of a button in the
+Audit Center; TODO d8607f77). Case does not matter. An unknown value does not make the configuration invalid:
+`HIGH` applies, and the ingestion reports it in the activity log. The workflow list shows the threshold in the
+panel of an audit workflow and lets you change it there; like every metadata change this is a new workflow
+version (part of the definition hash, refused for sealed workflows).
 
 ## Result Format v1
 
@@ -437,8 +445,8 @@ earlier findings only as Markdown in `previous_report`. Section 10b of the same 
   same identity **as long as the finding still exists**: an accepted finding that is left out is never
   checked again. It does not carry a fixed one forward – a re-reported `AWAITING_VERIFICATION` finding
   becomes `OPEN` again.
-- `CRITICAL` and `HIGH` generate managed TODOs (see [Managed TODOs](#managed-todos)). `MEDIUM` can be
-  confirmed in the Audit Center; `LOW` remains a finding for the time being.
+- Findings at or above the workflow's threshold (`todoMinSeverity`, default `HIGH`) generate managed TODOs (see
+  [Managed TODOs](#managed-todos)); lighter ones get their TODO at the push of a button in the Audit Center.
 - A linked TODO set to `DONE` – managed or manually linked – moves an open finding to
   `AWAITING_VERIFICATION`, unless another TODO linked to it is still open (`OPEN`, `IN_PROGRESS`,
   `BACKLOG`; TODO `ab1ed481`). This holds for every write path – REST, TodoTrigger auto-close, linked
@@ -458,7 +466,7 @@ earlier findings only as Markdown in `previous_report`. Section 10b of the same 
 
 ### Managed TODOs
 
-**Managed TODOs** (`ManagedTodoWriter`): only for `CRITICAL`/`HIGH` findings in status `OPEN` whose evidence names a measurement of the run (`ensureAll`, one query per report for links and TODOs; tag `audit`, `auto:workflow`, `TodoCreatedEvent` → TodoTrigger). Accepted/dismissed risks, re-reviews and unverified findings start no fix loop. After every ingest, `ManagedTodoWriter.reconcile` closes the TODO as soon as all linked findings are terminal and reopens it when one comes back; `ManagedTodoReconciler` does the same after a disposition change in the Audit Center and after a merge. A TODO on demand (`POST /api/v1/audit-findings/{id}/todos`, `AuditFindingTodoLinker`) takes the same path (`ManagedTodoWriter.create`), but its link carries `manual`. If none of the open linked findings is above the threshold any more (say after changed criteria HIGH → MEDIUM), an automatically created TODO is released: link removed, status `ARCHIVED` (not `DONE` — nothing was fixed), entry in the activity log; an `IN_PROGRESS` TODO stays untouched (TODO ba0dcb3a). A TODO on demand is never released, it follows its findings like a HIGH one: `DONE` once all are terminal, `OPEN` again when one comes back (TODO f2ce6c50).
+**Managed TODOs** (`ManagedTodoWriter`): only for findings at or above the workflow's threshold (`AuditTodoThreshold` from `todoMinSeverity`, default `CRITICAL`/`HIGH`) in status `OPEN` whose evidence names a measurement of the run (`ensureAll`, one query per report for links and TODOs; tag `audit`, `auto:workflow`, `TodoCreatedEvent` → TodoTrigger). Accepted/dismissed risks, re-reviews and unverified findings start no fix loop. After every ingest, `ManagedTodoWriter.reconcile` closes the TODO as soon as all linked findings are terminal and reopens it when one comes back; `ManagedTodoReconciler` does the same after a disposition change in the Audit Center and after a merge. A TODO on demand (`POST /api/v1/audit-findings/{id}/todos`, `AuditFindingTodoLinker`) takes the same path (`ManagedTodoWriter.create`), but its link carries `manual`. If none of the open linked findings reaches the threshold any more (say after changed criteria HIGH → MEDIUM or a threshold lowered down to `NONE`), an automatically created TODO is released: link removed, status `ARCHIVED` (not `DONE` — nothing was fixed), entry in the activity log; an `IN_PROGRESS` TODO stays untouched (TODO ba0dcb3a). A TODO on demand is never released, it follows its findings like one above the threshold: `DONE` once all are terminal, `OPEN` again when one comes back (TODO f2ce6c50).
 
 **Gate status** comes from the workflow's run metadata (`gate_status`), not from the findings; `AuditSummary.openFindingsBySeverity` counts only non-terminal findings, `findingsByStatus` returns accepted ones separately (Audit Center: "open X · accepted Y"; the findings tab filters on open ones by default).
 

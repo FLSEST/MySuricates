@@ -91,7 +91,7 @@ class AuditDispositionLifecycleTest {
         assertThat(legacy.getDispositionNote())
                 .isEqualTo("Bewusst so\n" + AuditDispositionLifecycle.NOTE_RULE_RETIRED);
         assertThat(savedFindings()).contains(legacy);
-        verify(managedTodoWriter).reconcile(argThat(touched -> touched.contains(legacy)));
+        verify(managedTodoWriter).reconcile(argThat(touched -> touched.contains(legacy)), eq(AuditTodoThreshold.HIGH));
         verify(reportRepository, never()).findValidGeneratedAtBefore(any(), any(), any(), any());
     }
 
@@ -325,7 +325,7 @@ class AuditDispositionLifecycleTest {
                 "/tmp/p", RunStatus.COMPLETED, Map.of(), Map.of(), null);
         AuditReport report = AuditReport.builder().id("rep-1").projectId(PROJECT).auditKey(auditKey)
                 .generatedAt(NOW).build();
-        applier.apply(event, report, List.of(findings), factNames);
+        applier.apply(event, report, List.of(findings), factNames, AuditTodoThreshold.HIGH);
     }
 
     @SuppressWarnings("unchecked")

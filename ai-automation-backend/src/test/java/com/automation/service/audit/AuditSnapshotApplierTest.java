@@ -29,6 +29,7 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -95,11 +96,43 @@ class AuditSnapshotApplierTest {
     }
 
     private void applyTo(String auditKey, ParsedFinding... findings) {
+        applyTo(auditKey, AuditTodoThreshold.DEFAULT, findings);
+    }
+
+    private void applyTo(String auditKey, AuditTodoThreshold threshold, ParsedFinding... findings) {
         WorkflowRunCompletedEvent event = new WorkflowRunCompletedEvent(this, "run-1", "wf-1", "Audit", PROJECT,
                 "/tmp/p", RunStatus.COMPLETED, Map.of(), Map.of(), null);
         AuditReport report = AuditReport.builder().id("rep-1").projectId(PROJECT).auditKey(auditKey)
                 .generatedAt(NOW).build();
-        applier.apply(event, report, List.of(findings), Set.of());
+        applier.apply(event, report, List.of(findings), Set.of(), threshold);
+    }
+
+    // --- d8607f77: the workflow decides from which severity a finding gets a TODO by itself ---------
+
+    @Test
+    void apply_aMediumFinding_getsNoTodoUnderTheDefaultThreshold() {
+        apply(new ParsedFinding("arch.misplaced-logic", "Foo.java", AuditSeverity.MEDIUM, "Foo", null, null, List.of()));
+
+        verify(managedTodoWriter).ensureAll(argThat(List::isEmpty), any());
+    }
+
+    @Test
+    void apply_aMediumFinding_getsATodo_whenTheWorkflowThresholdIsMedium() {
+        applyTo(AUDIT_KEY, AuditTodoThreshold.MEDIUM,
+                new ParsedFinding("arch.misplaced-logic", "Foo.java", AuditSeverity.MEDIUM, "Foo", null, null, List.of()),
+                new ParsedFinding("arch.misplaced-logic", "Bar.java", AuditSeverity.LOW, "Bar", null, null, List.of()));
+
+        verify(managedTodoWriter).ensureAll(argThat(findings -> findings.size() == 1
+                && "Foo.java".equals(findings.getFirst().getSubject())), any());
+        verify(managedTodoWriter).reconcile(any(), eq(AuditTodoThreshold.MEDIUM));
+    }
+
+    @Test
+    void apply_aCriticalFinding_getsNoTodo_whenTheWorkflowThresholdIsNone() {
+        applyTo(AUDIT_KEY, AuditTodoThreshold.NONE,
+                new ParsedFinding("arch.misplaced-logic", "Foo.java", AuditSeverity.CRITICAL, "Foo", null, null, List.of()));
+
+        verify(managedTodoWriter).ensureAll(argThat(List::isEmpty), any());
     }
 
     // --- TODO 90c4f7db: what audit_findings shows with ¦ is stored with | -------------------
@@ -202,7 +235,7 @@ class AuditSnapshotApplierTest {
         verify(occurrenceRepository, times(1)).saveAll(any());
         verify(occurrenceRepository, never()).existsByFindingIdAndReportId(any(), any());
         verify(occurrenceRepository, never()).save(any());
-        verify(managedTodoWriter).reconcile(argThat(touched -> touched.size() == 4));
+        verify(managedTodoWriter).reconcile(argThat(touched -> touched.size() == 4), eq(AuditTodoThreshold.HIGH));
     }
 
     /** One occurrence per finding and report: what the report already has is not created again. */

@@ -4,7 +4,6 @@ import com.automation.entity.ActivityLog;
 import com.automation.entity.AuditFinding;
 import com.automation.entity.AuditFindingTodo;
 import com.automation.entity.AuditReport;
-import com.automation.entity.AuditSeverity;
 import com.automation.entity.Todo;
 import com.automation.event.TodoCreatedEvent;
 import com.automation.mapper.TodoMapper;
@@ -47,11 +46,6 @@ class ManagedTodoWriter {
     private final TodoRepository todoRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final ActivityLogService activityLog;
-
-    /** Does an open finding of this severity deserve a managed TODO? Only CRITICAL and HIGH. */
-    static boolean needsTodo(AuditSeverity severity) {
-        return severity == AuditSeverity.CRITICAL || severity == AuditSeverity.HIGH;
-    }
 
     /**
      * The managed TODO per finding — reuse an existing one, otherwise create one; a managed
@@ -105,11 +99,11 @@ class ManagedTodoWriter {
     /**
      * Closes managed TODOs whose findings are all terminal, and reopens them as soon as
      * one comes back — a finding that reappears needs an open task again.
-     * If none of the open findings is above the TODO threshold any more ({@link #needsTodo}), the
+     * If none of the open findings reaches the audit's TODO threshold any more ({@link AuditTodoThreshold}), the
      * TODO is released ({@link #release}) — unless it was created by hand: that was a decision about the finding,
-     * not the threshold's, so it follows the findings like a HIGH one (f2ce6c50).
+     * not the threshold's, so it follows the findings like one above the threshold (f2ce6c50).
      */
-    void reconcile(List<AuditFinding> touched) {
+    void reconcile(List<AuditFinding> touched, AuditTodoThreshold threshold) {
         List<String> ids = touched.stream().map(AuditFinding::getId).distinct().toList();
         if (ids.isEmpty()) return;
         // One query per level instead of three per link (TODO be14db43): TODOs, their links
@@ -141,9 +135,9 @@ class ManagedTodoWriter {
             boolean allTerminal = !linked.isEmpty() && linked.stream().allMatch(f -> f.getStatus().isTerminal());
             boolean manual = todoLinks.stream().anyMatch(l -> l.isManaged() && l.isManual());
             boolean belowThreshold = !manual && !allTerminal && linked.stream()
-                    .filter(f -> !f.getStatus().isTerminal()).noneMatch(f -> needsTodo(f.getSeverity()));
+                    .filter(f -> !f.getStatus().isTerminal()).noneMatch(f -> threshold.admits(f.getSeverity()));
             if (belowThreshold) {
-                if (release(todo, todoLinks, released)) changed.add(todo);
+                if (release(todo, todoLinks, released, threshold)) changed.add(todo);
             } else if (allTerminal && todo.getStatus() != Todo.Status.DONE) {
                 todo.setStatus(Todo.Status.DONE);
                 changed.add(todo);
@@ -167,19 +161,20 @@ class ManagedTodoWriter {
      *
      * @return whether the TODO was released
      */
-    private boolean release(Todo todo, List<AuditFindingTodo> todoLinks, List<AuditFindingTodo> released) {
+    private boolean release(Todo todo, List<AuditFindingTodo> todoLinks, List<AuditFindingTodo> released,
+                            AuditTodoThreshold threshold) {
         if (todo.getStatus() == Todo.Status.IN_PROGRESS) return false;
         todoLinks.stream().filter(AuditFindingTodo::isManaged).forEach(released::add);
         if (REFERENCE_TYPE.equals(todo.getReferenceType())) {
             todo.setReferenceType(null);
             todo.setReferenceId(null);
         }
-        log.info("Managed audit TODO {} ({}) released: no linked open finding is CRITICAL/HIGH any more",
-                todo.getId(), todo.getTitle());
+        log.info("Managed audit TODO {} ({}) released: no linked open finding reaches the TODO threshold {} any more",
+                todo.getId(), todo.getTitle(), threshold);
         // Visible in the activity log, so a released TODO does not just vanish from the audit center (f2ce6c50)
         activityLog.info(ActivityLog.LogCategory.EXECUTION,
                 "Audit-TODO freigegeben: " + todo.getTitle() + " (" + todo.getId() + ") – kein verknüpftes offenes "
-                        + "Finding mehr HIGH/CRITICAL, Verknüpfung gelöst, Status ARCHIVED",
+                        + "Finding erreicht mehr die TODO-Schwelle " + threshold + ", Verknüpfung gelöst, Status ARCHIVED",
                 "AuditIngestionService");
         todo.setStatus(Todo.Status.ARCHIVED);
         return true;

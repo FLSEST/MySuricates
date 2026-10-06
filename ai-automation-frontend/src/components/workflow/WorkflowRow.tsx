@@ -5,6 +5,7 @@ import {
   Square,
   Bell,
   FlaskConical,
+  ShieldCheck,
   Cloud,
   Workflow as WorkflowFlowIcon,
 } from 'lucide-react';
@@ -13,6 +14,7 @@ import { formatTimestamp } from '../../utils/localeFormat';
 import { ExecutionBadges } from '../shared/ExecutionBadges';
 import { WorkflowIcon } from '../../utils/workflowIcon';
 import { SealStateIcon } from './SealStateIcon';
+import { auditConfigOf } from './auditWorkflow';
 import { useSealStatus } from '../../hooks/useSealStatus';
 import type { useNavigate } from 'react-router-dom';
 import type { Workflow } from '../../types';
@@ -43,6 +45,7 @@ export function WorkflowRow({
   showDetails = false,
 }: WorkflowRowProps) {
   const t = useT();
+  const audit = auditConfigOf(workflow.metadata);
   const locale = useI18nStore((s) => s.locale);
   const sealStatus = useSealStatus(workflow.id);
   const handleClick = () => {
@@ -93,7 +96,14 @@ export function WorkflowRow({
           <SealStateIcon sealed={workflow.sealed} status={sealStatus} />
         </span>
       )}
-      {!selectMode && !!workflow.metadata?.autoTodo?.enabled && (
+      {!selectMode && audit && (
+        <span className="inline-flex shrink-0" title={t.workflows.auditWorkflowBadge.replace('{key}', audit.key)}
+          data-testid="row-audit">
+          <ShieldCheck className="w-3 h-3 text-accent/70" aria-hidden="true" />
+          <span className="sr-only">{t.workflows.auditWorkflowBadge.replace('{key}', audit.key)}</span>
+        </span>
+      )}
+      {!selectMode && !audit && !!workflow.metadata?.autoTodo?.enabled && (
         <Bell className="w-3 h-3 text-accent/50 shrink-0" />
       )}
       {!selectMode && workflow.testStatus === 'PASSED' && (

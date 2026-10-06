@@ -14,7 +14,8 @@ type MainView = 'overview' | 'audit' | 'legacy';
 
 /**
  * Audit Center: the audits at a glance, one audit with report, history and findings, and the legacy
- * archive. `?finding=<id>` opens the findings of that finding's audit. The views live in
+ * archive. `?finding=<id>` opens the findings of that finding's audit, `?audit=<key>&project=<id>` the findings
+ * of that audit (link from an audit workflow, d8607f77). The views live in
  * `components/audit/`, the logic in `useActiveAudit`, `useFindingActions` and `useAuditCenter`.
  */
 export function AuditCenter() {
@@ -22,9 +23,14 @@ export function AuditCenter() {
   const locale = useI18nStore((state) => state.locale);
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedFinding = searchParams.get('finding');
-  const [view, setView] = useState<MainView>(requestedFinding ? 'audit' : 'overview');
-  const [auditTab, setAuditTab] = useState<AuditTab>(requestedFinding ? 'findings' : 'report');
-  const { audits, loading, activeAudit, linkedStatus, linkPending, select } = useActiveAudit(requestedFinding);
+  const auditParam = searchParams.get('audit');
+  const projectParam = searchParams.get('project');
+  const requestedAudit = useMemo(() => (auditParam && projectParam ? { projectId: projectParam, auditKey: auditParam } : null),
+    [auditParam, projectParam]);
+  const linked = !!requestedFinding || !!requestedAudit;
+  const [view, setView] = useState<MainView>(linked ? 'audit' : 'overview');
+  const [auditTab, setAuditTab] = useState<AuditTab>(linked ? 'findings' : 'report');
+  const { audits, loading, activeAudit, linkedStatus, linkPending, select } = useActiveAudit(requestedFinding, requestedAudit);
   const { data: projects } = useProjects();
 
   const projectNames = useMemo(() => new Map(projects?.map((project) => [project.id, project.name]) ?? []), [projects]);
@@ -33,10 +39,12 @@ export function AuditCenter() {
     select(audit);
     // A click in the overview wins over the deep link, which otherwise kept its own audit open (6ff1c580):
     // the link is used up, and the URL says what is open.
-    if (requestedFinding) {
+    if (linked) {
       setSearchParams((params) => {
         const next = new URLSearchParams(params);
         next.delete('finding');
+        next.delete('audit');
+        next.delete('project');
         return next;
       }, { replace: true });
     }
@@ -72,9 +80,9 @@ export function AuditCenter() {
           projectName={projectNames.get(activeAudit.projectId)} requestedFinding={requestedFinding}
           requestedFindingStatus={linkedStatus} />
       )}
-      {view === 'audit' && requestedFinding && !activeAudit && !linkPending && (
+      {view === 'audit' && linked && !activeAudit && !linkPending && (
         <div className="flex-1 flex items-center justify-center text-sm text-text-secondary">
-          {t.auditCenter.linkedNotFound}
+          {requestedFinding ? t.auditCenter.linkedNotFound : t.auditCenter.linkedAuditNotFound}
         </div>
       )}
       {view === 'legacy' && <LegacyReports />}
