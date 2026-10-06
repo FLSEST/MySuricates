@@ -9,6 +9,7 @@ import com.automation.entity.Skill;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowChain;
 import com.automation.executor.NestedBlocks;
+import com.automation.executor.WorkflowStarters;
 import com.automation.repository.WorkflowChainRepository;
 import com.automation.repository.WorkflowRepository;
 import com.automation.service.workflow.WorkflowSealVerifier;
@@ -27,7 +28,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.function.Consumer;
 
 /**
  * What may go to Prod (TODO 84a78bb7): only workflows whose seal holds — the same check
@@ -40,10 +40,6 @@ import java.util.function.Consumer;
 @Component
 @RequiredArgsConstructor
 public class SealedSyncScope {
-
-    static final String SUB_WORKFLOW = "sub-workflow";
-    /** Current key and the legacy key the sub-workflow executor still reads. */
-    private static final List<String> WORKFLOW_ID_KEYS = List.of("workflow_id", "workflowId");
 
     /**
      * Ids allowed for a sealed-only target, and what stays behind: per sealed workflow the notes about its
@@ -199,29 +195,17 @@ public class SealedSyncScope {
         return items == null ? List.of() : items.stream().filter(i -> allowed.contains(i.id())).toList();
     }
 
-    /** Workflow ids the definition calls as sub-workflows, nested blocks included. */
+    /**
+     * Workflow ids the definition starts — sub-workflow blocks and foreach with {@code workflow_id}, nested
+     * blocks included ({@link WorkflowStarters}, the same search the bundle export uses).
+     */
     static Set<String> subWorkflowIds(Workflow workflow) {
         Set<String> ids = new TreeSet<>();
-        Consumer<Map<String, Object>> collect = config -> {
-            if (config == null) {
-                return;
-            }
-            for (String key : WORKFLOW_ID_KEYS) {
-                if (config.get(key) instanceof String id && !id.isBlank()) {
-                    ids.add(id);
-                }
-            }
-        };
         if (workflow.getBlocks() != null) {
             for (BlockDefinition block : workflow.getBlocks()) {
-                if (SUB_WORKFLOW.equals(block.getType())) {
-                    collect.accept(block.getConfig());
-                }
-                NestedBlocks.visit(block.getConfig(), nested -> {
-                    if (SUB_WORKFLOW.equals(nested.type())) {
-                        collect.accept(nested.config());
-                    }
-                });
+                ids.addAll(WorkflowStarters.startedWorkflowIds(block.getType(), block.getConfig()).values());
+                NestedBlocks.visit(block.getConfig(),
+                        nested -> ids.addAll(WorkflowStarters.startedWorkflowIds(nested.type(), nested.config()).values()));
             }
         }
         return ids;

@@ -106,6 +106,23 @@ class SealedSyncScopeTest {
         assertThat(s.notesFor(List.of(), null)).containsExactly("Chain 'c-mixed' stays in Dev: 'Report draft' is not sealed");
     }
 
+    /** 49558f78: foreach with workflow_id starts a workflow per item — an unsealed one gets the same hint. */
+    @Test
+    void namesAnUnsealedWorkflowThatAForeachStartsPerItem() {
+        Workflow looping = workflow("w-ok", "p-1");
+        looping.setBlocks(new java.util.ArrayList<>(List.of(BlockDefinition.builder().type("foreach")
+                .config(new java.util.HashMap<>(Map.of("items", "a\nb", "workflow_id", "w-per-item"))).build())));
+        when(workflowRepository.findSealedWithSkills()).thenReturn(List.of(looping));
+        when(workflowRepository.findIdAndNameByIdIn(any())).thenReturn(List.<Object[]>of(new Object[]{"w-per-item", "Per item"}));
+        when(chainRepository.findAll()).thenReturn(List.of());
+
+        SealedSyncScope.Scope s = scope.scope();
+
+        assertThat(s.workflowIds()).containsExactly("w-ok");
+        assertThat(s.notes()).containsExactly(
+                "Workflow 'w-ok' calls sub-workflow 'Per item', which is not sealed — it stays in Dev and must already exist on Prod");
+    }
+
     private static Workflow workflow(String id, String projectId) {
         Workflow w = Workflow.builder().name(id).project(Project.builder().build()).sealed(true).build();
         w.setId(id);

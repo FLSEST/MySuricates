@@ -2,6 +2,7 @@ package com.automation.service.project.bundle;
 
 import com.automation.executor.ExecutionMode;
 import com.automation.executor.NestedBlocks;
+import com.automation.executor.WorkflowStarters;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -15,15 +16,11 @@ import java.util.regex.Pattern;
 
 /**
  * Block-level work on the raw block maps of a bundle: sub-workflow references, skill references and
- * what the preview shows. Nested blocks are found by {@link NestedBlocks}, the walker the validators use.
+ * what the preview shows. Nested blocks are found by {@link NestedBlocks}, the walker the validators use;
+ * which blocks start a workflow under which key, by {@link WorkflowStarters}.
  */
 final class BundleBlocks {
 
-    static final String SUB_WORKFLOW = "sub-workflow";
-    /** Block types that start another workflow by {@code workflow_id}: foreach does it per item (a5c9fbbf). */
-    private static final Set<String> WORKFLOW_STARTERS = Set.of(SUB_WORKFLOW, "foreach");
-    /** Current key and the legacy key the sub-workflow executor still reads. */
-    static final List<String> WORKFLOW_ID_KEYS = List.of("workflow_id", "workflowId");
     static final Pattern WORKFLOW_REF = Pattern.compile("@@workflow:([^@\\s]+)@@");
     static final Pattern SKILL_REF = Pattern.compile("@@skill:(.+)@@");
     static final int SHELL_PREVIEW_CHARS = 200;
@@ -68,36 +65,25 @@ final class BundleBlocks {
     static List<String> exportWorkflowRefs(List<Map<String, Object>> blocks, Map<String, String> keyById,
                                            String workflowName) {
         List<String> warnings = new ArrayList<>();
-        forEachBlock(blocks, (type, config) -> {
-            if (!WORKFLOW_STARTERS.contains(type) || config == null) {
-                return;
-            }
-            for (String idKey : WORKFLOW_ID_KEYS) {
-                if (config.get(idKey) instanceof String id && isFixedId(id)) {
-                    String key = keyById.get(id);
-                    if (key != null) {
-                        config.put(idKey, workflowRef(key));
-                    } else {
-                        warnings.add(externalRefWarning(workflowName, id));
-                    }
+        forEachBlock(blocks, (type, config) -> WorkflowStarters.startedWorkflowIds(type, config).forEach((idKey, id) -> {
+            if (isFixedId(id)) {
+                String key = keyById.get(id);
+                if (key != null) {
+                    config.put(idKey, workflowRef(key));
+                } else {
+                    warnings.add(externalRefWarning(workflowName, id));
                 }
             }
-        });
+        }));
         return warnings;
     }
 
     /** Preview: sub-workflow ids that are no bundle reference (the exporter kept them as they were). */
     static List<String> externalRefs(List<Map<String, Object>> blocks) {
         List<String> ids = new ArrayList<>();
-        forEachBlock(blocks, (type, config) -> {
-            if (WORKFLOW_STARTERS.contains(type) && config != null) {
-                for (String idKey : WORKFLOW_ID_KEYS) {
-                    if (config.get(idKey) instanceof String id && isFixedId(id) && !WORKFLOW_REF.matcher(id).matches()) {
-                        ids.add(id);
-                    }
-                }
-            }
-        });
+        forEachBlock(blocks, (type, config) -> WorkflowStarters.startedWorkflowIds(type, config).values().stream()
+                .filter(id -> isFixedId(id) && !WORKFLOW_REF.matcher(id).matches())
+                .forEach(ids::add));
         return ids;
     }
 
