@@ -11,32 +11,32 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Config-Schlüssel gegen das Block-Config-Schema, das auch der Editor nutzt (TODO f5153c47) — oben wie
- * verschachtelt (switch-Cases, {@code default}, {@code blocks}).
+ * Config keys against the block config schema that the editor also uses (TODO f5153c47) - top-level and
+ * nested (switch cases, {@code default}, {@code blocks}).
  *
  * <ul>
- *   <li>{@code unknown-config-key} ({@code MEDIUM}) — kein Executor liest den Schlüssel, die Einstellung
- *       wirkt nicht: {@code command} statt {@code goal} im agentic-Block, {@code max_chars} im
- *       document-Block, {@code container_image} eines retry-Blocks ohne {@code execution_mode: shell}.
- *       Bei naher Schreibweise mit Vorschlag.</li>
- *   <li>{@code missing-required-config-key} ({@code HIGH}) — ohne ihn kann der Block nicht laufen.</li>
- *   <li>{@code invalid-config-value} ({@code HIGH} bei {@code on_failure}, sonst {@code MEDIUM}) — Wert
- *       außerhalb der festen Werte des Schlüssels. Werte mit {@code {{} (Platzhalter) werden erst zur
- *       Laufzeit bekannt und bleiben ungeprüft; Legacy-Werte gelten als gültig.</li>
- *   <li>{@code legacy-config-key} ({@code LOW}) — alter Name eines Schlüssels ({@code legacyFor} im Schema,
- *       etwa {@code workflowId} am sub-workflow): wirkt noch, läuft aber aus (TODO 5ee07e94). Die Meldung
- *       nennt den neuen Namen; ist der auch gesetzt, gilt nur er.</li>
+ *   <li>{@code unknown-config-key} ({@code MEDIUM}) - no executor reads the key, the setting
+ *       has no effect: {@code command} instead of {@code goal} in the agentic block, {@code max_chars} in the
+ *       document block, {@code container_image} of a retry block without {@code execution_mode: shell}.
+ *       With a suggestion for a near spelling.</li>
+ *   <li>{@code missing-required-config-key} ({@code HIGH}) - without it the block cannot run.</li>
+ *   <li>{@code invalid-config-value} ({@code HIGH} for {@code on_failure}, otherwise {@code MEDIUM}) - value
+ *       outside the key's fixed values. Values with {@code {{} (placeholder) only become known at
+ *       runtime and stay unchecked; legacy values count as valid.</li>
+ *   <li>{@code legacy-config-key} ({@code LOW}) - old name of a key ({@code legacyFor} in the schema,
+ *       e.g. {@code workflowId} on sub-workflow): still works but is being phased out (TODO 5ee07e94). The message
+ *       names the new name; if that is also set, only it applies.</li>
  * </ul>
  *
- * <p>Blocktypen ohne Schema bleiben ungeprüft. {@code items_source} eines foreach mit
- * {@code items_command} prüft {@link ForEachRules} genauer ({@code items-command-without-source}); hier
- * entfällt der Wert-Befund dann, damit derselbe Fehler nicht zweimal erscheint.
+ * <p>Block types without a schema stay unchecked. {@code items_source} of a foreach with
+ * {@code items_command} is checked more precisely by {@link ForEachRules} ({@code items-command-without-source}); the
+ * value finding is dropped here then, so the same error does not appear twice.
  */
 final class ConfigKeyRules {
 
     private ConfigKeyRules() {}
 
-    /** Schlüssel, die neben {@code config} auf die Blockebene gehören. */
+    /** Keys that belong on the block level next to {@code config}. */
     private static final Set<String> BLOCK_LEVEL_KEYS = Set.of("name", "type", "skillIds", "requiredCapabilities");
 
     static void apply(List<BlockDefinition> blocks, List<AnalyzerFinding> out) {
@@ -57,7 +57,7 @@ final class ConfigKeyRules {
         }
     }
 
-    /** Wo ein Befund hängt: Index und Name des äußeren Blocks, bei verschachtelten der Pfad dazu (de/en). */
+    /** Where a finding hangs: index and name of the outer block, for nested ones the path to it (de/en). */
     private record Where(int index, String name, String path, String pathEn) {
         String prefix() {
             return path == null ? "" : path + ": ";
@@ -78,7 +78,7 @@ final class ConfigKeyRules {
             String key = entry.getKey();
             BlockConfigSchema.Field field = fields.get(key);
             if (field == null) {
-                // config.blocks meldet BlockShapeRules genauer (dead-nested-blocks, HIGH)
+                // config.blocks is reported more precisely by BlockShapeRules (dead-nested-blocks, HIGH)
                 if ("blocks".equals(key)) continue;
                 out.add(AnalyzerFinding.of("unknown-config-key", Severity.MEDIUM, where.index(), where.name(),
                         where.prefix() + "unbekannter Config-Schlüssel " + key + " — der " + type
@@ -104,7 +104,7 @@ final class ConfigKeyRules {
             }
         }
 
-        // Verschachtelt fallen topLevelOnly-Schlüssel aus requiredOneOf; bleibt einer übrig, ist er Pflicht
+        // When nested, topLevelOnly keys drop out of requiredOneOf; if one remains, it is required
         List<String> oneOf = schema.requiredOneOfKeys(type);
         List<String> requiredKeys = new java.util.ArrayList<>(schema.requiredKeys(type));
         if (where.path() != null) {
@@ -127,10 +127,10 @@ final class ConfigKeyRules {
         checkOneOf(oneOf, type, cfg, fields, where, out);
     }
 
-    /** {@code requiredOneOf}: genau einer der Schlüssel – keiner oder mehrere lassen den Block abbrechen. */
+    /** {@code requiredOneOf}: exactly one of the keys - none or several make the block abort. */
     private static void checkOneOf(List<String> oneOf, String type, Map<String, Object> cfg,
                                    Map<String, BlockConfigSchema.Field> fields, Where where, List<AnalyzerFinding> out) {
-        // Ein leerer Text gilt wie im Executor als nicht gesetzt
+        // An empty text counts as not set, as in the executor
         long present = oneOf.stream().filter(key -> cfg.get(key) != null
                 && !(cfg.get(key) instanceof String text && text.isBlank())).count();
         if (oneOf.isEmpty() || present == 1) return;
@@ -162,7 +162,7 @@ final class ConfigKeyRules {
                         + String.join(", ", field.values())));
     }
 
-    /** {@code onlyWith}: jeder genannte Schlüssel hat den Wert — {@code "*"} heißt: ist gesetzt. */
+    /** {@code onlyWith}: every named key has the value - {@code "*"} means: is set. */
     private static boolean onlyWithMet(BlockConfigSchema.Field field, Map<String, Object> cfg) {
         return field.onlyWith().entrySet().stream().allMatch(e -> ANY.equals(e.getValue())
                 ? cfg.get(e.getKey()) != null && !(cfg.get(e.getKey()) instanceof String s && s.isBlank())
@@ -176,13 +176,13 @@ final class ConfigKeyRules {
 
     private static final String ANY = "*";
 
-    /** foreach mit items_command: {@link ForEachRules} meldet einen falschen items_source-Wert schon genauer. */
+    /** foreach with items_command: {@link ForEachRules} already reports a wrong items_source value more precisely. */
     private static boolean skipValueCheck(String type, String key, Map<String, Object> cfg) {
         return "foreach".equals(type) && "items_source".equals(key)
                 && cfg.get("items_command") instanceof String command && !command.isBlank();
     }
 
-    /** Alter Schlüsselname: wirkt noch, läuft aus — mit dem Namen, der ihn ersetzt. */
+    /** Old key name: still works, being phased out - with the name that replaces it. */
     private static AnalyzerFinding legacyKey(BlockConfigSchema.Field field, Map<String, Object> cfg, Where where) {
         String current = field.legacyFor();
         boolean both = cfg.get(current) != null;
@@ -197,14 +197,14 @@ final class ConfigKeyRules {
                         : "; rename the key to " + current));
     }
 
-    /** Ob ein alter Name des Pflichtschlüssels gesetzt ist, den der Executor weiter liest ({@code workflowId}). */
+    /** Whether an old name of the required key is set that the executor still reads ({@code workflowId}). */
     private static boolean legacyKeyPresent(Map<String, BlockConfigSchema.Field> fields, String required,
                                             Map<String, Object> cfg) {
         return fields.values().stream()
                 .anyMatch(f -> required.equals(f.legacyFor()) && cfg.get(f.key()) != null);
     }
 
-    /** Steht statt des Pflichtschlüssels ein unbekannter, der ihm ähnelt, nennt die Meldung ihn gleich mit; sonst {@code null}. */
+    /** If an unknown key that resembles it stands in place of the required key, the message names it right away; otherwise {@code null}. */
     private static String presentInstead(Map<String, Object> cfg, Map<String, BlockConfigSchema.Field> fields,
                                          String required) {
         for (String key : cfg.keySet()) {
@@ -215,7 +215,7 @@ final class ConfigKeyRules {
         return null;
     }
 
-    /** Vorgeschlagen werden nur aktuelle Namen, nie die alte Schreibweise eines Schlüssels. */
+    /** Only current names are suggested, never the old spelling of a key. */
     private static Set<String> suggestable(Map<String, BlockConfigSchema.Field> fields) {
         Set<String> keys = new LinkedHashSet<>();
         fields.values().forEach(f -> {
@@ -235,8 +235,8 @@ final class ConfigKeyRules {
     }
 
     /**
-     * Der nächstgelegene bekannte Schlüssel: gleich bis auf camelCase/snake_case, sonst Levenshtein ≤ 2 —
-     * bei kurzen Schlüsseln strenger, damit aus {@code mode} kein Vorschlag für {@code name} wird.
+     * The closest known key: equal up to camelCase/snake_case, otherwise Levenshtein ≤ 2 -
+     * stricter for short keys, so that {@code mode} does not become a suggestion for {@code name}.
      */
     static String suggestion(String key, Set<String> known) {
         String normalized = normalize(key);

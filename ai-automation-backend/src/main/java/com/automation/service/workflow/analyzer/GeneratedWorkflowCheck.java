@@ -14,34 +14,34 @@ import java.util.Comparator;
 import java.util.List;
 
 /**
- * Baufehler-Prüfung für Definitionen, die eine KI erzeugt oder geändert hat (TODO 326d5987) — die eine
- * Stelle, über die Assistent, Factory, Wünsche, Dialog-Import und Konvertierung den {@link WorkflowAnalyzer}
- * nach der Erzeugung laufen lassen.
+ * Construction-error check for definitions an AI created or changed (TODO 326d5987) - the one
+ * place through which assistant, factory, wishes, dialog import and conversion run the {@link WorkflowAnalyzer}
+ * after generation.
  *
  * <ul>
- *   <li>{@link #findings} liefert die Befunde ab {@code MEDIUM}, {@code HIGH} zuerst; {@code LOW} ist Hygiene
- *       und kein Anlass, eine KI oder den Nutzer zu behelligen.</li>
- *   <li>{@link #format} macht daraus einen kompakten Text: je Zeile Schwere, Regel, Block, Detail — höchstens
- *       {@value #MAX_LINES} Zeilen und ein „… und N weitere“.</li>
- *   <li>{@link #correctOnce} gibt der KI bei {@code HIGH}-Befunden <b>genau eine</b> Korrekturrunde; nie bei
- *       {@code MEDIUM}/{@code LOW} (Kostenregel). Ist die Antwort unbrauchbar, hat sie eine andere Struktur
- *       (Blockzahl, Blocktyp je Position, Zahl der verschachtelten Blöcke je Container) oder hat die korrigierte
- *       Fassung mehr {@code HIGH}-Befunde, gilt die ursprüngliche. Lässt die Korrektur {@code name},
- *       {@code skillIds} oder {@code requiredCapabilities} eines Blocks weg, kommen sie aus dem Original.</li>
- *   <li>{@link #reviewRepair} legt dieselben Regeln an eine Reparatur an, die der Aufrufer selbst bei der KI
- *       geholt hat (Factory-Auto-Fix, TODO 99a9dfb0) — ohne eigenen KI-Aufruf.</li>
+ *   <li>{@link #findings} returns the findings from {@code MEDIUM} up, {@code HIGH} first; {@code LOW} is hygiene
+ *       and no reason to bother an AI or the user.</li>
+ *   <li>{@link #format} turns them into a compact text: per line severity, rule, block, detail - at most
+ *       {@value #MAX_LINES} lines and a "… und N weitere".</li>
+ *   <li>{@link #correctOnce} gives the AI <b>exactly one</b> correction round for {@code HIGH} findings; never for
+ *       {@code MEDIUM}/{@code LOW} (cost rule). If the answer is unusable, has a different structure
+ *       (block count, block type per position, number of nested blocks per container) or if the corrected
+ *       version has more {@code HIGH} findings, the original applies. If the correction omits {@code name},
+ *       {@code skillIds} or {@code requiredCapabilities} of a block, they come from the original.</li>
+ *   <li>{@link #reviewRepair} applies the same rules to a repair that the caller itself fetched from the AI
+ *       (factory auto-fix, TODO 99a9dfb0) - without its own AI call.</li>
  * </ul>
  *
- * <p>Die Prüfung ändert nie selbst etwas und blockiert kein Speichern. Der KI-Aufruf kommt vom Aufrufer
- * (gleiches Modell, gleicher Provider wie sein ursprünglicher Aufruf) und darf nicht in einer Transaktion
- * laufen; {@link #reportRemaining} schreibt ins Activity-Log und gehört deshalb hinter die Transaktion.
+ * <p>The check never changes anything itself and does not block saving. The AI call comes from the caller
+ * (same model, same provider as its original call) and must not run inside a transaction;
+ * {@link #reportRemaining} writes to the activity log and therefore belongs after the transaction.
  */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class GeneratedWorkflowCheck {
 
-    /** Höchstzahl der Befundzeilen in {@link #format}/{@link #summaryLines}; der Rest wird gezählt. */
+    /** Maximum number of finding lines in {@link #format}/{@link #summaryLines}; the rest is counted. */
     static final int MAX_LINES = 10;
 
     private static final String SOURCE = "GeneratedWorkflowCheck";
@@ -52,21 +52,21 @@ public class GeneratedWorkflowCheck {
     private final ObjectMapper objectMapper;
     private final ActivityLogService activityLogService;
 
-    /** Der KI-Aufruf des Aufrufers: Prompt hinein, Antworttext heraus. */
+    /** The caller's AI call: prompt in, answer text out. */
     @FunctionalInterface
     public interface ModelCall {
         String ask(String prompt) throws Exception;
     }
 
-    /** Ergebnis von {@link #correctOnce}: die Blöcke, die gespeichert werden, und ihre Befunde ab MEDIUM. */
+    /** Result of {@link #correctOnce}: the blocks that get saved, and their findings from MEDIUM up. */
     public record Correction(List<BlockDefinition> blocks, List<AnalyzerFinding> remaining,
                              boolean attempted, boolean applied) {
     }
 
     /**
-     * Ergebnis von {@link #reviewRepair}: übernommen ({@code rejection == null}; {@code blocks} ist die ergänzte
-     * Reparatur) oder verworfen mit Grund ({@code blocks} ist das Original). {@code findings} sind die Befunde ab
-     * MEDIUM der Fassung in {@code blocks}.
+     * Result of {@link #reviewRepair}: accepted ({@code rejection == null}; {@code blocks} is the completed
+     * repair) or rejected with a reason ({@code blocks} is the original). {@code findings} are the findings from
+     * MEDIUM up of the version in {@code blocks}.
      */
     public record RepairReview(List<BlockDefinition> blocks, List<AnalyzerFinding> findings, String rejection) {
 
@@ -79,12 +79,12 @@ public class GeneratedWorkflowCheck {
         }
     }
 
-    /** Befunde ab MEDIUM einer gespeicherten Definition (samt Metadaten), HIGH zuerst. */
+    /** Findings from MEDIUM up of a saved definition (including metadata), HIGH first. */
     public List<AnalyzerFinding> findings(Workflow workflow) {
         return relevant(analyzer.analyze(workflow));
     }
 
-    /** Befunde ab MEDIUM einer losen Blockliste, HIGH zuerst. */
+    /** Findings from MEDIUM up of a loose block list, HIGH first. */
     public List<AnalyzerFinding> findings(List<BlockDefinition> blocks, String instructions) {
         return relevant(analyzer.analyze(blocks, instructions));
     }
@@ -101,16 +101,16 @@ public class GeneratedWorkflowCheck {
     }
 
     /**
-     * Die Befunde als Zeilen, höchstens {@value #MAX_LINES} und bei mehr eine Schlusszeile „… und N weitere“ —
-     * für Ergebnisse, die der Nutzer sieht. Deutsch; {@link #summaryLines(List, String)} für eine andere Sprache.
+     * The findings as lines, at most {@value #MAX_LINES} and, if there are more, a closing line "… und N weitere" -
+     * for results the user sees. German; {@link #summaryLines(List, String)} for another language.
      */
     public static List<String> summaryLines(List<AnalyzerFinding> findings) {
         return summaryLines(findings, DE);
     }
 
     /**
-     * Wie {@link #summaryLines(List)}, in {@code language} ({@code "en"}, sonst deutsch) — Detailtext und
-     * Schlusszeile („… and N more“) aus {@link AnalyzerFinding#detail(String)} (TODO 81773d7b).
+     * Like {@link #summaryLines(List)}, in {@code language} ({@code "en"}, otherwise German) - detail text and
+     * closing line ("… and N more") from {@link AnalyzerFinding#detail(String)} (TODO 81773d7b).
      */
     public static List<String> summaryLines(List<AnalyzerFinding> findings, String language) {
         boolean en = EN.equalsIgnoreCase(language);
@@ -125,17 +125,17 @@ public class GeneratedWorkflowCheck {
         return lines;
     }
 
-    /** {@link #summaryLines} als Aufzählung, eine Zeile je Befund; leer ohne Befunde. Deutsch. */
+    /** {@link #summaryLines} as a list, one line per finding; empty without findings. German. */
     public static String format(List<AnalyzerFinding> findings) {
         return format(findings, DE);
     }
 
-    /** {@link #format(List)} in {@code language} ({@code "en"}, sonst deutsch). */
+    /** {@link #format(List)} in {@code language} ({@code "en"}, otherwise German). */
     public static String format(List<AnalyzerFinding> findings, String language) {
         return String.join("\n", summaryLines(findings, language).stream().map(l -> "- " + l).toList());
     }
 
-    /** Eine Befundzeile: Schwere, Regel, Block (1-basiert, mit Name) und Detail — deutsch. */
+    /** One finding line: severity, rule, block (1-based, with name) and detail - German. */
     static String line(AnalyzerFinding f) {
         return line(f, DE);
     }
@@ -154,11 +154,11 @@ public class GeneratedWorkflowCheck {
     }
 
     /**
-     * Höchstens eine Korrekturrunde: nur bei HIGH-Befunden fragt sie {@code model} (Prompt → Antworttext)
-     * genau einmal nach einer korrigierten Blockliste. Wirft nie — ein Fehler des Modells zählt als
-     * unbrauchbare Antwort.
+     * At most one correction round: only for HIGH findings does it ask {@code model} (prompt → answer text)
+     * exactly once for a corrected block list. Never throws - a model error counts as an
+     * unusable answer.
      *
-     * @param model der KI-Aufruf des Aufrufers, mit dessen Provider und Modell; läuft außerhalb jeder Transaktion
+     * @param model the caller's AI call, with its provider and model; runs outside any transaction
      */
     public Correction correctOnce(List<BlockDefinition> blocks, String instructions, ModelCall model) {
         List<AnalyzerFinding> before = findings(blocks, instructions);
@@ -187,11 +187,11 @@ public class GeneratedWorkflowCheck {
     }
 
     /**
-     * Prüft eine Blockliste, die eine KI aus {@code original} gemacht hat — etwa die Auto-Fix-Reparatur der Factory
-     * (TODO 99a9dfb0) —, nach denselben Regeln wie die Korrekturrunde von {@link #correctOnce}, ohne selbst die KI zu
-     * fragen: Verwerfen, wenn die Struktur nicht gleich geblieben ist ({@link CorrectionAnswer#shapeChange}) oder die
-     * Reparatur mehr {@code HIGH}-Befunde hat als das Original. Weggelassene {@code name}, {@code skillIds} und
-     * {@code requiredCapabilities} kommen aus dem Original ({@code repaired} wird dafür ergänzt).
+     * Checks a block list an AI made from {@code original} - e.g. the factory's auto-fix repair
+     * (TODO 99a9dfb0) - by the same rules as the correction round of {@link #correctOnce}, without asking the AI
+     * itself: reject if the structure did not stay the same ({@link CorrectionAnswer#shapeChange}) or the
+     * repair has more {@code HIGH} findings than the original. Omitted {@code name}, {@code skillIds} and
+     * {@code requiredCapabilities} come from the original ({@code repaired} is completed for that).
      */
     public RepairReview reviewRepair(List<BlockDefinition> original, List<BlockDefinition> repaired, String instructions) {
         return review(original, findings(original, instructions), repaired, instructions);
@@ -201,7 +201,7 @@ public class GeneratedWorkflowCheck {
                                 List<BlockDefinition> repaired, String instructions) {
         String shapeChange = CorrectionAnswer.shapeChange(original, repaired);
         if (shapeChange != null) {
-            // Typischer Fehler: das Modell liefert nur den reparierten Block zurück — die übrigen fielen still weg.
+            // Typical error: the model returns only the repaired block - the others silently dropped out.
             return RepairReview.rejected(original, before, "Struktur geändert: " + shapeChange);
         }
         CorrectionAnswer.keepOmittedFields(original, repaired);
@@ -238,10 +238,10 @@ public class GeneratedWorkflowCheck {
     }
 
     /**
-     * Meldet verbliebene Befunde ab MEDIUM als WARN ins Activity-Log, am Workflow. Ohne Befunde nichts.
-     * Außerhalb jeder Transaktion aufrufen; ein Fehler beim Schreiben bricht den Weg nicht ab.
+     * Reports remaining findings from MEDIUM up as WARN to the activity log, on the workflow. Nothing without findings.
+     * Call outside any transaction; a failure while writing does not abort the path.
      *
-     * @param origin wer den Workflow erzeugt hat, etwa „Factory“ oder „Wunsch“
+     * @param origin who created the workflow, e.g. "Factory" or "Wunsch"
      */
     public void reportRemaining(String workflowId, String workflowName, String origin, List<AnalyzerFinding> findings) {
         if (findings == null || findings.isEmpty()) {

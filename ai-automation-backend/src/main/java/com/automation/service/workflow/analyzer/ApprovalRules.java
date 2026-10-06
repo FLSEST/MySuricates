@@ -9,14 +9,14 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Regeln für {@code approval}-Blöcke, oben wie verschachtelt (foreach, while, conditional, …).
+ * Rules for {@code approval} blocks, top-level and nested (foreach, while, conditional, …).
  *
- * <p>{@code on-no-without-reject-option}: Ein Block setzt {@code on_no: fail} oder {@code skip}, aber
- * keine seiner {@code options} gilt als Ablehnung — weder über {@code reject_options} noch über die
- * Vorgabe „No“/„Nein“. {@code /approve} nimmt nur angebotene Optionen an, also kann die Ablehnung
- * nie eintreten und {@code on_no} greift nie (TODO 41aeeb09, abgespalten aus 50c7b5d5). Die Regel
- * nutzt dieselbe {@link ApprovalRejection} wie der Block, damit Prüfung und Ausführung nicht
- * auseinanderlaufen.
+ * <p>{@code on-no-without-reject-option}: a block sets {@code on_no: fail} or {@code skip}, but
+ * none of its {@code options} counts as a rejection - neither via {@code reject_options} nor via the
+ * default "No"/"Nein". {@code /approve} only accepts offered options, so the rejection can
+ * never occur and {@code on_no} never takes effect (TODO 41aeeb09, split off from 50c7b5d5). The rule
+ * uses the same {@link ApprovalRejection} as the block, so that check and execution do not
+ * drift apart.
  */
 final class ApprovalRules {
 
@@ -24,7 +24,7 @@ final class ApprovalRules {
 
     private static final List<String> DEFAULT_OPTIONS = List.of("Yes", "Yes always", "No");
 
-    /** Schutz vor pathologisch tiefen Configs, wie in {@link BlockText}. */
+    /** Protection against pathologically deep configs, as in {@link BlockText}. */
     private static final int MAX_DEPTH = 12;
 
     static void apply(List<BlockDefinition> blocks, List<AnalyzerFinding> out) {
@@ -38,7 +38,7 @@ final class ApprovalRules {
         }
     }
 
-    /** Verschachtelte Blöcke tragen ihren Typ und ihre Config als Map; gemeldet wird am äußeren Block. */
+    /** Nested blocks carry their type and config as a map; the finding is reported on the outer block. */
     private static void nested(Object value, int index, String outerName, List<AnalyzerFinding> out, int depth) {
         if (value == null || depth > MAX_DEPTH) return;
         if (value instanceof Map<?, ?> map) {
@@ -59,7 +59,7 @@ final class ApprovalRules {
 
         List<String> rejectAnswers = ApprovalRejection.rejectAnswers(config.get("reject_options"));
         if (config.get("auto_answer") instanceof String auto && ApprovalRejection.isRejection(auto, rejectAnswers)) {
-            return; // die Automatik-Antwort selbst lehnt ab — on_no greift
+            return; // the automatic answer itself rejects - on_no takes effect
         }
         List<String> options = config.get("options") instanceof List<?> list
                 ? list.stream().filter(String.class::isInstance).map(String.class::cast).toList()

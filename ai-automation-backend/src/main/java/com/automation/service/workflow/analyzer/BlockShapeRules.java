@@ -10,28 +10,28 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Was an der Form eines Blocks steht, aber nie läuft — oben wie verschachtelt (switch-Cases, {@code default},
+ * What is on the shape of a block but never runs - top-level and nested (switch cases, {@code default},
  * {@code blocks}).
  *
  * <ul>
- *   <li>{@code dead-nested-blocks} ({@code HIGH}) — {@code config.blocks}: Kein Executor führt eine
- *       {@code blocks}-Liste aus, auf keinem Blocktyp (5536c5aa). foreach, retry, conditional und while
- *       führen ihren {@code command} aus, switch nur {@code cases[].blocks} und {@code default}. Die
- *       verschachtelten Blöcke laufen nie, der Block tut etwas anderes, als die Definition zeigt.
- *       {@link ConfigKeyRules} meldet den Schlüssel deshalb nicht noch einmal als unbekannt.</li>
- *   <li>{@code unknown-block-field} — ein Feld neben {@code type}, {@code name}, {@code config},
- *       {@code requiredCapabilities} und {@code skillIds} (d3aa0b28). Es wirkt nicht; früher verwarf der
- *       ObjectMapper es still, seit {@link BlockDefinition#unknownFields()} bleibt es erhalten und wird hier
- *       gemeldet. {@code HIGH}, wenn es ein Config-Schlüssel des Blocktyps ist ({@code "on_failure": "continue"}
- *       neben statt in {@code config}: der Lauf stoppt trotzdem), {@code MEDIUM} bei naher Schreibweise eines
- *       Blockfelds ({@code skill_ids}), sonst {@code LOW}.</li>
+ *   <li>{@code dead-nested-blocks} ({@code HIGH}) - {@code config.blocks}: no executor runs a
+ *       {@code blocks} list, on no block type (5536c5aa). foreach, retry, conditional and while
+ *       run their {@code command}, switch only {@code cases[].blocks} and {@code default}. The
+ *       nested blocks never run, the block does something other than the definition shows.
+ *       {@link ConfigKeyRules} therefore does not report the key again as unknown.</li>
+ *   <li>{@code unknown-block-field} - a field next to {@code type}, {@code name}, {@code config},
+ *       {@code requiredCapabilities} and {@code skillIds} (d3aa0b28). It has no effect; the
+ *       ObjectMapper used to drop it silently, since {@link BlockDefinition#unknownFields()} it is kept and reported
+ *       here. {@code HIGH} if it is a config key of the block type ({@code "on_failure": "continue"}
+ *       next to instead of inside {@code config}: the run stops anyway), {@code MEDIUM} for a near spelling of a
+ *       block field ({@code skill_ids}), otherwise {@code LOW}.</li>
  * </ul>
  */
 final class BlockShapeRules {
 
     private BlockShapeRules() {}
 
-    /** Die Felder, die ein Block neben {@code config} haben darf — {@link BlockDefinition}. */
+    /** The fields a block may have besides {@code config} - {@link BlockDefinition}. */
     static final Set<String> BLOCK_FIELDS = BlockDefinition.FIELDS;
 
     private static final String DEAD_LIST = "blocks";
@@ -57,7 +57,7 @@ final class BlockShapeRules {
         }
     }
 
-    /** Index und Name des äußeren Blocks, bei verschachtelten der Pfad dazu als Präfix (de/en). */
+    /** Index and name of the outer block, for nested ones the path to it as a prefix (de/en). */
     private record Where(int index, String name, String prefix, String prefixEn) {}
 
     private static void check(BlockConfigSchema schema, String type, Map<String, Object> config,

@@ -11,8 +11,8 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Die Antwort der Korrekturrunde von {@link GeneratedWorkflowCheck}: lesen, auf gleiche Struktur prüfen und
- * weggelassene Blockfelder aus dem Original ergänzen (TODO 326d5987).
+ * The answer of the correction round of {@link GeneratedWorkflowCheck}: read it, check it for the same structure and
+ * fill in omitted block fields from the original (TODO 326d5987).
  */
 @Slf4j
 final class CorrectionAnswer {
@@ -21,10 +21,10 @@ final class CorrectionAnswer {
     }
 
     /**
-     * Was die Korrektur an der Struktur geändert hat, oder {@code null}, wenn sie gleich geblieben ist: gleiche
-     * Zahl der Top-Level-Blöcke, gleicher Typ je Position und je Block dieselben verschachtelten Positionen
-     * ({@link NestedBlocks}: {@code blocks}, {@code cases[].blocks}, {@code default}) — also gleich viele
-     * Blöcke in jedem Container. Die Typen verschachtelter Blöcke darf die Korrektur ändern.
+     * What the correction changed in the structure, or {@code null} if it stayed the same: same
+     * number of top-level blocks, same type per position and per block the same nested positions
+     * ({@link NestedBlocks}: {@code blocks}, {@code cases[].blocks}, {@code default}) - so the same number of
+     * blocks in every container. The correction may change the types of nested blocks.
      */
     static String shapeChange(List<BlockDefinition> original, List<BlockDefinition> corrected) {
         if (original.size() != corrected.size()) {
@@ -49,7 +49,7 @@ final class CorrectionAnswer {
         return null;
     }
 
-    /** Erste Position, an der zwei gleich lange Pfadlisten auseinandergehen, als {@code alt → neu}; sonst {@code null}. */
+    /** First position where two path lists of equal length diverge, as {@code old → new}; otherwise {@code null}. */
     private static String firstMoved(List<String> before, List<String> after) {
         for (int j = 0; j < before.size(); j++) {
             if (!before.get(j).equals(after.get(j))) {
@@ -65,7 +65,7 @@ final class CorrectionAnswer {
         return paths;
     }
 
-    /** Übernimmt je Position {@code name}, {@code skillIds} und {@code requiredCapabilities}, wo die Korrektur sie weglässt. */
+    /** Takes over {@code name}, {@code skillIds} and {@code requiredCapabilities} per position where the correction omits them. */
     static void keepOmittedFields(List<BlockDefinition> original, List<BlockDefinition> corrected) {
         for (int i = 0; i < original.size(); i++) {
             BlockDefinition a = original.get(i);
@@ -84,9 +84,9 @@ final class CorrectionAnswer {
     }
 
     /**
-     * Liest eine Blockliste aus einer Modellantwort: ein JSON-Array oder ein Objekt mit {@code blocks},
-     * gern in Code-Fences ({@link BlockJsonReader#parseAnswer}, dieselbe Abbildung wie die Factory).
-     * Leer, wenn nichts Brauchbares darin steht.
+     * Reads a block list from a model answer: a JSON array or an object with {@code blocks},
+     * possibly in code fences ({@link BlockJsonReader#parseAnswer}, the same mapping as the factory).
+     * Empty if nothing usable is in it.
      */
     static List<BlockDefinition> parse(String response, ObjectMapper objectMapper) {
         try {

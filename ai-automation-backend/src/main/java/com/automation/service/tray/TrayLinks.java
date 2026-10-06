@@ -5,7 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import java.awt.Desktop;
 import java.net.URI;
 
-/** Wohin Tray-Menü und Tray-Klick führen, und das Öffnen im Browser. Aus {@link SystemTrayService} gezogen (Größen-Ratchet). */
+/** Where the tray menu and tray click lead, and opening in the browser. Extracted from {@link SystemTrayService} (size ratchet). */
 @Slf4j
 final class TrayLinks {
 
@@ -16,7 +16,7 @@ final class TrayLinks {
         return route(baseUrl, "/approvals");
     }
 
-    /** Klick aufs Icon bzw. auf die Meldung: Wartet eine Freigabe, direkt auf die Freigaben-Seite, sonst die Web-UI. */
+    /** Click on the icon or the notification: if an approval is waiting, straight to the approvals page, otherwise the web UI. */
     static String clickTarget(String baseUrl, int pendingApprovals) {
         return pendingApprovals > 0 ? approvals(baseUrl) : stripTrailingSlash(baseUrl);
     }

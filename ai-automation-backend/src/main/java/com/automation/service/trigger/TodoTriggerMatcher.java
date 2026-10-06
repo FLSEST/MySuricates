@@ -13,31 +13,31 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * Ob ein TodoTrigger auf ein TODO passt – als reine Funktion, ohne Repository (TODO c6ea8f5c).
+ * Whether a TodoTrigger matches a TODO - as a pure function, without a repository (TODO c6ea8f5c).
  *
- * <p>Dieselben Regeln entscheiden, ob {@link TodoTriggerService} einen Fix-Workflow startet, und ob
- * die Relationskarte eines Ziels den Trigger als Bearbeitung des TODOs zeigt. Deshalb arbeitet der
- * Abgleich auf zwei schmalen Records statt auf den Entities: Die Karte liest schlanke Projektionen
- * und soll dafuer keine Entity laden.
+ * <p>The same rules decide whether {@link TodoTriggerService} starts a fix workflow and whether
+ * a goal's relation map shows the trigger as handling the TODO. That is why the
+ * matching works on two slim records instead of the entities: the map reads slim projections
+ * and should not load an entity for it.
  *
  * <ul>
- *   <li>Tags: alle Tags des Musters (kommagetrennt) muessen am TODO stehen; leeres Muster passt immer.</li>
- *   <li>Projekt: nur wenn gesetzt, dann genau gleich. Quelle: nur wenn gesetzt, dann dieselbe Konstante;
- *       eine unbekannte Quelle passt auf kein TODO.</li>
- *   <li>Mindest-Prioritaet: das TODO muss mindestens so dringend sein; ein unbekannter Wert wird ignoriert.</li>
+ *   <li>Tags: all tags of the pattern (comma-separated) must be on the TODO; an empty pattern always matches.</li>
+ *   <li>Project: only if set, then exactly equal. Source: only if set, then the same constant;
+ *       an unknown source matches no TODO.</li>
+ *   <li>Minimum priority: the TODO must be at least that urgent; an unknown value is ignored.</li>
  * </ul>
  */
 @Slf4j
 public final class TodoTriggerMatcher {
 
-    /** Die Filter eines Triggers. */
+    /** The filters of a trigger. */
     public record Criteria(String tagPattern, String projectId, String sourceFilter, String minPriority) {
         public static Criteria of(TodoTrigger trigger) {
             return new Criteria(trigger.getTagPattern(), trigger.getProjectId(), trigger.getSourceFilter(), trigger.getMinPriority());
         }
     }
 
-    /** Was der Abgleich vom TODO braucht; {@code tagsJson} wie in der Spalte {@code todos.tags}. */
+    /** What the matching needs from the TODO; {@code tagsJson} as in the column {@code todos.tags}. */
     public record Subject(String tagsJson, String projectId, Todo.Source source, Todo.Priority priority) {
         public static Subject of(Todo todo) {
             return new Subject(todo.getTags(), todo.getProjectId(), todo.getSource(), todo.getPriority());
@@ -55,7 +55,7 @@ public final class TodoTriggerMatcher {
             return false;
         }
         if (isSet(trigger.sourceFilter())) {
-            // Eine unbekannte Quelle passt auf kein TODO – wie vorher der reine Textvergleich.
+            // An unknown source matches no TODO - as the plain text comparison did before.
             Todo.Source source = sourceFilter(trigger.sourceFilter());
             if (source == null || todo.source() != source) {
                 return false;
@@ -65,10 +65,10 @@ public final class TodoTriggerMatcher {
     }
 
     /**
-     * Die Quelle eines Triggers, wie Backlog-Abfrage und {@link #matches} sie lesen: getrimmt, in
-     * beliebiger Schreibweise ({@link EnumParameter}, TODO a9bf13d5); {@code null}, wenn nicht gesetzt
-     * oder unbekannt. Neue Trigger speichern den Namen der Konstante, ein unbekannter Wert kann nur
-     * aus einem aelteren Trigger stammen.
+     * The source of a trigger as the backlog query and {@link #matches} read it: trimmed, in
+     * any spelling ({@link EnumParameter}, TODO a9bf13d5); {@code null} if not set
+     * or unknown. New triggers store the constant's name, an unknown value can only
+     * come from an older trigger.
      */
     public static Todo.Source sourceFilter(String value) {
         return storedFilter(Todo.Source.class, "sourceFilter", value);

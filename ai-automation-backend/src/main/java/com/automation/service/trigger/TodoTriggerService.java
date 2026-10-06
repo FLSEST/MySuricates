@@ -284,7 +284,7 @@ public class TodoTriggerService {
 
     // ── Matching logic ──────────────────────────────
 
-    /** Abgleich in {@link TodoTriggerMatcher}, den auch die Relationskarte der Ziele nutzt. */
+    /** Matching lives in {@link TodoTriggerMatcher}, which the goals' relation map also uses. */
     boolean matches(TodoTrigger trigger, Todo todo) {
         return TodoTriggerMatcher.matches(TodoTriggerMatcher.Criteria.of(trigger), TodoTriggerMatcher.Subject.of(todo));
     }

@@ -94,7 +94,7 @@ public class SystemTrayService {
 
             PopupMenu menu = buildMenu(new TrayState(0, 0, 0, 0, false, starting));
             trayIcon.setPopupMenu(menu);
-            // Doppelklick aufs Icon bzw. Klick auf die Meldung (je nach Desktop): wartet eine Freigabe, direkt dorthin
+            // Double-click on the icon or click on the notification (depending on the desktop): if an approval is waiting, go straight there
             trayIcon.addActionListener(e -> TrayLinks.open(TrayLinks.clickTarget(traySettings.browserBaseUrl(),
                     previousState != null ? previousState.pendingApprovals() : 0)));
 
@@ -148,7 +148,7 @@ public class SystemTrayService {
         long runsToday = runRepository.countByStartedAtAfter(todayStart);
         long failedToday = runRepository.countByStatusAndStartedAtAfter(RunStatus.FAILED, todayStart);
         int pendingApprovals = executionRegistry.getPendingApprovalCount();
-        // Nicht eingerichtetes Docker ist kein Warnzustand, nur eingerichtetes, das nicht antwortet (a0e85182)
+        // Docker that is not set up is not a warning state, only a set-up one that does not respond (a0e85182)
         boolean dockerOk = dockerExpectation.probe() != DockerExpectation.State.DOWN;
         List<InstanceLight> instances = instanceMonitor.collect();
 

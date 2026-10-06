@@ -22,11 +22,11 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Stoppt Projekt-Container, die länger als {@code docker.container.idle-timeout-minutes} ohne
- * Aktivität laufen, und lässt vorher {@link DockerOrphanReconciler} verwaiste Docker-Container
- * einsammeln. Container mit aktivem Run ({@link WorkflowExecutionRegistry}) bleiben unberührt.
- * Liegt in {@code service.workflow}, weil es den Run-Zustand liest — so hängt
- * {@code service.project} dafür nicht an {@code service.workflow}.
+ * Stops project containers that run longer than {@code docker.container.idle-timeout-minutes} without
+ * activity, and first lets {@link DockerOrphanReconciler} collect orphaned Docker containers.
+ * Containers with an active run ({@link WorkflowExecutionRegistry}) are left untouched.
+ * Lives in {@code service.workflow} because it reads the run state - so
+ * {@code service.project} does not depend on {@code service.workflow} for it.
  */
 @Component
 @Slf4j
@@ -70,7 +70,7 @@ public class IdleContainerReaper {
     // TransactionTemplate bursts per container.
     @Scheduled(fixedRate = 300_000)
     public void cleanupIdleContainers() {
-        if (!dockerExpectation.isConfigured()) return; // ohne Docker nichts aufzuraeumen (a0e85182)
+        if (!dockerExpectation.isConfigured()) return; // without Docker there is nothing to clean up (a0e85182)
         List<Container> running = readOnlyTransactionTemplate.execute(status ->
                 containerRepository.findByStatus(ContainerStatus.RUNNING));
         Set<String> activeContainers = executionRegistry.getActiveContainerIds();

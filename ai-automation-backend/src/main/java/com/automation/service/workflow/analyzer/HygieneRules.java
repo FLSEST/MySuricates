@@ -10,21 +10,21 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
- * Regeln zur <b>Hygiene</b> einzelner Blöcke: Fehlerabbruch im Shell-Block, Pfade mit Klarnamen,
- * doppelte Anweisungen, datierte Modell-IDs.
+ * Rules for the <b>hygiene</b> of individual blocks: error abort in the shell block, paths with real names,
+ * duplicate instructions, dated model IDs.
  *
- * <p>Alle deterministisch am Text prüfbar — kein KI-Aufruf, keine Heuristik mit Schwellwert.
- * Was ein Urteil bräuchte (redundante KI-Aufrufe, Sparsamkeits-Leiter, zu knappe Timeouts),
- * steht bewusst nicht hier; siehe Klassendoku von {@link WorkflowAnalyzer}.
+ * <p>All deterministically checkable on the text - no AI call, no heuristic with a threshold.
+ * What would need a judgement (redundant AI calls, economy ladder, too-tight timeouts)
+ * deliberately is not here; see the class doc of {@link WorkflowAnalyzer}.
  */
 final class HygieneRules {
 
     private HygieneRules() {}
 
-    /** Ein Pfad unter einem Benutzerverzeichnis — trägt den Klarnamen und bricht auf jedem anderen Rechner. */
+    /** A path under a user directory - carries the real name and breaks on every other machine. */
     private static final Pattern HOME_PATH = Pattern.compile("(?:/home|/Users)/([A-Za-z0-9._-]+)/");
 
-    /** Wie {@code TemplateHygieneGateTest}: Aliase statt datierter IDs, die still veralten. */
+    /** Like {@code TemplateHygieneGateTest}: aliases instead of dated IDs, which silently go stale. */
     private static final Pattern DATED_MODEL = Pattern.compile("claude-(opus|sonnet|haiku|fable)-\\d");
 
     static void apply(List<BlockDefinition> blocks, String workflowInstructions, List<AnalyzerFinding> out) {
@@ -78,10 +78,10 @@ final class HygieneRules {
     }
 
     /**
-     * Der KI-Auftrag des Blocks ({@link BlockText#instructions}) oder eines in ihm verschachtelten
-     * Blocks ({@link BlockText#nestedInstructions}, TODO ce4abac1) wiederholt wörtlich, was ohnehin
-     * über {@code workflow.instructions} in jeden Aufruf geht: dieselben Regeln zweimal im Kontext,
-     * doppelt bezahlt.
+     * The AI task of the block ({@link BlockText#instructions}) or of a block nested in it
+     * ({@link BlockText#nestedInstructions}, TODO ce4abac1) repeats verbatim what already
+     * goes into every call via {@code workflow.instructions}: the same rules twice in the context,
+     * paid for twice.
      */
     private static void duplicatedInstructions(BlockDefinition block, String instructions, int i,
                                                String name, List<AnalyzerFinding> out) {

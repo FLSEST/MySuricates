@@ -22,32 +22,32 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Loescht einen einzelnen Workflow-Run samt seiner Spuren.
+ * Deletes a single workflow run along with its traces.
  *
- * <p>Abgrenzung zu {@link RunCleanupService}: der raeumt nachts automatisch
- * INTERRUPTED-Laeufe weg und verlaesst sich dabei ganz auf die JPA-Kaskade.
- * Hier loescht ein Mensch bewusst einen bestimmten Lauf — auch einen
- * fehlgeschlagenen, und der hat im Gegensatz zu einem abgebrochenen fast immer
- * einen Dead-Letter-Eintrag und manchmal ein Incident-TODO an sich haengen.
+ * <p>Distinction from {@link RunCleanupService}: that one automatically removes
+ * INTERRUPTED runs at night and relies entirely on the JPA cascade.
+ * Here a human deliberately deletes a specific run - also a
+ * failed one, and unlike an aborted one it almost always has
+ * a dead-letter entry and sometimes an incident TODO attached.
  *
- * <p>Was von selbst mitgeht: {@code step_results} (Kaskade plus
- * {@code ON DELETE CASCADE}) und {@code template_verifications.last_run_id}
- * ({@code ON DELETE SET NULL}). Notizen liegen im {@code metadata}-JSON des
- * Runs und sterben mit der Zeile.
+ * <p>What goes along automatically: {@code step_results} (cascade plus
+ * {@code ON DELETE CASCADE}) and {@code template_verifications.last_run_id}
+ * ({@code ON DELETE SET NULL}). Notes live in the {@code metadata} JSON of the
+ * run and die with the row.
  *
- * <p>Was hier von Hand geschieht, weil es nur lose Textspalten ohne
- * Fremdschluessel sind: Dead-Letter-Eintraege, TODO-Verweise, Wunsch-Verweise.
+ * <p>What is done by hand here because they are only loose text columns without
+ * foreign keys: dead-letter entries, TODO references, wish references.
  *
- * <p>Fremde Datensaetze werden nie mitgeloescht. Ein TODO verliert seinen
- * Verweis, aber nicht sein Leben; haengt ein Audit-Bericht am Lauf, verweigert
- * der Dienst die Loeschung, statt Beweisdaten zu verwaisen.
+ * <p>Foreign records are never deleted along. A TODO loses its
+ * reference but not its life; if an audit report hangs on the run, the
+ * service refuses the deletion instead of orphaning evidence data.
  */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class RunDeletionService {
 
-    /** Laeufe in diesen Zustaenden sind noch in Bewegung und werden nicht angetastet. */
+    /** Runs in these states are still in motion and are not touched. */
     private static final Set<RunStatus> LEBENDIG =
             EnumSet.of(RunStatus.PENDING, RunStatus.RUNNING, RunStatus.PAUSED);
 
@@ -60,11 +60,11 @@ public class RunDeletionService {
     private final ActivityLogService activityLogService;
 
     /**
-     * Loescht den Lauf und alle losen Verweise darauf.
+     * Deletes the run and all loose references to it.
      *
-     * @throws ResourceNotFoundException wenn es den Lauf nicht gibt
-     * @throws IllegalStateException     wenn er noch laeuft oder Audit-Beweise
-     *                                   an ihm haengen (wird zu HTTP 409)
+     * @throws ResourceNotFoundException if the run does not exist
+     * @throws IllegalStateException     if it is still running or audit evidence
+     *                                   hangs on it (becomes HTTP 409)
      */
     @Transactional
     public void delete(String runId) {
@@ -86,7 +86,7 @@ public class RunDeletionService {
         log.info("Deleted run {} ({}, status {}): {} steps, {} DLQ entries, {} todo refs, {} wish refs",
                 runId, workflowName, run.getStatus(), schritte, dlq, todos, wuensche);
 
-        // Bewusst protokolliert: wir raeumen die Historie auf, wir vertuschen sie nicht.
+        // Logged on purpose: we tidy up the history, we do not cover it up.
         activityLogService.info(LogCategory.EXECUTION,
                 "Run geloescht: " + workflowName + " (" + run.getStatus() + ", "
                         + schritte + " Schritte, " + dlq + " DLQ-Eintraege)",
@@ -99,8 +99,8 @@ public class RunDeletionService {
                     "Run " + run.getId() + " is still active (" + run.getStatus()
                             + ") — cancel it before deleting");
         }
-        // audit_reports.workflow_run_id und audit_findings.first/last_seen_run_id sind
-        // NOT NULL. Ein Loeschen wuerde dort unaufloesbare Verweise hinterlassen.
+        // audit_reports.workflow_run_id and audit_findings.first/last_seen_run_id are
+        // NOT NULL. Deleting would leave unresolvable references there.
         if (auditReportRepository.existsByWorkflowRunId(run.getId())) {
             throw new IllegalStateException(
                     "Run " + run.getId() + " is referenced by an audit report — "
@@ -109,12 +109,12 @@ public class RunDeletionService {
     }
 
     /**
-     * Nimmt den Verweis aus den TODOs, laesst die TODOs selbst stehen.
+     * Removes the reference from the TODOs, leaves the TODOs themselves in place.
      *
-     * <p>Ein bei {@code RUNNING} stehengebliebener Reparaturlauf wird auf
-     * {@code IDLE} zurueckgesetzt: ohne den Run kann {@code isFixRunStillRunning}
-     * ihn nicht mehr pruefen, und das TODO haenge sonst dauerhaft in einem
-     * Zustand, aus dem es nicht mehr herauskommt.
+     * <p>A repair run stuck at {@code RUNNING} is reset to
+     * {@code IDLE}: without the run, {@code isFixRunStillRunning}
+     * can no longer check it, and the TODO would otherwise hang permanently in a
+     * state it can no longer get out of.
      */
     private int loeseTodoVerweise(String runId) {
         List<Todo> betroffen = todoRepository.findByWorkflowRunIdOrLastFixRunId(runId, runId);

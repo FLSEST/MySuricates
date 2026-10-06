@@ -103,8 +103,8 @@ public class CompletionTriggerService {
     public void onWorkflowRunCompleted(WorkflowRunCompletedEvent event) {
         List<CompletionTrigger> candidates =
                 repository.findBySourceWorkflowIdAndEnabledTrue(event.getWorkflowId());
-        // Zähler der ausgelösten Trigger gesammelt speichern statt save je Trigger (TODO 986bb1f1);
-        // geschrieben wird ohnehin erst beim Commit dieser Transaktion.
+        // Save the counters of the fired triggers in one go instead of a save per trigger (TODO 986bb1f1);
+        // they are only written at the commit of this transaction anyway.
         List<CompletionTrigger> fired = new ArrayList<>();
 
         for (CompletionTrigger trigger : candidates) {
