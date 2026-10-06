@@ -68,12 +68,8 @@
 45 scripts/ci/pre-push-checks.sh
 71 scripts/ci/public-hygiene.sh
 2 scripts/installer-probe.sh
-1 scripts/lib/art.generated.sh
-2 scripts/lib/block-types.generated.sh
 100 scripts/lib/hygiene-rules.sh
-5 scripts/lib/module-catalog.generated.sh
-5 scripts/lib/pool-sanitizer.generated.sh
-9 scripts/lib/provider-catalog.generated.sh
+1 scripts/lib/pool-sanitizer.generated.sh
 1 scripts/lib/tui.sh
 3 scripts/load-test/report.py
 1 scripts/public-readiness/arch-findings.py
