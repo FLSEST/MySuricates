@@ -68,7 +68,7 @@ class SecurityConfigIntegrationTest {
 
     @Test
     void publicEndpoint_jvmMemory_accessibleWithoutAuth() throws Exception {
-        // c2cda5ed: die drei Heap-Zahlen fuer den Performance-Audit — ohne Key, aber nur sie
+        // c2cda5ed: the three heap numbers for the performance audit — without a key, but only those
         mockMvc.perform(get("/api/v1/system/jvm-memory"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.jvm_memory_used_bytes").isNumber())
@@ -112,8 +112,8 @@ class SecurityConfigIntegrationTest {
 
     @Test
     void protectedEndpoint_actuatorMetricsWithoutAuth_returns403() throws Exception {
-        // Die Metrik-Oberflaeche verraet Routen, Lastprofil und Speicherlage — sie bleibt
-        // hinter dem Key; frei ist nur /api/v1/system/jvm-memory (c2cda5ed).
+        // The metrics surface reveals routes, load profile and memory state — it stays
+        // behind the key; only /api/v1/system/jvm-memory is open (c2cda5ed).
         mockMvc.perform(get("/actuator/metrics"))
                 .andExpect(status().isForbidden());
         mockMvc.perform(get("/actuator/metrics/jvm.memory.used"))
@@ -122,7 +122,7 @@ class SecurityConfigIntegrationTest {
 
     @Test
     void protectedEndpoint_requestMetricsWithoutAuth_returns403() throws Exception {
-        // Die Ausnahme gilt dem einen Pfad, nicht seinen Nachbarn unter /system.
+        // The exception applies to that one path, not to its neighbours under /system.
         mockMvc.perform(get("/api/v1/system/request-metrics"))
                 .andExpect(status().isForbidden());
     }
@@ -136,7 +136,7 @@ class SecurityConfigIntegrationTest {
 
     @Test
     void protectedEndpoint_publicPathWithSuffix_returns403() throws Exception {
-        // Die oeffentlichen System-Pfade sind exakte Treffer — ein Anhang macht sie nicht frei.
+        // The public system paths are exact matches — a suffix does not make them open.
         mockMvc.perform(get("/api/v1/system/health/extra"))
                 .andExpect(status().isForbidden());
         mockMvc.perform(get("/api/v1/system/info/extra"))
@@ -156,7 +156,7 @@ class SecurityConfigIntegrationTest {
                 .andExpect(status().is(not(403)));
     }
 
-    // --- Group 2b: Pfadgrenzen — eine Ausnahme gilt dem Muster, nicht seinen Nachbarn ---
+    // --- Group 2b: path boundaries — an exception applies to the pattern, not to its neighbours ---
 
     @ParameterizedTest
     @ValueSource(strings = {
@@ -195,9 +195,9 @@ class SecurityConfigIntegrationTest {
                 .andExpect(status().is(not(403)));
     }
 
-    // --- Group 2c: eine Liste — Filterkette und ApiKeyAuthFilter entscheiden gleich ---
+    // --- Group 2c: one list — filter chain and ApiKeyAuthFilter decide the same way ---
 
-    /** Ein konkreter Pfad je Muster: {@code *} wird ein Segment, {@code **} zwei. */
+    /** One concrete path per pattern: {@code *} becomes one segment, {@code **} two. */
     private static String concrete(String pattern) {
         return pattern.replace("**", "a/b").replace("*", "x");
     }
@@ -250,7 +250,7 @@ class SecurityConfigIntegrationTest {
 
     @Test
     void protectedEndpoint_actuatorMetricsWithValidKey_succeeds() throws Exception {
-        // Mit Key bleibt die Metrik-Oberflaeche erreichbar — gesperrt ist nur der Weg ohne Key.
+        // With a key the metrics surface stays reachable — only the way without a key is blocked.
         mockMvc.perform(get("/actuator/metrics/jvm.memory.used")
                         .header(API_KEY_HEADER, VALID_API_KEY))
                 .andExpect(status().isOk());
@@ -275,7 +275,7 @@ class SecurityConfigIntegrationTest {
 
     @Test
     void csrf_authenticatedPostWithoutCsrfToken_notRejected() throws Exception {
-        // Auch schreibende Aufrufe hinter dem Key kommen ohne CSRF-Token durch — der Key ersetzt es.
+        // Writing calls behind the key also get through without a CSRF token — the key replaces it.
         mockMvc.perform(post("/api/v1/ws-ticket")
                         .header(API_KEY_HEADER, VALID_API_KEY))
                 .andExpect(status().isOk());
@@ -291,8 +291,8 @@ class SecurityConfigIntegrationTest {
 
     @Test
     void sessionManagement_authenticatedRequest_createsNoSession() throws Exception {
-        // STATELESS: auch nach erfolgreicher Anmeldung per Key entsteht keine Sitzung,
-        // die ein spaeterer Aufruf ohne Key wiederverwenden koennte.
+        // STATELESS: even after a successful login via key no session is created
+        // that a later call without a key could reuse.
         MvcResult result = mockMvc.perform(get("/api/v1/projects")
                         .header(API_KEY_HEADER, VALID_API_KEY))
                 .andExpect(status().isOk())

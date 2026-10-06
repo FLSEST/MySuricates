@@ -19,16 +19,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * V92 ordnet Ziele ausdruecklich Projekten zu ({@code goal_projects}), macht aus den bisherigen
- * Meilensteinen Arbeitspakete ({@code goal_work_packages}: Projekt, Position, Zeitraum) und legt die
- * NEUEN Meilensteine an ({@code goal_milestones}, {@code goal_milestone_work_packages}) – TODO c60bf914
- * (Ziele Stufe 1: Ziel → Projekte → Arbeitspakete → TODOs, Meilensteine, Gliederung und Zeitstrahl).
+ * V92 explicitly assigns goals to projects ({@code goal_projects}), turns the previous
+ * milestones into work packages ({@code goal_work_packages}: project, position, period) and creates the
+ * NEW milestones ({@code goal_milestones}, {@code goal_milestone_work_packages}) – TODO c60bf914
+ * (goals stage 1: goal → projects → work packages → TODOs, milestones, outline and timeline).
  *
- * <p>Gegen eine eigene SQLite-Datei mit {@code foreign_keys=true}, wie im Betrieb: bis V91 migrieren,
- * Bestand anlegen, dann V92. Zwei Fallen, die das beweist: {@code DROP TABLE goal_milestones} setzt
- * mit eingeschalteten Fremdschluesseln alle {@code todos.milestone_id} auf NULL – die Migration muss
- * die Zuordnungen sichern und zurueckschreiben; und der Fremdschluessel in {@code todos} nennt die
- * Tabelle beim Namen – er muss auf {@code goal_work_packages} zeigen, nicht auf die neue
+ * <p>Against its own SQLite file with {@code foreign_keys=true}, as in production: migrate to V91,
+ * create existing data, then V92. Two traps that it proves: {@code DROP TABLE goal_milestones} sets
+ * all {@code todos.milestone_id} to NULL with foreign keys enabled – the migration must back up
+ * and write back the assignments; and the foreign key in {@code todos} names the
+ * table by name – it must point to {@code goal_work_packages}, not to the new
  * {@code goal_milestones}.
  */
 class GoalWorkPackagesMigrationTest {
@@ -54,7 +54,7 @@ class GoalWorkPackagesMigrationTest {
             milestone(st, "m2", "g1", "Beta", "2026-10-05T21:59:59Z", null);
             milestone(st, "m4", "g1", "Leer", "2026-10-01T21:59:59Z", null);
             milestone(st, "m3", "g2", "Ohne Projekt", "2026-11-01T21:59:59Z", null);
-            // pA: 3 aktive TODOs, pB: 2 aktive + 1 archiviertes, pC: nur ein archiviertes
+            // pA: 3 active TODOs, pB: 2 active + 1 archived, pC: only one archived
             todo(st, "a1", "g1", "pA", "m1", "OPEN");
             todo(st, "a2", "g1", "pA", "m1", "DONE");
             todo(st, "a3", "g1", "pA", null, "OPEN");
@@ -108,7 +108,7 @@ class GoalWorkPackagesMigrationTest {
                     .asString().contains("work_package_id");
             assertThat(rows(st, "SELECT name FROM sqlite_master WHERE name = 'idx_todos_milestone'")).isEmpty();
 
-            // Der Fremdschluessel todos.work_package_id zeigt auf goal_work_packages – nicht auf die neue goal_milestones
+            // The foreign key todos.work_package_id points to goal_work_packages – not to the new goal_milestones
             assertThat(rows(st, "SELECT \"table\", \"from\", on_delete FROM pragma_foreign_key_list('todos') "
                     + "WHERE \"from\" = 'work_package_id'")).containsExactly("goal_work_packages|work_package_id|SET NULL");
             st.executeUpdate("INSERT INTO goal_milestones (id, goal_id, title, due_date, created_at, updated_at) "
@@ -149,7 +149,7 @@ class GoalWorkPackagesMigrationTest {
                     .containsExactly("null");
             assertThat(rows(st, "SELECT COUNT(*) FROM todos")).containsExactly("9");
 
-            // Meilenstein loeschen nimmt seine Verknuepfungen mit, das Paket bleibt
+            // Deleting a milestone takes its links with it, the package stays
             goal(st, "g3");
             st.executeUpdate("INSERT INTO goal_milestones (id, goal_id, title, due_date, created_at, updated_at) "
                     + "VALUES ('ms-3', 'g3', 'M', '2026-10-15T21:59:59Z', '2026-09-27T00:00:00Z', '2026-09-27T00:00:00Z')");
@@ -160,7 +160,7 @@ class GoalWorkPackagesMigrationTest {
             assertThat(rows(st, "SELECT COUNT(*) FROM goal_milestone_work_packages")).containsExactly("0");
             assertThat(rows(st, "SELECT id FROM goal_work_packages WHERE goal_id = 'g3'")).containsExactly("wp-3");
 
-            // Projekt loeschen: Zielprojekt-Zeile geht mit, das Paket verliert nur sein Projekt
+            // Deleting a project: the goal project row goes with it, the package only loses its project
             st.executeUpdate("INSERT INTO goal_projects (goal_id, project_id, position) VALUES ('g3', 'pC', 0)");
             st.executeUpdate("DELETE FROM projects WHERE id = 'pC'");
             assertThat(rows(st, "SELECT COUNT(*) FROM goal_projects WHERE goal_id = 'g3'")).containsExactly("0");
@@ -202,7 +202,7 @@ class GoalWorkPackagesMigrationTest {
                 + "VALUES ('" + id + "', '" + id + "', 'ACTIVE', '2026-09-01T00:00:00Z', '2026-09-01T00:00:00Z')");
     }
 
-    /** Ein Meilenstein im Schema bis V91 – nach V92 ein Arbeitspaket. */
+    /** A milestone in the schema up to V91 – after V92 a work package. */
     private static void milestone(Statement st, String id, String goalId, String title, String due, String reachedAt)
             throws SQLException {
         st.executeUpdate("INSERT INTO goal_milestones (id, goal_id, title, due_date, reached_at, created_at, updated_at) "
@@ -223,7 +223,7 @@ class GoalWorkPackagesMigrationTest {
         return value == null ? "NULL" : "'" + value + "'";
     }
 
-    /** TODO-ID → zugeordnete Paket-ID aus der genannten Spalte (vor V92 {@code milestone_id}). */
+    /** TODO id → assigned package id from the given column (before V92 {@code milestone_id}). */
     private static Map<String, String> assignments(SQLiteDataSource dataSource, String column) throws SQLException {
         Map<String, String> result = new LinkedHashMap<>();
         try (Connection c = dataSource.getConnection(); Statement st = c.createStatement();
@@ -256,7 +256,7 @@ class GoalWorkPackagesMigrationTest {
         return Flyway.configure()
                 .dataSource(dataSource)
                 .locations("classpath:db/migration")
-                .mixed(true)   // wie in application.yml: aeltere Migrationen mischen PRAGMA und DDL
+                .mixed(true)   // as in application.yml: older migrations mix PRAGMA and DDL
                 .target(target)
                 .load();
     }

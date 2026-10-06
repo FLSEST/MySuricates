@@ -70,7 +70,7 @@ class AgenticApprovalGateTest {
         assertThat(iterData.get("approval")).isEqualTo("rejected");
     }
 
-    /** Die Laufseite fragt auf das Ereignis hin GET /approval ab – die Frage muss dann schon hinterlegt sein (5b08cf33). */
+    /** On the event the run page polls GET /approval — the question must already be stored by then (5b08cf33). */
     @Test
     void registersTheQuestionBeforeAnnouncingIt() {
         ExecutionContext context = contextAnswering(CompletableFuture.completedFuture("Yes"));

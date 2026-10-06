@@ -683,9 +683,9 @@ class ExecutionContextTest {
     }
 
     /**
-     * Die gefärbte Ausgabe färbt den Lauf: Ab ihr ist der Taint klebrig wie bei externem Input —
-     * auch ein Folgeblock mit sauberem Prompt liefert eine gequotete Ausgabe, und der Export ist
-     * nicht mehr leer. Das ist die Aussage, die in der Doku stand und die hier festgenagelt wird.
+     * The tainted output taints the run: from then on the taint is sticky as with external input —
+     * even a following block with a clean prompt delivers a quoted output, and the export is
+     * no longer empty. That is the statement that was in the docs and is pinned down here.
      */
     @Test
     void platformPrompt_recordedOutput_taintsTheRestOfTheRun() {
@@ -880,8 +880,8 @@ class ExecutionContextTest {
     }
 
     /**
-     * TODO cadfc423: das Flag „Plattform-Daten sind in einer Shell-Kommandozeile gelandet" gehoert
-     * in den Export — sonst beginnt ein Resume ohne verbuchte Ausgabe wieder ungefaerbt.
+     * TODO cadfc423: the flag "platform data landed in a shell command line" belongs
+     * in the export — otherwise a resume starts without booked output, untainted again.
      */
     @Test
     void exportTaint_platformDataUsedInShell_isExportedWithoutAnyRecordedOutput() {

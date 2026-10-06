@@ -6,7 +6,7 @@ import org.junit.jupiter.params.provider.EnumSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** isTerminal entscheidet, ob ein verwaltetes TODO geschlossen wird und ob ein Finding offen zaehlt. */
+/** isTerminal decides whether a managed TODO is closed and whether a finding counts as open. */
 class AuditFindingStatusTest {
 
     @ParameterizedTest
@@ -23,7 +23,7 @@ class AuditFindingStatusTest {
 
     @Test
     void values_areExactlyTheFiveKnownStates() {
-        // Neue Werte muessen bewusst einem der beiden isTerminal-Zweige zugeordnet werden.
+        // New values must be deliberately assigned to one of the two isTerminal branches.
         assertThat(AuditFindingStatus.values()).containsExactly(
                 AuditFindingStatus.OPEN, AuditFindingStatus.AWAITING_VERIFICATION,
                 AuditFindingStatus.RESOLVED, AuditFindingStatus.ACCEPTED_RISK, AuditFindingStatus.DISMISSED);

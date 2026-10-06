@@ -101,7 +101,7 @@ class WorkflowSealControllerTest {
                 .andExpect(status().isMethodNotAllowed());
     }
 
-    /** Ohne Härtungsschalter darf der Endpunkt nicht erreichbar sein — das erledigt der Modul-Guard. */
+    /** Without the hardening switch the endpoint must not be reachable — the module guard takes care of that. */
     @Test
     void controllerHaengtAmSiegelModul() {
         RequiresModule requirement = WorkflowSealController.class.getAnnotation(RequiresModule.class);

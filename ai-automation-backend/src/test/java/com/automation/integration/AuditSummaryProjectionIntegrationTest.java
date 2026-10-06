@@ -48,10 +48,10 @@ import java.util.function.Supplier;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * {@code GET /audits} liest Reports als Projektion ohne Markdown und zaehlt Findings per GROUP BY
- * (TODO 3d7e3987). Die Zusammenfassung muss feldgleich bleiben mit der, die aus den vollen
- * Entities entsteht – die Detailansicht ({@code getAudit}) baut sie weiter aus Report und Findings.
- * Gegen echtes SQLite, weil Konstruktor-Ausdruck, Enum-Spalten und GROUP BY dort laufen.
+ * {@code GET /audits} reads reports as a projection without markdown and counts findings via GROUP BY
+ * (TODO 3d7e3987). The summary must stay field-identical to the one built from the full
+ * entities — the detail view ({@code getAudit}) still builds it from report and findings.
+ * Against real SQLite, because constructor expression, enum columns and GROUP BY run there.
  */
 @SpringBootTest
 @ActiveProfiles("integration")
@@ -104,12 +104,12 @@ class AuditSummaryProjectionIntegrationTest {
     }
 
     /**
-     * Derselbe auditKey in zwei Projekten: Gruppierung und Zaehlung halten die Projekte auseinander,
-     * die Findings des einen Projekts landen nicht in der Zusammenfassung des anderen.
+     * The same auditKey in two projects: grouping and counting keep the projects apart,
+     * the findings of one project do not end up in the summary of the other.
      */
     @Test
     void sameAuditKeyInTwoProjectsStaysApart() {
-        String category = "cat-" + UUID.randomUUID(); // nur die Reports dieses Tests
+        String category = "cat-" + UUID.randomUUID(); // only the reports of this test
         String projectA = UUID.randomUUID().toString();
         String projectB = UUID.randomUUID().toString();
         AuditReport reportA = report(projectA, "a.shared", category, GateStatus.RED, AuditIngestionStatus.VALID, NOW, null);
@@ -130,7 +130,7 @@ class AuditSummaryProjectionIntegrationTest {
         assertThat(overview.get(1).openFindingsBySeverity()).isEmpty();
     }
 
-    /** Ein Audit mit Report, aber ohne Findings: leere Zaehlungen, genau wie aus den Entities. */
+    /** An audit with a report but without findings: empty counts, exactly as from the entities. */
     @Test
     void auditWithReportButWithoutFindingsHasEmptyCounts() {
         String projectId = UUID.randomUUID().toString();
@@ -148,10 +148,10 @@ class AuditSummaryProjectionIntegrationTest {
     }
 
     /**
-     * Die Report-Seite loest die Herkunft ihrer Laeufe gegen echtes SQLite auf (TODO a3b89355): Ketteneintrag
-     * mit Kette, Zeitplan der Kette und Definitionsversion, direkter Lauf, Kettenlauf von vor V89 und ein
-     * geloeschter Lauf. Die Zahl der Statements haengt nicht an der Zahl der Reports — eine Seite mit vier
-     * Reports kostet so viel wie eine mit einem.
+     * The report page resolves the origin of its runs against real SQLite (TODO a3b89355): chain entry
+     * with chain, schedule of the chain and definition version, direct run, chain run from before V89 and a
+     * deleted run. The number of statements does not depend on the number of reports — a page with four
+     * reports costs as much as one with one.
      */
     @Test
     void reportPageResolvesTheRunOrigins_inAFixedNumberOfStatements() {
@@ -212,10 +212,10 @@ class AuditSummaryProjectionIntegrationTest {
     }
 
     /**
-     * Vom Kontext eines Laufs kommt nur der Eltern-Ausloeser nach Java, gelesen in SQLite: Ein Ketteneintrag
-     * mit ungekuerzter previous_chain_output liefert eine Zeile mit genau diesem Wert. Ein kaputter Kontext
-     * (kein JSON) laesst die Seite laden — der Ausloeser faellt auf CHAIN zurueck, ohne Ausloeser am Lauf
-     * auf null. Mit dem Kontext durch den JsonMapConverter scheiterte daran die ganze Seite.
+     * Of a run's context only the parent trigger comes to Java, read in SQLite: a chain entry
+     * with an untruncated previous_chain_output yields a row with exactly this value. A broken context
+     * (not JSON) lets the page load — the trigger falls back to CHAIN, without a trigger on the run
+     * to null. With the context going through the JsonMapConverter the whole page failed on it.
      */
     @Test
     void reportPageReadsOnlyTheParentTriggerSource_andSurvivesABrokenContext() {
@@ -310,7 +310,7 @@ class AuditSummaryProjectionIntegrationTest {
                 .severity(AuditSeverity.LOW).title(title).observedAt(NOW).build());
     }
 
-    /** Jede Zusammenfassung der Uebersicht gleicht der, die {@code getAudit} aus den vollen Entities baut. */
+    /** Every summary of the overview equals the one {@code getAudit} builds from the full entities. */
     private void assertMatchesSummariesFromEntities(List<AuditSummary> overview) {
         for (AuditSummary summary : overview) {
             AuditSummary fromEntities = auditCenterService.getAudit(summary.projectId(), summary.auditKey()).summary();

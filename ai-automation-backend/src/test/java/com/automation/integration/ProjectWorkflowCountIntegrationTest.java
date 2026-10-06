@@ -25,10 +25,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 /**
- * {@code workflowCount} der Projektkarten (TODO 8dabaca8): Die Liste zaehlt mit EINER
- * GROUP-BY-Abfrage, das Einzelprojekt mit einer Zaehlabfrage — beide als JPQL, damit die
- * {@code @SQLRestriction("deleted_at IS NULL")} von {@code Workflow} greift und soft-geloeschte
- * Workflows nicht mitzaehlen. Eine native Query wuerde sie mitzaehlen; dieser Test haelt das fest.
+ * {@code workflowCount} of the project cards (TODO 8dabaca8): The list counts with ONE
+ * GROUP BY query, the single project with a count query — both as JPQL, so that the
+ * {@code @SQLRestriction("deleted_at IS NULL")} of {@code Workflow} applies and soft-deleted
+ * workflows do not count. A native query would count them; this test pins that down.
  */
 @SpringBootTest
 @AutoConfigureMockMvc

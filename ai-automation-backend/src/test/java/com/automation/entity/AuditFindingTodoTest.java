@@ -25,7 +25,7 @@ class AuditFindingTodoTest {
 
     @Test
     void managed_canBePromoted() {
-        // AuditFindingMerger hebt eine bestehende Verknuepfung auf managed, wenn die Dublette verwaltet war.
+        // AuditFindingMerger lifts an existing link to managed when the duplicate was managed.
         AuditFindingTodo link = AuditFindingTodo.builder().findingId("f1").todoId("t1").build();
         link.setManaged(true);
 

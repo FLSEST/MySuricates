@@ -97,7 +97,7 @@ class SystemControllerTest {
 
     @Test
     void health_dockerNotConfigured_isNotAnError() throws Exception {
-        // a0e85182: eine Installation ohne Docker ist ein Normalzustand, kein gestoerter Betrieb
+        // a0e85182: an installation without Docker is a normal state, not a disturbed operation
         when(dockerExpectation.probe()).thenReturn(DockerExpectation.State.NOT_CONFIGURED);
         mockDbHealthy();
 
@@ -155,8 +155,8 @@ class SystemControllerTest {
         when(rateLimitConfig.getClientGlobalBackoffSeconds()).thenReturn(3);
         when(rateLimitConfig.getClientDefaultRetryAfterSeconds()).thenReturn(15);
 
-        // Ohne diese Werte rät der Client sein Backoff-Budget (b6feccbc) — eine fremde
-        // Instanz mit anderem Limit bekäme falsch geratene Sperrzeiten.
+        // Without these values the client guesses its backoff budget (b6feccbc) — a foreign
+        // instance with a different limit would get wrongly guessed lock times.
         mockMvc.perform(get("/api/v1/system/info"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.rateLimit.enabled").value(true))
@@ -179,7 +179,7 @@ class SystemControllerTest {
                 .andExpect(jsonPath("$.rateLimit.defaultRetryAfterSeconds").value(10));
     }
 
-    // --- jvm-memory: drei Zahlen ohne Key statt der Metrik-Oberflaeche (c2cda5ed) ---
+    // --- jvm-memory: three numbers without a key instead of the metrics surface (c2cda5ed) ---
 
     @Test
     void jvmMemory_returnsExactlyTheThreeHeapNumbers() throws Exception {
@@ -190,7 +190,7 @@ class SystemControllerTest {
                 .andExpect(jsonPath("$.jvm_heap_used_percent").isNumber())
                 .andReturn().getResponse().getContentAsString();
 
-        // Genau diese drei Schluessel, sonst nichts aus der Metrik-Oberflaeche.
+        // Exactly these three keys, nothing else from the metrics surface.
         assertThat(objectMapper.readValue(body, Map.class).keySet()).containsExactly(
                 "jvm_memory_used_bytes", "jvm_memory_max_bytes", "jvm_heap_used_percent");
     }
@@ -210,8 +210,8 @@ class SystemControllerTest {
 
     @Test
     void jvmMemory_undefinedMax_leavesMaxAndPercentEmpty() {
-        // MemoryUsage.getMax() ist -1, wenn die JVM kein Maximum kennt: dann gibt es keinen
-        // Anteil, und -1 als "Maximum" darf nicht als Zahl durchgereicht werden.
+        // MemoryUsage.getMax() is -1 when the JVM knows no maximum: then there is no
+        // share, and -1 as "maximum" must not be passed on as a number.
         Map<String, Object> numbers = SystemController.jvmMemory(new MemoryUsage(0, 1_000L, 2_000L, -1L));
 
         assertThat(numbers).containsExactly(

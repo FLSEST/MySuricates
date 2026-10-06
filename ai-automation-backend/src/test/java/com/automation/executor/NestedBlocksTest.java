@@ -41,7 +41,7 @@ class NestedBlocksTest {
         assertThat(labelsOf(config)).containsExactly("inner", "deep", "after");
     }
 
-    /** Der Pfad nennt die Stelle unter dem äußeren Block — für Meldungen wie „Block 2 › cases[0] › Block 1“. */
+    /** The path names the place under the outer block — for messages like „Block 2 › cases[0] › Block 1“. */
     @Test
     void namesThePathBelowTheOuterBlockCountingBlocksFromOne() {
         Map<String, Object> inner = Map.of("type", "switch", "name", "inner",

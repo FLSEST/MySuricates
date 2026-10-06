@@ -85,7 +85,7 @@ class ConversionControllerTest {
                 "wf-new", "proj-1", "Project", null, null, "My Workflow",
                 "desc", null, List.of(), null, Map.of(), List.of(), List.of(), 0, null, null, null, null, Map.of(), null, null, null, null, null);
 
-        // Alte Clients schicken nur Projekt und Name: ohne Blöcke erzeugt der Server den Vorschlag neu.
+        // Old clients send only project and name: without blocks the server regenerates the proposal.
         when(conversionService.createWorkflowFromSuggestion("run-1", "proj-1", "My Workflow", null, null))
                 .thenReturn(response);
 
@@ -97,7 +97,7 @@ class ConversionControllerTest {
                 .andExpect(jsonPath("$.name").value("My Workflow"));
     }
 
-    /** Der geprüfte Vorschlag aus der Vorschau wird unverändert an den Service durchgereicht (TODO 935af6d3). */
+    /** The checked proposal from the preview is passed to the service unchanged (TODO 935af6d3). */
     @Test
     void createWorkflow_withReviewedBlocks_passesThemThrough() throws Exception {
         WorkflowResponse response = new WorkflowResponse(

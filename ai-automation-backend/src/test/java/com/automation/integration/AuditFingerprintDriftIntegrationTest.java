@@ -26,9 +26,9 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Beweist gegen echtes SQLite, dass subject-Drift zwischen zwei Audit-Runs kein zweites Finding
- * mehr erzeugt: der Fingerprint haengt am normalisierten subject (Audit-TODO 0e19648d). Vorher
- * wurde das alte Finding RESOLVED, ein neues OPEN angelegt und das managed TODO faelschlich DONE.
+ * Proves against real SQLite that subject drift between two audit runs no longer produces a second finding:
+ * the fingerprint hangs on the normalised subject (audit TODO 0e19648d). Before, the old finding
+ * became RESOLVED, a new one OPEN was created and the managed TODO wrongly DONE.
  */
 @SpringBootTest
 @ActiveProfiles("integration")
@@ -84,9 +84,9 @@ class AuditFingerprintDriftIntegrationTest {
     }
 
     /**
-     * Vor dem Fix erzeugte ein Drift-Subject ein neues OPEN-Finding samt managed TODO und unterlief
-     * damit die Risiko-Akzeptanz. Jetzt trifft die Ingestion das akzeptierte Finding — und die
-     * Akzeptanz-Policy entscheidet allein (Wiedereroeffnung nur bei belegter Verschlechterung).
+     * Before the fix a drift subject produced a new OPEN finding plus managed TODO and undermined
+     * the risk acceptance. Now the ingestion hits the accepted finding — and the
+     * acceptance policy alone decides (reopening only on proven deterioration).
      */
     @Test
     void driftingSubjectDoesNotUndoAnAcceptedRisk() {

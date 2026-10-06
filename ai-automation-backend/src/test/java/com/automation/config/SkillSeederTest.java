@@ -51,7 +51,7 @@ class SkillSeederTest {
         return loader.loadAll().get(0);
     }
 
-    /** Kopie eines Built-ins, wie sie in der DB laege — mit frei waehlbarer Version. */
+    /** Copy of a built-in as it would be in the DB — with a freely chosen version. */
     private Skill dbCopy(Skill source, String version) {
         Skill copy = Skill.builder()
                 .id(source.getId())
@@ -151,7 +151,7 @@ class SkillSeederTest {
 
     @Test
     void run_neverTouchesUserSkills() {
-        // Nutzer-Skills sind builtin=false und tauchen in findByBuiltin(true) nicht auf.
+        // User skills are builtin=false and do not show up in findByBuiltin(true).
         when(skillRepository.findByBuiltin(true)).thenReturn(List.of());
         when(gateway.save(any(Skill.class), eq(SkillChangeSource.BUILTIN_SEED))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -169,7 +169,7 @@ class SkillSeederTest {
 
     @Test
     void run_registersUnknownBuiltInsFromDbToo() {
-        // Ein Built-in, das es in den Ressourcen nicht mehr gibt, bleibt erhalten und registriert.
+        // A built-in that no longer exists in the resources is kept and registered.
         Skill orphan = Skill.builder()
                 .id("builtin-retired")
                 .name("Retired")

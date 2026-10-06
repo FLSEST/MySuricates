@@ -25,11 +25,11 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Folgebefund zu ab1ed481: Jeder Weg, der ein verknuepftes TODO auf DONE setzt und speichert — REST
- * ({@code TodoService}), TodoTrigger-Auto-Close ({@code TodoFeedbackListener}), verknuepfter Workflow
- * ({@code TodoResolutionListener}), Sammelschliessen per saveAll —, bringt den offenen Befund auf
- * AWAITING_VERIFICATION. Die Listener tun genau das hier: {@code setStatus(DONE)} und {@code save}.
- * Das Domainereignis des Saves laeuft in derselben Transaktion; rollt sie zurueck, bleibt auch der Befund.
+ * Follow-up finding to ab1ed481: Every way that sets a linked TODO to DONE and saves it — REST
+ * ({@code TodoService}), TodoTrigger auto-close ({@code TodoFeedbackListener}), linked workflow
+ * ({@code TodoResolutionListener}), bulk closing via saveAll —, brings the open finding to
+ * AWAITING_VERIFICATION. The listeners do exactly this here: {@code setStatus(DONE)} and {@code save}.
+ * The domain event of the save runs in the same transaction; if it rolls back, the finding stays too.
  */
 @SpringBootTest
 @ActiveProfiles("integration")
@@ -118,7 +118,7 @@ class AuditTodoCompletionIntegrationTest {
         assertThat(statusOf(finding)).isEqualTo(AuditFindingStatus.OPEN);
     }
 
-    /** Review zu ab1ed481: das Sammel-UPDATE laedt keine Entities — der Befund folgt trotzdem. */
+    /** Review of ab1ed481: the bulk UPDATE loads no entities — the finding follows anyway. */
     @Test
     void bulkStatusUpdateToDone_movesTheFindings() {
         AuditFinding a = openFinding("fp-bulk-a");

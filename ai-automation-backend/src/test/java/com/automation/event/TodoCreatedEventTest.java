@@ -74,7 +74,7 @@ class TodoCreatedEventTest {
         assertThat(event.getTodo().getStatus()).isEqualTo(Todo.Status.OPEN);
     }
 
-    // --- Immutabilität ---
+    // --- Immutability ---
 
     @Test
     void should_returnSameTodoReference_when_calledMultipleTimes() {
@@ -85,8 +85,8 @@ class TodoCreatedEventTest {
 
     @Test
     void should_reflectMutationsToTodo_when_todoIsChangedExternally() {
-        // Da Todo eine mutable Entity ist, hält das Event nur die Referenz —
-        // Änderungen am Todo sind sichtbar (kein defensives Kopieren).
+        // Since Todo is a mutable entity, the event holds only the reference —
+        // changes to the Todo are visible (no defensive copying).
         Todo todo = Todo.builder().id("id").title("Original").build();
         TodoCreatedEvent event = new TodoCreatedEvent(SOURCE, todo);
         todo.setTitle("Changed");

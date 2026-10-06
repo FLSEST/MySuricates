@@ -16,8 +16,8 @@ import java.time.Instant;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Die Run-Detailantwort nennt die Kette ihres Ketten-Runs (3a35ced1), damit die Run-Herkunft auf
- * {@code /chains?chain=<id>} verlinkt. Gegen echtes SQLite, weil die JPQL nur die Fremdschlüsselspalte liest.
+ * The run detail response names the chain of its chain run (3a35ced1), so the run origin links to
+ * {@code /chains?chain=<id>}. Against real SQLite, because the JPQL reads only the foreign key column.
  */
 @SpringBootTest
 @ActiveProfiles("integration")

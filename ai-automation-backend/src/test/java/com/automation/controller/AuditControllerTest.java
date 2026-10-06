@@ -163,7 +163,7 @@ class AuditControllerTest {
                 .andExpect(status().isNotFound());
     }
 
-    /** Herkunft des Laufs im Report (TODO a3b89355): jedes Feld steht im JSON, unbekannt als null. */
+    /** Origin of the run in the report (TODO a3b89355): every field is in the JSON, unknown as null. */
     @Test
     void getReport_serialisesTheRunOrigin_unknownFieldsAsNull() throws Exception {
         when(auditCenterService.getReport("r-chain")).thenReturn(new AuditReportResponse("r-chain", "proj-1", "wf-1",

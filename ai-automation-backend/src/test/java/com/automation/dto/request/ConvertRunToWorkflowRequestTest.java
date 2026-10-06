@@ -116,7 +116,7 @@ class ConvertRunToWorkflowRequestTest {
         assertThat(request.toString()).contains("My Workflow");
     }
 
-    /** Alte Clients: nur Projekt und Name — ohne geprüften Vorschlag (TODO 935af6d3). */
+    /** Old clients: only project and name — without a checked proposal (TODO 935af6d3). */
     @Test
     void should_carryNoReviewedSuggestion_when_builtFromProjectAndNameOnly() {
         var request = new ConvertRunToWorkflowRequest("proj-123", "My Workflow");

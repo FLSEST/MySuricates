@@ -37,8 +37,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
- * Ziele ueber die echte API gegen die echte Datenbank (TODO dc0566f8): anlegen, TODOs zuordnen,
- * ordnen, einschaetzen, Fortschritt, loeschen. Security ist im Profil {@code integration} aus.
+ * Goals via the real API against the real database (TODO dc0566f8): create, assign TODOs,
+ * order, estimate, progress, delete. Security is off in the profile {@code integration}.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -135,7 +135,7 @@ class GoalApiIntegrationTest {
         perform(patch("/api/v1/todos/" + todo.getId() + "/planning"), Map.of("suggestedEffort", "max"))
                 .andExpect(status().isBadRequest());
 
-        // Ein Mensch ueberschreibt die KI; die Frage ist geklaert.
+        // A human overrides the AI; the question is settled.
         perform(patch("/api/v1/todos/" + todo.getId() + "/planning"), Map.of("suggestedEffort", "medium", "openQuestion", ""))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.planning.ratedBy").value("USER"))
@@ -150,10 +150,10 @@ class GoalApiIntegrationTest {
     }
 
     /**
-     * Ein zweites Ordnen mit weniger TODOs nimmt den uebrigen ihren Rang (TODO f83dcc48): reorder laedt
-     * die nicht mehr genannten gebuendelt nach (findAllById) und speichert sie ohne Rang. Der
-     * Persistenzkontext wird vorher geleert wie zwischen zwei echten Anfragen, sonst kaemen die TODOs
-     * aus dem Cache statt aus der Datenbank.
+     * A second ordering with fewer TODOs takes the rank from the remaining ones (TODO f83dcc48): reorder loads
+     * the no longer named ones in bulk (findAllById) and saves them without a rank. The
+     * persistence context is cleared beforehand as between two real requests, otherwise the TODOs would come
+     * from the cache instead of the database.
      */
     @Test
     void reorderWithFewerTodos_dropsTheRankOfTheOthers() throws Exception {
@@ -170,7 +170,7 @@ class GoalApiIntegrationTest {
         JsonNode reordered = json(perform(put("/api/v1/goals/" + goalId + "/order"),
                 Map.of("todoIds", List.of(videos.getId()))).andExpect(status().isOk()));
 
-        // Mit Rang zuerst, dann ohne Rang nach Prioritaet (HIGH vor LOW).
+        // With rank first, then without rank by priority (HIGH before LOW).
         assertThat(ids(reordered)).containsExactly(videos.getId(), privacy.getId(), docs.getId());
         assertThat(reordered.at("/todos/0/goalRank").asInt()).isEqualTo(1);
         assertThat(reordered.at("/todos/1/goalRank").isNull()).isTrue();
@@ -216,9 +216,9 @@ class GoalApiIntegrationTest {
     }
 
     /**
-     * Relationskarte (TODO c6ea8f5c): Herkunft aus Gate-Lauf, Audit und Mensch, Bearbeitung per
-     * Fix-Workflow und TodoTrigger, Ergebnis des letzten Fix-Laufs, Kandidaten ueber {@code include}
-     * – und {@code goalId=none} als Filter fuer TODOs ohne Ziel.
+     * Relation map (TODO c6ea8f5c): origin from gate run, audit and human, handling via
+     * fix workflow and TodoTrigger, result of the last fix run, candidates via {@code include}
+     * – and {@code goalId=none} as a filter for TODOs without a goal.
      */
     @Test
     void relations_showOriginWorkersAndResult_andCandidatesFromUnassignedTodos() throws Exception {
@@ -249,7 +249,7 @@ class GoalApiIntegrationTest {
         assertThat(gateNode.at("/origin/kind").asText()).isEqualTo("WORKFLOW_RUN");
         assertThat(gateNode.at("/origin/workflowName").asText()).isEqualTo(gate.getName());
         assertThat(gateNode.at("/origin/runStatus").asText()).isEqualTo("FAILED");
-        // Andere Tests koennen aktive Trigger hinterlassen – gezielt nach dem eigenen suchen.
+        // Other tests may leave active triggers behind – search specifically for the own one.
         assertThat(workersOf(gateNode, fixer.getId())).containsExactly("TRIGGER:Karten-Fixer");
         assertThat(gateNode.at("/result/runStatus").asText()).isEqualTo("COMPLETED");
         assertThat(gateNode.at("/result/workflowId").asText()).isEqualTo(fixer.getId());
@@ -414,7 +414,7 @@ class GoalApiIntegrationTest {
         assertThat(detail.at("/todos/0/projectId").asText()).isEqualTo(projectB.getId());
     }
 
-    // ── „Könnte dazugehören“ nur aus den Zielprojekten (TODO c60bf914) ─────────────────────
+    // ── „Könnte dazugehören“ only from the goal projects (TODO c60bf914) ─────────────────────
 
     @Test
     void candidates_comeFromTheGoalProjects_orFromAllProjectsOnRequest() throws Exception {
@@ -502,7 +502,7 @@ class GoalApiIntegrationTest {
         JsonNode listed = find(json(mockMvc.perform(get("/api/v1/goals"))), goalId);
         assertThat(listed.at("/progress/decided").asInt()).as("auch in der Liste, aus dem GROUP BY").isEqualTo(1);
 
-        // Eine neue Frage laesst die Entscheidung stehen; "" nimmt sie zurueck
+        // A new question leaves the decision in place; "" takes it back
         perform(patch("/api/v1/todos/" + style.getId() + "/planning"), Map.of("openQuestion", "Farbig oder nicht?"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.planning.decision").value("Handgezeichnet"))

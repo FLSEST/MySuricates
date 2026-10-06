@@ -38,10 +38,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
- * Arbeitspakete (bis V92 „Meilensteine“, TODO 259f4f66), Zuordnen ueber {@code planning}, „Braucht
- * dich“ und der Ziel-Waechter ueber die echte API gegen die echte Datenbank – TODO c60bf914 (Ziele
- * Stufe 1: Ziel → Projekte → Arbeitspakete → TODOs, Meilensteine, Gliederung und Zeitstrahl). Neben
- * {@link GoalApiIntegrationTest} (Ziele selbst) und {@link GoalMilestoneApiIntegrationTest} (Meilensteine).
+ * Work packages (until V92 „Meilensteine“, TODO 259f4f66), assigning via {@code planning}, „Braucht
+ * dich“ and the goal guard via the real API against the real database – TODO c60bf914 (goals
+ * stage 1: goal → projects → work packages → TODOs, milestones, outline and timeline). Next to
+ * {@link GoalApiIntegrationTest} (goals themselves) and {@link GoalMilestoneApiIntegrationTest} (milestones).
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -76,7 +76,7 @@ class GoalWorkPackageApiIntegrationTest {
         String goalId = createGoal("Launch");
         Instant soon = Instant.now().plus(2, ChronoUnit.DAYS);
 
-        // ein Ziel ohne Projekte: das Paket braucht eine projectId
+        // a goal without projects: the package needs a projectId
         perform(post("/api/v1/goals/" + goalId + "/work-packages"), Map.of("title", "Ohne Projekt"))
                 .andExpect(status().isBadRequest());
         JsonNode beta = json(perform(post("/api/v1/goals/" + goalId + "/work-packages"), Map.of("title", "Beta",
@@ -141,7 +141,7 @@ class GoalWorkPackageApiIntegrationTest {
         perform(patch("/api/v1/todos/" + first.getId() + "/planning"), Map.of("workPackageId", workPackageId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.planning.workPackageId").value(workPackageId));
-        // der alte Feldname wird weiter angenommen
+        // the old field name is still accepted
         perform(patch("/api/v1/todos/" + second.getId() + "/planning"), Map.of("milestoneId", workPackageId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.planning.workPackageId").value(workPackageId));
@@ -198,7 +198,7 @@ class GoalWorkPackageApiIntegrationTest {
         perform(patch("/api/v1/todos/" + todo.getId() + "/planning"), Map.of("workPackageId", "missing"))
                 .andExpect(status().isNotFound());
 
-        // Ziel und Paket in einem Schritt: das Ziel zuerst, dann das Paket.
+        // Goal and package in one step: the goal first, then the package.
         perform(patch("/api/v1/todos/" + loose.getId() + "/planning"), Map.of("goalId", otherGoal, "workPackageId", foreign))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.planning.workPackageId").value(foreign));
@@ -359,7 +359,7 @@ class GoalWorkPackageApiIntegrationTest {
         perform(put("/api/v1/goals/" + goalId + "/work-packages/order"), Map.of("ids", List.of("missing")))
                 .andExpect(status().isNotFound());
 
-        // nur den Start leeren liesse ein halbes Paket
+        // clearing only the start would leave half a package
         perform(put("/api/v1/goals/" + goalId + "/work-packages/" + a1), Map.of("startDate", ""))
                 .andExpect(status().isBadRequest());
         perform(put("/api/v1/goals/" + goalId + "/work-packages/" + a1), Map.of("startDate", "", "endDate", ""))
@@ -401,8 +401,8 @@ class GoalWorkPackageApiIntegrationTest {
     }
 
     /**
-     * Paket im Projekt; ein Projekt, das dem Ziel noch fehlt, kommt dabei dazu. {@code end} null = ohne
-     * Zeitraum, sonst ein Ein-Tages-Paket bis {@code end}.
+     * Package in the project; a project the goal still lacks is added in the process. {@code end} null = without
+     * period, otherwise a one-day package up to {@code end}.
      */
     private String createWorkPackage(String goalId, String title, Instant end, Project project) throws Exception {
         Map<String, Object> body = new HashMap<>(Map.of("title", title, "projectId", project.getId()));

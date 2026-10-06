@@ -74,7 +74,7 @@ class TodoCreateBlockExecutorTest {
                         && "proj-1".equals(req.projectId())
                         && req.source() == Todo.Source.WORKFLOW
                         && "run-1".equals(req.workflowRunId())));
-        // Die neue TODO-ID steht Folge-Blöcken als Variable zur Verfügung
+        // The new TODO id is available to following blocks as a variable
         assertThat(ctx.getVariable("todo_id")).isEqualTo("todo-9");
     }
 

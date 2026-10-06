@@ -15,7 +15,7 @@ class AuditIngestionStatusTest {
 
     @Test
     void valueOf_roundTripsThePersistedName() {
-        // Als EnumType.STRING gespeichert: der Name ist der DB-Wert.
+        // Stored as EnumType.STRING: the name is the DB value.
         for (AuditIngestionStatus status : AuditIngestionStatus.values()) {
             assertThat(AuditIngestionStatus.valueOf(status.name())).isSameAs(status);
         }

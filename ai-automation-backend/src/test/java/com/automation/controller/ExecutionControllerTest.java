@@ -485,7 +485,7 @@ class ExecutionControllerTest {
                 .andExpect(jsonPath("$.required").value(true));
     }
 
-    /** Ein Formular mit mehreren Feldern kommt wie im WebSocket-Ereignis mit seinen fields (ec913801). */
+    /** A form with several fields arrives with its fields, as in the WebSocket event (ec913801). */
     @Test
     void getPendingApproval_humanInput_carriesFormFields() throws Exception {
         var approval = ApprovalRequest.builder()

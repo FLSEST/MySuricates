@@ -94,7 +94,7 @@ class LineStagesTest {
         assertThat(LinesHeadTailStage.tail().apply(input, Map.of("lines", 9), guard).output()).isEqualTo(input);
     }
 
-    /** TODO 0f376d6a: Der abschließende Umbruch zählt nicht als eigene (leere) Zeile. */
+    /** TODO 0f376d6a: The trailing line break does not count as a separate (empty) line. */
     @Test
     void headAndTail_trailingNewlineIsNoExtraLine() {
         String input = "a\nb\n";
