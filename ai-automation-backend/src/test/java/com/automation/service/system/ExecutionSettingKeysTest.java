@@ -70,8 +70,8 @@ class ExecutionSettingKeysTest {
     }
 
     /**
-     * TODO 4218fcaa: ganzzahlige und Bruch-Schluessel stehen in <b>einer</b> Map, damit ein neuer
-     * Schluessel nur an einer Stelle eingetragen werden muss.
+     * TODO 4218fcaa: integer and fraction keys live in <b>one</b> map, so a new
+     * key has to be registered in only one place.
      */
     @Test
     void integerAndDecimalKeys_liveInTheOneBoundsMap() {

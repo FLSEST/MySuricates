@@ -191,7 +191,7 @@ class GoalWorkPackageServiceTest {
         verify(workPackageRepository, never()).save(any());
     }
 
-    /** Ein Zeitraum hat Start und Ende oder keins von beiden, und der Start liegt nie nach dem Ende. */
+    /** A period has start and end or neither, and the start is never after the end. */
     @Test
     void create_periodNeedsBothDates_andStartNotAfterEnd_sameDayIsFine() {
         assertThatThrownBy(() -> service.create("g1", request("Beta", "2026-10-01", null)))
@@ -209,7 +209,7 @@ class GoalWorkPackageServiceTest {
         GoalWorkPackageService.requireValidPeriod(null, null);
     }
 
-    /** Ohne Projekt nur, wenn das Ziel genau eins hat. */
+    /** Without a project only if the goal has exactly one. */
     @Test
     void create_withoutProject_needsExactlyOneGoalProject() {
         when(goalRepository.existsById("g1")).thenReturn(true);
@@ -367,7 +367,7 @@ class GoalWorkPackageServiceTest {
                 .thenReturn(Optional.of(new GoalWithWorkPackages(goal, new ArrayList<>(List.of(workPackages)))));
     }
 
-    /** Ein Paket mit Ende {@code end} (Start = Ende) oder ohne Zeitraum. */
+    /** A package with end {@code end} (start = end) or without a period. */
     private static GoalWorkPackage workPackage(String id, Instant end, Instant completedAt) {
         return GoalWorkPackage.builder().id(id).goalId("g1").title(id).startDate(end).endDate(end)
                 .completedAt(completedAt).build();

@@ -93,8 +93,8 @@ class SchedulerServiceTest {
     }
 
     /**
-     * Die Liste laeuft ueber {@code findAllWithTargets()}, nicht ueber {@code findAll()}: Nur die
-     * Join-Fetch-Variante holt Workflow und Kette mit, statt sie je Zeile nachzuladen
+     * The list goes via {@code findAllWithTargets()}, not via {@code findAll()}: only the
+     * join-fetch variant fetches workflow and chain along, instead of reloading them per row
      * (TODO c9ec9844).
      */
     @Test
@@ -305,7 +305,7 @@ class SchedulerServiceTest {
 
     // --- findWorkflowRunsByScheduleId ---
 
-    /** Unter dem Limit ist die Liste schon alles: keine Zaehlabfrage (TODO 86777fb4). */
+    /** Below the limit the list is already everything: no count query (TODO 86777fb4). */
     @Test
     void findWorkflowRunsByScheduleId_belowTheLimit_countsNothing() {
         WorkflowRun run = WorkflowRun.builder().id("run-1").build();
@@ -319,7 +319,7 @@ class SchedulerServiceTest {
         verify(workflowRunRepository, never()).countByTriggeredByScheduleId(any());
     }
 
-    /** Am Limit zaehlt eine Abfrage alle Runs – die Oberflaeche nennt dann „weitere“ (TODO 86777fb4). */
+    /** At the limit a query counts all runs – the UI then says "weitere" (TODO 86777fb4). */
     @Test
     void findWorkflowRunsByScheduleId_atTheLimit_countsAll() {
         List<WorkflowRun> newest = List.of(WorkflowRun.builder().id("run-2").build(), WorkflowRun.builder().id("run-1").build());

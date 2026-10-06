@@ -380,9 +380,9 @@ class WorkflowPoolServiceTest {
 
     @Test
     void exportToPool_reportsSanitizedPathsInTheResponse() throws Exception {
-        // sub-workflow trägt die Referenz auf einen anderen Workflow in der Config. Sie ist
-        // instanzgebunden und fällt weg — der Aufrufer muss erfahren, dass der Eintrag so
-        // nicht installierbar ist.
+        // sub-workflow carries the reference to another workflow in the config. It is
+        // instance-bound and is dropped — the caller must learn that the entry is
+        // not installable as is.
         stubWorkflow(Workflow.builder()
                 .id("wf-1").name("Build Gate")
                 .blocks(List.of(BlockDefinition.builder()
@@ -427,8 +427,8 @@ class WorkflowPoolServiceTest {
     }
 
     /**
-     * TODO 96640e6f: getrackte Pool-Dateien nutzen {@code effort} — ohne das Feld im Export ginge
-     * die Einstellung beim Roundtrip Export → Install verloren.
+     * TODO 96640e6f: tracked pool files use {@code effort} — without the field in the export the
+     * setting would be lost in the export → install roundtrip.
      */
     @Test
     void exportToPool_writesEffort() throws Exception {
@@ -471,9 +471,9 @@ class WorkflowPoolServiceTest {
     }
 
     /**
-     * TODO 96640e6f: {@code UpdateWorkflowRequest} nimmt 14 Positionsargumente, {@code category},
-     * {@code effort} und {@code version} stehen nebeneinander und sind alle String — eine Umsortierung
-     * des Records wuerde effort sonst still als category einsetzen, ohne dass ein Test es merkt.
+     * TODO 96640e6f: {@code UpdateWorkflowRequest} takes 14 positional arguments, {@code category},
+     * {@code effort} and {@code version} sit next to each other and are all String — a reordering
+     * of the record would silently insert effort as category without any test noticing.
      */
     @Test
     void install_onAnExistingWorkflow_passesEffortToTheUpdate() throws Exception {
@@ -494,8 +494,8 @@ class WorkflowPoolServiceTest {
     }
 
     /**
-     * TODO a3b89355: Die Neuinstallation laeuft ueber update und verlor die Pool-Version — das Audit
-     * Center zeigte v3.0.0 fuer eine 4.4.0-Pooldatei, und ein Export haette 3.0.0 zurueckgeschrieben.
+     * TODO a3b89355: The reinstall goes via update and lost the pool version — the Audit
+     * Center showed v3.0.0 for a 4.4.0 pool file, and an export would have written 3.0.0 back.
      */
     @Test
     void install_onAnExistingWorkflow_passesThePoolVersionToTheUpdate() throws Exception {
@@ -514,7 +514,7 @@ class WorkflowPoolServiceTest {
                 eq(ChangeSource.POOL_INSTALL));
     }
 
-    /** Eine leere Version in der Pooldatei laesst das Label stehen, wie create seinen Default behaelt. */
+    /** An empty version in the pool file leaves the label alone, as create keeps its default. */
     @Test
     void install_onAnExistingWorkflow_blankPoolVersionKeepsTheLabel() throws Exception {
         writePoolFile("test-flow.json", """

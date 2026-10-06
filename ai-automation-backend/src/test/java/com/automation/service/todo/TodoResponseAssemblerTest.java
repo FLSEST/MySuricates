@@ -30,7 +30,7 @@ class TodoResponseAssemblerTest {
     @Mock private WorkflowRepository workflowRepository;
     @Mock private TodoMapper todoMapper;
     @Mock private com.automation.repository.GoalRepository goalRepository;
-    /** Modul goals an; einzelne Tests schalten es aus (TODO c60bf914). */
+    /** Module goals on; individual tests turn it off (TODO c60bf914). */
     @org.mockito.Spy private com.automation.modules.ModuleRegistry modules = com.automation.modules.ModuleRegistry.allEnabled();
 
     @InjectMocks private TodoResponseAssembler assembler;
@@ -68,7 +68,7 @@ class TodoResponseAssemblerTest {
         assertThat(responses).extracting(TodoResponse::projectName).containsExactly("Proj", "Proj");
         assertThat(responses.get(1).linkedWorkflowName()).isEqualTo("Fix");
         verify(projectRepository, never()).findById(any());
-        // Keine ganzen Entities: findAllById kostete je Projekt ein select containers (TODO 08224ed6)
+        // No whole entities: findAllById cost one select containers per project (TODO 08224ed6)
         verify(projectRepository, never()).findAllById(any());
         verify(workflowRepository, never()).findAllById(any());
     }
@@ -84,7 +84,7 @@ class TodoResponseAssemblerTest {
         verify(workflowRepository, never()).findIdAndNameByIdIn(any());
     }
 
-    /** Modul goals aus (TODO c60bf914): kein planning, kein Zieltitel-Nachschlagen – die Daten bleiben am TODO. */
+    /** Module goals off (TODO c60bf914): no planning, no goal title lookup – the data stays on the TODO. */
     @Test
     void goalsOff_leavesPlanningOut_andLooksUpNoGoal() {
         org.mockito.Mockito.doReturn(false).when(modules).isEnabled(com.automation.modules.ModuleCatalog.GOALS);

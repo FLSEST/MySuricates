@@ -30,7 +30,7 @@ class TodoSpecificationsTest {
                 .endsWith(Todo.Priority.LOW);
     }
 
-    /** {@code goalId=none} waehlt TODOs ohne Ziel – die Kandidaten der Relationskarte (TODO c6ea8f5c). */
+    /** {@code goalId=none} selects TODOs without a goal – the candidates of the relation map (TODO c6ea8f5c). */
     @Test
     @SuppressWarnings("unchecked")
     void inGoal_none_selectsTodosWithoutGoal_anIdSelectsThatGoal_blankSelectsAll() {

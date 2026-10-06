@@ -12,9 +12,9 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Die Beschriftungen des Tray-Menüs. Das AWT-Menü selbst ({@code PopupMenu}, {@code MenuItem}) lässt
- * sich headless nicht anlegen (HeadlessException); getestet wird daher die Zustandslogik, die der
- * Builder für die Zeilen benutzt.
+ * The labels of the tray menu. The AWT menu itself ({@code PopupMenu}, {@code MenuItem}) cannot
+ * be created headless (HeadlessException); therefore the state logic is tested that the
+ * builder uses for the rows.
  */
 class TrayMenuBuilderTest {
 

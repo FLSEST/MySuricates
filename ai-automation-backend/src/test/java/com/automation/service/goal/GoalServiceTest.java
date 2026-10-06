@@ -79,7 +79,7 @@ class GoalServiceTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
-    /** TODO c60bf914: Zielprojekte mit Zaehlern aus den nicht archivierten TODOs in diesem Projekt. */
+    /** TODO c60bf914: goal projects with counters from the non-archived TODOs in this project. */
     @Test
     void projects_countPerAssignedProject_inTheirOrder_withoutArchived() {
         List<GoalProjectRow> projects = List.of(
@@ -113,7 +113,7 @@ class GoalServiceTest {
         assertThat(byGoal.get("g2")).containsExactly(new GoalResponse.ProjectRef("pA", "AutoPilot"));
     }
 
-    /** TODO 68a5e24e: entschieden = Entscheidung ohne offene Frage, nicht archiviert – im Fortschritt und je Projekt. */
+    /** TODO 68a5e24e: decided = decision without an open question, not archived – in progress and per project. */
     @Test
     void decided_countsDecisionsWithoutOpenQuestion_withoutArchived() {
         List<GoalTodoRow> rows = List.of(

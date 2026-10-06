@@ -10,9 +10,9 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Der Trigger-Abgleich als reine Funktion (TODO c6ea8f5c): Dieselben Regeln entscheiden, ob ein
- * TodoTrigger feuert ({@link TodoTriggerService}) und ob die Relationskarte eines Ziels ihn als
- * Bearbeitung eines TODOs zeigt. Die Faelle hier spiegeln die Matching-Tests des Services.
+ * The trigger matching as a pure function (TODO c6ea8f5c): The same rules decide whether a
+ * TodoTrigger fires ({@link TodoTriggerService}) and whether a goal's relation map shows it as
+ * handling of a TODO. The cases here mirror the matching tests of the service.
  */
 class TodoTriggerMatcherTest {
 

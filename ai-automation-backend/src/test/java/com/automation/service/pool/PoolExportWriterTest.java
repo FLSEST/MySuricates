@@ -92,7 +92,7 @@ class PoolExportWriterTest {
         assertThat(json.get("metadata")).isEqualTo(Map.of("origin", "hand"));
     }
 
-    /** Braucht ein Werkzeug außerhalb von Repo und Projekt — so steht es auch in der Datei (TODO 7ddacd1d). */
+    /** Needs a tool outside repo and project — as it also stands in the file (TODO 7ddacd1d). */
     @Test
     void scopeExternalLandetInDerDatei() throws IOException {
         ExportToPoolResponse res = writer.write(base().build(), null, PoolScope.EXTERNAL, tmp);

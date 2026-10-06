@@ -4,7 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Die synthetische Gate-Beschreibung eines checked_command – geschrieben und erkannt an einer Stelle (TODO 2aa9ddd5). */
+/** The synthetic gate description of a checked_command – written and recognized in one place (TODO 2aa9ddd5). */
 class CommandExitDescriptionTest {
 
     @Test

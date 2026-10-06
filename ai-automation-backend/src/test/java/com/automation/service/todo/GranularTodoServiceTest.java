@@ -262,8 +262,8 @@ class GranularTodoServiceTest {
     }
 
     /**
-     * Wrapper-Bloecke (Komprimierung, Weiterreichen einer Ausgabe) kuerzen oder verstellen Titel:
-     * ein gekuerzter Titel ist eine Dublette derselben Zeile, kein zweites TODO (TODO 8d02ed3f).
+     * Wrapper blocks (compression, passing on an output) shorten or alter titles:
+     * a shortened title is a duplicate of the same row, not a second TODO (TODO 8d02ed3f).
      */
     @Test
     void granularTodos_truncatedTitleInSameRun_createsOnlyTheLongerTodo() {
@@ -289,8 +289,8 @@ class GranularTodoServiceTest {
     }
 
     /**
-     * Die Praefix-Regel greift erst ab {@code PREFIX_MIN_LENGTH} = 20 Zeichen: „timeout im executor"
-     * (19) ist als gemeinsamer Anfang noch zu wenig, um einen eigenen Befund zu verwerfen.
+     * The prefix rule only applies from {@code PREFIX_MIN_LENGTH} = 20 characters: "timeout im executor"
+     * (19) is still too little as a common beginning to discard a finding of its own.
      */
     @Test
     void granularTodos_truncatedTitleJustBelowThePrefixMinimum_staysItsOwnTodo() {
@@ -304,7 +304,7 @@ class GranularTodoServiceTest {
                 "Timeout im Executor…", "Timeout im Executor behebt sich nicht");
     }
 
-    /** Ein Zeichen mehr gemeinsamer Anfang (21) — jetzt ist es die gekuerzte Fassung. */
+    /** One more character of common beginning (21) — now it is the shortened version. */
     @Test
     void granularTodos_truncatedTitleJustAboveThePrefixMinimum_isDropped() {
         List<Map<String, Object>> items = List.of(
@@ -317,9 +317,9 @@ class GranularTodoServiceTest {
     }
 
     /**
-     * Ohne Kuerzungszeichen ist ein gemeinsamer Anfang kein Beweis: „Fehler in Modul A beheben" ist
-     * ein eigener Befund mit eigener Prioritaet und Beschreibung, auch wenn ein zweiter Titel damit
-     * anfaengt. Nur ein mit „…"/„..." abgeschnittener Titel ist nachweislich dieselbe Zeile.
+     * Without a truncation mark a common beginning is no proof: "Fehler in Modul A beheben" is
+     * a finding of its own with its own priority and description, even if a second title
+     * starts with it. Only a title cut off with "…"/"..." is demonstrably the same row.
      */
     @Test
     void granularTodos_longerTitleContinuingAShorterOne_staysTwoTodos() {
@@ -333,7 +333,7 @@ class GranularTodoServiceTest {
                 "Fehler in Modul A beheben", "Fehler in Modul A beheben, Teil 2");
     }
 
-    /** Gegenprobe: ein gemeinsamer kurzer Anfang macht aus zwei Befunden keinen einzigen. */
+    /** Control: a common short beginning does not turn two findings into one. */
     @Test
     void granularTodos_differentTitles_stayTwoTodos() {
         List<Map<String, Object>> items = List.of(
@@ -383,7 +383,7 @@ class GranularTodoServiceTest {
         assertThat(previousTodo.getStatus()).isEqualTo(Todo.Status.DONE);
     }
 
-    /** dfb3fee8: mehrere nicht mehr gemeldete TODOs werden in einem saveAll geschlossen, nicht save je TODO. */
+    /** dfb3fee8: several no-longer-reported TODOs are closed in one saveAll, not save per TODO. */
     @Test
     void closeStale_closesAllStaleTodosInOneBatch_andKeepsTheOthers() {
         Todo staleA = Todo.builder().id("a").title("Alt A").status(Todo.Status.OPEN)

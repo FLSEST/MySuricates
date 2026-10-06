@@ -93,7 +93,7 @@ class SystemTrayServiceTest {
 
     @Test
     void collectStatus_dockerNotConfiguredIsNoWarning() {
-        // a0e85182: ohne eingerichtetes Docker bleibt das Tray-Icon gruen
+        // a0e85182: without a configured Docker the tray icon stays green
         when(executionRegistry.getActiveRunCount()).thenReturn(0);
         when(runRepository.countByStartedAtAfter(any(Instant.class))).thenReturn(0L);
         when(runRepository.countByStatusAndStartedAtAfter(eq(RunStatus.FAILED), any(Instant.class))).thenReturn(0L);

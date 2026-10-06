@@ -269,7 +269,7 @@ class CompletionTriggerServiceTest {
         // Should not throw — error is caught and logged
         service.onWorkflowRunCompleted(event);
     }
-    /** 986bb1f1: die Zähler aller ausgelösten Trigger in einem saveAll statt save je Trigger. */
+    /** 986bb1f1: the counters of all fired triggers in one saveAll instead of save per trigger. */
     @Test
     void onCompleted_savesTheCountersOfAllFiredTriggersInOneBatch() {
         Workflow otherTarget = Workflow.builder().id("wf-tgt-2").name("Target 2").build();
@@ -293,7 +293,7 @@ class CompletionTriggerServiceTest {
         assertThat(notFiring.getTriggerCount()).isZero();
     }
 
-    /** Ein Trigger, dessen Ziel nicht startet, zählt nicht mit — die übrigen werden trotzdem gespeichert. */
+    /** A trigger whose target does not start does not count — the others are saved anyway. */
     @Test
     void onCompleted_failedStart_isNotCounted_othersAreStillSaved() {
         Workflow brokenTarget = Workflow.builder().id("wf-broken").name("Broken").build();

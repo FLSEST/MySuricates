@@ -110,7 +110,7 @@ class ExecutionSettingsServiceTest {
         return newService(runDeletionPolicy, throttles);
     }
 
-    /** Die fuenf Themen-Gruppen so, wie Spring sie in @Order-Reihenfolge injiziert. */
+    /** The five topic groups as Spring injects them in @Order order. */
     private ExecutionSettingsService newService(RunDeletionPolicy runDeletionPolicy, AiCliThrottles throttles) {
         return new ExecutionSettingsService(appSettingsRepository, List.of(
                 new ExecutionCapacitySettings(executionSemaphore, throttles, hostClaudeConfig,
@@ -381,7 +381,7 @@ class ExecutionSettingsServiceTest {
         assertThat(schedulerConfig.isCatchUpOnResume()).isTrue();
     }
 
-    /** TODO 90d10ba1: Schalter und Wartezeit des automatischen Fortsetzens sind Laufzeit-Einstellungen. */
+    /** TODO 90d10ba1: the switch and wait time of automatic resuming are runtime settings. */
     @Test
     void validateAndApply_runAutoResume_updatesConfigAndReportsCurrentValues() {
         service.validateAndApply("runAutoResumeEnabled", "0");
@@ -617,8 +617,8 @@ class ExecutionSettingsServiceTest {
     }
 
     /**
-     * init() laeuft in @PostConstruct: wirft ein Applier beim Anwenden eines gespeicherten Wertes,
-     * darf das den Start nicht verhindern — der Wert wird verworfen, alles andere laeuft weiter.
+     * init() runs in @PostConstruct: if an applier throws while applying a stored value,
+     * that must not prevent startup — the value is discarded, everything else keeps running.
      */
     @Test
     void init_aFailingApplierDoesNotBreakTheStartup() {
@@ -698,10 +698,10 @@ class ExecutionSettingsServiceTest {
     }
 
     /**
-     * Ein Applier ohne Grenzen in BOUNDS ist tot: {@code validateAndApply} loest den Schluessel
-     * zuerst ueber {@code resolve} auf, das fuer unbekannte Schluessel wirft. Genau so waren die
-     * sieben {@code request-metrics-*}-Einstellungen unerreichbar (TODO fc0994d6) — dieser
-     * Waechter faengt den naechsten Fall beim Anlegen.
+     * An applier without bounds in BOUNDS is dead: {@code validateAndApply} resolves the key
+     * first via {@code resolve}, which throws for unknown keys. That is exactly how the
+     * seven {@code request-metrics-*} settings became unreachable (TODO fc0994d6) — this
+     * guard catches the next case at creation.
      */
     @Test
     void jederApplierHatGrenzenUndIstDamitErreichbar() {
@@ -711,7 +711,7 @@ class ExecutionSettingsServiceTest {
                         .containsKey(key));
     }
 
-    /** Und umgekehrt: eine Grenze ohne Applier verspricht eine Wirkung, die niemand ausfuehrt. */
+    /** And conversely: a bound without an applier promises an effect that nobody executes. */
     @Test
     void jederGrenzwertHatEinenApplier() {
         assertThat(ExecutionSettingKeys.BOUNDS.keySet())
@@ -737,7 +737,7 @@ class ExecutionSettingsServiceTest {
                 .hasMessageContaining("execution-max-concurrent");
     }
 
-    /** Ein Batch wird vorab komplett geprueft — ein ungueltiger Wert laesst auch die gueltigen davor ungesetzt. */
+    /** A batch is fully validated up front — an invalid value leaves the valid ones before it unset as well. */
     @Test
     void batchWithInvalidValue_appliesNothing() {
         LinkedHashMap<String, String> batch = new LinkedHashMap<>();

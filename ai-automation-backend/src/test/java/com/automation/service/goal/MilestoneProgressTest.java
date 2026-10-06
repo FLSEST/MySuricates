@@ -16,9 +16,9 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Zustand der Meilensteine aus ihren verknuepften Arbeitspaketen (TODO c60bf914 Ziele Stufe 1: Ziel →
- * Projekte → Arbeitspakete → TODOs, Meilensteine, Gliederung und Zeitstrahl): mit Paketen automatisch,
- * ohne Pakete von Hand, sonst nach Datum; reachedAt/reopened, Reihenfolge und der naechste Meilenstein.
+ * State of the milestones from their linked work packages (TODO c60bf914 Goals stage 1: goal →
+ * projects → work packages → TODOs, milestones, outline and timeline): automatic with packages,
+ * by hand without packages, otherwise by date; reachedAt/reopened, order and the next milestone.
  */
 class MilestoneProgressTest {
 
@@ -88,7 +88,7 @@ class MilestoneProgressTest {
         assertThat(MilestoneProgress.next(List.of())).isNull();
     }
 
-    /** Die Zielliste rechnet aus Zusammenfassungen dasselbe aus wie die Detailansicht. */
+    /** The goal list computes the same from summaries as the detail view. */
     @Test
     void nextOf_summaries_sameRules_withoutLoadingPackages() {
         Instant soon = NOW.plus(Duration.ofDays(2));

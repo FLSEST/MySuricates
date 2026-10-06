@@ -51,7 +51,7 @@ class TodoServiceTest {
     @Mock
     private TodoGoalConsistency goalConsistency;
 
-    /** Modul goals an; einzelne Tests schalten es aus (TODO c60bf914). */
+    /** Module goals on; individual tests turn it off (TODO c60bf914). */
     @org.mockito.Spy private com.automation.modules.ModuleRegistry modules = com.automation.modules.ModuleRegistry.allEnabled();
 
     @InjectMocks
@@ -293,7 +293,7 @@ class TodoServiceTest {
         Todo result = todoService.update("t-1", request);
 
         assertThat(result.getStatus()).isEqualTo(Todo.Status.DONE);
-        // Die Audit-Seite haengt am Domainereignis des Saves (AuditTodoCompletionListener), nicht am Service.
+        // The audit side hangs on the domain event of the save (AuditTodoCompletionListener), not on the service.
         assertThat(existing.domainEvents()).containsExactly(new Todo.Completed(existing));
     }
 
@@ -313,7 +313,7 @@ class TodoServiceTest {
         assertThat(result.getProjectId()).isNull();
     }
 
-    /** TODO c60bf914: ein Projektwechsel haelt das TODO mit seinem Ziel stimmig – nur bei echtem Wechsel. */
+    /** TODO c60bf914: a project change keeps the TODO consistent with its goal – only on a real change. */
     @Test
     void update_projectChange_keepsTheGoalConsistent_sameProjectDoesNot() {
         Todo existing = Todo.builder().id("t-1").title("Test").projectId("proj-1").goalId("g1").build();
@@ -411,8 +411,8 @@ class TodoServiceTest {
     }
 
     /**
-     * Review-Befund zu ab1ed481: Das Sammel-UPDATE laedt keine Entities, also meldet kein TODO selbst
-     * {@link Todo.Completed}. Bei Ziel DONE gehen die tatsaechlich wechselnden IDs gesammelt hinaus.
+     * Review finding on ab1ed481: The bulk UPDATE loads no entities, so no TODO reports
+     * {@link Todo.Completed} itself. On goal DONE the actually changing IDs go out collectively.
      */
     @Test
     void bulkUpdateStatus_toDone_reportsTheTodosThatActuallyChange() {
@@ -451,7 +451,7 @@ class TodoServiceTest {
         verify(todoRepository, never()).bulkSetStatus(any(), any(), any());
     }
 
-    /** Modul goals aus (TODO c60bf914): der goalId-Filter ist ein 400 statt stillschweigend die ganze Liste. */
+    /** Module goals off (TODO c60bf914): the goalId filter is a 400 instead of silently the whole list. */
     @Test
     void findAll_goalFilterWhileGoalsIsOff_isRefused_withoutFilterItWorks() {
         org.mockito.Mockito.doReturn(false).when(modules).isEnabled(com.automation.modules.ModuleCatalog.GOALS);

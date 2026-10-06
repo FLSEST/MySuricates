@@ -22,9 +22,9 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Relationskarte ohne Service und Repositories (TODO c8a11b7a): was aus einer Zeile und den
- * Nachschlagetabellen wird. Den Weg durch {@code GoalRelationsService} samt Buendelung prueft
- * {@code GoalRelationsServiceTest}; hier stehen die Randfaelle der Zuordnung.
+ * Relation map without service and repositories (TODO c8a11b7a): what a row and the
+ * lookup tables turn into. The path through {@code GoalRelationsService} including bundling is tested by
+ * {@code GoalRelationsServiceTest}; here are the edge cases of the mapping.
  */
 class GoalRelationAssemblerTest {
 
@@ -206,7 +206,7 @@ class GoalRelationAssemblerTest {
         return new RowBuilder(id);
     }
 
-    /** Baut eine {@link GoalRelationRow}; ohne Angaben ein offenes MEDIUM-TODO eines Menschen. */
+    /** Builds a {@link GoalRelationRow}; without arguments an open MEDIUM TODO by a human. */
     private static final class RowBuilder {
         private final String id;
         private Todo.Priority priority = Todo.Priority.MEDIUM;

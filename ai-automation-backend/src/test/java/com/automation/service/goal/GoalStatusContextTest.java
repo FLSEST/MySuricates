@@ -23,8 +23,8 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * goal_status und goal_guard_*: Inhalt, Ampel und Sanierung gegen gefaelschte Marker (TODO 259f4f66);
- * Meilensteine und Arbeitspakete getrennt (TODO c60bf914).
+ * goal_status and goal_guard_*: content, traffic light and sanitizing against forged markers (TODO 259f4f66);
+ * milestones and work packages separate (TODO c60bf914).
  */
 class GoalStatusContextTest {
 
@@ -56,7 +56,7 @@ class GoalStatusContextTest {
         assertThat(block).doesNotContain("Ohne Datum");
     }
 
-    /** Ein Arbeitspaket ohne Zeitraum (TODO c60bf914): „ohne Zeitraum“ statt einer leeren Stelle, nie faellig. */
+    /** A work package without a period (TODO c60bf914): "ohne Zeitraum" instead of an empty spot, never due. */
     @Test
     void workPackageWithoutPeriod_isListedAsSuch_andKeepsTheGuardGreen() {
         GoalSnapshot snapshot = snapshot("Launch", null,

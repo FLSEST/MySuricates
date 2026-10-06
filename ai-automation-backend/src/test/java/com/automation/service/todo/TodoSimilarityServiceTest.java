@@ -102,8 +102,8 @@ class TodoSimilarityServiceTest {
     }
 
     /**
-     * Die Schwelle steht in den Einstellungen und wird pro Aufruf gelesen: eine Aenderung wirkt
-     * ohne Neustart (TODO 380818b1). Kandidat und Titel ueberlappen zu 0,2.
+     * The threshold lives in the settings and is read per call: a change takes effect
+     * without restart (TODO 380818b1). Candidate and title overlap at 0.2.
      */
     @Test
     void findSimilar_readsTheKeywordThresholdPerCall() throws Exception {

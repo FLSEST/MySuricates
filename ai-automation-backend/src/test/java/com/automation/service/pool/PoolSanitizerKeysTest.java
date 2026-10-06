@@ -11,16 +11,16 @@ import java.util.Locale;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Koppelt die Instanz-Schlüsselliste des Exports an die des Hygiene-Gates (TODO 96640e6f).
+ * Couples the export's instance key list to that of the hygiene gate (TODO 96640e6f).
  *
- * <p>{@link PoolExportSanitizer} entfernt diese Schlüssel beim Export, {@code
- * scripts/ci/pool-neutrality.sh} beanstandet sie im getrackten Bestand — vorher zwei getrennte
- * Listen ohne Kopplung: ein neuer Schlüssel im Sanitizer fehlte im Gate und umgekehrt, und
- * niemandem fiel es auf.
+ * <p>{@link PoolExportSanitizer} removes these keys on export, {@code
+ * scripts/ci/pool-neutrality.sh} flags them in the tracked stock — before, two separate
+ * lists without coupling: a new key in the sanitizer was missing in the gate and vice versa, and
+ * nobody noticed.
  *
- * <p>Vorbild ist {@code ModuleCatalogTextsTest} mit {@code scripts/lib/module-catalog.generated.sh}:
- * der Test rendert die Bash-Zeile, das Skript liest die erzeugte Datei. Driftet eine Seite, wird
- * dieser Test rot.
+ * <p>Modelled on {@code ModuleCatalogTextsTest} with {@code scripts/lib/module-catalog.generated.sh}:
+ * the test renders the bash line, the script reads the generated file. If one side drifts, this
+ * test turns red.
  */
 class PoolSanitizerKeysTest {
 

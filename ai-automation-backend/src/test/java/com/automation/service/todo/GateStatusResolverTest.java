@@ -107,7 +107,7 @@ class GateStatusResolverTest {
         assertThat(result).isNull();
     }
 
-    /** Ein unlesbarer Wert darf ein strengeres Urteil aus dem Laufstatus nicht mildern. */
+    /** An unreadable value must not soften a stricter verdict from the run status. */
     @Test
     void resolve_invalidExplicitGate_fallsBackToDerivation() {
         WorkflowRunCompletedEvent event = createEvent(RunStatus.FAILED,
@@ -121,8 +121,8 @@ class GateStatusResolverTest {
     }
 
     /**
-     * Zuvor fiel ein unlesbarer Wert bei einem durchgelaufenen Run stumm auf GREEN durch — ein
-     * still fehlgeschlagener Prüf-Schritt war damit von einem Erfolg nicht zu unterscheiden
+     * Before, an unreadable value on a completed run silently fell through to GREEN — a
+     * silently failed check step was thus indistinguishable from a success
      * (TODO 63ecc124).
      */
     @Test

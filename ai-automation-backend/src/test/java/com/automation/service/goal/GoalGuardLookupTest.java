@@ -21,7 +21,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
-/** Ziel-Waechter: Zeitplan-Vorrang, eine Abfrage fuer die ganze Liste, Ziele ohne Waechter (TODO 4e185f05). */
+/** Goal guard: schedule precedence, one query for the whole list, goals without a guard (TODO 4e185f05). */
 @ExtendWith(MockitoExtension.class)
 class GoalGuardLookupTest {
 

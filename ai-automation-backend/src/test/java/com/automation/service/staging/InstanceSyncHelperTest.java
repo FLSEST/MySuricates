@@ -152,7 +152,7 @@ class InstanceSyncHelperTest {
         assertThat(result.errors()).containsExactly("Setting 'auto-repair-default': boom");
     }
 
-    /** Ein neu angelegter Workflow verliert auf dem Ziel weder Metadaten noch Standard-Kontext (62422aef). */
+    /** A newly created workflow keeps both metadata and default context on the target (62422aef). */
     @Test
     void sync_newWorkflow_carriesMetadataAndDefaultContext() throws Exception {
         Project proj = Project.builder().id("p1").name("Proj").path("/proj").type(ProjectType.CODE).build();
@@ -177,9 +177,9 @@ class InstanceSyncHelperTest {
     }
 
     /**
-     * b18939a6: Der Import-Body trägt die Prüfsumme über genau die gesendeten Felder — das Ziel prüft sie
-     * nach dem Transport (JSON hin und zurück) als VERIFIED und schreibt keine Warnung „no integrity checksum“.
-     * Ein leeres Versions-Label fehlt im Body und darf die Prüfsumme deshalb nicht verfälschen.
+     * b18939a6: The import body carries the checksum over exactly the sent fields — the target verifies it
+     * after the transport (JSON there and back) as VERIFIED and writes no warning "no integrity checksum".
+     * An empty version label is missing from the body and therefore must not falsify the checksum.
      */
     @Test
     void sync_newWorkflow_sendsAnIntegrityChecksumTheTargetVerifies() throws Exception {
@@ -209,7 +209,7 @@ class InstanceSyncHelperTest {
         assertThat(DefinitionIntegrity.verifyImport(onTarget).status()).isEqualTo(IntegrityCheck.Status.VERIFIED);
     }
 
-    /** Der Versionsstand kommt mit – per Import wie per PUT (62422aef). */
+    /** The version state comes along – via import as via PUT (62422aef). */
     @Test
     void sync_carriesTheVersionLabel_onImportAndUpdate() throws Exception {
         Project proj = Project.builder().id("p1").name("Proj").path("/proj").type(ProjectType.CODE).build();

@@ -42,9 +42,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Relationskarte eines Ziels (TODO c6ea8f5c): Herkunftsarten, Bearbeitung per Fix-Workflow und
- * TodoTrigger, Ergebnis des letzten Fix-Laufs, Kandidaten – und alles gebuendelt, eine Abfrage je
- * Art statt eine je TODO.
+ * Relation map of a goal (TODO c6ea8f5c): origin kinds, handling via fix workflow and
+ * TodoTrigger, result of the last fix run, candidates – and all of it bundled, one query per
+ * kind instead of one per TODO.
  */
 @ExtendWith(MockitoExtension.class)
 class GoalRelationsServiceTest {
@@ -231,7 +231,7 @@ class GoalRelationsServiceTest {
         return new RowBuilder(id);
     }
 
-    /** Baut eine {@link GoalRelationRow}; ohne Angaben ein offenes MEDIUM-TODO eines Menschen. */
+    /** Builds a {@link GoalRelationRow}; without arguments an open MEDIUM TODO by a human. */
     private static final class RowBuilder {
         private final String id;
         private Todo.Priority priority = Todo.Priority.MEDIUM;

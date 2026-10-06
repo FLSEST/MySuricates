@@ -324,7 +324,7 @@ class TodoTriggerServiceTest {
 
             service.processBacklog();
 
-            // Nicht einmal die Trigger-Liste wird geladen — die Pause greift vor jeder DB-Arbeit.
+            // Not even the trigger list is loaded — the pause takes effect before any DB work.
             verifyNoInteractions(repository);
             verifyNoInteractions(todoRepository);
             verifyNoInteractions(workflowExecutor);
@@ -351,7 +351,7 @@ class TodoTriggerServiceTest {
 
             service.processBacklog();
 
-            // Kein Aufraeumen noetig: ein abgelaufenes Fenster gibt den Loop von selbst frei.
+            // No cleanup needed: an expired window frees the loop by itself.
             verify(repository).findByEnabledTrue();
         }
 
@@ -369,7 +369,7 @@ class TodoTriggerServiceTest {
         void startupLog_withUnparseableValue_doesNotThrow() {
             config.setSkipUntil("kaputt");
 
-            service.logPauseWindowAtStartup();   // darf den Boot nicht verhindern
+            service.logPauseWindowAtStartup();   // must not prevent boot
         }
     }
 

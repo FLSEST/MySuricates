@@ -703,8 +703,8 @@ class ScheduledWorkflowExecutorTest {
 
 
     /**
-     * Modul goals aus (TODO c60bf914): ein zielgebundener Zeitplan – der Ziel-Waechter traegt goal_id in
-     * seinem Eingabekontext – startet keinen Lauf, der ohne Zieldaten scheitern wuerde, und rueckt weiter.
+     * Module goals off (TODO c60bf914): a goal-bound schedule – the goal guard carries goal_id in
+     * its input context – starts no run that would fail without goal data, and moves on.
      */
     @Test
     void executeSingleSchedule_goalScheduleWhileGoalsIsOff_isSkippedAndMovesOn() {
