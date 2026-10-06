@@ -69,12 +69,17 @@ def parse_cpd(text):
     return measured, duplicates
 
 
-def parse_pmd(text, prefix="pmd"):
+def parse_pmd(text, prefix=None):
     """(state, {subject: [(line, rule, message)]}) from the SARIF fact sheet of the pmd block.
 
     state: ok | truncated (more than 200 hits, the rest is not listed) | not_measured (no FAKT line,
-    or the platform reported NICHT GEMESSEN)."""
+    or the platform reported NICHT GEMESSEN). Without a prefix it is read from the sheet's header
+    ("## FAKTENBLATT <prefix>"): the block was renamed pmd -> pmd_design in Review 4.10.0, because the
+    platform's evidence check ignores names shorter than 4 characters."""
     text = text or ""
+    if prefix is None:
+        header = re.search(r"^## FAKTENBLATT (\S+)", text, re.M)
+        prefix = header.group(1) if header else "pmd"
     if ("NICHT GEMESSEN: %s_findings" % prefix) in text or ("FAKT %s_findings:" % prefix) not in text:
         return "not_measured", {}
     state = "truncated" if re.search(r"^TREFFER %s: \(\+\d+ " % re.escape(prefix), text, re.M) else "ok"

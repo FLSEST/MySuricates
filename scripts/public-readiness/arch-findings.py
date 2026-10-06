@@ -51,12 +51,19 @@ Nicht gemessene Dimensionen (Blatt fehlt, jdeps/Scan gescheitert, cycles_state !
 unaufgeloeste Importe, kein git oder flacher Klon, NCLOC- oder Kollaborateur-Zaehlung gescheitert) stehen als not_measured= in ## findings_summary; fuer sie gibt
 es keine Befunde, und der Report fuehrt bekannte Befunde dieser Dimension unveraendert weiter.
 
-Werkzeuge (optional, TODO 67128699 und c608cdda, siehe arch_tools.py): --cpd <sprache>=<datei> (CSV von
-pmd cpd, je Sprache einmal), --pmd <datei> (SARIF-Faktenblatt von pmd check), --jscpd <datei> (SARIF-
-Faktenblatt von jscpd: Frontend samt .tsx, das CPD nicht lesen kann) und --lizard <datei> (Warnungen von
-lizard -w: Komplexitaet je Funktion im Frontend). Daraus ## duplicates (die groessten
-dateiuebergreifenden Duplikate) und ## complexity (Komplexitaet je Methode, nur fuer Kandidaten). Beides sind
-Fakten fuers Urteil, keine Befunde. Ohne die Eingabe steht der Abschnitt als nicht gemessen da.
+Tools (optional, TODO 67128699 and c608cdda, see arch_tools.py): --cpd <language>=<file> (CSV of pmd cpd,
+once per language), --pmd <file> (SARIF fact sheet of pmd check), --jscpd <file> (SARIF fact sheet of jscpd:
+the frontend including .tsx, which CPD cannot read) and --lizard <file> (warnings of lizard -w: complexity
+per frontend function). They yield ## duplicates (the largest duplicates across files) and ## complexity
+(complexity per method, candidates only). Both are facts for the judgement, never findings. Without the
+input the section says it was not measured.
+
+Evidence (TODO 2c07ce7e, Review 4.10.0): the platform's evidence check (EvidenceVerification) accepts an
+evidence only if it names a FAKT or TREFFER line of a "## FAKTENBLATT" of the same run. So the output ends
+with "## FAKTENBLATT arch": one FAKT line per measured finding and candidate, named after the subject
+(fact_name) and therefore stable across runs, plus FAKT arch_scope with the measurement scope. The
+evidence of every measured finding starts with that name, candidate rows carry it in the column fakt; the
+report copies both.
 
 Aufruf:  arch-findings.py <backend-faktenblatt> [<frontend-faktenblatt>] [--cpd java=<datei>]
                           [--cpd typescript=<datei>] [--pmd <datei>] [--jscpd <datei>] [--lizard <datei>]
@@ -66,6 +73,7 @@ Ausgabe: ## findings, ## observations, ## review_candidates, ## duplicates, ## c
 Exit:    0 immer (Faktenblatt fuer einen nachgelagerten Auswerter, kein Gate); 2 bei falschem Aufruf.
 """
 import os
+import re
 import sys
 
 import arch_tools
@@ -471,7 +479,8 @@ class Classifier:
                "# jede Zeile unveraendert in Tabelle und Envelope: keine eigene Schwere, keine weiteren Befunde.",
                "# ruleKey\tsubject\tseverity\tevidence"]
         findings = sorted(set(self.findings), key=lambda f: (-SEVERITY_RANK[f[2]], f[0], f[1]))
-        out += ["\t".join(f) for f in findings] or ["(keine Befunde)"]
+        out += ["\t".join((rule, subject, severity, "%s: %s" % (fact_name(subject), evidence)))
+                for rule, subject, severity, evidence in findings] or ["(keine Befunde)"]
         out += ["", "## observations",
                 "# Nur fuers Markdown (Beobachtung, kein Finding): groesse = Band %d-%d NCLOC oder grosse, stabile"
                 % (BAND_OBSERVE, BAND_FINDING),
@@ -493,8 +502,8 @@ class Classifier:
             out.append("# Groessen nicht gemessen (%s): von dieser Seite keine Kandidaten" % ",".join(gaps))
         if self.recent_missing:
             out.append("# ## recent fehlt (%s): von dieser Seite keine neuen Dateien" % ",".join(sorted(self.recent_missing)))
-        out.append("# art\tsubject\taenderungen_7d\tangaben")
-        out += ["\t".join(c) for c in candidates] or ["(keine Kandidaten)"]
+        out.append("# art\tsubject\taenderungen_7d\tangaben\tfakt (Name fuer den Beleg eines Urteils)")
+        out += ["\t".join(c + (fact_name(c[1]),)) for c in candidates] or ["(keine Kandidaten)"]
         out += ["", "## duplicates",
                 "# Je Seite die %d groessten Duplikate ueber Dateigrenzen, nach Tokens: Backend pmd cpd ab 100 Tokens,"
                 % DUPLICATES_LISTED,
@@ -538,7 +547,45 @@ class Classifier:
                 "hotspot_min_changes=%d" % HOTSPOT_MIN_CHANGES,
                 "deps_finding=%d" % DEPS_FINDING,
                 "not_measured=%s" % ",".join(sorted(set(self.not_measured)))]
+        out += [""] + self.fact_sheet(findings, candidates)
         return "\n".join(out) + "\n"
+
+    def scope(self):
+        """What this run measured: dimensions of the grading plus the analysis tools that delivered."""
+        dimensions = {"backend_sizes", "backend_cycles", "backend_layers", "frontend_sizes", "frontend_cycles"}
+        measured = sorted(dimensions - set(self.not_measured))
+        tools = []
+        if "java" in self.cpd_measured:
+            tools.append("cpd_java")
+        if self.tsx_measured:
+            tools.append("jscpd")
+        elif "typescript" in self.cpd_measured:
+            tools.append("cpd_ts")
+        if self.pmd_state in ("ok", "truncated"):
+            tools.append("pmd_design")
+        if self.lizard_state == "ok":
+            tools.append("lizard")
+        return measured + tools
+
+    def fact_sheet(self, findings, candidates):
+        """## FAKTENBLATT arch: one FAKT line per measured finding and candidate, named by fact_name."""
+        out = ["## FAKTENBLATT arch",
+               "# Je Messbefund und Kandidat eine FAKT-Zeile; jeder Beleg nennt ihren Namen (Belegpruefung der",
+               "# Plattform). arch_scope ist der Messumfang dieses Laufs.",
+               "FAKT arch_scope: %s" % (",".join(self.scope()) or "nichts gemessen")]
+        facts = {}
+        for rule, subject, severity, evidence in findings:
+            facts.setdefault(subject, []).append("befund %s %s, %s" % (rule, severity, evidence))
+        for art, subject, changes, details in candidates:
+            facts.setdefault(subject, []).append("kandidat %s, aenderungen_7d=%s, %s" % (art, changes, details))
+        out += ["FAKT %s: %s" % (fact_name(subject), "; ".join(parts)) for subject, parts in facts.items()]
+        return out
+
+
+def fact_name(subject):
+    """Stable fact name for a subject: FAKT names allow letters, digits, _ . - only (EvidenceVerification)."""
+    slug = subject.replace("<->", ".and.").replace("->", ".to.")
+    return "arch_" + re.sub(r"[^A-Za-z0-9_.-]+", ".", slug).strip(".")
 
 
 def parse_files(lines, backend):

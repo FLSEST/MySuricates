@@ -279,6 +279,13 @@ measured findings were classified – without having judged anything. Since vers
   (`frontend_complexity_state`). Duplicates are sorted by tokens, because jscpd gives no line count; since the two
   tools count tokens differently, `## duplicates` lists the ten largest per side and the `dublette` candidates
   alternate between backend and frontend.
+- **Evidence and measurement scope (4.10.0, TODO `2c07ce7e`)**: since 4.8 the tool blocks write fact sheets, so the
+  platform's evidence check (`EvidenceVerification`) applies. `arch_metrics` wrote no FAKT lines, so every
+  architecture finding counted as unsupported. `arch-findings.py` now appends `## FAKTENBLATT arch`: one FAKT line
+  per measured finding and candidate, named after the subject (`arch_com.automation….java`). The evidence of every
+  measured finding starts with that name, candidate rows carry it in the column `fakt`, and judgement evidence cites
+  it. `FAKT arch_scope` states the measurement scope; when it changes, the trend reads "nicht vergleichbar". The PMD
+  block is called `pmd_design`, because the evidence check ignores names under 4 characters.
 
 ### Test coverage: envelope from the target list
 

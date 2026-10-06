@@ -196,29 +196,34 @@ for gone in (">200 Zeilen", ">300 Zeilen", ">5 Abhaengigkeiten", ">7 Abhaengigke
              "arch.duplicated-logic"):
     assert gone not in prompt, "alte Regel steht noch im Prompt: " + gone
 assert "Paketkopplung" in prompt and "KEIN Befund mehr" in prompt, "Paketkopplung als Trend fehlt"
-assert "Neu in 4.9.0:" in prompt, "einmalige Erklaerung der Frontend-Werkzeuge fehlt"
-assert "Neu in 4.8.0:" not in prompt and "Neu in 4.7.0:" not in prompt, "fruehere einmalige Erklaerungen sind erledigt"
+assert "Neu in 4.10.0:" in prompt, "one-off explanation of the evidence anchors is missing"
+assert all("Neu in 4.%d.0:" % v not in prompt for v in (7, 8, 9)), "earlier one-off explanations are done"
 assert "Regelwechsel 4.6.0" not in prompt, "die einmalige Erklaerung von 4.6.0 ist erledigt"
 assert "NCLOC" in prompt and "Hotspot" in prompt, "NCLOC-Baender und Hotspot-Regel fehlen"
 assert "nur Kollaborateure" in prompt, "Zahl meint Kollaborateure"
-assert wf["version"] == "4.9.0", wf["version"]
+assert wf["version"] == "4.10.0", wf["version"]
 # 67128699: PMD aus automation-agent-analysis misst Duplikate (CPD je Sprache, CSV) und Komplexitaet (SARIF);
 # die Werkzeug-Bloecke laufen vor arch_metrics, das ihre Ausgaben an arch-findings.py reicht.
 tool_blocks = {b.get("name"): b for b in blocks if b["config"].get("container_args")}
-assert set(tool_blocks) == {"cpd_java", "jscpd", "pmd", "lizard"}, set(tool_blocks)
+# 2c07ce7e: the PMD block is pmd_design, because the evidence check of the platform ignores fact names under 4 characters.
+assert set(tool_blocks) == {"cpd_java", "jscpd", "pmd_design", "lizard"}, set(tool_blocks)
+assert all(len(name) >= 4 for name in tool_blocks), "fact prefixes must be at least 4 characters"
 for tool in tool_blocks.values():
     assert tool["config"]["container_image"] == "automation-agent-analysis:latest"
     assert tool["config"].get("on_failure") == "continue", "ein fehlendes Image darf das Review nicht abbrechen"
     assert blocks.index(tool) < i_metrics, "Werkzeug-Bloecke muessen vor arch_metrics laufen"
 assert "--no-fail-on-violation" in tool_blocks["cpd_java"]["config"]["container_args"]
-assert tool_blocks["pmd"]["config"].get("output_format") == "sarif"
-assert "/workspace/scripts/public-readiness/pmd-architecture.xml" in tool_blocks["pmd"]["config"]["container_args"]
+assert tool_blocks["pmd_design"]["config"].get("output_format") == "sarif"
+assert "/workspace/scripts/public-readiness/pmd-architecture.xml" in tool_blocks["pmd_design"]["config"]["container_args"]
 assert "--cpd java=" in command and "--jscpd " in command and "--pmd " in command and "--lizard " in command, "Werkzeug-Fakten fehlen in der Einstufung"
 # c608cdda: jscpd misst das Frontend samt .tsx per SARIF, lizard die Komplexitaet je Frontend-Funktion.
 assert tool_blocks["jscpd"]["config"].get("output_format") == "sarif" and "tsx" in ",".join(tool_blocks["jscpd"]["config"]["container_args"])
 assert "-i" in tool_blocks["lizard"]["config"]["container_args"], "lizard endet sonst bei Warnungen mit Exit 1"
-for name in ("cpd_java", "jscpd", "pmd", "lizard"):
+for name in ("cpd_java", "jscpd", "pmd_design", "lizard"):
     assert "{{ block.%s.output }}" % name in command, name
+# 2c07ce7e: evidence cites the FAKT lines of ## FAKTENBLATT arch, the report states the measurement scope.
+for marker in ("## FAKTENBLATT arch", "fakt-Namen der Kandidatenzeile", "**Messumfang**: <Wert von FAKT arch_scope", "nicht vergleichbar", "unbelegt"):
+    assert marker in prompt, "evidence/scope rule missing in the prompt: " + marker
 for marker in ("## duplicates", "## complexity", "art dublette", "frontend_complexity_state", "nie ein eigener Befund"):
     assert marker in prompt, "Werkzeug-Fakten im Prompt unvollstaendig: " + marker
 # e0e9495f: das Skript waehlt Kandidaten, arch-seams.py misst ihre Schnittkanten, die KI urteilt.

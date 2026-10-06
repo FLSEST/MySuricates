@@ -278,6 +278,13 @@ gilt: **Das Skript bestimmt, wo hingeschaut wird, die KI, was dort los ist.**
   (`frontend_complexity_state`). Duplikate werden nach Tokens sortiert, weil jscpd keine Zeilenzahl nennt; weil die
   Token-Zählung der beiden Werkzeuge nicht gleich ist, nennt `## duplicates` je Seite die zehn größten, und die
   Kandidaten der Art `dublette` wechseln zwischen Backend und Frontend ab.
+- **Belege und Messumfang (4.10.0, TODO `2c07ce7e`)**: Seit 4.8 schreiben die Werkzeug-Blöcke Faktenblätter, damit
+  greift die Belegprüfung der Plattform (`EvidenceVerification`). `arch_metrics` schrieb keine FAKT-Zeilen, deshalb
+  galten alle Architektur-Befunde als unbelegt. `arch-findings.py` hängt nun `## FAKTENBLATT arch` an: je Messbefund
+  und Kandidat eine FAKT-Zeile, benannt nach dem Subjekt (`arch_com.automation….java`). Die evidence jedes
+  Messbefunds beginnt mit diesem Namen, Kandidatenzeilen tragen ihn in der Spalte `fakt`, und Urteilsbelege zitieren
+  ihn. `FAKT arch_scope` nennt den Messumfang; ändert er sich, lautet der Trend „nicht vergleichbar“. Der PMD-Block
+  heißt `pmd_design`, weil die Belegprüfung Namen unter 4 Zeichen ignoriert.
 
 ### Test-Abdeckung: Envelope aus der Soll-Liste
 

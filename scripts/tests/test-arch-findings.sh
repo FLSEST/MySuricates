@@ -31,8 +31,8 @@ finding() {  # $1 = output, $2 = subject -> "ruleKey<TAB>severity" or empty
 observed() {  # $1 = output, $2 = subject -> kind or empty
   section "$1" observations | awk -F'\t' -v s="$2" '$2 == s { print $1 }'
 }
-evidence() {  # $1 = output, $2 = subject
-  section "$1" findings | awk -F'\t' -v s="$2" '$2 == s { print $4 }'
+evidence() {  # $1 = output, $2 = subject -> evidence without the leading fact name (Review 4.10.0)
+  section "$1" findings | awk -F'\t' -v s="$2" '$2 == s { sub(/^arch_[A-Za-z0-9_.-]*: /, "", $4); print $4 }'
 }
 summary() {  # $1 = output, $2 = key
   section "$1" findings_summary | sed -n "s/^$2=//p"
@@ -497,13 +497,13 @@ C="com/automation/cand"
 python3 "$FINDINGS" "$TMP/cand-backend.txt" "$TMP/cand-frontend.txt" > "$TMP/cand.txt" 2> "$TMP/cand.err"
 candidates() { section "$1" review_candidates | awk -F'\t' '{ print $1 " " $2 }'; }
 check "Abschnitte in fester Reihenfolge, Werkzeug-Fakten zwischen Kandidaten und Baendern" \
-  '[ "$(grep -n "^## " "$TMP/cand.txt" | cut -d: -f2 | tr "\n" " ")" = "## findings ## observations ## review_candidates ## duplicates ## complexity ## bands ## findings_summary " ]'
+  '[ "$(grep -n "^## " "$TMP/cand.txt" | cut -d: -f2 | tr "\n" " ")" = "## findings ## observations ## review_candidates ## duplicates ## complexity ## bands ## findings_summary ## FAKTENBLATT arch " ]'
 check "Hotspots: Befunde zuerst (nach Aenderungen), dann Beobachtungen; neue nach NCLOC; .ts und Tests nie" \
   '[ "$(candidates "$TMP/cand.txt" | tr "\n" "|")" = "hotspot $C/CoupledHot.java|hotspot $C/FindingFew.java|hotspot $C/ObsMany.java|hotspot frontend/src/pages/HotPage.tsx|hotspot $C/NewHot.java|neu frontend/src/components/NewPanel.tsx|neu $C/NewBig.java|" ]'
 check "aenderungen_7d aus ## recent, 0 ohne Eintrag" \
   '[ "$(section "$TMP/cand.txt" review_candidates | awk -F"\t" "{ print \$3 }" | tr "\n" " ")" = "2 0 0 4 3 2 1 " ]'
 check "angaben = evidence der Einstufung plus Befund bzw. Beobachtung" \
-  'section "$TMP/cand.txt" review_candidates | grep -qx "hotspot${TAB}$C/CoupledHot.java${TAB}2${TAB}100 NCLOC (140 Zeilen), 10 deps, 8 Aenderungen in 90 Tagen (Hotspot ab 5); befund arch.high-coupling MEDIUM"'
+  'section "$TMP/cand.txt" review_candidates | grep -qx "hotspot${TAB}$C/CoupledHot.java${TAB}2${TAB}100 NCLOC (140 Zeilen), 10 deps, 8 Aenderungen in 90 Tagen (Hotspot ab 5); befund arch.high-coupling MEDIUM${TAB}arch_com.automation.cand.CoupledHot.java"'
 check "findings_summary zaehlt die Kandidaten" '[ "$(summary "$TMP/cand.txt" review_candidates)" = 7 ]'
 check "kein Kandidat ist ein Hotspot ohne Befund oder Beobachtung, keiner stabil" \
   '! section "$TMP/cand.txt" review_candidates | grep -E "Plain.java|ObsStable.java|NewSmall.java" >/dev/null'
@@ -560,7 +560,7 @@ python3 "$FINDINGS" "$TMP/cand-backend.txt" "$TMP/cand-frontend.txt" --cpd java=
   --cpd typescript="$TMP/cpd-ts.csv" --pmd "$TMP/pmd.txt" > "$TMP/tools.txt" 2> "$TMP/tools.err"; RC=$?
 check "mit Werkzeug-Eingaben: exit 0, stderr leer" '[ "$RC" -eq 0 ] && [ ! -s "$TMP/tools.err" ]'
 check "dublette: groesstes Duplikat, erste freie Datei, die anderen Stellen in angaben" \
-  'section "$TMP/tools.txt" review_candidates | grep -qx "dublette${TAB}$C/Plain.java${TAB}0${TAB}40 Zeilen (250 Tokens) doppelt, hier ab Zeile 12; ebenso in $C/NewBig.java:10"'
+  'section "$TMP/tools.txt" review_candidates | grep -qx "dublette${TAB}$C/Plain.java${TAB}0${TAB}40 Zeilen (250 Tokens) doppelt, hier ab Zeile 12; ebenso in $C/NewBig.java:10${TAB}arch_com.automation.cand.Plain.java"'
 check "dublette: schon gewaehlte Kandidaten werden nicht erneut subject (CoupledHot -> ObsStable)" \
   'section "$TMP/tools.txt" review_candidates | grep -q "^dublette${TAB}$C/ObsStable.java${TAB}"'
 check "dublette: hoechstens 3, Duplikate innerhalb einer Datei und Testdateien zaehlen nicht" \
@@ -613,7 +613,7 @@ check "jscpd: .tsx-Duplikat steht in der Frontend-Liste, zeilen -, Testdatei fae
 check "jscpd: Frontend gemessen, Hinweis nennt jscpd statt ungeprueft" \
   '[ -z "$(summary "$TMP/fe-tools.txt" duplicates_not_measured)" ] && grep -q "^# Frontend samt .tsx jscpd" "$TMP/fe-tools.txt" && ! grep -q "^# .tsx ungeprueft" "$TMP/fe-tools.txt"'
 check "jscpd: dublette nennt Tokens ohne Zeilenzahl, schon gewaehlte Kandidaten bleiben aussen vor" \
-  'section "$TMP/fe-tools.txt" review_candidates | grep -q "^dublette${TAB}frontend/src/components/NewHelper.ts${TAB}1${TAB}300 Tokens doppelt, hier ab Zeile 24; ebenso in frontend/src/pages/HotPage.tsx:28$"'
+  'section "$TMP/fe-tools.txt" review_candidates | grep -q "^dublette${TAB}frontend/src/components/NewHelper.ts${TAB}1${TAB}300 Tokens doppelt, hier ab Zeile 24; ebenso in frontend/src/pages/HotPage.tsx:28${TAB}arch_frontend.src.components.NewHelper.ts$"'
 check "lizard: Komplexitaet nur fuer Frontend-Kandidaten, Zustand ok" \
   '[ "$(section "$TMP/fe-tools.txt" complexity | cut -f1-3 | tr "\n" "|")" = "frontend/src/pages/HotPage.tsx${TAB}30${TAB}CCN|" ] \
      && [ "$(summary "$TMP/fe-tools.txt" frontend_complexity_state)" = ok ]'
@@ -633,6 +633,37 @@ check "dublette wechselt zwischen Backend und Frontend (erst das groesste Backen
 check "duplicates: Backend-Liste vor der Frontend-Liste" \
   'section "$TMP/fe-tools.txt" duplicates | sed -n 1p | grep -q "^40${TAB}250${TAB}$C/NewBig.java" \
      && section "$TMP/fe-tools.txt" duplicates | tail -1 | grep -q "frontend/src/"'
+
+echo "16) Evidence as fact sheet and measurement scope (TODO 2c07ce7e)"
+facts() { section "$1" "FAKTENBLATT arch"; }
+# Fact sheets are read into a variable and grepped via here-string: under pipefail, grep -q closing
+# the pipe early would turn awk's SIGPIPE into a failed check.
+OUT_FACTS="$(facts "$TMP/out.txt")"
+check "every measured finding's evidence starts with the name of a FAKT line of the same run" \
+  'section "$TMP/out.txt" findings | { ok=1; while IFS="$TAB" read -r rule subj sev ev; do
+     grep -q "^FAKT ${ev%%: *}: " <<< "$OUT_FACTS" || ok=0; done; [ "$ok" = 1 ]; }'
+check "fact names use allowed characters only and derive from the subject (pair, layer edge, file)" \
+  'grep -q "^FAKT arch_cycles.pair.com.automation.q1.and.com.automation.q2: befund arch.package-cycle MEDIUM" <<< "$OUT_FACTS" \
+     && grep -q "^FAKT arch_layer.com.automation.controller.to.com.automation.repository: " <<< "$OUT_FACTS" \
+     && grep -q "^FAKT arch_frontend.src.pages.Huge.tsx: " <<< "$OUT_FACTS" \
+     && [ -z "$(grep "^FAKT " <<< "$OUT_FACTS" | cut -d" " -f2 | grep -v "^[A-Za-z0-9_.-]*:$")" ]'
+check "a candidate with a finding gets one FAKT line carrying both" \
+  '[ "$(grep -c "^FAKT arch_com.automation.cand.CoupledHot.java: " <<< "$(facts "$TMP/cand.txt")")" -eq 1 ] \
+     && grep -q "^FAKT arch_com.automation.cand.CoupledHot.java: befund arch.high-coupling MEDIUM, .*; kandidat hotspot, aenderungen_7d=2, " <<< "$(facts "$TMP/cand.txt")"'
+check "every candidate row names a fakt the fact sheet knows" \
+  'section "$TMP/fe-tools.txt" review_candidates | while IFS="$TAB" read -r art subj ch det fakt; do
+     grep -q "^FAKT $fakt: .*kandidat $art" <<< "$(facts "$TMP/fe-tools.txt")" || exit 1; done'
+check "arch_scope lists every dimension and tool that delivered" \
+  'grep -qx "FAKT arch_scope: backend_cycles,backend_layers,backend_sizes,frontend_cycles,frontend_sizes,cpd_java,jscpd,lizard" <<< "$(facts "$TMP/fe-tools.txt")"'
+check "arch_scope without tools: only the measured dimensions" \
+  'grep -qx "FAKT arch_scope: backend_sizes,frontend_cycles,frontend_sizes" <<< "$(facts "$TMP/nojdeps.txt")"'
+check "fact names meet the evidence check's minimum length (4 characters)" \
+  '! facts "$TMP/fe-tools.txt" | grep "^FAKT " | cut -d" " -f2 | tr -d ":" | grep -E "^.{0,3}$" >/dev/null'
+sed 's/pmd/pmd_design/g' "$TMP/pmd.txt" > "$TMP/pmd-design.txt"
+python3 "$FINDINGS" "$TMP/cand-backend.txt" --pmd "$TMP/pmd-design.txt" > "$TMP/pmd-design.out"
+check "pmd_design: prefix read from the header, complexity and scope as with pmd" \
+  '[ "$(summary "$TMP/pmd-design.out" complexity_state)" = ok ] && grep -q "CognitiveComplexity" <<< "$(section "$TMP/pmd-design.out" complexity)" \
+     && grep -q "^FAKT arch_scope: .*pmd_design" <<< "$(facts "$TMP/pmd-design.out")"'
 
 echo
 echo "passed=$PASS failed=$FAIL"
