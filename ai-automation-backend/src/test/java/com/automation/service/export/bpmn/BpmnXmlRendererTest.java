@@ -65,10 +65,10 @@ class BpmnXmlRendererTest {
         String xml = render(WorkflowFixtures.workflow("Sonderzeichen", List.of(
                 WorkflowFixtures.block("shell", "A & B <C>", Map.of(
                         "command", "grep 'x' && echo \"<ok>\"")))));
-        // Roh-Zeichen dürfen nicht unescaped im Dokument stehen …
+        // Raw characters must not appear unescaped in the document …
         assertThat(xml).doesNotContain("<ok>");
         assertThat(xml).doesNotContain("A & B");
-        // … sondern als Entities (das XML bleibt wohlgeformt, s. alleFixturesSindSchemaValide)
+        // … but as entities (the XML stays well-formed, see alleFixturesSindSchemaValide)
         assertThat(xml).contains("&amp;");
         assertThat(xml).contains("&lt;ok&gt;");
     }
@@ -112,7 +112,7 @@ class BpmnXmlRendererTest {
             assertThat(nodeIds).as("Fixture '%s': Knoten ohne BPMNShape", wf.getName()).isSubsetOf(shapeRefs);
 
             NodeList edges = doc.getElementsByTagNameNS(BpmnXmlRenderer.NS_DI, "BPMNEdge");
-            // Kanten im Diagramm = Kontrollfluss + Datenassoziationen
+            // Edges in the diagram = control flow + data associations
             int flows = doc.getElementsByTagNameNS(BpmnXmlRenderer.NS_MODEL, "sequenceFlow").getLength()
                     + doc.getElementsByTagNameNS(BpmnXmlRenderer.NS_MODEL, "dataInputAssociation").getLength()
                     + doc.getElementsByTagNameNS(BpmnXmlRenderer.NS_MODEL, "dataOutputAssociation").getLength();
@@ -125,7 +125,7 @@ class BpmnXmlRendererTest {
         }
     }
 
-    /** a5c9fbbf: Aufrufaktivität mit calledElement und Multi-Instance-Marker, XSD-gültig über den Katalog. */
+    /** a5c9fbbf: call activity with calledElement and multi-instance marker, XSD-valid across the catalog. */
     @Test
     void foreachMitWorkflowIdRendertCallActivityMitMultiInstance() {
         String xml = render(WorkflowFixtures.roundtripCatalog().stream()
@@ -141,8 +141,8 @@ class BpmnXmlRendererTest {
         assertThat(xml).contains("mysuricates:blockConfig");
         assertThat(xml).contains("git log --oneline -20");
         assertThat(xml).contains("scriptFormat=\"bash\"");
-        // Verlustfreiheit: Typ UND Name werden als Attribute mitgeführt, damit der Reimport
-        // nicht aus der BPMN-Semantik geraten werden muss (DOM schreibt Attribute alphabetisch).
+        // Losslessness: type AND name are carried as attributes so the re-import
+        // does not have to guess it from BPMN semantics (DOM writes attributes alphabetically).
         assertThat(xml).contains("type=\"shell\"");
         assertThat(xml).contains("name=\"Daten sammeln\"");
     }
@@ -167,8 +167,8 @@ class BpmnXmlRendererTest {
                 referenced.add(child.getAttribute("sourceRef"));
                 referenced.add(child.getAttribute("targetRef"));
             }
-            // Datenobjekte hängen nicht am Kontrollfluss, sondern an Datenassoziationen —
-            // deren Enden stehen als Kind-Elemente, nicht als Attribute.
+            // Data objects do not hang on the control flow, but on data associations —
+            // their ends appear as child elements, not as attributes.
             if ("dataInputAssociation".equals(child.getLocalName())
                     || "dataOutputAssociation".equals(child.getLocalName())) {
                 NodeList refs = child.getChildNodes();

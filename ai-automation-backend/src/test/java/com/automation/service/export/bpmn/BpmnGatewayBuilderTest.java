@@ -18,14 +18,14 @@ import static com.automation.service.export.bpmn.WorkflowFixtures.block;
 import static com.automation.service.export.bpmn.WorkflowFixtures.ordered;
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Layout und Kanten der Gateway-Segmente (conditional/switch) — isoliert von BpmnModelBuilder. */
+/** Layout and edges of the gateway segments (conditional/switch) — isolated from BpmnModelBuilder. */
 class BpmnGatewayBuilderTest {
 
     private final BpmnNodeFactory f = new BpmnNodeFactory(new ObjectMapper());
     private final FakeChains chains = new FakeChains();
     private final BpmnGatewayBuilder builder = new BpmnGatewayBuilder(f, chains);
 
-    /** Eine Aufgabe pro Block, nebeneinander; Knotenhöhe über {@code h} steuerbar. */
+    /** One task per block, side by side; node height controllable via {@code h}. */
     private final class FakeChains implements BpmnGatewayBuilder.ChainBuilder {
         final Map<String, String> registered = new LinkedHashMap<>();
         final List<String> chainPrefixes = new ArrayList<>();
@@ -99,7 +99,7 @@ class BpmnGatewayBuilderTest {
         assertThat(seg.entryId).isEqualTo("b_0_split");
         assertThat(seg.exitId).isEqualTo("b_0_merge");
         assertThat(seg.width).isEqualTo(GW + GAP + TASK_W + GAP + GW);
-        // Then-Task eine Zeile unter der Hauptlinie, KI-Modus ohne execution_mode=shell
+        // Then task one row below the main line, AI mode without execution_mode=shell
         BpmnModel.Node then = node(seg, "b_0_then");
         assertThat(then.kind).isEqualTo(BpmnModel.Kind.SERVICE_TASK);
         assertThat(then.x).isEqualTo(GW + GAP);
@@ -158,13 +158,13 @@ class BpmnGatewayBuilderTest {
         assertThat(direct.name).isEqualTo("default");
         assertThat(split.defaultFlowId).isEqualTo(direct.id);
 
-        // breiteste Zeile (2 Tasks) bestimmt die Merge-Position
+        // widest row (2 tasks) determines the merge position
         double chainWidth = 2 * TASK_W + GAP;
         double mergeX = GW + GAP + chainWidth + GAP;
         assertThat(node(seg, "b_1_merge").x).isEqualTo(mergeX);
         assertThat(seg.width).isEqualTo(mergeX + GW);
 
-        // Zeilen untereinander, um GW + GAP eingerückt
+        // Rows below one another, indented by GW + GAP
         assertThat(node(seg, "b_1_c0_0").x).isEqualTo(GW + GAP);
         assertThat(node(seg, "b_1_c0_0").y).isEqualTo(ROW_STEP - TASK_H / 2);
         assertThat(node(seg, "b_1_c1_0").y).isEqualTo(2 * ROW_STEP - TASK_H / 2);
@@ -213,15 +213,15 @@ class BpmnGatewayBuilderTest {
 
         assertThat(seg.edges).anyMatch(e -> e.sourceRef.equals("b_0_split")
                 && e.targetRef.equals("b_0_merge") && "leer".equals(e.name));
-        // der volle Case rückt auf die erste Zeile — der leere verbraucht keine Achse
+        // the full case moves up to the first row — the empty one uses no axis
         assertThat(node(seg, "b_0_c1_0").y).isEqualTo(ROW_STEP - TASK_H / 2);
-        // ohne Zweig-Inhalt bleibt die Mindestbreite eines Tasks
+        // without branch content the minimum width of a task remains
         assertThat(node(seg, "b_0_merge").x).isEqualTo(GW + GAP + TASK_W + GAP);
     }
 
     @Test
     void hoheZeileSchiebtDieNaechsteZeileWeiterNachUnten() {
-        chains.taskHeight = 400; // Ausdehnung unter der Achse: 200
+        chains.taskHeight = 400; // extent below the axis: 200
         BlockDefinition sw = block("switch", null, ordered("expression", "e",
                 "cases", List.of(
                         ordered("value", "a", "blocks", List.of(branch("shell", "A"))),

@@ -13,17 +13,17 @@ final class WorkflowFixtures {
     }
 
     /**
-     * Map mit fester Reihenfolge — die EINZIGE erlaubte Map-Quelle in dieser Fixture.
+     * Map with fixed order — the ONLY permitted map source in this fixture.
      *
-     * <p>{@code Map.of} iteriert pro JVM zufällig (SALT in {@code ImmutableCollections}); in einem
-     * Golden-File landet diese Reihenfolge als Config-JSON und macht die Datei zwischen zwei Läufen
-     * instabil. Für Block-Configs faellt das nicht auf, weil {@link #block} sie in eine
-     * {@code LinkedHashMap} umkopiert — aber verschachtelte Maps in Listen (Switch-Cases,
-     * Branch-Blöcke) gehen unveraendert ins JSON. Genau dort war {@code branching.bpmn}
-     * JVM-instabil (TODO 7557b928/df5c689d).
+     * <p>{@code Map.of} iterates randomly per JVM (SALT in {@code ImmutableCollections}); in a
+     * golden file this order ends up as config JSON and makes the file unstable between two runs.
+     * For block configs this goes unnoticed because {@link #block} copies them into a
+     * {@code LinkedHashMap} — but nested maps in lists (switch cases,
+     * branch blocks) go into the JSON unchanged. Exactly there {@code branching.bpmn}
+     * was JVM-unstable (TODO 7557b928/df5c689d).
      *
-     * <p>Dass {@code Map.of} hier nicht wieder auftaucht, haelt
-     * {@link WorkflowFixturesOrderGuardTest} fest.
+     * <p>That {@code Map.of} does not reappear here is pinned by
+     * {@link WorkflowFixturesOrderGuardTest}.
      */
     static Map<String, Object> ordered(Object... keyValues) {
         Map<String, Object> map = new LinkedHashMap<>();
@@ -37,9 +37,9 @@ final class WorkflowFixtures {
         BlockDefinition b = new BlockDefinition();
         b.setType(type);
         b.setName(name);
-        // LinkedHashMap, nicht HashMap: so liest das Golden-File die Schlüssel in der
-        // Reihenfolge, in der die Fixture sie schreibt — und spiegelt damit den
-        // Produktionspfad, wo Jackson ebenfalls LinkedHashMap liefert.
+        // LinkedHashMap, not HashMap: this is how the golden file reads the keys in the
+        // order in which the fixture writes them — and thus mirrors the
+        // production path, where Jackson also delivers LinkedHashMap.
         b.setConfig(new LinkedHashMap<>(config));
         return b;
     }
@@ -56,8 +56,8 @@ final class WorkflowFixtures {
     }
 
     /**
-     * Datenfluss-Fixture: {@code tests} erzeugt, {@code compress} konsumiert (Config {@code source})
-     * und erzeugt, {@code report} konsumiert über {@code block.compress.output}.
+     * Data-flow fixture: {@code tests} produces, {@code compress} consumes (config {@code source})
+     * and produces, {@code report} consumes via {@code block.compress.output}.
      */
     static Workflow dataFlow() {
         return workflow("Datenfluss", List.of(
@@ -67,9 +67,9 @@ final class WorkflowFixtures {
     }
 
     /**
-     * Datenfluss über eine Verzweigung (7557b928): {@code tests} fließt in den Case-Block
-     * {@code analyse}, dessen Ausgabe der spätere Top-Level-Block {@code report} konsumiert.
-     * Endpunkte der Assoziationen sind die Zweig-Tasks, nicht das Gateway.
+     * Data flow across a branching (7557b928): {@code tests} flows into the case block
+     * {@code analyse}, whose output is consumed by the later top-level block {@code report}.
+     * The endpoints of the associations are the branch tasks, not the gateway.
      */
     static Workflow branching() {
         return workflow("Verzweigter Datenfluss", List.of(
@@ -85,9 +85,9 @@ final class WorkflowFixtures {
     }
 
     /**
-     * Katalog aller Export-Fixtures für den Roundtrip-Beweis: jeder Block-Typ (WORKFLOW-GUIDE),
-     * unbekannter Typ, benannte/namenlose Blöcke, verschachtelte Switch-Cases (conditional,
-     * foreach, weiterer switch), Sonderzeichen und der leere Prozess.
+     * Catalog of all export fixtures for the roundtrip proof: every block type (WORKFLOW-GUIDE),
+     * unknown type, named/nameless blocks, nested switch cases (conditional,
+     * foreach, further switch), special characters and the empty process.
      */
     static List<Workflow> roundtripCatalog() {
         return List.of(
@@ -95,7 +95,7 @@ final class WorkflowFixtures {
                 linear(),
                 dataFlow(),
                 branching(),
-                // step_N_output: 0-basiert, ohne Wrapper-Block davor ⇒ Kante zum ersten Block
+                // step_N_output: 0-based, without a wrapper block before it ⇒ edge to the first block
                 workflow("StepIndex", List.of(
                         block("shell", "erst", ordered("command", "mvn test")),
                         block("simple", "dann", ordered("command", "Fasse zusammen:\n{{ step_0_output }}")))),
@@ -106,7 +106,7 @@ final class WorkflowFixtures {
                         "condition", "test -f out.txt", "then_command", "cat out.txt", "execution_mode", "shell")))),
                 workflow("Loop", List.of(block("foreach", "Songs erstellen", ordered(
                         "variable_name", "item", "items", List.of("a", "b"), "command", "Verarbeite {{ item }}")))),
-                // foreach mit workflow_id (a5c9fbbf): Aufrufaktivität je Item statt Unterprozess mit Befehl
+                // foreach with workflow_id (a5c9fbbf): call activity per item instead of sub-process with command
                 workflow("LoopWorkflow", List.of(block("foreach", "je Feature", ordered(
                         "variable_name", "feature", "items", List.of("a", "b"), "workflow_id", "wf-feature",
                         "context", ordered("feature_id", "{{ feature.id }}"))))),

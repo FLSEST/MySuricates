@@ -111,7 +111,7 @@ class DialogTextRulesTest {
             Locale before = Locale.getDefault();
             Locale.setDefault(Locale.forLanguageTag("tr-TR"));
             try {
-                // Ohne Locale.ROOT wird aus "I" ein punktloses "ı" und "I'LL NOW" passt nicht mehr.
+                // Without Locale.ROOT "I" becomes a dotless "ı" and "I'LL NOW" no longer matches.
                 assertThat(DialogTextRules.isMetaCommentary("I'LL NOW run the tests")).isTrue();
                 assertThat(DialogTextRules.isMetaCommentary("I CAN SEE the error")).isTrue();
             } finally {

@@ -7,7 +7,7 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Ein Finding muss sich auf eine Messung dieses Laufs berufen (TODO a94b56a0). */
+/** A finding must rely on a measurement of this run (TODO a94b56a0). */
 class EvidenceVerificationTest {
 
     private static final String FACT_SHEET = """
@@ -54,7 +54,7 @@ class EvidenceVerificationTest {
         assertThat(EvidenceVerification.isSupported(null, names)).isFalse();
     }
 
-    /** Ohne Faktenblatt gibt es nichts zu pruefen — kein Faktenblatt ist kein Verdacht. */
+    /** Without a fact sheet there is nothing to check — no fact sheet is no suspicion. */
     @Test
     void ohneFaktenblattBleibtJedesFindingGedeckt() {
         assertThat(EvidenceVerification.isSupported("was auch immer", Set.of())).isTrue();
@@ -62,9 +62,9 @@ class EvidenceVerificationTest {
     }
 
     /**
-     * Die Grenze der mechanischen Pruefung, absichtlich festgehalten: Ein vorhandener Messwert
-     * deckt den Beleg, auch wenn die Schlussfolgerung mit ihm nichts zu tun hat. Genau so kam der
-     * Anlassfall durch — geprueft wird die Herkunft des Belegs, nicht seine Tragfaehigkeit.
+     * The limit of the mechanical check, recorded on purpose: an existing measured value
+     * covers the evidence even if the conclusion has nothing to do with it. That is exactly how the
+     * triggering case got through — what is checked is the origin of the evidence, not its load-bearing capacity.
      */
     @Test
     void erkenntKeineFehldeutungEinesEchtenMesswerts() {

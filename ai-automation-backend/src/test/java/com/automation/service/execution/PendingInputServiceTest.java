@@ -72,7 +72,7 @@ class PendingInputServiceTest {
         assertThat(second.timeoutAt()).isNull();
     }
 
-    /** Ein Human-Input-Formular kommt mit seinen Feldern, ein Approval ohne (ec913801). */
+    /** A human-input form comes with its fields, an approval without (ec913801). */
     @Test
     void humanInputForm_carriesItsFields_approvalNone() {
         Instant since = Instant.parse("2026-10-01T08:00:00Z");

@@ -84,7 +84,7 @@ class DeadLetterServiceTest {
         verifyNoInteractions(repository);
     }
 
-    /** Synchrone Listener laufen nacheinander — ein Fehler hier darf die folgenden nicht abschneiden. */
+    /** Synchronous listeners run one after another — an error here must not cut off the following ones. */
     @Test
     void onWorkflowRunCompleted_swallowsRepositoryFailure() {
         when(repository.save(any())).thenThrow(new RuntimeException("dlq down"));

@@ -18,8 +18,8 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Roundtrip-Beweis (Spec §5): Export → Import ergibt exakt die ursprüngliche Block-Liste
- * (Typ, Name, Config) — über den gesamten Fixture-Katalog inkl. verschachtelter Switch-Cases.
+ * Roundtrip proof (spec §5): export → import yields exactly the original block list
+ * (type, name, config) — across the whole fixture catalog including nested switch cases.
  */
 class BpmnRoundtripTest {
 
@@ -44,7 +44,7 @@ class BpmnRoundtripTest {
     @ParameterizedTest
     @MethodSource("fixtures")
     void doppelterRoundtripIstStabil(Workflow wf) {
-        // Export(Import(Export(wf))) muss byte-identisch zu Export(wf) sein (Idempotenz).
+        // Export(Import(Export(wf))) must be byte-identical to Export(wf) (idempotence).
         String first = exporter.export(wf);
         ImportedWorkflow imported = importer.importFrom(first);
         Workflow again = WorkflowFixtures.workflow(imported.name(), imported.blocks());
@@ -64,10 +64,10 @@ class BpmnRoundtripTest {
     void namenloserBlockKommtOhneNameZurueck() {
         Workflow wf = WorkflowFixtures.workflow("N", List.of(WorkflowFixtures.block("shell", null, Map.of("command", "ls"))));
         BlockDefinition restored = importer.importFrom(exporter.export(wf)).blocks().get(0);
-        assertThat(restored.getName()).isNull(); // NICHT der abgeleitete "Shell: ls"-Text
+        assertThat(restored.getName()).isNull(); // NOT the derived "Shell: ls" text
     }
 
-    /** Datenobjekte sind reine Darstellung — der Import überliest sie, die Config bleibt Quelle der Wahrheit. */
+    /** Data objects are pure presentation — the import ignores them, the config stays the source of truth. */
     @Test
     void datenobjekteWerdenBeimImportIgnoriert() {
         Workflow wf = WorkflowFixtures.dataFlow();
@@ -100,7 +100,7 @@ class BpmnRoundtripTest {
             BlockDefinition r = restored.get(i);
             assertThat(r.getType()).as("Block %d Typ", i).isEqualTo(o.getType());
             assertThat(nullIfBlank(r.getName())).as("Block %d Name", i).isEqualTo(nullIfBlank(o.getName()));
-            // Config über JSON normalisiert vergleichen (gleiche Zahlentypen wie nach dem Reimport)
+            // Compare config normalized via JSON (same number types as after the re-import)
             assertThat(r.getConfig()).as("Block %d Config", i).isEqualTo(normalize(o.getConfig()));
         }
     }

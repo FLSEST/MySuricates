@@ -14,7 +14,7 @@ import static com.automation.service.export.bpmn.WorkflowFixtures.block;
 import static com.automation.service.export.bpmn.WorkflowFixtures.ordered;
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Datenobjekte, Assoziationen und Koordinaten aus den erkannten Referenzen. */
+/** Data objects, associations and coordinates from the detected references. */
 class BpmnDataFlowBuilderTest {
 
     private final BpmnModel model = new BpmnModel();
@@ -103,7 +103,7 @@ class BpmnDataFlowBuilderTest {
 
     @Test
     void referenzOhneAktivitaetsKnotenWirdUebersprungen() {
-        task("b_1", "B", 350); // b_0 ist ein Gateway und hat keinen Aktivitäts-Knoten
+        task("b_1", "B", 350); // b_0 is a gateway and has no activity node
         List<BlockDefinition> blocks = List.of(
                 block("conditional", "weiche", ordered("condition", "c")),
                 block("simple", null, ordered("command", "{{ previous_output }}")));
@@ -119,7 +119,7 @@ class BpmnDataFlowBuilderTest {
     void unbenannterErzeugerNimmtKnotennamenUndKollidierendeIdsBekommenSuffix() {
         task("b_0", "Shell", 100);
         task("b_1", "B", 350);
-        // Ein vorhandener Knoten belegt bereits die Id, die das Datenobjekt bekäme.
+        // An existing node already occupies the id that the data object would get.
         BpmnModel.Node clash = new BpmnModel.Node("data_shell", BpmnModel.Kind.TASK);
         model.nodes.add(clash);
         List<BlockDefinition> blocks = List.of(

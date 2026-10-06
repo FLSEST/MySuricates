@@ -24,19 +24,19 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
-/** Verhalten der Ingestion gegenueber akzeptierten Risiken (ACCEPTED_RISK): Snapshot, Verschlechterung, Verfall. */
+/** Behavior of the ingestion towards accepted risks (ACCEPTED_RISK): snapshot, deterioration, expiry. */
 @ExtendWith(MockitoExtension.class)
 class AuditIngestionServiceTest {
     private static final Instant ACCEPTED_AT = Instant.parse("2026-03-01T10:00:00Z");
     private static final String PROJECT = "proj-1";
     /**
-     * Erfundener auditKey ohne Katalogeintrag: Die Tests hier pruefen die Akzeptanz-Politik, nicht
-     * das ruleKey-Vokabular. Mit einem echten Schluessel wuerde jedes ergaenzte Vokabular sie
-     * mitreissen (seit TODO a17e2d19 haben alle ausgelieferten Audits einen Katalog) — dann meldete
-     * die Ingestion den Fixture-Key 'size.class' als unbekannt und verifyNoInteractions schluege an.
+     * Made-up auditKey without a catalog entry: the tests here check the acceptance policy, not
+     * the ruleKey vocabulary. With a real key every added vocabulary entry would drag them
+     * along (since TODO a17e2d19 all shipped audits have a catalog) — the ingestion would then report
+     * the fixture key 'size.class' as unknown and verifyNoInteractions would fail.
      */
     private static final String AUDIT_KEY = "test.audit-ohne-katalog";
-    /** Ein Audit MIT ruleKey-Katalog (siehe {@code audit/rule-keys.json}). */
+    /** An audit WITH a ruleKey catalog (see {@code audit/rule-keys.json}). */
     private static final String COVERAGE_KEY = "mysuricates.test-coverage";
 
     @Mock private WorkflowRunRepository runRepository;
@@ -74,7 +74,7 @@ class AuditIngestionServiceTest {
         });
     }
 
-    /** Alle Findings, die {@code saveAll} bekam (3deaee34: der Applier speichert gesammelt). */
+    /** All findings that {@code saveAll} received (3deaee34: the applier saves in bulk). */
     @SuppressWarnings("unchecked")
     private List<AuditFinding> savedFindings() {
         ArgumentCaptor<Iterable<AuditFinding>> captor = ArgumentCaptor.forClass(Iterable.class);
@@ -123,7 +123,7 @@ class AuditIngestionServiceTest {
         when(runRepository.findByIdWithSteps(runId)).thenReturn(Optional.of(run));
     }
 
-    /** 94fda6ef: gleiche Identitaet im selben Report — der zweite Befund faellt weg, aber nicht mehr still. */
+    /** 94fda6ef: same identity in the same report — the second finding is dropped, but no longer silently. */
     @Test
     void findingWithTheSameIdentity_isDroppedAndReported() {
         stubRunWithSubjects("run-1", "application.yml:key-a", "application.yml:key-b");
@@ -145,7 +145,7 @@ class AuditIngestionServiceTest {
         verify(activityLog, never()).warn(any(), contains("gleiche Identitaet"), any(), any(), any());
     }
 
-    /** Ein akzeptiertes Finding; {@code inSnapshot} = der neue Report enthaelt es (gleicher Fingerprint). */
+    /** An accepted finding; {@code inSnapshot} = the new report contains it (same fingerprint). */
     private AuditFinding acceptedFinding(String snapshotEvidence, Instant acceptedAt, boolean inSnapshot) {
         AuditFinding finding = AuditFinding.builder()
                 .id("f-accepted").projectId(PROJECT).auditKey(AUDIT_KEY).fingerprint("fp").ruleKey("size.class")
@@ -155,7 +155,7 @@ class AuditIngestionServiceTest {
                 .resolvedAt(acceptedAt).firstSeenReportId("rep-0").lastSeenReportId("rep-0")
                 .firstSeenRunId("run-0").lastSeenRunId("run-0").firstSeenAt(ACCEPTED_AT).lastSeenAt(ACCEPTED_AT)
                 .occurrenceCount(2).build();
-        // Im Snapshot heisst: derselbe Fingerprint wie der Befund im Envelope (size.class / Big.java).
+        // In the snapshot means: the same fingerprint as the finding in the envelope (size.class / Big.java).
         finding.setFingerprint(inSnapshot ? AuditSnapshotApplier.fingerprint(PROJECT, AUDIT_KEY, "size.class", "Big.java")
                 : "fp-anderer-befund");
         when(findingRepository.findByProjectIdAndAuditKey(PROJECT, AUDIT_KEY)).thenReturn(List.of(finding));
@@ -223,8 +223,8 @@ class AuditIngestionServiceTest {
     }
 
     /**
-     * ruleKey-Drift erzeugt sonst Wiedergaenger-Findings: der Envelope-Key wird auf den
-     * Katalogeintrag normalisiert (Audit-TODO 8fc9a401) — ohne Meldung, das ist der Normalfall.
+     * ruleKey drift otherwise produces recurrence findings: the envelope key is normalized to the
+     * catalog entry (audit TODO 8fc9a401) — without a message, that is the normal case.
      */
     @Test
     void driftedRuleKey_isNormalizedOntoTheCatalogEntryWithoutWarning() {
@@ -236,7 +236,7 @@ class AuditIngestionServiceTest {
         verifyNoInteractions(activityLog);
     }
 
-    /** Der verworfene Report nennt den Grund im Activity-Log, nicht nur im Server-Log. */
+    /** The rejected report names the reason in the activity log, not only in the server log. */
     @Test
     void unknownRuleKey_isReportedToTheActivityLog() {
         stubCoverageRun("run-1", "coverage.mystery");
@@ -256,16 +256,16 @@ class AuditIngestionServiceTest {
 
         service.ingest(event("run-1", COVERAGE_KEY));
 
-        // Beide unbekannten Keys stehen in EINER Meldung des verworfenen Reports — je Run eine.
+        // Both unknown keys appear in ONE message of the rejected report — one per run.
         verify(activityLog).warn(any(), contains("coverage.mystery"), anyString(), anyString(), anyString());
     }
 
     /**
-     * Frueher wurde ein Finding mit unbekanntem Key uebernommen und am Finding markiert
-     * (TODO ffa6d846). Seit f57945e2 faellt der <b>ganze Report</b> aus: Ein gedrifteter Key macht
-     * den Fingerprint unzuverlaessig, und ein Snapshot mit unzuverlaessigen Identitaeten loest die
-     * Vorgaengergeneration auf, statt sie wiederzuerkennen. Die Markierung war die Zwischenstufe,
-     * solange es keine haertere Konsequenz gab.
+     * Formerly a finding with an unknown key was accepted and flagged on the finding
+     * (TODO ffa6d846). Since f57945e2 the <b>whole report</b> is dropped: a drifted key makes
+     * the fingerprint unreliable, and a snapshot with unreliable identities resolves the
+     * previous generation instead of recognizing it. The flag was the intermediate stage
+     * as long as there was no harsher consequence.
      */
     @Test
     void unknownRuleKey_verwirftDenGanzenReport() {
@@ -279,7 +279,7 @@ class AuditIngestionServiceTest {
         verify(findingRepository, never()).saveAll(any());
     }
 
-    /** Ein bekannter Key markiert nicht — auch nicht der auf den Katalog normalisierte. */
+    /** A known key does not flag — not even the one normalized to the catalog. */
     @Test
     void knownAndDriftedRuleKeys_doNotMarkTheFinding() {
         stubCoverageRun("run-1", "Test-Coverage.Untested_Class");
@@ -290,9 +290,9 @@ class AuditIngestionServiceTest {
     }
 
     /**
-     * Die Markierung faellt von selbst weg, sobald der Katalog den Key kennt: Das Flag wird bei
-     * JEDEM Ingest neu gesetzt, nicht nur beim Anlegen. Sonst bliebe ein einmal markiertes
-     * Finding fuer immer markiert und die Anzeige waere nach der Katalog-Ergaenzung falsch.
+     * The flag disappears on its own as soon as the catalog knows the key: the flag is set anew on
+     * EVERY ingest, not only on creation. Otherwise a once-flagged
+     * finding would stay flagged forever and the display would be wrong after the catalog addition.
      */
     @Test
     void markIsClearedOnTheNextIngestOnceTheCatalogKnowsTheKey() {
@@ -313,7 +313,7 @@ class AuditIngestionServiceTest {
         assertThat(marked.isUnknownRuleKey()).isFalse();
     }
 
-    /** Ein Audit ohne Katalogeintrag wird nicht geprueft — die uebrigen Audits vergeben frei. */
+    /** An audit without a catalog entry is not checked — the other audits assign freely. */
     @Test
     void anAuditWithoutCatalogEntry_isNotChecked() {
         acceptedFinding("Big.java: 320 LOC", ACCEPTED_AT, true);
@@ -328,8 +328,8 @@ class AuditIngestionServiceTest {
         return savedFindings().getLast();
     }
 
-    /** Ein Coverage-Run mit je einem LOW-Finding pro ruleKey (LOW erzeugt kein verwaltetes TODO). */
-    /** Coverage-Run ohne Bestand: jedes Finding ist neu. */
+    /** A coverage run with one LOW finding per ruleKey (LOW produces no managed TODO). */
+    /** Coverage run without existing data: every finding is new. */
     private void stubCoverageRun(String runId, String... ruleKeys) {
         stubCoverageRunEnvelope(runId, ruleKeys);
     }
@@ -369,8 +369,8 @@ class AuditIngestionServiceTest {
     }
 
     /**
-     * 276ac76f: Health-Befunde aus dem alten Regel-Schema (complexity.god-class-count) standen nach jedem gueltigen
-     * Lauf weiter als akzeptiert in den Zaehlern. Der naechste gueltige, vollstaendige Snapshot schliesst sie.
+     * 276ac76f: health findings from the old rule schema (complexity.god-class-count) stayed in the counters as accepted
+     * after every valid run. The next valid, complete snapshot closes them.
      */
     @Test
     void acceptedFindingWithARuleKeyNoLongerInTheCatalog_isResolvedByTheNextValidSnapshot() {
@@ -400,7 +400,7 @@ class AuditIngestionServiceTest {
         assertThat(savedFindings()).contains(legacy);
     }
 
-    /** Run mit Faktenblatt-Block: Beleg-Pruefung greift (TODO a94b56a0). */
+    /** Run with a fact-sheet block: the evidence check applies (TODO a94b56a0). */
     private void stubRunWithFactSheet(String runId, String evidence) {
         String envelope = "<!-- mysuricates:audit-result:v1 {\"snapshotComplete\":true,\"findings\":[{\"ruleKey\":\"size.class\","
                 + "\"subject\":\"Big.java\",\"severity\":\"HIGH\",\"title\":\"Big.java ist zu gross\","
@@ -413,7 +413,7 @@ class AuditIngestionServiceTest {
         WorkflowRun run = WorkflowRun.builder().id(runId).workflow(Workflow.builder().name("Health Audit").build())
                 .status(RunStatus.COMPLETED).completedAt(ACCEPTED_AT).steps(new ArrayList<>(List.of(facts, report))).build();
         when(runRepository.findByIdWithSteps(runId)).thenReturn(Optional.of(run));
-        // findingRepository.saveAll ist in setUp gestubt; findBy... liefert per Mockito-Default leer.
+        // findingRepository.saveAll is stubbed in setUp; findBy... returns empty by Mockito default.
     }
 
     @Test
@@ -442,7 +442,7 @@ class AuditIngestionServiceTest {
         verify(todoRepository).save(any());
     }
 
-    /** Ein Run mit frei waehlbarem ruleKey — fuer die Katalogpruefung. */
+    /** A run with a freely selectable ruleKey — for the catalog check. */
     private void stubRunWithRuleKey(String runId, String ruleKey) {
         String envelope = "<!-- mysuricates:audit-result:v1 {\"snapshotComplete\":true,\"findings\":[{\"ruleKey\":\""
                 + ruleKey + "\",\"subject\":\"Big.java\",\"severity\":\"HIGH\",\"title\":\"t\","
@@ -452,7 +452,7 @@ class AuditIngestionServiceTest {
         WorkflowRun run = WorkflowRun.builder().id(runId).workflow(Workflow.builder().name("Coverage").build())
                 .status(RunStatus.COMPLETED).completedAt(ACCEPTED_AT).steps(new ArrayList<>(List.of(step))).build();
         when(runRepository.findByIdWithSteps(runId)).thenReturn(Optional.of(run));
-        // HIGH erzeugt ein verwaltetes TODO — nur im gueltigen Fall, deshalb lenient.
+        // HIGH produces a managed TODO — only in the valid case, hence lenient.
         lenient().when(todoRepository.save(any())).thenAnswer(inv -> {
             Todo todo = inv.getArgument(0);
             if (todo.getId() == null) todo.setId("todo-" + UUID.randomUUID());
@@ -461,9 +461,9 @@ class AuditIngestionServiceTest {
     }
 
     /**
-     * Gedriftete ruleKeys tragen die richtige <i>Anzahl</i> Findings und passieren deshalb den
-     * zaehlenden Gate-Block. Die Ingestion legte daraufhin lauter neue Identitaeten an und schloss
-     * die Vorgaengergeneration als RESOLVED — ebenso viele Wiedergaenger (TODO f57945e2).
+     * Drifted ruleKeys carry the right <i>number</i> of findings and therefore pass the
+     * counting gate block. The ingestion then created nothing but new identities and closed
+     * the previous generation as RESOLVED — as many recurrences (TODO f57945e2).
      */
     @Test
     void unbekannterRuleKeyMachtDenGanzenReportUngueltig() {
@@ -480,7 +480,7 @@ class AuditIngestionServiceTest {
         verify(todoRepository, never()).save(any());
     }
 
-    /** Ein Key aus dem Katalog laeuft unveraendert durch. */
+    /** A key from the catalog passes through unchanged. */
     @Test
     void bekannterRuleKeyBleibtGueltig() {
         stubRunWithRuleKey("run-1", "test-coverage.untested-class");
@@ -493,7 +493,7 @@ class AuditIngestionServiceTest {
         assertThat(savedFindings()).isNotEmpty();
     }
 
-    /** Ein Audit ohne Katalogeintrag vergibt seine Keys frei — unveraendertes Verhalten. */
+    /** An audit without a catalog entry assigns its keys freely — unchanged behavior. */
     @Test
     void ohneKatalogBleibtDerReportGueltig() {
         stubRunWithRuleKey("run-1", "was.auch.immer");
@@ -507,9 +507,9 @@ class AuditIngestionServiceTest {
     }
 
     /**
-     * Die Naht zum {@link AuditSnapshotApplier} (Audit-TODO aac5fbf7): Der Service prueft und
-     * speichert den Report und reicht nur einen gueltigen weiter — mit den Findings des Envelopes und
-     * den Messwerten des Laufs.
+     * The seam to the {@link AuditSnapshotApplier} (audit TODO aac5fbf7): the service checks and
+     * saves the report and passes on only a valid one — with the findings of the envelope and
+     * the metrics of the run.
      */
     @Nested
     class HandOverToTheApplier {
@@ -517,7 +517,7 @@ class AuditIngestionServiceTest {
         @Mock private AuditSnapshotApplier applier;
         private AuditIngestionService withMockedApplier;
 
-        /** Nach dem aeusseren setUp: erst dann stehen die Mocks, die der Service bekommt. */
+        /** After the outer setUp: only then do the mocks the service receives exist. */
         @BeforeEach
         void mockTheApplier() {
             withMockedApplier = new AuditIngestionService(runRepository, reportRepository,
@@ -553,8 +553,8 @@ class AuditIngestionServiceTest {
         }
     }
     /**
-     * Provider und Modell des Reports (fa66ea31): Setzt ein Shell-Block den Envelope zusammen, ist der
-     * reportBlock kein KI-Schritt. Das Modell nennt dann der Schritt des promptBlock, nicht der Workflow.
+     * Provider and model of the report (fa66ea31): if a shell block assembles the envelope, the
+     * reportBlock is not an AI step. The model is then named by the promptBlock's step, not the workflow.
      */
     @Nested
     class ProviderAndModel {

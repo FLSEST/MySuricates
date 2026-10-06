@@ -28,8 +28,8 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Der einmalige Merge-Job fuehrt Wiedergaenger zusammen, die vor der subject-Normalisierung als
- * eigene Findings entstanden sind (Audit-TODO 0e19648d) — und ist beim zweiten Lauf ein No-op.
+ * The one-off merge job merges recurrences that arose as separate findings before the subject
+ * normalization (audit TODO 0e19648d) — and is a no-op on the second run.
  */
 @SpringBootTest
 @ActiveProfiles("integration")
@@ -37,14 +37,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AuditFingerprintMigrationJobTest {
 
     /**
-     * Erfundener auditKey ohne Katalogeintrag. Hier geht es um die Fingerprint-Migration, nicht um
-     * das ruleKey-Vokabular; mit einem echten Schluessel reisst jedes ergaenzte Vokabular diese
-     * Tests mit (seit TODO a17e2d19 haben alle sechs ausgelieferten Audits einen Katalog -- vorher
-     * stand hier mysuricates.security).
+     * Made-up auditKey without a catalog entry. This is about the fingerprint migration, not about
+     * the ruleKey vocabulary; with a real key every added vocabulary entry drags these
+     * tests along (since TODO a17e2d19 all six shipped audits have a catalog -- before that
+     * this was mysuricates.security).
      */
     private static final String AUDIT_KEY = "test.audit-ohne-katalog";
     private static final String RULE_KEY = "shell.injection";
-    /** Das einzige Audit mit ruleKey-Katalog (siehe {@code audit/rule-keys.json}). */
+    /** The only audit with a ruleKey catalog (see {@code audit/rule-keys.json}). */
     private static final String COVERAGE_AUDIT_KEY = "mysuricates.test-coverage";
     private static final String CANONICAL_RULE_KEY = "test-coverage.untested-class";
     private static final Instant T0 = Instant.parse("2026-09-05T10:30:00Z");
@@ -83,7 +83,7 @@ class AuditFingerprintMigrationJobTest {
         AuditFinding untouched = saveFinding("application.yml:key-store-password", AuditFindingStatus.OPEN, 2, T1, T1, reportOld, "run-old");
         saveOccurrence(older.getId(), reportOld);
         saveOccurrence(newer.getId(), reportNew);
-        saveOccurrence(newer.getId(), reportOld); // Kollision: das Ziel hat diesen Report schon
+        saveOccurrence(newer.getId(), reportOld); // collision: the target already has this report
         String todoId = todoRepository.save(Todo.builder().title("Shell-Aufruf ohne Escaping")
                 .status(Todo.Status.OPEN).priority(Todo.Priority.HIGH).projectId(projectId)
                 .source(Todo.Source.WORKFLOW).sourceAgent("audit-center")
@@ -140,8 +140,8 @@ class AuditFingerprintMigrationJobTest {
     }
 
     /**
-     * Ein akzeptiertes Risiko ist eine menschliche Entscheidung — ein Wiedergaenger darf sie beim
-     * Zusammenfuehren nicht aufheben. Wiedereroeffnung nur ueber {@link AuditAcceptancePolicy}.
+     * An accepted risk is a human decision — a recurrence must not revoke it when
+     * merging. Reopening only via {@link AuditAcceptancePolicy}.
      */
     @Test
     void acceptedRiskTargetStaysAcceptedWhenTheTwinIsOpen() {
@@ -181,9 +181,9 @@ class AuditFingerprintMigrationJobTest {
     }
 
     /**
-     * Gegenprobe zum Spiegelfall: erbt das Ziel die Akzeptanz des Wiedergaengers, muss auch dessen
-     * umgehaengtes managed TODO geschlossen werden — die Absence-Schleife von
-     * {@code AuditIngestionService} fasst terminale Findings nie wieder an.
+     * Counter-check to the mirror case: if the target inherits the recurrence's acceptance, its
+     * re-attached managed TODO must be closed as well — the absence loop of
+     * {@code AuditIngestionService} never touches terminal findings again.
      */
     @Test
     void closesTheManagedTodoWhenTheMergedTargetInheritsATerminalDisposition() {
@@ -216,8 +216,8 @@ class AuditFingerprintMigrationJobTest {
     }
 
     /**
-     * Ein nicht-terminales Ziel schliesst nichts: das managed TODO der Dublette bleibt offen und
-     * haengt am Ziel — sonst verschwaende der Merge einen echten Fix-Auftrag.
+     * A non-terminal target closes nothing: the duplicate's managed TODO stays open and
+     * stays attached to the target — otherwise the merge would make a real fix task vanish.
      */
     @Test
     void keepsTheManagedTodoOpenWhenTheMergedTargetIsNotTerminal() {
@@ -241,9 +241,9 @@ class AuditFingerprintMigrationJobTest {
     }
 
     /**
-     * Ein zur Wiedervorlage stehender Wiedergaenger zieht das aufgeloeste Ziel zurueck in
-     * {@code AWAITING_VERIFICATION} — dann darf kein Loesungszeitpunkt stehen bleiben, sonst zeigt
-     * das Audit Center ein offenes Finding mit Behebungsdatum.
+     * A recurrence due for resubmission pulls the resolved target back into
+     * {@code AWAITING_VERIFICATION} — then no resolution timestamp may remain, otherwise the
+     * Audit Center shows an open finding with a fix date.
      */
     @Test
     void clearsResolvedAtWhenTheTargetFallsBackToAwaitingVerification() {
@@ -261,9 +261,9 @@ class AuditFingerprintMigrationJobTest {
     }
 
     /**
-     * Spiegelfall und wahrscheinlichster Drift-Verlauf: das aeltere Finding wurde auto-resolved,
-     * der juengere Wiedergaenger wurde akzeptiert. Die Disposition schlaegt, egal auf welcher Seite
-     * sie steht — sonst liefe der naechste Ingest ueber RESOLVED → OPEN samt neuem managed TODO.
+     * Mirror case and most likely drift path: the older finding was auto-resolved,
+     * the younger recurrence was accepted. The disposition wins, whichever side
+     * it is on — otherwise the next ingest would go RESOLVED → OPEN including a new managed TODO.
      */
     @Test
     void resolvedTargetInheritsTheAcceptedRiskOfItsTwin() {
@@ -292,11 +292,11 @@ class AuditFingerprintMigrationJobTest {
     }
 
     /**
-     * Seit dem ruleKey-Katalog (Audit-TODO 8fc9a401) bildet die Ingestion den Fingerprint aus dem
-     * <em>normalisierten</em> ruleKey. Altbestand mit gedrifteter Schreibweise wuerde sonst beim
-     * naechsten Ingest nicht mehr gefunden — neues Finding, altes ueber die Abwesenheits-Schleife
-     * auf RESOLVED, und eine Akzeptanz bliebe am toten Datensatz haengen. Der Aufraeumlauf zieht
-     * den Key deshalb mit nach.
+     * Since the ruleKey catalog (audit TODO 8fc9a401) the ingestion forms the fingerprint from the
+     * <em>normalized</em> ruleKey. Legacy data with a drifted spelling would otherwise no longer be found at the
+     * next ingest — new finding, the old one set to RESOLVED via the absence loop,
+     * and an acceptance would stay stuck on the dead record. The cleanup run therefore
+     * carries the key along.
      */
     @Test
     void normalizesDriftedRuleKeysAndMergesTheTwinsTheyCreated() {
@@ -329,14 +329,14 @@ class AuditFingerprintMigrationJobTest {
     }
 
     /**
-     * Der haeufigste Realfall: ein <em>einzelnes</em> gedriftetes Altfinding ohne Zwilling. Hier
-     * muss die neue Schreibweise wirklich in der DB landen — im Zwillingsfall traegt der
-     * ueberlebende Datensatz den kanonischen Key ohnehin, dort beweist nichts die Schreibung.
+     * The most common real case: a <em>single</em> drifted legacy finding without a twin. Here
+     * the new spelling must really land in the DB — in the twin case the
+     * surviving record carries the canonical key anyway, so nothing there proves the spelling.
      */
     /**
-     * v3 (94fda6ef): Ein {@code <art>:<wert>}-Finding trug bisher den Fingerprint von {@code <art>};
-     * nach der Migration hat es genau den, den der naechste Ingest bildet — sonst entstuende ein
-     * Wiedergaenger und das Altfinding fiele auf RESOLVED.
+     * v3 (94fda6ef): A {@code <art>:<wert>} finding used to carry the fingerprint of {@code <art>};
+     * after the migration it has exactly the one the next ingest forms — otherwise a
+     * recurrence would arise and the legacy finding would fall to RESOLVED.
      */
     @Test
     void rehashesAKindPrefixedSubjectOntoItsFullIdentity() {
@@ -354,8 +354,8 @@ class AuditFingerprintMigrationJobTest {
     }
 
     /**
-     * v4 (90c4f7db): {@code audit_findings} zeigt ein {@code |} im subject als {@code ¦}. Ein Finding, das schon
-     * mit {@code ¦} gespeichert ist, und sein Zwilling mit {@code |} sind derselbe Befund.
+     * v4 (90c4f7db): {@code audit_findings} shows a {@code |} in the subject as {@code ¦}. A finding already stored
+     * with {@code ¦} and its twin with {@code |} are the same finding.
      */
     @Test
     void mergesAFindingStoredWithTheMaskedSeparatorOntoItsPipeTwin() {
@@ -395,9 +395,9 @@ class AuditFingerprintMigrationJobTest {
     }
 
     /**
-     * Gegenprobe mit einem Key, den die Normalisierung veraendern <em>wuerde</em>: nur der
-     * fehlende Katalogeintrag haelt ihn fest. Mit einem bereits kanonischen Key bewiese der Test
-     * nichts — er bliebe auch gruen, wenn normalize() bedingungslos liefe.
+     * Counter-check with a key that the normalization <em>would</em> change: only the
+     * missing catalog entry holds it in place. With an already canonical key the test would prove
+     * nothing — it would also stay green if normalize() ran unconditionally.
      */
     @Test
     void leavesADriftedRuleKeyOfAnUncataloguedAuditAlone() {
@@ -419,9 +419,9 @@ class AuditFingerprintMigrationJobTest {
     }
 
     /**
-     * Ein Finding, das gleich danach als Dublette geloescht wird, braucht die neue Schreibweise
-     * nicht: das UPDATE waere verworfen und die Log-Zeile behauptete eine Aenderung, die niemand
-     * je sieht. Gezogen wird der Key erst am ueberlebenden Datensatz.
+     * A finding that is deleted as a duplicate right afterwards does not need the new spelling:
+     * the UPDATE would be discarded and the log line would claim a change that nobody
+     * ever sees. The key is only pulled on the surviving record.
      */
     @Test
     void doesNotRewriteTheRuleKeyOfAFindingItDeletesAsADuplicate() {
@@ -444,7 +444,7 @@ class AuditFingerprintMigrationJobTest {
         assertThat(findingRepository.findById(drifted.getId())).isEmpty();
     }
 
-    /** Ein Audit ohne Katalogeintrag behaelt seine Keys — dort vergibt der Prompt sie frei. */
+    /** An audit without a catalog entry keeps its keys — there the prompt assigns them freely. */
     @Test
     void leavesRuleKeysOfAnUncataloguedAuditAlone() {
         AuditFinding finding = saveFinding("ContainerShellService", AuditFindingStatus.OPEN, 1, T1, T1, reportOld, "run-old");
@@ -469,11 +469,11 @@ class AuditFingerprintMigrationJobTest {
                 .firstSeenAt(firstSeenAt).lastSeenAt(lastSeenAt).occurrenceCount(2).build());
     }
 
-    // --- v6 (87a1dac0): Klassenname = Pfad, Kennzahl-Regeln mit FAKT-Namen ----------------------
+    // --- v6 (87a1dac0): class name = path, metric rules with FAKT names ----------------------
 
     /**
-     * Derselbe Befund stand einmal unter dem Klassennamen (akzeptiert) und einmal unter dem Pfad (offen, mit
-     * verwaltetem TODO). Der Aufraeumlauf fuehrt beide zusammen; die Akzeptanz gewinnt, das TODO schliesst.
+     * The same finding once stood under the class name (accepted) and once under the path (open, with a
+     * managed TODO). The cleanup run merges both; the acceptance wins, the TODO closes.
      */
     @Test
     void mergesClassNameAndPathOfTheSameClass_keepingTheAcceptedRisk() {
@@ -518,7 +518,7 @@ class AuditFingerprintMigrationJobTest {
         assertThat(again.getStatus()).isEqualTo(AuditFindingStatus.ACCEPTED_RISK);
     }
 
-    /** Gleichnamige Klasse in Backend und Frontend: der Aufraeumlauf fuehrt sie nicht zusammen. */
+    /** Same-named class in backend and frontend: the cleanup run does not merge them. */
     @Test
     void keepsTheBackendClassAndTheFrontendModuleOfTheSameNameApart() {
         AuditFinding backend = saveFinding("com/automation/entity/ActivityLog.java", AuditFindingStatus.ACCEPTED_RISK,
@@ -536,7 +536,7 @@ class AuditFingerprintMigrationJobTest {
                 .isEqualTo(AuditFindingStatus.OPEN);
     }
 
-    /** Kennzahl-Regel: gedriftete subjects ("Datenbank", "DB-Groesse") gehen auf den FAKT-Namen ueber. */
+    /** Metric rule: drifted subjects ("Datenbank", "DB-Groesse") are moved over to the FAKT name. */
     @Test
     void mergesDriftedSubjectsOfAMetricRuleOntoTheFactName_keepingTheAcceptedRisk() {
         String performance = "mysuricates.performance";
@@ -576,7 +576,7 @@ class AuditFingerprintMigrationJobTest {
                 .firstSeenAt(firstSeenAt).lastSeenAt(lastSeenAt).occurrenceCount(1).build());
     }
 
-    // --- Folgebefund zu 802f740a: feste subjects je ruleKey -------------------------------------
+    // --- Follow-up finding to 802f740a: fixed subjects per ruleKey -------------------------------------
 
     private static final String PUBLIC_READINESS = "project.public-readiness";
 
@@ -594,9 +594,9 @@ class AuditFingerprintMigrationJobTest {
     }
 
     /**
-     * Ein Wiedergaenger mit abweichendem subject einer Regel mit festem Wert traegt die Einordnung; seit die
-     * Ingestion den festen Wert durchsetzt, faende der naechste Lauf ihn nicht mehr. Der Aufraeumlauf fuehrt
-     * ihn auf den kanonischen Befund zusammen — die Einordnung samt Notiz geht mit.
+     * A recurrence with a deviating subject of a rule with a fixed value carries the disposition; since the
+     * ingestion enforces the fixed value, the next run would no longer find it. The cleanup run merges
+     * it into the canonical finding — the disposition including its note goes along.
      */
     @Test
     void mergesDriftedSubjectsOfAFixedRuleOntoTheCanonicalFinding_keepingTheirDisposition() {
@@ -631,7 +631,7 @@ class AuditFingerprintMigrationJobTest {
         assertThat(again.getStatus()).isEqualTo(AuditFindingStatus.ACCEPTED_RISK);
     }
 
-    /** Ohne kanonischen Zwilling wird der abweichende Befund selbst kanonisch — Einordnung bleibt. */
+    /** Without a canonical twin the deviating finding itself becomes canonical — disposition stays. */
     @Test
     void movesALoneDriftedFindingOfAFixedRuleOntoTheFixedSubject() {
         AuditFinding drifted = savePublicReadinessFinding("public.deadcode.markers", "ai-automation-backend",
@@ -653,9 +653,9 @@ class AuditFingerprintMigrationJobTest {
     }
 
     /**
-     * Review zu 802f740a: zwei Befunde derselben festen Regel mit altem subject — einer davon eingeordnet —
-     * und der kanonische. Alle drei werden einer, die Einordnung samt Notiz bleibt, egal in welcher
-     * Reihenfolge der Merge die Wiedergaenger trifft.
+     * Review of 802f740a: two findings of the same fixed rule with an old subject — one of them dispositioned —
+     * and the canonical one. All three become one, the disposition including its note stays, no matter in which
+     * order the merge hits the recurrences.
      */
     @Test
     void mergesTwoDriftedSubjectsAndTheCanonicalOne_keepingTheAcceptance() {
@@ -681,9 +681,9 @@ class AuditFingerprintMigrationJobTest {
     }
 
     /**
-     * Review zu 802f740a: Tauschen zwei Ueberlebende ihre Fingerprints, braeche uq(project_id, audit_key,
-     * fingerprint) beim ersten Schreiben — und der Job scheiterte bei jedem Start erneut. Er schreibt
-     * deshalb zweiphasig (erst ein Platzhalter, dann das Ziel).
+     * Review of 802f740a: if two survivors swap their fingerprints, uq(project_id, audit_key,
+     * fingerprint) would break on the first write — and the job would fail again at every start. It therefore
+     * writes in two phases (first a placeholder, then the target).
      */
     @Test
     void twoSurvivorsSwappingTheirFingerprints_doNotBreakTheUniqueConstraint() {
@@ -757,7 +757,7 @@ class AuditFingerprintMigrationJobTest {
                 .title("Shell-Aufruf ohne Escaping").observedAt(T1).build());
     }
 
-    /** Fingerprint vor der Normalisierung: SHA-256 ueber rohen ruleKey und rohes subject. */
+    /** Fingerprint before normalization: SHA-256 over raw ruleKey and raw subject. */
     private String legacyFingerprint(String subject) {
         return legacyFingerprint(AUDIT_KEY, RULE_KEY, subject);
     }

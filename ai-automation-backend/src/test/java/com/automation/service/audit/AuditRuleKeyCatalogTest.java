@@ -18,8 +18,8 @@ import java.util.regex.Pattern;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Der ruleKey-Katalog: Laden, Normalisierung — und das Gate gegen Drift zwischen Katalog und den
- * ausgelieferten Audit-Prompts (Audit-TODO 8fc9a401).
+ * The ruleKey catalog: loading, normalization — and the gate against drift between the catalog and the
+ * shipped audit prompts (audit TODO 8fc9a401).
  */
 class AuditRuleKeyCatalogTest {
 
@@ -35,7 +35,7 @@ class AuditRuleKeyCatalogTest {
                 .contains("test-coverage.untested-class", "test-coverage.thin-test");
     }
 
-    /** 802f740a: Eintraege mit festem subject zaehlen als erlaubte Keys und liefern ihren Wert. */
+    /** 802f740a: entries with a fixed subject count as allowed keys and supply their value. */
     @Test
     void loadsFixedSubjects_andTreatsTheirKeysAsAllowed() {
         assertThat(catalog.allowedKeys(PUBLIC_READINESS))
@@ -64,9 +64,9 @@ class AuditRuleKeyCatalogTest {
     }
 
     /**
-     * Bewusst ein erfundener auditKey: Seit TODO a17e2d19 haben alle sechs ausgelieferten Audits
-     * einen Katalogeintrag. Ein echter Schluessel als Beispiel wuerde diesen Test beim naechsten
-     * ergaenzten Vokabular wieder rot machen — vorher stand hier mysuricates.architecture.
+     * Deliberately a made-up auditKey: since TODO a17e2d19 all six shipped audits have
+     * a catalog entry. A real key as an example would turn this test red again at the next
+     * added vocabulary entry — before that, mysuricates.architecture stood here.
      */
     @Test
     void anAuditWithoutCatalogEntryIsNotChecked() {
@@ -102,8 +102,8 @@ class AuditRuleKeyCatalogTest {
     }
 
     /**
-     * Gate: jeder ruleKey, den ein ausgelieferter Audit-Prompt woertlich vergibt, steht im Katalog.
-     * Sonst wuerde die Ingestion im Betrieb WARNen, obwohl der Prompt genau diesen Key verlangt.
+     * Gate: every ruleKey that a shipped audit prompt assigns literally is in the catalog.
+     * Otherwise the ingestion would WARN in operation although the prompt demands exactly this key.
      */
     @Test
     void everyRuleKeyFixedInAPoolPromptIsInTheCatalog() throws IOException {
@@ -128,11 +128,11 @@ class AuditRuleKeyCatalogTest {
     }
 
     /**
-     * Gate: der Evidenz-Prompt (project.public-readiness) legt je ruleKey auch das subject fest —
-     * einen festen Wert fuer Regeln, die das Repository als Ganzes betreffen, sonst die Pfadregel
-     * (TODO 3a9e275b). Ohne diese Vorgabe waehlte das Modell zwischen zwei Laeufen fuer denselben
-     * Befund ein anderes subject, und der Befund kam als Wiedergaenger ohne seine Disposition zurueck.
-     * Ein fester Wert muss die Normalisierung unveraendert ueberstehen — sonst ist er selbst die Drift.
+     * Gate: the evidence prompt (project.public-readiness) also fixes the subject per ruleKey —
+     * a fixed value for rules that concern the repository as a whole, otherwise the path rule
+     * (TODO 3a9e275b). Without this requirement the model would choose a different subject for the same
+     * finding between two runs, and the finding would come back as a recurrence without its disposition.
+     * A fixed value must survive the normalization unchanged — otherwise it is itself the drift.
      */
     @Test
     void publicReadinessPromptFixesTheSubjectOfEveryRuleKey() throws IOException {
@@ -176,14 +176,14 @@ class AuditRuleKeyCatalogTest {
     }
 
     /**
-     * Gate (802f740a): Der Katalog setzt genau die festen subjects durch, die der Evidenz-Prompt verlangt —
-     * je ruleKey mit genau einem {@code subject "<wert>"} denselben Wert, sonst (Pfadregel, mehrere Module)
-     * keinen. Liefen beide auseinander, ueberschriebe die Ingestion ein subject, an das sich das Modell hielt.
+     * Gate (802f740a): the catalog enforces exactly the fixed subjects that the evidence prompt demands —
+     * per ruleKey with exactly one {@code subject "<wert>"} the same value, otherwise (path rule, several modules)
+     * none. If the two diverged, the ingestion would overwrite a subject the model adhered to.
      */
     @Test
     void catalogFixedSubjectsAreTheOnesThePublicReadinessPromptDemands() throws IOException {
         Pattern entry = Pattern.compile("(?m)^- ruleKey \"([a-z0-9][a-z0-9.\\-]*)\"(.*)$");
-        // subject "a" — oder eine Auswahl: subject "a" oder "b" (dann kein fester Wert).
+        // subject "a" — or a choice: subject "a" or "b" (then no fixed value).
         Pattern fixedSubject = Pattern.compile("subject (\"[^\"]*\"(?: oder \"[^\"]*\")*)");
         Pattern quoted = Pattern.compile("\"([^\"]*)\"");
         List<String> violations = new ArrayList<>();
@@ -223,9 +223,9 @@ class AuditRuleKeyCatalogTest {
     }
 
     /**
-     * Gate (802f740a): Auch das Envelope-Beispiel am Ende eines Prompts nennt keinen ruleKey ausserhalb des
-     * Katalogs. Uebernaehme das Modell ihn, verwuerfe die Ingestion den ganzen Report. Erlaubt ist daneben nur
-     * der Schema-Platzhalter {@code stabile-regel-id}, den kein Katalog kennt.
+     * Gate (802f740a): the envelope example at the end of a prompt also names no ruleKey outside the
+     * catalog. If the model adopted it, the ingestion would discard the whole report. Besides that only
+     * the schema placeholder {@code stabile-regel-id} is allowed, which no catalog knows.
      */
     @Test
     void envelopeExamplesUseACataloguedRuleKeyOrThePlaceholder() throws IOException {
@@ -258,7 +258,7 @@ class AuditRuleKeyCatalogTest {
         assertThat(violations).isEmpty();
     }
 
-    /** 87a1dac0: Kennzahl-Regeln des Performance-Audits haben den FAKT-Namen als festes subject. */
+    /** 87a1dac0: metric rules of the performance audit have the FAKT name as a fixed subject. */
     @Test
     void metricRulesOfThePerformanceAuditHaveTheFactNameAsFixedSubject() {
         String performance = "mysuricates.performance";
@@ -271,7 +271,7 @@ class AuditRuleKeyCatalogTest {
         assertThat(catalog.fixedSubject(performance, "perf.request.slow-route")).as("Route").isNull();
     }
 
-    /** 87a1dac0: Kennzahl-Regeln des Health-Checks haben den FAKT-Namen als festes subject. */
+    /** 87a1dac0: metric rules of the health check have the FAKT name as a fixed subject. */
     @Test
     void metricRulesOfTheHealthCheckHaveTheFactNameAsFixedSubject() {
         String health = "mysuricates.health";
@@ -283,10 +283,10 @@ class AuditRuleKeyCatalogTest {
     }
 
     /**
-     * Gate (87a1dac0): Ein festes subject ausserhalb des Evidenz-Prompts muss im Prompt seines Audits in einer
-     * Zeile zusammen mit seinem ruleKey stehen — sonst setzte die Ingestion einen Wert durch, den das Modell nie
-     * zu sehen bekommt, und die Tabelle BEKANNTE BEFUNDE zeigte ihm ein subject, das es nicht kennt. Ein fester
-     * Wert muss ausserdem die Normalisierung unveraendert ueberstehen.
+     * Gate (87a1dac0): a fixed subject outside the evidence prompt must appear in its audit's prompt on a
+     * line together with its ruleKey — otherwise the ingestion would enforce a value the model never
+     * gets to see, and the BEKANNTE BEFUNDE table would show it a subject it does not know. A fixed
+     * value must additionally survive the normalization unchanged.
      */
     @Test
     void fixedSubjectsOfOtherAuditsStandNextToTheirRuleKeyInThePrompt() throws IOException {
@@ -324,12 +324,12 @@ class AuditRuleKeyCatalogTest {
     }
 
     /**
-     * ruleKeys, die ein Prompt seinem Modell woertlich vorgibt. Das Envelope-Beispiel am Ende jedes
-     * Prompts zaehlt nicht: dort stehen Schema-Platzhalter ({@code "ruleKey":"stabile-regel-id"},
-     * {@code "subject":"pfad/zur/datei"}), keine Vokabeln.
+     * ruleKeys that a prompt literally gives its model. The envelope example at the end of every
+     * prompt does not count: it contains schema placeholders ({@code "ruleKey":"stabile-regel-id"},
+     * {@code "subject":"pfad/zur/datei"}), no vocabulary.
      */
     private static Set<String> literalRuleKeys(JsonNode root) {
-        // Nur echte Zuweisungen ("ruleKey":"x" / ruleKey "x"), nicht der Fliesstext der Prompts.
+        // Only real assignments ("ruleKey":"x" / ruleKey "x"), not the running text of the prompts.
         Pattern pattern = Pattern.compile("ruleKey[\"']?\\s*:?\\s*[\"']([a-z0-9][a-z0-9.\\-]*)[\"']");
         Pattern envelopeExample = Pattern.compile("<!--\\s*mysuricates:audit-result:v1.*?-->", Pattern.DOTALL);
         Set<String> keys = new LinkedHashSet<>();
@@ -360,7 +360,7 @@ class AuditRuleKeyCatalogTest {
         }
     }
 
-    /** Ausgelieferte Audit-Definitionen ({@code metadata.audit.enabled}) aus {@code workflow-pool/}. */
+    /** Shipped audit definitions ({@code metadata.audit.enabled}) from {@code workflow-pool/}. */
     private static List<Path> poolDefinitions() throws IOException {
         Path pool = ShippedDefinitions.poolDirectoryOrNull();
         assertThat(pool).as("workflow-pool nicht gefunden ab " + Paths.get("").toAbsolutePath()).isNotNull();

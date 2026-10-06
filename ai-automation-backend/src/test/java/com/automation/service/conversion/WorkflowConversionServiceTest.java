@@ -355,7 +355,7 @@ class WorkflowConversionServiceTest {
         assertThat(result).isSameAs(response);
     }
 
-    // ── Anlegen mit dem geprüften Vorschlag aus der Vorschau (TODO 935af6d3) ──
+    // ── Creating with the checked proposal from the preview (TODO 935af6d3) ──
 
     @Nested
     class ReviewedSuggestion {
@@ -369,7 +369,7 @@ class WorkflowConversionServiceTest {
         private List<BlockDefinition> reviewed() {
             return List.of(
                     BlockDefinition.builder().type("shell").config(Map.of("command", "set -euo pipefail; npm test")).build(),
-                    // Ein Baufehler (simple ohne command): Die Meldung nach dem Speichern bleibt.
+                    // A build error (simple without command): the message after saving stays.
                     BlockDefinition.builder().type("simple").config(Map.of("prompt", "Fasse zusammen")).build());
         }
 
@@ -392,9 +392,9 @@ class WorkflowConversionServiceTest {
             assertThat(captor.getValue().name()).isEqualTo("Geprüft");
             assertThat(captor.getValue().description()).isEqualTo("Aus der Vorschau");
             assertThat(captor.getValue().blocks()).containsExactlyElementsOf(blocks);
-            // Kein neuer Vorschlag: kein KI-Aufruf, kein Provider.
+            // No new proposal: no AI call, no provider.
             verifyNoInteractions(aiProvider, aiProviderRegistry);
-            // Die deterministische Baufehler-Meldung nach dem Speichern bleibt.
+            // The deterministic build-error message after saving stays.
             verify(activityLogService).warn(any(), contains("Baufehler-Prüfung (Konvertierung)"), anyString(),
                     isNull(), eq("new-wf"));
         }
@@ -420,7 +420,7 @@ class WorkflowConversionServiceTest {
             assertThat(txDuringCreate.get()).isTrue();
         }
 
-        /** Gleiches Fehlerbild wie suggestWorkflow: unbekannter Lauf → 404. */
+        /** Same error picture as suggestWorkflow: unknown run → 404. */
         @Test
         void withReviewedBlocks_unknownRun_throwsNotFound_andSavesNothing() {
             when(runRepository.findById("unknown")).thenReturn(Optional.empty());
@@ -431,7 +431,7 @@ class WorkflowConversionServiceTest {
             verifyNoInteractions(workflowService, aiProvider);
         }
 
-        /** Gleiches Fehlerbild wie der alte Weg: ein nicht abgeschlossener Lauf hat keinen Vorschlag. */
+        /** Same error picture as the old path: an unfinished run has no proposal. */
         @Test
         void withReviewedBlocks_runNotCompleted_throwsNoConversionAvailable() {
             WorkflowRun running = buildCompletedRunWithAgenticSteps();
@@ -445,7 +445,7 @@ class WorkflowConversionServiceTest {
             verifyNoInteractions(workflowService, aiProvider);
         }
 
-        /** Mit Blöcken gibt es keinen Server-Vorschlag, aus dem der Name käme: Der Client schickt ihn mit. */
+        /** With blocks there is no server proposal the name would come from: the client sends it along. */
         @Test
         void withReviewedBlocks_withoutName_isRejected_beforeAnything() {
             assertThatThrownBy(() -> conversionService.createWorkflowFromSuggestion(
@@ -454,7 +454,7 @@ class WorkflowConversionServiceTest {
             verifyNoInteractions(runRepository, workflowService, aiProvider);
         }
 
-        /** Ohne (oder mit leeren) Blöcken bleibt es beim alten Weg: Der Vorschlag wird neu erzeugt. */
+        /** Without (or with empty) blocks the old path stays: the proposal is generated anew. */
         @Test
         void withoutReviewedBlocks_theSuggestionIsCreatedAgain() throws Exception {
             when(runRepository.findById("run-1")).thenReturn(Optional.of(buildCompletedRunWithAgenticSteps()));
@@ -469,7 +469,7 @@ class WorkflowConversionServiceTest {
             ArgumentCaptor<com.automation.dto.request.CreateWorkflowRequest> captor =
                     ArgumentCaptor.forClass(com.automation.dto.request.CreateWorkflowRequest.class);
             verify(workflowService).create(captor.capture(), eq(ChangeSource.CONVERSION));
-            // Der regelbasierte Vorschlag (npm install, npm test), nicht die leere Liste.
+            // The rule-based proposal (npm install, npm test), not the empty list.
             assertThat(captor.getValue().blocks()).hasSize(2);
             assertThat(captor.getValue().description()).startsWith("Automatically generated");
         }

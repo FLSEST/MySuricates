@@ -150,7 +150,7 @@ class ChainExecutorTest {
         assertThat(saved.getTriggerSource()).as("Starter der Kette (V96)").isEqualTo(TriggerSource.MANUAL);
     }
 
-    /** TODO 6db47bc2: die Kette hält ihren Starter selbst fest, nicht nur ihre Einträge im Kontext. */
+    /** TODO 6db47bc2: the chain itself keeps its starter, not only its entries in the context. */
     @Test
     void execute_recordsWhatStartedTheChain() {
         doAnswer(inv -> null).when(virtualThreadExecutor).submit(any(Runnable.class));
@@ -555,7 +555,7 @@ class ChainExecutorTest {
 
         chainExecutor.execute(testChain, null);
 
-        verify(workflowRunRepository, never()).findById("wfr-1");   // die Eintrags-Frist 0 wartet nicht
+        verify(workflowRunRepository, never()).findById("wfr-1");   // the entry deadline 0 does not wait
         assertThat(captureLastSavedRun().getEntryRuns().get(0).getStatus()).isEqualTo(RunStatus.FAILED);
     }
 }

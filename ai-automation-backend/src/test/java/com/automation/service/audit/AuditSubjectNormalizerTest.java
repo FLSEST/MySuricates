@@ -8,47 +8,47 @@ import org.junit.jupiter.params.provider.ValueSource;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Nagelt die Normalisierungsregeln fest, die den Finding-Fingerprint gegen subject-Drift
- * stabilisieren (Audit-TODO 0e19648d).
+ * Pins down the normalization rules that stabilize the finding fingerprint against subject
+ * drift (audit TODO 0e19648d).
  */
 class AuditSubjectNormalizerTest {
 
     @ParameterizedTest(name = "[{index}] \"{0}\" -> \"{1}\"")
     @CsvSource(delimiter = '|', value = {
-            // Methoden-Suffix hinter einem Klassennamen faellt weg
+            // Method suffix after a class name drops out
             "ContainerShellService.execute | ContainerShellService",
             "TemplateResolver.resolveShell | TemplateResolver",
-            // Voll qualifiziert: Methode und Paket fallen weg, es bleibt der Klassenname (87a1dac0)
+            // Fully qualified: method and package drop out, the class name remains (87a1dac0)
             "com.automation.service.Foo.bar | Foo",
-            // Schluesselzusatz hinter dem ersten Doppelpunkt faellt weg
+            // Key suffix after the first colon drops out
             "application.yml:key-store-password | application.yml",
             "src/main/resources/application.yml:key-store-password | src/main/resources/application.yml",
-            // Dateiname mit klein geschriebenem Praefix bleibt ganz (keine Klasse davor)
+            // Filename with a lowercase prefix stays whole (no class before it)
             "application.yml | application.yml",
             "docker-compose.yml | docker-compose.yml",
-            // Klassenname und Pfad sind dieselbe Identitaet (87a1dac0)
+            // Class name and path are the same identity (87a1dac0)
             "src/main/java/com/automation/Foo.java | Foo",
             "com/automation/service/AssistantService.java | AssistantService",
             "service/audit/ManagedTodoWriter.java | ManagedTodoWriter",
             "com/automation/service/AssistantService.java:42 | AssistantService",
             "AssistantService.java | AssistantService",
             "com.automation.service.AssistantService | AssistantService",
-            // Kein Java-FQN: ein Paketsegment allein, Dateiendung als letztes Segment, kein CamelCase
+            // Not a Java FQN: a package segment alone, file extension as the last segment, no CamelCase
             "pom.XML | pom.XML",
             "docs.README | docs.README",
             "x.Yml | x.Yml",
             "config.app.Yml | config.app.Yml",
             "service.Foo | service.Foo",
             "com.example.CONSTANTS | com.example.CONSTANTS",
-            // Frontend-Module bleiben Pfade: ActivityLog.tsx ist nicht die Java-Klasse ActivityLog. Nur die
-            // Praefix-Varianten desselben Moduls werden angeglichen.
+            // Frontend modules stay paths: ActivityLog.tsx is not the Java class ActivityLog. Only the
+            // prefix variants of the same module are aligned.
             "frontend/src/pages/Workflows.tsx | frontend/src/pages/Workflows.tsx",
             "ai-automation-frontend/src/pages/Workflows.tsx | frontend/src/pages/Workflows.tsx",
             "src/pages/Workflows.tsx | frontend/src/pages/Workflows.tsx",
             "ai-automation-frontend/src/api/ErrorText.ts | frontend/src/api/ErrorText.ts",
             "frontend/src/pages/ActivityLog.tsx:42 | frontend/src/pages/ActivityLog.tsx",
             "ActivityLog.tsx | ActivityLog.tsx",
-            // Andere Pfade bleiben ganz: klein geschriebene Module gibt es mehrfach, Tests sind keine Klasse
+            // Other paths stay whole: lowercase modules exist several times, tests are not a class
             "frontend/src/api/client.ts | frontend/src/api/client.ts",
             "frontend/src/hooks/index.ts | frontend/src/hooks/index.ts",
             "frontend/src/pages/Todos.test.tsx | frontend/src/pages/Todos.test.tsx",
@@ -56,16 +56,16 @@ class AuditSubjectNormalizerTest {
             "GET /api/v1/workflows | GET /api/v1/workflows",
             "cycles/component/com.automation.config | cycles/component/com.automation.config",
             "layer/com.automation.controller->com.automation.repository | layer/com.automation.controller->com.automation.repository",
-            // Ohne Punkt bleibt alles stehen
+            // Without a dot everything stays
             "ContainerShellService | ContainerShellService",
-            // Gross-/Kleinschreibung bleibt unveraendert, ein gross geschriebener Suffix ist keine Methode
+            // Case stays unchanged, an uppercase suffix is not a method
             "Application.YML | Application.YML",
-            // Vor dem Doppelpunkt eine Datei oder Klasse: der Rest ist Position/Schluessel und faellt weg
+            // Before the colon a file or class: the rest is position/key and drops out
             "pom.xml:docker-java-core | pom.xml",
-            // (Klasse.java faltet wie Klasse.methode auf den Klassennamen)
+            // (Klasse.java folds like Klasse.methode onto the class name)
             "RateLimitFilter.java:47 | RateLimitFilter",
             "ShellBlockExecutor:resolveTemplate | ShellBlockExecutor",
-            // Vor dem Doppelpunkt ein klein geschriebenes Art-Wort: <art>:<wert> ist die Identitaet (94fda6ef)
+            // Before the colon a lowercase kind word: <art>:<wert> is the identity (94fda6ef)
             "package:com.automation.controller | package:com.automation.controller",
             "package:com.automation.service.workflow | package:com.automation.service.workflow",
             "safe-inventory:git-status | safe-inventory:git-status",
@@ -100,7 +100,7 @@ class AuditSubjectNormalizerTest {
         assertThat(AuditSubjectNormalizer.normalize(once)).isEqualTo(once);
     }
 
-    /** Gleichnamige Klasse in Backend und Frontend: zwei Identitaeten, egal in welcher Schreibweise. */
+    /** Same-named class in backend and frontend: two identities, whatever the spelling. */
     @Test
     void sameNameInBackendAndFrontend_staysApart() {
         String backend = AuditSubjectNormalizer.normalize("com/automation/entity/ActivityLog.java");
@@ -111,8 +111,8 @@ class AuditSubjectNormalizerTest {
     }
 
     /**
-     * Grundlage der Klassennamen-Normalisierung (87a1dac0): Unter src/main/java ist jeder einfache Klassenname
-     * eindeutig. Kaeme ein zweiter dazu, fielen die Audit-Befunde beider Klassen auf eine Identitaet.
+     * Basis of the class-name normalization (87a1dac0): under src/main/java every simple class name is
+     * unique. If a second one were added, the audit findings of both classes would fall onto one identity.
      */
     @Test
     void simpleClassNamesUnderSrcMainJavaAreUnique() throws java.io.IOException {
