@@ -35,6 +35,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
+/** Workflows: create, read, change and delete them, start runs, list their runs and move them as JSON. */
 @RestController
 @RequestMapping("/api/v1/workflows")
 @RequiredArgsConstructor
@@ -47,33 +48,50 @@ public class WorkflowController {
     private final WorkflowMapper workflowMapper;
     private final ProcessFormatAdapter bpmnExportAdapter;
 
+    /** Lists all workflows of projects that are not archived, each with its run count. */
     @GetMapping
     public List<WorkflowResponse> listWorkflows() {
         return workflowMapper.toResponseListWithRunCounts(workflowService.findAll());
     }
 
+    /**
+     * Creates a workflow in the project named by {@code projectId} and answers {@code 201}.
+     * The first version row is written with it; unknown block types are rejected.
+     */
     @PostMapping
     public ResponseEntity<WorkflowResponse> createWorkflow(@Valid @RequestBody CreateWorkflowRequest request) {
         var workflow = workflowService.create(request, ChangeSource.USER);
         return ResponseEntity.status(HttpStatus.CREATED).body(workflowMapper.toResponse(workflow));
     }
 
+    /** Returns one workflow with its blocks and activated skills. */
     @GetMapping("/{id}")
     public ResponseEntity<WorkflowResponse> getWorkflow(@PathVariable String id) {
         return ResponseEntity.ok(workflowMapper.toResponse(workflowService.findById(id)));
     }
 
+    /**
+     * Changes the given fields of a workflow; fields left out stay as they are.
+     * A definition change writes a new version and is refused on a sealed workflow ({@code 409 WORKFLOW_SEALED});
+     * name and {@code version} label are no definition change and stay editable. A blank {@code version} or one
+     * over 255 characters is 400 – leave the field out to keep the label.
+     */
     @PutMapping("/{id}")
     public ResponseEntity<WorkflowResponse> updateWorkflow(@PathVariable String id, @RequestBody UpdateWorkflowRequest request) {
         return ResponseEntity.ok(workflowMapper.toResponse(workflowService.update(id, request, ChangeSource.USER)));
     }
 
+    /** Soft-deletes a workflow ({@code 204}); a sealed workflow is refused with {@code 409 WORKFLOW_SEALED}. */
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteWorkflow(@PathVariable String id) {
         workflowService.delete(id);
         return ResponseEntity.noContent().build();
     }
 
+    /**
+     * Starts a manual run and returns it right away with status {@code RUNNING}; the blocks run in the background.
+     * The optional {@code context} is merged over the workflow's default context. A refused start creates no run.
+     */
     @PostMapping("/{id}/execute")
     public ResponseEntity<WorkflowRunResponse> executeWorkflow(
             @PathVariable String id,
@@ -87,6 +105,7 @@ public class WorkflowController {
         return ResponseEntity.ok(workflowMapper.toRunResponse(run));
     }
 
+    /** Lists the workflow's runs, newest first, paginated ({@code page}, {@code size}) and without their steps. */
     @GetMapping("/{id}/runs")
     public PageResponse<WorkflowRunListItemResponse> getWorkflowRuns(
             @PathVariable String id,
@@ -95,11 +114,13 @@ public class WorkflowController {
         return executionQueryService.listRunsForWorkflow(id, page, size);
     }
 
+    /** Returns one run with its steps; the run is looked up by {@code runId} alone. */
     @GetMapping("/{id}/runs/{runId}")
     public WorkflowRunResponse getWorkflowRun(@PathVariable String id, @PathVariable String runId) {
         return executionQueryService.getRunForWorkflow(runId);
     }
 
+    /** Activates the skills in {@code skillIds} for the workflow; already active ones are kept once. */
     @PostMapping("/{id}/skills")
     @RequiresModule(ModuleCatalog.SKILLS)
     public ResponseEntity<WorkflowResponse> activateSkills(
@@ -108,12 +129,17 @@ public class WorkflowController {
         return ResponseEntity.ok(workflowMapper.toResponse(workflowService.activateSkills(id, request.skillIds())));
     }
 
+    /** Deactivates one skill for the workflow. */
     @DeleteMapping("/{id}/skills/{skillId}")
     @RequiresModule(ModuleCatalog.SKILLS)
     public ResponseEntity<WorkflowResponse> deactivateSkill(@PathVariable String id, @PathVariable String skillId) {
         return ResponseEntity.ok(workflowMapper.toResponse(workflowService.deactivateSkill(id, skillId)));
     }
 
+    /**
+     * Exports the workflow as portable JSON without ids or project, with an {@code integrity} checksum
+     * that {@code POST /api/v1/workflows/import} verifies.
+     */
     @GetMapping("/export/{id}")
     public ExportWorkflowResponse exportWorkflow(@PathVariable String id) {
         var workflow = workflowService.findById(id);
@@ -132,7 +158,7 @@ public class WorkflowController {
         return export.withIntegrity(DefinitionIntegrity.ofExport(export));
     }
 
-    /** Exportiert den Workflow als BPMN 2.0 XML (Spec: docs/plans/2026-07-09-bpmn-integration-design.md). */
+    /** Exports the workflow as BPMN 2.0 XML for download. */
     @GetMapping("/{id}/export/bpmn")
     @RequiresModule(ModuleCatalog.BPMN)
     public ResponseEntity<String> exportWorkflowAsBpmn(@PathVariable String id) {
@@ -146,6 +172,13 @@ public class WorkflowController {
                 .body(xml);
     }
 
+    /**
+     * Imports a workflow from its JSON export and answers {@code 201}.
+     * With {@code updateIfExists} a workflow of the same name in the target project is updated instead
+     * ({@code 200}); without {@code projectId} it goes to the collection project. A checksum in {@code integrity}
+     * that does not match the content is rejected with {@code 400} before anything is written. A blank
+     * {@code version} keeps the default label on a new workflow and the previous one on an update.
+     */
     @PostMapping("/import")
     public ResponseEntity<WorkflowResponse> importWorkflow(@Valid @RequestBody ImportWorkflowRequest request) {
         DefinitionIntegrity.verifyImport(request); // mismatch → 400 before anything is written (TODO b18939a6)

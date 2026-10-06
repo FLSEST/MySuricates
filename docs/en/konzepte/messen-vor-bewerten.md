@@ -1,6 +1,5 @@
 <!-- last-sync: 2026-09-23 from: docs/konzepte/messen-vor-bewerten.md -->
 
-<!-- concept-facts-sha256: 47f72cd8883f6032a246606f7af297a20af1c83a1a13ed6078d019d53951318a -->
 <!-- concept-source: d7e7e28cf7209b4369ad33467bb4fe781a178baa -->
 
 # Deterministic measurement before AI assessment
@@ -24,19 +23,7 @@ The mechanism saves model work where simple tools are sufficient. Measurements p
 
 ## Drawbacks and costs
 
-Shell is not free: commands require time, resources, maintenance, and suitable tools. Results are only as good as the measurement scripts, data quality, and current environment; changed data can produce different results. An operational finding mainly shows usage: in the 30-day sample, shell steps make up a large share of the typed step records, while many visible workflow definitions no longer have a stored run. This does not prove domain-specific usefulness, cost savings, or an error rate. Data on verification coverage and causal benefit is missing.
-
-## Operational evidence
-
-Measurement: **2026-09-19 (UTC)**, one local development instance. Inventory counters refer to the records visible via REST; step counts count stored steps with type metadata in the 30-day window. Wrappers are counted once. This is not evidence of effectiveness.
-
-| Metric | Count / denominator |
-|---|---:|
-| Shell steps in the 30-day window | 144 / 223 |
-| Simple steps in the 30-day window | 41 / 223 |
-| Workflows without a stored run | 202 / 263 |
-
-[Definitions, measurement limits, and raw counters](../../konzepte/betriebsdaten.json) · [Measurement method and repetition](README.md)
+Shell is not free: commands require time, resources, maintenance, and suitable tools. Results are only as good as the measurement scripts, data quality, and current environment; changed data can produce different results. Data on verification coverage and causal benefit is missing.
 
 ## In the code
 

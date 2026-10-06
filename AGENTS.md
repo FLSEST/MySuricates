@@ -146,7 +146,7 @@ Im Workflow selbst kommen Ziel-Daten nie per REST, sondern als Kontextvariablen 
 und `{{ goal_guard_* }}`, sobald der Lauf `goal_id` traegt ([docs/WORKFLOW-GUIDE.md](docs/WORKFLOW-GUIDE.md)
 → „Ziel-Kontext“).
 
-Referenz: [docs/api-referenz.md](docs/api-referenz.md) → „Ziele“.
+Referenz: [docs/api-referenz.md](docs/api-referenz.md#apiv1goals) → `/api/v1/goals`.
 
 ## Cypress E2E gegen Dev oder Test
 
@@ -566,7 +566,8 @@ DELETE /api/v1/assistant/sessions/<session-uuid>
 | Execution-Config (Timeouts, Concurrency) | `GET`/`PUT /api/v1/system/execution-config` |
 | Integrationen + Verbindungen | `GET /api/v1/integrations` (je Provider `connections[]`), `GET /api/v1/integrations/{providerId}/connections`; `connect`, `credentials`, `connection`, `actions`, `task-targets` nehmen `?connection=<name>` (ohne: `default`) |
 
-Feld-Details zu allen Endpunkten: [docs/api-referenz.md](docs/api-referenz.md).
+Alle Endpunkte mit Zweck und Modul: [docs/api-referenz.md](docs/api-referenz.md) (erzeugt aus den Controllern);
+die Felder stehen in den DTOs unter `ai-automation-backend/src/main/java/com/automation/dto/`.
 
 ## Todo-Resolve in der Praxis
 

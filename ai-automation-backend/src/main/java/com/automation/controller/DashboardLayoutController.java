@@ -33,6 +33,7 @@ public class DashboardLayoutController {
     private final DashboardLayoutVersionMapper mapper;
     private final ObjectMapper objectMapper;
 
+    /** Lists saved dashboard layout versions page by page, newest first, without their content; {@code size} is capped at 100. */
     @GetMapping
     public PageResponse<DashboardLayoutVersionSummary> list(@RequestParam(defaultValue = "0") int page,
                                                             @RequestParam(defaultValue = "20") int size) {
@@ -41,6 +42,7 @@ public class DashboardLayoutController {
                 result.getTotalElements(), result.getTotalPages());
     }
 
+    /** Returns one dashboard layout version including its layout content. */
     @GetMapping("/{id}")
     public DashboardLayoutVersionResponse get(@PathVariable String id) throws JsonProcessingException {
         DashboardLayoutVersion version = service.get(id);
@@ -49,7 +51,15 @@ public class DashboardLayoutController {
                 objectMapper.readTree(version.getContent()));
     }
 
-    /** The body is validated field by field in DashboardLayoutValidator (unknown fields → 400). */
+    /**
+     * Saves the dashboard layout as a new version ({@code 201}), or answers {@code 200} when it equals the newest one.
+     * The comparison ignores {@code activeViewId} (each device shows its own view), which is still stored and must name a view.
+     * Without {@code force: true} a {@code baseVersionId} other than the newest version is refused with
+     * {@code 409 STATE_CONFLICT}: another device saved in between. The body is validated field by field (unknown
+     * fields → 400) with the limits of the frontend's {@code LAYOUT_LIMITS} (at most 20 views, 100 widgets per view);
+     * over {@code automation.dashboard.layout.max-request-bytes} (default 256 KiB) it is 413. Each save trims the unnamed
+     * versions to the newest {@code dashboard-layout-retention-count} (default 100); named ones are never trimmed.
+     */
     @PostMapping
     public ResponseEntity<DashboardLayoutVersionSummary> save(@RequestBody JsonNode body) {
         DashboardLayoutVersionService.SaveResult result = service.save(body);
@@ -57,6 +67,7 @@ public class DashboardLayoutController {
                 .body(mapper.toSummary(result.version()));
     }
 
+    /** Sets or removes ({@code null}) the name of a layout version. A name has 1–80 characters; a named version is never deleted automatically. */
     @PatchMapping("/{id}")
     public DashboardLayoutVersionSummary rename(@PathVariable String id, @RequestBody JsonNode body) {
         return mapper.toSummary(service.rename(id, body));

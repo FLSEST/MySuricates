@@ -2,7 +2,7 @@
   "id": "yellow-gate-creates-auto-todo",
   "title": "YELLOW legt ein Auto-TODO mit Gate- und Kategorie-Tags an",
   "derivedFrom": {
-    "spec": "docs/onboarding platform.md — AutoTodo: YELLOW → MEDIUM, Tags auto:workflow, gate:*, category:*",
+    "spec": "docs/architektur.md → Gate Status System — AutoTodo: YELLOW → MEDIUM, Tags auto:workflow, gate:*, category:*",
     "incidents": [
       "2265c5ce (AutoTodoService: granulare todo_items eines Batches mergen ineinander)",
       "81e9a6f9 (todo_item/gate_status Marker provider-agnostisch)"

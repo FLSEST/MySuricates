@@ -13,6 +13,7 @@ Run: python3 -m unittest discover -s scripts/tests -p 'test_docs_parity_check.py
 import contextlib
 import importlib.util
 import io
+import json
 import subprocess
 import sys
 import tempfile
@@ -298,7 +299,8 @@ class SectionPairingTest(unittest.TestCase):
         self.assertEqual(self.align(de, en), (["## Eins"], []))
 
     def test_concept_page_prose_sections(self):
-        # Nachbau von docs/konzepte/*.md: feste Gliederung, reine Prosa, ganz uebersetzte
+        # Nachbau von docs/konzepte/*.md im damaligen Stand (mit Messabschnitt, den die Seiten seit
+        # TODO 1ab3ad21 nicht mehr haben): feste Gliederung, reine Prosa, ganz uebersetzte
         # Ueberschriften. Fehlte "Vorteile", nannte die Pruefung "Nachteile und Kosten" -- der
         # Betriebsbeleg teilt mit ihm die Zahl `263` und zog ihn zu sich (TODO 3fbff015).
         de = ("# Haertung\n\n## Wofür taugt das?\n" + "Ein Absatz ueber den Zweck. " * 28 + "\n\n"
@@ -340,22 +342,13 @@ class StockPairingTest(unittest.TestCase):
         ("WORKFLOW-GUIDE.md", "### Provider-Regel: Codex ist read-only"),
         ("WORKFLOW-GUIDE.md", "### History-Komprimierung"),
         ("WORKFLOW-GUIDE.md", "#### Automatische Extraktion (Auto-Memory)"),
-        ("api-referenz.md", "### `POST /api/v1/webhooks/{id}/enable`"),
-        ("api-referenz.md", "### `GET /api/v1/assistant/suggestions`"),
         ("architektur.md", "## WebSocket (Live-Logs + Status)"),
-        ("belege.md", "## 2026-09-19 · Das Gate fand den Fehler des Agenten, der es erweiterte"),
         ("entwicklung.md", "## Abhängigkeits-Meldungen (Frontend)"),
-        ("vision.md", "## Die Idee"),
-        ("vision.md", "## Leitideen"),
-        ("vision.md", "### Beruf"),
         ("workflow-memory-diagrams.md", "### workflow_memory"),
-        ("onboarding/FAQ.md", "### Muss ich Docker installiert haben?"),
-        ("onboarding/README.md", "## Willkommen!"),
         ("konzepte/agentische-budgets.md", "## Wofür taugt das?"),
         ("konzepte/gates.md", "## Wofür taugt das?"),
         ("konzepte/haertung.md", "## Wofür taugt das?"),
         ("konzepte/haertung.md", "## Vorteile"),
-        ("konzepte/haertung.md", "## Betriebsbeleg"),
         ("konzepte/messen-vor-bewerten.md", "## Wofür taugt das?"),
         ("konzepte/messen-vor-bewerten.md", "## Vorteile"),
         ("konzepte/persistenz-herkunft.md", "## Wofür taugt das?"),
@@ -363,7 +356,6 @@ class StockPairingTest(unittest.TestCase):
         ("konzepte/selbstverbesserung.md", "## Wofür taugt das?"),
         ("konzepte/workflow-memory.md", "## Wofür taugt das?"),
         ("konzepte/workflow-memory.md", "## Vorteile"),
-        ("konzepte/workflow-memory.md", "## Betriebsbeleg"),
         ("konzepte/zugaenge.md", "## Wofür taugt das?"),
         ("konzepte/zugaenge.md", "## Vorteile"),
     )
@@ -399,6 +391,329 @@ class StockPairingTest(unittest.TestCase):
             self.assertEqual([h for h, _ in got], dpc.headings(f))
             self.assertIn("# Kommentar", got[0][1])
             self.assertEqual(got[1][1], "hinten")
+
+
+REFERENCE = REPO / "scripts" / "docs-reference.py"
+_ref_spec = importlib.util.spec_from_file_location("docs_reference", REFERENCE)
+ref = importlib.util.module_from_spec(_ref_spec)
+sys.modules[_ref_spec.name] = ref  # dataclasses brauchen das Modul in sys.modules
+_ref_spec.loader.exec_module(ref)
+
+FIXTURE_CONTROLLER = """package com.automation.controller;
+
+import com.automation.modules.ModuleCatalog;
+import com.automation.modules.RequiresModule;
+
+/** Foos verwalten: anlegen und lesen (TODO 1a2b3c4d). Zweiter Satz faellt weg. */
+@RestController
+@RequestMapping("/api/v1/foos")
+@RequiresModule(ModuleCatalog.CHAINS)
+public class FooController {
+
+    /**
+     * Liefert ein Foo, z. B. das unter {@code /{id}/bar} verlinkte (TODO 5e6f7a8b). Dieser Satz
+     * gehoert nicht mehr dazu.
+     *
+     * @param id die ID
+     */
+    @GetMapping("/{id}")
+    public Foo get(@PathVariable String id) { return null; }
+
+    /**
+     * Ersetzt ein Foo. Antwortet mit {@code 409}, solange es benutzt wird (TODO 9a8b7c6d).
+     * <p>Siehe {@link FooService#replace}.
+     *
+     * @return das Foo
+     */
+    @PutMapping("/{id}")
+    public Foo replace(@PathVariable String id) { return null; }
+
+    @PostMapping
+    @RequiresModule(ModuleCatalog.WEBHOOKS)
+    public Foo create() { return null; }
+
+    // Kein Javadoc, nur ein Kommentar.
+    @GetMapping(value = "/{id}/text", produces = "text/markdown")
+    public String text(@PathVariable String id) { return ""; }
+}
+"""
+
+FIXTURE_ERROR_CODE = """public enum ErrorCode {
+    RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "Resource not found"),
+    TEAPOT(HttpStatus.I_AM_A_TEAPOT, "Short and stout");
+}
+"""
+
+FIXTURE_MODULES = """public enum ModuleCatalog {
+    CHAINS("chains", RESEARCH, STABLE, false, Set.of(), List.of(), "Chains."),
+    WEBHOOKS("webhooks", ADVANCED, STABLE, false, Set.of(), List.of(), "Webhooks.");
+}
+"""
+
+
+def _doc(de, en):
+    return {"de": de, "en": en}
+
+
+FIXTURE_SCHEMA = {
+    "onFailure": {"type": "string", "doc": _doc("Bei Fehler.", "On failure."), "default": "stop",
+                  "values": [{"value": "stop", "doc": _doc("Stoppen.", "Stop.")},
+                             {"value": "continue", "doc": _doc("Weiter.", "Go on.")}]},
+    "commonFields": {"label": {"type": "string", "doc": _doc("Anzeigename.", "Label.")}},
+    "ai": {"blockTypes": ["simple"], "fields": {"effort": {"type": "string", "doc": _doc("Aufwand.", "Effort."),
+                                                            "values": [{"value": "low", "doc": _doc("Wenig.", "Little.")}],
+                                                            "ignoreCase": True}}},
+    "sharedFields": {"execution_mode": {"type": "string", "doc": _doc("Modus.", "Mode."), "legacy": "claude",
+                                        "default": "ai",
+                                        "values": [{"value": "ai", "doc": _doc("KI.", "AI.")},
+                                                   {"value": "shell", "doc": _doc("Shell.", "Shell.")}]},
+                     "wrapper_mounts": {"type": "array", "items": {"type": "string"}, "doc": _doc("Mounts a|b.", "Mounts a|b."),
+                                        "onlyWith": {"execution_mode": "shell"}}},
+    "blockTypes": {
+        "simple": {"required": ["command"], "fields": {
+            "command": {"type": "string", "doc": _doc("Der Prompt.", "The prompt.")},
+            "timeout_seconds": {"type": "integer", "doc": _doc("Timeout.", "Timeout."), "minimum": 1}}},
+        "foreach": {"requiredOneOf": ["command", "workflow_id"], "fields": {
+            "command": {"type": "string", "doc": _doc("Befehl.", "Command.")},
+            "workflow_id": {"type": "string", "doc": _doc("Workflow.", "Workflow.")},
+            "execution_mode": "#execution_mode",
+            "mounts": "#wrapper_mounts"}},
+        "compress": {"required": [], "fields": {}},
+    },
+    "compressOps": [{"op": "text.normalize", "doc": _doc("Normalisieren.", "Normalise.")}],
+}
+
+
+class GeneratedReferenceTest(unittest.TestCase):
+    """scripts/docs-reference.py erzeugt API- und Block-Referenz aus dem Code (TODO 1ab3ad21).
+
+    Kleine Fixtures statt des echten Repos: ein Controller, ein ErrorCode, ein Schema-Ausschnitt.
+    Die Vorlagen enthalten keine Links, damit das Doku-Gate auf der Fixture nur das Erzeugte sieht.
+    """
+
+    def build(self, tmp) -> Path:
+        root = Path(tmp)
+        files = {
+            ref.CONTROLLER_DIR + "/FooController.java": FIXTURE_CONTROLLER,
+            ref.ERROR_CODE: FIXTURE_ERROR_CODE,
+            ref.MODULE_CATALOG: FIXTURE_MODULES,
+            ref.BLOCK_SCHEMA: json.dumps(FIXTURE_SCHEMA, ensure_ascii=False),
+            "scripts/docs-reference/api-referenz.de.md": "# API-Referenz\n\nEinleitung DE.\n",
+            "scripts/docs-reference/api-referenz.en.md": "# API Reference\n\nIntro EN.\n",
+            "scripts/docs-reference/block-referenz.de.md": "# Block-Referenz\n",
+            "scripts/docs-reference/block-referenz.en.md": "# Block Reference\n",
+        }
+        for rel, text in files.items():
+            (root / rel).parent.mkdir(parents=True, exist_ok=True)
+            (root / rel).write_text(text, encoding="utf-8")
+        (root / "docs" / "en").mkdir(parents=True)
+        return root
+
+    def run_reference(self, root: Path, mode: str):
+        proc = subprocess.run([sys.executable, str(REFERENCE), mode, "--root", str(root)],
+                              capture_output=True, text=True, check=False)
+        return proc.returncode, proc.stdout, proc.stderr
+
+    def test_api_page_lists_endpoints_with_purpose_and_module(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.build(tmp)
+            code, out, err = self.run_reference(root, "--write")
+            self.assertEqual(code, 0, err)
+            page = (root / "docs" / "api-referenz.md").read_text(encoding="utf-8")
+            self.assertTrue(page.startswith(ref.MARKER + "\n\n# API-Referenz\n\nEinleitung DE.\n"), page)
+            # Erster Satz des Javadoc; TODO-Kuerzel weg, "z. B." beendet keinen Satz, {@code} mit Klammern.
+            self.assertIn("| `GET /api/v1/foos/{id}` | Liefert ein Foo, z. B. das unter `/{id}/bar` verlinkte."
+                          " | `chains` |", page)
+            # Methoden-Annotation schlaegt Klassen-Annotation; ohne Javadoc bleibt der Zweck leer.
+            self.assertIn("| `POST /api/v1/foos` |  | `webhooks` |", page)
+            # produces ist kein Pfad (wie in api-endpoint-diff.sh).
+            self.assertIn("| `GET /api/v1/foos/{id}/text` |  | `chains` |", page)
+            self.assertNotIn("text/markdown", page)
+            self.assertIn("## /api/v1/foos\n\nQuelle: `FooController` – Foos verwalten: anlegen und lesen.\n", page)
+            # Unbekannte HttpStatus-Konstante: Name statt geratener Zahl.
+            self.assertIn("| `RESOURCE_NOT_FOUND` | 404 | Resource not found |", page)
+            self.assertIn("| `TEAPOT` | I_AM_A_TEAPOT | Short and stout |", page)
+            en = (root / "docs" / "en" / "api-referenz.md").read_text(encoding="utf-8")
+            self.assertIn("| `POST /api/v1/foos` |  | `webhooks` |", en)
+            self.assertIn("Source: `FooController`", en)
+            self.assertIn("## Error codes", en)
+
+    def test_api_page_lists_the_rest_of_the_javadoc_as_notes(self):
+        # Was nach dem ersten Satz steht, gehoert nicht in die Tabelle, geht aber auch nicht verloren:
+        # Liste unter der Tabelle, ohne Block-Tags, Herkunftskuerzel und Inline-Tags; Endpunkte ohne
+        # weiteren Text fehlen in der Liste.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.build(tmp)
+            code, _, err = self.run_reference(root, "--write")
+            self.assertEqual(code, 0, err)
+            notes = ("- `GET /api/v1/foos/{id}` — Dieser Satz gehoert nicht mehr dazu.\n"
+                     "- `PUT /api/v1/foos/{id}` — Antwortet mit `409`, solange es benutzt wird."
+                     " Siehe `FooService#replace`.\n")
+            page = (root / "docs" / "api-referenz.md").read_text(encoding="utf-8")
+            self.assertIn("| `PUT /api/v1/foos/{id}` | Ersetzt ein Foo. | `chains` |\n"
+                          "| `GET /api/v1/foos/{id}/text` |  | `chains` |\n\nHinweise:\n\n" + notes, page)
+            self.assertNotIn("@param", page)
+            self.assertNotIn("das Foo", page)
+            en = (root / "docs" / "en" / "api-referenz.md").read_text(encoding="utf-8")
+            self.assertIn("\n\nNotes:\n\n" + notes, en)
+            self.assertNotIn("Hinweise", en)
+
+    def test_api_page_satisfies_the_endpoint_diff(self):
+        # api-endpoint-diff.sh sucht "METHODE /api/v1/..." in beiden Fassungen — die erzeugte Seite muss passen.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.build(tmp)
+            self.run_reference(root, "--write")
+            proc = subprocess.run(
+                ["bash", str(REPO / "scripts" / "public-readiness" / "api-endpoint-diff.sh"),
+                 str(root / ref.CONTROLLER_DIR), str(root / "docs" / "api-referenz.md"),
+                 str(root / "docs" / "en" / "api-referenz.md")],
+                capture_output=True, text=True, check=False)
+            self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+
+    def test_block_page_renders_fields(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.build(tmp)
+            self.run_reference(root, "--write")
+            page = (root / "docs" / "block-referenz.md").read_text(encoding="utf-8")
+            self.assertIn("| `on_failure` | string |  | `stop` | `stop`: Stoppen. · `continue`: Weiter. | Bei Fehler. |",
+                          page)
+            self.assertIn("| `effort` | string |  |  | `low`: Wenig. · Groß-/Kleinschreibung egal | Aufwand. |", page)
+            self.assertIn("## `simple`\n\nDazu die [gemeinsamen Felder](#gemeinsame-felder) und die"
+                          " [KI-Felder](#ki-felder).", page)
+            self.assertIn("| `command` | string | ja |  |  | Der Prompt. |", page)
+            self.assertIn("| `timeout_seconds` | integer |  |  | ≥ 1 | Timeout. |", page)
+            # requiredOneOf, aufgeloester #-Verweis samt Altwert, onlyWith, maskierter Strich.
+            self.assertIn("| `command` | string | einer von `command`, `workflow_id` |  |  | Befehl. |", page)
+            self.assertIn("| `execution_mode` | string |  | `ai` | `ai`: KI. · `shell`: Shell. ·"
+                          " alt, noch angenommen: `claude` | Modus. |", page)
+            self.assertIn("| `mounts` | string[] |  |  |  | Mounts a\\|b. Gelesen nur mit `execution_mode: shell`. |",
+                          page)
+            self.assertIn("## `compress`\n\nDazu die [gemeinsamen Felder](#gemeinsame-felder).\n\n"
+                          "Keine eigenen Schlüssel.\n\n### Stufen", page)
+            self.assertIn("| `text.normalize` | Normalisieren. |", page)
+            en = (root / "docs" / "en" / "block-referenz.md").read_text(encoding="utf-8")
+            self.assertIn("| `command` | string | yes |  |  | The prompt. |", en)
+            self.assertIn("### Stages", en)
+
+    def test_check_names_a_stale_page(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.build(tmp)
+            self.run_reference(root, "--write")
+            code, out, _ = self.run_reference(root, "--check")
+            self.assertEqual(code, 0, out)
+            page = root / "docs" / "en" / "block-referenz.md"
+            page.write_text(page.read_text(encoding="utf-8") + "von Hand\n", encoding="utf-8")
+            code, out, _ = self.run_reference(root, "--check")
+            self.assertEqual(code, 1, out)
+            self.assertEqual(out.strip(), "veraltet: docs/en/block-referenz.md")
+            self.assertIn("von Hand", page.read_text(encoding="utf-8"), "--check darf nichts schreiben")
+
+    def test_check_sees_a_new_endpoint(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.build(tmp)
+            self.run_reference(root, "--write")
+            controller = root / ref.CONTROLLER_DIR / "FooController.java"
+            controller.write_text(controller.read_text(encoding="utf-8").replace(
+                "    @PostMapping\n", "    @DeleteMapping(\"/{id}\")\n    public void drop() {}\n\n    @PostMapping\n"),
+                encoding="utf-8")
+            code, out, _ = self.run_reference(root, "--check")
+            self.assertEqual(code, 1, out)
+            self.assertIn("veraltet: docs/api-referenz.md", out)
+            self.assertIn("veraltet: docs/en/api-referenz.md", out)
+
+    def test_parity_gate_reports_a_stale_page(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.build(tmp)
+            self.run_reference(root, "--write")
+            code, out = run_script(root)
+            self.assertEqual(code, 0, out)
+            page = root / "docs" / "api-referenz.md"
+            page.write_text(page.read_text(encoding="utf-8").replace("Einleitung DE.", "Von Hand."), encoding="utf-8")
+            code, out = run_script(root)
+            self.assertEqual(code, 1, out)
+            self.assertIn("BEFUND: veraltet-erzeugt docs/api-referenz.md (python3 scripts/docs-reference.py --write)",
+                          out)
+
+    def test_missing_source_of_an_existing_page_is_an_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.build(tmp)
+            self.run_reference(root, "--write")
+            (root / ref.BLOCK_SCHEMA).unlink()
+            code, _, err = self.run_reference(root, "--check")
+            self.assertEqual(code, 2, err)
+            self.assertIn("docs/block-referenz.md: Quelle fehlt", err)
+            code, out = run_script(root)
+            self.assertIn("BEFUND: referenz-fehler docs/block-referenz.md: Quelle fehlt", out)
+
+    def test_root_without_sources_and_pages_is_skipped(self):
+        # Die Fixtures der anderen Tests hier bauen kein Backend nach — dort prueft der Erzeuger nichts.
+        with tempfile.TemporaryDirectory() as tmp:
+            code, out, err = self.run_reference(Path(tmp), "--check")
+            self.assertEqual(code, 0, out + err)
+
+    def test_templates_are_not_link_checked(self):
+        # Die Links einer Vorlage gelten am Ziel unter docs/, nicht unter scripts/docs-reference/.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.build(tmp)
+            template = root / "scripts" / "docs-reference" / "api-referenz.de.md"
+            template.write_text("# API-Referenz\n\n[Entwicklung](entwicklung.md)\n", encoding="utf-8")
+            (root / "docs" / "entwicklung.md").write_text("# E\n", encoding="utf-8")
+            (root / "docs" / "en" / "entwicklung.md").write_text("# E\n", encoding="utf-8")
+            self.run_reference(root, "--write")
+            code, out = run_script(root)
+            self.assertEqual(code, 0, out)
+
+
+class FirstSentenceTest(unittest.TestCase):
+    def sentence(self, *lines):
+        return ref.first_sentence(list(lines))
+
+    def test_stops_at_the_first_period_followed_by_space(self):
+        self.assertEqual(self.sentence("Erster Satz. Zweiter Satz."), "Erster Satz.")
+
+    def test_abbreviations_do_not_end_the_sentence(self):
+        self.assertEqual(self.sentence("Liest z. B. Dateien, d. h. alles. Rest."), "Liest z. B. Dateien, d. h. alles.")
+        self.assertEqual(self.sentence("Uses e.g. files. Rest."), "Uses e.g. files.")
+
+    def test_inline_tags_and_html(self):
+        self.assertEqual(self.sentence("Ruft {@link Foo#bar(String) bar} und {@code /{id}/x} <b>fett</b>."),
+                         "Ruft bar und `/{id}/x` fett.")
+        self.assertEqual(self.sentence("Nutzt {@link WorkflowController}."), "Nutzt `WorkflowController`.")
+
+    def test_origin_references_are_dropped(self):
+        self.assertEqual(self.sentence("Zaehlt Runs (TODO 86777fb4) und mehr (c2cda5ed)."), "Zaehlt Runs und mehr.")
+        self.assertEqual(self.sentence("Ziel und Rang – TODO dc0566f8."), "Ziel und Rang.")
+
+    def test_block_tags_and_paragraphs_end_the_description(self):
+        self.assertEqual(self.sentence("Ohne Punkt", "@param x egal"), "Ohne Punkt")
+        self.assertEqual(self.sentence("Kopf ohne Punkt <p>Absatz."), "Kopf ohne Punkt")
+
+
+class DescribeTest(unittest.TestCase):
+    """Rest der Beschreibung nach dem ersten Satz — Quelle der Hinweise unter einer API-Tabelle."""
+
+    def describe(self, *lines):
+        return ref.describe(list(lines))
+
+    def test_rest_follows_the_first_sentence(self):
+        self.assertEqual(self.describe("Erster Satz. Zweiter, z. B. mit", "Umbruch. Dritter."),
+                         ("Erster Satz.", "Zweiter, z. B. mit Umbruch. Dritter."))
+
+    def test_no_rest(self):
+        self.assertEqual(self.describe("Nur ein Satz.", "", "@return x"), ("Nur ein Satz.", ""))
+
+    def test_paragraphs_join_with_a_space(self):
+        self.assertEqual(self.describe("Kopf. Mitte.<p>Absatz eins.</p>", "<p>Absatz zwei."),
+                         ("Kopf.", "Mitte. Absatz eins. Absatz zwei."))
+        self.assertEqual(self.describe("Kopf ohne Punkt <p>Absatz."), ("Kopf ohne Punkt", "Absatz."))
+
+    def test_block_tags_end_the_rest(self):
+        self.assertEqual(self.describe("Kopf. Regel.", "@param x egal", "@throws Foo nie"), ("Kopf.", "Regel."))
+
+    def test_inline_tags_and_origin_references_in_the_rest(self):
+        self.assertEqual(self.describe("Kopf. Mit {@code 409} (TODO 1a2b3c4d), siehe {@link Foo#bar}",
+                                       "und {@link Foo#baz baz} &lt;x&gt;."),
+                         ("Kopf.", "Mit `409`, siehe `Foo#bar` und baz <x>."))
 
 
 class RepoTest(unittest.TestCase):

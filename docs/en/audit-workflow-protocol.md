@@ -417,19 +417,15 @@ earlier findings only as Markdown in `previous_report`. Section 10b of the same 
     metric rule (fixed subject in FACT form) only a run that measured the FACT resolves it; if the FACT is
     missing from the fact sheet, the classification stays (partial measurement). If the finding shows up
     again later, it is a regression (`OPEN`) – the classification has to be made anew.
-- If an `ACCEPTED_RISK` finding re-appears, `AuditAcceptancePolicy` checks it against the evidence
-  frozen at acceptance: if a measured value lies more than 10 % above it or the change rate has newly
-  reached the hotspot threshold, the finding becomes `OPEN`
-  again (the disposition note gets `Verschlechtert: old → new`); if the acceptance is 180 days old, it
-  moves to `AWAITING_VERIFICATION` (`Wiedervorlage nach 180 Tagen`). A `DISMISSED` finding stays
-  `DISMISSED` even when it re-appears.
+- If an `ACCEPTED_RISK` finding re-appears, `AuditAcceptancePolicy` checks deterioration and
+  expiry (see [Risk acceptance](#risk-acceptance)). A `DISMISSED` finding stays `DISMISSED` even when it
+  re-appears.
 - That is why a report prompt carries classified findings from `{{ audit_findings }}` forward with the
   same identity **as long as the finding still exists**: an accepted finding that is left out is never
   checked again. It does not carry a fixed one forward – a re-reported `AWAITING_VERIFICATION` finding
   becomes `OPEN` again.
-- `CRITICAL` and `HIGH` automatically generate managed TODOs. `MEDIUM` can be confirmed in the Audit
-  Center; `LOW` remains a finding for the time being. If an open finding drops below `HIGH`, its
-  managed TODO is unlinked and archived (unless it is `IN_PROGRESS`).
+- `CRITICAL` and `HIGH` generate managed TODOs (see [Managed TODOs](#managed-todos)). `MEDIUM` can be
+  confirmed in the Audit Center; `LOW` remains a finding for the time being.
 - A linked TODO set to `DONE` – managed or manually linked – moves an open finding to
   `AWAITING_VERIFICATION`, unless another TODO linked to it is still open (`OPEN`, `IN_PROGRESS`,
   `BACKLOG`; TODO `ab1ed481`). This holds for every write path – REST, TodoTrigger auto-close, linked
@@ -440,3 +436,27 @@ earlier findings only as Markdown in `previous_report`. Section 10b of the same 
 - Manually linked TODOs are never automatically changed in status – not even when their finding
   becomes `RESOLVED`. An open manual TODO next to a resolved finding is therefore intended; whoever
   created it closes it.
+
+### Identity of a finding
+
+`AuditResultParser` takes the envelope apart. `AuditIngestionService.ingest` (called by `AuditIngestionListener` on `WorkflowRunCompletedEvent`) checks and stores one `AuditReport` per run (VALID/INVALID); `AuditSnapshotApplier` matches the findings of a valid report in the same transaction by fingerprint (SHA-256 over projectId/auditKey/ruleKey/**normalised** subject):
+
+- **Normalisation** (`AuditSubjectNormalizer`): if a lower-case kind word stands before the first `:` (`package:…`, `keyword:…`, `safe-inventory:…`), `<kind>:<value>` stays whole — it is the identity. Otherwise everything from the first `:` and a lower-case method suffix behind a class name are dropped (`ContainerShellService.execute` → `ContainerShellService`, `application.yml:key-store-password` → `application.yml`). Class name and Java path are the same identity (TODO 87a1dac0): a path to a `.java` file starting with an upper-case letter and a fully qualified class name become the class name (`com/automation/service/AssistantService.java`, `com.automation.service.AssistantService` → `AssistantService`). Frontend modules (`.ts`/`.tsx`) stay paths, even without a directory – otherwise `ActivityLog.tsx` would merge with the Java class `ActivityLog`; only `ai-automation-frontend/src/…` and `src/…` are aligned to `frontend/src/…`. Other paths with `/` and file names without a class prefix stay whole. Metric rules (one finding per measured value) carry the FACT name as their fixed `subject` in the ruleKey catalogue (`perf.db.size` → `database_bytes`, `health.type-errors` → `frontend_tsc_errors`). Otherwise the model-generated `subject` drifts between runs and creates revenants (old finding `RESOLVED`, new one `OPEN`, managed TODO wrongly `DONE`). The stored `subject` is a display attribute only: on a match the newest value wins. `AuditFingerprintMigrationJob` (startup, idempotent) recomputes old rows and merges revenants into the oldest finding through `AuditFindingMerger` (counters added up, TODO links and occurrences move along). A human disposition (`ACCEPTED_RISK`, `DISMISSED`) always wins — whether it sits on the target or on the revenant; status and disposition (`dispositionNote`/`-Evidence`/`-At`, `resolvedAt`) move together, and a finding is only reopened through `AuditAcceptancePolicy` (proven deterioration). Every merge is logged before the delete with both IDs, both raw subjects and the `ruleKey`; a failing scope is logged and blocks neither the others nor the startup. If two findings of the **same** report yield the same identity, only the first is taken; the ingestion reports the others with their subjects in the activity log (they used to vanish silently, TODO 94fda6ef).
+
+### Managed TODOs
+
+**Managed TODOs** (`ManagedTodoWriter`): only for `CRITICAL`/`HIGH` findings in status `OPEN` whose evidence names a measurement of the run (`ensureAll`, one query per report for links and TODOs; tag `audit`, `auto:workflow`, `TodoCreatedEvent` → TodoTrigger). Accepted/dismissed risks, re-reviews and unverified findings start no fix loop. After every ingest, `ManagedTodoWriter.reconcile` closes the TODO as soon as all linked findings are terminal and reopens it when one comes back; `ManagedTodoReconciler` does the same after a disposition change in the Audit Center and after a merge. A TODO on demand (`POST /api/v1/audit-findings/{id}/todos`, `AuditFindingTodoLinker`) takes the same path (`ManagedTodoWriter.create`). If none of the open linked findings is above the threshold any more (say after changed criteria HIGH → MEDIUM), the TODO is released: link removed, status `ARCHIVED` (not `DONE` — nothing was fixed); an `IN_PROGRESS` TODO stays untouched (TODO ba0dcb3a).
+
+**Gate status** comes from the workflow's run metadata (`gate_status`), not from the findings; `AuditSummary.openFindingsBySeverity` counts only non-terminal findings, `findingsByStatus` returns accepted ones separately (Audit Center: "open X · accepted Y"; the findings tab filters on open ones by default).
+
+### Risk acceptance
+
+A finding is accepted via `PATCH /api/v1/audit-findings/{id}` with `status=ACCEPTED_RISK` and `dispositionNote`; the rules live in `AuditAcceptancePolicy`, the number parser in `EvidenceMetrics`:
+
+| Rule | Behaviour |
+|---|---|
+| Evidence snapshot | On acceptance, `AuditCenterService.updateFinding` freezes the current `evidence` text as `disposition_evidence` and the time as `disposition_at` (V69). Both stay through later status changes for traceability; accepting again sets both anew. |
+| Deterioration | If the finding shows up again, the ingestion compares measurable values of the new evidence with the snapshot — `EvidenceMetrics.parse` recognises `number + unit` (`LOC`/`lines`/`Zeilen`, `NCLOC` as a unit of its own, never as `LOC`, `deps`, `KB`/`MB`/`GB`, `ms`, `%`, `files`, `classes`, `methods`, `tests`, `warnings`, `errors`, `issues`, `vulnerabilities`; synonyms are merged, per unit the largest value counts) and named counts from fact lines (`FAKT <name>_count: <number>`, the name is the key). If a shared key lies > 10 % above the snapshot, the finding goes back to `OPEN` and the note gains `Verschlechtert: 320 LOC → 400 LOC`; the snapshot stays. The change rate (`6 Aenderungen in 90 Tagen (Hotspot ab 5)`, `Backend churn: 30`) fluctuates and is not compared by percentage: it reopens only if it was below the hotspot threshold in the snapshot and reaches it now (threshold from `Hotspot ab N` in the current evidence, otherwise 5 as in `arch-findings.py`; note `Verschlechtert: 0 Änderungen → 6 Änderungen (Hotspot ab 5)`). Without comparable numbers (one-sided or none at all) there is no reopening. |
+| Expiry | If the acceptance is older than 180 days when the finding reappears (`disposition_at`, fallback `resolved_at` for old acceptances), the finding goes to `AWAITING_VERIFICATION` with the note `Wiedervorlage nach 180 Tagen` — without a managed TODO. This happens exactly once: afterwards the normal rules apply (next ingest: present → `OPEN`, gone → `RESOLVED`); only a new acceptance starts a new period. Deterioration takes precedence over expiry. |
+
+Per finding, the Audit Center shows the acceptance date, the re-review date (+180 days), the disposition note and the snapshot (expandable). Tests: `AuditAcceptancePolicyTest`, `EvidenceMetricsTest`, `AuditIngestionServiceTest`, `AuditSnapshotApplierTest`, `AuditControllerTest`, frontend `AuditCenter.test.tsx`.

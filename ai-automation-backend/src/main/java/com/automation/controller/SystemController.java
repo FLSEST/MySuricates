@@ -21,9 +21,9 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Kern-Auskunft unter /api/v1/system: Health, Plattform-Info, Auth-Status, Heap-Belegung und
- * Client-Fehler-Meldungen. Die übrigen /system-Endpunkte sind nach Zuständigkeit
- * aufgeteilt: {@link SystemAiProviderController}, {@link SystemMaintenanceController},
+ * Core information under /api/v1/system: health, platform info, auth status, heap usage and
+ * client error reports. The other /system endpoints are split by concern:
+ * {@link SystemAiProviderController}, {@link SystemMaintenanceController},
  * {@link SystemSettingsController}, {@link SystemAccessController}.
  */
 @RestController
@@ -44,11 +44,16 @@ public class SystemController {
     @Value("${automation.environment:Dev}")
     private String environment;
 
+    /** Tells whether API-key security is switched on ({@code securityEnabled}); reachable without a key. */
     @GetMapping("/auth-status")
     public Map<String, Object> authStatus() {
         return Map.of("securityEnabled", securityEnabled);
     }
 
+    /**
+     * Health check without a key: {@code UP}, {@code DEGRADED} (Docker expected but not answering) or {@code DOWN} (database unreachable).
+     * The components list database response time and Docker state.
+     */
     @GetMapping("/health")
     public Map<String, Object> health() {
         DockerExpectation.State docker = dockerExpectation.probe();
@@ -100,11 +105,11 @@ public class SystemController {
     }
 
     /**
-     * Heap-Belegung als genau drei Zahlen, ohne API-Key (c2cda5ed): der Performance-Audit misst
-     * damit den Speicher, ohne dass die ganze Metrik-Oberfläche unter {@code /actuator/metrics}
-     * frei wird — die verrät Routen und Lastprofil und bleibt hinter dem Key. Quelle ist der
-     * MemoryMXBean, nicht Micrometer: {@code jvm.memory.max} summiert über Pools, deren Maximum
-     * undefiniert ({@code -1}) ist.
+     * Returns the heap usage as exactly three numbers, without an API key (c2cda5ed). The performance
+     * audit measures memory with it without opening all of {@code /actuator/metrics}, which reveals
+     * routes and load profile and stays behind the key. The source is the MemoryMXBean, not Micrometer:
+     * {@code jvm.memory.max} sums over pools whose maximum is undefined ({@code -1}). Without a known heap
+     * maximum, maximum and percentage are {@code null} rather than guessed; the percentage has one decimal.
      */
     @GetMapping("/jvm-memory")
     public Map<String, Object> jvmMemory() {
@@ -124,6 +129,7 @@ public class SystemController {
 
     record ClientErrorReport(String message, String stack, String source, String url, String timestamp) {}
 
+    /** Accepts an error report from the browser client and writes it to the backend log (202). */
     @PostMapping("/client-errors")
     public ResponseEntity<Void> reportClientError(@RequestBody ClientErrorReport report) {
         log.warn("[CLIENT] {} | source={} url={} | {}", report.message(), report.source(), report.url(),
@@ -131,6 +137,7 @@ public class SystemController {
         return ResponseEntity.accepted().build();
     }
 
+    /** Returns name, version, build, Java version, runtime mode, environment and the rate-limit figures; reachable without a key. */
     @GetMapping("/info")
     public Map<String, Object> info() {
         Map<String, Object> result = new LinkedHashMap<>();

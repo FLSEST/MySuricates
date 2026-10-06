@@ -30,7 +30,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
-/** AI-Provider- und Capability-Auskunft unter /api/v1/system. */
+/** AI providers and capabilities under /api/v1/system. */
 @RestController
 @RequestMapping("/api/v1/system")
 @RequiredArgsConstructor
@@ -49,6 +49,7 @@ public class SystemAiProviderController {
     @Value("${automation.environment:Dev}")
     private String environment;
 
+    /** Lists the registered AI providers, the default provider and each provider's declared capabilities. */
     @GetMapping("/ai-providers")
     public Map<String, Object> aiProviders() {
         return Map.of(
@@ -58,6 +59,10 @@ public class SystemAiProviderController {
         );
     }
 
+    /**
+     * Describes what this instance offers: API and app version, all API routes, the block types usable now and the module state.
+     * Block types whose module is switched off are left out.
+     */
     @GetMapping("/capabilities")
     public SystemCapabilitiesResponse capabilities() {
         List<SystemCapabilitiesResponse.RouteCapabilityResponse> routes = requestMappingHandlerMapping
@@ -142,7 +147,9 @@ public class SystemAiProviderController {
 
     /**
      * Models the provider offers on this host, discovered from the CLI / its local caches and
-     * served from a TTL cache. Never fails because of a missing CLI — see {@link ModelCatalog#available()}.
+     * served from a TTL cache. A failed probe (CLI missing, timeout, unreadable output) never fails the
+     * request: {@code available} is then {@code false}, {@code reason} says why and {@code models} is empty.
+     * An unknown provider id is 404.
      */
     @GetMapping("/ai-providers/{id}/models")
     public ModelCatalog models(@PathVariable String id) {
@@ -158,7 +165,8 @@ public class SystemAiProviderController {
     /**
      * Per provider: program on the PATH, login found (file or environment variable), and the commands
      * for what is missing — for the start page and the settings (f5a273ae). Cached, see
-     * {@link AiProviderStatusService}; never a token or file content.
+     * {@link AiProviderStatusService}; never a token or file content. {@code READY} means program and
+     * login were found, not that the login is still valid.
      */
     @GetMapping("/ai-providers/status")
     public AiProviderStatusReport aiProviderStatus() {

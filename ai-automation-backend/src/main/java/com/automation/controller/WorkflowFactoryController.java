@@ -19,6 +19,10 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Workflow factory: has an AI generate workflows from a topic, verify them on the test instance and promote them
+ * to templates.
+ */
 @RequiresModule(ModuleCatalog.FACTORY)
 @RestController
 @RequestMapping("/api/v1/factory")
@@ -31,6 +35,7 @@ public class WorkflowFactoryController {
 
     /**
      * Generate a workflow from a topic (preview only, no testing).
+     * {@code topic} is required; the answer is 201 with the new workflow.
      */
     @PostMapping("/generate")
     public ResponseEntity<?> generate(@Valid @RequestBody WorkflowFactoryRequest request) throws IOException {
@@ -40,6 +45,7 @@ public class WorkflowFactoryController {
 
     /**
      * Full factory pipeline: generate → deploy to test → verify → optionally promote.
+     * {@code maxRetries} (default 2) bounds the repair attempts made with {@code autoFix}.
      */
     @PostMapping("/run")
     public ResponseEntity<WorkflowFactoryResult> run(@Valid @RequestBody WorkflowFactoryRequest request) {

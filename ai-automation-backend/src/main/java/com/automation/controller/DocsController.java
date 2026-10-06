@@ -16,6 +16,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
+/** Serves the Markdown documentation from the configured docs directory ({@code automation.docs.directory}) to the UI. */
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/docs")
@@ -26,16 +27,18 @@ public class DocsController {
             Map.entry("WORKFLOW-GUIDE.md", "Workflow Guide"),
             Map.entry("architektur.md", "Architektur"),
             Map.entry("api-referenz.md", "API-Referenz"),
+            Map.entry("baukasten.md", "Baukasten"),
+            Map.entry("block-referenz.md", "Block-Referenz"),
             Map.entry("assistant-system.md", "Assistant System"),
             Map.entry("datenmodell.md", "Datenmodell"),
             Map.entry("deployment.md", "Deployment"),
             Map.entry("entwicklung.md", "Entwicklung"),
-            Map.entry("frontend.md", "Frontend"),
-            Map.entry("workflow-memory-architecture.md", "Workflow Memory")
+            Map.entry("frontend.md", "Frontend")
     );
 
     private final DocsConfig docsConfig;
 
+    /** Lists the Markdown documents of the docs directory, German and English, each with name, label and language. */
     @GetMapping
     public List<Map<String, String>> listDocs() {
         Path docsDir = resolveDocsDir();
@@ -64,6 +67,10 @@ public class DocsController {
         }
     }
 
+    /**
+     * Returns the Markdown content of one document; {@code lang} is {@code de} (default) or {@code en}.
+     * Answers 400 for names with path parts or without {@code .md}, 404 if the file does not exist.
+     */
     @GetMapping("/{name}")
     public ResponseEntity<Map<String, String>> getDoc(
             @PathVariable String name,

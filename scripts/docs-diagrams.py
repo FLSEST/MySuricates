@@ -697,7 +697,7 @@ def render_html(doc, note, lang):
 def shared_prefix(titles):
     """Gemeinsames Namenspraefix der Seiten ("Produkt — "), sofern es eines gibt.
 
-    Im Verzeichnis steht es sonst neunmal untereinander. Gemessen statt fest
+    Im Verzeichnis steht es sonst in jeder Zeile. Gemessen statt fest
     verdrahtet: heisst das Produkt eines Tages anders, wandert die Zeile mit.
     """
     if len(titles) < 2:

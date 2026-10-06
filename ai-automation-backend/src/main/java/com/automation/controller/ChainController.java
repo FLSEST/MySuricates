@@ -26,6 +26,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
+/** Workflow chains: define sequences of workflows, start them and follow their runs. */
 @RequiresModule(ModuleCatalog.CHAINS)
 @RestController
 @RequestMapping("/api/v1/chains")
@@ -36,33 +37,46 @@ public class ChainController {
     private final ChainExecutor chainExecutor;
     private final ChainMapper chainMapper;
 
+    /** Lists all workflow chains. */
     @GetMapping
     public List<ChainResponse> listChains() {
         return chainMapper.toResponseList(chainService.findAll());
     }
 
+    /** Creates a chain from an ordered list of workflow entries and returns it with 201. */
     @PostMapping
     public ResponseEntity<ChainResponse> createChain(@Valid @RequestBody CreateChainRequest request) {
         WorkflowChain chain = chainService.create(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(chainMapper.toResponse(chain));
     }
 
+    /** Returns one chain with its entries. */
     @GetMapping("/{id}")
     public ChainResponse getChain(@PathVariable String id) {
         return chainMapper.toResponse(chainService.findById(id));
     }
 
+    /** Updates a chain; fields left out stay unchanged, {@code entries} replaces the whole entry list. */
     @PutMapping("/{id}")
     public ChainResponse updateChain(@PathVariable String id, @Valid @RequestBody UpdateChainRequest request) {
         return chainMapper.toResponse(chainService.update(id, request));
     }
 
+    /**
+     * Deletes a chain; answers 204.
+     * Refused with 409 while the chain has an active run ({@code PENDING}, {@code RUNNING} or {@code PAUSED}),
+     * which would otherwise go on starting the chain's workflows; cancel the run first.
+     */
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteChain(@PathVariable String id) {
         chainService.delete(id);
         return ResponseEntity.noContent().build();
     }
 
+    /**
+     * Starts a chain run in the background and returns it with 201; the entries then run one after another.
+     * The optional body is the input context of the run.
+     */
     @PostMapping("/{id}/execute")
     public ResponseEntity<ChainRunResponse> executeChain(
             @PathVariable String id,
@@ -72,6 +86,10 @@ public class ChainController {
         return ResponseEntity.status(HttpStatus.CREATED).body(chainMapper.toRunResponse(run));
     }
 
+    /**
+     * Lists the runs of all chains page by page, newest first.
+     * {@code status} ignores case (unknown value: 400); {@code search} matches the chain name.
+     */
     @GetMapping("/runs")
     public PageResponse<ChainRunResponse> listAllRuns(
             @RequestParam(defaultValue = "0") int page,
@@ -95,16 +113,22 @@ public class ChainController {
         );
     }
 
+    /** Lists the runs of one chain, newest first. */
     @GetMapping("/{id}/runs")
     public List<ChainRunResponse> listRuns(@PathVariable String id) {
         return chainMapper.toRunResponseList(chainService.findRunsByChainId(id));
     }
 
+    /** Returns one chain run with its entry runs. */
     @GetMapping("/{id}/runs/{runId}")
     public ChainRunResponse getRun(@PathVariable String id, @PathVariable String runId) {
         return chainMapper.toRunResponse(chainService.findRunById(runId));
     }
 
+    /**
+     * Asks a running chain run to stop; it starts no further entries.
+     * Answers 200 even if the run is not active.
+     */
     @PostMapping("/runs/{runId}/cancel")
     public ResponseEntity<Void> cancelRun(@PathVariable String runId) {
         chainExecutor.cancel(runId);

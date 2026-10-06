@@ -209,9 +209,9 @@ README_SOURCE = "README.de.md"
 # ---------------------------------------------------------------------------
 # Technologietabelle: "| **React** | 19.2 | UI-Framework |"
 #
-# Gilt fuer JEDE gepruefte Datei, nicht nur fuers Onboarding — heute stehen
-# solche Tabellen nur in docs/onboarding/README.md (DE/EN), eine kuenftige
-# anderswo soll aber genauso mitlaufen. Die Doku kuerzt, deshalb gilt die
+# Gilt fuer JEDE gepruefte Datei — die einzige solche Tabelle stand in
+# docs/onboarding/README.md (entfallen im Doku-Umbau, TODO 1ab3ad21), eine
+# kuenftige soll aber genauso mitlaufen. Die Doku kuerzt, deshalb gilt die
 # genannte Version als richtig, wenn sie ein komponentenweises Praefix der
 # echten ist (19.2 zu 19.2.4 ja, 19.21 zu 19.2.4 nein).
 # ---------------------------------------------------------------------------
@@ -257,7 +257,7 @@ FORBIDDEN_PATTERNS = [
     (re.compile(r"claude-(?:opus|sonnet|haiku|fable)-\d+-\d"),
      "datierte Modell-ID — in der Doku gelten die Aliase opus/sonnet/haiku/fable"),
     # Das Produkt heisst MySuricates. "AutoPilot" ist nur der Name des Projekts, unter dem
-    # MySuricates seine eigenen TODOs fuehrt (docs/onboarding/README.md) — bis e3101cd6
+    # MySuricates seine eigenen TODOs fuehrt — bis e3101cd6
     # stand er trotzdem als "AutoPilot — …" im Titel aller Diagramm-Seiten. Geprueft wird
     # nur die Ueberschrift mit Gedankenstrich; der Projektname im Fliesstext bleibt frei.
     (re.compile(r"^#{1,6}\s+AutoPilot\s+[—–-]\s"),

@@ -158,14 +158,24 @@ dann `scripts/instance.sh up --name main`. Einen Autostart dafür richtet der In
 
 ### Und jetzt?
 
-Damit läuft die Anwendung. Ein erster Weg hinein, ohne etwas zu bauen:
+Damit läuft die Anwendung. Einen festen Weg hinein gibt es nicht — nimm das Beispiel, das zu dir
+passt. Jedes zeigt andere [Bausteine](baukasten.md), und nur das letzte setzt ein Software-Projekt voraus.
+
+| Beispiel | Wo | Was es zeigt |
+|---|---|---|
+| Beispielprojekt | Dashboard, Workflows und Projekte bieten es an, solange es noch kein Projekt gibt | Fünf Workflows ohne KI und ohne Einrichtung: Freigabe, Wenn-dann-sonst, Schleife, TODO-Lebenszyklus, Meldung ans Dashboard |
+| „Ordner-Backup (tar.gz)“ | Vorlagen | Feste Schritte erledigen die Arbeit (Archive, Prüfsummen), ein KI-Schritt fasst am Ende zusammen; per Zeitplan etwa jede Nacht |
+| „Dokument-Prüfung“ | Vorlagen | KI-Schritte prüfen Grammatik und Fakten und fassen zusammen; das Ergebnis liest du im Lauf |
+| „Iterative Verbesserung“ | Vorlagen | Ein Text wird in einer Schleife verbessert, bis die Qualität stimmt |
+| „SSL-Zertifikat-Prüfung“ | Vorlagen | Je Domain ein fester Prüfschritt, danach eine Meldung über anstehende Verlängerungen |
+| „Ziel-Wächter“ | Schalter „Wächter“ auf der Seite eines Ziels | Prüft täglich ohne KI, was an einem Ziel überfällig ist, und meldet eine Ampel ans Dashboard |
+| „Code-Qualität“ | Vorlagen | Lint, Tests mit Wiederholung und Build, ganz ohne KI |
+
+Für jedes Beispiel gilt:
 
 1. **Projekt anlegen** — jeder Workflow gehört zu einem Projekt; ein Projekt zeigt auf ein
-   Verzeichnis auf deinem Rechner (beim Container: innerhalb des Projektordners). Zum Ausprobieren
-   gibt es das **Beispielprojekt**: Dashboard, Workflows und Projekte bieten es an, solange noch kein
-   Projekt existiert. Ein Klick, und fünf Beispiel-Workflows laufen ohne KI und ohne Einrichtung:
-   Freigabe, Wenn-dann-sonst, Schleife, TODO-Lebenszyklus und eine Meldung ans Dashboard.
-   Das Dashboard bekommt dazu eine eigene Ansicht, die nur dieses Projekt zeigt.
+   Verzeichnis auf deinem Rechner (beim Container: innerhalb des Projektordners). Das
+   Beispielprojekt legt sich mit einem Klick selbst an und bekommt eine eigene Dashboard-Ansicht.
 2. **Eine Vorlage übernehmen** — unter *Templates* liegen 54 fertige Workflows. Eine auswählen,
    ins Projekt kopieren, starten. Der Lauf zeigt Schritt für Schritt, was passiert. Vorlagen, die
    ein auf dieser Instanz ausgeschaltetes Modul brauchen, stehen hinter einem Zähler, und der Filter
@@ -304,5 +314,5 @@ Passwort — SSL aus mit dem Default bleibt weiterhin erlaubt.
 
 - [Entwicklung](entwicklung.md) — Build, Tests, Konventionen
 - [Deployment](deployment.md) — Docker, Umgebungsvariablen, Staging
-- [Architektur](architektur.md) — Systemübersicht, Block-Typen
+- [Architektur](architektur.md) — Systemübersicht, Schichten, Sicherheit
 - [Workflow-Guide](WORKFLOW-GUIDE.md) — Workflows bauen

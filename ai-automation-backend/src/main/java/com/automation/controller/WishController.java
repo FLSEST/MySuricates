@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
+/** Wishes: a request in plain words that an AI loop decomposes into workflows, runs, evaluates and refines. */
 @RequiresModule(ModuleCatalog.WISHES)
 @RestController
 @RequestMapping("/api/v1/wishes")
@@ -28,6 +29,10 @@ public class WishController {
     private final WishFulfillmentLoop fulfillmentLoop;
     private final WishMapper wishMapper;
 
+    /**
+     * Creates a wish and starts fulfilling it in the background; returns it with 201.
+     * {@code text} and {@code projectId} are required, an unknown project returns 404.
+     */
     @PostMapping
     public ResponseEntity<WishResponse> createWish(@Valid @RequestBody CreateWishRequest request) {
         Wish wish = wishService.create(request.text(), request.projectId(), request.maxIterations(), request.referenceWorkflowIds(), request.autoRefine());
@@ -35,34 +40,43 @@ public class WishController {
         return ResponseEntity.status(HttpStatus.CREATED).body(wishMapper.toResponse(wish));
     }
 
+    /** Lists all wishes, newest first. */
     @GetMapping
     public List<WishResponse> listWishes() {
         return wishMapper.toResponseList(wishService.findAll());
     }
 
+    /** Returns one wish with its status, iterations and generated workflows. */
     @GetMapping("/{id}")
     public WishResponse getWish(@PathVariable String id) {
         return wishMapper.toResponse(wishService.findById(id));
     }
 
+    /** Stops the fulfillment loop and marks a wish that is not finished yet as CANCELLED. */
     @PostMapping("/{id}/cancel")
     public ResponseEntity<Void> cancelWish(@PathVariable String id) {
         fulfillmentLoop.cancel(id);
         return ResponseEntity.ok().build();
     }
 
+    /**
+     * Responds to a wish with {@code action} ACCEPT, REFINE, CANCEL, CLARIFY or RETRY plus optional {@code feedback}.
+     * Each action is only allowed in its matching state (else 409); RETRY restarts a FAILED or CANCELLED wish.
+     */
     @PostMapping("/{id}/respond")
     public WishResponse respondToWish(@PathVariable String id, @Valid @RequestBody WishRespondRequest request) {
         Wish wish = wishService.respond(id, request);
         return wishMapper.toResponse(wish);
     }
 
+    /** Saves the first generated workflow of a completed wish as a template and returns {@code templateId}. */
     @PostMapping("/{id}/crystallize")
     public Map<String, String> crystallizeWish(@PathVariable String id) {
         String templateId = wishService.crystallize(id);
         return Map.of("templateId", templateId);
     }
 
+    /** Deletes a wish; only COMPLETED, FAILED or CANCELLED wishes can be deleted (else 409). */
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteWish(@PathVariable String id) {
         wishService.delete(id);

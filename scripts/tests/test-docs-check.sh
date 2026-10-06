@@ -32,7 +32,7 @@ for f in README.md README.de.md LICENSE NOTICE SECURITY.md CONTRIBUTING.md; do
 done
 # Ein README ohne Ueberschrift zum Ausprobieren ist seit TODO 1b84ecab ein Befund.
 for f in README.md README.de.md; do printf '# %s\n\nKurz.\n\n## Quickstart\n' "$f" > "$FAKE/$f"; done
-for f in GETTING-STARTED.md architektur.md vision.md workflow-pool-kuratierung.md; do
+for f in GETTING-STARTED.md architektur.md baukasten.md workflow-pool-kuratierung.md; do
   echo "# $f" > "$FAKE/docs/$f"
 done
 
@@ -69,13 +69,13 @@ done
 check "vollstaendiges Repo bleibt GREEN" 'grep -q "^gate_status: GREEN" <<< "$OUT"'
 
 echo "Fall 5: Pflichtdokument in docs/ fehlt -> YELLOW"
-rm "$FAKE/docs/vision.md"
+rm "$FAKE/docs/baukasten.md"
 OUT="$(run_gate)"
 check "gate_status YELLOW"           'grep -q "^gate_status: YELLOW" <<< "$OUT"'
-check "docs/vision.md als missing"   'grep -q "^missing: docs/vision.md$" <<< "$OUT"'
+check "docs/baukasten.md als missing" 'grep -q "^missing: docs/baukasten.md$" <<< "$OUT"'
 
 echo "Fall 6: Schnellstart hinter zu viel Text -> YELLOW ohne todo_item (TODO 1b84ecab)"
-echo "# vision.md" > "$FAKE/docs/vision.md"
+echo "# baukasten.md" > "$FAKE/docs/baukasten.md"
 { echo "# README"; for i in $(seq 1 60); do echo "eins zwei drei vier fuenf sechs sieben acht neun zehn"; done
   echo "<!-- ein langer Kommentar"; for i in $(seq 1 60); do echo "wort wort wort wort wort wort wort wort wort wort"; done; echo "-->"
   echo "## Quickstart"; } > "$FAKE/README.md"

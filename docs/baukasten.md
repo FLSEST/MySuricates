@@ -1,9 +1,10 @@
 # Baukasten
 
-> **Wie arbeite ich mit starken LLMs, um auch meine beschränkten Fähigkeiten nutzen zu können?**
+> **Wie arbeite ich mit starken LLMs, wenn ich Agentensystemen nicht nur auf Zuruf weitere Aufgaben geben
+> oder sie einfach frei laufen lassen will?**
 
-Aus dieser Frage ist MySuricates entstanden. Die Antworten darauf sind Bausteine, und man braucht
-nicht alle: Ein kleiner Kern ist immer da, der Rest wird zugeschaltet – oder man schließt an, was man
+Auf diese Frage gibt es heute schon sehr unterschiedliche Antworten. Die von MySuricates sind Bausteine,
+und man braucht nicht alle: Ein kleiner Kern ist immer da, der Rest wird zugeschaltet – oder man schließt an, was man
 schon hat. Deterministisch ist der rote Faden, weil man das, was man gebaut hat, wiederverwenden will.
 
 Die Kennzeichen in den Tabellen:
@@ -13,7 +14,7 @@ Die Kennzeichen in den Tabellen:
   ([Liste aller Module](architektur.md#module-system-startkonfiguration))
 - **Schalter** – Härtung, die beim Start gesetzt wird
 
-## Die vier Antworten
+## Die Antworten
 
 ### 1. Nichts verschwindet im Leeren
 
@@ -24,19 +25,17 @@ Workflows, die an Dinge denken, die in einer Sitzung vergessen gingen.
 |---|---|---|
 | Lauf-Verlauf | Kern | Jeder Schritt hält fest, was hineinging und was herauskam. |
 | Versionen | Kern | Jede Änderung an einem Workflow bleibt erhalten und lässt sich zurückholen. |
-| TODOs | Kern | Was ein Lauf findet, wird eine Aufgabe. |
+| TODOs | Kern | Was ein Lauf findet, wird eine Aufgabe. Zum Ausprobieren: Blaupause „TODO-Lebenszyklus“. |
 | API für Agenten | Kern | Eine KI-Sitzung (etwa Claude Code oder Codex) legt TODOs an und startet Workflows – das Projekt kennt MySuricates. → [AGENTS.md](../AGENTS.md) |
-| Gedächtnis | +research | Erkenntnisse aus Läufen fließen in spätere Läufe ein. → [Workflow-Memory](konzepte/workflow-memory.md) |
-| Audit | +research | Befunde mit Verlauf, auch solche, die bewusst in Kauf genommen werden. → [Audit-Protokoll](audit-workflow-protocol.md) |
+| Gedächtnis | +research | Erkenntnisse aus Läufen fließen in spätere Läufe ein. → [Workflow-Memory](konzepte/workflow-memory.md) · Zum Ausprobieren: Blaupause „Workflow-Memory nutzen“. |
 
 ### 2. Deterministisch und nicht-deterministisch kombinieren – und sichtbar machen
 
 | Baustein | | Wozu |
 |---|---|---|
-| Workflow aus Schritten | Kern | Feste Schritte (Shell, Verzweigung, Schleife), KI-Schritte und Mensch-Schritte (Freigabe, Eingabe) in einem Ablauf. → [Workflow-Guide](WORKFLOW-GUIDE.md) |
+| Workflow aus Schritten | Kern | Feste Schritte (Shell, Verzweigung, Schleife), KI-Schritte und Mensch-Schritte (Freigabe, Eingabe) in einem Ablauf. → [Workflow-Guide](WORKFLOW-GUIDE.md), alle Einstellungen je Schritt in der [Block-Referenz](block-referenz.md) · Zum Ausprobieren: Blaupausen „Wenn – dann – sonst“, „Liste abarbeiten“, „Freigabe vor dem Handeln“, „Formular und Verwendung“. |
 | Schrittart im Lauf | Kern | Bei jedem Schritt ist zu sehen, ob eine KI, eine feste Regel oder ein Mensch gehandelt hat. |
-| Ampel | Kern | Ein Schritt gibt `GREEN`, `YELLOW` oder `RED` aus – ein Urteil, an dem weitere Schritte hängen können. → [Gates](konzepte/gates.md) |
-| Agent-Schritt mit Budget | Kern | Eine offene KI-Aufgabe läuft gegen feste Grenzen: Durchgänge, Zeit, Tokens. → [Agentische Budgets](konzepte/agentische-budgets.md) |
+| Agent-Schritt mit Budget | Kern | Eine offene KI-Aufgabe läuft gegen feste Grenzen: Durchgänge, Zeit, Tokens. → [Agentische Budgets](konzepte/agentische-budgets.md) · Zum Ausprobieren: Blaupause „Agent mit Freigabe (teuer)“. |
 | Prüfung der Definition | Kern | Meldet Baufehler eines Workflows, bevor er läuft. |
 | Diagramm (BPMN) | +research | Derselbe Ablauf als Diagramm, auch während eines Laufs – lesbar ohne Code, austauschbar mit BPMN-Werkzeugen. |
 | Siegel | Schalter | Ein freigegebener Ablauf läuft nur so, wie er freigegeben wurde. → [Härtung](konzepte/haertung.md) |
@@ -46,19 +45,31 @@ Workflows, die an Dinge denken, die in einer Sitzung vergessen gingen.
 | Baustein | | Wozu |
 |---|---|---|
 | KI-Anbieter | Kern | Claude und Codex direkt, über Pi weitere Modelle – wählbar je Workflow oder je Schritt. Wechselt man den Anbieter, bleibt der Ablauf. |
-| Modell je Schritt | Kern | Ein eng gefasster KI-Schritt kann ein kleineres Modell oder einen anderen Anbieter bekommen. |
-| Anbindungen | Kern / +full | Eigene Bausteine nutzen oder ein vorhandenes System anschließen – siehe [Eigen oder anschließen](#eigen-oder-anschließen). |
+| Modell je Schritt | Kern | Ein eng gefasster KI-Schritt kann ein kleineres Modell oder einen anderen Anbieter bekommen. Zum Ausprobieren: Blaupause „Modell pro Schritt“. |
+| Anbindungen | Kern / +full | Eigene Bausteine nutzen oder ein vorhandenes System anschließen – siehe [Eigen oder anschließen](#eigen-oder-anschließen). Zum Ausprobieren: Blaupause „Integration abfragen“ (+full). |
 
-### 4. Daraus viele weitere Ideen
+### 4. Schleifen, die vergleichen, wiederfinden und Menschen bewerten lassen
+
+Schleifen (Loop-Engineering) wie das Audit-System machen einen Lauf mit früheren vergleichbar, finden
+schon einmal gestellte Fragen wieder und lassen Menschen das Ergebnis bewerten.
+
+| Baustein | | Wozu |
+|---|---|---|
+| Ampel | Kern | Ein Schritt gibt `GREEN`, `YELLOW` oder `RED` aus – ein Urteil, an dem weitere Schritte hängen können. → [Gates](konzepte/gates.md) · Zum Ausprobieren: Blaupause „Ampel“. |
+| TODO-Auslöser | Kern | Ein TODO startet einen Reparatur-Workflow, danach läuft die Prüfung erneut; die Zahl der Versuche ist begrenzt. → [Selbstverbesserung](konzepte/selbstverbesserung.md) · Zum Ausprobieren: Blaupausen „Von einem TODO-Trigger gestartet“, „Schleife bis zum Ziel“. |
+| Freigabe | Kern | Ein Mensch bewertet ein Ergebnis, bevor es weitergeht – auch mitten in einer Schleife. Zum Ausprobieren: Blaupausen „Freigabe vor dem Handeln“, „Schleife mit Freigabe“. |
+| Audit | +research | Befunde behalten ihre Identität über Läufe hinweg: Was schon gefunden, behoben oder bewusst in Kauf genommen wurde, kennt der nächste Lauf und meldet es nicht als neu. → [Audit-Protokoll](audit-workflow-protocol.md) |
+
+### 5. Daraus viele weitere Ideen
 
 | Baustein | | Wozu |
 |---|---|---|
 | Vorlagen, Pool, Blaupausen | Kern | Fertige Workflows übernehmen und anpassen; Blaupausen sind Grundgerüste zum Ausfüllen. → [Pool](../workflow-pool/README.md) |
-| Auslöser | Kern | Zeitplan, Folge auf einen Lauf, Folge auf ein TODO. → [Zugänge](konzepte/zugaenge.md) |
-| Teil-Workflows | Kern | Ein Workflow ruft einen anderen auf, auch einmal je Eintrag einer Liste. |
-| Ziele | Kern | TODOs und Workflows auf ein Ergebnis hin bündeln. |
-| Dashboard-Bericht | Kern | Ein Workflow legt sein Ergebnis als Kachel aufs Dashboard. |
-| Ketten | +research | Mehrere Workflows hintereinander. |
+| Auslöser | Kern | Zeitplan, Folge auf einen Lauf, Folge auf ein TODO. → [Zugänge](konzepte/zugaenge.md) · Zum Ausprobieren: Blaupausen „Per Zeitplan starten“, „Von einem TODO-Trigger gestartet“, „Per Webhook starten (mit Signatur)“ (+full, Schalter `webhook-signatures`). |
+| Teil-Workflows | Kern | Ein Workflow ruft einen anderen auf, auch einmal je Eintrag einer Liste. Zum Ausprobieren: Blaupause „Teil-Workflow aufrufen (Paket)“. |
+| Ziele | Kern | TODOs und Workflows auf ein Ergebnis hin bündeln. Zum Ausprobieren: Vorlage „Ziel-Wächter“. |
+| Dashboard-Bericht | Kern | Ein Workflow legt sein Ergebnis als Kachel aufs Dashboard. Zum Ausprobieren: Blaupause „Ergebnis melden“. |
+| Ketten | +research | Mehrere Workflows hintereinander. Zum Ausprobieren: Blaupause „Glied einer Kette“. |
 
 ## Eigen oder anschließen
 
@@ -96,6 +107,7 @@ brauchten und wo es scheiterte; so lässt sich an derselben Aufgabe sehen, was f
 
 ### Loop-Engineering
 
+Die Bausteine dazu stehen oben unter [Antwort 4](#4-schleifen-die-vergleichen-wiederfinden-und-menschen-bewerten-lassen).
 Ein Lauf prüft und findet etwas, daraus wird ein TODO, ein Folge-Lauf repariert, die Prüfung läuft
 erneut. Bausteine: Ampel → TODO → TODO-Auslöser → Reparatur-Workflow. Begrenzt wird der Kreis durch
 eine Höchstzahl an Versuchen, und ein Reparaturlauf erzeugt selbst kein TODO.
@@ -135,4 +147,5 @@ Seite „Freigaben“ mit allem, was auf eine Entscheidung wartet, und die Laufa
 Diagramm. Hinweise erscheinen dort, wo man sie braucht.
 
 Zum Nachschlagen: [Architektur](architektur.md), [API-Referenz](api-referenz.md),
+[Block-Referenz](block-referenz.md),
 [Datenmodell](datenmodell.md), [Deployment](deployment.md), [Entwicklung](entwicklung.md).

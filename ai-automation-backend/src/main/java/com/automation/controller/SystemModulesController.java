@@ -27,12 +27,17 @@ public class SystemModulesController {
     private final ModuleOverrideService overrides;
     private final ModuleRegistry registry;
 
+    /**
+     * Switches a feature module on or off ({@code enabled}) with immediate effect and returns the state of all modules.
+     * An unknown module name is 404; the change is recorded as a SECURITY entry in the activity log.
+     */
     @PutMapping("/{name}")
     public SystemModulesResponse setEnabled(@PathVariable String name, @Valid @RequestBody ModuleToggleRequest request) {
         overrides.setEnabled(name, request.enabled());
         return ModuleCapabilityMapper.modulesResponse(registry);
     }
 
+    /** Drops the settings override of a module so it follows the startup configuration again; returns the state of all modules. */
     @DeleteMapping("/{name}/override")
     public SystemModulesResponse resetToConfig(@PathVariable String name) {
         overrides.resetToConfig(name);

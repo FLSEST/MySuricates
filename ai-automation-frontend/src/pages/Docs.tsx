@@ -114,7 +114,8 @@ export function Docs() {
                 prose-td:border prose-td:border-border
                 prose-blockquote:border-accent/40 prose-blockquote:text-text-secondary
                 prose-strong:text-text prose-hr:border-border">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {/* skipHtml: raw HTML is never rendered, so a marker comment like the one on generated pages would show as text */}
+                <ReactMarkdown remarkPlugins={[remarkGfm]} skipHtml>
                   {content}
                 </ReactMarkdown>
               </article>

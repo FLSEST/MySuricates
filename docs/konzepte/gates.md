@@ -1,4 +1,3 @@
-<!-- concept-facts-sha256: 47f72cd8883f6032a246606f7af297a20af1c83a1a13ed6078d019d53951318a -->
 <!-- concept-source: d7e7e28cf7209b4369ad33467bb4fe781a178baa -->
 
 # Gates: ein maschinenlesbares Urteil
@@ -21,18 +20,7 @@ Der Mechanismus trennt technische Ausführung von fachlicher Bewertung. Ein sinn
 
 ## Nachteile und Kosten
 
-Ein Gate beweist keine Qualität, sondern nur, dass ein Marker erkannt oder ein technischer Status abgeleitet wurde. Besonders wichtig: Ein COMPLETED-Run ohne Marker kann GREEN werden, obwohl keine fachliche Vollständigkeitsprüfung belegt ist. Es fehlen Daten zu kausalem Nutzen, Fehlerrate und Prüfungsabdeckung. Der Betriebsbefund zeigt lediglich Bestand und Nutzungsumfeld: 1235 gespeicherte Runs sind kein Lifetime-Wert, und 144 von 223 typisierten Schrittaufzeichnungen der letzten 30 Tage sind Shell-Blöcke, nicht Gate-Erfolge oder fachlicher Nutzen.
-
-## Betriebsbeleg
-
-Messung: **2026-09-19 (UTC)**, eine lokale Entwicklungsinstanz. Bestandszähler beziehen sich auf die über REST sichtbaren Datensätze; Schrittzahlen zählen gespeicherte Schritte mit Typ-Metadaten im 30-Tage-Fenster. Wrapper zählen einmal. Dies ist kein Wirksamkeitsnachweis.
-
-| Messgröße | Anzahl / Bezugsgröße |
-|---|---:|
-| Shell-Schritte im 30-Tage-Fenster | 144 / 223 |
-| Gespeicherte Runs (alle Zeiträume) | 1235 |
-
-[Definitionen, Messgrenzen und Rohzähler](betriebsdaten.json) · [Messmethode und Wiederholung](README.md)
+Ein Gate beweist keine Qualität, sondern nur, dass ein Marker erkannt oder ein technischer Status abgeleitet wurde. Besonders wichtig: Ein COMPLETED-Run ohne Marker kann GREEN werden, obwohl keine fachliche Vollständigkeitsprüfung belegt ist. Es fehlen Daten zu kausalem Nutzen, Fehlerrate und Prüfungsabdeckung.
 
 ## Im Code
 

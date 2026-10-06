@@ -157,14 +157,24 @@ service runs. An instance on this machine (`--runtime host`) does **not** start 
 
 ### What now?
 
-The application is running. A first way in, without building anything:
+The application is running. There is no fixed way in — pick the example that suits you. Each one
+shows different [building blocks](baukasten.md), and only the last one needs a software project.
+
+| Example | Where | What it shows |
+|---|---|---|
+| Example project | The dashboard, workflows and projects offer it while no project exists yet | Five workflows without AI and without any setup: approval, if-then-else, loop, TODO lifecycle, report to the dashboard |
+| “Folder Backup (tar.gz)” | Templates | Fixed steps do the work (archives, checksums), an AI step sums up at the end; on a schedule, every night for example |
+| “Document Review” | Templates | AI steps check grammar and facts and summarise; you read the result in the run |
+| “Iterative Refinement” | Templates | A text is improved in a loop until the quality is right |
+| “SSL Certificate Check” | Templates | One fixed check per domain, then a report on upcoming renewals |
+| “Goal guard” | The “Guard” switch on a goal's page | Checks daily, without AI, what is overdue on a goal and reports a traffic light to the dashboard |
+| “Code Quality” | Templates | Lint, tests with retry and build, entirely without AI |
+
+For every example:
 
 1. **Create a project** — every workflow belongs to a project; a project points at a directory on
-   your machine (in the container: inside the projects folder). To try things out there is the
-   **example project**: the dashboard, workflows and projects offer it while no project exists yet.
-   One click, and its five example workflows run without AI and without any setup: approval,
-   if-then-else, loop, TODO lifecycle and a report to the dashboard. The dashboard gets
-   a view of its own that shows only this project.
+   your machine (in the container: inside the projects folder). The example project creates
+   itself with one click and gets a dashboard view of its own.
 2. **Take a template** — *Templates* holds 54 ready-made workflows. Pick one, copy it into the
    project, run it. The run shows step by step what happens. Templates that need a module switched
    off on this instance wait behind a counter, and the "Runs without AI" filter shows only what calls
@@ -301,5 +311,5 @@ in the repo — SSL off with the default password remains allowed.
 
 - [Development](entwicklung.md) — Build, tests, conventions
 - [Deployment](deployment.md) — Docker, environment variables, staging
-- [Architecture](architektur.md) — System overview, block types
+- [Architecture](architektur.md) — System overview, layers, security
 - [Workflow Guide](WORKFLOW-GUIDE.md) — Building workflows

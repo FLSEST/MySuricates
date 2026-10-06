@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Collect anonymous aggregate evidence before starting the concept-page workflow.
+"""Collect anonymous aggregate counters of one MySuricates installation.
+
+A standalone tool for a separate operational measurement; the concept pages under
+docs/konzepte/ carry no measurement and do not read its output. The result describes one
+installation at one moment, so it lands in the gitignored reports/ directory, not in docs/.
 
 Run from an operator session, never from a workflow block. Raw API responses and
 credentials stay in memory; only explicitly selected counters are written.
@@ -11,7 +15,7 @@ import os
 from pathlib import Path
 import urllib.request
 
-CATALOG = Path(__file__).with_name('catalog.json')
+DEFAULT_OUTPUT = Path(__file__).resolve().parents[2] / 'reports' / 'concepts' / 'facts.json'
 
 # Never through a proxy from the environment (cf662c01): urllib sends localhost through http_proxy and
 # all_proxy too — behind a proxy the calls failed, and the proxy got the X-API-Key.
@@ -77,12 +81,6 @@ def collect(base, key):
         metric('steps_' + row['blockType'].replace('-', '_'), row['stepCount'], typed_steps,
                '/learning/dashboard?days=30',
                'Last 30 days: retained step records with blockType metadata; wrappers counted once, not inner calls')
-    # The dashboard lists only block types that have steps in the window. A step count the
-    # concept catalog relies on is therefore measured as zero instead of missing.
-    for key in sorted({key for item in json.loads(CATALOG.read_text()) for key in item['metrics']}):
-        if key.startswith('steps_') and key not in metrics:
-            metric(key, 0, typed_steps, '/learning/dashboard?days=30',
-                   'Last 30 days: no retained step record of this block type in the window')
     for field in ('activeSchedules', 'totalSchedules', 'activeWebhooks', 'activeTodoTriggers',
                   'activeCompletionTriggers', 'activeMemoryEntries'):
         metric(field, stats[field], None, '/learning/platform-stats', 'Current configured inventory; not effectiveness')
@@ -100,7 +98,8 @@ def collect(base, key):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--api-base', default='http://localhost:9090/api/v1')
-    parser.add_argument('--output', required=True, type=Path)
+    parser.add_argument('--output', type=Path, default=DEFAULT_OUTPUT,
+                        help='default: reports/concepts/facts.json in this checkout (gitignored)')
     args = parser.parse_args()
     key = os.environ.get('MYSURICATES_API_KEY')
     if not key:

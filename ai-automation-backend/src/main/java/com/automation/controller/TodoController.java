@@ -31,6 +31,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
+/** TODOs: list, create, edit and close them, start their fix workflow, export them to a tracker, find duplicates. */
 @RestController
 @RequestMapping("/api/v1/todos")
 @RequiredArgsConstructor
@@ -46,6 +47,11 @@ public class TodoController {
     private final TodoSimilarityService similarityService;
     private final TodoPlanningService planningService;
 
+    /**
+     * Lists TODOs page by page, most urgent first, filtered by project, status, priority, source, tag, text or goal.
+     * ARCHIVED TODOs only appear when {@code status} names them; status, priority and source ignore case, an unknown
+     * value returns 400, and {@code goalId=none} selects TODOs without a goal.
+     */
     @GetMapping
     public PageResponse<TodoResponse> listTodos(
             @RequestParam(defaultValue = "0") int page,
@@ -60,40 +66,66 @@ public class TodoController {
         return todoService.findAll(page, size, projectId, status, priority, source, tag, q, goalId);
     }
 
+    /**
+     * Creates a TODO and returns it with 201; only {@code title} is required.
+     * Defaults are OPEN, MEDIUM and source USER; an unknown {@code projectId} or {@code linkedWorkflowId} returns 404,
+     * and a new OPEN TODO can start matching TODO triggers. {@code agentSessionRef} keeps only the conversation UUID
+     * found in the value (a whole {@code claude --resume} command is accepted); a value without a UUID is dropped.
+     */
     @PostMapping
     public ResponseEntity<TodoResponse> createTodo(@Valid @RequestBody CreateTodoRequest request) {
         var todo = todoService.create(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(todoMapper.toResponse(todo));
     }
 
+    /** Returns one TODO. */
     @GetMapping("/{id}")
     public TodoResponse getTodo(@PathVariable String id) {
         return todoService.findByIdResponse(id);
     }
 
+    /**
+     * Updates the fields sent in the body and leaves the others unchanged.
+     * An empty {@code dueDate} or {@code linkedWorkflowId} clears it; an unknown project or workflow id returns 404.
+     */
     @PutMapping("/{id}")
     public TodoResponse updateTodo(@PathVariable String id, @RequestBody UpdateTodoRequest request) {
         return todoService.updateAndReturn(id, request);
     }
 
-    /** Ziel, Rang und Einschaetzung (Komplexitaet, Effort, Begruendung, offene Frage) – TODO dc0566f8. */
+    /**
+     * Sets a TODO's goal, work package, rank, assessment (complexity, effort, reasoning, open question) and decision.
+     * A {@code goalId} in the same request is applied first; an unknown goal or work package is 404.
+     * {@code goalRank} of 0 or less removes the rank, a rank without a goal is 400. Sending {@code complexity},
+     * {@code suggestedEffort} or {@code ratingNote} stamps {@code ratedAt}, with {@code ratedBy} defaulting to
+     * {@code USER}; other values than S/M/L/XL or low/medium/high/xhigh are 400.
+     */
     @PatchMapping("/{id}/planning")
     @RequiresModule(ModuleCatalog.GOALS)
     public TodoResponse updateTodoPlanning(@PathVariable String id, @RequestBody UpdateTodoPlanningRequest request) {
         return planningService.update(id, request);
     }
 
+    /** Sets the status of a TODO ({@code status} required), optionally recording the {@code sessionId} that changed it. */
     @PatchMapping("/{id}/status")
     public TodoResponse updateTodoStatus(@PathVariable String id,
                                          @Valid @RequestBody UpdateTodoStatusRequest request) {
         return todoService.updateStatusAndReturn(id, request);
     }
 
+    /**
+     * Starts the TODO's linked fix workflow and sets the TODO to IN_PROGRESS.
+     * Returns 400 without a linked workflow and 409 when the TODO is DONE or its last fix run is still running.
+     */
     @PostMapping("/{id}/resolve")
     public com.automation.dto.response.WorkflowRunResponse resolveTodo(@PathVariable String id) {
         return workflowMapper.toRunResponse(todoResolutionService.resolve(id));
     }
 
+    /**
+     * Creates a task for the TODO in an external tracker and returns its reference; a TODO already exported returns the existing link.
+     * Provider and target come from the body or the project's {@code taskExport} setting.
+     */
     @PostMapping("/{id}/export")
     @RequiresModule(ModuleCatalog.INTEGRATIONS)
     public TodoExportResponse exportTodo(@PathVariable String id,
@@ -104,12 +136,14 @@ public class TodoController {
         return new TodoExportResponse(ref.referenceType(), ref.referenceId(), ref.url());
     }
 
+    /** Deletes a TODO permanently. */
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteTodo(@PathVariable String id) {
         todoService.delete(id);
         return ResponseEntity.noContent().build();
     }
 
+    /** Counts TODOs per status, optionally only those of {@code projectId}. */
     @GetMapping("/count")
     public TodoCountResponse countTodos(@RequestParam(required = false) String projectId) {
         return todoService.count(projectId);
@@ -140,7 +174,7 @@ public class TodoController {
 
     /**
      * Check for similar TODOs before creating a new one.
-     * Frontend calls this to offer merge/link options to the user.
+     * {@code projectId} and {@code title} are required. Frontend calls this to offer merge/link options to the user.
      */
     @GetMapping("/similar")
     public List<SimilarTodoResponse> findSimilar(

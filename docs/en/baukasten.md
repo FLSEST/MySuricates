@@ -1,9 +1,10 @@
 # Building blocks
 
-> **How do I work with strong LLMs so that I can put my own limited abilities to use as well?**
+> **How do I work with strong LLMs if I don't just want to hand agent systems more tasks on demand
+> or simply let them run free?**
 
-MySuricates grew out of this question. The answers are building blocks, and you don't need all of
-them: a small core is always there, the rest is switched on – or you connect what you already have.
+There are already very different answers to this question today. The ones MySuricates gives are
+building blocks, and you don't need all of them: a small core is always there, the rest is switched on – or you connect what you already have.
 Determinism is the common thread, because you want to reuse what you have built.
 
 The markers in the tables:
@@ -13,7 +14,7 @@ The markers in the tables:
   ([list of all modules](architektur.md#module-system-startup-configuration))
 - **Switch** – hardening, set at startup
 
-## The four answers
+## The answers
 
 ### 1. Nothing disappears into the void
 
@@ -24,19 +25,17 @@ remember the things that were forgotten during a session.
 |---|---|---|
 | Run history | Core | Every step records what went in and what came out. |
 | Versions | Core | Every change to a workflow is kept and can be restored. |
-| TODOs | Core | Whatever a run finds becomes a task. |
+| TODOs | Core | Whatever a run finds becomes a task. To try: blueprint “TODO lifecycle”. |
 | API for agents | Core | An AI session (Claude Code or Codex, for example) creates TODOs and starts workflows – the project knows MySuricates. → [AGENTS.md](../../AGENTS.md) |
-| Memory | +research | Insights from runs flow into later runs. → [Workflow memory](konzepte/workflow-memory.md) |
-| Audit | +research | Findings with a history, including those accepted on purpose. → [Audit protocol](audit-workflow-protocol.md) |
+| Memory | +research | Insights from runs flow into later runs. → [Workflow memory](konzepte/workflow-memory.md) · To try: blueprint “Using workflow memory”. |
 
 ### 2. Combine deterministic and non-deterministic – and make it visible
 
 | Building block | | What for |
 |---|---|---|
-| Workflow made of steps | Core | Fixed steps (shell, branch, loop), AI steps and human steps (approval, input) in one flow. → [Workflow guide](WORKFLOW-GUIDE.md) |
+| Workflow made of steps | Core | Fixed steps (shell, branch, loop), AI steps and human steps (approval, input) in one flow. → [Workflow guide](WORKFLOW-GUIDE.md), every setting per step in the [block reference](block-referenz.md) · To try: blueprints “If – then – else”, “Working through a list”, “Approval before acting”, “Form and its use”. |
 | Step kind in the run | Core | Each step shows whether an AI, a fixed rule or a person acted. |
-| Traffic light | Core | A step outputs `GREEN`, `YELLOW` or `RED` – a verdict further steps can depend on. → [Gates](konzepte/gates.md) |
-| Agent step with a budget | Core | An open-ended AI task runs against fixed limits: iterations, time, tokens. → [Agentic budgets](konzepte/agentische-budgets.md) |
+| Agent step with a budget | Core | An open-ended AI task runs against fixed limits: iterations, time, tokens. → [Agentic budgets](konzepte/agentische-budgets.md) · To try: blueprint “Agent with approval (expensive)”. |
 | Definition check | Core | Reports construction errors in a workflow before it runs. |
 | Diagram (BPMN) | +research | The same flow as a diagram, also while a run is in progress – readable without code, exchangeable with BPMN tools. |
 | Seal | Switch | An approved flow runs only the way it was approved. → [Hardening](konzepte/haertung.md) |
@@ -46,19 +45,31 @@ remember the things that were forgotten during a session.
 | Building block | | What for |
 |---|---|---|
 | AI providers | Core | Claude and Codex directly, further models through Pi – selectable per workflow or per step. Switch the provider and keep your flow. |
-| Model per step | Core | A narrowly scoped AI step can get a smaller model or a different provider. |
-| Connections | Core / +full | Use your own building blocks or connect an existing system – see [Own or connect](#own-or-connect). |
+| Model per step | Core | A narrowly scoped AI step can get a smaller model or a different provider. To try: blueprint “Model per step”. |
+| Connections | Core / +full | Use your own building blocks or connect an existing system – see [Own or connect](#own-or-connect). To try: blueprint “Querying an integration” (+full). |
 
-### 4. Many more ideas grew from this
+### 4. Loops that compare, find again and let people evaluate
+
+Loops (loop engineering) like the audit system make a run comparable with earlier ones, find questions
+that were already asked, and let people evaluate the result.
+
+| Building block | | What for |
+|---|---|---|
+| Traffic light | Core | A step outputs `GREEN`, `YELLOW` or `RED` – a verdict further steps can depend on. → [Gates](konzepte/gates.md) · To try: blueprint “Traffic light”. |
+| TODO trigger | Core | A TODO starts a repair workflow, then the check runs again; the number of attempts is limited. → [Self-improvement](konzepte/selbstverbesserung.md) · To try: blueprints “Started by a TODO trigger”, “Loop until done”. |
+| Approval | Core | A person evaluates a result before it goes on – even in the middle of a loop. To try: blueprints “Approval before acting”, “Loop with a gate”. |
+| Audit | +research | Findings keep their identity across runs: whatever was already found, fixed or accepted on purpose is known to the next run and not reported as new. → [Audit protocol](audit-workflow-protocol.md) |
+
+### 5. Many more ideas grew from this
 
 | Building block | | What for |
 |---|---|---|
 | Templates, pool, blueprints | Core | Take ready-made workflows and adapt them; blueprints are scaffolds to fill in. → [Pool](../../workflow-pool/README.md) |
-| Triggers | Core | Schedule, follow-up to a run, follow-up to a TODO. → [Access paths](konzepte/zugaenge.md) |
-| Sub-workflows | Core | One workflow calls another, also once per entry of a list. |
-| Goals | Core | Bundle TODOs and workflows towards one result. |
-| Dashboard report | Core | A workflow puts its result on the dashboard as a tile. |
-| Chains | +research | Several workflows in a row. |
+| Triggers | Core | Schedule, follow-up to a run, follow-up to a TODO. → [Access paths](konzepte/zugaenge.md) · To try: blueprints “Starting on a schedule”, “Started by a TODO trigger”, “Starting via webhook (signed)” (+full, switch `webhook-signatures`). |
+| Sub-workflows | Core | One workflow calls another, also once per entry of a list. To try: blueprint “Calling a sub-workflow (package)”. |
+| Goals | Core | Bundle TODOs and workflows towards one result. To try: template “Goal guard”. |
+| Dashboard report | Core | A workflow puts its result on the dashboard as a tile. To try: blueprint “Reporting a result”. |
+| Chains | +research | Several workflows in a row. To try: blueprint “Link in a chain”. |
 
 ## Own or connect
 
@@ -96,6 +107,7 @@ same task you can see what works.
 
 ### Loop engineering
 
+The building blocks for it are listed above under [answer 4](#4-loops-that-compare-find-again-and-let-people-evaluate).
 A run checks and finds something, it becomes a TODO, a follow-up run repairs it, and the check runs
 again. Building blocks: traffic light → TODO → TODO trigger → repair workflow. The loop is limited by a
 maximum number of attempts, and a repair run does not create a TODO itself.
@@ -135,4 +147,5 @@ blueprints in the user interface, the [concepts](konzepte/README.md) to adopt, a
 diagram. Hints appear where you need them.
 
 For reference: [Architecture](architektur.md), [API reference](api-referenz.md),
+[Block reference](block-referenz.md),
 [Data model](datenmodell.md), [Deployment](deployment.md), [Development](entwicklung.md).

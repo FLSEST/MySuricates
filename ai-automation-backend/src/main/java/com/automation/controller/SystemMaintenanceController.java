@@ -20,7 +20,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
-/** Wartung unter /api/v1/system: Auto-Repair, VACUUM, Datenbank-Backups. */
+/** Maintenance under /api/v1/system: auto-repair, VACUUM, database backups. */
 @RestController
 @RequestMapping("/api/v1/system")
 @RequiredArgsConstructor
@@ -29,6 +29,10 @@ public class SystemMaintenanceController {
     private final AutoRepairService autoRepairService;
     private final DatabaseBackupService databaseBackupService;
 
+    /**
+     * Queues a repair for every workflow with a failed run and answers 202 with the number queued.
+     * Without {@code force=true} only workflows with auto-repair enabled; sealed workflows are always skipped.
+     */
     @PostMapping("/repair-failed")
     @RequiresModule(ModuleCatalog.FACTORY)
     public ResponseEntity<Map<String, Object>> repairAllFailed(
@@ -40,6 +44,7 @@ public class SystemMaintenanceController {
                 "force", force));
     }
 
+    /** Runs a full SQLite VACUUM and reports its duration; a failed VACUUM is 500. */
     @PostMapping("/vacuum")
     public ResponseEntity<Map<String, Object>> vacuumDatabase() {
         Map<String, Object> result = databaseBackupService.fullVacuum();
@@ -49,6 +54,7 @@ public class SystemMaintenanceController {
         return ResponseEntity.ok(result);
     }
 
+    /** Creates a backup of the database now and returns it as a file download. */
     @GetMapping("/backup")
     public ResponseEntity<Resource> backupDatabase() throws IOException {
         Path backupPath = databaseBackupService.createBackup();
@@ -65,6 +71,10 @@ public class SystemMaintenanceController {
 
     public record BackupMetadata(String filename, long sizeBytes, Instant createdAt) {}
 
+    /**
+     * Creates a backup of the database and returns its file name, size and time.
+     * An optional {@code reason} goes into the activity log; old backups beyond the retain count are deleted.
+     */
     @PostMapping("/backup")
     public ResponseEntity<BackupMetadata> createBackup(
             @RequestParam(required = false) String reason) throws IOException {
@@ -77,11 +87,13 @@ public class SystemMaintenanceController {
         ));
     }
 
+    /** Lists the backup files with name, size and creation time, newest first. */
     @GetMapping("/backups")
     public List<DatabaseBackupService.BackupInfo> listBackups() throws IOException {
         return databaseBackupService.listBackups();
     }
 
+    /** Downloads one backup file; an unknown name or one with a path in it is 404. */
     @GetMapping("/backups/{filename}")
     public ResponseEntity<Resource> downloadBackup(@PathVariable String filename) throws IOException {
         Path file = databaseBackupService.getBackupFile(filename);

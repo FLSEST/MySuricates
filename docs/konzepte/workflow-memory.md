@@ -1,4 +1,3 @@
-<!-- concept-facts-sha256: 47f72cd8883f6032a246606f7af297a20af1c83a1a13ed6078d019d53951318a -->
 <!-- concept-source: d7e7e28cf7209b4369ad33467bb4fe781a178baa -->
 
 # Workflow-Memory
@@ -21,18 +20,7 @@ Der Mechanismus macht implizites Laufwissen wiederverwendbar, ohne jeden Workflo
 
 ## Nachteile und Kosten
 
-Die Erinnerung ist eine KI-Zusammenfassung, keine geprüfte Wahrheit. Fehler, Auslassungen oder veraltete Annahmen können sich in spätere Läufe fortpflanzen, besonders wenn automatische Aktivierung genutzt wird. Jede Extraktion und jedes Mitsenden erhöht Aufwand, Latenz und Promptumfang; lokale Speicherung bedeutet zudem nicht, dass die beteiligten KI-Aufrufe lokal bleiben. Betriebsseitig sind aktuell 6 aktive Memory-Einträge in der Instanz und 263 sichtbare Workflow-Definitionen in aktiven Projekten belegt. Das beschreibt nur Bestand und Konfiguration, nicht Nutzen. Daten zu kausalem Erfolg, Fehlerrate, Retention-Vergleichbarkeit oder fachlicher Verifikationsabdeckung fehlen.
-
-## Betriebsbeleg
-
-Messung: **2026-09-19 (UTC)**, eine lokale Entwicklungsinstanz. Bestandszähler beziehen sich auf die über REST sichtbaren Datensätze; Schrittzahlen zählen gespeicherte Schritte mit Typ-Metadaten im 30-Tage-Fenster. Wrapper zählen einmal. Dies ist kein Wirksamkeitsnachweis.
-
-| Messgröße | Anzahl / Bezugsgröße |
-|---|---:|
-| Aktive Memory-Einträge | 6 |
-| Sichtbare Workflows in aktiven Projekten | 263 |
-
-[Definitionen, Messgrenzen und Rohzähler](betriebsdaten.json) · [Messmethode und Wiederholung](README.md)
+Die Erinnerung ist eine KI-Zusammenfassung, keine geprüfte Wahrheit. Fehler, Auslassungen oder veraltete Annahmen können sich in spätere Läufe fortpflanzen, besonders wenn automatische Aktivierung genutzt wird. Jede Extraktion und jedes Mitsenden erhöht Aufwand, Latenz und Promptumfang; lokale Speicherung bedeutet zudem nicht, dass die beteiligten KI-Aufrufe lokal bleiben.
 
 ## Im Code
 

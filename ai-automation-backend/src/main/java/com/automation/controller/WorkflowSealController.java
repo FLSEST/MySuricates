@@ -24,11 +24,19 @@ public class WorkflowSealController {
     private final WorkflowSealService sealService;
     private final WorkflowMapper workflowMapper;
 
+    /**
+     * Seals the workflow: records and signs the hash of its definition and of its skills; idempotent.
+     * Afterwards definition changes and deletion are refused and a changed definition no longer starts.
+     */
     @PostMapping("/seal")
     public WorkflowResponse seal(@PathVariable String id) {
         return workflowMapper.toResponse(sealService.seal(id));
     }
 
+    /**
+     * Removes the seal and logs the previous hash as a {@code SECURITY} entry; idempotent.
+     * Refused with {@code 403 SEAL_IMMUTABLE} while {@code automation.hardening.seal-immutable} is on.
+     */
     @PostMapping("/unseal")
     public WorkflowResponse unseal(@PathVariable String id) {
         return workflowMapper.toResponse(sealService.unseal(id));

@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/** Lists and reads the Markdown reports in the configured reports directory ({@code automation.reports.directory}). */
 @Slf4j
 @RequiresModule(ModuleCatalog.AUDIT)
 @RestController
@@ -30,6 +31,10 @@ public class ReportsController {
 
     private final ReportsConfig reportsConfig;
 
+    /**
+     * Lists the {@code .md} files of the reports directory as {@code name} and {@code label}, newest date in the name first.
+     * An unreadable directory yields an empty list.
+     */
     @GetMapping
     public List<Map<String, String>> listReports() {
         Path dir = resolveReportsDir();
@@ -51,6 +56,10 @@ public class ReportsController {
         }
     }
 
+    /**
+     * Returns the content of one report as {@code content}.
+     * Only plain {@code .md} file names are accepted (400 otherwise); a missing file is 404.
+     */
     @GetMapping("/{name}")
     public ResponseEntity<Map<String, String>> getReport(@PathVariable String name) {
         validateName(name);

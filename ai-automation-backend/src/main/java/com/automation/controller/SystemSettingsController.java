@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** Laufzeit-Settings unter /api/v1/system: App-Settings und Execution-Config. */
+/** Runtime settings under /api/v1/system: application settings and execution config. */
 @RestController
 @RequestMapping("/api/v1/system")
 @RequiredArgsConstructor
@@ -23,6 +23,7 @@ public class SystemSettingsController {
     private final TraySettingsService traySettingsService;
 
     /**
+     * Returns one application setting; a key that is not allowed answers {@code 400}.
      * {@code value} is the stored value or empty; {@code default}, only for a setting whose default
      * comes from the startup configuration ({@code backup-retain-count}), is what applies while
      * nothing is stored.
@@ -39,6 +40,11 @@ public class SystemSettingsController {
         return ResponseEntity.ok(body);
     }
 
+    /**
+     * Stores an application setting from {@code value} in the body.
+     * Keys outside the allowed list, or a missing {@code value}, are 400. {@code backup-retain-count} takes
+     * 1–365, checked before anything is stored, and applies from the next backup rotation on, also after a restart.
+     */
     @PutMapping("/settings/{key}")
     public ResponseEntity<Void> setSetting(@PathVariable String key, @RequestBody Map<String, String> body) {
         if (!systemSettingsService.isAllowedKey(key)) {
@@ -52,11 +58,18 @@ public class SystemSettingsController {
         return ResponseEntity.ok().build();
     }
 
+    /** Returns the current execution settings (concurrency, timeouts, rate limit and more) plus the read-only {@code activeRuns}. */
     @GetMapping("/execution-config")
     public ResponseEntity<Map<String, Object>> getExecutionConfig() {
         return ResponseEntity.ok(executionSettingsService.getCurrentSettings());
     }
 
+    /**
+     * Changes execution settings with immediate effect and returns the full current set.
+     * All values are checked before any is applied, so an invalid one (400) leaves every setting unchanged.
+     * Keys are the kebab-case names or their camelCase aliases; an unknown key or a value outside its bounds
+     * ({@code ExecutionSettingKeys.BOUNDS}) is 400. Stored values are applied again after a restart.
+     */
     @PutMapping("/execution-config")
     public ResponseEntity<?> updateExecutionConfig(@RequestBody Map<String, String> settings) {
         try {
@@ -67,11 +80,16 @@ public class SystemSettingsController {
         }
     }
 
+    /** Returns the settings of the host tray icon: popups, which events notify, and the public URL the browser opens. */
     @GetMapping("/tray-config")
     public ResponseEntity<Map<String, Object>> getTrayConfig() {
         return ResponseEntity.ok(traySettingsService.getCurrentSettings());
     }
 
+    /**
+     * Updates the tray settings; only the fields sent change, and the answer is the full state.
+     * {@code publicUrl} must use HTTPS, plain HTTP only for localhost (400 otherwise).
+     */
     @PutMapping("/tray-config")
     public ResponseEntity<?> updateTrayConfig(@RequestBody Map<String, Object> settings) {
         try {

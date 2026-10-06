@@ -1,6 +1,5 @@
 <!-- last-sync: 2026-09-23 from: docs/konzepte/zugaenge.md -->
 
-<!-- concept-facts-sha256: 47f72cd8883f6032a246606f7af297a20af1c83a1a13ed6078d019d53951318a -->
 <!-- concept-source: d7e7e28cf7209b4369ad33467bb4fe781a178baa -->
 
 # Access paths: schedule, event, plugin and UI
@@ -27,22 +26,6 @@ The main benefit is unification: new start paths do not each have to rebuild the
 ## Drawbacks and costs
 
 The solution does not guarantee exactly-once execution. Unattended starts depend on configuration and enabled triggers, not only on the code. In addition, operation is designed around one API key and local single-user operation; tenant or permission concepts are therefore not evidenced.
-
-The current operational finding is only an inventory: 24 of 48 schedules are active, active webhooks are absent, TODO triggers are active, completion triggers are not. No usage, business value, error rate, or test coverage can be derived from this; older lifetime comparisons are missing because of retention, soft deletion, and mutable metadata.
-
-## Operational evidence
-
-Measurement: **2026-09-19 (UTC)**, one local development instance. Inventory counters refer to the records visible via REST; step counts count stored steps with type metadata in the 30-day window. Wrappers are counted once. This is not evidence of effectiveness.
-
-| Metric | Count / reference value |
-|---|---:|
-| Active schedules | 24 |
-| Schedules total | 48 |
-| Active webhooks | 0 |
-| Active TODO triggers | 8 |
-| Active completion triggers | 0 |
-
-[Definitions, measurement limits, and raw counters](../../konzepte/betriebsdaten.json) · [Measurement method and repetition](README.md)
 
 ## In the code
 

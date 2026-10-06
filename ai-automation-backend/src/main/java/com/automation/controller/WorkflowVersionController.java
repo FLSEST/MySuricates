@@ -23,8 +23,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Versionsgeschichte eines Workflows: auflisten, einzeln abrufen, wiederherstellen.
- * Aus {@link WorkflowController} herausgelöst (6c2a2ad7), Pfade unverändert.
+ * Version history of a workflow: list, fetch one, restore.
+ * Split off from {@link WorkflowController} (6c2a2ad7), paths unchanged.
  */
 @RestController
 @RequestMapping("/api/v1/workflows")
@@ -37,6 +37,7 @@ public class WorkflowVersionController {
     private final WorkflowVersionMapper workflowVersionMapper;
     private final ObjectMapper objectMapper;
 
+    /** Lists the workflow's versions, newest first, paginated ({@code page}, {@code size}). */
     @GetMapping("/{id}/versions")
     public PageResponse<WorkflowVersionResponse> getVersions(
             @PathVariable String id,
@@ -51,6 +52,7 @@ public class WorkflowVersionController {
         );
     }
 
+    /** Returns one version with its definition snapshot; a version of another workflow answers {@code 404}. */
     @GetMapping("/{id}/versions/{versionId}")
     public WorkflowVersionResponse getVersion(@PathVariable String id, @PathVariable String versionId) {
         WorkflowVersion version = workflowVersionService.findById(versionId);
@@ -60,6 +62,10 @@ public class WorkflowVersionController {
         return workflowVersionMapper.toResponse(version);
     }
 
+    /**
+     * Sets the workflow's definition back to this version; the change is recorded as a new version.
+     * A sealed workflow is refused with {@code 409 WORKFLOW_SEALED}.
+     */
     @PostMapping("/{id}/versions/{versionId}/restore")
     public ResponseEntity<WorkflowResponse> restoreVersion(@PathVariable String id, @PathVariable String versionId) {
         WorkflowVersion version = workflowVersionService.findById(versionId);

@@ -1,4290 +1,56 @@
+<!-- Erzeugt von scripts/docs-reference.py – nicht von Hand ändern -->
+
 # API Reference
+
+> **Scope:** The MySuricates REST API, generated from the code from “Error codes” on
+> (`python3 scripts/docs-reference.py --write`, see [Development → Generated references](entwicklung.md#generated-references)).
+> The curated short reference for external agents, with examples, is [AGENTS.md](../../AGENTS.md).
+
+One table per area (first path segment after `/api/v1`): method and path, as purpose the first sentence
+of the handler method's Javadoc – without Javadoc the cell stays empty – and the module from
+`@RequiresModule` (“core” = always on). Whatever the Javadoc says after that – status codes, limits, side
+effects – is listed below the table as “Notes”. Request and response fields are in the DTOs under
+`ai-automation-backend/src/main/java/com/automation/dto/`, the behaviour in the controller named in the
+“Source” line.
 
 ## General
 
-- **Base URL:** `http://localhost:9090/api/v1`
-- **Content-Type:** `application/json`
-- **Authentication:** Header `X-API-Key: <key>` (when `automation.security.enabled=true`)
+- **Base URL:** `http://localhost:9090/api/v1`, content type `application/json`
+- **Authentication:** header `X-API-Key: <key>` (when `automation.security.enabled=true`)
 - **Proxy:** always call `curl` with an API key as `curl --noproxy '*'` – with `http_proxy` set,
   curl sends even requests to `localhost` through the proxy, key included. The documentation gate
   `doc-facts-check.sh` checks every example in `docs/` and `AGENTS.md` for it.
+- **Modules:** if the module of an endpoint is switched off, it answers `404` with code `MODULE_DISABLED`.
+- **Pagination:** paged lists take `page` (from 0) and `size` and return a page object with `content`
+  and `totalElements`.
 
-### Error Format
-
-All errors follow this format:
+### Error format
 
 ```json
-{
-  "code": "INTERNAL_ERROR",
-  "error": "Error message",
-  "timestamp": "2025-01-15T10:30:00Z"
-}
+{ "code": "INTERNAL_ERROR", "error": "Error message", "timestamp": "2025-01-15T10:30:00Z" }
 ```
 
-The `details` field is only included when needed (`@JsonInclude(NON_NULL)`).
+`details` is only included when needed (`@JsonInclude(NON_NULL)`), validation errors
+(`VALIDATION_FAILED`) also carry `fieldErrors` (field → message).
 
-`params` (an object of strings) is only included when code and params describe the message completely —
-e.g. `{"code":"WORKFLOW_SEALED","params":{"name":"Nightly"}}` or
-`{"code":"RESOURCE_NOT_FOUND","params":{"resource":"Workflow","id":"…"}}`, empty (`{}`) for a fixed
-text. The UI then shows its own translation of the code; `error` stays the English text for logs and API
-clients. Without `params`, `error` is free text from the throw site and is shown as it is.
+`params` (an object of strings) is only included when code and params describe the message completely –
+e.g. `{"code":"WORKFLOW_SEALED","params":{"name":"Nightly"}}`, empty (`{}`) for a fixed text. The UI
+then shows its own translation of the code; `error` stays the English text for logs and API clients.
+Without `params`, `error` is free text from the throw site and is shown as it is.
 
 Where one code stands for many messages (`INVALID_ARGUMENT`, `STATE_CONFLICT`, …), `messageKey` comes
-along too — a key of the backend enum `ErrorMessage`, e.g.
+along too – a key of the backend enum `ErrorMessage`, e.g.
 `{"code":"INVALID_ARGUMENT","messageKey":"INVALID_CRON","params":{"expression":"…"}}`. The UI then
 translates the key instead of the code.
 
-**Error Codes:**
-
-| Code | HTTP Status |
-|---|---|
-| `RESOURCE_NOT_FOUND` | 404 |
-| `MODULE_DISABLED` | 404 |
-| `MODULES_NOT_EDITABLE` | 403 |
-| `VALIDATION_FAILED` | 400 |
-| `INVALID_ARGUMENT` | 400 |
-| `WORKFLOW_EXECUTION_FAILED` | 500 |
-| `CONTAINER_ERROR` | 500 |
-| `STAGING_ERROR` | 500 |
-| `STATE_CONFLICT` | 409 |
-| `WORKFLOW_SEALED` | 409 |
-| `WORKFLOW_TAMPERED` | 409 |
-| `SKILL_PINNED_BY_SEAL` | 409 |
-| `SEAL_IMMUTABLE` | 403 |
-| `UNATTENDED_REQUIRES_SEAL` | 403 |
-| `UNATTENDED_PLATFORM_ACCESS` | 403 |
-| `WEBHOOK_SIGNATURE_INVALID` | 401 |
-| `NO_TASK_TARGET` | 400 |
-| `PROVIDER_NOT_CONNECTED` | 409 |
-| `PROVIDER_NOT_TASK_CAPABLE` | 400 |
-| `SERVICE_UNAVAILABLE` | 503 |
-| `TOKEN_BUDGET_EXCEEDED` | 429 |
-| `RATE_LIMITED` | 429 |
-| `PAYLOAD_TOO_LARGE` | 413 |
-| `OPERATION_TIMEOUT` | 504 |
-| `METHOD_NOT_ALLOWED` | 405 |
-| `RUN_DELETION_DISABLED` | 403 |
-| `INTERNAL_ERROR` | 500 |
-
-For validation errors (`VALIDATION_FAILED`, 400) additionally:
-
-```json
-{
-  "code": "VALIDATION_FAILED",
-  "error": "Validation failed",
-  "timestamp": "2025-01-15T10:30:00Z",
-  "fieldErrors": {
-    "name": "must not be blank",
-    "type": "must not be null"
-  }
-}
-```
-
-### HTTP Status Codes
-
-| Code | Meaning |
-|---|---|
-| 200 | Success |
-| 201 | Resource created |
-| 202 | Accepted (asynchronous processing) |
-| 204 | Deleted (no body) |
-| 400 | Validation error |
-| 404 | Resource not found |
-| 409 | Conflict (invalid state) |
-| 429 | Rate limit exceeded |
-| 500 | Internal server error |
-| 503 | Service unavailable (e.g. test instance unhealthy) |
-| 504 | Operation timeout |
-
----
-
-## Projects
-
-### `GET /api/v1/projects`
-
-List all projects.
-
-**Response:** `ProjectResponse[]`
-
-```json
-[
-  {
-    "id": "uuid",
-    "name": "My Project",
-    "subtitle": null,
-    "description": null,
-    "type": "CODE",
-    "path": "/workspace/project",
-    "config": {},
-    "aiContext": null,
-    "status": "STOPPED",
-    "container": null,
-    "archivedAt": null,
-    "createdAt": "2025-01-15T10:00:00Z",
-    "updatedAt": "2025-01-15T10:00:00Z",
-    "workflowCount": 3
-  }
-]
-```
-
-### `POST /api/v1/projects`
-
-Create a new project.
-
-**Request:**
-
-```json
-{
-  "name": "My Project",
-  "type": "CODE",
-  "path": "/workspace/project",
-  "config": {}
-}
-```
-
-| Field | Type | Required | Values |
-|---|---|---|---|
-| `name` | String | Yes | |
-| `subtitle` | String | No | |
-| `description` | String | No | |
-| `type` | Enum | Yes | `CODE`, `CONTENT`, `RESEARCH`, `BUSINESS`, `PERSONAL` |
-| `path` | String | Yes | Path in the container |
-| `config` | Object | No | Free-form JSON |
-| `aiContext` | String | No | AI context for the project |
-
-**Response:** `201` with `ProjectResponse`
-
-### `POST /api/v1/projects/example`
-
-Create the bundled example project, meant for a fresh installation. The UI offers it while there is no project yet.
-
-- **Directory:** The template `classpath:examples/example-project/` is copied to `<automation.examples.directory>/example-project`. The default is `mysuricates-examples` below the workspace root, or `./data/examples` next to the database without a workspace root. The environment variable for it is `AUTOMATION_EXAMPLES_DIR`. An existing directory is never overwritten.
-- **Workflows:** one workflow per shipped template listed in `ExampleProjectService.EXAMPLE_TEMPLATE_IDS` (currently the blueprints `blueprint-approval`, `blueprint-if`, `blueprint-loop`, `blueprint-todo` and `blueprint-report`, none of them calls AI), with `changeSource` `example-project`. A template whose blocks need a module that is switched off (such as `blueprint-report` without `dashboard-report`) is left out and added on the next call once the module is on.
-- **Idempotent:** An active project that already points at the directory is returned, and missing example workflows are added. The description and `README.md` of an older copy are brought up to date only while they still match the text of an earlier version word for word; changed ones stay as they are.
-
-| Parameter | Type | Required | Values |
-|---|---|---|---|
-| `locale` | Query | No | `de`, `en` (default `en`): language of the project name and the example workflows |
-
-**Response:** `201` with `ProjectResponse` when the project was created, `200` otherwise.
-
-### `GET /api/v1/projects/{id}`
-
-Retrieve a single project.
-
-**Response:** `ProjectResponse`
-
-### `PUT /api/v1/projects/{id}`
-
-Update a project.
-
-**Request:**
-
-```json
-{
-  "name": "New Name",
-  "subtitle": "Subtitle",
-  "description": "Description",
-  "type": "RESEARCH",
-  "path": "/workspace/new",
-  "config": {},
-  "aiContext": "..."
-}
-```
-
-All fields are optional; only provided fields are updated. Editable are `cronExpression` (`CRON` only),
-`scheduledAt` (`ONCE` only), `description`, `inputContext`, `endDate` and `maxRuns` (`CRON` only),
-`catchUpOnResume` and `conflictBehavior` (`SKIP`/`OVERLAP`, since 2026-09-24; any other value → `400`).
-Target and type of a schedule stay fixed.
-
-**Response:** `ProjectResponse`
-
-### `DELETE /api/v1/projects/{id}`
-
-Delete a project (including container and workflows).
-
-**Response:** `204 No Content`
-
-### `GET /api/v1/projects/archived`
-
-List archived projects.
-
-**Response:** `ProjectResponse[]`
-
-### `POST /api/v1/projects/{id}/restore`
-
-Restore an archived project.
-
-**Response:** `ProjectResponse`
-
-### `POST /api/v1/projects/{id}/start`
-
-Start the Docker container for the project.
-
-**Response:** `ProjectResponse` (status changes to `STARTING` → `RUNNING`)
-
-### `POST /api/v1/projects/{id}/stop`
-
-Stop the Docker container.
-
-**Response:** `ProjectResponse` (status changes to `STOPPED`)
-
-### `GET /api/v1/projects/{id}/workflows`
-
-List all workflows of a project.
-
-**Response:** `WorkflowResponse[]`
-
-### `POST /api/v1/projects/{id}/generate-context`
-
-Generate AI context for the project (analyzes the project directory).
-
-**Response:** `{ "context": "..." }`
-
-### `GET /api/v1/projects/{id}/export`
-
-The whole project as a **bundle** — one JSON file with master data (without path, container, status, ids), all
-workflows, the chains whose entries only name workflows of this project (only with module `chains`, otherwise left
-out + warning), and the schedules on them. Not included: runs, TODOs, memory, webhooks, TODO/completion triggers,
-seals, skills (by name only). Format and path tokens: [architektur.md → Project bundle](architektur.md#project-bundle).
-
-**Response:** `200`, `Content-Disposition: attachment; filename="<project-slug>.mysuricates-bundle.json"`
-
-```json
-{ "format": "mysuricates-project-bundle", "formatVersion": 1, "exportedAt": "…", "appVersion": "…",
-  "project": { "name": "…", "subtitle": null, "description": "…", "type": "CODE", "aiContext": null, "config": {} },
-  "workflows": [ { "key": "tests", "definition": { "name": "Tests", "blocks": [ … ], "activatedSkillNames": [] } } ],
-  "chains": [ { "key": "nightly", "name": "Nightly", "entries": [ { "workflowKey": "tests", "sortOrder": 0 } ] } ],
-  "schedules": [ { "target": { "workflowKey": "tests" }, "cronExpression": "0 0 6 * * *", "scheduleType": "CRON" } ],
-  "paths": [ { "token": "@@path:1@@", "original": "/tmp/app-venv", "occurrences": 2, "hint": "Tests › blocks[0].config.command" } ],
-  "skillNames": [], "warnings": [] }
-```
-
-`404` for an unknown or archived project.
-
-### `POST /api/v1/projects/import/preview`
-
-Checks a bundle and shows what an import would create — writes nothing. Body at most 5 MB.
-
-**Request:** `{ "bundle": { … }, "targetProjectId": "<uuid, optional — fills nameTakenInTarget>" }`
-
-**Response:**
-
-```json
-{ "project": { "name": "…", "nameTaken": true },
-  "workflows": [ { "key": "tests", "name": "Tests", "blockCount": 3, "blockTypes": ["shell", "simple"],
-                   "providers": ["CLAUDE"], "models": ["opus"], "shellCommands": ["first 200 characters per shell field"],
-                   "nameTakenInTarget": false } ],
-  "chains": [ { "key": "nightly", "name": "Nightly", "entries": 2 } ],
-  "schedules": [ { "target": "workflow:tests", "cronExpression": "0 0 6 * * *", "willBeDisabled": true } ],
-  "paths": [ { "token": "@@path:1@@", "original": "/tmp/app-venv", "occurrences": 2, "hint": "…" } ],
-  "warnings": [ "…" ] }
-```
-
-`400` with all problems at once: wrong `format`, `formatVersion` ≠ 1, missing required fields, duplicate keys,
-`workflowKey`/`chainKey`/`@@workflow:key@@`/`@@path:N@@` without a target in the bundle, invalid cron.
-
-### `POST /api/v1/projects/import`
-
-Creates the bundle in **one** transaction: project (mode `new`) → workflows through the regular write path
-(`changeSource` `import`, unsealed, one version row each) → `@@workflow:key@@` to the new ids (second version
-row) → chains → schedules, always **disabled**. If a step fails, nothing is created.
-
-**Request:**
-
-```json
-{ "bundle": { … },
-  "project": { "mode": "new", "name": "App (Import)", "path": "/home/x/code/app" },
-  "pathMappings": { "@@path:1@@": "/home/x/.venvs/app" },
-  "onConflict": "skip" }
-```
-
-- `project`: `{"mode":"new","name","path"}` (`path` may be empty) or `{"mode":"existing","projectId"}`.
-- `pathMappings`: required for every token in `paths` (suggestion: `original`); `{{ project_path }}` stays a placeholder.
-- `onConflict` (only with `existing`): `skip` (default; references point to the existing workflow of that name)
-  or `rename` (`Name (Import)`, `Name (Import 2)`, …).
-
-**Response:** `201`
-
-```json
-{ "projectId": "…", "created": { "workflows": 8, "chains": 1, "schedules": 2 },
-  "skipped": [ { "kind": "workflow", "key": "tests", "reason": "name exists" } ],
-  "renamed": [ { "kind": "workflow", "key": "report", "from": "Report", "to": "Report (Import)" } ],
-  "warnings": [ "…" ] }
-```
-
-`400` for a missing path mapping (listing the tokens), an invalid bundle or target; `404` for an unknown target
-project. The bundle brings executable shell commands along — the UI shows them in the preview before it offers the
-import; the API itself does not require the preview (API key like every other write).
-
----
-
-## Workflows
-
-### `GET /api/v1/workflows`
-
-List all workflows.
-
-**Response:** `WorkflowResponse[]`
-
-```json
-[
-  {
-    "id": "uuid",
-    "projectId": "uuid",
-    "projectName": "My Project",
-    "projectSubtitle": null,
-    "projectDescription": null,
-    "name": "Code Review",
-    "description": "Automated code review",
-    "icon": "🔍",
-    "blocks": [
-      { "type": "simple", "config": { "command": "Review code" }, "requiredCapabilities": [], "skillIds": [] }
-    ],
-    "version": "1.0.0",
-    "metadata": {},
-    "activatedSkillIds": [],
-    "activatedSkillNames": [],
-    "runCount": 0,
-    "instructions": null,
-    "model": null,
-    "provider": null,
-    "templateId": null,
-    "defaultContext": {},
-    "testStatus": "UNTESTED",
-    "lastTestedAt": null,
-    "tags": [],
-    "category": null,
-    "tagsGeneratedAt": null,
-    "tagsUserEdited": false,
-    "createdAt": "2025-01-15T10:00:00Z",
-    "updatedAt": "2025-01-15T10:00:00Z",
-    "stableSyncedAt": null
-  }
-]
-```
-
-### `POST /api/v1/workflows`
-
-Create a new workflow.
-
-**Request:**
-
-```json
-{
-  "projectId": "uuid",
-  "name": "Code Review",
-  "description": "Automated code review",
-  "icon": "🔍",
-  "blocks": [
-    { "type": "simple", "config": { "command": "Review code" }, "requiredCapabilities": [], "skillIds": [] }
-  ],
-  "activatedSkillIds": ["skill-uuid-1"]
-}
-```
-
-| Field | Type | Required |
-|---|---|---|
-| `projectId` | String | Yes |
-| `name` | String | Yes |
-| `description` | String | No |
-| `icon` | String | No |
-| `blocks` | BlockDefinition[] | Yes |
-| `activatedSkillIds` | String[] | No |
-| `instructions` | String | No |
-| `model` | String | No |
-| `provider` | String | No |
-| `templateId` | String | No |
-| `metadata` | Object | No |
-| `defaultContext` | Object | No |
-| `version` | String | No |
-
-**BlockDefinition Fields:**
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `type` | String | Yes | Block type (simple, shell, agentic, ...) |
-| `name` | String | No | Human-readable name for `{{ block.<name>.output }}` references |
-| `config` | Object | Yes | Type-specific configuration |
-| `requiredCapabilities` | String[] | No | Required capabilities |
-| `skillIds` | String[] | No | Skill IDs additionally activated for this block on top of workflow skills (additive) |
-
-**Response:** `201` with `WorkflowResponse`
-
-### `GET /api/v1/workflows/{id}`
-
-Retrieve a single workflow.
-
-**Response:** `WorkflowResponse`
-
-### `PUT /api/v1/workflows/{id}`
-
-Update a workflow.
-
-**Request:**
-
-```json
-{
-  "name": "New Name",
-  "description": "New description",
-  "icon": "✨",
-  "blocks": [],
-  "version": "4.4.0"
-}
-```
-
-**Response:** `WorkflowResponse`
-
-All fields are optional; a missing field stays unchanged. `version` is the version label (at most 255 characters, blank → `400`), not part of the definition: it creates no new version and changes no hash. A pool reinstall sets it to the pool file's version.
-
-The server decides the change's origin (`changeSource` of the new version). Sealed workflows: definition changes → `409 WORKFLOW_SEALED`, renaming and `version` still work.
-
-### `DELETE /api/v1/workflows/{id}`
-
-Delete a workflow.
-
-**Response:** `204 No Content`
-
-### `GET /api/v1/workflows/export/{id}`
-
-Export a workflow as portable JSON (without IDs, without project assignment).
-
-**Response:** `ExportWorkflowResponse`
-
-```json
-{
-  "name": "Code Review",
-  "description": "Automated code review",
-  "icon": "🔍",
-  "blocks": [
-    { "type": "simple", "config": { "command": "Review code" }, "requiredCapabilities": [], "skillIds": [] }
-  ],
-  "instructions": null,
-  "model": null,
-  "version": "1.0.0",
-  "exportedAt": "2025-02-22T14:00:00Z",
-  "integrity": "sha256:9f2c…"
-}
-```
-
-`integrity` is the checksum over everything the import takes over (without `name` and `exportedAt`); `POST /api/v1/workflows/import` checks it. Details: [Curation → Checksum](workflow-pool-kuratierung.md#checksum-integrity).
-
-### `GET /api/v1/workflows/{id}/export/bpmn`
-
-Export a workflow as BPMN 2.0 XML (Camunda Modeler compatible).
-
-**Response:** File download (`.bpmn`, `Content-Disposition: attachment`)
-
-### `POST /api/v1/workflows/import/bpmn`
-
-Import a workflow previously exported via `GET /api/v1/workflows/{id}/export/bpmn` as a **new** workflow (roundtrip). Only accepts MySuricates' own exports (BPMN extension `mysuricates:blockConfig`); foreign BPMN, broken XML, or oversized input returns `400` — nothing is created in that case.
-
-**Query parameter:** `projectId` (required) — target project
-
-**Request:** `Content-Type: application/xml` or `text/xml`, body = BPMN XML
-
-**Response:** `201` with `WorkflowResponse`
-
-### `POST /api/v1/workflows/import`
-
-Import a workflow from JSON (exported format + target project).
-
-**Request:**
-
-```json
-{
-  "projectId": "uuid",
-  "name": "Code Review",
-  "description": "Automated code review",
-  "icon": "🔍",
-  "blocks": [
-    { "type": "simple", "config": { "command": "Review code" }, "requiredCapabilities": [], "skillIds": [] }
-  ],
-  "instructions": null,
-  "model": null,
-  "updateIfExists": false
-}
-```
-
-| Field | Type | Required |
-|---|---|---|
-| `projectId` | String | No (fallback: "Collection" project) |
-| `name` | String | Yes |
-| `description` | String | No |
-| `icon` | String | No |
-| `blocks` | BlockDefinition[] | No |
-| `instructions` | String | No |
-| `model` | String | No |
-| `updateIfExists` | Boolean | No (default: `false`) |
-| `version` | String | No — the export's version label (`4.4.0`); missing or blank keeps the default `1.0.0` or the current label |
-| `integrity` | String | No — the export's checksum (`sha256:<hex>`). If it does not match the content: `400` with `messageKey` `IMPORT_INTEGRITY_MISMATCH`, nothing is written. Without it: imported with a warning in the log |
-
-When `updateIfExists=true` and a workflow with the same name exists in the target project, it will be updated instead of creating a new one — `version` included, as with `PUT` and a pool reinstall.
-
-#### Block Config: `timeout_seconds`
-
-All block types support an optional `timeout_seconds` field in the block config.
-This overrides the Claude CLI timeout per block (default: global value from `automation.host-claude.timeout-seconds`, default 300s).
-
-```json
-{
-  "type": "simple",
-  "config": {
-    "command": "Analyze the code in src/",
-    "timeout_seconds": 600
-  }
-}
-```
-
-| Block Type | Effect of `timeout_seconds` |
-|---|---|
-| `simple` | Claude CLI timeout for the step |
-| `retry` | Claude CLI timeout per retry attempt (shell: shell timeout) |
-| `conditional` | Claude CLI timeout for condition evaluation and branch execution |
-| `foreach` | Claude CLI timeout per iteration (shell: shell timeout) |
-| `while` | Claude CLI timeout for condition and body (shell: shell timeout) |
-| `skill-capability` | Claude CLI timeout for capability execution |
-| `agentic` | Claude CLI timeout for REASON and ACT phase per iteration |
-| `shell` | Shell process timeout (as before) |
-
-Without `timeout_seconds`, the global default (`automation.host-claude.timeout-seconds`) applies.
-
-**Response:** `201` with `WorkflowResponse`
-
-### `POST /api/v1/workflows/{id}/execute`
-
-Execute a workflow.
-
-**Request (optional):**
-
-```json
-{
-  "context": {
-    "target": "src/main.py",
-    "mode": "strict"
-  }
-}
-```
-
-**Response:** `WorkflowRunResponse`
-
-```json
-{
-  "id": "run-uuid",
-  "workflowId": "workflow-uuid",
-  "workflowName": "Code Review",
-  "projectName": "My Project",
-  "projectPath": "/workspace/project",
-  "status": "RUNNING",
-  "steps": [],
-  "startedAt": "2025-01-15T10:00:00Z",
-  "completedAt": null,
-  "durationMs": null,
-  "userRating": null,
-  "error": {},
-  "metadata": {},
-  "inputContext": {},
-  "triggeredByScheduleId": null,
-  "triggerSource": "MANUAL",
-  "definitionHash": "3f1c…e9",
-  "definitionVersionId": "version-uuid",
-  "chainRunId": null,
-  "chainId": null
-}
-```
-
-`definitionHash`/`definitionVersionId` are `null` when `automation.hardening.provenance` is off. `chainRunId` names the chain run that started the run as one of its entries (`triggerSource: CHAIN`, after a resume `RESUME`), otherwise `null` — also for retries and sub-workflows, which only inherit `{{ chain_run_id }}` with the context; runs from before V89 have none. `chainId` names the chain of that chain run (for the link `/chains?chain=<id>`, 3a35ced1), otherwise `null` – also when the chain run is gone; only the detail response carries it, older backends omit it. Refused starts create no run: `409 WORKFLOW_TAMPERED` (sealed definition modified), `403 UNATTENDED_REQUIRES_SEAL` (unattended triggers only), `403 UNATTENDED_PLATFORM_ACCESS` (unattended trigger, definition with a `HIGH` finding `self-api-call`/`direct-db-access`).
-
-### `GET /api/v1/workflows/{id}/runs`
-
-All runs of a workflow (descending by start time, paginated).
-
-**Query Parameters:** `page` (default: 0), `size` (default: 50)
-
-**Response:** `PageResponse<WorkflowRunListItemResponse>` — **without steps**, the same list rows as
-`GET /api/v1/executions` (`stepCount`, `lastStepStatus`, `lastStepPreview`). Until 2026-09-23 this
-route carried every run with all its steps. A run's steps come from `GET /api/v1/workflows/{id}/runs/{runId}`.
-
-### `GET /api/v1/workflows/{id}/runs/{runId}`
-
-Retrieve a single run.
-
-**Response:** `WorkflowRunResponse`
-
-### `POST /api/v1/workflows/{id}/optimize`
-
-Generate an optimization suggestion for a workflow (AI-based).
-
-**Response:** `Map<String, Object>` with optimization suggestion
-
-### `GET /api/v1/workflows/{id}/similar`
-
-Find similar workflows.
-
-**Query Parameters:** `limit` (default: 5, max: 20)
-
-**Response:** `List<Map<String, Object>>`
-
-### `POST /api/v1/workflows/{id}/repair`
-
-Repair a failed workflow on the test instance. Requires that the workflow has failed runs and the test instance is healthy.
-
-**Response:** `202 Accepted` with `{ "status": "repair_started", "workflowId": "...", "workflowName": "..." }` — sealed workflows: `409 WORKFLOW_SEALED` before the repair starts
-
-### `GET /api/v1/workflows/{id}/analyze`
-
-Deterministic build-error check of a definition (no AI call) — reports only, never blocks the save path.
-
-**Response:**
-
-```json
-{
-  "workflowId": "workflow-uuid",
-  "workflowName": "AutoPilot Backend Quality Gate",
-  "findingCount": 2,
-  "bySeverity": { "HIGH": 1, "MEDIUM": 1 },
-  "findings": [ { "rule": "self-api-call", "severity": "HIGH", "...": "..." } ]
-}
-```
-
-### `GET /api/v1/workflows/analyze`
-
-Inventory check across all definitions — per workflow only numbers, plus the distribution across rules; fetch the full findings per workflow via `GET /api/v1/workflows/{id}/analyze`.
-
-**Query Parameters:** `minSeverity` (`HIGH` or `MEDIUM`, optional — hides lighter findings)
-
-**Response:**
-
-```json
-{
-  "workflowsChecked": 42,
-  "workflowsAffected": 3,
-  "findingsTotal": 5,
-  "byRule": { "self-api-call": 2, "missing-timeout": 3 },
-  "workflows": [
-    { "workflowId": "workflow-uuid", "workflowName": "...", "findings": 2, "bySeverity": { "HIGH": 1, "MEDIUM": 1 } }
-  ]
-}
-```
-
-### `POST /api/v1/workflows/{id}/skills`
-
-Activate skills for a workflow.
-
-**Request:**
-
-```json
-{
-  "skillIds": ["skill-uuid-1", "skill-uuid-2"]
-}
-```
-
-**Response:** `WorkflowResponse`
-
-### `DELETE /api/v1/workflows/{id}/skills/{skillId}`
-
-Deactivate a skill from a workflow.
-
-**Response:** `WorkflowResponse`
-
-### `GET /api/v1/workflows/{id}/versions`
-
-List all versions of a workflow (paginated).
-
-**Query Parameters:** `page` (default: 0), `size` (default: 20)
-
-**Response:** `PageResponse<WorkflowVersionResponse>`
-
-```json
-{
-  "content": [
-    {
-      "id": "version-uuid",
-      "workflowId": "workflow-uuid",
-      "versionNumber": 3,
-      "snapshot": { ... },
-      "changeSource": "assistant",
-      "definitionHash": "3f1c…e9",
-      "changeMessage": "Prompt adjusted",
-      "createdAt": "2025-01-15T10:00:00Z"
-    }
-  ],
-  "page": 0,
-  "size": 20,
-  "totalElements": 3,
-  "totalPages": 1
-}
-```
-
-### `GET /api/v1/workflows/{id}/versions/{versionId}`
-
-Retrieve a single version.
-
-**Response:** `WorkflowVersionResponse`
-
-### `POST /api/v1/workflows/{id}/versions/{versionId}/restore`
-
-Restore a workflow to a previous version.
-
-**Response:** `WorkflowResponse`
-
-### `POST /api/v1/workflows/{id}/seal`
-
-Seal a workflow (switch `automation.hardening.sealing`, otherwise `404 MODULE_DISABLED`). Records the current definition
-hash; afterwards the workflow rejects definition changes and deletion (`409 WORKFLOW_SEALED`) and does not start when the
-definition no longer matches the seal (`409 WORKFLOW_TAMPERED`). Idempotent; logs a `SECURITY` entry.
-
-**Response:** `WorkflowResponse` with `sealed: true`, `sealedHash`, `sealedAt`
-
-### `POST /api/v1/workflows/{id}/unseal`
-
-Remove the seal (same switch). Logs a `SECURITY` entry with the previous hash.
-
-**Response:** `WorkflowResponse` with `sealed: false`
-
-### `GET /api/v1/workflows/seal-status`
-
-Seal status of every workflow, for the UI — checked without starting a run (the same check as `RunAdmission`). Lists every sealed workflow plus every workflow with refused starts in the last seven days (a refused start leaves no run row — this is where it becomes visible). Not gated behind the `sealing` module: a seal set while the switch was on stays visible after it is turned off.
-
-**Response:** `List<WorkflowSealStatusResponse>`
-
-```json
-[
-  {
-    "workflowId": "workflow-uuid",
-    "workflowName": "AutoPilot Backend Quality Gate",
-    "state": "INTACT",
-    "problem": "NONE",
-    "detail": null,
-    "changedSkills": [],
-    "skillsPinned": true,
-    "signed": true,
-    "pinnedSkillCount": 2,
-    "sealedAt": "2026-09-01T10:00:00Z",
-    "refusedStarts": 0,
-    "lastRefusedAt": null,
-    "lastRefusal": null
-  }
-]
-```
-
-`state`: `INTACT`, `VIOLATED` or `NOT_SEALED`. `problem`: `NONE`, `DEFINITION_CHANGED`, `SKILLS_CHANGED` or `UNVERIFIABLE`. `skillsPinned`: `false` for seals from before V80.
-
-### `GET /api/v1/workflows/{id}/seal-events`
-
-Seal history of one workflow (sealed/unsealed), newest first — kept beyond the activity log's retention.
-
-**Response:** `List<WorkflowSealEventResponse>`
-
-```json
-[
-  {
-    "id": "event-uuid",
-    "workflowId": "workflow-uuid",
-    "workflowName": "AutoPilot Backend Quality Gate",
-    "action": "SEALED",
-    "occurredAt": "2026-09-01T10:00:00Z",
-    "definitionHash": "3f1c…e9",
-    "signed": true,
-    "chainIntact": true
-  }
-]
-```
-
-`chainIntact`: `false` when this entry's hash or its predecessor's no longer fits — the history was changed outside the application.
-
----
-
-## Workflow Templates
-
-### `GET /api/v1/workflow-templates`
-
-List all workflow templates, sorted by kind and `sortOrder`. The field `kind` separates templates (`TEMPLATE`) from blueprints (`BLUEPRINT`: empty scaffolds that show how block types connect, see [WORKFLOW-GUIDE → Blueprints](WORKFLOW-GUIDE.md#blueprints)).
-
-**Query:** `locale` (optional, `de`/`en`): language of the steps (`blocks`, `instructions`) of bilingual templates. English when omitted. `name` and `description` stay maps. See [WORKFLOW-GUIDE → Bilingual templates](WORKFLOW-GUIDE.md#bilingual-templates).
-
-**Response:** `WorkflowTemplateResponse[]`
-
-```json
-[
-  {
-    "id": "uuid",
-    "name": {"de": "Code-Qualität", "en": "Code Quality"},
-    "description": {"de": "Prüft Code-Qualität", "en": "Checks code quality"},
-    "icon": "🔍",
-    "category": "CODE",
-    "blocks": [
-      { "type": "simple", "config": { "command": "npm run lint" } }
-    ],
-    "instructions": null,
-    "model": null,
-    "builtIn": true,
-    "sortOrder": 0,
-    "qualityStatus": null,
-    "verifications": [],
-    "version": "1.0.0",
-    "createdAt": "2025-01-15T10:00:00Z",
-    "updatedAt": "2025-01-15T10:00:00Z",
-    "kind": "TEMPLATE",
-    "requiredModules": [],
-    "needsAi": true
-  }
-]
-```
-
-`verifications` contains one object per project in which the template was verified, with `projectId`, `projectName`, `lastRunId`, `verifiedAt`.
-
-`requiredModules` names the optional modules its blocks need (such as `skills` for `skill-capability`, `integrations` for `integration`; nested blocks included). While one of them is off, the run refuses the block and the template picker hides the template. `needsAi` tells whether a run can call an AI model: model blocks, `foreach`/`while`/`conditional`/`retry` without `execution_mode: shell`, a `simple` block in a `switch` branch without shell mode, and `sub-workflow`, because the workflow it starts is not part of the definition.
-
-### `GET /api/v1/workflow-templates/{id}`
-
-Retrieve a single template. Query `locale` as for the list.
-
-**Response:** `WorkflowTemplateResponse`
-
-### `POST /api/v1/workflow-templates`
-
-Create a new user template (`builtIn` is automatically set to `false`).
-
-**Request:**
-
-```json
-{
-  "name": {"de": "Mein Template", "en": "My Template"},
-  "description": {"de": "Beschreibung", "en": "Description"},
-  "icon": "⚡",
-  "category": "CODE",
-  "blocks": [
-    { "type": "simple", "config": { "command": "echo hello" } }
-  ],
-  "instructions": null,
-  "model": null
-}
-```
-
-| Field | Type | Required |
-|---|---|---|
-| `name` | Map<String, String> | Yes |
-| `description` | Map<String, String> | No |
-| `icon` | String | No |
-| `category` | String | No |
-| `blocks` | BlockDefinition[] | Yes |
-| `instructions` | String | No |
-| `model` | String | No |
-
-**Response:** `201` with `WorkflowTemplateResponse`
-
-### `PUT /api/v1/workflow-templates/{id}`
-
-Update a template. For built-in templates, only `sortOrder` and `category` can be changed.
-
-**Request:**
-
-```json
-{
-  "name": {"de": "Neuer Name", "en": "New Name"},
-  "description": {"de": "Neue Beschreibung", "en": "New Description"},
-  "sortOrder": 5
-}
-```
-
-All fields are optional; only provided fields are updated.
-
-**Response:** `WorkflowTemplateResponse`
-
-### `DELETE /api/v1/workflow-templates/{id}`
-
-Delete a user template. Built-in templates cannot be deleted (→ `400`).
-
-**Response:** `204 No Content`
-
-### `POST /api/v1/workflow-templates/from-workflow/{workflowId}`
-
-Save an existing workflow as a new template (name, description, blocks, instructions, model are carried over).
-
-**Response:** `201` with `WorkflowTemplateResponse`
-
-### `POST /api/v1/workflow-templates/{id}/install`
-
-Create a workflow from a template in a project — together with the blueprints its `sub-workflow` blocks call
-(TODO 093d2f11). A blueprint package names the called blueprint in `workflow_id` (`blueprint-…`); the installation
-creates it first in the same project and then fills in its new id. A template without such a reference is created as
-with `POST /workflows`. `changeSource` of the versions: `template-install`.
-
-**Request:**
-
-```json
-{ "projectId": "uuid", "name": "My package", "description": "…", "locale": "en", "metadata": { "autoTodo": { "enabled": true } } }
-```
-
-| Field | Type | Required |
-|---|---|---|
-| `projectId` | String | Yes |
-| `name`, `description` | String | No: blank → the template's own in `locale` |
-| `locale` | String (`de`/`en`) | No: language of names and steps; English without it |
-| `metadata` | Object | No: as with `POST /workflows`, only for the created workflow, not for the parts |
-
-**Response:** `201` with `{ "workflowId": "uuid", "workflowName": "…", "partWorkflowIds": ["uuid"] }`; an unknown
-blueprint in the reference → `404`, and nothing is created.
-
----
-
-## Executions
-
-### `GET /api/v1/executions`
-
-List all executions (paginated, filterable).
-
-**Query Parameters:**
-
-| Parameter | Type | Description |
-|---|---|---|
-| `page` | int | Page (default: 0) |
-| `size` | int | Entries per page (default: 50) |
-| `status` | String | Filter by status: `PENDING`, `RUNNING`, `PAUSED`, `COMPLETED`, `COMPLETED_WITH_ERRORS`, `FAILED`, `CANCELLED`, `INTERRUPTED` |
-| `workflowId` | String | Filter by workflow |
-| `projectId` | String | Filter by project |
-| `search` | String | Full-text search |
-
-`status` ignores upper and lower case. An unknown value returns `400` (`INVALID_ARGUMENT`), and the message lists the allowed values.
-
-**Response:** `PageResponse<WorkflowRunListItemResponse>` — **without steps.** Instead of the
-steps, a list row carries `stepCount`, `lastStepStatus` and `lastStepPreview` (the last step's
-output, truncated to 500 characters — cut in the database, the step rows are not loaded). Why: the list used to carry every `step_results.output`
-(TEXT) — 3,061,816 bytes measured for 60 runs, 51,716 afterwards. If you need the steps, fetch the
-run individually via `GET /api/v1/executions/{id}`; the detail route still returns everything.
-Like the detail route, every row carries `chainRunId` (the chain run of a chain entry, otherwise `null`; older backends omit the field).
-
-### `GET /api/v1/executions/pending-input`
-
-All runs currently waiting for an answer — approvals and human input, oldest first (UI: sidebar entry + `/approvals`).
-
-**Response:** `List<PendingInputResponse>`
-
-```json
-[
-  {
-    "runId": "run-uuid",
-    "workflowId": "workflow-uuid",
-    "workflowName": "AutoPilot Backend Quality Gate",
-    "type": "approval",
-    "blockId": "block-id",
-    "question": "Continue?",
-    "options": ["Yes", "No"],
-    "rejectOptions": ["No"],
-    "stepIndex": 2,
-    "requestedAt": "2026-09-30T10:00:00Z",
-    "timeoutAt": null
-  }
-]
-```
-
-`type`: `approval` or `human-input`. `timeoutAt`: `null` if the waiting block has no timeout. Human input with a form
-also carries `fields` (as with `GET /executions/{id}/approval`); without a form the key is absent.
-
-### `GET /api/v1/executions/{id}`
-
-Retrieve execution status (including steps).
-
-**Response:** `WorkflowRunResponse`
-
-### `POST /api/v1/executions/{id}/pause`
-
-Pause a running execution.
-
-**Response:** `200 OK`
-
-### `POST /api/v1/executions/{id}/resume`
-
-Resume a paused execution.
-
-**Response:** `200 OK`
-
-### `POST /api/v1/executions/{id}/cancel`
-
-Cancel an execution.
-
-**Response:** `200 OK`
-
-### `POST /api/v1/executions/{id}/retry`
-
-Retry a failed execution (creates a new run with the same input context).
-
-**Response:** `WorkflowRunResponse`
-
-### `POST /api/v1/executions/{id}/resume-from-step`
-
-Resume an interrupted execution from the failed step.
-
-**Response:** `WorkflowRunResponse`
-
-### `PATCH /api/v1/executions/{id}/notes`
-
-Update notes of an execution.
-
-**Request:**
-
-```json
-{
-  "notes": "Free-text note about the run"
-}
-```
-
-**Response:** `WorkflowRunResponse`
-
-### `POST /api/v1/executions/{id}/approve`
-
-Answer an approval gate or human input.
-
-**Request:**
-
-```json
-{
-  "answer": "Yes"
-}
-```
-
-| Field | Type | Required |
-|---|---|---|
-| `answer` | String | Yes |
-
-**Note:** The field is called `answer`, not `approved`.
-
-**Response:** `200 OK`
-
-### `GET /api/v1/executions/{id}/approval`
-
-Check whether an approval or human input is pending.
-
-**Response (no approval pending):**
-
-```json
-{
-  "pending": false
-}
-```
-
-**Response (approval pending):**
-
-```json
-{
-  "pending": true,
-  "blockId": "block-id",
-  "question": "Should we proceed?",
-  "options": ["Yes", "No"],
-  "stepIndex": 2,
-  "type": "approval"
-}
-```
-
-**Response (human input pending):**
-
-```json
-{
-  "pending": true,
-  "blockId": "block-id",
-  "question": "Please enter a filename:",
-  "options": [],
-  "stepIndex": 3,
-  "type": "human-input",
-  "inputType": "text",
-  "defaultValue": "",
-  "variableName": "filename",
-  "required": true,
-  "validationPattern": null
-}
-```
-
-If the block defines a form with several fields (`fields`), it comes along as `fields` (per field `variable_name`,
-`label`, `input_type`, `required`, `default_value`, `options`, …) – as in the WebSocket event `human_input_required`;
-without a form the key is absent.
-
-### `GET /api/v1/executions/{id}/live-log`
-
-Buffered live lines of a run for replay after a reload or late open (memory only, until 10 minutes after the run ends).
-Query: `afterSeq` (default `-1` = everything). Without a buffer `200` with `available: false`.
-
-**Response:**
-
-```json
-{
-  "runId": "run-uuid",
-  "bufferId": "buffer-uuid",
-  "available": true,
-  "firstSeq": 0,
-  "lastSeq": 2,
-  "skipped": 0,
-  "stepNames": { "0": "Build" },
-  "lines": [
-    { "seq": 1, "stepIndex": 0, "kind": "tool", "text": "Bash: mvn test", "ts": 1757844005000 },
-    { "seq": 2, "stepIndex": 0, "kind": "tool_result", "text": "↳ 1.2 KB", "ts": 1757844009000 }
-  ]
-}
-```
-
-`kind`: `line` (raw line), `text`, `tool`, `tool_result`, `tool_error`, `result`, `system`. `stepNames`: block names of steps with buffered lines (key = `stepIndex`).
-
-### `DELETE /api/v1/executions/{id}`
-
-Delete a run together with its steps and loose references to it. `409` if the run is still active or an audit report is attached to it. TODOs and audit data are never deleted along with it.
-
-`403 RUN_DELETION_DISABLED` if the instance was started with `automation.executions.allow-delete: false` (env `AUTOMATION_EXECUTIONS_ALLOW_DELETE`, default `true`) — checked before any lookup, for every id. Startup configuration only, no REST or settings switch. `GET /api/v1/system/capabilities` reports it as `runDeletionAllowed`; the UI then hides the delete buttons. Run retention (`run-retention-days`) and the nightly INTERRUPTED sweep still apply — to lose nothing, also set `run-retention-days` to `0`. While deletion is off, `PUT /api/v1/system/execution-config` accepts `run-retention-days` only if it is equal or longer (`0` counts as the longest), otherwise `403 RUN_DELETION_DISABLED` — and none of the call is applied.
-
-**Response:** `204 No Content`
-
-### `POST /api/v1/executions/{id}/todos/approve`
-
-Approve or reject auto-generated TODOs of a run.
-
-**Request:**
-
-```json
-{
-  "approved": true
-}
-```
-
-**Response:** `200 OK`
-
-### `POST /api/v1/executions/{id}/command`
-
-Send an ad-hoc command in the context of a running execution.
-
-**Request:**
-
-```json
-{
-  "command": "ls -la"
-}
-```
-
-**Response:**
-
-```json
-{
-  "output": "..."
-}
-```
-
----
-
-## Skills
-
-### `GET /api/v1/skills`
-
-List all skills.
-
-**Response:** `SkillResponse[]`
-
-```json
-[
-  {
-    "id": "uuid",
-    "name": "Code Analysis",
-    "description": "Analyzes source code",
-    "icon": "🔬",
-    "category": "CODE",
-    "aiContext": "You are a code analysis expert...",
-    "configSchema": {},
-    "builtin": true,
-    "version": "1.0.0",
-    "capabilities": [
-      {
-        "id": "uuid",
-        "name": "analyze",
-        "description": "Analyzes code",
-        "inputSchema": {},
-        "outputSchema": {},
-        "async": false,
-        "writes": false
-      }
-    ],
-    "createdAt": "2025-01-15T10:00:00Z"
-  }
-]
-```
-
-### `GET /api/v1/skills/{id}`
-
-Retrieve a single skill.
-
-**Response:** `SkillResponse`
-
-### `GET /api/v1/skills/{id}/capabilities`
-
-List capabilities of a skill.
-
-**Response:** `CapabilityResponse[]`
-
-### `GET /api/v1/skills/{id}/versions`
-
-Change history of a skill, newest first — also for deleted skills.
-
-**Response:** `SkillVersionResponse[]` with `id`, `skillId`, `versionNumber`, `operation` (`CREATE`/`UPDATE`/`DELETE`), `changeSource` (`user`/`import`/`builtin-seed`), `contentHash`, `createdAt`; the snapshot itself is not returned.
-
-### `GET /api/v1/skills/seal-pins`
-
-Maps each skill id to the names of the sealed workflows that use the skill. Such skills cannot be changed or deleted.
-
-**Response:** `{"<skillId>": ["workflow name", ...]}`
-
-### `POST /api/v1/skills`
-
-Create a new skill.
-
-**Request:**
-
-```json
-{
-  "name": "Custom Skill",
-  "description": "Description",
-  "icon": "⚡",
-  "category": "CODE",
-  "aiContext": "System prompt...",
-  "configSchema": {}
-}
-```
-
-| Field | Type | Required | Values |
-|---|---|---|---|
-| `name` | String | Yes | |
-| `category` | Enum | Yes | `DOCUMENT`, `CODE`, `DATA`, `CONTENT`, `RESEARCH`, `BUSINESS`, `PRODUCTIVITY` |
-| `description` | String | No | |
-| `icon` | String | No | |
-| `aiContext` | String | No | |
-| `configSchema` | Object | No | |
-
-**Response:** `201` with `SkillResponse`
-
-### `PUT /api/v1/skills/{id}`
-
-Edit a custom skill. `name`, `description`, `icon`, `category` and `aiContext` can be changed (required fields as for creation); `configSchema`, capabilities and the version label stay as they are. Each change writes a row to `GET /api/v1/skills/{id}/versions` (source `user`).
-
-**Response:** `200` with `SkillResponse` · `409 STATE_CONFLICT` for a built-in skill (the next release update would overwrite the change) · `409 SKILL_PINNED_BY_SEAL` while a sealed workflow uses the skill
-
-### `DELETE /api/v1/skills/{id}`
-
-Delete a skill.
-
-**Response:** `204 No Content` · `409 STATE_CONFLICT` for a built-in skill · `409 SKILL_PINNED_BY_SEAL` while a sealed workflow uses the skill
-
-### `GET /api/v1/skills/export/{id}`
-
-Export a skill as JSON (including capabilities).
-
-**Response:** `ExportSkillResponse`
-
-### `POST /api/v1/skills/import`
-
-Import a skill from JSON.
-
-**Request:** `ImportSkillRequest` (exported format); every capability needs a `name`, otherwise `400`
-
-**Response:** `201` with `SkillResponse`
-
----
-
-## Schedules
-
-### `GET /api/v1/schedules`
-
-List all schedules.
-
-**Response:** `ScheduledWorkflowResponse[]`
-
-```json
-[
-  {
-    "id": "uuid",
-    "workflowId": "uuid",
-    "workflowName": "Nightly Build",
-    "projectName": "My Project",
-    "chainId": null,
-    "chainName": null,
-    "targetType": "WORKFLOW",
-    "cronExpression": "0 0 2 * * ?",
-    "scheduleType": "CRON",
-    "scheduledAt": null,
-    "delayExpression": null,
-    "enabled": true,
-    "description": "Nightly build",
-    "inputContext": {},
-    "lastRunAt": null,
-    "lastRunStatus": null,
-    "nextRunAt": "2025-01-16T02:00:00Z",
-    "endDate": null,
-    "maxRuns": 0,
-    "runCount": 0,
-    "conflictBehavior": "SKIP",
-    "catchUpOnResume": false,
-    "pausedUntil": null,
-    "maintenance": false,
-    "createdAt": "2025-01-15T10:00:00Z"
-  }
-]
-```
-
-`nextRunAt` is the next run the scheduler will actually start. If the stored time lies in an active
-`skip-until` pause (`automation.scheduler.skip-until`), this is the first occurrence after the pause —
-`null` for a one-off schedule, which expires — and `pausedUntil` names the end of the pause; otherwise
-`pausedUntil` is `null`. The tick only advances the stored time once it becomes due; without this, list,
-calendar and workflow page showed a run that never happens until then (since 2026-09-24, TODO a776fd2a).
-While maintenance mode is on, the scheduler starts nothing, and nothing says when it will be switched off:
-`nextRunAt` is then `null` and `maintenance` is `true` (for every schedule with a stored next run; the
-stored value stays, TODO 7704b1e9). The same applies to every route that returns `ScheduledWorkflowResponse`.
-
-### `GET /api/v1/schedules/remaining-today`
-
-Remaining scheduled executions for today.
-
-**Query Parameters:** `projectId` (optional) — only schedules of that project's workflows; chains belong to no
-project and drop out (project filter of the dashboard view).
-
-**Response:** `UpcomingScheduleResponse` (`count`, `schedules[]`, `pausedUntil`, `maintenance`). Occurrences
-inside an active `skip-until` pause are left out — the tick skips them —, and `pausedUntil` names the end of the
-pause, else `null`. In maintenance mode the list is empty and `maintenance` is `true`: nothing starts while it is on.
-
-### `GET /api/v1/schedules/remaining-this-week`
-
-Remaining scheduled executions for this week. `projectId` (optional) as for `remaining-today`.
-
-**Response:** `UpcomingScheduleResponse` (like `remaining-today`, including `pausedUntil` and `maintenance`)
-
-### `GET /api/v1/schedules/{id}`
-
-Retrieve a single schedule.
-
-**Response:** `ScheduledWorkflowResponse`
-
-### `GET /api/v1/schedules/{id}/runs`
-
-The newest runs triggered by this schedule — at most `limit` of each kind (query parameter,
-default 50, 1–500), plus the totals.
-
-**Response:**
-
-```json
-{
-  "workflowRuns": [...],
-  "chainRuns": [...],
-  "workflowRunsTotal": 26000,
-  "chainRunsTotal": 0
-}
-```
-
-When `workflowRunsTotal` exceeds `workflowRuns.length`, the limit cut the list (until 2026-09-26 every
-run came, without a ceiling).
-
-`workflowRuns` are `WorkflowRunListItemResponse` — **without steps**, the same list rows as
-`GET /api/v1/executions` (`stepCount`, `lastStepStatus`, `lastStepPreview`). Until 2026-09-23 this
-route carried every run with all its steps. A run's steps come from `GET /api/v1/executions/{id}`.
-
-### `GET /api/v1/schedules/workflow/{workflowId}`
-
-Schedules of a specific workflow.
-
-**Response:** `ScheduledWorkflowResponse[]`
-
-### `GET /api/v1/schedules/chain/{chainId}`
-
-Schedules of a specific chain.
-
-**Response:** `ScheduledWorkflowResponse[]`
-
-### `GET /api/v1/schedules/calendar`
-
-Calendar data: scheduled executions and past runs within a time range.
-
-**Query Parameters:**
-
-| Parameter | Type | Required |
-|---|---|---|
-| `from` | Instant | Yes |
-| `to` | Instant | Yes |
-| `limit` | int | No (default 1000, 1–5000) |
-
-**Response:** `CalendarDataResponse` with `upcoming` (`ScheduledWorkflowResponse[]`, schedules whose next
-actual run lies in the range — during a `skip-until` pause, that is after the pause) and `pastRuns` (`WorkflowRunListItemResponse[]` — **without steps**, the same list
-rows as `GET /api/v1/executions`; until 2026-09-23 with every step of every run in the range).
-`pastRuns` are the newest `limit` runs of the range, `pastRunsTotal` counts all of them (until 2026-09-26 without a ceiling).
-
-### `POST /api/v1/schedules/preview`
-
-Preview the next 5 execution times for a cron expression.
-
-**Request:**
-
-```json
-{
-  "cronExpression": "0 0 2 * * ?"
-}
-```
-
-**Response:** `{ "runs": ["2025-01-16T02:00:00Z", ...] }` — during an active `skip-until` pause the times
-start after the pause, and the response additionally carries `"pausedUntil"`.
-
-### `POST /api/v1/schedules`
-
-Create a new schedule.
-
-**Request:**
-
-```json
-{
-  "workflowId": "uuid",
-  "cronExpression": "0 0 2 * * ?",
-  "description": "Nightly build",
-  "inputContext": {}
-}
-```
-
-| Field | Type | Required |
-|---|---|---|
-| `workflowId` | String | Yes (when `targetType` = `WORKFLOW`) |
-| `chainId` | String | Yes (when `targetType` = `CHAIN`) |
-| `targetType` | String | No (default: `WORKFLOW`, values: `WORKFLOW`, `CHAIN`) |
-| `cronExpression` | String | Yes (Spring Cron, 6 fields) |
-| `description` | String | No |
-| `inputContext` | Object | No |
-| `scheduleType` | String | No (default: `CRON`, values: `CRON`, `ONCE`, `DELAYED`) |
-| `scheduledAt` | Instant | No (for `ONCE` schedules) |
-| `delayExpression` | String | No (for `DELAYED` schedules, e.g. `"2h"`, `"30m"`) |
-| `endDate` | Instant | No (optional end date for `CRON` schedules) |
-| `maxRuns` | Integer | No (max starts, 0 = unlimited — see below) |
-| `conflictBehavior` | String | No (default: `SKIP`, values: `SKIP`, `OVERLAP` — see below) |
-| `catchUpOnResume` | boolean | No (default: `false` — see below) |
-
-`targetType`, `scheduleType` and `conflictBehavior` are trimmed and accepted in any case; any other
-value → `400`, and the message names the allowed values.
-
-- **`conflictBehavior`:** with `SKIP`, an occurrence is dropped while the target still has a run in
-  `RUNNING` or `PAUSED`: `nextRunAt` moves on to the next occurrence, a one-off schedule (`ONCE`,
-  `DELAYED`) expires, and the activity log notes “Schedule skipped (previous run still in progress)”.
-  Likewise while an interrupted run of the workflow waits for its automatic resume (“Schedule skipped
-  (interrupted run is being resumed automatically)”, `reason: auto-resume-pending`).
-  `OVERLAP` starts a second run next to it anyway.
-- **`maxRuns`:** counts every start of the schedule, a failed or refused one too; an occurrence dropped by
-  `SKIP` does not count. Once the number is reached, the schedule is disabled. Re-enabling does not reset
-  `runCount`.
-- **No run left → `400`** (since 2026-10-03): if the first occurrence of a `CRON` schedule lies at or after
-  `endDate`, create, update and enable refuse it (`messageKey` `SCHEDULE_NEXT_RUN_AFTER_END_DATE`), as they
-  do `maxRuns` ≤ `runCount` (`SCHEDULE_MAX_RUNS_REACHED`) — before, it looked active and ended silently when
-  it fell due, or started once more after `maxRuns` was lowered. A disabled schedule has no next run and
-  stays editable; enabling it checks. Also `400`: a cron expression without a future occurrence
-  (`SCHEDULE_NO_NEXT_RUN`) and a `ONCE` time more than 60 s in the past (`SCHEDULE_ONCE_IN_PAST`, on create,
-  enable and when the time is moved). `PUT` checks only when `cronExpression`, `scheduledAt`, `endDate` or
-  `maxRuns` are sent.
-- **`catchUpOnResume`:** catches up occurrences of this schedule that fell into a standby or a restart,
-  even when the global setting `scheduler-catch-up-on-resume` is off. That setting is on by default — then
-  every schedule is caught up anyway, one after another through the catch-up queue.
-
-**Response:** `201` with `ScheduledWorkflowResponse`
-
-### `PUT /api/v1/schedules/{id}`
-
-Update a schedule.
-
-**Request:**
-
-```json
-{
-  "cronExpression": "0 30 1 * * ?",
-  "description": "New schedule",
-  "inputContext": {},
-  "endDate": null,
-  "maxRuns": 10
-}
-```
-
-All fields are optional; only provided fields are updated. If an enabled `CRON` schedule is then left
-without an occurrence before `endDate`, or its `maxRuns` are used up → `400` (see above).
-
-**Response:** `ScheduledWorkflowResponse`
-
-### `POST /api/v1/schedules/{id}/enable`
-
-Enable a schedule. A `CRON` schedule whose next occurrence lies at or after `endDate`, whose `maxRuns`
-are used up or whose cron expression no longer parses (`INVALID_CRON`) → `400`.
-
-**Response:** `ScheduledWorkflowResponse`
-
-### `POST /api/v1/schedules/{id}/disable`
-
-Disable a schedule.
-
-**Response:** `ScheduledWorkflowResponse`
-
-### `DELETE /api/v1/schedules/{id}`
-
-Delete a schedule.
-
-**Response:** `204 No Content`
-
-### `GET /api/v1/schedules/catch-up`
-
-Query the sequential catch-up queue: the missed occurrence currently being caught up (after a cold start/resume) and the ones still waiting. Not persisted — due occurrences are re-queued after a restart.
-
-**Response:** `CatchUpQueue.Snapshot` (`active`, `pending[]`)
-
-### `GET /api/v1/schedules/maintenance`
-
-Query maintenance mode status, together with an active `skip-until` pause from the configuration.
-
-**Response:** `{ "enabled": false, "pausedUntil": null }` — `pausedUntil` is the end of the pause while it is
-still ahead, else `null`.
-
-### `POST /api/v1/schedules/maintenance`
-
-Toggle maintenance mode on/off. In maintenance mode no schedule starts; the stored `nextRunAt` stays
-where it is, and the views show no next run meanwhile (`maintenance: true`, see above). When it is
-switched off, every schedule whose time fell into the pause starts once, right away — all at the same
-time, without the catch-up queue.
-
-**Request:**
-
-```json
-{
-  "enabled": true
-}
-```
-
-**Response:** `{ "enabled": true, "pausedUntil": null }`
-
----
-
-## Webhooks
-
-The secret token is only ever returned in full (`tokenVisible: true`) right after creation
-(`POST /api/v1/webhooks`) or regeneration (`POST /api/v1/webhooks/{id}/regenerate-token`). Every
-other management response (list, get, enable, disable) masks it: only the first 8 characters plus
-`…` (U+2026), and `webhookUrl` uses that same masked token. Save the full token immediately after
-creating/regenerating — it cannot be retrieved again afterwards.
-
-**Upgrade note:** existing webhook tokens are no longer readable in full after this update. To
-recover, call `POST /api/v1/webhooks/{id}/regenerate-token` and reconfigure the external caller
-(e.g. the GitHub webhook settings) with the new token.
-
-### `GET /api/v1/webhooks`
-
-List all webhooks.
-
-**Response:** `WebhookTriggerResponse[]`
-
-```json
-[
-  {
-    "id": "uuid",
-    "workflowId": "uuid",
-    "workflowName": "Deploy Pipeline",
-    "secretToken": "abc123de…",
-    "tokenVisible": false,
-    "webhookUrl": "http://localhost:9090/api/v1/webhook/trigger/abc123de…",
-    "enabled": true,
-    "description": "GitHub Push Hook",
-    "defaultContext": {},
-    "lastTriggeredAt": null,
-    "triggerCount": 0,
-    "createdAt": "2025-01-15T10:00:00Z",
-    "signatureRequired": false
-  }
-]
-```
-
-### `GET /api/v1/webhooks/{id}`
-
-Retrieve a single webhook.
-
-**Response:** `WebhookTriggerResponse` (token masked, `tokenVisible: false`)
-
-### `GET /api/v1/webhooks/workflow/{workflowId}`
-
-Webhooks of a specific workflow.
-
-**Response:** `WebhookTriggerResponse[]` (token masked, `tokenVisible: false`)
-
-### `POST /api/v1/webhooks`
-
-Create a new webhook (token is automatically generated).
-
-**Request:**
-
-```json
-{
-  "workflowId": "uuid",
-  "description": "GitHub Push Hook",
-  "defaultContext": {}
-}
-```
-
-| Field | Type | Required |
-|---|---|---|
-| `workflowId` | String | Yes |
-| `description` | String | No |
-| `defaultContext` | Object | No |
-
-**Response:** `201` with `WebhookTriggerResponse` — token shown in full, `tokenVisible: true`
-
-### `POST /api/v1/webhooks/{id}/enable`
-
-Enable a webhook.
-
-**Response:** `WebhookTriggerResponse` (token masked, `tokenVisible: false`)
-
-### `POST /api/v1/webhooks/{id}/disable`
-
-Disable a webhook.
-
-**Response:** `WebhookTriggerResponse` (token masked, `tokenVisible: false`)
-
-### `POST /api/v1/webhooks/{id}/regenerate-token`
-
-Generates a new secret token for the webhook. The previous token stops working immediately;
-`lastTriggeredAt` and `triggerCount` are left unchanged. Logs a `SECURITY` entry to the
-ActivityLog.
-
-**Response:** `WebhookTriggerResponse` — new token shown in full, `tokenVisible: true`
-
-### `POST /api/v1/webhooks/{id}/secret`
-
-Set or rotate the signing secret (switch `automation.hardening.webhook-signatures`, otherwise `404 MODULE_DISABLED`).
-The secret appears only in this response and is stored encrypted; from now on trigger calls need a signature. Logs a
-`SECURITY` entry.
-
-**Response:** `{ "secret": "<64 hex>", "header": "X-Signature" }`
-
-### `DELETE /api/v1/webhooks/{id}/secret`
-
-Remove the signing secret (same switch).
-
-**Response:** `204 No Content`
-
-### `DELETE /api/v1/webhooks/{id}`
-
-Delete a webhook.
-
-**Response:** `204 No Content`
-
-### `POST /api/v1/webhook/trigger/{token}` (Public)
-
-Trigger a webhook. **No API key required.**
-
-**Request (optional):**
-
-```json
-{
-  "branch": "main",
-  "commit": "abc123"
-}
-```
-
-The payload is merged with the webhook's `defaultContext` and passed as context to the workflow execution.
-It must be a JSON object (otherwise `400`); keys prefixed with `__` are reserved.
-
-**Signature:** If the webhook has a signing secret (`signatureRequired: true`), the call needs the header
-`X-Signature: sha256=<hex>` (or `X-Hub-Signature-256`) carrying the HMAC-SHA256 of the raw request bytes — otherwise
-`401 WEBHOOK_SIGNATURE_INVALID`:
-
-```bash
-SIG=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$SECRET" | cut -d' ' -f2)
-curl -X POST "$URL" -H 'Content-Type: application/json' -H "X-Signature: sha256=$SIG" -d "$BODY"
-```
-
-With `automation.hardening.require-sealed-for-unattended` a webhook only starts sealed workflows (otherwise
-`403 UNATTENDED_REQUIRES_SEAL`). A workflow that accesses the platform itself (`HIGH` finding `self-api-call`/`direct-db-access`) is never started by a webhook (`403 UNATTENDED_PLATFORM_ACCESS`).
-
-**Response:** `WorkflowRunResponse`
-
----
-
-## Completion Triggers
-
-Completion triggers automatically start a target workflow when a source workflow completes.
-
-### `GET /api/v1/completion-triggers`
-
-List all completion triggers.
-
-**Response:** `CompletionTriggerResponse[]`
-
-### `GET /api/v1/completion-triggers/{id}`
-
-Retrieve a single trigger.
-
-**Response:** `CompletionTriggerResponse`
-
-### `GET /api/v1/completion-triggers/workflow/{workflowId}/as-source`
-
-Retrieve triggers where the specified workflow acts as a source.
-
-**Response:** `CompletionTriggerResponse[]`
-
-### `GET /api/v1/completion-triggers/workflow/{workflowId}/as-target`
-
-Retrieve triggers where the specified workflow acts as a target.
-
-**Response:** `CompletionTriggerResponse[]`
-
-### `POST /api/v1/completion-triggers`
-
-Create a new completion trigger.
-
-**Request:**
-
-```json
-{
-  "sourceWorkflowId": "uuid",
-  "targetWorkflowId": "uuid",
-  "triggerOnSuccess": true,
-  "triggerOnFailure": false,
-  "triggerAlways": false,
-  "description": "After successful build: start deployment",
-  "contextVariables": {}
-}
-```
-
-| Field | Type | Required |
-|---|---|---|
-| `sourceWorkflowId` | String | Yes |
-| `targetWorkflowId` | String | Yes |
-| `triggerOnSuccess` | boolean | No |
-| `triggerOnFailure` | boolean | No |
-| `triggerAlways` | boolean | No |
-| `description` | String | No |
-| `contextVariables` | Object | No |
-
-**Response:** `201` with `CompletionTriggerResponse`
-
-**CompletionTriggerResponse Fields:** `id`, `sourceWorkflowId`, `sourceWorkflowName`, `targetWorkflowId`, `targetWorkflowName`, `enabled`, `triggerOnSuccess`, `triggerOnFailure`, `triggerAlways`, `description`, `contextVariables`, `lastTriggeredAt`, `triggerCount`, `createdAt`
-
-### `POST /api/v1/completion-triggers/{id}/enable`
-
-Enable a trigger.
-
-**Response:** `CompletionTriggerResponse`
-
-### `POST /api/v1/completion-triggers/{id}/disable`
-
-Disable a trigger.
-
-**Response:** `CompletionTriggerResponse`
-
-### `DELETE /api/v1/completion-triggers/{id}`
-
-Delete a trigger.
-
-**Response:** `204 No Content`
-
----
-
-## Integrations (OAuth Providers)
-
-Plugin system for external services (Google Calendar, Gmail, Jira, Confluence, Trello). Each provider is automatically discovered and offers OAuth connection + actions.
-
-**Named connections:** A provider can have several connections (e.g. two accounts). Every endpoint that concerns one connection (`connect`, `credentials`, `connection`, `actions`, `task-targets`) takes the optional query parameter `connection=<name>` (1–40 characters `[a-z0-9-]`, else `400`); without it `default` applies. Details: [integrations.md](integrations.md#several-connections-per-provider).
-
-### `GET /api/v1/integrations`
-
-List all providers with connection status, actions, and account info.
-
-**Response:** `200 OK`
-```json
-[
-  {
-    "providerId": "google-calendar",
-    "displayName": "Google Calendar",
-    "icon": "calendar",
-    "description": "...",
-    "status": "CONNECTED",
-    "configured": true,
-    "requiresCredentials": true,
-    "accountEmail": "user@gmail.com",
-    "accountName": "Max Mustermann",
-    "connectedSince": "2026-04-01T10:00:00Z",
-    "scopes": "https://www.googleapis.com/auth/calendar",
-    "optionalScopes": [
-      { "scope": "https://www.googleapis.com/auth/calendar.events", "label": "Manage events", "granted": true }
-    ],
-    "supportsTaskExport": false,
-    "actions": [
-      { "name": "list_events", "description": "...", "inputSchema": {...}, "available": true }
-    ],
-    "requiresOAuthFlow": true,
-    "connections": [
-      { "name": "default", "status": "CONNECTED", "configured": true, "accountEmail": "user@gmail.com", "accountName": "Max Mustermann", "connectedSince": "2026-04-01T10:00:00Z", "scopes": "..." },
-      { "name": "work", "status": "CONNECTED", "configured": true, "accountEmail": "max@company.example", "accountName": null, "connectedSince": "2026-09-24T08:00:00Z", "scopes": "..." }
-    ]
-  }
-]
-```
-
-The top-level fields (`status`, `accountEmail`, …) describe the `default` connection.
-
-### `GET /api/v1/integrations/{providerId}/connections`
-
-All stored connections of a provider, `default` first (fields as in `connections[]` above).
-
-### `GET /api/v1/integrations/{providerId}`
-
-Retrieve a single provider with details.
-
-### `GET /api/v1/integrations/{providerId}/connect`
-
-Generate an OAuth authorization URL.
-
-**Query Parameters:** `scopes` (optional, list of additional OAuth scopes)
-
-**Response:** `200 OK`
-```json
-{ "authorizationUrl": "https://accounts.google.com/o/oauth2/v2/auth?..." }
-```
-
-### `GET /api/v1/integrations/{providerId}/callback`
-
-OAuth callback (public, no API key). Exchanges authorization code for tokens and closes the popup window via `postMessage`.
-
-### `POST /api/v1/integrations/{providerId}/credentials`
-
-Save client credentials (Client ID + Secret). Stored AES-256-GCM encrypted in the database.
-
-**Body:**
-```json
-{ "clientId": "...", "clientSecret": "..." }
-```
-
-**Response:** `IntegrationProviderResponse`
-
-### `DELETE /api/v1/integrations/{providerId}/connection`
-
-Disconnect OAuth connection. Deletes stored tokens.
-
-**Response:** `204 No Content`
-
-### `DELETE /api/v1/integrations/{providerId}/credentials`
-
-Delete client credentials.
-
-**Response:** `204 No Content`
-
-### `GET /api/v1/integrations/{providerId}/actions`
-
-List all available actions of the provider. `available` is `false` when required OAuth scopes are missing.
-
-### `POST /api/v1/integrations/{providerId}/actions/{action}`
-
-Execute an action. The body contains the action-specific parameters.
-
-**Body (example Google Calendar `create_event`):**
-```json
-{
-  "summary": "Meeting",
-  "startDateTime": "2026-04-15T10:00:00+02:00",
-  "endDateTime": "2026-04-15T11:00:00+02:00"
-}
-```
-
-### `GET /api/v1/integrations/{providerId}/task-targets`
-
-List available task export targets (e.g. Jira boards, Trello lists).
-
-**Response:** `List<TaskTarget>`
-
----
-
-## Onboarding Profiles
-
-AI context templates for project onboarding. 5 built-in profiles (Developer, Research, Content, Ops, Base) + custom profiles.
-
-### `GET /api/v1/projects/{id}/onboarding/status`
-
-Check onboarding status of a project (active profiles, generated file).
-
-### `POST /api/v1/projects/{id}/onboarding/enable`
-
-Enable onboarding for a project. Generates the onboarding file from the selected profiles.
-
-**Body:**
-```json
-{ "format": "md", "profileIds": ["profile-uuid-1", "profile-uuid-2"] }
-```
-
-**Response:** `OnboardingStatusResponse`
-
-### `POST /api/v1/projects/{id}/onboarding/disable`
-
-Disable onboarding for a project.
-
-**Response:** `OnboardingStatusResponse`
-
-### `POST /api/v1/projects/{id}/onboarding/refresh`
-
-Regenerate the onboarding file.
-
-**Response:** `OnboardingStatusResponse`
-
-### `GET /api/v1/projects/{id}/onboarding/preview`
-
-Preview the generated onboarding file.
-
-**Response:** `{ "content": "..." }`
-
-### `GET /api/v1/onboarding-profiles`
-
-List all onboarding profiles.
-
-**Response:** `OnboardingProfileResponse[]`
-
-### `GET /api/v1/onboarding-profiles/{id}`
-
-Retrieve a single profile.
-
-**Response:** `OnboardingProfileResponse`
-
-### `POST /api/v1/onboarding-profiles`
-
-Create a new profile.
-
-**Request:**
-
-```json
-{
-  "key": "my-profile",
-  "name": {"de": "Mein Profil", "en": "My Profile"},
-  "description": {"de": "...", "en": "..."},
-  "content": "Profile content...",
-  "type": "PROFILE"
-}
-```
-
-| Field | Type | Required | Values |
-|---|---|---|---|
-| `key` | String | Yes | Pattern: `^[a-z0-9-]+$` |
-| `name` | Map<String, String> | Yes | |
-| `description` | Map<String, String> | No | |
-| `content` | String | Yes | |
-| `type` | Enum | Yes | `BASE`, `PROFILE` |
-
-**Response:** `201` with `OnboardingProfileResponse`
-
-**OnboardingProfileResponse Fields:** `id`, `key`, `name`, `description`, `content`, `type`, `builtIn`, `sortOrder`, `version`, `historyCount`, `createdAt`, `updatedAt`
-
-### `PUT /api/v1/onboarding-profiles/{id}`
-
-Update profile content (automatically creates a history entry).
-
-**Response:** `OnboardingProfileResponse`
-
-### `DELETE /api/v1/onboarding-profiles/{id}`
-
-Delete a profile.
-
-**Response:** `204 No Content`
-
-### `POST /api/v1/onboarding-profiles/{id}/reset`
-
-Set a built-in profile to the current shipped text; the previous text goes into the history, `customized` becomes `false`.
-
-**Response:** `OnboardingProfileResponse` (includes `customized` — changed by hand — and `updateAvailable` — a newer shipped text exists than the one the profile is based on)
-
-### `GET /api/v1/onboarding-profiles/{id}/shipped`
-
-The current shipped text of a built-in profile, to compare before taking it over.
-
-**Response:** `{ "version": 4, "content": { "de": "...", "en": "..." } }` · 404 for custom profiles
-
-### `GET /api/v1/onboarding-profiles/{id}/history`
-
-Retrieve the change history of a profile.
-
-**Response:** `OnboardingProfileHistoryResponse[]`
-
----
-
-## Todo Triggers (Self-Improvement Loop)
-
-Todo triggers automatically start fix workflows when TODOs are created. Closes the self-improvement loop: Audit → TODO → Fix → Verify → Close.
-
-### `GET /api/v1/todo-triggers`
-
-List all todo triggers.
-
-**Response:** `TodoTriggerResponse[]`
-
-### `GET /api/v1/todo-triggers/{id}`
-
-Retrieve a single todo trigger.
-
-**Response:** `TodoTriggerResponse`
-
-### `GET /api/v1/todo-triggers/workflow/{workflowId}`
-
-Retrieve todo triggers that have the specified workflow as a target.
-
-**Response:** `TodoTriggerResponse[]`
-
-### `POST /api/v1/todo-triggers`
-
-Create a new todo trigger.
-
-**Request:**
-
-```json
-{
-  "tagPattern": "backend,testing",
-  "targetWorkflowId": "<workflow-id>",
-  "projectId": null,
-  "sourceFilter": "WORKFLOW",
-  "minPriority": "HIGH",
-  "description": "Auto-fix: missing backend tests",
-  "maxAttempts": 3,
-  "autoClose": true,
-  "contextTemplate": { "extra_key": "extra_value" }
-}
-```
-
-| Field | Required | Description |
-|---|---|---|
-| `tagPattern` | Yes | Comma-separated tags (AND logic). All tags must be present in the TODO |
-| `targetWorkflowId` | Yes | ID of the fix workflow to be started |
-| `projectId` | No | Optional: only match TODOs in this project |
-| `sourceFilter` | No | Optional: `"USER"`, `"AI"` or `"WORKFLOW"` |
-| `minPriority` | No | Optional: Minimum priority (`"LOW"`, `"MEDIUM"`, `"HIGH"`, `"CRITICAL"`) |
-| `description` | No | Human-readable description |
-| `maxAttempts` | No | Max fix attempts per TODO (default: 3) |
-| `autoClose` | No | Automatically close TODO on GREEN gate (default: true) |
-| `processBacklog` | No | Process existing matching TODOs on creation (default: true) |
-| `contextTemplate` | No | Static context variables, merged with TODO data |
-
-`sourceFilter` and `minPriority` are accepted in any case and stored as the constant; any other value
-→ `400`, and the message names the allowed values.
-
-**Response:** `201` with `TodoTriggerResponse`
-
-**TodoTriggerResponse Fields:** `id`, `tagPattern`, `projectId`, `sourceFilter`, `minPriority`, `targetWorkflowId`, `targetWorkflowName`, `contextTemplate`, `enabled`, `maxAttempts`, `autoClose`, `processBacklog`, `description`, `lastTriggeredAt`, `triggerCount`, `createdAt`
-
-**Context variables** automatically provided to the fix workflow:
-
-| Variable | Description |
-|---|---|
-| `todo_id` | TODO UUID |
-| `todo_title` | TODO title |
-| `todo_description` | TODO description (Markdown) |
-| `todo_tags` | TODO tags as JSON array |
-| `todo_priority` | `LOW`, `MEDIUM`, `HIGH` or `CRITICAL` |
-| `todo_project_id` | Project UUID of the TODO |
-| `todo_source` | `USER`, `AI` or `WORKFLOW` |
-| `todo_reference_type` | Reference type (e.g. `workflow_run`) |
-| `todo_reference_id` | Reference ID (e.g. workflow ID) |
-| `todo_trigger_id` | ID of the triggering TodoTrigger |
-
-### `POST /api/v1/todo-triggers/{id}/enable`
-
-Enable a trigger.
-
-**Response:** `TodoTriggerResponse`
-
-### `POST /api/v1/todo-triggers/{id}/disable`
-
-Disable a trigger.
-
-**Response:** `TodoTriggerResponse`
-
-### `DELETE /api/v1/todo-triggers/{id}`
-
-Delete a trigger.
-
-**Response:** `204 No Content`
-
-### Loop Prevention
-
-Fix workflows started by a TodoTrigger set `todoTriggerRun: true` in the run metadata. This prevents:
-- **AutoTodoService** skips TODO creation for these runs (no Audit→TODO→Fix→TODO loop)
-- **Max Attempts**: After `maxAttempts` failed attempts, the trigger is no longer fired for this TODO
-- **Running Check**: If `lastFixRunId` is still RUNNING, no second fix run is started
-
----
-
-## Audit Center
-
-Read-only view of audit workflow results (gate status per audit run) and the findings derived from them, plus promotion of individual findings to TODOs. Module `audit` (`automation.modules.audit`) — when disabled, every endpoint below responds with `404 MODULE_DISABLED`.
-
-### `GET /api/v1/audits`
-
-List all audits (grouped by project + `auditKey`) with the latest valid report for each. Optional filters: `projectId`, `category`, `gateStatus`.
-
-**Response:** `AuditSummary[]`
-
-### `GET /api/v1/audits/{auditKey}`
-
-Details of an audit (summary + latest report). Required parameter: `projectId`.
-
-**Response:** `AuditDetail`
-
-### `GET /api/v1/audits/{auditKey}/reports`
-
-All reports of an audit, paginated (`page`, `size`). Required parameter: `projectId`.
-
-**Response:** `PageResponse<AuditReportResponse>` — heads only: `markdownContent` is `null`. The text
-comes from `GET /api/v1/audit-reports/{id}` (until 2026-09-26 every page carried every report in full).
-
-### `GET /api/v1/audit-reports/{id}`
-
-Retrieve a single audit report.
-
-**Response:** `AuditReportResponse`
-
-Besides content, gate and `findingCount`, every report (also in the list and in `AuditDetail.latestReport`) carries the origin of its run, each field `null` when unknown:
-
-| Field | Meaning |
-|---|---|
-| `workflowVersion` | The workflow's version label when the report was stored (e.g. the pool version) |
-| `triggerSource` | Effective trigger; for a chain entry the trigger of the chain (`SCHEDULE`, `MANUAL`, …). A chain run from before V89 stays `CHAIN`, a sub-workflow run `SUB_WORKFLOW` |
-| `scheduleId` | Triggering schedule; for a chain entry the chain's schedule |
-| `chainRunId`, `chainId`, `chainName` | Chain run and chain of a chain entry; `chainRunId` stays when the chain has been deleted |
-| `definitionVersionNumber` | Number of the definition version the run executed (empty without `automation.hardening.provenance`) |
-
-The list resolves counts and origins for the whole page with one query each, not per report.
-
-### `GET /api/v1/audit-findings`
-
-List findings across all audits, paginated (`page`, `size`). Optional filters: `projectId`, `auditKey`, `status`, `severity`.
-
-**Response:** `PageResponse<AuditFindingResponse>`
-
-### `GET /api/v1/audit-findings/{id}`
-
-Retrieve a single finding.
-
-**Response:** `AuditFindingResponse`
-
-### `PATCH /api/v1/audit-findings/{id}`
-
-Change a finding's status or disposition note.
-
-**Request:**
-
-| Field | Type | Required |
-|---|---|---|
-| `status` | Enum (`AuditFindingStatus`) | No |
-| `dispositionNote` | String | No |
-
-**Response:** `AuditFindingResponse`
-
-### `POST /api/v1/audit-findings/{id}/todos`
-
-Create a MySuricates-managed TODO from the finding ("managed TODO").
-
-**Response:** `AuditFindingResponse`
-
-### `POST /api/v1/audit-findings/{id}/todo-links`
-
-Manually link an existing TODO to the finding.
-
-**Request:** `{ "todoId": "uuid" }`
-
-**Response:** `AuditFindingResponse`
-
-### `DELETE /api/v1/audit-findings/{id}/todo-links/{todoId}`
-
-Remove the link between a finding and a TODO.
-
-**Response:** `204 No Content`
-
----
-
-## Notifications
-
-Notifications upon workflow completion (webhook or desktop).
-
-### `GET /api/v1/notifications`
-
-List all notification configurations.
-
-**Response:** `NotificationConfigResponse[]`
-
-### `GET /api/v1/notifications/{id}`
-
-Retrieve a single notification configuration.
-
-**Response:** `NotificationConfigResponse`
-
-### `POST /api/v1/notifications`
-
-Create a new notification configuration.
-
-**Request:**
-
-```json
-{
-  "name": "Slack Deployment",
-  "channelType": "WEBHOOK",
-  "webhookUrl": "https://hooks.slack.com/...",
-  "workflowId": null,
-  "triggerOnSuccess": true,
-  "triggerOnFailure": true,
-  "triggerAlways": false,
-  "messageTemplate": "Workflow {{workflow_name}} {{status}} ({{duration}})"
-}
-```
-
-| Field | Type | Required | Values |
-|---|---|---|---|
-| `name` | String | Yes | |
-| `channelType` | Enum | Yes | `WEBHOOK`, `DESKTOP` |
-| `webhookUrl` | String | No (required for `WEBHOOK`) | Slack/Discord/Teams webhook URL |
-| `workflowId` | String | No | `null` = global (all workflows) |
-| `triggerOnSuccess` | boolean | No | |
-| `triggerOnFailure` | boolean | No | |
-| `triggerAlways` | boolean | No | |
-| `messageTemplate` | String | No | Supports `{{workflow_name}}`, `{{status}}`, `{{duration}}`, `{{error_message}}` |
-
-**Response:** `201` with `NotificationConfigResponse`
-
-**NotificationConfigResponse Fields:** `id`, `name`, `enabled`, `channelType`, `webhookUrl`, `workflowId`, `triggerOnSuccess`, `triggerOnFailure`, `triggerAlways`, `messageTemplate`, `createdAt`
-
-### `POST /api/v1/notifications/{id}/enable`
-
-Enable a notification.
-
-**Response:** `NotificationConfigResponse`
-
-### `POST /api/v1/notifications/{id}/disable`
-
-Disable a notification.
-
-**Response:** `NotificationConfigResponse`
-
-### `DELETE /api/v1/notifications/{id}`
-
-Delete a notification configuration.
-
-**Response:** `204 No Content`
-
----
-
-## System
-
-### `GET /api/v1/system/health` (Public)
-
-Health check.
-
-**Response:**
-
-```json
-{
-  "status": "UP",
-  "timestamp": "2025-01-15T10:00:00Z",
-  "docker": "CONNECTED",
-  "components": {
-    "database": { "status": "UP", "responseTimeMs": 2 },
-    "docker": { "status": "UP" }
-  }
-}
-```
-
-`status` can be `UP`, `DEGRADED` (Docker unavailable), or `DOWN` (database unavailable).
-`docker` can be `CONNECTED` or `UNAVAILABLE`.
-
-### `GET /api/v1/system/info` (Public)
-
-System information.
-
-**Response:**
-
-```json
-{
-  "name": "MySuricates",
-  "version": "0.7.3",
-  "buildType": "SNAPSHOT",
-  "buildTimestamp": null,
-  "java": "21.0.1",
-  "tailscale": "DISABLED",
-  "environment": "Dev"
-}
-```
-
-### `GET /api/v1/system/auth-status`
-
-Query authentication status.
-
-**Response:** `{ "securityEnabled": true }`
-
-### `GET /api/v1/system/jvm-memory` (Public)
-
-The JVM's heap usage as exactly three numbers — for shell blocks such as the performance audit, which
-have no API key. The rest of the metrics surface under `/actuator/metrics` requires the key.
-
-**Response:**
-
-```json
-{
-  "jvm_memory_used_bytes": 268435456,
-  "jvm_memory_max_bytes": 1073741824,
-  "jvm_heap_used_percent": 25.0
-}
-```
-
-The values refer to the heap (`MemoryMXBean`); the share is rounded to one decimal. If the JVM knows
-no heap maximum, `jvm_memory_max_bytes` and `jvm_heap_used_percent` are `null`.
-
-### `GET /api/v1/system/ai-providers`
-
-Query available AI providers and default provider.
-
-**Response:**
-
-```json
-{
-  "providers": ["CLAUDE", "PI", "CODEX"],
-  "default": "CLAUDE"
-}
-```
-
-### `GET /api/v1/system/capabilities`
-
-Retrieve system capabilities (API version, app version, available routes and block types) and the module status decided at startup.
-
-**Response:** `SystemCapabilitiesResponse` — module fields excerpt:
-
-```json
-{
-  "preset": "core",
-  "modulesUiEditable": false,
-  "modules": [
-    {
-      "name": "webhooks", "kind": "feature", "enabled": false,
-      "tier": "advanced", "maturity": "stable", "risks": ["network"], "requires": [],
-      "property": "automation.modules.webhooks", "envVar": "AUTOMATION_MODULES_WEBHOOKS",
-      "description": "Inbound webhook triggers that start workflows from outside.",
-      "configured": false, "overridden": false
-    }
-  ]
-}
-```
-
-Endpoints of disabled modules answer `404` with `{"code": "MODULE_DISABLED"}`. `configured` is the value from the startup configuration, `overridden` marks a switch made in the settings.
-
-### `PUT /api/v1/system/modules/{name}`
-
-Switch a feature module at runtime — only with `automation.modules.ui-editable: true`; applies immediately and survives restarts. Logs a `SECURITY` entry.
-
-**Request:** `{ "enabled": true }`
-
-**Response:** `{ "preset": "core", "uiEditable": true, "modules": [ … ] }` (module entries as above)
-
-**Errors:** `403 MODULES_NOT_EDITABLE` (switch off), `400 INVALID_ARGUMENT` (hardening switch — startup configuration only), `409 STATE_CONFLICT` (dependency, e.g. `wishes` needs `chains`), `404` (unknown module)
-
-### `DELETE /api/v1/system/modules/{name}/override`
-
-Remove the settings switch: the module follows the startup configuration again. Same response and errors as `PUT`.
-
-### `GET /api/v1/system/ai-providers/PI/catalog`
-
-Retrieve the model catalog of the Pi provider.
-
-**Response:** `PiCatalog`
-
-### `GET /api/v1/system/ai-providers/{id}/models`
-
-Models this provider offers on this host (host discovery via CLI or local cache, TTL-cached). Never fails because of a missing CLI — returns `available: false` with `reason` instead.
-
-**Response:** `ModelCatalog` (`providerId`, `available`, `source`, `fetchedAt`, `reason`, `models[]`)
-
-### `POST /api/v1/system/ai-providers/{id}/models/refresh`
-
-Bypass the cache and probe the host now.
-
-**Response:** `ModelCatalog`
-
-### `GET /api/v1/system/ai-providers/status`
-
-Whether the AI CLIs on the backend's machine are ready: per provider the program on the `PATH`, a login (login file or environment variable — the same rule as the installer, from `AiProvider#setup()`) and the commands to install and log in. Starts no CLI; the answer is cached (`automation.ai-provider-status.ttl-seconds`, default 60). It holds only names and commands, never a token or file content. "Ready" means program and login were found — not that the login is still valid.
-
-**Response:**
-
-```json
-{
-  "container": false,
-  "loginCommand": null,
-  "checkedAt": "2026-09-24T10:00:00Z",
-  "providers": [
-    {
-      "id": "CLAUDE", "cli": "claude", "state": "READY",
-      "installed": true, "loggedIn": true, "loginVia": "ENVIRONMENT", "loginSource": "CLAUDE_CODE_OAUTH_TOKEN",
-      "install": "curl -fsSL https://claude.ai/install.sh | bash -s <version>   (or: npm install -g @anthropic-ai/claude-code@<version>)",
-      "login": "claude auth login", "defaultProvider": true, "loginNote": null
-    },
-    {
-      "id": "CODEX", "cli": "codex", "state": "LOGIN_MISSING",
-      "installed": true, "loggedIn": false, "loginVia": null, "loginSource": null,
-      "install": "npm install -g @openai/codex@<version>", "login": "codex login",
-      "defaultProvider": false, "loginNote": null
-    },
-    {
-      "id": "PI", "cli": "pi", "state": "LOGIN_MISSING",
-      "installed": true, "loggedIn": false, "loginVia": null, "loginSource": null,
-      "install": "npm install -g @earendil-works/pi-coding-agent@<version>", "login": "pi",
-      "defaultProvider": false, "loginNote": "pi_slash_login"
-    }
-  ]
-}
-```
-
-`state`: `READY` (program and login found), `LOGIN_MISSING` (program found, no login), `NOT_INSTALLED` (program missing). `loginSource`: the variable name or the login file as `~/…` — or as `$VARIABLE/…` when a container instance moves the directory (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `PI_CODING_AGENT_DIR`). `container: true` means the backend runs in a container: the programs and logins inside it are what counts.
-`login` is only the command; what to do after it comes as a key in `loginNote` (`null` when the command says it
-all) — the interface translates it (`aiProviderStatus.loginNotes`), and so does the installer (`M_login_note_<key>`).
-
-Fields without a value come as `null`, they are not left out. `loginCommand` names, in a container, the fixed login command of the start path (e.g. `scripts/tryout.sh login [claude|codex|pi]`), otherwise `null`; `install` names the pinned CLI version ([entwicklung.md → AI CLI versions](entwicklung.md#ai-cli-versions-installer-and-tryout)).
-
-### `POST /api/v1/system/ai-providers/status/refresh`
-
-Bypass the cache and check now, e.g. right after logging in.
-
-**Response:** as `GET /api/v1/system/ai-providers/status`
-
-### `POST /api/v1/system/client-errors`
-
-Report frontend errors (for logging).
-
-**Request:**
-
-```json
-{
-  "message": "TypeError: ...",
-  "stack": "...",
-  "source": "component",
-  "url": "/workflows",
-  "timestamp": "2025-01-15T10:00:00Z"
-}
-```
-
-**Response:** `202 Accepted`
-
-### `POST /api/v1/system/remote-access/enable`
-
-Enable Tailscale remote access.
-
-**Response:** `RemoteAccessResponse`
-
-```json
-{
-  "enabled": true,
-  "ip": "100.64.0.1",
-  "hostname": "automation.tailnet.ts.net"
-}
-```
-
-### `POST /api/v1/system/remote-access/disable`
-
-Disable Tailscale remote access.
-
-**Response:** `200 OK`
-
-### `GET /api/v1/system/remote-access/status`
-
-Query Tailscale status.
-
-**Response:** `RemoteAccessResponse`
-
-### `POST /api/v1/system/vacuum`
-
-Execute SQLite database VACUUM.
-
-**Response:** `Map<String, Object>`
-
-### `GET /api/v1/system/backup`
-
-Download database backup.
-
-**Response:** File download (SQLite backup)
-
-### `POST /api/v1/system/backup`
-
-Create a named backup.
-
-**Query Parameters:** `reason` (optional, String)
-
-**Response:** `BackupMetadata` with `filename`, `sizeBytes`, `createdAt`
-
-### `GET /api/v1/system/backups`
-
-List all available backups.
-
-**Response:** `BackupInfo[]`
-
-### `GET /api/v1/system/backups/{filename}`
-
-Download a specific backup.
-
-**Response:** File download
-
-### `GET /api/v1/system/settings/{key}`
-
-Retrieve an application setting.
-
-**Allowed Keys:** `auto-todo-default`, `auto-repair-default`, `auto-repair-mode`, `auto-repair-max-retries`, `auto-repair-timeout-seconds`, `default-ai-provider`, `assistant-thinking-phrases`, `assistant-model`, `suggestions-model`, `suggestions-enabled`, `backup-retain-count`, `github.repo-allowlist`
-
-**Response:** `{ "key": "...", "value": "..." }` — `value` is empty while nothing is stored. For `backup-retain-count`, `"default"` comes along: the value of `automation.backup.retain-count` that applies then (e.g. `{ "key": "backup-retain-count", "value": "", "default": "30" }`).
-
-### `PUT /api/v1/system/settings/{key}`
-
-Set an application setting.
-
-**Request:**
-
-```json
-{
-  "value": "true"
-}
-```
-
-**Response:** `200 OK`
-
-`backup-retain-count` takes 1–365; any other value → `400`, and nothing is stored. The stored value
-applies from the next rotation on and keeps applying after a restart (otherwise
-`automation.backup.retain-count`).
-
-### `GET /api/v1/system/tray-config`
-
-Retrieve runtime settings for the host tray icon.
-
-**Response:**
-
-```json
-{
-  "popupsEnabled": true,
-  "notifyApprovals": true,
-  "notifyFailures": true,
-  "notifySuccess": false,
-  "publicUrl": "https://mysuricates.example.com"
-}
-```
-
-### `PUT /api/v1/system/tray-config`
-
-Update tray settings. Partial updates are accepted. External browser targets must use HTTPS; HTTP is allowed only for loopback addresses. The browser target is separate from internal health-check URLs.
-
-**Request/response:** the same fields as `GET`; the response contains the complete validated state.
-
-### `GET /api/v1/system/execution-config`
-
-Retrieve current execution configuration (timeouts, token limits, etc.). Additionally contains a read-only field `activeRuns` with the number of active runs.
-
-**Allowed Keys:**
-
-| Key | Range |
-|---|---|
-| `execution-max-concurrent` | 1–50 |
-| `claude-max-concurrent-calls` | 1–20 |
-| `claude-reserved-for-interactive` | 0–10 |
-| `claude-timeout-seconds` | 30–3600 |
-| `claude-inter-call-delay-ms` | 0–30000 |
-| `chain-workflow-timeout-minutes` | 5–1440 |
-| `rate-limit-enabled` | 0–1 |
-| `rate-limit-requests-per-minute` | 10–10000 |
-| `assistant-chat-timeout-seconds` | 30–900 |
-| `task-command-timeout-seconds` | 10–3600 |
-| `allow-extra-mounts` | 0–1 |
-| `todo-hygiene-enabled` | 0–1 |
-| `todo-stale-days` | 7–365 |
-| `todo-hygiene-max-per-run` | 10–2000 |
-| `scheduler-catch-up-on-resume` | 0–1 |
-| `scheduler-resume-grace-minutes` | 1–60 |
-| `run-auto-resume-enabled` | 0–1 |
-| `run-auto-resume-delay-seconds` | 0–3600 |
-| `summarization-timeout-seconds` | 30–600 |
-| `factory-timeout-seconds` | 60–3600 |
-| `wish-total-timeout-minutes` | 5–1440 |
-| `wish-workflow-wait-minutes` | 1–120 |
-| `wish-default-shell-timeout-seconds` | 30–3600 |
-| `wish-default-agentic-total-timeout-seconds` | 60–86400 |
-
-**Response:** `Map<String, Object>` with current settings
-
-### `PUT /api/v1/system/execution-config`
-
-Update execution configuration.
-
-**Request:** `Map<String, String>` with the settings to change (keys as above, camelCase also accepted)
-
-**Response:** `Map<String, Object>` with updated settings
-
-### `POST /api/v1/system/repair-failed`
-
-Automatically repair all failed workflows. Requires a healthy test instance.
-
-**Query Parameters:** `force` (boolean, default: `false`)
-
-**Response:** `202 Accepted` with `{ "status": "repair_started", "workflowsQueued": 3, "force": false }`
-
-### `POST /api/v1/system/open-path`
-
-Open a file or directory in the native file manager (Linux: `xdg-open`).
-
-**Request:**
-
-```json
-{
-  "path": "/home/user/project"
-}
-```
-
-**Response:** `{ "status": "ok" }`
-
-### `GET /api/v1/system/integration-snippet`
-
-Render a Markdown integration snippet for a project (for AGENTS.md etc.): the base onboarding profile with this instance's address and key command, plus the project's workflows.
-
-**Query Parameters:** `projectPath` (optional), `locale` (`de`/`en`, optional; default `en`)
-
-**Response:** `String` (Content-Type: `text/markdown`)
-
-### `GET /api/v1/system/browse`
-
-Browse directory contents (subdirectories only, no hidden folders).
-
-**Query Parameters:** `path` (String, optional, default: home directory)
-
-**Response:**
-
-```json
-{
-  "current": "/home/user",
-  "parent": "/home",
-  "directories": [
-    { "name": "Documents", "path": "/home/user/Documents" }
-  ]
-}
-```
-
-### `GET /api/v1/system/request-metrics`
-
-Request cost per route since the last daily snapshot (live window from memory), most expensive (p95) first. See [entwicklung.md → Backend Tests](entwicklung.md#backend-tests) for the measurement chain behind this.
-
-**Response:** `List<RouteSnapshot>`
-
-```json
-[
-  {
-    "route": "GET /api/v1/todos/{id}",
-    "calls": 120,
-    "p50Ms": 8,
-    "p95Ms": 42,
-    "maxMs": 310,
-    "p95WaitMs": 3,
-    "waitShare": 0.07,
-    "maxSqlStatements": 4,
-    "avgSqlStatements": 2.1,
-    "maxResponseBytes": 4096,
-    "avgResponseBytes": 1024
-  }
-]
-```
-
-### `GET /api/v1/system/request-metrics/daily`
-
-Stored daily rows — with `route` the history of one route (oldest first, the baseline a drift check compares against), without `route` the rows of a single day.
-
-**Query Parameters:** `route` (String, optional), `days` (int, default: 7 — only with `route`)
-
-**Response:** `List<RequestMetricDaily>` (same fields as above, plus `day`)
-
----
-
-## Learning / Dashboard
-
-### `GET /api/v1/learning/dashboard`
-
-Dashboard data with statistics.
-
-**Query Parameters:** `days` (default: 30), `projectId` (optional). `projectId` restricts every value to that
-project's workflows and runs — including the overall numbers (`totalWorkflows`, `totalRuns`, `runsToday`,
-`successRate`, `topWorkflows`), which count all time regardless of `days`.
-
-**Response:**
-
-```json
-{
-  "totalWorkflows": 12,
-  "totalRuns": 156,
-  "runsToday": 5,
-  "successfulRuns": 140,
-  "failedRuns": 16,
-  "averageDurationMs": 45000,
-  "successRate": 89.7,
-  "totalCostUsd30d": 12.50,
-  "totalTokens30d": 250000,
-  "totalInputTokens": 180000,
-  "totalOutputTokens": 70000,
-  "topWorkflows": [
-    { "workflowId": "uuid", "workflowName": "Code Review", "runCount": 42 }
-  ],
-  "recentRuns": [
-    { "id": "uuid", "workflowId": "uuid", "workflowName": "Code Review", "projectName": "AutoPilot", "status": "COMPLETED", "startedAt": "2025-01-15T08:00:00Z", "completedAt": "2025-01-15T08:00:32Z", "durationMs": 32000 }
-  ],
-  "timeSeries": [
-    { "date": "2025-01-15", "count": 8, "successRate": 87.5, "failedCount": 1, "avgDurationMs": 32000, "totalCostUsd": 0.45, "totalTokens": 9500 }
-  ],
-  "providerStats": [
-    { "provider": "CLAUDE", "runCount": 150, "totalTokens": 240000, "totalCostUsd": 11.0, "successRate": 90.0 }
-  ],
-  "modelStats": [
-    { "requestedModel": "sonnet", "provider": "CLAUDE", "model": "claude-sonnet", "stepCount": 200, "totalTokens": 180000, "totalCostUsd": 8.5 }
-  ],
-  "gateStatusSummary": [
-    { "status": "GREEN", "count": 10 }
-  ],
-  "failureReasons": [
-    { "reason": "timeout", "count": 3 }
-  ],
-  "costByWorkflow": [
-    { "workflowId": "uuid", "workflowName": "Code Review", "totalCostUsd": 5.0, "runCount": 42 }
-  ],
-  "blockTypeUsage": [
-    { "blockType": "simple", "stepCount": 100, "failedCount": 2, "failureRate": 2.0 }
-  ],
-  "triggerDistribution": {
-    "manual": 50, "scheduled": 80, "webhook": 10, "completionTrigger": 5, "todoTrigger": 11
-  }
-}
-```
-
-`recentRuns` holds up to the ten newest runs in the time range as slim rows — only the fields above,
-without steps, metadata, or input context. `GET /api/v1/executions/{id}` returns the full run. Until
-TODO 2ccb9e40 these were whole runs with every step (about 600 KB per call, polled every 30 s).
-
-`modelStats` groups steps by the combination of `requestedModel` (requested),
-`provider` (AI provider), and `model` (reported; date suffixes are removed as before).
-Missing or blank values remain `null`; the requested model never replaces the reported one.
-Calls without a reported model and values such as `<synthetic>` remain visible.
-Integration steps do not contribute to these AI statistics.
-
-### `GET /api/v1/learning/platform-stats`
-
-Platform-wide statistics.
-
-**Response:** `PlatformStatsResponse` with `activeProjects`, `archivedProjects`, `totalWorkflows`, `workflowPoolSize`, `totalSkills`, `builtinSkills`, `customSkills`, `topSkillsByUsage`, `totalTemplates`, `builtinTemplates`, `customTemplates`, `activeSchedules`, `totalSchedules`, `activeWebhooks`, `totalWebhooks`, `chainStats`, `activeTodoTriggers`, `activeCompletionTriggers`, `activeMemoryEntries`, `todoStats`, `wishStats`, `assistantStats`
-
-### `GET /api/v1/learning/workflows/{workflowId}/stats`
-
-Statistics of a single workflow.
-
-**Response:**
-
-```json
-{
-  "workflowId": "uuid",
-  "totalRuns": 42,
-  "successfulRuns": 38,
-  "failedRuns": 4,
-  "averageDurationMs": 32000,
-  "successRate": 90.5
-}
-```
-
-### `GET /api/v1/learning/workflows/{workflowId}/step-analytics`
-
-Step-level analysis of a workflow.
-
-**Response:** `Array<Object>` with step statistics
-
-### `GET /api/v1/learning/workflows/{workflowId}/suggestions`
-
-Optimization suggestions based on run data.
-
-**Response:** `Array<Object>` with improvement suggestions
-
-### `GET /api/v1/learning/workflows/{workflowId}/similar`
-
-Find similar workflows.
-
-**Response:** `Array<Object>` with similar workflows
-
-### `GET /api/v1/learning/workflows/{workflowId}/agentic-history`
-
-Agentic strategy history of a workflow (how the AI strategy evolved across runs).
-
-**Response:** `Array<Object>`
-
-### `GET /api/v1/learning/workflows/{workflowId}/agentic-analytics`
-
-Agentic block analysis: iterations, token usage, success rate.
-
-**Response:** `Map<String, Object>`
-
-### `GET /api/v1/learning/workflows/{workflowId}/tool-patterns`
-
-Tool usage patterns of a workflow (which tools are used how often).
-
-**Response:** `Map<String, Object>`
-
-### `GET /api/v1/learning/workflows/{workflowId}/execution-insights`
-
-Execution insights: trends, anomalies, performance metrics.
-
-**Response:** `Map<String, Object>` — sums over all runs of the workflow, among them `totalInputTokens`, `totalOutputTokens`, `totalCacheReadInputTokens`, `totalCacheCreationInputTokens` and `totalThinkingTokens` (part of the output tokens; the last three since TODO 20861200, `0` when no step reports them).
-
-### `GET /api/v1/learning/runs/{runId}/insights`
-
-Detailed insights for a single run.
-
-**Response:** `Map<String, Object>` — sums as above, plus `steps[]` with the figures per step; `cacheReadInputTokens`, `cacheCreationInputTokens` and `thinkingTokens` only on steps that report them (Claude).
-
-### `POST /api/v1/learning/runs/{runId}/rate?rating={1-5}`
-
-Rate a run (1-5 stars).
-
-| Parameter | Type | Required | Values |
-|---|---|---|---|
-| `rating` | int (Query) | Yes | 1-5 |
-
-**Response:** `200 OK`
-
----
-
-## Dashboard Layouts
-
-History of the dashboard layout (all views), shared across devices. The frontend saves a snapshot when editing ends. Unnamed versions are trimmed to the newest `dashboard-layout-retention-count` (default 100, see `/system/execution-config`); named ones are kept.
-
-### `GET /api/v1/dashboard/layouts`
-
-Versions, newest first, **without** the layout content.
-
-**Query parameters:** `page` (default: 0), `size` (default: 20, at most 100)
-
-**Response:** `PageResponse<DashboardLayoutVersionSummary>`
-
-```json
-{
-  "content": [
-    { "id": "version-uuid", "createdAt": "2026-09-15T10:00:00Z", "deviceLabel": "Browser 3f2a",
-      "name": null, "formatVersion": 2, "viewCount": 1, "contentHash": "9b1c…" }
-  ],
-  "page": 0, "size": 20, "totalElements": 1, "totalPages": 1
-}
-```
-
-### `GET /api/v1/dashboard/layouts/{id}`
-
-One version with content: the fields above plus `layout` (`{ "activeViewId": …, "views": [ … ] }`).
-
-### `POST /api/v1/dashboard/layouts`
-
-Saves a snapshot. Body at most 256 KiB; unknown fields → 400.
-
-```json
-{
-  "deviceLabel": "Browser 3f2a",
-  "formatVersion": 2,
-  "baseVersionId": "version-uuid",
-  "force": false,
-  "layout": { "activeViewId": "default",
-              "views": [ { "id": "default", "name": "", "widgets": [ { "instanceId": "todos", "type": "todos" } ] } ] }
-}
-```
-
-- **201** new version; **200** content identical to the newest version (no new row).
-- The dedupe hash (`contentHash`) leaves out `activeViewId`: each device chooses the shown view itself, so a snapshot that differs only in it creates no new version (**200**). `activeViewId` is still stored and validated (must reference a view).
-- **409 `STATE_CONFLICT`**: the newest version is not `baseVersionId` — another device saved. `"force": true` saves anyway.
-- **413**: body larger than `automation.dashboard.layout.max-request-bytes` (default 262144).
-- Limits as in the frontend (`LAYOUT_LIMITS`): ≤ 20 views, ≤ 100 widgets per view, ids `^[a-z0-9][a-z0-9-]*$` with ≤ 80 characters, view names ≤ 80 Unicode code points, `config` only string (≤ 500) / number / boolean with ≤ 20 keys `^[a-zA-Z][a-zA-Z0-9]{0,39}$`, `filter.days` 1–365.
-
-### `PATCH /api/v1/dashboard/layouts/{id}`
-
-Body `{ "name": "before the rework" }` names a version (1–80 characters), `{ "name": null }` removes the name. Named versions are never deleted automatically.
-
----
-
-## Dashboard workflow widgets
-
-Data of the dashboard's workflow widgets (status widget and result widget). Core endpoint, no module gate.
-
-### `GET /api/v1/dashboard/workflow-results`
-
-For each queried workflow: the **latest run** and the validated result — **without** step outputs.
-
-**Query parameters:** `workflowIds` (multiple or comma-separated, at most 50; each id must match `^[a-z0-9][a-z0-9-]{0,79}$`, else **400**). Without parameters: empty list.
-
-**Response:** one entry per queried id, in request order.
-
-```json
-[
-  { "workflowId": "wf-a1", "workflowName": "Nightly QA", "available": true,
-    "run": { "runId": "run-1", "status": "COMPLETED", "startedAt": "2026-09-18T08:00:00Z",
-             "completedAt": "2026-09-18T08:02:00Z", "durationMs": 120000, "gateStatus": "GREEN" },
-    "resultState": "VALID",
-    "result": { "title": "Nightly QA", "status": "YELLOW",
-                "kpis": [{ "label": "Hunts", "value": "1361", "trend": "UP" }],
-                "items": ["3 Hunts ohne Route"], "summary": "Zwei Befunde." } }
-]
-```
-
-- `available: false` (soft-deleted or unknown workflow) ⇒ `workflowName`, `run` and `result` are `null`, `resultState` is `MISSING`.
-- `resultState`: `VALID` (contract fulfilled), `INVALID` (marker present but rejected), `MISSING` (no marker). Only present when `VALID`.
-
-### The `dashboard_widget:` marker in a workflow
-
-> **Precedence:** Once a `dashboard-report` block of the run has written a validated result, the marker is not evaluated — not even a broken marker sets `dashboard_widget_error`. The block is the deliberately configured way, the marker is opportunistic.
-
-A workflow reports its dashboard result like `gate_status:` as a marker line in the block output; the JSON may span multiple lines:
-
-```
-dashboard_widget: {"title": "Nightly QA", "status": "YELLOW",
-  "kpis": [{"label": "Hunts", "value": "1361", "trend": "UP"}],
-  "items": ["3 Hunts ohne Route"], "summary": "Zwei Befunde."}
-```
-
-Contract (validated at run end and written to run metadata, re-validated on read):
-
-| Field | Required | Rule |
-|---|---|---|
-| `status` | yes | `GREEN`, `YELLOW` or `RED` |
-| `title` | no | text, ≤ 80 characters |
-| `kpis` | no | ≤ 6 objects with `label` (≤ 40), `value` (≤ 40, **string**) and optional `trend` (`UP`/`DOWN`/`FLAT`) |
-| `items` | no | ≤ 10 texts, each ≤ 200 characters |
-| `summary` | no | text, ≤ 500 characters |
-
-- **Unknown fields ⇒ the whole contract is rejected** (including in KPI objects).
-- Text is single-line: empty, too long, or with control, zero-width, bidi, separator, private-use characters or lone UTF-16 surrogates ⇒ rejected.
-- KPI values are strings; a number in a string position is a contract violation.
-- The JSON is read to a maximum of 8192 characters; if the closing bracket does not come by then, the marker is invalid.
-- If multiple blocks report a marker, the **last** one wins; outputs from compression blocks (`derivedOutput`) are skipped.
-- **Inside a *single* block output the opposite applies: two markers reject that output entirely** (`resultState: INVALID`, no widget result). Block outputs frequently quote foreign text, and a quoted marker must never out-vote the report's own result — better no result than a wrong one. Emitting the marker twice in one block therefore shows "no valid result".
-- So write your own marker **at the start of a line**, with the JSON directly after it (a fenced code block on the next line is fine too). A marker that sits mid-line *and* is separated from its JSON by a blank line, a non-breaking space (U+00A0) or a NEL (U+0085) is not recognised — a marker quoted from foreign text can then be the only recognised one.
-- Content appears in the dashboard **as text only** — no Markdown, no HTML, no links, no images. The contract deliberately contains no id and no URL field.
-
-### WebSocket `/topic/dashboard/runs`
-
-After a run ends and is saved: `{"type":"run_completed","runId":"run-1","workflowId":"wf-a1","status":"COMPLETED"}`. Only ids and status — the dashboard then reloads its workflow widgets.
-
-### `POST /api/v1/dashboard/report-assist`
-
-AI suggestion for the fields of a `dashboard-report` block, derived from the workflow's **last run**. A single tool-less AI call (provider `CLAUDE`, no model flag); the response is validated in the backend against the same contract as a marker. Raw response and run output never leave the server.
-
-Module `dashboard-report`; the setting `dashboard-report-assist-enabled` (see `/system/execution-config`) must also be `1`.
-
-**Body:** `{ "workflowId": "wf-a1" }`
-
-**Response:**
-
-```json
-{ "runId": "run-1", "runCompletedAt": "2026-09-18T08:02:00Z", "provider": "CLAUDE",
-  "proposal": { "title": "Nightly QA", "status": "YELLOW",
-                "kpis": [{ "label": "Hunts", "value": "1361", "trend": "UP" }],
-                "items": ["3 Hunts without route"], "summary": "One finding." } }
-```
-
-- **400**: `workflowId` missing or empty.
-- **404**: Module off (`MODULE_DISABLED`) or workflow unknown/soft-deleted.
-- **409**: setting off, no Claude CLI on this host (checked via the `CLAUDE` provider's model catalog), no run or no output in the last run, AI does not answer or answer does not match contract. The message is fixed — it never contains part of the response.
-
-The suggestion typically describes only one run, with no variables. For persistent KPIs enter `{{ variable }}` in the block.
-
----
-
-## Chains
-
-### `GET /api/v1/chains`
-
-List all workflow chains.
-
-**Response:** `ChainResponse[]`
-
-### `POST /api/v1/chains`
-
-Create a new chain.
-
-**Request:**
-
-```json
-{
-  "name": "Deploy Pipeline",
-  "description": "Build, Test, Deploy",
-  "icon": "⛓",
-  "entries": [
-    { "workflowId": "uuid", "sortOrder": 0, "inputContext": {}, "stopOnFailure": true }
-  ],
-  "stopOnFailure": true,
-  "runCount": 0,
-  "metadata": {}
-}
-```
-
-`ChainEntryResponse` additionally contains: `workflowName`, `projectName`, `label`.
-
-**Response:** `201` with `ChainResponse`
-
-### `GET /api/v1/chains/{id}`
-
-Retrieve a chain.
-
-**Response:** `ChainResponse`
-
-### `PUT /api/v1/chains/{id}`
-
-Update a chain.
-
-**Response:** `ChainResponse`
-
-### `DELETE /api/v1/chains/{id}`
-
-Delete a chain.
-
-**Response:** `204 No Content`; `409` (`STATE_CONFLICT`, `messageKey: CHAIN_RUN_ACTIVE`) while the chain has a
-run in status `PENDING`, `RUNNING` or `PAUSED` — it would otherwise keep running without its chain and start
-its workflows. Wait for it or `POST /api/v1/chains/runs/{runId}/cancel` first, then delete.
-
-### `POST /api/v1/chains/{id}/execute`
-
-Execute a chain.
-
-**Request (optional):** `{ "key": "value" }` (input context)
-
-**Response:** `201` with `ChainRunResponse`
-
-### `GET /api/v1/chains/runs`
-
-All chain runs (paginated).
-
-**Query Parameters:** `page`, `size`, `status`, `search` — `status` as for `GET /api/v1/executions`: case does not matter, an unknown value returns `400` listing the allowed values.
-
-**Response:** `PageResponse<ChainRunResponse>`
-
-### `GET /api/v1/chains/{id}/runs`
-
-Runs of a specific chain.
-
-**Response:** `ChainRunResponse[]`
-
-### `GET /api/v1/chains/{id}/runs/{runId}`
-
-Retrieve a single chain run.
-
-**Response:** `ChainRunResponse`
-
-`ChainRunResponse.triggerSource` names what started the chain (`MANUAL`, `SCHEDULE`, `WISH`); `null` for chain runs from before V96 that no schedule started. Older backends omit the field.
-
-### `POST /api/v1/chains/runs/{runId}/cancel`
-
-Cancel a chain run.
-
-**Response:** `200 OK`
-
----
-
-## Chain Templates
-
-Predefined chain templates that can be installed as chains into a project.
-
-### `GET /api/v1/chain-templates`
-
-List all chain templates.
-
-**Response:** `ChainTemplateResponse[]`
-
-```json
-[
-  {
-    "id": "template-id",
-    "name": {"de": "CI/CD Pipeline", "en": "CI/CD Pipeline"},
-    "description": {"de": "Build, Test, Deploy Chain", "en": "Build, Test, Deploy Chain"},
-    "icon": "🔄",
-    "entries": [
-      { "templateId": "workflow-template-id", "label": {"de": "Build", "en": "Build"} }
-    ]
-  }
-]
-```
-
-### `GET /api/v1/chain-templates/{id}`
-
-Retrieve a single chain template.
-
-**Response:** `ChainTemplateResponse`
-
-### `POST /api/v1/chain-templates/{id}/install`
-
-Install a chain template into a project (creates the chain and all referenced workflows).
-
-**Request:**
-
-```json
-{
-  "projectId": "uuid",
-  "chainName": "My CI/CD Pipeline",
-  "locale": "en"
-}
-```
-
-| Field | Type | Required |
-|---|---|---|
-| `projectId` | String | Yes |
-| `chainName` | String | No |
-| `locale` | String (`de`/`en`) | No: language of names, labels and the steps of bilingual templates; German when omitted |
-
-**Response:** `201` with `ChainInstallResponse`
-
-```json
-{
-  "chainId": "uuid",
-  "chainName": "CI/CD Pipeline",
-  "workflowIds": ["uuid-1", "uuid-2"]
-}
-```
-
----
-
-## TODOs
-
-### `GET /api/v1/todos`
-
-List TODOs (paginated, filterable).
-
-**Query Parameters:**
-
-| Parameter | Type | Description |
-|---|---|---|
-| `page` | int | Page (default: 0) |
-| `size` | int | Entries per page (default: 50) |
-| `projectId` | String | Filter by project |
-| `status` | String[] | Filter by status: `OPEN`, `IN_PROGRESS`, `DONE`, `BACKLOG`, `ARCHIVED` |
-| `priority` | String | Filter by priority: `CRITICAL`, `HIGH`, `MEDIUM`, `LOW` |
-| `source` | String | Filter by source: `USER`, `AI`, `WORKFLOW` |
-| `tag` | String | Filter by tag |
-| `q` | String | Full-text search |
-| `goalId` | String | Only TODOs of this goal (V85); `none` = only TODOs without a goal (candidates for the relation map). With the module `goals` switched off → 400 |
-
-`status`, `priority` and `source` ignore upper and lower case. An unknown value returns `400` (`INVALID_ARGUMENT`), and the message lists the allowed values.
-
-**Response:** `PageResponse<TodoResponse>` – with `planning` (goal, rank, assessment) once any of it is set
-
-### `POST /api/v1/todos`
-
-Create a new TODO.
-
-**Request:**
-
-```json
-{
-  "title": "Short imperative title",
-  "description": "Markdown with context",
-  "status": "OPEN",
-  "priority": "HIGH",
-  "tags": ["backend", "bug"],
-  "projectId": "uuid",
-  "linkedWorkflowId": null,
-  "source": "AI",
-  "sourceAgent": "claude-code",
-  "sessionId": "shell-session-id",
-  "agentSessionRef": "4fde1b91-2cce-4ab2-b7d0-fd2a138f9322",
-  "workflowRunId": null,
-  "referenceType": null,
-  "referenceId": null,
-  "dueDate": null
-}
-```
-
-| Field | Type | Required |
-|---|---|---|
-| `title` | String | Yes |
-| `description` | String | No |
-| `status` | Enum | No (default: `OPEN`) |
-| `priority` | Enum | No |
-| `tags` | String[] | No |
-| `projectId` | String | No |
-| `linkedWorkflowId` | String | No |
-| `source` | Enum | No |
-| `sourceAgent` | String | No |
-| `sessionId` | String | No |
-| `agentSessionRef` | String | No — UUID of the agent conversation (`claude --resume <uuid>`). A whole command is accepted and the UUID taken from it; anything that is not a UUID is discarded. |
-| `workflowRunId` | String | No |
-| `referenceType` | String | No |
-| `referenceId` | String | No |
-| `dueDate` | Instant | No |
-
-**Response:** `201` with `TodoResponse`
-
-**TodoResponse Fields:** `id`, `title`, `description`, `status`, `priority`, `tags`, `projectId`, `projectName`, `linkedWorkflowId`, `linkedWorkflowName`, `source`, `sourceAgent`, `sessionId`, `agentSessionRef`, `workflowRunId`, `referenceType`, `referenceId`, `exportedProvider`, `exportedRef`, `exportedUrl`, `fixAttempts`, `lastFixRunId`, `resolutionState` (`IDLE`, `RUNNING`, `FAILED`, `SUCCEEDED`), `dueDate`, `createdAt`, `updatedAt`
-
-### `GET /api/v1/todos/{id}`
-
-Retrieve a single TODO.
-
-**Response:** `TodoResponse`
-
-### `PUT /api/v1/todos/{id}`
-
-Fully update a TODO.
-
-**Response:** `TodoResponse`
-
-### `PATCH /api/v1/todos/{id}/status`
-
-Change the status of a TODO.
-
-**Request:**
-
-```json
-{
-  "status": "IN_PROGRESS",
-  "sessionId": "optional-session-id"
-}
-```
-
-**Response:** `TodoResponse`
-
-### `POST /api/v1/todos/{id}/resolve`
-
-Automatically resolve a TODO (starts a matching fix workflow).
-
-**Response:** `WorkflowRunResponse`
-
-### `POST /api/v1/todos/{id}/export`
-
-Export a TODO to an external system (e.g. Jira, Trello).
-
-**Request (optional):**
-
-```json
-{
-  "provider": "jira",
-  "target": "board-id"
-}
-```
-
-**Response:** `TodoExportResponse` with `referenceType`, `referenceId`, `url`
-
-### `DELETE /api/v1/todos/{id}`
-
-Delete a TODO.
-
-**Response:** `204 No Content`
-
-### `GET /api/v1/todos/count`
-
-Count TODOs by status. Optional query parameter `projectId` counts only that project's TODOs (dashboard project filter).
-
-**Response:** `TodoCountResponse` with `open`, `inProgress`, `done`, `backlog`, `archived`
-
-### `GET /api/v1/todos/overview`
-
-TODO overview with project rollups and "Needs You" items.
-
-**Response:** `TodoOverviewResponse` with `projects` (List), `needsYou` (List), `generatedAt`, `staleThresholdDays`, `milestonesDue` (dates of active goals that need attention – `kind` `MILESTONE`: milestones that are `DUE_SOON`/`OVERDUE` and not reached, `total`/`done` = linked work packages; `kind` `WORK_PACKAGE` (V92): work packages whose end has passed while they still have open TODOs, `dueDate` = end, `total`/`done` = TODOs; each with `id`, `title`, `goalId`, `goalTitle`, `dueDate`, `state`, `total`, `done`, `kind`, by date)
-
-### `POST /api/v1/todos/bulk-status`
-
-Change the status of multiple TODOs at once.
-
-**Request:**
-
-```json
-{
-  "ids": ["uuid-1", "uuid-2"],
-  "status": "DONE"
-}
-```
-
-**Response:** `{ "updated": 2 }`
-
-### `POST /api/v1/todos/archive-stale`
-
-Archive stale TODOs.
-
-**Query Parameters:** `projectId` (optional)
-
-**Response:** `{ "archived": 5 }`
-
-### `GET /api/v1/todos/similar`
-
-Search for similar TODOs (for duplicate detection).
-
-**Query Parameters:** `projectId` (required), `title` (required)
-
-**Response:** `SimilarTodoResponse[]` with `id`, `title`, `priority`, `score`, `similarity`
-
-### `PATCH /api/v1/todos/{id}/planning`
-
-Set a TODO's goal, rank, work package and assessment (V85; `workPackageId` since V92, formerly `milestoneId` – the old name is still accepted). `null` leaves a field alone, an empty string clears it: `goalId: ""` detaches the TODO from its goal, `workPackageId: ""` from its work package, `openQuestion: ""` marks the question as settled. `workPackageId` must be a work package of the TODO's own goal and own project (else 400, unknown 404; a `goalId` in the same request applies first); when the TODO changes or leaves its goal, `workPackageId` is cleared. If the TODO's project is not assigned to the goal yet, it is added. `planning` in the response carries `workPackageId`. `goalRank <= 0` removes the rank. Without `ratedBy` the assessment counts as human (`USER`); the server sets `ratedAt` whenever `complexity`, `suggestedEffort` or `ratingNote` is sent.
-
-```json
-{
-  "goalId": "uuid",
-  "goalRank": 2,
-  "complexity": "M",
-  "suggestedEffort": "high",
-  "ratingNote": "Many files, but a clear template",
-  "openQuestion": "Which video style?",
-  "ratedBy": "AI",
-  "workPackageId": "uuid"
-}
-```
-
-`complexity`: `S`, `M`, `L`, `XL` · `suggestedEffort`: `low`, `medium`, `high`, `xhigh` · other values → 400.
-
-**Decision** (V93): `decision` records how an open question was decided – a non-empty value stores the text, `decidedAt = now`, `decidedBy = ratedBy` (else `USER`) and clears `openQuestion`; `""` removes the decision (text, time, author). A non-empty new question and a non-empty decision in the same request → 400. A later new question leaves the decision in place. `planning` in the response carries `decision`, `decidedAt`, `decidedBy` and `decisionState` (`QUESTION` = open question, `DECIDED` = decision without an open question, else `NONE`).
-
-**Response:** `TodoResponse`
-
----
-
-## Goals
-
-A goal collects TODOs across projects and shows progress (V85). Every endpoint in this section and `PATCH /todos/{id}/planning` belongs to the standard module `goals`; switched off (`automation.modules.goals=false`) they answer 404 `MODULE_DISABLED`, TODO responses then carry no `planning` and `milestonesDue` is empty – the data is kept. See [architektur.md](architektur.md#goals--ordering-todos-across-projects-v85).
-
-### `GET /api/v1/goals`
-
-Goals with progress, newest first. **Query:** `status` (repeatable; default `ACTIVE` and `DONE`, archived ones only when asked for), `projectId` (optional, V92: only goals this project is assigned to).
-
-**Response:** `GoalResponse[]` – `id`, `title`, `description`, `status`, `targetDate`, `createdAt`, `updatedAt`, `progress` (`total`, `open`, `inProgress`, `backlog`, `done`, `openQuestions`, `percentDone`, `decided`; `total` excludes ARCHIVED), `guard` (`enabled`, `workflowId`, `scheduleId`, `nextRunAt`; never switched on = `enabled: false`, the rest `null`), `projects[]` (V92: `id`, `name` of the assigned projects in their order; never `null`), `nextMilestone` (V92: the next milestone not yet reached, by date – `id`, `title`, `dueDate`, `state`; `null` = none; for all goals of the list from one query).
-
-### `POST /api/v1/goals`
-
-```json
-{ "title": "Open-source launch", "description": "Repo public, README with video", "targetDate": "2026-10-15",
-  "projectIds": ["<project-id>", "…"] }
-```
-
-`targetDate` as a date or ISO instant. `projectIds` optional (V92): the goal's projects in this order, an unknown one → `404`. **Response:** `201` + `GoalResponse`
-
-### `GET /api/v1/goals/{id}`
-
-The goal with its TODOs in work order (rank, then priority, then age) – without descriptions – and progress per project.
-
-**Response:** `GoalDetailResponse` – `goal`, `todos[]` (`id`, `title`, `status`, `priority`, `projectId`, `projectName`, `tags`, `goalRank`, `complexity`, `suggestedEffort`, `ratingNote`, `ratedBy`, `ratedAt`, `openQuestion`, `updatedAt`, `dueDate`, `workPackageId`, `decision`, `decidedAt`, `decidedBy`, `decisionState`), `byProject[]` (`projectId`, `projectName`, `total`, `done`; derived from the TODOs, kept for existing callers), `projects[]` (V92: the assigned projects by `position` – `projectId`, `name`, `archived`, `position`, `total`, `done`, `openQuestions`, `decided` (V93), counted from the goal's non-archived TODOs in that project), `workPackages[]` (V92: `GoalWorkPackageResponse`, by project position, then `position`), `milestones[]` (V92: `GoalMilestoneResponse`, by date, then title). If reading detects a work package or milestone as completed or reached for the first time, it stores `completedAt`/`reachedAt`.
-
-### `GET /api/v1/goals/{id}/relations`
-
-Relation map: for every TODO of the goal, where it comes from, which workflow works on it and what the last fix run did. A goal is never linked to workflows directly – only through these relations of its TODOs. **Query:** `include` – up to 20 TODO IDs (comma-separated or repeated) that belong to no goal yet; they follow the goal's TODOs as candidates (`candidate: true`). IDs that belong to a goal are skipped.
-
-**Response:** `GoalRelationsResponse` – `goalId`, `activeTriggers` (active TodoTriggers overall), `todos[]` in work order with `id`, `title`, `status`, `priority`, `projectId`, `projectName`, `tags`, `goalRank`, `candidate` and
-
-- `origin` – `kind` (`AUDIT` | `HEALTH` | `WORKFLOW_RUN` | `AGENT` | `USER`, checked in this order), `workflowId`/`workflowName` of the creating run (or of the `workflow_run` reference), `runId`, `runStatus`, `findingIds` (audit findings from `reference_id` and `audit_finding_todos`), `agent` (`sourceAgent`)
-- `workers[]` – `kind` `LINKED` (fix workflow on the TODO) or `TRIGGER` (every active TodoTrigger whose tags, project, source and minimum priority match), `workflowId`, `workflowName`, `triggerId`, `triggerLabel`; deleted workflows are left out
-- `result` – `runId` (last fix run), `workflowId`, `runStatus`, `at` (end, its start while it runs), `fixAttempts`, `resolutionState`; `null` while no fix run ever ran
-
-Read in batches: one query per kind, independent of the number of TODOs (`RequestCostRatchetTest`). Unknown goal → `404`.
-
-### `PUT /api/v1/goals/{id}`
-
-Partial update: `title`, `description`, `status`, `targetDate` (`null` = unchanged, empty = clear). **Response:** `GoalResponse`
-
-### `DELETE /api/v1/goals/{id}`
-
-Deletes the goal; its TODOs stay and only lose the assignment (work package included), its work packages and milestones go, a goal guard pauses (its workflow stays). **Response:** `204`
-
-### `POST /api/v1/goals/{id}/todos`
-
-Assign TODOs: `{ "todoIds": ["…"] }`. A TODO from another goal moves here and loses its work package; newly assigned TODOs get no rank. If their project is not assigned to the goal yet, it is appended (V92) – likewise via `PATCH /todos/{id}/planning` (`goalId`) and when a TODO changes its project (`PUT /todos/{id}`, which also drops a work package of the old project). **Response:** `GoalDetailResponse`
-
-### `PUT /api/v1/goals/{id}/order`
-
-Set the order: `{ "todoIds": ["…"] }` → rank 1..n in this sequence; all other TODOs of the goal lose their rank. Every ID must already belong to the goal, else 400. **Response:** `GoalDetailResponse`
-
-### Projects of a goal (V92)
-
-A goal is explicitly assigned to one or more projects, in an order (`goal_projects`).
-
-- `POST /api/v1/goals/{id}/projects` – `{ "projectId": "…" }` appends the project; already assigned = unchanged (idempotent). Unknown goal/project → `404`. **Response:** `GoalDetailResponse`
-- `PUT /api/v1/goals/{id}/projects/order` – `{ "ids": ["<projectId>", …] }`: the named ones first in this order, the other goal projects behind them in their previous order; a project not assigned to the goal → `400`. **Response:** `GoalDetailResponse`
-- `DELETE /api/v1/goals/{id}/projects/{projectId}?cascade=false` – if work packages or TODOs of the goal still hang on the project → `409` (`STATE_CONFLICT`, the message names the counts). `cascade=true` deletes the project's work packages in this goal (milestones lose the link) and releases its TODOs from the goal (the TODOs stay). **Response:** `204`
-
-### Work packages (V92)
-
-A work package belongs to exactly one project of the goal (`projectId`) and bundles TODOs of that project; until V92 they were called milestones (V88). TODOs are assigned via `PATCH /todos/{id}/planning` (`workPackageId`) – only TODOs of the same goal and project (else `400`; a TODO without a project fits no package with a project). The period is optional: `startDate` and `endDate` only come together, and the start never lies after the end (else `400`). The state is computed on read from the end: `REACHED` (completed: all assigned TODOs without ARCHIVED done, at least one), else `OVERDUE`, `DUE_SOON` (≤ 3 days) or `OPEN` – without a period only `OPEN` or `REACHED`. `completedAt` keeps the first detection and stays; if the package opens again afterwards, `reopened: true`. `openQuestions` counts the active TODOs in it with an open question.
-
-**`GoalWorkPackageResponse`:**
-
-```json
-{
-  "id": "b1f0…", "goalId": "6c2e…", "projectId": "3a9d…", "title": "Promo material",
-  "startDate": "2026-09-28T00:00:00Z", "endDate": "2026-10-01T23:59:59Z", "position": 0,
-  "state": "DUE_SOON", "total": 4, "done": 2, "openQuestions": 1, "decided": 1,
-  "completedAt": null, "reopened": false,
-  "createdAt": "2026-09-24T08:00:00Z", "updatedAt": "2026-09-24T08:00:00Z"
-}
-```
-
-- `GET /api/v1/goals/{id}/work-packages` – by project position, then `position`. **Response:** `GoalWorkPackageResponse[]`
-- `POST /api/v1/goals/{id}/work-packages` – `{ "title": "Promo material", "projectId": "…", "startDate": "2026-09-28", "endDate": "2026-10-01" }`; period optional, ISO instant or date (start `2026-09-28` = from 00:00:00 UTC, end `2026-10-01` = until 23:59:59 UTC); `projectId` required unless the goal has exactly one project (else `400`), a project the goal does not have yet is added; the package goes to the end of its project; title at most 200 characters. **Response:** `201` + `GoalWorkPackageResponse`
-- `PUT /api/v1/goals/{id}/work-packages/{workPackageId}` – partial update `{ "title"?, "projectId"?, "startDate"?, "endDate"? }` (`null` = unchanged, `""` clears a date). The result must have the full period or none (else `400`). Changing the project only works while no TODOs are assigned to the package (else `400`); it goes to the end of the new project. **Response:** `GoalWorkPackageResponse`
-- `PUT /api/v1/goals/{id}/work-packages/order` – `{ "ids": ["<workPackageId>", …] }`: packages of ONE project in a new order, unnamed ones of the same project behind them; packages of different projects → `400`, a foreign one → `404`. **Response:** all `GoalWorkPackageResponse` of the goal
-- `DELETE /api/v1/goals/{id}/work-packages/{workPackageId}` – the TODOs stay in the goal and only lose the assignment, milestones lose the link. **Response:** `204`
-
-Unknown goal, or a package of another goal → `404`.
-
-### Milestones (V92)
-
-A milestone is a date of the whole goal – no project, the date is required. Optionally it hangs on work packages of the same goal (`workPackageIds`): then it is `REACHED` once all linked packages are completed; `reachedAt` keeps the first detection, and if the packages are later no longer all completed, `reopened: true`. Without packages a person marks it (`reached`). Otherwise the date decides: `OVERDUE`, `DUE_SOON` (≤ 3 days) or `OPEN`. Not to be confused with the milestones before V92 – those are work packages now.
-
-**`GoalMilestoneResponse`:**
-
-```json
-{
-  "id": "7d21…", "goalId": "6c2e…", "title": "Launch", "dueDate": "2026-10-15T23:59:59Z",
-  "state": "OPEN", "workPackageIds": ["b1f0…", "c4e2…"], "packagesTotal": 2, "packagesDone": 1,
-  "reachedAt": null, "reopened": false,
-  "createdAt": "2026-09-24T08:00:00Z", "updatedAt": "2026-09-24T08:00:00Z"
-}
-```
-
-- `GET /api/v1/goals/{id}/milestones` – by date, then title. **Response:** `GoalMilestoneResponse[]`
-- `POST /api/v1/goals/{id}/milestones` – `{ "title": "Launch", "dueDate": "2026-10-15", "workPackageIds": ["…"] }`; `dueDate` required (a date = until 23:59:59 UTC); every package must belong to the goal (else `400`). **Response:** `201` + `GoalMilestoneResponse`
-- `PUT /api/v1/goals/{id}/milestones/{milestoneId}` – partial update `{ "title"?, "dueDate"?, "workPackageIds"?, "reached"? }`; `workPackageIds` replaces the links (`[]` removes all), `reached: true` marks it as reached by hand, `false` takes that back – only without linked packages (after this change), else `400`. **Response:** `GoalMilestoneResponse`
-- `DELETE /api/v1/goals/{id}/milestones/{milestoneId}` – the work packages stay. **Response:** `204`
-
-Unknown goal, or a milestone of another goal → `404`.
-
-### Workflows on the goal (V94)
-
-A workflow hangs on the whole goal or on one of its work packages, with the role `WORKER` ("works on it") or `STATUS` ("reports the status"). It is started via `POST /api/v1/workflows/{workflowId}/execute` with `{ "context": { "goal_id": "…", "work_package_id": "…"?, "goal_locale": "en" } }` (TriggerSource `MANUAL`; `goal_id` provides `goal_status`/`goal_guard_*`); its latest status comes from `GET /api/v1/dashboard/workflow-results?workflowIds=…`.
-
-**`GoalWorkflowResponse`:** `{ "id", "goalId", "workPackageId": "…"|null, "workflowId", "workflowName", "workflowProjectId": "…"|null, "role": "WORKER"|"STATUS", "guard": false, "createdAt" }`
-
-- `GET /api/v1/goals/{id}/workflows` – goal level first, then by package order, then by name; soft-deleted workflows are left out. If the goal guard is switched on, it is the first entry `{ "id": "guard", "guard": true, "role": "STATUS", "workPackageId": null, … }`. **Response:** `GoalWorkflowResponse[]`
-- `POST /api/v1/goals/{id}/workflows` – `{ "workflowId": "…", "workPackageId": "…"?, "role": "WORKER"? }`; a package not of this goal → `400`, workflow unknown or deleted → `404`, the same attachment already there → `409`. **Response:** `201` + `GoalWorkflowResponse`
-- `PATCH /api/v1/goals/{id}/workflows/{attachmentId}` – `{ "role": "STATUS" }`. **Response:** `GoalWorkflowResponse`
-- `DELETE /api/v1/goals/{id}/workflows/{attachmentId}` – detaches, the workflow stays; `guard` → `400` (the guard has its own switch). **Response:** `204`
-
-Deleting a work package or the goal removes its attachments.
-
-### `GET /api/v1/goals/{id}/candidates`
-
-"Might belong here": open TODOs (OPEN, IN_PROGRESS, BACKLOG) without a goal. **Query:** `q`, `tag`, `allProjects` (default `false`: only TODOs from the goal's projects; a goal without projects then returns an empty page; `true`: from all), `page` (0), `size` (20). **Response:** a page like `GET /api/v1/todos` (`content` = `TodoResponse[]`, `totalElements`, …). Unknown goal → `404`.
-
-### `POST /api/v1/goals/{id}/guard`
-
-Switch the goal guard on or off (V88): `{ "enabled": true, "projectId": "…"?, "cron": "0 0 8 * * *"?, "locale": "en"? }`.
-
-- **First switch-on:** creates a workflow "Goal guard: <title>" (`locale` `de`: "Ziel-Wächter: …") from the shipped template `goal-guard` with `defaultContext` `{goal_id, goal_locale}` (`changeSource` `goal-guard`), plus a CRON schedule (default daily 08:00, `inputContext.goal_id`, conflict `SKIP`). Project: `projectId`, else the first non-archived goal project (V92), else the one with most of the goal's TODOs, else the oldest active one; no project at all → 400.
-- **Switching on again:** re-enables the existing schedule; a given `cron` replaces the old one. If the workflow was deleted, a new one is created.
-- **Switching off** (`enabled: false`): pauses the schedule, the workflow stays. Deleting the goal pauses it as well.
-
-Invalid `cron` → 400, module `dashboard-report` off → 409, unknown goal/project → 404. **Response:** `GoalResponse` with `guard`:
-
-```json
-{ "id": "6c2e…", "title": "Open-source launch", "…": "…",
-  "guard": { "enabled": true, "workflowId": "9a4d…", "scheduleId": "e71b…", "nextRunAt": "2026-09-25T06:00:00Z" } }
-```
-
-"Check now" starts `POST /api/v1/workflows/{workflowId}/execute`; the result shows up as that workflow's dashboard tile.
-
----
-
-## Workflow Memory
-
-### `GET /api/v1/workflows/{workflowId}/memory`
-
-All memory entries of a workflow.
-
-**Response:** `WorkflowMemoryResponse[]`
-
-### `POST /api/v1/workflows/{workflowId}/memory/extract`
-
-Extract knowledge from runs.
-
-**Request:**
-
-```json
-{
-  "runIds": ["run-uuid-1", "run-uuid-2"],
-  "provider": "CLAUDE"
-}
-```
-
-**Response:** `201` with `WorkflowMemoryResponse`
-
-**WorkflowMemoryResponse Fields:** `id`, `workflowId`, `title`, `content`, `tags`, `sourceRunIds`, `provider`, `active`, `createdAt`
-
-### `PUT /api/v1/workflows/{workflowId}/memory/{memoryId}`
-
-Update a memory entry.
-
-**Request:** `{ "title": "...", "content": "..." }`
-
-**Response:** `WorkflowMemoryResponse`
-
-### `PUT /api/v1/workflows/{workflowId}/memory/{memoryId}/activate`
-
-Activate a memory entry (will be injected into subsequent runs).
-
-**Response:** `204 No Content`
-
-### `DELETE /api/v1/workflows/{workflowId}/memory/{memoryId}`
-
-Delete a memory entry.
-
-**Response:** `204 No Content`
-
----
-
-## Activity Log
-
-### `GET /api/v1/activity-log`
-
-List activity log (paginated, filterable).
-
-**Query Parameters:** `page` (default: 0), `size` (default: 50), `level` (`DEBUG`, `INFO`, `WARN`, `ERROR`), `category` (`SYSTEM`, `EXECUTION`, `SCHEDULE`, `WEBHOOK`, `SECURITY`, `CONTAINER`, `PLUGIN`), `workflowId`
-
-`level` and `category` ignore upper and lower case. An unknown value returns `400` (`INVALID_ARGUMENT`), and the message lists the allowed values.
-
-**Response:** `PageResponse<ActivityLogResponse>`
-
-### `POST /api/v1/activity-log`
-
-Create a new activity log entry.
-
-**Request:**
-
-```json
-{
-  "level": "INFO",
-  "message": "Manual entry",
-  "source": "plugin",
-  "referenceId": null,
-  "workflowId": null,
-  "metadata": {}
-}
-```
-
-**ActivityLogResponse Fields:** `id`, `timestamp`, `level`, `category`, `message`, `source`, `referenceId`, `workflowId`, `metadata`, `createdAt`
-
-**Response:** `201` with `ActivityLogResponse`
-
----
-
-## Assistant
-
-### `POST /api/v1/assistant/chat`
-
-Send a chat message to the AI assistant.
-
-**Request:**
-
-```json
-{
-  "message": "How do I create a workflow for code reviews?",
-  "history": [
-    { "role": "user", "content": "Hello" },
-    { "role": "assistant", "content": "Hello! How can I help?" }
-  ],
-  "context": {
-    "page": "workflows",
-    "entityId": "workflow-uuid",
-    "projectId": "project-uuid",
-    "workflowId": "workflow-uuid",
-    "runId": null,
-    "pathname": "/workflows/workflow-uuid"
-  },
-  "provider": "CLAUDE",
-  "language": "de",
-  "sessionId": "session-uuid",
-  "requestId": "request-uuid"
-}
-```
-
-| Field | Type | Required |
-|---|---|---|
-| `message` | String | Yes |
-| `history` | MessageEntry[] | No |
-| `context` | PageContext | No |
-| `provider` | String | No |
-| `language` | String | No |
-| `sessionId` | String | No |
-| `requestId` | String | No |
-
-`MessageEntry` = `{role, content, toolResults?}`. `toolResults` (optional, assistant entries only) are the results of
-the tools confirmed on that turn: `[{"type": "create_workflow", "success": true, "message": "✓ …"}]`. The server takes
-only executed ones (no leading `✗`), from the last 3 assistant turns, at most 5 per turn and 600 characters each, and
-marks them as data in the prompt ([assistant-system.md](assistant-system.md) → "Tool results in the history"). Without
-the field everything stays as before.
-
-**Response:** `AssistantChatResponse`
-
-```json
-{
-  "message": "Here is a guide...",
-  "actions": [
-    {
-      "type": "run_workflow",
-      "id": "workflow-uuid",
-      "name": "Code Review",
-      "label": "Start workflow",
-      "options": null,
-      "payload": null
-    }
-  ],
-  "model": "sonnet",
-  "provider": "CLAUDE",
-  "responseTimeMs": 1234,
-  "pendingTools": [
-    {
-      "id": "tool-uuid",
-      "type": "create_todo",
-      "description": "Create TODO: Add unit tests",
-      "expiresAt": "2025-01-15T10:30:00Z"
-    }
-  ]
-}
-```
-
-**Navigation Types:** `run_workflow`, `show_workflow`, `start_wish`, `show_run`, `ask_choice`
-
-**Mutating Proposal Types** (handled server-side as `PendingTool` with confirm/reject UI): `propose_create_todo`, `propose_cancel_run`, `propose_rerun_workflow`, `propose_update_todo_status`
-
-### `GET /api/v1/assistant/sessions`
-
-List all chat sessions.
-
-**Response:** `AssistantSessionSummary[]` with `id`, `preview`, `page`, `messageCount`, `startedAt`
-
-### `GET /api/v1/assistant/sessions/{id}`
-
-Retrieve a single chat session with messages.
-
-**Response:** `AssistantSessionDetail` with `id`, `preview`, `page`, `entityId`, `messages`, `messageCount`, `startedAt`, `endedAt`
-
-### `DELETE /api/v1/assistant/sessions/{id}`
-
-Delete a chat session.
-
-**Response:** `200 OK`
-
-### `POST /api/v1/assistant/pending-tools/{id}/confirm`
-
-Confirm a pending tool call (e.g. workflow start by the assistant).
-
-**Request (optional):**
-
-```json
-{
-  "sessionId": "session-uuid",
-  "language": "en"
-}
-```
-
-`language` (`de` | `en`, optional, default German): language of the build check that `create_workflow`/`update_workflow`
-append to their result.
-
-**Response:** `ToolExecutionResult` (or `410 Gone` if already processed/expired)
-
-### `POST /api/v1/assistant/pending-tools/{id}/reject`
-
-Reject a pending tool call.
-
-**Request (optional):**
-
-```json
-{
-  "sessionId": "session-uuid",
-  "language": "en"
-}
-```
-
-**Response:** `ToolExecutionResult` (or `410 Gone` if already processed/expired)
-
-### `GET /api/v1/assistant/suggestions`
-
-Retrieve context-related suggestions for a page.
-
-**Query Parameters:** `page` (String, required), `locale` (`de` | `en`, default `de` – suggestions are kept per language)
-
-**Response:** `String[]`
-
-### `POST /api/v1/assistant/suggestions/refresh`
-
-Regenerate suggestions for a page.
-
-**Query Parameters:** `page` (String, required), `locale` (`de` | `en`, default `de`)
-
-**Response:** `String[]`
-
----
-
-## Dialog Import
-
-Analysis and import of Claude Code dialog sessions as workflows.
-
-### `GET /api/v1/dialog/sessions/count`
-
-Count sessions per project directory (fast, no file reading).
-
-**Response:** `Map<String, Integer>`
-
-### `GET /api/v1/dialog/sessions`
-
-List sessions with metadata.
-
-**Query Parameters:**
-
-| Parameter | Type | Description |
-|---|---|---|
-| `projectPath` | String | No (optional: filter by project) |
-| `limit` | int | Default: 50 (max: 2000 with projectPath, 500 without) |
-
-**Response:** `DialogSessionInfo[]`
-
-### `GET /api/v1/dialog/projects`
-
-List all known project paths (for filter dropdown).
-
-**Response:** `String[]`
-
-### `POST /api/v1/dialog/sessions/analyze`
-
-Analyze a session with AI and generate a workflow suggestion.
-
-**Request:**
-
-```json
-{
-  "filePath": "/home/user/.claude/projects/.../session.jsonl"
-}
-```
-
-**Response:** `DialogWorkflowSuggestion`
-
-### `POST /api/v1/dialog/sessions/create-workflow`
-
-Create a workflow from a suggestion.
-
-**Request:**
-
-```json
-{
-  "projectId": "uuid",
-  "name": "Workflow Name",
-  "suggestion": { ... }
-}
-```
-
-| Field | Type | Required |
-|---|---|---|
-| `projectId` | String | Yes |
-| `name` | String | No |
-| `suggestion` | DialogWorkflowSuggestion | Yes |
-
-**Response:** `WorkflowResponse`
-
----
-
-## Staging (Stable Environment)
-
-### `GET /api/v1/staging/status`
-
-Status of the stable environment.
-
-**Response:** `StagingStatusResponse` with `containerRunning`, `healthy`, `promotePhase`, `promoteStep`, `promoteTotalSteps`, `lastSnapshot`, `error`, `stableVersion`, `stableBuildTimestamp`
-
-### `POST /api/v1/staging/start`
-
-Start the stable container.
-
-**Response:** `200 OK`
-
-### `POST /api/v1/staging/stop`
-
-Stop the stable container.
-
-**Response:** `200 OK`
-
-### `POST /api/v1/staging/promote`
-
-Build a new snapshot and deploy as stable.
-
-**Response:** `202 Accepted`
-
-### `POST /api/v1/staging/promote/cancel`
-
-Cancel an ongoing promote operation.
-
-**Response:** `200 OK`
-
-### `GET /api/v1/staging/sync-preview`
-
-Preview of sync operations (what would be transferred from dev to stable?).
-
-**Response:** `SyncPreview` with `projects`, `workflows`, `skills`, `chains` (each a list of `SyncPreviewItem`)
-
-### `POST /api/v1/staging/sync-definitions`
-
-Transfer definitions from dev to stable (projects, workflows, skills, chains).
-
-**Request (optional):**
-
-```json
-{
-  "projectIds": ["uuid"],
-  "workflowIds": ["uuid"],
-  "skillIds": ["uuid"],
-  "chainIds": ["uuid"]
-}
-```
-
-All fields are optional; without filters, all definitions are synchronized.
-
-**Response:** `SyncResult` with `projectsSynced`, `workflowsSynced`, `skillsSynced`, `chainsSynced`, `skipped`, `errors`, `preSyncBackup`
-
-### `GET /api/v1/staging/targets`
-
-Sync targets of the staged setup (`scripts/setup.sh --mode staged`): Test and Prod as Dev knows them from the
-startup configuration (`automation.staging.targets.{test,prod}.url` / `.key-file`, written by the installer into
-`deploy/instances/dev.env`). Targets that are not configured are left out.
-
-**Response:** list of `SyncTargetResponse` with `name` (`test`/`prod`), `url`, `keyPresent` (key file exists and is
-not empty), `reachable`, `sealedOnly` (Prod: sealed definitions only), `version`
-
-### `GET /api/v1/staging/targets/{target}/sync-preview`
-
-Preview Dev → `test` or `prod`. For Prod only what may go there: workflows with an intact seal, their projects and
-skills, chains made only of such workflows.
-
-**Response:** `SyncPreview`, for Prod with `notes` (what stays in Dev although a sealed workflow calls it:
-unsealed sub-workflows, chains with unsealed workflows); `409` (`STATE_CONFLICT`) with `messageKey` `SYNC_TARGET_NOT_CONFIGURED`,
-`SYNC_TARGET_KEY_MISSING` or `SYNC_TARGET_UNREACHABLE`
-
-### `POST /api/v1/staging/targets/{target}/sync-definitions`
-
-Transfer definitions from Dev to `test` or `prod`. Request as for `POST /api/v1/staging/sync-definitions`; for Prod
-the selection is narrowed to sealed definitions, never widened. Dev reads the target's API key from the key file on
-every call (`scripts/instance.sh sync-keys --name dev`), never from the target's database.
-
-**Response:** `SyncResult` (for Prod with `notes` as in the preview, limited to the workflows sent); errors as for the preview
-
----
-
-## Testing (Test Instance)
-
-### `GET /api/v1/testing/status`
-
-Status of the test instance (port 8090).
-
-**Response:** `TestingStatusResponse` with `containerRunning`, `healthy`, `testVersion`, `testBuildTimestamp`
-
-### `POST /api/v1/testing/start`
-
-Start the test container.
-
-**Response:** `200 OK`
-
-### `POST /api/v1/testing/stop`
-
-Stop the test container.
-
-**Response:** `200 OK`
-
-### `POST /api/v1/testing/reset`
-
-Reset the test instance database.
-
-**Response:** `200 OK`
-
-### `GET /api/v1/testing/sync-preview`
-
-Preview of sync operations (dev → test).
-
-**Response:** `SyncPreview`
-
-### `POST /api/v1/testing/sync-definitions`
-
-Transfer definitions from dev to test. Request format same as `POST /api/v1/staging/sync-definitions`.
-
-**Response:** `SyncResult`
-
-### `POST /api/v1/testing/report-result`
-
-Report a test result from the test instance.
-
-**Request:** `{ "workflowName": "...", "projectName": "...", "status": "PASSED|FAILED" }`
-
-**Response:** `200 OK`
-
-### `POST /api/v1/testing/pull-changes`
-
-Pull changes from dev into the test instance.
-
-**Response:** `SyncResult`
-
----
-
-## Conversions
-
-### `GET /api/v1/conversions/runs/{runId}/suggest`
-
-Generate a conversion suggestion for an agentic run.
-
-**Response:** `WorkflowSuggestion` (workflow structure as suggestion)
-
-### `POST /api/v1/conversions/runs/{runId}/create-workflow`
-
-Create a workflow from an agentic run.
-
-**Request:**
-
-```json
-{
-  "projectId": "uuid",
-  "name": "Converted Workflow",
-  "description": "Description from the preview",
-  "blocks": [{ "type": "shell", "config": { "command": "npm test" } }]
-}
-```
-
-`description` and `blocks` are optional: the reviewed suggestion from `GET …/suggest`. With `blocks`,
-exactly these blocks are saved without generating the suggestion again (no AI call); `name` is then
-required (otherwise `400`), and the run must exist (`404`) and be completed. Without `blocks` the
-server generates the suggestion again (previous behaviour). In both cases the build check reports
-findings of the saved workflow in the activity log.
-
-**Response:** `WorkflowResponse`
-
----
-
-## Workflow Pool
-
-### `GET /api/v1/pool`
-
-List all available pool workflows. Query `locale` (optional): language of the steps of bilingual pool files, English when omitted.
-
-**Response:** `PoolWorkflowEntry[]`
-
-### `GET /api/v1/pool/{id}`
-
-Retrieve a single pool workflow.
-
-**Response:** `PoolWorkflowEntry`
-
-### `POST /api/v1/pool/{id}/install`
-
-Install a pool workflow into a project.
-
-**Request:**
-
-```json
-{
-  "projectId": "uuid",
-  "name": "Optional Name",
-  "forceCreate": false,
-  "locale": "en"
-}
-```
-
-| Field | Type | Required |
-|---|---|---|
-| `projectId` | String | Yes |
-| `name` | String | No |
-| `forceCreate` | Boolean | No |
-| `locale` | String (`de`/`en`) | No: language of name, description and steps; English when omitted. A workflow installed earlier in the other language is updated, not duplicated |
-
-**Response:** `{ "workflowId": "uuid", "workflowName": "...", "created": true, "integrity": "VERIFIED" }`
-
-`integrity`: `VERIFIED` (the pool file's checksum matches) or `MISSING` (file without checksum, installed with a warning). If the checksum does not match, nothing is installed: `400` with `messageKey` `POOL_INTEGRITY_MISMATCH`.
-
-### `POST /api/v1/pool/export/{workflowId}`
-
-Export an existing workflow to the pool.
-
-**Query parameter:** `scope` = `repo` | `portable` (optional, default `portable`) — pool metadata separating repo-bound from portable entries. An unknown value yields `400`. Rule set: [workflow-pool-kuratierung.md](workflow-pool-kuratierung.md).
-
-The export writes no instance bindings: `projectId`, `workflowId`, `runId`, `scheduleId`, `chainId`, `executionId` with a concrete value and UUID values are dropped; a UUID inside a text is replaced with `REDACTED-UUID`.
-
-**Request (optional):**
-
-```json
-{
-  "nameEn": "English Name",
-  "nameDe": "Deutscher Name",
-  "descriptionEn": "...",
-  "descriptionDe": "...",
-  "category": "CODE",
-  "tags": ["review"],
-  "author": "..."
-}
-```
-
-**Response:** `201` with `ExportToPoolResponse` (`poolId`, `filename`, `sanitizedPaths`). `sanitizedPaths` names the cleaned-up spots by path — for a `sub-workflow` block it holds `blocks[N].config.workflowId`, and the entry is only installable once that reference has been filled in.
-
----
-
-## Workflow Factory
-
-### `GET /api/v1/factory/topics`
-
-Retrieve available topic categories.
-
-**Response:** `Array<{ "id": "...", "label": "..." }>`
-
-### `POST /api/v1/factory/generate`
-
-Generate a workflow from a topic (preview, without test execution).
-
-**Request:**
-
-```json
-{
-  "topic": "code-review",
-  "description": "Automated code review",
-  "category": "CODE",
-  "projectId": "uuid",
-  "testInputs": {},
-  "autoPromote": false,
-  "autoFix": false,
-  "maxRetries": 2,
-  "provider": "CLAUDE"
-}
-```
-
-| Field | Type | Required |
-|---|---|---|
-| `topic` | String | Yes |
-| `description` | String | No |
-| `category` | String | No |
-| `projectId` | String | No |
-| `testInputs` | Object | No |
-| `autoPromote` | boolean | No |
-| `autoFix` | boolean | No |
-| `maxRetries` | int | No (default: 2) |
-| `provider` | String | No |
-
-**Response:** `201` with `WorkflowResponse`
-
-### `POST /api/v1/factory/run`
-
-Full factory pipeline: Generate → Test Instance → Verify → optionally Promote.
-
-**Request:** `WorkflowFactoryRequest` (as above)
-
-**Response:** `WorkflowFactoryResult` with `workflowId`, `workflowName`, `status`, `testRunId`, `testStatus`, `testError`, `promotedAsTemplate`, `durationMs`, `retryErrors`
-
-### `POST /api/v1/factory/verify/{id}`
-
-Verify an existing workflow on the test instance.
-
-**Response:** `WorkflowFactoryResult`
-
-### `POST /api/v1/factory/promote/{id}`
-
-Promote a verified workflow as a template.
-
-**Response:** `WorkflowFactoryResult`
-
----
-
-## Wishes
-
-### `GET /api/v1/wishes`
-
-List all wishes.
-
-**Response:** `WishResponse[]`
-
-### `POST /api/v1/wishes`
-
-Create a new wish and fulfill it asynchronously.
-
-**Request:**
-
-```json
-{
-  "text": "Create a workflow that summarizes the latest AI news daily",
-  "projectId": "uuid",
-  "maxIterations": 5,
-  "referenceWorkflowIds": ["uuid"]
-}
-```
-
-| Field | Type | Required |
-|---|---|---|
-| `text` | String | Yes |
-| `projectId` | String | Yes |
-| `maxIterations` | Integer | No |
-| `referenceWorkflowIds` | String[] | No |
-| `autoRefine` | boolean | No (default: `false`) |
-
-**Response:** `201` with `WishResponse`
-
-**WishResponse Fields:** `id`, `originalText`, `status`, `projectId`, `projectName`, `decomposition`, `generatedWorkflowIds`, `generatedWorkflowNames`, `referenceWorkflowIds`, `referenceWorkflowNames`, `generatedChainId`, `iterationCount`, `maxIterations`, `currentRunId`, `resultSummary`, `error`, `iterationHistory`, `metadata`, `autoRefine`, `stoppedPhase` (phase a `FAILED`/`CANCELLED` wish stopped in, otherwise `null`; V97), `createdAt`, `updatedAt`
-
-**WishStatus Values:** `RECEIVED`, `DECOMPOSING`, `AWAITING_DECOMPOSE_APPROVAL`, `EXECUTING`, `EVALUATING`, `REFINING`, `AWAITING_CLARIFICATION`, `AWAITING_APPROVAL`, `COMPLETED`, `FAILED`, `CANCELLED`
-
-### `GET /api/v1/wishes/{id}`
-
-Retrieve a single wish.
-
-**Response:** `WishResponse`
-
-### `POST /api/v1/wishes/{id}/cancel`
-
-Cancel a wish.
-
-**Response:** `200 OK`
-
-### `POST /api/v1/wishes/{id}/respond`
-
-Provide feedback on the current iteration.
-
-**Request:**
-
-```json
-{
-  "action": "ACCEPT",
-  "feedback": "Optional: adjustment requests"
-}
-```
-
-| Field | Type | Required | Values |
-|---|---|---|---|
-| `action` | Enum | Yes | `ACCEPT`, `REFINE`, `CANCEL`, `CLARIFY`, `RETRY` |
-| `feedback` | String | No | |
-
-**Response:** `WishResponse`
-
-### `POST /api/v1/wishes/{id}/crystallize`
-
-Crystallize a successful wish as a template.
-
-**Response:** `{ "templateId": "uuid" }`
-
-### `DELETE /api/v1/wishes/{id}`
-
-Delete a wish.
-
-**Response:** `204 No Content`
-
----
-
-## Docs
-
-### `GET /api/v1/docs`
-
-List available documentation files.
-
-**Response:** `Array<{ "name": "architektur.md", "label": "Architektur", "lang": "de" }>`
-
-### `GET /api/v1/docs/{name}`
-
-Retrieve the content of a documentation file (`.md` files only).
-
-**Query Parameters:** `lang` (default: `"de"`, values: `"de"`, `"en"`)
-
-**Response:** `{ "content": "# Architecture\n..." }`
-
----
-
-## Search
-
-### `GET /api/v1/search`
-
-Aggregated search across workflows (substring/fuzzy ranking).
-
-**Query Parameters:**
-
-| Parameter | Type | Description |
-|---|---|---|
-| `q` | String | Search term |
-| `types` | String | Types to search (default: `"workflow"`) |
-| `limit` | int | Max results (default: 20, max: 50) |
-
-**Response:**
-
-```json
-{
-  "workflows": [...]
-}
-```
-
-### `POST /api/v1/search/workflows/semantic`
-
-Semantic workflow search via AI model. Returns `204 No Content` when semantic search is not enabled.
-
-**Request:**
-
-```json
-{
-  "query": "Check code quality",
-  "limit": 5
-}
-```
-
-**Response:** `SemanticSearchResult[]` with `workflowId`, `workflowName`, `reason`, `score`
-
----
-
-## Reports
-
-### `GET /api/v1/reports`
-
-List available report files (`.md` files in the configured reports directory, sorted by date descending).
-
-**Response:** `Array<{ "name": "report-2025-01.md", "label": "Report 2025 01" }>`
-
-### `GET /api/v1/reports/{name}`
-
-Retrieve the content of a report file (`.md` files only, path traversal protection).
-
-**Response:** `{ "content": "# Report\n..." }`
-
----
-
-## Dead Letter Queue
-
-Failed workflow runs are automatically captured in the DLQ and can be managed there.
-
-### `GET /api/v1/dlq`
-
-List DLQ entries (paginated).
-
-**Query Parameters:**
-
-| Parameter | Type | Description |
-|---|---|---|
-| `status` | String | Filter: `OPEN`, `RETRIED`, `DISCARDED` |
-| `page` | int | Page (default: 0) |
-| `size` | int | Entries per page (default: 20) |
-
-**Response:** `Page<DeadLetterEntry>` with `id`, `workflowRunId`, `workflowId`, `workflowName`, `errorMessage`, `failedStepIndex`, `retryCount`, `lastFailureAt`, `status`, `createdAt`, `updatedAt`
-
-### `GET /api/v1/dlq/{id}`
-
-Retrieve a single DLQ entry.
-
-**Response:** `DeadLetterEntry`
-
-### `POST /api/v1/dlq/{id}/retry`
-
-Retry a DLQ entry (starts a fresh workflow execution with the original input context).
-
-**Response:** `DeadLetterEntry` (status changes to `RETRIED`)
-
-### `DELETE /api/v1/dlq/{id}`
-
-Discard a DLQ entry.
-
-**Response:** `204 No Content`
-
----
-
-## Debug
-
-### `GET /api/v1/debug/failed-workflows`
-
-Workflows whose last run failed (`FAILED` / `COMPLETED_WITH_ERRORS`), sorted by last error descending.
-
-**Response:** `BrokenWorkflowResponse[]`
-
----
-
 ## WebSocket
 
-### Connection
+STOMP over SockJS on `ws://localhost:9090/ws`. The handshake needs a short-lived single-use ticket from
+`POST /api/v1/ws-ticket` (API key in the header, response `{ "ticket": "kxJ9…", "expiresInSeconds": 30 }`) –
+redeemable exactly once, a fresh one for every connect attempt (including every reconnect). An `apiKey`
+query parameter is refused.
 
-```
-Endpoint: ws://localhost:9090/ws (SockJS)
-Protocol: STOMP
-```
-
-### Topics
-
-| Topic | Description |
+| Topic | Content |
 |---|---|
 | `/topic/executions/{runId}/logs` | Workflow execution logs (steps, status, approval prompts) |
 | `/topic/chains/{chainRunId}/status` | Chain execution status updates |
@@ -4292,50 +58,931 @@ Protocol: STOMP
 | `/topic/assistant/{sessionId}/events` | Assistant push events (created items, suggestions) |
 | `/topic/wishes/{wishId}/status` | Wish iteration status |
 | `/topic/activity-log` | Global activity log events |
+| `/topic/dashboard/runs` | After a finished run is saved `{"type":"run_completed","runId":…,"workflowId":…,"status":…}` – only ids and status |
 
-### Message Format (Execution Logs)
+Execution logs are JSON objects distinguished by `type`; step messages have none. Other types: `status`,
+`approval_required`/`approval_resolved`, `human_input_required`/`human_input_resolved`, `agentic_*`,
+`foreach_item_started`/`foreach_item_completed`, `container_starting`/`container_started`/`container_skipped`,
+`command` and `live_output` – output of running blocks, batched at most every 250 ms, with `seq` gap-free
+per `bufferId` (gaps = skipped lines; replay via `GET /api/v1/executions/{id}/live-log`).
 
-JSON objects distinguished by `type`. Step messages (placeholder at start and finished step) have no `type`:
+The terminal (`ws://localhost:9090/ws/terminal/{runId}?ticket=...`) is a raw WebSocket without
+SockJS/STOMP, likewise with a fresh ticket, at most 3 sessions per container.
 
-```json
-{ "stepIndex": 1, "status": "COMPLETED", "input": "...", "output": "...", "durationMs": 4200, "blockType": "shell", "blockName": "Build" }
-```
+## Error codes
 
-Other types: `status`, `approval_required`/`approval_resolved`, `human_input_required`/`human_input_resolved`,
-`agentic_*`, `foreach_item_started`/`foreach_item_completed`, `container_starting`/`container_started`/`container_skipped`,
-`command` and `live_output` — output of running blocks, batched at most every 250 ms:
+From `ErrorCode` (`ai-automation-backend/src/main/java/com/automation/exception/ErrorCode.java`). If the throw site gives no text of its own, the default text is in the field `error`.
 
-```json
-{
-  "type": "live_output",
-  "runId": "run-uuid",
-  "bufferId": "buffer-uuid",
-  "lines": [{ "seq": 41, "stepIndex": 1, "kind": "line", "text": "[INFO] BUILD SUCCESS", "ts": 1757844005000 }],
-  "skipped": 0
-}
-```
+| Code | HTTP status | Default text |
+|---|---|---|
+| `RESOURCE_NOT_FOUND` | 404 | Resource not found |
+| `MODULE_DISABLED` | 404 | Module disabled |
+| `MODULES_NOT_EDITABLE` | 403 | Modules cannot be switched at runtime |
+| `VALIDATION_FAILED` | 400 | Validation failed |
+| `INVALID_ARGUMENT` | 400 | Invalid argument |
+| `WORKFLOW_EXECUTION_FAILED` | 500 | Workflow execution failed |
+| `CONTAINER_ERROR` | 500 | Container error |
+| `STAGING_ERROR` | 500 | Staging error |
+| `STATE_CONFLICT` | 409 | State conflict |
+| `WORKFLOW_SEALED` | 409 | Workflow is sealed |
+| `WORKFLOW_TAMPERED` | 409 | Sealed workflow definition was modified |
+| `SKILL_PINNED_BY_SEAL` | 409 | Skill is used by a sealed workflow |
+| `SEAL_IMMUTABLE` | 403 | Unsealing is disabled in the startup configuration |
+| `UNATTENDED_REQUIRES_SEAL` | 403 | Unattended runs require a sealed workflow |
+| `UNATTENDED_PLATFORM_ACCESS` | 403 | Unattended runs of workflows that access the platform directly are refused |
+| `WEBHOOK_SIGNATURE_INVALID` | 401 | Missing or invalid webhook signature |
+| `NO_TASK_TARGET` | 400 | No task export target configured |
+| `PROVIDER_NOT_CONNECTED` | 409 | Integration provider not connected |
+| `PROVIDER_NOT_TASK_CAPABLE` | 400 | Integration provider cannot receive tasks |
+| `SERVICE_UNAVAILABLE` | 503 | Service unavailable |
+| `TOKEN_BUDGET_EXCEEDED` | 429 | Token budget exceeded |
+| `RATE_LIMITED` | 429 | Rate limit exceeded |
+| `PAYLOAD_TOO_LARGE` | 413 | Payload too large |
+| `OPERATION_TIMEOUT` | 504 | Operation timed out |
+| `METHOD_NOT_ALLOWED` | 405 | Method not allowed |
+| `RUN_DELETION_DISABLED` | 403 | Deleting runs is disabled |
+| `INTERNAL_ERROR` | 500 | Internal server error |
 
-`seq` is gap-free per `bufferId`; gaps mean skipped lines. Replay: `GET /api/v1/executions/{id}/live-log`.
+## /api/v1/activity-log
 
-### Terminal WebSocket
+Source: `ActivityLogController` – Activity log: read the platform's event log and let plugins add their own entries.
 
-```
-Endpoint: ws://localhost:9090/ws/terminal/{runId}?ticket=...
-```
+| Endpoint | Purpose | Module |
+|---|---|---|
+| `GET /api/v1/activity-log` | Lists activity log entries page by page, newest first, optionally filtered by level, category and workflow. | core |
+| `POST /api/v1/activity-log` | Writes an entry of category `PLUGIN` to the activity log and returns it with 201. | core |
 
-For real-time container access (interactive shell). Raw WebSocket (no SockJS/STOMP). Max 3 sessions per container. Authentication via a short-lived single-use ticket from `POST /api/v1/ws-ticket` (API key in the header) — an `apiKey` query parameter is refused. The same applies to the STOMP/SockJS handshake on `/ws`.
+Notes:
 
-### Handshake ticket
+- `GET /api/v1/activity-log` — `level` and `category` ignore case; an unknown value is rejected with 400.
+- `POST /api/v1/activity-log` — `message` is required; `level` defaults to `INFO`, `source` to `plugin`.
 
-```
-POST /api/v1/ws-ticket
-Header: X-API-Key: <key>
-```
+## /api/v1/assistant
 
-Response:
+Sources:
 
-```json
-{ "ticket": "kxJ9…", "expiresInSeconds": 30 }
-```
+- `AssistantController` – AI assistant chat: messages, stored chat sessions and confirming or rejecting the tools it proposes.
+- `PageSuggestionController` – Quick-action suggestions the assistant offers per page of the UI.
 
-Redeemable exactly once, then invalid; likewise after it expires. Fetch a fresh ticket for every connect attempt, including every reconnect.
+| Endpoint | Purpose | Module |
+|---|---|---|
+| `POST /api/v1/assistant/chat` | Sends a message to the AI assistant and returns its answer with suggested actions and pending tools. | `assistant` |
+| `POST /api/v1/assistant/pending-tools/{id}/confirm` | Executes a previously proposed tool after explicit user confirmation. | `assistant` |
+| `POST /api/v1/assistant/pending-tools/{id}/reject` | Rejects a tool the assistant proposed, without executing it. | `assistant` |
+| `GET /api/v1/assistant/sessions` | Lists the most recent assistant chat sessions, newest first. | `assistant` |
+| `GET /api/v1/assistant/sessions/{id}` | Returns one assistant chat session with its messages. | `assistant` |
+| `DELETE /api/v1/assistant/sessions/{id}` | Deletes an assistant chat session. | `assistant` |
+| `GET /api/v1/assistant/suggestions` | Returns the stored quick-action suggestions for `page`, or built-in defaults if none are stored yet. | `assistant` |
+| `POST /api/v1/assistant/suggestions/refresh` | Generates new suggestions for `page` with an AI call based on recent assistant sessions, stores and returns them. | `assistant` |
+
+Notes:
+
+- `POST /api/v1/assistant/chat` — With `sessionId` the exchange is appended to that stored session.
+- `POST /api/v1/assistant/pending-tools/{id}/confirm` — Returns 410 Gone if the tool has already been consumed or expired — the frontend treats that as "already handled" and doesn't retry.
+- `POST /api/v1/assistant/pending-tools/{id}/reject` — Returns 410 Gone if the tool has already been handled or expired.
+- `GET /api/v1/assistant/suggestions` — Kept per language: `locale` other than `en` counts as German.
+
+## /api/v1/audit-findings
+
+Source: `AuditController` – Audit center: results of audit workflows (gate status per report), the findings derived from them and their TODOs.
+
+| Endpoint | Purpose | Module |
+|---|---|---|
+| `GET /api/v1/audit-findings` | Lists findings across all audits page by page, most severe first, then most recently seen. | `audit` |
+| `GET /api/v1/audit-findings/{id}` | Returns one finding with its linked TODOs. | `audit` |
+| `PATCH /api/v1/audit-findings/{id}` | Changes a finding's status and/or disposition note; fields left out stay unchanged. | `audit` |
+| `POST /api/v1/audit-findings/{id}/todo-links` | Links an existing TODO (`todoId`) to the finding. | `audit` |
+| `DELETE /api/v1/audit-findings/{id}/todo-links/{todoId}` | Removes the link between a finding and a TODO; answers 204. | `audit` |
+| `POST /api/v1/audit-findings/{id}/todos` | Creates a TODO managed by MySuricates from the finding and returns the finding with its TODO links. | `audit` |
+
+Notes:
+
+- `GET /api/v1/audit-findings` — Optional filters: `projectId`, `auditKey`, `status`, `severity`.
+- `PATCH /api/v1/audit-findings/{id}` — A terminal status sets the resolution time, and the managed TODO is reconciled with the new state.
+
+## /api/v1/audit-reports
+
+Source: `AuditController` – Audit center: results of audit workflows (gate status per report), the findings derived from them and their TODOs.
+
+| Endpoint | Purpose | Module |
+|---|---|---|
+| `GET /api/v1/audit-reports/{id}` | Returns one audit report including its Markdown text. | `audit` |
+
+## /api/v1/audits
+
+Source: `AuditController` – Audit center: results of audit workflows (gate status per report), the findings derived from them and their TODOs.
+
+| Endpoint | Purpose | Module |
+|---|---|---|
+| `GET /api/v1/audits` | Lists every audit (per project and `auditKey`) with its latest valid report and finding counts. | `audit` |
+| `GET /api/v1/audits/{auditKey}` | Returns one audit: its summary with finding counts and its latest valid report including the text. | `audit` |
+| `GET /api/v1/audits/{auditKey}/reports` | Lists the reports of an audit page by page, newest first; `projectId` is required. | `audit` |
+
+Notes:
+
+- `GET /api/v1/audits` — Optional filters: `projectId`, `category`, `gateStatus`.
+- `GET /api/v1/audits/{auditKey}` — `projectId` is required; 404 if the audit has no valid report.
+- `GET /api/v1/audits/{auditKey}/reports` — Heads only: `markdownContent` is `null`, the text comes from `GET /api/v1/audit-reports/{id}`.
+
+## /api/v1/chain-templates
+
+Source: `ChainTemplateController` – Built-in chain templates that can be installed into a project as a chain with its workflows.
+
+| Endpoint | Purpose | Module |
+|---|---|---|
+| `GET /api/v1/chain-templates` | Lists the built-in chain templates with their entries. | `chains` |
+| `GET /api/v1/chain-templates/{id}` | Returns one built-in chain template. | `chains` |
+| `POST /api/v1/chain-templates/{id}/install` | Installs a chain template into a project: creates one workflow per entry plus the chain, answers 201. | `chains` |
+
+Notes:
+
+- `POST /api/v1/chain-templates/{id}/install` — `projectId` is required; `locale` picks the language of names, labels and bilingual steps (German if omitted).
+
+## /api/v1/chains
+
+Source: `ChainController` – Workflow chains: define sequences of workflows, start them and follow their runs.
+
+| Endpoint | Purpose | Module |
+|---|---|---|
+| `GET /api/v1/chains` | Lists all workflow chains. | `chains` |
+| `POST /api/v1/chains` | Creates a chain from an ordered list of workflow entries and returns it with 201. | `chains` |
+| `GET /api/v1/chains/runs` | Lists the runs of all chains page by page, newest first. | `chains` |
+| `POST /api/v1/chains/runs/{runId}/cancel` | Asks a running chain run to stop; it starts no further entries. | `chains` |
+| `GET /api/v1/chains/{id}` | Returns one chain with its entries. | `chains` |
+| `PUT /api/v1/chains/{id}` | Updates a chain; fields left out stay unchanged, `entries` replaces the whole entry list. | `chains` |
+| `DELETE /api/v1/chains/{id}` | Deletes a chain; answers 204. | `chains` |
+| `POST /api/v1/chains/{id}/execute` | Starts a chain run in the background and returns it with 201; the entries then run one after another. | `chains` |
+| `GET /api/v1/chains/{id}/runs` | Lists the runs of one chain, newest first. | `chains` |
+| `GET /api/v1/chains/{id}/runs/{runId}` | Returns one chain run with its entry runs. | `chains` |
+
+Notes:
+
+- `GET /api/v1/chains/runs` — `status` ignores case (unknown value: 400); `search` matches the chain name.
+- `POST /api/v1/chains/runs/{runId}/cancel` — Answers 200 even if the run is not active.
+- `DELETE /api/v1/chains/{id}` — Refused with 409 while the chain has an active run (`PENDING`, `RUNNING` or `PAUSED`), which would otherwise go on starting the chain's workflows; cancel the run first.
+- `POST /api/v1/chains/{id}/execute` — The optional body is the input context of the run.
+
+## /api/v1/completion-triggers
+
+Source: `CompletionTriggerController` – Completion triggers: start a target workflow automatically when a source workflow finishes.
+
+| Endpoint | Purpose | Module |
+|---|---|---|
+| `GET /api/v1/completion-triggers` | Lists all completion triggers. | core |
+| `POST /api/v1/completion-triggers` | Creates a completion trigger from source to target workflow and returns it with 201. | core |
+| `GET /api/v1/completion-triggers/workflow/{workflowId}/as-source` | Lists the triggers that fire when the given workflow finishes. | core |
+| `GET /api/v1/completion-triggers/workflow/{workflowId}/as-target` | Lists the triggers that start the given workflow. | core |
+| `GET /api/v1/completion-triggers/{id}` | Returns one completion trigger. | core |
+| `DELETE /api/v1/completion-triggers/{id}` | Deletes a completion trigger; answers 204. | core |
+| `POST /api/v1/completion-triggers/{id}/disable` | Disables a trigger without deleting it. | core |
+| `POST /api/v1/completion-triggers/{id}/enable` | Enables a trigger; the cycle check runs again first. | core |
+
+Notes:
+
+- `POST /api/v1/completion-triggers` — Both workflows must exist (404); a trigger that would start its own source or close a cycle is rejected with 400.
+
+## /api/v1/conversions
+
+Source: `ConversionController` – Turns the successful agentic steps of a run into a reusable workflow.
+
+| Endpoint | Purpose | Module |
+|---|---|---|
+| `POST /api/v1/conversions/runs/{runId}/create-workflow` | Creates a workflow from a run's suggestion in the given project. | `conversion` |
+| `GET /api/v1/conversions/runs/{runId}/suggest` | Suggests a workflow built from the agentic steps of a run that reached their goal. | `conversion` |
+
+Notes:
+
+- `POST /api/v1/conversions/runs/{runId}/create-workflow` — With `blocks` (the reviewed suggestion) exactly these are saved without a new AI call, and `name` is required; without them the suggestion is generated again. An unknown run is 404, a run that is not COMPLETED or has nothing to convert is 409; the answer is 200 with the new workflow.
+- `GET /api/v1/conversions/runs/{runId}/suggest` — Tries an AI conversion first and falls back to rule-based; without such steps the suggestion is marked unavailable.
+
+## /api/v1/dashboard
+
+Sources:
+
+- `DashboardLayoutController` – Version history of the dashboard layout.
+- `DashboardReportAssistController` – The editor's AI proposal for a `dashboard-report` block.
+- `DashboardWorkflowController` – Data of the dashboard's workflow widgets (spec E3).
+
+| Endpoint | Purpose | Module |
+|---|---|---|
+| `GET /api/v1/dashboard/layouts` | Lists saved dashboard layout versions page by page, newest first, without their content; `size` is capped at 100. | core |
+| `POST /api/v1/dashboard/layouts` | Saves the dashboard layout as a new version (`201`), or answers `200` when it equals the newest one. | core |
+| `GET /api/v1/dashboard/layouts/{id}` | Returns one dashboard layout version including its layout content. | core |
+| `PATCH /api/v1/dashboard/layouts/{id}` | Sets or removes (`null`) the name of a layout version. | core |
+| `POST /api/v1/dashboard/report-assist` | Has an AI propose the fields of a `dashboard-report` block for `workflowId` from one of its runs. | `dashboard-report` |
+| `GET /api/v1/dashboard/workflow-results` | Returns, per requested workflow, its latest run and its validated dashboard result, never step output. | core |
+
+Notes:
+
+- `POST /api/v1/dashboard/layouts` — The comparison ignores `activeViewId` (each device shows its own view), which is still stored and must name a view. Without `force: true` a `baseVersionId` other than the newest version is refused with `409 STATE_CONFLICT`: another device saved in between. The body is validated field by field (unknown fields → 400) with the limits of the frontend's `LAYOUT_LIMITS` (at most 20 views, 100 widgets per view); over `automation.dashboard.layout.max-request-bytes` (default 256 KiB) it is 413. Each save trims the unnamed versions to the newest `dashboard-layout-retention-count` (default 100); named ones are never trimmed.
+- `PATCH /api/v1/dashboard/layouts/{id}` — A name has 1–80 characters; a named version is never deleted automatically.
+- `POST /api/v1/dashboard/report-assist` — One tool-less call to the `CLAUDE` CLI over the tail of the latest run, checked against the `dashboard_widget` contract; neither the raw answer nor the run output leaves the server. 400 for a missing id, 404 for an unknown workflow, 409 (with a fixed message) when the execution setting `dashboard-report-assist-enabled` is off, the Claude CLI is missing on this host, there is no usable run, or the answer did not match the contract.
+- `GET /api/v1/dashboard/workflow-results` — `workflowIds` (repeated or comma-separated) takes at most 50 ids of the form `^[a-z0-9][a-z0-9-]{0,79}$`, otherwise 400; without ids the list is empty. One entry per distinct id in request order; an unknown or soft-deleted workflow has `available: false` and `resultState: MISSING`, and `result` is only set when `resultState` is `VALID`.
+
+## /api/v1/debug
+
+Source: `WorkflowDebugController` – Workflow-Debug endpoints — back the /debug "what is currently broken" page.
+
+| Endpoint | Purpose | Module |
+|---|---|---|
+| `GET /api/v1/debug/failed-workflows` | Workflows whose most recent run failed (FAILED / COMPLETED_WITH_ERRORS), latest first. | `debug` |
+
+Notes:
+
+- `GET /api/v1/debug/failed-workflows` — Restart a workflow by retrying its run via `POST /api/v1/executions/{runId}/retry`.
+
+## /api/v1/dialog
+
+Source: `DialogController` – Dialog import: turns recorded Claude Code sessions (JSONL files under `~/.claude/projects`) into workflows.
+
+| Endpoint | Purpose | Module |
+|---|---|---|
+| `GET /api/v1/dialog/projects` | Returns all known project paths (for the filter dropdown). | `dialog-import` |
+| `GET /api/v1/dialog/sessions` | Lists sessions with their metadata. | `dialog-import` |
+| `POST /api/v1/dialog/sessions/analyze` | Analyzes a session with AI and returns a workflow suggestion. | `dialog-import` |
+| `GET /api/v1/dialog/sessions/count` | Counts the sessions per project directory (fast, without reading the files). | `dialog-import` |
+| `POST /api/v1/dialog/sessions/create-workflow` | Creates a workflow from a suggestion (with optional user adjustments). | `dialog-import` |
+
+Notes:
+
+- `GET /api/v1/dialog/sessions` — `limit` (default 50) is capped at 2000 with `projectPath` (one project, all sessions visible) and at 500 without it (for "Other Sessions").
+- `POST /api/v1/dialog/sessions/analyze` — `filePath` must be a `.jsonl` file under `~/.claude/projects`; any other path is 400.
+- `POST /api/v1/dialog/sessions/create-workflow` — `projectId` is required; the answer is 200 with the new workflow.
+
+## /api/v1/dlq
+
+Source: `DeadLetterController` – Dead letter queue: failed workflow runs, kept for retry or discard.
+
+| Endpoint | Purpose | Module |
+|---|---|---|
+| `GET /api/v1/dlq` | Lists dead letter entries page by page, most recent failure first; optional `status` filter. | core |
+| `GET /api/v1/dlq/{id}` | Returns one dead letter entry. | core |
+| `DELETE /api/v1/dlq/{id}` | Discards a dead letter entry: it is marked `DISCARDED`, not deleted; answers 204. | core |
+| `POST /api/v1/dlq/{id}/retry` | Starts the workflow again with the input context of the failed run and marks the entry as retried. | core |
+
+Notes:
+
+- `POST /api/v1/dlq/{id}/retry` — If the workflow or the failed run no longer exists, nothing starts, but the entry is still marked retried.
+
+## /api/v1/docs
+
+Source: `DocsController` – Serves the Markdown documentation from the configured docs directory (`automation.docs.directory`) to the UI.
+
+| Endpoint | Purpose | Module |
+|---|---|---|
+| `GET /api/v1/docs` | Lists the Markdown documents of the docs directory, German and English, each with name, label and language. | core |
+| `GET /api/v1/docs/{name}` | Returns the Markdown content of one document; `lang` is `de` (default) or `en`. | core |
+
+Notes:
+
+- `GET /api/v1/docs/{name}` — Answers 400 for names with path parts or without `.md`, 404 if the file does not exist.
+
+## /api/v1/executions
+
+Source: `ExecutionController` – Workflow runs: list and inspect them, control running ones and answer the questions they wait on.
+
+| Endpoint | Purpose | Module |
+|---|---|---|
+| `GET /api/v1/executions` | Lists workflow runs page by page, newest first, without their steps (fetch one run for those). | core |
+| `GET /api/v1/executions/pending-input` | Lists all runs currently waiting for an answer — approvals and human input, oldest first. | core |
+| `GET /api/v1/executions/{id}` | Returns one workflow run including all its steps. | core |
+| `DELETE /api/v1/executions/{id}` | Deletes a run with its steps and the loose references to it. | core |
+| `GET /api/v1/executions/{id}/approval` | Returns the approval or human input the run is waiting for, or `{"pending": false}`. | core |
+| `POST /api/v1/executions/{id}/approve` | Answers the run's open question. | core |
+| `POST /api/v1/executions/{id}/cancel` | Cancels a running or queued run. | core |
+| `POST /api/v1/executions/{id}/command` | Sends an ad-hoc command to the Claude session in the container of a running run and returns its output. | core |
+| `GET /api/v1/executions/{id}/live-log` | Returns a run's buffered live lines (in memory only, until ~10 min after the run ends) for the replay after a reload. | core |
+| `PATCH /api/v1/executions/{id}/notes` | Stores a free-text note on the run; a blank `notes` removes it. | core |
+| `POST /api/v1/executions/{id}/pause` | Pauses a running run before its next block; answers 200 even if the run is not active. | core |
+| `POST /api/v1/executions/{id}/resume` | Resumes a paused run; answers 200 even if the run is not active. | core |
+| `POST /api/v1/executions/{id}/resume-from-step` | Continues an `INTERRUPTED` run after its last completed step; without completed steps it starts over. | core |
+| `POST /api/v1/executions/{id}/retry` | Starts the run's workflow again as a new run with the same input context. | core |
+| `POST /api/v1/executions/{id}/todos/approve` | Creates (`approved: true`) or discards the TODOs a run proposed for approval. | core |
+
+Notes:
+
+- `GET /api/v1/executions` — Filters: `status` (case-insensitive, unknown value: 400), `workflowId`, `projectId`, `search` (workflow name).
+- `DELETE /api/v1/executions/{id}` — 409 while the run is still active or an audit report belongs to it. TODOs and audit data are never deleted with it — see `RunDeletionService`. 403 `RUN_DELETION_DISABLED` when `automation.executions.allow-delete=false` (`RunDeletionPolicy`) — checked before any lookup, so it does not reveal whether the run exists.
+- `GET /api/v1/executions/{id}/approval` — Includes `options` and `rejectOptions`; human input adds its input fields.
+- `POST /api/v1/executions/{id}/approve` — 400 when an approval does not offer the answer as an option.
+- `POST /api/v1/executions/{id}/cancel` — A run still marked `RUNNING` without an active execution is set to `CANCELLED` directly.
+- `GET /api/v1/executions/{id}/live-log` — `available=false` instead of 404 when nothing is buffered.
+- `POST /api/v1/executions/{id}/resume-from-step` — Other statuses are refused.
+
+## /api/v1/factory
+
+Source: `WorkflowFactoryController` – Workflow factory: has an AI generate workflows from a topic, verify them on the test instance and promote them to templates.
+
+| Endpoint | Purpose | Module |
+|---|---|---|
+| `POST /api/v1/factory/generate` | Generate a workflow from a topic (preview only, no testing). | `factory` |
+| `POST /api/v1/factory/promote/{id}` | Promote a verified workflow as a template. | `factory` |
+| `POST /api/v1/factory/run` | Full factory pipeline: generate → deploy to test → verify → optionally promote. | `factory` |
+| `GET /api/v1/factory/topics` | Get available topic categories for the factory. | `factory` |
+| `POST /api/v1/factory/verify/{id}` | Verify an existing workflow on the test instance. | `factory` |
+
+Notes:
+
+- `POST /api/v1/factory/generate` — `topic` is required; the answer is 201 with the new workflow.
+- `POST /api/v1/factory/run` — `maxRetries` (default 2) bounds the repair attempts made with `autoFix`.
+
+## /api/v1/goals
+
+Sources:
+
+- `GoalController` – Goals: collect TODOs across projects towards one outcome, order them and show the progress.
+- `GoalWorkflowController` – Workflows on a goal or one of its work packages: list, attach, change role, detach.
+
+| Endpoint | Purpose | Module |
+|---|---|---|
+| `GET /api/v1/goals` | Lists goals, newest first; without `status` the active and done ones. | `goals` |
+| `POST /api/v1/goals` | Creates a goal (201); `title` is required, optional `projectIds` are attached in that order. | `goals` |
+| `GET /api/v1/goals/{goalId}/workflows` | Lists the workflows attached to the goal: the guard first (if switched on), then those on the goal, then those on work packages. | `goals` |
+| `POST /api/v1/goals/{goalId}/workflows` | Attaches a workflow to the goal or one of its work packages (201); `role` is `WORKER` (default) or `STATUS`. | `goals` |
+| `PATCH /api/v1/goals/{goalId}/workflows/{attachmentId}` | Changes the role of an attachment (`WORKER` or `STATUS`); the `guard` entry cannot be changed (400). | `goals` |
+| `DELETE /api/v1/goals/{goalId}/workflows/{attachmentId}` | Detaches the workflow, which itself stays; `guard` → 400 (the guard has its own switch). | `goals` |
+| `GET /api/v1/goals/{id}` | Returns the goal with its TODOs, progress per project, projects, work packages and milestones. | `goals` |
+| `PUT /api/v1/goals/{id}` | Partially updates a goal: `null` keeps a field, an empty `description` or `targetDate` clears it. | `goals` |
+| `DELETE /api/v1/goals/{id}` | Deletes the goal (204); its TODOs stay and only lose the assignment, a guard is paused. | `goals` |
+| `GET /api/v1/goals/{id}/candidates` | Lists open TODOs without a goal that could belong to it, by default only from the goal's projects (`allProjects=true`: from all). | `goals` |
+| `POST /api/v1/goals/{id}/guard` | Switches the goal guard on or off. | `goals` |
+| `GET /api/v1/goals/{id}/milestones` | Lists the goal's milestones by date, then title, with state and package counters. | `goals` |
+| `POST /api/v1/goals/{id}/milestones` | Creates a milestone (201); `dueDate` is required, `workPackageIds` must belong to the same goal (else 400). | `goals` |
+| `PUT /api/v1/goals/{id}/milestones/{milestoneId}` | Updates a milestone; `workPackageIds` replaces its links, `reached` only without linked packages (else 400). | `goals` |
+| `DELETE /api/v1/goals/{id}/milestones/{milestoneId}` | Deletes the milestone (204); the linked work packages stay. | `goals` |
+| `PUT /api/v1/goals/{id}/order` | Sets the order: the TODOs named get rank 1..n, all other TODOs of the goal none. | `goals` |
+| `POST /api/v1/goals/{id}/projects` | Appends a project to the goal's projects; one already assigned stays unchanged (idempotent). | `goals` |
+| `PUT /api/v1/goals/{id}/projects/order` | Reorders the goal's projects: those named first, the others behind them in their previous order. | `goals` |
+| `DELETE /api/v1/goals/{id}/projects/{projectId}` | Detaches a project from the goal (204). | `goals` |
+| `GET /api/v1/goals/{id}/relations` | Returns the goal's relation map: per TODO its origin, its handling (fix workflow, matching TODO triggers) and its result. | `goals` |
+| `POST /api/v1/goals/{id}/todos` | Assigns TODOs to the goal without a rank – they come after the ranked ones. | `goals` |
+| `GET /api/v1/goals/{id}/work-packages` | Lists the goal's work packages by project position and position in the project, with state and counters. | `goals` |
+| `POST /api/v1/goals/{id}/work-packages` | Adds a work package at the end of its project (201); without `projectId` only if the goal has exactly one project. | `goals` |
+| `PUT /api/v1/goals/{id}/work-packages/order` | Reorders the work packages of ONE project; the answer lists all work packages of the goal. | `goals` |
+| `PUT /api/v1/goals/{id}/work-packages/{workPackageId}` | Partially updates a work package; `""` clears a date, the result needs both dates or none (else 400). | `goals` |
+| `DELETE /api/v1/goals/{id}/work-packages/{workPackageId}` | Deletes the work package (204); its TODOs stay in the goal, milestones lose the link, its workflow attachments go. | `goals` |
+
+Notes:
+
+- `GET /api/v1/goals` — With `projectId` only the goals this project is assigned to.
+- `POST /api/v1/goals` — An unknown project id is a 404.
+- `GET /api/v1/goals/{goalId}/workflows` — Soft-deleted workflows are left out.
+- `POST /api/v1/goals/{goalId}/workflows` — A work package of another goal is a 400, an unknown workflow a 404, the same attachment twice a 409.
+- `GET /api/v1/goals/{id}` — Reading records the moment a work package or milestone is first found complete or reached.
+- `DELETE /api/v1/goals/{id}` — Work packages, milestones and workflow attachments go with it; the guard's workflow stays.
+- `GET /api/v1/goals/{id}/candidates` — Paged like `GET /api/v1/todos`.
+- `POST /api/v1/goals/{id}/guard` — The first switch-on creates a workflow from the template `goal-guard` plus a daily schedule; after that only the schedule is enabled or disabled. An invalid `cron` or no project to put the workflow in is 400.
+- `PUT /api/v1/goals/{id}/order` — Every id must already belong to the goal (else 400).
+- `PUT /api/v1/goals/{id}/projects/order` — A project not in the goal is 400.
+- `DELETE /api/v1/goals/{id}/projects/{projectId}` — While work packages or TODOs of the goal still belong to it, the answer is 409 – with `cascade=true` the work packages are deleted and the TODOs detached.
+- `GET /api/v1/goals/{id}/relations` — `include` adds up to 20 TODOs not yet assigned as candidates (`candidate: true`); ids of TODOs that already belong to a goal are skipped.
+- `POST /api/v1/goals/{id}/todos` — A TODO of another goal moves here and loses its work package.
+- `GET /api/v1/goals/{id}/work-packages` — The state is OPEN/DUE_SOON/OVERDUE/REACHED based on the end; without a period only OPEN/REACHED.
+- `POST /api/v1/goals/{id}/work-packages` — A named project not yet in the goal is added to it; `startDate` and `endDate` come together or not at all. The title has at most 200 characters.
+- `PUT /api/v1/goals/{id}/work-packages/order` — That project's packages not named follow behind; packages of different projects are 400, one of another goal 404.
+- `PUT /api/v1/goals/{id}/work-packages/{workPackageId}` — `projectId` can change only while no TODOs are assigned to the package; the package then moves to the end of the new project.
+
+## /api/v1/integrations
+
+Source: `IntegrationController` – Integration providers and their connections.
+
+| Endpoint | Purpose | Module |
+|---|---|---|
+| `GET /api/v1/integrations` | Lists all providers with connection status, actions and account info; top-level fields describe `default`. | `integrations` |
+| `GET /api/v1/integrations/{providerId}` | Returns one provider with the same fields as the list. | `integrations` |
+| `GET /api/v1/integrations/{providerId}/actions` | Lists the provider's actions; `available` is `false` when the connection lacks a required scope. | `integrations` |
+| `POST /api/v1/integrations/{providerId}/actions/{action}` | Runs one action with the body as its parameters and returns the provider's result; an unconnected provider is a 409. | `integrations` |
+| `GET /api/v1/integrations/{providerId}/callback` | OAuth2 callback endpoint — public (no API key required). | `integrations` |
+| `GET /api/v1/integrations/{providerId}/connect` | Returns the OAuth `authorizationUrl` for the popup and the `callbackOrigin` its result comes from. | `integrations` |
+| `DELETE /api/v1/integrations/{providerId}/connection` | Disconnects: clears the stored tokens and revokes an OAuth token at the provider; client credentials stay (204). | `integrations` |
+| `GET /api/v1/integrations/{providerId}/connections` | Every stored connection of a provider, `default` first. | `integrations` |
+| `POST /api/v1/integrations/{providerId}/credentials` | Stores `clientId` and `clientSecret` encrypted for the connection, creating it if new. | `integrations` |
+| `DELETE /api/v1/integrations/{providerId}/credentials` | Deletes the whole connection including its client credentials and revokes an OAuth token at the provider (204). | `integrations` |
+| `GET /api/v1/integrations/{providerId}/task-targets` | Lists the targets a TODO can be exported to (e.g. boards or lists); empty if the provider cannot export or the call fails. | `integrations` |
+
+Notes:
+
+- `GET /api/v1/integrations/{providerId}/callback` — Exchanges authorization code for tokens, then returns an HTML page that notifies the parent window via postMessage. The connection name comes from the server-side state, never from this request — the callback URL is the same for all connections.
+- `GET /api/v1/integrations/{providerId}/connect` — `frontendOrigin` must be the API's own origin or one CORS allows (else 400); no client credentials is a 409.
+- `POST /api/v1/integrations/{providerId}/credentials` — Both are required unless the provider needs no credentials; a provider without OAuth flow checks them right away.
+
+## /api/v1/learning
+
+Source: `LearningController` – Run statistics: dashboard figures, platform counts, per-workflow and per-run analytics, and run ratings.
+
+| Endpoint | Purpose | Module |
+|---|---|---|
+| `GET /api/v1/learning/dashboard` | Returns the dashboard figures: all-time run counts and success rate, plus cost, tokens, time series and model stats of the last `days` days. | core |
+| `GET /api/v1/learning/platform-stats` | Returns platform-wide counts: projects, workflows, skills, templates, schedules, webhooks, chains, triggers, TODOs and wishes. | core |
+| `GET /api/v1/learning/runs/{runId}/insights` | Returns cost and token sums of one run plus the figures per step. | `learning` |
+| `POST /api/v1/learning/runs/{runId}/rate` | Stores a user rating for a run; the query parameter `rating` must be between 1 and 5. | core |
+| `GET /api/v1/learning/workflows/{workflowId}/agentic-analytics` | Summarizes the recent agentic steps of a workflow: how often the goal was reached and the average iterations. | `learning` |
+| `GET /api/v1/learning/workflows/{workflowId}/agentic-history` | Lists the most recent agentic steps of a workflow with goal, iterations, outcome and the sequence of actions taken. | `learning` |
+| `GET /api/v1/learning/workflows/{workflowId}/execution-insights` | Returns cost and token sums over all runs of a workflow, plus the models used. | `learning` |
+| `GET /api/v1/learning/workflows/{workflowId}/similar` | Lists other workflows with a similar set of block types, most similar first. | `learning` |
+| `GET /api/v1/learning/workflows/{workflowId}/stats` | Returns run statistics of one workflow: counts per outcome, success rate, durations and average rating. | `learning` |
+| `GET /api/v1/learning/workflows/{workflowId}/step-analytics` | Returns statistics per step index of a workflow across all its runs. | `learning` |
+| `GET /api/v1/learning/workflows/{workflowId}/suggestions` | Returns optimization hints derived from the workflow's runs, e.g. low success rate, failing or slow steps, high cost. | `learning` |
+| `GET /api/v1/learning/workflows/{workflowId}/tool-patterns` | Returns which tools the workflow's AI steps used, how often, and recurring tool sequences. | `learning` |
+
+Notes:
+
+- `GET /api/v1/learning/dashboard` — `projectId` restricts every value, the overall counts included, to that project's workflows and runs. `recentRuns` holds at most the ten newest runs of the window, without steps.
+
+## /api/v1/notifications
+
+Source: `NotificationController` – Notification configs that send a webhook or desktop message when a workflow run finishes.
+
+| Endpoint | Purpose | Module |
+|---|---|---|
+| `GET /api/v1/notifications` | Lists all notification configs. | core |
+| `POST /api/v1/notifications` | Creates a notification config (201); `name` and `channelType` (`WEBHOOK` or `DESKTOP`) are required. | core |
+| `GET /api/v1/notifications/{id}` | Returns one notification config. | core |
+| `DELETE /api/v1/notifications/{id}` | Deletes the notification config (204). | core |
+| `POST /api/v1/notifications/{id}/disable` | Switches the notification config off. | core |
+| `POST /api/v1/notifications/{id}/enable` | Switches the notification config on. | core |
+
+Notes:
+
+- `POST /api/v1/notifications` — Without `workflowId` it fires for every workflow; `messageTemplate` may use placeholders like `{{status}}`. `triggerOnSuccess` covers COMPLETED and COMPLETED_WITH_ERRORS, `triggerOnFailure` FAILED and INTERRUPTED, `triggerAlways` any status. Placeholders, written without spaces: `{{workflow_name}}`, `{{workflow_id}}`, `{{run_id}}`, `{{status}}`, `{{error_message}}`; without a template a default message is sent. A `WEBHOOK` config without `webhookUrl` is accepted but sends nothing.
+
+## /api/v1/onboarding-profiles
+
+Source: `OnboardingProfileController` – Onboarding profiles: the built-in and custom texts a project's onboarding file for AI agents is assembled from.
+
+| Endpoint | Purpose | Module |
+|---|---|---|
+| `GET /api/v1/onboarding-profiles` | Lists all onboarding profiles in their sort order. | `onboarding-profiles` |
+| `POST /api/v1/onboarding-profiles` | Creates a custom profile (201); `key` (lowercase letters, digits, dashes), `name`, `content` and `type` are required. | `onboarding-profiles` |
+| `GET /api/v1/onboarding-profiles/{id}` | Returns one onboarding profile. | `onboarding-profiles` |
+| `PUT /api/v1/onboarding-profiles/{id}` | Updates name, description or content of a profile; only the languages sent in `content` are replaced. | `onboarding-profiles` |
+| `DELETE /api/v1/onboarding-profiles/{id}` | Deletes a custom profile and its history (204); built-in profiles cannot be deleted (400). | `onboarding-profiles` |
+| `GET /api/v1/onboarding-profiles/{id}/history` | Lists the earlier versions of a profile's content, newest first. | `onboarding-profiles` |
+| `POST /api/v1/onboarding-profiles/{id}/reset` | Sets a built-in profile back to the current shipped text; the previous text goes into the history. | `onboarding-profiles` |
+| `GET /api/v1/onboarding-profiles/{id}/shipped` | The current shipped text of a built-in profile, to compare with an edited one before taking it over. | `onboarding-profiles` |
+
+Notes:
+
+- `POST /api/v1/onboarding-profiles` — `content` is Markdown per language and needs at least one filled language; a taken `key` is a 400.
+- `PUT /api/v1/onboarding-profiles/{id}` — A content change keeps the old text in the history and rewrites the onboarding files of the projects using it.
+- `POST /api/v1/onboarding-profiles/{id}/reset` — A custom profile is a 400. Afterwards `customized` is `false`, and a changed text rewrites the onboarding files of the projects using the profile.
+- `GET /api/v1/onboarding-profiles/{id}/shipped` — A custom profile has no shipped text: 404.
+
+## /api/v1/pool
+
+Source: `WorkflowPoolController` – Workflow pool: list and install the shared workflow files of the pool directory, and export a workflow into it.
+
+| Endpoint | Purpose | Module |
+|---|---|---|
+| `GET /api/v1/pool` | Lists the workflows of the pool directory, sorted by English name; empty when the pool is switched off. | core |
+| `POST /api/v1/pool/export/{workflowId}` | Writes the workflow as a new pool file and answers `201`; instance bindings such as ids are removed and listed in `sanitizedPaths`. | core |
+| `GET /api/v1/pool/{id}` | Returns one pool workflow; `locale` as for the list. | core |
+| `POST /api/v1/pool/{id}/install` | Installs a pool workflow into the project `projectId`, or updates the copy an earlier install left there. | core |
+
+Notes:
+
+- `POST /api/v1/pool/export/{workflowId}` — Id keys (`projectId`, `workflowId`, ...) with a concrete value and UUID values are dropped, placeholders like `{{ project_id }}` stay, and a UUID inside a text becomes `REDACTED-UUID`. An unknown `scope` is 400.
+- `POST /api/v1/pool/{id}/install` — The copy is also found under its name in the other language; `forceCreate` always creates a new one. A pool file whose checksum does not match is refused with `400`; the answer's `integrity` says `VERIFIED` or `MISSING`.
+
+## /api/v1/projects
+
+Sources:
+
+- `ProjectBundleController` – A whole project as one file: export, preview of an import, import.
+- `ProjectController` – Projects: create, edit, archive and restore them, start or stop their container, and manage their onboarding file.
+
+| Endpoint | Purpose | Module |
+|---|---|---|
+| `GET /api/v1/projects` | Lists all projects that are not archived. | core |
+| `POST /api/v1/projects` | Creates a project (201); `name`, `type` and `path` are required. | core |
+| `GET /api/v1/projects/archived` | Lists the archived projects. | core |
+| `POST /api/v1/projects/example` | The bundled example project for a fresh installation: created on the first call (201), returned on every further call (200) — with any example workflow it lacks added. | core |
+| `POST /api/v1/projects/import` | Imports a bundle into a new or existing project in one transaction (201); schedules arrive disabled. | core |
+| `POST /api/v1/projects/import/preview` | Validates a bundle and shows what an import would create, including its shell commands; writes nothing. | core |
+| `GET /api/v1/projects/{id}` | Returns one project; an archived project is a 404. | core |
+| `PUT /api/v1/projects/{id}` | Updates the fields sent and keeps the others; a new `path` is checked like on create. | core |
+| `DELETE /api/v1/projects/{id}` | Archives the project (204) and stops its container if it was running; its workflows stay. | core |
+| `GET /api/v1/projects/{id}/export` | Downloads the project as a bundle file: master data, workflows, chains and schedules, with local paths as tokens. | core |
+| `POST /api/v1/projects/{id}/generate-context` | Generates an AI context text from the project directory with the default AI provider and stores it as `aiContext`. | core |
+| `POST /api/v1/projects/{id}/onboarding/disable` | Switches onboarding off and deletes the onboarding file if MySuricates wrote it. | `onboarding-profiles` |
+| `POST /api/v1/projects/{id}/onboarding/enable` | Switches onboarding on and writes the onboarding file from the chosen profiles into the project directory. | `onboarding-profiles` |
+| `GET /api/v1/projects/{id}/onboarding/preview` | Returns the onboarding file text as it would be written, as `{"content": …}`, without writing it. | `onboarding-profiles` |
+| `POST /api/v1/projects/{id}/onboarding/refresh` | Writes the onboarding file again from the current profiles; does nothing while onboarding is off. | `onboarding-profiles` |
+| `GET /api/v1/projects/{id}/onboarding/status` | Returns the onboarding state: on or off, format, profiles, language, file path and whether the file exists or is foreign. | `onboarding-profiles` |
+| `POST /api/v1/projects/{id}/restore` | Restores an archived project. | core |
+| `POST /api/v1/projects/{id}/start` | Creates and starts the project's Docker container and returns the project with status `RUNNING`, or `ERROR` if it failed. | core |
+| `POST /api/v1/projects/{id}/stop` | Stops the project's Docker container and returns the project with status `STOPPED`. | core |
+| `GET /api/v1/projects/{id}/workflows` | Lists the workflows of a project with their run counts. | core |
+
+Notes:
+
+- `POST /api/v1/projects` — `path` must be an existing directory (under the workspace root if one is set), otherwise 400.
+- `POST /api/v1/projects/example` — Its files are copied to `automation.examples.directory`; an existing copy is never overwritten. An example whose blocks need a switched-off module is left out until a later call with the module on; `locale` (`de`/`en`, default `en`) picks the language of names and workflows.
+- `POST /api/v1/projects/import` — Every path token needs an entry in `pathMappings`, otherwise 400 and nothing is created.
+- `DELETE /api/v1/projects/{id}` — `POST /{id}/restore` brings it back.
+- `GET /api/v1/projects/{id}/export` — An unknown or archived project is a 404.
+- `POST /api/v1/projects/{id}/generate-context` — Returns `{"context": …}`; the project path must exist (else 400).
+- `POST /api/v1/projects/{id}/onboarding/enable` — `format` is `CLAUDE_RULES` (default) or `AGENTS_MD`; a file without the MySuricates marker is never overwritten.
+
+## /api/v1/reports
+
+Source: `ReportsController` – Lists and reads the Markdown reports in the configured reports directory (`automation.reports.directory`).
+
+| Endpoint | Purpose | Module |
+|---|---|---|
+| `GET /api/v1/reports` | Lists the `.md` files of the reports directory as `name` and `label`, newest date in the name first. | `audit` |
+| `GET /api/v1/reports/{name}` | Returns the content of one report as `content`. | `audit` |
+
+Notes:
+
+- `GET /api/v1/reports` — An unreadable directory yields an empty list.
+- `GET /api/v1/reports/{name}` — Only plain `.md` file names are accepted (400 otherwise); a missing file is 404.
+
+## /api/v1/schedules
+
+Source: `ScheduleController` – Time-based starts of workflows and chains: cron, one-off and delayed schedules, calendar and the scheduler pauses.
+
+| Endpoint | Purpose | Module |
+|---|---|---|
+| `GET /api/v1/schedules` | Lists all schedules. | core |
+| `POST /api/v1/schedules` | Creates a schedule for a workflow (`workflowId`) or a chain (`targetType: CHAIN`, `chainId`) and answers 201. | core |
+| `GET /api/v1/schedules/calendar` | Returns the calendar data between `from` and `to`: upcoming schedules and past runs. | core |
+| `GET /api/v1/schedules/catch-up` | Sequential catch-up queue: the missed occurrence currently running and the ones waiting. | core |
+| `GET /api/v1/schedules/chain/{chainId}` | Lists the schedules of one chain. | core |
+| `GET /api/v1/schedules/maintenance` | Both pauses: the maintenance switch and an active skip-until window from the configuration. | core |
+| `POST /api/v1/schedules/maintenance` | Switches the scheduler maintenance mode on or off with `enabled`; while it is on, no schedule starts. | core |
+| `POST /api/v1/schedules/preview` | Previews the next run times of the cron expression in `cronExpression`. | core |
+| `GET /api/v1/schedules/remaining-this-week` | Lists the runs still due this week; `projectId` (optional) filters like `remaining-today`. | core |
+| `GET /api/v1/schedules/remaining-today` | Lists the runs still due today. | core |
+| `GET /api/v1/schedules/workflow/{workflowId}` | Lists the schedules of one workflow. | core |
+| `GET /api/v1/schedules/{id}` | Returns one schedule; unknown id is 404. | core |
+| `PUT /api/v1/schedules/{id}` | Updates a schedule; only the fields sent are changed. | core |
+| `DELETE /api/v1/schedules/{id}` | Deletes a schedule (204). | core |
+| `POST /api/v1/schedules/{id}/disable` | Disables a schedule and clears its next run. | core |
+| `POST /api/v1/schedules/{id}/enable` | Enables a schedule and computes its next run. | core |
+| `GET /api/v1/schedules/{id}/runs` | Lists a schedule's newest workflow and chain runs as list rows, with step count and last-step preview. | core |
+
+Notes:
+
+- `GET /api/v1/schedules` — `nextRunAt` is the next run that will actually start; during a skip-until pause `pausedUntil` names its end, and while the maintenance switch is on `nextRunAt` is null and `maintenance` true.
+- `POST /api/v1/schedules` — Unknown enum values, an invalid cron expression or a schedule without any run left are 400. `targetType`, `scheduleType` and `conflictBehavior` are trimmed and ignore case; the defaults are `WORKFLOW`, `CRON` and `SKIP`.
+- `GET /api/v1/schedules/calendar` — Upcoming = schedules whose next real run lies in the period (behind a skip-until pause). Past runs: the newest `limit` of the period plus their total. `from` and `to` are required; `limit` defaults to 1000 and is clamped to 1–5000.
+- `POST /api/v1/schedules/maintenance` — The switch is stored and survives a restart.
+- `POST /api/v1/schedules/preview` — It returns 5 times. A missing or invalid expression is 400; during a skip-until pause the times start after it and `pausedUntil` is set.
+- `GET /api/v1/schedules/remaining-today` — `projectId` (optional): only the schedules of that project's workflows — the dashboard filter; chains belong to no project and are left out then.
+- `PUT /api/v1/schedules/{id}` — If an enabled cron schedule is then left without a run before `endDate` or `maxRuns`, the answer is 400.
+- `POST /api/v1/schedules/{id}/enable` — An unparsable cron expression, a passed `endDate` or used-up `maxRuns` is 400.
+- `GET /api/v1/schedules/{id}/runs` — The detail route of a run has the full text. At most `limit` per kind (default 50, clamped to 1–500), plus the total of each.
+
+## /api/v1/search
+
+Source: `SearchController` – Aggregates search across workflows (and later runs/skills/integrations).
+
+| Endpoint | Purpose | Module |
+|---|---|---|
+| `GET /api/v1/search` | Searches workflows by name, description, tags and category for `q` and returns the best matches. | core |
+| `POST /api/v1/search/workflows/semantic` | Ranks workflows against a natural-language `query` with the AI suggestions model, each with a match reason. | core |
+
+Notes:
+
+- `GET /api/v1/search` — An empty `q` yields an empty list; `limit` (default 20) is capped at 50.
+- `POST /api/v1/search/workflows/semantic` — Answers 204 when semantic search is switched off (`automation.discovery.semantic-enabled`).
+
+## /api/v1/skills
+
+Source: `SkillController` – Skills and their capabilities: list, create, edit, delete, version history and JSON import/export.
+
+| Endpoint | Purpose | Module |
+|---|---|---|
+| `GET /api/v1/skills` | Lists all skills, built-in and custom, with their capabilities. | `skills` |
+| `POST /api/v1/skills` | Creates a custom skill and answers 201; `name` and `category` are required. | `skills` |
+| `GET /api/v1/skills/export/{id}` | Exports a skill with its capabilities as JSON in the format the import accepts. | `skills` |
+| `POST /api/v1/skills/import` | Imports a skill from its exported JSON as a new custom skill and answers 201; every capability needs a `name`. | `skills` |
+| `GET /api/v1/skills/seal-pins` | skill id → names of the sealed workflows that use it; such skills cannot be changed or deleted. | `skills` |
+| `GET /api/v1/skills/{id}` | Returns one skill with its capabilities; unknown id is 404. | `skills` |
+| `PUT /api/v1/skills/{id}` | Updates a custom skill. | `skills` |
+| `DELETE /api/v1/skills/{id}` | Deletes a custom skill (204). | `skills` |
+| `GET /api/v1/skills/{id}/capabilities` | Lists the capabilities of one skill. | `skills` |
+| `GET /api/v1/skills/{id}/versions` | Returns the change history of a skill, newest first, also for a skill deleted since; the snapshots are not included. | `skills` |
+
+Notes:
+
+- `PUT /api/v1/skills/{id}` — Custom skills only (built-in → 409); a skill used by a sealed workflow → 409 SKILL_PINNED_BY_SEAL. Only name, description, icon, category and `aiContext` change; `configSchema`, the capabilities and the version label stay as they are.
+- `DELETE /api/v1/skills/{id}` — A built-in skill or one used by a sealed workflow is refused with 409.
+
+## /api/v1/staging
+
+Sources:
+
+- `StagedSyncController` – Definition sync of the staged setup: Dev → Test / Prod.
+- `StagingController` – The local Stable environment (Docker container): status, start/stop, promote and definition sync from this instance.
+
+| Endpoint | Purpose | Module |
+|---|---|---|
+| `POST /api/v1/staging/promote` | Starts a promote in the background (202): stop Stable, build backend, frontend and image, start it again. | `staging` |
+| `POST /api/v1/staging/promote/cancel` | Cancels a running promote and kills its current build step. | `staging` |
+| `POST /api/v1/staging/start` | Starts the Stable container and waits until it is healthy. | `staging` |
+| `GET /api/v1/staging/status` | Returns whether the Stable container runs and is healthy, the promote progress and the Stable version. | `staging` |
+| `POST /api/v1/staging/stop` | Stops the Stable container. | `staging` |
+| `POST /api/v1/staging/sync-definitions` | Transfers projects, workflows, skills and chains from this instance to Stable; an optional body narrows the selection by ids. | `staging` |
+| `GET /api/v1/staging/sync-preview` | Previews which projects, workflows, skills and chains a sync to Stable would transfer; 409 while Stable is not healthy. | `staging` |
+| `GET /api/v1/staging/targets` | Lists the configured sync targets (`test`, `prod`) with URL, key presence and reachability. | `staging` |
+| `POST /api/v1/staging/targets/{target}/sync-definitions` | Transfers projects, workflows, skills and chains to `test` or `prod`; an optional body narrows the selection by ids. | `staging` |
+| `GET /api/v1/staging/targets/{target}/sync-preview` | Previews what a sync from this instance to `test` or `prod` would transfer; for `prod` only sealed definitions. | `staging` |
+
+Notes:
+
+- `POST /api/v1/staging/promote` — While a promote is running another one is 409; progress is in `GET /api/v1/staging/status`.
+- `POST /api/v1/staging/start` — Refused with 409 when no Stable frontend has been built yet; run a promote first.
+- `POST /api/v1/staging/sync-definitions` — Refused with 409 while Stable is not healthy.
+- `GET /api/v1/staging/targets` — Targets that are not configured are left out.
+- `POST /api/v1/staging/targets/{target}/sync-definitions` — For `prod` the selection is narrowed to sealed definitions; errors as for the preview.
+- `GET /api/v1/staging/targets/{target}/sync-preview` — A target that is not configured, has no key file or is unreachable is 409.
+
+## /api/v1/system
+
+Sources:
+
+- `SystemAccessController` – Access endpoints under /api/v1/system: remote access (Tailscale) and the local file system.
+- `SystemAiProviderController` – AI providers and capabilities under /api/v1/system.
+- `SystemController` – Core information under /api/v1/system: health, platform info, auth status, heap usage and client error reports.
+- `SystemMaintenanceController` – Maintenance under /api/v1/system: auto-repair, VACUUM, database backups.
+- `SystemModulesController` – Runtime module switches for the settings UI.
+- `SystemRequestMetricsController` – Request costs per route: the live window from memory and the stored daily history.
+- `SystemSettingsController` – Runtime settings under /api/v1/system: application settings and execution config.
+
+| Endpoint | Purpose | Module |
+|---|---|---|
+| `GET /api/v1/system/ai-providers` | Lists the registered AI providers, the default provider and each provider's declared capabilities. | core |
+| `GET /api/v1/system/ai-providers/PI/catalog` | Returns the pi runtime catalog read from `~/.pi/agent`: which backend providers are authenticated, which are custom-defined in models.json, and what pi's own default-provider/-model is set to. | core |
+| `GET /api/v1/system/ai-providers/status` | Per provider: program on the PATH, login found (file or environment variable), and the commands for what is missing — for the start page and the settings. | core |
+| `POST /api/v1/system/ai-providers/status/refresh` | Looks at the machine again now, e.g. right after logging in. | core |
+| `GET /api/v1/system/ai-providers/{id}/models` | Models the provider offers on this host, discovered from the CLI / its local caches and served from a TTL cache. | core |
+| `POST /api/v1/system/ai-providers/{id}/models/refresh` | Bypasses the cache and probes the host now. | core |
+| `GET /api/v1/system/auth-status` | Tells whether API-key security is switched on (`securityEnabled`); reachable without a key. | core |
+| `GET /api/v1/system/backup` | Creates a backup of the database now and returns it as a file download. | core |
+| `POST /api/v1/system/backup` | Creates a backup of the database and returns its file name, size and time. | core |
+| `GET /api/v1/system/backups` | Lists the backup files with name, size and creation time, newest first. | core |
+| `GET /api/v1/system/backups/{filename}` | Downloads one backup file; an unknown name or one with a path in it is 404. | core |
+| `GET /api/v1/system/browse` | Lists the subdirectories of `path` (default: the home directory) without hidden ones, plus the parent path. | core |
+| `GET /api/v1/system/capabilities` | Describes what this instance offers: API and app version, all API routes, the block types usable now and the module state. | core |
+| `POST /api/v1/system/client-errors` | Accepts an error report from the browser client and writes it to the backend log (202). | core |
+| `GET /api/v1/system/execution-config` | Returns the current execution settings (concurrency, timeouts, rate limit and more) plus the read-only `activeRuns`. | core |
+| `PUT /api/v1/system/execution-config` | Changes execution settings with immediate effect and returns the full current set. | core |
+| `GET /api/v1/system/health` | Health check without a key: `UP`, `DEGRADED` (Docker expected but not answering) or `DOWN` (database unreachable). | core |
+| `GET /api/v1/system/info` | Returns name, version, build, Java version, runtime mode, environment and the rate-limit figures; reachable without a key. | core |
+| `GET /api/v1/system/integration-snippet` | Renders the base onboarding text as a Markdown snippet to paste into a project, e.g. into an `AGENTS.md`. | `onboarding-profiles` |
+| `GET /api/v1/system/jvm-memory` | Returns the heap usage as exactly three numbers, without an API key. | core |
+| `PUT /api/v1/system/modules/{name}` | Switches a feature module on or off (`enabled`) with immediate effect and returns the state of all modules. | core |
+| `DELETE /api/v1/system/modules/{name}/override` | Drops the settings override of a module so it follows the startup configuration again; returns the state of all modules. | core |
+| `POST /api/v1/system/open-path` | Opens a file or directory (`path`) in the desktop's file manager on the host. | core |
+| `POST /api/v1/system/remote-access/disable` | Takes Tailscale down on the host; a failing command or a container instance is 503. | `remote-access` |
+| `POST /api/v1/system/remote-access/enable` | Brings Tailscale up on the host and returns the Tailscale IP and hostname. | `remote-access` |
+| `GET /api/v1/system/remote-access/status` | Returns whether Tailscale is up, with IP and hostname, and whether this instance runs in a container. | `remote-access` |
+| `POST /api/v1/system/repair-failed` | Queues a repair for every workflow with a failed run and answers 202 with the number queued. | `factory` |
+| `GET /api/v1/system/request-metrics` | Routes measured since the last daily snapshot, most expensive (p95) first. | core |
+| `GET /api/v1/system/request-metrics/daily` | Stored daily rows for one route, oldest first — the baseline a drift check compares against. | core |
+| `GET /api/v1/system/settings/{key}` | Returns one application setting; a key that is not allowed answers `400`. | core |
+| `PUT /api/v1/system/settings/{key}` | Stores an application setting from `value` in the body. | core |
+| `GET /api/v1/system/tray-config` | Returns the settings of the host tray icon: popups, which events notify, and the public URL the browser opens. | core |
+| `PUT /api/v1/system/tray-config` | Updates the tray settings; only the fields sent change, and the answer is the full state. | core |
+| `POST /api/v1/system/vacuum` | Runs a full SQLite VACUUM and reports its duration; a failed VACUUM is 500. | core |
+
+Notes:
+
+- `GET /api/v1/system/ai-providers/status` — Cached, see `AiProviderStatusService`; never a token or file content. `READY` means program and login were found, not that the login is still valid.
+- `GET /api/v1/system/ai-providers/{id}/models` — A failed probe (CLI missing, timeout, unreadable output) never fails the request: `available` is then `false`, `reason` says why and `models` is empty. An unknown provider id is 404.
+- `POST /api/v1/system/backup` — An optional `reason` goes into the activity log; old backups beyond the retain count are deleted.
+- `GET /api/v1/system/browse` — The root and system directories are refused with 400, as is a path that is no readable directory.
+- `GET /api/v1/system/capabilities` — Block types whose module is switched off are left out.
+- `PUT /api/v1/system/execution-config` — All values are checked before any is applied, so an invalid one (400) leaves every setting unchanged. Keys are the kebab-case names or their camelCase aliases; an unknown key or a value outside its bounds (`ExecutionSettingKeys.BOUNDS`) is 400. Stored values are applied again after a restart.
+- `GET /api/v1/system/health` — The components list database response time and Docker state.
+- `GET /api/v1/system/integration-snippet` — With a `projectPath` of a known project it uses that project's id and lists its workflows; `locale` picks the language (default `en`).
+- `GET /api/v1/system/jvm-memory` — The performance audit measures memory with it without opening all of `/actuator/metrics`, which reveals routes and load profile and stays behind the key. The source is the MemoryMXBean, not Micrometer: `jvm.memory.max` sums over pools whose maximum is undefined (`-1`). Without a known heap maximum, maximum and percentage are `null` rather than guessed; the percentage has one decimal.
+- `PUT /api/v1/system/modules/{name}` — An unknown module name is 404; the change is recorded as a SECURITY entry in the activity log.
+- `POST /api/v1/system/open-path` — An empty, missing or system path (`/etc`, `/proc`, ...) is 400.
+- `POST /api/v1/system/remote-access/enable` — A failing Tailscale command, or an instance running in a container, is 503.
+- `POST /api/v1/system/repair-failed` — Without `force=true` only workflows with auto-repair enabled; sealed workflows are always skipped.
+- `GET /api/v1/system/request-metrics/daily` — Without `route` today's stored rows of all routes are returned instead, most expensive first; `days` (default 7, at most 90) only applies with `route`.
+- `GET /api/v1/system/settings/{key}` — `value` is the stored value or empty; `default`, only for a setting whose default comes from the startup configuration (`backup-retain-count`), is what applies while nothing is stored.
+- `PUT /api/v1/system/settings/{key}` — Keys outside the allowed list, or a missing `value`, are 400. `backup-retain-count` takes 1–365, checked before anything is stored, and applies from the next backup rotation on, also after a restart.
+- `PUT /api/v1/system/tray-config` — `publicUrl` must use HTTPS, plain HTTP only for localhost (400 otherwise).
+
+## /api/v1/testing
+
+Source: `TestingController` – Controls the Test instance container: start, stop, reset, push definitions to it and pull changes back.
+
+| Endpoint | Purpose | Module |
+|---|---|---|
+| `POST /api/v1/testing/pull-changes` | Takes instructions and model of the Test instance's workflows into the workflows with the same name and project here. | `staging` |
+| `POST /api/v1/testing/report-result` | Records a test result as test status of the workflow with this name and project name. | `staging` |
+| `POST /api/v1/testing/reset` | Wipes the Test database volume, starts the container fresh and pushes all definitions to it. | `staging` |
+| `POST /api/v1/testing/start` | Starts the Test container with this instance's API key and waits for its health check. | `staging` |
+| `GET /api/v1/testing/status` | Reports whether the Test container is running and healthy, plus its version and build timestamp when healthy. | `staging` |
+| `POST /api/v1/testing/stop` | Stops the Test container. | `staging` |
+| `POST /api/v1/testing/sync-definitions` | Copies definitions from this instance to the Test instance, after a backup there. | `staging` |
+| `GET /api/v1/testing/sync-preview` | Lists which projects, workflows, skills and chains a sync would create or update on the Test instance. | `staging` |
+
+Notes:
+
+- `POST /api/v1/testing/pull-changes` — Returns 409 while the Test instance is not healthy.
+- `POST /api/v1/testing/report-result` — `workflowName` and `status` are required (else 400); an unknown workflow is only logged.
+- `POST /api/v1/testing/reset` — Everything that existed only on the Test instance is lost.
+- `POST /api/v1/testing/start` — Returns 409 while no `stable-frontend/` build exists (promote first).
+- `POST /api/v1/testing/sync-definitions` — Without a body everything is synced; `projectIds`, `workflowIds`, `skillIds` and `chainIds` narrow it down. Returns 409 while the Test instance is not healthy.
+
+## /api/v1/todo-triggers
+
+Source: `TodoTriggerController` – TODO triggers: start a fix workflow automatically when an open TODO matches tags, project, source and priority.
+
+| Endpoint | Purpose | Module |
+|---|---|---|
+| `GET /api/v1/todo-triggers` | Lists all TODO triggers. | core |
+| `POST /api/v1/todo-triggers` | Creates a TODO trigger and returns it with 201; `tagPattern` and `targetWorkflowId` are required. | core |
+| `GET /api/v1/todo-triggers/workflow/{workflowId}` | Lists the TODO triggers that start the given workflow. | core |
+| `GET /api/v1/todo-triggers/{id}` | Returns one TODO trigger. | core |
+| `DELETE /api/v1/todo-triggers/{id}` | Deletes a TODO trigger. | core |
+| `POST /api/v1/todo-triggers/{id}/disable` | Disables a TODO trigger; it then ignores new and existing TODOs. | core |
+| `POST /api/v1/todo-triggers/{id}/enable` | Enables a TODO trigger. | core |
+
+Notes:
+
+- `POST /api/v1/todo-triggers` — `sourceFilter` and `minPriority` ignore case, other values return 400; with `processBacklog` (default on) the periodic poll also picks up existing matching TODOs.
+
+## /api/v1/todos
+
+Source: `TodoController` – TODOs: list, create, edit and close them, start their fix workflow, export them to a tracker, find duplicates.
+
+| Endpoint | Purpose | Module |
+|---|---|---|
+| `GET /api/v1/todos` | Lists TODOs page by page, most urgent first, filtered by project, status, priority, source, tag, text or goal. | core |
+| `POST /api/v1/todos` | Creates a TODO and returns it with 201; only `title` is required. | core |
+| `POST /api/v1/todos/archive-stale` | Archive stale auto-todos now (cockpit "Verstaubtes archivieren"). | core |
+| `POST /api/v1/todos/bulk-status` | Bulk status change (e.g. archive selected todos). | core |
+| `GET /api/v1/todos/count` | Counts TODOs per status, optionally only those of `projectId`. | core |
+| `GET /api/v1/todos/overview` | Cross-project cockpit overview: per-project rollups + a global "Braucht dich" lane. | core |
+| `GET /api/v1/todos/similar` | Check for similar TODOs before creating a new one. | core |
+| `GET /api/v1/todos/{id}` | Returns one TODO. | core |
+| `PUT /api/v1/todos/{id}` | Updates the fields sent in the body and leaves the others unchanged. | core |
+| `DELETE /api/v1/todos/{id}` | Deletes a TODO permanently. | core |
+| `POST /api/v1/todos/{id}/export` | Creates a task for the TODO in an external tracker and returns its reference; a TODO already exported returns the existing link. | `integrations` |
+| `PATCH /api/v1/todos/{id}/planning` | Sets a TODO's goal, work package, rank, assessment (complexity, effort, reasoning, open question) and decision. | `goals` |
+| `POST /api/v1/todos/{id}/resolve` | Starts the TODO's linked fix workflow and sets the TODO to IN_PROGRESS. | core |
+| `PATCH /api/v1/todos/{id}/status` | Sets the status of a TODO (`status` required), optionally recording the `sessionId` that changed it. | core |
+
+Notes:
+
+- `GET /api/v1/todos` — ARCHIVED TODOs only appear when `status` names them; status, priority and source ignore case, an unknown value returns 400, and `goalId=none` selects TODOs without a goal.
+- `POST /api/v1/todos` — Defaults are OPEN, MEDIUM and source USER; an unknown `projectId` or `linkedWorkflowId` returns 404, and a new OPEN TODO can start matching TODO triggers. `agentSessionRef` keeps only the conversation UUID found in the value (a whole `claude --resume` command is accepted); a value without a UUID is dropped.
+- `POST /api/v1/todos/archive-stale` — Optional `projectId` scopes it to one project; omit to archive across all. Returns `{"archived": n}`.
+- `POST /api/v1/todos/bulk-status` — Returns `{"updated": n}`.
+- `GET /api/v1/todos/similar` — `projectId` and `title` are required. Frontend calls this to offer merge/link options to the user.
+- `PUT /api/v1/todos/{id}` — An empty `dueDate` or `linkedWorkflowId` clears it; an unknown project or workflow id returns 404.
+- `POST /api/v1/todos/{id}/export` — Provider and target come from the body or the project's `taskExport` setting.
+- `PATCH /api/v1/todos/{id}/planning` — A `goalId` in the same request is applied first; an unknown goal or work package is 404. `goalRank` of 0 or less removes the rank, a rank without a goal is 400. Sending `complexity`, `suggestedEffort` or `ratingNote` stamps `ratedAt`, with `ratedBy` defaulting to `USER`; other values than S/M/L/XL or low/medium/high/xhigh are 400.
+- `POST /api/v1/todos/{id}/resolve` — Returns 400 without a linked workflow and 409 when the TODO is DONE or its last fix run is still running.
+
+## /api/v1/webhook
+
+Source: `WebhookController` – Webhooks: manage the tokens that start a workflow from outside, and the public trigger endpoint itself.
+
+| Endpoint | Purpose | Module |
+|---|---|---|
+| `POST /api/v1/webhook/trigger/{token}` | Starts the webhook's workflow without API key; the token in the path authorizes the call. | `webhooks` |
+
+Notes:
+
+- `POST /api/v1/webhook/trigger/{token}` — An optional JSON object body is merged over `defaultContext` (keys starting with `__` return 400); with a signing secret the call needs a valid `X-Signature` header, else 401. A body that is no JSON object is 400, an unknown token 404, a disabled webhook 409.
+
+## /api/v1/webhooks
+
+Source: `WebhookController` – Webhooks: manage the tokens that start a workflow from outside, and the public trigger endpoint itself.
+
+| Endpoint | Purpose | Module |
+|---|---|---|
+| `GET /api/v1/webhooks` | Lists all webhooks; tokens and URLs are masked to their first characters. | `webhooks` |
+| `POST /api/v1/webhooks` | Creates an enabled webhook for `workflowId` and returns it with 201. | `webhooks` |
+| `GET /api/v1/webhooks/workflow/{workflowId}` | Lists the webhooks of a workflow with masked tokens. | `webhooks` |
+| `GET /api/v1/webhooks/{id}` | Returns one webhook with masked token. | `webhooks` |
+| `DELETE /api/v1/webhooks/{id}` | Deletes a webhook; its token stops working. | `webhooks` |
+| `POST /api/v1/webhooks/{id}/disable` | Disables a webhook; calls to its trigger URL then return 409. | `webhooks` |
+| `POST /api/v1/webhooks/{id}/enable` | Enables a webhook. | `webhooks` |
+| `POST /api/v1/webhooks/{id}/regenerate-token` | Rotates a webhook's secret token. | `webhooks` |
+| `POST /api/v1/webhooks/{id}/secret` | Creates or rotates the signing secret; the response is the only place it is ever shown. | `webhook-signatures` |
+| `DELETE /api/v1/webhooks/{id}/secret` | Removes the signing secret, so trigger calls no longer need a signature; logged as `SECURITY`. | `webhook-signatures` |
+
+Notes:
+
+- `GET /api/v1/webhooks` — Masked means the first 8 characters plus `…`; only create and regenerate-token show the full token.
+- `POST /api/v1/webhooks` — Only this response shows the full token and URL (`tokenVisible: true`) – store them right away.
+- `POST /api/v1/webhooks/{id}/regenerate-token` — Like creating a webhook, the response is the only place the new token is ever revealed in full — every other management endpoint masks it. The old token stops working at once; `lastTriggeredAt` and `triggerCount` stay, and a `SECURITY` entry is written to the activity log.
+- `POST /api/v1/webhooks/{id}/secret` — From then on every trigger call needs a valid signature; a `SECURITY` entry is logged.
+
+## /api/v1/wishes
+
+Source: `WishController` – Wishes: a request in plain words that an AI loop decomposes into workflows, runs, evaluates and refines.
+
+| Endpoint | Purpose | Module |
+|---|---|---|
+| `GET /api/v1/wishes` | Lists all wishes, newest first. | `wishes` |
+| `POST /api/v1/wishes` | Creates a wish and starts fulfilling it in the background; returns it with 201. | `wishes` |
+| `GET /api/v1/wishes/{id}` | Returns one wish with its status, iterations and generated workflows. | `wishes` |
+| `DELETE /api/v1/wishes/{id}` | Deletes a wish; only COMPLETED, FAILED or CANCELLED wishes can be deleted (else 409). | `wishes` |
+| `POST /api/v1/wishes/{id}/cancel` | Stops the fulfillment loop and marks a wish that is not finished yet as CANCELLED. | `wishes` |
+| `POST /api/v1/wishes/{id}/crystallize` | Saves the first generated workflow of a completed wish as a template and returns `templateId`. | `wishes` |
+| `POST /api/v1/wishes/{id}/respond` | Responds to a wish with `action` ACCEPT, REFINE, CANCEL, CLARIFY or RETRY plus optional `feedback`. | `wishes` |
+
+Notes:
+
+- `POST /api/v1/wishes` — `text` and `projectId` are required, an unknown project returns 404.
+- `POST /api/v1/wishes/{id}/respond` — Each action is only allowed in its matching state (else 409); RETRY restarts a FAILED or CANCELLED wish.
+
+## /api/v1/workflow-templates
+
+Source: `WorkflowTemplateController` – Workflow templates and blueprints: list, maintain, create from a workflow, and install into a project.
+
+| Endpoint | Purpose | Module |
+|---|---|---|
+| `GET /api/v1/workflow-templates` | Lists all templates and blueprints by `sortOrder`, each with the projects it was verified in. | core |
+| `POST /api/v1/workflow-templates` | Creates a user template (`builtIn` is always `false`) and answers `201`. | core |
+| `POST /api/v1/workflow-templates/from-workflow/{workflowId}` | Saves a workflow's name, description, blocks, instructions and model as a new user template (`201`). | core |
+| `GET /api/v1/workflow-templates/{id}` | Returns one template; `locale` as for the list. | core |
+| `PUT /api/v1/workflow-templates/{id}` | Changes the given fields of a template; fields left out stay as they are. | core |
+| `DELETE /api/v1/workflow-templates/{id}` | Deletes a user template (`204`); a built-in template is refused with `409`. | core |
+| `POST /api/v1/workflow-templates/{id}/install` | Creates a workflow from the template in a project, plus the blueprints its sub-workflow blocks call, wired to their new ids. | core |
+
+Notes:
+
+- `POST /api/v1/workflow-templates/{id}/install` — An unknown referenced blueprint is a 404 and nothing is created. A blank `name` or `description` takes the template's in `locale` (default English); `metadata` goes to the new workflow only, not to the blueprints it calls.
+
+## /api/v1/workflows
+
+Sources:
+
+- `WorkflowAnalyzerController` – Deterministic check of workflow definitions for construction errors — on demand, never blocking.
+- `WorkflowAssistController` – Help with an existing workflow: optimization suggestion, similar workflows, repair after failed runs.
+- `WorkflowController` – Workflows: create, read, change and delete them, start runs, list their runs and move them as JSON.
+- `WorkflowImportController` – Imports external process formats as a NEW workflow (round trip to the export in `WorkflowController`).
+- `WorkflowMemoryController` – Workflow memory: knowledge distilled from a workflow's runs, of which one entry can be active per workflow.
+- `WorkflowSealController` – Seal / unseal a workflow.
+- `WorkflowSealStatusController` – Read-only seal status for the UI.
+- `WorkflowVersionController` – Version history of a workflow: list, fetch one, restore.
+
+| Endpoint | Purpose | Module |
+|---|---|---|
+| `GET /api/v1/workflows` | Lists all workflows of projects that are not archived, each with its run count. | core |
+| `POST /api/v1/workflows` | Creates a workflow in the project named by `projectId` and answers `201`. | core |
+| `GET /api/v1/workflows/analyze` | Checks all definitions in active projects. | core |
+| `GET /api/v1/workflows/export/{id}` | Exports the workflow as portable JSON without ids or project, with an `integrity` checksum that `POST /api/v1/workflows/import` verifies. | core |
+| `POST /api/v1/workflows/import` | Imports a workflow from its JSON export and answers `201`. | core |
+| `POST /api/v1/workflows/import/bpmn` | Imports a previously exported BPMN process (with `mysuricates:blockConfig`) as a new workflow in the project. | `bpmn` |
+| `GET /api/v1/workflows/seal-status` | Every sealed workflow plus every workflow with refused starts in the last seven days. | core |
+| `GET /api/v1/workflows/{id}` | Returns one workflow with its blocks and activated skills. | core |
+| `PUT /api/v1/workflows/{id}` | Changes the given fields of a workflow; fields left out stay as they are. | core |
+| `DELETE /api/v1/workflows/{id}` | Soft-deletes a workflow (`204`); a sealed workflow is refused with `409 WORKFLOW_SEALED`. | core |
+| `GET /api/v1/workflows/{id}/analyze` | Returns the findings of one workflow definition. | core |
+| `POST /api/v1/workflows/{id}/execute` | Starts a manual run and returns it right away with status `RUNNING`; the blocks run in the background. | core |
+| `GET /api/v1/workflows/{id}/export/bpmn` | Exports the workflow as BPMN 2.0 XML for download. | `bpmn` |
+| `POST /api/v1/workflows/{id}/optimize` | Asks the workflow's AI provider for an optimization suggestion and returns it as JSON. | core |
+| `POST /api/v1/workflows/{id}/repair` | Starts an AI repair of a workflow with failed runs in the background and answers `202`. | `factory` |
+| `GET /api/v1/workflows/{id}/runs` | Lists the workflow's runs, newest first, paginated (`page`, `size`) and without their steps. | core |
+| `GET /api/v1/workflows/{id}/runs/{runId}` | Returns one run with its steps; the run is looked up by `runId` alone. | core |
+| `POST /api/v1/workflows/{id}/seal` | Seals the workflow: records and signs the hash of its definition and of its skills; idempotent. | `sealing` |
+| `GET /api/v1/workflows/{id}/seal-events` | Sealing and unsealing of one workflow, newest first — kept beyond the activity log's retention. | core |
+| `GET /api/v1/workflows/{id}/similar` | Lists other workflows whose block types overlap with this one, most similar first, at most `limit` entries. | core |
+| `POST /api/v1/workflows/{id}/skills` | Activates the skills in `skillIds` for the workflow; already active ones are kept once. | `skills` |
+| `DELETE /api/v1/workflows/{id}/skills/{skillId}` | Deactivates one skill for the workflow. | `skills` |
+| `POST /api/v1/workflows/{id}/unseal` | Removes the seal and logs the previous hash as a `SECURITY` entry; idempotent. | `sealing` |
+| `GET /api/v1/workflows/{id}/versions` | Lists the workflow's versions, newest first, paginated (`page`, `size`). | core |
+| `GET /api/v1/workflows/{id}/versions/{versionId}` | Returns one version with its definition snapshot; a version of another workflow answers `404`. | core |
+| `POST /api/v1/workflows/{id}/versions/{versionId}/restore` | Sets the workflow's definition back to this version; the change is recorded as a new version. | core |
+| `GET /api/v1/workflows/{workflowId}/memory` | Lists the workflow's memory entries, newest first. | `memory` |
+| `POST /api/v1/workflows/{workflowId}/memory/extract` | Has an AI summarize the steps of the given runs into a new, inactive memory entry and answers `201`. | `memory` |
+| `PUT /api/v1/workflows/{workflowId}/memory/{memoryId}` | Changes title and/or content of a memory entry; a field left out stays as it is. | `memory` |
+| `DELETE /api/v1/workflows/{workflowId}/memory/{memoryId}` | Deletes a memory entry (`204`). | `memory` |
+| `PUT /api/v1/workflows/{workflowId}/memory/{memoryId}/activate` | Makes this memory entry the workflow's active one and deactivates all others (`204`). | `memory` |
+
+Notes:
+
+- `POST /api/v1/workflows` — The first version row is written with it; unknown block types are rejected.
+- `GET /api/v1/workflows/analyze` — The answer is condensed on purpose: only counts per workflow, plus the distribution over the rules. The full findings come per workflow — a full output over hundreds of definitions would be a megabyte nobody reads.
+- `POST /api/v1/workflows/import` — With `updateIfExists` a workflow of the same name in the target project is updated instead (`200`); without `projectId` it goes to the collection project. A checksum in `integrity` that does not match the content is rejected with `400` before anything is written. A blank `version` keeps the default label on a new workflow and the previous one on an update.
+- `POST /api/v1/workflows/import/bpmn` — Foreign BPMN, broken XML or oversized input → 400; nothing is created when the import fails (parsing and validation run before `create`).
+- `PUT /api/v1/workflows/{id}` — A definition change writes a new version and is refused on a sealed workflow (`409 WORKFLOW_SEALED`); name and `version` label are no definition change and stay editable. A blank `version` or one over 255 characters is 400 – leave the field out to keep the label.
+- `POST /api/v1/workflows/{id}/execute` — The optional `context` is merged over the workflow's default context. A refused start creates no run.
+- `POST /api/v1/workflows/{id}/optimize` — Changes nothing; a failed AI call comes back as `200` with `error: true` and a `message`.
+- `POST /api/v1/workflows/{id}/repair` — Without a failed run `400`; a sealed workflow is refused with `409 WORKFLOW_SEALED`.
+- `POST /api/v1/workflows/{id}/seal` — Afterwards definition changes and deletion are refused and a changed definition no longer starts.
+- `GET /api/v1/workflows/{id}/similar` — `limit` defaults to 5 and is capped at 20.
+- `POST /api/v1/workflows/{id}/unseal` — Refused with `403 SEAL_IMMUTABLE` while `automation.hardening.seal-immutable` is on.
+- `POST /api/v1/workflows/{id}/versions/{versionId}/restore` — A sealed workflow is refused with `409 WORKFLOW_SEALED`.
+- `POST /api/v1/workflows/{workflowId}/memory/extract` — Without `runIds` the workflow's latest runs are used; `provider` defaults to `CLAUDE`. No runs or no steps: `422`; a failed AI call: `502`.
+- `PUT /api/v1/workflows/{workflowId}/memory/{memoryId}/activate` — The active entry is written into the project before each run so the executing agent can read it.
+
+## /api/v1/ws-ticket
+
+Source: `WebSocketTicketController` – Hands out short-lived, single-use tickets for the WebSocket handshake.
+
+| Endpoint | Purpose | Module |
+|---|---|---|
+| `POST /api/v1/ws-ticket` | Issues a single-use ticket for the WebSocket handshake URL; it expires after `expiresInSeconds`. | core |

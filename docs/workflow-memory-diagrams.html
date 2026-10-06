@@ -220,7 +220,7 @@ graph TB
 sequenceDiagram
     participant B as Browser
     participant C as Controller
-    participant S as MemoryService
+    participant S as WorkflowMemoryService
     participant P as Preprocessor
     participant SM as Summarizer<br/>(Claude/Codex)
     participant CLI as CLI auf Host<br/>(claude/codex)
@@ -230,7 +230,7 @@ sequenceDiagram
     C-&gt;&gt;S: extractKnowledge()
     S-&gt;&gt;DB: Runs laden<br/>(letzte 10 oder spezifische IDs)
     DB--&gt;&gt;S: List&lt;WorkflowRun&gt;
-    S-&gt;&gt;S: StepResults sammeln
+    S-&gt;&gt;S: Schritte (StepResult) sammeln
     S-&gt;&gt;P: preprocess(steps)
     Note over P: Code-Blöcke über 30 Zeilen ersetzen<br/>Data-Dumps über 20 Zeilen ersetzen<br/>Meta-Kommentare entfernen<br/>Wiederholte Zeilen zusammenfassen<br/>Agentic-Iterationen verdichten
     P--&gt;&gt;S: preprocessed String
@@ -325,7 +325,7 @@ classDiagram
   <pre class="mermaid">
 sequenceDiagram
     participant WE as WorkflowExecutor<br/>(ExecutionContextFactory)
-    participant MS as MemoryService
+    participant MS as WorkflowMemoryService
     participant DB as SQLite
     participant FS as Filesystem
     participant CLI as KI-CLI<br/>(Block Execution)
@@ -344,7 +344,7 @@ sequenceDiagram
     Note over CLI: Claude CLI liest automatisch<br/>alle .claude/rules/*.md<br/>inkl. project-memory.md,<br/>Codex und Pi bekommen sie<br/>an den System-Prompt gehängt
 
     CLI--&gt;&gt;WE: Ergebnis
-    WE-&gt;&gt;DB: WorkflowRun + StepResults speichern
+    WE-&gt;&gt;DB: WorkflowRun + Schritte (StepResult) speichern
 
     Note over DB: Gespeicherte Runs können<br/>später für neue<br/>Memory-Extraktion genutzt werden
   </pre>
@@ -432,7 +432,7 @@ erDiagram
 
 <section id="dateistruktur">
   <h2>Dateistruktur <span>Projekt + Runtime</span></h2>
-  <p>Alle Dateien, die zum Workflow-Memory-Feature gehören.</p>
+  <p>Die wichtigsten Dateien des Workflow-Memory-Features. Tests liegen unter <code>ai-automation-backend/src/test/java/com/automation/</code>, meist im Paket der getesteten Klasse.</p>
   <pre class="tree">
 <span class="dir">ai-automation-backend/src/main/java/com/automation/</span>
 ├── <span class="dir">config/</span>
@@ -481,19 +481,6 @@ erDiagram
     ├── claude-summarizer.md              <span class="comment">← Vorlage → CLAUDE.md</span>
     └── codex-summarizer.md               <span class="comment">← Vorlage → AGENTS.md</span>
 
-<span class="dir">ai-automation-backend/src/test/java/com/automation/</span>
-├── <span class="dir">service/ai/</span>
-│   ├── HostClaudeServiceTest.java
-│   └── HostCodexServiceTest.java
-└── <span class="dir">service/memory/</span>
-    ├── AutoMemoryExtractionListenerTest.java
-    ├── ClaudeSummarizerTest.java
-    ├── CodexSummarizerTest.java
-    ├── ConversationPreprocessorTest.java
-    ├── KnowledgeSummarizerTest.java
-    ├── SummarizationSetupServiceTest.java
-    └── WorkflowMemoryServiceTest.java
-
 <span class="dir">ai-automation-frontend/src/</span>
 ├── <span class="dir">components/workflow/</span>
 │   └── WorkflowMemoryPanel.tsx           <span class="comment">← Anbieter CLAUDE oder CODEX</span>
@@ -507,9 +494,6 @@ erDiagram
 │   └── CLAUDE.md                         <span class="comment">← Kopie von claude-summarizer.md</span>
 └── <span class="dir">codex/</span>
     └── AGENTS.md                         <span class="comment">← Kopie von codex-summarizer.md</span>
-
-<span class="dir">docs/</span>
-└── workflow-memory-architecture.md
   </pre>
 </section>
 

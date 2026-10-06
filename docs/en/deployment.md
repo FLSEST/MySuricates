@@ -247,77 +247,20 @@ the Docker API. They are needed as follows:
 
 ## Dockerfiles
 
-### Agent Node (`docker/Dockerfile.agent-node`)
+The Dockerfiles of the agent images and of Stable/Test live under `ai-automation-backend/docker/`; what
+they install is written there. Two pitfalls when building:
 
-- **Base:** `node:22-slim`
-- **Tools:** git, curl, jq
-- **User:** `agent` (UID 1000)
-- **Claude CLI:** Directories prepared (binary + config mounted from host)
-- **CMD:** `tail -f /dev/null` (container stays active for `docker exec`)
+- **Fetching third-party repos afresh:** In `Dockerfile.agent-devops` the layers with third-party repos
+  (gh, Docker) come last, behind `ARG APT_REFRESH`. A new value (Compose: `AGENT_APT_REFRESH`, e.g. the
+  month) rebuilds them instead of taking keys and package lists from an old layer cache — a build failed
+  on exactly that with `NO_PUBKEY` although the current keyring was correct (97e1529d). gitleaks and trivy
+  are pinned.
+- **Python packages:** `Dockerfile.agent-python` installs its packages unpinned behind `ARG PIP_REFRESH`;
+  the same `AGENT_APT_REFRESH` fetches the current ones, otherwise they would stay at the state of the
+  first build (8b7a39b9).
 
-### Agent Python (`docker/Dockerfile.agent-python`)
-
-- **Base:** `python:3.12-slim`
-- **Tools:** git, curl, jq
-- **Packages:** anthropic, pandas, numpy, requests, beautifulsoup4 — unpinned, behind `ARG PIP_REFRESH`:
-  the same `AGENT_APT_REFRESH` as for agent-devops installs the current ones, otherwise they would stay
-  at the state of the first build (8b7a39b9)
-
-### Agent DevOps (`docker/Dockerfile.agent-devops`)
-
-- **Base:** `ubuntu:24.04`
-- **Tools:** git, curl, jq, bash, python3
-- **GitHub CLI:** `gh` from the official APT repository
-- **Security Tools:** gitleaks, trivy (binaries with SHA256 verification, multi-arch)
-- **Docker:** Docker CE CLI (client only, no daemon)
-- **Freshness:** the layers with third-party repos (gh, Docker) come last, behind `ARG APT_REFRESH`. A
-  new value (Compose: `AGENT_APT_REFRESH`, e.g. the month) rebuilds them instead of taking keys and
-  package lists from an old layer cache — a build once failed on `NO_PUBKEY` that way although the
-  current keyring was fine (97e1529d). gitleaks and trivy are pinned.
-- **User:** `agent` (UID 1000)
-- **CMD:** `tail -f /dev/null`
-
-### Agent Java (`docker/Dockerfile.agent-java`)
-
-- **Base:** `eclipse-temurin:21-jdk-jammy`
-- **Tools:** maven, git, curl, jq, bash, python3, libreoffice-writer (headless DOCX→PDF)
-- **Fonts:** fonts-liberation, fonts-dejavu
-- **User:** `agent` (UID 1000)
-- **CMD:** `tail -f /dev/null`
-
-### Stable (`docker/Dockerfile.stable`)
-
-- **Base:** `eclipse-temurin:21-jre-jammy` (Ubuntu-based, glibc for Claude CLI)
-- **ARGs:** `HOST_USER`, `HOST_UID`, `HOST_GID`, `HOST_HOME` — for user mapping with the host
-- **Tools:** curl, git, gosu, python3, jq, nodejs, npm, wget, unzip, Docker CE CLI
-- **Entrypoint:** `entrypoint.sh` (user switching via gosu, Docker socket permissions)
-- **Port:** 9091
-- **Healthcheck:** `curl -f http://localhost:9091/api/v1/system/health`
-- **JVM:** ZGC (Generational), 256MB–1GB Heap, headless AWT
-
-## Docker Compose Files
-
-### `docker-compose.yml` (Main)
-
-Only builds the agent images (`profiles: build-only`), starts no service.
-
-### `docker-compose.stable.yml`
-
-Stable environment on port 9091:
-- Container: `mysuricates-stable`
-- Profile: `SPRING_PROFILES_ACTIVE=stable`
-- Volumes: `stable-data` (persistent DB), `stable-secrets` (integration and seal keys, kept apart from the DB — 3fb2242c), `stable-frontend/` (read-only; the built UI that `scripts/staging.sh snapshot` copies there from `ai-automation-frontend/dist` — without this folder `staging.sh start` refuses to start), host project directories, backup volume (`~/.mysuricates/backups/stable`); AI providers, Docker socket (off by default) and port (only `127.0.0.1:9091` by default) come from the override file of `scripts/staging.sh` ([AI providers in the container](#ai-providers-in-the-container))
-- Named Volume: `stable-data`
-
-### `docker-compose.test.yml`
-
-Test instance on port 8090 (uses `docker/Dockerfile.stable` as build base):
-- Container: `mysuricates-test`
-- Image: `ai-automation-backend-test`
-- Profile: `SPRING_PROFILES_ACTIVE=test`
-- Volumes: `test-data` (persistent DB), `test-secrets` (keys as for Stable), `stable-frontend/` (read-only, the same built UI as for Stable), `application-test.yml` (read-only), backup volume (`~/.mysuricates/backups/test`); AI providers, Docker socket and port (`127.0.0.1:8090`) as for Stable
-- Healthcheck: `curl -f http://localhost:8090/api/v1/system/health`
-- Named Volume: `test-data`
+`Dockerfile.stable` (base of Stable and Test) is Ubuntu-based because the Claude CLI needs glibc, and
+matches the user to the machine through the ARGs `HOST_USER`, `HOST_UID`, `HOST_GID` and `HOST_HOME`.
 
 ## Environment Variables
 
@@ -456,8 +399,6 @@ AUTOMATION_RATE_LIMIT_ENABLED=true   # optional
 - Rate limiting recommended
 - Docker socket only when needed (`MYSURICATES_DOCKER_SOCKET=1`, see above) — gives the instance full control over Docker on the machine
 
-**Note:** HikariCP pool size is set to 1. SQLite only allows one concurrent writer. Pool size=1 serializes all DB operations — no lock contention. Increasing pool size only makes sense when switching to PostgreSQL.
-
 ## Tailscale Remote Access
 
 The `remote-access` module makes the backend reachable from outside the local network via
@@ -525,19 +466,14 @@ Possible `status` values: `UP` (DB + Docker ok), `DEGRADED` (DB ok, Docker not r
 
 ## Database Backup
 
-The SQLite database is a single file:
-
-```bash
-# Create backup
-cp data/automation.db data/automation.db.backup
-
-# Or while the system is running (WAL mode)
-sqlite3 data/automation.db ".backup 'data/automation.db.backup'"
-```
-
-**Location:** `ai-automation-backend/data/automation.db` (local) or `/app/data/automation.db` (Docker)
-
-The file contains all projects, workflows, runs, skills, schedules, webhooks, chains, todos, integrations, templates, and other entities. A backup of this file preserves the entire platform state.
+The SQLite database is a single file (`ai-automation-backend/data/automation.db` locally,
+`/app/data/automation.db` in the container) and holds the complete state of the platform. The backend
+backs it up itself: daily at 02:00 (`automation.backup.cron`) into `automation.backup.directory` (default
+`<data folder>/backups/dev`, Stable and Test have directories of their own); the last
+`automation.backup.retain-count` backups (default 30) are kept. A backup right now:
+`POST /api/v1/system/backup`; list and download under Settings → Backups. A manual copy (`cp`) only while
+the backend is stopped — nothing but the backend touches the running file (Hibernate cache, a single
+writer).
 
 ## Reverse Proxy
 
@@ -647,17 +583,10 @@ Limits worth knowing:
 
 - **Nothing is escaped in AI prompts.** A prompt is not a command line; the model does not defend
   against prompt injection.
-- **An AI answer that followed a prompt with platform data is coloured itself.** If platform data is
-  in the prompt of a `simple`, `agentic` or `skill-capability` block (nested forms included), the
-  output of exactly that block counts as untrusted: a following shell block receives
-  `{{ previous_output }}` **single-quoted**. Once that coloured output is recorded, the run is
-  coloured — and the colouring is sticky as always: every **further** block output and the variables
-  derived from it (`step_N_output`, `foreach` items, `document` extracts) are quoted from then on
-  too, and `exportTaint()` passes that on to sub-workflows and to a resume. In practice: nearly every
-  audit or report workflow that reads `previous_report` in a prompt runs in quoted mode from that
-  block on. **In your own workflows, set `"shell_escape_variables": true` in every shell block that
-  consumes an AI block's output** — the block then behaves the same in coloured and in uncoloured
-  runs.
+- **An AI answer that followed a prompt with platform data is coloured itself.** A following shell block
+  receives its output single-quoted, and every further block output of the run from then on. **In your
+  own workflows, set `"shell_escape_variables": true` in every shell block that consumes an AI block's
+  output** — the block then behaves the same in coloured and in uncoloured runs.
 - **What quoting does not defend against:** what is quoted is the text of the AI answer, not how it
   came about. The trust model does not help against manipulation of the content (prompt injection).
 - **Quoting cannot see files you write yourself.** A shell block that writes a tainted value into a
@@ -710,7 +639,7 @@ Authentication uses the `X-API-Key` header and covers `/api/**` and `/actuator/*
 | `/api/v1/system/health`, `/system/info`, `/system/auth-status` | Status checks before login |
 | `/api/v1/system/jvm-memory` | Heap usage as exactly three numbers (`jvm_memory_used_bytes`, `jvm_memory_max_bytes`, `jvm_heap_used_percent`) for the performance audit |
 | `/actuator/health` | Docker healthcheck |
-| `/ws/**` | WebSocket handshake (the key is checked there as a query parameter) |
+| `/ws/**` | WebSocket handshake (authenticated by a one-time ticket from `POST /api/v1/ws-ticket`, see [Reverse Proxy](#reverse-proxy)) |
 | `/api/v1/webhook/trigger/**` | Public webhook entry point |
 | `/api/v1/integrations/*/callback` | OAuth callbacks |
 
@@ -745,8 +674,9 @@ is as confidential as the key itself.
 
 ### Webhooks
 
-The trigger endpoint is guarded solely by a token in the path (32 random bytes from `SecureRandom`).
-There is no signature verification and no replay protection. As a counterweight, a hard-wired limit
+The trigger endpoint is guarded by a token in the path (32 random bytes from `SecureRandom`).
+A signature is only verified when the webhook has a signing secret (HMAC-SHA256, see
+[Workflow Hardening](architektur.md#workflow-hardening-optional)); there is no replay protection. As a counterweight, a hard-wired limit
 of 10 requests per minute and IP applies — independent of the global rate-limit switch — the payload
 is capped at 50 fields, and every caller-supplied value is marked untrusted and always escaped in
 shell blocks.
@@ -813,7 +743,7 @@ Re-enable without a code change: set `AUTOMATION_STAGING_AUTO_START=true` / `AUT
 
 There are two ways to silence the scheduler for a while:
 
-- **`automation.scheduler.skip-until`** (`AUTOMATION_SCHEDULER_SKIP_UNTIL`, ISO instant, e.g. `2026-07-30T22:00:00Z`) — for time windows. Due schedules are skipped **and** their `nextRunAt` is advanced past the window, so there is no catch-up stampede at the end. It expires on its own; an unparseable value is ignored (fail open). Read only at backend startup. The UI shows the pause: a banner on the Schedules page, a note on the dashboard, and as “next run” in list, calendar and dashboard the first occurrence after the pause (API: `pausedUntil`, see [API reference](api-referenz.md#get-apiv1schedules)).
+- **`automation.scheduler.skip-until`** (`AUTOMATION_SCHEDULER_SKIP_UNTIL`, ISO instant, e.g. `2026-07-30T22:00:00Z`) — for time windows. Due schedules are skipped **and** their `nextRunAt` is advanced past the window, so there is no catch-up stampede at the end. It expires on its own; an unparseable value is ignored (fail open). Read only at backend startup. The UI shows the pause: a banner on the Schedules page, a note on the dashboard, and as “next run” in list, calendar and dashboard the first occurrence after the pause (API: `pausedUntil`, see the notes on `GET /api/v1/schedules` in the [API reference](api-referenz.md#apiv1schedules)).
 - **Maintenance mode** (`POST /api/v1/schedules/maintenance`, pause button on the Schedules page) — runtime switch without an end date, persisted in `app_settings`. Note: `nextRunAt` is *not* advanced, so when you switch it off, every schedule that became due fires at once.
 
 For local, non-committed overrides use `ai-automation-backend/config/application.yml` — Spring Boot loads that directory in addition to the classpath config and with higher precedence (the directory is in `.gitignore`).
@@ -824,7 +754,7 @@ The stable environment is a Docker container containing the backend + embedded R
 
 **Key Files:**
 - `ai-automation-backend/docker/Dockerfile.stable` — Ubuntu-based (glibc for Claude CLI)
-- `ai-automation-backend/docker-compose.stable.yml` — data, frontend, projects; AI providers and the socket via `scripts/staging.sh write-override stable`
+- `ai-automation-backend/docker-compose.stable.yml` — container `mysuricates-stable`, profile `stable`; volumes `stable-data` (database), `stable-secrets` (keys, see below), `stable-frontend/` (read-only: the built UI that `scripts/staging.sh snapshot` copies there from `ai-automation-frontend/dist` — without this folder `staging.sh start` refuses to start), project folders and backups (`~/.mysuricates/backups/stable`); AI providers, Docker socket and port via `scripts/staging.sh write-override stable`
 - `ai-automation-backend/src/main/resources/application-stable.yml` — Port 9091, auto-start disabled, frontend serving enabled
 
 **Keys:** the integration and seal keys live in the volume `stable-secrets`, apart from the database.
@@ -845,7 +775,7 @@ The test instance is a dedicated Docker container for automated workflow tests:
 - Database can be reset via API (`POST /api/v1/testing/reset`)
 
 **Key Files:**
-- `ai-automation-backend/docker-compose.test.yml` — Container `mysuricates-test`, port 8090, profile `test`
+- `ai-automation-backend/docker-compose.test.yml` — container `mysuricates-test`, port 8090, profile `test`, built on `docker/Dockerfile.stable`; volumes `test-data`, `test-secrets`, `stable-frontend/` (the same built UI as Stable), `application-test.yml` (read-only) and backups (`~/.mysuricates/backups/test`); AI providers, Docker socket and port (`127.0.0.1:8090`) as for Stable
 
 ### Staging CLI Management
 
@@ -930,21 +860,6 @@ In Settings → Stable, a version comparison is shown:
 - **Dev**: Version from `/api/v1/system/info`
 - **Stable**: Version from the stable container's `/api/v1/system/info`
 
-When versions differ (e.g., after a release), a promote is recommended.
-
-### Release + Promote Workflow
-
-```bash
-# 1. Bump version
-./scripts/release.sh           # e.g. 0.3.2 → 0.3.3
-
-# 2. Deploy new version to Stable
-./scripts/staging.sh promote   # Builds and starts Stable with the new version
-```
-
-### Git Tags
-
-| Tag Format | Created By | Purpose |
-|---|---|---|
-| `v0.3.2` | `release.sh` | Semver release marker |
-| `stable-20250225-143022` | `staging.sh promote` | Deployment timestamp |
+When versions differ (e.g., after a release), a promote is recommended (`./scripts/staging.sh promote`).
+Versions, release script and git tags:
+[entwicklung.md → Versioning & Releases](entwicklung.md#versioning--releases).

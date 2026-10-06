@@ -25,9 +25,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Hilfen rund um einen bestehenden Workflow: Optimierungsvorschlag, ähnliche Workflows,
- * Reparatur nach fehlgeschlagenen Runs. Aus {@link WorkflowController} herausgelöst
- * (6c2a2ad7), Pfade unverändert.
+ * Help with an existing workflow: optimization suggestion, similar workflows, repair after failed
+ * runs. Split off from {@link WorkflowController} (6c2a2ad7), paths unchanged.
  */
 @RestController
 @RequestMapping("/api/v1/workflows")
@@ -40,12 +39,20 @@ public class WorkflowAssistController {
     private final WorkflowSimilarityService workflowSimilarityService;
     private final AutoRepairService autoRepairService;
 
+    /**
+     * Asks the workflow's AI provider for an optimization suggestion and returns it as JSON.
+     * Changes nothing; a failed AI call comes back as {@code 200} with {@code error: true} and a {@code message}.
+     */
     @PostMapping("/{id}/optimize")
     public ResponseEntity<Map<String, Object>> optimizeWorkflow(@PathVariable String id) {
         Map<String, Object> suggestion = optimizationService.optimizeWorkflow(id);
         return ResponseEntity.ok(suggestion);
     }
 
+    /**
+     * Lists other workflows whose block types overlap with this one, most similar first, at most {@code limit}
+     * entries. {@code limit} defaults to 5 and is capped at 20.
+     */
     @GetMapping("/{id}/similar")
     public List<Map<String, Object>> getSimilarWorkflows(
             @PathVariable String id,
@@ -55,6 +62,10 @@ public class WorkflowAssistController {
         return all.size() > capped ? all.subList(0, capped) : all;
     }
 
+    /**
+     * Starts an AI repair of a workflow with failed runs in the background and answers {@code 202}.
+     * Without a failed run {@code 400}; a sealed workflow is refused with {@code 409 WORKFLOW_SEALED}.
+     */
     @PostMapping("/{id}/repair")
     @RequiresModule(ModuleCatalog.FACTORY)
     public ResponseEntity<?> repairWorkflow(@PathVariable String id) {

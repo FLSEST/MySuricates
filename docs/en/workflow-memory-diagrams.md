@@ -63,7 +63,7 @@ Step by step: read runs, condense, summarize, store. The AI call runs outside an
 sequenceDiagram
     participant B as Browser
     participant C as Controller
-    participant S as MemoryService
+    participant S as WorkflowMemoryService
     participant P as Preprocessor
     participant SM as Summarizer<br/>(Claude/Codex)
     participant CLI as CLI on the host<br/>(claude/codex)
@@ -73,7 +73,7 @@ sequenceDiagram
     C->>S: extractKnowledge()
     S->>DB: Load runs<br/>(last 10 or specific IDs)
     DB-->>S: List<WorkflowRun>
-    S->>S: Collect StepResults
+    S->>S: Collect steps (StepResult)
     S->>P: preprocess(steps)
     Note over P: Replace code blocks over 30 lines<br/>Replace data dumps over 20 lines<br/>Remove meta comments<br/>Merge repeated lines<br/>Condense agentic iterations
     P-->>S: preprocessed String
@@ -167,7 +167,7 @@ Before the first block, the run writes the workflow's active memory into the pro
 ```mermaid
 sequenceDiagram
     participant WE as WorkflowExecutor<br/>(ExecutionContextFactory)
-    participant MS as MemoryService
+    participant MS as WorkflowMemoryService
     participant DB as SQLite
     participant FS as Filesystem
     participant CLI as AI CLI<br/>(Block Execution)
@@ -186,7 +186,7 @@ sequenceDiagram
     Note over CLI: Claude CLI automatically reads<br/>all .claude/rules/*.md<br/>incl. project-memory.md,<br/>Codex and Pi get them<br/>appended to the system prompt
 
     CLI-->>WE: Result
-    WE->>DB: Save WorkflowRun + StepResults
+    WE->>DB: Save WorkflowRun + steps (StepResult)
 
     Note over DB: Stored runs can later<br/>be used for new<br/>memory extraction
 ```
@@ -278,7 +278,7 @@ Activating a memory sets `active=false` for all other memories of the same workf
 
 ## File Structure — *Project + Runtime*
 
-All files that belong to the Workflow Memory feature.
+The main files of the workflow memory feature. Tests live under `ai-automation-backend/src/test/java/com/automation/`, mostly in the package of the class under test.
 
 ```text
 ai-automation-backend/src/main/java/com/automation/
@@ -328,19 +328,6 @@ ai-automation-backend/src/main/resources/
     ├── claude-summarizer.md              ← template → CLAUDE.md
     └── codex-summarizer.md               ← template → AGENTS.md
 
-ai-automation-backend/src/test/java/com/automation/
-├── service/ai/
-│   ├── HostClaudeServiceTest.java
-│   └── HostCodexServiceTest.java
-└── service/memory/
-    ├── AutoMemoryExtractionListenerTest.java
-    ├── ClaudeSummarizerTest.java
-    ├── CodexSummarizerTest.java
-    ├── ConversationPreprocessorTest.java
-    ├── KnowledgeSummarizerTest.java
-    ├── SummarizationSetupServiceTest.java
-    └── WorkflowMemoryServiceTest.java
-
 ai-automation-frontend/src/
 ├── components/workflow/
 │   └── WorkflowMemoryPanel.tsx           ← provider CLAUDE or CODEX
@@ -354,9 +341,6 @@ ai-automation-frontend/src/
 │   └── CLAUDE.md                         ← copy of claude-summarizer.md
 └── codex/
     └── AGENTS.md                         ← copy of codex-summarizer.md
-
-docs/
-└── workflow-memory-architecture.md
 ```
 
 ## API Endpoints — */api/v1/workflows/{id}/memory*

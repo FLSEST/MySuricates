@@ -147,7 +147,7 @@ PROVIDERS="$(fact_providers)"
 COMMITS="$(fact_commits)"
 
 # ---------------------------------------------------------------------------
-# Versionen der Technologietabellen (docs/onboarding/README.md, DE und EN)
+# Versionen von Technologietabellen ("| **React** | 19.2 |", heute keine in der Doku)
 #
 # Quelle ist pom.xml bzw. package.json. Die Doku kuerzt ("React 19.2" fuer
 # 19.2.4) — geprueft wird deshalb komponentenweise als Praefix, siehe

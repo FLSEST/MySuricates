@@ -8,9 +8,9 @@ import schemaSource from '../../data/blockConfigSchema.json';
  *
  * The keys, types, allowed values and texts live in `src/data/blockConfigSchema.json` — the single source
  * the backend analyzer reads as well (`ConfigKeyRules`, TODO f5153c47): the Maven build copies the file
- * onto the classpath, so editor and analyzer cannot drift apart. The texts are domain reference (source:
- * docs/WORKFLOW-GUIDE.md §2 „Block-Typ-Referenz"), not UI labels, so they sit there as {de, en} instead of
- * in the i18n files. Unknown keys only warn — the backend ignores them as well — and
+ * onto the classpath, so editor and analyzer cannot drift apart. The texts are domain reference (rendered
+ * into docs/block-referenz.md by scripts/docs-reference.py), not UI labels, so they sit there as {de, en}
+ * instead of in the i18n files. Unknown keys only warn — the backend ignores them as well — and
  * `blockConfigSchema.test.ts` checks the shipped templates against the file.
  */
 

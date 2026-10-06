@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Prepare evidence packets, assemble concept pages, and fail closed on bad output."""
+"""Prepare code-evidence packets, assemble concept pages, and fail closed on bad output.
+
+The pages describe mechanisms, not an installation: they carry no operational measurement.
+"""
 import argparse
-import datetime as dt
-import hashlib
 import json
 from pathlib import Path
 import re
@@ -13,27 +14,7 @@ HEADINGS = {
     'de': ['Wofür taugt das?', 'Vorteile', 'Nachteile und Kosten'],
     'en': ['What is it useful for?', 'Benefits', 'Drawbacks and costs'],
 }
-LABELS = {
-    'steps_shell': 'Shell-Schritte im 30-Tage-Fenster',
-    'steps_simple': 'Simple-Schritte im 30-Tage-Fenster',
-    'steps_agentic': 'Agentische Schritte im 30-Tage-Fenster',
-    'retained_runs': 'Gespeicherte Runs (alle Zeiträume)',
-    'todos_without_resolution_state': 'TODOs ohne Zustand im optionalen Resolve-Pfad',
-    'activeTodoTriggers': 'Aktive TODO-Trigger',
-    'ai_todos_with_session': 'KI-TODOs mit ausgefüllter Session-ID',
-    'activeSchedules': 'Aktive Zeitpläne',
-    'totalSchedules': 'Zeitpläne insgesamt',
-    'activeWebhooks': 'Aktive Webhooks',
-    'activeCompletionTriggers': 'Aktive Abschluss-Trigger',
-    'workflows_never_run': 'Workflows ohne gespeicherten Run',
-    'activeMemoryEntries': 'Aktive Memory-Einträge',
-    'workflows': 'Sichtbare Workflows in aktiven Projekten',
-    'workflows_sealed': 'Versiegelte sichtbare Workflows',
-    'workflows_explicit_provider': 'Sichtbare Workflows mit eigenem KI-Anbieter',
-    'workflows_explicit_effort': 'Sichtbare Workflows mit eigenem Effort',
-    'steps_integration': 'Integrations-Schritte im 30-Tage-Fenster',
-    'steps_skill_capability': 'Skill-Schritte im 30-Tage-Fenster',
-}
+CODE_HEADING = {'de': 'Im Code', 'en': 'In the code'}
 INDEX_DE = Path('docs/konzepte/README.md')
 
 
@@ -78,50 +59,28 @@ def add_index_rows(text, items, language):
     return '\n'.join(lines)
 
 
-def digest(path):
-    return hashlib.sha256(path.read_bytes()).hexdigest()
-
-
 def private_markers(text):
     return re.search(r'/home/[\w.-]+/|/Users/[\w.-]+/|'
                      r'\b[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\b|'
                      r'[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}', text)
 
 
-def prepare(root, work, facts_path, items=None):
+def prepare(root, work, items=None):
     items = select() if items is None else items
-    facts = read_json(facts_path)
-    if facts.get('schema') != 1 or not facts.get('metrics'):
-        raise ValueError('Missing/unsupported measurement snapshot')
-    measured = dt.datetime.fromisoformat(facts['collected_at'])
-    age = dt.datetime.now(dt.timezone.utc) - measured
-    if not dt.timedelta(0) <= age <= dt.timedelta(days=1):
-        raise ValueError('Collect measurements again: snapshot must be at most 24 hours old')
-    if private_markers(json.dumps(facts)):
-        raise ValueError('Private markers in measurement snapshot')
-    missing = sorted({key for item in items for key in item['metrics']} - set(facts['metrics']))
-    if missing:
-        raise ValueError('Measurement snapshot lacks metrics: ' + ', '.join(missing))
     work.mkdir(parents=True, exist_ok=False)
     (work / 'drafts').mkdir()
     (work / 'packets').mkdir()
-    (work / 'facts.json').write_bytes(facts_path.read_bytes())
     commit = subprocess.check_output(['git', '-C', str(root), 'rev-parse', 'HEAD'], text=True).strip()
-    (work / 'manifest.json').write_text(json.dumps({'source_commit': commit,
-        'facts_sha256': digest(facts_path)}, indent=2) + '\n')
+    (work / 'manifest.json').write_text(json.dumps({'source_commit': commit}, indent=2) + '\n')
     for item in items:
-        selected = {key: facts['metrics'][key] for key in item['metrics']}
-        packet = [f'# {item["title_de"]}', item['notes'],
-                  '## Aktuelle Betriebsdaten', facts['collected_at'],
-                  json.dumps(selected, ensure_ascii=False, indent=2),
-                  '\n'.join(facts['limitations']), '## Quellcode-Belege']
+        packet = [f'# {item["title_de"]}', item['notes'], '## Quellcode-Belege']
         for source in item['sources']:
             content = (root / source).read_text()
             packet += [f'### {source}', content[:18000]]
             if len(content) > 18000:
                 packet.append('[Auszug; restliche Datei bei Bedarf gezielt im Repository lesen.]')
         (work / 'packets' / (item['slug'] + '.txt')).write_text('\n\n'.join(packet) + '\n')
-    print(f'Prepared {len(items)} evidence packets; measurement snapshot verified')
+    print(f'Prepared {len(items)} evidence packets')
 
 
 def check_body(text, language='de'):
@@ -136,12 +95,9 @@ def check_body(text, language='de'):
         raise ValueError('Private data or unresolved placeholder')
 
 
-def assemble(root, work, facts_path, items=None):
+def assemble(root, work, items=None):
     items = select() if items is None else items
     manifest = read_json(work / 'manifest.json')
-    if digest(facts_path) != manifest['facts_sha256']:
-        raise ValueError('Measurement snapshot changed during generation')
-    facts = read_json(facts_path)
     bodies = {}
     for item in items:
         body = (work / 'drafts' / (item['slug'] + '.md')).read_text().strip()
@@ -150,25 +106,10 @@ def assemble(root, work, facts_path, items=None):
     target = work / 'de'
     target.mkdir(exist_ok=True)
     for item in items:
-        measurements = []
-        for key in item['metrics']:
-            metric = facts['metrics'][key]
-            value = str(metric['value'])
-            if metric['denominator'] is not None:
-                value += ' / ' + str(metric['denominator'])
-            measurements.append(f'| {LABELS[key]} | {value} |')
         sources = '\n'.join(f'- [{Path(p).name}](../../{p})' for p in item['sources'])
-        text = (f'<!-- concept-facts-sha256: {manifest["facts_sha256"]} -->\n'
-                f'<!-- concept-source: {manifest["source_commit"]} -->\n\n'
+        text = (f'<!-- concept-source: {manifest["source_commit"]} -->\n\n'
                 f'# {item["title_de"]}\n\n```mermaid\n{item["diagram_de"]}\n```\n\n'
-                f'{bodies[item["slug"]]}\n\n## Betriebsbeleg\n\n'
-                f'Messung: **{facts["collected_at"][:10]} (UTC)**, eine lokale Entwicklungsinstanz. '
-                'Bestandszähler beziehen sich auf die über REST sichtbaren Datensätze; '
-                'Schrittzahlen zählen gespeicherte Schritte mit Typ-Metadaten im 30-Tage-Fenster. '
-                'Wrapper zählen einmal. Dies ist kein Wirksamkeitsnachweis.\n\n'
-                '| Messgröße | Anzahl / Bezugsgröße |\n|---|---:|\n' + '\n'.join(measurements) +
-                '\n\n[Definitionen, Messgrenzen und Rohzähler](betriebsdaten.json) · '
-                '[Messmethode und Wiederholung](README.md)\n\n## Im Code\n\n' + sources + '\n')
+                f'{bodies[item["slug"]]}\n\n## {CODE_HEADING["de"]}\n\n{sources}\n')
         (target / (item['slug'] + '.md')).write_text(text)
     # New pages need a row in the overview; the copy goes next to the pages for the same review.
     index = root / INDEX_DE
@@ -178,10 +119,10 @@ def assemble(root, work, facts_path, items=None):
         if updated != current:
             (target / 'README.md').write_text(updated)
             print('Wrote README.md with overview rows for the new pages')
-    print(f'Assembled {len(items)} German pages with fixed diagrams, measurements and source links')
+    print(f'Assembled {len(items)} German pages with fixed diagrams and source links')
 
 
-def finish_english(root, directory, facts_path, items=None):
+def finish_english(root, directory, items=None):
     """Repair language-dependent assembly parts after the existing docs translator."""
     items = select() if items is None else items
     for item in items:
@@ -193,52 +134,35 @@ def finish_english(root, directory, facts_path, items=None):
         text = text.replace('```mermaid\n' + item['diagram_de'] + '\n```',
                             '```mermaid\n' + item['diagram_en'] + '\n```')
         text = text.replace('(../../ai-automation-backend/', '(../../../ai-automation-backend/')
-        text = text.replace('(betriebsdaten.json)', '(../../konzepte/betriebsdaten.json)')
         path.write_text(text)
     index = directory / 'README.md'
     if index.exists():
         text = add_index_rows(index.read_text(), items, 'en')
-        text = text.replace('(betriebsdaten.json)', '(../../konzepte/betriebsdaten.json)')
         for folder in ('scripts', 'workflow-pool'):
             text = text.replace('(../../' + folder + '/', '(../../../' + folder + '/')
         index.write_text(text)
-    check(root, directory, facts_path, 'en', items)
+    check(root, directory, 'en', items)
 
 
-def check(root, directory, facts_path, language, items=None):
+def check(root, directory, language, items=None):
     items = select() if items is None else items
-    facts = read_json(facts_path)
     failures = []
     for item in items:
         path = directory / (item['slug'] + '.md')
         try:
             text = path.read_text()
-            if f'concept-facts-sha256: {digest(facts_path)}' not in text:
-                raise ValueError('Missing/mismatched measurement provenance')
+            if not re.search(r'^<!-- concept-source: [0-9a-f]{40} -->$', text, re.M):
+                raise ValueError('Missing source-commit provenance')
             if re.findall(r'```mermaid\n(.*?)\n```', text, re.S) != [item['diagram_' + language]]:
                 raise ValueError('Missing or changed deterministic diagram')
             if private_markers(text) or '{{' in text or '[TODO]' in text:
                 raise ValueError('Private data or unresolved placeholder')
             headings = re.findall(r'^## (.+)$', text, re.M)
-            if headings[:3] != HEADINGS[language] or len(headings) != 5:
-                raise ValueError('Missing sections')
-            rows = re.findall(r'^\| [^|]+ \| ([\d /]+) \|$', text, re.M)
-            expected_rows = []
-            for key in item['metrics']:
-                if key not in facts['metrics']:
-                    raise ValueError('Measurement snapshot lacks metric ' + key)
-                value = str(facts['metrics'][key]['value'])
-                denominator = facts['metrics'][key]['denominator']
-                if denominator is not None:
-                    value += ' / ' + str(denominator)
-                expected_rows.append(value)
-            if rows != expected_rows:
-                raise ValueError('Changed/missing measurement rows')
+            if headings != HEADINGS[language] + [CODE_HEADING[language]]:
+                raise ValueError('Missing or extra sections')
             # Resolve source links against their final destination, including before installation.
             final_parent = root / ('docs/konzepte' if language == 'de' else 'docs/en/konzepte')
             for link in re.findall(r'\]\(([^)]+)\)', text):
-                if link in ('README.md', 'betriebsdaten.json', '../../konzepte/betriebsdaten.json'):
-                    continue
                 if '://' in link or not (final_parent / link.split('#')[0]).resolve().is_file():
                     raise ValueError('Unverified source link: ' + link)
             if language == 'en' and not text.startswith('<!-- last-sync:'):
@@ -268,7 +192,6 @@ def main():
     parser.add_argument('action', choices=['prepare', 'assemble', 'check', 'finish-english', 'list'])
     parser.add_argument('--root', type=Path, default=Path.cwd())
     parser.add_argument('--work', type=Path)
-    parser.add_argument('--facts', type=Path)
     parser.add_argument('--language', choices=['de', 'en'], default='de')
     parser.add_argument('--only', default='',
                         help='Comma-separated catalog slugs; empty = all pages')
@@ -279,13 +202,13 @@ def main():
     if args.action == 'list':
         list_items(items, args.paths, bool(slugs(args.only)))
         return
-    if args.work is None or args.facts is None:
-        parser.error('--work and --facts are required for ' + args.action)
+    if args.work is None:
+        parser.error('--work is required for ' + args.action)
     actions = {'prepare': prepare, 'assemble': assemble, 'finish-english': finish_english}
     if args.action == 'check':
-        check(args.root, args.work, args.facts, args.language, items)
+        check(args.root, args.work, args.language, items)
     else:
-        actions[args.action](args.root, args.work, args.facts, items)
+        actions[args.action](args.root, args.work, items)
 
 
 if __name__ == '__main__':

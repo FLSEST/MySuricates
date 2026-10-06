@@ -37,11 +37,11 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 /**
- * Ziele: TODOs projektuebergreifend auf ein Ergebnis hin sammeln, ordnen und den Fortschritt
- * zeigen (TODO dc0566f8). Die Einschaetzung eines einzelnen TODOs laeuft ueber
- * {@code PATCH /api/v1/todos/{id}/planning} – dort auch die Zuordnung zu einem Arbeitspaket.
- * Ziel-Waechter: TODO 259f4f66. Projekte des Ziels, Arbeitspakete (je Projekt, mit Zeitraum und
- * Reihenfolge) und Meilensteine (Termine des Ziels, optional an Pakete geknuepft): TODO c60bf914.
+ * Goals: collect TODOs across projects towards one outcome, order them and show the progress
+ * (TODO dc0566f8). A single TODO is assessed through {@code PATCH /api/v1/todos/{id}/planning},
+ * which also assigns it to a work package. Goal guard: TODO 259f4f66. Projects of the goal, work
+ * packages (per project, with period and order) and milestones (dates of the goal, optionally tied to
+ * packages): TODO c60bf914.
  */
 @RestController
 @RequiresModule(ModuleCatalog.GOALS)
@@ -59,8 +59,8 @@ public class GoalController {
     private final GoalGuardService guardService;
 
     /**
-     * Ohne {@code status}: aktive und erledigte Ziele, neueste zuerst. Mit {@code projectId} nur die
-     * Ziele, denen dieses Projekt zugeordnet ist.
+     * Lists goals, newest first; without {@code status} the active and done ones. With {@code projectId}
+     * only the goals this project is assigned to.
      */
     @GetMapping
     public List<GoalResponse> listGoals(@RequestParam(required = false) List<Goal.Status> status,
@@ -68,20 +68,28 @@ public class GoalController {
         return goalService.list(status, projectId);
     }
 
+    /**
+     * Creates a goal (201); {@code title} is required, optional {@code projectIds} are attached in that order.
+     * An unknown project id is a 404.
+     */
     @PostMapping
     public ResponseEntity<GoalResponse> createGoal(@Valid @RequestBody CreateGoalRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(goalService.create(request));
     }
 
+    /**
+     * Returns the goal with its TODOs, progress per project, projects, work packages and milestones.
+     * Reading records the moment a work package or milestone is first found complete or reached.
+     */
     @GetMapping("/{id}")
     public GoalDetailResponse getGoal(@PathVariable String id) {
         return goalService.detail(id);
     }
 
     /**
-     * Relationskarte (TODO c6ea8f5c): je TODO Herkunft, Bearbeitung (Fix-Workflow, passende
-     * TodoTrigger) und Ergebnis. {@code include} holt bis zu 20 noch nicht zugeordnete TODOs als
-     * Kandidaten dazu ({@code candidate: true}).
+     * Returns the goal's relation map: per TODO its origin, its handling (fix workflow, matching TODO
+     * triggers) and its result (TODO c6ea8f5c). {@code include} adds up to 20 TODOs not yet assigned
+     * as candidates ({@code candidate: true}); ids of TODOs that already belong to a goal are skipped.
      */
     @GetMapping("/{id}/relations")
     public GoalRelationsResponse getRelations(@PathVariable String id,
@@ -89,12 +97,16 @@ public class GoalController {
         return relationsService.relations(id, include);
     }
 
+    /** Partially updates a goal: {@code null} keeps a field, an empty {@code description} or {@code targetDate} clears it. */
     @PutMapping("/{id}")
     public GoalResponse updateGoal(@PathVariable String id, @RequestBody UpdateGoalRequest request) {
         return goalService.update(id, request);
     }
 
-    /** Loescht das Ziel; seine TODOs bleiben und verlieren nur die Zuordnung, ein Waechter pausiert. */
+    /**
+     * Deletes the goal (204); its TODOs stay and only lose the assignment, a guard is paused.
+     * Work packages, milestones and workflow attachments go with it; the guard's workflow stays.
+     */
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteGoal(@PathVariable String id) {
         guardService.pauseForDeletedGoal(id); // sein Waechter-Workflow bleibt, laeuft aber nicht mehr
@@ -103,8 +115,8 @@ public class GoalController {
     }
 
     /**
-     * „Könnte dazugehören“: offene TODOs ohne Ziel, standardmaessig nur aus den Projekten des Ziels
-     * ({@code allProjects=true}: aus allen). Seite wie {@code GET /todos}.
+     * Lists open TODOs without a goal that could belong to it, by default only from the goal's projects
+     * ({@code allProjects=true}: from all). Paged like {@code GET /api/v1/todos}.
      */
     @GetMapping("/{id}/candidates")
     public PageResponse<TodoResponse> candidates(@PathVariable String id,
@@ -116,33 +128,42 @@ public class GoalController {
         return candidateService.candidates(id, q, tag, allProjects, page, size);
     }
 
-    /** Ordnet TODOs dem Ziel zu (ohne Rang – sie stehen hinter den eingeordneten). */
+    /**
+     * Assigns TODOs to the goal without a rank – they come after the ranked ones.
+     * A TODO of another goal moves here and loses its work package.
+     */
     @PostMapping("/{id}/todos")
     public GoalDetailResponse assignTodos(@PathVariable String id, @Valid @RequestBody GoalTodoIdsRequest request) {
         return membershipService.assign(id, request.todoIds());
     }
 
-    /** Reihenfolge: die genannten TODOs bekommen Rang 1..n, alle uebrigen des Ziels keinen. */
+    /**
+     * Sets the order: the TODOs named get rank 1..n, all other TODOs of the goal none.
+     * Every id must already belong to the goal (else 400).
+     */
     @PutMapping("/{id}/order")
     public GoalDetailResponse reorderTodos(@PathVariable String id, @Valid @RequestBody GoalTodoIdsRequest request) {
         return membershipService.reorder(id, request.todoIds());
     }
 
-    /** Projekt ans Ende der Zielprojekte haengen; schon zugeordnet = unveraendert (idempotent). */
+    /** Appends a project to the goal's projects; one already assigned stays unchanged (idempotent). */
     @PostMapping("/{id}/projects")
     public GoalDetailResponse addProject(@PathVariable String id, @Valid @RequestBody GoalProjectRequest request) {
         return projectService.add(id, request.projectId());
     }
 
-    /** Zielprojekte neu ordnen: die genannten vorn, die uebrigen in bisheriger Folge dahinter. */
+    /**
+     * Reorders the goal's projects: those named first, the others behind them in their previous order.
+     * A project not in the goal is 400.
+     */
     @PutMapping("/{id}/projects/order")
     public GoalDetailResponse reorderProjects(@PathVariable String id, @Valid @RequestBody GoalIdsRequest request) {
         return projectService.reorder(id, request.ids());
     }
 
     /**
-     * Projekt vom Ziel loesen. Haengen daran im Ziel noch Arbeitspakete oder TODOs: 409 – mit
-     * {@code cascade=true} werden die Arbeitspakete geloescht und die TODOs vom Ziel geloest.
+     * Detaches a project from the goal (204). While work packages or TODOs of the goal still belong to it,
+     * the answer is 409 – with {@code cascade=true} the work packages are deleted and the TODOs detached.
      */
     @DeleteMapping("/{id}/projects/{projectId}")
     public ResponseEntity<Void> removeProject(@PathVariable String id, @PathVariable String projectId,
@@ -152,59 +173,73 @@ public class GoalController {
     }
 
     /**
-     * Arbeitspakete des Ziels nach Projekt-Position und Position im Projekt, mit Zustand
-     * (OPEN/DUE_SOON/OVERDUE/REACHED auf Basis des Endes; ohne Zeitraum nur OPEN/REACHED) und Zaehlern.
+     * Lists the goal's work packages by project position and position in the project, with state and counters.
+     * The state is OPEN/DUE_SOON/OVERDUE/REACHED based on the end; without a period only OPEN/REACHED.
      */
     @GetMapping("/{id}/work-packages")
     public List<GoalWorkPackageResponse> listWorkPackages(@PathVariable String id) {
         return workPackageService.list(id);
     }
 
+    /**
+     * Adds a work package at the end of its project (201); without {@code projectId} only if the goal has exactly one project.
+     * A named project not yet in the goal is added to it; {@code startDate} and {@code endDate} come together or not at all.
+     * The title has at most 200 characters.
+     */
     @PostMapping("/{id}/work-packages")
     public ResponseEntity<GoalWorkPackageResponse> createWorkPackage(@PathVariable String id,
                                                                      @Valid @RequestBody CreateGoalWorkPackageRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(workPackageService.create(id, request));
     }
 
-    /** Arbeitspakete EINES Projekts neu ordnen; Antwort: alle Arbeitspakete des Ziels. */
+    /**
+     * Reorders the work packages of ONE project; the answer lists all work packages of the goal.
+     * That project's packages not named follow behind; packages of different projects are 400, one of another goal 404.
+     */
     @PutMapping("/{id}/work-packages/order")
     public List<GoalWorkPackageResponse> reorderWorkPackages(@PathVariable String id, @Valid @RequestBody GoalIdsRequest request) {
         return workPackageService.reorder(id, request.ids());
     }
 
+    /**
+     * Partially updates a work package; {@code ""} clears a date, the result needs both dates or none (else 400).
+     * {@code projectId} can change only while no TODOs are assigned to the package; the package then moves
+     * to the end of the new project.
+     */
     @PutMapping("/{id}/work-packages/{workPackageId}")
     public GoalWorkPackageResponse updateWorkPackage(@PathVariable String id, @PathVariable String workPackageId,
                                                      @RequestBody UpdateGoalWorkPackageRequest request) {
         return workPackageService.update(id, workPackageId, request);
     }
 
-    /** Loescht das Arbeitspaket; seine TODOs bleiben im Ziel, Meilensteine verlieren die Verknuepfung. */
+    /** Deletes the work package (204); its TODOs stay in the goal, milestones lose the link, its workflow attachments go. */
     @DeleteMapping("/{id}/work-packages/{workPackageId}")
     public ResponseEntity<Void> deleteWorkPackage(@PathVariable String id, @PathVariable String workPackageId) {
         workPackageService.delete(id, workPackageId);
         return ResponseEntity.noContent().build();
     }
 
-    /** Meilensteine des Ziels nach Datum, dann Titel, mit Zustand und Paket-Zaehlern. */
+    /** Lists the goal's milestones by date, then title, with state and package counters. */
     @GetMapping("/{id}/milestones")
     public List<GoalMilestoneResponse> listMilestones(@PathVariable String id) {
         return milestoneService.list(id);
     }
 
+    /** Creates a milestone (201); {@code dueDate} is required, {@code workPackageIds} must belong to the same goal (else 400). */
     @PostMapping("/{id}/milestones")
     public ResponseEntity<GoalMilestoneResponse> createMilestone(@PathVariable String id,
                                                                  @Valid @RequestBody CreateGoalMilestoneRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(milestoneService.create(id, request));
     }
 
-    /** {@code workPackageIds} ersetzt die Verknuepfungen; {@code reached} nur ohne verknuepfte Pakete. */
+    /** Updates a milestone; {@code workPackageIds} replaces its links, {@code reached} only without linked packages (else 400). */
     @PutMapping("/{id}/milestones/{milestoneId}")
     public GoalMilestoneResponse updateMilestone(@PathVariable String id, @PathVariable String milestoneId,
                                                  @RequestBody UpdateGoalMilestoneRequest request) {
         return milestoneService.update(id, milestoneId, request);
     }
 
-    /** Loescht den Meilenstein; die verknuepften Arbeitspakete bleiben. */
+    /** Deletes the milestone (204); the linked work packages stay. */
     @DeleteMapping("/{id}/milestones/{milestoneId}")
     public ResponseEntity<Void> deleteMilestone(@PathVariable String id, @PathVariable String milestoneId) {
         milestoneService.delete(id, milestoneId);
@@ -212,8 +247,9 @@ public class GoalController {
     }
 
     /**
-     * Ziel-Waechter ein- oder ausschalten: beim ersten Einschalten Workflow aus der Vorlage
-     * {@code goal-guard} plus taeglicher Zeitplan, danach nur noch Zeitplan an/aus.
+     * Switches the goal guard on or off. The first switch-on creates a workflow from the template
+     * {@code goal-guard} plus a daily schedule; after that only the schedule is enabled or disabled.
+     * An invalid {@code cron} or no project to put the workflow in is 400.
      */
     @PostMapping("/{id}/guard")
     public GoalResponse setGuard(@PathVariable String id, @Valid @RequestBody GoalGuardRequest request) {
